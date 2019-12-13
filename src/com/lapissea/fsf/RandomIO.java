@@ -3,13 +3,15 @@ package com.lapissea.fsf;
 import java.io.Flushable;
 import java.io.IOException;
 
-public interface RandomIO extends AutoCloseable, Flushable{
+public interface RandomIO extends AutoCloseable, Flushable, ContentWriter, ContentReader{
 	
-	void trim();
+	RandomIO setPos(long pos) throws IOException;
 	
-	void setPos(long pos);
+	long getPos() throws IOException;
 	
-	long getPos();
+	long getSize() throws IOException;
+	
+	RandomIO setSize(long newSize) throws IOException;
 	
 	@Override
 	void close() throws IOException;
@@ -17,27 +19,49 @@ public interface RandomIO extends AutoCloseable, Flushable{
 	@Override
 	void flush() throws IOException;
 	
+	default void trim() throws IOException{
+		var pos =getPos();
+		var size=getSize();
+		if(size >= pos) return;
+		setSize(pos);
+	}
+	
+	default long skip(long n) throws IOException{
+		long toSkip=Math.min(n, remaining());
+		setPos(getPos());
+		return toSkip;
+	}
+	
+	default long remaining() throws IOException{
+		return getSize()-getPos();
+	}
+	
 	////////
 	
 	
-	int read();
+	@Override
+	int read() throws IOException;
 	
-	void read(byte[] b, int off, int len);
+	@Override
+	int read(byte[] b, int off, int len) throws IOException;
 	
-	default void read(byte[] b){
-		read(b, 0, b.length);
+	default int read(byte[] b) throws IOException{
+		return read(b, 0, b.length);
 	}
 	
 	
 	////////
 	
 	
-	void write(byte b);
+	@Override
+	void write(int b) throws IOException;
 	
-	void write(byte[] b, int off, int len);
+	@Override
+	void write(byte[] b, int off, int len) throws IOException;
 	
-	default void write(byte[] b){
+	default RandomIO write(byte[] b) throws IOException{
 		write(b, 0, b.length);
+		return this;
 	}
 	
 }

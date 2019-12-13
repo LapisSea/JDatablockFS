@@ -1,5 +1,6 @@
 package com.lapissea.fsf;
 
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.TextUtil;
 
@@ -11,6 +12,7 @@ import java.util.List;
 /**
  * Internal class that maps file IOInterface to read and expand (when needed) a chunk chain
  */
+@SuppressWarnings("AutoBoxing")
 public class ChunkIO implements IOInterface{
 	
 	private final List<Chunk> chunks=new ArrayList<>(4);
@@ -82,6 +84,61 @@ public class ChunkIO implements IOInterface{
 	}
 	
 	@Override
+	public RandomIO doRandom(){
+		return new RandomIO(){
+			@Override
+			public RandomIO setPos(long pos) throws IOException{
+				throw NotImplementedException.infer();//TODO: implement .setPos()
+			}
+			
+			@Override
+			public long getPos() throws IOException{
+				throw NotImplementedException.infer();//TODO: implement .getPos()
+			}
+			
+			@Override
+			public long getSize() throws IOException{
+				throw NotImplementedException.infer();//TODO: implement .getSize()
+			}
+			
+			@Override
+			public RandomIO setSize(long newSize) throws IOException{
+				throw NotImplementedException.infer();//TODO: implement .setSize()
+			}
+			
+			@Override
+			public void close() throws IOException{
+				throw NotImplementedException.infer();//TODO: implement .close()
+			}
+			
+			@Override
+			public void flush() throws IOException{
+				throw NotImplementedException.infer();//TODO: implement .flush()
+			}
+			
+			@Override
+			public int read() throws IOException{
+				throw NotImplementedException.infer();//TODO: implement .read()
+			}
+			
+			@Override
+			public int read(byte[] b, int off, int len) throws IOException{
+				throw NotImplementedException.infer();//TODO: implement .read()
+			}
+			
+			@Override
+			public void write(int b) throws IOException{
+				throw NotImplementedException.infer();//TODO: implement .write()
+			}
+			
+			@Override
+			public void write(byte[] b, int off, int len) throws IOException{
+				throw NotImplementedException.infer();//TODO: implement .write()
+			}
+		};
+	}
+	
+	@Override
 	public ContentOutputStream write(long fileOffset) throws IOException{
 		long[] offs=calcStartOffset(fileOffset);
 		
@@ -121,7 +178,7 @@ public class ChunkIO implements IOInterface{
 				return chunk.getDataSize()-offset;
 			}
 			
-			void logWrittenBytes(int numOBytes) throws IOException{
+			void logWrittenBytes(int numOBytes){
 				offset+=numOBytes;
 				chunk.pushUsed(offset);
 			}
@@ -267,6 +324,7 @@ public class ChunkIO implements IOInterface{
 	
 	@Override
 	public long size() throws IOException{
+		//noinspection StatementWithEmptyBody
 		while(discoverChunk()) ;
 		
 		if(chunks.size()==1) return chunks.get(0).getUsed();
