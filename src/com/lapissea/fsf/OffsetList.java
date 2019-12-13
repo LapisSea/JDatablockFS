@@ -8,22 +8,24 @@ import com.lapissea.util.function.FunctionOI;
 
 import java.io.EOFException;
 import java.io.IOException;
-import java.lang.reflect.Array;
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.IntStream;
 
 import static com.lapissea.fsf.FileSystemInFile.*;
 
-public class OffsetList<T extends FileObject&Comparable<T>> extends AbstractCollection<T> implements ShadowChunks{
+public class OffsetList<T extends FileObject&Comparable<T>> extends AbstractList<T> implements ShadowChunks{
 	
 	public static void init(ContentOutputStream out, long[] pos, int size) throws IOException{
 		int ratio=5;
 		int ss   =FILE_TABLE_PADDING/ratio;
 		int fs   =FILE_TABLE_PADDING-ss;
 		
-		new Chunk(null, pos[0],NumberSize.SHORT ,fs).init(out);
-		new Chunk(null, pos[0],NumberSize.SHORT, ss).init(out);
+		LogUtil.println(new Chunk(null, pos[0], NumberSize.SHORT, fs));
+		
+		new Chunk(null, pos[0], NumberSize.SHORT, fs).init(out);
+		new Chunk(null, pos[0], NumberSize.SHORT, ss).init(out);
 	}
 	
 	private static final int OFFSETS_PER_CHUNK=8;
@@ -35,6 +37,8 @@ public class OffsetList<T extends FileObject&Comparable<T>> extends AbstractColl
 	private final ChunkIO offsetsIo;
 	private       int     size;
 	
+	private NumberSize sizePerOffset;
+	
 	private final Map<Integer, long[]> offsetCache=new WeakValueHashMap<Integer, long[]>().defineStayAlivePolicy(3);
 	private final Map<Long, T>         objectCache=new WeakValueHashMap<Long, T>().defineStayAlivePolicy(3);
 	
@@ -45,8 +49,10 @@ public class OffsetList<T extends FileObject&Comparable<T>> extends AbstractColl
 		
 		try(var io=offsetsIo.read()){
 			this.size=io.readInt();
+			this.sizePerOffset=NumberSize.ordinal(io.readByte());
 		}catch(EOFException e){
 			this.size=0;
+			this.sizePerOffset=NumberSize.BYTE;
 		}
 	}
 	
@@ -55,49 +61,73 @@ public class OffsetList<T extends FileObject&Comparable<T>> extends AbstractColl
 		return List.of(objectsIo.getRoot(), offsetsIo.getRoot());
 	}
 	
-	@SuppressWarnings({"unchecked", "AutoBoxing"})
-	private void fullReadSortImpl(T obj) throws IOException{
-		var    siz    =size();
-		var    newSiz =siz+1;
-		long[] offsets=new long[newSiz];
-		T[]    objects=(T[])Array.newInstance(obj.getClass(), newSiz);
+	
+	@SuppressWarnings({"AutoBoxing"})
+	private void fullReadUnknownModify(int expectedSizeChange, Consumer<List<T>> modifier) throws IOException{
 		
-		for(int i=0;i<siz;i++){
-			offsets[i]=getOffset(i);
+		List<T> objects=new ArrayList<>(size()+expectedSizeChange);
+		{
+			long[] offsets=new long[size];
+			
+			for(int i=0;i<size();i++){
+				offsets[i]=getOffset(i);
+			}
+			
+			for(long offset : offsets){
+				objects.add(getByOffset(offset));
+			}
 		}
-		for(int i=0;i<siz;i++){
-			objects[i]=getByOffset(offsets[i]);
-		}
 		
-		offsets[siz]=siz==0?0:offsets[siz-1]+objects[siz-1].length();
-		objects[siz]=obj;
+		modifier.accept(objects);
 		
-		int[] orderIndex=IntStream.range(0, objects.length)
+		int[] orderIndex=IntStream.range(0, objects.size())
 		                          .boxed()
-		                          .sorted(Comparator.comparing(i->objects[i]))
+		                          .sorted(Comparator.comparing(objects::get))
 		                          .mapToInt(Integer::intValue)
 		                          .toArray();
 		
+		long[] computedOffsets=new long[objects.size()];
 		
-		size=newSiz;
+		long off=0;
+		for(int i=0;i<objects.size();i++){
+			T o=objects.get(i);
+			computedOffsets[i]=off;
+			off+=o.length();
+		}
+		
+		sizePerOffset=NumberSize.getBySize(off);
+		
+		boolean ok    =true;
+		int     offPos=0;
+		
 		
 		offsetCache.clear();
 		try(var io=offsetsIo.write()){
-			io.writeInt(newSiz);
+			io.writeInt(size());
+			io.writeByte(sizePerOffset.ordinal());
+			
 			for(int index : orderIndex){
-				io.writeLong(offsets[index]);
+				sizePerOffset.write(io, computedOffsets[index]);
 			}
 		}
 		
 		objectCache.clear();
 		try(var io=objectsIo.write()){
 			for(int index : orderIndex){
-				objects[index].write(io);
+				objects.get(index).write(io);
 			}
 		}
+		size=objects.size();
+	}
+	
+	
+	public void addElement(T obj) throws IOException{
+		//todo make partial update implementation
+		fullReadUnknownModify(1, l->l.add(obj));
 	}
 	
 	@Override
+	@Deprecated
 	public boolean add(T obj){
 		try{
 			addElement(obj);
@@ -107,9 +137,57 @@ public class OffsetList<T extends FileObject&Comparable<T>> extends AbstractColl
 		return true;
 	}
 	
-	public void addElement(T obj) throws IOException{
-		//todo make partial update implementation
-		fullReadSortImpl(obj);
+	@Override
+	@Deprecated
+	public T get(int index){
+		try{
+			return getByIndex(index);
+		}catch(IOException e){
+			throw UtilL.uncheckedThrow(e);
+		}
+	}
+	
+	@Override
+	@Deprecated
+	public T set(int index, T element){
+		try{
+			return setByIndex(index, element);
+		}catch(IOException e){
+			throw UtilL.uncheckedThrow(e);
+		}
+	}
+	
+	public T setByIndex(int index, T element) throws IOException{
+		Objects.checkIndex(index, size());
+		
+		T old=getByIndex(index);
+		
+		if(old==element||!element.equals(old)){
+			
+			fullReadUnknownModify(0, l->l.set(index, element));
+			
+			try(var io=objectsIo.read(getOffset(index))){
+				old.read(io);
+			}
+		}
+		
+		return old;
+	}
+	
+	@Override
+	public T remove(int index){
+		try{
+			return removeElement(index);
+		}catch(IOException e){
+			throw UtilL.uncheckedThrow(e);
+		}
+	}
+	
+	public T removeElement(int index) throws IOException{
+		Objects.checkIndex(index, size());
+		T old=getByIndex(index);
+		fullReadUnknownModify(0, l->l.remove(index));
+		return old;
 	}
 	
 	@Override
@@ -124,9 +202,6 @@ public class OffsetList<T extends FileObject&Comparable<T>> extends AbstractColl
 		T read=tConstructor.get();
 		try(var io=objectsIo.read(offset)){
 			read.read(io);
-		}catch(EOFException e){
-			LogUtil.println(offset, objectsIo.getRoot().header.source.size());
-			throw e;
 		}
 		objectCache.put(offset, read);
 		
@@ -146,14 +221,14 @@ public class OffsetList<T extends FileObject&Comparable<T>> extends AbstractColl
 		
 		long[] chunk=offsetCache.computeIfAbsent(chunkIndex, ind->{
 			
-			int start=ind*OFFSET_CHUNK_SIZE+Integer.SIZE/Byte.SIZE;
+			int start=ind*OFFSET_CHUNK_SIZE+Integer.BYTES+Byte.BYTES;
 			
 			try(var io=offsetsIo.read(start)){
-				
-				long[] result=new long[(int)Math.min(OFFSETS_PER_CHUNK, (offsetsIo.size()-start)/Long.BYTES)];
+				long   remaining=offsetsIo.size()-start;
+				long[] result   =new long[(int)Math.min(OFFSETS_PER_CHUNK, remaining/sizePerOffset.bytes)];
 				
 				for(int j=0;j<result.length;j++){
-					result[j]=io.readLong();
+					result[j]=sizePerOffset.read(io);
 				}
 				
 				return result;

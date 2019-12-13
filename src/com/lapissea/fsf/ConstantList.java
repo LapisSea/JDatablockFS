@@ -78,6 +78,17 @@ public class ConstantList<T extends FileObject&Comparable<T>> extends AbstractLi
 		return t;
 	}
 	
+	@Override
+	@Deprecated
+	public boolean add(T t){
+		try{
+			addElement(t);
+		}catch(IOException e){
+			throw UtilL.uncheckedThrow(e);
+		}
+		return true;
+	}
+	
 	public void addElement(T t) throws IOException{
 		int index=size();
 		setSize(index+1);
@@ -88,6 +99,7 @@ public class ConstantList<T extends FileObject&Comparable<T>> extends AbstractLi
 	}
 	
 	@Override
+	@Deprecated
 	public T get(int index){
 		try{
 			return getElement(index);
@@ -145,6 +157,7 @@ public class ConstantList<T extends FileObject&Comparable<T>> extends AbstractLi
 	}
 	
 	@Override
+	@Deprecated
 	public T set(int index, T element){
 		try{
 			T old=getElement(index);

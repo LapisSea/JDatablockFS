@@ -7,20 +7,22 @@ import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 
+import static com.lapissea.util.LogUtil.Init.*;
+
 class FSFTest{
 	static{
-		LogUtil.Init.attach(0/*LogUtil.Init.USE_CALL_POS*/);
+		LogUtil.Init.attach(USE_CALL_POS|USE_TABULATED_HEADER);
 	}
 	
 	public static void main(String[] args){
 		try{
 			
-			
 			new File("testFileSystem.fsf").delete();
 			FileSystemInFile fil=new FileSystemInFile(new File("testFileSystem.fsf"));
 			
+			
 			int[]                       counter={0};
-			UnsafeRunnable<IOException> snap   =()->ImageIO.write(fil.renderFile(), "png", new File("snap"+(counter[0]++)+".png")); ;
+			UnsafeRunnable<IOException> snap   =()->ImageIO.write(fil.renderFile(24, 20), "png", new File("snap"+(counter[0]++)+".png"));
 			
 			snap.run();
 			
@@ -35,30 +37,24 @@ class FSFTest{
 			}
 			snap.run();
 			
-			try(OutputStream os=testFile.write()){
-				os.write("THIS W".getBytes());
-			}
+			testFile.writeAll("THIS W".getBytes());
 			snap.run();
-			try(OutputStream os=testFile.write()){
-				os.write("THIS WORKS!!!!".getBytes());
-			}
-			try(OutputStream os=testFile.write()){
-				os.write("THIS W".getBytes());
-			}
-			try(OutputStream os=testFile.write()){
-				os.write("THIS WORKS!!!!".getBytes());
-			}
-			try(OutputStream os=testFile.write()){
-				os.write("THIS W".getBytes());
-			}
-			
+			testFile.writeAll("THIS WORKS!!!!".getBytes());
+			testFile.writeAll("THIS W".getBytes());
+			testFile.writeAll("THIS WORKS!!!!".getBytes());
+			testFile.writeAll("THIS W".getBytes());
+			testFile.writeAll("this works????".getBytes());
+			snap.run();
+			fil.createFile("test3.txt", 8).writeAll("1h234d56".getBytes());
+			snap.run();
+			fil.createFile("test4.txt", 8).writeAll("2341g634".getBytes());
+			snap.run();
+			fil.getFile("test3.txt").writeAll("1h234dsfa333333333333333333333333333333333sdfasdfd56".getBytes());
 			snap.run();
 			
 			fil.defragment();
 			snap.run();
 			
-			LogUtil.println(new String(fil.getFile("test.txt").readAll()));
-			LogUtil.println(new String(fil.getFile("test2.txt").readAll()));
 			System.exit(0);
 			
 			LogUtil.println(new String(testFile.readAll()));

@@ -1,7 +1,5 @@
 package com.lapissea.fsf;
 
-import com.lapissea.util.UtilL;
-
 import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
@@ -19,50 +17,57 @@ import static com.lapissea.util.UtilL.*;
  * 3. offset (physical start)
  * 4. data start
  * 5. data end (physical end & next physical chunk)
+ *
+ * Header contains:
+ * - flags defining header value sizes and chunk properties
+ * - body size (number of bytes chunk can store in body)
+ * - used (number of bytes that have user written data)
+ * - next (offset to next chunk in chain)
+ *
  * */
 public class Chunk{
-	
-	public static Chunk read(Header header, long offset) throws IOException{
-		try(var in=header.source.read(offset)){
-			return read(header, in, offset);
-		}
-	}
 	
 	public static int headerSize(long fileSize, long chunkSize){
 		return headerSize(NumberSize.getBySize(fileSize), NumberSize.getBySize(chunkSize));
 	}
 	
 	public static int headerSize(NumberSize nextType, NumberSize bodyType){
-		return FLAGS_SIZE.bytesPerValue+
-		       nextType.bytesPerValue+
-		       bodyType.bytesPerValue*2;
+		return FLAGS_SIZE.bytes+
+		       nextType.bytes+
+		       bodyType.bytes*2;
 	}
 	
 	private static final NumberSize FLAGS_SIZE=NumberSize.BYTE;
 	
-	public static Chunk read(Header header, ContentInputStream in, long offset) throws IOException{
-		
-		int flags=(int)FLAGS_SIZE.read(in);
-		
-		var nextType=NumberSize.fromFlags(flags, 6);
-		var bodyType=NumberSize.fromFlags(flags, 4);
-		
-		var chunkUsed=UtilL.checkFlag(flags, 1<<3);
-		
-		long next    =requirePositive(nextType.read(in));
-		long used    =requirePositive(bodyType.read(in));
-		long dataSize=requirePositive(bodyType.read(in));
-		
-		return new Chunk(header, offset, nextType, next, bodyType, used, dataSize, chunkUsed);
+	
+	public static Chunk read(Header header, long offset) throws IOException{
+		try(var in=header.source.read(offset)){
+			
+			var flags=FlagReader.read(in, FLAGS_SIZE);
+			
+			var nextType=flags.readEnum(NumberSize.class);
+			var bodyType=flags.readEnum(NumberSize.class);
+			
+			var chunkUsed=flags.readBoolBit();
+			
+			long next    =requirePositive(nextType.read(in));
+			long used    =requirePositive(bodyType.read(in));
+			long dataSize=requirePositive(bodyType.read(in));
+			
+			return new Chunk(header, offset, nextType, next, bodyType, used, dataSize, chunkUsed);
+		}
 	}
+	
 	public void saveHeader(ContentOutputStream os) throws IOException{
 		
-		int flags=0;
-		flags=nextType.writeFlag(flags, 6);
-		flags=bodyType.writeFlag(flags, 4);
-		if(isChunkUsed()) flags|=1<<3;
+		var flags=new FlagWriter(FLAGS_SIZE);
 		
-		FLAGS_SIZE.write(os, flags);
+		flags.writeEnum(nextType);
+		flags.writeEnum(bodyType);
+		
+		flags.writeBoolBit(isChunkUsed());
+		
+		flags.export(os);
 		
 		nextType.write(os, getNext());
 		bodyType.write(os, getUsed());
@@ -79,14 +84,14 @@ public class Chunk{
 	private boolean chunkUsed;
 	private boolean dirty;
 	
-	private final long offset;
+	private long offset;
 	
-	private final NumberSize nextType;
-	private       long       next;
+	private NumberSize nextType;
+	private long       next;
 	
-	private final NumberSize bodyType;
-	private       long       used;
-	private       long       dataSize;
+	private NumberSize bodyType;
+	private long       used;
+	private long       dataSize;
 	
 	private ChunkIO io;
 	
@@ -99,19 +104,21 @@ public class Chunk{
 	}
 	
 	public Chunk(Header header, long offset, NumberSize nextType, long next, NumberSize bodyType, long used, long dataSize, boolean chunkUsed){
-		Assert(dataSize>0);
-		
-		this.header=header;
-		this.offset=offset;
-		
-		this.nextType=nextType;
-		this.next=next;
-		
-		this.bodyType=bodyType;
-		this.used=used;
-		this.dataSize=dataSize;
-		
-		this.chunkUsed=chunkUsed;
+		try{
+			this.header=header;
+			this.offset=offset;
+			
+			this.nextType=nextType;
+			this.next=next;
+			
+			this.bodyType=bodyType;
+			this.used=used;
+			this.dataSize=dataSize;
+			
+			this.chunkUsed=chunkUsed;
+		}catch(Exception e){
+			throw new IllegalArgumentException(e);
+		}
 	}
 	
 	
@@ -149,7 +156,15 @@ public class Chunk{
 	}
 	
 	public long wholeSize(){
-		return getHeaderSize()+getDataSize();
+		return wholeSize(nextType, bodyType);
+	}
+	
+	public long wholeSize(long fileSize){
+		return wholeSize(NumberSize.getBySize(fileSize), bodyType);
+	}
+	
+	public long wholeSize(NumberSize nextType, NumberSize bodyType){
+		return headerSize(nextType, bodyType)+getDataSize();
 	}
 	
 	public int getHeaderSize(){
@@ -286,5 +301,33 @@ public class Chunk{
 		}while(link!=null);
 		
 		return List.copyOf(chain);
+	}
+	
+	public Chunk moveTo(Chunk newChunk) throws IOException{
+		Assert(newChunk.getDataSize()==getDataSize());
+		
+		Chunk oldReference=new Chunk(header, offset, nextType, next, bodyType, used, dataSize, true);
+		
+		offset=newChunk.offset;
+		
+		nextType=newChunk.nextType;
+		next=newChunk.next;
+		
+		bodyType=newChunk.bodyType;
+		used=newChunk.used;
+		dataSize=newChunk.dataSize;
+		dirty=true;
+		
+		saveHeader();
+		
+		try(var out=newChunk.io().write()){
+			try(var in=newChunk.io().read()){
+				in.transferTo(out);
+			}
+		}
+		
+		header.notifyMovement(oldReference, newChunk);
+		
+		return oldReference;
 	}
 }

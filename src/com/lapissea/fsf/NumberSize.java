@@ -7,16 +7,12 @@ import java.io.IOException;
 
 public enum NumberSize{
 	
-	BYTE(Byte.BYTES, 0xFFL, ContentInputStream::readUnsignedByte, (ou, l)->ou.writeByte((int)l)),
-	SHORT(Short.BYTES, 0xFFFFL, ContentInputStream::readUnsignedShort, (ou, l)->ou.writeShort((int)l)),
-	INT(Integer.BYTES, 0xFFFFFFFFL, in->in.readInt()&0xFFFFFFFFL, (ou, l)->ou.writeInt((int)l)),
+	BYTE(Byte.BYTES, 0xFFL, ContentInputStream::readUnsignedByte, (out, num)->out.writeByte((int)num)),
+	SHORT(Short.BYTES, 0xFFFFL, ContentInputStream::readUnsignedShort, (out, num)->out.writeShort((int)num)),
+	INT(Integer.BYTES, 0xFFFFFFFFL, in->in.readInt()&0xFFFFFFFFL, (out, num)->out.writeInt((int)num)),
 	LONG(Long.BYTES, Long.MAX_VALUE, ContentInputStream::readLong, ContentOutputStream::writeLong);
 	
 	private static final NumberSize[] VALS=NumberSize.values();
-	
-	public static NumberSize fromFlags(int flags, int offset){
-		return ordinal((flags >>> offset)&0b11);
-	}
 	
 	public static NumberSize ordinal(int index){
 		return VALS[index];
@@ -29,14 +25,14 @@ public enum NumberSize{
 		throw new RuntimeException("Extremely large file?");
 	}
 	
-	public final byte bytesPerValue;
+	public final byte bytes;
 	public final long maxSize;
 	
 	private final UnsafeFunctionOL<ContentInputStream, IOException>  reader;
 	private final UnsafeConsumerOL<ContentOutputStream, IOException> writer;
 	
-	NumberSize(int bytesPerValue, long maxSize, UnsafeFunctionOL<ContentInputStream, IOException> reader, UnsafeConsumerOL<ContentOutputStream, IOException> writer){
-		this.bytesPerValue=(byte)bytesPerValue;
+	NumberSize(int bytes, long maxSize, UnsafeFunctionOL<ContentInputStream, IOException> reader, UnsafeConsumerOL<ContentOutputStream, IOException> writer){
+		this.bytes=(byte)bytes;
 		this.maxSize=maxSize;
 		this.reader=reader;
 		this.writer=writer;
@@ -48,12 +44,6 @@ public enum NumberSize{
 	
 	public void write(ContentOutputStream out, long value) throws IOException{
 		writer.accept(out, value);
-	}
-	
-	public int writeFlag(int flags, int offset) throws IOException{
-		flags&=~(0b11<<offset);
-		flags|=ordinal()<<offset;
-		return flags;
 	}
 	
 	public NumberSize next(){

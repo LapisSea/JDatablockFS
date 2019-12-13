@@ -4,27 +4,39 @@ import java.io.IOException;
 
 public class FilePointer extends FileObject implements Comparable<FilePointer>{
 	
+	private static final NumberSize FLAGS_SIZE=NumberSize.BYTE;
+	
 	public final Header header;
 	
-	private String localPath;
-	private long   chunkOffset;
+	private String     localPath;
+	private NumberSize offsetType;
+	private long       chunkOffset;
 	
 	public FilePointer(Header header, String localPath){
-		this(header, localPath, -1);
+		this(header, localPath, null, -1);
 	}
 	
 	public FilePointer(Header header, String localPath, long chunkOffset){
+		this(header, localPath, NumberSize.getBySize(chunkOffset), chunkOffset);
+	}
+	
+	public FilePointer(Header header, String localPath, NumberSize offsetType, long chunkOffset){
 		this.header=header;
 		this.localPath=localPath;
+		this.offsetType=offsetType;
 		this.chunkOffset=chunkOffset;
 	}
 	
-	public FilePointer(Header header) {
+	public FilePointer(Header header){
 		this(header, null);
 	}
 	
 	public String getLocalPath(){
 		return localPath;
+	}
+	
+	public NumberSize getOffsetType(){
+		return offsetType;
 	}
 	
 	public long getChunkOffset(){
@@ -33,20 +45,32 @@ public class FilePointer extends FileObject implements Comparable<FilePointer>{
 	
 	@Override
 	public void write(ContentOutputStream dest) throws IOException{
+		
+		var flags=new FlagWriter(FLAGS_SIZE);
+		flags.writeEnum(offsetType);
+		flags.export(dest);
+		
+		offsetType.write(dest, chunkOffset);
+		
 		Content.NULL_TERMINATED_STRING.write(dest, localPath);
-		dest.writeLong(chunkOffset);
 	}
 	
 	@Override
 	public void read(ContentInputStream stream) throws IOException{
+		
+		var flags=FlagReader.read(stream, FLAGS_SIZE);
+		offsetType=flags.readEnum(NumberSize.class);
+		
+		chunkOffset=offsetType.read(stream);
+		
 		localPath=Content.NULL_TERMINATED_STRING.read(stream);
-		chunkOffset=stream.readLong();
 	}
 	
 	@Override
 	public int length(){
-		return Content.NULL_TERMINATED_STRING.length(localPath)+
-		       Long.SIZE/Byte.SIZE;
+		return FLAGS_SIZE.bytes+
+		       offsetType.bytes+
+		       Content.NULL_TERMINATED_STRING.length(localPath);
 	}
 	
 	@Override

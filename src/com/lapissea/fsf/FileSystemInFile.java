@@ -76,21 +76,25 @@ public class FileSystemInFile{
 	}
 	
 	public void defragment() throws IOException{
-		LogUtil.println(TextUtil.toTable(header.allChunks(true)));
+//		LogUtil.println(TextUtil.toTable(header.allChunks(true)));
+//		LogUtil.println();
 		header.defragment();
-		LogUtil.println(TextUtil.toTable(header.allChunks(true)));
+//		LogUtil.println(TextUtil.toTable(header.allChunks(true)));
+//		LogUtil.println();
 	}
 	
 	public BufferedImage renderFile() throws IOException{
+		return renderFile(1, 1);
+	}
+	
+	public BufferedImage renderFile(int minWidth, int minHeight) throws IOException{
 		var size=header.source.size();
-		int w   =1;
-		int h   =1;
+		int w   =minWidth;
+		int h   =minHeight;
 		
-		while(true){
-			if(w*h >= size) break;
-			w++;
-			if(w*h >= size) break;
-			h++;
+		while(w*h<size){
+			if(w<=h) w++;
+			else h++;
 		}
 		
 		BufferedImage img=new BufferedImage(w*3, h*3, BufferedImage.TYPE_INT_ARGB);
@@ -106,7 +110,7 @@ public class FileSystemInFile{
 			                     }
 		                     })
 		                     .collect(Collectors.toList());
-		int[]   counter={0};
+		int[] counter={0};
 		BiConsumer<Integer, Color> pixelPush=(bo, color)->{
 			int x=counter[0]%(img.getWidth()/3), y=counter[0]/(img.getWidth()/3);
 			int b=bo;
@@ -136,9 +140,10 @@ public class FileSystemInFile{
 			for(Chunk chunk : header.allChunks(true)){
 				counter[0]=(int)chunk.getOffset();
 				
-				Color bodyCol=chunk.isChunkUsed()?headerData.contains(chunk)?Color.BLUE:Color.GREEN:Color.WHITE;
+				Color bodyCol=chunk.isChunkUsed()?headerData.contains(chunk)?Color.BLUE:Color.GREEN.darker():Color. GRAY;
+				Color headCol=new Color(Math.min(255, bodyCol.getRed()+100), Math.min(255, bodyCol.getGreen()+100), Math.min(255, bodyCol.getBlue()+100));
 				for(long i=0, j=chunk.getHeaderSize();i<j;i++){
-					pixelPush.accept(in.read(), i==0?Color.ORANGE:bodyCol.darker());
+					pixelPush.accept(in.read(), i==0?Color.ORANGE:headCol);
 				}
 				for(long i=0, j=chunk.getDataSize();i<j;i++){
 					pixelPush.accept(in.read(), bodyCol);

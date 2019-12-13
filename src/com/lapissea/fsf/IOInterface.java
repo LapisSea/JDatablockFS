@@ -1,8 +1,11 @@
 package com.lapissea.fsf;
 
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 
-import java.io.*;
+import java.io.File;
+import java.io.IOException;
+import java.io.RandomAccessFile;
 
 import static com.lapissea.fsf.FileSystemInFile.*;
 
@@ -117,7 +120,31 @@ public interface IOInterface{
 		return write(0);
 	}
 	
-	ContentOutputStream write(long fileOffset) throws IOException;
+	RandomIO doRandom() throws IOException;
+	
+	default ContentOutputStream write(long fileOffset) throws IOException{
+		return new ContentOutputStream(){
+			@Override
+			public void write(byte[] b, int off, int len) throws IOException{
+				super.write(b, off, len);
+			}
+			
+			@Override
+			public void flush() throws IOException{
+				super.flush();
+			}
+			
+			@Override
+			public void close() throws IOException{
+				super.close();
+			}
+			
+			@Override
+			public void write(int b) throws IOException{
+				throw NotImplementedException.infer();//TODO: implement .write()
+			}
+		};
+	}
 	
 	default void write(long fileOffset, byte[] data) throws IOException{
 		write(fileOffset, data.length, data);
