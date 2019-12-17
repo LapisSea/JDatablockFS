@@ -130,6 +130,7 @@ public class Chunk{
 		return getNext()!=0;
 	}
 	
+	@SuppressWarnings("AutoBoxing")
 	public Chunk nextChunk() throws IOException{
 		if(!hasNext()) return null;
 		return header.getByOffset(getNext());
@@ -153,6 +154,7 @@ public class Chunk{
 		return getDataStart()+getDataSize();
 	}
 	
+	@SuppressWarnings("AutoBoxing")
 	public Chunk nextPhysical() throws IOException{
 		if(isLastPhysical()) return null;
 		
@@ -257,7 +259,13 @@ public class Chunk{
 	
 	@Override
 	public int hashCode(){
-		return Objects.hash(header, getOffset());
+		
+		int result=1;
+		
+		result=31*result+(header==null?0:header.hashCode());
+		result=31*result+Long.hashCode(getOffset());
+		
+		return result;
 	}
 	
 	//////////////////////////////////////////////////////////////////
@@ -270,7 +278,7 @@ public class Chunk{
 	
 	public void saveHeader() throws IOException{
 		dirty=false;
-		try(var out=header.source.write(getOffset())){
+		try(var out=header.source.write(getOffset(), false)){
 			saveHeader(out);
 		}
 	}
@@ -320,7 +328,7 @@ public class Chunk{
 		
 		saveHeader();
 		
-		try(var out=newChunk.io().write()){
+		try(var out=newChunk.io().write(false)){
 			try(var in=newChunk.io().read()){
 				in.transferTo(out);
 			}

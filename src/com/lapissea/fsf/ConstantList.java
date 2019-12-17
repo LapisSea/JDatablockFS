@@ -51,7 +51,7 @@ public class ConstantList<T extends FileObject&Comparable<T>> extends AbstractLi
 	
 	private void setSize(int size) throws IOException{
 		this.size=size;
-		try(var out=data.write(0)){
+		try(var out=data.write(false)){
 			out.writeInt(size);
 		}
 	}
@@ -93,7 +93,7 @@ public class ConstantList<T extends FileObject&Comparable<T>> extends AbstractLi
 		int index=size();
 		setSize(index+1);
 		
-		try(var out=data.write(calcPos(index))){
+		try(var out=data.write(calcPos(index), true)){
 			t.write(out);
 		}
 	}
@@ -109,13 +109,18 @@ public class ConstantList<T extends FileObject&Comparable<T>> extends AbstractLi
 	}
 	
 	public void setElement(int index, T element) throws IOException{
+		if(index==size()){
+			addElement(element);
+			return;
+		}
+		
 		Objects.checkIndex(index, size());
 		var arr =new byte[bytesPerElement];
 		var buff=ByteBuffer.wrap(arr);
 		
 		element.write(new ContentOutputStream.Wrapp(new ByteBufferBackedOutputStream(buff)));
 		
-		try(var in=data.write(calcPos(index))){
+		try(var in=data.write(calcPos(index), false)){
 			in.write(arr);
 		}
 		

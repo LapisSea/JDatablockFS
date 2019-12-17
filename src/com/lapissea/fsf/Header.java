@@ -46,7 +46,7 @@ public class Header{
 	
 	private static void initEmptyFile(IOInterface file) throws IOException{
 		long[] pos={0};
-		try(var out=new ContentOutputStream.Wrapp(new TrackingOutputStream(file.write(), pos))){
+		try(var out=new ContentOutputStream.Wrapp(new TrackingOutputStream(file.write(true), pos))){
 			out.write(MAGIC_BYTES);
 			
 			var vers  =Version.values();
@@ -158,7 +158,7 @@ public class Header{
 		
 		var chunk=new Chunk(this, source.getSize(), NumberSize.getBySize(source.getSize()).next(), 0, bodyType, initialSize);
 		
-		try(var out=source.write(source.getSize())){
+		try(var out=source.write(source.getSize(), true)){
 			chunk.init(out);
 		}
 		
@@ -200,7 +200,7 @@ public class Header{
 				chunk.setDataSize(chunk.getDataSize()+growth);
 				chunk.syncHeader();
 				
-				try(var out=source.write(chunk.getDataStart()+oldDataSize)){
+				try(var out=source.write(chunk.getDataStart()+oldDataSize, true)){
 					Utils.zeroFill(out, (int)growth);
 				}
 				logChunkAction("Growth", chunk);
@@ -482,10 +482,10 @@ public class Header{
 	public void notifyMovement(Chunk oldReference, Chunk newChunk) throws IOException{
 		
 		for(int i=0;i<fileList.size();i++){
-			FilePointer p=fileList.get(i);
+			FilePointer p=fileList.getByIndex(i);
 			
 			if(p.getChunkOffset()==oldReference.getOffset()){
-				fileList.set(i, new FilePointer(this, p.getLocalPath(), p.getOffsetType().max(NumberSize.getBySize(newChunk.getOffset())), newChunk.getOffset()));
+				fileList.setByIndex(i, new FilePointer(this, p.getLocalPath(), p.getOffsetType().max(NumberSize.getBySize(newChunk.getOffset())), newChunk.getOffset()));
 				return;
 			}
 			

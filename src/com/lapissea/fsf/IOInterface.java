@@ -256,8 +256,12 @@ public interface IOInterface{
 	class RandomIOOutputStream extends ContentOutputStream{
 		
 		private final RandomIO io;
+		private final boolean  clipOnEnd;
 		
-		RandomIOOutputStream(RandomIO io){this.io=io;}
+		RandomIOOutputStream(RandomIO io, boolean clipOnEnd){
+			this.io=io;
+			this.clipOnEnd=clipOnEnd;
+		}
 		
 		@Override
 		public void write(@NotNull byte[] b, int off, int len) throws IOException{
@@ -271,7 +275,7 @@ public interface IOInterface{
 		
 		@Override
 		public void close() throws IOException{
-			io.trim();
+			if(clipOnEnd) io.trim();
 			io.close();
 		}
 		
@@ -300,7 +304,7 @@ public interface IOInterface{
 	 */
 	default ContentOutputStream write(long fileOffset, boolean clipOnEnd) throws IOException{
 		
-		return new RandomIOOutputStream(doRandom().setPos(fileOffset));
+		return new RandomIOOutputStream(doRandom().setPos(fileOffset), clipOnEnd);
 	}
 	
 	default void write(long fileOffset, boolean clipOnEnd, byte[] data) throws IOException{

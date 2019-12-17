@@ -63,7 +63,7 @@ public class VirtualFile{
 			@Override
 			public void close() throws IOException{
 				createData(wrote);
-				var directOut=getData().write(0);
+				var directOut=getData().write(true);
 				writeTo(directOut);
 				out=directOut;
 			}
@@ -109,7 +109,7 @@ public class VirtualFile{
 			if(offset!=0) createData(0);
 			else return new BufferingInit();
 		}
-		return getData().write(offset);
+		return getData().write(offset, false);
 		
 	}
 	
