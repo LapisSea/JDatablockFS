@@ -98,7 +98,7 @@ public class OffsetIndexSortedList<T extends FileObject&Comparable<T>> extends A
 		LogUtil.println(offsetsIo.readAll());
 		
 		offsetCache.clear();
-		try(var io=offsetsIo.write()){
+		try(var io=offsetsIo.write(true)){
 //			io.writeInt(newSize);
 //			LogUtil.println(offsetsIo.readAll());
 			io.writeByte(0xFF);
@@ -124,7 +124,7 @@ public class OffsetIndexSortedList<T extends FileObject&Comparable<T>> extends A
 		}
 		
 		objectCache.clear();
-		try(var io=objectsIo.write()){
+		try(var io=objectsIo.write(true)){
 			for(int index : orderIndex){
 				objects.get(index).write(io);
 			}

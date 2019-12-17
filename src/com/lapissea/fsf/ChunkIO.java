@@ -164,18 +164,22 @@ public class ChunkIO implements IOInterface{
 			
 			@Override
 			public RandomIO setSize(long newSize) throws IOException{
+				var oldSize=getSize();
+				if(oldSize==newSize) return this;
+				
+				
 				var pos=getPos();
 				
-				var oldSize=getSize();
 				if(newSize>oldSize){
 					setPos(oldSize);
 					Utils.zeroFill(this::write, newSize-oldSize);
 				}else{
 					setPointer(newSize, SET);
 				}
-				setPos(pos);
 				
 				Assert(newSize==getSize());
+				
+				setPos(pos);
 				
 				return this;
 			}

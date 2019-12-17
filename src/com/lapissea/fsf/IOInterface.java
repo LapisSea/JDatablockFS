@@ -115,22 +115,26 @@ public interface IOInterface{
 		}
 		
 		@Override
-		public ContentOutputStream write(long fileOffset) throws IOException{
+		public ContentOutputStream write(long fileOffset, boolean clipOnEnd) throws IOException{
 			return new ContentOutputStream(){
 				long pos=fileOffset;
 				
+				private void snapPos() throws IOException{
+					if(ra.getFilePointer()!=pos) ra.seek(pos);
+				}
+				
 				@Override
 				public void write(int b) throws IOException{
-					if(ra.getFilePointer()!=pos) ra.seek(pos);
-					pos++;
+					snapPos();
 					ra.write(b);
+					pos++;
 				}
 				
 				@Override
 				public void write(@NotNull byte[] b, int off, int len) throws IOException{
-					if(ra.getFilePointer()!=pos) ra.seek(pos);
-					pos+=len;
+					snapPos();
 					ra.write(b, off, len);
+					pos+=len;
 				}
 				
 			};
@@ -278,8 +282,8 @@ public interface IOInterface{
 	}
 	
 	
-	default ContentOutputStream write() throws IOException{
-		return write(0);
+	default ContentOutputStream write(boolean clipOnEnd) throws IOException{
+		return write(0, clipOnEnd);
 	}
 	
 	/**
@@ -294,17 +298,17 @@ public interface IOInterface{
 	 * <p>Creates a new sequential write interface.</p>
 	 * <p>Writing <b>will</b> implicitly truncate the underlying contents when closed.</p>
 	 */
-	default ContentOutputStream write(long fileOffset) throws IOException{
+	default ContentOutputStream write(long fileOffset, boolean clipOnEnd) throws IOException{
 		
 		return new RandomIOOutputStream(doRandom().setPos(fileOffset));
 	}
 	
-	default void write(long fileOffset, byte[] data) throws IOException{
-		write(fileOffset, data.length, data);
+	default void write(long fileOffset, boolean clipOnEnd, byte[] data) throws IOException{
+		write(fileOffset, clipOnEnd, data.length, data);
 	}
 	
-	default void write(long fileOffset, int length, byte[] data) throws IOException{
-		try(var stream=write(fileOffset)){
+	default void write(long fileOffset, boolean clipOnEnd, int length, byte[] data) throws IOException{
+		try(var stream=write(fileOffset, clipOnEnd)){
 			stream.write(data, 0, length);
 		}
 	}
