@@ -5,6 +5,7 @@ import com.lapissea.util.NotNull;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.util.Arrays;
 
 import static com.lapissea.fsf.FileSystemInFile.*;
 
@@ -35,15 +36,25 @@ public interface IOInterface{
 		@Override
 		public RandomIO doRandom(){
 			return new RandomIO(){
+				private long pos;
+				
+				private final byte[] buf=new byte[8];
+				
 				@Override
-				public RandomIO setPos(long pos) throws IOException{
-					ra.seek(pos);
+				public byte[] contentBuf(){
+					return buf;
+				}
+				
+				@Override
+				public RandomIO setPos(long pos){
+					if(pos<0) throw new IndexOutOfBoundsException();
+					this.pos=pos;
 					return this;
 				}
 				
 				@Override
 				public long getPos() throws IOException{
-					return ra.getFilePointer();
+					return Math.min(this.pos, getSize());
 				}
 				
 				@Override
@@ -65,24 +76,40 @@ public interface IOInterface{
 				@Override
 				public void flush(){ }
 				
-				@Override
-				public int read() throws IOException{
-					return ra.read();
+				private void snapPos() throws IOException{
+					var pos=getPos();
+					if(ra.getFilePointer()!=pos) ra.seek(pos);
 				}
 				
 				@Override
+				public int read() throws IOException{
+					snapPos();
+					var i=ra.read();
+					if(i!=-1) pos++;
+					return i;
+				}
+				
+				
+				@Override
 				public int read(byte[] b, int off, int len) throws IOException{
-					return ra.read(b, off, len);
+					snapPos();
+					var read=ra.read(b, off, len);
+					if(read>0) pos+=read;
+					return read;
 				}
 				
 				@Override
 				public void write(int b) throws IOException{
+					snapPos();
 					ra.write(b);
+					pos++;
 				}
 				
 				@Override
 				public void write(byte[] b, int off, int len) throws IOException{
+					snapPos();
 					ra.write(b, off, len);
+					pos+=len;
 				}
 			};
 		}
@@ -163,7 +190,7 @@ public interface IOInterface{
 		}
 		
 		@Override
-		public long size() throws IOException{
+		public long getSize() throws IOException{
 			return ra.length();
 		}
 		
@@ -172,6 +199,84 @@ public interface IOInterface{
 			ra.setLength(newSize);
 		}
 	}
+	
+	
+	class RandomInputStream extends ContentInputStream{
+		
+		private final RandomIO io;
+		private       Long     mark;
+		
+		RandomInputStream(RandomIO io){this.io=io;}
+		
+		@Override
+		public int read(@NotNull byte[] b, int off, int len) throws IOException{
+			return io.read(b, off, len);
+		}
+		
+		@Override
+		public int read() throws IOException{
+			return io.read();
+		}
+		
+		@Override
+		public long skip(long n) throws IOException{
+			return io.skip(n);
+		}
+		
+		@Override
+		public void close() throws IOException{
+			io.close();
+		}
+		
+		@SuppressWarnings("AutoBoxing")
+		@Override
+		public synchronized void mark(int readLimit){
+			try{
+				mark=io.getPos();
+			}catch(IOException e){
+				throw new RuntimeException(e);
+			}
+		}
+		
+		@Override
+		public synchronized void reset() throws IOException{
+			io.setPos(mark);
+		}
+		
+		@Override
+		public boolean markSupported(){
+			return true;
+		}
+	}
+	
+	class RandomIOOutputStream extends ContentOutputStream{
+		
+		private final RandomIO io;
+		
+		RandomIOOutputStream(RandomIO io){this.io=io;}
+		
+		@Override
+		public void write(@NotNull byte[] b, int off, int len) throws IOException{
+			io.write(b, off, len);
+		}
+		
+		@Override
+		public void flush() throws IOException{
+			io.flush();
+		}
+		
+		@Override
+		public void close() throws IOException{
+			io.trim();
+			io.close();
+		}
+		
+		@Override
+		public void write(int b) throws IOException{
+			io.write(b);
+		}
+	}
+	
 	
 	default ContentOutputStream write() throws IOException{
 		return write(0);
@@ -183,7 +288,7 @@ public interface IOInterface{
 	 *
 	 * @return RandomIO instance
 	 */
-	RandomIO doRandom();
+	RandomIO doRandom() throws IOException;
 	
 	/**
 	 * <p>Creates a new sequential write interface.</p>
@@ -191,33 +296,6 @@ public interface IOInterface{
 	 */
 	default ContentOutputStream write(long fileOffset) throws IOException{
 		
-		class RandomIOOutputStream extends ContentOutputStream{
-			
-			private final RandomIO io;
-			
-			RandomIOOutputStream(RandomIO io){this.io=io;}
-			
-			@Override
-			public void write(@NotNull byte[] b, int off, int len) throws IOException{
-				io.write(b, off, len);
-			}
-			
-			@Override
-			public void flush() throws IOException{
-				io.flush();
-			}
-			
-			@Override
-			public void close() throws IOException{
-				io.trim();
-				io.close();
-			}
-			
-			@Override
-			public void write(int b) throws IOException{
-				io.write(b);
-			}
-		}
 		return new RandomIOOutputStream(doRandom().setPos(fileOffset));
 	}
 	
@@ -231,61 +309,11 @@ public interface IOInterface{
 		}
 	}
 	
-	
 	default ContentInputStream read() throws IOException{
 		return read(0);
 	}
 	
 	default ContentInputStream read(long fileOffset) throws IOException{
-		
-		class RandomInputStream extends ContentInputStream{
-			
-			private final RandomIO io;
-			private       Long     mark;
-			
-			RandomInputStream(RandomIO io){this.io=io;}
-			
-			@Override
-			public int read(@NotNull byte[] b, int off, int len) throws IOException{
-				return io.read(b, off, len);
-			}
-			
-			@Override
-			public int read() throws IOException{
-				return io.read();
-			}
-			
-			@Override
-			public long skip(long n) throws IOException{
-				return io.skip(n);
-			}
-			
-			@Override
-			public void close() throws IOException{
-				io.close();
-			}
-			
-			@SuppressWarnings("AutoBoxing")
-			@Override
-			public synchronized void mark(int readLimit){
-				try{
-					mark=io.getPos();
-				}catch(IOException e){
-					throw new RuntimeException(e);
-				}
-			}
-			
-			@Override
-			public synchronized void reset() throws IOException{
-				io.setPos(mark);
-			}
-			
-			@Override
-			public boolean markSupported(){
-				return true;
-			}
-		}
-		
 		return new RandomInputStream(doRandom().setPos(fileOffset));
 	}
 	
@@ -299,7 +327,16 @@ public interface IOInterface{
 		}
 	}
 	
-	long size() throws IOException;
+	default byte[] readAll() throws IOException{
+		try(var stream=read()){
+			byte[] data=new byte[Math.toIntExact(getSize())];
+			int    read=stream.readNBytes(data, 0, data.length);
+			if(read!=data.length) data=Arrays.copyOf(data, read);
+			return data;
+		}
+	}
+	
+	long getSize() throws IOException;
 	
 	void setSize(long newSize) throws IOException;
 }

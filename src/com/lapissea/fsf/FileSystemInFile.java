@@ -88,7 +88,7 @@ public class FileSystemInFile{
 	}
 	
 	public BufferedImage renderFile(int minWidth, int minHeight) throws IOException{
-		var size=header.source.size();
+		var size=header.source.getSize();
 		int w   =minWidth;
 		int h   =minHeight;
 		

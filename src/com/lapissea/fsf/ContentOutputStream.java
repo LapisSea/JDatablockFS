@@ -9,6 +9,7 @@ public abstract class ContentOutputStream extends OutputStream implements Conten
 	
 	public static class Wrapp extends ContentOutputStream{
 		
+		
 		private final OutputStream os;
 		
 		public Wrapp(OutputStream os){
@@ -37,4 +38,10 @@ public abstract class ContentOutputStream extends OutputStream implements Conten
 		
 	}
 	
+	private final byte[] buf=new byte[8];
+	
+	@Override
+	public byte[] contentBuf(){
+		return buf;
+	}
 }

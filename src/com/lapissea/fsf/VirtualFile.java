@@ -115,7 +115,7 @@ public class VirtualFile{
 	
 	public long getSize() throws IOException{
 		var data=getData();
-		return data==null?0:data.size();
+		return data==null?0:data.getSize();
 	}
 	
 	public void delete(){

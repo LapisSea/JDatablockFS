@@ -30,6 +30,9 @@ class FSFTest{
 			try(OutputStream os=testFile.write()){
 				os.write("THIS WORKS!!!!".getBytes());
 			}
+			LogUtil.println(new String(fil.getFile("test.txt").readAll()));
+			System.exit(0);
+			
 			snap.run();
 			
 			try(OutputStream os=fil.getFile("test2.txt").write()){

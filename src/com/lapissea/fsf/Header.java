@@ -54,7 +54,7 @@ public class Header{
 			out.write(latest.major);
 			out.write(latest.minor);
 			
-			OffsetList.init(out, pos, FILE_TABLE_PADDING);
+			OffsetIndexSortedList.init(out, pos, FILE_TABLE_PADDING);
 			ConstantList.init(out, pos, Long.BYTES*FREE_CHUNK_CAPACITY);
 			
 		}
@@ -64,9 +64,9 @@ public class Header{
 	
 	public final IOInterface source;
 	
-	private final OffsetList<FilePointer> fileList;
-	private final ConstantList<LongVal>   freeChunks;
-	private final Map<Long, Chunk>        chunkCache=new WeakValueHashMap<Long, Chunk>().defineStayAlivePolicy(3);
+	private final OffsetIndexSortedList<FilePointer> fileList;
+	private final ConstantList<LongVal>              freeChunks;
+	private final Map<Long, Chunk>                   chunkCache=new WeakValueHashMap<Long, Chunk>().defineStayAlivePolicy(3);
 	
 	public Header(IOInterface source) throws IOException{
 		var minLen=MAGIC_BYTES.length+2;
@@ -99,7 +99,7 @@ public class Header{
 		
 		Chunk frees=names.nextPhysical();
 		
-		fileList=new OffsetList<>(()->new FilePointer(this), names, offsets);
+		fileList=new OffsetIndexSortedList<>(()->new FilePointer(this), names, offsets);
 		
 		freeChunks=new ConstantList<>(frees, Long.BYTES, LongVal::new);
 	}
@@ -156,9 +156,9 @@ public class Header{
 			return best;
 		}
 		
-		var chunk=new Chunk(this, source.size(), NumberSize.getBySize(source.size()).next(), 0, bodyType, initialSize);
+		var chunk=new Chunk(this, source.getSize(), NumberSize.getBySize(source.getSize()).next(), 0, bodyType, initialSize);
 		
-		try(var out=source.write(source.size())){
+		try(var out=source.write(source.getSize())){
 			chunk.init(out);
 		}
 		
@@ -191,7 +191,7 @@ public class Header{
 		long nextOffset=chunk.nextPhysicalOffset();
 		
 		try{
-			var sourceSize=source.size();
+			var sourceSize=source.getSize();
 			if(nextOffset >= sourceSize){//last at end of file
 				var oldDataSize=chunk.getDataSize();
 				
@@ -386,7 +386,7 @@ public class Header{
 			}
 			var usage=calcTotalUsage(chain);
 			
-			headerUsage+=Chunk.headerSize(source.size(), usage)+usage*1.3;
+			headerUsage+=Chunk.headerSize(source.getSize(), usage)+usage*1.3;
 		}
 		
 		if(headerDirty){
@@ -419,7 +419,7 @@ public class Header{
 				Assert(freeChunks.remove((int)indexes.get(i)).value==0);
 			}
 			
-			NumberSize s=NumberSize.getBySize(source.size()+cleared);
+			NumberSize s=NumberSize.getBySize(source.getSize()+cleared);
 			
 			for(int i=0;i<fileList.size();i++){
 				var p=fileList.getByIndex(i);

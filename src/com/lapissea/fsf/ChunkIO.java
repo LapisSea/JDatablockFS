@@ -1,340 +1,323 @@
 package com.lapissea.fsf;
 
-import com.lapissea.util.NotImplementedException;
-import com.lapissea.util.NotNull;
-import com.lapissea.util.TextUtil;
-
-import java.io.EOFException;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Objects;
+
+import static com.lapissea.fsf.ChunkIO.MoveMode.*;
+import static com.lapissea.util.UtilL.*;
 
 /**
  * Internal class that maps file IOInterface to read and expand (when needed) a chunk chain
  */
-@SuppressWarnings("AutoBoxing")
 public class ChunkIO implements IOInterface{
 	
-	private final List<Chunk> chunks=new ArrayList<>(4);
-	private final List<Long>  ends  =new ArrayList<>(4);
+	private final ChunkChain chunks;
 	
 	private final IOInterface chunkSource;
 	
 	public ChunkIO(Chunk chunk){
 		chunkSource=chunk.header.source;
-		chunks.add(chunk);
-		ends.add(chunk.getDataSize());
+		chunks=new ChunkChain(chunk);
 	}
 	
 	public Chunk getRoot(){
 		return chunks.get(0);
 	}
 	
-	private void addChunk(Chunk chunk){
-		chunks.add(chunk);
-		ends.add(ends.get(ends.size()-1)+chunk.getDataSize());
-	}
 	
-	private void growChunks(int size) throws IOException{
-		var last=chunks.get(chunks.size()-1);
-		
-		if(!discoverChunk()){
-			var oldSize=last.getDataSize();
-			last.header.requestMemory(last, size);
-			if(oldSize!=last.getDataSize()){
-				var prevOff=0L;
-				if(ends.size()>1) prevOff=ends.get(ends.size()-2);
-				
-				ends.set(ends.size()-1, prevOff+last.getDataSize());
-			}else{
-				growChunks(size);
-			}
-		}
-	}
-	
-	private boolean discoverChunk() throws IOException{
-		var last=chunks.get(chunks.size()-1);
-		
-		if(!last.hasNext()) return false;
-		
-		addChunk(last.nextChunk());
-		return true;
-	}
-	
-	private long[] calcStartOffset(long fileOffset) throws IOException{
-		int  startIndex;
-		long startOffset;
-		find:
-		{
-			for(int i=0;i<ends.size();i++){
-				var remaining=ends.get(i)-fileOffset;
-				if(remaining>0){
-					startIndex=i;
-					startOffset=chunks.get(startIndex).getDataSize()-remaining;
-					break find;
-				}
-			}
-			
-			if(discoverChunk()) return calcStartOffset(fileOffset);
-			
-			throw new EOFException(fileOffset+" "+TextUtil.toNamedPrettyJson(chunks, true));
-		}
-		
-		return new long[]{startIndex, startOffset};
+	protected enum MoveMode{
+		CLIP,
+		EOF,
+		EXTEND,
+		SET
 	}
 	
 	@Override
-	public RandomIO doRandom(){
-		return new RandomIO(){
-			@Override
-			public RandomIO setPos(long pos) throws IOException{
-				throw NotImplementedException.infer();//TODO: implement .setPos()
+	public RandomIO doRandom() throws IOException{
+		
+		class ChunkSpaceTransformer implements RandomIO{
+			RandomIO io;
+			
+			long chainSpaceDataStart;
+			long chainSpaceOffset;
+			
+			Chunk chunk;
+			
+			
+			ChunkSpaceTransformer(RandomIO io){
+				this.io=io;
+				chunks.dependencyInvalidate.add(this::invalidate);
+			}
+			
+			private void invalidate(){
+				chunk=null;
+				chainSpaceDataStart=0;
 			}
 			
 			@Override
-			public long getPos() throws IOException{
-				throw NotImplementedException.infer();//TODO: implement .getPos()
+			public byte[] contentBuf(){
+				return io.contentBuf();
+			}
+			
+			private boolean isInRange(long chainSpaceChunkDataStart, long dataSize){
+				return chainSpaceChunkDataStart<=chainSpaceOffset&&(chainSpaceChunkDataStart+dataSize)>chainSpaceOffset;
+			}
+			
+			private boolean applyMovement(MoveMode mode) throws IOException{
+				var chunkOffset=chainSpaceOffset-chainSpaceDataStart;
+				
+				switch(mode){
+				case SET -> {
+					chunk.setUsed(chunkOffset);
+					chunk.chainForwardFree();
+				}
+				case EXTEND -> {
+					chunk.pushUsed(chunkOffset);
+					chunk.syncHeader();
+				}
+				}
+				
+				io.setPos(chunk.getDataStart()+chunkOffset);
+				
+				if(chunk==null) orientPointer(mode);
+				
+				if(!chunk.hasNext()) return true;
+				var remaining=getDataSize(mode, chunk)-chunkOffset();
+				if(remaining>0) return true;
+				
+				return false;
+			}
+			
+			private long chunkOffset(){
+				return chainSpaceOffset-chainSpaceDataStart;
+			}
+			
+			private void setPointer(long absolute, MoveMode mode) throws IOException{
+				if(absolute<0) throw new IndexOutOfBoundsException(absolute+"");
+				
+				chainSpaceOffset=absolute;
+				orientPointer(mode);
+			}
+			
+			private long getDataSize(MoveMode mode, Chunk chunk){
+				return mode==EOF?chunk.getUsed():chunk.getDataSize();
+			}
+			
+			private boolean orientPointer(MoveMode mode) throws IOException{
+				
+				//TODO: test if this optimization is a problem when chain is invalidated
+				if(chunk!=null){
+					if(isInRange(chainSpaceDataStart, getDataSize(mode, chunk))){
+						if(applyMovement(mode)) return true;
+					}
+					invalidate();
+				}
+				
+				int i=0;
+				for(Chunk ch : chunks){
+					var off=chunks.getChainSpaceOffset(i);
+					if(isInRange(off, getDataSize(mode, ch))){
+						chunk=ch;
+						chainSpaceDataStart=off;
+						
+						if(applyMovement(mode)) return true;
+					}
+					if(mode==SET){
+						ch.setUsed(ch.getDataSize());
+					}
+					i++;
+				}
+				
+				switch(mode){
+				case CLIP -> {
+					chunk=chunks.get(chunks.size()-1);
+					chainSpaceDataStart=chunks.getChainSpaceOffset(chunks.size()-1);
+				}
+				case EOF -> {
+//					throw new EOFException(sum+" <= "+chainSpaceOffset+", "+(chainSpaceOffset-sum)+", "+TextUtil.toString(chunk));
+				}
+				case EXTEND, SET -> {
+					chunks.growBy(chainSpaceOffset-chunks.getChainSpaceOffset(chunks.size()-1));
+					orientPointer(mode);
+					return true;
+				}
+				}
+				
+				return false;
+			}
+			
+			@Override
+			public RandomIO setPos(long pos) throws IOException{
+				setPointer(pos, CLIP);
+				return this;
+			}
+			
+			@Override
+			public long getPos(){
+				return chainSpaceOffset;
 			}
 			
 			@Override
 			public long getSize() throws IOException{
-				throw NotImplementedException.infer();//TODO: implement .getSize()
+				return chunks.getTotalSize();
 			}
 			
 			@Override
 			public RandomIO setSize(long newSize) throws IOException{
-				throw NotImplementedException.infer();//TODO: implement .setSize()
+				var pos=getPos();
+				
+				var oldSize=getSize();
+				if(newSize>oldSize){
+					setPos(oldSize);
+					Utils.zeroFill(this::write, newSize-oldSize);
+				}else{
+					setPointer(newSize, SET);
+				}
+				setPos(pos);
+				
+				Assert(newSize==getSize());
+				
+				return this;
+			}
+			
+			private void finish(){
+				chunks.dependencyInvalidate.remove((Runnable)this::invalidate);
+			}
+			
+			@Override
+			protected void finalize() throws Throwable{
+				super.finalize();
+				finish();
 			}
 			
 			@Override
 			public void close() throws IOException{
-				throw NotImplementedException.infer();//TODO: implement .close()
+				finish();
+				flush();
+				io=null;
 			}
 			
 			@Override
 			public void flush() throws IOException{
-				throw NotImplementedException.infer();//TODO: implement .flush()
+				io.flush();
 			}
+			
+			////////////////////////////////////////////////////////////////////////
+			
+			private int prepareRead(int requested) throws IOException{
+				if(!orientPointer(EOF)){
+					return -1;
+				}
+				
+				var chunkOffset=chunkOffset();
+				var remaining  =chunk.getUsed()-chunkOffset;
+				if(remaining==0){
+					Assert(!chunk.hasNext());
+					return -1;
+				}
+				return (int)Math.min(remaining, requested);
+			}
+			
+			private void confirmRead(long bytesWritten){
+				chainSpaceOffset+=bytesWritten;
+			}
+			
+			private int prepareWrite(int requested) throws IOException{
+				orientPointer(EXTEND);
+				var chunkOffset=chunkOffset();
+				var remaining  =chunk.getDataSize()-chunkOffset;
+				return (int)Math.min(remaining, requested);
+			}
+			
+			private void confirmWrite(long bytesWritten){
+				var chunkOffset=chunkOffset();
+				chainSpaceOffset+=bytesWritten;
+				chunk.pushUsed(chunkOffset+bytesWritten);
+			}
+			
+			////////////////////////////////////////////////////////////////////////
 			
 			@Override
 			public int read() throws IOException{
-				throw NotImplementedException.infer();//TODO: implement .read()
+				var toRead=prepareRead(1);
+				if(toRead==-1) return -1;
+				
+				Assert(toRead==1);
+				int b=io.read();
+				
+				if(b==-1) return -1;
+				confirmRead(1);
+				
+				return b;
 			}
 			
 			@Override
 			public int read(byte[] b, int off, int len) throws IOException{
-				throw NotImplementedException.infer();//TODO: implement .read()
+				Objects.checkFromIndexSize(off, len, b.length);
+				
+				int total=0;
+				while(len>0){
+					var toRead=prepareRead(len);
+					if(toRead==-1) return total==0?-1:total;
+					
+					Assert(toRead>0);
+					int read=io.read(b, off, toRead);
+					
+					confirmRead(read);
+					
+					len-=read;
+					off+=read;
+					total+=read;
+				}
+				return total;
 			}
+			
+			////////////////////////////////////////////////////////////////////////
 			
 			@Override
 			public void write(int b) throws IOException{
-				throw NotImplementedException.infer();//TODO: implement .write()
+				int toWrite=prepareWrite(1);
+				Assert(toWrite==1);
+				
+				io.write(b);
+				
+				confirmWrite(1);
 			}
+			
 			
 			@Override
 			public void write(byte[] b, int off, int len) throws IOException{
-				throw NotImplementedException.infer();//TODO: implement .write()
-			}
-		};
-	}
-	
-	@Override
-	public ContentOutputStream write(long fileOffset) throws IOException{
-		long[] offs=calcStartOffset(fileOffset);
-		
-		int  startIndex =(int)offs[0];
-		long startOffset=offs[1];
-		
-		return new ContentOutputStream(){
-			int index=startIndex;
-			long offset=startOffset;
-			Chunk chunk=chunks.get(index);
-			ContentOutputStream chunkData=chunkSource.write(chunk.getDataStart()+startOffset);
-			
-			void ensureChunk(int size) throws IOException{
-				if(remaining()!=0) return;
+				Objects.checkFromIndexSize(off, len, b.length);
 				
-				var lastIndex=chunks.size()-1;
-				if(lastIndex==index){//ran out of chunks
-					growChunks(size);
-					
-					ensureChunk(size);
-					return;
-				}
-				
-				
-				index++;
-				
-				chunk.syncHeader();
-				chunk=chunks.get(index);
-				chunk.setUsed(0);
-				chunkData.close();
-				chunkData=chunkSource.write(chunk.getDataStart());
-				
-				offset=0;
-			}
-			
-			long remaining(){
-				return chunk.getDataSize()-offset;
-			}
-			
-			void logWrittenBytes(int numOBytes){
-				offset+=numOBytes;
-				chunk.pushUsed(offset);
-			}
-			
-			@Override
-			public void write(int b) throws IOException{
-				ensureChunk(1);
-				
-				logWrittenBytes(1);
-				chunkData.write(b);
-			}
-			
-			@Override
-			public void write(@NotNull byte[] b, int off, int len) throws IOException{
 				while(len>0){
-					ensureChunk(len);
+					int toWrite=prepareWrite(len);
+					Assert(toWrite >= 1);
 					
-					int toWrite=(int)Math.min(remaining(), len);
+					io.write(b, off, toWrite);
 					
-					logWrittenBytes(toWrite);
-					chunkData.write(b, off, toWrite);
-					
+					confirmWrite(toWrite);
 					
 					len-=toWrite;
 					off+=toWrite;
 				}
-				
 			}
 			
-			@Override
-			public void flush() throws IOException{
-				chunkData.flush();
-			}
-			
-			@Override
-			public void close() throws IOException{
-				chunkData.close();
-				chunk.setUsed(offset);
-				chunk.chainForwardFree();
-				
-				if(index+1<chunks.size()){
-					chunks.subList(index+1, chunks.size()).clear();
-				}
-				chunk.syncHeader();
-			}
-			
-			@Override
-			public String toString(){
-				return "Output{"+
-				       "index="+index+
-				       ", chunk="+TextUtil.toString(chunk)+
-				       ", offset="+offset+
-				       '}';
-			}
-		};
+			////////////////////////////////////////////////////////////////////////
+		}
+		
+		return new ChunkSpaceTransformer(chunkSource.doRandom());
 	}
 	
-	@Override
-	public ContentInputStream read(long fileOffset) throws IOException{
-		long[] offs=calcStartOffset(fileOffset);
-		
-		int  startIndex =(int)offs[0];
-		long startOffset=offs[1];
-		
-		return new ContentInputStream(){
-			int index=startIndex;
-			long offset=startOffset;
-			Chunk chunk=chunks.get(index);
-			ContentInputStream chunkData=chunkSource.read(chunk.getDataStart()+startOffset);
-			
-			//returns if end is reached
-			boolean ensureChunk() throws IOException{
-				if(remaining()!=0) return false;
-				
-				var lastIndex=chunks.size()-1;
-				if(lastIndex==index){//ran out of chunks
-					var last=chunks.get(chunks.size()-1);
-					
-					if(!last.hasNext()) return true;
-					
-					addChunk(last.nextChunk());
-					return ensureChunk();
-					
-				}
-				
-				index++;
-				chunk=chunks.get(index);
-				chunkData=chunkSource.read(chunk.getDataStart());
-				offset=0;
-				return false;
-			}
-			
-			long remaining(){
-				return chunk.getUsed()-offset;
-			}
-			
-			@Override
-			public int read(@NotNull byte[] b, int off, int len) throws IOException{
-				
-				int sum=0;
-				while(len>0){
-					if(ensureChunk()){
-						return sum==0?-1:sum;
-					}
-					var toRead=(int)Math.min(remaining(), len);
-					var read  =chunkData.read(b, off, toRead);
-					offset+=read;
-					len-=read;
-					off+=read;
-					sum+=read;
-				}
-				return sum;
-			}
-			
-			@Override
-			public long skip(long n) throws IOException{
-				if(ensureChunk()) return 0;
-				
-				var skipped=chunkData.skip(Math.min(n, remaining()));
-				offset+=skipped;
-				return skipped;
-			}
-			
-			@Override
-			public int available() throws IOException{
-				return (int)Math.min(chunkData.available(), remaining());
-			}
-			
-			@Override
-			public int read() throws IOException{
-				if(ensureChunk()) return -1;
-				
-				offset++;
-				return chunkData.read();
-			}
-			
-			@Override
-			public void close() throws IOException{
-				chunkData.close();
-			}
-		};
-	}
 	
 	@Override
-	public long size() throws IOException{
-		//noinspection StatementWithEmptyBody
-		while(discoverChunk()) ;
-		
-		if(chunks.size()==1) return chunks.get(0).getUsed();
-		
-		return ends.get(ends.size()-2)+
-		       chunks.get(ends.size()-1).getUsed();
+	public long getSize(){
+		return chunks.stream().mapToLong(Chunk::getUsed).sum();
 	}
 	
 	@Override
 	public void setSize(long newSize) throws IOException{
-		write(newSize).close();
+		try(var io=doRandom()){
+			io.setSize(newSize);
+		}
 	}
 }

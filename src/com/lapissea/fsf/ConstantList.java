@@ -14,7 +14,7 @@ import java.util.function.Supplier;
 public class ConstantList<T extends FileObject&Comparable<T>> extends AbstractList<T> implements ShadowChunks{
 	
 	public static void init(ContentOutputStream out, long[] pos, int size) throws IOException{
-		new Chunk(null, pos[0],NumberSize.SHORT, Integer.BYTES+size).init(out);
+		Chunk.init(out, pos[0], NumberSize.SHORT, Integer.BYTES+size);
 	}
 	
 	private final Chunk       chunk;

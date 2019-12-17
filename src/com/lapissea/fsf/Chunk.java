@@ -1,9 +1,7 @@
 package com.lapissea.fsf;
 
 import java.io.IOException;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 
 import static com.lapissea.util.UtilL.*;
 
@@ -35,6 +33,10 @@ public class Chunk{
 		return FLAGS_SIZE.bytes+
 		       nextType.bytes+
 		       bodyType.bytes*2;
+	}
+	
+	public static void init(ContentOutputStream out, long pos, NumberSize nextType, int fs) throws IOException{
+		new Chunk(null, pos, nextType, fs).init(out);
 	}
 	
 	private static final NumberSize FLAGS_SIZE=NumberSize.BYTE;
@@ -95,7 +97,9 @@ public class Chunk{
 	
 	private ChunkIO io;
 	
-	public Chunk(Header header, long offset, NumberSize nextType, long dataSize){
+	Set<Runnable> dependencyInvalidate=new HashSet<>(3);
+	
+	private Chunk(Header header, long offset, NumberSize nextType, long dataSize){
 		this(header, offset, nextType, 0, NumberSize.getBySize(dataSize), dataSize);
 	}
 	
@@ -142,7 +146,7 @@ public class Chunk{
 	}
 	
 	public boolean isLastPhysical() throws IOException{
-		return nextPhysicalOffset() >= header.source.size();
+		return nextPhysicalOffset() >= header.source.getSize();
 	}
 	
 	public long nextPhysicalOffset(){
@@ -186,21 +190,27 @@ public class Chunk{
 	public void clearNext(){
 		try{
 			setNext(0);
-		}catch(BitDepthOutOfSpace bitDepthOutOfSpace){
-			bitDepthOutOfSpace.printStackTrace();//should never happen
+		}catch(BitDepthOutOfSpace e){
+			throw new RuntimeException(e);//should never happen
 		}
 	}
 	
 	public void setNext(long next) throws BitDepthOutOfSpace{
+		if(this.next==next) return;
+		
 		getNextType().ensureCanFit(next);
 		this.next=next;
 		dirty=true;
+		notifyDependency();
 	}
 	
 	public void setDataSize(long dataSize) throws BitDepthOutOfSpace{
+		if(this.dataSize==dataSize) return;
+		
 		getBodyType().ensureCanFit(dataSize);
 		this.dataSize=dataSize;
 		dirty=true;
+		notifyDependency();
 	}
 	
 	public boolean isChunkUsed(){
@@ -267,25 +277,15 @@ public class Chunk{
 	
 	
 	public void init(ContentOutputStream os) throws IOException{
-		
 		saveHeader(os);
-		
-		var buff     =new byte[(int)Math.min(256, getDataSize())];
-		var remaining=getDataSize();
-		
-		do{
-			var toWrite=(int)Math.min(remaining, buff.length);
-			remaining-=toWrite;
-			
-			os.write(buff, 0, toWrite);
-			
-		}while(remaining>0);
+		Utils.zeroFill(os, getDataSize());
 	}
 	
 	public void chainForwardFree() throws IOException{
 		if(!hasNext()) return;
 		var chunk=nextChunk();
 		clearNext();
+		syncHeader();
 		header.freeChunkChain(chunk);
 	}
 	
@@ -326,8 +326,16 @@ public class Chunk{
 			}
 		}
 		
+		notifyDependency();
+		
 		header.notifyMovement(oldReference, newChunk);
 		
 		return oldReference;
+	}
+	
+	private void notifyDependency(){
+		for(Runnable runnable : dependencyInvalidate){
+			runnable.run();
+		}
 	}
 }
