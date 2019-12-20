@@ -29,7 +29,7 @@ public class FileSystemInFile{
 	public static final String EXTENSION="fsf";
 	
 	
-	private final Header header;
+	public final Header header;
 	
 	public FileSystemInFile(File file) throws IOException{
 		this(new IOInterface.FileRA(file));
@@ -40,10 +40,11 @@ public class FileSystemInFile{
 	}
 	
 	public VirtualFile getFile(String path) throws IOException{
+		path=Header.normalizePath(path);
 		
 		var pointer=header.getByPath(path);
 		if(pointer==null){
-			pointer=new FilePointer(header, Header.normalizePath(path));
+			pointer=new FilePointer(header, path);
 		}
 		
 		return new VirtualFile(pointer);
@@ -83,11 +84,8 @@ public class FileSystemInFile{
 //		LogUtil.println();
 	}
 	
-	public BufferedImage renderFile() throws IOException{
-		return renderFile(1, 1);
-	}
 	
-	public BufferedImage renderFile(int minWidth, int minHeight) throws IOException{
+	public BufferedImage renderFile(int minWidth, int minHeight, long[] ids) throws IOException{
 		var size=header.source.getSize();
 		int w   =minWidth;
 		int h   =minHeight;
@@ -120,7 +118,15 @@ public class FileSystemInFile{
 				int   x1 =x*3+i%3;
 				int   y1 =y*3+i/3;
 				
+				for(long id : ids){
+					if(id==counter[0]){
+						col=Color.YELLOW;
+						break;
+					}
+				}
+				
 				if((b&(1<<i))==0) col=new Color(col.getRed()/4, col.getGreen()/4, col.getBlue()/4);
+				
 				
 				img.setRGB(x1, y1, col.getRGB());
 			}
@@ -129,24 +135,34 @@ public class FileSystemInFile{
 			counter[0]++;
 		};
 		
+		for(long i=0;i<size;i++){
+			pixelPush.accept(0, Color.BLACK);
+		}
+		
+		counter[0]=0;
+		
 		for(byte b : Header.getMagicBytes()){
 			pixelPush.accept((int)b, Color.RED);
 		}
 		pixelPush.accept((int)header.version.major, Color.RED);
 		pixelPush.accept((int)header.version.minor, Color.RED);
 		
-		
-		try(var in=header.source.read()){
+		try(var in=header.source.doRandom()){
 			for(Chunk chunk : header.allChunks(true)){
+				in.setPos(chunk.getOffset());
 				counter[0]=(int)chunk.getOffset();
 				
-				Color bodyCol=chunk.isChunkUsed()?headerData.contains(chunk)?Color.BLUE:Color.GREEN.darker():Color. GRAY;
+				Color bodyCol=chunk.isChunkUsed()?headerData.contains(chunk)?Color.BLUE:Color.GREEN.darker():Color.GRAY;
 				Color headCol=new Color(Math.min(255, bodyCol.getRed()+100), Math.min(255, bodyCol.getGreen()+100), Math.min(255, bodyCol.getBlue()+100));
+				
 				for(long i=0, j=chunk.getHeaderSize();i<j;i++){
 					pixelPush.accept(in.read(), i==0?Color.ORANGE:headCol);
 				}
-				for(long i=0, j=chunk.getDataSize();i<j;i++){
+				for(long i=0, j=chunk.getUsed();i<j;i++){
 					pixelPush.accept(in.read(), bodyCol);
+				}
+				for(long i=0, j=chunk.getDataSize()-chunk.getUsed();i<j;i++){
+					pixelPush.accept(in.read(), Color.GRAY);
 				}
 			}
 		}

@@ -83,9 +83,7 @@ public class ChunkIO implements IOInterface{
 				
 				if(!chunk.hasNext()) return true;
 				var remaining=getDataSize(mode, chunk)-chunkOffset();
-				if(remaining>0) return true;
-				
-				return false;
+				return remaining>0;
 			}
 			
 			private long chunkOffset(){
@@ -233,10 +231,11 @@ public class ChunkIO implements IOInterface{
 				return (int)Math.min(remaining, requested);
 			}
 			
-			private void confirmWrite(long bytesWritten){
+			private void confirmWrite(long bytesWritten) throws IOException{
 				var chunkOffset=chunkOffset();
 				chainSpaceOffset+=bytesWritten;
 				chunk.pushUsed(chunkOffset+bytesWritten);
+				chunk.saveHeader();
 			}
 			
 			////////////////////////////////////////////////////////////////////////

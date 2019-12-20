@@ -1,6 +1,8 @@
 package com.lapissea.fsf;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.lang.ref.WeakReference;
 import java.util.*;
 
 import static com.lapissea.util.UtilL.*;
@@ -35,8 +37,8 @@ public class Chunk{
 		       bodyType.bytes*2;
 	}
 	
-	public static void init(ContentOutputStream out, long pos, NumberSize nextType, int fs) throws IOException{
-		new Chunk(null, pos, nextType, fs).init(out);
+	public static void init(ContentOutputStream out, long offset, NumberSize nextType, int fs) throws IOException{
+		new Chunk(null, offset, nextType, fs).init(out);
 	}
 	
 	private static final NumberSize FLAGS_SIZE=NumberSize.BYTE;
@@ -60,7 +62,26 @@ public class Chunk{
 		}
 	}
 	
+	private static class WriteNode{
+		final ByteArrayOutputStream bb;
+		final ContentOutputStream   buff;
+		
+		private WriteNode(ByteArrayOutputStream bb, ContentOutputStream buff){
+			this.bb=bb;
+			this.buff=buff;
+		}
+	}
+	
+	private WeakReference<WriteNode> headerWriteCache=new WeakReference<>(null);
+	
 	public void saveHeader(ContentOutputStream os) throws IOException{
+		var c=headerWriteCache.get();
+		if(c==null){
+			var bb=new ByteArrayOutputStream(getHeaderSize());
+			headerWriteCache=new WeakReference<>(c=new WriteNode(bb, new ContentOutputStream.Wrapp(bb)));
+		}
+		
+		var buff=c.buff;
 		
 		var flags=new FlagWriter(FLAGS_SIZE);
 		
@@ -69,11 +90,16 @@ public class Chunk{
 		
 		flags.writeBoolBit(isChunkUsed());
 		
-		flags.export(os);
+		flags.export(buff);
 		
-		nextType.write(os, getNext());
-		bodyType.write(os, getUsed());
-		bodyType.write(os, getDataSize());
+		nextType.write(buff, getNext());
+		bodyType.write(buff, getUsed());
+		bodyType.write(buff, getDataSize());
+		
+		var bb=c.bb;
+		Assert(getHeaderSize()==bb.size());
+		bb.writeTo(os);
+		bb.reset();
 	}
 	
 	private static long requirePositive(long val) throws IOException{

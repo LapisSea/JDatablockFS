@@ -1,5 +1,7 @@
 import com.lapissea.fsf.FileSystemInFile;
+import com.lapissea.fsf.IOInterface;
 import com.lapissea.util.LogUtil;
+import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeRunnable;
 
 import javax.imageio.ImageIO;
@@ -16,13 +18,40 @@ class FSFTest{
 	
 	public static void main(String[] args){
 		try{
+//			var l=new ArrayList<>(List.of("t", "a"));
+//
+//
+//			int[] orderIndex=IntStream.range(0, l.size())
+//			                          .boxed()
+//			                          .sorted(Comparator.comparing(l::get))
+//			                          .mapToInt(Integer::intValue)
+//			                          .toArray();
+//
+//			LogUtil.println(orderIndex);
+//			LogUtil.println(l);
+//			for(int index : orderIndex){
+//				LogUtil.println(l.get(index));
+//			}
+//			l.sort(Comparator.comparing(a->a));
+//			LogUtil.println(l);
+//			System.exit(0);
 			
-			new File("testFileSystem.fsf").delete();
-			FileSystemInFile fil=new FileSystemInFile(new File("testFileSystem.fsf"));
+			
+			for(File file : new File(".").listFiles()){
+				file.delete();
+			}
+			var              source=new IOInterface.FileRA(new File("testFileSystem.fsf"));
+			FileSystemInFile fil   =new FileSystemInFile(source);
 			
 			
-			int[]                       counter={0};
-			UnsafeRunnable<IOException> snap   =()->ImageIO.write(fil.renderFile(24, 20), "png", new File("snap"+(counter[0]++)+".png"));
+			int[] counter={0};
+			UnsafeConsumer<long[], IOException> snap0=ids->{
+				var img=fil.renderFile(26, 26, ids);
+				ImageIO.write(img, "png", new File("snap"+(counter[0]++)+".png"));
+			};
+			UnsafeRunnable<IOException> snap=()->snap0.accept(new long[0]);
+
+//			source.onWrite=snap0;
 			
 			snap.run();
 			
@@ -30,15 +59,16 @@ class FSFTest{
 			try(OutputStream os=testFile.write()){
 				os.write("THIS WORKS!!!!".getBytes());
 			}
-			LogUtil.println(new String(fil.getFile("test.txt").readAll()));
-			System.exit(0);
+			LogUtil.println(fil.getFile("test.txt").readAllString());
 			
 			snap.run();
 			
-			try(OutputStream os=fil.getFile("test2.txt").write()){
+			try(OutputStream os=fil.getFile("aaaaaaa").write()){
 				os.write("THIS REALLY WORKS!!!!".getBytes());
 			}
 			snap.run();
+			LogUtil.println(fil.getFile("aaaaaaa").readAllString());
+			System.exit(0);
 			
 			testFile.writeAll("THIS W".getBytes());
 			snap.run();
@@ -60,20 +90,20 @@ class FSFTest{
 			
 			System.exit(0);
 			
-			LogUtil.println(new String(testFile.readAll()));
+			LogUtil.println(testFile.readAllString());
 			
 			fil.delete("");
 			
-			LogUtil.println(new String(fil.getFile("test2.txt").readAll()));
+			LogUtil.println(fil.getFile("test2.txt").readAllString());
 			
 			fil.getFile("test.txt").writeAll("This is a very very very fucking long text that will force the file to grow.".getBytes());
-			LogUtil.println(new String(fil.getFile("test.txt").readAll()));
+			LogUtil.println(fil.getFile("test.txt").readAllString());
 			
 			fil.getFile("test.txt").writeAll("This is a bit smaller text that will force the file to grow shrink.".getBytes());
-			LogUtil.println(new String(fil.getFile("test.txt").readAll()));
+			LogUtil.println(fil.getFile("test.txt").readAllString());
 			
 			fil.getFile("test.txt").writeAll("This is small.".getBytes());
-			LogUtil.println(new String(fil.getFile("test.txt").readAll()));
+			LogUtil.println(fil.getFile("test.txt").readAllString());
 			
 			fil.delete("");
 			System.exit(0);

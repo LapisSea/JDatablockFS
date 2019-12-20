@@ -97,7 +97,7 @@ public class Header{
 		
 		Chunk offsets=names.nextPhysical();
 		
-		Chunk frees=names.nextPhysical();
+		Chunk frees=offsets.nextPhysical();
 		
 		fileList=new OffsetIndexSortedList<>(()->new FilePointer(this), names, offsets);
 		
@@ -117,46 +117,49 @@ public class Header{
 		String pat     =normalizePath(path);
 		var    existing=getByPathUnsafe(pat);
 		if(existing!=null){
-			return existing.getChunk();
+			return existing.loadChunk();
 		}
 		
 		
 		Chunk chunk=alocChunk(initialSize, NumberSize.getBySize(initialSize));
 		fileList.addElement(new FilePointer(this, pat, chunk.getOffset()));
+		LogUtil.println(TextUtil.toTable("Added file", fileList));
 		return chunk;
 	}
 	
 	private Chunk alocChunk(long initialSize, NumberSize bodyType) throws IOException{
-		
-		int   bestInd=-1;
-		Chunk best   =null;
-		long  diff   =Long.MAX_VALUE;
-		
-		for(int i=0;i<freeChunks.size();i++){
-			Chunk c =getByOffset(freeChunks.getElement(i).value);
-			long  ds=c.getDataSize();
+		if(!freeChunks.isEmpty()){
+			int   bestInd=-1;
+			Chunk best   =null;
+			long  diff   =Long.MAX_VALUE;
 			
-			if(ds<initialSize) continue;
+			for(int i=0;i<freeChunks.size();i++){
+				Chunk c =getByOffset(freeChunks.getElement(i).value);
+				long  ds=c.getDataSize();
+				
+				if(ds<initialSize) continue;
+				
+				long newDiff=ds-initialSize;
+				if(newDiff<=diff){
+					best=c;
+					diff=newDiff;
+					bestInd=i;
+					if(diff==0) break;
+				}
+			}
 			
-			long newDiff=ds-initialSize;
-			if(newDiff<=diff){
-				best=c;
-				diff=newDiff;
-				bestInd=i;
-				if(diff==0) break;
+			if(best!=null){
+				logChunkAction("REUSED", best);
+				
+				freeChunks.remove(bestInd);
+				best.setChunkUsed(true);
+				best.syncHeader();
+				return best;
 			}
 		}
 		
-		if(best!=null){
-			logChunkAction("REUSED", best);
-			
-			freeChunks.remove(bestInd);
-			best.setChunkUsed(true);
-			best.syncHeader();
-			return best;
-		}
-		
 		var chunk=new Chunk(this, source.getSize(), NumberSize.getBySize(source.getSize()).next(), 0, bodyType, initialSize);
+		chunkCache.put(chunk.getOffset(), chunk);
 		
 		try(var out=source.write(source.getSize(), true)){
 			chunk.init(out);
@@ -344,7 +347,7 @@ public class Header{
 		}
 		
 		for(var pointer : fileList){
-			result.add(pointer.getChunk());
+			result.add(pointer.loadChunk());
 		}
 		
 		for(int i=0;i<result.size();i++){
@@ -423,8 +426,8 @@ public class Header{
 			
 			for(int i=0;i<fileList.size();i++){
 				var p=fileList.getByIndex(i);
-				if(p.getOffsetType()==s) continue;
-				var off=p.getChunkOffset();
+				if(p.getStartSize()==s) continue;
+				var off=p.getStart();
 				if(toMove.stream().anyMatch(c->c.getOffset()==off)){
 					fileList.setByIndex(i, new FilePointer(this, p.getLocalPath(), s, off));
 				}
@@ -484,12 +487,12 @@ public class Header{
 		for(int i=0;i<fileList.size();i++){
 			FilePointer p=fileList.getByIndex(i);
 			
-			if(p.getChunkOffset()==oldReference.getOffset()){
-				fileList.setByIndex(i, new FilePointer(this, p.getLocalPath(), p.getOffsetType().max(NumberSize.getBySize(newChunk.getOffset())), newChunk.getOffset()));
+			if(p.getStart()==oldReference.getOffset()){
+				fileList.setByIndex(i, new FilePointer(this, p.getLocalPath(), p.getStartSize().max(NumberSize.getBySize(newChunk.getOffset())), newChunk.getOffset()));
 				return;
 			}
 			
-			var chunk=p.getChunk();
+			var chunk=p.loadChunk();
 			do{
 				if(chunk.getNext()==oldReference.getOffset()){
 					try{

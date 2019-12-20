@@ -4,9 +4,12 @@ import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 
 import java.io.*;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
 import static com.lapissea.fsf.FileSystemInFile.*;
+import static com.lapissea.util.UtilL.*;
 
 public class VirtualFile{
 	
@@ -19,6 +22,14 @@ public class VirtualFile{
 	
 	public String getPath(){
 		return source.getLocalPath();
+	}
+	
+	public String readAllString() throws IOException{
+		return readAllString(StandardCharsets.UTF_8);
+	}
+	
+	public String readAllString(Charset charset) throws IOException{
+		return new String(readAll(), charset);
 	}
 	
 	public byte[] readAll() throws IOException{
@@ -49,7 +60,7 @@ public class VirtualFile{
 	
 	private ChunkIO getData() throws IOException{
 		if(data==null){
-			var c=source.getChunk();
+			var c=source.loadChunk();
 			if(c!=null) data=c.io();
 		}
 		return data;
@@ -62,8 +73,9 @@ public class VirtualFile{
 		private OutputStream out=new ByteArrayOutputStream(){
 			@Override
 			public void close() throws IOException{
+				Assert(getData()==null);
 				createData(wrote);
-				var directOut=getData().write(true);
+				var directOut=getData().write(clipOnEnd);
 				writeTo(directOut);
 				out=directOut;
 			}
@@ -71,6 +83,12 @@ public class VirtualFile{
 		
 		private boolean usingDirect;
 		private int     wrote;
+		
+		private final boolean clipOnEnd;
+		
+		private BufferingInit(boolean clipOnEnd){
+			this.clipOnEnd=clipOnEnd;
+		}
 		
 		private void logWrite(int moreData) throws IOException{
 			if(usingDirect) return;
@@ -107,9 +125,9 @@ public class VirtualFile{
 	public OutputStream write(long offset) throws IOException{
 		if(getData()==null){
 			if(offset!=0) createData(0);
-			else return new BufferingInit();
+			else return new BufferingInit(true);
 		}
-		return getData().write(offset, false);
+		return getData().write(offset, true);
 		
 	}
 	
@@ -125,9 +143,6 @@ public class VirtualFile{
 	
 	public void writeAll(byte[] bytes) throws IOException{
 		if(getData()==null) createData(bytes.length);
-		
-		try(OutputStream os=write()){
-			os.write(bytes);
-		}
+		getData().write(true, bytes);
 	}
 }

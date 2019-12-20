@@ -2,6 +2,7 @@ package com.lapissea.fsf;
 
 import java.io.Flushable;
 import java.io.IOException;
+import java.util.Objects;
 
 public interface RandomIO extends AutoCloseable, Flushable, ContentWriter, ContentReader{
 	
@@ -22,7 +23,7 @@ public interface RandomIO extends AutoCloseable, Flushable, ContentWriter, Conte
 	default void trim() throws IOException{
 		var pos =getPos();
 		var size=getSize();
-		if(size >= pos) return;
+		if(pos >= size) return;
 		setSize(pos);
 	}
 	
@@ -43,7 +44,16 @@ public interface RandomIO extends AutoCloseable, Flushable, ContentWriter, Conte
 	int read() throws IOException;
 	
 	@Override
-	int read(byte[] b, int off, int len) throws IOException;
+	default int read(byte[] b, int off, int len) throws IOException{
+		Objects.checkFromIndexSize(off, len, b.length);
+		int i=off;
+		for(int j=off+len;i<j;i++){
+			var bi=read();
+			if(bi<0) break;
+			b[i]=(byte)bi;
+		}
+		return i-off;
+	}
 	
 	default int read(byte[] b) throws IOException{
 		return read(b, 0, b.length);
@@ -57,7 +67,12 @@ public interface RandomIO extends AutoCloseable, Flushable, ContentWriter, Conte
 	void write(int b) throws IOException;
 	
 	@Override
-	void write(byte[] b, int off, int len) throws IOException;
+	default void write(byte[] b, int off, int len) throws IOException{
+		Objects.checkFromIndexSize(off, len, b.length);
+		for(int i=off, j=off+len;i<j;i++){
+			write(b[i]);
+		}
+	}
 	
 	default RandomIO write(byte[] b) throws IOException{
 		write(b, 0, b.length);

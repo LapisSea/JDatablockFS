@@ -1,17 +1,22 @@
 package com.lapissea.fsf;
 
 import com.lapissea.util.NotNull;
+import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.Arrays;
+import java.util.stream.LongStream;
 
 import static com.lapissea.fsf.FileSystemInFile.*;
+import static com.lapissea.util.UtilL.*;
 
 public interface IOInterface{
 	
 	class FileRA implements IOInterface{
+		public UnsafeConsumer<long[], IOException> onWrite=writes->{};
+		
 		private       RandomAccessFile ra;
 		private final String           path;
 		
@@ -69,8 +74,8 @@ public interface IOInterface{
 				}
 				
 				@Override
-				public void close() throws IOException{
-					ra.close();
+				public void close(){
+//					ra.close();
 				}
 				
 				@Override
@@ -78,7 +83,10 @@ public interface IOInterface{
 				
 				private void snapPos() throws IOException{
 					var pos=getPos();
-					if(ra.getFilePointer()!=pos) ra.seek(pos);
+					var p0 =ra.getFilePointer();
+					if(p0!=pos) ra.seek(pos);
+					var p1=ra.getFilePointer();
+					Assert(pos==p1);
 				}
 				
 				@Override
@@ -102,6 +110,7 @@ public interface IOInterface{
 				public void write(int b) throws IOException{
 					snapPos();
 					ra.write(b);
+					onWrite.accept(new long[]{pos});
 					pos++;
 				}
 				
@@ -109,86 +118,8 @@ public interface IOInterface{
 				public void write(byte[] b, int off, int len) throws IOException{
 					snapPos();
 					ra.write(b, off, len);
+					onWrite.accept(LongStream.range(pos, pos+len).toArray());
 					pos+=len;
-				}
-			};
-		}
-		
-		@Override
-		public ContentOutputStream write(long fileOffset, boolean clipOnEnd) throws IOException{
-			return new ContentOutputStream(){
-				long pos=fileOffset;
-				
-				private void snapPos() throws IOException{
-					if(ra.getFilePointer()!=pos) ra.seek(pos);
-				}
-				
-				@Override
-				public void write(int b) throws IOException{
-					snapPos();
-					ra.write(b);
-					pos++;
-				}
-				
-				@Override
-				public void write(@NotNull byte[] b, int off, int len) throws IOException{
-					snapPos();
-					ra.write(b, off, len);
-					pos+=len;
-				}
-				
-			};
-		}
-		
-		@Override
-		public ContentInputStream read(long fileOffset) throws IOException{
-			return new ContentInputStream(){
-				long pos=fileOffset;
-				
-				@Override
-				public long skip(long n) throws IOException{
-					var skipped=ra.skipBytes((int)Math.min(n, Integer.MAX_VALUE));
-					pos+=skipped;
-					return skipped;
-				}
-				
-				@Override
-				public int read() throws IOException{
-					if(ra.getFilePointer()!=pos) ra.seek(pos);
-					pos++;
-					return ra.read();
-				}
-				
-				@Override
-				public int read(@NotNull byte[] b, int off, int len) throws IOException{
-					if(ra.getFilePointer()!=pos) ra.seek(pos);
-					int read=ra.read(b, off, len);
-					pos+=read;
-					return read;
-				}
-				
-				@Override
-				public boolean markSupported(){
-					try{
-						ra.getFilePointer();
-						return true;
-					}catch(IOException ignored){}
-					return false;
-				}
-				
-				long mark;
-				
-				@Override
-				public synchronized void mark(int readlimit){
-					try{
-						mark=ra.getFilePointer();
-					}catch(IOException ignored){}
-				}
-				
-				@Override
-				public synchronized void reset() throws IOException{
-					pos+=mark;
-					ra.seek(mark);
 				}
 			};
 		}
@@ -275,7 +206,9 @@ public interface IOInterface{
 		
 		@Override
 		public void close() throws IOException{
-			if(clipOnEnd) io.trim();
+			if(clipOnEnd){
+				io.trim();
+			}
 			io.close();
 		}
 		
@@ -303,8 +236,11 @@ public interface IOInterface{
 	 * <p>Writing <b>will</b> implicitly truncate the underlying contents when closed.</p>
 	 */
 	default ContentOutputStream write(long fileOffset, boolean clipOnEnd) throws IOException{
-		
 		return new RandomIOOutputStream(doRandom().setPos(fileOffset), clipOnEnd);
+	}
+	
+	default void write(boolean clipOnEnd, byte[] data) throws IOException{
+		write(0, clipOnEnd, data.length, data);
 	}
 	
 	default void write(long fileOffset, boolean clipOnEnd, byte[] data) throws IOException{

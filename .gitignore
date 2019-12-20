@@ -1,0 +1,9 @@
+/*
+/*/
+!/src/
+!/res/
+!.gitignore
+!/LICENSE.md
+!/README.md
+!pom.xml
+!.editorconfig
