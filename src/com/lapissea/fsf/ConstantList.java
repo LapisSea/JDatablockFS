@@ -13,8 +13,10 @@ import java.util.function.Supplier;
 
 public class ConstantList<T extends FileObject&Comparable<T>> extends AbstractList<T> implements ShadowChunks{
 	
-	public static void init(ContentOutputStream out, long[] pos, int size) throws IOException{
-		Chunk.init(out, pos[0], NumberSize.SHORT, Integer.BYTES+size);
+	private static final NumberSize LIST_SIZE=NumberSize.INT;
+	
+	public static void init(ContentOutputStream out, long[] pos, int bytesPerElement, int initialCapacity) throws IOException{
+		Chunk.init(out, pos[0], NumberSize.SHORT, LIST_SIZE.bytes+initialCapacity*bytesPerElement);
 	}
 	
 	private final Chunk       chunk;
@@ -33,7 +35,7 @@ public class ConstantList<T extends FileObject&Comparable<T>> extends AbstractLi
 		this.newT=newT;
 		
 		try(var in=data.read()){
-			size=in.readInt();
+			size=(int)LIST_SIZE.read(in);
 		}catch(EOFException e){
 			size=0;
 		}
@@ -52,21 +54,21 @@ public class ConstantList<T extends FileObject&Comparable<T>> extends AbstractLi
 	private void setSize(int size) throws IOException{
 		this.size=size;
 		try(var out=data.write(false)){
-			out.writeInt(size);
+			LIST_SIZE.write(out, size);
 		}
 	}
 	
 	private long calcPos(int index){
-		return Integer.BYTES+bytesPerElement*index;
+		return LIST_SIZE.bytes+bytesPerElement*index;
 	}
 	
 	public T getElement(int index) throws IOException{
 		Objects.checkIndex(index, size());
 		
 		Integer ind=index;
-		
-		var cached=cache.get(ind);
-		if(cached!=null) return cached;
+
+//		var cached=cache.get(ind);
+//		if(cached!=null) return cached;
 		
 		T t=newT.get();
 		try(var in=data.read(calcPos(index))){
@@ -94,8 +96,12 @@ public class ConstantList<T extends FileObject&Comparable<T>> extends AbstractLi
 		setSize(index+1);
 		
 		try(var out=data.write(calcPos(index), true)){
+			LogUtil.println(index, out);
 			t.write(out);
+			LogUtil.println("b", out);
 		}
+		
+		LogUtil.println(this.size(), this);
 	}
 	
 	@Override
@@ -193,5 +199,19 @@ public class ConstantList<T extends FileObject&Comparable<T>> extends AbstractLi
 				}
 			}
 		};
+	}
+	
+	public long capacity() throws IOException{
+		var siz=data.getCapacity()-LIST_SIZE.bytes;
+		return siz/bytesPerElement;
+	}
+	
+	public boolean ensureElementCapacity(int capacity) throws IOException{
+		if(size() >= capacity) return false;
+		var neededSize=capacity*bytesPerElement+LIST_SIZE.bytes;
+		if(data.getCapacity() >= neededSize) return false;
+		data.setCapacity(neededSize);
+		
+		return true;
 	}
 }

@@ -1,44 +1,47 @@
 package com.lapissea.fsf;
 
-import com.lapissea.util.LogUtil;
-
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.List;
 
-import static com.lapissea.util.UtilL.*;
-
-public class FilePointer extends FileObject implements Comparable<FilePointer>{
+public class FilePointer extends FileObject.FullLayout<FilePointer> implements Comparable<FilePointer>{
 	
-	
-	private static final NumberSize FLAGS_SIZE=NumberSize.BYTE;
+	private static final SequenceLayout<FilePointer> LAYOUT=
+		FileObject.sequenceBuilder(List.of(
+			new FlagDef<>(NumberSize.BYTE,
+			              (flags, p)->flags.writeEnum(p.startSize),
+			              (flags, p)->p.startSize=flags.readEnum(NumberSize.class)),
+			new NumberDef<>(FilePointer::getStartSize,
+			                FilePointer::getStart,
+			                FilePointer::setStart),
+			new ContentDef<>(Content.NULL_TERMINATED_STRING,
+			                 FilePointer::getLocalPath,
+			                 FilePointer::setLocalPath)
+		                                  ));
 	
 	final Header header;
 	
-	private String     localPath;
 	private NumberSize startSize;
 	private long       start;
+	private String     localPath;
+	
+	public FilePointer(Header header){
+		this(header, null);
+	}
 	
 	public FilePointer(Header header, String localPath){
 		this(header, localPath, null, -1);
 	}
 	
 	public FilePointer(Header header, String localPath, long start){
-		this(header, localPath, NumberSize.getBySize(start), start);
+		this(header, localPath, NumberSize.bySize(start), start);
 	}
 	
 	public FilePointer(Header header, String localPath, NumberSize startSize, long start){
+		super(LAYOUT);
 		this.header=header;
 		this.localPath=localPath;
 		this.startSize=startSize;
 		this.start=start;
-	}
-	
-	public FilePointer(Header header){
-		this(header, null);
-	}
-	
-	public String getLocalPath(){
-		return localPath;
 	}
 	
 	public NumberSize getStartSize(){
@@ -49,42 +52,17 @@ public class FilePointer extends FileObject implements Comparable<FilePointer>{
 		return start;
 	}
 	
-	@Override
-	public void write(ContentOutputStream dest) throws IOException{
-		
-		ByteArrayOutputStream os =new ByteArrayOutputStream(length());
-		var                   buf=new ContentOutputStream.Wrapp(os);
-		
-		var flags=new FlagWriter(FLAGS_SIZE);
-		flags.writeEnum(startSize);
-		flags.export(buf);
-		
-		startSize.write(buf, start);
-		
-		Content.NULL_TERMINATED_STRING.write(buf, localPath);
-		
-		Assert(length()==os.size());
-		os.writeTo(dest);
+	private void setStart(long start){
+		startSize=NumberSize.bySize(start);
+		this.start=start;
 	}
 	
-	@Override
-	public void read(ContentInputStream stream) throws IOException{
-		
-		var flags=FlagReader.read(stream, FLAGS_SIZE);
-		startSize=flags.readEnum(NumberSize.class);
-		
-		start=startSize.read(stream);
-		
-		localPath=Content.NULL_TERMINATED_STRING.read(stream);
-		
-		LogUtil.println("read", this);
+	public String getLocalPath(){
+		return localPath;
 	}
 	
-	@Override
-	public int length(){
-		return FLAGS_SIZE.bytes+
-		       startSize.bytes+
-		       Content.NULL_TERMINATED_STRING.length(localPath);
+	private void setLocalPath(String localPath){
+		this.localPath=localPath;
 	}
 	
 	@Override
@@ -92,7 +70,7 @@ public class FilePointer extends FileObject implements Comparable<FilePointer>{
 		return localPath.compareTo(o.localPath);
 	}
 	
-	public Chunk loadChunk() throws IOException{
+	public Chunk dereference() throws IOException{
 		var off=getStart();
 		return off==-1?null:header.getByOffset(off);
 	}

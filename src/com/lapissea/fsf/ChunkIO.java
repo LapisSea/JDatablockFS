@@ -35,8 +35,8 @@ public class ChunkIO implements IOInterface{
 	@Override
 	public RandomIO doRandom() throws IOException{
 		
-		class ChunkSpaceTransformer implements RandomIO{
-			RandomIO io;
+		class ChunkSpaceRandomIO implements RandomIO{
+			RandomIO data;
 			
 			long chainSpaceDataStart;
 			long chainSpaceOffset;
@@ -44,8 +44,8 @@ public class ChunkIO implements IOInterface{
 			Chunk chunk;
 			
 			
-			ChunkSpaceTransformer(RandomIO io){
-				this.io=io;
+			ChunkSpaceRandomIO(RandomIO data){
+				this.data=data;
 				chunks.dependencyInvalidate.add(this::invalidate);
 			}
 			
@@ -54,9 +54,14 @@ public class ChunkIO implements IOInterface{
 				chainSpaceDataStart=0;
 			}
 			
+			private void setChunk(int chainInd){
+				chunk=chunks.get(chainInd);
+				chainSpaceDataStart=chunks.getChainSpaceOffset(chainInd);
+			}
+			
 			@Override
 			public byte[] contentBuf(){
-				return io.contentBuf();
+				return data.contentBuf();
 			}
 			
 			private boolean isInRange(long chainSpaceChunkDataStart, long dataSize){
@@ -68,6 +73,12 @@ public class ChunkIO implements IOInterface{
 				
 				switch(mode){
 				case SET -> {
+					if(chunkOffset==0&&chainSpaceDataStart>0){
+						var id=chunks.indexOf(chunk);
+						setChunk(id-1);
+						return applyMovement(mode);
+					}
+					
 					chunk.setUsed(chunkOffset);
 					chunk.chainForwardFree();
 				}
@@ -77,9 +88,9 @@ public class ChunkIO implements IOInterface{
 				}
 				}
 				
-				io.setPos(chunk.getDataStart()+chunkOffset);
-				
 				if(chunk==null) orientPointer(mode);
+				
+				data.setPos(chunk.getDataStart()+chunkOffset);
 				
 				if(!chunk.hasNext()) return true;
 				var remaining=getDataSize(mode, chunk)-chunkOffset();
@@ -128,14 +139,18 @@ public class ChunkIO implements IOInterface{
 				
 				switch(mode){
 				case CLIP -> {
-					chunk=chunks.get(chunks.size()-1);
-					chainSpaceDataStart=chunks.getChainSpaceOffset(chunks.size()-1);
+					setChunk(chunks.size()-1);
 				}
 				case EOF -> {
 //					throw new EOFException(sum+" <= "+chainSpaceOffset+", "+(chainSpaceOffset-sum)+", "+TextUtil.toString(chunk));
 				}
 				case EXTEND, SET -> {
-					chunks.growBy(chainSpaceOffset-chunks.getChainSpaceOffset(chunks.size()-1));
+					setChunk(chunks.size()-1);
+					var lastSize=chunk.getDataSize();
+					var end     =chainSpaceDataStart+lastSize;
+					var toGrow  =chainSpaceOffset-end;
+					if(toGrow==0) return true;
+					chunks.growBy(toGrow);
 					orientPointer(mode);
 					return true;
 				}
@@ -161,21 +176,26 @@ public class ChunkIO implements IOInterface{
 			}
 			
 			@Override
-			public RandomIO setSize(long newSize) throws IOException{
+			public long getCapacity() throws IOException{
+				return chunks.getTotalCapacity();
+			}
+			
+			@Override
+			public RandomIO setCapacity(long newCapacity) throws IOException{
 				var oldSize=getSize();
-				if(oldSize==newSize) return this;
+				if(oldSize==newCapacity) return this;
 				
 				
 				var pos=getPos();
 				
-				if(newSize>oldSize){
+				if(newCapacity>oldSize){
 					setPos(oldSize);
-					Utils.zeroFill(this::write, newSize-oldSize);
+					Utils.zeroFill(this::write, newCapacity-oldSize);
 				}else{
-					setPointer(newSize, SET);
+					setPointer(newCapacity, SET);
 				}
 				
-				Assert(newSize==getSize());
+				Assert(newCapacity==getSize());
 				
 				setPos(pos);
 				
@@ -196,12 +216,12 @@ public class ChunkIO implements IOInterface{
 			public void close() throws IOException{
 				finish();
 				flush();
-				io=null;
+				data=null;
 			}
 			
 			@Override
 			public void flush() throws IOException{
-				io.flush();
+				data.flush();
 			}
 			
 			////////////////////////////////////////////////////////////////////////
@@ -226,8 +246,22 @@ public class ChunkIO implements IOInterface{
 			
 			private int prepareWrite(int requested) throws IOException{
 				orientPointer(EXTEND);
+				
 				var chunkOffset=chunkOffset();
 				var remaining  =chunk.getDataSize()-chunkOffset;
+				
+				if(remaining==0){
+					var oldOff=chainSpaceOffset;
+					try{
+						chainSpaceOffset+=requested;
+						orientPointer(EXTEND);
+					}finally{
+						chainSpaceOffset=oldOff;
+					}
+					var result=prepareWrite(requested);
+					Assert(result>0);
+					return result;
+				}
 				return (int)Math.min(remaining, requested);
 			}
 			
@@ -246,7 +280,7 @@ public class ChunkIO implements IOInterface{
 				if(toRead==-1) return -1;
 				
 				Assert(toRead==1);
-				int b=io.read();
+				int b=data.read();
 				
 				if(b==-1) return -1;
 				confirmRead(1);
@@ -264,7 +298,7 @@ public class ChunkIO implements IOInterface{
 					if(toRead==-1) return total==0?-1:total;
 					
 					Assert(toRead>0);
-					int read=io.read(b, off, toRead);
+					int read=data.read(b, off, toRead);
 					
 					confirmRead(read);
 					
@@ -282,7 +316,7 @@ public class ChunkIO implements IOInterface{
 				int toWrite=prepareWrite(1);
 				Assert(toWrite==1);
 				
-				io.write(b);
+				data.write(b);
 				
 				confirmWrite(1);
 			}
@@ -296,7 +330,7 @@ public class ChunkIO implements IOInterface{
 					int toWrite=prepareWrite(len);
 					Assert(toWrite >= 1);
 					
-					io.write(b, off, toWrite);
+					data.write(b, off, toWrite);
 					
 					confirmWrite(toWrite);
 					
@@ -306,9 +340,15 @@ public class ChunkIO implements IOInterface{
 			}
 			
 			////////////////////////////////////////////////////////////////////////
+			
+			
+			@Override
+			public String toString(){
+				return chunks.toString()+" -> "+chainSpaceOffset;
+			}
 		}
 		
-		return new ChunkSpaceTransformer(chunkSource.doRandom());
+		return new ChunkSpaceRandomIO(chunkSource.doRandom());
 	}
 	
 	
@@ -318,9 +358,14 @@ public class ChunkIO implements IOInterface{
 	}
 	
 	@Override
-	public void setSize(long newSize) throws IOException{
+	public long getCapacity(){
+		return chunks.stream().mapToLong(Chunk::getDataSize).sum();
+	}
+	
+	@Override
+	public void setCapacity(long newCapacity) throws IOException{
 		try(var io=doRandom()){
-			io.setSize(newSize);
+			io.setCapacity(newCapacity);
 		}
 	}
 }

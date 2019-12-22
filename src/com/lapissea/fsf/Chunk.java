@@ -1,5 +1,7 @@
 package com.lapissea.fsf;
 
+import com.lapissea.util.TextUtil;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
@@ -28,7 +30,7 @@ import static com.lapissea.util.UtilL.*;
 public class Chunk{
 	
 	public static int headerSize(long fileSize, long chunkSize){
-		return headerSize(NumberSize.getBySize(fileSize), NumberSize.getBySize(chunkSize));
+		return headerSize(NumberSize.bySize(fileSize), NumberSize.bySize(chunkSize));
 	}
 	
 	public static int headerSize(NumberSize nextType, NumberSize bodyType){
@@ -103,7 +105,9 @@ public class Chunk{
 	}
 	
 	private static long requirePositive(long val) throws IOException{
-		if(val<0) throw new IOException("Malformed file");
+		if(val<0){
+			throw new IOException("Malformed file");
+		}
 		return val;
 	}
 	
@@ -126,7 +130,7 @@ public class Chunk{
 	Set<Runnable> dependencyInvalidate=new HashSet<>(3);
 	
 	private Chunk(Header header, long offset, NumberSize nextType, long dataSize){
-		this(header, offset, nextType, 0, NumberSize.getBySize(dataSize), dataSize);
+		this(header, offset, nextType, 0, NumberSize.bySize(dataSize), dataSize);
 	}
 	
 	public Chunk(Header header, long offset, NumberSize nextType, long next, NumberSize bodyType, long dataSize){
@@ -192,7 +196,7 @@ public class Chunk{
 	}
 	
 	public long wholeSize(long fileSize){
-		return wholeSize(NumberSize.getBySize(fileSize), bodyType);
+		return wholeSize(NumberSize.bySize(fileSize), bodyType);
 	}
 	
 	public long wholeSize(NumberSize nextType, NumberSize bodyType){
@@ -218,12 +222,16 @@ public class Chunk{
 	public void clearNext(){
 		try{
 			setNext(0);
-		}catch(BitDepthOutOfSpace e){
+		}catch(BitDepthOutOfSpaceException e){
 			throw new RuntimeException(e);//should never happen
 		}
 	}
 	
-	public void setNext(long next) throws BitDepthOutOfSpace{
+	public void setNext(Chunk next) throws BitDepthOutOfSpaceException{
+		setNext(next.getOffset());
+	}
+	
+	public void setNext(long next) throws BitDepthOutOfSpaceException{
 		if(this.next==next) return;
 		
 		getNextType().ensureCanFit(next);
@@ -232,7 +240,7 @@ public class Chunk{
 		notifyDependency();
 	}
 	
-	public void setDataSize(long dataSize) throws BitDepthOutOfSpace{
+	public void setDataSize(long dataSize) throws BitDepthOutOfSpaceException{
 		if(this.dataSize==dataSize) return;
 		
 		getBodyType().ensureCanFit(dataSize);
@@ -323,7 +331,7 @@ public class Chunk{
 		header.freeChunkChain(chunk);
 	}
 	
-	public List<Chunk> makeChain() throws IOException{
+	public List<Chunk> loadWholeChain() throws IOException{
 		if(!hasNext()) return List.of(this);
 		
 		List<Chunk> chain=new LinkedList<>();
@@ -338,21 +346,25 @@ public class Chunk{
 	}
 	
 	public Chunk moveTo(Chunk newChunk) throws IOException{
-		Assert(newChunk.getDataSize()==getDataSize());
 		
 		Chunk oldReference=new Chunk(header, offset, nextType, next, bodyType, used, dataSize, true);
 		
 		offset=newChunk.offset;
-		
 		nextType=newChunk.nextType;
-		next=newChunk.next;
-		
 		bodyType=newChunk.bodyType;
-		used=newChunk.used;
 		dataSize=newChunk.dataSize;
+		
+		try{
+			newChunk.setNext(next);
+			newChunk.setUsed(used);
+		}catch(BitDepthOutOfSpaceException e){
+			throw new RuntimeException(e);//should never happen
+		}
+		
 		dirty=true;
 		
 		saveHeader();
+		newChunk.saveHeader();
 		
 		try(var out=newChunk.io().write(false)){
 			try(var in=newChunk.io().read()){
@@ -362,14 +374,43 @@ public class Chunk{
 		
 		notifyDependency();
 		
-		header.notifyMovement(oldReference, newChunk);
+		header.notifyMovement(oldReference.getOffset(), newChunk);
 		
 		return oldReference;
 	}
 	
-	private void notifyDependency(){
+	public void notifyDependency(){
 		for(Runnable runnable : dependencyInvalidate){
 			runnable.run();
 		}
 	}
+	
+	static{
+		TextUtil.IN_TABLE_TO_STRINGS.register(Chunk.class, Chunk::toShortString);
+	}
+	
+	@Override
+	public String toString(){
+		final StringBuilder sb=new StringBuilder("Chunk{");
+		
+		if(!isChunkUsed()) sb.append("free, ");
+		
+		sb.append("[")
+		  .append(getUsed())
+		  .append("/")
+		  .append(getDataSize()).append(getBodyType().shotName)
+		  .append("]");
+		
+		sb.append(", @").append(getOffset());
+		
+		if(hasNext()) sb.append(", next: ").append(getNext()).append(getNextType().shotName);
+		
+		sb.append('}');
+		return sb.toString();
+	}
+	
+	public String toShortString(){
+		return getUsed()+"/"+getDataSize()+getBodyType().shotName+"@"+getOffset();
+	}
+	
 }

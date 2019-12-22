@@ -3,12 +3,19 @@ package com.lapissea.fsf;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
+import com.lapissea.util.function.BiIntConsumer;
+import com.lapissea.util.function.TriFunction;
 
 import java.awt.*;
+import java.awt.geom.Line2D;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
-import java.util.function.BiConsumer;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class FileSystemInFile{
@@ -60,7 +67,7 @@ public class FileSystemInFile{
 		var pointer=header.getByPath(path);
 		if(pointer==null){
 			var chunk=header.createFile(path, initialSize);
-			pointer=new FilePointer(header, path, chunk.getOffset());
+			pointer=header.getByPath(path);
 		}
 		
 		return new VirtualFile(pointer);
@@ -86,54 +93,136 @@ public class FileSystemInFile{
 	
 	
 	public BufferedImage renderFile(int minWidth, int minHeight, long[] ids) throws IOException{
-		var size=header.source.getSize();
-		int w   =minWidth;
-		int h   =minHeight;
-		
-		while(w*h<size){
-			if(w<=h) w++;
-			else h++;
+		return renderFile(minWidth, minHeight, ids, 4);
+	}
+	
+	public BufferedImage renderFile(int minWidth, int minHeight, long[] ids, int resolutionMul) throws IOException{
+		var       size=header.source.getSize();
+		final int width;
+		final int height;
+		{
+			int w=minWidth;
+			int h=minHeight;
+			
+			while(w*h<size){
+				if(w<=h) w++;
+				else h++;
+			}
+			width=w;
+			height=h;
 		}
 		
-		BufferedImage img=new BufferedImage(w*3, h*3, BufferedImage.TYPE_INT_ARGB);
+		int pixelSize=3*resolutionMul;
 		
+		BufferedImage img=new BufferedImage(width*pixelSize, height*pixelSize, BufferedImage.TYPE_INT_ARGB);
+		Graphics2D    g2 =img.createGraphics();
+		g2.setFont(new Font("Monospaced", Font.PLAIN, pixelSize));
+		
+		
+		g2.setStroke(new BasicStroke(pixelSize/6F));
+		g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+		g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_OFF);
 		
 		var headerData=header.headerChunks()
 		                     .stream()
 		                     .flatMap(c->{
 			                     try{
-				                     return c.makeChain().stream();
+				                     return c.loadWholeChain().stream();
 			                     }catch(IOException e){
 				                     throw UtilL.uncheckedThrow(e);
 			                     }
 		                     })
 		                     .collect(Collectors.toList());
+		
+		BiFunction<Color, Float, Color> mul=(col, val)->new Color((int)(col.getRed()*val), (int)(col.getGreen()*val), (int)(col.getBlue()*val));
+		TriFunction<Color, Color, Float, Color> mix=(l, r, val)->{
+			var rev=1-val;
+			return new Color(
+				(l.getRed()/255F)*val+(r.getRed()/255F)*rev,
+				(l.getGreen()/255F)*val+(r.getGreen()/255F)*rev,
+				(l.getBlue()/255F)*val+(r.getBlue()/255F)*rev,
+				(l.getAlpha()/255F)*val+(r.getAlpha()/255F)*rev
+			);
+		};
+		
 		int[] counter={0};
-		BiConsumer<Integer, Color> pixelPush=(bo, color)->{
-			int x=counter[0]%(img.getWidth()/3), y=counter[0]/(img.getWidth()/3);
-			int b=bo;
+		
+		BiIntConsumer<Color> pixelPushByte=(b, color)->{
+			var count=counter[0];
+			int x=count%width,
+				y=count/width;
 			
-			for(int i=0;i<8;i++){
+			for(int i=0;i<9;i++){
 				Color col=color;
-				int   x1 =x*3+i%3;
-				int   y1 =y*3+i/3;
+				int   pp =pixelSize/3;
 				
-				for(long id : ids){
-					if(id==counter[0]){
-						col=Color.YELLOW;
-						break;
+				int x1=x*pixelSize+(i%3)*pp;
+				int y1=y*pixelSize+(i/3)*pp;
+				
+				if(i==8){
+					f:
+					{
+						for(long id : ids){
+							if(id==counter[0]){
+								g2.setColor(Color.YELLOW);
+								break f;
+							}
+						}
+						g2.setColor(Color.BLACK);
 					}
+					g2.fillRect(x1, y1, pp, pp);
+					continue;
 				}
 				
-				if((b&(1<<i))==0) col=new Color(col.getRed()/4, col.getGreen()/4, col.getBlue()/4);
+				if((b&(1<<i))==0) col=mul.apply(col, 1F/4);
 				
-				
-				img.setRGB(x1, y1, col.getRGB());
+				g2.setColor(col);
+				g2.fillRect(x1, y1, pp, pp);
 			}
-			img.setRGB(x*3+2, y*3+2, Color.BLACK.getRGB());
+		};
+		BiIntConsumer<Color> pixelPushLetter=(b, color)->{
+			char c    =(char)b;
+			var  count=counter[0];
+			int x=count%width,
+				y=count/width;
+			
+			x*=pixelSize;
+			y*=pixelSize;
+
+//			g.setColor(new Color(1, 1, 1, 0.3F));
+//			g.fillRect(x, y, pixelSize, pixelSize);
+			
+			x+=pixelSize*0.2F;
+			y+=pixelSize*0.8F;
+			
+			g2.setColor(color);
+			g2.drawString(""+c, x, y);
+			g2.setColor(new Color(1, 1, 1, 0.4F));
+			g2.drawString(""+c, x, y);
+		};
+		
+		BiIntConsumer<Color> pixelPush=(b, color)->{
+			
+			pixelPushByte.accept(b, color);
+			
+			char c=(char)b;
+			if(g2.getFont().canDisplay(c)&&!Character.isWhitespace(c)){
+				pixelPushLetter.accept(c, color);
+			}
 			
 			counter[0]++;
 		};
+		
+		Function<Chunk, Color> randColor;
+		{
+			Random rand=new Random();
+			randColor=chunk->{
+				rand.setSeed(chunk.getOffset());
+				
+				var c=new Color(Color.HSBtoRGB(rand.nextFloat()*255, 1, 1));
+				return new Color(c.getRed()/255F, c.getGreen()/255F, c.getBlue()/255F, 0.3F);
+			};
+		}
 		
 		for(long i=0;i<size;i++){
 			pixelPush.accept(0, Color.BLACK);
@@ -142,31 +231,79 @@ public class FileSystemInFile{
 		counter[0]=0;
 		
 		for(byte b : Header.getMagicBytes()){
-			pixelPush.accept((int)b, Color.RED);
+			pixelPush.accept(b, Color.RED);
 		}
-		pixelPush.accept((int)header.version.major, Color.RED);
-		pixelPush.accept((int)header.version.minor, Color.RED);
+		pixelPushByte.accept(header.version.major, Color.RED);
+		counter[0]++;
+		pixelPushByte.accept(header.version.minor, Color.RED);
+		counter[0]++;
+		
+		var chunks=header.allChunks(true);
 		
 		try(var in=header.source.doRandom()){
-			for(Chunk chunk : header.allChunks(true)){
-				in.setPos(chunk.getOffset());
-				counter[0]=(int)chunk.getOffset();
+			List<List<Chunk>> chains=new ArrayList<>();
+			
+			while(!chunks.isEmpty()){
+				var chain=chunks.get(0).loadWholeChain();
+				chunks.removeAll(chain);
+				chains.add(chain);
+			}
+			
+			for(var chain : chains){
+				var rand=randColor.apply(chain.get(0));
 				
-				Color bodyCol=chunk.isChunkUsed()?headerData.contains(chunk)?Color.BLUE:Color.GREEN.darker():Color.GRAY;
-				Color headCol=new Color(Math.min(255, bodyCol.getRed()+100), Math.min(255, bodyCol.getGreen()+100), Math.min(255, bodyCol.getBlue()+100));
-				
-				for(long i=0, j=chunk.getHeaderSize();i<j;i++){
-					pixelPush.accept(in.read(), i==0?Color.ORANGE:headCol);
-				}
-				for(long i=0, j=chunk.getUsed();i<j;i++){
-					pixelPush.accept(in.read(), bodyCol);
-				}
-				for(long i=0, j=chunk.getDataSize()-chunk.getUsed();i<j;i++){
-					pixelPush.accept(in.read(), Color.GRAY);
+				for(Chunk chunk : chain){
+					
+					in.setPos(chunk.getOffset());
+					counter[0]=(int)chunk.getOffset();
+					
+					Color bodyCol;
+					if(chunk.isChunkUsed()){
+						if(headerData.contains(chunk)) bodyCol=Color.BLUE;
+						else{
+							bodyCol=Color.GREEN.darker();
+						}
+					}else bodyCol=Color.GRAY;
+					
+					Color headCol=mix.apply(new Color(Math.min(255, bodyCol.getRed()+100), Math.min(255, bodyCol.getGreen()+100), Math.min(255, bodyCol.getBlue()+100)), rand, 0.7F);
+					
+					for(long i=0, j=chunk.getHeaderSize();i<j;i++){
+						pixelPushByte.accept(in.read(), headCol);
+						counter[0]++;
+					}
+					
+					for(long i=0, j=chunk.getDataSize();i<j;i++){
+						if(i >= chunk.getUsed()) bodyCol=Color.LIGHT_GRAY;
+						pixelPush.accept(in.read(), mul.apply(bodyCol, ((chunk.getDataSize()-i)/(float)chunk.getDataSize())*0.7F+0.3F));
+					}
 				}
 			}
+			for(var chain : chains){
+				
+				var col=randColor.apply(chain.get(0));
+				
+				for(Chunk chunk : chain){
+					if(!chunk.hasNext()) continue;
+					
+					in.setPos(chunk.getOffset());
+					counter[0]=(int)chunk.getOffset();
+					
+					g2.setColor(col);
+					var v1=chunk.getOffset();
+					var v2=chunk.getNext();
+					
+					int x1=(int)(v1%width),
+						y1=(int)(v1/width);
+					
+					int x2=(int)(v2%width),
+						y2=(int)(v2/width);
+					
+					g2.draw(new Line2D.Double((x1+0.5)*pixelSize, (y1+0.5)*pixelSize, (x2+0.5)*pixelSize, (y2+0.5)*pixelSize));
+				}
+			}
+			
 		}
-		
+		g2.dispose();
 		return img;
 	}
 }

@@ -60,7 +60,7 @@ public class VirtualFile{
 	
 	private ChunkIO getData() throws IOException{
 		if(data==null){
-			var c=source.loadChunk();
+			var c=source.dereference();
 			if(c!=null) data=c.io();
 		}
 		return data;

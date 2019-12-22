@@ -68,8 +68,13 @@ public interface IOInterface{
 				}
 				
 				@Override
-				public RandomIO setSize(long newSize) throws IOException{
-					ra.setLength(newSize);
+				public long getCapacity() throws IOException{
+					return ra.length();
+				}
+				
+				@Override
+				public RandomIO setCapacity(long newCapacity) throws IOException{
+					ra.setLength(newCapacity);
 					return this;
 				}
 				
@@ -110,7 +115,9 @@ public interface IOInterface{
 				public void write(int b) throws IOException{
 					snapPos();
 					ra.write(b);
-					onWrite.accept(new long[]{pos});
+					try{
+						onWrite.accept(new long[]{pos});
+					}catch(Exception ignored){}
 					pos++;
 				}
 				
@@ -118,7 +125,9 @@ public interface IOInterface{
 				public void write(byte[] b, int off, int len) throws IOException{
 					snapPos();
 					ra.write(b, off, len);
-					onWrite.accept(LongStream.range(pos, pos+len).toArray());
+					try{
+						onWrite.accept(LongStream.range(pos, pos+len).toArray());
+					}catch(Exception ignored){}
 					pos+=len;
 				}
 			};
@@ -130,8 +139,13 @@ public interface IOInterface{
 		}
 		
 		@Override
-		public void setSize(long newSize) throws IOException{
-			ra.setLength(newSize);
+		public long getCapacity() throws IOException{
+			return ra.length();
+		}
+		
+		@Override
+		public void setCapacity(long newCapacity) throws IOException{
+			ra.setLength(newCapacity);
 		}
 	}
 	
@@ -182,6 +196,11 @@ public interface IOInterface{
 		public boolean markSupported(){
 			return true;
 		}
+		
+		@Override
+		public String toString(){
+			return this.getClass().getSimpleName()+"{"+io+'}';
+		}
 	}
 	
 	class RandomIOOutputStream extends ContentOutputStream{
@@ -216,6 +235,11 @@ public interface IOInterface{
 		public void write(int b) throws IOException{
 			io.write(b);
 		}
+		
+		@Override
+		public String toString(){
+			return this.getClass().getSimpleName()+'{'+io+'}';
+		}
 	}
 	
 	
@@ -248,8 +272,10 @@ public interface IOInterface{
 	}
 	
 	default void write(long fileOffset, boolean clipOnEnd, int length, byte[] data) throws IOException{
-		try(var stream=write(fileOffset, clipOnEnd)){
-			stream.write(data, 0, length);
+		try(var io=doRandom()){
+			io.setPos(fileOffset);
+			io.write(data, 0, length);
+			if(clipOnEnd) io.trim();
 		}
 	}
 	
@@ -266,8 +292,9 @@ public interface IOInterface{
 	}
 	
 	default void read(long fileOffset, int length, byte[] dest) throws IOException{
-		try(var stream=read(fileOffset)){
-			stream.readNBytes(dest, 0, length);
+		try(var io=doRandom()){
+			io.setPos(fileOffset);
+			io.readFully(dest, 0, length);
 		}
 	}
 	
@@ -282,5 +309,7 @@ public interface IOInterface{
 	
 	long getSize() throws IOException;
 	
-	void setSize(long newSize) throws IOException;
+	long getCapacity() throws IOException;
+	
+	void setCapacity(long newCapacity) throws IOException;
 }

@@ -1,6 +1,9 @@
 package com.lapissea.fsf;
 
-import com.lapissea.util.*;
+import com.lapissea.util.ByteBufferBackedInputStream;
+import com.lapissea.util.NotNull;
+import com.lapissea.util.UtilL;
+import com.lapissea.util.WeakValueHashMap;
 import com.lapissea.util.function.FunctionOI;
 
 import java.io.EOFException;
@@ -9,21 +12,20 @@ import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
-import java.util.stream.IntStream;
 
 import static com.lapissea.fsf.FileSystemInFile.*;
 
 public class OffsetIndexSortedList<T extends FileObject&Comparable<T>> extends AbstractList<T> implements ShadowChunks{
 	
 	private static final FileObject.SequenceLayout<OffsetIndexSortedList<?>> HEADER=
-			FileObject.sequenceBuilder(List.of(
-					new FileObject.FileNumberDef<>(NumberSize.INT,
-					                               l->l.size,
-					                               (val, l)->l.size=(int)val),
-					new FileObject.FileFlagDef<>(NumberSize.BYTE,
-					                             (flags, l)->flags.writeEnum(l.sizePerOffset),
-					                             (flags, l)->l.sizePerOffset=flags.readEnum(NumberSize.class))
-			                                  ));
+		FileObject.sequenceBuilder(List.of(
+			new FileObject.NumberDef<>(NumberSize.INT,
+			                           OffsetIndexSortedList::size,
+			                           (l, val)->l.size=(int)val),
+			new FileObject.FlagDef<>(NumberSize.BYTE,
+			                         (flags, l)->flags.writeEnum(l.sizePerOffset),
+			                         (flags, l)->l.sizePerOffset=flags.readEnum(NumberSize.class))
+		                                  ));
 	
 	private static final int OFFSETS_PER_CHUNK=8;
 	private static final int OFFSET_CHUNK_SIZE=OFFSETS_PER_CHUNK*(Long.BYTES);
@@ -84,45 +86,47 @@ public class OffsetIndexSortedList<T extends FileObject&Comparable<T>> extends A
 		}
 		
 		modifier.accept(objects);
-		var newSize=objects.size();
+		objects.sort(Comparable::compareTo);
 		
-		int[] orderIndex=IntStream.range(0, newSize)
-		                          .boxed()
-		                          .sorted(Comparator.comparing(objects::get))
-		                          .mapToInt(Integer::intValue)
-		                          .toArray();
-		
-		long[] computedOffsets=new long[newSize];
+		var newSize   =objects.size();
+		var newOffsets=new long[newSize];
 		
 		long off=0;
-		for(int i : orderIndex){
+		for(int i=0;i<newSize;i++){
 			T o=objects.get(i);
-			computedOffsets[i]=off;
+			newOffsets[i]=off;
 			off+=o.length();
 		}
 		
-		sizePerOffset=NumberSize.getBySize(off);
-		
+		sizePerOffset=NumberSize.bySize(off);
+		size=newSize;
 		
 		offsetCache.clear();
-		try(var io=offsetsIo.write(true)){
-			var oldSize=size;
-			size=objects.size();
-			HEADER.write(io, this);
-			size=oldSize;
-			
-			for(long l : computedOffsets){
-				sizePerOffset.write(io, l);
-			}
+		objectCache.clear();
+		
+		for(int i=0;i<newSize;i++){
+			objectCache.put(newOffsets[i], objects.get(i));
 		}
 		
-		objectCache.clear();
+		var offCounter=0;
+		var ind       =0;
+		while(offCounter<newSize){
+			int numCount=Math.min(OFFSETS_PER_CHUNK, newSize-offCounter);
+			offsetCache.put(ind, Arrays.copyOfRange(newOffsets, offCounter, numCount));
+			offCounter+=numCount;
+			ind++;
+		}
+		
+		try(var out=offsetsIo.write(true)){
+			HEADER.write(out, this);
+			sizePerOffset.write(out, newOffsets);
+		}
+		
 		try(var io=objectsIo.write(true)){
-			for(int index : orderIndex){
-				objects.get(index).write(io);
+			for(var o : objects){
+				o.write(io);
 			}
 		}
-		size=objects.size();
 	}
 	
 	
@@ -202,11 +206,9 @@ public class OffsetIndexSortedList<T extends FileObject&Comparable<T>> extends A
 	}
 	
 	private T getByOffset(Long offset) throws IOException{
-//		var cached=objectCache.get(offset);
-//		if(cached!=null) return cached;
+		var cached=objectCache.get(offset);
+		if(cached!=null) return cached;
 		
-		LogUtil.println(objectsIo.getSize(), offsetsIo.getSize());
-		LogUtil.println(offset);
 		T read=tConstructor.get();
 		try(var io=objectsIo.read(offset)){
 			read.read(io);
@@ -248,7 +250,6 @@ public class OffsetIndexSortedList<T extends FileObject&Comparable<T>> extends A
 		Objects.checkIndex(index, size());
 		int chunkIndex=index/OFFSETS_PER_CHUNK;
 		
-		offsetCache.clear();
 		long[] chunk=offsetCache.get(chunkIndex);
 		if(chunk==null){
 			offsetCache.put(chunkIndex, chunk=loadOffsetChunk(chunkIndex));
@@ -319,4 +320,13 @@ public class OffsetIndexSortedList<T extends FileObject&Comparable<T>> extends A
 		};
 	}
 	
+	public long capacity(){
+		return objectsIo.getCapacity();
+	}
+	
+	public boolean ensureCapacity(long capacity) throws IOException{
+		if(capacity() >= capacity) return false;
+		objectsIo.setCapacity(capacity);
+		return true;
+	}
 }

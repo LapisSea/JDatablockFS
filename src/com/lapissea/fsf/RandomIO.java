@@ -12,7 +12,9 @@ public interface RandomIO extends AutoCloseable, Flushable, ContentWriter, Conte
 	
 	long getSize() throws IOException;
 	
-	RandomIO setSize(long newSize) throws IOException;
+	long getCapacity() throws IOException;
+	
+	RandomIO setCapacity(long newCapacity) throws IOException;
 	
 	@Override
 	void close() throws IOException;
@@ -24,7 +26,7 @@ public interface RandomIO extends AutoCloseable, Flushable, ContentWriter, Conte
 		var pos =getPos();
 		var size=getSize();
 		if(pos >= size) return;
-		setSize(pos);
+		setCapacity(pos);
 	}
 	
 	default long skip(long n) throws IOException{

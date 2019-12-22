@@ -10,5 +10,7 @@
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="module" module-name="jlapisutil" />
     <orderEntry type="library" name="Maven: junit:junit:3.8.1" level="project" />
+    <orderEntry type="library" name="jcodec-0.2.5" level="project" />
+    <orderEntry type="library" name="jcodec-javase-0.2.3" level="project" />
   </component>
 </module>

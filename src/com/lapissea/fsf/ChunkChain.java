@@ -7,6 +7,7 @@ import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class ChunkChain extends AbstractList<Chunk>{
 	
@@ -126,11 +127,21 @@ public class ChunkChain extends AbstractList<Chunk>{
 	
 	public void growBy(long amount) throws IOException{
 		var last=getLast();
-		last.header.requestMemory(last, amount);
+		last.header.requestMemory(chunks[0], last, amount);
 	}
 	
 	public long getTotalSize() throws IOException{
 		readAll();
 		return offsets[size-1]+chunks[size-1].getUsed();
+	}
+	
+	public long getTotalCapacity() throws IOException{
+		readAll();
+		return offsets[size-1]+chunks[size-1].getDataSize();
+	}
+	
+	@Override
+	public String toString(){
+		return "["+stream().map(Chunk::toShortString).collect(Collectors.joining(", "))+"]";
 	}
 }
