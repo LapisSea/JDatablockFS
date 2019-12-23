@@ -4,8 +4,50 @@ import com.lapissea.util.NotNull;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
 
 public abstract class ContentOutputStream extends OutputStream implements ContentWriter{
+	
+	public static class BA extends ContentOutputStream{
+		private final byte[] ba;
+		private       int    pos;
+		
+		public BA(byte[] ba){this.ba=ba;}
+		
+		@Override
+		public void write(int b) throws IOException{
+			ba[pos]=(byte)b;
+			pos++;
+		}
+		
+		@Override
+		public void write(@NotNull byte[] b, int off, int len) throws IOException{
+			System.arraycopy(b, off, ba, pos, len);
+			pos+=len;
+		}
+		
+		public void reset(){
+			pos=0;
+		}
+	}
+	
+	public static class BB extends ContentOutputStream{
+		private final ByteBuffer bb;
+		
+		public BB(ByteBuffer bb){
+			this.bb=bb;
+		}
+		
+		@Override
+		public void write(int b) throws IOException{
+			bb.put((byte)b);
+		}
+		
+		@Override
+		public void write(@NotNull byte[] b, int off, int len) throws IOException{
+			bb.put(b, off, len);
+		}
+	}
 	
 	public static class Wrapp extends ContentOutputStream{
 		

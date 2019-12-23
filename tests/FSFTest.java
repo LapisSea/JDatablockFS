@@ -74,8 +74,8 @@ class FSFTest{
 		};
 		
 		try{
-			var              source=new IOInterface.FileRA(new File("testFileSystem.fsf"));
-			FileSystemInFile fil   =new FileSystemInFile(source);
+			var source=new IOInterface.FileRA(new File("testFileSystem.fsf"));
+			var fil   =new FileSystemInFile(source);
 			
 			
 			UnsafeConsumer<long[], IOException> snapshotIds=ids->{

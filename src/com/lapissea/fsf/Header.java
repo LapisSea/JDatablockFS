@@ -12,21 +12,10 @@ import java.nio.file.Paths;
 import java.util.*;
 
 import static com.lapissea.fsf.FileSystemInFile.*;
+import static com.lapissea.fsf.NumberSize.*;
 
 @SuppressWarnings("AutoBoxing")
 public class Header{
-	
-	public static String normalizePath(String path){
-		var p=Paths.get(path).normalize().toString();
-		return p.equals(path)?path:p;
-	}
-	
-	private static final byte[]  MAGIC_BYTES="LSFSIF".getBytes(StandardCharsets.UTF_8);
-	private static final boolean LOG_ACTIONS=true;
-	
-	public static byte[] getMagicBytes(){
-		return MAGIC_BYTES.clone();
-	}
 	
 	public enum Version{
 		V01(0, 1);
@@ -44,6 +33,78 @@ public class Header{
 		}
 	}
 	
+	private static class SizedNumber extends FileObject.FullLayout<SizedNumber> implements FixedLenList.ElementHead<SizedNumber, LongFileBacked>{
+		
+		private static final SequenceLayout<SizedNumber> LAYOUT=FileObject.sequenceBuilder(List.of(
+			new FileObject.FlagDef<>(BYTE,
+			                         (writer, head)->writer.writeEnum(head.size),
+			                         (reader, head)->head.size=reader.readEnum(NumberSize.class))
+		                                                                                          ));
+		
+		private NumberSize size;
+		
+		public SizedNumber(){
+			this(null);
+		}
+		
+		public SizedNumber(NumberSize size){
+			super(LAYOUT);
+			this.size=size;
+		}
+		
+		@Override
+		public SizedNumber copy(){
+			return new SizedNumber(size);
+		}
+		
+		@Override
+		public boolean willChange(LongFileBacked element){
+			return NumberSize.bySize(element.value).max(size)!=size;
+		}
+		
+		@Override
+		public void update(LongFileBacked element){
+			size=NumberSize.bySize(element.value).max(size);
+		}
+		
+		@Override
+		public int getElementSize(){
+			return size.bytes;
+		}
+		
+		@Override
+		public LongFileBacked newElement(){
+			return new LongFileBacked();
+		}
+		
+		@Override
+		public void readElement(ContentInputStream src, LongFileBacked dest) throws IOException{
+			dest.value=size.read(src);
+		}
+		
+		@Override
+		public void writeElement(ContentOutputStream dest, LongFileBacked src) throws IOException{
+			size.write(dest, src.value);
+		}
+		
+		@Override
+		public String toString(){
+			return size+"S";
+		}
+	}
+	
+	public static String normalizePath(String path){
+		var p=Paths.get(path).normalize().toString();
+		return p.equals(path)?path:p;
+	}
+	
+	private static final byte[]  MAGIC_BYTES="LSFSIF".getBytes(StandardCharsets.UTF_8);
+	private static final boolean LOG_ACTIONS=false;
+	
+	public static byte[] getMagicBytes(){
+		return MAGIC_BYTES.clone();
+	}
+	
 	private static void initEmptyFile(IOInterface file) throws IOException{
 		long[] pos={0};
 		try(var out=new ContentOutputStream.Wrapp(new TrackingOutputStream(file.write(true), pos))){
@@ -55,7 +116,7 @@ public class Header{
 			out.write(latest.minor);
 			
 			OffsetIndexSortedList.init(out, pos, FILE_TABLE_PADDING);
-			ConstantList.init(out, pos, Long.BYTES, FREE_CHUNK_CAPACITY);
+			FixedLenList.init(out, pos, new SizedNumber(BYTE), FREE_CHUNK_CAPACITY);
 			
 		}
 	}
@@ -64,9 +125,9 @@ public class Header{
 	
 	public final IOInterface source;
 	
-	private final OffsetIndexSortedList<FilePointer> fileList;
-	private final ConstantList<LongFileBacked>       freeChunks;
-	private final Map<Long, Chunk>                   chunkCache=new WeakValueHashMap<Long, Chunk>().defineStayAlivePolicy(3);
+	private final OffsetIndexSortedList<FilePointer>        fileList;
+	private final FixedLenList<SizedNumber, LongFileBacked> freeChunks;
+	private final Map<Long, Chunk>                          chunkCache=new WeakValueHashMap<Long, Chunk>().defineStayAlivePolicy(3);
 	
 	public Header(IOInterface source) throws IOException{
 		var minLen=MAGIC_BYTES.length+2;
@@ -101,7 +162,21 @@ public class Header{
 		
 		fileList=new OffsetIndexSortedList<>(()->new FilePointer(this), names, offsets);
 		
-		freeChunks=new ConstantList<>(frees, Long.BYTES, LongFileBacked::new);
+		freeChunks=new FixedLenList<>(frees, new SizedNumber());
+		
+		LogUtil.println(freeChunks);
+		freeChunks.addElement(new LongFileBacked(155));
+		LogUtil.println(freeChunks);
+		freeChunks.removeElement(0);
+		LogUtil.println(freeChunks);
+		freeChunks.addElement(new LongFileBacked(135));
+		LogUtil.println(freeChunks);
+		freeChunks.addElement(new LongFileBacked(251));
+		LogUtil.println(freeChunks);
+		freeChunks.addElement(new LongFileBacked(2000));
+		LogUtil.println(freeChunks);
+		LogUtil.println(new FixedLenList<>(frees, new SizedNumber()));
+		System.exit(0);
 	}
 	
 	public FilePointer getByPath(String path) throws IOException{
@@ -149,7 +224,7 @@ public class Header{
 			if(best!=null){
 				if(LOG_ACTIONS) logChunkAction("REUSED", best);
 				
-				freeChunks.remove(bestInd);
+				freeChunks.removeElement(bestInd);
 				best.setChunkUsed(true);
 				best.syncHeader();
 				return best;
@@ -219,7 +294,7 @@ public class Header{
 					if(next.wholeSize() >= requestedMemory){
 						mergeChunks(chunk, next);
 						if(LOG_ACTIONS) logChunkAction("Merged free", chunk);
-						freeChunks.remove(nextInd);
+						freeChunks.removeElement(nextInd);
 						return;
 					}
 				}

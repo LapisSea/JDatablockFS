@@ -7,6 +7,7 @@ public class LongFileBacked extends FileObject implements Comparable<LongFileBac
 	public long value;
 	
 	public LongFileBacked(){
+		this(-1);
 	}
 	
 	@Override
@@ -24,7 +25,7 @@ public class LongFileBacked extends FileObject implements Comparable<LongFileBac
 	}
 	
 	@Override
-	public int length(){
+	public long length(){
 		return Long.BYTES;
 	}
 	

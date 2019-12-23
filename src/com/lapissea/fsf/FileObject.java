@@ -18,7 +18,7 @@ public abstract class FileObject{
 		
 		void read(ContentInputStream stream, T dest) throws IOException;
 		
-		int length(T parent);
+		long length(T parent);
 	}
 	
 	public interface SequenceLayout<T>{
@@ -26,15 +26,15 @@ public abstract class FileObject{
 		
 		void read(ContentInputStream stream, T dest) throws IOException;
 		
-		int length(T source);
+		long length(T source);
 	}
 	
 	public static class ObjDef<T, V extends FileObject> implements ObjectDef<T>{
 		private final Function<T, V>   getter;
-		private final BiConsumer<V, T> setter;
+		private final BiConsumer<T, V> setter;
 		private final Function<T, V>   constructor;
 		
-		public ObjDef(Function<T, V> getter, BiConsumer<V, T> setter, Function<T, V> constructor){
+		public ObjDef(Function<T, V> getter, BiConsumer<T, V> setter, Function<T, V> constructor){
 			this.getter=getter;
 			this.setter=setter;
 			this.constructor=constructor;
@@ -58,11 +58,11 @@ public abstract class FileObject{
 			var val=constructor.apply(dest);
 			val.read(stream);
 			
-			setter.accept(val, dest);
+			setter.accept(dest, val);
 		}
 		
 		@Override
-		public int length(T parent){
+		public long length(T parent){
 			return getter.apply(parent).length();
 		}
 	}
@@ -80,7 +80,7 @@ public abstract class FileObject{
 		}
 		
 		@Override
-		public int length(T parent){
+		public long length(T parent){
 			return size(parent).bytes;
 		}
 	}
@@ -162,7 +162,7 @@ public abstract class FileObject{
 		}
 		
 		@Override
-		public int length(T parent){
+		public long length(T parent){
 			return type.length(getter.apply(parent));
 		}
 	}
@@ -198,10 +198,10 @@ public abstract class FileObject{
 			}
 			
 			@Override
-			public int length(T source){
-				int sum=0;
+			public long length(T source){
+				long sum=0;
 				for(ObjectDef<T> v : arr){
-					int length=v.length(source);
+					long length=v.length(source);
 					sum+=length;
 				}
 				return sum;
@@ -232,7 +232,7 @@ public abstract class FileObject{
 		}
 		
 		@Override
-		public int length(){
+		public long length(){
 			return layout.length(self());
 		}
 	}
@@ -241,6 +241,6 @@ public abstract class FileObject{
 	
 	public abstract void write(ContentOutputStream dest) throws IOException;
 	
-	public abstract int length();
+	public abstract long length();
 	
 }

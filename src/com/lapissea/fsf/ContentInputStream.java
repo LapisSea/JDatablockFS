@@ -4,8 +4,60 @@ import com.lapissea.util.NotNull;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 
 public abstract class ContentInputStream extends InputStream implements ContentReader{
+	
+	public static class BA extends ContentInputStream{
+		private final byte[] ba;
+		private       int    pos;
+		
+		public BA(byte[] ba){
+			this.ba=ba;
+		}
+		
+		
+		@Override
+		public int read() throws IOException{
+			int rem=ba.length-pos;
+			if(rem==0) return -1;
+			return ba[pos++]&0xFF;
+		}
+		
+		@Override
+		public int read(@NotNull byte[] b, int off, int len) throws IOException{
+			int rem=ba.length-pos;
+			if(rem==0) return -1;
+			if(len<rem) len=rem;
+			System.arraycopy(ba, pos, b, off, len);
+			pos+=len;
+			return len;
+		}
+	}
+	
+	public static class BB extends ContentInputStream{
+		private final ByteBuffer bb;
+		
+		public BB(ByteBuffer bb){
+			this.bb=bb;
+		}
+		
+		@Override
+		public int read() throws IOException{
+			int rem=bb.remaining();
+			if(rem==0) return -1;
+			return bb.get();
+		}
+		
+		@Override
+		public int read(@NotNull byte[] b, int off, int len) throws IOException{
+			int rem=bb.remaining();
+			if(rem==0) return -1;
+			if(len<rem) len=rem;
+			bb.get(b, off, len);
+			return len;
+		}
+	}
 	
 	public static class Wrapp extends ContentInputStream{
 		

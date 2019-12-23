@@ -11,7 +11,9 @@ public interface ContentReader{
 	
 	default int readUnsignedByte() throws IOException{
 		int ch=read();
-		if(ch<0) throw new EOFException();
+		if(ch<0){
+			throw new EOFException();
+		}
 		return ch;
 	}
 	

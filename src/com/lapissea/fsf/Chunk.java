@@ -1,6 +1,7 @@
 package com.lapissea.fsf;
 
 import com.lapissea.util.TextUtil;
+import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -39,8 +40,24 @@ public class Chunk{
 		       bodyType.bytes*2;
 	}
 	
-	public static void init(ContentOutputStream out, long offset, NumberSize nextType, int fs) throws IOException{
-		new Chunk(null, offset, nextType, fs).init(out);
+	public static void init(ContentOutputStream out, long offset, NumberSize nextType, int bodySize) throws IOException{
+		init(out, offset, nextType, bodySize, null);
+	}
+	
+	public static void init(ContentOutputStream out, long offset, NumberSize nextType, long bodySize, UnsafeConsumer<ContentOutputStream, IOException> initContents) throws IOException{
+		
+		ByteArrayOutputStream ba=null;
+		if(initContents!=null){
+			ba=new ByteArrayOutputStream();
+			ContentOutputStream contents=new ContentOutputStream.Wrapp(ba);
+			initContents.accept(contents);
+			if(ba.size()>bodySize) bodySize=ba.size();
+		}
+		
+		var c=new Chunk(null, offset, nextType, bodySize);
+		
+		c.init(out, ba==null?null:ba.toByteArray());
+		
 	}
 	
 	private static final NumberSize FLAGS_SIZE=NumberSize.BYTE;
@@ -319,8 +336,22 @@ public class Chunk{
 	
 	
 	public void init(ContentOutputStream os) throws IOException{
+		init(os, null);
+	}
+	
+	public void init(ContentOutputStream os, byte[] initialData) throws IOException{
+		if(initialData!=null){
+			setUsed(initialData.length);
+		}
+		
 		saveHeader(os);
-		Utils.zeroFill(os, getDataSize());
+		
+		var toZeroOut=getDataSize();
+		if(initialData!=null){
+			os.write(initialData);
+			toZeroOut-=initialData.length;
+		}
+		Utils.zeroFill(os, toZeroOut);
 	}
 	
 	public void chainForwardFree() throws IOException{

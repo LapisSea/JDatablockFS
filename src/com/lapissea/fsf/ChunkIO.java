@@ -141,9 +141,6 @@ public class ChunkIO implements IOInterface{
 				case CLIP -> {
 					setChunk(chunks.size()-1);
 				}
-				case EOF -> {
-//					throw new EOFException(sum+" <= "+chainSpaceOffset+", "+(chainSpaceOffset-sum)+", "+TextUtil.toString(chunk));
-				}
 				case EXTEND, SET -> {
 					setChunk(chunks.size()-1);
 					var lastSize=chunk.getDataSize();
@@ -344,7 +341,7 @@ public class ChunkIO implements IOInterface{
 			
 			@Override
 			public String toString(){
-				return chunks.toString()+" -> "+chainSpaceOffset;
+				return ChunkIO.this+" -> "+chainSpaceOffset;
 			}
 		}
 		
@@ -367,5 +364,10 @@ public class ChunkIO implements IOInterface{
 		try(var io=doRandom()){
 			io.setCapacity(newCapacity);
 		}
+	}
+	
+	@Override
+	public String toString(){
+		return "ChunkIO{"+chunks+'}';
 	}
 }
