@@ -11,8 +11,8 @@ import java.util.stream.Collectors;
 
 public class ChunkChain extends AbstractList<Chunk>{
 	
-	private long[]  offsets=new long[2];
-	private Chunk[] chunks =new Chunk[2];
+	private long[]  capacityOffsets=new long[2];
+	private Chunk[] chunks         =new Chunk[2];
 	private int     size;
 	
 	Set<Runnable> dependencyInvalidate=new HashSet<>(3);
@@ -27,13 +27,13 @@ public class ChunkChain extends AbstractList<Chunk>{
 		if(size >= chunks.length){
 			var newSiz=size<<1;
 			chunks=Arrays.copyOf(chunks, newSiz);
-			offsets=Arrays.copyOf(offsets, newSiz);
+			capacityOffsets=Arrays.copyOf(capacityOffsets, newSiz);
 		}
 		
-		if(size==0) offsets[size]=0;
+		if(size==0) capacityOffsets[size]=0;
 		else{
 			var prev=size-1;
-			offsets[size]=offsets[prev]+chunks[prev].getDataSize();
+			capacityOffsets[size]=capacityOffsets[prev]+chunks[prev].getDataCapacity();
 		}
 		
 		chunks[size]=chunk;
@@ -80,7 +80,7 @@ public class ChunkChain extends AbstractList<Chunk>{
 	
 	public long getChainSpaceOffset(int index){
 		Objects.checkIndex(index, size);
-		return offsets[index];
+		return capacityOffsets[index];
 	}
 	
 	@Override
@@ -132,12 +132,17 @@ public class ChunkChain extends AbstractList<Chunk>{
 	
 	public long getTotalSize() throws IOException{
 		readAll();
-		return offsets[size-1]+chunks[size-1].getUsed();
+		if(size==1) return chunks[0].getUsed();
+		
+		return Arrays.stream(chunks)
+		             .limit(size)
+		             .mapToLong(Chunk::getUsed)
+		             .sum();
 	}
 	
 	public long getTotalCapacity() throws IOException{
 		readAll();
-		return offsets[size-1]+chunks[size-1].getDataSize();
+		return capacityOffsets[size-1]+chunks[size-1].getDataCapacity();
 	}
 	
 	@Override

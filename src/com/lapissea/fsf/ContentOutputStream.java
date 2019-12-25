@@ -29,6 +29,11 @@ public abstract class ContentOutputStream extends OutputStream implements Conten
 		public void reset(){
 			pos=0;
 		}
+		
+		@Override
+		public String toString(){
+			return this.getClass().getSimpleName()+"{"+pos+"/"+ba.length+"}";
+		}
 	}
 	
 	public static class BB extends ContentOutputStream{
@@ -46,6 +51,11 @@ public abstract class ContentOutputStream extends OutputStream implements Conten
 		@Override
 		public void write(@NotNull byte[] b, int off, int len) throws IOException{
 			bb.put(b, off, len);
+		}
+		
+		@Override
+		public String toString(){
+			return this.getClass().getSimpleName()+"{"+bb.position()+"/"+bb.limit()+"}";
 		}
 	}
 	

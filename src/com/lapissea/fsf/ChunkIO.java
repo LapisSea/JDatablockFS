@@ -1,9 +1,11 @@
 package com.lapissea.fsf;
 
+
 import java.io.IOException;
 import java.util.Objects;
 
 import static com.lapissea.fsf.ChunkIO.MoveMode.*;
+import static com.lapissea.fsf.FileSystemInFile.*;
 import static com.lapissea.util.UtilL.*;
 
 /**
@@ -109,7 +111,7 @@ public class ChunkIO implements IOInterface{
 			}
 			
 			private long getDataSize(MoveMode mode, Chunk chunk){
-				return mode==EOF?chunk.getUsed():chunk.getDataSize();
+				return mode==EOF?chunk.getUsed():chunk.getDataCapacity();
 			}
 			
 			private boolean orientPointer(MoveMode mode) throws IOException{
@@ -132,7 +134,7 @@ public class ChunkIO implements IOInterface{
 						if(applyMovement(mode)) return true;
 					}
 					if(mode==SET){
-						ch.setUsed(ch.getDataSize());
+						ch.setUsed(ch.getDataCapacity());
 					}
 					i++;
 				}
@@ -143,7 +145,7 @@ public class ChunkIO implements IOInterface{
 				}
 				case EXTEND, SET -> {
 					setChunk(chunks.size()-1);
-					var lastSize=chunk.getDataSize();
+					var lastSize=chunk.getDataCapacity();
 					var end     =chainSpaceDataStart+lastSize;
 					var toGrow  =chainSpaceOffset-end;
 					if(toGrow==0) return true;
@@ -179,22 +181,29 @@ public class ChunkIO implements IOInterface{
 			
 			@Override
 			public RandomIO setCapacity(long newCapacity) throws IOException{
-				var oldSize=getSize();
-				if(oldSize==newCapacity) return this;
+				var oldCapacity=getCapacity();
+				if(oldCapacity==newCapacity) return this;
 				
+				long size;
+				if(DEBUG_VALIDATION){
+					size=getSize();
+				}
 				
 				var pos=getPos();
 				
-				if(newCapacity>oldSize){
-					setPos(oldSize);
-					Utils.zeroFill(this::write, newCapacity-oldSize);
+				if(newCapacity>oldCapacity){
+					setPointer(oldCapacity, CLIP);
+					fillZero(newCapacity-oldCapacity);
 				}else{
 					setPointer(newCapacity, SET);
 				}
-				
-				Assert(newCapacity==getSize());
-				
 				setPos(pos);
+				
+				
+				if(DEBUG_VALIDATION){
+					Assert(newCapacity<=getCapacity(), newCapacity, getCapacity(), this);
+					Assert(size==getSize()||newCapacity==getSize(), newCapacity+"/"+getCapacity(), size+"/"+getSize(), this);
+				}
 				
 				return this;
 			}
@@ -241,32 +250,29 @@ public class ChunkIO implements IOInterface{
 				chainSpaceOffset+=bytesWritten;
 			}
 			
-			private int prepareWrite(int requested) throws IOException{
-				orientPointer(EXTEND);
+			private int prepareWrite(int requested, boolean pushUsed) throws IOException{
+				orientPointer(pushUsed?EXTEND:CLIP);
 				
 				var chunkOffset=chunkOffset();
-				var remaining  =chunk.getDataSize()-chunkOffset;
+				var remaining  =chunk.getDataCapacity()-chunkOffset;
 				
 				if(remaining==0){
-					var oldOff=chainSpaceOffset;
-					try{
-						chainSpaceOffset+=requested;
-						orientPointer(EXTEND);
-					}finally{
-						chainSpaceOffset=oldOff;
-					}
-					var result=prepareWrite(requested);
+					chunks.growBy(requested);
+					
+					var result=prepareWrite(requested, pushUsed);
 					Assert(result>0);
 					return result;
 				}
 				return (int)Math.min(remaining, requested);
 			}
 			
-			private void confirmWrite(long bytesWritten) throws IOException{
+			private void confirmWrite(long bytesWritten, boolean pushUsed) throws IOException{
 				var chunkOffset=chunkOffset();
 				chainSpaceOffset+=bytesWritten;
-				chunk.pushUsed(chunkOffset+bytesWritten);
-				chunk.saveHeader();
+				if(pushUsed){
+					chunk.pushUsed(chunkOffset+bytesWritten);
+					chunk.saveHeader();
+				}
 			}
 			
 			////////////////////////////////////////////////////////////////////////
@@ -310,26 +316,35 @@ public class ChunkIO implements IOInterface{
 			
 			@Override
 			public void write(int b) throws IOException{
-				int toWrite=prepareWrite(1);
+				int toWrite=prepareWrite(1, true);
 				Assert(toWrite==1);
 				
 				data.write(b);
 				
-				confirmWrite(1);
+				confirmWrite(1, true);
 			}
 			
 			
 			@Override
 			public void write(byte[] b, int off, int len) throws IOException{
+				write(b, off, len, true);
+			}
+			
+			@Override
+			public void fillZero(long requestedMemory) throws IOException{
+				Utils.zeroFill((b, off, len)->write(b, off, len, false), requestedMemory);
+			}
+			
+			public void write(byte[] b, int off, int len, boolean pushUsed) throws IOException{
 				Objects.checkFromIndexSize(off, len, b.length);
 				
 				while(len>0){
-					int toWrite=prepareWrite(len);
+					int toWrite=prepareWrite(len, pushUsed);
 					Assert(toWrite >= 1);
 					
 					data.write(b, off, toWrite);
 					
-					confirmWrite(toWrite);
+					confirmWrite(toWrite, pushUsed);
 					
 					len-=toWrite;
 					off+=toWrite;
@@ -356,13 +371,23 @@ public class ChunkIO implements IOInterface{
 	
 	@Override
 	public long getCapacity(){
-		return chunks.stream().mapToLong(Chunk::getDataSize).sum();
+		return chunks.stream().mapToLong(Chunk::getDataCapacity).sum();
 	}
 	
 	@Override
 	public void setCapacity(long newCapacity) throws IOException{
 		try(var io=doRandom()){
+			long oldSize;
+			if(DEBUG_VALIDATION) oldSize=io.getSize();
+			
 			io.setCapacity(newCapacity);
+			
+			if(DEBUG_VALIDATION){
+				Assert(io.getCapacity() >= newCapacity,
+				       io.getCapacity(), newCapacity, io);
+				Assert(oldSize==io.getSize()||io.getSize()==newCapacity,
+				       oldSize, io.getSize(), newCapacity, io);
+			}
 		}
 	}
 	

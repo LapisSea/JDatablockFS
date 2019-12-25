@@ -325,7 +325,8 @@ public class OffsetIndexSortedList<T extends FileObject&Comparable<T>> extends A
 	}
 	
 	public boolean ensureCapacity(long capacity) throws IOException{
-		if(capacity() >= capacity) return false;
+		var cap=capacity();
+		if(cap >= capacity) return false;
 		objectsIo.setCapacity(capacity);
 		return true;
 	}

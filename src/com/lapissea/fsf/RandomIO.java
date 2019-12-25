@@ -81,4 +81,6 @@ public interface RandomIO extends AutoCloseable, Flushable, ContentWriter, Conte
 		return this;
 	}
 	
+	
+	void fillZero(long requestedMemory) throws IOException;
 }

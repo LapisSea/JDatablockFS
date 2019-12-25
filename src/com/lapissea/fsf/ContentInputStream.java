@@ -33,6 +33,11 @@ public abstract class ContentInputStream extends InputStream implements ContentR
 			pos+=len;
 			return len;
 		}
+		
+		@Override
+		public String toString(){
+			return this.getClass().getSimpleName()+"{"+pos+"/"+ba.length+"}";
+		}
 	}
 	
 	public static class BB extends ContentInputStream{
@@ -56,6 +61,11 @@ public abstract class ContentInputStream extends InputStream implements ContentR
 			if(len<rem) len=rem;
 			bb.get(b, off, len);
 			return len;
+		}
+		
+		@Override
+		public String toString(){
+			return this.getClass().getSimpleName()+"{"+bb.position()+"/"+bb.limit()+"}";
 		}
 	}
 	

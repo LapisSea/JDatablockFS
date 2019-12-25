@@ -28,13 +28,14 @@ public class FileSystemInFile{
 	public static int MINIMUM_CHUNK_SIZE =16;
 	public static int FREE_CHUNK_CAPACITY=2;
 	
+	public static final boolean DEBUG_VALIDATION=true;
+	
 	/**
 	 * Used to define a memory buffer limit when writing to a new file. Used to reduce fragmentation.
 	 */
 	public static int MAX_BUFFERING_INIT_SIZE=1024;
 	
 	public static final String EXTENSION="fsf";
-	
 	
 	public final Header header;
 	
@@ -123,7 +124,7 @@ public class FileSystemInFile{
 		g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 		g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_OFF);
 		
-		var headerData=header.headerChunks()
+		var headerData=header.headerStartChunks()
 		                     .stream()
 		                     .flatMap(c->{
 			                     try{
@@ -272,9 +273,9 @@ public class FileSystemInFile{
 						counter[0]++;
 					}
 					
-					for(long i=0, j=chunk.getDataSize();i<j;i++){
+					for(long i=0, j=chunk.getDataCapacity();i<j;i++){
 						if(i >= chunk.getUsed()) bodyCol=Color.LIGHT_GRAY;
-						pixelPush.accept(in.read(), mul.apply(bodyCol, ((chunk.getDataSize()-i)/(float)chunk.getDataSize())*0.7F+0.3F));
+						pixelPush.accept(in.read(), mul.apply(bodyCol, ((chunk.getDataCapacity()-i)/(float)chunk.getDataCapacity())*0.7F+0.3F));
 					}
 				}
 			}

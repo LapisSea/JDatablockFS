@@ -14,8 +14,139 @@ import static com.lapissea.util.UtilL.*;
 
 public interface IOInterface{
 	
+	class MemoryRA implements IOInterface{
+		public UnsafeConsumer<long[], IOException> onWrite;
+		
+		private byte[] bb=new byte[4];
+		private int    used;
+		
+		@Override
+		public RandomIO doRandom(){
+			return new RandomIO(){
+				
+				private final byte[] buf=new byte[8];
+				private int pos;
+				
+				@Override
+				public RandomIO setPos(long pos){
+					this.pos=Math.toIntExact(pos);
+					return this;
+				}
+				
+				@Override
+				public long getPos(){
+					return Math.min(pos, used);
+				}
+				
+				@Override
+				public long getSize(){
+					return MemoryRA.this.getSize();
+				}
+				
+				@Override
+				public long getCapacity(){
+					return MemoryRA.this.getCapacity();
+				}
+				
+				@Override
+				public RandomIO setCapacity(long newCapacity){
+					MemoryRA.this.setCapacity(newCapacity);
+					pos=Math.min(pos, used);
+					return this;
+				}
+				
+				@Override
+				public void close(){}
+				
+				@Override
+				public void flush(){}
+				
+				@Override
+				public int read(){
+					int remaining=(int)(getSize()-getPos());
+					if(remaining<=0) return -1;
+					return bb[pos++]&0xFF;
+				}
+				
+				@Override
+				public int read(byte[] b, int off, int len){
+					int remaining=(int)(getSize()-getPos());
+					if(remaining<=0) return -1;
+					if(remaining<len) len=remaining;
+					
+					System.arraycopy(bb, pos, b, off, len);
+					pos+=len;
+					return len;
+				}
+				
+				@Override
+				public void write(int b){
+					int remaining=(int)(getCapacity()-getPos());
+					if(remaining<=0) setCapacity(Math.max(4, Math.max(getCapacity()+1, getCapacity()+1-remaining)));
+					bb[pos]=(byte)b;
+					if(onWrite!=null){
+						try{
+							onWrite.accept(new long[]{pos});
+						}catch(Exception ignored){}
+					}
+					pos++;
+					if(used<pos) used=pos;
+				}
+				
+				@Override
+				public void write(byte[] b, int off, int len){
+					write(b, off, len, true);
+				}
+				
+				public void write(byte[] b, int off, int len, boolean pushPos){
+					int remaining=(int)(getCapacity()-getPos());
+					if(remaining<len) setCapacity(Math.max(4, Math.max(getCapacity()<<1, getCapacity()+len-remaining)));
+					
+					System.arraycopy(b, off, bb, pos, len);
+					if(onWrite!=null){
+						try{
+							onWrite.accept(LongStream.range(pos, pos+len).toArray());
+						}catch(Exception ignored){}
+					}
+					if(pushPos){
+						pos+=len;
+						if(used<pos) used=pos;
+					}
+				}
+				
+				@Override
+				public void fillZero(long requestedMemory) throws IOException{
+					Utils.zeroFill((b, off, len)->write(b, off, len, false), requestedMemory);
+				}
+				
+				@Override
+				public byte[] contentBuf(){
+					return buf;
+				}
+				
+			};
+		}
+		
+		@Override
+		public long getSize(){
+			return used;
+		}
+		
+		@Override
+		public long getCapacity(){
+			return bb.length;
+		}
+		
+		@Override
+		public void setCapacity(long newCapacity){
+			if(getCapacity()==newCapacity) return;
+			bb=Arrays.copyOf(bb, (int)newCapacity);
+			used=Math.min(used, bb.length);
+		}
+	}
+	
 	class FileRA implements IOInterface{
-		public UnsafeConsumer<long[], IOException> onWrite=writes->{};
+		public UnsafeConsumer<long[], IOException> onWrite;
 		
 		private       RandomAccessFile ra;
 		private final String           path;
@@ -115,20 +246,33 @@ public interface IOInterface{
 				public void write(int b) throws IOException{
 					snapPos();
 					ra.write(b);
-					try{
-						onWrite.accept(new long[]{pos});
-					}catch(Exception ignored){}
+					if(onWrite!=null){
+						try{
+							onWrite.accept(new long[]{pos});
+						}catch(Exception ignored){}
+					}
 					pos++;
 				}
 				
 				@Override
 				public void write(byte[] b, int off, int len) throws IOException{
+					write(b, off, len, true);
+				}
+				
+				public void write(byte[] b, int off, int len, boolean pushPos) throws IOException{
 					snapPos();
 					ra.write(b, off, len);
-					try{
-						onWrite.accept(LongStream.range(pos, pos+len).toArray());
-					}catch(Exception ignored){}
-					pos+=len;
+					if(onWrite!=null){
+						try{
+							onWrite.accept(LongStream.range(pos, pos+len).toArray());
+						}catch(Exception ignored){}
+					}
+					if(pushPos) pos+=len;
+				}
+				
+				@Override
+				public void fillZero(long requestedMemory) throws IOException{
+					Utils.zeroFill((b, off, len)->write(b, off, len, false), requestedMemory);
 				}
 			};
 		}
@@ -311,5 +455,11 @@ public interface IOInterface{
 	
 	long getCapacity() throws IOException;
 	
+	/**
+	 * Tries to grows or shrinks capacity as closely as it is convenient for the underlying data. <br>
+	 * <br>
+	 * If growing, it is required that capacity is set to greater or equal to newCapacity.<br>
+	 * If shrinking, it is not required that capacity is shrunk but is required to always be greater or equal to newCapacity.
+	 */
 	void setCapacity(long newCapacity) throws IOException;
 }

@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.util.*;
 
+import static com.lapissea.fsf.FileSystemInFile.*;
 import static com.lapissea.util.UtilL.*;
 
 /*
@@ -32,6 +33,10 @@ public class Chunk{
 	
 	public static int headerSize(long fileSize, long chunkSize){
 		return headerSize(NumberSize.bySize(fileSize), NumberSize.bySize(chunkSize));
+	}
+	
+	public static int headerSize(NumberSize nextType, long chunkSize){
+		return headerSize(nextType, NumberSize.bySize(chunkSize));
 	}
 	
 	public static int headerSize(NumberSize nextType, NumberSize bodyType){
@@ -113,15 +118,21 @@ public class Chunk{
 		
 		nextType.write(buff, getNext());
 		bodyType.write(buff, getUsed());
-		bodyType.write(buff, getDataSize());
+		bodyType.write(buff, getDataCapacity());
 		
 		var bb=c.bb;
-		Assert(getHeaderSize()==bb.size());
+		if(DEBUG_VALIDATION){
+			Assert(getHeaderSize()==bb.size(), getHeaderSize(), bb.size(), this);
+		}
 		bb.writeTo(os);
 		bb.reset();
 	}
 	
 	private static long requirePositive(long val) throws IOException{
+		return requireGreaterOrEqual(val, 0);
+	}
+	
+	private static long requireGreaterOrEqual(long val, long limit) throws IOException{
 		if(val<0){
 			throw new IOException("Malformed file");
 		}
@@ -140,31 +151,31 @@ public class Chunk{
 	
 	private NumberSize bodyType;
 	private long       used;
-	private long       dataSize;
+	private long       dataCapacity;
 	
 	private ChunkIO io;
 	
 	Set<Runnable> dependencyInvalidate=new HashSet<>(3);
 	
-	private Chunk(Header header, long offset, NumberSize nextType, long dataSize){
-		this(header, offset, nextType, 0, NumberSize.bySize(dataSize), dataSize);
+	private Chunk(Header header, long offset, NumberSize nextType, long dataCapacity){
+		this(header, offset, nextType, 0, NumberSize.bySize(dataCapacity), dataCapacity);
 	}
 	
-	public Chunk(Header header, long offset, NumberSize nextType, long next, NumberSize bodyType, long dataSize){
-		this(header, offset, nextType, next, bodyType, 0, dataSize, true);
+	public Chunk(Header header, long offset, NumberSize nextType, long next, NumberSize bodyType, long dataCapacity){
+		this(header, offset, nextType, next, bodyType, 0, dataCapacity, true);
 	}
 	
-	public Chunk(Header header, long offset, NumberSize nextType, long next, NumberSize bodyType, long used, long dataSize, boolean chunkUsed){
+	public Chunk(Header header, long offset, NumberSize nextType, long next, NumberSize bodyType, long used, long dataCapacity, boolean chunkUsed){
 		try{
 			this.header=header;
-			this.offset=offset;
+			this.offset=requirePositive(offset);
 			
-			this.nextType=nextType;
-			this.next=next;
+			this.nextType=Objects.requireNonNull(nextType);
+			this.next=requireGreaterOrEqual(next, Header.FILE_HEADER_SIZE);
 			
-			this.bodyType=bodyType;
-			this.used=used;
-			this.dataSize=dataSize;
+			this.bodyType=Objects.requireNonNull(bodyType);
+			this.dataCapacity=requirePositive(dataCapacity);
+			this.used=requireGreaterOrEqual(used, dataCapacity);
 			
 			this.chunkUsed=chunkUsed;
 		}catch(Exception e){
@@ -198,7 +209,7 @@ public class Chunk{
 	}
 	
 	public long nextPhysicalOffset(){
-		return getDataStart()+getDataSize();
+		return getDataStart()+getDataCapacity();
 	}
 	
 	@SuppressWarnings("AutoBoxing")
@@ -217,7 +228,7 @@ public class Chunk{
 	}
 	
 	public long wholeSize(NumberSize nextType, NumberSize bodyType){
-		return headerSize(nextType, bodyType)+getDataSize();
+		return headerSize(nextType, bodyType)+getDataCapacity();
 	}
 	
 	public int getHeaderSize(){
@@ -231,7 +242,10 @@ public class Chunk{
 	}
 	
 	public void setUsed(long used){
-		if(used>getDataSize()) throw new IndexOutOfBoundsException(used+" > "+getDataSize());
+		if(used>getDataCapacity()) throw new IndexOutOfBoundsException(used+" > "+getDataCapacity());
+//		if(getOffset()==48){
+//			LogUtil.println("ay");
+//		}
 		this.used=used;
 		dirty=true;
 	}
@@ -257,11 +271,11 @@ public class Chunk{
 		notifyDependency();
 	}
 	
-	public void setDataSize(long dataSize) throws BitDepthOutOfSpaceException{
-		if(this.dataSize==dataSize) return;
+	public void setDataCapacity(long dataCapacity) throws BitDepthOutOfSpaceException{
+		if(this.dataCapacity==dataCapacity) return;
 		
-		getBodyType().ensureCanFit(dataSize);
-		this.dataSize=dataSize;
+		getBodyType().ensureCanFit(dataCapacity);
+		this.dataCapacity=dataCapacity;
 		dirty=true;
 		notifyDependency();
 	}
@@ -287,8 +301,8 @@ public class Chunk{
 		return next;
 	}
 	
-	public long getDataSize(){
-		return dataSize;
+	public long getDataCapacity(){
+		return dataCapacity;
 	}
 	
 	public NumberSize getBodyType(){
@@ -346,7 +360,7 @@ public class Chunk{
 		
 		saveHeader(os);
 		
-		var toZeroOut=getDataSize();
+		var toZeroOut=getDataCapacity();
 		if(initialData!=null){
 			os.write(initialData);
 			toZeroOut-=initialData.length;
@@ -376,14 +390,33 @@ public class Chunk{
 		return List.copyOf(chain);
 	}
 	
-	public Chunk moveTo(Chunk newChunk) throws IOException{
+	public void moveTo(Chunk newChunk) throws IOException{
+		if(DEBUG_VALIDATION){
+			Assert(getUsed()<=newChunk.getDataCapacity(), getUsed()+" can't fit in to "+newChunk.getDataCapacity());
+		}
+		try(var out=newChunk.io().write(false)){
+			try(var in=this.io().read()){
+				var buf=new byte[(int)Math.min(2048, getUsed())];
+				
+				var remaining=getUsed();
+				
+				while(remaining>0){
+					int read=in.read(buf, 0, (int)Math.min(remaining, buf.length));
+					out.write(buf, 0, read);
+					remaining-=read;
+				}
+			}
+		}
 		
-		Chunk oldReference=new Chunk(header, offset, nextType, next, bodyType, used, dataSize, true);
+		io=null;
+		headerWriteCache.clear();
+		
+		var oldOffset=offset;
 		
 		offset=newChunk.offset;
 		nextType=newChunk.nextType;
 		bodyType=newChunk.bodyType;
-		dataSize=newChunk.dataSize;
+		dataCapacity=newChunk.dataCapacity;
 		
 		try{
 			newChunk.setNext(next);
@@ -397,17 +430,10 @@ public class Chunk{
 		saveHeader();
 		newChunk.saveHeader();
 		
-		try(var out=newChunk.io().write(false)){
-			try(var in=newChunk.io().read()){
-				in.transferTo(out);
-			}
-		}
 		
 		notifyDependency();
 		
-		header.notifyMovement(oldReference.getOffset(), newChunk);
-		
-		return oldReference;
+		header.notifyMovement(oldOffset, newChunk.getOffset());
 	}
 	
 	public void notifyDependency(){
@@ -429,7 +455,7 @@ public class Chunk{
 		sb.append("[")
 		  .append(getUsed())
 		  .append("/")
-		  .append(getDataSize()).append(getBodyType().shotName)
+		  .append(getDataCapacity()).append(getBodyType().shotName)
 		  .append("]");
 		
 		sb.append(", @").append(getOffset());
@@ -441,7 +467,15 @@ public class Chunk{
 	}
 	
 	public String toShortString(){
-		return getUsed()+"/"+getDataSize()+getBodyType().shotName+"@"+getOffset();
+		StringBuilder b=new StringBuilder();
+		if(isChunkUsed()) b.append("free - ");
+		b.append(getUsed());
+		b.append("/");
+		b.append(getDataCapacity());
+		b.append(getBodyType().shotName);
+		b.append("@");
+		b.append(getOffset());
+		return b.toString();
 	}
 	
 }

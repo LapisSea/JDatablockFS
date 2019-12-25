@@ -47,7 +47,7 @@ class FSFTest{
 			return encoderArr[0];
 		};
 		
-		int[] counter={0};
+		int[] counter={1};
 		var   pool   =(ThreadPoolExecutor)Executors.newFixedThreadPool(1);
 		
 		Function<BufferedImage, BufferedImage> noAlpha=img->{
@@ -63,10 +63,12 @@ class FSFTest{
 		UnsafeConsumer<BufferedImage, IOException> doPng=img->ImageIO.write(img, "png", new File("snap"+(counter[0]++)+".png"));
 		UnsafeConsumer<BufferedImage, IOException> doJpg=img->ImageIO.write(noAlpha.apply(img), "jpg", new File("snap"+(counter[0]++)+".jpg"));
 		
+		UnsafeConsumer<BufferedImage, IOException> writer=null;
+		
 		UnsafeConsumer<BufferedImage, IOException> writeImg=img->{
 			pool.submit(()->{
 				try{
-					doPng.accept(img);
+					writer.accept(img);
 				}catch(Exception ex){
 					ex.printStackTrace();
 				}
@@ -74,7 +76,7 @@ class FSFTest{
 		};
 		
 		try{
-			var source=new IOInterface.FileRA(new File("testFileSystem.fsf"));
+			var source=new IOInterface.MemoryRA();
 			var fil   =new FileSystemInFile(source);
 			
 			
@@ -83,12 +85,13 @@ class FSFTest{
 				writeImg.accept(img);
 			};
 			UnsafeRunnable<IOException> snapshot=()->{};
-
-//			boolean moreLog=false;
-//
-//			if(moreLog) source.onWrite=snapshotIds;
-//			else snapshot=()->snapshotIds.accept(new long[0]);
 			
+			if(writer!=null){
+				boolean moreLog=writer==doMp4;
+				
+				if(moreLog) source.onWrite=snapshotIds;
+				else snapshot=()->snapshotIds.accept(new long[0]);
+			}
 			
 			snapshot.run();
 			
@@ -130,9 +133,9 @@ class FSFTest{
 			
 			
 			fil.defragment();
+			snapshot.run();
 			LogUtil.println(fil.getFile("test3").readAllString());
 			if(true) return;
-			snapshot.run();
 			
 			LogUtil.println(testFile.readAllString());
 			

@@ -1,9 +1,7 @@
 package com.lapissea.fsf;
 
-import com.lapissea.util.LogUtil;
-import com.lapissea.util.NotImplementedException;
-import com.lapissea.util.TextUtil;
-import com.lapissea.util.WeakValueHashMap;
+import com.lapissea.util.*;
+import com.lapissea.util.function.UnsafeFunction;
 
 import java.io.EOFException;
 import java.io.IOException;
@@ -13,93 +11,19 @@ import java.util.*;
 
 import static com.lapissea.fsf.FileSystemInFile.*;
 import static com.lapissea.fsf.NumberSize.*;
+import static com.lapissea.util.UtilL.*;
 
 @SuppressWarnings("AutoBoxing")
 public class Header{
-	
-	public enum Version{
-		V01(0, 1);
-		
-		public final byte major;
-		public final byte minor;
-		
-		Version(int major, int minor){
-			this.major=(byte)major;
-			this.minor=(byte)minor;
-		}
-		
-		public boolean is(byte[] versionBytes){
-			return versionBytes[0]==major&&versionBytes[1]==minor;
-		}
-	}
-	
-	private static class SizedNumber extends FileObject.FullLayout<SizedNumber> implements FixedLenList.ElementHead<SizedNumber, LongFileBacked>{
-		
-		private static final SequenceLayout<SizedNumber> LAYOUT=FileObject.sequenceBuilder(List.of(
-			new FileObject.FlagDef<>(BYTE,
-			                         (writer, head)->writer.writeEnum(head.size),
-			                         (reader, head)->head.size=reader.readEnum(NumberSize.class))
-		                                                                                          ));
-		
-		private NumberSize size;
-		
-		public SizedNumber(){
-			this(null);
-		}
-		
-		public SizedNumber(NumberSize size){
-			super(LAYOUT);
-			this.size=size;
-		}
-		
-		@Override
-		public SizedNumber copy(){
-			return new SizedNumber(size);
-		}
-		
-		@Override
-		public boolean willChange(LongFileBacked element){
-			return NumberSize.bySize(element.value).max(size)!=size;
-		}
-		
-		@Override
-		public void update(LongFileBacked element){
-			size=NumberSize.bySize(element.value).max(size);
-		}
-		
-		@Override
-		public int getElementSize(){
-			return size.bytes;
-		}
-		
-		@Override
-		public LongFileBacked newElement(){
-			return new LongFileBacked();
-		}
-		
-		@Override
-		public void readElement(ContentInputStream src, LongFileBacked dest) throws IOException{
-			dest.value=size.read(src);
-		}
-		
-		@Override
-		public void writeElement(ContentOutputStream dest, LongFileBacked src) throws IOException{
-			size.write(dest, src.value);
-		}
-		
-		@Override
-		public String toString(){
-			return size+"S";
-		}
-	}
 	
 	public static String normalizePath(String path){
 		var p=Paths.get(path).normalize().toString();
 		return p.equals(path)?path:p;
 	}
 	
-	private static final byte[]  MAGIC_BYTES="LSFSIF".getBytes(StandardCharsets.UTF_8);
-	private static final boolean LOG_ACTIONS=false;
+	private static final byte[]  MAGIC_BYTES     ="LSFSIF".getBytes(StandardCharsets.UTF_8);
+	public static final  int     FILE_HEADER_SIZE=MAGIC_BYTES.length+2;
+	private static final boolean LOG_ACTIONS     =true;
 	
 	public static byte[] getMagicBytes(){
 		return MAGIC_BYTES.clone();
@@ -116,7 +40,7 @@ public class Header{
 			out.write(latest.minor);
 			
 			OffsetIndexSortedList.init(out, pos, FILE_TABLE_PADDING);
-			FixedLenList.init(out, pos, new SizedNumber(BYTE), FREE_CHUNK_CAPACITY);
+			FixedLenList.init(out, pos, new SizedNumber(BYTE, ()->(long)(file.getSize()*1.5)), FREE_CHUNK_CAPACITY);
 			
 		}
 	}
@@ -130,9 +54,8 @@ public class Header{
 	private final Map<Long, Chunk>                          chunkCache=new WeakValueHashMap<Long, Chunk>().defineStayAlivePolicy(3);
 	
 	public Header(IOInterface source) throws IOException{
-		var minLen=MAGIC_BYTES.length+2;
 		try(var in=source.read(0)){
-			in.skipNBytes(minLen);
+			in.skipNBytes(FILE_HEADER_SIZE);
 		}catch(EOFException e){//new empty file
 			initEmptyFile(source);
 		}
@@ -162,21 +85,24 @@ public class Header{
 		
 		fileList=new OffsetIndexSortedList<>(()->new FilePointer(this), names, offsets);
 		
-		freeChunks=new FixedLenList<>(frees, new SizedNumber());
-		
-		LogUtil.println(freeChunks);
-		freeChunks.addElement(new LongFileBacked(155));
-		LogUtil.println(freeChunks);
-		freeChunks.removeElement(0);
-		LogUtil.println(freeChunks);
-		freeChunks.addElement(new LongFileBacked(135));
-		LogUtil.println(freeChunks);
-		freeChunks.addElement(new LongFileBacked(251));
-		LogUtil.println(freeChunks);
-		freeChunks.addElement(new LongFileBacked(2000));
-		LogUtil.println(freeChunks);
-		LogUtil.println(new FixedLenList<>(frees, new SizedNumber()));
-		System.exit(0);
+		freeChunks=new FixedLenList<>(frees, new SizedNumber(source::getSize));
+
+//		LogUtil.println(freeChunks);
+//		freeChunks.addElement(new LongFileBacked(20));
+//		LogUtil.println(freeChunks);
+//		freeChunks.addElement(new LongFileBacked(200));
+//		freeChunks.deb();
+//		freeChunks.ensureElementCapacity(3);
+//		freeChunks.ensureElementCapacity(4);
+//		freeChunks.deb();
+//		LogUtil.println(freeChunks);
+//		freeChunks.addElement(new LongFileBacked(2000));
+//		LogUtil.println(freeChunks);
+//		freeChunks.ensureElementCapacity(5);
+//		freeChunks.deb();
+//		LogUtil.println(freeChunks);
+//
+//		System.exit(0);
 	}
 	
 	public FilePointer getByPath(String path) throws IOException{
@@ -196,12 +122,16 @@ public class Header{
 		}
 		
 		
-		Chunk chunk=alocChunk(initialSize, NumberSize.bySize(initialSize));
+		Chunk chunk=alocChunk(initialSize, true);
 		fileList.addElement(new FilePointer(this, pat, chunk.getOffset()));
 		return chunk;
 	}
 	
-	private Chunk alocChunk(long initialSize, NumberSize bodyType) throws IOException{
+	private Chunk alocChunk(long initialSize, boolean allowNonOptimal) throws IOException{
+		return alocChunk(initialSize, NumberSize.bySize(initialSize), allowNonOptimal);
+	}
+	
+	private Chunk alocChunk(long initialSize, NumberSize bodyType, boolean allowNonOptimal) throws IOException{
 		if(!freeChunks.isEmpty()){
 			int   bestInd=-1;
 			Chunk best   =null;
@@ -209,7 +139,13 @@ public class Header{
 			
 			for(int i=0;i<freeChunks.size();i++){
 				Chunk c =getByOffset(freeChunks.getElement(i).value);
-				long  ds=c.getDataSize();
+				long  ds=c.getDataCapacity();
+				
+				if(!allowNonOptimal){
+					if(ds<initialSize){
+						continue;
+					}
+				}
 				
 				long newDiff=ds-initialSize;
 				
@@ -252,7 +188,7 @@ public class Header{
 	}
 	
 	private void mergeChunks(Chunk dest, Chunk toMerge) throws IOException, BitDepthOutOfSpaceException{
-		dest.setDataSize(toMerge.nextPhysicalOffset()-dest.getDataStart());
+		dest.setDataCapacity(toMerge.nextPhysicalOffset()-dest.getDataStart());
 		dest.syncHeader();
 	}
 	
@@ -270,13 +206,14 @@ public class Header{
 		try{
 			var sourceSize=source.getSize();
 			if(nextOffset >= sourceSize){//last at end of file
-				var oldDataSize=chunk.getDataSize();
+				var oldDataSize=chunk.getDataCapacity();
 				
-				chunk.setDataSize(chunk.getDataSize()+requestedMemory);
+				chunk.setDataCapacity(chunk.getDataCapacity()+requestedMemory);
 				chunk.syncHeader();
 				
-				try(var out=source.write(chunk.getDataStart()+oldDataSize, true)){
-					Utils.zeroFill(out, (int)requestedMemory);
+				try(var out=source.doRandom()){
+					out.setPos(chunk.getDataStart()+oldDataSize);
+					out.fillZero(requestedMemory);
 				}
 				if(LOG_ACTIONS) logChunkAction("GROWTH", chunk);
 				return;
@@ -307,17 +244,29 @@ public class Header{
 		
 		NumberSize bodyNum=chunk.getBodyType()
 		                        .next()
-		                        .min(NumberSize.bySize((long)(chunk.getDataSize()*1.3)))//don't overestimate chunk size of last was cut off
+		                        .min(NumberSize.bySize((long)(chunk.getDataCapacity()*1.3)))//don't overestimate chunk size of last was cut off
 		                        .max(NumberSize.bySize(initSize));//make sure init size can fit
 		
-		var newChunk=alocChunk(initSize, bodyNum);
+		var newChunk=alocChunk(initSize, bodyNum, true);
 		var off     =newChunk.getOffset();
 		try{
 			chunk.setNext(off);
 		}catch(BitDepthOutOfSpaceException e){
 			LogUtil.println("Failed to link "+newChunk+" to "+chunk+" because offset of "+off+" can not fit in to "+chunk.getNextType());
 			freeChunk(newChunk);
+			
+			var oldData=chainStart.io().readAll();//todo: remove sanity check
+			
 			rescueChain(chainStart, requestedMemory);
+			
+			var newData=chainStart.io().readAll();
+			
+			if(!Arrays.equals(oldData, newData)){
+				LogUtil.println(oldData);
+				LogUtil.println(newData);
+				throw new RuntimeException("rescue chain fail");
+			}
+			
 			return;
 		}
 		
@@ -327,6 +276,8 @@ public class Header{
 	}
 	
 	private void rescueChain(Chunk chainStart, long additionalSpace) throws IOException{
+		freeChunks.deb();
+		
 		var chain=chainStart.loadWholeChain();
 		
 		for(int i=chain.size()-1;i >= 0;i--){
@@ -334,44 +285,46 @@ public class Header{
 			if(chunk.getNextType().canFit(source.getSize())){
 				var toFree=chain.subList(i+1, chain.size());
 				
-				var toFreeSize=toFree.stream().mapToLong(Chunk::getUsed).sum();
+				LogUtil.println(toFree);
 				
-				var alocSize=toFreeSize+additionalSpace;
-				var newChunk=alocChunk(alocSize, NumberSize.bySize(alocSize));
+				var alocSize=toFree.stream().mapToLong(Chunk::getUsed).sum()+additionalSpace;
+				var newChunk=alocChunk(alocSize, true);
 				
-				try(var out=newChunk.io().write(false)){
-					for(Chunk old : toFree){
-						try(var in=old.io().read()){
+				if(!toFree.isEmpty()){
+					try(var out=newChunk.io().write(false)){
+						try(var in=toFree.get(0).io().read()){
 							in.transferTo(out);
 						}
 					}
+					
 				}
 				
-				freeChunkChain(toFree.get(0));
 				try{
 					chunk.setNext(newChunk);
 				}catch(BitDepthOutOfSpaceException e){
 					throw new RuntimeException(e);//should never happen
+				}finally{
+					freeChunks.deb();
+					
+					if(!toFree.isEmpty()){
+						freeChunkChain(toFree.get(0));
+					}
 				}
 				return;
 			}
 		}
 		
-		var toFreeSize=chain.stream().mapToLong(Chunk::getUsed).sum();
 		
-		var alocSize=toFreeSize+additionalSpace;
-		var newChunk=alocChunk(alocSize, NumberSize.bySize(alocSize));
+		var alocSize=chain.stream().mapToLong(Chunk::getUsed).sum()+additionalSpace;
 		
-		chainStart.moveTo(newChunk);
+		chainStart.moveTo(alocChunk(alocSize, false));
 		
 		try(var out=chainStart.io().write(false)){
-			for(int i=1;i<chain.size();i++){
-				Chunk old=chain.get(i);
-				try(var in=old.io().read()){
-					in.transferTo(out);
-				}
+			try(var in=chain.get(1).io().read()){
+				in.transferTo(out);
 			}
 		}
+		freeChunkChain(chain.get(1));
 	}
 	
 	public void freeChunkChain(Chunk chunk) throws IOException{
@@ -393,8 +346,9 @@ public class Header{
 		var offset    =chunk.getOffset();
 		var nextOffset=chunk.nextPhysicalOffset();
 		
-		if(freeChunks.isEmpty()) freeChunks.addElement(new LongFileBacked(offset));
-		else{
+		if(freeChunks.isEmpty()){
+			freeChunks.addElement(new LongFileBacked(offset));
+		}else{
 			var ind=freeChunks.indexOf(new LongFileBacked(nextOffset));
 			
 			if(ind==-1){
@@ -413,7 +367,7 @@ public class Header{
 				else{
 					//merge chunk with previous
 					try{
-						previous.setDataSize(chunk.nextPhysicalOffset()-previous.getDataStart());
+						previous.setDataCapacity(chunk.nextPhysicalOffset()-previous.getDataStart());
 						previous.syncHeader();
 						return;//don't sync chunk header bc it does not exist anymore
 					}catch(BitDepthOutOfSpaceException ignored){ }
@@ -461,7 +415,7 @@ public class Header{
 		List<Chunk> result=new ArrayList<>();
 		
 		if(includeHeader){
-			result.addAll(headerChunks());
+			result.addAll(headerStartChunks());
 		}
 		
 		for(var pointer : fileList){
@@ -482,42 +436,50 @@ public class Header{
 		return result;
 	}
 	
-	private long calcTotalUsage(List<Chunk> chain){
-		return chain.stream().mapToLong(Chunk::getUsed).sum();
+	private long calcTotalDataSize(List<Chunk> chain){
+		return chain.stream().mapToLong(Chunk::getDataCapacity).sum();
 	}
 	
+	private Chunk firstChunk() throws IOException{
+		return getByOffset((long)FILE_HEADER_SIZE);
+	}
 	
 	public void defragment() throws IOException{
-//		LogUtil.println("defragmenting not implemented");
-//		if(true) throw null;
+		LogUtil.println("defragment start");
 		
-		var headerChunks=headerChunks();
+		freeChunks.deb();
 		
-		long pos=headerChunks.get(0).getOffset();
+		var firstChunk=firstChunk();
 		
-		long headerUsage=0;
-		var  headerDirty=false;
-		for(Chunk headerChunk : headerChunks){
-			var chain=headerChunk.loadWholeChain();
-			if(!headerDirty){
-				if(chain.size()>1) headerDirty=true;
-				else{
-					var last=chain.get(chain.size()-1);
-					if(last.getDataSize()!=last.getUsed()) headerDirty=true;
-				}
-			}
-			var usage=calcTotalUsage(chain);
-			
-			headerUsage+=Chunk.headerSize(source.getSize(), usage)+usage*1.3;
+		var headerChunks=headerStartChunks();
+		headerChunks.sort(Comparator.comparingLong(Chunk::getOffset));
+		
+		var headerChains=new ArrayList<List<Chunk>>(headerChunks.size());
+		for(Chunk chunk : headerChunks){
+			headerChains.add(chunk.loadWholeChain());
 		}
 		
-		if(headerDirty){
-			//clear space
+		long[] headerDataUsages      =headerChains.stream().mapToLong(this::calcTotalDataSize).toArray();
+		long[] headerDataUsagesPadded=Arrays.stream(headerDataUsages).map(l->(long)(l*1.3)).toArray();
+		
+		
+		UnsafeFunction<Long, Long, IOException> calcHeaderUsage=fileSizeO->{
+			long fileSize=fileSizeO;
+			long sum     =0;
 			
-			long        toClear  =headerUsage;
-			long        cleared  =0;
-			var         nextChunk=headerChunks.get(0);
-			List<Chunk> toMove   =new ArrayList<>();
+			for(var usage : headerDataUsagesPadded){
+				sum+=Chunk.headerSize(fileSize, usage)+usage;
+			}
+			
+			return sum;
+		};
+		
+		UnsafeFunction<Long, PairM<List<Chunk>, Long>, IOException> calcToCLear=toCLearO->{
+			long toClear=toCLearO;
+			
+			long cleared  =0;
+			var  nextChunk=firstChunk;
+			var  toMove   =new ArrayList<Chunk>();
 			
 			do{
 				cleared+=nextChunk.wholeSize();
@@ -526,50 +488,119 @@ public class Header{
 				if(nextChunk==null) throw new NullPointerException();//should never happen??
 			}while(toClear>cleared);
 			
-			var neededFreeChunks=freeChunks.size()+toMove.size();
-			if(freeChunks.ensureElementCapacity(neededFreeChunks)){
-				defragment();
-				return;
-			}
+			return new PairM<>(toMove, cleared);
+		};
+		
+		long        headerUsage;
+		List<Chunk> toMove;
+		long        cleared;
+		long        predictedSize;
+		NumberSize  fileSafeSizeMod;
+		
+		while(true){
 			
-			NumberSize size=NumberSize.bySize(source.getSize()+cleared);
+			headerUsage=calcHeaderUsage.apply(source.getSize());
+			do{
+				var p=calcToCLear.apply(headerUsage);
+				toMove=p.obj1;
+				cleared=p.obj2;
+				
+				predictedSize=source.getSize()+cleared;
+				headerUsage=calcHeaderUsage.apply(predictedSize);
+				
+				LogUtil.println(headerUsage, cleared);
+			}while(headerUsage>cleared);
+			
+			fileSafeSizeMod=NumberSize.bySize(predictedSize);
+			LogUtil.println(fileSafeSizeMod);
+			
+			var neededFreeChunks=freeChunks.size()+toMove.size()*2;
+			LogUtil.println("neededFreeChunks", neededFreeChunks);
+			
+			if(freeChunks.ensureElementCapacity(neededFreeChunks)) continue;
 			
 			long needed=0;
 			
 			for(int i=0;i<fileList.size();i++){
 				var p=fileList.getByIndex(i);
-				needed+=new FilePointer(this, p.getLocalPath(), size, p.getStart()).length();
+				needed+=new FilePointer(this, p.getLocalPath(), fileSafeSizeMod, p.getStart()).length();
 			}
 			
-			if(fileList.ensureCapacity(needed)){
-				defragment();
-				return;
-			}
-			
-			List<Chunk> oldLocations=new ArrayList<>();
-			
-			LogUtil.println(toMove.stream().map(Chunk::getOffset));
-			LogUtil.println(headerChunks.stream().map(Chunk::getOffset));
-			
-			for(Chunk chunk : toMove){
-				LogUtil.printTable(chunk);
-				
-				var   siz     =chunk.getDataSize();
-				Chunk newChunk=alocChunk(siz, NumberSize.bySize(siz));
-				
-				oldLocations.add(chunk.moveTo(newChunk));
-				LogUtil.printTable(chunk);
-//				LogUtil.println("ay");
-			}
-			LogUtil.println(headerChunks.stream().map(Chunk::getOffset));
+			LogUtil.println("needed file list memory", needed);
+			if(fileList.ensureCapacity(needed)) continue;
 			
 			
+			break;
+		}
+		
+		NumberSize fileSafeSize=fileSafeSizeMod;
+		
+		long[] headerDataUsagesFinal=headerDataUsagesPadded.clone();
+		
+		{
+			var headerSizes  =Arrays.stream(headerDataUsagesPadded).map(siz->Chunk.headerSize(fileSafeSize, siz)).toArray();
+			var freeDataSpace=cleared-Arrays.stream(headerSizes).sum();
+			
+			fairDistribute(headerDataUsagesFinal, freeDataSpace);
 		}
 		
 		
+		for(Chunk chunk : toMove){
+			var siz=chunk.getDataCapacity();
+			
+			chunk.moveTo(alocChunk(siz, false));
+		}
+		
+		long counter=firstChunk.getOffset();
+		
+		for(int i=0, j=headerChains.size();i<j;i++){
+			var   chain      =headerChains.get(i);
+			Chunk headerChunk=chain.get(0);
+			
+			long siz=headerDataUsagesFinal[i];
+			
+			headerChunk.moveTo(new Chunk(this, counter, bySize(source.getSize()), 0, bySize(siz), siz));
+			
+			counter+=headerChunk.getHeaderSize()+siz;
+			
+			if(chain.size()>1){
+				try(var out=headerChunk.io().write(headerChunk.getUsed(), false)){
+					
+					try(var in=chain.get(1).io().read()){
+						in.transferTo(out);
+					}
+				}
+				
+				freeChunkChain(chain.get(1));
+			}
+		}
+		
 	}
 	
-	public List<Chunk> headerChunks(){
+	private void fairDistribute(long[] values, long toDistribute){
+		
+		long totalUsage=Arrays.stream(values).sum();
+		
+		var free=toDistribute-totalUsage;
+		
+		if(free>0){
+			int toUse=values.length;
+			do{
+				var bulkAdd=free/toUse;
+				
+				for(int i=0;i<toUse;i++){
+					values[i]+=bulkAdd;
+					free-=bulkAdd;
+				}
+				toUse--;
+			}while(free>0);
+		}else{
+			Assert(free==0);
+		}
+		
+	}
+	
+	public List<Chunk> headerStartChunks(){
 		List<Chunk> arll=new ArrayList<>(fileList.getShadowChunks());
 		arll.addAll(freeChunks.getShadowChunks());
 		return arll;
@@ -594,14 +625,14 @@ public class Header{
 		return result;
 	}
 	
-	public void notifyMovement(long oldOffset, Chunk newChunk) throws IOException{
+	public void notifyMovement(long oldOffset, long newOffset) throws IOException{
 		chunkCache.remove(oldOffset);
 		
 		for(int i=0;i<fileList.size();i++){
 			FilePointer p=fileList.getByIndex(i);
 			
 			if(p.getStart()==oldOffset){
-				fileList.setByIndex(i, new FilePointer(this, p.getLocalPath(), p.getStartSize().max(NumberSize.bySize(newChunk.getOffset())), newChunk.getOffset()));
+				fileList.setByIndex(i, new FilePointer(this, p.getLocalPath(), p.getStartSize().max(NumberSize.bySize(newOffset)), newOffset));
 				return;
 			}
 			
@@ -609,7 +640,7 @@ public class Header{
 			do{
 				if(chunk.getNext()==oldOffset){
 					try{
-						chunk.setNext(newChunk.getOffset());
+						chunk.setNext(newOffset);
 					}catch(BitDepthOutOfSpaceException e){
 						throw new NotImplementedException(e);//todo implement handling this by copying the chunk to end
 					}

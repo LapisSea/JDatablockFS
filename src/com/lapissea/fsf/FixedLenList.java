@@ -6,15 +6,18 @@ import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static com.lapissea.fsf.FileSystemInFile.*;
+import static com.lapissea.util.UtilL.*;
+
 @SuppressWarnings("AutoBoxing")
 public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E> extends AbstractList<E> implements ShadowChunks{
 	
 	public interface ElementHead<SELF, E>{
 		SELF copy();
 		
-		boolean willChange(E element);
+		boolean willChange(E element) throws IOException;
 		
-		void update(E element);
+		void update(E element) throws IOException;
 		
 		
 		int getElementSize();
@@ -27,24 +30,8 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 		void writeElement(ContentOutputStream dest, E src) throws IOException;
 	}
 	
-	
-	private static final NumberSize LIST_SIZE=NumberSize.INT;
-	
-	private static final FileObject.SequenceLayout<FixedLenList<?, ?>> HEADER_LAYOUT=
-		FileObject.sequenceBuilder(List.of(
-			new FileObject.NumberDef<>(LIST_SIZE,
-			                           FixedLenList::size,
-			                           (l, val)->l.size=(int)val),
-			new FileObject.ObjDef<>(l->l.header,
-			                        (l, h)->{ throw new ShouldNeverHappenException(); },
-			                        l->{ throw new ShouldNeverHappenException(); }
-			)));
-	
 	public static <H extends FileObject&ElementHead<H, ?>> void init(ContentOutputStream out, long[] pos, H header, int initialCapacity) throws IOException{
-		Chunk.init(out, pos[0], NumberSize.SHORT, (LIST_SIZE.bytes+header.length())+initialCapacity*header.getElementSize(), data->{
-			LIST_SIZE.write(data, 0);
-			header.write(data);
-		});
+		Chunk.init(out, pos[0], NumberSize.SHORT, (header.length())+initialCapacity*header.getElementSize(), header::write);
 	}
 	
 	private final Chunk       chunk;
@@ -55,14 +42,20 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 	
 	private final WeakValueHashMap<Integer, E> cache=new WeakValueHashMap<>();
 	
+	/**
+	 * @param chunk       Chunk where the data will be read and written to. (and any chunks that are a part of a {@link ChunkChain} whos root is this chunk.
+	 * @param initialHead Object that serves to define how to read/write and possibly call for reformation of all elements in this list.
+	 *                    Its size must not change as the list does not support dynamic size headers. The list will not defend against this and corruption will possibly occur.
+	 */
 	public FixedLenList(Chunk chunk, H initialHead) throws IOException{
 		this.chunk=chunk;
 		data=chunk.io();
 		header=initialHead;
 		
 		try(var in=data.read()){
-			HEADER_LAYOUT.read(in, this);
+			header.read(in);
 		}
+		calcSize();
 	}
 	
 	@Override
@@ -75,21 +68,23 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 		return size;
 	}
 	
-	private void setSize(int size) throws IOException{
-		this.size=size;
-		try(var out=data.write(false)){
-			LIST_SIZE.write(out, size);
-		}
-		
-		data.setCapacity(calcPos(size));
+	private long calcDataSize() throws IOException{
+		return data.getSize()-header.length();
 	}
 	
-	private long headerLength(){
-		return HEADER_LAYOUT.length(this);
+	private void calcSize() throws IOException{
+		size=Math.toIntExact(calcDataSize()/header.getElementSize());
+	}
+	
+	private void setSize(int size) throws IOException{
+		this.size=size;
+		data.setCapacity(calcPos(size));
+		calcSize();
+		Assert(size==this.size);
 	}
 	
 	private long calcPos(int index){
-		return headerLength()+header.getElementSize()*index;
+		return header.length()+header.getElementSize()*index;
 	}
 	
 	public E getElement(int index) throws IOException{
@@ -100,29 +95,31 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 		Objects.checkIndex(index, size());
 		
 		var cached=cache.get(index);
+		if(!DEBUG_VALIDATION){
+			if(cached!=null) return cached;
+		}
 		
 		E e=header.newElement();
 		try(var in=data.read(calcPos(index))){
 			header.readElement(in, e);
 		}
 		
-		if(cached!=null){
-			if(!e.equals(cached)){
-				Map<Integer, E> disk=new LinkedHashMap<>();
-				for(int i=0;i<size();i++){
-					E d=header.newElement();
-					try(var in=data.read(calcPos(i))){
-						header.readElement(in, d);
+		if(DEBUG_VALIDATION){
+			if(cached!=null){
+				if(!e.equals(cached)){
+					Map<Integer, E> disk=new LinkedHashMap<>();
+					for(int i=0;i<size();i++){
+						E d=header.newElement();
+						try(var in=data.read(calcPos(i))){
+							header.readElement(in, d);
+						}
+						disk.put(i, d);
 					}
-					disk.put(i, d);
+					
+					throw new AssertionError("\n"+TextUtil.toTable("cache mismatch", List.of(disk, cache)));
 				}
-				
-				LogUtil.println(data);
-				
-				LogUtil.println(TextUtil.toTable("cache mismatch", List.of(disk, cache)));
-				throw new AssertionError();
+				return cached;
 			}
-			return cached;//TODO: disable sanity check
 		}
 		
 		cache.put(index, e);
@@ -146,11 +143,9 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 		
 		byte[] buffer   =new byte[newSiz];
 		var    bufferOut=new ContentOutputStream.BA(buffer);
-
-//		data.setCapacity(headerLength()+size()*header.getElementSize());
 		
 		try(var out=data.write(true)){
-			HEADER_LAYOUT.write(out, this);
+			header.write(out);
 			
 			
 			for(E e : elementBuffer){
@@ -160,33 +155,32 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 				out.write(buffer);
 			}
 		}
+		
+		LogUtil.println(data.getSize(), data.getCapacity(), elementBuffer);
+		
+		var oldSize=size;
+		calcSize();
+		Assert(oldSize==size, oldSize+" "+size);
 	}
 	
 	public void addElement(E e) throws IOException{
-		LogUtil.println("adding", e);
 		updateHeader(e);
 		
 		int index  =size();
 		int newSize=index+1;
 		
 		cache.put(index, e);
-
-
-//		LogUtil.println(data);
-//		LogUtil.println(data.readAll());
-		
-		setSize(newSize);
 		
 		try(var out=data.write(calcPos(index), true)){
-//			LogUtil.println(index, out);
-			
-			byte[] buffer=new byte[header.getElementSize()];
-			header.writeElement(new ContentOutputStream.BA(buffer), e);
-			out.write(buffer);
 
-//			LogUtil.println("b", out);
+//			byte[] buffer=new byte[header.getElementSize()];
+//			var dest=new ContentOutputStream.BA(buffer);
+			header.writeElement(out, e);
+//			out.write(buffer);
+			
 		}
-//		LogUtil.println(data.readAll());
+		
+		calcSize();
 	}
 	
 	public void setElement(int index, E element) throws IOException{
@@ -196,8 +190,6 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 			addElement(element);
 			return;
 		}
-		
-		LogUtil.println("setting", element, "at", index);
 		
 		Objects.checkIndex(index, size());
 		
@@ -223,8 +215,6 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 	public void removeElement(int index) throws IOException{
 		Objects.checkIndex(index, size());
 		int newSize=size()-1;
-		
-		LogUtil.println("removing at", index);
 		
 		//removing last element can be done by simply declaring it not inside list
 		if(newSize==index){
@@ -263,15 +253,15 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 	}
 	
 	public long capacity() throws IOException{
-		var dataSize=data.getCapacity()-headerLength();
-		return dataSize/header.getElementSize();
+		var dataCapacity=data.getCapacity()-header.length();
+		return dataCapacity/header.getElementSize();
 	}
 	
 	public boolean ensureElementCapacity(int capacity) throws IOException{
 		if(size() >= capacity) return false;
-		var neededSize=capacity*header.getElementSize()+headerLength();
-		if(data.getCapacity() >= neededSize) return false;
-		data.setCapacity(neededSize);
+		var neededCapacity=capacity*header.getElementSize()+header.length();
+		if(data.getCapacity() >= neededCapacity) return false;
+		data.setCapacity(neededCapacity);
 		
 		return true;
 	}
@@ -330,10 +320,15 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 	
 	@Override
 	public String toString(){
-		try{
-			return header+" -> ["+stream().map(Object::toString).collect(Collectors.joining(", "))+"] raw: "+TextUtil.toString(data.readAll());
-		}catch(IOException e){
-			throw UtilL.uncheckedThrow(e);
-		}
+		return header+" -> ["+stream().map(Object::toString).collect(Collectors.joining(", "))+"]";
+	}
+	
+	public void deb() throws IOException{
+//		LogUtil.println(header);
+//		LogUtil.println(size);
+//		LogUtil.println(data);
+//		LogUtil.println(data.readAll());
+//
+//		LogUtil.println(calcPos(size), data.getSize());
 	}
 }
