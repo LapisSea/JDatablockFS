@@ -167,46 +167,63 @@ public abstract class FileObject{
 		}
 	}
 	
+	public static final SequenceLayout<Object> EMPTY_SEQUENCE=new SequenceLayout<>(){
+		@Override
+		public void write(ContentOutputStream stream, Object source){}
+		
+		@Override
+		public void read(ContentInputStream stream, Object dest){}
+		
+		@Override
+		public long length(Object source){ return 0; }
+	};
+	
+	private static class SequenceLayoutArrImpl<T> implements SequenceLayout<T>{
+		private final ObjectDef<T>[] arr;
+		
+		private final ByteArrayOutputStream os =new ByteArrayOutputStream();
+		private final ContentOutputStream   buf=new ContentOutputStream.Wrapp(os);
+		
+		private SequenceLayoutArrImpl(ObjectDef<T>[] arr){
+			this.arr=arr;
+		}
+		
+		@Override
+		public void write(ContentOutputStream stream, T source) throws IOException{
+			synchronized(this){
+				os.reset();
+				
+				for(var value : arr){
+					value.write(buf, source);
+				}
+				
+				Assert(os.size()==length(source));
+				os.writeTo(stream);
+			}
+		}
+		
+		@Override
+		public void read(ContentInputStream stream, T dest) throws IOException{
+			for(var value : arr){
+				value.read(stream, dest);
+			}
+		}
+		
+		@Override
+		public long length(T source){
+			long sum=0;
+			for(ObjectDef<T> v : arr){
+				long length=v.length(source);
+				sum+=length;
+			}
+			return sum;
+		}
+	}
+	
 	@SuppressWarnings("unchecked")
 	public static <T, Vs> SequenceLayout<T> sequenceBuilder(List<ObjectDef<T>> values){
-		ObjectDef<T>[] arr=values.toArray(ObjectDef[]::new);
-		
-		return new SequenceLayout<>(){
-			
-			ByteArrayOutputStream os=new ByteArrayOutputStream();
-			ContentOutputStream buf=new ContentOutputStream.Wrapp(os);
-			
-			@Override
-			public void write(ContentOutputStream stream, T source) throws IOException{
-				synchronized(this){
-					os.reset();
-					
-					for(var value : arr){
-						value.write(buf, source);
-					}
-					
-					Assert(os.size()==length(source));
-					os.writeTo(stream);
-				}
-			}
-			
-			@Override
-			public void read(ContentInputStream stream, T dest) throws IOException{
-				for(var value : arr){
-					value.read(stream, dest);
-				}
-			}
-			
-			@Override
-			public long length(T source){
-				long sum=0;
-				for(ObjectDef<T> v : arr){
-					long length=v.length(source);
-					sum+=length;
-				}
-				return sum;
-			}
-		};
+		if(values.isEmpty()) return (SequenceLayout<T>)EMPTY_SEQUENCE;
+		return new SequenceLayoutArrImpl<>(values.toArray(ObjectDef[]::new));
 	}
 	
 	public static class FullLayout<SELF extends FullLayout<SELF>> extends FileObject{

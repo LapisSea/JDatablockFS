@@ -31,7 +31,7 @@ public interface RandomIO extends AutoCloseable, Flushable, ContentWriter, Conte
 	
 	default long skip(long n) throws IOException{
 		long toSkip=Math.min(n, remaining());
-		setPos(getPos());
+		setPos(getPos()+toSkip);
 		return toSkip;
 	}
 	

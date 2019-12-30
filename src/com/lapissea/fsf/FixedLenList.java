@@ -1,6 +1,9 @@
 package com.lapissea.fsf;
 
-import com.lapissea.util.*;
+import com.lapissea.util.NotNull;
+import com.lapissea.util.TextUtil;
+import com.lapissea.util.UtilL;
+import com.lapissea.util.WeakValueHashMap;
 
 import java.io.IOException;
 import java.util.*;
@@ -30,27 +33,35 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 		void writeElement(ContentOutputStream dest, E src) throws IOException;
 	}
 	
-	public static <H extends FileObject&ElementHead<H, ?>> void init(ContentOutputStream out, long[] pos, H header, int initialCapacity) throws IOException{
-		Chunk.init(out, pos[0], NumberSize.SHORT, (header.length())+initialCapacity*header.getElementSize(), header::write);
+	public static <H extends FileObject&ElementHead<H, ?>> void init(ContentOutputStream out, H header, int initialCapacity) throws IOException{
+		Chunk.init(out, NumberSize.SHORT, (header.length())+initialCapacity*header.getElementSize(), header::write);
 	}
 	
-	private final Chunk       chunk;
-	private final IOInterface data;
-	private final H           header;
-	private       int         size;
+	public static <T, H extends FileObject&ElementHead<H, T>> void init(ContentOutputStream out, H header, List<T> initialElements) throws IOException{
+		Chunk.init(out, NumberSize.SHORT, (header.length())+initialElements.size()*header.getElementSize(), dest->{
+			header.write(dest);
+			for(T e : initialElements){
+				header.writeElement(dest, e);
+			}
+		});
+	}
+	
+	private final ChunkIO data;
+	private final H       header;
+	private       int     size;
+	private       boolean leaveMeAlone;
 	
 	
 	private final WeakValueHashMap<Integer, E> cache=new WeakValueHashMap<>();
 	
 	/**
-	 * @param chunk       Chunk where the data will be read and written to. (and any chunks that are a part of a {@link ChunkChain} whos root is this chunk.
 	 * @param initialHead Object that serves to define how to read/write and possibly call for reformation of all elements in this list.
 	 *                    Its size must not change as the list does not support dynamic size headers. The list will not defend against this and corruption will possibly occur.
+	 * @param chunk       Chunk where the data will be read and written to. (and any chunks that are a part of a {@link ChunkChain} whos root is this chunk.
 	 */
-	public FixedLenList(Chunk chunk, H initialHead) throws IOException{
-		this.chunk=chunk;
-		data=chunk.io();
+	public FixedLenList(H initialHead, Chunk chunk) throws IOException{
 		header=initialHead;
+		data=chunk.io();
 		
 		try(var in=data.read()){
 			header.read(in);
@@ -58,13 +69,18 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 		calcSize();
 	}
 	
+	public int getElementSize(){
+		return header.getElementSize();
+	}
+	
 	@Override
 	public List<Chunk> getShadowChunks(){
-		return List.of(chunk);
+		return List.of(data.getRoot());
 	}
 	
 	@Override
 	public int size(){
+		if(leaveMeAlone) return 0;
 		return size;
 	}
 	
@@ -78,7 +94,9 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 	
 	private void setSize(int size) throws IOException{
 		this.size=size;
+		
 		data.setCapacity(calcPos(size));
+		
 		calcSize();
 		Assert(size==this.size);
 	}
@@ -155,8 +173,6 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 				out.write(buffer);
 			}
 		}
-		
-		LogUtil.println(data.getSize(), data.getCapacity(), elementBuffer);
 		
 		var oldSize=size;
 		calcSize();
@@ -321,14 +337,5 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 	@Override
 	public String toString(){
 		return header+" -> ["+stream().map(Object::toString).collect(Collectors.joining(", "))+"]";
-	}
-	
-	public void deb() throws IOException{
-//		LogUtil.println(header);
-//		LogUtil.println(size);
-//		LogUtil.println(data);
-//		LogUtil.println(data.readAll());
-//
-//		LogUtil.println(calcPos(size), data.getSize());
 	}
 }

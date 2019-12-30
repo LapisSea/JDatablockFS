@@ -2,11 +2,11 @@ package com.lapissea.fsf;
 
 import java.io.IOException;
 
-public class LongFileBacked extends FileObject implements Comparable<LongFileBacked>{
+public class ChunkPointer extends FileObject implements Comparable<ChunkPointer>{
 	
 	public long value;
 	
-	public LongFileBacked(){
+	public ChunkPointer(){
 		this(-1);
 	}
 	
@@ -15,7 +15,11 @@ public class LongFileBacked extends FileObject implements Comparable<LongFileBac
 		value=dest.readLong();
 	}
 	
-	public LongFileBacked(long value){
+	public ChunkPointer(Chunk chunk){
+		this(chunk.getOffset());
+	}
+	
+	public ChunkPointer(long value){
 		this.value=value;
 	}
 	
@@ -30,16 +34,20 @@ public class LongFileBacked extends FileObject implements Comparable<LongFileBac
 	}
 	
 	@Override
-	public int compareTo(LongFileBacked o){
+	public int compareTo(ChunkPointer o){
 		return Long.compare(value, o.value);
 	}
 	
 	@Override
 	public boolean equals(Object o){
 		if(this==o) return true;
-		if(!(o instanceof LongFileBacked)) return false;
-		var other=(LongFileBacked)o;
-		return value==other.value;
+		if(!(o instanceof ChunkPointer)) return false;
+		var other=(ChunkPointer)o;
+		return equals(other.value);
+	}
+	
+	public boolean equals(long ptr){
+		return value==ptr;
 	}
 	
 	@Override
@@ -50,5 +58,9 @@ public class LongFileBacked extends FileObject implements Comparable<LongFileBac
 	@Override
 	public String toString(){
 		return Long.toString(value);
+	}
+	
+	public Chunk dereference(Header header) throws IOException{
+		return header.getByOffset(value);
 	}
 }

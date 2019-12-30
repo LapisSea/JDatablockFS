@@ -9,6 +9,9 @@ import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static com.lapissea.fsf.FileSystemInFile.*;
+import static com.lapissea.util.UtilL.*;
+
 public class ChunkChain extends AbstractList<Chunk>{
 	
 	private long[]  capacityOffsets=new long[2];
@@ -22,6 +25,38 @@ public class ChunkChain extends AbstractList<Chunk>{
 		addChunk(root);
 	}
 	
+	private class InvRef implements Runnable{
+		Chunk     c;
+		Throwable t=new Throwable("local stack reference");
+		
+		public InvRef(Chunk ch){
+			this.c=ch;
+		}
+		
+		@Override
+		public void run(){
+			invalidate();
+		}
+		
+		@Override
+		public String toString(){
+			return "\nREFERENCE\n"+Arrays.stream(t.getStackTrace()).map(Objects::toString).collect(Collectors.joining("\n"));
+		}
+		
+		@Override
+		public boolean equals(Object o){
+			if(this==o) return true;
+			if(!(o instanceof InvRef)) return false;
+			InvRef runnable=(InvRef)o;
+			return Objects.equals(c, runnable.c);
+		}
+		
+		@Override
+		public int hashCode(){
+			return Objects.hash(c);
+		}
+	}
+	
 	private void addChunk(Chunk chunk){
 		
 		if(size >= chunks.length){
@@ -32,19 +67,26 @@ public class ChunkChain extends AbstractList<Chunk>{
 		
 		if(size==0) capacityOffsets[size]=0;
 		else{
-			var prev=size-1;
-			capacityOffsets[size]=capacityOffsets[prev]+chunks[prev].getDataCapacity();
+			var prev=lastIndex();
+			capacityOffsets[size]=capacityOffsets[prev]+chunks[prev].getCapacity();
 		}
 		
 		chunks[size]=chunk;
 		size++;
 		
-		chunk.dependencyInvalidate.add(this::invalidate);
+		
+		chunk.dependencyInvalidate.add(new InvRef(chunk));
+	}
+	
+	private int lastIndex(){
+		return size-1;
 	}
 	
 	private void invalidate(){
 		if(size==1) return;
 		for(int i=1;i<size;i++){
+			var chunk=chunks[i];
+			chunk.dependencyInvalidate.remove(new InvRef(chunk));
 			chunks[i]=null;
 		}
 		size=1;
@@ -54,8 +96,17 @@ public class ChunkChain extends AbstractList<Chunk>{
 		}
 	}
 	
-	private Chunk getLast(){
-		return chunks[size-1];
+	private Chunk getRoot(){
+		return chunks[0];
+	}
+	
+	private Chunk getLast() throws IOException{
+		readAll();
+		return getLastUnsafe();
+	}
+	
+	private Chunk getLastUnsafe(){
+		return chunks[lastIndex()];
 	}
 	
 	@Override
@@ -68,8 +119,8 @@ public class ChunkChain extends AbstractList<Chunk>{
 		return size;
 	}
 	
-	private void readAll() throws IOException{
-		var next=getLast();
+	public void readAll() throws IOException{
+		var next=getLastUnsafe();
 		
 		while(true){
 			next=next.nextChunk();
@@ -78,7 +129,17 @@ public class ChunkChain extends AbstractList<Chunk>{
 		}
 	}
 	
-	public long getChainSpaceOffset(int index){
+	public long getChainSpaceSizeOffset(int index) throws IOException{
+		readAll();
+		Objects.checkIndex(index, size);
+		
+		return Arrays.stream(chunks)
+		             .limit(index)
+		             .mapToLong(Chunk::getSize)
+		             .sum();
+	}
+	
+	public long getChainSpaceCapacityOffset(int index){
 		Objects.checkIndex(index, size);
 		return capacityOffsets[index];
 	}
@@ -94,7 +155,7 @@ public class ChunkChain extends AbstractList<Chunk>{
 		
 		while(index >= size){
 			try{
-				var last=getLast();
+				var last=getLastUnsafe();
 				var next=last.nextChunk();
 				if(next==null) return null;
 				addChunk(next);
@@ -126,23 +187,28 @@ public class ChunkChain extends AbstractList<Chunk>{
 	}
 	
 	public void growBy(long amount) throws IOException{
-		var last=getLast();
-		last.header.requestMemory(chunks[0], last, amount);
+		
+		long oldCapacity;
+		if(DEBUG_VALIDATION){
+			oldCapacity=getTotalCapacity();
+		}
+		
+		Chunk root=getRoot(), last=getLast();
+		last.header.requestMemory(root, last, amount);
+		
+		if(DEBUG_VALIDATION){
+			var expectedCapacity=oldCapacity+amount;
+			Assert(getTotalCapacity() >= expectedCapacity, "Failed to grow chain", oldCapacity+"+"+amount+"="+expectedCapacity+" > "+getTotalCapacity(), this);
+		}
 	}
 	
 	public long getTotalSize() throws IOException{
-		readAll();
-		if(size==1) return chunks[0].getUsed();
-		
-		return Arrays.stream(chunks)
-		             .limit(size)
-		             .mapToLong(Chunk::getUsed)
-		             .sum();
+		return getChainSpaceSizeOffset(size-1)+getLastUnsafe().getSize();
 	}
 	
 	public long getTotalCapacity() throws IOException{
 		readAll();
-		return capacityOffsets[size-1]+chunks[size-1].getDataCapacity();
+		return capacityOffsets[lastIndex()]+getLastUnsafe().getCapacity();
 	}
 	
 	@Override

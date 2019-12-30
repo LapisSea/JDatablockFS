@@ -7,7 +7,7 @@ import java.util.List;
 
 import static com.lapissea.fsf.NumberSize.*;
 
-public class SizedNumber extends FileObject.FullLayout<SizedNumber> implements FixedLenList.ElementHead<SizedNumber, LongFileBacked>{
+public class SizedNumber extends FileObject.FullLayout<SizedNumber> implements FixedLenList.ElementHead<SizedNumber, ChunkPointer>{
 	
 	private static final SequenceLayout<SizedNumber> LAYOUT=FileObject.sequenceBuilder(List.of(
 		new FlagDef<>(BYTE,
@@ -35,12 +35,12 @@ public class SizedNumber extends FileObject.FullLayout<SizedNumber> implements F
 	}
 	
 	@Override
-	public boolean willChange(LongFileBacked element) throws IOException{
+	public boolean willChange(ChunkPointer element) throws IOException{
 		return NumberSize.bySize(Math.max(element.value, extraSource.getAsLong())).max(size)!=size;
 	}
 	
 	@Override
-	public void update(LongFileBacked element) throws IOException{
+	public void update(ChunkPointer element) throws IOException{
 		size=NumberSize.bySize(Math.max(element.value, extraSource.getAsLong())).max(size);
 	}
 	
@@ -50,17 +50,17 @@ public class SizedNumber extends FileObject.FullLayout<SizedNumber> implements F
 	}
 	
 	@Override
-	public LongFileBacked newElement(){
-		return new LongFileBacked();
+	public ChunkPointer newElement(){
+		return new ChunkPointer();
 	}
 	
 	@Override
-	public void readElement(ContentInputStream src, LongFileBacked dest) throws IOException{
+	public void readElement(ContentInputStream src, ChunkPointer dest) throws IOException{
 		dest.value=size.read(src);
 	}
 	
 	@Override
-	public void writeElement(ContentOutputStream dest, LongFileBacked src) throws IOException{
+	public void writeElement(ContentOutputStream dest, ChunkPointer src) throws IOException{
 		size.write(dest, src.value);
 	}
 	

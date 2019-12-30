@@ -4,6 +4,7 @@ import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.BiIntConsumer;
+import com.lapissea.util.function.TriConsumer;
 import com.lapissea.util.function.TriFunction;
 
 import java.awt.*;
@@ -15,8 +16,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+
+import static java.awt.Font.*;
 
 public class FileSystemInFile{
 	
@@ -117,12 +121,12 @@ public class FileSystemInFile{
 		
 		BufferedImage img=new BufferedImage(width*pixelSize, height*pixelSize, BufferedImage.TYPE_INT_ARGB);
 		Graphics2D    g2 =img.createGraphics();
-		g2.setFont(new Font("Monospaced", Font.PLAIN, pixelSize));
+		
+		g2.setFont(new Font(MONOSPACED, PLAIN, pixelSize));
 		
 		
-		g2.setStroke(new BasicStroke(pixelSize/6F));
 		g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-		g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_OFF);
+//		g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_OFF);
 		
 		var headerData=header.headerStartChunks()
 		                     .stream()
@@ -189,9 +193,6 @@ public class FileSystemInFile{
 			
 			x*=pixelSize;
 			y*=pixelSize;
-
-//			g.setColor(new Color(1, 1, 1, 0.3F));
-//			g.fillRect(x, y, pixelSize, pixelSize);
 			
 			x+=pixelSize*0.2F;
 			y+=pixelSize*0.8F;
@@ -221,7 +222,7 @@ public class FileSystemInFile{
 				rand.setSeed(chunk.getOffset());
 				
 				var c=new Color(Color.HSBtoRGB(rand.nextFloat()*255, 1, 1));
-				return new Color(c.getRed()/255F, c.getGreen()/255F, c.getBlue()/255F, 0.3F);
+				return new Color(c.getRed()/255F, c.getGreen()/255F, c.getBlue()/255F, 0.5F);
 			};
 		}
 		
@@ -238,6 +239,9 @@ public class FileSystemInFile{
 		counter[0]++;
 		pixelPushByte.accept(header.version.minor, Color.RED);
 		counter[0]++;
+		
+		var ptrs     =header.getHeaderPointers();
+		var ptrsChunk=ptrs.getShadowChunks().get(0);
 		
 		var chunks=header.allChunks(true);
 		
@@ -259,7 +263,8 @@ public class FileSystemInFile{
 					counter[0]=(int)chunk.getOffset();
 					
 					Color bodyCol;
-					if(chunk.isChunkUsed()){
+					if(chain.get(0)==ptrsChunk) bodyCol=Color.RED;
+					else if(chunk.isUsed()){
 						if(headerData.contains(chunk)) bodyCol=Color.BLUE;
 						else{
 							bodyCol=Color.GREEN.darker();
@@ -273,33 +278,62 @@ public class FileSystemInFile{
 						counter[0]++;
 					}
 					
-					for(long i=0, j=chunk.getDataCapacity();i<j;i++){
-						if(i >= chunk.getUsed()) bodyCol=Color.LIGHT_GRAY;
-						pixelPush.accept(in.read(), mul.apply(bodyCol, ((chunk.getDataCapacity()-i)/(float)chunk.getDataCapacity())*0.7F+0.3F));
+					for(long i=0, j=chunk.getCapacity();i<j;i++){
+						if(i >= chunk.getSize()) bodyCol=Color.LIGHT_GRAY;
+						pixelPush.accept(in.read(), mul.apply(bodyCol, ((chunk.getCapacity()-i)/(float)chunk.getCapacity())*0.7F+0.3F));
 					}
 				}
 			}
+			
+			g2.setStroke(new BasicStroke(1/6F));
+			g2.scale(pixelSize, pixelSize);
+			
+			Consumer<double[]> drawLine=cords->g2.draw(new Line2D.Double(cords[0], cords[1], cords[2], cords[3]));
+			
+			TriConsumer<Color, Long, Long> drawLink=(col, v1, v2)->{
+				g2.setColor(col);
+				
+				double x1=(v1%width)+0.5;
+				double y1=(long)(v1/width)+0.5;
+				
+				double x2=(v2%width)+0.5;
+				double y2=(long)(v2/width)+0.5;
+				
+				double xMid=(x1+x2)/2;
+				double yMid=(y1+y2)/2;
+				
+				double x2m1=x2-x1;
+				double y2m1=y2-y1;
+				
+				
+				double normal =-Math.atan2(y2m1, x2m1);
+				double tangent=normal+Math.PI/2;
+				
+				double arrowSize=Math.min(0.5, Math.sqrt(y2m1*y2m1+x2m1*x2m1)/3)/2;
+				
+				double nsin=Math.sin(normal)*arrowSize;
+				double ncos=Math.cos(normal)*arrowSize;
+				double tsin=Math.sin(tangent)*arrowSize;
+				double tcos=Math.cos(tangent)*arrowSize;
+				
+				drawLine.accept(new double[]{x1, y1, x2, y2});
+				
+				drawLine.accept(new double[]{xMid+tsin, yMid+tcos, xMid+nsin-tsin, yMid+ncos-tcos});
+				drawLine.accept(new double[]{xMid+tsin, yMid+tcos, xMid-nsin-tsin, yMid-ncos-tcos});
+			};
+			
+			for(int i=0;i<ptrs.size();i++){
+				var chunk=ptrs.getElement(i).dereference(header);
+				drawLink.accept(randColor.apply(chunk), ptrsChunk.getDataStart()+ptrs.getElementSize()*i, chunk.getOffset());
+			}
+			
 			for(var chain : chains){
 				
 				var col=randColor.apply(chain.get(0));
 				
 				for(Chunk chunk : chain){
 					if(!chunk.hasNext()) continue;
-					
-					in.setPos(chunk.getOffset());
-					counter[0]=(int)chunk.getOffset();
-					
-					g2.setColor(col);
-					var v1=chunk.getOffset();
-					var v2=chunk.getNext();
-					
-					int x1=(int)(v1%width),
-						y1=(int)(v1/width);
-					
-					int x2=(int)(v2%width),
-						y2=(int)(v2/width);
-					
-					g2.draw(new Line2D.Double((x1+0.5)*pixelSize, (y1+0.5)*pixelSize, (x2+0.5)*pixelSize, (y2+0.5)*pixelSize));
+					drawLink.accept(col, chunk.getOffset(), chunk.getNext());
 				}
 			}
 			

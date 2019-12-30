@@ -22,6 +22,8 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+import static com.lapissea.util.UtilL.*;
+
 class FSFTest{
 	static{
 //		LogUtil.Init.attach(0);
@@ -81,7 +83,7 @@ class FSFTest{
 			
 			
 			UnsafeConsumer<long[], IOException> snapshotIds=ids->{
-				var img=fil.renderFile(20, 20, ids, 10);
+				var img=fil.renderFile(24, 24, ids, 12);
 				writeImg.accept(img);
 			};
 			UnsafeRunnable<IOException> snapshot=()->{};
@@ -99,7 +101,9 @@ class FSFTest{
 			try(OutputStream os=testFile.write()){
 				os.write("THIS WORKS!!!!".getBytes());
 			}
-			LogUtil.println(fil.getFile("test").readAllString());
+			
+			var s2=fil.getFile("test").readAllString();
+			Assert(s2.equals("THIS WORKS!!!!"), s2);
 			
 			snapshot.run();
 			
@@ -107,7 +111,9 @@ class FSFTest{
 				os.write("THIS REALLY WORKS!!!!".getBytes());
 			}
 			snapshot.run();
-			LogUtil.println(fil.getFile("aaaaaaa").readAllString());
+			
+			var s0=fil.getFile("aaaaaaa").readAllString();
+			Assert(s0.equals("THIS REALLY WORKS!!!!"), s0);
 			
 			testFile.writeAll("THIS W".getBytes());
 			snapshot.run();
@@ -121,14 +127,15 @@ class FSFTest{
 			snapshot.run();
 			fil.createFile("test4", 8).writeAll("123456789".getBytes());
 			snapshot.run();
-			fil.createFile("5", 8).writeAll("12345678".getBytes());
+			fil.createFile("a5", 8).writeAll("12345678".getBytes());
 			snapshot.run();
 			fil.getFile("test3").writeAll("12345678".getBytes());
 			snapshot.run();
 			fil.getFile("test4").writeAll("12345678".getBytes());
 			snapshot.run();
 			fil.getFile("test3").writeAll("Ur mum very gay. Like very GAY. Ur mum so gay she make the gay not gay.".getBytes());
-			LogUtil.println(fil.getFile("test3").readAllString());
+			var s1=fil.getFile("test3").readAllString();
+			Assert(s1.equals("Ur mum very gay. Like very GAY. Ur mum so gay she make the gay not gay."), s1);
 			snapshot.run();
 			
 			

@@ -30,13 +30,13 @@ public class OffsetIndexSortedList<T extends FileObject&Comparable<T>> extends A
 	private static final int OFFSETS_PER_CHUNK=8;
 	private static final int OFFSET_CHUNK_SIZE=OFFSETS_PER_CHUNK*(Long.BYTES);
 	
-	public static void init(ContentOutputStream out, long[] pos, int size) throws IOException{
+	public static void init(ContentOutputStream out, int size) throws IOException{
 		int ratio=4;
 		int ss   =FILE_TABLE_PADDING/ratio;
 		int fs   =FILE_TABLE_PADDING-ss;
 		
-		Chunk.init(out, pos[0], NumberSize.SHORT, fs);
-		Chunk.init(out, pos[0], NumberSize.SHORT, ss);
+		Chunk.init(out, NumberSize.SHORT, fs);
+		Chunk.init(out, NumberSize.SHORT, ss);
 	}
 	
 	private final Supplier<T> tConstructor;
@@ -320,7 +320,7 @@ public class OffsetIndexSortedList<T extends FileObject&Comparable<T>> extends A
 		};
 	}
 	
-	public long capacity(){
+	public long capacity() throws IOException{
 		return objectsIo.getCapacity();
 	}
 	

@@ -446,7 +446,9 @@ public interface IOInterface{
 		try(var stream=read()){
 			byte[] data=new byte[Math.toIntExact(getSize())];
 			int    read=stream.readNBytes(data, 0, data.length);
-			if(read!=data.length) data=Arrays.copyOf(data, read);
+			if(DEBUG_VALIDATION){
+				Assert(read==data.length, "Failed to read data amount specified by getSize() =", data.length, "read =", read);
+			}
 			return data;
 		}
 	}
