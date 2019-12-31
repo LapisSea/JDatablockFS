@@ -87,7 +87,7 @@ public interface IOInterface{
 					if(onWrite!=null){
 						try{
 							onWrite.accept(new long[]{pos});
-						}catch(Exception ignored){}
+						}catch(Throwable ignored){}
 					}
 					pos++;
 					if(used<pos) used=pos;
@@ -106,7 +106,7 @@ public interface IOInterface{
 					if(onWrite!=null){
 						try{
 							onWrite.accept(LongStream.range(pos, pos+len).toArray());
-						}catch(Exception ignored){}
+						}catch(Throwable ignored){}
 					}
 					if(pushPos){
 						pos+=len;
@@ -249,7 +249,7 @@ public interface IOInterface{
 					if(onWrite!=null){
 						try{
 							onWrite.accept(new long[]{pos});
-						}catch(Exception ignored){}
+						}catch(Throwable ignored){}
 					}
 					pos++;
 				}
@@ -265,7 +265,7 @@ public interface IOInterface{
 					if(onWrite!=null){
 						try{
 							onWrite.accept(LongStream.range(pos, pos+len).toArray());
-						}catch(Exception ignored){}
+						}catch(Throwable ignored){}
 					}
 					if(pushPos) pos+=len;
 				}

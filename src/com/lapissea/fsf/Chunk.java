@@ -46,6 +46,18 @@ public class Chunk{
 		       bodyType.bytes*2;
 	}
 	
+	public static long wholeSize(long fileSize, long capacity){
+		return wholeSize(NumberSize.bySize(fileSize), capacity);
+	}
+	
+	public static long wholeSize(NumberSize nextType, long capacity){
+		return wholeSize(nextType, NumberSize.bySize(capacity), capacity);
+	}
+	
+	public static long wholeSize(NumberSize nextType, NumberSize bodyType, long capacity){
+		return headerSize(nextType, bodyType)+capacity;
+	}
+	
 	public static void init(ContentOutputStream out, NumberSize nextType, int bodySize) throws IOException{
 		init(out, nextType, bodySize, null);
 	}
@@ -60,7 +72,7 @@ public class Chunk{
 			if(ba.size()>bodySize) bodySize=ba.size();
 		}
 		
-		var c=new Chunk(null, 0, nextType, bodySize);
+		var c=new Chunk(null, 0, nextType, 0, bodySize);
 		
 		c.init(out, ba==null?null:ba.toByteArray());
 		
@@ -161,8 +173,8 @@ public class Chunk{
 	
 	Set<Runnable> dependencyInvalidate=new HashSet<>(3);
 	
-	private Chunk(Header header, long offset, NumberSize nextType, long capacity){
-		this(header, offset, nextType, 0, NumberSize.bySize(capacity), capacity);
+	public Chunk(Header header, long offset, NumberSize nextType, long next, long capacity){
+		this(header, offset, nextType, next, NumberSize.bySize(capacity), capacity);
 	}
 	
 	public Chunk(Header header, long offset, NumberSize nextType, long next, NumberSize bodyType, long capacity){
@@ -232,14 +244,14 @@ public class Chunk{
 	}
 	
 	public long wholeSize(NumberSize nextType, NumberSize bodyType){
-		return headerSize(nextType, bodyType)+getCapacity();
+		return wholeSize(nextType, bodyType, getCapacity());
 	}
 	
 	public int getHeaderSize(){
 		return headerSize(nextType, bodyType);
 	}
 	
-	public void pushUsed(long offset){
+	public void pushSize(long offset){
 		if(offset>getSize()){
 			setSize(offset);
 		}
@@ -391,6 +403,12 @@ public class Chunk{
 	public boolean overlaps(long start, long end) throws IOException{
 		long a=getOffset(), b=nextPhysicalOffset();
 		return Math.max(start, a)-Math.min(end, b)<(a-b)+(start-end);
+	}
+	
+	public void moveToAndFreeOld(Chunk newChunk) throws IOException{
+		var old=new Chunk(header, getOffset(), getNextType(), 0, getBodyType(), size, getCapacity(), true);
+		moveTo(newChunk);
+		header.freeChunk(old);
 	}
 	
 	public void moveTo(Chunk newChunk) throws IOException{

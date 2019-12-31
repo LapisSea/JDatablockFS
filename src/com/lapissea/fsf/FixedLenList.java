@@ -49,7 +49,6 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 	private final ChunkIO data;
 	private final H       header;
 	private       int     size;
-	private       boolean leaveMeAlone;
 	
 	
 	private final WeakValueHashMap<Integer, E> cache=new WeakValueHashMap<>();
@@ -80,7 +79,6 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 	
 	@Override
 	public int size(){
-		if(leaveMeAlone) return 0;
 		return size;
 	}
 	

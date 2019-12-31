@@ -72,7 +72,7 @@ public class ChunkIO implements IOInterface{
 				chunk.chainForwardFree();
 			}
 			case EXTEND -> {
-				chunk.pushUsed(chunkOffset);
+				chunk.pushSize(chunkOffset);
 				chunk.syncHeader();
 			}
 			}
@@ -276,9 +276,16 @@ public class ChunkIO implements IOInterface{
 		private void confirmWrite(long bytesWritten, boolean pushUsed) throws IOException{
 			var chunkOffset=chunkOffset();
 			chainSpaceOffset+=bytesWritten;
+			
 			if(pushUsed){
-				chunk.pushUsed(chunkOffset+bytesWritten);
+				var newSiz=chunkOffset+bytesWritten;
+				
+				chunk.pushSize(newSiz);
 				chunk.saveHeader();
+				
+				if(DEBUG_VALIDATION){
+					Assert(chunk.getSize() >= newSiz);
+				}
 			}
 		}
 		

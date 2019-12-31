@@ -1,6 +1,7 @@
 import com.lapissea.fsf.FileSystemInFile;
 import com.lapissea.fsf.IOInterface;
 import com.lapissea.util.LogUtil;
+import com.lapissea.util.MathUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeRunnable;
@@ -12,17 +13,25 @@ import org.jcodec.common.model.Rational;
 import org.jcodec.scale.AWTUtil;
 
 import javax.imageio.ImageIO;
+import javax.swing.*;
 import java.awt.*;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
 import static com.lapissea.util.UtilL.*;
+import static javax.swing.SwingUtilities.*;
 
 class FSFTest{
 	static{
@@ -37,6 +46,36 @@ class FSFTest{
 		}
 		
 		var encoderArr=new SequenceEncoder[1];
+		var jframe    =new JFrame[1];
+		var jfb       =new ArrayList<BufferedImage>();
+		
+		Supplier<JFrame> getJFrame=()->{
+			if(jframe[0]==null){
+				var jf=new JFrame();
+				jf.setVisible(true);
+				jf.setLocationRelativeTo(null);
+				jf.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+				jf.addComponentListener(new ComponentAdapter(){
+					@Override
+					public void componentResized(ComponentEvent e){
+						jf.setLocationRelativeTo(null);
+					}
+				});
+				jf.addMouseMotionListener(new MouseAdapter(){
+					@Override
+					public void mouseDragged(MouseEvent e){
+						invokeLater(()->{
+							jf.setContentPane(new JLabel(new ImageIcon(jfb.get(MathUtil.snap((int)(jfb.size()*(e.getX()/(float)jf.getWidth())), 0, jfb.size()-1)))));
+							jf.pack();
+						});
+					}
+				});
+				jf.setResizable(false);
+				jf.requestFocus();
+				jframe[0]=jf;
+			}
+			return jframe[0];
+		};
 		
 		Supplier<SequenceEncoder> encoder=()->{
 			if(encoderArr[0]==null){
@@ -61,11 +100,20 @@ class FSFTest{
 			g2d.dispose();
 			return copy;
 		};
+		
 		UnsafeConsumer<BufferedImage, IOException> doMp4=img->encoder.get().encodeNativeFrame(AWTUtil.fromBufferedImageRGB(noAlpha.apply(img)));
 		UnsafeConsumer<BufferedImage, IOException> doPng=img->ImageIO.write(img, "png", new File("snap"+(counter[0]++)+".png"));
 		UnsafeConsumer<BufferedImage, IOException> doJpg=img->ImageIO.write(noAlpha.apply(img), "jpg", new File("snap"+(counter[0]++)+".jpg"));
+		UnsafeConsumer<BufferedImage, IOException> doGui=img->{
+			jfb.add(noAlpha.apply(img));
+			invokeLater(()->{
+				var jf=getJFrame.get();
+				jf.setContentPane(new JLabel(new ImageIcon(noAlpha.apply(img))));
+				jf.pack();
+			});
+		};
 		
-		UnsafeConsumer<BufferedImage, IOException> writer=null;
+		UnsafeConsumer<BufferedImage, IOException> writer=doGui;
 		
 		UnsafeConsumer<BufferedImage, IOException> writeImg=img->{
 			pool.submit(()->{
@@ -89,7 +137,7 @@ class FSFTest{
 			UnsafeRunnable<IOException> snapshot=()->{};
 			
 			if(writer!=null){
-				boolean moreLog=writer==doMp4;
+				boolean moreLog=List.of(doMp4, doGui).contains(writer);
 				
 				if(moreLog) source.onWrite=snapshotIds;
 				else snapshot=()->snapshotIds.accept(new long[0]);
@@ -168,9 +216,8 @@ class FSFTest{
 		}catch(Throwable e){
 			e.printStackTrace();
 		}finally{
-			UtilL.sleepWhile(()->pool.getTaskCount()>pool.getCompletedTaskCount());
+			UtilL.sleepWhile(()->pool.getTaskCount()>pool.getCompletedTaskCount(), 50);
 			if(encoderArr[0]!=null) encoderArr[0].finish();
-			System.exit(0);
 		}
 	}
 	
