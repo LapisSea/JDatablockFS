@@ -12,7 +12,7 @@ public class ChunkPointer extends FileObject implements Comparable<ChunkPointer>
 	
 	@Override
 	public void read(ContentInputStream dest) throws IOException{
-		value=dest.readLong();
+		value=dest.readInt8();
 	}
 	
 	public ChunkPointer(Chunk chunk){

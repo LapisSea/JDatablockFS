@@ -278,9 +278,19 @@ public class FileSystemInFile{
 						counter[0]++;
 					}
 					
+					
 					for(long i=0, j=chunk.getCapacity();i<j;i++){
-						if(i >= chunk.getSize()) bodyCol=Color.LIGHT_GRAY;
-						pixelPush.accept(in.read(), mul.apply(bodyCol, ((chunk.getCapacity()-i)/(float)chunk.getCapacity())*0.7F+0.3F));
+						float mulFac;
+						if(i >= chunk.getSize()){
+							bodyCol=chunk.isUsed()?Color.LIGHT_GRAY:new Color(157, 127, 97);
+							
+							var siz=chunk.getCapacity()-chunk.getSize();
+							mulFac=((siz-(i-chunk.getSize()))/(float)siz);
+						}else{
+							var siz=chunk.getCapacity();
+							mulFac=((siz-i)/(float)siz);
+						}
+						pixelPush.accept(in.read(), mul.apply(bodyCol, mulFac*0.7F+0.3F));
 					}
 				}
 			}

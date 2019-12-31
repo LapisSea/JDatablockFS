@@ -16,9 +16,9 @@ public interface Content<T>{
 		
 		@Override
 		public long[] read(ContentInputStream src) throws IOException{
-			long[] data=new long[src.readInt()];
+			long[] data=new long[src.readInt4()];
 			for(int i=0;i<data.length;i++){
-				data[i]=src.readLong();
+				data[i]=src.readInt8();
 			}
 			return data;
 		}
@@ -46,7 +46,7 @@ public interface Content<T>{
 			StringBuilder result=new StringBuilder();
 			
 			int c;
-			while((c=src.readByte())!=0){
+			while((c=src.readInt1())!=0){
 				result.append((char)c);
 			}
 			

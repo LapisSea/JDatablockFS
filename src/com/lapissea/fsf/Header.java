@@ -102,7 +102,7 @@ public class Header{
 				out.write(latest.major);
 				out.write(latest.minor);
 				
-				FixedLenList.init(out, headerPointersNum, localOffsets.size());
+				FixedLenList.init(NumberSize.NONE, out, headerPointersNum, localOffsets.size());
 				
 				try(var in=chunksFakeFile.read()){
 					in.transferTo(out);
@@ -257,7 +257,9 @@ public class Header{
 		try(var out=source.write(source.getSize(), true)){
 			chunk.init(out);
 		}
-		
+		if(chunk.getOffset()==343){
+			int i=0;
+		}
 		if(LOG_ACTIONS) logChunkAction("ALOC", chunk);
 		
 		return chunk;
@@ -518,8 +520,6 @@ public class Header{
 				}
 			}
 		}
-		
-		
 	}
 	
 	public void freeChunkChain(Chunk chunk) throws IOException{
@@ -540,16 +540,19 @@ public class Header{
 		chunk.setUsed(false);
 		chunk.setSize(0);
 		chunk.clearNext();
+		
 		try{
 			
 			if(deallocatingFreeAction(chunk)) return;
 			
-			if(forwardFreeMergeAction(chunk)){
-				chunk.syncHeader();
+			var ff=forwardFreeMergeAction(chunk);
+			if(ff) chunk.syncHeader();
+			
+			if(backwardFreeMergeAction(chunk)){
+				if(ff) Assert(freeChunks.remove(new ChunkPointer(chunk)));
 				return;
 			}
-			
-			if(backwardFreeMergeAction(chunk)) return;
+			if(ff) return;
 			
 			normalFreeAction(chunk);
 			chunk.syncHeader();
@@ -565,6 +568,16 @@ public class Header{
 		chunkCache.remove(chunk.getOffset());
 		
 		if(LOG_ACTIONS) logChunkAction("FREE DEALLOC", chunk);
+		
+		for(int i=0;i<freeChunks.size();i++){
+			Chunk ch=freeChunks.getElement(i).dereference(this);
+			if(ch.isLastPhysical()){
+				freeChunks.removeElement(i);
+				freeChunk(ch);
+				break;
+			}
+		}
+		
 		return true;
 	}
 	
@@ -745,9 +758,9 @@ public class Header{
 		}
 		
 		if(DEBUG_VALIDATION){
-			Assert(!freeRegion.isUsed());
-			Assert(!freeRegion.overlaps(start, end));
-			Assert(freeRegion.getCapacity() >= size);
+			Assert(!freeRegion.isUsed(), freeRegion, start, size, end);
+			Assert(!freeRegion.overlaps(start, end), freeRegion, start, size, end);
+			Assert(freeRegion.getCapacity() >= size, freeRegion, start, size, end);
 		}
 		
 		return freeRegion;
@@ -758,6 +771,7 @@ public class Header{
 		
 		defragmenting=true;
 		LogUtil.println("defragmenting");
+		int counter=0;
 		
 		try{
 			
@@ -772,22 +786,22 @@ public class Header{
 				
 				var chain=chunk.loadWholeChain();
 				var size =calcTotalSize(chain);
-
-//				if(chain.size()==1){
-//					if(calcTotalCapacity(chain)==size){
-//						pos+=chunk.wholeSize();
-//						continue;
-//					}
-//				}
 				
-				var chunkSize=Chunk.headerSize(source.getSize(), size)*3+size;
+				if(chunk.getOffset()==pos&&chain.size()==1){
+					if(calcTotalCapacity(chain)==size){
+						pos+=chunk.wholeSize();
+						continue;
+					}
+				}
 				
-				var freeRegion=clearRegion(pos, chunkSize);
-//				pos+=freeRegion.wholeSize();
+				
+				var freeRegion=clearRegion(pos, Chunk.headerSize(source.getSize(), size)*3+size);
 				
 				chunk.moveToAndFreeOld(alocFreeSplit(freeRegion, size));
 				
-				pos=chunk.nextPhysicalOffset();
+				if(TRUE()) return;
+				
+				pos+=chunk.getHeaderSize()+size;
 				
 				if(chain.size()>1){
 					var second=chain.get(1);
@@ -799,8 +813,11 @@ public class Header{
 					
 					chunk.chainForwardFree();
 				}
+				LogUtil.println(counter);
 				
 				if(DEBUG_VALIDATION) validateFile();
+				
+				LogUtil.println(freeChunks);
 				
 			}
 			

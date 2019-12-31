@@ -34,7 +34,11 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 	}
 	
 	public static <H extends FileObject&ElementHead<H, ?>> void init(ContentOutputStream out, H header, int initialCapacity) throws IOException{
-		Chunk.init(out, NumberSize.SHORT, (header.length())+initialCapacity*header.getElementSize(), header::write);
+		init(NumberSize.SHORT, out, header, initialCapacity);
+	}
+	
+	public static <H extends FileObject&ElementHead<H, ?>> void init(NumberSize nextType, ContentOutputStream out, H header, int initialCapacity) throws IOException{
+		Chunk.init(out, nextType, (header.length())+initialCapacity*header.getElementSize(), header::write);
 	}
 	
 	public static <T, H extends FileObject&ElementHead<H, T>> void init(ContentOutputStream out, H header, List<T> initialElements) throws IOException{
@@ -259,6 +263,15 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 			public E next(){
 				try{
 					return getElement(index++);
+				}catch(IOException e){
+					throw UtilL.uncheckedThrow(e);
+				}
+			}
+			
+			@Override
+			public void remove(){
+				try{
+					removeElement(--index);
 				}catch(IOException e){
 					throw UtilL.uncheckedThrow(e);
 				}

@@ -7,10 +7,11 @@ import java.io.IOException;
 
 public enum NumberSize{
 	
-	BYTE('B', 0xFFL, Byte.BYTES, ContentInputStream::readUnsignedByte, (out, num)->out.writeByte((int)num)),
-	SHORT('S', 0xFFFFL, Short.BYTES, ContentInputStream::readUnsignedShort, (out, num)->out.writeShort((int)num)),
-	INT('I', 0xFFFFFFFFL, Integer.BYTES, in->in.readInt()&0xFFFFFFFFL, (out, num)->out.writeInt((int)num)),
-	LONG('L', Long.MAX_VALUE, Long.BYTES, ContentInputStream::readLong, ContentOutputStream::writeLong);
+	NONE('X', 0, 0, in->0, (out, num)->{}),
+	BYTE('B', 0xFFL, Byte.BYTES, ContentReader::readUnsignedInt1, (out, num)->out.writeByte((int)num)),
+	SHORT('S', 0xFFFFL, Short.BYTES, ContentReader::readUnsignedInt2, (out, num)->out.writeShort((int)num)),
+	INT('I', 0xFFFFFFFFL, Integer.BYTES, ContentReader::readUnsignedInt4, (out, num)->out.writeInt((int)num)),
+	LONG('L', Long.MAX_VALUE, Long.BYTES, ContentReader::readInt8, ContentWriter::writeLong);
 	
 	private static final NumberSize[] VALS=NumberSize.values();
 	
@@ -29,10 +30,10 @@ public enum NumberSize{
 	public final long maxSize;
 	public final char shotName;
 	
-	private final UnsafeFunctionOL<ContentInputStream, IOException>  reader;
-	private final UnsafeConsumerOL<ContentOutputStream, IOException> writer;
+	private final UnsafeFunctionOL<ContentReader, IOException> reader;
+	private final UnsafeConsumerOL<ContentWriter, IOException> writer;
 	
-	NumberSize(char shotName, long maxSize, int bytes, UnsafeFunctionOL<ContentInputStream, IOException> reader, UnsafeConsumerOL<ContentOutputStream, IOException> writer){
+	NumberSize(char shotName, long maxSize, int bytes, UnsafeFunctionOL<ContentReader, IOException> reader, UnsafeConsumerOL<ContentWriter, IOException> writer){
 		this.shotName=shotName;
 		this.bytes=(byte)bytes;
 		this.maxSize=maxSize;

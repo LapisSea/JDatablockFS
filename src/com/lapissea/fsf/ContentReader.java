@@ -5,34 +5,11 @@ import java.io.IOException;
 
 @SuppressWarnings("PointlessBitwiseExpression")
 public interface ContentReader{
+//	byte[] contentBuf();
+	
 	int read() throws IOException;
 	
 	int read(byte[] b, int off, int len) throws IOException;
-	
-	default int readUnsignedByte() throws IOException{
-		int ch=read();
-		if(ch<0){
-			throw new EOFException();
-		}
-		return ch;
-	}
-	
-	
-	default short readShort() throws IOException{
-		int ch1=read();
-		int ch2=read();
-		if((ch1|ch2)<0)
-			throw new EOFException();
-		return (short)((ch1<<8)+(ch2<<0));
-	}
-	
-	default int readUnsignedShort() throws IOException{
-		int ch1=read();
-		int ch2=read();
-		if((ch1|ch2)<0)
-			throw new EOFException();
-		return (ch1<<8)+(ch2<<0);
-	}
 	
 	default char readChar() throws IOException{
 		int ch1=read();
@@ -42,7 +19,40 @@ public interface ContentReader{
 		return (char)((ch1<<8)+(ch2<<0));
 	}
 	
-	default int readInt() throws IOException{
+	default int readInt1() throws IOException{
+		return read();
+	}
+	
+	default int readUnsignedInt1() throws IOException{
+		int ch=read();
+		if(ch<0){
+			throw new EOFException();
+		}
+		return ch;
+	}
+	
+	
+	default short readInt2() throws IOException{
+		int ch1=read();
+		int ch2=read();
+		if((ch1|ch2)<0)
+			throw new EOFException();
+		return (short)((ch1<<8)+(ch2<<0));
+	}
+	
+	default int readUnsignedInt2() throws IOException{
+		int ch1=read();
+		int ch2=read();
+		if((ch1|ch2)<0)
+			throw new EOFException();
+		return (ch1<<8)+(ch2<<0);
+	}
+	
+	default long readUnsignedInt4() throws IOException{
+		return readInt4()&0xFFFFFFFFL;
+	}
+	
+	default int readInt4() throws IOException{
 		int ch1=read();
 		int ch2=read();
 		int ch3=read();
@@ -53,7 +63,7 @@ public interface ContentReader{
 	}
 	
 	
-	default long readLong() throws IOException{
+	default long readInt8() throws IOException{
 		byte[] readBuffer=new byte[8];
 		readFully(readBuffer, 0, 8);
 		return (((long)readBuffer[0]<<56)+
@@ -78,7 +88,4 @@ public interface ContentReader{
 		}
 	}
 	
-	default int readByte() throws IOException{
-		return read();
-	}
 }

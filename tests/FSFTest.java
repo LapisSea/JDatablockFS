@@ -15,10 +15,7 @@ import org.jcodec.scale.AWTUtil;
 import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ComponentAdapter;
-import java.awt.event.ComponentEvent;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
+import java.awt.event.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -27,6 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -44,14 +42,26 @@ class FSFTest{
 		for(File file : new File(".").listFiles()){
 			file.delete();
 		}
+		var pixelScale=12;
 		
-		var encoderArr=new SequenceEncoder[1];
-		var jframe    =new JFrame[1];
-		var jfb       =new ArrayList<BufferedImage>();
+		var     encoderArr=new SequenceEncoder[1];
+		var     jframe    =new JFrame[1];
+		var     jfb       =new ArrayList<BufferedImage>();
+		var     jft       =new ArrayList<Throwable>();
+		float[] imgPos    ={0};
+		int[]   pos       ={0, 0};
+		
+		class T<t>{
+			t t;
+		}
+		
+		T<Consumer<BufferedImage>> setGUIImg0=new T();
 		
 		Supplier<JFrame> getJFrame=()->{
 			if(jframe[0]==null){
+				
 				var jf=new JFrame();
+				
 				jf.setVisible(true);
 				jf.setLocationRelativeTo(null);
 				jf.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -61,21 +71,71 @@ class FSFTest{
 						jf.setLocationRelativeTo(null);
 					}
 				});
-				jf.addMouseMotionListener(new MouseAdapter(){
+				
+				var adp=new MouseAdapter(){
+					@Override
+					public void mouseMoved(MouseEvent e){
+						
+						Point rootPaneOrigin=jf.getRootPane().getContentPane().getLocationOnScreen();
+						Point myComp2Origin =jf.getLocationOnScreen();
+						
+						pos[0]=e.getX()+(int)(myComp2Origin.getX()-rootPaneOrigin.getX());
+						pos[1]=e.getY()+(int)(myComp2Origin.getY()-rootPaneOrigin.getY());
+						
+						invokeLater(jf::repaint);
+					}
+					
 					@Override
 					public void mouseDragged(MouseEvent e){
-						invokeLater(()->{
-							jf.setContentPane(new JLabel(new ImageIcon(jfb.get(MathUtil.snap((int)(jfb.size()*(e.getX()/(float)jf.getWidth())), 0, jfb.size()-1)))));
-							jf.pack();
-						});
+						imgPos[0]=MathUtil.snap(jfb.size()*(e.getX()/(float)jf.getWidth()), 0, jfb.size()-1);
+						setGUIImg0.t.accept(jfb.get(MathUtil.snap((int)imgPos[0], 0, jfb.size()-1)));
+						mouseMoved(e);
 					}
-				});
+					
+					@Override
+					public void mouseWheelMoved(MouseWheelEvent e){
+						imgPos[0]=(float)MathUtil.snap(e.getPreciseWheelRotation()+imgPos[0], 0, jfb.size());
+						setGUIImg0.t.accept(jfb.get(MathUtil.snap((int)imgPos[0], 0, jfb.size()-1)));
+					}
+					
+					@Override
+					public void mouseClicked(MouseEvent e){
+						jft.get(MathUtil.snap((int)imgPos[0], 0, jfb.size()-1)).printStackTrace();
+					}
+				};
+				
+				jf.addMouseMotionListener(adp);
+				jf.addMouseWheelListener(adp);
+				jf.addMouseListener(adp);
+				
 				jf.setResizable(false);
 				jf.requestFocus();
 				jframe[0]=jf;
 			}
 			return jframe[0];
 		};
+		
+		
+		setGUIImg0.t=img->invokeLater(()->{
+			var jf=getJFrame.get();
+			
+			var lab=new JLabel(new ImageIcon(img)){
+				@Override
+				public void paint(Graphics g){
+					super.paint(g);
+					g.setColor(Color.WHITE);
+					g.setFont(new Font(Font.MONOSPACED, Font.BOLD, pixelScale*2));
+					var pp=pixelScale*3;
+					var x =pos[0];
+					var y =pos[1];
+					g.drawString(""+(x/pp+y/pp*jf.getContentPane().getWidth()/pp), pos[0]/pp*pp, pos[1]/pp*pp+pp/2);
+				}
+			};
+			
+			jf.setContentPane(lab);
+			jf.pack();
+		});
+		Consumer<BufferedImage> setGUIImg=setGUIImg0.t;
 		
 		Supplier<SequenceEncoder> encoder=()->{
 			if(encoderArr[0]==null){
@@ -105,24 +165,25 @@ class FSFTest{
 		UnsafeConsumer<BufferedImage, IOException> doPng=img->ImageIO.write(img, "png", new File("snap"+(counter[0]++)+".png"));
 		UnsafeConsumer<BufferedImage, IOException> doJpg=img->ImageIO.write(noAlpha.apply(img), "jpg", new File("snap"+(counter[0]++)+".jpg"));
 		UnsafeConsumer<BufferedImage, IOException> doGui=img->{
-			jfb.add(noAlpha.apply(img));
-			invokeLater(()->{
-				var jf=getJFrame.get();
-				jf.setContentPane(new JLabel(new ImageIcon(noAlpha.apply(img))));
-				jf.pack();
-			});
+			img=noAlpha.apply(img);
+			
+			jfb.add(img);
+			
+			imgPos[0]=jfb.size()-1;
+			setGUIImg.accept(img);
 		};
 		
 		UnsafeConsumer<BufferedImage, IOException> writer=doGui;
 		
 		UnsafeConsumer<BufferedImage, IOException> writeImg=img->{
-			pool.submit(()->{
-				try{
-					writer.accept(img);
-				}catch(Exception ex){
-					ex.printStackTrace();
-				}
-			});
+			jft.add(new Throwable());
+//			pool.submit(()->{
+			try{
+				writer.accept(img);
+			}catch(Exception ex){
+				ex.printStackTrace();
+			}
+//			});
 		};
 		
 		try{
@@ -131,7 +192,7 @@ class FSFTest{
 			
 			
 			UnsafeConsumer<long[], IOException> snapshotIds=ids->{
-				var img=fil.renderFile(24, 24, ids, 12);
+				var img=fil.renderFile(24, 24, ids, pixelScale);
 				writeImg.accept(img);
 			};
 			UnsafeRunnable<IOException> snapshot=()->{};
@@ -140,7 +201,7 @@ class FSFTest{
 				boolean moreLog=List.of(doMp4, doGui).contains(writer);
 				
 				if(moreLog) source.onWrite=snapshotIds;
-				else snapshot=()->snapshotIds.accept(new long[0]);
+				snapshot=()->snapshotIds.accept(new long[0]);
 			}
 			
 			snapshot.run();
