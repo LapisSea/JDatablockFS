@@ -7,26 +7,6 @@ public interface ContentWriter{
 	
 	byte[] contentBuf();
 	
-	void write(int b) throws IOException;
-	
-	void write(byte[] b, int off, int len) throws IOException;
-	
-	default void writeBoolean(boolean v) throws IOException{
-		writeByte(v?1:0);
-	}
-	
-	default void writeByte(int v) throws IOException{
-		write(v);
-	}
-	
-	default void writeShort(int v) throws IOException{
-		byte[] writeBuffer=contentBuf();
-		writeBuffer[0]=(byte)((v >>> 8)&0xFF);
-		writeBuffer[1]=(byte)((v >>> 0)&0xFF);
-		write(writeBuffer, 0, 2);
-		
-	}
-	
 	default void writeChar(int v) throws IOException{
 		byte[] writeBuffer=contentBuf();
 		writeBuffer[0]=(byte)((v >>> 8)&0xFF);
@@ -34,7 +14,35 @@ public interface ContentWriter{
 		write(writeBuffer, 0, 2);
 	}
 	
-	default void writeInt(int v) throws IOException{
+	void write(int b) throws IOException;
+	
+	void write(byte[] b, int off, int len) throws IOException;
+	
+	default void writeBoolean(boolean v) throws IOException{
+		writeInt1(v?1:0);
+	}
+	
+	default void writeInt1(int v) throws IOException{
+		write(v);
+	}
+	
+	default void writeInt2(int v) throws IOException{
+		byte[] writeBuffer=contentBuf();
+		writeBuffer[0]=(byte)((v >>> 8)&0xFF);
+		writeBuffer[1]=(byte)((v >>> 0)&0xFF);
+		write(writeBuffer, 0, 2);
+		
+	}
+	
+	default void writeInt3(int v) throws IOException{
+		byte[] writeBuffer=contentBuf();
+		writeBuffer[0]=(byte)((v >>> 16)&0xFF);
+		writeBuffer[1]=(byte)((v >>> 8)&0xFF);
+		writeBuffer[2]=(byte)((v >>> 0)&0xFF);
+		write(writeBuffer, 0, 3);
+	}
+	
+	default void writeInt4(int v) throws IOException{
 		byte[] writeBuffer=contentBuf();
 		writeBuffer[0]=(byte)((v >>> 24)&0xFF);
 		writeBuffer[1]=(byte)((v >>> 16)&0xFF);
@@ -43,7 +51,28 @@ public interface ContentWriter{
 		write(writeBuffer, 0, 4);
 	}
 	
-	default void writeLong(long v) throws IOException{
+	default void writeInt5(long v) throws IOException{
+		byte[] writeBuffer=contentBuf();
+		writeBuffer[0]=(byte)(v >>> 32);
+		writeBuffer[1]=(byte)(v >>> 24);
+		writeBuffer[2]=(byte)(v >>> 16);
+		writeBuffer[3]=(byte)(v >>> 8);
+		writeBuffer[4]=(byte)(v >>> 0);
+		write(writeBuffer, 0, 5);
+	}
+	
+	default void writeInt6(long v) throws IOException{
+		byte[] writeBuffer=contentBuf();
+		writeBuffer[0]=(byte)(v >>> 40);
+		writeBuffer[1]=(byte)(v >>> 32);
+		writeBuffer[2]=(byte)(v >>> 24);
+		writeBuffer[3]=(byte)(v >>> 16);
+		writeBuffer[4]=(byte)(v >>> 8);
+		writeBuffer[5]=(byte)(v >>> 0);
+		write(writeBuffer, 0, 6);
+	}
+	
+	default void writeInt8(long v) throws IOException{
 		byte[] writeBuffer=contentBuf();
 		writeBuffer[0]=(byte)(v >>> 56);
 		writeBuffer[1]=(byte)(v >>> 48);
@@ -56,12 +85,12 @@ public interface ContentWriter{
 		write(writeBuffer, 0, 8);
 	}
 	
-	default void writeFloat(float v) throws IOException{
-		writeInt(Float.floatToIntBits(v));
+	default void writeFloat4(float v) throws IOException{
+		writeInt4(Float.floatToIntBits(v));
 	}
 	
-	default void writeDouble(double v) throws IOException{
-		writeLong(Double.doubleToLongBits(v));
+	default void writeFloat8(double v) throws IOException{
+		writeInt8(Double.doubleToLongBits(v));
 	}
 	
 }

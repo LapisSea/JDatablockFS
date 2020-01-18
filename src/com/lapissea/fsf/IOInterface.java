@@ -2,6 +2,7 @@ package com.lapissea.fsf;
 
 import com.lapissea.util.NotNull;
 import com.lapissea.util.function.UnsafeConsumer;
+import com.lapissea.util.function.UnsafeFunction;
 
 import java.io.File;
 import java.io.IOException;
@@ -14,11 +15,41 @@ import static com.lapissea.util.UtilL.*;
 
 public interface IOInterface{
 	
+	/**
+	 * <p>Creates a new random read and write interface.</p>
+	 * <p>Writing <b>will not</b> implicitly truncate the underlying contents when closed.</p>
+	 *
+	 * @return RandomIO instance
+	 */
+	RandomIO doRandom() throws IOException;
+	
+	long getSize() throws IOException;
+	
+	/**
+	 * Tries to grows or shrinks capacity as closely as it is convenient for the underlying data. <br>
+	 * <br>
+	 * If growing, it is required that capacity is set to greater or equal to newCapacity.<br>
+	 * If shrinking, it is not required that capacity is shrunk but is required to always be greater or equal to newCapacity.
+	 */
+	void setCapacity(long newCapacity) throws IOException;
+	
+	long getCapacity() throws IOException;
+	
+	
 	class MemoryRA implements IOInterface{
-		public UnsafeConsumer<long[], IOException> onWrite;
+		public transient UnsafeConsumer<long[], IOException> onWrite;
 		
-		private byte[] bb=new byte[4];
+		private byte[] bb;
 		private int    used;
+		
+		public MemoryRA(IOInterface data) throws IOException{
+			bb=data.readAll();
+			used=bb.length;
+		}
+		
+		public MemoryRA(){
+			bb=new byte[4];
+		}
 		
 		@Override
 		public RandomIO doRandom(){
@@ -29,6 +60,7 @@ public interface IOInterface{
 				
 				@Override
 				public RandomIO setPos(long pos){
+					if(pos<0) throw new IndexOutOfBoundsException();
 					this.pos=Math.toIntExact(pos);
 					return this;
 				}
@@ -156,17 +188,18 @@ public interface IOInterface{
 			return path;
 		}
 		
-		public FileRA(File file) throws IOException{
-			var extp="."+EXTENSION;
-			if(!file.getPath().endsWith(extp)) file=new File(file.getPath()+extp);
+		public FileRA(File file, FileSystemInFile.Config config) throws IOException{
+			File enforcedFile=config.shouldEnforceExtension?config.enforceExtension(file):file;
 			
-			if(!file.isFile()){
+			if(!enforcedFile.isFile()){
+				enforcedFile=config.enforceExtension(enforcedFile);
+				
 				//noinspection ResultOfMethodCallIgnored
-				file.createNewFile();
+				enforcedFile.createNewFile();
 			}
-			path=file.getPath();
-			ra=new RandomAccessFile(file, "rw");
 			
+			path=enforcedFile.getPath();
+			ra=new RandomAccessFile(enforcedFile, "rw");
 		}
 		
 		@Override
@@ -296,6 +329,7 @@ public interface IOInterface{
 	
 	class RandomInputStream extends ContentInputStream{
 		
+		private final byte[]   buf=new byte[8];
 		private final RandomIO io;
 		private       Long     mark;
 		
@@ -345,16 +379,21 @@ public interface IOInterface{
 		public String toString(){
 			return this.getClass().getSimpleName()+"{"+io+'}';
 		}
+		
+		@Override
+		public byte[] contentBuf(){
+			return buf;
+		}
 	}
 	
-	class RandomIOOutputStream extends ContentOutputStream{
+	class RandomOutputStream extends ContentOutputStream{
 		
 		private final RandomIO io;
-		private final boolean  clipOnEnd;
+		private final boolean  trimOnClose;
 		
-		RandomIOOutputStream(RandomIO io, boolean clipOnEnd){
+		RandomOutputStream(RandomIO io, boolean trimOnClose){
 			this.io=io;
-			this.clipOnEnd=clipOnEnd;
+			this.trimOnClose=trimOnClose;
 		}
 		
 		@Override
@@ -369,7 +408,7 @@ public interface IOInterface{
 		
 		@Override
 		public void close() throws IOException{
-			if(clipOnEnd){
+			if(trimOnClose){
 				io.trim();
 			}
 			io.close();
@@ -386,49 +425,52 @@ public interface IOInterface{
 		}
 	}
 	
+	default ContentOutputStream write(boolean trimOnClose) throws IOException{ return write(0, trimOnClose); }
 	
-	default ContentOutputStream write(boolean clipOnEnd) throws IOException{
-		return write(0, clipOnEnd);
+	default ContentOutputStream write(long fileOffset, boolean trimOnClose) throws IOException{
+		return new RandomOutputStream(doRandom().setPos(fileOffset), trimOnClose);
 	}
 	
-	/**
-	 * <p>Creates a new random read and write interface.</p>
-	 * <p>Writing <b>will not</b> implicitly truncate the underlying contents when closed.</p>
-	 *
-	 * @return RandomIO instance
-	 */
-	RandomIO doRandom() throws IOException;
+	default void write(boolean trimOnClose, byte[] data) throws IOException                 { write(0, trimOnClose, data); }
 	
-	/**
-	 * <p>Creates a new sequential write interface.</p>
-	 * <p>Writing <b>will</b> implicitly truncate the underlying contents when closed.</p>
-	 */
-	default ContentOutputStream write(long fileOffset, boolean clipOnEnd) throws IOException{
-		return new RandomIOOutputStream(doRandom().setPos(fileOffset), clipOnEnd);
-	}
+	default void write(long fileOffset, boolean trimOnClose, byte[] data) throws IOException{ write(fileOffset, trimOnClose, data.length, data); }
 	
-	default void write(boolean clipOnEnd, byte[] data) throws IOException{
-		write(0, clipOnEnd, data.length, data);
-	}
-	
-	default void write(long fileOffset, boolean clipOnEnd, byte[] data) throws IOException{
-		write(fileOffset, clipOnEnd, data.length, data);
-	}
-	
-	default void write(long fileOffset, boolean clipOnEnd, int length, byte[] data) throws IOException{
+	default void write(long fileOffset, boolean trimOnClose, int length, byte[] data) throws IOException{
 		try(var io=doRandom()){
 			io.setPos(fileOffset);
 			io.write(data, 0, length);
-			if(clipOnEnd) io.trim();
+			if(trimOnClose) io.trim();
 		}
 	}
 	
-	default ContentInputStream read() throws IOException{
-		return read(0);
+	
+	default <T> T read(UnsafeFunction<ContentInputStream, T, IOException> reader) throws IOException{ return read(0, reader); }
+	
+	default <T> T read(long fileOffset, UnsafeFunction<ContentInputStream, T, IOException> reader) throws IOException{
+		try(var io=read(fileOffset)){
+			return reader.apply(io);
+		}
 	}
+	
+	default void read(UnsafeConsumer<ContentInputStream, IOException> reader) throws IOException{ read(0, reader); }
+	
+	default void read(long fileOffset, UnsafeConsumer<ContentInputStream, IOException> reader) throws IOException{
+		try(var io=read(fileOffset)){
+			reader.accept(io);
+		}
+	}
+	
+	default ContentInputStream read() throws IOException{ return read(0); }
 	
 	default ContentInputStream read(long fileOffset) throws IOException{
 		return new RandomInputStream(doRandom().setPos(fileOffset));
+	}
+	
+	
+	default byte[] read(long fileOffset, int length) throws IOException{
+		byte[] dest=new byte[length];
+		read(fileOffset, dest);
+		return dest;
 	}
 	
 	default void read(long fileOffset, byte[] dest) throws IOException{
@@ -452,16 +494,4 @@ public interface IOInterface{
 			return data;
 		}
 	}
-	
-	long getSize() throws IOException;
-	
-	long getCapacity() throws IOException;
-	
-	/**
-	 * Tries to grows or shrinks capacity as closely as it is convenient for the underlying data. <br>
-	 * <br>
-	 * If growing, it is required that capacity is set to greater or equal to newCapacity.<br>
-	 * If shrinking, it is not required that capacity is shrunk but is required to always be greater or equal to newCapacity.
-	 */
-	void setCapacity(long newCapacity) throws IOException;
 }

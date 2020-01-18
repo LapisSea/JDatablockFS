@@ -3,10 +3,10 @@ package com.lapissea.fsf;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
-import com.lapissea.util.WeakValueHashMap;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import static com.lapissea.fsf.FileSystemInFile.*;
@@ -54,8 +54,7 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 	private final H       header;
 	private       int     size;
 	
-	
-	private final WeakValueHashMap<Integer, E> cache=new WeakValueHashMap<>();
+	private final Map<Integer, E> cache;
 	
 	/**
 	 * @param initialHead Object that serves to define how to read/write and possibly call for reformation of all elements in this list.
@@ -65,6 +64,8 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 	public FixedLenList(H initialHead, Chunk chunk) throws IOException{
 		header=initialHead;
 		data=chunk.io();
+		
+		cache=chunk.header.config.newCacheMap();
 		
 		try(var in=data.read()){
 			header.read(in);
@@ -86,11 +87,11 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 		return size;
 	}
 	
-	private long calcDataSize() throws IOException{
+	private long calcDataSize(){
 		return data.getSize()-header.length();
 	}
 	
-	private void calcSize() throws IOException{
+	private void calcSize(){
 		size=Math.toIntExact(calcDataSize()/header.getElementSize());
 	}
 	
@@ -126,18 +127,7 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 		
 		if(DEBUG_VALIDATION){
 			if(cached!=null){
-				if(!e.equals(cached)){
-					Map<Integer, E> disk=new LinkedHashMap<>();
-					for(int i=0;i<size();i++){
-						E d=header.newElement();
-						try(var in=data.read(calcPos(i))){
-							header.readElement(in, d);
-						}
-						disk.put(i, d);
-					}
-					
-					throw new AssertionError("\n"+TextUtil.toTable("cache mismatch", List.of(disk, cache)));
-				}
+				checkIntegrity();
 				return cached;
 			}
 		}
@@ -145,6 +135,21 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 		cache.put(index, e);
 		
 		return e;
+	}
+	
+	private void checkIntegrity() throws IOException{
+		Map<Integer, E> disk=new LinkedHashMap<>();
+		for(int i=0;i<size();i++){
+			E d=header.newElement();
+			try(var in=data.read(calcPos(i))){
+				header.readElement(in, d);
+			}
+			disk.put(i, d);
+		}
+		
+		if(!disk.equals(cache)){
+			throw new AssertionError(header+" "+TextUtil.toString(data.readAll())+"\n"+TextUtil.toTable("cache mismatch", List.of(disk, cache)));
+		}
 	}
 	
 	private void updateHeader(E change) throws IOException{
@@ -155,14 +160,23 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 		
 		//TODO: Performance - lower memory footprint algorithm needed
 		var elementBuffer=new ArrayList<>(this);
+		checkIntegrity();
 		
 		header.update(change);
+		
+		ensureElementCapacity(oldCapacity);
 		
 		var newSiz=header.getElementSize();
 		var oldSiz=oldHeader.getElementSize();
 		
 		byte[] buffer   =new byte[newSiz];
 		var    bufferOut=new ContentOutputStream.BA(buffer);
+		
+		List<Chunk> chain;
+		if(DEBUG_VALIDATION){
+			chain=data.getRoot().loadWholeChain();
+			checkIntegrity();
+		}
 		
 		try(var out=data.write(true)){
 			header.write(out);
@@ -176,6 +190,11 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 			}
 		}
 		
+		if(DEBUG_VALIDATION){
+			Assert(chain.equals(data.getRoot().loadWholeChain()), "\n", chain, "\n", data.getRoot().loadWholeChain());
+			checkIntegrity();
+		}
+		
 		var oldSize=size;
 		calcSize();
 		Assert(oldSize==size, oldSize+" "+size);
@@ -187,18 +206,37 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 		int index  =size();
 		int newSize=index+1;
 		
+		if(DEBUG_VALIDATION){
+			checkIntegrity();
+		}
+		
 		cache.put(index, e);
 		
+		ensureElementCapacity(size()+1);
+		
+		List<Chunk> chain;
+		if(DEBUG_VALIDATION){
+			chain=data.getRoot().loadWholeChain();
+		}
+		
 		try(var out=data.write(calcPos(index), true)){
-
-//			byte[] buffer=new byte[header.getElementSize()];
-//			var dest=new ContentOutputStream.BA(buffer);
-			header.writeElement(out, e);
-//			out.write(buffer);
+			byte[] buffer=new byte[header.getElementSize()];
+			var    dest  =new ContentOutputStream.BA(buffer);
 			
+			header.writeElement(dest, e);
+			
+			out.write(buffer);
+		}
+		
+		if(DEBUG_VALIDATION){
+			Assert(chain.equals(data.getRoot().loadWholeChain()), "\n", chain, "\n", data.getRoot().loadWholeChain());
 		}
 		
 		calcSize();
+		
+		if(DEBUG_VALIDATION){
+			checkIntegrity();
+		}
 	}
 	
 	public void setElement(int index, E element) throws IOException{
@@ -228,6 +266,8 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 		try(var in=data.write(calcPos(index), false)){
 			in.write(buffer);
 		}
+		
+		if(DEBUG_VALIDATION) checkIntegrity();
 	}
 	
 	public void removeElement(int index) throws IOException{
@@ -246,6 +286,14 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 		cache.remove(newSize);
 		
 		setElement(index, last);
+		
+		if(DEBUG_VALIDATION) checkIntegrity();
+	}
+	
+	public void modifyElement(int index, Consumer<E> modifier) throws IOException{
+		E element=getElement(index);
+		modifier.accept(element);
+		setElement(index, element);
 	}
 	
 	@NotNull
@@ -279,9 +327,9 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 		};
 	}
 	
-	public long capacity() throws IOException{
+	public int capacity(){
 		var dataCapacity=data.getCapacity()-header.length();
-		return dataCapacity/header.getElementSize();
+		return (int)(dataCapacity/header.getElementSize());
 	}
 	
 	public boolean ensureElementCapacity(int capacity) throws IOException{
@@ -349,4 +397,5 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 	public String toString(){
 		return header+" -> ["+stream().map(Object::toString).collect(Collectors.joining(", "))+"]";
 	}
+	
 }

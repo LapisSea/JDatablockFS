@@ -1,8 +1,6 @@
 package com.lapissea.fsf;
 
-import com.lapissea.util.LogUtil;
-import com.lapissea.util.TextUtil;
-import com.lapissea.util.UtilL;
+import com.lapissea.util.*;
 import com.lapissea.util.function.BiIntConsumer;
 import com.lapissea.util.function.TriConsumer;
 import com.lapissea.util.function.TriFunction;
@@ -12,43 +10,181 @@ import java.awt.geom.Line2D;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
+import java.lang.ref.SoftReference;
+import java.lang.ref.WeakReference;
 import java.util.List;
-import java.util.Random;
+import java.util.*;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static java.awt.Font.*;
 
 public class FileSystemInFile{
 	
-	/**
-	 * How much bytes the file table will allocate as free space for expansion to delay or avoid file table fragmentation.<br></br>
-	 * Used when creating a new file or on defragmentation.
-	 */
-	public static int FILE_TABLE_PADDING =30;
-	public static int MINIMUM_CHUNK_SIZE =16;
-	public static int FREE_CHUNK_CAPACITY=2;
+	private static class IgnoreMap<K, V> extends AbstractMap<K, V>{
+		
+		@NotNull
+		@Override
+		public Set<Map.Entry<K, V>> entrySet(){
+			return Collections.emptySet();
+		}
+		
+		@Override
+		public V put(K key, V value){
+			return null;
+		}
+		
+		@Override
+		public V get(Object key){
+			return null;
+		}
+		
+		@Override
+		public boolean containsKey(Object key){
+			return false;
+		}
+		
+		@Override
+		public boolean containsValue(Object key){
+			return false;
+		}
+	}
+	
 	
 	public static final boolean DEBUG_VALIDATION=true;
 	
-	/**
-	 * Used to define a memory buffer limit when writing to a new file. Used to reduce fragmentation.
-	 */
-	public static int MAX_BUFFERING_INIT_SIZE=1024;
-	
-	public static final String EXTENSION="fsf";
+	public static class Config{
+		
+		public enum CacheMode{
+			/**
+			 * Most aggressive caching. Never drops any object no matter what. (useful for debugging)
+			 */
+			AGGRESSIVE,
+			/**
+			 * Aggressive ({@link SoftReference}) caching. Will drop objects if system is running low on memory (useful for very slow IO such as over the network)
+			 */
+			FORGIVING,
+			/**
+			 * Smart ({@link WeakReference}) conservative caching. Will drop any object if it is no longer used but will will keep it conserve if for a minimum amount of period. (useful for data that is accessed many times by disconnected modules)
+			 */
+			LAZY,
+			/**
+			 * Smart ({@link WeakReference}) caching. Will drop any object if it is no longer used. (Useful for most general purpose)
+			 */
+			WEAK,
+			/**
+			 * No caching. Will never accept any object and will stay empty all the time. (Useful for worse case scenario benchmarking or buggy caching)
+			 */
+			NONE,
+		}
+		
+		/**
+		 * Hint at what should be used to mark a file system when storing it.
+		 */
+		public static String    DEFAULT_EXTENSION               ="fsf";
+		/**
+		 * Defines if DEFAULT_EXTENSION should be taken as an enforced rule rather than a hint.
+		 */
+		public static boolean   DEFAULT_SHOULD_ENFORCE_EXTENSION=true;
+		/**
+		 * Used to define a memory buffer limit when writing to a new file. Used to reduce fragmentation.
+		 */
+		public static int       DEFAULT_MAX_BUFFERING_INIT_SIZE =1024;
+		/**
+		 * How much bytes the file table will allocate as free space for expansion to delay or avoid file table fragmentation.<br></br>
+		 * Used when creating a new file or on defragmentation.
+		 */
+		public static int       DEFAULT_FILE_TABLE_PADDING      =30;
+		/**
+		 * Defines the initial size of a chunk. (Note that this is a rule only for the chunk allocation circumstances where allocation is not easy or signs of fragmentation are apparent)
+		 */
+		public static int       DEFAULT_MINIMUM_CHUNK_SIZE      =16;
+		/**
+		 * Defines how much free chunks can be kept track of before fragmenting the list.
+		 */
+		public static int       DEFAULT_FREE_CHUNK_CAPACITY     =2;
+		/**
+		 * Defines a memory caching policy to reduce repeated reads and deserialization. This policy is enforced within a {@link Map} implementation used by various systems. <br><br>
+		 * Rules:
+		 * <ul>
+		 *     <li>If a {@link Map} returns <code>null</code> for a particular <code>long offset</code> then a value is not cached and must be read and parsed.</li>
+		 *
+		 *     <li>If a {@link Map} returns <code>non null</code> then this is object when serialized must produce the same bytes in values and length as
+		 *     the bytes under the offset in the underlying {@link IOInterface} (<code>offset</code> local to a sub system such as a list or global, depending on the context)</li>
+		 *
+		 *     <li><b>ALL</b> cached objects <b>MUST</b> be kept in synchronisation with the underlying {@link IOInterface} (by modification of existing
+		 *     objects not replacement in order to keep existing references in sync) with an exception of outside modifications what is illegal as outside
+		 *     changes are not checked for and may cause corruption.</li>
+		 * </ul>
+		 */
+		public static CacheMode DEFAULT_CACHE_MODE              =DEBUG_VALIDATION?CacheMode.AGGRESSIVE:CacheMode.WEAK;
+		
+		
+		public final int       fileTablePadding;
+		public final int       minimumChunkSize;
+		public final int       freeChunkCapacity;
+		public final int       maxBufferingInitSize;
+		public final CacheMode cacheMode;
+		public final String    extension;
+		public final boolean   shouldEnforceExtension;
+		
+		public Config(){
+			this(DEFAULT_FILE_TABLE_PADDING,
+			     DEFAULT_MINIMUM_CHUNK_SIZE,
+			     DEFAULT_FREE_CHUNK_CAPACITY,
+			     DEFAULT_MAX_BUFFERING_INIT_SIZE,
+			     DEFAULT_CACHE_MODE,
+			     DEFAULT_EXTENSION,
+			     DEFAULT_SHOULD_ENFORCE_EXTENSION);
+		}
+		
+		public Config(int fileTablePadding, int minimumChunkSize, int freeChunkCapacity, int maxBufferingInitSize, CacheMode cacheMode, String extension, boolean shouldEnforceExtension){
+			this.fileTablePadding=fileTablePadding;
+			this.minimumChunkSize=minimumChunkSize;
+			this.freeChunkCapacity=freeChunkCapacity;
+			this.maxBufferingInitSize=maxBufferingInitSize;
+			this.cacheMode=cacheMode;
+			this.extension=extension;
+			this.shouldEnforceExtension=shouldEnforceExtension;
+		}
+		
+		public <K, V> Map<K, V> newCacheMap(){
+			return switch(cacheMode){
+				case AGGRESSIVE -> new HashMap<>();
+				case FORGIVING -> new SoftValueHashMap<>();
+				case LAZY -> new WeakValueHashMap<K, V>().defineStayAlivePolicy(3);
+				case WEAK -> new WeakValueHashMap<>();
+				case NONE -> new IgnoreMap<>();
+			};
+		}
+		
+		public File enforceExtension(File file){
+			var extp="."+extension;
+			
+			if(file.getPath().endsWith(extp)) return file;
+			return new File(file.getPath()+extp);
+		}
+	}
 	
 	public final Header header;
 	
 	public FileSystemInFile(File file) throws IOException{
-		this(new IOInterface.FileRA(file));
+		this(file, new Config());
+	}
+	
+	public FileSystemInFile(File file, Config config) throws IOException{
+		this(new IOInterface.FileRA(file, config), config);
 	}
 	
 	public FileSystemInFile(IOInterface source) throws IOException{
-		header=new Header(source);
+		this(source, new Config());
+	}
+	
+	public FileSystemInFile(IOInterface source, Config config) throws IOException{
+		header=new Header(source, config);
 	}
 	
 	public VirtualFile getFile(String path) throws IOException{
@@ -79,7 +215,7 @@ public class FileSystemInFile{
 	}
 	
 	public void delete(String path) throws IOException{
-		LogUtil.println(TextUtil.toTable(header.allChunks(true)));
+		LogUtil.println(TextUtil.toTable(header.allChunks()));
 		System.exit(0);
 		getFile(path).delete();
 	}
@@ -89,16 +225,16 @@ public class FileSystemInFile{
 	}
 	
 	public void defragment() throws IOException{
-//		LogUtil.println(TextUtil.toTable(header.allChunks(true)));
-//		LogUtil.println();
 		header.defragment();
-//		LogUtil.println(TextUtil.toTable(header.allChunks(true)));
-//		LogUtil.println();
 	}
 	
 	
 	public BufferedImage renderFile(int minWidth, int minHeight, long[] ids) throws IOException{
 		return renderFile(minWidth, minHeight, ids, 4);
+	}
+	
+	private interface GetAlpha{
+		int get(int x, int y);
 	}
 	
 	public BufferedImage renderFile(int minWidth, int minHeight, long[] ids, int resolutionMul) throws IOException{
@@ -117,28 +253,6 @@ public class FileSystemInFile{
 			height=h;
 		}
 		
-		int pixelSize=3*resolutionMul;
-		
-		BufferedImage img=new BufferedImage(width*pixelSize, height*pixelSize, BufferedImage.TYPE_INT_ARGB);
-		Graphics2D    g2 =img.createGraphics();
-		
-		g2.setFont(new Font(MONOSPACED, PLAIN, pixelSize));
-		
-		
-		g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-//		g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_OFF);
-		
-		var headerData=header.headerStartChunks()
-		                     .stream()
-		                     .flatMap(c->{
-			                     try{
-				                     return c.loadWholeChain().stream();
-			                     }catch(IOException e){
-				                     throw UtilL.uncheckedThrow(e);
-			                     }
-		                     })
-		                     .collect(Collectors.toList());
-		
 		BiFunction<Color, Float, Color> mul=(col, val)->new Color((int)(col.getRed()*val), (int)(col.getGreen()*val), (int)(col.getBlue()*val));
 		TriFunction<Color, Color, Float, Color> mix=(l, r, val)->{
 			var rev=1-val;
@@ -149,6 +263,15 @@ public class FileSystemInFile{
 				(l.getAlpha()/255F)*val+(r.getAlpha()/255F)*rev
 			);
 		};
+		
+		int pixelSize=3*resolutionMul;
+		
+		BufferedImage img=new BufferedImage(width*pixelSize, height*pixelSize, BufferedImage.TYPE_INT_ARGB);
+		Graphics2D    g2 =img.createGraphics();
+		
+		g2.setFont(new Font(MONOSPACED, PLAIN, pixelSize));
+		
+		g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 		
 		int[] counter={0};
 		
@@ -226,8 +349,10 @@ public class FileSystemInFile{
 			};
 		}
 		
-		for(long i=0;i<size;i++){
-			pixelPush.accept(0, Color.BLACK);
+		try(var in=header.source.doRandom()){
+			for(long i=0;i<size;i++){
+				pixelPush.accept(in.readUnsignedInt1(), Color.DARK_GRAY);
+			}
 		}
 		
 		counter[0]=0;
@@ -240,115 +365,239 @@ public class FileSystemInFile{
 		pixelPushByte.accept(header.version.minor, Color.RED);
 		counter[0]++;
 		
-		var ptrs     =header.getHeaderPointers();
-		var ptrsChunk=ptrs.getShadowChunks().get(0);
-		
-		var chunks=header.allChunks(true);
-		
-		try(var in=header.source.doRandom()){
-			List<List<Chunk>> chains=new ArrayList<>();
+		try{
 			
-			while(!chunks.isEmpty()){
-				var chain=chunks.get(0).loadWholeChain();
-				chunks.removeAll(chain);
-				chains.add(chain);
-			}
+			var headerData=header.headerStartChunks()
+			                     .stream()
+			                     .flatMap(c->{
+				                     try{
+					                     return c.loadWholeChain().stream();
+				                     }catch(IOException e){
+					                     throw UtilL.uncheckedThrow(e);
+				                     }
+			                     })
+			                     .collect(Collectors.toList());
 			
-			for(var chain : chains){
-				var rand=randColor.apply(chain.get(0));
+			
+			var ptrs     =header.getHeaderPointers();
+			var ptrsChunk=ptrs.getShadowChunks().get(0);
+			
+			var chunks=header.allChunks();
+			chunks.add(header.firstChunk());
+			
+			try(var in=header.source.doRandom()){
+				List<List<Chunk>> chains=new ArrayList<>();
 				
-				for(Chunk chunk : chain){
+				while(!chunks.isEmpty()){
+					var chain=chunks.get(0).loadWholeChain();
+					chunks.removeAll(chain);
+					chains.add(chain);
+				}
+				
+				for(var chain : chains){
+					var rand=randColor.apply(chain.get(0));
 					
-					in.setPos(chunk.getOffset());
-					counter[0]=(int)chunk.getOffset();
-					
-					Color bodyCol;
-					if(chain.get(0)==ptrsChunk) bodyCol=Color.RED;
-					else if(chunk.isUsed()){
-						if(headerData.contains(chunk)) bodyCol=Color.BLUE;
-						else{
-							bodyCol=Color.GREEN.darker();
+					for(Chunk chunk : chain){
+						
+						in.setPos(chunk.getOffset());
+						counter[0]=(int)chunk.getOffset();
+						
+						Color bodyCol;
+						if(chain.get(0)==ptrsChunk) bodyCol=Color.RED;
+						else if(chunk.isUsed()){
+							if(headerData.contains(chunk)) bodyCol=Color.BLUE;
+							else{
+								bodyCol=Color.GREEN.darker();
+							}
+						}else bodyCol=Color.GRAY;
+						
+						Color headCol=mix.apply(new Color(Math.min(255, bodyCol.getRed()+100), Math.min(255, bodyCol.getGreen()+100), Math.min(255, bodyCol.getBlue()+100)), rand, 0.7F);
+						
+						for(long i=0, j=chunk.getHeaderSize();i<j;i++){
+							pixelPushByte.accept(in.read(), headCol);
+							counter[0]++;
 						}
-					}else bodyCol=Color.GRAY;
-					
-					Color headCol=mix.apply(new Color(Math.min(255, bodyCol.getRed()+100), Math.min(255, bodyCol.getGreen()+100), Math.min(255, bodyCol.getBlue()+100)), rand, 0.7F);
-					
-					for(long i=0, j=chunk.getHeaderSize();i<j;i++){
-						pixelPushByte.accept(in.read(), headCol);
-						counter[0]++;
-					}
-					
-					
-					for(long i=0, j=chunk.getCapacity();i<j;i++){
-						float mulFac;
-						if(i >= chunk.getSize()){
-							bodyCol=chunk.isUsed()?Color.LIGHT_GRAY:new Color(157, 127, 97);
-							
-							var siz=chunk.getCapacity()-chunk.getSize();
-							mulFac=((siz-(i-chunk.getSize()))/(float)siz);
-						}else{
-							var siz=chunk.getCapacity();
-							mulFac=((siz-i)/(float)siz);
+						
+						
+						for(long i=0, j=chunk.getCapacity();i<j;i++){
+							float mulFac;
+							if(i >= chunk.getSize()){
+								bodyCol=chunk.isUsed()?Color.LIGHT_GRAY:new Color(157, 127, 97);
+								
+								var siz=chunk.getCapacity()-chunk.getSize();
+								mulFac=((siz-(i-chunk.getSize()))/(float)siz);
+							}else{
+								var siz=chunk.getCapacity();
+								mulFac=((siz-i)/(float)siz);
+							}
+							pixelPush.accept(in.read(), mul.apply(bodyCol, mulFac*0.7F+0.3F));
 						}
-						pixelPush.accept(in.read(), mul.apply(bodyCol, mulFac*0.7F+0.3F));
 					}
 				}
-			}
-			
-			g2.setStroke(new BasicStroke(1/6F));
-			g2.scale(pixelSize, pixelSize);
-			
-			Consumer<double[]> drawLine=cords->g2.draw(new Line2D.Double(cords[0], cords[1], cords[2], cords[3]));
-			
-			TriConsumer<Color, Long, Long> drawLink=(col, v1, v2)->{
-				g2.setColor(col);
 				
-				double x1=(v1%width)+0.5;
-				double y1=(long)(v1/width)+0.5;
+				BufferedImage lineImg=new BufferedImage(width*pixelSize, height*pixelSize, BufferedImage.TYPE_INT_ARGB);
+				Graphics2D    lineG  =lineImg.createGraphics();
 				
-				double x2=(v2%width)+0.5;
-				double y2=(long)(v2/width)+0.5;
+				lineG.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 				
-				double xMid=(x1+x2)/2;
-				double yMid=(y1+y2)/2;
+				lineG.setStroke(new BasicStroke(Math.max(1F/pixelSize, 1/12F)));
+				lineG.scale(pixelSize, pixelSize);
 				
-				double x2m1=x2-x1;
-				double y2m1=y2-y1;
+				Consumer<double[]> drawLine=cords->lineG.draw(new Line2D.Double(cords[0], cords[1], cords[2], cords[3]));
 				
+				TriConsumer<Color, Long, Long> drawLink=(col, v1, v2)->{
+					lineG.setColor(col);
+					
+					double x1=(v1%width)+0.5;
+					double y1=(long)(v1/width)+0.5;
+					
+					double x2=(v2%width)+0.5;
+					double y2=(long)(v2/width)+0.5;
+					
+					double xMid=(x1+x2)/2;
+					double yMid=(y1+y2)/2;
+					
+					double x2m1=x2-x1;
+					double y2m1=y2-y1;
+					
+					
+					double normal =-Math.atan2(y2m1, x2m1);
+					double tangent=normal+Math.PI/2;
+					
+					double arrowSize=Math.min(0.5, Math.sqrt(y2m1*y2m1+x2m1*x2m1)/3)/2;
+					
+					double nsin=Math.sin(normal)*arrowSize;
+					double ncos=Math.cos(normal)*arrowSize;
+					double tsin=Math.sin(tangent)*arrowSize;
+					double tcos=Math.cos(tangent)*arrowSize;
+					
+					drawLine.accept(new double[]{x1, y1, x2, y2});
+					
+					drawLine.accept(new double[]{xMid+tsin, yMid+tcos, xMid+nsin-tsin, yMid+ncos-tcos});
+					drawLine.accept(new double[]{xMid+tsin, yMid+tcos, xMid-nsin-tsin, yMid-ncos-tcos});
+				};
 				
-				double normal =-Math.atan2(y2m1, x2m1);
-				double tangent=normal+Math.PI/2;
-				
-				double arrowSize=Math.min(0.5, Math.sqrt(y2m1*y2m1+x2m1*x2m1)/3)/2;
-				
-				double nsin=Math.sin(normal)*arrowSize;
-				double ncos=Math.cos(normal)*arrowSize;
-				double tsin=Math.sin(tangent)*arrowSize;
-				double tcos=Math.cos(tangent)*arrowSize;
-				
-				drawLine.accept(new double[]{x1, y1, x2, y2});
-				
-				drawLine.accept(new double[]{xMid+tsin, yMid+tcos, xMid+nsin-tsin, yMid+ncos-tcos});
-				drawLine.accept(new double[]{xMid+tsin, yMid+tcos, xMid-nsin-tsin, yMid-ncos-tcos});
-			};
-			
-			for(int i=0;i<ptrs.size();i++){
-				var chunk=ptrs.getElement(i).dereference(header);
-				drawLink.accept(randColor.apply(chunk), ptrsChunk.getDataStart()+ptrs.getElementSize()*i, chunk.getOffset());
-			}
-			
-			for(var chain : chains){
-				
-				var col=randColor.apply(chain.get(0));
-				
-				for(Chunk chunk : chain){
-					if(!chunk.hasNext()) continue;
-					drawLink.accept(col, chunk.getOffset(), chunk.getNext());
+				for(int i=0;i<ptrs.size();i++){
+					var chunk=ptrs.getElement(i).dereference(header);
+					drawLink.accept(new Color(randColor.apply(chunk).getRGB()), ptrsChunk.getDataStart()+ptrs.getElementSize()*i, chunk.getOffset());
 				}
+				
+				for(var chain : chains){
+					
+					var col=new Color(randColor.apply(chain.get(0)).getRGB());
+					
+					for(Chunk chunk : chain){
+						if(!chunk.hasNext()) continue;
+						drawLink.accept(col, chunk.getOffset(), chunk.getNext());
+					}
+				}
+				
+				
+				lineG.dispose();
+				
+				BufferedImage lineImgOutline=new BufferedImage(lineImg.getWidth(), lineImg.getHeight(), BufferedImage.TYPE_INT_ARGB);
+				
+				var outlineColor=new Color(1, 1, 1, 0F).getRGB();
+				
+				
+				int[] pixels=lineImg.getRGB(0, 0, lineImg.getWidth(), lineImg.getHeight(), null, 0, lineImg.getWidth());
+				for(int i=0, j=pixels.length;i<j;i++){
+					pixels[i]=((pixels[i] >> 24)&0xff);
+				}
+				
+				GetAlpha getAlpha=(x, y)->pixels[x+y*lineImg.getWidth()];
+				
+				int perChunk=256;
+				
+				int num=lineImg.getWidth()*lineImg.getHeight();
+				
+				IntStream.range(0, num/perChunk).parallel().forEach(idC->{
+					for(int id=idC*perChunk, j=Math.min(num, (idC+1)*perChunk);id<j;id++){
+						
+						int x=id%lineImg.getWidth();
+						int y=id/lineImg.getWidth();
+						int alpha;
+						
+						var xLower=x>0;
+						var xUpper=x<lineImg.getWidth()-1;
+						var yLower=y>0;
+						var yUpper=y<lineImg.getHeight()-1;
+						
+						alpha=getAlpha.get(x, y);
+						
+						if(xLower&&alpha<0xFF) alpha=Math.max(alpha, getAlpha.get(x-1, y));
+						if(xUpper&&alpha<0xFF) alpha=Math.max(alpha, getAlpha.get(x+1, y));
+						if(yLower&&alpha<0xFF) alpha=Math.max(alpha, getAlpha.get(x, y-1));
+						if(yUpper&&alpha<0xFF) alpha=Math.max(alpha, getAlpha.get(x, y+1));
+						if(yUpper&&alpha<0xFF) alpha=Math.max(alpha, getAlpha.get(x, y+1));
+						
+						if(xLower&&yLower&&alpha<0xFF) alpha=Math.max(alpha, getAlpha.get(x-1, y-1)/2);
+						if(xLower&&yUpper&&alpha<0xFF) alpha=Math.max(alpha, getAlpha.get(x-1, y+1)/2);
+						if(xUpper&&yUpper&&alpha<0xFF) alpha=Math.max(alpha, getAlpha.get(x+1, y+1)/2);
+						if(xUpper&&yLower&&alpha<0xFF) alpha=Math.max(alpha, getAlpha.get(x+1, y-1)/2);
+						
+						lineImgOutline.setRGB(x, y, (alpha<<24)|outlineColor);
+						
+					}
+				});
+				
+				Graphics2D out=lineImgOutline.createGraphics();
+				out.drawImage(lineImg, null, 0, 0);
+				out.dispose();
+				
+				AlphaComposite ac=AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.5F);
+				g2.setComposite(ac);
+				
+				g2.drawImage(lineImgOutline, null, 0, 0);
 			}
-			
-		}
+		}catch(Throwable ignored){ }
 		g2.dispose();
 		return img;
+	}
+	
+	@Override
+	public boolean equals(Object o){
+		if(this==o) return true;
+		if(!(o instanceof FileSystemInFile)) return false;
+		FileSystemInFile that=(FileSystemInFile)o;
+		
+		var i1=header.allChunksIter.iterator();
+		var i2=that.header.allChunksIter.iterator();
+		
+		while(i1.hasNext()&&i2.hasNext()){
+			Chunk o1=i1.next();
+			Chunk o2=i2.next();
+			
+			if(o1.isUsed()!=o2.isUsed()||o1.getOffset()!=o2.getOffset()||o1.getNext()!=o2.getNext()){
+//				LogUtil.println(o1, o2);
+				return false;
+			}
+			
+			var io1=o1.io();
+			var io2=o2.io();
+			
+			if(io1.getSize()!=io2.getSize()||io1.getCapacity()!=io2.getCapacity()){
+//				LogUtil.println(o1, o2);
+				return false;
+			}
+			
+			if(o1.isUsed()){
+				try{
+					if(!Arrays.equals(io1.readAll(), io2.readAll())){
+//						LogUtil.println(o1, o2);
+						return false;
+					}
+				}catch(IOException e){
+					throw UtilL.uncheckedThrow(e);
+				}
+			}
+		}
+		
+		return !i1.hasNext()&&!i2.hasNext();
+	}
+	
+	@Override
+	public int hashCode(){
+		return header.hashCode();
 	}
 }

@@ -1,9 +1,6 @@
 package com.lapissea.fsf;
 
-import com.lapissea.util.LogUtil;
-import com.lapissea.util.NotImplementedException;
-import com.lapissea.util.TextUtil;
-import com.lapissea.util.WeakValueHashMap;
+import com.lapissea.util.*;
 
 import java.io.EOFException;
 import java.io.IOException;
@@ -11,6 +8,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.function.BiConsumer;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 import static com.lapissea.fsf.FileSystemInFile.*;
 import static com.lapissea.fsf.NumberSize.*;
@@ -32,13 +31,6 @@ public class Header{
 		return MAGIC_BYTES.clone();
 	}
 	
-	private static void initHeaderChunks(IOInterface file) throws IOException{
-		try(var out=file.write(true)){
-			OffsetIndexSortedList.init(out, FILE_TABLE_PADDING);
-			FixedLenList.init(out, new SizedNumber(BYTE, ()->(long)(file.getSize()*1.5)), FREE_CHUNK_CAPACITY);
-		}
-	}
-	
 	public final Version version;
 	
 	public final IOInterface source;
@@ -47,12 +39,44 @@ public class Header{
 	
 	private final OffsetIndexSortedList<FilePointer>      fileList;
 	private final FixedLenList<SizedNumber, ChunkPointer> freeChunks;
-	private final Map<Long, Chunk>                        chunkCache=new WeakValueHashMap<Long, Chunk>().defineStayAlivePolicy(3);
+	private final Map<Long, Chunk>                        chunkCache;
 	
-	private boolean defragmenting;
+	private      boolean                 defragmenting;
+	public final FileSystemInFile.Config config;
 	
-	public Header(IOInterface source) throws IOException{
+	public final Iterable<Chunk> allChunksIter=()->{
+		try{
+			return new Iterator<>(){
+				Chunk chunk=firstChunk();
+				
+				@Override
+				public boolean hasNext(){
+					try{
+						return !chunk.isLastPhysical();
+					}catch(IOException e){
+						throw UtilL.uncheckedThrow(e);
+					}
+				}
+				
+				@Override
+				public Chunk next(){
+					try{
+						return chunk=chunk.nextPhysical();
+					}catch(IOException e){
+						throw UtilL.uncheckedThrow(e);
+					}
+				}
+			};
+		}catch(Exception e){
+			throw UtilL.uncheckedThrow(e);
+		}
+	};
+	
+	public Header(IOInterface source, FileSystemInFile.Config config) throws IOException{
 		this.source=source;
+		this.config=config;
+		
+		chunkCache=config.newCacheMap();
 		
 		Version                                 version;
 		FixedLenList<FixedNumber, ChunkPointer> headerPointers;
@@ -80,7 +104,11 @@ public class Header{
 			version=vs[vs.length-1];
 			
 			var chunksFakeFile=new IOInterface.MemoryRA();
-			initHeaderChunks(chunksFakeFile);
+			
+			try(var out=chunksFakeFile.write(true)){
+				OffsetIndexSortedList.init(out, config.fileTablePadding, config);
+				FixedLenList.init(out, new SizedNumber(BYTE, ()->(long)(chunksFakeFile.getSize()*1.5)), config.freeChunkCapacity);
+			}
 			
 			List<ChunkPointer> localOffsets=new ArrayList<>();
 			
@@ -102,7 +130,7 @@ public class Header{
 				out.write(latest.major);
 				out.write(latest.minor);
 				
-				FixedLenList.init(NumberSize.NONE, out, headerPointersNum, localOffsets.size());
+				FixedLenList.init(NumberSize.VOID, out, headerPointersNum, localOffsets.size());
 				
 				try(var in=chunksFakeFile.read()){
 					in.transferTo(out);
@@ -131,6 +159,8 @@ public class Header{
 		fileList=new OffsetIndexSortedList<>(()->new FilePointer(this), names, offsets);
 		
 		freeChunks=new FixedLenList<>(new SizedNumber(source::getSize), frees);
+		
+		validateFile();
 	}
 	
 	public FilePointer getByPath(String path) throws IOException{
@@ -212,55 +242,82 @@ public class Header{
 	}
 	
 	private Chunk alocFreeReuse(Chunk chunk) throws IOException{
-		return alocFreeReuse(freeChunks.indexOf(new ChunkPointer(chunk)), chunk);
-	}
-	
-	private Chunk alocFreeReuse(int chunkIndex, Chunk chunk) throws IOException{
 		
-		if(LOG_ACTIONS) logChunkAction("REUSED", chunk);
+		if(DEBUG_VALIDATION) validateFile();
+		
+		int chunkIndex=freeChunks.indexOf(new ChunkPointer(chunk));
 		
 		freeChunks.removeElement(chunkIndex);
 		chunk.setUsed(true);
 		chunk.syncHeader();
 		
+		if(DEBUG_VALIDATION) validateFile();
+		if(LOG_ACTIONS) logChunkAction("REUSED", chunk);
+		
 		return chunk;
 	}
 	
 	
-	private Chunk alocFreeSplit(Chunk freeChunk, long initialSize) throws IOException{
-		chunkCache.remove(freeChunk.getOffset());
+	private Chunk alocFreeSplit(Chunk freeChunk, long initialCapacity) throws IOException{
 		
-		var   safeNext=safeNextType();
-		Chunk chunk   =new Chunk(this, freeChunk.getOffset(), safeNext, 0, initialSize);
-		chunkCache.put(chunk.getOffset(), chunk);
+		if(DEBUG_VALIDATION){
+			Assert(!freeChunk.isUsed());
+			validateFile();
+		}
 		
-		var remaining   =freeChunk.wholeSize()-chunk.wholeSize();
-		var freeCapacity=remaining-Chunk.headerSize(safeNext, remaining);
+		var safeNext=safeNextType();
+		var offset  =freeChunk.getOffset();
 		
-		Chunk splitFree=new Chunk(this, chunk.nextPhysicalOffset(), safeNext, 0, NumberSize.bySize(freeCapacity), 0, freeCapacity, false);
-		chunkCache.put(splitFree.getOffset(), splitFree);
-		
-		splitFree.saveHeader();
-		freeChunks.setElement(freeChunks.indexOf(new ChunkPointer(freeChunk)), new ChunkPointer(splitFree));
-		chunk.saveHeader();
+		var space=freeChunk.wholeSize();
 		
 		
-		if(LOG_ACTIONS) logChunkAction("ALOC F SPLIT", chunk);
-		return chunk;
+		var alocChunkSize  =Chunk.wholeSize(safeNext, initialCapacity);
+		var freeRemaining  =space-alocChunkSize;
+		var freeChunkHeader=freeChunk.getHeaderSize();
+		
+		if(freeRemaining<=freeChunkHeader) return alocFreeReuse(freeChunk);
+		
+		var freeChunkCapacity=freeRemaining-freeChunkHeader;
+		
+		Chunk alocChunk=new Chunk(this, offset, safeNext, 0, initialCapacity);
+		
+		try{
+			freeChunk.setCapacity(freeChunkCapacity);
+		}catch(BitDepthOutOfSpaceException e){
+			throw new ShouldNeverHappenError(e);
+		}
+		
+		freeChunk.setOffset(offset+alocChunkSize);
+		
+		freeChunk.saveHeader();
+		alocChunk.saveHeader();
+		
+		notifyMovement(offset, freeChunk);
+		
+		alocChunk=getByOffset(alocChunk.getOffset());
+		
+		if(DEBUG_VALIDATION) validateFile();
+		
+		if(LOG_ACTIONS) logChunkAction("ALOC F SPLIT", alocChunk);
+		return alocChunk;
 	}
 	
 	private Chunk alocNew(NumberSize bodyType, long initialSize) throws IOException{
+		var chunk=initChunk(source.getSize(), safeNextType(), bodyType, initialSize);
+		if(DEBUG_VALIDATION) validateFile();
+		if(LOG_ACTIONS) logChunkAction("ALOC", chunk);
+		return chunk;
+	}
+	
+	private Chunk initChunk(long offset, NumberSize nextType, NumberSize bodyType, long initialSize) throws IOException{
 		
-		var chunk=new Chunk(this, source.getSize(), safeNextType(), 0, bodyType, initialSize);
-		chunkCache.put(chunk.getOffset(), chunk);
+		var chunk=new Chunk(this, offset, nextType, 0, bodyType, initialSize);
+		putChunkInCache(chunk);
 		
 		try(var out=source.write(source.getSize(), true)){
 			chunk.init(out);
 		}
-		if(chunk.getOffset()==343){
-			int i=0;
-		}
-		if(LOG_ACTIONS) logChunkAction("ALOC", chunk);
+		
 		
 		return chunk;
 	}
@@ -315,7 +372,7 @@ public class Header{
 	
 	private Chunk chainedAlocAction(Chunk chunk, long requestedMemory) throws IOException, BitDepthOutOfSpaceException{
 		
-		var initSize=Math.max(requestedMemory, MINIMUM_CHUNK_SIZE);
+		var initSize=Math.max(requestedMemory, config.minimumChunkSize);
 		
 		NumberSize bodyNum=chunk.getBodyType()
 		                        .next()
@@ -450,7 +507,7 @@ public class Header{
 				try{
 					chunk.setNext(newChunk);
 				}catch(BitDepthOutOfSpaceException e){
-					throw new RuntimeException(e);//should never happen
+					throw new ShouldNeverHappenError(e);
 				}finally{
 					if(!toFree.isEmpty()){
 						freeChunkChain(toFree.get(0));
@@ -486,36 +543,70 @@ public class Header{
 		for(var val : freeChunks) sourcedChunkIterOne("Free chunk", val.dereference(this), consumer);
 	}
 	
-	private void validateFile() throws IOException{
+	private void removeChunkInCache(Long offset){
+		chunkCache.remove(offset);
+	}
+	
+	private void putChunkInCache(Chunk chunk){
+		Long key=chunk.getOffset();
+		var  old=chunkCache.put(key, chunk);
+		if(DEBUG_VALIDATION) Assert(old==null, old, chunk);
+	}
+	
+	private Chunk getChunkInCache(Long offset){
+		return chunkCache.get(offset);
+	}
+	
+	void validateFile() throws IOException{
 		
-		class Range{
+		for(var e : chunkCache.entrySet()){
+			var cached=e.getValue();
+			
+			if(!cached.isDirty()){
+				var read=readChunk(e.getKey());
+				if(!read.equals(cached)){
+					
+					if(cached.lastMod!=null) cached.lastMod.printStackTrace();
+					
+					throw new AssertionError("Chunk cache mismatch\n"+
+					                         TextUtil.toTable("cached / read", List.of(cached, read)));
+				}
+			}
+		}
+		
+		for(var ch : freeChunks){
+			var c=ch.dereference(this);
+			Assert(!c.isUsed(), c, freeChunks);
+		}
+		
+		class Node{
 			public final long a, b;
 			public final String source;
 			public final Chunk  chunk;
 			
-			Range(Chunk chunk, String source){
+			Node(Chunk chunk, String source){
 				this.a=chunk.getOffset();
 				this.b=chunk.getOffset()+chunk.wholeSize();
 				this.chunk=chunk;
 				this.source=source;
 			}
 			
-			boolean overlap(Range other){
+			boolean overlaps(Node other){
 				return Math.max(other.a, a)-Math.min(other.b, b)<(a-b)+(other.a-other.b);
 			}
 		}
 		
-		List<Range> ranges=new ArrayList<>();
+		List<Node> nodes=new ArrayList<>();
 		
 		sourcedChunkIter((newSource, chunk)->{
-			var dup=ranges.stream().filter(r->r.chunk.equals(chunk)).findAny();
+			var dup=nodes.stream().filter(r->r.chunk.equals(chunk)).findAny();
 			if(dup.isPresent()) throw new AssertionError("Duplicate chunk reference:\n"+dup.get().source+"\n"+newSource);
-			ranges.add(new Range(chunk, newSource));
+			nodes.add(new Node(chunk, newSource));
 		});
 		
-		for(var range1 : ranges){
-			for(var range2 : ranges){
-				if(range1.overlap(range2)){
+		for(var range1 : nodes){
+			for(var range2 : nodes){
+				if(range1.overlaps(range2)){
 					throw new AssertionError("\n"+TextUtil.toTable("Overlapping", List.of(range1, range2)));
 				}
 			}
@@ -535,11 +626,15 @@ public class Header{
 					throw new AssertionError("Trying to free chunk "+ch+" in use: "+src);
 				}
 			});
+			
+			validateFile();
 		}
 		
 		chunk.setUsed(false);
-		chunk.setSize(0);
+		chunk.setSize(1);
 		chunk.clearNext();
+		
+		chunk.syncHeader();
 		
 		try{
 			
@@ -561,11 +656,12 @@ public class Header{
 		}
 	}
 	
+	
 	private boolean deallocatingFreeAction(Chunk chunk) throws IOException{
 		if(!chunk.isLastPhysical()) return false;
 		
 		source.setCapacity(chunk.getOffset());
-		chunkCache.remove(chunk.getOffset());
+		removeChunkInCache(chunk);
 		
 		if(LOG_ACTIONS) logChunkAction("FREE DEALLOC", chunk);
 		
@@ -582,6 +678,9 @@ public class Header{
 	}
 	
 	private boolean backwardFreeMergeAction(Chunk chunk) throws IOException{
+		if(DEBUG_VALIDATION) validateFile();
+		
+		if(freeChunks.isEmpty()) return false;
 		
 		var offset=chunk.getOffset();
 		
@@ -602,43 +701,47 @@ public class Header{
 		try{
 			previous.setCapacity(chunk.nextPhysicalOffset()-previous.getDataStart());
 		}catch(BitDepthOutOfSpaceException e){
-			return false;
+			throw new NotImplementedException(e);//TODO: reformat header be able to merge
 		}
 		
 		previous.syncHeader();
-		if(LOG_ACTIONS) logChunkAction("FREE B MERGE", chunk);
+		
+		removeChunkInCache(chunk);
+		
+		if(DEBUG_VALIDATION) validateFile();
+		if(LOG_ACTIONS){
+			logChunkAction("FREE B MERGE", previous);
+			logChunkAction("", chunk);
+		}
 		
 		return true;
 	}
 	
-	private boolean forwardFreeMergeAction(Chunk chunk) throws IOException{
+	private boolean forwardFreeMergeAction(Chunk toMergeInTo) throws IOException{
 		if(freeChunks.isEmpty()) return false;
 		
-		var offset =chunk.getOffset();
-		var nextPtr=new ChunkPointer(chunk.nextPhysicalOffset());
+		var nextPtr=new ChunkPointer(toMergeInTo.nextPhysicalOffset());
 		
 		var nextIndex=freeChunks.indexOf(nextPtr);
 		
 		if(nextIndex==-1) return false;
 		
+		//merge if next physical chunk also free
+		Chunk next=nextPtr.dereference(this);
+		
 		try{
-			//merge if next physical chunk also free
-			Chunk next=nextPtr.dereference(this);
-			
-			mergeChunks(chunk, next);
-			
-			chunkCache.remove(nextPtr.value);
-			
-			var nextVal=freeChunks.getElement(nextIndex);
-			nextVal.value=chunk.getOffset();
-			freeChunks.setElement(nextIndex, nextVal);
-			
-			if(LOG_ACTIONS) logChunkAction("FREE F MERGE", chunk);
-			
-			return true;
+			mergeChunks(toMergeInTo, next);
 		}catch(BitDepthOutOfSpaceException e){
-			return false;//todo reformat header be able to merge
+			throw new NotImplementedException(e);//TODO: reformat header be able to merge
 		}
+		
+		removeChunkInCache(nextPtr);
+		
+		freeChunks.modifyElement(nextIndex, val->val.set(toMergeInTo));
+		
+		if(LOG_ACTIONS) logChunkAction("FREE F MERGE", toMergeInTo);
+		
+		return true;
 	}
 	
 	private void normalFreeAction(Chunk chunk) throws IOException{
@@ -646,12 +749,30 @@ public class Header{
 		if(LOG_ACTIONS) logChunkAction("FREED", chunk);
 	}
 	
+	private Chunk readChunk(long offset) throws IOException{
+		return Chunk.read(this, offset);
+	}
+	
+	private void removeChunkInCache(ChunkPointer ptr){
+		removeChunkInCache(ptr.value);
+	}
+	
+	private void removeChunkInCache(Chunk chunk){
+		removeChunkInCache(chunk.getOffset());
+	}
+	
+	public Chunk getByOffsetCached(Long offset){
+		return getChunkInCache(offset);
+	}
+	
 	public Chunk getByOffset(Long offset) throws IOException{
-		var cached=chunkCache.get(offset);
+		var cached=getChunkInCache(offset);
 		if(cached!=null) return cached;
 		
-		var read=Chunk.read(this, offset);
-		chunkCache.put(offset, read);
+		var read=readChunk(offset);
+		putChunkInCache(read);
+
+//		if(LOG_ACTIONS) logChunkAction("READ", read);
 		
 		return read;
 	}
@@ -664,29 +785,12 @@ public class Header{
 		return files;
 	}
 	
-	public List<Chunk> allChunks(boolean includeHeader) throws IOException{
-		List<Chunk> result=new ArrayList<>();
-		
-		if(includeHeader){
-			result.addAll(headerStartChunks());
-		}
-		
-		for(var pointer : fileList){
-			result.add(pointer.dereference());
-		}
-		
-		for(int i=0;i<result.size();i++){
-			var c=result.get(i);
-			if(c.hasNext()) result.add(c.nextChunk());
-		}
-		
-		for(ChunkPointer val : freeChunks){
-			result.add(getByOffset(val.value));
-		}
-		
-		result.sort(Comparator.comparingLong(Chunk::getOffset));
-		
-		return result;
+	public List<Chunk> allChunks(){
+		return StreamSupport.stream(allChunksIter.spliterator(), false).collect(Collectors.toList());
+	}
+	
+	private long calcTotalWholeSize(List<Chunk> chain){
+		return chain.stream().mapToLong(Chunk::wholeSize).sum();
 	}
 	
 	private long calcTotalCapacity(List<Chunk> chain){
@@ -705,18 +809,39 @@ public class Header{
 		return chains;
 	}
 	
-	private Chunk firstChunk() throws IOException{
+	public Chunk firstChunk() throws IOException{
 		return getByOffset((long)FILE_HEADER_SIZE);
+	}
+	
+	private List<Chunk> prevDetectingMove(Chunk chunk) throws IOException{
+		for(Chunk ch : allChunksIter){
+			if(ch.getNext()==chunk.getOffset()){
+				var moved=prevDetectingMove(ch);
+				if(!moved.isEmpty()) return moved;
+				
+				var chain=ch.loadWholeChain();
+				
+				var totalSize=calcTotalSize(chain);
+				
+				moveChainToChunk(ch, alocNew(bySize(totalSize), totalSize));
+				return chain;
+			}
+		}
+		
+		return List.of();
 	}
 	
 	private Chunk clearRegion(long start, long size) throws IOException{
 		long end  =start+size;
 		var  first=firstChunk();
+
+//		LogUtil.println("freeing region from", start, "to", end);
+		
 		Assert(!first.overlaps(start, end));
 		
 		var startChunk=first.nextPhysical();
 		
-		List<Chunk> toMove=new ArrayList<>();
+		List<Chunk> toMove=new LinkedList<>();
 		{
 			Chunk walk=startChunk;
 			while(true){
@@ -738,8 +863,16 @@ public class Header{
 		
 		toMove.removeIf(ch->!ch.isUsed());
 		
-		for(Chunk chunk : toMove){
-			chunk.moveToAndFreeOld(aloc(chunk.getSize()==0?chunk.getCapacity():chunk.getSize(), false));
+		while(!toMove.isEmpty()){
+			Chunk chunk=toMove.remove(0);
+			
+			var moved=prevDetectingMove(chunk);
+			if(!moved.isEmpty()){
+				toMove.removeAll(moved);
+				continue;
+			}
+			
+			chunk.moveToAndFreeOld(aloc(chunk.getSize()==0?chunk.getCapacity():chunk.getSize(), false));//TODO: check if trimming size has any side effects / regressions
 		}
 		
 		Chunk freeRegion;
@@ -755,23 +888,78 @@ public class Header{
 				}
 				walk=next;
 			}
+			
+			if(DEBUG_VALIDATION){
+				Assert(!freeRegion.isUsed(), freeRegion, start, size, end);
+			}
 		}
 		
 		if(DEBUG_VALIDATION){
+			validateFile();
 			Assert(!freeRegion.isUsed(), freeRegion, start, size, end);
-			Assert(!freeRegion.overlaps(start, end), freeRegion, start, size, end);
-			Assert(freeRegion.getCapacity() >= size, freeRegion, start, size, end);
+			Assert(!freeRegion.overlaps(start, end), freeRegion, "Freed start", start, size, end);
+			Assert(freeRegion.wholeSize() >= size, "Did not free region", freeRegion, "["+start+"..."+end+"]", size);
 		}
 		
 		return freeRegion;
 	}
 	
+	private void moveChainToChunk(Chunk chunk, Chunk newChunk) throws IOException{
+		if(DEBUG_VALIDATION){
+			validateFile();
+			chunk.checkCaching();
+			newChunk.checkCaching();
+		}
+		
+		var chain=chunk.loadWholeChain();
+		var siz  =calcTotalSize(chain);
+		
+		
+		if(DEBUG_VALIDATION){
+			validateFile();
+			Assert(siz<=newChunk.getCapacity());
+		}
+		
+		if(chain.size()>1){
+			var second=chain.get(1);
+			
+			if(DEBUG_VALIDATION) validateFile();
+			
+			try(var out=newChunk.io().write(chunk.getSize(), false)){
+				try(var in=second.io().read()){
+					in.transferTo(out);
+				}
+			}
+			
+			if(DEBUG_VALIDATION) validateFile();
+			
+			Assert(!newChunk.hasNext());
+			
+			if(DEBUG_VALIDATION) validateFile();
+			chunk.moveToAndFreeOld(newChunk);
+			
+			if(DEBUG_VALIDATION) validateFile();
+			chunk.setSize(siz);
+			chunk.chainForwardFree();
+		}else{
+			chunk.moveToAndFreeOld(newChunk);
+		}
+		
+	}
+	
 	public void defragment() throws IOException{
 		Assert(!defragmenting);
+		if(DEBUG_VALIDATION) validateFile();
 		
 		defragmenting=true;
 		LogUtil.println("defragmenting");
 		int counter=0;
+		
+		var headerChunks=new ArrayList<Chunk>(headerPointers.size());
+		for(var ptr : headerPointers){
+			headerChunks.add(ptr.dereference(this));
+		}
+		Object e1=null;
 		
 		try{
 			
@@ -783,9 +971,16 @@ public class Header{
 					chunk=chunk.nextPhysical();
 					if(chunk.isLastPhysical()) break;
 				}while(!chunk.isUsed());
+				chunk.checkCaching();
 				
 				var chain=chunk.loadWholeChain();
-				var size =calcTotalSize(chain);
+				
+				var size=calcTotalSize(chain);
+				
+				//TODO: use more more sensible padding
+				if(headerChunks.contains(chunk)){
+					size+=chain.size()*bySize(source.getSize()).bytes;
+				}
 				
 				if(chunk.getOffset()==pos&&chain.size()==1){
 					if(calcTotalCapacity(chain)==size){
@@ -794,40 +989,24 @@ public class Header{
 					}
 				}
 				
-				
 				var freeRegion=clearRegion(pos, Chunk.headerSize(source.getSize(), size)*3+size);
 				
-				chunk.moveToAndFreeOld(alocFreeSplit(freeRegion, size));
+				var defrag=alocFreeSplit(freeRegion, size);
 				
-				if(TRUE()) return;
+				moveChainToChunk(chunk, defrag);
 				
-				pos+=chunk.getHeaderSize()+size;
-				
-				if(chain.size()>1){
-					var second=chain.get(1);
-					try(var out=chunk.io().write(chunk.getSize(), false)){
-						try(var in=second.io().read()){
-							in.transferTo(out);
-						}
-					}
-					
-					chunk.chainForwardFree();
-				}
-				LogUtil.println(counter);
+				pos+=chunk.wholeSize();
 				
 				if(DEBUG_VALIDATION) validateFile();
-				
-				LogUtil.println(freeChunks);
-				
 			}
 			
 			
 		}catch(Throwable e){
-			e.printStackTrace();
+			e1=e;
 			throw e;
 		}finally{
 			defragmenting=false;
-			if(DEBUG_VALIDATION) validateFile();
+			if(DEBUG_VALIDATION&&e1==null) validateFile();
 		}
 	}
 	
@@ -872,6 +1051,7 @@ public class Header{
 		       source.equals(header.source);
 	}
 	
+	
 	@Override
 	public int hashCode(){
 		int result=1;
@@ -886,17 +1066,23 @@ public class Header{
 		return headerPointers;
 	}
 	
-	public void notifyMovement(long oldOffset, long newOffset) throws IOException{
+	public void notifyMovement(long oldOffset, Chunk newOffset) throws IOException{
 		if(LOG_ACTIONS){
-			var ay=new LinkedHashMap<String, Object>();
-			ay.put("Chunk action", "MOVED");
-			ay.put("offset", oldOffset);
-			ay.put("next", newOffset);
-			
-			LogUtil.printTable(ay);
+			LogUtil.printTable("Chunk action", "MOVED", "from", oldOffset, "to", newOffset.getOffset());
 		}
 		
-		chunkCache.remove(oldOffset);
+		removeChunkInCache(oldOffset);
+		removeChunkInCache(newOffset);
+		putChunkInCache(newOffset);
+		
+		for(int i=0;i<freeChunks.size();i++){
+			ChunkPointer pointer=freeChunks.getElement(i);
+			if(pointer.equals(oldOffset)){
+				pointer.value=newOffset.getOffset();
+				freeChunks.setElement(i, pointer);
+				return;
+			}
+		}
 		
 		for(int i=0;i<headerPointers.size();i++){
 			var ptr=headerPointers.getElement(i);
@@ -924,7 +1110,7 @@ public class Header{
 			FilePointer p=fileList.getByIndex(i);
 			
 			if(p.getStart()==oldOffset){
-				fileList.setByIndex(i, new FilePointer(this, p.getLocalPath(), p.getStartSize().max(NumberSize.bySize(newOffset)), newOffset));
+				fileList.setByIndex(i, new FilePointer(this, p.getLocalPath(), p.getStartSize().max(NumberSize.bySize(newOffset.getOffset())), newOffset.getOffset()));
 				return;
 			}
 			

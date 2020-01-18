@@ -28,7 +28,9 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+import static com.lapissea.util.PoolOwnThread.*;
 import static com.lapissea.util.UtilL.*;
+import static java.awt.RenderingHints.*;
 import static javax.swing.SwingUtilities.*;
 
 class FSFTest{
@@ -42,7 +44,7 @@ class FSFTest{
 		for(File file : new File(".").listFiles()){
 			file.delete();
 		}
-		var pixelScale=12;
+		var pixelScale=13;
 		
 		var     encoderArr=new SequenceEncoder[1];
 		var     jframe    =new JFrame[1];
@@ -55,14 +57,14 @@ class FSFTest{
 			t t;
 		}
 		
-		T<Consumer<BufferedImage>> setGUIImg0=new T();
+		T<Consumer<BufferedImage>> setGUIImg0=new T<>();
 		
 		Supplier<JFrame> getJFrame=()->{
 			if(jframe[0]==null){
 				
 				var jf=new JFrame();
+				jf.setVisible(false);
 				
-				jf.setVisible(true);
 				jf.setLocationRelativeTo(null);
 				jf.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 				jf.addComponentListener(new ComponentAdapter(){
@@ -114,7 +116,7 @@ class FSFTest{
 			}
 			return jframe[0];
 		};
-		
+		async(getJFrame);
 		
 		setGUIImg0.t=img->invokeLater(()->{
 			var jf=getJFrame.get();
@@ -128,13 +130,17 @@ class FSFTest{
 					var pp=pixelScale*3;
 					var x =pos[0];
 					var y =pos[1];
+					var g2=(Graphics2D)g;
+					g2.setRenderingHint(KEY_TEXT_ANTIALIASING, VALUE_TEXT_ANTIALIAS_ON);
 					g.drawString(""+(x/pp+y/pp*jf.getContentPane().getWidth()/pp), pos[0]/pp*pp, pos[1]/pp*pp+pp/2);
 				}
 			};
 			
 			jf.setContentPane(lab);
 			jf.pack();
+			invokeLater(()->jf.setVisible(true));
 		});
+		
 		Consumer<BufferedImage> setGUIImg=setGUIImg0.t;
 		
 		Supplier<SequenceEncoder> encoder=()->{
@@ -150,6 +156,7 @@ class FSFTest{
 		
 		int[] counter={1};
 		var   pool   =(ThreadPoolExecutor)Executors.newFixedThreadPool(1);
+		var   runner =Executors.newWorkStealingPool();
 		
 		Function<BufferedImage, BufferedImage> noAlpha=img->{
 			BufferedImage copy=new BufferedImage(img.getWidth(), img.getHeight(), BufferedImage.TYPE_INT_RGB);
@@ -175,26 +182,35 @@ class FSFTest{
 		
 		UnsafeConsumer<BufferedImage, IOException> writer=doGui;
 		
-		UnsafeConsumer<BufferedImage, IOException> writeImg=img->{
-			jft.add(new Throwable());
-//			pool.submit(()->{
-			try{
-				writer.accept(img);
-			}catch(Exception ex){
-				ex.printStackTrace();
-			}
-//			});
-		};
 		
 		try{
 			var source=new IOInterface.MemoryRA();
 			var fil   =new FileSystemInFile(source);
 			
-			
 			UnsafeConsumer<long[], IOException> snapshotIds=ids->{
-				var img=fil.renderFile(24, 24, ids, pixelScale);
-				writeImg.accept(img);
+				var copy=new FileSystemInFile(new IOInterface.MemoryRA(source));
+				Assert(fil.equals(copy));
+				
+				var img=async(()->{
+					try{
+						return copy.renderFile(24, 24, ids, pixelScale);
+					}catch(IOException e){
+						throw UtilL.uncheckedThrow(e);
+					}
+				}, runner);
+				
+				var t=new Throwable("Clicked snapshot");
+				
+				pool.submit(()->{
+					jft.add(t);
+					try{
+						writer.accept(img.join());
+					}catch(Exception ex){
+						ex.printStackTrace();
+					}
+				});
 			};
+			
 			UnsafeRunnable<IOException> snapshot=()->{};
 			
 			if(writer!=null){

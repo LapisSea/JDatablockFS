@@ -20,7 +20,7 @@ public class FlagWriter{
 	public <T extends Enum<T>> void writeEnum(T val){
 		var consts=val.getDeclaringClass().getEnumConstants();
 		var size  =consts.length;
-		var bits=Math.max(1, (int)Math.ceil(Math.log(size)/Math.log(2)));
+		var bits  =Math.max(1, (int)Math.ceil(Math.log(size)/Math.log(2)));
 		writeBits(val.ordinal(), bits);
 	}
 	
@@ -31,6 +31,10 @@ public class FlagWriter{
 		buffer|=safeData<<written;
 		
 		written+=bitCount;
+	}
+	
+	public int remainingCount(){
+		return numberSize.bytes*Byte.SIZE-written;
 	}
 	
 	public long getFlags(){

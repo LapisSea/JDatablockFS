@@ -221,6 +221,12 @@ public class ChunkIO implements IOInterface{
 		public void close() throws IOException{
 			finish();
 			flush();
+			if(chunk!=null) chunk.syncHeader();
+			else{
+				for(var c : chunks){
+					c.syncHeader();
+				}
+			}
 			data=null;
 		}
 		
@@ -384,25 +390,24 @@ public class ChunkIO implements IOInterface{
 		chunks=new ChunkChain(chunk);
 	}
 	
-	public Chunk getRoot(){
-		return chunks.get(0);
-	}
+	public Chunk getRoot(){ return chunks.get(0); }
 	
 	
 	@Override
 	public RandomIO doRandom() throws IOException{
-		
 		return new ChunkSpaceRandomIO(chunkSource.doRandom());
 	}
 	
 	
 	@Override
 	public long getSize(){
+		//TODO: use precomputed implementation
 		return chunks.stream().mapToLong(Chunk::getSize).sum();
 	}
 	
 	@Override
 	public long getCapacity(){
+		//TODO: use precomputed implementation
 		return chunks.stream().mapToLong(Chunk::getCapacity).sum();
 	}
 	

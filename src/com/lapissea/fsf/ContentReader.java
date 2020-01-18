@@ -5,18 +5,17 @@ import java.io.IOException;
 
 @SuppressWarnings("PointlessBitwiseExpression")
 public interface ContentReader{
-//	byte[] contentBuf();
+	byte[] contentBuf();
 	
 	int read() throws IOException;
 	
 	int read(byte[] b, int off, int len) throws IOException;
 	
 	default char readChar() throws IOException{
-		int ch1=read();
-		int ch2=read();
-		if((ch1|ch2)<0)
-			throw new EOFException();
-		return (char)((ch1<<8)+(ch2<<0));
+		byte[] readBuffer=contentBuf();
+		readFully(readBuffer, 0, 2);
+		return (char)((readBuffer[0]<<8)+
+		              (readBuffer[1]<<0));
 	}
 	
 	default int readInt1() throws IOException{
@@ -25,27 +24,31 @@ public interface ContentReader{
 	
 	default int readUnsignedInt1() throws IOException{
 		int ch=read();
-		if(ch<0){
-			throw new EOFException();
-		}
+		if(ch<0) throw new EOFException();
 		return ch;
 	}
 	
 	
 	default short readInt2() throws IOException{
-		int ch1=read();
-		int ch2=read();
-		if((ch1|ch2)<0)
-			throw new EOFException();
-		return (short)((ch1<<8)+(ch2<<0));
+		byte[] readBuffer=contentBuf();
+		readFully(readBuffer, 0, 2);
+		return (short)(((readBuffer[0]&255)<<8)+
+		               ((readBuffer[1]&255)<<0));
 	}
 	
 	default int readUnsignedInt2() throws IOException{
-		int ch1=read();
-		int ch2=read();
-		if((ch1|ch2)<0)
-			throw new EOFException();
-		return (ch1<<8)+(ch2<<0);
+		byte[] readBuffer=contentBuf();
+		readFully(readBuffer, 0, 2);
+		return ((readBuffer[0]&255)<<8)+
+		       ((readBuffer[1]&255)<<0);
+	}
+	
+	default int readUnsignedInt3() throws IOException{
+		byte[] readBuffer=contentBuf();
+		readFully(readBuffer, 0, 3);
+		return (((readBuffer[0]&255)<<16)+
+		        ((readBuffer[1]&255)<<8)+
+		        ((readBuffer[2]&255)<<0));
 	}
 	
 	default long readUnsignedInt4() throws IOException{
@@ -53,18 +56,38 @@ public interface ContentReader{
 	}
 	
 	default int readInt4() throws IOException{
-		int ch1=read();
-		int ch2=read();
-		int ch3=read();
-		int ch4=read();
-		if((ch1|ch2|ch3|ch4)<0)
-			throw new EOFException();
-		return ((ch1<<24)+(ch2<<16)+(ch3<<8)+(ch4<<0));
+		byte[] readBuffer=contentBuf();
+		readFully(readBuffer, 0, 4);
+		return (((readBuffer[0]&255)<<24)+
+		        ((readBuffer[1]&255)<<16)+
+		        ((readBuffer[2]&255)<<8)+
+		        ((readBuffer[3]&255)<<0));
 	}
 	
 	
+	default long readUnsignedInt5() throws IOException{
+		byte[] readBuffer=contentBuf();
+		readFully(readBuffer, 0, 5);
+		return (((long)(readBuffer[0]&255)<<32)+
+		        ((long)(readBuffer[1]&255)<<24)+
+		        ((readBuffer[2]&255)<<16)+
+		        ((readBuffer[3]&255)<<8)+
+		        ((readBuffer[4]&255)<<0));
+	}
+	
+	default long readUnsignedInt6() throws IOException{
+		byte[] readBuffer=contentBuf();
+		readFully(readBuffer, 0, 6);
+		return (((long)(readBuffer[0]&255)<<40)+
+		        ((long)(readBuffer[1]&255)<<32)+
+		        ((long)(readBuffer[2]&255)<<24)+
+		        ((readBuffer[3]&255)<<16)+
+		        ((readBuffer[4]&255)<<8)+
+		        ((readBuffer[5]&255)<<0));
+	}
+	
 	default long readInt8() throws IOException{
-		byte[] readBuffer=new byte[8];
+		byte[] readBuffer=contentBuf();
 		readFully(readBuffer, 0, 8);
 		return (((long)readBuffer[0]<<56)+
 		        ((long)(readBuffer[1]&255)<<48)+

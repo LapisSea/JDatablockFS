@@ -25,7 +25,7 @@ public class ChunkPointer extends FileObject implements Comparable<ChunkPointer>
 	
 	@Override
 	public void write(ContentOutputStream dest) throws IOException{
-		dest.writeLong(value);
+		dest.writeInt8(value);
 	}
 	
 	@Override
@@ -62,5 +62,9 @@ public class ChunkPointer extends FileObject implements Comparable<ChunkPointer>
 	
 	public Chunk dereference(Header header) throws IOException{
 		return header.getByOffset(value);
+	}
+	
+	public void set(Chunk chunk){
+		value=chunk.getOffset();
 	}
 }

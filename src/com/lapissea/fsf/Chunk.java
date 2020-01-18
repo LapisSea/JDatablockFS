@@ -7,7 +7,10 @@ import com.lapissea.util.function.UnsafeConsumer;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
+import java.time.LocalDateTime;
 import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static com.lapissea.fsf.FileSystemInFile.*;
 import static com.lapissea.util.UtilL.*;
@@ -30,15 +33,12 @@ import static com.lapissea.util.UtilL.*;
  * - next (offset to next chunk in chain)
  *
  * */
+@SuppressWarnings("AutoBoxing")
 public class Chunk{
 	
-	public static int headerSize(long fileSize, long chunkSize){
-		return headerSize(NumberSize.bySize(fileSize), NumberSize.bySize(chunkSize));
-	}
+	public static int headerSize(long fileSize, long chunkSize)      { return headerSize(NumberSize.bySize(fileSize), NumberSize.bySize(chunkSize)); }
 	
-	public static int headerSize(NumberSize nextType, long chunkSize){
-		return headerSize(nextType, NumberSize.bySize(chunkSize));
-	}
+	public static int headerSize(NumberSize nextType, long chunkSize){ return headerSize(nextType, NumberSize.bySize(chunkSize)); }
 	
 	public static int headerSize(NumberSize nextType, NumberSize bodyType){
 		return FLAGS_SIZE.bytes+
@@ -46,21 +46,15 @@ public class Chunk{
 		       bodyType.bytes*2;
 	}
 	
-	public static long wholeSize(long fileSize, long capacity){
-		return wholeSize(NumberSize.bySize(fileSize), capacity);
-	}
+	public static long wholeSize(long fileSize, long capacity)      { return wholeSize(NumberSize.bySize(fileSize), capacity); }
 	
-	public static long wholeSize(NumberSize nextType, long capacity){
-		return wholeSize(nextType, NumberSize.bySize(capacity), capacity);
-	}
+	public static long wholeSize(NumberSize nextType, long capacity){ return wholeSize(nextType, NumberSize.bySize(capacity), capacity); }
 	
 	public static long wholeSize(NumberSize nextType, NumberSize bodyType, long capacity){
 		return headerSize(nextType, bodyType)+capacity;
 	}
 	
-	public static void init(ContentOutputStream out, NumberSize nextType, int bodySize) throws IOException{
-		init(out, nextType, bodySize, null);
-	}
+	public static void init(ContentOutputStream out, NumberSize nextType, int bodySize) throws IOException{ init(out, nextType, bodySize, null); }
 	
 	public static void init(ContentOutputStream out, NumberSize nextType, long bodySize, UnsafeConsumer<ContentOutputStream, IOException> initContents) throws IOException{
 		
@@ -78,16 +72,25 @@ public class Chunk{
 		
 	}
 	
-	private static final NumberSize FLAGS_SIZE=NumberSize.BYTE;
+	private static final NumberSize FLAGS_SIZE=NumberSize.SHORT;
 	
 	
 	public static Chunk read(Header header, long offset, ContentInputStream in) throws IOException{
-		var flags=FlagReader.read(in, FLAGS_SIZE);
+		var flagData=FLAGS_SIZE.read(in);
+		var flags   =new FlagReader(flagData, FLAGS_SIZE);
+
+//		var flags=FlagReader.read(in, FLAGS_SIZE);
 		
 		var nextType=flags.readEnum(NumberSize.class);
 		var bodyType=flags.readEnum(NumberSize.class);
 		
 		var chunkUsed=flags.readBoolBit();
+		
+		if(DEBUG_VALIDATION){
+			do{
+				Assert(flags.readBoolBit(), "Invalid chunk header", offset, flagData, Long.toBinaryString(flagData), Long.toHexString(flagData));
+			}while(flags.remainingCount()>0);
+		}
 		
 		long next    =requirePositive(nextType.read(in));
 		long used    =requirePositive(bodyType.read(in));
@@ -130,6 +133,12 @@ public class Chunk{
 		
 		flags.writeBoolBit(isUsed());
 		
+		if(DEBUG_VALIDATION){
+			while(flags.remainingCount()>0){
+				flags.writeBoolBit(true);
+			}
+		}
+		
 		flags.export(buff);
 		
 		nextType.write(buff, getNext());
@@ -171,6 +180,11 @@ public class Chunk{
 	
 	private ChunkIO io;
 	
+	private static int counter;
+	
+	Throwable lastMod;
+	final Throwable madeAt=new Throwable((counter++)+" "+LocalDateTime.now().toString());
+	
 	Set<Runnable> dependencyInvalidate=new HashSet<>(3);
 	
 	public Chunk(Header header, long offset, NumberSize nextType, long next, long capacity){
@@ -184,21 +198,27 @@ public class Chunk{
 	public Chunk(Header header, long offset, NumberSize nextType, long next, NumberSize bodyType, long size, long capacity, boolean used){
 		try{
 			this.header=header;
+			
 			this.offset=requirePositive(offset);
 			
 			this.nextType=Objects.requireNonNull(nextType);
 			this.next=requireGreaterOrEqual(next, Header.FILE_HEADER_SIZE);
 			
 			this.bodyType=Objects.requireNonNull(bodyType);
-			this.capacity=requirePositive(capacity);
+			this.capacity=requireGreaterOrEqual(capacity, 1);
 			this.size=requireGreaterOrEqual(size, capacity);
 			
 			this.used=used;
+			
 		}catch(Exception e){
 			throw new IllegalArgumentException(e);
 		}
 	}
 	
+	private void markDirty(){
+		dirty=true;
+		lastMod=new Throwable("ay");
+	}
 	
 	public boolean hasNext(){
 		return getNext()!=0;
@@ -259,9 +279,10 @@ public class Chunk{
 	
 	public void setSize(long size){
 		if(this.size==size) return;
+		
 		if(size>getCapacity()) throw new IndexOutOfBoundsException(size+" > "+getCapacity());
 		this.size=size;
-		dirty=true;
+		markDirty();
 	}
 	
 	public void clearNext(){
@@ -279,9 +300,11 @@ public class Chunk{
 	public void setNext(long next) throws BitDepthOutOfSpaceException{
 		if(this.next==next) return;
 		
+		if(DEBUG_VALIDATION) Assert(getNextType()!=NumberSize.VOID);
+		
 		getNextType().ensureCanFit(next);
 		this.next=next;
-		dirty=true;
+		markDirty();
 		
 		notifyDependency();
 	}
@@ -290,8 +313,10 @@ public class Chunk{
 		if(this.capacity==capacity) return;
 		
 		getBodyType().ensureCanFit(capacity);
+		Assert(capacity>0);
+		
 		this.capacity=capacity;
-		dirty=true;
+		markDirty();
 		notifyDependency();
 	}
 	
@@ -301,13 +326,19 @@ public class Chunk{
 	
 	public void setUsed(boolean used){
 		if(this.used==used) return;
+		
 		this.used=used;
-		dirty=true;
+		markDirty();
 	}
 	
 	public long getOffset(){
 		return offset;
 	}
+	
+	public void setOffset(long offset){
+		this.offset=offset;
+	}
+	
 	
 	public long getSize(){
 		return size;
@@ -333,8 +364,17 @@ public class Chunk{
 	public boolean equals(Object o){
 		if(this==o) return true;
 		if(!(o instanceof Chunk)) return false;
-		Chunk chunk=(Chunk)o;
-		return getOffset()==chunk.getOffset()&&
+		return equals((Chunk)o);
+	}
+	
+	public boolean equals(Chunk chunk){
+		return chunk!=null&&
+		       getOffset()==chunk.getOffset()&&
+		       getNext()==chunk.getNext()&&
+		       getCapacity()==chunk.getCapacity()&&
+		       getSize()==chunk.getSize()&&
+		       getBodyType()==chunk.getBodyType()&&
+		       getNextType()==chunk.getNextType()&&
 		       Objects.equals(header, chunk.header);
 	}
 	
@@ -352,9 +392,14 @@ public class Chunk{
 	}
 	
 	public void saveHeader() throws IOException{
-		dirty=false;
 		try(var out=header.source.write(getOffset(), false)){
 			saveHeader(out);
+		}
+		dirty=false;
+		
+		if(DEBUG_VALIDATION){
+			var read=read(header, offset);
+			Assert(equals(read), this, read);
 		}
 	}
 	
@@ -379,7 +424,11 @@ public class Chunk{
 	}
 	
 	public void chainForwardFree() throws IOException{
-		if(!hasNext()) return;
+		if(!hasNext()){
+			syncHeader();
+			return;
+		}
+		
 		var chunk=nextChunk();
 		clearNext();
 		syncHeader();
@@ -400,15 +449,28 @@ public class Chunk{
 		return List.copyOf(chain);
 	}
 	
-	public boolean overlaps(long start, long end) throws IOException{
+	public boolean overlaps(long start, long end){
 		long a=getOffset(), b=nextPhysicalOffset();
 		return Math.max(start, a)-Math.min(end, b)<(a-b)+(start-end);
 	}
 	
 	public void moveToAndFreeOld(Chunk newChunk) throws IOException{
-		var old=new Chunk(header, getOffset(), getNextType(), 0, getBodyType(), size, getCapacity(), true);
+		
+		if(DEBUG_VALIDATION) header.validateFile();
+		
+		var oldOff=getOffset();
+		
 		moveTo(newChunk);
+		
+		var old=header.getByOffset(oldOff);
+		
+		old.clearNext();
+		old.setSize(0);
+		old.syncHeader();
+		
 		header.freeChunk(old);
+		
+		if(DEBUG_VALIDATION) header.validateFile();
 	}
 	
 	public void moveTo(Chunk newChunk) throws IOException{
@@ -416,6 +478,7 @@ public class Chunk{
 		String oldChunk;
 		
 		if(DEBUG_VALIDATION){
+			header.validateFile();
 			Assert(!this.equals(newChunk), "Trying to move chunk into itself", this, newChunk);
 			Assert(!overlaps(newChunk.getOffset(), newChunk.getOffset()+newChunk.wholeSize()), "Overlapping chunks", this, newChunk);
 			Assert(getSize()<=newChunk.getCapacity(), getSize()+" can't fit in to "+newChunk.getCapacity());
@@ -447,7 +510,7 @@ public class Chunk{
 		nextType=newChunk.nextType;
 		bodyType=newChunk.bodyType;
 		capacity=newChunk.capacity;
-		dirty=true;
+		markDirty();
 		
 		try{
 			newChunk.setNext(next);
@@ -462,17 +525,24 @@ public class Chunk{
 		
 		notifyDependency();
 		
-		header.notifyMovement(oldOffset, newChunk.getOffset());
+		header.notifyMovement(oldOffset, this);
 		
 		if(DEBUG_VALIDATION){
+			checkCaching();
+			var old=header.getByOffsetCached(oldOffset);
+			
 			var newData=io().readAll();
 			if(!Arrays.equals(oldData, newData)){
 				throw new AssertionError(TextUtil.toString(loadWholeChain())+"\n"+
 				                         oldChunk+"\n"+
 				                         TextUtil.toString(this)+"\n"+
 				                         TextUtil.toString(oldData)+"\n"+
-				                         TextUtil.toString(newData));
+				                         TextUtil.toString(newData)+"\n"+
+				                         TextUtil.toTable(oldData, newData));
 			}
+			
+			
+			header.validateFile();
 		}
 	}
 	
@@ -514,4 +584,24 @@ public class Chunk{
 		return b.toString();
 	}
 	
+	public boolean isDirty(){
+		return dirty;
+	}
+	
+	public void checkCaching() throws IOException{
+		var cached=header.getByOffset(getOffset());
+		if(cached!=this){
+			Function<Chunk, String> tostr=ch->ch+" "+System.identityHashCode(ch)+"\n"+
+			                                  ch.madeAt.toString()+"\n"+
+			                                  Arrays.stream(ch.madeAt.getStackTrace())
+			                                        .map(Objects::toString)
+			                                        .collect(Collectors.joining("\n"));
+			
+			throw new AssertionError("\n"+
+			                         tostr.apply(this)+"\n\n"+
+			                         tostr.apply(cached)+"\n"+
+			                         TextUtil.toTable(this, cached)
+			);
+		}
+	}
 }

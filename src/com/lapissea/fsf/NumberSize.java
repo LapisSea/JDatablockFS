@@ -7,11 +7,14 @@ import java.io.IOException;
 
 public enum NumberSize{
 	
-	NONE('X', 0, 0, in->0, (out, num)->{}),
-	BYTE('B', 0xFFL, Byte.BYTES, ContentReader::readUnsignedInt1, (out, num)->out.writeByte((int)num)),
-	SHORT('S', 0xFFFFL, Short.BYTES, ContentReader::readUnsignedInt2, (out, num)->out.writeShort((int)num)),
-	INT('I', 0xFFFFFFFFL, Integer.BYTES, ContentReader::readUnsignedInt4, (out, num)->out.writeInt((int)num)),
-	LONG('L', Long.MAX_VALUE, Long.BYTES, ContentReader::readInt8, ContentWriter::writeLong);
+	VOID('V', 0x0, 0, in->0, (out, num)->{}),
+	BYTE('B', 0xFFL, 1, ContentReader::readUnsignedInt1, (out, num)->out.writeInt1((int)num)),
+	SHORT('s', 0xFFFFL, 2, ContentReader::readUnsignedInt2, (out, num)->out.writeInt2((int)num)),
+	BIG_SHORT('S', 0xFFFFFFL, 3, ContentReader::readUnsignedInt3, (out, num)->out.writeInt3((int)num)),
+	INT('i', 0xFFFFFFFFL, 4, ContentReader::readUnsignedInt4, (out, num)->out.writeInt4((int)num)),
+	BIG_INT('I', 0xFFFFFFFFFFL, 5, ContentReader::readUnsignedInt5, ContentWriter::writeInt5),
+	SMALL_LONG('l', 0xFFFFFFFFFFFFL, 6, ContentReader::readUnsignedInt6, ContentWriter::writeInt6),
+	LONG('L', 0X7FFFFFFFFFFFFFFFL, 8, ContentReader::readInt8, ContentWriter::writeInt8);
 	
 	private static final NumberSize[] VALS=NumberSize.values();
 	
@@ -41,40 +44,38 @@ public enum NumberSize{
 		this.writer=writer;
 	}
 	
-	public long read(ContentInputStream in) throws IOException{
+	public long read(ContentReader in) throws IOException{
 		return reader.apply(in);
 	}
 	
-	public void write(ContentOutputStream out, long value) throws IOException{
+	public void write(ContentWriter out, long value) throws IOException{
 		writer.accept(out, value);
 	}
 	
 	public NumberSize next(){
-		if(VALS[VALS.length-1]==this) return this;
+		if(ordinal(VALS.length-1)==this) return this;
 		return ordinal(ordinal()+1);
 	}
 	
 	public NumberSize max(NumberSize other){
 		if(other==this) return this;
-		
 		return bytes >= other.bytes?this:other;
 	}
 	
 	public NumberSize min(NumberSize other){
 		if(other==this) return this;
-		
 		return bytes<=other.bytes?this:other;
 	}
 	
 	public boolean canFit(long num){
-		return num<=maxSize;
+		return num<maxSize;
 	}
 	
 	public void ensureCanFit(long num) throws BitDepthOutOfSpaceException{
 		if(!canFit(num)) throw new BitDepthOutOfSpaceException(this, num);
 	}
 	
-	public void write(ContentOutputStream stream, long[] data) throws IOException{
+	public void write(ContentWriter stream, long[] data) throws IOException{
 		for(var l : data){
 			write(stream, l);
 		}

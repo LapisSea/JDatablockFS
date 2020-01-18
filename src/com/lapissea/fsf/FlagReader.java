@@ -25,7 +25,7 @@ public class FlagReader{
 		var consts=type.getEnumConstants();
 		var size  =consts.length;
 		
-		int bits=Math.max(1, (int)Math.ceil(Math.log(size)/Math.log(2)));
+		int bits   =Math.max(1, (int)Math.ceil(Math.log(size)/Math.log(2)));
 		int ordinal=readBits(bits);
 		return consts[ordinal];
 	}
@@ -41,6 +41,10 @@ public class FlagReader{
 		var result=data&makeMask(numOBits);
 		data >>>= numOBits;
 		return (int)result;
+	}
+	
+	public int remainingCount(){
+		return bitCount;
 	}
 	
 	private long makeMask(int size){

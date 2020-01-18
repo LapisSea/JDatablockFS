@@ -3,14 +3,16 @@ package com.lapissea.fsf;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
+import static com.lapissea.fsf.FileSystemInFile.*;
+
 public interface Content<T>{
 	
 	Content<long[]> LONG_ARRAY            =new Content<>(){
 		@Override
 		public void write(ContentOutputStream dest, long[] array) throws IOException{
-			dest.writeInt(array.length);
+			dest.writeInt4(array.length);
 			for(long l : array){
-				dest.writeLong(l);
+				dest.writeInt8(l);
 			}
 		}
 		
@@ -38,7 +40,7 @@ public interface Content<T>{
 			}
 			
 			dest.write(bytes);
-			dest.writeByte(0);
+			dest.writeInt1(0);
 		}
 		
 		@Override
@@ -47,6 +49,9 @@ public interface Content<T>{
 			
 			int c;
 			while((c=src.readInt1())!=0){
+				if(DEBUG_VALIDATION&&c==-1){
+					throw new RuntimeException();
+				}
 				result.append((char)c);
 			}
 			

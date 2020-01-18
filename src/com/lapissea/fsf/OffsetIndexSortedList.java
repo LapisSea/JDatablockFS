@@ -3,7 +3,6 @@ package com.lapissea.fsf;
 import com.lapissea.util.ByteBufferBackedInputStream;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
-import com.lapissea.util.WeakValueHashMap;
 import com.lapissea.util.function.FunctionOI;
 
 import java.io.EOFException;
@@ -30,10 +29,10 @@ public class OffsetIndexSortedList<T extends FileObject&Comparable<T>> extends A
 	private static final int OFFSETS_PER_CHUNK=8;
 	private static final int OFFSET_CHUNK_SIZE=OFFSETS_PER_CHUNK*(Long.BYTES);
 	
-	public static void init(ContentOutputStream out, int size) throws IOException{
+	public static void init(ContentOutputStream out, int size, Config config) throws IOException{
 		int ratio=4;
-		int ss   =FILE_TABLE_PADDING/ratio;
-		int fs   =FILE_TABLE_PADDING-ss;
+		int ss   =config.fileTablePadding/ratio;
+		int fs   =config.fileTablePadding-ss;
 		
 		Chunk.init(out, NumberSize.SHORT, fs);
 		Chunk.init(out, NumberSize.SHORT, ss);
@@ -47,10 +46,13 @@ public class OffsetIndexSortedList<T extends FileObject&Comparable<T>> extends A
 	
 	private NumberSize sizePerOffset;
 	
-	private final Map<Integer, long[]> offsetCache=new WeakValueHashMap<Integer, long[]>().defineStayAlivePolicy(3);
-	private final Map<Long, T>         objectCache=new WeakValueHashMap<Long, T>().defineStayAlivePolicy(3);
+	private final Map<Integer, long[]> offsetCache;
+	private final Map<Long, T>         objectCache;
 	
 	public OffsetIndexSortedList(Supplier<T> tConstructor, Chunk objects, Chunk offsets) throws IOException{
+		offsetCache=objects.header.config.newCacheMap();
+		objectCache=objects.header.config.newCacheMap();
+		
 		this.tConstructor=tConstructor;
 		objectsIo=objects.io();
 		offsetsIo=offsets.io();
@@ -220,8 +222,7 @@ public class OffsetIndexSortedList<T extends FileObject&Comparable<T>> extends A
 	
 	@SuppressWarnings("AutoBoxing")
 	public T getByIndex(int index) throws IOException{
-		Objects.checkIndex(index, size());
-		Long offset=getOffset(index);
+		long offset=getOffset(index);
 		return getByOffset(offset);
 	}
 	

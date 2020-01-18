@@ -9,6 +9,8 @@ import java.nio.ByteBuffer;
 public abstract class ContentInputStream extends InputStream implements ContentReader{
 	
 	public static class BA extends ContentInputStream{
+		private final byte[] buf=new byte[8];
+		
 		private final byte[] ba;
 		private       int    pos;
 		
@@ -38,9 +40,17 @@ public abstract class ContentInputStream extends InputStream implements ContentR
 		public String toString(){
 			return this.getClass().getSimpleName()+"{"+pos+"/"+ba.length+"}";
 		}
+		
+		@Override
+		public byte[] contentBuf(){
+			return buf;
+		}
 	}
 	
 	public static class BB extends ContentInputStream{
+		
+		private final byte[] buf=new byte[8];
+		
 		private final ByteBuffer bb;
 		
 		public BB(ByteBuffer bb){
@@ -67,10 +77,16 @@ public abstract class ContentInputStream extends InputStream implements ContentR
 		public String toString(){
 			return this.getClass().getSimpleName()+"{"+bb.position()+"/"+bb.limit()+"}";
 		}
+		
+		@Override
+		public byte[] contentBuf(){
+			return buf;
+		}
 	}
 	
 	public static class Wrapp extends ContentInputStream{
 		
+		private final byte[]      buf=new byte[8];
 		private final InputStream in;
 		
 		public Wrapp(InputStream in){
@@ -116,6 +132,11 @@ public abstract class ContentInputStream extends InputStream implements ContentR
 		@Override
 		public int read() throws IOException{
 			return in.read();
+		}
+		
+		@Override
+		public byte[] contentBuf(){
+			return buf;
 		}
 	}
 	

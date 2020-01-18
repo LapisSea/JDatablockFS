@@ -8,7 +8,6 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
-import static com.lapissea.fsf.FileSystemInFile.*;
 import static com.lapissea.util.UtilL.*;
 
 public class VirtualFile{
@@ -93,7 +92,7 @@ public class VirtualFile{
 		private void logWrite(int moreData) throws IOException{
 			if(usingDirect) return;
 			wrote+=moreData;//ok to add moreData before as extra space will be filled right away
-			if(wrote>MAX_BUFFERING_INIT_SIZE) realFileMode();
+			if(wrote>source.header.config.maxBufferingInitSize) realFileMode();
 		}
 		
 		private void realFileMode() throws IOException{
