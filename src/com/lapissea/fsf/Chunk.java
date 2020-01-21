@@ -88,7 +88,14 @@ public class Chunk{
 		
 		if(DEBUG_VALIDATION){
 			do{
-				Assert(flags.readBoolBit(), "Invalid chunk header", offset, flagData, Long.toBinaryString(flagData), Long.toHexString(flagData));
+				if(!flags.readBoolBit()){
+					var siz=FLAGS_SIZE.bytes*Byte.SIZE;
+					var d  =new StringBuilder(siz);
+					d.append(Long.toBinaryString(flagData));
+					while(d.length()<siz) d.insert(0, "0");
+					
+					throw new AssertionError(TextUtil.toString("Invalid chunk header", offset, flagData, d.toString()));
+				}
 			}while(flags.remainingCount()>0);
 		}
 		
@@ -474,75 +481,80 @@ public class Chunk{
 	}
 	
 	public void moveTo(Chunk newChunk) throws IOException{
-		byte[] oldData;
-		String oldChunk;
-		
-		if(DEBUG_VALIDATION){
-			header.validateFile();
-			Assert(!this.equals(newChunk), "Trying to move chunk into itself", this, newChunk);
-			Assert(!overlaps(newChunk.getOffset(), newChunk.getOffset()+newChunk.wholeSize()), "Overlapping chunks", this, newChunk);
-			Assert(getSize()<=newChunk.getCapacity(), getSize()+" can't fit in to "+newChunk.getCapacity());
-			
-			oldData=io().readAll();
-			oldChunk=TextUtil.toString(this);
-		}
-		
-		try(var out=newChunk.io().write(false)){
-			try(var in=this.io().read()){
-				var buf=new byte[(int)Math.min(2048, getSize())];
-				
-				var remaining=getSize();
-				
-				while(remaining>0){
-					int read=in.read(buf, 0, (int)Math.min(remaining, buf.length));
-					out.write(buf, 0, read);
-					remaining-=read;
-				}
-			}
-		}
-		
-		io=null;
-		headerWriteCache.clear();
-		
 		var oldOffset=offset;
 		
-		offset=newChunk.offset;
-		nextType=newChunk.nextType;
-		bodyType=newChunk.bodyType;
-		capacity=newChunk.capacity;
-		markDirty();
-		
 		try{
-			newChunk.setNext(next);
-			newChunk.setSize(size);
-		}catch(BitDepthOutOfSpaceException e){
-			throw new ShouldNeverHappenError(e);
-		}
-		
-		
-		saveHeader();
-		newChunk.saveHeader();
-		
-		notifyDependency();
-		
-		header.notifyMovement(oldOffset, this);
-		
-		if(DEBUG_VALIDATION){
-			checkCaching();
-			var old=header.getByOffsetCached(oldOffset);
+			byte[] oldData;
+			String oldChunk;
 			
-			var newData=io().readAll();
-			if(!Arrays.equals(oldData, newData)){
-				throw new AssertionError(TextUtil.toString(loadWholeChain())+"\n"+
-				                         oldChunk+"\n"+
-				                         TextUtil.toString(this)+"\n"+
-				                         TextUtil.toString(oldData)+"\n"+
-				                         TextUtil.toString(newData)+"\n"+
-				                         TextUtil.toTable(oldData, newData));
+			if(DEBUG_VALIDATION){
+				header.validateFile();
+				Assert(!this.equals(newChunk), "Trying to move chunk into itself", this, newChunk);
+				Assert(!overlaps(newChunk.getOffset(), newChunk.getOffset()+newChunk.wholeSize()), "Overlapping chunks", this, newChunk);
+				Assert(getSize()<=newChunk.getCapacity(), getSize()+" can't fit in to "+newChunk.getCapacity());
+				
+				oldData=io().readAll();
+				oldChunk=TextUtil.toString(this);
+			}
+			
+			try(var out=newChunk.io().write(false)){
+				try(var in=this.io().read()){
+					var buf=new byte[(int)Math.min(2048, getSize())];
+					
+					var remaining=getSize();
+					
+					while(remaining>0){
+						int read=in.read(buf, 0, (int)Math.min(remaining, buf.length));
+						out.write(buf, 0, read);
+						remaining-=read;
+					}
+				}
+			}
+			
+			io=null;
+			headerWriteCache.clear();
+			
+			
+			offset=newChunk.offset;
+			nextType=newChunk.nextType;
+			bodyType=newChunk.bodyType;
+			capacity=newChunk.capacity;
+			markDirty();
+			
+			try{
+				newChunk.setNext(next);
+				newChunk.setSize(size);
+			}catch(BitDepthOutOfSpaceException e){
+				throw new ShouldNeverHappenError(e);
 			}
 			
 			
-			header.validateFile();
+			saveHeader();
+			newChunk.saveHeader();
+			
+			notifyDependency();
+			
+			header.notifyMovement(oldOffset, this);
+			
+			if(DEBUG_VALIDATION){
+				checkCaching();
+				var old=header.getByOffsetCached(oldOffset);
+				
+				var newData=io().readAll();
+				if(!Arrays.equals(oldData, newData)){
+					throw new AssertionError(TextUtil.toString(loadWholeChain())+"\n"+
+					                         oldChunk+"\n"+
+					                         TextUtil.toString(this)+"\n"+
+					                         TextUtil.toString(oldData)+"\n"+
+					                         TextUtil.toString(newData)+"\n"+
+					                         TextUtil.toTable(oldData, newData));
+				}
+				
+				
+				header.validateFile();
+			}
+		}catch(Throwable e){
+			throw new IOException(oldOffset+" "+offset, e);
 		}
 	}
 	

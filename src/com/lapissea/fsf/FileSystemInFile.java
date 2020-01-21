@@ -229,12 +229,20 @@ public class FileSystemInFile{
 	}
 	
 	
-	public BufferedImage renderFile(int minWidth, int minHeight, long[] ids) throws IOException{
-		return renderFile(minWidth, minHeight, ids, 4);
-	}
-	
 	private interface GetAlpha{
 		int get(int x, int y);
+	}
+	
+	public BufferedImage renderFile(int width, long[] ids, int resolutionMul) throws IOException{
+		var size=header.source.getSize();
+		int w   =Math.max(width, 1);
+		int h   =1;
+		
+		while(w*h<size){
+			h++;
+		}
+		
+		return renderFile(w, h, ids, resolutionMul);
 	}
 	
 	public BufferedImage renderFile(int minWidth, int minHeight, long[] ids, int resolutionMul) throws IOException{

@@ -1,6 +1,7 @@
 /*
 /*/
 !/src/
+!/tests/
 !/res/
 !.gitignore
 !/LICENSE.md
