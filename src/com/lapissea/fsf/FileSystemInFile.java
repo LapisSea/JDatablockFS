@@ -6,6 +6,7 @@ import com.lapissea.util.function.TriConsumer;
 import com.lapissea.util.function.TriFunction;
 
 import java.awt.*;
+import java.awt.geom.Ellipse2D;
 import java.awt.geom.Line2D;
 import java.awt.image.BufferedImage;
 import java.io.File;
@@ -17,42 +18,11 @@ import java.util.*;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static java.awt.Font.*;
 
 public class FileSystemInFile{
-	
-	private static class IgnoreMap<K, V> extends AbstractMap<K, V>{
-		
-		@NotNull
-		@Override
-		public Set<Map.Entry<K, V>> entrySet(){
-			return Collections.emptySet();
-		}
-		
-		@Override
-		public V put(K key, V value){
-			return null;
-		}
-		
-		@Override
-		public V get(Object key){
-			return null;
-		}
-		
-		@Override
-		public boolean containsKey(Object key){
-			return false;
-		}
-		
-		@Override
-		public boolean containsValue(Object key){
-			return false;
-		}
-	}
-	
 	
 	public static final boolean DEBUG_VALIDATION=true;
 	
@@ -75,10 +45,6 @@ public class FileSystemInFile{
 			 * Smart ({@link WeakReference}) caching. Will drop any object if it is no longer used. (Useful for most general purpose)
 			 */
 			WEAK,
-			/**
-			 * No caching. Will never accept any object and will stay empty all the time. (Useful for worse case scenario benchmarking or buggy caching)
-			 */
-			NONE,
 		}
 		
 		/**
@@ -157,7 +123,6 @@ public class FileSystemInFile{
 				case FORGIVING -> new SoftValueHashMap<>();
 				case LAZY -> new WeakValueHashMap<K, V>().defineStayAlivePolicy(3);
 				case WEAK -> new WeakValueHashMap<>();
-				case NONE -> new IgnoreMap<>();
 			};
 		}
 		
@@ -310,7 +275,7 @@ public class FileSystemInFile{
 					continue;
 				}
 				
-				if((b&(1<<i))==0) col=mul.apply(col, 1F/4);
+				if((b&(1<<i))==0) col=mul.apply(col, 1F/3);
 				
 				g2.setColor(col);
 				g2.fillRect(x1, y1, pp, pp);
@@ -330,7 +295,7 @@ public class FileSystemInFile{
 			
 			g2.setColor(color);
 			g2.drawString(""+c, x, y);
-			g2.setColor(new Color(1, 1, 1, 0.4F));
+			g2.setColor(new Color(1, 1, 1, 0.2F));
 			g2.drawString(""+c, x, y);
 		};
 		
@@ -342,15 +307,13 @@ public class FileSystemInFile{
 			if(g2.getFont().canDisplay(c)&&!Character.isWhitespace(c)){
 				pixelPushLetter.accept(c, color);
 			}
-			
-			counter[0]++;
 		};
 		
-		Function<Chunk, Color> randColor;
+		Function<Long, Color> randColor;
 		{
 			Random rand=new Random();
-			randColor=chunk->{
-				rand.setSeed(chunk.getOffset());
+			randColor=chunkStart->{
+				rand.setSeed(chunkStart);
 				
 				var c=new Color(Color.HSBtoRGB(rand.nextFloat()*255, 1, 1));
 				return new Color(c.getRed()/255F, c.getGreen()/255F, c.getBlue()/255F, 0.5F);
@@ -360,6 +323,7 @@ public class FileSystemInFile{
 		try(var in=header.source.doRandom()){
 			for(long i=0;i<size;i++){
 				pixelPush.accept(in.readUnsignedInt1(), Color.DARK_GRAY);
+				counter[0]++;
 			}
 		}
 		
@@ -367,7 +331,9 @@ public class FileSystemInFile{
 		
 		for(byte b : Header.getMagicBytes()){
 			pixelPush.accept(b, Color.RED);
+			counter[0]++;
 		}
+		
 		pixelPushByte.accept(header.version.major, Color.RED);
 		counter[0]++;
 		pixelPushByte.accept(header.version.minor, Color.RED);
@@ -375,80 +341,61 @@ public class FileSystemInFile{
 		
 		try{
 			
-			var headerData=header.headerStartChunks()
-			                     .stream()
-			                     .flatMap(c->{
-				                     try{
-					                     return c.loadWholeChain().stream();
-				                     }catch(IOException e){
-					                     throw UtilL.uncheckedThrow(e);
-				                     }
-			                     })
-			                     .collect(Collectors.toList());
-			
-			
-			var ptrs     =header.getHeaderPointers();
-			var ptrsChunk=ptrs.getShadowChunks().get(0);
-			
-			var chunks=header.allChunks();
-			chunks.add(header.firstChunk());
+			var allChunks=header.allChunks();
 			
 			try(var in=header.source.doRandom()){
-				List<List<Chunk>> chains=new ArrayList<>();
 				
-				while(!chunks.isEmpty()){
-					var chain=chunks.get(0).loadWholeChain();
-					chunks.removeAll(chain);
-					chains.add(chain);
-				}
-				
-				for(var chain : chains){
-					var rand=randColor.apply(chain.get(0));
+				for(Map.Entry<HeaderModule, List<List<Chunk>>> entry : allChunks.entrySet()){
+					HeaderModule      module=entry.getKey();
+					List<List<Chunk>> chains=entry.getValue();
 					
-					for(Chunk chunk : chain){
+					var ownsBinaryOnly=module.ownsBinaryOnly();
+					
+					for(var chain : chains){
+						var rand=randColor.apply(chain.get(0).getOffset());
 						
-						in.setPos(chunk.getOffset());
-						counter[0]=(int)chunk.getOffset();
+						var owning=module.getOwning().contains(chain.get(0));
 						
-						Color bodyCol;
-						if(chain.get(0)==ptrsChunk) bodyCol=Color.RED;
-						else if(chunk.isUsed()){
-							if(headerData.contains(chunk)) bodyCol=Color.BLUE;
-							else{
-								bodyCol=Color.GREEN.darker();
+						for(Chunk chunk : chain){
+							
+							in.setPos(chunk.getOffset());
+							counter[0]=(int)chunk.getOffset();
+							
+							Color bodyCol=module.displayColor();
+							if(owning) bodyCol=mix.apply(bodyCol, Color.RED, 0.7F);
+							
+							Color headCol=mix.apply(new Color(Math.min(255, bodyCol.getRed()+100), Math.min(255, bodyCol.getGreen()+100), Math.min(255, bodyCol.getBlue()+100)), rand, 0.7F);
+							
+							for(long i=0, j=chunk.getHeaderSize();i<j;i++){
+								pixelPushByte.accept(in.read(), headCol);
+								counter[0]++;
 							}
-						}else bodyCol=Color.GRAY;
-						
-						Color headCol=mix.apply(new Color(Math.min(255, bodyCol.getRed()+100), Math.min(255, bodyCol.getGreen()+100), Math.min(255, bodyCol.getBlue()+100)), rand, 0.7F);
-						
-						for(long i=0, j=chunk.getHeaderSize();i<j;i++){
-							pixelPushByte.accept(in.read(), headCol);
-							counter[0]++;
-						}
-						
-						
-						for(long i=0, j=chunk.getCapacity();i<j;i++){
-							float mulFac;
-							if(i >= chunk.getSize()){
-								bodyCol=chunk.isUsed()?Color.LIGHT_GRAY:new Color(157, 127, 97);
+							
+							
+							for(long i=0, j=chunk.getCapacity();i<j;i++){
+								Color pixelCol=bodyCol;
+								if(i >= chunk.getSize()){
+									pixelCol=mul.apply(pixelCol, 0.3F);
+									
+									var siz=chunk.getCapacity()-chunk.getSize();
+								}else{
+									var siz=chunk.getCapacity();
+								}
 								
-								var siz=chunk.getCapacity()-chunk.getSize();
-								mulFac=((siz-(i-chunk.getSize()))/(float)siz);
-							}else{
-								var siz=chunk.getCapacity();
-								mulFac=((siz-i)/(float)siz);
+								(owning&&ownsBinaryOnly?pixelPushByte:pixelPush).accept(in.read(), pixelCol);
+								counter[0]++;
 							}
-							pixelPush.accept(in.read(), mul.apply(bodyCol, mulFac*0.7F+0.3F));
 						}
 					}
 				}
+				
 				
 				BufferedImage lineImg=new BufferedImage(width*pixelSize, height*pixelSize, BufferedImage.TYPE_INT_ARGB);
 				Graphics2D    lineG  =lineImg.createGraphics();
 				
 				lineG.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-				
-				lineG.setStroke(new BasicStroke(Math.max(1F/pixelSize, 1/12F)));
+				float lineWidth=Math.max(1F/pixelSize, 1/15F);
+				lineG.setStroke(new BasicStroke(lineWidth));
 				lineG.scale(pixelSize, pixelSize);
 				
 				Consumer<double[]> drawLine=cords->lineG.draw(new Line2D.Double(cords[0], cords[1], cords[2], cords[3]));
@@ -483,20 +430,29 @@ public class FileSystemInFile{
 					
 					drawLine.accept(new double[]{xMid+tsin, yMid+tcos, xMid+nsin-tsin, yMid+ncos-tcos});
 					drawLine.accept(new double[]{xMid+tsin, yMid+tcos, xMid-nsin-tsin, yMid-ncos-tcos});
+					
+					var circleSiz=3*lineWidth;
+					lineG.fill(new Ellipse2D.Double(x1-circleSiz/2, y1-circleSiz/2, circleSiz, circleSiz));
 				};
 				
-				for(int i=0;i<ptrs.size();i++){
-					var chunk=ptrs.getElement(i).dereference(header);
-					drawLink.accept(new Color(randColor.apply(chunk).getRGB()), ptrsChunk.getDataStart()+ptrs.getElementSize()*i, chunk.getOffset());
-				}
 				
-				for(var chain : chains){
+				for(Map.Entry<HeaderModule, List<List<Chunk>>> entry : allChunks.entrySet()){
+					HeaderModule      module=entry.getKey();
+					List<List<Chunk>> chains=entry.getValue();
 					
-					var col=new Color(randColor.apply(chain.get(0)).getRGB());
+					for(SourcedPointer reference : module.getReferences()){
+						var val =reference.pointer.value;
+						var rand=randColor.apply(val);
+						drawLink.accept(rand, reference.source, val);
+					}
 					
-					for(Chunk chunk : chain){
-						if(!chunk.hasNext()) continue;
-						drawLink.accept(col, chunk.getOffset(), chunk.getNext());
+					for(List<Chunk> chain : chains){
+						var col=new Color(randColor.apply(chain.get(0).getOffset()).getRGB());
+						
+						for(Chunk chunk : chain){
+							if(!chunk.hasNext()) continue;
+							drawLink.accept(col, chunk.getOffset(), chunk.getNext());
+						}
 					}
 				}
 				
@@ -538,11 +494,11 @@ public class FileSystemInFile{
 						if(yLower&&alpha<0xFF) alpha=Math.max(alpha, getAlpha.get(x, y-1));
 						if(yUpper&&alpha<0xFF) alpha=Math.max(alpha, getAlpha.get(x, y+1));
 						if(yUpper&&alpha<0xFF) alpha=Math.max(alpha, getAlpha.get(x, y+1));
-						
-						if(xLower&&yLower&&alpha<0xFF) alpha=Math.max(alpha, getAlpha.get(x-1, y-1)/2);
-						if(xLower&&yUpper&&alpha<0xFF) alpha=Math.max(alpha, getAlpha.get(x-1, y+1)/2);
-						if(xUpper&&yUpper&&alpha<0xFF) alpha=Math.max(alpha, getAlpha.get(x+1, y+1)/2);
-						if(xUpper&&yLower&&alpha<0xFF) alpha=Math.max(alpha, getAlpha.get(x+1, y-1)/2);
+
+//						if(xLower&&yLower&&alpha<0xFF) alpha=Math.max(alpha, getAlpha.get(x-1, y-1)/2);
+//						if(xLower&&yUpper&&alpha<0xFF) alpha=Math.max(alpha, getAlpha.get(x-1, y+1)/2);
+//						if(xUpper&&yUpper&&alpha<0xFF) alpha=Math.max(alpha, getAlpha.get(x+1, y+1)/2);
+//						if(xUpper&&yLower&&alpha<0xFF) alpha=Math.max(alpha, getAlpha.get(x+1, y-1)/2);
 						
 						lineImgOutline.setRGB(x, y, (alpha<<24)|outlineColor);
 						
@@ -558,7 +514,10 @@ public class FileSystemInFile{
 				
 				g2.drawImage(lineImgOutline, null, 0, 0);
 			}
-		}catch(Throwable ignored){ }
+		}catch(Throwable e){
+			e.printStackTrace();
+		}
+		
 		g2.dispose();
 		return img;
 	}

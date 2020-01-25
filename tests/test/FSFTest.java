@@ -6,11 +6,9 @@ import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeRunnable;
 
-import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.ArrayList;
 
 import static com.lapissea.util.UtilL.*;
 
@@ -29,10 +27,9 @@ class FSFTest{
 			file.delete();
 		}
 		
-		var snapshots=new ArrayList<Renderer.Snapshot>();
-		
 		
 		var pixelScale=13;
+//		Renderer renderer  =new Renderer.None();
 		Renderer renderer=new Renderer.GUI(pixelScale);
 		
 		
@@ -43,7 +40,7 @@ class FSFTest{
 			
 			UnsafeConsumer<long[], IOException> snapshotIds=ids->{
 				var copy=new FileSystemInFile(new IOInterface.MemoryRA(source));
-//				Assert(fil.equals(copy));
+				Assert(fil.equals(copy));
 				
 				renderer.snapshot(new Renderer.Snapshot(copy, ids, new Throwable("Clicked snapshot")));
 			};
@@ -127,9 +124,7 @@ class FSFTest{
 			
 			try{
 				snapshot.run();
-			}catch(Throwable e){
-				e.printStackTrace();
-			}
+			}catch(Throwable e){}
 			
 			renderer.finish();
 		}

@@ -1,7 +1,7 @@
 package test;
 
+import com.lapissea.fsf.Chunk;
 import com.lapissea.fsf.FileSystemInFile;
-import com.lapissea.util.LogUtil;
 import com.lapissea.util.MathUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.WeakValueHashMap;
@@ -127,7 +127,7 @@ public interface Renderer{
 		CompletableFuture<Void> task;
 		
 		private final int minSize;
-		private final int pixelScale;
+		private       int pixelScale;
 		protected     int count;
 		
 		public Png(int minSize, int pixelScale){
@@ -193,11 +193,12 @@ public interface Renderer{
 	
 	class GUI implements Renderer{
 		
-		private       List<Snapshot> snapshots=new ArrayList<>();
-		private final int            pixelScale;
-		JFrame  jframe=null;
-		float[] imgPos={0};
-		int[]   pos   ={0, 0};
+		private List<Snapshot> snapshots=new ArrayList<>();
+		private int            pixelScale;
+		
+		private JFrame  jframe=null;
+		private float[] imgPos={0};
+		private int[]   pos   ={0, 0};
 		
 		Map<Integer, BufferedImage> cache=new WeakValueHashMap<Integer, BufferedImage>().defineStayAlivePolicy(5);
 		
@@ -205,12 +206,17 @@ public interface Renderer{
 			this.pixelScale=pixelScale;
 		}
 		
+		
 		private int safePos(){
 			return MathUtil.snap((int)imgPos[0], 0, snapshots.size()-1);
 		}
 		
-		private int getWidth(){
+		private int getWidthPx(){
 			return Math.max(5, getJFrame().getContentPane().getWidth()/(pixelScale*3));
+		}
+		
+		private int getHeightPx(){
+			return getJFrame().getContentPane().getHeight()/(pixelScale*3);
 		}
 		
 		public synchronized JFrame getJFrame(){
@@ -230,16 +236,25 @@ public interface Renderer{
 				
 				jf.setVisible(true);
 				
-				jf.setSize(1000, 700);
+				jf.setSize(1000, 750);
 				jf.setLocationRelativeTo(null);
 				jf.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 				jf.addComponentListener(new ComponentAdapter(){
+					int lastW;
+					int lastH;
+					
 					@Override
 					public void componentResized(ComponentEvent e){
 						invokeLater(()->{
-							if(getWidth()*pixelScale*3==getImg(safePos()).getWidth()) return;
+							if(lastW==getWidthPx()&&lastH==getHeightPx()) return;
+							
+							recalcPixelSize();
+							
 							cache.clear();
 							jf.revalidate();
+							jf.repaint();
+							lastW=getWidthPx();
+							lastH=getHeightPx();
 						});
 					}
 				});
@@ -288,18 +303,42 @@ public interface Renderer{
 			return jframe;
 		}
 		
+		private void recalcPixelSize(){
+			var h=getJFrame().getContentPane().getHeight();
+			
+			long siz;
+			try{
+				siz=snapshots.get(safePos()).copy.header.source.getSize();
+			}catch(IOException ex){
+				throw UtilL.uncheckedThrow(ex);
+			}
+			
+			pixelScale=2;
+			
+			while(true){
+				
+				int lineCount=(int)Math.ceil(((double)siz)/getWidthPx());
+				
+				if(h<lineCount*pixelScale*3) break;
+				pixelScale++;
+			}
+			
+			pixelScale--;
+			
+		}
+		
 		BufferedImage render(int i){
-			return Renderer.renderFile(snapshots.get(i), getWidth(), pixelScale).join();
+			return Renderer.renderFile(snapshots.get(i), getWidthPx(), pixelScale).join();
 		}
 		
 		BufferedImage getImg(int index){
 			return cache.computeIfAbsent(index, i->{
 				var img=render(i);
-				async(()->{
-					for(int j=Math.max(0, i-2);j<Math.min(snapshots.size(), i+2);j++){
+				for(int j=Math.max(0, i-5);j<Math.min(snapshots.size(), i+5);j++){
+					async(()->{
 						cache.computeIfAbsent(i, this::render);
-					}
-				});
+					});
+				}
 				return img;
 			});
 		}
@@ -315,26 +354,124 @@ public interface Renderer{
 					if(i==img) return;
 				}catch(Exception ignored){}
 				
+				var thisPos=safePos();
 				var lab=new JLabel(new ImageIcon(img)){
+					Chunk hoverChunk;
+					Color hoverCol=Color.WHITE;
+					
+					int pxW=getWidthPx();
+					
+					void outlineChunk(Graphics2D g, Chunk chunk){
+						var   pp       =pixelScale*3;
+						float lineWidth=Math.max(1F/pp, 1/25F)*pp;
+						g.setStroke(new BasicStroke(lineWidth));
+						
+						var start=chunk.getOffset();
+						for(long i=start, end=chunk.nextPhysicalOffset();i<end;i++){
+							int x=(int)(i%pxW);
+							int y=(int)(i/pxW);
+							
+							if(i+pxW >= end){
+								int drawX=x*pp;
+								int drawY=y*pp+pp-1;
+								
+								g.drawLine(drawX, drawY, drawX+pp, drawY);
+							}
+							
+							if(i-pxW<start){
+								int drawX=x*pp;
+								int drawY=y*pp;
+								
+								g.drawLine(drawX, drawY, drawX+pp, drawY);
+							}
+							
+							if(i==start||x==0){
+								int drawX=x*pp;
+								int drawY=y*pp;
+								
+								g.drawLine(drawX, drawY, drawX, drawY+pp);
+							}
+							if(i+1==end||x+1==pxW){
+								int drawX=x*pp+pp-1;
+								int drawY=y*pp;
+								
+								g.drawLine(drawX, drawY, drawX, drawY+pp);
+							}
+						}
+					}
+					
 					@Override
 					public void paint(Graphics g){
+						paint((Graphics2D)g);
+					}
+					
+					public void paint(Graphics2D g){
 						super.paint(g);
-						g.setColor(Color.WHITE);
-						g.setFont(new Font(Font.MONOSPACED, Font.BOLD, pixelScale*2));
+						
 						var pp=pixelScale*3;
-						var x =pos[0];
-						var y =pos[1];
-						var g2=(Graphics2D)g;
-						g2.setRenderingHint(KEY_TEXT_ANTIALIASING, VALUE_TEXT_ANTIALIAS_ON);
-						var width=getImg(safePos()).getWidth();
-						g.drawString(""+(x/pp+y/pp*width/pp), pos[0]/pp*pp, pos[1]/pp*pp+pp/2);
+						
+						var width  =img.getWidth();
+						var hoverX =pos[0];
+						var hoverY =pos[1];
+						var bytePos=(hoverX/pp+hoverY/pp*width/pp);
+						
+						findChunk:
+						try{
+							if(hoverChunk!=null&&hoverChunk.overlaps(bytePos, bytePos+1)){
+								break findChunk;
+							}
+							
+							hoverChunk=null;
+							hoverCol=Color.WHITE;
+							
+							var chunks=snapshots.get(thisPos).copy.header.allChunks();
+							for(var e : chunks.entrySet()){
+								List<List<Chunk>> chains=e.getValue();
+								for(List<Chunk> chain : chains){
+									for(Chunk chunk : chain){
+										if(chunk.overlaps(bytePos, bytePos+1)){
+											hoverChunk=chunk;
+											hoverCol=e.getKey().displayColor();
+											hoverCol=new Color(Math.min(255, hoverCol.getRed()+100), Math.min(255, hoverCol.getGreen()+100), Math.min(255, hoverCol.getBlue()+100));
+//											break findChunk; //can't use bc of the hacky header file module
+										}
+									}
+								}
+							}
+						}catch(IOException ignored){ }
+						
+						
+						g.setColor(hoverCol);
+						g.setFont(new Font(Font.MONOSPACED, Font.BOLD, pixelScale*2));
+						
+						g.setRenderingHint(KEY_TEXT_ANTIALIASING, VALUE_TEXT_ANTIALIAS_ON);
+						g.drawString(bytePos+"", pos[0]/pp*pp, pos[1]/pp*pp+pp/2);
+						
+						if(hoverChunk!=null){
+							try{
+								g.setColor(hoverCol.darker().darker());
+								hoverChunk.loadWholeChain(c->outlineChunk(g, c));
+								
+								g.setColor(hoverCol);
+								outlineChunk(g, hoverChunk);
+							}catch(IOException e){
+								e.printStackTrace();
+							}
+						}
 					}
 				};
 				
 				target.removeAll();
 				target.add(lab);
 				
-				target.revalidate();
+				if(jf.getContentPane().getHeight()<img.getHeight()){
+					recalcPixelSize();
+					
+					cache.clear();
+				}
+				
+				jf.revalidate();
+				jf.repaint();
 			});
 		}
 		
@@ -353,6 +490,8 @@ public interface Renderer{
 				
 				getJFrame().requestFocus();
 			}
+			
+			recalcPixelSize();
 		}
 		
 		@Override

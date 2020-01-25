@@ -1,6 +1,7 @@
 package com.lapissea.fsf;
 
 import com.lapissea.util.ByteBufferBackedInputStream;
+import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.FunctionOI;
@@ -114,7 +115,7 @@ public class OffsetIndexSortedList<T extends FileObject&Comparable<T>> extends A
 		var ind       =0;
 		while(offCounter<newSize){
 			int numCount=Math.min(OFFSETS_PER_CHUNK, newSize-offCounter);
-			offsetCache.put(ind, Arrays.copyOfRange(newOffsets, offCounter, numCount));
+			offsetCache.put(ind, Arrays.copyOfRange(newOffsets, offCounter, offCounter+numCount));
 			offCounter+=numCount;
 			ind++;
 		}
@@ -126,10 +127,16 @@ public class OffsetIndexSortedList<T extends FileObject&Comparable<T>> extends A
 		
 		try(var io=objectsIo.write(true)){
 			for(var o : objects){
+				counter++;
+				if(counter==90){
+					int i=0;
+				}
 				o.write(io);
 			}
 		}
 	}
+	
+	static int counter;
 	
 	
 	public void addElement(T obj) throws IOException{
@@ -247,7 +254,7 @@ public class OffsetIndexSortedList<T extends FileObject&Comparable<T>> extends A
 	}
 	
 	@SuppressWarnings("AutoBoxing")
-	private long getOffset(Integer index) throws IOException{
+	public long getOffset(Integer index) throws IOException{
 		Objects.checkIndex(index, size());
 		int chunkIndex=index/OFFSETS_PER_CHUNK;
 		

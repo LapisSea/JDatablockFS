@@ -1,8 +1,6 @@
 package com.lapissea.fsf;
 
-import com.lapissea.util.NotNull;
-import com.lapissea.util.TextUtil;
-import com.lapissea.util.UtilL;
+import com.lapissea.util.*;
 
 import java.io.IOException;
 import java.util.*;
@@ -33,43 +31,85 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 		void writeElement(ContentOutputStream dest, E src) throws IOException;
 	}
 	
-	public static <H extends FileObject&ElementHead<H, ?>> void init(ContentOutputStream out, H header, int initialCapacity) throws IOException{
-		init(NumberSize.SHORT, out, header, initialCapacity);
+	public static <H extends FileObject&ElementHead<H, ?>> void init(ContentOutputStream out, H header, int initialCapacity, boolean addEmergency) throws IOException{
+		init(NumberSize.SHORT, out, header, initialCapacity, addEmergency);
 	}
 	
-	public static <H extends FileObject&ElementHead<H, ?>> void init(NumberSize nextType, ContentOutputStream out, H header, int initialCapacity) throws IOException{
+	public static <H extends FileObject&ElementHead<H, ?>> void init(NumberSize nextType, ContentOutputStream out, H header, int initialCapacity, boolean addEmergency) throws IOException{
 		Chunk.init(out, nextType, (header.length())+initialCapacity*header.getElementSize(), header::write);
+		if(addEmergency) init(out, header.copy(), Math.max(1, initialCapacity/2), false);
 	}
 	
-	public static <T, H extends FileObject&ElementHead<H, T>> void init(ContentOutputStream out, H header, List<T> initialElements) throws IOException{
+	public static <T, H extends FileObject&ElementHead<H, T>> void init(ContentOutputStream out, H header, List<T> initialElements, boolean addEmergency) throws IOException{
 		Chunk.init(out, NumberSize.SHORT, (header.length())+initialElements.size()*header.getElementSize(), dest->{
 			header.write(dest);
 			for(T e : initialElements){
 				header.writeElement(dest, e);
 			}
 		});
+		
+		if(addEmergency) init(out, header.copy(), Math.max(1, initialElements.size()/2), false);
 	}
 	
-	private final ChunkIO data;
-	private final H       header;
-	private       int     size;
+	private final ChunkIO            data;
+	private final FixedLenList<H, E> reserveData;
+	private final H                  header;
+	private       int                size;
+	
+	private boolean modifying;
 	
 	private final Map<Integer, E> cache;
 	
 	/**
 	 * @param initialHead Object that serves to define how to read/write and possibly call for reformation of all elements in this list.
 	 *                    Its size must not change as the list does not support dynamic size headers. The list will not defend against this and corruption will possibly occur.
-	 * @param chunk       Chunk where the data will be read and written to. (and any chunks that are a part of a {@link ChunkChain} whos root is this chunk.
+	 * @param data        Chunk where the data will be read and written to. (and any chunks that are a part of a {@link ChunkChain} whos root is this chunk.
+	 * @param reserveData Chunk where emergency data will be stored to transparently prevent recursive modification (does not prevent concurrent mod!)
 	 */
-	public FixedLenList(H initialHead, Chunk chunk) throws IOException{
+	public FixedLenList(H initialHead, @NotNull Chunk data, @Nullable Chunk reserveData) throws IOException{
 		header=initialHead;
-		data=chunk.io();
+		this.data=data.io();
 		
-		cache=chunk.header.config.newCacheMap();
+		cache=data.header.config.newCacheMap();
 		
-		try(var in=data.read()){
+		try(var in=this.data.read()){
 			header.read(in);
 		}
+		
+		if(reserveData!=null){
+			var that=this;
+			this.reserveData=new FixedLenList<>(initialHead.copy(), reserveData, null){
+				@Override
+				protected void calcSize(){
+					super.calcSize();
+					that.calcSize();
+				}
+			};
+		}else{
+			this.reserveData=null;
+		}
+		
+		calcSize();
+	}
+	
+	private boolean hasReserveData(){
+		return reserveData!=null&&!reserveData.isEmpty();
+	}
+	
+	private void flushReserve() throws IOException{
+		if(!hasReserveData()) return;
+		
+		Assert(!modifying);
+		
+		LogUtil.println("flushing", this);
+		
+		calcSize();
+		ensureElementCapacity(size());
+		
+		while(!reserveData.isEmpty()){
+			addElement(remove(size()-1));
+		}
+		
 		calcSize();
 	}
 	
@@ -91,25 +131,57 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 		return data.getSize()-header.length();
 	}
 	
-	private void calcSize(){
+	protected void calcSize(){
 		size=Math.toIntExact(calcDataSize()/header.getElementSize());
+		if(hasReserveData()){
+			size+=reserveData.size();
+		}
 	}
 	
 	private void setSize(int size) throws IOException{
+		//DO NOT REMOVE list may be accessed while setting capacity!
 		this.size=size;
 		
-		data.setCapacity(calcPos(size));
+		LogUtil.println("setSize", size);
+		var newCap=calcPos(size);
+		data.setCapacity(newCap);
 		
 		calcSize();
-		Assert(size==this.size);
+//		Assert(size==this.size, size, this.size);
 	}
 	
-	private long calcPos(int index){
-		return header.length()+header.getElementSize()*index;
+	public long calcPos(int index){
+		return header.length()+calcDataPos(index);
+	}
+	
+	private int calcDataPos(int index){
+		return header.getElementSize()*index;
 	}
 	
 	public E getElement(int index) throws IOException{
 		return getElement(header, index);
+	}
+	
+	private int calcReserveIndex(int index){
+		var mainElements=(data.getSize()-header.length())/header.getElementSize();
+		return (int)(index-mainElements);
+	}
+	
+	private E readElement(H header, int index) throws IOException{
+		E e=header.newElement();
+		
+		var pos=calcPos(index);
+		if(data.getSize()>pos){
+			try(var in=data.read(pos)){
+				header.readElement(in, e);
+			}
+		}else{
+			Objects.checkIndex(index, size());
+			LogUtil.println(index, data.getSize(), pos, size());
+			return reserveData.get(calcReserveIndex(index));
+		}
+		
+		return e;
 	}
 	
 	private E getElement(H header, int index) throws IOException{
@@ -120,174 +192,269 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 			if(cached!=null) return cached;
 		}
 		
-		E e=header.newElement();
-		try(var in=data.read(calcPos(index))){
-			header.readElement(in, e);
-		}
+		E e=readElement(header, index);
 		
 		if(DEBUG_VALIDATION){
 			if(cached!=null){
-				checkIntegrity();
+				Assert(cached.equals(e));
 				return cached;
 			}
 		}
-		
 		cache.put(index, e);
 		
 		return e;
 	}
 	
-	private void checkIntegrity() throws IOException{
+	public void checkIntegrity() throws IOException{
 		Map<Integer, E> disk=new LinkedHashMap<>();
 		for(int i=0;i<size();i++){
-			E d=header.newElement();
-			try(var in=data.read(calcPos(i))){
-				header.readElement(in, d);
-			}
+			E d=readElement(header, i);
 			disk.put(i, d);
 		}
 		
-		if(!disk.equals(cache)){
-			throw new AssertionError(header+" "+TextUtil.toString(data.readAll())+"\n"+TextUtil.toTable("cache mismatch", List.of(disk, cache)));
+		for(Map.Entry<Integer, E> entry : cache.entrySet()){
+			var i  =entry.getKey();
+			var val=entry.getValue();
+			
+			var diskVal=disk.get(i);
+			if(!val.equals(diskVal)){
+				LogUtil.println(data.getRoot().loadWholeChain());
+				throw new AssertionError(header+" "+TextUtil.toString(data.readAll())+"\n"+TextUtil.toTable("disk / cache", List.of(disk, cache)));
+			}
 		}
 	}
 	
 	private void updateHeader(E change) throws IOException{
 		if(!header.willChange(change)) return;
+		var oldMod=modifying;
 		
-		var oldCapacity=capacity();
-		var oldHeader  =header.copy();
-		
-		//TODO: Performance - lower memory footprint algorithm needed
-		var elementBuffer=new ArrayList<>(this);
-		checkIntegrity();
-		
-		header.update(change);
-		
-		ensureElementCapacity(oldCapacity);
-		
-		var newSiz=header.getElementSize();
-		var oldSiz=oldHeader.getElementSize();
-		
-		byte[] buffer   =new byte[newSiz];
-		var    bufferOut=new ContentOutputStream.BA(buffer);
-		
-		List<Chunk> chain;
-		if(DEBUG_VALIDATION){
-			chain=data.getRoot().loadWholeChain();
+		try{
+			modifying=true;
+			
+			
+			if(DEBUG_VALIDATION) checkIntegrity();
+			
+			var oldCapacity=capacity();
+			var oldHeader  =header.copy();
+			
+			//TODO: Performance - lower memory footprint algorithm needed
+			var elementBuffer=new ArrayList<>(this);
 			checkIntegrity();
-		}
-		
-		try(var out=data.write(true)){
-			header.write(out);
 			
+			header.update(change);
 			
-			for(E e : elementBuffer){
-				header.writeElement(bufferOut, e);
-				bufferOut.reset();
+			ensureElementCapacity(oldCapacity);
+			
+			var newSiz=header.getElementSize();
+			var oldSiz=oldHeader.getElementSize();
+			
+			byte[] buffer   =new byte[newSiz];
+			var    bufferOut=new ContentOutputStream.BA(buffer);
+			
+			List<Chunk> chain;
+			if(DEBUG_VALIDATION){
+				chain=data.getRoot().loadWholeChain();
+				checkIntegrity();
+			}
+			
+			try(var out=data.write(true)){
+				header.write(out);
 				
-				out.write(buffer);
+				
+				for(E e : elementBuffer){
+					header.writeElement(bufferOut, e);
+					bufferOut.reset();
+					
+					out.write(buffer);
+				}
+			}
+			
+			if(DEBUG_VALIDATION){
+				Assert(chain.equals(data.getRoot().loadWholeChain()), "\n", chain, "\n", data.getRoot().loadWholeChain());
+				checkIntegrity();
+			}
+			
+			var oldSize=size;
+			calcSize();
+			Assert(oldSize==size, oldSize+" "+size);
+			
+		}finally{
+			if(!oldMod){
+				modifying=false;
+				flushReserve();
 			}
 		}
-		
-		if(DEBUG_VALIDATION){
-			Assert(chain.equals(data.getRoot().loadWholeChain()), "\n", chain, "\n", data.getRoot().loadWholeChain());
-			checkIntegrity();
-		}
-		
-		var oldSize=size;
-		calcSize();
-		Assert(oldSize==size, oldSize+" "+size);
 	}
 	
 	public void addElement(E e) throws IOException{
 		updateHeader(e);
 		
-		int index  =size();
-		int newSize=index+1;
+		LogUtil.println("adding", e, modifying);
 		
-		if(DEBUG_VALIDATION){
-			checkIntegrity();
-		}
-		
-		cache.put(index, e);
-		
-		ensureElementCapacity(size()+1);
-		
-		List<Chunk> chain;
-		if(DEBUG_VALIDATION){
-			chain=data.getRoot().loadWholeChain();
-		}
-		
-		try(var out=data.write(calcPos(index), true)){
-			byte[] buffer=new byte[header.getElementSize()];
-			var    dest  =new ContentOutputStream.BA(buffer);
+		var oldMod=modifying;
+		try{
+			modifying=true;
 			
-			header.writeElement(dest, e);
 			
-			out.write(buffer);
+			int index  =size();
+			int newSize=index+1;
+			
+			if(DEBUG_VALIDATION){
+				checkIntegrity();
+			}
+			
+			cache.remove(index);
+			
+			if(!oldMod){
+				ensureElementCapacity(size()+1);
+				
+				List<Chunk> chain;
+				if(DEBUG_VALIDATION){
+					chain=data.getRoot().loadWholeChain();
+				}
+				
+				try(var out=data.write(calcPos(index), false)){
+					out.write(elementToBytes(e));
+				}
+				
+				if(DEBUG_VALIDATION){
+					Assert(chain.equals(data.getRoot().loadWholeChain()), "\n", chain, "\n", data.getRoot().loadWholeChain());
+				}
+				
+			}else{
+				LogUtil.println("reserved", e);
+				reserveData.addElement(e);
+			}
+			cache.put(index, e);
+			calcSize();
+			
+			if(DEBUG_VALIDATION){
+				checkIntegrity();
+			}
+			
+		}finally{
+			if(!oldMod){
+				modifying=false;
+				flushReserve();
+			}
 		}
+	}
+	
+	private byte[] elementToBytes(E e) throws IOException{
 		
-		if(DEBUG_VALIDATION){
-			Assert(chain.equals(data.getRoot().loadWholeChain()), "\n", chain, "\n", data.getRoot().loadWholeChain());
-		}
+		byte[] elementData=new byte[header.getElementSize()];
+		header.writeElement(new ContentOutputStream.BA(elementData), e);
 		
-		calcSize();
-		
-		if(DEBUG_VALIDATION){
-			checkIntegrity();
-		}
+		return elementData;
 	}
 	
 	public void setElement(int index, E element) throws IOException{
 		Objects.requireNonNull(element);
 		
+		LogUtil.println("setting", element, modifying);
+		
 		if(index==size()){
 			addElement(element);
 			return;
 		}
-		
 		Objects.checkIndex(index, size());
 		
-		updateHeader(element);
-		
-		var buffer=new byte[header.getElementSize()];
-		
-		header.writeElement(new ContentOutputStream.BA(buffer), element);
-		
-		Integer iob   =index;
-		var     cached=cache.get(iob);
-		if(cached!=null){
-			if(cached!=element){//if element not same object then sync existing to reflect change in references
-				header.readElement(new ContentInputStream.BA(buffer), cached);
+		var oldMod=modifying;
+		try{
+			modifying=true;
+			
+			if(hasReserveData()){
+				int directSize  =size()-reserveData.size();
+				int reserveIndex=index-directSize;
+				if(reserveIndex >= 0){
+					reserveData.setElement(reserveIndex, element);
+					return;
+				}
 			}
-		}else cache.put(iob, element);
-		
-		try(var in=data.write(calcPos(index), false)){
-			in.write(buffer);
+			
+			updateHeader(element);
+			
+			var buffer=new byte[header.getElementSize()];
+			header.writeElement(new ContentOutputStream.BA(buffer), element);
+			
+			Integer iob   =index;
+			var     cached=cache.get(iob);
+			if(cached!=null){
+				if(cached!=element){//if element not same object then sync existing to reflect change in references
+					header.readElement(new ContentInputStream.BA(buffer), cached);
+				}
+			}else cache.put(iob, element);
+			
+			try(var in=data.write(calcPos(index), false)){
+				in.write(buffer);
+			}
+			
+			if(DEBUG_VALIDATION) checkIntegrity();
+			
+		}finally{
+			if(!oldMod){
+				modifying=false;
+				flushReserve();
+			}
 		}
 		
-		if(DEBUG_VALIDATION) checkIntegrity();
 	}
 	
 	public void removeElement(int index) throws IOException{
 		Objects.checkIndex(index, size());
-		int newSize=size()-1;
 		
-		//removing last element can be done by simply declaring it not inside list
-		if(newSize==index){
-			setSize(newSize);
+		LogUtil.println("removing", getElement(index), modifying);
+		
+		var oldMod=modifying;
+		try{
+			modifying=true;
+			
+			int newSize=size()-1;
+			
+			if(hasReserveData()){
+				int directSize  =size()-reserveData.size();
+				int reserveIndex=index-directSize;
+				
+				if(reserveIndex >= 0){
+					cache.remove(index);
+					reserveData.removeElement(reserveIndex);
+					calcSize();
+					return;
+				}
+				
+				int li  =reserveData.size()-1;
+				E   last=reserveData.getElement(li);
+				reserveData.removeElement(li);
+				
+				cache.remove(newSize);
+				
+				setElement(index, last);
+				
+				calcSize();
+			}
+			
+			//removing last element can be done by simply declaring it not inside list
+			if(newSize==index){
+				cache.remove(newSize);
+				setSize(newSize);
+				return;
+			}
+			
+			E last=getElement(newSize);
+			
 			cache.remove(newSize);
-			return;
+			setSize(newSize);
+			
+			setElement(index, last);
+			
+			if(DEBUG_VALIDATION) checkIntegrity();
+			
+		}finally{
+			if(!oldMod){
+				modifying=false;
+				flushReserve();
+			}
 		}
-		
-		E last=getElement(newSize);
-		setSize(newSize);
-		cache.remove(newSize);
-		
-		setElement(index, last);
-		
-		if(DEBUG_VALIDATION) checkIntegrity();
 	}
 	
 	public void modifyElement(int index, Consumer<E> modifier) throws IOException{
@@ -333,12 +500,26 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 	}
 	
 	public boolean ensureElementCapacity(int capacity) throws IOException{
-		if(size() >= capacity) return false;
+		var siz=size();
+		if(hasReserveData()) siz-=reserveData.size();
+		if(siz >= capacity) return false;
 		var neededCapacity=capacity*header.getElementSize()+header.length();
 		if(data.getCapacity() >= neededCapacity) return false;
 		data.setCapacity(neededCapacity);
 		
 		return true;
+	}
+	
+	public void clearElements() throws IOException{
+		if(isEmpty()) return;
+		
+		if(hasReserveData()){
+			super.clear();
+			return;
+		}
+		
+		cache.clear();
+		setSize(0);
 	}
 	
 	/////////////////////////////////////////////////////////////////////
@@ -389,13 +570,34 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 		}
 	}
 	
+	@Override
+	public void clear(){
+		try{
+			clearElements();
+		}catch(IOException e){
+			throw UtilL.uncheckedThrow(e);
+		}
+	}
+	
 	static{
 		TextUtil.CUSTOM_TO_STRINGS.register(FixedLenList.class, FixedLenList::toString);
 	}
 	
 	@Override
 	public String toString(){
-		return header+" -> ["+stream().map(Object::toString).collect(Collectors.joining(", "))+"]";
+		var s=new StringBuilder().append(header).append(" -> [");
+		
+		if(hasReserveData()){
+			s.append(stream().limit(size()-reserveData.size())
+			                 .map(Object::toString)
+			                 .collect(Collectors.joining(", ")));
+			s.append(" + ");
+			s.append(reserveData.toString());
+		}else{
+			s.append(stream().map(Object::toString).collect(Collectors.joining(", ")));
+		}
+		
+		return s.append("]").toString();
 	}
 	
 }

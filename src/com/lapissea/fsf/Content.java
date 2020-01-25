@@ -4,12 +4,56 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
 import static com.lapissea.fsf.FileSystemInFile.*;
+import static com.lapissea.util.UtilL.*;
 
 public interface Content<T>{
 	
+	Content<byte[]> BYTE_ARRAY=new Content<>(){
+		
+		@Override
+		public void write(ContentWriter dest, byte[] bytes) throws IOException{
+			var siz=NumberSize.bySize(bytes.length);
+			
+			var flags=new FlagWriter(NumberSize.BYTE);
+			flags.writeEnum(siz);
+			if(DEBUG_VALIDATION) flags.fillRestAllOne();
+			
+			flags.export(dest);
+			
+			siz.write(dest, bytes.length);
+			dest.write(bytes);
+		}
+		
+		@Override
+		public byte[] read(ContentReader src) throws IOException{
+			
+			var flags=FlagReader.read(src, NumberSize.BYTE);
+			
+			var siz      =flags.readEnum(NumberSize.class);
+			var arraySize=siz.read(src);
+			
+			if(DEBUG_VALIDATION){
+				Assert(flags.checkRestAllOne());
+			}
+			
+			var data=new byte[Math.toIntExact(arraySize)];
+			
+			src.readFully(data, 0, data.length);
+			
+			return data;
+		}
+		
+		@Override
+		public int length(byte[] dest){
+			return NumberSize.BYTE.bytes+
+			       NumberSize.bySize(dest.length).bytes+
+			       dest.length;
+		}
+	};
+	
 	Content<long[]> LONG_ARRAY            =new Content<>(){
 		@Override
-		public void write(ContentOutputStream dest, long[] array) throws IOException{
+		public void write(ContentWriter dest, long[] array) throws IOException{
 			dest.writeInt4(array.length);
 			for(long l : array){
 				dest.writeInt8(l);
@@ -17,7 +61,7 @@ public interface Content<T>{
 		}
 		
 		@Override
-		public long[] read(ContentInputStream src) throws IOException{
+		public long[] read(ContentReader src) throws IOException{
 			long[] data=new long[src.readInt4()];
 			for(int i=0;i<data.length;i++){
 				data[i]=src.readInt8();
@@ -32,7 +76,7 @@ public interface Content<T>{
 	};
 	Content<String> NULL_TERMINATED_STRING=new Content<>(){
 		@Override
-		public void write(ContentOutputStream dest, String string) throws IOException{
+		public void write(ContentWriter dest, String string) throws IOException{
 			var bytes=string.getBytes(StandardCharsets.UTF_8);
 			
 			for(var b : bytes){
@@ -44,7 +88,7 @@ public interface Content<T>{
 		}
 		
 		@Override
-		public String read(ContentInputStream src) throws IOException{
+		public String read(ContentReader src) throws IOException{
 			StringBuilder result=new StringBuilder();
 			
 			int c;
@@ -64,9 +108,9 @@ public interface Content<T>{
 		}
 	};
 	
-	void write(ContentOutputStream dest, T t) throws IOException;
+	void write(ContentWriter dest, T t) throws IOException;
 	
-	T read(ContentInputStream src) throws IOException;
+	T read(ContentReader src) throws IOException;
 	
 	int length(T dest);
 	

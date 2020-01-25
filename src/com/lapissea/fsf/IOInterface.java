@@ -152,6 +152,11 @@ public interface IOInterface{
 				}
 				
 				@Override
+				public long getGlobalPos(){
+					return getPos();
+				}
+				
+				@Override
 				public byte[] contentBuf(){
 					return buf;
 				}
@@ -307,6 +312,11 @@ public interface IOInterface{
 				public void fillZero(long requestedMemory) throws IOException{
 					Utils.zeroFill((b, off, len)->write(b, off, len, false), requestedMemory);
 				}
+				
+				@Override
+				public long getGlobalPos() throws IOException{
+					return getPos();
+				}
 			};
 		}
 		
@@ -383,6 +393,16 @@ public interface IOInterface{
 		@Override
 		public byte[] contentBuf(){
 			return buf;
+		}
+		
+		@Override
+		public long getOffset() throws IOException{
+			return io.getPos();
+		}
+		
+		@Override
+		public long getGlobalOffset() throws IOException{
+			return io.getGlobalPos();
 		}
 	}
 	

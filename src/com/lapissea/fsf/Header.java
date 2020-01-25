@@ -1,6 +1,10 @@
 package com.lapissea.fsf;
 
+import com.lapissea.fsf.headermodules.DataMappedModule;
+import com.lapissea.fsf.headermodules.FileHeaderModule;
+import com.lapissea.fsf.headermodules.FreeChunksModule;
 import com.lapissea.util.*;
+import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.EOFException;
 import java.io.IOException;
@@ -8,8 +12,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.function.BiConsumer;
-import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
 
 import static com.lapissea.fsf.FileSystemInFile.*;
 import static com.lapissea.fsf.NumberSize.*;
@@ -18,9 +20,18 @@ import static com.lapissea.util.UtilL.*;
 @SuppressWarnings("AutoBoxing")
 public class Header{
 	
-	public static String normalizePath(String path){
-		var p=Paths.get(path).normalize().toString();
-		return p.equals(path)?path:p;
+	private static final class Region{
+		static Region bySize(long start, long size){
+			return new Region(start, start+size);
+		}
+		
+		final long start;
+		final long end;
+		
+		private Region(long start, long end){
+			this.start=start;
+			this.end=end;
+		}
 	}
 	
 	private static final byte[]  MAGIC_BYTES     ="LSFSIF".getBytes(StandardCharsets.UTF_8);
@@ -31,18 +42,30 @@ public class Header{
 		return MAGIC_BYTES.clone();
 	}
 	
+	
+	public static String normalizePath(String path){
+		var p=Paths.get(path).normalize().toString();
+		return p.equals(path)?path:p;
+	}
+	
 	public final Version version;
 	
 	public final IOInterface source;
 	
+	@Deprecated
 	private final FixedLenList<FixedNumber, ChunkPointer> headerPointers;
 	
 	private final OffsetIndexSortedList<FilePointer>      fileList;
 	private final FixedLenList<SizedNumber, ChunkPointer> freeChunks;
 	private final Map<Long, Chunk>                        chunkCache;
 	
-	private      boolean                 defragmenting;
+	private boolean defragmenting;
+	
+	private Region region;
+	
 	public final FileSystemInFile.Config config;
+	
+	public final List<HeaderModule> modules;
 	
 	public final Iterable<Chunk> allChunksIter=()->{
 		try{
@@ -73,6 +96,12 @@ public class Header{
 	};
 	
 	public Header(IOInterface source, FileSystemInFile.Config config) throws IOException{
+		
+		var dmm=new DataMappedModule(this);
+		var fkm=new FreeChunksModule(this);
+		
+		modules=List.of(fkm, dmm);
+		
 		this.source=source;
 		this.config=config;
 		
@@ -97,7 +126,7 @@ public class Header{
 			              .findAny()
 			              .orElseThrow(()->new IOException("Invalid version number "+TextUtil.toString(versionBytes)));
 			
-			headerPointers=new FixedLenList<>(headerPointersNum, firstChunk());
+			headerPointers=new FixedLenList<>(headerPointersNum, firstChunk(), null);
 		}catch(EOFException eof){
 			//new empty file
 			var vs=Version.values();
@@ -106,8 +135,9 @@ public class Header{
 			var chunksFakeFile=new IOInterface.MemoryRA();
 			
 			try(var out=chunksFakeFile.write(true)){
-				OffsetIndexSortedList.init(out, config.fileTablePadding, config);
-				FixedLenList.init(out, new SizedNumber(BYTE, ()->(long)(chunksFakeFile.getSize()*1.5)), config.freeChunkCapacity);
+				for(HeaderModule module : modules){
+					module.init(out, config);
+				}
 			}
 			
 			List<ChunkPointer> localOffsets=new ArrayList<>();
@@ -130,7 +160,7 @@ public class Header{
 				out.write(latest.major);
 				out.write(latest.minor);
 				
-				FixedLenList.init(NumberSize.VOID, out, headerPointersNum, localOffsets.size());
+				FixedLenList.init(NumberSize.VOID, out, headerPointersNum, localOffsets.size(), false);
 				
 				try(var in=chunksFakeFile.read()){
 					in.transferTo(out);
@@ -139,7 +169,7 @@ public class Header{
 			
 			var ptrsData=firstChunk();
 			
-			headerPointers=new FixedLenList<>(headerPointersNum, ptrsData);
+			headerPointers=new FixedLenList<>(headerPointersNum, ptrsData, null);
 			
 			for(var off : localOffsets){
 				off.value+=ptrsData.nextPhysicalOffset();
@@ -152,15 +182,17 @@ public class Header{
 		
 		var iter=headerPointers.iterator();
 		
-		Chunk names  =iter.next().dereference(this);
-		Chunk offsets=iter.next().dereference(this);
-		Chunk frees  =iter.next().dereference(this);
+		for(HeaderModule module : modules){
+			module.read(iter::next);
+		}
+		Assert(!iter.hasNext());
 		
-		fileList=new OffsetIndexSortedList<>(()->new FilePointer(this), names, offsets);
+		freeChunks=fkm.getList();
 		
-		freeChunks=new FixedLenList<>(new SizedNumber(source::getSize), frees);
+		fileList=dmm.getMappings();
 		
 		validateFile();
+		
 	}
 	
 	public FilePointer getByPath(String path) throws IOException{
@@ -189,11 +221,8 @@ public class Header{
 	}
 	
 	private Chunk aloc(long initialSize, NumberSize bodyType, boolean allowNonOptimal) throws IOException{
-		
-		if(!defragmenting){
-			Chunk ch=tryRealoc(initialSize, bodyType, allowNonOptimal);
-			if(ch!=null) return ch;
-		}
+		Chunk ch=tryRealoc(initialSize, bodyType, allowNonOptimal);
+		if(ch!=null) return ch;
 		
 		return alocNew(bodyType, initialSize);
 	}
@@ -201,14 +230,18 @@ public class Header{
 	private Chunk tryRealoc(long initialSize, NumberSize bodyType, boolean allowNonOptimal) throws IOException{
 		if(freeChunks.isEmpty()) return null;
 		
-		int   bestInd=-1;
 		Chunk best   =null;
 		Chunk biggest=null;
 		long  diff   =Long.MAX_VALUE;
 		
 		for(int i=0;i<freeChunks.size();i++){
-			Chunk c =freeChunks.getElement(i).dereference(this);
-			long  ds=c.getCapacity();
+			Chunk c=freeChunks.getElement(i).dereference(this);
+			
+			if(region!=null&&c.overlaps(region.start, region.end)){
+				continue;
+			}
+			
+			long ds=c.getCapacity();
 			
 			if(!allowNonOptimal){
 				if(ds<initialSize){
@@ -225,7 +258,6 @@ public class Header{
 			if(newDiff<diff){
 				best=c;
 				diff=newDiff;
-				bestInd=i;
 				if(diff==0) break;
 			}
 		}
@@ -246,6 +278,8 @@ public class Header{
 		if(DEBUG_VALIDATION) validateFile();
 		
 		int chunkIndex=freeChunks.indexOf(new ChunkPointer(chunk));
+		
+		LogUtil.println(chunk, chunkIndex, freeChunks);
 		
 		freeChunks.removeElement(chunkIndex);
 		chunk.setUsed(true);
@@ -322,9 +356,7 @@ public class Header{
 		return chunk;
 	}
 	
-	private NumberSize safeNextType() throws IOException{
-		return NumberSize.bySize((long)(source.getSize()*1.1));
-	}
+	private NumberSize safeNextType() throws IOException{ return NumberSize.bySize((long)(source.getSize()*1.1)); }
 	
 	private void logChunkAction(String action, Chunk chunk){
 		if(!LOG_ACTIONS) throw new RuntimeException();
@@ -517,17 +549,17 @@ public class Header{
 			}
 		}
 		
-		
 		var alocSize=chain.stream().mapToLong(Chunk::getSize).sum()+additionalSpace;
 		
-		chainStart.moveTo(aloc(alocSize, false));
-		
-		try(var out=chainStart.io().write(false)){
-			try(var in=chain.get(1).io().read()){
-				in.transferTo(out);
+		chainStart.moveToAndFreeOld(aloc(alocSize, false));
+		if(chain.size()>1){
+			try(var out=chainStart.io().write(false)){
+				try(var in=chain.get(1).io().read()){
+					in.transferTo(out);
+				}
 			}
+			chainStart.chainForwardFree();
 		}
-		freeChunkChain(chain.get(1));
 	}
 	
 	private void sourcedChunkIterOne(String prevSource, Chunk chunk, BiConsumer<String, Chunk> consumer) throws IOException{
@@ -562,6 +594,8 @@ public class Header{
 		for(var e : chunkCache.entrySet()){
 			var cached=e.getValue();
 			
+			Assert(cached.getOffset()==e.getKey(), cached.getOffset(), e.getKey());
+			
 			if(!cached.isDirty()){
 				var read=readChunk(e.getKey());
 				if(!read.equals(cached)){
@@ -573,6 +607,8 @@ public class Header{
 				}
 			}
 		}
+		
+		freeChunks.checkIntegrity();
 		
 		for(var ch : freeChunks){
 			var c=ch.dereference(this);
@@ -614,9 +650,11 @@ public class Header{
 	}
 	
 	public void freeChunkChain(Chunk chunk) throws IOException{
-		if(chunk.hasNext()) freeChunkChain(chunk.nextChunk());
+		var next=chunk.nextChunk();
 		freeChunk(chunk);
+		if(next!=null) freeChunkChain(next);
 	}
+	
 	
 	public void freeChunk(Chunk chunk) throws IOException{
 		
@@ -629,13 +667,13 @@ public class Header{
 			
 			validateFile();
 		}
+		LogUtil.println("freeing", chunk);
 		
 		chunk.setUsed(false);
-		chunk.setSize(1);
+		chunk.setSize(0);
 		chunk.clearNext();
 		
-		chunk.syncHeader();
-		
+		Throwable e=null;
 		try{
 			
 			if(deallocatingFreeAction(chunk)) return;
@@ -644,16 +682,26 @@ public class Header{
 			if(ff) chunk.syncHeader();
 			
 			if(backwardFreeMergeAction(chunk)){
-				if(ff) Assert(freeChunks.remove(new ChunkPointer(chunk)));
+				if(ff){
+					Assert(freeChunks.remove(new ChunkPointer(chunk)));
+					chunkCache.remove(chunk.getOffset());
+				}
 				return;
 			}
 			if(ff) return;
 			
+			if(chunk.getOffset()==189){
+				int i=0;
+			}
 			normalFreeAction(chunk);
 			chunk.syncHeader();
-		}finally{
-			if(DEBUG_VALIDATION) validateFile();
+		}catch(Throwable e1){
+			e=e1;
 		}
+		if(DEBUG_VALIDATION){
+			if(e==null) validateFile();
+		}
+		if(e!=null) throw UtilL.uncheckedThrow(e);
 	}
 	
 	
@@ -677,12 +725,12 @@ public class Header{
 		return true;
 	}
 	
-	private boolean backwardFreeMergeAction(Chunk chunk) throws IOException{
+	private boolean backwardFreeMergeAction(Chunk chunkToMerge) throws IOException{
 		if(DEBUG_VALIDATION) validateFile();
 		
 		if(freeChunks.isEmpty()) return false;
 		
-		var offset=chunk.getOffset();
+		var offset=chunkToMerge.getOffset();
 		
 		Chunk previous;
 		find:
@@ -699,19 +747,19 @@ public class Header{
 		}
 		
 		try{
-			previous.setCapacity(chunk.nextPhysicalOffset()-previous.getDataStart());
+			previous.setCapacity(chunkToMerge.nextPhysicalOffset()-previous.getDataStart());
 		}catch(BitDepthOutOfSpaceException e){
 			throw new NotImplementedException(e);//TODO: reformat header be able to merge
 		}
 		
 		previous.syncHeader();
 		
-		removeChunkInCache(chunk);
+		removeChunkInCache(chunkToMerge);
+		chunkToMerge.nukeHeader();
 		
-		if(DEBUG_VALIDATION) validateFile();
 		if(LOG_ACTIONS){
 			logChunkAction("FREE B MERGE", previous);
-			logChunkAction("", chunk);
+			logChunkAction("", chunkToMerge);
 		}
 		
 		return true;
@@ -735,17 +783,23 @@ public class Header{
 			throw new NotImplementedException(e);//TODO: reformat header be able to merge
 		}
 		
+		toMergeInTo.syncHeader();
+		
 		removeChunkInCache(nextPtr);
+		next.nukeHeader();
 		
 		freeChunks.modifyElement(nextIndex, val->val.set(toMergeInTo));
 		
 		if(LOG_ACTIONS) logChunkAction("FREE F MERGE", toMergeInTo);
+		if(DEBUG_VALIDATION) validateFile();
 		
 		return true;
 	}
 	
 	private void normalFreeAction(Chunk chunk) throws IOException{
-		freeChunks.addElement(new ChunkPointer(chunk));
+		var ptr=new ChunkPointer(chunk);
+		if(DEBUG_VALIDATION) Assert(!freeChunks.contains(ptr), "Duplicate", ptr, "in", freeChunks);
+		freeChunks.addElement(ptr);
 		if(LOG_ACTIONS) logChunkAction("FREED", chunk);
 	}
 	
@@ -785,21 +839,37 @@ public class Header{
 		return files;
 	}
 	
-	public List<Chunk> allChunks(){
-		return StreamSupport.stream(allChunksIter.spliterator(), false).collect(Collectors.toList());
+	public Map<HeaderModule, List<List<Chunk>>> allChunks() throws IOException{
+		Map<HeaderModule, List<List<Chunk>>> moduleChunks=new LinkedHashMap<>();
+		
+		UnsafeConsumer<HeaderModule, IOException> add=module->{
+			List<List<Chunk>> chunks=new ArrayList<>();
+			
+			for(Chunk chunk : module.getOwning()){
+				chunks.add(chunk.loadWholeChain());
+			}
+			
+			for(SourcedPointer reference : module.getReferences()){
+				chunks.add(reference.pointer.dereference(this).loadWholeChain());
+			}
+			
+			moduleChunks.put(module, chunks);
+		};
+		
+		add.accept(new FileHeaderModule(this));
+		
+		for(HeaderModule module : modules){
+			add.accept(module);
+		}
+		
+		return moduleChunks;
 	}
 	
-	private long calcTotalWholeSize(List<Chunk> chain){
-		return chain.stream().mapToLong(Chunk::wholeSize).sum();
-	}
+	private long calcTotalWholeSize(List<Chunk> chain){ return chain.stream().mapToLong(Chunk::wholeSize).sum(); }
 	
-	private long calcTotalCapacity(List<Chunk> chain){
-		return chain.stream().mapToLong(Chunk::getCapacity).sum();
-	}
+	private long calcTotalCapacity(List<Chunk> chain) { return chain.stream().mapToLong(Chunk::getCapacity).sum(); }
 	
-	private long calcTotalSize(List<Chunk> chain){
-		return chain.stream().mapToLong(Chunk::getSize).sum();
-	}
+	private long calcTotalSize(List<Chunk> chain)     { return chain.stream().mapToLong(Chunk::getSize).sum(); }
 	
 	private List<List<Chunk>> chunksToChains(List<Chunk> chunks) throws IOException{
 		var chains=new ArrayList<List<Chunk>>(chunks.size());
@@ -832,76 +902,86 @@ public class Header{
 	}
 	
 	private Chunk clearRegion(long start, long size) throws IOException{
-		long end  =start+size;
-		var  first=firstChunk();
-
-//		LogUtil.println("freeing region from", start, "to", end);
-		
-		Assert(!first.overlaps(start, end));
-		
-		var startChunk=first.nextPhysical();
-		
-		List<Chunk> toMove=new LinkedList<>();
-		{
-			Chunk walk=startChunk;
-			while(true){
-				var next=walk.nextPhysical();
-				if(next.getOffset()>start) break;
-				walk=next;
-			}
+		Assert(size>0);
+		return clearRegion(new Region(start, start+size));
+	}
+	
+	private Chunk clearRegion(Region region) throws IOException{
+		this.region=region;
+		try{
+			long start=region.start;
+			long size =region.end-region.start;
+			long end  =region.end;
+			var  first=firstChunk();
 			
-			while(true){
-				toMove.add(walk);
-				
-				var next=walk.nextPhysical();
-				if(next.getOffset() >= end) break;
-				walk=next;
-			}
-		}
-		
-		var fo=new ChunkPointer(toMove.get(0).getOffset());
-		
-		toMove.removeIf(ch->!ch.isUsed());
-		
-		while(!toMove.isEmpty()){
-			Chunk chunk=toMove.remove(0);
+			Assert(!first.overlaps(start, end));
 			
-			var moved=prevDetectingMove(chunk);
-			if(!moved.isEmpty()){
-				toMove.removeAll(moved);
-				continue;
-			}
+			var startChunk=first.nextPhysical();
 			
-			chunk.moveToAndFreeOld(aloc(chunk.getSize()==0?chunk.getCapacity():chunk.getSize(), false));//TODO: check if trimming size has any side effects / regressions
-		}
-		
-		Chunk freeRegion;
-		
-		if(freeChunks.contains(fo)) freeRegion=fo.dereference(this);
-		else{
-			Chunk walk=startChunk;
-			while(true){
-				var next=walk.nextPhysical();
-				if(next.getOffset()>start){
-					freeRegion=walk;
-					break;
+			List<Chunk> toMove=new LinkedList<>();
+			{
+				Chunk walk=startChunk;
+				while(true){
+					var next=walk.nextPhysical();
+					if(next.getOffset()>start) break;
+					walk=next;
 				}
-				walk=next;
+				
+				while(true){
+					toMove.add(walk);
+					
+					var next=walk.nextPhysical();
+					if(next.getOffset() >= end) break;
+					walk=next;
+				}
+			}
+			
+			var fo=new ChunkPointer(toMove.get(0).getOffset());
+			
+			toMove.removeIf(ch->!ch.isUsed());
+			
+			while(!toMove.isEmpty()){
+				Chunk chunk=toMove.remove(0);
+				
+				var moved=prevDetectingMove(chunk);
+				if(!moved.isEmpty()){
+					toMove.removeAll(moved);
+					continue;
+				}
+				
+				chunk.moveToAndFreeOld(aloc(chunk.getSize()==0?chunk.getCapacity():chunk.getSize(), false));//TODO: check if trimming size has any side effects / regressions
+			}
+			
+			Chunk freeRegion;
+			
+			if(freeChunks.contains(fo)) freeRegion=fo.dereference(this);
+			else{
+				Chunk walk=startChunk;
+				while(true){
+					var next=walk.nextPhysical();
+					if(next.getOffset()>start){
+						freeRegion=walk;
+						break;
+					}
+					walk=next;
+				}
+				
+				if(DEBUG_VALIDATION){
+					Assert(!freeRegion.isUsed(), freeRegion, start, size, end);
+				}
 			}
 			
 			if(DEBUG_VALIDATION){
+				validateFile();
 				Assert(!freeRegion.isUsed(), freeRegion, start, size, end);
+				Assert(freeRegion.overlaps(start, end), freeRegion, "Freed start", start, size, end);
+				Assert(freeRegion.wholeSize() >= size, "Did not free region", freeRegion, "["+start+"..."+end+"]", size);
 			}
+			
+			return freeRegion;
+		}finally{
+			this.region=null;
 		}
-		
-		if(DEBUG_VALIDATION){
-			validateFile();
-			Assert(!freeRegion.isUsed(), freeRegion, start, size, end);
-			Assert(!freeRegion.overlaps(start, end), freeRegion, "Freed start", start, size, end);
-			Assert(freeRegion.wholeSize() >= size, "Did not free region", freeRegion, "["+start+"..."+end+"]", size);
-		}
-		
-		return freeRegion;
 	}
 	
 	private void moveChainToChunk(Chunk chunk, Chunk newChunk) throws IOException{
@@ -947,6 +1027,39 @@ public class Header{
 		
 	}
 	
+	private void compositChainTo(Chunk chunk, Region region) throws IOException{
+		
+		var headerChunks=new ArrayList<Chunk>(headerPointers.size());
+		for(var ptr : headerPointers){
+			headerChunks.add(ptr.dereference(this));
+		}
+		
+		chunk.checkCaching();
+		
+		var chain=chunk.loadWholeChain();
+		
+		var size=calcTotalSize(chain);
+		
+		//TODO: use more more sensible padding
+		if(headerChunks.contains(chunk)){
+			size+=chain.size()*bySize(source.getSize()).bytes;
+		}
+		
+		var pos=region.start;
+		
+		if(chunk.getOffset()==pos&&chain.size()==1){
+			if(calcTotalCapacity(chain)==size){
+				return;
+			}
+		}
+		
+		var freeRegion=clearRegion(Region.bySize(pos, Chunk.headerSize(source.getSize(), size)*3+size));
+		
+		var defrag=alocFreeSplit(freeRegion, size);
+		
+		moveChainToChunk(chunk, defrag);
+	}
+	
 	public void defragment() throws IOException{
 		Assert(!defragmenting);
 		if(DEBUG_VALIDATION) validateFile();
@@ -963,14 +1076,16 @@ public class Header{
 		
 		try{
 			
-			var chunk=firstChunk();
-			var pos  =chunk.nextPhysicalOffset();
+			Chunk chunk=firstChunk();
+			var   pos  =chunk.nextPhysicalOffset();
 			
 			while(!chunk.isLastPhysical()){
 				do{
 					chunk=chunk.nextPhysical();
 					if(chunk.isLastPhysical()) break;
 				}while(!chunk.isUsed());
+				
+				
 				chunk.checkCaching();
 				
 				var chain=chunk.loadWholeChain();
@@ -989,7 +1104,7 @@ public class Header{
 					}
 				}
 				
-				var freeRegion=clearRegion(pos, Chunk.headerSize(source.getSize(), size)*3+size);
+				var freeRegion=clearRegion(Region.bySize(pos, Chunk.headerSize(source.getSize(), size)*3+size));
 				
 				var defrag=alocFreeSplit(freeRegion, size);
 				
@@ -1062,6 +1177,7 @@ public class Header{
 		return result;
 	}
 	
+	@Deprecated
 	public FixedLenList<FixedNumber, ChunkPointer> getHeaderPointers(){
 		return headerPointers;
 	}
@@ -1129,6 +1245,12 @@ public class Header{
 		}
 		
 		if(DEBUG_VALIDATION) validateFile();
+	}
+	
+	public void deleteFile(String localPath) throws IOException{
+		var file=getByPath(localPath);
+		fileList.removeElement(fileList.indexOf(file));
+		freeChunkChain(file.dereference());
 	}
 }
 

@@ -57,10 +57,6 @@ public interface RandomIO extends AutoCloseable, Flushable, ContentWriter, Conte
 		return i-off;
 	}
 	
-	default int read(byte[] b) throws IOException{
-		return read(b, 0, b.length);
-	}
-	
 	
 	////////
 	
@@ -76,11 +72,7 @@ public interface RandomIO extends AutoCloseable, Flushable, ContentWriter, Conte
 		}
 	}
 	
-	default RandomIO write(byte[] b) throws IOException{
-		write(b, 0, b.length);
-		return this;
-	}
-	
-	
 	void fillZero(long requestedMemory) throws IOException;
+	
+	long getGlobalPos() throws IOException;
 }

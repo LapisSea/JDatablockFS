@@ -7,7 +7,7 @@ public class FlagReader{
 	private long data;
 	private int  bitCount;
 	
-	public static FlagReader read(ContentInputStream in, NumberSize size) throws IOException{
+	public static FlagReader read(ContentReader in, NumberSize size) throws IOException{
 		return new FlagReader(size.read(in), size.bytes*Byte.SIZE);
 	}
 	
@@ -49,5 +49,12 @@ public class FlagReader{
 	
 	private long makeMask(int size){
 		return (1<<size)-1;
+	}
+	
+	public boolean checkRestAllOne(){
+		do{
+			if(!readBoolBit()) return false;
+		}while(remainingCount()>0);
+		return true;
 	}
 }

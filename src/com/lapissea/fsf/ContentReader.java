@@ -9,6 +9,10 @@ public interface ContentReader{
 	
 	int read() throws IOException;
 	
+	default int read(byte[] b) throws IOException{
+		return read(b, 0, b.length);
+	}
+	
 	int read(byte[] b, int off, int len) throws IOException;
 	
 	default char readChar() throws IOException{

@@ -41,11 +41,17 @@ public class FlagWriter{
 		return buffer;
 	}
 	
-	public void export(ContentOutputStream dest) throws IOException{
+	public void export(ContentWriter dest) throws IOException{
 		numberSize.write(dest, getFlags());
 	}
 	
 	private long makeMask(int size){
 		return (1<<size)-1;
+	}
+	
+	public void fillRestAllOne(){
+		while(remainingCount()>0){
+			writeBoolBit(true);
+		}
 	}
 }

@@ -45,6 +45,12 @@ public abstract class ContentInputStream extends InputStream implements ContentR
 		public byte[] contentBuf(){
 			return buf;
 		}
+		
+		@Override
+		public long getOffset(){
+			return pos;
+		}
+		
 	}
 	
 	public static class BB extends ContentInputStream{
@@ -81,6 +87,11 @@ public abstract class ContentInputStream extends InputStream implements ContentR
 		@Override
 		public byte[] contentBuf(){
 			return buf;
+		}
+		
+		@Override
+		public long getOffset(){
+			return bb.position();
 		}
 	}
 	
@@ -138,6 +149,16 @@ public abstract class ContentInputStream extends InputStream implements ContentR
 		public byte[] contentBuf(){
 			return buf;
 		}
+		
+		@Override
+		public long getOffset(){
+			return -1;
+		}
 	}
 	
+	public abstract long getOffset() throws IOException;
+	
+	public long getGlobalOffset() throws IOException{
+		return getOffset();
+	}
 }

@@ -1,6 +1,5 @@
 package com.lapissea.fsf;
 
-import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 
 import java.io.*;
@@ -135,9 +134,9 @@ public class VirtualFile{
 		return data==null?0:data.getSize();
 	}
 	
-	public void delete(){
-		
-		throw new NotImplementedException();
+	public void delete() throws IOException{
+		data=null;
+		source.header.deleteFile(source.getLocalPath());
 	}
 	
 	public void writeAll(byte[] bytes) throws IOException{

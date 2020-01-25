@@ -134,6 +134,7 @@ public class ChunkIO implements IOInterface{
 				}
 				if(mode==SET){
 					ch.setSize(ch.getCapacity());
+					ch.syncHeader();
 				}
 				i++;
 			}
@@ -353,6 +354,11 @@ public class ChunkIO implements IOInterface{
 		@Override
 		public void fillZero(long requestedMemory) throws IOException{
 			Utils.zeroFill((b, off, len)->write(b, off, len, false), requestedMemory);
+		}
+		
+		@Override
+		public long getGlobalPos() throws IOException{
+			return data.getGlobalPos();
 		}
 		
 		public void write(byte[] b, int off, int len, boolean pushUsed) throws IOException{

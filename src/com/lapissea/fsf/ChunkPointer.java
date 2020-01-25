@@ -4,6 +4,12 @@ import java.io.IOException;
 
 public class ChunkPointer extends FileObject implements Comparable<ChunkPointer>{
 	
+	public static ChunkPointer readNew(ContentInputStream src) throws IOException{
+		ChunkPointer ptr=new ChunkPointer();
+		ptr.read(src);
+		return ptr;
+	}
+	
 	public long value;
 	
 	public ChunkPointer(){
@@ -57,7 +63,7 @@ public class ChunkPointer extends FileObject implements Comparable<ChunkPointer>
 	
 	@Override
 	public String toString(){
-		return Long.toString(value);
+		return "@"+value;
 	}
 	
 	public Chunk dereference(Header header) throws IOException{

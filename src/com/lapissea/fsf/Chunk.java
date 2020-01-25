@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -87,16 +88,13 @@ public class Chunk{
 		var chunkUsed=flags.readBoolBit();
 		
 		if(DEBUG_VALIDATION){
-			do{
-				if(!flags.readBoolBit()){
-					var siz=FLAGS_SIZE.bytes*Byte.SIZE;
-					var d  =new StringBuilder(siz);
-					d.append(Long.toBinaryString(flagData));
-					while(d.length()<siz) d.insert(0, "0");
-					
-					throw new AssertionError(TextUtil.toString("Invalid chunk header", offset, flagData, d.toString()));
-				}
-			}while(flags.remainingCount()>0);
+			if(!flags.checkRestAllOne()){
+				var siz=FLAGS_SIZE.bytes*Byte.SIZE;
+				var d  =new StringBuilder(siz);
+				d.append(Long.toBinaryString(flagData));
+				while(d.length()<siz) d.insert(0, "0");
+				throw new AssertionError(TextUtil.toString("Invalid chunk header", offset, d.toString()));
+			}
 		}
 		
 		long next    =requirePositive(nextType.read(in));
@@ -140,11 +138,7 @@ public class Chunk{
 		
 		flags.writeBoolBit(isUsed());
 		
-		if(DEBUG_VALIDATION){
-			while(flags.remainingCount()>0){
-				flags.writeBoolBit(true);
-			}
-		}
+		if(DEBUG_VALIDATION) flags.fillRestAllOne();
 		
 		flags.export(buff);
 		
@@ -165,10 +159,12 @@ public class Chunk{
 	}
 	
 	private static long requireGreaterOrEqual(long val, long limit) throws IOException{
-		if(val<0){
-			throw new IOException("Malformed file");
-		}
+		if(val<0) malformedFile();
 		return val;
+	}
+	
+	private static void malformedFile() throws IOException{
+		throw new IOException("Malformed file");
 	}
 	
 	final Header header;
@@ -211,7 +207,9 @@ public class Chunk{
 			this.nextType=Objects.requireNonNull(nextType);
 			this.next=requireGreaterOrEqual(next, Header.FILE_HEADER_SIZE);
 			
+			if(bodyType==NumberSize.VOID) malformedFile();
 			this.bodyType=Objects.requireNonNull(bodyType);
+			
 			this.capacity=requireGreaterOrEqual(capacity, 1);
 			this.size=requireGreaterOrEqual(size, capacity);
 			
@@ -446,19 +444,32 @@ public class Chunk{
 		if(!hasNext()) return List.of(this);
 		
 		List<Chunk> chain=new LinkedList<>();
-		
-		Chunk link=this;
-		do{
-			chain.add(link);
-			link=link.nextChunk();
-		}while(link!=null);
-		
+		loadWholeChain(chain::add);
 		return List.copyOf(chain);
 	}
 	
+	public void loadWholeChain(Consumer<Chunk> dest) throws IOException{
+		Chunk link=this;
+		do{
+			dest.accept(link);
+			link=link.nextChunk();
+		}while(link!=null);
+	}
+	
+	public boolean overlaps(Chunk other){
+		return overlaps(other.getOffset(), other.nextPhysicalOffset());
+	}
+	
 	public boolean overlaps(long start, long end){
-		long a=getOffset(), b=nextPhysicalOffset();
-		return Math.max(start, a)-Math.min(end, b)<(a-b)+(start-end);
+		Assert(start<end);
+		
+		long thisStart=getOffset(), thisEnd=nextPhysicalOffset();
+		
+		if(start<=thisStart){
+			return end>thisStart;
+		}
+		
+		return start<thisEnd;
 	}
 	
 	public void moveToAndFreeOld(Chunk newChunk) throws IOException{
@@ -615,5 +626,9 @@ public class Chunk{
 			                         TextUtil.toTable(this, cached)
 			);
 		}
+	}
+	
+	public void nukeHeader() throws IOException{
+		header.source.write(getOffset(), false, new byte[FLAGS_SIZE.bytes]);
 	}
 }

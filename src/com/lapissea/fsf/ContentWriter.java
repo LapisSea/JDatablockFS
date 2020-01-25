@@ -16,6 +16,10 @@ public interface ContentWriter{
 	
 	void write(int b) throws IOException;
 	
+	default void write(byte[] b) throws IOException{
+		write(b, 0, b.length);
+	}
+	
 	void write(byte[] b, int off, int len) throws IOException;
 	
 	default void writeBoolean(boolean v) throws IOException{
