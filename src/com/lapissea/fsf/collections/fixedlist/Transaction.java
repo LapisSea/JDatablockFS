@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 
+import static com.lapissea.fsf.FileSystemInFile.*;
 import static com.lapissea.util.UtilL.*;
 
 final class Transaction<E>{
@@ -44,7 +45,7 @@ final class Transaction<E>{
 	
 	void commit(List<E> list){
 		Objects.requireNonNull(action);
-		Assert(!(list instanceof FixedLenList));
+		if(DEBUG_VALIDATION) Assert(!(list instanceof FixedLenList));
 		
 		switch(action){
 		case ADD -> list.add(element);
