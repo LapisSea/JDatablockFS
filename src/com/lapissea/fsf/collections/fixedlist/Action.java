@@ -5,7 +5,7 @@ import java.util.function.Function;
 enum Action{
 	ADD(s->s+1, t->"add("+t.element+")"),
 	REMOVE(s->s-1, t->"remove("+t.index+")"),
-	SET(s->s, t->"set("+t.element+" @"+t.index),
+	SET(s->s, t->"set("+t.index+", "+t.element+")"),
 	CLEAR(s->0, t->"clear()");
 	
 	interface Resizer{

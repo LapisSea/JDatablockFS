@@ -73,6 +73,7 @@ public class Header{
 	private final Map<Long, Chunk>                        chunkCache;
 	
 	private boolean defragmenting;
+	private boolean safeAloc;
 	
 	private Region region;
 	
@@ -229,15 +230,33 @@ public class Header{
 		return chunk;
 	}
 	
+	public class SafeAlocSession implements AutoCloseable{
+		private final boolean lastsafeAloc;
+		
+		private SafeAlocSession(){
+			lastsafeAloc=safeAloc;
+			safeAloc=true;
+		}
+		
+		@Override
+		public void close(){
+			safeAloc=lastsafeAloc;
+		}
+	}
+	
+	public SafeAlocSession safeAlocSession(){
+		return new SafeAlocSession();
+	}
+	
 	public Chunk aloc(long initialSize, boolean allowNonOptimal) throws IOException{
 		return aloc(initialSize, NumberSize.bySize(initialSize), allowNonOptimal);
 	}
 	
 	public Chunk aloc(long initialSize, NumberSize bodyType, boolean allowNonOptimal) throws IOException{
-//		if(!defragmenting){
-		Chunk ch=tryRealoc(initialSize, bodyType, allowNonOptimal);
-		if(ch!=null) return ch;
-//		}
+		if(!safeAloc){
+			Chunk ch=tryRealoc(initialSize, bodyType, allowNonOptimal);
+			if(ch!=null) return ch;
+		}
 		
 		return alocNew(bodyType, initialSize);
 	}

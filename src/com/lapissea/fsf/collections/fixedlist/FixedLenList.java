@@ -1,7 +1,9 @@
 package com.lapissea.fsf.collections.fixedlist;
 
+import com.lapissea.fsf.Header;
 import com.lapissea.fsf.NumberSize;
 import com.lapissea.fsf.ShadowChunks;
+import com.lapissea.fsf.Utils;
 import com.lapissea.fsf.chunk.Chunk;
 import com.lapissea.fsf.chunk.ChunkChain;
 import com.lapissea.fsf.chunk.ChunkIO;
@@ -9,6 +11,7 @@ import com.lapissea.fsf.io.ContentInputStream;
 import com.lapissea.fsf.io.ContentOutputStream;
 import com.lapissea.fsf.io.serialization.FileObject;
 import com.lapissea.util.*;
+import com.lapissea.util.function.UnsafeIntFunction;
 
 import java.io.IOException;
 import java.util.*;
@@ -65,9 +68,10 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 		if(addEmergency) init(out, header.copy(), Math.max(1, initialElements.size()/2), false);
 	}
 	
+	private final Header                                                header;
 	private final ChunkIO                                               data;
 	private final FixedLenList<TransactionHeader<H, E>, Transaction<E>> transactionBuffer;
-	private final H                                                     header;
+	private final H                                                     listHeader;
 	private       int                                                   size;
 	
 	private boolean modifying;
@@ -81,13 +85,15 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 	 * @param transactionBufferData Chunk where emergency data will be stored in form of a transaction log that will act as shadow changes until the log is applied to main data
 	 */
 	public FixedLenList(H initialHead, @NotNull Chunk data, @Nullable Chunk transactionBufferData) throws IOException{
-		header=initialHead;
+		listHeader=initialHead;
+		header=data.header;
+		
 		this.data=data.io();
 		
-		cache=data.header.config.newCacheMap();
+		cache=header.config.newCacheMap();
 		
 		try(var in=this.data.read()){
-			header.read(in);
+			listHeader.read(in);
 		}
 		
 		if(transactionBufferData!=null){
@@ -111,7 +117,7 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 	}
 	
 	public int getElementSize(){
-		return header.getElementSize();
+		return listHeader.getElementSize();
 	}
 	
 	private void applyBackingTransactions() throws IOException{
@@ -154,11 +160,13 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 	}
 	
 	private void doTransaction(Transaction<E> transaction) throws IOException{
+		
+		LogUtil.println(this, transaction);
 		if(modifying){
 			if(transactionBuffer==null){
-//				throw new ConcurrentModificationException(transaction.toString());
-				LogUtil.println("warning cocurent mod", this, transaction);
-				commitTransaction(transaction);
+				throw new ConcurrentModificationException(TextUtil.toString(this, transaction));
+//				LogUtil.println("warning cocurent mod", this, transaction);
+//				commitTransaction(transaction);
 			}else{
 				if(DEBUG_VALIDATION) checkIntegrity();
 				transactionBuffer.addElement(transaction);
@@ -166,7 +174,9 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 			}
 		}else{
 			applyBackingTransactions();
-			commitTransaction(transaction);
+			try(var s=header.safeAlocSession()){
+				commitTransaction(transaction);
+			}
 			applyBackingTransactions();
 		}
 	}
@@ -183,11 +193,11 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 	}
 	
 	private long calcDataSize(){
-		return data.getSize()-header.length();
+		return data.getSize()-listHeader.length();
 	}
 	
 	protected int calcMainSize(){
-		return Math.toIntExact(calcDataSize()/header.getElementSize());
+		return Math.toIntExact(calcDataSize()/listHeader.getElementSize());
 	}
 	
 	protected void calcSize(){
@@ -212,72 +222,106 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 	}
 	
 	public long calcPos(int index){
-		return header.length()+calcDataPos(index);
+		return listHeader.length()+calcDataPos(index);
 	}
 	
 	private int calcDataPos(int index){
-		return header.getElementSize()*index;
+		return listHeader.getElementSize()*index;
 	}
 	
 	@NotNull
 	public E getElement(int index) throws IOException{
-		return Objects.requireNonNull(getElement(header, index));
+		return Objects.requireNonNull(getElement(listHeader, index));
 	}
 	
 	private int calcReserveIndex(int index){
-		var mainElements=(data.getSize()-header.length())/header.getElementSize();
+		var mainElements=(data.getSize()-listHeader.length())/listHeader.getElementSize();
 		return (int)(index-mainElements);
 	}
 	
 	
-	private E readElement(H header, int index) throws IOException{
-		var ay=hasBackingTransactions();
-		if(ay){
-			var realSize=Math.toIntExact(calcDataSize()/header.getElementSize());
-			
-			List<E> shadowCopy=new ArrayList<>(size());
-			for(int i=0;i<realSize;i++){
-				shadowCopy.add(null);
-			}
-			
-			for(var transaction : transactionBuffer){
-				transaction.commit(shadowCopy);
-			}
-			
-			E val=shadowCopy.get(index);
-			if(val!=null) return val;//getting modified
-			
-			//getting from main
-			var cached=cache.get(index);
-			if(cached!=null) return cached;
-			
+	private List<E> transactionReconstructView(UnsafeIntFunction<E, IOException> get){
+		
+		var realSize=Math.toIntExact(calcDataSize()/listHeader.getElementSize());
+		
+		List<Transaction.Reconstruct<E>> shadowCopy=new ArrayList<>(size());
+		for(int i=0;i<realSize;i++){
+			shadowCopy.add(new Transaction.Reconstruct<>(i));
 		}
 		
-		E e=header.newElement();
+		for(var transaction : transactionBuffer){
+			transaction.commit(shadowCopy);
+		}
+		
+		return new AbstractList<>(){
+			@Override
+			public E get(int index){
+				var reconstruct=shadowCopy.get(index);
+				if(reconstruct.logValue!=null) return reconstruct.logValue;
+				try{
+					return get.apply(index);
+				}catch(IOException e){
+					throw UtilL.uncheckedThrow(e);
+				}
+			}
+			
+			@Override
+			public int size(){
+				return shadowCopy.size();
+			}
+		};
+	}
+	
+	private E readElementDirect(H listHeader, int index) throws IOException{
+		E e=listHeader.newElement();
 		try(var in=data.read(calcPos(index))){
-			header.readElement(in, e);
+			listHeader.readElement(in, e);
 		}
 		return e;
 	}
 	
+	private E readElement(H listHeader, int index) throws IOException{
+		if(hasBackingTransactions()){
+			List<E> view=transactionReconstructView(realId->{
+				var cached=cache.get(realId);
+				if(cached!=null) return cached;
+				
+				return readElementDirect(listHeader, realId);
+			});
+			
+			return view.get(index);
+		}
+		
+		return readElementDirect(listHeader, index);
+	}
 	
-	private E getElement(H header, int index) throws IOException{
-		Objects.checkIndex(index, size());
+	
+	private E safeCacheFetch(H listHeader, int index) throws IOException{
+		if(hasBackingTransactions()){
+			List<E> view=transactionReconstructView(cache::get);
+			return view.get(index);
+		}
 		
 		var cached=cache.get(index);
-		if(!DEBUG_VALIDATION){
-			if(cached!=null) return cached;
-		}
+		if(!DEBUG_VALIDATION) return cached;
 		
-		E e=readElement(header, index);
+		if(cached==null) return null;
 		
-		if(DEBUG_VALIDATION){
-			if(cached!=null){
-				Assert(cached.equals(e), cached, e);
-				return cached;
-			}
-		}
-		cache.put(index, e);
+		E read=readElement(listHeader, index);
+		
+		Assert(cached.equals(read), cached, read);
+		return cached;
+	}
+	
+	private E getElement(H listHeader, int index) throws IOException{
+		Objects.checkIndex(index, size());
+		
+		var cached=safeCacheFetch(listHeader, index);
+		if(cached!=null) return cached;
+		
+		E e=readElement(listHeader, index);
+		
+		if(!hasBackingTransactions()) cache.put(index, e);
 		
 		return e;
 	}
@@ -285,25 +329,24 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 	public void checkIntegrity() throws IOException{
 //		if(DEBUG_VALIDATION) data.getRoot().header.validateFile();
 		
-		Map<Integer, E> disk=new LinkedHashMap<>();
+		var disk    =new LinkedHashMap<Integer, E>();
+		var cacheMap=new HashMap<Integer, E>();
+		
 		for(int i=0;i<size();i++){
-			E d=readElement(header, i);
+			E d=readElement(listHeader, i);
 			disk.put(i, d);
+			var c=safeCacheFetch(listHeader, i);
+			if(c!=null) cacheMap.put(i, c);
 		}
 		
-		for(Map.Entry<Integer, E> entry : cache.entrySet()){
-			var i  =entry.getKey();
-			var val=entry.getValue();
-			
-			var diskVal=disk.get(i);
-			if(!val.equals(diskVal)){
-				throw new AssertionError(header+" "+TextUtil.toString(data.readAll())+"\n"+TextUtil.toTable("disk / cache", List.of(disk, cache)));
-			}
+		if(!Utils.isCacheValid(disk, cacheMap)){
+			throw new AssertionError(listHeader+" "+TextUtil.toString(data.readAll())+"\n"+TextUtil.toTable("disk / cache", List.of(disk, cache)));
 		}
+		
 	}
 	
 	private void updateHeader(E change) throws IOException{
-		if(!header.willChange(change)) return;
+		if(!listHeader.willChange(change)) return;
 		var oldMod=modifying;
 		
 		try{
@@ -313,17 +356,17 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 			if(DEBUG_VALIDATION) checkIntegrity();
 			
 			var oldCapacity=capacity();
-			var oldHeader  =header.copy();
+			var oldHeader  =listHeader.copy();
 			
 			//TODO: Performance - lower memory footprint algorithm needed
 			var elementBuffer=new ArrayList<>(this);
 			checkIntegrity();
 			
-			header.update(change);
+			listHeader.update(change);
 			
 			ensureElementCapacity(oldCapacity);
 			
-			var newSiz=header.getElementSize();
+			var newSiz=listHeader.getElementSize();
 			var oldSiz=oldHeader.getElementSize();
 			
 			byte[] buffer   =new byte[newSiz];
@@ -336,11 +379,11 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 			}
 			
 			try(var out=data.write(true)){
-				header.write(out);
+				listHeader.write(out);
 				
 				
 				for(E e : elementBuffer){
-					header.writeElement(bufferOut, e);
+					listHeader.writeElement(bufferOut, e);
 					bufferOut.reset();
 					
 					out.write(buffer);
@@ -384,7 +427,7 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 		}
 		
 		try(var out=data.write(calcPos(index), false)){
-			out.write(elementToBytes(header, e));
+			out.write(elementToBytes(listHeader, e));
 		}
 		
 		if(DEBUG_VALIDATION){
@@ -400,7 +443,7 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 	
 	void applySet(int index, E element) throws IOException{
 		
-		var buffer=elementToBytes(header, element);
+		var buffer=elementToBytes(listHeader, element);
 		
 		cache.remove(index);
 		try(var in=data.write(calcPos(index), false)){
@@ -474,8 +517,8 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 	}
 	
 	public int capacity(){
-		var dataCapacity=data.getCapacity()-header.length();
-		return (int)(dataCapacity/header.getElementSize());
+		var dataCapacity=data.getCapacity()-listHeader.length();
+		return (int)(dataCapacity/listHeader.getElementSize());
 	}
 	
 	public boolean ensureElementCapacity(int capacity) throws IOException{
@@ -487,7 +530,7 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 		}
 		
 		if(size() >= capacity) return false;
-		var neededCapacity=capacity*header.getElementSize()+header.length();
+		var neededCapacity=capacity*listHeader.getElementSize()+listHeader.length();
 		if(data.getCapacity() >= neededCapacity) return false;
 		data.setCapacity(neededCapacity);
 		
@@ -557,7 +600,7 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 	
 	@Override
 	public String toString(){
-		var s=new StringBuilder().append(header).append(" -> [");
+		var s=new StringBuilder().append(listHeader).append(" -> [");
 		
 		if(hasBackingTransactions()){
 			s.append(stream().limit(calcMainSize())

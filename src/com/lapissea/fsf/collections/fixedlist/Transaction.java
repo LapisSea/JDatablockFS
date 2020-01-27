@@ -4,9 +4,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 
-import static com.lapissea.fsf.FileSystemInFile.*;
-import static com.lapissea.util.UtilL.*;
-
 final class Transaction<E>{
 	
 	public E      element;
@@ -43,14 +40,28 @@ final class Transaction<E>{
 		}
 	}
 	
-	void commit(List<E> list){
+	static class Reconstruct<E>{
+		final int selfIndex;
+		E logValue;
+		
+		Reconstruct(int selfIndex){this.selfIndex=selfIndex;}
+		
+		Reconstruct(E logValue){
+			this(-1);
+			this.logValue=logValue;
+		}
+	}
+	
+	void commit(List<Reconstruct<E>> list){
 		Objects.requireNonNull(action);
-		if(DEBUG_VALIDATION) Assert(!(list instanceof FixedLenList));
 		
 		switch(action){
-		case ADD -> list.add(element);
-		case REMOVE -> list.remove(index);
-		case SET -> list.set(index, element);
+		case ADD -> list.add(new Reconstruct<>(element));
+		case REMOVE -> {
+			Reconstruct<E> last=list.remove(list.size()-1);
+			list.set(index, last);
+		}
+		case SET -> list.set(index, new Reconstruct<>(element));
 		case CLEAR -> list.clear();
 		}
 	}
