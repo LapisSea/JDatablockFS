@@ -1,7 +1,8 @@
 package test;
 
 import com.lapissea.fsf.FileSystemInFile;
-import com.lapissea.fsf.IOInterface;
+import com.lapissea.fsf.Renderer;
+import com.lapissea.fsf.io.IOInterface;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeRunnable;

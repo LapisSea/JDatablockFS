@@ -1,8 +1,21 @@
 package com.lapissea.fsf;
 
-import com.lapissea.fsf.headermodules.DataMappedModule;
-import com.lapissea.fsf.headermodules.FileHeaderModule;
-import com.lapissea.fsf.headermodules.FreeChunksModule;
+import com.lapissea.fsf.chunk.Chunk;
+import com.lapissea.fsf.chunk.ChunkPointer;
+import com.lapissea.fsf.chunk.MutableChunkPointer;
+import com.lapissea.fsf.chunk.SourcedChunkPointer;
+import com.lapissea.fsf.collections.SparsePointerList;
+import com.lapissea.fsf.collections.fixedlist.FixedLenList;
+import com.lapissea.fsf.collections.fixedlist.headers.FixedNumber;
+import com.lapissea.fsf.collections.fixedlist.headers.SizedNumber;
+import com.lapissea.fsf.exceptions.BitDepthOutOfSpaceException;
+import com.lapissea.fsf.headermodule.HeaderModule;
+import com.lapissea.fsf.headermodule.modules.DataMappedModule;
+import com.lapissea.fsf.headermodule.modules.FileHeaderModule;
+import com.lapissea.fsf.headermodule.modules.FreeChunksModule;
+import com.lapissea.fsf.io.ContentInputStream;
+import com.lapissea.fsf.io.IOInterface;
+import com.lapissea.fsf.io.TrackingInputStream;
 import com.lapissea.util.*;
 import com.lapissea.util.function.UnsafeConsumer;
 
@@ -55,7 +68,7 @@ public class Header{
 	@Deprecated
 	private final FixedLenList<FixedNumber, ChunkPointer> headerPointers;
 	
-	private final OffsetIndexSortedList<FilePointer>      fileList;
+	private final SparsePointerList<FilePointer>          fileList;
 	private final FixedLenList<SizedNumber, ChunkPointer> freeChunks;
 	private final Map<Long, Chunk>                        chunkCache;
 	
@@ -140,7 +153,7 @@ public class Header{
 				}
 			}
 			
-			List<ChunkPointer> localOffsets=new ArrayList<>();
+			List<MutableChunkPointer> localOffsets=new ArrayList<>();
 			
 			long[] pos={0};
 			try(var in=new ContentInputStream.Wrapp(new TrackingInputStream(chunksFakeFile.read(), pos))){
@@ -148,7 +161,7 @@ public class Header{
 					var chunk=Chunk.read(null, pos[0], in);
 					in.skipNBytes(chunk.getCapacity());
 					
-					localOffsets.add(new ChunkPointer(chunk));
+					localOffsets.add(new MutableChunkPointer(chunk));
 				}
 			}catch(EOFException ignored){}
 			
@@ -172,7 +185,7 @@ public class Header{
 			headerPointers=new FixedLenList<>(headerPointersNum, ptrsData, null);
 			
 			for(var off : localOffsets){
-				off.value+=ptrsData.nextPhysicalOffset();
+				off.setValue(off.getValue()+ptrsData.nextPhysicalOffset());
 				headerPointers.addElement(off);
 			}
 		}
@@ -190,8 +203,8 @@ public class Header{
 		freeChunks=fkm.getList();
 		
 		fileList=dmm.getMappings();
-		
-		validateFile();
+
+//		validateFile();
 		
 	}
 	
@@ -200,7 +213,7 @@ public class Header{
 	}
 	
 	private FilePointer getByPathUnsafe(String path) throws IOException{
-		return fileList.findSingle(comp->comp.getLocalPath().compareTo(path));
+		return fileList.findSingle(comp->comp.getLocalPath().equals(path));
 	}
 	
 	public Chunk createFile(String path, long initialSize) throws IOException{
@@ -216,13 +229,15 @@ public class Header{
 		return chunk;
 	}
 	
-	private Chunk aloc(long initialSize, boolean allowNonOptimal) throws IOException{
+	public Chunk aloc(long initialSize, boolean allowNonOptimal) throws IOException{
 		return aloc(initialSize, NumberSize.bySize(initialSize), allowNonOptimal);
 	}
 	
-	private Chunk aloc(long initialSize, NumberSize bodyType, boolean allowNonOptimal) throws IOException{
+	public Chunk aloc(long initialSize, NumberSize bodyType, boolean allowNonOptimal) throws IOException{
+//		if(!defragmenting){
 		Chunk ch=tryRealoc(initialSize, bodyType, allowNonOptimal);
 		if(ch!=null) return ch;
+//		}
 		
 		return alocNew(bodyType, initialSize);
 	}
@@ -278,8 +293,6 @@ public class Header{
 		if(DEBUG_VALIDATION) validateFile();
 		
 		int chunkIndex=freeChunks.indexOf(new ChunkPointer(chunk));
-		
-		LogUtil.println(chunk, chunkIndex, freeChunks);
 		
 		freeChunks.removeElement(chunkIndex);
 		chunk.setUsed(true);
@@ -589,7 +602,7 @@ public class Header{
 		return chunkCache.get(offset);
 	}
 	
-	void validateFile() throws IOException{
+	public void validateFile() throws IOException{
 		
 		for(var e : chunkCache.entrySet()){
 			var cached=e.getValue();
@@ -667,7 +680,6 @@ public class Header{
 			
 			validateFile();
 		}
-		LogUtil.println("freeing", chunk);
 		
 		chunk.setUsed(false);
 		chunk.setSize(0);
@@ -736,7 +748,7 @@ public class Header{
 		find:
 		{
 			for(var val : freeChunks){
-				Chunk prev=getByOffset(val.value);
+				Chunk prev=getByOffset(val.getValue());
 				var   next=prev.nextPhysicalOffset();
 				if(next==offset){
 					previous=prev;
@@ -788,7 +800,7 @@ public class Header{
 		removeChunkInCache(nextPtr);
 		next.nukeHeader();
 		
-		freeChunks.modifyElement(nextIndex, val->val.set(toMergeInTo));
+		freeChunks.setElement(nextIndex, new ChunkPointer(toMergeInTo));
 		
 		if(LOG_ACTIONS) logChunkAction("FREE F MERGE", toMergeInTo);
 		if(DEBUG_VALIDATION) validateFile();
@@ -808,7 +820,7 @@ public class Header{
 	}
 	
 	private void removeChunkInCache(ChunkPointer ptr){
-		removeChunkInCache(ptr.value);
+		removeChunkInCache(ptr.getValue());
 	}
 	
 	private void removeChunkInCache(Chunk chunk){
@@ -834,7 +846,7 @@ public class Header{
 	public VirtualFile[] listFiles() throws IOException{
 		var files=new VirtualFile[fileList.size()];
 		for(int i=0;i<files.length;i++){
-			files[i]=new VirtualFile(fileList.getByIndex(i));
+			files[i]=new VirtualFile(fileList.getElement(i));
 		}
 		return files;
 	}
@@ -849,7 +861,7 @@ public class Header{
 				chunks.add(chunk.loadWholeChain());
 			}
 			
-			for(SourcedPointer reference : module.getReferences()){
+			for(SourcedChunkPointer reference : module.getReferences()){
 				chunks.add(reference.pointer.dereference(this).loadWholeChain());
 			}
 			
@@ -918,7 +930,7 @@ public class Header{
 			
 			var startChunk=first.nextPhysical();
 			
-			List<Chunk> toMove=new LinkedList<>();
+			Deque<Chunk> toMove=new LinkedList<>();
 			{
 				Chunk walk=startChunk;
 				while(true){
@@ -928,7 +940,7 @@ public class Header{
 				}
 				
 				while(true){
-					toMove.add(walk);
+					toMove.addLast(walk);
 					
 					var next=walk.nextPhysical();
 					if(next.getOffset() >= end) break;
@@ -936,12 +948,11 @@ public class Header{
 				}
 			}
 			
-			var fo=new ChunkPointer(toMove.get(0).getOffset());
-			
-			toMove.removeIf(ch->!ch.isUsed());
+			var fo=new ChunkPointer(toMove.getFirst().getOffset());
 			
 			while(!toMove.isEmpty()){
-				Chunk chunk=toMove.remove(0);
+				Chunk chunk=toMove.pop();
+				if(!chunk.isUsed()) continue;
 				
 				var moved=prevDetectingMove(chunk);
 				if(!moved.isEmpty()){
@@ -1194,8 +1205,7 @@ public class Header{
 		for(int i=0;i<freeChunks.size();i++){
 			ChunkPointer pointer=freeChunks.getElement(i);
 			if(pointer.equals(oldOffset)){
-				pointer.value=newOffset.getOffset();
-				freeChunks.setElement(i, pointer);
+				freeChunks.setElement(i, new ChunkPointer(newOffset));
 				return;
 			}
 		}
@@ -1223,10 +1233,10 @@ public class Header{
 		}
 		
 		for(int i=0;i<fileList.size();i++){
-			FilePointer p=fileList.getByIndex(i);
+			FilePointer p=fileList.getElement(i);
 			
 			if(p.getStart()==oldOffset){
-				fileList.setByIndex(i, new FilePointer(this, p.getLocalPath(), p.getStartSize().max(NumberSize.bySize(newOffset.getOffset())), newOffset.getOffset()));
+				fileList.setElement(i, new FilePointer(this, p.getLocalPath(), p.getStartSize().max(NumberSize.bySize(newOffset.getOffset())), newOffset.getOffset()));
 				return;
 			}
 			
@@ -1251,6 +1261,14 @@ public class Header{
 		var file=getByPath(localPath);
 		fileList.removeElement(fileList.indexOf(file));
 		freeChunkChain(file.dereference());
+	}
+	
+	@Override
+	public String toString(){
+		return "Header{"+
+		       "version="+version+
+		       ", source="+source+
+		       '}';
 	}
 }
 

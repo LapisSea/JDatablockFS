@@ -1,5 +1,8 @@
 package com.lapissea.fsf;
 
+import com.lapissea.fsf.exceptions.BitDepthOutOfSpaceException;
+import com.lapissea.fsf.io.ContentReader;
+import com.lapissea.fsf.io.ContentWriter;
 import com.lapissea.util.function.UnsafeConsumerOL;
 import com.lapissea.util.function.UnsafeFunctionOL;
 
@@ -29,7 +32,7 @@ public enum NumberSize{
 		throw new RuntimeException("Extremely large file?");
 	}
 	
-	public final byte bytes;
+	public final int  bytes;
 	public final long maxSize;
 	public final char shotName;
 	
@@ -38,7 +41,7 @@ public enum NumberSize{
 	
 	NumberSize(char shotName, long maxSize, int bytes, UnsafeFunctionOL<ContentReader, IOException> reader, UnsafeConsumerOL<ContentWriter, IOException> writer){
 		this.shotName=shotName;
-		this.bytes=(byte)bytes;
+		this.bytes=bytes;
 		this.maxSize=maxSize;
 		this.reader=reader;
 		this.writer=writer;

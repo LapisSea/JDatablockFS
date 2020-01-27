@@ -2,8 +2,9 @@ package com.lapissea.fsf;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Map;
 
-class Utils{
+public class Utils{
 	
 	public interface ConsumerBaII{
 		void accept(byte[] bytes, int off, int len) throws IOException;
@@ -24,4 +25,16 @@ class Utils{
 		}
 	}
 	
+	public static <K, V> boolean isCacheValid(Map<K, V> disk, Map<K, V> cache){
+		for(var entry : cache.entrySet()){
+			var key=entry.getKey();
+			var val=entry.getValue();
+			
+			var diskVal=disk.get(key);
+			if(!val.equals(diskVal)){
+				return false;
+			}
+		}
+		return true;
+	}
 }

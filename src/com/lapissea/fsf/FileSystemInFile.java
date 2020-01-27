@@ -1,5 +1,9 @@
 package com.lapissea.fsf;
 
+import com.lapissea.fsf.chunk.Chunk;
+import com.lapissea.fsf.chunk.SourcedChunkPointer;
+import com.lapissea.fsf.headermodule.HeaderModule;
+import com.lapissea.fsf.io.IOInterface;
 import com.lapissea.util.*;
 import com.lapissea.util.function.BiIntConsumer;
 import com.lapissea.util.function.TriConsumer;
@@ -63,7 +67,7 @@ public class FileSystemInFile{
 		 * How much bytes the file table will allocate as free space for expansion to delay or avoid file table fragmentation.<br></br>
 		 * Used when creating a new file or on defragmentation.
 		 */
-		public static int       DEFAULT_FILE_TABLE_PADDING      =30;
+		public static int       DEFAULT_FILE_TABLE_PADDING      =3;
 		/**
 		 * Defines the initial size of a chunk. (Note that this is a rule only for the chunk allocation circumstances where allocation is not easy or signs of fragmentation are apparent)
 		 */
@@ -246,10 +250,13 @@ public class FileSystemInFile{
 		
 		g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 		
-		int[] counter={0};
+		int[]     counter={0};
+		boolean[] filled =new boolean[Math.toIntExact(size)];
 		
 		BiIntConsumer<Color> pixelPushByte=(b, color)->{
 			var count=counter[0];
+			filled[count]=true;
+			
 			int x=count%width,
 				y=count/width;
 			
@@ -320,15 +327,6 @@ public class FileSystemInFile{
 			};
 		}
 		
-		try(var in=header.source.doRandom()){
-			for(long i=0;i<size;i++){
-				pixelPush.accept(in.readUnsignedInt1(), Color.DARK_GRAY);
-				counter[0]++;
-			}
-		}
-		
-		counter[0]=0;
-		
 		for(byte b : Header.getMagicBytes()){
 			pixelPush.accept(b, Color.RED);
 			counter[0]++;
@@ -339,6 +337,7 @@ public class FileSystemInFile{
 		pixelPushByte.accept(header.version.minor, Color.RED);
 		counter[0]++;
 		
+		BufferedImage lineImgOutline=null;
 		try{
 			
 			var allChunks=header.allChunks();
@@ -440,8 +439,8 @@ public class FileSystemInFile{
 					HeaderModule      module=entry.getKey();
 					List<List<Chunk>> chains=entry.getValue();
 					
-					for(SourcedPointer reference : module.getReferences()){
-						var val =reference.pointer.value;
+					for(SourcedChunkPointer reference : module.getReferences()){
+						var val =reference.pointer.getValue();
 						var rand=randColor.apply(val);
 						drawLink.accept(rand, reference.source, val);
 					}
@@ -459,7 +458,7 @@ public class FileSystemInFile{
 				
 				lineG.dispose();
 				
-				BufferedImage lineImgOutline=new BufferedImage(lineImg.getWidth(), lineImg.getHeight(), BufferedImage.TYPE_INT_ARGB);
+				lineImgOutline=new BufferedImage(lineImg.getWidth(), lineImg.getHeight(), BufferedImage.TYPE_INT_ARGB);
 				
 				var outlineColor=new Color(1, 1, 1, 0F).getRGB();
 				
@@ -475,6 +474,7 @@ public class FileSystemInFile{
 				
 				int num=lineImg.getWidth()*lineImg.getHeight();
 				
+				BufferedImage finalLineImgOutline=lineImgOutline;
 				IntStream.range(0, num/perChunk).parallel().forEach(idC->{
 					for(int id=idC*perChunk, j=Math.min(num, (idC+1)*perChunk);id<j;id++){
 						
@@ -500,7 +500,7 @@ public class FileSystemInFile{
 //						if(xUpper&&yUpper&&alpha<0xFF) alpha=Math.max(alpha, getAlpha.get(x+1, y+1)/2);
 //						if(xUpper&&yLower&&alpha<0xFF) alpha=Math.max(alpha, getAlpha.get(x+1, y-1)/2);
 						
-						lineImgOutline.setRGB(x, y, (alpha<<24)|outlineColor);
+						finalLineImgOutline.setRGB(x, y, (alpha<<24)|outlineColor);
 						
 					}
 				});
@@ -509,15 +509,26 @@ public class FileSystemInFile{
 				out.drawImage(lineImg, null, 0, 0);
 				out.dispose();
 				
-				AlphaComposite ac=AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.5F);
-				g2.setComposite(ac);
-				
-				g2.drawImage(lineImgOutline, null, 0, 0);
 			}
 		}catch(Throwable e){
 			e.printStackTrace();
 		}
 		
+		try(var in=header.source.doRandom()){
+			for(int i=0;i<size;i++){
+				var b=in.readUnsignedInt1();
+				if(!filled[i]){
+					counter[0]=i;
+					pixelPush.accept(b, Color.DARK_GRAY.darker());
+				}
+			}
+		}
+		if(lineImgOutline!=null){
+			AlphaComposite ac=AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.5F);
+			g2.setComposite(ac);
+			
+			g2.drawImage(lineImgOutline, null, 0, 0);
+		}
 		g2.dispose();
 		return img;
 	}

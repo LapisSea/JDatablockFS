@@ -1,5 +1,6 @@
 package com.lapissea.fsf;
 
+import com.lapissea.fsf.chunk.ChunkIO;
 import com.lapissea.util.NotNull;
 
 import java.io.*;
