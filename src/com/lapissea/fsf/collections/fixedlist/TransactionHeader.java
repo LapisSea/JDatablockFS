@@ -62,7 +62,7 @@ final class TransactionHeader
 		var hasIndex  =flags.readBoolBit();
 		var hasElement=flags.readBoolBit();
 		
-		dest.action=flags.readEnum(FixedLenList.Action.class);
+		dest.action=flags.readEnum(Action.class);
 		
 		if(hasIndex) dest.index=(int)INDEX_SIZE.read(src);
 		else{

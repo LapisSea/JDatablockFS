@@ -12,7 +12,6 @@ import com.lapissea.util.*;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static com.lapissea.fsf.FileSystemInFile.*;
@@ -39,55 +38,6 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 		void writeElement(ContentOutputStream dest, E src) throws IOException;
 	}
 	
-	
-	enum Action{
-		ADD(s->s+1, (l, transaction)->{
-			if(!(l instanceof FixedLenList)){
-				l.add(transaction.element);
-				return;
-			}
-			((FixedLenList<?, Object>)l).applyAdd(transaction.element);
-		}, t->"add("+t.element+")"),
-		REMOVE(s->s-1, (l, transaction)->{
-			if(!(l instanceof FixedLenList)){
-				l.remove(transaction.index);
-				return;
-			}
-			((FixedLenList<?, Object>)l).applyRemove(transaction.index);
-		}, t->"remove("+t.index+")"),
-		SET(s->s, (l, transaction)->{
-			if(!(l instanceof FixedLenList)){
-				l.set(transaction.index, transaction.element);
-				return;
-			}
-			((FixedLenList<?, Object>)l).applySet(transaction.index, transaction.element);
-		}, t->"set("+t.element+" @"+t.index),
-		CLEAR(s->0, (l, transaction)->{
-			if(!(l instanceof FixedLenList)){
-				l.clear();
-				return;
-			}
-			((FixedLenList<?, Object>)l).applyClear();
-		}, t->"clear()");
-		
-		interface Committer<E>{
-			void commit(List<E> list, Transaction<E> transaction) throws IOException;
-		}
-		
-		interface Resizer{
-			int resize(int size);
-		}
-		
-		final Committer<?>                     committer;
-		final Resizer                          sizeModification;
-		final Function<Transaction<?>, String> toString;
-		
-		Action(Resizer sizeModification, Committer<?> committer, Function<Transaction<?>, String> toString){
-			this.committer=committer;
-			this.sizeModification=sizeModification;
-			this.toString=toString;
-		}
-	}
 	
 	private static <E> byte[] elementToBytes(ElementHead<?, E> header, E e) throws IOException{
 		byte[] elementData=new byte[header.getElementSize()];
@@ -419,7 +369,7 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 		doTransaction(new Transaction<>(e, Action.ADD));
 	}
 	
-	private void applyAdd(E e) throws IOException{
+	void applyAdd(E e) throws IOException{
 		
 		int index  =size();
 		int newSize=index+1;
@@ -448,7 +398,7 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 		doTransaction(new Transaction<>(element, Action.SET, index));
 	}
 	
-	private void applySet(int index, E element) throws IOException{
+	void applySet(int index, E element) throws IOException{
 		
 		var buffer=elementToBytes(header, element);
 		
@@ -463,7 +413,7 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 		doTransaction(new Transaction<>(Action.REMOVE, index));
 	}
 	
-	private void applyRemove(int index) throws IOException{
+	void applyRemove(int index) throws IOException{
 		
 		int newSize=size()-1;
 		
@@ -487,7 +437,7 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 		doTransaction(new Transaction<>(Action.CLEAR));
 	}
 	
-	private void applyClear() throws IOException{
+	void applyClear() throws IOException{
 		cache.clear();
 		setSize(0);
 	}

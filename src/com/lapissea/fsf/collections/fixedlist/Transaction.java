@@ -4,40 +4,54 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 
+import static com.lapissea.util.UtilL.*;
+
 final class Transaction<E>{
 	
-	public E                   element;
-	public int                 index;
-	public FixedLenList.Action action;
+	public E      element;
+	public int    index;
+	public Action action;
 	
 	Transaction(){ }
 	
-	Transaction(FixedLenList.Action action){
+	Transaction(Action action){
 		this(null, action);
 	}
 	
-	Transaction(E element, FixedLenList.Action action){
+	Transaction(E element, Action action){
 		this(element, action, -1);
 	}
 	
-	Transaction(FixedLenList.Action action, int index){
+	Transaction(Action action, int index){
 		this(null, action, index);
 	}
 	
-	Transaction(E element, FixedLenList.Action action, int index){
+	Transaction(E element, Action action, int index){
 		this();
 		this.element=element;
 		this.action=Objects.requireNonNull(action);
 		this.index=index;
 	}
 	
-	void commit(List<E> list) throws IOException{
+	void commit(FixedLenList<?, E> list) throws IOException{
+		switch(action){
+		case ADD -> list.applyAdd(element);
+		case REMOVE -> list.applyRemove(index);
+		case SET -> list.applySet(index, element);
+		case CLEAR -> list.applyClear();
+		}
+	}
+	
+	void commit(List<E> list){
 		Objects.requireNonNull(action);
+		Assert(!(list instanceof FixedLenList));
 		
-		@SuppressWarnings("unchecked")
-		var c=(FixedLenList.Action.Committer<E>)action.committer;
-		
-		c.commit(list, this);
+		switch(action){
+		case ADD -> list.add(element);
+		case REMOVE -> list.remove(index);
+		case SET -> list.set(index, element);
+		case CLEAR -> list.clear();
+		}
 	}
 	
 	@Override
