@@ -8,10 +8,7 @@ import com.lapissea.fsf.chunk.ChunkIO;
 import com.lapissea.fsf.io.ContentInputStream;
 import com.lapissea.fsf.io.ContentOutputStream;
 import com.lapissea.fsf.io.serialization.FileObject;
-import com.lapissea.util.NotNull;
-import com.lapissea.util.Nullable;
-import com.lapissea.util.TextUtil;
-import com.lapissea.util.UtilL;
+import com.lapissea.util.*;
 
 import java.io.IOException;
 import java.util.*;
@@ -50,28 +47,28 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 				return;
 			}
 			((FixedLenList<?, Object>)l).applyAdd(transaction.element);
-		}, t->"("+t.element+")+"),
+		}, t->"add("+t.element+")"),
 		REMOVE(s->s-1, (l, transaction)->{
 			if(!(l instanceof FixedLenList)){
 				l.remove(transaction.index);
 				return;
 			}
 			((FixedLenList<?, Object>)l).applyRemove(transaction.index);
-		}, t->"-@"+t.index),
+		}, t->"remove("+t.index+")"),
 		SET(s->s, (l, transaction)->{
 			if(!(l instanceof FixedLenList)){
 				l.set(transaction.index, transaction.element);
 				return;
 			}
 			((FixedLenList<?, Object>)l).applySet(transaction.index, transaction.element);
-		}, t->"("+t.element+")=@"+t.index),
+		}, t->"set("+t.element+" @"+t.index),
 		CLEAR(s->0, (l, transaction)->{
 			if(!(l instanceof FixedLenList)){
 				l.clear();
 				return;
 			}
 			((FixedLenList<?, Object>)l).applyClear();
-		}, t->"</>");
+		}, t->"clear()");
 		
 		interface Committer<E>{
 			void commit(List<E> list, Transaction<E> transaction) throws IOException;
@@ -208,10 +205,15 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 	
 	private void doTransaction(Transaction<E> transaction) throws IOException{
 		if(modifying){
-			if(DEBUG_VALIDATION) checkIntegrity();
-			if(transactionBuffer==null) throw new ConcurrentModificationException(transaction.toString());
-			transactionBuffer.addElement(transaction);
-			if(DEBUG_VALIDATION) checkIntegrity();
+			if(transactionBuffer==null){
+//				throw new ConcurrentModificationException(transaction.toString());
+				LogUtil.println("warning cocurent mod", this, transaction);
+				commitTransaction(transaction);
+			}else{
+				if(DEBUG_VALIDATION) checkIntegrity();
+				transactionBuffer.addElement(transaction);
+				if(DEBUG_VALIDATION) checkIntegrity();
+			}
 		}else{
 			applyBackingTransactions();
 			commitTransaction(transaction);

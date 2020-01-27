@@ -681,9 +681,9 @@ public class Header{
 			validateFile();
 		}
 		
-		chunk.setUsed(false);
 		chunk.setSize(0);
 		chunk.clearNext();
+		chunk.setUsed(false);
 		
 		Throwable e=null;
 		try{

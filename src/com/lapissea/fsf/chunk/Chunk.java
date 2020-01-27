@@ -471,10 +471,10 @@ public class Chunk{
 		moveTo(newChunk);
 		
 		var old=header.getByOffset(oldOff);
-		
-		old.clearNext();
-		old.setSize(0);
-		old.syncHeader();
+
+//		old.clearNext();
+//		old.setSize(0);
+//		old.syncHeader();
 		
 		header.freeChunk(old);
 		
