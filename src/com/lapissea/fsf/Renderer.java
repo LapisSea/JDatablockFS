@@ -5,12 +5,6 @@ import com.lapissea.util.LogUtil;
 import com.lapissea.util.MathUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.WeakValueHashMap;
-import org.jcodec.api.SequenceEncoder;
-import org.jcodec.common.Codec;
-import org.jcodec.common.Format;
-import org.jcodec.common.io.NIOUtils;
-import org.jcodec.common.model.Rational;
-import org.jcodec.scale.AWTUtil;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;
@@ -76,50 +70,50 @@ public interface Renderer{
 			this.stackTrace=stackTrace;
 		}
 	}
-	
-	class MP4 extends Png{
-		
-		SequenceEncoder encoderArr;
-		
-		public MP4(int size, int pixelScale){
-			super(size, pixelScale);
-		}
-		
-		@Override
-		public boolean doAll(){
-			return true;
-		}
-		
-		@Override
-		protected void save(BufferedImage img) throws IOException{
-			if(task!=null){
-				task.join();
-				task=null;
-			}
-			getEncoder().encodeNativeFrame(AWTUtil.fromBufferedImageRGB(Renderer.noAlpha(img)));
-		}
-		
-		@Override
-		public void finish(){
-			try{
-				getEncoder().finish();
-			}catch(IOException e){
-				e.printStackTrace();
-			}
-		}
-		
-		private SequenceEncoder getEncoder(){
-			if(encoderArr==null){
-				try{
-					encoderArr=new SequenceEncoder(NIOUtils.writableChannel(new File("output.mp4")), Rational.R(60, 1), Format.MOV, Codec.H264, null);
-				}catch(IOException e){
-					throw UtilL.uncheckedThrow(e);
-				}
-			}
-			return encoderArr;
-		}
-		
-	}
+
+//	class MP4 extends Png{
+//
+//		SequenceEncoder encoderArr;
+//
+//		public MP4(int size, int pixelScale){
+//			super(size, pixelScale);
+//		}
+//
+//		@Override
+//		public boolean doAll(){
+//			return true;
+//		}
+//
+//		@Override
+//		protected void save(BufferedImage img) throws IOException{
+//			if(task!=null){
+//				task.join();
+//				task=null;
+//			}
+//			getEncoder().encodeNativeFrame(AWTUtil.fromBufferedImageRGB(Renderer.noAlpha(img)));
+//		}
+//
+//		@Override
+//		public void finish(){
+//			try{
+//				getEncoder().finish();
+//			}catch(IOException e){
+//				e.printStackTrace();
+//			}
+//		}
+//
+//		private SequenceEncoder getEncoder(){
+//			if(encoderArr==null){
+//				try{
+//					encoderArr=new SequenceEncoder(NIOUtils.writableChannel(new File("output.mp4")), Rational.R(60, 1), Format.MOV, Codec.H264, null);
+//				}catch(IOException e){
+//					throw UtilL.uncheckedThrow(e);
+//				}
+//			}
+//			return encoderArr;
+//		}
+//
+//	}
 	
 	class Png implements Renderer{
 		CompletableFuture<Void> task;
