@@ -2,7 +2,7 @@ package com.lapissea.fsf.collections.fixedlist.headers;
 
 import com.lapissea.fsf.NumberSize;
 import com.lapissea.fsf.chunk.ChunkPointer;
-import com.lapissea.fsf.chunk.MutableChunkPointer;
+import com.lapissea.fsf.chunk.SizedChunkPointer;
 import com.lapissea.fsf.collections.fixedlist.FixedLenList;
 import com.lapissea.fsf.io.ContentInputStream;
 import com.lapissea.fsf.io.ContentOutputStream;
@@ -59,12 +59,14 @@ public class SizedNumber extends FileObject.FullLayout<SizedNumber> implements F
 	
 	@Override
 	public ChunkPointer newElement(){
-		return new MutableChunkPointer();
+		return new SizedChunkPointer(size);
 	}
 	
 	@Override
 	public void readElement(ContentInputStream src, ChunkPointer dest) throws IOException{
-		((MutableChunkPointer)dest).setValue(size.read(src));
+		var ptr=(SizedChunkPointer)dest;
+		ptr.setSize(size);
+		ptr.read(src);
 	}
 	
 	@Override

@@ -735,4 +735,8 @@ public class Chunk{
 		
 		header.source.write(getOffset(), false, new byte[siz]);
 	}
+	
+	public ChunkPointer reference(){
+		return new ChunkPointer(this);
+	}
 }
