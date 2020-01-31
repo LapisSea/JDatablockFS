@@ -10,8 +10,7 @@ import com.lapissea.fsf.flags.FlagWriter;
 import com.lapissea.fsf.io.ContentBuffer;
 import com.lapissea.fsf.io.ContentInputStream;
 import com.lapissea.fsf.io.ContentOutputStream;
-import com.lapissea.util.ShouldNeverHappenError;
-import com.lapissea.util.TextUtil;
+import com.lapissea.util.*;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.ByteArrayOutputStream;
@@ -20,6 +19,7 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import static com.lapissea.fsf.FileSystemInFile.*;
@@ -102,7 +102,7 @@ public class Chunk{
 				var d  =new StringBuilder(siz);
 				d.append(Long.toBinaryString(flagData));
 				while(d.length()<siz) d.insert(0, "0");
-				throw new AssertionError(TextUtil.toString("Invalid chunk header", offset, d.toString()));
+				throw new AssertionError(TextUtil.toString("Invalid chunk header", new ChunkPointer(offset), d.toString()));
 			}
 		}
 		
@@ -145,11 +145,11 @@ public class Chunk{
 		
 	}
 	
-	private static long requirePositive(long val) throws IOException{
+	private static long requirePositive(long val) throws MalformedFileException{
 		return requireGreaterOrEqual(val, 0);
 	}
 	
-	private static long requireGreaterOrEqual(long val, long limit) throws IOException{
+	private static long requireGreaterOrEqual(long val, long limit) throws MalformedFileException{
 		if(val<0) throw new MalformedFileException();
 		return val;
 	}
@@ -178,41 +178,38 @@ public class Chunk{
 	public transient       Throwable lastMod;
 	public final transient Throwable madeAt=new Throwable((counter++)+" "+LocalDateTime.now().toString());
 	
-	Set<Runnable> dependencyInvalidate=new HashSet<>(3);
+	public transient Set<Runnable> dependencyInvalidate=new HashSet<>(3);
 	
-	public Chunk(Header header, long offset, NumberSize nextType, long next, long capacity){
+	public Chunk(Header header, long offset, NumberSize nextType, long next, long capacity) throws MalformedFileException{
 		this(header, offset, nextType, next, NumberSize.bySize(capacity), capacity);
 	}
 	
-	public Chunk(Header header, long offset, NumberSize nextType, long next, NumberSize bodyType, long capacity){
+	public Chunk(Header header, long offset, NumberSize nextType, long next, NumberSize bodyType, long capacity) throws MalformedFileException{
 		this(header, offset, nextType, next, bodyType, 0, capacity, true);
 	}
 	
-	public Chunk(Header header, long offset, NumberSize nextType, long next, NumberSize bodyType, long size, long capacity, boolean used){
-		try{
-			this.header=header;
-			
-			this.offset=requirePositive(offset);
-			
-			this.nextType=Objects.requireNonNull(nextType);
-			this.next=requireGreaterOrEqual(next, Header.FILE_HEADER_SIZE);
-			
-			if(bodyType==NumberSize.VOID) throw new MalformedFileException();
-			this.bodyType=Objects.requireNonNull(bodyType);
-			
-			this.capacity=requireGreaterOrEqual(capacity, 1);
-			this.size=requireGreaterOrEqual(size, capacity);
-			
-			this.used=used;
-			
-		}catch(Exception e){
-			throw new IllegalArgumentException(e);
-		}
+	public Chunk(Header header, long offset, NumberSize nextType, long next, NumberSize bodyType, long size, long capacity, boolean used) throws MalformedFileException{
+		this.header=header;
+		
+		this.offset=requirePositive(offset);
+		
+		this.nextType=Objects.requireNonNull(nextType);
+		this.next=requireGreaterOrEqual(next, Header.FILE_HEADER_SIZE);
+		
+		if(bodyType==NumberSize.VOID) throw new MalformedFileException();
+		this.bodyType=Objects.requireNonNull(bodyType);
+		
+		this.capacity=requireGreaterOrEqual(capacity, 1);
+		
+		this.size=requireGreaterOrEqual(size, capacity);
+		
+		this.used=used;
+		
 	}
 	
 	private void markDirty(){
 		dirty=true;
-		lastMod=new Throwable("ay");
+		lastMod=new Throwable(this.toString());
 	}
 	
 	public boolean hasNext(){
@@ -430,20 +427,105 @@ public class Chunk{
 		header.freeChunkChain(chunk);
 	}
 	
-	public List<Chunk> loadWholeChain() throws IOException{
-		if(!hasNext()) return List.of(this);
+	public List<Chunk> collectWholeChain() throws IOException{
+		if(!hasNext()){
+			if(DEBUG_VALIDATION) checkCaching();
+			return List.of(this);
+		}
 		
 		List<Chunk> chain=new LinkedList<>();
-		loadWholeChain(chain::add);
+		walkOverWholeChain(chain::add);
 		return List.copyOf(chain);
 	}
 	
-	public void loadWholeChain(Consumer<Chunk> dest) throws IOException{
+	public void calculateWholeChainSizes(long[] totalSize, long[] totalCapacity) throws IOException{
+		walkOverWholeChain(chunk->{
+			totalSize[0]+=chunk.getSize();
+			totalCapacity[0]+=chunk.getCapacity();
+		});
+	}
+	
+	@Nullable
+	public Chunk findFirstInChain(@NotNull Predicate<Chunk> check) throws IOException{
+		Objects.requireNonNull(check);
+		
+		Chunk[] result={null};
+		walkOverChain(chunk->{
+			if(check.test(chunk)){
+				result[0]=chunk;
+				return true;
+			}
+			return false;
+		});
+		return result[0];
+	}
+	
+	@Nullable
+	public Chunk findLastInChain(@NotNull Predicate<Chunk> check) throws IOException{
+		Objects.requireNonNull(check);
+		
+		Chunk[] result={null};
+		walkOverWholeChain(chunk->{
+			if(check.test(chunk)) result[0]=chunk;
+		});
+		return result[0];
+	}
+	
+	
+	public void walkOverWholeChain(@NotNull Consumer<Chunk> consumer) throws IOException{
+		Objects.requireNonNull(consumer);
+		
+		walkOverChain(chunk->{
+			consumer.accept(chunk);
+			return false;
+		});
+	}
+	
+	public Iterator<Chunk> chainWalker() throws IOException{
+		
+		class ChainWalker implements Iterator<Chunk>{
+			Chunk next;
+			
+			public ChainWalker(Chunk next){
+				this.next=next;
+			}
+			
+			@Override
+			public boolean hasNext(){
+				return next!=null;
+			}
+			
+			@Override
+			public Chunk next(){
+				var ch=next;
+				if(!hasNext()) throw new NoSuchElementException();
+				
+				try{
+					next=ch.nextChunk();
+				}catch(IOException e){
+					throw UtilL.uncheckedThrow(e);
+				}
+				
+				return ch;
+			}
+		}
+		
+		return new ChainWalker(this);
+	}
+	
+	public void walkOverChain(@NotNull Predicate<Chunk> walker) throws IOException{
+		Objects.requireNonNull(walker);
+		
 		Chunk link=this;
-		do{
-			dest.accept(link);
-			link=link.nextChunk();
-		}while(link!=null);
+		while(true){
+			if(DEBUG_VALIDATION) link.checkCaching();
+			
+			if(walker.test(link)) return;
+			
+			var next=link.nextChunk();
+			if(next==null) return;
+			link=next;
+		}
 	}
 	
 	public boolean overlaps(Chunk other){
@@ -477,6 +559,39 @@ public class Chunk{
 //		old.syncHeader();
 		
 		header.freeChunk(old);
+		
+		if(DEBUG_VALIDATION) header.validateFile();
+	}
+	
+	public void transparentChainRestart(Chunk newChunk) throws IOException{
+		
+		if(DEBUG_VALIDATION) header.validateFile();
+		
+		var oldOffset=getOffset();
+		
+		offset=newChunk.offset;
+		nextType=newChunk.nextType;
+		bodyType=newChunk.bodyType;
+		capacity=newChunk.capacity;
+		size=newChunk.size;
+		next=newChunk.next;
+		
+		
+		notifyDependency();
+		
+		header.notifyMovement(oldOffset, this);
+		
+		var old=header.getByOffset(oldOffset);
+		old.io().setSize(0);
+		
+		var ch  =collectWholeChain();
+		var last=ch.get(ch.size()-1);
+		try{
+			last.setNext(old);
+			last.syncHeader();
+		}catch(BitDepthOutOfSpaceException e){
+			throw new NotImplementedException();
+		}
 		
 		if(DEBUG_VALIDATION) header.validateFile();
 	}
@@ -543,7 +658,7 @@ public class Chunk{
 			
 			var newData=io().readAll();
 			if(!Arrays.equals(oldData, newData)){
-				throw new AssertionError(TextUtil.toString(loadWholeChain())+"\n"+
+				throw new AssertionError(TextUtil.toString(collectWholeChain())+"\n"+
 				                         oldChunk+"\n"+
 				                         TextUtil.toString(this)+"\n"+
 				                         TextUtil.toString(oldData)+"\n"+
@@ -566,6 +681,7 @@ public class Chunk{
 		final StringBuilder sb=new StringBuilder("Chunk{");
 		
 		if(!isUsed()) sb.append("free, ");
+		if(isDirty()) sb.append("dirty, ");
 		
 		sb.append("[")
 		  .append(getSize())
@@ -612,7 +728,11 @@ public class Chunk{
 		}
 	}
 	
-	public void nukeHeader() throws IOException{
-		header.source.write(getOffset(), false, new byte[FLAGS_SIZE.bytes]);
+	public void nukeChunk() throws IOException{
+		int siz;
+		if(DEBUG_VALIDATION) siz=Math.toIntExact(wholeSize());
+		else siz=FLAGS_SIZE.bytes;
+		
+		header.source.write(getOffset(), false, new byte[siz]);
 	}
 }

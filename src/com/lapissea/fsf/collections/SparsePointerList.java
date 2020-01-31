@@ -5,8 +5,8 @@ import com.lapissea.fsf.NumberSize;
 import com.lapissea.fsf.ShadowChunks;
 import com.lapissea.fsf.Utils;
 import com.lapissea.fsf.chunk.Chunk;
+import com.lapissea.fsf.chunk.ChunkLink;
 import com.lapissea.fsf.chunk.ChunkPointer;
-import com.lapissea.fsf.chunk.SourcedChunkPointer;
 import com.lapissea.fsf.collections.fixedlist.FixedLenList;
 import com.lapissea.fsf.collections.fixedlist.headers.SizedNumber;
 import com.lapissea.fsf.io.ContentOutputStream;
@@ -14,11 +14,15 @@ import com.lapissea.fsf.io.serialization.FileObject;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
+import com.lapissea.util.function.UnsafeBiFunction;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static com.lapissea.fsf.FileSystemInFile.*;
 import static com.lapissea.util.UtilL.*;
@@ -37,7 +41,7 @@ import static com.lapissea.util.UtilL.*;
 public class SparsePointerList<E extends FileObject> extends AbstractList<E> implements ShadowChunks{
 	
 	public static <H extends FileObject&FixedLenList.ElementHead<H, ?>> void init(ContentOutputStream out, H header, int initialCapacity) throws IOException{
-		FixedLenList.init(NumberSize.SHORT, out, header, initialCapacity, false);
+		FixedLenList.init(NumberSize.BYTE, out, header, initialCapacity, false);
 	}
 	
 	private final FixedLenList<SizedNumber, ChunkPointer> valuePointers;
@@ -51,7 +55,7 @@ public class SparsePointerList<E extends FileObject> extends AbstractList<E> imp
 		this.constructor=Objects.requireNonNull(constructor);
 		header=data.header;
 		cache=header.config.newCacheMap();
-		this.valuePointers=new FixedLenList<>(new SizedNumber(NumberSize.SHORT, header.source::getSize), data, null);
+		this.valuePointers=new FixedLenList<>(()->new SizedNumber(header.source::getSize), data, null);
 	}
 	
 	private void checkIntegrity() throws IOException{
@@ -156,25 +160,21 @@ public class SparsePointerList<E extends FileObject> extends AbstractList<E> imp
 		if(DEBUG_VALIDATION) checkIntegrity();
 	}
 	
-	public List<SourcedChunkPointer> getReferences() throws IOException{
-		List<SourcedChunkPointer> data=new ArrayList<>();
-		
-		var list=valuePointers;
-		
-		try(var stream=valuePointers.getShadowChunks().get(0).io().doRandom()){
-			for(int i=0;i<list.size();i++){
+	public Stream<ChunkLink> openValueLinkStream(UnsafeBiFunction<ChunkPointer, E, ChunkLink, IOException> valueMapper){
+		return IntStream.range(0, size()).mapToObj(i->{
+			try{
+				var valPtr=valuePointers.getElement(i);
+				var val   =getElement(i);
 				
-				stream.setPos(list.calcPos(i));
-				
-				var          off=stream.getGlobalPos();
-				ChunkPointer val=list.getElement(i);
-				
-				data.add(new SourcedChunkPointer(val, off));
+				return valueMapper.apply(valPtr, val);
+			}catch(IOException e){
+				throw UtilL.uncheckedThrow(e);
 			}
-		}
-		
-		return data;
-		
+		}).limit(size());
+	}
+	
+	public Stream<ChunkLink> openLinkStream() throws IOException{
+		return valuePointers.openLinkStream(Function.identity());
 	}
 	
 	public E findSingle(Predicate<E> comparator) throws IOException{

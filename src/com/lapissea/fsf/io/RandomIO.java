@@ -6,11 +6,15 @@ import java.util.Objects;
 
 public interface RandomIO extends AutoCloseable, Flushable, ContentWriter, ContentReader{
 	
-	RandomIO setPos(long pos) throws IOException;
-	
 	long getPos() throws IOException;
 	
+	RandomIO setPos(long pos) throws IOException;
+	
+	
 	long getSize() throws IOException;
+	
+	RandomIO setSize(long targetSize) throws IOException;
+	
 	
 	long getCapacity() throws IOException;
 	

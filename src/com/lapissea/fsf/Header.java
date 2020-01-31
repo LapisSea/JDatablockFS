@@ -1,9 +1,6 @@
 package com.lapissea.fsf;
 
-import com.lapissea.fsf.chunk.Chunk;
-import com.lapissea.fsf.chunk.ChunkPointer;
-import com.lapissea.fsf.chunk.MutableChunkPointer;
-import com.lapissea.fsf.chunk.SourcedChunkPointer;
+import com.lapissea.fsf.chunk.*;
 import com.lapissea.fsf.collections.SparsePointerList;
 import com.lapissea.fsf.collections.fixedlist.FixedLenList;
 import com.lapissea.fsf.collections.fixedlist.headers.FixedNumber;
@@ -11,13 +8,12 @@ import com.lapissea.fsf.collections.fixedlist.headers.SizedNumber;
 import com.lapissea.fsf.exceptions.BitDepthOutOfSpaceException;
 import com.lapissea.fsf.headermodule.HeaderModule;
 import com.lapissea.fsf.headermodule.modules.DataMappedModule;
-import com.lapissea.fsf.headermodule.modules.FileHeaderModule;
 import com.lapissea.fsf.headermodule.modules.FreeChunksModule;
 import com.lapissea.fsf.io.ContentInputStream;
 import com.lapissea.fsf.io.IOInterface;
 import com.lapissea.fsf.io.TrackingInputStream;
 import com.lapissea.util.*;
-import com.lapissea.util.function.UnsafeConsumer;
+import com.lapissea.util.function.UnsafeFunctionOL;
 
 import java.io.EOFException;
 import java.io.IOException;
@@ -25,6 +21,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.function.BiConsumer;
+import java.util.function.BiPredicate;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.lapissea.fsf.FileSystemInFile.*;
 import static com.lapissea.fsf.NumberSize.*;
@@ -81,34 +82,6 @@ public class Header{
 	
 	public final List<HeaderModule> modules;
 	
-	public final Iterable<Chunk> allChunksIter=()->{
-		try{
-			return new Iterator<>(){
-				Chunk chunk=firstChunk();
-				
-				@Override
-				public boolean hasNext(){
-					try{
-						return !chunk.isLastPhysical();
-					}catch(IOException e){
-						throw UtilL.uncheckedThrow(e);
-					}
-				}
-				
-				@Override
-				public Chunk next(){
-					try{
-						return chunk=chunk.nextPhysical();
-					}catch(IOException e){
-						throw UtilL.uncheckedThrow(e);
-					}
-				}
-			};
-		}catch(Exception e){
-			throw UtilL.uncheckedThrow(e);
-		}
-	};
-	
 	public Header(IOInterface source, FileSystemInFile.Config config) throws IOException{
 		
 		var dmm=new DataMappedModule(this);
@@ -124,7 +97,7 @@ public class Header{
 		Version                                 version;
 		FixedLenList<FixedNumber, ChunkPointer> headerPointers;
 		
-		FixedNumber headerPointersNum=new FixedNumber(LONG);
+		Supplier<FixedNumber> headerPointersNum=()->new FixedNumber(LONG);
 		
 		try(var in=source.read()){
 			var mgb=new byte[MAGIC_BYTES.length];
@@ -146,7 +119,7 @@ public class Header{
 			var vs=Version.values();
 			version=vs[vs.length-1];
 			
-			var chunksFakeFile=new IOInterface.MemoryRA();
+			var chunksFakeFile=new IOInterface.MemoryRA(false);
 			
 			try(var out=chunksFakeFile.write(true)){
 				for(HeaderModule module : modules){
@@ -174,7 +147,7 @@ public class Header{
 				out.write(latest.major);
 				out.write(latest.minor);
 				
-				FixedLenList.init(NumberSize.VOID, out, headerPointersNum, localOffsets.size(), false);
+				FixedLenList.init(NumberSize.VOID, out, headerPointersNum.get(), localOffsets.size(), false);
 				
 				try(var in=chunksFakeFile.read()){
 					in.transferTo(out);
@@ -515,6 +488,11 @@ public class Header{
 		return requestedMemory;
 	}
 	
+	private void mergeChunks(Chunk dest, Chunk toMerge) throws IOException, BitDepthOutOfSpaceException{
+		dest.setCapacity(toMerge.nextPhysicalOffset()-dest.getDataStart());
+		dest.syncHeader();
+	}
+	
 	private void rescueChainAction(Chunk chainStart, long requestedMemory) throws IOException{
 		if(LOG_ACTIONS) logChunkAction("RESCUE", chainStart);
 		
@@ -542,14 +520,9 @@ public class Header{
 		}
 	}
 	
-	private void mergeChunks(Chunk dest, Chunk toMerge) throws IOException, BitDepthOutOfSpaceException{
-		dest.setCapacity(toMerge.nextPhysicalOffset()-dest.getDataStart());
-		dest.syncHeader();
-	}
-	
 	private void rescueChain(Chunk chainStart, long additionalSpace) throws IOException{
 		
-		var chain=chainStart.loadWholeChain();
+		var chain=chainStart.collectWholeChain();
 		
 		for(int i=chain.size()-1;i >= 0;i--){
 			var chunk=chain.get(i);
@@ -570,6 +543,7 @@ public class Header{
 				
 				try{
 					chunk.setNext(newChunk);
+					chunk.syncHeader();
 				}catch(BitDepthOutOfSpaceException e){
 					throw new ShouldNeverHappenError(e);
 				}finally{
@@ -642,9 +616,9 @@ public class Header{
 		
 		freeChunks.checkIntegrity();
 		
-		for(var ch : freeChunks){
-			var c=ch.dereference(this);
-			Assert(!c.isUsed(), c, freeChunks);
+		for(ChunkPointer ptr : freeChunks){
+			Chunk freeChunk=ptr.dereference(this);
+			Assert(!freeChunk.isUsed(), "Chunk not marked as free but listed under free chunks:", freeChunk, "in", freeChunks);
 		}
 		
 		class Node{
@@ -682,9 +656,8 @@ public class Header{
 	}
 	
 	public void freeChunkChain(Chunk chunk) throws IOException{
-		var next=chunk.nextChunk();
+		if(chunk.hasNext()) freeChunkChain(chunk.nextChunk());
 		freeChunk(chunk);
-		if(next!=null) freeChunkChain(next);
 	}
 	
 	
@@ -777,16 +750,15 @@ public class Header{
 			return false;
 		}
 		
+		removeChunkInCache(chunkToMerge);
+		chunkToMerge.nukeChunk();
+		
 		try{
 			previous.setCapacity(chunkToMerge.nextPhysicalOffset()-previous.getDataStart());
 		}catch(BitDepthOutOfSpaceException e){
 			throw new NotImplementedException(e);//TODO: reformat header be able to merge
 		}
-		
 		previous.syncHeader();
-		
-		removeChunkInCache(chunkToMerge);
-		chunkToMerge.nukeHeader();
 		
 		if(LOG_ACTIONS){
 			logChunkAction("FREE B MERGE", previous);
@@ -817,9 +789,9 @@ public class Header{
 		toMergeInTo.syncHeader();
 		
 		removeChunkInCache(nextPtr);
-		next.nukeHeader();
 		
 		freeChunks.setElement(nextIndex, new ChunkPointer(toMergeInTo));
+		next.nukeChunk();
 		
 		if(LOG_ACTIONS) logChunkAction("FREE F MERGE", toMergeInTo);
 		if(DEBUG_VALIDATION) validateFile();
@@ -870,30 +842,88 @@ public class Header{
 		return files;
 	}
 	
+	public List<Chunk> allChunkWalkerFlat() throws IOException{
+		List<Chunk> chain=new ArrayList<>();
+		allChunkWalkerFlat((h, c)->chain.add(c));
+		return chain;
+	}
+	
+	public Optional<ChunkWModule> allChunkWalkerFlat(BiPredicate<HeaderModule, Chunk> consumer) throws IOException{
+		return allChunkWalkerFlat(m->true, consumer);
+	}
+	
+	public Optional<ChunkWModule> allChunkWalkerFlat(Predicate<HeaderModule> moduleFilter, BiPredicate<HeaderModule, Chunk> consumer) throws IOException{
+		var walker=allChunkWalker();
+		while(walker.hasNext()){
+			var pair=walker.next();
+			
+			try(var stream=pair.obj2){
+				var module=pair.obj1;
+				if(!moduleFilter.test(module)) continue;
+				
+				var opt=stream.map(iter->{
+					while(iter.hasNext()){
+						var chunk=iter.next();
+						if(consumer.test(module, chunk)) return chunk;
+					}
+					return null;
+				}).filter(Objects::nonNull).findAny();
+				
+				if(opt.isPresent()) return Optional.of(new ChunkWModule(opt.get(), module));
+			}
+		}
+		
+		return Optional.empty();
+	}
+	
 	public Map<HeaderModule, List<List<Chunk>>> allChunks() throws IOException{
 		Map<HeaderModule, List<List<Chunk>>> moduleChunks=new LinkedHashMap<>();
 		
-		UnsafeConsumer<HeaderModule, IOException> add=module->{
-			List<List<Chunk>> chunks=new ArrayList<>();
-			
-			for(Chunk chunk : module.getOwning()){
-				chunks.add(chunk.loadWholeChain());
+		allChunkWalker().forEachRemaining(pair->{
+			try(var stream=pair.obj2){
+				moduleChunks.put(pair.obj1, stream.map(iter->{
+					List<Chunk> chain=new ArrayList<>(4);
+					iter.forEachRemaining(chain::add);
+					return chain;
+				}).collect(Collectors.toList()));
 			}
-			
-			for(SourcedChunkPointer reference : module.getReferences()){
-				chunks.add(reference.pointer.dereference(this).loadWholeChain());
-			}
-			
-			moduleChunks.put(module, chunks);
-		};
-		
-		add.accept(new FileHeaderModule(this));
-		
-		for(HeaderModule module : modules){
-			add.accept(module);
-		}
-		
+		});
 		return moduleChunks;
+	}
+	
+	@SuppressWarnings("RedundantThrows")
+	public Iterator<PairM<HeaderModule, Stream<Iterator<Chunk>>>> allChunkWalker() throws IOException{
+		return new Iterator<>(){
+			Iterator<HeaderModule> moduleIterator=modules.iterator();
+			
+			@Override
+			public boolean hasNext(){
+				return moduleIterator.hasNext();
+			}
+			
+			@Override
+			public PairM<HeaderModule, Stream<Iterator<Chunk>>> next(){
+				HeaderModule module=moduleIterator.next();
+				try{
+					var stream=Stream.concat(module.getOwning().stream(), module.getReferenceStream().map(link->{
+						try{
+							return link.pointer.dereference(Header.this);
+						}catch(IOException e){
+							throw UtilL.uncheckedThrow(e);
+						}
+					})).map(rootChunk->{
+						try{
+							return rootChunk.chainWalker();
+						}catch(IOException e){
+							throw UtilL.uncheckedThrow(e);
+						}
+					});
+					return new PairM<>(module, stream);
+				}catch(IOException e){
+					throw UtilL.uncheckedThrow(e);
+				}
+			}
+		};
 	}
 	
 	private long calcTotalWholeSize(List<Chunk> chain){ return chain.stream().mapToLong(Chunk::wholeSize).sum(); }
@@ -905,7 +935,7 @@ public class Header{
 	private List<List<Chunk>> chunksToChains(List<Chunk> chunks) throws IOException{
 		var chains=new ArrayList<List<Chunk>>(chunks.size());
 		for(Chunk chunk : chunks){
-			chains.add(chunk.loadWholeChain());
+			chains.add(chunk.collectWholeChain());
 		}
 		return chains;
 	}
@@ -914,22 +944,34 @@ public class Header{
 		return getByOffset((long)FILE_HEADER_SIZE);
 	}
 	
-	private List<Chunk> prevDetectingMove(Chunk chunk) throws IOException{
-		for(Chunk ch : allChunksIter){
-			if(ch.getNext()==chunk.getOffset()){
-				var moved=prevDetectingMove(ch);
-				if(!moved.isEmpty()) return moved;
-				
-				var chain=ch.loadWholeChain();
-				
-				var totalSize=calcTotalSize(chain);
-				
-				moveChainToChunk(ch, alocNew(bySize(totalSize), totalSize));
-				return chain;
-			}
-		}
+	private Chunk findChainStart(Chunk chunk) throws IOException{
+		return findChainStart(new ChunkWModule(chunk, null));
+	}
+	
+	private Chunk findChainStart(ChunkWModule chunk) throws IOException{
+		var targetOffset=chunk.getChunk().getOffset();
+		var searchResult=allChunkWalkerFlat(chunk::check, (m, ch)->ch.getNext()==targetOffset);
 		
-		return List.of();
+		if(searchResult.isEmpty()) return chunk.getChunk();
+		var previous=searchResult.get();
+		
+		var root=findChainStart(previous);
+		if(root!=null) return root;
+		return chunk.getChunk();
+	}
+	
+	private List<Chunk> prevDetectingMove(Chunk chunk) throws IOException{
+		
+		var ch=findChainStart(chunk);
+		if(ch==chunk) return List.of();
+		
+		var chain=ch.collectWholeChain();
+		
+		var totalSize=calcTotalSize(chain);
+		
+		moveChainToChunk(ch, alocNew(bySize(totalSize), totalSize));
+		return chain;
+		
 	}
 	
 	private Chunk clearRegion(long start, long size) throws IOException{
@@ -1003,9 +1045,9 @@ public class Header{
 			
 			if(DEBUG_VALIDATION){
 				validateFile();
-				Assert(!freeRegion.isUsed(), freeRegion, start, size, end);
-				Assert(freeRegion.overlaps(start, end), freeRegion, "Freed start", start, size, end);
-				Assert(freeRegion.wholeSize() >= size, "Did not free region", freeRegion, "["+start+"..."+end+"]", size);
+				Assert(!freeRegion.isUsed(), "Illegal reference to used chunk", freeRegion, "["+start+"..."+end+"]", size);
+				Assert(freeRegion.overlaps(start, end), "Freed start chunk", freeRegion, "["+start+"..."+end+"]", size);
+				Assert(freeRegion.wholeSize() >= size, "Did not free enough of a region", freeRegion, "["+start+"..."+end+"]", size);
 			}
 			
 			return freeRegion;
@@ -1021,13 +1063,13 @@ public class Header{
 			newChunk.checkCaching();
 		}
 		
-		var chain=chunk.loadWholeChain();
+		var chain=chunk.collectWholeChain();
 		var siz  =calcTotalSize(chain);
 		
 		
 		if(DEBUG_VALIDATION){
 			validateFile();
-			Assert(siz<=newChunk.getCapacity());
+			Assert(siz<=newChunk.getCapacity(), siz, newChunk);
 		}
 		
 		if(chain.size()>1){
@@ -1045,106 +1087,98 @@ public class Header{
 			
 			Assert(!newChunk.hasNext());
 			
-			if(DEBUG_VALIDATION) validateFile();
-			chunk.moveToAndFreeOld(newChunk);
+			var oldOff=chunk.getOffset();
 			
-			if(DEBUG_VALIDATION) validateFile();
+			chunk.moveTo(newChunk);
+			
 			chunk.setSize(siz);
 			chunk.chainForwardFree();
+			
+			var old=getByOffset(oldOff);
+			
+			freeChunk(old);
+			
+			if(DEBUG_VALIDATION) validateFile();
 		}else{
 			chunk.moveToAndFreeOld(newChunk);
 		}
 		
 	}
 	
-	private void compositChainTo(Chunk chunk, Region region) throws IOException{
-		
-		var headerChunks=new ArrayList<Chunk>(headerPointers.size());
-		for(var ptr : headerPointers){
-			headerChunks.add(ptr.dereference(this));
-		}
+	private void compositChainTo(Chunk chunk, long pos, UnsafeFunctionOL<Chunk, IOException> capacityManager) throws IOException{
 		
 		chunk.checkCaching();
 		
-		var chain=chunk.loadWholeChain();
+		var size=capacityManager.apply(chunk);
 		
-		var size=calcTotalSize(chain);
-		
-		//TODO: use more more sensible padding
-		if(headerChunks.contains(chunk)){
-			size+=chain.size()*bySize(source.getSize()).bytes;
-		}
-		
-		var pos=region.start;
-		
-		if(chunk.getOffset()==pos&&chain.size()==1){
-			if(calcTotalCapacity(chain)==size){
-				return;
+		if(chunk.getOffset()==pos){
+			var chain=chunk.collectWholeChain();
+			if(chain.size()==1){
+				if(calcTotalCapacity(chain)==size){
+					return;
+				}
 			}
 		}
 		
-		var freeRegion=clearRegion(Region.bySize(pos, Chunk.headerSize(source.getSize(), size)*3+size));
+		Chunk freeRegion;
+		while(true){
+			freeRegion=clearRegion(Region.bySize(pos, Chunk.headerSize(source.getSize(), size)*3+size));
+			
+			var sizeNew=capacityManager.apply(chunk);
+			
+			if(sizeNew==size) break;
+			size=sizeNew;
+		}
 		
 		var defrag=alocFreeSplit(freeRegion, size);
+		Assert(size<=defrag.getCapacity(), size, defrag);
 		
 		moveChainToChunk(chunk, defrag);
 	}
 	
 	public void defragment() throws IOException{
 		Assert(!defragmenting);
+		
 		if(DEBUG_VALIDATION) validateFile();
+		if(LOG_ACTIONS) LogUtil.println("defragmenting");
 		
 		defragmenting=true;
-		LogUtil.println("defragmenting");
 		int counter=0;
 		
-		var headerChunks=new ArrayList<Chunk>(headerPointers.size());
-		for(var ptr : headerPointers){
-			headerChunks.add(ptr.dereference(this));
-		}
 		Object e1=null;
 		
 		try{
+			long[] pos={firstChunk().nextPhysicalOffset()};
 			
-			Chunk chunk=firstChunk();
-			var   pos  =chunk.nextPhysicalOffset();
-			
-			while(!chunk.isLastPhysical()){
-				do{
-					chunk=chunk.nextPhysical();
-					if(chunk.isLastPhysical()) break;
-				}while(!chunk.isUsed());
-				
-				
-				chunk.checkCaching();
-				
-				var chain=chunk.loadWholeChain();
-				
-				var size=calcTotalSize(chain);
-				
-				//TODO: use more more sensible padding
-				if(headerChunks.contains(chunk)){
-					size+=chain.size()*bySize(source.getSize()).bytes;
+			for(HeaderModule module : modules){
+				for(Chunk chunk : module.getOwning()){
+					
+					compositChainTo(chunk, pos[0], module::capacityManager);
+					pos[0]+=chunk.wholeSize();
+					if(DEBUG_VALIDATION) validateFile();
+					
 				}
-				
-				if(chunk.getOffset()==pos&&chain.size()==1){
-					if(calcTotalCapacity(chain)==size){
-						pos+=chunk.wholeSize();
-						continue;
-					}
-				}
-				
-				var freeRegion=clearRegion(Region.bySize(pos, Chunk.headerSize(source.getSize(), size)*3+size));
-				
-				var defrag=alocFreeSplit(freeRegion, size);
-				
-				moveChainToChunk(chunk, defrag);
-				
-				pos+=chunk.wholeSize();
-				
-				if(DEBUG_VALIDATION) validateFile();
 			}
 			
+			UnsafeFunctionOL<Chunk, IOException> capacityManager=chunk->{
+				long[] size={0}, capacity={0};
+				chunk.calculateWholeChainSizes(size, capacity);
+				
+				if(size[0]>0) return size[0];
+				return capacity[0];
+			};
+			
+			for(HeaderModule module : modules){
+				for(ChunkLink reference : module.getReferences()){
+					var chunk=reference.pointer.dereference(this);
+					if(!chunk.isUsed()) continue;
+					
+					compositChainTo(chunk, pos[0], capacityManager);
+					pos[0]+=chunk.wholeSize();
+					if(DEBUG_VALIDATION) validateFile();
+					
+				}
+			}
 			
 		}catch(Throwable e){
 			e1=e;
@@ -1176,15 +1210,6 @@ public class Header{
 			Assert(free==0);
 		}
 		
-	}
-	
-	public List<Chunk> headerStartChunks() throws IOException{
-		List<Chunk> arll=new ArrayList<>(headerPointers.size()+1);
-		arll.addAll(headerPointers.getShadowChunks());
-		for(var ptr : headerPointers){
-			arll.add(ptr.dereference(this));
-		}
-		return arll;
 	}
 	
 	@Override

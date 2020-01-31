@@ -1,15 +1,16 @@
 package com.lapissea.fsf.chunk;
 
 
+import com.lapissea.fsf.Utils;
 import com.lapissea.fsf.io.IOInterface;
 import com.lapissea.fsf.io.RandomIO;
-import com.lapissea.fsf.Utils;
+import com.lapissea.util.LogUtil;
 
 import java.io.IOException;
 import java.util.Objects;
 
-import static com.lapissea.fsf.chunk.ChunkIO.OverflowMode.*;
 import static com.lapissea.fsf.FileSystemInFile.*;
+import static com.lapissea.fsf.chunk.ChunkIO.OverflowMode.*;
 import static com.lapissea.util.UtilL.*;
 
 /**
@@ -31,6 +32,7 @@ public class ChunkIO implements IOInterface{
 		long chainSpaceOffset;
 		
 		Chunk chunk;
+		private boolean finished;
 		
 		
 		ChunkSpaceRandomIO(RandomIO data){
@@ -38,12 +40,18 @@ public class ChunkIO implements IOInterface{
 			chunks.dependencyInvalidate.add(this::invalidate);
 		}
 		
+		private void checkUsed(Chunk chunk){
+			if(DEBUG_VALIDATION){
+				Assert(chunk.isUsed(), chunk, chunks);
+			}
+		}
+		
 		private void invalidate(){
 			chunk=null;
 			chainSpaceDataStart=0;
 			
 			if(DEBUG_VALIDATION){
-				Assert(chunks.stream().allMatch(Chunk::isUsed), chunks);
+				chunks.forEach(this::checkUsed);
 			}
 		}
 		
@@ -113,9 +121,8 @@ public class ChunkIO implements IOInterface{
 			
 			//TODO: test if this optimization is a problem when chain is invalidated
 			if(chunk!=null){
-				if(DEBUG_VALIDATION){
-					Assert(chunk.isUsed(), chunk, chunks);
-				}
+				checkUsed(chunk);
+				
 				if(isInRange(chainSpaceDataStart, getDataSize(mode, chunk))){
 					if(applyMovement(mode)) return true;
 				}
@@ -124,9 +131,7 @@ public class ChunkIO implements IOInterface{
 			
 			int i=0;
 			for(Chunk ch : chunks){
-				if(DEBUG_VALIDATION){
-					Assert(ch.isUsed(), ch, chunks);
-				}
+				checkUsed(ch);
 				
 				var off=getDataOffset(mode, i);
 				var siz=getDataSize(mode, ch);
@@ -179,6 +184,37 @@ public class ChunkIO implements IOInterface{
 		}
 		
 		@Override
+		public RandomIO setSize(long targetSize) throws IOException{
+			var oldSize=getSize();
+			if(oldSize==targetSize) return this;
+			Assert(targetSize<=getCapacity());
+			
+			long capacity;
+			if(DEBUG_VALIDATION){
+				capacity=getCapacity();
+			}
+			
+			long remaining=targetSize;
+			
+			for(Chunk chunk : chunks){
+				long consume=Math.min(remaining, chunk.getCapacity());
+				remaining=Math.max(0, remaining-consume);
+				
+				chunk.setSize(consume);
+				chunk.syncHeader();
+			}
+			
+			invalidate();
+			
+			if(DEBUG_VALIDATION){
+				Assert(targetSize==getSize(), "Capacity changed when setting size", targetSize+"/"+getSize(), capacity+"/"+getCapacity(), this);
+				Assert(capacity==getCapacity(), capacity, getCapacity(), this);
+			}
+			
+			return this;
+		}
+		
+		@Override
 		public long getCapacity() throws IOException{
 			return chunks.getTotalCapacity();
 		}
@@ -193,16 +229,21 @@ public class ChunkIO implements IOInterface{
 				size=getSize();
 			}
 			
-			var pos=getPos();
+			//clip size
+			setSize(Math.min(getSize(), targetCapacity));
 			
-			if(targetCapacity>oldCapacity){
-				setPointer(oldCapacity, CLIP);
-				fillZero(targetCapacity-oldCapacity);
-			}else{
-				setPointer(targetCapacity, SET);
+			long remaining=targetCapacity;
+			for(Chunk chunk : chunks){
+				remaining-=chunk.getCapacity();
+				if(remaining<=0){
+					chunk.chainForwardFree();
+					break;
+				}
 			}
-			setPos(pos);
 			
+			if(remaining>0){
+				chunks.growBy(remaining);
+			}
 			
 			if(DEBUG_VALIDATION){
 				Assert(targetCapacity<=getCapacity(), targetCapacity, getCapacity(), this);
@@ -213,12 +254,14 @@ public class ChunkIO implements IOInterface{
 		}
 		
 		private void finish(){
+			finished=true;
 			chunks.dependencyInvalidate.remove((Runnable)this::invalidate);
 		}
 		
 		@Override
 		protected void finalize() throws Throwable{
 			super.finalize();
+			if(!finished) LogUtil.printlnEr("DID NOT CLOSE STREAM");
 			finish();
 		}
 		
@@ -408,6 +451,26 @@ public class ChunkIO implements IOInterface{
 		return new ChunkSpaceRandomIO(chunkSource.doRandom());
 	}
 	
+	@Override
+	public void setSize(long requestedSize) throws IOException{
+		try(RandomIO io=doRandom()){
+			long oldCapacity;
+			if(DEBUG_VALIDATION){
+				oldCapacity=io.getCapacity();
+			}
+			
+			io.setSize(requestedSize);
+			
+			if(DEBUG_VALIDATION){
+				Assert(io.getSize()==getSize(), "IO/source disagreement", io.getSize(), getSize());
+				Assert(io.getCapacity()==getCapacity(), "IO/source disagreement", io.getCapacity(), getCapacity());
+				
+				Assert(io.getCapacity()==oldCapacity, "Capacity changed when setting size", io.getCapacity(), oldCapacity, io);
+				Assert(io.getSize()==requestedSize, "Did not set requested size", io.getSize(), requestedSize, io);
+			}
+		}
+	}
+	
 	
 	@Override
 	public long getSize(){
@@ -423,17 +486,20 @@ public class ChunkIO implements IOInterface{
 	
 	@Override
 	public void setCapacity(long newCapacity) throws IOException{
-		try(var io=doRandom()){
+		try(RandomIO io=doRandom()){
 			long oldSize;
 			if(DEBUG_VALIDATION) oldSize=io.getSize();
 			
 			io.setCapacity(newCapacity);
 			
 			if(DEBUG_VALIDATION){
-				Assert(io.getCapacity() >= newCapacity,
-				       io.getCapacity(), newCapacity, io);
-				Assert(oldSize==io.getSize()||io.getSize()==newCapacity,
-				       oldSize, io.getSize(), newCapacity, io);
+				Assert(io.getSize()==getSize(), "IO/source disagreement", io.getSize(), getSize());
+				Assert(io.getCapacity()==getCapacity(), "IO/source disagreement", io.getCapacity(), getCapacity());
+				
+				Assert(io.getCapacity() >= newCapacity, "Did not allocate enough", io.getCapacity(), newCapacity, io);
+				Assert(oldSize==io.getSize()||
+				       (io.getSize()==newCapacity&&newCapacity<oldSize),
+				       "Size changed when setting capacity", oldSize, io.getSize(), newCapacity, io);
 			}
 		}
 	}

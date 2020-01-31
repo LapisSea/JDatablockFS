@@ -24,6 +24,8 @@ public interface IOInterface{
 	 */
 	RandomIO doRandom() throws IOException;
 	
+	void setSize(long requestedSize) throws IOException;
+	
 	long getSize() throws IOException;
 	
 	/**
@@ -43,13 +45,25 @@ public interface IOInterface{
 		private byte[] bb;
 		private int    used;
 		
-		public MemoryRA(IOInterface data) throws IOException{
+		private final boolean readOnly;
+		
+		public MemoryRA(IOInterface data, boolean readOnly) throws IOException{
 			bb=data.readAll();
 			used=bb.length;
+			this.readOnly=readOnly;
 		}
 		
-		public MemoryRA(){
+		public MemoryRA(boolean readOnly){
 			bb=new byte[4];
+			this.readOnly=readOnly;
+		}
+		
+		private void pushOnWrite(long[] ids){
+			try{
+				onWrite.accept(ids);
+			}catch(Throwable e){
+				throw new RuntimeException("Exception on write event", e);
+			}
 		}
 		
 		@Override
@@ -58,6 +72,7 @@ public interface IOInterface{
 				
 				private final byte[] buf=new byte[8];
 				private int pos;
+				
 				
 				@Override
 				public RandomIO setPos(long pos){
@@ -77,12 +92,23 @@ public interface IOInterface{
 				}
 				
 				@Override
+				public RandomIO setSize(long targetSize){
+					if(readOnly) throw new UnsupportedOperationException();
+					
+					MemoryRA.this.setSize(targetSize);
+					pos=Math.min(pos, used);
+					return this;
+				}
+				
+				@Override
 				public long getCapacity(){
 					return MemoryRA.this.getCapacity();
 				}
 				
 				@Override
 				public RandomIO setCapacity(long newCapacity){
+					if(readOnly) throw new UnsupportedOperationException();
+					
 					MemoryRA.this.setCapacity(newCapacity);
 					pos=Math.min(pos, used);
 					return this;
@@ -114,13 +140,13 @@ public interface IOInterface{
 				
 				@Override
 				public void write(int b){
+					if(readOnly) throw new UnsupportedOperationException();
+					
 					int remaining=(int)(getCapacity()-getPos());
 					if(remaining<=0) setCapacity(Math.max(4, Math.max(getCapacity()+1, getCapacity()+1-remaining)));
 					bb[pos]=(byte)b;
 					if(onWrite!=null){
-						try{
-							onWrite.accept(new long[]{pos});
-						}catch(Throwable ignored){}
+						pushOnWrite(new long[]{pos});
 					}
 					pos++;
 					if(used<pos) used=pos;
@@ -132,14 +158,14 @@ public interface IOInterface{
 				}
 				
 				public void write(byte[] b, int off, int len, boolean pushPos){
+					if(readOnly) throw new UnsupportedOperationException();
+					
 					int remaining=(int)(getCapacity()-getPos());
 					if(remaining<len) setCapacity(Math.max(4, Math.max(getCapacity()<<1, getCapacity()+len-remaining)));
 					
 					System.arraycopy(b, off, bb, pos, len);
 					if(onWrite!=null){
-						try{
-							onWrite.accept(LongStream.range(pos, pos+len).toArray());
-						}catch(Throwable ignored){}
+						pushOnWrite(LongStream.range(pos, pos+len).toArray());
 					}
 					if(pushPos){
 						pos+=len;
@@ -149,6 +175,8 @@ public interface IOInterface{
 				
 				@Override
 				public void fillZero(long requestedMemory) throws IOException{
+					if(readOnly) throw new UnsupportedOperationException();
+					
 					Utils.zeroFill((b, off, len)->write(b, off, len, false), requestedMemory);
 				}
 				
@@ -166,6 +194,11 @@ public interface IOInterface{
 		}
 		
 		@Override
+		public void setSize(long requestedSize){
+			throw new UnsupportedOperationException();
+		}
+		
+		@Override
 		public long getSize(){
 			return used;
 		}
@@ -177,6 +210,8 @@ public interface IOInterface{
 		
 		@Override
 		public void setCapacity(long newCapacity){
+			if(readOnly) throw new UnsupportedOperationException();
+			
 			if(getCapacity()==newCapacity) return;
 			bb=Arrays.copyOf(bb, (int)newCapacity);
 			used=Math.min(used, bb.length);
@@ -188,11 +223,6 @@ public interface IOInterface{
 		
 		private       RandomAccessFile ra;
 		private final String           path;
-		
-		@Override
-		public String toString(){
-			return path;
-		}
 		
 		public FileRA(File file, Config config) throws IOException{
 			File enforcedFile=config.shouldEnforceExtension?config.enforceExtension(file):file;
@@ -206,6 +236,19 @@ public interface IOInterface{
 			
 			path=enforcedFile.getPath();
 			ra=new RandomAccessFile(enforcedFile, "rw");
+		}
+		
+		@Override
+		public String toString(){
+			return path;
+		}
+		
+		private void pushOnWrite(long[] ids){
+			try{
+				onWrite.accept(ids);
+			}catch(Throwable e){
+				throw new RuntimeException("Exception on write event", e);
+			}
 		}
 		
 		@Override
@@ -235,6 +278,11 @@ public interface IOInterface{
 				@Override
 				public long getSize() throws IOException{
 					return ra.length();
+				}
+				
+				@Override
+				public RandomIO setSize(long targetSize){
+					throw new UnsupportedOperationException();
 				}
 				
 				@Override
@@ -286,9 +334,7 @@ public interface IOInterface{
 					snapPos();
 					ra.write(b);
 					if(onWrite!=null){
-						try{
-							onWrite.accept(new long[]{pos});
-						}catch(Throwable ignored){}
+						pushOnWrite(new long[]{pos});
 					}
 					pos++;
 				}
@@ -302,9 +348,7 @@ public interface IOInterface{
 					snapPos();
 					ra.write(b, off, len);
 					if(onWrite!=null){
-						try{
-							onWrite.accept(LongStream.range(pos, pos+len).toArray());
-						}catch(Throwable ignored){}
+						pushOnWrite(LongStream.range(pos, pos+len).toArray());
 					}
 					if(pushPos) pos+=len;
 				}
@@ -319,6 +363,11 @@ public interface IOInterface{
 					return getPos();
 				}
 			};
+		}
+		
+		@Override
+		public void setSize(long requestedSize){
+			throw new UnsupportedOperationException();
 		}
 		
 		@Override
@@ -510,6 +559,7 @@ public interface IOInterface{
 			byte[] data=new byte[Math.toIntExact(getSize())];
 			int    read=stream.readNBytes(data, 0, data.length);
 			if(DEBUG_VALIDATION){
+				//noinspection AutoBoxing
 				Assert(read==data.length, "Failed to read data amount specified by getSize() =", data.length, "read =", read);
 			}
 			return data;

@@ -40,8 +40,8 @@ public class OffsetIndexSortedList<T extends FileObject&Comparable<T>> extends A
 		int ss   =config.fileTablePadding/ratio;
 		int fs   =config.fileTablePadding-ss;
 		
-		Chunk.init(out, NumberSize.SHORT, fs);
-		Chunk.init(out, NumberSize.SHORT, ss);
+		Chunk.init(out, NumberSize.BYTE, fs);
+		Chunk.init(out, NumberSize.BYTE, ss);
 	}
 	
 	private final Supplier<T> tConstructor;

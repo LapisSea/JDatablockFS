@@ -1,6 +1,7 @@
 package com.lapissea.fsf;
 
 import com.lapissea.fsf.chunk.Chunk;
+import com.lapissea.util.LogUtil;
 import com.lapissea.util.MathUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.WeakValueHashMap;
@@ -23,6 +24,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.function.Consumer;
 
 import static com.lapissea.util.PoolOwnThread.*;
 import static java.awt.RenderingHints.*;
@@ -30,26 +33,22 @@ import static javax.swing.SwingUtilities.*;
 
 public interface Renderer{
 	
-	Executor runner=e->{
-		var t=new Thread(e);
-		t.setPriority(Thread.MIN_PRIORITY);
-		t.start();
-	};
+	Executor runner=Executors.newWorkStealingPool();
 	
-	private static CompletableFuture<BufferedImage> renderFile(Snapshot snap, int minWidth, int pixelScale){
+	private static CompletableFuture<BufferedImage> renderFile(Snapshot snap, int minWidth, int pixelScale, boolean printError){
 		return async(()->{
 			try{
-				return snap.copy.renderFile(minWidth, snap.ids, pixelScale);
+				return snap.copy.renderFile(minWidth, snap.ids, pixelScale, printError);
 			}catch(IOException e){
 				throw UtilL.uncheckedThrow(e);
 			}
 		}, runner);
 	}
 	
-	private static CompletableFuture<BufferedImage> renderFile(Snapshot snap, int minWidth, int minHeight, int pixelScale){
+	private static CompletableFuture<BufferedImage> renderFile(Snapshot snap, int minWidth, int minHeight, int pixelScale, boolean printError){
 		return async(()->{
 			try{
-				return snap.copy.renderFile(minWidth, minHeight, snap.ids, pixelScale);
+				return snap.copy.renderFile(minWidth, minHeight, snap.ids, pixelScale, printError);
 			}catch(IOException e){
 				throw UtilL.uncheckedThrow(e);
 			}
@@ -142,7 +141,7 @@ public interface Renderer{
 		@Override
 		public void snapshot(Snapshot snap){
 			finish();
-			task=Renderer.renderFile(snap, minSize, minSize, pixelScale).thenAccept(img->{
+			task=Renderer.renderFile(snap, minSize, minSize, pixelScale, false).thenAccept(img->{
 				try{
 					save(img);
 				}catch(IOException e){
@@ -195,7 +194,7 @@ public interface Renderer{
 		private List<Snapshot> snapshots=new ArrayList<>();
 		private int            pixelScale;
 		
-		private JFrame  jframe=null;
+		private JFrame  jframe;
 		private float[] imgPos={0};
 		private int[]   pos   ={0, 0};
 		
@@ -203,6 +202,90 @@ public interface Renderer{
 		
 		public GUI(int pixelScale){
 			this.pixelScale=pixelScale;
+			
+			
+			jframe=new JFrame(){
+				@Override
+				public void paint(Graphics g){
+					if(snapshots.isEmpty()) invokeLater(this::repaint);
+					else setGUIImg(getImg(safePos()));
+					super.paint(g);
+				}
+			};
+			
+			var p=new JPanel();
+			p.setBackground(Color.DARK_GRAY);
+			p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
+			
+			jframe.setVisible(true);
+			
+			jframe.setSize(1000, 750);
+			jframe.setLocationRelativeTo(null);
+			jframe.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+			jframe.addComponentListener(new ComponentAdapter(){
+				int lastW;
+				int lastH;
+				
+				@Override
+				public void componentResized(ComponentEvent e){
+					if(snapshots.isEmpty()) return;
+					invokeLater(()->{
+						boolean noChange=recalcPixelSize();
+						
+						if(noChange&&lastW==getWidthPx()&&lastH==getHeightPx()) return;
+						
+						cache.clear();
+						jframe.revalidate();
+						jframe.repaint();
+						lastW=getWidthPx();
+						lastH=getHeightPx();
+					});
+				}
+			});
+			
+			var adp=new MouseAdapter(){
+				@Override
+				public void mouseMoved(MouseEvent e){
+					
+					Point rootPaneOrigin=jframe.getRootPane().getContentPane().getLocationOnScreen();
+					Point myComp2Origin =jframe.getLocationOnScreen();
+					
+					pos[0]=e.getX()+(int)(myComp2Origin.getX()-rootPaneOrigin.getX());
+					pos[1]=e.getY()+(int)(myComp2Origin.getY()-rootPaneOrigin.getY());
+					
+					invokeLater(jframe::repaint);
+				}
+				
+				@Override
+				public void mouseDragged(MouseEvent e){
+					imgPos[0]=MathUtil.snap(snapshots.size()*(e.getX()/(float)jframe.getWidth()), 0, snapshots.size()-1);
+					setGUIImg(getImg(safePos()));
+					mouseMoved(e);
+				}
+				
+				@Override
+				public void mouseWheelMoved(MouseWheelEvent e){
+					imgPos[0]=(float)MathUtil.snap(e.getPreciseWheelRotation()+imgPos[0], 0, snapshots.size());
+					setGUIImg(getImg(safePos()));
+				}
+				
+				@Override
+				public void mouseClicked(MouseEvent e){
+					var snap=snapshots.get(safePos());
+					LogUtil.printlnEr("=============");
+					Renderer.renderFile(snap, getWidthPx(), pixelScale, true).join();
+					LogUtil.printlnEr("=============");
+					snap.stackTrace.printStackTrace();
+					LogUtil.printlnEr("=============");
+				}
+			};
+			
+			jframe.addMouseMotionListener(adp);
+			jframe.addMouseWheelListener(adp);
+			jframe.addMouseListener(adp);
+			
+			jframe.setContentPane(p);
+			jframe.requestFocus();
 		}
 		
 		
@@ -218,91 +301,11 @@ public interface Renderer{
 			return getJFrame().getContentPane().getHeight()/(pixelScale*3);
 		}
 		
-		public synchronized JFrame getJFrame(){
-			if(jframe==null){
-				
-				var jf=new JFrame(){
-					@Override
-					public void paint(Graphics g){
-						setGUIImg(getImg(safePos()));
-						super.paint(g);
-					}
-				};
-				
-				var p=new JPanel();
-				p.setBackground(Color.DARK_GRAY);
-				p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
-				
-				jf.setVisible(true);
-				
-				jf.setSize(1000, 750);
-				jf.setLocationRelativeTo(null);
-				jf.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-				jf.addComponentListener(new ComponentAdapter(){
-					int lastW;
-					int lastH;
-					
-					@Override
-					public void componentResized(ComponentEvent e){
-						invokeLater(()->{
-							if(lastW==getWidthPx()&&lastH==getHeightPx()) return;
-							
-							recalcPixelSize();
-							
-							cache.clear();
-							jf.revalidate();
-							jf.repaint();
-							lastW=getWidthPx();
-							lastH=getHeightPx();
-						});
-					}
-				});
-				
-				var adp=new MouseAdapter(){
-					@Override
-					public void mouseMoved(MouseEvent e){
-						
-						Point rootPaneOrigin=jf.getRootPane().getContentPane().getLocationOnScreen();
-						Point myComp2Origin =jf.getLocationOnScreen();
-						
-						pos[0]=e.getX()+(int)(myComp2Origin.getX()-rootPaneOrigin.getX());
-						pos[1]=e.getY()+(int)(myComp2Origin.getY()-rootPaneOrigin.getY());
-						
-						invokeLater(jf::repaint);
-					}
-					
-					@Override
-					public void mouseDragged(MouseEvent e){
-						imgPos[0]=MathUtil.snap(snapshots.size()*(e.getX()/(float)jf.getWidth()), 0, snapshots.size()-1);
-						setGUIImg(getImg(safePos()));
-						mouseMoved(e);
-					}
-					
-					@Override
-					public void mouseWheelMoved(MouseWheelEvent e){
-						imgPos[0]=(float)MathUtil.snap(e.getPreciseWheelRotation()+imgPos[0], 0, snapshots.size());
-						setGUIImg(getImg(safePos()));
-					}
-					
-					@Override
-					public void mouseClicked(MouseEvent e){
-						snapshots.get(MathUtil.snap((int)imgPos[0], 0, snapshots.size()-1)).stackTrace.printStackTrace();
-					}
-				};
-				
-				jf.addMouseMotionListener(adp);
-				jf.addMouseWheelListener(adp);
-				jf.addMouseListener(adp);
-				
-				jf.setContentPane(p);
-				
-				jframe=jf;
-			}
-			
+		public JFrame getJFrame(){
 			return jframe;
 		}
 		
-		private void recalcPixelSize(){
+		private boolean recalcPixelSize(){
 			var h=getJFrame().getContentPane().getHeight();
 			
 			long siz;
@@ -311,25 +314,28 @@ public interface Renderer{
 			}catch(IOException ex){
 				throw UtilL.uncheckedThrow(ex);
 			}
+			var oldSize=pixelScale;
 			
 			pixelScale=2;
 			
 			while(true){
-				
 				int lineCount=(int)Math.ceil(((double)siz)/getWidthPx());
-				
 				if(h<lineCount*pixelScale*3) break;
 				pixelScale++;
 			}
 			
 			pixelScale--;
 			
+			if(pixelScale!=oldSize) cache.clear();
+			
+			return pixelScale==oldSize;
 		}
 		
 		BufferedImage render(int i){
-			return Renderer.renderFile(snapshots.get(i), getWidthPx(), pixelScale).join();
+			return Renderer.renderFile(snapshots.get(i), getWidthPx(), pixelScale, false).join();
 		}
 		
+		@SuppressWarnings("AutoBoxing")
 		BufferedImage getImg(int index){
 			return cache.computeIfAbsent(index, this::render);
 		}
@@ -441,7 +447,7 @@ public interface Renderer{
 						if(hoverChunk!=null){
 							try{
 								g.setColor(hoverCol.darker().darker());
-								hoverChunk.loadWholeChain(c->outlineChunk(g, c));
+								hoverChunk.walkOverWholeChain((Consumer<Chunk>)c->outlineChunk(g, c));
 								
 								g.setColor(hoverCol);
 								outlineChunk(g, hoverChunk);
@@ -476,11 +482,6 @@ public interface Renderer{
 			int i=snapshots.size();
 			snapshots.add(snap);
 			imgPos[0]=i;
-			if(i==0){
-				setGUIImg(getImg(0));
-				
-				getJFrame().requestFocus();
-			}
 			
 			recalcPixelSize();
 		}

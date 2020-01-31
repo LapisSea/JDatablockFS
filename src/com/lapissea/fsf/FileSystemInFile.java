@@ -1,7 +1,7 @@
 package com.lapissea.fsf;
 
 import com.lapissea.fsf.chunk.Chunk;
-import com.lapissea.fsf.chunk.SourcedChunkPointer;
+import com.lapissea.fsf.chunk.ChunkLink;
 import com.lapissea.fsf.headermodule.HeaderModule;
 import com.lapissea.fsf.io.IOInterface;
 import com.lapissea.util.*;
@@ -26,6 +26,7 @@ import java.util.stream.IntStream;
 
 import static java.awt.Font.*;
 
+@SuppressWarnings("AutoBoxing")
 public class FileSystemInFile{
 	
 	public static final boolean DEBUG_VALIDATION=true;
@@ -202,7 +203,7 @@ public class FileSystemInFile{
 		int get(int x, int y);
 	}
 	
-	public BufferedImage renderFile(int width, long[] ids, int resolutionMul) throws IOException{
+	public BufferedImage renderFile(int width, long[] ids, int resolutionMul, boolean printError) throws IOException{
 		var size=header.source.getSize();
 		int w   =Math.max(width, 1);
 		int h   =1;
@@ -211,10 +212,10 @@ public class FileSystemInFile{
 			h++;
 		}
 		
-		return renderFile(w, h, ids, resolutionMul);
+		return renderFile(w, h, ids, resolutionMul, printError);
 	}
 	
-	public BufferedImage renderFile(int minWidth, int minHeight, long[] ids, int resolutionMul) throws IOException{
+	public BufferedImage renderFile(int minWidth, int minHeight, long[] ids, int resolutionMul, boolean printError) throws IOException{
 		var       size=header.source.getSize();
 		final int width;
 		final int height;
@@ -316,9 +317,20 @@ public class FileSystemInFile{
 			}
 		};
 		
-		Function<Long, Color> randColor;
+		Function<Long, Color>    randColor;
+		Function<Long, double[]> randPos;
+		Function<Long, Double>   randVal;
 		{
 			Random rand=new Random();
+			randPos=chunkStart->{
+				rand.setSeed(chunkStart);
+				
+				return new double[]{rand.nextDouble()-0.5, rand.nextDouble()-0.5};
+			};
+			randVal=chunkStart->{
+				rand.setSeed(chunkStart);
+				return rand.nextDouble();
+			};
 			randColor=chunkStart->{
 				rand.setSeed(chunkStart);
 				
@@ -339,7 +351,6 @@ public class FileSystemInFile{
 		
 		BufferedImage lineImgOutline=null;
 		try{
-			
 			var allChunks=header.allChunks();
 			
 			try(var in=header.source.doRandom()){
@@ -401,12 +412,21 @@ public class FileSystemInFile{
 				
 				TriConsumer<Color, Long, Long> drawLink=(col, v1, v2)->{
 					lineG.setColor(col);
+					var padding=0.2;
+					var rp1    =randPos.apply(v1);
+					var rp2    =randPos.apply(v2);
 					
-					double x1=(v1%width)+0.5;
-					double y1=(long)(v1/width)+0.5;
+					double x1c=(v1%width)+0.5;
+					double y1c=(long)(v1/width)+0.5;
 					
-					double x2=(v2%width)+0.5;
-					double y2=(long)(v2/width)+0.5;
+					double x2c=(v2%width)+0.5;
+					double y2c=(long)(v2/width)+0.5;
+					
+					double x1=x1c+rp1[0]*(1-padding*2);
+					double y1=y1c+rp1[1]*(1-padding*2);
+					
+					double x2=x2c+padding+rp2[0]*(1-padding*2);
+					double y2=y2c+padding+rp2[1]*(1-padding*2);
 					
 					double xMid=(x1+x2)/2;
 					double yMid=(y1+y2)/2;
@@ -431,7 +451,10 @@ public class FileSystemInFile{
 					drawLine.accept(new double[]{xMid+tsin, yMid+tcos, xMid-nsin-tsin, yMid-ncos-tcos});
 					
 					var circleSiz=3*lineWidth;
-					lineG.fill(new Ellipse2D.Double(x1-circleSiz/2, y1-circleSiz/2, circleSiz, circleSiz));
+					lineG.fill(new Ellipse2D.Double(x1c-circleSiz/2, y1c-circleSiz/2, circleSiz, circleSiz));
+					
+					drawLine.accept(new double[]{x1, y1, x1c, y1c});
+					drawLine.accept(new double[]{x2, y2, x2c, y2c});
 				};
 				
 				
@@ -439,7 +462,7 @@ public class FileSystemInFile{
 					HeaderModule      module=entry.getKey();
 					List<List<Chunk>> chains=entry.getValue();
 					
-					for(SourcedChunkPointer reference : module.getReferences()){
+					for(ChunkLink reference : module.getReferences()){
 						var val =reference.pointer.getValue();
 						var rand=randColor.apply(val);
 						drawLink.accept(rand, reference.source, val);
@@ -511,7 +534,7 @@ public class FileSystemInFile{
 				
 			}
 		}catch(Throwable e){
-			e.printStackTrace();
+			if(printError) e.printStackTrace();
 		}
 		
 		try(var in=header.source.doRandom()){
@@ -539,8 +562,13 @@ public class FileSystemInFile{
 		if(!(o instanceof FileSystemInFile)) return false;
 		FileSystemInFile that=(FileSystemInFile)o;
 		
-		var i1=header.allChunksIter.iterator();
-		var i2=that.header.allChunksIter.iterator();
+		Iterator<Chunk> i1, i2;
+		try{
+			i1=this.header.allChunkWalkerFlat().iterator();
+			i2=that.header.allChunkWalkerFlat().iterator();
+		}catch(IOException e){
+			throw UtilL.uncheckedThrow(e);
+		}
 		
 		while(i1.hasNext()&&i2.hasNext()){
 			Chunk o1=i1.next();

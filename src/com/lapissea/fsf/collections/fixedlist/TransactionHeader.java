@@ -9,7 +9,7 @@ import com.lapissea.fsf.io.serialization.FileObject;
 
 import java.io.IOException;
 
-final class TransactionHeader
+public final class TransactionHeader
 	<CHILD extends FileObject&FixedLenList.ElementHead<CHILD, E>, E>
 	extends FileObject.FullLayout<TransactionHeader<CHILD, E>>
 	implements FixedLenList.ElementHead<TransactionHeader<CHILD, E>, Transaction<E>>{
@@ -98,5 +98,10 @@ final class TransactionHeader
 		
 		if(hasElement) child.writeElement(dest, src.element);
 		else dest.write(new byte[child.getElementSize()]);
+	}
+	
+	@Override
+	public String toString(){
+		return "Transaction("+child+')';
 	}
 }

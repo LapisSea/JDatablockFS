@@ -11,6 +11,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 
+import static com.lapissea.util.UtilL.*;
+
 class FSFTest_freeChunks{
 	
 	public static final long[] NO_IDS=new long[0];
@@ -36,14 +38,15 @@ class FSFTest_freeChunks{
 		
 		UnsafeRunnable<IOException> snapshot=()->{};
 		try{
-			var source=new IOInterface.MemoryRA();
+			var source=new IOInterface.MemoryRA(false);
 			var fil   =new FileSystemInFile(source);
 			
 			UnsafeConsumer<long[], IOException> snapshotIds=ids->{
-				var copy=new FileSystemInFile(new IOInterface.MemoryRA(source));
-//				Assert(fil.equals(copy));
+				var copy=new FileSystemInFile(new IOInterface.MemoryRA(source, true));
 				
 				renderer.snapshot(new Renderer.Snapshot(copy, ids, new Throwable("Clicked snapshot")));
+				
+				Assert(fil.equals(copy));
 			};
 			
 			if(renderer.doAll()) source.onWrite=snapshotIds;

@@ -36,14 +36,15 @@ class FSFTest{
 		
 		UnsafeRunnable<IOException> snapshot=()->{};
 		try{
-			var source=new IOInterface.MemoryRA();
+			var source=new IOInterface.MemoryRA(false);
 			var fil   =new FileSystemInFile(source);
 			
 			UnsafeConsumer<long[], IOException> snapshotIds=ids->{
-				var copy=new FileSystemInFile(new IOInterface.MemoryRA(source));
-				Assert(fil.equals(copy));
+				var copy=new FileSystemInFile(new IOInterface.MemoryRA(source, true));
 				
 				renderer.snapshot(new Renderer.Snapshot(copy, ids, new Throwable("Clicked snapshot")));
+				
+				fil.equals(copy);
 			};
 			
 			if(renderer.doAll()) source.onWrite=snapshotIds;
