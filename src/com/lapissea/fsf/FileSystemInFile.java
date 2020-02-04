@@ -4,7 +4,10 @@ import com.lapissea.fsf.chunk.Chunk;
 import com.lapissea.fsf.chunk.ChunkLink;
 import com.lapissea.fsf.headermodule.HeaderModule;
 import com.lapissea.fsf.io.IOInterface;
-import com.lapissea.util.*;
+import com.lapissea.util.PairM;
+import com.lapissea.util.SoftValueHashMap;
+import com.lapissea.util.UtilL;
+import com.lapissea.util.WeakValueHashMap;
 import com.lapissea.util.function.BiIntConsumer;
 import com.lapissea.util.function.TriConsumer;
 import com.lapissea.util.function.TriFunction;
@@ -177,7 +180,7 @@ public class FileSystemInFile{
 		
 		var pointer=header.getByPath(path);
 		if(pointer==null){
-			var chunk=header.createFile(path, initialSize);
+			header.createFile(path, initialSize);
 			pointer=header.getByPath(path);
 		}
 		
@@ -185,8 +188,6 @@ public class FileSystemInFile{
 	}
 	
 	public void delete(String path) throws IOException{
-		LogUtil.println(TextUtil.toTable(header.allChunks()));
-		System.exit(0);
 		getFile(path).delete();
 	}
 	
@@ -351,22 +352,24 @@ public class FileSystemInFile{
 		
 		BufferedImage lineImgOutline=null;
 		try{
-			var allChunks=header.allChunks();
+			var allChunks=header.allChunks(true);
 			
 			try(var in=header.source.doRandom()){
 				
-				for(Map.Entry<HeaderModule, List<List<Chunk>>> entry : allChunks.entrySet()){
-					HeaderModule      module=entry.getKey();
-					List<List<Chunk>> chains=entry.getValue();
+				for(Map.Entry<HeaderModule, List<List<ChunkLink>>> entry : allChunks.entrySet()){
+					HeaderModule          module=entry.getKey();
+					List<List<ChunkLink>> chains=entry.getValue();
 					
 					var ownsBinaryOnly=module.ownsBinaryOnly();
 					
 					for(var chain : chains){
-						var rand=randColor.apply(chain.get(0).getOffset());
+						var rand=randColor.apply(chain.get(0).sourcePos);
 						
 						var owning=module.getOwning().contains(chain.get(0));
 						
-						for(Chunk chunk : chain){
+						for(var link : chain){
+							if(!link.sourceValidChunk) continue;
+							Chunk chunk=header.getByOffset(link.sourcePos);
 							
 							in.setPos(chunk.getOffset());
 							counter[0]=(int)chunk.getOffset();
@@ -377,7 +380,8 @@ public class FileSystemInFile{
 							Color headCol=mix.apply(new Color(Math.min(255, bodyCol.getRed()+100), Math.min(255, bodyCol.getGreen()+100), Math.min(255, bodyCol.getBlue()+100)), rand, 0.7F);
 							
 							for(long i=0, j=chunk.getHeaderSize();i<j;i++){
-								pixelPushByte.accept(in.read(), headCol);
+								if(in.getPos()!=counter[0]) pixelPushByte.accept(0, Color.RED);
+								else pixelPushByte.accept(in.read(), headCol);
 								counter[0]++;
 							}
 							
@@ -391,8 +395,8 @@ public class FileSystemInFile{
 								}else{
 									var siz=chunk.getCapacity();
 								}
-								
-								(owning&&ownsBinaryOnly?pixelPushByte:pixelPush).accept(in.read(), pixelCol);
+								if(in.getPos()!=counter[0]) pixelPushByte.accept(0, Color.RED);
+								else (owning&&ownsBinaryOnly?pixelPushByte:pixelPush).accept(in.read(), pixelCol);
 								counter[0]++;
 							}
 						}
@@ -458,22 +462,22 @@ public class FileSystemInFile{
 				};
 				
 				
-				for(Map.Entry<HeaderModule, List<List<Chunk>>> entry : allChunks.entrySet()){
-					HeaderModule      module=entry.getKey();
-					List<List<Chunk>> chains=entry.getValue();
+				for(Map.Entry<HeaderModule, List<List<ChunkLink>>> entry : allChunks.entrySet()){
+					HeaderModule          module=entry.getKey();
+					List<List<ChunkLink>> chains=entry.getValue();
 					
-					for(ChunkLink reference : module.getReferences()){
-						var val =reference.pointer.getValue();
+					for(ChunkLink reference : module.buildReferences()){
+						var val =reference.getPointer().getValue();
 						var rand=randColor.apply(val);
-						drawLink.accept(rand, reference.source, val);
+						drawLink.accept(rand, reference.sourcePos, val);
 					}
 					
-					for(List<Chunk> chain : chains){
-						var col=new Color(randColor.apply(chain.get(0).getOffset()).getRGB());
+					for(List<ChunkLink> chain : chains){
+						var col=new Color(randColor.apply(chain.get(0).sourcePos).getRGB());
 						
-						for(Chunk chunk : chain){
-							if(!chunk.hasNext()) continue;
-							drawLink.accept(col, chunk.getOffset(), chunk.getNext());
+						for(ChunkLink link : chain){
+							if(!link.hasPointer()) continue;
+							drawLink.accept(col, link.sourcePos, link.getPointer().getValue());
 						}
 					}
 				}
@@ -534,6 +538,7 @@ public class FileSystemInFile{
 				
 			}
 		}catch(Throwable e){
+			e.printStackTrace();
 			if(printError) e.printStackTrace();
 		}
 		
@@ -561,11 +566,15 @@ public class FileSystemInFile{
 		if(this==o) return true;
 		if(!(o instanceof FileSystemInFile)) return false;
 		FileSystemInFile that=(FileSystemInFile)o;
+		return findContentDifference(that)==null;
+	}
+	
+	public PairM<Chunk, Chunk> findContentDifference(FileSystemInFile that){
 		
 		Iterator<Chunk> i1, i2;
 		try{
-			i1=this.header.allChunkWalkerFlat().iterator();
-			i2=that.header.allChunkWalkerFlat().iterator();
+			i1=this.header.allChunkWalkerFlat(true);
+			i2=that.header.allChunkWalkerFlat(true);
 		}catch(IOException e){
 			throw UtilL.uncheckedThrow(e);
 		}
@@ -575,23 +584,20 @@ public class FileSystemInFile{
 			Chunk o2=i2.next();
 			
 			if(o1.isUsed()!=o2.isUsed()||o1.getOffset()!=o2.getOffset()||o1.getNext()!=o2.getNext()){
-//				LogUtil.println(o1, o2);
-				return false;
+				return new PairM<>(o1, o2);
 			}
 			
 			var io1=o1.io();
 			var io2=o2.io();
 			
 			if(io1.getSize()!=io2.getSize()||io1.getCapacity()!=io2.getCapacity()){
-//				LogUtil.println(o1, o2);
-				return false;
+				return new PairM<>(o1, o2);
 			}
 			
 			if(o1.isUsed()){
 				try{
 					if(!Arrays.equals(io1.readAll(), io2.readAll())){
-//						LogUtil.println(o1, o2);
-						return false;
+						return new PairM<>(o1, o2);
 					}
 				}catch(IOException e){
 					throw UtilL.uncheckedThrow(e);
@@ -599,7 +605,9 @@ public class FileSystemInFile{
 			}
 		}
 		
-		return !i1.hasNext()&&!i2.hasNext();
+		if(!i1.hasNext()&&!i2.hasNext()) return null;
+		
+		return new PairM<>(i1.hasNext()?i1.next():null, i2.hasNext()?i2.next():null);
 	}
 	
 	@Override

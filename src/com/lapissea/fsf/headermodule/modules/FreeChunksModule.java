@@ -13,7 +13,6 @@ import com.lapissea.fsf.io.ContentOutputStream;
 import java.awt.*;
 import java.io.IOException;
 import java.util.Objects;
-import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
@@ -59,8 +58,8 @@ public class FreeChunksModule extends HeaderModule{
 	 * MUST CALL CLOSE ON STREAM
 	 */
 	@Override
-	public Stream<ChunkLink> getReferenceStream() throws IOException{
-		return getList().openLinkStream(Function.identity());
+	public Stream<ChunkLink> openReferenceStream() throws IOException{
+		return getList().openLinkStream(e->e, (old, ptr)->ptr);
 	}
 	
 	@Override

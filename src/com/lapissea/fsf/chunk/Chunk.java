@@ -178,7 +178,7 @@ public class Chunk{
 	public transient       Throwable lastMod;
 	public final transient Throwable madeAt=new Throwable((counter++)+" "+LocalDateTime.now().toString());
 	
-	public transient Set<Runnable> dependencyInvalidate=new HashSet<>(3);
+	public transient List<Runnable> dependencyInvalidate=new ArrayList<>();
 	
 	public Chunk(Header header, long offset, NumberSize nextType, long next, long capacity) throws MalformedFileException{
 		this(header, offset, nextType, next, NumberSize.bySize(capacity), capacity);
@@ -196,7 +196,7 @@ public class Chunk{
 		this.nextType=Objects.requireNonNull(nextType);
 		this.next=requireGreaterOrEqual(next, Header.FILE_HEADER_SIZE);
 		
-		if(bodyType==NumberSize.VOID) throw new MalformedFileException();
+		if(bodyType==NumberSize.VOID) throw new MalformedFileException(new ChunkPointer(offset).toString());
 		this.bodyType=Objects.requireNonNull(bodyType);
 		
 		this.capacity=requireGreaterOrEqual(capacity, 1);
@@ -287,6 +287,10 @@ public class Chunk{
 	
 	public void setNext(Chunk next) throws BitDepthOutOfSpaceException{
 		setNext(next.getOffset());
+	}
+	
+	public void setNext(ChunkPointer next) throws BitDepthOutOfSpaceException{
+		setNext(next.getValue());
 	}
 	
 	public void setNext(long next) throws BitDepthOutOfSpaceException{
@@ -479,38 +483,6 @@ public class Chunk{
 			consumer.accept(chunk);
 			return false;
 		});
-	}
-	
-	public Iterator<Chunk> chainWalker() throws IOException{
-		
-		class ChainWalker implements Iterator<Chunk>{
-			Chunk next;
-			
-			public ChainWalker(Chunk next){
-				this.next=next;
-			}
-			
-			@Override
-			public boolean hasNext(){
-				return next!=null;
-			}
-			
-			@Override
-			public Chunk next(){
-				var ch=next;
-				if(!hasNext()) throw new NoSuchElementException();
-				
-				try{
-					next=ch.nextChunk();
-				}catch(IOException e){
-					throw UtilL.uncheckedThrow(e);
-				}
-				
-				return ch;
-			}
-		}
-		
-		return new ChainWalker(this);
 	}
 	
 	public void walkOverChain(@NotNull Predicate<Chunk> walker) throws IOException{
@@ -707,6 +679,18 @@ public class Chunk{
 		return b.toString();
 	}
 	
+	public String toTableString(){
+		StringBuilder b=new StringBuilder();
+		if(!isUsed()) b.append("free ");
+		b.append(getSize());
+		b.append("/");
+		b.append(getCapacity()).append(getBodyType().shotName);
+		b.append("@").append(getOffset());
+		
+		if(hasNext()) b.append(" -> @").append(getNext()).append(getNextType().shotName);
+		return b.toString();
+	}
+	
 	public boolean isDirty(){
 		return dirty;
 	}
@@ -738,5 +722,9 @@ public class Chunk{
 	
 	public ChunkPointer reference(){
 		return new ChunkPointer(this);
+	}
+	
+	public ChunkLink link(){
+		return new ChunkLink(this);
 	}
 }

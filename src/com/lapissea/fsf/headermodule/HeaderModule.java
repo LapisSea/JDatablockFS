@@ -7,9 +7,11 @@ import com.lapissea.fsf.chunk.ChunkLink;
 import com.lapissea.fsf.chunk.ChunkPointer;
 import com.lapissea.fsf.io.ContentOutputStream;
 import com.lapissea.util.ArrayViewList;
+import com.lapissea.util.UtilL;
 
 import java.awt.*;
 import java.io.IOException;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -47,16 +49,26 @@ public abstract class HeaderModule{
 		postWrite();
 	}
 	
+	public final Stream<Iterator<ChunkLink>> openChainStream() throws IOException{
+		return Stream.concat(getOwning().stream().map(Chunk::link), openReferenceStream()).map(link->{
+			try{
+				return link.linkWalker(header);
+			}catch(IOException e){
+				throw UtilL.uncheckedThrow(e);
+			}
+		});
+	}
+	
 	public List<Chunk> getOwning(){
 		return Objects.requireNonNull(owning);
 	}
 	
 	protected abstract int getOwningChunkCount();
 	
-	public abstract Stream<ChunkLink> getReferenceStream() throws IOException;
+	public abstract Stream<ChunkLink> openReferenceStream() throws IOException;
 	
-	public List<ChunkLink> getReferences() throws IOException{
-		try(var refStream=getReferenceStream()){
+	public List<ChunkLink> buildReferences() throws IOException{
+		try(var refStream=openReferenceStream()){
 			return refStream.collect(Collectors.toList());
 		}
 	}

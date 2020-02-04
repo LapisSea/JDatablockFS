@@ -1,6 +1,6 @@
 package com.lapissea.fsf.collections;
 
-import com.lapissea.fsf.*;
+import com.lapissea.fsf.NumberSize;
 import com.lapissea.fsf.chunk.Chunk;
 import com.lapissea.fsf.chunk.ChunkIO;
 import com.lapissea.fsf.io.ContentInputStream;
@@ -20,7 +20,7 @@ import java.util.function.Supplier;
 
 import static com.lapissea.fsf.FileSystemInFile.*;
 
-public class OffsetIndexSortedList<T extends FileObject&Comparable<T>> extends AbstractList<T> implements ShadowChunks{
+public class OffsetIndexSortedList<T extends FileObject&Comparable<T>> extends IOList.Abstract<T>{
 	
 	private static final FileObject.SequenceLayout<OffsetIndexSortedList<?>> HEADER=
 		FileObject.sequenceBuilder(List.of(
@@ -132,58 +132,22 @@ public class OffsetIndexSortedList<T extends FileObject&Comparable<T>> extends A
 		
 		try(var io=objectsIo.write(true)){
 			for(var o : objects){
-				counter++;
-				if(counter==90){
-					int i=0;
-				}
 				o.write(io);
 			}
 		}
 	}
 	
-	static int counter;
-	
-	
+	@Override
 	public void addElement(T obj) throws IOException{
 		//TODO Performance - make partial update implementation
 		fullReadUnknownModify(1, l->l.add(obj));
 	}
 	
 	@Override
-	@Deprecated
-	public boolean add(T obj){
-		try{
-			addElement(obj);
-		}catch(IOException e){
-			throw UtilL.uncheckedThrow(e);
-		}
-		return true;
-	}
-	
-	@Override
-	@Deprecated
-	public T get(int index){
-		try{
-			return getByIndex(index);
-		}catch(IOException e){
-			throw UtilL.uncheckedThrow(e);
-		}
-	}
-	
-	@Override
-	@Deprecated
-	public T set(int index, T element){
-		try{
-			return setByIndex(index, element);
-		}catch(IOException e){
-			throw UtilL.uncheckedThrow(e);
-		}
-	}
-	
-	public T setByIndex(int index, T element) throws IOException{
+	public void setElement(int index, T element) throws IOException{
 		Objects.checkIndex(index, size());
 		
-		T old=getByIndex(index);
+		T old=getElement(index);
 		
 		if(old==element||!element.equals(old)){
 			
@@ -194,24 +158,13 @@ public class OffsetIndexSortedList<T extends FileObject&Comparable<T>> extends A
 				old.read(io);
 			}
 		}
-		
-		return old;
 	}
 	
 	@Override
-	public T remove(int index){
-		try{
-			return removeElement(index);
-		}catch(IOException e){
-			throw UtilL.uncheckedThrow(e);
-		}
-	}
-	
-	public T removeElement(int index) throws IOException{
+	public void removeElement(int index) throws IOException{
 		Objects.checkIndex(index, size());
-		T old=getByIndex(index);
+		T old=getElement(index);
 		fullReadUnknownModify(0, l->l.remove(index));
-		return old;
 	}
 	
 	@Override
@@ -232,8 +185,9 @@ public class OffsetIndexSortedList<T extends FileObject&Comparable<T>> extends A
 		return read;
 	}
 	
+	@Override
 	@SuppressWarnings("AutoBoxing")
-	public T getByIndex(int index) throws IOException{
+	public T getElement(int index) throws IOException{
 		long offset=getOffset(index);
 		return getByOffset(offset);
 	}
@@ -273,7 +227,7 @@ public class OffsetIndexSortedList<T extends FileObject&Comparable<T>> extends A
 	
 	public T findSingle(FunctionOI<T> comparator) throws IOException{
 		int index=findSingleIndex(comparator);
-		return index==-1?null:getByIndex(index);
+		return index==-1?null:getElement(index);
 	}
 	
 	public T findSingle(T toFind) throws IOException{
@@ -282,7 +236,7 @@ public class OffsetIndexSortedList<T extends FileObject&Comparable<T>> extends A
 	
 	public T findSingle(T toFind, Comparator<T> comparator) throws IOException{
 		int index=findSingleIndex(toFind, comparator);
-		return index==-1?null:getByIndex(index);
+		return index==-1?null:getElement(index);
 	}
 	
 	public int findSingleIndex(T toFind, Comparator<T> comparator) throws IOException{
@@ -301,7 +255,7 @@ public class OffsetIndexSortedList<T extends FileObject&Comparable<T>> extends A
 		
 		while(low<=high){
 			int mid   =(low+high) >>> 1;
-			T   midVal=getByIndex(mid);
+			T   midVal=getElement(mid);
 			
 			int cmp=comparator.apply(midVal);
 			if(cmp<0) low=mid+1;
@@ -325,7 +279,7 @@ public class OffsetIndexSortedList<T extends FileObject&Comparable<T>> extends A
 			@Override
 			public T next(){
 				try{
-					return getByIndex(index++);
+					return getElement(index++);
 				}catch(IOException e){
 					throw UtilL.uncheckedThrow(e);
 				}
@@ -342,5 +296,19 @@ public class OffsetIndexSortedList<T extends FileObject&Comparable<T>> extends A
 		if(cap >= capacity) return false;
 		objectsIo.setCapacity(capacity);
 		return true;
+	}
+	
+	@Override
+	public void clearElements() throws IOException{
+		objectCache.clear();
+		offsetCache.clear();
+		
+		sizePerOffset=NumberSize.BYTE;
+		size=0;
+		
+		try(var out=offsetsIo.write(true)){
+			HEADER.write(out, this);
+		}
+		objectsIo.setCapacity(0);
 	}
 }

@@ -7,7 +7,6 @@ import com.lapissea.fsf.chunk.ChunkLink;
 import com.lapissea.fsf.chunk.ChunkPointer;
 import com.lapissea.fsf.collections.fixedlist.FixedLenList;
 import com.lapissea.fsf.collections.fixedlist.headers.FixedNumber;
-import com.lapissea.fsf.collections.fixedlist.headers.SizedNumber;
 import com.lapissea.fsf.headermodule.HeaderModule;
 import com.lapissea.fsf.io.ContentOutputStream;
 import com.lapissea.util.UtilL;
@@ -16,7 +15,6 @@ import java.awt.*;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
-import java.util.function.Function;
 import java.util.stream.Stream;
 
 import static com.lapissea.fsf.NumberSize.*;
@@ -41,7 +39,7 @@ public class FileHeaderModule extends HeaderModule{
 	
 	@Override
 	public void init(ContentOutputStream out, FileSystemInFile.Config config) throws IOException{
-		FixedLenList.init(out, new SizedNumber(BYTE, ()->200), config.freeChunkCapacity, false);
+		FixedLenList.init(out, new FixedNumber(LONG), config.freeChunkCapacity, false);
 	}
 	
 	@Override
@@ -53,8 +51,8 @@ public class FileHeaderModule extends HeaderModule{
 	 * MUST CALL CLOSE ON STREAM
 	 */
 	@Override
-	public Stream<ChunkLink> getReferenceStream() throws IOException{
-		return getList().openLinkStream(Function.identity());
+	public Stream<ChunkLink> openReferenceStream() throws IOException{
+		return getList().openLinkStream(e->e, (old, ptr)->ptr);
 	}
 	
 	@Override

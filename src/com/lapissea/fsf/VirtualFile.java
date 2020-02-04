@@ -1,6 +1,6 @@
 package com.lapissea.fsf;
 
-import com.lapissea.fsf.chunk.ChunkIO;
+import com.lapissea.fsf.io.IOInterface;
 import com.lapissea.util.NotNull;
 
 import java.io.*;
@@ -13,7 +13,7 @@ import static com.lapissea.util.UtilL.*;
 public class VirtualFile{
 	
 	private final FilePointer source;
-	private       ChunkIO     data;
+	private       IOInterface data;
 	
 	public VirtualFile(FilePointer pointer){
 		this.source=pointer;
@@ -45,7 +45,7 @@ public class VirtualFile{
 	
 	public InputStream read(long offset) throws IOException{
 		var data=getData();
-		if(data==null) throw new FileNotFoundException();
+		if(data==null) throw new FileNotFoundException(getPath());
 		return data.read(offset);
 	}
 	
@@ -53,11 +53,11 @@ public class VirtualFile{
 		return write(0);
 	}
 	
-	private void createData(long initialSize) throws IOException{
-		data=source.header.createFile(source.getLocalPath(), initialSize).io();
+	private void ensureFileExistance(long initialSize) throws IOException{
+		source.header.createFile(source.getLocalPath(), initialSize);
 	}
 	
-	private ChunkIO getData() throws IOException{
+	private IOInterface getData() throws IOException{
 		if(data==null){
 			var c=source.dereference();
 			if(c!=null) data=c.io();
@@ -73,7 +73,7 @@ public class VirtualFile{
 			@Override
 			public void close() throws IOException{
 				Assert(getData()==null);
-				createData(wrote);
+				ensureFileExistance(wrote);
 				var directOut=getData().write(clipOnEnd);
 				writeTo(directOut);
 				out=directOut;
@@ -123,7 +123,7 @@ public class VirtualFile{
 	
 	public OutputStream write(long offset) throws IOException{
 		if(getData()==null){
-			if(offset!=0) createData(0);
+			if(offset!=0) ensureFileExistance(0);
 			else return new BufferingInit(true);
 		}
 		return getData().write(offset, true);
@@ -141,7 +141,7 @@ public class VirtualFile{
 	}
 	
 	public void writeAll(byte[] bytes) throws IOException{
-		if(getData()==null) createData(bytes.length);
+		if(getData()==null) ensureFileExistance(bytes.length);
 		getData().write(true, bytes);
 	}
 }

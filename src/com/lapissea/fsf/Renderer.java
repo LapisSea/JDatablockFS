@@ -1,6 +1,7 @@
 package com.lapissea.fsf;
 
 import com.lapissea.fsf.chunk.Chunk;
+import com.lapissea.fsf.chunk.ChunkLink;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.MathUtil;
 import com.lapissea.util.UtilL;
@@ -19,7 +20,6 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
-import java.util.function.Consumer;
 
 import static com.lapissea.util.PoolOwnThread.*;
 import static java.awt.RenderingHints.*;
@@ -185,8 +185,8 @@ public interface Renderer{
 	
 	class GUI implements Renderer{
 		
-		private List<Snapshot> snapshots=new ArrayList<>();
-		private int            pixelScale;
+		private List<Snapshot> snapshots =new ArrayList<>();
+		private int            pixelScale=1;
 		
 		private JFrame  jframe;
 		private float[] imgPos={0};
@@ -194,10 +194,7 @@ public interface Renderer{
 		
 		Map<Integer, BufferedImage> cache=new WeakValueHashMap<Integer, BufferedImage>().defineStayAlivePolicy(5);
 		
-		public GUI(int pixelScale){
-			this.pixelScale=pixelScale;
-			
-			
+		public GUI(){
 			jframe=new JFrame(){
 				@Override
 				public void paint(Graphics g){
@@ -414,12 +411,14 @@ public interface Renderer{
 							
 							hoverChunk=null;
 							hoverCol=Color.WHITE;
-							
-							var chunks=snapshots.get(thisPos).copy.header.allChunks();
+							var header=snapshots.get(thisPos).copy.header;
+							var chunks=header.allChunks(true);
 							for(var e : chunks.entrySet()){
-								List<List<Chunk>> chains=e.getValue();
-								for(List<Chunk> chain : chains){
-									for(Chunk chunk : chain){
+								var chains=e.getValue();
+								for(var chain : chains){
+									for(ChunkLink link : chain){
+										if(!link.sourceValidChunk) continue;
+										Chunk chunk=header.getByOffset(link.sourcePos);
 										if(chunk.overlaps(bytePos, bytePos+1)){
 											hoverChunk=chunk;
 											hoverCol=e.getKey().displayColor();
@@ -441,7 +440,7 @@ public interface Renderer{
 						if(hoverChunk!=null){
 							try{
 								g.setColor(hoverCol.darker().darker());
-								hoverChunk.walkOverWholeChain((Consumer<Chunk>)c->outlineChunk(g, c));
+								hoverChunk.walkOverWholeChain(c->outlineChunk(g, c));
 								
 								g.setColor(hoverCol);
 								outlineChunk(g, hoverChunk);
@@ -478,6 +477,7 @@ public interface Renderer{
 			imgPos[0]=i;
 			
 			recalcPixelSize();
+			invokeLater(getJFrame()::repaint);
 		}
 		
 		@Override

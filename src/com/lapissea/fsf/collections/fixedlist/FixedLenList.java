@@ -2,17 +2,22 @@ package com.lapissea.fsf.collections.fixedlist;
 
 import com.lapissea.fsf.Header;
 import com.lapissea.fsf.NumberSize;
-import com.lapissea.fsf.ShadowChunks;
 import com.lapissea.fsf.Utils;
 import com.lapissea.fsf.chunk.*;
+import com.lapissea.fsf.collections.IOList;
 import com.lapissea.fsf.io.ContentInputStream;
 import com.lapissea.fsf.io.ContentOutputStream;
 import com.lapissea.fsf.io.serialization.FileObject;
-import com.lapissea.util.*;
+import com.lapissea.util.NotNull;
+import com.lapissea.util.Nullable;
+import com.lapissea.util.TextUtil;
+import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeIntFunction;
+import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -23,7 +28,7 @@ import static com.lapissea.fsf.FileSystemInFile.*;
 import static com.lapissea.util.UtilL.*;
 
 @SuppressWarnings("AutoBoxing")
-public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E> extends AbstractList<E> implements ShadowChunks{
+public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E> extends IOList.Abstract<E>{
 	
 	public interface ElementHead<SELF, E>{
 		SELF copy();
@@ -69,6 +74,8 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 		
 		if(addEmergency) init(out, header.copy(), Math.max(1, initialElements.size()/2), false);
 	}
+	
+	private UnsafeSupplier<FixedLenList<H, E>, IOException> shadowList;
 	
 	private final Header header;
 	
@@ -172,6 +179,7 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 	}
 	
 	private void doTransaction(Transaction<E> transaction) throws IOException{
+		Assert(shadowList==null);
 		if(modifying){
 			if(transactionBuffer==null){
 				throw new ConcurrentModificationException(TextUtil.toString(this, transaction));
@@ -245,8 +253,11 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 		return getListHeader().getElementSize()*index;
 	}
 	
+	@Override
 	@NotNull
 	public E getElement(int index) throws IOException{
+		if(shadowList!=null) return shadowList.get().getElement(index);
+		
 		return Objects.requireNonNull(getElement(getListHeader(), index));
 	}
 	
@@ -325,7 +336,7 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 		
 		E read=readElement(listHeader, index);
 		
-		Assert(cached.equals(read), cached, read);
+		Assert(cached.equals(read), cached, read, data);
 		return cached;
 	}
 	
@@ -343,7 +354,6 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 	}
 	
 	public void checkIntegrity() throws IOException{
-		if(listHeader==null) return;
 		
 		if(DEBUG_VALIDATION){
 			var prev     =Thread.currentThread().getStackTrace()[2];
@@ -382,10 +392,21 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 		try{
 			modifying=true;
 			
-			
 			if(DEBUG_VALIDATION) checkIntegrity();
 
 //			LogUtil.println("reformatting", this);
+			
+			var offset =data.getRoot().getOffset();
+			var tOffset=transactionBuffer==null?0:transactionBuffer.data.getRoot().getOffset();
+			
+			shadowList=()->{
+				var l=new FixedLenList<>(headerType, header.getByOffset(offset), tOffset==0?null:header.getByOffset(tOffset));
+				if(l.isEmpty()){
+					shadowList=null;
+					return this;
+				}
+				return l;
+			};
 			
 			var newHeader=getListHeader().copy();
 			newHeader.update(change);
@@ -405,14 +426,12 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 			var root=data.getRoot();
 			
 			var oldSize=size;
-			
-			listHeader=null;
-			size=0;
+			listHeader=newHeader;
 			
 			root.transparentChainRestart(newData);
 			
 			readListHeader();
-			size=oldSize;
+			shadowList=null;
 			
 			if(DEBUG_VALIDATION){
 				checkIntegrity();
@@ -433,6 +452,7 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 		return (int)(size*CAPACITY_SHRINK_RATIO)+1;
 	}
 	
+	@Override
 	public void addElement(E e) throws IOException{
 		Objects.requireNonNull(e);
 		doTransaction(new Transaction<>(e, Action.ADD));
@@ -461,6 +481,7 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 		}
 	}
 	
+	@Override
 	public void setElement(int index, E element) throws IOException{
 		Objects.requireNonNull(element);
 		Objects.checkIndex(index, size());
@@ -477,6 +498,7 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 		}
 	}
 	
+	@Override
 	public void removeElement(int index) throws IOException{
 		Objects.checkIndex(index, size());
 		doTransaction(new Transaction<>(Action.REMOVE, index));
@@ -503,6 +525,7 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 		applySet(index, last);
 	}
 	
+	@Override
 	public void clearElements() throws IOException{
 		if(isEmpty()) return;
 		doTransaction(new Transaction<>(Action.CLEAR));
@@ -550,6 +573,7 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 	}
 	
 	public boolean ensureElementCapacity(int capacity) throws IOException{
+		Assert(shadowList==null);
 		
 		if(hasBackingTransactions()){
 			int toAdd=capacity-size();
@@ -569,19 +593,20 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 	/**
 	 * MUST CALL CLOSE ON STREAM
 	 */
-	public Stream<ChunkLink> openLinkStream(Function<E, ? extends ChunkPointer> pointerMapper) throws IOException{
+	public Stream<ChunkLink> openLinkStream(Function<E, ChunkPointer> getter, BiFunction<E, ChunkPointer, E> setter) throws IOException{
+		if(isEmpty()) return Stream.empty();
 		
 		var chainIo=data.getRoot().io().doRandom();
-		
-		return IntStream.range(0, size()).mapToObj(i->{
+		int siz    =size();
+		return IntStream.range(0, siz).mapToObj(i->{
+			Assert(siz==size());
 			try{
 				chainIo.setPos(calcPos(i));
 				
 				var off=chainIo.getGlobalPos();
-				var e  =getElement(i);
-				var val=pointerMapper.apply(e);
+				var ptr=getter.apply(getElement(i));
 				
-				return new ChunkLink(val, off);
+				return new ChunkLink(false, ptr, off, val->modifyElement(i, e->setter.apply(e, val)));
 			}catch(IOException e){
 				throw UtilL.uncheckedThrow(e);
 			}
@@ -594,62 +619,14 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 		});
 	}
 	
+	public void modifyElement(int index, Function<E, E> modifier) throws IOException{
+		E ay=getElement(index);
+		ay=modifier.apply(ay);
+		setElement(index, ay);
+	}
+	
 	/////////////////////////////////////////////////////////////////////
 	/////////////////////////////////////////////////////////////////////
-	
-	@Override
-	@Deprecated
-	public boolean add(E t){
-		try{
-			addElement(t);
-		}catch(IOException e){
-			throw UtilL.uncheckedThrow(e);
-		}
-		return true;
-	}
-	
-	@Override
-	@Deprecated
-	public E get(int index){
-		try{
-			return getElement(index);
-		}catch(IOException e){
-			throw UtilL.uncheckedThrow(e);
-		}
-	}
-	
-	@Override
-	@Deprecated
-	public E remove(int index){
-		try{
-			E old=getElement(index);
-			removeElement(index);
-			return old;
-		}catch(IOException e){
-			throw UtilL.uncheckedThrow(e);
-		}
-	}
-	
-	@Override
-	@Deprecated
-	public E set(int index, E element){
-		try{
-			E old=getElement(index);
-			setElement(index, element);
-			return old;
-		}catch(IOException e){
-			throw UtilL.uncheckedThrow(e);
-		}
-	}
-	
-	@Override
-	public void clear(){
-		try{
-			clearElements();
-		}catch(IOException e){
-			throw UtilL.uncheckedThrow(e);
-		}
-	}
 	
 	static{
 		TextUtil.CUSTOM_TO_STRINGS.register(t->instanceOf(t, FixedLenList.class), t->instanceOf(t, FixedLenList.class), Object::toString);

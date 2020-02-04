@@ -1,14 +1,8 @@
 package test;
 
-import com.lapissea.fsf.FileSystemInFile;
 import com.lapissea.fsf.Renderer;
-import com.lapissea.fsf.io.IOInterface;
 import com.lapissea.util.LogUtil;
-import com.lapissea.util.function.UnsafeConsumer;
-import com.lapissea.util.function.UnsafeRunnable;
 
-import java.io.File;
-import java.io.IOException;
 import java.io.OutputStream;
 
 import static com.lapissea.util.UtilL.*;
@@ -22,36 +16,8 @@ class FSFTest{
 		LogUtil.Init.attach(LogUtil.Init.USE_CALL_POS|LogUtil.Init.USE_TABULATED_HEADER);
 	}
 	
-	public static void main(String[] args) throws Exception{
-		
-		for(File file : new File(".").listFiles()){
-			file.delete();
-		}
-		
-		
-		var pixelScale=13;
-//		Renderer renderer  =new Renderer.None();
-		Renderer renderer=new Renderer.GUI(pixelScale);
-		
-		
-		UnsafeRunnable<IOException> snapshot=()->{};
-		try{
-			var source=new IOInterface.MemoryRA(false);
-			var fil   =new FileSystemInFile(source);
-			
-			UnsafeConsumer<long[], IOException> snapshotIds=ids->{
-				var copy=new FileSystemInFile(new IOInterface.MemoryRA(source, true));
-				
-				renderer.snapshot(new Renderer.Snapshot(copy, ids, new Throwable("Clicked snapshot")));
-				
-				fil.equals(copy);
-			};
-			
-			if(renderer.doAll()) source.onWrite=snapshotIds;
-			snapshot=()->snapshotIds.accept(NO_IDS);
-			
-			snapshot.run();
-			
+	public static void main(String[] args){
+		TestTemplate.run(Renderer.GUI::new, (fil, snapshot)->{
 			var testFile=fil.createFile("test", 8);
 			try(OutputStream os=testFile.write()){
 				os.write("THIS WORKS!!!!".getBytes());
@@ -120,16 +86,7 @@ class FSFTest{
 			fil.delete("test");
 			
 			fil.getFile("test");
-		}catch(Throwable e){
-			e.printStackTrace();
-		}finally{
-			
-			try{
-				snapshot.run();
-			}catch(Throwable e){}
-			
-			renderer.finish();
-		}
+		});
 	}
 	
 }

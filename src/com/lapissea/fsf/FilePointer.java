@@ -23,7 +23,7 @@ public class FilePointer extends FileObject.FullLayout<FilePointer> implements C
 			                 FilePointer::setLocalPath)
 		                                  ));
 	
-	final Header header;
+	public final transient Header header;
 	
 	private NumberSize startSize;
 	private long       start;
@@ -77,7 +77,7 @@ public class FilePointer extends FileObject.FullLayout<FilePointer> implements C
 	
 	public Chunk dereference() throws IOException{
 		var off=getStart();
-		return off==-1?null:header.getByOffset(off);
+		return off<=0?null:header.getByOffset(off);
 	}
 	
 	@Override

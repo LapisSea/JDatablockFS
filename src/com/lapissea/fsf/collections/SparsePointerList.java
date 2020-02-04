@@ -14,12 +14,12 @@ import com.lapissea.fsf.io.serialization.FileObject;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
-import com.lapissea.util.function.UnsafeBiFunction;
 
 import java.io.IOException;
-import java.util.*;
-import java.util.function.Function;
-import java.util.function.Predicate;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.function.Supplier;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -38,7 +38,7 @@ import static com.lapissea.util.UtilL.*;
  * for localised data fragmentation with minimal extra footprint optimized for smaller data sets.
  * (flags byte + size + next index instead of next offset?)
  */
-public class SparsePointerList<E extends FileObject> extends AbstractList<E> implements ShadowChunks{
+public class SparsePointerList<E extends FileObject> extends IOList.Abstract<E> implements ShadowChunks{
 	
 	public static <H extends FileObject&FixedLenList.ElementHead<H, ?>> void init(ContentOutputStream out, H header, int initialCapacity) throws IOException{
 		FixedLenList.init(NumberSize.BYTE, out, header, initialCapacity, false);
@@ -103,11 +103,13 @@ public class SparsePointerList<E extends FileObject> extends AbstractList<E> imp
 		return read;
 	}
 	
+	@Override
 	public E getElement(int index) throws IOException{
 		Objects.checkIndex(index, size());
 		return Objects.requireNonNull(resolvePointer(getPtr(index)));
 	}
 	
+	@Override
 	public void addElement(E e) throws IOException{
 		Objects.requireNonNull(e);
 		
@@ -126,6 +128,7 @@ public class SparsePointerList<E extends FileObject> extends AbstractList<E> imp
 		if(DEBUG_VALIDATION) checkIntegrity();
 	}
 	
+	@Override
 	public void setElement(int index, E e) throws IOException{
 		Objects.checkIndex(index, size());
 		Objects.requireNonNull(e);
@@ -136,23 +139,26 @@ public class SparsePointerList<E extends FileObject> extends AbstractList<E> imp
 		try(var out=chunk.io().write(true)){
 			e.write(out);
 		}
-		cache.remove(valuePointers.getElement(index));
+		cache.remove(getPtr(index));
 		valuePointers.setElement(index, new ChunkPointer(chunk));
 		
 		if(DEBUG_VALIDATION) checkIntegrity();
 	}
 	
+	@Override
 	public void removeElement(int index) throws IOException{
 		Objects.checkIndex(index, size());
 		
 		if(DEBUG_VALIDATION) checkIntegrity();
-		
-		cache.remove(valuePointers.getElement(index));
+		var valuePtr=getPtr(index);
+		cache.remove(valuePtr);
 		valuePointers.removeElement(index);
+		header.freeChunk(valuePtr.dereference(header));
 		
 		if(DEBUG_VALIDATION) checkIntegrity();
 	}
 	
+	@Override
 	public void clearElements() throws IOException{
 		if(DEBUG_VALIDATION) checkIntegrity();
 		cache.clear();
@@ -160,13 +166,16 @@ public class SparsePointerList<E extends FileObject> extends AbstractList<E> imp
 		if(DEBUG_VALIDATION) checkIntegrity();
 	}
 	
-	public Stream<ChunkLink> openValueLinkStream(UnsafeBiFunction<ChunkPointer, E, ChunkLink, IOException> valueMapper){
+	public interface ValueMapper<E>{
+		ChunkLink map(int valueIndex, ChunkPointer valuePtr, E value) throws IOException;
+	}
+	
+	public Stream<ChunkLink> openValueLinkStream(ValueMapper<E> valueMapper){
 		return IntStream.range(0, size()).mapToObj(i->{
 			try{
 				var valPtr=valuePointers.getElement(i);
 				var val   =getElement(i);
-				
-				return valueMapper.apply(valPtr, val);
+				return valueMapper.map(i, valPtr, val);
 			}catch(IOException e){
 				throw UtilL.uncheckedThrow(e);
 			}
@@ -174,76 +183,12 @@ public class SparsePointerList<E extends FileObject> extends AbstractList<E> imp
 	}
 	
 	public Stream<ChunkLink> openLinkStream() throws IOException{
-		return valuePointers.openLinkStream(Function.identity());
-	}
-	
-	public E findSingle(Predicate<E> comparator) throws IOException{
-		for(int i=0;i<this.size();i++){
-			E e=this.getElement(i);
-			if(comparator.test(e)) return e;
-		}
-		return null;
-	}
-	
-	
-	@Deprecated
-	@Override
-	public E get(int index){
-		try{
-			return getElement(index);
-		}catch(IOException e){
-			throw UtilL.uncheckedThrow(e);
-		}
+		return valuePointers.openLinkStream(e->e, (old, val)->val);
 	}
 	
 	@Override
 	public int size(){
 		return valuePointers.size();
-	}
-	
-	@Deprecated
-	@Override
-	public boolean add(E e){
-		try{
-			addElement(e);
-			return true;
-		}catch(IOException e1){
-			throw UtilL.uncheckedThrow(e1);
-		}
-	}
-	
-	@Deprecated
-	@Override
-	public E set(int index, E element){
-		try{
-			E old=getElement(index);
-			setElement(index, element);
-			return old;
-		}catch(IOException e1){
-			throw UtilL.uncheckedThrow(e1);
-		}
-	}
-	
-	@Deprecated
-	@Override
-	public E remove(int index){
-		try{
-			E old=getElement(index);
-			removeElement(index);
-			return old;
-		}catch(IOException e1){
-			throw UtilL.uncheckedThrow(e1);
-		}
-	}
-	
-	@Deprecated
-	@Override
-	public void clear(){
-		try{
-			clearElements();
-		}catch(IOException e1){
-			throw UtilL.uncheckedThrow(e1);
-		}
 	}
 	
 	@Override

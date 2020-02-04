@@ -40,7 +40,8 @@ public class ChunkChain extends AbstractList<Chunk>{
 		
 		@Override
 		public String toString(){
-			return "\nREFERENCE\n"+Arrays.stream(t.getStackTrace()).map(Objects::toString).collect(Collectors.joining("\n"));
+			return "REFERENCE: "+c;
+//			return "\nREFERENCE\n"+Arrays.stream(t.getStackTrace()).map(Objects::toString).collect(Collectors.joining("\n"));
 		}
 		
 		@Override
@@ -74,8 +75,8 @@ public class ChunkChain extends AbstractList<Chunk>{
 		chunks[size]=chunk;
 		size++;
 		
-		
-		chunk.dependencyInvalidate.add(new InvRef(chunk));
+		var ref=new InvRef(chunk);
+		if(!chunk.dependencyInvalidate.contains(ref)) chunk.dependencyInvalidate.add(ref);
 	}
 	
 	private int lastIndex(){

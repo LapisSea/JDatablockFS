@@ -52,15 +52,18 @@ public class DataMappedModule extends HeaderModule{
 	}
 	
 	@Override
-	public Stream<ChunkLink> getReferenceStream() throws IOException{
-		return Stream.concat(mappings.openLinkStream(),
-		                     mappings.openValueLinkStream((ptr, mapping)->{
-			                     var ch=ptr.dereference(header);
+	public Stream<ChunkLink> openReferenceStream() throws IOException{
+		return Stream.concat(mappings.openLinkStream(), mappings.openValueLinkStream((valueIndex, valuePtr, value)->{
+			var chunk=valuePtr.dereference(header);
 			
-			                     var filePtr=new ChunkPointer(mapping.getStart());
-			                     var source =ch.getDataStart();
-			                     return new ChunkLink(filePtr, source);
-		                     }));
+			var filePtr=new ChunkPointer(value.getStart());
+			var source =chunk.getDataStart();
+			
+			return new ChunkLink(false, filePtr, source, p->{
+				var newVal=new FilePointer(value.header, value.getLocalPath(), p.getValue());
+				mappings.setElement(valueIndex, newVal);
+			});
+		}));
 	}
 	
 	@Override
