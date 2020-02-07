@@ -8,10 +8,7 @@ import com.lapissea.fsf.collections.IOList;
 import com.lapissea.fsf.io.ContentInputStream;
 import com.lapissea.fsf.io.ContentOutputStream;
 import com.lapissea.fsf.io.serialization.FileObject;
-import com.lapissea.util.NotNull;
-import com.lapissea.util.Nullable;
-import com.lapissea.util.TextUtil;
-import com.lapissea.util.UtilL;
+import com.lapissea.util.*;
 import com.lapissea.util.function.UnsafeIntFunction;
 import com.lapissea.util.function.UnsafeSupplier;
 
@@ -124,7 +121,7 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 	
 	private void readListHeader() throws IOException{
 		var h=headerType.get();
-		try(var in=this.data.read()){
+		try(var in=data.read()){
 			h.read(in);
 		}
 		listHeader=h;
@@ -400,12 +397,13 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 			var tOffset=transactionBuffer==null?0:transactionBuffer.data.getRoot().getOffset();
 			
 			shadowList=()->{
-				var l=new FixedLenList<>(headerType, header.getByOffset(offset), tOffset==0?null:header.getByOffset(tOffset));
-				if(l.isEmpty()){
+				var dataChunk=header.getByOffset(offset);
+				if(dataChunk.getSize()==0){
 					shadowList=null;
 					return this;
 				}
-				return l;
+				
+				return new FixedLenList<>(headerType, dataChunk, tOffset==0?null:header.getByOffset(tOffset));
 			};
 			
 			var newHeader=getListHeader().copy();
@@ -617,12 +615,6 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 				throw UtilL.uncheckedThrow(e);
 			}
 		});
-	}
-	
-	public void modifyElement(int index, Function<E, E> modifier) throws IOException{
-		E ay=getElement(index);
-		ay=modifier.apply(ay);
-		setElement(index, ay);
 	}
 	
 	/////////////////////////////////////////////////////////////////////

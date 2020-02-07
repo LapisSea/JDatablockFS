@@ -190,12 +190,25 @@ public class Header{
 		return fileList.findSingle(comp->comp.getLocalPath().equals(path));
 	}
 	
-	public void createFile(String path, long initialSize) throws IOException{
-		String pat     =normalizePath(path);
-		var    existing=getByPathUnsafe(pat);
+	public void createFile(String path) throws IOException{
+		var pat     =normalizePath(path);
+		var existing=getByPathUnsafe(pat);
 		if(existing!=null) return;
 		
-		fileList.addElement(new FilePointer(this, pat, NumberSize.bySize(source.getSize()), 0));
+		fileList.addElement(new FilePointer(this, pat, NumberSize.bySize((long)(source.getSize()*1.3)), 0));
+	}
+	
+	public FilePointer makeFileData(String path, long initialSize) throws IOException{
+		var pat     =normalizePath(path);
+		int ptrIndex=fileList.findIndex(comp->comp.getLocalPath().equals(pat));
+		Assert(ptrIndex!=-1);
+		
+		var mem=aloc(initialSize, true);
+		
+		var ptrNew=new FilePointer(this, pat, mem.getOffset());
+		fileList.setElement(ptrIndex, ptrNew);
+		
+		return ptrNew;
 	}
 	
 	public class SafeAlocSession implements AutoCloseable{
@@ -267,9 +280,7 @@ public class Header{
 		if(best==null) return null;
 		
 		if(diff>0){
-			if(biggest.getCapacity()-initialSize>Chunk.headerSize(source.getSize(), diff)*3){
-				return alocFreeSplit(biggest, initialSize);
-			}
+			return alocFreeSplit(biggest, initialSize);
 		}
 		
 		return alocFreeReuse(best);
@@ -575,7 +586,10 @@ public class Header{
 	private void sourcedChunkIter(BiConsumer<String, Chunk> consumer) throws IOException{
 		for(var chunk : fileList.getShadowChunks()) sourcedChunkIterOne("fileList", chunk, consumer);
 		for(var chunk : freeChunks.getShadowChunks()) sourcedChunkIterOne("freeChunks", chunk, consumer);
-		for(var pointer : fileList) sourcedChunkIterOne("File("+pointer.getLocalPath()+")", pointer.dereference(), consumer);
+		for(var pointer : fileList){
+			var ref=pointer.dereference();
+			if(ref!=null) sourcedChunkIterOne("File("+pointer.getLocalPath()+")", ref, consumer);
+		}
 		for(var val : freeChunks) sourcedChunkIterOne("Free chunk", val.dereference(this), consumer);
 	}
 	
@@ -804,6 +818,7 @@ public class Header{
 	}
 	
 	private Chunk readChunk(long offset) throws IOException{
+		if(DEBUG_VALIDATION) Assert(offset >= FILE_HEADER_SIZE, offset);
 		return Chunk.read(this, offset);
 	}
 	
@@ -819,7 +834,7 @@ public class Header{
 		return getChunkInCache(offset);
 	}
 	
-	public Chunk getByOffset(Long offset) throws IOException{
+	public synchronized Chunk getByOffset(Long offset) throws IOException{
 		var cached=getChunkInCache(offset);
 		if(cached!=null) return cached;
 		

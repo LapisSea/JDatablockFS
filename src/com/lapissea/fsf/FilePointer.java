@@ -5,23 +5,26 @@ import com.lapissea.fsf.io.serialization.Content;
 import com.lapissea.fsf.io.serialization.FileObject;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.Objects;
+
+import static com.lapissea.util.UtilL.*;
 
 public class FilePointer extends FileObject.FullLayout<FilePointer> implements Comparable<FilePointer>{
 	
 	private static final SequenceLayout<FilePointer> LAYOUT=
-		FileObject.sequenceBuilder(List.of(
-			new FlagDef<>(NumberSize.BYTE,
-			              (flags, p)->flags.writeEnum(p.startSize),
+		FileObject.sequenceBuilder(
+			new FlagDef<>((flags, p)->flags.writeEnum(p.startSize),
 			              (flags, p)->p.startSize=flags.readEnum(NumberSize.class)),
 			new NumberDef<>(FilePointer::getStartSize,
-			                FilePointer::getStart,
+			                pointer->{
+				                Assert(pointer.getStart() >= 0, pointer);
+				                return pointer.getStart();
+			                },
 			                FilePointer::setStart),
 			new ContentDef<>(Content.NULL_TERMINATED_STRING,
 			                 FilePointer::getLocalPath,
 			                 FilePointer::setLocalPath)
-		                                  ));
+		                          );
 	
 	public final transient Header header;
 	
@@ -38,7 +41,7 @@ public class FilePointer extends FileObject.FullLayout<FilePointer> implements C
 	}
 	
 	public FilePointer(Header header, String localPath, long start){
-		this(header, localPath, NumberSize.bySize(start), start);
+		this(header, localPath, start==-1?null:NumberSize.bySize(start), start);
 	}
 	
 	public FilePointer(Header header, String localPath, NumberSize startSize, long start){
@@ -58,7 +61,6 @@ public class FilePointer extends FileObject.FullLayout<FilePointer> implements C
 	}
 	
 	private void setStart(long start){
-		startSize=NumberSize.bySize(start);
 		this.start=start;
 	}
 	
@@ -97,5 +99,9 @@ public class FilePointer extends FileObject.FullLayout<FilePointer> implements C
 		result=31*result+Long.hashCode(getStart());
 		result=31*result+(getLocalPath()==null?0:getLocalPath().hashCode());
 		return result;
+	}
+	
+	public String toTableString(){
+		return localPath+(" @"+start)+startSize.shortName;
 	}
 }

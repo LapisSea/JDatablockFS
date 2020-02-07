@@ -34,13 +34,13 @@ public enum NumberSize{
 	
 	public final int  bytes;
 	public final long maxSize;
-	public final char shotName;
+	public final char shortName;
 	
 	private final UnsafeFunctionOL<ContentReader, IOException> reader;
 	private final UnsafeConsumerOL<ContentWriter, IOException> writer;
 	
-	NumberSize(char shotName, long maxSize, int bytes, UnsafeFunctionOL<ContentReader, IOException> reader, UnsafeConsumerOL<ContentWriter, IOException> writer){
-		this.shotName=shotName;
+	NumberSize(char shortName, long maxSize, int bytes, UnsafeFunctionOL<ContentReader, IOException> reader, UnsafeConsumerOL<ContentWriter, IOException> writer){
+		this.shortName=shortName;
 		this.bytes=bytes;
 		this.maxSize=maxSize;
 		this.reader=reader;

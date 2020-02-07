@@ -398,6 +398,8 @@ public interface Renderer{
 						
 						var pp=pixelScale*3;
 						
+						var header=snapshots.get(thisPos).copy.header;
+						
 						var width  =img.getWidth();
 						var hoverX =pos[0];
 						var hoverY =pos[1];
@@ -411,7 +413,6 @@ public interface Renderer{
 							
 							hoverChunk=null;
 							hoverCol=Color.WHITE;
-							var header=snapshots.get(thisPos).copy.header;
 							var chunks=header.allChunks(true);
 							for(var e : chunks.entrySet()){
 								var chains=e.getValue();
@@ -436,6 +437,13 @@ public interface Renderer{
 						
 						g.setRenderingHint(KEY_TEXT_ANTIALIASING, VALUE_TEXT_ANTIALIAS_ON);
 						g.drawString(bytePos+"", pos[0]/pp*pp, pos[1]/pp*pp+pp/2);
+						
+						try{
+							byte[] b=header.source.read(bytePos, 1);
+							g.setFont(new Font(Font.MONOSPACED, Font.BOLD, pixelScale));
+							g.drawString((b[0]&0xFF)+"", pos[0]/pp*pp, pos[1]/pp*pp+pp/2+pixelScale);
+						}catch(IOException ignored){}
+						
 						
 						if(hoverChunk!=null){
 							try{

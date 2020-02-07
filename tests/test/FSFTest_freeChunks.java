@@ -12,9 +12,8 @@ class FSFTest_freeChunks{
 	
 	public static void main(String[] args){
 		TestTemplate.run(Renderer.GUI::new, (fil, snapshot)->{
-			fil.getFile("buffer").writeAll("ay lamaooo".getBytes());
-//			fil.getFile("buffer").delete();
+			FSFTest_console.doCommand(fil, snapshot, "for i 0 100 write file%i lol");
+			FSFTest_console.doCommand(fil, snapshot, "for i 0 100 delete file%i");
 		});
 	}
-	
 }

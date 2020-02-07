@@ -6,6 +6,7 @@ import com.lapissea.util.UtilL;
 import java.io.IOException;
 import java.util.AbstractList;
 import java.util.List;
+import java.util.function.Function;
 import java.util.function.Predicate;
 
 public interface IOList<E> extends List<E>, ShadowChunks{
@@ -13,7 +14,11 @@ public interface IOList<E> extends List<E>, ShadowChunks{
 	abstract class Abstract<E> extends AbstractList<E> implements IOList<E>{
 		@Override
 		public E get(int index){
-			return ((IOList<E>)this).get(index);
+			try{
+				return getElement(index);
+			}catch(IOException e){
+				throw UtilL.uncheckedThrow(e);
+			}
 		}
 	}
 	
@@ -83,10 +88,22 @@ public interface IOList<E> extends List<E>, ShadowChunks{
 	}
 	
 	default E findSingle(Predicate<E> comparator) throws IOException{
-		for(int i=0;i<this.size();i++){
-			E e=this.getElement(i);
-			if(comparator.test(e)) return e;
+		int index=findIndex(comparator);
+		if(index==-1) return null;
+		return getElement(index);
+	}
+	
+	default int findIndex(Predicate<E> comparator) throws IOException{
+		for(int i=0;i<size();i++){
+			E e=getElement(i);
+			if(comparator.test(e)) return i;
 		}
-		return null;
+		return -1;
+	}
+	
+	default void modifyElement(int index, Function<E, E> modifier) throws IOException{
+		E ay=getElement(index);
+		ay=modifier.apply(ay);
+		setElement(index, ay);
 	}
 }

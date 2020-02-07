@@ -171,6 +171,9 @@ public class FileSystemInFile{
 		return new VirtualFile(pointer);
 	}
 	
+	public VirtualFile createFile(String path) throws IOException{
+		return createFile(path, 0);
+	}
 	
 	/**
 	 * Same as {@link #getFile(String) getFile} except it immediately defines and pre allocates space for a file if it does not already exist. (useful when create
@@ -180,7 +183,8 @@ public class FileSystemInFile{
 		
 		var pointer=header.getByPath(path);
 		if(pointer==null){
-			header.createFile(path, initialSize);
+			header.createFile(path);
+			if(initialSize>0) header.makeFileData(path, initialSize);
 			pointer=header.getByPath(path);
 		}
 		
@@ -304,7 +308,7 @@ public class FileSystemInFile{
 			
 			g2.setColor(color);
 			g2.drawString(""+c, x, y);
-			g2.setColor(new Color(1, 1, 1, 0.2F));
+			g2.setColor(new Color(1, 1, 1, 0.4F));
 			g2.drawString(""+c, x, y);
 		};
 		
@@ -395,9 +399,11 @@ public class FileSystemInFile{
 								}else{
 									var siz=chunk.getCapacity();
 								}
-								if(in.getPos()!=counter[0]) pixelPushByte.accept(0, Color.RED);
-								else (owning&&ownsBinaryOnly?pixelPushByte:pixelPush).accept(in.read(), pixelCol);
-								counter[0]++;
+								if(counter[0]<size){
+									if(in.getPos()!=counter[0]) pixelPushByte.accept(0, Color.RED);
+									else (owning&&ownsBinaryOnly?pixelPushByte:pixelPush).accept(in.read(), pixelCol);
+									counter[0]++;
+								}
 							}
 						}
 					}

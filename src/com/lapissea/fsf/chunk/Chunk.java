@@ -658,12 +658,12 @@ public class Chunk{
 		sb.append("[")
 		  .append(getSize())
 		  .append("/")
-		  .append(getCapacity()).append(getBodyType().shotName)
+		  .append(getCapacity()).append(getBodyType().shortName)
 		  .append("]");
 		
 		sb.append(", @").append(getOffset());
 		
-		if(hasNext()) sb.append(", next: ").append(getNext()).append(getNextType().shotName);
+		if(hasNext()) sb.append(", next: ").append(getNext()).append(getNextType().shortName);
 		
 		sb.append('}');
 		return sb.toString();
@@ -674,7 +674,7 @@ public class Chunk{
 		if(!isUsed()) b.append("free ");
 		b.append(getSize());
 		b.append("/");
-		b.append(getCapacity()).append(getBodyType().shotName);
+		b.append(getCapacity()).append(getBodyType().shortName);
 		b.append("@").append(getOffset());
 		return b.toString();
 	}
@@ -682,12 +682,14 @@ public class Chunk{
 	public String toTableString(){
 		StringBuilder b=new StringBuilder();
 		if(!isUsed()) b.append("free ");
+		if(isDirty()) b.append("dirty ");
+		
 		b.append(getSize());
 		b.append("/");
-		b.append(getCapacity()).append(getBodyType().shotName);
+		b.append(getCapacity()).append(getBodyType().shortName);
 		b.append("@").append(getOffset());
 		
-		if(hasNext()) b.append(" -> @").append(getNext()).append(getNextType().shotName);
+		if(hasNext()) b.append(" -> @").append(getNext()).append(getNextType().shortName);
 		return b.toString();
 	}
 	
@@ -714,8 +716,9 @@ public class Chunk{
 	
 	public void nukeChunk() throws IOException{
 		int siz;
-		if(DEBUG_VALIDATION) siz=Math.toIntExact(wholeSize());
-		else siz=FLAGS_SIZE.bytes;
+//		if(DEBUG_VALIDATION) siz=Math.toIntExact(wholeSize());
+//		else
+		siz=FLAGS_SIZE.bytes;
 		
 		header.source.write(getOffset(), false, new byte[siz]);
 	}

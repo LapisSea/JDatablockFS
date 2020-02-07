@@ -2,13 +2,13 @@ package com.lapissea.fsf.collections;
 
 import com.lapissea.fsf.Header;
 import com.lapissea.fsf.NumberSize;
-import com.lapissea.fsf.ShadowChunks;
 import com.lapissea.fsf.Utils;
 import com.lapissea.fsf.chunk.Chunk;
 import com.lapissea.fsf.chunk.ChunkLink;
 import com.lapissea.fsf.chunk.ChunkPointer;
 import com.lapissea.fsf.collections.fixedlist.FixedLenList;
 import com.lapissea.fsf.collections.fixedlist.headers.SizedNumber;
+import com.lapissea.fsf.io.ContentInputStream;
 import com.lapissea.fsf.io.ContentOutputStream;
 import com.lapissea.fsf.io.serialization.FileObject;
 import com.lapissea.util.NotNull;
@@ -38,7 +38,7 @@ import static com.lapissea.util.UtilL.*;
  * for localised data fragmentation with minimal extra footprint optimized for smaller data sets.
  * (flags byte + size + next index instead of next offset?)
  */
-public class SparsePointerList<E extends FileObject> extends IOList.Abstract<E> implements ShadowChunks{
+public class SparsePointerList<E extends FileObject> extends IOList.Abstract<E>{
 	
 	public static <H extends FileObject&FixedLenList.ElementHead<H, ?>> void init(ContentOutputStream out, H header, int initialCapacity) throws IOException{
 		FixedLenList.init(NumberSize.BYTE, out, header, initialCapacity, false);
@@ -94,7 +94,10 @@ public class SparsePointerList<E extends FileObject> extends IOList.Abstract<E> 
 		
 		if(DEBUG_VALIDATION){
 			if(cached!=null){
-				Assert(cached.equals(read), cached, read);
+				if(!cached.equals(read)){
+					checkIntegrity();
+					throw new AssertionError("cache mismatch:\n"+TextUtil.toTable("disk / cache", read, cached));
+				}
 				return cached;
 			}
 		}
@@ -109,6 +112,17 @@ public class SparsePointerList<E extends FileObject> extends IOList.Abstract<E> 
 		return Objects.requireNonNull(resolvePointer(getPtr(index)));
 	}
 	
+	private void writeToChunk(E e, Chunk chunk) throws IOException{
+		try(var out=chunk.io().write(true)){
+			e.write(out);
+		}
+		
+		if(DEBUG_VALIDATION){
+			var read=readValue(chunk.reference());
+			Assert(read.equals(e), read, e);
+		}
+	}
+	
 	@Override
 	public void addElement(E e) throws IOException{
 		Objects.requireNonNull(e);
@@ -118,8 +132,11 @@ public class SparsePointerList<E extends FileObject> extends IOList.Abstract<E> 
 		valuePointers.ensureElementCapacity(valuePointers.size()+1);
 		
 		var chunk=header.aloc(e.length(), false);
-		try(var out=chunk.io().write(true)){
-			e.write(out);
+		writeToChunk(e, chunk);
+		
+		if(DEBUG_VALIDATION){
+			var read=readValue(chunk.reference());
+			if(!read.equals(e)) throw new AssertionError("\n"+TextUtil.toTable("e / read", e, read));
 		}
 		
 		cache.put(new ChunkPointer(chunk), e);
@@ -128,6 +145,7 @@ public class SparsePointerList<E extends FileObject> extends IOList.Abstract<E> 
 		if(DEBUG_VALIDATION) checkIntegrity();
 	}
 	
+	
 	@Override
 	public void setElement(int index, E e) throws IOException{
 		Objects.checkIndex(index, size());
@@ -135,12 +153,39 @@ public class SparsePointerList<E extends FileObject> extends IOList.Abstract<E> 
 		
 		if(DEBUG_VALIDATION) checkIntegrity();
 		
-		var chunk=header.aloc(e.length(), false);
-		try(var out=chunk.io().write(true)){
-			e.write(out);
+		var oldPtr=getPtr(index);
+		
+		var old=getElement(index);
+		if(old!=e){
+			if(old.equals(e)){
+				var cached=cache.get(oldPtr);
+				
+				byte[] bb =new byte[(int)e.length()];
+				var    buf=new ContentOutputStream.BA(bb);
+				cached.read(new ContentInputStream.BA(bb));
+				return;
+			}
+		}else{
+			E read=readValue(oldPtr);
+			if(read.equals(e)) return;
 		}
-		cache.remove(getPtr(index));
-		valuePointers.setElement(index, new ChunkPointer(chunk));
+		
+		var oldChunk=getPtr(index).dereference(header);
+		
+		if(oldChunk.getSize()==e.length()){
+			writeToChunk(e, oldChunk);
+			cache.put(oldChunk.reference(), e);
+		}else{
+			
+			var chunk=header.aloc(e.length(), false);
+			writeToChunk(e, chunk);
+			
+			cache.remove(oldChunk.reference());
+			cache.put(chunk.reference(), e);
+			valuePointers.setElement(index, new ChunkPointer(chunk));
+			
+			header.freeChunkChain(oldChunk);
+		}
 		
 		if(DEBUG_VALIDATION) checkIntegrity();
 	}
@@ -153,7 +198,7 @@ public class SparsePointerList<E extends FileObject> extends IOList.Abstract<E> 
 		var valuePtr=getPtr(index);
 		cache.remove(valuePtr);
 		valuePointers.removeElement(index);
-		header.freeChunk(valuePtr.dereference(header));
+		header.freeChunkChain(valuePtr.dereference(header));
 		
 		if(DEBUG_VALIDATION) checkIntegrity();
 	}

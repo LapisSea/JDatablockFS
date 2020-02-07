@@ -54,7 +54,8 @@ public class VirtualFile{
 	}
 	
 	private void ensureFileExistance(long initialSize) throws IOException{
-		source.header.createFile(source.getLocalPath(), initialSize);
+		source.header.createFile(source.getLocalPath());
+		data=source.header.makeFileData(source.getLocalPath(), initialSize).dereference().io();
 	}
 	
 	private IOInterface getData() throws IOException{
@@ -123,11 +124,17 @@ public class VirtualFile{
 	
 	public OutputStream write(long offset) throws IOException{
 		if(getData()==null){
-			if(offset!=0) ensureFileExistance(0);
-			else return new BufferingInit(true);
+			ensureFileExistance(16);
+//			if(offset!=0) ensureFileExistance(16);
+//			else return new BufferingInit(true);
 		}
 		return getData().write(offset, true);
 		
+	}
+	
+	public long getSizeOnDisk() throws IOException{
+		var data=getData();
+		return data==null?0:data.getCapacity();
 	}
 	
 	public long getSize() throws IOException{
@@ -141,7 +148,9 @@ public class VirtualFile{
 	}
 	
 	public void writeAll(byte[] bytes) throws IOException{
-		if(getData()==null) ensureFileExistance(bytes.length);
+		if(getData()==null){
+			ensureFileExistance(bytes.length);
+		}
 		getData().write(true, bytes);
 	}
 }

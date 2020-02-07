@@ -130,6 +130,10 @@ public abstract class FileObject{
 		private final BiConsumer<FlagWriter, T> getter;
 		private final BiConsumer<FlagReader, T> setter;
 		
+		public FlagDef(BiConsumer<FlagWriter, T> getter, BiConsumer<FlagReader, T> setter){
+			this(NumberSize.BYTE, getter, setter);
+		}
+		
 		public FlagDef(NumberSize size, BiConsumer<FlagWriter, T> getter, BiConsumer<FlagReader, T> setter){
 			this(t->size, getter, setter);
 		}
