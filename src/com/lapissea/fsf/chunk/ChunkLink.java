@@ -50,6 +50,11 @@ public class ChunkLink{
 		return pointer;
 	}
 	
+	public Chunk dereferenceSource(Header header) throws IOException{
+		Assert(sourceValidChunk);
+		return header.getByOffset(sourcePos);
+	}
+	
 	public void setPointer(ChunkPointer pointer) throws IOException{
 		Objects.requireNonNull(pointer);
 		setter.accept(pointer);

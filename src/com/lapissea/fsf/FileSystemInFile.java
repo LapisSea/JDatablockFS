@@ -4,10 +4,7 @@ import com.lapissea.fsf.chunk.Chunk;
 import com.lapissea.fsf.chunk.ChunkLink;
 import com.lapissea.fsf.headermodule.HeaderModule;
 import com.lapissea.fsf.io.IOInterface;
-import com.lapissea.util.PairM;
-import com.lapissea.util.SoftValueHashMap;
-import com.lapissea.util.UtilL;
-import com.lapissea.util.WeakValueHashMap;
+import com.lapissea.util.*;
 import com.lapissea.util.function.BiIntConsumer;
 import com.lapissea.util.function.TriConsumer;
 import com.lapissea.util.function.TriFunction;
@@ -27,6 +24,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.IntStream;
 
+import static com.lapissea.util.UtilL.*;
 import static java.awt.Font.*;
 
 @SuppressWarnings("AutoBoxing")
@@ -256,12 +254,18 @@ public class FileSystemInFile{
 		
 		g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 		
-		int[]     counter={0};
-		boolean[] filled =new boolean[Math.toIntExact(size)];
+		int[]  counter={0};
+		BitSet filled =new BitSet(Math.toIntExact(size));
 		
 		BiIntConsumer<Color> pixelPushByte=(b, color)->{
 			var count=counter[0];
-			filled[count]=true;
+			if(count<filled.size()){
+				
+				if(filled.get(count)){
+					color=Color.RED;
+				}
+				filled.set(count, true);
+			}
 			
 			int x=count%width,
 				y=count/width;
@@ -344,21 +348,19 @@ public class FileSystemInFile{
 			};
 		}
 		
-		for(byte b : Header.getMagicBytes()){
-			pixelPush.accept(b, Color.RED);
-			counter[0]++;
-		}
-		
-		pixelPushByte.accept(header.version.major, Color.RED);
-		counter[0]++;
-		pixelPushByte.accept(header.version.minor, Color.RED);
-		counter[0]++;
+		Color oufColor=new Color(255, 0, 255);
 		
 		BufferedImage lineImgOutline=null;
 		try{
 			var allChunks=header.allChunks(true);
 			
 			try(var in=header.source.doRandom()){
+				for(int i=0;i<Header.FILE_HEADER_SIZE;i++){
+					pixelPush.accept(in.read(), Color.RED);
+					counter[0]++;
+				}
+				
+				var drawn=new HashSet<Long>();
 				
 				for(Map.Entry<HeaderModule, List<List<ChunkLink>>> entry : allChunks.entrySet()){
 					HeaderModule          module=entry.getKey();
@@ -369,11 +371,14 @@ public class FileSystemInFile{
 					for(var chain : chains){
 						var rand=randColor.apply(chain.get(0).sourcePos);
 						
-						var owning=module.getOwning().contains(chain.get(0));
+						var l     =chain.get(0);
+						var owning=l.sourceValidChunk&&module.getOwning().contains(l.dereferenceSource(header));
 						
 						for(var link : chain){
 							if(!link.sourceValidChunk) continue;
-							Chunk chunk=header.getByOffset(link.sourcePos);
+							if(!drawn.add(link.sourcePos)) continue;
+							
+							Chunk chunk=link.dereferenceSource(header);
 							
 							in.setPos(chunk.getOffset());
 							counter[0]=(int)chunk.getOffset();
@@ -384,8 +389,10 @@ public class FileSystemInFile{
 							Color headCol=mix.apply(new Color(Math.min(255, bodyCol.getRed()+100), Math.min(255, bodyCol.getGreen()+100), Math.min(255, bodyCol.getBlue()+100)), rand, 0.7F);
 							
 							for(long i=0, j=chunk.getHeaderSize();i<j;i++){
-								if(in.getPos()!=counter[0]) pixelPushByte.accept(0, Color.RED);
-								else pixelPushByte.accept(in.read(), headCol);
+								
+								var b=in.read();
+								if(b==-1) pixelPushByte.accept(255, oufColor);
+								else pixelPushByte.accept(b, headCol);
 								counter[0]++;
 							}
 							
@@ -399,11 +406,11 @@ public class FileSystemInFile{
 								}else{
 									var siz=chunk.getCapacity();
 								}
-								if(counter[0]<size){
-									if(in.getPos()!=counter[0]) pixelPushByte.accept(0, Color.RED);
-									else (owning&&ownsBinaryOnly?pixelPushByte:pixelPush).accept(in.read(), pixelCol);
-									counter[0]++;
-								}
+								
+								var b=in.read();
+								if(b==-1) pixelPushByte.accept(255, oufColor);
+								else (owning&&ownsBinaryOnly?pixelPushByte:pixelPush).accept(b, pixelCol);
+								counter[0]++;
 							}
 						}
 					}
@@ -551,7 +558,8 @@ public class FileSystemInFile{
 		try(var in=header.source.doRandom()){
 			for(int i=0;i<size;i++){
 				var b=in.readUnsignedInt1();
-				if(!filled[i]){
+				if(!filled.get(i)){
+					Assert(in.getPos()-1==i, in.getPos()-1, i);
 					counter[0]=i;
 					pixelPush.accept(b, Color.DARK_GRAY.darker());
 				}

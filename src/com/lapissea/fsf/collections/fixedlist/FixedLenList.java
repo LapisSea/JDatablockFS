@@ -579,6 +579,8 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 			return transactionBuffer.ensureElementCapacity(transactionBuffer.size()+toAdd);
 		}
 		
+		if(!isEmpty()) updateHeader(getElement(0));
+		
 		if(size() >= capacity) return false;
 		var neededCapacity=capacity*getListHeader().getElementSize()+getListHeader().length();
 		if(data.getCapacity() >= neededCapacity) return false;

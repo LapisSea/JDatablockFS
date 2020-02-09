@@ -50,13 +50,14 @@ public abstract class HeaderModule{
 	}
 	
 	public final Stream<Iterator<ChunkLink>> openChainStream() throws IOException{
-		return Stream.concat(getOwning().stream().map(Chunk::link), openReferenceStream()).map(link->{
-			try{
-				return link.linkWalker(header);
-			}catch(IOException e){
-				throw UtilL.uncheckedThrow(e);
-			}
-		});
+		return Stream.concat(getOwning().stream().map(Chunk::link), openReferenceStream())
+		             .map(link->{
+			             try{
+				             return link.linkWalker(header);
+			             }catch(IOException e){
+				             throw UtilL.uncheckedThrow(e);
+			             }
+		             });
 	}
 	
 	public List<Chunk> getOwning(){

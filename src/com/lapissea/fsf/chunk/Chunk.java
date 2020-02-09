@@ -76,7 +76,7 @@ public class Chunk{
 			if(ba.size()>bodySize) bodySize=ba.size();
 		}
 		
-		var c=new Chunk(null, 0, nextType, 0, bodySize);
+		var c=new Chunk(null, Header.FILE_HEADER_SIZE, nextType, 0, bodySize);
 		
 		c.init(out, ba==null?null:ba.toByteArray());
 		
@@ -149,8 +149,13 @@ public class Chunk{
 		return requireGreaterOrEqual(val, 0);
 	}
 	
+	private static long requireLesserOrEqual(long val, long limit) throws MalformedFileException{
+		if(val>limit) throw new MalformedFileException(val+">"+limit);
+		return val;
+	}
+	
 	private static long requireGreaterOrEqual(long val, long limit) throws MalformedFileException{
-		if(val<0) throw new MalformedFileException();
+		if(val<limit) throw new MalformedFileException(val+"<"+limit);
 		return val;
 	}
 	
@@ -194,14 +199,14 @@ public class Chunk{
 		this.offset=requirePositive(offset);
 		
 		this.nextType=Objects.requireNonNull(nextType);
-		this.next=requireGreaterOrEqual(next, Header.FILE_HEADER_SIZE);
+		this.next=next==0?0:requireGreaterOrEqual(next, Header.FILE_HEADER_SIZE);
 		
 		if(bodyType==NumberSize.VOID) throw new MalformedFileException(new ChunkPointer(offset).toString());
 		this.bodyType=Objects.requireNonNull(bodyType);
 		
 		this.capacity=requireGreaterOrEqual(capacity, 1);
 		
-		this.size=requireGreaterOrEqual(size, capacity);
+		this.size=requireLesserOrEqual(size, capacity);
 		
 		this.used=used;
 		

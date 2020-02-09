@@ -179,7 +179,7 @@ public class Header{
 		fileList=dmm.getMappings();
 
 //		validateFile();
-		
+	
 	}
 	
 	public FilePointer getByPath(String path) throws IOException{
@@ -351,21 +351,20 @@ public class Header{
 	
 	private Chunk alocNew(NumberSize bodyType, long initialSize) throws IOException{
 		Assert(initialSize>0);
-		var chunk=initChunk(source.getSize(), safeNextType(), bodyType, initialSize);
+		var chunk=initChunk(safeNextType(), bodyType, initialSize);
 		if(DEBUG_VALIDATION) validateFile();
 		if(LOG_ACTIONS) logChunkAction("ALOC", chunk);
 		return chunk;
 	}
 	
-	private Chunk initChunk(long offset, NumberSize nextType, NumberSize bodyType, long initialSize) throws IOException{
+	private Chunk initChunk(NumberSize nextType, NumberSize bodyType, long initialSize) throws IOException{
 		
-		var chunk=new Chunk(this, offset, nextType, 0, bodyType, initialSize);
-		putChunkInCache(chunk);
-		
-		try(var out=source.write(source.getSize(), true)){
+		var chunk=new Chunk(this, source.getSize(), nextType, 0, bodyType, initialSize);
+		try(var out=source.write(chunk.getOffset(), true)){
 			chunk.init(out);
 		}
 		
+		putChunkInCache(chunk);
 		
 		return chunk;
 	}
@@ -665,6 +664,8 @@ public class Header{
 				}
 			}
 		}
+		
+		sourcedChunkIter((h, c)->{});
 	}
 	
 	public void freeChunkChain(Chunk chunk) throws IOException{
@@ -852,6 +853,12 @@ public class Header{
 			files[i]=new VirtualFile(fileList.getElement(i));
 		}
 		return files;
+	}
+	
+	public Set<Chunk> allChunkFlat(boolean fakeFileHeadModule) throws IOException{
+		Set<Chunk> chunks=new HashSet<>();
+		allChunkWalkerFlat(fakeFileHeadModule).forEachRemaining(chunks::add);
+		return chunks;
 	}
 	
 	public Iterator<Chunk> allChunkWalkerFlat(boolean fakeFileHeadModule) throws IOException{

@@ -66,7 +66,7 @@ public class FileHeaderModule extends HeaderModule{
 	
 	@Override
 	public Color displayColor(){
-		return Color.RED;
+		return new Color(255, 82, 24);
 	}
 	
 	@Override

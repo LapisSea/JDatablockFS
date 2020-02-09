@@ -12,8 +12,10 @@ class FSFTest_freeChunks{
 	
 	public static void main(String[] args){
 		TestTemplate.run(Renderer.GUI::new, (fil, snapshot)->{
-			FSFTest_console.doCommand(fil, snapshot, "for i 0 100 write file%i lol");
-			FSFTest_console.doCommand(fil, snapshot, "for i 0 100 delete file%i");
+//			FSFTest_console.doCommand(fil, snapshot, "for i 0 100 write file%i loool that's funny");
+			
+			FSFTest_console.doCommand(fil, snapshot, "for i 0 30 write file%i haha");
+			FSFTest_console.doCommand(fil, snapshot, "for i 0 30 write file%i lol haha");
 		});
 	}
 }
