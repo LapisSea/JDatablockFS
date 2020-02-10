@@ -45,4 +45,8 @@ public class SizedChunkPointer extends ChunkPointer{
 	public void setSize(NumberSize size){
 		this.size=size;
 	}
+	
+	public SizedChunkPointer copy(){
+		return new SizedChunkPointer(size, value);
+	}
 }

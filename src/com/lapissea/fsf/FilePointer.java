@@ -1,6 +1,7 @@
 package com.lapissea.fsf;
 
 import com.lapissea.fsf.chunk.Chunk;
+import com.lapissea.fsf.chunk.ChunkPointer;
 import com.lapissea.fsf.io.serialization.Content;
 import com.lapissea.fsf.io.serialization.FileObject;
 
@@ -79,7 +80,7 @@ public class FilePointer extends FileObject.FullLayout<FilePointer> implements C
 	
 	public Chunk dereference() throws IOException{
 		var off=getStart();
-		return off<=0?null:header.getByOffset(off);
+		return off<=0?null:header.getChunk(new ChunkPointer(off));
 	}
 	
 	@Override

@@ -54,8 +54,12 @@ public class ChunkPointer extends FileObject implements Comparable<ChunkPointer>
 	public boolean equals(Object o){
 		if(this==o) return true;
 		if(!(o instanceof ChunkPointer)) return false;
-		var other=(ChunkPointer)o;
-		return equals(other.value);
+		return equals((ChunkPointer)o);
+	}
+	
+	public boolean equals(ChunkPointer ptr){
+		if(ptr==null) return false;
+		return equals(ptr.getValue());
 	}
 	
 	public boolean equals(long ptr){
@@ -73,7 +77,7 @@ public class ChunkPointer extends FileObject implements Comparable<ChunkPointer>
 	}
 	
 	public Chunk dereference(Header header) throws IOException{
-		return header.getByOffset(value);
+		return header.getChunk(this);
 	}
 	
 	public long getValue(){

@@ -7,7 +7,6 @@ import com.lapissea.fsf.chunk.ChunkLink;
 import com.lapissea.fsf.chunk.ChunkPointer;
 import com.lapissea.fsf.io.ContentOutputStream;
 import com.lapissea.util.ArrayViewList;
-import com.lapissea.util.UtilL;
 
 import java.awt.*;
 import java.io.IOException;
@@ -51,13 +50,7 @@ public abstract class HeaderModule{
 	
 	public final Stream<Iterator<ChunkLink>> openChainStream() throws IOException{
 		return Stream.concat(getOwning().stream().map(Chunk::link), openReferenceStream())
-		             .map(link->{
-			             try{
-				             return link.linkWalker(header);
-			             }catch(IOException e){
-				             throw UtilL.uncheckedThrow(e);
-			             }
-		             });
+		             .map(l->l.linkWalker(header));
 	}
 	
 	public List<Chunk> getOwning(){

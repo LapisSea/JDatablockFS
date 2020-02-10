@@ -10,6 +10,8 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.function.Supplier;
+import java.util.stream.Stream;
 
 import static com.lapissea.util.UtilL.*;
 
@@ -50,9 +52,13 @@ public class ChunkLink{
 		return pointer;
 	}
 	
-	public Chunk dereferenceSource(Header header) throws IOException{
+	public ChunkPointer sourceReference(){
 		Assert(sourceValidChunk);
-		return header.getByOffset(sourcePos);
+		return new ChunkPointer(sourcePos);
+	}
+	
+	public Chunk dereferenceSource(Header header) throws IOException{
+		return header.getChunk(sourceReference());
 	}
 	
 	public void setPointer(ChunkPointer pointer) throws IOException{
@@ -65,14 +71,37 @@ public class ChunkLink{
 		return pointer!=null;
 	}
 	
-	public Iterator<ChunkLink> linkWalker(Header header) throws IOException{
-		
-		class ChainWalker implements Iterator<ChunkLink>{
-			ChunkLink link;
-			
-			public ChainWalker(ChunkLink link){
-				this.link=link;
+	private ChunkLink next(Header header){
+		if(hasPointer()){
+			try{
+				return new ChunkLink(getPointer().dereference(header));
+			}catch(IOException e){
+				throw UtilL.uncheckedThrow(e);
 			}
+		}else return null;
+	}
+	
+	public Stream<ChunkLink> linkWalkerStream(Header header){
+		return Stream.generate(new Supplier<ChunkLink>(){
+			ChunkLink link=ChunkLink.this;
+			
+			@Override
+			public ChunkLink get(){
+				synchronized(this){
+					if(link==null) return null;
+					try{
+						return link;
+					}finally{
+						link=link.next(header);
+					}
+				}
+			}
+		}).takeWhile(Objects::nonNull);
+	}
+	
+	public Iterator<ChunkLink> linkWalker(Header header){
+		return new Iterator<>(){
+			ChunkLink link=ChunkLink.this;
 			
 			@Override
 			public boolean hasNext(){
@@ -82,21 +111,12 @@ public class ChunkLink{
 			@Override
 			public ChunkLink next(){
 				if(!hasNext()) throw new NoSuchElementException();
-				
-				var old=link;
-				
-				if(link.hasPointer()){
-					try{
-						link=new ChunkLink(link.getPointer().dereference(header));
-					}catch(IOException e){
-						throw UtilL.uncheckedThrow(e);
-					}
-				}else link=null;
-				
-				return old;
+				try{
+					return link;
+				}finally{
+					link=link.next(header);
+				}
 			}
-		}
-		
-		return new ChainWalker(this);
+		};
 	}
 }

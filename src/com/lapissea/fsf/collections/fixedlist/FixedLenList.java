@@ -8,7 +8,10 @@ import com.lapissea.fsf.collections.IOList;
 import com.lapissea.fsf.io.ContentInputStream;
 import com.lapissea.fsf.io.ContentOutputStream;
 import com.lapissea.fsf.io.serialization.FileObject;
-import com.lapissea.util.*;
+import com.lapissea.util.NotNull;
+import com.lapissea.util.Nullable;
+import com.lapissea.util.TextUtil;
+import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeIntFunction;
 import com.lapissea.util.function.UnsafeSupplier;
 
@@ -393,17 +396,16 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 
 //			LogUtil.println("reformatting", this);
 			
-			var offset =data.getRoot().getOffset();
-			var tOffset=transactionBuffer==null?0:transactionBuffer.data.getRoot().getOffset();
+			ChunkPointer ptr =data.getRoot().reference();
+			ChunkPointer tPtr=transactionBuffer==null?null:transactionBuffer.data.getRoot().reference();
 			
 			shadowList=()->{
-				var dataChunk=header.getByOffset(offset);
+				var dataChunk=header.getChunk(ptr);
 				if(dataChunk.getSize()==0){
 					shadowList=null;
 					return this;
 				}
-				
-				return new FixedLenList<>(headerType, dataChunk, tOffset==0?null:header.getByOffset(tOffset));
+				return new FixedLenList<>(headerType, dataChunk, header.getChunk(tPtr));
 			};
 			
 			var newHeader=getListHeader().copy();

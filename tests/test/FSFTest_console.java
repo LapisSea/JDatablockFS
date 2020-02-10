@@ -71,6 +71,18 @@ class FSFTest_console{
 		}
 	}
 	
+	static class Foo{
+		public final Object lol;
+		public final int    ay;
+		public final String ass;
+		
+		Foo(Object lol, int ay, String ass){
+			this.lol=lol;
+			this.ay=ay;
+			this.ass=ass;
+		}
+	}
+	
 	public static void main(String[] args){
 		
 		TestTemplate.run(Renderer.None::new, (fil, snapshot)->{

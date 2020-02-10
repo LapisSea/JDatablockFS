@@ -180,10 +180,16 @@ public class Chunk{
 	
 	private ContentBuffer headerWriteCache;
 	
+	private ChunkPointer referenceCache;
+	
 	public transient       Throwable lastMod;
 	public final transient Throwable madeAt=new Throwable((counter++)+" "+LocalDateTime.now().toString());
 	
 	public transient List<Runnable> dependencyInvalidate=new ArrayList<>();
+	
+	public Chunk(Header header, ChunkPointer ptr, NumberSize nextType, long next, long capacity) throws MalformedFileException{
+		this(header, ptr.getValue(), nextType, next, capacity);
+	}
 	
 	public Chunk(Header header, long offset, NumberSize nextType, long next, long capacity) throws MalformedFileException{
 		this(header, offset, nextType, next, NumberSize.bySize(capacity), capacity);
@@ -194,14 +200,15 @@ public class Chunk{
 	}
 	
 	public Chunk(Header header, long offset, NumberSize nextType, long next, NumberSize bodyType, long size, long capacity, boolean used) throws MalformedFileException{
+		if(bodyType==NumberSize.VOID) throw new MalformedFileException(new ChunkPointer(offset).toString());
+		
 		this.header=header;
 		
-		this.offset=requirePositive(offset);
+		setOffset(offset);
 		
 		this.nextType=Objects.requireNonNull(nextType);
 		this.next=next==0?0:requireGreaterOrEqual(next, Header.FILE_HEADER_SIZE);
 		
-		if(bodyType==NumberSize.VOID) throw new MalformedFileException(new ChunkPointer(offset).toString());
 		this.bodyType=Objects.requireNonNull(bodyType);
 		
 		this.capacity=requireGreaterOrEqual(capacity, 1);
@@ -221,10 +228,9 @@ public class Chunk{
 		return getNext()!=0;
 	}
 	
-	@SuppressWarnings("AutoBoxing")
 	public Chunk nextChunk() throws IOException{
 		if(!hasNext()) return null;
-		return header.getByOffset(getNext());
+		return header.getChunk(new ChunkPointer(getNext()));
 	}
 	
 	public ChunkIO io(){
@@ -238,18 +244,17 @@ public class Chunk{
 	}
 	
 	public boolean isLastPhysical() throws IOException{
-		return nextPhysicalOffset() >= header.source.getSize();
+		return nextPhysicalOffset()==header.source.getSize();
 	}
 	
 	public long nextPhysicalOffset(){
 		return getDataStart()+getCapacity();
 	}
 	
-	@SuppressWarnings("AutoBoxing")
 	public Chunk nextPhysical() throws IOException{
 		if(isLastPhysical()) return null;
 		
-		return header.getByOffset(nextPhysicalOffset());
+		return header.getChunk(new ChunkPointer(nextPhysicalOffset()));
 	}
 	
 	public long wholeSize(){
@@ -337,7 +342,9 @@ public class Chunk{
 	}
 	
 	public void setOffset(long offset){
+		if(this.offset==offset) return;
 		this.offset=offset;
+		referenceCache=null;
 	}
 	
 	
@@ -525,11 +532,11 @@ public class Chunk{
 		
 		if(DEBUG_VALIDATION) header.validateFile();
 		
-		var oldOff=getOffset();
+		var oldPtr=reference();
 		
 		moveTo(newChunk);
 		
-		var old=header.getByOffset(oldOff);
+		var old=header.getChunk(oldPtr);
 
 //		old.clearNext();
 //		old.setSize(0);
@@ -544,9 +551,9 @@ public class Chunk{
 		
 		if(DEBUG_VALIDATION) header.validateFile();
 		
-		var oldOffset=getOffset();
+		var oldPtr=reference();
 		
-		offset=newChunk.offset;
+		setOffset(newChunk.offset);
 		nextType=newChunk.nextType;
 		bodyType=newChunk.bodyType;
 		capacity=newChunk.capacity;
@@ -556,9 +563,9 @@ public class Chunk{
 		
 		notifyDependency();
 		
-		header.notifyMovement(oldOffset, this);
+		header.notifyMovement(oldPtr, this);
 		
-		var old=header.getByOffset(oldOffset);
+		var old=header.getChunk(oldPtr);
 		old.io().setSize(0);
 		
 		var ch  =collectWholeChain();
@@ -574,7 +581,7 @@ public class Chunk{
 	}
 	
 	public void moveTo(Chunk newChunk) throws IOException{
-		var oldOffset=offset;
+		var oldPtr=reference();
 		
 		byte[] oldData;
 		String oldChunk;
@@ -607,8 +614,7 @@ public class Chunk{
 		io=null;
 		headerWriteCache=null;
 		
-		
-		offset=newChunk.offset;
+		setOffset(newChunk.offset);
 		nextType=newChunk.nextType;
 		bodyType=newChunk.bodyType;
 		capacity=newChunk.capacity;
@@ -627,11 +633,11 @@ public class Chunk{
 		
 		notifyDependency();
 		
-		header.notifyMovement(oldOffset, this);
+		header.notifyMovement(oldPtr, this);
 		
 		if(DEBUG_VALIDATION){
 			checkCaching();
-			var old=header.getByOffsetCached(oldOffset);
+			var old=header.getByOffsetCached(oldPtr);
 			
 			var newData=io().readAll();
 			if(!Arrays.equals(oldData, newData)){
@@ -703,7 +709,7 @@ public class Chunk{
 	}
 	
 	public void checkCaching() throws IOException{
-		var cached=header.getByOffset(getOffset());
+		var cached=header.getChunk(reference());
 		if(cached!=this){
 			Function<Chunk, String> toStr=ch->ch+" "+System.identityHashCode(ch)+"\n"+
 			                                  ch.madeAt.toString()+"\n"+
@@ -729,10 +735,16 @@ public class Chunk{
 	}
 	
 	public ChunkPointer reference(){
-		return new ChunkPointer(this);
+		if(referenceCache==null) referenceCache=new ChunkPointer(this);
+		return referenceCache;
 	}
 	
 	public ChunkLink link(){
 		return new ChunkLink(this);
+	}
+	
+	public void clearSize() throws IOException{
+		setSize(0);
+		syncHeader();
 	}
 }

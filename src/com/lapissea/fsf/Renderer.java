@@ -419,7 +419,7 @@ public interface Renderer{
 								for(var chain : chains){
 									for(ChunkLink link : chain){
 										if(!link.sourceValidChunk) continue;
-										Chunk chunk=header.getByOffset(link.sourcePos);
+										Chunk chunk=link.dereferenceSource(header);
 										if(chunk.overlaps(bytePos, bytePos+1)){
 											hoverChunk=chunk;
 											hoverCol=e.getKey().displayColor();
