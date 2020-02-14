@@ -22,15 +22,15 @@ import static com.lapissea.fsf.FileSystemInFile.*;
 
 public class OffsetIndexSortedList<T extends FileObject&Comparable<T>> extends IOList.Abstract<T>{
 	
-	private static final FileObject.SequenceLayout<OffsetIndexSortedList<?>> HEADER=
-		FileObject.sequenceBuilder(List.of(
+	private static final FileObject.ObjectDef<OffsetIndexSortedList<?>> HEADER=
+		FileObject.sequenceBuilder(
 			new FileObject.NumberDef<>(NumberSize.INT,
 			                           OffsetIndexSortedList::size,
 			                           (l, val)->l.size=(int)val),
 			new FileObject.FlagDef<>(NumberSize.BYTE,
 			                         (flags, l)->flags.writeEnum(l.sizePerOffset),
 			                         (flags, l)->l.sizePerOffset=flags.readEnum(NumberSize.class))
-		                                  ));
+		                          );
 	
 	private static final int OFFSETS_PER_CHUNK=8;
 	private static final int OFFSET_CHUNK_SIZE=OFFSETS_PER_CHUNK*(Long.BYTES);

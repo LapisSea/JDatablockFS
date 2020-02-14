@@ -1,6 +1,7 @@
 package com.lapissea.fsf.chunk;
 
 import com.lapissea.fsf.Header;
+import com.lapissea.fsf.INumber;
 import com.lapissea.fsf.io.ContentInputStream;
 import com.lapissea.fsf.io.ContentReader;
 import com.lapissea.fsf.io.ContentWriter;
@@ -8,7 +9,7 @@ import com.lapissea.fsf.io.serialization.FileObject;
 
 import java.io.IOException;
 
-public class ChunkPointer extends FileObject implements Comparable<ChunkPointer>{
+public class ChunkPointer extends FileObject implements Comparable<ChunkPointer>, INumber{
 	
 	public static ChunkPointer readNew(ContentInputStream src) throws IOException{
 		ChunkPointer ptr=new ChunkPointer();
@@ -80,6 +81,7 @@ public class ChunkPointer extends FileObject implements Comparable<ChunkPointer>
 		return header.getChunk(this);
 	}
 	
+	@Override
 	public long getValue(){
 		return value;
 	}

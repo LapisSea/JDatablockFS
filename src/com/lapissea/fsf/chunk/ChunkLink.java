@@ -81,7 +81,7 @@ public class ChunkLink{
 		}else return null;
 	}
 	
-	public Stream<ChunkLink> linkWalkerStream(Header header){
+	public Stream<ChunkLink> stream(Header header){
 		return Stream.generate(new Supplier<ChunkLink>(){
 			ChunkLink link=ChunkLink.this;
 			
@@ -99,7 +99,7 @@ public class ChunkLink{
 		}).takeWhile(Objects::nonNull);
 	}
 	
-	public Iterator<ChunkLink> linkWalker(Header header){
+	public Iterator<ChunkLink> iterator(Header header){
 		return new Iterator<>(){
 			ChunkLink link=ChunkLink.this;
 			

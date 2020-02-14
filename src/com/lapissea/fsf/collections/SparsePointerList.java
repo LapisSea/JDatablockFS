@@ -6,6 +6,7 @@ import com.lapissea.fsf.Utils;
 import com.lapissea.fsf.chunk.Chunk;
 import com.lapissea.fsf.chunk.ChunkLink;
 import com.lapissea.fsf.chunk.ChunkPointer;
+import com.lapissea.fsf.chunk.MutableChunkPointer;
 import com.lapissea.fsf.collections.fixedlist.FixedLenList;
 import com.lapissea.fsf.collections.fixedlist.headers.SizedNumber;
 import com.lapissea.fsf.io.ContentInputStream;
@@ -45,18 +46,18 @@ public class SparsePointerList<E extends FileObject> extends IOList.Abstract<E>{
 		FixedLenList.init(NumberSize.BYTE, out, header, initialCapacity, false);
 	}
 	
-	private final FixedLenList<SizedNumber, ChunkPointer> valuePointers;
+	private final FixedLenList<SizedNumber<ChunkPointer>, ChunkPointer> valuePointers;
 	
 	private final Map<Integer, E> cache;
 	
 	private final Supplier<E> constructor;
-	private final Header      header;
+	private final Header<?>   header;
 	
 	public SparsePointerList(@NotNull Supplier<E> constructor, @NotNull Chunk data) throws IOException{
 		this.constructor=Objects.requireNonNull(constructor);
 		header=data.header;
 		cache=header.config.newCacheMap();
-		this.valuePointers=new FixedLenList<>(()->new SizedNumber(header.source::getSize), data, null);
+		this.valuePointers=new FixedLenList<>(()->new SizedNumber<>(MutableChunkPointer::new, header.source::getSize), data, null);
 	}
 	
 	private void checkIntegrity() throws IOException{

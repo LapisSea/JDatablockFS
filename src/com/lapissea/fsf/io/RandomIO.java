@@ -6,6 +6,109 @@ import java.util.Objects;
 
 public interface RandomIO extends AutoCloseable, Flushable, ContentWriter, ContentReader{
 	
+	enum Mode{
+		READ_ONLY(true, false),
+		READ_WRITE(true, true);
+		
+		public final boolean canRead;
+		public final boolean canWrite;
+		
+		Mode(boolean canRead, boolean canWrite){
+			this.canRead=canRead;
+			this.canWrite=canWrite;
+		}
+	}
+	
+	static RandomIO readOnly(RandomIO io){
+		Objects.requireNonNull(io);
+		
+		class ReadOnly implements RandomIO{
+			
+			@Override
+			public long getPos() throws IOException{
+				return io.getPos();
+			}
+			
+			@Override
+			public RandomIO setPos(long pos) throws IOException{
+				io.setPos(pos);
+				return this;
+			}
+			
+			@Override
+			public long getSize() throws IOException{
+				return io.getSize();
+			}
+			
+			@Override
+			public RandomIO setSize(long targetSize){
+				throw new UnsupportedOperationException();
+			}
+			
+			@Override
+			public long getCapacity() throws IOException{
+				return io.getCapacity();
+			}
+			
+			@Override
+			public RandomIO setCapacity(long newCapacity){
+				throw new UnsupportedOperationException();
+			}
+			
+			@Override
+			public void close() throws IOException{
+				io.close();
+			}
+			
+			@Override
+			public void flush() throws IOException{
+				io.close();
+			}
+			
+			@Override
+			public int read() throws IOException{
+				return io.read();
+			}
+			
+			@Override
+			public byte[] contentBuf(){
+				return io.contentBuf();
+			}
+			
+			@Override
+			public void write(int b) throws IOException{
+				throw new UnsupportedOperationException();
+			}
+			
+			@Override
+			public void fillZero(long requestedMemory){
+				throw new UnsupportedOperationException();
+			}
+			
+			@Override
+			public long getGlobalPos() throws IOException{
+				return io.getGlobalPos();
+			}
+			
+			@Override
+			public String toString(){
+				return "RO{"+io.toString()+"}";
+			}
+			
+			@Override
+			public int hashCode(){
+				return io.hashCode();
+			}
+			
+			@SuppressWarnings("EqualsWhichDoesntCheckParameterClass")
+			@Override
+			public boolean equals(Object obj){
+				return io.equals(obj);
+			}
+		}
+		return new ReadOnly();
+	}
+	
 	long getPos() throws IOException;
 	
 	RandomIO setPos(long pos) throws IOException;

@@ -2,9 +2,17 @@ package com.lapissea.fsf;
 
 import com.lapissea.fsf.chunk.Chunk;
 import com.lapissea.fsf.chunk.ChunkLink;
+import com.lapissea.fsf.endpoint.IFile;
+import com.lapissea.fsf.endpoint.IFileSystem;
+import com.lapissea.fsf.endpoint.IdentifierIO;
+import com.lapissea.fsf.endpoint.VirtualFile;
+import com.lapissea.fsf.endpoint.data.FileData;
 import com.lapissea.fsf.headermodule.HeaderModule;
 import com.lapissea.fsf.io.IOInterface;
-import com.lapissea.util.*;
+import com.lapissea.util.PairM;
+import com.lapissea.util.SoftValueHashMap;
+import com.lapissea.util.UtilL;
+import com.lapissea.util.WeakValueHashMap;
 import com.lapissea.util.function.BiIntConsumer;
 import com.lapissea.util.function.TriConsumer;
 import com.lapissea.util.function.TriFunction;
@@ -23,12 +31,13 @@ import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static com.lapissea.util.UtilL.*;
 import static java.awt.Font.*;
 
 @SuppressWarnings("AutoBoxing")
-public class FileSystemInFile{
+public class FileSystemInFile<Identifier> implements IFileSystem<Identifier>{
 	
 	public static final boolean DEBUG_VALIDATION=true;
 	
@@ -140,44 +149,45 @@ public class FileSystemInFile{
 		}
 	}
 	
-	public final Header header;
+	public final Header<Identifier> header;
 	
-	public FileSystemInFile(File file) throws IOException{
-		this(file, new Config());
+	public FileSystemInFile(File file, IdentifierIO<Identifier> identifierIO) throws IOException{
+		this(file, identifierIO, new Config());
 	}
 	
-	public FileSystemInFile(File file, Config config) throws IOException{
-		this(new IOInterface.FileRA(file, config), config);
+	public FileSystemInFile(File file, IdentifierIO<Identifier> identifierIO, Config config) throws IOException{
+		this(new FileData(file, config), identifierIO, config);
 	}
 	
-	public FileSystemInFile(IOInterface source) throws IOException{
-		this(source, new Config());
+	public FileSystemInFile(IOInterface source, IdentifierIO<Identifier> identifierIO) throws IOException{
+		this(source, identifierIO, new Config());
 	}
 	
-	public FileSystemInFile(IOInterface source, Config config) throws IOException{
-		header=new Header(source, config);
+	public FileSystemInFile(IOInterface source, IdentifierIO<Identifier> identifierIO, Config config) throws IOException{
+		header=new Header<>(source, identifierIO, config);
 	}
 	
-	public VirtualFile getFile(String path) throws IOException{
-		path=Header.normalizePath(path);
+	@Override
+	public VirtualFile<Identifier> getFile(Identifier path) throws IOException{
 		
 		var pointer=header.getByPath(path);
 		if(pointer==null){
-			pointer=new FilePointer(header, path);
+			pointer=new FilePointer<>(header, path);
 		}
 		
-		return new VirtualFile(pointer);
+		return new VirtualFile<>(pointer);
 	}
 	
-	public VirtualFile createFile(String path) throws IOException{
+	@Override
+	public VirtualFile<Identifier> createFile(Identifier path) throws IOException{
 		return createFile(path, 0);
 	}
 	
 	/**
-	 * Same as {@link #getFile(String) getFile} except it immediately defines and pre allocates space for a file if it does not already exist. (useful when create
+	 * Same as {@link #getFile(Identifier) getFile} except it immediately defines and pre allocates space for a file if it does not already exist. (useful when create
 	 */
-	public VirtualFile createFile(String path, long initialSize) throws IOException{
-		path=Header.normalizePath(path);
+	@Override
+	public VirtualFile<Identifier> createFile(Identifier path, long initialSize) throws IOException{
 		
 		var pointer=header.getByPath(path);
 		if(pointer==null){
@@ -186,17 +196,15 @@ public class FileSystemInFile{
 			pointer=header.getByPath(path);
 		}
 		
-		return new VirtualFile(pointer);
+		return new VirtualFile<>(pointer);
 	}
 	
-	public void delete(String path) throws IOException{
-		getFile(path).delete();
+	@Override
+	public Stream<IFile<Identifier>> listFiles(){
+		return header.listFiles().map(VirtualFile::new);
 	}
 	
-	public VirtualFile[] listFiles() throws IOException{
-		return header.listFiles();
-	}
-	
+	@Override
 	public void defragment() throws IOException{
 		header.defragment();
 	}
@@ -362,9 +370,9 @@ public class FileSystemInFile{
 				
 				var drawn=new HashSet<Long>();
 				
-				for(Map.Entry<HeaderModule, List<List<ChunkLink>>> entry : allChunks.entrySet()){
-					HeaderModule          module=entry.getKey();
-					List<List<ChunkLink>> chains=entry.getValue();
+				for(var entry : allChunks.entrySet()){
+					var module=entry.getKey();
+					var chains=entry.getValue();
 					
 					var ownsBinaryOnly=module.ownsBinaryOnly();
 					
@@ -475,9 +483,9 @@ public class FileSystemInFile{
 				};
 				
 				
-				for(Map.Entry<HeaderModule, List<List<ChunkLink>>> entry : allChunks.entrySet()){
-					HeaderModule          module=entry.getKey();
-					List<List<ChunkLink>> chains=entry.getValue();
+				for(Map.Entry<HeaderModule<Identifier>, List<List<ChunkLink>>> entry : allChunks.entrySet()){
+					HeaderModule<Identifier> module=entry.getKey();
+					List<List<ChunkLink>>    chains=entry.getValue();
 					
 					for(ChunkLink reference : module.buildReferences()){
 						var val =reference.getPointer().getValue();
@@ -579,11 +587,11 @@ public class FileSystemInFile{
 	public boolean equals(Object o){
 		if(this==o) return true;
 		if(!(o instanceof FileSystemInFile)) return false;
-		FileSystemInFile that=(FileSystemInFile)o;
+		var that=(FileSystemInFile<?>)o;
 		return findContentDifference(that)==null;
 	}
 	
-	public PairM<Chunk, Chunk> findContentDifference(FileSystemInFile that){
+	public PairM<Chunk, Chunk> findContentDifference(FileSystemInFile<?> that){
 		
 		Iterator<Chunk> i1, i2;
 		try{

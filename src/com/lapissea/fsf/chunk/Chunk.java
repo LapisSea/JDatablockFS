@@ -200,7 +200,6 @@ public class Chunk{
 	}
 	
 	public Chunk(Header header, long offset, NumberSize nextType, long next, NumberSize bodyType, long size, long capacity, boolean used) throws MalformedFileException{
-		if(bodyType==NumberSize.VOID) throw new MalformedFileException(new ChunkPointer(offset).toString());
 		
 		this.header=header;
 		
@@ -209,7 +208,7 @@ public class Chunk{
 		this.nextType=Objects.requireNonNull(nextType);
 		this.next=next==0?0:requireGreaterOrEqual(next, Header.FILE_HEADER_SIZE);
 		
-		this.bodyType=Objects.requireNonNull(bodyType);
+		this.bodyType=bodyType.requireNonVoid();
 		
 		this.capacity=requireGreaterOrEqual(capacity, 1);
 		
@@ -461,7 +460,23 @@ public class Chunk{
 		});
 	}
 	
-	@Nullable
+	public void shit(){
+		List<StringBuilder> sbs=shit(new StringBuilder());
+	}
+	
+	public <T> List<T> shit(T dummyT){
+		List<T> ts=new ArrayList<>();
+		for(int i=0;i<10;i++){
+			try{
+				ts.add(((Class<T>)dummyT.getClass()).getConstructor().newInstance());
+			}catch(ReflectiveOperationException e){
+				throw new RuntimeException(e);
+			}
+		}
+		return ts;
+	}
+	
+	@NotNull
 	public Chunk findFirstInChain(@NotNull Predicate<Chunk> check) throws IOException{
 		Objects.requireNonNull(check);
 		
@@ -548,6 +563,10 @@ public class Chunk{
 	}
 	
 	public void transparentChainRestart(Chunk newChunk) throws IOException{
+		transparentChainRestart(newChunk, false);
+	}
+	
+	public void transparentChainRestart(Chunk newChunk, boolean freeOld) throws IOException{
 		
 		if(DEBUG_VALIDATION) header.validateFile();
 		
@@ -568,13 +587,17 @@ public class Chunk{
 		var old=header.getChunk(oldPtr);
 		old.io().setSize(0);
 		
-		var ch  =collectWholeChain();
-		var last=ch.get(ch.size()-1);
-		try{
-			last.setNext(old);
-			last.syncHeader();
-		}catch(BitDepthOutOfSpaceException e){
-			throw new NotImplementedException();
+		if(freeOld){
+			header.freeChunkChain(old);
+		}else{
+			Chunk last=findFirstInChain(chunk->!chunk.hasNext());
+			
+			try{
+				last.setNext(old);
+				last.syncHeader();
+			}catch(BitDepthOutOfSpaceException e){
+				throw new NotImplementedException();//TODO
+			}
 		}
 		
 		if(DEBUG_VALIDATION) header.validateFile();
@@ -654,7 +677,7 @@ public class Chunk{
 	}
 	
 	public void notifyDependency(){
-		for(Runnable runnable : dependencyInvalidate){
+		for(Runnable runnable : dependencyInvalidate.toArray(Runnable[]::new)){
 			runnable.run();
 		}
 	}

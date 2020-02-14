@@ -11,16 +11,14 @@ import java.util.function.Supplier;
 
 public class MaxSizeFileObject<E extends FileObject> extends FileObject.FullLayout<MaxSizeFileObject<E>> implements FixedLenList.ElementHead<MaxSizeFileObject<E>, E>{
 	
-	private static final SequenceLayout<MaxSizeFileObject<?>> LAYOUT=FileObject.sequenceBuilder(
-		new FileObject.NumberDef<>(NumberSize.BIG_SHORT, h->h.maxElementSize, (h, v)->h.maxElementSize=(int)v)
-	                                                                                           );
+	private static final ObjectDef<MaxSizeFileObject<?>> LAYOUT=new FileObject.NumberDef<>(NumberSize.BIG_SHORT, h->h.maxElementSize, (h, v)->h.maxElementSize=(int)v);
 	
 	private final Supplier<E> constructor;
 	
 	private int maxElementSize=1;
 	
 	public MaxSizeFileObject(Supplier<E> constructor){
-		super((SequenceLayout<MaxSizeFileObject<E>>)((Object)LAYOUT));
+		super((ObjectDef<MaxSizeFileObject<E>>)((Object)LAYOUT));
 		this.constructor=constructor;
 	}
 	

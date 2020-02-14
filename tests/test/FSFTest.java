@@ -63,29 +63,6 @@ class FSFTest{
 			fil.defragment();
 			snapshot.run();
 			LogUtil.println(fil.getFile("test3").readAllString());
-			if(true) return;
-			
-			LogUtil.println(testFile.readAllString());
-			
-			fil.delete("");
-			
-			LogUtil.println(fil.getFile("test2").readAllString());
-			
-			fil.getFile("test").writeAll("This is a very very very fucking long text that will force the file to grow.".getBytes());
-			LogUtil.println(fil.getFile("test").readAllString());
-			
-			fil.getFile("test").writeAll("This is a bit smaller text that will force the file to grow shrink.".getBytes());
-			LogUtil.println(fil.getFile("test").readAllString());
-			
-			fil.getFile("test").writeAll("This is small.".getBytes());
-			LogUtil.println(fil.getFile("test").readAllString());
-			
-			fil.delete("");
-			System.exit(0);
-			
-			fil.delete("test");
-			
-			fil.getFile("test");
 		});
 	}
 	

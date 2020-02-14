@@ -2,7 +2,9 @@ package test;
 
 import com.lapissea.fsf.FileSystemInFile;
 import com.lapissea.fsf.Renderer;
-import com.lapissea.fsf.io.IOInterface;
+import com.lapissea.fsf.endpoint.IFileSystem;
+import com.lapissea.fsf.endpoint.IdentifierIO;
+import com.lapissea.fsf.endpoint.data.MemoryData;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeRunnable;
 
@@ -12,7 +14,7 @@ import java.util.function.Supplier;
 public class TestTemplate{
 	
 	public interface Runner{
-		void run(FileSystemInFile fil, UnsafeRunnable<IOException> snapshot) throws IOException;
+		void run(IFileSystem<String> fil, UnsafeRunnable<IOException> snapshot) throws IOException;
 	}
 	
 	private static final long[] NO_IDS=new long[0];
@@ -23,11 +25,11 @@ public class TestTemplate{
 		
 		UnsafeRunnable<IOException> snapshot;
 		try{
-			var source=new IOInterface.MemoryRA(false);
-			var fil   =new FileSystemInFile(source);
+			var source=new MemoryData(false);
+			var fil   =new FileSystemInFile<>(source, IdentifierIO.STRING);
 			
 			UnsafeConsumer<long[], IOException> snapshotIds=ids->{
-				var copy=new FileSystemInFile(new IOInterface.MemoryRA(source, true));
+				var copy=new FileSystemInFile<>(new MemoryData(source, true), IdentifierIO.STRING);
 				
 				renderer.snapshot(new Renderer.Snapshot(copy, ids, new Throwable("Clicked snapshot")));
 				

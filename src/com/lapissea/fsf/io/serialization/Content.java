@@ -1,6 +1,7 @@
 package com.lapissea.fsf.io.serialization;
 
 import com.lapissea.fsf.NumberSize;
+import com.lapissea.fsf.SmallNumber;
 import com.lapissea.fsf.flags.FlagReader;
 import com.lapissea.fsf.flags.FlagWriter;
 import com.lapissea.fsf.io.ContentReader;
@@ -13,6 +14,27 @@ import static com.lapissea.fsf.FileSystemInFile.*;
 import static com.lapissea.util.UtilL.*;
 
 public interface Content<T>{
+	
+	Content<byte[]> BYTE_ARRAY_SMALL=new Content<>(){
+		
+		@Override
+		public void write(ContentWriter dest, byte[] bytes) throws IOException{
+			SmallNumber.writeNum(dest, bytes.length);
+			dest.write(bytes);
+		}
+		
+		@Override
+		public byte[] read(ContentReader src) throws IOException{
+			var data=new byte[SmallNumber.readNum(src)];
+			src.readFully(data, 0, data.length);
+			return data;
+		}
+		
+		@Override
+		public int length(byte[] dest){
+			return SmallNumber.bytes(dest.length)+dest.length;
+		}
+	};
 	
 	Content<byte[]> BYTE_ARRAY=new Content<>(){
 		

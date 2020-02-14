@@ -60,11 +60,11 @@ public interface Renderer{
 	}
 	
 	class Snapshot{
-		FileSystemInFile copy;
-		long[]           ids;
-		Throwable        stackTrace;
+		FileSystemInFile<?> copy;
+		long[]              ids;
+		Throwable           stackTrace;
 		
-		public Snapshot(FileSystemInFile copy, long[] ids, Throwable stackTrace){
+		public Snapshot(FileSystemInFile<?> copy, long[] ids, Throwable stackTrace){
 			this.copy=copy;
 			this.ids=ids;
 			this.stackTrace=stackTrace;

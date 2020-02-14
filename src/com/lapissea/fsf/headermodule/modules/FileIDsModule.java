@@ -1,15 +1,15 @@
 package com.lapissea.fsf.headermodule.modules;
 
+import com.lapissea.fsf.FileID;
 import com.lapissea.fsf.FileSystemInFile;
 import com.lapissea.fsf.Header;
 import com.lapissea.fsf.chunk.Chunk;
 import com.lapissea.fsf.chunk.ChunkLink;
-import com.lapissea.fsf.chunk.ChunkPointer;
-import com.lapissea.fsf.chunk.MutableChunkPointer;
 import com.lapissea.fsf.collections.fixedlist.FixedLenList;
 import com.lapissea.fsf.collections.fixedlist.headers.SizedNumber;
 import com.lapissea.fsf.headermodule.HeaderModule;
 import com.lapissea.fsf.io.ContentOutputStream;
+import com.lapissea.util.NotImplementedException;
 
 import java.awt.*;
 import java.io.IOException;
@@ -19,13 +19,13 @@ import java.util.stream.Stream;
 
 import static com.lapissea.fsf.NumberSize.*;
 
-public class FreeChunksModule<Identifier> extends HeaderModule<Identifier>{
+public class FileIDsModule<Identifier> extends HeaderModule<Identifier>{
 	
-	private final Supplier<SizedNumber<ChunkPointer>> headerSupplier=()->new SizedNumber<>(MutableChunkPointer::new, header.source::getSize);
+	private final Supplier<SizedNumber<FileID>> headerSupplier=()->new SizedNumber<>(FileID.Mutable::new, header.source::getSize);
 	
-	private FixedLenList<SizedNumber<ChunkPointer>, ChunkPointer> list;
+	private FixedLenList<SizedNumber<FileID>, FileID> list;
 	
-	public FreeChunksModule(Header<Identifier> header){
+	public FileIDsModule(Header<Identifier> header){
 		super(header);
 	}
 	
@@ -34,7 +34,7 @@ public class FreeChunksModule<Identifier> extends HeaderModule<Identifier>{
 		return 2;
 	}
 	
-	public FixedLenList<SizedNumber<ChunkPointer>, ChunkPointer> getList(){
+	public FixedLenList<SizedNumber<FileID>, FileID> getList(){
 		return Objects.requireNonNull(list);
 	}
 	
@@ -45,7 +45,7 @@ public class FreeChunksModule<Identifier> extends HeaderModule<Identifier>{
 	
 	@Override
 	public void init(ContentOutputStream out, FileSystemInFile.Config config) throws IOException{
-		FixedLenList.init(out, new SizedNumber<>(MutableChunkPointer::new, BYTE, ()->200), config.freeChunkCapacity, true);
+		FixedLenList.init(out, new SizedNumber<FileID>(FileID.Mutable::new, BYTE, ()->200), config.freeChunkCapacity, true);
 	}
 	
 	@Override
@@ -60,12 +60,13 @@ public class FreeChunksModule<Identifier> extends HeaderModule<Identifier>{
 	 */
 	@Override
 	public Stream<ChunkLink> openReferenceStream() throws IOException{
-		return getList().openLinkStream(e->e, (old, ptr)->ptr);
+		throw new NotImplementedException();//TODO
+//		return getList().openLinkStream(e->new ChunkPointer(e.getValue()), (old, ptr)->new ChunkPointer(ptr));
 	}
 	
 	@Override
 	public Color displayColor(){
-		return Color.BLUE.brighter();
+		return Color.GREEN.brighter();
 	}
 	
 	@Override

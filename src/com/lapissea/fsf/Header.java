@@ -5,6 +5,8 @@ import com.lapissea.fsf.collections.IOList;
 import com.lapissea.fsf.collections.fixedlist.FixedLenList;
 import com.lapissea.fsf.collections.fixedlist.headers.FixedNumber;
 import com.lapissea.fsf.collections.fixedlist.headers.SizedNumber;
+import com.lapissea.fsf.endpoint.IdentifierIO;
+import com.lapissea.fsf.endpoint.data.MemoryData;
 import com.lapissea.fsf.exceptions.BitDepthOutOfSpaceException;
 import com.lapissea.fsf.headermodule.HeaderModule;
 import com.lapissea.fsf.headermodule.modules.DataMappedModule;
@@ -19,7 +21,6 @@ import com.lapissea.util.function.UnsafeFunctionOL;
 import java.io.EOFException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.Predicate;
@@ -32,7 +33,7 @@ import static com.lapissea.fsf.NumberSize.*;
 import static com.lapissea.util.UtilL.*;
 
 @SuppressWarnings("AutoBoxing")
-public class Header{
+public class Header<Identifier>{
 	
 	private static final class Region{
 		static Region bySize(long start, long size){
@@ -56,19 +57,13 @@ public class Header{
 		return MAGIC_BYTES.clone();
 	}
 	
-	
-	public static String normalizePath(String path){
-		var p=Paths.get(path).normalize().toString();
-		return p.equals(path)?path:p;
-	}
-	
 	public final Version version;
 	
 	public final IOInterface source;
 	
-	private final IOList<FilePointer>                     fileList;
-	private final FixedLenList<SizedNumber, ChunkPointer> freeChunks;
-	private final Map<ChunkPointer, Chunk>                chunkCache;
+	private final IOList<FilePointer<Identifier>>                       fileList;
+	private final FixedLenList<SizedNumber<ChunkPointer>, ChunkPointer> freeChunks;
+	private final Map<ChunkPointer, Chunk>                              chunkCache;
 	
 	private boolean defragmenting;
 	private boolean safeAloc;
@@ -77,12 +72,15 @@ public class Header{
 	
 	public final FileSystemInFile.Config config;
 	
-	public final List<HeaderModule> modules;
+	public final List<HeaderModule<Identifier>> modules;
 	
-	public Header(IOInterface source, FileSystemInFile.Config config) throws IOException{
+	public final IdentifierIO<Identifier> identifierIO;
+	
+	public Header(IOInterface source, IdentifierIO<Identifier> identifierIO, FileSystemInFile.Config config) throws IOException{
+		this.identifierIO=identifierIO;
 		
-		var dmm=new DataMappedModule(this);
-		var fkm=new FreeChunksModule(this);
+		var dmm=new DataMappedModule<>(this);
+		var fkm=new FreeChunksModule<>(this);
 		
 		modules=List.of(fkm, dmm);
 		
@@ -116,10 +114,10 @@ public class Header{
 			var vs=Version.values();
 			version=vs[vs.length-1];
 			
-			var chunksFakeFile=new IOInterface.MemoryRA(false);
+			var chunksFakeFile=new MemoryData(false);
 			
 			try(var out=chunksFakeFile.write(true)){
-				for(HeaderModule module : modules){
+				for(var module : modules){
 					module.init(out, config);
 				}
 			}
@@ -128,6 +126,7 @@ public class Header{
 			
 			long[] pos={0};
 			try(var in=new ContentInputStream.Wrapp(new TrackingInputStream(chunksFakeFile.read(), pos))){
+				//noinspection InfiniteLoopStatement
 				while(true){
 					var chunk=Chunk.read(null, pos[0], in);
 					in.skipNBytes(chunk.getCapacity());
@@ -165,7 +164,7 @@ public class Header{
 		
 		var iter=headerPointers.iterator();
 		
-		for(HeaderModule module : modules){
+		for(var module : modules){
 			module.read(iter::next);
 		}
 		Assert(!iter.hasNext());
@@ -178,30 +177,24 @@ public class Header{
 	
 	}
 	
-	public FilePointer getByPath(String path) throws IOException{
-		return getByPathUnsafe(normalizePath(path));
-	}
-	
-	private FilePointer getByPathUnsafe(String path) throws IOException{
+	public FilePointer<Identifier> getByPath(Identifier path) throws IOException{
 		return fileList.findSingle(comp->comp.getLocalPath().equals(path));
 	}
 	
-	public void createFile(String path) throws IOException{
-		var pat     =normalizePath(path);
-		var existing=getByPathUnsafe(pat);
+	public void createFile(Identifier path) throws IOException{
+		var existing=getByPath(path);
 		if(existing!=null) return;
 		
-		fileList.addElement(new FilePointer(this, pat, NumberSize.bySize((long)(source.getSize()*1.3)), 0));
+		fileList.addElement(new FilePointer<>(this, path, new SelfSizedNumber(NumberSize.bySize((long)(source.getSize()*1.3)), 0)));
 	}
 	
-	public FilePointer makeFileData(String path, long initialSize) throws IOException{
-		var pat     =normalizePath(path);
-		int ptrIndex=fileList.findIndex(comp->comp.getLocalPath().equals(pat));
+	public FilePointer<Identifier> makeFileData(Identifier path, long initialSize) throws IOException{
+		int ptrIndex=fileList.findIndex(comp->comp.getLocalPath().equals(path));
 		Assert(ptrIndex!=-1);
 		
 		var mem=aloc(initialSize, true);
 		
-		var ptrNew=new FilePointer(this, pat, mem.getOffset());
+		var ptrNew=new FilePointer<>(this, path, new SelfSizedNumber(mem.getOffset()));
 		fileList.setElement(ptrIndex, ptrNew);
 		
 		return ptrNew;
@@ -502,7 +495,7 @@ public class Header{
 		var targetOff=chunk.getOffset();
 		return modules.stream()
 		              .flatMap(m->m.getOwning().stream())
-		              .flatMap(c->c.link().linkWalkerStream(this))
+		              .flatMap(c->c.link().stream(this))
 		              .filter(l->l.sourceValidChunk)
 		              .anyMatch(l->l.sourcePos==targetOff);
 	}
@@ -543,70 +536,28 @@ public class Header{
 		
 		var chain=chainStart.collectWholeChain();
 		
-		for(int i=chain.size()-1;i >= 0;i--){
-			var chunk=chain.get(i);
-			if(chunk.getNextType().canFit(source.getSize())){
-				var toFree=chain.subList(i+1, chain.size());
-				
-				var alocSize=toFree.stream().mapToLong(Chunk::getCapacity).sum()+additionalSpace;
-				var newChunk=aloc(alocSize, false);
-				
-				if(!toFree.isEmpty()){
-					try(var out=newChunk.io().write(false)){
-						try(var in=toFree.get(0).io().read()){
-							in.transferTo(out);
-						}
-					}
-					
+		List<Chunk> toFree;
+		
+		find:
+		{
+			for(int i=chain.size()-1;i >= 0;i--){
+				var chunk=chain.get(i);
+				if(chunk.getNextType().canFit(source.getSize())){
+					toFree=chain.subList(i+1, chain.size());
+					break find;
 				}
-				
-				try{
-					chunk.setNext(newChunk);
-					chunk.syncHeader();
-				}catch(BitDepthOutOfSpaceException e){
-					throw new ShouldNeverHappenError(e);
-				}
-				
-				if(!toFree.isEmpty()){
-					for(var c : toFree){
-						c.clearSize();
-					}
-					try{
-						newChunk.setNext(toFree.get(0));
-					}catch(BitDepthOutOfSpaceException e){
-						throw new ShouldNeverHappenError(e);
-					}
-				}
-				
-				return;
 			}
+			
+			toFree=chain;
 		}
 		
-		var alocSize=chain.stream().mapToLong(Chunk::getSize).sum()+additionalSpace;
+		var first   =toFree.get(0);
+		var newChunk=aloc(calcTotalSize(toFree)+additionalSpace, false);
 		
-		chainStart.moveToAndFreeOld(aloc(alocSize, false));
-		if(chain.size()>1){
-			try(var out=chainStart.io().write(false)){
-				try(var in=chain.get(1).io().read()){
-					in.transferTo(out);
-				}
-			}
-			
-			chainStart.clearNext();
-			
-			var toFree=chain.subList(1, chain.size());
-			
-			if(!toFree.isEmpty()){
-				for(var c : toFree){
-					c.clearSize();
-				}
-				try{
-					chainStart.setNext(toFree.get(0));
-				}catch(BitDepthOutOfSpaceException e){
-					throw new ShouldNeverHappenError(e);
-				}
-			}
-		}
+		first.io().transferTo(newChunk.io());
+		
+		first.transparentChainRestart(newChunk, true);
+		
 	}
 	
 	private void sourcedChunkIterOne(String prevSource, Chunk chunk, BiConsumer<String, Chunk> consumer) throws IOException{
@@ -619,7 +570,7 @@ public class Header{
 		for(var chunk : fileList.getShadowChunks()) sourcedChunkIterOne("fileList", chunk, consumer);
 		for(var chunk : freeChunks.getShadowChunks()) sourcedChunkIterOne("freeChunks", chunk, consumer);
 		for(var pointer : fileList){
-			var ref=pointer.dereference();
+			var ref=pointer.getFile().getFilePtr(this).dereference(this);
 			if(ref!=null) sourcedChunkIterOne("File("+pointer.getLocalPath()+")", ref, consumer);
 		}
 		for(var val : freeChunks) sourcedChunkIterOne("Free chunk", val.dereference(this), consumer);
@@ -737,7 +688,7 @@ public class Header{
 			if(backwardFreeMergeAction(chunk)){
 				if(ff){
 					Assert(freeChunks.remove(new ChunkPointer(chunk)));
-					chunkCache.remove(chunk.getOffset());
+					chunkCache.remove(chunk.reference());
 				}
 				return;
 			}
@@ -877,12 +828,8 @@ public class Header{
 		return read;
 	}
 	
-	public VirtualFile[] listFiles() throws IOException{
-		var files=new VirtualFile[fileList.size()];
-		for(int i=0;i<files.length;i++){
-			files[i]=new VirtualFile(fileList.getElement(i));
-		}
-		return files;
+	public Stream<FilePointer<Identifier>> listFiles(){
+		return fileList.stream();
 	}
 	
 	public Set<Chunk> allChunkFlat(boolean fakeFileHeadModule) throws IOException{
@@ -892,7 +839,7 @@ public class Header{
 	}
 	
 	public Iterator<Chunk> allChunkWalkerFlat(boolean fakeFileHeadModule) throws IOException{
-		Iterator<PairM<HeaderModule, Stream<Iterator<ChunkLink>>>> layered=allChunkWalker(fakeFileHeadModule);
+		var layered=allChunkWalker(fakeFileHeadModule);
 		return new Iterator<>(){
 			Iterator<Iterator<ChunkLink>> chains;
 			Iterator<ChunkLink> chain;
@@ -946,26 +893,25 @@ public class Header{
 			;
 	}
 	
-	public interface ChunkLinkIter{
-		Predicate<HeaderModule> ALL_MODULES=m->true;
+	public interface ChunkLinkIter<Identifier>{
 		
 		/**
 		 * @return should stop iterating
 		 */
-		boolean consume(HeaderModule module, ChunkLink link) throws IOException;
+		boolean consume(HeaderModule<Identifier> module, ChunkLink link) throws IOException;
 	}
 	
-	public Optional<ChunkLinkWModule> allChunkWalkerFlat(boolean fakeFileHeadModule, ChunkLinkIter consumer) throws IOException{
-		return allChunkWalkerFlat(fakeFileHeadModule, ChunkLinkIter.ALL_MODULES, consumer);
+	public Optional<ChunkLinkWModule<Identifier>> allChunkWalkerFlat(boolean fakeFileHeadModule, ChunkLinkIter<Identifier> consumer) throws IOException{
+		return allChunkWalkerFlat(fakeFileHeadModule, m->true, consumer);
 	}
 	
-	public Optional<ChunkLinkWModule> allChunkWalkerFlat(boolean fakeFileHeadModule, Predicate<HeaderModule> moduleFilter, ChunkLinkIter consumer) throws IOException{
+	public Optional<ChunkLinkWModule<Identifier>> allChunkWalkerFlat(boolean fakeFileHeadModule, Predicate<HeaderModule<Identifier>> moduleFilter, ChunkLinkIter<Identifier> consumer) throws IOException{
 		var walker=allChunkWalker(fakeFileHeadModule);
 		while(walker.hasNext()){
 			var pair=walker.next();
 			
 			try(var stream=pair.obj2){
-				HeaderModule module=pair.obj1;
+				var module=pair.obj1;
 				if(!moduleFilter.test(module)) continue;
 				
 				Iterator<Iterator<ChunkLink>> iiter=stream.iterator();
@@ -974,7 +920,7 @@ public class Header{
 					
 					while(iter.hasNext()){
 						var link=iter.next();
-						if(consumer.consume(module, link)) return Optional.of(new ChunkLinkWModule(link, module));
+						if(consumer.consume(module, link)) return Optional.of(new ChunkLinkWModule<>(link, module));
 					}
 				}
 			}
@@ -983,9 +929,9 @@ public class Header{
 		return Optional.empty();
 	}
 	
-	public Map<HeaderModule, List<List<ChunkLink>>> allChunks(boolean fakeFileHeadModule) throws IOException{
+	public Map<HeaderModule<Identifier>, List<List<ChunkLink>>> allChunks(boolean fakeFileHeadModule) throws IOException{
 		
-		Map<HeaderModule, List<List<ChunkLink>>> moduleChunks=new LinkedHashMap<>(modules.size());
+		Map<HeaderModule<Identifier>, List<List<ChunkLink>>> moduleChunks=new LinkedHashMap<>(modules.size());
 		
 		allChunkWalker(fakeFileHeadModule).forEachRemaining(pair->{
 			try(var stream=pair.obj2){
@@ -999,12 +945,12 @@ public class Header{
 		return moduleChunks;
 	}
 	
-	public Iterator<PairM<HeaderModule, Stream<Iterator<ChunkLink>>>> allChunkWalker(boolean fakeFileHeadModule) throws IOException{
-		List<HeaderModule> mds;
+	public Iterator<PairM<HeaderModule<Identifier>, Stream<Iterator<ChunkLink>>>> allChunkWalker(boolean fakeFileHeadModule) throws IOException{
+		List<HeaderModule<Identifier>> mds;
 		
 		if(fakeFileHeadModule){
 			mds=new ArrayList<>(modules.size()+1);
-			mds.add(new FileHeaderModule(this));
+			mds.add(new FileHeaderModule<>(this));
 			mds.addAll(modules);
 		}else{
 			mds=modules;
@@ -1014,9 +960,9 @@ public class Header{
 	}
 	
 	@SuppressWarnings("RedundantThrows")
-	public Iterator<PairM<HeaderModule, Stream<Iterator<ChunkLink>>>> allChunkWalker(Iterable<HeaderModule> modules) throws IOException{
+	public Iterator<PairM<HeaderModule<Identifier>, Stream<Iterator<ChunkLink>>>> allChunkWalker(Iterable<HeaderModule<Identifier>> modules) throws IOException{
 		return new Iterator<>(){
-			Iterator<HeaderModule> moduleIterator=modules.iterator();
+			Iterator<HeaderModule<Identifier>> moduleIterator=modules.iterator();
 			
 			@Override
 			public boolean hasNext(){
@@ -1024,8 +970,8 @@ public class Header{
 			}
 			
 			@Override
-			public PairM<HeaderModule, Stream<Iterator<ChunkLink>>> next(){
-				HeaderModule module=moduleIterator.next();
+			public PairM<HeaderModule<Identifier>, Stream<Iterator<ChunkLink>>> next(){
+				var module=moduleIterator.next();
 				try{
 					return new PairM<>(module, module.openChainStream());
 				}catch(IOException e){
@@ -1053,16 +999,16 @@ public class Header{
 		return getChunk(new ChunkPointer(FILE_HEADER_SIZE));
 	}
 	
-	private Optional<ChunkLinkWModule> findDependency(ChunkPointer ptr, HeaderModule module) throws IOException{
+	private Optional<ChunkLinkWModule<Identifier>> findDependency(ChunkPointer ptr, HeaderModule<Identifier> module) throws IOException{
 		return allChunkWalkerFlat(true, m->module==null||module==m, (m, link)->link.hasPointer()&&link.getPointer().equals(ptr));
 	}
 	
 	private Chunk findChainStart(Chunk chunk) throws IOException{
-		return findChainStart(new ChunkLinkWModule(new ChunkLink(chunk), null));
+		return findChainStart(new ChunkLinkWModule<>(new ChunkLink(chunk), null));
 	}
 	
-	private Chunk findChainStart(ChunkLinkWModule chunk) throws IOException{
-		Optional<ChunkLinkWModule> matchLink=findDependency(new ChunkPointer(chunk.getLink().sourcePos), chunk.getModule());
+	private Chunk findChainStart(ChunkLinkWModule<Identifier> chunk) throws IOException{
+		Optional<ChunkLinkWModule<Identifier>> matchLink=findDependency(new ChunkPointer(chunk.getLink().sourcePos), chunk.getModule());
 		
 		if(matchLink.isEmpty()) return null;
 		var previous=matchLink.get();
@@ -1265,7 +1211,7 @@ public class Header{
 		try{
 			long[] pos={firstChunk().nextPhysicalOffset()};
 			
-			for(HeaderModule module : modules){
+			for(var module : modules){
 				for(Chunk chunk : module.getOwning()){
 					
 					compositChainTo(chunk, pos[0], module::capacityManager);
@@ -1283,7 +1229,7 @@ public class Header{
 				return capacity[0];
 			};
 			
-			for(HeaderModule module : modules){
+			for(var module : modules){
 				for(ChunkLink reference : module.buildReferences()){
 					var chunk=reference.getPointer().dereference(this);
 					if(!chunk.isUsed()) continue;
@@ -1331,7 +1277,7 @@ public class Header{
 	public boolean equals(Object o){
 		if(this==o) return true;
 		if(!(o instanceof Header)) return false;
-		Header header=(Header)o;
+		var header=(Header<?>)o;
 		return version==header.version&&
 		       source.equals(header.source);
 	}
@@ -1368,10 +1314,18 @@ public class Header{
 		if(DEBUG_VALIDATION) validateFile();
 	}
 	
-	public void deleteFile(String localPath) throws IOException{
-		var file=getByPath(localPath);
+	public void deleteFile(Identifier localPath) throws IOException{
+		FilePointer<Identifier> file=getByPath(localPath);
 		fileList.removeElement(fileList.indexOf(file));
-		freeChunkChain(file.dereference());
+		var fileId=file.getFile();
+		if(fileId!=null) freeChunkChain(fileId.getFilePtr(this).dereference(this));
+	}
+	
+	public boolean rename(Identifier id, Identifier newId) throws IOException{
+		int ptrIndex=fileList.findIndex(comp->comp.getLocalPath().equals(id));
+		if(ptrIndex==-1) return false;
+		fileList.modifyElement(ptrIndex, old->old.withPath(newId));
+		return true;
 	}
 	
 	@Override
@@ -1380,6 +1334,10 @@ public class Header{
 		       "version="+version+
 		       ", source="+source+
 		       '}';
+	}
+	
+	public ChunkPointer getFile(FileID fileID){
+		return null;
 	}
 }
 

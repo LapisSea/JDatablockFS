@@ -9,12 +9,11 @@ import com.lapissea.fsf.io.ContentOutputStream;
 import com.lapissea.fsf.io.serialization.FileObject;
 
 import java.io.IOException;
-import java.util.List;
 
 public class FixedNumber extends FileObject.FullLayout<FixedNumber> implements FixedLenList.ElementHead<FixedNumber, ChunkPointer>{
 	
 	
-	private static final SequenceLayout<FixedNumber> LAYOUT=FileObject.sequenceBuilder(List.of());
+	private static final ObjectDef<FixedNumber> LAYOUT=FileObject.sequenceBuilder();
 	
 	private final NumberSize size;
 	

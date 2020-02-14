@@ -17,13 +17,13 @@ public final class TransactionHeader
 	private static final NumberSize ACTION_SIZE=NumberSize.BYTE;
 	private static final NumberSize INDEX_SIZE =NumberSize.INT;
 	
-	private static final SequenceLayout<TransactionHeader<?, ?>> LAYOUT=FileObject.sequenceBuilder(ObjDef.finalRef(h->h.child));
+	private static final ObjectDef<TransactionHeader<?, ?>> LAYOUT=FileObject.sequenceBuilder(ObjDef.finalRef(h->h.child));
 	
 	private final CHILD child;
 	
 	@SuppressWarnings("unchecked")
 	public TransactionHeader(CHILD child){
-		super((SequenceLayout<TransactionHeader<CHILD, E>>)((Object)LAYOUT));
+		super((ObjectDef<TransactionHeader<CHILD, E>>)((Object)LAYOUT));
 		this.child=child;
 	}
 	

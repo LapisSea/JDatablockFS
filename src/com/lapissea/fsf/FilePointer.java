@@ -1,108 +1,87 @@
 package com.lapissea.fsf;
 
-import com.lapissea.fsf.chunk.Chunk;
-import com.lapissea.fsf.chunk.ChunkPointer;
 import com.lapissea.fsf.io.serialization.Content;
 import com.lapissea.fsf.io.serialization.FileObject;
 
-import java.io.IOException;
 import java.util.Objects;
+import java.util.function.Supplier;
 
-import static com.lapissea.util.UtilL.*;
-
-public class FilePointer extends FileObject.FullLayout<FilePointer> implements Comparable<FilePointer>{
+public class FilePointer<Identifier> extends FileObject.FullLayout<FilePointer<Identifier>>/*implements Comparable<FilePointer<Identifier>>*/{
 	
-	private static final SequenceLayout<FilePointer> LAYOUT=
-		FileObject.sequenceBuilder(
-			new FlagDef<>((flags, p)->flags.writeEnum(p.startSize),
-			              (flags, p)->p.startSize=flags.readEnum(NumberSize.class)),
-			new NumberDef<>(FilePointer::getStartSize,
-			                pointer->{
-				                Assert(pointer.getStart() >= 0, pointer);
-				                return pointer.getStart();
-			                },
-			                FilePointer::setStart),
-			new ContentDef<>(Content.NULL_TERMINATED_STRING,
-			                 FilePointer::getLocalPath,
-			                 FilePointer::setLocalPath)
-		                          );
+	private static final ObjectDef<FilePointer<Object>> LAYOUT=FileObject.sequenceBuilder(
+		new ObjDef<>(v->v.fileId,
+		             (v, f)->v.fileId=f,
+		             (Supplier<SelfSizedNumber>)SelfSizedNumber::new),
+		new ContentDef<>(Content.BYTE_ARRAY_SMALL,
+		                 p->p.header.identifierIO.write(p.getLocalPath()),
+		                 (p, v)->p.setLocalPath(p.header.identifierIO.read(v))){
+			@Override
+			public long length(FilePointer<Object> p){
+				var size=p.header.identifierIO.size(p.getLocalPath());
+				return SmallNumber.bytes(size)+size;
+			}
+		}
+	                                                                                     );
 	
-	public final transient Header header;
+	private static final SelfSizedNumber NO_ID=new SelfSizedNumber(0);
 	
-	private NumberSize startSize;
-	private long       start;
-	private String     localPath;
+	public final transient Header<Identifier> header;
 	
-	public FilePointer(Header header){
+	private SelfSizedNumber fileId;
+	private Identifier      localPath;
+	
+	public FilePointer(Header<Identifier> header){
 		this(header, null);
 	}
 	
-	public FilePointer(Header header, String localPath){
-		this(header, localPath, null, -1);
+	public FilePointer(Header<Identifier> header, Identifier path){
+		this(header, path, null);
 	}
 	
-	public FilePointer(Header header, String localPath, long start){
-		this(header, localPath, start==-1?null:NumberSize.bySize(start), start);
-	}
-	
-	public FilePointer(Header header, String localPath, NumberSize startSize, long start){
-		super(LAYOUT);
+	public FilePointer(Header<Identifier> header, Identifier path, SelfSizedNumber fileId){
+		super((ObjectDef<FilePointer<Identifier>>)((Object)LAYOUT));
+		
 		this.header=header;
-		this.localPath=localPath;
-		this.startSize=startSize;
-		this.start=start;
+		this.localPath=path;
+		if(fileId==null) this.fileId=NO_ID;
+		else this.fileId=fileId;
 	}
 	
-	public NumberSize getStartSize(){
-		return startSize;
-	}
-	
-	public long getStart(){
-		return start;
-	}
-	
-	private void setStart(long start){
-		this.start=start;
-	}
-	
-	public String getLocalPath(){
+	public Identifier getLocalPath(){
 		return localPath;
 	}
 	
-	private void setLocalPath(String localPath){
+	private void setLocalPath(Identifier localPath){
 		this.localPath=localPath;
 	}
 	
-	@Override
-	public int compareTo(FilePointer o){
-		return localPath.compareTo(o.localPath);
+	public FileID getFile(){
+		return fileId.getValue()==0?null:new FileID(fileId);
 	}
 	
-	public Chunk dereference() throws IOException{
-		var off=getStart();
-		return off<=0?null:header.getChunk(new ChunkPointer(off));
+	public FilePointer<Identifier> withPath(Identifier path){
+		return new FilePointer<>(header, path, fileId);
 	}
 	
 	@Override
 	public boolean equals(Object o){
 		if(this==o) return true;
 		if(!(o instanceof FilePointer)) return false;
-		FilePointer that=(FilePointer)o;
-		return getStart()==that.getStart()&&
-		       getStartSize()==that.getStartSize()&&
+		var that=(FilePointer<?>)o;
+		return fileId.equals(that.fileId)&&
 		       Objects.equals(getLocalPath(), that.getLocalPath());
 	}
 	
 	@Override
 	public int hashCode(){
 		int result=1;
-		result=31*result+getStartSize().hashCode();
-		result=31*result+Long.hashCode(getStart());
+		result=31*result+fileId.hashCode();
 		result=31*result+(getLocalPath()==null?0:getLocalPath().hashCode());
 		return result;
 	}
 	
 	public String toTableString(){
-		return localPath+(" @"+start)+startSize.shortName;
+		return localPath+" -> "+fileId;
 	}
+	
 }

@@ -19,11 +19,11 @@ import java.util.stream.Stream;
 
 import static com.lapissea.fsf.NumberSize.*;
 
-public class FileHeaderModule extends HeaderModule{
+public class FileHeaderModule<Identifier> extends HeaderModule<Identifier>{
 	
 	private FixedLenList<FixedNumber, ChunkPointer> list;
 	
-	public FileHeaderModule(Header header) throws IOException{
+	public FileHeaderModule(Header<Identifier> header) throws IOException{
 		super(header);
 		list=new FixedLenList<>(()->new FixedNumber(LONG), getOwning().get(0), null);
 	}

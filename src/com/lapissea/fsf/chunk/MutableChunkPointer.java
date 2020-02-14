@@ -1,6 +1,8 @@
 package com.lapissea.fsf.chunk;
 
-public class MutableChunkPointer extends ChunkPointer{
+import com.lapissea.fsf.INumber;
+
+public class MutableChunkPointer extends ChunkPointer implements INumber.Mutable{
 	public MutableChunkPointer(){
 	}
 	
@@ -17,6 +19,7 @@ public class MutableChunkPointer extends ChunkPointer{
 		value=chunk.getOffset();
 	}
 	
+	@Override
 	public void setValue(long value){
 		this.value=value;
 	}

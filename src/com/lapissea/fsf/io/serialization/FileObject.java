@@ -12,9 +12,11 @@ import com.lapissea.util.function.BiConsumerOL;
 import com.lapissea.util.function.FunctionOL;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 import static com.lapissea.util.UtilL.*;
 
@@ -28,14 +30,6 @@ public abstract class FileObject{
 		long length(T parent);
 	}
 	
-	public interface SequenceLayout<T>{
-		void write(ContentWriter stream, T source) throws IOException;
-		
-		void read(ContentReader stream, T dest) throws IOException;
-		
-		long length(T source);
-	}
-	
 	public static class ObjDef<T, V extends FileObject> implements ObjectDef<T>{
 		
 		public static <T, V extends FileObject> ObjDef<T, V> finalRef(Function<T, V> getter){
@@ -47,6 +41,10 @@ public abstract class FileObject{
 		private final Function<T, V>   getter;
 		private final BiConsumer<T, V> setter;
 		private final Function<T, V>   constructor;
+		
+		public ObjDef(Function<T, V> getter, BiConsumer<T, V> setter, Supplier<V> constructor){
+			this(getter, setter, t->constructor.get());
+		}
 		
 		public ObjDef(Function<T, V> getter, BiConsumer<T, V> setter, Function<T, V> constructor){
 			this.getter=getter;
@@ -158,6 +156,19 @@ public abstract class FileObject{
 		}
 	}
 	
+	public static class SingleEnumDef<T, V extends Enum<V>> extends FlagDef<T>{
+		
+		public SingleEnumDef(Class<V> type, Function<T, V> getter, BiConsumer<T, V> setter){
+			super(Arrays.stream(NumberSize.values()).filter(s->s.bytes*8 >= FlagWriter.enumBits(type)).findFirst().orElseThrow(),
+			      (f, t)->f.writeEnum(getter.apply(t)).fillRestAllOne(),
+			      (f, v)->{
+				      V val=f.readEnum(type);
+				      Assert(f.checkRestAllOne());
+				      setter.accept(v, val);
+			      });
+		}
+	}
+	
 	public static class ContentDef<T, V, Type extends Content<V>> implements ObjectDef<T>{
 		private final Function<T, V>   getter;
 		private final BiConsumer<T, V> setter;
@@ -185,7 +196,7 @@ public abstract class FileObject{
 		}
 	}
 	
-	public static final SequenceLayout<Object> EMPTY_SEQUENCE=new SequenceLayout<>(){
+	public static final ObjectDef<Object> EMPTY_SEQUENCE=new ObjectDef<>(){
 		@Override
 		public void write(ContentWriter stream, Object source){}
 		
@@ -196,7 +207,7 @@ public abstract class FileObject{
 		public long length(Object source){ return 0; }
 	};
 	
-	private static class SequenceLayoutArrImpl<T> implements SequenceLayout<T>{
+	private static class SequenceLayoutArrImpl<T> implements ObjectDef<T>{
 		private final ObjectDef<T>[] arr;
 		
 		private final ContentBuffer buf=new ContentBuffer();
@@ -237,22 +248,27 @@ public abstract class FileObject{
 		}
 	}
 	
+	@SuppressWarnings("unchecked")
+	public static <T> ObjectDef<T> sequenceBuilder(){
+		return (ObjectDef<T>)EMPTY_SEQUENCE;
+	}
+	
 	@SafeVarargs
-	public static <T> SequenceLayout<T> sequenceBuilder(ObjectDef<T>... values){
+	public static <T> ObjectDef<T> sequenceBuilder(ObjectDef<T>... values){
 		return sequenceBuilder(ArrayViewList.create(values, null));
 	}
 	
 	@SuppressWarnings("unchecked")
-	public static <T> SequenceLayout<T> sequenceBuilder(List<ObjectDef<T>> values){
-		if(values.isEmpty()) return (SequenceLayout<T>)EMPTY_SEQUENCE;
+	public static <T> ObjectDef<T> sequenceBuilder(List<ObjectDef<T>> values){
+		if(values.isEmpty()) return (ObjectDef<T>)EMPTY_SEQUENCE;
 		return new SequenceLayoutArrImpl<>(values.toArray(ObjectDef[]::new));
 	}
 	
 	public static class FullLayout<SELF extends FullLayout<SELF>> extends FileObject{
 		
-		private final SequenceLayout<SELF> layout;
+		private final ObjectDef<SELF> layout;
 		
-		public FullLayout(SequenceLayout<SELF> layout){
+		public FullLayout(ObjectDef<SELF> layout){
 			this.layout=layout;
 		}
 		

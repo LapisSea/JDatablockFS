@@ -1,8 +1,7 @@
 package com.lapissea.fsf.collections.fixedlist.headers;
 
+import com.lapissea.fsf.INumber;
 import com.lapissea.fsf.NumberSize;
-import com.lapissea.fsf.chunk.ChunkPointer;
-import com.lapissea.fsf.chunk.SizedChunkPointer;
 import com.lapissea.fsf.collections.fixedlist.FixedLenList;
 import com.lapissea.fsf.io.ContentInputStream;
 import com.lapissea.fsf.io.ContentOutputStream;
@@ -10,45 +9,45 @@ import com.lapissea.fsf.io.serialization.FileObject;
 import com.lapissea.util.UnsafeLongSupplier;
 
 import java.io.IOException;
-import java.util.List;
+import java.util.function.Supplier;
 
-import static com.lapissea.fsf.NumberSize.*;
-
-public class SizedNumber extends FileObject.FullLayout<SizedNumber> implements FixedLenList.ElementHead<SizedNumber, ChunkPointer>{
+public class SizedNumber<E extends INumber> extends FileObject.FullLayout<SizedNumber<E>> implements FixedLenList.ElementHead<SizedNumber<E>, E>{
 	
-	private static final SequenceLayout<SizedNumber> LAYOUT=FileObject.sequenceBuilder(List.of(
-		new FlagDef<>(BYTE,
-		              (writer, head)->writer.writeEnum(head.size),
-		              (reader, head)->head.size=reader.readEnum(NumberSize.class))
-	                                                                                          ));
+	private static final ObjectDef<SizedNumber<?>> LAYOUT=FileObject.sequenceBuilder(
+		new SingleEnumDef<>(NumberSize.class,
+		                    head->head.size,
+		                    (head, size)->head.size=size)
+	                                                                                );
 	
 	private NumberSize size;
 	
+	private final Supplier<E>                     constructor;
 	private final UnsafeLongSupplier<IOException> extraSource;
 	
-	public SizedNumber(UnsafeLongSupplier<IOException> extraSource){
-		this(null, extraSource);
+	public SizedNumber(Supplier<E> constructor, UnsafeLongSupplier<IOException> extraSource){
+		this(constructor, null, extraSource);
 	}
 	
-	public SizedNumber(NumberSize size, UnsafeLongSupplier<IOException> extraSource){
-		super(LAYOUT);
+	public SizedNumber(Supplier<E> constructor, NumberSize size, UnsafeLongSupplier<IOException> extraSource){
+		super((ObjectDef<SizedNumber<E>>)((Object)LAYOUT));
 		this.size=size;
+		this.constructor=constructor;
 		this.extraSource=extraSource;
 	}
 	
 	@Override
-	public SizedNumber copy(){
-		return new SizedNumber(size, extraSource);
+	public SizedNumber<E> copy(){
+		return new SizedNumber<>(constructor, size, extraSource);
 	}
 	
 	@Override
-	public boolean willChange(ChunkPointer element) throws IOException{
+	public boolean willChange(E element) throws IOException{
 		var val=element.getValue();
 		return NumberSize.bySize(Math.max(val, extraSource.getAsLong())).max(size)!=size;
 	}
 	
 	@Override
-	public void update(ChunkPointer element) throws IOException{
+	public void update(E element) throws IOException{
 		size=NumberSize.bySize(Math.max(element.getValue(), extraSource.getAsLong())).max(size);
 	}
 	
@@ -58,19 +57,18 @@ public class SizedNumber extends FileObject.FullLayout<SizedNumber> implements F
 	}
 	
 	@Override
-	public ChunkPointer newElement(){
-		return new SizedChunkPointer(size);
+	public E newElement(){
+		return constructor.get();
 	}
 	
 	@Override
-	public void readElement(ContentInputStream src, ChunkPointer dest) throws IOException{
-		var ptr=(SizedChunkPointer)dest;
-		ptr.setSize(size);
-		ptr.read(src);
+	public void readElement(ContentInputStream src, E dest) throws IOException{
+		var num=size.read(src);
+		((INumber.Mutable)dest).setValue(num);
 	}
 	
 	@Override
-	public void writeElement(ContentOutputStream dest, ChunkPointer src) throws IOException{
+	public void writeElement(ContentOutputStream dest, E src) throws IOException{
 		size.write(dest, src.getValue());
 	}
 	

@@ -55,9 +55,16 @@ public enum NumberSize{
 		writer.accept(out, value);
 	}
 	
+	public NumberSize prev(){
+		var prevId=ordinal()-1;
+		if(prevId==-1) return this;
+		return ordinal(prevId);
+	}
+	
 	public NumberSize next(){
-		if(ordinal(VALS.length-1)==this) return this;
-		return ordinal(ordinal()+1);
+		var nextId=ordinal()+1;
+		if(nextId==VALS.length) return this;
+		return ordinal(nextId);
 	}
 	
 	public NumberSize max(NumberSize other){
@@ -82,6 +89,11 @@ public enum NumberSize{
 		for(var l : data){
 			write(stream, l);
 		}
+	}
+	
+	public NumberSize requireNonVoid(){
+		if(this==VOID) throw new RuntimeException("Value must not be "+VOID);
+		return this;
 	}
 	
 }

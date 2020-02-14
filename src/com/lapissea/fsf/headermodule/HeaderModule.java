@@ -18,12 +18,12 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-public abstract class HeaderModule{
+public abstract class HeaderModule<Identifier>{
 	
-	protected final Header      header;
-	private         List<Chunk> owning;
+	protected final Header<Identifier> header;
+	private         List<Chunk>        owning;
 	
-	public HeaderModule(Header header){
+	public HeaderModule(Header<Identifier> header){
 		this.header=header;
 	}
 	
@@ -50,7 +50,7 @@ public abstract class HeaderModule{
 	
 	public final Stream<Iterator<ChunkLink>> openChainStream() throws IOException{
 		return Stream.concat(getOwning().stream().map(Chunk::link), openReferenceStream())
-		             .map(l->l.linkWalker(header));
+		             .map(l->l.iterator(header));
 	}
 	
 	public List<Chunk> getOwning(){

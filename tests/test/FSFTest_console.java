@@ -1,17 +1,18 @@
 package test;
 
-import com.lapissea.fsf.FileSystemInFile;
 import com.lapissea.fsf.Renderer;
+import com.lapissea.fsf.endpoint.IFileSystem;
 import com.lapissea.util.LogUtil;
-import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.function.UnsafeRunnable;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Scanner;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 class FSFTest_console{
@@ -23,7 +24,7 @@ class FSFTest_console{
 	}
 	
 	interface CmdAction{
-		void run(FileSystemInFile file, String data) throws IOException;
+		void run(IFileSystem<String> file, String data) throws IOException;
 	}
 	
 	enum Command{
@@ -50,15 +51,28 @@ class FSFTest_console{
 			}
 		}),
 		READ((file, data)->{
-			LogUtil.println(file.getFile(data).readAllString());
+			var fil=file.getFile(data);
+			if(fil.exists()) LogUtil.println(fil.readAllString());
+			else{
+				LogUtil.println("\""+data+"\" does not exist");
+			}
 		}),
 		RENAME((file, data)->{
-			throw new NotImplementedException();//TODO
+			int pos =data.indexOf(" ");
+			var from=data.substring(0, pos);
+			var to  =data.substring(pos+1);
+			if(!file.getFile(from).rename(to)){
+				LogUtil.println("Failed to rename \""+from+"\" to \""+to+'"');
+			}
 		}),
 		LIST((file, data)->{
-			LogUtil.println(TextUtil.toTable(Arrays.asList(file.listFiles())));
+			LogUtil.println(TextUtil.toTable(file.listFiles().collect(Collectors.toList())));
 		}),
-		DELETE(FileSystemInFile::delete),
+		DELETE((file, data)->{
+			if(!file.getFile(data).delete()){
+				LogUtil.println("Failed to delete: \""+data+'"');
+			}
+		}),
 		DEFRAG((file, data)->{
 			file.defragment();
 		}),
@@ -84,8 +98,9 @@ class FSFTest_console{
 	}
 	
 	public static void main(String[] args){
+		LogUtil.Init.attach(0);
 		
-		TestTemplate.run(Renderer.None::new, (fil, snapshot)->{
+		TestTemplate.run(Renderer.GUI::new, (fil, snapshot)->{
 			Scanner scanner=new Scanner(System.in);
 			while(true){
 				var line=scanner.nextLine();
@@ -100,7 +115,8 @@ class FSFTest_console{
 		});
 	}
 	
-	public static void doCommand(FileSystemInFile fil, UnsafeRunnable<IOException> snapshot, String line) throws IOException{
+	//for i 0 10 write lol%i ay{1234}*%i
+	public static void doCommand(IFileSystem<String> fil, UnsafeRunnable<IOException> snapshot, String line) throws IOException{
 		if(line.startsWith("for ")){
 			var reader=new Scanner(new ByteArrayInputStream((line+"\n").getBytes()));
 			reader.next("\\w*");
@@ -108,10 +124,46 @@ class FSFTest_console{
 			int from =reader.nextInt();
 			int to   =reader.nextInt();
 			
-			line=reader.nextLine().trim();
+			var rawCmd=reader.nextLine();
 			
 			while(from!=to){
-				doCommand(fil, snapshot, line.replace(value, from+""));
+				int forVal=from;
+				
+				var command=new StringBuilder(rawCmd);
+				while(Character.isWhitespace(command.charAt(0))) command.deleteCharAt(0);
+				
+				for(int i=0;i<command.length();i++){
+					char c=command.charAt(i);
+					if(c=='{'){
+						var start=i+1;
+						int end  =start+2;
+						for(;end<command.length();end++){
+							c=command.charAt(end);
+							if(c=='}'){
+								if(end+2+value.length()>command.length()) break;
+								
+								var opC=command.charAt(end+1)+"";
+								var op=Map.<String, Function<String, String>>of(
+									"*", s->s.repeat(forVal)
+								                                               ).get(opC);
+								if(op==null) break;
+								
+								
+								var vTag=command.substring(end+2, end+2+value.length());
+								if(!vTag.equals(value)) break;
+								
+								var valMod=op.apply(command.substring(start, end));
+								command.replace(start-1, end+2+value.length(), valMod);
+							}
+						}
+					}
+				}
+				int ind;
+				while((ind=command.indexOf(value))!=-1){
+					command.replace(ind, ind+value.length(), forVal+"");
+				}
+				
+				doCommand(fil, snapshot, command.toString());
 				if(from<to) from++;
 				else from--;
 			}
@@ -133,6 +185,7 @@ class FSFTest_console{
 			return;
 		}
 		var ls=commandStr.length()+1;
+		System.gc();
 		command.executor.run(fil, ls >= line.length()?"":line.substring(ls));
 		snapshot.run();
 	}
