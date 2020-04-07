@@ -1,45 +1,38 @@
 package com.lapissea.fsf.headermodule.modules;
 
-import com.lapissea.fsf.FileSystemInFile;
 import com.lapissea.fsf.Header;
 import com.lapissea.fsf.chunk.Chunk;
 import com.lapissea.fsf.chunk.ChunkLink;
 import com.lapissea.fsf.chunk.ChunkPointer;
+import com.lapissea.fsf.collections.IOList;
 import com.lapissea.fsf.collections.fixedlist.FixedLenList;
 import com.lapissea.fsf.collections.fixedlist.headers.FixedNumber;
 import com.lapissea.fsf.headermodule.HeaderModule;
-import com.lapissea.fsf.io.ContentOutputStream;
 import com.lapissea.util.UtilL;
 
 import java.awt.*;
 import java.io.IOException;
 import java.util.List;
-import java.util.Objects;
 import java.util.stream.Stream;
 
 import static com.lapissea.fsf.NumberSize.*;
 
-public class FileHeaderModule<Identifier> extends HeaderModule<Identifier>{
+public class FileHeaderModule<Identifier> extends HeaderModule<IOList<ChunkPointer>, Identifier>{
 	
-	private FixedLenList<FixedNumber, ChunkPointer> list;
 	
-	public FileHeaderModule(Header<Identifier> header) throws IOException{
-		super(header);
-		list=new FixedLenList<>(()->new FixedNumber(LONG), getOwning().get(0), null);
+	public FileHeaderModule(Header<Identifier> header){
+		super(header, o->{});
 	}
 	
 	@Override
-	protected int getOwningChunkCount(){
+	public int getOwningChunkCount(){
 		return 1;
 	}
 	
-	public FixedLenList<FixedNumber, ChunkPointer> getList(){
-		return Objects.requireNonNull(list);
-	}
-	
 	@Override
-	public void init(ContentOutputStream out, FileSystemInFile.Config config) throws IOException{
-		FixedLenList.init(out, new FixedNumber(LONG), config.freeChunkCapacity, false);
+	public List<Chunk> init() throws IOException{
+		var pointerCount=header.modules.stream().mapToInt(HeaderModule::getOwningChunkCount).sum();
+		return FixedLenList.init(header, new FixedNumber(LONG), pointerCount, false);
 	}
 	
 	@Override
@@ -52,7 +45,20 @@ public class FileHeaderModule<Identifier> extends HeaderModule<Identifier>{
 	 */
 	@Override
 	public Stream<ChunkLink> openReferenceStream() throws IOException{
-		return getList().openLinkStream(e->e, (old, ptr)->ptr);
+		return getValue().openLinkStream(ChunkPointer.CONVERTER);
+	}
+	
+	@Override
+	protected IOList<ChunkPointer> getValue(){
+		if(super.getValue()==null){
+			try{
+				read(getOwning().iterator()::next);
+			}catch(IOException e){
+				e.printStackTrace();
+			}
+		}
+		
+		return super.getValue();
 	}
 	
 	@Override
@@ -64,6 +70,10 @@ public class FileHeaderModule<Identifier> extends HeaderModule<Identifier>{
 		}
 	}
 	
+	public IOList<ChunkPointer> getList(){
+		return getValue();
+	}
+	
 	@Override
 	public Color displayColor(){
 		return new Color(255, 82, 24);
@@ -72,5 +82,10 @@ public class FileHeaderModule<Identifier> extends HeaderModule<Identifier>{
 	@Override
 	public boolean ownsBinaryOnly(){
 		return true;
+	}
+	
+	@Override
+	protected FixedLenList<FixedNumber, ChunkPointer> postRead() throws IOException{
+		return new FixedLenList<>(()->new FixedNumber(LONG), getOwning().get(0), null);
 	}
 }

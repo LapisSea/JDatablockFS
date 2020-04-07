@@ -12,13 +12,12 @@ import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
+import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeIntFunction;
 import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.function.BiFunction;
-import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -55,29 +54,39 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 		return elementData;
 	}
 	
-	public static <H extends FileObject&ElementHead<H, ?>> void init(ContentOutputStream out, H header, int initialCapacity, boolean addEmergency) throws IOException{
-		init(NumberSize.BYTE, out, header, initialCapacity, addEmergency);
+	public static <H extends FileObject&ElementHead<H, ?>> List<Chunk> init(Header<?> fileHeader, H header, int initialCapacity, boolean addEmergency) throws IOException{
+		return init(fileHeader, NumberSize.BYTE, header, initialCapacity, addEmergency);
 	}
 	
-	public static <H extends FileObject&ElementHead<H, ?>> void init(NumberSize nextType, ContentOutputStream out, H header, int initialCapacity, boolean addEmergency) throws IOException{
-		Chunk.init(out, nextType, (header.length())+initialCapacity*header.getElementSize(), header::write);
-		if(addEmergency) init(out, header.copy(), Math.max(1, initialCapacity/2), false);
+	public static <H extends FileObject&ElementHead<H, ?>> List<Chunk> init(Header<?> fileHeader, NumberSize nextType, H header, int initialCapacity, boolean addEmergency) throws IOException{
+		return init(fileHeader, nextType, header, initialCapacity, addEmergency, header::write);
 	}
 	
-	public static <T, H extends FileObject&ElementHead<H, T>> void init(ContentOutputStream out, H header, List<T> initialElements, boolean addEmergency) throws IOException{
-		Chunk.init(out, NumberSize.BYTE, (header.length())+initialElements.size()*header.getElementSize(), dest->{
+	private static <H extends FileObject&ElementHead<H, ?>> List<Chunk> init(Header<?> fileHeader, NumberSize nextType, H header, int initialCapacity, boolean addEmergency, UnsafeConsumer<ContentOutputStream, IOException> fill) throws IOException{
+		Chunk c=fileHeader.aloc((header.length())+initialCapacity*header.getElementSize(), false);
+		try(var out=c.io().write(true)){
+			fill.accept(out);
+		}
+		if(addEmergency){
+			var ch=init(fileHeader, header.copy(), Math.max(1, initialCapacity/2), false);
+			return Stream.concat(Stream.of(c), ch.stream()).collect(Collectors.toList());
+		}
+		return List.of(c);
+		
+	}
+	
+	public static <T, H extends FileObject&ElementHead<H, T>> List<Chunk> init(Header<?> fileHeader, H header, List<T> initialElements, boolean addEmergency) throws IOException{
+		return init(fileHeader, NumberSize.BYTE, header, initialElements.size(), addEmergency, dest->{
 			header.write(dest);
-			for(T e : initialElements){
-				header.writeElement(dest, e);
+			for(T t : initialElements){
+				header.writeElement(dest, t);
 			}
 		});
-		
-		if(addEmergency) init(out, header.copy(), Math.max(1, initialElements.size()/2), false);
 	}
 	
 	private UnsafeSupplier<FixedLenList<H, E>, IOException> shadowList;
 	
-	private final Header header;
+	private final Header<?> header;
 	
 	private       H           listHeader;
 	private final Supplier<H> headerType;
@@ -90,9 +99,13 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 	
 	private final Map<Integer, E> cache;
 	
+	public FixedLenList(Supplier<H> headerType, @NotNull Chunk data) throws IOException{
+		this(headerType, data, null);
+	}
+	
 	/**
-	 * @param headerType            Provides object that serves to define how to read/write and possibly call for reformation of all elements in this list.
-	 *                              Its size must not change as the list does not support dynamic size headers. The list will not defend against this and corruption will possibly occur.
+	 * @param headerType            Provides object that serves to define how to read/write and possibly call for reformation of all elements in this owner.
+	 *                              Its size must not change as the owner does not support dynamic size headers. The owner will not defend against this and corruption will possibly occur.
 	 * @param data                  Chunk where the data will be read and written to. (and any chunks that are a part of a {@link ChunkChain} whos root is this chunk.
 	 * @param transactionBufferData Chunk where emergency data will be stored in form of a transaction log that will act as shadow changes until the log is applied to main data
 	 */
@@ -201,12 +214,6 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 	}
 	
 	@Override
-	public List<Chunk> getShadowChunks(){
-		if(transactionBuffer!=null) return List.of(data.getRoot(), transactionBuffer.getShadowChunks().get(0));
-		return List.of(data.getRoot());
-	}
-	
-	@Override
 	public int size(){
 		return size;
 	}
@@ -232,7 +239,7 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 	private static final float CAPACITY_SHRINK_RATIO=3F/2;
 	
 	private void setSize(int size) throws IOException{
-		//DO NOT REMOVE list may be accessed while setting capacity!
+		//DO NOT REMOVE owner may be accessed while setting capacity!
 		this.size=size;
 		
 		var newSize=calcPos(size);
@@ -246,11 +253,11 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 	}
 	
 	public long calcPos(int index) throws IOException{
-		return getListHeader().length()+calcDataPos(index);
+		return calcPos(getListHeader(), index);
 	}
 	
-	private int calcDataPos(int index) throws IOException{
-		return getListHeader().getElementSize()*index;
+	public static <H extends FileObject&FixedLenList.ElementHead<H, ?>> long calcPos(H listHeader, int index) throws IOException{
+		return listHeader.length()+listHeader.getElementSize()*index;
 	}
 	
 	@Override
@@ -353,6 +360,7 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 		return e;
 	}
 	
+	@Override
 	public void checkIntegrity() throws IOException{
 		
 		if(DEBUG_VALIDATION){
@@ -510,7 +518,7 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 		}
 		int newSize=size()-1;
 		
-		//removing last element can be done by simply declaring it not inside list
+		//removing last element can be done by simply declaring it not inside owner
 		if(newSize==index){
 			cache.remove(newSize);
 			setSize(newSize);
@@ -529,6 +537,11 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 	public void clearElements() throws IOException{
 		if(isEmpty()) return;
 		doTransaction(new Transaction<>(Action.CLEAR));
+	}
+	
+	@Override
+	public Chunk getData(){
+		return data.getRoot();
 	}
 	
 	void applyClear() throws IOException{
@@ -595,10 +608,11 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 	/**
 	 * MUST CALL CLOSE ON STREAM
 	 */
-	public Stream<ChunkLink> openLinkStream(Function<E, ChunkPointer> getter, BiFunction<E, ChunkPointer, E> setter) throws IOException{
+	@Override
+	public Stream<ChunkLink> openLinkStream(PointerConverter<E> converter) throws IOException{
 		if(isEmpty()) return Stream.empty();
 		
-		var chainIo=data.getRoot().io().doRandom();
+		var chainIo=getData().io().doRandom();
 		int siz    =size();
 		return IntStream.range(0, siz).mapToObj(i->{
 			Assert(siz==size());
@@ -606,9 +620,9 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 				chainIo.setPos(calcPos(i));
 				
 				var off=chainIo.getGlobalPos();
-				var ptr=getter.apply(getElement(i));
+				var ptr=converter.get(header, getElement(i));
 				
-				return new ChunkLink(false, ptr, off, val->modifyElement(i, e->setter.apply(e, val)));
+				return new ChunkLink(false, ptr, off, val->modifyElement(i, e->converter.set(header, e, val)));
 			}catch(IOException e){
 				throw UtilL.uncheckedThrow(e);
 			}

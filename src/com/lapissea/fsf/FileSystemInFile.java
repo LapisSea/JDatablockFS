@@ -2,11 +2,12 @@ package com.lapissea.fsf;
 
 import com.lapissea.fsf.chunk.Chunk;
 import com.lapissea.fsf.chunk.ChunkLink;
+import com.lapissea.fsf.collections.IOList;
 import com.lapissea.fsf.endpoint.IFile;
 import com.lapissea.fsf.endpoint.IFileSystem;
 import com.lapissea.fsf.endpoint.IdentifierIO;
 import com.lapissea.fsf.endpoint.VirtualFile;
-import com.lapissea.fsf.endpoint.data.FileData;
+import com.lapissea.fsf.endpoint.data.BaseFileData;
 import com.lapissea.fsf.headermodule.HeaderModule;
 import com.lapissea.fsf.io.IOInterface;
 import com.lapissea.util.PairM;
@@ -36,7 +37,7 @@ import java.util.stream.Stream;
 import static com.lapissea.util.UtilL.*;
 import static java.awt.Font.*;
 
-@SuppressWarnings("AutoBoxing")
+@SuppressWarnings({"AutoBoxing", "RedundantThrows"})
 public class FileSystemInFile<Identifier> implements IFileSystem<Identifier>{
 	
 	public static final boolean DEBUG_VALIDATION=true;
@@ -84,9 +85,9 @@ public class FileSystemInFile<Identifier> implements IFileSystem<Identifier>{
 		 */
 		public static int       DEFAULT_MINIMUM_CHUNK_SIZE      =16;
 		/**
-		 * Defines how much free chunks can be kept track of before fragmenting the list.
+		 * Defines how much free chunks can be kept track of before fragmenting the owner.
 		 */
-		public static int       DEFAULT_FREE_CHUNK_CAPACITY     =2;
+		public static int       DEFAULT_FREE_CHUNK_CAPACITY     =8;
 		/**
 		 * Defines a memory caching policy to reduce repeated reads and deserialization. This policy is enforced within a {@link Map} implementation used by various systems. <br><br>
 		 * Rules:
@@ -94,7 +95,7 @@ public class FileSystemInFile<Identifier> implements IFileSystem<Identifier>{
 		 *     <li>If a {@link Map} returns <code>null</code> for a particular <code>long offset</code> then a value is not cached and must be read and parsed.</li>
 		 *
 		 *     <li>If a {@link Map} returns <code>non null</code> then this is object when serialized must produce the same bytes in values and length as
-		 *     the bytes under the offset in the underlying {@link IOInterface} (<code>offset</code> local to a sub system such as a list or global, depending on the context)</li>
+		 *     the bytes under the offset in the underlying {@link IOInterface} (<code>offset</code> local to a sub system such as a owner or global, depending on the context)</li>
 		 *
 		 *     <li><b>ALL</b> cached objects <b>MUST</b> be kept in synchronisation with the underlying {@link IOInterface} (by modification of existing
 		 *     objects not replacement in order to keep existing references in sync) with an exception of outside modifications what is illegal as outside
@@ -156,7 +157,7 @@ public class FileSystemInFile<Identifier> implements IFileSystem<Identifier>{
 	}
 	
 	public FileSystemInFile(File file, IdentifierIO<Identifier> identifierIO, Config config) throws IOException{
-		this(new FileData(file, config), identifierIO, config);
+		this(new BaseFileData(file, config), identifierIO, config);
 	}
 	
 	public FileSystemInFile(IOInterface source, IdentifierIO<Identifier> identifierIO) throws IOException{
@@ -169,18 +170,11 @@ public class FileSystemInFile<Identifier> implements IFileSystem<Identifier>{
 	
 	@Override
 	public VirtualFile<Identifier> getFile(Identifier path) throws IOException{
+		var ptr=header.getFilePtrByPath(path)
+		              .map(IOList.Ref::getFake)
+		              .orElseGet(()->new FileTag<>(header, path));
 		
-		var pointer=header.getByPath(path);
-		if(pointer==null){
-			pointer=new FilePointer<>(header, path);
-		}
-		
-		return new VirtualFile<>(pointer);
-	}
-	
-	@Override
-	public VirtualFile<Identifier> createFile(Identifier path) throws IOException{
-		return createFile(path, 0);
+		return new VirtualFile<>(ptr);
 	}
 	
 	/**
@@ -189,14 +183,18 @@ public class FileSystemInFile<Identifier> implements IFileSystem<Identifier>{
 	@Override
 	public VirtualFile<Identifier> createFile(Identifier path, long initialSize) throws IOException{
 		
-		var pointer=header.getByPath(path);
-		if(pointer==null){
-			header.createFile(path);
-			if(initialSize>0) header.makeFileData(path, initialSize);
-			pointer=header.getByPath(path);
-		}
+		var pointer=header.getFilePtrByPath(path);
+		if(pointer.isPresent()) return new VirtualFile<>(pointer.get().get());
 		
-		return new VirtualFile<>(pointer);
+		var created=header.createFileTag(path);
+		if(initialSize>0){
+			var tag=header.alocIDToTag(created, initialSize);
+			if(DEBUG_VALIDATION){
+				Assert(created.get().equals(tag));
+				Assert(tag.equals(header.getFilePtrByPath(path).orElseThrow().get()));
+			}
+		}
+		return new VirtualFile<>(created.get());
 	}
 	
 	@Override
@@ -206,7 +204,8 @@ public class FileSystemInFile<Identifier> implements IFileSystem<Identifier>{
 	
 	@Override
 	public void defragment() throws IOException{
-		header.defragment();
+//		header.defragment();
+		throw null;
 	}
 	
 	
@@ -483,12 +482,16 @@ public class FileSystemInFile<Identifier> implements IFileSystem<Identifier>{
 				};
 				
 				
-				for(Map.Entry<HeaderModule<Identifier>, List<List<ChunkLink>>> entry : allChunks.entrySet()){
-					HeaderModule<Identifier> module=entry.getKey();
-					List<List<ChunkLink>>    chains=entry.getValue();
+				for(var entry : allChunks.entrySet()){
+					HeaderModule<?, Identifier> module=entry.getKey();
+					List<List<ChunkLink>>       chains=entry.getValue();
 					
 					for(ChunkLink reference : module.buildReferences()){
-						var val =reference.getPointer().getValue();
+						var ptr=reference.getPointer();
+						if(ptr==null){
+							continue;
+						}
+						var val =ptr.getValue();
 						var rand=randColor.apply(val);
 						drawLink.accept(rand, reference.sourcePos, val);
 					}

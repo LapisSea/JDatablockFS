@@ -39,6 +39,10 @@ public class ChunkLink{
 		this(true, pointer, source.getOffset(), setter);
 	}
 	
+	public ChunkLink(boolean sourceValidChunk, ChunkPointer pointer, long sourcePos){
+		this(sourceValidChunk, pointer, sourcePos, o->{throw new UnsupportedOperationException();});
+	}
+	
 	public ChunkLink(boolean sourceValidChunk, ChunkPointer pointer, long sourcePos, UnsafeConsumer<ChunkPointer, IOException> setter){
 		this.sourceValidChunk=sourceValidChunk;
 		Assert(sourcePos>0);
@@ -57,7 +61,7 @@ public class ChunkLink{
 		return new ChunkPointer(sourcePos);
 	}
 	
-	public Chunk dereferenceSource(Header header) throws IOException{
+	public Chunk dereferenceSource(Header<?> header) throws IOException{
 		return header.getChunk(sourceReference());
 	}
 	
@@ -71,7 +75,7 @@ public class ChunkLink{
 		return pointer!=null;
 	}
 	
-	private ChunkLink next(Header header){
+	private ChunkLink next(Header<?> header){
 		if(hasPointer()){
 			try{
 				return new ChunkLink(getPointer().dereference(header));
@@ -81,7 +85,7 @@ public class ChunkLink{
 		}else return null;
 	}
 	
-	public Stream<ChunkLink> stream(Header header){
+	public Stream<ChunkLink> stream(Header<?> header){
 		return Stream.generate(new Supplier<ChunkLink>(){
 			ChunkLink link=ChunkLink.this;
 			
@@ -99,7 +103,7 @@ public class ChunkLink{
 		}).takeWhile(Objects::nonNull);
 	}
 	
-	public Iterator<ChunkLink> iterator(Header header){
+	public Iterator<ChunkLink> iterator(Header<?> header){
 		return new Iterator<>(){
 			ChunkLink link=ChunkLink.this;
 			

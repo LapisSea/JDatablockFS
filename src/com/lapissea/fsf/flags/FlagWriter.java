@@ -63,9 +63,18 @@ public class FlagWriter{
 	}
 	
 	public FlagWriter fillRestAllOne(){
+		writeBoolBit(true);
 		while(remainingCount()>0){
 			writeBoolBit(true);
 		}
 		return this;
+	}
+	
+	@Override
+	public String toString(){
+		StringBuilder sb=new StringBuilder(remainingCount());
+		sb.append(Long.toBinaryString(buffer));
+		while(sb.length()<numberSize.bytes*Byte.SIZE) sb.insert(0, '0');
+		return sb.toString();
 	}
 }

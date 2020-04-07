@@ -1,6 +1,7 @@
 package com.lapissea.fsf.io;
 
 import com.lapissea.util.NotNull;
+import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
 
@@ -10,7 +11,9 @@ public class RandomInputStream extends ContentInputStream{
 	private final RandomIO io;
 	private       Long     mark;
 	
-	public RandomInputStream(RandomIO io){this.io=io;}
+	public RandomInputStream(RandomIO io){
+		this.io=io;
+	}
 	
 	@Override
 	public int read(@NotNull byte[] b, int off, int len) throws IOException{
@@ -54,7 +57,7 @@ public class RandomInputStream extends ContentInputStream{
 	
 	@Override
 	public String toString(){
-		return this.getClass().getSimpleName()+"{"+io+'}';
+		return this.getClass().getSimpleName()+"{"+TextUtil.toString(io)+'}';
 	}
 	
 	@Override

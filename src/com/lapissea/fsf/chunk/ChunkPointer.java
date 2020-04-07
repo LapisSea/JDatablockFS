@@ -2,19 +2,32 @@ package com.lapissea.fsf.chunk;
 
 import com.lapissea.fsf.Header;
 import com.lapissea.fsf.INumber;
-import com.lapissea.fsf.io.ContentInputStream;
+import com.lapissea.fsf.NumberSize;
+import com.lapissea.fsf.collections.IOList;
 import com.lapissea.fsf.io.ContentReader;
 import com.lapissea.fsf.io.ContentWriter;
 import com.lapissea.fsf.io.serialization.FileObject;
+import com.lapissea.util.NotNull;
+import com.lapissea.util.Nullable;
 
 import java.io.IOException;
 
 public class ChunkPointer extends FileObject implements Comparable<ChunkPointer>, INumber{
 	
-	public static ChunkPointer readNew(ContentInputStream src) throws IOException{
-		ChunkPointer ptr=new ChunkPointer();
-		ptr.read(src);
-		return ptr;
+	public static final IOList.PointerConverter<ChunkPointer> CONVERTER=IOList.PointerConverter.make(p->p, (old, ptr)->ptr);
+	
+	public static ChunkPointer newOrNull(long ptr){
+		if(ptr==0) return null;
+		return new ChunkPointer(ptr);
+	}
+	
+	@Nullable
+	public static ChunkPointer readOrNull(@NotNull NumberSize size, @NotNull ContentReader src) throws IOException{
+		return newOrNull(size.read(src));
+	}
+	
+	public static void writeNullable(@NotNull NumberSize size, @NotNull ContentWriter dest, @Nullable ChunkPointer ptr) throws IOException{
+		size.write(dest, ptr==null?0:ptr.getValue());
 	}
 	
 	protected long value;
@@ -30,6 +43,10 @@ public class ChunkPointer extends FileObject implements Comparable<ChunkPointer>
 	
 	public ChunkPointer(Chunk chunk){
 		this(chunk.getOffset());
+	}
+	
+	public ChunkPointer(INumber value){
+		this(value.getValue());
 	}
 	
 	public ChunkPointer(long value){
@@ -63,10 +80,6 @@ public class ChunkPointer extends FileObject implements Comparable<ChunkPointer>
 		return equals(ptr.getValue());
 	}
 	
-	public boolean equals(long ptr){
-		return value==ptr;
-	}
-	
 	@Override
 	public int hashCode(){
 		return Long.hashCode(value);
@@ -77,7 +90,7 @@ public class ChunkPointer extends FileObject implements Comparable<ChunkPointer>
 		return "@"+value;
 	}
 	
-	public Chunk dereference(Header header) throws IOException{
+	public Chunk dereference(Header<?> header) throws IOException{
 		return header.getChunk(this);
 	}
 	

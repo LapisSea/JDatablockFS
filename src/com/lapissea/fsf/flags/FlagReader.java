@@ -1,7 +1,7 @@
 package com.lapissea.fsf.flags;
 
-import com.lapissea.fsf.io.ContentReader;
 import com.lapissea.fsf.NumberSize;
+import com.lapissea.fsf.io.ContentReader;
 
 import java.io.IOException;
 
@@ -59,5 +59,13 @@ public class FlagReader{
 			if(!readBoolBit()) return false;
 		}while(remainingCount()>0);
 		return true;
+	}
+	
+	@Override
+	public String toString(){
+		StringBuilder sb=new StringBuilder(remainingCount());
+		sb.append(Long.toBinaryString(data));
+		while(sb.length()<remainingCount()) sb.insert(0, '0');
+		return sb.toString();
 	}
 }

@@ -3,6 +3,7 @@ package com.lapissea.fsf.endpoint.data;
 import com.lapissea.fsf.Utils;
 import com.lapissea.fsf.io.IOInterface;
 import com.lapissea.fsf.io.RandomIO;
+import com.lapissea.util.NotNull;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
@@ -37,6 +38,7 @@ public class MemoryData implements IOInterface{
 	}
 	
 	@Override
+	@NotNull
 	public RandomIO doRandom(){
 		return new RandomIO(){
 			
@@ -108,6 +110,17 @@ public class MemoryData implements IOInterface{
 				return len;
 			}
 			
+			private void pushUsed(){
+				if(used<pos){
+					var old=used;
+					used=pos;
+					
+					if(onWrite!=null){
+						pushOnWrite(LongStream.range(old, used).toArray());
+					}
+				}
+			}
+			
 			@Override
 			public void write(int b){
 				if(readOnly) throw new UnsupportedOperationException();
@@ -119,7 +132,7 @@ public class MemoryData implements IOInterface{
 					pushOnWrite(new long[]{pos});
 				}
 				pos++;
-				if(used<pos) used=pos;
+				pushUsed();
 			}
 			
 			@Override
@@ -139,7 +152,7 @@ public class MemoryData implements IOInterface{
 				}
 				if(pushPos){
 					pos+=len;
-					if(used<pos) used=pos;
+					pushUsed();
 				}
 			}
 			
@@ -179,11 +192,29 @@ public class MemoryData implements IOInterface{
 	}
 	
 	@Override
+	public String getName(){
+		return "mem";
+	}
+	
+	@Override
 	public void setCapacity(long newCapacity){
 		if(readOnly) throw new UnsupportedOperationException();
 		
 		if(getCapacity()==newCapacity) return;
+		
 		bb=Arrays.copyOf(bb, (int)newCapacity);
 		used=Math.min(used, bb.length);
+	}
+	
+	@Override
+	public String toString(){
+		StringBuilder stringBuilder=new StringBuilder("MemoryData{");
+		int           max          =100;
+		for(int i=0;i<Math.min(used, max);i++){
+			stringBuilder.append((char)bb[i]);
+		}
+		if(bb.length>max) stringBuilder.append("...");
+		stringBuilder.append('}');
+		return stringBuilder.toString();
 	}
 }

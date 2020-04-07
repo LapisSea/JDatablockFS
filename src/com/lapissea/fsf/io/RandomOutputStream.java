@@ -1,6 +1,7 @@
 package com.lapissea.fsf.io;
 
 import com.lapissea.util.NotNull;
+import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
 
@@ -39,6 +40,6 @@ public class RandomOutputStream extends ContentOutputStream{
 	
 	@Override
 	public String toString(){
-		return this.getClass().getSimpleName()+'{'+io+'}';
+		return this.getClass().getSimpleName()+'{'+TextUtil.toString(io)+'}';
 	}
 }

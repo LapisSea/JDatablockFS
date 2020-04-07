@@ -69,6 +69,10 @@ public class ChunkIO implements IOInterface{
 			return chainSpaceChunkDataStart<=chainSpaceOffset&&(chainSpaceChunkDataStart+dataSize)>chainSpaceOffset;
 		}
 		
+		private void setDataPos(long chunkOffset) throws IOException{
+			data.setPos(chunk.getDataStart()+chunkOffset);
+		}
+		
 		private boolean applyMovement(OverflowMode mode) throws IOException{
 			var chunkOffset=chainSpaceOffset-chainSpaceDataStart;
 			
@@ -91,9 +95,22 @@ public class ChunkIO implements IOInterface{
 			
 			if(chunk==null) orientPointer(mode);
 			
-			data.setPos(chunk.getDataStart()+chunkOffset);
 			
-			if(!chunk.hasNext()) return true;
+			if(!chunk.hasNext()){
+				if(mode==CLIP){
+					var overshoot=chunkOffset-chunk.getSize();
+					if(overshoot>0){
+						chunkOffset-=overshoot;
+						chainSpaceOffset-=overshoot;
+						
+					}
+				}
+				setDataPos(chunkOffset);
+				return true;
+			}
+			
+			setDataPos(chunkOffset);
+			
 			var remaining=getDataSize(mode, chunk)-chunkOffset();
 			return remaining>0;
 		}
@@ -169,7 +186,16 @@ public class ChunkIO implements IOInterface{
 		
 		@Override
 		public RandomIO setPos(long pos) throws IOException{
+			long[] old;
+			if(DEBUG_VALIDATION){
+				Assert(getSize() >= getPos());
+				old=new long[]{getPos(), getSize(), pos};
+			}
+			
 			setPointer(pos, CLIP);
+			if(DEBUG_VALIDATION){
+				Assert(getPos()==Math.min(getSize(), pos), old, getPos(), getSize(), pos, chunks);
+			}
 			return this;
 		}
 		
@@ -447,7 +473,8 @@ public class ChunkIO implements IOInterface{
 	
 	
 	@Override
-	public RandomIO doRandom() throws IOException{
+	public @com.lapissea.util.NotNull
+	RandomIO doRandom() throws IOException{
 		return new ChunkSpaceRandomIO(chunkSource.doRandom());
 	}
 	
@@ -482,6 +509,11 @@ public class ChunkIO implements IOInterface{
 	public long getCapacity(){
 		//TODO: use precomputed implementation
 		return chunks.stream().mapToLong(Chunk::getCapacity).sum();
+	}
+	
+	@Override
+	public String getName(){
+		return chunkSource.getName()+"@"+getRoot().getOffset();
 	}
 	
 	@Override

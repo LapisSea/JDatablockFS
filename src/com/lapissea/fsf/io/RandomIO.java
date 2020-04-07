@@ -21,106 +21,18 @@ public interface RandomIO extends AutoCloseable, Flushable, ContentWriter, Conte
 	
 	static RandomIO readOnly(RandomIO io){
 		Objects.requireNonNull(io);
-		
-		class ReadOnly implements RandomIO{
-			
-			@Override
-			public long getPos() throws IOException{
-				return io.getPos();
-			}
-			
-			@Override
-			public RandomIO setPos(long pos) throws IOException{
-				io.setPos(pos);
-				return this;
-			}
-			
-			@Override
-			public long getSize() throws IOException{
-				return io.getSize();
-			}
-			
-			@Override
-			public RandomIO setSize(long targetSize){
-				throw new UnsupportedOperationException();
-			}
-			
-			@Override
-			public long getCapacity() throws IOException{
-				return io.getCapacity();
-			}
-			
-			@Override
-			public RandomIO setCapacity(long newCapacity){
-				throw new UnsupportedOperationException();
-			}
-			
-			@Override
-			public void close() throws IOException{
-				io.close();
-			}
-			
-			@Override
-			public void flush() throws IOException{
-				io.close();
-			}
-			
-			@Override
-			public int read() throws IOException{
-				return io.read();
-			}
-			
-			@Override
-			public byte[] contentBuf(){
-				return io.contentBuf();
-			}
-			
-			@Override
-			public void write(int b) throws IOException{
-				throw new UnsupportedOperationException();
-			}
-			
-			@Override
-			public void fillZero(long requestedMemory){
-				throw new UnsupportedOperationException();
-			}
-			
-			@Override
-			public long getGlobalPos() throws IOException{
-				return io.getGlobalPos();
-			}
-			
-			@Override
-			public String toString(){
-				return "RO{"+io.toString()+"}";
-			}
-			
-			@Override
-			public int hashCode(){
-				return io.hashCode();
-			}
-			
-			@SuppressWarnings("EqualsWhichDoesntCheckParameterClass")
-			@Override
-			public boolean equals(Object obj){
-				return io.equals(obj);
-			}
-		}
-		return new ReadOnly();
+		return new RandomIOReadOnly(io);
 	}
 	
 	long getPos() throws IOException;
-	
 	RandomIO setPos(long pos) throws IOException;
 	
 	
 	long getSize() throws IOException;
-	
 	RandomIO setSize(long targetSize) throws IOException;
 	
 	
 	long getCapacity() throws IOException;
-	
 	RandomIO setCapacity(long newCapacity) throws IOException;
 	
 	@Override
@@ -179,6 +91,9 @@ public interface RandomIO extends AutoCloseable, Flushable, ContentWriter, Conte
 		}
 	}
 	
+	/**
+	 * Simiar to the write methods except it writes some number of 0 bytes but does not modify things such as the size of the data. (useful for clearing garbage data after some data has ben shrunk)
+	 */
 	void fillZero(long requestedMemory) throws IOException;
 	
 	long getGlobalPos() throws IOException;

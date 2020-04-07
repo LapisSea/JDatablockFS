@@ -1,12 +1,11 @@
 package com.lapissea.fsf.headermodule.modules;
 
-import com.lapissea.fsf.FileEntry;
+import com.lapissea.fsf.Folder;
 import com.lapissea.fsf.Header;
 import com.lapissea.fsf.chunk.Chunk;
 import com.lapissea.fsf.chunk.ChunkLink;
-import com.lapissea.fsf.collections.IOList;
-import com.lapissea.fsf.collections.fixedlist.FixedLenList;
 import com.lapissea.fsf.headermodule.HeaderModule;
+import com.lapissea.util.NotImplementedException;
 
 import java.awt.*;
 import java.io.IOException;
@@ -14,9 +13,10 @@ import java.util.List;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
-public class FileIDsModule<Identifier> extends HeaderModule<IOList<FileEntry>, Identifier>{
+public class FolderModule<Identifier> extends HeaderModule<Folder<Identifier>, Identifier>{
 	
-	public FileIDsModule(Header<Identifier> header, Consumer<IOList<FileEntry>> onRead){
+	
+	public FolderModule(Header<Identifier> header, Consumer<Folder<Identifier>> onRead){
 		super(header, onRead);
 	}
 	
@@ -26,20 +26,18 @@ public class FileIDsModule<Identifier> extends HeaderModule<IOList<FileEntry>, I
 	}
 	
 	@Override
-	protected IOList<FileEntry> postRead() throws IOException{
-		return new FixedLenList<>(()->new FileEntry.Head(header), getOwning().get(0));
+	protected Folder<Identifier> postRead() throws IOException{
+		return getOwning(0).io().readAsObject(new Folder<>(header));
 	}
 	
 	@Override
 	public List<Chunk> init() throws IOException{
-		return FixedLenList.init(header, new FileEntry.Head(header), header.config.freeChunkCapacity, false);
+		return Folder.init(header);
 	}
 	
 	@Override
 	public long capacityManager(Chunk chunk) throws IOException{
-		long[] siz={0}, cap={0};
-		chunk.calculateWholeChainSizes(siz, cap);
-		return siz[0]*2;
+		throw new NotImplementedException();//TODO
 	}
 	
 	/**
@@ -47,16 +45,17 @@ public class FileIDsModule<Identifier> extends HeaderModule<IOList<FileEntry>, I
 	 */
 	@Override
 	public Stream<ChunkLink> openReferenceStream() throws IOException{
-		return getValue().openLinkStream(FileEntry.CONVERTER);
+		return getValue().openReferenceStream(getOwning().get(0).getDataStart());
+//		return getList().openLinkStream(e->new ChunkPointer(e.getValue()), (old, ptr)->new ChunkPointer(ptr));
 	}
 	
 	@Override
 	public Color displayColor(){
-		return Color.GREEN.brighter();
+		return Color.CYAN.darker();
 	}
 	
 	@Override
 	public boolean ownsBinaryOnly(){
-		return true;
+		return false;
 	}
 }

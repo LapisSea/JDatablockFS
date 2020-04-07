@@ -13,13 +13,13 @@ import java.util.stream.LongStream;
 
 import static com.lapissea.util.UtilL.*;
 
-public class FileData implements IOInterface{
+public class BaseFileData implements IOInterface{
 	public UnsafeConsumer<long[], IOException> onWrite;
 	
 	private       RandomAccessFile ra;
 	private final String           path;
 	
-	public FileData(File file, FileSystemInFile.Config config) throws IOException{
+	public BaseFileData(File file, FileSystemInFile.Config config) throws IOException{
 		File enforcedFile=config.shouldEnforceExtension?config.enforceExtension(file):file;
 		
 		if(!enforcedFile.isFile()){
@@ -47,7 +47,8 @@ public class FileData implements IOInterface{
 	}
 	
 	@Override
-	public RandomIO doRandom(){
+	public @com.lapissea.util.NotNull
+	RandomIO doRandom(){
 		return new RandomIO(){
 			private long pos;
 			
@@ -173,6 +174,11 @@ public class FileData implements IOInterface{
 	@Override
 	public long getCapacity() throws IOException{
 		return ra.length();
+	}
+	
+	@Override
+	public String getName(){
+		return "F("+new File(path).getName()+")";
 	}
 	
 	@Override

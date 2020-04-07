@@ -2,7 +2,10 @@ package com.lapissea.fsf;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Arrays;
 import java.util.Map;
+
+import static com.lapissea.util.UtilL.*;
 
 public class Utils{
 	
@@ -38,4 +41,26 @@ public class Utils{
 		return true;
 	}
 	
+	public static void fairDistribute(long[] values, long toDistribute){
+		
+		long totalUsage=Arrays.stream(values).sum();
+		
+		var free=toDistribute-totalUsage;
+		
+		if(free>0){
+			int toUse=values.length;
+			do{
+				var bulkAdd=free/toUse;
+				
+				for(int i=0;i<toUse;i++){
+					values[i]+=bulkAdd;
+					free-=bulkAdd;
+				}
+				toUse--;
+			}while(free>0);
+		}else{
+			Assert(free==0);
+		}
+		
+	}
 }

@@ -18,8 +18,16 @@ public class SelfSizedNumber extends FileObject.FullLayout<SelfSizedNumber> impl
 	private NumberSize size;
 	private long       value;
 	
+	public SelfSizedNumber(INumber value){
+		this(value.getValue());
+	}
+	
 	public SelfSizedNumber(long value){
 		this(NumberSize.bySize(value), value);
+	}
+	
+	public SelfSizedNumber(NumberSize size, INumber value){
+		this(size, value.getValue());
 	}
 	
 	public SelfSizedNumber(NumberSize size, long value){
@@ -51,10 +59,9 @@ public class SelfSizedNumber extends FileObject.FullLayout<SelfSizedNumber> impl
 	
 	@Override
 	public boolean equals(Object o){
-		if(this==o) return true;
-		if(!(o instanceof SelfSizedNumber)) return false;
-		SelfSizedNumber that=(SelfSizedNumber)o;
-		return getValue()==that.getValue()&&
+		return this==o||
+		       o instanceof SelfSizedNumber that&&
+		       getValue()==that.getValue()&&
 		       getSize()==that.getSize();
 	}
 	
@@ -64,5 +71,10 @@ public class SelfSizedNumber extends FileObject.FullLayout<SelfSizedNumber> impl
 		result=31*result+(getSize()==null?0:getSize().hashCode());
 		result=31*result+Long.hashCode(getValue());
 		return result;
+	}
+	
+	@Override
+	public String toString(){
+		return value+""+size.shortName;
 	}
 }

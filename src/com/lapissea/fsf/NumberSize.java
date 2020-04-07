@@ -25,6 +25,10 @@ public enum NumberSize{
 		return VALS[index];
 	}
 	
+	public static NumberSize bySize(INumber size){
+		return bySize(size.getValue());
+	}
+	
 	public static NumberSize bySize(long size){
 		for(NumberSize value : VALS){
 			if(value.maxSize >= size) return value;
@@ -51,6 +55,10 @@ public enum NumberSize{
 		return reader.apply(in);
 	}
 	
+	public void write(ContentWriter out, INumber value) throws IOException{
+		write(out, value.getValue());
+	}
+	
 	public void write(ContentWriter out, long value) throws IOException{
 		writer.accept(out, value);
 	}
@@ -67,14 +75,26 @@ public enum NumberSize{
 		return ordinal(nextId);
 	}
 	
+	public boolean greaterThan(NumberSize other){
+		if(other==this) return false;
+		return bytes>other.bytes;
+	}
+	
+	public boolean lesserThan(NumberSize other){
+		if(other==this) return false;
+		return bytes<other.bytes;
+	}
+	
 	public NumberSize max(NumberSize other){
-		if(other==this) return this;
-		return bytes >= other.bytes?this:other;
+		return greaterThan(other)?this:other;
 	}
 	
 	public NumberSize min(NumberSize other){
-		if(other==this) return this;
-		return bytes<=other.bytes?this:other;
+		return lesserThan(other)?this:other;
+	}
+	
+	public boolean canFit(INumber num){
+		return canFit(num.getValue());
 	}
 	
 	public boolean canFit(long num){

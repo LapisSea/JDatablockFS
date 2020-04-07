@@ -55,4 +55,9 @@ public class ContentBuffer{
 		buf.reset();
 		return stream;
 	}
+	
+	@Override
+	public String toString(){
+		return "ContentBuffer{"+buf+'}';
+	}
 }

@@ -323,6 +323,7 @@ public interface Renderer{
 		}
 		
 		BufferedImage render(int i){
+			if(snapshots.isEmpty()) return new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
 			return Renderer.renderFile(snapshots.get(i), getWidthPx(), pixelScale, false).join();
 		}
 		
@@ -452,7 +453,8 @@ public interface Renderer{
 								
 								g.setColor(hoverCol);
 								outlineChunk(g, hoverChunk);
-							}catch(IOException e){
+								
+							}catch(Exception e){
 								e.printStackTrace();
 							}
 						}

@@ -66,13 +66,16 @@ public class Chunk{
 	
 	public static void init(ContentOutputStream out, NumberSize nextType, int bodySize) throws IOException{ init(out, nextType, bodySize, null); }
 	
+	public static void init(ContentOutputStream out, NumberSize nextType, UnsafeConsumer<ContentOutputStream, IOException> initContents) throws IOException{
+		init(out, nextType, -1, Objects.requireNonNull(initContents));
+	}
+	
 	public static void init(ContentOutputStream out, NumberSize nextType, long bodySize, UnsafeConsumer<ContentOutputStream, IOException> initContents) throws IOException{
 		
 		ByteArrayOutputStream ba=null;
 		if(initContents!=null){
 			ba=new ByteArrayOutputStream();
-			ContentOutputStream contents=new ContentOutputStream.Wrapp(ba);
-			initContents.accept(contents);
+			initContents.accept(new ContentOutputStream.Wrapp(ba));
 			if(ba.size()>bodySize) bodySize=ba.size();
 		}
 		
@@ -85,7 +88,7 @@ public class Chunk{
 	private static final NumberSize FLAGS_SIZE=NumberSize.SHORT;
 	
 	
-	public static Chunk read(Header header, long offset, ContentInputStream in) throws IOException{
+	public static Chunk read(Header<?> header, long offset, ContentInputStream in) throws IOException{
 		var flagData=FLAGS_SIZE.read(in);
 		var flags   =new FlagReader(flagData, FLAGS_SIZE);
 
@@ -113,7 +116,7 @@ public class Chunk{
 		return new Chunk(header, offset, nextType, next, bodyType, used, dataSize, chunkUsed);
 	}
 	
-	public static Chunk read(Header header, long offset) throws IOException{
+	public static Chunk read(Header<?> header, long offset) throws IOException{
 		try(ContentInputStream in=header.source.read(offset)){
 			return read(header, offset, in);
 		}
@@ -568,7 +571,10 @@ public class Chunk{
 	
 	public void transparentChainRestart(Chunk newChunk, boolean freeOld) throws IOException{
 		
-		if(DEBUG_VALIDATION) header.validateFile();
+		if(DEBUG_VALIDATION){
+			header.validateFile();
+			Assert(newChunk!=this);
+		}
 		
 		var oldPtr=reference();
 		

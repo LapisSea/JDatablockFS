@@ -3,6 +3,11 @@ package com.lapissea.fsf;
 public enum Version{
 	V01(0, 1);
 	
+	public static Version last(){
+		var vs=Version.values();
+		return vs[vs.length-1];
+	}
+	
 	public final byte major;
 	public final byte minor;
 	

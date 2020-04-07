@@ -7,7 +7,9 @@ public interface IFileSystem<Identifier>{
 	
 	IFile<Identifier> getFile(Identifier id) throws IOException;
 	
-	IFile<Identifier> createFile(Identifier id) throws IOException;
+	default IFile<Identifier> createFile(Identifier id) throws IOException{
+		return createFile(id, 0);
+	}
 	
 	IFile<Identifier> createFile(Identifier id, long initialSize) throws IOException;
 	

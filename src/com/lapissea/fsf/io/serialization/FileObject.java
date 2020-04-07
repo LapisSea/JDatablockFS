@@ -1,6 +1,9 @@
 package com.lapissea.fsf.io.serialization;
 
 import com.lapissea.fsf.NumberSize;
+import com.lapissea.fsf.SelfSizedNumber;
+import com.lapissea.fsf.SmallNumber;
+import com.lapissea.fsf.endpoint.IdentifierIO;
 import com.lapissea.fsf.flags.FlagReader;
 import com.lapissea.fsf.flags.FlagWriter;
 import com.lapissea.fsf.io.ContentBuffer;
@@ -12,12 +15,15 @@ import com.lapissea.util.function.BiConsumerOL;
 import com.lapissea.util.function.FunctionOL;
 
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+import static com.lapissea.fsf.FileSystemInFile.*;
 import static com.lapissea.util.UtilL.*;
 
 public abstract class FileObject{
@@ -28,6 +34,78 @@ public abstract class FileObject{
 		void read(ContentReader stream, T dest) throws IOException;
 		
 		long length(T parent);
+	}
+	
+	public interface SegmentedObjectDef<T> extends ObjectDef<T>{
+		int getSegmentCount();
+		
+		long getSegmentLength(int index, T source);
+		
+		default long getSegmentOffset(int index, T source){
+			Objects.checkIndex(index, getSegmentCount());
+			long sum=0;
+			for(int i=0;i<index;i++){
+				sum+=getSegmentLength(index, source);
+			}
+			return sum;
+		}
+		
+		@Override
+		default long length(T source){
+			long sum=0;
+			for(int i=0, j=getSegmentCount();i<j;i++){
+				sum+=getSegmentLength(i, source);
+			}
+			return sum;
+		}
+	}
+	
+	public static class InlineArrayDef<T, V extends FileObject> implements ObjectDef<T>{
+		
+		private final Function<T, V[]>   getter;
+		private final BiConsumer<T, V[]> setter;
+		private final Function<T, V>     constructor;
+		
+		public InlineArrayDef(Function<T, V[]> getter, BiConsumer<T, V[]> setter, Supplier<V> constructor){
+			this(getter, setter, t->constructor.get());
+		}
+		
+		public InlineArrayDef(Function<T, V[]> getter, BiConsumer<T, V[]> setter, Function<T, V> constructor){
+			this.getter=getter;
+			this.setter=setter;
+			this.constructor=constructor;
+		}
+		
+		@Override
+		public void write(ContentWriter stream, T source) throws IOException{
+			V[] data=getter.apply(source);
+			new SelfSizedNumber(data.length).write(stream);
+			for(V v : data){
+				v.write(stream);
+			}
+		}
+		
+		@Override
+		public void read(ContentReader stream, T dest) throws IOException{
+			var size=new SelfSizedNumber();
+			size.read(stream);
+			
+			@SuppressWarnings("unchecked")
+			V[] data=(V[])Array.newInstance(constructor.apply(dest).getClass(), Math.toIntExact(size.getValue()));
+			
+			for(int i=0;i<data.length;i++){
+				data[i]=constructor.apply(dest);
+				data[i].read(stream);
+			}
+			setter.accept(dest, data);
+		}
+		
+		@Override
+		public long length(T parent){
+			V[] data=getter.apply(parent);
+			return NumberSize.bySize(data.length).bytes+
+			       Arrays.stream(data).mapToLong(FileObject::length).sum();
+		}
 	}
 	
 	public static class ObjDef<T, V extends FileObject> implements ObjectDef<T>{
@@ -156,6 +234,36 @@ public abstract class FileObject{
 		}
 	}
 	
+	public static class IdIODef<T, id> implements ObjectDef<T>{
+		
+		private final Function<T, IdentifierIO<id>> getIO;
+		private final Function<T, id>               getter;
+		private final BiConsumer<T, id>             setter;
+		
+		public IdIODef(Function<T, IdentifierIO<id>> getIO, Function<T, id> getter, BiConsumer<T, id> setter){
+			this.getIO=getIO;
+			this.getter=getter;
+			this.setter=setter;
+		}
+		
+		@Override
+		public void write(ContentWriter stream, T source) throws IOException{
+			Content.BYTE_ARRAY_SMALL.write(stream, getIO.apply(source).write(getter.apply(source)));
+		}
+		
+		@Override
+		public void read(ContentReader stream, T dest) throws IOException{
+			setter.accept(dest, getIO.apply(dest).read(Content.BYTE_ARRAY_SMALL.read(stream)));
+		}
+		
+		@Override
+		public long length(T parent){
+			var len=getIO.apply(parent).size(getter.apply(parent));
+			return SmallNumber.bytes(len)+len;
+		}
+		
+	}
+	
 	public static class SingleEnumDef<T, V extends Enum<V>> extends FlagDef<T>{
 		
 		public SingleEnumDef(Class<V> type, Function<T, V> getter, BiConsumer<T, V> setter){
@@ -196,18 +304,30 @@ public abstract class FileObject{
 		}
 	}
 	
-	public static final ObjectDef<Object> EMPTY_SEQUENCE=new ObjectDef<>(){
+	private static final SegmentedObjectDef<Object> EMPTY_SEQUENCE=new SegmentedObjectDef<>(){
 		@Override
-		public void write(ContentWriter stream, Object source){}
+		public int getSegmentCount(){
+			return 0;
+		}
 		
 		@Override
-		public void read(ContentReader stream, Object dest){}
+		public long getSegmentLength(int index, Object source){
+			return 0;
+		}
 		
 		@Override
-		public long length(Object source){ return 0; }
+		public void write(ContentWriter stream, Object source){ }
+		
+		@Override
+		public void read(ContentReader stream, Object dest){ }
+		
+		@Override
+		public long length(Object parent){
+			return 0;
+		}
 	};
 	
-	private static class SequenceLayoutArrImpl<T> implements ObjectDef<T>{
+	private static class SequenceLayoutArrImpl<T> implements SegmentedObjectDef<T>{
 		private final ObjectDef<T>[] arr;
 		
 		private final ContentBuffer buf=new ContentBuffer();
@@ -220,12 +340,15 @@ public abstract class FileObject{
 		public void write(ContentWriter stream, T source) throws IOException{
 			synchronized(this){
 				try(var buf=this.buf.session(stream)){
-					
+					long sum=0;
 					for(var value : arr){
 						value.write(buf, source);
+						sum+=value.length(source);
+						if(DEBUG_VALIDATION){
+							Assert(buf.size()==sum, source, value, buf.size(), sum);
+						}
 					}
 					
-					Assert(buf.size()==length(source));
 				}
 			}
 		}
@@ -238,29 +361,29 @@ public abstract class FileObject{
 		}
 		
 		@Override
-		public long length(T source){
-			long sum=0;
-			for(ObjectDef<T> v : arr){
-				long length=v.length(source);
-				sum+=length;
-			}
-			return sum;
+		public int getSegmentCount(){
+			return arr.length;
+		}
+		
+		@Override
+		public long getSegmentLength(int index, T source){
+			return arr[index].length(source);
 		}
 	}
 	
 	@SuppressWarnings("unchecked")
-	public static <T> ObjectDef<T> sequenceBuilder(){
-		return (ObjectDef<T>)EMPTY_SEQUENCE;
+	public static <T> SegmentedObjectDef<T> sequenceBuilder(){
+		return (SegmentedObjectDef<T>)EMPTY_SEQUENCE;
 	}
 	
 	@SafeVarargs
-	public static <T> ObjectDef<T> sequenceBuilder(ObjectDef<T>... values){
+	public static <T> SegmentedObjectDef<T> sequenceBuilder(ObjectDef<T>... values){
 		return sequenceBuilder(ArrayViewList.create(values, null));
 	}
 	
 	@SuppressWarnings("unchecked")
-	public static <T> ObjectDef<T> sequenceBuilder(List<ObjectDef<T>> values){
-		if(values.isEmpty()) return (ObjectDef<T>)EMPTY_SEQUENCE;
+	public static <T> SegmentedObjectDef<T> sequenceBuilder(List<ObjectDef<T>> values){
+		if(values.isEmpty()) return sequenceBuilder();
 		return new SequenceLayoutArrImpl<>(values.toArray(ObjectDef[]::new));
 	}
 	

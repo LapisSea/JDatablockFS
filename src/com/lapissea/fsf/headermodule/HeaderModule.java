@@ -1,12 +1,10 @@
 package com.lapissea.fsf.headermodule;
 
-import com.lapissea.fsf.FileSystemInFile;
 import com.lapissea.fsf.Header;
 import com.lapissea.fsf.chunk.Chunk;
 import com.lapissea.fsf.chunk.ChunkLink;
-import com.lapissea.fsf.chunk.ChunkPointer;
-import com.lapissea.fsf.io.ContentOutputStream;
 import com.lapissea.util.ArrayViewList;
+import com.lapissea.util.function.UnsafeSupplier;
 
 import java.awt.*;
 import java.io.IOException;
@@ -14,36 +12,40 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-public abstract class HeaderModule<Identifier>{
+public abstract class HeaderModule<Val, Identifier>{
 	
+	private final Consumer<Val> onRead;
+	
+	private         Val                value;
 	protected final Header<Identifier> header;
 	private         List<Chunk>        owning;
 	
-	public HeaderModule(Header<Identifier> header){
+	public HeaderModule(Header<Identifier> header, Consumer<Val> onRead){
+		this.onRead=onRead;
 		this.header=header;
 	}
 	
-	public void read(Supplier<ChunkPointer> chunkIter) throws IOException{
+	public void read(UnsafeSupplier<Chunk, IOException> chunkIter) throws IOException{
 		preRead();
 		
 		var owningArr=new Chunk[getOwningChunkCount()];
 		for(int i=0;i<owningArr.length;i++){
-			owningArr[i]=chunkIter.get().dereference(header);
+			owningArr[i]=chunkIter.get();
 		}
 		
 		owning=ArrayViewList.create(owningArr, null);
 		
-		postRead();
+		value=postRead();
+		onRead.accept(getValue());
 	}
 	
-	public void write(Consumer<ChunkPointer> dest) throws IOException{
+	public void write(Consumer<Chunk> dest) throws IOException{
 		preWrite();
 		for(Chunk chunk : owning){
-			dest.accept(new ChunkPointer(chunk));
+			dest.accept(chunk);
 		}
 		postWrite();
 	}
@@ -53,11 +55,15 @@ public abstract class HeaderModule<Identifier>{
 		             .map(l->l.iterator(header));
 	}
 	
+	public Chunk getOwning(int index){
+		return getOwning().get(index);
+	}
+	
 	public List<Chunk> getOwning(){
 		return Objects.requireNonNull(owning);
 	}
 	
-	protected abstract int getOwningChunkCount();
+	public abstract int getOwningChunkCount();
 	
 	public abstract Stream<ChunkLink> openReferenceStream() throws IOException;
 	
@@ -73,13 +79,17 @@ public abstract class HeaderModule<Identifier>{
 	
 	protected void preRead() throws IOException  {}
 	
-	protected void postRead() throws IOException {}
+	protected abstract Val postRead() throws IOException;
 	
 	protected void preWrite() throws IOException {}
 	
 	protected void postWrite() throws IOException{}
 	
-	public abstract void init(ContentOutputStream out, FileSystemInFile.Config config) throws IOException;
+	public abstract List<Chunk> init() throws IOException;
 	
 	public abstract long capacityManager(Chunk chunk) throws IOException;
+	
+	protected Val getValue(){
+		return value;
+	}
 }

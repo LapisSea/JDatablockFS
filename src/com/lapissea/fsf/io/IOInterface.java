@@ -1,9 +1,13 @@
 package com.lapissea.fsf.io;
 
+import com.lapissea.fsf.io.serialization.FileObject;
+import com.lapissea.util.NotNull;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;
 
 import java.io.IOException;
+import java.util.Objects;
+import java.util.function.Supplier;
 
 import static com.lapissea.fsf.FileSystemInFile.*;
 import static com.lapissea.util.UtilL.*;
@@ -16,11 +20,20 @@ public interface IOInterface{
 	 *
 	 * @return RandomIO instance
 	 */
+	@NotNull
 	RandomIO doRandom() throws IOException;
 	
-	void setSize(long requestedSize) throws IOException;
+	default void setSize(long requestedSize) throws IOException{
+		try(var io=doRandom()){
+			io.setSize(requestedSize);
+		}
+	}
 	
-	long getSize() throws IOException;
+	default long getSize() throws IOException{
+		try(var io=doRandom()){
+			return io.getSize();
+		}
+	}
 	
 	/**
 	 * Tries to grows or shrinks capacity as closely as it is convenient for the underlying data. <br>
@@ -28,13 +41,23 @@ public interface IOInterface{
 	 * If growing, it is required that capacity is set to greater or equal to newCapacity.<br>
 	 * If shrinking, it is not required that capacity is shrunk but is required to always be greater or equal to newCapacity.
 	 */
-	void setCapacity(long newCapacity) throws IOException;
+	default void setCapacity(long newCapacity) throws IOException{
+		try(var io=doRandom()){
+			io.setCapacity(newCapacity);
+		}
+	}
 	
-	long getCapacity() throws IOException;
+	default long getCapacity() throws IOException{
+		try(var io=doRandom()){
+			return io.getCapacity();
+		}
+	}
 	
 	
+	@NotNull
 	default ContentOutputStream write(boolean trimOnClose) throws IOException{ return write(0, trimOnClose); }
 	
+	@NotNull
 	default ContentOutputStream write(long fileOffset, boolean trimOnClose) throws IOException{
 		return new RandomOutputStream(doRandom().setPos(fileOffset), trimOnClose);
 	}
@@ -52,8 +75,10 @@ public interface IOInterface{
 	}
 	
 	
+	@NotNull
 	default <T> T read(UnsafeFunction<ContentInputStream, T, IOException> reader) throws IOException{ return read(0, reader); }
 	
+	@NotNull
 	default <T> T read(long fileOffset, UnsafeFunction<ContentInputStream, T, IOException> reader) throws IOException{
 		try(var io=read(fileOffset)){
 			return reader.apply(io);
@@ -68,8 +93,10 @@ public interface IOInterface{
 		}
 	}
 	
+	@NotNull
 	default ContentInputStream read() throws IOException{ return read(0); }
 	
+	@NotNull
 	default ContentInputStream read(long fileOffset) throws IOException{
 		return new RandomInputStream(doRandom().setPos(fileOffset));
 	}
@@ -114,4 +141,34 @@ public interface IOInterface{
 			in.transferTo(out);
 		}
 	}
+	
+	default <T extends FileObject> T readAsObject(Supplier<T> newObject) throws IOException{ return readAsObject(0, newObject); }
+	
+	default <T extends FileObject> T readAsObject(long offset, Supplier<T> newObject) throws IOException{
+		return readAsObject(newObject.get());
+	}
+	
+	default <T extends FileObject> T readAsObject(T object) throws IOException{ return readAsObject(0, object); }
+	
+	default <T extends FileObject> T readAsObject(long offset, T object) throws IOException{
+		Objects.requireNonNull(object);
+		try(var in=read(offset)){
+			object.read(in);
+		}
+		return object;
+	}
+	
+	default <T extends FileObject> T writeAsObject(T object) throws IOException                     { return writeAsObject(0, object, true); }
+	
+	default <T extends FileObject> T writeAsObject(T object, boolean trimOnClose) throws IOException{ return writeAsObject(0, object, trimOnClose); }
+	
+	default <T extends FileObject> T writeAsObject(long offset, T object, boolean trimOnClose) throws IOException{
+		Objects.requireNonNull(object);
+		try(var in=write(offset, trimOnClose)){
+			object.write(in);
+		}
+		return object;
+	}
+	
+	String getName();
 }
