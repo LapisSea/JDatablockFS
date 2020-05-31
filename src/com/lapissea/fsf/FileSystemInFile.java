@@ -40,7 +40,7 @@ import static java.awt.Font.*;
 @SuppressWarnings({"AutoBoxing", "RedundantThrows"})
 public class FileSystemInFile<Identifier> implements IFileSystem<Identifier>{
 	
-	public static final boolean DEBUG_VALIDATION=true;
+	public static final boolean DEBUG_VALIDATION=false;
 	
 	public static class Config{
 		
@@ -171,7 +171,7 @@ public class FileSystemInFile<Identifier> implements IFileSystem<Identifier>{
 	@Override
 	public VirtualFile<Identifier> getFile(Identifier path) throws IOException{
 		var ptr=header.getFilePtrByPath(path)
-		              .map(IOList.Ref::getFake)
+		              .map(IOList.Ref::getUnchecked)
 		              .orElseGet(()->new FileTag<>(header, path));
 		
 		return new VirtualFile<>(ptr);
@@ -204,8 +204,7 @@ public class FileSystemInFile<Identifier> implements IFileSystem<Identifier>{
 	
 	@Override
 	public void defragment() throws IOException{
-//		header.defragment();
-		throw null;
+		header.defragment();
 	}
 	
 	
@@ -359,7 +358,7 @@ public class FileSystemInFile<Identifier> implements IFileSystem<Identifier>{
 		
 		BufferedImage lineImgOutline=null;
 		try{
-			var allChunks=header.allChunks(true);
+			var allChunks=header.collectAllChunks(true);
 			
 			try(var in=header.source.doRandom()){
 				for(int i=0;i<Header.FILE_HEADER_SIZE;i++){
@@ -367,7 +366,7 @@ public class FileSystemInFile<Identifier> implements IFileSystem<Identifier>{
 					counter[0]++;
 				}
 				
-				var drawn=new HashSet<Long>();
+				var drawn=new BitSet(Math.toIntExact(size));
 				
 				for(var entry : allChunks.entrySet()){
 					var module=entry.getKey();
@@ -378,12 +377,16 @@ public class FileSystemInFile<Identifier> implements IFileSystem<Identifier>{
 					for(var chain : chains){
 						var rand=randColor.apply(chain.get(0).sourcePos);
 						
-						var l     =chain.get(0);
-						var owning=l.sourceValidChunk&&module.getOwning().contains(l.dereferenceSource(header));
+						var l=chain.stream().filter(ChunkLink::isSourceValidChunk).findAny().orElse(null);
+						if(l==null) continue;
+						
+						Chunk s     =l.dereferenceSource(header);
+						var   owning=l.isSourceValidChunk()&&module.getOwning().anyMatch(m->m.equals(s));
 						
 						for(var link : chain){
-							if(!link.sourceValidChunk) continue;
-							if(!drawn.add(link.sourcePos)) continue;
+							if(!link.isSourceValidChunk()) continue;
+							if(drawn.get((int)link.sourcePos)) continue;
+							drawn.set((int)link.sourcePos);
 							
 							Chunk chunk=link.dereferenceSource(header);
 							
@@ -589,50 +592,47 @@ public class FileSystemInFile<Identifier> implements IFileSystem<Identifier>{
 	@Override
 	public boolean equals(Object o){
 		if(this==o) return true;
-		if(!(o instanceof FileSystemInFile)) return false;
-		var that=(FileSystemInFile<?>)o;
+		if(!(o instanceof FileSystemInFile<?> that)) return false;
 		return findContentDifference(that)==null;
 	}
 	
 	public PairM<Chunk, Chunk> findContentDifference(FileSystemInFile<?> that){
 		
-		Iterator<Chunk> i1, i2;
-		try{
-			i1=this.header.allChunkWalkerFlat(true);
-			i2=that.header.allChunkWalkerFlat(true);
+		try(var s1=this.header.allChunkWalkerFlat(true);var s2=that.header.allChunkWalkerFlat(true)){
+			Iterator<Chunk> i1=s1.iterator(), i2=s2.iterator();
+			
+			while(i1.hasNext()&&i2.hasNext()){
+				Chunk o1=i1.next();
+				Chunk o2=i2.next();
+				
+				if(o1.isUsed()!=o2.isUsed()||o1.getOffset()!=o2.getOffset()||o1.getNext()!=o2.getNext()){
+					return new PairM<>(o1, o2);
+				}
+				
+				var io1=o1.io();
+				var io2=o2.io();
+				
+				if(io1.getSize()!=io2.getSize()||io1.getCapacity()!=io2.getCapacity()){
+					return new PairM<>(o1, o2);
+				}
+				
+				if(o1.isUsed()){
+					try{
+						if(!Arrays.equals(io1.readAll(), io2.readAll())){
+							return new PairM<>(o1, o2);
+						}
+					}catch(IOException e){
+						throw UtilL.uncheckedThrow(e);
+					}
+				}
+			}
+			
+			if(!i1.hasNext()&&!i2.hasNext()) return null;
+			
+			return new PairM<>(i1.hasNext()?i1.next():null, i2.hasNext()?i2.next():null);
 		}catch(IOException e){
 			throw UtilL.uncheckedThrow(e);
 		}
-		
-		while(i1.hasNext()&&i2.hasNext()){
-			Chunk o1=i1.next();
-			Chunk o2=i2.next();
-			
-			if(o1.isUsed()!=o2.isUsed()||o1.getOffset()!=o2.getOffset()||o1.getNext()!=o2.getNext()){
-				return new PairM<>(o1, o2);
-			}
-			
-			var io1=o1.io();
-			var io2=o2.io();
-			
-			if(io1.getSize()!=io2.getSize()||io1.getCapacity()!=io2.getCapacity()){
-				return new PairM<>(o1, o2);
-			}
-			
-			if(o1.isUsed()){
-				try{
-					if(!Arrays.equals(io1.readAll(), io2.readAll())){
-						return new PairM<>(o1, o2);
-					}
-				}catch(IOException e){
-					throw UtilL.uncheckedThrow(e);
-				}
-			}
-		}
-		
-		if(!i1.hasNext()&&!i2.hasNext()) return null;
-		
-		return new PairM<>(i1.hasNext()?i1.next():null, i2.hasNext()?i2.next():null);
 	}
 	
 	@Override

@@ -5,7 +5,6 @@ import com.lapissea.fsf.Header;
 import com.lapissea.fsf.collections.IOList;
 import com.lapissea.fsf.io.FileData;
 import com.lapissea.fsf.io.RandomIO;
-import com.lapissea.util.NotImplementedException;
 
 import java.io.IOException;
 import java.util.Optional;
@@ -76,7 +75,7 @@ public class VirtualFile<Identifier> implements IFile<Identifier>{
 	
 	@Override
 	public boolean exists() throws IOException{
-		throw NotImplementedException.infer();//TODO: implement VirtualFile.exists()
+		return header().getFilePtrByPath(source.getPath()).isPresent();
 	}
 	
 	@Override

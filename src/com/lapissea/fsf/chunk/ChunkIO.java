@@ -5,6 +5,7 @@ import com.lapissea.fsf.Utils;
 import com.lapissea.fsf.io.IOInterface;
 import com.lapissea.fsf.io.RandomIO;
 import com.lapissea.util.LogUtil;
+import com.lapissea.util.NotNull;
 
 import java.io.IOException;
 import java.util.Objects;
@@ -25,6 +26,8 @@ public class ChunkIO implements IOInterface{
 		SET
 	}
 	
+	private static int index=0;
+	
 	private class ChunkSpaceRandomIO implements RandomIO{
 		RandomIO data;
 		
@@ -34,8 +37,14 @@ public class ChunkIO implements IOInterface{
 		Chunk chunk;
 		private boolean finished;
 		
+		Throwable madeAt=new Throwable((++index)+"");
+		
 		
 		ChunkSpaceRandomIO(RandomIO data){
+			if(index==219){
+				int i=0;
+			}
+			
 			this.data=data;
 			chunks.dependencyInvalidate.add(this::invalidate);
 		}
@@ -168,6 +177,10 @@ public class ChunkIO implements IOInterface{
 			switch(mode){
 			case CLIP -> {
 				setChunk(chunks.size()-1);
+				var overshoot=chunkOffset()-chunk.getSize();
+				if(overshoot>0){
+					chainSpaceOffset-=overshoot;
+				}
 			}
 			case EXTEND, SET -> {
 				setChunk(chunks.size()-1);
@@ -279,7 +292,11 @@ public class ChunkIO implements IOInterface{
 			return this;
 		}
 		
-		private void finish(){
+		private void finish() throws IOException{
+			if(finished){
+				throw new IOException("ALREADY CLOSED STREAM", madeAt);
+			}
+			
 			finished=true;
 			chunks.dependencyInvalidate.remove((Runnable)this::invalidate);
 		}
@@ -287,8 +304,13 @@ public class ChunkIO implements IOInterface{
 		@Override
 		protected void finalize() throws Throwable{
 			super.finalize();
-			if(!finished) LogUtil.printlnEr("DID NOT CLOSE STREAM");
-			finish();
+			if(!finished){
+				LogUtil.printlnEr("DID NOT CLOSE STREAM");
+				madeAt.printStackTrace();
+				sysExit(0);
+				
+				finish();
+			}
 		}
 		
 		@Override
@@ -306,7 +328,7 @@ public class ChunkIO implements IOInterface{
 		
 		@Override
 		public void flush() throws IOException{
-			data.flush();
+			if(data!=null) data.flush();
 		}
 		
 		////////////////////////////////////////////////////////////////////////
@@ -473,8 +495,8 @@ public class ChunkIO implements IOInterface{
 	
 	
 	@Override
-	public @com.lapissea.util.NotNull
-	RandomIO doRandom() throws IOException{
+	@NotNull
+	public RandomIO doRandom() throws IOException{
 		return new ChunkSpaceRandomIO(chunkSource.doRandom());
 	}
 	

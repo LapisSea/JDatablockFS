@@ -8,10 +8,7 @@ import com.lapissea.fsf.collections.IOList;
 import com.lapissea.fsf.io.ContentInputStream;
 import com.lapissea.fsf.io.ContentOutputStream;
 import com.lapissea.fsf.io.serialization.FileObject;
-import com.lapissea.util.NotNull;
-import com.lapissea.util.Nullable;
-import com.lapissea.util.TextUtil;
-import com.lapissea.util.UtilL;
+import com.lapissea.util.*;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeIntFunction;
 import com.lapissea.util.function.UnsafeSupplier;
@@ -339,11 +336,7 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 		var cached=cache.get(index);
 		if(!DEBUG_VALIDATION) return cached;
 		
-		if(cached==null) return null;
-		
-		E read=readElement(listHeader, index);
-		
-		Assert(cached.equals(read), cached, read, data);
+		checkCacheIntegrity(cache::get);
 		return cached;
 	}
 	
@@ -373,20 +366,24 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 			}
 		}
 		
+		checkCacheIntegrity(i->safeCacheFetch(getListHeader(), i));
+	}
+	
+	private void checkCacheIntegrity(UnsafeIntFunction<E, IOException> cacheGet) throws IOException{
+		
 		var disk    =new LinkedHashMap<Integer, E>();
 		var cacheMap=new HashMap<Integer, E>();
 		
 		for(int i=0;i<size();i++){
 			E d=readElement(getListHeader(), i);
 			disk.put(i, d);
-			var c=safeCacheFetch(getListHeader(), i);
+			var c=cacheGet.apply(i);
 			if(c!=null) cacheMap.put(i, c);
 		}
 		
 		if(!Utils.isCacheValid(disk, cacheMap)){
-			throw new AssertionError(getListHeader()+" "+TextUtil.toString(data.readAll())+"\n"+TextUtil.toTable("disk / cache", List.of(disk, cache)));
+			throw new AssertionError(System.identityHashCode(this)+" "+getListHeader()+" "+TextUtil.toString(data.readAll())+"\n"+TextUtil.toTable("disk / cache", List.of(disk, cache)));
 		}
-		
 	}
 	
 	private long calcFileSize(H listHeader, int size){
@@ -504,6 +501,7 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 		try(var in=data.write(calcPos(index), false)){
 			in.write(buffer);
 		}
+		cache.put(index, element);
 	}
 	
 	@Override
@@ -540,7 +538,7 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 	}
 	
 	@Override
-	public Chunk getData(){
+	public Chunk getLocation(){
 		return data.getRoot();
 	}
 	
@@ -612,7 +610,20 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 	public Stream<ChunkLink> openLinkStream(PointerConverter<E> converter) throws IOException{
 		if(isEmpty()) return Stream.empty();
 		
-		var chainIo=getData().io().doRandom();
+		boolean[] notClosed={true};
+		Throwable th       =new Throwable();
+		Object gcTrigger=new Object(){
+			@Override
+			protected void finalize() throws Throwable{
+				if(notClosed[0]){
+					th.printStackTrace();
+					sysExit(0);
+				}
+				super.finalize();
+			}
+		};
+		
+		var chainIo=getLocation().io().doRandom();
 		int siz    =size();
 		return IntStream.range(0, siz).mapToObj(i->{
 			Assert(siz==size());
@@ -622,11 +633,16 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 				var off=chainIo.getGlobalPos();
 				var ptr=converter.get(header, getElement(i));
 				
+				gcTrigger.toString();
+				
 				return new ChunkLink(false, ptr, off, val->modifyElement(i, e->converter.set(header, e, val)));
 			}catch(IOException e){
 				throw UtilL.uncheckedThrow(e);
 			}
 		}).onClose(()->{
+			LogUtil.println("ok");
+			notClosed[0]=false;
+			gcTrigger.toString();
 			try{
 				chainIo.close();
 			}catch(IOException e){

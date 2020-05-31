@@ -135,7 +135,7 @@ public class FileData implements IOInterface{
 	public FileData(Header<?> header, IOList.Ref<FileEntry> value){
 		this.header=header;
 		this.value=value;
-		entry=value.getFake();
+		entry=value.getUnchecked();
 	}
 	
 	private synchronized void initEntryData(long initialCapacity) throws IOException{
@@ -149,7 +149,7 @@ public class FileData implements IOInterface{
 	
 	private FileEntry getEntry(){
 		if(DEBUG_VALIDATION){
-			Assert(value.getFake().getId().equals(entry.getId()));
+			Assert(value.getUnchecked().getId().equals(entry.getId()));
 		}
 		return entry;
 	}

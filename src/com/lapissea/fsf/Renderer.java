@@ -2,24 +2,20 @@ package com.lapissea.fsf;
 
 import com.lapissea.fsf.chunk.Chunk;
 import com.lapissea.fsf.chunk.ChunkLink;
-import com.lapissea.util.LogUtil;
-import com.lapissea.util.MathUtil;
-import com.lapissea.util.UtilL;
-import com.lapissea.util.WeakValueHashMap;
+import com.lapissea.fsf.io.IOInterface;
+import com.lapissea.util.*;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.image.BufferedImage;
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
+import java.io.*;
+import java.net.Socket;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.stream.Collectors;
 
 import static com.lapissea.util.PoolOwnThread.*;
 import static java.awt.RenderingHints.*;
@@ -210,7 +206,7 @@ public interface Renderer{
 			
 			jframe.setVisible(true);
 			
-			jframe.setSize(1000, 750);
+			jframe.setSize(300, 300);
 			jframe.setLocationRelativeTo(null);
 			jframe.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 			jframe.addComponentListener(new ComponentAdapter(){
@@ -414,12 +410,12 @@ public interface Renderer{
 							
 							hoverChunk=null;
 							hoverCol=Color.WHITE;
-							var chunks=header.allChunks(true);
+							var chunks=header.collectAllChunks(true);
 							for(var e : chunks.entrySet()){
 								var chains=e.getValue();
 								for(var chain : chains){
 									for(ChunkLink link : chain){
-										if(!link.sourceValidChunk) continue;
+										if(!link.isSourceValidChunk()) continue;
 										Chunk chunk=link.dereferenceSource(header);
 										if(chunk.overlaps(bytePos, bytePos+1)){
 											hoverChunk=chunk;
@@ -491,7 +487,189 @@ public interface Renderer{
 		}
 		
 		@Override
-		public void finish(){}
+		public void finish(){
+			jframe.setVisible(false);
+			jframe.setSize(1000, 750);
+			jframe.setLocationRelativeTo(null);
+			invokeLater(()->jframe.setVisible(true));
+		}
+	}
+	
+	class Client implements Renderer{
+		
+		ExecutorService runner=Executors.newSingleThreadExecutor();
+		List<Snapshot>  queue =new ArrayList<>();
+		
+		volatile int sent;
+		volatile int index;
+		
+		private Socket           socket;
+		private DataOutputStream out;
+		
+		public Client(){
+			this(666);
+//			runner.submit(()->{
+//				int[] ind={0};
+//				UtilL.sleepWhile(()->index==ind[0], 50);
+//				UtilL.sleepWhile(()->{
+//					if(index!=ind[0]){
+//						ind[0]=index;
+//						return true;
+//					}
+//					return false;
+//				}, 50);
+//			});
+		}
+		
+		public Client(int port){
+			try{
+				socket=new Socket("127.0.0.1", port);
+				BufferedReader serverTalk=new BufferedReader(new InputStreamReader(socket.getInputStream()));
+				
+				var t=new Thread(()->{
+					while(true){
+						try{
+							serverTalk.transferTo(new Writer(){
+								@Override
+								public void write(char[] cbuf, int off, int len) throws IOException{
+									serverSays(new String(cbuf, off, len));
+								}
+								
+								@Override
+								public void flush() throws IOException{ }
+								
+								@Override
+								public void close() throws IOException{ }
+							});
+						}catch(IOException ignored){ }
+					}
+				});
+				t.setDaemon(true);
+				t.start();
+				
+				out=new DataOutputStream(socket.getOutputStream());
+				
+				out.writeUTF("CLEAR");
+				out.flush();
+			}catch(IOException e){
+				e.printStackTrace();
+			}
+		}
+		
+		private void serverSays(String c){
+			LogUtil.printEr(c);
+		}
+		
+		private CompletableFuture<PairM<Integer, byte[]>> makePacket(IOInterface data, long[] writtenIds, Throwable stackTrace) throws IOException{
+			if(out==null) return null;
+			
+			int ind;
+			
+			synchronized(this){
+				ind=index;
+				index++;
+			}
+			
+			return async(()->{
+				try{
+					var packet=new ByteArrayOutputStream();
+					var out   =new DataOutputStream(packet);
+					
+					out.writeUTF("EMBEDDED");
+					
+					out.writeInt(writtenIds.length);
+					for(var e : writtenIds) out.writeLong(e);
+					
+					var els=Arrays.stream(stackTrace.getStackTrace()).map(Objects::toString).toArray(String[]::new);
+					out.writeInt(els.length);
+					for(var e : els) out.writeUTF(e);
+					
+					out.writeInt(Math.toIntExact(data.getSize()));
+					try(var in=data.read()){
+						in.transferTo(out);
+					}
+					
+					return new PairM<>(ind, packet.toByteArray());
+					
+				}catch(IOException e){
+					throw UtilL.uncheckedThrow(e);
+				}
+			}, ForkJoinPool.commonPool());
+			
+		}
+		
+		private synchronized void send(byte[] packet){
+			
+			sent++;
+			
+			try{
+				out.write(packet);
+			}catch(IOException e){
+				throw UtilL.uncheckedThrow(e);
+			}
+		}
+		
+		@Override
+		public boolean doAll(){
+			return true;
+		}
+		
+		@Override
+		public void snapshot(Snapshot snap) throws IOException{
+			queue.add(snap);
+		}
+		
+		@Override
+		public void finish(){
+			if(out==null) return;
+//			UtilL.sleep(3000);
+			try{
+				
+				List<CompletableFuture<PairM<Integer, byte[]>>> futures=new ArrayList<>(queue.size());
+				for(int i=queue.size()-1;i >= 0;i--){
+					var snap=queue.remove(i);
+					futures.add(makePacket(snap.copy.header.source, snap.ids, snap.stackTrace));
+				}
+				
+				futures.stream()
+				       .map(CompletableFuture::join)
+				       .collect(Collectors.toMap(p->p.obj1, p->p.obj2))
+				       .entrySet()
+				       .stream()
+				       .sorted(Comparator.comparingInt(e->-e.getKey()))
+				       .map(Entry::getValue)
+				       .forEach(bb->{
+					       try{
+						       out.write(bb);
+					       }catch(IOException e){
+						       throw UtilL.uncheckedThrow(e);
+					       }
+				       });
+				
+				out.flush();
+			}catch(IOException e){
+				e.printStackTrace();
+			}
+			
+			System.gc();
+			
+			UtilL.sleepWhile(()->{
+				try{
+					out.writeUTF("NOOP");
+					out.flush();
+					return true;
+				}catch(IOException e){
+					return false;
+				}
+			}, 100);
+			try{
+				runner.shutdown();
+				out.close();
+				socket.close();
+			}catch(IOException e){
+				e.printStackTrace();
+			}
+		}
 	}
 	
 	boolean doAll();

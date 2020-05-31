@@ -27,7 +27,7 @@ public class FileIDsModule<Identifier> extends HeaderModule<IOList<FileEntry>, I
 	
 	@Override
 	protected IOList<FileEntry> postRead() throws IOException{
-		return new FixedLenList<>(()->new FileEntry.Head(header), getOwning().get(0));
+		return new FixedLenList<>(()->new FileEntry.Head(header), getOwning(0));
 	}
 	
 	@Override

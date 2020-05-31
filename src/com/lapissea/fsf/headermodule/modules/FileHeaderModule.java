@@ -52,7 +52,7 @@ public class FileHeaderModule<Identifier> extends HeaderModule<IOList<ChunkPoint
 	protected IOList<ChunkPointer> getValue(){
 		if(super.getValue()==null){
 			try{
-				read(getOwning().iterator()::next);
+				read(()->IOList.of(Header.FIRST_POINTER).makeReference(0));
 			}catch(IOException e){
 				e.printStackTrace();
 			}
@@ -62,9 +62,9 @@ public class FileHeaderModule<Identifier> extends HeaderModule<IOList<ChunkPoint
 	}
 	
 	@Override
-	public List<Chunk> getOwning(){
+	public Stream<Chunk> getOwning(){
 		try{
-			return List.of(header.firstChunk());
+			return Stream.of(header.firstChunk());
 		}catch(IOException e){
 			throw UtilL.uncheckedThrow(e);
 		}
@@ -86,6 +86,6 @@ public class FileHeaderModule<Identifier> extends HeaderModule<IOList<ChunkPoint
 	
 	@Override
 	protected FixedLenList<FixedNumber, ChunkPointer> postRead() throws IOException{
-		return new FixedLenList<>(()->new FixedNumber(LONG), getOwning().get(0), null);
+		return new FixedLenList<>(()->new FixedNumber(LONG), getOwning(0), null);
 	}
 }

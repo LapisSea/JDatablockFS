@@ -8,12 +8,11 @@ import com.lapissea.util.function.UnsafeRunnable;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Scanner;
+import java.util.*;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 class FSFTest_console{
 	
@@ -29,14 +28,14 @@ class FSFTest_console{
 	
 	enum Command{
 		WRITE((file, data)->{
-			StringBuilder fileName=new StringBuilder();
+			var fileName=new StringBuilder();
 			for(int i=0;i<data.length();i++){
 				char c=data.charAt(i);
 				if(c==' ') break;
 				fileName.append(c);
 			}
 			
-			file.getFile(fileName.toString()).writeAll(data.substring(fileName.length()+1).getBytes());
+			file.createFile(fileName.toString()).writeAll(data.substring(fileName.length()+1).getBytes());
 		}),
 		WRITE_STREAM((file, data)->{
 			try(var stream=file.createFile(data).write()){
@@ -58,15 +57,15 @@ class FSFTest_console{
 			}
 		}),
 		RENAME((file, data)->{
-			int pos =data.indexOf(" ");
-			var from=data.substring(0, pos);
-			var to  =data.substring(pos+1);
+			int    pos =data.indexOf(" ");
+			String from=data.substring(0, pos);
+			var    to  =data.substring(pos+1);
 			if(!file.getFile(from).rename(to)){
 				LogUtil.println("Failed to rename \""+from+"\" to \""+to+'"');
 			}
 		}),
 		LIST((file, data)->{
-			LogUtil.println(TextUtil.toTable(file.listFiles().collect(Collectors.toList())));
+			LogUtil.println(TextUtil.toTable(file.listFiles()));
 		}),
 		DELETE((file, data)->{
 			if(!file.getFile(data).delete()){
@@ -100,7 +99,21 @@ class FSFTest_console{
 	public static void main(String[] args){
 		LogUtil.Init.attach(0);
 		
-		TestTemplate.run(Renderer.GUI::new, (fil, snapshot)->{
+		Stream<String> lines=null;
+		
+		Predicate<String> isCommand=null;
+		
+		
+		List<StringBuilder> sbs=new ArrayList<>();
+		
+		lines.forEach(l->{
+			if(isCommand.test(l)) sbs.add(new StringBuilder());
+			var sb=sbs.get(sbs.size()-1);
+			if(sb.length()>0) sb.append(" ");
+			sb.append(l);
+		});
+		
+		TestTemplate.run(Renderer.Client::new, (fil, snapshot)->{
 			Scanner scanner=new Scanner(System.in);
 			while(true){
 				var line=scanner.nextLine();

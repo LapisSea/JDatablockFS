@@ -44,7 +44,7 @@ import static com.lapissea.util.UtilL.*;
  *
  * */
 @SuppressWarnings("AutoBoxing")
-public class Chunk{
+public class Chunk implements Comparable<Chunk>{
 	
 	public static int headerSize(long fileSize, long chunkSize)      { return headerSize(NumberSize.bySize(fileSize), NumberSize.bySize(chunkSize)); }
 	
@@ -165,7 +165,7 @@ public class Chunk{
 	private static int counter;
 	
 	
-	public final transient Header header;
+	public final transient Header<?> header;
 	
 	private boolean used;
 	private boolean dirty;
@@ -317,6 +317,10 @@ public class Chunk{
 		notifyDependency();
 	}
 	
+	public boolean canSetCapacity(long capacity){
+		return getBodyType().canFit(capacity);
+	}
+	
 	public void setCapacity(long capacity) throws BitDepthOutOfSpaceException{
 		if(this.capacity==capacity) return;
 		
@@ -461,22 +465,6 @@ public class Chunk{
 			totalSize[0]+=chunk.getSize();
 			totalCapacity[0]+=chunk.getCapacity();
 		});
-	}
-	
-	public void shit(){
-		List<StringBuilder> sbs=shit(new StringBuilder());
-	}
-	
-	public <T> List<T> shit(T dummyT){
-		List<T> ts=new ArrayList<>();
-		for(int i=0;i<10;i++){
-			try{
-				ts.add(((Class<T>)dummyT.getClass()).getConstructor().newInstance());
-			}catch(ReflectiveOperationException e){
-				throw new RuntimeException(e);
-			}
-		}
-		return ts;
 	}
 	
 	@NotNull
@@ -775,5 +763,10 @@ public class Chunk{
 	public void clearSize() throws IOException{
 		setSize(0);
 		syncHeader();
+	}
+	
+	@Override
+	public int compareTo(Chunk o){
+		return Long.compare(getOffset(), o.getOffset());
 	}
 }

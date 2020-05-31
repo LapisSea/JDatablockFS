@@ -33,7 +33,7 @@ public class FreeChunksModule<Identifier> extends HeaderModule<FixedLenList<Size
 	
 	@Override
 	protected FixedLenList<SizedNumber<ChunkPointer>, ChunkPointer> postRead() throws IOException{
-		return new FixedLenList<>(headerSupplier, getOwning().get(0), getOwning().get(1));
+		return new FixedLenList<>(headerSupplier, getOwning(0), getOwning(1));
 	}
 	
 	@Override

@@ -11,10 +11,17 @@ import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
 
 import java.io.IOException;
+import java.util.function.Function;
 
 public class ChunkPointer extends FileObject implements Comparable<ChunkPointer>, INumber{
 	
 	public static final IOList.PointerConverter<ChunkPointer> CONVERTER=IOList.PointerConverter.make(p->p, (old, ptr)->ptr);
+	
+	@Nullable
+	public static <T> T mapNullable(@Nullable ChunkPointer ptr, @NotNull Function<ChunkPointer, T> num){
+		if(ptr==null||ptr.equals(0)) return null;
+		return num.apply(ptr);
+	}
 	
 	public static ChunkPointer newOrNull(long ptr){
 		if(ptr==0) return null;

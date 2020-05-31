@@ -15,12 +15,11 @@ import com.lapissea.fsf.io.serialization.FileObject;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
+import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -42,18 +41,53 @@ import static com.lapissea.util.UtilL.*;
 @SuppressWarnings("AutoBoxing")
 public class SparsePointerList<E extends FileObject> extends IOList.Abstract<E>{
 	
+	private class Node implements UnsafeConsumer<E, IOException>{
+		E   val;
+		int index;
+		
+		public Node(int index){this.index=index; }
+		
+		public Node(int index, E e){
+			this(index);
+			val=e;
+		}
+		
+		@Override
+		public void accept(E t) throws IOException{
+			Objects.requireNonNull(t);
+			val=t;
+			setElement(index, val);
+		}
+		
+		@Override
+		public boolean equals(Object o){
+			return this==o||
+			       o instanceof SparsePointerList<?>.Node node&&
+			       val.equals(node.val);
+		}
+		
+		@Override
+		public int hashCode(){
+			return val.hashCode();
+		}
+	}
+	
 	public static <H extends FileObject&FixedLenList.ElementHead<H, ?>> List<Chunk> init(Header<?> fileHeader, H header, int initialCapacity) throws IOException{
 		return FixedLenList.init(fileHeader, NumberSize.BYTE, header, initialCapacity, false);
 	}
 	
 	private final FixedLenList<SizedNumber<ChunkPointer>, ChunkPointer> valuePointers;
 	
-	private final Map<Integer, E> cache;
+	private final Map<Integer, Node> cache;
 	
-	private final Supplier<E> constructor;
-	private final Header<?>   header;
+	private final Function<UnsafeConsumer<E, IOException>, E> constructor;
+	private final Header<?>                                   header;
 	
 	public SparsePointerList(@NotNull Supplier<E> constructor, @NotNull Chunk data) throws IOException{
+		this(setter->constructor.get(), data);
+	}
+	
+	public SparsePointerList(@NotNull Function<UnsafeConsumer<E, IOException>, E> constructor, @NotNull Chunk data) throws IOException{
 		this.constructor=Objects.requireNonNull(constructor);
 		header=data.header;
 		cache=header.config.newCacheMap();
@@ -65,10 +99,13 @@ public class SparsePointerList<E extends FileObject> extends IOList.Abstract<E>{
 		
 		Map<Integer, E> disk=new LinkedHashMap<>();
 		for(int i=0;i<size();i++){
-			disk.put(i, readValue(getPtr(i)));
+			disk.put(i, readValue(i, getPtr(i)).val);
 		}
 		
-		if(!Utils.isCacheValid(disk, cache)){
+		Map<Integer, E> c=new HashMap<>(cache.size());
+		cache.forEach((k, v)->c.put(k, v.val));
+		
+		if(!Utils.isCacheValid(disk, c)){
 			throw new AssertionError("\n"+TextUtil.toTable("disk / cache", List.of(disk, cache)));
 		}
 	}
@@ -77,26 +114,32 @@ public class SparsePointerList<E extends FileObject> extends IOList.Abstract<E>{
 		return valuePointers.getElement(index);
 	}
 	
-	private E readValue(int index) throws IOException{
-		return readValue(getPtr(index));
+	private Node readValue(int index) throws IOException{
+		return readValue(index, getPtr(index));
 	}
 	
-	private E readValue(ChunkPointer ptr) throws IOException{
+	private Node readValue(int index, ChunkPointer ptr) throws IOException{
+		
 		Chunk data=ptr.dereference(header);
-		E     e   =constructor.get();
+		
+		Node node=new Node(index);
+		E    e   =constructor.apply(node);
+		Objects.requireNonNull(e);
+		node.val=e;
+		
 		try(var in=data.io().read()){
 			e.read(in);
 		}
-		return e;
+		return node;
 	}
 	
-	private E resolvePointer(int index) throws IOException{
-		E cached=cache.get(index);
+	private Node resolvePointer(int index) throws IOException{
+		Node cached=cache.get(index);
 		if(!DEBUG_VALIDATION){
 			if(cached!=null) return cached;
 		}
 		
-		E read=readValue(index);
+		Node read=readValue(index);
 		
 		if(DEBUG_VALIDATION){
 			if(cached!=null){
@@ -115,7 +158,7 @@ public class SparsePointerList<E extends FileObject> extends IOList.Abstract<E>{
 	@Override
 	public E getElement(int index) throws IOException{
 		Objects.checkIndex(index, size());
-		return Objects.requireNonNull(resolvePointer(index));
+		return Objects.requireNonNull(resolvePointer(index)).val;
 	}
 	
 	private void writeToChunk(E e, Chunk chunk) throws IOException{
@@ -124,9 +167,18 @@ public class SparsePointerList<E extends FileObject> extends IOList.Abstract<E>{
 		}
 		
 		if(DEBUG_VALIDATION){
-			var read=readValue(chunk.reference());
-			Assert(read.equals(e), read, e);
+			var read=readValue(-1, chunk.reference());
+			Assert(read.val.equals(e), read, e);
 		}
+	}
+	
+	private void cache(int index, E val){
+		cache(index, new Node(index, val));
+	}
+	
+	private void cache(int index, Node val){
+		val.index=index;
+		cache.put(index, val);
 	}
 	
 	@Override
@@ -140,11 +192,10 @@ public class SparsePointerList<E extends FileObject> extends IOList.Abstract<E>{
 		writeToChunk(e, chunk);
 		
 		if(DEBUG_VALIDATION){
-			var read=readValue(chunk.reference());
-			if(!read.equals(e)) throw new AssertionError("\n"+TextUtil.toTable("e / read", e, read));
+			var read=readValue(-1, chunk.reference());
+			if(!read.val.equals(e)) throw new AssertionError("\n"+TextUtil.toTable("e / read", e, read));
 		}
-		
-		cache.put(valuePointers.size(), e);
+		cache(valuePointers.size(), e);
 		valuePointers.addElement(chunk.reference());
 		
 		if(DEBUG_VALIDATION) checkIntegrity();
@@ -167,20 +218,15 @@ public class SparsePointerList<E extends FileObject> extends IOList.Abstract<E>{
 				
 				var bb=new byte[(int)e.length()];
 				e.write(new ContentOutputStream.BA(bb));
-				cached.read(new ContentInputStream.BA(bb));
+				cached.val.read(new ContentInputStream.BA(bb));
 				return;
 			}
 		}else{
-			E read=readValue(oldPtr);
+			E read=readValue(index, oldPtr).val;
 			if(read.equals(e)) return;
 		}
 		
 		var oldChunk=getPtr(index).dereference(header);
-
-//		if(oldChunk.getSize()==e.length()){
-//			writeToChunk(e, oldChunk);
-//			cache.put(index, e);
-//		}else{
 		
 		valuePointers.ensureElementCapacity(valuePointers.size()+1);
 		
@@ -189,10 +235,9 @@ public class SparsePointerList<E extends FileObject> extends IOList.Abstract<E>{
 		
 		cache.remove(index);
 		valuePointers.setElement(index, new ChunkPointer(chunk));
-		cache.put(index, e);
+		cache(index, e);
 		
 		header.freeChunkChain(oldChunk);
-//		}
 		
 		if(DEBUG_VALIDATION) checkIntegrity();
 	}
@@ -239,19 +284,6 @@ public class SparsePointerList<E extends FileObject> extends IOList.Abstract<E>{
 		if(isEmpty()) return Stream.empty();
 		
 		return valuePointers.openLinkStream(ChunkPointer.CONVERTER);
-
-//		int siz=size();
-//		return IntStream.range(0, siz).mapToObj(i->{
-//			Assert(siz==size());
-//			try{
-//				var off=getPtr(i).getValue();
-//				var ptr=converter.get(header, getElement(i));
-//
-//				return new ChunkLink(false, ptr, off, val->modifyElement(i, e->converter.set(header, e, val)));
-//			}catch(IOException e){
-//				throw UtilL.uncheckedThrow(e);
-//			}
-//		});
 	}
 	
 	@Override
@@ -260,7 +292,7 @@ public class SparsePointerList<E extends FileObject> extends IOList.Abstract<E>{
 	}
 	
 	@Override
-	public Chunk getData(){
-		return valuePointers.getData();
+	public Chunk getLocation(){
+		return valuePointers.getLocation();
 	}
 }

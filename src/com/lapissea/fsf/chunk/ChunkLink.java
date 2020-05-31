@@ -17,8 +17,8 @@ import static com.lapissea.util.UtilL.*;
 
 public class ChunkLink{
 	
-	public final boolean sourceValidChunk;
-	public final long    sourcePos;
+	private final boolean sourceValidChunk;
+	public final  long    sourcePos;
 	
 	private final UnsafeConsumer<ChunkPointer, IOException> setter;
 	
@@ -40,7 +40,7 @@ public class ChunkLink{
 	}
 	
 	public ChunkLink(boolean sourceValidChunk, ChunkPointer pointer, long sourcePos){
-		this(sourceValidChunk, pointer, sourcePos, o->{throw new UnsupportedOperationException();});
+		this(sourceValidChunk, pointer, sourcePos, null);
 	}
 	
 	public ChunkLink(boolean sourceValidChunk, ChunkPointer pointer, long sourcePos, UnsafeConsumer<ChunkPointer, IOException> setter){
@@ -67,8 +67,18 @@ public class ChunkLink{
 	
 	public void setPointer(ChunkPointer pointer) throws IOException{
 		Objects.requireNonNull(pointer);
+		requireModifiable();
+		
 		setter.accept(pointer);
 		this.pointer=pointer;
+	}
+	
+	public void requireModifiable(){
+		if(!isModifiable()) throw new UnsupportedOperationException("This link does not provide modification ability");
+	}
+	
+	public boolean isModifiable(){
+		return setter!=null;
 	}
 	
 	public boolean hasPointer(){
@@ -92,11 +102,12 @@ public class ChunkLink{
 			@Override
 			public ChunkLink get(){
 				synchronized(this){
+					var link=this.link;
 					if(link==null) return null;
 					try{
 						return link;
 					}finally{
-						link=link.next(header);
+						this.link=link.next(header);
 					}
 				}
 			}
@@ -114,13 +125,23 @@ public class ChunkLink{
 			
 			@Override
 			public ChunkLink next(){
+				var link=this.link;
 				if(!hasNext()) throw new NoSuchElementException();
 				try{
 					return link;
 				}finally{
-					link=link.next(header);
+					this.link=link.next(header);
 				}
 			}
 		};
+	}
+	
+	public boolean isSourceValidChunk(){
+		return sourceValidChunk;
+	}
+	
+	@Override
+	public String toString(){
+		return (isSourceValidChunk()?sourceReference():sourcePos)+" -> "+(hasPointer()?getPointer():"/");
 	}
 }

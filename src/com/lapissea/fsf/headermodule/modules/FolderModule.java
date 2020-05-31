@@ -27,7 +27,12 @@ public class FolderModule<Identifier> extends HeaderModule<Folder<Identifier>, I
 	
 	@Override
 	protected Folder<Identifier> postRead() throws IOException{
-		return getOwning(0).io().readAsObject(new Folder<>(header));
+		return getOwning(0).io().readAsObject(new Folder<>(header, newF->{
+			var old=getOwning(0);
+			var c  =header.aloc(newF, true);
+			setOwningChunk(0, c);
+			header.freeChunkChain(old);
+		}));
 	}
 	
 	@Override
@@ -45,13 +50,12 @@ public class FolderModule<Identifier> extends HeaderModule<Folder<Identifier>, I
 	 */
 	@Override
 	public Stream<ChunkLink> openReferenceStream() throws IOException{
-		return getValue().openReferenceStream(getOwning().get(0).getDataStart());
-//		return getList().openLinkStream(e->new ChunkPointer(e.getValue()), (old, ptr)->new ChunkPointer(ptr));
+		return getValue().openReferenceStream(getOwning(0).getDataStart());
 	}
 	
 	@Override
 	public Color displayColor(){
-		return Color.CYAN.darker();
+		return Color.ORANGE;
 	}
 	
 	@Override

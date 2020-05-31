@@ -10,19 +10,73 @@ import com.lapissea.util.function.UnsafeFunction;
 
 import java.io.IOException;
 import java.util.AbstractList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 public interface IOList<E> extends List<E>{
+	
+	@SafeVarargs
+	static <T> IOList<T> of(T... data){
+		return of(Arrays.asList(data));
+	}
+	
+	static <T> IOList<T> of(List<T> data){
+		return new Abstract<>(){
+			@Override
+			public T getElement(int index) throws IOException{
+				return data.get(index);
+			}
+			
+			@Override
+			public void addElement(T element) throws IOException{
+				throw new UnsupportedOperationException();
+			}
+			
+			@Override
+			public void setElement(int index, T element) throws IOException{
+				throw new UnsupportedOperationException();
+			}
+			
+			@Override
+			public void removeElement(int index) throws IOException{
+				throw new UnsupportedOperationException();
+			}
+			
+			@Override
+			public void clearElements() throws IOException{
+				throw new UnsupportedOperationException();
+			}
+			
+			@Override
+			public Stream<ChunkLink> openLinkStream(PointerConverter<T> converter) throws IOException{
+				throw new UnsupportedOperationException();
+			}
+			
+			@Override
+			public Chunk getLocation(){
+				throw new UnsupportedOperationException();
+			}
+			
+			@Override
+			public void checkIntegrity() throws IOException{ }
+			
+			@Override
+			public int size(){
+				return data.size();
+			}
+		};
+	}
 	
 	record Ref<E>(
 		IOList<E>owner,
 		int index
 	){
-		public E getFake(){
+		public E getUnchecked(){
 			return owner.get(index);
 		}
 		
@@ -266,9 +320,13 @@ public interface IOList<E> extends List<E>{
 	
 	Stream<ChunkLink> openLinkStream(PointerConverter<E> converter) throws IOException;
 	
-	Chunk getData();
+	Chunk getLocation();
 	
 	void checkIntegrity() throws IOException;
+	
+	default Stream<Ref<E>> makeReferenceStream(){
+		return IntStream.range(0, size()).mapToObj(this::makeReference);
+	}
 	
 	default Ref<E> makeReference(int index){
 		return new Ref<>(this, index);

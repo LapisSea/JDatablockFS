@@ -10,6 +10,9 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.stream.LongStream;
 
+import static com.lapissea.fsf.FileSystemInFile.*;
+import static com.lapissea.util.UtilL.*;
+
 public class MemoryData implements IOInterface{
 	public transient UnsafeConsumer<long[], IOException> onWrite;
 	
@@ -19,13 +22,24 @@ public class MemoryData implements IOInterface{
 	private final boolean readOnly;
 	
 	public MemoryData(IOInterface data, boolean readOnly) throws IOException{
-		bb=data.readAll();
-		used=bb.length;
-		this.readOnly=readOnly;
+		this(data.readAll(), readOnly);
+	}
+	
+	public MemoryData(byte[] data, boolean readOnly){
+		this(data, data.length, readOnly);
 	}
 	
 	public MemoryData(boolean readOnly){
-		bb=new byte[4];
+		this(new byte[4], 0, readOnly);
+	}
+	
+	public MemoryData(byte[] data, int used, boolean readOnly){
+		var ok=data.length >= used;
+		if(DEBUG_VALIDATION) Assert(ok, data.length, ">=", used);
+		else Assert(ok);
+		
+		bb=data;
+		this.used=used;
 		this.readOnly=readOnly;
 	}
 	

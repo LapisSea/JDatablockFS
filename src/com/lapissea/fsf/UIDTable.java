@@ -146,7 +146,7 @@ public class UIDTable{
 		var head    =new Range.Head(NumberSize.bySize(newRange.stream().mapToLong(r->r.end).max().orElseThrow()));
 		var capacity=FixedLenList.calcPos(head, newRange.size());
 		
-		var oldData=ranges.getData();
+		var oldData=ranges.getLocation();
 		var newData=oldData.header.aloc(capacity, true);
 		
 		var newRanges=new FixedLenList<>(Range.Head::new, newData);

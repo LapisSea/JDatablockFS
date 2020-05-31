@@ -12,13 +12,14 @@ import com.lapissea.fsf.io.serialization.FileObject;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
+import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -29,54 +30,93 @@ import static com.lapissea.util.UtilL.*;
 @SuppressWarnings("unchecked")
 public class Folder<Identifier> extends FileObject.FullLayout<Folder<Identifier>>{
 	
-	private static <T extends FileObject, Id> IOList<T> getList(Header<Id> header, ChunkPointer ptr, Function<Header<Id>, T> makeElement){
+	private static <T extends FileObject, Id> IOList<T> getList(Header<Id> header, ChunkPointer ptr, BiFunction<Header<Id>, UnsafeConsumer<T, IOException>, T> makeElement){
 		try{
 			var chunk=ptr.dereference(header);
-			return new SparsePointerList<>(()->makeElement.apply(header), chunk);
+			return new SparsePointerList<>(setter->makeElement.apply(header, setter), chunk);
 		}catch(IOException e){
 			throw UtilL.uncheckedThrow(e);
 		}
 	}
 	
-	private static <T extends FileObject, Id> ObjDef<Folder<Id>, SelfSizedNumber> defList(Function<Folder<Id>, IOList<T>> getList, BiConsumer<Folder<Id>, IOList<T>> setList, Function<Header<Id>, T> makeElement){
+	private static <T extends FileObject, Id> ObjDef<Folder<Id>, SelfSizedNumber> defList(Function<Folder<Id>, Folder<Id>.ListValue<?>> getter){
 		return new ObjDef<>(
-			p->{
-				var list=getList.apply(p);
-				return list==null?null:new SelfSizedNumber(list.getData().getOffset());
-			},
-			(p, v)->setList.accept(p, getList(p.header, new ChunkPointer(v), makeElement)),
-			(Supplier<SelfSizedNumber>)SelfSizedNumber::new);
+			p->ChunkPointer.mapNullable(getter.apply(p).getPtr(), SelfSizedNumber::new),
+			(p, v)->getter.apply(p).setPtr(v),
+			(Supplier<SelfSizedNumber>)SelfSizedNumber::new
+		);
 	}
 	
 	public static <T> List<Chunk> init(Header<T> header) throws IOException{
-		var folder=new Folder<>(header);
-		folder.children=folder.initList(Folder::new);
-		folder.files=folder.initList(FileTag::new);
+		var folder=new Folder<>(header, e->{});
+		folder.children.setPtr(folder.initList());
+		folder.files.setPtr(folder.initList());
 		
 		return List.of(header.aloc(folder, false));
 	}
 	
 	private static final SegmentedObjectDef<Folder<?>> LAYOUT=(SegmentedObjectDef<Folder<?>>)(Object)FileObject.sequenceBuilder(
 		new IdIODef<>(Folder::getIO, Folder::getName, Folder::setName),
-		defList(f->f.children, (f, l)->f.children=l, Folder::new),
-		defList(f->f.files, (f, l)->f.files=l, FileTag::new)
+		defList(f->f.children),
+		defList(f->f.files)
 	                                                                                                                           );
 	
-	
-	private final Header<Identifier> header;
-	
-	private Identifier                  name;
-	private IOList<Folder<Identifier>>  children;
-	private IOList<FileTag<Identifier>> files;
-	
-	public Folder(Header<Identifier> header){
-		this(header, header.identifierIO.defaultVal());
+	private class ListValue<E extends FileObject>{
+		
+		private final BiFunction<Header<Identifier>, UnsafeConsumer<E, IOException>, E> makeElement;
+		
+		private IOList<E>    list;
+		private ChunkPointer listLoc;
+		
+		private ListValue(BiFunction<Header<Identifier>, UnsafeConsumer<E, IOException>, E> makeElement){
+			this.makeElement=makeElement;
+		}
+		
+		private ChunkLink makeLink(long thisOff){
+			return new ChunkLink(false, listLoc, thisOff, newPtr->{
+				setPtr(newPtr);
+				update();
+			});
+		}
+		
+		private ChunkPointer getPtr(){
+			return listLoc;
+		}
+		
+		private IOList<E> makeList(ChunkPointer ptr){
+			return getList(header, ptr, makeElement);
+		}
+		
+		private void setPtr(INumber ptr){
+			listLoc=new ChunkPointer(ptr);
+			if(list==null||!listLoc.equals(list.getLocation().getOffset())){
+				list=ChunkPointer.mapNullable(listLoc, this::makeList);
+			}
+		}
 	}
 	
-	public Folder(Header<Identifier> header, Identifier name){
+	private final Header<Identifier>                              header;
+	private final UnsafeConsumer<Folder<Identifier>, IOException> update;
+	
+	private Identifier name;
+	
+	private final ListValue<Folder<Identifier>>  children=new ListValue<>(Folder::new);
+	private final ListValue<FileTag<Identifier>> files   =new ListValue<>((h, setter)->new FileTag<>(h));
+	
+	public Folder(Header<Identifier> header, UnsafeConsumer<Folder<Identifier>, IOException> update){
+		this(header, update, header.identifierIO.defaultVal());
+	}
+	
+	public Folder(Header<Identifier> header, UnsafeConsumer<Folder<Identifier>, IOException> update, Identifier name){
 		super((ObjectDef<Folder<Identifier>>)((Object)LAYOUT));
 		this.header=header;
+		this.update=update;
 		this.name=name;
+		
+	}
+	
+	private void update() throws IOException{
+		update.accept(this);
 	}
 	
 	public boolean isRoot(){
@@ -95,16 +135,15 @@ public class Folder<Identifier> extends FileObject.FullLayout<Folder<Identifier>
 		return name;
 	}
 	
-	private <T extends FileObject> IOList<T> initList(Function<Header<Identifier>, T> makeElement) throws IOException{
-		Chunk c=SparsePointerList.init(header, new SizedNumber<>(MutableChunkPointer::new, NumberSize.BYTE, header.source::getSize), 8).get(0);
-		return getList(header, c.reference(), makeElement);
+	private ChunkPointer initList() throws IOException{
+		return SparsePointerList.init(header, new SizedNumber<>(MutableChunkPointer::new, NumberSize.BYTE, header.source::getSize), 8).get(0).reference();
 	}
 	
 	@NotNull
-	public IOList<FileTag<Identifier>> getFiles(){ return Objects.requireNonNull(files); }
+	public IOList<FileTag<Identifier>> getFiles(){ return Objects.requireNonNull(files.list); }
 	
 	@NotNull
-	public IOList<Folder<Identifier>> getChildren(){ return Objects.requireNonNull(children); }
+	public IOList<Folder<Identifier>> getChildren(){ return Objects.requireNonNull(children.list); }
 	
 	@NotNull
 	public Optional<Folder<Identifier>> cd(@NotNull IdentifierIO<Identifier> id, @NotNull Identifier path) throws IOException{
@@ -179,23 +218,14 @@ public class Folder<Identifier> extends FileObject.FullLayout<Folder<Identifier>
 	
 	public Stream<ChunkLink> openReferenceStream(long thisOff){
 		try{
-			var cPos=getChildren().openLinkStream(IOList.PointerConverter.getDummy()).mapToLong(l->{
-				if(l.sourceValidChunk){
-					try{
-						return l.sourceReference().dereference(header).getDataStart();
-					}catch(IOException ignored){ }
-				}
-				return l.sourcePos;
-			});
+			var cPos    =getChildren().openLinkStream(IOList.PointerConverter.getDummy()).mapToLong(l->l.sourcePos);
 			var cPosIter=cPos.iterator();
 			
 			return Stream.of(
-				Stream.of(
-					new ChunkLink(false, getChildren().getData().reference(), thisOff+LAYOUT.getSegmentOffset(1, this)),
-					new ChunkLink(false, getFiles().getData().reference(), thisOff+LAYOUT.getSegmentOffset(2, this))
-				         ),
-				getFiles().openLinkStream(FileTag.idConverter()),
-				getChildren().stream().flatMap(f->f.openReferenceStream(cPosIter.nextLong())).onClose(cPos::close)
+				Stream.of(children.makeLink(thisOff+LAYOUT.getSegmentOffset(1, this)))
+				, Stream.of(files.makeLink(thisOff+LAYOUT.getSegmentOffset(2, this)))
+				, getChildren().stream().flatMap(f->f.openReferenceStream(cPosIter.nextLong())).onClose(cPos::close)
+				, getFiles().openLinkStream(FileTag.idConverter())
 			                ).flatMap(s->s);
 		}catch(IOException e){
 			throw UtilL.uncheckedThrow(e);
