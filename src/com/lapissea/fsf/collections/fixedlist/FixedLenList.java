@@ -609,19 +609,19 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 	@Override
 	public Stream<ChunkLink> openLinkStream(PointerConverter<E> converter) throws IOException{
 		if(isEmpty()) return Stream.empty();
-		
-		boolean[] notClosed={true};
-		Throwable th       =new Throwable();
-		Object gcTrigger=new Object(){
-			@Override
-			protected void finalize() throws Throwable{
-				if(notClosed[0]){
-					th.printStackTrace();
-					sysExit(0);
-				}
-				super.finalize();
-			}
-		};
+
+//		boolean[] notClosed={true};
+//		Throwable th       =new Throwable();
+//		Object gcTrigger=new Object(){
+//			@Override
+//			protected void finalize() throws Throwable{
+//				if(notClosed[0]){
+//					th.printStackTrace();
+//					sysExit(0);
+//				}
+//				super.finalize();
+//			}
+//		};
 		
 		var chainIo=getLocation().io().doRandom();
 		int siz    =size();
@@ -632,17 +632,17 @@ public class FixedLenList<H extends FileObject&FixedLenList.ElementHead<H, E>, E
 				
 				var off=chainIo.getGlobalPos();
 				var ptr=converter.get(header, getElement(i));
-				
-				gcTrigger.toString();
+
+//				gcTrigger.toString();
 				
 				return new ChunkLink(false, ptr, off, val->modifyElement(i, e->converter.set(header, e, val)));
 			}catch(IOException e){
 				throw UtilL.uncheckedThrow(e);
 			}
 		}).onClose(()->{
-			LogUtil.println("ok");
-			notClosed[0]=false;
-			gcTrigger.toString();
+//			LogUtil.println("ok");
+//			notClosed[0]=false;
+//			gcTrigger.toString();
 			try{
 				chainIo.close();
 			}catch(IOException e){

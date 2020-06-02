@@ -8,18 +8,19 @@ import com.lapissea.util.function.UnsafeRunnable;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Scanner;
 import java.util.function.Function;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 class FSFTest_console{
 	
 	public static final long[] NO_IDS=new long[0];
 	
 	static{
-//		LogUtil.Init.attach(LogUtil.Init.USE_CALL_POS|LogUtil.Init.USE_TABULATED_HEADER);
+		LogUtil.Init.attach(LogUtil.Init.USE_CALL_POS|LogUtil.Init.USE_TABULATED_HEADER);
 	}
 	
 	interface CmdAction{
@@ -84,36 +85,10 @@ class FSFTest_console{
 		}
 	}
 	
-	static class Foo{
-		public final Object lol;
-		public final int    ay;
-		public final String ass;
-		
-		Foo(Object lol, int ay, String ass){
-			this.lol=lol;
-			this.ay=ay;
-			this.ass=ass;
-		}
-	}
-	
 	public static void main(String[] args){
 		LogUtil.Init.attach(0);
 		
-		Stream<String> lines=null;
-		
-		Predicate<String> isCommand=null;
-		
-		
-		List<StringBuilder> sbs=new ArrayList<>();
-		
-		lines.forEach(l->{
-			if(isCommand.test(l)) sbs.add(new StringBuilder());
-			var sb=sbs.get(sbs.size()-1);
-			if(sb.length()>0) sb.append(" ");
-			sb.append(l);
-		});
-		
-		TestTemplate.run(Renderer.Client::new, (fil, snapshot)->{
+		TestTemplate.run(Renderer.Client::make, (fil, snapshot)->{
 			Scanner scanner=new Scanner(System.in);
 			while(true){
 				var line=scanner.nextLine();

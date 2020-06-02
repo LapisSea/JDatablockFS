@@ -16,7 +16,7 @@ class FSFTest_freeChunks{
 		while(true){
 			NanoTimer t=new NanoTimer();
 			t.start();
-			TestTemplate.run(Renderer.None::new, (fil, snapshot)->{
+			TestTemplate.run(Renderer.Client::make, (fil, snapshot)->{
 				FSFTest_console.doCommand(fil, snapshot, "for i 0 30 write file%i haha");
 				FSFTest_console.doCommand(fil, snapshot, "for i 0 30 write file%i lol haha");
 			});

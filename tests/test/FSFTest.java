@@ -34,7 +34,7 @@ class FSFTest{
 	
 	public static void main(String[] args){
 		
-		TestTemplate.run(()->new Renderer.Client(666), FSFTest::test);
+		TestTemplate.run(Renderer.Client::make, FSFTest::test);
 //		TestTemplate.run(()->new Renderer.None(), FSFTest::test);
 	}
 	

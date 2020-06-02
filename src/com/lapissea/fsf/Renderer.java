@@ -497,63 +497,62 @@ public interface Renderer{
 	
 	class Client implements Renderer{
 		
+		public static Renderer make(){
+			return make(666);
+		}
+		
+		public static Renderer make(int port){
+			try{
+				return new Client(port);
+			}catch(IOException e){
+				LogUtil.println(e);
+				return new GUI();
+			}
+		}
+		
 		ExecutorService runner=Executors.newSingleThreadExecutor();
 		List<Snapshot>  queue =new ArrayList<>();
 		
 		volatile int sent;
 		volatile int index;
 		
-		private Socket           socket;
-		private DataOutputStream out;
+		private final Socket           socket;
+		private final DataOutputStream out;
 		
-		public Client(){
-			this(666);
-//			runner.submit(()->{
-//				int[] ind={0};
-//				UtilL.sleepWhile(()->index==ind[0], 50);
-//				UtilL.sleepWhile(()->{
-//					if(index!=ind[0]){
-//						ind[0]=index;
-//						return true;
-//					}
-//					return false;
-//				}, 50);
-//			});
-		}
-		
-		public Client(int port){
-			try{
-				socket=new Socket("127.0.0.1", port);
-				BufferedReader serverTalk=new BufferedReader(new InputStreamReader(socket.getInputStream()));
-				
-				var t=new Thread(()->{
-					while(true){
-						try{
-							serverTalk.transferTo(new Writer(){
-								@Override
-								public void write(char[] cbuf, int off, int len) throws IOException{
-									serverSays(new String(cbuf, off, len));
-								}
-								
-								@Override
-								public void flush() throws IOException{ }
-								
-								@Override
-								public void close() throws IOException{ }
-							});
-						}catch(IOException ignored){ }
-					}
-				});
-				t.setDaemon(true);
-				t.start();
-				
-				out=new DataOutputStream(socket.getOutputStream());
-				
-				out.writeUTF("CLEAR");
-				out.flush();
-			}catch(IOException e){
-				e.printStackTrace();
+		private Client(int port) throws IOException{
+			int newPort;
+			try(var s=new Socket("127.0.0.1", port)){
+				newPort=new Scanner(s.getInputStream()).nextInt();
 			}
+			
+			socket=new Socket("127.0.0.1", newPort);
+			BufferedReader serverTalk=new BufferedReader(new InputStreamReader(socket.getInputStream()));
+			
+			var t=new Thread(()->{
+				while(true){
+					try{
+						serverTalk.transferTo(new Writer(){
+							@Override
+							public void write(char[] cbuf, int off, int len) throws IOException{
+								serverSays(new String(cbuf, off, len));
+							}
+							
+							@Override
+							public void flush() throws IOException{ }
+							
+							@Override
+							public void close() throws IOException{ }
+						});
+					}catch(IOException ignored){ }
+				}
+			});
+			t.setDaemon(true);
+			t.start();
+			
+			out=new DataOutputStream(socket.getOutputStream());
+			
+			out.writeUTF("CLEAR");
+			out.flush();
 		}
 		
 		private void serverSays(String c){
