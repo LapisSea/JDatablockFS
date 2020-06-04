@@ -15,7 +15,6 @@ import java.net.Socket;
 import java.util.List;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.stream.Collectors;
 
 import static com.lapissea.util.PoolOwnThread.*;
 import static java.awt.RenderingHints.*;
@@ -511,13 +510,14 @@ public interface Renderer{
 		}
 		
 		ExecutorService runner=Executors.newSingleThreadExecutor();
-		List<Snapshot>  queue =new ArrayList<>();
+		List<Snapshot>  queue =Collections.synchronizedList(new ArrayList<>());
 		
 		volatile int sent;
 		volatile int index;
 		
 		private final Socket           socket;
 		private final DataOutputStream out;
+		private       boolean          finishing;
 		
 		private Client(int port) throws IOException{
 			int newPort;
@@ -553,6 +553,29 @@ public interface Renderer{
 			
 			out.writeUTF("CLEAR");
 			out.flush();
+			
+			UtilL.runWhileThread("queue executor", ()->!finishing||!queue.isEmpty(), ()->{
+//				if(!finishing){
+//					UtilL.sleep(200);
+//				}
+				
+				if(queue.isEmpty()){
+					UtilL.sleep(1);
+					return;
+				}
+				
+				try{
+					
+					var snap=queue.remove(0);
+					
+					out.write(makePacket(snap.copy.header.source, snap.ids, snap.stackTrace).join().obj2);
+					
+					out.flush();
+				}catch(IOException e){
+					e.printStackTrace();
+				}
+				
+			});
 		}
 		
 		private void serverSays(String c){
@@ -621,37 +644,15 @@ public interface Renderer{
 		@Override
 		public void finish(){
 			if(out==null) return;
-//			UtilL.sleep(3000);
-			try{
-				
-				List<CompletableFuture<PairM<Integer, byte[]>>> futures=new ArrayList<>(queue.size());
-				for(int i=queue.size()-1;i >= 0;i--){
-					var snap=queue.remove(i);
-					futures.add(makePacket(snap.copy.header.source, snap.ids, snap.stackTrace));
-				}
-				
-				futures.stream()
-				       .map(CompletableFuture::join)
-				       .collect(Collectors.toMap(p->p.obj1, p->p.obj2))
-				       .entrySet()
-				       .stream()
-				       .sorted(Comparator.comparingInt(e->-e.getKey()))
-				       .map(Entry::getValue)
-				       .forEach(bb->{
-					       try{
-						       out.write(bb);
-					       }catch(IOException e){
-						       throw UtilL.uncheckedThrow(e);
-					       }
-				       });
-				
-				out.flush();
-			}catch(IOException e){
-				e.printStackTrace();
-			}
+			
+			finishing=true;
+			
+			UtilL.sleepWhile(()->!queue.isEmpty(), 10);
+			
 			
 			System.gc();
 			
+			//keep alive
 			UtilL.sleepWhile(()->{
 				try{
 					out.writeUTF("NOOP");
@@ -660,7 +661,7 @@ public interface Renderer{
 				}catch(IOException e){
 					return false;
 				}
-			}, 100);
+			}, 300);
 			try{
 				runner.shutdown();
 				out.close();

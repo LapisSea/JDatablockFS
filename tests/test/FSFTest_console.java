@@ -19,27 +19,70 @@ class FSFTest_console{
 	
 	public static final long[] NO_IDS=new long[0];
 	
-	static{
-		LogUtil.Init.attach(LogUtil.Init.USE_CALL_POS|LogUtil.Init.USE_TABULATED_HEADER);
+	interface CmdAction{
+		void run(IFileSystem<String> file, StringBuilder data) throws IOException;
 	}
 	
-	interface CmdAction{
-		void run(IFileSystem<String> file, String data) throws IOException;
+	static String readWord(StringBuilder sb, String message){
+		if(sb.length()==0) return "";
+		if(sb.charAt(0)=='"'){
+			return readUntilQuote(sb, message);
+		}
+		return readUntilWhitespace(sb, message);
+	}
+	
+	static String readUntilQuote(StringBuilder sb, String message){
+		var word=new StringBuilder();
+		int i   =1;
+		for(;i<sb.length();i++){
+			char c=sb.charAt(i);
+			if(c=='"'){
+				break;
+			}
+			
+			word.append(c);
+		}
+		
+		if(word.length()==0) throw new IllegalArgumentException(message);
+		
+		
+		sb.delete(0, i);
+		
+		return word.toString();
+	}
+	
+	static String readUntilWhitespace(StringBuilder sb, String message){
+		var word=new StringBuilder();
+		int i   =0;
+		for(;i<sb.length();i++){
+			char c=sb.charAt(i);
+			if(Character.isWhitespace(c)){
+				for(;i<sb.length();i++){
+					if(!Character.isWhitespace(sb.charAt(i))) break;
+				}
+				break;
+			}
+			
+			word.append(c);
+		}
+		
+		if(word.length()==0) throw new IllegalArgumentException(message);
+		
+		sb.replace(0, i, "");
+		
+		return word.toString();
 	}
 	
 	enum Command{
-		WRITE((file, data)->{
-			var fileName=new StringBuilder();
-			for(int i=0;i<data.length();i++){
-				char c=data.charAt(i);
-				if(c==' ') break;
-				fileName.append(c);
-			}
+		WRITE((file, command)->{
 			
-			file.createFile(fileName.toString()).writeAll(data.substring(fileName.length()+1).getBytes());
+			var fileName=readWord(command, "write <file name> <data>");
+			var data    =command.toString().getBytes();
+			
+			file.createFile(fileName).writeAll(data);
 		}),
-		WRITE_STREAM((file, data)->{
-			try(var stream=file.createFile(data).write()){
+		WRITE_STREAM((file, command)->{
+			try(var stream=file.createFile(readWord(command, "write_stream <file name> //write stop to end input")).write()){
 				Scanner scanner=new Scanner(System.in);
 				while(true){
 					String ch=scanner.nextLine();
@@ -50,27 +93,28 @@ class FSFTest_console{
 				e.printStackTrace();
 			}
 		}),
-		READ((file, data)->{
-			var fil=file.getFile(data);
+		READ((file, command)->{
+			var fil=file.getFile(readWord(command, "read <file name>"));
 			if(fil.exists()) LogUtil.println(fil.readAllString());
 			else{
-				LogUtil.println("\""+data+"\" does not exist");
+				LogUtil.println("\""+fil.getPath()+"\" does not exist");
 			}
 		}),
-		RENAME((file, data)->{
-			int    pos =data.indexOf(" ");
-			String from=data.substring(0, pos);
-			var    to  =data.substring(pos+1);
+		RENAME((file, command)->{
+			String from=readWord(command, "rename <old file name> <new file name>");
+			String to  =readWord(command, "rename <old file name> <new file name>");
+			
 			if(!file.getFile(from).rename(to)){
 				LogUtil.println("Failed to rename \""+from+"\" to \""+to+'"');
 			}
 		}),
-		LIST((file, data)->{
+		LIST((file, command)->{
 			LogUtil.println(TextUtil.toTable(file.listFiles()));
 		}),
-		DELETE((file, data)->{
-			if(!file.getFile(data).delete()){
-				LogUtil.println("Failed to delete: \""+data+'"');
+		DELETE((file, command)->{
+			var f=file.getFile(readWord(command, "delete <file name>"));
+			if(!f.delete()){
+				LogUtil.println("Failed to delete: \""+f.getPath()+'"');
 			}
 		}),
 		DEFRAG((file, data)->{
@@ -96,6 +140,8 @@ class FSFTest_console{
 				
 				try{
 					doCommand(fil, snapshot, line);
+				}catch(IllegalArgumentException e){
+					LogUtil.printlnEr("Invalid input, write:", e.getMessage());
 				}catch(Throwable e){
 					e.printStackTrace();
 				}
@@ -104,9 +150,9 @@ class FSFTest_console{
 	}
 	
 	//for i 0 10 write lol%i ay{1234}*%i
-	public static void doCommand(IFileSystem<String> fil, UnsafeRunnable<IOException> snapshot, String line) throws IOException{
-		if(line.startsWith("for ")){
-			var reader=new Scanner(new ByteArrayInputStream((line+"\n").getBytes()));
+	public static void doCommand(IFileSystem<String> fil, UnsafeRunnable<IOException> snapshot, String cmdLine) throws IOException{
+		if(cmdLine.startsWith("for ")){
+			var reader=new Scanner(new ByteArrayInputStream((cmdLine+"\n").getBytes()));
 			reader.next("\\w*");
 			var value="%"+reader.next("\\w*");
 			int from =reader.nextInt();
@@ -158,23 +204,19 @@ class FSFTest_console{
 			return;
 		}
 		
-		StringBuilder commandStr=new StringBuilder();
-		for(int i=0;i<line.length();i++){
-			char c=line.charAt(i);
-			if(c==' ') break;
-			commandStr.append(Character.toUpperCase(c));
-		}
+		StringBuilder trimmingCommand=new StringBuilder(cmdLine);
+		
+		String commandName=readUntilWhitespace(trimmingCommand, "<command> ...").toUpperCase();
 		
 		Command command;
 		try{
-			command=Command.valueOf(commandStr.toString());
+			command=Command.valueOf(commandName);
 		}catch(IllegalArgumentException e){
-			LogUtil.printlnEr("Command", commandStr.toString(), "does not exist ("+Arrays.stream(Command.values()).map(Objects::toString).map(String::toLowerCase).collect(Collectors.joining(", "))+")");
+			LogUtil.printlnEr("Command", commandName, "does not exist ("+Arrays.stream(Command.values()).map(Objects::toString).map(String::toLowerCase).collect(Collectors.joining(", "))+")");
 			return;
 		}
-		var ls=commandStr.length()+1;
-		System.gc();
-		command.executor.run(fil, ls >= line.length()?"":line.substring(ls));
+		
+		command.executor.run(fil, trimmingCommand);
 		snapshot.run();
 	}
 	

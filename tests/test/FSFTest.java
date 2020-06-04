@@ -7,9 +7,6 @@ import com.lapissea.util.function.UnsafeRunnable;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.Iterator;
-import java.util.Objects;
-import java.util.stream.Stream;
 
 import static com.lapissea.util.UtilL.*;
 
@@ -19,17 +16,7 @@ class FSFTest{
 	
 	static{
 //		LogUtil.Init.attach(0);
-		LogUtil.Init.attach(LogUtil.Init.USE_CALL_POS|LogUtil.Init.USE_TABULATED_HEADER);
-	}
-	
-	public static <T> Stream<T> stream(Iterator<T> iter){
-		Objects.requireNonNull(iter);
-		
-		Object endFlag=new Object();
-		return Stream.generate(()->{
-			if(!iter.hasNext()) return endFlag;
-			return iter.next();
-		}).takeWhile(e->e!=endFlag).map(e->(T)e);
+//		LogUtil.Init.attach(LogUtil.Init.USE_CALL_POS|LogUtil.Init.USE_TABULATED_HEADER);
 	}
 	
 	public static void main(String[] args){
@@ -39,6 +26,7 @@ class FSFTest{
 	}
 	
 	private static void test(IFileSystem<String> fs, UnsafeRunnable<IOException> snapshot) throws IOException{
+		
 		
 		snapshot.run();
 		
