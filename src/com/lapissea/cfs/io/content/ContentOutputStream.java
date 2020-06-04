@@ -1,4 +1,4 @@
-package com.lapissea.cfs.io;
+package com.lapissea.cfs.io.content;
 
 import com.lapissea.util.NotNull;
 

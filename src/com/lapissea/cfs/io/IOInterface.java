@@ -1,5 +1,7 @@
 package com.lapissea.cfs.io;
 
+import com.lapissea.cfs.io.content.ContentInputStream;
+import com.lapissea.cfs.io.content.ContentOutputStream;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;

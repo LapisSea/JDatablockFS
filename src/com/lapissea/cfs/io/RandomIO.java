@@ -1,5 +1,8 @@
 package com.lapissea.cfs.io;
 
+import com.lapissea.cfs.io.content.ContentReader;
+import com.lapissea.cfs.io.content.ContentWriter;
+
 import java.io.Flushable;
 import java.io.IOException;
 import java.util.Objects;

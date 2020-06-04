@@ -1,5 +1,8 @@
 package com.lapissea.cfs.io;
 
+import com.lapissea.cfs.io.content.ContentOutputStream;
+import com.lapissea.cfs.io.content.ContentWriter;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 

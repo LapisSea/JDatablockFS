@@ -1,5 +1,6 @@
 package com.lapissea.cfs.io;
 
+import com.lapissea.cfs.io.content.ContentInputStream;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.TextUtil;
 
