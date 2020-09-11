@@ -8,8 +8,58 @@ import java.nio.ByteBuffer;
 
 public abstract class ContentInputStream extends InputStream implements ContentReader{
 	
+	public static class Joining2 extends ContentInputStream{
+		private ContentReader other;
+		
+		private ContentReader source;
+		
+		public Joining2(ContentReader first, ContentReader second){
+			this.other=second;
+			source=first;
+		}
+		
+		@Override
+		public long getOffset() throws IOException{
+			return -1;
+		}
+		
+		private boolean shouldPop(int val){
+			return val<0&&other!=null;
+		}
+		
+		private void pop(){
+			source=other;
+			other=null;
+		}
+		
+		@Override
+		public int read() throws IOException{
+			int b=source.read();
+			if(shouldPop(b)){
+				pop();
+				return read();
+			}
+			return b;
+		}
+		
+		@Override
+		public int read(@NotNull byte[] b, int off, int len) throws IOException{
+			int read=source.read(b, off, len);
+			if(shouldPop(read)){
+				pop();
+				return read(b, off, len);
+			}
+			return read;
+		}
+		
+		@Override
+		public String toString(){
+			if(other==null) return "Joining{"+source+'}';
+			return "Joining{"+source+" + "+other+'}';
+		}
+	}
+	
 	public static class BA extends ContentInputStream{
-		private final byte[] buf=new byte[8];
 		
 		private final byte[] ba;
 		private       int    pos;
@@ -21,19 +71,19 @@ public abstract class ContentInputStream extends InputStream implements ContentR
 		
 		@Override
 		public int read() throws IOException{
-			int rem=ba.length-pos;
+			int rem=available();
 			if(rem==0) return -1;
 			return ba[pos++]&0xFF;
 		}
 		
 		@Override
 		public int read(@NotNull byte[] b, int off, int len) throws IOException{
-			int rem=ba.length-pos;
+			int rem=available();
 			if(rem==0) return -1;
-			if(len<rem) len=rem;
-			System.arraycopy(ba, pos, b, off, len);
-			pos+=len;
-			return len;
+			int read=Math.min(len, rem);
+			System.arraycopy(ba, pos, b, off, read);
+			pos+=read;
+			return read;
 		}
 		
 		@Override
@@ -42,20 +92,17 @@ public abstract class ContentInputStream extends InputStream implements ContentR
 		}
 		
 		@Override
-		public byte[] contentBuf(){
-			return buf;
-		}
-		
-		@Override
 		public long getOffset(){
 			return pos;
 		}
 		
+		@Override
+		public int available(){
+			return ba.length-pos;
+		}
 	}
 	
 	public static class BB extends ContentInputStream{
-		
-		private final byte[] buf=new byte[8];
 		
 		private final ByteBuffer bb;
 		
@@ -65,14 +112,14 @@ public abstract class ContentInputStream extends InputStream implements ContentR
 		
 		@Override
 		public int read() throws IOException{
-			int rem=bb.remaining();
+			int rem=available();
 			if(rem==0) return -1;
 			return bb.get();
 		}
 		
 		@Override
 		public int read(@NotNull byte[] b, int off, int len) throws IOException{
-			int rem=bb.remaining();
+			int rem=available();
 			if(rem==0) return -1;
 			if(len<rem) len=rem;
 			bb.get(b, off, len);
@@ -85,19 +132,18 @@ public abstract class ContentInputStream extends InputStream implements ContentR
 		}
 		
 		@Override
-		public byte[] contentBuf(){
-			return buf;
+		public long getOffset(){
+			return bb.position();
 		}
 		
 		@Override
-		public long getOffset(){
-			return bb.position();
+		public int available(){
+			return bb.remaining();
 		}
 	}
 	
 	public static class Wrapp extends ContentInputStream{
 		
-		private final byte[]      buf=new byte[8];
 		private final InputStream in;
 		
 		public Wrapp(InputStream in){
@@ -146,11 +192,6 @@ public abstract class ContentInputStream extends InputStream implements ContentR
 		}
 		
 		@Override
-		public byte[] contentBuf(){
-			return buf;
-		}
-		
-		@Override
 		public long getOffset(){
 			return -1;
 		}
@@ -160,5 +201,10 @@ public abstract class ContentInputStream extends InputStream implements ContentR
 	
 	public long getGlobalOffset() throws IOException{
 		return getOffset();
+	}
+	
+	@Override
+	public ContentInputStream inStream(){
+		return this;
 	}
 }

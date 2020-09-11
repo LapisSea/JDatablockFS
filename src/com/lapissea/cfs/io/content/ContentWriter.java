@@ -1,11 +1,13 @@
 package com.lapissea.cfs.io.content;
 
+import com.lapissea.cfs.io.streams.ContentReaderOutputStream;
+import com.lapissea.util.Nullable;
+
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
 @SuppressWarnings("PointlessBitwiseExpression")
-public interface ContentWriter{
-	
-	byte[] contentBuf();
+public interface ContentWriter extends AutoCloseable, ContentBuff{
 	
 	default void writeChar(int v) throws IOException{
 		byte[] writeBuffer=contentBuf();
@@ -97,4 +99,49 @@ public interface ContentWriter{
 		writeInt8(Double.doubleToLongBits(v));
 	}
 	
+	default ContentOutputStream outStream(){return new ContentReaderOutputStream(this);}
+	
+	@Override
+	default void close() throws IOException{}
+	
+	default ContentWriter bufferExactWrite(long amount)                { return bufferExactWrite(amount, true); }
+	default ContentWriter bufferExactWrite(int amount)                 { return bufferExactWrite(amount, true); }
+	
+	default ContentWriter bufferExactWrite(long amount, boolean finish){ return bufferExactWrite(Math.toIntExact(amount), finish); }
+	default ContentWriter bufferExactWrite(int amount, boolean finish) { return bufferExactWrite(amount, finish?BufferErrorSupplier.DEFAULT_WRITE:null); }
+	
+	default ContentWriter bufferExactWrite(long amount, @Nullable BufferErrorSupplier<? extends IOException> errorOnMismatch){
+		return bufferExactWrite(Math.toIntExact(amount), errorOnMismatch);
+	}
+	default ContentWriter bufferExactWrite(int amount, @Nullable BufferErrorSupplier<? extends IOException> errorOnMismatch){
+		ContentWriter that=this;
+		class WriteArrayBuffer extends ByteArrayOutputStream implements ContentWriter{
+			
+			public WriteArrayBuffer(){
+				super(amount);
+			}
+			
+			@Override
+			public synchronized void close() throws IOException{
+				if(errorOnMismatch!=null){
+					if(count!=amount) throw errorOnMismatch.apply(this.size(), amount);
+				}
+				that.write(buf, 0, count);
+			}
+			
+			@Override
+			public synchronized String toString(){
+				return new String(buf, 0, Math.max(amount, count));
+			}
+		}
+		
+		return new WriteArrayBuffer();
+	}
+	
+	static boolean isDirect(ContentWriter out){
+		return
+			out instanceof ByteArrayOutputStream||
+			out instanceof ContentOutputStream.BA||
+			out instanceof ContentOutputStream.BB;
+	}
 }

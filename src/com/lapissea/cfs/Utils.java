@@ -2,6 +2,12 @@ package com.lapissea.cfs;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.lang.invoke.CallSite;
+import java.lang.invoke.LambdaMetafactory;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import java.util.Map;
 
@@ -61,6 +67,29 @@ public class Utils{
 		}else{
 			Assert(free==0);
 		}
-		
+	}
+	
+	public static <FInter, T extends FInter> T makeLambda(Method method, Class<FInter> functionalInterface){
+		try{
+			var lookup=MethodHandles.privateLookupIn(method.getDeclaringClass(), MethodHandles.lookup());
+			method.setAccessible(true);
+			var handle=lookup.unreflect(method);
+			
+			Method functionalInterfaceFunction=Arrays.stream(functionalInterface.getMethods()).filter(m->!Modifier.isStatic(m.getModifiers())).findAny().orElseThrow();
+			
+			MethodType signature=MethodType.methodType(functionalInterfaceFunction.getReturnType(), functionalInterfaceFunction.getParameterTypes());
+			
+			CallSite site=LambdaMetafactory.metafactory(lookup,
+			                                            functionalInterfaceFunction.getName(),
+			                                            MethodType.methodType(functionalInterface),
+			                                            signature,
+			                                            handle,
+			                                            handle.type());
+			
+			//noinspection unchecked
+			return (T)site.getTarget().invoke();
+		}catch(Throwable e){
+			throw new RuntimeException(e);
+		}
 	}
 }

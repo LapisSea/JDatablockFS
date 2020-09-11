@@ -89,10 +89,4 @@ public abstract class ContentOutputStream extends OutputStream implements Conten
 		
 	}
 	
-	private final byte[] buf=new byte[8];
-	
-	@Override
-	public byte[] contentBuf(){
-		return buf;
-	}
 }

@@ -30,7 +30,7 @@ public class RandomIOReadOnly implements RandomIO{
 	}
 	
 	@Override
-	public RandomIO setSize(long targetSize) throws IOException{
+	public void setSize(long targetSize) throws IOException{
 		throw new UnsupportedOperationException();
 	}
 	
@@ -57,11 +57,6 @@ public class RandomIOReadOnly implements RandomIO{
 	@Override
 	public int read() throws IOException{
 		return io.read();
-	}
-	
-	@Override
-	public byte[] contentBuf(){
-		return io.contentBuf();
 	}
 	
 	@Override
@@ -119,4 +114,10 @@ public class RandomIOReadOnly implements RandomIO{
 	public void write(byte[] b, int off, int len) throws IOException{
 		throw new UnsupportedOperationException();
 	}
+	
+	@Override
+	public RandomIO readOnly(){
+		return this;
+	}
+	
 }

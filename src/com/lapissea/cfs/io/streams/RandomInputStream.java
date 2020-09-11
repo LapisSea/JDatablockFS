@@ -1,5 +1,6 @@
-package com.lapissea.cfs.io;
+package com.lapissea.cfs.io.streams;
 
+import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.content.ContentInputStream;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.TextUtil;
@@ -8,7 +9,6 @@ import java.io.IOException;
 
 public class RandomInputStream extends ContentInputStream{
 	
-	private final byte[]   buf=new byte[8];
 	private final RandomIO io;
 	private       long     mark;
 	
@@ -58,11 +58,6 @@ public class RandomInputStream extends ContentInputStream{
 	@Override
 	public String toString(){
 		return this.getClass().getSimpleName()+"{"+TextUtil.toString(io)+'}';
-	}
-	
-	@Override
-	public byte[] contentBuf(){
-		return buf;
 	}
 	
 	@Override

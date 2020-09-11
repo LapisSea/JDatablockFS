@@ -1,5 +1,6 @@
-package com.lapissea.cfs.io;
+package com.lapissea.cfs.io.streams;
 
+import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.content.ContentOutputStream;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.TextUtil;

@@ -1,8 +1,11 @@
-package com.lapissea.cfs;
+package com.lapissea.cfs.objects;
 
 import com.lapissea.cfs.exceptions.BitDepthOutOfSpaceException;
+import com.lapissea.cfs.io.bit.BitUtils;
+import com.lapissea.cfs.io.bit.EnumFlag;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
+import com.lapissea.util.Nullable;
 import com.lapissea.util.function.UnsafeConsumerOL;
 import com.lapissea.util.function.UnsafeFunctionOL;
 
@@ -21,8 +24,14 @@ public enum NumberSize{
 	
 	private static final NumberSize[] VALS=NumberSize.values();
 	
+	public static final EnumFlag<NumberSize> FLAG_INFO=EnumFlag.get(NumberSize.class);
+	
 	public static NumberSize ordinal(int index){
 		return VALS[index];
+	}
+	
+	public static NumberSize bySizeVoidable(@Nullable INumber size){
+		return size==null?VOID:bySize(size);
 	}
 	
 	public static NumberSize bySize(INumber size){
@@ -31,9 +40,21 @@ public enum NumberSize{
 	
 	public static NumberSize bySize(long size){
 		for(NumberSize value : VALS){
-			if(value.maxSize >= size) return value;
+			if(value.maxSize>=size) return value;
 		}
-		throw new RuntimeException("Extremely large file?");
+		throw new RuntimeException("Extremely large value");
+	}
+	
+	public static NumberSize byBits(int bits){
+		int bytes=(int)Math.ceil(bits/(double)Byte.SIZE);
+		return byBytes(bytes);
+	}
+	
+	public static NumberSize byBytes(int bytes){
+		for(NumberSize value : VALS){
+			if(value.bytes>=bytes) return value;
+		}
+		throw new RuntimeException("Extremely large value");
 	}
 	
 	public final int  bytes;
@@ -56,7 +77,7 @@ public enum NumberSize{
 	}
 	
 	public void write(ContentWriter out, INumber value) throws IOException{
-		write(out, value.getValue());
+		write(out, value==null?0:value.getValue());
 	}
 	
 	public void write(ContentWriter out, long value) throws IOException{
@@ -101,6 +122,9 @@ public enum NumberSize{
 		return num<maxSize;
 	}
 	
+	public void ensureCanFit(INumber num) throws BitDepthOutOfSpaceException{
+		ensureCanFit(num.getValue());
+	}
 	public void ensureCanFit(long num) throws BitDepthOutOfSpaceException{
 		if(!canFit(num)) throw new BitDepthOutOfSpaceException(this, num);
 	}
@@ -116,4 +140,14 @@ public enum NumberSize{
 		return this;
 	}
 	
+	public int bits(){
+		return bytes*Byte.SIZE;
+	}
+	
+	public String binaryString(long value){
+		var    bitCount=bits();
+		String bits    =Long.toBinaryString(value&BitUtils.makeMask(bitCount));
+		if(bits.length()==bitCount) return bits;
+		return "0".repeat(bitCount-bits.length())+bits;
+	}
 }

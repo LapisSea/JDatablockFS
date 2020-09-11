@@ -1,6 +1,8 @@
-package com.lapissea.cfs;
+package com.lapissea.cfs.objects;
 
-public interface INumber{
+import com.lapissea.util.NotNull;
+
+public interface INumber extends Comparable<INumber>{
 	
 	interface Mutable extends INumber{
 		void setValue(long value);
@@ -14,5 +16,10 @@ public interface INumber{
 	
 	default boolean equals(long value){
 		return getValue()==value;
+	}
+	
+	@Override
+	default int compareTo(@NotNull INumber o){
+		return Long.compare(getValue(), o.getValue());
 	}
 }
