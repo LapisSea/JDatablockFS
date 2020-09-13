@@ -208,16 +208,17 @@ public class ChunkIO implements RandomIO{
 				
 				Chunk next=chunk.next();
 				
-				if(chunkSpace<chunk.getSize()){
-					chunk.zeroOutFromTo(chunkSpace);
-				}
-				
 				chunk.modifyAndSave(ch->{
 					ch.clampSize(chunkSpace);
 					ch.setNextPtr(null);
 				});
+				if(chunkSpace<chunk.getSize()){
+					chunk.zeroOutFromTo(chunkSpace);
+				}
 				
-				if(next!=null) next.freeChaining();
+				if(next!=null){
+					next.freeChaining();
+				}
 				return this;
 			}
 			
@@ -373,10 +374,10 @@ public class ChunkIO implements RandomIO{
 			long oldSize=chunk.getSize();
 			
 			long newSize=Math.min(remaining, oldSize);
-			
-			if(newSize<chunk.getSize()){
-				chunk.zeroOutFromTo(newSize);
-			}
+
+//			if(newSize<chunk.getSize()){
+//				chunk.zeroOutFromTo(newSize);
+//			}
 			
 			chunk.modifyAndSave(c->c.setSize(newSize));
 			

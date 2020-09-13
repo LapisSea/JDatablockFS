@@ -6,6 +6,7 @@ import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.TextUtil;
+import com.lapissea.util.ZeroArrays;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
@@ -255,6 +256,10 @@ public class MemoryData implements IOInterface{
 		
 		bb=Arrays.copyOf(bb, newCapacity);
 		used=Math.min(used, newCapacity);
+		
+		if(onWrite!=null){
+			pushOnWrite(ZeroArrays.ZERO_LONG);
+		}
 	}
 	
 	@Override

@@ -16,8 +16,8 @@ import static com.lapissea.cfs.Config.*;
 
 public class StructFlatList<T extends IOStruct.Instance> implements IOList<T>{
 	
-	private final Chunk data;
-	private       int   size;
+	private Chunk data;
+	private int   size;
 	
 	private final Supplier<T> constructor;
 	
@@ -221,6 +221,14 @@ public class StructFlatList<T extends IOStruct.Instance> implements IOList<T>{
 		
 		var elementCount=dataSize/elementSize;
 		this.size=Math.toIntExact(elementCount);
+	}
+	
+	@Override
+	public void free() throws IOException{
+		clear();
+		var d=data;
+		data=null;
+		d.freeChaining();
 	}
 	
 	@Override

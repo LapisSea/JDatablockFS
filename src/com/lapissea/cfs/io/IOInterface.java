@@ -9,9 +9,6 @@ import com.lapissea.util.function.UnsafeFunction;
 import java.io.IOException;
 import java.util.Objects;
 
-import static com.lapissea.cfs.Config.*;
-import static com.lapissea.util.UtilL.*;
-
 public interface IOInterface extends Sizable.Mod, RandomIO.Creator{
 	
 	@Override
@@ -108,14 +105,8 @@ public interface IOInterface extends Sizable.Mod, RandomIO.Creator{
 	}
 	
 	default byte[] readAll() throws IOException{
-		try(var stream=read()){
-			byte[] data=new byte[Math.toIntExact(getSize())];
-			int    read=stream.readNBytes(data, 0, data.length);
-			if(DEBUG_VALIDATION){
-				//noinspection AutoBoxing
-				Assert(read==data.length, "Failed to read data amount specified by getSize() =", data.length, "read =", read);
-			}
-			return data;
+		try(var stream=io()){
+			return stream.readRemaining();
 		}
 	}
 	

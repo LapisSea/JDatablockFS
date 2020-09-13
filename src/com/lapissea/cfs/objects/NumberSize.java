@@ -5,6 +5,8 @@ import com.lapissea.cfs.io.bit.BitUtils;
 import com.lapissea.cfs.io.bit.EnumFlag;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
+import com.lapissea.cfs.objects.chunk.ChunkPointer;
+import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.function.UnsafeConsumerOL;
 import com.lapissea.util.function.UnsafeFunctionOL;
@@ -122,7 +124,12 @@ public enum NumberSize{
 		return num<maxSize;
 	}
 	
-	public void ensureCanFit(INumber num) throws BitDepthOutOfSpaceException{
+	public void ensureCanFit(@Nullable ChunkPointer num) throws BitDepthOutOfSpaceException{
+		if(num==null) return;
+		ensureCanFit(num.getValue());
+	}
+	
+	public void ensureCanFit(@NotNull INumber num) throws BitDepthOutOfSpaceException{
 		ensureCanFit(num.getValue());
 	}
 	public void ensureCanFit(long num) throws BitDepthOutOfSpaceException{

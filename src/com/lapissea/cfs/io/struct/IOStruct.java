@@ -15,6 +15,7 @@ import com.lapissea.cfs.io.struct.engine.impl.BitBlockNode;
 import com.lapissea.cfs.objects.INumber;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.util.LogUtil;
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.TextUtil;
 
@@ -29,7 +30,6 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static com.lapissea.cfs.Config.*;
-import static java.lang.StackWalker.Option.*;
 import static java.lang.annotation.ElementType.*;
 import static java.lang.annotation.RetentionPolicy.*;
 import static java.util.stream.Collectors.*;
@@ -205,6 +205,14 @@ public class IOStruct{
 		
 		NumberSize defaultSize() default NumberSize.VOID;
 		String sizeRef() default "";
+	}
+	
+	@Target(FIELD)
+	@Retention(RUNTIME)
+	public @interface PointerValue{
+		int index();
+		
+		String ptrValName() default "";
 	}
 	
 	public static class Instance{
@@ -395,12 +403,31 @@ public class IOStruct{
 			                       })
 			                       .collect(joining(", ", "{", "}"));
 		}
+		
+		public Offset calcVarOffset(int index){
+			return calcVarOffset(struct.variables.get(index));
+		}
+		
+		public Offset calcVarOffset(VariableNode<?> var){
+			
+			var known=var.getKnownOffset();
+			if(known!=null) return known;
+			
+			long offset=0;
+			
+			for(VariableNode<?> node : struct.variableIter){
+				if(node==var) return Offset.fromBytes(offset);
+				offset+=FixedSize.getSizeUnknown(this, node);
+			}
+			
+			throw new NotImplementedException();
+		}
 	}
 	
 	private static final Map<Class<?>, IOStruct> CACHE=new HashMap<>();
 	
 	public static IOStruct thisClass(){
-		Class<?> type=StackWalker.getInstance(RETAIN_CLASS_REFERENCE)
+		Class<?> type=StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE)
 		                         .walk(s->s.skip(1)
 		                                   .findFirst()
 		                                   .orElseThrow()
@@ -551,5 +578,8 @@ public class IOStruct{
 		if(!variables.equals(iter)){
 			LogUtil.println(TextUtil.toTable("Iteration variables", iter));
 		}
+	}
+	public VariableNode<?> varByName(String nextPtr){
+		return variables.stream().filter(v->v.name.equals(nextPtr)).findAny().orElseThrow(()->new RuntimeException(nextPtr+" does not exist in "+this));
 	}
 }

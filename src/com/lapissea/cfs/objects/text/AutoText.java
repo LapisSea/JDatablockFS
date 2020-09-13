@@ -62,6 +62,7 @@ public class AutoText extends AbstractText{
 		numSize=NumberSize.bySize(Math.max(charCount, byteCount())).max(NumberSize.BYTE);
 	}
 	
+	
 	@Override
 	protected int charCount(){
 		return charCount;

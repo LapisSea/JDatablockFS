@@ -43,11 +43,11 @@ public class Chunk extends IOStruct.Instance.Contained implements Iterable<Chunk
 		return result;
 	}
 	
-	public final  Cluster      cluster;
-	private final ChunkPointer ptr;
-	private       Chunk        nextCache;
-	private       boolean      dirty;
-	private       long         headerSize=-1;
+	public final Cluster      cluster;
+	private      ChunkPointer ptr;
+	private      Chunk        nextCache;
+	private      boolean      dirty;
+	private      long         headerSize=-1;
 	
 	
 	@Value(index=-1)
@@ -70,7 +70,7 @@ public class Chunk extends IOStruct.Instance.Contained implements Iterable<Chunk
 	public void setNextPtr(ChunkPointer newNextPtr){
 		if(Objects.equals(nextPtr, newNextPtr)) return;
 		
-		if(newNextPtr!=null) nextSize.ensureCanFit(newNextPtr);
+		nextSize.ensureCanFit(newNextPtr);
 		
 		nextPtr=newNextPtr;
 		nextCache=newNextPtr==null?null:cluster.getChunkCached(newNextPtr);
@@ -194,9 +194,8 @@ public class Chunk extends IOStruct.Instance.Contained implements Iterable<Chunk
 	@NotNull
 	@Override
 	public Iterator<Chunk> iterator(){
-		var that=this;
 		return new Iterator<>(){
-			Chunk chunk=that;
+			Chunk chunk=Chunk.this;
 			
 			@Override
 			public boolean hasNext(){
@@ -216,7 +215,7 @@ public class Chunk extends IOStruct.Instance.Contained implements Iterable<Chunk
 		};
 	}
 	
-	public List<Chunk> collectNext(){
+	public List<Chunk> collectNext() throws IOException{
 		List<Chunk> chain=new LinkedList<>();
 		for(Chunk chunk : this){
 			chain.add(chunk);
@@ -225,6 +224,7 @@ public class Chunk extends IOStruct.Instance.Contained implements Iterable<Chunk
 	}
 	
 	public void freeChaining() throws IOException{
+		cluster.validate();
 		var tofree=collectNext();
 		for(Chunk chunk : tofree){
 			chunk.modifyAndSave(ch->ch.setUsed(false));
@@ -248,18 +248,7 @@ public class Chunk extends IOStruct.Instance.Contained implements Iterable<Chunk
 	
 	@Override
 	public int hashCode(){
-		
-		int result=1;
-		
-		result=31*result+getPtr().hashCode();
-		result=31*result+Boolean.hashCode(isUsed());
-		result=31*result+(getBodyNumSize()==null?0:getBodyNumSize().hashCode());
-		result=31*result+(getNextSize()==null?0:getNextSize().hashCode());
-		result=31*result+Long.hashCode(getCapacity());
-		result=31*result+Long.hashCode(getSize());
-		result=31*result+(getNextPtr()==null?0:getNextPtr().hashCode());
-		
-		return result;
+		return getPtr().hashCode();
 	}
 	
 	public long dataStart(){
@@ -346,5 +335,9 @@ public class Chunk extends IOStruct.Instance.Contained implements Iterable<Chunk
 	
 	private void markDirty(){
 		dirty=true;
+	}
+	
+	public void setPtr(ChunkPointer ptr){
+		this.ptr=Objects.requireNonNull(ptr);
 	}
 }

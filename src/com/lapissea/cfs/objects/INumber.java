@@ -20,6 +20,11 @@ public interface INumber extends Comparable<INumber>{
 	
 	@Override
 	default int compareTo(@NotNull INumber o){
-		return Long.compare(getValue(), o.getValue());
+		return compareTo(o.getValue());
 	}
+	
+	default int compareTo(long o){
+		return Long.compare(getValue(), o);
+	}
+	
 }

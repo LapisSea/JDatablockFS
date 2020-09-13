@@ -37,15 +37,16 @@ public class Cluster extends IOStruct.Instance.Contained{
 		}
 		
 		@Override
-		public void close(){
+		public void close() throws IOException{
 			safeAllocationMode=prevState;
-			if(!safeAllocationMode) onSafeEnd();
+//			if(!safeAllocationMode) onSafeEnd();
 		}
 	}
 	
 	private static final int DEFAULT_MIN_CHUNK_SIZE=8;
 	
-	private static final ChunkPointer FIRST_PTR=new ChunkPointer(IOStruct.thisClass().requireKnownSize());
+	private static final IOStruct     TYPE     =IOStruct.thisClass();
+	private static final ChunkPointer FIRST_PTR=new ChunkPointer(TYPE.requireKnownSize());
 	
 	
 	@EnumValue(index=1, customBitSize=16)
@@ -69,18 +70,20 @@ public class Cluster extends IOStruct.Instance.Contained{
 		this.data=data;
 		this.minChunkSize=minChunkSize;
 		
-		try(var ses=safeSession()){
-			if(data.isEmpty()) initData();
-			
-			readStruct();
+		if(data.isEmpty()){
+			try(var ses=safeSession()){
+				initData();
+			}
 		}
+		
+		readStruct();
 	}
 	
 	public SafeSession safeSession(){
 		return new SafeSession();
 	}
 	
-	public void safeSession(Runnable session){
+	public void safeSession(Runnable session) throws IOException{
 		try(SafeSession ses=safeSession()){
 			session.run();
 		}
@@ -88,13 +91,12 @@ public class Cluster extends IOStruct.Instance.Contained{
 	
 	
 	private void initData() throws IOException{
-//		this.structType().logStruct();
-		
 		version=Version.last();
 		writeStruct();
 		
 		setFreeChunksPtr(appendNew(IOStruct.getInstance(StructLinkedList.class).requireMaximumSize()).getPtr());
 		writeStruct();
+//		onSafeEnd();
 	}
 	
 	@Set
@@ -104,11 +106,16 @@ public class Cluster extends IOStruct.Instance.Contained{
 		this.freeChunksPtr=freeChunksPtr;
 		
 		if(freeChunksPtr!=null){
-			Function<ChunkPointer, ChunkPointer.PtrRef> box=ChunkPointer.PtrSmart::new;
+			Function<ChunkPointer, ChunkPointer.PtrRef> box=ChunkPointer.PtrFixed::new;
 			
 			IOList<ChunkPointer.PtrRef> data=new StructLinkedList<>(getChunk(freeChunksPtr), ()->box.apply(null));
 			
 			freeChunks=new IOList<>(){
+				@Override
+				public String toString(){
+					return data.toString();
+				}
+				
 				@Override
 				public int size(){
 					return data.size();
@@ -119,8 +126,14 @@ public class Cluster extends IOStruct.Instance.Contained{
 				}
 				@Override
 				public void setElement(int index, ChunkPointer value) throws IOException{
-					try(var ses=safeSession()){
-						data.setElement(index, box.apply(value));
+					var boxed=box.apply(value);
+					if(boxed.structType().getKnownSize().isPresent()||data.getElement(index).getInstanceSize()==boxed.getInstanceSize()){
+						data.setElement(index, boxed);
+					}else{
+						try(var ses=safeSession()){
+							data.setElement(index, boxed);
+						}
+						onSafeEnd();
 					}
 				}
 				@Override
@@ -128,22 +141,29 @@ public class Cluster extends IOStruct.Instance.Contained{
 					try(var ses=safeSession()){
 						data.ensureCapacity(elementCapacity);
 					}
+					onSafeEnd();
 				}
 				@Override
 				public void removeElement(int index) throws IOException{
 					try(var ses=safeSession()){
 						data.removeElement(index);
 					}
+					onSafeEnd();
 				}
 				@Override
 				public void addElement(int index, ChunkPointer value) throws IOException{
 					try(var ses=safeSession()){
 						data.addElement(index, box.apply(value));
 					}
+					onSafeEnd();
 				}
 				@Override
 				public void validate() throws IOException{
 					data.validate();
+				}
+				@Override
+				public void free() throws IOException{
+					data.free();
 				}
 			};
 			freeChunks.validate();
@@ -186,11 +206,9 @@ public class Cluster extends IOStruct.Instance.Contained{
 	
 	public Chunk alloc(long requestedCapacity) throws IOException{
 		
-		Chunk chunk=null;
+		Chunk chunk;
 		
-		if(!safeAllocationMode){
-			chunk=tryReuse(requestedCapacity);
-		}
+		chunk=tryReuse(requestedCapacity);
 		
 		if(chunk==null){
 			chunk=appendNew(requestedCapacity);
@@ -203,62 +221,76 @@ public class Cluster extends IOStruct.Instance.Contained{
 		return chunk;
 	}
 	
-	private void onSafeEnd(){
-	
+	private void onSafeEnd() throws IOException{
+		var nullCount=freeChunks.count(Objects::isNull);
+		while(nullCount>2){
+			freeChunks.removeElement(freeChunks.indexOfLast(null));
+			nullCount--;
+		}
+		if(nullCount==0){
+			freeChunks.addElement(null);
+		}
 	}
 	
 	private Chunk tryReuse(long requestedCapacity) throws IOException{
 		if(freeChunks.isEmpty()) return null;
+		if(freeChunks.size()==1&&freeChunks.getElement(0)==null) return null;
 		
-		Chunk largest     =null;
-		int   largestIndex=-1;
+		Chunk largest=null;
+		
+		int  bestIndex   =-1;
+		long bestOverAloc=Long.MAX_VALUE;
 		
 		for(int i=0;i<freeChunks.size();i++){
-			Chunk chunk=freeChunks.getElement(i).dereference(this);
+			var ptr=freeChunks.getElement(i);
+			if(ptr==null) continue;
+			
+			Chunk chunk=ptr.dereference(this);
 			var   cap  =chunk.getCapacity();
 			
 			if(cap<requestedCapacity){
 				continue;
 			}
 			
-			if(cap<=requestedCapacity+minChunkSize/2){
-				chunk.modifyAndSave(c->c.setUsed(true));
-				freeChunks.removeElement(i);
-				LogUtil.println("aloc reuse exact", chunk);
-				return chunk;
+			if(!safeAllocationMode){
+				long maxSize =requestedCapacity+minChunkSize;
+				long overAloc=maxSize-cap;
+				if(overAloc>=0&&overAloc<bestOverAloc){
+					bestOverAloc=overAloc;
+					bestIndex=i;
+					if(overAloc==0) break;
+				}
 			}
 			
 			if(largest==null||largest.getCapacity()<cap){
 				largest=chunk;
-				largestIndex=i;
 			}
 		}
 		
+		if(bestIndex!=-1){
+			Chunk chunk=freeChunks.getElement(bestIndex).dereference(this);
+			
+			chunk.modifyAndSave(c->c.setUsed(true));
+			
+			freeChunks.removeElement(bestIndex);
+			LogUtil.println("aloc reuse exact", chunk);
+			return chunk;
+		}
 		
 		if(largest!=null&&largest.getCapacity()>requestedCapacity){
 			long totalSpace=largest.totalSize();
 			
-			Chunk chunkUse=new Chunk(this, largest.getPtr(), requestedCapacity, NumberSize.bySize(requestedCapacity*4/3), calcPtrSize());
+			Chunk chunkUse=new Chunk(this, largest.getPtr(), requestedCapacity, calcPtrSize());
 			
-			long  remaining        =totalSpace-chunkUse.totalSize();
-			Chunk remainingChunk   =new Chunk(this, new ChunkPointer(chunkUse.dataEnd()), remaining, calcPtrSize());
-			long  remainingCapacity=remaining-remainingChunk.getInstanceSize();
+			chunkUse.setPtr(new ChunkPointer(largest.dataEnd()-chunkUse.totalSize()));
 			
-			if(remainingCapacity>0){
-				remainingChunk.setCapacity(remainingCapacity);
-				remainingChunk.setUsed(false);
-				
-				
-				assert remainingChunk.dataEnd()==largest.dataEnd():remainingChunk.dataEnd()+" "+largest.dataEnd();
-				
-				destroyChunk(largest);
-				
+			long freeCapacity=largest.getCapacity()-chunkUse.totalSize();
+			
+			if(freeCapacity>=DEFAULT_MIN_CHUNK_SIZE){
 				chunkUse=makeChunkReal(chunkUse);
-				remainingChunk=makeChunkReal(remainingChunk);
+				largest.modifyAndSave(c->c.setCapacity(freeCapacity));
 				
-				freeChunks.setElement(largestIndex, remainingChunk.getPtr());
-				
-				LogUtil.println("aloc reuse split", largest, " -> ", chunkUse, remainingChunk);
+				LogUtil.println("aloc reuse split", largest, " -> ", chunkUse);
 				
 				return chunkUse;
 			}
@@ -301,6 +333,10 @@ public class Cluster extends IOStruct.Instance.Contained{
 	}
 	
 	public Chunk getChunk(ChunkPointer ptr) throws IOException{
+		if(ptr.compareTo(getInstanceSize())<0) throw new IndexOutOfBoundsException("Illegal pointer "+ptr.toString());
+		if(ptr.compareTo(data.getSize())>=0) throw new IndexOutOfBoundsException("Illegal pointer "+ptr.toString());
+		
+		
 		Chunk cached=getChunkCached(ptr);
 		if(cached!=null){
 			if(DEBUG_VALIDATION){
@@ -326,9 +362,9 @@ public class Cluster extends IOStruct.Instance.Contained{
 		chunk.zeroOutHead();
 	}
 	
-	private void popLast(Chunk chunk) throws IOException{
+	private void popChunk(Chunk chunk) throws IOException{
 		LogUtil.println("freeing deallocated", chunk);
-		destroyChunk(chunk);
+		chunkCache.remove(chunk.getPtr());
 		data.setCapacity(chunk.getPtr().getValue());
 	}
 	
@@ -342,15 +378,9 @@ public class Cluster extends IOStruct.Instance.Contained{
 		
 		UnsafeBiConsumer<Chunk, Chunk, IOException> merge=(target, next)->{
 			long cap=next.dataEnd()-target.dataStart();
-			destroyChunk(next);
 			target.modifyAndSave(c->c.setCapacity(cap));
-			assert target.dataEnd()==next.dataEnd():target.dataEnd()+" "+next.dataEnd();
+			destroyChunk(next);
 		};
-		
-		validate();
-		if(toFree.getPtr().equals(112)){
-			int i=0;
-		}
 		
 		Function<Chunk, long[]> rang=ch->new long[]{ch.getPtr().value(), ch.dataEnd()};
 		
@@ -364,22 +394,29 @@ public class Cluster extends IOStruct.Instance.Contained{
 			if(next.isUsed()) next=null;
 			else{
 				var ptr=next.getPtr();
-				nextIndex=freeChunks.indexOf(v->v.equals(ptr));
+				nextIndex=freeChunks.indexOf(ptr);
 			}
 		}
 		
 		Chunk prev;
-		int   prevIndex=freeChunks.indexOf(v->toFree.getPtr().equals(v.dereference(this).dataEnd()));
+		int   prevIndex=freeChunks.find(v->v!=null&&toFree.getPtr().equals(v.dereference(this).dataEnd()));
 		if(prevIndex!=-1){
 			prev=freeChunks.getElement(prevIndex).dereference(this);
-		}else prev=null;
+		}else{
+			prev=null;
+		}
 		
+		
+		if(toFree.getPtr().equals(237)){
+			int i=0;
+		}
 		
 		if(next!=null&&prev!=null){
 			LogUtil.println("free triple merge", rang.apply(prev), rang.apply(toFree), rang.apply(next));
-			destroyChunk(toFree);
-			freeChunks.removeElement(nextIndex);
+			freeChunks.setElement(nextIndex, null);
+			
 			merge.accept(prev, next);
+			destroyChunk(toFree);
 			
 		}else if(prev!=null){
 			LogUtil.println("free merge", rang.apply(prev), rang.apply(toFree));
@@ -392,7 +429,12 @@ public class Cluster extends IOStruct.Instance.Contained{
 			
 		}else{
 			LogUtil.println("free list", toFree);
-			freeChunks.addElement(toFree.getPtr());
+			int emptyIndex=freeChunks.indexOf(null);
+			if(emptyIndex!=-1){
+				freeChunks.setElement(emptyIndex, toFree.getPtr());
+			}else{
+				freeChunks.addElement(toFree.getPtr());
+			}
 		}
 		
 		
@@ -403,6 +445,7 @@ public class Cluster extends IOStruct.Instance.Contained{
 				List<long[]> ranges=new ArrayList<>();
 				for(int i=0;i<freeChunks.size();i++){
 					ChunkPointer c=freeChunks.getElement(i);
+					if(c==null) continue;
 					
 					Chunk ch=c.dereference(this);
 					ranges.add(rang.apply(ch));
@@ -414,13 +457,13 @@ public class Cluster extends IOStruct.Instance.Contained{
 						TextUtil.toString(ranges)+"\n"+freeChunks;
 					last=range[1];
 				}
-				LogUtil.println(ranges);
+//				LogUtil.println(freeChunks, ranges);
 			}
+			validate();
 		}
 	}
 	
 	public void free(List<Chunk> toFree) throws IOException{
-		validate();
 		if(DEBUG_VALIDATION){
 			for(Chunk chunk : toFree){
 				checkCached(chunk);
@@ -430,14 +473,12 @@ public class Cluster extends IOStruct.Instance.Contained{
 		
 		for(Chunk chunk : toFree.stream().sorted(Comparator.comparing(Chunk::getPtr).reversed()).collect(Collectors.toUnmodifiableList())){
 			if(isLastPhysical(chunk)){
-				popLast(chunk);
+				popChunk(chunk);
 				validate();
 				continue;
 			}
 			listAsFree(chunk);
-			validate();
 		}
-		validate();
 	}
 	
 	public void allocTo(Chunk target, long toAllocate) throws IOException{
@@ -470,6 +511,32 @@ public class Cluster extends IOStruct.Instance.Contained{
 			remaining-=chain.getAsLong();
 		}
 	}
+	
+	public String chainDump() throws IOException{
+		StringBuilder  sb     =new StringBuilder();
+		HashSet<Chunk> visited=new HashSet<>();
+		
+		try{
+			
+			for(Chunk chunk=getFirstChunk();
+			    chunk!=null;
+			    chunk=chunk.nextPhysical()){
+				if(visited.contains(chunk)) continue;
+				
+				List<Chunk> chain=chunk.collectNext();
+				visited.addAll(chain);
+				
+				byte[] d=chunk.ioAt(0, io->{return io.readInts1(Math.toIntExact(io.getSize()));});
+				
+				sb.append('\n').append(new MemoryData(d, true).hexdump(chain.toString()));
+			}
+		}catch(Throwable e){
+			sb.append("\n...").append("ERROR: ").append(e.getMessage());
+		}
+		
+		return sb.toString();
+	}
+	
 	public String chunkDump() throws IOException{
 		StringBuilder sb=new StringBuilder(new MemoryData(data.read(0, (int)getInstanceSize()), true).hexdump("header"));
 		try{
@@ -503,11 +570,13 @@ public class Cluster extends IOStruct.Instance.Contained{
 					used+=chunk.getSize();
 					total+=chunk.getCapacity();
 				}else{
+//					assert freeChunks.contains(chunk.getPtr()):chunk+" marked as unused but not listed "+freeChunks;
 					free+=chunk.getCapacity();
 				}
 			}
 			
 			for(var freeChunk : freeChunks){
+				if(freeChunk==null) continue;
 				var chunk=freeChunk.dereference(this);
 				assert !chunk.isUsed();
 			}
@@ -517,5 +586,20 @@ public class Cluster extends IOStruct.Instance.Contained{
 		}catch(IOException e){
 			throw new IOException("Invalid data "+this+"\n"+data.hexdump(), e);
 		}
+	}
+	
+	public interface LinkAcceptor{
+		void link(boolean chunkDest, long src, long dest, IOStruct.Instance destVal);
+	}
+	
+	private void memoryWalk(LinkAcceptor acceptor, long structLocation, IOStruct.Instance instance){
+	
+	}
+	
+	public void memoryWalk(LinkAcceptor acceptor) throws IOException{
+		
+		var off=calcVarOffset(TYPE.varByName("freeChunksPtr")).getOffset();
+		
+		acceptor.link(true, off, freeChunksPtr.getValue(), (IOStruct.Instance)freeChunks);
 	}
 }

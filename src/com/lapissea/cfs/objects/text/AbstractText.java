@@ -41,4 +41,7 @@ public abstract class AbstractText extends IOStruct.Instance implements CharSequ
 		return data.hashCode();
 	}
 	
+	public String getData(){
+		return data;
+	}
 }

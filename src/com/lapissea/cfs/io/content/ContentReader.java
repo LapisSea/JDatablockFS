@@ -301,6 +301,10 @@ public interface ContentReader extends AutoCloseable, ContentBuff{
 		return b;
 	}
 	
+	default byte[] readRemaining() throws IOException{
+		return inStream().readAllBytes();
+	}
+	
 	default ContentInputStream inStream(){return new ContentReaderInputStream(this);}
 	
 	@Override

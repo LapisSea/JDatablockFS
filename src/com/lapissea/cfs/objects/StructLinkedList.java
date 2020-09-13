@@ -81,7 +81,6 @@ public class StructLinkedList<T extends IOStruct.Instance> extends IOStruct.Inst
 		}
 		
 		void allocContainer(Cluster cluster) throws IOException{
-			assert value!=null;
 			container=cluster.allocWrite(this);
 		}
 		
@@ -93,12 +92,23 @@ public class StructLinkedList<T extends IOStruct.Instance> extends IOStruct.Inst
 		void setNext(Node node){
 			next=node.container.getPtr();
 		}
+		
+		@Override
+		public void writeStruct() throws IOException{
+			try(var buff=getStructSourceIO()){
+				writeStruct(buff);
+				buff.trim();
+			}
+			if(DEBUG_VALIDATION){
+				validateWrittenData();
+			}
+		}
 	}
 	
 	private boolean changing;
 	
 	private final UnsafeFunction<Chunk, T, IOException> constructor;
-	private final Chunk                                 container;
+	private       Chunk                                 container;
 	
 	private final Map<Integer, Node> nodeCache=new WeakValueHashMap<>();
 	
@@ -222,9 +232,12 @@ public class StructLinkedList<T extends IOStruct.Instance> extends IOStruct.Inst
 		Objects.checkIndex(index, size());
 		
 		Runnable popCache=()->{
-			nodeCache.remove(index);
-			var decremented=nodeCache.entrySet().stream().filter(e->e.getKey()>index).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-			decremented.forEach((k, v)->nodeCache.remove(k));
+			for(var i : nodeCache.keySet().stream().filter(v->v>=index).collect(Collectors.toList())){
+				nodeCache.remove(i);
+			}
+//			nodeCache.remove(index);
+//			var decremented=nodeCache.entrySet().stream().filter(e->e.getKey()>index).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+//			decremented.forEach((k, v)->nodeCache.remove(k));
 		};
 		
 		Chunk toRemove=null;
@@ -266,16 +279,16 @@ public class StructLinkedList<T extends IOStruct.Instance> extends IOStruct.Inst
 		Objects.checkIndex(index, size()+1);
 		Objects.requireNonNull(value);
 		
+		Node newNode=new Node(constructor);
+		newNode.value=value;
+		
+		newNode.next=new ChunkPointer(cluster().getData().getSize());
+		newNode.allocContainer(cluster());
+		
 		
 		if(changing) throw new IllegalStateException("recursive change");
 		changing=true;
 		try{
-			Node newNode=new Node(constructor);
-			newNode.value=value;
-			
-			newNode.next=new ChunkPointer(cluster().getData().getSize());
-			newNode.allocContainer(cluster());
-			
 			if(index==0){
 				newNode.next=first;
 				newNode.writeStruct();
@@ -315,6 +328,14 @@ public class StructLinkedList<T extends IOStruct.Instance> extends IOStruct.Inst
 			
 			checkCache(cached);
 		}
+	}
+	
+	@Override
+	public void free() throws IOException{
+		clear();
+		var d=container;
+		container=null;
+		d.freeChaining();
 	}
 	
 	private void checkCache(Node node) throws IOException{
