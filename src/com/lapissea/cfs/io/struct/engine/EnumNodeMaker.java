@@ -42,7 +42,7 @@ public class EnumNodeMaker<T extends Enum<T>> extends StructReflectionImpl.NodeM
 			case -1 -> 0;
 			default -> {
 				if(valueAnn.customBitSize()<flagInfo.bits){
-					throw new IllegalStateException(valueField+" has too small custom bit size of "+valueAnn.customBitSize());
+					throw new IllegalStateException(valueField+" has too small custom bit size of "+valueAnn.customBitSize()+" and must be at least "+flagInfo.bits);
 				}
 				yield valueAnn.customBitSize()-flagInfo.bits;
 			}

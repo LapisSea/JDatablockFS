@@ -43,13 +43,29 @@ public class StructLinkedList<T extends IOStruct.Instance> extends IOStruct.Inst
 		
 		@Write
 		void writeValue(ContentWriter dest, IOStruct.Instance source) throws IOException{
-			source.writeStruct(dest);
+			
+			var off=getStructOffset()+calcVarOffset(2).getOffset();
+			if(DEBUG_VALIDATION){
+				if(dest instanceof RandomIO io){
+					assert off==io.getPos():off+" == "+io.getPos();
+				}
+			}
+			
+			source.writeStruct(dest, off);
 		}
 		
 		@Read
 		IOStruct.Instance readValue(ContentReader source, IOStruct.Instance oldVal) throws IOException{
 			var val=constructor.apply(container);
-			val.readStruct(source);
+			
+			var off=getStructOffset()+calcVarOffset(2).getOffset();
+			if(DEBUG_VALIDATION){
+				if(source instanceof RandomIO io){
+					assert off==io.getPos():off+" == "+io.getPos();
+				}
+			}
+			
+			val.readStruct(source, off);
 			return val;
 		}
 		

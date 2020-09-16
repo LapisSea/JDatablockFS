@@ -24,6 +24,8 @@ import java.lang.annotation.Annotation;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 import java.util.*;
+import java.util.function.BiConsumer;
+import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -226,7 +228,7 @@ public class IOStruct{
 			protected abstract RandomIO getStructSourceIO() throws IOException;
 			
 			public void readStruct() throws IOException{
-				try(var buff=getStructSourceIO()){
+				try(RandomIO buff=getStructSourceIO()){
 					readStruct(buff);
 				}
 			}
@@ -253,6 +255,8 @@ public class IOStruct{
 			}
 		}
 		
+		private long structOffset=-1;
+		
 		private final IOStruct struct;
 		
 		public Instance(){
@@ -263,8 +267,18 @@ public class IOStruct{
 			this.struct=struct;
 		}
 		
+		public long getStructOffset(){
+			return structOffset;
+		}
 		
-		public void readStruct(ContentReader in) throws IOException{
+		
+		public final void readStruct(RandomIO buff) throws IOException{
+			readStruct(buff, buff.getPos());
+		}
+		
+		public void readStruct(ContentReader in, long structOffset) throws IOException{
+			this.structOffset=structOffset;
+			
 			boolean shouldClose=false;
 			
 			ContentReader buff;
@@ -300,7 +314,11 @@ public class IOStruct{
 			}
 		}
 		
-		public void writeStruct(ContentWriter out) throws IOException{
+		public final void writeStruct(RandomIO buff) throws IOException{
+			writeStruct(buff, buff.getPos());
+		}
+		
+		public void writeStruct(ContentWriter out, long structOffset) throws IOException{
 			boolean shouldClose=false;
 			
 			ContentWriter buff;
@@ -351,7 +369,7 @@ public class IOStruct{
 		public void validateWrittenData(ContentReader in) throws IOException{
 			var siz=getInstanceSize();
 			var bb =new ByteArrayOutputStream(Math.toIntExact(siz));
-			writeStruct(SimpleContentWriter.pass(bb));
+			writeStruct(SimpleContentWriter.pass(bb), structOffset);
 			
 			if(bb.size()!=siz){
 				throw new MalformedObjectException("Object declared size of "+siz+" but wrote "+bb.size()+" bytes");
@@ -387,7 +405,8 @@ public class IOStruct{
 		
 		@Override
 		public String toString(){
-			return struct.variables.stream().map(var->var.toString(this))
+			return struct.variables.stream()
+			                       .map(var->var.toString(this))
 			                       .map(e->e.getKey()+": "+TextUtil.toString(e.getValue()))
 			                       .collect(joining(", ", getClass().getSimpleName()+"{", "}"));
 		}
@@ -410,7 +429,7 @@ public class IOStruct{
 		}
 		
 		public Offset calcVarOffset(int index){
-			return calcVarOffset(struct.variables.get(index));
+			return calcVarOffset(structType().getVar(index));
 		}
 		
 		public Offset calcVarOffset(String varName){
@@ -419,28 +438,46 @@ public class IOStruct{
 		
 		public Offset calcVarOffset(VariableNode<?> var){
 			
-			boolean isFlag=var instanceof VariableNode.Flag;
-			
 			var known=var.getKnownOffset();
 			if(known!=null) return known;
 			
+			ResolvedOffset offset=iterateOffsets((v, off)->v==var);
+			
+			if(offset==null) throw new IllegalArgumentException(var+" not in "+struct);
+			
+			return offset.offset;
+		}
+		
+		public record ResolvedOffset(VariableNode<?> var, Offset offset){}
+		
+		public void iterateOffsets(BiConsumer<VariableNode<?>, Offset> consumer){
+			iterateOffsets((v, o)->{
+				consumer.accept(v, o);
+				return false;
+			});
+		}
+		
+		public ResolvedOffset iterateOffsets(BiPredicate<VariableNode<?>, Offset> consumer){
 			Offset offset=Offset.ZERO;
 			
 			for(VariableNode<?> node : struct.variableIter){
-				if(isFlag&&node instanceof BitBlockNode block){
-					Offset blockOffset=Offset.ZERO;
+				if(node instanceof BitBlockNode block){
+					Offset blockOffset=offset.addBits(0);
 					for(VariableNode.Flag<?> flag : block.flagsNodes){
-						if(flag==var){
-							return blockOffset.add(offset);
-						}
+						if(consumer.test(flag, blockOffset)) return new ResolvedOffset(flag, blockOffset);
 						blockOffset=blockOffset.addBits(flag.getTotalBits());
 					}
-				}else if(node==var) return offset;
+					
+					var pred=offset.addBytes(block.blockInfo().wordSize().bytes);
+					assert blockOffset.equals(pred):blockOffset+" "+pred;
+				}else{
+					if(consumer.test(node, offset)) return new ResolvedOffset(node, offset);
+				}
 				
 				offset=offset.addBytes(FixedSize.getSizeUnknown(this, node));
 			}
 			
-			throw new IllegalArgumentException(var+" not in "+struct);
+			return null;
 		}
 	}
 	

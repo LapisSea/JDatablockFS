@@ -40,15 +40,20 @@ public sealed interface Offset{
 	
 	static Offset fromBytes(long bytes){ return new ByteOffset(bytes); }
 	static Offset fromBits(long bits){
-		var bi=new BitOffset(bits);
-		var by=new ByteOffset(bi.getOffset());
-		return bi.equals(by)?by:bi;
+//		var bi=new BitOffset(bits);
+//		var by=new ByteOffset(bi.getOffset());
+//		return bi.equals(by)?by:bi;
+		return new BitOffset(bits);
 	}
 	
 	Offset ZERO=fromBytes(0);
 	
 	long getOffset();
 	long getBitOffset();
+	
+	default int inByteBitOffset(){
+		return (int)(getBitOffset()-getOffset()*Byte.SIZE);
+	}
 	
 	default Offset addBytes(long bytes){
 		return add(fromBytes(bytes));

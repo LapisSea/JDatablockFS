@@ -48,16 +48,16 @@ public class Chunk extends IOStruct.Instance.Contained implements Iterable<Chunk
 	private      Chunk        nextCache;
 	private      boolean      dirty;
 	private      long         headerSize=-1;
-	
-	
-	@Value(index=-1)
-	private boolean typed;
+
+
+//	@Value(index=-1)
+//	private boolean typed;
 	
 	@Value(index=0)
 	private boolean used;
 	
-	@EnumValue(index=1) private NumberSize bodyNumSize;
-	@EnumValue(index=2) private NumberSize nextSize;
+	@EnumValue(index=1) private                  NumberSize bodyNumSize;
+	@EnumValue(index=2, customBitSize=4) private NumberSize nextSize;
 	
 	
 	@PrimitiveValue(index=3, sizeRef="bodyNumSize") private long capacity;
@@ -110,15 +110,19 @@ public class Chunk extends IOStruct.Instance.Contained implements Iterable<Chunk
 	}
 	
 	@Override
-	public void readStruct(ContentReader in) throws IOException{
-		super.readStruct(in);
+	public void readStruct(ContentReader in, long structOffset) throws IOException{
+		assert getPtr().equals(structOffset):getPtr()+" "+structOffset;
+		
+		super.readStruct(in, structOffset);
 		headerSize=getInstanceSize();
 	}
 	
 	@Override
-	public void writeStruct(ContentWriter out) throws IOException{
+	public void writeStruct(ContentWriter out, long structOffset) throws IOException{
+		assert getPtr().equals(structOffset):getPtr()+" "+structOffset;
+		
 		dirty=false;
-		super.writeStruct(out);
+		super.writeStruct(out, structOffset);
 	}
 	@NotNull
 	public ChunkPointer getPtr(){ return ptr; }

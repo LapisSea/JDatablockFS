@@ -3,8 +3,11 @@ package test;
 import com.lapissea.cfs.Cluster;
 import com.lapissea.cfs.io.bit.FlagReader;
 import com.lapissea.cfs.io.impl.MemoryData;
+import com.lapissea.cfs.io.struct.IOStruct;
+import com.lapissea.cfs.io.struct.Offset;
 import com.lapissea.cfs.io.struct.VariableNode;
 import com.lapissea.cfs.objects.chunk.Chunk;
+import com.lapissea.cfs.objects.chunk.ChunkPointer;
 import com.lapissea.util.*;
 
 import javax.swing.*;
@@ -18,7 +21,6 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.util.List;
 import java.util.*;
-import java.util.function.BiConsumer;
 import java.util.stream.IntStream;
 
 import static java.awt.RenderingHints.*;
@@ -161,43 +163,20 @@ public class Display extends JFrame{
 			for(long id : frame.ids()){
 				if(id>=bytes.length) continue;
 				int i =(int)id;
-				int b =bytes[i]&0xFF;
 				int xi=i%width;
 				int yi=i/width;
 				
-				int off=(int)Math.round(pixelsPerByte/3D*2);
-				int siz=pixelsPerByte-off;
-				g.fillRect(xi*pixelsPerByte+off, yi*pixelsPerByte+off, siz, siz);
+				fillBit(g, 8, xi*pixelsPerByte, yi*pixelsPerByte);
 			}
 			
-			initFont(g);
 			
 			for(Chunk chunk : physicalIterator){
-				
-				BiConsumer<String, Object> doVar=(name, val)->{
-					var v   =chunk.structType().getVar(name);
-					int from=Math.toIntExact(chunk.getPtr().getValue()+chunk.calcVarOffset(v).getOffset());
-					int to  =from;
-					
-					for(int i=0;i<VariableNode.FixedSize.getSizeUnknown(chunk, v);i++){
-						to++;
-						if(to%width==0) break;
-					}
-					
-					int xPosFrom=from%width, yPosFrom=from/width;
-					int xPosTo  =to%width, yPosTo=to/width;
-					
-					drawStringIn(g, TextUtil.toString(val), new Rectangle(pixelsPerByte*xPosFrom, pixelsPerByte*yPosFrom, pixelsPerByte*(to-from), pixelsPerByte));
-				};
-				
-				g.setColor(alpha(Color.RED, 0.5F));
-				doVar.accept("capacity", chunk.getCapacity());
-				g.setColor(alpha(Color.GREEN, 0.5F));
-				doVar.accept("size", chunk.getSize());
-				g.setColor(alpha(Color.BLUE, 0.5F));
-				doVar.accept("nextPtr", chunk.getNextPtr());
-				
+				annotateStruct(g, width, chunk);
 			}
+			
+			annotateStruct(g, width, cluster[0]);
+			
+			initFont(g);
 			
 			g.setRenderingHint(KEY_ANTIALIASING, VALUE_ANTIALIAS_ON);
 			var siz  =Math.max(1, pixelsPerByte/8F);
@@ -218,7 +197,7 @@ public class Display extends JFrame{
 				chunkColor=alpha(mix(chunkColor, Color.LIGHT_GRAY, 0.5F), 0.5F);
 				g.setColor(chunkColor);
 				
-				VariableNode<?> ptrNode=chunk.structType().getVar("nextPtr");
+				VariableNode<ChunkPointer> ptrNode=chunk.structType().getVar("nextPtr");
 				
 				int start=(int)(chunk.getPtr().value()+chunk.calcVarOffset(ptrNode).getOffset());
 				int pSiz =(int)ptrNode.mapSize(chunk);
@@ -392,13 +371,80 @@ public class Display extends JFrame{
 		render=null;
 	}
 	
+	private void annotateStruct(Graphics2D g, int width, IOStruct.Instance instance){
+		IOStruct typ=instance.structType();
+		
+		Random rand=new Random();
+		instance.iterateOffsets((VariableNode<?> var, Offset off)->{
+			rand.setSeed(var.name.hashCode());
+			
+			g.setColor(
+				alpha(new Color(
+					      Color.HSBtoRGB(
+						      rand.nextFloat(),
+						      rand.nextFloat()/0.4F+0.6F,
+						      1F
+					      )),
+				      0.5F));
+			
+			Rectangle area;
+			
+			if(off instanceof Offset.BitOffset){
+				final var from    =(int)(instance.getStructOffset()+off.getOffset());
+				int       xPosFrom=from%width, yPosFrom=from/width;
+				
+				int fromB=Math.toIntExact(instance.getStructOffset()+off.getOffset());
+				int toB  =fromB;
+				
+				var fl=(VariableNode.Flag<?>)var;
+				
+				int ib     =off.inByteBitOffset();
+				var bitSize=Math.min(fl.getBitSize(), 8-ib);
+				
+				for(int i=0;i<bitSize;i++){
+					toB++;
+					if(toB%3==0) break;
+				}
+				
+				
+				int xi=ib%3;
+				int yi=ib/3;
+				
+				area=new Rectangle(
+					(int)(pixelsPerByte*(xPosFrom+xi/3D)), (int)(pixelsPerByte*(yPosFrom+yi/3D)),
+					(int)(pixelsPerByte/3D*(toB-fromB)),
+					pixelsPerByte/3*Math.max(1, bitSize/3));
+				initFont(g, 1/3D);
+				
+			}else{
+				
+				int from=Math.toIntExact(instance.getStructOffset()+off.getOffset());
+				int to  =from;
+				
+				for(int i=0;i<VariableNode.FixedSize.getSizeUnknown(instance, var);i++){
+					to++;
+					if(to%width==0) break;
+				}
+				
+				int xPosFrom=from%width, yPosFrom=from/width;
+				area=new Rectangle(pixelsPerByte*xPosFrom, pixelsPerByte*yPosFrom, pixelsPerByte*(to-from), pixelsPerByte);
+				initFont(g);
+			}
+			
+			drawStringIn(g, TextUtil.toString(var.toString(instance).getValue()), area, true);
+			g.setColor(mul(g.getColor(), 0.4F));
+			g.drawRect(area.x, area.y, area.width, area.height);
+		});
+		
+	}
+	
 	BufferedImage render;
 	
 	BufferedImage getByte(int value, Color color, boolean withChar){
 		return byteCache.computeIfAbsent(new ByteInfo(value, color, withChar), this::renderByte);
 	}
 	
-	private void fillByte(Graphics2D g, int index, float xOff, float yOff){
+	private void fillBit(Graphics2D g, int index, float xOff, float yOff){
 		int   xi =index%3;
 		int   yi =index/3;
 		float pxS=pixelsPerByte/3F;
@@ -417,7 +463,7 @@ public class Display extends JFrame{
 		return gv.getPixelBounds(null, 0, 0);
 	}
 	
-	private void drawStringIn(Graphics2D g, String s, Rectangle area){
+	private void drawStringIn(Graphics2D g, String s, Rectangle area, boolean doStroke){
 		var         rect=getStringBounds(g, s);
 		FontMetrics fm  =g.getFontMetrics();
 		
@@ -434,13 +480,36 @@ public class Display extends JFrame{
 				g.scale(scale, 1);
 			}
 		}
-		
+		if(h>0){
+			double scale=area.height/h;
+			if(scale<1){
+				g.scale(1, scale);
+			}
+		}
+		if(doStroke){
+			var aa=g.getRenderingHint(KEY_ANTIALIASING);
+			var c =g.getColor();
+			var st=g.getStroke();
+			
+			g.setColor(new Color(0, 0, 0, 0.5F));
+			g.setStroke(new BasicStroke(1));
+			g.setRenderingHint(KEY_ANTIALIASING, VALUE_ANTIALIAS_ON);
+			
+			g.draw(g.getFont().createGlyphVector(g.getFontRenderContext(), s).getOutline());
+			
+			g.setColor(c);
+			g.setStroke(st);
+			g.setRenderingHint(KEY_ANTIALIASING, aa);
+		}
 		g.drawString(s, 0, 0);
 		g.setTransform(t);
 	}
 	
 	private Font initFont(Graphics2D g){
-		var f=new Font(Font.MONOSPACED, Font.PLAIN, (int)(pixelsPerByte*0.8F));
+		return initFont(g, 0.8);
+	}
+	private Font initFont(Graphics2D g, double sizeMul){
+		var f=new Font(Font.MONOSPACED, Font.PLAIN, (int)(pixelsPerByte*sizeMul));
 		g.setRenderingHint(KEY_TEXT_ANTIALIASING, f.getSize()>12?VALUE_TEXT_ANTIALIAS_ON:VALUE_TEXT_ANTIALIAS_OFF);
 		
 		g.setFont(f);
@@ -462,7 +531,7 @@ public class Display extends JFrame{
 		
 		for(FlagReader flags=new FlagReader(info.uVal, 8);flags.remainingCount()>0;){
 			if(flags.readBoolBit()){
-				fillByte(g, flags.readCount()-1, 0, 0);
+				fillBit(g, flags.readCount()-1, 0, 0);
 			}
 		}
 		
@@ -474,7 +543,7 @@ public class Display extends JFrame{
 				String s=Character.toString(c);
 				g.setColor(new Color(1, 1, 1, 0.6F));
 				
-				drawStringIn(g, s, new Rectangle(0, 0, pixelsPerByte, pixelsPerByte));
+				drawStringIn(g, s, new Rectangle(0, 0, pixelsPerByte, pixelsPerByte), false);
 			}
 		}
 		
