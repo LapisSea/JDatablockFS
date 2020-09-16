@@ -27,9 +27,9 @@ public class BitBlockNode extends VariableNode.FixedSize.Node<Object>{
 		return blockInfo.range().mapToObj(type.variables::get).map(n->(Flag<?>)n);
 	}
 	
-	private final FlagBlock     blockInfo;
-	private final IOStruct      type;
-	private final List<Flag<?>> flagsNodes;
+	private final          FlagBlock     blockInfo;
+	private final          IOStruct      type;
+	public final transient List<Flag<?>> flagsNodes;
 	
 	public BitBlockNode(IOStruct type, int flagIndex){
 		this(type, ((Flag<?>)type.variables.get(flagIndex)).getBlockInfo());

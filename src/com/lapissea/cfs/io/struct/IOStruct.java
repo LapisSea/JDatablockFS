@@ -15,7 +15,6 @@ import com.lapissea.cfs.io.struct.engine.impl.BitBlockNode;
 import com.lapissea.cfs.objects.INumber;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.util.LogUtil;
-import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.TextUtil;
 
@@ -420,17 +419,28 @@ public class IOStruct{
 		
 		public Offset calcVarOffset(VariableNode<?> var){
 			
+			boolean isFlag=var instanceof VariableNode.Flag;
+			
 			var known=var.getKnownOffset();
 			if(known!=null) return known;
 			
-			long offset=0;
+			Offset offset=Offset.ZERO;
 			
 			for(VariableNode<?> node : struct.variableIter){
-				if(node==var) return Offset.fromBytes(offset);
-				offset+=FixedSize.getSizeUnknown(this, node);
+				if(isFlag&&node instanceof BitBlockNode block){
+					Offset blockOffset=Offset.ZERO;
+					for(VariableNode.Flag<?> flag : block.flagsNodes){
+						if(flag==var){
+							return blockOffset.add(offset);
+						}
+						blockOffset=blockOffset.addBits(flag.getTotalBits());
+					}
+				}else if(node==var) return offset;
+				
+				offset=offset.addBytes(FixedSize.getSizeUnknown(this, node));
 			}
 			
-			throw new NotImplementedException();
+			throw new IllegalArgumentException(var+" not in "+struct);
 		}
 	}
 	

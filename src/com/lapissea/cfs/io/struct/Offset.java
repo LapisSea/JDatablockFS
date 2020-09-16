@@ -50,7 +50,17 @@ public sealed interface Offset{
 	long getOffset();
 	long getBitOffset();
 	
+	default Offset addBytes(long bytes){
+		return add(fromBytes(bytes));
+	}
+	default Offset addBits(long bits){
+		return add(fromBits(bits));
+	}
+	
 	default Offset add(@NotNull Offset other){
+		if(this instanceof ByteOffset b1&&other instanceof ByteOffset b2){
+			return fromBytes(b1.offset+b2.offset);
+		}
 		return fromBits(getBitOffset()+other.getBitOffset());
 	}
 	
