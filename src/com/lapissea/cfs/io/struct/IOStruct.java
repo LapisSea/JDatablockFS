@@ -589,11 +589,12 @@ public class IOStruct{
 			LogUtil.println(TextUtil.toTable("Iteration variables", iter));
 		}
 	}
-	public VariableNode<?> getVar(int varIndex){
-		return variables.stream().filter(v->v.index==varIndex).findAny().orElseThrow(()->new RuntimeException("Var with index "+varIndex+" does not exist in "+this));
+	
+	public <T, V extends VariableNode<T>> V getVar(int varIndex){
+		return (V)variables.stream().filter(v->v.index==varIndex).findAny().orElseThrow(()->new RuntimeException("Var with index "+varIndex+" does not exist in "+this));
 	}
 	
-	public VariableNode<?> getVar(String varName){
-		return variables.stream().filter(v->v.name.equals(varName)).findAny().orElseThrow(()->new RuntimeException(varName+" does not exist in "+this));
+	public <T, V extends VariableNode<T>> V getVar(String varName){
+		return (V)variables.stream().filter(v->v.name.equals(varName)).findAny().orElseThrow(()->new RuntimeException(varName+" does not exist in "+this));
 	}
 }
