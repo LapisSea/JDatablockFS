@@ -100,6 +100,13 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader, Sizab
 	long getCapacity() throws IOException;
 	RandomIO setCapacity(long newCapacity) throws IOException;
 	
+	default RandomIO ensureCapacity(long capacity) throws IOException{
+		if(getCapacity()<capacity){
+			setCapacity(capacity);
+		}
+		return this;
+	}
+	
 	@Override
 	void close() throws IOException;
 	

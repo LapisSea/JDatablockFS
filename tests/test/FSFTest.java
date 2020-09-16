@@ -65,7 +65,7 @@ class FSFTest{
 	private static void flatListTest(Cluster cluster) throws IOException{
 		
 		
-		IOList<ChunkPointer> list=IOList.boxed(
+		IOList<ChunkPointer> list=IOList.box(
 			new StructFlatList<>(cluster.alloc(8), ChunkPointer.PtrFixed::new),
 			ChunkPointer.PtrFixed::getValue,
 			ChunkPointer.PtrFixed::new
@@ -105,7 +105,7 @@ class FSFTest{
 	
 	private static void linkedListTest(Cluster cluster) throws IOException{
 		
-		IOList<String> list=IOList.boxed(
+		IOList<String> list=IOList.box(
 			new StructLinkedList<>(cluster.alloc(8), (Supplier<AutoText>)AutoText::new),
 			AutoText::getData,
 			AutoText::new
@@ -132,10 +132,10 @@ class FSFTest{
 		list.addElement("!bro lmao xD!");
 		cluster.validate();
 		list.validate();
-		list.addElement("!kek?!?!?!");
-		list.addElement("!kek?!?!?!");
-		list.addElement("!kek?!?!?!");
-		list.addElement("!kek?!?!?!");
+		list.addElement("!kek.?!?!?!");
+		list.addElement("!kek.?!?!?!");
+		list.addElement("!kek.?!?!?!");
+		list.addElement("!kek.?!?!?!");
 		cluster.validate();
 		list.validate();
 		list.removeElement(1);
@@ -145,7 +145,10 @@ class FSFTest{
 		cluster.validate();
 		list.validate();
 		
+		list.setElement(2, "hahaah ay this is long?!?!?!?!??!?!?!??!?!?!!??!");
+		
 		LogUtil.println(list);
+//		throw new RuntimeException();
 
 //		for(int i=0;i<list.size();i++){
 //			LogUtil.println(list.getElement(i));

@@ -206,14 +206,14 @@ public class IOStruct{
 		NumberSize defaultSize() default NumberSize.VOID;
 		String sizeRef() default "";
 	}
-	
-	@Target(FIELD)
-	@Retention(RUNTIME)
-	public @interface PointerValue{
-		int index();
-		
-		String ptrValName() default "";
-	}
+
+//	@Target(FIELD)
+//	@Retention(RUNTIME)
+//	public @interface PointerValue{
+//		int index();
+//
+//		String ptrValName() default "";
+//	}
 	
 	public static class Instance{
 		
@@ -233,8 +233,14 @@ public class IOStruct{
 			}
 			
 			public void writeStruct() throws IOException{
+				writeStruct(false);
+			}
+			
+			public void writeStruct(boolean trimAfterWrite) throws IOException{
 				try(var buff=getStructSourceIO()){
+					buff.ensureCapacity(buff.getPos()+this.getInstanceSize());
 					writeStruct(buff);
+					if(trimAfterWrite) buff.trim();
 				}
 				if(DEBUG_VALIDATION){
 					validateWrittenData();

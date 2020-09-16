@@ -225,7 +225,9 @@ public class StructFlatList<T extends IOStruct.Instance> implements IOList<T>{
 	
 	@Override
 	public void free() throws IOException{
-		clear();
+		cache.clear();
+		size=0;
+		
 		var d=data;
 		data=null;
 		d.freeChaining();

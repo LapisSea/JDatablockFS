@@ -189,15 +189,15 @@ public class ChunkIO implements RandomIO{
 	
 	@Override
 	public long getCapacity() throws IOException{
-		return mapSum(this::effectiveCapacity);
+		return mapSum(Chunk::getCapacity);
 	}
 	
 	@Override
 	public RandomIO setCapacity(long newCapacity) throws IOException{
 		long prev=0;
 		
-		Chunk chunk=head;
-		while(chunk!=null){
+		Chunk chunk=Objects.requireNonNull(head);
+		while(true){
 			
 			long contentStart=prev;
 			long contentEnd  =contentStart+chunk.getSize();
@@ -219,17 +219,23 @@ public class ChunkIO implements RandomIO{
 				if(next!=null){
 					next.freeChaining();
 				}
+				
+				var cap=getCapacity();
+				if(cap<newCapacity) throw new IOException(cap+" < "+newCapacity);
+				
 				return this;
 			}
-			
+			prev+=chunk.getCapacity();
 			if(!chunk.hasNext()) break;
-			prev+=chunk.getSize();
 			chunk=Objects.requireNonNull(chunk.next());
 		}
 		
-		long target=newCapacity-prev;
+		long toGrow=newCapacity-prev;
 		
+		chunk.growBy(toGrow);
 		
+		var cap=getCapacity();
+		if(cap<newCapacity) throw new IOException(cap+" < "+newCapacity);
 		return this;
 	}
 	@Override

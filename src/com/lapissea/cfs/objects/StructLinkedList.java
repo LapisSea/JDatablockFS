@@ -95,13 +95,7 @@ public class StructLinkedList<T extends IOStruct.Instance> extends IOStruct.Inst
 		
 		@Override
 		public void writeStruct() throws IOException{
-			try(var buff=getStructSourceIO()){
-				writeStruct(buff);
-				buff.trim();
-			}
-			if(DEBUG_VALIDATION){
-				validateWrittenData();
-			}
+			writeStruct(true);
 		}
 	}
 	
@@ -364,5 +358,28 @@ public class StructLinkedList<T extends IOStruct.Instance> extends IOStruct.Inst
 	}
 	public boolean isChanging(){
 		return changing;
+	}
+	
+	@Override
+	public void clear() throws IOException{
+		List<Chunk> tofree=new ArrayList<>();
+		for(int i=0;i<size();i++){
+			tofree.addAll(getNode(i).container.collectNext());
+		}
+		
+		size=0;
+		first=null;
+		writeStruct();
+		
+		for(Chunk chunk : tofree){
+			chunk.modifyAndSave(ch->{
+				ch.setSize(0);
+				ch.setUsed(false);
+			});
+		}
+		
+		cluster().free(tofree);
+		
+		validate();
 	}
 }

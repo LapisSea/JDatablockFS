@@ -11,12 +11,16 @@ import com.lapissea.util.Rand;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.awt.font.FontRenderContext;
+import java.awt.font.GlyphVector;
 import java.awt.geom.Line2D;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.util.List;
 import java.util.*;
 import java.util.stream.IntStream;
+
+import static java.awt.RenderingHints.*;
 
 public class Display extends JFrame{
 	
@@ -136,7 +140,7 @@ public class Display extends JFrame{
 			}
 			
 			if(cluster!=null){
-				g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+				g.setRenderingHint(KEY_ANTIALIASING, VALUE_ANTIALIAS_ON);
 				var siz  =Math.max(1, pixelsPerByte/8F);
 				var sFul =new BasicStroke(siz);
 				var sHalf=new BasicStroke(siz/2);
@@ -340,43 +344,62 @@ public class Display extends JFrame{
 		return byteCache.computeIfAbsent(new ByteInfo(value, color, withChar), this::renderByte);
 	}
 	
+	private void fillByte(Graphics2D g, int index, float xOff, float yOff){
+		int   xi =index%3;
+		int   yi =index/3;
+		float pxS=pixelsPerByte/3F;
+		
+		float x1=xi*pxS;
+		float y1=yi*pxS;
+		float x2=(xi+1)*pxS;
+		float y2=(yi+1)*pxS;
+		
+		g.fill(new Rectangle2D.Float(xOff+x1, yOff+y1, x2-x1, y2-y1));
+	}
+	
+	private Rectangle getStringBounds(Graphics2D g2, String str){
+		FontRenderContext frc=g2.getFontRenderContext();
+		GlyphVector       gv =g2.getFont().createGlyphVector(frc, str);
+		return gv.getPixelBounds(null, 0, 0);
+	}
+	
 	private BufferedImage renderByte(ByteInfo info){
 		var bb=new BufferedImage(pixelsPerByte, pixelsPerByte, BufferedImage.TYPE_INT_ARGB);
-		var g =bb.createGraphics();
-//		g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-		g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-		g.setRenderingHint(RenderingHints.KEY_COLOR_RENDERING, RenderingHints.VALUE_COLOR_RENDER_QUALITY);
-		g.setRenderingHint(RenderingHints.KEY_ALPHA_INTERPOLATION, RenderingHints.VALUE_ALPHA_INTERPOLATION_QUALITY);
+		
+		Graphics2D g=bb.createGraphics();
+//		g.setRenderingHint(KEY_ANTIALIASING, VALUE_ANTIALIAS_ON);
+//		g.setRenderingHint(KEY_COLOR_RENDERING, VALUE_COLOR_RENDER_QUALITY);
+//		g.setRenderingHint(KEY_ALPHA_INTERPOLATION, VALUE_ALPHA_INTERPOLATION_QUALITY);
 		
 		g.setColor(mul(info.color, 0.5F));
 		g.fillRect(0, 0, pixelsPerByte, pixelsPerByte);
 		
-		{
-			g.setColor(info.color);
-			var f=new FlagReader(info.uVal, 8);
-			
-			
-			for(int i=0;i<8;i++){
-				if(f.readBoolBit()){
-					int   xi =i%3;
-					int   yi =i/3;
-					float pxS=pixelsPerByte/3F;
-					
-					g.fill(new Rectangle2D.Float(xi*pxS, yi*pxS, pxS, pxS));
-				}
+		g.setColor(info.color);
+		
+		for(FlagReader flags=new FlagReader(info.uVal, 8);flags.remainingCount()>0;){
+			if(flags.readBoolBit()){
+				fillByte(g, flags.readCount()-1, 0, 0);
 			}
 		}
 		
 		if(info.withChar){
 			var f=new Font(Font.MONOSPACED, Font.PLAIN, (int)(pixelsPerByte*0.8F));
+			g.setRenderingHint(KEY_TEXT_ANTIALIASING, f.getSize()>12?VALUE_TEXT_ANTIALIAS_ON:VALUE_TEXT_ANTIALIAS_OFF);
+			
 			g.setFont(f);
+			
 			char c=(char)((byte)info.uVal);
 			if(f.canDisplay(c)){
 				String s=Character.toString(c);
 				g.setColor(new Color(1, 1, 1, 0.6F));
 				
-				g.drawString(s, (pixelsPerByte-g.getFontMetrics().stringWidth(s))/2, (int)(pixelsPerByte*0.9F));
+				var         rect=getStringBounds(g, s);
+				FontMetrics fm  =g.getFontMetrics();
 				
+				double h=rect.getHeight();
+				double w=rect.getWidth();
+				
+				g.drawString(s, (int)((pixelsPerByte-w)/2D), (int)(h+(pixelsPerByte-h)/2));
 			}
 		}
 		
