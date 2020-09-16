@@ -8,7 +8,7 @@ import static com.lapissea.cfs.io.bit.BitUtils.*;
 
 public interface BitReader{
 	
-	int readBits(int numOBits);
+	long readBits(int numOBits);
 	
 	default <T extends Enum<T>> T readEnum(Class<T> type){
 		return readEnum(EnumFlag.get(type));
@@ -46,6 +46,18 @@ public interface BitReader{
 			
 			int zeroIndex=binaryRangeFindZero(chunk, toRead, read);
 			if(zeroIndex!=-1) return read+zeroIndex;
+			read+=toRead;
+		}
+	}
+	
+	default void skip(int numOBits){
+		int read=0;
+		while(true){
+			int remaining=numOBits-read;
+			if(remaining==0) return;
+			
+			int toRead=Math.min(remaining, 63);
+			readBits(toRead);
 			read+=toRead;
 		}
 	}

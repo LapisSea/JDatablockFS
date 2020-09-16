@@ -44,10 +44,10 @@ public class FlagReader implements BitReader, AutoCloseable{
 	}
 	
 	@Override
-	public int readBits(int numOBits){
+	public long readBits(int numOBits){
 		if(bitCount<numOBits) throw new RuntimeException("ran out of bits");
 		
-		var result=(int)(data&makeMask(numOBits));
+		var result=(data&makeMask(numOBits));
 		data >>>= numOBits;
 		bitCount-=numOBits;
 		return result;

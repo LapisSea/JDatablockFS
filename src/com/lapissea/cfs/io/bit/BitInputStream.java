@@ -41,10 +41,10 @@ public class BitInputStream implements BitReader, AutoCloseable{
 	}
 	
 	@Override
-	public int readBits(int numOBits){
+	public long readBits(int numOBits){
 		assert numOBits<=bufferedBits;
 		
-		var result=(int)(buffer&makeMask(numOBits));
+		var result=(buffer&makeMask(numOBits));
 		buffer >>>= numOBits;
 		bufferedBits-=numOBits;
 		return result;

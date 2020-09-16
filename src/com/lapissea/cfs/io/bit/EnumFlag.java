@@ -34,7 +34,7 @@ public class EnumFlag<T extends Enum<T>>{
 	}
 	
 	public T read(BitReader source){
-		int ordinal=source.readBits(bits);
+		int ordinal=(int)source.readBits(bits);
 		return getEnumByIndex(ordinal);
 	}
 	
