@@ -14,8 +14,8 @@ public class BoolIOImpl extends VariableNode.Flag<Boolean>{
 	private final IOStruct.Get.GetterB getFun;
 	private final IOStruct.Set.SetterB setFun;
 	
-	public BoolIOImpl(String name, Field valueField, IOStruct.Get.GetterB getFun, IOStruct.Set.SetterB setFun){
-		super(name, 1, 0);
+	public BoolIOImpl(String name, int index, Field valueField, IOStruct.Get.GetterB getFun, IOStruct.Set.SetterB setFun){
+		super(name, index, 1, 0);
 		this.valueField=valueField;
 		this.getFun=getFun;
 		this.setFun=setFun;

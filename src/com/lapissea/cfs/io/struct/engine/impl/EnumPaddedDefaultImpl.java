@@ -17,8 +17,8 @@ public class EnumPaddedDefaultImpl<T extends Enum<T>> extends VariableNode.Flag<
 	private final IOStruct.Get.Getter<T> getFun;
 	private final IOStruct.Set.Setter<T> setFun;
 	
-	public EnumPaddedDefaultImpl(int totalBits, int paddingBits, EnumFlag<T> flagInfo, Field valueField, IOStruct.Get.Getter<T> getFun, IOStruct.Set.Setter<T> setFun){
-		super(valueField.getName(), totalBits, paddingBits);
+	public EnumPaddedDefaultImpl(int index, int totalBits, int paddingBits, EnumFlag<T> flagInfo, Field valueField, IOStruct.Get.Getter<T> getFun, IOStruct.Set.Setter<T> setFun){
+		super(valueField.getName(), index, totalBits, paddingBits);
 		this.valueField=valueField;
 		this.getFun=getFun;
 		this.setFun=setFun;

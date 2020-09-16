@@ -57,9 +57,9 @@ public class EnumNodeMaker<T extends Enum<T>> extends StructReflectionImpl.NodeM
 		
 		if(readFun!=null||writeFun!=null){
 			NumberSize numberSize=NumberSize.byBits(totalBits);
-			return new EnumCustomByteWiseIO<>(valueField.getName(), numberSize.bytes, valueField, flagInfo, numberSize, getFun, setFun, readFun, writeFun);
+			return new EnumCustomByteWiseIO<>(valueField.getName(), valueAnn.index(), numberSize.bytes, valueField, flagInfo, numberSize, getFun, setFun, readFun, writeFun);
 		}
 		
-		return new EnumPaddedDefaultImpl<>(flagInfo.bits, paddingBits, flagInfo, valueField, getFun, setFun);
+		return new EnumPaddedDefaultImpl<>(valueAnn.index(), flagInfo.bits, paddingBits, flagInfo, valueField, getFun, setFun);
 	}
 }

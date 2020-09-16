@@ -414,6 +414,10 @@ public class IOStruct{
 			return calcVarOffset(struct.variables.get(index));
 		}
 		
+		public Offset calcVarOffset(String varName){
+			return calcVarOffset(structType().getVar(varName));
+		}
+		
 		public Offset calcVarOffset(VariableNode<?> var){
 			
 			var known=var.getKnownOffset();
@@ -585,7 +589,11 @@ public class IOStruct{
 			LogUtil.println(TextUtil.toTable("Iteration variables", iter));
 		}
 	}
-	public VariableNode<?> varByName(String nextPtr){
-		return variables.stream().filter(v->v.name.equals(nextPtr)).findAny().orElseThrow(()->new RuntimeException(nextPtr+" does not exist in "+this));
+	public VariableNode<?> getVar(int varIndex){
+		return variables.stream().filter(v->v.index==varIndex).findAny().orElseThrow(()->new RuntimeException("Var with index "+varIndex+" does not exist in "+this));
+	}
+	
+	public VariableNode<?> getVar(String varName){
+		return variables.stream().filter(v->v.name.equals(varName)).findAny().orElseThrow(()->new RuntimeException(varName+" does not exist in "+this));
 	}
 }

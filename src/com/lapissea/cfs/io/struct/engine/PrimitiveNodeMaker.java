@@ -27,7 +27,7 @@ public class PrimitiveNodeMaker<T> extends StructReflectionImpl.NodeMaker<T>{
 		
 		var valueType=valueField.getType();
 		
-		if(valueType==boolean.class) return (VariableNode<T>)new BoolIOImpl(name, valueField, IOStruct.Get.GetterB.get(info), IOStruct.Set.SetterB.get(info));
+		if(valueType==boolean.class) return (VariableNode<T>)new BoolIOImpl(name, valueAnn.index(), valueField, IOStruct.Get.GetterB.get(info), IOStruct.Set.SetterB.get(info));
 		
 		if(valueType==long.class){
 			NumberSize fixedSize=valueAnn.defaultSize();
@@ -39,13 +39,13 @@ public class PrimitiveNodeMaker<T> extends StructReflectionImpl.NodeMaker<T>{
 					if(varSize.getType()!=NumberSize.class) throw new ClassCastException(varSize+" must be a NumberSize enum!");
 					varSize.setAccessible(true);
 					
-					return (VariableNode<T>)new LongVarSizeIOImpl(name, valueField, IOStruct.Get.GetterL.get(info), IOStruct.Set.SetterL.get(info), varSize, fixedSize);
+					return (VariableNode<T>)new LongVarSizeIOImpl(name, valueAnn.index(), valueField, IOStruct.Get.GetterL.get(info), IOStruct.Set.SetterL.get(info), varSize, fixedSize);
 				}catch(ReflectiveOperationException e){
 					throw new RuntimeException(e);
 				}
 			}
 			
-			return (VariableNode<T>)new LongIOImpl(name, valueField, IOStruct.Get.GetterL.get(info), IOStruct.Set.SetterL.get(info), fixedSize);
+			return (VariableNode<T>)new LongIOImpl(name, valueAnn.index(), valueField, IOStruct.Get.GetterL.get(info), IOStruct.Set.SetterL.get(info), fixedSize);
 		}
 		
 		if(valueType==int.class){
@@ -58,13 +58,13 @@ public class PrimitiveNodeMaker<T> extends StructReflectionImpl.NodeMaker<T>{
 					if(varSize.getType()!=NumberSize.class) throw new ClassCastException(varSize+" must be a NumberSize enum!");
 					varSize.setAccessible(true);
 					
-					return (VariableNode<T>)new IntVarSizeIOImpl(name, valueField, IOStruct.Get.GetterI.get(info), IOStruct.Set.SetterI.get(info), varSize, fixedSize);
+					return (VariableNode<T>)new IntVarSizeIOImpl(name, valueAnn.index(), valueField, IOStruct.Get.GetterI.get(info), IOStruct.Set.SetterI.get(info), varSize, fixedSize);
 				}catch(ReflectiveOperationException e){
 					throw new RuntimeException(e);
 				}
 			}
 			
-			return (VariableNode<T>)new IntIOImpl(name, valueField, IOStruct.Get.GetterI.get(info), IOStruct.Set.SetterI.get(info), fixedSize);
+			return (VariableNode<T>)new IntIOImpl(name, valueAnn.index(), valueField, IOStruct.Get.GetterI.get(info), IOStruct.Set.SetterI.get(info), fixedSize);
 		}
 		
 		throw new NotImplementedException(valueType.toString());

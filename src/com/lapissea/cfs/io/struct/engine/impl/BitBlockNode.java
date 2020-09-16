@@ -35,7 +35,7 @@ public class BitBlockNode extends VariableNode.FixedSize.Node<Object>{
 		this(type, ((Flag<?>)type.variables.get(flagIndex)).getBlockInfo());
 	}
 	private BitBlockNode(IOStruct type, FlagBlock blockInfo){
-		super(getFlags(blockInfo, type).map(v->v.name).collect(Collectors.joining(", ", "Flags[", "]")), blockInfo.wordSize().bytes);
+		super(getFlags(blockInfo, type).map(v->v.name).collect(Collectors.joining(", ", "Flags[", "]")), Integer.MIN_VALUE/2, blockInfo.wordSize().bytes);
 		this.type=type;
 		this.blockInfo=blockInfo;
 		flagsNodes=getFlags(blockInfo, type).collect(Collectors.toUnmodifiableList());

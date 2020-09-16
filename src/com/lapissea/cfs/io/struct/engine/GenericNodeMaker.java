@@ -48,11 +48,11 @@ public class GenericNodeMaker<T> extends StructReflectionImpl.NodeMaker<T>{
 		var valueType=(Class<T>)valueField.getType();
 		
 		
-		if(valueType==boolean.class) return (VariableNode<T>)new BoolIOImpl(name, valueField, GetterB.get(info), SetterB.get(info));
+		if(valueType==boolean.class) return (VariableNode<T>)new BoolIOImpl(name, valueAnn.index(), valueField, GetterB.get(info), SetterB.get(info));
 		if(valueType==long.class){
 			var args=valueAnn.rwArgs();
 			var size=args.length>0?NumberSize.valueOf(args[0]):NumberSize.LONG;
-			return (VariableNode<T>)new LongIOImpl(name, valueField, GetterL.get(info), SetterL.get(info), size);
+			return (VariableNode<T>)new LongIOImpl(name, valueAnn.index(), valueField, GetterL.get(info), SetterL.get(info), size);
 		}
 		
 		
@@ -92,9 +92,9 @@ public class GenericNodeMaker<T> extends StructReflectionImpl.NodeMaker<T>{
 		}
 		
 		if(fixedSize.isPresent()){
-			return new FixedGenericIOImpl<>(name, fixedSize.getAsInt(), valueField, getFun, setFun, sizerFun, readFun, writeFun);
+			return new FixedGenericIOImpl<>(name, valueAnn.index(), fixedSize.getAsInt(), valueField, getFun, setFun, sizerFun, readFun, writeFun);
 		}
 		
-		return new GenericIOImpl<>(name, valueField, getFun, setFun, sizerFun, readFun, writeFun, maxSize);
+		return new GenericIOImpl<>(name, valueAnn.index(), valueField, getFun, setFun, sizerFun, readFun, writeFun, maxSize);
 	}
 }

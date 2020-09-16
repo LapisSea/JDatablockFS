@@ -575,7 +575,7 @@ public class Cluster extends IOStruct.Instance.Contained{
 	
 	public void memoryWalk(LinkAcceptor acceptor) throws IOException{
 		
-		var off=calcVarOffset(TYPE.varByName("freeChunksPtr")).getOffset();
+		var off=calcVarOffset("freeChunksPtr").getOffset();
 		
 		acceptor.link(true, off, freeChunksPtr.getValue(), (IOStruct.Instance)freeChunks);
 	}

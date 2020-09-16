@@ -18,8 +18,8 @@ public class LongIOImpl extends VariableNode.PrimitiveLong implements VariableNo
 	private final IOStruct.Set.SetterL setFun;
 	private final NumberSize           size;
 	
-	public LongIOImpl(String name, Field valueField, IOStruct.Get.GetterL getFun, IOStruct.Set.SetterL setFun, NumberSize size){
-		super(name);
+	public LongIOImpl(String name, int index, Field valueField, IOStruct.Get.GetterL getFun, IOStruct.Set.SetterL setFun, NumberSize size){
+		super(name, index);
 		this.valueField=valueField;
 		this.getFun=getFun;
 		this.setFun=setFun;

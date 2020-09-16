@@ -175,7 +175,7 @@ public class Display extends JFrame{
 			for(Chunk chunk : physicalIterator){
 				
 				BiConsumer<String, Object> doVar=(name, val)->{
-					var v   =chunk.structType().varByName(name);
+					var v   =chunk.structType().getVar(name);
 					int from=Math.toIntExact(chunk.getPtr().getValue()+chunk.calcVarOffset(v).getOffset());
 					int to  =from;
 					
@@ -218,7 +218,7 @@ public class Display extends JFrame{
 				chunkColor=alpha(mix(chunkColor, Color.LIGHT_GRAY, 0.5F), 0.5F);
 				g.setColor(chunkColor);
 				
-				VariableNode<?> ptrNode=chunk.structType().varByName("nextPtr");
+				VariableNode<?> ptrNode=chunk.structType().getVar("nextPtr");
 				
 				int start=(int)(chunk.getPtr().value()+chunk.calcVarOffset(ptrNode).getOffset());
 				int pSiz =(int)ptrNode.mapSize(chunk);

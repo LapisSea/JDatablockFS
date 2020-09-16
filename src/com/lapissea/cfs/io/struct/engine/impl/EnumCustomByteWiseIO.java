@@ -22,8 +22,8 @@ public class EnumCustomByteWiseIO<T extends Enum<T>> extends VariableNode.FixedS
 	private final IOStruct.Read.Reader<T>  readFun;
 	private final IOStruct.Write.Writer<T> writeFun;
 	
-	public EnumCustomByteWiseIO(String name, int bytes, Field valueField, EnumFlag<T> flagInfo, NumberSize numberSize, IOStruct.Get.Getter<T> getFun, IOStruct.Set.Setter<T> setFun, IOStruct.Read.Reader<T> readFun, IOStruct.Write.Writer<T> writeFun){
-		super(name, bytes);
+	public EnumCustomByteWiseIO(String name, int index, int bytes, Field valueField, EnumFlag<T> flagInfo, NumberSize numberSize, IOStruct.Get.Getter<T> getFun, IOStruct.Set.Setter<T> setFun, IOStruct.Read.Reader<T> readFun, IOStruct.Write.Writer<T> writeFun){
+		super(name, index, bytes);
 		this.valueField=valueField;
 		this.flagInfo=flagInfo;
 		this.numberSize=numberSize;

@@ -20,8 +20,8 @@ public abstract class VariableNode<ValTyp>{
 		abstract class Node<ValTyp> extends VariableNode<ValTyp> implements FixedSize{
 			
 			private final int size;
-			protected Node(String name, int size){
-				super(name);
+			protected Node(String name, int index, int size){
+				super(name, index);
 				this.size=size;
 			}
 			
@@ -108,8 +108,8 @@ public abstract class VariableNode<ValTyp>{
 		private FlagBlock  blockInfo;
 		private NumberSize individualSize;
 		
-		protected Flag(String name, int bitSize, int paddingBits){
-			super(name, -1);
+		protected Flag(String name, int index, int bitSize, int paddingBits){
+			super(name, index, -1);
 			this.bitSize=bitSize;
 			this.paddingBits=paddingBits;
 		}
@@ -197,8 +197,8 @@ public abstract class VariableNode<ValTyp>{
 	
 	private abstract static class Primitive<T> extends VariableNode<T>{
 		
-		protected Primitive(String name){
-			super(name);
+		protected Primitive(String name, int index){
+			super(name, index);
 		}
 		
 		@Override
@@ -229,10 +229,10 @@ public abstract class VariableNode<ValTyp>{
 	}
 	
 	public abstract static class PrimitiveLong extends Primitive<Long>{
-		protected PrimitiveLong(String name){
-			super(name);
-		}
 		
+		protected PrimitiveLong(String name, int index){
+			super(name, index);
+		}
 		protected abstract long get(IOStruct.Instance source);
 		protected abstract void set(IOStruct.Instance target, long newValue);
 		protected abstract long read(IOStruct.Instance target, ContentReader source, long oldVal) throws IOException;
@@ -258,10 +258,10 @@ public abstract class VariableNode<ValTyp>{
 	}
 	
 	public abstract static class PrimitiveInt extends Primitive<Integer>{
-		protected PrimitiveInt(String name){
-			super(name);
-		}
 		
+		protected PrimitiveInt(String name, int index){
+			super(name, index);
+		}
 		protected abstract int get(IOStruct.Instance source);
 		protected abstract void set(IOStruct.Instance target, int newValue);
 		protected abstract int read(IOStruct.Instance target, ContentReader source, int oldVal) throws IOException;
@@ -287,11 +287,13 @@ public abstract class VariableNode<ValTyp>{
 	}
 	
 	public final String name;
+	public final int    index;
 	
 	private Offset knownOffset;
 	
-	protected VariableNode(String name){
+	protected VariableNode(String name, int index){
 		this.name=name;
+		this.index=index;
 	}
 	
 	protected abstract ValTyp getValue(IOStruct.Instance source);
