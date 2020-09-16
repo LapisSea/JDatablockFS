@@ -5,8 +5,7 @@ import com.lapissea.cfs.io.bit.FlagReader;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.io.struct.VariableNode;
 import com.lapissea.cfs.objects.chunk.Chunk;
-import com.lapissea.util.MathUtil;
-import com.lapissea.util.Rand;
+import com.lapissea.util.*;
 
 import javax.swing.*;
 import java.awt.*;
@@ -16,8 +15,10 @@ import java.awt.font.GlyphVector;
 import java.awt.geom.Line2D;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
+import java.io.IOException;
 import java.util.List;
 import java.util.*;
+import java.util.function.BiConsumer;
 import java.util.stream.IntStream;
 
 import static java.awt.RenderingHints.*;
@@ -93,11 +94,40 @@ public class Display extends JFrame{
 				g.drawImage(getByte(b, color, withChar), xi*pixelsPerByte, yi*pixelsPerByte, null);
 			};
 			
-			Cluster cluster=null;
-			try{
-				cluster=new Cluster(new MemoryData(bytes, true));
+			Cluster[] cluster={null};
+			
+			Iterable<Chunk> physicalIterator=()->{
+				Chunk c1;
+				try{
+					c1=cluster[0]==null?null:cluster[0].getFirstChunk();
+				}catch(IOException e){
+					throw UtilL.uncheckedThrow(e);
+				}
 				
-				for(Chunk chunk=cluster.getFirstChunk();chunk!=null;chunk=chunk.nextPhysical()){
+				return new Iterator<>(){
+					Chunk ch=c1;
+					
+					@Override
+					public boolean hasNext(){
+						return ch!=null;
+					}
+					@Override
+					public Chunk next(){
+						Chunk c=ch;
+						try{
+							ch=c.nextPhysical();
+						}catch(IOException e){
+							LogUtil.println(e);
+							ch=null;
+						}
+						return c;
+					}
+				};
+			};
+			
+			try{
+				cluster[0]=new Cluster(new MemoryData(bytes, true));
+				for(Chunk chunk : physicalIterator){
 					var chunkColor=chunk.isUsed()?Color.GREEN:Color.CYAN;
 					var dataColor =mul(chunkColor, 0.5F);
 					var freeColor =alpha(chunkColor, 0.4F);
@@ -106,7 +136,7 @@ public class Display extends JFrame{
 						
 						drawByte.draw(i, chunkColor, false);
 						
-						if(!cluster.isLastPhysical(chunk)){
+						if(!cluster[0].isLastPhysical(chunk)){
 							drawByte.draw((int)chunk.dataEnd(), Color.RED, true);
 						}
 					}
@@ -114,10 +144,11 @@ public class Display extends JFrame{
 					for(int i=0, j=(int)chunk.getCapacity();i<j;i++){
 						drawByte.draw((int)(i+chunk.dataStart()), i>=chunk.getSize()?freeColor:dataColor, true);
 					}
+					
 				}
 			}catch(Throwable e){
-//				LogUtil.println(e);
-				e.printStackTrace();
+				LogUtil.println(e);
+//				e.printStackTrace();
 			}
 			
 			for(int i=0;i<bytes.length;i++){
@@ -139,49 +170,72 @@ public class Display extends JFrame{
 				g.fillRect(xi*pixelsPerByte+off, yi*pixelsPerByte+off, siz, siz);
 			}
 			
-			if(cluster!=null){
-				g.setRenderingHint(KEY_ANTIALIASING, VALUE_ANTIALIAS_ON);
-				var siz  =Math.max(1, pixelsPerByte/8F);
-				var sFul =new BasicStroke(siz);
-				var sHalf=new BasicStroke(siz/2);
+			initFont(g);
+			
+			for(Chunk chunk : physicalIterator){
 				
-				g.setStroke(sFul);
-				try{
-					for(Chunk chunk=cluster.getFirstChunk();chunk!=null;chunk=chunk.nextPhysical()){
-						if(!chunk.hasNext()) continue;
-						var chunkColor=chunk.isUsed()?Color.GREEN:Color.CYAN;
-						
-						try{
-							chunk.getNextPtr().dereference(cluster);
-						}catch(Throwable e){
-							chunkColor=Color.RED;
-						}
-						
-						chunkColor=alpha(mix(chunkColor, Color.LIGHT_GRAY, 0.5F), 0.5F);
-						g.setColor(chunkColor);
-						
-						VariableNode<?> ptrNode=chunk.structType().varByName("nextPtr");
-						
-						int start=(int)(chunk.getPtr().value()+chunk.calcVarOffset(ptrNode).getOffset());
-						int pSiz =(int)ptrNode.mapSize(chunk);
-						
-						if(IntStream.range(start, start+pSiz).noneMatch(i->i%width==0)){
-							g.setStroke(sHalf);
-							drawLine(g, width, start, start+pSiz-1);
-							g.setStroke(sFul);
-						}
-						
-						drawArrow(g, width, start, (int)chunk.getNextPtr().value());
+				BiConsumer<String, Object> doVar=(name, val)->{
+					var v   =chunk.structType().varByName(name);
+					int from=Math.toIntExact(chunk.getPtr().getValue()+chunk.calcVarOffset(v).getOffset());
+					int to  =from;
+					
+					for(int i=0;i<VariableNode.FixedSize.getSizeUnknown(chunk, v);i++){
+						to++;
+						if(to%width==0) break;
 					}
+					
+					int xPosFrom=from%width, yPosFrom=from/width;
+					int xPosTo  =to%width, yPosTo=to/width;
+					
+					drawStringIn(g, TextUtil.toString(val), new Rectangle(pixelsPerByte*xPosFrom, pixelsPerByte*yPosFrom, pixelsPerByte*(to-from), pixelsPerByte));
+				};
+				
+				g.setColor(alpha(Color.RED, 0.5F));
+				doVar.accept("capacity", chunk.getCapacity());
+				g.setColor(alpha(Color.GREEN, 0.5F));
+				doVar.accept("size", chunk.getSize());
+				g.setColor(alpha(Color.BLUE, 0.5F));
+				doVar.accept("nextPtr", chunk.getNextPtr());
+				
+			}
+			
+			g.setRenderingHint(KEY_ANTIALIASING, VALUE_ANTIALIAS_ON);
+			var siz  =Math.max(1, pixelsPerByte/8F);
+			var sFul =new BasicStroke(siz);
+			var sHalf=new BasicStroke(siz/2);
+			
+			g.setStroke(sFul);
+			for(Chunk chunk : physicalIterator){
+				if(!chunk.hasNext()) continue;
+				var chunkColor=chunk.isUsed()?Color.GREEN:Color.CYAN;
+				
+				try{
+					chunk.getNextPtr().dereference(cluster[0]);
 				}catch(Throwable e){
-					e.printStackTrace();
+					chunkColor=Color.RED;
 				}
+				
+				chunkColor=alpha(mix(chunkColor, Color.LIGHT_GRAY, 0.5F), 0.5F);
+				g.setColor(chunkColor);
+				
+				VariableNode<?> ptrNode=chunk.structType().varByName("nextPtr");
+				
+				int start=(int)(chunk.getPtr().value()+chunk.calcVarOffset(ptrNode).getOffset());
+				int pSiz =(int)ptrNode.mapSize(chunk);
+				
+				if(IntStream.range(start, start+pSiz).noneMatch(i->i%width==0)){
+					g.setStroke(sHalf);
+					drawLine(g, width, start, start+pSiz-1);
+					g.setStroke(sFul);
+				}
+				
+				drawArrow(g, width, start, (int)chunk.getNextPtr().value());
 			}
 		}
 		
 		private void calcSize(int bytesCount){
 			
-			int newPixelsPerByte=Math.min(pixelsPerByte, getWidth()/2);
+			int newPixelsPerByte=MathUtil.snap(pixelsPerByte, 3, getWidth()/2);
 			
 			while(true){
 				int width         =getWidth()/newPixelsPerByte;
@@ -320,7 +374,7 @@ public class Display extends JFrame{
 		
 		setBackground(Color.GRAY);
 		setVisible(true);
-		createBufferStrategy(2);
+		createBufferStrategy(3);
 	}
 	
 	private void setPixelsPerByte(int pixelsPerByte){
@@ -363,6 +417,36 @@ public class Display extends JFrame{
 		return gv.getPixelBounds(null, 0, 0);
 	}
 	
+	private void drawStringIn(Graphics2D g, String s, Rectangle area){
+		var         rect=getStringBounds(g, s);
+		FontMetrics fm  =g.getFontMetrics();
+		
+		double h=rect.getHeight();
+		double w=rect.getWidth();
+		
+		var t=g.getTransform();
+		
+		g.translate(area.x, area.y);
+		g.translate(Math.max(0, area.width-w)/2D, h+(area.height-h)/2);
+		if(w>0){
+			double scale=area.width/w;
+			if(scale<1){
+				g.scale(scale, 1);
+			}
+		}
+		
+		g.drawString(s, 0, 0);
+		g.setTransform(t);
+	}
+	
+	private Font initFont(Graphics2D g){
+		var f=new Font(Font.MONOSPACED, Font.PLAIN, (int)(pixelsPerByte*0.8F));
+		g.setRenderingHint(KEY_TEXT_ANTIALIASING, f.getSize()>12?VALUE_TEXT_ANTIALIAS_ON:VALUE_TEXT_ANTIALIAS_OFF);
+		
+		g.setFont(f);
+		return f;
+	}
+	
 	private BufferedImage renderByte(ByteInfo info){
 		var bb=new BufferedImage(pixelsPerByte, pixelsPerByte, BufferedImage.TYPE_INT_ARGB);
 		
@@ -383,23 +467,14 @@ public class Display extends JFrame{
 		}
 		
 		if(info.withChar){
-			var f=new Font(Font.MONOSPACED, Font.PLAIN, (int)(pixelsPerByte*0.8F));
-			g.setRenderingHint(KEY_TEXT_ANTIALIASING, f.getSize()>12?VALUE_TEXT_ANTIALIAS_ON:VALUE_TEXT_ANTIALIAS_OFF);
-			
-			g.setFont(f);
+			Font f=initFont(g);
 			
 			char c=(char)((byte)info.uVal);
 			if(f.canDisplay(c)){
 				String s=Character.toString(c);
 				g.setColor(new Color(1, 1, 1, 0.6F));
 				
-				var         rect=getStringBounds(g, s);
-				FontMetrics fm  =g.getFontMetrics();
-				
-				double h=rect.getHeight();
-				double w=rect.getWidth();
-				
-				g.drawString(s, (int)((pixelsPerByte-w)/2D), (int)(h+(pixelsPerByte-h)/2));
+				drawStringIn(g, s, new Rectangle(0, 0, pixelsPerByte, pixelsPerByte));
 			}
 		}
 		

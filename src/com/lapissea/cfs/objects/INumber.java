@@ -12,6 +12,10 @@ public interface INumber extends Comparable<INumber>{
 		}
 	}
 	
+	default int getValueInt(){
+		return Math.toIntExact(getValue());
+	}
+	
 	long getValue();
 	
 	default boolean equals(long value){
