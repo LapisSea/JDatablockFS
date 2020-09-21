@@ -1,5 +1,7 @@
 package com.lapissea.cfs.io.struct;
 
+import com.lapissea.cfs.Cluster;
+import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.MalformedObjectException;
 import com.lapissea.cfs.exceptions.OutOfSyncDataException;
 import com.lapissea.cfs.io.RandomIO;
@@ -14,21 +16,26 @@ import com.lapissea.cfs.io.struct.engine.StructReflectionImpl.NodeMaker.FunDef.A
 import com.lapissea.cfs.io.struct.engine.impl.BitBlockNode;
 import com.lapissea.cfs.objects.INumber;
 import com.lapissea.cfs.objects.NumberSize;
-import com.lapissea.util.LogUtil;
-import com.lapissea.util.Nullable;
-import com.lapissea.util.TextUtil;
+import com.lapissea.cfs.objects.chunk.Chunk;
+import com.lapissea.cfs.objects.chunk.ChunkPointer;
+import com.lapissea.util.*;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Type;
 import java.util.*;
 import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static com.lapissea.cfs.Config.*;
 import static java.lang.annotation.ElementType.*;
@@ -44,11 +51,28 @@ public class IOStruct{
 	public static final List<Class<Annotation>> TAG_TYPES  =ANNOTATIONS.stream().filter(n->!VALUE_TYPES.contains(n)).collect(toUnmodifiableList());
 	
 	@Retention(RUNTIME)
+	public @interface Construct{
+		
+		interface Constructor<T>{
+			@Nullable
+			static <T> Constructor<T> get(ValueRelations.ValueInfo info, Type valueType){
+				return new FunDef(valueType,
+				                  new Arg(Chunk.class, "source"))
+					       .getOverride(info, IOStruct.Construct.Constructor.class);
+			}
+			
+			T construct(IOStruct.Instance target, Chunk source) throws IOException;
+		}
+		
+		String target() default "";
+	}
+	
+	@Retention(RUNTIME)
 	public @interface Read{
 		
 		interface Reader<T>{
 			@Nullable
-			static <T> Reader<T> get(ValueRelations.ValueInfo info, Class<T> valueType){
+			static <T> Reader<T> get(ValueRelations.ValueInfo info, Type valueType){
 				return new FunDef(valueType,
 				                  new Arg(ContentReader.class, "source"),
 				                  new Arg(valueType, "oldVal"))
@@ -66,7 +90,7 @@ public class IOStruct{
 		
 		interface Writer<T>{
 			@Nullable
-			static <T> Writer<T> get(ValueRelations.ValueInfo info, Class<T> valueType){
+			static <T> Writer<T> get(ValueRelations.ValueInfo info, Type valueType){
 				return new FunDef(Void.TYPE,
 				                  new Arg(ContentWriter.class, "dest"),
 				                  new Arg(valueType, "source"))
@@ -83,7 +107,7 @@ public class IOStruct{
 		
 		interface Getter<T>{
 			@Nullable
-			static <T> Getter<T> get(ValueRelations.ValueInfo info, Class<T> valueType){
+			static <T> Getter<T> get(ValueRelations.ValueInfo info, Type valueType){
 				return new FunDef(valueType)
 					       .getOverride(info, Getter.class);
 			}
@@ -125,7 +149,7 @@ public class IOStruct{
 		
 		interface Setter<T>{
 			@Nullable
-			static <T> Setter<T> get(ValueRelations.ValueInfo info, Class<T> valueType){
+			static <T> Setter<T> get(ValueRelations.ValueInfo info, Type valueType){
 				return new FunDef(Void.TYPE,
 				                  new Arg(valueType, "newValue"))
 					       .getOverride(info, Setter.class);
@@ -171,7 +195,7 @@ public class IOStruct{
 		
 		interface Sizer<T>{
 			@Nullable
-			static <T> IOStruct.Size.Sizer<T> get(ValueRelations.ValueInfo info, Class<T> valueType){
+			static <T> IOStruct.Size.Sizer<T> get(ValueRelations.ValueInfo info, Type valueType){
 				return new FunDef(long.class,
 				                  new Arg(valueType, "value"))
 					       .getOverride(info, IOStruct.Size.Sizer.class);
@@ -207,29 +231,70 @@ public class IOStruct{
 		NumberSize defaultSize() default NumberSize.VOID;
 		String sizeRef() default "";
 	}
-
-//	@Target(FIELD)
-//	@Retention(RUNTIME)
-//	public @interface PointerValue{
-//		int index();
-//
-//		String ptrValName() default "";
-//	}
+	
+	@Target(FIELD)
+	@Retention(RUNTIME)
+	public @interface PointerValue{
+		int index();
+		
+		Class<? extends ReaderWriter<ChunkPointer>> rw() default ChunkPointer.FixedIO.class;
+		String[] rwArgs() default {"LONG"};
+		
+		Class<? extends IOStruct.Instance> type() default IOStruct.Instance.class;
+	}
 	
 	public static class Instance{
 		
 		public abstract static class Contained extends Instance{
 			
+			public abstract static class SingletonChunk extends Contained{
+				
+				public SingletonChunk(){
+				}
+				
+				public SingletonChunk(IOStruct struct){
+					super(struct);
+				}
+				public SingletonChunk(INumber structOffset){
+					this(structOffset.getValue());
+				}
+				public SingletonChunk(long structOffset){
+					super(structOffset);
+				}
+				public SingletonChunk(IOStruct struct, long structOffset){
+					super(struct, structOffset);
+				}
+				
+				public abstract Chunk getContainer();
+				
+				@Override
+				protected RandomIO getStructSourceIO() throws IOException{
+					return getContainer().io();
+				}
+				@Override
+				protected Cluster getSourceCluster() throws IOException{
+					return getContainer().cluster;
+				}
+			}
+			
 			public Contained(){ }
 			public Contained(IOStruct struct){
 				super(struct);
 			}
+			public Contained(long structOffset){
+				super(structOffset);
+			}
+			public Contained(IOStruct struct, long structOffset){
+				super(struct, structOffset);
+			}
 			
 			protected abstract RandomIO getStructSourceIO() throws IOException;
 			
+			protected abstract Cluster getSourceCluster() throws IOException;
+			
 			public void readStruct() throws IOException{
 				try(RandomIO buff=getStructSourceIO()){
-					readStruct(buff);
+					readStruct(getSourceCluster(), buff);
 				}
 			}
 			
@@ -240,7 +305,7 @@ public class IOStruct{
 			public void writeStruct(boolean trimAfterWrite) throws IOException{
 				try(var buff=getStructSourceIO()){
 					buff.ensureCapacity(buff.getPos()+this.getInstanceSize());
-					writeStruct(buff);
+					writeStruct(getSourceCluster(), buff);
 					if(trimAfterWrite) buff.trim();
 				}
 				if(DEBUG_VALIDATION){
@@ -250,7 +315,7 @@ public class IOStruct{
 			
 			public void validateWrittenData() throws IOException{
 				try(var buff=getStructSourceIO()){
-					validateWrittenData(buff);
+					validateWrittenData(getSourceCluster(), buff);
 				}
 			}
 		}
@@ -260,11 +325,19 @@ public class IOStruct{
 		private final IOStruct struct;
 		
 		public Instance(){
-			this.struct=getInstance(this.getClass());
+			this.struct=get(this.getClass());
+		}
+		public Instance(long structOffset){
+			this.struct=get(this.getClass());
+			this.structOffset=structOffset;
 		}
 		
 		public Instance(IOStruct struct){
-			this.struct=struct;
+			this.struct=Objects.requireNonNull(struct);
+		}
+		public Instance(IOStruct struct, long structOffset){
+			this.struct=Objects.requireNonNull(struct);
+			this.structOffset=structOffset;
 		}
 		
 		public long getStructOffset(){
@@ -272,11 +345,11 @@ public class IOStruct{
 		}
 		
 		
-		public final void readStruct(RandomIO buff) throws IOException{
-			readStruct(buff, buff.getPos());
+		public final void readStruct(Cluster cluster, RandomIO buff) throws IOException{
+			readStruct(cluster, buff, buff.getPos());
 		}
 		
-		public void readStruct(ContentReader in, long structOffset) throws IOException{
+		public void readStruct(Cluster cluster, ContentReader in, long structOffset) throws IOException{
 			this.structOffset=structOffset;
 			
 			boolean shouldClose=false;
@@ -297,13 +370,13 @@ public class IOStruct{
 							if(v instanceof FixedSize f){
 								var siz=f.getSize();
 								try(ContentReader vbuf=buff.bufferExactRead(siz, (w, e)->new IOException(this.getClass().getName()+" Var \""+v.name+"\" "+w+"/"+e))){
-									v.read(this, vbuf);
+									v.read(this, cluster, vbuf);
 								}
 							}else{
-								v.read(this, buff);
+								v.read(this, cluster, buff);
 							}
 						}else{
-							v.read(this, buff);
+							v.read(this, cluster, buff);
 						}
 					}catch(IOException e){
 						throw new IOException("Failed to read variable "+v+" in "+struct+" from "+buff, e);
@@ -314,13 +387,13 @@ public class IOStruct{
 			}
 		}
 		
-		public final void writeStruct(RandomIO buff) throws IOException{
-			writeStruct(buff, buff.getPos());
+		public final void writeStruct(Cluster cluster, RandomIO buff) throws IOException{
+			writeStruct(cluster, buff, buff.getPos());
 		}
 		
-		public void writeStruct(ContentWriter out, long structOffset) throws IOException{
-			boolean shouldClose=false;
-			
+		public void writeStruct(Cluster cluster, ContentWriter out, long structOffset) throws IOException{
+			boolean       shouldClose=false;
+			Throwable     e1         =null;
 			ContentWriter buff;
 			if(ContentWriter.isDirect(out)) buff=out;
 			else{
@@ -333,16 +406,26 @@ public class IOStruct{
 					for(var v : struct.variableIter){
 						var size=v.mapSize(this);
 						try(ContentWriter vbuf=buff.bufferExactWrite(size, (written, expected)->new IOException(this.getClass().getName()+" Var \""+v.name+"\" written/expected "+written+"/"+expected))){
-							v.write(this, vbuf);
+							v.write(this, cluster, vbuf);
 						}
 					}
 				}else{
 					for(var v : struct.variableIter){
-						v.write(this, buff);
+						v.write(this, cluster, buff);
 					}
 				}
+			}catch(Throwable e){
+				e1=e;
 			}finally{
-				if(shouldClose) buff.close();
+				if(shouldClose){
+					try{
+						buff.close();
+					}catch(Throwable e2){
+						if(e1!=null) e1.addSuppressed(e2);
+						else throw e2;
+					}
+					if(e1!=null) throw UtilL.uncheckedThrow(e1);
+				}
 			}
 		}
 		
@@ -366,10 +449,10 @@ public class IOStruct{
 			return sum;
 		}
 		
-		public void validateWrittenData(ContentReader in) throws IOException{
+		public void validateWrittenData(Cluster cluster, ContentReader in) throws IOException{
 			var siz=getInstanceSize();
 			var bb =new ByteArrayOutputStream(Math.toIntExact(siz));
-			writeStruct(SimpleContentWriter.pass(bb), structOffset);
+			writeStruct(cluster, SimpleContentWriter.pass(bb), structOffset);
 			
 			if(bb.size()!=siz){
 				throw new MalformedObjectException("Object declared size of "+siz+" but wrote "+bb.size()+" bytes");
@@ -490,22 +573,29 @@ public class IOStruct{
 		                                   .orElseThrow()
 		                                   .getDeclaringClass()
 		                         );
-		return getInstance((Class<? extends Instance>)type);
+		return get((Class<? extends Instance>)type);
 	}
 	
-	public static IOStruct getInstance(Class<? extends Instance> instanceClass){
-		return CACHE.computeIfAbsent(instanceClass, c->new IOStruct(instanceClass));
+	public static IOStruct get(Class<? extends Instance> instanceClass){
+		var result=CACHE.get(instanceClass);
+		if(result==null){
+			result=new IOStruct(instanceClass);
+			CACHE.put(instanceClass, result);
+		}
+		return result;
 	}
 	
 	public final Class<? extends Instance> instanceClass;
 	
 	public final List<VariableNode<Object>> variables;
 	
-	protected final VariableNode<?>[] variableIter;
+	private final VariableNode<?>[] variableIter;
 	
 	private final OptionalLong knownSize;
 	private final long         minimumSize;
 	private final OptionalLong maximumSize;
+	
+	private final Construct.Constructor<? extends Instance> constructor;
 	
 	private IOStruct(Class<? extends Instance> instanceClass){
 		this.instanceClass=instanceClass;
@@ -531,8 +621,39 @@ public class IOStruct{
 		knownSize=calculateKnownSize();
 		minimumSize=calculateMinimumSize();
 		maximumSize=calculateMaximumSize();
+		
+		constructor=findConstructor();
 
 //		logStruct();
+	}
+	
+	private Construct.Constructor<? extends Instance> findConstructor(){
+		
+		for(Method method : instanceClass.getMethods()){
+			if(method.getName().equals("constructThis")&&method.getDeclaredAnnotation(Construct.class)!=null){
+				return Utils.makeLambda(method, Construct.Constructor.class);
+			}
+		}
+		try{
+			BiFunction<Constructor<Instance>, Object[], Instance> make=(c, args)->{
+				try{
+					return (Instance)c.newInstance();
+				}catch(ReflectiveOperationException e){
+					throw new RuntimeException(e);
+				}
+			};
+			
+			return Utils.tryMapConstructor((Class<Instance>)instanceClass, List.of(
+				Stream::empty,
+				()->Stream.of(Chunk.class)
+			), (BiFunction<Integer, Constructor<Instance>, Construct.Constructor<Instance>>)(i, c)->switch(i){
+				case 0 -> (t, chunk)->make.apply(c, ZeroArrays.ZERO_OBJECT);
+				case 1 -> (t, chunk)->make.apply(c, new Object[]{chunk});
+				default -> throw new RuntimeException();
+			});
+		}catch(ReflectiveOperationException e){
+			return null;
+		}
 	}
 	
 	private OptionalLong calculateMaximumSize(){
@@ -643,5 +764,13 @@ public class IOStruct{
 	
 	public <T, V extends VariableNode<T>> V getVar(String varName){
 		return (V)variables.stream().filter(v->v.name.equals(varName)).findAny().orElseThrow(()->new RuntimeException(varName+" does not exist in "+this));
+	}
+	
+	public boolean canInstate(){
+		return constructor!=null;
+	}
+	public <T extends Instance> T newInstance(IOStruct.Instance target, Chunk chunk) throws IOException{
+		if(!canInstate()) throw new UnsupportedOperationException(this.instanceClass.getName()+" does not support auto construction");
+		return (T)constructor.construct(target, chunk);
 	}
 }

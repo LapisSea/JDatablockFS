@@ -96,7 +96,8 @@ public record ChunkPointer(long value) implements INumber{
 	}
 	
 	public ChunkPointer{
-		assert value>0;
+		assert value>0:
+			this.toString()+""+value;
 	}
 	
 	public static class FixedIO implements ReaderWriter<ChunkPointer>{

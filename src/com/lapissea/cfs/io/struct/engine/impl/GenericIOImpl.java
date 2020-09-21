@@ -1,5 +1,6 @@
 package com.lapissea.cfs.io.struct.engine.impl;
 
+import com.lapissea.cfs.Cluster;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.struct.IOStruct;
@@ -69,12 +70,12 @@ public class GenericIOImpl<T> extends VariableNode<T>{
 	}
 	
 	@Override
-	public T read(IOStruct.Instance target, ContentReader source, T oldVal) throws IOException{
+	public T read(IOStruct.Instance target, ContentReader source, T oldVal, Cluster cluster) throws IOException{
 		return readFun.read(target, source, oldVal);
 	}
 	
 	@Override
-	public void write(IOStruct.Instance target, ContentWriter dest, T source) throws IOException{
+	public void write(IOStruct.Instance target, Cluster cluster, ContentWriter dest, T source) throws IOException{
 		writeFun.write(target, dest, source);
 	}
 	@Override

@@ -32,11 +32,7 @@ public class Chunk extends IOStruct.Instance.Contained implements Iterable<Chunk
 		try{
 			result.readStruct();
 		}catch(IllegalBitValueException e){
-//			var data=cluster.getData().ioAt(ptr, io->{
-//				return io.readInts1((int)Math.min(4, io.remaining()));
-//			});
-			
-			throw new IOException("Not a chunk at "+ptr/*+"\n"+new MemoryData(data, false).hexdump(ptr+" - "+ptr.addPtr(data.length))*/, e);
+			throw new IOException("Not a chunk at "+ptr, e);
 		}catch(IOException e){
 			throw new IOException("Failed to read chunk at "+ptr, e);
 		}
@@ -53,7 +49,7 @@ public class Chunk extends IOStruct.Instance.Contained implements Iterable<Chunk
 //	@Value(index=-1)
 //	private boolean typed;
 	
-	@Value(index=0)
+	@PrimitiveValue(index=0)
 	private boolean used;
 	
 	@EnumValue(index=1) private                  NumberSize bodyNumSize;
@@ -88,7 +84,7 @@ public class Chunk extends IOStruct.Instance.Contained implements Iterable<Chunk
 	}
 	
 	public Chunk(@NotNull Cluster cluster, @NotNull ChunkPointer ptr, long capacity, @NotNull NumberSize bodyNumSize, @NotNull NumberSize nextSize){
-		super(THIS_TYP);
+		super(THIS_TYP, ptr.getValue());
 		this.cluster=cluster;
 		this.ptr=ptr;
 		this.bodyNumSize=bodyNumSize;
@@ -110,20 +106,21 @@ public class Chunk extends IOStruct.Instance.Contained implements Iterable<Chunk
 	}
 	
 	@Override
-	public void readStruct(ContentReader in, long structOffset) throws IOException{
+	public void readStruct(Cluster cluster, ContentReader in, long structOffset) throws IOException{
 		assert getPtr().equals(structOffset):getPtr()+" "+structOffset;
 		
-		super.readStruct(in, structOffset);
+		super.readStruct(cluster, in, structOffset);
 		headerSize=getInstanceSize();
 	}
 	
 	@Override
-	public void writeStruct(ContentWriter out, long structOffset) throws IOException{
+	public void writeStruct(Cluster cluster, ContentWriter out, long structOffset) throws IOException{
 		assert getPtr().equals(structOffset):getPtr()+" "+structOffset;
 		
 		dirty=false;
-		super.writeStruct(out, structOffset);
+		super.writeStruct(cluster, out, structOffset);
 	}
+	
 	@NotNull
 	public ChunkPointer getPtr(){ return ptr; }
 	
@@ -193,6 +190,10 @@ public class Chunk extends IOStruct.Instance.Contained implements Iterable<Chunk
 	@Override
 	protected RandomIO getStructSourceIO() throws IOException{
 		return cluster.getData().io().setPos(getPtr());
+	}
+	@Override
+	protected Cluster getSourceCluster() throws IOException{
+		return cluster;
 	}
 	
 	@NotNull

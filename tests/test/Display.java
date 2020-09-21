@@ -18,19 +18,14 @@ import java.awt.font.GlyphVector;
 import java.awt.geom.Line2D;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
-import java.io.IOException;
+import java.io.*;
 import java.util.List;
 import java.util.*;
 import java.util.stream.IntStream;
 
 import static java.awt.RenderingHints.*;
 
-public class Display extends JFrame{
-	
-	static{
-		System.setProperty("sun.java2d.d3d", "true");
-//		Toolkit.getDefaultToolkit().setDynamicLayout(false);
-	}
+public class Display extends JFrame implements DataLogger{
 	
 	private record ByteInfo(int uVal, Color color, boolean withChar){}
 	
@@ -169,7 +164,6 @@ public class Display extends JFrame{
 				fillBit(g, 8, xi*pixelsPerByte, yi*pixelsPerByte);
 			}
 			
-			
 			for(Chunk chunk : physicalIterator){
 				annotateStruct(g, width, chunk);
 			}
@@ -250,12 +244,24 @@ public class Display extends JFrame{
 				
 				var image=render;
 				
-				if(image==null||image.getWidth()!=getWidth()||image.getHeight()!=getHeight()){
-					image=new BufferedImage(getWidth(), getHeight(), BufferedImage.TYPE_INT_ARGB);
+				if(shouldRerender){
+					shouldRerender=false;
+					
+					if(image==null||image.getWidth()!=getWidth()||image.getHeight()!=getHeight()){
+						image=getGraphicsConfiguration().createCompatibleImage(getWidth(), getHeight(), Transparency.TRANSLUCENT);
+						render=image;
+					}
+					
 					Graphics2D g1=image.createGraphics();
+					
+					g1.setComposite(AlphaComposite.Clear);
+					g1.fillRect(0, 0, getWidth(), getHeight());
+					g1.setComposite(AlphaComposite.SrcOver);
+					
 					renderImage(g1, frame);
+					
 					g1.dispose();
-					render=image;
+					
 				}
 				
 				g.drawImage(image, 0, 0, null);
@@ -297,7 +303,15 @@ public class Display extends JFrame{
 	private final Map<ByteInfo, BufferedImage> byteCache=new HashMap<>();
 	
 	public Display(){
-		setSize(800, 800);
+		File f=new File("wind");
+		
+		try(var in=new BufferedReader(new FileReader(f))){
+			setLocation(Integer.parseInt(in.readLine()), Integer.parseInt(in.readLine()));
+			setSize(Integer.parseInt(in.readLine()), Integer.parseInt(in.readLine()));
+		}catch(Throwable ignored){
+			setSize(800, 800);
+			setLocationRelativeTo(null);
+		}
 		
 		var pan=new Pan();
 		pan.setBackground(Color.GRAY);
@@ -307,12 +321,26 @@ public class Display extends JFrame{
 		
 		addKeyListener(new KeyAdapter(){
 			@Override
-			public void keyTyped(KeyEvent e){
-				if(e.getKeyChar()=='a') setPos(getPos()-1);
-				if(e.getKeyChar()=='d') setPos(getPos()+1);
+			public void keyPressed(KeyEvent e){
+				if(e.getKeyChar()=='a'||e.getKeyCode()==37) setPos(getPos()-1);
+				if(e.getKeyChar()=='d'||e.getKeyCode()==39) setPos(getPos()+1);
 				setPos(MathUtil.snap(getPos(), 0, frames.size()-1));
-				
 				repaint();
+				
+				if(e.getKeyCode()==122){
+					dispose();
+					if(isUndecorated()){
+						setUndecorated(false);
+						setExtendedState(JFrame.NORMAL);
+						setSize(800, 800);
+						setVisible(true);
+						
+					}else{
+						setUndecorated(true);
+						setExtendedState(JFrame.MAXIMIZED_BOTH);
+						setVisible(true);
+					}
+				}
 			}
 		});
 		
@@ -322,6 +350,22 @@ public class Display extends JFrame{
 				setPixelsPerByte(300);
 				
 				repaint();
+			}
+			@Override
+			public void componentMoved(ComponentEvent e){
+				super.componentMoved(e);
+				if(!isUndecorated()){
+					try(var in=new BufferedWriter(new FileWriter(f))){
+						in.write(Integer.toString(getLocation().x));
+						in.newLine();
+						in.write(Integer.toString(getLocation().y));
+						in.newLine();
+						in.write(Integer.toString(getSize().width));
+						in.newLine();
+						in.write(Integer.toString(getSize().height));
+						in.newLine();
+					}catch(Throwable ignored){ }
+				}
 			}
 		});
 		
@@ -362,16 +406,19 @@ public class Display extends JFrame{
 		if(this.pixelsPerByte==pixelsPerByte) return;
 		this.pixelsPerByte=pixelsPerByte;
 		byteCache.clear();
+		shouldRerender=true;
 	}
 	
 	public void setPos(int pos){
 		if(this.pos==pos) return;
 		
 		this.pos=pos;
-		render=null;
+		shouldRerender=true;
 	}
 	
 	private void annotateStruct(Graphics2D g, int width, IOStruct.Instance instance){
+//		if(true) return;
+		
 		IOStruct typ=instance.structType();
 		
 		Random rand=new Random();
@@ -438,7 +485,8 @@ public class Display extends JFrame{
 		
 	}
 	
-	BufferedImage render;
+	boolean       shouldRerender=true;
+	BufferedImage render        =null;
 	
 	BufferedImage getByte(int value, Color color, boolean withChar){
 		return byteCache.computeIfAbsent(new ByteInfo(value, color, withChar), this::renderByte);
@@ -552,11 +600,13 @@ public class Display extends JFrame{
 	}
 	
 	
-	public void push(MemFrame frame){
+	@Override
+	public void log(MemFrame frame){
 		frames.add(frame);
 		setPos(frames.size()-1);
 		repaint();
 	}
+	
 	public int getPos(){
 		return pos;
 	}

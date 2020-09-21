@@ -1,5 +1,6 @@
 package com.lapissea.cfs.io.struct;
 
+import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
@@ -19,7 +20,8 @@ public class ValueRelations{
 	public record ValueInfo(
 		@NotNull StructImpl.Annotated<Field, ?> value,
 		Map<Class<? extends Annotation>, StructImpl.Annotated<Method, ?>> functions
-	){}
+	){
+	}
 	
 	private static final boolean VALIDATE_VALUE_INDEX="true".equalsIgnoreCase(System.getProperty("com.lapissea.cfs.struct.index_validate", "true"));
 	
@@ -81,7 +83,7 @@ public class ValueRelations{
 //			               .map(e->e.val().getName())
 //			               .collect(joining("\n"));
 //			if(!negs.isEmpty()){
-//				throw new IllegalArgumentException("Invalid negative indices assigned to values:\n"+negs);
+//				throw new MalformedStructLayout("Invalid negative indices assigned to values:\n"+negs);
 //			}
 			
 			var dups=groups.entrySet()
@@ -90,7 +92,7 @@ public class ValueRelations{
 			               .map(e->TextUtil.toString(e.getKey()+":", e.getValue().stream().map(an->an.val().getDeclaringClass().getSimpleName()+"."+an.val().getName())))
 			               .collect(joining("\n"));
 			if(!dups.isEmpty()){
-				throw new IllegalArgumentException("Values must not have duplicated indices:\n"+dups);
+				throw new MalformedStructLayout("Values must not have duplicated indices:\n"+dups);
 			}
 		}
 		

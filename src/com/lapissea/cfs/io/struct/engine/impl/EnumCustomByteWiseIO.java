@@ -1,5 +1,6 @@
 package com.lapissea.cfs.io.struct.engine.impl;
 
+import com.lapissea.cfs.Cluster;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
@@ -61,7 +62,7 @@ public class EnumCustomByteWiseIO<T extends Enum<T>> extends VariableNode.FixedS
 	}
 	
 	@Override
-	public T read(IOStruct.Instance target, ContentReader source, T oldVal) throws IOException{
+	public T read(IOStruct.Instance target, ContentReader source, T oldVal, Cluster cluster) throws IOException{
 		if(readFun!=null){
 			return readFun.read(target, source, oldVal);
 		}else{
@@ -72,7 +73,7 @@ public class EnumCustomByteWiseIO<T extends Enum<T>> extends VariableNode.FixedS
 	}
 	
 	@Override
-	public void write(IOStruct.Instance target, ContentWriter dest, T source) throws IOException{
+	public void write(IOStruct.Instance target, Cluster cluster, ContentWriter dest, T source) throws IOException{
 		if(writeFun!=null){
 			writeFun.write(target, dest, source);
 		}else{

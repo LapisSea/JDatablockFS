@@ -1,11 +1,9 @@
 package com.lapissea.cfs.objects;
 
-import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.struct.IOStruct;
 import com.lapissea.cfs.objects.chunk.Chunk;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.WeakValueHashMap;
-import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
 import java.lang.reflect.Constructor;
@@ -68,13 +66,17 @@ public class StructFlatList<T extends IOStruct.Instance> implements IOList<T>{
 	
 	private void write(int index, T value) throws IOException{
 		cache.remove(index);
-		data.ioAt(calcElementOffset(index), (UnsafeConsumer<RandomIO, IOException>)value::writeStruct);
+		data.ioAt(calcElementOffset(index), io->{
+			value.writeStruct(data.cluster, io);
+		});
 		cache.put(index, value);
 	}
 	
 	private T read(int index) throws IOException{
 		T val=constructor.get();
-		data.ioAt(calcElementOffset(index), (UnsafeConsumer<RandomIO, IOException>)val::readStruct);
+		data.ioAt(calcElementOffset(index), io->{
+			val.readStruct(data.cluster, io);
+		});
 		return val;
 	}
 	
@@ -156,7 +158,7 @@ public class StructFlatList<T extends IOStruct.Instance> implements IOList<T>{
 				  .write(lastData);
 			}else{
 				io.setPos(toOffset);
-				fromEl.writeStruct(io);
+				fromEl.writeStruct(data.cluster,io);
 				cache.put(oTo, fromEl);
 			}
 		});

@@ -13,7 +13,7 @@ import static com.lapissea.cfs.Config.*;
 
 public class ChunkIO implements RandomIO{
 	
-	private final Chunk head;
+	public final Chunk head;
 	
 	private Chunk cursor;
 	private long  cursorStart;

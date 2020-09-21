@@ -1,5 +1,6 @@
 package com.lapissea.cfs.io.struct.engine.impl;
 
+import com.lapissea.cfs.Cluster;
 import com.lapissea.cfs.exceptions.IllegalBitValueException;
 import com.lapissea.cfs.io.bit.FlagReader;
 import com.lapissea.cfs.io.bit.FlagWriter;
@@ -48,12 +49,12 @@ public class BitBlockNode extends VariableNode.FixedSize.Node<Object>{
 	
 	
 	@Override
-	public Object read(IOStruct.Instance target, ContentReader source, Object oldVal) throws IOException{
-		read(target, source);
+	public Object read(IOStruct.Instance target, ContentReader source, Object oldVal, Cluster cluster) throws IOException{
+		read(target, cluster,source);
 		return null;
 	}
 	@Override
-	public void read(IOStruct.Instance target, ContentReader source) throws IOException{
+	public void read(IOStruct.Instance target, Cluster cluster, ContentReader source) throws IOException{
 		classCheck(target);
 		
 		NumberSize size=blockInfo.wordSize();
@@ -121,12 +122,12 @@ public class BitBlockNode extends VariableNode.FixedSize.Node<Object>{
 	}
 	
 	@Override
-	public void write(IOStruct.Instance target, ContentWriter dest, Object source) throws IOException{
-		write(target, dest);
+	public void write(IOStruct.Instance target, Cluster cluster, ContentWriter dest, Object source) throws IOException{
+		write(target, cluster, dest);
 	}
 	
 	@Override
-	public void write(IOStruct.Instance target, ContentWriter dest) throws IOException{
+	public void write(IOStruct.Instance target, Cluster cluster, ContentWriter dest) throws IOException{
 		classCheck(target);
 		
 		try(var flags=new FlagWriter.AutoPop(blockInfo.wordSize(), dest)){

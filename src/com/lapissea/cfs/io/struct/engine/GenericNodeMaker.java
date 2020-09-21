@@ -3,22 +3,15 @@ package com.lapissea.cfs.io.struct.engine;
 import com.lapissea.cfs.io.ReaderWriter;
 import com.lapissea.cfs.io.struct.IOStruct;
 import com.lapissea.cfs.io.struct.IOStruct.Get.Getter;
-import com.lapissea.cfs.io.struct.IOStruct.Get.GetterB;
-import com.lapissea.cfs.io.struct.IOStruct.Get.GetterL;
 import com.lapissea.cfs.io.struct.IOStruct.Read.Reader;
 import com.lapissea.cfs.io.struct.IOStruct.Set.Setter;
-import com.lapissea.cfs.io.struct.IOStruct.Set.SetterB;
-import com.lapissea.cfs.io.struct.IOStruct.Set.SetterL;
 import com.lapissea.cfs.io.struct.IOStruct.Size.Sizer;
 import com.lapissea.cfs.io.struct.IOStruct.Write.Writer;
 import com.lapissea.cfs.io.struct.StructImpl;
 import com.lapissea.cfs.io.struct.ValueRelations;
 import com.lapissea.cfs.io.struct.VariableNode;
-import com.lapissea.cfs.io.struct.engine.impl.BoolIOImpl;
 import com.lapissea.cfs.io.struct.engine.impl.FixedGenericIOImpl;
 import com.lapissea.cfs.io.struct.engine.impl.GenericIOImpl;
-import com.lapissea.cfs.io.struct.engine.impl.LongIOImpl;
-import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.util.TextUtil;
 
 import java.lang.reflect.Field;
@@ -45,15 +38,7 @@ public class GenericNodeMaker<T> extends StructReflectionImpl.NodeMaker<T>{
 			valueField.setAccessible(true);
 		}
 		
-		var valueType=(Class<T>)valueField.getType();
-		
-		
-		if(valueType==boolean.class) return (VariableNode<T>)new BoolIOImpl(name, valueAnn.index(), valueField, GetterB.get(info), SetterB.get(info));
-		if(valueType==long.class){
-			var args=valueAnn.rwArgs();
-			var size=args.length>0?NumberSize.valueOf(args[0]):NumberSize.LONG;
-			return (VariableNode<T>)new LongIOImpl(name, valueAnn.index(), valueField, GetterL.get(info), SetterL.get(info), size);
-		}
+		var valueType=valueField.getGenericType();
 		
 		
 		Getter<T> getFun     =Getter.get(info, valueType);

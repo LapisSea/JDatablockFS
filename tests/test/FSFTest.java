@@ -18,39 +18,50 @@ import java.util.function.Supplier;
 class FSFTest{
 	
 	static{
-//		LogUtil.Init.attach(LogUtil.Init.USE_CALL_POS|LogUtil.Init.USE_TABULATED_HEADER);
+		System.setProperty("sun.java2d.opengl", "true");
+//		System.setProperty("sun.java2d.d3d", "true");
+//		Toolkit.getDefaultToolkit().setDynamicLayout(false);
+
+// 		LogUtil.Init.attach(LogUtil.Init.USE_CALL_POS|LogUtil.Init.USE_TABULATED_HEADER);
 	}
 	
 	
-	public static void main(String[] args) throws Throwable{
-		
-		LateInit<Display> display=new LateInit<>(Display::new);
-		
-		var preBuf=new LinkedList<MemFrame>();
-		
-		var mem=new MemoryData();
-		
+	public static void main(String[] args){
 		try{
+			
+			LateInit<DataLogger> display=new LateInit<>(()->{
+//				return new Display();
+				return f->{};
+			});
+			
+			var preBuf=new LinkedList<MemFrame>();
+			
+			var mem=new MemoryData();
+			
 			var cluster=new Cluster(mem);
 			
 			mem.onWrite=ids->{
 				preBuf.add(new MemFrame(mem.readAll(), ids, new Throwable()));
 				display.ifInited(d->{
 					while(!preBuf.isEmpty()){
-						d.push(preBuf.remove(0));
+						d.log(preBuf.remove(0));
 					}
 				});
 			};
 			
-			doTests(cluster);
+			try{
+				
+				doTests(cluster);
+				
+			}catch(Throwable e){
+				e.printStackTrace();
+			}finally{
+				display.block();
+				mem.onWrite.accept(ZeroArrays.ZERO_LONG);
+				display.get().finish();
+			}
 			
-		}catch(Throwable e){
-			e.printStackTrace();
-		}finally{
-			display.block();
-			mem.onWrite.accept(ZeroArrays.ZERO_LONG);
-		}
-		
+		}catch(Throwable e1){e1.printStackTrace();}
 		
 	}
 	

@@ -17,7 +17,120 @@ import java.util.stream.StreamSupport;
 
 public interface IOList<T> extends Iterable<T>{
 	
-	class Boxed<From, To> implements IOList<To>{
+	interface IBoxed<From, To> extends IOList<To>{
+		
+		@Override
+		default int size(){
+			return getData().size();
+		}
+		
+		@Override
+		default To getElement(int index) throws IOException{
+			return getUnboxer().apply(getData().getElement(index));
+		}
+		@Override
+		default void setElement(int index, To value) throws IOException{
+			getData().setElement(index, getBoxer().apply(value));
+		}
+		@Override
+		default void ensureCapacity(int elementCapacity) throws IOException{
+			getData().ensureCapacity(elementCapacity);
+		}
+		@Override
+		default void removeElement(int index) throws IOException{
+			getData().removeElement(index);
+		}
+		@Override
+		default void addElement(int index, To value) throws IOException{
+			getData().addElement(index, getBoxer().apply(value));
+		}
+		@Override
+		default void validate() throws IOException{
+			getData().validate();
+		}
+		@Override
+		default void free() throws IOException{
+			getData().free();
+		}
+		
+		@Override
+		default void addElement(To value) throws IOException{
+			getData().addElement(getBoxer().apply(value));
+		}
+		@Override
+		default To pop() throws IOException{
+			return getUnboxer().apply(getData().pop());
+		}
+		@Override
+		default boolean isEmpty(){
+			return getData().isEmpty();
+		}
+		@Override
+		default void modifyElement(int index, UnsafeFunction<To, To, IOException> modifier) throws IOException{
+			getData().modifyElement(index, e->getBoxer().apply(modifier.apply(getUnboxer().apply(e))));
+		}
+		@Override
+		default void clear() throws IOException{
+			getData().clear();
+		}
+		
+		@Override
+		default boolean contains(To ptr) throws IOException{
+			return getData().contains(getBoxer().apply(ptr));
+		}
+		@Override
+		default int indexOf(To value) throws IOException{
+			return getData().indexOf(getBoxer().apply(value));
+		}
+		@Override
+		default int find(UnsafePredicate<To, IOException> matcher) throws IOException{
+			return getData().find(e->matcher.test(getUnboxer().apply(e)));
+		}
+		@Override
+		default int indexOfLast(To value) throws IOException{
+			return getData().indexOfLast(getBoxer().apply(value));
+		}
+		@Override
+		default int findLast(UnsafePredicate<To, IOException> matcher) throws IOException{
+			return getData().findLast(e->matcher.test(getUnboxer().apply(e)));
+		}
+		@Override
+		default int count(UnsafePredicate<To, IOException> matcher) throws IOException{
+			return getData().count(e->matcher.test(getUnboxer().apply(e)));
+		}
+		
+		@Override
+		default Stream<To> stream(){
+			return getData().stream().map(getUnboxer());
+		}
+		
+		@NotNull
+		@Override
+		default Iterator<To> iterator(){
+			Iterator<From> source=getData().iterator();
+			return new Iterator<>(){
+				@Override
+				public boolean hasNext(){
+					return source.hasNext();
+				}
+				@Override
+				public To next(){
+					return getUnboxer().apply(source.next());
+				}
+				@Override
+				public void remove(){
+					source.remove();
+				}
+			};
+		}
+		
+		
+		IOList<From> getData();
+		Function<From, To> getUnboxer();
+		Function<To, From> getBoxer();
+	}
+	
+	class Boxed<From, To> implements IBoxed<From, To>{
 		private final IOList<From> data;
 		
 		private final Function<From, To> unboxer;
@@ -27,123 +140,26 @@ public interface IOList<T> extends Iterable<T>{
 			this.unboxer=unboxer;
 			this.boxer=boxer;
 		}
+		
 		@Override
 		public String toString(){
 			return stream().map(TextUtil.SHORT_TO_STRINGS::toString).collect(Collectors.joining(", ", "[", "]"));
 		}
-		
 		@Override
 		public int hashCode(){
-			return data.hashCode();
-		}
-		
-		@Override
-		public int size(){
-			return data.size();
-		}
-		
-		@Override
-		public To getElement(int index) throws IOException{
-			return unboxer.apply(data.getElement(index));
+			return getData().hashCode();
 		}
 		@Override
-		public void setElement(int index, To value) throws IOException{
-			data.setElement(index, boxer.apply(value));
-		}
-		@Override
-		public void ensureCapacity(int elementCapacity) throws IOException{
-			data.ensureCapacity(elementCapacity);
-		}
-		@Override
-		public void removeElement(int index) throws IOException{
-			data.removeElement(index);
-		}
-		@Override
-		public void addElement(int index, To value) throws IOException{
-			data.addElement(index, boxer.apply(value));
-		}
-		@Override
-		public void validate() throws IOException{
-			data.validate();
-		}
-		@Override
-		public void free() throws IOException{
-			data.free();
-		}
-		
-		@Override
-		public void addElement(To value) throws IOException{
-			data.addElement(boxer.apply(value));
-		}
-		@Override
-		public To pop() throws IOException{
-			return unboxer.apply(data.pop());
-		}
-		@Override
-		public boolean isEmpty(){
-			return data.isEmpty();
-		}
-		@Override
-		public void modifyElement(int index, UnsafeFunction<To, To, IOException> modifier) throws IOException{
-			data.modifyElement(index, e->boxer.apply(modifier.apply(unboxer.apply(e))));
-		}
-		@Override
-		public void clear() throws IOException{
-			data.clear();
-		}
-		
-		@Override
-		public boolean contains(To ptr) throws IOException{
-			return data.contains(boxer.apply(ptr));
-		}
-		@Override
-		public int indexOf(To value) throws IOException{
-			return data.indexOf(boxer.apply(value));
-		}
-		@Override
-		public int find(UnsafePredicate<To, IOException> matcher) throws IOException{
-			return data.find(e->matcher.test(unboxer.apply(e)));
-		}
-		@Override
-		public int indexOfLast(To value) throws IOException{
-			return data.indexOfLast(boxer.apply(value));
-		}
-		@Override
-		public int findLast(UnsafePredicate<To, IOException> matcher) throws IOException{
-			return data.findLast(e->matcher.test(unboxer.apply(e)));
-		}
-		@Override
-		public int count(UnsafePredicate<To, IOException> matcher) throws IOException{
-			return data.count(e->matcher.test(unboxer.apply(e)));
-		}
-		
-		@Override
-		public Stream<To> stream(){
-			return data.stream().map(unboxer);
-		}
-		
-		@NotNull
-		@Override
-		public Iterator<To> iterator(){
-			Iterator<From> source=data.iterator();
-			return new Iterator<>(){
-				@Override
-				public boolean hasNext(){
-					return source.hasNext();
-				}
-				@Override
-				public To next(){
-					return unboxer.apply(source.next());
-				}
-				@Override
-				public void remove(){
-					source.remove();
-				}
-			};
-		}
-		
-		public IOList<From> getUnboxed(){
+		public IOList<From> getData(){
 			return data;
+		}
+		@Override
+		public Function<From, To> getUnboxer(){
+			return unboxer;
+		}
+		@Override
+		public Function<To, From> getBoxer(){
+			return boxer;
 		}
 	}
 	

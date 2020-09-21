@@ -1,5 +1,6 @@
 package com.lapissea.cfs.io;
 
+import com.lapissea.cfs.Cluster;
 import com.lapissea.cfs.io.content.ContentInputStream;
 import com.lapissea.cfs.io.content.ContentOutputStream;
 import com.lapissea.cfs.io.content.ContentReader;
@@ -75,8 +76,8 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader, Sizab
 			return io().setPos(offset);
 		}
 		
-		default <T extends IOStruct.Instance> T storeTo(T dest) throws IOException{
-			io(dest::readStruct);
+		default <T extends IOStruct.Instance> T storeTo(Cluster cluster, T dest) throws IOException{
+			io(io->dest.readStruct(cluster,io));
 			return dest;
 		}
 		

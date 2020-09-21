@@ -21,9 +21,9 @@ import static com.lapissea.cfs.Config.*;
 import static com.lapissea.cfs.io.struct.IOStruct.*;
 
 @SuppressWarnings("AutoBoxing")
-public class StructLinkedList<T extends IOStruct.Instance> extends IOStruct.Instance.Contained implements IOList<T>{
+public class StructLinkedList<T extends IOStruct.Instance> extends IOStruct.Instance.Contained.SingletonChunk implements IOList<T>{
 	
-	private static class Node extends IOStruct.Instance.Contained{
+	private static class Node extends IOStruct.Instance.Contained.SingletonChunk{
 		
 		@SuppressWarnings("unchecked")
 		private static final VariableNode<ChunkPointer> NEXT_VAR=(VariableNode<ChunkPointer>)(VariableNode<?>)IOStruct.thisClass().variables.get(0);
@@ -38,11 +38,13 @@ public class StructLinkedList<T extends IOStruct.Instance> extends IOStruct.Inst
 		IOStruct.Instance value;
 		
 		public Node(UnsafeFunction<Chunk, ? extends IOStruct.Instance, IOException> constructor){
+			super(0);
 			this.constructor=constructor;
 		}
 		
 		@Write
 		void writeValue(ContentWriter dest, IOStruct.Instance source) throws IOException{
+			Objects.requireNonNull(container);
 			
 			var off=getStructOffset()+calcVarOffset(2).getOffset();
 			if(DEBUG_VALIDATION){
@@ -51,7 +53,7 @@ public class StructLinkedList<T extends IOStruct.Instance> extends IOStruct.Inst
 				}
 			}
 			
-			source.writeStruct(dest, off);
+			source.writeStruct(container.cluster, dest, off);
 		}
 		
 		@Read
@@ -65,7 +67,7 @@ public class StructLinkedList<T extends IOStruct.Instance> extends IOStruct.Inst
 				}
 			}
 			
-			val.readStruct(source, off);
+			val.readStruct(container.cluster, source, off);
 			return val;
 		}
 		
@@ -92,12 +94,13 @@ public class StructLinkedList<T extends IOStruct.Instance> extends IOStruct.Inst
 		}
 		
 		@Override
-		protected RandomIO getStructSourceIO() throws IOException{
-			return container.io();
+		public Chunk getContainer(){
+			return container;
 		}
 		
 		void allocContainer(Cluster cluster) throws IOException{
-			container=cluster.allocWrite(this);
+			container=cluster.alloc(getInstanceSize());
+			writeStruct();
 		}
 		
 		void initContainer(Chunk chunk) throws IOException{
@@ -132,6 +135,8 @@ public class StructLinkedList<T extends IOStruct.Instance> extends IOStruct.Inst
 		this(container, c->constructor.get());
 	}
 	public StructLinkedList(Chunk container, UnsafeFunction<Chunk, T, IOException> constructor){
+		super(container.getPtr());
+		
 		this.container=container;
 		this.constructor=constructor;
 	}
@@ -194,7 +199,7 @@ public class StructLinkedList<T extends IOStruct.Instance> extends IOStruct.Inst
 		for(int i=start;i<index;i++){
 			resultPtr=resultPtr.dereference(cluster())
 			                   .ioAt(Node.NEXT_VAR.getKnownOffset().getOffset(), io->{
-				                   Node.NEXT_VAR.read(result, io);
+				                   Node.NEXT_VAR.read(result, cluster(), io);
 				                   return result.next;
 			                   });
 		}
@@ -364,11 +369,6 @@ public class StructLinkedList<T extends IOStruct.Instance> extends IOStruct.Inst
 	
 	
 	@Override
-	protected RandomIO getStructSourceIO() throws IOException{
-		return container.io();
-	}
-	
-	@Override
 	public String toString(){
 		return stream().map(Instance::toShortString).collect(Collectors.joining(", ", "[", "]"));
 	}
@@ -378,24 +378,30 @@ public class StructLinkedList<T extends IOStruct.Instance> extends IOStruct.Inst
 	
 	@Override
 	public void clear() throws IOException{
-		List<Chunk> tofree=new ArrayList<>();
+		List<Chunk> toFree=new ArrayList<>();
 		for(int i=0;i<size();i++){
-			tofree.addAll(getNode(i).container.collectNext());
+			toFree.addAll(getNode(i).container.collectNext());
 		}
 		
 		size=0;
 		first=null;
+		nodeCache.clear();
 		writeStruct();
 		
-		for(Chunk chunk : tofree){
+		for(Chunk chunk : toFree){
 			chunk.modifyAndSave(ch->{
 				ch.setSize(0);
 				ch.setUsed(false);
 			});
 		}
 		
-		cluster().free(tofree);
+		cluster().free(toFree);
+		
 		
 		validate();
+	}
+	@Override
+	public Chunk getContainer(){
+		return container;
 	}
 }

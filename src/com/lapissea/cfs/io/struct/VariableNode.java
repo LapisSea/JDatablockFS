@@ -1,5 +1,6 @@
 package com.lapissea.cfs.io.struct;
 
+import com.lapissea.cfs.Cluster;
 import com.lapissea.cfs.io.bit.FlagReader;
 import com.lapissea.cfs.io.bit.FlagWriter;
 import com.lapissea.cfs.io.content.ContentReader;
@@ -165,7 +166,7 @@ public abstract class VariableNode<ValTyp>{
 		
 		@Deprecated
 		@Override
-		public ValTyp read(IOStruct.Instance target, ContentReader source, ValTyp oldVal) throws IOException{
+		public ValTyp read(IOStruct.Instance target, ContentReader source, ValTyp oldVal, Cluster cluster) throws IOException{
 			try(var flags=FlagReader.read(source, individualSize)){
 				return readData(target, flags, oldVal);
 			}
@@ -173,7 +174,7 @@ public abstract class VariableNode<ValTyp>{
 		
 		@Deprecated
 		@Override
-		public void write(IOStruct.Instance target, ContentWriter dest, ValTyp source) throws IOException{
+		public void write(IOStruct.Instance target, Cluster cluster, ContentWriter dest, ValTyp source) throws IOException{
 			try(var flags=new FlagWriter.AutoPop(individualSize, dest)){
 				writeData(target, flags, source);
 			}
@@ -202,10 +203,10 @@ public abstract class VariableNode<ValTyp>{
 		}
 		
 		@Override
-		public abstract void read(IOStruct.Instance target, ContentReader source) throws IOException;
+		public abstract void read(IOStruct.Instance target, Cluster cluster, ContentReader source) throws IOException;
 		
 		@Override
-		public abstract void write(IOStruct.Instance target, ContentWriter dest) throws IOException;
+		public abstract void write(IOStruct.Instance target, Cluster cluster, ContentWriter dest) throws IOException;
 		
 		@Override
 		public abstract long mapSize(IOStruct.Instance target);
@@ -218,10 +219,10 @@ public abstract class VariableNode<ValTyp>{
 		protected final void setValue(IOStruct.Instance target, T newValue){ throw new UnsupportedOperationException(toString()); }
 		@Deprecated
 		@Override
-		protected final T read(IOStruct.Instance target, ContentReader source, T oldVal){ throw new UnsupportedOperationException(toString()); }
+		protected final T read(IOStruct.Instance target, ContentReader source, T oldVal, Cluster cluster){ throw new UnsupportedOperationException(toString()); }
 		@Deprecated
 		@Override
-		protected final void write(IOStruct.Instance target, ContentWriter dest, T source){ throw new UnsupportedOperationException(toString()); }
+		protected final void write(IOStruct.Instance target, Cluster cluster, ContentWriter dest, T source){ throw new UnsupportedOperationException(toString()); }
 		@Deprecated
 		@Override
 		public long mapSize(IOStruct.Instance target, T value){ throw new UnsupportedOperationException(toString());}
@@ -239,14 +240,14 @@ public abstract class VariableNode<ValTyp>{
 		protected abstract void write(IOStruct.Instance target, ContentWriter dest, long source) throws IOException;
 		
 		@Override
-		public void read(IOStruct.Instance target, ContentReader source) throws IOException{
+		public void read(IOStruct.Instance target, Cluster cluster, ContentReader source) throws IOException{
 			var oldVal=get(target);
 			var newVal=read(target, source, oldVal);
 			set(target, newVal);
 		}
 		
 		@Override
-		public void write(IOStruct.Instance target, ContentWriter dest) throws IOException{
+		public void write(IOStruct.Instance target, Cluster cluster, ContentWriter dest) throws IOException{
 			write(target, dest, get(target));
 		}
 		
@@ -268,14 +269,14 @@ public abstract class VariableNode<ValTyp>{
 		protected abstract void write(IOStruct.Instance target, ContentWriter dest, int source) throws IOException;
 		
 		@Override
-		public void read(IOStruct.Instance target, ContentReader source) throws IOException{
+		public void read(IOStruct.Instance target, Cluster cluster, ContentReader source) throws IOException{
 			var oldVal=get(target);
 			var newVal=read(target, source, oldVal);
 			set(target, newVal);
 		}
 		
 		@Override
-		public void write(IOStruct.Instance target, ContentWriter dest) throws IOException{
+		public void write(IOStruct.Instance target, Cluster cluster, ContentWriter dest) throws IOException{
 			write(target, dest, get(target));
 		}
 		
@@ -302,19 +303,19 @@ public abstract class VariableNode<ValTyp>{
 	
 	protected abstract long mapSize(IOStruct.Instance target, ValTyp value);
 	
-	protected abstract ValTyp read(IOStruct.Instance target, ContentReader source, ValTyp oldVal) throws IOException;
+	protected abstract ValTyp read(IOStruct.Instance target, ContentReader source, ValTyp oldVal, Cluster cluster) throws IOException;
 	
-	protected abstract void write(IOStruct.Instance target, ContentWriter dest, ValTyp source) throws IOException;
+	protected abstract void write(IOStruct.Instance target, Cluster cluster, ContentWriter dest, ValTyp source) throws IOException;
 	
 	
-	public void read(IOStruct.Instance target, ContentReader source) throws IOException{
+	public void read(IOStruct.Instance target, Cluster cluster, ContentReader source) throws IOException{
 		var oldVal=getValue(target);
-		var newVal=read(target, source, oldVal);
+		var newVal=read(target, source, oldVal, cluster);
 		setValue(target, newVal);
 	}
 	
-	public void write(IOStruct.Instance target, ContentWriter dest) throws IOException{
-		write(target, dest, getValue(target));
+	public void write(IOStruct.Instance target, Cluster cluster, ContentWriter dest) throws IOException{
+		write(target, cluster, dest, getValue(target));
 	}
 	
 	public long mapSize(IOStruct.Instance target){

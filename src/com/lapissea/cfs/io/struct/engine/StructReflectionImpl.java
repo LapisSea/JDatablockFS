@@ -1,6 +1,7 @@
 package com.lapissea.cfs.io.struct.engine;
 
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.io.struct.IOStruct;
 import com.lapissea.cfs.io.struct.StructImpl;
 import com.lapissea.cfs.io.struct.ValueRelations;
@@ -26,7 +27,12 @@ public class StructReflectionImpl implements StructImpl{
 	public abstract static class NodeMaker<Base>{
 		
 		
-		public record FunDef(Type returnType, Arg... args){
+		public record FunDef(Throwable t, Type returnType, Arg... args){
+			
+			public FunDef(Type returnType, Arg... args){
+				this(new Throwable(), returnType, args);
+			}
+			
 			public record Arg(Type type, String name){
 				@Override
 				public String toString(){
@@ -47,15 +53,17 @@ public class StructReflectionImpl implements StructImpl{
 				if(ay==null) return null;
 				var f=ay.val();
 				
-				if(!f.getGenericReturnType().equals(returnType())){
-					throw new IllegalStateException(f+" should return "+TextUtil.toString(returnType()));
+				var retCheck=f.getGenericReturnType();
+				if(!retCheck.equals(returnType())){
+					t.printStackTrace();
+					throw new MalformedStructLayout(f+" should return "+TextUtil.toString(returnType())+" but returns "+retCheck);
 				}
 				var args1=f.getGenericParameterTypes();
 				
-				if(args1.length!=args.length) throw new IllegalStateException(f+"\nshould have arguments\n"+Arrays.stream(args).map(TextUtil::toString).collect(joining("\n")));
+				if(args1.length!=args.length) throw new MalformedStructLayout(f+"\nshould have arguments\n"+Arrays.stream(args).map(TextUtil::toString).collect(joining("\n")));
 				
 				for(int i=0;i<args1.length;i++){
-					if(!args1[i].equals(args[i].type)) throw new IllegalStateException(f+"\nshould have arguments\n"+Arrays.stream(args).map(TextUtil::toString).collect(joining("\n")));
+					if(!args1[i].equals(args[i].type)) throw new MalformedStructLayout(f+"\nshould have arguments\n"+Arrays.stream(args).map(TextUtil::toString).collect(joining("\n")));
 				}
 				
 				return Utils.makeLambda(f, fInter);
@@ -69,7 +77,8 @@ public class StructReflectionImpl implements StructImpl{
 	private static final Map<Class<? extends Annotation>, NodeMaker<?>> NODE_MAKERS=Map.ofEntries(
 		new SimpleEntry<>(IOStruct.EnumValue.class, new EnumNodeMaker<>()),
 		new SimpleEntry<>(IOStruct.Value.class, new GenericNodeMaker<>()),
-		new SimpleEntry<>(IOStruct.PrimitiveValue.class, new PrimitiveNodeMaker<>())
+		new SimpleEntry<>(IOStruct.PrimitiveValue.class, new PrimitiveNodeMaker<>()),
+		new SimpleEntry<>(IOStruct.PointerValue.class, new PointerNodeMaker<>())
 	);
 	
 	private VariableNode<?> infoToNode(Class<?> clazz, String name, ValueRelations.ValueInfo info){

@@ -1,6 +1,5 @@
 package com.lapissea.cfs.io.struct.engine;
 
-import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.io.bit.EnumFlag;
 import com.lapissea.cfs.io.struct.IOStruct;
 import com.lapissea.cfs.io.struct.IOStruct.Get.Getter;
@@ -12,8 +11,10 @@ import com.lapissea.cfs.io.struct.ValueRelations;
 import com.lapissea.cfs.io.struct.VariableNode;
 import com.lapissea.cfs.io.struct.engine.impl.EnumCustomByteWiseIO;
 import com.lapissea.cfs.io.struct.engine.impl.EnumPaddedDefaultImpl;
+import com.lapissea.cfs.objects.NumberSize;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Type;
 
 public class EnumNodeMaker<T extends Enum<T>> extends StructReflectionImpl.NodeMaker<T>{
 	
@@ -50,10 +51,11 @@ public class EnumNodeMaker<T extends Enum<T>> extends StructReflectionImpl.NodeM
 		
 		int totalBits=flagInfo.bits+paddingBits;
 		
-		Getter<T> getFun  =Getter.get(info, enumType);
-		Setter<T> setFun  =Setter.get(info, enumType);
-		Reader<T> readFun =Reader.get(info, enumType);
-		Writer<T> writeFun=Writer.get(info, enumType);
+		Type      type    =valueField.getGenericType();
+		Getter<T> getFun  =Getter.get(info, type);
+		Setter<T> setFun  =Setter.get(info, type);
+		Reader<T> readFun =Reader.get(info, type);
+		Writer<T> writeFun=Writer.get(info, type);
 		
 		if(readFun!=null||writeFun!=null){
 			NumberSize numberSize=NumberSize.byBits(totalBits);
