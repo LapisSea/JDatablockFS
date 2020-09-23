@@ -2,6 +2,7 @@ package com.lapissea.cfs.io.struct.engine.impl;
 
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
+import com.lapissea.cfs.io.struct.IOInstance;
 import com.lapissea.cfs.io.struct.IOStruct;
 import com.lapissea.cfs.io.struct.VariableNode;
 import com.lapissea.cfs.objects.NumberSize;
@@ -27,7 +28,7 @@ public class IntIOImpl extends VariableNode.PrimitiveInt implements VariableNode
 	}
 	
 	@Override
-	protected int get(IOStruct.Instance source){
+	protected int get(IOInstance source){
 		if(getFun!=null) return getFun.getValue(source);
 		else{
 			try{
@@ -39,7 +40,7 @@ public class IntIOImpl extends VariableNode.PrimitiveInt implements VariableNode
 	}
 	
 	@Override
-	protected void set(IOStruct.Instance target, int newValue){
+	protected void set(IOInstance target, int newValue){
 		if(getFun!=null) setFun.setValue(target, newValue);
 		else{
 			try{
@@ -52,12 +53,12 @@ public class IntIOImpl extends VariableNode.PrimitiveInt implements VariableNode
 	
 	
 	@Override
-	protected int read(IOStruct.Instance target, ContentReader source, int oldVal) throws IOException{
+	protected int read(IOInstance target, ContentReader source, int oldVal) throws IOException{
 		return (int)size.read(source);
 	}
 	
 	@Override
-	protected void write(IOStruct.Instance target, ContentWriter dest, int source) throws IOException{
+	protected void write(IOInstance target, ContentWriter dest, int source) throws IOException{
 		size.write(dest, source);
 	}
 	
@@ -72,7 +73,7 @@ public class IntIOImpl extends VariableNode.PrimitiveInt implements VariableNode
 	
 	@Deprecated
 	@Override
-	public long mapSize(IOStruct.Instance target){
+	public long mapSize(IOInstance target){
 		return getSize();
 	}
 }

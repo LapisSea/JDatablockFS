@@ -1,5 +1,6 @@
 package com.lapissea.cfs.objects;
 
+import com.lapissea.cfs.io.struct.IOInstance;
 import com.lapissea.cfs.io.struct.IOStruct;
 import com.lapissea.cfs.objects.chunk.Chunk;
 import com.lapissea.util.TextUtil;
@@ -14,7 +15,7 @@ import java.util.function.Supplier;
 
 import static com.lapissea.cfs.Config.*;
 
-public class StructFlatList<T extends IOStruct.Instance> implements IOList<T>{
+public class StructFlatList<T extends IOInstance> implements IOList<T>{
 	
 	private Chunk data;
 	private int   size;
@@ -26,7 +27,7 @@ public class StructFlatList<T extends IOStruct.Instance> implements IOList<T>{
 	private final Map<Integer, T> cache=new WeakValueHashMap<>();
 	
 	
-	private static <T extends IOStruct.Instance> Supplier<T> makeConstructor(Class<T> type){
+	private static <T extends IOInstance> Supplier<T> makeConstructor(Class<T> type){
 		Constructor<T> c;
 		try{
 			c=type.getConstructor();
@@ -51,7 +52,7 @@ public class StructFlatList<T extends IOStruct.Instance> implements IOList<T>{
 		this.data=data;
 		this.constructor=constructor;
 		
-		IOStruct struct=constructor.get().structType();
+		IOStruct struct=constructor.get().getStruct();
 		elementSize=Math.toIntExact(struct.requireKnownSize());
 		
 		calcSize();

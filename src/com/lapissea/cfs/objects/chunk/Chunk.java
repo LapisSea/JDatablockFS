@@ -5,6 +5,7 @@ import com.lapissea.cfs.exceptions.IllegalBitValueException;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
+import com.lapissea.cfs.io.struct.IOInstance;
 import com.lapissea.cfs.io.struct.IOStruct;
 import com.lapissea.cfs.io.struct.IOStruct.EnumValue;
 import com.lapissea.cfs.io.struct.IOStruct.PrimitiveValue;
@@ -24,7 +25,7 @@ import java.util.Objects;
 
 import static com.lapissea.cfs.Config.*;
 
-public class Chunk extends IOStruct.Instance.Contained implements Iterable<Chunk>, RandomIO.Creator{
+public class Chunk extends IOInstance.Contained implements Iterable<Chunk>, RandomIO.Creator{
 	private static final IOStruct THIS_TYP=IOStruct.thisClass();
 	
 	public static Chunk read(Cluster cluster, ChunkPointer ptr) throws IOException{

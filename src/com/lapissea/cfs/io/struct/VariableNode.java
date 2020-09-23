@@ -36,7 +36,7 @@ public abstract class VariableNode<ValTyp>{
 			 */
 			@Deprecated
 			@Override
-			public long mapSize(IOStruct.Instance target, ValTyp value){
+			public long mapSize(IOInstance target, ValTyp value){
 				return getSize();
 			}
 			
@@ -45,7 +45,7 @@ public abstract class VariableNode<ValTyp>{
 			 */
 			@Deprecated
 			@Override
-			public long mapSize(IOStruct.Instance target){ return getSize(); }
+			public long mapSize(IOInstance target){ return getSize(); }
 			
 			@Override
 			public OptionalLong getMaximumSize(){
@@ -56,7 +56,7 @@ public abstract class VariableNode<ValTyp>{
 		
 		long getSize();
 		
-		static long getSizeUnknown(IOStruct.Instance target, VariableNode<?> v){
+		static long getSizeUnknown(IOInstance target, VariableNode<?> v){
 			return v instanceof FixedSize f?f.getSize():v.mapSize(target);
 		}
 	}
@@ -161,12 +161,12 @@ public abstract class VariableNode<ValTyp>{
 			return bitSize+paddingBits;
 		}
 		
-		protected abstract ValTyp readData(IOStruct.Instance target, FlagReader source, ValTyp oldVal);
-		protected abstract void writeData(IOStruct.Instance target, FlagWriter dest, ValTyp source);
+		protected abstract ValTyp readData(IOInstance target, FlagReader source, ValTyp oldVal);
+		protected abstract void writeData(IOInstance target, FlagWriter dest, ValTyp source);
 		
 		@Deprecated
 		@Override
-		public ValTyp read(IOStruct.Instance target, ContentReader source, ValTyp oldVal, Cluster cluster) throws IOException{
+		public ValTyp read(IOInstance target, ContentReader source, ValTyp oldVal, Cluster cluster) throws IOException{
 			try(var flags=FlagReader.read(source, individualSize)){
 				return readData(target, flags, oldVal);
 			}
@@ -174,20 +174,20 @@ public abstract class VariableNode<ValTyp>{
 		
 		@Deprecated
 		@Override
-		public void write(IOStruct.Instance target, Cluster cluster, ContentWriter dest, ValTyp source) throws IOException{
+		public void write(IOInstance target, Cluster cluster, ContentWriter dest, ValTyp source) throws IOException{
 			try(var flags=new FlagWriter.AutoPop(individualSize, dest)){
 				writeData(target, flags, source);
 			}
 		}
 		
 		
-		public final void write(IOStruct.Instance target, FlagWriter dest){
+		public final void write(IOInstance target, FlagWriter dest){
 			ValTyp source=getValue(target);
 			writeData(target, dest, source);
 			dest.fillNOne(paddingBits);
 		}
 		
-		public final void read(IOStruct.Instance target, FlagReader source){
+		public final void read(IOInstance target, FlagReader source){
 			var oldVal=getValue(target);
 			var newVal=readData(target, source, oldVal);
 			source.checkNOneAndThrow(paddingBits);
@@ -203,29 +203,29 @@ public abstract class VariableNode<ValTyp>{
 		}
 		
 		@Override
-		public abstract void read(IOStruct.Instance target, Cluster cluster, ContentReader source) throws IOException;
+		public abstract void read(IOInstance target, Cluster cluster, ContentReader source) throws IOException;
 		
 		@Override
-		public abstract void write(IOStruct.Instance target, Cluster cluster, ContentWriter dest) throws IOException;
+		public abstract void write(IOInstance target, Cluster cluster, ContentWriter dest) throws IOException;
 		
 		@Override
-		public abstract long mapSize(IOStruct.Instance target);
+		public abstract long mapSize(IOInstance target);
 		
 		@Deprecated
 		@Override
-		protected final T getValue(IOStruct.Instance source){ throw new UnsupportedOperationException(toString()); }
+		protected final T getValue(IOInstance source){ throw new UnsupportedOperationException(toString()); }
 		@Deprecated
 		@Override
-		protected final void setValue(IOStruct.Instance target, T newValue){ throw new UnsupportedOperationException(toString()); }
+		protected final void setValue(IOInstance target, T newValue){ throw new UnsupportedOperationException(toString()); }
 		@Deprecated
 		@Override
-		protected final T read(IOStruct.Instance target, ContentReader source, T oldVal, Cluster cluster){ throw new UnsupportedOperationException(toString()); }
+		protected final T read(IOInstance target, ContentReader source, T oldVal, Cluster cluster){ throw new UnsupportedOperationException(toString()); }
 		@Deprecated
 		@Override
-		protected final void write(IOStruct.Instance target, Cluster cluster, ContentWriter dest, T source){ throw new UnsupportedOperationException(toString()); }
+		protected final void write(IOInstance target, Cluster cluster, ContentWriter dest, T source){ throw new UnsupportedOperationException(toString()); }
 		@Deprecated
 		@Override
-		public long mapSize(IOStruct.Instance target, T value){ throw new UnsupportedOperationException(toString());}
+		public long mapSize(IOInstance target, T value){ throw new UnsupportedOperationException(toString());}
 		
 	}
 	
@@ -234,27 +234,26 @@ public abstract class VariableNode<ValTyp>{
 		protected PrimitiveLong(String name, int index){
 			super(name, index);
 		}
-		protected abstract long get(IOStruct.Instance source);
-		protected abstract void set(IOStruct.Instance target, long newValue);
-		protected abstract long read(IOStruct.Instance target, ContentReader source, long oldVal) throws IOException;
-		protected abstract void write(IOStruct.Instance target, ContentWriter dest, long source) throws IOException;
+		protected abstract long get(IOInstance source);
+		protected abstract void set(IOInstance target, long newValue);
+		protected abstract long read(IOInstance target, ContentReader source, long oldVal) throws IOException;
+		protected abstract void write(IOInstance target, ContentWriter dest, long source) throws IOException;
 		
 		@Override
-		public void read(IOStruct.Instance target, Cluster cluster, ContentReader source) throws IOException{
+		public void read(IOInstance target, Cluster cluster, ContentReader source) throws IOException{
 			var oldVal=get(target);
 			var newVal=read(target, source, oldVal);
 			set(target, newVal);
 		}
 		
 		@Override
-		public void write(IOStruct.Instance target, Cluster cluster, ContentWriter dest) throws IOException{
+		public void write(IOInstance target, Cluster cluster, ContentWriter dest) throws IOException{
 			write(target, dest, get(target));
 		}
 		
-		@SuppressWarnings("AutoBoxing")
 		@Override
-		public SimpleEntry<String, Object> toString(IOStruct.Instance instance){
-			return new SimpleEntry<>(name, get(instance));
+		public Long getValueAsObj(IOInstance source){
+			return get(source);
 		}
 	}
 	
@@ -263,27 +262,26 @@ public abstract class VariableNode<ValTyp>{
 		protected PrimitiveInt(String name, int index){
 			super(name, index);
 		}
-		protected abstract int get(IOStruct.Instance source);
-		protected abstract void set(IOStruct.Instance target, int newValue);
-		protected abstract int read(IOStruct.Instance target, ContentReader source, int oldVal) throws IOException;
-		protected abstract void write(IOStruct.Instance target, ContentWriter dest, int source) throws IOException;
+		protected abstract int get(IOInstance source);
+		protected abstract void set(IOInstance target, int newValue);
+		protected abstract int read(IOInstance target, ContentReader source, int oldVal) throws IOException;
+		protected abstract void write(IOInstance target, ContentWriter dest, int source) throws IOException;
 		
 		@Override
-		public void read(IOStruct.Instance target, Cluster cluster, ContentReader source) throws IOException{
+		public void read(IOInstance target, Cluster cluster, ContentReader source) throws IOException{
 			var oldVal=get(target);
 			var newVal=read(target, source, oldVal);
 			set(target, newVal);
 		}
 		
 		@Override
-		public void write(IOStruct.Instance target, Cluster cluster, ContentWriter dest) throws IOException{
+		public void write(IOInstance target, Cluster cluster, ContentWriter dest) throws IOException{
 			write(target, dest, get(target));
 		}
 		
-		@SuppressWarnings("AutoBoxing")
 		@Override
-		public SimpleEntry<String, Object> toString(IOStruct.Instance instance){
-			return new SimpleEntry<>(name, get(instance));
+		public Integer getValueAsObj(IOInstance source){
+			return get(source);
 		}
 	}
 	
@@ -297,28 +295,32 @@ public abstract class VariableNode<ValTyp>{
 		this.index=index;
 	}
 	
-	protected abstract ValTyp getValue(IOStruct.Instance source);
+	public ValTyp getValueAsObj(IOInstance source){
+		return getValue(source);
+	}
 	
-	protected abstract void setValue(IOStruct.Instance target, ValTyp newValue);
+	protected abstract ValTyp getValue(IOInstance source);
 	
-	protected abstract long mapSize(IOStruct.Instance target, ValTyp value);
+	protected abstract void setValue(IOInstance target, ValTyp newValue);
 	
-	protected abstract ValTyp read(IOStruct.Instance target, ContentReader source, ValTyp oldVal, Cluster cluster) throws IOException;
+	protected abstract long mapSize(IOInstance target, ValTyp value);
 	
-	protected abstract void write(IOStruct.Instance target, Cluster cluster, ContentWriter dest, ValTyp source) throws IOException;
+	protected abstract ValTyp read(IOInstance target, ContentReader source, ValTyp oldVal, Cluster cluster) throws IOException;
+	
+	protected abstract void write(IOInstance target, Cluster cluster, ContentWriter dest, ValTyp source) throws IOException;
 	
 	
-	public void read(IOStruct.Instance target, Cluster cluster, ContentReader source) throws IOException{
+	public void read(IOInstance target, Cluster cluster, ContentReader source) throws IOException{
 		var oldVal=getValue(target);
 		var newVal=read(target, source, oldVal, cluster);
 		setValue(target, newVal);
 	}
 	
-	public void write(IOStruct.Instance target, Cluster cluster, ContentWriter dest) throws IOException{
+	public void write(IOInstance target, Cluster cluster, ContentWriter dest) throws IOException{
 		write(target, cluster, dest, getValue(target));
 	}
 	
-	public long mapSize(IOStruct.Instance target){
+	public long mapSize(IOInstance target){
 		return mapSize(target, getValue(target));
 	}
 	
@@ -333,8 +335,8 @@ public abstract class VariableNode<ValTyp>{
 		return knownOffset;
 	}
 	
-	public SimpleEntry<String, Object> toString(IOStruct.Instance instance){
-		return new SimpleEntry<>(name, getValue(instance));
+	public SimpleEntry<String, Object> toString(IOInstance instance){
+		return new SimpleEntry<>(name, getValueAsObj(instance));
 	}
 	
 	@Override

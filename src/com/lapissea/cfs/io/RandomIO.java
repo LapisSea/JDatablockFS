@@ -7,7 +7,7 @@ import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.streams.RandomInputStream;
 import com.lapissea.cfs.io.streams.RandomOutputStream;
-import com.lapissea.cfs.io.struct.IOStruct;
+import com.lapissea.cfs.io.struct.IOInstance;
 import com.lapissea.cfs.objects.INumber;
 import com.lapissea.cfs.objects.chunk.ChunkPointer;
 import com.lapissea.util.TextUtil;
@@ -76,8 +76,8 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader, Sizab
 			return io().setPos(offset);
 		}
 		
-		default <T extends IOStruct.Instance> T storeTo(Cluster cluster, T dest) throws IOException{
-			io(io->dest.readStruct(cluster,io));
+		default <T extends IOInstance> T storeTo(Cluster cluster, T dest) throws IOException{
+			io(io->dest.readStruct(cluster, io));
 			return dest;
 		}
 		

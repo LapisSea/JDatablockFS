@@ -6,7 +6,7 @@ import com.lapissea.cfs.io.bit.FlagReader;
 import com.lapissea.cfs.io.bit.FlagWriter;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
-import com.lapissea.cfs.io.struct.IOStruct;
+import com.lapissea.cfs.io.struct.IOInstance;
 import com.lapissea.cfs.io.struct.IOStruct.Value;
 import com.lapissea.cfs.objects.INumber;
 import com.lapissea.cfs.objects.NumberSize;
@@ -16,7 +16,7 @@ import java.util.Objects;
 import java.util.OptionalInt;
 import java.util.function.Function;
 
-public record ChunkPointer(long value) implements INumber{
+public class ChunkPointer implements INumber{
 	
 	public static class PtrFixed extends PtrRef{
 		
@@ -56,7 +56,7 @@ public record ChunkPointer(long value) implements INumber{
 		
 	}
 	
-	public abstract static class PtrRef extends IOStruct.Instance{
+	public abstract static class PtrRef extends IOInstance{
 		
 		public abstract ChunkPointer getValue();
 		
@@ -76,8 +76,8 @@ public record ChunkPointer(long value) implements INumber{
 		@Override
 		public boolean equals(Object o){
 			if(this==o) return true;
-			if(!(o instanceof PtrRef ptrFixed)) return false;
-			return Objects.equals(getValue(), ptrFixed.getValue());
+			return o instanceof PtrRef ptrFixed&&
+			       Objects.equals(getValue(), ptrFixed.getValue());
 		}
 		
 		public boolean equals(ChunkPointer o){
@@ -94,10 +94,19 @@ public record ChunkPointer(long value) implements INumber{
 		}
 		
 	}
+	public static ChunkPointer of(long value){
+		return new ChunkPointer(value);
+	}
+	public static ChunkPointer of(INumber value){
+		return new ChunkPointer(value.getValue());
+	}
 	
-	public ChunkPointer{
+	private final long value;
+	
+	public ChunkPointer(long value){
+		this.value=value;
 		assert value>0:
-			this.toString()+""+value;
+			this.toString();
 	}
 	
 	public static class FixedIO implements ReaderWriter<ChunkPointer>{
@@ -131,7 +140,7 @@ public record ChunkPointer(long value) implements INumber{
 		}
 		@Override
 		public OptionalInt getMaxSize(){
-			return OptionalInt.of(NumberSize.LONG.bytes);
+			return OptionalInt.of(NumberSize.LARGEST.bytes);
 		}
 	}
 	
@@ -177,7 +186,7 @@ public record ChunkPointer(long value) implements INumber{
 		public OptionalInt getFixedSize(){ return OptionalInt.empty();}
 		@Override
 		public OptionalInt getMaxSize(){
-			return OptionalInt.of(NumberSize.LONG.bytes);
+			return OptionalInt.of(NumberSize.LARGEST.bytes);
 		}
 	}
 	
@@ -227,7 +236,7 @@ public record ChunkPointer(long value) implements INumber{
 		public OptionalInt getFixedSize(){ return OptionalInt.empty();}
 		@Override
 		public OptionalInt getMaxSize(){
-			return OptionalInt.of(NumberSize.LONG.bytes);
+			return OptionalInt.of(NumberSize.LARGEST.bytes);
 		}
 	}
 	
@@ -265,5 +274,17 @@ public record ChunkPointer(long value) implements INumber{
 	}
 	public long add(long value){
 		return getValue()+value;
+	}
+	
+	@Override
+	public boolean equals(Object o){
+		return o==this||
+		       o instanceof INumber num&&
+		       equals(num.getValue());
+	}
+	
+	@Override
+	public int hashCode(){
+		return Long.hashCode(getValue());
 	}
 }

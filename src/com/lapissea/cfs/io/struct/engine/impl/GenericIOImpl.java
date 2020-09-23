@@ -3,6 +3,7 @@ package com.lapissea.cfs.io.struct.engine.impl;
 import com.lapissea.cfs.Cluster;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
+import com.lapissea.cfs.io.struct.IOInstance;
 import com.lapissea.cfs.io.struct.IOStruct;
 import com.lapissea.cfs.io.struct.VariableNode;
 import com.lapissea.util.ShouldNeverHappenError;
@@ -40,7 +41,7 @@ public class GenericIOImpl<T> extends VariableNode<T>{
 	
 	@SuppressWarnings("unchecked")
 	@Override
-	public T getValue(IOStruct.Instance source){
+	public T getValue(IOInstance source){
 		if(getFun!=null){
 			return getFun.getValue(source);
 		}else{
@@ -53,7 +54,7 @@ public class GenericIOImpl<T> extends VariableNode<T>{
 	}
 	
 	@Override
-	public void setValue(IOStruct.Instance target, T value){
+	public void setValue(IOInstance target, T value){
 		if(setFun!=null){
 			setFun.setValue(target, value);
 		}else{
@@ -65,17 +66,17 @@ public class GenericIOImpl<T> extends VariableNode<T>{
 		}
 	}
 	@Override
-	public long mapSize(IOStruct.Instance target, T value){
+	public long mapSize(IOInstance target, T value){
 		return sizerFun.mapSize(target, value);
 	}
 	
 	@Override
-	public T read(IOStruct.Instance target, ContentReader source, T oldVal, Cluster cluster) throws IOException{
+	public T read(IOInstance target, ContentReader source, T oldVal, Cluster cluster) throws IOException{
 		return readFun.read(target, source, oldVal);
 	}
 	
 	@Override
-	public void write(IOStruct.Instance target, Cluster cluster, ContentWriter dest, T source) throws IOException{
+	public void write(IOInstance target, Cluster cluster, ContentWriter dest, T source) throws IOException{
 		writeFun.write(target, dest, source);
 	}
 	@Override

@@ -31,7 +31,7 @@ public class PrimitiveNodeMaker<T> extends StructReflectionImpl.NodeMaker<T>{
 		
 		if(valueType==long.class){
 			NumberSize fixedSize=valueAnn.defaultSize();
-			if(fixedSize==NumberSize.VOID) fixedSize=NumberSize.LONG;
+			if(fixedSize==NumberSize.VOID) fixedSize=NumberSize.LARGEST;
 			
 			if(!valueAnn.sizeRef().isEmpty()){
 				try{

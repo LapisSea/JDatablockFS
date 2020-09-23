@@ -2,10 +2,7 @@ package com.lapissea.cfs.io.struct.engine;
 
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
-import com.lapissea.cfs.io.struct.IOStruct;
-import com.lapissea.cfs.io.struct.StructImpl;
-import com.lapissea.cfs.io.struct.ValueRelations;
-import com.lapissea.cfs.io.struct.VariableNode;
+import com.lapissea.cfs.io.struct.*;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
@@ -92,7 +89,7 @@ public class StructReflectionImpl implements StructImpl{
 	}
 	
 	@Override
-	public <T extends IOStruct.Instance> List<VariableNode<Object>> generateVariables(Class<T> clazz, RelationCollection data){
+	public <T extends IOInstance> List<VariableNode<Object>> generateVariables(Class<T> clazz, RelationCollection data){
 		var values=new ValueRelations(data);
 
 //		LogUtil.println(TextUtil.toNamedPrettyJson(values.data));

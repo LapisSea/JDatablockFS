@@ -2,13 +2,10 @@ package com.lapissea.cfs.io.struct.engine;
 
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.io.ReaderWriter;
-import com.lapissea.cfs.io.struct.IOStruct;
+import com.lapissea.cfs.io.struct.*;
 import com.lapissea.cfs.io.struct.IOStruct.Construct.Constructor;
 import com.lapissea.cfs.io.struct.IOStruct.Get.Getter;
 import com.lapissea.cfs.io.struct.IOStruct.Set.Setter;
-import com.lapissea.cfs.io.struct.StructImpl;
-import com.lapissea.cfs.io.struct.ValueRelations;
-import com.lapissea.cfs.io.struct.VariableNode;
 import com.lapissea.cfs.io.struct.engine.impl.StructPtrIOImpl;
 import com.lapissea.cfs.objects.chunk.ChunkPointer;
 import com.lapissea.util.UtilL;
@@ -17,7 +14,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Type;
 import java.util.Objects;
 
-public class PointerNodeMaker<T extends IOStruct.Instance> extends StructReflectionImpl.NodeMaker<T>{
+public class PointerNodeMaker<T extends IOInstance> extends StructReflectionImpl.NodeMaker<T>{
 	
 	@Override
 	@SuppressWarnings("unchecked")
@@ -34,13 +31,13 @@ public class PointerNodeMaker<T extends IOStruct.Instance> extends StructReflect
 			valueField=val.val();
 			valueField.setAccessible(true);
 			
-			overrideType=valueAnn.type()==IOStruct.Instance.class?null:IOStruct.get(valueAnn.type());
+			overrideType=valueAnn.type()==IOInstance.class?null:IOStruct.get(valueAnn.type());
 		}
 		
 		IOStruct structType;
 		{
 			var typDirty=valueField.getType();
-			var typ     =UtilL.instanceOf(typDirty, IOStruct.Instance.class)?IOStruct.get((Class<IOStruct.Instance>)typDirty):null;
+			var typ     =UtilL.instanceOf(typDirty, IOInstance.class)?IOStruct.get((Class<IOInstance>)typDirty):null;
 			
 			if(overrideType==null){
 				structType=Objects.requireNonNull(typ);

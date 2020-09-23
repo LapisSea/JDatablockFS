@@ -2,6 +2,7 @@ package com.lapissea.cfs.io.struct.engine.impl;
 
 import com.lapissea.cfs.io.bit.FlagReader;
 import com.lapissea.cfs.io.bit.FlagWriter;
+import com.lapissea.cfs.io.struct.IOInstance;
 import com.lapissea.cfs.io.struct.IOStruct;
 import com.lapissea.cfs.io.struct.VariableNode;
 import com.lapissea.util.ShouldNeverHappenError;
@@ -21,7 +22,7 @@ public class BoolIOImpl extends VariableNode.Flag<Boolean>{
 		this.setFun=setFun;
 	}
 	
-	protected boolean getValueB(IOStruct.Instance source){
+	protected boolean getValueB(IOInstance source){
 		if(getFun!=null) return getFun.getValue(source);
 		else{
 			try{
@@ -32,7 +33,7 @@ public class BoolIOImpl extends VariableNode.Flag<Boolean>{
 		}
 	}
 	
-	protected void setValueB(IOStruct.Instance target, boolean newValue){
+	protected void setValueB(IOInstance target, boolean newValue){
 		if(getFun!=null) setFun.setValue(target, newValue);
 		else{
 			try{
@@ -44,24 +45,24 @@ public class BoolIOImpl extends VariableNode.Flag<Boolean>{
 	}
 	
 	
-	protected boolean readDataB(IOStruct.Instance target, FlagReader source, boolean oldVal){
+	protected boolean readDataB(IOInstance target, FlagReader source, boolean oldVal){
 		return source.readBoolBit();
 	}
 	
-	protected void writeDataB(IOStruct.Instance target, FlagWriter dest, boolean source){
+	protected void writeDataB(IOInstance target, FlagWriter dest, boolean source){
 		dest.writeBoolBit(source);
 	}
 	
 	@Deprecated
 	@Override
-	protected Boolean getValue(IOStruct.Instance source){ return getValueB(source); }
+	protected Boolean getValue(IOInstance source){ return getValueB(source); }
 	@Deprecated
 	@Override
-	protected void setValue(IOStruct.Instance target, Boolean newValue){ setValueB(target, newValue); }
+	protected void setValue(IOInstance target, Boolean newValue){ setValueB(target, newValue); }
 	@Deprecated
 	@Override
-	protected Boolean readData(IOStruct.Instance target, FlagReader source, Boolean oldVal){ return readDataB(target, source, oldVal); }
+	protected Boolean readData(IOInstance target, FlagReader source, Boolean oldVal){ return readDataB(target, source, oldVal); }
 	@Deprecated
 	@Override
-	protected void writeData(IOStruct.Instance target, FlagWriter dest, Boolean source){ writeDataB(target, dest, source); }
+	protected void writeData(IOInstance target, FlagWriter dest, Boolean source){ writeDataB(target, dest, source); }
 }

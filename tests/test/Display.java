@@ -3,9 +3,11 @@ package test;
 import com.lapissea.cfs.Cluster;
 import com.lapissea.cfs.io.bit.FlagReader;
 import com.lapissea.cfs.io.impl.MemoryData;
+import com.lapissea.cfs.io.struct.IOInstance;
 import com.lapissea.cfs.io.struct.IOStruct;
 import com.lapissea.cfs.io.struct.Offset;
 import com.lapissea.cfs.io.struct.VariableNode;
+import com.lapissea.cfs.io.struct.engine.impl.StructPtrIOImpl;
 import com.lapissea.cfs.objects.chunk.Chunk;
 import com.lapissea.cfs.objects.chunk.ChunkPointer;
 import com.lapissea.util.*;
@@ -21,11 +23,17 @@ import java.awt.image.BufferedImage;
 import java.io.*;
 import java.util.List;
 import java.util.*;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.IntStream;
 
 import static java.awt.RenderingHints.*;
 
 public class Display extends JFrame implements DataLogger{
+	
+	interface DrawB{
+		void draw(int index, Color color, boolean withChar, boolean force);
+	}
 	
 	private record ByteInfo(int uVal, Color color, boolean withChar){}
 	
@@ -75,23 +83,25 @@ public class Display extends JFrame implements DataLogger{
 			BitSet drawn=new BitSet(bytes.length);
 			
 			
-			interface DrawB{
-				void draw(int index, Color color, boolean withChar);
-			}
-			
-			DrawB drawByte=(i, color, withChar)->{
+			DrawB drawByte=(i, color, withChar, force)->{
+				if(i<bytes.length){
+					if(!force&&drawn.get(i)) return;
+					drawn.set(i);
+				}
+				
 				if(i>=bytes.length) color=alpha(Color.RED, 0.4F);
 				
 				int b =i>=bytes.length?0xFF:bytes[i]&0xFF;
 				int xi=i%width;
 				int yi=i/width;
 				
-				if(i<bytes.length) drawn.set(i);
 				
 				g.drawImage(getByte(b, color, withChar), xi*pixelsPerByte, yi*pixelsPerByte, null);
 			};
 			
 			Cluster[] cluster={null};
+			
+			List<Pointer> ptrs=new ArrayList<>();
 			
 			Iterable<Chunk> physicalIterator=()->{
 				Chunk c1;
@@ -114,7 +124,8 @@ public class Display extends JFrame implements DataLogger{
 						try{
 							ch=c.nextPhysical();
 						}catch(IOException e){
-							LogUtil.println(e);
+							e.printStackTrace();
+//							LogUtil.println(e);
 							ch=null;
 						}
 						return c;
@@ -124,35 +135,31 @@ public class Display extends JFrame implements DataLogger{
 			
 			try{
 				cluster[0]=new Cluster(new MemoryData(bytes, true));
+				
+				try{
+					annotateStruct(g, width, drawByte, cluster[0], cluster[0], ptrs::add);
+				}catch(IOException e){
+					throw UtilL.uncheckedThrow(e);
+				}
 				for(Chunk chunk : physicalIterator){
-					var chunkColor=chunk.isUsed()?Color.GREEN:Color.CYAN;
-					var dataColor =mul(chunkColor, 0.5F);
-					var freeColor =alpha(chunkColor, 0.4F);
-					
-					for(int i=(int)chunk.getPtr().value();i<chunk.dataStart();i++){
-						
-						drawByte.draw(i, chunkColor, false);
-						
-						if(!cluster[0].isLastPhysical(chunk)){
-							drawByte.draw((int)chunk.dataEnd(), Color.RED, true);
-						}
-					}
-					
-					for(int i=0, j=(int)chunk.getCapacity();i<j;i++){
-						drawByte.draw((int)(i+chunk.dataStart()), i>=chunk.getSize()?freeColor:dataColor, true);
-					}
-					
+					fillChunk(drawByte, chunk, c->alpha(mix(c, Color.GRAY, 0.5F), c.getAlpha()/255F*0.6F));
+				}
+				for(Chunk chunk : physicalIterator){
+					annotateStruct(g, width, drawByte, cluster[0], chunk, ptrs::add);
 				}
 			}catch(Throwable e){
-				LogUtil.println(e);
-//				e.printStackTrace();
+//				LogUtil.println(e);
+				e.printStackTrace();
 			}
 			
-			for(int i=0;i<bytes.length;i++){
-				if(drawn.get(i)) continue;
-				
-				drawByte.draw(i, Color.GRAY, true);
-			}
+			
+			initFont(g);
+			
+			var unusedColor=alpha(Color.GRAY, 0.5F);
+			IntStream.range(0, bytes.length)
+			         .parallel()
+			         .forEach(i->drawByte.draw(i, unusedColor, true, false));
+			
 			
 			g.setColor(Color.YELLOW);
 			for(long id : frame.ids()){
@@ -164,45 +171,30 @@ public class Display extends JFrame implements DataLogger{
 				fillBit(g, 8, xi*pixelsPerByte, yi*pixelsPerByte);
 			}
 			
-			for(Chunk chunk : physicalIterator){
-				annotateStruct(g, width, chunk);
-			}
-			
-			annotateStruct(g, width, cluster[0]);
-			
-			initFont(g);
-			
 			g.setRenderingHint(KEY_ANTIALIASING, VALUE_ANTIALIAS_ON);
 			var siz  =Math.max(1, pixelsPerByte/8F);
 			var sFul =new BasicStroke(siz);
 			var sHalf=new BasicStroke(siz/2);
 			
 			g.setStroke(sFul);
-			for(Chunk chunk : physicalIterator){
-				if(!chunk.hasNext()) continue;
-				var chunkColor=chunk.isUsed()?Color.GREEN:Color.CYAN;
+			for(Pointer ptr : ptrs){
 				
-				try{
-					chunk.getNextPtr().dereference(cluster[0]);
-				}catch(Throwable e){
-					chunkColor=Color.RED;
-				}
+				int start=ptr.from;
+				int end  =ptr.to;
 				
-				chunkColor=alpha(mix(chunkColor, Color.LIGHT_GRAY, 0.5F), 0.5F);
-				g.setColor(chunkColor);
+				int pSiz=ptr.size;
 				
-				VariableNode<ChunkPointer> ptrNode=chunk.structType().getVar("nextPtr");
+				g.setColor(alpha(ptr.color, 0.5F));
 				
-				int start=(int)(chunk.getPtr().value()+chunk.calcVarOffset(ptrNode).getOffset());
-				int pSiz =(int)ptrNode.mapSize(chunk);
-				
-				if(IntStream.range(start, start+pSiz).noneMatch(i->i%width==0)){
+				if(pSiz>1&&IntStream.range(start, start+pSiz).noneMatch(i->i%width==0)){
+					g.setColor(alpha(ptr.color, 0.1F));
 					g.setStroke(sHalf);
 					drawLine(g, width, start, start+pSiz-1);
 					g.setStroke(sFul);
 				}
 				
-				drawArrow(g, width, start, (int)chunk.getNextPtr().value());
+				g.setColor(alpha(ptr.color, 0.5F));
+				drawArrow(g, width, start, end);
 			}
 		}
 		
@@ -416,79 +408,167 @@ public class Display extends JFrame implements DataLogger{
 		shouldRerender=true;
 	}
 	
-	private void annotateStruct(Graphics2D g, int width, IOStruct.Instance instance){
-//		if(true) return;
-		
-		IOStruct typ=instance.structType();
-		
-		Random rand=new Random();
-		instance.iterateOffsets((VariableNode<?> var, Offset off)->{
-			rand.setSeed(var.name.hashCode());
+	static record Pointer(int from, int to, int size, Color color){}
+	
+	private void annotateStruct(Graphics2D g, int width, DrawB drawByte, Cluster cluster, IOInstance instance, Consumer<Pointer> pointerRecord) throws IOException{
+		annotateStruct(g, width, drawByte, cluster, new LinkedList<>(), instance, pointerRecord);
+	}
+	private void annotateStruct(Graphics2D g, int width, DrawB drawByte, Cluster cluster, List<IOInstance> stack, IOInstance instance, Consumer<Pointer> pointerRecord) throws IOException{
+		try{
+			if(stack.contains(instance)) return;
+			stack.add(instance);
 			
-			g.setColor(
-				alpha(new Color(
-					      Color.HSBtoRGB(
-						      rand.nextFloat(),
-						      rand.nextFloat()/0.4F+0.6F,
-						      1F
-					      )),
-				      0.5F));
-			
-			Rectangle area;
-			
-			if(off instanceof Offset.BitOffset){
-				final var from    =(int)(instance.getStructOffset()+off.getOffset());
-				int       xPosFrom=from%width, yPosFrom=from/width;
-				
-				int fromB=Math.toIntExact(instance.getStructOffset()+off.getOffset());
-				int toB  =fromB;
-				
-				var fl=(VariableNode.Flag<?>)var;
-				
-				int ib     =off.inByteBitOffset();
-				var bitSize=Math.min(fl.getBitSize(), 8-ib);
-				
-				for(int i=0;i<bitSize;i++){
-					toB++;
-					if(toB%3==0) break;
-				}
-				
-				
-				int xi=ib%3;
-				int yi=ib/3;
-				
-				area=new Rectangle(
-					(int)(pixelsPerByte*(xPosFrom+xi/3D)), (int)(pixelsPerByte*(yPosFrom+yi/3D)),
-					(int)(pixelsPerByte/3D*(toB-fromB)),
-					pixelsPerByte/3*Math.max(1, bitSize/3));
-				initFont(g, 1/3D);
-				
-			}else{
-				
-				int from=Math.toIntExact(instance.getStructOffset()+off.getOffset());
-				int to  =from;
-				
-				for(int i=0;i<VariableNode.FixedSize.getSizeUnknown(instance, var);i++){
-					to++;
-					if(to%width==0) break;
-				}
-				
-				int xPosFrom=from%width, yPosFrom=from/width;
-				area=new Rectangle(pixelsPerByte*xPosFrom, pixelsPerByte*yPosFrom, pixelsPerByte*(to-from), pixelsPerByte);
-				initFont(g);
+			if(instance instanceof Chunk c){
+				fillChunk(drawByte, c, Function.identity());
 			}
 			
-			drawStringIn(g, TextUtil.toString(var.toString(instance).getValue()), area, true);
-			g.setColor(mul(g.getColor(), 0.4F));
-			g.drawRect(area.x, area.y, area.width, area.height);
-		});
+			List<IOInstance> recurse=new ArrayList<>();
+			
+			IOStruct typ=instance.getStruct();
+			
+			Random rand=new Random();
+			instance.iterateOffsets((VariableNode<?> var, Offset off)->{
+				try{
+					rand.setSeed(var.name.hashCode());
+					
+					var col=new Color(
+						Color.HSBtoRGB(
+							rand.nextFloat(),
+							rand.nextFloat()/0.4F+0.6F,
+							1F
+						)
+					);
+					
+					g.setColor(alpha(col, 0.5F));
+					
+					Rectangle area;
+					
+					var varSize=(int)VariableNode.FixedSize.getSizeUnknown(instance, var);
+					
+					if(off instanceof Offset.BitOffset){
+						final var from    =(int)(instance.getStructOffset()+off.getOffset());
+						int       xPosFrom=from%width, yPosFrom=from/width;
+						
+						int fromB=Math.toIntExact(instance.getStructOffset()+off.getOffset());
+						int toB  =fromB;
+						
+						var fl=(VariableNode.Flag<?>)var;
+						
+						int ib     =off.inByteBitOffset();
+						var bitSize=Math.min(fl.getBitSize(), 8-ib);
+						
+						for(int i=0;i<bitSize;i++){
+							toB++;
+							if(toB%3==0) break;
+						}
+						
+						
+						int xi=ib%3;
+						int yi=ib/3;
+						
+						area=new Rectangle(
+							(int)(pixelsPerByte*(xPosFrom+xi/3D)), (int)(pixelsPerByte*(yPosFrom+yi/3D)),
+							(int)(pixelsPerByte/3D*(toB-fromB)),
+							pixelsPerByte/3*Math.max(1, bitSize/3));
+						initFont(g, 1/3D);
+						
+					}else{
+						
+						int from=Math.toIntExact(instance.getStructOffset()+off.getOffset());
+						int to  =from;
+						
+						for(int i=0;i<varSize;i++){
+							to++;
+							if(to%width==0) break;
+						}
+						
+						int xPosFrom=from%width, yPosFrom=from/width;
+						area=new Rectangle(pixelsPerByte*xPosFrom, pixelsPerByte*yPosFrom, pixelsPerByte*(to-from), pixelsPerByte);
+						initFont(g);
+						
+						IntStream.range(from, from+varSize).forEach(i->drawByte.draw(i, mix(col, Color.GRAY, 0.65F), false, false));
+						
+					}
+					
+					Object valVal=var.getValueAsObj(instance);
+					
+					if(var instanceof StructPtrIOImpl<?>&&valVal instanceof IOInstance inst){
+						long valOff=inst.getStructOffset();
+						pointerRecord.accept(new Pointer((int)(instance.getStructOffset()+off.getOffset()), (int)valOff, varSize, g.getColor()));
+						if(inst instanceof IOInstance.Contained.SingletonChunk ch){
+							recurse.add(ch.getContainer());
+						}
+						recurse.add(inst);
+					}else if(valVal instanceof IOInstance inst){
+						try{
+							annotateStruct(g, width, drawByte, cluster, stack, inst, pointerRecord);
+						}catch(IOException e){
+							e.printStackTrace();
+						}
+					}else if(valVal instanceof ChunkPointer ptr){
+						var color=g.getColor();
+						try{
+							recurse.add(ptr.dereference(cluster));
+						}catch(Throwable e){
+							color=Color.RED;
+						}
+						
+						pointerRecord.accept(new Pointer((int)(instance.getStructOffset()+off.getOffset()), ptr.getValueInt(), varSize, color));
+					}
+					
+					
+					String text=TextUtil.toString(valVal)
+					                    .replace('\t', '↹')
+					                    .replace('\n', '↵');
+					
+					drawStringIn(g, text, area, true);
+					g.setColor(mul(g.getColor(), 0.4F));
+					g.drawRect(area.x, area.y, area.width, area.height);
+					
+				}catch(Throwable e){
+					e.printStackTrace();
+					try{
+						int from   =Math.toIntExact(instance.getStructOffset()+off.getOffset());
+						var varSize=(int)VariableNode.FixedSize.getSizeUnknown(instance, var);
+						IntStream.range(from, from+varSize).forEach(i->drawByte.draw(i, Color.RED, false, true));
+					}catch(Throwable e1){
+						LogUtil.println(e1);
+					}
+				}
+				
+			});
+			
+			for(IOInstance instance1 : recurse){
+				annotateStruct(g, width, drawByte, cluster, stack, instance1, pointerRecord);
+			}
+		}finally{
+			stack.remove(instance);
+		}
+	}
+	
+	private void fillChunk(DrawB drawByte, Chunk chunk, Function<Color, Color> filter) throws IOException{
 		
+		var chunkColor=chunk.isUsed()?Color.GREEN:Color.CYAN;
+		var dataColor =mul(chunkColor, 0.5F);
+		var freeColor =alpha(chunkColor, 0.4F);
+		
+		chunkColor=filter.apply(chunkColor);
+		dataColor=filter.apply(dataColor);
+		freeColor=filter.apply(freeColor);
+		
+		for(int i=(int)chunk.getPtr().getValue();i<chunk.dataStart();i++){
+			drawByte.draw(i, chunkColor, false, false);
+		}
+		
+		for(int i=0, j=(int)chunk.getCapacity();i<j;i++){
+			drawByte.draw((int)(i+chunk.dataStart()), i>=chunk.getSize()?freeColor:dataColor, true, false);
+		}
 	}
 	
 	boolean       shouldRerender=true;
 	BufferedImage render        =null;
 	
-	BufferedImage getByte(int value, Color color, boolean withChar){
+	synchronized BufferedImage getByte(int value, Color color, boolean withChar){
 		return byteCache.computeIfAbsent(new ByteInfo(value, color, withChar), this::renderByte);
 	}
 	

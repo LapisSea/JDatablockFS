@@ -4,6 +4,7 @@ import com.lapissea.cfs.Cluster;
 import com.lapissea.cfs.io.ReaderWriter;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
+import com.lapissea.cfs.io.struct.IOInstance;
 import com.lapissea.cfs.io.struct.IOStruct;
 import com.lapissea.cfs.io.struct.VariableNode;
 import com.lapissea.cfs.objects.chunk.Chunk;
@@ -14,9 +15,9 @@ import java.lang.reflect.Field;
 import java.util.OptionalLong;
 
 @SuppressWarnings("unchecked")
-public class StructPtrIOImpl<T extends IOStruct.Instance> extends VariableNode<T>{
+public class StructPtrIOImpl<T extends IOInstance> extends VariableNode<T>{
 	
-	public static class Fixed<T extends IOStruct.Instance> extends StructPtrIOImpl<T> implements VariableNode.FixedSize{
+	public static class Fixed<T extends IOInstance> extends StructPtrIOImpl<T> implements VariableNode.FixedSize{
 		
 		public Fixed(String name, int index, Field valueField, IOStruct.Get.Getter<T> getFun, IOStruct.Set.Setter<T> setFun, IOStruct.Construct.Constructor<T> constructorFun, ReaderWriter<ChunkPointer> ptrIO, IOStruct structType){
 			super(name, index, valueField, getFun, setFun, constructorFun, ptrIO, structType);
@@ -27,11 +28,11 @@ public class StructPtrIOImpl<T extends IOStruct.Instance> extends VariableNode<T
 			return ptrIO.getFixedSize().orElseThrow();
 		}
 		@Override
-		protected long mapSize(IOStruct.Instance target, T value){
+		protected long mapSize(IOInstance target, T value){
 			return getSize();
 		}
 		@Override
-		public long mapSize(IOStruct.Instance target){
+		public long mapSize(IOInstance target){
 			return getSize();
 		}
 	}
@@ -59,7 +60,7 @@ public class StructPtrIOImpl<T extends IOStruct.Instance> extends VariableNode<T
 	}
 	
 	@Override
-	protected T getValue(IOStruct.Instance source){
+	protected T getValue(IOInstance source){
 		if(getFun==null){
 			try{
 				return (T)valueField.get(source);
@@ -72,7 +73,7 @@ public class StructPtrIOImpl<T extends IOStruct.Instance> extends VariableNode<T
 	}
 	
 	@Override
-	protected void setValue(IOStruct.Instance target, T newValue){
+	protected void setValue(IOInstance target, T newValue){
 		if(setFun==null){
 			try{
 				valueField.set(target, newValue);
@@ -85,27 +86,29 @@ public class StructPtrIOImpl<T extends IOStruct.Instance> extends VariableNode<T
 	}
 	
 	@Override
-	protected long mapSize(IOStruct.Instance target, T value){
+	protected long mapSize(IOInstance target, T value){
 		var siz=ptrIO.getFixedSize();
 		if(siz.isPresent()) return siz.getAsInt();
-		return ptrIO.mapSize(target, new ChunkPointer(value.getStructOffset()));
+		return ptrIO.mapSize(target, value==null?null:new ChunkPointer(value.getStructOffset()));
 	}
 	
 	@Override
-	protected T read(IOStruct.Instance target, ContentReader source, T oldVal, Cluster cluster) throws IOException{
+	protected T read(IOInstance target, ContentReader source, T oldVal, Cluster cluster) throws IOException{
 		ChunkPointer ptr=ptrIO.read(target, source, null);
 		Chunk        c  =ptr.dereference(cluster);
 		T            val;
 		if(oldVal==null){
-			val=structType.newInstance(target, c);
+			val=newInstance(target, c);
 		}else{
 			val=oldVal;
 		}
-		return c.storeTo(cluster, val);
+		c.storeTo(cluster, val);
+		assert val.getStructOffset()==c.dataStart():val.getStructOffset()+" "+c.dataStart();
+		return val;
 	}
 	
 	@Override
-	protected void write(IOStruct.Instance target, Cluster cluster, ContentWriter dest, T source) throws IOException{
+	protected void write(IOInstance target, Cluster cluster, ContentWriter dest, T source) throws IOException{
 		ChunkPointer ptr;
 		if(source==null) ptr=null;
 		else{
@@ -114,7 +117,19 @@ public class StructPtrIOImpl<T extends IOStruct.Instance> extends VariableNode<T
 //				ptr=cluster.alloc(source.getInstanceSize()).getPtr();
 				throw new IllegalStateException();
 			}else{
-				ptr=new ChunkPointer(offset);
+				var typ=IOStruct.get(Chunk.class);
+				find:
+				{
+					for(long i=typ.getMinimumSize(), j=typ.requireMaximumSize();i<j;i++){
+						try{
+							var realPtr=new ChunkPointer(offset-i);
+							realPtr.dereference(cluster);
+							ptr=realPtr;
+							break find;
+						}catch(IOException ignored){}
+					}
+					throw new IOException();
+				}
 			}
 			
 			ptr.dereference(cluster).io(io->source.writeStruct(cluster, io));
@@ -128,7 +143,7 @@ public class StructPtrIOImpl<T extends IOStruct.Instance> extends VariableNode<T
 		return ptrIO.getMaxSize().isPresent()?OptionalLong.of(ptrIO.getMaxSize().getAsInt()):OptionalLong.empty();
 	}
 	
-	private T newInstance(IOStruct.Instance target, Chunk chunk) throws IOException{
+	private T newInstance(IOInstance target, Chunk chunk) throws IOException{
 		if(constructorFun!=null){
 			return constructorFun.construct(target, chunk);
 		}else{
@@ -136,7 +151,7 @@ public class StructPtrIOImpl<T extends IOStruct.Instance> extends VariableNode<T
 		}
 	}
 	
-	public void allocNew(IOStruct.Instance target, Cluster cluster) throws IOException{
+	public void allocNew(IOInstance target, Cluster cluster) throws IOException{
 		var chunk=cluster.alloc(structType.getKnownSize().orElse(structType.getMaximumSize().orElse(structType.getMinimumSize())));
 		T   val  =newInstance(target, chunk);
 		chunk.io(io->{

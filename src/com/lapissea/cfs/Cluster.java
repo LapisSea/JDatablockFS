@@ -3,6 +3,7 @@ package com.lapissea.cfs;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.impl.MemoryData;
+import com.lapissea.cfs.io.struct.IOInstance;
 import com.lapissea.cfs.io.struct.IOStruct;
 import com.lapissea.cfs.io.struct.IOStruct.Construct;
 import com.lapissea.cfs.io.struct.IOStruct.EnumValue;
@@ -27,7 +28,7 @@ import java.util.stream.Collectors;
 
 import static com.lapissea.cfs.Config.*;
 
-public class Cluster extends IOStruct.Instance.Contained{
+public class Cluster extends IOInstance.Contained{
 	
 	public class SafeSession implements AutoCloseable{
 		
@@ -80,9 +81,6 @@ public class Cluster extends IOStruct.Instance.Contained{
 		readStruct();
 	}
 
-//	public SafeSession safeSession(){
-//		return new SafeSession();
-//	}
 	
 	public void safeSession(UnsafeRunnable<IOException> session) throws IOException{
 		SafeSession ses=new SafeSession();
@@ -99,16 +97,18 @@ public class Cluster extends IOStruct.Instance.Contained{
 		version=Version.last();
 		writeStruct();
 		
-		StructPtrIOImpl<IOStruct.Instance> imp=TYPE.getVar("unboxedFreeChunks");
-		
+		StructPtrIOImpl<SingletonChunk> imp=TYPE.getVar("unboxedFreeChunks");
 		imp.allocNew(this, this);
 		
 		writeStruct();
+		
+		freeChunks.addElement(null);
 	}
 	
 	@IOStruct.Set
 	public void setUnboxedFreeChunks(IOList<ChunkPointer.PtrRef> unboxedFreeChunks){
 		this.unboxedFreeChunks=unboxedFreeChunks;
+		
 		
 		Function<ChunkPointer, ChunkPointer.PtrRef> box  =ChunkPointer.PtrFixed::new;
 		Function<ChunkPointer.PtrRef, ChunkPointer> unbox=ChunkPointer.PtrRef::getValue;
@@ -116,42 +116,23 @@ public class Cluster extends IOStruct.Instance.Contained{
 	}
 	
 	@Construct
-	private IOList<ChunkPointer.PtrRef> constructUnboxedFreeChunks(Chunk source){
+	private IOList<ChunkPointer.PtrRef> constructUnboxedFreeChunks(Chunk source) throws IOException{
 		Function<ChunkPointer, ChunkPointer.PtrRef> box  =ChunkPointer.PtrFixed::new;
 		Function<ChunkPointer.PtrRef, ChunkPointer> unbox=ChunkPointer.PtrRef::getValue;
 		
-		boolean knownSize=box.apply(null).structType().getKnownSize().isPresent();
+		boolean knownSize=box.apply(null).getStruct().getKnownSize().isPresent();
 		
-		return new StructLinkedList<>(source, ()->box.apply(null)){
-			@Override
-			public void setElement(int index, ChunkPointer.PtrRef value) throws IOException{
-				if(knownSize||getElement(index).getInstanceSize()==value.getInstanceSize()){
-					super.setElement(index, value);
-				}else{
-					safeSession(()->{
-						super.setElement(index, value);
-					});
-				}
-			}
-			@Override
-			public void ensureCapacity(int elementCapacity) throws IOException{
-				safeSession(()->{
-					super.ensureCapacity(elementCapacity);
-				});
-			}
-			@Override
-			public void removeElement(int index) throws IOException{
-				safeSession(()->{
-					super.removeElement(index);
-				});
-			}
-			@Override
-			public void addElement(int index, ChunkPointer.PtrRef value) throws IOException{
-				safeSession(()->{
-					super.addElement(index, value);
-				});
+		var           l =new StructLinkedList<>(source, ()->box.apply(null));
+		SafeSession[] ss={null};
+		l.changingListener=b->{
+			if(b){
+				ss[0]=new SafeSession();
+			}else{
+				ss[0].close();
+				ss[0]=null;
 			}
 		};
+		return l;
 	}
 	
 	private Chunk makeChunkReal(Chunk chunk) throws IOException{
@@ -180,7 +161,7 @@ public class Cluster extends IOStruct.Instance.Contained{
 		return chunk;
 	}
 	
-	public Chunk allocWrite(IOStruct.Instance obj) throws IOException{
+	public Chunk allocWrite(IOInstance obj) throws IOException{
 		Chunk chunk=alloc(obj.getInstanceSize());
 		chunk.io(io->obj.writeStruct(this, io));
 		return chunk;
@@ -217,8 +198,8 @@ public class Cluster extends IOStruct.Instance.Contained{
 	}
 	
 	private Chunk tryReuse(long requestedCapacity) throws IOException{
-		if(freeChunks==null||freeChunks.isEmpty()) return null;
-		if(freeChunks.size()==1&&freeChunks.getElement(0)==null) return null;
+		if(safeMode||freeChunks==null||freeChunks.isEmpty()) return null;
+		if(freeChunks.find(Objects::nonNull)==-1) return null;
 		
 		Chunk largest=null;
 		
@@ -374,7 +355,7 @@ public class Cluster extends IOStruct.Instance.Contained{
 			destroyChunk(next);
 		};
 		
-		Function<Chunk, long[]> rang=ch->new long[]{ch.getPtr().value(), ch.dataEnd()};
+		Function<Chunk, long[]> rang=ch->new long[]{ch.getPtr().getValue(), ch.dataEnd()};
 		
 		LogUtil.println("freeing", toFree);
 		
@@ -398,10 +379,6 @@ public class Cluster extends IOStruct.Instance.Contained{
 			prev=null;
 		}
 		
-		
-		if(toFree.getPtr().equals(237)){
-			int i=0;
-		}
 		
 		if(next!=null&&prev!=null){
 			LogUtil.println("free triple merge", rang.apply(prev), rang.apply(toFree), rang.apply(next));
@@ -548,7 +525,7 @@ public class Cluster extends IOStruct.Instance.Contained{
 	}
 	
 	public Chunk getFirstChunk() throws IOException{
-		return getChunk(new ChunkPointer(structType().requireKnownSize()));
+		return getChunk(new ChunkPointer(getStruct().requireKnownSize()));
 	}
 	
 	public void validate() throws IOException{
@@ -581,10 +558,10 @@ public class Cluster extends IOStruct.Instance.Contained{
 	}
 	
 	public interface LinkAcceptor{
-		void link(boolean chunkDest, long src, long dest, IOStruct.Instance destVal);
+		void link(boolean chunkDest, long src, long dest, IOInstance destVal);
 	}
 	
-	private void memoryWalk(LinkAcceptor acceptor, long structLocation, IOStruct.Instance instance){
+	private void memoryWalk(LinkAcceptor acceptor, long structLocation, IOInstance instance){
 	
 	}
 	
@@ -593,5 +570,11 @@ public class Cluster extends IOStruct.Instance.Contained{
 		var off=calcVarOffset("freeChunks").getOffset();
 
 //		acceptor.link(true, off, freeChunksPtr.getValue(), (IOStruct.Instance)freeChunks);
+	}
+	
+	@Override
+	protected void setStructOffset(long structOffset){
+		assert structOffset==0:structOffset;
+		this.structOffset=structOffset;
 	}
 }

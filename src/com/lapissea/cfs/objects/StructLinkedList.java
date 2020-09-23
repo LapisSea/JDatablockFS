@@ -4,12 +4,15 @@ import com.lapissea.cfs.Cluster;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
+import com.lapissea.cfs.io.struct.IOInstance;
 import com.lapissea.cfs.io.struct.IOStruct;
 import com.lapissea.cfs.io.struct.VariableNode;
 import com.lapissea.cfs.objects.chunk.Chunk;
 import com.lapissea.cfs.objects.chunk.ChunkPointer;
+import com.lapissea.cfs.objects.chunk.ObjectPointer;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.WeakValueHashMap;
+import com.lapissea.util.function.BooleanConsumer;
 import com.lapissea.util.function.UnsafeFunction;
 
 import java.io.IOException;
@@ -21,30 +24,29 @@ import static com.lapissea.cfs.Config.*;
 import static com.lapissea.cfs.io.struct.IOStruct.*;
 
 @SuppressWarnings("AutoBoxing")
-public class StructLinkedList<T extends IOStruct.Instance> extends IOStruct.Instance.Contained.SingletonChunk implements IOList<T>{
+public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained.SingletonChunk implements IOList<T>{
 	
-	private static class Node extends IOStruct.Instance.Contained.SingletonChunk{
+	private static class Node extends IOInstance.Contained.SingletonChunk{
 		
 		@SuppressWarnings("unchecked")
 		private static final VariableNode<ChunkPointer> NEXT_VAR=(VariableNode<ChunkPointer>)(VariableNode<?>)IOStruct.thisClass().variables.get(0);
 		
-		private final UnsafeFunction<Chunk, ? extends IOStruct.Instance, IOException> constructor;
-		Chunk container;
+		private final UnsafeFunction<Chunk, ? extends IOInstance, IOException> constructor;
+		private       Chunk                                                    container;
 		
 		@Value(index=1, rw=ChunkPointer.AutoSizedIO.class, rwArgs="BYTE")
 		ChunkPointer next;
 		
 		@Value(index=2)
-		IOStruct.Instance value;
+		IOInstance value;
 		
-		public Node(UnsafeFunction<Chunk, ? extends IOStruct.Instance, IOException> constructor){
-			super(0);
+		public Node(UnsafeFunction<Chunk, ? extends IOInstance, IOException> constructor){
 			this.constructor=constructor;
 		}
 		
 		@Write
-		void writeValue(ContentWriter dest, IOStruct.Instance source) throws IOException{
-			Objects.requireNonNull(container);
+		void writeValue(ContentWriter dest, IOInstance source) throws IOException{
+			Objects.requireNonNull(getContainer());
 			
 			var off=getStructOffset()+calcVarOffset(2).getOffset();
 			if(DEBUG_VALIDATION){
@@ -53,26 +55,26 @@ public class StructLinkedList<T extends IOStruct.Instance> extends IOStruct.Inst
 				}
 			}
 			
-			source.writeStruct(container.cluster, dest, off);
+			source.writeStruct(getContainer().cluster, dest, off);
 		}
 		
 		@Read
-		IOStruct.Instance readValue(ContentReader source, IOStruct.Instance oldVal) throws IOException{
-			var val=constructor.apply(container);
+		IOInstance readValue(ContentReader source, IOInstance oldVal) throws IOException{
+			var val=constructor.apply(getContainer());
 			
 			var off=getStructOffset()+calcVarOffset(2).getOffset();
 			if(DEBUG_VALIDATION){
 				if(source instanceof RandomIO io){
-					assert off==io.getPos():off+" == "+io.getPos();
+					assert off==io.getGlobalPos():this+" "+off+" == "+io.getGlobalPos();
 				}
 			}
 			
-			val.readStruct(container.cluster, source, off);
+			val.readStruct(getContainer().cluster, source, off);
 			return val;
 		}
 		
 		@Size
-		private long sizeValue(IOStruct.Instance value){
+		private long sizeValue(IOInstance value){
 			return value.getInstanceSize();
 		}
 		
@@ -98,18 +100,23 @@ public class StructLinkedList<T extends IOStruct.Instance> extends IOStruct.Inst
 			return container;
 		}
 		
+		void setContainer(Chunk container){
+			this.container=container;
+			setStructOffset(container.getPtr());
+		}
+		
 		void allocContainer(Cluster cluster) throws IOException{
-			container=cluster.alloc(getInstanceSize());
+			setContainer(cluster.alloc(getInstanceSize()));
 			writeStruct();
 		}
 		
 		void initContainer(Chunk chunk) throws IOException{
-			container=chunk;
+			setContainer(chunk);
 			readStruct();
 		}
 		
 		void setNext(Node node){
-			next=node.container.getPtr();
+			next=node.getContainer().getPtr();
 		}
 		
 		@Override
@@ -125,20 +132,26 @@ public class StructLinkedList<T extends IOStruct.Instance> extends IOStruct.Inst
 	
 	private final Map<Integer, Node> nodeCache=new WeakValueHashMap<>();
 	
+	public BooleanConsumer changingListener=b->{};
+	
 	@PrimitiveValue(index=0, defaultSize=NumberSize.INT)
 	private int size;
 	
-	@Value(index=1, rw=ChunkPointer.AutoSizedIO.class)
-	private ChunkPointer first;
+	@Value(index=1, rw=ObjectPointer.FixedIO.class)
+	private final ObjectPointer<Node> first;
 	
-	public StructLinkedList(Chunk container, Supplier<T> constructor){
+	public StructLinkedList(Chunk container, Supplier<T> constructor) throws IOException{
 		this(container, c->constructor.get());
 	}
-	public StructLinkedList(Chunk container, UnsafeFunction<Chunk, T, IOException> constructor){
-		super(container.getPtr());
+	
+	public StructLinkedList(Chunk container, UnsafeFunction<Chunk, T, IOException> constructor) throws IOException{
+		super(container.dataStart());
 		
 		this.container=container;
 		this.constructor=constructor;
+		first=new ObjectPointer.Struct<>(()->new Node(constructor));
+		
+		validate();
 	}
 	
 	private Cluster cluster(){
@@ -161,11 +174,10 @@ public class StructLinkedList<T extends IOStruct.Instance> extends IOStruct.Inst
 		}
 		
 		if(index==0){
-			Chunk target=first.dereference(cluster());
 			
 			Node result=new Node(constructor);
 			
-			result.initContainer(target);
+			result.initContainer(first.getBlock(cluster()));
 			
 			nodeCache.put(0, result);
 			
@@ -223,8 +235,8 @@ public class StructLinkedList<T extends IOStruct.Instance> extends IOStruct.Inst
 		Objects.checkIndex(index, size());
 		Objects.requireNonNull(value);
 		
-		if(changing) throw new IllegalStateException("recursive change");
-		changing=true;
+		if(isChanging()) throw new IllegalStateException("recursive change");
+		setChanging(true);
 		try{
 			
 			Node node=getNode(index);
@@ -235,7 +247,7 @@ public class StructLinkedList<T extends IOStruct.Instance> extends IOStruct.Inst
 			node.writeStruct();
 			
 		}finally{
-			changing=false;
+			setChanging(false);
 		}
 	}
 	
@@ -247,22 +259,29 @@ public class StructLinkedList<T extends IOStruct.Instance> extends IOStruct.Inst
 		Objects.checkIndex(index, size());
 		
 		Runnable popCache=()->{
-			for(var i : nodeCache.keySet().stream().filter(v->v>=index).collect(Collectors.toList())){
-				nodeCache.remove(i);
+//			for(var i : nodeCache.keySet().stream().filter(v->v>=index).collect(Collectors.toList())){
+//				nodeCache.remove(i);
+//			}
+			
+			var decremented=nodeCache.entrySet()
+			                         .stream()
+			                         .filter(e->e.getKey()>index)
+			                         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+			nodeCache.remove(index);
+			if(!decremented.isEmpty()){
+				decremented.forEach((k, v)->nodeCache.remove(k));
+//				decremented.forEach((i, n)->nodeCache.put(i-1, n));
 			}
-//			nodeCache.remove(index);
-//			var decremented=nodeCache.entrySet().stream().filter(e->e.getKey()>index).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-//			decremented.forEach((k, v)->nodeCache.remove(k));
 		};
 		
 		Chunk toRemove=null;
 		
-		if(changing) throw new IllegalStateException("recursive change");
-		changing=true;
+		if(isChanging()) throw new IllegalStateException("recursive change");
+		setChanging(true);
 		try{
 			if(index==0){
-				toRemove=first.dereference(cluster());
-				first=getNode(0).next;
+				toRemove=first.getBlock(cluster());
+				first.set(getNode(0).next, 0);
 				popCache.run();
 				addSizeAndSave(-1);
 				return;
@@ -271,7 +290,7 @@ public class StructLinkedList<T extends IOStruct.Instance> extends IOStruct.Inst
 			Node prevNode=getNode(index-1);
 			Node node    =getNode(index);
 			
-			toRemove=node.container;
+			toRemove=node.getContainer();
 			
 			prevNode.next=node.next;
 			
@@ -281,7 +300,7 @@ public class StructLinkedList<T extends IOStruct.Instance> extends IOStruct.Inst
 			
 			addSizeAndSave(-1);
 		}finally{
-			changing=false;
+			setChanging(false);
 			if(toRemove!=null){
 				toRemove.freeChaining();
 			}
@@ -290,24 +309,70 @@ public class StructLinkedList<T extends IOStruct.Instance> extends IOStruct.Inst
 	}
 	
 	@Override
+	protected void setStructOffset(long structOffset){
+		if(container!=null){
+			assert container.dataStart()==structOffset:container.dataStart()+" "+structOffset;
+		}
+		super.setStructOffset(structOffset);
+	}
+	
+	private Node fromVal(T value){
+		Node node=new Node(constructor);
+		node.value=value;
+		return node;
+	}
+	
+	@Override
+	public void addElement(T value) throws IOException{
+		Objects.requireNonNull(value);
+		validate();
+		
+		Node newNode=fromVal(value);
+		newNode.allocContainer(cluster());
+		
+		if(isChanging()) throw new IllegalStateException("recursive change");
+		setChanging(true);
+		try{
+			if(isEmpty()){
+				first.set(newNode.getContainer().getPtr(), 0);
+			}else{
+				Node last=getNode(size()-1);
+				last.setNext(newNode);
+				last.writeStruct();
+			}
+			addSizeAndSave(1);
+		}finally{
+			setChanging(false);
+		}
+	}
+	
+	
+	@Override
 	public void addElement(int index, T value) throws IOException{
+		if(index==size()){
+			addElement(value);
+			return;
+		}
+		
 		Objects.checkIndex(index, size()+1);
 		Objects.requireNonNull(value);
 		
-		Node newNode=new Node(constructor);
-		newNode.value=value;
+		validate();
+		
+		Node newNode=fromVal(value);
 		
 		newNode.next=new ChunkPointer(cluster().getData().getSize());
 		newNode.allocContainer(cluster());
 		
+		validate();
 		
-		if(changing) throw new IllegalStateException("recursive change");
-		changing=true;
+		if(isChanging()) throw new IllegalStateException("recursive change");
+		setChanging(true);
 		try{
 			if(index==0){
-				newNode.next=first;
+				newNode.next=first.getDataBlock();
 				newNode.writeStruct();
-				first=newNode.container.getPtr();
+				first.set(newNode.getContainer().getPtr(), 0);
 			}else{
 				int  insertionIndex=index-1;
 				Node insertionNode =getNode(insertionIndex);
@@ -321,13 +386,15 @@ public class StructLinkedList<T extends IOStruct.Instance> extends IOStruct.Inst
 			
 			addSizeAndSave(1);
 		}finally{
-			changing=false;
+			setChanging(false);
 		}
 	}
 	
 	@Override
 	public void validate() throws IOException{
 		if(!DEBUG_VALIDATION) return;
+		
+		assert container.dataStart()==getStructOffset():container.dataStart()+" "+getStructOffset();
 		
 		var elementCount=stream().count();
 		assert elementCount==size:elementCount+"=="+size();
@@ -356,7 +423,7 @@ public class StructLinkedList<T extends IOStruct.Instance> extends IOStruct.Inst
 	private void checkCache(Node node) throws IOException{
 		
 		Node read=new Node(constructor);
-		read.initContainer(node.container);
+		read.initContainer(node.getContainer());
 		
 		assert read.equals(node):"\n"+TextUtil.toTable("cached/read mismatch", List.of(node, read));
 	}
@@ -370,21 +437,18 @@ public class StructLinkedList<T extends IOStruct.Instance> extends IOStruct.Inst
 	
 	@Override
 	public String toString(){
-		return stream().map(Instance::toShortString).collect(Collectors.joining(", ", "[", "]"));
-	}
-	public boolean isChanging(){
-		return changing;
+		return stream().map(IOInstance::toShortString).collect(Collectors.joining(", ", "[", "]"));
 	}
 	
 	@Override
 	public void clear() throws IOException{
 		List<Chunk> toFree=new ArrayList<>();
 		for(int i=0;i<size();i++){
-			toFree.addAll(getNode(i).container.collectNext());
+			toFree.addAll(getNode(i).getContainer().collectNext());
 		}
 		
 		size=0;
-		first=null;
+		first.unset();
 		nodeCache.clear();
 		writeStruct();
 		
@@ -403,5 +467,13 @@ public class StructLinkedList<T extends IOStruct.Instance> extends IOStruct.Inst
 	@Override
 	public Chunk getContainer(){
 		return container;
+	}
+	
+	private boolean isChanging(){
+		return changing;
+	}
+	private void setChanging(boolean changing){
+		this.changing=changing;
+		changingListener.accept(changing);
 	}
 }

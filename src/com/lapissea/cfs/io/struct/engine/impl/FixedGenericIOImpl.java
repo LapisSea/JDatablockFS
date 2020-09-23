@@ -3,6 +3,7 @@ package com.lapissea.cfs.io.struct.engine.impl;
 import com.lapissea.cfs.Cluster;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
+import com.lapissea.cfs.io.struct.IOInstance;
 import com.lapissea.cfs.io.struct.IOStruct;
 import com.lapissea.cfs.io.struct.VariableNode;
 
@@ -35,12 +36,12 @@ public class FixedGenericIOImpl<T> extends GenericIOImpl<T> implements VariableN
 	 */
 	@Deprecated
 	@Override
-	public long mapSize(IOStruct.Instance target, T value){
+	public long mapSize(IOInstance target, T value){
 		return getSize();
 	}
 	
 	@Override
-	public T read(IOStruct.Instance target, ContentReader source, T oldVal, Cluster cluster) throws IOException{
+	public T read(IOInstance target, ContentReader source, T oldVal, Cluster cluster) throws IOException{
 		if(!ContentReader.isDirect(source)&&getSize()>5){
 			try(ContentReader buff=source.bufferExactRead(getSize())){
 				return super.read(target, buff, oldVal, cluster);
@@ -51,7 +52,7 @@ public class FixedGenericIOImpl<T> extends GenericIOImpl<T> implements VariableN
 	}
 	
 	@Override
-	public void write(IOStruct.Instance target, Cluster cluster, ContentWriter dest, T source) throws IOException{
+	public void write(IOInstance target, Cluster cluster, ContentWriter dest, T source) throws IOException{
 		if(ContentWriter.isDirect(dest)){
 			super.write(target, cluster, dest, source);
 		}else{

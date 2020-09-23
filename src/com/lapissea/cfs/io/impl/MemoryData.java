@@ -115,6 +115,7 @@ public class MemoryData implements IOInterface{
 		
 		public void write(byte[] b, int off, int len, boolean pushPos){
 			if(readOnly) throw new UnsupportedOperationException();
+			if(len==0) return;
 			
 			int remaining=(int)(getCapacity()-getPos());
 			if(remaining<len) setCapacity(Math.max(4, Math.max((int)(getCapacity()*4D/3), getCapacity()+len-remaining)));

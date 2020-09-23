@@ -6,6 +6,7 @@ import com.lapissea.cfs.io.bit.FlagReader;
 import com.lapissea.cfs.io.bit.FlagWriter;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
+import com.lapissea.cfs.io.struct.IOInstance;
 import com.lapissea.cfs.io.struct.IOStruct;
 import com.lapissea.cfs.io.struct.Offset;
 import com.lapissea.cfs.io.struct.VariableNode;
@@ -43,18 +44,18 @@ public class BitBlockNode extends VariableNode.FixedSize.Node<Object>{
 	}
 	
 	@Override
-	public Object getValue(IOStruct.Instance source){ throw new UnsupportedOperationException();}
+	public Object getValue(IOInstance source){ throw new UnsupportedOperationException();}
 	@Override
-	public void setValue(IOStruct.Instance target, Object newValue){throw new UnsupportedOperationException();}
+	public void setValue(IOInstance target, Object newValue){throw new UnsupportedOperationException();}
 	
 	
 	@Override
-	public Object read(IOStruct.Instance target, ContentReader source, Object oldVal, Cluster cluster) throws IOException{
-		read(target, cluster,source);
+	public Object read(IOInstance target, ContentReader source, Object oldVal, Cluster cluster) throws IOException{
+		read(target, cluster, source);
 		return null;
 	}
 	@Override
-	public void read(IOStruct.Instance target, Cluster cluster, ContentReader source) throws IOException{
+	public void read(IOInstance target, Cluster cluster, ContentReader source) throws IOException{
 		classCheck(target);
 		
 		NumberSize size=blockInfo.wordSize();
@@ -122,12 +123,12 @@ public class BitBlockNode extends VariableNode.FixedSize.Node<Object>{
 	}
 	
 	@Override
-	public void write(IOStruct.Instance target, Cluster cluster, ContentWriter dest, Object source) throws IOException{
+	public void write(IOInstance target, Cluster cluster, ContentWriter dest, Object source) throws IOException{
 		write(target, cluster, dest);
 	}
 	
 	@Override
-	public void write(IOStruct.Instance target, Cluster cluster, ContentWriter dest) throws IOException{
+	public void write(IOInstance target, Cluster cluster, ContentWriter dest) throws IOException{
 		classCheck(target);
 		
 		try(var flags=new FlagWriter.AutoPop(blockInfo.wordSize(), dest)){
@@ -147,8 +148,8 @@ public class BitBlockNode extends VariableNode.FixedSize.Node<Object>{
 		}
 	}
 	
-	private void classCheck(IOStruct.Instance target){
-		if(target.structType()!=type) throw new ClassCastException(TextUtil.toString(target.structType(), "!=", type));
+	private void classCheck(IOInstance target){
+		if(target.getStruct()!=type) throw new ClassCastException(TextUtil.toString(target.getStruct(), "!=", type));
 	}
 	
 	

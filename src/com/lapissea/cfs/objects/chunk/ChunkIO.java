@@ -262,7 +262,7 @@ public class ChunkIO implements RandomIO{
 		
 		long   cOff     =calcCursorOffset();
 		long   remaining=cursor.getSize()-cOff;
-		long[] next     ={cursor.dataEnd(), cursor.dataStart(), cursor.getPtr().value()};
+		long[] next     ={cursor.dataEnd(), cursor.dataStart(), cursor.getPtr().getValue()};
 		if(remaining==0) return -1;
 		
 		int toRead=(int)Math.min(len, remaining);

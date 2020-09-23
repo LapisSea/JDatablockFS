@@ -76,11 +76,11 @@ public interface StructImpl{
 	
 	StructImpl DEFAULT_IMPL=new StructReflectionImpl();
 	
-	static <T extends IOStruct.Instance> List<VariableNode<Object>> generateVariablesDefault(Class<T> clazz){
+	static <T extends IOInstance> List<VariableNode<Object>> generateVariablesDefault(Class<T> clazz){
 		return DEFAULT_IMPL.generateVariables(clazz);
 	}
 	
-	default <T extends IOStruct.Instance> List<VariableNode<Object>> generateVariables(Class<T> clazz){
+	default <T extends IOInstance> List<VariableNode<Object>> generateVariables(Class<T> clazz){
 		RelationCollection data=new RelationCollection();
 		
 		Annotated.collect(clazz, data.map, new Annotated.ElementDef<>(c->Arrays.stream(c.getDeclaredMethods()).filter(e->!Modifier.isStatic(e.getModifiers())), Method::getAnnotation), AnnotationRelations::methods);
@@ -89,6 +89,6 @@ public interface StructImpl{
 		return generateVariables(clazz, data);
 	}
 	
-	<T extends IOStruct.Instance> List<VariableNode<Object>> generateVariables(Class<T> clazz, RelationCollection data);
+	<T extends IOInstance> List<VariableNode<Object>> generateVariables(Class<T> clazz, RelationCollection data);
 	
 }

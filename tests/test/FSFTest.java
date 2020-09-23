@@ -5,6 +5,7 @@ import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.objects.IOList;
 import com.lapissea.cfs.objects.StructFlatList;
 import com.lapissea.cfs.objects.StructLinkedList;
+import com.lapissea.cfs.objects.chunk.Chunk;
 import com.lapissea.cfs.objects.chunk.ChunkPointer;
 import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.util.LateInit;
@@ -30,8 +31,9 @@ class FSFTest{
 		try{
 			
 			LateInit<DataLogger> display=new LateInit<>(()->{
-//				return new Display();
-				return f->{};
+				//ay
+				return new Display();
+//				return f->{};
 			});
 			
 			var preBuf=new LinkedList<MemFrame>();
@@ -66,11 +68,22 @@ class FSFTest{
 	}
 	
 	private static void doTests(Cluster cluster) throws IOException{
+
+//		for(int i=0;i<2;i++){
+//			flatListTest(cluster);
+//			linkedListTest(cluster);
+//		}
 		
-		for(int i=0;i<10;i++){
-			flatListTest(cluster);
-			linkedListTest(cluster);
-		}
+		Chunk c1=cluster.alloc(10);
+		Chunk c2=cluster.alloc(10);
+		Chunk c3=cluster.alloc(10);
+		Chunk c4=cluster.alloc(10);
+		Chunk c5=cluster.alloc(10);
+		Chunk c6=cluster.alloc(10);
+		
+		c1.freeChaining();
+		c3.freeChaining();
+		c5.freeChaining();
 	}
 	
 	private static void flatListTest(Cluster cluster) throws IOException{
@@ -103,6 +116,9 @@ class FSFTest{
 		list.addElement(new ChunkPointer(15254351));
 		list.addElement(new ChunkPointer(15254351));
 		list.validate();
+		
+		list.removeElement(1);
+		list.removeElement(3);
 
 //		LogUtil.println(cluster.getData().hexdump());
 //

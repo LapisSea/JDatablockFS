@@ -2,13 +2,13 @@ package com.lapissea.cfs.objects;
 
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
-import com.lapissea.cfs.io.struct.IOStruct;
+import com.lapissea.cfs.io.struct.IOInstance;
 import com.lapissea.cfs.io.struct.IOStruct.*;
 import com.lapissea.util.ZeroArrays;
 
 import java.io.IOException;
 
-public class SizedBlob extends IOStruct.Instance{
+public class SizedBlob extends IOInstance{
 	
 	@EnumValue(index=1)
 	private NumberSize lenSize;
@@ -34,7 +34,7 @@ public class SizedBlob extends IOStruct.Instance{
 	public void setData(byte[] data){
 		this.data=data;
 		byteCount=data==null?0:data.length;
-		lenSize=NumberSize.bySize(byteCount).max(NumberSize.BYTE);
+		lenSize=NumberSize.bySize(byteCount).max(NumberSize.SMALEST_REAL);
 	}
 	
 	@Size

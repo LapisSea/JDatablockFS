@@ -1,9 +1,9 @@
 package com.lapissea.cfs.objects.text;
 
-import com.lapissea.cfs.io.struct.IOStruct;
+import com.lapissea.cfs.io.struct.IOInstance;
 import com.lapissea.cfs.io.struct.IOStruct.Value;
 
-public abstract class AbstractText extends IOStruct.Instance implements CharSequence{
+public abstract class AbstractText extends IOInstance implements CharSequence{
 	
 	@Value(index=10)
 	protected String data;

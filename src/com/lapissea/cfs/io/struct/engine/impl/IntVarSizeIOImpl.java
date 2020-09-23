@@ -2,6 +2,7 @@ package com.lapissea.cfs.io.struct.engine.impl;
 
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
+import com.lapissea.cfs.io.struct.IOInstance;
 import com.lapissea.cfs.io.struct.IOStruct;
 import com.lapissea.cfs.io.struct.VariableNode;
 import com.lapissea.cfs.objects.NumberSize;
@@ -28,7 +29,7 @@ public class IntVarSizeIOImpl extends VariableNode.PrimitiveInt{
 		this.defaultSize=defaultSize==NumberSize.VOID?null:defaultSize;
 	}
 	
-	private NumberSize getSize(IOStruct.Instance source){
+	private NumberSize getSize(IOInstance source){
 		NumberSize size;
 		try{
 			size=(NumberSize)varSize.get(source);
@@ -42,7 +43,7 @@ public class IntVarSizeIOImpl extends VariableNode.PrimitiveInt{
 	}
 	
 	@Override
-	protected int get(IOStruct.Instance source){
+	protected int get(IOInstance source){
 		if(getFun!=null) return getFun.getValue(source);
 		else{
 			try{
@@ -54,7 +55,7 @@ public class IntVarSizeIOImpl extends VariableNode.PrimitiveInt{
 	}
 	
 	@Override
-	protected void set(IOStruct.Instance target, int newValue){
+	protected void set(IOInstance target, int newValue){
 		if(setFun!=null) setFun.setValue(target, newValue);
 		else{
 			try{
@@ -67,23 +68,23 @@ public class IntVarSizeIOImpl extends VariableNode.PrimitiveInt{
 	
 	
 	@Override
-	protected int read(IOStruct.Instance target, ContentReader source, int oldVal) throws IOException{
+	protected int read(IOInstance target, ContentReader source, int oldVal) throws IOException{
 		return (int)getSize(target).read(source);
 	}
 	
 	@Override
-	protected void write(IOStruct.Instance target, ContentWriter dest, int source) throws IOException{
+	protected void write(IOInstance target, ContentWriter dest, int source) throws IOException{
 		getSize(target).write(dest, source);
 	}
 	
 	@Deprecated
 	@Override
-	public long mapSize(IOStruct.Instance target){
+	public long mapSize(IOInstance target){
 		return getSize(target).bytes;
 	}
 	
 	@Override
 	public OptionalLong getMaximumSize(){
-		return OptionalLong.of(NumberSize.LONG.bytes);
+		return OptionalLong.of(NumberSize.LARGEST.bytes);
 	}
 }

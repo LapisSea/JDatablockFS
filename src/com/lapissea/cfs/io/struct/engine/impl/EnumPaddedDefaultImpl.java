@@ -3,6 +3,7 @@ package com.lapissea.cfs.io.struct.engine.impl;
 import com.lapissea.cfs.io.bit.EnumFlag;
 import com.lapissea.cfs.io.bit.FlagReader;
 import com.lapissea.cfs.io.bit.FlagWriter;
+import com.lapissea.cfs.io.struct.IOInstance;
 import com.lapissea.cfs.io.struct.IOStruct;
 import com.lapissea.cfs.io.struct.VariableNode;
 import com.lapissea.util.ShouldNeverHappenError;
@@ -26,19 +27,19 @@ public class EnumPaddedDefaultImpl<T extends Enum<T>> extends VariableNode.Flag<
 	}
 	
 	@Override
-	public T readData(IOStruct.Instance target, FlagReader source, T oldVal){
+	public T readData(IOInstance target, FlagReader source, T oldVal){
 		return flagInfo.read(source);
 	}
 	
 	@Override
-	public void writeData(IOStruct.Instance target, FlagWriter dest, T source){
+	public void writeData(IOInstance target, FlagWriter dest, T source){
 		Objects.requireNonNull(source);
 		flagInfo.write(source, dest);
 	}
 	
 	@Override
 	@SuppressWarnings("unchecked")
-	public T getValue(IOStruct.Instance source){
+	public T getValue(IOInstance source){
 		if(getFun!=null) return getFun.getValue(source);
 		else{
 			try{
@@ -50,7 +51,7 @@ public class EnumPaddedDefaultImpl<T extends Enum<T>> extends VariableNode.Flag<
 	}
 	
 	@Override
-	public void setValue(IOStruct.Instance target, T value){
+	public void setValue(IOInstance target, T value){
 		if(setFun!=null) setFun.setValue(target, value);
 		else{
 			try{

@@ -18,7 +18,7 @@ public enum NumberSize{
 	VOID('V', 0x0, 0, in->0, (out, num)->{}),
 	BYTE('B', 0xFFL, 1, ContentReader::readUnsignedInt1, (out, num)->out.writeInt1((int)num)),
 	SHORT('s', 0xFFFFL, 2, ContentReader::readUnsignedInt2, (out, num)->out.writeInt2((int)num)),
-	BIG_SHORT('S', 0xFFFFFFL, 3, ContentReader::readUnsignedInt3, (out, num)->out.writeInt3((int)num)),
+	SMALL_INT('S', 0xFFFFFFL, 3, ContentReader::readUnsignedInt3, (out, num)->out.writeInt3((int)num)),
 	INT('i', 0xFFFFFFFFL, 4, ContentReader::readUnsignedInt4, (out, num)->out.writeInt4((int)num)),
 	BIG_INT('I', 0xFFFFFFFFFFL, 5, ContentReader::readUnsignedInt5, ContentWriter::writeInt5),
 	SMALL_LONG('l', 0xFFFFFFFFFFFFL, 6, ContentReader::readUnsignedInt6, ContentWriter::writeInt6),
@@ -27,6 +27,9 @@ public enum NumberSize{
 	private static final NumberSize[] VALS=NumberSize.values();
 	
 	public static final EnumFlag<NumberSize> FLAG_INFO=EnumFlag.get(NumberSize.class);
+	
+	public static final NumberSize SMALEST_REAL=BYTE;
+	public static final NumberSize LARGEST     =VALS[VALS.length-1];
 	
 	public static NumberSize ordinal(int index){
 		return VALS[index];
