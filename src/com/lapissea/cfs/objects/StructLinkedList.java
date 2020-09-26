@@ -1,7 +1,6 @@
 package com.lapissea.cfs.objects;
 
 import com.lapissea.cfs.Cluster;
-import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.struct.IOInstance;
@@ -24,52 +23,46 @@ import static com.lapissea.cfs.Config.*;
 import static com.lapissea.cfs.io.struct.IOStruct.*;
 
 @SuppressWarnings("AutoBoxing")
-public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained.SingletonChunk implements IOList<T>{
+public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained.SingletonChunk<StructLinkedList<T>> implements IOList<T>{
 	
-	private static class Node extends IOInstance.Contained.SingletonChunk{
+	private static final IOStruct                   NODE_TYP     =IOStruct.get(StructLinkedList.Node.class);
+	private static final VariableNode<ChunkPointer> NODE_NEXT_VAR=NODE_TYP.getVar(0);
+	
+	private class Node extends IOInstance.Contained.SingletonChunk<Node>{
 		
-		@SuppressWarnings("unchecked")
-		private static final VariableNode<ChunkPointer> NEXT_VAR=(VariableNode<ChunkPointer>)(VariableNode<?>)IOStruct.thisClass().variables.get(0);
+		private Chunk container;
 		
-		private final UnsafeFunction<Chunk, ? extends IOInstance, IOException> constructor;
-		private       Chunk                                                    container;
+		@Value(index=0, rw=ObjectPointer.AutoSizedNoOffsetIO.class, rwArgs="BYTE")
+		private final ObjectPointer<Node> next;
 		
-		@Value(index=1, rw=ChunkPointer.AutoSizedIO.class, rwArgs="BYTE")
-		ChunkPointer next;
+		@Value(index=1)
+		private IOInstance value;
 		
-		@Value(index=2)
-		IOInstance value;
+		public Node(Chunk container){
+			this();
+			setContainer(container);
+		}
 		
-		public Node(UnsafeFunction<Chunk, ? extends IOInstance, IOException> constructor){
-			this.constructor=constructor;
+		public Node(){
+			super(NODE_TYP);
+			next=new ObjectPointer.Struct<>(getValueConstructor());
+		}
+		
+		@Override
+		protected UnsafeFunction<Chunk, Node, IOException> getValueConstructor(){
+			return Node::new;
 		}
 		
 		@Write
 		void writeValue(ContentWriter dest, IOInstance source) throws IOException{
 			Objects.requireNonNull(getContainer());
-			
-			var off=getStructOffset()+calcVarOffset(2).getOffset();
-			if(DEBUG_VALIDATION){
-				if(dest instanceof RandomIO io){
-					assert off==io.getPos():off+" == "+io.getPos();
-				}
-			}
-			
-			source.writeStruct(getContainer().cluster, dest, off);
+			source.writeStruct(getContainer().cluster, dest);
 		}
 		
 		@Read
 		IOInstance readValue(ContentReader source, IOInstance oldVal) throws IOException{
-			var val=constructor.apply(getContainer());
-			
-			var off=getStructOffset()+calcVarOffset(2).getOffset();
-			if(DEBUG_VALIDATION){
-				if(source instanceof RandomIO io){
-					assert off==io.getGlobalPos():this+" "+off+" == "+io.getGlobalPos();
-				}
-			}
-			
-			val.readStruct(getContainer().cluster, source, off);
+			var val=valConstructor.apply(getContainer());
+			val.readStruct(getContainer().cluster, source);
 			return val;
 		}
 		
@@ -81,7 +74,7 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 		@Override
 		public boolean equals(Object o){
 			if(this==o) return true;
-			return o instanceof Node node&&
+			return o instanceof StructLinkedList<?>.Node node&&
 			       Objects.equals(next, node.next)&&
 			       Objects.equals(value, node.value);
 		}
@@ -102,11 +95,10 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 		
 		void setContainer(Chunk container){
 			this.container=container;
-			setStructOffset(container.getPtr());
 		}
 		
 		void allocContainer(Cluster cluster) throws IOException{
-			setContainer(cluster.alloc(getInstanceSize()));
+			setContainer(cluster.alloc(getInstanceSize(), solidNodes));
 			writeStruct();
 		}
 		
@@ -116,7 +108,7 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 		}
 		
 		void setNext(Node node){
-			next=node.getContainer().getPtr();
+			next.set(node.getContainer().getPtr(), 0);
 		}
 		
 		@Override
@@ -126,8 +118,9 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 	}
 	
 	private boolean changing;
+	private boolean solidNodes=true;
 	
-	private final UnsafeFunction<Chunk, T, IOException> constructor;
+	private final UnsafeFunction<Chunk, T, IOException> valConstructor;
 	private       Chunk                                 container;
 	
 	private final Map<Integer, Node> nodeCache=new WeakValueHashMap<>();
@@ -137,19 +130,17 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 	@PrimitiveValue(index=0, defaultSize=NumberSize.INT)
 	private int size;
 	
-	@Value(index=1, rw=ObjectPointer.FixedIO.class)
+	@Value(index=1, rw=ObjectPointer.FixedNoOffsetIO.class)
 	private final ObjectPointer<Node> first;
 	
-	public StructLinkedList(Chunk container, Supplier<T> constructor) throws IOException{
-		this(container, c->constructor.get());
+	public StructLinkedList(Chunk container, Supplier<T> valConstructor) throws IOException{
+		this(container, c->valConstructor.get());
 	}
 	
-	public StructLinkedList(Chunk container, UnsafeFunction<Chunk, T, IOException> constructor) throws IOException{
-		super(container.dataStart());
-		
+	public StructLinkedList(Chunk container, UnsafeFunction<Chunk, T, IOException> valConstructor) throws IOException{
 		this.container=container;
-		this.constructor=constructor;
-		first=new ObjectPointer.Struct<>(()->new Node(constructor));
+		this.valConstructor=valConstructor;
+		first=new ObjectPointer.Struct<>(Node::new);
 		
 		validate();
 	}
@@ -175,7 +166,7 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 		
 		if(index==0){
 			
-			Node result=new Node(constructor);
+			Node result=new Node();
 			
 			result.initContainer(first.getBlock(cluster()));
 			
@@ -184,8 +175,8 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 			return result;
 		}
 		
-		int          start;
-		ChunkPointer startingPtr;
+		int                 start;
+		ObjectPointer<Node> startingPtr;
 		
 		Node prev=nodeCache.get(index-1);
 		if(prev!=null){
@@ -204,19 +195,19 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 			startingPtr=entry.getValue().next;
 		}
 		
-		Node result=new Node(constructor);
+		Node result=new Node();
 		
-		ChunkPointer resultPtr=startingPtr;
-		
+		ObjectPointer<Node> resultPtr =startingPtr;
+		var                 nextVarOff=NODE_NEXT_VAR.getKnownOffset().getOffset();
 		for(int i=start;i<index;i++){
-			resultPtr=resultPtr.dereference(cluster())
-			                   .ioAt(Node.NEXT_VAR.getKnownOffset().getOffset(), io->{
-				                   Node.NEXT_VAR.read(result, cluster(), io);
-				                   return result.next;
-			                   });
+			resultPtr=resultPtr.io(cluster(), io->{
+				io.skip(nextVarOff);
+				NODE_NEXT_VAR.read(result, cluster(), io);
+				return result.next;
+			});
 		}
 		
-		result.initContainer(resultPtr.dereference(cluster()));
+		result.initContainer(resultPtr.getBlock(cluster()));
 		
 		nodeCache.put(index, result);
 		return result;
@@ -243,7 +234,17 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 			if(node.value.equals(value)) return;
 			
 			
+			Node sizeCheck=new Node();
+			sizeCheck.value=value;
+			sizeCheck.next.set(node.next);
+			
+			var oldVal=node.value;
 			node.value=value;
+			
+			if(sizeCheck.getInstanceSize()>node.getInstanceSize()){
+				//????
+			}
+			
 			node.writeStruct();
 			
 		}finally{
@@ -252,7 +253,7 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 	}
 	
 	@Override
-	public void ensureCapacity(int elementCapacity) throws IOException{ }
+	public void ensureCapacity(int elementCapacity){ }
 	
 	@Override
 	public void removeElement(int index) throws IOException{
@@ -281,7 +282,7 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 		try{
 			if(index==0){
 				toRemove=first.getBlock(cluster());
-				first.set(getNode(0).next, 0);
+				first.set(getNode(0).next);
 				popCache.run();
 				addSizeAndSave(-1);
 				return;
@@ -292,7 +293,7 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 			
 			toRemove=node.getContainer();
 			
-			prevNode.next=node.next;
+			prevNode.next.set(node.next);
 			
 			popCache.run();
 			
@@ -308,16 +309,8 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 		
 	}
 	
-	@Override
-	protected void setStructOffset(long structOffset){
-		if(container!=null){
-			assert container.dataStart()==structOffset:container.dataStart()+" "+structOffset;
-		}
-		super.setStructOffset(structOffset);
-	}
-	
 	private Node fromVal(T value){
-		Node node=new Node(constructor);
+		Node node=new Node();
 		node.value=value;
 		return node;
 	}
@@ -334,7 +327,7 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 		setChanging(true);
 		try{
 			if(isEmpty()){
-				first.set(newNode.getContainer().getPtr(), 0);
+				first.set(newNode.getSelfPtr());
 			}else{
 				Node last=getNode(size()-1);
 				last.setNext(newNode);
@@ -361,7 +354,7 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 		
 		Node newNode=fromVal(value);
 		
-		newNode.next=new ChunkPointer(cluster().getData().getSize());
+		newNode.next.set(new ChunkPointer(cluster().getData().getSize()), 0);
 		newNode.allocContainer(cluster());
 		
 		validate();
@@ -370,14 +363,14 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 		setChanging(true);
 		try{
 			if(index==0){
-				newNode.next=first.getDataBlock();
+				newNode.next.set(first);
 				newNode.writeStruct();
 				first.set(newNode.getContainer().getPtr(), 0);
 			}else{
 				int  insertionIndex=index-1;
 				Node insertionNode =getNode(insertionIndex);
 				
-				newNode.next=insertionNode.next;
+				newNode.next.set(insertionNode.next);
 				newNode.writeStruct();
 				
 				insertionNode.setNext(newNode);
@@ -393,8 +386,6 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 	@Override
 	public void validate() throws IOException{
 		if(!DEBUG_VALIDATION) return;
-		
-		assert container.dataStart()==getStructOffset():container.dataStart()+" "+getStructOffset();
 		
 		var elementCount=stream().count();
 		assert elementCount==size:elementCount+"=="+size();
@@ -422,7 +413,7 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 	
 	private void checkCache(Node node) throws IOException{
 		
-		Node read=new Node(constructor);
+		Node read=new Node();
 		read.initContainer(node.getContainer());
 		
 		assert read.equals(node):"\n"+TextUtil.toTable("cached/read mismatch", List.of(node, read));

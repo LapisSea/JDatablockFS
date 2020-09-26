@@ -2,24 +2,27 @@ package com.lapissea.cfs.io.struct.engine.impl;
 
 import com.lapissea.cfs.Cluster;
 import com.lapissea.cfs.io.ReaderWriter;
+import com.lapissea.cfs.io.SelfPoint;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.struct.IOInstance;
 import com.lapissea.cfs.io.struct.IOStruct;
 import com.lapissea.cfs.io.struct.VariableNode;
 import com.lapissea.cfs.objects.chunk.Chunk;
-import com.lapissea.cfs.objects.chunk.ChunkPointer;
+import com.lapissea.cfs.objects.chunk.ObjectPointer;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.OptionalLong;
 
 @SuppressWarnings("unchecked")
-public class StructPtrIOImpl<T extends IOInstance> extends VariableNode<T>{
+public class StructPtrIOImpl<T extends IOInstance&SelfPoint<T>> extends VariableNode.SelfPointer<T>{
 	
-	public static class Fixed<T extends IOInstance> extends StructPtrIOImpl<T> implements VariableNode.FixedSize{
+	public static class Fixed<T extends IOInstance&SelfPoint<T>> extends StructPtrIOImpl<T> implements VariableNode.FixedSize{
 		
-		public Fixed(String name, int index, Field valueField, IOStruct.Get.Getter<T> getFun, IOStruct.Set.Setter<T> setFun, IOStruct.Construct.Constructor<T> constructorFun, ReaderWriter<ChunkPointer> ptrIO, IOStruct structType){
+		public Fixed(String name, int index,
+		             Field valueField, IOStruct.Get.Getter<T> getFun, IOStruct.Set.Setter<T> setFun, IOStruct.Construct.Constructor<T> constructorFun,
+		             ReaderWriter<ObjectPointer<T>> ptrIO, IOStruct structType){
 			super(name, index, valueField, getFun, setFun, constructorFun, ptrIO, structType);
 		}
 		
@@ -42,14 +45,14 @@ public class StructPtrIOImpl<T extends IOInstance> extends VariableNode<T>{
 	private final IOStruct.Set.Setter<T>            setFun;
 	private final IOStruct.Construct.Constructor<T> constructorFun;
 	
-	protected final ReaderWriter<ChunkPointer> ptrIO;
+	protected final ReaderWriter<ObjectPointer<T>> ptrIO;
 	
 	private final IOStruct structType;
 	
 	
 	public StructPtrIOImpl(String name, int index,
 	                       Field valueField, IOStruct.Get.Getter<T> getFun, IOStruct.Set.Setter<T> setFun, IOStruct.Construct.Constructor<T> constructorFun,
-	                       ReaderWriter<ChunkPointer> ptrIO, IOStruct structType){
+	                       ReaderWriter<ObjectPointer<T>> ptrIO, IOStruct structType){
 		super(name, index);
 		this.valueField=valueField;
 		this.getFun=getFun;
@@ -89,50 +92,39 @@ public class StructPtrIOImpl<T extends IOInstance> extends VariableNode<T>{
 	protected long mapSize(IOInstance target, T value){
 		var siz=ptrIO.getFixedSize();
 		if(siz.isPresent()) return siz.getAsInt();
-		return ptrIO.mapSize(target, value==null?null:new ChunkPointer(value.getStructOffset()));
+		return ptrIO.mapSize(target, value.getSelfPtr());
 	}
 	
 	@Override
 	protected T read(IOInstance target, ContentReader source, T oldVal, Cluster cluster) throws IOException{
-		ChunkPointer ptr=ptrIO.read(target, source, null);
-		Chunk        c  =ptr.dereference(cluster);
-		T            val;
+		ObjectPointer<T> ptr=ptrIO.read(target, source, new ObjectPointer.Struct<>(null));
+		if(ptr.getDataBlock()==null) return null;
+		Chunk c=ptr.getBlock(cluster);
+		T     val;
 		if(oldVal==null){
 			val=newInstance(target, c);
 		}else{
 			val=oldVal;
 		}
-		c.storeTo(cluster, val);
-		assert val.getStructOffset()==c.dataStart():val.getStructOffset()+" "+c.dataStart();
+		
+		c.ioAt(ptr.getOffset(), io->{val.readStruct(cluster, io);});
+		
 		return val;
 	}
 	
 	@Override
 	protected void write(IOInstance target, Cluster cluster, ContentWriter dest, T source) throws IOException{
-		ChunkPointer ptr;
+		ObjectPointer<T> ptr;
 		if(source==null) ptr=null;
 		else{
-			long offset=source.getStructOffset();
-			if(offset==-1){
+			ptr=source.getSelfPtr();
+			
+			if(ptr.getDataBlock()==null){
 //				ptr=cluster.alloc(source.getInstanceSize()).getPtr();
 				throw new IllegalStateException();
-			}else{
-				var typ=IOStruct.get(Chunk.class);
-				find:
-				{
-					for(long i=typ.getMinimumSize(), j=typ.requireMaximumSize();i<j;i++){
-						try{
-							var realPtr=new ChunkPointer(offset-i);
-							realPtr.dereference(cluster);
-							ptr=realPtr;
-							break find;
-						}catch(IOException ignored){}
-					}
-					throw new IOException();
-				}
 			}
 			
-			ptr.dereference(cluster).io(io->source.writeStruct(cluster, io));
+			ptr.write(cluster, source);
 		}
 		
 		ptrIO.write(target, dest, ptr);
@@ -151,9 +143,19 @@ public class StructPtrIOImpl<T extends IOInstance> extends VariableNode<T>{
 		}
 	}
 	
+	@Override
 	public void allocNew(IOInstance target, Cluster cluster) throws IOException{
-		var chunk=cluster.alloc(structType.getKnownSize().orElse(structType.getMaximumSize().orElse(structType.getMinimumSize())));
-		T   val  =newInstance(target, chunk);
+		allocNew(target, cluster, structType.getKnownSize().isPresent()||structType.getMaximumSize().isPresent());
+	}
+	
+	@Override
+	public void allocNew(IOInstance target, Cluster cluster, boolean disableNext) throws IOException{
+		var chunk=cluster.alloc(
+			structType.getKnownSize().orElse(structType.getMaximumSize().orElse(structType.getMinimumSize())),
+			disableNext);
+		
+		T val=newInstance(target, chunk);
+		
 		chunk.io(io->{
 			val.writeStruct(cluster, io);
 			io.trim();

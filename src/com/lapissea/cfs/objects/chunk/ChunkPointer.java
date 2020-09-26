@@ -16,45 +16,8 @@ import java.util.Objects;
 import java.util.OptionalInt;
 import java.util.function.Function;
 
-public class ChunkPointer implements INumber{
-	
-	public static class PtrFixed extends PtrRef{
-		
-		@Value(index=1, rw=ChunkPointer.FixedIO.class, rwArgs="LONG")
-		private ChunkPointer value;
-		
-		
-		public PtrFixed(){}
-		
-		public PtrFixed(ChunkPointer value){
-			this.value=value;
-		}
-		
-		@Override
-		public ChunkPointer getValue(){
-			return value;
-		}
-		
-	}
-	
-	public static class PtrSmart extends PtrRef{
-		
-		@Value(index=1, rw=ChunkPointer.AutoSizedIO.class)
-		private ChunkPointer value;
-		
-		
-		public PtrSmart(){}
-		
-		public PtrSmart(ChunkPointer value){
-			this.value=value;
-		}
-		
-		@Override
-		public ChunkPointer getValue(){
-			return value;
-		}
-		
-	}
+//@ValueBased
+public final class ChunkPointer implements INumber{
 	
 	public abstract static class PtrRef extends IOInstance{
 		
@@ -94,20 +57,44 @@ public class ChunkPointer implements INumber{
 		}
 		
 	}
-	public static ChunkPointer of(long value){
-		return new ChunkPointer(value);
-	}
-	public static ChunkPointer of(INumber value){
-		return new ChunkPointer(value.getValue());
+	
+	public static class PtrFixed extends PtrRef{
+		
+		@Value(index=1, rw=ChunkPointer.FixedIO.class, rwArgs="LONG")
+		private ChunkPointer value;
+		
+		public PtrFixed(){}
+		
+		public PtrFixed(ChunkPointer value){
+			this.value=value;
+		}
+		
+		@Override
+		public ChunkPointer getValue(){
+			return value;
+		}
+		
 	}
 	
-	private final long value;
-	
-	public ChunkPointer(long value){
-		this.value=value;
-		assert value>0:
-			this.toString();
+	public static class PtrSmart extends PtrRef{
+		
+		@Value(index=1, rw=ChunkPointer.AutoSizedIO.class)
+		private ChunkPointer value;
+		
+		
+		public PtrSmart(){}
+		
+		public PtrSmart(ChunkPointer value){
+			this.value=value;
+		}
+		
+		@Override
+		public ChunkPointer getValue(){
+			return value;
+		}
+		
 	}
+	
 	
 	public static class FixedIO implements ReaderWriter<ChunkPointer>{
 		
@@ -238,6 +225,26 @@ public class ChunkPointer implements INumber{
 		public OptionalInt getMaxSize(){
 			return OptionalInt.of(NumberSize.LARGEST.bytes);
 		}
+	}
+	
+	
+	public static ChunkPointer of(long value){
+		return new ChunkPointer(value);
+	}
+	public static ChunkPointer of(INumber value){
+		return new ChunkPointer(value.getValue());
+	}
+	
+	public static long getValueNullable(ChunkPointer ptr){
+		return ptr==null?0:ptr.getValue();
+	}
+	
+	private final long value;
+	
+	public ChunkPointer(long value){
+		this.value=value;
+		assert value>0:
+			this.toString();
 	}
 	
 	public static ChunkPointer getNullable(long value){

@@ -10,6 +10,7 @@ import com.lapissea.cfs.io.streams.RandomOutputStream;
 import com.lapissea.cfs.io.struct.IOInstance;
 import com.lapissea.cfs.objects.INumber;
 import com.lapissea.cfs.objects.chunk.ChunkPointer;
+import com.lapissea.cfs.objects.chunk.ObjectPointer;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;
@@ -172,6 +173,9 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader, Sizab
 	 */
 	void fillZero(long requestedMemory) throws IOException;
 	
+	default ObjectPointer<?> getGlobalRef() throws IOException{
+		throw new UnsupportedOperationException();
+	}
 	long getGlobalPos() throws IOException;
 	
 	default RandomIO readOnly(){

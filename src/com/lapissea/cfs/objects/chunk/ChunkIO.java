@@ -210,7 +210,7 @@ public class ChunkIO implements RandomIO{
 				
 				chunk.modifyAndSave(ch->{
 					ch.clampSize(chunkSpace);
-					ch.setNextPtr(null);
+					ch.clearNextPtr();
 				});
 				if(chunkSpace<chunk.getSize()){
 					chunk.zeroOutFromTo(chunkSpace);
@@ -364,6 +364,11 @@ public class ChunkIO implements RandomIO{
 			chunk=chunk.next();
 		}
 		syncSourceCursor();
+	}
+	
+	@Override
+	public ObjectPointer<?> getGlobalRef() throws IOException{
+		return new ObjectPointer.Struct<>(null);
 	}
 	
 	@Override

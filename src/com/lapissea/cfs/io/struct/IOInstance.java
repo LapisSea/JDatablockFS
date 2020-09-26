@@ -4,6 +4,7 @@ import com.lapissea.cfs.Cluster;
 import com.lapissea.cfs.exceptions.MalformedObjectException;
 import com.lapissea.cfs.exceptions.OutOfSyncDataException;
 import com.lapissea.cfs.io.RandomIO;
+import com.lapissea.cfs.io.SelfPoint;
 import com.lapissea.cfs.io.content.ContentInputStream;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
@@ -11,9 +12,11 @@ import com.lapissea.cfs.io.content.SimpleContentWriter;
 import com.lapissea.cfs.io.struct.engine.impl.BitBlockNode;
 import com.lapissea.cfs.objects.INumber;
 import com.lapissea.cfs.objects.chunk.Chunk;
+import com.lapissea.cfs.objects.chunk.ObjectPointer;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
+import com.lapissea.util.function.UnsafeFunction;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -33,22 +36,11 @@ public class IOInstance{
 	
 	public abstract static class Contained extends IOInstance{
 		
-		public abstract static class SingletonChunk extends Contained{
+		public abstract static class SingletonChunk<SELF extends SingletonChunk<SELF>> extends Contained implements SelfPoint<SELF>{
 			
-			public SingletonChunk(){
-			}
-			
+			public SingletonChunk(){ }
 			public SingletonChunk(IOStruct struct){
 				super(struct);
-			}
-			public SingletonChunk(INumber structOffset){
-				this(structOffset.getValue());
-			}
-			public SingletonChunk(long structOffset){
-				super(structOffset);
-			}
-			public SingletonChunk(IOStruct struct, long structOffset){
-				super(struct, structOffset);
 			}
 			
 			public abstract Chunk getContainer();
@@ -58,21 +50,23 @@ public class IOInstance{
 				return getContainer().io();
 			}
 			@Override
-			protected Cluster getSourceCluster() throws IOException{
+			protected Cluster getSourceCluster(){
 				return getContainer().cluster;
 			}
 			
+			protected UnsafeFunction<Chunk, SELF, IOException> getValueConstructor(){
+				return null;
+			}
+			
+			@Override
+			public ObjectPointer<SELF> getSelfPtr(){
+				return new ObjectPointer.Struct<>(getContainer().getPtr(), 0, getValueConstructor());
+			}
 		}
 		
 		public Contained(){ }
 		public Contained(IOStruct struct){
 			super(struct);
-		}
-		public Contained(long structOffset){
-			super(structOffset);
-		}
-		public Contained(IOStruct struct, long structOffset){
-			super(struct, structOffset);
 		}
 		
 		protected abstract RandomIO getStructSourceIO() throws IOException;
@@ -107,17 +101,6 @@ public class IOInstance{
 		}
 	}
 	
-	protected long structOffset=-1;
-	public long getStructOffset(){ return structOffset; }
-	protected void setStructOffset(long structOffset){
-		assert structOffset>0:
-			this+" "+structOffset;
-		this.structOffset=structOffset;
-	}
-	protected final void setStructOffset(INumber structOffset){
-		setStructOffset(structOffset.getValue());
-	}
-	
 	private final IOStruct struct;
 	@NotNull
 	public IOStruct getStruct(){ return struct; }
@@ -125,22 +108,13 @@ public class IOInstance{
 	public IOInstance(){
 		this.struct=IOStruct.get(getClass());
 	}
-	public IOInstance(long structOffset){
-		this.struct=IOStruct.get(getClass());
-		this.setStructOffset(structOffset);
-	}
-	public IOInstance(IOStruct struct, long structOffset){
-		this(struct);
-		this.setStructOffset(structOffset);
-	}
 	public IOInstance(IOStruct struct){
-		this.struct=Objects.requireNonNull(struct);
+		Objects.requireNonNull(struct);
+		assert getClass()==struct.instanceClass;
+		this.struct=struct;
 	}
 	
-	
-	public void readStruct(Cluster cluster, RandomIO buff) throws IOException{ readStruct(cluster, buff, buff.getGlobalPos()); }
-	public void readStruct(Cluster cluster, ContentReader in, long structOffset) throws IOException{
-		this.setStructOffset(structOffset);
+	public void readStruct(Cluster cluster, ContentReader in) throws IOException{
 		
 		boolean shouldClose=false;
 		
@@ -177,8 +151,7 @@ public class IOInstance{
 		}
 	}
 	
-	public void writeStruct(Cluster cluster, RandomIO buff) throws IOException{ writeStruct(cluster, buff, buff.getGlobalPos()); }
-	public void writeStruct(Cluster cluster, ContentWriter out, long structOffset) throws IOException{
+	public void writeStruct(Cluster cluster, ContentWriter out) throws IOException{
 		boolean       shouldClose=false;
 		Throwable     e1         =null;
 		ContentWriter buff;
@@ -240,7 +213,7 @@ public class IOInstance{
 	public void validateWrittenData(Cluster cluster, ContentReader in) throws IOException{
 		var siz=getInstanceSize();
 		var bb =new ByteArrayOutputStream(Math.toIntExact(siz));
-		writeStruct(cluster, SimpleContentWriter.pass(bb), getStructOffset());
+		writeStruct(cluster, SimpleContentWriter.pass(bb));
 		
 		if(bb.size()!=siz){
 			throw new MalformedObjectException("Object declared size of "+siz+" but wrote "+bb.size()+" bytes");

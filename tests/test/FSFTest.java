@@ -13,7 +13,9 @@ import com.lapissea.util.LogUtil;
 import com.lapissea.util.ZeroArrays;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.function.Supplier;
 
 class FSFTest{
@@ -31,9 +33,8 @@ class FSFTest{
 		try{
 			
 			LateInit<DataLogger> display=new LateInit<>(()->{
-				//ay
-				return new Display();
-//				return f->{};
+//				return new Display();
+				return f->{};
 			});
 			
 			var preBuf=new LinkedList<MemFrame>();
@@ -68,24 +69,33 @@ class FSFTest{
 	}
 	
 	private static void doTests(Cluster cluster) throws IOException{
-
-//		for(int i=0;i<2;i++){
-//			flatListTest(cluster);
-//			linkedListTest(cluster);
-//		}
 		
-		Chunk c1=cluster.alloc(10);
-		Chunk c2=cluster.alloc(10);
-		Chunk c3=cluster.alloc(10);
-		Chunk c4=cluster.alloc(10);
-		Chunk c5=cluster.alloc(10);
-		Chunk c6=cluster.alloc(10);
+		for(int i=0;i<2;i++){
+			freeChunksTest(cluster);
+			flatListTest(cluster);
+			linkedListTest(cluster);
+		}
 		
-		c1.freeChaining();
-		c3.freeChaining();
-		c5.freeChaining();
+		
 	}
 	
+	private static void freeChunksTest(Cluster cluster) throws IOException{
+		
+		List<Chunk> chunk1=new ArrayList<>();
+		List<Chunk> chunk2=new ArrayList<>();
+		
+		for(int i=0;i<5;i++){
+			chunk1.add(cluster.alloc(8));
+			chunk2.add(cluster.alloc(8));
+		}
+		
+		for(Chunk chunk : chunk1){
+			chunk.freeChaining();
+		}
+		for(Chunk chunk : chunk2){
+			chunk.freeChaining();
+		}
+	}
 	private static void flatListTest(Cluster cluster) throws IOException{
 		
 		

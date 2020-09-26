@@ -1,6 +1,7 @@
 package com.lapissea.cfs.objects.chunk;
 
 import com.lapissea.cfs.Cluster;
+import com.lapissea.cfs.exceptions.BitDepthOutOfSpaceException;
 import com.lapissea.cfs.exceptions.IllegalBitValueException;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.content.ContentReader;
@@ -47,9 +48,6 @@ public class Chunk extends IOInstance.Contained implements Iterable<Chunk>, Rand
 	private      long         headerSize=-1;
 
 
-//	@Value(index=-1)
-//	private boolean typed;
-	
 	@PrimitiveValue(index=0)
 	private boolean used;
 	
@@ -63,14 +61,29 @@ public class Chunk extends IOInstance.Contained implements Iterable<Chunk>, Rand
 	@Value(index=5, rw=ChunkPointer.WrittenSizeIO.class, rwArgs="nextSize")
 	private ChunkPointer nextPtr;
 	
+	public void clearNextPtr(){
+		if(nextCache==null) return;
+		
+		nextPtr=null;
+		nextCache=null;
+		
+		markDirty();
+	}
+	
 	@Set
-	public void setNextPtr(ChunkPointer newNextPtr){
+	public void setNextPtr(@Nullable ChunkPointer newNextPtr) throws BitDepthOutOfSpaceException{
+		if(newNextPtr==null){
+			clearNextPtr();
+			return;
+		}
+		
 		if(Objects.equals(nextPtr, newNextPtr)) return;
 		
 		nextSize.ensureCanFit(newNextPtr);
 		
 		nextPtr=newNextPtr;
-		nextCache=newNextPtr==null?null:cluster.getChunkCached(newNextPtr);
+		nextCache=cluster.getChunkCached(newNextPtr);
+		
 		markDirty();
 	}
 	
@@ -85,14 +98,16 @@ public class Chunk extends IOInstance.Contained implements Iterable<Chunk>, Rand
 	}
 	
 	public Chunk(@NotNull Cluster cluster, @NotNull ChunkPointer ptr, long capacity, @NotNull NumberSize bodyNumSize, @NotNull NumberSize nextSize){
-		super(THIS_TYP, ptr.getValue());
+		super(THIS_TYP);
 		this.cluster=cluster;
 		this.ptr=ptr;
 		this.bodyNumSize=bodyNumSize;
 		this.capacity=capacity;
 		this.nextSize=nextSize;
 		used=true;
-		headerSize=getInstanceSize();
+		headerSize=super.getInstanceSize();
+		
+		dirty=false;
 	}
 	
 	public void initBody(ContentWriter dest) throws IOException{
@@ -106,20 +121,23 @@ public class Chunk extends IOInstance.Contained implements Iterable<Chunk>, Rand
 		}
 	}
 	
+	
 	@Override
-	public void readStruct(Cluster cluster, ContentReader in, long structOffset) throws IOException{
-		assert getPtr().equals(structOffset):getPtr()+" "+structOffset;
-		
-		super.readStruct(cluster, in, structOffset);
-		headerSize=getInstanceSize();
+	public long getInstanceSize(){
+		return headerSize;
 	}
 	
 	@Override
-	public void writeStruct(Cluster cluster, ContentWriter out, long structOffset) throws IOException{
-		assert getPtr().equals(structOffset):getPtr()+" "+structOffset;
+	public void readStruct(Cluster cluster, ContentReader in) throws IOException{
+		super.readStruct(cluster, in);
+		headerSize=super.getInstanceSize();
+	}
+	
+	@Override
+	public void writeStruct(Cluster cluster, ContentWriter out) throws IOException{
 		
 		dirty=false;
-		super.writeStruct(cluster, out, structOffset);
+		super.writeStruct(cluster, out);
 	}
 	
 	@NotNull

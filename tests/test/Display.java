@@ -1,15 +1,16 @@
 package test;
 
 import com.lapissea.cfs.Cluster;
+import com.lapissea.cfs.io.SelfPoint;
 import com.lapissea.cfs.io.bit.FlagReader;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.io.struct.IOInstance;
 import com.lapissea.cfs.io.struct.IOStruct;
 import com.lapissea.cfs.io.struct.Offset;
 import com.lapissea.cfs.io.struct.VariableNode;
-import com.lapissea.cfs.io.struct.engine.impl.StructPtrIOImpl;
 import com.lapissea.cfs.objects.chunk.Chunk;
 import com.lapissea.cfs.objects.chunk.ChunkPointer;
+import com.lapissea.cfs.objects.chunk.ObjectPointer;
 import com.lapissea.util.*;
 
 import javax.swing.*;
@@ -29,6 +30,7 @@ import java.util.stream.IntStream;
 
 import static java.awt.RenderingHints.*;
 
+@SuppressWarnings("AutoBoxing")
 public class Display extends JFrame implements DataLogger{
 	
 	interface DrawB{
@@ -74,7 +76,7 @@ public class Display extends JFrame implements DataLogger{
 			);
 		}
 		
-		private void renderImage(Graphics2D g, MemFrame frame){
+		private void renderImage(Graphics2D g, MemFrame frame) throws Throwable{
 			
 			var bytes=frame.data();
 			
@@ -133,23 +135,18 @@ public class Display extends JFrame implements DataLogger{
 				};
 			};
 			
+			cluster[0]=new Cluster(new MemoryData(bytes, true));
+			
 			try{
-				cluster[0]=new Cluster(new MemoryData(bytes, true));
-				
-				try{
-					annotateStruct(g, width, drawByte, cluster[0], cluster[0], ptrs::add);
-				}catch(IOException e){
-					throw UtilL.uncheckedThrow(e);
-				}
-				for(Chunk chunk : physicalIterator){
-					fillChunk(drawByte, chunk, c->alpha(mix(c, Color.GRAY, 0.5F), c.getAlpha()/255F*0.6F));
-				}
-				for(Chunk chunk : physicalIterator){
-					annotateStruct(g, width, drawByte, cluster[0], chunk, ptrs::add);
-				}
+				annotateStruct(g, width, drawByte, cluster[0], cluster[0], 0, ptrs::add);
+//				for(Chunk chunk : physicalIterator){
+//					fillChunk(drawByte, chunk, c->alpha(mix(c, Color.GRAY, 0.5F), c.getAlpha()/255F*0.6F));
+//				}
+//				for(Chunk chunk : physicalIterator){
+//					annotateStruct(g, width, drawByte, cluster[0], chunk, chunk.getPtr().getValue(), ptrs::add);
+//				}
 			}catch(Throwable e){
-//				LogUtil.println(e);
-				e.printStackTrace();
+				new RuntimeException("failed to complete data annotation", e).printStackTrace();
 			}
 			
 			
@@ -250,7 +247,11 @@ public class Display extends JFrame implements DataLogger{
 					g1.fillRect(0, 0, getWidth(), getHeight());
 					g1.setComposite(AlphaComposite.SrcOver);
 					
-					renderImage(g1, frame);
+					try{
+						renderImage(g1, frame);
+					}catch(Throwable e){
+						new RuntimeException("Failed to complete frame render", e).printStackTrace();
+					}
 					
 					g1.dispose();
 					
@@ -410,10 +411,16 @@ public class Display extends JFrame implements DataLogger{
 	
 	static record Pointer(int from, int to, int size, Color color){}
 	
-	private void annotateStruct(Graphics2D g, int width, DrawB drawByte, Cluster cluster, IOInstance instance, Consumer<Pointer> pointerRecord) throws IOException{
-		annotateStruct(g, width, drawByte, cluster, new LinkedList<>(), instance, pointerRecord);
+	private void annotateStruct(Graphics2D g, int width, DrawB drawByte,
+	                            Cluster cluster,
+	                            IOInstance instance, long instanceOffset,
+	                            Consumer<Pointer> pointerRecord) throws IOException{
+		annotateStruct(g, width, drawByte, cluster, new LinkedList<>(), instance, instanceOffset, pointerRecord);
 	}
-	private void annotateStruct(Graphics2D g, int width, DrawB drawByte, Cluster cluster, List<IOInstance> stack, IOInstance instance, Consumer<Pointer> pointerRecord) throws IOException{
+	private void annotateStruct(Graphics2D g, int width, DrawB drawByte,
+	                            Cluster cluster, List<IOInstance> stack,
+	                            IOInstance instance, long instanceOffset,
+	                            Consumer<Pointer> pointerRecord) throws IOException{
 		try{
 			if(stack.contains(instance)) return;
 			stack.add(instance);
@@ -422,14 +429,16 @@ public class Display extends JFrame implements DataLogger{
 				fillChunk(drawByte, c, Function.identity());
 			}
 			
-			List<IOInstance> recurse=new ArrayList<>();
+			List<PairM<Long, IOInstance>> recurse=new ArrayList<>();
 			
 			IOStruct typ=instance.getStruct();
+			
+			var typeHash=instance.getStruct().instanceClass.getName().hashCode()&0xffffffffL;
 			
 			Random rand=new Random();
 			instance.iterateOffsets((VariableNode<?> var, Offset off)->{
 				try{
-					rand.setSeed(var.name.hashCode());
+					rand.setSeed((((long)var.name.hashCode())<<32)|typeHash);
 					
 					var col=new Color(
 						Color.HSBtoRGB(
@@ -446,10 +455,10 @@ public class Display extends JFrame implements DataLogger{
 					var varSize=(int)VariableNode.FixedSize.getSizeUnknown(instance, var);
 					
 					if(off instanceof Offset.BitOffset){
-						final var from    =(int)(instance.getStructOffset()+off.getOffset());
+						final var from    =(int)(instanceOffset+off.getOffset());
 						int       xPosFrom=from%width, yPosFrom=from/width;
 						
-						int fromB=Math.toIntExact(instance.getStructOffset()+off.getOffset());
+						int fromB=Math.toIntExact(instanceOffset+off.getOffset());
 						int toB  =fromB;
 						
 						var fl=(VariableNode.Flag<?>)var;
@@ -474,7 +483,7 @@ public class Display extends JFrame implements DataLogger{
 						
 					}else{
 						
-						int from=Math.toIntExact(instance.getStructOffset()+off.getOffset());
+						int from=Math.toIntExact(instanceOffset+off.getOffset());
 						int to  =from;
 						
 						for(int i=0;i<varSize;i++){
@@ -492,43 +501,68 @@ public class Display extends JFrame implements DataLogger{
 					
 					Object valVal=var.getValueAsObj(instance);
 					
-					if(var instanceof StructPtrIOImpl<?>&&valVal instanceof IOInstance inst){
-						long valOff=inst.getStructOffset();
-						pointerRecord.accept(new Pointer((int)(instance.getStructOffset()+off.getOffset()), (int)valOff, varSize, g.getColor()));
-						if(inst instanceof IOInstance.Contained.SingletonChunk ch){
-							recurse.add(ch.getContainer());
-						}
-						recurse.add(inst);
+					if(var instanceof VariableNode.SelfPointer<?>&&valVal instanceof IOInstance inst){
+						var ptr   =((SelfPoint<?>)inst).getSelfPtr();
+						var c     =ptr.getBlock(cluster);
+						var valOff=ptr.globalOffset(cluster);
+						
+						pointerRecord.accept(new Pointer((int)(instanceOffset+off.getOffset()), (int)valOff, varSize, g.getColor()));
+						
+						recurse.add(new PairM<>(c.getPtr().getValue(), c));
+						recurse.add(new PairM<>(valOff, inst));
 					}else if(valVal instanceof IOInstance inst){
 						try{
-							annotateStruct(g, width, drawByte, cluster, stack, inst, pointerRecord);
+							long valOff=instanceOffset+off.getOffset();
+							annotateStruct(g, width, drawByte, cluster, stack, inst, valOff, pointerRecord);
 						}catch(IOException e){
 							e.printStackTrace();
 						}
 					}else if(valVal instanceof ChunkPointer ptr){
 						var color=g.getColor();
 						try{
-							recurse.add(ptr.dereference(cluster));
+							recurse.add(new PairM<>(ptr.getValue(), ptr.dereference(cluster)));
 						}catch(Throwable e){
 							color=Color.RED;
 						}
 						
-						pointerRecord.accept(new Pointer((int)(instance.getStructOffset()+off.getOffset()), ptr.getValueInt(), varSize, color));
+						pointerRecord.accept(new Pointer((int)(instanceOffset+off.getOffset()), ptr.getValueInt(), varSize, color));
+					}else if(valVal instanceof ObjectPointer<?> ptr){
+						if(ptr.getDataBlock()!=null){
+							
+							var color=g.getColor();
+							try{
+								Object o=ptr.read(cluster);
+								if(o instanceof IOInstance i){
+									var oOff=ptr.globalOffset(cluster);
+									recurse.add(new PairM<>(oOff, i));
+								}
+							}catch(Throwable e){
+								new RuntimeException("failed to read object pointer "+ptr, e).printStackTrace();
+								color=Color.RED;
+							}
+							
+							pointerRecord.accept(new Pointer((int)(instanceOffset+off.getOffset()), (int)ptr.globalOffset(cluster), varSize, color));
+						}
 					}
 					
-					
-					String text=TextUtil.toString(valVal)
-					                    .replace('\t', '↹')
-					                    .replace('\n', '↵');
-					
-					drawStringIn(g, text, area, true);
-					g.setColor(mul(g.getColor(), 0.4F));
-					g.drawRect(area.x, area.y, area.width, area.height);
+					if(area.width>0){
+						try{
+							String text=TextUtil.toString(valVal)
+							                    .replace('\t', '↹')
+							                    .replace('\n', '↵');
+							
+							drawStringIn(g, text, area, true);
+						}catch(Throwable e){
+							e.printStackTrace();
+						}
+						g.setColor(mul(g.getColor(), 0.4F));
+						g.drawRect(area.x, area.y, area.width, area.height);
+					}
 					
 				}catch(Throwable e){
 					e.printStackTrace();
 					try{
-						int from   =Math.toIntExact(instance.getStructOffset()+off.getOffset());
+						int from   =Math.toIntExact(instanceOffset+off.getOffset());
 						var varSize=(int)VariableNode.FixedSize.getSizeUnknown(instance, var);
 						IntStream.range(from, from+varSize).forEach(i->drawByte.draw(i, Color.RED, false, true));
 					}catch(Throwable e1){
@@ -538,8 +572,8 @@ public class Display extends JFrame implements DataLogger{
 				
 			});
 			
-			for(IOInstance instance1 : recurse){
-				annotateStruct(g, width, drawByte, cluster, stack, instance1, pointerRecord);
+			for(var i : recurse){
+				annotateStruct(g, width, drawByte, cluster, stack, i.obj2, i.obj1, pointerRecord);
 			}
 		}finally{
 			stack.remove(instance);

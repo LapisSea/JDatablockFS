@@ -1,6 +1,7 @@
 package com.lapissea.cfs.io.struct;
 
 import com.lapissea.cfs.Cluster;
+import com.lapissea.cfs.io.SelfPoint;
 import com.lapissea.cfs.io.bit.FlagReader;
 import com.lapissea.cfs.io.bit.FlagWriter;
 import com.lapissea.cfs.io.content.ContentReader;
@@ -283,6 +284,18 @@ public abstract class VariableNode<ValTyp>{
 		public Integer getValueAsObj(IOInstance source){
 			return get(source);
 		}
+	}
+	
+	public abstract static class SelfPointer<T extends SelfPoint<T>> extends VariableNode<T>{
+		
+		protected SelfPointer(String name, int index){
+			super(name, index);
+		}
+		
+		public void allocNew(IOInstance target, Cluster cluster) throws IOException{
+			allocNew(target, cluster, false);
+		}
+		public abstract void allocNew(IOInstance target, Cluster cluster, boolean disableNext) throws IOException;
 	}
 	
 	public final String name;

@@ -10,11 +10,8 @@ import com.lapissea.cfs.io.struct.engine.StructReflectionImpl.NodeMaker.FunDef.A
 import com.lapissea.cfs.io.struct.engine.impl.BitBlockNode;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.chunk.Chunk;
-import com.lapissea.cfs.objects.chunk.ChunkPointer;
-import com.lapissea.util.LogUtil;
-import com.lapissea.util.Nullable;
-import com.lapissea.util.TextUtil;
-import com.lapissea.util.ZeroArrays;
+import com.lapissea.cfs.objects.chunk.ObjectPointer;
+import com.lapissea.util.*;
 
 import java.io.IOException;
 import java.lang.annotation.Annotation;
@@ -25,6 +22,8 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.util.*;
 import java.util.function.BiFunction;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -227,8 +226,8 @@ public class IOStruct{
 	public @interface PointerValue{
 		int index();
 		
-		Class<? extends ReaderWriter<ChunkPointer>> rw() default ChunkPointer.FixedIO.class;
-		String[] rwArgs() default {"LONG"};
+		Class<? extends ReaderWriter<ObjectPointer<?>>> rw() default ObjectPointer.FixedIO.class;
+		String[] rwArgs() default {};
 		
 		Class<? extends IOInstance> type() default IOInstance.class;
 	}
@@ -430,13 +429,23 @@ public class IOStruct{
 		}
 	}
 	
-	public <T, V extends VariableNode<T>> V getVar(int varIndex){
-		if(simpleIndex) return (V)variables.get(varIndex);
-		return (V)variables.stream().filter(v->v.index==varIndex).findAny().orElseThrow(()->new RuntimeException("Var with index "+varIndex+" does not exist in "+this));
+	public <V extends VariableNode<?>> V findVar(Predicate<VariableNode<?>> finder){
+		return findVar(finder, ()->"Could not find var in "+this);
 	}
 	
-	public <T, V extends VariableNode<T>> V getVar(String varName){
-		return (V)variables.stream().filter(v->v.name.equals(varName)).findAny().orElseThrow(()->new RuntimeException(varName+" does not exist in "+this));
+	@NotNull
+	public <V extends VariableNode<?>> V findVar(Predicate<VariableNode<?>> finder, Supplier<String> errorMsg){
+		return (V)variables.stream().filter(finder).findAny().orElseThrow(()->new RuntimeException(errorMsg.get()));
+	}
+	
+	@NotNull
+	public <V extends VariableNode<?>> V getVar(int varIndex){
+		if(simpleIndex) return (V)variables.get(varIndex);
+		return findVar(v->v.index==varIndex, ()->"Var with index "+varIndex+" does not exist in "+this);
+	}
+	
+	public <V extends VariableNode<?>> V getVar(String varName){
+		return findVar(v->v.name.equals(varName), ()->varName+" does not exist in "+this);
 	}
 	
 	public boolean canInstate(){

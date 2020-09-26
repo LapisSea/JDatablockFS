@@ -37,9 +37,12 @@ public interface ReaderWriter<T>{
 		}
 	};
 	
+	/**
+	 * finds and calls constructor of [parent], [varargs]
+	 */
 	@Nullable
-	static <L extends ReaderWriter> L getInstance(Class<?> containerClass, Class<L> rwClass, String[] args){
-		if(rwClass==ReaderWriter.class) return null;
+	static <L extends ReaderWriter<?>> L getInstance(Class<?> containerClass, Class<L> rwClass, String[] args){
+		if((Object)rwClass==ReaderWriter.class) return null;
 		return Utils.findConstructorInstance(rwClass, List.of(
 			new AbstractMap.SimpleEntry<>(
 				()->Stream.concat(Stream.of(Class.class), Arrays.stream(args).map(o->String.class)),

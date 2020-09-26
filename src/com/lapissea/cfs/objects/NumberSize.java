@@ -128,8 +128,7 @@ public enum NumberSize{
 	}
 	
 	public void ensureCanFit(@Nullable ChunkPointer num) throws BitDepthOutOfSpaceException{
-		if(num==null) return;
-		ensureCanFit(num.getValue());
+		ensureCanFit(ChunkPointer.getValueNullable(num));
 	}
 	
 	public void ensureCanFit(@NotNull INumber num) throws BitDepthOutOfSpaceException{
