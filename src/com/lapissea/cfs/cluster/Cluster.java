@@ -1,4 +1,4 @@
-package com.lapissea.cfs;
+package com.lapissea.cfs.cluster;
 
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.RandomIO;
@@ -10,17 +10,13 @@ import com.lapissea.cfs.io.struct.IOStruct.EnumValue;
 import com.lapissea.cfs.io.struct.IOStruct.PointerValue;
 import com.lapissea.cfs.io.struct.VariableNode.SelfPointer;
 import com.lapissea.cfs.objects.IOList;
-import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.StructLinkedList;
 import com.lapissea.cfs.objects.Version;
 import com.lapissea.cfs.objects.chunk.Chunk;
 import com.lapissea.cfs.objects.chunk.ChunkPointer;
-import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UnsafeLongSupplier;
-import com.lapissea.util.function.UnsafeBiConsumer;
-import com.lapissea.util.function.UnsafeFunction;
 import com.lapissea.util.function.UnsafeRunnable;
 
 import java.io.IOException;
@@ -39,7 +35,7 @@ public class Cluster extends IOInstance.Contained{
 		
 		private SafeSession(){
 			synchronized(Cluster.this){
-				prevState=safeMode;
+				prevState=isSafeMode();
 				safeMode=true;
 			}
 		}
@@ -61,15 +57,16 @@ public class Cluster extends IOInstance.Contained{
 	
 	@PointerValue(index=1, type=StructLinkedList.class)
 	private IOList<ChunkPointer.PtrRef> unboxedFreeChunks;
-	private IOList<ChunkPointer>        freeChunks;
+	IOList<ChunkPointer> freeChunks;
 	
 	private final IOInterface              data;
-	private final Map<ChunkPointer, Chunk> chunkCache=new HashMap<>();
+	final         Map<ChunkPointer, Chunk> chunkCache=new HashMap<>();
 	
-	private final int minChunkSize;
+	final int minChunkSize;
 	
 	private volatile boolean safeMode;
 	
+	public boolean isSafeMode()                        { return safeMode; }
 	
 	public Cluster(IOInterface data) throws IOException{this(data, DEFAULT_MIN_CHUNK_SIZE);}
 	public Cluster(IOInterface data, int minChunkSize) throws IOException{
@@ -92,7 +89,7 @@ public class Cluster extends IOInstance.Contained{
 		}finally{
 			ses.close();
 		}
-		if(!safeMode) onSafeEnd();
+		if(!isSafeMode()) onSafeEnd();
 	}
 	
 	
@@ -143,118 +140,11 @@ public class Cluster extends IOInstance.Contained{
 		return chunk;
 	}
 	
-	private Chunk makeChunkReal(Chunk chunk) throws IOException{
-		assert !chunkCache.containsKey(chunk.getPtr());
-		chunk.writeStruct();
-		
-		Chunk read=getChunk(chunk.getPtr());
-		assert read.equals(chunk);
-		return read;
-	}
-	
-	private Chunk tryReuse(long requestedCapacity, boolean disableNext, Predicate<Chunk> approve) throws IOException{
-		if(safeMode||freeChunks==null||freeChunks.isEmpty()) return null;
-		if(freeChunks.find(Objects::nonNull)==-1) return null;
-		
-		UnsafeFunction<Chunk, Chunk, IOException> popEnd=chunk->{
-			Chunk chunkUse=new Chunk(this, chunk.getPtr(), requestedCapacity, calcPtrSize(disableNext));
-			chunkUse.setPtr(new ChunkPointer(chunk.dataEnd()-chunkUse.totalSize()));
-			return chunkUse;
-		};
-		
-		Chunk largest=null;
-		
-		int  bestIndex   =-1;
-		long bestOverAloc=Long.MAX_VALUE;
-		
-		for(int i=0;i<freeChunks.size();i++){
-			var ptr=freeChunks.getElement(i);
-			if(ptr==null) continue;
-			
-			Chunk chunk=getChunk(ptr);
-			long  cap  =chunk.getCapacity();
-			
-			if(cap<requestedCapacity){
-				continue;
-			}
-			
-			if(!safeMode){
-				long maxSize =requestedCapacity+minChunkSize;
-				long overAloc=maxSize-cap;
-				if(overAloc>=0&&overAloc<bestOverAloc&&approve.test(chunk)){
-					bestOverAloc=overAloc;
-					bestIndex=i;
-					if(overAloc==0) break;
-				}
-			}
-			
-			if(largest==null||largest.getCapacity()<cap){
-				Chunk chunkUse=popEnd.apply(chunk);
-				
-				long freeCapacity=chunk.getCapacity()-chunkUse.totalSize();
-				if(freeCapacity>=minChunkSize&&approve.test(chunk)){
-					largest=chunk;
-				}
-			}
-		}
-		
-		if(bestIndex!=-1){
-			Chunk chunk=getChunk(freeChunks.getElement(bestIndex));
-			
-			chunk.modifyAndSave(c->c.setUsed(true));
-			
-			freeChunks.setElement(bestIndex, null);
-			LogUtil.println("aloc reuse exact", chunk);
-			return chunk;
-		}
-		
-		if(largest!=null){
-			Chunk chunkUse=makeChunkReal(popEnd.apply(largest));
-			
-			long freeCapacity=largest.getCapacity()-chunkUse.totalSize();
-			assert freeCapacity>=minChunkSize;
-			
-			largest.modifyAndSave(c->c.setCapacity(freeCapacity));
-			
-			LogUtil.println("aloc reuse split", largest, " -> ", chunkUse);
-			
-			return chunkUse;
-		}
-		
-		return null;
-	}
-	private Chunk appendNew(long requestedSize, boolean disableNext, Predicate<Chunk> approve) throws IOException{
-		ChunkPointer ptr=new ChunkPointer(data.getSize());
-		
-		Chunk fakeChunk=new Chunk(this, ptr, requestedSize, calcPtrSize(disableNext));
-		if(!approve.test(fakeChunk)) return null;
-		
-		Chunk chunk=makeChunkReal(fakeChunk);
-		assert data.getSize()==chunk.dataStart():data.getSize()+"=="+chunk.dataStart();
-		
-		data.ioAt(chunk.dataStart(), io->{
-			Utils.zeroFill(io::write, chunk.getCapacity());
-		});
-		
-		assert data.getSize()==chunk.dataEnd():data.getSize()+"=="+chunk.dataEnd();
-		
-		LogUtil.println("aloc append", chunk);
-		
-		return chunk;
-	}
-	
-	
 	public Chunk alloc(long requestedCapacity) throws IOException                     { return alloc(requestedCapacity, false); }
 	public Chunk alloc(long requestedCapacity, boolean disableNext) throws IOException{ return alloc(requestedCapacity, disableNext, c->true); }
 	public Chunk alloc(long requestedCapacity, boolean disableNext, Predicate<Chunk> approve) throws IOException{
 		
-		Chunk chunk;
-		
-		chunk=tryReuse(requestedCapacity, disableNext, approve);
-		
-		if(chunk==null){
-			chunk=appendNew(requestedCapacity, disableNext, approve);
-		}
+		Chunk chunk=MAllocer.AUTO.alloc(this, requestedCapacity, disableNext, approve);
 		
 		if(DEBUG_VALIDATION){
 			if(chunk!=null) checkCached(chunk);
@@ -268,17 +158,12 @@ public class Cluster extends IOInstance.Contained{
 		
 		var nullCount=freeChunks.count(Objects::isNull);
 		while(nullCount>2){
-			freeChunks.removeElement(freeChunks.indexOfLast(null));
+			freeChunks.removeElement(freeChunks.indexOf(null));
 			nullCount--;
 		}
 		if(nullCount==0){
 			freeChunks.addElement(null);
 		}
-	}
-	
-	private NumberSize calcPtrSize(boolean disableNext) throws IOException{
-		if(disableNext) return NumberSize.VOID;
-		return NumberSize.bySize(data.getSize()).next();
 	}
 	
 	public IOInterface getData(){
@@ -341,114 +226,6 @@ public class Cluster extends IOInstance.Contained{
 		return chunk.dataEnd()>=data.getSize();
 	}
 	
-	private void destroyChunk(Chunk chunk) throws IOException{
-		chunkCache.remove(chunk.getPtr());
-		chunk.zeroOutHead();
-	}
-	
-	private void popChunk(Chunk chunk) throws IOException{
-		LogUtil.println("freeing deallocated", chunk);
-		var ptr=chunk.getPtr();
-		chunkCache.remove(ptr);
-		data.setCapacity(ptr.getValue());
-		freeChunks.find(p->p!=null&&ptr.equals(getChunk(p).dataEnd()),
-		                i->freeChunks.setElement(i, null));
-	}
-	
-	
-	private void listAsFree(Chunk toFree) throws IOException{
-		toFree.setSize(0);
-		toFree.clearNextPtr();
-		toFree.syncStruct();
-		
-		toFree.zeroOutCapacity();
-		
-		UnsafeBiConsumer<Chunk, Chunk, IOException> merge=(target, next)->{
-			long cap=next.dataEnd()-target.dataStart();
-			target.modifyAndSave(c->c.setCapacity(cap));
-			destroyChunk(next);
-		};
-		
-		Function<Chunk, long[]> rang=ch->new long[]{ch.getPtr().getValue(), ch.dataEnd()};
-		
-		LogUtil.println("freeing", toFree);
-		
-		
-		Chunk next     =toFree.nextPhysical();
-		int   nextIndex=-1;
-		
-		if(next!=null){
-			if(next.isUsed()) next=null;
-			else{
-				var ptr=next.getPtr();
-				nextIndex=freeChunks.indexOf(ptr);
-				if(nextIndex==-1){
-					next=null;
-				}
-			}
-		}
-		
-		Chunk prev;
-		int   prevIndex=freeChunks.find(v->v!=null&&toFree.getPtr().equals(getChunk(v).dataEnd()));
-		if(prevIndex!=-1){
-			prev=getChunk(freeChunks.getElement(prevIndex));
-		}else{
-			prev=null;
-		}
-		
-		
-		if(next!=null&&prev!=null){
-			LogUtil.println("free triple merge", rang.apply(prev), rang.apply(toFree), rang.apply(next));
-			freeChunks.setElement(nextIndex, null);
-			
-			merge.accept(prev, next);
-			destroyChunk(toFree);
-			
-		}else if(prev!=null){
-			LogUtil.println("free merge", rang.apply(prev), rang.apply(toFree));
-			merge.accept(prev, toFree);
-			
-		}else if(next!=null){
-			LogUtil.println("free merge", rang.apply(toFree), rang.apply(next));
-			freeChunks.setElement(nextIndex, toFree.getPtr());
-			merge.accept(toFree, next);
-			
-		}else{
-			LogUtil.println("free list", toFree);
-			int emptyIndex=freeChunks.indexOf(null);
-			if(emptyIndex!=-1){
-				freeChunks.setElement(emptyIndex, toFree.getPtr());
-			}else{
-				freeChunks.addElement(toFree.getPtr());
-			}
-		}
-		
-		
-		if(DEBUG_VALIDATION){
-			if(freeChunks.size()>1){
-				freeChunks.validate();
-				
-				List<long[]> ranges=new ArrayList<>();
-				for(int i=0;i<freeChunks.size();i++){
-					ChunkPointer c=freeChunks.getElement(i);
-					if(c==null) continue;
-					
-					Chunk ch=getChunk(c);
-					ranges.add(rang.apply(ch));
-				}
-				ranges.sort(Comparator.comparingLong(e->e[0]));
-				long last=-1;
-				for(long[] range : ranges){
-					assert range[0]!=last:
-						TextUtil.toString(ranges)+"\n"+freeChunks;
-					last=range[1];
-				}
-//				LogUtil.println(freeChunks, ranges);
-			}
-			validate();
-		}
-	}
-	
 	public void free(List<Chunk> toFree) throws IOException{
 		if(DEBUG_VALIDATION){
 			for(Chunk chunk : toFree){
@@ -458,12 +235,7 @@ public class Cluster extends IOInstance.Contained{
 		}
 		
 		for(Chunk chunk : toFree.stream().sorted(Comparator.comparing(Chunk::getPtr).reversed()).collect(Collectors.toUnmodifiableList())){
-			if(isLastPhysical(chunk)){
-				popChunk(chunk);
-				validate();
-				continue;
-			}
-			listAsFree(chunk);
+			MAllocer.AUTO.dealloc(chunk);
 		}
 	}
 	

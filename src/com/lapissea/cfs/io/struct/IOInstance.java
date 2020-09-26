@@ -1,6 +1,6 @@
 package com.lapissea.cfs.io.struct;
 
-import com.lapissea.cfs.Cluster;
+import com.lapissea.cfs.cluster.Cluster;
 import com.lapissea.cfs.exceptions.MalformedObjectException;
 import com.lapissea.cfs.exceptions.OutOfSyncDataException;
 import com.lapissea.cfs.io.RandomIO;

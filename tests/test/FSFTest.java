@@ -1,6 +1,6 @@
 package test;
 
-import com.lapissea.cfs.Cluster;
+import com.lapissea.cfs.cluster.Cluster;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.objects.IOList;
 import com.lapissea.cfs.objects.StructFlatList;

@@ -1,6 +1,6 @@
 package com.lapissea.cfs.io.struct;
 
-import com.lapissea.cfs.Cluster;
+import com.lapissea.cfs.cluster.Cluster;
 import com.lapissea.cfs.io.SelfPoint;
 import com.lapissea.cfs.io.bit.FlagReader;
 import com.lapissea.cfs.io.bit.FlagWriter;

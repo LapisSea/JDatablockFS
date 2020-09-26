@@ -1,6 +1,6 @@
 package test;
 
-import com.lapissea.cfs.Cluster;
+import com.lapissea.cfs.cluster.Cluster;
 import com.lapissea.cfs.io.SelfPoint;
 import com.lapissea.cfs.io.bit.FlagReader;
 import com.lapissea.cfs.io.impl.MemoryData;

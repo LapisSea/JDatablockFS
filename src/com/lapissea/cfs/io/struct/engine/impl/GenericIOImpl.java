@@ -1,6 +1,6 @@
 package com.lapissea.cfs.io.struct.engine.impl;
 
-import com.lapissea.cfs.Cluster;
+import com.lapissea.cfs.cluster.Cluster;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.struct.IOInstance;

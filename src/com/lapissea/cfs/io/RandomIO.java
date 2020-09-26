@@ -1,6 +1,6 @@
 package com.lapissea.cfs.io;
 
-import com.lapissea.cfs.Cluster;
+import com.lapissea.cfs.cluster.Cluster;
 import com.lapissea.cfs.io.content.ContentInputStream;
 import com.lapissea.cfs.io.content.ContentOutputStream;
 import com.lapissea.cfs.io.content.ContentReader;

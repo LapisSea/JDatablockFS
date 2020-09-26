@@ -1,6 +1,6 @@
 package com.lapissea.cfs.objects.chunk;
 
-import com.lapissea.cfs.Cluster;
+import com.lapissea.cfs.cluster.Cluster;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.ReaderWriter;
 import com.lapissea.cfs.io.bit.FlagReader;
