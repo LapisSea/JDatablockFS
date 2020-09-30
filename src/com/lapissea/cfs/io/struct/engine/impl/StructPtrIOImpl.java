@@ -154,13 +154,11 @@ public class StructPtrIOImpl<T extends IOInstance&SelfPoint<T>> extends Variable
 			structType.getKnownSize().orElse(structType.getMaximumSize().orElse(structType.getMinimumSize())),
 			disableNext);
 		
-		T val=newInstance(target, chunk);
+		setValue(target, newInstance(target, chunk));
 		
 		chunk.io(io->{
-			val.writeStruct(cluster, io);
+			getValue(target).writeStruct(cluster, io);
 			io.trim();
 		});
-		
-		setValue(target, val);
 	}
 }

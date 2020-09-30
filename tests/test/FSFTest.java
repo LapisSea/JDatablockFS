@@ -33,8 +33,8 @@ class FSFTest{
 		try{
 			
 			LateInit<DataLogger> display=new LateInit<>(()->{
-//				return new Display();
-				return f->{};
+				return new Display();
+//				return f->{};
 			});
 			
 			var preBuf=new LinkedList<MemFrame>();
@@ -76,7 +76,6 @@ class FSFTest{
 			linkedListTest(cluster);
 		}
 		
-		
 	}
 	
 	private static void freeChunksTest(Cluster cluster) throws IOException{
@@ -90,9 +89,12 @@ class FSFTest{
 		}
 		
 		for(Chunk chunk : chunk1){
+			cluster.checkCached(chunk);
 			chunk.freeChaining();
 		}
 		for(Chunk chunk : chunk2){
+			LogUtil.println(chunk);
+			cluster.checkCached(chunk);
 			chunk.freeChaining();
 		}
 	}
@@ -100,7 +102,7 @@ class FSFTest{
 		
 		
 		IOList<ChunkPointer> list=IOList.box(
-			new StructFlatList<>(cluster.alloc(8), ChunkPointer.PtrFixed::new),
+			StructFlatList.allocate(cluster::userAlloc, 2, ChunkPointer.PtrFixed::new),
 			ChunkPointer.PtrFixed::getValue,
 			ChunkPointer.PtrFixed::new
 		);
@@ -143,7 +145,7 @@ class FSFTest{
 	private static void linkedListTest(Cluster cluster) throws IOException{
 		
 		IOList<String> list=IOList.box(
-			new StructLinkedList<>(cluster.alloc(8), (Supplier<AutoText>)AutoText::new),
+			StructLinkedList.allocate(cluster::userAlloc, (Supplier<AutoText>)AutoText::new),
 			AutoText::getData,
 			AutoText::new
 		);

@@ -46,19 +46,22 @@ public class Chunk extends IOInstance.Contained implements Iterable<Chunk>, Rand
 	private      Chunk        nextCache;
 	private      boolean      dirty;
 	private      long         headerSize=-1;
-
-
+	
+	
 	@PrimitiveValue(index=0)
+	private boolean userData;
+	
+	@PrimitiveValue(index=1)
 	private boolean used;
 	
-	@EnumValue(index=1) private                  NumberSize bodyNumSize;
-	@EnumValue(index=2, customBitSize=4) private NumberSize nextSize;
+	@EnumValue(index=2) private NumberSize bodyNumSize;
+	@EnumValue(index=3) private NumberSize nextSize;
 	
 	
-	@PrimitiveValue(index=3, sizeRef="bodyNumSize") private long capacity;
-	@PrimitiveValue(index=4, sizeRef="bodyNumSize") private long size;
+	@PrimitiveValue(index=4, sizeRef="bodyNumSize") private long capacity;
+	@PrimitiveValue(index=5, sizeRef="bodyNumSize") private long size;
 	
-	@Value(index=5, rw=ChunkPointer.WrittenSizeIO.class, rwArgs="nextSize")
+	@Value(index=6, rw=ChunkPointer.WrittenSizeIO.class, rwArgs="nextSize")
 	private ChunkPointer nextPtr;
 	
 	public void clearNextPtr(){
@@ -68,6 +71,11 @@ public class Chunk extends IOInstance.Contained implements Iterable<Chunk>, Rand
 		nextCache=null;
 		
 		markDirty();
+	}
+	
+	public void setNext(@NotNull Chunk chunk) throws BitDepthOutOfSpaceException{
+		Objects.requireNonNull(chunk);
+		setNextPtr(chunk.getPtr());
 	}
 	
 	@Set
@@ -121,6 +129,15 @@ public class Chunk extends IOInstance.Contained implements Iterable<Chunk>, Rand
 		}
 	}
 	
+	public boolean isUserData(){
+		return userData;
+	}
+	
+	public void markAsUser(){
+		if(userData) return;
+		userData=true;
+		markDirty();
+	}
 	
 	@Override
 	public long getInstanceSize(){
@@ -155,6 +172,7 @@ public class Chunk extends IOInstance.Contained implements Iterable<Chunk>, Rand
 	public void setUsed(boolean used){
 		if(this.used==used) return;
 		this.used=used;
+		if(!used) userData=false;
 		markDirty();
 	}
 	public void setCapacity(long newCapacity){
@@ -185,9 +203,13 @@ public class Chunk extends IOInstance.Contained implements Iterable<Chunk>, Rand
 		markDirty();
 	}
 	
+	public void requireReal(){
+		cluster.checkCached(this);
+	}
+	
 	public void syncStruct() throws IOException{
 		if(DEBUG_VALIDATION){
-			cluster.checkCached(this);
+			requireReal();
 		}
 		if(!dirty) return;
 		writeStruct();
@@ -251,7 +273,11 @@ public class Chunk extends IOInstance.Contained implements Iterable<Chunk>, Rand
 		cluster.validate();
 		var tofree=collectNext();
 		for(Chunk chunk : tofree){
+			if(DEBUG_VALIDATION){
+				chunk.requireReal();
+			}
 			chunk.modifyAndSave(ch->ch.setUsed(false));
+			
 		}
 		
 		cluster.free(tofree);
@@ -295,8 +321,8 @@ public class Chunk extends IOInstance.Contained implements Iterable<Chunk>, Rand
 		return dataStart()+getSize();
 	}
 	
-	public void growBy(long amount) throws IOException{
-		cluster.allocTo(this, amount);
+	public void growBy(Chunk firstChunk, long amount) throws IOException{
+		cluster.allocTo(firstChunk, this, amount);
 	}
 	
 	public void modifyAndSave(UnsafeConsumer<Chunk, IOException> modifier) throws IOException{
@@ -348,6 +374,11 @@ public class Chunk extends IOInstance.Contained implements Iterable<Chunk>, Rand
 		sb.append(getBodyNumSize().shortName);
 		if(hasNext()) sb.append(" >> ").append(getNextPtr());
 		if(!isUsed()) sb.append(", unused");
+		
+		Chunk cached=cluster.getChunkCached(getPtr());
+		if(cached==null) sb.append(", fake");
+		else if(cached!=this) sb.append(", INVALID");
+		
 		sb.append('}');
 		return sb.toString();
 	}
@@ -361,7 +392,7 @@ public class Chunk extends IOInstance.Contained implements Iterable<Chunk>, Rand
 		dirty=true;
 	}
 	
-	public void setPtr(ChunkPointer ptr){
+	public void setLocation(ChunkPointer ptr){
 		this.ptr=Objects.requireNonNull(ptr);
 	}
 }

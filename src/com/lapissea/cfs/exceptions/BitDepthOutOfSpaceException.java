@@ -3,7 +3,7 @@ package com.lapissea.cfs.exceptions;
 
 import com.lapissea.cfs.objects.NumberSize;
 
-public class BitDepthOutOfSpaceException extends RuntimeException{
+public class BitDepthOutOfSpaceException extends Exception{
 	public final NumberSize numberSize;
 	public final long       num;
 	

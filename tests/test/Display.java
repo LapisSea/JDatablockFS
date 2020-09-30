@@ -29,6 +29,7 @@ import java.util.function.Function;
 import java.util.stream.IntStream;
 
 import static java.awt.RenderingHints.*;
+import static javax.swing.SwingUtilities.*;
 
 @SuppressWarnings("AutoBoxing")
 public class Display extends JFrame implements DataLogger{
@@ -40,6 +41,9 @@ public class Display extends JFrame implements DataLogger{
 	private record ByteInfo(int uVal, Color color, boolean withChar){}
 	
 	private class Pan extends JPanel{
+		
+		public int mouseX;
+		public int mouseY;
 		
 		private void drawArrow(Graphics2D g, int width, int from, int to){
 			int xPosFrom=from%width, yPosFrom=from/width;
@@ -77,6 +81,14 @@ public class Display extends JFrame implements DataLogger{
 		}
 		
 		private void renderImage(Graphics2D g, MemFrame frame) throws Throwable{
+			
+			g.setColor(Color.LIGHT_GRAY);
+			int step=8;
+			for(int x=0;x<getWidth()+2;x+=step){
+				for(int y=(x/step)%step;y<getHeight()+2;y+=step){
+					g.drawRect(x+Rand.i(2), y+Rand.i(2), 1, 1);
+				}
+			}
 			
 			var bytes=frame.data();
 			
@@ -139,12 +151,12 @@ public class Display extends JFrame implements DataLogger{
 			
 			try{
 				annotateStruct(g, width, drawByte, cluster[0], cluster[0], 0, ptrs::add);
-//				for(Chunk chunk : physicalIterator){
-//					fillChunk(drawByte, chunk, c->alpha(mix(c, Color.GRAY, 0.5F), c.getAlpha()/255F*0.6F));
-//				}
-//				for(Chunk chunk : physicalIterator){
-//					annotateStruct(g, width, drawByte, cluster[0], chunk, chunk.getPtr().getValue(), ptrs::add);
-//				}
+				for(Chunk chunk : physicalIterator){
+					fillChunk(drawByte, chunk, c->alpha(mix(c, Color.GRAY, 0.8F), c.getAlpha()/255F*0.8F));
+				}
+				for(Chunk chunk : physicalIterator){
+					annotateStruct(g, width, drawByte, cluster[0], chunk, chunk.getPtr().getValue(), ptrs::add);
+				}
 			}catch(Throwable e){
 				new RuntimeException("failed to complete data annotation", e).printStackTrace();
 			}
@@ -216,16 +228,11 @@ public class Display extends JFrame implements DataLogger{
 		
 		@Override
 		public void paint(Graphics g){
+			paint((Graphics2D)g);
+		}
+		public void paint(Graphics2D g){
 			try{
 				super.paint(g);
-				
-				g.setColor(Color.LIGHT_GRAY);
-				int step=8;
-				for(int x=0;x<getWidth()+2;x+=step){
-					for(int y=(x/step)%step;y<getHeight()+2;y+=step){
-						g.drawRect(x+Rand.i(2), y+Rand.i(2), 1, 1);
-					}
-				}
 				
 				if(frames.isEmpty()) return;
 				var frame=frames.get(getPos());
@@ -259,6 +266,16 @@ public class Display extends JFrame implements DataLogger{
 				
 				g.drawImage(image, 0, 0, null);
 				
+				int xByte=mouseX/pixelsPerByte;
+				int yByte=mouseY/pixelsPerByte;
+				
+				int width=Math.max(1, this.getWidth()/pixelsPerByte);
+				
+				Rectangle area=new Rectangle(xByte*pixelsPerByte, yByte*pixelsPerByte, pixelsPerByte, pixelsPerByte);
+				
+				g.setColor(Color.CYAN.darker());
+				initFont(g);
+				drawStringIn(g, Integer.toString(yByte*width+xByte), area, true);
 			}catch(Throwable e){
 				e.printStackTrace();
 			}
@@ -362,21 +379,26 @@ public class Display extends JFrame implements DataLogger{
 			}
 		});
 		
-		addMouseMotionListener(new MouseMotionAdapter(){
+		pan.addMouseMotionListener(new MouseMotionAdapter(){
+			@Override
+			public void mouseMoved(MouseEvent e){
+				pan.mouseX=e.getX();
+				pan.mouseY=e.getY();
+				pan.repaint();
+			}
 			@Override
 			public void mouseDragged(MouseEvent e){
+				pan.mouseX=e.getX();
+				pan.mouseY=e.getY();
+				
 				int width=pan.getWidth();
-				int x    =MathUtil.snap(e.getXOnScreen()-pan.getLocationOnScreen().x, 0, width);
+				int x    =MathUtil.snap(pan.mouseX, 0, width);
 				
 				float val=x/(float)width;
 				
 				setPos((int)(val*(frames.size()-1)));
 				
-				repaint();
-			}
-			@Override
-			public void mouseMoved(MouseEvent e){
-				repaint();
+				pan.repaint();
 			}
 		});
 		
@@ -637,13 +659,13 @@ public class Display extends JFrame implements DataLogger{
 		g.translate(area.x, area.y);
 		g.translate(Math.max(0, area.width-w)/2D, h+(area.height-h)/2);
 		if(w>0){
-			double scale=area.width/w;
+			double scale=(area.width-1)/w;
 			if(scale<1){
 				g.scale(scale, 1);
 			}
 		}
 		if(h>0){
-			double scale=area.height/h;
+			double scale=(area.height-1)/h;
 			if(scale<1){
 				g.scale(1, scale);
 			}
@@ -718,7 +740,7 @@ public class Display extends JFrame implements DataLogger{
 	public void log(MemFrame frame){
 		frames.add(frame);
 		setPos(frames.size()-1);
-		repaint();
+		invokeLater(this::repaint);
 	}
 	
 	public int getPos(){

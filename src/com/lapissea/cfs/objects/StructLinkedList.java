@@ -13,6 +13,7 @@ import com.lapissea.util.TextUtil;
 import com.lapissea.util.WeakValueHashMap;
 import com.lapissea.util.function.BooleanConsumer;
 import com.lapissea.util.function.UnsafeFunction;
+import com.lapissea.util.function.UnsafeLongFunction;
 
 import java.io.IOException;
 import java.util.*;
@@ -117,6 +118,15 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 		}
 	}
 	
+	
+	public static <T extends IOInstance> StructLinkedList<T> allocate(UnsafeLongFunction<Chunk, IOException> allocator, Supplier<T> valConstructor) throws IOException{
+		return allocate(allocator, c->valConstructor.get());
+	}
+	
+	public static <T extends IOInstance> StructLinkedList<T> allocate(UnsafeLongFunction<Chunk, IOException> allocator, UnsafeFunction<Chunk, T, IOException> valConstructor) throws IOException{
+		return new StructLinkedList<>(allocator.apply(IOStruct.get(StructLinkedList.class).requireKnownSize()), valConstructor);
+	}
+	
 	private boolean changing;
 	private boolean solidNodes=true;
 	
@@ -127,7 +137,7 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 	
 	public BooleanConsumer changingListener=b->{};
 	
-	@PrimitiveValue(index=0, defaultSize=NumberSize.INT)
+	//	@PrimitiveValue(index=0, defaultSize=NumberSize.INT)
 	private int size;
 	
 	@Value(index=1, rw=ObjectPointer.FixedNoOffsetIO.class)
@@ -142,9 +152,34 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 		this.valConstructor=valConstructor;
 		first=new ObjectPointer.Struct<>(Node::new);
 		
+		
+		if(container.getSize()>0) readStruct();
+		size=nextWalkCount();
+		
 		validate();
 	}
+	private int nextWalkCount() throws IOException{
+		int count=0;
+		
+		Node result=new Node();
+		
+		ObjectPointer<Node> resultPtr =first;
+		var                 nextVarOff=NODE_NEXT_VAR.getKnownOffset().getOffset();
+		while(resultPtr.hasPtr()){
+			count++;
+			resultPtr=resultPtr.io(cluster(), io->{
+				io.skip(nextVarOff);
+				NODE_NEXT_VAR.read(result, cluster(), io);
+				return result.next;
+			});
+		}
+		return count;
+	}
 	
+	@Override
+	protected UnsafeFunction<Chunk, StructLinkedList<T>, IOException> getValueConstructor(){
+		return c->new StructLinkedList<>(c, valConstructor);
+	}
 	private Cluster cluster(){
 		return container.cluster;
 	}

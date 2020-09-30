@@ -225,7 +225,7 @@ public abstract class ObjectPointer<T>{
 		set(dataBlock, offset);
 	}
 	
-	public void set(ObjectPointer<T> offset){
+	public void set(ObjectPointer<?> offset){
 		set(offset.dataBlock, offset.offset);
 	}
 	public void unset(){ set(null, 0); }
@@ -309,5 +309,9 @@ public abstract class ObjectPointer<T>{
 	@Override
 	public String toString(){
 		return getDataBlock()==null?"null":getDataBlock()+" >> "+getOffset();
+	}
+	
+	public boolean hasPtr(){
+		return getDataBlock()!=null;
 	}
 }

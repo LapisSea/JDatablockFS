@@ -22,7 +22,7 @@ abstract class MAllocer{
 	private static final class PushPop extends MAllocer{
 		
 		@Override
-		public Chunk alloc(Cluster cluster, long requestedSize, boolean disableNext, Predicate<Chunk> approve) throws IOException{
+		public Chunk alloc(Cluster cluster, long requestedSize, boolean disableResizing, Predicate<Chunk> approve) throws IOException{
 			
 			var freeChunks=cluster.freeChunks;
 			var chunkCache=cluster.chunkCache;
@@ -30,7 +30,7 @@ abstract class MAllocer{
 			
 			ChunkPointer ptr=new ChunkPointer(data.getSize());
 			
-			Chunk fakeChunk=new Chunk(cluster, ptr, requestedSize, calcPtrSize(cluster, disableNext));
+			Chunk fakeChunk=new Chunk(cluster, ptr, requestedSize, calcPtrSize(cluster, disableResizing));
 			if(!approve.test(fakeChunk)) return null;
 			
 			Chunk chunk=makeChunkReal(fakeChunk);
@@ -71,7 +71,7 @@ abstract class MAllocer{
 	private static final class ListingAddConsume extends MAllocer{
 		
 		@Override
-		public Chunk alloc(Cluster cluster, long requestedCapacity, boolean disableNext, Predicate<Chunk> approve) throws IOException{
+		public Chunk alloc(Cluster cluster, long requestedCapacity, boolean disableResizing, Predicate<Chunk> approve) throws IOException{
 			
 			var freeChunks  =cluster.freeChunks;
 			var chunkCache  =cluster.chunkCache;
@@ -82,8 +82,8 @@ abstract class MAllocer{
 			if(freeChunks.find(Objects::nonNull)==-1) return null;
 			
 			UnsafeFunction<Chunk, Chunk, IOException> popEnd=chunk->{
-				Chunk chunkUse=new Chunk(cluster, chunk.getPtr(), requestedCapacity, calcPtrSize(cluster, disableNext));
-				chunkUse.setPtr(new ChunkPointer(chunk.dataEnd()-chunkUse.totalSize()));
+				Chunk chunkUse=new Chunk(cluster, chunk.getPtr(), requestedCapacity, calcPtrSize(cluster, disableResizing));
+				chunkUse.setLocation(new ChunkPointer(chunk.dataEnd()-chunkUse.totalSize()));
 				return chunkUse;
 			};
 			
@@ -155,13 +155,16 @@ abstract class MAllocer{
 			var chunkCache=cluster.chunkCache;
 			var data      =cluster.getData();
 			
-			toFree.setSize(0);
-			toFree.clearNextPtr();
-			toFree.syncStruct();
+			toFree.modifyAndSave(ch->{
+				ch.setSize(0);
+				ch.clearNextPtr();
+			});
 			
 			toFree.zeroOutCapacity();
 			
 			UnsafeBiConsumer<Chunk, Chunk, IOException> merge=(target, next)->{
+				target.requireReal();
+				
 				long cap=next.dataEnd()-target.dataStart();
 				target.modifyAndSave(c->c.setCapacity(cap));
 				destroyChunk(chunkCache, next);
@@ -184,13 +187,16 @@ abstract class MAllocer{
 			}
 			
 			Chunk prev;
-			int   prevIndex=freeChunks.find(v->v!=null&&toFree.getPtr().equals(cluster.getChunk(v).dataEnd()));
-			if(prevIndex!=-1){
-				prev=cluster.getChunk(freeChunks.getElement(prevIndex));
-			}else{
-				prev=null;
+			{
+				var freeOffset=toFree.getPtr().getValue();
+				int prevIndex =freeChunks.find(v->v!=null&&freeOffset==cluster.getChunk(v).dataEnd());
+				
+				if(prevIndex!=-1){
+					prev=cluster.getChunk(freeChunks.getElement(prevIndex));
+				}else{
+					prev=null;
+				}
 			}
-			
 			
 			if(next!=null&&prev!=null){
 				LogUtil.println("free triple merge", rang.apply(prev), rang.apply(toFree), rang.apply(next));
@@ -238,7 +244,6 @@ abstract class MAllocer{
 							TextUtil.toString(ranges)+"\n"+freeChunks;
 						last=range[1];
 					}
-//				LogUtil.println(freeChunks, ranges);
 				}
 				cluster.validate();
 			}
@@ -251,13 +256,13 @@ abstract class MAllocer{
 	
 	public static final MAllocer AUTO=new MAllocer(){
 		@Override
-		public Chunk alloc(Cluster cluster, long requestedSize, boolean disableNext, Predicate<Chunk> approve) throws IOException{
+		public Chunk alloc(Cluster cluster, long requestedSize, boolean disableResizing, Predicate<Chunk> approve) throws IOException{
 			Chunk chunk;
 			
-			chunk=FREE_ADD_CONSUME.alloc(cluster, requestedSize, disableNext, approve);
+			chunk=FREE_ADD_CONSUME.alloc(cluster, requestedSize, disableResizing, approve);
 			
 			if(chunk==null){
-				chunk=PUSH_POP.alloc(cluster, requestedSize, disableNext, approve);
+				chunk=PUSH_POP.alloc(cluster, requestedSize, disableResizing, approve);
 			}
 			
 			return chunk;
@@ -288,7 +293,7 @@ abstract class MAllocer{
 		return NumberSize.bySize(cluster.getData().getSize()).next();
 	}
 	
-	public abstract Chunk alloc(Cluster cluster, long requestedSize, boolean disableNext, Predicate<Chunk> approve) throws IOException;
+	public abstract Chunk alloc(Cluster cluster, long requestedSize, boolean disableResizing, Predicate<Chunk> approve) throws IOException;
 	public abstract boolean dealloc(Chunk chunk) throws IOException;
 	
 }

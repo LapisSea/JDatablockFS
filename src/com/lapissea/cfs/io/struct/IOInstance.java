@@ -58,6 +58,7 @@ public class IOInstance{
 				return null;
 			}
 			
+			@NotNull
 			@Override
 			public ObjectPointer<SELF> getSelfPtr(){
 				return new ObjectPointer.Struct<>(getContainer().getPtr(), 0, getValueConstructor());

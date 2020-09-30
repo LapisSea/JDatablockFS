@@ -212,6 +212,9 @@ public abstract class VariableNode<ValTyp>{
 		@Override
 		public abstract long mapSize(IOInstance target);
 		
+		@Override
+		public abstract void setValueAsObj(IOInstance target, T value);
+		
 		@Deprecated
 		@Override
 		protected final T getValue(IOInstance source){ throw new UnsupportedOperationException(toString()); }
@@ -256,6 +259,11 @@ public abstract class VariableNode<ValTyp>{
 		public Long getValueAsObj(IOInstance source){
 			return get(source);
 		}
+		
+		@Override
+		public void setValueAsObj(IOInstance target, Long value){
+			set(target, value);
+		}
 	}
 	
 	public abstract static class PrimitiveInt extends Primitive<Integer>{
@@ -284,6 +292,11 @@ public abstract class VariableNode<ValTyp>{
 		public Integer getValueAsObj(IOInstance source){
 			return get(source);
 		}
+		
+		@Override
+		public void setValueAsObj(IOInstance target, Integer value){
+			set(target, value);
+		}
 	}
 	
 	public abstract static class SelfPointer<T extends SelfPoint<T>> extends VariableNode<T>{
@@ -310,6 +323,10 @@ public abstract class VariableNode<ValTyp>{
 	
 	public ValTyp getValueAsObj(IOInstance source){
 		return getValue(source);
+	}
+	
+	public void setValueAsObj(IOInstance target, ValTyp value){
+		setValue(target, value);
 	}
 	
 	protected abstract ValTyp getValue(IOInstance source);

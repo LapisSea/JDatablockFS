@@ -163,8 +163,18 @@ public interface IOList<T> extends Iterable<T>{
 		}
 	}
 	
-	static <From, To> IOList<To> box(IOList<From> data, Function<From, To> unboxer, Function<To, From> boxer){
-		return new Boxed<>(data, unboxer, boxer);
+	@SuppressWarnings("unchecked")
+	static <From, To> IOList<From> unbox(IOList<To> data){
+		if(data==null) return null;
+		if(data instanceof IBoxed<?, ?> boxed){
+			return (IOList<From>)boxed.getData();
+		}else{
+			throw new ClassCastException(data+" is not a boxed list");
+		}
+	}
+	
+	static <From, To> IBoxed<From, To> box(IOList<From> data, Function<From, To> unboxer, Function<To, From> boxer){
+		return new IOList.Boxed<>(data, unboxer, boxer);
 	}
 	
 	int size();
@@ -185,6 +195,13 @@ public interface IOList<T> extends Iterable<T>{
 	}
 	
 	void ensureCapacity(int elementCapacity) throws IOException;
+	
+	default boolean removeElement(T toRemove) throws IOException{
+		int index=indexOf(toRemove);
+		if(index==-1) return false;
+		removeElement(index);
+		return true;
+	}
 	
 	void removeElement(int index) throws IOException;
 	

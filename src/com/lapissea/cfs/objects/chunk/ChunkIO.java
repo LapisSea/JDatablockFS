@@ -40,6 +40,11 @@ public class ChunkIO implements RandomIO{
 		localPos=0;
 	}
 	
+	private void checkCursorInChain() throws IOException{
+		if(head==cursor) return;
+		assert head.collectNext().contains(cursor):cursor+" not in "+head.collectNext();
+	}
+	
 	private long calcCursorEnd(){
 		return cursorStart+cursorEffectiveCapacity();
 	}
@@ -134,6 +139,9 @@ public class ChunkIO implements RandomIO{
 	}
 	
 	private void setCursor(long pos) throws IOException{
+		if(DEBUG_VALIDATION){
+			checkCursorInChain();
+		}
 		try{
 			if(pos<localPos){
 				if(pos>=cursorStart){
@@ -158,6 +166,7 @@ public class ChunkIO implements RandomIO{
 		}finally{
 			assert calcCursorOffset()>=0:"cursorOffset "+calcCursorOffset()+" < 0";
 			assert calcCursorOffset()<=cursor.getSize():"cursorOffset "+calcCursorOffset()+" > "+cursor.getSize();
+			checkCursorInChain();
 		}
 		
 	}
@@ -232,7 +241,7 @@ public class ChunkIO implements RandomIO{
 		
 		long toGrow=newCapacity-prev;
 		
-		chunk.growBy(toGrow);
+		chunk.growBy(head, toGrow);
 		
 		var cap=getCapacity();
 		if(cap<newCapacity) throw new IOException(cap+" < "+newCapacity);
@@ -291,6 +300,7 @@ public class ChunkIO implements RandomIO{
 		
 		if(DEBUG_VALIDATION){
 			cursor.cluster.checkCached(cursor);
+			checkCursorInChain();
 		}
 		
 		Chunk last =cursor;
@@ -305,7 +315,7 @@ public class ChunkIO implements RandomIO{
 		}
 		
 		long toAllocate=amount-remaining;
-		last.growBy(toAllocate);
+		last.growBy(head, toAllocate);
 		
 	}
 	
@@ -317,6 +327,9 @@ public class ChunkIO implements RandomIO{
 	@Override
 	public void write(byte[] b, int off, int len) throws IOException{
 		if(len<=0) return;
+		if(DEBUG_VALIDATION){
+			checkCursorInChain();
+		}
 		
 		int remaining=len;
 		int offAdd   =off;

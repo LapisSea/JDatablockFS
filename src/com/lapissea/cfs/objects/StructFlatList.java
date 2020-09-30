@@ -1,10 +1,11 @@
 package com.lapissea.cfs.objects;
 
+import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.io.struct.IOInstance;
-import com.lapissea.cfs.io.struct.IOStruct;
 import com.lapissea.cfs.objects.chunk.Chunk;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.WeakValueHashMap;
+import com.lapissea.util.function.UnsafeLongFunction;
 
 import java.io.IOException;
 import java.lang.reflect.Constructor;
@@ -16,16 +17,6 @@ import java.util.function.Supplier;
 import static com.lapissea.cfs.Config.*;
 
 public class StructFlatList<T extends IOInstance> implements IOList<T>{
-	
-	private Chunk data;
-	private int   size;
-	
-	private final Supplier<T> constructor;
-	
-	private final int elementSize;
-	
-	private final Map<Integer, T> cache=new WeakValueHashMap<>();
-	
 	
 	private static <T extends IOInstance> Supplier<T> makeConstructor(Class<T> type){
 		Constructor<T> c;
@@ -44,6 +35,29 @@ public class StructFlatList<T extends IOInstance> implements IOList<T>{
 		};
 	}
 	
+	private static int calcElementSize(Supplier<? extends IOInstance> constructor){
+		var type=constructor.get().getStruct();
+		var size=type.getKnownSize().orElse(-1);
+		
+		if(size==-1) throw new MalformedStructLayout("Flat list must have a fixed size");
+		
+		return Math.toIntExact(size);
+	}
+	
+	public static <T extends IOInstance> StructFlatList<T> allocate(UnsafeLongFunction<Chunk, IOException> allocator, int initialCapacity, Supplier<T> constructor) throws IOException{
+		return new StructFlatList<>(allocator.apply(calcElementSize(constructor)*initialCapacity), constructor);
+	}
+	
+	private Chunk data;
+	private int   size;
+	
+	private final Supplier<T> constructor;
+	
+	private final int elementSize;
+	
+	private final Map<Integer, T> cache=new WeakValueHashMap<>();
+	
+	
 	public StructFlatList(Chunk data, Class<T> type) throws IOException{
 		this(data, makeConstructor(type));
 	}
@@ -52,8 +66,7 @@ public class StructFlatList<T extends IOInstance> implements IOList<T>{
 		this.data=data;
 		this.constructor=constructor;
 		
-		IOStruct struct=constructor.get().getStruct();
-		elementSize=Math.toIntExact(struct.requireKnownSize());
+		elementSize=calcElementSize(constructor);
 		
 		calcSize();
 	}
@@ -159,7 +172,7 @@ public class StructFlatList<T extends IOInstance> implements IOList<T>{
 				  .write(lastData);
 			}else{
 				io.setPos(toOffset);
-				fromEl.writeStruct(data.cluster,io);
+				fromEl.writeStruct(data.cluster, io);
 				cache.put(oTo, fromEl);
 			}
 		});
@@ -188,6 +201,13 @@ public class StructFlatList<T extends IOInstance> implements IOList<T>{
 		
 		sizeChange(-1);
 		
+	}
+	
+	@Override
+	public void addElement(T value) throws IOException{
+		Objects.requireNonNull(value);
+		write(size(), value);
+		sizeChange(1);
 	}
 	
 	@Override

@@ -124,6 +124,7 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader, Sizab
 	
 	@Override
 	default long skip(long n) throws IOException{
+		if(n==0) return 0;
 		long toSkip=Math.min(n, remaining());
 		setPos(getPos()+toSkip);
 		return toSkip;

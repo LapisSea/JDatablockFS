@@ -49,19 +49,19 @@ public class StructReflectionImpl implements StructImpl{
 				Annotated<Method, ?> ay=info.functions().get(annType);
 				if(ay==null) return null;
 				var f=ay.val();
-				
-				var retCheck=f.getGenericReturnType();
-				if(!retCheck.equals(returnType())){
-					t.printStackTrace();
-					throw new MalformedStructLayout(f+" should return "+TextUtil.toString(returnType())+" but returns "+retCheck);
-				}
+
+//				var retCheck=f.getGenericReturnType();
+//				if(!retCheck.equals(returnType())){
+//					t.printStackTrace();
+//					throw new MalformedStructLayout(f+" should return "+TextUtil.toString(returnType())+" but returns "+retCheck);
+//				}
 				var args1=f.getGenericParameterTypes();
 				
 				if(args1.length!=args.length) throw new MalformedStructLayout(f+"\nshould have arguments\n"+Arrays.stream(args).map(TextUtil::toString).collect(joining("\n")));
-				
-				for(int i=0;i<args1.length;i++){
-					if(!args1[i].equals(args[i].type)) throw new MalformedStructLayout(f+"\nshould have arguments\n"+Arrays.stream(args).map(TextUtil::toString).collect(joining("\n")));
-				}
+
+//				for(int i=0;i<args1.length;i++){
+//					if(!args1[i].equals(args[i].type)) throw new MalformedStructLayout(f+"\nshould have arguments\n"+Arrays.stream(args).map(TextUtil::toString).collect(joining("\n")));
+//				}
 				
 				return Utils.makeLambda(f, fInter);
 			}

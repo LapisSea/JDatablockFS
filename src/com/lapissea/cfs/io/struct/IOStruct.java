@@ -226,7 +226,7 @@ public class IOStruct{
 	public @interface PointerValue{
 		int index();
 		
-		Class<? extends ReaderWriter<ObjectPointer<?>>> rw() default ObjectPointer.FixedIO.class;
+		Class<? extends ReaderWriter<ObjectPointer<?>>> rw() default ObjectPointer.FixedNoOffsetIO.class;
 		String[] rwArgs() default {};
 		
 		Class<? extends IOInstance> type() default IOInstance.class;
@@ -263,7 +263,7 @@ public class IOStruct{
 	private final long         minimumSize;
 	private final OptionalLong maximumSize;
 	
-	private final Construct.Constructor<? extends IOInstance> constructor;
+	private final Construct.Constructor<?> constructor;
 	
 	private final boolean simpleIndex;
 	
