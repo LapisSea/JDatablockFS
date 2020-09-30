@@ -8,7 +8,9 @@ import com.lapissea.util.function.UnsafeIntConsumer;
 import com.lapissea.util.function.UnsafePredicate;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -177,6 +179,180 @@ public interface IOList<T> extends Iterable<T>{
 		return new IOList.Boxed<>(data, unboxer, boxer);
 	}
 	
+	static <T> IOList<T> wrap(T[] data){
+		return new IOList<>(){
+			
+			@Override
+			public String toString(){
+				return stream().map(TextUtil.SHORT_TO_STRINGS::toString).collect(Collectors.joining(", ", "[", "]"));
+			}
+			
+			@Override
+			public int size(){
+				return data.length;
+			}
+			@Override
+			public T getElement(int index){
+				return data[index];
+			}
+			@Override
+			public void setElement(int index, T value){
+				data[index]=value;
+			}
+			@Override
+			public void ensureCapacity(int elementCapacity){
+				if(elementCapacity>size()){
+					throw new UnsupportedOperationException();
+				}
+			}
+			@Override
+			public void removeElement(int index){
+				throw new UnsupportedOperationException();
+			}
+			@Override
+			public void addElement(int index, T value){
+				throw new UnsupportedOperationException();
+			}
+			@Override
+			public void validate(){ }
+			@Override
+			public void free(){
+				throw new UnsupportedOperationException();
+			}
+		};
+	}
+	static <T> IOList<T> wrap(List<T> data){
+		return new IOList<>(){
+			
+			@Override
+			public String toString(){
+				return stream().map(TextUtil.SHORT_TO_STRINGS::toString).collect(Collectors.joining(", ", "[", "]"));
+			}
+			
+			@Override
+			public int size(){
+				return data.size();
+			}
+			@Override
+			public T getElement(int index){
+				return data.get(index);
+			}
+			@Override
+			public void setElement(int index, T value){
+				data.set(index, value);
+			}
+			@Override
+			public void ensureCapacity(int elementCapacity){
+				if(data instanceof ArrayList<?> l){
+					l.ensureCapacity(elementCapacity);
+				}
+			}
+			@Override
+			public void removeElement(int index){
+				data.remove(index);
+			}
+			@Override
+			public void addElement(int index, T value){
+				data.add(index, value);
+			}
+			@Override
+			public void validate(){ }
+			@Override
+			public void free(){
+				data.clear();
+			}
+		};
+	}
+	static <T> IOList<T> mergeView(List<IOList<T>> lists){
+		interface LocalAction<L, R>{
+			R apply(IOList<L> list, int localIndex) throws IOException;
+		}
+		
+		return new IOList<>(){
+			
+			@Override
+			public String toString(){
+				return lists.stream()
+				            .filter(l->!l.isEmpty())
+				            .map(l->l.stream()
+				                     .map(TextUtil.SHORT_TO_STRINGS::toString)
+				                     .collect(Collectors.joining(", ")))
+				            .collect(Collectors.joining(" + ", "[", "]"));
+			}
+			
+			@Override
+			public int size(){
+				int sum=0;
+				for(var list : lists){
+					sum+=list.size();
+				}
+				return sum;
+			}
+			
+			private <R> R localIndex(int index, LocalAction<T, R> action) throws IOException{
+				if(index<0) throw new IndexOutOfBoundsException(index);
+				int localIndex=index;
+				for(var list : lists){
+					int siz=list.size();
+					if(localIndex<siz){
+						return action.apply(list, localIndex);
+					}
+					localIndex-=list.size();
+				}
+				throw new IndexOutOfBoundsException(index);
+			}
+			
+			@Override
+			public T getElement(int index) throws IOException{
+				return localIndex(index, IOList::getElement);
+			}
+			
+			@Override
+			public void setElement(int index, T value) throws IOException{
+				localIndex(index, (list, i)->{
+					list.setElement(i, value);
+					return null;
+				});
+			}
+			@Override
+			public void ensureCapacity(int elementCapacity) throws IOException{
+				int size  =size();
+				int toGrow=elementCapacity-size;
+				if(toGrow>0){
+					var last=lists.get(lists.size()-1);
+					last.ensureCapacity(last.size()+toGrow);
+				}
+			}
+			
+			@Override
+			public void removeElement(int index) throws IOException{
+				localIndex(index, (list, i)->{
+					list.removeElement(i);
+					return null;
+				});
+			}
+			@Override
+			public void addElement(int index, T value) throws IOException{
+				localIndex(index, (list, i)->{
+					list.addElement(i, value);
+					return null;
+				});
+			}
+			@Override
+			public void validate() throws IOException{
+				for(var list : lists){
+					list.validate();
+				}
+			}
+			@Override
+			public void free() throws IOException{
+				for(var list : lists){
+					list.free();
+				}
+			}
+		};
+	}
+	
 	int size();
 	
 	default boolean isEmpty(){
@@ -230,6 +406,13 @@ public interface IOList<T> extends Iterable<T>{
 	
 	default int indexOf(T value) throws IOException{
 		return find(v->Objects.equals(v, value));
+	}
+	
+	default boolean noneMatches(UnsafePredicate<T, IOException> matcher) throws IOException{
+		return find(matcher)==-1;
+	}
+	default boolean anyMatches(UnsafePredicate<T, IOException> matcher) throws IOException{
+		return find(matcher)!=-1;
 	}
 	
 	default void find(UnsafePredicate<T, IOException> matcher, UnsafeIntConsumer<IOException> onFound) throws IOException{
@@ -307,6 +490,21 @@ public interface IOList<T> extends Iterable<T>{
 			}
 			
 		};
+	}
+	
+	@SuppressWarnings("unchecked")
+	default void addElements(T... toAdd) throws IOException{
+		addElements(wrap(toAdd));
+	}
+	
+	default void addElements(List<T> toAdd) throws IOException{
+		addElements(wrap(toAdd));
+	}
+	
+	default void addElements(IOList<T> toAdd) throws IOException{
+		for(T t : toAdd){
+			addElement(t);
+		}
 	}
 	
 	void validate() throws IOException;

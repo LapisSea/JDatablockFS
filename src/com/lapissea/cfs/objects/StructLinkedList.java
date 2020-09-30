@@ -498,8 +498,9 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 	private boolean isChanging(){
 		return changing;
 	}
-	private void setChanging(boolean changing){
+	private void setChanging(boolean changing) throws IOException{
 		this.changing=changing;
+		validate();
 		changingListener.accept(changing);
 	}
 }

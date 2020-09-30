@@ -24,8 +24,8 @@ class FSFTest{
 		System.setProperty("sun.java2d.opengl", "true");
 //		System.setProperty("sun.java2d.d3d", "true");
 //		Toolkit.getDefaultToolkit().setDynamicLayout(false);
-
-// 		LogUtil.Init.attach(LogUtil.Init.USE_CALL_POS|LogUtil.Init.USE_TABULATED_HEADER);
+		
+		LogUtil.Init.attach(LogUtil.Init.USE_CALL_POS|LogUtil.Init.USE_TABULATED_HEADER);
 	}
 	
 	
@@ -70,11 +70,12 @@ class FSFTest{
 	
 	private static void doTests(Cluster cluster) throws IOException{
 		
-		for(int i=0;i<2;i++){
-			freeChunksTest(cluster);
-			flatListTest(cluster);
-			linkedListTest(cluster);
-		}
+		freeChunksTest(cluster);
+//		for(int i=0;i<2;i++){
+//			freeChunksTest(cluster);
+//			flatListTest(cluster);
+//			linkedListTest(cluster);
+//		}
 		
 	}
 	
@@ -85,16 +86,13 @@ class FSFTest{
 		
 		for(int i=0;i<5;i++){
 			chunk1.add(cluster.alloc(8));
-			chunk2.add(cluster.alloc(8));
+			chunk2.add(cluster.alloc(10));
 		}
 		
 		for(Chunk chunk : chunk1){
-			cluster.checkCached(chunk);
 			chunk.freeChaining();
 		}
 		for(Chunk chunk : chunk2){
-			LogUtil.println(chunk);
-			cluster.checkCached(chunk);
 			chunk.freeChaining();
 		}
 	}

@@ -1,17 +1,18 @@
 package com.lapissea.cfs.cluster;
 
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.objects.IOList;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.chunk.Chunk;
 import com.lapissea.cfs.objects.chunk.ChunkPointer;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
-import com.lapissea.util.TextUtil;
 import com.lapissea.util.function.UnsafeBiConsumer;
 import com.lapissea.util.function.UnsafeFunction;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
@@ -22,9 +23,8 @@ abstract class MAllocer{
 	private static final class PushPop extends MAllocer{
 		
 		@Override
-		public Chunk alloc(Cluster cluster, long requestedSize, boolean disableResizing, Predicate<Chunk> approve) throws IOException{
+		public Chunk alloc(Cluster cluster, IOList<ChunkPointer> freeChunks, long requestedSize, boolean disableResizing, Predicate<Chunk> approve) throws IOException{
 			
-			var freeChunks=cluster.freeChunks;
 			var chunkCache=cluster.chunkCache;
 			var data      =cluster.getData();
 			
@@ -48,11 +48,10 @@ abstract class MAllocer{
 		}
 		
 		@Override
-		public boolean dealloc(Chunk chunk) throws IOException{
+		public boolean dealloc(Chunk chunk, IOList<ChunkPointer> freeChunks) throws IOException{
 			var cluster=chunk.cluster;
 			if(!cluster.isLastPhysical(chunk)) return false;
 			
-			var freeChunks=cluster.freeChunks;
 			var chunkCache=cluster.chunkCache;
 			var data      =cluster.getData();
 			
@@ -71,15 +70,14 @@ abstract class MAllocer{
 	private static final class ListingAddConsume extends MAllocer{
 		
 		@Override
-		public Chunk alloc(Cluster cluster, long requestedCapacity, boolean disableResizing, Predicate<Chunk> approve) throws IOException{
+		public Chunk alloc(Cluster cluster, IOList<ChunkPointer> freeChunks, long requestedCapacity, boolean disableResizing, Predicate<Chunk> approve) throws IOException{
 			
-			var freeChunks  =cluster.freeChunks;
 			var chunkCache  =cluster.chunkCache;
 			var data        =cluster.getData();
 			var minChunkSize=cluster.minChunkSize;
 			
-			if(cluster.isSafeMode()||freeChunks==null||freeChunks.isEmpty()) return null;
-			if(freeChunks.find(Objects::nonNull)==-1) return null;
+			if(cluster.isSafeMode()) return null;
+			if(freeChunks.noneMatches(Objects::nonNull)) return null;
 			
 			UnsafeFunction<Chunk, Chunk, IOException> popEnd=chunk->{
 				Chunk chunkUse=new Chunk(cluster, chunk.getPtr(), requestedCapacity, calcPtrSize(cluster, disableResizing));
@@ -149,9 +147,8 @@ abstract class MAllocer{
 			return null;
 		}
 		@Override
-		public boolean dealloc(Chunk toFree) throws IOException{
+		public boolean dealloc(Chunk toFree, IOList<ChunkPointer> freeChunks) throws IOException{
 			var cluster   =toFree.cluster;
-			var freeChunks=cluster.freeChunks;
 			var chunkCache=cluster.chunkCache;
 			var data      =cluster.getData();
 			
@@ -226,25 +223,25 @@ abstract class MAllocer{
 			
 			
 			if(DEBUG_VALIDATION){
-				if(freeChunks.size()>1){
-					freeChunks.validate();
-					
-					List<long[]> ranges=new ArrayList<>();
-					for(int i=0;i<freeChunks.size();i++){
-						ChunkPointer c=freeChunks.getElement(i);
-						if(c==null) continue;
-						
-						Chunk ch=cluster.getChunk(c);
-						ranges.add(rang.apply(ch));
-					}
-					ranges.sort(Comparator.comparingLong(e->e[0]));
-					long last=-1;
-					for(long[] range : ranges){
-						assert range[0]!=last:
-							TextUtil.toString(ranges)+"\n"+freeChunks;
-						last=range[1];
-					}
-				}
+//				if(freeChunks.size()>1){
+//					freeChunks.validate();
+//
+//					List<long[]> ranges=new ArrayList<>();
+//					for(int i=0;i<freeChunks.size();i++){
+//						ChunkPointer c=freeChunks.getElement(i);
+//						if(c==null) continue;
+//
+//						Chunk ch=cluster.getChunk(c);
+//						ranges.add(rang.apply(ch));
+//					}
+//					ranges.sort(Comparator.comparingLong(e->e[0]));
+//					long last=-1;
+//					for(long[] range : ranges){
+//						assert range[0]!=last:
+//							TextUtil.toString(ranges)+"\n"+freeChunks;
+//						last=range[1];
+//					}
+//				}
 				cluster.validate();
 			}
 			return true;
@@ -256,21 +253,21 @@ abstract class MAllocer{
 	
 	public static final MAllocer AUTO=new MAllocer(){
 		@Override
-		public Chunk alloc(Cluster cluster, long requestedSize, boolean disableResizing, Predicate<Chunk> approve) throws IOException{
+		public Chunk alloc(Cluster cluster, IOList<ChunkPointer> freeChunks, long requestedSize, boolean disableResizing, Predicate<Chunk> approve) throws IOException{
 			Chunk chunk;
 			
-			chunk=FREE_ADD_CONSUME.alloc(cluster, requestedSize, disableResizing, approve);
+			chunk=FREE_ADD_CONSUME.alloc(cluster, freeChunks, requestedSize, disableResizing, approve);
 			
 			if(chunk==null){
-				chunk=PUSH_POP.alloc(cluster, requestedSize, disableResizing, approve);
+				chunk=PUSH_POP.alloc(cluster, freeChunks, requestedSize, disableResizing, approve);
 			}
 			
 			return chunk;
 		}
 		@Override
-		public boolean dealloc(Chunk chunk) throws IOException{
-			if(PUSH_POP.dealloc(chunk)) return true;
-			if(FREE_ADD_CONSUME.dealloc(chunk)) return true;
+		public boolean dealloc(Chunk chunk, IOList<ChunkPointer> freeChunks) throws IOException{
+			if(PUSH_POP.dealloc(chunk, freeChunks)) return true;
+			if(FREE_ADD_CONSUME.dealloc(chunk, freeChunks)) return true;
 			
 			throw new NotImplementedException();
 		}
@@ -293,7 +290,7 @@ abstract class MAllocer{
 		return NumberSize.bySize(cluster.getData().getSize()).next();
 	}
 	
-	public abstract Chunk alloc(Cluster cluster, long requestedSize, boolean disableResizing, Predicate<Chunk> approve) throws IOException;
-	public abstract boolean dealloc(Chunk chunk) throws IOException;
+	public abstract Chunk alloc(Cluster cluster, IOList<ChunkPointer> freeChunks, long requestedSize, boolean disableResizing, Predicate<Chunk> approve) throws IOException;
+	public abstract boolean dealloc(Chunk chunk, IOList<ChunkPointer> freeChunks) throws IOException;
 	
 }

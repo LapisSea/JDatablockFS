@@ -27,7 +27,6 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.Config.*;
@@ -62,10 +61,24 @@ public class Cluster extends IOInstance.Contained{
 	private Version version;
 	
 	@PointerValue(index=1, type=StructLinkedList.class)
-	IOList<ChunkPointer> freeChunks;
+	private IOList<ChunkPointer> freeChunks;
+	
+	private final LinkedList<Chunk> freeingQueue=new LinkedList<>(){
+		@Override
+		public Chunk set(int index, Chunk element){
+			if(element==null) remove(index);
+			return super.set(index, element);
+		}
+		@Override
+		public boolean add(Chunk chunk){
+			return chunk!=null&&super.add(chunk);
+		}
+	};
+	
+	private IOList<ChunkPointer> effectiveFreeChunks=createBoxedFreeingQueue();
 	
 	@PointerValue(index=2, type=StructLinkedList.class)
-	IOList<ChunkPointer> userChunks;
+	private IOList<ChunkPointer> userChunks;
 	
 	private final IOInterface              data;
 	final         Map<ChunkPointer, Chunk> chunkCache=new HashMap<>();
@@ -107,8 +120,7 @@ public class Cluster extends IOInstance.Contained{
 		
 		writeStruct();
 		
-		freeChunks.addElement(null);
-		freeChunks.addElement(null);
+		freeChunks.addElements(null, null);
 	}
 	
 	@IOStruct.Get
@@ -134,6 +146,7 @@ public class Cluster extends IOInstance.Contained{
 		Function<ChunkPointer.PtrRef, ChunkPointer> unbox=ChunkPointer.PtrRef::getValue;
 		
 		this.freeChunks=IOList.box(unboxedFreeChunks, unbox, box);
+		effectiveFreeChunks=IOList.mergeView(List.of(createBoxedFreeingQueue(), freeChunks));
 	}
 	@Construct
 	private IOList<ChunkPointer.PtrRef> constructFreeChunks(Chunk source) throws IOException{
@@ -159,6 +172,17 @@ public class Cluster extends IOInstance.Contained{
 		return l;
 	}
 	
+	private IOList<ChunkPointer> createBoxedFreeingQueue(){
+		return IOList.box(IOList.wrap(freeingQueue), Chunk::getPtr, ptr->{
+			if(ptr==null) return null;
+			try{
+				return getChunk(ptr);
+			}catch(IOException e){
+				throw new RuntimeException(e);
+			}
+		});
+	}
+	
 	public Chunk allocWrite(IOInstance obj) throws IOException{
 		Chunk chunk=alloc(obj.getInstanceSize(), obj.getStruct().getKnownSize().isPresent());
 		chunk.io(io->obj.writeStruct(this, io));
@@ -169,13 +193,16 @@ public class Cluster extends IOInstance.Contained{
 	public Chunk alloc(long requestedCapacity, boolean disableResizing) throws IOException{ return alloc(requestedCapacity, disableResizing, c->true); }
 	public Chunk alloc(long requestedCapacity, boolean disableResizing, Predicate<Chunk> approve) throws IOException{
 		
-		Chunk chunk=MAllocer.AUTO.alloc(this, requestedCapacity, disableResizing, approve);
+		Chunk chunk=MAllocer.AUTO.alloc(this, getFreeData(), requestedCapacity, disableResizing, approve);
 		
 		if(DEBUG_VALIDATION){
 			if(chunk!=null) checkCached(chunk);
 		}
 		
 		return chunk;
+	}
+	private IOList<ChunkPointer> getFreeData(){
+		return effectiveFreeChunks;
 	}
 	
 	private void onSafeEnd() throws IOException{
@@ -185,7 +212,7 @@ public class Cluster extends IOInstance.Contained{
 			freeChunks.addElement(null);
 		}else{
 			while(freeChunks.count(Objects::isNull)>2){
-				freeChunks.removeElement(freeChunks.indexOf(null));
+				freeChunks.removeElement(freeChunks.indexOfLast(null));
 			}
 		}
 	}
@@ -250,7 +277,7 @@ public class Cluster extends IOInstance.Contained{
 		return chunk.dataEnd()>=data.getSize();
 	}
 	
-	public void free(List<Chunk> toFree) throws IOException{
+	public synchronized void free(List<Chunk> toFree) throws IOException{
 		if(DEBUG_VALIDATION){
 			for(Chunk chunk : toFree){
 				checkCached(chunk);
@@ -262,23 +289,51 @@ public class Cluster extends IOInstance.Contained{
 			}
 		}
 		
+		freeingQueue.addAll(toFree);
+		
 		for(Chunk chunk : toFree){
 			if(chunk.isUserData()){
 				userChunks.removeElement(chunk.getPtr());
 			}
 		}
 		
-		if(toFree.size()==1){
-			var val=toFree.get(0);
-			if(val.getPtr().equals(112)){
-				int i=0;
-			}
-			MAllocer.AUTO.dealloc(val);
-		}else{
+		if(!freeingChunks){
+			processFreeQueue();
+		}
+	}
+	
+	private boolean freeingChunks;
+	
+	private void processFreeQueue() throws IOException{
+		try{
+			assert !freeingChunks;
+			freeingChunks=true;
 			
-			for(Chunk chunk : toFree.stream().sorted(Comparator.comparing(Chunk::getPtr).reversed()).collect(Collectors.toUnmodifiableList())){
-				MAllocer.AUTO.dealloc(chunk);
+			
+			while(!freeingQueue.isEmpty()){
+				Chunk val;
+				if(freeingQueue.size()==1) val=freeingQueue.removeFirst();
+				else{
+					ChunkPointer lastPtr  =null;
+					int          bestIndex=-1;
+					for(int i=0, j=freeingQueue.size();i<j;i++){
+						var ptr=freeingQueue.get(i).getPtr();
+						if(lastPtr==null||ptr.compareTo(lastPtr)>0){
+							lastPtr=ptr;
+							bestIndex=i;
+						}
+					}
+					assert bestIndex!=-1;
+					val=freeingQueue.remove(bestIndex);
+				}
+				
+				if(val.getPtr().equals(112)){
+					int i=0;
+				}
+				MAllocer.AUTO.dealloc(val, getFreeData());
 			}
+		}finally{
+			freeingChunks=false;
 		}
 	}
 	
@@ -430,22 +485,35 @@ public class Cluster extends IOInstance.Contained{
 	
 	public void validate() throws IOException{
 		try{
-			long used =0;
-			long total=0;
-			long free =0;
 			
-			for(Chunk chunk=getFirstChunk();chunk!=null;chunk=chunk.nextPhysical()){
-				if(chunk.isUsed()){
-					used+=chunk.getSize();
-					total+=chunk.getCapacity();
-				}else{
-					free+=chunk.getCapacity();
+			for(var entry : chunkCache.entrySet()){
+				if(!entry.getKey().equals(entry.getValue().getPtr())){
+					throw new RuntimeException("invalid entry state"+entry);
 				}
+				Chunk ch=entry.getValue();
+				checkSync(ch);
 			}
 			
-			for(var freeChunk : freeChunks){
-				if(freeChunk==null) continue;
-				var chunk=getChunk(freeChunk);
+			//noinspection StatementWithEmptyBody
+			for(Chunk chunk=getFirstChunk();chunk!=null;chunk=chunk.nextPhysical()){ }
+			
+			Set<ChunkPointer> unique=new HashSet<>();
+			
+			for(var freePtr : freeChunks){
+				if(freePtr==null) continue;
+				if(!unique.add(freePtr)){
+					if(DEBUG_VALIDATION){
+						Chunk c;
+						try{
+							c=getChunk(freePtr);
+						}catch(IOException e){c=null;}
+						throw new IllegalStateException("Duplicate chunk ptr: "+freePtr+(c==null?" <err>":" "+c)+" in "+freeChunks);
+					}else{
+						LogUtil.println("Possible corruption! Duplicate free chunk", freePtr, "in", freeChunks);
+						freeChunks.find(freePtr::equals, freeChunks::removeElement);
+					}
+				}
+				var chunk=getChunk(freePtr);
 				assert !chunk.isUsed();
 			}
 			
@@ -462,14 +530,17 @@ public class Cluster extends IOInstance.Contained{
 		
 		boolean found=memoryWalk(val->{
 			LogUtil.println(val.stack);
-			if(val.value().equals(oldPtr)){
-				val.setter.accept(newPtr);
+			if(val.isValue(oldPtr)){
+				val.set(newPtr);
 				return true;
 			}
 			return false;
 		});
 		
-		assert found:"trying to move unreferenced chunk: "+oldChunk;
+		assert found:
+			"trying to move unreferenced chunk: "+oldChunk.toString();
+		
+		if(true) throw null;
 		
 		chunkCache.remove(oldPtr);
 		chunkCache.put(newPtr, oldChunk);
@@ -487,6 +558,10 @@ public class Cluster extends IOInstance.Contained{
 		public ChunkPointer value(){
 			return stack.get(stack.size()-1);
 		}
+		
+		public boolean isValue(ChunkPointer value)          { return value().equals(value); }
+		
+		public void set(ChunkPointer ptr) throws IOException{ setter.accept(ptr); }
 	}
 	
 	private List<ChunkPointer> pushStack(List<ChunkPointer> stack, ChunkPointer el){
