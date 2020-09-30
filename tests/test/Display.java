@@ -325,7 +325,7 @@ public class Display extends JFrame implements DataLogger{
 		
 		var pan=new Pan();
 		pan.setBackground(Color.GRAY);
-		add(pan);
+		setContentPane(pan);
 		
 		setDefaultCloseOperation(EXIT_ON_CLOSE);
 		
@@ -402,7 +402,7 @@ public class Display extends JFrame implements DataLogger{
 			}
 		});
 		
-		addMouseListener(new MouseAdapter(){
+		pan.addMouseListener(new MouseAdapter(){
 			@Override
 			public void mouseClicked(MouseEvent e){
 				frames.get(getPos()).e().printStackTrace();
@@ -410,9 +410,8 @@ public class Display extends JFrame implements DataLogger{
 			}
 		});
 		
-		setBackground(Color.GRAY);
 		setVisible(true);
-		createBufferStrategy(3);
+		createBufferStrategy(2);
 	}
 	
 	private void setPixelsPerByte(int pixelsPerByte){
