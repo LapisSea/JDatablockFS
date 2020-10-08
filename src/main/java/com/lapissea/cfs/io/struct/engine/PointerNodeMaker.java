@@ -19,7 +19,7 @@ public class PointerNodeMaker<T extends IOInstance&SelfPoint<T>> extends StructR
 	
 	@Override
 	@SuppressWarnings("unchecked")
-	protected VariableNode<T> makeNode(Class<?> clazz, String name, ValueRelations.ValueInfo info){
+	protected VariableNode<T> makeNode(IOStruct clazz, String name, ValueRelations.ValueInfo info){
 		
 		IOStruct              overrideType;
 		IOStruct.PointerValue valueAnn;
@@ -60,13 +60,13 @@ public class PointerNodeMaker<T extends IOInstance&SelfPoint<T>> extends StructR
 		Constructor<T> constructorFun=Constructor.get(info, valueType);
 		
 		if(constructorFun==null&&!structType.canInstate()){
-			throw new MalformedStructLayout("value "+valueField.getName()+" in "+clazz.getName()+" is not auto constructable and does not have a constructor function!");
+			throw new MalformedStructLayout("value "+valueField.getName()+" in "+clazz.instanceClass.getName()+" is not auto constructable and does not have a constructor function!");
 		}
 		
 		Getter<T> getFun=Getter.get(info, valueType);
 		Setter<T> setFun=Setter.get(info, valueType);
 		
-		ReaderWriter<ObjectPointer<T>> rw=Objects.requireNonNull(ReaderWriter.getInstance(clazz, (Class<ReaderWriter<ObjectPointer<T>>>)((Object)valueAnn.rw()), valueAnn.rwArgs()));
+		ReaderWriter<ObjectPointer<T>> rw=Objects.requireNonNull(ReaderWriter.getInstance(clazz.instanceClass, (Class<ReaderWriter<ObjectPointer<T>>>)((Object)valueAnn.rw()), valueAnn.rwArgs()));
 		
 		if(rw.getFixedSize().isPresent()){
 			return new StructPtrIOImpl.Fixed<>(name, valueAnn.index(), valueField, getFun, setFun, constructorFun, rw, structType);

@@ -19,7 +19,7 @@ import java.lang.reflect.Type;
 public class EnumNodeMaker<T extends Enum<T>> extends StructReflectionImpl.NodeMaker<T>{
 	
 	@Override
-	protected VariableNode<T> makeNode(Class<?> clazz, String name, ValueRelations.ValueInfo info){
+	protected VariableNode<T> makeNode(IOStruct clazz, String name, ValueRelations.ValueInfo info){
 		
 		IOStruct.EnumValue valueAnn;
 		Field              valueField;

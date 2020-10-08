@@ -67,7 +67,7 @@ public class StructReflectionImpl implements StructImpl{
 			}
 		}
 		
-		protected abstract VariableNode<Base> makeNode(Class<?> clazz, String name, ValueRelations.ValueInfo info);
+		protected abstract VariableNode<Base> makeNode(IOStruct clazz, String name, ValueRelations.ValueInfo info);
 		
 	}
 	
@@ -76,9 +76,9 @@ public class StructReflectionImpl implements StructImpl{
 		new SimpleEntry<>(IOStruct.Value.class, new GenericNodeMaker<>()),
 		new SimpleEntry<>(IOStruct.PrimitiveValue.class, new PrimitiveNodeMaker<>()),
 		new SimpleEntry<>(IOStruct.PointerValue.class, new PointerNodeMaker<>())
-	);
+	                                                                                             );
 	
-	private VariableNode<?> infoToNode(Class<?> clazz, String name, ValueRelations.ValueInfo info){
+	private VariableNode<?> infoToNode(IOStruct clazz, String name, ValueRelations.ValueInfo info){
 		
 		Annotated<Field, ?> val=info.value();
 		
@@ -89,7 +89,7 @@ public class StructReflectionImpl implements StructImpl{
 	}
 	
 	@Override
-	public <T extends IOInstance> List<VariableNode<Object>> generateVariables(Class<T> clazz, RelationCollection data){
+	public <T extends IOInstance> List<VariableNode<Object>> generateVariables(IOStruct clazz, RelationCollection data){
 		var values=new ValueRelations(data);
 
 //		LogUtil.println(TextUtil.toNamedPrettyJson(values.data));

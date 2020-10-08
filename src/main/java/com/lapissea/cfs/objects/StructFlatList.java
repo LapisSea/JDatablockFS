@@ -290,9 +290,10 @@ public class StructFlatList<T extends IOInstance> implements IOList<T>{
 			
 			assert index<size:index+"<"+size;
 			
-			T read=read(e.getKey());
+			T read=read(index);
 			
-			assert read.equals(cached):"\n"+TextUtil.toTable("cached/read mismatch", List.of(cached, read));
+			assert read.equals(cached):
+				"\n"+TextUtil.toTable("cached/read mismatch @"+index, List.of(cached, read));
 		}
 	}
 }

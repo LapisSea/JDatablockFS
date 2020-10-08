@@ -25,7 +25,7 @@ public class GenericNodeMaker<T> extends StructReflectionImpl.NodeMaker<T>{
 	
 	@Override
 	@SuppressWarnings("unchecked")
-	protected VariableNode<T> makeNode(Class<?> clazz, String name, ValueRelations.ValueInfo info){
+	protected VariableNode<T> makeNode(IOStruct clazz, String name, ValueRelations.ValueInfo info){
 		
 		IOStruct.Value valueAnn;
 		Field          valueField;
@@ -50,8 +50,15 @@ public class GenericNodeMaker<T> extends StructReflectionImpl.NodeMaker<T>{
 		OptionalInt  fixedSize=OptionalInt.empty();
 		OptionalLong maxSize  =OptionalLong.empty();
 		
+		if(sizerFunTmp!=null){
+			IOStruct.Size siz=(IOStruct.Size)info.functions().get(IOStruct.Size.class).annotation();
+			if(siz.fixedSize()!=-1){
+				fixedSize=OptionalInt.of(Math.toIntExact(siz.fixedSize()));
+				maxSize=OptionalLong.of(siz.fixedSize());
+			}
+		}
 		
-		ReaderWriter<T> rw=ReaderWriter.getInstance(clazz, valueAnn.rw(), valueAnn.rwArgs());
+		ReaderWriter<T> rw=ReaderWriter.getInstance(clazz.instanceClass, valueAnn.rw(), valueAnn.rwArgs());
 		if(rw!=null){
 			fixedSize=rw.getFixedSize();
 			maxSize=rw.getMaxSize().stream().asLongStream().findAny();
@@ -64,6 +71,7 @@ public class GenericNodeMaker<T> extends StructReflectionImpl.NodeMaker<T>{
 		readFun=readFunTmp;
 		writeFun=writeFunTmp;
 		sizerFun=sizerFunTmp;
+		
 		
 		Function<Field, String> toStr=f->f.getDeclaringClass().getName()+"."+f.getName();
 		

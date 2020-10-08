@@ -202,6 +202,8 @@ public class IOStruct{
 			long mapSize(IOInstance target, T value);
 		}
 		
+		long fixedSize() default -1;
+		
 		String target() default "";
 	}
 	
@@ -277,8 +279,9 @@ public class IOStruct{
 	
 	private IOStruct(Class<? extends IOInstance> instanceClass){
 		this.instanceClass=instanceClass;
+		constructor=findConstructor();
 		
-		variables=StructImpl.generateVariablesDefault((Class<IOInstance>)instanceClass);
+		variables=StructImpl.generateVariablesDefault(this);
 		
 		simpleIndex=IntStream.range(0, variables.size()).allMatch(i->variables.get(i).index==i);
 		
@@ -300,8 +303,7 @@ public class IOStruct{
 		knownSize=calculateKnownSize();
 		minimumSize=calculateMinimumSize();
 		maximumSize=calculateMaximumSize();
-		
-		constructor=findConstructor();
+
 
 //		logStruct();
 	}
@@ -316,20 +318,26 @@ public class IOStruct{
 		try{
 			BiFunction<Constructor<IOInstance>, Object[], IOInstance> make=(c, args)->{
 				try{
-					return (IOInstance)c.newInstance();
+					return (IOInstance)c.newInstance(args);
 				}catch(ReflectiveOperationException e){
 					throw new RuntimeException(e);
 				}
 			};
 			
-			return Utils.tryMapConstructor((Class<IOInstance>)instanceClass, List.of(
-				Stream::empty,
-				()->Stream.of(Chunk.class)
-			                                                                        ), (BiFunction<Integer, Constructor<IOInstance>, Construct.Constructor<IOInstance>>)(i, c)->switch(i){
-				case 0 -> (t, chunk)->make.apply(c, ZeroArrays.ZERO_OBJECT);
-				case 1 -> (t, chunk)->make.apply(c, new Object[]{chunk});
-				default -> throw new RuntimeException();
-			});
+			return Utils.tryMapConstructor(
+				(Class<IOInstance>)instanceClass,
+				List.of(
+					Stream::empty,
+					()->Stream.of(Chunk.class)),
+				(BiFunction<Integer, Constructor<IOInstance>, Construct.Constructor<IOInstance>>)(i, c)->{
+					c.setAccessible(true);
+					return switch(i){
+						case 0 -> (t, chunk)->make.apply(c, ZeroArrays.ZERO_OBJECT);
+						case 1 -> (t, chunk)->make.apply(c, new Object[]{chunk});
+						default -> throw new RuntimeException();
+					};
+				}
+			                              );
 		}catch(ReflectiveOperationException e){
 			return null;
 		}

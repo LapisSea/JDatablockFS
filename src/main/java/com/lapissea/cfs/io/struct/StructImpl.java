@@ -76,19 +76,19 @@ public interface StructImpl{
 	
 	StructImpl DEFAULT_IMPL=new StructReflectionImpl();
 	
-	static <T extends IOInstance> List<VariableNode<Object>> generateVariablesDefault(Class<T> clazz){
+	static <T extends IOInstance> List<VariableNode<Object>> generateVariablesDefault(IOStruct clazz){
 		return DEFAULT_IMPL.generateVariables(clazz);
 	}
 	
-	default <T extends IOInstance> List<VariableNode<Object>> generateVariables(Class<T> clazz){
+	default <T extends IOInstance> List<VariableNode<Object>> generateVariables(IOStruct clazz){
 		RelationCollection data=new RelationCollection();
 		
-		Annotated.collect(clazz, data.map, new Annotated.ElementDef<>(c->Arrays.stream(c.getDeclaredMethods()).filter(e->!Modifier.isStatic(e.getModifiers())), Method::getAnnotation), AnnotationRelations::methods);
-		Annotated.collect(clazz, data.map, new Annotated.ElementDef<>(c->Arrays.stream(c.getDeclaredFields()).filter(e->!Modifier.isStatic(e.getModifiers())), Field::getAnnotation), AnnotationRelations::fields);
+		Annotated.collect(clazz.instanceClass, data.map, new Annotated.ElementDef<>(c->Arrays.stream(c.getDeclaredMethods()).filter(e->!Modifier.isStatic(e.getModifiers())), Method::getAnnotation), AnnotationRelations::methods);
+		Annotated.collect(clazz.instanceClass, data.map, new Annotated.ElementDef<>(c->Arrays.stream(c.getDeclaredFields()).filter(e->!Modifier.isStatic(e.getModifiers())), Field::getAnnotation), AnnotationRelations::fields);
 		
 		return generateVariables(clazz, data);
 	}
 	
-	<T extends IOInstance> List<VariableNode<Object>> generateVariables(Class<T> clazz, RelationCollection data);
+	<T extends IOInstance> List<VariableNode<Object>> generateVariables(IOStruct clazz, RelationCollection data);
 	
 }

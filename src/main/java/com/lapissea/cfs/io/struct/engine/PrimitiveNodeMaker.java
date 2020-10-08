@@ -13,7 +13,7 @@ import java.lang.reflect.Field;
 public class PrimitiveNodeMaker<T> extends StructReflectionImpl.NodeMaker<T>{
 	@SuppressWarnings("unchecked")
 	@Override
-	protected VariableNode<T> makeNode(Class<?> clazz, String name, ValueRelations.ValueInfo info){
+	protected VariableNode<T> makeNode(IOStruct clazz, String name, ValueRelations.ValueInfo info){
 		IOStruct.PrimitiveValue valueAnn;
 		Field                   valueField;
 		{
@@ -35,7 +35,7 @@ public class PrimitiveNodeMaker<T> extends StructReflectionImpl.NodeMaker<T>{
 			
 			if(!valueAnn.sizeRef().isEmpty()){
 				try{
-					Field varSize=clazz.getDeclaredField(valueAnn.sizeRef());
+					Field varSize=clazz.instanceClass.getDeclaredField(valueAnn.sizeRef());
 					if(varSize.getType()!=NumberSize.class) throw new ClassCastException(varSize+" must be a NumberSize enum!");
 					varSize.setAccessible(true);
 					
@@ -54,7 +54,7 @@ public class PrimitiveNodeMaker<T> extends StructReflectionImpl.NodeMaker<T>{
 			
 			if(!valueAnn.sizeRef().isEmpty()){
 				try{
-					Field varSize=clazz.getDeclaredField(valueAnn.sizeRef());
+					Field varSize=clazz.instanceClass.getDeclaredField(valueAnn.sizeRef());
 					if(varSize.getType()!=NumberSize.class) throw new ClassCastException(varSize+" must be a NumberSize enum!");
 					varSize.setAccessible(true);
 					
