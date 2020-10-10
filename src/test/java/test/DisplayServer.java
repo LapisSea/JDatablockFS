@@ -3,11 +3,14 @@ package test;
 import com.lapissea.cfs.io.content.ContentInputStream;
 import com.lapissea.cfs.io.content.ContentOutputStream;
 import com.lapissea.cfs.io.content.ContentReader;
+import com.lapissea.util.AsynchronousBufferingInputStream;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeConsumer;
 
+import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.net.*;
+import java.util.concurrent.CompletableFuture;
 
 public class DisplayServer implements DataLogger{
 	
@@ -17,9 +20,14 @@ public class DisplayServer implements DataLogger{
 		FINISH
 	}
 	
+	private static DataLogger getRealLogger(){
+		return new DisplayLWJGL();
+	}
+	
 	public static void main(String[] args) throws IOException{
+		LogUtil.Init.attach(LogUtil.Init.USE_CALL_POS|LogUtil.Init.USE_CALL_THREAD|LogUtil.Init.USE_TABULATED_HEADER);
 		
-		DataLogger display=new Display();
+		DataLogger display=getRealLogger();
 		
 		ServerSocket server=new ServerSocket(666);
 		
@@ -27,7 +35,7 @@ public class DisplayServer implements DataLogger{
 			try(Socket client=server.accept()){
 				LogUtil.println("connected", client);
 				var           os     =client.getOutputStream();
-				ContentReader content=new ContentInputStream.Wrapp(client.getInputStream());
+				ContentReader content=new ContentInputStream.Wrapp(AsynchronousBufferingInputStream.makeAsync(client.getInputStream()));
 				
 				run:
 				while(true){
@@ -74,6 +82,7 @@ public class DisplayServer implements DataLogger{
 	}
 	
 	final DataLogger proxy;
+	CompletableFuture<Void> task=CompletableFuture.completedFuture(null);
 	
 	
 	public DisplayServer(){
@@ -84,7 +93,7 @@ public class DisplayServer implements DataLogger{
 			
 			LogUtil.println("connected", socket);
 			var is    =socket.getInputStream();
-			var writer=new ContentOutputStream.Wrapp(socket.getOutputStream());
+			var writer=new ContentOutputStream.Wrapp(new BufferedOutputStream(socket.getOutputStream()));
 			
 			UnsafeConsumer<Action, IOException> sendAction=(Action a)->{
 				writer.writeInt1(a.ordinal());
@@ -135,7 +144,7 @@ public class DisplayServer implements DataLogger{
 			proxy.reset();
 		}catch(IOException e){
 			e.printStackTrace();
-			proxy=new Display();
+			proxy=getRealLogger();
 		}
 		this.proxy=proxy;
 	}

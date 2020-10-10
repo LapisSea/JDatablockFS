@@ -30,7 +30,7 @@ import java.util.stream.IntStream;
 import static java.awt.RenderingHints.*;
 
 @SuppressWarnings("AutoBoxing")
-public class Display extends JFrame implements DataLogger{
+public class Display2D extends JFrame implements DataLogger{
 	
 	interface DrawB{
 		void draw(int index, Color color, boolean withChar, boolean force);
@@ -317,7 +317,7 @@ public class Display extends JFrame implements DataLogger{
 	private final List<MemFrame>               frames   =new ArrayList<>();
 	private final Map<ByteInfo, BufferedImage> byteCache=new HashMap<>();
 	
-	public Display(){
+	public Display2D(){
 		File f=new File("wind");
 		
 		try(var in=new BufferedReader(new FileReader(f))){

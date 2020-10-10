@@ -35,8 +35,9 @@ class FSFTest{
 			
 			LateInit<DataLogger> display=new LateInit<>(()->{
 				if(DEBUG_VALIDATION){
+//					return new DisplayLWJGL();
 					return new DisplayServer();
-//					return new Display();
+//					return new Display2D();
 				}
 				return new DataLogger.Blank();
 			});
