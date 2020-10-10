@@ -3,14 +3,16 @@ package test;
 import com.lapissea.cfs.io.content.ContentInputStream;
 import com.lapissea.cfs.io.content.ContentOutputStream;
 import com.lapissea.cfs.io.content.ContentReader;
-import com.lapissea.util.AsynchronousBufferingInputStream;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeConsumer;
 
+import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.net.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
 public class DisplayServer implements DataLogger{
 	
@@ -35,7 +37,9 @@ public class DisplayServer implements DataLogger{
 			try(Socket client=server.accept()){
 				LogUtil.println("connected", client);
 				var           os     =client.getOutputStream();
-				ContentReader content=new ContentInputStream.Wrapp(AsynchronousBufferingInputStream.makeAsync(client.getInputStream()));
+				ContentReader content=new ContentInputStream.Wrapp(new BufferedInputStream(client.getInputStream()));
+				
+				Executor exec=Executors.newSingleThreadExecutor();
 				
 				run:
 				while(true){
@@ -51,7 +55,7 @@ public class DisplayServer implements DataLogger{
 								stackTrace[i]=new String(data);
 							}
 							
-							display.log(new MemFrame(bb, ids, stackTrace));
+							exec.execute(()->display.log(new MemFrame(bb, ids, stackTrace)));
 						}
 						case RESET -> {
 							display.reset();

@@ -12,8 +12,11 @@ import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.function.IntFunction;
+import java.util.stream.IntStream;
 
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.stb.STBTruetype.*;
@@ -32,18 +35,19 @@ public class TTFont{
 	
 	private class Bitmap{
 		final STBTTBakedChar.Buffer charInfo;
-		final int                   texture;
-		final float                 pixelHeight;
-		final int                   bitmapWidth;
-		final int                   bitmapHeight;
+		int texture=-1;
+		final float pixelHeight;
+		final int   bitmapWidth;
+		final int   bitmapHeight;
+		
+		long lastUsed=System.currentTimeMillis();
 		
 		private Bitmap(float pixelHeight){
 			this.pixelHeight=pixelHeight;
 			
-			var bitmapWidth =64;
+			var bitmapWidth =32;
 			var bitmapHeight=32;
 			
-			texture=glGenTextures();
 			charInfo=STBTTBakedChar.malloc(255-FIRST_CHAR);
 			
 			ByteBuffer bitmap;
@@ -66,26 +70,36 @@ public class TTFont{
 				break;
 				
 			}
-			
-			glBindTexture(GL_TEXTURE_2D, texture);
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, bitmapWidth, bitmapHeight, 0, GL_ALPHA, GL_UNSIGNED_BYTE, bitmap);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-//			glBindTexture(GL_TEXTURE_2D, 0);
-			
 			this.bitmapWidth=bitmapWidth;
 			this.bitmapHeight=bitmapHeight;
+			
+			ByteBuffer finalBitmap=bitmap;
+			openglTask.accept(()->{
+				texture=glGenTextures();
+				glBindTexture(GL_TEXTURE_2D, texture);
+				glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, this.bitmapWidth, this.bitmapHeight, 0, GL_ALPHA, GL_UNSIGNED_BYTE, finalBitmap);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			});
 		}
 		
 		void free(){
-			charInfo.free();
-			glDeleteTextures(texture);
+			openglTask.accept(()->{
+				charInfo.free();
+				glDeleteTextures(texture);
+			});
 		}
 	}
 	
-	private final List<Bitmap> bitmapCache=new ArrayList<>();
+	private final List<Bitmap>               bitmapCache=new ArrayList<>();
+	private final IntFunction<AutoCloseable> bulkHook;
+	private final Runnable                   renderRequest;
+	private final Consumer<Runnable>         openglTask;
 	
-	public TTFont(String ttfPath){
+	public TTFont(String ttfPath, IntFunction<AutoCloseable> bulkHook, Runnable renderRequest, Consumer<Runnable> openglTask){
+		this.bulkHook=bulkHook;
+		this.renderRequest=renderRequest;
+		this.openglTask=openglTask;
 		
 		byte[] ttfData;
 		try{
@@ -115,21 +129,65 @@ public class TTFont{
 			descent=pDescent.get(0);
 			lineGap=pLineGap.get(0);
 		}
-		
 	}
 	
+	private boolean generating;
 	
 	private Bitmap getBitmap(float pixelHeight){
-		for(Bitmap bitmap : bitmapCache){
-			if(Math.abs(bitmap.pixelHeight-pixelHeight)<0.5) return bitmap;
-		}
-		if(bitmapCache.size()>6){
-			bitmapCache.remove(0).free();
+		
+		Bitmap best;
+		synchronized(bitmapCache){
+			if(bitmapCache.isEmpty()) bitmapCache.add(new Bitmap(16));
+			best=bitmapCache.get(0);
+			for(Bitmap bitmap : bitmapCache){
+				if(bitmap.texture==-1) continue;
+				
+				var bestDist=Math.abs(best.pixelHeight-pixelHeight);
+				var thisDist=Math.abs(bitmap.pixelHeight-pixelHeight);
+				if(thisDist<0.5){
+					bitmap.lastUsed=System.currentTimeMillis();
+					return bitmap;
+				}
+				if(thisDist<bestDist) best=bitmap;
+				
+			}
 		}
 		
-		Bitmap bitmap=new Bitmap(pixelHeight);
-		bitmapCache.add(bitmap);
-		return bitmap;
+		var bestDist=Math.abs(best.pixelHeight-pixelHeight);
+		
+		gen:
+		if(!generating){
+			synchronized(bitmapCache){
+				for(Bitmap bitmap : bitmapCache){
+					var thisDist=Math.abs(bitmap.pixelHeight-pixelHeight);
+					if(thisDist<0.5) break gen;
+				}
+			}
+			
+			generating=true;
+			new Thread(()->{
+				try{
+					Bitmap bitmap=new Bitmap(pixelHeight);
+					
+					synchronized(bitmapCache){
+						if(bitmapCache.size()>6){
+							IntStream.range(0, bitmapCache.size())
+							         .boxed()
+							         .min(Comparator.comparingLong(i->bitmapCache.get(i).lastUsed))
+							         .ifPresent(i->bitmapCache.remove((int)i).free());
+						}
+						bitmap.lastUsed=System.currentTimeMillis();
+						bitmapCache.add(bitmap);
+					}
+					renderRequest.run();
+				}finally{
+					generating=false;
+				}
+			}).start();
+		}
+		
+		best.lastUsed=System.currentTimeMillis();
+		return best;
 	}
 	
 	private float getStringWidth(STBTTFontinfo info, String text, float fontHeight){
@@ -150,12 +208,14 @@ public class TTFont{
 	}
 	
 	public float[] getStringBounds(String string, float pixelHeight){
-		float minX=Float.MAX_VALUE;
-		float minY=Float.MAX_VALUE;
+		float minX=0;
+		float minY=0;
 		float maxX=Float.MIN_VALUE;
 		float maxY=Float.MIN_VALUE;
 		
 		Bitmap bitmap=getBitmap(pixelHeight);
+		
+		float scale=pixelHeight/bitmap.pixelHeight;
 		
 		try(MemoryStack stack=stackPush()){
 			
@@ -181,7 +241,7 @@ public class TTFont{
 				
 			}
 		}
-		return new float[]{maxX-minX, maxY-minY};
+		return new float[]{(maxX-minX)*scale, (maxY-minY)*scale};
 	}
 	
 	
@@ -189,8 +249,9 @@ public class TTFont{
 		//TODO
 	}
 	
-	public void fillString(String string, float pixelHeight, IntFunction<AutoCloseable> bulkHook){
+	public void fillString(String string, float pixelHeight){
 		Bitmap bitmap=getBitmap(pixelHeight);
+		float  scale =pixelHeight/bitmap.pixelHeight;
 		
 		try(MemoryStack stack=stackPush()){
 			
@@ -198,12 +259,9 @@ public class TTFont{
 			FloatBuffer y=stack.floats(0.0f);
 			
 			STBTTAlignedQuad q=STBTTAlignedQuad.mallocStack(stack);
-
-//			glEnable(GL_TEXTURE);
+			
 			glBindTexture(GL_TEXTURE_2D, bitmap.texture);
 			glEnable(GL_TEXTURE_2D);
-			glEnable(GL_BLEND);
-			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 			
 			try(var apply=bulkHook.apply(GL_QUADS)){
 				for(int i=0;i<string.length();i++){
@@ -214,10 +272,10 @@ public class TTFont{
 					
 					
 					float
-						x0=q.x0(),
-						x1=q.x1(),
-						y0=q.y0(),
-						y1=q.y1();
+						x0=q.x0()*scale,
+						x1=q.x1()*scale,
+						y0=q.y0()*scale,
+						y1=q.y1()*scale;
 					
 					glTexCoord2f(q.s0(), q.t0());
 					glVertex2f(x0, y0);

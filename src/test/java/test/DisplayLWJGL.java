@@ -62,6 +62,8 @@ public class DisplayLWJGL implements DataLogger{
 	
 	private final GlfwWindow window=new GlfwWindow();
 	
+	private final List<Runnable> glTasks=Collections.synchronizedList(new LinkedList<>());
+	
 	private final List<MemFrame>    frames       =new ArrayList<>();
 	private final ChangeRegistryInt pixelsPerByte=new ChangeRegistryInt(300);
 	private final ChangeRegistryInt framePos     =new ChangeRegistryInt(-1);
@@ -71,7 +73,7 @@ public class DisplayLWJGL implements DataLogger{
 	
 	private boolean bulkDrawing;
 	
-	private final TTFont font=new TTFont("/CourierPrime-Regular.ttf");
+	private final TTFont font=new TTFont("/CourierPrime-Regular.ttf", BulkDraw::new, ()->shouldRender=true, glTasks::add);
 	
 	public DisplayLWJGL(){
 		var t=new Thread(()->{
@@ -146,9 +148,14 @@ public class DisplayLWJGL implements DataLogger{
 		window.size.set(600, 600);
 		window.centerWindow();
 		
-		new Thread(()->window.autoHandleStateSaving(new File("glfw-win.json")), "glfw watch").start();
+		var stateFile=new File("glfw-win.json");
+		window.loadState(stateFile);
+		new Thread(()->window.autoHandleStateSaving(stateFile), "glfw watch").start();
 		
-		window.onDestroy(()->System.exit(0));
+		window.onDestroy(()->{
+			window.saveState(stateFile);
+			System.exit(0);
+		});
 		
 		glfwWindowHint(GLFW_SAMPLES, 8);
 		
@@ -190,6 +197,8 @@ public class DisplayLWJGL implements DataLogger{
 	}
 	
 	private void render(){
+		glTasks.forEach(Runnable::run);
+		glTasks.clear();
 		try{
 			render(getFramePos());
 			window.swapBuffers();
@@ -548,7 +557,7 @@ public class DisplayLWJGL implements DataLogger{
 	}
 	
 	private void fillString(String str){
-		font.fillString(str, fontScale, mode->this.new BulkDraw(mode));
+		font.fillString(str, fontScale);
 	}
 	
 	private boolean canFontDisplay(char c){
