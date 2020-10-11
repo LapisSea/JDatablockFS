@@ -67,7 +67,7 @@ class FSFTest{
 					}
 				});
 			};
-			
+			mem.onWrite.accept(ZeroArrays.ZERO_LONG);
 			try{
 				doTests(cluster);
 			}finally{
@@ -97,9 +97,16 @@ class FSFTest{
 		List<Chunk> chunk1=new ArrayList<>();
 		List<Chunk> chunk2=new ArrayList<>();
 		
+		
+		chunk1.add(cluster.userAlloc(200));
+		chunk1.add(cluster.userAlloc(200));
+		chunk1.add(cluster.userAlloc(200));
+		chunk1.add(cluster.userAlloc(200));
+		chunk1.add(cluster.userAlloc(200));
+		
 		for(int i=0;i<5;i++){
-			chunk1.add(cluster.userAlloc(10));
-			chunk2.add(cluster.alloc(10));
+//			chunk1.add(cluster.userAlloc(20));
+//			chunk2.add(cluster.alloc(10));
 		}
 //		cluster.batchFree(()->{
 		for(Chunk chunk : chunk1){
