@@ -46,13 +46,16 @@ public interface IOInterface extends Sizable.Mod, RandomIO.Creator{
 	
 	@NotNull
 	default ContentOutputStream write(boolean trimOnClose) throws IOException{ return write(0, trimOnClose); }
+	
 	@NotNull
 	default ContentOutputStream write(long fileOffset, boolean trimOnClose) throws IOException{
 		return io().setPos(fileOffset).outStream(trimOnClose);
 	}
 	
 	default void write(boolean trimOnClose, byte[] data) throws IOException                 { write(0, trimOnClose, data); }
+	
 	default void write(long fileOffset, boolean trimOnClose, byte[] data) throws IOException{ write(fileOffset, trimOnClose, data.length, data); }
+	
 	default void write(long fileOffset, boolean trimOnClose, int length, byte[] data) throws IOException{
 		try(var io=io()){
 			io.setPos(fileOffset);
@@ -64,6 +67,7 @@ public interface IOInterface extends Sizable.Mod, RandomIO.Creator{
 	
 	@NotNull
 	default <T> T read(UnsafeFunction<ContentInputStream, T, IOException> reader) throws IOException{ return read(0, reader); }
+	
 	@NotNull
 	default <T> T read(long fileOffset, @NotNull UnsafeFunction<ContentInputStream, T, IOException> reader) throws IOException{
 		Objects.requireNonNull(reader);
@@ -84,6 +88,7 @@ public interface IOInterface extends Sizable.Mod, RandomIO.Creator{
 	
 	@NotNull
 	default ContentInputStream read() throws IOException{ return read(0); }
+	
 	@NotNull
 	default ContentInputStream read(long fileOffset) throws IOException{
 		return io().setPos(fileOffset).inStream();
@@ -97,6 +102,7 @@ public interface IOInterface extends Sizable.Mod, RandomIO.Creator{
 	}
 	
 	default void read(long fileOffset, byte[] dest) throws IOException{ read(fileOffset, dest.length, dest); }
+	
 	default void read(long fileOffset, int length, byte[] dest) throws IOException{
 		try(var io=io()){
 			io.setPos(fileOffset);
@@ -105,12 +111,11 @@ public interface IOInterface extends Sizable.Mod, RandomIO.Creator{
 	}
 	
 	default byte[] readAll() throws IOException{
-		try(var stream=io()){
-			return stream.readRemaining();
-		}
+		return read(0, Math.toIntExact(getSize()));
 	}
 	
 	default void transferTo(IOInterface dest) throws IOException{ transferTo(dest, true); }
+	
 	default void transferTo(IOInterface dest, boolean trimOnClose) throws IOException{
 		try(var in=read();
 		    var out=dest.write(trimOnClose)){

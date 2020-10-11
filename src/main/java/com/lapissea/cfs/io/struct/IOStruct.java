@@ -426,8 +426,16 @@ public class IOStruct{
 	
 	@Override
 	public String toString(){
+		return toString(false);
+	}
+	
+	public String toShortString(){
+		return toString(true);
+	}
+	
+	private String toString(boolean shortStr){
 		StringBuilder result=new StringBuilder("IOStruct{");
-		result.append(instanceClass.getName()).append(", ").append(variables.size()).append(" values");
+		result.append(shortStr?instanceClass.getSimpleName():instanceClass.getName()).append(", ").append(variables.size()).append(" values");
 		
 		if(getKnownSize().isPresent()){
 			result.append(", fixed size: ").append(requireKnownSize()).append(" bytes");

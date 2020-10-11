@@ -1,6 +1,6 @@
 package com.lapissea.cfs.io.content;
 
-import com.lapissea.util.function.UnsafeLongConsumer;
+import com.lapissea.util.function.UnsafeIntConsumer;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -25,7 +25,7 @@ public abstract class SimpleContentWriter implements ContentWriter{
 		};
 	}
 	
-	public static ContentWriter single(UnsafeLongConsumer<IOException> write){
+	public static ContentWriter single(UnsafeIntConsumer<IOException> write){
 		return new SimpleContentWriter(){
 			@Override
 			public void write(int b) throws IOException{

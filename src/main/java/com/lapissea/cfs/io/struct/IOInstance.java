@@ -20,6 +20,7 @@ import com.lapissea.util.function.UnsafeFunction;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.BiConsumer;
@@ -259,8 +260,8 @@ public class IOInstance{
 		
 		if(!DEBUG_VALIDATION) throw new OutOfSyncDataException();
 		
-		Function<byte[], Map<String, String>> toMap=b->IntStream.range(0, b.length).boxed().collect(Collectors.toMap(i->""+i, i->""+b[i]));
-		throw new OutOfSyncDataException("\n"+TextUtil.toTable(TextUtil.toString(this), toMap.apply(arr), toMap.apply(real)));
+		Function<byte[], Map<String, String>> toMap=bytes->IntStream.range(0, bytes.length).boxed().collect(Collectors.toMap(i->""+i, i->String.format("%02X ", bytes[i])));
+		throw new OutOfSyncDataException("\n"+TextUtil.toTable(TextUtil.toString(this), List.of(toMap.apply(arr), toMap.apply(real))));
 	}
 	
 	
