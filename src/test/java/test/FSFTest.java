@@ -39,7 +39,6 @@ class FSFTest{
 			
 			LateInit<DataLogger> display=new LateInit<>(()->{
 				if(DEBUG_VALIDATION){
-//					return new DisplayLWJGL();
 					String jarPath=null;
 					
 					try(var r=new FileReader(new File("config.json"))){
@@ -47,27 +46,26 @@ class FSFTest{
 					}catch(Exception e){ }
 					
 					return new DisplayServer(jarPath);
-//					return new Display2D();
 				}
 				return new DataLogger.Blank();
 			});
-			display.block();
-			var preBuf=new LinkedList<MemFrame>();
 			
-			var mem=new MemoryData();
-			Cluster.class.getSimpleName();
-			
+			var     mem    =new MemoryData();
 			Cluster cluster=Cluster.build(b->b.withIO(mem));
 			
-			mem.onWrite=ids->{
-				preBuf.add(new MemFrame(mem.readAll(), ids, new Throwable()));
-				display.ifInited(d->{
-					while(!preBuf.isEmpty()){
-						d.log(preBuf.remove(0));
-					}
-				});
-			};
-			mem.onWrite.accept(ZeroArrays.ZERO_LONG);
+			if(DEBUG_VALIDATION){
+				var preBuf=new LinkedList<MemFrame>();
+				mem.onWrite=ids->{
+					preBuf.add(new MemFrame(mem.readAll(), ids, new Throwable()));
+					display.ifInited(d->{
+						while(!preBuf.isEmpty()){
+							d.log(preBuf.remove(0));
+						}
+					});
+				};
+				mem.onWrite.accept(ZeroArrays.ZERO_LONG);
+			}
+			
 			try{
 				doTests(cluster);
 			}finally{

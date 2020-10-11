@@ -24,7 +24,11 @@ public class DisplayServer implements DataLogger{
 	}
 	
 	private static DataLogger getRealLogger(){
-		return new DisplayLWJGL();
+		try{
+			return new DisplayLWJGL();
+		}catch(Throwable e){
+			return new Display2D();
+		}
 	}
 	
 	public static void main(String[] args) throws IOException{
