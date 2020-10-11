@@ -613,9 +613,6 @@ public class Cluster extends IOInstance.Contained{
 		LogUtil.println("moving", oldChunk, "to", newChunk);
 		
 		boolean found=memoryWalk(val->{
-//			if(oldPtr.equals(228)){
-//				int i=0;
-//			}
 			LogUtil.println(val.stack);
 			if(val.isValue(oldPtr)){
 				val.set(newPtr);
@@ -694,8 +691,9 @@ public class Cluster extends IOInstance.Contained{
 					});
 					if(valueFeedMod.test(ptrToDo)) return true;
 				}else{
-					
+					IOInstance pointedInstance=null;
 					if(variable instanceof SelfPointer){
+						pointedInstance=(IOInstance)val;
 						val=((SelfPoint<?>)val).getSelfPtr();
 					}
 					
@@ -707,11 +705,17 @@ public class Cluster extends IOInstance.Contained{
 						});
 						if(valueFeedMod.test(ptrToDo)) return true;
 						
-						var read=ptr.read(this);
+						Object read;
+						if(pointedInstance!=null) read=pointedInstance;
+						else read=ptr.read(this);
+						
 						if(read instanceof IOInstance inst){
 							UnsafeRunnable<IOException> saver;
 							if(inst instanceof IOInstance.Contained cont){
-								saver=cont::writeStruct;
+								saver=()->{
+									cont.writeStruct();
+									cont.validateWrittenData();
+								};
 							}else if(inst.getStruct().getKnownSize().isPresent()){
 								saver=()->((ObjectPointer<IOInstance>)ptr).write(this, inst);
 							}else{
