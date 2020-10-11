@@ -7,12 +7,15 @@ public interface DataLogger{
 		public void log(MemFrame frame){ }
 		
 		@Override
+		public void finish(){ }
+		
+		@Override
 		public void reset(){ }
 	}
 	
 	void log(MemFrame frame);
 	
-	default void finish(){}
+	void finish();
 	
 	void reset();
 }

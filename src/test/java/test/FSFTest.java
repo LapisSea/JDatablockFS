@@ -1,5 +1,6 @@
 package test;
 
+import com.google.gson.GsonBuilder;
 import com.lapissea.cfs.cluster.Cluster;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.objects.IOList;
@@ -12,8 +13,11 @@ import com.lapissea.util.LateInit;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.ZeroArrays;
 
+import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -36,12 +40,18 @@ class FSFTest{
 			LateInit<DataLogger> display=new LateInit<>(()->{
 				if(DEBUG_VALIDATION){
 //					return new DisplayLWJGL();
-					return new DisplayServer();
+					String jarPath=null;
+					
+					try(var r=new FileReader(new File("config.json"))){
+						jarPath=new GsonBuilder().create().fromJson(r, HashMap.class).get("serverDisplayJar").toString();
+					}catch(Exception e){ }
+					
+					return new DisplayServer(jarPath);
 //					return new Display2D();
 				}
 				return new DataLogger.Blank();
 			});
-			
+			display.block();
 			var preBuf=new LinkedList<MemFrame>();
 			
 			var mem=new MemoryData();

@@ -1,5 +1,6 @@
 package test;
 
+import com.lapissea.cfs.Config;
 import com.lapissea.cfs.io.content.ContentInputStream;
 import com.lapissea.cfs.io.content.ContentOutputStream;
 import com.lapissea.cfs.io.content.ContentReader;
@@ -8,9 +9,9 @@ import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.net.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
@@ -27,11 +28,13 @@ public class DisplayServer implements DataLogger{
 	}
 	
 	public static void main(String[] args) throws IOException{
-		LogUtil.Init.attach(LogUtil.Init.USE_CALL_POS|LogUtil.Init.USE_CALL_THREAD|LogUtil.Init.USE_TABULATED_HEADER);
+//		LogUtil.Init.attach(LogUtil.Init.USE_CALL_POS|LogUtil.Init.USE_CALL_THREAD|LogUtil.Init.USE_TABULATED_HEADER);
 		
 		DataLogger display=getRealLogger();
 		
 		ServerSocket server=new ServerSocket(666);
+		
+		LogUtil.println("started");
 		
 		while(true){
 			try(Socket client=server.accept()){
@@ -86,14 +89,27 @@ public class DisplayServer implements DataLogger{
 	}
 	
 	final DataLogger proxy;
-	CompletableFuture<Void> task=CompletableFuture.completedFuture(null);
-	
 	
 	public DisplayServer(){
+		this(null);
+	}
+	
+	public DisplayServer(String jarPath){
 		DataLogger proxy;
 		try{
-			var socket=new Socket();
-			socket.connect(new InetSocketAddress(InetAddress.getLocalHost(), 666), 100);
+			var socketMake=new Socket();
+			try{
+				socketMake.connect(new InetSocketAddress(InetAddress.getLocalHost(), 666), 100);
+			}catch(SocketTimeoutException e){
+				socketMake.close();
+				if(jarPath==null) throw new IOException(e);
+				var debugMode=Config.DEBUG_VALIDATION;
+				var args     ="--illegal-access=deny --enable-preview -XX:+UseG1GC -XX:MaxHeapFreeRatio=10 -XX:MinHeapFreeRatio=1 -Xms50m -server -XX:+UseCompressedOops";
+				Runtime.getRuntime().exec("java -jar "+(debugMode?"-ea ":"")+args+" \""+new File(jarPath).getAbsolutePath()+"\"");
+				socketMake=new Socket();
+				socketMake.connect(new InetSocketAddress(InetAddress.getLocalHost(), 666), 1000);
+			}
+			var socket=socketMake;
 			
 			LogUtil.println("connected", socket);
 			var is    =socket.getInputStream();
@@ -145,6 +161,26 @@ public class DisplayServer implements DataLogger{
 					}
 				}
 			};
+			
+			Executor   exec=Executors.newSingleThreadExecutor();
+			DataLogger p1  =proxy;
+			proxy=new DataLogger(){
+				@Override
+				public void log(MemFrame frame){
+					exec.execute(()->p1.log(frame));
+				}
+				
+				@Override
+				public void reset(){
+					exec.execute(p1::reset);
+				}
+				
+				@Override
+				public void finish(){
+					exec.execute(p1::finish);
+				}
+			};
+			
 			proxy.reset();
 		}catch(IOException e){
 			e.printStackTrace();
@@ -156,6 +192,11 @@ public class DisplayServer implements DataLogger{
 	@Override
 	public void log(MemFrame frame){
 		proxy.log(frame);
+	}
+	
+	@Override
+	public void finish(){
+		proxy.finish();
 	}
 	
 	@Override

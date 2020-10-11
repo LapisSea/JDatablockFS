@@ -28,6 +28,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.IntStream;
 
+import static com.lapissea.glfw.GlfwKeyboardEvent.Type.*;
 import static com.lapissea.glfw.GlfwWindow.SurfaceAPI.*;
 import static com.lapissea.util.UtilL.*;
 import static org.lwjgl.glfw.GLFW.*;
@@ -35,7 +36,7 @@ import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL30.*;
 
 @SuppressWarnings("AutoBoxing")
-public class DisplayLWJGL implements DataLogger{
+public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	
 	private class BulkDraw implements AutoCloseable{
 		
@@ -54,9 +55,6 @@ public class DisplayLWJGL implements DataLogger{
 		}
 	}
 	
-	interface DrawB{
-		void draw(int index, Color color, boolean withChar, boolean force);
-	}
 	
 	static record Pointer(int from, int to, int size, Color color){}
 	
@@ -116,6 +114,9 @@ public class DisplayLWJGL implements DataLogger{
 				ifFrame(frame->calcSize(frame.data().length, true));
 				render();
 			});
+			
+			window.registryKeyboardKey.register(GLFW_KEY_LEFT, DOWN, e->setFrame(getFramePos()-1));
+			window.registryKeyboardKey.register(GLFW_KEY_RIGHT, DOWN, e->setFrame(getFramePos()+1));
 			
 			window.autoF11Toggle();
 			window.whileOpen(()->{
@@ -197,15 +198,18 @@ public class DisplayLWJGL implements DataLogger{
 	}
 	
 	private void render(){
-		glTasks.forEach(Runnable::run);
-		glTasks.clear();
-		try{
-			render(getFramePos());
-			window.swapBuffers();
-		}catch(Throwable e){
-			LogUtil.printlnEr(e);
-//			e.printStackTrace();
+		if(!glTasks.isEmpty()){
+			glTasks.forEach(Runnable::run);
+			glTasks.clear();
 		}
+		try{
+			errorMode=false;
+			render(getFramePos());
+		}catch(Throwable e){
+			errorMode=true;
+			render(getFramePos());
+		}
+		window.swapBuffers();
 	}
 	
 	private void render(int frameIndex){
@@ -251,7 +255,7 @@ public class DisplayLWJGL implements DataLogger{
 			translate(-1, 1);
 			scale(2F/getWidth(), -2F/getHeight());
 			
-			setColor(Color.LIGHT_GRAY);
+			setColor(errorMode?Color.RED.darker():Color.LIGHT_GRAY);
 			
 			
 			try(var bulkDraw=new BulkDraw(GL_QUADS)){
@@ -263,7 +267,7 @@ public class DisplayLWJGL implements DataLogger{
 				}
 			}
 			
-			glColor4f(1, 1, 1, 0.5F);
+			setColor(alpha(Color.WHITE, 0.5F));
 			
 			List<Pointer> ptrs=new ArrayList<>();
 			
@@ -292,9 +296,7 @@ public class DisplayLWJGL implements DataLogger{
 							try{
 								ch=c.nextPhysical();
 							}catch(IOException e){
-								e.printStackTrace();
-//							LogUtil.println(e);
-								ch=null;
+								throw new RuntimeException(e);
 							}
 							return c;
 						}
@@ -303,13 +305,13 @@ public class DisplayLWJGL implements DataLogger{
 				
 				annotateStruct(width, drawByte, cluster, cluster, 0, ptrs::add);
 				for(Chunk chunk : physicalIterator){
-					fillChunk(drawByte, chunk, c->alpha(mix(c, Color.GRAY, 0.8F), c.getAlpha()/255F*0.8F));
+					fillChunk(drawByte, chunk, c->alpha(mix(c, Color.RED, 0.6F), c.getAlpha()/255F*0.7F));
 				}
 				for(Chunk chunk : physicalIterator){
 					annotateStruct(width, drawByte, cluster, chunk, chunk.getPtr().getValue(), ptrs::add);
 				}
 			}catch(Throwable e){
-				e.printStackTrace();
+				handleError(e);
 			}
 			
 			setColor(alpha(Color.GRAY, 0.5F));
@@ -331,7 +333,7 @@ public class DisplayLWJGL implements DataLogger{
 				int xi=i%width;
 				int yi=i/width;
 				
-				fillBit(8, pixelsPerByte, xi*pixelsPerByte, yi*pixelsPerByte);
+				fillBit(8, xi*pixelsPerByte, yi*pixelsPerByte);
 			}
 			
 			var siz  =Math.max(1, pixelsPerByte/8F);
@@ -479,7 +481,7 @@ public class DisplayLWJGL implements DataLogger{
 							long valOff=instanceOffset+off.getOffset();
 							annotateStruct(width, drawByte, cluster, stack, inst, valOff, pointerRecord);
 						}catch(IOException e){
-							e.printStackTrace();
+							handleError(e);
 						}
 					}else if(valVal instanceof ChunkPointer ptr){
 						var color=col;
@@ -504,7 +506,7 @@ public class DisplayLWJGL implements DataLogger{
 								recurse.add(new PairM<>(oOff, i));
 							}
 						}catch(Throwable e){
-							new RuntimeException("failed to read object pointer "+ptr, e).printStackTrace();
+							handleError(e);
 							color=Color.RED;
 						}
 						
@@ -519,21 +521,19 @@ public class DisplayLWJGL implements DataLogger{
 							
 							drawStringIn(text, area, true);
 						}catch(Throwable e){
-							e.printStackTrace();
+							handleError(e);
 						}
 						setColor(mul(readColor(), 0.4F));
 						outlineQuad(area.x, area.y, area.width, area.height);
 					}
 					
 				}catch(Throwable e){
-					e.printStackTrace();
 					try{
 						int from   =Math.toIntExact(instanceOffset+off.getOffset());
 						var varSize=(int)VariableNode.FixedSize.getSizeUnknown(instance, var);
 						IntStream.range(from, from+varSize).forEach(i->drawByte.draw(i, Color.RED, false, true));
-					}catch(Throwable e1){
-						LogUtil.println(e1);
-					}
+					}catch(Throwable ignored){ }
+					handleError(e);
 				}
 				
 			});
@@ -546,14 +546,19 @@ public class DisplayLWJGL implements DataLogger{
 		}
 	}
 	
+	boolean errorMode;
+	
+	private void handleError(Throwable e){
+		if(errorMode) new RuntimeException("Failed to process frame "+getFramePos(), e).printStackTrace();
+		else throw UtilL.uncheckedThrow(e);
+	}
 	
 	private float[] getStringBounds(String str){
 		return font.getStringBounds(str, fontScale);
 	}
 	
 	private void outlineString(String str){
-	
-	
+		font.outlineString(str, fontScale);
 	}
 	
 	private void fillString(String str){
@@ -630,25 +635,6 @@ public class DisplayLWJGL implements DataLogger{
 		lineWidth=width;
 	}
 	
-	private void fillChunk(DrawB drawByte, Chunk chunk, Function<Color, Color> filter){
-		
-		var chunkColor=chunk.isUsed()?Color.GREEN:Color.CYAN;
-		var dataColor =mul(chunkColor, 0.5F);
-		var freeColor =alpha(chunkColor, 0.4F);
-		
-		chunkColor=filter.apply(chunkColor);
-		dataColor=filter.apply(dataColor);
-		freeColor=filter.apply(freeColor);
-		
-		for(int i=(int)chunk.getPtr().getValue();i<chunk.dataStart();i++){
-			drawByte.draw(i, chunkColor, false, false);
-		}
-		
-		for(int i=0, j=(int)chunk.getCapacity();i<j;i++){
-			drawByte.draw((int)(i+chunk.dataStart()), i>=chunk.getSize()?freeColor:dataColor, true, false);
-		}
-	}
-	
 	private void setColor(Color color){
 		glColor4f(color.getRed()/255F, color.getGreen()/255F, color.getBlue()/255F, color.getAlpha()/255F);
 	}
@@ -680,7 +666,7 @@ public class DisplayLWJGL implements DataLogger{
 		try(var bulkDraw=new BulkDraw(GL_QUADS)){
 			for(FlagReader flags=new FlagReader(b, 8);flags.remainingCount()>0;){
 				if(flags.readBoolBit()){
-					fillBit(flags.readCount()-1, pixelsPerByte, 0, 0);
+					fillBit(flags.readCount()-1, 0, 0);
 				}
 			}
 		}
@@ -699,49 +685,8 @@ public class DisplayLWJGL implements DataLogger{
 		setColor(color);
 	}
 	
-	private void fillBit(int index, int pixelsPerByte, float xOff, float yOff){
-		int   xi =index%3;
-		int   yi =index/3;
-		float pxS=pixelsPerByte/3F;
-		
-		float x1=xi*pxS;
-		float y1=yi*pxS;
-		float x2=(xi+1)*pxS;
-		float y2=(yi+1)*pxS;
-		
-		fillQuad(xOff+x1, yOff+y1, x2-x1, y2-y1);
-	}
-	
-	
-	private void drawArrow(int width, int from, int to){
-		int xPosFrom=from%width, yPosFrom=from/width;
-		int xPosTo  =to%width, yPosTo=to/width;
-		
-		double xFrom=xPosFrom+0.5, yFrom=yPosFrom+0.5;
-		double xTo  =xPosTo+0.5, yTo=yPosTo+0.5;
-		
-		double xMid=(xFrom+xTo)/2, yMid=(yFrom+yTo)/2;
-		
-		double angle=Math.atan2(xTo-xFrom, yTo-yFrom);
-		
-		double arrowSize=0.4;
-		
-		double sin=Math.sin(angle)*arrowSize/2;
-		double cos=Math.cos(angle)*arrowSize/2;
-		
-		drawLine(xMid+sin, yMid+cos, xMid-sin-cos, yMid-cos+sin);
-		drawLine(xMid+sin, yMid+cos, xMid-sin+cos, yMid-cos-sin);
-		drawLine(xFrom, yFrom, xTo, yTo);
-	}
-	
-	private void drawLine(int width, int from, int to){
-		int xPosFrom=from%width, yPosFrom=from/width;
-		int xPosTo  =to%width, yPosTo=to/width;
-		
-		drawLine(xPosFrom+0.5, yPosFrom+0.5, xPosTo+0.5, yPosTo+0.5);
-	}
-	
-	private void drawLine(double xFrom, double yFrom, double xTo, double yTo){
+	@Override
+	protected void drawLine(double xFrom, double yFrom, double xTo, double yTo){
 		var pixelsPerByte=getPixelsPerByte();
 		var angle        =-Math.toDegrees(Math.atan2(xTo-xFrom, yTo-yFrom));
 		var length       =MathUtil.length(xFrom-xTo, yTo-yFrom)*pixelsPerByte;
@@ -751,6 +696,27 @@ public class DisplayLWJGL implements DataLogger{
 		
 		fillQuad(-lineWidth/2, 0, lineWidth, length);
 		glPopMatrix();
+	}
+	
+	
+	@Override
+	protected void fillQuad(double x, double y, double width, double height){
+		if(!bulkDrawing) glBegin(GL_QUADS);
+		glVertex3d(x, y, 0);
+		glVertex3d(x+width, y, 0);
+		glVertex3d(x+width, y+height, 0);
+		glVertex3d(x, y+height, 0);
+		if(!bulkDrawing) glEnd();
+	}
+	
+	@Override
+	protected void outlineQuad(double x, double y, double width, double height){
+		if(!bulkDrawing) glBegin(GL_LINE_LOOP);
+		glVertex3d(x, y, 0);
+		glVertex3d(x+width, y, 0);
+		glVertex3d(x+width, y+height, 0);
+		glVertex3d(x, y+height, 0);
+		if(!bulkDrawing) glEnd();
 	}
 	
 	private void glErrorPrint(){
@@ -769,24 +735,6 @@ public class DisplayLWJGL implements DataLogger{
 		});
 	}
 	
-	private void fillQuad(double x, double y, double width, double height){
-		if(!bulkDrawing) glBegin(GL_QUADS);
-		glVertex3d(x, y, 0);
-		glVertex3d(x+width, y, 0);
-		glVertex3d(x+width, y+height, 0);
-		glVertex3d(x, y+height, 0);
-		if(!bulkDrawing) glEnd();
-	}
-	
-	private void outlineQuad(double x, double y, double width, double height){
-		if(!bulkDrawing) glBegin(GL_LINE_LOOP);
-		glVertex3d(x, y, 0);
-		glVertex3d(x+width, y, 0);
-		glVertex3d(x+width, y+height, 0);
-		glVertex3d(x, y+height, 0);
-		if(!bulkDrawing) glEnd();
-	}
-	
 	private void initFont(){
 		initFont(0.8F);
 	}
@@ -802,6 +750,9 @@ public class DisplayLWJGL implements DataLogger{
 	}
 	
 	@Override
+	public void finish(){ }
+	
+	@Override
 	public void reset(){
 		frames.clear();
 		setFrame(0);
@@ -815,34 +766,9 @@ public class DisplayLWJGL implements DataLogger{
 		return window.size.y();
 	}
 	
+	@Override
 	public int getPixelsPerByte(){
 		return pixelsPerByte.get();
-	}
-	
-	private static Color mul(Color color, float mul){
-		return new Color(Math.round(color.getRed()*mul), Math.round(color.getGreen()*mul), Math.round(color.getBlue()*mul), color.getAlpha());
-	}
-	
-	private static Color add(Color color, Color other){
-		return new Color(
-			Math.min(255, color.getRed()+other.getRed()),
-			Math.min(255, color.getGreen()+other.getGreen()),
-			Math.min(255, color.getBlue()+other.getBlue()),
-			Math.min(255, color.getAlpha()+other.getAlpha())
-		);
-	}
-	
-	private static Color alpha(Color color, float alpha){
-		return new Color(
-			color.getRed(),
-			color.getGreen(),
-			color.getBlue(),
-			(int)(alpha*255)
-		);
-	}
-	
-	private static Color mix(Color color, Color other, float mul){
-		return add(mul(color, 1-mul), mul(other, mul));
 	}
 	
 	

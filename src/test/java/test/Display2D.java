@@ -30,11 +30,9 @@ import java.util.stream.IntStream;
 import static java.awt.RenderingHints.*;
 
 @SuppressWarnings("AutoBoxing")
-public class Display2D extends JFrame implements DataLogger{
+public class Display2D extends BinaryDrawing implements DataLogger{
 	
-	interface DrawB{
-		void draw(int index, Color color, boolean withChar, boolean force);
-	}
+	private Graphics2D currentGraphics;
 	
 	private record ByteInfo(int uVal, Color color, boolean withChar){}
 	
@@ -43,44 +41,8 @@ public class Display2D extends JFrame implements DataLogger{
 		public int mouseX;
 		public int mouseY;
 		
-		private void drawArrow(Graphics2D g, int width, int from, int to){
-			int xPosFrom=from%width, yPosFrom=from/width;
-			int xPosTo  =to%width, yPosTo=to/width;
-			
-			double xFrom=xPosFrom+0.5, yFrom=yPosFrom+0.5;
-			double xTo  =xPosTo+0.5, yTo=yPosTo+0.5;
-			
-			double xMid=(xFrom+xTo)/2, yMid=(yFrom+yTo)/2;
-			
-			double angle=Math.atan2(xTo-xFrom, yTo-yFrom);
-			
-			double arrowSize=0.4;
-			
-			double sin=Math.sin(angle)*arrowSize/2;
-			double cos=Math.cos(angle)*arrowSize/2;
-			
-			drawLine(g, xMid+sin, yMid+cos, xMid-sin-cos, yMid-cos+sin);
-			drawLine(g, xMid+sin, yMid+cos, xMid-sin+cos, yMid-cos-sin);
-			
-			drawLine(g, xFrom, yFrom, xTo, yTo);
-		}
-		
-		private void drawLine(Graphics2D g, int width, int from, int to){
-			int xPosFrom=from%width, yPosFrom=from/width;
-			int xPosTo  =to%width, yPosTo=to/width;
-			
-			drawLine(g, xPosFrom+0.5, yPosFrom+0.5, xPosTo+0.5, yPosTo+0.5);
-		}
-		
-		private void drawLine(Graphics2D g, double xFrom, double yFrom, double xTo, double yTo){
-			g.draw(new Line2D.Double(
-				       xFrom*pixelsPerByte, yFrom*pixelsPerByte,
-				       xTo*pixelsPerByte, yTo*pixelsPerByte)
-			      );
-		}
-		
 		private void renderImage(Graphics2D g, MemFrame frame){
-			
+			currentGraphics=g;
 			g.setColor(Color.LIGHT_GRAY);
 			int step=8;
 			for(int x=0;x<getWidth()+2;x+=step){
@@ -178,7 +140,7 @@ public class Display2D extends JFrame implements DataLogger{
 				int xi=i%width;
 				int yi=i/width;
 				
-				fillBit(g, 8, xi*pixelsPerByte, yi*pixelsPerByte);
+				fillBit(8, xi*pixelsPerByte, yi*pixelsPerByte);
 			}
 			
 			g.setRenderingHint(KEY_ANTIALIASING, VALUE_ANTIALIAS_ON);
@@ -199,12 +161,12 @@ public class Display2D extends JFrame implements DataLogger{
 				if(pSiz>1&&IntStream.range(start, start+pSiz).noneMatch(i->i%width==0)){
 					g.setColor(alpha(ptr.color, 0.1F));
 					g.setStroke(sHalf);
-					drawLine(g, width, start, start+pSiz-1);
+					drawLine(width, start, start+pSiz-1);
 					g.setStroke(sFul);
 				}
 				
 				g.setColor(alpha(ptr.color, 0.5F));
-				drawArrow(g, width, start, end);
+				drawArrow(width, start, end);
 			}
 		}
 		
@@ -284,101 +246,78 @@ public class Display2D extends JFrame implements DataLogger{
 		}
 	}
 	
-	private static Color mul(Color color, float mul){
-		return new Color(Math.round(color.getRed()*mul), Math.round(color.getGreen()*mul), Math.round(color.getBlue()*mul), color.getAlpha());
-	}
-	
-	private static Color add(Color color, Color other){
-		return new Color(
-			Math.min(255, color.getRed()+other.getRed()),
-			Math.min(255, color.getGreen()+other.getGreen()),
-			Math.min(255, color.getBlue()+other.getBlue()),
-			Math.min(255, color.getAlpha()+other.getAlpha())
-		);
-	}
-	
-	private static Color alpha(Color color, float alpha){
-		return new Color(
-			color.getRed(),
-			color.getGreen(),
-			color.getBlue(),
-			(int)(alpha*255)
-		);
-	}
-	
-	private static Color mix(Color color, Color other, float mul){
-		return add(mul(color, 1-mul), mul(other, mul));
-	}
-	
 	
 	private int pos;
 	private int pixelsPerByte=300;
 	
 	private final List<MemFrame>               frames   =new ArrayList<>();
 	private final Map<ByteInfo, BufferedImage> byteCache=new HashMap<>();
+	private final JFrame                       frame    =new JFrame(){
+	
+	};
 	
 	public Display2D(){
 		File f=new File("wind");
 		
 		try(var in=new BufferedReader(new FileReader(f))){
-			setLocation(Integer.parseInt(in.readLine()), Integer.parseInt(in.readLine()));
-			setSize(Integer.parseInt(in.readLine()), Integer.parseInt(in.readLine()));
+			frame.setLocation(Integer.parseInt(in.readLine()), Integer.parseInt(in.readLine()));
+			frame.setSize(Integer.parseInt(in.readLine()), Integer.parseInt(in.readLine()));
 		}catch(Throwable ignored){
-			setSize(800, 800);
-			setLocationRelativeTo(null);
+			frame.setSize(800, 800);
+			frame.setLocationRelativeTo(null);
 		}
 		
 		var pan=new Pan();
 		pan.setBackground(Color.GRAY);
-		setContentPane(pan);
+		frame.setContentPane(pan);
 		
-		setDefaultCloseOperation(EXIT_ON_CLOSE);
+		frame.setDefaultCloseOperation(frame.EXIT_ON_CLOSE);
 		
-		addKeyListener(new KeyAdapter(){
+		frame.addKeyListener(new KeyAdapter(){
 			@Override
 			public void keyPressed(KeyEvent e){
 				if(e.getKeyChar()=='a'||e.getKeyCode()==37) setPos(getPos()-1);
 				if(e.getKeyChar()=='d'||e.getKeyCode()==39) setPos(getPos()+1);
 				setPos(MathUtil.snap(getPos(), 0, frames.size()-1));
-				repaint();
+				frame.repaint();
 				
 				if(e.getKeyCode()==122){
-					dispose();
-					if(isUndecorated()){
-						setUndecorated(false);
-						setExtendedState(JFrame.NORMAL);
-						setSize(800, 800);
-						setVisible(true);
+					frame.dispose();
+					if(frame.isUndecorated()){
+						frame.setUndecorated(false);
+						frame.setExtendedState(JFrame.NORMAL);
+						frame.setSize(800, 800);
+						frame.setVisible(true);
 						
 					}else{
-						setUndecorated(true);
-						setExtendedState(JFrame.MAXIMIZED_BOTH);
-						setVisible(true);
+						frame.setUndecorated(true);
+						frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
+						frame.setVisible(true);
 					}
 				}
 			}
 		});
 		
-		addComponentListener(new ComponentAdapter(){
+		frame.addComponentListener(new ComponentAdapter(){
 			@Override
 			public void componentResized(ComponentEvent e){
 				setPixelsPerByte(300);
 				
-				repaint();
+				frame.repaint();
 			}
 			
 			@Override
 			public void componentMoved(ComponentEvent e){
 				super.componentMoved(e);
-				if(!isUndecorated()){
+				if(!frame.isUndecorated()){
 					try(var in=new BufferedWriter(new FileWriter(f))){
-						in.write(Integer.toString(getLocation().x));
+						in.write(Integer.toString(frame.getLocation().x));
 						in.newLine();
-						in.write(Integer.toString(getLocation().y));
+						in.write(Integer.toString(frame.getLocation().y));
 						in.newLine();
-						in.write(Integer.toString(getSize().width));
+						in.write(Integer.toString(frame.getSize().width));
 						in.newLine();
-						in.write(Integer.toString(getSize().height));
+						in.write(Integer.toString(frame.getSize().height));
 						in.newLine();
 					}catch(Throwable ignored){ }
 				}
@@ -414,12 +353,12 @@ public class Display2D extends JFrame implements DataLogger{
 			public void mouseClicked(MouseEvent e){
 				if(frames.isEmpty()) return;
 				frames.get(getPos()).printStackTrace();
-				repaint();
+				frame.repaint();
 			}
 		});
 		
-		setVisible(true);
-		createBufferStrategy(2);
+		frame.setVisible(true);
+		frame.createBufferStrategy(2);
 	}
 	
 	private void setPixelsPerByte(int pixelsPerByte){
@@ -612,43 +551,11 @@ public class Display2D extends JFrame implements DataLogger{
 		}
 	}
 	
-	private void fillChunk(DrawB drawByte, Chunk chunk, Function<Color, Color> filter) throws IOException{
-		
-		var chunkColor=chunk.isUsed()?Color.GREEN:Color.CYAN;
-		var dataColor =mul(chunkColor, 0.5F);
-		var freeColor =alpha(chunkColor, 0.4F);
-		
-		chunkColor=filter.apply(chunkColor);
-		dataColor=filter.apply(dataColor);
-		freeColor=filter.apply(freeColor);
-		
-		for(int i=(int)chunk.getPtr().getValue();i<chunk.dataStart();i++){
-			drawByte.draw(i, chunkColor, false, false);
-		}
-		
-		for(int i=0, j=(int)chunk.getCapacity();i<j;i++){
-			drawByte.draw((int)(i+chunk.dataStart()), i>=chunk.getSize()?freeColor:dataColor, true, false);
-		}
-	}
-	
 	boolean       shouldRerender=true;
 	BufferedImage render        =null;
 	
 	synchronized BufferedImage getByte(int value, Color color, boolean withChar){
 		return byteCache.computeIfAbsent(new ByteInfo(value, color, withChar), this::renderByte);
-	}
-	
-	private void fillBit(Graphics2D g, int index, float xOff, float yOff){
-		int   xi =index%3;
-		int   yi =index/3;
-		float pxS=pixelsPerByte/3F;
-		
-		float x1=xi*pxS;
-		float y1=yi*pxS;
-		float x2=(xi+1)*pxS;
-		float y2=(yi+1)*pxS;
-		
-		g.fill(new Rectangle2D.Float(xOff+x1, yOff+y1, x2-x1, y2-y1));
 	}
 	
 	private Rectangle getStringBounds(Graphics2D g2, String str){
@@ -726,7 +633,7 @@ public class Display2D extends JFrame implements DataLogger{
 		
 		for(FlagReader flags=new FlagReader(info.uVal, 8);flags.remainingCount()>0;){
 			if(flags.readBoolBit()){
-				fillBit(g, flags.readCount()-1, 0, 0);
+				fillBit(flags.readCount()-1, 0, 0);
 			}
 		}
 		
@@ -746,19 +653,44 @@ public class Display2D extends JFrame implements DataLogger{
 		return bb;
 	}
 	
+	@Override
+	protected void fillQuad(double x, double y, double width, double height){
+		currentGraphics.fill(new Rectangle2D.Double(x, y, width, height));
+	}
+	
+	@Override
+	protected void outlineQuad(double x, double y, double width, double height){
+		currentGraphics.draw(new Rectangle2D.Double(x, y, width, height));
+	}
+	
+	@Override
+	protected int getPixelsPerByte(){
+		return pixelsPerByte;
+	}
+	
+	@Override
+	protected void drawLine(double xFrom, double yFrom, double xTo, double yTo){
+		currentGraphics.draw(new Line2D.Double(
+			                     xFrom*pixelsPerByte, yFrom*pixelsPerByte,
+			                     xTo*pixelsPerByte, yTo*pixelsPerByte)
+		                    );
+	}
 	
 	@Override
 	public void log(MemFrame frame){
 		frames.add(frame);
 		setPos(frames.size()-1);
-		repaint();
+		this.frame.repaint();
 	}
+	
+	@Override
+	public void finish(){ }
 	
 	@Override
 	public void reset(){
 		frames.clear();
 		setPos(0);
-		repaint();
+		frame.repaint();
 	}
 	
 	public int getPos(){
