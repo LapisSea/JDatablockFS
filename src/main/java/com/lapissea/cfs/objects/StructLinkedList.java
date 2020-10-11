@@ -199,15 +199,20 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 		this.container=container;
 		this.valConstructor=valConstructor;
 		this.solidNodes=solidNodes;
-		first=new ObjectPointer.Struct<>(Node::new);
-		
+		first=new ObjectPointer.Struct<>(Node::new){
+			@Override
+			public ObjectPointer<Node> set(ChunkPointer dataBlock, long offset){
+				return super.set(dataBlock, offset);
+			}
+		};
 		
 		if(container.getSize()>0){
 			readStruct();
+			
+			size=nextWalkCount();
+			
+			validate();
 		}
-		size=nextWalkCount();
-		
-		validate();
 	}
 	
 	private int nextWalkCount() throws IOException{
@@ -262,7 +267,7 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 		Node cached=nodeCache.get(index);
 		if(cached!=null){
 			if(DEBUG_VALIDATION){
-				checkCache(cached);
+				checkCache(cached, index);
 			}
 			return cached;
 		}
@@ -337,7 +342,7 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 		Node node=getNode(index);
 		if(node.value.equals(value)) return;
 		
-		changeSession(()->{
+		changeSession(size->{
 			
 			Node sizeCheck=fromVal(value);
 			sizeCheck.next.set(node.next);
@@ -378,7 +383,7 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 		Objects.checkIndex(index, size());
 		
 		
-		Chunk toRemove=changeSession(()->{
+		Chunk toRemove=changeSession(size->{
 			Chunk ch;
 			if(index==0){
 				ch=first.getBlock(cluster());
@@ -435,11 +440,12 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 		if(e!=null) throw UtilL.uncheckedThrow(e);
 	}
 	
-	private void changeSession(UnsafeRunnable<IOException> action) throws IOException{
-		Throwable e=null;
+	private void changeSession(UnsafeIntConsumer<IOException> action) throws IOException{
+		Throwable e   =null;
+		int       size=size();
 		pushChange();
 		try{
-			action.run();
+			action.accept(size);
 			return;
 		}catch(Throwable t){
 			e=t;
@@ -449,11 +455,12 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 		throw new ShouldNeverHappenError();
 	}
 	
-	private <R> R changeSession(UnsafeSupplier<R, IOException> action) throws IOException{
-		Throwable e=null;
+	private <R> R changeSession(UnsafeIntFunction<R, IOException> action) throws IOException{
+		Throwable e   =null;
+		int       size=size();
 		pushChange();
 		try{
-			return action.get();
+			return action.apply(size);
 		}catch(Throwable t){
 			e=t;
 		}finally{
@@ -503,10 +510,7 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 	}
 	
 	private void linkToEnd(Node newNode, int chainSize) throws IOException{
-		
-		int size=size();
-		
-		changeSession(()->{
+		changeSession(size->{
 			if(size==0){
 				first.set(newNode.getSelfPtr());
 				writeStruct();
@@ -551,7 +555,7 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 		validate();
 		
 		
-		changeSession(()->{
+		changeSession(size->{
 			if(index==0){
 				newNode.next.set(first);
 				newNode.writeStruct();
@@ -574,7 +578,7 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 	@Override
 	public void validate() throws IOException{
 		if(!DEBUG_VALIDATION) return;
-		
+		validateWrittenData();
 		checkSize();
 		
 		for(var e : nodeCache.entrySet()){
@@ -586,7 +590,7 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 			
 			assert index<size:index+"<"+size;
 			
-			checkCache(cached);
+			checkCache(cached, index);
 		}
 	}
 	
@@ -598,13 +602,12 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 		d.freeChaining();
 	}
 	
-	private void checkCache(Node node) throws IOException{
+	private void checkCache(Node node, int index) throws IOException{
 		
 		Node read=new Node();
 		read.initContainer(node.getContainer());
 		
-		//("cached/read mismatch");//
-		if(!read.equals(node)) throw new IOException("\n"+TextUtil.toTable("cached/read mismatch", List.of(node, read)));
+		if(!read.equals(node)) throw new IOException("\n"+TextUtil.toTable("cached/read mismatch of at "+index+" from "+container.getPtr(), List.of(node, read)));
 	}
 	
 	private void addSize(int delta) throws IOException{
