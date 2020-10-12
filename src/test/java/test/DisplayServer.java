@@ -5,6 +5,7 @@ import com.lapissea.cfs.io.content.ContentInputStream;
 import com.lapissea.cfs.io.content.ContentOutputStream;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.util.LogUtil;
+import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.BufferedInputStream;
@@ -15,7 +16,10 @@ import java.net.*;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
+@SuppressWarnings("AutoBoxing")
 public class DisplayServer implements DataLogger{
+	
+	private static final boolean THREADED_OUTPUT=UtilL.sysPropertyByClass(DisplayServer.class, "THREADED_OUTPUT", Boolean.FALSE, Boolean::parseBoolean);
 	
 	enum Action{
 		LOG,
@@ -64,9 +68,7 @@ public class DisplayServer implements DataLogger{
 							
 							exec.execute(()->display.log(new MemFrame(bb, ids, stackTrace)));
 						}
-						case RESET -> {
-							display.reset();
-						}
+						case RESET -> display.reset();
 						case FINISH -> {
 							client.close();
 							break run;
@@ -166,24 +168,26 @@ public class DisplayServer implements DataLogger{
 				}
 			};
 			
-			Executor   exec=Executors.newSingleThreadExecutor();
-			DataLogger p1  =proxy;
-			proxy=new DataLogger(){
-				@Override
-				public void log(MemFrame frame){
-					exec.execute(()->p1.log(frame));
-				}
-				
-				@Override
-				public void reset(){
-					exec.execute(p1::reset);
-				}
-				
-				@Override
-				public void finish(){
-					exec.execute(p1::finish);
-				}
-			};
+			if(THREADED_OUTPUT){
+				Executor   exec  =Executors.newSingleThreadExecutor();
+				DataLogger logger=proxy;
+				proxy=new DataLogger(){
+					@Override
+					public void log(MemFrame frame){
+						exec.execute(()->logger.log(frame));
+					}
+					
+					@Override
+					public void reset(){
+						exec.execute(logger::reset);
+					}
+					
+					@Override
+					public void finish(){
+						exec.execute(logger::finish);
+					}
+				};
+			}
 			
 			proxy.reset();
 		}catch(IOException e){
