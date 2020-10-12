@@ -113,7 +113,7 @@ public class DisplayServer implements DataLogger{
 				var args     ="--illegal-access=deny --enable-preview -XX:+UseG1GC -XX:MaxHeapFreeRatio=10 -XX:MinHeapFreeRatio=1 -Xms50m -server -XX:+UseCompressedOops";
 				Runtime.getRuntime().exec("java -jar "+(debugMode?"-ea ":"")+args+" \""+new File(jarPath).getAbsolutePath()+"\"");
 				socketMake=new Socket();
-				socketMake.connect(new InetSocketAddress(InetAddress.getLocalHost(), 666), 1000);
+				socketMake.connect(new InetSocketAddress(InetAddress.getLocalHost(), 666), 100);
 			}
 			var socket=socketMake;
 			

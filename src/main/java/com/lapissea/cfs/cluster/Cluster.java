@@ -614,21 +614,15 @@ public class Cluster extends IOInstance.Contained{
 		LogUtil.println("moving", oldChunk, "to", newChunk);
 		
 		boolean found=memoryWalk(val->{
-			LogUtil.println(val.stack);
 			if(val.isValue(oldPtr)){
 				val.set(newPtr);
 				return true;
 			}
 			return false;
 		});
-
-//		if(!found){
-//			throw new IOException("trying to move unreferenced chunk: "+oldChunk);
-//		}
+		
 		assert found:
 			"trying to move unreferenced chunk: "+oldChunk.toString();
-
-//		if(true) throw null;
 		
 		chunkCache.remove(oldPtr);
 		chunkCache.put(newPtr, oldChunk);

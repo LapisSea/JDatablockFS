@@ -199,12 +199,7 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 		this.container=container;
 		this.valConstructor=valConstructor;
 		this.solidNodes=solidNodes;
-		first=new ObjectPointer.Struct<>(this::tryCacheFetch){
-			@Override
-			public ObjectPointer<Node> set(ChunkPointer dataBlock, long offset){
-				return super.set(dataBlock, offset);
-			}
-		};
+		first=new ObjectPointer.Struct<>(this::tryCacheFetch);
 		
 		if(container.getSize()>0){
 			readStruct();
