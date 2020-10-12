@@ -392,8 +392,8 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 				ch=first.getBlock(cluster());
 				first.set(getNode(0).next);
 				popCache(0);
-				addSize(-1);
 				writeStruct();
+				addSize(-1);
 				return ch;
 			}
 			
