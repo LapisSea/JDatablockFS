@@ -144,6 +144,12 @@ public class Chunk extends IOInstance.Contained implements Iterable<Chunk>, Rand
 		userData=true;
 	}
 	
+	public void clearUserMark(){
+		if(!userData) return;
+		this.userData=false;
+		markDirty();
+	}
+	
 	@Override
 	public long getInstanceSize(){
 		return headerSize;
@@ -184,7 +190,6 @@ public class Chunk extends IOInstance.Contained implements Iterable<Chunk>, Rand
 		if(this.used==used) return;
 		markDirty();
 		this.used=used;
-		if(!used) userData=false;
 	}
 	public void setCapacity(long newCapacity){
 		if(this.capacity==newCapacity) return;

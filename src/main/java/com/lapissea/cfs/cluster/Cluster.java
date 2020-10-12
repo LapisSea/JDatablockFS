@@ -367,6 +367,7 @@ public class Cluster extends IOInstance.Contained{
 			freeingChunks=true;
 			userChunks.removeElement(chunk.getPtr());
 			freeingChunks=oldFreeingChunks;
+			chunk.modifyAndSave(Chunk::clearUserMark);
 		}
 		
 		if(!freeingChunks){
