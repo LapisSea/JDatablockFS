@@ -300,7 +300,7 @@ public class Cluster extends IOInstance.Contained{
 		checkCached(cached);
 		
 		Chunk read=readChunk(cached.getPtr());
-		assert cached.equals(read):"\n"+TextUtil.toTable("unsaved changes -> cached,read", List.of(cached, read));
+		assert cached.equals(read):"\n"+TextUtil.toTable("unsaved chunk changes -> cached,read", List.of(cached, read));
 	}
 	
 	public void checkCached(Chunk chunk){
@@ -499,12 +499,15 @@ public class Cluster extends IOInstance.Contained{
 			}
 		};
 		UnsafeLongSupplier<IOException> growChunk=()->{
-			long possibleGrowth  =target.getBodyNumSize().maxSize-target.getCapacity();
+			long possibleGrowth=target.getBodyNumSize().maxSize-target.getCapacity();
+			if(possibleGrowth==0) return 0;
+			
 			long toGrow          =Math.min(toAllocate, possibleGrowth);
 			long newChunkCapacity=target.getCapacity()+toGrow;
 			
 			data.setCapacity(data.getCapacity()+toGrow);
-			target.modifyAndSave(c->c.setCapacity(newChunkCapacity));
+			
+			target.setCapacityConfident(newChunkCapacity);
 			
 			return toGrow;
 		};

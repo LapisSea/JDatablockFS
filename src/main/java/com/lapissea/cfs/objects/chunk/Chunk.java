@@ -15,6 +15,7 @@ import com.lapissea.cfs.io.struct.IOStruct.Value;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
+import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeConsumer;
 
@@ -180,19 +181,57 @@ public class Chunk extends IOInstance.Contained implements Iterable<Chunk>, Rand
 	public boolean isUsed()           { return used; }
 	
 	public NumberSize getBodyNumSize(){ return bodyNumSize; }
+	
 	public long getSize()             { return size; }
+	
 	public long getCapacity()         { return capacity; }
 	
 	public NumberSize getNextSize()   { return nextSize; }
+	
 	public ChunkPointer getNextPtr()  { return nextPtr; }
+	
+	public void setBodyNumSize(NumberSize bodyNumSize){
+		if(this.bodyNumSize==bodyNumSize) return;
+		this.bodyNumSize=bodyNumSize;
+		markDirty();
+		headerSize=super.getInstanceSize();
+	}
 	
 	public void setUsed(boolean used){
 		if(this.used==used) return;
 		markDirty();
 		this.used=used;
 	}
-	public void setCapacity(long newCapacity){
+	
+	/**
+	 * @return if capacity was set successfully
+	 */
+	public boolean trySetCapacity(long newCapacity){
+		if(this.capacity==newCapacity) return true;
+		
+		if(!getBodyNumSize().canFit(newCapacity)) return false;
+		
+		setCapacity0(newCapacity);
+		return true;
+	}
+	
+	public void setCapacityConfident(long newCapacity){
+		try{
+			setCapacity(newCapacity);
+		}catch(BitDepthOutOfSpaceException e){
+			throw new ShouldNeverHappenError(e);
+		}
+	}
+	
+	public void setCapacity(long newCapacity) throws BitDepthOutOfSpaceException{
 		if(this.capacity==newCapacity) return;
+		
+		getBodyNumSize().ensureCanFit(newCapacity);
+		
+		setCapacity0(newCapacity);
+	}
+	
+	private void setCapacity0(long newCapacity){
 		this.capacity=newCapacity;
 		markDirty();
 		clampSize(newCapacity);
@@ -248,6 +287,7 @@ public class Chunk extends IOInstance.Contained implements Iterable<Chunk>, Rand
 	protected RandomIO getStructSourceIO() throws IOException{
 		return cluster.getData().io().setPos(getPtr());
 	}
+	
 	@Override
 	protected Cluster getSourceCluster() throws IOException{
 		return cluster;

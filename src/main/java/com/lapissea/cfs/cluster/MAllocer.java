@@ -1,6 +1,7 @@
 package com.lapissea.cfs.cluster;
 
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.exceptions.BitDepthOutOfSpaceException;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.objects.IOList;
 import com.lapissea.cfs.objects.NumberSize;
@@ -157,7 +158,7 @@ abstract class MAllocer{
 				long freeCapacity=largest.getCapacity()-chunkUse.totalSize();
 				assert freeCapacity>=minChunkSize;
 				
-				largest.modifyAndSave(c->c.setCapacity(freeCapacity));
+				largest.modifyAndSave(c->c.setCapacityConfident(freeCapacity));
 				
 				LogUtil.println("aloc reuse split", largest, " -> ", chunkUse);
 				
@@ -172,7 +173,16 @@ abstract class MAllocer{
 			next.requireReal();
 			
 			long cap=next.dataEnd()-target.dataStart();
-			target.modifyAndSave(c->c.setCapacity(cap));
+			
+			try{
+				target.setCapacity(cap);
+			}catch(BitDepthOutOfSpaceException e){
+				target.setBodyNumSize(NumberSize.bySize(cap));
+				cap=next.dataEnd()-target.dataStart();
+				assert cap>0;
+				target.setCapacityConfident(cap);
+			}
+			target.syncStruct();
 			destroyChunk(chunkCache, next);
 			
 		}
