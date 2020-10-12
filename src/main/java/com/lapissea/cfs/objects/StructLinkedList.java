@@ -42,7 +42,7 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 		@Value(index=1)
 		private IOInstance value;
 		
-		public Node(Chunk container){
+		private Node(Chunk container){
 			this();
 			setContainer(container);
 		}
@@ -54,7 +54,7 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 		
 		@Override
 		protected UnsafeFunction<Chunk, Node, IOException> getSelfConstructor(){
-			return Node::new;
+			return StructLinkedList.this::tryCacheFetch;
 		}
 		
 		public IOInstance getValue(){
@@ -192,14 +192,14 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 	//@PrimitiveValue(index=0, defaultSize=NumberSize.INT)
 	private int size;
 	
-	@Value(index=1, rw=ObjectPointer.FixedNoOffsetIO.class)
+	@Value(index=0, rw=ObjectPointer.FixedNoOffsetIO.class)
 	private final ObjectPointer<Node> first;
 	
 	private StructLinkedList(Chunk container, boolean solidNodes, UnsafeFunction<Chunk, T, IOException> valConstructor) throws IOException{
 		this.container=container;
 		this.valConstructor=valConstructor;
 		this.solidNodes=solidNodes;
-		first=new ObjectPointer.Struct<>(Node::new){
+		first=new ObjectPointer.Struct<>(this::tryCacheFetch){
 			@Override
 			public ObjectPointer<Node> set(ChunkPointer dataBlock, long offset){
 				return super.set(dataBlock, offset);
@@ -213,6 +213,14 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 			
 			validate();
 		}
+	}
+	
+	private Node tryCacheFetch(Chunk chunk){
+		return nodeCache.values()
+		                .stream()
+		                .filter(c->c.getContainer()==chunk)
+		                .findAny()
+		                .orElseGet(()->new Node(chunk));
 	}
 	
 	private int nextWalkCount() throws IOException{
