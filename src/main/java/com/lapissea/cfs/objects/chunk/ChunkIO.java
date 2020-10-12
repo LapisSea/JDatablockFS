@@ -41,6 +41,10 @@ public class ChunkIO implements RandomIO{
 	}
 	
 	private void checkCursorInChain() throws IOException{
+		if(DEBUG_VALIDATION){
+			head.requireReal();
+			cursor.requireReal();
+		}
 		if(head==cursor) return;
 		assert head.collectNext().contains(cursor):cursor+" not in "+head.collectNext();
 	}
@@ -227,6 +231,7 @@ public class ChunkIO implements RandomIO{
 				
 				if(next!=null){
 					next.freeChaining();
+					revalidate();
 				}
 				
 				var cap=getCapacity();
