@@ -26,6 +26,7 @@ import static com.lapissea.cfs.Config.*;
 class FSFTest{
 	
 	static{
+		System.setProperty("test.DisplayServer.THREADED_OUTPUT", "true");
 		System.setProperty("sun.java2d.opengl", "true");
 //		System.setProperty("sun.java2d.d3d", "true");
 //		Toolkit.getDefaultToolkit().setDynamicLayout(false);
@@ -95,22 +96,15 @@ class FSFTest{
 		List<Chunk> chunk1=new ArrayList<>();
 		List<Chunk> chunk2=new ArrayList<>();
 		
-		
-		chunk1.add(cluster.userAlloc(200));
-		chunk1.add(cluster.userAlloc(200));
-		chunk1.add(cluster.userAlloc(200));
-		chunk1.add(cluster.userAlloc(200));
-		chunk1.add(cluster.userAlloc(200));
-		
 		for(int i=0;i<5;i++){
-//			chunk1.add(cluster.userAlloc(20));
-//			chunk2.add(cluster.alloc(10));
+			chunk1.add(cluster.userAlloc(100));
+			chunk2.add(cluster.alloc(10));
 		}
-//		cluster.batchFree(()->{
-		for(Chunk chunk : chunk1){
-			chunk.freeChaining();
-		}
-//		});
+		cluster.batchFree(()->{
+			for(Chunk chunk : chunk1){
+				chunk.freeChaining();
+			}
+		});
 		
 		for(Chunk chunk : chunk2){
 			chunk.freeChaining();
@@ -175,13 +169,13 @@ class FSFTest{
 		list.addElement("ay lmao()111111");
 		list.validate();
 		cluster.validate();
-		list.addElement("ay124 lmao()");
+		list.addElement("ay124 lmao(]");
 		list.validate();
 		cluster.validate();
 		list.removeElement(0);
 		list.validate();
 		cluster.validate();
-		list.addElement("ay lmao()");
+		list.addElement("ay lmao(}");
 		list.validate();
 		cluster.validate();
 		list.removeElement(1);

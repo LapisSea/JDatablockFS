@@ -193,13 +193,12 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 	private int size;
 	
 	@Value(index=0, rw=ObjectPointer.FixedNoOffsetIO.class)
-	private final ObjectPointer<Node> first;
+	private final ObjectPointer<Node> first=new ObjectPointer.Struct<>(this::tryCacheFetch);
 	
 	private StructLinkedList(Chunk container, boolean solidNodes, UnsafeFunction<Chunk, T, IOException> valConstructor) throws IOException{
 		this.container=container;
 		this.valConstructor=valConstructor;
 		this.solidNodes=solidNodes;
-		first=new ObjectPointer.Struct<>(this::tryCacheFetch);
 		
 		if(container.getSize()>0){
 			readStruct();
