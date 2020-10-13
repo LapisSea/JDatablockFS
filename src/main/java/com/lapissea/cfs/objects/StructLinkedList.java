@@ -581,7 +581,9 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 	@Override
 	public void validate() throws IOException{
 		if(!DEBUG_VALIDATION) return;
-		validateWrittenData();
+		if(container.getSize()>0){
+			validateWrittenData();
+		}
 		checkSize();
 		
 		for(var e : nodeCache.entrySet()){
