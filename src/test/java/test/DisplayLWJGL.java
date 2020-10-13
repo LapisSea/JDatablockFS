@@ -115,8 +115,14 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 				render();
 			});
 			
-			window.registryKeyboardKey.register(GLFW_KEY_LEFT, DOWN, e->setFrame(getFramePos()-1));
-			window.registryKeyboardKey.register(GLFW_KEY_RIGHT, DOWN, e->setFrame(getFramePos()+1));
+			window.registryKeyboardKey.register(e->{
+				int delta;
+				if(e.getKey()==GLFW_KEY_LEFT||e.getKey()==GLFW_KEY_A) delta=-1;
+				else if(e.getKey()==GLFW_KEY_RIGHT||e.getKey()==GLFW_KEY_D) delta=1;
+				else return;
+				if(e.getType()==UP) return;
+				setFrame(getFramePos()+delta);
+			});
 			
 			window.autoF11Toggle();
 			window.whileOpen(()->{
