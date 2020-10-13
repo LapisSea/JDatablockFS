@@ -4,16 +4,16 @@ import com.lapissea.cfs.Config;
 import com.lapissea.cfs.io.content.ContentInputStream;
 import com.lapissea.cfs.io.content.ContentOutputStream;
 import com.lapissea.cfs.io.content.ContentReader;
+import com.lapissea.util.AsynchronousBufferingInputStream;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeConsumer;
 
-import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.net.*;
-import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 @SuppressWarnings("AutoBoxing")
@@ -38,7 +38,7 @@ public class DisplayServer implements DataLogger{
 	public static void main(String[] args) throws IOException{
 //		LogUtil.Init.attach(LogUtil.Init.USE_CALL_POS|LogUtil.Init.USE_CALL_THREAD|LogUtil.Init.USE_TABULATED_HEADER);
 		
-		DataLogger display=getRealLogger();
+		DataLogger display=null;
 		
 		ServerSocket server=new ServerSocket(666);
 		
@@ -47,10 +47,9 @@ public class DisplayServer implements DataLogger{
 		while(true){
 			try(Socket client=server.accept()){
 				LogUtil.println("connected", client);
-				var           os     =client.getOutputStream();
-				ContentReader content=new ContentInputStream.Wrapp(new BufferedInputStream(client.getInputStream()));
+				ContentReader content=new ContentInputStream.Wrapp(AsynchronousBufferingInputStream.makeAsync(client.getInputStream()));
 				
-				Executor exec=Executors.newSingleThreadExecutor();
+				if(display==null) display=getRealLogger();
 				
 				run:
 				while(true){
@@ -66,9 +65,11 @@ public class DisplayServer implements DataLogger{
 								stackTrace[i]=new String(data);
 							}
 							
-							exec.execute(()->display.log(new MemFrame(bb, ids, stackTrace)));
+							display.log(new MemFrame(bb, ids, stackTrace));
 						}
-						case RESET -> display.reset();
+						case RESET -> {
+							display.reset();
+						}
 						case FINISH -> {
 							client.close();
 							break run;
@@ -121,10 +122,7 @@ public class DisplayServer implements DataLogger{
 			var is    =socket.getInputStream();
 			var writer=new ContentOutputStream.Wrapp(new BufferedOutputStream(socket.getOutputStream()));
 			
-			UnsafeConsumer<Action, IOException> sendAction=(Action a)->{
-				writer.writeInt1(a.ordinal());
-				writer.flush();
-			};
+			UnsafeConsumer<Action, IOException> sendAction=(Action a)->writer.writeInt1(a.ordinal());
 			
 			proxy=new DataLogger(){
 				@Override
@@ -151,6 +149,7 @@ public class DisplayServer implements DataLogger{
 				public void reset(){
 					try{
 						sendAction.accept(Action.RESET);
+						writer.flush();
 					}catch(IOException e){
 						e.printStackTrace();
 					}
@@ -160,6 +159,7 @@ public class DisplayServer implements DataLogger{
 				public void finish(){
 					try{
 						sendAction.accept(Action.FINISH);
+						writer.flush();
 						is.read();
 						socket.close();
 					}catch(IOException e){
@@ -169,8 +169,8 @@ public class DisplayServer implements DataLogger{
 			};
 			
 			if(THREADED_OUTPUT){
-				Executor   exec  =Executors.newSingleThreadExecutor();
-				DataLogger logger=proxy;
+				ExecutorService exec  =Executors.newSingleThreadExecutor();
+				DataLogger      logger=proxy;
 				proxy=new DataLogger(){
 					@Override
 					public void log(MemFrame frame){
@@ -185,6 +185,7 @@ public class DisplayServer implements DataLogger{
 					@Override
 					public void finish(){
 						exec.execute(logger::finish);
+						exec.shutdown();
 					}
 				};
 			}
