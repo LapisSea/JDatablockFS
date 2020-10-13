@@ -78,46 +78,14 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 			
 			List<Pointer> ptrs=new ArrayList<>();
 			
-			Iterable<Chunk> physicalIterator=()->{
-				Chunk c1;
-				try{
-					c1=cluster[0]==null?null:cluster[0].getFirstChunk();
-				}catch(IOException e){
-					throw UtilL.uncheckedThrow(e);
-				}
-				
-				return new Iterator<>(){
-					Chunk ch=c1;
-					
-					@Override
-					public boolean hasNext(){
-						return ch!=null;
-					}
-					
-					@Override
-					public Chunk next(){
-						Chunk c=ch;
-						try{
-							ch=c.nextPhysical();
-						}catch(IOException e){
-							e.printStackTrace();
-//							LogUtil.println(e);
-							ch=null;
-						}
-						return c;
-					}
-				};
-			};
-			
-			
 			try{
 				cluster[0]=Cluster.build(b->b.withMemoryView(bytes));
 				
 				annotateStruct(g, width, drawByte, cluster[0], cluster[0], 0, ptrs::add);
-				for(Chunk chunk : physicalIterator){
+				for(Chunk chunk : cluster[0].getFirstChunk().physicalIterator()){
 					fillChunk(drawByte, chunk, c->alpha(mix(c, Color.GRAY, 0.8F), c.getAlpha()/255F*0.8F));
 				}
-				for(Chunk chunk : physicalIterator){
+				for(Chunk chunk : cluster[0].getFirstChunk().physicalIterator()){
 					annotateStruct(g, width, drawByte, cluster[0], chunk, chunk.getPtr().getValue(), ptrs::add);
 				}
 			}catch(Throwable e){

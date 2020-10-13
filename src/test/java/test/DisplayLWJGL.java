@@ -280,40 +280,11 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			try{
 				Cluster cluster=Cluster.build(b->b.withMemoryView(bytes));
 				
-				Iterable<Chunk> physicalIterator=()->{
-					Chunk c1;
-					try{
-						c1=cluster.getFirstChunk();
-					}catch(IOException e){
-						throw UtilL.uncheckedThrow(e);
-					}
-					
-					return new Iterator<>(){
-						Chunk ch=c1;
-						
-						@Override
-						public boolean hasNext(){
-							return ch!=null;
-						}
-						
-						@Override
-						public Chunk next(){
-							Chunk c=ch;
-							try{
-								ch=c.nextPhysical();
-							}catch(IOException e){
-								throw new RuntimeException(e);
-							}
-							return c;
-						}
-					};
-				};
-				
 				annotateStruct(width, drawByte, cluster, cluster, 0, ptrs::add);
-				for(Chunk chunk : physicalIterator){
+				for(Chunk chunk : cluster.getFirstChunk().physicalIterator()){
 					fillChunk(drawByte, chunk, c->alpha(mix(c, Color.RED, 0.6F), c.getAlpha()/255F*0.7F));
 				}
-				for(Chunk chunk : physicalIterator){
+				for(Chunk chunk : cluster.getFirstChunk().physicalIterator()){
 					annotateStruct(width, drawByte, cluster, chunk, chunk.getPtr().getValue(), ptrs::add);
 				}
 			}catch(Throwable e){

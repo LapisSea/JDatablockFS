@@ -464,4 +464,50 @@ public class Chunk extends IOInstance.Contained implements Iterable<Chunk>, Rand
 	public void setLocation(ChunkPointer ptr){
 		this.ptr=Objects.requireNonNull(ptr);
 	}
+	
+	private class PhysicalIterable implements Iterable<Chunk>{
+		
+		@NotNull
+		@Override
+		public Iterator<Chunk> iterator(){
+			return new Iterator<>(){
+				Chunk ch=Chunk.this;
+				
+				@Override
+				public boolean hasNext(){
+					return ch!=null;
+				}
+				
+				@Override
+				public Chunk next(){
+					Chunk c=ch;
+					try{
+						ch=c.nextPhysical();
+					}catch(IOException e){
+						throw new RuntimeException(e);
+					}
+					return c;
+				}
+			};
+		}
+	}
+	
+	public Iterable<Chunk> physicalIterator(){
+		return new PhysicalIterable();
+	}
+	
+	public Chunk fakeCopy(){
+		Chunk chunk=new Chunk(cluster, ptr, capacity, bodyNumSize, nextSize);
+		
+		chunk.ptr=this.ptr;
+		chunk.nextCache=this.nextCache;
+		chunk.headerSize=this.headerSize;
+		chunk.userData=this.userData;
+		chunk.used=this.used;
+		chunk.bodyNumSize=this.bodyNumSize;
+		chunk.nextSize=this.nextSize;
+		chunk.capacity=this.capacity;
+		chunk.size=this.size;
+		return chunk;
+	}
 }
