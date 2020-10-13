@@ -8,10 +8,7 @@ import com.lapissea.util.function.UnsafeIntConsumer;
 import com.lapissea.util.function.UnsafePredicate;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -193,6 +190,110 @@ public interface IOList<T> extends Iterable<T>{
 		}
 	}
 	
+	class MergedView<T> implements IOList<T>{
+		
+		private interface LocalAction<L, R>{
+			R apply(IOList<L> list, int localIndex) throws IOException;
+		}
+		
+		private final IOList<T>[] data;
+		
+		public MergedView(IOList<T>[] data){
+			this.data=data;
+		}
+		
+		@Override
+		public Stream<T> stream(){
+			return Arrays.stream(data)
+			             .flatMap(IOList::stream);
+		}
+		
+		@Override
+		public String toString(){
+			return Arrays.stream(data)
+			             .filter(l->!l.isEmpty())
+			             .map(l->l.stream()
+			                      .map(TextUtil::toShortString)
+			                      .collect(Collectors.joining(", ")))
+			             .collect(Collectors.joining(" + ", "[", "]"));
+		}
+		
+		@Override
+		public int size(){
+			int sum=0;
+			for(var list : data){
+				sum+=list.size();
+			}
+			return sum;
+		}
+		
+		private <R> R localIndex(int index, LocalAction<T, R> action) throws IOException{
+			if(index<0) throw new IndexOutOfBoundsException(index);
+			int localIndex=index;
+			for(var list : data){
+				int siz=list.size();
+				if(localIndex<siz){
+					return action.apply(list, localIndex);
+				}
+				localIndex-=siz;
+			}
+			throw new IndexOutOfBoundsException(index);
+		}
+		
+		@Override
+		public T getElement(int index) throws IOException{
+			return localIndex(index, IOList::getElement);
+		}
+		
+		@Override
+		public void setElement(int index, T value) throws IOException{
+			localIndex(index, (list, i)->{
+				list.setElement(i, value);
+				return null;
+			});
+		}
+		
+		@Override
+		public void ensureCapacity(int elementCapacity) throws IOException{
+			int size  =size();
+			int toGrow=elementCapacity-size;
+			if(toGrow>0){
+				var last=data[data.length-1];
+				last.ensureCapacity(last.size()+toGrow);
+			}
+		}
+		
+		@Override
+		public void removeElement(int index) throws IOException{
+			localIndex(index, (list, i)->{
+				list.removeElement(i);
+				return null;
+			});
+		}
+		
+		@Override
+		public void addElement(int index, T value) throws IOException{
+			localIndex(index, (list, i)->{
+				list.addElement(i, value);
+				return null;
+			});
+		}
+		
+		@Override
+		public void validate() throws IOException{
+			for(var list : data){
+				list.validate();
+			}
+		}
+		
+		@Override
+		public void free() throws IOException{
+			for(var list : data){
+				list.free();
+			}
+		}
+	}
+	
 	@SuppressWarnings("unchecked")
 	static <From, To> IOList<From> unbox(IOList<To> data){
 		if(data==null) return null;
@@ -307,97 +408,18 @@ public interface IOList<T> extends Iterable<T>{
 		};
 	}
 	
+	@SuppressWarnings("unchecked")
 	static <T> IOList<T> mergeView(List<IOList<T>> lists){
-		interface LocalAction<L, R>{
-			R apply(IOList<L> list, int localIndex) throws IOException;
-		}
-		
-		return new IOList<>(){
-			
-			@Override
-			public String toString(){
-				return lists.stream()
-				            .filter(l->!l.isEmpty())
-				            .map(l->l.stream()
-				                     .map(TextUtil::toShortString)
-				                     .collect(Collectors.joining(", ")))
-				            .collect(Collectors.joining(" + ", "[", "]"));
-			}
-			
-			@Override
-			public int size(){
-				int sum=0;
-				for(var list : lists){
-					sum+=list.size();
-				}
-				return sum;
-			}
-			
-			private <R> R localIndex(int index, LocalAction<T, R> action) throws IOException{
-				if(index<0) throw new IndexOutOfBoundsException(index);
-				int localIndex=index;
-				for(var list : lists){
-					int siz=list.size();
-					if(localIndex<siz){
-						return action.apply(list, localIndex);
-					}
-					localIndex-=siz;
-				}
-				throw new IndexOutOfBoundsException(index);
-			}
-			
-			@Override
-			public T getElement(int index) throws IOException{
-				return localIndex(index, IOList::getElement);
-			}
-			
-			@Override
-			public void setElement(int index, T value) throws IOException{
-				localIndex(index, (list, i)->{
-					list.setElement(i, value);
-					return null;
-				});
-			}
-			
-			@Override
-			public void ensureCapacity(int elementCapacity) throws IOException{
-				int size  =size();
-				int toGrow=elementCapacity-size;
-				if(toGrow>0){
-					var last=lists.get(lists.size()-1);
-					last.ensureCapacity(last.size()+toGrow);
-				}
-			}
-			
-			@Override
-			public void removeElement(int index) throws IOException{
-				localIndex(index, (list, i)->{
-					list.removeElement(i);
-					return null;
-				});
-			}
-			
-			@Override
-			public void addElement(int index, T value) throws IOException{
-				localIndex(index, (list, i)->{
-					list.addElement(i, value);
-					return null;
-				});
-			}
-			
-			@Override
-			public void validate() throws IOException{
-				for(var list : lists){
-					list.validate();
-				}
-			}
-			
-			@Override
-			public void free() throws IOException{
-				for(var list : lists){
-					list.free();
-				}
-			}
+		return switch(lists.size()){
+			case 0 -> throw new IllegalArgumentException("Nothing to merge");
+			case 1 -> lists.get(0);
+			default -> new MergedView<>(
+				lists.stream()
+				     .flatMap(s->s instanceof MergedView<T> merged?
+				                 Arrays.stream(merged.data):
+				                 Stream.of(s))
+				     .toArray(IOList[]::new)
+			);
 		};
 	}
 	
