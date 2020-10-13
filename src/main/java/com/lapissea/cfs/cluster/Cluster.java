@@ -131,8 +131,8 @@ public class Cluster extends IOInstance.Contained{
 		freeingQueue=new LinkedList<>(){
 			@Override
 			public Chunk set(int index, Chunk element){
-				if(element==null) remove(index);
-				return super.set(index, element);
+				if(element==null) return remove(index);
+				else return super.set(index, element);
 			}
 			
 			@Override
