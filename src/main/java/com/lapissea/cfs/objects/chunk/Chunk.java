@@ -93,7 +93,7 @@ public class Chunk extends IOInstance.Contained implements Iterable<Chunk>, Rand
 		
 		if(Objects.equals(nextPtr, newNextPtr)) return;
 		
-		nextSize.ensureCanFit(newNextPtr);
+		getNextSize().ensureCanFit(newNextPtr);
 		
 		markDirty();
 		nextPtr=newNextPtr;
@@ -193,6 +193,13 @@ public class Chunk extends IOInstance.Contained implements Iterable<Chunk>, Rand
 	public void setBodyNumSize(NumberSize bodyNumSize){
 		if(this.bodyNumSize==bodyNumSize) return;
 		this.bodyNumSize=bodyNumSize;
+		markDirty();
+		headerSize=super.getInstanceSize();
+	}
+	
+	public void setNextSize(NumberSize nextSize){
+		if(this.nextSize==nextSize) return;
+		this.nextSize=nextSize;
 		markDirty();
 		headerSize=super.getInstanceSize();
 	}
