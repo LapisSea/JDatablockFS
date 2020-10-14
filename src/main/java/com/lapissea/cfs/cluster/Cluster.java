@@ -1,5 +1,6 @@
 package com.lapissea.cfs.cluster;
 
+import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.BitDepthOutOfSpaceException;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.RandomIO;
@@ -29,6 +30,7 @@ import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.Config.*;
@@ -238,6 +240,11 @@ public class Cluster extends IOInstance.Contained{
 				throw new RuntimeException(e);
 			}
 		});
+	}
+	
+	NumberSize calcPtrSize(boolean disableNext) throws IOException{
+		if(disableNext) return NumberSize.VOID;
+		return NumberSize.bySize(getData().getSize()).next();
 	}
 	
 	public Chunk allocWrite(IOInstance obj) throws IOException{
@@ -459,15 +466,13 @@ public class Cluster extends IOInstance.Contained{
 						transferAmount+=firstChunk.getSize();
 						Chunk newBlock=alloc(Math.max(toAlloc+transferAmount, minChunkSize), false);
 						
-						try(var io=firstChunk.io()){
-							assert io.getSize()==transferAmount:io.getSize()+" "+transferAmount;
-							
-							try(var dest=newBlock.io()){
-								io.inStream().transferTo(dest.outStream());
+						if(DEBUG_VALIDATION){
+							try(var io=firstChunk.io()){
+								assert io.getSize()==transferAmount:io.getSize()+" "+transferAmount;
 							}
 						}
 						
-						moveChunk(firstChunk, newBlock);
+						copyDataAndMoveChunk(firstChunk, newBlock);
 						return;
 					}
 					
@@ -609,15 +614,29 @@ public class Cluster extends IOInstance.Contained{
 		}
 	}
 	
-	public void moveChunk(Chunk oldChunk, Chunk newChunk) throws IOException{
+	public void copyDataAndMoveChunk(Chunk oldChunk, Chunk newChunk) throws IOException{
+		assert newChunk.getCapacity()>=oldChunk.getCapacity();
+		try(var io=oldChunk.io()){
+			try(var dest=newChunk.io()){
+				Utils.transferExact(io, dest, oldChunk.getSize());
+			}
+		}
+		oldChunk.modifyAndSave(Chunk::clearNextPtr);
+		
+		var oldPtr=oldChunk.getPtr();
+		moveChunkRef(oldChunk, newChunk);
+		
+		getChunk(oldPtr).freeChaining();
+	}
+	
+	public void moveChunkRef(Chunk oldChunk, Chunk newChunk) throws IOException{
 		var oldPtr=oldChunk.getPtr();
 		var newPtr=newChunk.getPtr();
 		
 		
-		LogUtil.println("moving", oldChunk, "to", newChunk);
-		
 		boolean found=memoryWalk(val->{
 			if(val.isValue(oldPtr)){
+				LogUtil.println("moving", oldChunk, "to", newChunk);
 				val.set(newPtr);
 				return true;
 			}
@@ -631,8 +650,6 @@ public class Cluster extends IOInstance.Contained{
 		chunkCache.put(newPtr, oldChunk);
 		oldChunk.setLocation(newPtr);
 		oldChunk.readStruct();
-		
-		getChunk(oldPtr).freeChaining();
 	}
 	
 	
@@ -745,6 +762,123 @@ public class Cluster extends IOInstance.Contained{
 		newData.modifyAndSave(Chunk::markAsUser);
 		userChunks.addElement(newData.getPtr());
 		return newData;
+	}
+	
+	private void chainToChunk(Chunk chainStart, Chunk destChunk) throws IOException{
+		try(var io=chainStart.io()){
+			try(var dest=destChunk.io()){
+				assert dest.getCapacity()>=io.getSize();
+				io.inStream().transferTo(dest.outStream());
+			}
+		}
+		var oldPtr=chainStart.getPtr();
+		moveChunkRef(chainStart, destChunk);
+		getChunk(oldPtr).freeChaining();
+	}
+	
+	public void pack() throws IOException{
+		
+		List<List<Chunk>> chains=new ArrayList<>();
+		
+		UnsafeConsumer<ChunkPointer, IOException> logPtr=ptr->{
+			Chunk chunk=getChunk(ptr);
+			IntStream.range(0, chains.size())
+			         .filter(i->chains.get(i).contains(chunk))
+			         .findAny().ifPresent(chains::remove);
+			if(chunk.hasNext()){
+				chains.add(chunk.collectNext());
+			}
+		};
+		
+		for(Chunk chunk : getFirstChunk().physicalIterator()){
+			logPtr.accept(chunk.getPtr());
+		}
+		
+		//TODO: use memwalk when user data becomes walkable
+//		memoryWalk(ptr->{
+//			logPtr.accept(ptr.value());
+//			return false;
+//		});
+		
+		LogUtil.println(chains);
+		for(List<Chunk> chain : chains){
+			chainToChunk(chain.get(0), alloc(chain.stream().mapToLong(Chunk::getCapacity).sum()));
+		}
+		
+		while(!freeChunks.isEmpty()){
+			ChunkPointer firstFreePtr=null;
+			int          firstIndex  =-1;
+			
+			for(int i=0;i<freeChunks.size();i++){
+				ChunkPointer ptr=freeChunks.getElement(i);
+				if(ptr==null) continue;
+				
+				if(firstFreePtr==null||ptr.compareTo(firstFreePtr)<0){
+					Chunk freeChunk=getChunk(ptr);
+					Chunk next     =freeChunk.nextPhysical();
+					if(next!=null&&next.isUsed()){
+						next=next.nextPhysical();
+						if(next==null||!next.isUsed()){
+							firstIndex=i;
+							firstFreePtr=ptr;
+						}
+					}
+				}
+			}
+			if(firstIndex==-1){
+				for(int i=0;i<freeChunks.size();i++){
+					ChunkPointer ptr=freeChunks.getElement(i);
+					if(ptr==null) continue;
+					
+					if(firstFreePtr==null||ptr.compareTo(firstFreePtr)<0){
+						firstIndex=i;
+						firstFreePtr=ptr;
+					}
+				}
+			}
+			
+			Objects.requireNonNull(firstFreePtr);
+			
+			Chunk freeChunk=getChunk(firstFreePtr);
+			Chunk next     =freeChunk.nextPhysical();
+			if(next==null) return;
+			
+			Chunk movedCopy=freeChunk.fakeCopy();
+			Chunk sameCopy =freeChunk.fakeCopy();
+			sameCopy.setUsed(true);
+			sameCopy.setNextSize(calcPtrSize(next.getNextSize()==NumberSize.VOID));
+			sameCopy.setCapacityConfident(next.getCapacity());
+			
+			movedCopy.setLocation(sameCopy.getPtr().addPtr(sameCopy.getInstanceSize()+next.getCapacity()));
+			
+			long freeSpace=sameCopy.dataEnd()-movedCopy.dataStart();
+			if(freeSpace>0){
+				movedCopy.setCapacityConfident(freeSpace);
+				
+				assert movedCopy.dataEnd()==freeChunk.dataEnd():movedCopy.dataEnd()+" "+freeChunk.dataEnd();
+				assert sameCopy.dataEnd()==movedCopy.getPtr().getValue():sameCopy.dataEnd()+" "+movedCopy.getPtr().getValue();
+				
+				movedCopy.writeStruct();
+				
+				
+				freeChunks.setElement(firstIndex, movedCopy.getPtr());
+				
+				validate();
+				
+				sameCopy.writeStruct();
+				freeChunk.readStruct();
+				
+				validate();
+				
+				copyDataAndMoveChunk(next, freeChunk);
+				
+				validate();
+			}else{
+				Chunk chunk=alloc(next.getCapacity(), next.getNextSize()==NumberSize.VOID, c->c.getPtr().compareTo(next.getPtr())>0);
+				copyDataAndMoveChunk(next, chunk);
+			}
+			
+		}
 	}
 	
 	public boolean isSafeMode() { return safeMode; }

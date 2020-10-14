@@ -300,8 +300,7 @@ abstract class MAllocer{
 	}
 	
 	protected NumberSize calcPtrSize(Cluster cluster, boolean disableNext) throws IOException{
-		if(disableNext) return NumberSize.VOID;
-		return NumberSize.bySize(cluster.getData().getSize()).next();
+		return cluster.calcPtrSize(disableNext);
 	}
 	
 	public abstract Chunk alloc(Cluster cluster, IOList<ChunkPointer> freeChunks, long requestedSize, boolean disableResizing, Predicate<Chunk> approve) throws IOException;

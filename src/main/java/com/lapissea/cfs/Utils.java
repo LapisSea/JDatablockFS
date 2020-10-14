@@ -1,5 +1,8 @@
 package com.lapissea.cfs;
 
+import com.lapissea.cfs.io.content.ContentReader;
+import com.lapissea.cfs.io.content.ContentWriter;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.invoke.CallSite;
@@ -28,6 +31,19 @@ public class Utils{
 	
 	public static void zeroFill(OutputStream dest, long size) throws IOException{
 		zeroFill(dest::write, size);
+	}
+	
+	public static void transferExact(ContentReader src, ContentWriter dest, long amount) throws IOException{
+		if(amount<0) throw new IllegalArgumentException(amount+" can't be negative");
+		byte[] buffer   =new byte[(int)Math.min(amount, 1<<13)];
+		long   remaining=amount;
+		int    read;
+		while(remaining>0){
+			int toTransfer=(int)Math.min(remaining, buffer.length);
+			src.readFully(buffer, 0, toTransfer);
+			dest.write(buffer, 0, toTransfer);
+			remaining-=toTransfer;
+		}
 	}
 	
 	public static void zeroFill(ConsumerBaII dest, long size) throws IOException{

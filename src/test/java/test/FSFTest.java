@@ -81,7 +81,10 @@ class FSFTest{
 	
 	private static void doTests(Cluster cluster) throws IOException{
 		
+		
 		for(int i=0;i<2;i++){
+			packTest(cluster);
+			if(true) return;
 			freeChunksTest(cluster);
 			flatListTest(cluster);
 			linkedListTest(cluster);
@@ -98,11 +101,11 @@ class FSFTest{
 			chunk1.add(cluster.userAlloc(100));
 			chunk2.add(cluster.alloc(10));
 		}
-		cluster.batchFree(()->{
-			for(Chunk chunk : chunk1){
-				chunk.freeChaining();
-			}
-		});
+//		cluster.batchFree(()->{
+		for(Chunk chunk : chunk1){
+			chunk.freeChaining();
+		}
+//		});
 		
 		for(Chunk chunk : chunk2){
 			chunk.freeChaining();
@@ -210,6 +213,33 @@ class FSFTest{
 //		LogUtil.println(cluster.getData().hexdump());
 		
 		list.free();
+		cluster.validate();
+	}
+	
+	private static void packTest(Cluster cluster) throws IOException{
+		
+		IOList<String> list=IOList.box(
+			StructLinkedList.build(b->b.withAllocator(cluster::userAlloc)
+			                           .withElementConstructor(AutoText::new)),
+			AutoText::getData,
+			AutoText::new
+		                              );
+		
+		list.addElement("ay lmao()111111");
+		list.addElement("ay");
+		list.addElement("ay1314 lmao(]");
+		list.addElement("ay lmao(}");
+		list.removeElement(1);
+		Chunk ch=cluster.userAlloc(223);
+		list.addElement("!bro lmao xD!?!?!?!??!");
+		list.addElement("!kek.?!?!?!");
+		ch.freeChaining();
+		list.setElement(2, "hahaah ay this is long?!?!?!?!??!?!?!??!?!?!!??!");
+		
+		
+		cluster.pack();
+//		list.free();
+		
 		cluster.validate();
 	}
 	
