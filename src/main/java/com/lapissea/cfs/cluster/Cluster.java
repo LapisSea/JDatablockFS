@@ -642,7 +642,7 @@ public class Cluster extends IOInstance.Contained{
 		});
 		
 		assert found:
-			"trying to move unreferenced chunk: "+oldChunk.toString();
+			"trying to move unreferenced chunk: "+oldChunk.toString()+" to "+newChunk;
 		
 		chunkCache.remove(oldPtr);
 		chunkCache.put(newPtr, oldChunk);
