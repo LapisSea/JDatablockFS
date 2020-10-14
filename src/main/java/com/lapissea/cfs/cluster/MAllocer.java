@@ -16,7 +16,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.function.Predicate;
 
 import static com.lapissea.cfs.Config.*;
 
@@ -25,15 +24,16 @@ abstract class MAllocer{
 	private static final class PushPop extends MAllocer{
 		
 		@Override
-		public Chunk alloc(Cluster cluster, IOList<ChunkPointer> freeChunks, long requestedSize, boolean disableResizing, Predicate<Chunk> approve) throws IOException{
+		public Chunk alloc(Cluster cluster, IOList<ChunkPointer> freeChunks, AllocateTicket ticket) throws IOException{
 			
 			IOInterface data        =cluster.getData();
 			int         minChunkSize=cluster.getMinChunkSize();
 			
 			ChunkPointer ptr=new ChunkPointer(data.getSize());
 			
-			Chunk fakeChunk=new Chunk(cluster, ptr, Math.max(minChunkSize, requestedSize), calcPtrSize(cluster, disableResizing));
-			if(!approve.test(fakeChunk)) return null;
+			Chunk fakeChunk=new Chunk(cluster, ptr, Math.max(minChunkSize, ticket.requestedBytes()), calcPtrSize(cluster, ticket));
+			if(ticket.userData()) fakeChunk.markAsUser();
+			if(!ticket.approve(fakeChunk)) return null;
 			
 			Chunk chunk=makeChunkReal(fakeChunk);
 			assert data.getSize()==chunk.dataStart():data.getSize()+"=="+chunk.dataStart();
@@ -93,7 +93,7 @@ abstract class MAllocer{
 	private static final class ListingAddConsume extends MAllocer{
 		
 		@Override
-		public Chunk alloc(Cluster cluster, IOList<ChunkPointer> freeChunks, long requestedCapacity, boolean disableResizing, Predicate<Chunk> approve) throws IOException{
+		public Chunk alloc(Cluster cluster, IOList<ChunkPointer> freeChunks, AllocateTicket ticket) throws IOException{
 			
 			int minChunkSize=cluster.getMinChunkSize();
 			
@@ -101,8 +101,9 @@ abstract class MAllocer{
 			if(freeChunks.noneMatches(Objects::nonNull)) return null;
 			
 			UnsafeFunction<Chunk, Chunk, IOException> popEnd=chunk->{
-				Chunk chunkUse=new Chunk(cluster, chunk.getPtr(), requestedCapacity, calcPtrSize(cluster, disableResizing));
+				Chunk chunkUse=new Chunk(cluster, chunk.getPtr(), ticket.requestedBytes(), calcPtrSize(cluster, ticket));
 				chunkUse.setLocation(new ChunkPointer(chunk.dataEnd()-chunkUse.totalSize()));
+				if(ticket.userData()) chunkUse.markAsUser();
 				return chunkUse;
 			};
 			
@@ -118,14 +119,14 @@ abstract class MAllocer{
 				Chunk chunk=cluster.getChunk(ptr);
 				long  cap  =chunk.getCapacity();
 				
-				if(cap<requestedCapacity){
+				if(cap<ticket.requestedBytes()){
 					continue;
 				}
 				
 				if(!cluster.isSafeMode()){
-					long maxSize =requestedCapacity+minChunkSize;
+					long maxSize =ticket.requestedBytes()+minChunkSize;
 					long overAloc=maxSize-cap;
-					if(overAloc>=0&&overAloc<bestOverAloc&&approve.test(chunk)){
+					if(overAloc>=0&&overAloc<bestOverAloc&&ticket.approve(chunk)){
 						bestOverAloc=overAloc;
 						bestIndex=i;
 						if(overAloc==0) break;
@@ -136,7 +137,7 @@ abstract class MAllocer{
 					Chunk chunkUse=popEnd.apply(chunk);
 					
 					long freeCapacity=chunk.getCapacity()-chunkUse.totalSize();
-					if(freeCapacity>=minChunkSize&&approve.test(chunk)){
+					if(freeCapacity>=minChunkSize&&ticket.approve(chunk)){
 						largest=chunk;
 					}
 				}
@@ -145,7 +146,10 @@ abstract class MAllocer{
 			if(bestIndex!=-1){
 				Chunk chunk=cluster.getChunk(freeChunks.getElement(bestIndex));
 				
-				chunk.modifyAndSave(c->c.setUsed(true));
+				chunk.modifyAndSave(c->{
+					if(ticket.userData()) c.markAsUser();
+					c.setUsed(true);
+				});
 				
 				freeChunks.setElement(bestIndex, null);
 				LogUtil.println("aloc reuse exact", chunk);
@@ -265,13 +269,13 @@ abstract class MAllocer{
 	
 	public static final MAllocer AUTO=new MAllocer(){
 		@Override
-		public Chunk alloc(Cluster cluster, IOList<ChunkPointer> freeChunks, long requestedSize, boolean disableResizing, Predicate<Chunk> approve) throws IOException{
+		public Chunk alloc(Cluster cluster, IOList<ChunkPointer> freeChunks, AllocateTicket ticket) throws IOException{
 			Chunk chunk;
 			
-			chunk=FREE_ADD_CONSUME.alloc(cluster, freeChunks, requestedSize, disableResizing, approve);
+			chunk=FREE_ADD_CONSUME.alloc(cluster, freeChunks, ticket);
 			
 			if(chunk==null){
-				chunk=PUSH_POP.alloc(cluster, freeChunks, requestedSize, disableResizing, approve);
+				chunk=PUSH_POP.alloc(cluster, freeChunks, ticket);
 			}
 			
 			return chunk;
@@ -299,11 +303,11 @@ abstract class MAllocer{
 		chunk.zeroOutHead();
 	}
 	
-	protected NumberSize calcPtrSize(Cluster cluster, boolean disableNext) throws IOException{
-		return cluster.calcPtrSize(disableNext);
+	protected NumberSize calcPtrSize(Cluster cluster, AllocateTicket ticket) throws IOException{
+		return cluster.calcPtrSize(ticket.disableResizing());
 	}
 	
-	public abstract Chunk alloc(Cluster cluster, IOList<ChunkPointer> freeChunks, long requestedSize, boolean disableResizing, Predicate<Chunk> approve) throws IOException;
+	public abstract Chunk alloc(Cluster cluster, IOList<ChunkPointer> freeChunks, AllocateTicket ticket) throws IOException;
 	
 	public abstract boolean dealloc(Chunk chunk, IOList<ChunkPointer> freeChunks) throws IOException;
 	

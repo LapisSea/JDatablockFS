@@ -1,11 +1,12 @@
 package com.lapissea.cfs.objects;
 
+import com.lapissea.cfs.cluster.AllocateTicket;
+import com.lapissea.cfs.cluster.Cluster;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.io.struct.IOInstance;
 import com.lapissea.cfs.objects.chunk.Chunk;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.WeakValueHashMap;
-import com.lapissea.util.function.UnsafeLongFunction;
 
 import java.io.IOException;
 import java.lang.reflect.Constructor;
@@ -44,8 +45,8 @@ public class StructFlatList<T extends IOInstance> implements IOList<T>{
 		return Math.toIntExact(size);
 	}
 	
-	public static <T extends IOInstance> StructFlatList<T> allocate(UnsafeLongFunction<Chunk, IOException> allocator, int initialCapacity, Supplier<T> constructor) throws IOException{
-		return new StructFlatList<>(allocator.apply(calcElementSize(constructor)*initialCapacity), constructor);
+	public static <T extends IOInstance> StructFlatList<T> allocate(Cluster cluster, AllocateTicket ticket, int initialCapacity, Supplier<T> constructor) throws IOException{
+		return new StructFlatList<>(ticket.withBytes(calcElementSize(constructor)*initialCapacity).submit(cluster), constructor);
 	}
 	
 	private Chunk data;

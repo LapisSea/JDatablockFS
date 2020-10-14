@@ -29,7 +29,6 @@ import java.io.IOException;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.Predicate;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -247,24 +246,20 @@ public class Cluster extends IOInstance.Contained{
 		return NumberSize.bySize(getData().getSize()).next();
 	}
 	
-	public Chunk allocWrite(IOInstance obj) throws IOException{
-		Chunk chunk=alloc(obj.getInstanceSize(), obj.getStruct().getKnownSize().isPresent());
-		chunk.io(io->obj.writeStruct(this, io));
-		return chunk;
-	}
-	
-	public Chunk alloc(long requestedCapacity) throws IOException                         { return alloc(requestedCapacity, false); }
-	
-	public Chunk alloc(long requestedCapacity, boolean disableResizing) throws IOException{ return alloc(requestedCapacity, disableResizing, c->true); }
-	
-	public Chunk alloc(long requestedCapacity, boolean disableResizing, Predicate<Chunk> approve) throws IOException{
+	public Chunk alloc(AllocateTicket ticket) throws IOException{
 		
-		Chunk chunk=MAllocer.AUTO.alloc(this, getFreeData(), requestedCapacity, disableResizing, approve);
+		Chunk chunk=MAllocer.AUTO.alloc(this, getFreeData(), ticket.withBytes(Math.max(getMinChunkSize(), ticket.requestedBytes())));
 		
-		if(DEBUG_VALIDATION){
-			if(chunk!=null) checkCached(chunk);
+		if(chunk!=null){
+			if(DEBUG_VALIDATION){
+				assert ticket.userData()==chunk.isUserData();
+				checkCached(chunk);
+			}
+			
+			if(ticket.userData()){
+				userChunks.addElement(chunk.getPtr());
+			}
 		}
-		
 		return chunk;
 	}
 	
@@ -448,7 +443,9 @@ public class Cluster extends IOInstance.Contained{
 			Chunk chainAppendChunk;
 			while(true){
 				NumberSize siz=toAppendTo.getNextSize();
-				chainAppendChunk=alloc(Math.max(toAlloc+transferAmount, minChunkSize), false, c->siz.canFit(c.getPtr()));
+				chainAppendChunk=AllocateTicket.bytes(toAlloc+transferAmount)
+				                               .withApproval(chunk->siz.canFit(chunk.getPtr()))
+				                               .submit(this);
 				
 				if(chainAppendChunk==null){
 					if(chunkChain==null){
@@ -464,7 +461,8 @@ public class Cluster extends IOInstance.Contained{
 						assert firstChunk==toAppendTo;
 						
 						transferAmount+=firstChunk.getSize();
-						Chunk newBlock=alloc(Math.max(toAlloc+transferAmount, minChunkSize), false);
+						Chunk newBlock=AllocateTicket.bytes(toAlloc+transferAmount)
+						                             .submit(this);
 						
 						if(DEBUG_VALIDATION){
 							try(var io=firstChunk.io()){
@@ -757,13 +755,6 @@ public class Cluster extends IOInstance.Contained{
 		return false;
 	}
 	
-	public Chunk userAlloc(long initialCapacity) throws IOException{
-		Chunk newData=alloc(initialCapacity);
-		newData.modifyAndSave(Chunk::markAsUser);
-		userChunks.addElement(newData.getPtr());
-		return newData;
-	}
-	
 	private void chainToChunk(Chunk chainStart, Chunk destChunk) throws IOException{
 		try(var io=chainStart.io()){
 			try(var dest=destChunk.io()){
@@ -802,7 +793,7 @@ public class Cluster extends IOInstance.Contained{
 		
 		LogUtil.println(chains);
 		for(List<Chunk> chain : chains){
-			chainToChunk(chain.get(0), alloc(chain.stream().mapToLong(Chunk::getCapacity).sum()));
+			chainToChunk(chain.get(0), AllocateTicket.bytes(chain.stream().mapToLong(Chunk::getCapacity).sum()).submit(this));
 		}
 		
 		while(!freeChunks.isEmpty()){
@@ -874,7 +865,10 @@ public class Cluster extends IOInstance.Contained{
 				
 				validate();
 			}else{
-				Chunk chunk=alloc(next.getCapacity(), next.getNextSize()==NumberSize.VOID, c->c.getPtr().compareTo(next.getPtr())>0);
+				Chunk chunk=AllocateTicket.bytes(next.getCapacity())
+				                          .shouldDisableResizing(next.getNextSize()==NumberSize.VOID)
+				                          .withApproval(c->c.getPtr().compareTo(next.getPtr())>0)
+				                          .submit(this);
 				copyDataAndMoveChunk(next, chunk);
 			}
 			

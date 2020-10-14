@@ -1,5 +1,7 @@
 package com.lapissea.cfs.objects;
 
+import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.cluster.AllocateTicket;
 import com.lapissea.cfs.cluster.Cluster;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
@@ -107,7 +109,7 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 		}
 		
 		void allocContainer(Cluster cluster) throws IOException{
-			setContainer(cluster.alloc(getInstanceSize(), solidNodes));
+			setContainer(AllocateTicket.fitTo(this).shouldDisableResizing(solidNodes).submit(cluster));
 			writeStruct();
 		}
 		
@@ -151,13 +153,11 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 		}
 		
 		
-		public Builder<T> withAllocator(UnsafeLongFunction<Chunk, IOException> allocator){
-			containerGetter=()->allocator.apply(LL_SIZE);
+		public Builder<T> withAllocation(Cluster cluster, AllocateTicket ticket){
+			containerGetter=()->ticket.withBytes(LL_SIZE)
+			                          .withDataPopulated((c, io)->Utils.zeroFill(io::write, LL_SIZE))
+			                          .submit(cluster);
 			return this;
-		}
-		
-		public Builder<T> withAllocationSource(Cluster cluster){
-			return withAllocator(s->cluster.alloc(s, true));
 		}
 		
 		public StructLinkedList<T> build() throws IOException{

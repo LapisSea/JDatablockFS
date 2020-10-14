@@ -1,5 +1,6 @@
 package com.lapissea.cfs.io.struct.engine.impl;
 
+import com.lapissea.cfs.cluster.AllocateTicket;
 import com.lapissea.cfs.cluster.Cluster;
 import com.lapissea.cfs.io.ReaderWriter;
 import com.lapissea.cfs.io.SelfPoint;
@@ -30,10 +31,12 @@ public class StructPtrIOImpl<T extends IOInstance&SelfPoint<T>> extends Variable
 		public long getSize(){
 			return ptrIO.getFixedSize().orElseThrow();
 		}
+		
 		@Override
 		protected long mapSize(IOInstance target, T value){
 			return getSize();
 		}
+		
 		@Override
 		public long mapSize(IOInstance target){
 			return getSize();
@@ -150,9 +153,9 @@ public class StructPtrIOImpl<T extends IOInstance&SelfPoint<T>> extends Variable
 	
 	@Override
 	public void allocNew(IOInstance target, Cluster cluster, boolean disableNext) throws IOException{
-		var chunk=cluster.alloc(
-			structType.getKnownSize().orElse(structType.getMaximumSize().orElse(structType.getMinimumSize())),
-			disableNext);
+		Chunk chunk=AllocateTicket.bytes(structType.getKnownSize().orElse(structType.getMaximumSize().orElse(structType.getMinimumSize())))
+		                          .shouldDisableResizing(disableNext)
+		                          .submit(cluster);
 		
 		setValue(target, newInstance(target, chunk));
 		

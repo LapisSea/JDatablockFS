@@ -1,6 +1,7 @@
 package test;
 
 import com.google.gson.GsonBuilder;
+import com.lapissea.cfs.cluster.AllocateTicket;
 import com.lapissea.cfs.cluster.Cluster;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.objects.IOList;
@@ -97,10 +98,13 @@ class FSFTest{
 		List<Chunk> chunk1=new ArrayList<>();
 		List<Chunk> chunk2=new ArrayList<>();
 		
+		AllocateTicket t1=AllocateTicket.bytes(100).asUserData();
+		AllocateTicket t2=AllocateTicket.bytes(10);
 		for(int i=0;i<5;i++){
-			chunk1.add(cluster.userAlloc(100));
-			chunk2.add(cluster.alloc(10));
+			chunk1.add(t1.submit(cluster));
+			chunk2.add(t2.submit(cluster));
 		}
+
 //		cluster.batchFree(()->{
 		for(Chunk chunk : chunk1){
 			chunk.freeChaining();
@@ -116,7 +120,7 @@ class FSFTest{
 		
 		
 		IOList<ChunkPointer> list=IOList.box(
-			StructFlatList.allocate(cluster::userAlloc, 2, ChunkPointer.PtrFixed::new),
+			StructFlatList.allocate(cluster, AllocateTicket.user(), 2, ChunkPointer.PtrFixed::new),
 			ChunkPointer.PtrFixed::getValue,
 			ChunkPointer.PtrFixed::new
 		                                    );
@@ -159,7 +163,7 @@ class FSFTest{
 	private static void linkedListTest(Cluster cluster) throws IOException{
 		
 		IOList<String> list=IOList.box(
-			StructLinkedList.build(b->b.withAllocator(cluster::userAlloc)
+			StructLinkedList.build(b->b.withAllocation(cluster, AllocateTicket.user())
 			                           .withElementConstructor(AutoText::new)),
 			AutoText::getData,
 			AutoText::new
@@ -219,7 +223,7 @@ class FSFTest{
 	private static void packTest(Cluster cluster) throws IOException{
 		
 		IOList<String> list=IOList.box(
-			StructLinkedList.build(b->b.withAllocator(cluster::userAlloc)
+			StructLinkedList.build(b->b.withAllocation(cluster, AllocateTicket.user())
 			                           .withElementConstructor(AutoText::new)),
 			AutoText::getData,
 			AutoText::new
@@ -230,7 +234,7 @@ class FSFTest{
 		list.addElement("ay1314 lmao(]");
 		list.addElement("ay lmao(}");
 		list.removeElement(1);
-		Chunk ch=cluster.userAlloc(223);
+		Chunk ch=AllocateTicket.bytes(223).asUserData().submit(cluster);
 		list.addElement("!bro lmao xD!?!?!?!??!");
 		list.addElement("!kek.?!?!?!");
 		ch.freeChaining();
