@@ -4,16 +4,17 @@ import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.struct.IOInstance;
 import com.lapissea.cfs.objects.chunk.Chunk;
 import com.lapissea.util.function.UnsafeBiConsumer;
+import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
 import java.util.function.Predicate;
 
-public record AllocateTicket(long requestedBytes, boolean disableResizing, boolean userData, Predicate<Chunk> approve, UnsafeBiConsumer<Cluster, RandomIO, IOException> dataPopulator){
+public record AllocateTicket(long bytes, boolean disableResizing, boolean userData, Predicate<Chunk> approve, UnsafeConsumer<Chunk, IOException> dataPopulator){
 	
 	public static final AllocateTicket DEFAULT=new AllocateTicket(0, false, false, null, null);
 	
 	public AllocateTicket{
-		assert requestedBytes>=0;
+		assert bytes>=0;
 	}
 	
 	public static AllocateTicket fitAndPopulate(IOInstance objectToFit){
@@ -21,10 +22,13 @@ public record AllocateTicket(long requestedBytes, boolean disableResizing, boole
 	}
 	
 	public static AllocateTicket fitTo(IOInstance objectToFit){
-		if(objectToFit.getStruct().getKnownSize().isEmpty()){
-			return bytes(objectToFit.getInstanceSize()).withDisabledResizing();
+		boolean fixedSize=objectToFit.getStruct().getKnownSize().isPresent();
+		
+		AllocateTicket ticket=bytes(objectToFit.getInstanceSize());
+		if(fixedSize){
+			ticket=ticket.withDisabledResizing();
 		}
-		return bytes(objectToFit.getInstanceSize());
+		return ticket;
 	}
 	
 	public static AllocateTicket bytes(long requestedBytes){
@@ -41,24 +45,32 @@ public record AllocateTicket(long requestedBytes, boolean disableResizing, boole
 	
 	public AllocateTicket shouldDisableResizing(boolean disableResizing){
 		if(this.disableResizing==disableResizing) return this;
-		return new AllocateTicket(requestedBytes, disableResizing, userData, approve, dataPopulator);
+		return new AllocateTicket(bytes, disableResizing, userData, approve, dataPopulator);
 	}
 	
 	public AllocateTicket withApproval(Predicate<Chunk> approve){
-		return new AllocateTicket(requestedBytes, disableResizing, userData, approve, dataPopulator);
+		return new AllocateTicket(bytes, disableResizing, userData, approve, dataPopulator);
 	}
 	
 	public AllocateTicket withDataPopulated(UnsafeBiConsumer<Cluster, RandomIO, IOException> dataPopulator){
-		return new AllocateTicket(requestedBytes, disableResizing, userData, approve, dataPopulator);
+		return withDataPopulated(c->{
+			try(var io=c.io()){
+				dataPopulator.accept(c.cluster, io);
+			}
+		});
+	}
+	
+	public AllocateTicket withDataPopulated(UnsafeConsumer<Chunk, IOException> dataPopulator){
+		return new AllocateTicket(bytes, disableResizing, userData, approve, dataPopulator);
 	}
 	
 	public AllocateTicket withBytes(long requestedBytes){
-		if(this.requestedBytes==requestedBytes) return this;
+		if(this.bytes==requestedBytes) return this;
 		return new AllocateTicket(requestedBytes, disableResizing, userData, approve, dataPopulator);
 	}
 	
 	public AllocateTicket asUserData(){
-		return new AllocateTicket(requestedBytes, disableResizing, true, approve, dataPopulator);
+		return new AllocateTicket(bytes, disableResizing, true, approve, dataPopulator);
 	}
 	
 	public Chunk submit(Cluster target) throws IOException{
@@ -71,9 +83,7 @@ public record AllocateTicket(long requestedBytes, boolean disableResizing, boole
 	
 	void populate(Chunk chunk) throws IOException{
 		if(dataPopulator==null) return;
-		try(var io=chunk.io()){
-			dataPopulator.accept(chunk.cluster, io);
-		}
+		dataPopulator.accept(chunk);
 	}
 	
 }

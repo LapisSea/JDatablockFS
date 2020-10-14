@@ -427,7 +427,7 @@ public class Chunk extends IOInstance.Contained implements Iterable<Chunk>, Rand
 	}
 	
 	@Override
-	public RandomIO io() throws IOException{
+	public ChunkIO io() throws IOException{
 		return new ChunkIO(this);
 	}
 	

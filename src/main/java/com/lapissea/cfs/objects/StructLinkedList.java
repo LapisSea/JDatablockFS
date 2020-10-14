@@ -109,8 +109,13 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 		}
 		
 		void allocContainer(Cluster cluster) throws IOException{
-			setContainer(AllocateTicket.fitTo(this).shouldDisableResizing(solidNodes).submit(cluster));
-			writeStruct();
+			AllocateTicket.fitTo(this)
+			              .shouldDisableResizing(solidNodes)
+			              .withDataPopulated(c->{
+				              setContainer(c);
+				              writeStruct();
+			              })
+			              .submit(cluster);
 		}
 		
 		void initContainer(Chunk chunk) throws IOException{

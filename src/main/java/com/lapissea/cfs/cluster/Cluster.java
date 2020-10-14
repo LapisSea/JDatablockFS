@@ -248,7 +248,7 @@ public class Cluster extends IOInstance.Contained{
 	
 	public Chunk alloc(AllocateTicket ticket) throws IOException{
 		
-		Chunk chunk=MAllocer.AUTO.alloc(this, getFreeData(), ticket.withBytes(Math.max(getMinChunkSize(), ticket.requestedBytes())));
+		Chunk chunk=MAllocer.AUTO.alloc(this, getFreeData(), ticket.withBytes(Math.max(getMinChunkSize(), ticket.bytes())));
 		
 		if(chunk!=null){
 			if(DEBUG_VALIDATION){

@@ -31,21 +31,19 @@ abstract class MAllocer{
 			
 			ChunkPointer ptr=new ChunkPointer(data.getSize());
 			
-			Chunk fakeChunk=new Chunk(cluster, ptr, Math.max(minChunkSize, ticket.requestedBytes()), calcPtrSize(cluster, ticket));
+			Chunk fakeChunk=new Chunk(cluster, ptr, Math.max(minChunkSize, ticket.bytes()), calcPtrSize(cluster, ticket));
 			if(ticket.userData()) fakeChunk.markAsUser();
 			if(!ticket.approve(fakeChunk)) return null;
 			
 			Chunk chunk=makeChunkReal(fakeChunk);
 			assert data.getSize()==chunk.dataStart():data.getSize()+"=="+chunk.dataStart();
 			
-			data.ioAt(chunk.dataStart(), io->{
-				Utils.zeroFill(io::write, chunk.getCapacity());
-			});
-			
-			assert data.getSize()==chunk.dataEnd():data.getSize()+"=="+chunk.dataEnd();
-			
-			LogUtil.println("alloc append", chunk);
-			
+			ticket.populate(chunk);
+			if(chunk.getSize()<chunk.getCapacity()){
+				data.ioAt(chunk.dataStart()+chunk.getSize(), io->{
+					Utils.zeroFill(io::write, chunk.getCapacity()-chunk.getSize());
+				});
+			}
 			return chunk;
 		}
 		
@@ -101,7 +99,7 @@ abstract class MAllocer{
 			if(freeChunks.noneMatches(Objects::nonNull)) return null;
 			
 			UnsafeFunction<Chunk, Chunk, IOException> popEnd=chunk->{
-				Chunk chunkUse=new Chunk(cluster, chunk.getPtr(), ticket.requestedBytes(), calcPtrSize(cluster, ticket));
+				Chunk chunkUse=new Chunk(cluster, chunk.getPtr(), ticket.bytes(), calcPtrSize(cluster, ticket));
 				chunkUse.setLocation(new ChunkPointer(chunk.dataEnd()-chunkUse.totalSize()));
 				if(ticket.userData()) chunkUse.markAsUser();
 				return chunkUse;
@@ -119,12 +117,12 @@ abstract class MAllocer{
 				Chunk chunk=cluster.getChunk(ptr);
 				long  cap  =chunk.getCapacity();
 				
-				if(cap<ticket.requestedBytes()){
+				if(cap<ticket.bytes()){
 					continue;
 				}
 				
 				if(!cluster.isSafeMode()){
-					long maxSize =ticket.requestedBytes()+minChunkSize;
+					long maxSize =ticket.bytes()+minChunkSize;
 					long overAloc=maxSize-cap;
 					if(overAloc>=0&&overAloc<bestOverAloc&&ticket.approve(chunk)){
 						bestOverAloc=overAloc;
@@ -153,6 +151,7 @@ abstract class MAllocer{
 				
 				freeChunks.setElement(bestIndex, null);
 				LogUtil.println("aloc reuse exact", chunk);
+				ticket.populate(chunk);
 				return chunk;
 			}
 			
@@ -166,6 +165,7 @@ abstract class MAllocer{
 				
 				LogUtil.println("aloc reuse split", largest, " -> ", chunkUse);
 				
+				ticket.populate(chunkUse);
 				return chunkUse;
 			}
 			
