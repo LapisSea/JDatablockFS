@@ -139,7 +139,7 @@ public class DisplayServer implements DataLogger{
 							writer.writeInt4(s.length());
 							writer.writeChars2(s);
 						}
-						writer.flush();
+						if(!THREADED_OUTPUT) writer.flush();
 					}catch(IOException e){
 						throw new RuntimeException(e);
 					}
@@ -149,7 +149,7 @@ public class DisplayServer implements DataLogger{
 				public void reset(){
 					try{
 						sendAction.accept(Action.RESET);
-						writer.flush();
+						if(!THREADED_OUTPUT) writer.flush();
 					}catch(IOException e){
 						e.printStackTrace();
 					}

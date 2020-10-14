@@ -11,42 +11,40 @@ import com.lapissea.cfs.objects.chunk.ChunkPointer;
 import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.LogUtil;
+import com.lapissea.util.TextUtil;
 import com.lapissea.util.ZeroArrays;
 
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
 
 import static com.lapissea.cfs.Config.*;
 
 class FSFTest{
 	
 	static{
-		System.setProperty("test.DisplayServer.THREADED_OUTPUT", "true");
 		System.setProperty("sun.java2d.opengl", "true");
-//		System.setProperty("sun.java2d.d3d", "true");
-//		Toolkit.getDefaultToolkit().setDynamicLayout(false);
-		
-		LogUtil.Init.attach(LogUtil.Init.USE_CALL_POS|LogUtil.Init.USE_TABULATED_HEADER);
+//		LogUtil.Init.attach(LogUtil.Init.USE_CALL_POS|LogUtil.Init.USE_TABULATED_HEADER);
 	}
 	
 	
 	public static void main(String[] args){
 		try{
+			Map<String, String> config=new HashMap<>();
+			try(var r=new FileReader(new File("config.json"))){
+				new GsonBuilder().create().<Map<String, Object>>fromJson(r, HashMap.class).forEach((k, v)->config.put(k, TextUtil.toString(v)));
+			}catch(Exception ignored){ }
+			
+			System.setProperty("test.DisplayServer.THREADED_OUTPUT", config.getOrDefault("threadedOutput", ""));
+			if(Boolean.parseBoolean(config.getOrDefault("fancyPrint", "true"))){
+				LogUtil.Init.attach(LogUtil.Init.USE_CALL_POS|LogUtil.Init.USE_TABULATED_HEADER);
+			}
 			
 			LateInit<DataLogger> display=new LateInit<>(()->{
 				if(DEBUG_VALIDATION){
-					String jarPath=null;
-					
-					try(var r=new FileReader(new File("config.json"))){
-						jarPath=new GsonBuilder().create().fromJson(r, HashMap.class).get("serverDisplayJar").toString();
-					}catch(Exception e){ }
-					
-					return new DisplayServer(jarPath);
+					Object jarPath=config.get("serverDisplayJar");
+					return new DisplayServer(jarPath==null?null:jarPath.toString());
 				}
 				return new DataLogger.Blank();
 			});
