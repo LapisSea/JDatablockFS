@@ -68,6 +68,10 @@ public abstract class BinaryDrawing{
 	
 	
 	protected void fillChunk(DrawB drawByte, Chunk chunk, Function<Color, Color> filter){
+		fillChunk(drawByte, chunk, filter, true, false);
+	}
+	
+	protected void fillChunk(DrawB drawByte, Chunk chunk, Function<Color, Color> filter, boolean withChar, boolean force){
 		
 		var chunkColor=chunk.isUsed()?chunk.isUserData()?Color.blue.brighter():Color.GREEN:Color.CYAN;
 		var dataColor =mul(chunkColor, 0.5F);
@@ -82,9 +86,10 @@ public abstract class BinaryDrawing{
 		}
 		
 		for(int i=0, j=(int)chunk.getCapacity();i<j;i++){
-			drawByte.draw((int)(i+chunk.dataStart()), i>=chunk.getSize()?freeColor:dataColor, true, false);
+			drawByte.draw((int)(i+chunk.dataStart()), i>=chunk.getSize()?freeColor:dataColor, withChar, force);
 		}
 	}
+	
 	protected void fillBit(int index, float xOff, float yOff){
 		int   xi =index%3;
 		int   yi =index/3;

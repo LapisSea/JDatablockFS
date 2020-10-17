@@ -11,10 +11,10 @@ import com.lapissea.cfs.objects.chunk.Chunk;
 import com.lapissea.cfs.objects.chunk.ChunkPointer;
 import com.lapissea.cfs.objects.chunk.ObjectPointer;
 import com.lapissea.glfw.GlfwMonitor;
-import com.lapissea.glfw.GlfwMouseEvent;
 import com.lapissea.glfw.GlfwWindow;
 import com.lapissea.util.*;
 import com.lapissea.util.event.change.ChangeRegistryInt;
+import com.lapissea.vec.Vec2i;
 import org.lwjgl.glfw.GLFWErrorCallback;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
@@ -25,7 +25,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.*;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import java.util.stream.IntStream;
 
 import static com.lapissea.glfw.GlfwKeyboardEvent.Type.*;
@@ -64,8 +63,8 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	
 	private final List<MemFrame>    frames       =new ArrayList<>();
 	private final ChangeRegistryInt pixelsPerByte=new ChangeRegistryInt(300);
-	private final ChangeRegistryInt framePos     =new ChangeRegistryInt(-1);
-	private       boolean           shouldRender;
+	private final ChangeRegistryInt framePos     =new ChangeRegistryInt(0);
+	private       boolean           shouldRender =true;
 	private       float             lineWidth;
 	private       float             fontScale;
 	
@@ -82,16 +81,30 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			byteIndex.register(e->shouldRender=true);
 			framePos.register(e->shouldRender=true);
 			
+			double[] travel={0};
+			
 			window.registryMouseButton.register(e->{
-				if(e.getType()!=GlfwMouseEvent.Type.DOWN) return;
-				if(e.getKey()==GLFW_MOUSE_BUTTON_LEFT){
-					ifFrame(MemFrame::printStackTrace);
+				if(e.getKey()!=GLFW_MOUSE_BUTTON_LEFT) return;
+				switch(e.getType()){
+				case DOWN:
+					travel[0]=0;
+					break;
+				case UP:
+					if(travel[0]<30){
+						ifFrame(MemFrame::printStackTrace);
+					}
+					break;
 				}
+				
 			});
 			window.registryMouseScroll.register(vec->setFrame((int)(getFramePos()+vec.y())));
 			
 			
+			Vec2i lastPos=new Vec2i();
 			window.mousePos.register(pos->{
+				
+				travel[0]+=lastPos.distanceTo(pos);
+				lastPos.set(pos);
 				
 				var pixelsPerByte=getPixelsPerByte();
 				
@@ -107,8 +120,6 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 				float percent=MathUtil.snap((pos.x()-10F)/(window.size.x()-20F), 0, 1);
 				setFrame(Math.round((frames.size()-1)*percent));
 			});
-			
-			setFrame(0);
 			
 			window.size.register(()->{
 				ifFrame(frame->calcSize(frame.data().length, true));
@@ -265,10 +276,11 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			
 			
 			try(var bulkDraw=new BulkDraw(GL_QUADS)){
-				int step=10;
+				float jiter=2;
+				int   step =10;
 				for(int x=0;x<getWidth()+2;x+=step){
 					for(int y=(x/step)%step;y<getHeight()+2;y+=step){
-						fillQuad(x+Rand.f(2), y+Rand.f(2), 2, 2);
+						fillQuad(x+Rand.f(jiter), y+Rand.f(jiter), 1.5, 1.5);
 					}
 				}
 			}
@@ -369,7 +381,8 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			var pixelsPerByte=getPixelsPerByte();
 			
 			if(instance instanceof Chunk c){
-				fillChunk(drawByte, c, Function.identity());
+				fillChunk(drawByte, c, ch->alpha(ch, ch.getAlpha()/255F*1F), false, false);
+				fillChunk(drawByte, c, ch->alpha(ch, 0.2F), true, true);
 			}
 			
 			List<PairM<Long, IOInstance>> recurse=new ArrayList<>();
@@ -438,8 +451,9 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 						area=new Rectangle(pixelsPerByte*xPosFrom, pixelsPerByte*yPosFrom, pixelsPerByte*(to-from), pixelsPerByte);
 						initFont();
 						
-						IntStream.range(from, from+varSize).forEach(i->drawByte.draw(i, mix(col, Color.GRAY, 0.65F), false, false));
+						IntStream.range(from, from+varSize).forEach(i->drawByte.draw(i, alpha(col, 1F), false, false));
 						
+						setColor(alpha(col, 0.8F));
 					}
 					
 					Object valVal=var.getValueAsObj(instance);
@@ -457,6 +471,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 						try{
 							long valOff=instanceOffset+off.getOffset();
 							annotateStruct(width, drawByte, cluster, stack, inst, valOff, pointerRecord);
+							area.width=0;
 						}catch(IOException e){
 							handleError(e);
 						}
@@ -491,11 +506,14 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 					}
 					
 					if(area.width>0){
+						setColor(alpha(col, 0.8F));
 						try{
-							String text=TextUtil.toString(valVal)
+							String text=TextUtil.toShortString(valVal)
 							                    .replace('\t', '↹')
 							                    .replace('\n', '↵');
-							
+							if(text.contains("AutoText")){
+								int i0=0;
+							}
 							drawStringIn(text, area, true);
 						}catch(Throwable e){
 							handleError(e);
@@ -526,8 +544,10 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	boolean errorMode;
 	
 	private void handleError(Throwable e){
-		if(errorMode) new RuntimeException("Failed to process frame "+getFramePos(), e).printStackTrace();
-		else throw UtilL.uncheckedThrow(e);
+		if(errorMode){
+			LogUtil.println(e);
+//			new RuntimeException("Failed to process frame "+getFramePos(), e).printStackTrace();
+		}else throw UtilL.uncheckedThrow(e);
 	}
 	
 	private float[] getStringBounds(String str){
@@ -574,6 +594,25 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			if(area.height>h){
 				this.fontScale=area.height;
 				
+				rect=getStringBounds(s);
+				
+				w=rect[0];
+				h=rect[1];
+			}
+		}
+		
+		if(w>0){
+			double scale=(area.width-1)/w;
+			if(scale<0.5){
+				this.fontScale/=scale<0.25?3:2;
+				
+				rect=getStringBounds(s);
+				
+				w=rect[0];
+				h=rect[1];
+			}
+			while((area.width-1)/w<0.5){
+				s=s.substring(0, s.length()-4)+"...";
 				rect=getStringBounds(s);
 				
 				w=rect[0];
@@ -654,7 +693,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			char c=(char)((byte)b);
 			if(canFontDisplay(c)){
 				String s=Character.toString(c);
-				setColor(new Color(1, 1, 1, 0.6F));
+				setColor(new Color(1, 1, 1, color.getAlpha()/255F*0.6F));
 				
 				drawStringIn(s, new Rectangle(0, 0, pixelsPerByte, pixelsPerByte), false);
 			}
