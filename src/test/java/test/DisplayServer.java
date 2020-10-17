@@ -4,15 +4,17 @@ import com.lapissea.cfs.Config;
 import com.lapissea.cfs.io.content.ContentInputStream;
 import com.lapissea.cfs.io.content.ContentOutputStream;
 import com.lapissea.cfs.io.content.ContentReader;
-import com.lapissea.util.AsynchronousBufferingInputStream;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeConsumer;
+import com.lapissea.util.function.UnsafeRunnable;
 
+import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.net.*;
+import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -24,7 +26,8 @@ public class DisplayServer implements DataLogger{
 	enum Action{
 		LOG,
 		RESET,
-		FINISH
+		FINISH,
+		PING
 	}
 	
 	private static DataLogger getRealLogger(){
@@ -36,11 +39,11 @@ public class DisplayServer implements DataLogger{
 	}
 	
 	public static void main(String[] args) throws IOException{
-//		LogUtil.Init.attach(LogUtil.Init.USE_CALL_POS|LogUtil.Init.USE_CALL_THREAD|LogUtil.Init.USE_TABULATED_HEADER);
-		
-		DataLogger display=null;
 		
 		ServerSocket server=new ServerSocket(666);
+		
+		DataLogger display=Arrays.asList(args).contains("lazy")?null:getRealLogger();
+		
 		
 		LogUtil.println("started");
 		
@@ -49,6 +52,7 @@ public class DisplayServer implements DataLogger{
 				LogUtil.println("connected", client);
 				ContentReader content=new ContentInputStream.Wrapp(AsynchronousBufferingInputStream.makeAsync(client.getInputStream()));
 				
+				var           out    =client.getOutputStream();
 				if(display==null) display=getRealLogger();
 				
 				run:
@@ -73,6 +77,10 @@ public class DisplayServer implements DataLogger{
 						case FINISH -> {
 							client.close();
 							break run;
+						}
+						case PING -> {
+							out.write(2);
+							out.flush();
 						}
 						}
 					}catch(SocketException e){
@@ -124,6 +132,13 @@ public class DisplayServer implements DataLogger{
 			
 			UnsafeConsumer<Action, IOException> sendAction=(Action a)->writer.writeInt1(a.ordinal());
 			
+			UnsafeRunnable<IOException> flush=()->{
+				if(THREADED_OUTPUT) return;
+				sendAction.accept(Action.PING);
+				writer.flush();
+				is.read();
+			};
+			
 			proxy=new DataLogger(){
 				@Override
 				public void log(MemFrame frame){
@@ -139,7 +154,7 @@ public class DisplayServer implements DataLogger{
 							writer.writeInt4(s.length());
 							writer.writeChars2(s);
 						}
-						if(!THREADED_OUTPUT) writer.flush();
+						flush.run();
 					}catch(IOException e){
 						throw new RuntimeException(e);
 					}
@@ -149,7 +164,7 @@ public class DisplayServer implements DataLogger{
 				public void reset(){
 					try{
 						sendAction.accept(Action.RESET);
-						if(!THREADED_OUTPUT) writer.flush();
+						flush.run();
 					}catch(IOException e){
 						e.printStackTrace();
 					}
