@@ -50,8 +50,7 @@ public class DisplayServer implements DataLogger{
 		while(true){
 			try(Socket client=server.accept()){
 				LogUtil.println("connected", client);
-				ContentReader content=new ContentInputStream.Wrapp(AsynchronousBufferingInputStream.makeAsync(client.getInputStream()));
-				
+				ContentReader content=new ContentInputStream.Wrapp(new BufferedInputStream(client.getInputStream()));
 				var           out    =client.getOutputStream();
 				if(display==null) display=getRealLogger();
 				
