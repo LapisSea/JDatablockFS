@@ -12,8 +12,6 @@ import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.function.UnsafeFunction;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -32,18 +30,16 @@ abstract class MAllocer{
 			ChunkPointer ptr=new ChunkPointer(data.getSize());
 			
 			Chunk fakeChunk=new Chunk(cluster, ptr, Math.max(minChunkSize, ticket.bytes()), calcPtrSize(cluster, ticket));
-			if(ticket.userData()) fakeChunk.markAsUser();
+			if(ticket.userData()!=null) fakeChunk.markAsUser();
 			if(!ticket.approve(fakeChunk)) return null;
 			
 			Chunk chunk=makeChunkReal(fakeChunk);
 			assert data.getSize()==chunk.dataStart():data.getSize()+"=="+chunk.dataStart();
 			
+			data.ioAt(chunk.dataStart(), io->{
+				Utils.zeroFill(io::write, chunk.getCapacity());
+			});
 			ticket.populate(chunk);
-			if(chunk.getSize()<chunk.getCapacity()){
-				data.ioAt(chunk.dataStart()+chunk.getSize(), io->{
-					Utils.zeroFill(io::write, chunk.getCapacity()-chunk.getSize());
-				});
-			}
 			return chunk;
 		}
 		
@@ -53,34 +49,26 @@ abstract class MAllocer{
 				var cluster=chunk.cluster;
 				if(!cluster.isLastPhysical(chunk)) return false;
 				
-				List<ChunkPointer> toYeet=new ArrayList<>();
-				toYeet.add(chunk.getPtr());
-				
-				Chunk last=chunk;
-				while(true){
-					long target=last.getPtr().getValue();
-					int  index =freeChunks.find(ptr->ptr!=null&&target==cluster.getChunk(ptr).dataEnd());
-					if(index==-1) break;
-					var ptr=freeChunks.getElement(index);
-					last=cluster.getChunk(ptr);
-					toYeet.add(ptr);
-					freeChunks.removeElement(index);
-				}
+				Chunk prevFree=null;
 				
 				var chunkCache=cluster.chunkCache;
 				var data      =cluster.getData();
 				
-				LogUtil.println("freeing deallocated", toYeet);
-				var ptr=last.getPtr();
-				toYeet.forEach(chunkCache::remove);
-				data.setCapacity(ptr.getValue());
-
-//				int index=freeChunks.find(p->p!=null&&ptr.equals(cluster.getChunk(p).dataEnd()));
-//				if(index!=-1){
-//					freeChunks.setElement(index, null);
-//				}
+				LogUtil.println("freeing deallocated", chunk);
+				var endPtr=chunk.getPtr();
+				chunkCache.remove(endPtr);
+				data.setCapacity(endPtr.getValue());
 				
 				cluster.validate();
+
+//				int prevIndex=freeChunks.find(ptr->ptr!=null&&endPtr.equals(cluster.getChunk(ptr).dataEnd()));
+//				if(prevIndex!=-1){
+//					var ch=cluster.getChunk(freeChunks.getElement(prevIndex));
+//					freeChunks.removeElement(prevIndex);
+//					if(!cluster.isLastPhysical(ch)) cluster.free(ch);
+//					else dealloc(chunk, freeChunks);
+//				}
+				
 				return true;
 			}catch(Throwable e){
 				throw new IOException("Failed to pop "+chunk, e);
@@ -101,7 +89,7 @@ abstract class MAllocer{
 			UnsafeFunction<Chunk, Chunk, IOException> popEnd=chunk->{
 				Chunk chunkUse=new Chunk(cluster, chunk.getPtr(), ticket.bytes(), calcPtrSize(cluster, ticket));
 				chunkUse.setLocation(new ChunkPointer(chunk.dataEnd()-chunkUse.totalSize()));
-				if(ticket.userData()) chunkUse.markAsUser();
+				if(ticket.userData()!=null) chunkUse.markAsUser();
 				return chunkUse;
 			};
 			
@@ -145,7 +133,7 @@ abstract class MAllocer{
 				Chunk chunk=cluster.getChunk(freeChunks.getElement(bestIndex));
 				
 				chunk.modifyAndSave(c->{
-					if(ticket.userData()) c.markAsUser();
+					if(ticket.userData()!=null) c.markAsUser();
 					c.setUsed(true);
 				});
 				
