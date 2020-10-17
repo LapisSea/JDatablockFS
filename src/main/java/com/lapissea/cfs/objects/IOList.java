@@ -9,6 +9,8 @@ import com.lapissea.util.function.UnsafePredicate;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -144,6 +146,39 @@ public interface IOList<T> extends Iterable<T>{
 			};
 		}
 		
+		
+		@Override
+		default Spliterator<To> spliterator(){
+			class BoxedSpliterator implements Spliterator<To>{
+				final Spliterator<From> source;
+				
+				BoxedSpliterator(Spliterator<From> source){this.source=source;}
+				
+				@Override
+				public boolean tryAdvance(Consumer<? super To> action){
+					return source.tryAdvance(e->action.accept(getUnboxer().apply(e)));
+				}
+				
+				@Override
+				public Spliterator<To> trySplit(){
+					Spliterator<From> split=source.trySplit();
+					if(split==null) return null;
+					return new BoxedSpliterator(split);
+				}
+				
+				@Override
+				public long estimateSize(){
+					return source.estimateSize();
+				}
+				
+				@Override
+				public int characteristics(){
+					return source.characteristics();
+				}
+			}
+			
+			return new BoxedSpliterator(getData().spliterator());
+		}
 		
 		IOList<From> getData();
 		
@@ -565,6 +600,52 @@ public interface IOList<T> extends Iterable<T>{
 			}
 			
 		};
+	}
+	
+	@Override
+	default Spliterator<T> spliterator(){
+		
+		class IOListSpliterator implements Spliterator<T>{
+			private final AtomicInteger current;
+			private final int           end;
+			
+			public IOListSpliterator(int current, int end){
+				this.current=new AtomicInteger(current);
+				this.end=end;
+			}
+			
+			@Override
+			public boolean tryAdvance(Consumer<? super T> action){
+				T element;
+				try{
+					element=getElement(current.getAndIncrement());
+				}catch(IOException e){
+					throw new RuntimeException(e);
+				}
+				action.accept(element);
+				return current.get()<size();
+			}
+			
+			@Override
+			public Spliterator<T> trySplit(){
+				int lo=current.get(), mid=(lo+end) >>> 1;
+				if(lo>=mid) return null;
+				current.set(mid);
+				return new IOListSpliterator(lo, mid);
+			}
+			
+			@Override
+			public long estimateSize(){
+				return end-current.get();
+			}
+			
+			@Override
+			public int characteristics(){
+				return Spliterator.ORDERED|Spliterator.SIZED|Spliterator.SUBSIZED;
+			}
+		}
+		
+		return new IOListSpliterator(0, size());
 	}
 	
 	@SuppressWarnings("unchecked")
