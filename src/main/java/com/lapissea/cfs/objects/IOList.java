@@ -458,6 +458,50 @@ public interface IOList<T> extends Iterable<T>{
 		};
 	}
 	
+	static <T> IOList<T> readOnly(IOList<T> list){
+		return new IOList<>(){
+			@Override
+			public int size(){
+				return list.size();
+			}
+			
+			@Override
+			public T getElement(int index) throws IOException{
+				return list.getElement(index);
+			}
+			
+			@Override
+			public void setElement(int index, T value){
+				throw new UnsupportedOperationException();
+			}
+			
+			@Override
+			public void ensureCapacity(int elementCapacity){
+				throw new UnsupportedOperationException();
+			}
+			
+			@Override
+			public void removeElement(int index){
+				throw new UnsupportedOperationException();
+			}
+			
+			@Override
+			public void addElement(int index, T value){
+				throw new UnsupportedOperationException();
+			}
+			
+			@Override
+			public void validate() throws IOException{
+				list.validate();
+			}
+			
+			@Override
+			public void free() throws IOException{
+				throw new UnsupportedOperationException();
+			}
+		};
+	}
+	
 	int size();
 	
 	default boolean isEmpty(){
