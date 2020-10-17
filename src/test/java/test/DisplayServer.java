@@ -120,7 +120,10 @@ public class DisplayServer implements DataLogger{
 				if(jarPath==null) throw new IOException(e);
 				var debugMode=Config.DEBUG_VALIDATION;
 				var args     ="--illegal-access=deny --enable-preview -XX:+UseG1GC -XX:MaxHeapFreeRatio=10 -XX:MinHeapFreeRatio=1 -Xms50m -server -XX:+UseCompressedOops";
-				Runtime.getRuntime().exec("java -jar "+(debugMode?"-ea ":"")+args+" \""+new File(jarPath).getAbsolutePath()+"\"");
+				
+				Process p=Runtime.getRuntime().exec("java -jar "+(debugMode?"-ea ":"")+args+" \""+new File(jarPath).getAbsolutePath()+"\" lazy");
+				p.getInputStream().read();
+				
 				socketMake=new Socket();
 				socketMake.connect(new InetSocketAddress(InetAddress.getLocalHost(), 666), 100);
 			}
