@@ -217,16 +217,20 @@ public abstract class VariableNode<ValTyp>{
 		
 		@Deprecated
 		@Override
-		protected final T getValue(IOInstance source){ throw new UnsupportedOperationException(toString()); }
+		public final T getValue(IOInstance source){ throw new UnsupportedOperationException(toString()); }
+		
 		@Deprecated
 		@Override
 		protected final void setValue(IOInstance target, T newValue){ throw new UnsupportedOperationException(toString()); }
+		
 		@Deprecated
 		@Override
 		protected final T read(IOInstance target, ContentReader source, T oldVal, Cluster cluster){ throw new UnsupportedOperationException(toString()); }
+		
 		@Deprecated
 		@Override
 		protected final void write(IOInstance target, Cluster cluster, ContentWriter dest, T source){ throw new UnsupportedOperationException(toString()); }
+		
 		@Deprecated
 		@Override
 		public long mapSize(IOInstance target, T value){ throw new UnsupportedOperationException(toString());}

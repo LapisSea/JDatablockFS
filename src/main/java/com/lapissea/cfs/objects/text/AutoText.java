@@ -1,5 +1,6 @@
 package com.lapissea.cfs.objects.text;
 
+import com.lapissea.cfs.cluster.Cluster;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.struct.IOStruct.*;
@@ -12,15 +13,19 @@ import java.util.Objects;
 
 public class AutoText extends AbstractText{
 	
+	@EnumValue(index=1)
+	private NumberSize   numSize=NumberSize.BYTE;
+	@EnumValue(index=2)
+	private CharEncoding set    =CharEncoding.UTF8;
 	
-	@EnumValue(index=1) private NumberSize   numSize=NumberSize.BYTE;
-	@EnumValue(index=2) private CharEncoding set    =CharEncoding.UTF8;
-	
-	@PrimitiveValue(index=3, sizeRef="numSize") private int byteSize;
-	@PrimitiveValue(index=4, sizeRef="numSize") private int charCount;
+	@PrimitiveValue(index=3, sizeRef="numSize")
+	private int byteSize;
+	@PrimitiveValue(index=4, sizeRef="numSize")
+	private int charCount;
 	
 	
 	public AutoText(){ this(""); }
+	
 	public AutoText(String data){
 		setData(data);
 	}
@@ -31,12 +36,12 @@ public class AutoText extends AbstractText{
 	}
 	
 	@Write
-	private void writeData(ContentWriter dest, String source) throws IOException{
+	private void writeData(Cluster cluster, ContentWriter dest, String source) throws IOException{
 		set.write(dest, source);
 	}
 	
 	@Read
-	private String readData(ContentReader source, String oldVal) throws IOException{
+	private String readData(Cluster cluster, ContentReader source, String oldVal) throws IOException{
 		try(var buf=source.bufferExactRead(byteCount())){
 			return set.read(buf, this);
 		}

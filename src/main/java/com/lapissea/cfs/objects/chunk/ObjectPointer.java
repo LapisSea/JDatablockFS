@@ -15,6 +15,7 @@ import com.lapissea.util.function.UnsafeFunction;
 import java.io.IOException;
 import java.util.Objects;
 import java.util.OptionalInt;
+import java.util.function.Function;
 
 @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
 public abstract class ObjectPointer<T>{
@@ -24,13 +25,13 @@ public abstract class ObjectPointer<T>{
 		private static final OptionalInt SIZ=OptionalInt.of(NumberSize.LARGEST.bytes*2);
 		
 		@Override
-		public ObjectPointer<?> read(Object targetObj, ContentReader source, ObjectPointer<?> oldValue) throws IOException{
+		public ObjectPointer<?> read(Object targetObj, Cluster cluster, ContentReader source, ObjectPointer<?> oldValue) throws IOException{
 			oldValue.set(ChunkPointer.getNullable(NumberSize.LARGEST.read(source)), NumberSize.LARGEST.read(source));
 			return oldValue;
 		}
 		
 		@Override
-		public void write(Object targetObj, ContentWriter target, ObjectPointer<?> source) throws IOException{
+		public void write(Object targetObj, Cluster cluster, ContentWriter target, ObjectPointer<?> source) throws IOException{
 			NumberSize.LARGEST.write(target, source==null?null:source.dataBlock);
 			NumberSize.LARGEST.write(target, source==null?0:source.offset);
 		}
@@ -50,13 +51,13 @@ public abstract class ObjectPointer<T>{
 		private static final OptionalInt SIZ=OptionalInt.of(NumberSize.LARGEST.bytes);
 		
 		@Override
-		public ObjectPointer<?> read(Object targetObj, ContentReader source, ObjectPointer<?> oldValue) throws IOException{
+		public ObjectPointer<?> read(Object targetObj, Cluster cluster, ContentReader source, ObjectPointer<?> oldValue) throws IOException{
 			oldValue.set(ChunkPointer.getNullable(NumberSize.LARGEST.read(source)), 0);
 			return oldValue;
 		}
 		
 		@Override
-		public void write(Object targetObj, ContentWriter target, ObjectPointer<?> source) throws IOException{
+		public void write(Object targetObj, Cluster cluster, ContentWriter target, ObjectPointer<?> source) throws IOException{
 			NumberSize.LARGEST.write(target, source==null?null:source.dataBlock);
 			assert source==null||source.offset==0:source.offset;
 			
@@ -81,7 +82,7 @@ public abstract class ObjectPointer<T>{
 		public AutoSizedIO(NumberSize minSize){this.minSize=minSize;}
 		
 		@Override
-		public ObjectPointer<?> read(Object targetObj, ContentReader source, ObjectPointer<?> oldValue) throws IOException{
+		public ObjectPointer<?> read(Object targetObj, Cluster cluster, ContentReader source, ObjectPointer<?> oldValue) throws IOException{
 			NumberSize ptrSiz;
 			NumberSize offSiz;
 			
@@ -99,7 +100,7 @@ public abstract class ObjectPointer<T>{
 		}
 		
 		@Override
-		public void write(Object targetObj, ContentWriter target, ObjectPointer<?> source) throws IOException{
+		public void write(Object targetObj, Cluster cluster, ContentWriter target, ObjectPointer<?> source) throws IOException{
 			var ptr=source==null?0:ChunkPointer.getValueNullable(source.getDataBlock());
 			var off=source==null?0:source.getOffset();
 			
@@ -150,7 +151,7 @@ public abstract class ObjectPointer<T>{
 		public AutoSizedNoOffsetIO(NumberSize minSize){this.minSize=minSize;}
 		
 		@Override
-		public ObjectPointer<?> read(Object targetObj, ContentReader source, ObjectPointer<?> oldValue) throws IOException{
+		public ObjectPointer<?> read(Object targetObj, Cluster cluster, ContentReader source, ObjectPointer<?> oldValue) throws IOException{
 			NumberSize ptrSiz;
 			
 			try(var flags=FlagReader.read(source, NumberSize.SMALEST_REAL)){
@@ -166,7 +167,7 @@ public abstract class ObjectPointer<T>{
 		}
 		
 		@Override
-		public void write(Object targetObj, ContentWriter target, ObjectPointer<?> source) throws IOException{
+		public void write(Object targetObj, Cluster cluster, ContentWriter target, ObjectPointer<?> source) throws IOException{
 			var ptr=source==null?0:ChunkPointer.getValueNullable(source.getDataBlock());
 			
 			NumberSize ptrSiz=NumberSize.bySize(ptr).max(minSize);
@@ -200,14 +201,43 @@ public abstract class ObjectPointer<T>{
 		}
 	}
 	
+	public static class StructCached<T extends IOInstance> extends Struct<T>{
+		private final Function<Chunk, T> cacheFetch;
+		
+		public StructCached(ChunkPointer dataBlock, long offset, UnsafeFunction<Chunk, T, IOException> constructor, Function<Chunk, T> cacheFetch){
+			super(dataBlock, offset, constructor);
+			this.cacheFetch=cacheFetch;
+		}
+		
+		public StructCached(UnsafeFunction<Chunk, T, IOException> constructor, Function<Chunk, T> cacheFetch){
+			super(constructor);
+			this.cacheFetch=cacheFetch;
+		}
+		
+		@Override
+		public T read(Cluster cluster) throws IOException{
+			T cached=cacheFetch.apply(getBlock(cluster));
+			if(cached!=null) return cached;
+			return super.read(cluster);
+		}
+	}
+	
 	public static class Struct<T extends IOInstance> extends ObjectPointer<T>{
 		
+		private final UnsafeFunction<Chunk, T, IOException> constructor;
+		
 		public Struct(ChunkPointer dataBlock, long offset, UnsafeFunction<Chunk, T, IOException> constructor){
-			super(dataBlock, offset, constructor);
+			super(dataBlock, offset);
+			this.constructor=constructor;
 		}
 		
 		public Struct(UnsafeFunction<Chunk, T, IOException> constructor){
-			super(constructor);
+			this.constructor=constructor;
+		}
+		
+		@Override
+		protected T construct(Chunk chunk) throws IOException{
+			return constructor.apply(chunk);
 		}
 		
 		@Override
@@ -225,12 +255,10 @@ public abstract class ObjectPointer<T>{
 	public static class Raw extends ObjectPointer<Object>{
 		
 		public Raw(ChunkPointer dataBlock, long offset){
-			super(dataBlock, offset, null);
+			super(dataBlock, offset);
 		}
 		
-		public Raw(){
-			super(null);
-		}
+		public Raw(){ }
 		
 		@Override
 		protected void write(Cluster cluster, Object value, RandomIO io) throws IOException{
@@ -246,14 +274,12 @@ public abstract class ObjectPointer<T>{
 	private ChunkPointer dataBlock;
 	private long         offset;
 	
-	private final UnsafeFunction<Chunk, T, IOException> constructor;
 	
-	public ObjectPointer(UnsafeFunction<Chunk, T, IOException> constructor){
-		this.constructor=constructor;
+	public ObjectPointer(){
+	
 	}
 	
-	public ObjectPointer(ChunkPointer dataBlock, long offset, UnsafeFunction<Chunk, T, IOException> constructor){
-		this(constructor);
+	public ObjectPointer(ChunkPointer dataBlock, long offset){
 		set(dataBlock, offset);
 	}
 	
@@ -275,6 +301,10 @@ public abstract class ObjectPointer<T>{
 	
 	protected abstract T read(Cluster cluster, RandomIO io, T value) throws IOException;
 	
+	protected T construct(Chunk chunk) throws IOException{
+		throw new UnsupportedOperationException();
+	}
+	
 	public void write(Cluster cluster, T value) throws IOException{
 		try(RandomIO io=io(cluster)){
 			write(cluster, value, io);
@@ -283,8 +313,9 @@ public abstract class ObjectPointer<T>{
 	
 	public T read(Cluster cluster) throws IOException{
 		if(dataBlock==null) return null;
-		T value=constructor.apply(getBlock(cluster));
+		T value=construct(getBlock(cluster));
 		try(RandomIO io=io(cluster)){
+			if(io.isEmpty()) return value;
 			return read(cluster, io, value);
 		}
 	}
@@ -358,5 +389,4 @@ public abstract class ObjectPointer<T>{
 	public boolean hasPtr(){
 		return getDataBlock()!=null;
 	}
-	
 }

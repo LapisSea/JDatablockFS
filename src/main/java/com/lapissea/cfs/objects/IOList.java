@@ -551,8 +551,8 @@ public interface IOList<T> extends Iterable<T>{
 		}
 	}
 	
-	default boolean contains(T ptr) throws IOException{
-		return indexOf(ptr)!=-1;
+	default boolean contains(T element) throws IOException{
+		return indexOf(element)!=-1;
 	}
 	
 	default int indexOf(T value) throws IOException{

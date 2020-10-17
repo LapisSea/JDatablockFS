@@ -65,7 +65,7 @@ public class EnumCustomByteWiseIO<T extends Enum<T>> extends VariableNode.FixedS
 	@Override
 	public T read(IOInstance target, ContentReader source, T oldVal, Cluster cluster) throws IOException{
 		if(readFun!=null){
-			return readFun.read(target, source, oldVal);
+			return readFun.read(target, cluster, source, oldVal);
 		}else{
 			try(var flags=FlagReader.read(source, numberSize)){
 				return flagInfo.read(flags);
@@ -76,7 +76,7 @@ public class EnumCustomByteWiseIO<T extends Enum<T>> extends VariableNode.FixedS
 	@Override
 	public void write(IOInstance target, Cluster cluster, ContentWriter dest, T source) throws IOException{
 		if(writeFun!=null){
-			writeFun.write(target, dest, source);
+			writeFun.write(target, cluster, dest, source);
 		}else{
 			try(var flags=new FlagWriter.AutoPop(numberSize, dest)){
 				flags.writeEnum(flagInfo, source);

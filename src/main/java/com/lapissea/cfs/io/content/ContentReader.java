@@ -293,13 +293,13 @@ public interface ContentReader extends AutoCloseable, ContentBuff{
 	
 	default byte[] readFully(byte[] b, int off, int len) throws IOException{
 		Objects.requireNonNull(b);
-		
 		if(len<0) throw new IndexOutOfBoundsException();
+		
 		int n=0;
 		while(n<len){
 			int count=read(b, off+n, len-n);
 			if(count<0){
-				throw new EOFException("Underflow requested="+len+", read="+n+", remaining="+(len-n));
+				throw new EOFException("Underflow! requested="+len+", read="+n+", remaining="+(len-n));
 			}
 			n+=count;
 		}

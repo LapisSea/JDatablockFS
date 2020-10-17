@@ -1,6 +1,7 @@
 package com.lapissea.cfs.objects.chunk;
 
 import com.lapissea.cfs.cluster.Cluster;
+import com.lapissea.cfs.cluster.TypeParser;
 import com.lapissea.cfs.io.ReaderWriter;
 import com.lapissea.cfs.io.bit.FlagReader;
 import com.lapissea.cfs.io.bit.FlagWriter;
@@ -9,7 +10,10 @@ import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.struct.IOInstance;
 import com.lapissea.cfs.io.struct.IOStruct.Value;
 import com.lapissea.cfs.objects.INumber;
+import com.lapissea.cfs.objects.IOType;
 import com.lapissea.cfs.objects.NumberSize;
+import com.lapissea.util.UtilL;
+import com.lapissea.util.function.UnsafeFunction;
 
 import java.io.IOException;
 import java.util.Objects;
@@ -18,6 +22,20 @@ import java.util.function.Function;
 
 //@ValueBased
 public final class ChunkPointer implements INumber{
+	
+	public static final TypeParser TYPE_PARSER=new TypeParser(){
+		@Override
+		public boolean canParse(Cluster cluster, IOType type){
+			if(!type.getGenericArgs().isEmpty()) return false;
+			return UtilL.instanceOf(type.getType().instanceClass, PtrRef.class);
+		}
+		
+		@Override
+		public UnsafeFunction<Chunk, IOInstance, IOException> parse(Cluster cluster, IOType type){
+			assert canParse(cluster, type);
+			return type.getType()::newInstance;
+		}
+	};
 	
 	public abstract static class PtrRef extends IOInstance{
 		
@@ -101,13 +119,15 @@ public final class ChunkPointer implements INumber{
 		}
 		
 		@Override
-		public ChunkPointer read(Object targetObj, ContentReader source, ChunkPointer oldValue) throws IOException{
+		public ChunkPointer read(Object targetObj, Cluster cluster, ContentReader source, ChunkPointer oldValue) throws IOException{
 			return ChunkPointer.getNullable(fixedSize.read(source));
 		}
+		
 		@Override
-		public void write(Object targetObj, ContentWriter target, ChunkPointer source) throws IOException{
+		public void write(Object targetObj, Cluster cluster, ContentWriter target, ChunkPointer source) throws IOException{
 			fixedSize.write(target, source);
 		}
+		
 		@Override
 		public long mapSize(Object targetObj, ChunkPointer source){
 			return fixedSize.bytes;
@@ -140,16 +160,16 @@ public final class ChunkPointer implements INumber{
 		}
 		
 		@Override
-		public ChunkPointer read(Object targetObj, ContentReader source, ChunkPointer oldValue) throws IOException{
-			NumberSize dataSize=FlagReader.readSingle(source, NumberSize.BYTE, NumberSize.FLAG_INFO);
+		public ChunkPointer read(Object targetObj, Cluster cluster, ContentReader source, ChunkPointer oldValue) throws IOException{
+			NumberSize dataSize=FlagReader.readSingle(source, NumberSize.SMALEST_REAL, NumberSize.FLAG_INFO);
 			return ChunkPointer.getNullable(dataSize.read(source));
 		}
 		
 		@Override
-		public void write(Object targetObj, ContentWriter target, ChunkPointer source) throws IOException{
+		public void write(Object targetObj, Cluster cluster, ContentWriter target, ChunkPointer source) throws IOException{
 			NumberSize dataSize=NumberSize.bySizeVoidable(source);
 			
-			try(var flags=new FlagWriter.AutoPop(NumberSize.BYTE, target)){
+			try(var flags=new FlagWriter.AutoPop(NumberSize.SMALEST_REAL, target)){
 				flags.writeEnum(NumberSize.FLAG_INFO, dataSize);
 			}
 			
@@ -158,7 +178,7 @@ public final class ChunkPointer implements INumber{
 		
 		@Override
 		public long mapSize(Object targetObj, ChunkPointer source){
-			return 1+NumberSize.bySizeVoidable(source).bytes;
+			return NumberSize.SMALEST_REAL.bytes+NumberSize.bySizeVoidable(source).bytes;
 		}
 		
 		@Override
@@ -195,12 +215,12 @@ public final class ChunkPointer implements INumber{
 		}
 		
 		@Override
-		public ChunkPointer read(Object targetObj, ContentReader source, ChunkPointer oldValue) throws IOException{
+		public ChunkPointer read(Object targetObj, Cluster cluster, ContentReader source, ChunkPointer oldValue) throws IOException{
 			return ChunkPointer.getNullable(getSize(targetObj).read(source));
 		}
 		
 		@Override
-		public void write(Object targetObj, ContentWriter target, ChunkPointer source) throws IOException{
+		public void write(Object targetObj, Cluster cluster, ContentWriter target, ChunkPointer source) throws IOException{
 			var siz=getSize(targetObj);
 			if(source==null) siz.write(target, 0);
 			else siz.write(target, source);

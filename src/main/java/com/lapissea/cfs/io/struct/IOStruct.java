@@ -1,6 +1,7 @@
 package com.lapissea.cfs.io.struct;
 
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.cluster.Cluster;
 import com.lapissea.cfs.io.ReaderWriter;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
@@ -12,6 +13,7 @@ import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.chunk.Chunk;
 import com.lapissea.cfs.objects.chunk.ObjectPointer;
 import com.lapissea.util.*;
+import com.lapissea.util.function.UnsafeFunction;
 
 import java.io.IOException;
 import java.lang.annotation.Annotation;
@@ -63,12 +65,13 @@ public class IOStruct{
 			@Nullable
 			static <T> Reader<T> get(ValueRelations.ValueInfo info, Type valueType){
 				return new FunDef(valueType,
+				                  new Arg(Cluster.class, "cluster"),
 				                  new Arg(ContentReader.class, "source"),
 				                  new Arg(valueType, "oldVal"))
 					       .getOverride(info, IOStruct.Read.Reader.class);
 			}
 			
-			T read(IOInstance target, ContentReader source, T oldVal) throws IOException;
+			T read(IOInstance target, Cluster cluster, ContentReader source, T oldVal) throws IOException;
 		}
 		
 		String target() default "";
@@ -81,12 +84,13 @@ public class IOStruct{
 			@Nullable
 			static <T> Writer<T> get(ValueRelations.ValueInfo info, Type valueType){
 				return new FunDef(Void.TYPE,
+				                  new Arg(Cluster.class, "cluster"),
 				                  new Arg(ContentWriter.class, "dest"),
 				                  new Arg(valueType, "source"))
 					       .getOverride(info, Writer.class);
 			}
 			
-			void write(IOInstance target, ContentWriter dest, T source) throws IOException;
+			void write(IOInstance target, Cluster cluster, ContentWriter dest, T source) throws IOException;
 		}
 		
 		String target() default "";
@@ -273,7 +277,7 @@ public class IOStruct{
 	private final long         minimumSize;
 	private final OptionalLong maximumSize;
 	
-	private final Construct.Constructor<?> constructor;
+	private final UnsafeFunction<Chunk, ? extends IOInstance, IOException> constructor;
 	
 	private final boolean simpleIndex;
 	
@@ -308,7 +312,7 @@ public class IOStruct{
 //		logStruct();
 	}
 	
-	private Construct.Constructor<? extends IOInstance> findConstructor(){
+	private UnsafeFunction<Chunk, ? extends IOInstance, IOException> findConstructor(){
 		
 		for(Method method : instanceClass.getMethods()){
 			if(method.getName().equals("constructThis")&&method.getDeclaredAnnotation(Construct.class)!=null){
@@ -329,11 +333,11 @@ public class IOStruct{
 				List.of(
 					Stream::empty,
 					()->Stream.of(Chunk.class)),
-				(BiFunction<Integer, Constructor<IOInstance>, Construct.Constructor<IOInstance>>)(i, c)->{
+				(BiFunction<Integer, Constructor<IOInstance>, UnsafeFunction<Chunk, IOInstance, IOException>>)(i, c)->{
 					c.setAccessible(true);
 					return switch(i){
-						case 0 -> (t, chunk)->make.apply(c, ZeroArrays.ZERO_OBJECT);
-						case 1 -> (t, chunk)->make.apply(c, new Object[]{chunk});
+						case 0 -> (chunk)->make.apply(c, ZeroArrays.ZERO_OBJECT);
+						case 1 -> (chunk)->make.apply(c, new Object[]{chunk});
 						default -> throw new RuntimeException();
 					};
 				}
@@ -426,16 +430,8 @@ public class IOStruct{
 	
 	@Override
 	public String toString(){
-		return toString(false);
-	}
-	
-	public String toShortString(){
-		return toString(true);
-	}
-	
-	private String toString(boolean shortStr){
 		StringBuilder result=new StringBuilder("IOStruct{");
-		result.append(shortStr?instanceClass.getSimpleName():instanceClass.getName()).append(", ").append(variables.size()).append(" values");
+		result.append(instanceClass.getName()).append(", ").append(variables.size()).append(" values");
 		
 		if(getKnownSize().isPresent()){
 			result.append(", fixed size: ").append(requireKnownSize()).append(" bytes");
@@ -443,6 +439,18 @@ public class IOStruct{
 		
 		return result.append("}").toString();
 	}
+	
+	public String toShortString(){
+		StringBuilder result=new StringBuilder("IoS{");
+		result.append(instanceClass.getSimpleName());
+		
+		if(getKnownSize().isPresent()){
+			result.append(", ").append(requireKnownSize()).append('b');
+		}
+		
+		return result.append("}").toString();
+	}
+	
 	
 	public void logStruct(){
 		LogUtil.println(this);
@@ -476,8 +484,8 @@ public class IOStruct{
 		return constructor!=null;
 	}
 	
-	public <T extends IOInstance> T newInstance(IOInstance target, Chunk chunk) throws IOException{
+	public <T extends IOInstance> T newInstance(Chunk chunk) throws IOException{
 		if(!canInstate()) throw new UnsupportedOperationException(this.instanceClass.getName()+" does not support auto construction");
-		return (T)constructor.construct(target, chunk);
+		return (T)constructor.apply(chunk);
 	}
 }

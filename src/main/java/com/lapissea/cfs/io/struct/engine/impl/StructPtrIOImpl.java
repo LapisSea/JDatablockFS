@@ -95,12 +95,12 @@ public class StructPtrIOImpl<T extends IOInstance&SelfPoint<T>> extends Variable
 	protected long mapSize(IOInstance target, T value){
 		var siz=ptrIO.getFixedSize();
 		if(siz.isPresent()) return siz.getAsInt();
-		return ptrIO.mapSize(target, value.getSelfPtr());
+		return ptrIO.mapSize(target, value==null?null:value.getSelfPtr());
 	}
 	
 	@Override
 	protected T read(IOInstance target, ContentReader source, T oldVal, Cluster cluster) throws IOException{
-		ObjectPointer<T> ptr=ptrIO.read(target, source, new ObjectPointer.Struct<>(null));
+		ObjectPointer<T> ptr=ptrIO.read(target, cluster, source, new ObjectPointer.Struct<>(null));
 		if(ptr.getDataBlock()==null) return null;
 		Chunk c=ptr.getBlock(cluster);
 		T     val;
@@ -130,7 +130,7 @@ public class StructPtrIOImpl<T extends IOInstance&SelfPoint<T>> extends Variable
 			ptr.write(cluster, source);
 		}
 		
-		ptrIO.write(target, dest, ptr);
+		ptrIO.write(target, cluster, dest, ptr);
 	}
 	
 	@Override
@@ -142,7 +142,7 @@ public class StructPtrIOImpl<T extends IOInstance&SelfPoint<T>> extends Variable
 		if(constructorFun!=null){
 			return constructorFun.construct(target, chunk);
 		}else{
-			return structType.newInstance(target, chunk);
+			return structType.newInstance(chunk);
 		}
 	}
 	
@@ -153,7 +153,7 @@ public class StructPtrIOImpl<T extends IOInstance&SelfPoint<T>> extends Variable
 	
 	@Override
 	public void allocNew(IOInstance target, Cluster cluster, boolean disableNext) throws IOException{
-		Chunk chunk=AllocateTicket.bytes(structType.getKnownSize().orElse(structType.getMaximumSize().orElse(structType.getMinimumSize())))
+		Chunk chunk=AllocateTicket.bytes(structType.getKnownSize().orElse(structType.getMinimumSize()))
 		                          .shouldDisableResizing(disableNext)
 		                          .submit(cluster);
 		

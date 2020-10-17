@@ -2,16 +2,19 @@ package com.lapissea.cfs.cluster;
 
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.struct.IOInstance;
+import com.lapissea.cfs.objects.IOType;
 import com.lapissea.cfs.objects.chunk.Chunk;
+import com.lapissea.util.NotNull;
+import com.lapissea.util.Nullable;
 import com.lapissea.util.function.UnsafeBiConsumer;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
 import java.util.function.Predicate;
 
-public record AllocateTicket(long bytes, boolean disableResizing, boolean userData, Predicate<Chunk> approve, UnsafeConsumer<Chunk, IOException> dataPopulator){
+public record AllocateTicket(long bytes, boolean disableResizing, @Nullable IOType userData, @Nullable Predicate<Chunk> approve, @Nullable UnsafeConsumer<Chunk, IOException> dataPopulator){
 	
-	public static final AllocateTicket DEFAULT=new AllocateTicket(0, false, false, null, null);
+	public static final AllocateTicket DEFAULT=new AllocateTicket(0, false, null, null, null);
 	
 	public AllocateTicket{
 		assert bytes>=0;
@@ -35,8 +38,8 @@ public record AllocateTicket(long bytes, boolean disableResizing, boolean userDa
 		return DEFAULT.withBytes(requestedBytes);
 	}
 	
-	public static AllocateTicket user(){
-		return DEFAULT.asUserData();
+	public static AllocateTicket user(@NotNull IOType type){
+		return DEFAULT.asUserData(type);
 	}
 	
 	public AllocateTicket withDisabledResizing(){
@@ -69,8 +72,8 @@ public record AllocateTicket(long bytes, boolean disableResizing, boolean userDa
 		return new AllocateTicket(requestedBytes, disableResizing, userData, approve, dataPopulator);
 	}
 	
-	public AllocateTicket asUserData(){
-		return new AllocateTicket(bytes, disableResizing, true, approve, dataPopulator);
+	public AllocateTicket asUserData(IOType type){
+		return new AllocateTicket(bytes, disableResizing, type, approve, dataPopulator);
 	}
 	
 	public Chunk submit(Cluster target) throws IOException{

@@ -13,6 +13,7 @@ import com.lapissea.cfs.io.struct.IOStruct.PrimitiveValue;
 import com.lapissea.cfs.io.struct.IOStruct.Set;
 import com.lapissea.cfs.io.struct.IOStruct.Value;
 import com.lapissea.cfs.objects.NumberSize;
+import com.lapissea.cfs.objects.UserInfo;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.ShouldNeverHappenError;
@@ -45,6 +46,7 @@ public class Chunk extends IOInstance.Contained implements Iterable<Chunk>, Rand
 	public final Cluster      cluster;
 	private      ChunkPointer ptr;
 	private      Chunk        nextCache;
+	private      UserInfo     userInfoCache;
 	private      boolean      dirty;
 	private      long         headerSize=-1;
 	private      boolean      reading;
@@ -97,7 +99,7 @@ public class Chunk extends IOInstance.Contained implements Iterable<Chunk>, Rand
 		
 		markDirty();
 		nextPtr=newNextPtr;
-		nextCache=cluster.getChunkCached(newNextPtr);
+		nextCache=null;
 		
 	}
 	
@@ -148,7 +150,27 @@ public class Chunk extends IOInstance.Contained implements Iterable<Chunk>, Rand
 	public void clearUserMark(){
 		if(!userData) return;
 		this.userData=false;
+		userInfoCache=null;
 		markDirty();
+	}
+	
+	public UserInfo getUserInfo(){
+		if(!isUserData()) throw new UnsupportedOperationException();
+		if(userInfoCache==null){
+			long loc=getPtr().getValue();
+			userInfoCache=cluster.getUserChunks()
+			                     .stream()
+			                     .filter(info->info.getPtr().equals(loc)).findAny()
+			                     .orElseThrow(()->new RuntimeException(this+" listed as user data but not listed a such"));
+		}
+		return userInfoCache;
+	}
+	
+	
+	public void precacheUserInfo(UserInfo info){
+		if(!isUserData()) throw new UnsupportedOperationException();
+		if(!info.getPtr().equals(getPtr())) throw new IllegalArgumentException();
+		userInfoCache=info;
 	}
 	
 	@Override
@@ -341,7 +363,11 @@ public class Chunk extends IOInstance.Contained implements Iterable<Chunk>, Rand
 		}else{
 			var tofree=collectNext();
 			for(Chunk chunk : tofree){
-				chunk.modifyAndSave(ch->ch.setUsed(false));
+				chunk.modifyAndSave(ch->{
+					ch.setUsed(false);
+					ch.setSize(0);
+					ch.clearNextPtr();
+				});
 			}
 			cluster.free(tofree);
 		}
@@ -352,12 +378,12 @@ public class Chunk extends IOInstance.Contained implements Iterable<Chunk>, Rand
 	public boolean equals(Object o){
 		return this==o||
 		       o instanceof Chunk chunk&&
-		       isUsed()==chunk.isUsed()&&
+		       getPtr().equals(chunk.getPtr())&&
 		       getCapacity()==chunk.getCapacity()&&
 		       getSize()==chunk.getSize()&&
-		       getPtr().equals(chunk.getPtr())&&
-		       getBodyNumSize()==chunk.getBodyNumSize()&&
 		       getNextSize()==chunk.getNextSize()&&
+		       isUsed()==chunk.isUsed()&&
+		       getBodyNumSize()==chunk.getBodyNumSize()&&
 		       Objects.equals(getNextPtr(), chunk.getNextPtr());
 	}
 	
@@ -470,6 +496,18 @@ public class Chunk extends IOInstance.Contained implements Iterable<Chunk>, Rand
 	
 	public void setLocation(ChunkPointer ptr){
 		this.ptr=Objects.requireNonNull(ptr);
+	}
+	
+	public long chainCapacity() throws IOException{
+		try(var io=io()){
+			return io.getCapacity();
+		}
+	}
+	
+	public long chainSize() throws IOException{
+		try(var io=io()){
+			return io.getSize();
+		}
 	}
 	
 	private class PhysicalIterable implements Iterable<Chunk>{

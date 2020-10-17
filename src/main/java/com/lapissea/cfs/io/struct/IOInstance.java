@@ -206,8 +206,8 @@ public class IOInstance{
 				if(e1!=null) e1.addSuppressed(e2);
 				else throw e2;
 			}
-			if(e1!=null) throw UtilL.uncheckedThrow(e1);
 		}
+		if(e1!=null) throw UtilL.uncheckedThrow(e1);
 		
 	}
 	

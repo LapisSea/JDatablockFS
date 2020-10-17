@@ -1,6 +1,7 @@
 package com.lapissea.cfs.io;
 
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.cluster.Cluster;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.util.Nullable;
@@ -16,13 +17,15 @@ public interface ReaderWriter<T>{
 	
 	ReaderWriter<?> DUMMY=new ReaderWriter<>(){
 		@Override
-		public Object read(Object targetObj, ContentReader source, Object oldValue){
+		public Object read(Object targetObj, Cluster cluster, ContentReader source, Object oldValue){
 			throw new UnsupportedOperationException();
 		}
+		
 		@Override
-		public void write(Object targetObj, ContentWriter target, Object source){
+		public void write(Object targetObj, Cluster cluster, ContentWriter target, Object source){
 			throw new UnsupportedOperationException();
 		}
+		
 		@Override
 		public long mapSize(Object targetObj, Object source){
 			throw new UnsupportedOperationException();
@@ -56,13 +59,13 @@ public interface ReaderWriter<T>{
 			new AbstractMap.SimpleEntry<>(
 				()->Stream.of(String[].class),
 				()->Stream.of(args))
-		));
+		                                                     ));
 		
 	}
 	
-	T read(Object targetObj, ContentReader source, T oldValue) throws IOException;
+	T read(Object targetObj, Cluster cluster, ContentReader source, T oldValue) throws IOException;
 	
-	void write(Object targetObj, ContentWriter target, T source) throws IOException;
+	void write(Object targetObj, Cluster cluster, ContentWriter target, T source) throws IOException;
 	
 	long mapSize(Object targetObj, T source);
 	

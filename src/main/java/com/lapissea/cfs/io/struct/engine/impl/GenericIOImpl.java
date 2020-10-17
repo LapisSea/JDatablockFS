@@ -72,12 +72,12 @@ public class GenericIOImpl<T> extends VariableNode<T>{
 	
 	@Override
 	public T read(IOInstance target, ContentReader source, T oldVal, Cluster cluster) throws IOException{
-		return readFun.read(target, source, oldVal);
+		return readFun.read(target, cluster, source, oldVal);
 	}
 	
 	@Override
 	public void write(IOInstance target, Cluster cluster, ContentWriter dest, T source) throws IOException{
-		writeFun.write(target, dest, source);
+		writeFun.write(target, cluster, dest, source);
 	}
 	@Override
 	public OptionalLong getMaximumSize(){
