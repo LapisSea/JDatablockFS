@@ -1,6 +1,8 @@
 package test;
 
+import com.lapissea.util.LogUtil;
 import org.lwjgl.BufferUtils;
+import org.lwjgl.opengl.GL11;
 import org.lwjgl.stb.STBTTAlignedQuad;
 import org.lwjgl.stb.STBTTBakedChar;
 import org.lwjgl.stb.STBTTFontinfo;
@@ -18,11 +20,14 @@ import java.util.function.Consumer;
 import java.util.function.IntFunction;
 import java.util.stream.IntStream;
 
+import static org.lwjgl.opengl.EXTTextureFilterAnisotropic.*;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.stb.STBTruetype.*;
 import static org.lwjgl.system.MemoryStack.*;
 
 public class TTFont{
+	
+	private static Boolean ANOSOTROPIC_SUPPORTED;
 	
 	private static final int FIRST_CHAR=6;
 	
@@ -49,6 +54,8 @@ public class TTFont{
 			var bitmapHeight=32;
 			
 			charInfo=STBTTBakedChar.malloc(255-FIRST_CHAR);
+			
+			LogUtil.println("compiling:", pixelHeight);
 			
 			ByteBuffer bitmap;
 			
@@ -80,6 +87,17 @@ public class TTFont{
 				glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, this.bitmapWidth, this.bitmapHeight, 0, GL_ALPHA, GL_UNSIGNED_BYTE, finalBitmap);
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+				
+				if(ANOSOTROPIC_SUPPORTED==null){
+					String str=GL11.glGetString(GL11.GL_EXTENSIONS);
+					ANOSOTROPIC_SUPPORTED=str!=null&&str.contains("GL_EXT_texture_filter_anisotropic");
+				}
+				
+				if(ANOSOTROPIC_SUPPORTED){
+					float[] aniso={0};
+					glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, aniso);
+					glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, aniso[0]);
+				}
 			});
 		}
 		
@@ -209,7 +227,7 @@ public class TTFont{
 	
 	public float[] getStringBounds(String string, float pixelHeight){
 		float minX=0;
-		float minY=0;
+		float minY=Float.MAX_VALUE;
 		float maxX=Float.MIN_VALUE;
 		float maxY=Float.MIN_VALUE;
 		
