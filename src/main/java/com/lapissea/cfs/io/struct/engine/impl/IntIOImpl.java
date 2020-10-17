@@ -63,11 +63,12 @@ public class IntIOImpl extends VariableNode.PrimitiveInt implements VariableNode
 	}
 	
 	@Override
-	public OptionalLong getMaximumSize(){
-		return OptionalLong.of(getSize());
+	public final OptionalLong getMaximumSize(){
+		return size.optionalBytesLong;
 	}
+	
 	@Override
-	public long getSize(){
+	public final long getSize(){
 		return size.bytes;
 	}
 	

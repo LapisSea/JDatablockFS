@@ -12,6 +12,8 @@ import com.lapissea.util.function.UnsafeConsumerOL;
 import com.lapissea.util.function.UnsafeFunctionOL;
 
 import java.io.IOException;
+import java.util.OptionalInt;
+import java.util.OptionalLong;
 
 public enum NumberSize{
 	
@@ -69,12 +71,18 @@ public enum NumberSize{
 	private final UnsafeFunctionOL<ContentReader, IOException> reader;
 	private final UnsafeConsumerOL<ContentWriter, IOException> writer;
 	
+	public final OptionalInt  optionalBytes;
+	public final OptionalLong optionalBytesLong;
+	
 	NumberSize(char shortName, long maxSize, int bytes, UnsafeFunctionOL<ContentReader, IOException> reader, UnsafeConsumerOL<ContentWriter, IOException> writer){
 		this.shortName=shortName;
 		this.bytes=bytes;
 		this.maxSize=maxSize;
 		this.reader=reader;
 		this.writer=writer;
+		
+		optionalBytes=OptionalInt.of(bytes);
+		optionalBytesLong=OptionalLong.of(bytes);
 	}
 	
 	public long read(ContentReader in) throws IOException{

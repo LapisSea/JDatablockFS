@@ -85,6 +85,6 @@ public class LongVarSizeIOImpl extends VariableNode.PrimitiveLong{
 	
 	@Override
 	public OptionalLong getMaximumSize(){
-		return OptionalLong.of(NumberSize.LARGEST.bytes);
+		return NumberSize.LARGEST.optionalBytesLong;
 	}
 }

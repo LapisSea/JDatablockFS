@@ -13,21 +13,23 @@ import java.util.OptionalLong;
 
 public class FixedGenericIOImpl<T> extends GenericIOImpl<T> implements VariableNode.FixedSize{
 	
-	private final int size;
+	private final int          size;
+	private final OptionalLong sizeOpt;
 	
 	public FixedGenericIOImpl(String name, int index, int size, Field valueField, IOStruct.Get.Getter<T> getFun, IOStruct.Set.Setter<T> setFun, IOStruct.Size.Sizer<T> sizerFun, IOStruct.Read.Reader<T> readFun, IOStruct.Write.Writer<T> writeFun){
 		super(name, index, valueField, getFun, setFun, sizerFun, readFun, writeFun, OptionalLong.of(size));
 		this.size=size;
+		sizeOpt=OptionalLong.of(size);
 	}
 	
 	
 	@Override
-	public OptionalLong getMaximumSize(){
-		return OptionalLong.of(getSize());
+	public final OptionalLong getMaximumSize(){
+		return sizeOpt;
 	}
 	
 	@Override
-	public long getSize(){
+	public final long getSize(){
 		return size;
 	}
 	
@@ -36,7 +38,7 @@ public class FixedGenericIOImpl<T> extends GenericIOImpl<T> implements VariableN
 	 */
 	@Deprecated
 	@Override
-	public long mapSize(IOInstance target, T value){
+	public final long mapSize(IOInstance target, T value){
 		return getSize();
 	}
 	
