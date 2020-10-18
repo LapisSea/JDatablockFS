@@ -39,9 +39,9 @@ import static java.util.stream.Collectors.*;
 public class Cluster extends IOInstance.Contained{
 	
 	public static class Builder{
-		private IOInterface data;
-		private int         minChunkSize=DEFAULT_MIN_CHUNK_SIZE;
-		private boolean     readOnly    =false;
+		protected IOInterface data;
+		protected int         minChunkSize=DEFAULT_MIN_CHUNK_SIZE;
+		protected boolean     readOnly    =false;
 		
 		public Builder withIO(IOInterface data){
 			this.data=data;
@@ -95,7 +95,7 @@ public class Cluster extends IOInstance.Contained{
 		}
 	}
 	
-	private static final int DEFAULT_MIN_CHUNK_SIZE=8;
+	protected static final int DEFAULT_MIN_CHUNK_SIZE=8;
 	
 	
 	public static Cluster build(Consumer<Builder> build) throws IOException{
@@ -177,15 +177,15 @@ public class Cluster extends IOInstance.Contained{
 		if(!isSafeMode()) onSafeEnd();
 	}
 	
-	
-	private void initData() throws IOException{
+	protected void initData() throws IOException{
 		version=Version.last();
 		writeStruct();
-		var type=IOStruct.thisClass();
 		
-		type.<SelfPointer<?>>getVar("freeChunks").allocNew(this, this);
-		type.<SelfPointer<?>>getVar("userChunks").allocNew(this, this);
-		type.<SelfPointer<?>>getVar("registeredTypes").allocNew(this, this);
+		for(VariableNode<?> variable : getStruct().variables){
+			if(variable instanceof VariableNode.SelfPointer<?> ptrVar){
+				initPointerVar(this, ptrVar);
+			}
+		}
 		
 		registeredTypes.initData();
 		
