@@ -53,7 +53,7 @@ public class Chunk extends IOInstance.Contained implements Iterable<Chunk>, Rand
 	
 	
 	@PrimitiveValue(index=0)
-	private boolean userData;
+	private boolean isUserData;
 	
 	@PrimitiveValue(index=1)
 	private boolean used;
@@ -138,20 +138,24 @@ public class Chunk extends IOInstance.Contained implements Iterable<Chunk>, Rand
 	}
 	
 	public boolean isUserData(){
-		return userData;
+		return isUserData;
+	}
+	
+	public void setIsUserData(boolean isUserData){
+		if(this.isUserData==isUserData) return;
+		this.isUserData=isUserData;
+		if(!isUserData){
+			userInfoCache=null;
+		}
+		markDirty();
 	}
 	
 	public void markAsUser(){
-		if(userData) return;
-		markDirty();
-		userData=true;
+		setIsUserData(true);
 	}
 	
 	public void clearUserMark(){
-		if(!userData) return;
-		this.userData=false;
-		userInfoCache=null;
-		markDirty();
+		setIsUserData(false);
 	}
 	
 	public UserInfo getUserInfo(){
@@ -472,6 +476,14 @@ public class Chunk extends IOInstance.Contained implements Iterable<Chunk>, Rand
 		sb.append(getBodyNumSize().shortName);
 		if(hasNext()) sb.append(" >> ").append(getNextPtr());
 		if(!isUsed()) sb.append(", unused");
+		if(isUserData()){
+			sb.append(", typ=");
+			try{
+				sb.append(getUserInfo().toShortString());
+			}catch(Throwable e){
+				sb.append("<ERR>");
+			}
+		}
 		
 		Chunk cached=cluster.getChunkCached(getPtr());
 		if(cached==null) sb.append(", fake");
@@ -547,7 +559,7 @@ public class Chunk extends IOInstance.Contained implements Iterable<Chunk>, Rand
 		chunk.ptr=this.ptr;
 		chunk.nextCache=this.nextCache;
 		chunk.headerSize=this.headerSize;
-		chunk.userData=this.userData;
+		chunk.isUserData=this.isUserData;
 		chunk.used=this.used;
 		chunk.bodyNumSize=this.bodyNumSize;
 		chunk.nextSize=this.nextSize;

@@ -862,7 +862,7 @@ public class Cluster extends IOInstance.Contained{
 				UnsafeConsumer<Chunk, IOException> applyProps=ch->{
 					sameCopy.setNextSize(calcPtrSize(ch.getNextSize()==NumberSize.VOID));
 					sameCopy.setCapacityConfident(ch.getCapacity());
-					if(ch.isUserData()) sameCopy.markAsUser();
+					sameCopy.setIsUserData(ch.isUserData());
 				};
 				
 				for(Chunk chunk : next.physicalIterator()){
@@ -898,6 +898,7 @@ public class Cluster extends IOInstance.Contained{
 				freeChunks.setElement(firstIndex, movedCopy.getPtr());
 				
 				validate();
+				sameCopy.setIsUserData(toMerge.isUserData());
 				
 				sameCopy.writeStruct();
 				freeChunk.readStruct();
@@ -913,9 +914,7 @@ public class Cluster extends IOInstance.Contained{
 				                          .shouldDisableResizing(toMerge.getNextSize()==NumberSize.VOID)
 //				                          .withApproval(c->c.getPtr().compareTo(toMerge.getPtr())>0)
                                           .submit(this);
-				if(toMerge.isUserData()){
-					chunk.modifyAndSave(Chunk::markAsUser);
-				}
+				chunk.modifyAndSave(c->c.setIsUserData(toMerge.isUserData()));
 				copyDataAndMoveChunk(toMerge, chunk);
 			}
 			

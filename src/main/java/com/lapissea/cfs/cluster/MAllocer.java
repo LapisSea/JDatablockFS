@@ -30,7 +30,7 @@ abstract class MAllocer{
 			ChunkPointer ptr=new ChunkPointer(data.getSize());
 			
 			Chunk fakeChunk=new Chunk(cluster, ptr, Math.max(minChunkSize, ticket.bytes()), calcPtrSize(cluster, ticket));
-			if(ticket.userData()!=null) fakeChunk.markAsUser();
+			fakeChunk.setIsUserData(ticket.userData()!=null);
 			if(!ticket.approve(fakeChunk)) return null;
 			
 			Chunk chunk=makeChunkReal(fakeChunk);
@@ -89,7 +89,7 @@ abstract class MAllocer{
 			UnsafeFunction<Chunk, Chunk, IOException> popEnd=chunk->{
 				Chunk chunkUse=new Chunk(cluster, chunk.getPtr(), ticket.bytes(), calcPtrSize(cluster, ticket));
 				chunkUse.setLocation(new ChunkPointer(chunk.dataEnd()-chunkUse.totalSize()));
-				if(ticket.userData()!=null) chunkUse.markAsUser();
+				chunkUse.setIsUserData(ticket.userData()!=null);
 				return chunkUse;
 			};
 			
@@ -133,7 +133,7 @@ abstract class MAllocer{
 				Chunk chunk=cluster.getChunk(freeChunks.getElement(bestIndex));
 				
 				chunk.modifyAndSave(c->{
-					if(ticket.userData()!=null) c.markAsUser();
+					c.setIsUserData(ticket.userData()!=null);
 					c.setUsed(true);
 				});
 				
