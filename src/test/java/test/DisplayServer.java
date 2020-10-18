@@ -72,6 +72,7 @@ public class DisplayServer implements DataLogger{
 						}
 						case RESET -> {
 							display.reset();
+							System.gc();
 						}
 						case FINISH -> {
 							client.close();
@@ -97,7 +98,7 @@ public class DisplayServer implements DataLogger{
 			}catch(Exception e){
 				e.printStackTrace();
 			}
-			
+			System.gc();
 		}
 		
 	}

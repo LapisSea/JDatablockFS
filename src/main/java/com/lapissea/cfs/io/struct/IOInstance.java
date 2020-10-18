@@ -265,6 +265,18 @@ public class IOInstance{
 	}
 	
 	
+	protected void initPointerVar(Cluster cluster, int varIndex) throws IOException{
+		initPointerVar(cluster, getStruct().getVar(varIndex));
+	}
+	
+	protected void initPointerVar(Cluster cluster, String varName) throws IOException{
+		initPointerVar(cluster, getStruct().getVar(varName));
+	}
+	
+	protected void initPointerVar(Cluster cluster, VariableNode.SelfPointer<?> ptrVar) throws IOException{
+		ptrVar.allocNew(this, cluster);
+	}
+	
 	@Override
 	public String toString(){
 		return variableToString();
@@ -277,24 +289,6 @@ public class IOInstance{
 		                            .collect(joining(", ", getClass().getSimpleName()+"{", "}"));
 	}
 
-//	public String toShortString(){
-//		return getClass().getSimpleName()+toTableString();
-//	}
-//	public String toTableString(){
-//		return getStruct().variables.stream().map(var->var.toString(this))
-//		                            .filter(e->{
-//			                            if(e.getValue() instanceof Boolean b) return b;
-//			                            if(e.getValue() instanceof Number n) return n.longValue()!=0;
-//			                            if(e.getValue() instanceof INumber n) return n.getValue()!=0;
-//			                            return e.getValue()!=null;
-//		                            })
-//		                            .map(e->{
-//			                            if(e.getValue() instanceof Boolean b) return e.getKey();
-//			                            return e.getKey()+": "+TextUtil.toString(e.getValue());
-//		                            })
-//		                            .collect(joining(", ", "{", "}"));
-//	}
-	
 	public Offset calcVarOffset(int index)     { return calcVarOffset(getStruct().getVar(index)); }
 	
 	public Offset calcVarOffset(String varName){ return calcVarOffset(getStruct().getVar(varName)); }

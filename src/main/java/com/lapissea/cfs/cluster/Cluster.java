@@ -291,7 +291,7 @@ public class Cluster extends IOInstance.Contained{
 		if(freeChunks.count(Objects::isNull)==0){
 			freeChunks.addElement(null);
 		}else{
-			while(freeChunks.count(Objects::isNull)>2){
+			while(freeChunks.count(Objects::isNull)>3){
 				freeChunks.removeElement(freeChunks.indexOfLast(null));
 			}
 		}
@@ -624,6 +624,7 @@ public class Cluster extends IOInstance.Contained{
 						Chunk c;
 						try{
 							c=getChunk(freePtr);
+							if(c.isUserData()) throw new IllegalStateException(c+" is user data but listed as free");
 						}catch(IOException e){c=null;}
 						throw new IllegalStateException("Duplicate chunk ptr: "+freePtr+(c==null?" <err>":" "+c)+" in "+freeChunks);
 					}else{
@@ -654,6 +655,8 @@ public class Cluster extends IOInstance.Contained{
 		Chunk toFree=getChunk(oldPtr);
 		toFree.modifyAndSave(Chunk::clearUserMark);
 		toFree.freeChaining();
+		
+		validate();
 	}
 	
 	public void moveChunkRef(Chunk oldChunk, Chunk newChunk) throws IOException{
@@ -662,6 +665,7 @@ public class Cluster extends IOInstance.Contained{
 		
 		PointerStack ptr=findPointer(val->val.isValue(oldPtr))
 			                 .orElseThrow(()->new MalformedClusterData("trying to move unreferenced chunk: "+oldChunk.toString()+" to "+newChunk));
+		LogUtil.println("moving", oldChunk, "to", newChunk);
 		ptr.set(newPtr);
 		
 		chunkCache.remove(oldPtr);
@@ -854,6 +858,9 @@ public class Cluster extends IOInstance.Contained{
 				if(next==null){
 					freeChunks.removeElement(firstIndex);
 					free(freeChunk);
+					while(freeChunks.count(Objects::isNull)>1){
+						freeChunks.removeElement(freeChunks.indexOfLast(null));
+					}
 					if(lastFreed) break;
 					lastFreed=true;
 					continue;
@@ -897,17 +904,12 @@ public class Cluster extends IOInstance.Contained{
 				
 				freeChunks.setElement(firstIndex, movedCopy.getPtr());
 				
-				validate();
 				sameCopy.setIsUserData(toMerge.isUserData());
 				
 				sameCopy.writeStruct();
 				freeChunk.readStruct();
 				
-				validate();
-				
 				copyDataAndMoveChunk(toMerge, freeChunk);
-				
-				validate();
 			}else{
 				
 				Chunk chunk=AllocateTicket.bytes(toMerge.getCapacity())
@@ -923,26 +925,11 @@ public class Cluster extends IOInstance.Contained{
 	
 	private void packChains() throws IOException{
 		
-		List<Chunk> chainRoots=new ArrayList<>();
-		
-		for(Chunk chunk : getFirstChunk().physicalIterator()){
-			Chunk next=chunk.next();
-			if(next!=null){
-				for(Iterator<Chunk> iter=chainRoots.iterator();iter.hasNext();){
-					if(iter.next()==next){
-						iter.remove();
-						break;
-					}
-				}
-			}
-			if(chunk.hasNext()){
-				chainRoots.add(chunk);
-			}
-		}
-		
-		LogUtil.println(chainRoots);
-		for(Chunk root : chainRoots){
-			if(root!=getChunkCached(root.getPtr())) continue;
+		while(true){
+			var p=findPointer(e->getChunk(e.value()).hasNext());
+			if(p.isEmpty()) break;
+			Chunk root=getChunk(p.get().value());
+			
 			Chunk solid=AllocateTicket.bytes(root.chainCapacity()).submit(this);
 			chainToChunk(root, solid);
 			validate();

@@ -1,6 +1,7 @@
 package com.lapissea.cfs.objects.text;
 
 import com.lapissea.cfs.cluster.Cluster;
+import com.lapissea.cfs.io.ReaderWriter;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.struct.IOStruct.*;
@@ -10,8 +11,39 @@ import com.lapissea.util.NotNull;
 
 import java.io.IOException;
 import java.util.Objects;
+import java.util.OptionalInt;
 
 public class AutoText extends AbstractText{
+	
+	public static class StringIO implements ReaderWriter<String>{
+		@Override
+		public String read(Object targetObj, Cluster cluster, ContentReader source, String oldValue) throws IOException{
+			AutoText text=new AutoText();
+			text.readStruct(cluster, source);
+			return text.getData();
+		}
+		
+		@Override
+		public void write(Object targetObj, Cluster cluster, ContentWriter target, String source) throws IOException{
+			AutoText text=new AutoText(source);
+			text.writeStruct(cluster, target);
+		}
+		
+		@Override
+		public long mapSize(Object targetObj, String source){
+			return new AutoText(source).getInstanceSize();
+		}
+		
+		@Override
+		public OptionalInt getFixedSize(){
+			return OptionalInt.empty();
+		}
+		
+		@Override
+		public OptionalInt getMaxSize(){
+			return OptionalInt.empty();
+		}
+	}
 	
 	@EnumValue(index=1)
 	private NumberSize   numSize=NumberSize.BYTE;
