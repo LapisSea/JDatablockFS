@@ -2,6 +2,7 @@ package com.lapissea.cfs.cluster;
 
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.struct.IOInstance;
+import com.lapissea.cfs.io.struct.IOStruct;
 import com.lapissea.cfs.objects.IOType;
 import com.lapissea.cfs.objects.chunk.Chunk;
 import com.lapissea.util.NotNull;
@@ -29,6 +30,18 @@ public record AllocateTicket(long bytes, boolean disableResizing, @Nullable IOTy
 		
 		AllocateTicket ticket=bytes(objectToFit.getInstanceSize());
 		if(fixedSize){
+			ticket=ticket.withDisabledResizing();
+		}
+		return ticket;
+	}
+	
+	public static AllocateTicket fitTo(Class<? extends IOInstance> typeToFit){
+		return fitTo(IOStruct.get(typeToFit));
+	}
+	
+	public static AllocateTicket fitTo(IOStruct typeToFit){
+		AllocateTicket ticket=bytes(typeToFit.getKnownSize().orElse(typeToFit.getMinimumSize()));
+		if(typeToFit.getKnownSize().isPresent()){
 			ticket=ticket.withDisabledResizing();
 		}
 		return ticket;
