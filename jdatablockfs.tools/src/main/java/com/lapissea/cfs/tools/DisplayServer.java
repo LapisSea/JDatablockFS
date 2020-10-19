@@ -1,4 +1,4 @@
-package test;
+package com.lapissea.cfs.tools;
 
 import com.lapissea.cfs.Config;
 import com.lapissea.cfs.io.content.ContentInputStream;
@@ -10,7 +10,6 @@ import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeRunnable;
 
 import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.net.*;
@@ -31,11 +30,11 @@ public class DisplayServer implements DataLogger{
 	}
 	
 	private static DataLogger getRealLogger(){
-		try{
+//		try{
 			return new DisplayLWJGL();
-		}catch(Throwable e){
-			return new Display2D();
-		}
+//		}catch(Throwable e){
+//			return new Display2D();
+//		}
 	}
 	
 	public static void main(String[] args) throws IOException{
@@ -131,15 +130,16 @@ public class DisplayServer implements DataLogger{
 			
 			LogUtil.println("connected", socket);
 			var is    =socket.getInputStream();
-			var writer=new ContentOutputStream.Wrapp(new BufferedOutputStream(socket.getOutputStream()));
+			var writer=new ContentOutputStream.Wrapp((socket.getOutputStream()));
+//			var writer=new ContentOutputStream.Wrapp(new BufferedOutputStream(socket.getOutputStream()));
 			
 			UnsafeConsumer<Action, IOException> sendAction=(Action a)->writer.writeInt1(a.ordinal());
 			
 			UnsafeRunnable<IOException> flush=()->{
 				if(THREADED_OUTPUT) return;
-				sendAction.accept(Action.PING);
+//				sendAction.accept(Action.PING);
 				writer.flush();
-				is.read();
+//				is.read();
 			};
 			
 			proxy=new DataLogger(){

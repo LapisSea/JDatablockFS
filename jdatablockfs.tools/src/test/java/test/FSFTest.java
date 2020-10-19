@@ -6,10 +6,14 @@ import com.lapissea.cfs.cluster.Cluster;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.objects.IOList;
 import com.lapissea.cfs.objects.IOType;
+import com.lapissea.cfs.objects.boxed.IOLong;
+import com.lapissea.cfs.objects.boxed.IOVoid;
 import com.lapissea.cfs.objects.StructLinkedList;
 import com.lapissea.cfs.objects.chunk.Chunk;
-import com.lapissea.cfs.objects.chunk.ChunkPointer;
 import com.lapissea.cfs.objects.text.AutoText;
+import com.lapissea.cfs.tools.DataLogger;
+import com.lapissea.cfs.tools.DisplayServer;
+import com.lapissea.cfs.tools.MemFrame;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
@@ -27,6 +31,7 @@ class FSFTest{
 	static{
 		System.setProperty("sun.java2d.opengl", "true");
 //		LogUtil.Init.attach(LogUtil.Init.USE_CALL_POS|LogUtil.Init.USE_TABULATED_HEADER);
+		LogUtil.Init.attach(0);
 	}
 	
 	
@@ -37,7 +42,7 @@ class FSFTest{
 				new GsonBuilder().create().<Map<String, Object>>fromJson(r, HashMap.class).forEach((k, v)->config.put(k, TextUtil.toString(v)));
 			}catch(Exception ignored){ }
 			
-			System.setProperty("test.DisplayServer.THREADED_OUTPUT", config.getOrDefault("threadedOutput", ""));
+			System.setProperty("com.lapissea.cfs.tools.DisplayServer.THREADED_OUTPUT", config.getOrDefault("threadedOutput", ""));
 			if(Boolean.parseBoolean(config.getOrDefault("fancyPrint", "true"))){
 				LogUtil.Init.attach(LogUtil.Init.USE_CALL_POS|LogUtil.Init.USE_TABULATED_HEADER);
 			}
@@ -49,6 +54,8 @@ class FSFTest{
 				}
 				return new DataLogger.Blank();
 			});
+			
+			display.block();
 			
 			var     mem    =new MemoryData();
 			Cluster cluster=Cluster.build(b->b.withIO(mem));
@@ -97,8 +104,8 @@ class FSFTest{
 		List<Chunk> chunk1=new ArrayList<>();
 		List<Chunk> chunk2=new ArrayList<>();
 		
-		AllocateTicket t1=AllocateTicket.bytes(100).asUserData(null);
-		AllocateTicket t2=AllocateTicket.bytes(10);
+		AllocateTicket t1=AllocateTicket.bytes(100).asUserData(new IOType(IOVoid.class));
+		AllocateTicket t2=t1.withBytes(10);
 		for(int i=0;i<5;i++){
 			chunk1.add(t1.submit(cluster));
 			chunk2.add(t2.submit(cluster));
@@ -118,32 +125,28 @@ class FSFTest{
 	private static void flatListTest(Cluster cluster) throws IOException{
 		
 		
-		IOList<ChunkPointer> list=IOList.box(
-			cluster.constructType(AllocateTicket.user(new IOType(StructLinkedList.class, ChunkPointer.PtrFixed.class))),
-			ChunkPointer.PtrFixed::getValue,
-			ChunkPointer.PtrFixed::new
-		                                    );
+		IOList<IOLong> list=cluster.constructType(AllocateTicket.user(new IOType(StructLinkedList.class, IOLong.class)));
 		
 		list.validate();
-		list.addElement(new ChunkPointer(141));
+		list.addElement(new IOLong(141));
 		list.validate();
-		list.addElement(new ChunkPointer(14351));
+		list.addElement(new IOLong(14351));
 		list.validate();
 		list.removeElement(0);
 		list.validate();
-		list.addElement(new ChunkPointer(2357));
-		list.addElement(new ChunkPointer(2357));
-		list.addElement(new ChunkPointer(2357));
-		list.addElement(new ChunkPointer(2357));
+		list.addElement(new IOLong(2357));
+		list.addElement(new IOLong(2357));
+		list.addElement(new IOLong(2357));
+		list.addElement(new IOLong(2357));
 		list.validate();
 		list.removeElement(2);
 		list.removeElement(1);
 		list.removeElement(1);
 		list.validate();
-		list.addElement(new ChunkPointer(15254351));
-		list.addElement(new ChunkPointer(15254351));
-		list.addElement(new ChunkPointer(15254351));
-		list.addElement(new ChunkPointer(15254351));
+		list.addElement(new IOLong(15254351));
+		list.addElement(new IOLong(15254351));
+		list.addElement(new IOLong(15254351));
+		list.addElement(new IOLong(15254351));
 		list.validate();
 		
 		list.removeElement(1);

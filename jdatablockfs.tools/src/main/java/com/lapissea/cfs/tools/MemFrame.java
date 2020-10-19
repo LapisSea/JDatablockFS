@@ -1,8 +1,8 @@
-package test;
+package com.lapissea.cfs.tools;
 
 import com.lapissea.util.LogUtil;
 
-record MemFrame(byte[] data, long[] ids, String[] e){
+public record MemFrame(byte[] data, long[] ids, String[] e){
 	
 	private static String[] toLines(Throwable e){
 		var      stack=e.getStackTrace();

@@ -1,4 +1,4 @@
-package test;
+package com.lapissea.cfs.tools;
 
 import com.lapissea.cfs.cluster.Cluster;
 import com.lapissea.cfs.io.SelfPoint;
@@ -10,14 +10,19 @@ import com.lapissea.cfs.io.struct.VariableNode;
 import com.lapissea.cfs.objects.chunk.Chunk;
 import com.lapissea.cfs.objects.chunk.ChunkPointer;
 import com.lapissea.cfs.objects.chunk.ObjectPointer;
+import com.lapissea.glfw.GlfwKeyboardEvent;
 import com.lapissea.glfw.GlfwMonitor;
+import com.lapissea.glfw.GlfwMouseEvent;
 import com.lapissea.glfw.GlfwWindow;
+import com.lapissea.glfw.GlfwWindow.SurfaceAPI;
 import com.lapissea.util.*;
 import com.lapissea.util.event.change.ChangeRegistryInt;
 import com.lapissea.vec.Vec2i;
+import org.lwjgl.glfw.GLFW;
 import org.lwjgl.glfw.GLFWErrorCallback;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL30;
 
 import java.awt.*;
 import java.io.File;
@@ -42,7 +47,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 		private boolean val;
 		
 		public BulkDraw(int mode){
-			glBegin(mode);
+			GL11.glBegin(mode);
 			val=bulkDrawing;
 			bulkDrawing=true;
 		}
@@ -50,7 +55,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 		@Override
 		public void close(){
 			bulkDrawing=val;
-			glEnd();
+			GL11.glEnd();
 		}
 	}
 	
@@ -115,7 +120,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 				
 				byteIndex.set(yByte*width+xByte);
 				
-				if(!window.isMouseKeyDown(GLFW_MOUSE_BUTTON_LEFT)) return;
+				if(!window.isMouseKeyDown(GLFW.GLFW_MOUSE_BUTTON_LEFT)) return;
 				
 				float percent=MathUtil.snap((pos.x()-10F)/(window.size.x()-20F), 0, 1);
 				setFrame(Math.round((frames.size()-1)*percent));
@@ -128,10 +133,10 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			
 			window.registryKeyboardKey.register(e->{
 				int delta;
-				if(e.getKey()==GLFW_KEY_LEFT||e.getKey()==GLFW_KEY_A) delta=-1;
-				else if(e.getKey()==GLFW_KEY_RIGHT||e.getKey()==GLFW_KEY_D) delta=1;
+				if(e.getKey()==GLFW.GLFW_KEY_LEFT||e.getKey()==GLFW.GLFW_KEY_A) delta=-1;
+				else if(e.getKey()==GLFW.GLFW_KEY_RIGHT||e.getKey()==GLFW.GLFW_KEY_D) delta=1;
 				else return;
-				if(e.getType()==UP) return;
+				if(e.getType()==GlfwKeyboardEvent.Type.UP) return;
 				setFrame(getFramePos()+delta);
 			});
 			
@@ -141,7 +146,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 					shouldRender=false;
 					render();
 				}
-				sleep(0, 1000);
+				UtilL.sleep(0, 1000);
 				window.pollEvents();
 			});
 			window.hide();
@@ -175,18 +180,18 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			System.exit(0);
 		});
 		
-		glfwWindowHint(GLFW_SAMPLES, 8);
+		GLFW.glfwWindowHint(GLFW.GLFW_SAMPLES, 8);
 		
-		window.init(OPENGL);
+		window.init(SurfaceAPI.OPENGL);
 		
 		window.grabContext();
 		
-		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-		glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-		glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+		GLFW.glfwWindowHint(GLFW.GLFW_CONTEXT_VERSION_MAJOR, 3);
+		GLFW.glfwWindowHint(GLFW.GLFW_CONTEXT_VERSION_MINOR, 3);
+		GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_PROFILE, GLFW.GLFW_OPENGL_CORE_PROFILE);
+		GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_FORWARD_COMPAT, GL11.GL_TRUE);
 		
-		glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_DONT_CARE);
+		GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_FORWARD_COMPAT, GLFW.GLFW_DONT_CARE);
 		
 		
 		GL.createCapabilities();
@@ -194,11 +199,11 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 		window.show();
 		
 		
-		glClearColor(0.5F, 0.5F, 0.5F, 1.0f);
+		GL11.glClearColor(0.5F, 0.5F, 0.5F, 1.0f);
 		
-		glDisable(GL_DEPTH_TEST);
-		glDepthMask(false);
-		glCullFace(GL_NONE);
+		GL11.glDisable(GL11.GL_DEPTH_TEST);
+		GL11.glDepthMask(false);
+		GL11.glCullFace(GL11.GL_NONE);
 		
 		glErrorPrint();
 	}
@@ -230,11 +235,11 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	}
 	
 	private void render(int frameIndex){
-		glViewport(0, 0, getWidth(), getHeight());
-		glClear(GL_COLOR_BUFFER_BIT);
+		GL11.glViewport(0, 0, getWidth(), getHeight());
+		GL11.glClear(GL11.GL_COLOR_BUFFER_BIT);
 		
-		glEnable(GL_BLEND);
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		GL11.glEnable(GL11.GL_BLEND);
+		GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
 //		glBlendFunc(GL_SRC_ALPHA_SATURATE, GL_ONE);
 //		glEnable(GL_POLYGON_SMOOTH);
 //		glHint(GL_POLYGON_SMOOTH_HINT, GL_NICEST);
@@ -268,14 +273,14 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			};
 			
 			
-			glLoadIdentity();
+			GL11.glLoadIdentity();
 			translate(-1, 1);
 			scale(2F/getWidth(), -2F/getHeight());
 			
 			setColor(errorMode?Color.RED.darker():Color.LIGHT_GRAY);
 			
 			
-			try(var bulkDraw=new BulkDraw(GL_QUADS)){
+			try(var bulkDraw=new BulkDraw(GL11.GL_QUADS)){
 				float jiter=2;
 				int   step =10;
 				for(int x=0;x<getWidth()+2;x+=step){
@@ -355,7 +360,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			
 			Rectangle area=new Rectangle(xByte*pixelsPerByte, yByte*pixelsPerByte, pixelsPerByte, pixelsPerByte);
 			
-			setColor(Color.CYAN.darker());
+			setColor(Color.MAGENTA.darker());
 			initFont();
 			drawStringIn(Integer.toString(yByte*width+xByte), area, true);
 		}
@@ -386,8 +391,6 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			}
 			
 			List<PairM<Long, IOInstance>> recurse=new ArrayList<>();
-			
-			IOStruct typ=instance.getStruct();
 			
 			var typeHash=instance.getStruct().instanceClass.getName().hashCode()&0xffffffffL;
 			
@@ -567,7 +570,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	}
 	
 	private void translate(double x, double y){
-		glTranslated(x, y, 0);
+		GL11.glTranslated(x, y, 0);
 	}
 	
 	private void scale(double scale){
@@ -575,11 +578,11 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	}
 	
 	private void scale(double x, double y){
-		glScaled(x, y, 1);
+		GL11.glScaled(x, y, 1);
 	}
 	
 	private void rotate(double angle){
-		glRotated(angle, 0, 0, 1);
+		GL11.glRotated(angle, 0, 0, 1);
 	}
 	
 	private void drawStringIn(String s, Rectangle area, boolean doStroke){
@@ -620,7 +623,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			}
 		}
 		
-		glPushMatrix();
+		GL11.glPushMatrix();
 		translate(area.x, area.y);
 		translate(Math.max(0, area.width-w)/2D, h+(area.height-h)/2);
 		
@@ -644,7 +647,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 		fillString(s);
 		
 		this.fontScale=fontScale;
-		glPopMatrix();
+		GL11.glPopMatrix();
 	}
 	
 	private void setStroke(float width){
@@ -652,20 +655,20 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	}
 	
 	private void setColor(Color color){
-		glColor4f(color.getRed()/255F, color.getGreen()/255F, color.getBlue()/255F, color.getAlpha()/255F);
+		GL11.glColor4f(color.getRed()/255F, color.getGreen()/255F, color.getBlue()/255F, color.getAlpha()/255F);
 	}
 	
 	private Color readColor(){
 		float[] color=new float[4];
-		glGetFloatv(GL_CURRENT_COLOR, color);
+		GL11.glGetFloatv(GL11.GL_CURRENT_COLOR, color);
 		return new Color(color[0], color[1], color[2], color[3]);
 	}
 	
 	private void renderByte(int b, int pixelsPerByte, boolean withChar, float x, float y){
-		glPushMatrix();
-		glTranslatef(x, y, 0);
+		GL11.glPushMatrix();
+		GL11.glTranslatef(x, y, 0);
 		renderByte(b, pixelsPerByte, withChar);
-		glPopMatrix();
+		GL11.glPopMatrix();
 	}
 	
 	
@@ -679,7 +682,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 		setColor(color);
 		
 		
-		try(var bulkDraw=new BulkDraw(GL_QUADS)){
+		try(var bulkDraw=new BulkDraw(GL11.GL_QUADS)){
 			for(FlagReader flags=new FlagReader(b, 8);flags.remainingCount()>0;){
 				if(flags.readBoolBit()){
 					fillBit(flags.readCount()-1, 0, 0);
@@ -706,47 +709,47 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 		var pixelsPerByte=getPixelsPerByte();
 		var angle        =-Math.toDegrees(Math.atan2(xTo-xFrom, yTo-yFrom));
 		var length       =MathUtil.length(xFrom-xTo, yTo-yFrom)*pixelsPerByte;
-		glPushMatrix();
+		GL11.glPushMatrix();
 		translate(xFrom*pixelsPerByte, yFrom*pixelsPerByte);
 		rotate(angle);
 		
 		fillQuad(-lineWidth/2, 0, lineWidth, length);
-		glPopMatrix();
+		GL11.glPopMatrix();
 	}
 	
 	
 	@Override
 	protected void fillQuad(double x, double y, double width, double height){
-		if(!bulkDrawing) glBegin(GL_QUADS);
-		glVertex3d(x, y, 0);
-		glVertex3d(x+width, y, 0);
-		glVertex3d(x+width, y+height, 0);
-		glVertex3d(x, y+height, 0);
-		if(!bulkDrawing) glEnd();
+		if(!bulkDrawing) GL11.glBegin(GL11.GL_QUADS);
+		GL11.glVertex3d(x, y, 0);
+		GL11.glVertex3d(x+width, y, 0);
+		GL11.glVertex3d(x+width, y+height, 0);
+		GL11.glVertex3d(x, y+height, 0);
+		if(!bulkDrawing) GL11.glEnd();
 	}
 	
 	@Override
 	protected void outlineQuad(double x, double y, double width, double height){
-		if(!bulkDrawing) glBegin(GL_LINE_LOOP);
-		glVertex3d(x, y, 0);
-		glVertex3d(x+width, y, 0);
-		glVertex3d(x+width, y+height, 0);
-		glVertex3d(x, y+height, 0);
-		if(!bulkDrawing) glEnd();
+		if(!bulkDrawing) GL11.glBegin(GL11.GL_LINE_LOOP);
+		GL11.glVertex3d(x, y, 0);
+		GL11.glVertex3d(x+width, y, 0);
+		GL11.glVertex3d(x+width, y+height, 0);
+		GL11.glVertex3d(x, y+height, 0);
+		if(!bulkDrawing) GL11.glEnd();
 	}
 	
 	private void glErrorPrint(){
 		int errorCode=GL11.glGetError();
-		if(errorCode==GL_NO_ERROR) return;
+		if(errorCode==GL11.GL_NO_ERROR) return;
 		
 		LogUtil.printlnEr(switch(errorCode){
-			case GL_INVALID_ENUM -> "INVALID_ENUM";
-			case GL_INVALID_VALUE -> "INVALID_VALUE";
-			case GL_INVALID_OPERATION -> "INVALID_OPERATION";
-			case GL_STACK_OVERFLOW -> "STACK_OVERFLOW";
-			case GL_STACK_UNDERFLOW -> "STACK_UNDERFLOW";
-			case GL_OUT_OF_MEMORY -> "OUT_OF_MEMORY";
-			case GL_INVALID_FRAMEBUFFER_OPERATION -> "INVALID_FRAMEBUFFER_OPERATION";
+			case GL11.GL_INVALID_ENUM -> "INVALID_ENUM";
+			case GL11.GL_INVALID_VALUE -> "INVALID_VALUE";
+			case GL11.GL_INVALID_OPERATION -> "INVALID_OPERATION";
+			case GL11.GL_STACK_OVERFLOW -> "STACK_OVERFLOW";
+			case GL11.GL_STACK_UNDERFLOW -> "STACK_UNDERFLOW";
+			case GL11.GL_OUT_OF_MEMORY -> "OUT_OF_MEMORY";
+			case GL30.GL_INVALID_FRAMEBUFFER_OPERATION -> "INVALID_FRAMEBUFFER_OPERATION";
 			default -> "Unknown error"+errorCode;
 		});
 	}

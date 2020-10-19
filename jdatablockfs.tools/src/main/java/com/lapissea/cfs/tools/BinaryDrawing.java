@@ -1,4 +1,4 @@
-package test;
+package com.lapissea.cfs.tools;
 
 import com.lapissea.cfs.objects.chunk.Chunk;
 

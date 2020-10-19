@@ -1,10 +1,11 @@
 /*
 /*/
 !/src/
-!/tests/
-!/res/
 !.gitignore
-!/LICENSE.md
+!/LICENSE
 !/README.md
+!/CODE_OF_CONDUCT.md
+!/jdatablockfs.tools/
 !pom.xml
 !.editorconfig
+/*/target/

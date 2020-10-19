@@ -1,4 +1,4 @@
-package test;
+package com.lapissea.cfs.tools;
 
 public interface DataLogger{
 	
