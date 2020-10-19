@@ -2,6 +2,7 @@ package com.lapissea.cfs.cluster.extensions;
 
 import com.lapissea.cfs.cluster.AllocateTicket;
 import com.lapissea.cfs.cluster.Cluster;
+import com.lapissea.cfs.cluster.PackingConfig;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.struct.IOInstance;
 import com.lapissea.cfs.io.struct.IOStruct.PointerValue;
@@ -88,7 +89,7 @@ public class FileCluster extends Cluster{
 	public static class Builder extends Cluster.Builder{
 		@Override
 		public FileCluster build() throws IOException{
-			return new FileCluster(data, minChunkSize, readOnly);
+			return new FileCluster(data, packingConfig, minChunkSize, readOnly);
 		}
 	}
 	
@@ -96,8 +97,8 @@ public class FileCluster extends Cluster{
 	private Folder rootFolder;
 	
 	
-	protected FileCluster(IOInterface data, int minChunkSize, boolean readOnly) throws IOException{
-		super(data, minChunkSize, readOnly);
+	protected FileCluster(IOInterface data, PackingConfig packingConfig, int minChunkSize, boolean readOnly) throws IOException{
+		super(data, packingConfig, minChunkSize, readOnly);
 	}
 	
 	
