@@ -138,6 +138,15 @@ public class IOStruct{
 			
 			int getValue(IOInstance target);
 		}
+		interface GetterF{
+			@Nullable
+			static <T> GetterF get(ValueRelations.ValueInfo info){
+				return new FunDef(int.class)
+					       .getOverride(info, GetterF.class);
+			}
+			
+			float getValue(IOInstance target);
+		}
 		
 		String target() default "";
 	}
@@ -187,6 +196,16 @@ public class IOStruct{
 			}
 			
 			void setValue(IOInstance target, int newValue);
+		}
+		interface SetterF{
+			@Nullable
+			static <T> SetterF get(ValueRelations.ValueInfo info){
+				return new FunDef(Void.TYPE,
+				                  new Arg(int.class, "newValue"))
+					       .getOverride(info, SetterF.class);
+			}
+			
+			void setValue(IOInstance target, float newValue);
 		}
 		
 		String target() default "";

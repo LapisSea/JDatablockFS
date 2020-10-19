@@ -66,6 +66,24 @@ public class PrimitiveNodeMaker<T> extends StructReflectionImpl.NodeMaker<T>{
 			
 			return (VariableNode<T>)new IntIOImpl(name, valueAnn.index(), valueField, IOStruct.Get.GetterI.get(info), IOStruct.Set.SetterI.get(info), fixedSize);
 		}
+		if(valueType==float.class){
+			NumberSize fixedSize=valueAnn.defaultSize();
+			if(fixedSize==NumberSize.VOID) fixedSize=NumberSize.INT;
+			
+			if(!valueAnn.sizeRef().isEmpty()){
+				try{
+					Field varSize=clazz.instanceClass.getDeclaredField(valueAnn.sizeRef());
+					if(varSize.getType()!=NumberSize.class) throw new ClassCastException(varSize+" must be a NumberSize enum!");
+					varSize.setAccessible(true);
+					
+					return (VariableNode<T>)new FloatVarSizeIOImpl(name, valueAnn.index(), valueField, IOStruct.Get.GetterF.get(info), IOStruct.Set.SetterF.get(info), varSize, fixedSize);
+				}catch(ReflectiveOperationException e){
+					throw new RuntimeException(e);
+				}
+			}
+			
+			return (VariableNode<T>)new FloatIOImpl(name, valueAnn.index(), valueField, IOStruct.Get.GetterF.get(info), IOStruct.Set.SetterF.get(info), fixedSize);
+		}
 		
 		throw new NotImplementedException(valueType.toString());
 	}

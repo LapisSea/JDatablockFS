@@ -179,7 +179,11 @@ public class Cluster extends IOInstance.Contained{
 		getTypeParsers().register(StructLinkedList.TYPE_PARSER);
 		getTypeParsers().register(ChunkPointer.TYPE_PARSER);
 		for(Class<? extends IOInstance> c : List.of(
-			AutoText.class
+			AutoText.class,
+			IOVoid.class,
+			IOLong.class,
+			IOInt.class,
+			IOFloat.class
 		                                           )){
 			getTypeParsers().register(TypeParser.rawExact(IOStruct.get(c)));
 		}

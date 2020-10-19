@@ -303,6 +303,39 @@ public abstract class VariableNode<ValTyp>{
 		}
 	}
 	
+	public abstract static class PrimitiveFloat extends Primitive<Float>{
+		
+		protected PrimitiveFloat(String name, int index){
+			super(name, index);
+		}
+		protected abstract float get(IOInstance source);
+		protected abstract void set(IOInstance target, float newValue);
+		protected abstract float read(IOInstance target, ContentReader source, float oldVal) throws IOException;
+		protected abstract void write(IOInstance target, ContentWriter dest, float source) throws IOException;
+		
+		@Override
+		public void read(IOInstance target, Cluster cluster, ContentReader source) throws IOException{
+			var oldVal=get(target);
+			var newVal=read(target, source, oldVal);
+			set(target, newVal);
+		}
+		
+		@Override
+		public void write(IOInstance target, Cluster cluster, ContentWriter dest) throws IOException{
+			write(target, dest, get(target));
+		}
+		
+		@Override
+		public Float getValueAsObj(IOInstance source){
+			return get(source);
+		}
+		
+		@Override
+		public void setValueAsObj(IOInstance target, Float value){
+			set(target, value);
+		}
+	}
+	
 	public abstract static class SelfPointer<T extends SelfPoint<T>> extends VariableNode<T>{
 		
 		protected SelfPointer(String name, int index){
