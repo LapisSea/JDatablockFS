@@ -170,7 +170,7 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 			StringBuilder result=new StringBuilder("Node{");
 			if(notInCache()) result.append("invalid, ");
 			result.append(container==null?"fake":container.getPtr());
-			result.append(" >> ").append(next).append(" value=").append(value).append('}');
+			result.append(" -> ").append(next).append(" value=").append(value).append('}');
 			return result.toString();
 		}
 		
@@ -538,7 +538,7 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 	}
 	
 	private void pushChange(){
-		if(isChanging()) throw new IllegalStateException("recursive change");
+		if(isChanging()) throw new IllegalStateException("recursive change at "+container);
 		
 		this.changing=true;
 		changingListener.accept(true);

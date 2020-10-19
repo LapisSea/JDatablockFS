@@ -1,5 +1,6 @@
 package com.lapissea.cfs.objects;
 
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
@@ -304,6 +305,11 @@ public interface IOList<T> extends Iterable<T>{
 				list.removeElement(i);
 				return null;
 			});
+		}
+		
+		@Override
+		public void addElement(T value) throws IOException{
+			data[data.length-1].addElement(value);
 		}
 		
 		@Override

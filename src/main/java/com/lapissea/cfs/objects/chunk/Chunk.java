@@ -463,10 +463,18 @@ public class Chunk extends IOInstance.Contained implements Iterable<Chunk>, Rand
 	
 	@Override
 	public String toString(){
-		return getClass().getSimpleName()+toShortString();
+		return getClass().getSimpleName()+toString(false);
 	}
 	
 	public String toShortString(){
+		return toString(true);
+	}
+	
+	public String toTableString(){
+		return toString(true);
+	}
+	
+	private String toString(boolean shortStr){
 		StringBuilder sb=new StringBuilder("{");
 		sb.append(ptr);
 		sb.append(" ");
@@ -477,11 +485,14 @@ public class Chunk extends IOInstance.Contained implements Iterable<Chunk>, Rand
 		if(hasNext()) sb.append(" >> ").append(getNextPtr());
 		if(!isUsed()) sb.append(", unused");
 		if(isUserData()){
-			sb.append(", typ=");
-			try{
-				sb.append(getUserInfo().toShortString());
-			}catch(Throwable e){
-				sb.append("<ERR>");
+			if(shortStr) sb.append(", usr");
+			else{
+				sb.append(", typ=");
+				try{
+					sb.append(getUserInfo().getType().toShortString());
+				}catch(Throwable e){
+					sb.append("<ERR>");
+				}
 			}
 		}
 		

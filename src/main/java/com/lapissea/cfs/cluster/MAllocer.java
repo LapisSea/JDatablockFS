@@ -39,6 +39,11 @@ abstract class MAllocer{
 			data.ioAt(chunk.dataStart(), io->{
 				Utils.zeroFill(io::write, chunk.getCapacity());
 			});
+			
+			LogUtil.printTable("Action", "alloc",
+			                   "Type", "Push",
+			                   "Chunk", chunk);
+			
 			ticket.populate(chunk);
 			return chunk;
 		}
@@ -54,7 +59,10 @@ abstract class MAllocer{
 				var chunkCache=cluster.chunkCache;
 				var data      =cluster.getData();
 				
-				LogUtil.println("freeing deallocated", chunk);
+				LogUtil.printTable("Action", "free",
+				                   "Type", "freeing",
+				                   "Chunk", chunk);
+				
 				var endPtr=chunk.getPtr();
 				chunkCache.remove(endPtr);
 				data.setCapacity(endPtr.getValue());
@@ -132,13 +140,15 @@ abstract class MAllocer{
 			if(bestIndex!=-1){
 				Chunk chunk=cluster.getChunk(freeChunks.getElement(bestIndex));
 				
+				freeChunks.setElement(bestIndex, null);
 				chunk.modifyAndSave(c->{
 					c.setIsUserData(ticket.userData()!=null);
 					c.setUsed(true);
 				});
 				
-				freeChunks.setElement(bestIndex, null);
-				LogUtil.println("aloc reuse exact", chunk);
+				LogUtil.printTable("Action", "alloc",
+				                   "Type", "reuse exact",
+				                   "Chunk", chunk);
 				ticket.populate(chunk);
 				return chunk;
 			}
@@ -151,7 +161,10 @@ abstract class MAllocer{
 				
 				largest.modifyAndSave(c->c.setCapacityConfident(freeCapacity));
 				
-				LogUtil.println("aloc reuse split", largest, " -> ", chunkUse);
+				LogUtil.printTable("Action", "alloc",
+				                   "Type", "reuse split",
+				                   "Source", largest,
+				                   "Chunk", chunkUse);
 				
 				ticket.populate(chunkUse);
 				return chunkUse;
@@ -219,22 +232,34 @@ abstract class MAllocer{
 			
 			if(next!=null){
 				if(prev!=null){
-					LogUtil.println("free triple merge", prev, toFree, next);
+					LogUtil.printTable("Action", "free",
+					                   "Type", "triple merge",
+					                   "Source", prev,
+					                   "Chunk", toFree,
+					                   "Chunk 2", next);
 					freeChunks.setElement(nextIndex, null);
 					
 					merge(chunkCache, prev, next);
 					destroyChunk(chunkCache, toFree);
 				}else{
-					LogUtil.println("free merge", toFree, next);
+					LogUtil.printTable("Action", "free",
+					                   "Type", "merge",
+					                   "Source", toFree,
+					                   "Chunk", next);
 					freeChunks.setElement(nextIndex, toFree.getPtr());
 					merge(chunkCache, toFree, next);
 				}
 			}else{
 				if(prev!=null){
-					LogUtil.println("free merge", prev, toFree);
+					LogUtil.printTable("Action", "free",
+					                   "Type", "merge",
+					                   "Source", prev,
+					                   "Chunk", toFree);
 					merge(chunkCache, prev, toFree);
 				}else{
-					LogUtil.println("free list", toFree);
+					LogUtil.printTable("Action", "free",
+					                   "Type", "list",
+					                   "Chunk", toFree);
 					int emptyIndex=freeChunks.indexOf(null);
 					if(emptyIndex!=-1){
 						freeChunks.setElement(emptyIndex, toFree.getPtr());

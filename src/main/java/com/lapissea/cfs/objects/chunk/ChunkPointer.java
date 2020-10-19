@@ -113,6 +113,9 @@ public final class ChunkPointer implements INumber{
 		public FixedIO(String sizeName){
 			this(NumberSize.valueOf(sizeName));
 		}
+		public FixedIO(){
+			this.fixedSize=NumberSize.LARGEST;
+		}
 		
 		public FixedIO(NumberSize fixedSize){
 			this.fixedSize=fixedSize;
@@ -167,7 +170,10 @@ public final class ChunkPointer implements INumber{
 		
 		@Override
 		public void write(Object targetObj, Cluster cluster, ContentWriter target, ChunkPointer source) throws IOException{
-			NumberSize dataSize=NumberSize.bySizeVoidable(source);
+			NumberSize dataSize=NumberSize.bySizeVoidable(source)
+			                              .max(minSize)
+//			                              .max(NumberSize.byBytes(cluster.getData().getSize()))
+				;
 			
 			try(var flags=new FlagWriter.AutoPop(NumberSize.SMALEST_REAL, target)){
 				flags.writeEnum(NumberSize.FLAG_INFO, dataSize);

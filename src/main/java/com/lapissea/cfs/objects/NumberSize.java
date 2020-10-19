@@ -57,7 +57,7 @@ public enum NumberSize{
 		return byBytes(bytes);
 	}
 	
-	public static NumberSize byBytes(int bytes){
+	public static NumberSize byBytes(long bytes){
 		for(NumberSize value : VALS){
 			if(value.bytes>=bytes) return value;
 		}
