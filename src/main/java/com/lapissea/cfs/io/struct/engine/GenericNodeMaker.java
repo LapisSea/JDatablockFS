@@ -1,5 +1,6 @@
 package com.lapissea.cfs.io.struct.engine;
 
+import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.io.ReaderWriter;
 import com.lapissea.cfs.io.struct.IOStruct;
 import com.lapissea.cfs.io.struct.IOStruct.Get.Getter;
@@ -81,7 +82,7 @@ public class GenericNodeMaker<T> extends StructReflectionImpl.NodeMaker<T>{
 		if(sizerFun==null) errors.add("size mapping");
 		
 		if(!errors.isEmpty()){
-			throw new IllegalStateException(toStr.apply(valueField)+" needs a "+ReaderWriter.class.getSimpleName()+" definition or "+String.join(", ", errors)+TextUtil.plural(" function", errors.size()));
+			throw new MalformedStructLayout(toStr.apply(valueField)+" needs a "+ReaderWriter.class.getSimpleName()+" definition or "+String.join(", ", errors)+TextUtil.plural(" function", errors.size()));
 		}
 		
 		if(fixedSize.isPresent()){

@@ -308,13 +308,13 @@ public class Cluster extends IOInstance.Contained{
 	private void onSafeEnd() throws IOException{
 		if(freeChunks==null) return;
 		
-//		if(freeChunks.count(Objects::isNull)==0){
-////			freeChunks.addElement(null);
-//		}else{
-//			while(freeChunks.count(Objects::isNull)>3){
-//				freeChunks.removeElement(freeChunks.indexOfLast(null));
-//			}
-//		}
+		if(freeChunks.count(Objects::isNull)==0){
+//			freeChunks.addElement(null);
+		}else{
+			while(freeChunks.count(Objects::isNull)>3){
+				freeChunks.removeElement(freeChunks.indexOfLast(null));
+			}
+		}
 	}
 	
 	public IOInterface getData(){
@@ -439,7 +439,6 @@ public class Cluster extends IOInstance.Contained{
 			assert !freeingChunks;
 			freeingChunks=true;
 			
-			
 			while(!freeingQueue.isEmpty()){
 				Chunk val;
 				if(freeingQueue.size()==1) val=freeingQueue.removeFirst();
@@ -449,10 +448,6 @@ public class Cluster extends IOInstance.Contained{
 			}
 		}finally{
 			freeingChunks=false;
-		}
-		
-		while(freeChunks.count(Objects::isNull)>3){
-			freeChunks.removeElement(freeChunks.indexOfLast(null));
 		}
 		
 		autoPack();

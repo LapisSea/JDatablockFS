@@ -138,7 +138,7 @@ public class MemoryData implements IOInterface{
 		
 		@Override
 		public long getGlobalPos(){
-			return getPos();
+			return -1;
 		}
 		
 		@Override

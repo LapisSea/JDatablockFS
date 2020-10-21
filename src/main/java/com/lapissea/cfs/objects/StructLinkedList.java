@@ -136,7 +136,7 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 				              if(DEBUG_VALIDATION){
 					              Node clone=new Node();
 					              clone.initContainer(c);
-					              assert clone.equals(this):clone+" "+this;
+					              assert clone.equals(this):"\n"+clone+"\n"+this;
 				              }
 			              })
 			              .submit(cluster);

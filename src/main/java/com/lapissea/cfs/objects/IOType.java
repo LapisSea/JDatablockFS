@@ -167,9 +167,12 @@ public class IOType extends IOInstance{
 	}
 	
 	public IOType(Class<? extends IOInstance> type, IOType... genericArgs){
+		this(IOStruct.get(type), genericArgs);
+	}
+	
+	public IOType(IOStruct type, IOType... genericArgs){
 		Objects.requireNonNull(type);
-		
-		this.type=IOStruct.get(type);
+		this.type=type;
 		this.genericArgs=List.of(genericArgs);
 	}
 	

@@ -1,5 +1,6 @@
 package com.lapissea.cfs.io.struct.engine;
 
+import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.io.struct.IOStruct;
 import com.lapissea.cfs.io.struct.StructImpl;
 import com.lapissea.cfs.io.struct.ValueRelations;
@@ -41,7 +42,7 @@ public class PrimitiveNodeMaker<T> extends StructReflectionImpl.NodeMaker<T>{
 					
 					return (VariableNode<T>)new LongVarSizeIOImpl(name, valueAnn.index(), valueField, IOStruct.Get.GetterL.get(info), IOStruct.Set.SetterL.get(info), varSize, fixedSize);
 				}catch(ReflectiveOperationException e){
-					throw new RuntimeException(e);
+					throw new MalformedStructLayout(e);
 				}
 			}
 			
@@ -60,7 +61,7 @@ public class PrimitiveNodeMaker<T> extends StructReflectionImpl.NodeMaker<T>{
 					
 					return (VariableNode<T>)new IntVarSizeIOImpl(name, valueAnn.index(), valueField, IOStruct.Get.GetterI.get(info), IOStruct.Set.SetterI.get(info), varSize, fixedSize);
 				}catch(ReflectiveOperationException e){
-					throw new RuntimeException(e);
+					throw new MalformedStructLayout(e);
 				}
 			}
 			

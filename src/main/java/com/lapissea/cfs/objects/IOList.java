@@ -521,7 +521,7 @@ public interface IOList<T> extends Iterable<T>{
 	default void modifyElement(int index, UnsafeFunction<T, T, IOException> modifier) throws IOException{
 		T oldValue=getElement(index);
 		T newValue=modifier.apply(oldValue);
-		if(!Objects.equals(oldValue, newValue)){
+		if(oldValue==newValue||!Objects.equals(oldValue, newValue)){
 			setElement(index, newValue);
 		}
 	}

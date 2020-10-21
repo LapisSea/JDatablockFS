@@ -17,6 +17,7 @@ import com.lapissea.util.function.UnsafeFunction;
 
 import java.io.IOException;
 import java.lang.annotation.Annotation;
+import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 import java.lang.reflect.Constructor;
@@ -42,6 +43,11 @@ public class IOStruct{
 	public static final List<Class<Annotation>> TAG_TYPES  =ANNOTATIONS.stream().filter(n->!VALUE_TYPES.contains(n)).collect(toUnmodifiableList());
 	
 	@Retention(RUNTIME)
+	@Target(TYPE)
+	public @interface SimpleRegister{}
+	
+	@Target(METHOD)
+	@Retention(RUNTIME)
 	public @interface Construct{
 		
 		interface Constructor<T>{
@@ -58,6 +64,7 @@ public class IOStruct{
 		String target() default "";
 	}
 	
+	@Target(METHOD)
 	@Retention(RUNTIME)
 	public @interface Read{
 		
@@ -77,6 +84,7 @@ public class IOStruct{
 		String target() default "";
 	}
 	
+	@Target(METHOD)
 	@Retention(RUNTIME)
 	public @interface Write{
 		
@@ -96,6 +104,7 @@ public class IOStruct{
 		String target() default "";
 	}
 	
+	@Target(METHOD)
 	@Retention(RUNTIME)
 	public @interface Get{
 		
@@ -138,6 +147,7 @@ public class IOStruct{
 			
 			int getValue(IOInstance target);
 		}
+		
 		interface GetterF{
 			@Nullable
 			static <T> GetterF get(ValueRelations.ValueInfo info){
@@ -197,6 +207,7 @@ public class IOStruct{
 			
 			void setValue(IOInstance target, int newValue);
 		}
+		
 		interface SetterF{
 			@Nullable
 			static <T> SetterF get(ValueRelations.ValueInfo info){
@@ -277,10 +288,15 @@ public class IOStruct{
 		                      .walk(s->(Class<? extends IOInstance>)s.skip(1).findFirst().orElseThrow().getDeclaringClass()));
 	}
 	
-	public static IOStruct get(Class<? extends IOInstance> instanceClass){
+	public static IOStruct get(@NotNull Class<? extends IOInstance> instanceClass){
+		Objects.requireNonNull(instanceClass);
 		var result=CACHE.get(instanceClass);
 		if(result==null){
-			result=new IOStruct(instanceClass);
+			try{
+				result=new IOStruct(instanceClass);
+			}catch(Throwable e){
+				throw new RuntimeException("Failed to compile struct "+instanceClass.getName(), e);
+			}
 			CACHE.put(instanceClass, result);
 		}
 		return result;
