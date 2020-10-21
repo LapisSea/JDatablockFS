@@ -5,7 +5,8 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<properties>
-		<javafxPath>${java.home}/../javafx-sdk-15/lib</javafxPath>
+		<javafxVersion>15</javafxVersion>
+		<javafxPath>${java.home}/../javafx-sdk-${javafxVersion}/lib</javafxPath>
 
 		<cfsVersion>1.0-SNAPSHOT</cfsVersion>
 
@@ -34,26 +35,22 @@
 		<dependency>
 			<groupId>org.openjfx</groupId>
 			<artifactId>javafx-base</artifactId>
-			<version>15</version>
-			<systemPath>${javafxPath}/javafx.base.jar</systemPath>
+			<version>${javafxVersion}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.openjfx</groupId>
 			<artifactId>javafx-controls</artifactId>
-			<version>15</version>
-			<systemPath>${javafxPath}/javafx.controls.jar</systemPath>
+			<version>${javafxVersion}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.openjfx</groupId>
 			<artifactId>javafx-fxml</artifactId>
-			<version>15</version>
-			<systemPath>${javafxPath}/javafx.fxml.jar</systemPath>
+			<version>${javafxVersion}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.openjfx</groupId>
 			<artifactId>javafx-graphics</artifactId>
-			<version>15</version>
-			<systemPath>${javafxPath}/javafx.graphics.jar</systemPath>
+			<version>${javafxVersion}</version>
 		</dependency>
 
 
@@ -68,42 +65,35 @@
 		<dependency>
 			<groupId>org.lwjgl</groupId>
 			<artifactId>lwjgl-opengl</artifactId>
-			
 		</dependency>
 		<dependency>
 			<groupId>org.lwjgl</groupId>
 			<artifactId>lwjgl-stb</artifactId>
-			
 		</dependency>
 		<dependency>
 			<groupId>org.lwjgl</groupId>
 			<artifactId>lwjgl</artifactId>
 			<classifier>${lwjgl.natives}</classifier>
-			
 		</dependency>
 		<dependency>
 			<groupId>org.lwjgl</groupId>
 			<artifactId>lwjgl-glfw</artifactId>
 			<classifier>${lwjgl.natives}</classifier>
-			
 		</dependency>
 		<dependency>
 			<groupId>org.lwjgl</groupId>
 			<artifactId>lwjgl-opengl</artifactId>
 			<classifier>${lwjgl.natives}</classifier>
-			
 		</dependency>
 		<dependency>
 			<groupId>org.lwjgl</groupId>
 			<artifactId>lwjgl-stb</artifactId>
 			<classifier>${lwjgl.natives}</classifier>
-			
 		</dependency>
 		<dependency>
 			<groupId>org.joml</groupId>
 			<artifactId>joml</artifactId>
 			<version>${joml.version}</version>
-			
 		</dependency>
 	</dependencies>
 

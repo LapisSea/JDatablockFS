@@ -14,20 +14,16 @@ import javafx.scene.Scene;
 
 public class UITest extends Application{
 	
-	public static void main(String[] args) throws IOException{
-		LogUtil.println(UITest.class.getResource("view/Ui.fxml"));
-//		launch(args);
-	}
+	public static void main(String[] args){ launch(args); }
 	
 	@Override
 	public void start(Stage primaryStage) throws Exception{
-		URL res=getClass().getResource("test/ui/view/Ui.fxml");
-		Objects.requireNonNull(res);
-		Parent root=FXMLLoader.load(res);
 		
-		primaryStage.setTitle("Hello World!");
+		primaryStage.setTitle("CSF UI Test");
 		
-		primaryStage.setScene(new Scene(root));
+		Scene scene=new Scene(FXMLLoader.load(Objects.requireNonNull(getClass().getResource("/view/Ui.fxml"))));
+		
+		primaryStage.setScene(scene);
 		primaryStage.show();
 	}
 	

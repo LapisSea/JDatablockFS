@@ -36,6 +36,8 @@ class FSFTest{
 	
 	
 	public static void main(String[] args){
+		LogUtil.println(Thread.currentThread().getContextClassLoader());
+		
 		try{
 			Map<String, String> config=new HashMap<>();
 			try(var r=new FileReader(new File("config.json"))){
@@ -43,9 +45,7 @@ class FSFTest{
 			}catch(Exception ignored){ }
 			
 			System.setProperty("com.lapissea.cfs.tools.DisplayServer.THREADED_OUTPUT", config.getOrDefault("threadedOutput", ""));
-			if(Boolean.parseBoolean(config.getOrDefault("fancyPrint", "true"))){
-				LogUtil.Init.attach(LogUtil.Init.USE_CALL_POS|LogUtil.Init.USE_TABULATED_HEADER);
-			}
+			LogUtil.Init.attach(Boolean.parseBoolean(config.getOrDefault("fancyPrint", "true"))?LogUtil.Init.USE_CALL_POS|LogUtil.Init.USE_TABULATED_HEADER:0);
 			
 			LateInit<DataLogger> display=new LateInit<>(()->{
 				if(DEBUG_VALIDATION){
