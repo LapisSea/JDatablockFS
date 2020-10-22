@@ -6,17 +6,14 @@ import com.lapissea.cfs.cluster.Cluster;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.objects.IOList;
 import com.lapissea.cfs.objects.IOType;
+import com.lapissea.cfs.objects.StructLinkedList;
 import com.lapissea.cfs.objects.boxed.IOLong;
 import com.lapissea.cfs.objects.boxed.IOVoid;
-import com.lapissea.cfs.objects.StructLinkedList;
 import com.lapissea.cfs.objects.chunk.Chunk;
 import com.lapissea.cfs.objects.text.AutoText;
-import com.lapissea.cfs.tools.DataLogger;
-import com.lapissea.cfs.tools.DisplayServer;
-import com.lapissea.cfs.tools.MemFrame;
+import com.lapissea.cfs.tools.*;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.LogUtil;
-import com.lapissea.util.TextUtil;
 import com.lapissea.util.ZeroArrays;
 
 import java.io.File;
@@ -30,48 +27,18 @@ class FSFTest{
 	
 	static{
 		System.setProperty("sun.java2d.opengl", "true");
-//		LogUtil.Init.attach(LogUtil.Init.USE_CALL_POS|LogUtil.Init.USE_TABULATED_HEADER);
-		LogUtil.Init.attach(0);
 	}
 	
 	
 	public static void main(String[] args){
-		LogUtil.println(Thread.currentThread().getContextClassLoader());
 		
 		try{
-			Map<String, String> config=new HashMap<>();
-			try(var r=new FileReader(new File("config.json"))){
-				new GsonBuilder().create().<Map<String, Object>>fromJson(r, HashMap.class).forEach((k, v)->config.put(k, TextUtil.toString(v)));
-			}catch(Exception ignored){ }
+			LateInit<DataLogger> display=Common.initAndLogger();
 			
-			System.setProperty("com.lapissea.cfs.tools.DisplayServer.THREADED_OUTPUT", config.getOrDefault("threadedOutput", ""));
-			LogUtil.Init.attach(Boolean.parseBoolean(config.getOrDefault("fancyPrint", "true"))?LogUtil.Init.USE_CALL_POS|LogUtil.Init.USE_TABULATED_HEADER:0);
+			if(DEBUG_VALIDATION) display.block();
 			
-			LateInit<DataLogger> display=new LateInit<>(()->{
-				if(DEBUG_VALIDATION){
-					Object jarPath=config.get("serverDisplayJar");
-					return new DisplayServer(jarPath==null?null:jarPath.toString());
-				}
-				return new DataLogger.Blank();
-			});
-			
-			display.block();
-			
-			var     mem    =new MemoryData();
-			Cluster cluster=Cluster.build(b->b.withIO(mem));
-			
-			if(DEBUG_VALIDATION){
-				var preBuf=new LinkedList<MemFrame>();
-				mem.onWrite=ids->{
-					preBuf.add(new MemFrame(mem.readAll(), ids, new Throwable()));
-					display.ifInited(d->{
-						while(!preBuf.isEmpty()){
-							d.log(preBuf.remove(0));
-						}
-					});
-				};
-				mem.onWrite.accept(ZeroArrays.ZERO_LONG);
-			}
+			MemoryData mem    =Common.newLoggedMemory(display);
+			Cluster    cluster=Cluster.build(b->b.withIO(mem));
 			
 			try{
 				doTests(cluster);
@@ -92,6 +59,7 @@ class FSFTest{
 		
 		for(int i=0;i<2;i++){
 			packTest(cluster);
+			if(true) return;
 			freeChunksTest(cluster);
 			flatListTest(cluster);
 			linkedListTest(cluster);

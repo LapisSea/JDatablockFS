@@ -14,13 +14,12 @@ import java.io.File;
 import java.io.IOException;
 import java.net.*;
 import java.util.Arrays;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 @SuppressWarnings("AutoBoxing")
 public class DisplayServer implements DataLogger{
-	
-	private static final boolean THREADED_OUTPUT=UtilL.sysPropertyByClass(DisplayServer.class, "THREADED_OUTPUT", Boolean.FALSE, Boolean::parseBoolean);
 	
 	enum Action{
 		LOG,
@@ -31,7 +30,7 @@ public class DisplayServer implements DataLogger{
 	
 	private static DataLogger getRealLogger(){
 //		try{
-			return new DisplayLWJGL();
+		return new DisplayLWJGL();
 //		}catch(Throwable e){
 //			return new Display2D();
 //		}
@@ -104,19 +103,17 @@ public class DisplayServer implements DataLogger{
 	
 	final DataLogger proxy;
 	
-	public DisplayServer(){
-		this(null);
-	}
-	
-	public DisplayServer(String jarPath){
+	public DisplayServer(Map<String, Object> config){
+		final boolean threadedOutput=Boolean.parseBoolean(config.getOrDefault("threadedOutput", "false").toString());
 		DataLogger proxy;
 		try{
 			var socketMake=new Socket();
 			try{
 				socketMake.connect(new InetSocketAddress(InetAddress.getLocalHost(), 666), 100);
 			}catch(SocketTimeoutException e){
+				String jarPath=config.getOrDefault("jar", "").toString();
 				socketMake.close();
-				if(jarPath==null) throw new IOException(e);
+				if(jarPath.isEmpty()) throw new IOException(e);
 				var debugMode=Config.DEBUG_VALIDATION;
 				var args     ="--illegal-access=deny --enable-preview -XX:+UseG1GC -XX:MaxHeapFreeRatio=10 -XX:MinHeapFreeRatio=1 -Xms50m -server -XX:+UseCompressedOops";
 				
@@ -136,7 +133,7 @@ public class DisplayServer implements DataLogger{
 			UnsafeConsumer<Action, IOException> sendAction=(Action a)->writer.writeInt1(a.ordinal());
 			
 			UnsafeRunnable<IOException> flush=()->{
-				if(THREADED_OUTPUT) return;
+				if(threadedOutput) return;
 //				sendAction.accept(Action.PING);
 				writer.flush();
 //				is.read();
@@ -186,7 +183,7 @@ public class DisplayServer implements DataLogger{
 				}
 			};
 			
-			if(THREADED_OUTPUT){
+			if(threadedOutput){
 				ExecutorService exec  =Executors.newSingleThreadExecutor();
 				DataLogger      logger=proxy;
 				proxy=new DataLogger(){
