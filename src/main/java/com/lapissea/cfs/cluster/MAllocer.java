@@ -9,7 +9,9 @@ import com.lapissea.cfs.objects.chunk.Chunk;
 import com.lapissea.cfs.objects.chunk.ChunkPointer;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;
+import com.lapissea.util.function.UnsafeRunnable;
 
 import java.io.IOException;
 import java.util.Map;
@@ -197,13 +199,10 @@ abstract class MAllocer{
 			Cluster                  cluster   =toFree.cluster;
 			Map<ChunkPointer, Chunk> chunkCache=cluster.chunkCache;
 			
-			toFree.modifyAndSave(ch->{
+			UnsafeConsumer<Chunk,IOException> clear=chunk->chunk.modifyAndSave(ch->{
 				ch.setSize(0);
 				ch.clearNextPtr();
 			});
-			
-			toFree.zeroOutCapacity();
-			
 			
 			Chunk next     =toFree.nextPhysical();
 			int   nextIndex=-1;
@@ -239,17 +238,28 @@ abstract class MAllocer{
 					                   "Chunk 2", next);
 					freeChunks.setElement(nextIndex, null);
 					
+					long start=prev.getCapacity();
+					
 					merge(chunkCache, prev, next);
-					destroyChunk(chunkCache, toFree);
+					removeCache(chunkCache, toFree);
+					
+					long end=prev.getCapacity();
+					
+					prev.zeroOutFromTo(start, end);
 				}else{
 					LogUtil.printTable("Action", "free",
 					                   "Type", "merge",
 					                   "Source", toFree,
 					                   "Chunk", next);
+					
+					clear.accept(toFree);
+					toFree.zeroOutCapacity();
 					freeChunks.setElement(nextIndex, toFree.getPtr());
 					merge(chunkCache, toFree, next);
 				}
 			}else{
+				clear.accept(toFree);
+				toFree.zeroOutCapacity();
 				if(prev!=null){
 					LogUtil.printTable("Action", "free",
 					                   "Type", "merge",
@@ -311,8 +321,12 @@ abstract class MAllocer{
 		return read;
 	}
 	
-	protected void destroyChunk(Map<ChunkPointer, Chunk> chunkCache, Chunk chunk) throws IOException{
+	protected void removeCache(Map<ChunkPointer, Chunk> chunkCache, Chunk chunk) throws IOException{
 		chunkCache.remove(chunk.getPtr());
+	}
+	
+	protected void destroyChunk(Map<ChunkPointer, Chunk> chunkCache, Chunk chunk) throws IOException{
+		removeCache(chunkCache,chunk);
 		chunk.zeroOutHead();
 	}
 	
