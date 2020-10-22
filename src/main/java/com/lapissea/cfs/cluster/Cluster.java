@@ -3,7 +3,8 @@ package com.lapissea.cfs.cluster;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.ActionStopException;
 import com.lapissea.cfs.exceptions.BitDepthOutOfSpaceException;
-import com.lapissea.cfs.exceptions.MalformedClusterData;
+import com.lapissea.cfs.exceptions.MalformedClusterDataException;
+import com.lapissea.cfs.exceptions.UnreferencedChunkException;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.SelfPoint;
@@ -474,6 +475,9 @@ public class Cluster extends IOInstance.Contained{
 			try{
 				pack(packingConfig.autoPackTime());
 			}catch(ActionStopException ignored){ }
+			catch(UnreferencedChunkException e){
+				//TODO: this is a bandage, use proper pack blacklist timeframes
+			}
 		}
 	}
 	
@@ -713,7 +717,7 @@ public class Cluster extends IOInstance.Contained{
 		var newPtr=newChunk.getPtr();
 		
 		PointerStack ptr=findPointer(val->val.equals(oldPtr))
-			                 .orElseThrow(()->new MalformedClusterData("trying to move unreferenced chunk: "+oldChunk.toString()+" to "+newChunk));
+			                 .orElseThrow(()->new UnreferencedChunkException("trying to move unreferenced chunk: "+oldChunk.toString()+" to "+newChunk));
 		LogUtil.printTable("Action", "moving",
 		                   "Source", oldChunk,
 		                   "Chunk", newChunk);
