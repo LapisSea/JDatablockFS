@@ -4,7 +4,6 @@ import com.lapissea.cfs.cluster.Cluster;
 import com.lapissea.cfs.io.SelfPoint;
 import com.lapissea.cfs.io.bit.FlagReader;
 import com.lapissea.cfs.io.struct.IOInstance;
-import com.lapissea.cfs.io.struct.IOStruct;
 import com.lapissea.cfs.io.struct.Offset;
 import com.lapissea.cfs.io.struct.VariableNode;
 import com.lapissea.cfs.objects.chunk.Chunk;
@@ -12,7 +11,6 @@ import com.lapissea.cfs.objects.chunk.ChunkPointer;
 import com.lapissea.cfs.objects.chunk.ObjectPointer;
 import com.lapissea.glfw.GlfwKeyboardEvent;
 import com.lapissea.glfw.GlfwMonitor;
-import com.lapissea.glfw.GlfwMouseEvent;
 import com.lapissea.glfw.GlfwWindow;
 import com.lapissea.glfw.GlfwWindow.SurfaceAPI;
 import com.lapissea.util.*;
@@ -32,12 +30,7 @@ import java.util.*;
 import java.util.function.Consumer;
 import java.util.stream.IntStream;
 
-import static com.lapissea.glfw.GlfwKeyboardEvent.Type.*;
-import static com.lapissea.glfw.GlfwWindow.SurfaceAPI.*;
-import static com.lapissea.util.UtilL.*;
 import static org.lwjgl.glfw.GLFW.*;
-import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.opengl.GL30.*;
 
 @SuppressWarnings("AutoBoxing")
 public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
@@ -355,14 +348,36 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 				drawArrow(width, start, end);
 			}
 			
-			int xByte=window.mousePos.x()/pixelsPerByte;
-			int yByte=window.mousePos.y()/pixelsPerByte;
+			int    xByte=window.mousePos.x()/pixelsPerByte;
+			int    yByte=window.mousePos.y()/pixelsPerByte;
+			String s    =Integer.toString(yByte*width+xByte);
 			
-			Rectangle area=new Rectangle(xByte*pixelsPerByte, yByte*pixelsPerByte, pixelsPerByte, pixelsPerByte);
+			setColor(Color.BLACK);
+			setStroke(2);
+			outlineQuad(xByte*pixelsPerByte, yByte*pixelsPerByte, pixelsPerByte, pixelsPerByte);
 			
-			setColor(Color.MAGENTA.darker());
-			initFont();
-			drawStringIn(Integer.toString(yByte*width+xByte), area, true);
+			setColor(Color.WHITE);
+			setStroke(1);
+			outlineQuad(xByte*pixelsPerByte, yByte*pixelsPerByte, pixelsPerByte, pixelsPerByte);
+			
+			initFont(1);
+			GL11.glPushMatrix();
+			int x=xByte*pixelsPerByte;
+			int y=yByte*pixelsPerByte;
+			
+			float[] bounds=getStringBounds(s);
+			x=Math.min(x, window.size.x()-(int)Math.ceil(bounds[0]));
+			y=Math.max(y, (int)Math.ceil(bounds[1]));
+			
+			translate(x, y);
+			
+			setColor(Color.BLACK);
+			outlineString(s);
+			
+			setColor(Color.WHITE);
+			fillString(s);
+			
+			GL11.glPopMatrix();
 		}
 		
 	}
