@@ -35,7 +35,7 @@ public interface TypeParser{
 			for(TypeParser parser : parsers){
 				if(parser.canParse(cluster, type)) return parser.parse(cluster, type);
 			}
-			throw new RuntimeException("Unknown type: "+type);
+			throw new RuntimeException("Unknown type: "+type.toShortString());
 		}
 	}
 	

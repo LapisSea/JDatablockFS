@@ -151,7 +151,7 @@ public class IOInstance{
 					
 					v.read(this, cluster, buff);
 				}catch(IOException e){
-					throw new IOException("Failed to read variable "+v+" in "+getStruct()+" from "+buff, e);
+					throw new IOException("Failed to read variable "+v+" in "+getStruct().toShortString(), e);
 				}
 			}
 		}catch(Throwable e){
@@ -288,7 +288,7 @@ public class IOInstance{
 		                            .map(e->e.getKey()+": "+TextUtil.toString(e.getValue()))
 		                            .collect(joining(", ", getClass().getSimpleName()+"{", "}"));
 	}
-
+	
 	public Offset calcVarOffset(int index)     { return calcVarOffset(getStruct().getVar(index)); }
 	
 	public Offset calcVarOffset(String varName){ return calcVarOffset(getStruct().getVar(varName)); }

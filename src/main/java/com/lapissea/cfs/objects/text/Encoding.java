@@ -43,7 +43,7 @@ class Encoding{
 			
 			int bits=1;
 			while(table.length>1<<bits) bits++;
-			assert table.length==1<<bits;
+			assert table.length==(1<<bits);
 			
 			int min=IntStream.range(0, table.length).map(i->table[i]).min().orElseThrow();
 			int max=IntStream.range(0, table.length).map(i->table[i]).max().orElse(-2)+1;

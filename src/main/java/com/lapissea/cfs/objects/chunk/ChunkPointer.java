@@ -70,7 +70,7 @@ public final class ChunkPointer implements INumber{
 	
 	public static class PtrFixed extends PtrRef{
 		
-		@Value(index=1, rw=ChunkPointer.FixedIO.class, rwArgs="LONG")
+		@Value(index=1, rw=ChunkPointer.FixedIO.class)
 		private ChunkPointer value;
 		
 		public PtrFixed(){}
@@ -113,6 +113,7 @@ public final class ChunkPointer implements INumber{
 		public FixedIO(String sizeName){
 			this(NumberSize.valueOf(sizeName));
 		}
+		
 		public FixedIO(){
 			this.fixedSize=NumberSize.LARGEST;
 		}
@@ -140,6 +141,7 @@ public final class ChunkPointer implements INumber{
 		public OptionalInt getFixedSize(){
 			return OptionalInt.of(fixedSize.bytes);
 		}
+		
 		@Override
 		public OptionalInt getMaxSize(){
 			return OptionalInt.of(NumberSize.LARGEST.bytes);
@@ -170,10 +172,7 @@ public final class ChunkPointer implements INumber{
 		
 		@Override
 		public void write(Object targetObj, Cluster cluster, ContentWriter target, ChunkPointer source) throws IOException{
-			NumberSize dataSize=NumberSize.bySizeVoidable(source)
-			                              .max(minSize)
-//			                              .max(NumberSize.byBytes(cluster.getData().getSize()))
-				;
+			NumberSize dataSize=calcNumSize(source);
 			
 			try(var flags=new FlagWriter.AutoPop(NumberSize.SMALEST_REAL, target)){
 				flags.writeEnum(NumberSize.FLAG_INFO, dataSize);
@@ -184,14 +183,22 @@ public final class ChunkPointer implements INumber{
 		
 		@Override
 		public long mapSize(Object targetObj, ChunkPointer source){
-			return NumberSize.SMALEST_REAL.bytes+NumberSize.bySizeVoidable(source).bytes;
+			return NumberSize.SMALEST_REAL.bytes+calcNumSize(source).bytes;
 		}
 		
 		@Override
 		public OptionalInt getFixedSize(){ return OptionalInt.empty();}
+		
 		@Override
 		public OptionalInt getMaxSize(){
 			return OptionalInt.of(NumberSize.LARGEST.bytes);
+		}
+		
+		private NumberSize calcNumSize(ChunkPointer source){
+			return NumberSize.bySizeVoidable(source)
+			                 .max(minSize)
+//			                              .max(NumberSize.bySize(cluster.getData().getSize()))
+				;
 		}
 	}
 	
@@ -239,6 +246,7 @@ public final class ChunkPointer implements INumber{
 		
 		@Override
 		public OptionalInt getFixedSize(){ return OptionalInt.empty();}
+		
 		@Override
 		public OptionalInt getMaxSize(){
 			return OptionalInt.of(NumberSize.LARGEST.bytes);
@@ -249,6 +257,7 @@ public final class ChunkPointer implements INumber{
 	public static ChunkPointer of(long value){
 		return new ChunkPointer(value);
 	}
+	
 	public static ChunkPointer of(INumber value){
 		return new ChunkPointer(value.getValue());
 	}
@@ -291,12 +300,15 @@ public final class ChunkPointer implements INumber{
 	public ChunkPointer addPtr(INumber value){
 		return addPtr(value.getValue());
 	}
+	
 	public ChunkPointer addPtr(long value){
 		return new ChunkPointer(getValue()+value);
 	}
+	
 	public long add(INumber value){
 		return add(value.getValue());
 	}
+	
 	public long add(long value){
 		return getValue()+value;
 	}
