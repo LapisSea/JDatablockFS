@@ -32,6 +32,8 @@ public class TTFont{
 	
 	private static Boolean ANOSOTROPIC_SUPPORTED;
 	
+	
+	private final	int replacer;
 	private final STBTTFontinfo info;
 	private final ByteBuffer    ttfBB;
 	
@@ -182,9 +184,9 @@ public class TTFont{
 			STBTruetype.stbtt_GetFontVMetrics(info, pAscent, pDescent, pLineGap);
 			
 		}
+		replacer=STBTruetype.stbtt_FindGlyphIndex(info, 11111);
 		int min=255;
 		for(int i=0;i<256;i++){
-			int replacer=STBTruetype.stbtt_FindGlyphIndex(info, 11111);
 			int g       =STBTruetype.stbtt_FindGlyphIndex(info, i);
 			if(g!=replacer){
 				min=i;
@@ -193,6 +195,7 @@ public class TTFont{
 		}
 		this.min=min;
 		this.max=min+10;
+		
 	}
 	
 	private boolean generating;
@@ -232,7 +235,7 @@ public class TTFont{
 					Bitmap bitmap=new Bitmap(pixelHeight);
 					
 					synchronized(bitmapCache){
-						if(bitmapCache.size()>6){
+						if(bitmapCache.size()>7){
 							IntStream.range(0, bitmapCache.size())
 							         .boxed()
 							         .min(Comparator.comparingLong(i->bitmapCache.get(i).lastUsed))
@@ -322,15 +325,15 @@ public class TTFont{
 		}
 	}
 	
-	public void outlineString(String string, float pixelHeight){
-		drawString(string, pixelHeight, bitmap->bitmap.outlineTexture);
+	public void outlineString(String string, float pixelHeight, float x, float y){
+		drawString(string, pixelHeight, x,y,bitmap->bitmap.outlineTexture);
 	}
 	
-	public void fillString(String string, float pixelHeight){
-		drawString(string, pixelHeight, bitmap->bitmap.texture);
+	public void fillString(String string, float pixelHeight, float x, float y){
+		drawString(string, pixelHeight,x,y, bitmap->bitmap.texture);
 	}
 	
-	private void drawString(String string, float pixelHeight, Function<Bitmap, Integer> getTex){
+	private void drawString(String string, float pixelHeight, float xOff, float yOff, Function<Bitmap, Integer> getTex){
 		pushMax(string);
 		
 		Bitmap bitmap=getBitmap(pixelHeight);
@@ -355,10 +358,10 @@ public class TTFont{
 					
 					
 					float
-						x0=q.x0()*scale,
-						x1=q.x1()*scale,
-						y0=q.y0()*scale,
-						y1=q.y1()*scale;
+						x0=q.x0()*scale+xOff,
+						x1=q.x1()*scale+xOff,
+						y0=q.y0()*scale+yOff,
+						y1=q.y1()*scale+yOff;
 					
 					GL11.glTexCoord2f(q.s0(), q.t0());
 					GL11.glVertex2f(x0, y0);
@@ -385,8 +388,6 @@ public class TTFont{
 	public boolean canFontDisplay(int c){
 		if(c<min) return false;
 		if(c>max) return false;
-		
-		int replacer=STBTruetype.stbtt_FindGlyphIndex(info, 11111);
 		int g       =STBTruetype.stbtt_FindGlyphIndex(info, c);
 		return g==replacer;
 	}

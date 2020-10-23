@@ -53,7 +53,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	}
 	
 	
-	static record Pointer(int from, int to, int size, Color color){}
+	static record Pointer(int from, int to, int size, Color color, String message){}
 	
 	private final GlfwWindow window=new GlfwWindow();
 	
@@ -279,12 +279,16 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 				}
 			}
 			
+			int xByte    =window.mousePos.x()/pixelsPerByte;
+			int yByte    =window.mousePos.y()/pixelsPerByte;
+			int byteIndex=yByte*width+xByte;
+			
 			setColor(alpha(Color.WHITE, 0.5F));
 			
 			List<Pointer> ptrs=new ArrayList<>();
-			
+			Cluster cluster;
 			try{
-				Cluster cluster=Cluster.build(b->b.withMemoryView(bytes));
+				cluster=Cluster.build(b->b.withMemoryView(bytes));
 				
 				annotateStruct(width, drawByte, cluster, cluster, 0, ptrs::add);
 				for(Chunk chunk : cluster.getFirstChunk().physicalIterator()){
@@ -294,6 +298,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 					annotateStruct(width, drawByte, cluster, chunk, chunk.getPtr().getValue(), ptrs::add);
 				}
 			}catch(Throwable e){
+				cluster=null;
 				handleError(e);
 			}
 			
@@ -338,15 +343,54 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 					setStroke(sHalf);
 					drawLine(width, start, start+pSiz-1);
 					setStroke(sFul);
+					setColor(alpha(ptr.color, 0.5F));
 				}
 				
-				setColor(alpha(ptr.color, 0.5F));
 				drawArrow(width, start, end);
+				
+				if(!ptr.message.isEmpty()){
+					int xPosFrom=start%width, yPosFrom=start/width;
+					int xPosTo  =end%width, yPosTo=end/width;
+					
+					float xFrom=xPosFrom+0.5F, yFrom=yPosFrom+0.5F;
+					float xTo  =xPosTo+0.5F, yTo=yPosTo+0.5F;
+					float x    =(xFrom+xTo)/2*pixelsPerByte, y=(yFrom+yTo)/2*pixelsPerByte;
+					setColor(ptr.color);
+					initFont();
+					int msgWidth=ptr.message.length();
+					int space=(int)(window.size.x()-x);
+					
+					var w=getStringBounds(ptr.message)[0];
+					while(w>space*1.5){
+						msgWidth--;
+						w=getStringBounds(ptr.message.substring(0,msgWidth))[0];
+					}
+					var lines=TextUtil.wrapLongString(ptr.message, msgWidth);
+					y-=fontScale/2F*lines.size();
+					for(String line : lines){
+						drawStringIn(line, new Rectangle((int)x, (int)y, space, pixelsPerByte), false, true);
+						y+=fontScale;
+					}
+				}
 			}
 			
-			int    xByte=window.mousePos.x()/pixelsPerByte;
-			int    yByte=window.mousePos.y()/pixelsPerByte;
-			String s    =Integer.toString(yByte*width+xByte);
+			translate(0.5,0.5);
+			
+			if(cluster!=null){
+				try{
+					for(Chunk chunk : cluster.getFirstChunk().physicalIterator()){
+						if(chunk.rangeIntersects(byteIndex)){
+							setStroke(1);
+							outlineChunk(width, pixelsPerByte, chunk, mix(chunkBaseColor(chunk),Color.WHITE,0.4F));
+							break;
+						}
+					}
+				}catch(IOException e){
+					handleError(e);
+				}
+			}
+			
+			String s=byteIndex+"";
 			
 			setColor(Color.BLACK);
 			setStroke(2);
@@ -365,17 +409,37 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			x=Math.min(x, window.size.x()-(int)Math.ceil(bounds[0]));
 			y=Math.max(y, (int)Math.ceil(bounds[1]));
 			
-			translate(x, y);
-			
 			setColor(Color.BLACK);
-			outlineString(s);
+			outlineString(s, x, y);
 			
 			setColor(Color.WHITE);
-			fillString(s);
+			fillString(s, x, y);
 			
 			GL11.glPopMatrix();
 		}
 		
+	}
+	
+	private void outlineChunk(int width, int pixelsPerByte, Chunk chunk, Color color){
+		setColor(color);
+		
+		for(int start=chunk.getPtr().getValueInt(), end=Math.toIntExact(chunk.dataEnd()), i=start;i<end;i++){
+			int x =i%width, y=i/width;
+			int x1=x, y1=y;
+			int x2=x1+1, y2=y1+1;
+			
+			if(i-start<width) drawLine(x1, y1, x2, y1);
+			if(end-i<=width) 			drawLine(x1, y2, x2, y2);
+		if(x==0||i==start)	drawLine(x1, y1, x1, y2);
+			if(x2==width||i==end-1)	drawLine(x2, y1, x2, y2);
+		}
+		if(chunk.hasNext()){
+			try{
+				outlineChunk(width,pixelsPerByte,chunk.next(),alpha(color,color.getAlpha()/255F*0.5F));
+			}catch(IOException e){
+				handleError(e);
+			}
+		}
 	}
 	
 	
@@ -477,7 +541,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 						var c     =ptr.getBlock(cluster);
 						var valOff=ptr.globalOffset(cluster);
 						
-						pointerRecord.accept(new Pointer((int)(instanceOffset+off.getOffset()), (int)valOff, varSize, col));
+						pointerRecord.accept(new Pointer((int)(instanceOffset+off.getOffset()), (int)valOff, varSize, col, ""));
 						
 						recurse.add(new PairM<>(c.getPtr().getValue(), c));
 						recurse.add(new PairM<>(valOff, inst));
@@ -490,21 +554,25 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 							handleError(e);
 						}
 					}else if(valVal instanceof ChunkPointer ptr){
-						var color=col;
+						var color  =col;
+						var message="";
 						try{
 							recurse.add(new PairM<>(ptr.getValue(), ptr.dereference(cluster)));
 						}catch(Throwable e){
+							handleError(e);
+							message=errorToMessage(e);
 							color=Color.RED;
 						}
 						
-						pointerRecord.accept(new Pointer((int)(instanceOffset+off.getOffset()), ptr.getValueInt(), varSize, color));
+						pointerRecord.accept(new Pointer((int)(instanceOffset+off.getOffset()), ptr.getValueInt(), varSize, color, message));
 					}else if(valVal instanceof ObjectPointer<?> ptr&&ptr.hasPtr()){
 						
 						if(ptr.getOffset()==0){
 							annotateStruct(width, drawByte, cluster, stack, ptr.getBlock(cluster), ptr.getDataBlock().getValue(), pointerRecord);
 						}
 						
-						var color=col;
+						var color  =col;
+						var message="";
 						try{
 							Object o=ptr.read(cluster);
 							if(o instanceof IOInstance i){
@@ -513,10 +581,11 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 							}
 						}catch(Throwable e){
 							handleError(e);
+							message=errorToMessage(e);
 							color=Color.RED;
 						}
 						
-						pointerRecord.accept(new Pointer((int)(instanceOffset+off.getOffset()), (int)ptr.globalOffset(cluster), varSize, color));
+						pointerRecord.accept(new Pointer((int)(instanceOffset+off.getOffset()), (int)ptr.globalOffset(cluster), varSize, color, message));
 					}
 					
 					if(area.width>0){
@@ -555,6 +624,15 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 		}
 	}
 	
+	private String errorToMessage(Throwable e){
+		StringBuilder message=new StringBuilder(e.getMessage());
+		while(e.getCause()!=null){
+			message.append("\nCause: ").append(e.getCause().getMessage());
+			e=e.getCause();
+		}
+		return message.toString();
+	}
+	
 	boolean errorMode;
 	
 	private void handleError(Throwable e){
@@ -568,12 +646,12 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 		return font.getStringBounds(str, fontScale);
 	}
 	
-	private void outlineString(String str){
-		font.outlineString(str, fontScale);
+	private void outlineString(String str, float x, float y){
+		font.outlineString(str, fontScale, x, y);
 	}
 	
-	private void fillString(String str){
-		font.fillString(str, fontScale);
+	private void fillString(String str, float x, float y){
+		font.fillString(str, fontScale, x, y);
 	}
 	
 	private boolean canFontDisplay(char c){
@@ -597,6 +675,10 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	}
 	
 	private void drawStringIn(String s, Rectangle area, boolean doStroke){
+		drawStringIn(s, area, doStroke, false);
+	}
+	
+	private void drawStringIn(String s, Rectangle area, boolean doStroke, boolean alignLeft){
 		var rect=getStringBounds(s);
 		
 		float w=rect[0];
@@ -605,7 +687,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 		float fontScale=this.fontScale;
 		
 		if(h>0){
-			if(area.height>h){
+			if(area.height<h){
 				this.fontScale=area.height;
 				
 				rect=getStringBounds(s);
@@ -626,6 +708,11 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 				h=rect[1];
 			}
 			while((area.width-1)/w<0.5){
+				if(s.isEmpty()) return;
+				if(s.length()<=4){
+					s=s.charAt(0)+"";
+					break;
+				}
 				s=s.substring(0, s.length()-4)+"...";
 				rect=getStringBounds(s);
 				
@@ -636,7 +723,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 		
 		GL11.glPushMatrix();
 		translate(area.x, area.y);
-		translate(Math.max(0, area.width-w)/2D, h+(area.height-h)/2);
+		translate(alignLeft?0:Math.max(0, area.width-w)/2D, h+(area.height-h)/2);
 		
 		if(w>0){
 			double scale=(area.width-1)/w;
@@ -651,11 +738,11 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			setColor(new Color(0, 0, 0, 0.5F));
 			setStroke(1);
 			
-			outlineString(s);
+			outlineString(s, 0, 0);
 			
 			setColor(c);
 		}
-		fillString(s);
+		fillString(s, 0, 0);
 		
 		this.fontScale=fontScale;
 		GL11.glPopMatrix();
