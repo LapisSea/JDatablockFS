@@ -203,13 +203,15 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	
 	private void setFrame(int frame){
 		if(frame>frames.size()-1) frame=frames.size()-1;
-		if(frame<0) frame=0;
 		framePos.set(frame);
 		window.title.set("Binary display - frame: "+frame);
 	}
 	
 	private int getFramePos(){
-		return framePos.get();
+		synchronized(framePos){
+			if(framePos.get()==-1) setFrame(frames.size()-1);
+			return framePos.get();
+		}
 	}
 	
 	private void render(){
@@ -863,7 +865,10 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	@Override
 	public void log(MemFrame frame){
 		frames.add(frame);
-		setFrame(frames.size()-1);
+		synchronized(framePos){
+			framePos.set(-1);
+		}
+		shouldRender=true;
 	}
 	
 	@Override
