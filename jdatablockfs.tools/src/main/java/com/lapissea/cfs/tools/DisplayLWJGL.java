@@ -32,7 +32,6 @@ import java.util.stream.IntStream;
 
 import static org.lwjgl.glfw.GLFW.*;
 
-@SuppressWarnings("AutoBoxing")
 public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	
 	private class BulkDraw implements AutoCloseable{
@@ -288,7 +287,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			setColor(alpha(Color.WHITE, 0.5F));
 			
 			List<Pointer> ptrs=new ArrayList<>();
-			Cluster cluster;
+			Cluster       cluster;
 			try{
 				cluster=Cluster.build(b->b.withMemoryView(bytes));
 				
@@ -360,12 +359,12 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 					setColor(ptr.color);
 					initFont();
 					int msgWidth=ptr.message.length();
-					int space=(int)(window.size.x()-x);
+					int space   =(int)(window.size.x()-x);
 					
 					var w=getStringBounds(ptr.message)[0];
 					while(w>space*1.5){
 						msgWidth--;
-						w=getStringBounds(ptr.message.substring(0,msgWidth))[0];
+						w=getStringBounds(ptr.message.substring(0, msgWidth))[0];
 					}
 					var lines=TextUtil.wrapLongString(ptr.message, msgWidth);
 					y-=fontScale/2F*lines.size();
@@ -376,14 +375,14 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 				}
 			}
 			
-			translate(0.5,0.5);
+			translate(0.5, 0.5);
 			
 			if(cluster!=null){
 				try{
 					for(Chunk chunk : cluster.getFirstChunk().physicalIterator()){
 						if(chunk.rangeIntersects(byteIndex)){
 							setStroke(1);
-							outlineChunk(width, pixelsPerByte, chunk, mix(chunkBaseColor(chunk),Color.WHITE,0.4F));
+							outlineChunk(width, pixelsPerByte, chunk, mix(chunkBaseColor(chunk), Color.WHITE, 0.4F));
 							break;
 						}
 					}
@@ -431,13 +430,13 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			int x2=x1+1, y2=y1+1;
 			
 			if(i-start<width) drawLine(x1, y1, x2, y1);
-			if(end-i<=width) 			drawLine(x1, y2, x2, y2);
-		if(x==0||i==start)	drawLine(x1, y1, x1, y2);
-			if(x2==width||i==end-1)	drawLine(x2, y1, x2, y2);
+			if(end-i<=width) drawLine(x1, y2, x2, y2);
+			if(x==0||i==start) drawLine(x1, y1, x1, y2);
+			if(x2==width||i==end-1) drawLine(x2, y1, x2, y2);
 		}
 		if(chunk.hasNext()){
 			try{
-				outlineChunk(width,pixelsPerByte,chunk.next(),alpha(color,color.getAlpha()/255F*0.5F));
+				outlineChunk(width, pixelsPerByte, chunk.next(), alpha(color, color.getAlpha()/255F*0.5F));
 			}catch(IOException e){
 				handleError(e);
 			}
