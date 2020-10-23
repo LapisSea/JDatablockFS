@@ -578,4 +578,10 @@ public class Chunk extends IOInstance.Contained implements Iterable<Chunk>, Rand
 		chunk.size=this.size;
 		return chunk;
 	}
+	
+	public boolean rangeIntersects(long index){
+		long start= ptr.getValue();
+		long end=dataEnd();
+		return index>=start&&index<end;
+	}
 }
