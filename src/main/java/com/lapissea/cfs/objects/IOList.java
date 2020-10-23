@@ -604,6 +604,16 @@ public interface IOList<T> extends Iterable<T>{
 		return -1;
 	}
 	
+	default boolean countGreaterThan(UnsafePredicate<T, IOException> matcher, int countLimit) throws IOException{
+		int count=0;
+		for(T el : this){
+			if(matcher.test(el)){
+				count++;
+				if(count>countLimit)return true;
+			}
+		}
+		return false;
+	}
 	default int count(UnsafePredicate<T, IOException> matcher) throws IOException{
 		int count=0;
 		for(T el : this){

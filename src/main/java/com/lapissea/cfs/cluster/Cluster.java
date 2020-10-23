@@ -312,7 +312,7 @@ public class Cluster extends IOInstance.Contained{
 		if(freeChunks.count(Objects::isNull)==0){
 //			freeChunks.addElement(null);
 		}else{
-			while(freeChunks.count(Objects::isNull)>3){
+			while(freeChunks.countGreaterThan(Objects::isNull, 3)){
 				freeChunks.removeElement(freeChunks.indexOfLast(null));
 			}
 		}
