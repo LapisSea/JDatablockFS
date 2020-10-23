@@ -6,8 +6,10 @@ import com.lapissea.cfs.io.bit.EnumFlag;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.objects.chunk.ChunkPointer;
+import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
+import com.lapissea.util.TextUtil;
 import com.lapissea.util.function.UnsafeConsumerOL;
 import com.lapissea.util.function.UnsafeFunctionOL;
 
@@ -61,7 +63,7 @@ public enum NumberSize{
 		for(NumberSize value : VALS){
 			if(value.bytes>=bytes) return value;
 		}
-		throw new RuntimeException("Extremely large value");
+		throw new RuntimeException("Extremely large byte length: "+bytes);
 	}
 	
 	public final int  bytes;
