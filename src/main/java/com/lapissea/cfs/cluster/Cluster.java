@@ -170,6 +170,7 @@ public class Cluster extends IOInstance.Contained{
 		registerParsers();
 		
 		if(data.isEmpty()){
+			if(readOnly) throw new MalformedClusterDataException("Cannot create cluster from read only empty data");
 			safeSession(this::initData);
 		}
 		
@@ -692,6 +693,8 @@ public class Cluster extends IOInstance.Contained{
 	
 	public void copyDataAndMoveChunk(Chunk oldChunk, Chunk newChunk) throws IOException{
 		assert newChunk.getCapacity()>=oldChunk.getCapacity();
+		assert oldChunk.isUsed():oldChunk+" "+newChunk;
+		
 		try(var io=oldChunk.io()){
 			try(var dest=newChunk.io()){
 				Utils.transferExact(io, dest, oldChunk.getSize());
@@ -958,6 +961,8 @@ public class Cluster extends IOInstance.Contained{
 					sameCopy.setCapacityConfident(ch.getCapacity());
 					sameCopy.setIsUserData(ch.isUserData());
 				};
+				
+				//TODO: unsafe, can cause infinite loop
 //				var ptrPos=freeChunk.getPtr().getValue();
 //
 //				var opt=findPointer(e->{

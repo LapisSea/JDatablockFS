@@ -233,10 +233,6 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 		
 		GL11.glEnable(GL11.GL_BLEND);
 		GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
-//		glBlendFunc(GL_SRC_ALPHA_SATURATE, GL_ONE);
-//		glEnable(GL_POLYGON_SMOOTH);
-//		glHint(GL_POLYGON_SMOOTH_HINT, GL_NICEST);
-		
 		
 		if(!frames.isEmpty()){
 			MemFrame frame=frames.get(frameIndex);

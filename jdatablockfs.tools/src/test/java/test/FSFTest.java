@@ -56,15 +56,14 @@ class FSFTest{
 	
 	private static void doTests(Cluster cluster) throws IOException{
 		
-		
 		for(int i=0;i<2;i++){
 			packTest(cluster);
-			if(true) return;
 			freeChunksTest(cluster);
 			flatListTest(cluster);
 			linkedListTest(cluster);
 		}
 		
+		cluster.pack();
 	}
 	
 	private static void freeChunksTest(Cluster cluster) throws IOException{

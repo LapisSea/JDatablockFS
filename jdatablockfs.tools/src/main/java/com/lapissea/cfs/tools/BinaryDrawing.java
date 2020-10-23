@@ -66,6 +66,9 @@ public abstract class BinaryDrawing{
 		drawLine(xPosFrom+0.5, yPosFrom+0.5, xPosTo+0.5, yPosTo+0.5);
 	}
 	
+	protected Color chunkBaseColor(Chunk chunk){
+		return chunk.isUsed()?chunk.isUserData()?Color.blue.brighter():Color.GREEN:Color.CYAN;
+	}
 	
 	protected void fillChunk(DrawB drawByte, Chunk chunk, Function<Color, Color> filter){
 		fillChunk(drawByte, chunk, filter, true, false);
@@ -73,7 +76,7 @@ public abstract class BinaryDrawing{
 	
 	protected void fillChunk(DrawB drawByte, Chunk chunk, Function<Color, Color> filter, boolean withChar, boolean force){
 		
-		var chunkColor=chunk.isUsed()?chunk.isUserData()?Color.blue.brighter():Color.GREEN:Color.CYAN;
+		var chunkColor=chunkBaseColor(chunk);
 		var dataColor =mul(chunkColor, 0.5F);
 		var freeColor =alpha(chunkColor, 0.4F);
 		
