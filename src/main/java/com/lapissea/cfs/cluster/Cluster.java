@@ -903,8 +903,15 @@ public class Cluster extends IOInstance.Contained{
 		Instant end=Instant.now().plus(timeAllowed);
 		
 		packChains(end);
-		long limitedPos=0;
-		boolean lastFreed=false;
+		
+		batchFree(()->{
+			for(int i=0;i<freeChunks.size();i++){
+				if(freeChunks.getElement(i)==null) freeChunks.removeElement(i);
+			}
+		});
+		
+		long    limitedPos=0;
+		boolean lastFreed =false;
 		while(!freeChunks.isEmpty()){
 			timeout(end);
 			
@@ -933,11 +940,14 @@ public class Cluster extends IOInstance.Contained{
 				
 				Chunk next=freeChunk.nextPhysical();
 				if(next==null){
-					freeChunks.removeElement(firstIndex);
-					free(freeChunk);
-					while(freeChunks.count(Objects::isNull)>1){
-						freeChunks.removeElement(freeChunks.indexOfLast(null));
-					}
+					int toRemove=firstIndex;
+					batchFree(()->{
+						freeChunks.removeElement(toRemove);
+						free(freeChunk);
+						while(freeChunks.countGreaterThan(Objects::isNull, 1)){
+							freeChunks.removeElement(freeChunks.indexOfLast(null));
+						}
+					});
 					if(lastFreed) break;
 					lastFreed=true;
 					continue;
@@ -967,6 +977,18 @@ public class Cluster extends IOInstance.Contained{
 				
 				applyProps.accept(next);
 				toMerge=next;
+			}
+			
+			//TODO: this should not be a thing, freeing algorithm needs improvements
+			// Case: Listed free, queued, queued, listed free
+			// Result: Listed free (w 2 merged), listed free
+			if(!toMerge.isUsed()){
+				int index=freeChunks.indexOf(toMerge.getPtr());
+				if(index!=-1){
+					freeChunks.removeElement(index);
+					free(toMerge);
+					continue;
+				}
 			}
 			
 			sameCopy.setUsed(true);
