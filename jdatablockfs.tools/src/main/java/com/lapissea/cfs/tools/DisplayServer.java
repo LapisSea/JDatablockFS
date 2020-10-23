@@ -5,7 +5,6 @@ import com.lapissea.cfs.io.content.ContentInputStream;
 import com.lapissea.cfs.io.content.ContentOutputStream;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.util.LogUtil;
-import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeRunnable;
 
@@ -29,11 +28,11 @@ public class DisplayServer implements DataLogger{
 	}
 	
 	private static DataLogger getRealLogger(){
-//		try{
-		return new DisplayLWJGL();
-//		}catch(Throwable e){
-//			return new Display2D();
-//		}
+		try{
+			return new DisplayLWJGL();
+		}catch(Throwable e){
+			return new Display2D();
+		}
 	}
 	
 	public static void main(String[] args) throws IOException{
@@ -105,7 +104,7 @@ public class DisplayServer implements DataLogger{
 	
 	public DisplayServer(Map<String, Object> config){
 		final boolean threadedOutput=Boolean.parseBoolean(config.getOrDefault("threadedOutput", "false").toString());
-		DataLogger proxy;
+		DataLogger    proxy;
 		try{
 			var socketMake=new Socket();
 			try{
