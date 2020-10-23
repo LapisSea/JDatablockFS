@@ -666,6 +666,7 @@ public interface IOList<T> extends Iterable<T>{
 			
 			@Override
 			public boolean tryAdvance(Consumer<? super T> action){
+				if(current.get()>=size())return false;
 				T element;
 				try{
 					element=getElement(current.getAndIncrement());
