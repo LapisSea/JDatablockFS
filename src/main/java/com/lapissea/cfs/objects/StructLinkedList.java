@@ -297,7 +297,7 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 	
 	private void checkSize() throws IOException{
 		int actualSize=nextWalkCount();
-		assert actualSize==size:actualSize+" != "+size;
+		if(actualSize!=size)throw new IllegalStateException(actualSize+" != "+size);
 	}
 	
 	@Override
@@ -536,9 +536,11 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 		}
 		throw new ShouldNeverHappenError();
 	}
-	
-	private void pushChange(){
+	private void requireNonChanging(){
 		if(isChanging()) throw new IllegalStateException("recursive change at "+container);
+	}
+	private void pushChange(){
+		requireNonChanging();
 		
 		this.changing=true;
 		changingListener.accept(true);
@@ -556,6 +558,8 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 		}
 		
 		if(toAdd.anyMatches(Objects::isNull)) throw new IllegalArgumentException(toAdd+" contains null value(s)!");
+		
+		requireNonChanging();
 		
 		List<Node> nodeChain=toAdd.stream().map(this::fromVal).collect(Collectors.toList());
 		
@@ -592,6 +596,7 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 	@Override
 	public void addElement(T value) throws IOException{
 		Objects.requireNonNull(value);
+		requireNonChanging();
 		
 		Node newNode=fromVal(value);
 		nodeCache.put(size, newNode);
@@ -612,6 +617,8 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 		Objects.requireNonNull(value);
 		
 		validate();
+		
+		requireNonChanging();
 		
 		Node newNode=fromVal(value);
 		
