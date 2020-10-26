@@ -19,10 +19,7 @@ import com.lapissea.util.function.UnsafeFunction;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
@@ -37,6 +34,8 @@ public class IOInstance{
 	public abstract static class Contained extends IOInstance{
 		
 		public abstract static class SingletonChunk<SELF extends SingletonChunk<SELF>> extends Contained implements SelfPoint<SELF>{
+			
+			private ObjectPointer<SELF> ptrCache;
 			
 			public SingletonChunk(){ }
 			
@@ -62,8 +61,9 @@ public class IOInstance{
 			
 			@NotNull
 			@Override
-			public ObjectPointer<SELF> getSelfPtr(){
-				return new ObjectPointer.Struct<>(getContainer().getPtr(), 0, getSelfConstructor());
+			public synchronized ObjectPointer<SELF> getSelfPtr(){
+				if(ptrCache==null) ptrCache=new ObjectPointer.Struct<>(getContainer().getPtr(), 0, getSelfConstructor());
+				return ptrCache;
 			}
 		}
 		
@@ -90,7 +90,12 @@ public class IOInstance{
 		public void writeStruct(boolean trimAfterWrite) throws IOException{
 			var buff=getStructSourceIO();
 			try{
-				buff.ensureCapacity(buff.getPos()+this.getInstanceSize());
+				this.writingInstance=true;
+				try{
+					buff.ensureCapacity(buff.getPos()+this.getInstanceSize());
+				}finally{
+					this.writingInstance=false;
+				}
 				writeStruct(getSourceCluster(), buff);
 				if(trimAfterWrite) buff.trim();
 			}catch(IOException e){
@@ -108,9 +113,14 @@ public class IOInstance{
 	}
 	
 	private final IOStruct struct;
+	protected     boolean  writingInstance;
 	
 	@NotNull
 	public IOStruct getStruct(){ return struct; }
+	
+	public boolean isWritingInstance(){
+		return writingInstance;
+	}
 	
 	public IOInstance(){
 		this.struct=IOStruct.get(getClass());
@@ -183,32 +193,39 @@ public class IOInstance{
 		}
 		
 		try{
-			if(DEBUG_VALIDATION){
-				for(var v : getStruct().variableIter){
-					var size=v.mapSize(this);
-					try(ContentWriter vbuf=buff.bufferExactWrite(size, (written, expected)->new IOException(this.getClass().getName()+" Var \""+v.name+"\" written/expected "+written+"/"+expected))){
-						v.write(this, cluster, vbuf);
+			if(writingInstance) throw new ConcurrentModificationException();
+			writingInstance=true;
+			
+			try{
+				if(DEBUG_VALIDATION){
+					for(var v : getStruct().variableIter){
+						var size=v.mapSize(this);
+						try(ContentWriter vbuf=buff.bufferExactWrite(size, (written, expected)->new IOException(this.getClass().getName()+" Var \""+v.name+"\" written/expected "+written+"/"+expected))){
+							v.write(this, cluster, vbuf);
+						}
+					}
+				}else{
+					for(var v : getStruct().variableIter){
+						v.write(this, cluster, buff);
 					}
 				}
-			}else{
-				for(var v : getStruct().variableIter){
-					v.write(this, cluster, buff);
+			}catch(Throwable e){
+				e1=e;
+			}
+			
+			if(shouldClose){
+				try{
+					buff.close();
+				}catch(Throwable e2){
+					if(e1!=null) e1.addSuppressed(e2);
+					else throw e2;
 				}
 			}
-		}catch(Throwable e){
-			e1=e;
+			if(e1!=null) throw UtilL.uncheckedThrow(e1);
+			
+		}finally{
+			writingInstance=false;
 		}
-		
-		if(shouldClose){
-			try{
-				buff.close();
-			}catch(Throwable e2){
-				if(e1!=null) e1.addSuppressed(e2);
-				else throw e2;
-			}
-		}
-		if(e1!=null) throw UtilL.uncheckedThrow(e1);
-		
 	}
 	
 	public long getInstanceSize(){
