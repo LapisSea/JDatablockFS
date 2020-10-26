@@ -291,6 +291,10 @@ public class Chunk extends IOInstance.Contained implements Iterable<Chunk>, Rand
 		this.size=newSize;
 	}
 	
+	public boolean isNextDisabled(){
+		return getNextSize()==NumberSize.VOID;
+	}
+	
 	public void requireReal(){
 		cluster.checkCached(this);
 	}

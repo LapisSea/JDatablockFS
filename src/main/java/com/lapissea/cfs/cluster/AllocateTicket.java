@@ -55,6 +55,10 @@ public record AllocateTicket(long bytes, boolean disableResizing, @Nullable IOTy
 		return DEFAULT.asUserData(type);
 	}
 	
+	public static AllocateTicket approved(Predicate<Chunk> approve){
+		return DEFAULT.withApproval(approve);
+	}
+	
 	public AllocateTicket withDisabledResizing(){
 		return shouldDisableResizing(true);
 	}

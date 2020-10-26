@@ -409,7 +409,11 @@ public abstract class VariableNode<ValTyp>{
 	
 	@Override
 	public String toString(){
-		StringBuilder sb=new StringBuilder(this.getClass().getSimpleName());
+		var cName=this.getClass().getName();
+		cName=cName.substring(cName.lastIndexOf('.')+1).replace("IOImpl$", ">");
+		StringBuilder sb =new StringBuilder(cName);
+		var           end="IOImpl";
+		if(cName.endsWith(end)) sb.setLength(sb.length()-end.length());
 		sb.append('{');
 		sb.append(name);
 		if(getKnownOffset()!=null) sb.append(", offset = ").append(getKnownOffset());
