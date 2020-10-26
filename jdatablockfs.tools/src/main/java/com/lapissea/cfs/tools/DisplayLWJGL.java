@@ -23,6 +23,7 @@ import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL30;
 
 import java.awt.*;
+import java.awt.datatransfer.DataFlavor;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
@@ -66,6 +67,9 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	private       float             fontScale;
 	
 	private boolean bulkDrawing;
+	private String  filter     ="";
+	private boolean filterMake =false;
+	private int[]   scrollRange=null;
 	
 	private final TTFont font=new TTFont("/CourierPrime-Regular.ttf", BulkDraw::new, ()->shouldRender=true, glTasks::add);
 	
@@ -115,7 +119,11 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 				if(!window.isMouseKeyDown(GLFW.GLFW_MOUSE_BUTTON_LEFT)) return;
 				
 				float percent=MathUtil.snap((pos.x()-10F)/(window.size.x()-20F), 0, 1);
-				setFrame(Math.round((frames.size()-1)*percent));
+				if(scrollRange!=null){
+					setFrame(Math.round(scrollRange[0]+(scrollRange[1]-scrollRange[0]+1)*percent));
+				}else{
+					setFrame(Math.round((frames.size()-1)*percent));
+				}
 			});
 			
 			window.size.register(()->{
@@ -124,9 +132,75 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			});
 			
 			window.registryKeyboardKey.register(e->{
+				if(!filter.isEmpty()&&e.getKey()==GLFW_KEY_ESCAPE){
+					filter="";
+					scrollRange=null;
+					shouldRender=true;
+				}
+				
+				if(filterMake){
+					shouldRender=true;
+					
+					if(e.getType()!=GlfwKeyboardEvent.Type.UP&&e.getKey()==GLFW_KEY_BACKSPACE){
+						if(!filter.isEmpty()){
+							filter=filter.substring(0, filter.length()-1);
+						}
+						return;
+					}
+					
+					if(e.getType()!=GlfwKeyboardEvent.Type.DOWN) return;
+					if(e.getKey()==GLFW_KEY_ENTER){
+						filterMake=false;
+						
+						
+						boolean lastMatch=false;
+						int     start    =0;
+						
+						int frameIndex=getFramePos();
+						find:
+						{
+							for(int i=0;i<frames.size();i++){
+								boolean match=!filter.isEmpty()&&Arrays.stream(frames.get(i).e()).anyMatch(l->l.contains(filter));
+								if(match==lastMatch){
+									continue;
+								}
+								if(frameIndex>=start&&frameIndex<=i){
+									scrollRange=new int[]{start, i};
+									break find;
+								}
+								lastMatch=match;
+								start=i;
+							}
+							int i=frames.size()-1;
+							if(frameIndex>=start&&frameIndex<=i){
+								scrollRange=new int[]{start, i};
+							}
+						}
+						
+						return;
+					}
+					if(e.getKey()==GLFW_KEY_V&&window.isKeyDown(GLFW_KEY_LEFT_CONTROL)){
+						try{
+							String data=(String)Toolkit.getDefaultToolkit().getSystemClipboard().getData(DataFlavor.stringFlavor);
+							filter+=data;
+						}catch(Exception ignored){ }
+						return;
+					}
+					var cg=(char)e.getKey();
+					if(!window.isKeyDown(GLFW_KEY_LEFT_SHIFT)) cg=Character.toLowerCase(cg);
+					if(canFontDisplay(cg)){
+						filter+=cg;
+					}
+					return;
+				}else if(e.getKey()==GLFW_KEY_F){
+					filter="";
+					scrollRange=null;
+					filterMake=true;
+				}
+				
 				int delta;
-				if(e.getKey()==GLFW.GLFW_KEY_LEFT||e.getKey()==GLFW.GLFW_KEY_A) delta=-1;
-				else if(e.getKey()==GLFW.GLFW_KEY_RIGHT||e.getKey()==GLFW.GLFW_KEY_D) delta=1;
+				if(e.getKey()==GLFW_KEY_LEFT||e.getKey()==GLFW_KEY_A) delta=-1;
+				else if(e.getKey()==GLFW_KEY_RIGHT||e.getKey()==GLFW_KEY_D) delta=1;
 				else return;
 				if(e.getType()==GlfwKeyboardEvent.Type.UP) return;
 				setFrame(getFramePos()+delta);
@@ -374,49 +448,86 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 					}
 				}
 			}
-			
-			translate(0.5, 0.5);
-			
-			String s=byteIndex+"";
-			
-			setColor(Color.BLACK);
-			setStroke(2);
-			outlineQuad(xByte*pixelsPerByte, yByte*pixelsPerByte, pixelsPerByte, pixelsPerByte);
-			
-			setColor(Color.WHITE);
-			setStroke(1);
-			outlineQuad(xByte*pixelsPerByte, yByte*pixelsPerByte, pixelsPerByte, pixelsPerByte);
-			
-			initFont(1);
-			GL11.glPushMatrix();
-			int x=xByte*pixelsPerByte;
-			int y=yByte*pixelsPerByte;
-			
-			float[] bounds=getStringBounds(s);
-			x=Math.min(x, window.size.x()-(int)Math.ceil(bounds[0]));
-			y=Math.max(y, (int)Math.ceil(bounds[1]));
-			
-			setColor(Color.BLACK);
-			outlineString(s, x, y);
-			
-			setColor(Color.WHITE);
-			fillString(s, x, y);
-			
-			GL11.glPopMatrix();
-			
-			if(cluster!=null){
-				try{
-					for(Chunk chunk : cluster.getFirstChunk().physicalIterator()){
-						if(chunk.rangeIntersects(byteIndex)){
-							setStroke(1);
-							outlineChunk(width, pixelsPerByte, chunk, mix(chunkBaseColor(chunk), Color.WHITE, 0.4F));
-							break;
+			{
+				translate(0.5, 0.5);
+				
+				String s=byteIndex+"";
+				
+				setColor(Color.BLACK);
+				setStroke(2);
+				outlineQuad(xByte*pixelsPerByte, yByte*pixelsPerByte, pixelsPerByte, pixelsPerByte);
+				
+				setColor(Color.WHITE);
+				setStroke(1);
+				outlineQuad(xByte*pixelsPerByte, yByte*pixelsPerByte, pixelsPerByte, pixelsPerByte);
+				
+				initFont(1);
+				GL11.glPushMatrix();
+				int x=xByte*pixelsPerByte;
+				int y=yByte*pixelsPerByte;
+				
+				float[] bounds=getStringBounds(s);
+				x=Math.min(x, window.size.x()-(int)Math.ceil(bounds[0]));
+				y=Math.max(y, (int)Math.ceil(bounds[1]));
+				
+				setColor(Color.BLACK);
+				outlineString(s, x, y);
+				
+				setColor(Color.WHITE);
+				fillString(s, x, y);
+				
+				GL11.glPopMatrix();
+				
+				if(cluster!=null){
+					try{
+						for(Chunk chunk : cluster.getFirstChunk().physicalIterator()){
+							if(chunk.rangeIntersects(byteIndex)){
+								setStroke(1);
+								outlineChunk(width, pixelsPerByte, chunk, mix(chunkBaseColor(chunk), Color.WHITE, 0.4F));
+								break;
+							}
 						}
+					}catch(IOException e){
+						handleError(e);
 					}
-				}catch(IOException e){
-					handleError(e);
 				}
+				translate(-0.5, -0.5);
 			}
+			
+			setColor(Color.WHITE);
+			if(filterMake){
+				initFont(1);
+				drawStringIn("Filter: "+filter, new Rectangle(0, 0, window.size.x(), window.size.y()), true, true);
+			}
+			
+			translate(0, window.size.y());
+			scale(1, -1);
+			
+			double w=window.size.x()/(double)frames.size();
+			
+			boolean lastMatch=false;
+			int     start    =0;
+			
+			double height=6;
+			
+			setColor(Color.BLUE.darker());
+			fillQuad((frameIndex-0.5)*w, 0, w*2, height*1.5);
+			fillQuad(frameIndex*w-0.75, 0, 1.5, height*1.5);
+			
+			for(int i=0;i<frames.size();i++){
+				boolean match=!filter.isEmpty()&&Arrays.stream(frames.get(i).e()).anyMatch(l->l.contains(filter));
+				if(match==lastMatch){
+					continue;
+				}
+				setColor(alpha(lastMatch?Color.RED.darker():Color.WHITE, frameIndex>=start&&frameIndex<=i?0.6F:0.3F));
+				fillQuad(start*w, 0, w*(i-start), height);
+				lastMatch=match;
+				start=i;
+			}
+			int i=frames.size();
+			setColor(alpha(lastMatch?Color.RED.darker():Color.WHITE, frameIndex>=start&&frameIndex<=i?0.6F:0.3F));
+			fillQuad(start*w, 0, w*(i-start), height);
+			
 		}
 		
 	}
@@ -875,6 +986,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	
 	@Override
 	public void reset(){
+		scrollRange=null;
 		frames.clear();
 		setFrame(0);
 	}
