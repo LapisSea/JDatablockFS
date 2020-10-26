@@ -809,7 +809,7 @@ public class Cluster extends IOInstance.Contained{
 		String deb
 	){}
 	
-	private static record PointerStack(
+	static record PointerStack(
 		List<PointerFrame> stack,
 		UnsafeConsumer<ChunkPointer, IOException> setter
 	){
@@ -861,11 +861,11 @@ public class Cluster extends IOInstance.Contained{
 		return findPointer(p->p.equals(val));
 	}
 	
-	private Optional<PointerStack> findPointer(UnsafePredicate<ChunkPointer, IOException> finder) throws IOException{
+	Optional<PointerStack> findPointer(UnsafePredicate<ChunkPointer, IOException> finder) throws IOException{
 		return memoryWalk(ptr->finder.test(ptr.headPtr()));
 	}
 	
-	private Optional<PointerStack> memoryWalk(UnsafePredicate<PointerStack, IOException> valueFeedMod) throws IOException{
+	Optional<PointerStack> memoryWalk(UnsafePredicate<PointerStack, IOException> valueFeedMod) throws IOException{
 		return memoryWalk(this, valueFeedMod);
 	}
 	
@@ -977,7 +977,7 @@ public class Cluster extends IOInstance.Contained{
 		return Optional.empty();
 	}
 	
-	private void chainToChunk(Chunk chainStart, Chunk destChunk) throws IOException{
+	void chainToChunk(Chunk chainStart, Chunk destChunk) throws IOException{
 		if(DEBUG_VALIDATION){
 			for(Chunk chunk : getFirstChunk().physicalIterator()){
 				if(chainStart.getPtr().equals(chunk.getNextPtr())) throw new IllegalArgumentException(chainStart+" is not the chain start");
@@ -1001,12 +1001,6 @@ public class Cluster extends IOInstance.Contained{
 		}catch(ActionStopException ignored){ }
 	}
 	
-	private void timeout(Instant end) throws ActionStopException{
-		if(end!=null&&Instant.now().isAfter(end)){
-			throw new ActionStopException();
-		}
-	}
-	
 	public void pack(Duration timeAllowed) throws IOException, ActionStopException{
 		if(packing) return;
 		try{
@@ -1021,205 +1015,10 @@ public class Cluster extends IOInstance.Contained{
 		if(getConfig().logActions()) LogUtil.printTable("Action", "PACK", "Type", timeAllowed!=null?timeAllowed.toString():"FULL");
 		Instant end=timeAllowed==null?null:Instant.now().plus(timeAllowed);
 		
-		packChains(end);
+		Pack.mergeChains(this, end);
 
-//		freeChunkScan(end);
-		memoryReorder(end);
-	}
-	
-	private void memoryReorder(Instant end) throws IOException, ActionStopException{
-		boolean ending=false;
-		while(true){
-			timeout(end);
-			Iterator<Chunk>     physicalOrder=getFirstChunk().physicalIterator().iterator();
-			PairM<Chunk, Chunk> missMatch    =new PairM<>();
-			var stackO=memoryWalk(ptr->{
-				Chunk c=physicalOrder.next();
-				if(c==null) return false;
-				if(!ptr.headPtr().equals(c.getPtr())){
-					missMatch.obj1=c;
-					missMatch.obj2=getChunk(ptr.headPtr());
-					return true;
-				}
-				return false;
-			});
-			if(stackO.isEmpty()){
-				shrinkFreeChunks();
-				if(ending) return;
-				ending=true;
-				continue;
-			}
-			
-			Chunk clearStart=missMatch.obj1;
-			Chunk toMoveIn  =missMatch.obj2;
-			
-			
-			ChunkPointer startPtr=clearStart.getPtr();
-			Chunk        start;
-			freeLoop:
-			while(true){
-				start=getChunk(startPtr);
-				for(Chunk chunk : start.physicalIterator()){
-					if(!chunk.isUsed()){
-						if(isLastPhysical(chunk)){
-							shrinkFreeChunks();
-							break freeLoop;
-						}
-						continue;
-					}
-					
-					if(!start.isUsed()){
-						try{
-							consomeFreeChunkStart(freeChunks.indexOf(startPtr), toMoveIn);
-							break freeLoop;
-						}catch(IllegalStateException ignored){ }
-					}
-					copyDataAndMoveChunk(chunk, AllocateTicket.approved(ch->ch.getPtr().compareTo(chunk.getPtr())>0));
-					break;
-				}
-			}
-		}
-	}
-	
-	private void shrinkFreeChunks() throws IOException{
-		batchFree(()->{
-			loop:
-			while(true){
-				for(Iterator<ChunkPointer> iter=freeChunks.iterator();iter.hasNext();){
-					var ptr=iter.next();
-					if(ptr==null){
-						iter.remove();
-						continue loop;
-					}
-					Chunk ch=getChunk(ptr);
-					if(isLastPhysical(ch)){
-						iter.remove();
-						free(ch);
-						continue loop;
-					}
-				}
-				break;
-			}
-		});
-	}
-	
-	private void consomeFreeChunkStart(int freeChunkIndex, Chunk toMerge) throws IOException{
-		consomeFreeChunkStart(getChunk(freeChunks.getElement(freeChunkIndex)), toMerge, ptr->freeChunks.setElement(freeChunkIndex, ptr));
-	}
-	
-	private void consomeFreeChunkStart(Chunk freeChunk, Chunk toMerge, UnsafeConsumer<ChunkPointer, IOException> logNewFreePos) throws IOException{
-		Chunk sameCopy=freeChunk.fakeCopy();
-		sameCopy.setNextSize(calcPtrSize(toMerge.isNextDisabled()));
-		sameCopy.setCapacityConfident(toMerge.getCapacity());
-		sameCopy.setIsUserData(toMerge.isUserData());
-		sameCopy.setUsed(true);
-		
-		long totalSpace=freeChunk.dataEnd()-sameCopy.dataEnd();
-		
-		Chunk movedCopy=freeChunk.fakeCopy();
-		movedCopy.setLocation(sameCopy.getPtr().addPtr(sameCopy.getInstanceSize()+toMerge.getCapacity()));
-		movedCopy.setBodyNumSize(NumberSize.bySize(totalSpace).max(NumberSize.SMALEST_REAL));
-		
-		long freeSpace=freeChunk.dataEnd()-sameCopy.dataEnd()-movedCopy.getInstanceSize();
-		
-		if(freeSpace<=0) throw new IllegalStateException();
-		
-		movedCopy.setCapacityConfident(freeSpace);
-		
-		assert movedCopy.dataEnd()==freeChunk.dataEnd():movedCopy.dataEnd()+" "+freeChunk.dataEnd();
-		assert sameCopy.dataEnd()==movedCopy.getPtr().getValue():sameCopy.dataEnd()+" "+movedCopy.getPtr().getValue();
-		
-		movedCopy.writeStruct();
-		
-		logNewFreePos.accept(movedCopy.getPtr());
-		
-		sameCopy.setIsUserData(toMerge.isUserData());
-		
-		sameCopy.writeStruct();
-		freeChunk.readStruct();
-		
-		copyDataAndMoveChunk(toMerge, freeChunk);
-	}
-	
-	private void freeChunkScan(Instant end) throws IOException, ActionStopException{
-		
-		long    limitedPos=0;
-		boolean lastFreed =false;
-		while(!freeChunks.isEmpty()){
-			timeout(end);
-			
-			ChunkPointer firstFreePtr=null;
-			int          firstIndex  =-1;
-			
-			for(int i=0;i<freeChunks.size();i++){
-				ChunkPointer ptr=freeChunks.getElement(i);
-				if(ptr==null) continue;
-				if(ptr.compareTo(limitedPos)<0) continue;
-				
-				if(firstFreePtr==null||ptr.compareTo(firstFreePtr)<0){
-					firstIndex=i;
-					firstFreePtr=ptr;
-				}
-			}
-			
-			if(firstFreePtr==null) break;
-			limitedPos=firstFreePtr.getValue();
-			
-			Chunk freeChunk=getChunk(firstFreePtr);
-			Chunk toMerge  =freeChunk.nextPhysical();
-			
-			if(toMerge==null){
-				int toRemove=firstIndex;
-				batchFree(()->{
-					freeChunks.removeElement(toRemove);
-					free(freeChunk);
-					while(freeChunks.countGreaterThan(Objects::isNull, 1)){
-						freeChunks.removeElement(freeChunks.indexOfLast(null));
-					}
-				});
-				if(lastFreed) break;
-				lastFreed=true;
-				continue;
-			}
-			
-			//TODO: this should not be a thing, freeing algorithm needs improvements
-			// Case: Listed free, queued, queued, listed free
-			// Result: Listed free (w 2 merged), listed free
-			if(!toMerge.isUsed()){
-				int index=freeChunks.indexOf(toMerge.getPtr());
-				if(index!=-1){
-					freeChunks.removeElement(index);
-					free(toMerge);
-					continue;
-				}
-			}
-			
-			try{
-				consomeFreeChunkStart(firstIndex, toMerge);
-			}catch(IllegalStateException e){
-				Chunk chunk=AllocateTicket.bytes(toMerge.getCapacity())
-				                          .shouldDisableResizing(toMerge.isNextDisabled())
-//				                          .withApproval(c->c.getPtr().compareTo(toMerge.getPtr())>0)
-                                          .submit(this);
-				chunk.modifyAndSave(c->c.setIsUserData(toMerge.isUserData()));
-				copyDataAndMoveChunk(toMerge, chunk);
-			}
-			
-		}
-	}
-	
-	private void packChains(Instant end) throws IOException, ActionStopException{
-		
-		while(true){
-			timeout(end);
-			var opt=findPointer(e->getChunk(e).hasNext());
-			if(opt.isEmpty()) break;
-			Chunk root=getChunk(opt.get().headPtr());
-			
-			Chunk solid=AllocateTicket.bytes(root.chainCapacity()).submit(this);
-			chainToChunk(root, solid);
-			validate();
-		}
+//		Pack.freeChunkScan(this, freeChunks, end);
+		Pack.memoryReorder(this, freeChunks, end);
 	}
 	
 	public boolean isSafeMode() { return safeMode; }

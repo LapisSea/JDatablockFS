@@ -21,6 +21,64 @@ import static com.lapissea.cfs.GlobalConfig.*;
 
 abstract class MAllocer{
 	
+	static final class FreeStart extends MAllocer{
+		
+		Chunk consumeFreeChunkStart(Cluster cluster, IOList<ChunkPointer> freeChunks, int freeChunkIndex, AllocateTicket ticket) throws IOException{
+			Chunk freeChunk=cluster.getChunk(freeChunks.getElement(freeChunkIndex));
+			
+			Chunk sameCopy=freeChunk.fakeCopy();
+			sameCopy.setNextSize(cluster.calcPtrSize(ticket.disableResizing()));
+			sameCopy.setCapacityConfident(ticket.bytes());
+			sameCopy.setIsUserData(ticket.userData()!=null);
+			sameCopy.setUsed(true);
+			
+			long totalSpace=freeChunk.dataEnd()-sameCopy.dataEnd();
+			
+			Chunk movedCopy=freeChunk.fakeCopy();
+			movedCopy.setLocation(sameCopy.getPtr().addPtr(sameCopy.getInstanceSize()+ticket.bytes()));
+			movedCopy.setBodyNumSize(NumberSize.bySize(totalSpace).max(NumberSize.SMALEST_REAL));
+			
+			long freeSpace=freeChunk.dataEnd()-sameCopy.dataEnd()-movedCopy.getInstanceSize();
+			
+			if(freeSpace<=0) return null;
+			
+			if(!ticket.approve(sameCopy)) return null;
+			
+			movedCopy.setCapacityConfident(freeSpace);
+			
+			assert movedCopy.dataEnd()==freeChunk.dataEnd():movedCopy.dataEnd()+" "+freeChunk.dataEnd();
+			assert sameCopy.dataEnd()==movedCopy.getPtr().getValue():sameCopy.dataEnd()+" "+movedCopy.getPtr().getValue();
+			
+			movedCopy.writeStruct();
+			
+			freeChunks.setElement(freeChunkIndex, movedCopy.getPtr());
+			
+			sameCopy.setIsUserData(ticket.userData()!=null);
+			
+			sameCopy.writeStruct();
+			freeChunk.readStruct();
+			
+			return cluster.getChunk(sameCopy.getPtr());
+		}
+		
+		@Override
+		public Chunk alloc(Cluster cluster, IOList<ChunkPointer> freeChunks, AllocateTicket ticket) throws IOException{
+			for(int i=0;i<freeChunks.size();i++){
+				if(freeChunks.getElement(i)==null) continue;
+				Chunk chunk=consumeFreeChunkStart(cluster, freeChunks, i, ticket);
+				if(chunk!=null){
+					return chunk;
+				}
+			}
+			return null;
+		}
+		
+		@Override
+		public boolean dealloc(Chunk chunk, IOList<ChunkPointer> freeChunks){
+			return false;
+		}
+	}
+	
 	private static final class PushPop extends MAllocer{
 		
 		@Override
@@ -55,8 +113,6 @@ abstract class MAllocer{
 			try{
 				var cluster=chunk.cluster;
 				if(!cluster.isLastPhysical(chunk)) return false;
-				
-				Chunk prevFree=null;
 				
 				var chunkCache=cluster.chunkCache;
 				var data      =cluster.getData();
@@ -292,28 +348,36 @@ abstract class MAllocer{
 		}
 	}
 	
-	public static final MAllocer PUSH_POP        =new PushPop();
-	public static final MAllocer FREE_ADD_CONSUME=new ListingAddConsume();
+	public static final MAllocer  PUSH_POP          =new PushPop();
+	public static final MAllocer  FREE_ADD_CONSUME  =new ListingAddConsume();
+	public static final FreeStart FREE_START_CONSUME=new FreeStart();
 	
 	public static final MAllocer AUTO=new MAllocer(){
+		
+		private final MAllocer[] methods={
+			FREE_START_CONSUME,
+			FREE_ADD_CONSUME,
+			PUSH_POP
+		};
+		
 		@Override
 		public Chunk alloc(Cluster cluster, IOList<ChunkPointer> freeChunks, AllocateTicket ticket) throws IOException{
-			Chunk chunk;
-			
-			chunk=FREE_ADD_CONSUME.alloc(cluster, freeChunks, ticket);
-			
-			if(chunk==null){
-				chunk=PUSH_POP.alloc(cluster, freeChunks, ticket);
+			for(MAllocer method : methods){
+				Chunk chunk=method.alloc(cluster, freeChunks, ticket);
+				if(chunk!=null){
+					ticket.populate(chunk);
+					return chunk;
+				}
 			}
-			
-			return chunk;
+			return null;
 		}
 		
 		@Override
 		public boolean dealloc(Chunk chunk, IOList<ChunkPointer> freeChunks) throws IOException{
-			if(PUSH_POP.dealloc(chunk, freeChunks)) return true;
-			if(FREE_ADD_CONSUME.dealloc(chunk, freeChunks)) return true;
-			
+			for(int i=methods.length-1;i>=0;i--){
+				MAllocer method=methods[i];
+				if(method.dealloc(chunk, freeChunks)) return true;
+			}
 			throw new NotImplementedException();
 		}
 	};
