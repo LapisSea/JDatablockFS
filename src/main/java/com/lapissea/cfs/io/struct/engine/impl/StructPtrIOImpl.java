@@ -1,7 +1,7 @@
 package com.lapissea.cfs.io.struct.engine.impl;
 
-import com.lapissea.cfs.cluster.AllocateTicket;
 import com.lapissea.cfs.cluster.Cluster;
+import com.lapissea.cfs.conf.AllocateTicket;
 import com.lapissea.cfs.io.ReaderWriter;
 import com.lapissea.cfs.io.SelfPoint;
 import com.lapissea.cfs.io.content.ContentReader;

@@ -1,4 +1,4 @@
-package com.lapissea.cfs.cluster;
+package com.lapissea.cfs.conf;
 
 import java.time.Duration;
 import java.util.Objects;

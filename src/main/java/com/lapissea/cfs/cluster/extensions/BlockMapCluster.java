@@ -1,9 +1,9 @@
 package com.lapissea.cfs.cluster.extensions;
 
 import com.lapissea.cfs.Utils;
-import com.lapissea.cfs.cluster.AllocateTicket;
 import com.lapissea.cfs.cluster.Cluster;
 import com.lapissea.cfs.cluster.TypeParser;
+import com.lapissea.cfs.conf.AllocateTicket;
 import com.lapissea.cfs.exceptions.IllegalKeyException;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.content.ContentReader;

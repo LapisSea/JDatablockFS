@@ -1,5 +1,6 @@
-package com.lapissea.cfs.cluster;
+package com.lapissea.cfs.conf;
 
+import com.lapissea.cfs.cluster.Cluster;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.struct.IOInstance;
 import com.lapissea.cfs.io.struct.IOStruct;
@@ -97,11 +98,11 @@ public record AllocateTicket(long bytes, boolean disableResizing, @Nullable IOTy
 		return target.alloc(this);
 	}
 	
-	boolean approve(Chunk chunk){
+	public boolean approve(Chunk chunk){
 		return approve==null||approve.test(chunk);
 	}
 	
-	void populate(Chunk chunk) throws IOException{
+	public void populate(Chunk chunk) throws IOException{
 		if(dataPopulator==null) return;
 		dataPopulator.accept(chunk);
 	}

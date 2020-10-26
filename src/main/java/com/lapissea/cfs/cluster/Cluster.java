@@ -1,6 +1,9 @@
 package com.lapissea.cfs.cluster;
 
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.conf.AllocateTicket;
+import com.lapissea.cfs.conf.ClusterConfig;
+import com.lapissea.cfs.conf.PackingConfig;
 import com.lapissea.cfs.exceptions.*;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.RandomIO;

@@ -1,6 +1,7 @@
 package com.lapissea.cfs.cluster;
 
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.conf.AllocateTicket;
 import com.lapissea.cfs.exceptions.BitDepthOutOfSpaceException;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.objects.IOList;

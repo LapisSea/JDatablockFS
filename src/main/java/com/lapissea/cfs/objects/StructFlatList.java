@@ -1,7 +1,7 @@
 package com.lapissea.cfs.objects;
 
-import com.lapissea.cfs.cluster.AllocateTicket;
 import com.lapissea.cfs.cluster.Cluster;
+import com.lapissea.cfs.conf.AllocateTicket;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.io.struct.IOInstance;
 import com.lapissea.cfs.objects.chunk.Chunk;
