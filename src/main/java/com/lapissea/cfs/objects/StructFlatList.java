@@ -15,7 +15,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
 
-import static com.lapissea.cfs.Config.*;
+import static com.lapissea.cfs.GlobalConfig.*;
 
 public class StructFlatList<T extends IOInstance> implements IOList<T>{
 	

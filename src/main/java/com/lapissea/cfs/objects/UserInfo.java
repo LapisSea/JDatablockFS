@@ -11,7 +11,7 @@ import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.util.Objects;
 
-import static com.lapissea.cfs.Config.*;
+import static com.lapissea.cfs.GlobalConfig.*;
 
 public class UserInfo extends IOInstance{
 	

@@ -21,7 +21,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.util.*;
 
-import static com.lapissea.cfs.Config.*;
+import static com.lapissea.cfs.GlobalConfig.*;
 
 class FSFTest{
 	

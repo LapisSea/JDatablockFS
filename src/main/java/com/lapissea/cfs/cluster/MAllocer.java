@@ -11,13 +11,12 @@ import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;
-import com.lapissea.util.function.UnsafeRunnable;
 
 import java.io.IOException;
 import java.util.Map;
 import java.util.Objects;
 
-import static com.lapissea.cfs.Config.*;
+import static com.lapissea.cfs.GlobalConfig.*;
 
 abstract class MAllocer{
 	
@@ -42,9 +41,9 @@ abstract class MAllocer{
 				Utils.zeroFill(io::write, chunk.getCapacity());
 			});
 			
-			LogUtil.printTable("Action", "alloc",
-			                   "Type", "Push",
-			                   "Chunk", chunk);
+			if(cluster.getConfig().logActions()) LogUtil.printTable("Action", "alloc",
+			                                                        "Type", "Push",
+			                                                        "Chunk", chunk);
 			
 			ticket.populate(chunk);
 			return chunk;
@@ -61,9 +60,9 @@ abstract class MAllocer{
 				var chunkCache=cluster.chunkCache;
 				var data      =cluster.getData();
 				
-				LogUtil.printTable("Action", "free",
-				                   "Type", "freeing",
-				                   "Chunk", chunk);
+				if(cluster.getConfig().logActions()) LogUtil.printTable("Action", "free",
+				                                                        "Type", "freeing",
+				                                                        "Chunk", chunk);
 				
 				var endPtr=chunk.getPtr();
 				chunkCache.remove(endPtr);
@@ -148,9 +147,9 @@ abstract class MAllocer{
 					c.setUsed(true);
 				});
 				
-				LogUtil.printTable("Action", "alloc",
-				                   "Type", "reuse exact",
-				                   "Chunk", chunk);
+				if(cluster.getConfig().logActions()) LogUtil.printTable("Action", "alloc",
+				                                                        "Type", "reuse exact",
+				                                                        "Chunk", chunk);
 				ticket.populate(chunk);
 				return chunk;
 			}
@@ -163,10 +162,10 @@ abstract class MAllocer{
 				
 				largest.modifyAndSave(c->c.setCapacityConfident(freeCapacity));
 				
-				LogUtil.printTable("Action", "alloc",
-				                   "Type", "reuse split",
-				                   "Source", largest,
-				                   "Chunk", chunkUse);
+				if(cluster.getConfig().logActions()) LogUtil.printTable("Action", "alloc",
+				                                                        "Type", "reuse split",
+				                                                        "Source", largest,
+				                                                        "Chunk", chunkUse);
 				
 				ticket.populate(chunkUse);
 				return chunkUse;
@@ -199,7 +198,7 @@ abstract class MAllocer{
 			Cluster                  cluster   =toFree.cluster;
 			Map<ChunkPointer, Chunk> chunkCache=cluster.chunkCache;
 			
-			UnsafeConsumer<Chunk,IOException> clear=chunk->chunk.modifyAndSave(ch->{
+			UnsafeConsumer<Chunk, IOException> clear=chunk->chunk.modifyAndSave(ch->{
 				ch.setSize(0);
 				ch.clearNextPtr();
 			});
@@ -231,11 +230,11 @@ abstract class MAllocer{
 			
 			if(next!=null){
 				if(prev!=null){
-					LogUtil.printTable("Action", "free",
-					                   "Type", "triple merge",
-					                   "Source", prev,
-					                   "Chunk", toFree,
-					                   "Chunk 2", next);
+					if(cluster.getConfig().logActions()) LogUtil.printTable("Action", "free",
+					                                                        "Type", "triple merge",
+					                                                        "Source", prev,
+					                                                        "Chunk", toFree,
+					                                                        "Chunk 2", next);
 					freeChunks.setElement(nextIndex, null);
 					
 					long start=prev.getCapacity();
@@ -244,32 +243,37 @@ abstract class MAllocer{
 					removeCache(chunkCache, toFree);
 					
 					long end=prev.getCapacity();
-					
-					prev.zeroOutFromTo(start, end);
+					if(cluster.getConfig().clearFreeData()){
+						prev.zeroOutFromTo(start, end);
+					}
 				}else{
-					LogUtil.printTable("Action", "free",
-					                   "Type", "merge",
-					                   "Source", toFree,
-					                   "Chunk", next);
+					if(cluster.getConfig().logActions()) LogUtil.printTable("Action", "free",
+					                                                        "Type", "merge",
+					                                                        "Source", toFree,
+					                                                        "Chunk", next);
 					
 					clear.accept(toFree);
-					toFree.zeroOutCapacity();
+					if(cluster.getConfig().clearFreeData()){
+						toFree.zeroOutCapacity();
+					}
 					freeChunks.setElement(nextIndex, toFree.getPtr());
 					merge(chunkCache, toFree, next);
 				}
 			}else{
 				clear.accept(toFree);
-				toFree.zeroOutCapacity();
+				if(cluster.getConfig().clearFreeData()){
+					toFree.zeroOutCapacity();
+				}
 				if(prev!=null){
-					LogUtil.printTable("Action", "free",
-					                   "Type", "merge",
-					                   "Source", prev,
-					                   "Chunk", toFree);
+					if(cluster.getConfig().logActions()) LogUtil.printTable("Action", "free",
+					                                                        "Type", "merge",
+					                                                        "Source", prev,
+					                                                        "Chunk", toFree);
 					merge(chunkCache, prev, toFree);
 				}else{
-					LogUtil.printTable("Action", "free",
-					                   "Type", "list",
-					                   "Chunk", toFree);
+					if(cluster.getConfig().logActions()) LogUtil.printTable("Action", "free",
+					                                                        "Type", "list",
+					                                                        "Chunk", toFree);
 					int emptyIndex=freeChunks.indexOf(null);
 					if(emptyIndex!=-1){
 						freeChunks.setElement(emptyIndex, toFree.getPtr());
@@ -326,8 +330,10 @@ abstract class MAllocer{
 	}
 	
 	protected void destroyChunk(Map<ChunkPointer, Chunk> chunkCache, Chunk chunk) throws IOException{
-		removeCache(chunkCache,chunk);
-		chunk.zeroOutHead();
+		removeCache(chunkCache, chunk);
+		if(chunk.cluster.getConfig().clearFreeData()){
+			chunk.zeroOutHead();
+		}
 	}
 	
 	protected NumberSize calcPtrSize(Cluster cluster, AllocateTicket ticket) throws IOException{

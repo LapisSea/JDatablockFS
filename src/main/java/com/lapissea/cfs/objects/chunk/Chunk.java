@@ -26,7 +26,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
 
-import static com.lapissea.cfs.Config.*;
+import static com.lapissea.cfs.GlobalConfig.*;
 
 public class Chunk extends IOInstance.Contained implements Iterable<Chunk>, RandomIO.Creator{
 	private static final IOStruct THIS_TYP=IOStruct.thisClass();

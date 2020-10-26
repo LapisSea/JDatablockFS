@@ -2,7 +2,7 @@ package com.lapissea.cfs;
 
 import com.lapissea.util.UtilL;
 
-public class Config{
+public class GlobalConfig{
 	
 	public static final boolean DEBUG_VALIDATION;
 	public static final boolean DETAILED_WALK_REPORT;
@@ -18,7 +18,7 @@ public class Config{
 		
 		DEBUG_VALIDATION=assertEnabled;
 		
-		DETAILED_WALK_REPORT=UtilL.sysPropertyByClass(Config.class, "DETAILED_WALK_REPORT", false, Boolean::valueOf);
+		DETAILED_WALK_REPORT=UtilL.sysPropertyByClass(GlobalConfig.class, "DETAILED_WALK_REPORT", false, Boolean::valueOf);
 	}
 	
 }

@@ -1,6 +1,6 @@
 package com.lapissea.cfs.tools;
 
-import com.lapissea.cfs.Config;
+import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.io.content.ContentInputStream;
 import com.lapissea.cfs.io.content.ContentOutputStream;
 import com.lapissea.cfs.io.content.ContentReader;
@@ -113,7 +113,7 @@ public class DisplayServer implements DataLogger{
 				String jarPath=config.getOrDefault("jar", "").toString();
 				socketMake.close();
 				if(jarPath.isEmpty()) throw new IOException(e);
-				var debugMode=Config.DEBUG_VALIDATION;
+				var debugMode=GlobalConfig.DEBUG_VALIDATION;
 				var args     ="--illegal-access=deny --enable-preview -XX:+UseG1GC -XX:MaxHeapFreeRatio=10 -XX:MinHeapFreeRatio=1 -Xms50m -server -XX:+UseCompressedOops";
 				
 				Process p=Runtime.getRuntime().exec("java -jar "+(debugMode?"-ea ":"")+args+" \""+new File(jarPath).getAbsolutePath()+"\" lazy");

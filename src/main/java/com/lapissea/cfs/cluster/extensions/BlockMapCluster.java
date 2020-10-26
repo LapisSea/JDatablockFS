@@ -34,9 +34,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
-import static com.lapissea.cfs.Config.*;
+import static com.lapissea.cfs.GlobalConfig.*;
 
-@SuppressWarnings("unused")
 public class BlockMapCluster<K extends IOInstance>{
 	
 	

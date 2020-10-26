@@ -23,10 +23,9 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
-import static com.lapissea.cfs.Config.*;
+import static com.lapissea.cfs.GlobalConfig.*;
 import static com.lapissea.cfs.io.struct.IOStruct.*;
 
-@SuppressWarnings("AutoBoxing")
 public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained.SingletonChunk<StructLinkedList<T>> implements IOList<T>{
 	
 	public static final TypeParser TYPE_PARSER=new TypeParser(){
@@ -168,6 +167,7 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 		@Override
 		public String toString(){
 			StringBuilder result=new StringBuilder("Node{");
+			if(isWritingInstance()) result.append("writing, ");
 			if(notInCache()) result.append("invalid, ");
 			result.append(container==null?"fake":container.getPtr());
 			result.append(" -> ").append(next).append(" value=").append(value).append('}');
@@ -321,7 +321,7 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 		
 		Node cached=nodeCache.get(index);
 		if(cached!=null){
-			if(DEBUG_VALIDATION){
+			if(DEBUG_VALIDATION&&!cached.isWritingInstance()){
 				checkCache(cached, index);
 			}
 			return cached;
@@ -381,7 +381,6 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 		return result;
 	}
 	
-	@SuppressWarnings("unchecked")
 	@Override
 	public T getElement(int index) throws IOException{
 		Objects.checkIndex(index, size());

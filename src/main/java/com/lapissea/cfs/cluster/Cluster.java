@@ -41,7 +41,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
-import static com.lapissea.cfs.Config.*;
+import static com.lapissea.cfs.GlobalConfig.*;
 import static java.util.stream.Collectors.*;
 
 public class Cluster extends IOInstance.Contained{
@@ -51,6 +51,7 @@ public class Cluster extends IOInstance.Contained{
 		protected int           minChunkSize =DEFAULT_MIN_CHUNK_SIZE;
 		protected boolean       readOnly     =false;
 		protected PackingConfig packingConfig=PackingConfig.DEFAULT;
+		protected ClusterConfig config       =ClusterConfig.DEFAULT;
 		
 		public Builder withPackingConfig(PackingConfig packingConfig){
 			this.packingConfig=packingConfig;
@@ -137,6 +138,7 @@ public class Cluster extends IOInstance.Contained{
 	private final LinkedList<Chunk>    freeingQueue;
 	private       IOList<ChunkPointer> effectiveFreeChunks;
 	private final PackingConfig        packingConfig;
+	private final ClusterConfig        config;
 	
 	private final IOInterface              data;
 	final         Map<ChunkPointer, Chunk> chunkCache;
@@ -146,8 +148,9 @@ public class Cluster extends IOInstance.Contained{
 	
 	private final TypeParser.Registry typeParsers=new TypeParser.Registry();
 	
-	protected Cluster(IOInterface data, PackingConfig packingConfig, int minChunkSize, boolean readOnly) throws IOException{
+	protected Cluster(IOInterface data, PackingConfig packingConfig, ClusterConfig config, int minChunkSize, boolean readOnly) throws IOException{
 		this.packingConfig=packingConfig;
+		this.config=config;
 		this.readOnly=readOnly;
 		this.data=data;
 		this.minChunkSize=minChunkSize;
