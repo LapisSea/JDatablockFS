@@ -58,7 +58,12 @@ abstract class MAllocer{
 			sameCopy.writeStruct();
 			freeChunk.readStruct();
 			
-			return cluster.getChunk(sameCopy.getPtr());
+			Chunk result=cluster.getChunk(sameCopy.getPtr());
+			
+			if(cluster.getConfig().logActions()) LogUtil.printTable("Action", "alloc",
+			                                                        "Type", "consume start",
+			                                                        "Chunk", result);
+			return result;
 		}
 		
 		@Override
