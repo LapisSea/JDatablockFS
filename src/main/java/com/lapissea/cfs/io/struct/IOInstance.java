@@ -269,6 +269,14 @@ public class IOInstance{
 		initPointerVar(cluster, getStruct().getVar(varIndex));
 	}
 	
+	protected void initPointerVarAll(Cluster cluster) throws IOException{
+		for(VariableNode<Object> var : getStruct().variables){
+			if(var instanceof VariableNode.SelfPointer<?> varPtr){
+				initPointerVar(cluster, varPtr);
+			}
+		}
+	}
+	
 	protected void initPointerVar(Cluster cluster, String varName) throws IOException{
 		initPointerVar(cluster, getStruct().getVar(varName));
 	}

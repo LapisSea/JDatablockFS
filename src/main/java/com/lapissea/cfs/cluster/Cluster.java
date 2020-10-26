@@ -206,11 +206,7 @@ public class Cluster extends IOInstance.Contained{
 		version=Version.last();
 		writeStruct();
 		
-		for(VariableNode<?> variable : getStruct().variables){
-			if(variable instanceof VariableNode.SelfPointer<?> ptrVar){
-				initPointerVar(this, ptrVar);
-			}
-		}
+		initPointerVarAll(this);
 		
 		registeredTypes.initData();
 		

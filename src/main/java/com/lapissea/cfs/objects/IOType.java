@@ -11,7 +11,6 @@ import com.lapissea.cfs.io.struct.IOStruct;
 import com.lapissea.cfs.io.struct.IOStruct.Construct;
 import com.lapissea.cfs.io.struct.IOStruct.Get;
 import com.lapissea.cfs.io.struct.IOStruct.Set;
-import com.lapissea.cfs.io.struct.VariableNode.SelfPointer;
 import com.lapissea.cfs.objects.chunk.Chunk;
 import com.lapissea.cfs.objects.chunk.ObjectPointer;
 import com.lapissea.cfs.objects.text.AutoText;
@@ -49,8 +48,7 @@ public class IOType extends IOInstance{
 		
 		public void initData() throws IOException{
 			assert typeNames==null;
-			IOStruct.thisClass().<SelfPointer<?>>getVar("typeNames").allocNew(this, getContainer().cluster);
-			IOStruct.thisClass().<SelfPointer<?>>getVar("registeredTypes").allocNew(this, getContainer().cluster);
+			initPointerVarAll(getContainer().cluster);
 		}
 		
 		@Get
