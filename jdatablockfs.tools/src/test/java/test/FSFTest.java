@@ -1,6 +1,5 @@
 package test;
 
-import com.google.gson.GsonBuilder;
 import com.lapissea.cfs.cluster.AllocateTicket;
 import com.lapissea.cfs.cluster.Cluster;
 import com.lapissea.cfs.io.impl.MemoryData;
@@ -11,15 +10,15 @@ import com.lapissea.cfs.objects.boxed.IOLong;
 import com.lapissea.cfs.objects.boxed.IOVoid;
 import com.lapissea.cfs.objects.chunk.Chunk;
 import com.lapissea.cfs.objects.text.AutoText;
-import com.lapissea.cfs.tools.*;
+import com.lapissea.cfs.tools.Common;
+import com.lapissea.cfs.tools.DataLogger;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.ZeroArrays;
 
-import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
 import static com.lapissea.cfs.GlobalConfig.*;
 
@@ -212,6 +211,7 @@ class FSFTest{
 		
 		cluster.pack();
 		list.free();
+		cluster.pack();
 		
 		cluster.validate();
 	}

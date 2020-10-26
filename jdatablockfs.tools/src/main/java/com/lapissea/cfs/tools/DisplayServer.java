@@ -17,7 +17,6 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-@SuppressWarnings("AutoBoxing")
 public class DisplayServer implements DataLogger{
 	
 	enum Action{
@@ -154,6 +153,7 @@ public class DisplayServer implements DataLogger{
 							writer.writeChars2(s);
 						}
 						flush.run();
+					}catch(SocketException ignored){
 					}catch(IOException e){
 						throw new RuntimeException(e);
 					}
@@ -164,6 +164,7 @@ public class DisplayServer implements DataLogger{
 					try{
 						sendAction.accept(Action.RESET);
 						flush.run();
+					}catch(SocketException ignored){
 					}catch(IOException e){
 						e.printStackTrace();
 					}
@@ -176,6 +177,7 @@ public class DisplayServer implements DataLogger{
 						writer.flush();
 						is.read();
 						socket.close();
+					}catch(SocketException ignored){
 					}catch(IOException e){
 						e.printStackTrace();
 					}

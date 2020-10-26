@@ -377,20 +377,6 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			
 			translate(0.5, 0.5);
 			
-			if(cluster!=null){
-				try{
-					for(Chunk chunk : cluster.getFirstChunk().physicalIterator()){
-						if(chunk.rangeIntersects(byteIndex)){
-							setStroke(1);
-							outlineChunk(width, pixelsPerByte, chunk, mix(chunkBaseColor(chunk), Color.WHITE, 0.4F));
-							break;
-						}
-					}
-				}catch(IOException e){
-					handleError(e);
-				}
-			}
-			
 			String s=byteIndex+"";
 			
 			setColor(Color.BLACK);
@@ -417,6 +403,20 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			fillString(s, x, y);
 			
 			GL11.glPopMatrix();
+			
+			if(cluster!=null){
+				try{
+					for(Chunk chunk : cluster.getFirstChunk().physicalIterator()){
+						if(chunk.rangeIntersects(byteIndex)){
+							setStroke(1);
+							outlineChunk(width, pixelsPerByte, chunk, mix(chunkBaseColor(chunk), Color.WHITE, 0.4F));
+							break;
+						}
+					}
+				}catch(IOException e){
+					handleError(e);
+				}
+			}
 		}
 		
 	}
