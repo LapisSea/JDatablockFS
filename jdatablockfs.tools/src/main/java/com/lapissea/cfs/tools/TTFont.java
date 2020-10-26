@@ -23,11 +23,6 @@ import java.util.function.Function;
 import java.util.function.IntFunction;
 import java.util.stream.IntStream;
 
-import static org.lwjgl.opengl.EXTTextureFilterAnisotropic.*;
-import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.stb.STBTruetype.*;
-import static org.lwjgl.system.MemoryStack.*;
-
 public class TTFont{
 	
 	private static Boolean ANOSOTROPIC_SUPPORTED;
@@ -388,7 +383,7 @@ public class TTFont{
 	public boolean canFontDisplay(int c){
 		if(c<min) return false;
 		if(c>max) return false;
-		int g       =STBTruetype.stbtt_FindGlyphIndex(info, c);
-		return g==replacer;
+		int g=STBTruetype.stbtt_FindGlyphIndex(info, c);
+		return g!=replacer;
 	}
 }
