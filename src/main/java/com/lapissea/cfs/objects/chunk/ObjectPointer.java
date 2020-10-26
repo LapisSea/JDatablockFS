@@ -18,7 +18,7 @@ import java.util.OptionalInt;
 import java.util.function.Function;
 
 @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
-public abstract class ObjectPointer<T>{
+public abstract class ObjectPointer<T extends IOInstance>{
 	
 	public static class FixedIO implements ReaderWriter<ObjectPointer<?>>{
 		
@@ -252,7 +252,7 @@ public abstract class ObjectPointer<T>{
 		}
 	}
 	
-	public static class Raw extends ObjectPointer<Object>{
+	public static class Raw extends ObjectPointer<IOInstance>{
 		
 		public Raw(ChunkPointer dataBlock, long offset){
 			super(dataBlock, offset);
@@ -261,12 +261,12 @@ public abstract class ObjectPointer<T>{
 		public Raw(){ }
 		
 		@Override
-		protected void write(Cluster cluster, Object value, RandomIO io) throws IOException{
+		protected void write(Cluster cluster, IOInstance value, RandomIO io) throws IOException{
 			throw new UnsupportedOperationException();
 		}
 		
 		@Override
-		protected Object read(Cluster cluster, RandomIO io, Object value) throws IOException{
+		protected IOInstance read(Cluster cluster, RandomIO io, IOInstance value) throws IOException{
 			throw new UnsupportedOperationException();
 		}
 	}

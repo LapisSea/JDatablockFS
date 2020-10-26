@@ -336,7 +336,7 @@ public abstract class VariableNode<ValTyp>{
 		}
 	}
 	
-	public abstract static class SelfPointer<T extends SelfPoint<T>> extends VariableNode<T>{
+	public abstract static class SelfPointer<T extends IOInstance&SelfPoint<T>> extends VariableNode<T>{
 		
 		protected SelfPointer(String name, int index){
 			super(name, index);
@@ -345,6 +345,7 @@ public abstract class VariableNode<ValTyp>{
 		public void allocNew(IOInstance target, Cluster cluster) throws IOException{
 			allocNew(target, cluster, false);
 		}
+		
 		public abstract void allocNew(IOInstance target, Cluster cluster, boolean disableNext) throws IOException;
 	}
 	
