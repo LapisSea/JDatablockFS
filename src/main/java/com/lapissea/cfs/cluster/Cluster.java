@@ -1,10 +1,7 @@
 package com.lapissea.cfs.cluster;
 
 import com.lapissea.cfs.Utils;
-import com.lapissea.cfs.exceptions.ActionStopException;
-import com.lapissea.cfs.exceptions.BitDepthOutOfSpaceException;
-import com.lapissea.cfs.exceptions.MalformedClusterDataException;
-import com.lapissea.cfs.exceptions.UnreferencedChunkException;
+import com.lapissea.cfs.exceptions.*;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.SelfPoint;
@@ -37,8 +34,10 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.*;
@@ -87,7 +86,7 @@ public class Cluster extends IOInstance.Contained{
 		}
 		
 		public Cluster build() throws IOException{
-			return new Cluster(data, packingConfig, minChunkSize, readOnly);
+			return new Cluster(data, packingConfig, config, minChunkSize, readOnly);
 		}
 	}
 	
@@ -125,12 +124,12 @@ public class Cluster extends IOInstance.Contained{
 	
 	@EnumValue(index=0, customBitSize=16)
 	private Version              version;
-	@PointerValue(index=1, type=StructLinkedList.class)
-	private IOList<ChunkPointer> freeChunks;
-	@PointerValue(index=2)
+	@PointerValue(index=1)
 	private IOType.Dictionary    registeredTypes;
-	@PointerValue(index=3, type=StructLinkedList.class)
+	@PointerValue(index=2, type=StructLinkedList.class)
 	private IOList<UserInfo>     userChunks;
+	@PointerValue(index=3, type=StructLinkedList.class)
+	private IOList<ChunkPointer> freeChunks;
 	
 	private final boolean              readOnly;
 	private       boolean              safeMode;
@@ -156,6 +155,8 @@ public class Cluster extends IOInstance.Contained{
 		this.minChunkSize=minChunkSize;
 		
 		freeingQueue=new LinkedList<>(){
+			private static final long serialVersionUID=-6734353874678934315L;
+			
 			@Override
 			public Chunk set(int index, Chunk element){
 				if(element==null) return remove(index);
@@ -283,7 +284,7 @@ public class Cluster extends IOInstance.Contained{
 		
 		if(uTyp!=null&&!typeParsers.canParse(this, uTyp)) throw new IllegalArgumentException("Unknown type: "+uTyp);
 		
-		Chunk chunk=MAllocer.AUTO.alloc(this, getFreeData(), ticket.withBytes(Math.max(getMinChunkSize(), ticket.bytes())));
+		Chunk chunk=MAllocer.AUTO.alloc(this, getFreeData(), ticket.withBytes(ticket.disableResizing()?ticket.bytes():Math.max(getMinChunkSize(), ticket.bytes())));
 		
 		if(chunk!=null){
 			
@@ -422,6 +423,10 @@ public class Cluster extends IOInstance.Contained{
 	}
 	
 	private Chunk popBestChunk(){
+		if(freeChunks.size()>5){
+			return freeingQueue.removeFirst();
+		}
+		
 		ChunkPointer bestPtr  =null;
 		int          bestIndex=-1;
 		for(int i=0, j=freeingQueue.size();i<j;i++){
@@ -451,7 +456,8 @@ public class Cluster extends IOInstance.Contained{
 			freeingChunks=false;
 		}
 		
-		autoPack();
+		//TODO: solve blacklist timeframes
+//		autoPack();
 	}
 	
 	private void autoPack() throws IOException{
@@ -474,8 +480,7 @@ public class Cluster extends IOInstance.Contained{
 		if(shouldPack){
 			try{
 				pack(packingConfig.autoPackTime());
-			}catch(ActionStopException ignored){ }
-			catch(UnreferencedChunkException e){
+			}catch(ActionStopException ignored){ }catch(UnreferencedChunkException e){
 				//TODO: this is a bandage, use proper pack blacklist timeframes
 			}
 		}
@@ -661,7 +666,6 @@ public class Cluster extends IOInstance.Contained{
 				checkSync(ch);
 			}
 			
-			//noinspection StatementWithEmptyBody
 			for(Chunk chunk=getFirstChunk();chunk!=null;chunk=chunk.nextPhysical()){ }
 			
 			Set<ChunkPointer> unique=new HashSet<>();
@@ -691,8 +695,53 @@ public class Cluster extends IOInstance.Contained{
 	}
 	
 	public void copyDataAndMoveChunk(Chunk oldChunk, Chunk newChunk) throws IOException{
-		assert newChunk.getCapacity()>=oldChunk.getCapacity();
-		assert oldChunk.isUsed():oldChunk+" "+newChunk;
+		if(DEBUG_VALIDATION) oldChunk.requireReal();
+		PointerStack stack=requireChunkPointerStack(oldChunk.getPtr());
+		copyDataAndMoveChunk(stack, newChunk);
+	}
+	
+	public void copyDataAndMoveChunk(Chunk oldChunk, AllocateTicket ticket) throws IOException{
+		if(DEBUG_VALIDATION) oldChunk.requireReal();
+		PointerStack stack=requireChunkPointerStack(oldChunk.getPtr());
+		copyDataAndMoveChunk(stack, ticket);
+	}
+	
+	public void copyDataAndMoveChunk(PointerStack stack, AllocateTicket ticket) throws IOException{
+		Chunk oldChunk=getChunk(stack.headPtr());
+		
+		if(DEBUG_VALIDATION){
+			assert stack.isModifiable();
+			assert oldChunk.isUsed():oldChunk;
+		}
+		
+		AllocateTicket ticketTailor=ticket.withDataPopulated((c, dest)->{
+			try(var io=oldChunk.io()){
+				Utils.transferExact(io, dest, oldChunk.getSize());
+			}
+		});
+		
+		if(ticketTailor.bytes()==0) ticketTailor=ticketTailor.withBytes(oldChunk.getCapacity());
+		else assert ticketTailor.bytes()>=oldChunk.getCapacity();
+		
+		ticketTailor=ticketTailor.shouldDisableResizing(oldChunk.isNextDisabled());
+		
+		Chunk chunk=alloc(ticketTailor);
+		chunk.modifyAndSave(ch->chunk.setIsUserData(oldChunk.isUserData()));
+		
+		moveChunkRef(stack, chunk, true);
+		
+		validate();
+	}
+	
+	public void copyDataAndMoveChunk(PointerStack stack, Chunk newChunk) throws IOException{
+		Chunk oldChunk=getChunk(stack.headPtr());
+		
+		if(DEBUG_VALIDATION){
+			assert stack.isModifiable();
+			newChunk.requireReal();
+			assert newChunk.getCapacity()>=oldChunk.getCapacity();
+			assert oldChunk.isUsed():oldChunk+" "+newChunk;
+		}
 		
 		try(var io=oldChunk.io()){
 			try(var dest=newChunk.io()){
@@ -700,91 +749,137 @@ public class Cluster extends IOInstance.Contained{
 			}
 		}
 		
-		var oldPtr=oldChunk.getPtr();
-		
-		moveChunkRef(oldChunk, newChunk);
-		
-		Chunk toFree=getChunk(oldPtr);
-		toFree.modifyAndSave(chunk->{
-			chunk.clearUserMark();
-			chunk.setUsed(false);
-		});
-		toFree.freeChaining();
+		moveChunkRef(stack, newChunk, true);
 		
 		validate();
 	}
 	
+	private PointerStack requireChunkPointerStack(ChunkPointer ptr) throws IOException{
+		return findPointer(val->val.equals(ptr))
+			       .orElseThrow(()->new UnreferencedChunkException("unreferenced chunk: "+ptr));
+	}
+	
 	public void moveChunkRef(Chunk oldChunk, Chunk newChunk) throws IOException{
-		var oldPtr=oldChunk.getPtr();
-		var newPtr=newChunk.getPtr();
+		var oldPtr=oldChunk.getPtr().getValue();
 		
-		PointerStack ptr=findPointer(val->val.equals(oldPtr))
-			                 .orElseThrow(()->new UnreferencedChunkException("trying to move unreferenced chunk: "+oldChunk.toString()+" to "+newChunk));
-		LogUtil.printTable("Action", "moving",
-		                   "Source", oldChunk,
-		                   "Chunk", newChunk);
-		ptr.set(newPtr);
+		moveChunkRef(findPointer(val->val.equals(oldPtr))
+			             .orElseThrow(()->new UnreferencedChunkException("trying to move unreferenced chunk: "+oldChunk.toString()+" to "+newChunk)), newChunk);
+	}
+	
+	public void moveChunkRef(PointerStack oldStack, Chunk newChunk) throws IOException{
+		moveChunkRef(oldStack, newChunk, false);
+	}
+	
+	public void moveChunkRef(PointerStack stack, Chunk newChunk, boolean freeOld) throws IOException{
+		ChunkPointer oldPtr  =stack.headPtr();
+		ChunkPointer newPtr  =newChunk.getPtr();
+		Chunk        oldChunk=getChunk(oldPtr);
+		
+		if(DEBUG_VALIDATION){
+			stack.requireRelevant(this);
+		}
+		
+		if(getConfig().logActions()) LogUtil.printTable("Action", "moving",
+		                                                "Source", oldPtr,
+		                                                "Chunk", newChunk);
+		
+		stack.set(newPtr);
 		
 		chunkCache.remove(oldPtr);
 		chunkCache.put(newPtr, oldChunk);
 		oldChunk.setLocation(newPtr);
 		oldChunk.readStruct();
 		
+		if(freeOld){
+			Chunk toFree=getChunk(oldPtr);
+			toFree.modifyAndSave(chunk->{
+				chunk.clearUserMark();
+				chunk.setUsed(false);
+			});
+			toFree.freeChaining();
+		}
 	}
 	
+	
+	private static record PointerFrame(
+		ChunkPointer ptr,
+		String deb
+	){}
 	
 	private static record PointerStack(
-		List<ChunkPointer> stack,
+		List<PointerFrame> stack,
 		UnsafeConsumer<ChunkPointer, IOException> setter
 	){
-		public ChunkPointer value(){
-			return stack.get(stack.size()-1);
+		public static PointerStack EMPTY=new PointerStack(List.of(), null);
+		
+		public String debStr(){
+			return stack.stream()
+			            .map(f->f.ptr+" -> "+f.deb)
+			            .collect(joining("\n"));
 		}
 		
-		public boolean isValue(ChunkPointer value)          { return value().equals(value); }
+		public ChunkPointer headPtr(){
+			return stack.get(stack.size()-1).ptr;
+		}
 		
-		public void set(ChunkPointer ptr) throws IOException{ setter.accept(ptr); }
+		public void set(ChunkPointer ptr) throws IOException{
+			if(!isModifiable()) throw new UnsupportedOperationException();
+			setter.accept(ptr);
+		}
+		
+		public PointerStack push(PointerFrame el, UnsafeConsumer<ChunkPointer, IOException> setter){
+			return new PointerStack(Stream.concat(stack.stream(), Stream.of(el)).collect(toUnmodifiableList()), setter);
+		}
+		
+		@Override
+		public String toString(){
+			return "PointerStack{"+
+			       (stack.isEmpty()?"empty":stack.stream().map(TextUtil::toShortString).collect(Collectors.joining(" -> ")))+
+			       (isModifiable()?"":", read only")+
+			       "}";
+		}
+		
+		public boolean isModifiable(){
+			return setter!=null;
+		}
+		
+		public void requireRelevant(Cluster cluster) throws IOException{
+			ChunkPointer ptr    =headPtr();
+			var          restack=cluster.findPointer(ptr).orElseThrow();
+			var          ptrs   =stack.stream().map(f->f.ptr).toArray();
+			var          rePtrs =restack.stack.stream().map(f->f.ptr).toArray();
+			if(Arrays.equals(ptrs, rePtrs)) return;
+			throw new OutOfSyncDataException(TextUtil.toString("tested/read\n", ptrs, "\n", rePtrs));
+		}
 	}
 	
-	private List<ChunkPointer> pushStack(List<ChunkPointer> stack, ChunkPointer el){
-		return Stream.concat(stack.stream(), Stream.of(el)).collect(toList());
+	private Optional<PointerStack> findPointer(ChunkPointer ptr) throws IOException{
+		long val=ptr.getValue();
+		return findPointer(p->p.equals(val));
 	}
 	
 	private Optional<PointerStack> findPointer(UnsafePredicate<ChunkPointer, IOException> finder) throws IOException{
-		ObjectHolder<PointerStack> result=new ObjectHolder<>();
-		boolean found=memoryWalk(ptr->{
-			if(finder.test(ptr.value())){
-				result.setObj(ptr);
-				return true;
-			}
-			return false;
-		});
-		return found?Optional.of(result.obj):Optional.empty();
+		return memoryWalk(ptr->finder.test(ptr.headPtr()));
 	}
 	
-	private boolean memoryWalk(UnsafePredicate<PointerStack, IOException> valueFeedMod) throws IOException{
-		return memoryWalk(this::writeStruct, this, List.of(), valueFeedMod);
+	private Optional<PointerStack> memoryWalk(UnsafePredicate<PointerStack, IOException> valueFeedMod) throws IOException{
+		return memoryWalk(this, valueFeedMod);
 	}
 	
-	@SuppressWarnings("unchecked")
-	private boolean memoryWalk(UnsafeRunnable<IOException> saveInstance, IOInstance instance, List<ChunkPointer> stack, UnsafePredicate<PointerStack, IOException> valueFeedMod) throws IOException{
-		if(instance instanceof Chunk chunk){
-			if(!chunk.hasNext()) return false;
-			
-			var stackNew=pushStack(stack, chunk.getNextPtr());
-			
-			var ptrToDo=new PointerStack(stackNew, newPtr->{
-				try{
-					chunk.setNextPtr(newPtr);
-				}catch(BitDepthOutOfSpaceException e){
-					throw new IOException(e);
-				}
-				saveInstance.run();
-			});
-			if(valueFeedMod.test(ptrToDo)) return true;
-			var next=Objects.requireNonNull(chunk.next());
-			return memoryWalk(next::writeStruct, next, stackNew, valueFeedMod);
-		}
+	private Optional<PointerStack> memoryWalk(IOInstance.Contained root, UnsafePredicate<PointerStack, IOException> valueFeedMod) throws IOException{
+		return memoryWalk(root::writeStruct, root, valueFeedMod);
+	}
+	
+	private Optional<PointerStack> memoryWalk(UnsafeRunnable<IOException> saveInstance, IOInstance instance, UnsafePredicate<PointerStack, IOException> valueFeedMod) throws IOException{
+		return memoryWalk(saveInstance, instance, PointerStack.EMPTY, valueFeedMod);
+	}
+	
+	private Optional<PointerStack> memoryWalk(UnsafeRunnable<IOException> saveInstance, IOInstance instance, PointerStack stack, UnsafePredicate<PointerStack, IOException> valueFeedMod) throws IOException{
+		
+		BiFunction<IOInstance, VariableNode<?>, String> debStr=(inst, variable)->{
+			if(DEBUG_VALIDATION) return inst.getStruct().instanceClass.getSimpleName()+"."+variable.toString()+" = "+variable.getValueAsObj(inst);
+			return null;
+		};
 		
 		for(VariableNode<?> variable : instance.getStruct().variables){
 			try{
@@ -792,34 +887,50 @@ public class Cluster extends IOInstance.Contained{
 				if(val==null) continue;
 				
 				if(val instanceof ChunkPointer ptr){
-					var stackNew=pushStack(stack, ptr);
-					var ptrToDo=new PointerStack(stackNew, newPtr->{
+					
+					var ptrToDo=stack.push(new PointerFrame(ptr, debStr.apply(instance, variable)), newPtr->{
 						((VariableNode<ChunkPointer>)variable).setValueAsObj(instance, newPtr);
 						saveInstance.run();
 					});
-					if(valueFeedMod.test(ptrToDo)) return true;
+					if(valueFeedMod.test(ptrToDo)) return Optional.of(ptrToDo);
+					
+					Chunk ch=getChunk(ptr);
+					
+					Optional<PointerStack> o=memoryWalk(ch::writeStruct, ch, ptrToDo, valueFeedMod);
+					if(o.isPresent()) return o;
 					continue;
 				}
 				
 				IOInstance pointedInstance=null;
 				if(variable instanceof SelfPointer){
 					pointedInstance=(IOInstance)val;
-					val=((SelfPoint<?>)val).getSelfPtr();
+					var sf=(SelfPoint<?>)val;
+					val=sf.getSelfPtr();
+					if(DEBUG_VALIDATION){
+						var  ptr    =(ObjectPointer<?>)val;
+						long oldOff =ptr.getOffset();
+						long testVal=oldOff==1?2:1;
+						ptr.setOffset(testVal);
+						assert sf.getSelfPtr().getOffset()==testVal:
+							variable+" "+sf+" "+sf.getSelfPtr()+" getSelfPtr() returns unchangeable data";
+						ptr.setOffset(oldOff);
+					}
 				}
 				
 				if(val instanceof ObjectPointer<?> ptr){
 					if(ptr.hasPtr()){
 						
-						var stackNew=pushStack(stack, ptr.getDataBlock());
-						var ptrToDo=new PointerStack(stackNew, newPtr->{
+						var ptrToDo=stack.push(new PointerFrame(ptr.getDataBlock(), debStr.apply(instance, variable)), newPtr->{
 							ptr.set(newPtr, ptr.getOffset());
 							saveInstance.run();
 						});
-						if(valueFeedMod.test(ptrToDo)) return true;
+						if(valueFeedMod.test(ptrToDo)) return Optional.of(ptrToDo);
 						
 						Chunk chunk=ptr.getBlock(this);
-						if(memoryWalk(chunk::writeStruct, chunk, stack, valueFeedMod)) return true;
-						
+						{
+							Optional<PointerStack> o=memoryWalk(chunk::writeStruct, chunk, ptrToDo, valueFeedMod);
+							if(o.isPresent()) return o;
+						}
 						Object read;
 						if(pointedInstance!=null) read=pointedInstance;
 						else{
@@ -838,12 +949,14 @@ public class Cluster extends IOInstance.Contained{
 							}else{
 								saver=null;
 							}
-							if(memoryWalk(saver, inst, stackNew, valueFeedMod)) return true;
+							Optional<PointerStack> o=memoryWalk(saver, inst, ptrToDo, valueFeedMod);
+							if(o.isPresent()) return o;
 						}
 						//TODO: handle chaining pointers when needed
 					}
 				}else if(val instanceof IOInstance inst){
-					if(memoryWalk(saveInstance, inst, stack, valueFeedMod)) return true;
+					Optional<PointerStack> o=memoryWalk(saveInstance, inst, stack, valueFeedMod);
+					if(o.isPresent()) return o;
 				}
 			}catch(Throwable e){
 				if(DETAILED_WALK_REPORT){
@@ -858,7 +971,7 @@ public class Cluster extends IOInstance.Contained{
 				throw e;
 			}
 		}
-		return false;
+		return Optional.empty();
 	}
 	
 	private void chainToChunk(Chunk chainStart, Chunk destChunk) throws IOException{
@@ -881,12 +994,12 @@ public class Cluster extends IOInstance.Contained{
 	
 	public void pack() throws IOException{
 		try{
-			pack(Duration.ofDays(666));
+			pack(null);
 		}catch(ActionStopException ignored){ }
 	}
 	
 	private void timeout(Instant end) throws ActionStopException{
-		if(Instant.now().isAfter(end)){
+		if(end!=null&&Instant.now().isAfter(end)){
 			throw new ActionStopException();
 		}
 	}
@@ -902,15 +1015,130 @@ public class Cluster extends IOInstance.Contained{
 	}
 	
 	private void doPack(Duration timeAllowed) throws IOException, ActionStopException{
-		Instant end=Instant.now().plus(timeAllowed);
+		if(getConfig().logActions()) LogUtil.printTable("Action", "PACK", "Type", timeAllowed!=null?timeAllowed.toString():"FULL");
+		Instant end=timeAllowed==null?null:Instant.now().plus(timeAllowed);
 		
 		packChains(end);
-		
+
+//		freeChunkScan(end);
+		memoryReorder(end);
+	}
+	
+	private void memoryReorder(Instant end) throws IOException, ActionStopException{
+		boolean ending=false;
+		while(true){
+			timeout(end);
+			Iterator<Chunk>     physicalOrder=getFirstChunk().physicalIterator().iterator();
+			PairM<Chunk, Chunk> missMatch    =new PairM<>();
+			var stackO=memoryWalk(ptr->{
+				Chunk c=physicalOrder.next();
+				if(c==null) return false;
+				if(!ptr.headPtr().equals(c.getPtr())){
+					missMatch.obj1=c;
+					missMatch.obj2=getChunk(ptr.headPtr());
+					return true;
+				}
+				return false;
+			});
+			if(stackO.isEmpty()){
+				shrinkFreeChunks();
+				if(ending) return;
+				ending=true;
+				continue;
+			}
+			
+			Chunk clearStart=missMatch.obj1;
+			Chunk toMoveIn  =missMatch.obj2;
+			
+			
+			ChunkPointer startPtr=clearStart.getPtr();
+			Chunk        start;
+			freeLoop:
+			while(true){
+				start=getChunk(startPtr);
+				for(Chunk chunk : start.physicalIterator()){
+					if(!chunk.isUsed()){
+						if(isLastPhysical(chunk)){
+							shrinkFreeChunks();
+							break freeLoop;
+						}
+						continue;
+					}
+					
+					if(!start.isUsed()){
+						try{
+							consomeFreeChunkStart(freeChunks.indexOf(startPtr), toMoveIn);
+							break freeLoop;
+						}catch(IllegalStateException ignored){ }
+					}
+					copyDataAndMoveChunk(chunk, AllocateTicket.approved(ch->ch.getPtr().compareTo(chunk.getPtr())>0));
+					break;
+				}
+			}
+		}
+	}
+	
+	private void shrinkFreeChunks() throws IOException{
 		batchFree(()->{
-			for(int i=0;i<freeChunks.size();i++){
-				if(freeChunks.getElement(i)==null) freeChunks.removeElement(i);
+			loop:
+			while(true){
+				for(Iterator<ChunkPointer> iter=freeChunks.iterator();iter.hasNext();){
+					var ptr=iter.next();
+					if(ptr==null){
+						iter.remove();
+						continue loop;
+					}
+					Chunk ch=getChunk(ptr);
+					if(isLastPhysical(ch)){
+						iter.remove();
+						free(ch);
+						continue loop;
+					}
+				}
+				break;
 			}
 		});
+	}
+	
+	private void consomeFreeChunkStart(int freeChunkIndex, Chunk toMerge) throws IOException{
+		consomeFreeChunkStart(getChunk(freeChunks.getElement(freeChunkIndex)), toMerge, ptr->freeChunks.setElement(freeChunkIndex, ptr));
+	}
+	
+	private void consomeFreeChunkStart(Chunk freeChunk, Chunk toMerge, UnsafeConsumer<ChunkPointer, IOException> logNewFreePos) throws IOException{
+		Chunk sameCopy=freeChunk.fakeCopy();
+		sameCopy.setNextSize(calcPtrSize(toMerge.isNextDisabled()));
+		sameCopy.setCapacityConfident(toMerge.getCapacity());
+		sameCopy.setIsUserData(toMerge.isUserData());
+		sameCopy.setUsed(true);
+		
+		long totalSpace=freeChunk.dataEnd()-sameCopy.dataEnd();
+		
+		Chunk movedCopy=freeChunk.fakeCopy();
+		movedCopy.setLocation(sameCopy.getPtr().addPtr(sameCopy.getInstanceSize()+toMerge.getCapacity()));
+		movedCopy.setBodyNumSize(NumberSize.bySize(totalSpace).max(NumberSize.SMALEST_REAL));
+		
+		long freeSpace=freeChunk.dataEnd()-sameCopy.dataEnd()-movedCopy.getInstanceSize();
+		
+		if(freeSpace<=0) throw new IllegalStateException();
+		
+		movedCopy.setCapacityConfident(freeSpace);
+		
+		assert movedCopy.dataEnd()==freeChunk.dataEnd():movedCopy.dataEnd()+" "+freeChunk.dataEnd();
+		assert sameCopy.dataEnd()==movedCopy.getPtr().getValue():sameCopy.dataEnd()+" "+movedCopy.getPtr().getValue();
+		
+		movedCopy.writeStruct();
+		
+		logNewFreePos.accept(movedCopy.getPtr());
+		
+		sameCopy.setIsUserData(toMerge.isUserData());
+		
+		sameCopy.writeStruct();
+		freeChunk.readStruct();
+		
+		copyDataAndMoveChunk(toMerge, freeChunk);
+	}
+	
+	private void freeChunkScan(Instant end) throws IOException, ActionStopException{
 		
 		long    limitedPos=0;
 		boolean lastFreed =false;
@@ -923,7 +1151,7 @@ public class Cluster extends IOInstance.Contained{
 			for(int i=0;i<freeChunks.size();i++){
 				ChunkPointer ptr=freeChunks.getElement(i);
 				if(ptr==null) continue;
-				if(ptr.compareTo(limitedPos)<0)continue;
+				if(ptr.compareTo(limitedPos)<0) continue;
 				
 				if(firstFreePtr==null||ptr.compareTo(firstFreePtr)<0){
 					firstIndex=i;
@@ -935,52 +1163,20 @@ public class Cluster extends IOInstance.Contained{
 			limitedPos=firstFreePtr.getValue();
 			
 			Chunk freeChunk=getChunk(firstFreePtr);
-			Chunk sameCopy =freeChunk.fakeCopy();
-			Chunk toMerge;
-			find:
-			{
-				
-				Chunk next=freeChunk.nextPhysical();
-				if(next==null){
-					int toRemove=firstIndex;
-					batchFree(()->{
-						freeChunks.removeElement(toRemove);
-						free(freeChunk);
-						while(freeChunks.countGreaterThan(Objects::isNull, 1)){
-							freeChunks.removeElement(freeChunks.indexOfLast(null));
-						}
-					});
-					if(lastFreed) break;
-					lastFreed=true;
-					continue;
-				}
-				
-				UnsafeConsumer<Chunk, IOException> applyProps=ch->{
-					sameCopy.setNextSize(calcPtrSize(ch.getNextSize()==NumberSize.VOID));
-					sameCopy.setCapacityConfident(ch.getCapacity());
-					sameCopy.setIsUserData(ch.isUserData());
-				};
-				
-				//TODO: unsafe, can cause infinite loop
-//				var ptrPos=freeChunk.getPtr().getValue();
-//
-//				var opt=findPointer(e->{
-//					if(e.compareTo(ptrPos)<=0) return false;
-//					Chunk chunk=getChunk(e);
-//					if(!chunk.isUsed()) return false;
-//					applyProps.accept(chunk);
-//					if(sameCopy.totalSize()<=freeChunk.totalSize()){
-//						int i=0;
-//					}
-//					return sameCopy.totalSize()<=freeChunk.totalSize();
-//				});
-//				if(opt.isPresent()){
-//					toMerge=getChunk(opt.get().value());
-//					break find;
-//				}
-				
-				applyProps.accept(next);
-				toMerge=next;
+			Chunk toMerge  =freeChunk.nextPhysical();
+			
+			if(toMerge==null){
+				int toRemove=firstIndex;
+				batchFree(()->{
+					freeChunks.removeElement(toRemove);
+					free(freeChunk);
+					while(freeChunks.countGreaterThan(Objects::isNull, 1)){
+						freeChunks.removeElement(freeChunks.indexOfLast(null));
+					}
+				});
+				if(lastFreed) break;
+				lastFreed=true;
+				continue;
 			}
 			
 			//TODO: this should not be a thing, freeing algorithm needs improvements
@@ -995,39 +1191,11 @@ public class Cluster extends IOInstance.Contained{
 				}
 			}
 			
-			sameCopy.setUsed(true);
-			
-			long totalSpace=freeChunk.dataEnd()-sameCopy.dataEnd();
-			
-			Chunk movedCopy=freeChunk.fakeCopy();
-			movedCopy.setLocation(sameCopy.getPtr().addPtr(sameCopy.getInstanceSize()+toMerge.getCapacity()));
-			movedCopy.setBodyNumSize(NumberSize.bySize(totalSpace).max(NumberSize.SMALEST_REAL));
-			
-			long freeSpace=freeChunk.dataEnd()-sameCopy.dataEnd()-movedCopy.getInstanceSize();
-			
-			timeout(end);
-			
-			if(freeSpace>0){
-				movedCopy.setCapacityConfident(freeSpace);
-				
-				assert movedCopy.dataEnd()==freeChunk.dataEnd():movedCopy.dataEnd()+" "+freeChunk.dataEnd();
-				assert sameCopy.dataEnd()==movedCopy.getPtr().getValue():sameCopy.dataEnd()+" "+movedCopy.getPtr().getValue();
-				
-				movedCopy.writeStruct();
-				
-				
-				freeChunks.setElement(firstIndex, movedCopy.getPtr());
-				
-				sameCopy.setIsUserData(toMerge.isUserData());
-				
-				sameCopy.writeStruct();
-				freeChunk.readStruct();
-				
-				copyDataAndMoveChunk(toMerge, freeChunk);
-			}else{
-				
+			try{
+				consomeFreeChunkStart(firstIndex, toMerge);
+			}catch(IllegalStateException e){
 				Chunk chunk=AllocateTicket.bytes(toMerge.getCapacity())
-				                          .shouldDisableResizing(toMerge.getNextSize()==NumberSize.VOID)
+				                          .shouldDisableResizing(toMerge.isNextDisabled())
 //				                          .withApproval(c->c.getPtr().compareTo(toMerge.getPtr())>0)
                                           .submit(this);
 				chunk.modifyAndSave(c->c.setIsUserData(toMerge.isUserData()));
@@ -1043,7 +1211,7 @@ public class Cluster extends IOInstance.Contained{
 			timeout(end);
 			var opt=findPointer(e->getChunk(e).hasNext());
 			if(opt.isEmpty()) break;
-			Chunk root=getChunk(opt.get().value());
+			Chunk root=getChunk(opt.get().headPtr());
 			
 			Chunk solid=AllocateTicket.bytes(root.chainCapacity()).submit(this);
 			chainToChunk(root, solid);
@@ -1096,5 +1264,16 @@ public class Cluster extends IOInstance.Contained{
 	
 	public IOList<UserInfo> getUserChunks(){
 		return userChunks;
+	}
+	
+	public ClusterConfig getConfig(){
+		return config;
+	}
+	
+	@Override
+	public void writeStruct() throws IOException{
+		super.writeStruct();
+		validateWrittenData();
+		if(registeredTypes!=null) registeredTypes.validateWrittenData();
 	}
 }
