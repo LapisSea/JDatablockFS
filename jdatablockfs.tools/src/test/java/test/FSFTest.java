@@ -76,7 +76,8 @@ class FSFTest{
 			chunk1.add(t1.submit(cluster));
 			chunk2.add(t2.submit(cluster));
 		}
-
+		
+		cluster.pack();
 //		cluster.batchFree(()->{
 		for(Chunk chunk : chunk1){
 			chunk.freeChaining();
