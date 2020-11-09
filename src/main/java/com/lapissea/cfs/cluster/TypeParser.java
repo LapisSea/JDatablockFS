@@ -1,5 +1,6 @@
 package com.lapissea.cfs.cluster;
 
+import com.lapissea.cfs.exceptions.UnknownIOTypeException;
 import com.lapissea.cfs.io.struct.IOInstance;
 import com.lapissea.cfs.io.struct.IOStruct;
 import com.lapissea.cfs.objects.IOType;
@@ -35,7 +36,8 @@ public interface TypeParser{
 			for(TypeParser parser : parsers){
 				if(parser.canParse(cluster, type)) return parser.parse(cluster, type);
 			}
-			throw new RuntimeException("Unknown type: "+type.toShortString());
+			
+			throw new UnknownIOTypeException("Unknown type: "+type.toShortString());
 		}
 	}
 	

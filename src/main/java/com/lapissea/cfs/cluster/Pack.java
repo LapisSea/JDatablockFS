@@ -116,7 +116,7 @@ class Pack{
 			timeout(end);
 			Iterator<Chunk>     physicalOrder=cluster.getFirstChunk().physicalIterator().iterator();
 			PairM<Chunk, Chunk> missMatch    =new PairM<>();
-			var stackO=cluster.memoryWalk(ptr->{
+			if(cluster.memoryWalk(ptr->{
 				Chunk c=physicalOrder.next();
 				if(c==null) return false;
 				if(!ptr.headPtr().equals(c.getPtr())){
@@ -125,8 +125,7 @@ class Pack{
 					return true;
 				}
 				return false;
-			});
-			if(stackO.isEmpty()){
+			}).isEmpty()){
 				shrinkFreeChunks(cluster, freeChunks);
 				if(ending) return;
 				ending=true;

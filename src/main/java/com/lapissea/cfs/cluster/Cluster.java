@@ -128,7 +128,7 @@ public class Cluster extends IOInstance.Contained{
 	@EnumValue(index=0, customBitSize=16)
 	private Version              version;
 	@PointerValue(index=1)
-	private IOType.Dictionary    registeredTypes;
+	private IOType.Dictionary    typeDictionary;
 	@PointerValue(index=2, type=StructLinkedList.class)
 	private IOList<UserInfo>     userChunks;
 	@PointerValue(index=3, type=StructLinkedList.class)
@@ -212,7 +212,7 @@ public class Cluster extends IOInstance.Contained{
 		
 		initPointerVarAll(this);
 		
-		registeredTypes.initData();
+		typeDictionary.initData();
 		
 		writeStruct();
 		
@@ -297,7 +297,7 @@ public class Cluster extends IOInstance.Contained{
 			}
 			
 			if(uTyp!=null){
-				registeredTypes.addType(uTyp);
+				typeDictionary.addType(uTyp);
 				var info=new UserInfo(uTyp, chunk.getPtr());
 				userChunks.addElement(info);
 				chunk.precacheUserInfo(info);
@@ -804,12 +804,12 @@ public class Cluster extends IOInstance.Contained{
 	}
 	
 	
-	private static record PointerFrame(
+	public static record PointerFrame(
 		ChunkPointer ptr,
 		String deb
 	){}
 	
-	static record PointerStack(
+	public static record PointerStack(
 		List<PointerFrame> stack,
 		UnsafeConsumer<ChunkPointer, IOException> setter
 	){
@@ -856,28 +856,28 @@ public class Cluster extends IOInstance.Contained{
 		}
 	}
 	
-	private Optional<PointerStack> findPointer(ChunkPointer ptr) throws IOException{
+	public Optional<PointerStack> findPointer(ChunkPointer ptr) throws IOException{
 		long val=ptr.getValue();
 		return findPointer(p->p.equals(val));
 	}
 	
-	Optional<PointerStack> findPointer(UnsafePredicate<ChunkPointer, IOException> finder) throws IOException{
+	public Optional<PointerStack> findPointer(UnsafePredicate<ChunkPointer, IOException> finder) throws IOException{
 		return memoryWalk(ptr->finder.test(ptr.headPtr()));
 	}
 	
-	Optional<PointerStack> memoryWalk(UnsafePredicate<PointerStack, IOException> valueFeedMod) throws IOException{
+	public Optional<PointerStack> memoryWalk(UnsafePredicate<PointerStack, IOException> valueFeedMod) throws IOException{
 		return memoryWalk(this, valueFeedMod);
 	}
 	
-	private Optional<PointerStack> memoryWalk(IOInstance.Contained root, UnsafePredicate<PointerStack, IOException> valueFeedMod) throws IOException{
+	public Optional<PointerStack> memoryWalk(IOInstance.Contained root, UnsafePredicate<PointerStack, IOException> valueFeedMod) throws IOException{
 		return memoryWalk(root::writeStruct, root, valueFeedMod);
 	}
 	
-	private Optional<PointerStack> memoryWalk(UnsafeRunnable<IOException> saveInstance, IOInstance instance, UnsafePredicate<PointerStack, IOException> valueFeedMod) throws IOException{
+	public Optional<PointerStack> memoryWalk(UnsafeRunnable<IOException> saveInstance, IOInstance instance, UnsafePredicate<PointerStack, IOException> valueFeedMod) throws IOException{
 		return memoryWalk(saveInstance, instance, PointerStack.EMPTY, valueFeedMod);
 	}
 	
-	private Optional<PointerStack> memoryWalk(UnsafeRunnable<IOException> saveInstance, IOInstance instance, PointerStack stack, UnsafePredicate<PointerStack, IOException> valueFeedMod) throws IOException{
+	public Optional<PointerStack> memoryWalk(UnsafeRunnable<IOException> saveInstance, IOInstance instance, PointerStack stack, UnsafePredicate<PointerStack, IOException> valueFeedMod) throws IOException{
 		
 		BiFunction<IOInstance, VariableNode<?>, String> debStr=(inst, variable)->{
 			if(DEBUG_VALIDATION) return inst.getStruct().instanceClass.getSimpleName()+"."+variable.toString()+" = "+variable.getValueAsObj(inst);
@@ -1027,8 +1027,8 @@ public class Cluster extends IOInstance.Contained{
 	
 	public boolean isReadOnly() { return readOnly; }
 	
-	public IOList<IOType> getRegisteredTypes(){
-		return registeredTypes.getRegisteredTypes();
+	public IOType.Dictionary getTypeDictionary(){
+		return typeDictionary;
 	}
 	
 	public TypeParser.Registry getTypeParsers(){
@@ -1076,6 +1076,6 @@ public class Cluster extends IOInstance.Contained{
 	public void writeStruct() throws IOException{
 		super.writeStruct();
 		validateWrittenData();
-		if(registeredTypes!=null) registeredTypes.validateWrittenData();
+		if(typeDictionary!=null) typeDictionary.validateWrittenData();
 	}
 }

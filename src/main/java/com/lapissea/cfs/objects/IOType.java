@@ -113,7 +113,7 @@ public class IOType extends IOInstance{
 		
 		@Override
 		public IOType read(Object targetObj, Cluster cluster, ContentReader source, IOType oldValue) throws IOException{
-			return cluster.getRegisteredTypes().getElement((int)NumberSize.INT.read(source));
+			return cluster.getTypeDictionary().getRegisteredTypes().getElement((int)NumberSize.INT.read(source));
 		}
 		
 		@Override
@@ -298,7 +298,8 @@ public class IOType extends IOInstance{
 	}
 	
 	public String toShortString(){
-		return type.instanceClass.getSimpleName()+(genericArgs.isEmpty()?"":genericArgs.stream().map(IOType::toShortString).collect(Collectors.joining(", ", "<", ">")));
+		var name=type.instanceClass.getName();
+		return name.substring(name.lastIndexOf('.')+1)+(genericArgs.isEmpty()?"":genericArgs.stream().map(IOType::toShortString).collect(Collectors.joining(", ", "<", ">")));
 	}
 	
 	public IOStruct getType(){
