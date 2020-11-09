@@ -1,6 +1,7 @@
 package test;
 
 import com.lapissea.cfs.cluster.Cluster;
+import com.lapissea.cfs.cluster.extensions.BlockMapCluster;
 import com.lapissea.cfs.conf.AllocateTicket;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.objects.IOList;
@@ -56,6 +57,8 @@ class FSFTest{
 	private static void doTests(Cluster cluster) throws IOException{
 		
 		for(int i=0;i<2;i++){
+			objectClusterTest(cluster);
+			if(true) return;
 			packTest(cluster);
 			freeChunksTest(cluster);
 			flatListTest(cluster);
@@ -63,6 +66,21 @@ class FSFTest{
 		}
 		
 		cluster.pack();
+	}
+	
+	private static void objectClusterTest(Cluster cluster) throws IOException{
+		BlockMapCluster<AutoText> objs=new BlockMapCluster<>(cluster, AutoText.class);
+		byte[]                    bb  =cluster.getData().readAll();
+		Cluster.build(b->b.withMemoryView(bb))
+		       .memoryWalk((Cluster.PointerStack e)->false);
+		objs.defineBlock(new AutoText("ay"), io->{
+			io.writeInts1("lmao".getBytes());
+			io.trim();
+		});
+		
+		objs.deleteBlock(new AutoText("ay"));
+		
+		objs.pack();
 	}
 	
 	private static void freeChunksTest(Cluster cluster) throws IOException{

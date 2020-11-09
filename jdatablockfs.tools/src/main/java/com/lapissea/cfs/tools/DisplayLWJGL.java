@@ -511,7 +511,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			double height=6;
 			
 			setColor(Color.BLUE.darker());
-			fillQuad((frameIndex-0.5)*w, 0, w*2, height*1.5);
+			fillQuad(frameIndex*w, 0, w, height*1.5);
 			fillQuad(frameIndex*w-0.75, 0, 1.5, height*1.5);
 			
 			for(int i=0;i<frames.size();i++){
