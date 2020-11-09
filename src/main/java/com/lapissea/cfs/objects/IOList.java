@@ -1,6 +1,5 @@
 package com.lapissea.cfs.objects;
 
-import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
@@ -17,7 +16,19 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
+import static com.lapissea.util.TextUtil.*;
+
 public interface IOList<T> extends Iterable<T>{
+	
+	abstract class Abstract<T> implements IOList<T>{
+		
+		@Override
+		public String toString(){
+			return stream().map(USE_SHORT_IN_COLLECTIONS?TextUtil::toShortString:TextUtil::toString)
+			               .collect(Collectors.joining(", ", "[", "]"));
+		}
+		
+	}
 	
 	interface IBoxed<From, To> extends IOList<To>{
 		@Override
@@ -201,11 +212,6 @@ public interface IOList<T> extends Iterable<T>{
 		}
 		
 		@Override
-		public String toString(){
-			return stream().map(TextUtil::toShortString).collect(Collectors.joining(", ", "[", "]"));
-		}
-		
-		@Override
 		public int hashCode(){
 			return getData().hashCode();
 		}
@@ -350,7 +356,7 @@ public interface IOList<T> extends Iterable<T>{
 	}
 	
 	static <T> IOList<T> wrap(T[] data){
-		return new IOList<>(){
+		return new Abstract<>(){
 			
 			@Override
 			public String toString(){
@@ -400,7 +406,7 @@ public interface IOList<T> extends Iterable<T>{
 	}
 	
 	static <T> IOList<T> wrap(List<T> data){
-		return new IOList<>(){
+		return new Abstract<>(){
 			
 			@Override
 			public String toString(){
@@ -465,7 +471,7 @@ public interface IOList<T> extends Iterable<T>{
 	}
 	
 	static <T> IOList<T> readOnly(IOList<T> list){
-		return new IOList<>(){
+		return new Abstract<>(){
 			@Override
 			public int size(){
 				return list.size();
@@ -502,7 +508,7 @@ public interface IOList<T> extends Iterable<T>{
 			}
 			
 			@Override
-			public void free() throws IOException{
+			public void free(){
 				throw new UnsupportedOperationException();
 			}
 		};
@@ -609,11 +615,12 @@ public interface IOList<T> extends Iterable<T>{
 		for(T el : this){
 			if(matcher.test(el)){
 				count++;
-				if(count>countLimit)return true;
+				if(count>countLimit) return true;
 			}
 		}
 		return false;
 	}
+	
 	default int count(UnsafePredicate<T, IOException> matcher) throws IOException{
 		int count=0;
 		for(T el : this){
@@ -676,7 +683,7 @@ public interface IOList<T> extends Iterable<T>{
 			
 			@Override
 			public boolean tryAdvance(Consumer<? super T> action){
-				if(current.get()>=size())return false;
+				if(current.get()>=size()) return false;
 				T element;
 				try{
 					element=getElement(current.getAndIncrement());
