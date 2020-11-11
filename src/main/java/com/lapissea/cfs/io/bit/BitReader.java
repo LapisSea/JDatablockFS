@@ -2,30 +2,32 @@ package com.lapissea.cfs.io.bit;
 
 import com.lapissea.cfs.exceptions.IllegalBitValueException;
 
+import java.io.IOException;
 import java.util.function.IntFunction;
 
 import static com.lapissea.cfs.io.bit.BitUtils.*;
 
 public interface BitReader{
 	
-	long readBits(int numOBits);
+	long readBits(int numOBits) throws IOException;
 	
-	default <T extends Enum<T>> T readEnum(Class<T> type){
+	default <T extends Enum<T>> T readEnum(Class<T> type) throws IOException{
 		return readEnum(EnumFlag.get(type));
 	}
-	default <T extends Enum<T>> T readEnum(EnumFlag<T> info){
+	
+	default <T extends Enum<T>> T readEnum(EnumFlag<T> info) throws IOException{
 		return info.read(this);
 	}
 	
-	default boolean readBoolBit(){
+	default boolean readBoolBit() throws IOException{
 		return readBits(1)==1;
 	}
 	
-	default void checkNOneAndThrow(int n){
+	default void checkNOneAndThrow(int n) throws IOException{
 		checkNOneAndThrow(n, bit->"Illegal bit at "+bit);
 	}
 	
-	default void checkNOneAndThrow(int n, IntFunction<String> message){
+	default void checkNOneAndThrow(int n, IntFunction<String> message) throws IOException{
 		int errorBit=checkNOne(n);
 		if(errorBit!=-1) throw new IllegalBitValueException(message.apply(errorBit));
 	}
@@ -34,7 +36,7 @@ public interface BitReader{
 	/**
 	 * @return index where a zero was found. If all bits are one then -1 is returned
 	 */
-	default int checkNOne(int n){
+	default int checkNOne(int n) throws IOException{
 		int read=0;
 		while(true){
 			int remaining=n-read;
@@ -50,7 +52,7 @@ public interface BitReader{
 		}
 	}
 	
-	default void skip(int numOBits){
+	default void skip(int numOBits) throws IOException{
 		int read=0;
 		while(true){
 			int remaining=numOBits-read;
@@ -62,4 +64,10 @@ public interface BitReader{
 		}
 	}
 	
+	default boolean[] readBits(boolean[] data) throws IOException{
+		for(int i=0;i<data.length;i++){
+			data[i]=readBoolBit();
+		}
+		return data;
+	}
 }

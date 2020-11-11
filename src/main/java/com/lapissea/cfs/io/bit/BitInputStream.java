@@ -18,7 +18,7 @@ public class BitInputStream implements BitReader, AutoCloseable{
 		this.source=source;
 	}
 	
-	public void prepareBits(int numOBits) throws IOException{
+	private void prepareBits(int numOBits) throws IOException{
 		
 		int bitsToRead=numOBits-bufferedBits;
 		if(bitsToRead>0){
@@ -41,8 +41,9 @@ public class BitInputStream implements BitReader, AutoCloseable{
 	}
 	
 	@Override
-	public long readBits(int numOBits){
-		assert numOBits<=bufferedBits;
+	public long readBits(int numOBits) throws IOException{
+		prepareBits(numOBits);
+		if(numOBits>bufferedBits) throw new IOException("ran out of bits");
 		
 		var result=(buffer&makeMask(numOBits));
 		buffer >>>= numOBits;
@@ -51,7 +52,7 @@ public class BitInputStream implements BitReader, AutoCloseable{
 	}
 	
 	@Override
-	public void close(){
+	public void close() throws IOException{
 		checkNOneAndThrow(bufferedBits);
 	}
 }

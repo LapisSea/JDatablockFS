@@ -12,7 +12,7 @@ public class FlagReader implements BitReader, AutoCloseable{
 	
 	
 	public static <T extends Enum<T>> T readSingle(ContentReader in, EnumFlag<T> enumInfo) throws IOException{
-		return readSingle(in, NumberSize.byBits(enumInfo.bits), enumInfo);
+		return readSingle(in, NumberSize.byBits(enumInfo.bitSize), enumInfo);
 	}
 	
 	public static <T extends Enum<T>> T readSingle(ContentReader in, NumberSize size, EnumFlag<T> enumInfo) throws IOException{
@@ -44,8 +44,8 @@ public class FlagReader implements BitReader, AutoCloseable{
 	}
 	
 	@Override
-	public long readBits(int numOBits){
-		if(bitCount<numOBits) throw new RuntimeException("ran out of bits");
+	public long readBits(int numOBits) throws IOException{
+		if(bitCount<numOBits) throw new IOException("ran out of bits");
 		
 		var result=(data&makeMask(numOBits));
 		data >>>= numOBits;
@@ -55,17 +55,17 @@ public class FlagReader implements BitReader, AutoCloseable{
 	
 	
 	@Override
-	public void checkNOneAndThrow(int n){
+	public void checkNOneAndThrow(int n) throws IOException{
 		int readBits=readCount();
 		checkNOneAndThrow(n, bit->"Illegal bit at "+(readBits+bit));
 	}
 	
-	public void checkRestAllOneAndThrow(){
+	public void checkRestAllOneAndThrow() throws IOException{
 		checkNOneAndThrow(remainingCount());
 	}
 	
 	@Override
-	public void close(){
+	public void close() throws IOException{
 		checkRestAllOneAndThrow();
 	}
 	

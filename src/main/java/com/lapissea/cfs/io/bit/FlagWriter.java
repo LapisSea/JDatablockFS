@@ -44,7 +44,7 @@ public class FlagWriter implements BitWriter{
 		return this;
 	}
 	
-	public FlagWriter fillRestAllOne(){
+	public FlagWriter fillRestAllOne() throws IOException{
 		fillNOne(remainingCount());
 		return this;
 	}

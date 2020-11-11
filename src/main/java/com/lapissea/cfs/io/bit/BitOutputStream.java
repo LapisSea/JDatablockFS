@@ -18,7 +18,7 @@ public class BitOutputStream implements BitWriter, AutoCloseable{
 	}
 	
 	@Override
-	public BitWriter writeBits(long data, int bitCount){
+	public BitWriter writeBits(long data, int bitCount) throws IOException{
 		assert (data&makeMask(bitCount))==data;
 		
 		buffer|=data<<written;
@@ -29,11 +29,7 @@ public class BitOutputStream implements BitWriter, AutoCloseable{
 			buffer >>>= 8;
 			written-=8;
 			
-			try{
-				dest.write(result);
-			}catch(IOException e){
-				throw new RuntimeException(e);
-			}
+			dest.write(result);
 		}
 		
 		return this;

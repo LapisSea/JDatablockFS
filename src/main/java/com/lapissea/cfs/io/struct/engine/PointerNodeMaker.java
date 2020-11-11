@@ -38,7 +38,7 @@ public class PointerNodeMaker<T extends IOInstance&SelfPoint<T>> extends StructR
 		IOStruct structType;
 		{
 			var typDirty=valueField.getType();
-			var typ     =UtilL.instanceOf(typDirty, IOInstance.class)?IOStruct.get((Class<IOInstance>)typDirty):null;
+			var typ     =UtilL.instanceOf(typDirty, IOInstance.class)?IOStruct.getUnknown(typDirty):null;
 			
 			if(overrideType==null){
 				if(typ==null) throw new MalformedStructLayout(valueField.getName()+" is not a struct and has no explicit type defined");

@@ -162,8 +162,9 @@ public abstract class VariableNode<ValTyp>{
 			return bitSize+paddingBits;
 		}
 		
-		protected abstract ValTyp readData(IOInstance target, FlagReader source, ValTyp oldVal);
-		protected abstract void writeData(IOInstance target, FlagWriter dest, ValTyp source);
+		protected abstract ValTyp readData(IOInstance target, BitReader source, ValTyp oldVal) throws IOException;
+		
+		protected abstract void writeData(IOInstance target, BitWriter dest, ValTyp source) throws IOException;
 		
 		@Deprecated
 		@Override
@@ -182,13 +183,13 @@ public abstract class VariableNode<ValTyp>{
 		}
 		
 		
-		public final void write(IOInstance target, FlagWriter dest){
+		public final void write(IOInstance target, FlagWriter dest) throws IOException{
 			ValTyp source=getValue(target);
 			writeData(target, dest, source);
 			dest.fillNOne(paddingBits);
 		}
 		
-		public final void read(IOInstance target, FlagReader source){
+		public final void read(IOInstance target, FlagReader source) throws IOException{
 			var oldVal=getValue(target);
 			var newVal=readData(target, source, oldVal);
 			source.checkNOneAndThrow(paddingBits);

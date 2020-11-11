@@ -86,7 +86,6 @@ class Encoding{
 			
 			try(var stream=new BitInputStream(w)){
 				for(int i=0;i<text.charCount();i++){
-					stream.prepareBits(bits);
 					int  index=(int)stream.readBits(bits);
 					char c    =decode(index);
 					
