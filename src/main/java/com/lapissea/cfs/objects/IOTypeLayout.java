@@ -2,12 +2,14 @@ package com.lapissea.cfs.objects;
 
 import com.lapissea.cfs.io.struct.IOInstance;
 import com.lapissea.cfs.io.struct.IOStruct;
+import com.lapissea.util.ArrayViewList;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.ZeroArrays;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.Arrays;
+import java.util.List;
 import java.util.stream.Collectors;
 
 public class IOTypeLayout extends IOInstance implements ParameterizedType{
@@ -98,6 +100,7 @@ public class IOTypeLayout extends IOInstance implements ParameterizedType{
 	
 	
 	public IOTypeLayout(){ }
+	
 	public IOTypeLayout(Class<? extends IOInstance> raw, IOTypeLayout... generics){
 		this(raw, null, generics);
 	}
@@ -132,6 +135,8 @@ public class IOTypeLayout extends IOInstance implements ParameterizedType{
 	public TypeArgument[] getArguments(){
 		return data==null?TypeArgument.NO_ARGS:data.arguments;
 	}
+	
+	public List<IOTypeLayout> getGenericArgs(){ return data==null?List.of():ArrayViewList.create(data.generics).obj2; }
 	
 	@Override
 	public IOTypeLayout[] getActualTypeArguments(){ return data==null?EMPTY_ARRAY:data.generics; }

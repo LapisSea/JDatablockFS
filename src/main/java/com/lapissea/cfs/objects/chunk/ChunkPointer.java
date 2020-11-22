@@ -11,7 +11,7 @@ import com.lapissea.cfs.io.struct.IOInstance;
 import com.lapissea.cfs.io.struct.IOStruct;
 import com.lapissea.cfs.io.struct.IOStruct.Value;
 import com.lapissea.cfs.objects.INumber;
-import com.lapissea.cfs.objects.IOType;
+import com.lapissea.cfs.objects.IOTypeLayout;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeFunction;
@@ -26,13 +26,13 @@ public final class ChunkPointer implements INumber{
 	
 	public static final TypeParser TYPE_PARSER=new TypeParser(){
 		@Override
-		public boolean canParse(Cluster cluster, IOType type){
+		public boolean canParse(Cluster cluster, IOTypeLayout type){
 			if(!type.getGenericArgs().isEmpty()) return false;
 			return UtilL.instanceOf(type.getType().instanceClass, PtrRef.class);
 		}
 		
 		@Override
-		public UnsafeFunction<Chunk, IOInstance, IOException> parse(Cluster cluster, IOType type){
+		public UnsafeFunction<Chunk, IOInstance, IOException> parse(Cluster cluster, IOTypeLayout type){
 			assert canParse(cluster, type);
 			return type.getType()::newInstance;
 		}

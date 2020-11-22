@@ -6,7 +6,7 @@ import com.lapissea.cfs.io.struct.IOInstance;
 import com.lapissea.cfs.io.struct.IOStruct.PointerValue;
 import com.lapissea.cfs.io.struct.IOStruct.Value;
 import com.lapissea.cfs.objects.IOList;
-import com.lapissea.cfs.objects.IOType;
+import com.lapissea.cfs.objects.IOTypeLayout;
 import com.lapissea.cfs.objects.StructLinkedList;
 import com.lapissea.cfs.objects.chunk.ChunkPointer;
 import com.lapissea.cfs.objects.text.AutoText;
@@ -63,7 +63,7 @@ public class FileCluster{
 		
 		void addChild(Cluster cluster, Folder folder) throws IOException{
 			if(children==null){
-				cluster.constructType(new IOType(StructLinkedList.class, Folder.class), AllocateTicket.fitTo(StructLinkedList.class));
+				cluster.constructType(new IOTypeLayout(StructLinkedList.class, new IOTypeLayout(Folder.class)), AllocateTicket.fitTo(StructLinkedList.class));
 			}
 			if(children.contains(folder)) return;
 			children.addElement(folder);

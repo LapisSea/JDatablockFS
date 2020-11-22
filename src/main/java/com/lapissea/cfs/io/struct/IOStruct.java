@@ -321,7 +321,7 @@ public class IOStruct implements Type{
 		
 		
 		private IOStruct fromIndex(Cluster cluster, int index) throws IOException{
-			IOList<String> names=cluster.getTypeDictionary().getTypeNames();
+			IOList<String> names=cluster.getGlobalStrings();
 			String         name =names.getElement(index);
 			try{
 				return IOStruct.getUnknown(Class.forName(name));
@@ -331,7 +331,7 @@ public class IOStruct implements Type{
 		}
 		
 		private int makeIndex(Cluster cluster, IOStruct struct) throws IOException{
-			IOList<String> names=cluster.getTypeDictionary().getTypeNames();
+			IOList<String> names=cluster.getGlobalStrings();
 			String         name =struct.instanceClass.getName();
 			
 			int index=names.indexOf(name);

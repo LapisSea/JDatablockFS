@@ -126,9 +126,14 @@ public class Cluster extends IOInstance.Contained{
 	}
 	
 	@EnumValue(index=0, customBitSize=16)
-	private Version              version;
-	@PointerValue(index=1)
-	private IOType.Dictionary    typeDictionary;
+	private Version version;
+	
+	@PointerValue(index=4, type=StructLinkedList.class)
+	private IOList<String> globalStrings;
+	
+	@PointerValue(index=1, type=StructLinkedList.class)
+	private IOList<IOTypeLayout> typeDictionary;
+	
 	@PointerValue(index=2, type=StructLinkedList.class)
 	private IOList<UserInfo>     userChunks;
 	@PointerValue(index=3, type=StructLinkedList.class)
@@ -212,8 +217,8 @@ public class Cluster extends IOInstance.Contained{
 		writeStruct();
 		
 		initPointerVarAll(this);
-		
-		typeDictionary.initData();
+
+//		typeDictionary.initData();
 		
 		writeStruct();
 		
@@ -298,7 +303,7 @@ public class Cluster extends IOInstance.Contained{
 			}
 			
 			if(uTyp!=null){
-				typeDictionary.addType(uTyp);
+				getTypeDictionary().addElement(uTyp);
 				var info=new UserInfo(uTyp, chunk.getPtr());
 				userChunks.addElement(info);
 				chunk.precacheUserInfo(info);
@@ -1035,16 +1040,21 @@ public class Cluster extends IOInstance.Contained{
 	
 	public boolean isReadOnly() { return readOnly; }
 	
-	public IOType.Dictionary getTypeDictionary(){
+	public IOList<IOTypeLayout> getTypeDictionary(){
 		return typeDictionary;
 	}
+	
+	public IOList<String> getGlobalStrings(){
+		return globalStrings;
+	}
+	
 	
 	public TypeParser.Registry getTypeParsers(){
 		return typeParsers;
 	}
 	
 	
-	public <T extends IOInstance> T constructType(IOType type) throws IOException{
+	public <T extends IOInstance> T constructType(IOTypeLayout type) throws IOException{
 		return constructType(type, (Chunk)null);
 	}
 	
@@ -1053,7 +1063,7 @@ public class Cluster extends IOInstance.Contained{
 		return constructType(ticket.userData(), ticket);
 	}
 	
-	public <T extends IOInstance> T constructType(IOType type, AllocateTicket ticket) throws IOException{
+	public <T extends IOInstance> T constructType(IOTypeLayout type, AllocateTicket ticket) throws IOException{
 		if(!getTypeParsers().canParse(this, type)){
 			throw new RuntimeException("Unknown type: "+type);
 		}
@@ -1065,7 +1075,7 @@ public class Cluster extends IOInstance.Contained{
 	}
 	
 	@SuppressWarnings("unchecked")
-	public <T extends IOInstance> T constructType(IOType type, Chunk dest) throws IOException{
+	public <T extends IOInstance> T constructType(IOTypeLayout type, Chunk dest) throws IOException{
 		if(dest!=null&&dest.isUserData()){
 			return (T)dest.getUserInfo().getObjPtr().read(this);
 		}
@@ -1084,6 +1094,6 @@ public class Cluster extends IOInstance.Contained{
 	public void writeStruct() throws IOException{
 		super.writeStruct();
 		validateWrittenData();
-		if(typeDictionary!=null) typeDictionary.validateWrittenData();
+		if(getTypeDictionary()!=null) getTypeDictionary().validate();
 	}
 }

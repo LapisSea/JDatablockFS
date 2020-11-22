@@ -16,7 +16,7 @@ import com.lapissea.cfs.io.struct.IOStruct.Size;
 import com.lapissea.cfs.io.struct.IOStruct.Value;
 import com.lapissea.cfs.io.struct.IOStruct.Write;
 import com.lapissea.cfs.objects.IOList;
-import com.lapissea.cfs.objects.IOType;
+import com.lapissea.cfs.objects.IOTypeLayout;
 import com.lapissea.cfs.objects.StructLinkedList;
 import com.lapissea.cfs.objects.chunk.Chunk;
 import com.lapissea.cfs.objects.chunk.ChunkPointer;
@@ -161,20 +161,20 @@ public class BlockMapCluster<K extends IOInstance>{
 		@Value(index=1, rw=ChunkPointer.AutoSizedIO.class)
 		private ChunkPointer dataLocation;
 		
-		private final IOType keyType;
+		private final IOTypeLayout keyType;
 		
-		public Entry(ReadWriteLock lock, K key, ChunkPointer dataLocation, IOType keyType){
+		public Entry(ReadWriteLock lock, K key, ChunkPointer dataLocation, IOTypeLayout keyType){
 			this.lock=lock;
 			this.key=key;
 			this.dataLocation=dataLocation;
 			this.keyType=keyType;
 		}
 		
-		private Entry(IOType keyType, K key){
+		private Entry(IOTypeLayout keyType, K key){
 			this(keyType);
 			this.key=key;
 		}
-		private Entry(IOType keyType){
+		private Entry(IOTypeLayout keyType){
 			this.keyType=keyType;
 			lock=new ReentrantReadWriteLock();
 		}
@@ -214,14 +214,14 @@ public class BlockMapCluster<K extends IOInstance>{
 	private static final IOStruct   ENTRY_TYPE  =IOStruct.get(Entry.class);
 	private static final TypeParser ENTRY_PARSER=new TypeParser(){
 		@Override
-		public boolean canParse(Cluster cluster, IOType type){
+		public boolean canParse(Cluster cluster, IOTypeLayout type){
 			if(type.getGenericArgs().size()!=1) return false;
-			return type.getType()==ENTRY_TYPE;
+			return type.getRawType()==ENTRY_TYPE;
 		}
 		
 		@Override
-		public UnsafeFunction<Chunk, IOInstance, IOException> parse(Cluster cluster, IOType type){
-			IOType keyType=type.getGenericArgs().get(0);
+		public UnsafeFunction<Chunk, IOInstance, IOException> parse(Cluster cluster, IOTypeLayout type){
+			IOTypeLayout keyType=type.getGenericArgs().get(0);
 			return c->new Entry<>(keyType);
 		}
 	};
@@ -231,17 +231,17 @@ public class BlockMapCluster<K extends IOInstance>{
 	
 	private final ReadWriteLock    lock=new ReentrantReadWriteLock();
 	private final Cluster          cluster;
-	private final IOType           keyType;
+	private final IOTypeLayout     keyType;
 	private final IOList<Entry<K>> data;
 	
 	public BlockMapCluster(@NotNull Cluster cluster, @NotNull Class<K> keyType) throws IOException{
 		this.cluster=cluster;
-		this.keyType=new IOType(keyType);
+		this.keyType=new IOTypeLayout(keyType);
 		
 		cluster.getTypeParsers().register(ENTRY_PARSER);
 		
-		var entryType=new IOType(ENTRY_TYPE, this.keyType);
-		var listType =new IOType(StructLinkedList.class, entryType);
+		var entryType=new IOTypeLayout(ENTRY_TYPE, this.keyType);
+		var listType =new IOTypeLayout(StructLinkedList.class, entryType);
 		
 		var userChunks=cluster.getUserChunks();
 		if(userChunks.isEmpty()) AllocateTicket.user(listType).submit(cluster);

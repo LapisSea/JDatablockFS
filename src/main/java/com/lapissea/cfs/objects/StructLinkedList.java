@@ -31,17 +31,17 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 	public static final TypeParser TYPE_PARSER=new TypeParser(){
 		
 		@Override
-		public boolean canParse(Cluster cluster, IOType type){
-			return type.getGenericArgs().size()==1&&type.getType().equals(LIST_TYP);
+		public boolean canParse(Cluster cluster, IOTypeLayout type){
+			return type.getGenericArgs().size()==1&&type.getRawType().equals(LIST_TYP);
 		}
 		
 		@Override
-		public UnsafeFunction<Chunk, IOInstance, IOException> parse(Cluster cluster, IOType type){
+		public UnsafeFunction<Chunk, IOInstance, IOException> parse(Cluster cluster, IOTypeLayout type){
 			var elType    =type.getGenericArgs().get(0);
 			var listConstr=cluster.getTypeParsers().parse(cluster, elType);
 			return chunk->build(b->b.withContainer(chunk)
 			                        .withElementContextConstructor(listConstr)
-			                        .withSolidNodes(elType.getType().getKnownSize().isPresent())
+			                        .withSolidNodes(elType.getRawType().getKnownSize().isPresent())
 			                   );
 		}
 	};

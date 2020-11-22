@@ -4,7 +4,7 @@ import com.lapissea.cfs.cluster.Cluster;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.struct.IOInstance;
 import com.lapissea.cfs.io.struct.IOStruct;
-import com.lapissea.cfs.objects.IOType;
+import com.lapissea.cfs.objects.IOTypeLayout;
 import com.lapissea.cfs.objects.chunk.Chunk;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
@@ -14,7 +14,7 @@ import com.lapissea.util.function.UnsafeConsumer;
 import java.io.IOException;
 import java.util.function.Predicate;
 
-public record AllocateTicket(long bytes, boolean disableResizing, @Nullable IOType userData, @Nullable Predicate<Chunk> approve, @Nullable UnsafeConsumer<Chunk, IOException> dataPopulator){
+public record AllocateTicket(long bytes, boolean disableResizing, @Nullable IOTypeLayout userData, @Nullable Predicate<Chunk> approve, @Nullable UnsafeConsumer<Chunk, IOException> dataPopulator){
 	
 	public static final AllocateTicket DEFAULT=new AllocateTicket(0, false, null, null, null);
 	
@@ -52,7 +52,7 @@ public record AllocateTicket(long bytes, boolean disableResizing, @Nullable IOTy
 		return DEFAULT.withBytes(requestedBytes);
 	}
 	
-	public static AllocateTicket user(@NotNull IOType type){
+	public static AllocateTicket user(@NotNull IOTypeLayout type){
 		return DEFAULT.asUserData(type);
 	}
 	
@@ -90,7 +90,7 @@ public record AllocateTicket(long bytes, boolean disableResizing, @Nullable IOTy
 		return new AllocateTicket(requestedBytes, disableResizing, userData, approve, dataPopulator);
 	}
 	
-	public AllocateTicket asUserData(IOType type){
+	public AllocateTicket asUserData(IOTypeLayout type){
 		return new AllocateTicket(bytes, disableResizing, type, approve, dataPopulator);
 	}
 	

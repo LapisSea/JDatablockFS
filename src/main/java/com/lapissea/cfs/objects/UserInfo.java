@@ -15,8 +15,8 @@ import static com.lapissea.cfs.GlobalConfig.*;
 
 public class UserInfo extends IOInstance{
 	
-	@IOStruct.Value(index=0, rw=IOType.IndexRef.class)
-	private IOType type;
+	@IOStruct.Value(index=0, rw=AutoRW.class)
+	private IOTypeLayout type;
 	
 	@IOStruct.Value(index=1, rw=ObjectPointer.AutoSizedNoOffsetIO.class)
 	private final ObjectPointer<? extends IOInstance> ptr=new ObjectPointer.Struct<>(this::typeConstruct){
@@ -32,7 +32,7 @@ public class UserInfo extends IOInstance{
 	
 	public UserInfo(){ }
 	
-	public UserInfo(IOType type, ChunkPointer ptr){
+	public UserInfo(IOTypeLayout type, ChunkPointer ptr){
 		this.type=type;
 		this.ptr.set(ptr, 0);
 	}
@@ -66,7 +66,7 @@ public class UserInfo extends IOInstance{
 		return getObjPtr().getDataBlock();
 	}
 	
-	public IOType getType(){
+	public IOTypeLayout getType(){
 		return type;
 	}
 	

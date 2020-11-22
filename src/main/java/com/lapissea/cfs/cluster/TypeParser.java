@@ -3,7 +3,7 @@ package com.lapissea.cfs.cluster;
 import com.lapissea.cfs.exceptions.UnknownIOTypeException;
 import com.lapissea.cfs.io.struct.IOInstance;
 import com.lapissea.cfs.io.struct.IOStruct;
-import com.lapissea.cfs.objects.IOType;
+import com.lapissea.cfs.objects.IOTypeLayout;
 import com.lapissea.cfs.objects.chunk.Chunk;
 import com.lapissea.util.function.UnsafeFunction;
 
@@ -24,7 +24,7 @@ public interface TypeParser{
 		}
 		
 		@Override
-		public boolean canParse(Cluster cluster, IOType type){
+		public boolean canParse(Cluster cluster, IOTypeLayout type){
 			for(TypeParser parser : parsers){
 				if(parser.canParse(cluster, type)) return true;
 			}
@@ -32,7 +32,7 @@ public interface TypeParser{
 		}
 		
 		@Override
-		public UnsafeFunction<Chunk, IOInstance, IOException> parse(Cluster cluster, IOType type){
+		public UnsafeFunction<Chunk, IOInstance, IOException> parse(Cluster cluster, IOTypeLayout type){
 			for(TypeParser parser : parsers){
 				if(parser.canParse(cluster, type)) return parser.parse(cluster, type);
 			}
@@ -46,23 +46,23 @@ public interface TypeParser{
 		return rawExact(rawType, (cl, typ)->rawType::newInstance);
 	}
 	
-	static TypeParser rawExact(IOStruct rawType, BiFunction<Cluster, IOType, UnsafeFunction<Chunk, IOInstance, IOException>> parser){
+	static TypeParser rawExact(IOStruct rawType, BiFunction<Cluster, IOTypeLayout, UnsafeFunction<Chunk, IOInstance, IOException>> parser){
 		return new TypeParser(){
 			@Override
-			public boolean canParse(Cluster cluster, IOType type){
-				return type.getGenericArgs().isEmpty()&&type.getType().equals(rawType);
+			public boolean canParse(Cluster cluster, IOTypeLayout type){
+				return type.getGenericArgs().length==0&&type.getRawType().equals(rawType);
 			}
 			
 			@Override
-			public UnsafeFunction<Chunk, IOInstance, IOException> parse(Cluster cluster, IOType type){
+			public UnsafeFunction<Chunk, IOInstance, IOException> parse(Cluster cluster, IOTypeLayout type){
 				assert canParse(cluster, type);
 				return parser.apply(cluster, type);
 			}
 		};
 	}
 	
-	boolean canParse(Cluster cluster, IOType type);
+	boolean canParse(Cluster cluster, IOTypeLayout type);
 	
-	UnsafeFunction<Chunk, IOInstance, IOException> parse(Cluster cluster, IOType type);
+	UnsafeFunction<Chunk, IOInstance, IOException> parse(Cluster cluster, IOTypeLayout type);
 	
 }

@@ -5,7 +5,6 @@ import com.lapissea.cfs.cluster.extensions.BlockMapCluster;
 import com.lapissea.cfs.conf.AllocateTicket;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.objects.IOList;
-import com.lapissea.cfs.objects.IOType;
 import com.lapissea.cfs.objects.IOTypeLayout;
 import com.lapissea.cfs.objects.StructLinkedList;
 import com.lapissea.cfs.objects.boxed.IOLong;
@@ -59,7 +58,7 @@ class FSFTest{
 		
 		var test=new IOTypeLayout(StructLinkedList.class, new int[]{2, 4}, new IOTypeLayout(IOLong.class));
 		
-		var c=AllocateTicket.fitAndPopulate(test).asUserData(new IOType(IOTypeLayout.class)).submit(cluster);
+		var c=AllocateTicket.fitAndPopulate(test).asUserData(new IOTypeLayout(IOTypeLayout.class)).submit(cluster);
 		
 		IOTypeLayout layout=new IOTypeLayout();
 		c.io(io->layout.readStruct(cluster, io));
@@ -105,7 +104,7 @@ class FSFTest{
 		List<Chunk> chunk1=new ArrayList<>();
 		List<Chunk> chunk2=new ArrayList<>();
 		
-		AllocateTicket t1=AllocateTicket.bytes(100).asUserData(new IOType(IOVoid.class));
+		AllocateTicket t1=AllocateTicket.bytes(100).asUserData(new IOTypeLayout(IOVoid.class));
 		AllocateTicket t2=t1.withBytes(10);
 		for(int i=0;i<5;i++){
 			chunk1.add(t1.submit(cluster));
@@ -127,7 +126,7 @@ class FSFTest{
 	private static void flatListTest(Cluster cluster) throws IOException{
 		
 		
-		IOList<IOLong> list=cluster.constructType(AllocateTicket.user(new IOType(StructLinkedList.class, IOLong.class)));
+		IOList<IOLong> list=cluster.constructType(AllocateTicket.user(new IOTypeLayout(StructLinkedList.class, new IOTypeLayout(IOLong.class))));
 		
 		list.validate();
 		list.addElement(new IOLong(141));
@@ -167,7 +166,7 @@ class FSFTest{
 	private static void linkedListTest(Cluster cluster) throws IOException{
 		
 		IOList<String> list=IOList.box(
-			cluster.constructType(AllocateTicket.user(new IOType(StructLinkedList.class, AutoText.class))),
+			cluster.constructType(AllocateTicket.user(new IOTypeLayout(StructLinkedList.class, new IOTypeLayout(AutoText.class)))),
 			AutoText::getData,
 			AutoText::new
 		                              );
@@ -224,7 +223,7 @@ class FSFTest{
 	}
 	
 	private static void packTest(Cluster cluster) throws IOException{
-		StructLinkedList<AutoText> raw=cluster.constructType(AllocateTicket.user(new IOType(StructLinkedList.class, AutoText.class)));
+		StructLinkedList<AutoText> raw=cluster.constructType(AllocateTicket.user(new IOTypeLayout(StructLinkedList.class, new IOTypeLayout(AutoText.class))));
 		IOList<String> list=IOList.box(
 			raw,
 			AutoText::getData,
