@@ -11,12 +11,8 @@ public interface BitReader{
 	
 	long readBits(int numOBits) throws IOException;
 	
-	default <T extends Enum<T>> T readEnum(Class<T> type) throws IOException{
-		return readEnum(EnumFlag.get(type));
-	}
-	
-	default <T extends Enum<T>> T readEnum(EnumFlag<T> info) throws IOException{
-		return info.read(this);
+	default <T extends Enum<T>> T readEnum(EnumUniverse<T> info, boolean nullable) throws IOException{
+		return info.read(this, nullable);
 	}
 	
 	default boolean readBoolBit() throws IOException{

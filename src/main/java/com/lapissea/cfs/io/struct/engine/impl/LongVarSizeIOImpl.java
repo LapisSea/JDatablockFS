@@ -20,8 +20,8 @@ public class LongVarSizeIOImpl extends VariableNode.PrimitiveLong{
 	private final NumberSize           defaultSize;
 	private final Field                varSize;
 	
-	public LongVarSizeIOImpl(String name, int index, Field valueField, IOStruct.Get.GetterL getFun, IOStruct.Set.SetterL setFun, Field varSize, NumberSize defaultSize){
-		super(name, index);
+	public LongVarSizeIOImpl(VarInfo info, Field valueField, IOStruct.Get.GetterL getFun, IOStruct.Set.SetterL setFun, Field varSize, NumberSize defaultSize){
+		super(info);
 		this.valueField=valueField;
 		this.getFun=getFun;
 		this.setFun=setFun;

@@ -584,7 +584,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			Random rand=new Random();
 			instance.iterateOffsets((VariableNode<?> var, Offset off)->{
 				try{
-					rand.setSeed((((long)var.name.hashCode())<<32)|typeHash);
+					rand.setSeed((((long)var.info.name().hashCode())<<32)|typeHash);
 					
 					var col=new Color(
 						Color.HSBtoRGB(
@@ -749,7 +749,8 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	
 	private void handleError(Throwable e){
 		if(errorMode){
-			LogUtil.println(e);
+//			LogUtil.println(e);
+			e.printStackTrace();
 //			new RuntimeException("Failed to process frame "+getFramePos(), e).printStackTrace();
 		}else throw UtilL.uncheckedThrow(e);
 	}
@@ -894,9 +895,11 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 		
 		try(var bulkDraw=new BulkDraw(GL11.GL_QUADS)){
 			for(FlagReader flags=new FlagReader(b, 8);flags.remainingCount()>0;){
-				if(flags.readBoolBit()){
-					fillBit(flags.readCount()-1, 0, 0);
-				}
+				try{
+					if(flags.readBoolBit()){
+						fillBit(flags.readCount()-1, 0, 0);
+					}
+				}catch(IOException e){}
 			}
 		}
 		

@@ -6,6 +6,7 @@ import com.lapissea.cfs.conf.AllocateTicket;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.objects.IOList;
 import com.lapissea.cfs.objects.IOType;
+import com.lapissea.cfs.objects.IOTypeLayout;
 import com.lapissea.cfs.objects.StructLinkedList;
 import com.lapissea.cfs.objects.boxed.IOLong;
 import com.lapissea.cfs.objects.boxed.IOVoid;
@@ -55,6 +56,22 @@ class FSFTest{
 	}
 	
 	private static void doTests(Cluster cluster) throws IOException{
+		
+		var test=new IOTypeLayout(StructLinkedList.class, new int[]{2, 4}, new IOTypeLayout(IOLong.class));
+		
+		var c=AllocateTicket.fitAndPopulate(test).asUserData(new IOType(IOTypeLayout.class)).submit(cluster);
+		
+		IOTypeLayout layout=new IOTypeLayout();
+		c.io(io->layout.readStruct(cluster, io));
+		
+		c.freeChaining();
+		
+		LogUtil.println(test.toShortString());
+		LogUtil.println(layout.toShortString());
+		
+		//cluster.pack();
+		
+		if(true) return;
 		
 		for(int i=0;i<2;i++){
 			objectClusterTest(cluster);

@@ -2,6 +2,8 @@ package com.lapissea.cfs.io.struct;
 
 import com.lapissea.cfs.cluster.Cluster;
 import com.lapissea.cfs.io.SelfPoint;
+import com.lapissea.cfs.io.bit.BitReader;
+import com.lapissea.cfs.io.bit.BitWriter;
 import com.lapissea.cfs.io.bit.FlagReader;
 import com.lapissea.cfs.io.bit.FlagWriter;
 import com.lapissea.cfs.io.content.ContentReader;
@@ -10,6 +12,7 @@ import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.List;
 import java.util.OptionalLong;
@@ -22,8 +25,9 @@ public abstract class VariableNode<ValTyp>{
 		abstract class Node<ValTyp> extends VariableNode<ValTyp> implements FixedSize{
 			
 			private final int size;
-			protected Node(String name, int index, int size){
-				super(name, index);
+			
+			protected Node(VarInfo info, int size){
+				super(info);
 				this.size=size;
 			}
 			
@@ -63,8 +67,6 @@ public abstract class VariableNode<ValTyp>{
 	}
 	
 	public abstract static class Flag<ValTyp> extends FixedSize.Node<ValTyp>{
-		
-		private static final float MIN_PADDING_RATIO=0;
 		
 		public record FlagBlock(int start, int end, int bitSum, NumberSize wordSize){
 			public int count(){
@@ -110,8 +112,8 @@ public abstract class VariableNode<ValTyp>{
 		private FlagBlock  blockInfo;
 		private NumberSize individualSize;
 		
-		protected Flag(String name, int index, int bitSize, int paddingBits){
-			super(name, index, -1);
+		protected Flag(VarInfo info, int bitSize, int paddingBits){
+			super(info, -1);
 			this.bitSize=bitSize;
 			this.paddingBits=paddingBits;
 		}
@@ -200,8 +202,8 @@ public abstract class VariableNode<ValTyp>{
 	
 	private abstract static class Primitive<T> extends VariableNode<T>{
 		
-		protected Primitive(String name, int index){
-			super(name, index);
+		protected Primitive(VarInfo info){
+			super(info);
 		}
 		
 		@Override
@@ -226,7 +228,7 @@ public abstract class VariableNode<ValTyp>{
 		
 		@Deprecated
 		@Override
-		protected final T read(IOInstance target, ContentReader source, T oldVal, Cluster cluster){ throw new UnsupportedOperationException(toString()); }
+		public final T read(IOInstance target, ContentReader source, T oldVal, Cluster cluster){ throw new UnsupportedOperationException(toString()); }
 		
 		@Deprecated
 		@Override
@@ -238,11 +240,84 @@ public abstract class VariableNode<ValTyp>{
 		
 	}
 	
+	public abstract static class ArrayVar<T> extends VariableNode<T>{
+		
+		public abstract static class Fixed<T> extends ArrayVar<T> implements FixedSize{
+			
+			protected Fixed(VarInfo info, int fixedElementSize){
+				super(info, fixedElementSize);
+				assert fixedElementSize>=0;
+			}
+			
+			@Override
+			protected final long getElementsSize(IOInstance target, T value){
+				return getFixedElementsSize();
+			}
+			
+			protected abstract long getFixedElementsSize();
+			
+			@Override
+			public long getSize(){
+				return fixedArraySize*getFixedElementsSize();
+			}
+		}
+		
+		
+		protected final int fixedArraySize;
+		
+		protected ArrayVar(VarInfo info, int fixedArraySize){
+			super(info);
+			this.fixedArraySize=fixedArraySize;
+		}
+		
+		protected abstract T makeArray(int size);
+		
+		protected abstract long getElementsSize(IOInstance target, T value);
+		
+		protected abstract void readElements(Cluster cluster, IOInstance target, ContentReader source, T array) throws IOException;
+		
+		protected abstract void writeElements(Cluster cluster, IOInstance target, ContentWriter dest, T array) throws IOException;
+		
+		private boolean fixedSize(){
+			return fixedArraySize!=-1;
+		}
+		
+		@Override
+		protected final long mapSize(IOInstance target, T value){
+			return (fixedSize()?0:headSize(value))+getElementsSize(target, value);
+		}
+		
+		@Override
+		public final T read(IOInstance target, ContentReader source, T oldVal, Cluster cluster) throws IOException{
+			int siz  =fixedSize()?fixedArraySize:readSize(source);
+			T   array=makeArray(siz);
+			readElements(cluster, target, source, array);
+			return array;
+		}
+		
+		@Override
+		public final void write(IOInstance target, Cluster cluster, ContentWriter dest, T array) throws IOException{
+			if(!fixedSize()) writeSize(dest, array);
+			writeElements(cluster, target, dest, array);
+		}
+		
+		protected int readSize(ContentReader source) throws IOException{
+			return Math.toIntExact(NumberSize.INT.read(source));
+		}
+		protected void writeSize(ContentWriter dest, T array) throws IOException{
+			NumberSize.INT.write(dest, Array.getLength(array));
+		}
+		protected int headSize(T array){
+			return NumberSize.INT.bytes;
+		}
+	}
+	
 	public abstract static class PrimitiveLong extends Primitive<Long>{
 		
-		protected PrimitiveLong(String name, int index){
-			super(name, index);
+		protected PrimitiveLong(VarInfo info){
+			super(info);
 		}
+		
 		protected abstract long get(IOInstance source);
 		protected abstract void set(IOInstance target, long newValue);
 		protected abstract long read(IOInstance target, ContentReader source, long oldVal) throws IOException;
@@ -273,9 +348,10 @@ public abstract class VariableNode<ValTyp>{
 	
 	public abstract static class PrimitiveInt extends Primitive<Integer>{
 		
-		protected PrimitiveInt(String name, int index){
-			super(name, index);
+		protected PrimitiveInt(VarInfo info){
+			super(info);
 		}
+		
 		protected abstract int get(IOInstance source);
 		protected abstract void set(IOInstance target, int newValue);
 		protected abstract int read(IOInstance target, ContentReader source, int oldVal) throws IOException;
@@ -306,9 +382,10 @@ public abstract class VariableNode<ValTyp>{
 	
 	public abstract static class PrimitiveFloat extends Primitive<Float>{
 		
-		protected PrimitiveFloat(String name, int index){
-			super(name, index);
+		protected PrimitiveFloat(VarInfo info){
+			super(info);
 		}
+		
 		protected abstract float get(IOInstance source);
 		protected abstract void set(IOInstance target, float newValue);
 		protected abstract float read(IOInstance target, ContentReader source, float oldVal) throws IOException;
@@ -339,8 +416,8 @@ public abstract class VariableNode<ValTyp>{
 	
 	public abstract static class SelfPointer<T extends IOInstance&SelfPoint<T>> extends VariableNode<T>{
 		
-		protected SelfPointer(String name, int index){
-			super(name, index);
+		protected SelfPointer(VarInfo info){
+			super(info);
 		}
 		
 		public void allocNew(IOInstance target, Cluster cluster) throws IOException{
@@ -350,14 +427,14 @@ public abstract class VariableNode<ValTyp>{
 		public abstract void allocNew(IOInstance target, Cluster cluster, boolean disableNext) throws IOException;
 	}
 	
-	public final String name;
-	public final int    index;
+	public static record VarInfo(String name, int index){}
+	
+	public final VarInfo info;
 	
 	private Offset knownOffset;
 	
-	protected VariableNode(String name, int index){
-		this.name=name;
-		this.index=index;
+	protected VariableNode(VarInfo info){
+		this.info=info;
 	}
 	
 	public ValTyp getValueAsObj(IOInstance source){
@@ -374,7 +451,7 @@ public abstract class VariableNode<ValTyp>{
 	
 	protected abstract long mapSize(IOInstance target, ValTyp value);
 	
-	protected abstract ValTyp read(IOInstance target, ContentReader source, ValTyp oldVal, Cluster cluster) throws IOException;
+	public abstract ValTyp read(IOInstance target, ContentReader source, ValTyp oldVal, Cluster cluster) throws IOException;
 	
 	protected abstract void write(IOInstance target, Cluster cluster, ContentWriter dest, ValTyp source) throws IOException;
 	
@@ -405,7 +482,7 @@ public abstract class VariableNode<ValTyp>{
 	}
 	
 	public SimpleEntry<String, Object> toString(IOInstance instance){
-		return new SimpleEntry<>(name, getValueAsObj(instance));
+		return new SimpleEntry<>(info.name, getValueAsObj(instance));
 	}
 	
 	@Override
@@ -416,7 +493,7 @@ public abstract class VariableNode<ValTyp>{
 		var           end="IOImpl";
 		if(cName.endsWith(end)) sb.setLength(sb.length()-end.length());
 		sb.append('{');
-		sb.append(name);
+		sb.append(info.name);
 		if(getKnownOffset()!=null) sb.append(", offset = ").append(getKnownOffset());
 		if(this instanceof FixedSize fixed) sb.append(", size = ").append(fixed.getSize());
 		sb.append('}');

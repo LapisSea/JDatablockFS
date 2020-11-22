@@ -51,14 +51,18 @@ public class IOType extends IOInstance{
 			initPointerVarAll(getContainer().cluster);
 		}
 		
-		@Get
-		private IOList<AutoText> getTypeNames(){
+		@Get(target="typeNames")
+		private IOList<AutoText> getTypeNamesB(){
 			return IOList.unbox(typeNames);
 		}
 		
 		@Set
 		private void setTypeNames(IOList<AutoText> typeNames){
 			this.typeNames=IOList.box(typeNames, AutoText::getData, AutoText::new);
+		}
+		
+		public IOList<String> getTypeNames(){
+			return typeNames;
 		}
 		
 		@Set
@@ -207,15 +211,13 @@ public class IOType extends IOInstance{
 	private void writeNum(ContentWriter target, int source) throws IOException{
 		NumberSize dataSize=NumberSize.bySize(source);
 		
-		try(var flags=new FlagWriter.AutoPop(NumberSize.SMALEST_REAL, target)){
-			flags.writeEnum(NumberSize.FLAG_INFO, dataSize);
-		}
+		FlagWriter.writeSingle(target, NumberSize.SMALEST_REAL, NumberSize.FLAG_INFO, false, dataSize);
 		
 		dataSize.write(target, source);
 	}
 	
 	private int readNum(ContentReader source) throws IOException{
-		NumberSize dataSize=FlagReader.readSingle(source, NumberSize.SMALEST_REAL, NumberSize.FLAG_INFO);
+		NumberSize dataSize=FlagReader.readSingle(source, NumberSize.SMALEST_REAL, NumberSize.FLAG_INFO, false);
 		return (int)dataSize.read(source);
 	}
 	

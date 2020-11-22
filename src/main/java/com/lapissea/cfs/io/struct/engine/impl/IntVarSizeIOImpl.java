@@ -20,8 +20,8 @@ public class IntVarSizeIOImpl extends VariableNode.PrimitiveInt{
 	private final NumberSize           defaultSize;
 	private final Field                varSize;
 	
-	public IntVarSizeIOImpl(String name, int index, Field valueField, IOStruct.Get.GetterI getFun, IOStruct.Set.SetterI setFun, Field varSize, NumberSize defaultSize){
-		super(name, index);
+	public IntVarSizeIOImpl(VarInfo info, Field valueField, IOStruct.Get.GetterI getFun, IOStruct.Set.SetterI setFun, Field varSize, NumberSize defaultSize){
+		super(info);
 		this.valueField=valueField;
 		this.getFun=getFun;
 		this.setFun=setFun;

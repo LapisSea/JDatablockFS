@@ -21,14 +21,14 @@ public class FloatVarSizeIOImpl extends VariableNode.PrimitiveFloat{
 	private final NumberSize           defaultSize;
 	private final Field                varSize;
 	
-	public FloatVarSizeIOImpl(String name, int index, Field valueField, IOStruct.Get.GetterF getFun, IOStruct.Set.SetterF setFun, Field varSize, NumberSize defaultSize){
-		super(name, index);
+	public FloatVarSizeIOImpl(VarInfo info, Field valueField, IOStruct.Get.GetterF getFun, IOStruct.Set.SetterF setFun, Field varSize, NumberSize defaultSize){
+		super(info);
 		this.valueField=valueField;
 		this.getFun=getFun;
 		this.setFun=setFun;
 		this.varSize=varSize;
 		this.defaultSize=defaultSize==NumberSize.VOID?null:defaultSize;
-		if(defaultSize!=NumberSize.INT)throw new MalformedStructLayout("Float size of "+defaultSize+" not supported");
+		if(defaultSize!=NumberSize.INT) throw new MalformedStructLayout("Float size of "+defaultSize+" not supported");
 	}
 	
 	private NumberSize getSize(IOInstance source){

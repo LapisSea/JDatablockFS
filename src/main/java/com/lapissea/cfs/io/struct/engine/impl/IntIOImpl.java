@@ -19,8 +19,8 @@ public class IntIOImpl extends VariableNode.PrimitiveInt implements VariableNode
 	private final IOStruct.Set.SetterI setFun;
 	private final NumberSize           size;
 	
-	public IntIOImpl(String name, int index, Field valueField, IOStruct.Get.GetterI getFun, IOStruct.Set.SetterI setFun, NumberSize size){
-		super(name, index);
+	public IntIOImpl(VarInfo info, Field valueField, IOStruct.Get.GetterI getFun, IOStruct.Set.SetterI setFun, NumberSize size){
+		super(info);
 		this.valueField=valueField;
 		this.getFun=getFun;
 		this.setFun=setFun;

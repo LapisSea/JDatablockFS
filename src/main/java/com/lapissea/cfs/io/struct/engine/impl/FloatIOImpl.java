@@ -20,13 +20,13 @@ public class FloatIOImpl extends VariableNode.PrimitiveFloat implements Variable
 	private final IOStruct.Set.SetterF setFun;
 	private final NumberSize           size;
 	
-	public FloatIOImpl(String name, int index, Field valueField, IOStruct.Get.GetterF getFun, IOStruct.Set.SetterF setFun, NumberSize size){
-		super(name, index);
+	public FloatIOImpl(VarInfo info, Field valueField, IOStruct.Get.GetterF getFun, IOStruct.Set.SetterF setFun, NumberSize size){
+		super(info);
 		this.valueField=valueField;
 		this.getFun=getFun;
 		this.setFun=setFun;
 		this.size=size;
-		if(size!=NumberSize.INT)throw new MalformedStructLayout("Float size of "+size+" not supported");
+		if(size!=NumberSize.INT) throw new MalformedStructLayout("Float size of "+size+" not supported");
 	}
 	
 	@Override

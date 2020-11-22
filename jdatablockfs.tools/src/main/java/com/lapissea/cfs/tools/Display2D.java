@@ -38,8 +38,9 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 	
 	private class Pan extends JPanel{
 		
-		public int mouseX;
-		public int mouseY;
+		private static final long serialVersionUID=7218388170521657519L;
+		public               int  mouseX;
+		public               int  mouseY;
 		
 		private void renderImage(Graphics2D g, MemFrame frame){
 			currentGraphics=g;
@@ -221,7 +222,8 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 	private final List<MemFrame>               frames   =new ArrayList<>();
 	private final Map<ByteInfo, BufferedImage> byteCache=new HashMap<>();
 	private final JFrame                       frame    =new JFrame(){
-	
+		
+		private static final long serialVersionUID=207535628410729425L;
 	};
 	
 	public Display2D(){
@@ -375,7 +377,7 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 			Random rand=new Random();
 			instance.iterateOffsets((VariableNode<?> var, Offset off)->{
 				try{
-					rand.setSeed((((long)var.name.hashCode())<<32)|typeHash);
+					rand.setSeed((((long)var.info.name().hashCode())<<32)|typeHash);
 					
 					var col=new Color(
 						Color.HSBtoRGB(
@@ -600,9 +602,11 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 		g.setColor(info.color);
 		
 		for(FlagReader flags=new FlagReader(info.uVal, 8);flags.remainingCount()>0;){
-			if(flags.readBoolBit()){
-				fillBit(flags.readCount()-1, 0, 0);
-			}
+			try{
+				if(flags.readBoolBit()){
+					fillBit(flags.readCount()-1, 0, 0);
+				}
+			}catch(IOException e){ }
 		}
 		
 		if(info.withChar){

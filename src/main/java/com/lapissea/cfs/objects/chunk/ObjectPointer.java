@@ -26,7 +26,7 @@ public abstract class ObjectPointer<T extends IOInstance>{
 		
 		@Override
 		public ObjectPointer<?> read(Object targetObj, Cluster cluster, ContentReader source, ObjectPointer<?> oldValue) throws IOException{
-			oldValue.set(ChunkPointer.getNullable(NumberSize.LARGEST.read(source)), NumberSize.LARGEST.read(source));
+			oldValue.set(ChunkPointer.ofNullable(NumberSize.LARGEST.read(source)), NumberSize.LARGEST.read(source));
 			return oldValue;
 		}
 		
@@ -52,7 +52,7 @@ public abstract class ObjectPointer<T extends IOInstance>{
 		
 		@Override
 		public ObjectPointer<?> read(Object targetObj, Cluster cluster, ContentReader source, ObjectPointer<?> oldValue) throws IOException{
-			oldValue.set(ChunkPointer.getNullable(NumberSize.LARGEST.read(source)), 0);
+			oldValue.set(ChunkPointer.ofNullable(NumberSize.LARGEST.read(source)), 0);
 			return oldValue;
 		}
 		
@@ -94,7 +94,7 @@ public abstract class ObjectPointer<T extends IOInstance>{
 			var ptr=ptrSiz.read(source);
 			var off=offSiz.read(source);
 			
-			oldValue.set(ChunkPointer.getNullable(ptr), off);
+			oldValue.set(ChunkPointer.ofNullable(ptr), off);
 			
 			return oldValue;
 		}
@@ -108,8 +108,8 @@ public abstract class ObjectPointer<T extends IOInstance>{
 			NumberSize offSiz=NumberSize.bySize(off).max(minSize);
 			
 			try(var flags=new FlagWriter.AutoPop(NumberSize.SMALEST_REAL, target)){
-				NumberSize.FLAG_INFO.write(ptrSiz, flags);
-				NumberSize.FLAG_INFO.write(offSiz, flags);
+				flags.writeEnum(NumberSize.FLAG_INFO, ptrSiz, false);
+				flags.writeEnum(NumberSize.FLAG_INFO, offSiz, false);
 			}
 			
 			ptrSiz.write(target, ptr);
@@ -161,7 +161,7 @@ public abstract class ObjectPointer<T extends IOInstance>{
 			
 			var ptr=ptrSiz.read(source);
 			
-			oldValue.set(ChunkPointer.getNullable(ptr), 0);
+			oldValue.set(ChunkPointer.ofNullable(ptr), 0);
 			
 			return oldValue;
 		}

@@ -21,7 +21,7 @@ public class GenericIOImpl<T> extends VariableNode<T>{
 	private final IOStruct.Write.Writer<T> writeFun;
 	private final OptionalLong             maxSize;
 	
-	public GenericIOImpl(String name, int index,
+	public GenericIOImpl(VarInfo info,
 	                     Field valueField,
 	                     IOStruct.Get.Getter<T> getFun,
 	                     IOStruct.Set.Setter<T> setFun,
@@ -29,7 +29,7 @@ public class GenericIOImpl<T> extends VariableNode<T>{
 	                     IOStruct.Read.Reader<T> readFun,
 	                     IOStruct.Write.Writer<T> writeFun,
 	                     OptionalLong maxSize){
-		super(name, index);
+		super(info);
 		this.getFun=getFun;
 		this.valueField=valueField;
 		this.setFun=setFun;

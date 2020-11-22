@@ -8,6 +8,7 @@ import com.lapissea.cfs.io.bit.FlagWriter;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.struct.IOInstance;
+import com.lapissea.cfs.io.struct.IOStruct;
 import com.lapissea.cfs.io.struct.IOStruct.Value;
 import com.lapissea.cfs.objects.INumber;
 import com.lapissea.cfs.objects.IOType;
@@ -88,14 +89,26 @@ public final class ChunkPointer implements INumber{
 	
 	public static class PtrSmart extends PtrRef{
 		
-		@Value(index=1, rw=ChunkPointer.AutoSizedIO.class)
-		private ChunkPointer value;
+		@IOStruct.EnumValue(index=0)
+		private NumberSize size;
 		
+		@IOStruct.Value(index=1)
+		private ChunkPointer value;
 		
 		public PtrSmart(){}
 		
 		public PtrSmart(ChunkPointer value){
 			this.value=value;
+		}
+		
+		@IOStruct.Read
+		private ChunkPointer readValue(Cluster cluster, ContentReader input, ChunkPointer oldVal) throws IOException{
+			return ChunkPointer.ofNullable(size.read(input));
+		}
+		
+		@IOStruct.Write
+		private void readValue(Cluster cluster, ContentWriter dest, ChunkPointer val) throws IOException{
+			size.write(dest, val);
 		}
 		
 		@Override
@@ -124,7 +137,7 @@ public final class ChunkPointer implements INumber{
 		
 		@Override
 		public ChunkPointer read(Object targetObj, Cluster cluster, ContentReader source, ChunkPointer oldValue) throws IOException{
-			return ChunkPointer.getNullable(fixedSize.read(source));
+			return ChunkPointer.ofNullable(fixedSize.read(source));
 		}
 		
 		@Override
@@ -166,17 +179,15 @@ public final class ChunkPointer implements INumber{
 		
 		@Override
 		public ChunkPointer read(Object targetObj, Cluster cluster, ContentReader source, ChunkPointer oldValue) throws IOException{
-			NumberSize dataSize=FlagReader.readSingle(source, NumberSize.SMALEST_REAL, NumberSize.FLAG_INFO);
-			return ChunkPointer.getNullable(dataSize.read(source));
+			NumberSize dataSize=FlagReader.readSingle(source, NumberSize.SMALEST_REAL, NumberSize.FLAG_INFO, false);
+			return ChunkPointer.ofNullable(dataSize.read(source));
 		}
 		
 		@Override
 		public void write(Object targetObj, Cluster cluster, ContentWriter target, ChunkPointer source) throws IOException{
 			NumberSize dataSize=calcNumSize(source);
 			
-			try(var flags=new FlagWriter.AutoPop(NumberSize.SMALEST_REAL, target)){
-				flags.writeEnum(NumberSize.FLAG_INFO, dataSize);
-			}
+			FlagWriter.writeSingle(target, NumberSize.SMALEST_REAL, NumberSize.FLAG_INFO, false, dataSize);
 			
 			dataSize.write(target, source);
 		}
@@ -229,7 +240,7 @@ public final class ChunkPointer implements INumber{
 		
 		@Override
 		public ChunkPointer read(Object targetObj, Cluster cluster, ContentReader source, ChunkPointer oldValue) throws IOException{
-			return ChunkPointer.getNullable(getSize(targetObj).read(source));
+			return ChunkPointer.ofNullable(getSize(targetObj).read(source));
 		}
 		
 		@Override
@@ -274,7 +285,7 @@ public final class ChunkPointer implements INumber{
 			this.toString();
 	}
 	
-	public static ChunkPointer getNullable(long value){
+	public static ChunkPointer ofNullable(long value){
 		if(value==0) return null;
 		return new ChunkPointer(value);
 	}

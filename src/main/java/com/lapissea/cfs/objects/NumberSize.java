@@ -1,17 +1,14 @@
 package com.lapissea.cfs.objects;
 
+import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.BitDepthOutOfSpaceException;
 import com.lapissea.cfs.io.bit.BitUtils;
-import com.lapissea.cfs.io.bit.EnumFlag;
+import com.lapissea.cfs.io.bit.EnumUniverse;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.objects.chunk.ChunkPointer;
-import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
-import com.lapissea.util.TextUtil;
-import com.lapissea.util.function.UnsafeConsumerOL;
-import com.lapissea.util.function.UnsafeFunctionOL;
 
 import java.io.IOException;
 import java.util.OptionalInt;
@@ -19,24 +16,46 @@ import java.util.OptionalLong;
 
 public enum NumberSize{
 	
-	VOID('V', 0x0, 0, in->0, (out, num)->{}),
-	BYTE('B', 0xFFL, 1, ContentReader::readUnsignedInt1, (out, num)->out.writeInt1((int)num)),
-	SHORT('s', 0xFFFFL, 2, ContentReader::readUnsignedInt2, (out, num)->out.writeInt2((int)num)),
-	SMALL_INT('S', 0xFFFFFFL, 3, ContentReader::readUnsignedInt3, (out, num)->out.writeInt3((int)num)),
-	INT('i', 0xFFFFFFFFL, 4, ContentReader::readUnsignedInt4, (out, num)->out.writeInt4((int)num)),
-	BIG_INT('I', 0xFFFFFFFFFFL, 5, ContentReader::readUnsignedInt5, ContentWriter::writeInt5),
-	SMALL_LONG('l', 0xFFFFFFFFFFFFL, 6, ContentReader::readUnsignedInt6, ContentWriter::writeInt6),
-	LONG('L', 0X7FFFFFFFFFFFFFFFL, 8, ContentReader::readInt8, ContentWriter::writeInt8);
+	VOID('V', 0x0, 0, in->0, (out, num)->{}, in->0, (out, num)->{}),
+	BYTE('B', 0xFFL, 1, ContentReader::readUnsignedInt1, (out, num)->out.writeInt1((int)num), NumberSize::RNS, NumberSize::WNS),
+	SHORT('s', 0xFFFFL, 2, ContentReader::readUnsignedInt2, (out, num)->out.writeInt2((int)num), in->Utils.shortBitsToFloat(in.readInt2()), (out, num)->out.writeInt2(Utils.floatToShortBits((float)num))),
+	SMALL_INT('S', 0xFFFFFFL, 3, ContentReader::readUnsignedInt3, (out, num)->out.writeInt3((int)num), NumberSize::RNS, NumberSize::WNS),
+	INT('i', 0xFFFFFFFFL, 4, ContentReader::readUnsignedInt4, (out, num)->out.writeInt4((int)num), in->Float.intBitsToFloat(in.readInt2()), (out, num)->out.writeInt4(Float.floatToIntBits((float)num))),
+	BIG_INT('I', 0xFFFFFFFFFFL, 5, ContentReader::readUnsignedInt5, ContentWriter::writeInt5, NumberSize::RNS, NumberSize::WNS),
+	SMALL_LONG('l', 0xFFFFFFFFFFFFL, 6, ContentReader::readUnsignedInt6, ContentWriter::writeInt6, NumberSize::RNS, NumberSize::WNS),
+	LONG('L', 0X7FFFFFFFFFFFFFFFL, 8, ContentReader::readInt8, ContentWriter::writeInt8, in->Double.longBitsToDouble(in.readInt8()), (out, num)->out.writeInt8(Double.doubleToLongBits(num)));
 	
-	private static final NumberSize[] VALS=NumberSize.values();
+	private static double RNS(ContentReader src){
+		throw new UnsupportedOperationException();
+	}
 	
-	public static final EnumFlag<NumberSize> FLAG_INFO=EnumFlag.get(NumberSize.class);
+	private static void WNS(ContentWriter dest, double value){
+		throw new UnsupportedOperationException();
+	}
+	
+	private interface WriterI{
+		void write(ContentWriter dest, long value) throws IOException;
+	}
+	
+	private interface ReaderI{
+		long read(ContentReader src) throws IOException;
+	}
+	
+	private interface WriterF{
+		void write(ContentWriter dest, double value) throws IOException;
+	}
+	
+	private interface ReaderF{
+		double read(ContentReader src) throws IOException;
+	}
+	
+	public static final EnumUniverse<NumberSize> FLAG_INFO=EnumUniverse.get(NumberSize.class);
 	
 	public static final NumberSize SMALEST_REAL=BYTE;
-	public static final NumberSize LARGEST     =VALS[VALS.length-1];
+	public static final NumberSize LARGEST     =LONG;
 	
 	public static NumberSize ordinal(int index){
-		return VALS[index];
+		return FLAG_INFO.get(index);
 	}
 	
 	public static NumberSize bySizeVoidable(@Nullable INumber size){
@@ -48,7 +67,7 @@ public enum NumberSize{
 	}
 	
 	public static NumberSize bySize(long size){
-		for(NumberSize value : VALS){
+		for(NumberSize value : FLAG_INFO){
 			if(value.maxSize>=size) return value;
 		}
 		throw new RuntimeException("Extremely large value");
@@ -60,7 +79,7 @@ public enum NumberSize{
 	}
 	
 	public static NumberSize byBytes(long bytes){
-		for(NumberSize value : VALS){
+		for(NumberSize value : FLAG_INFO){
 			if(value.bytes>=bytes) return value;
 		}
 		throw new RuntimeException("Extremely large byte length: "+bytes);
@@ -70,25 +89,38 @@ public enum NumberSize{
 	public final long maxSize;
 	public final char shortName;
 	
-	private final UnsafeFunctionOL<ContentReader, IOException> reader;
-	private final UnsafeConsumerOL<ContentWriter, IOException> writer;
+	private final ReaderI reader;
+	private final WriterI writer;
+	private final ReaderF readerFloating;
+	private final WriterF writerFloating;
 	
 	public final OptionalInt  optionalBytes;
 	public final OptionalLong optionalBytesLong;
 	
-	NumberSize(char shortName, long maxSize, int bytes, UnsafeFunctionOL<ContentReader, IOException> reader, UnsafeConsumerOL<ContentWriter, IOException> writer){
+	NumberSize(char shortName, long maxSize, int bytes, ReaderI reader, WriterI writer, ReaderF readerFloating, WriterF writerFloating){
 		this.shortName=shortName;
 		this.bytes=bytes;
 		this.maxSize=maxSize;
+		
 		this.reader=reader;
 		this.writer=writer;
+		this.readerFloating=readerFloating;
+		this.writerFloating=writerFloating;
 		
 		optionalBytes=OptionalInt.of(bytes);
 		optionalBytesLong=OptionalLong.of(bytes);
 	}
 	
+	public double readFloating(ContentReader in) throws IOException{
+		return readerFloating.read(in);
+	}
+	
+	public void writeFloating(ContentWriter out, double value) throws IOException{
+		writerFloating.write(out, value);
+	}
+	
 	public long read(ContentReader in) throws IOException{
-		return reader.apply(in);
+		return reader.read(in);
 	}
 	
 	public void write(ContentWriter out, INumber value) throws IOException{
@@ -96,7 +128,7 @@ public enum NumberSize{
 	}
 	
 	public void write(ContentWriter out, long value) throws IOException{
-		writer.accept(out, value);
+		writer.write(out, value);
 	}
 	
 	public NumberSize prev(){
@@ -107,8 +139,17 @@ public enum NumberSize{
 	
 	public NumberSize next(){
 		var nextId=ordinal()+1;
-		if(nextId==VALS.length) return this;
+		if(nextId==FLAG_INFO.size()) return this;
 		return ordinal(nextId);
+	}
+	
+	public boolean greaterThanOrEqual(NumberSize other){
+		if(other==this) return false;
+		return bytes>=other.bytes;
+	}
+	public boolean lesserThanOrEqual(NumberSize other){
+		if(other==this) return false;
+		return bytes<=other.bytes;
 	}
 	
 	public boolean greaterThan(NumberSize other){
@@ -144,6 +185,7 @@ public enum NumberSize{
 	public void ensureCanFit(@NotNull INumber num) throws BitDepthOutOfSpaceException{
 		ensureCanFit(num.getValue());
 	}
+	
 	public void ensureCanFit(long num) throws BitDepthOutOfSpaceException{
 		if(!canFit(num)) throw new BitDepthOutOfSpaceException(this, num);
 	}
@@ -157,6 +199,10 @@ public enum NumberSize{
 	public NumberSize requireNonVoid(){
 		if(this==VOID) throw new RuntimeException("Value must not be "+VOID);
 		return this;
+	}
+	
+	public int bytes(){
+		return bytes;
 	}
 	
 	public int bits(){

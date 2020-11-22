@@ -15,11 +15,11 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Type;
 import java.util.Objects;
 
-public class PointerNodeMaker<T extends IOInstance&SelfPoint<T>> extends StructReflectionImpl.NodeMaker<T>{
+public class PointerNodeMaker<T extends IOInstance&SelfPoint<T>> extends StructReflectionImpl.NodeMaker{
 	
 	@Override
 	@SuppressWarnings("unchecked")
-	protected VariableNode<T> makeNode(IOStruct clazz, String name, ValueRelations.ValueInfo info){
+	protected VariableNode<?> makeNode(IOStruct clazz, String name, ValueRelations.ValueInfo info){
 		
 		IOStruct              overrideType;
 		IOStruct.PointerValue valueAnn;
@@ -34,6 +34,8 @@ public class PointerNodeMaker<T extends IOInstance&SelfPoint<T>> extends StructR
 			
 			overrideType=valueAnn.type()==IOInstance.class?null:IOStruct.get(valueAnn.type());
 		}
+		
+		VariableNode.VarInfo vInfo=new VariableNode.VarInfo(name, valueAnn.index());
 		
 		IOStruct structType;
 		{
@@ -66,11 +68,11 @@ public class PointerNodeMaker<T extends IOInstance&SelfPoint<T>> extends StructR
 		Getter<T> getFun=Getter.get(info, valueType);
 		Setter<T> setFun=Setter.get(info, valueType);
 		
-		ReaderWriter<ObjectPointer<T>> rw=Objects.requireNonNull(ReaderWriter.getInstance(clazz.instanceClass, (Class<ReaderWriter<ObjectPointer<T>>>)((Object)valueAnn.rw()), valueAnn.rwArgs()));
+		ReaderWriter<ObjectPointer<T>> rw=Objects.requireNonNull(ReaderWriter.getInstance(clazz.instanceClass, valueType, (Class<ReaderWriter<ObjectPointer<T>>>)((Object)valueAnn.rw()), valueAnn.rwArgs()));
 		
 		if(rw.getFixedSize().isPresent()){
-			return new StructPtrIOImpl.Fixed<>(name, valueAnn.index(), valueField, getFun, setFun, constructorFun, rw, structType);
+			return new StructPtrIOImpl.Fixed<>(vInfo, valueField, getFun, setFun, constructorFun, rw, structType);
 		}
-		return new StructPtrIOImpl<>(name, valueAnn.index(), valueField, getFun, setFun, constructorFun, rw, structType);
+		return new StructPtrIOImpl<>(vInfo, valueField, getFun, setFun, constructorFun, rw, structType);
 	}
 }

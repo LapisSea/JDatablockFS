@@ -192,7 +192,8 @@ public class Cluster extends IOInstance.Contained{
 			IOVoid.class,
 			IOLong.class,
 			IOInt.class,
-			IOFloat.class
+			IOFloat.class,
+			IOTypeLayout.class
 		                                           )){
 			getTypeParsers().register(TypeParser.rawExact(IOStruct.get(c)));
 		}
@@ -398,7 +399,7 @@ public class Cluster extends IOInstance.Contained{
 	public synchronized void free(Chunk chunk) throws IOException{
 		if(DEBUG_VALIDATION){
 			checkCached(chunk);
-			assert !chunk.isUsed():chunk+" is used!";
+//			assert !chunk.isUsed():chunk+" is used!";
 			
 			if(chunk.isUserData()){
 				var ptr=chunk.getPtr().getValue();
@@ -407,7 +408,6 @@ public class Cluster extends IOInstance.Contained{
 			assert !getFreeData().contains(chunk.getPtr()):chunk;
 		}
 		
-		freeingQueue.add(chunk);
 		
 		if(chunk.isUserData()){
 			boolean oldFreeingChunks=freeingChunks;
@@ -417,8 +417,16 @@ public class Cluster extends IOInstance.Contained{
 			userChunks.removeElement(userChunks.find(info->info.getPtr().equals(ptr)));
 			
 			freeingChunks=oldFreeingChunks;
-			chunk.modifyAndSave(Chunk::clearUserMark);
 		}
+		
+		chunk.modifyAndSave(ch->{
+			ch.setUsed(false);
+			ch.setSize(0);
+			ch.clearNextPtr();
+			ch.clearUserMark();
+		});
+		
+		freeingQueue.add(chunk);
 		
 		if(!freeingChunks){
 			processFreeQueue();
@@ -884,7 +892,7 @@ public class Cluster extends IOInstance.Contained{
 			return null;
 		};
 		
-		for(VariableNode<?> variable : instance.getStruct().variables){
+		for(VariableNode<?> variable : instance.getStruct().getVariables()){
 			try{
 				Object val=variable.getValueAsObj(instance);
 				if(val==null) continue;

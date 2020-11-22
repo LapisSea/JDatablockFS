@@ -11,14 +11,8 @@ public interface BitWriter{
 		return this;
 	}
 	
-	
-	@SuppressWarnings("unchecked")
-	default <T extends Enum<T>> BitWriter writeEnum(T val) throws IOException{
-		return writeEnum(EnumFlag.get(val.getClass()), val);
-	}
-	
-	default <T extends Enum<T>> BitWriter writeEnum(EnumFlag<T> info, T val) throws IOException{
-		info.write(val, this);
+	default <T extends Enum<T>> BitWriter writeEnum(EnumUniverse<T> info, T val, boolean nullable) throws IOException{
+		info.write(val, this, nullable);
 		return this;
 	}
 	

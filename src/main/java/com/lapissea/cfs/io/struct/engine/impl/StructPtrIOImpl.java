@@ -21,10 +21,10 @@ public class StructPtrIOImpl<T extends IOInstance&SelfPoint<T>> extends Variable
 	
 	public static class Fixed<T extends IOInstance&SelfPoint<T>> extends StructPtrIOImpl<T> implements VariableNode.FixedSize{
 		
-		public Fixed(String name, int index,
+		public Fixed(VarInfo info,
 		             Field valueField, IOStruct.Get.Getter<T> getFun, IOStruct.Set.Setter<T> setFun, IOStruct.Construct.Constructor<T> constructorFun,
 		             ReaderWriter<ObjectPointer<T>> ptrIO, IOStruct structType){
-			super(name, index, valueField, getFun, setFun, constructorFun, ptrIO, structType);
+			super(info, valueField, getFun, setFun, constructorFun, ptrIO, structType);
 		}
 		
 		@Override
@@ -53,10 +53,10 @@ public class StructPtrIOImpl<T extends IOInstance&SelfPoint<T>> extends Variable
 	private final IOStruct structType;
 	
 	
-	public StructPtrIOImpl(String name, int index,
+	public StructPtrIOImpl(VarInfo info,
 	                       Field valueField, IOStruct.Get.Getter<T> getFun, IOStruct.Set.Setter<T> setFun, IOStruct.Construct.Constructor<T> constructorFun,
 	                       ReaderWriter<ObjectPointer<T>> ptrIO, IOStruct structType){
-		super(name, index);
+		super(info);
 		this.valueField=valueField;
 		this.getFun=getFun;
 		this.setFun=setFun;
@@ -99,7 +99,7 @@ public class StructPtrIOImpl<T extends IOInstance&SelfPoint<T>> extends Variable
 	}
 	
 	@Override
-	protected T read(IOInstance target, ContentReader source, T oldVal, Cluster cluster) throws IOException{
+	public T read(IOInstance target, ContentReader source, T oldVal, Cluster cluster) throws IOException{
 		ObjectPointer<T> ptr=ptrIO.read(target, cluster, source, new ObjectPointer.Struct<>(null));
 		if(ptr.getDataBlock()==null) return null;
 		Chunk c=ptr.getBlock(cluster);

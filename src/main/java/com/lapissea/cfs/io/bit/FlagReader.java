@@ -6,23 +6,31 @@ import com.lapissea.cfs.objects.NumberSize;
 
 import java.io.IOException;
 
+import static com.lapissea.cfs.GlobalConfig.*;
 import static com.lapissea.cfs.io.bit.BitUtils.*;
 
 public class FlagReader implements BitReader, AutoCloseable{
 	
 	
-	public static <T extends Enum<T>> T readSingle(ContentReader in, EnumFlag<T> enumInfo) throws IOException{
-		return readSingle(in, NumberSize.byBits(enumInfo.bitSize), enumInfo);
+	private static final ThreadLocal<FlagReader> INTERNAL_READERS=ThreadLocal.withInitial(()->new FlagReader(0, -1));
+	
+	public static <T extends Enum<T>> T readSingle(ContentReader in, EnumUniverse<T> enumInfo, boolean nullable) throws IOException{
+		return readSingle(in, enumInfo.numSize(nullable), enumInfo, nullable);
 	}
 	
-	public static <T extends Enum<T>> T readSingle(ContentReader in, NumberSize size, EnumFlag<T> enumInfo) throws IOException{
-		try(var flags=read(in, size)){
-			return flags.readEnum(enumInfo);
+	public static <T extends Enum<T>> T readSingle(ContentReader in, NumberSize size, EnumUniverse<T> enumInfo, boolean nullable) throws IOException{
+		if(DEBUG_VALIDATION){
+			var nums=enumInfo.numSize(nullable);
+			if(nums.lesserThan(size)) throw new IllegalArgumentException(nums+" <= "+size);
+		}
+		
+		try(var flags=INTERNAL_READERS.get().start(size.read(in), size.bits())){
+			return flags.readEnum(enumInfo, nullable);
 		}
 	}
 	
 	public static FlagReader read(ContentReader in, NumberSize size) throws IOException{
-		return new FlagReader(size.read(in), size.bytes*Byte.SIZE);
+		return new FlagReader(size.read(in), size);
 	}
 	
 	private final int  totalBitCount;
@@ -30,13 +38,18 @@ public class FlagReader implements BitReader, AutoCloseable{
 	private       int  bitCount;
 	
 	public FlagReader(long data, NumberSize size){
-		this(data, size.bytes*Byte.SIZE);
+		this(data, size.bits());
 	}
 	
 	public FlagReader(long data, int bitCount){
+		totalBitCount=bitCount;
+		start(data, bitCount);
+	}
+	
+	private FlagReader start(long data, int bitCount){
 		this.data=data;
 		this.bitCount=bitCount;
-		totalBitCount=bitCount;
+		return this;
 	}
 	
 	public int remainingCount(){

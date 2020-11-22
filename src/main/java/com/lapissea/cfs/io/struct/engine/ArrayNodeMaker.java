@@ -1,5 +1,7 @@
 package com.lapissea.cfs.io.struct.engine;
 
+import com.lapissea.cfs.GenericType;
+import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.io.ReaderWriter;
 import com.lapissea.cfs.io.struct.IOStruct;
@@ -11,42 +13,51 @@ import com.lapissea.cfs.io.struct.IOStruct.Write.Writer;
 import com.lapissea.cfs.io.struct.StructImpl;
 import com.lapissea.cfs.io.struct.ValueRelations;
 import com.lapissea.cfs.io.struct.VariableNode;
-import com.lapissea.cfs.io.struct.engine.impl.FixedGenericIOImpl;
-import com.lapissea.cfs.io.struct.engine.impl.GenericIOImpl;
+import com.lapissea.cfs.io.struct.engine.impl.GenericArrayFixedIOImpl;
+import com.lapissea.cfs.io.struct.engine.impl.GenericArrayIOImpl;
 import com.lapissea.util.TextUtil;
 
+import java.lang.invoke.VarHandle;
 import java.lang.reflect.Field;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
 import java.util.function.Function;
 
-public class GenericNodeMaker<T> extends StructReflectionImpl.NodeMaker{
+public class ArrayNodeMaker<T> extends StructReflectionImpl.NodeMaker{
 	
 	
 	@Override
 	@SuppressWarnings("unchecked")
-	protected VariableNode<T> makeNode(IOStruct clazz, String name, ValueRelations.ValueInfo info){
+	protected VariableNode<T[]> makeNode(IOStruct clazz, String name, ValueRelations.ValueInfo info){
 		
-		IOStruct.Value valueAnn;
-		Field          valueField;
+		IOStruct.ArrayValue valueAnn;
+		Field               valueField;
 		{
 			StructImpl.Annotated<Field, ?> val=info.value();
 			
-			valueAnn=(IOStruct.Value)val.annotation();
+			valueAnn=(IOStruct.ArrayValue)val.annotation();
 			
 			valueField=val.val();
 			valueField.setAccessible(true);
 		}
 		
-		var valueType=valueField.getGenericType();
+		var  fixedElements=valueAnn.fixedElements();
+		Type arrayType    =valueField.getGenericType();
 		
+		Type elementType;
+		if(arrayType instanceof ParameterizedType parm) elementType=new GenericType(((Class<?>)parm.getRawType()).componentType(), null, parm.getActualTypeArguments());
+		else elementType=((Class<?>)arrayType).componentType();
 		
-		Getter<T> getFun     =Getter.get(info, valueType);
-		Setter<T> setFun     =Setter.get(info, valueType);
-		Reader<T> readFunTmp =Reader.get(info, valueType), readFun;
-		Writer<T> writeFunTmp=Writer.get(info, valueType), writeFun;
-		Sizer<T>  sizerFunTmp=Sizer.get(info, valueType), sizerFun;
+		VariableNode.VarInfo vInfo=new VariableNode.VarInfo(name, valueAnn.index());
+		
+		Getter<T[]> getFun     =Getter.get(info, arrayType);
+		Setter<T[]> setFun     =Setter.get(info, arrayType);
+		Reader<T>   readFunTmp =Reader.get(info, elementType), readFun;
+		Writer<T>   writeFunTmp=Writer.get(info, elementType), writeFun;
+		Sizer<T>    sizerFunTmp=Sizer.get(info, elementType), sizerFun;
 		
 		OptionalInt  fixedSize=OptionalInt.empty();
 		OptionalLong maxSize  =OptionalLong.empty();
@@ -59,7 +70,7 @@ public class GenericNodeMaker<T> extends StructReflectionImpl.NodeMaker{
 			}
 		}
 		
-		ReaderWriter<T> rw=ReaderWriter.getInstance(clazz.instanceClass, valueType, valueAnn.rw(), valueAnn.rwArgs());
+		ReaderWriter<T> rw=ReaderWriter.getInstance(clazz.instanceClass, elementType, valueAnn.rw(), valueAnn.rwArgs());
 		if(rw!=null){
 			fixedSize=rw.getFixedSize();
 			maxSize=rw.getMaxSize().stream().asLongStream().findAny();
@@ -85,12 +96,12 @@ public class GenericNodeMaker<T> extends StructReflectionImpl.NodeMaker{
 			throw new MalformedStructLayout(toStr.apply(valueField)+" needs a "+ReaderWriter.class.getSimpleName()+" definition or "+String.join(", ", errors)+TextUtil.plural(" function", errors.size()));
 		}
 		
-		VariableNode.VarInfo vInfo=new VariableNode.VarInfo(name, valueAnn.index());
+		VarHandle handle=Utils.makeVarHandle(valueField);
 		
-		if(fixedSize.isPresent()){
-			return new FixedGenericIOImpl<>(vInfo, fixedSize.getAsInt(), valueField, getFun, setFun, sizerFun, readFun, writeFun);
+		if(fixedSize.isPresent()&&fixedElements!=-1){
+			return new GenericArrayFixedIOImpl<>(vInfo, handle, fixedSize.getAsInt(), getFun, setFun, readFun, writeFun);
 		}
 		
-		return new GenericIOImpl<>(vInfo, valueField, getFun, setFun, sizerFun, readFun, writeFun, maxSize);
+		return new GenericArrayIOImpl<>(vInfo, handle, getFun, setFun, sizerFun, readFun, writeFun);
 	}
 }

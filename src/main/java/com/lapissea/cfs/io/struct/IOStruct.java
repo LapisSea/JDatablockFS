@@ -2,6 +2,7 @@ package com.lapissea.cfs.io.struct;
 
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.cluster.Cluster;
+import com.lapissea.cfs.exceptions.MalformedObjectException;
 import com.lapissea.cfs.io.ReaderWriter;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
@@ -9,6 +10,7 @@ import com.lapissea.cfs.io.struct.VariableNode.FixedSize;
 import com.lapissea.cfs.io.struct.engine.StructReflectionImpl.NodeMaker.FunDef;
 import com.lapissea.cfs.io.struct.engine.StructReflectionImpl.NodeMaker.FunDef.Arg;
 import com.lapissea.cfs.io.struct.engine.impl.BitBlockNode;
+import com.lapissea.cfs.objects.IOList;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.chunk.Chunk;
 import com.lapissea.cfs.objects.chunk.ObjectPointer;
@@ -17,7 +19,6 @@ import com.lapissea.util.function.UnsafeFunction;
 
 import java.io.IOException;
 import java.lang.annotation.Annotation;
-import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 import java.lang.reflect.Constructor;
@@ -35,16 +36,12 @@ import static java.lang.annotation.RetentionPolicy.*;
 import static java.util.stream.Collectors.*;
 
 @SuppressWarnings("unchecked")
-public class IOStruct{
+public class IOStruct implements Type{
 	
 	@SuppressWarnings("unchecked")
 	public static final List<Class<Annotation>> ANNOTATIONS=Arrays.stream(IOStruct.class.getClasses()).filter(Class::isAnnotation).map(c->(Class<Annotation>)c).collect(toUnmodifiableList());
 	public static final List<Class<Annotation>> VALUE_TYPES=ANNOTATIONS.stream().filter(n->n.getSimpleName().endsWith("Value")).collect(toUnmodifiableList());
 	public static final List<Class<Annotation>> TAG_TYPES  =ANNOTATIONS.stream().filter(n->!VALUE_TYPES.contains(n)).collect(toUnmodifiableList());
-	
-	@Retention(RUNTIME)
-	@Target(TYPE)
-	public @interface SimpleRegister{}
 	
 	@Target(METHOD)
 	@Retention(RUNTIME)
@@ -120,7 +117,7 @@ public class IOStruct{
 		
 		interface GetterB{
 			@Nullable
-			static <T> GetterB get(ValueRelations.ValueInfo info){
+			static GetterB get(ValueRelations.ValueInfo info){
 				return new FunDef(boolean.class)
 					       .getOverride(info, GetterB.class);
 			}
@@ -130,7 +127,7 @@ public class IOStruct{
 		
 		interface GetterL{
 			@Nullable
-			static <T> GetterL get(ValueRelations.ValueInfo info){
+			static GetterL get(ValueRelations.ValueInfo info){
 				return new FunDef(long.class)
 					       .getOverride(info, GetterL.class);
 			}
@@ -140,7 +137,7 @@ public class IOStruct{
 		
 		interface GetterI{
 			@Nullable
-			static <T> GetterI get(ValueRelations.ValueInfo info){
+			static GetterI get(ValueRelations.ValueInfo info){
 				return new FunDef(int.class)
 					       .getOverride(info, GetterI.class);
 			}
@@ -150,7 +147,7 @@ public class IOStruct{
 		
 		interface GetterF{
 			@Nullable
-			static <T> GetterF get(ValueRelations.ValueInfo info){
+			static GetterF get(ValueRelations.ValueInfo info){
 				return new FunDef(int.class)
 					       .getOverride(info, GetterF.class);
 			}
@@ -177,7 +174,7 @@ public class IOStruct{
 		
 		interface SetterB{
 			@Nullable
-			static <T> SetterB get(ValueRelations.ValueInfo info){
+			static SetterB get(ValueRelations.ValueInfo info){
 				return new FunDef(Void.TYPE,
 				                  new Arg(boolean.class, "newValue"))
 					       .getOverride(info, SetterB.class);
@@ -188,7 +185,7 @@ public class IOStruct{
 		
 		interface SetterL{
 			@Nullable
-			static <T> SetterL get(ValueRelations.ValueInfo info){
+			static SetterL get(ValueRelations.ValueInfo info){
 				return new FunDef(Void.TYPE,
 				                  new Arg(long.class, "newValue"))
 					       .getOverride(info, SetterL.class);
@@ -199,7 +196,7 @@ public class IOStruct{
 		
 		interface SetterI{
 			@Nullable
-			static <T> SetterI get(ValueRelations.ValueInfo info){
+			static SetterI get(ValueRelations.ValueInfo info){
 				return new FunDef(Void.TYPE,
 				                  new Arg(int.class, "newValue"))
 					       .getOverride(info, SetterI.class);
@@ -210,7 +207,7 @@ public class IOStruct{
 		
 		interface SetterF{
 			@Nullable
-			static <T> SetterF get(ValueRelations.ValueInfo info){
+			static SetterF get(ValueRelations.ValueInfo info){
 				return new FunDef(Void.TYPE,
 				                  new Arg(int.class, "newValue"))
 					       .getOverride(info, SetterF.class);
@@ -256,6 +253,8 @@ public class IOStruct{
 	public @interface EnumValue{
 		int index();
 		
+		boolean nullable() default false;
+		
 		byte customBitSize() default -1;
 	}
 	
@@ -281,51 +280,146 @@ public class IOStruct{
 		Class<? extends IOInstance> type() default IOInstance.class;
 	}
 	
+	@Target(FIELD)
+	@Retention(RUNTIME)
+	public @interface PrimitiveArrayValue{
+		int index();
+		
+		int fixedElements() default -1;
+		
+		NumberSize defaultSize() default NumberSize.VOID;
+		
+		String sizeRef() default "";
+	}
+	
+	@Target(FIELD)
+	@Retention(RUNTIME)
+	public @interface ArrayValue{
+		int index();
+		
+		int fixedElements() default -1;
+		
+		Class<? extends ReaderWriter> rw() default ReaderWriter.class;
+		
+		String[] rwArgs() default {};
+	}
+	
+	public static class ClusterDict implements ReaderWriter<IOStruct>{
+		
+		private static final NumberSize NUMBER_SIZE=NumberSize.SMALL_INT;
+		
+		@Override
+		public IOStruct read(Object targetObj, Cluster cluster, ContentReader source, IOStruct oldValue) throws IOException{
+			int index=(int)NUMBER_SIZE.read(source);
+			return fromIndex(cluster, index);
+		}
+		
+		@Override
+		public void write(Object targetObj, Cluster cluster, ContentWriter target, IOStruct source) throws IOException{
+			NUMBER_SIZE.write(target, makeIndex(cluster, source));
+		}
+		
+		
+		private IOStruct fromIndex(Cluster cluster, int index) throws IOException{
+			IOList<String> names=cluster.getTypeDictionary().getTypeNames();
+			String         name =names.getElement(index);
+			try{
+				return IOStruct.getUnknown(Class.forName(name));
+			}catch(ClassNotFoundException e){
+				throw new MalformedObjectException(name+" not found", e);
+			}
+		}
+		
+		private int makeIndex(Cluster cluster, IOStruct struct) throws IOException{
+			IOList<String> names=cluster.getTypeDictionary().getTypeNames();
+			String         name =struct.instanceClass.getName();
+			
+			int index=names.indexOf(name);
+			if(index!=-1) return index;
+			
+			names.addElement(name);
+			return names.indexOf(name);
+		}
+		
+		@Override
+		public long mapSize(Object targetObj, IOStruct source){
+			return NUMBER_SIZE.bytes;
+		}
+		
+		@Override
+		public OptionalInt getFixedSize(){
+			return NUMBER_SIZE.optionalBytes;
+		}
+		
+		@Override
+		public OptionalInt getMaxSize(){
+			return getFixedSize();
+		}
+	}
+	
 	private static final Map<Class<?>, IOStruct> CACHE=new HashMap<>();
 	
 	public static IOStruct thisClass(){
-		return get(StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE)
-		                      .walk(s->(Class<? extends IOInstance>)s.skip(1).findFirst().orElseThrow().getDeclaringClass()));
+		return getUnknown(StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE)
+		                             .walk(s->s.skip(1).findFirst().orElseThrow().getDeclaringClass()));
+	}
+	
+	public static IOStruct getUnknown(@NotNull Class<?> instanceClass){
+		Objects.requireNonNull(instanceClass);
+		
+		if(!UtilL.instanceOf(instanceClass, IOInstance.class)){
+			throw new IllegalArgumentException(instanceClass.getName()+" is not an IOInstance");
+		}
+		
+		return get((Class<? extends IOInstance>)instanceClass);
 	}
 	
 	public static IOStruct get(@NotNull Class<? extends IOInstance> instanceClass){
 		Objects.requireNonNull(instanceClass);
+		
+		if(instanceClass==IOInstance.class) throw new IllegalArgumentException("Cannot make IOStruct from raw IOInstance");
+		
 		var result=CACHE.get(instanceClass);
 		if(result==null){
+			result=new IOStruct(instanceClass);
+			CACHE.put(instanceClass, result);
 			try{
-				result=new IOStruct(instanceClass);
+				result.compile();
 			}catch(Throwable e){
+				CACHE.remove(instanceClass);
 				throw new RuntimeException("Failed to compile struct "+instanceClass.getName(), e);
 			}
-			CACHE.put(instanceClass, result);
 		}
 		return result;
 	}
 	
 	public final Class<? extends IOInstance> instanceClass;
 	
-	public final List<VariableNode<Object>> variables;
+	private List<VariableNode<Object>> variables;
 	
-	final VariableNode<?>[] variableIter;
+	VariableNode<?>[] variableIter;
 	
-	private final OptionalLong knownSize;
-	private final long         minimumSize;
-	private final OptionalLong maximumSize;
+	private OptionalLong knownSize  =OptionalLong.empty();
+	private long         minimumSize;
+	private OptionalLong maximumSize=OptionalLong.empty();
 	
-	private final UnsafeFunction<Chunk, ? extends IOInstance, IOException> constructor;
+	private UnsafeFunction<Chunk, ? extends IOInstance, IOException> constructor;
 	
-	private final boolean simpleIndex;
+	private boolean simpleIndex;
 	
 	private IOStruct(Class<? extends IOInstance> instanceClass){
 		this.instanceClass=instanceClass;
+	}
+	
+	private void compile(){
 		constructor=findConstructor();
 		
 		variables=StructImpl.generateVariablesDefault(this);
 		
-		simpleIndex=IntStream.range(0, variables.size()).allMatch(i->variables.get(i).index==i);
+		simpleIndex=IntStream.range(0, getVariables().size()).allMatch(i->getVariables().get(i).info.index()==i);
 		
-		for(int i=0;i<variables.size();i++){
-			variables.get(i).postProcess(i, variables);
+		for(int i=0;i<getVariables().size();i++){
+			getVariables().get(i).postProcess(i, getVariables());
 		}
 		
 		variableIter=computeIter();
@@ -350,7 +444,7 @@ public class IOStruct{
 	private UnsafeFunction<Chunk, ? extends IOInstance, IOException> findConstructor(){
 		
 		for(Method method : instanceClass.getMethods()){
-			if(method.getName().equals("constructThis")&&method.getDeclaredAnnotation(Construct.class)!=null){
+			if("constructThis".equals(method.getName())&&method.getDeclaredAnnotation(Construct.class)!=null){
 				return Utils.makeLambda(method, Construct.Constructor.class);
 			}
 		}
@@ -401,9 +495,9 @@ public class IOStruct{
 	}
 	
 	private OptionalLong calculateKnownSize(){
-		if(variables.isEmpty()) return OptionalLong.of(0);
+		if(getVariables().isEmpty()) return OptionalLong.of(0);
 		
-		var last=variables.get(variables.size()-1);
+		var last=getVariables().get(getVariables().size()-1);
 		if(last instanceof FixedSize fix){
 			var off=last.getKnownOffset();
 			if(off!=null){
@@ -415,10 +509,10 @@ public class IOStruct{
 	}
 	
 	private VariableNode<?>[] computeIter(){
-		List<VariableNode<?>> indexBuilder=new ArrayList<>(variables.size());
+		List<VariableNode<?>> indexBuilder=new ArrayList<>(getVariables().size());
 		
-		for(int i=0;i<variables.size();){
-			var v=variables.get(i);
+		for(int i=0;i<getVariables().size();){
+			var v=getVariables().get(i);
 			
 			if(v instanceof VariableNode.Flag<?> ff){
 				try{
@@ -466,7 +560,7 @@ public class IOStruct{
 	@Override
 	public String toString(){
 		StringBuilder result=new StringBuilder("IOStruct{");
-		result.append(instanceClass.getName()).append(", ").append(variables.size()).append(" values");
+		result.append(instanceClass.getName()).append(", ").append(getVariables().size()).append(" values");
 		
 		if(getKnownSize().isPresent()){
 			result.append(", fixed size: ").append(requireKnownSize()).append(" bytes");
@@ -489,9 +583,9 @@ public class IOStruct{
 	
 	public void logStruct(){
 		LogUtil.println(this);
-		LogUtil.println(TextUtil.toTable("variables", variables));
+		LogUtil.println(TextUtil.toTable("variables", getVariables()));
 		var iter=List.of(variableIter);
-		if(!variables.equals(iter)){
+		if(!getVariables().equals(iter)){
 			LogUtil.println(TextUtil.toTable("Iteration variables", iter));
 		}
 	}
@@ -502,17 +596,17 @@ public class IOStruct{
 	
 	@NotNull
 	public <V extends VariableNode<?>> V findVar(Predicate<VariableNode<?>> finder, Supplier<String> errorMsg){
-		return (V)variables.stream().filter(finder).findAny().orElseThrow(()->new RuntimeException(errorMsg.get()));
+		return (V)getVariables().stream().filter(finder).findAny().orElseThrow(()->new RuntimeException(errorMsg.get()));
 	}
 	
 	@NotNull
 	public <V extends VariableNode<?>> V getVar(int varIndex){
-		if(simpleIndex) return (V)variables.get(varIndex);
-		return findVar(v->v.index==varIndex, ()->"Var with index "+varIndex+" does not exist in "+this);
+		if(simpleIndex) return (V)getVariables().get(varIndex);
+		return findVar(v->v.info.index()==varIndex, ()->"Var with index "+varIndex+" does not exist in "+this);
 	}
 	
 	public <V extends VariableNode<?>> V getVar(String varName){
-		return findVar(v->v.name.equals(varName), ()->varName+" does not exist in "+this);
+		return findVar(v->v.info.name().equals(varName), ()->varName+" does not exist in "+this);
 	}
 	
 	public boolean canInstate(){
@@ -522,5 +616,13 @@ public class IOStruct{
 	public <T extends IOInstance> T newInstance(Chunk chunk) throws IOException{
 		if(!canInstate()) throw new UnsupportedOperationException(this.instanceClass.getName()+" does not support auto construction");
 		return (T)constructor.apply(chunk);
+	}
+	public List<VariableNode<Object>> getVariables(){
+		return variables;
+	}
+	
+	@Override
+	public String getTypeName(){
+		return instanceClass.getTypeName();
 	}
 }

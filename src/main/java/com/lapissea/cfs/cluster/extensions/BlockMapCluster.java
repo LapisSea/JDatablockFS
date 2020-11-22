@@ -154,7 +154,7 @@ public class BlockMapCluster<K extends IOInstance>{
 	
 	private static class Entry<K extends IOInstance> extends IOInstance{
 		
-		private ReadWriteLock lock;
+		private final ReadWriteLock lock;
 		
 		@Value(index=0)
 		private K            key;

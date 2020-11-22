@@ -16,8 +16,8 @@ public class FixedGenericIOImpl<T> extends GenericIOImpl<T> implements VariableN
 	private final int          size;
 	private final OptionalLong sizeOpt;
 	
-	public FixedGenericIOImpl(String name, int index, int size, Field valueField, IOStruct.Get.Getter<T> getFun, IOStruct.Set.Setter<T> setFun, IOStruct.Size.Sizer<T> sizerFun, IOStruct.Read.Reader<T> readFun, IOStruct.Write.Writer<T> writeFun){
-		super(name, index, valueField, getFun, setFun, sizerFun, readFun, writeFun, OptionalLong.of(size));
+	public FixedGenericIOImpl(VarInfo info, int size, Field valueField, IOStruct.Get.Getter<T> getFun, IOStruct.Set.Setter<T> setFun, IOStruct.Size.Sizer<T> sizerFun, IOStruct.Read.Reader<T> readFun, IOStruct.Write.Writer<T> writeFun){
+		super(info, valueField, getFun, setFun, sizerFun, readFun, writeFun, OptionalLong.of(size));
 		this.size=size;
 		sizeOpt=OptionalLong.of(size);
 	}

@@ -366,17 +366,9 @@ public class Chunk extends IOInstance.Contained implements Iterable<Chunk>, Rand
 		cluster.validate();
 		
 		if(!hasNext()){
-			modifyAndSave(ch->ch.setUsed(false));
 			cluster.free(this);
 		}else{
 			var tofree=collectNext();
-			for(Chunk chunk : tofree){
-				chunk.modifyAndSave(ch->{
-					ch.setUsed(false);
-					ch.setSize(0);
-					ch.clearNextPtr();
-				});
-			}
 			cluster.free(tofree);
 		}
 		

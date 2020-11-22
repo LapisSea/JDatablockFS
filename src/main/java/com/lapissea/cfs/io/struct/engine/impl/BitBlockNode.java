@@ -26,7 +26,7 @@ import static com.lapissea.cfs.GlobalConfig.*;
 public class BitBlockNode extends VariableNode.FixedSize.Node<Object>{
 	
 	private static Stream<Flag<?>> getFlags(FlagBlock blockInfo, IOStruct type){
-		return blockInfo.range().mapToObj(type.variables::get).map(n->(Flag<?>)n);
+		return blockInfo.range().mapToObj(type.getVariables()::get).map(n->(Flag<?>)n);
 	}
 	
 	private final          FlagBlock     blockInfo;
@@ -34,10 +34,10 @@ public class BitBlockNode extends VariableNode.FixedSize.Node<Object>{
 	public final transient List<Flag<?>> flagsNodes;
 	
 	public BitBlockNode(IOStruct type, int flagIndex){
-		this(type, ((Flag<?>)type.variables.get(flagIndex)).getBlockInfo());
+		this(type, ((Flag<?>)type.getVariables().get(flagIndex)).getBlockInfo());
 	}
 	private BitBlockNode(IOStruct type, FlagBlock blockInfo){
-		super(getFlags(blockInfo, type).map(v->v.name).collect(Collectors.joining(", ", "Flags[", "]")), Integer.MIN_VALUE/2, blockInfo.wordSize().bytes);
+		super(new VarInfo(getFlags(blockInfo, type).map(v->v.info.name()).collect(Collectors.joining(", ", "Flags[", "]")), Integer.MIN_VALUE/2), blockInfo.wordSize().bytes);
 		this.type=type;
 		this.blockInfo=blockInfo;
 		flagsNodes=getFlags(blockInfo, type).collect(Collectors.toUnmodifiableList());
@@ -61,7 +61,7 @@ public class BitBlockNode extends VariableNode.FixedSize.Node<Object>{
 		NumberSize size=blockInfo.wordSize();
 		long       bits=size.read(source);
 		
-		try(var flags=new FlagReader(bits, size.bytes*Byte.SIZE)){
+		try(var flags=new FlagReader(bits, size)){
 			for(var flagNode : flagsNodes){
 				if(DEBUG_VALIDATION){
 					int remaining=flags.remainingCount();
@@ -82,21 +82,20 @@ public class BitBlockNode extends VariableNode.FixedSize.Node<Object>{
 			for(int i=0;i<flagsNodes.size();i++){
 				Flag<?> flagNode=flagsNodes.get(i);
 				
-				char c=flagNode.name.charAt(0);
+				char c=flagNode.info.name().charAt(0);
 				if(charMap.containsKey(c)) c=Character.isUpperCase(c)?Character.toLowerCase(c):Character.toUpperCase(c);
 				if(charMap.containsKey(c)) c=Integer.toString(i).charAt(0);
 				
 				assert !charMap.containsKey(c);
 				
-				charMap.put(c, flagNode.name);
+				charMap.put(c, flagNode.info.name());
 			}
 			
 			sb.append(charMap).append("\n");
 			
-			for(int j=0;j<flagsNodes.size();j++){
-				Flag<?> flagsNode=flagsNodes.get(j);
+			for(Flag<?> flagsNode : flagsNodes){
 				for(int i=0;i<flagsNode.getBitSize();i++){
-					sb.append(charMap.entrySet().stream().filter(e1->e1.getValue().equals(flagsNode.name)).findAny().orElseThrow().getKey());
+					sb.append(charMap.entrySet().stream().filter(e1->e1.getValue().equals(flagsNode.info.name())).findAny().orElseThrow().getKey());
 				}
 				sb.append("-".repeat(flagsNode.getPaddingBits()));
 			}
@@ -105,7 +104,7 @@ public class BitBlockNode extends VariableNode.FixedSize.Node<Object>{
 			sb.append(new StringBuilder(size.binaryString(bits)).reverse());
 			sb.append("\n");
 			
-			try(var flags=new FlagReader(bits, size.bytes*Byte.SIZE)){
+			try(var flags=new FlagReader(bits, size)){
 				for(Flag<?> flagsNode : flagsNodes){
 					for(int i=0;i<flagsNode.getBitSize();i++){
 						sb.append(' ');

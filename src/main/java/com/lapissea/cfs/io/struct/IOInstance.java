@@ -4,6 +4,7 @@ import com.lapissea.cfs.cluster.Cluster;
 import com.lapissea.cfs.exceptions.MalformedObjectException;
 import com.lapissea.cfs.exceptions.OutOfSyncDataException;
 import com.lapissea.cfs.io.RandomIO;
+import com.lapissea.cfs.io.ReaderWriter;
 import com.lapissea.cfs.io.SelfPoint;
 import com.lapissea.cfs.io.content.ContentInputStream;
 import com.lapissea.cfs.io.content.ContentReader;
@@ -19,6 +20,7 @@ import com.lapissea.util.function.UnsafeFunction;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.lang.reflect.Type;
 import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.BiPredicate;
@@ -112,6 +114,78 @@ public class IOInstance{
 		}
 	}
 	
+	public static class AutoRWEmptyNull<T extends IOInstance> extends AutoRW<T>{
+		
+		public AutoRWEmptyNull(Type targetType){
+			super(targetType);
+		}
+		
+		@Override
+		public T read(Object targetObj, Cluster cluster, ContentReader source, T oldValue) throws IOException{
+			if(source.readBoolean()) return null;
+			return super.read(targetObj, cluster, source, oldValue);
+		}
+		@Override
+		public void write(Object targetObj, Cluster cluster, ContentWriter target, T source) throws IOException{
+			target.writeBoolean(source==null);
+			if(source==null) return;
+			super.write(targetObj, cluster, target, source);
+		}
+		@Override
+		public long mapSize(Object targetObj, T source){
+			if(source==null) return 1;
+			return 1+super.mapSize(targetObj, source);
+		}
+		@Override
+		public OptionalInt getFixedSize(){
+			return OptionalInt.empty();
+		}
+		@Override
+		public OptionalInt getMaxSize(){
+			return super.getMaxSize().stream().map(s->s+1).findAny();
+		}
+	}
+	
+	public static class AutoRW<T extends IOInstance> implements ReaderWriter<T>{
+		
+		private final IOStruct struct;
+		
+		public AutoRW(Type targetType){
+			struct=IOStruct.getUnknown((Class<?>)targetType);
+		}
+		
+		@Override
+		public T read(Object targetObj, Cluster cluster, ContentReader source, T oldValue) throws IOException{
+			T val=oldValue==null?struct.newInstance(null):oldValue;
+			val.readStruct(cluster, source);
+			return val;
+		}
+		
+		@Override
+		public void write(Object targetObj, Cluster cluster, ContentWriter target, T source) throws IOException{
+			source.writeStruct(cluster, target);
+		}
+		
+		@Override
+		public long mapSize(Object targetObj, T source){
+			return struct.getKnownSize().orElseGet(source::getInstanceSize);
+		}
+		
+		@Override
+		public OptionalInt getFixedSize(){
+			var siz=struct.getKnownSize();
+			if(siz.isEmpty()) return OptionalInt.empty();
+			return OptionalInt.of(Math.toIntExact(siz.getAsLong()));
+		}
+		
+		@Override
+		public OptionalInt getMaxSize(){
+			var siz=struct.getMaximumSize();
+			if(siz.isEmpty()) return OptionalInt.empty();
+			return OptionalInt.of(Math.toIntExact(siz.getAsLong()));
+		}
+	}
+	
 	private final IOStruct struct;
 	protected     boolean  writingInstance;
 	
@@ -152,7 +226,7 @@ public class IOInstance{
 					if(DEBUG_VALIDATION){
 						if(v instanceof VariableNode.FixedSize f){
 							var siz=f.getSize();
-							try(ContentReader vbuf=buff.bufferExactRead(siz, (w, e)->new IOException(this.getClass().getName()+" Var \""+v.name+"\" "+w+"/"+e))){
+							try(ContentReader vbuf=buff.bufferExactRead(siz, (w, e)->new IOException(this.getClass().getName()+" Var \""+v.info.name()+"\" "+w+"/"+e))){
 								v.read(this, cluster, vbuf);
 							}
 							break read;
@@ -160,7 +234,7 @@ public class IOInstance{
 					}
 					
 					v.read(this, cluster, buff);
-				}catch(IOException e){
+				}catch(Throwable e){
 					throw new IOException("Failed to read variable "+v+" in "+getStruct().toShortString(), e);
 				}
 			}
@@ -200,7 +274,7 @@ public class IOInstance{
 				if(DEBUG_VALIDATION){
 					for(var v : getStruct().variableIter){
 						var size=v.mapSize(this);
-						try(ContentWriter vbuf=buff.bufferExactWrite(size, (written, expected)->new IOException(this.getClass().getName()+" Var \""+v.name+"\" written/expected "+written+"/"+expected))){
+						try(ContentWriter vbuf=buff.bufferExactWrite(size, (written, expected)->new IOException(this.getClass().getName()+"."+v.info.name()+" written/expected "+written+"/"+expected))){
 							v.write(this, cluster, vbuf);
 						}
 					}
@@ -287,7 +361,7 @@ public class IOInstance{
 	}
 	
 	protected void initPointerVarAll(Cluster cluster) throws IOException{
-		for(VariableNode<Object> var : getStruct().variables){
+		for(VariableNode<Object> var : getStruct().getVariables()){
 			if(var instanceof VariableNode.SelfPointer<?> varPtr){
 				initPointerVar(cluster, varPtr);
 			}
@@ -308,10 +382,10 @@ public class IOInstance{
 	}
 	
 	public final String variableToString(){
-		return getStruct().variables.stream()
-		                            .map(var->var.toString(this))
-		                            .map(e->e.getKey()+": "+TextUtil.toString(e.getValue()))
-		                            .collect(joining(", ", getClass().getSimpleName()+"{", "}"));
+		return getStruct().getVariables().stream()
+		                  .map(var->var.toString(this))
+		                  .map(e->e.getKey()+": "+TextUtil.toString(e.getValue()))
+		                  .collect(joining(", ", getClass().getSimpleName()+"{", "}"));
 	}
 	
 	public Offset calcVarOffset(int index)     { return calcVarOffset(getStruct().getVar(index)); }
