@@ -12,7 +12,7 @@ import java.io.IOException;
 import java.lang.invoke.VarHandle;
 import java.util.Objects;
 
-public class EnumPaddedDefaultImpl<T extends Enum<T>> extends VariableNode.Flag<T>{
+public class EnumPaddedDefaultIOImpl<T extends Enum<T>> extends VariableNode.Flag<T>{
 	
 	private final EnumUniverse<T> flagInfo;
 	private final VarHandle       valueField;
@@ -20,7 +20,7 @@ public class EnumPaddedDefaultImpl<T extends Enum<T>> extends VariableNode.Flag<
 	private final Setter<T>       setFun;
 	private final boolean         nullable;
 	
-	public EnumPaddedDefaultImpl(VarInfo info, boolean nullable, int totalBits, int paddingBits, EnumUniverse<T> flagInfo, VarHandle valueField, Getter<T> getFun, Setter<T> setFun){
+	public EnumPaddedDefaultIOImpl(VarInfo info, boolean nullable, int totalBits, int paddingBits, EnumUniverse<T> flagInfo, VarHandle valueField, Getter<T> getFun, Setter<T> setFun){
 		super(info, totalBits, paddingBits);
 		this.nullable=nullable;
 		this.valueField=valueField;

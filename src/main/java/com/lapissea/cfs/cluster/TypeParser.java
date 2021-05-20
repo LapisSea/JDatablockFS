@@ -50,7 +50,7 @@ public interface TypeParser{
 		return new TypeParser(){
 			@Override
 			public boolean canParse(Cluster cluster, IOTypeLayout type){
-				return type.getGenericArgs().length==0&&type.getRawType().equals(rawType);
+				return type.getGenericArgs().isEmpty()&&type.getRawType().equals(rawType);
 			}
 			
 			@Override

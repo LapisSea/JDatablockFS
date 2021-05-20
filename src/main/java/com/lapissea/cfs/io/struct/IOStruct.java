@@ -304,6 +304,14 @@ public class IOStruct implements Type{
 		String[] rwArgs() default {};
 	}
 	
+	@Target(FIELD)
+	@Retention(RUNTIME)
+	public @interface GlobalSetValue{
+		int index();
+		
+		Class<? extends IOInstance> type() default IOInstance.class;
+	}
+	
 	public static class ClusterDict implements ReaderWriter<IOStruct>{
 		
 		private static final NumberSize NUMBER_SIZE=NumberSize.SMALL_INT;
@@ -324,7 +332,7 @@ public class IOStruct implements Type{
 			IOList<String> names=cluster.getGlobalStrings();
 			String         name =names.getElement(index);
 			try{
-				return IOStruct.getUnknown(Class.forName(name));
+				return IOStruct.ofUnknown(Class.forName(name));
 			}catch(ClassNotFoundException e){
 				throw new MalformedObjectException(name+" not found", e);
 			}
@@ -360,21 +368,21 @@ public class IOStruct implements Type{
 	private static final Map<Class<?>, IOStruct> CACHE=new HashMap<>();
 	
 	public static IOStruct thisClass(){
-		return getUnknown(StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE)
-		                             .walk(s->s.skip(1).findFirst().orElseThrow().getDeclaringClass()));
+		return ofUnknown(StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE)
+		                            .walk(s->s.skip(1).findFirst().orElseThrow().getDeclaringClass()));
 	}
 	
-	public static IOStruct getUnknown(@NotNull Class<?> instanceClass){
+	public static IOStruct ofUnknown(@NotNull Class<?> instanceClass){
 		Objects.requireNonNull(instanceClass);
 		
 		if(!UtilL.instanceOf(instanceClass, IOInstance.class)){
 			throw new IllegalArgumentException(instanceClass.getName()+" is not an IOInstance");
 		}
 		
-		return get((Class<? extends IOInstance>)instanceClass);
+		return of((Class<? extends IOInstance>)instanceClass);
 	}
 	
-	public static IOStruct get(@NotNull Class<? extends IOInstance> instanceClass){
+	public static IOStruct of(@NotNull Class<? extends IOInstance> instanceClass){
 		Objects.requireNonNull(instanceClass);
 		
 		if(instanceClass==IOInstance.class) throw new IllegalArgumentException("Cannot make IOStruct from raw IOInstance");

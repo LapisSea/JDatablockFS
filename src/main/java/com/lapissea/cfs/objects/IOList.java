@@ -6,6 +6,7 @@ import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeFunction;
 import com.lapissea.util.function.UnsafeIntConsumer;
 import com.lapissea.util.function.UnsafePredicate;
+import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.IOException;
 import java.util.*;
@@ -28,6 +29,8 @@ public interface IOList<T> extends Iterable<T>{
 			               .collect(Collectors.joining(", ", "[", "]"));
 		}
 		
+		@Override
+		public void ensureCapacity(int elementCapacity) throws IOException{ }
 	}
 	
 	interface IBoxed<From, To> extends IOList<To>{
@@ -199,7 +202,7 @@ public interface IOList<T> extends Iterable<T>{
 		Function<To, From> getBoxer();
 	}
 	
-	class Boxed<From, To> implements IBoxed<From, To>{
+	class Boxed<From, To> extends Abstract<To> implements IBoxed<From, To>{
 		private final IOList<From> data;
 		
 		private final Function<From, To> unboxer;
@@ -232,7 +235,7 @@ public interface IOList<T> extends Iterable<T>{
 		}
 	}
 	
-	class MergedView<T> implements IOList<T>{
+	class MergedView<T> extends Abstract<T> implements IOList<T>{
 		
 		private interface LocalAction<L, R>{
 			R apply(IOList<L> list, int localIndex) throws IOException;
@@ -339,6 +342,256 @@ public interface IOList<T> extends Iterable<T>{
 				list.free();
 			}
 		}
+	}
+	
+	@SuppressWarnings("RedundantThrows")
+	final class Empty<T> extends Abstract<T>{
+		
+		public static final IOList<?> THE_EMPTY=new Empty<>();
+		
+		private Empty(){
+		}
+		
+		@Override
+		public void addElements(IOList<T> toAdd) throws IOException{
+			throw new UnsupportedOperationException();
+		}
+		
+		@Override
+		public int size(){
+			return 0;
+		}
+		
+		@Override
+		public T getElement(int index) throws IOException{
+			throw new IndexOutOfBoundsException(index);
+		}
+		
+		@Override
+		public void setElement(int index, T value) throws IOException{
+			throw new IndexOutOfBoundsException(index);
+		}
+		
+		@Override
+		public void ensureCapacity(int elementCapacity) throws IOException{
+			throw new UnsupportedOperationException();
+		}
+		
+		@Override
+		public void removeElement(int index) throws IOException{
+			throw new IndexOutOfBoundsException(index);
+		}
+		
+		@Override
+		public void addElement(int index, T value) throws IOException{
+			throw new IndexOutOfBoundsException(index);
+		}
+		
+		@Override
+		public void validate() throws IOException{ }
+		
+		@Override
+		public void free() throws IOException{ }
+		
+		@Override
+		public void addElement(T value) throws IOException{
+			throw new UnsupportedOperationException();
+		}
+		
+		@Override
+		public T pop() throws IOException{
+			throw new UnsupportedOperationException();
+		}
+		
+		@Override
+		public boolean isEmpty(){
+			return true;
+		}
+		
+		@Override
+		public void modifyElement(int index, UnsafeFunction<T, T, IOException> modifier) throws IOException{
+			throw new IndexOutOfBoundsException(index);
+		}
+		
+		@Override
+		public void clear() throws IOException{ }
+		
+		@Override
+		public boolean contains(T ptr) throws IOException{
+			return false;
+		}
+		
+		@Override
+		public int indexOf(T value) throws IOException{
+			return -1;
+		}
+		
+		@Override
+		public int find(UnsafePredicate<T, IOException> matcher) throws IOException{
+			return -1;
+		}
+		
+		@Override
+		public int indexOfLast(T value) throws IOException{
+			return -1;
+		}
+		
+		@Override
+		public int findLast(UnsafePredicate<T, IOException> matcher) throws IOException{
+			return -1;
+		}
+		
+		@Override
+		public int count(UnsafePredicate<T, IOException> matcher) throws IOException{
+			return 0;
+		}
+		
+		@Override
+		public Stream<T> stream(){
+			return Stream.of();
+		}
+		
+		@Override
+		public Iterator<T> iterator(){
+			return Collections.emptyIterator();
+		}
+	}
+	
+	class LateDataInitList<T> extends Abstract<T>{
+		
+		private UnsafeSupplier<IOList<T>, IOException> initializer;
+		
+		private IOList<T> realData;
+		
+		public LateDataInitList(UnsafeSupplier<IOList<T>, IOException> initializer){
+			this.initializer=Objects.requireNonNull(initializer);
+		}
+		
+		private IOList<T> realData() throws IOException{
+			if(realData==null){
+				synchronized(this){
+					if(realData==null){
+						realData=initializer.get();
+						initializer=null;
+					}
+				}
+			}
+			return realData;
+		}
+		
+		private IOList<T> optionalData(){
+			return realData==null?IOList.empty():realData;
+		}
+		
+		@Override
+		public void addElements(IOList<T> toAdd) throws IOException{
+			realData().addElements(toAdd);
+		}
+		
+		@Override
+		public int size(){
+			return optionalData().size();
+		}
+		
+		@Override
+		public T getElement(int index) throws IOException{
+			return optionalData().getElement(index);
+		}
+		
+		@Override
+		public void setElement(int index, T value) throws IOException{
+			realData().setElement(index, value);
+		}
+		
+		@Override
+		public void ensureCapacity(int elementCapacity) throws IOException{
+			realData().ensureCapacity(elementCapacity);
+		}
+		
+		@Override
+		public void removeElement(int index) throws IOException{
+			realData().removeElement(index);
+		}
+		
+		@Override
+		public void addElement(int index, T value) throws IOException{
+			realData().addElement(index, value);
+		}
+		
+		@Override
+		public void validate() throws IOException{
+			optionalData().validate();
+		}
+		
+		@Override
+		public void free() throws IOException{
+			optionalData().free();
+		}
+		
+		@Override
+		public void addElement(T value) throws IOException{
+			realData().addElement(value);
+		}
+		
+		@Override
+		public T pop() throws IOException{
+			return realData().pop();
+		}
+		
+		@Override
+		public boolean isEmpty(){
+			return optionalData().isEmpty();
+		}
+		
+		@Override
+		public void modifyElement(int index, UnsafeFunction<T, T, IOException> modifier) throws IOException{
+			realData().modifyElement(index, modifier);
+		}
+		
+		@Override
+		public void clear() throws IOException{
+			optionalData().clear();
+		}
+		
+		@Override
+		public boolean contains(T ptr) throws IOException{
+			return optionalData().contains(ptr);
+		}
+		
+		@Override
+		public int indexOf(T value) throws IOException{
+			return optionalData().indexOf(value);
+		}
+		
+		@Override
+		public int find(UnsafePredicate<T, IOException> matcher) throws IOException{
+			return optionalData().find(matcher);
+		}
+		
+		@Override
+		public int indexOfLast(T value) throws IOException{
+			return optionalData().indexOfLast(value);
+		}
+		
+		@Override
+		public int findLast(UnsafePredicate<T, IOException> matcher) throws IOException{
+			return optionalData().findLast(matcher);
+		}
+		
+		@Override
+		public int count(UnsafePredicate<T, IOException> matcher) throws IOException{
+			return optionalData().count(matcher);
+		}
+		
+		@Override
+		public Stream<T> stream(){
+			return optionalData().stream();
+		}
+	}
+	
+	@SuppressWarnings("unchecked")
+	static <T> IOList<T> empty(){
+		return (IOList<T>)Empty.THE_EMPTY;
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -512,6 +765,10 @@ public interface IOList<T> extends Iterable<T>{
 				throw new UnsupportedOperationException();
 			}
 		};
+	}
+	
+	static <T> IOList<T> lateInit(UnsafeSupplier<IOList<T>, IOException> initializer){
+		return new LateDataInitList<>(initializer);
 	}
 	
 	int size();

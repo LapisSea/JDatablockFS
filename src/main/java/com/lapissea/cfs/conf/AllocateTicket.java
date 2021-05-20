@@ -37,7 +37,7 @@ public record AllocateTicket(long bytes, boolean disableResizing, @Nullable IOTy
 	}
 	
 	public static AllocateTicket fitTo(Class<? extends IOInstance> typeToFit){
-		return fitTo(IOStruct.get(typeToFit));
+		return fitTo(IOStruct.of(typeToFit));
 	}
 	
 	public static AllocateTicket fitTo(IOStruct typeToFit){

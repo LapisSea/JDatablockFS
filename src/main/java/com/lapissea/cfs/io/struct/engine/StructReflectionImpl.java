@@ -68,7 +68,8 @@ public class StructReflectionImpl implements StructImpl{
 		new SimpleEntry<>(IOStruct.PrimitiveValue.class, new PrimitiveNodeMaker()),
 		new SimpleEntry<>(IOStruct.PointerValue.class, new PointerNodeMaker<>()),
 		new SimpleEntry<>(IOStruct.PrimitiveArrayValue.class, new PrimitiveArrayNodeMaker()),
-		new SimpleEntry<>(IOStruct.ArrayValue.class, new ArrayNodeMaker<>())
+		new SimpleEntry<>(IOStruct.ArrayValue.class, new ArrayNodeMaker<>()),
+		new SimpleEntry<>(IOStruct.GlobalSetValue.class, new GlobalSetNodeMaker<>())
 	                                                                                          );
 	
 	@SuppressWarnings("unchecked")

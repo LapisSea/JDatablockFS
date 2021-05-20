@@ -32,7 +32,7 @@ public class PointerNodeMaker<T extends IOInstance&SelfPoint<T>> extends StructR
 			valueField=val.val();
 			valueField.setAccessible(true);
 			
-			overrideType=valueAnn.type()==IOInstance.class?null:IOStruct.get(valueAnn.type());
+			overrideType=valueAnn.type()==IOInstance.class?null:IOStruct.of(valueAnn.type());
 		}
 		
 		VariableNode.VarInfo vInfo=new VariableNode.VarInfo(name, valueAnn.index());
@@ -40,7 +40,7 @@ public class PointerNodeMaker<T extends IOInstance&SelfPoint<T>> extends StructR
 		IOStruct structType;
 		{
 			var typDirty=valueField.getType();
-			var typ     =UtilL.instanceOf(typDirty, IOInstance.class)?IOStruct.getUnknown(typDirty):null;
+			var typ     =UtilL.instanceOf(typDirty, IOInstance.class)?IOStruct.ofUnknown(typDirty):null;
 			
 			if(overrideType==null){
 				if(typ==null) throw new MalformedStructLayout(valueField.getName()+" is not a struct and has no explicit type defined");

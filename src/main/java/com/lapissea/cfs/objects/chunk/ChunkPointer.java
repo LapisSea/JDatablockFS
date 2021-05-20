@@ -28,13 +28,13 @@ public final class ChunkPointer implements INumber{
 		@Override
 		public boolean canParse(Cluster cluster, IOTypeLayout type){
 			if(!type.getGenericArgs().isEmpty()) return false;
-			return UtilL.instanceOf(type.getType().instanceClass, PtrRef.class);
+			return UtilL.instanceOf(type.getRawType().instanceClass, PtrRef.class);
 		}
 		
 		@Override
 		public UnsafeFunction<Chunk, IOInstance, IOException> parse(Cluster cluster, IOTypeLayout type){
 			assert canParse(cluster, type);
-			return type.getType()::newInstance;
+			return type.getRawType()::newInstance;
 		}
 	};
 	

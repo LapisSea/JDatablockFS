@@ -211,7 +211,7 @@ public class BlockMapCluster<K extends IOInstance>{
 		}
 	}
 	
-	private static final IOStruct   ENTRY_TYPE  =IOStruct.get(Entry.class);
+	private static final IOStruct   ENTRY_TYPE  =IOStruct.of(Entry.class);
 	private static final TypeParser ENTRY_PARSER=new TypeParser(){
 		@Override
 		public boolean canParse(Cluster cluster, IOTypeLayout type){

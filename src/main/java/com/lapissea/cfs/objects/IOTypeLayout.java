@@ -108,7 +108,7 @@ public class IOTypeLayout extends IOInstance implements ParameterizedType{
 		this(raw, arrayDims, generics, null);
 	}
 	public IOTypeLayout(Class<? extends IOInstance> raw, int[] arrayDims, IOTypeLayout[] generics, TypeArgument[] arguments){
-		this(IOStruct.get(raw), arrayDims, generics, arguments);
+		this(IOStruct.of(raw), arrayDims, generics, arguments);
 	}
 	public IOTypeLayout(IOStruct raw, IOTypeLayout... generics){
 		this(raw, null, generics);

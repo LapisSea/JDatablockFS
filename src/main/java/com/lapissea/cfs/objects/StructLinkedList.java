@@ -49,7 +49,7 @@ public class StructLinkedList<T extends IOInstance> extends IOInstance.Contained
 	private static final IOStruct LIST_TYP=thisClass();
 	private static final long     LL_SIZE =LIST_TYP.requireKnownSize();
 	
-	private static final IOStruct                   NODE_TYP     =IOStruct.get(StructLinkedList.Node.class);
+	private static final IOStruct                   NODE_TYP     =IOStruct.of(StructLinkedList.Node.class);
 	private static final VariableNode<ChunkPointer> NODE_NEXT_VAR=NODE_TYP.getVar(0);
 	
 	private class Node extends IOInstance.Contained.SingletonChunk<Node>{

@@ -12,7 +12,7 @@ import com.lapissea.cfs.io.struct.StructImpl;
 import com.lapissea.cfs.io.struct.ValueRelations;
 import com.lapissea.cfs.io.struct.VariableNode;
 import com.lapissea.cfs.io.struct.engine.impl.EnumCustomByteWiseIO;
-import com.lapissea.cfs.io.struct.engine.impl.EnumPaddedDefaultImpl;
+import com.lapissea.cfs.io.struct.engine.impl.EnumPaddedDefaultIOImpl;
 import com.lapissea.cfs.objects.NumberSize;
 
 import java.lang.invoke.VarHandle;
@@ -65,6 +65,7 @@ public class EnumNodeMaker<T extends Enum<T>> extends StructReflectionImpl.NodeM
 			return new EnumCustomByteWiseIO<>(vInfo, valueAnn.nullable(), numberSize.bytes, varh, flagInfo, numberSize, getFun, setFun, readFun, writeFun);
 		}
 		
-		return new EnumPaddedDefaultImpl<>(vInfo, valueAnn.nullable(), bitSize, paddingBits, flagInfo, varh, getFun, setFun);
+		return new EnumPaddedDefaultIOImpl<>(vInfo, valueAnn.nullable(), bitSize, paddingBits, flagInfo, varh, getFun, setFun);
 	}
 }
+

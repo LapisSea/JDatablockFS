@@ -20,6 +20,7 @@ import com.lapissea.util.ZeroArrays;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 import static com.lapissea.cfs.GlobalConfig.*;
 
@@ -27,6 +28,41 @@ class FSFTest{
 	
 	static{
 		System.setProperty("sun.java2d.opengl", "true");
+	}
+	
+	static class Link implements Comparable<Link>{
+		enum Quality{
+			HD(1),
+			SD(0),
+			POTATO(-1),
+			;
+			
+			final int qIndex;
+			Quality(int qIndex){this.qIndex=qIndex;}
+		}
+		
+		private final Quality quality;
+		private final String  host;
+		
+		Link(Quality quality, String host){
+			this.quality=Objects.requireNonNull(quality);
+			this.host=Objects.requireNonNull(host);
+		}
+		
+		
+		@Override
+		public int compareTo(Link o){
+			int qc=Integer.compare(quality.qIndex, o.quality.qIndex);
+			if(qc!=0) return qc;
+			return host.compareTo(o.host);
+		}
+		public Quality getQuality(){
+			return quality;
+		}
+		
+		public String getHost(){
+			return host;
+		}
 	}
 	
 	

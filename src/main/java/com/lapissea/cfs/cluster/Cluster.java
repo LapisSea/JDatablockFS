@@ -34,6 +34,7 @@ import com.lapissea.util.function.UnsafeRunnable;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.ref.WeakReference;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
@@ -112,6 +113,37 @@ public class Cluster extends IOInstance.Contained{
 		}
 	}
 	
+	@SuppressWarnings("FieldMayBeFinal")
+	private static class TypedList extends IOInstance{
+		
+		static TypedList allocate(Cluster cluster, IOStruct struct) throws IOException{
+			return new TypedList(struct, AllocateTicket.fitTo(StructLinkedList.class).submit(cluster).getPtr());
+		}
+		
+		@IOStruct.Value(index=0, rw=IOStruct.ClusterDict.class)
+		private IOStruct type;
+		
+		@IOStruct.Value(index=1, rw=ChunkPointer.AutoSizedIO.class)
+		private ChunkPointer ptr;
+		
+		private WeakReference<IOList<?>> cache=new WeakReference<>(null);
+		
+		TypedList(IOStruct type, ChunkPointer ptr){
+			this.type=type;
+			this.ptr=ptr;
+		}
+		
+		<T> IOList<T> getList(Cluster cluster) throws IOException{
+			IOList<?> value=cache.get();
+			if(value==null){
+				Chunk chunk=ptr.dereference(cluster);
+				value=StructLinkedList.build(e->e.withContainer(chunk));
+				cache=new WeakReference<>(value);
+			}
+			return (IOList<T>)value;
+		}
+	}
+	
 	protected static final int DEFAULT_MIN_CHUNK_SIZE=8;
 	
 	
@@ -128,15 +160,15 @@ public class Cluster extends IOInstance.Contained{
 	@EnumValue(index=0, customBitSize=16)
 	private Version version;
 	
-	@PointerValue(index=4, type=StructLinkedList.class)
-	private IOList<String> globalStrings;
-	
-	@PointerValue(index=1, type=StructLinkedList.class)
-	private IOList<IOTypeLayout> typeDictionary;
+	@PointerValue(index=1, type=StructHashMap.class)
+	private IOMap<IOStruct, TypedList> globalObjectSet;
 	
 	@PointerValue(index=2, type=StructLinkedList.class)
-	private IOList<UserInfo>     userChunks;
+	private IOList<AutoText> globalStrings;
+	
 	@PointerValue(index=3, type=StructLinkedList.class)
+	private IOList<UserInfo>     userChunks;
+	@PointerValue(index=4, type=StructLinkedList.class)
 	private IOList<ChunkPointer> freeChunks;
 	
 	private final boolean              readOnly;
@@ -200,7 +232,7 @@ public class Cluster extends IOInstance.Contained{
 			IOFloat.class,
 			IOTypeLayout.class
 		                                           )){
-			getTypeParsers().register(TypeParser.rawExact(IOStruct.get(c)));
+			getTypeParsers().register(TypeParser.rawExact(IOStruct.of(c)));
 		}
 	}
 	
@@ -1040,12 +1072,27 @@ public class Cluster extends IOInstance.Contained{
 	
 	public boolean isReadOnly() { return readOnly; }
 	
-	public IOList<IOTypeLayout> getTypeDictionary(){
-		return typeDictionary;
+	public IOList<IOTypeLayout> getTypeDictionary() throws IOException{
+		return getIndexedObjectDB(IOTypeLayout.class);
 	}
 	
 	public IOList<String> getGlobalStrings(){
-		return globalStrings;
+		return IOList.box(globalStrings, AutoText::getData, AutoText::new);
+	}
+	
+	public <T extends IOInstance> IOList<T> getIndexedObjectDB(Class<T> type) throws IOException{
+		return getIndexedObjectDB(IOStruct.of(type));
+	}
+	public <T extends IOInstance> IOList<T> getIndexedObjectDB(IOStruct struct) throws IOException{
+		TypedList value=globalObjectSet.getValue(struct);
+		if(value==null){
+			return IOList.lateInit(()->{
+				TypedList lis=TypedList.allocate(this, struct);
+				globalObjectSet.putValue(struct, lis);
+				return lis.getList(this);
+			});
+		}
+		return value.getList(this);
 	}
 	
 	

@@ -20,6 +20,7 @@ import com.lapissea.util.function.UnsafeFunction;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.*;
 import java.util.function.BiConsumer;
@@ -151,7 +152,7 @@ public class IOInstance{
 		private final IOStruct struct;
 		
 		public AutoRW(Type targetType){
-			struct=IOStruct.getUnknown((Class<?>)targetType);
+			struct=IOStruct.ofUnknown((Class<?>)(targetType instanceof ParameterizedType parm?parm.getRawType():targetType));
 		}
 		
 		@Override
@@ -197,7 +198,7 @@ public class IOInstance{
 	}
 	
 	public IOInstance(){
-		this.struct=IOStruct.get(getClass());
+		this.struct=IOStruct.of(getClass());
 	}
 	
 	public IOInstance(IOStruct struct){
