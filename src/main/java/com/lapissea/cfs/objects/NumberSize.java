@@ -6,7 +6,6 @@ import com.lapissea.cfs.io.bit.BitUtils;
 import com.lapissea.cfs.io.bit.EnumUniverse;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
-import com.lapissea.cfs.objects.chunk.ChunkPointer;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
 
@@ -25,13 +24,8 @@ public enum NumberSize{
 	SMALL_LONG('l', 0xFFFFFFFFFFFFL, 6, ContentReader::readUnsignedInt6, ContentWriter::writeInt6, NumberSize::RNS, NumberSize::WNS),
 	LONG('L', 0X7FFFFFFFFFFFFFFFL, 8, ContentReader::readInt8, ContentWriter::writeInt8, in->Double.longBitsToDouble(in.readInt8()), (out, num)->out.writeInt8(Double.doubleToLongBits(num)));
 	
-	private static double RNS(ContentReader src){
-		throw new UnsupportedOperationException();
-	}
-	
-	private static void WNS(ContentWriter dest, double value){
-		throw new UnsupportedOperationException();
-	}
+	private static double RNS(ContentReader src)             { throw new UnsupportedOperationException(); }
+	private static void WNS(ContentWriter dest, double value){ throw new UnsupportedOperationException(); }
 	
 	private interface WriterI{
 		void write(ContentWriter dest, long value) throws IOException;
@@ -74,8 +68,7 @@ public enum NumberSize{
 	}
 	
 	public static NumberSize byBits(int bits){
-		int bytes=(int)Math.ceil(bits/(double)Byte.SIZE);
-		return byBytes(bytes);
+		return byBytes(Utils.bitToByte(bits));
 	}
 	
 	public static NumberSize byBytes(long bytes){

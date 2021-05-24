@@ -1,7 +1,7 @@
 package com.lapissea.cfs.io.content;
 
-import com.lapissea.cfs.io.streams.ContentReaderInputStream;
-import com.lapissea.util.Nullable;
+import com.lapissea.cfs.BufferErrorSupplier;
+import com.lapissea.cfs.io.ContentBuff;
 import com.lapissea.util.ZeroArrays;
 
 import java.io.ByteArrayInputStream;
@@ -315,29 +315,33 @@ public interface ContentReader extends AutoCloseable, ContentBuff{
 	@Override
 	default void close() throws IOException{}
 	
-	default ContentInputStream bufferExactRead(long amount) throws IOException                { return bufferExactRead(Math.toIntExact(amount), BufferErrorSupplier.DEFAULT_READ); }
-	default ContentInputStream bufferExactRead(int amount) throws IOException                 { return bufferExactRead(amount, BufferErrorSupplier.DEFAULT_READ); }
 	
-	default ContentInputStream bufferExactRead(long amount, boolean finish) throws IOException{ return bufferExactRead(Math.toIntExact(amount), finish?BufferErrorSupplier.DEFAULT_READ:null); }
-	default ContentInputStream bufferExactRead(int amount, boolean finish) throws IOException { return bufferExactRead(amount, finish?BufferErrorSupplier.DEFAULT_READ:null); }
-	
-	default ContentInputStream bufferExactRead(long amount, @Nullable BufferErrorSupplier<? extends IOException> errorOnMismatch) throws IOException{
-		return bufferExactRead(Math.toIntExact(amount), errorOnMismatch);
-	}
-	default ContentInputStream bufferExactRead(int amount, @Nullable BufferErrorSupplier<? extends IOException> errorOnMismatch) throws IOException{
-		if(amount==0) return new ContentInputStream.BA(ZeroArrays.ZERO_BYTE);
+	record BufferTicket(ContentReader target, int amount, BufferErrorSupplier<? extends IOException> errorOnMismatch){
+		public BufferTicket requireExact(){
+			return requireExact(BufferErrorSupplier.DEFAULT_READ);
+		}
+		public BufferTicket requireExact(BufferErrorSupplier<? extends IOException> errorOnMismatch){
+			return new BufferTicket(target, amount, errorOnMismatch);
+		}
 		
-		return new ContentInputStream.BA(readInts1(amount)){
-			@Override
-			public void close() throws IOException{
-				super.close();
-				if(errorOnMismatch!=null){
-					var av=available();
-					if(av>0) throw errorOnMismatch.apply(getPos(), amount);
+		public ContentReader submit() throws IOException{
+			if(amount==0) return new ContentInputStream.BA(ZeroArrays.ZERO_BYTE);
+			
+			return new ContentInputStream.BA(target.readInts1(amount)){
+				@Override
+				public void close() throws IOException{
+					super.close();
+					if(errorOnMismatch!=null){
+						var av=available();
+						if(av>0) throw errorOnMismatch.apply(getPos(), amount);
+					}
 				}
-			}
-		};
+			};
+		}
 	}
+	
+	default BufferTicket readTicket(long amount){ return readTicket(Math.toIntExact(amount)); }
+	default BufferTicket readTicket(int amount) { return new BufferTicket(this, amount, null); }
 	
 	static boolean isDirect(ContentReader in){
 		return

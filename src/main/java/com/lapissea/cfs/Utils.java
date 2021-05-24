@@ -7,13 +7,11 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.invoke.*;
 import java.lang.reflect.*;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.function.BiFunction;
 import java.util.function.IntFunction;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -230,5 +228,39 @@ public class Utils{
 			mant&=0x3ff;
 		}
 		return Float.intBitsToFloat((hbits&0x8000)<<16|(exp|mant)<<13);
+	}
+	
+	public static void requireNull(Object o){
+		if(o!=null) throw new IllegalStateException();
+	}
+	
+	public static int bitToByte(int bits){
+		return (int)Math.ceil(bits/(double)Byte.SIZE);
+	}
+	public static long bitToByte(long bits){
+		return (long)Math.ceil(bits/(double)Byte.SIZE);
+	}
+	public static OptionalLong bitToByte(OptionalLong bits){
+		return bits.isPresent()?OptionalLong.of(bitToByte(bits.getAsLong())):bits;
+	}
+	
+	public static OptionalLong addIfBoth(OptionalLong a, OptionalLong b){
+		if(a.isEmpty()) return a;
+		if(b.isEmpty()) return b;
+		return OptionalLong.of(a.getAsLong()+b.getAsLong());
+	}
+	
+	public static String byteArrayToBitString(byte[] data){
+		return byteArrayToBitString(data, 0, data.length);
+	}
+	public static String byteArrayToBitString(byte[] data, int length){
+		return byteArrayToBitString(data, 0, length);
+	}
+	public static String byteArrayToBitString(byte[] data, int offset, int length){
+		return IntStream.range(offset, offset+length)
+		                .map(i->data[i]&0xFF)
+		                .mapToObj(b->String.format("%8s", Integer.toBinaryString(b)).replace(' ', '0'))
+		                .map(s->new StringBuilder(s).reverse())
+		                .collect(Collectors.joining());
 	}
 }

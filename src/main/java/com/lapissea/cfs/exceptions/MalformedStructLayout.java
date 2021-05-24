@@ -1,7 +1,11 @@
 package com.lapissea.cfs.exceptions;
 
+import java.io.Serial;
+
 public class MalformedStructLayout extends RuntimeException{
 	
+	@Serial
+	private static final long serialVersionUID=-7080003095967659414L;
 	public MalformedStructLayout(){
 	}
 	

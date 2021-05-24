@@ -9,7 +9,7 @@ import java.io.IOException;
 import static com.lapissea.cfs.GlobalConfig.*;
 import static com.lapissea.cfs.io.bit.BitUtils.*;
 
-public class FlagWriter implements BitWriter{
+public class FlagWriter implements BitWriter<FlagWriter>{
 	
 	public static class AutoPop extends FlagWriter implements AutoCloseable{
 		private final ContentWriter dest;

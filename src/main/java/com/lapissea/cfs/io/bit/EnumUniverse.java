@@ -1,5 +1,6 @@
 package com.lapissea.cfs.io.bit;
 
+import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.util.UtilL;
 import sun.misc.Unsafe;
@@ -8,8 +9,6 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.*;
 import java.util.function.IntFunction;
-
-import static com.lapissea.cfs.GlobalConfig.*;
 
 public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
 	
@@ -49,7 +48,7 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
 					try{
 						@SuppressWarnings("unchecked")
 						E[] universe=(E[])unsafe.getObject(EnumSet.noneOf(type), universeOffset);
-						if(DEBUG_VALIDATION){
+						if(GlobalConfig.DEBUG_VALIDATION){
 							if(!Arrays.equals(universe, getUniverseSafe(type))){
 								return null;
 							}
@@ -128,8 +127,8 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
 		return get(ordinal);
 	}
 	
-	public void write(T source, BitWriter dest) throws IOException{ write(source, dest, false); }
-	public void write(T source, BitWriter dest, boolean nullable) throws IOException{
+	public void write(T source, BitWriter<?> dest) throws IOException{ write(source, dest, false); }
+	public void write(T source, BitWriter<?> dest, boolean nullable) throws IOException{
 		int index;
 		if(nullable){
 			index=source==null?0:source.ordinal()+1;

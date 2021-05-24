@@ -6,7 +6,6 @@ import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.TextUtil;
-import com.lapissea.util.ZeroArrays;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
@@ -279,15 +278,13 @@ public class MemoryData implements IOInterface{
 				throw new RuntimeException(e);
 			}
 		}
-		
-		StringBuilder result=new StringBuilder("[");
-		for(int i=0, j=Math.min(used, max);i<j;i++){
+		StringBuilder result=new StringBuilder(used*3+1).append('[');
+		for(int i=0;i<used;i++){
 			var ay=Integer.toHexString(bb[i]&0xFF).toUpperCase();
 			if(ay.length()==1) result.append('0');
 			result.append(ay);
-			if(i+1<j) result.append('|');
+			if(i+1<used) result.append('|');
 		}
-		if(used>max) result.append("...");
 		result.append(']');
 		return result.toString();
 	}

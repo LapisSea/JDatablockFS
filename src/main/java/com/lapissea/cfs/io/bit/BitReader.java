@@ -25,7 +25,9 @@ public interface BitReader{
 	
 	default void checkNOneAndThrow(int n, IntFunction<String> message) throws IOException{
 		int errorBit=checkNOne(n);
-		if(errorBit!=-1) throw new IllegalBitValueException(message.apply(errorBit));
+		if(errorBit!=-1){
+			throw new IllegalBitValueException(message.apply(errorBit));
+		}
 	}
 	
 	

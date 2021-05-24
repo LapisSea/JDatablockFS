@@ -28,8 +28,8 @@ public interface IOInterface extends Sizable.Mod, RandomIO.Creator{
 	/**
 	 * Tries to grows or shrinks capacity as closely as it is convenient for the underlying data. <br>
 	 * <br>
-	 * If growing, it is required that capacity is set to greater or equal to newCapacity.<br>
-	 * If shrinking, it is not required that capacity is shrunk but is required to always be greater or equal to newCapacity.
+	 * If growing, it is required target capacity is set to greater or equal to newCapacity.<br>
+	 * If shrinking, it is not required target capacity is shrunk but is required to always be greater or equal to newCapacity.
 	 */
 	default void setCapacity(long newCapacity) throws IOException{
 		try(var io=io()){

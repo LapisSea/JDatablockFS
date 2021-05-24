@@ -1,16 +1,13 @@
 package com.lapissea.cfs.io;
 
-import com.lapissea.cfs.cluster.Cluster;
 import com.lapissea.cfs.io.content.ContentInputStream;
 import com.lapissea.cfs.io.content.ContentOutputStream;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.streams.RandomInputStream;
 import com.lapissea.cfs.io.streams.RandomOutputStream;
-import com.lapissea.cfs.io.struct.IOInstance;
+import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.INumber;
-import com.lapissea.cfs.objects.chunk.ChunkPointer;
-import com.lapissea.cfs.objects.chunk.ObjectPointer;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;
@@ -75,11 +72,6 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader, Sizab
 		
 		default RandomIO ioAt(long offset) throws IOException{
 			return io().setPos(offset);
-		}
-		
-		default <T extends IOInstance> T storeTo(Cluster cluster, T dest) throws IOException{
-			io(io->dest.readStruct(cluster, io));
-			return dest;
 		}
 		
 		default void io(UnsafeConsumer<RandomIO, IOException> session) throws IOException{
@@ -174,9 +166,6 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader, Sizab
 	 */
 	void fillZero(long requestedMemory) throws IOException;
 	
-	default ObjectPointer<?> getGlobalRef() throws IOException{
-		throw new UnsupportedOperationException();
-	}
 	long getGlobalPos() throws IOException;
 	
 	default RandomIO readOnly(){
@@ -193,7 +182,7 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader, Sizab
 	default ContentOutputStream outStream(boolean trimOnClose){ return new RandomOutputStream(this, trimOnClose); }
 	
 	default ChunkPointer posAsPtr() throws IOException{
-		return new ChunkPointer(getPos());
+		return ChunkPointer.of(getPos());
 	}
 	
 	default String hexdump() throws IOException{
@@ -218,7 +207,6 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader, Sizab
 		try(ContentReader in=this){
 			
 			long   read   =0;
-			long   lineNum=0;
 			byte[] line   =new byte[width];
 			
 			while(true){

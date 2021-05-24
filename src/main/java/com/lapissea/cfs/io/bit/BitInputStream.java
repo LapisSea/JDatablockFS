@@ -13,6 +13,7 @@ public class BitInputStream implements BitReader, AutoCloseable{
 	
 	private long buffer;
 	private int  bufferedBits;
+	private long totalBits;
 	
 	public BitInputStream(ContentReader source){
 		this.source=source;
@@ -28,11 +29,11 @@ public class BitInputStream implements BitReader, AutoCloseable{
 				int byt=source.read();
 				if(byt==-1) throw new EOFException();
 				
-				buffer|=byt<<bufferedBits;
+				buffer|=(long)byt<<bufferedBits;
 				bufferedBits+=Byte.SIZE;
 			}else{
 				for(byte byt : source.readInts1(toRead)){
-					buffer|=byt<<bufferedBits;
+					buffer|=(long)byt<<bufferedBits;
 					bufferedBits+=Byte.SIZE;
 				}
 				
@@ -48,11 +49,16 @@ public class BitInputStream implements BitReader, AutoCloseable{
 		var result=(buffer&makeMask(numOBits));
 		buffer >>>= numOBits;
 		bufferedBits-=numOBits;
+		totalBits+=numOBits;
 		return result;
 	}
 	
 	@Override
 	public void close() throws IOException{
 		checkNOneAndThrow(bufferedBits);
+	}
+	
+	public long getTotalBits(){
+		return totalBits;
 	}
 }

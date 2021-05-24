@@ -1,7 +1,8 @@
 package com.lapissea.cfs.io.content;
 
-import com.lapissea.cfs.io.streams.ContentReaderOutputStream;
-import com.lapissea.util.Nullable;
+import com.lapissea.cfs.BufferErrorSupplier;
+import com.lapissea.cfs.io.ContentBuff;
+import com.lapissea.util.function.BiIntConsumer;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -236,23 +237,20 @@ public interface ContentWriter extends AutoCloseable, ContentBuff{
 	@Override
 	default void close() throws IOException{}
 	
-	default ContentWriter bufferExactWrite(long amount)                { return bufferExactWrite(amount, true); }
-	
-	default ContentWriter bufferExactWrite(int amount)                 { return bufferExactWrite(amount, true); }
-	
-	default ContentWriter bufferExactWrite(long amount, boolean finish){ return bufferExactWrite(Math.toIntExact(amount), finish); }
-	
-	default ContentWriter bufferExactWrite(int amount, boolean finish) { return bufferExactWrite(amount, finish?BufferErrorSupplier.DEFAULT_WRITE:null); }
-	
-	default ContentWriter bufferExactWrite(long amount, @Nullable BufferErrorSupplier<? extends IOException> errorOnMismatch){
-		return bufferExactWrite(Math.toIntExact(amount), errorOnMismatch);
-	}
-	
-	default ContentWriter bufferExactWrite(int amount, @Nullable BufferErrorSupplier<? extends IOException> errorOnMismatch){
-		ContentWriter that=this;
-		class WriteArrayBuffer extends ByteArrayOutputStream implements ContentWriter{
+	record BufferTicket(ContentWriter target, int amount, BufferErrorSupplier<? extends IOException> errorOnMismatch, BiIntConsumer<byte[]> onFinish){
+		public BufferTicket requireExact(){
+			return requireExact(BufferErrorSupplier.DEFAULT_WRITE);
+		}
+		public BufferTicket requireExact(BufferErrorSupplier<? extends IOException> errorOnMismatch){
+			return new BufferTicket(target, amount, errorOnMismatch, onFinish);
+		}
+		public BufferTicket onFinish(BiIntConsumer<byte[]> onFinish){
+			return new BufferTicket(target, amount, errorOnMismatch, onFinish);
+		}
+		
+		private class WriteArrayBuffer extends ByteArrayOutputStream implements ContentWriter{
 			
-			public WriteArrayBuffer(){
+			private WriteArrayBuffer(){
 				super(amount);
 			}
 			
@@ -261,7 +259,10 @@ public interface ContentWriter extends AutoCloseable, ContentBuff{
 				if(errorOnMismatch!=null){
 					if(count!=amount) throw errorOnMismatch.apply(this.size(), amount);
 				}
-				that.write(buf, 0, count);
+				if(onFinish!=null){
+					onFinish.accept(count, buf);
+				}
+				target.write(buf, 0, count);
 			}
 			
 			@Override
@@ -270,13 +271,12 @@ public interface ContentWriter extends AutoCloseable, ContentBuff{
 			}
 		}
 		
-		return new WriteArrayBuffer();
+		public ContentWriter submit(){
+			return new WriteArrayBuffer();
+		}
 	}
 	
-	static boolean isDirect(ContentWriter out){
-		return
-			out instanceof ByteArrayOutputStream||
-			out instanceof ContentOutputStream.BA||
-			out instanceof ContentOutputStream.BB;
-	}
+	default BufferTicket writeTicket(long amount){ return writeTicket(Math.toIntExact(amount)); }
+	default BufferTicket writeTicket(int amount) { return new BufferTicket(this, amount, null, null); }
+	
 }

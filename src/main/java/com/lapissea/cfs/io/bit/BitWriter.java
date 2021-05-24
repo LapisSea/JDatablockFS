@@ -1,40 +1,51 @@
 package com.lapissea.cfs.io.bit;
 
+import com.lapissea.util.NotNull;
+
 import java.io.IOException;
 
-public interface BitWriter{
+public interface BitWriter<SELF extends BitWriter<SELF>>{
 	
-	BitWriter writeBits(long data, int bitCount) throws IOException;
+	SELF writeBits(long data, int bitCount) throws IOException;
 	
-	default BitWriter writeBoolBit(boolean bool) throws IOException{
+	@SuppressWarnings("unchecked")
+	private SELF self(){
+		return (SELF)this;
+	}
+	
+	default SELF writeBoolBit(boolean bool) throws IOException{
 		writeBits(bool?1:0, 1);
-		return this;
+		return self();
 	}
 	
-	default <T extends Enum<T>> BitWriter writeEnum(EnumUniverse<T> info, T val, boolean nullable) throws IOException{
+	default <T extends Enum<T>> SELF writeEnum(@NotNull T val) throws IOException{
+		return writeEnum(EnumUniverse.getUnknown(val.getClass()), val, false);
+	}
+	
+	default <T extends Enum<T>> SELF writeEnum(EnumUniverse<T> info, T val, boolean nullable) throws IOException{
 		info.write(val, this, nullable);
-		return this;
+		return self();
 	}
 	
 	
-	default BitWriter writeBits(int data, int bitCount) throws IOException{
+	default SELF writeBits(int data, int bitCount) throws IOException{
 		writeBits((long)data, bitCount);
-		return this;
+		return self();
 	}
 	
-	default BitWriter writeBits(boolean[] data) throws IOException{
+	default SELF writeBits(boolean[] data) throws IOException{
 		for(boolean f : data){
 			writeBoolBit(f);
 		}
-		return this;
+		return self();
 	}
 	
 	
-	default BitWriter fillNOne(int n) throws IOException{
+	default SELF fillNOne(int n) throws IOException{
 		for(int i=0;i<n;i++){
 			writeBoolBit(true);
 		}
-		return this;
+		return self();
 	}
 	
 }
