@@ -18,8 +18,8 @@ public interface BitWriter<SELF extends BitWriter<SELF>>{
 		return self();
 	}
 	
-	default <T extends Enum<T>> SELF writeEnum(@NotNull T val) throws IOException{
-		return writeEnum(EnumUniverse.getUnknown(val.getClass()), val, false);
+	default <T extends Enum<T>> SELF writeEnum(@NotNull T val, boolean nullable) throws IOException{
+		return writeEnum(EnumUniverse.getUnknown(val.getClass()), val, nullable);
 	}
 	
 	default <T extends Enum<T>> SELF writeEnum(EnumUniverse<T> info, T val, boolean nullable) throws IOException{

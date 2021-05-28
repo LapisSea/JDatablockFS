@@ -8,11 +8,11 @@ import com.lapissea.cfs.io.streams.RandomInputStream;
 import com.lapissea.cfs.io.streams.RandomOutputStream;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.INumber;
+import com.lapissea.util.NotNull;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;
 
-import java.awt.*;
 import java.io.Flushable;
 import java.io.IOException;
 import java.util.Objects;
@@ -35,7 +35,7 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader, Sizab
 	interface Creator{
 		
 		default String hexdump() throws IOException{
-			return hexdump(32);
+			return hexdump(HexDump.DEFAULT_MAX_WIDTH);
 		}
 		
 		default String hexdump(int maxWidth) throws IOException{
@@ -43,11 +43,11 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader, Sizab
 		}
 		
 		default String hexdump(String title) throws IOException{
-			return hexdump(title, 32);
+			return hexdump(title, HexDump.DEFAULT_MAX_WIDTH);
 		}
 		
 		default String hexdump(String title, int maxWidth) throws IOException{
-			return io().hexdump(title, maxWidth);
+			return HexDump.hexDump(io(), title, maxWidth).toString();
 		}
 		
 		default void ioAt(ChunkPointer ptr, UnsafeConsumer<RandomIO, IOException> session) throws IOException{
@@ -82,6 +82,79 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader, Sizab
 		
 		RandomIO io() throws IOException;
 		
+		default void write(boolean trimOnClose, byte[] data) throws IOException             { write(0, trimOnClose, data); }
+		
+		default void write(long offset, boolean trimOnClose, byte[] data) throws IOException{ write(offset, trimOnClose, data.length, data); }
+		
+		default void write(long offset, boolean trimOnClose, int length, byte[] data) throws IOException{
+			try(var io=ioAt(offset)){
+				io.write(data, 0, length);
+				if(trimOnClose) io.trim();
+			}
+		}
+		
+		@NotNull
+		default ContentOutputStream write(boolean trimOnClose) throws IOException{ return write(0, trimOnClose); }
+		
+		@NotNull
+		default ContentOutputStream write(long offset, boolean trimOnClose) throws IOException{
+			return ioAt(offset).outStream(trimOnClose);
+		}
+		
+		
+		@NotNull
+		default <T> T read(UnsafeFunction<ContentInputStream, T, IOException> reader) throws IOException{ return read(0, reader); }
+		
+		@NotNull
+		default <T> T read(long offset, @NotNull UnsafeFunction<ContentInputStream, T, IOException> reader) throws IOException{
+			Objects.requireNonNull(reader);
+			try(var io=read(offset)){
+				return Objects.requireNonNull(reader.apply(io));
+			}
+		}
+		
+		default void read(UnsafeConsumer<ContentInputStream, IOException> reader) throws IOException{ read(0, reader); }
+		
+		default void read(long offset, @NotNull UnsafeConsumer<ContentInputStream, IOException> reader) throws IOException{
+			Objects.requireNonNull(reader);
+			
+			try(var io=read(offset)){
+				reader.accept(io);
+			}
+		}
+		
+		@NotNull
+		default ContentInputStream read() throws IOException{ return read(0); }
+		
+		@NotNull
+		default ContentInputStream read(long offset) throws IOException{
+			return ioAt(offset).inStream();
+		}
+		
+		
+		default byte[] read(long offset, int length) throws IOException{
+			byte[] dest=new byte[length];
+			read(offset, dest);
+			return dest;
+		}
+		
+		default void read(long offset, byte[] dest) throws IOException{ read(offset, dest.length, dest); }
+		
+		default void read(long offset, int length, byte[] dest) throws IOException{
+			if(length==0) return;
+			try(var io=ioAt(offset)){
+				io.readFully(dest, 0, length);
+			}
+		}
+		
+		default void transferTo(IOInterface dest) throws IOException{ transferTo(dest, true); }
+		
+		default void transferTo(IOInterface dest, boolean trimOnClose) throws IOException{
+			try(var in=read();
+			    var out=dest.write(trimOnClose)){
+				in.transferTo(out);
+			}
+		}
 	}
 	
 	long getPos() throws IOException;
@@ -185,67 +258,4 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader, Sizab
 		return ChunkPointer.of(getPos());
 	}
 	
-	default String hexdump() throws IOException{
-		return hexdump(TextUtil.toNamedJson(this), 32);
-	}
-	
-	default String hexdump(String title, int maxWidth) throws IOException{
-		
-		long size=getSize();
-		
-		int    digits=String.valueOf(size).length();
-		String format="%0"+digits+"d/%0"+digits+"d: ";
-		
-		StringBuilder result=new StringBuilder(128).append("hexdump: ").append(title).append("\n");
-		
-		int round=8;
-		int space=result.length()-format.formatted(0, 0).length();
-		int width=Math.min(Math.max((int)Math.round((Math.max(space/4.0, Math.sqrt(size))/(double)round)), 1)*round, maxWidth);
-		
-		Font font=new Font("SERIF", Font.PLAIN, 1);
-		
-		try(ContentReader in=this){
-			
-			long   read   =0;
-			byte[] line   =new byte[width];
-			
-			while(true){
-				long remaining=size-read;
-				if(remaining==0) return result.toString();
-				
-				int lineSiz=(int)Math.min(remaining, line.length);
-				
-				result.append(format.formatted(read, read+lineSiz));
-				
-				read+=lineSiz;
-				in.readFully(line, 0, lineSiz);
-				
-				
-				for(int i=0;i<line.length;i++){
-					if(i>=lineSiz){
-						result.append("  ");
-					}else{
-						var ay=Integer.toHexString(line[i]&0xFF).toUpperCase();
-						if(ay.length()==1) result.append('0');
-						result.append(ay);
-					}
-					result.append(' ');
-				}
-				
-				for(int i=0;i<lineSiz;i++){
-					char c=(char)line[i];
-					
-					result.append((char)switch(c){
-						case 0 -> '␀';
-						case '\n' -> '↵';
-						case '\t' -> '↹';
-//						case ' ' -> '⌴';
-						default -> font.canDisplay(c)?c:'·';
-					});
-				}
-				if(read<size) result.append('\n');
-			}
-			
-		}
-	}
 }

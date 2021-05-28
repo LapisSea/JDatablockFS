@@ -1,8 +1,9 @@
-package com.lapissea.cfs;
+package com.lapissea.cfs.chunk;
 
 import com.lapissea.cfs.exceptions.MalformedFileException;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.content.ContentReader;
+import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.instancepipe.ContiguousPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
@@ -10,19 +11,16 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.annotations.IOFieldDependency;
 import com.lapissea.cfs.type.field.annotations.IOFieldMark;
 import com.lapissea.util.LogUtil;
-import com.lapissea.util.NotNull;
-import com.lapissea.util.TextUtil;
 import com.lapissea.util.WeakValueHashMap;
 
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Map;
-import java.util.Objects;
 
 import static com.lapissea.cfs.objects.NumberSize.*;
 import static java.nio.charset.StandardCharsets.*;
 
-public class Cluster{
+public class Cluster implements ChunkDataProvider{
 	
 	private static final byte[] MAGIC_ID="CC.DB/FS".getBytes(UTF_8);
 	
@@ -36,17 +34,26 @@ public class Cluster{
 		}
 	}
 	
+	public static void writeMagic(ContentWriter dest) throws IOException{
+		dest.write(MAGIC_ID);
+	}
+	
 	public static void init(IOInterface data) throws IOException{
 		try(var io=data.write(true)){
 			io.write(MAGIC_ID);
 			FIRST_CHUNK_PTR_SIZE.write(io, FIRST_CHUNK_PTR);
-			
-			Metadata metadata=new Metadata();
-			
-			new Chunk(null, FIRST_CHUNK_PTR, metadata.calcSize(), 0).writeHeader(io);
-			LogUtil.println(metadata);
-			new ContiguousPipe().write(io, metadata);
 		}
+		
+		var provider=ChunkDataProvider.newVerySimpleProvider(data);
+		
+		Metadata metadata=new Metadata();
+		metadata.value=69;
+		
+		AllocateTicket.bytes(metadata.calcSize())
+		              .withApproval(c->c.getPtr().equals(FIRST_CHUNK_PTR))
+		              .withDataPopulated((p, io)->new ContiguousPipe().write(io, metadata))
+		              .submit(provider);
+		
 	}
 	
 	private static class Metadata extends IOInstance<Metadata>{
@@ -71,7 +78,8 @@ public class Cluster{
 	
 	private final Map<ChunkPointer, Chunk> chunkCache=new WeakValueHashMap<>();
 	
-	private final IOInterface source;
+	private final IOInterface   source;
+	private final MemoryManager memoryManager=new VerySimpleMemoryManager(this);
 	
 	private ChunkPointer mainChunkPtr;
 	
@@ -85,28 +93,21 @@ public class Cluster{
 		}
 		
 		Metadata m=new Metadata();
-		LogUtil.println(mainChunkPtr.dereference(this));
-		LogUtil.println(Utils.byteArrayToBitString(mainChunkPtr.dereference(this).io().readInts1(2)));
-		LogUtil.println(source.toString());
 		new ContiguousPipe().read(mainChunkPtr.dereference(this).io(), m);
 		LogUtil.println(m);
 	}
 	
-	public Chunk getChunk(@NotNull ChunkPointer pointer) throws IOException{
-		Objects.requireNonNull(pointer);
-		
-		var cached=chunkCache.get(pointer);
-		if(cached!=null){
-			var read=Chunk.readChunk(this, source, pointer);
-			if(!read.equals(cached)) throw new IllegalStateException("Chunk cache desync\n"+TextUtil.toTable("read/cached", read, cached));
-		}
-		
-		var read=Chunk.readChunk(this, source, pointer);
-		chunkCache.put(pointer, read);
-		return read;
-	}
-	
+	@Override
 	public IOInterface getSource(){
 		return source;
+	}
+	@Override
+	public MemoryManager getMemoryManager(){
+		return memoryManager;
+	}
+	
+	@Override
+	public Map<ChunkPointer, Chunk> getChunkCache(){
+		return chunkCache;
 	}
 }

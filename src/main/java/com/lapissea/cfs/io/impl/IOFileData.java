@@ -128,9 +128,17 @@ public class IOFileData implements IOInterface, AutoCloseable{
 	
 	private RandomAccessFile source;
 	
-	private final String path;
+	private final String  path;
+	private final boolean readOnly;
 	
-	public IOFileData(File file){
+	public IOFileData(File file) throws IOException{
+		this.readOnly=!file.canWrite();
+		path=file.getPath();
+	}
+	
+	public IOFileData(File file, boolean readOnly) throws IOException{
+		if(!readOnly&&!file.canWrite()) throw new IOException("can not write to "+file.getPath());
+		this.readOnly=readOnly;
 		path=file.getPath();
 	}
 	
@@ -159,7 +167,9 @@ public class IOFileData implements IOInterface, AutoCloseable{
 	public long getCapacity() throws IOException{ return getSource().length(); }
 	
 	@Override
-	public String getName(){ return "F("+new File(path).getName()+")"; }
+	public boolean isReadOnly(){
+		return readOnly;
+	}
 	
 	@Override
 	public void setCapacity(long newCapacity) throws IOException{ getSource().setLength(newCapacity); }

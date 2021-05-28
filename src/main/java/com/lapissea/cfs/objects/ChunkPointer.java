@@ -1,18 +1,19 @@
 package com.lapissea.cfs.objects;
 
-import com.lapissea.cfs.Chunk;
-import com.lapissea.cfs.Cluster;
+import com.lapissea.cfs.chunk.Chunk;
+import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.io.content.ContentReader;
+import com.lapissea.util.NotNull;
 
 import java.io.IOException;
 
-@jdk.internal.ValueBased
 public final class ChunkPointer implements INumber{
 	
 	public static ChunkPointer read(NumberSize size, ContentReader src) throws IOException{
-		return ChunkPointer.of(size.read(src));
+		return ChunkPointer.ofNullable(size.read(src));
 	}
 	
+	@NotNull
 	public static ChunkPointer of(long value){
 		return new ChunkPointer(value);
 	}
@@ -33,9 +34,9 @@ public final class ChunkPointer implements INumber{
 	private final long value;
 	
 	private ChunkPointer(long value){
+		if(value==0) throw new NullPointerException();
+		if(value<0) throw new IllegalArgumentException();
 		this.value=value;
-		assert value>0:
-			this.toString();
 	}
 	
 	public static ChunkPointer ofNullable(long value){

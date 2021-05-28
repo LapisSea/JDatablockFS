@@ -254,8 +254,8 @@ public class ByteBufferData implements IOInterface{
 	}
 	
 	@Override
-	public String getName(){
-		return "mem";
+	public boolean isReadOnly(){
+		return readOnly;
 	}
 	
 	@Override

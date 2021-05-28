@@ -257,15 +257,15 @@ public class MemoryData implements IOInterface{
 		
 		bb=Arrays.copyOf(bb, newCapacity);
 		used=Math.min(used, newCapacity);
-
+		
 		if(onWrite!=null){
-			pushOnWrite(LongStream.range(lastCapacity,newCapacity).toArray());
+			pushOnWrite(LongStream.range(lastCapacity, newCapacity).toArray());
 		}
 	}
 	
 	@Override
-	public String getName(){
-		return "mem";
+	public boolean isReadOnly(){
+		return readOnly;
 	}
 	
 	@Override

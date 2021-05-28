@@ -1,6 +1,6 @@
 package test;
 
-import com.lapissea.cfs.Cluster;
+import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.util.LogUtil;
