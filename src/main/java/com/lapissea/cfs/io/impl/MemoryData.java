@@ -72,7 +72,7 @@ public abstract class MemoryData<DataType> implements IOInterface{
 			if(remaining<=0) return -1;
 			
 			int clampedLen=Math.min(remaining, len);
-			readN(data, pos, b, off, len);
+			readN(data, pos, b, off, clampedLen);
 			pos+=clampedLen;
 			return clampedLen;
 		}
