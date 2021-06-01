@@ -11,16 +11,45 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.LongStream;
 
 import static com.lapissea.cfs.GlobalConfig.*;
 
 public interface ChunkDataProvider{
 	
-	static ChunkDataProvider newVerySimpleProvider(){
-		return newVerySimpleProvider((UnsafeBiConsumer<IOInterface, long[], IOException>)null);
+	class VerySimple implements ChunkDataProvider{
+		private final Map<ChunkPointer, Chunk> cache        =Collections.synchronizedMap(new HashMap<>());
+		private final MemoryManager            memoryManager=new VerySimpleMemoryManager(this);
+		private final IOInterface              data;
+		
+		public VerySimple(IOInterface data){
+			this.data=data;
+		}
+		
+		@Override
+		public IOInterface getSource(){
+			return data;
+		}
+		@Override
+		public MemoryManager getMemoryManager(){
+			return memoryManager;
+		}
+		@Override
+		public Map<ChunkPointer, Chunk> getChunkCache(){
+			return cache;
+		}
+		@Override
+		public String toString(){
+			return "DummyCache";
+		}
 	}
-	static ChunkDataProvider newVerySimpleProvider(UnsafeBiConsumer<IOInterface, long[], IOException> onWrite){
-		var data=new MemoryData();
+	
+	static ChunkDataProvider newVerySimpleProvider(){
+		return newVerySimpleProvider((UnsafeBiConsumer<IOInterface, LongStream, IOException>)null);
+	}
+	
+	static ChunkDataProvider newVerySimpleProvider(UnsafeBiConsumer<IOInterface, LongStream, IOException> onWrite){
+		var data=new MemoryData.Arr();
 		
 		try(var io=data.io()){
 			Cluster.writeMagic(io);
@@ -29,32 +58,12 @@ public interface ChunkDataProvider{
 		}
 		
 		if(onWrite!=null) data.onWrite=ids->onWrite.accept(data, ids);
+		
 		return newVerySimpleProvider(data);
 	}
 	
 	static ChunkDataProvider newVerySimpleProvider(IOInterface data){
-		
-		return new ChunkDataProvider(){
-			private final Map<ChunkPointer, Chunk> cache=Collections.synchronizedMap(new HashMap<>());
-			private final MemoryManager memoryManager=new VerySimpleMemoryManager(this);
-			
-			@Override
-			public IOInterface getSource(){
-				return data;
-			}
-			@Override
-			public MemoryManager getMemoryManager(){
-				return memoryManager;
-			}
-			@Override
-			public Map<ChunkPointer, Chunk> getChunkCache(){
-				return cache;
-			}
-			@Override
-			public String toString(){
-				return "DummyCache";
-			}
-		};
+		return new VerySimple(data);
 	}
 	
 	IOInterface getSource();
@@ -85,7 +94,7 @@ public interface ChunkDataProvider{
 	}
 	
 	default boolean isLastPhysical(Chunk chunk) throws IOException{
-		return chunk.dataEnd()>=getSource().getSize();
+		return chunk.dataEnd()>=getSource().getIOSize();
 	}
 	default void validate(){}
 	

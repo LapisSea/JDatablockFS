@@ -1,6 +1,5 @@
 package com.lapissea.cfs.io.impl;
 
-
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.RandomIO;
@@ -9,15 +8,14 @@ import com.lapissea.util.TextUtil;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.stream.LongStream;
 
-public class MemoryData implements IOInterface{
-	
-	private class MemoryRandomIO implements RandomIO{
+public abstract class MemoryData<DataType> implements IOInterface{
+	private class MemRandomIO implements RandomIO{
 		
 		private int pos;
-		
 		
 		@Override
 		public RandomIO setPos(long pos){
@@ -33,20 +31,17 @@ public class MemoryData implements IOInterface{
 		
 		@Override
 		public long getSize(){
-			return MemoryData.this.getSize();
+			return used;
 		}
 		
 		@Override
 		public void setSize(long targetSize){
-			if(readOnly) throw new UnsupportedOperationException();
-			
-			MemoryData.this.setSize(targetSize);
-			pos=Math.min(pos, used);
+			throw new UnsupportedOperationException();
 		}
 		
 		@Override
 		public long getCapacity(){
-			return MemoryData.this.getCapacity();
+			return used;
 		}
 		
 		@Override
@@ -68,18 +63,18 @@ public class MemoryData implements IOInterface{
 		public int read(){
 			int remaining=(int)(getSize()-getPos());
 			if(remaining<=0) return -1;
-			return bb[pos++]&0xFF;
+			return read1(data, pos++)&0xFF;
 		}
 		
 		@Override
 		public int read(byte[] b, int off, int len){
 			int remaining=(int)(getSize()-getPos());
 			if(remaining<=0) return -1;
-			if(remaining<len) len=remaining;
 			
-			System.arraycopy(bb, pos, b, off, len);
-			pos+=len;
-			return len;
+			int clampedLen=Math.min(remaining, len);
+			readN(data, pos, b, off, len);
+			pos+=clampedLen;
+			return clampedLen;
 		}
 		
 		private void pushUsed(){
@@ -87,9 +82,7 @@ public class MemoryData implements IOInterface{
 				var old=used;
 				used=pos;
 				
-				if(onWrite!=null){
-					pushOnWrite(LongStream.range(old, used).toArray());
-				}
+				logWriteEvent(old, used);
 			}
 		}
 		
@@ -99,10 +92,8 @@ public class MemoryData implements IOInterface{
 			
 			int remaining=(int)(getCapacity()-getPos());
 			if(remaining<=0) setCapacity(Math.max(4, Math.max(getCapacity()+1, getCapacity()+1-remaining)));
-			bb[pos]=(byte)b;
-			if(onWrite!=null){
-				pushOnWrite(new long[]{pos});
-			}
+			write1(data, pos, (byte)b);
+			logWriteEvent(pos);
 			pos++;
 			pushUsed();
 		}
@@ -119,10 +110,8 @@ public class MemoryData implements IOInterface{
 			int remaining=(int)(getCapacity()-getPos());
 			if(remaining<len) setCapacity(Math.max(4, Math.max((int)(getCapacity()*4D/3), getCapacity()+len-remaining)));
 			
-			System.arraycopy(b, off, bb, pos, len);
-			if(onWrite!=null){
-				pushOnWrite(LongStream.range(pos, pos+len).toArray());
-			}
+			writeN(b, off, data, pos, len);
+			logWriteEvent(pos, pos+len);
 			if(pushPos){
 				pos+=len;
 				pushUsed();
@@ -145,7 +134,7 @@ public class MemoryData implements IOInterface{
 		public String toString(){
 			int count=64;
 			
-			int start=pos-count/2, end=start+count;
+			int start=pos, end=start+count;
 			
 			int overshoot=end-used;
 			if(overshoot>0){
@@ -153,19 +142,26 @@ public class MemoryData implements IOInterface{
 				end=used;
 			}
 			
+			String name=getClass().getSimpleName();
 			String pre;
 			if(start<0){
 				start=0;
-				pre="MemoryRandomIO{pos="+pos+", data=";
-			}else pre="MemoryRandomIO{";
+				pre="{pos="+pos+", data=";
+			}else pre="{";
 			
-			var post="}";
+			var post=overshoot==0?"}":" + "+overshoot+" more}";
 			
-			var result=new StringBuilder(pre.length()+post.length()+end-start);
+			var result=new StringBuilder(name.length()+pre.length()+post.length()+end-start);
 			
-			result.append(pre);
+			result.append(name).append(pre);
 			for(int i=start;i<end;i++){
-				result.append((char)bb[i]);
+				char c=(char)read1(data, i);
+				result.append(switch(c){
+					case 0 -> '␀';
+					case '\n' -> '↵';
+					case '\t' -> '↹';
+					default -> c;
+				});
 			}
 			result.append(post);
 			
@@ -173,50 +169,33 @@ public class MemoryData implements IOInterface{
 		}
 	}
 	
+	public transient UnsafeConsumer<LongStream, IOException> onWrite;
 	
-	////////////////////////////////////////////////////////////////////////////////
-	
-	
-	public transient UnsafeConsumer<long[], IOException> onWrite;
-	
-	private byte[] bb;
-	private int    used;
+	private DataType data;
+	private int      used;
 	
 	private final boolean readOnly;
 	
-	public MemoryData(IOInterface data, boolean readOnly) throws IOException{
-		this(data.readAll(), readOnly);
-	}
-	
-	public MemoryData(byte[] data, boolean readOnly){
-		this(data, data.length, readOnly);
-	}
-	public MemoryData(int dataSize, boolean readOnly){
-		this(new byte[dataSize], readOnly);
-	}
-	
-	public MemoryData(int dataSize){
-		this(dataSize, false);
-	}
-	
-	public MemoryData(){
-		this(false);
-	}
-	
-	public MemoryData(boolean readOnly){
-		this(new byte[4], 0, readOnly);
-	}
-	
-	public MemoryData(byte[] data, int used, boolean readOnly){
-		var ok=data.length>=used;
-		if(!ok) throw new IllegalArgumentException(TextUtil.toString(data.length, ">=", used));
+	public MemoryData(DataType data, int used, boolean readOnly){
+		var ok=getLength(data)>=used;
+		if(!ok) throw new IllegalArgumentException(TextUtil.toString(getLength(data), ">=", used));
 		
-		bb=data;
+		this.data=data;
 		this.used=used;
 		this.readOnly=readOnly;
 	}
 	
-	private void pushOnWrite(long[] ids){
+	private void logWriteEvent(long single){
+		if(onWrite!=null){
+			logWriteEvent(LongStream.of(single));
+		}
+	}
+	private void logWriteEvent(long start, long end){
+		if(onWrite!=null){
+			logWriteEvent(LongStream.range(start, end));
+		}
+	}
+	private void logWriteEvent(LongStream ids){
 		try{
 			onWrite.accept(ids);
 		}catch(Throwable e){
@@ -227,40 +206,27 @@ public class MemoryData implements IOInterface{
 	@Override
 	@NotNull
 	public RandomIO io(){
-		return new MemoryRandomIO();
+		return new MemRandomIO();
 	}
 	
 	@Override
-	public void setSize(long requestedSize){
-		throw new UnsupportedOperationException();
-	}
-	
-	@Override
-	public long getSize(){
+	public long getIOSize(){
 		return used;
 	}
 	
-	@Override
-	public long getCapacity(){
-		return used;
-	}
-	
-	@Override
 	public void setCapacity(long newCapacity){
 		setCapacity(Math.toIntExact(newCapacity));
 	}
 	private void setCapacity(int newCapacity){
 		if(readOnly) throw new UnsupportedOperationException();
 		
-		long lastCapacity=getCapacity();
+		long lastCapacity=getIOSize();
 		if(lastCapacity==newCapacity) return;
 		
-		bb=Arrays.copyOf(bb, newCapacity);
+		data=resize(data, newCapacity);
 		used=Math.min(used, newCapacity);
 		
-		if(onWrite!=null){
-			pushOnWrite(LongStream.range(lastCapacity, newCapacity).toArray());
-		}
+		logWriteEvent(lastCapacity, newCapacity);
 	}
 	
 	@Override
@@ -280,12 +246,141 @@ public class MemoryData implements IOInterface{
 		}
 		StringBuilder result=new StringBuilder(used*3+1).append('[');
 		for(int i=0;i<used;i++){
-			var ay=Integer.toHexString(bb[i]&0xFF).toUpperCase();
+			var ay=Integer.toHexString(read1(data, i)&0xFF).toUpperCase();
 			if(ay.length()==1) result.append('0');
 			result.append(ay);
 			if(i+1<used) result.append('|');
 		}
 		result.append(']');
 		return result.toString();
+	}
+	
+	protected abstract int getLength(DataType data);
+	protected abstract DataType resize(DataType oldData, int newSize);
+	
+	protected abstract byte read1(DataType data, int i);
+	protected abstract void write1(DataType data, int i, byte b);
+	protected abstract void readN(DataType src, int index, byte[] dest, int off, int len);
+	protected abstract void writeN(byte[] src, int index, DataType dest, int off, int len);
+	
+	
+	public static IOInterface from(byte[] data, boolean readOnly){
+		return new Arr(data, readOnly);
+	}
+	public static IOInterface from(ByteBuffer data, boolean readOnly){
+		return new Buff(data, readOnly);
+	}
+	
+	public static class Arr extends MemoryData<byte[]>{
+		
+		public Arr(IOInterface data, boolean readOnly) throws IOException{
+			this(data.readAll(), readOnly);
+		}
+		
+		public Arr(byte[] data, boolean readOnly){
+			this(data, data.length, readOnly);
+		}
+		public Arr(int dataSize, boolean readOnly){
+			this(new byte[dataSize], readOnly);
+		}
+		
+		public Arr(int dataSize){
+			this(dataSize, false);
+		}
+		
+		public Arr(){
+			this(false);
+		}
+		
+		public Arr(boolean readOnly){
+			this(new byte[4], 0, readOnly);
+		}
+		
+		public Arr(byte[] data, int used, boolean readOnly){
+			super(data, used, readOnly);
+		}
+		
+		@Override
+		protected int getLength(byte[] data){
+			return data.length;
+		}
+		@Override
+		protected byte read1(byte[] data, int i){
+			return data[i];
+		}
+		@Override
+		protected void write1(byte[] data, int i, byte b){
+			data[i]=b;
+		}
+		@Override
+		protected void readN(byte[] src, int index, byte[] dest, int off, int len){
+			System.arraycopy(src, index, dest, off, len);
+		}
+		@Override
+		protected void writeN(byte[] src, int index, byte[] dest, int off, int len){
+			System.arraycopy(src, index, dest, off, len);
+		}
+		@Override
+		protected byte[] resize(byte[] oldData, int newSize){
+			return Arrays.copyOf(oldData, newSize);
+		}
+	}
+	
+	public static class Buff extends MemoryData<ByteBuffer>{
+		
+		public Buff(IOInterface data, boolean readOnly) throws IOException{
+			this(ByteBuffer.wrap(data.readAll()), readOnly);
+		}
+		
+		public Buff(ByteBuffer data, boolean readOnly){
+			this(data, data.limit(), readOnly);
+		}
+		public Buff(int dataSize, boolean readOnly){
+			this(ByteBuffer.allocate(dataSize), readOnly);
+		}
+		
+		public Buff(int dataSize){
+			this(dataSize, false);
+		}
+		
+		public Buff(){
+			this(false);
+		}
+		
+		public Buff(boolean readOnly){
+			this(ByteBuffer.allocate(4), 0, readOnly);
+		}
+		
+		public Buff(ByteBuffer data, int used, boolean readOnly){
+			super(data, used, readOnly);
+		}
+		@Override
+		protected int getLength(ByteBuffer data){
+			return data.limit();
+		}
+		@Override
+		protected byte read1(ByteBuffer data, int i){
+			return data.get(i);
+		}
+		@Override
+		protected void write1(ByteBuffer data, int i, byte b){
+			data.put(i, b);
+		}
+		@Override
+		protected void readN(ByteBuffer src, int index, byte[] dest, int off, int len){
+			src.get(index, dest, off, len);
+		}
+		@Override
+		protected void writeN(byte[] src, int index, ByteBuffer dest, int off, int len){
+			dest.put(off, src, index, len);
+		}
+		@Override
+		protected ByteBuffer resize(ByteBuffer oldData, int newSize){
+			ByteBuffer newData=ByteBuffer.allocate(newSize);
+			oldData.position(0);
+			newData.put(oldData);
+			newData.position(0);
+			return newData;
+		}
 	}
 }

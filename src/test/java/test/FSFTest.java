@@ -13,7 +13,7 @@ public class FSFTest{
 	public static void main(String[] args) throws IOException{
 		LogUtil.Init.attach(USE_CALL_POS|USE_TABULATED_HEADER);
 		
-		IOInterface data=new MemoryData();
+		IOInterface data=new MemoryData.Arr();
 		Cluster.init(data);
 		
 		var cluster=new Cluster(data);

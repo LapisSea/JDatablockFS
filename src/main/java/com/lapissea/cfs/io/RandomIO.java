@@ -17,7 +17,7 @@ import java.io.Flushable;
 import java.io.IOException;
 import java.util.Objects;
 
-public interface RandomIO extends Flushable, ContentWriter, ContentReader, Sizable.Mod{
+public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 	
 	enum Mode{
 		READ_ONLY(true, false),
@@ -48,6 +48,14 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader, Sizab
 		
 		default String hexdump(String title, int maxWidth) throws IOException{
 			return HexDump.hexDump(io(), title, maxWidth).toString();
+		}
+		
+		default byte[] readAll() throws IOException{
+			try(var io=io()){
+				byte[] data=new byte[Math.toIntExact(io.getSize())];
+				io.readFully(data);
+				return data;
+			}
 		}
 		
 		default void ioAt(ChunkPointer ptr, UnsafeConsumer<RandomIO, IOException> session) throws IOException{
@@ -156,6 +164,14 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader, Sizab
 			}
 		}
 	}
+	
+	
+	default boolean isEmpty() throws IOException{
+		return getSize()==0;
+	}
+	
+	void setSize(long requestedSize) throws IOException;
+	long getSize() throws IOException;
 	
 	long getPos() throws IOException;
 	RandomIO setPos(long pos) throws IOException;

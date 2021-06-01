@@ -1,7 +1,6 @@
 package com.lapissea.cfs.tools;
 
 import com.google.gson.GsonBuilder;
-import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.ZeroArrays;

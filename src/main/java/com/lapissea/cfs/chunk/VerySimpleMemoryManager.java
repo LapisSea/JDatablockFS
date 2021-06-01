@@ -27,7 +27,7 @@ public class VerySimpleMemoryManager implements MemoryManager{
 	public Chunk alloc(AllocateTicket ticket) throws IOException{
 		var src=context.getSource();
 		
-		var siz    =src.getSize();
+		var siz    =src.getIOSize();
 		var builder=new ChunkBuilder(context, ChunkPointer.of(siz)).withCapacity(ticket.bytes()).withNext(ticket.next());
 		var chunk  =builder.create();
 		if(!ticket.approve(chunk)) return null;

@@ -2,7 +2,6 @@ package test.ui;
 
 import com.lapissea.cfs.cluster.Cluster;
 import com.lapissea.cfs.cluster.extensions.BlockMapCluster;
-import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.io.struct.IOInstance;
 import com.lapissea.cfs.tools.Common;
 import com.lapissea.cfs.tools.DataLogger;

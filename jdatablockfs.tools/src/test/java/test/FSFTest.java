@@ -3,7 +3,6 @@ package test;
 import com.lapissea.cfs.cluster.Cluster;
 import com.lapissea.cfs.cluster.extensions.BlockMapCluster;
 import com.lapissea.cfs.conf.AllocateTicket;
-import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.objects.IOList;
 import com.lapissea.cfs.objects.IOTypeLayout;
 import com.lapissea.cfs.objects.StructLinkedList;

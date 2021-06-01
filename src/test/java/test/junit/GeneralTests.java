@@ -28,12 +28,12 @@ public class GeneralTests{
 	void chunkHeadIntegrity(long capacity) throws IOException{
 		
 		var provider=ChunkDataProvider.newVerySimpleProvider();
+		var chunk   =AllocateTicket.bytes(capacity).submit(provider);
 		
-		var chunk=AllocateTicket.bytes(capacity).submit(provider);
-		provider.getChunkCache().clear();
-		var ch=provider.getChunk(chunk.getPtr());
+		var providerRead=ChunkDataProvider.newVerySimpleProvider(provider.getSource());
+		var readChunk   =providerRead.getChunk(chunk.getPtr());
 		
-		assertEquals(chunk, ch);
+		assertEquals(chunk, readChunk);
 	}
 	
 	@ParameterizedTest
@@ -79,7 +79,7 @@ public class GeneralTests{
 	}
 	
 	private IOInterface blankData(){
-		return new MemoryData();
+		return new MemoryData.Arr();
 	}
 	
 }

@@ -3,7 +3,7 @@ package com.lapissea.cfs.chunk;
 import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.exceptions.DesyncedCacheException;
 import com.lapissea.cfs.exceptions.MalformedPointerException;
-import com.lapissea.cfs.io.ChunkIO;
+import com.lapissea.cfs.io.ChunkChainIO;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.bit.FlagReader;
@@ -25,7 +25,7 @@ import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.*;
 
-public final class Chunk implements IOInterface, IterablePP<Chunk>{
+public final class Chunk implements RandomIO.Creator, IterablePP<Chunk>{
 	
 	private static final NumberSize FLAGS_SIZE=NumberSize.BYTE;
 	private static final long       MIN_HEADER_SIZE;
@@ -43,7 +43,7 @@ public final class Chunk implements IOInterface, IterablePP<Chunk>{
 	}
 	
 	public static Chunk readChunk(@NotNull ChunkDataProvider provider, @NotNull ChunkPointer pointer) throws IOException{
-		if(provider.getSource().getSize()<pointer.add(MIN_HEADER_SIZE)) throw new MalformedPointerException(pointer.toString());
+		if(provider.getSource().getIOSize()<pointer.add(MIN_HEADER_SIZE)) throw new MalformedPointerException(pointer.toString());
 		Chunk chunk=new Chunk(provider, pointer);
 		chunk.readHeader();
 		return chunk;
@@ -141,7 +141,7 @@ public final class Chunk implements IOInterface, IterablePP<Chunk>{
 	
 	@Override
 	public RandomIO io() throws IOException{
-		return new ChunkIO(this);
+		return new ChunkChainIO(this);
 	}
 	
 	public long dataStart(){
@@ -156,7 +156,6 @@ public final class Chunk implements IOInterface, IterablePP<Chunk>{
 	public ChunkPointer getPtr(){
 		return ptr;
 	}
-	@Override
 	public long getSize(){
 		return size;
 	}
@@ -174,7 +173,6 @@ public final class Chunk implements IOInterface, IterablePP<Chunk>{
 		setSize(getSize()+amount);
 	}
 	
-	@Override
 	public void setSize(long newSize){
 		if(this.size==newSize) return;
 		assert newSize<=getCapacity():newSize+" > "+getCapacity();
@@ -183,12 +181,10 @@ public final class Chunk implements IOInterface, IterablePP<Chunk>{
 		this.size=newSize;
 	}
 	
-	@Override
 	public long getCapacity(){
 		return capacity;
 	}
 	
-	@Override
 	public boolean isReadOnly(){
 		return provider.isReadOnly();
 	}
@@ -336,8 +332,7 @@ public final class Chunk implements IOInterface, IterablePP<Chunk>{
 		       getPtr().equals(chunk.getPtr())&&
 		       getBodyNumSize()==chunk.getBodyNumSize()&&
 		       nextSize==chunk.nextSize&&
-		       Objects.equals(getNextPtr(), chunk.getNextPtr())&&
-		       Objects.equals(provider, chunk.provider);
+		       Objects.equals(getNextPtr(), chunk.getNextPtr());
 	}
 	
 	@Override

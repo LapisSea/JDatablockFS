@@ -8,7 +8,7 @@ import java.util.Objects;
 
 import static com.lapissea.cfs.GlobalConfig.*;
 
-public class ChunkIO implements RandomIO{
+public class ChunkChainIO implements RandomIO{
 	
 	public final Chunk head;
 	
@@ -19,7 +19,7 @@ public class ChunkIO implements RandomIO{
 	
 	private final RandomIO source;
 	
-	public ChunkIO(Chunk head) throws IOException{
+	public ChunkChainIO(Chunk head) throws IOException{
 		this.head=head;
 		restartCursor();
 		source=head.getProvider().getSource().io();
@@ -342,10 +342,6 @@ public class ChunkIO implements RandomIO{
 			
 			long newSize=Math.min(remaining, oldSize);
 
-//			if(newSize<chunk.getSize()){
-//				chunk.zeroOutFromTo(newSize);
-//			}
-			
 			chunk.modifyAndSave(c->c.setSize(newSize));
 			
 			remaining=Math.max(0, remaining-newSize);

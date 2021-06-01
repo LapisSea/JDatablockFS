@@ -158,12 +158,11 @@ public class IOFileData implements IOInterface, AutoCloseable{
 	public RandomIO io(){ return new FIleRandomIO(); }
 	
 	@Override
-	public void setSize(long requestedSize){ throw new UnsupportedOperationException(); }
+	public void setIOSize(long requestedSize){ throw new UnsupportedOperationException(); }
 	
 	@Override
-	public long getSize() throws IOException{ return getSource().length(); }
+	public long getIOSize() throws IOException{ return getSource().length(); }
 	
-	@Override
 	public long getCapacity() throws IOException{ return getSource().length(); }
 	
 	@Override
@@ -171,7 +170,6 @@ public class IOFileData implements IOInterface, AutoCloseable{
 		return readOnly;
 	}
 	
-	@Override
 	public void setCapacity(long newCapacity) throws IOException{ getSource().setLength(newCapacity); }
 	
 	@Override
