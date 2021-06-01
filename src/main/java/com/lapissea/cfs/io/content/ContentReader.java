@@ -7,10 +7,30 @@ import com.lapissea.util.ZeroArrays;
 import java.io.ByteArrayInputStream;
 import java.io.EOFException;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.Objects;
 
 @SuppressWarnings({"PointlessBitwiseExpression", "PointlessArithmeticExpression"})
 public interface ContentReader extends AutoCloseable, ContentBuff{
+	
+	default void read(ByteBuffer buff) throws IOException{
+		int b=read();
+		if(b<0) throw new EOFException();
+		buff.put((byte)b);
+	}
+	default int read(ByteBuffer buff, int length) throws IOException{
+		if(length>buff.remaining()) throw new IndexOutOfBoundsException("reading "+length+" remaining "+buff.remaining());
+		
+		if(buff.hasArray()&&!buff.isReadOnly()){
+			return read(buff.array(), buff.position(), length);
+		}
+		byte[] bb  =new byte[Math.min(length, 1024)];
+		int    read=read(bb);
+		if(read>0){
+			buff.put(bb, 0, read);
+		}
+		return read;
+	}
 	
 	int read() throws IOException;
 	
@@ -348,5 +368,17 @@ public interface ContentReader extends AutoCloseable, ContentBuff{
 			in instanceof ContentInputStream.BA||
 			in instanceof ContentInputStream.BB||
 			in instanceof ByteArrayInputStream;
+	}
+	
+	default long transferTo(ContentWriter out) throws IOException{
+		Objects.requireNonNull(out);
+		long   transferred=0;
+		byte[] buffer     =new byte[8192];
+		int    read;
+		while((read=this.read(buffer, 0, 8192))>=0){
+			out.write(buffer, 0, read);
+			transferred+=read;
+		}
+		return transferred;
 	}
 }

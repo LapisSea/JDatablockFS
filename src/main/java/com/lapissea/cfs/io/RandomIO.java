@@ -15,6 +15,7 @@ import com.lapissea.util.function.UnsafeFunction;
 
 import java.io.Flushable;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.util.Objects;
 
 public interface RandomIO extends Flushable, ContentWriter, ContentReader{
@@ -155,12 +156,15 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 			}
 		}
 		
-		default void transferTo(IOInterface dest) throws IOException{ transferTo(dest, true); }
-		
 		default void transferTo(IOInterface dest, boolean trimOnClose) throws IOException{
 			try(var in=read();
 			    var out=dest.write(trimOnClose)){
-				in.transferTo(out);
+				in.transferTo((OutputStream)out);
+			}
+		}
+		default void transferTo(ContentWriter dest) throws IOException{
+			try(var in=read()){
+				in.transferTo(dest);
 			}
 		}
 	}

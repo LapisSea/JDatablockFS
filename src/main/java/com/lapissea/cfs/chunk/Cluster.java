@@ -3,7 +3,6 @@ package com.lapissea.cfs.chunk;
 import com.lapissea.cfs.exceptions.MalformedFileException;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.content.ContentReader;
-import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.instancepipe.ContiguousPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
@@ -13,27 +12,27 @@ import com.lapissea.cfs.type.field.annotations.IOFieldMark;
 import com.lapissea.util.LogUtil;
 
 import java.io.IOException;
-import java.util.Arrays;
+import java.nio.ByteBuffer;
 
 import static com.lapissea.cfs.objects.NumberSize.*;
 import static java.nio.charset.StandardCharsets.*;
 
 public class Cluster implements ChunkDataProvider{
 	
-	private static final byte[] MAGIC_ID="CC.DB/FS".getBytes(UTF_8);
+	private static final ByteBuffer MAGIC_ID=ByteBuffer.wrap("CC.DB/FS".getBytes(UTF_8));
 	
 	private static final NumberSize   FIRST_CHUNK_PTR_SIZE=LARGEST;
-	private static final ChunkPointer FIRST_CHUNK_PTR     =ChunkPointer.of(MAGIC_ID.length+FIRST_CHUNK_PTR_SIZE.bytes);
+	private static final ChunkPointer FIRST_CHUNK_PTR     =ChunkPointer.of(MAGIC_ID.limit()+FIRST_CHUNK_PTR_SIZE.bytes);
 	
-	private static void readMagic(ContentReader src) throws IOException{
-		var magicId=src.readInts1(MAGIC_ID.length);
-		if(!Arrays.equals(magicId, MAGIC_ID)){
-			throw new MalformedFileException(new String(magicId, UTF_8)+" is not a valid magic id");
-		}
+	public static ByteBuffer getMagicId(){
+		return MAGIC_ID.asReadOnlyBuffer();
 	}
 	
-	public static void writeMagic(ContentWriter dest) throws IOException{
-		dest.write(MAGIC_ID);
+	private static void readMagic(ContentReader src) throws IOException{
+		var magicId=ByteBuffer.wrap(src.readInts1(MAGIC_ID.limit()));
+		if(!magicId.equals(MAGIC_ID)){
+			throw new MalformedFileException(UTF_8.decode(magicId)+" is not a valid magic id");
+		}
 	}
 	
 	public static void init(IOInterface data) throws IOException{

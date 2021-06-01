@@ -49,7 +49,7 @@ public interface ChunkDataProvider{
 		var data=new MemoryData.Arr();
 		
 		try(var io=data.io()){
-			Cluster.writeMagic(io);
+			io.write(Cluster.getMagicId());
 		}catch(IOException e){
 			throw new RuntimeException(e);
 		}

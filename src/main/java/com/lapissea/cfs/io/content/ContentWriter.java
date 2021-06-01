@@ -2,14 +2,28 @@ package com.lapissea.cfs.io.content;
 
 import com.lapissea.cfs.BufferErrorSupplier;
 import com.lapissea.cfs.io.ContentBuff;
+import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.util.function.BiIntConsumer;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 @SuppressWarnings({"PointlessBitwiseExpression", "PointlessArithmeticExpression"})
 public interface ContentWriter extends AutoCloseable, ContentBuff{
 	
+	default void write(ByteBuffer b) throws IOException{
+		write(b, b.position(), b.remaining());
+	}
+	default void write(ByteBuffer b, int off, int len) throws IOException{
+		if(b.hasArray()&&!b.isReadOnly()){
+			write(b.array(), off, len);
+		}else{
+			try(var io=MemoryData.from(b.slice(b.position(), b.limit()-b.position()), true).io()){
+				io.transferTo(this);
+			}
+		}
+	}
 	void write(int b) throws IOException;
 	
 	default void write(byte[] b) throws IOException{
