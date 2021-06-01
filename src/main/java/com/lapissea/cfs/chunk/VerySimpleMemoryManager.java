@@ -37,7 +37,7 @@ public class VerySimpleMemoryManager implements MemoryManager{
 			Utils.zeroFill(io::write, chunk.getCapacity());
 		}
 		
-		context.getChunkCache().put(chunk.getPtr(), chunk);
+		context.getChunkCache().add(chunk);
 		return chunk;
 	}
 }

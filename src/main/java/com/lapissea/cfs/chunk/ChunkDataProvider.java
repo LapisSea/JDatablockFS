@@ -7,9 +7,6 @@ import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.util.function.UnsafeBiConsumer;
 
 import java.io.IOException;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Objects;
 import java.util.stream.LongStream;
 
@@ -18,9 +15,9 @@ import static com.lapissea.cfs.GlobalConfig.*;
 public interface ChunkDataProvider{
 	
 	class VerySimple implements ChunkDataProvider{
-		private final Map<ChunkPointer, Chunk> cache        =Collections.synchronizedMap(new HashMap<>());
-		private final MemoryManager            memoryManager=new VerySimpleMemoryManager(this);
-		private final IOInterface              data;
+		private final ChunkCache    cache        =new ChunkCache();
+		private final MemoryManager memoryManager=new VerySimpleMemoryManager(this);
+		private final IOInterface   data;
 		
 		public VerySimple(IOInterface data){
 			this.data=data;
@@ -35,7 +32,7 @@ public interface ChunkDataProvider{
 			return memoryManager;
 		}
 		@Override
-		public Map<ChunkPointer, Chunk> getChunkCache(){
+		public ChunkCache getChunkCache(){
 			return cache;
 		}
 		@Override
@@ -69,7 +66,7 @@ public interface ChunkDataProvider{
 	IOInterface getSource();
 	MemoryManager getMemoryManager();
 	
-	Map<ChunkPointer, Chunk> getChunkCache();
+	ChunkCache getChunkCache();
 	
 	default Chunk getChunkCached(ChunkPointer ptr){
 		Objects.requireNonNull(ptr);
@@ -84,9 +81,11 @@ public interface ChunkDataProvider{
 			if(!read.equals(cached)) throw new DesyncedCacheException(read, cached);
 		}
 		
-		var read=Chunk.readChunk(this, ptr);
-		getChunkCache().put(ptr, read);
-		return read;
+		return getChunkCache().getOr(ptr, this::readChunk);
+	}
+	
+	private Chunk readChunk(ChunkPointer ptr) throws IOException{
+		return Chunk.readChunk(this, ptr);
 	}
 	
 	default boolean isReadOnly(){

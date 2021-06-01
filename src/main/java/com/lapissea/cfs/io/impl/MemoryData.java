@@ -293,7 +293,7 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		}
 		
 		public Arr(boolean readOnly){
-			this(new byte[4], 0, readOnly);
+			this(new byte[32], 0, readOnly);
 		}
 		
 		public Arr(byte[] data, int used, boolean readOnly){
@@ -348,7 +348,7 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		}
 		
 		public Buff(boolean readOnly){
-			this(ByteBuffer.allocate(4), 0, readOnly);
+			this(ByteBuffer.allocate(32), 0, readOnly);
 		}
 		
 		public Buff(ByteBuffer data, int used, boolean readOnly){

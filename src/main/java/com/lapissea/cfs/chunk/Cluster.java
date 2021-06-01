@@ -15,7 +15,6 @@ import com.lapissea.util.WeakValueHashMap;
 
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Map;
 
 import static com.lapissea.cfs.objects.NumberSize.*;
 import static java.nio.charset.StandardCharsets.*;
@@ -76,7 +75,7 @@ public class Cluster implements ChunkDataProvider{
 		
 	}
 	
-	private final Map<ChunkPointer, Chunk> chunkCache=new WeakValueHashMap<>();
+	private final ChunkCache chunkCache=new ChunkCache(()->new WeakValueHashMap<ChunkPointer, Chunk>().defineStayAlivePolicy(10));
 	
 	private final IOInterface   source;
 	private final MemoryManager memoryManager=new VerySimpleMemoryManager(this);
@@ -107,7 +106,7 @@ public class Cluster implements ChunkDataProvider{
 	}
 	
 	@Override
-	public Map<ChunkPointer, Chunk> getChunkCache(){
+	public ChunkCache getChunkCache(){
 		return chunkCache;
 	}
 }
