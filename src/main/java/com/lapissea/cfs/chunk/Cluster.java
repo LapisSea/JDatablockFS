@@ -11,7 +11,6 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.annotations.IOFieldDependency;
 import com.lapissea.cfs.type.field.annotations.IOFieldMark;
 import com.lapissea.util.LogUtil;
-import com.lapissea.util.WeakValueHashMap;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -75,7 +74,7 @@ public class Cluster implements ChunkDataProvider{
 		
 	}
 	
-	private final ChunkCache chunkCache=new ChunkCache(()->new WeakValueHashMap<ChunkPointer, Chunk>().defineStayAlivePolicy(10));
+	private final ChunkCache chunkCache=ChunkCache.weak();
 	
 	private final IOInterface   source;
 	private final MemoryManager memoryManager=new VerySimpleMemoryManager(this);

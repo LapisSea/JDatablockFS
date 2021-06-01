@@ -4,6 +4,7 @@ import com.lapissea.cfs.exceptions.DesyncedCacheException;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
+import com.lapissea.util.WeakValueHashMap;
 import com.lapissea.util.function.UnsafeFunction;
 
 import java.util.Collections;
@@ -14,11 +15,15 @@ import java.util.function.Supplier;
 
 public class ChunkCache{
 	
+	public static ChunkCache strong(){
+		return new ChunkCache(()->Collections.synchronizedMap(new HashMap<>()));
+	}
+	public static ChunkCache weak(){
+		return new ChunkCache(()->Collections.synchronizedMap(new WeakValueHashMap<ChunkPointer, Chunk>().defineStayAlivePolicy(10)));
+	}
+	
 	private final Map<ChunkPointer, Chunk> data;
 	
-	public ChunkCache(){
-		this(()->Collections.synchronizedMap(new HashMap<>()));
-	}
 	public ChunkCache(Supplier<Map<ChunkPointer, Chunk>> newData){
 		data=Objects.requireNonNull(newData.get());
 	}

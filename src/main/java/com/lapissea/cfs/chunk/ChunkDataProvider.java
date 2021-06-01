@@ -15,7 +15,7 @@ import static com.lapissea.cfs.GlobalConfig.*;
 public interface ChunkDataProvider{
 	
 	class VerySimple implements ChunkDataProvider{
-		private final ChunkCache    cache        =new ChunkCache();
+		private final ChunkCache    cache        =ChunkCache.strong();
 		private final MemoryManager memoryManager=new VerySimpleMemoryManager(this);
 		private final IOInterface   data;
 		
