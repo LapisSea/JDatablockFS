@@ -4,28 +4,22 @@ import com.lapissea.cfs.io.bit.BitReader;
 import com.lapissea.cfs.io.bit.BitWriter;
 import com.lapissea.cfs.io.bit.EnumUniverse;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.IFieldAccessor;
 
 import java.io.IOException;
-import java.util.OptionalLong;
 
 public class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> extends IOField.Bit<T, E>{
 	
-	private final EnumUniverse<E> enumUniverse;
+	private final EnumUniverse<E>   enumUniverse;
+	private final SizeDescriptor<T> sizeDescriptor;
 	
 	public IOFieldEnum(IFieldAccessor<T> field){
 		super(field);
 		enumUniverse=EnumUniverse.getUnknown(field.getType());
-	}
-	
-	@Override
-	public long calcSize(T instance){
-		return enumUniverse.bitSize;
-	}
-	@Override
-	public OptionalLong getFixedSize(){
-		return OptionalLong.of(enumUniverse.bitSize);
+		sizeDescriptor=new SizeDescriptor.Fixed<>(WordSpace.BIT, enumUniverse.bitSize);
 	}
 	
 	@Override
@@ -41,5 +35,10 @@ public class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> extends IOF
 	@Override
 	public boolean instancesEqual(T inst1, T inst2){
 		return get(inst1)==get(inst2);
+	}
+	
+	@Override
+	public SizeDescriptor<T> getSizeDescriptor(){
+		return sizeDescriptor;
 	}
 }

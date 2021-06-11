@@ -1,6 +1,7 @@
 package com.lapissea.cfs.type.field;
 
 import com.lapissea.cfs.Index;
+import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.DepSort;
@@ -15,7 +16,9 @@ import com.lapissea.util.TextUtil;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.OptionalLong;
 import java.util.function.Function;
+import java.util.function.ToLongFunction;
 import java.util.stream.Collectors;
 
 public class IOFieldTools{
@@ -44,8 +47,7 @@ public class IOFieldTools{
 		};
 		
 		for(IOField<T, ?> field : mapData){
-			if(field.getWordSpace()==WordSpace.BIT){
-				//noinspection unchecked
+			if(field.getSizeDescriptor().getWordSpace()==WordSpace.BIT){
 				bitBuilder.add((IOField.Bit<T, ?>)field);
 				continue;
 			}
@@ -64,8 +66,8 @@ public class IOFieldTools{
 	public static <T extends IOInstance<T>> Index computeDependencyIndex(List<IOField<T, ?>> fields){
 		try{
 			return new DepSort<>(fields, f->f.getDependencies().stream().mapToInt(fields::indexOf))
-				       .sort(Comparator.comparingInt((IOField<T, ?> f)->f.getWordSpace().sortOrder)
-				                       .thenComparingInt(f->f.getFixedSize().isPresent()?0:1)
+				       .sort(Comparator.comparingInt((IOField<T, ?> f)->f.getSizeDescriptor().getWordSpace().sortOrder)
+				                       .thenComparingInt(f->f.getSizeDescriptor().fixed().isPresent()?0:1)
 				                       .thenComparing(f->switch(f.getDependencies().size()){
 					                       case 0 -> "";
 					                       case 1 -> f.getDependencies().get(0).getName();
@@ -84,5 +86,12 @@ public class IOFieldTools{
 		var opt=field.getStruct().getFieldsByType(NumberSize.class).filter(f->f.getName().equals(dynSiz.value())).findAny();
 		if(opt.isEmpty()) throw new ShouldNeverHappenError("This should have been checked in annotation logic");
 		return opt.get();
+	}
+	
+	public static <T extends IOInstance<T>> OptionalLong sumVarsIfAll(List<? extends IOField<T, ?>> fields, Function<SizeDescriptor<T>, OptionalLong> mapper){
+		return fields.stream().map(IOField::getSizeDescriptor).map(mapper).reduce(OptionalLong.of(0), Utils::addIfBoth);
+	}
+	public static <T extends IOInstance<T>> long sumVars(List<? extends IOField<T, ?>> fields, ToLongFunction<SizeDescriptor<T>> mapper){
+		return fields.stream().map(IOField::getSizeDescriptor).mapToLong(mapper).sum();
 	}
 }

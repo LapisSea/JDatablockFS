@@ -31,22 +31,12 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator{
 	private static final Struct<Chunk>               STRUCT=Struct.of(Chunk.class);
 	private static final ContiguousStructPipe<Chunk> PIPE  =ContiguousStructPipe.of(STRUCT);
 	
-	private static final long MIN_HEADER_SIZE;
-	
-	static{
-		Chunk c=new Chunk(null, null);
-		c.bodyNumSize=c.calcBodyNumSize();
-		c.nextSize=NumberSize.VOID;
-		c.calcHeaderSize();
-		MIN_HEADER_SIZE=c.headerSize;
-	}
-	
 	public static ChunkPointer getPtr(Chunk chunk){
 		return chunk==null?null:chunk.getPtr();
 	}
 	
 	public static Chunk readChunk(@NotNull ChunkDataProvider provider, @NotNull ChunkPointer pointer) throws IOException{
-		if(provider.getSource().getIOSize()<pointer.add(MIN_HEADER_SIZE)) throw new MalformedPointerException(pointer.toString());
+		if(provider.getSource().getIOSize()<pointer.add(PIPE.getSizeDescriptor().min())) throw new MalformedPointerException(pointer.toString());
 		Chunk chunk=new Chunk(provider, pointer);
 		chunk.readHeader();
 		return chunk;
@@ -103,7 +93,7 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator{
 	}
 	
 	private void calcHeaderSize(){
-		headerSize=(int)PIPE.calcSize(this);
+		headerSize=(int)PIPE.getSizeDescriptor().variable(this);
 	}
 	
 	private NumberSize calcBodyNumSize(){

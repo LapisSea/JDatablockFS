@@ -1,5 +1,6 @@
 package com.lapissea.cfs;
 
+import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 
@@ -7,13 +8,12 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.invoke.*;
 import java.lang.reflect.*;
-import java.util.*;
-import java.util.function.BiFunction;
+import java.util.Arrays;
+import java.util.Map;
+import java.util.OptionalLong;
 import java.util.function.IntFunction;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 import static com.lapissea.util.UtilL.*;
 
@@ -102,7 +102,6 @@ public class Utils{
 			                                            handle,
 			                                            handle.type());
 			
-			//noinspection unchecked
 			return (T)site.getTarget().invoke();
 		}catch(Throwable e){
 			throw new RuntimeException("failed to create lambda\n"+method+"\n"+functionalInterface, e);
@@ -132,7 +131,6 @@ public class Utils{
 			                                            handle,
 			                                            handle.type());
 			
-			//noinspection unchecked
 			return (T)site.getTarget().invoke();
 		}catch(Throwable e){
 			throw new RuntimeException("failed to create lambda\n"+constructor+"\n"+functionalInterface, e);
@@ -149,48 +147,24 @@ public class Utils{
 		}
 	}
 	
-	public static <T> T findConstructorInstance(Class<T> rwClass, List<Map.Entry<Supplier<Stream<Class<?>>>, Supplier<Stream<Object>>>> definition){
-		return definition.stream()
-		                 .map(e->{
-			                 Class<?>[]     argTypes=e.getKey().get().toArray(Class[]::new);
-			                 Constructor<T> constr;
-			                 try{
-				                 constr=rwClass.getConstructor(argTypes);
-			                 }catch(NoSuchMethodException instantiationException){
-				                 return null;
-			                 }
-			                 if(!constr.canAccess(null)) return null;
-			                 try{
-				                 return constr.newInstance(e.getValue().get().toArray(Object[]::new));
-			                 }catch(InvocationTargetException e1){
-				                 throw uncheckedThrow(e1.getCause());
-			                 }catch(InstantiationException|IllegalAccessException e1){
-				                 throw new RuntimeException(e1);
-			                 }
-		                 })
-		                 .filter(Objects::nonNull)
-		                 .findFirst()
-		                 .orElseThrow(()->new RuntimeException("cannot construct "+rwClass.getName()));
-	}
-	
-	public static <T> Constructor<T> tryMapConstructor(Class<T> rwClass, List<Supplier<Stream<Class<?>>>> definition) throws ReflectiveOperationException{
-		return tryMapConstructor(rwClass, definition, (i, e)->e);
-	}
-	
-	public static <T, L> L tryMapConstructor(Class<T> rwClass, List<Supplier<Stream<Class<?>>>> definition, BiFunction<Integer, Constructor<T>, L> mapper) throws ReflectiveOperationException{
-		return IntStream.range(0, definition.size())
-		                .mapToObj(e->{
-			                try{
-				                return Map.entry(e, rwClass.getConstructor(definition.get(e).get().toArray(Class[]::new)));
-			                }catch(ReflectiveOperationException ignored){
-				                return null;
-			                }
-		                })
-		                .filter(Objects::nonNull)
-		                .map(e->mapper.apply(e.getKey(), e.getValue()))
-		                .findFirst()
-		                .orElseThrow(()->new ReflectiveOperationException("cannot find constructor "+rwClass.getName()));
-		
+	public static <FInter, T extends FInter> T findConstructor(Class<?> clazz, Class<FInter> functionalInterface, Class<?>... parameterTypes){
+		try{
+			var lconst=clazz.getConstructor(parameterTypes);
+			return Utils.makeLambda(lconst, functionalInterface);
+		}catch(ReflectiveOperationException ce){
+			
+			try{
+				Method of=clazz.getMethod("of", parameterTypes);
+				if(!Modifier.isStatic(of.getModifiers())) throw new ReflectiveOperationException(of+" not static");
+				if(!Modifier.isPublic(of.getModifiers())) throw new ReflectiveOperationException(of+" not public");
+				if(!of.getReturnType().equals(clazz)) throw new ReflectiveOperationException(of+" does not return "+clazz);
+				
+				return Utils.makeLambda(of, functionalInterface);
+			}catch(ReflectiveOperationException ofe){
+				ofe.addSuppressed(ce);
+				throw new MalformedStructLayout(clazz.getName()+" does not have a valid constructor or of static method with arguments of "+Arrays.toString(parameterTypes), ofe);
+			}
+		}
 	}
 	
 	public static int floatToShortBits(float fval){

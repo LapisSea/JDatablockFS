@@ -2,7 +2,13 @@ package test.junit;
 
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.ChunkDataProvider;
+import com.lapissea.cfs.objects.ContiguousIOList;
+import com.lapissea.cfs.objects.IOList;
+import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.field.annotations.IOValue;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -76,6 +82,39 @@ public class GeneralTests{
 		
 		var readBody=chunk.readAll();
 		assertArrayEquals(bodyData, readBody);
+	}
+	
+	static class Dummy extends IOInstance<Dummy>{
+		
+		@IOValue
+		int dummyValue;
+		
+		public Dummy(){
+		}
+		public Dummy(int dummyValue){
+			this.dummyValue=dummyValue;
+		}
+	}
+	
+	@Test
+	void testContiguousIOList() throws IOException{
+		var provider=ChunkDataProvider.newVerySimpleProvider();
+//		var provider=ChunkDataProvider.newVerySimpleProvider((data, ids)->LogUtil.println(data));
+		
+		
+		var chunk=AllocateTicket.bytes(64).submit(provider);
+		
+		var ref=chunk.getPtr().makeReference(0);
+		var typ=Struct.of(Dummy.class);
+		
+		IOList<Dummy> list=new ContiguousIOList<>(provider, ref, typ);
+		
+		list.add(new Dummy(69));
+		list.add(new Dummy(420));
+		
+		IOList<Dummy> read=new ContiguousIOList<>(provider, ref, typ);
+		
+		assertEquals(list, read);
 	}
 	
 }

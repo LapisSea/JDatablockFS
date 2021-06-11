@@ -6,12 +6,14 @@ import com.lapissea.cfs.io.bit.BitOutputStream;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.IOFieldTools;
+import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.OptionalLong;
 import java.util.stream.Collectors;
 
 import static com.lapissea.cfs.GlobalConfig.*;
@@ -20,23 +22,28 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 	
 	private final List<IOField.Bit<T, ?>> group;
 	
-	private final OptionalLong fixedSize;
+	private final SizeDescriptor<T> sizeDescriptor;
+	
 	
 	public BitFieldMerger(List<IOField.Bit<T, ?>> group){
 		super(null);
 		assert !group.isEmpty();
 		this.group=List.copyOf(group);
-		fixedSize=Utils.bitToByte(group.stream().map(IOField.Bit::getFixedSize).reduce(OptionalLong.of(0), Utils::addIfBoth));
+		
+		var fixedSize=Utils.bitToByte(IOFieldTools.sumVarsIfAll(group, SizeDescriptor::fixed));
+		if(fixedSize.isPresent()) sizeDescriptor=new SizeDescriptor.Fixed<>(WordSpace.BYTE, fixedSize.getAsLong());
+		else sizeDescriptor=new SizeDescriptor.Unknown<>(WordSpace.BYTE, IOFieldTools.sumVars(group, SizeDescriptor::min), IOFieldTools.sumVarsIfAll(group, SizeDescriptor::max)){
+			@Override
+			public long variable(T instance){
+				return Utils.bitToByte(group.stream().mapToLong(s->s.getSizeDescriptor().variable(instance)).sum());
+			}
+		};
 		initCommon(group.stream().flatMap(f->f.getDependencies().stream()).distinct().toList());
 	}
 	
 	@Override
-	public long calcSize(T instance){
-		return Utils.bitToByte(group.stream().mapToLong(s->s.calcSize(instance)).sum());
-	}
-	@Override
-	public OptionalLong getFixedSize(){
-		return fixedSize;
+	public SizeDescriptor<T> getSizeDescriptor(){
+		return sizeDescriptor;
 	}
 	
 	@Override
@@ -45,10 +52,11 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 		try(var stream=new BitOutputStream(dest)){
 			for(var fi : group){
 				if(DEBUG_VALIDATION){
+					var  sizeD=fi.getSizeDescriptor();
 					long size;
-					var  fixed=fi.getFixedSize();
+					var  fixed=sizeD.fixed();
 					if(fixed.isPresent()) size=fixed.getAsLong();
-					else size=fi.calcSize(instance);
+					else size=sizeD.variable(instance);
 					var oldW=stream.getTotalBits();
 					
 					try{
@@ -74,10 +82,11 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 		try(var stream=new BitInputStream(src)){
 			for(var fi : group){
 				if(DEBUG_VALIDATION){
+					var  sizeD=fi.getSizeDescriptor();
 					long size;
-					var  fixed=fi.getFixedSize();
+					var  fixed=sizeD.fixed();
 					if(fixed.isPresent()) size=fixed.getAsLong();
-					else size=fi.calcSize(instance);
+					else size=sizeD.variable(instance);
 					var oldW=stream.getTotalBits();
 					
 					fi.readBits(stream, instance);

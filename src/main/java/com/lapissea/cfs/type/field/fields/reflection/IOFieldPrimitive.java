@@ -8,13 +8,13 @@ import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
+import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.IFieldAccessor;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.EnumSet;
 import java.util.Objects;
-import java.util.OptionalLong;
 import java.util.function.Function;
 
 import static com.lapissea.cfs.objects.NumberSize.*;
@@ -322,16 +322,6 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
-		public long calcSize(T instance){
-			return 1;
-		}
-		@Override
-		public OptionalLong getFixedSize(){
-			return OptionalLong.of(1);
-		}
-		
-		
-		@Override
 		public void writeBits(BitWriter<?> dest, T instance) throws IOException{
 			dest.writeBoolBit(getValue(instance));
 		}
@@ -348,10 +338,16 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		public int instanceHashCode(T instance){
 			return Boolean.hashCode(getValue(instance));
 		}
+		
+		@Override
+		public SizeDescriptor<T> getSizeDescriptor(){
+			return SizeDescriptor.Fixed.singleBit();
+		}
 	}
 	
 	private final NumberSize              size;
 	private       Function<T, NumberSize> dynamicSize;
+	private       SizeDescriptor<T>       sizeDescriptor;
 	
 	protected IOFieldPrimitive(IFieldAccessor<T> field, NumberSize size){
 		super(field);
@@ -361,14 +357,24 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 	@Override
 	public void init(){
 		super.init();
-		var field=IOFieldTools.getDynamicSize(getAccessor());
+		var field  =IOFieldTools.getDynamicSize(getAccessor());
+		var allowed=allowedSizes();
 		if(field!=null){
-			var allowed=allowedSizes();
 			dynamicSize=instance->{
 				var val=field.get(instance);
 				if(!allowed.contains(val)) throw new IllegalStateException(val+" is not an allowed size in "+allowed);
 				return val;
 			};
+			sizeDescriptor=new SizeDescriptor.Unknown<>(
+				allowed.stream().mapToLong(NumberSize::bytes).min().orElse(0),
+				allowed.stream().mapToLong(NumberSize::bytes).max()){
+				@Override
+				public long variable(T instance){
+					return getSize(instance).bytes;
+				}
+			};
+		}else{
+			sizeDescriptor=new SizeDescriptor.Fixed<>(size.bytes);
 		}
 	}
 	
@@ -385,11 +391,7 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 	}
 	
 	@Override
-	public final long calcSize(T instance){
-		return getSize(instance).bytes;
-	}
-	@Override
-	public final OptionalLong getFixedSize(){
-		return dynamicSize!=null?OptionalLong.empty():OptionalLong.of(size.bytes);
+	public SizeDescriptor<T> getSizeDescriptor(){
+		return sizeDescriptor;
 	}
 }

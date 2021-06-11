@@ -8,7 +8,6 @@ import com.lapissea.cfs.io.bit.BitWriter;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.access.IFieldAccessor;
 import com.lapissea.util.TextUtil;
 
@@ -31,10 +30,6 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		protected Bit(IFieldAccessor<T> field){
 			super(field);
 		}
-		@Override
-		public WordSpace getWordSpace(){
-			return WordSpace.BIT;
-		}
 		
 		@Deprecated
 		@Override
@@ -42,7 +37,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 			try(var writer=new BitOutputStream(dest)){
 				writeBits(writer, instance);
 				if(DEBUG_VALIDATION){
-					writer.requireWritten(calcSize(instance));
+					writer.requireWritten(getSizeDescriptor().variable(instance));
 				}
 			}
 		}
@@ -53,7 +48,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 			try(var reader=new BitInputStream(src)){
 				readBits(reader, instance);
 				if(DEBUG_VALIDATION){
-					reader.requireRead(calcSize(instance));
+					reader.requireRead(getSizeDescriptor().variable(instance));
 				}
 			}
 		}
@@ -78,10 +73,6 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		Objects.requireNonNull(deps);
 		Utils.requireNull(dependencies);
 		dependencies=deps;
-	}
-	
-	public WordSpace getWordSpace(){
-		return WordSpace.BYTE;
 	}
 	
 	public List<IOField<T, ?>> getDependencies(){
@@ -113,19 +104,25 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		getAccessor().set(instance, value);
 	}
 	
-	public final long calcByteSize(T instance){
-		var size=calcSize(instance);
-		return switch(getWordSpace()){
-			case BIT -> Utils.bitToByte(size);
-			case BYTE -> size;
-		};
-	}
-	
-	public abstract long calcSize(T instance);
-	public abstract OptionalLong getFixedSize();
+	public abstract SizeDescriptor<T> getSizeDescriptor();
 	
 	public abstract void write(ContentWriter dest, T instance) throws IOException;
 	public abstract void read(ContentReader src, T instance) throws IOException;
+	
+	public final void writeReported(ContentWriter dest, T instance) throws IOException{
+		try{
+			write(dest, instance);
+		}catch(Exception e){
+			throw new IOException("Failed to write "+TextUtil.toString(this), e);
+		}
+	}
+	public final void readReported(ContentReader src, T instance) throws IOException{
+		try{
+			read(src, instance);
+		}catch(Exception e){
+			throw new IOException("Failed to read "+TextUtil.toString(this), e);
+		}
+	}
 	
 	/**
 	 * @return string of the resolved value or null if string has no substance

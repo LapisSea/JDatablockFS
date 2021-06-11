@@ -1,7 +1,7 @@
 package com.lapissea.cfs.objects;
 
 import com.lapissea.cfs.chunk.Chunk;
-import com.lapissea.cfs.chunk.Cluster;
+import com.lapissea.cfs.chunk.ChunkDataProvider;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.util.NotNull;
 
@@ -48,8 +48,8 @@ public final class ChunkPointer implements INumber{
 		return value;
 	}
 	
-	public Chunk dereference(Cluster cluster) throws IOException{
-		return cluster.getChunk(this);
+	public Chunk dereference(ChunkDataProvider provider) throws IOException{
+		return provider.getChunk(this);
 	}
 	
 	@Override
@@ -85,4 +85,7 @@ public final class ChunkPointer implements INumber{
 		return Long.hashCode(getValue());
 	}
 	
+	public Reference makeReference(long offset){
+		return new Reference(this, offset);
+	}
 }

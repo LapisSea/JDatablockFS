@@ -20,7 +20,7 @@ import static java.nio.charset.StandardCharsets.*;
 
 public class Cluster implements ChunkDataProvider{
 	
-	private static final ByteBuffer MAGIC_ID=ByteBuffer.wrap("CC.DB/FS".getBytes(UTF_8));
+	private static final ByteBuffer MAGIC_ID=ByteBuffer.wrap("BYTE-BABE".getBytes(UTF_8)).asReadOnlyBuffer();
 	
 	private static final NumberSize   FIRST_CHUNK_PTR_SIZE=LARGEST;
 	private static final ChunkPointer FIRST_CHUNK_PTR     =ChunkPointer.of(MAGIC_ID.limit()+FIRST_CHUNK_PTR_SIZE.bytes);
@@ -46,12 +46,12 @@ public class Cluster implements ChunkDataProvider{
 		
 		Metadata metadata=new Metadata();
 		metadata.value1=300;
+		var pipe=ContiguousStructPipe.of(Metadata.class);
 		
-		AllocateTicket.bytes(metadata.calcSize())
+		AllocateTicket.bytes(pipe.getSizeDescriptor().variable(metadata))
 		              .withApproval(c->c.getPtr().equals(FIRST_CHUNK_PTR))
 		              .withDataPopulated((p, io)->{
-			              ContiguousStructPipe.of(Metadata.class)
-			                                  .write(io, metadata);
+			              pipe.write(io, metadata);
 		              })
 		              .submit(provider);
 		
@@ -73,12 +73,11 @@ public class Cluster implements ChunkDataProvider{
 	private final IOInterface   source;
 	private final MemoryManager memoryManager=new VerySimpleMemoryManager(this);
 	
-	private ChunkPointer mainChunkPtr;
-	
 	
 	public Cluster(IOInterface source) throws IOException{
 		this.source=source;
 		
+		ChunkPointer mainChunkPtr;
 		try(var io=source.read()){
 			readMagic(io);
 			mainChunkPtr=ChunkPointer.read(FIRST_CHUNK_PTR_SIZE, io);
@@ -87,8 +86,8 @@ public class Cluster implements ChunkDataProvider{
 		var      ch=mainChunkPtr.dereference(this);
 		Metadata m =new Metadata();
 		try(var io=ch.io()){
-			ContiguousStructPipe.of(Metadata.class)
-			                    .read(io, m);
+			var pipe=ContiguousStructPipe.of(Metadata.class);
+			pipe.read(io, m);
 		}
 		LogUtil.println(m);
 		m.value1=20;

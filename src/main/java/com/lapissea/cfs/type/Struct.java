@@ -1,6 +1,7 @@
 package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.GlobalConfig;
+import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.type.compilation.FieldCompiler;
 import com.lapissea.cfs.type.field.IOField;
@@ -11,6 +12,7 @@ import java.util.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 public class Struct<T extends IOInstance<T>>{
@@ -51,7 +53,6 @@ public class Struct<T extends IOInstance<T>>{
 			throw new IllegalArgumentException(instanceClass.getName()+" is not an "+IOInstance.class.getSimpleName());
 		}
 		
-		//noinspection unchecked
 		return of((Class<? extends IOInstance>)instanceClass);
 	}
 	
@@ -59,7 +60,6 @@ public class Struct<T extends IOInstance<T>>{
 		Objects.requireNonNull(instanceClass);
 		
 		try(var ignored=STRUCT_CACHE_LOCK.doLock()){
-			//noinspection unchecked
 			var cached=(Struct<T>)STRUCT_CACHE.get(instanceClass);
 			if(cached!=null) return cached;
 			
@@ -92,15 +92,15 @@ public class Struct<T extends IOInstance<T>>{
 		}
 	}
 	
-	private final Class<T>     type;
-	private final OptionalLong fixedSize;
+	private final Class<T> type;
 	
 	private final List<IOField<T, ?>> fields;
 	private final List<IOField<T, ?>> virtualFields;
 	
+	private Supplier<T> emptyConstructor;
+	
 	public Struct(Class<T> type){
 		this.type=type;
-		fixedSize=OptionalLong.empty();
 		fields=FieldCompiler.create().compile(this);
 		fields.forEach(IOField::init);
 		virtualFields=fields.stream().filter(f->f.getAccessor() instanceof VirtualAccessor).toList();
@@ -112,9 +112,6 @@ public class Struct<T extends IOInstance<T>>{
 	}
 	public Class<T> getType(){
 		return type;
-	}
-	public OptionalLong getFixedSize(){
-		return fixedSize;
 	}
 	
 	public List<IOField<T, ?>> getFields(){
@@ -146,5 +143,10 @@ public class Struct<T extends IOInstance<T>>{
 			comma=true;
 		}
 		return sb.append('}').toString();
+	}
+	
+	public Supplier<T> requireEmptyConstructor(){
+		if(emptyConstructor==null) emptyConstructor=Utils.findConstructor(getType(), Supplier.class);
+		return emptyConstructor;
 	}
 }
