@@ -15,11 +15,12 @@ public interface ContentWriter extends AutoCloseable, ContentBuff{
 	default void write(ByteBuffer b) throws IOException{
 		write(b, b.position(), b.remaining());
 	}
+	
 	default void write(ByteBuffer b, int off, int len) throws IOException{
 		if(b.hasArray()&&!b.isReadOnly()){
-			write(b.array(), off, len);
+			write(b.array(), off+b.arrayOffset(), len);
 		}else{
-			try(var io=MemoryData.from(b.slice(b.position(), b.limit()-b.position()), true).io()){
+			try(var io=MemoryData.build().withRaw(b.slice(off, len)).build().io()){
 				io.transferTo(this);
 			}
 		}

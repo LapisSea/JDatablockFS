@@ -10,12 +10,12 @@ import java.io.IOException;
 public final class ChunkPointer implements INumber{
 	
 	public static ChunkPointer read(NumberSize size, ContentReader src) throws IOException{
-		return ChunkPointer.ofNullable(size.read(src));
+		return ChunkPointer.of(size.read(src));
 	}
 	
 	@NotNull
 	public static ChunkPointer of(long value){
-		return new ChunkPointer(value);
+		return value==0?null:new ChunkPointer(value);
 	}
 	
 	@Deprecated
@@ -37,11 +37,6 @@ public final class ChunkPointer implements INumber{
 		if(value==0) throw new NullPointerException();
 		if(value<0) throw new IllegalArgumentException();
 		this.value=value;
-	}
-	
-	public static ChunkPointer ofNullable(long value){
-		if(value==0) return null;
-		return new ChunkPointer(value);
 	}
 	
 	public ChunkPointer(INumber value){

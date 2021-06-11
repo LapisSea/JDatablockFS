@@ -16,6 +16,15 @@ public class Index{
 		public final T get(int index){
 			return getUnmapped(map(index));
 		}
+		
+		@Override
+		public int size(){
+			return Index.this.size();
+		}
+		
+		public List<T> mappedCopy(){
+			return List.copyOf(this);
+		}
 	}
 	
 	private final class BList<T> extends Bound<T>{
@@ -25,10 +34,6 @@ public class Index{
 		@Override
 		protected T getUnmapped(int index){
 			return unbound.get(index);
-		}
-		@Override
-		public int size(){
-			return unbound.size();
 		}
 	}
 	
@@ -40,10 +45,6 @@ public class Index{
 		protected T getUnmapped(int index){
 			return unbound[index];
 		}
-		@Override
-		public int size(){
-			return unbound.length;
-		}
 	}
 	
 	private final int[] data;
@@ -52,7 +53,7 @@ public class Index{
 		this.data=Objects.requireNonNull(rawIndex);
 	}
 	
-	public int length(){
+	public int size(){
 		return data.length;
 	}
 	

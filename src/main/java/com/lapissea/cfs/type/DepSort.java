@@ -19,7 +19,7 @@ public class DepSort<T>{
 		
 		public final Index cycle;
 		
-		private CycleException(Index cycle, List<?> data){
+		private CycleException(Index cycle){
 			super("Dependency cycle detected! Cycle index: "+cycle);
 			this.cycle=cycle;
 		}
@@ -94,8 +94,7 @@ public class DepSort<T>{
 			if(visited.get(i)) return;
 			
 			if(stack.contains(i)){
-				stack.add(i);
-				throw new CycleException(stack.toIndex(), data);
+				throw new CycleException(stack.toIndex());
 			}
 			stack.add(i);
 			
@@ -127,10 +126,9 @@ public class DepSort<T>{
 	}
 	
 	public Index sort(IntStream orderSuggestion){
-		int[] arr  =orderSuggestion.toArray();
-		var   index=new TSort().sort(Arrays.stream(arr));
+		int[] arr=orderSuggestion.toArray();
 		
-		return index;
+		return new TSort().sort(Arrays.stream(arr));
 	}
 	
 	private IntStream getDependencies(int i){

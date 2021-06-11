@@ -1,23 +1,24 @@
 package com.lapissea.cfs.chunk;
 
-import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.exceptions.DesyncedCacheException;
 import com.lapissea.cfs.exceptions.MalformedPointerException;
 import com.lapissea.cfs.io.ChunkChainIO;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.RandomIO;
-import com.lapissea.cfs.io.bit.FlagReader;
-import com.lapissea.cfs.io.bit.FlagWriter;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
+import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
+import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.field.annotations.IODependency;
+import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -25,10 +26,12 @@ import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.*;
 
-public final class Chunk implements RandomIO.Creator, IterablePP<Chunk>{
+public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator{
 	
-	private static final NumberSize FLAGS_SIZE=NumberSize.BYTE;
-	private static final long       MIN_HEADER_SIZE;
+	private static final Struct<Chunk>               STRUCT=Struct.of(Chunk.class);
+	private static final ContiguousStructPipe<Chunk> PIPE  =ContiguousStructPipe.of(STRUCT);
+	
+	private static final long MIN_HEADER_SIZE;
 	
 	static{
 		Chunk c=new Chunk(null, null);
@@ -49,26 +52,38 @@ public final class Chunk implements RandomIO.Creator, IterablePP<Chunk>{
 		return chunk;
 	}
 	
+	@IOValue
+	private NumberSize bodyNumSize;
+	
+	@IODependency.NumSize("bodyNumSize")
+	@IOValue
+	private long capacity;
+	
+	@IODependency.NumSize("bodyNumSize")
+	@IOValue
+	private long size;
+	
+	@IOValue
+	private NumberSize nextSize;
+	
+	@IOValue
+	@IODependency.NumSize("nextSize")
+	@Nullable
+	private ChunkPointer nextPtr;
+	
+	
 	@NotNull
 	private final ChunkDataProvider provider;
 	@NotNull
 	private final ChunkPointer      ptr;
 	
-	@NotNull
-	private NumberSize bodyNumSize;
-	private long       capacity;
-	private long       size;
-	
-	@NotNull
-	private NumberSize   nextSize;
-	@Nullable
-	private ChunkPointer nextPtr;
 	
 	private int     headerSize;
 	private boolean dirty;
 	private Chunk   nextCache;
 	
 	private Chunk(ChunkDataProvider provider, ChunkPointer ptr){
+		super(STRUCT);
 		this.provider=provider;
 		this.ptr=ptr;
 	}
@@ -80,7 +95,7 @@ public final class Chunk implements RandomIO.Creator, IterablePP<Chunk>{
 		this.capacity=capacity;
 		this.size=size;
 		this.nextSize=Objects.requireNonNull(nextSize);
-		this.nextPtr=nextPtr;
+		setNextPtr(nextPtr);
 		
 		assert capacity>=size;
 		
@@ -88,9 +103,7 @@ public final class Chunk implements RandomIO.Creator, IterablePP<Chunk>{
 	}
 	
 	private void calcHeaderSize(){
-		headerSize=FLAGS_SIZE.bytes+
-		           getBodyNumSize().bytes*2+
-		           nextSize.bytes;
+		headerSize=(int)PIPE.calcSize(this);
 	}
 	
 	private NumberSize calcBodyNumSize(){
@@ -104,16 +117,7 @@ public final class Chunk implements RandomIO.Creator, IterablePP<Chunk>{
 	}
 	public void writeHeader(ContentWriter dest) throws IOException{
 		dirty=false;
-		try(var buff=dest.writeTicket(headerSize).requireExact().submit()){
-			var flags=new FlagWriter(FLAGS_SIZE);
-			flags.writeEnum(NumberSize.FLAG_INFO, bodyNumSize, false);
-			flags.writeEnum(NumberSize.FLAG_INFO, nextSize, false);
-			flags.export(buff);
-			
-			bodyNumSize.write(buff, capacity);
-			bodyNumSize.write(buff, size);
-			nextSize.write(buff, nextPtr);
-		}
+		PIPE.write(dest, this);
 	}
 	
 	public void readHeader() throws IOException{
@@ -122,15 +126,7 @@ public final class Chunk implements RandomIO.Creator, IterablePP<Chunk>{
 		}
 	}
 	public void readHeader(ContentReader src) throws IOException{
-		var flags=FlagReader.read(src, FLAGS_SIZE);
-		
-		bodyNumSize=flags.readEnum(NumberSize.FLAG_INFO, false);
-		nextSize=flags.readEnum(NumberSize.FLAG_INFO, false);
-		
-		capacity=bodyNumSize.read(src);
-		size=bodyNumSize.read(src);
-		nextPtr=ChunkPointer.read(nextSize, src);
-		
+		PIPE.read(src, this);
 		calcHeaderSize();
 	}
 	
@@ -204,13 +200,23 @@ public final class Chunk implements RandomIO.Creator, IterablePP<Chunk>{
 		return nextPtr;
 	}
 	
-	public void clearNextPtr(){
-		if(nextCache==null) return;
-		
-		nextPtr=null;
+	private void setNextPtr(ChunkPointer nextPtr){
+		if(Objects.equals(nextPtr, this.nextPtr)) return;
+		this.nextPtr=nextPtr;
 		nextCache=null;
-		
 		markDirty();
+	}
+	
+	public Chunk next() throws IOException{
+		if(nextCache==null){
+			if(getNextPtr()==null) return null;
+			nextCache=provider.getChunk(getNextPtr());
+		}
+		return nextCache;
+	}
+	
+	public void clearNextPtr(){
+		setNextPtr(null);
 	}
 	
 	public Chunk nextUnsafe(){
@@ -221,13 +227,6 @@ public final class Chunk implements RandomIO.Creator, IterablePP<Chunk>{
 		}
 	}
 	
-	public Chunk next() throws IOException{
-		if(nextCache==null){
-			if(nextPtr==null) return null;
-			nextCache=provider.getChunk(nextPtr);
-		}
-		return nextCache;
-	}
 	
 	public List<Chunk> collectNext(){
 		return streamNext().collect(Collectors.toList());
@@ -241,7 +240,7 @@ public final class Chunk implements RandomIO.Creator, IterablePP<Chunk>{
 		if(this!=cached) throw new DesyncedCacheException(this, cached);
 	}
 	
-	public boolean hasNext(){
+	public boolean hasNextPtr(){
 		return getNextPtr()!=null;
 	}
 	
@@ -277,20 +276,16 @@ public final class Chunk implements RandomIO.Creator, IterablePP<Chunk>{
 		long amount=to-from;
 		if(amount>getCapacity()) throw new IOException("Overflow "+(to-from)+" > "+getCapacity());
 		
-		getSource().ioAt(dataStart()+from, io->{
-			io.fillZero(amount);
-		});
+		getSource().ioAt(dataStart()+from, io->io.fillZero(amount));
 	}
 	
 	public void zeroOutHead() throws IOException{
-		getSource().ioAt(getPtr().getValue(), io->{
-			io.fillZero(headerSize);
-		});
+		getSource().ioAt(getPtr().getValue(), io->io.fillZero(headerSize));
 	}
 	public void freeChaining() throws IOException{
 		provider.validate();
 		
-		if(!hasNext()){
+		if(!hasNextPtr()){
 			provider.getMemoryManager().free(this);
 		}else{
 			var tofree=collectNext();
@@ -327,12 +322,12 @@ public final class Chunk implements RandomIO.Creator, IterablePP<Chunk>{
 	public boolean equals(Object o){
 		if(this==o) return true;
 		if(!(o instanceof Chunk chunk)) return false;
-		return getCapacity()==chunk.getCapacity()&&
-		       getSize()==chunk.getSize()&&
-		       getPtr().equals(chunk.getPtr())&&
-		       getBodyNumSize()==chunk.getBodyNumSize()&&
+		return capacity==chunk.capacity&&
+		       size==chunk.size&&
+		       ptr.equals(chunk.ptr)&&
+		       bodyNumSize==chunk.bodyNumSize&&
 		       nextSize==chunk.nextSize&&
-		       Objects.equals(getNextPtr(), chunk.getNextPtr());
+		       Objects.equals(nextPtr, chunk.nextPtr);
 	}
 	
 	@Override
@@ -347,10 +342,5 @@ public final class Chunk implements RandomIO.Creator, IterablePP<Chunk>{
 		result=31*result+Objects.hashCode(getNextPtr());
 		
 		return result;
-	}
-	
-	@Override
-	public Iterator<Chunk> iterator(){
-		return IterablePP.nullTerminated(()->new ChainSupplier(this)).iterator();
 	}
 }

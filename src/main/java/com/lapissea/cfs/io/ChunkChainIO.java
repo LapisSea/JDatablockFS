@@ -1,5 +1,6 @@
 package com.lapissea.cfs.io;
 
+import com.lapissea.cfs.chunk.ChainWalker;
 import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.util.function.FunctionOL;
 
@@ -65,7 +66,7 @@ public class ChunkChainIO implements RandomIO{
 		return effectiveCapacity(cursor);
 	}
 	private long effectiveCapacity(Chunk chunk){
-		if(chunk.hasNext()) return chunk.getCapacity();
+		if(chunk.hasNextPtr()) return chunk.getCapacity();
 		else return chunk.getSize();
 	}
 	
@@ -192,7 +193,7 @@ public class ChunkChainIO implements RandomIO{
 				return this;
 			}
 			prev+=chunk.getCapacity();
-			if(!chunk.hasNext()) break;
+			if(!chunk.hasNextPtr()) break;
 			chunk=Objects.requireNonNull(chunk.next());
 		}
 		
@@ -254,7 +255,7 @@ public class ChunkChainIO implements RandomIO{
 		Chunk chunk=last.next();
 		
 		if(chunk!=null){
-			for(Chunk c : chunk){
+			for(Chunk c : new ChainWalker(chunk)){
 				remaining+=chunk.getCapacity();
 				if(amount<=remaining) return;
 				last=c;
@@ -284,7 +285,7 @@ public class ChunkChainIO implements RandomIO{
 		while(remaining>0){
 			long offset=calcCursorOffset();
 			long cRem  =cursor.getCapacity()-offset;
-			if(cRem==0&&!cursor.hasNext()){
+			if(cRem==0&&!cursor.hasNextPtr()){
 				ensureForwardCapacity(remaining);
 				continue;
 			}
@@ -313,7 +314,7 @@ public class ChunkChainIO implements RandomIO{
 		
 		while(remaining>0&&chunk!=null){
 			long cRem=chunk.getSize();
-			if(cRem==0&&!chunk.hasNext()){
+			if(cRem==0&&!chunk.hasNextPtr()){
 				return;
 			}
 			
@@ -325,11 +326,9 @@ public class ChunkChainIO implements RandomIO{
 		}
 		syncSourceCursor();
 	}
-	
-	
 	@Override
-	public long getGlobalPos(){
-		return calcGlobalPos();
+	public boolean isReadOnly(){
+		return head.isReadOnly();
 	}
 	
 	@Override

@@ -35,20 +35,20 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 	
 	interface Creator{
 		
-		default String hexdump() throws IOException{
+		default StringBuilder hexdump() throws IOException{
 			return hexdump(HexDump.DEFAULT_MAX_WIDTH);
 		}
 		
-		default String hexdump(int maxWidth) throws IOException{
+		default StringBuilder hexdump(int maxWidth) throws IOException{
 			return hexdump(TextUtil.toNamedJson(this), maxWidth);
 		}
 		
-		default String hexdump(String title) throws IOException{
+		default StringBuilder hexdump(String title) throws IOException{
 			return hexdump(title, HexDump.DEFAULT_MAX_WIDTH);
 		}
 		
-		default String hexdump(String title, int maxWidth) throws IOException{
-			return HexDump.hexDump(io(), title, maxWidth).toString();
+		default StringBuilder hexdump(String title, int maxWidth) throws IOException{
+			return ioMap(io->HexDump.hexDump(io, title, maxWidth));
 		}
 		
 		default byte[] readAll() throws IOException{
@@ -63,17 +63,19 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 			ioAt(ptr.getValue(), session);
 		}
 		
-		default <T> T ioAt(ChunkPointer ptr, UnsafeFunction<RandomIO, T, IOException> session) throws IOException{
-			return ioAt(ptr.getValue(), session);
-		}
-		
 		default void ioAt(long offset, UnsafeConsumer<RandomIO, IOException> session) throws IOException{
+			Objects.requireNonNull(session);
 			try(var io=ioAt(offset)){
 				session.accept(io);
 			}
 		}
 		
-		default <T> T ioAt(long offset, UnsafeFunction<RandomIO, T, IOException> session) throws IOException{
+		default <T> T ioMapAt(ChunkPointer ptr, UnsafeFunction<RandomIO, T, IOException> session) throws IOException{
+			return ioMapAt(ptr.getValue(), session);
+		}
+		
+		default <T> T ioMapAt(long offset, UnsafeFunction<RandomIO, T, IOException> session) throws IOException{
+			Objects.requireNonNull(session);
 			try(var io=ioAt(offset)){
 				return session.apply(io);
 			}
@@ -83,7 +85,14 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 			return io().setPos(offset);
 		}
 		
+		default <T> T ioMap(UnsafeFunction<RandomIO, T, IOException> session) throws IOException{
+			Objects.requireNonNull(session);
+			try(var io=io()){
+				return session.apply(io);
+			}
+		}
 		default void io(UnsafeConsumer<RandomIO, IOException> session) throws IOException{
+			Objects.requireNonNull(session);
 			try(var io=io()){
 				session.accept(io);
 			}
@@ -96,6 +105,7 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 		default void write(long offset, boolean trimOnClose, byte[] data) throws IOException{ write(offset, trimOnClose, data.length, data); }
 		
 		default void write(long offset, boolean trimOnClose, int length, byte[] data) throws IOException{
+			Objects.requireNonNull(data);
 			try(var io=ioAt(offset)){
 				io.write(data, 0, length);
 				if(trimOnClose) io.trim();
@@ -259,11 +269,14 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 	 */
 	void fillZero(long requestedMemory) throws IOException;
 	
-	long getGlobalPos() throws IOException;
-	
 	default RandomIO readOnly(){
+		if(isReadOnly()){
+			return this;
+		}
 		return new RandomIOReadOnly(this);
 	}
+	
+	boolean isReadOnly();
 	
 	@Override
 	default ContentInputStream inStream(){
@@ -278,4 +291,15 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 		return ChunkPointer.of(getPos());
 	}
 	
+	@Override
+	default long transferTo(ContentWriter out) throws IOException{
+		int buffSize=8192;
+		
+		var remaining=remaining();
+		if(remaining<buffSize){
+			buffSize=Math.max((int)remaining, 8);
+		}
+		
+		return transferTo(out, buffSize);
+	}
 }

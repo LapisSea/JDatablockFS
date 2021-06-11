@@ -3,18 +3,19 @@ package com.lapissea.cfs.chunk;
 import com.lapissea.cfs.exceptions.MalformedFileException;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.content.ContentReader;
-import com.lapissea.cfs.io.instancepipe.ContiguousPipe;
+import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.field.annotations.IOFieldDependency;
-import com.lapissea.cfs.type.field.annotations.IOFieldMark;
+import com.lapissea.cfs.type.field.annotations.IODependency;
+import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.LogUtil;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import static com.lapissea.cfs.objects.NumberSize.*;
+import static com.lapissea.cfs.type.field.annotations.IODependency.VirtualNumSize.RetentionPolicy.*;
 import static java.nio.charset.StandardCharsets.*;
 
 public class Cluster implements ChunkDataProvider{
@@ -44,32 +45,26 @@ public class Cluster implements ChunkDataProvider{
 		var provider=ChunkDataProvider.newVerySimpleProvider(data);
 		
 		Metadata metadata=new Metadata();
-		metadata.value=69;
+		metadata.value1=300;
 		
 		AllocateTicket.bytes(metadata.calcSize())
 		              .withApproval(c->c.getPtr().equals(FIRST_CHUNK_PTR))
-		              .withDataPopulated((p, io)->new ContiguousPipe().write(io, metadata))
+		              .withDataPopulated((p, io)->{
+			              ContiguousStructPipe.of(Metadata.class)
+			                                  .write(io, metadata);
+		              })
 		              .submit(provider);
 		
 	}
 	
 	private static class Metadata extends IOInstance<Metadata>{
 		
-		@IOFieldMark
-		public NumberSize ay=VOID;
-		
-		@IOFieldMark
-		public int value=1111111111;
-		
-		@IOFieldMark
-		public NumberSize lmao=VOID;
-		
-		@IOFieldDependency("value1Size")
-		@IOFieldMark
+		@IODependency.VirtualNumSize(name="ayyyy", retention=GROW_ONLY)
+		@IOValue
 		public int value1=255;
-		
-		@IOFieldMark
-		public NumberSize value1Size=VOID;
+		@IODependency.VirtualNumSize(name="ayyyy", retention=GROW_ONLY)
+		@IOValue
+		public int value2=255;
 		
 	}
 	
@@ -89,8 +84,14 @@ public class Cluster implements ChunkDataProvider{
 			mainChunkPtr=ChunkPointer.read(FIRST_CHUNK_PTR_SIZE, io);
 		}
 		
-		Metadata m=new Metadata();
-		new ContiguousPipe().read(mainChunkPtr.dereference(this).io(), m);
+		var      ch=mainChunkPtr.dereference(this);
+		Metadata m =new Metadata();
+		try(var io=ch.io()){
+			ContiguousStructPipe.of(Metadata.class)
+			                    .read(io, m);
+		}
+		LogUtil.println(m);
+		m.value1=20;
 		LogUtil.println(m);
 	}
 	

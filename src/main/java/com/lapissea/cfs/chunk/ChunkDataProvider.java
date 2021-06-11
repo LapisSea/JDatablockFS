@@ -4,11 +4,9 @@ import com.lapissea.cfs.exceptions.DesyncedCacheException;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.objects.ChunkPointer;
-import com.lapissea.util.function.UnsafeBiConsumer;
 
 import java.io.IOException;
 import java.util.Objects;
-import java.util.stream.LongStream;
 
 import static com.lapissea.cfs.GlobalConfig.*;
 
@@ -41,21 +39,15 @@ public interface ChunkDataProvider{
 		}
 	}
 	
-	static ChunkDataProvider newVerySimpleProvider(){
-		return newVerySimpleProvider((UnsafeBiConsumer<IOInterface, LongStream, IOException>)null);
+	static ChunkDataProvider newVerySimpleProvider() throws IOException{
+		return newVerySimpleProvider((MemoryData.EventLogger)null);
 	}
 	
-	static ChunkDataProvider newVerySimpleProvider(UnsafeBiConsumer<IOInterface, LongStream, IOException> onWrite){
-		var data=new MemoryData.Arr();
-		
-		try(var io=data.io()){
-			io.write(Cluster.getMagicId());
-		}catch(IOException e){
-			throw new RuntimeException(e);
-		}
-		
-		if(onWrite!=null) data.onWrite=ids->onWrite.accept(data, ids);
-		
+	static ChunkDataProvider newVerySimpleProvider(MemoryData.EventLogger onWrite) throws IOException{
+		var data=new MemoryData.Builder()
+			         .withOnWrite(onWrite)
+			         .withInitial(dest->dest.write(Cluster.getMagicId()))
+			         .build();
 		return newVerySimpleProvider(data);
 	}
 	

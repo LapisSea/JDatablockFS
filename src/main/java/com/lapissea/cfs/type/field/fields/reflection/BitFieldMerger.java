@@ -1,13 +1,13 @@
-package com.lapissea.cfs.type.field.reflection;
+package com.lapissea.cfs.type.field.fields.reflection;
 
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.io.bit.BitInputStream;
 import com.lapissea.cfs.io.bit.BitOutputStream;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
-import com.lapissea.cfs.type.IOField;
 import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.util.LogUtil;
+import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
 import java.util.List;
@@ -23,9 +23,11 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 	private final OptionalLong fixedSize;
 	
 	public BitFieldMerger(List<IOField.Bit<T, ?>> group){
+		super(null);
+		assert !group.isEmpty();
 		this.group=List.copyOf(group);
 		fixedSize=Utils.bitToByte(group.stream().map(IOField.Bit::getFixedSize).reduce(OptionalLong.of(0), Utils::addIfBoth));
-		initCommon(group.stream().flatMap(f->f.getDeps().stream()).distinct().toList(), -2);
+		initCommon(group.stream().flatMap(f->f.getDependencies().stream()).distinct().toList());
 	}
 	
 	@Override
@@ -40,12 +42,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 	@Override
 	public void write(ContentWriter dest, T instance) throws IOException{
 		
-		try(var buff=dest
-			             .writeTicket(calcSize(instance))
-			             .requireExact()
-			             .onFinish((i, b)->LogUtil.println(Utils.byteArrayToBitString(b, i)))
-			             .submit();
-		    var stream=new BitOutputStream(buff)){
+		try(var stream=new BitOutputStream(dest)){
 			for(var fi : group){
 				if(DEBUG_VALIDATION){
 					long size;
@@ -54,11 +51,19 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 					else size=fi.calcSize(instance);
 					var oldW=stream.getTotalBits();
 					
-					fi.writeBits(stream, instance);
+					try{
+						fi.writeBits(stream, instance);
+					}catch(Exception e){
+						throw new IOException("Failed to write "+TextUtil.toShortString(fi), e);
+					}
 					var written=stream.getTotalBits()-oldW;
 					if(written!=size) throw new RuntimeException("Written bits "+written+" but "+size+" expected on "+fi);
 				}else{
-					fi.writeBits(stream, instance);
+					try{
+						fi.writeBits(stream, instance);
+					}catch(Exception e){
+						throw new IOException("Failed to write "+TextUtil.toShortString(fi), e);
+					}
 				}
 			}
 		}
@@ -95,11 +100,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 	}
 	
 	@Override
-	public String toShortString(){
-		return toString();
-	}
-	@Override
-	public String toString(){
-		return group.stream().map(IOField::getNameOrId).collect(Collectors.joining(" + ", "{", "}"));
+	public String getName(){
+		return group.stream().map(IOField::getName).collect(Collectors.joining(" + "));
 	}
 }

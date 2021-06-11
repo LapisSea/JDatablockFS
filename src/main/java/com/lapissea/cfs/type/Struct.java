@@ -1,20 +1,35 @@
 package com.lapissea.cfs.type;
 
-import com.lapissea.cfs.Index;
+import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
-import com.lapissea.cfs.type.field.FieldCompiler;
-import com.lapissea.cfs.type.field.reflection.BitFieldMerger;
-import com.lapissea.util.LogUtil;
-import com.lapissea.util.NotNull;
-import com.lapissea.util.UtilL;
-import com.lapissea.util.WeakValueHashMap;
+import com.lapissea.cfs.type.compilation.FieldCompiler;
+import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.access.VirtualAccessor;
+import com.lapissea.util.*;
 
 import java.util.*;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class Struct<T extends IOInstance<T>>{
+	
+	static class AutoLock implements AutoCloseable{
+		private final Lock lock;
+		AutoLock(Lock lock){this.lock=lock;}
+		
+		AutoLock doLock(){
+			lock.lock();
+			return this;
+		}
+		@Override
+		public void close(){
+			lock.unlock();
+		}
+	}
+	
+	private static final AutoLock STRUCT_CACHE_LOCK=new AutoLock(new ReentrantLock());
 	
 	private static final Map<Class<?>, Struct<?>> STRUCT_CACHE  =new WeakValueHashMap<>();
 	private static final Map<Class<?>, Thread>    STRUCT_COMPILE=Collections.synchronizedMap(new HashMap<>());
@@ -43,13 +58,15 @@ public class Struct<T extends IOInstance<T>>{
 	public static <T extends IOInstance<T>> Struct<T> of(Class<T> instanceClass){
 		Objects.requireNonNull(instanceClass);
 		
-		synchronized(STRUCT_CACHE){
+		try(var ignored=STRUCT_CACHE_LOCK.doLock()){
 			//noinspection unchecked
 			var cached=(Struct<T>)STRUCT_CACHE.get(instanceClass);
 			if(cached!=null) return cached;
+			
 		}
 		
-		if(instanceClass==(Object)IOInstance.class) throw new IllegalArgumentException("Can not compile Instance itself");
+		
+		if(instanceClass.equals(IOInstance.class)) throw new IllegalArgumentException("Can not compile Instance itself");
 		
 		Thread thread=STRUCT_COMPILE.get(instanceClass);
 		if(thread!=null){
@@ -58,15 +75,17 @@ public class Struct<T extends IOInstance<T>>{
 			return of(instanceClass);
 		}
 		
-		try{
+		try(var ignored=STRUCT_CACHE_LOCK.doLock()){
+			
 			STRUCT_COMPILE.put(instanceClass, Thread.currentThread());
 			
 			Struct<T> struct=new Struct<>(instanceClass);
-			synchronized(STRUCT_CACHE){
-				STRUCT_CACHE.put(instanceClass, struct);
+			STRUCT_CACHE.put(instanceClass, struct);
+			
+			if(GlobalConfig.PRINT_COMPILATION){
+				LogUtil.println(TextUtil.toTable("Compiled:"+struct.getType().getSimpleName(), struct.getFields()));
 			}
 			
-			LogUtil.println("COMPILED:", struct);
 			return struct;
 		}finally{
 			STRUCT_COMPILE.remove(instanceClass);
@@ -77,57 +96,14 @@ public class Struct<T extends IOInstance<T>>{
 	private final OptionalLong fixedSize;
 	
 	private final List<IOField<T, ?>> fields;
-	private final List<IOField<T, ?>> ioFields;
+	private final List<IOField<T, ?>> virtualFields;
 	
 	public Struct(Class<T> type){
 		this.type=type;
 		fixedSize=OptionalLong.empty();
-		fields=computeFields();
-		ioFields=mergeBitSpace(computeOrderIndex().mapData(fields));
-		LogUtil.println(ioFields);
-		LogUtil.println(ioFields.stream().map(i->i.getFixedSize()));
-	}
-	private List<IOField<T, ?>> mergeBitSpace(List<IOField<T, ?>> mapData){
-		var result    =new LinkedList<IOField<T, ?>>();
-		var bitBuilder=new LinkedList<IOField.Bit<T, ?>>();
-		
-		Runnable pushBuilt=()->{
-			if(bitBuilder.isEmpty()) return;
-			result.add(new BitFieldMerger<>(bitBuilder));
-			bitBuilder.clear();
-		};
-		
-		for(IOField<T, ?> field : mapData){
-			if(field.getWordSpace()==WordSpace.BIT){
-				bitBuilder.add((IOField.Bit<T, ?>)field);
-				continue;
-			}
-			pushBuilt.run();
-			result.add(field);
-		}
-		pushBuilt.run();
-		
-		return List.copyOf(result);
-	}
-	
-	private Index computeOrderIndex(){
-		try{
-			return new DepSort<>(fields, f->f.getDeps().stream().mapToInt(IOField::getIndex))
-				       .sort(Comparator.comparingInt((IOField<T, ?> f)->0)
-				                       .thenComparingInt((IOField<T, ?> f)->f.getFixedSize().isPresent()?0:1)
-				                       .thenComparingInt((IOField<T, ?> f)->f.getWordSpace().sortOrder)
-				       );
-		}catch(DepSort.CycleException e){
-			throw new MalformedStructLayout("Field dependency cycle detected:\n"+
-			                                e.cycle.mapData(fields)
-			                                       .stream()
-			                                       .map(IOField::getNameOrId)
-			                                       .collect(Collectors.joining("\n")));
-		}
-	}
-	
-	private List<IOField<T, ?>> computeFields(){
-		return FieldCompiler.create().compile(this);
+		fields=FieldCompiler.create().compile(this);
+		fields.forEach(IOField::init);
+		virtualFields=fields.stream().filter(f->f.getAccessor() instanceof VirtualAccessor).toList();
 	}
 	
 	@Override
@@ -140,12 +116,19 @@ public class Struct<T extends IOInstance<T>>{
 	public OptionalLong getFixedSize(){
 		return fixedSize;
 	}
+	
 	public List<IOField<T, ?>> getFields(){
 		return fields;
 	}
+	public List<IOField<T, ?>> getVirtualFields(){
+		return virtualFields;
+	}
 	
-	public List<IOField<T, ?>> getIoFields(){
-		return ioFields;
+	public Optional<IOField<T, ?>> getFieldByName(String name){
+		return getFields().stream().filter(f->f.getName().equals(name)).findAny();
+	}
+	public <E> Stream<IOField<T, E>> getFieldsByType(Class<E> type){
+		return getFields().stream().filter(f->UtilL.instanceOf(f.getAccessor().getType(), type)).map(f->(IOField<T, E>)f);
 	}
 	
 	public String instanceToString(T instance, boolean doShort){

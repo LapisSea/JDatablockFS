@@ -22,7 +22,7 @@ public interface ContentReader extends AutoCloseable, ContentBuff{
 		if(length>buff.remaining()) throw new IndexOutOfBoundsException("reading "+length+" remaining "+buff.remaining());
 		
 		if(buff.hasArray()&&!buff.isReadOnly()){
-			return read(buff.array(), buff.position(), length);
+			return read(buff.array(), buff.position()+buff.arrayOffset(), length);
 		}
 		byte[] bb  =new byte[Math.min(length, 1024)];
 		int    read=read(bb);
@@ -371,11 +371,15 @@ public interface ContentReader extends AutoCloseable, ContentBuff{
 	}
 	
 	default long transferTo(ContentWriter out) throws IOException{
+		return transferTo(out, 8192);
+	}
+	default long transferTo(ContentWriter out, int buffSize) throws IOException{
 		Objects.requireNonNull(out);
-		long   transferred=0;
-		byte[] buffer     =new byte[8192];
+		long transferred=0;
+		
+		byte[] buffer=new byte[buffSize];
 		int    read;
-		while((read=this.read(buffer, 0, 8192))>=0){
+		while((read=this.read(buffer))>=0){
 			out.write(buffer, 0, read);
 			transferred+=read;
 		}

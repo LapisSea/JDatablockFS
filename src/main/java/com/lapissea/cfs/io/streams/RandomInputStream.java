@@ -65,8 +65,4 @@ public class RandomInputStream extends ContentInputStream{
 		return io.getPos();
 	}
 	
-	@Override
-	public long getGlobalOffset() throws IOException{
-		return io.getGlobalPos();
-	}
 }

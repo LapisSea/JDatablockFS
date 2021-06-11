@@ -113,10 +113,9 @@ public class IOFileData implements IOInterface, AutoCloseable{
 		public void fillZero(long requestedMemory) throws IOException{
 			Utils.zeroFill((b, off, len)->write(b, off, len, false), requestedMemory);
 		}
-		
 		@Override
-		public long getGlobalPos() throws IOException{
-			return getPos();
+		public boolean isReadOnly(){
+			return readOnly;
 		}
 	}
 	

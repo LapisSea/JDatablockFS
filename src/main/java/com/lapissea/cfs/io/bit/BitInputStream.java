@@ -61,4 +61,11 @@ public class BitInputStream implements BitReader, AutoCloseable{
 	public long getTotalBits(){
 		return totalBits;
 	}
+	
+	public void requireRead(long expected) throws IOException{
+		var total=getTotalBits();
+		if(total!=expected){
+			throw new IOException(this+" read "+total+" but "+expected+" was expected");
+		}
+	}
 }

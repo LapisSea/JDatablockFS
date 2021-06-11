@@ -50,4 +50,11 @@ public class BitOutputStream implements BitWriter<BitOutputStream>, AutoCloseabl
 	public long getTotalBits(){
 		return totalBits;
 	}
+	
+	public void requireWritten(long expected) throws IOException{
+		var total=getTotalBits();
+		if(total!=expected){
+			throw new IOException(this+" wrote "+total+" but "+expected+" was expected");
+		}
+	}
 }

@@ -1,11 +1,12 @@
 package com.lapissea.cfs;
 
 import com.lapissea.util.LogUtil;
+import com.lapissea.util.UtilL;
 
 public class GlobalConfig{
 	
 	public static final boolean DEBUG_VALIDATION;
-//	public static final boolean DETAILED_WALK_REPORT;
+	public static       boolean PRINT_COMPILATION;
 	
 	static{
 		boolean assertEnabled=false;
@@ -17,8 +18,8 @@ public class GlobalConfig{
 		}
 		
 		DEBUG_VALIDATION=assertEnabled;
-
-//		DETAILED_WALK_REPORT=UtilL.sysPropertyByClass(GlobalConfig.class, "DETAILED_WALK_REPORT", false, Boolean::valueOf);
+		
+		PRINT_COMPILATION=UtilL.sysPropertyByClass(GlobalConfig.class, "printCompilation", true, Boolean::valueOf);
 		
 		if(DEBUG_VALIDATION){
 			LogUtil.println("Running with debugging");

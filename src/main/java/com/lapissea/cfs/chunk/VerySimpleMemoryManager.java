@@ -38,6 +38,12 @@ public class VerySimpleMemoryManager implements MemoryManager{
 		}
 		
 		context.getChunkCache().add(chunk);
+		
+		var initial=ticket.dataPopulator();
+		if(initial!=null){
+			initial.accept(chunk);
+		}
+		
 		return chunk;
 	}
 }

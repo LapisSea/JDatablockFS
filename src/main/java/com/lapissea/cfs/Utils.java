@@ -31,7 +31,6 @@ public class Utils{
 		if(amount<0) throw new IllegalArgumentException(amount+" can't be negative");
 		byte[] buffer   =new byte[(int)Math.min(amount, 1<<13)];
 		long   remaining=amount;
-		int    read;
 		while(remaining>0){
 			int toTransfer=(int)Math.min(remaining, buffer.length);
 			src.readFully(buffer, 0, toTransfer);

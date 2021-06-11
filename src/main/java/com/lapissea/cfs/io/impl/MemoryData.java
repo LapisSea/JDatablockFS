@@ -3,9 +3,11 @@ package com.lapissea.cfs.io.impl;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.RandomIO;
+import com.lapissea.cfs.io.content.ContentOutputBuilder;
+import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.TextUtil;
-import com.lapissea.util.function.UnsafeConsumer;
+import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -13,7 +15,8 @@ import java.util.Arrays;
 import java.util.stream.LongStream;
 
 public abstract class MemoryData<DataType> implements IOInterface{
-	private class MemRandomIO implements RandomIO{
+	
+	public class MemRandomIO implements RandomIO{
 		
 		private int pos;
 		
@@ -124,10 +127,9 @@ public abstract class MemoryData<DataType> implements IOInterface{
 			
 			Utils.zeroFill((b, off, len)->write(b, off, len, false), requestedMemory);
 		}
-		
 		@Override
-		public long getGlobalPos(){
-			return -1;
+		public boolean isReadOnly(){
+			return readOnly;
 		}
 		
 		@Override
@@ -169,20 +171,23 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		}
 	}
 	
-	public transient UnsafeConsumer<LongStream, IOException> onWrite;
+	public transient EventLogger onWrite;
 	
 	private DataType data;
 	private int      used;
 	
 	private final boolean readOnly;
 	
-	public MemoryData(DataType data, int used, boolean readOnly){
+	public MemoryData(DataType data, Builder info) throws IOException{
+		
 		var ok=getLength(data)>=used;
 		if(!ok) throw new IllegalArgumentException(TextUtil.toString(getLength(data), ">=", used));
 		
 		this.data=data;
-		this.used=used;
-		this.readOnly=readOnly;
+		this.used=info.getUsed()==-1?getLength(data):info.getUsed();
+		this.readOnly=info.isReadOnly();
+		
+		onWrite=info.getOnWrite();
 	}
 	
 	private void logWriteEvent(long single){
@@ -197,7 +202,7 @@ public abstract class MemoryData<DataType> implements IOInterface{
 	}
 	private void logWriteEvent(LongStream ids){
 		try{
-			onWrite.accept(ids);
+			onWrite.log(this, ids);
 		}catch(Throwable e){
 			throw new RuntimeException("Exception on write event", e);
 		}
@@ -205,7 +210,7 @@ public abstract class MemoryData<DataType> implements IOInterface{
 	
 	@Override
 	@NotNull
-	public RandomIO io(){
+	public MemRandomIO io(){
 		return new MemRandomIO();
 	}
 	
@@ -239,7 +244,7 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		int max=40;
 		if(used>max){
 			try{
-				return hexdump();
+				return hexdump().toString();
 			}catch(IOException e){
 				throw new RuntimeException(e);
 			}
@@ -263,41 +268,94 @@ public abstract class MemoryData<DataType> implements IOInterface{
 	protected abstract void readN(DataType src, int index, byte[] dest, int off, int len);
 	protected abstract void writeN(byte[] src, int index, DataType dest, int off, int len);
 	
-	
-	public static IOInterface from(byte[] data, boolean readOnly){
-		return new Arr(data, readOnly);
-	}
-	public static IOInterface from(ByteBuffer data, boolean readOnly){
-		return new Buff(data, readOnly);
+	public static Builder build(){
+		return new Builder();
 	}
 	
-	public static class Arr extends MemoryData<byte[]>{
+	public interface EventLogger{
+		void log(MemoryData<?> data, LongStream ids) throws IOException;
+	}
+	
+	public interface DataInitializer{
+		void init(ContentWriter dest) throws IOException;
+	}
+	
+	public static class Builder{
+		private UnsafeSupplier<Object, IOException> dataProducer;
+		private boolean                             readOnly=false;
+		private int                                 used    =-1;
+		private EventLogger                         onWrite;
 		
-		public Arr(IOInterface data, boolean readOnly) throws IOException{
-			this(data.readAll(), readOnly);
+		public Builder withInitial(DataInitializer init){
+			this.dataProducer=()->{
+				var builder=new ContentOutputBuilder(32);
+				init.init(builder);
+				return builder.toByteArray();
+			};
+			return this;
 		}
 		
-		public Arr(byte[] data, boolean readOnly){
-			this(data, data.length, readOnly);
+		public Builder withCapacity(int capacity){
+			this.dataProducer=()->new byte[capacity];
+			return this;
 		}
-		public Arr(int dataSize, boolean readOnly){
-			this(new byte[dataSize], readOnly);
-		}
-		
-		public Arr(int dataSize){
-			this(dataSize, false);
+		public Builder withData(IOInterface data){
+			this.dataProducer=data::readAll;
+			return this;
 		}
 		
-		public Arr(){
-			this(false);
+		public Builder withRaw(Object data){
+			this.dataProducer=()->data;
+			return this;
 		}
 		
-		public Arr(boolean readOnly){
-			this(new byte[32], 0, readOnly);
+		public Builder asReadOnly(){
+			this.readOnly=true;
+			return this;
 		}
 		
-		public Arr(byte[] data, int used, boolean readOnly){
-			super(data, used, readOnly);
+		public Builder withUsedLength(int used){
+			this.used=used;
+			return this;
+		}
+		
+		public Builder withOnWrite(EventLogger onWrite){
+			this.onWrite=onWrite;
+			return this;
+		}
+		
+		private Object readData() throws IOException{
+			if(dataProducer==null) return withCapacity(32).readData();
+			
+			return dataProducer.get();
+		}
+		
+		public EventLogger getOnWrite(){
+			return onWrite;
+		}
+		
+		public int getUsed(){
+			return used;
+		}
+		
+		public boolean isReadOnly(){
+			return readOnly;
+		}
+		
+		public MemoryData<?> build() throws IOException{
+			var actualData=readData();
+			
+			if(actualData instanceof byte[] data) return new Arr(data, this);
+			if(actualData instanceof ByteBuffer data) return new Buff(data.slice(), this);
+			
+			throw new RuntimeException("unknown data tyoe "+actualData);
+		}
+	}
+	
+	private static final class Arr extends MemoryData<byte[]>{
+		
+		public Arr(byte[] data, Builder info) throws IOException{
+			super(data, info);
 		}
 		
 		@Override
@@ -326,34 +384,12 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		}
 	}
 	
-	public static class Buff extends MemoryData<ByteBuffer>{
+	private static final class Buff extends MemoryData<ByteBuffer>{
 		
-		public Buff(IOInterface data, boolean readOnly) throws IOException{
-			this(ByteBuffer.wrap(data.readAll()), readOnly);
-		}
-		
-		public Buff(ByteBuffer data, boolean readOnly){
-			this(data, data.limit(), readOnly);
-		}
-		public Buff(int dataSize, boolean readOnly){
-			this(ByteBuffer.allocate(dataSize), readOnly);
+		public Buff(ByteBuffer data, Builder info) throws IOException{
+			super(data, info);
 		}
 		
-		public Buff(int dataSize){
-			this(dataSize, false);
-		}
-		
-		public Buff(){
-			this(false);
-		}
-		
-		public Buff(boolean readOnly){
-			this(ByteBuffer.allocate(32), 0, readOnly);
-		}
-		
-		public Buff(ByteBuffer data, int used, boolean readOnly){
-			super(data, used, readOnly);
-		}
 		@Override
 		protected int getLength(ByteBuffer data){
 			return data.limit();

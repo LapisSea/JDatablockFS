@@ -2,8 +2,6 @@ package test.junit;
 
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.ChunkDataProvider;
-import com.lapissea.cfs.io.IOInterface;
-import com.lapissea.cfs.io.impl.MemoryData;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -18,7 +16,8 @@ import static org.junit.jupiter.api.Assertions.*;
 public class GeneralTests{
 	
 	@BeforeAll
-	static void init(){
+	static void init() throws IOException{
+//		LogUtil.Init.attach(USE_CALL_POS|USE_TABULATED_HEADER);
 		
 		ChunkDataProvider.newVerySimpleProvider();
 	}
@@ -44,6 +43,7 @@ public class GeneralTests{
 		
 		var chunkSecond=AllocateTicket.bytes(1).submit(provider);
 		var chunk      =AllocateTicket.bytes(capacity).withNext(chunkSecond).submit(provider);
+//		var chunk=AllocateTicket.bytes(capacity).submit(provider);
 		
 		byte[] bodyData=new byte[(int)capacity];
 		for(int i=0;i<bodyData.length;i++){
@@ -76,10 +76,6 @@ public class GeneralTests{
 		
 		var readBody=chunk.readAll();
 		assertArrayEquals(bodyData, readBody);
-	}
-	
-	private IOInterface blankData(){
-		return new MemoryData.Arr();
 	}
 	
 }

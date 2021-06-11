@@ -203,10 +203,6 @@ public abstract class ContentInputStream extends InputStream implements ContentR
 	
 	public abstract long getOffset() throws IOException;
 	
-	public long getGlobalOffset() throws IOException{
-		return getOffset();
-	}
-	
 	@Override
 	public ContentInputStream inStream(){
 		return this;

@@ -2,7 +2,6 @@ package com.lapissea.cfs.io;
 
 import java.io.IOException;
 
-@SuppressWarnings("RedundantThrows")
 public class RandomIOReadOnly implements RandomIO{
 	private final RandomIO io;
 	
@@ -70,11 +69,6 @@ public class RandomIOReadOnly implements RandomIO{
 	}
 	
 	@Override
-	public long getGlobalPos() throws IOException{
-		return io.getGlobalPos();
-	}
-	
-	@Override
 	public String toString(){
 		return "ReadOnly{"+io.toString()+"}";
 	}
@@ -116,8 +110,7 @@ public class RandomIOReadOnly implements RandomIO{
 	}
 	
 	@Override
-	public RandomIO readOnly(){
-		return this;
+	public boolean isReadOnly(){
+		return true;
 	}
-	
 }
