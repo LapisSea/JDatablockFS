@@ -3,6 +3,8 @@ package com.lapissea.cfs.chunk;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
 
+import java.util.Objects;
+
 public final class ChunkBuilder{
 	
 	private ChunkDataProvider provider;
@@ -13,7 +15,7 @@ public final class ChunkBuilder{
 	private long       size;
 	
 	private NumberSize   nextSize;
-	private ChunkPointer nextPtr;
+	private ChunkPointer nextPtr=ChunkPointer.NULL;
 	
 	public ChunkBuilder(ChunkDataProvider provider, ChunkPointer ptr){
 		this.provider=provider;
@@ -46,7 +48,7 @@ public final class ChunkBuilder{
 		return this;
 	}
 	public ChunkBuilder withNext(ChunkPointer next){
-		this.nextPtr=next;
+		this.nextPtr=Objects.requireNonNull(next);
 		return this;
 	}
 	public ChunkBuilder withNext(Chunk next){
@@ -59,7 +61,7 @@ public final class ChunkBuilder{
 		if(bodyNumSize==null) bodyNumSize=NumberSize.bySize(capacity);
 		
 		var nextSize=this.nextSize;
-		if(nextSize==null) nextSize=NumberSize.bySizeVoidable(nextPtr).max(NumberSize.BYTE);
+		if(nextSize==null) nextSize=NumberSize.bySize(nextPtr).max(NumberSize.BYTE);
 		
 		return new Chunk(provider, ptr, bodyNumSize, capacity, size, nextSize, nextPtr);
 	}

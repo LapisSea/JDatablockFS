@@ -1,9 +1,13 @@
 package com.lapissea.cfs.type;
 
 public enum WordSpace{
-	BIT(1),
-	BYTE(2);
+	BIT(1, "bit"),
+	BYTE(2, "byte");
 	
-	public final int sortOrder;
-	WordSpace(int sortOrder){this.sortOrder=sortOrder;}
+	public final int    sortOrder;
+	public final String friendlyName;
+	WordSpace(int sortOrder, String friendlyName){
+		this.sortOrder=sortOrder;
+		this.friendlyName=friendlyName;
+	}
 }

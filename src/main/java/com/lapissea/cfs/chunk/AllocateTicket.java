@@ -12,10 +12,11 @@ import java.util.function.Predicate;
 
 public record AllocateTicket(long bytes, boolean disableResizing, ChunkPointer next, @Nullable Predicate<Chunk> approve, @Nullable UnsafeConsumer<Chunk, IOException> dataPopulator){
 	
-	public static final AllocateTicket DEFAULT=new AllocateTicket(0, false, null, null, null);
+	public static final AllocateTicket DEFAULT=new AllocateTicket(0, false, ChunkPointer.NULL, null, null);
 	
 	public AllocateTicket{
 		assert bytes>=0;
+		Objects.requireNonNull(next);
 	}
 	
 	

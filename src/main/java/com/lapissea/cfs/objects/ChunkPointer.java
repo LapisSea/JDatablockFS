@@ -9,13 +9,15 @@ import java.io.IOException;
 
 public final class ChunkPointer implements INumber{
 	
+	public static final ChunkPointer NULL=new ChunkPointer(0);
+	
 	public static ChunkPointer read(NumberSize size, ContentReader src) throws IOException{
 		return ChunkPointer.of(size.read(src));
 	}
 	
 	@NotNull
 	public static ChunkPointer of(long value){
-		return value==0?null:new ChunkPointer(value);
+		return value==0?NULL:new ChunkPointer(value);
 	}
 	
 	@Deprecated
@@ -24,7 +26,7 @@ public final class ChunkPointer implements INumber{
 	}
 	
 	public static ChunkPointer of(INumber value){
-		return new ChunkPointer(value.getValue());
+		return of(value.getValue());
 	}
 	
 	public static long getValueNullable(ChunkPointer ptr){
@@ -34,13 +36,8 @@ public final class ChunkPointer implements INumber{
 	private final long value;
 	
 	private ChunkPointer(long value){
-		if(value==0) throw new NullPointerException();
 		if(value<0) throw new IllegalArgumentException();
 		this.value=value;
-	}
-	
-	public ChunkPointer(INumber value){
-		this(value.getValue());
 	}
 	
 	@Override
@@ -49,6 +46,7 @@ public final class ChunkPointer implements INumber{
 	}
 	
 	public Chunk dereference(ChunkDataProvider provider) throws IOException{
+		checkNull();
 		return provider.getChunk(this);
 	}
 	
@@ -58,18 +56,22 @@ public final class ChunkPointer implements INumber{
 	}
 	
 	public ChunkPointer addPtr(INumber value){
+		checkNull();
 		return addPtr(value.getValue());
 	}
 	
 	public ChunkPointer addPtr(long value){
+		checkNull();
 		return new ChunkPointer(getValue()+value);
 	}
 	
 	public long add(INumber value){
+		checkNull();
 		return add(value.getValue());
 	}
 	
 	public long add(long value){
+		checkNull();
 		return getValue()+value;
 	}
 	
@@ -86,6 +88,14 @@ public final class ChunkPointer implements INumber{
 	}
 	
 	public Reference makeReference(long offset){
+		checkNull();
 		return new Reference(this, offset);
+	}
+	
+	public void checkNull(){
+		if(isNull()) throw new NullPointerException();
+	}
+	public boolean isNull(){
+		return getValue()==0;
 	}
 }

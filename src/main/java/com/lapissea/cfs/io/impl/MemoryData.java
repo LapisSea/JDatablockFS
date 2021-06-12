@@ -12,6 +12,7 @@ import com.lapissea.util.function.UnsafeSupplier;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 
 public abstract class MemoryData<DataType> implements IOInterface{
@@ -239,25 +240,12 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		return readOnly;
 	}
 	
+	public String toShortString(){
+		return TextUtil.mapObjectValues(this).entrySet().stream().map(TextUtil::toShortString).collect(Collectors.joining(", ", "{", "}"));
+	}
 	@Override
 	public String toString(){
-		int max=40;
-		if(used>max){
-			try{
-				return hexdump().toString();
-			}catch(IOException e){
-				throw new RuntimeException(e);
-			}
-		}
-		StringBuilder result=new StringBuilder(used*3+1).append('[');
-		for(int i=0;i<used;i++){
-			var ay=Integer.toHexString(read1(data, i)&0xFF).toUpperCase();
-			if(ay.length()==1) result.append('0');
-			result.append(ay);
-			if(i+1<used) result.append('|');
-		}
-		result.append(']');
-		return result.toString();
+		return MemoryData.class.getSimpleName()+toShortString();
 	}
 	
 	protected abstract int getLength(DataType data);

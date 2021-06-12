@@ -50,7 +50,9 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 			var created=lConstructor.apply(struct);
 			
 			if(GlobalConfig.PRINT_COMPILATION){
-				LogUtil.println(TextUtil.toTable("Compiled pipe "+type.getSimpleName()+" for: "+struct.getType().getSimpleName(), created.getSpecificFields()));
+				LogUtil.println("Compiled pipe "+type.getSimpleName()+" for: "+struct.getType().getSimpleName()+"\n"+
+				                TextUtil.toTable("specificFields", created.getSpecificFields())+"\n"+
+				                "Size info "+TextUtil.toNamedPrettyJson(created.getSizeDescriptor()));
 			}
 			
 			group.put(struct, created);
@@ -73,10 +75,10 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	public SizeDescriptor<T> getSizeDescriptor(){
 		if(sizeDescription==null){
 			var fields=getSpecificFields();
-			var fixed =IOFieldTools.sumVarsIfAll(fields, SizeDescriptor::fixed);
+			var fixed =IOFieldTools.sumVarsIfAll(fields, SizeDescriptor::getFixed);
 			if(fixed.isPresent()) sizeDescription=new SizeDescriptor.Fixed<>(WordSpace.BYTE, fixed.getAsLong());
 			else{
-				sizeDescription=new SizeDescriptor.Unknown<T>(WordSpace.BYTE, IOFieldTools.sumVars(fields, SizeDescriptor::min), IOFieldTools.sumVarsIfAll(fields, SizeDescriptor::max)){
+				sizeDescription=new SizeDescriptor.Unknown<T>(WordSpace.BYTE, IOFieldTools.sumVars(fields, SizeDescriptor::getMin), IOFieldTools.sumVarsIfAll(fields, SizeDescriptor::getMax)){
 					@Override
 					public long variable(T instance){
 						return IOFieldTools.sumVars(fields, d->d.variable(instance));

@@ -30,9 +30,9 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 		assert !group.isEmpty();
 		this.group=List.copyOf(group);
 		
-		var fixedSize=Utils.bitToByte(IOFieldTools.sumVarsIfAll(group, SizeDescriptor::fixed));
+		var fixedSize=Utils.bitToByte(IOFieldTools.sumVarsIfAll(group, SizeDescriptor::getFixed));
 		if(fixedSize.isPresent()) sizeDescriptor=new SizeDescriptor.Fixed<>(WordSpace.BYTE, fixedSize.getAsLong());
-		else sizeDescriptor=new SizeDescriptor.Unknown<>(WordSpace.BYTE, IOFieldTools.sumVars(group, SizeDescriptor::min), IOFieldTools.sumVarsIfAll(group, SizeDescriptor::max)){
+		else sizeDescriptor=new SizeDescriptor.Unknown<>(WordSpace.BYTE, IOFieldTools.sumVars(group, SizeDescriptor::getMin), IOFieldTools.sumVarsIfAll(group, SizeDescriptor::getMax)){
 			@Override
 			public long variable(T instance){
 				return Utils.bitToByte(group.stream().mapToLong(s->s.getSizeDescriptor().variable(instance)).sum());
@@ -54,7 +54,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 				if(DEBUG_VALIDATION){
 					var  sizeD=fi.getSizeDescriptor();
 					long size;
-					var  fixed=sizeD.fixed();
+					var  fixed=sizeD.getFixed();
 					if(fixed.isPresent()) size=fixed.getAsLong();
 					else size=sizeD.variable(instance);
 					var oldW=stream.getTotalBits();
@@ -84,7 +84,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 				if(DEBUG_VALIDATION){
 					var  sizeD=fi.getSizeDescriptor();
 					long size;
-					var  fixed=sizeD.fixed();
+					var  fixed=sizeD.getFixed();
 					if(fixed.isPresent()) size=fixed.getAsLong();
 					else size=sizeD.variable(instance);
 					var oldW=stream.getTotalBits();

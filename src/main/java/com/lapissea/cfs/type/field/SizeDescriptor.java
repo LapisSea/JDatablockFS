@@ -2,6 +2,7 @@ package com.lapissea.cfs.type.field;
 
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.type.WordSpace;
+import com.lapissea.util.TextUtil;
 
 import java.util.Objects;
 import java.util.OptionalLong;
@@ -32,11 +33,19 @@ public interface SizeDescriptor<T>{
 		@Override
 		public long variable(T instance){ return size; }
 		@Override
-		public OptionalLong fixed(){ return OptionalLong.of(size); }
+		public OptionalLong getFixed(){ return OptionalLong.of(size); }
 		@Override
-		public OptionalLong max(){ return OptionalLong.of(size); }
+		public OptionalLong getMax(){ return OptionalLong.of(size); }
 		@Override
-		public long min(){ return size; }
+		public long getMin(){ return size; }
+		
+		public String toShortString(){
+			return "{"+size+" "+TextUtil.plural(getWordSpace().friendlyName, (int)size)+"}";
+		}
+		@Override
+		public String toString(){
+			return "Size"+toShortString();
+		}
 	}
 	
 	abstract class Unknown<T> implements SizeDescriptor<T>{
@@ -57,11 +66,28 @@ public interface SizeDescriptor<T>{
 		@Override
 		public WordSpace getWordSpace(){ return wordSpace; }
 		@Override
-		public OptionalLong fixed(){ return OptionalLong.empty(); }
+		public OptionalLong getFixed(){ return OptionalLong.empty(); }
 		@Override
-		public OptionalLong max(){ return max; }
+		public OptionalLong getMax(){ return max; }
 		@Override
-		public long min(){ return min; }
+		public long getMin(){ return min; }
+		
+		@Override
+		public String toString(){
+			return "Size"+toShortString();
+		}
+		public String toShortString(){
+			StringBuilder sb=new StringBuilder();
+			sb.append('{');
+			if(min>0||max.isPresent()){
+				sb.append(min);
+				if(max.isPresent()) sb.append('-').append(max.getAsLong());
+				else sb.append("<?");
+				sb.append(' ');
+			}
+			sb.append(TextUtil.plural(getWordSpace().friendlyName));
+			return sb.append('}').toString();
+		}
 	}
 	
 	default long variableBytes(T instance){
@@ -73,18 +99,18 @@ public interface SizeDescriptor<T>{
 	}
 	
 	default long requireFixed(){
-		return fixed().orElseThrow();
+		return getFixed().orElseThrow();
 	}
 	default long requireMax(){
-		return max().orElseThrow();
+		return getMax().orElseThrow();
 	}
 	
 	
 	WordSpace getWordSpace();
 	
 	long variable(T instance);
-	OptionalLong fixed();
+	OptionalLong getFixed();
 	
-	OptionalLong max();
-	long min();
+	OptionalLong getMax();
+	long getMin();
 }

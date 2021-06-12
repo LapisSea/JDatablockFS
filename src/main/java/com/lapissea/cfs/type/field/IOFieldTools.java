@@ -13,13 +13,11 @@ import com.lapissea.cfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 
-import java.util.Comparator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.OptionalLong;
+import java.util.*;
 import java.util.function.Function;
 import java.util.function.ToLongFunction;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class IOFieldTools{
 	
@@ -67,7 +65,7 @@ public class IOFieldTools{
 		try{
 			return new DepSort<>(fields, f->f.getDependencies().stream().mapToInt(fields::indexOf))
 				       .sort(Comparator.comparingInt((IOField<T, ?> f)->f.getSizeDescriptor().getWordSpace().sortOrder)
-				                       .thenComparingInt(f->f.getSizeDescriptor().fixed().isPresent()?0:1)
+				                       .thenComparingInt(f->f.getSizeDescriptor().getFixed().isPresent()?0:1)
 				                       .thenComparing(f->switch(f.getDependencies().size()){
 					                       case 0 -> "";
 					                       case 1 -> f.getDependencies().get(0).getName();
@@ -80,10 +78,13 @@ public class IOFieldTools{
 	}
 	
 	public static <T extends IOInstance<T>> IOField<T, NumberSize> getDynamicSize(IFieldAccessor<T> field){
-		var dynSiz=field.getAnnotation(IODependency.NumSize.class);
+		Optional<String> dynSiz=Stream.of(
+			Optional.ofNullable(field.getAnnotation(IODependency.NumSize.class)).map(IODependency.NumSize::value),
+			Optional.ofNullable(field.getAnnotation(IODependency.VirtualNumSize.class)).map(IODependency.VirtualNumSize::name)
+		).filter(Optional::isPresent).map(Optional::get).findAny();
 		
-		if(dynSiz==null) return null;
-		var opt=field.getStruct().getFieldsByType(NumberSize.class).filter(f->f.getName().equals(dynSiz.value())).findAny();
+		if(dynSiz.isEmpty()) return null;
+		var opt=field.getStruct().getFieldsByType(NumberSize.class).filter(f->f.getName().equals(dynSiz.get())).findAny();
 		if(opt.isEmpty()) throw new ShouldNeverHappenError("This should have been checked in annotation logic");
 		return opt.get();
 	}

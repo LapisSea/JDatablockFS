@@ -107,4 +107,11 @@ public class Cluster implements ChunkDataProvider{
 	public ChunkCache getChunkCache(){
 		return chunkCache;
 	}
+	
+	@Override
+	public String toString(){
+		return "Cluster{"+
+		       "source="+source+
+		       '}';
+	}
 }

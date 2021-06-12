@@ -36,7 +36,7 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator{
 	}
 	
 	public static Chunk readChunk(@NotNull ChunkDataProvider provider, @NotNull ChunkPointer pointer) throws IOException{
-		if(provider.getSource().getIOSize()<pointer.add(PIPE.getSizeDescriptor().min())) throw new MalformedPointerException(pointer.toString());
+		if(provider.getSource().getIOSize()<pointer.add(PIPE.getSizeDescriptor().getMin())) throw new MalformedPointerException(pointer.toString());
 		Chunk chunk=new Chunk(provider, pointer);
 		chunk.readHeader();
 		return chunk;
@@ -56,10 +56,11 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator{
 	@IOValue
 	private NumberSize nextSize;
 	
+	@NotNull
 	@IOValue
 	@IODependency.NumSize("nextSize")
 	@Nullable
-	private ChunkPointer nextPtr;
+	private ChunkPointer nextPtr=ChunkPointer.NULL;
 	
 	
 	@NotNull
@@ -186,12 +187,14 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator{
 		return provider;
 	}
 	
+	@NotNull
 	public ChunkPointer getNextPtr(){
 		return nextPtr;
 	}
 	
 	private void setNextPtr(ChunkPointer nextPtr){
-		if(Objects.equals(nextPtr, this.nextPtr)) return;
+		Objects.requireNonNull(nextPtr);
+		if(this.nextPtr.equals(nextPtr)) return;
 		this.nextPtr=nextPtr;
 		nextCache=null;
 		markDirty();
@@ -199,14 +202,14 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator{
 	
 	public Chunk next() throws IOException{
 		if(nextCache==null){
-			if(getNextPtr()==null) return null;
+			if(!hasNextPtr()) return null;
 			nextCache=provider.getChunk(getNextPtr());
 		}
 		return nextCache;
 	}
 	
 	public void clearNextPtr(){
-		setNextPtr(null);
+		setNextPtr(ChunkPointer.NULL);
 	}
 	
 	public Chunk nextUnsafe(){
@@ -231,7 +234,7 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator{
 	}
 	
 	public boolean hasNextPtr(){
-		return getNextPtr()!=null;
+		return !getNextPtr().isNull();
 	}
 	
 	public void modifyAndSave(UnsafeConsumer<Chunk, IOException> modifier) throws IOException{

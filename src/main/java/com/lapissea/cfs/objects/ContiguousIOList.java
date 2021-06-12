@@ -25,7 +25,7 @@ public class ContiguousIOList<T extends IOInstance<T>> extends IOInstance.Unmana
 		super(provider, reference);
 		this.type=type;
 		this.elementPipe=ContiguousStructPipe.of(type);
-		sizePerElement=elementPipe.getSizeDescriptor().fixed().orElseThrow();
+		sizePerElement=elementPipe.getSizeDescriptor().getFixed().orElseThrow();
 		
 		try(var io=reference.io(provider)){
 			if(io.getSize()==0) writeManagedFields();
