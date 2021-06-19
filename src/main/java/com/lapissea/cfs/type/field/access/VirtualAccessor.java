@@ -85,51 +85,51 @@ public class VirtualAccessor<CTyp extends IOInstance<CTyp>> implements IFieldAcc
 	
 	@Override
 	public double getDouble(CTyp instance){
-		throw NotImplementedException.infer();//TODO: implement VirtualAccessor.getDouble()
+		return (double)get(instance);
 	}
 	@Override
 	public void setDouble(CTyp instance, double value){
-		throw NotImplementedException.infer();//TODO: implement VirtualAccessor.setDouble()
+		set(instance, value);
 	}
 	@Override
 	public float getFloat(CTyp instance){
-		throw NotImplementedException.infer();//TODO: implement VirtualAccessor.getFloat()
+		return (float)get(instance);
 	}
 	@Override
 	public void setFloat(CTyp instance, float value){
-		throw NotImplementedException.infer();//TODO: implement VirtualAccessor.setFloat()
+		set(instance, value);
 	}
 	@Override
 	public byte getByte(CTyp instance){
-		throw NotImplementedException.infer();//TODO: implement VirtualAccessor.getByte()
+		return (byte)get(instance);
 	}
 	@Override
 	public void setByte(CTyp instance, byte value){
-		throw NotImplementedException.infer();//TODO: implement VirtualAccessor.setByte()
+		set(instance, value);
 	}
 	@Override
 	public boolean getBoolean(CTyp instance){
-		throw NotImplementedException.infer();//TODO: implement VirtualAccessor.getBoolean()
+		return (boolean)get(instance);
 	}
 	@Override
 	public void setBoolean(CTyp instance, boolean value){
-		throw NotImplementedException.infer();//TODO: implement VirtualAccessor.setBoolean()
+		set(instance, value);
 	}
 	@Override
 	public long getLong(CTyp instance){
-		throw NotImplementedException.infer();//TODO: implement VirtualAccessor.getLong()
+		return (long)get(instance);
 	}
 	@Override
 	public void setLong(CTyp instance, long value){
-		throw NotImplementedException.infer();//TODO: implement VirtualAccessor.setLong()
+		set(instance, value);
 	}
 	@Override
 	public int getInt(CTyp instance){
-		throw NotImplementedException.infer();//TODO: implement VirtualAccessor.getInt()
+		return (int)get(instance);
 	}
 	@Override
 	public void setInt(CTyp instance, int value){
-		throw NotImplementedException.infer();//TODO: implement VirtualAccessor.setInt()
+		set(instance, value);
 	}
 	
 	private String namString(){
