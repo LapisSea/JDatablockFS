@@ -9,20 +9,21 @@ public class GlobalConfig{
 	public static       boolean PRINT_COMPILATION;
 	
 	static{
-		boolean assertEnabled=false;
+		DEBUG_VALIDATION=testAssertion();
 		
-		try{
-			assert false;
-		}catch(AssertionError e){
-			assertEnabled=true;
-		}
-		
-		DEBUG_VALIDATION=assertEnabled;
-		
-		PRINT_COMPILATION=UtilL.sysPropertyByClass(GlobalConfig.class, "printCompilation", true, Boolean::valueOf);
+		PRINT_COMPILATION=UtilL.sysPropertyByClass(GlobalConfig.class, "printCompilation", false, Boolean::valueOf);
 		
 		if(DEBUG_VALIDATION){
 			LogUtil.println("Running with debugging");
+		}
+	}
+	
+	private static boolean testAssertion(){
+		try{
+			assert false;
+			return false;
+		}catch(AssertionError e){
+			return true;
 		}
 	}
 	

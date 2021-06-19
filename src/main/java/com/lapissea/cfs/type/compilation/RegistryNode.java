@@ -1,5 +1,6 @@
 package com.lapissea.cfs.type.compilation;
 
+import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.IOField;
@@ -15,8 +16,7 @@ public interface RegistryNode{
 		Class<?> getType();
 		@Override
 		default boolean canCreate(Type type){
-			if(type instanceof Class<?> c) return UtilL.instanceOf(c, getType());
-			return false;
+			return UtilL.instanceOf(Utils.typeToRaw(type), getType());
 		}
 	}
 	

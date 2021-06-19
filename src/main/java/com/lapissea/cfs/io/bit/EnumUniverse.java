@@ -8,11 +8,14 @@ import sun.misc.Unsafe;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.*;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.IntFunction;
 
 public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
 	
-	private static final Map<Class<? extends Enum>, EnumUniverse<?>> CACHE=new HashMap<>();
+	private static final Map<Class<? extends Enum>, EnumUniverse<?>> CACHE     =new HashMap<>();
+	private static final ReadWriteLock                               CACHE_LOCK=new ReentrantReadWriteLock();
 	
 	private interface UGet{
 		<E extends Enum<E>> E[] get(Class<E> type);
@@ -89,11 +92,30 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
 	
 	@SuppressWarnings("unchecked")
 	public static <T extends Enum<T>> EnumUniverse<T> get(Class<T> type){
-		EnumUniverse<T> flags=(EnumUniverse<T>)CACHE.get(type);
+		EnumUniverse<T> flags;
+		
+		var read=CACHE_LOCK.readLock();
+		try{
+			read.lock();
+			flags=(EnumUniverse<T>)CACHE.get(type);
+		}finally{
+			read.unlock();
+		}
+		
 		if(flags==null){
-			synchronized(CACHE){
-				ensureEnum(type);
-				flags=(EnumUniverse<T>)CACHE.computeIfAbsent(type, EnumUniverse::new);
+			ensureEnum(type);
+			var write=CACHE_LOCK.writeLock();
+			try{
+				write.lock();
+				
+				flags=(EnumUniverse<T>)CACHE.get(type);
+				if(flags==null){
+					var newFlags=new EnumUniverse<>(type);
+					CACHE.put(type, newFlags);
+					return newFlags;
+				}
+			}finally{
+				write.unlock();
 			}
 		}
 		return flags;

@@ -2,10 +2,10 @@ package test.junit;
 
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.ChunkDataProvider;
-import com.lapissea.cfs.objects.ContiguousIOList;
-import com.lapissea.cfs.objects.IOList;
+import com.lapissea.cfs.objects.collections.ContiguousIOList;
+import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.TypeDefinition;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -105,7 +105,7 @@ public class GeneralTests{
 		var chunk=AllocateTicket.bytes(64).submit(provider);
 		
 		var ref=chunk.getPtr().makeReference(0);
-		var typ=Struct.of(Dummy.class);
+		var typ=TypeDefinition.of(ContiguousIOList.class, Dummy.class);
 		
 		IOList<Dummy> list=new ContiguousIOList<>(provider, ref, typ);
 		

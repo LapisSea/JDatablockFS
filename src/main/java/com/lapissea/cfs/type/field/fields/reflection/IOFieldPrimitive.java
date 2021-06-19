@@ -1,5 +1,6 @@
 package com.lapissea.cfs.type.field.fields.reflection;
 
+import com.lapissea.cfs.chunk.ChunkDataProvider;
 import com.lapissea.cfs.io.bit.BitReader;
 import com.lapissea.cfs.io.bit.BitWriter;
 import com.lapissea.cfs.io.content.ContentReader;
@@ -44,7 +45,10 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		
 		
 		public FDouble(IFieldAccessor<T> field){
-			super(field, LONG);
+			this(field, false);
+		}
+		public FDouble(IFieldAccessor<T> field, boolean forceFixed){
+			super(field, forceFixed, LONG);
 		}
 		@Override
 		protected EnumSet<NumberSize> allowedSizes(){
@@ -77,7 +81,7 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
-		public void read(ContentReader src, T instance) throws IOException{
+		public void read(ChunkDataProvider provider, ContentReader src, T instance) throws IOException{
 			var size=getSize(instance);
 			setValue(instance, size.readFloating(src));
 		}
@@ -96,7 +100,10 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		
 		
 		public FFloat(IFieldAccessor<T> field){
-			super(field, INT);
+			this(field, false);
+		}
+		public FFloat(IFieldAccessor<T> field, boolean forceFixed){
+			super(field, forceFixed, INT);
 		}
 		@Override
 		protected EnumSet<NumberSize> allowedSizes(){
@@ -129,7 +136,7 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
-		public void read(ContentReader src, T instance) throws IOException{
+		public void read(ChunkDataProvider provider, ContentReader src, T instance) throws IOException{
 			var size=getSize(instance);
 			setValue(instance, (float)size.readFloating(src));
 		}
@@ -147,7 +154,10 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 	public static class FLong<T extends IOInstance<T>> extends IOFieldPrimitive<T, Long>{
 		
 		public FLong(IFieldAccessor<T> field){
-			super(field, LONG);
+			this(field, false);
+		}
+		public FLong(IFieldAccessor<T> field, boolean forceFixed){
+			super(field, forceFixed, LONG);
 		}
 		
 		private long getValue(T instance){
@@ -176,7 +186,7 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
-		public void read(ContentReader src, T instance) throws IOException{
+		public void read(ChunkDataProvider provider, ContentReader src, T instance) throws IOException{
 			var size=getSize(instance);
 			setValue(instance, size.read(src));
 		}
@@ -195,7 +205,10 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		
 		
 		public FInt(IFieldAccessor<T> field){
-			super(field, INT);
+			this(field, false);
+		}
+		public FInt(IFieldAccessor<T> field, boolean forceFixed){
+			super(field, forceFixed, INT);
 		}
 		@Override
 		protected EnumSet<NumberSize> allowedSizes(){
@@ -230,7 +243,7 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
-		public void read(ContentReader src, T instance) throws IOException{
+		public void read(ChunkDataProvider provider, ContentReader src, T instance) throws IOException{
 			var size=getSize(instance);
 			setValue(instance, (int)size.read(src));
 		}
@@ -248,7 +261,11 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 	public static class FByte<T extends IOInstance<T>> extends IOFieldPrimitive<T, Byte>{
 		
 		public FByte(IFieldAccessor<T> field){
-			super(field, BYTE);
+			this(field, false);
+		}
+		
+		public FByte(IFieldAccessor<T> field, boolean forceFixed){
+			super(field, forceFixed, BYTE);
 		}
 		@Override
 		protected EnumSet<NumberSize> allowedSizes(){
@@ -282,7 +299,7 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
-		public void read(ContentReader src, T instance) throws IOException{
+		public void read(ChunkDataProvider provider, ContentReader src, T instance) throws IOException{
 			setValue(instance, src.readInt1());
 		}
 		
@@ -345,19 +362,21 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 	}
 	
+	private final boolean                 forceFixed;
 	private final NumberSize              size;
 	private       Function<T, NumberSize> dynamicSize;
 	private       SizeDescriptor<T>       sizeDescriptor;
 	
-	protected IOFieldPrimitive(IFieldAccessor<T> field, NumberSize size){
+	protected IOFieldPrimitive(IFieldAccessor<T> field, boolean forceFixed, NumberSize size){
 		super(field);
+		this.forceFixed=forceFixed;
 		this.size=size;
 	}
 	
 	@Override
 	public void init(){
 		super.init();
-		var field  =IOFieldTools.getDynamicSize(getAccessor());
+		var field  =forceFixed?null:IOFieldTools.getDynamicSize(getAccessor());
 		var allowed=allowedSizes();
 		if(field!=null){
 			dynamicSize=instance->{
@@ -369,7 +388,7 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 				allowed.stream().mapToLong(NumberSize::bytes).min().orElse(0),
 				allowed.stream().mapToLong(NumberSize::bytes).max()){
 				@Override
-				public long variable(T instance){
+				public long calcUnknown(T instance){
 					return getSize(instance).bytes;
 				}
 			};
@@ -393,5 +412,13 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 	@Override
 	public SizeDescriptor<T> getSizeDescriptor(){
 		return sizeDescriptor;
+	}
+	@Override
+	public IOField<T, ValueType> implMaxAsFixedSize(){
+		try{
+			return (IOField<T, ValueType>)getClass().getConstructor(IFieldAccessor.class, boolean.class).newInstance(getAccessor(), true);
+		}catch(ReflectiveOperationException e){
+			throw new RuntimeException(e);
+		}
 	}
 }

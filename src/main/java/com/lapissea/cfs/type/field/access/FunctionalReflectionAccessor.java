@@ -3,6 +3,7 @@ package com.lapissea.cfs.type.field.access;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.objects.INumber;
+import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.util.NotNull;
@@ -11,21 +12,20 @@ import com.lapissea.util.UtilL;
 
 import java.lang.annotation.Annotation;
 import java.lang.invoke.MethodHandle;
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.Optional;
 import java.util.function.LongFunction;
 
-public class ReflectionAccessor<CTyp extends IOInstance<CTyp>> implements IFieldAccessor<CTyp>{
+public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> implements IFieldAccessor<CTyp>{
 	
-	public static class INum<CTyp extends IOInstance<CTyp>> extends ReflectionAccessor<CTyp>{
+	public static class INum<CTyp extends IOInstance<CTyp>> extends FunctionalReflectionAccessor<CTyp>{
 		
 		private final LongFunction<INumber> constructor;
 		
-		public INum(Struct<CTyp> struct, Field field, Optional<Method> getter, Optional<Method> setter, String name, Type genericType){
-			super(struct, field, getter, setter, name, genericType);
+		public INum(Struct<CTyp> struct, GetAnnotation annotations, Method getter, Method setter, String name, Type genericType){
+			super(struct, annotations, getter, setter, name, genericType);
 			constructor=Utils.findConstructor(getType(), LongFunction.class, long.class);
 		}
 		@Override
@@ -48,40 +48,37 @@ public class ReflectionAccessor<CTyp extends IOInstance<CTyp>> implements IField
 	private final Type     genericType;
 	private final Class<?> rawType;
 	
-	private final Field        field;
 	private final MethodHandle getter;
 	private final MethodHandle setter;
 	
-	public ReflectionAccessor(Struct<CTyp> struct, Field field, Optional<Method> getter, Optional<Method> setter, String name, Type genericType){
+	private final GetAnnotation annotations;
+	
+	public FunctionalReflectionAccessor(Struct<CTyp> struct, GetAnnotation annotations, Method getter, Method setter, String name, Type genericType){
 		this.struct=struct;
-		this.field=field;
+		this.annotations=annotations;
 		this.name=name;
 		this.genericType=genericType;
 		this.rawType=(Class<?>)(genericType instanceof ParameterizedType p?p.getRawType():genericType);
 		
-		getter.ifPresent(get->{
-			if(!Utils.genericInstanceOf(get.getReturnType(), genericType)){
-				throw new MalformedStructLayout("getter returns "+get.getReturnType()+" but "+genericType+" is required\n"+get);
-			}
-			if(get.getParameterCount()!=0){
-				throw new MalformedStructLayout("getter must not have arguments\n"+get);
-			}
-		});
+		if(!Utils.genericInstanceOf(getter.getReturnType(), genericType)){
+			throw new MalformedStructLayout("getter returns "+getter.getReturnType()+" but "+genericType+" is required\n"+getter);
+		}
+		if(getter.getParameterCount()!=0){
+			throw new MalformedStructLayout("getter must not have arguments\n"+getter);
+		}
 		
-		setter.ifPresent(set->{
-			if(!Utils.genericInstanceOf(set.getReturnType(), Void.TYPE)){
-				throw new MalformedStructLayout("setter returns "+set.getReturnType()+" but "+genericType+" is required\n"+set);
-			}
-			if(set.getParameterCount()!=1){
-				throw new MalformedStructLayout("setter must have 1 argument of "+genericType+"\n"+set);
-			}
-			if(!Utils.genericInstanceOf(set.getGenericParameterTypes()[0], genericType)){
-				throw new MalformedStructLayout("setter argument is "+set.getGenericParameterTypes()[0]+" but "+genericType+" is required\n"+set);
-			}
-		});
+		if(!Utils.genericInstanceOf(setter.getReturnType(), Void.TYPE)){
+			throw new MalformedStructLayout("setter returns "+setter.getReturnType()+" but "+genericType+" is required\n"+setter);
+		}
+		if(setter.getParameterCount()!=1){
+			throw new MalformedStructLayout("setter must have 1 argument of "+genericType+"\n"+setter);
+		}
+		if(!Utils.genericInstanceOf(setter.getGenericParameterTypes()[0], genericType)){
+			throw new MalformedStructLayout("setter argument is "+setter.getGenericParameterTypes()[0]+" but "+genericType+" is required\n"+setter);
+		}
 		
-		this.getter=getter.map(Utils::makeMethodHandle).orElse(null);
-		this.setter=setter.map(Utils::makeMethodHandle).orElse(null);
+		this.getter=Utils.makeMethodHandle(getter);
+		this.setter=Utils.makeMethodHandle(setter);
 	}
 	
 	@Override
@@ -92,11 +89,7 @@ public class ReflectionAccessor<CTyp extends IOInstance<CTyp>> implements IField
 	@Nullable
 	@Override
 	public <T extends Annotation> Optional<T> getAnnotation(Class<T> annotationClass){
-		return Optional.ofNullable(field.getAnnotation(annotationClass));
-	}
-	@Override
-	public boolean hasAnnotation(Class<? extends Annotation> annotationClass){
-		return field.isAnnotationPresent(annotationClass);
+		return Optional.ofNullable(annotations.get(annotationClass));
 	}
 	
 	@NotNull
@@ -125,11 +118,7 @@ public class ReflectionAccessor<CTyp extends IOInstance<CTyp>> implements IField
 	@Override
 	public Object get(CTyp instance){
 		try{
-			if(getter!=null){
-				return getter.invoke(instance);
-			}else{
-				return field.get(instance);
-			}
+			return getter.invoke(instance);
 		}catch(Throwable e){
 			throw UtilL.uncheckedThrow(e);
 		}
@@ -138,11 +127,7 @@ public class ReflectionAccessor<CTyp extends IOInstance<CTyp>> implements IField
 	@Override
 	public void set(CTyp instance, Object value){
 		try{
-			if(setter!=null){
-				setter.invoke(instance, value);
-			}else{
-				field.set(instance, value);
-			}
+			setter.invoke(instance, value);
 		}catch(Throwable e){
 			throw UtilL.uncheckedThrow(e);
 		}
@@ -151,11 +136,7 @@ public class ReflectionAccessor<CTyp extends IOInstance<CTyp>> implements IField
 	@Override
 	public double getDouble(CTyp instance){
 		try{
-			if(getter!=null){
-				return (double)getter.invoke(instance);
-			}else{
-				return field.getDouble(instance);
-			}
+			return (double)getter.invoke(instance);
 		}catch(Throwable e){
 			throw UtilL.uncheckedThrow(e);
 		}
@@ -164,11 +145,7 @@ public class ReflectionAccessor<CTyp extends IOInstance<CTyp>> implements IField
 	@Override
 	public void setDouble(CTyp instance, double value){
 		try{
-			if(setter!=null){
-				setter.invoke(instance, value);
-			}else{
-				field.setDouble(instance, value);
-			}
+			setter.invoke(instance, value);
 		}catch(Throwable e){
 			throw UtilL.uncheckedThrow(e);
 		}
@@ -177,11 +154,7 @@ public class ReflectionAccessor<CTyp extends IOInstance<CTyp>> implements IField
 	@Override
 	public float getFloat(CTyp instance){
 		try{
-			if(getter!=null){
-				return (float)getter.invoke(instance);
-			}else{
-				return field.getFloat(instance);
-			}
+			return (float)getter.invoke(instance);
 		}catch(Throwable e){
 			throw UtilL.uncheckedThrow(e);
 		}
@@ -190,11 +163,7 @@ public class ReflectionAccessor<CTyp extends IOInstance<CTyp>> implements IField
 	@Override
 	public void setFloat(CTyp instance, float value){
 		try{
-			if(setter!=null){
-				setter.invoke(instance, value);
-			}else{
-				field.setFloat(instance, value);
-			}
+			setter.invoke(instance, value);
 		}catch(Throwable e){
 			throw UtilL.uncheckedThrow(e);
 		}
@@ -203,11 +172,7 @@ public class ReflectionAccessor<CTyp extends IOInstance<CTyp>> implements IField
 	@Override
 	public byte getByte(CTyp instance){
 		try{
-			if(getter!=null){
-				return (byte)getter.invoke(instance);
-			}else{
-				return field.getByte(instance);
-			}
+			return (byte)getter.invoke(instance);
 		}catch(Throwable e){
 			throw UtilL.uncheckedThrow(e);
 		}
@@ -216,11 +181,7 @@ public class ReflectionAccessor<CTyp extends IOInstance<CTyp>> implements IField
 	@Override
 	public void setByte(CTyp instance, byte value){
 		try{
-			if(setter!=null){
-				setter.invoke(instance, value);
-			}else{
-				field.setByte(instance, value);
-			}
+			setter.invoke(instance, value);
 		}catch(Throwable e){
 			throw UtilL.uncheckedThrow(e);
 		}
@@ -229,11 +190,7 @@ public class ReflectionAccessor<CTyp extends IOInstance<CTyp>> implements IField
 	@Override
 	public boolean getBoolean(CTyp instance){
 		try{
-			if(getter!=null){
-				return (boolean)getter.invoke(instance);
-			}else{
-				return field.getBoolean(instance);
-			}
+			return (boolean)getter.invoke(instance);
 		}catch(Throwable e){
 			throw UtilL.uncheckedThrow(e);
 		}
@@ -242,11 +199,7 @@ public class ReflectionAccessor<CTyp extends IOInstance<CTyp>> implements IField
 	@Override
 	public void setBoolean(CTyp instance, boolean value){
 		try{
-			if(setter!=null){
-				setter.invoke(instance, value);
-			}else{
-				field.setBoolean(instance, value);
-			}
+			setter.invoke(instance, value);
 		}catch(Throwable e){
 			throw UtilL.uncheckedThrow(e);
 		}
@@ -256,11 +209,7 @@ public class ReflectionAccessor<CTyp extends IOInstance<CTyp>> implements IField
 	@Override
 	public long getLong(CTyp instance){
 		try{
-			if(getter!=null){
-				return (long)getter.invoke(instance);
-			}else{
-				return field.getLong(instance);
-			}
+			return (long)getter.invoke(instance);
 		}catch(Throwable e){
 			throw UtilL.uncheckedThrow(e);
 		}
@@ -269,11 +218,7 @@ public class ReflectionAccessor<CTyp extends IOInstance<CTyp>> implements IField
 	@Override
 	public void setLong(CTyp instance, long value){
 		try{
-			if(setter!=null){
-				setter.invoke(instance, value);
-			}else{
-				field.setLong(instance, value);
-			}
+			setter.invoke(instance, value);
 		}catch(Throwable e){
 			throw UtilL.uncheckedThrow(e);
 		}
@@ -282,11 +227,7 @@ public class ReflectionAccessor<CTyp extends IOInstance<CTyp>> implements IField
 	@Override
 	public int getInt(CTyp instance){
 		try{
-			if(getter!=null){
-				return (int)getter.invoke(instance);
-			}else{
-				return field.getInt(instance);
-			}
+			return (int)getter.invoke(instance);
 		}catch(Throwable e){
 			throw UtilL.uncheckedThrow(e);
 		}
@@ -295,11 +236,7 @@ public class ReflectionAccessor<CTyp extends IOInstance<CTyp>> implements IField
 	@Override
 	public void setInt(CTyp instance, int value){
 		try{
-			if(setter!=null){
-				setter.invoke(instance, value);
-			}else{
-				field.setInt(instance, value);
-			}
+			setter.invoke(instance, value);
 		}catch(Throwable e){
 			throw UtilL.uncheckedThrow(e);
 		}

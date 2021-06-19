@@ -1,0 +1,87 @@
+package com.lapissea.cfs.type.field.fields.reflection;
+
+import com.lapissea.cfs.chunk.AllocateTicket;
+import com.lapissea.cfs.chunk.Chunk;
+import com.lapissea.cfs.chunk.ChunkDataProvider;
+import com.lapissea.cfs.io.content.ContentReader;
+import com.lapissea.cfs.io.content.ContentWriter;
+import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
+import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
+import com.lapissea.cfs.io.instancepipe.StructPipe;
+import com.lapissea.cfs.objects.Reference;
+import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.TypeDefinition;
+import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.SizeDescriptor;
+import com.lapissea.cfs.type.field.access.IFieldAccessor;
+
+import java.io.IOException;
+
+public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType extends IOInstance.Unmanaged<ValueType>> extends IOField.Ref<T, ValueType>{
+	
+	
+	private final SizeDescriptor<T>           descriptor;
+	private final Struct.Unmanaged<ValueType> struct;
+	private final StructPipe<ValueType>       instancePipe;
+	private final StructPipe<Reference>       referencePipe;
+	
+	public IOFieldUnmanagedObjectReference(IFieldAccessor<T> accessor){
+		this(accessor, false);
+	}
+	public IOFieldUnmanagedObjectReference(IFieldAccessor<T> accessor, boolean fixed){
+		super(accessor);
+		
+		if(fixed){
+			referencePipe=FixedContiguousStructPipe.of(Reference.class);
+			descriptor=new SizeDescriptor.Fixed<>(referencePipe.getSizeDescriptor().requireFixed());
+		}else{
+			referencePipe=ContiguousStructPipe.of(Reference.class);
+			
+			SizeDescriptor<Reference> s=referencePipe.getSizeDescriptor();
+			descriptor=SizeDescriptor.overrideUnknown(s, instance->s.calcUnknown(getReference(instance)));
+		}
+		
+		struct=(Struct.Unmanaged<ValueType>)Struct.Unmanaged.ofUnknown(getAccessor().getType());
+		instancePipe=ContiguousStructPipe.of(struct);
+	}
+	
+	@Override
+	public void allocate(T instance, ChunkDataProvider provider) throws IOException{
+		Chunk chunk=AllocateTicket.bytes(instancePipe.getSizeDescriptor().fixedOrMin()).submit(provider);
+		var   val  =makeValueObject(provider, chunk.getPtr().makeReference());
+		set(instance, val);
+	}
+	
+	@Override
+	public Reference getReference(T instance){
+		return getReference(get(instance));
+	}
+	@Override
+	public Ref<T, ValueType> implMaxAsFixedSize(){
+		return new IOFieldUnmanagedObjectReference<>(getAccessor(), true);
+	}
+	
+	private Reference getReference(ValueType val){
+		if(val==null) return new Reference();
+		return val.getReference();
+	}
+	private ValueType makeValueObject(ChunkDataProvider provider, Reference readNew){
+		return struct.requireUnmanagedConstructor().create(provider, readNew, TypeDefinition.of(getAccessor().getGenericType()));
+	}
+	
+	@Override
+	public SizeDescriptor<T> getSizeDescriptor(){
+		return descriptor;
+	}
+	
+	@Override
+	public void write(ContentWriter dest, T instance) throws IOException{
+		referencePipe.write(dest, getReference(instance));
+	}
+	
+	@Override
+	public void read(ChunkDataProvider provider, ContentReader src, T instance) throws IOException{
+		set(instance, makeValueObject(provider, referencePipe.readNew(provider, src)));
+	}
+}

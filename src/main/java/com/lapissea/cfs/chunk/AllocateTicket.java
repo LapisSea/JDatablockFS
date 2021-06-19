@@ -1,24 +1,35 @@
 package com.lapissea.cfs.chunk;
 
 import com.lapissea.cfs.io.RandomIO;
+import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
+import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.function.UnsafeBiConsumer;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Predicate;
 
-public record AllocateTicket(long bytes, boolean disableResizing, ChunkPointer next, @Nullable Predicate<Chunk> approve, @Nullable UnsafeConsumer<Chunk, IOException> dataPopulator){
+public record AllocateTicket(long bytes, boolean disableResizing, ChunkPointer next, Optional<Predicate<Chunk>> approve, @Nullable UnsafeConsumer<Chunk, IOException> dataPopulator){
 	
-	public static final AllocateTicket DEFAULT=new AllocateTicket(0, false, ChunkPointer.NULL, null, null);
+	public static final AllocateTicket DEFAULT=new AllocateTicket(0, false, ChunkPointer.NULL, Optional.empty(), null);
 	
 	public AllocateTicket{
 		assert bytes>=0;
 		Objects.requireNonNull(next);
+		Objects.requireNonNull(approve);
 	}
 	
+	public static <IO extends IOInstance<IO>> AllocateTicket withData(Class<? extends StructPipe> pipeType, IO data){
+		return withData(StructPipe.of(pipeType, data.getThisStruct()), data);
+	}
+	
+	public static <IO extends IOInstance<IO>> AllocateTicket withData(StructPipe<IO> pipe, IO data){
+		return bytes(pipe.getSizeDescriptor().calcUnknown(data)).withDataPopulated((p, io)->pipe.write(io, data));
+	}
 	
 	public static AllocateTicket bytes(long requestedBytes){
 		return DEFAULT.withBytes(requestedBytes);
@@ -38,7 +49,17 @@ public record AllocateTicket(long bytes, boolean disableResizing, ChunkPointer n
 	}
 	
 	public AllocateTicket withApproval(Predicate<Chunk> approve){
-		return new AllocateTicket(bytes, disableResizing, next, approve, dataPopulator);
+		return new AllocateTicket(bytes, disableResizing, next, this.approve.map(approve::and), dataPopulator);
+	}
+	
+	public <IO extends IOInstance<IO>> AllocateTicket withDataPopulated(Class<? extends StructPipe> pipeType, IO data){
+		return withDataPopulated(StructPipe.of(pipeType, data.getThisStruct()), data);
+	}
+	
+	public <IO extends IOInstance<IO>> AllocateTicket withDataPopulated(StructPipe<IO> pipe, IO data){
+		Objects.requireNonNull(pipe);
+		Objects.requireNonNull(data);
+		return withDataPopulated((p, io)->pipe.write(io, data));
 	}
 	
 	public AllocateTicket withDataPopulated(UnsafeBiConsumer<ChunkDataProvider, RandomIO, IOException> dataPopulator){
@@ -73,7 +94,7 @@ public record AllocateTicket(long bytes, boolean disableResizing, ChunkPointer n
 	}
 	
 	public boolean approve(Chunk chunk){
-		return approve==null||approve.test(chunk);
+		return approve.isEmpty()||approve.get().test(chunk);
 	}
 	
 	public void populate(Chunk chunk) throws IOException{

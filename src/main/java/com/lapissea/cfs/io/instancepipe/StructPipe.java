@@ -2,11 +2,12 @@ package com.lapissea.cfs.io.instancepipe;
 
 import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.chunk.ChunkDataProvider;
+import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
-import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
@@ -14,7 +15,6 @@ import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
-import java.io.Serial;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,39 +24,45 @@ import java.util.function.Function;
 
 public abstract class StructPipe<T extends IOInstance<T>>{
 	
-	private static class StructGroup<T extends IOInstance<T>> extends HashMap<Struct<T>, StructPipe<T>>{
-		@Serial
-		private static final long serialVersionUID=-4101348902993564538L;
+	private static class StructGroup<P extends StructPipe<?>> extends HashMap<Struct<?>, P>{
+		
+		private final Function<Struct<?>, P> lConstructor;
+		private final Class<P>               type;
+		
+		private StructGroup(Class<P> type){
+			this.type=type;
+			try{
+				lConstructor=Utils.makeLambda(type.getConstructor(Struct.class), Function.class);
+			}catch(ReflectiveOperationException e){
+				throw new RuntimeException("Failed to get pipe constructor", e);
+			}
+		}
+		
+		<T extends IOInstance<T>> P make(Struct<T> struct){
+			var cached=get(struct);
+			if(cached!=null) return cached;
+			
+			P created=lConstructor.apply(struct);
+			
+			if(GlobalConfig.PRINT_COMPILATION){
+				LogUtil.println("Compiled "+struct.getType().getSimpleName()+" with "+TextUtil.toNamedPrettyJson(created, true));
+			}
+			
+			put(struct, created);
+			return created;
+		}
 	}
 	
-	private static final Map<Class<? extends StructPipe>, StructGroup<?>> CACHE     =new HashMap<>();
-	private static final Lock                                             CACHE_LOCK=new ReentrantLock();
+	private static final Map<Class<? extends StructPipe<?>>, StructGroup<?>> CACHE     =new HashMap<>();
+	private static final Lock                                                CACHE_LOCK=new ReentrantLock();
 	
 	public static <T extends IOInstance<T>, P extends StructPipe<T>> P of(Class<P> type, Struct<T> struct){
 		try{
 			CACHE_LOCK.lock();
 			
-			var group=(StructGroup<T>)CACHE.computeIfAbsent(type, t->new StructGroup<>());
+			StructGroup<P> group=(StructGroup<P>)CACHE.computeIfAbsent(type, StructGroup::new);
 			
-			var cached=(P)group.get(struct);
-			if(cached!=null) return cached;
-			
-			Function<Struct<T>, P> lConstructor;
-			try{
-				lConstructor=Utils.makeLambda(type.getConstructor(StructPipe.class.getConstructors()[0].getParameterTypes()), Function.class);
-			}catch(ReflectiveOperationException e){
-				throw new RuntimeException("Failed to get pipe constructor", e);
-			}
-			var created=lConstructor.apply(struct);
-			
-			if(GlobalConfig.PRINT_COMPILATION){
-				LogUtil.println("Compiled pipe "+type.getSimpleName()+" for: "+struct.getType().getSimpleName()+"\n"+
-				                TextUtil.toTable("specificFields", created.getSpecificFields())+"\n"+
-				                "Size info "+TextUtil.toNamedPrettyJson(created.getSizeDescriptor()));
-			}
-			
-			group.put(struct, created);
-			return created;
+			return group.make(struct);
 		}finally{
 			CACHE_LOCK.unlock();
 		}
@@ -69,19 +75,32 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		this.type=type;
 	}
 	
+	public void write(RandomIO.Creator dest, T instance) throws IOException{
+		try(var io=dest.io()){
+			write(io, instance);
+		}
+	}
+	public T read(ChunkDataProvider provider, RandomIO.Creator src, T instance) throws IOException{
+		try(var io=src.io()){
+			return read(provider, io, instance);
+		}
+	}
+	
 	public abstract void write(ContentWriter dest, T instance) throws IOException;
-	public abstract T read(ContentReader src, T instance) throws IOException;
+	public abstract T read(ChunkDataProvider provider, ContentReader src, T instance) throws IOException;
 	
 	public SizeDescriptor<T> getSizeDescriptor(){
 		if(sizeDescription==null){
 			var fields=getSpecificFields();
-			var fixed =IOFieldTools.sumVarsIfAll(fields, SizeDescriptor::getFixed);
-			if(fixed.isPresent()) sizeDescription=new SizeDescriptor.Fixed<>(WordSpace.BYTE, fixed.getAsLong());
+			var fixed =IOFieldTools.sumVarsIfAll(fields, desc->desc.toBytes(desc.getFixed()));
+			if(fixed.isPresent()) sizeDescription=new SizeDescriptor.Fixed<>(fixed.getAsLong());
 			else{
-				sizeDescription=new SizeDescriptor.Unknown<T>(WordSpace.BYTE, IOFieldTools.sumVars(fields, SizeDescriptor::getMin), IOFieldTools.sumVarsIfAll(fields, SizeDescriptor::getMax)){
+				var unknownFields=fields.stream().filter(f->!f.getSizeDescriptor().hasFixed()).toList();
+				var knownFixed   =IOFieldTools.sumVars(fields, d->d.getFixed().orElse(0));
+				sizeDescription=new SizeDescriptor.Unknown<>(IOFieldTools.sumVars(fields, siz->siz.toBytes(siz.getMin())), IOFieldTools.sumVarsIfAll(fields, siz->siz.toBytes(siz.getMax()))){
 					@Override
-					public long variable(T instance){
-						return IOFieldTools.sumVars(fields, d->d.variable(instance));
+					public long calcUnknown(T instance){
+						return knownFixed+IOFieldTools.sumVars(unknownFields, d->d.calcUnknown(instance));
 					}
 				};
 			}
@@ -89,14 +108,19 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		return sizeDescription;
 	}
 	
-	public T readNew(ContentReader src) throws IOException{
+	public T readNew(ChunkDataProvider provider, RandomIO.Creator src) throws IOException{
+		try(var io=src.io()){
+			return readNew(provider, io);
+		}
+	}
+	public T readNew(ChunkDataProvider provider, ContentReader src) throws IOException{
 		T instance=type.requireEmptyConstructor().get();
-		return read(src, instance);
+		return read(provider, src, instance);
 	}
 	
 	public Struct<T> getType(){
 		return type;
 	}
 	
-	protected abstract List<IOField<T, ?>> getSpecificFields();
+	public abstract List<IOField<T, ?>> getSpecificFields();
 }

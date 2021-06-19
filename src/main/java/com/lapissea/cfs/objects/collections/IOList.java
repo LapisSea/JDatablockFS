@@ -1,4 +1,4 @@
-package com.lapissea.cfs.objects;
+package com.lapissea.cfs.objects.collections;
 
 import com.lapissea.cfs.IterablePP;
 

@@ -171,6 +171,10 @@ public enum NumberSize{
 		return num<maxSize;
 	}
 	
+	public long remaining(long num){
+		return maxSize-num;
+	}
+	
 	public void ensureCanFit(@Nullable ChunkPointer num) throws BitDepthOutOfSpaceException{
 		ensureCanFit(ChunkPointer.getValueNullable(num));
 	}

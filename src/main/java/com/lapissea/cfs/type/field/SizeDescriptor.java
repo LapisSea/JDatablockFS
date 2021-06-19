@@ -1,18 +1,20 @@
 package com.lapissea.cfs.type.field;
 
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.util.TextUtil;
 
 import java.util.Objects;
 import java.util.OptionalLong;
+import java.util.function.ToLongFunction;
 
-public interface SizeDescriptor<T>{
+public interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 	
-	final class Fixed<T> implements SizeDescriptor<T>{
+	final class Fixed<T extends IOInstance<T>> implements SizeDescriptor<T>{
 		
 		private static final SizeDescriptor<?> SINGLE_BIT=new Fixed<>(WordSpace.BIT, 1);
-		public static <T> SizeDescriptor<T> singleBit(){
+		public static <T extends IOInstance<T>> SizeDescriptor<T> singleBit(){
 			return (SizeDescriptor<T>)SINGLE_BIT;
 		}
 		
@@ -31,7 +33,10 @@ public interface SizeDescriptor<T>{
 		@Override
 		public WordSpace getWordSpace(){ return wordSpace; }
 		@Override
-		public long variable(T instance){ return size; }
+		public long calcUnknown(T instance){
+			return size;
+			//throw new ShouldNeverHappenError("Do not calculate unknown, use getFixed when it is provided");
+		}
 		@Override
 		public OptionalLong getFixed(){ return OptionalLong.of(size); }
 		@Override
@@ -48,7 +53,7 @@ public interface SizeDescriptor<T>{
 		}
 	}
 	
-	abstract class Unknown<T> implements SizeDescriptor<T>{
+	abstract class Unknown<Inst extends IOInstance<Inst>> implements SizeDescriptor<Inst>{
 		
 		private final WordSpace    wordSpace;
 		private final long         min;
@@ -90,25 +95,60 @@ public interface SizeDescriptor<T>{
 		}
 	}
 	
-	default long variableBytes(T instance){
-		var size=variable(instance);
+	static <T extends IOInstance<T>> SizeDescriptor<T> overrideUnknown(SizeDescriptor<?> source, ToLongFunction<T> override){
+		if(source.getFixed().isPresent()) return source instanceof Fixed<?> f?(SizeDescriptor<T>)f:new Fixed<>(source.getFixed().getAsLong());
+		return new Unknown<>(source.getWordSpace(), source.getMin(), source.getMax()){
+			@Override
+			public long calcUnknown(T instance){
+				return override.applyAsLong(instance);
+			}
+		};
+	}
+	
+	default OptionalLong toBytes(OptionalLong val){
+		if(val.isEmpty()) return val;
+		return OptionalLong.of(toBytes(val.getAsLong()));
+	}
+	default long toBytes(long val){
 		return switch(getWordSpace()){
-			case BIT -> Utils.bitToByte(size);
-			case BYTE -> size;
+			case BIT -> Utils.bitToByte(val);
+			case BYTE -> val;
 		};
 	}
 	
 	default long requireFixed(){
-		return getFixed().orElseThrow();
+		return getFixed().orElseThrow(()->new IllegalStateException("Fixed size is required"));
 	}
 	default long requireMax(){
 		return getMax().orElseThrow();
 	}
 	
+	default SizeDescriptor<Inst> maxAsFixed(){
+		if(getFixed().isPresent()) return this;
+		return new Fixed<>(getWordSpace(), requireMax());
+	}
+	
+	default long fixedOrMin(){
+		var fixed=getFixed();
+		if(fixed.isPresent()) return fixed.getAsLong();
+		return getMin();
+	}
+	default OptionalLong fixedOrMax(){
+		var fixed=getFixed();
+		if(fixed.isPresent()) return fixed;
+		return getMax();
+	}
+	
+	default boolean hasFixed(){
+		return getFixed().isPresent();
+	}
+	default boolean hasMax(){
+		return getMax().isPresent();
+	}
 	
 	WordSpace getWordSpace();
 	
-	long variable(T instance);
+	long calcUnknown(Inst instance);
 	OptionalLong getFixed();
 	
 	OptionalLong getMax();

@@ -1,6 +1,7 @@
 package com.lapissea.cfs.type.field.fields.reflection;
 
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.chunk.ChunkDataProvider;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.objects.INumber;
@@ -18,12 +19,17 @@ import java.util.function.LongFunction;
 public class IOFieldNumber<T extends IOInstance<T>, E extends INumber> extends IOField<T, E>{
 	private final NumberSize size=NumberSize.LONG;
 	
-	private Function<T, NumberSize> dynamicSize;
-	private LongFunction<E>         constructor;
-	private SizeDescriptor<T>       sizeDescriptor;
+	private final boolean                 forceFixed;
+	private       Function<T, NumberSize> dynamicSize;
+	private       LongFunction<E>         constructor;
+	private       SizeDescriptor<T>       sizeDescriptor;
 	
 	public IOFieldNumber(IFieldAccessor<T> accessor){
+		this(accessor, false);
+	}
+	public IOFieldNumber(IFieldAccessor<T> accessor, boolean forceFixed){
 		super(accessor);
+		this.forceFixed=forceFixed;
 	}
 	
 	@Override
@@ -31,17 +37,21 @@ public class IOFieldNumber<T extends IOInstance<T>, E extends INumber> extends I
 		super.init();
 		this.constructor=Utils.findConstructor(getAccessor().getType(), LongFunction.class, long.class);
 		
-		var field=IOFieldTools.getDynamicSize(getAccessor());
+		var field=forceFixed?null:IOFieldTools.getDynamicSize(getAccessor());
 		
 		dynamicSize=field==null?null:field::get;
 		
 		if(dynamicSize==null) sizeDescriptor=new SizeDescriptor.Fixed<>(size.bytes);
 		else sizeDescriptor=new SizeDescriptor.Unknown<>(0, NumberSize.LARGEST.optionalBytesLong){
 			@Override
-			public long variable(T instance){
+			public long calcUnknown(T instance){
 				return getSize(instance).bytes;
 			}
 		};
+	}
+	@Override
+	public IOField<T, E> implMaxAsFixedSize(){
+		return new IOFieldNumber<>(getAccessor(), true);
 	}
 	
 	private NumberSize getSize(T instance){
@@ -56,7 +66,7 @@ public class IOFieldNumber<T extends IOInstance<T>, E extends INumber> extends I
 	}
 	
 	@Override
-	public void read(ContentReader src, T instance) throws IOException{
+	public void read(ChunkDataProvider provider, ContentReader src, T instance) throws IOException{
 		var size=getSize(instance);
 		set(instance, constructor.apply(size.read(src)));
 	}

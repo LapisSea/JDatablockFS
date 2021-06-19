@@ -19,9 +19,37 @@ public class VerySimpleMemoryManager implements MemoryManager{
 	public void free(List<Chunk> tofree){
 		throw NotImplementedException.infer();
 	}
+	
+	private long growFileAloc(Chunk target, long toAllocate) throws IOException{
+//		LogUtil.println("growing file by:", toAllocate);
+		
+		if(context.isLastPhysical(target)){
+			var remaining=target.getBodyNumSize().remaining(target.getCapacity());
+			var toGrow   =Math.min(toAllocate, remaining);
+			if(toGrow>0){
+				try(var io=context.getSource().io()){
+					io.setCapacity(io.getCapacity()+toGrow);
+				}
+				target.modifyAndSave(ch->ch.setCapacity(ch.getCapacity()+toGrow));
+				return toGrow;
+			}
+		}
+		return 0;
+	}
+	
 	@Override
 	public void allocTo(Chunk firstChunk, Chunk target, long toAllocate) throws IOException{
-		throw NotImplementedException.infer();
+		
+		long remaining=toAllocate;
+		while(remaining>0){
+			long aloc;
+			
+			remaining-=(aloc=growFileAloc(target, remaining));
+			if(aloc>0) continue;
+			
+			throw new NotImplementedException();
+		}
+		
 	}
 	@Override
 	public Chunk alloc(AllocateTicket ticket) throws IOException{

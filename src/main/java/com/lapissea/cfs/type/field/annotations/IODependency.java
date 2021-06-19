@@ -3,6 +3,7 @@ package com.lapissea.cfs.type.field.annotations;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.compilation.AnnotationLogic;
+import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
 import com.lapissea.cfs.type.field.access.IFieldAccessor;
 
@@ -10,7 +11,9 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Stream;
 
+import static com.lapissea.cfs.type.field.IOField.UsageHintType.*;
 import static com.lapissea.cfs.type.field.annotations.IODependency.VirtualNumSize.RetentionPolicy.*;
 
 @Retention(RetentionPolicy.RUNTIME)
@@ -18,7 +21,7 @@ public @interface IODependency{
 	
 	AnnotationLogic<IODependency> LOGIC=new AnnotationLogic<>(){
 		@Override
-		public Set<String> getDependencyValueNames(IODependency annotation){
+		public Set<String> getDependencyValueNames(IFieldAccessor<?> field, IODependency annotation){
 			return Set.of(annotation.value());
 		}
 	};
@@ -30,8 +33,12 @@ public @interface IODependency{
 		
 		AnnotationLogic<NumSize> LOGIC=new AnnotationLogic<>(){
 			@Override
-			public Set<String> getDependencyValueNames(NumSize annotation){
+			public Set<String> getDependencyValueNames(IFieldAccessor<?> field, NumSize annotation){
 				return Set.of(annotation.value());
+			}
+			@Override
+			public Stream<IOField.UsageHint> getHints(NumSize annotation){
+				return Stream.of(new IOField.UsageHint(DYNAMIC_SIZE_RESOLVE_DATA, annotation.value()));
 			}
 		};
 		
@@ -49,12 +56,17 @@ public @interface IODependency{
 		
 		AnnotationLogic<VirtualNumSize> LOGIC=new AnnotationLogic<>(){
 			@Override
-			public Set<String> getDependencyValueNames(VirtualNumSize annotation){
+			public Set<String> getDependencyValueNames(IFieldAccessor<?> field, VirtualNumSize annotation){
 				return Set.of(annotation.name());
 			}
 			
 			@Override
-			public <T extends IOInstance<T>> List<VirtualFieldDefinition<T, ?>> injectPerInstanceValue(Context<T> context, VirtualNumSize ann){
+			public Stream<IOField.UsageHint> getHints(VirtualNumSize annotation){
+				return Stream.of(new IOField.UsageHint(DYNAMIC_SIZE_RESOLVE_DATA, annotation.name()));
+			}
+			
+			@Override
+			public <T extends IOInstance<T>> List<VirtualFieldDefinition<T, ?>> injectPerInstanceValue(IFieldAccessor<T> field, VirtualNumSize ann){
 				return List.of(new VirtualFieldDefinition<>(
 					ann.retention()!=GHOST,
 					ann.name(),

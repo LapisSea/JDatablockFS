@@ -46,7 +46,7 @@ public final class ChunkPointer implements INumber{
 	}
 	
 	public Chunk dereference(ChunkDataProvider provider) throws IOException{
-		checkNull();
+		requireNonNull();
 		return provider.getChunk(this);
 	}
 	
@@ -56,22 +56,22 @@ public final class ChunkPointer implements INumber{
 	}
 	
 	public ChunkPointer addPtr(INumber value){
-		checkNull();
+		requireNonNull();
 		return addPtr(value.getValue());
 	}
 	
 	public ChunkPointer addPtr(long value){
-		checkNull();
+		requireNonNull();
 		return new ChunkPointer(getValue()+value);
 	}
 	
 	public long add(INumber value){
-		checkNull();
+		requireNonNull();
 		return add(value.getValue());
 	}
 	
 	public long add(long value){
-		checkNull();
+		requireNonNull();
 		return getValue()+value;
 	}
 	
@@ -87,12 +87,15 @@ public final class ChunkPointer implements INumber{
 		return Long.hashCode(getValue());
 	}
 	
+	public Reference makeReference(){
+		return makeReference(0);
+	}
 	public Reference makeReference(long offset){
-		checkNull();
+		requireNonNull();
 		return new Reference(this, offset);
 	}
 	
-	public void checkNull(){
+	public void requireNonNull(){
 		if(isNull()) throw new NullPointerException();
 	}
 	public boolean isNull(){

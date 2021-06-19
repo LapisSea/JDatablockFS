@@ -1,10 +1,12 @@
 package com.lapissea.cfs.type.field.fields.reflection;
 
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.chunk.ChunkDataProvider;
 import com.lapissea.cfs.io.bit.BitInputStream;
 import com.lapissea.cfs.io.bit.BitOutputStream;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
+import com.lapissea.cfs.type.FieldSet;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
@@ -34,11 +36,11 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 		if(fixedSize.isPresent()) sizeDescriptor=new SizeDescriptor.Fixed<>(WordSpace.BYTE, fixedSize.getAsLong());
 		else sizeDescriptor=new SizeDescriptor.Unknown<>(WordSpace.BYTE, IOFieldTools.sumVars(group, SizeDescriptor::getMin), IOFieldTools.sumVarsIfAll(group, SizeDescriptor::getMax)){
 			@Override
-			public long variable(T instance){
-				return Utils.bitToByte(group.stream().mapToLong(s->s.getSizeDescriptor().variable(instance)).sum());
+			public long calcUnknown(T instance){
+				return Utils.bitToByte(group.stream().mapToLong(s->s.getSizeDescriptor().calcUnknown(instance)).sum());
 			}
 		};
-		initCommon(group.stream().flatMap(f->f.getDependencies().stream()).distinct().toList());
+		initLateData(new FieldSet<>(group.stream().flatMap(f->f.getDependencies().stream())), group.stream().flatMap(f->f.getUsageHints().stream()));
 	}
 	
 	@Override
@@ -56,7 +58,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 					long size;
 					var  fixed=sizeD.getFixed();
 					if(fixed.isPresent()) size=fixed.getAsLong();
-					else size=sizeD.variable(instance);
+					else size=sizeD.calcUnknown(instance);
 					var oldW=stream.getTotalBits();
 					
 					try{
@@ -78,7 +80,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 	}
 	
 	@Override
-	public void read(ContentReader src, T instance) throws IOException{
+	public void read(ChunkDataProvider provider, ContentReader src, T instance) throws IOException{
 		try(var stream=new BitInputStream(src)){
 			for(var fi : group){
 				if(DEBUG_VALIDATION){
@@ -86,7 +88,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 					long size;
 					var  fixed=sizeD.getFixed();
 					if(fixed.isPresent()) size=fixed.getAsLong();
-					else size=sizeD.variable(instance);
+					else size=sizeD.calcUnknown(instance);
 					var oldW=stream.getTotalBits();
 					
 					fi.readBits(stream, instance);
@@ -111,5 +113,10 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 	@Override
 	public String getName(){
 		return group.stream().map(IOField::getName).collect(Collectors.joining(" + "));
+	}
+	
+	@Override
+	public IOField<T, Object> implMaxAsFixedSize(){
+		return new BitFieldMerger<>(group.stream().<Bit<T, ?>>map(Bit::implMaxAsFixedSize).toList());
 	}
 }

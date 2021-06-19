@@ -9,7 +9,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-@SuppressWarnings({"PointlessBitwiseExpression", "PointlessArithmeticExpression"})
 public interface ContentWriter extends AutoCloseable, ContentBuff{
 	
 	default void write(ByteBuffer b) throws IOException{
@@ -263,7 +262,7 @@ public interface ContentWriter extends AutoCloseable, ContentBuff{
 			return new BufferTicket(target, amount, errorOnMismatch, onFinish);
 		}
 		
-		private class WriteArrayBuffer extends ByteArrayOutputStream implements ContentWriter{
+		public class WriteArrayBuffer extends ByteArrayOutputStream implements ContentWriter{
 			
 			private WriteArrayBuffer(){
 				super(amount);
@@ -286,7 +285,7 @@ public interface ContentWriter extends AutoCloseable, ContentBuff{
 			}
 		}
 		
-		public ContentWriter submit(){
+		public WriteArrayBuffer submit(){
 			return new WriteArrayBuffer();
 		}
 	}

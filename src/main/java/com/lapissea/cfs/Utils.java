@@ -3,6 +3,8 @@ package com.lapissea.cfs;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
+import com.lapissea.util.NotNull;
+import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -10,6 +12,7 @@ import java.lang.invoke.*;
 import java.lang.reflect.*;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.function.IntFunction;
 import java.util.stream.Collectors;
@@ -114,13 +117,21 @@ public class Utils{
 		return i->(Arr[])Array.newInstance(elType, i);
 	}
 	
+	public static <FInter> Method getFunctionalMethod(Class<FInter> functionalInterface){
+		var methods=Arrays.stream(functionalInterface.getMethods()).filter(m->!Modifier.isStatic(m.getModifiers())&&Modifier.isAbstract(m.getModifiers())).toList();
+		if(methods.size()!=1){
+			throw new IllegalArgumentException(functionalInterface+" is not a functional interface!");
+		}
+		return methods.get(0);
+	}
+	
 	public static <FInter, T extends FInter> T makeLambda(Constructor<?> constructor, Class<FInter> functionalInterface){
 		try{
 			var lookup=MethodHandles.privateLookupIn(constructor.getDeclaringClass(), MethodHandles.lookup());
 			constructor.setAccessible(true);
 			var handle=lookup.unreflectConstructor(constructor);
 			
-			Method functionalInterfaceFunction=Arrays.stream(functionalInterface.getMethods()).filter(m->!Modifier.isStatic(m.getModifiers())).findAny().orElseThrow();
+			Method functionalInterfaceFunction=getFunctionalMethod(functionalInterface);
 			
 			MethodType signature=MethodType.methodType(functionalInterfaceFunction.getReturnType(), functionalInterfaceFunction.getParameterTypes());
 			
@@ -131,7 +142,7 @@ public class Utils{
 			                                            handle,
 			                                            handle.type());
 			
-			return (T)site.getTarget().invoke();
+			return Objects.requireNonNull((T)site.getTarget().invoke());
 		}catch(Throwable e){
 			throw new RuntimeException("failed to create lambda\n"+constructor+"\n"+functionalInterface, e);
 		}
@@ -147,11 +158,30 @@ public class Utils{
 		}
 	}
 	
-	public static <FInter, T extends FInter> T findConstructor(Class<?> clazz, Class<FInter> functionalInterface, Class<?>... parameterTypes){
+	public static MethodHandle makeMethodHandle(@NotNull Method method){
 		try{
-			var lconst=clazz.getConstructor(parameterTypes);
+			var lookup=MethodHandles.privateLookupIn(method.getDeclaringClass(), MethodHandles.lookup());
+			method.setAccessible(true);
+			return lookup.unreflect(method);
+		}catch(Throwable e){
+			throw new RuntimeException("failed to create MethodHandle\n"+method, e);
+		}
+	}
+	
+	@NotNull
+	public static <FInter, T extends FInter> T findConstructor(@NotNull Class<?> clazz, Class<FInter> functionalInterface, Class<?>... parameterTypes){
+		try{
+			Constructor<?> lconst;
+			if(Modifier.isPrivate(clazz.getModifiers())){
+				lconst=clazz.getDeclaredConstructor(parameterTypes);
+			}else{
+				lconst=clazz.getConstructor(parameterTypes);
+			}
+			
 			return Utils.makeLambda(lconst, functionalInterface);
 		}catch(ReflectiveOperationException ce){
+			
+			
 			
 			try{
 				Method of=clazz.getMethod("of", parameterTypes);
@@ -161,8 +191,7 @@ public class Utils{
 				
 				return Utils.makeLambda(of, functionalInterface);
 			}catch(ReflectiveOperationException ofe){
-				ofe.addSuppressed(ce);
-				throw new MalformedStructLayout(clazz.getName()+" does not have a valid constructor or of static method with arguments of "+Arrays.toString(parameterTypes), ofe);
+				throw new MalformedStructLayout(clazz.getName()+" does not have a valid constructor or of static method with arguments of "+Arrays.toString(parameterTypes));
 			}
 		}
 	}
@@ -235,5 +264,31 @@ public class Utils{
 		                .mapToObj(b->String.format("%8s", Integer.toBinaryString(b)).replace(' ', '0'))
 		                .map(s->new StringBuilder(s).reverse())
 		                .collect(Collectors.joining());
+	}
+	
+	@Deprecated
+	public static Class<?> typeToRaw(Class<?> type){
+		return type;
+	}
+	public static Class<?> typeToRaw(Type type){
+		if(type instanceof Class<?> c) return c;
+		if(type instanceof ParameterizedType c) return (Class<?>)c.getRawType();
+		throw new IllegalArgumentException(type.toString());
+	}
+	public static boolean genericInstanceOf(Type testType, Type type){
+		if(testType.equals(type)) return true;
+		
+		if(type instanceof ParameterizedType parm){
+			Type[] args=parm.getActualTypeArguments(), testArgs;
+			if(testType instanceof ParameterizedType parm2) testArgs=parm2.getActualTypeArguments();
+			else return false;
+			if(args.length!=testArgs.length) return false;
+			for(int i=0;i<args.length;i++){
+				if(!genericInstanceOf(testArgs[i], args[i])) return false;
+			}
+			return true;
+		}
+		
+		return UtilL.instanceOf((Class<?>)testType, (Class<?>)type);
 	}
 }

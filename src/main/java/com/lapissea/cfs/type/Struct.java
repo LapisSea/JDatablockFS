@@ -2,13 +2,19 @@ package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.chunk.ChunkDataProvider;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
+import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.compilation.FieldCompiler;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.util.*;
 
-import java.util.*;
+import java.lang.reflect.Modifier;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
@@ -17,21 +23,56 @@ import java.util.stream.Stream;
 
 public class Struct<T extends IOInstance<T>>{
 	
-	static class AutoLock implements AutoCloseable{
-		private final Lock lock;
-		AutoLock(Lock lock){this.lock=lock;}
+	public static class Unmanaged<T extends IOInstance.Unmanaged<T>> extends Struct<T>{
 		
-		AutoLock doLock(){
-			lock.lock();
-			return this;
+		public interface Constr<T>{
+			T create(ChunkDataProvider provider, Reference reference, TypeDefinition data);
 		}
+		
+		public static Unmanaged<?> thisClass(){
+			return ofUnknown(getStack(s->s.skip(1)));
+		}
+		
+		public static Unmanaged<?> ofUnknown(@NotNull Class<?> instanceClass){
+			Objects.requireNonNull(instanceClass);
+			
+			if(!UtilL.instanceOf(instanceClass, IOInstance.class)){
+				throw new IllegalArgumentException(instanceClass.getName()+" is not an "+IOInstance.class.getSimpleName());
+			}
+			
+			return ofUnmanaged((Class<? extends IOInstance.Unmanaged>)instanceClass);
+		}
+		
+		public static <T extends IOInstance.Unmanaged<T>> Unmanaged<T> ofUnmanaged(Class<T> instanceClass){
+			Objects.requireNonNull(instanceClass);
+			
+			Unmanaged<T> cached=(Unmanaged<T>)getCached(instanceClass);
+			if(cached!=null) return cached;
+			
+			
+			return compile(instanceClass, Unmanaged::new);
+		}
+		
+		private Constr<T> unmanagedConstructor;
+		
+		public Unmanaged(Class<T> type){
+			super(type);
+		}
+		public Constr<T> requireUnmanagedConstructor(){
+			if(unmanagedConstructor==null){
+				unmanagedConstructor=Utils.findConstructor(getType(), Constr.class, Utils.getFunctionalMethod(Constr.class).getParameterTypes());
+			}
+			return unmanagedConstructor;
+		}
+		
+		@Deprecated
 		@Override
-		public void close(){
-			lock.unlock();
+		public Supplier<T> requireEmptyConstructor(){
+			throw new UnsupportedOperationException();
 		}
 	}
 	
-	private static final AutoLock STRUCT_CACHE_LOCK=new AutoLock(new ReentrantLock());
+	private static final Lock STRUCT_CACHE_LOCK=new ReentrantLock();
 	
 	private static final Map<Class<?>, Struct<?>> STRUCT_CACHE  =new WeakValueHashMap<>();
 	private static final Map<Class<?>, Thread>    STRUCT_COMPILE=Collections.synchronizedMap(new HashMap<>());
@@ -59,43 +100,59 @@ public class Struct<T extends IOInstance<T>>{
 	public static <T extends IOInstance<T>> Struct<T> of(Class<T> instanceClass){
 		Objects.requireNonNull(instanceClass);
 		
-		try(var ignored=STRUCT_CACHE_LOCK.doLock()){
-			var cached=(Struct<T>)STRUCT_CACHE.get(instanceClass);
-			if(cached!=null) return cached;
-			
+		Struct<T> cached=getCached(instanceClass);
+		if(cached!=null) return cached;
+		
+		if(UtilL.instanceOf(instanceClass, IOInstance.Unmanaged.class)){
+			return (Struct<T>)Unmanaged.ofUnknown(instanceClass);
 		}
-		
-		
-		if(instanceClass.equals(IOInstance.class)) throw new IllegalArgumentException("Can not compile Instance itself");
+		return compile(instanceClass, t->{
+			if(UtilL.instanceOf(t, IOInstance.Unmanaged.class)) throw new ClassCastException();
+			return new Struct<>(t);
+		});
+	}
+	
+	private static <T extends IOInstance<T>, S extends Struct<T>> S compile(Class<T> instanceClass, Function<Class<T>, S> newStruct){
+		if(Modifier.isAbstract(instanceClass.getModifiers())) throw new IllegalArgumentException("Can not compile "+instanceClass.getName()+" because it is abstract");
 		
 		Thread thread=STRUCT_COMPILE.get(instanceClass);
 		if(thread!=null){
 			if(thread==Thread.currentThread()) throw new MalformedStructLayout("Recursive struct compilation");
 			UtilL.sleepWhile(()->STRUCT_COMPILE.containsKey(instanceClass));
-			return of(instanceClass);
+			return Objects.requireNonNull((S)getCached(instanceClass));
 		}
 		
-		try(var ignored=STRUCT_CACHE_LOCK.doLock()){
+		try{
+			STRUCT_CACHE_LOCK.lock();
 			
 			STRUCT_COMPILE.put(instanceClass, Thread.currentThread());
 			
-			Struct<T> struct=new Struct<>(instanceClass);
+			S struct=newStruct.apply(instanceClass);
 			STRUCT_CACHE.put(instanceClass, struct);
 			
 			if(GlobalConfig.PRINT_COMPILATION){
-				LogUtil.println(TextUtil.toTable("Compiled:"+struct.getType().getSimpleName(), struct.getFields()));
+				LogUtil.println(TextUtil.toTable("Compiled: "+struct.getType().getName(), struct.getFields()));
 			}
 			
 			return struct;
 		}finally{
 			STRUCT_COMPILE.remove(instanceClass);
+			STRUCT_CACHE_LOCK.unlock();
+		}
+	}
+	private static <T extends IOInstance<T>> Struct<T> getCached(Class<T> instanceClass){
+		try{
+			STRUCT_CACHE_LOCK.lock();
+			return (Struct<T>)STRUCT_CACHE.get(instanceClass);
+		}finally{
+			STRUCT_CACHE_LOCK.unlock();
 		}
 	}
 	
 	private final Class<T> type;
 	
-	private final List<IOField<T, ?>> fields;
-	private final List<IOField<T, ?>> virtualFields;
+	private final FieldSet<T, ?> fields;
+	private final FieldSet<T, ?> virtualFields;
 	
 	private Supplier<T> emptyConstructor;
 	
@@ -103,7 +160,7 @@ public class Struct<T extends IOInstance<T>>{
 		this.type=type;
 		fields=FieldCompiler.create().compile(this);
 		fields.forEach(IOField::init);
-		virtualFields=fields.stream().filter(f->f.getAccessor() instanceof VirtualAccessor).toList();
+		virtualFields=new FieldSet<>(fields.stream().filter(f->f.getAccessor() instanceof VirtualAccessor));
 	}
 	
 	@Override
@@ -114,18 +171,11 @@ public class Struct<T extends IOInstance<T>>{
 		return type;
 	}
 	
-	public List<IOField<T, ?>> getFields(){
+	public FieldSet<T, ?> getFields(){
 		return fields;
 	}
-	public List<IOField<T, ?>> getVirtualFields(){
+	public FieldSet<T, ?> getVirtualFields(){
 		return virtualFields;
-	}
-	
-	public Optional<IOField<T, ?>> getFieldByName(String name){
-		return getFields().stream().filter(f->f.getName().equals(name)).findAny();
-	}
-	public <E> Stream<IOField<T, E>> getFieldsByType(Class<E> type){
-		return getFields().stream().filter(f->UtilL.instanceOf(f.getAccessor().getType(), type)).map(f->(IOField<T, E>)f);
 	}
 	
 	public String instanceToString(T instance, boolean doShort){

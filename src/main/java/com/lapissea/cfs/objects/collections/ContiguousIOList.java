@@ -1,18 +1,28 @@
-package com.lapissea.cfs.objects;
+package com.lapissea.cfs.objects.collections;
 
 import com.lapissea.cfs.chunk.ChunkDataProvider;
-import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
+import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
+import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.TypeDefinition;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.TextUtil;
+import com.lapissea.util.UtilL;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
 public class ContiguousIOList<T extends IOInstance<T>> extends IOInstance.Unmanaged<ContiguousIOList<T>> implements IOList<T>{
+	
+	
+	private static final TypeDefinition.Check TYPE_CHECK=new TypeDefinition.Check(
+		ContiguousIOList.class,
+		List.of(c->UtilL.instanceOf(c, IOInstance.class)&&!UtilL.instanceOf(c, IOInstance.Unmanaged.class))
+	);
 	
 	@IOValue
 	private int size;
@@ -21,10 +31,12 @@ public class ContiguousIOList<T extends IOInstance<T>> extends IOInstance.Unmana
 	private final long          sizePerElement;
 	private final StructPipe<T> elementPipe;
 	
-	public ContiguousIOList(ChunkDataProvider provider, Reference reference, Struct<T> type) throws IOException{
+	public ContiguousIOList(ChunkDataProvider provider, Reference reference, TypeDefinition data) throws IOException{
 		super(provider, reference);
-		this.type=type;
-		this.elementPipe=ContiguousStructPipe.of(type);
+		TYPE_CHECK.ensureValid(data);
+		this.type=(Struct<T>)data.argAsStruct(0);
+		type.requireEmptyConstructor();
+		this.elementPipe=FixedContiguousStructPipe.of(type);
 		sizePerElement=elementPipe.getSizeDescriptor().getFixed().orElseThrow();
 		
 		try(var io=reference.io(provider)){
@@ -53,7 +65,7 @@ public class ContiguousIOList<T extends IOInstance<T>> extends IOInstance.Unmana
 			var skipped=io.skip(pos);
 			if(skipped!=pos) throw new IOException();
 			
-			return elementPipe.readNew(io);
+			return elementPipe.readNew(getProvider(), io);
 		}
 	}
 	

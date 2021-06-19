@@ -8,6 +8,7 @@ import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
+import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.IOInstance;
@@ -28,8 +29,8 @@ import static com.lapissea.cfs.GlobalConfig.*;
 
 public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator{
 	
-	private static final Struct<Chunk>               STRUCT=Struct.of(Chunk.class);
-	private static final ContiguousStructPipe<Chunk> PIPE  =ContiguousStructPipe.of(STRUCT);
+	private static final Struct<Chunk>     STRUCT=Struct.of(Chunk.class);
+	private static final StructPipe<Chunk> PIPE  =ContiguousStructPipe.of(STRUCT);
 	
 	public static ChunkPointer getPtr(Chunk chunk){
 		return chunk==null?null:chunk.getPtr();
@@ -56,10 +57,8 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator{
 	@IOValue
 	private NumberSize nextSize;
 	
-	@NotNull
 	@IOValue
 	@IODependency.NumSize("nextSize")
-	@Nullable
 	private ChunkPointer nextPtr=ChunkPointer.NULL;
 	
 	
@@ -94,7 +93,7 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator{
 	}
 	
 	private void calcHeaderSize(){
-		headerSize=(int)PIPE.getSizeDescriptor().variable(this);
+		headerSize=(int)PIPE.getSizeDescriptor().calcUnknown(this);
 	}
 	
 	private NumberSize calcBodyNumSize(){
@@ -117,7 +116,7 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator{
 		}
 	}
 	public void readHeader(ContentReader src) throws IOException{
-		PIPE.read(src, this);
+		PIPE.read(provider, src, this);
 		calcHeaderSize();
 	}
 	
@@ -143,9 +142,6 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator{
 	public ChunkPointer getPtr(){
 		return ptr;
 	}
-	public long getSize(){
-		return size;
-	}
 	
 	
 	public void pushSize(long newSize){
@@ -160,7 +156,13 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator{
 		setSize(getSize()+amount);
 	}
 	
+	@IOValue
+	public long getSize(){
+		return size;
+	}
+	@IOValue
 	public void setSize(long newSize){
+		forbidReadOnly();
 		if(this.size==newSize) return;
 		assert newSize<=getCapacity():newSize+" > "+getCapacity();
 		
@@ -168,17 +170,33 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator{
 		this.size=newSize;
 	}
 	
+	@IOValue
 	public long getCapacity(){
 		return capacity;
 	}
+	@IOValue
+	public void setCapacity(long newCapacity){
+		forbidReadOnly();
+		if(this.capacity==newCapacity) return;
+		this.capacity=newCapacity;
+		markDirty();
+	}
 	
+	public void forbidReadOnly(){
+		if(isReadOnly()){
+			throw new UnsupportedOperationException();
+		}
+	}
 	public boolean isReadOnly(){
 		return provider.isReadOnly();
 	}
+	
+	
 	public long totalSize(){
 		return headerSize+capacity;
 	}
 	
+	@IOValue
 	public NumberSize getBodyNumSize(){
 		return bodyNumSize;
 	}
@@ -188,11 +206,14 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator{
 	}
 	
 	@NotNull
+	@IOValue
 	public ChunkPointer getNextPtr(){
 		return nextPtr;
 	}
 	
+	@IOValue
 	private void setNextPtr(ChunkPointer nextPtr){
+		forbidReadOnly();
 		Objects.requireNonNull(nextPtr);
 		if(this.nextPtr.equals(nextPtr)) return;
 		this.nextPtr=nextPtr;
@@ -305,9 +326,7 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator{
 	}
 	
 	private void markDirty(){
-		if(provider.isReadOnly()){
-			throw new UnsupportedOperationException();
-		}
+		forbidReadOnly();
 		dirty=true;
 	}
 	

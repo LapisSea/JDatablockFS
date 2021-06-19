@@ -10,7 +10,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Objects;
 
-@SuppressWarnings({"PointlessBitwiseExpression", "PointlessArithmeticExpression"})
 public interface ContentReader extends AutoCloseable, ContentBuff{
 	
 	default void read(ByteBuffer buff) throws IOException{
@@ -344,7 +343,7 @@ public interface ContentReader extends AutoCloseable, ContentBuff{
 			return new BufferTicket(target, amount, errorOnMismatch);
 		}
 		
-		public ContentReader submit() throws IOException{
+		public ContentInputStream submit() throws IOException{
 			if(amount==0) return new ContentInputStream.BA(ZeroArrays.ZERO_BYTE);
 			
 			return new ContentInputStream.BA(target.readInts1(amount)){

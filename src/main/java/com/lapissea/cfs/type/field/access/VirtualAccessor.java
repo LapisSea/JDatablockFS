@@ -13,6 +13,7 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
@@ -52,8 +53,8 @@ public class VirtualAccessor<CTyp extends IOInstance<CTyp>> implements IFieldAcc
 	
 	@Nullable
 	@Override
-	public <T extends Annotation> T getAnnotation(Class<T> annotationClass){
-		return null;
+	public <T extends Annotation> Optional<T> getAnnotation(Class<T> annotationClass){
+		return Optional.empty();
 	}
 	@Override
 	public String getName(){

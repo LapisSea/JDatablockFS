@@ -1,5 +1,6 @@
 package com.lapissea.cfs.io.instancepipe;
 
+import com.lapissea.cfs.chunk.ChunkDataProvider;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.type.IOInstance;
@@ -25,7 +26,8 @@ public class ContiguousStructPipe<T extends IOInstance<T>> extends StructPipe<T>
 	
 	public ContiguousStructPipe(Struct<T> type){
 		super(type);
-		ioFields=IOFieldTools.stepFinal(type.getFields(), List.of(
+		
+		ioFields=IOFieldTools.stepFinal((List<IOField<T, ?>>)type.getFields(), List.of(
 			IOFieldTools::dependencyReorder,
 			IOFieldTools::mergeBitSpace
 		));
@@ -35,7 +37,15 @@ public class ContiguousStructPipe<T extends IOInstance<T>> extends StructPipe<T>
 	public void write(ContentWriter dest, T instance) throws IOException{
 		for(IOField<T, ?> field : ioFields){
 			if(DEBUG_VALIDATION){
-				var buf=dest.writeTicket(field.getSizeDescriptor().variableBytes(instance)).requireExact().submit();
+				
+				var  desc =field.getSizeDescriptor();
+				var  fixed=desc.getFixed();
+				long siz;
+				if(fixed.isPresent()) siz=fixed.getAsLong();
+				else siz=desc.calcUnknown(instance);
+				long bytes=desc.toBytes(siz);
+				
+				var buf=dest.writeTicket(bytes).requireExact().submit();
 				field.writeReported(buf, instance);
 				buf.close();
 			}else{
@@ -45,21 +55,29 @@ public class ContiguousStructPipe<T extends IOInstance<T>> extends StructPipe<T>
 	}
 	
 	@Override
-	public T read(ContentReader src, T instance) throws IOException{
+	public T read(ChunkDataProvider provider, ContentReader src, T instance) throws IOException{
 		for(IOField<T, ?> field : ioFields){
 			if(DEBUG_VALIDATION){
-				var buf=src.readTicket(field.getSizeDescriptor().variableBytes(instance)).requireExact().submit();
-				field.readReported(buf, instance);
+				
+				var  desc =field.getSizeDescriptor();
+				var  fixed=desc.getFixed();
+				long siz;
+				if(fixed.isPresent()) siz=fixed.getAsLong();
+				else siz=desc.calcUnknown(instance);
+				long bytes=desc.toBytes(siz);
+				
+				var buf=src.readTicket(bytes).requireExact().submit();
+				field.readReported(provider, buf, instance);
 				buf.close();
 			}else{
-				field.readReported(src, instance);
+				field.readReported(provider, src, instance);
 			}
 		}
 		return instance;
 	}
 	
 	@Override
-	protected List<IOField<T, ?>> getSpecificFields(){
+	public List<IOField<T, ?>> getSpecificFields(){
 		return ioFields;
 	}
 }

@@ -11,13 +11,17 @@ import static com.lapissea.util.LogUtil.Init.*;
 
 public class FSFTest{
 	public static void main(String[] args) throws IOException{
+		System.setProperty("com.lapissea.cfs.GlobalConfig.printCompilation", "true");
+		
 		LogUtil.Init.attach(USE_CALL_POS|USE_TABULATED_HEADER);
 		
 		IOInterface data=MemoryData.build().build();
 		Cluster.init(data);
 		
 		var cluster=new Cluster(data);
-		LogUtil.println(cluster);
-		LogUtil.println(data);
+//		LogUtil.println(cluster);
+//		LogUtil.println(data);
+		
+		System.exit(0);
 	}
 }

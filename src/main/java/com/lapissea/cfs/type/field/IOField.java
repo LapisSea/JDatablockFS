@@ -1,21 +1,27 @@
 package com.lapissea.cfs.type.field;
 
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.chunk.ChunkDataProvider;
 import com.lapissea.cfs.io.bit.BitInputStream;
 import com.lapissea.cfs.io.bit.BitOutputStream;
 import com.lapissea.cfs.io.bit.BitReader;
 import com.lapissea.cfs.io.bit.BitWriter;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
+import com.lapissea.cfs.objects.Reference;
+import com.lapissea.cfs.type.FieldSet;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.access.IFieldAccessor;
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
-import java.util.List;
+import java.util.EnumSet;
 import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.*;
 
@@ -23,6 +29,33 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	
 	static{
 		TextUtil.SHORT_TO_STRINGS.register(OptionalLong.class, l->l.isEmpty()?"()L":"("+l.getAsLong()+")L");
+	}
+	
+	
+	public enum UsageHintType{
+		DYNAMIC_SIZE_RESOLVE_DATA
+	}
+	
+	public static record UsageHint(UsageHintType type, String target){
+		public UsageHint(UsageHintType type){
+			this(type, null);
+		}
+	}
+	
+	
+	public abstract static class Ref<T extends IOInstance<T>, Type> extends IOField<T, Type>{
+		
+		public Ref(IFieldAccessor<T> accessor){
+			super(accessor);
+		}
+		
+		public abstract void allocate(T instance, ChunkDataProvider provider) throws IOException;
+		public abstract Reference getReference(T instance);
+		
+		@Override
+		public IOField.Ref<T, Type> implMaxAsFixedSize(){
+			throw new NotImplementedException();
+		}
 	}
 	
 	public abstract static class Bit<T extends IOInstance<T>, Type> extends IOField<T, Type>{
@@ -37,63 +70,47 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 			try(var writer=new BitOutputStream(dest)){
 				writeBits(writer, instance);
 				if(DEBUG_VALIDATION){
-					writer.requireWritten(getSizeDescriptor().variable(instance));
+					writer.requireWritten(getSizeDescriptor().calcUnknown(instance));
 				}
 			}
 		}
 		
 		@Deprecated
 		@Override
-		public final void read(ContentReader src, T instance) throws IOException{
+		public final void read(ChunkDataProvider provider, ContentReader src, T instance) throws IOException{
 			try(var reader=new BitInputStream(src)){
 				readBits(reader, instance);
 				if(DEBUG_VALIDATION){
-					reader.requireRead(getSizeDescriptor().variable(instance));
+					reader.requireRead(getSizeDescriptor().calcUnknown(instance));
 				}
 			}
 		}
 		
 		public abstract void writeBits(BitWriter<?> dest, T instance) throws IOException;
 		public abstract void readBits(BitReader src, T instance) throws IOException;
+		
+		@Override
+		public IOField.Bit<T, Type> implMaxAsFixedSize(){
+			throw new NotImplementedException();
+		}
 	}
 	
 	private final IFieldAccessor<T> accessor;
 	
-	private List<IOField<T, ?>> dependencies;
+	private FieldSet<T, ?>         dependencies;
+	private EnumSet<UsageHintType> usageHints;
 	
-	protected IOField(IFieldAccessor<T> accessor){
+	public IOField(IFieldAccessor<T> accessor){
 		this.accessor=accessor;
 	}
 	
-	public IFieldAccessor<T> getAccessor(){
-		return accessor;
-	}
-	
-	public void initCommon(List<IOField<T, ?>> deps){
-		Objects.requireNonNull(deps);
+	public void initLateData(FieldSet<T, ?> deps, Stream<UsageHintType> hints){
 		Utils.requireNull(dependencies);
+		Utils.requireNull(usageHints);
 		dependencies=deps;
-	}
-	
-	public List<IOField<T, ?>> getDependencies(){
-		return dependencies;
-	}
-	
-	public String getName(){return getAccessor().getName();}
-	
-	public String toShortString(){
-		return "{"+
-		       Objects.requireNonNull(getName())+
-		       switch(getDependencies().size()){
-			       case 0 -> "";
-			       case 1 -> ", dep: "+getDependencies().get(0).getName();
-			       default -> getDependencies().stream().map(IOField::getName).collect(Collectors.joining(",", ", deps: ", ""));
-		       }+
-		       '}';
-	}
-	@Override
-	public String toString(){
-		return this.getClass().getSimpleName()+toShortString();
+		var h=EnumSet.noneOf(UsageHintType.class);
+		hints.forEach(h::add);
+		usageHints=h;
 	}
 	
 	public ValueType get(T instance){
@@ -107,8 +124,6 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	public abstract SizeDescriptor<T> getSizeDescriptor();
 	
 	public abstract void write(ContentWriter dest, T instance) throws IOException;
-	public abstract void read(ContentReader src, T instance) throws IOException;
-	
 	public final void writeReported(ContentWriter dest, T instance) throws IOException{
 		try{
 			write(dest, instance);
@@ -116,9 +131,11 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 			throw new IOException("Failed to write "+TextUtil.toString(this), e);
 		}
 	}
-	public final void readReported(ContentReader src, T instance) throws IOException{
+	
+	public abstract void read(ChunkDataProvider provider, ContentReader src, T instance) throws IOException;
+	public final void readReported(ChunkDataProvider provider, ContentReader src, T instance) throws IOException{
 		try{
-			read(src, instance);
+			read(provider, src, instance);
 		}catch(Exception e){
 			throw new IOException("Failed to read "+TextUtil.toString(this), e);
 		}
@@ -144,4 +161,42 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	public void init(){
 		getAccessor().init(this);
 	}
+	
+	
+	public String getName()                      { return getAccessor().getName(); }
+	public Struct<T> getStruct()                 { return getAccessor().getStruct(); }
+	public IFieldAccessor<T> getAccessor()       { return accessor; }
+	public FieldSet<T, ?> getDependencies()      { return Objects.requireNonNull(dependencies); }
+	public EnumSet<UsageHintType> getUsageHints(){ return Objects.requireNonNull(usageHints); }
+	
+	public String toShortString(){
+		return Objects.requireNonNull(getName())+"{"+
+		       "size: "+TextUtil.toShortString(getSizeDescriptor())+
+		       switch(getDependencies().size()){
+			       case 0 -> "";
+			       case 1 -> ", dep: "+getDependencies().get(0).getName();
+			       default -> getDependencies().stream().map(IOField::getName).collect(Collectors.joining(",", ", deps: ", ""));
+		       }+
+		       '}';
+	}
+	@Override
+	public String toString(){
+		return getAccessor().getType().getSimpleName()+"#"+toShortString();
+	}
+	
+	
+	public IOField<T, ValueType> forceMaxAsFixedSize(){
+		if(getSizeDescriptor().hasFixed()) return this;
+		if(!getSizeDescriptor().hasMax()) throw new UnsupportedOperationException(this+" does not have a reasonable maximum size");
+		var f=implMaxAsFixedSize();
+		f.initLateData(getDependencies(), getUsageHints().stream());
+		f.init();
+		if(!f.getSizeDescriptor().hasFixed()) throw new RuntimeException(this+" failed to make itslef fixed");
+		return f;
+	}
+	
+	protected IOField<T, ValueType> implMaxAsFixedSize(){
+		throw new NotImplementedException();
+	}
+	
 }
