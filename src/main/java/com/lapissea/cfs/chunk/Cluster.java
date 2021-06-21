@@ -3,7 +3,7 @@ package com.lapissea.cfs.chunk;
 import com.lapissea.cfs.exceptions.MalformedFileException;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.content.ContentReader;
-import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
+import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
@@ -27,15 +27,11 @@ import static java.nio.charset.StandardCharsets.*;
 
 public class Cluster implements ChunkDataProvider{
 	
-	static{
-		Chunk.getPtr(null);
-	}
-	
 	private static final ByteBuffer MAGIC_ID=ByteBuffer.wrap("BYTE-BABE".getBytes(UTF_8)).asReadOnlyBuffer();
 	
 	private static final NumberSize           FIRST_CHUNK_PTR_SIZE=LARGEST;
 	private static final ChunkPointer         FIRST_CHUNK_PTR     =ChunkPointer.of(MAGIC_ID.limit()+FIRST_CHUNK_PTR_SIZE.bytes);
-	private static final StructPipe<Metadata> METADATA_PIPE       =FixedContiguousStructPipe.of(Metadata.class);
+	private static final StructPipe<Metadata> METADATA_PIPE       =ContiguousStructPipe.of(Metadata.class);
 	
 	public static ByteBuffer getMagicId(){
 		return MAGIC_ID.asReadOnlyBuffer();
@@ -60,10 +56,11 @@ public class Cluster implements ChunkDataProvider{
 		Metadata metadata=new Metadata();
 		metadata.value1=300;
 		
-		Chunk ch=AllocateTicket.bytes(METADATA_PIPE.getSizeDescriptor().requireFixed())
+		Chunk ch=AllocateTicket.bytes(30)
 		                       .withApproval(c->c.getPtr().equals(FIRST_CHUNK_PTR))
 		                       .submit(provider);
 		
+		METADATA_PIPE.write(ch, metadata);
 		metadata.allocateNulls(provider);
 		METADATA_PIPE.write(ch, metadata);
 		metadata.list.add(new Dummy(4124));
@@ -92,8 +89,13 @@ public class Cluster implements ChunkDataProvider{
 		public int value2=69;
 		
 		@IOValue
+		@IONullability(NULLABLE)
 		@IOValue.OverrideType(value=ContiguousIOList.class)
 		public IOList<Dummy> list;
+		
+		@IOValue
+		@IONullability(NULLABLE)
+		public AutoText text;
 	}
 	
 	private final ChunkCache chunkCache=ChunkCache.weak();
@@ -112,7 +114,8 @@ public class Cluster implements ChunkDataProvider{
 			mainChunkPtr=ChunkPointer.read(FIRST_CHUNK_PTR_SIZE, io);
 		}
 		
-		metadata=METADATA_PIPE.readNew(this, mainChunkPtr.dereference(this));
+		var ch=mainChunkPtr.dereference(this);
+		metadata=METADATA_PIPE.readNew(this, ch);
 		
 		LogUtil.println(TextUtil.toNamedPrettyJson(metadata));
 	}

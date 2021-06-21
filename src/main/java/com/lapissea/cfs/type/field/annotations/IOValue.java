@@ -8,6 +8,8 @@ import com.lapissea.cfs.type.field.VirtualFieldDefinition;
 import com.lapissea.cfs.type.field.access.IFieldAccessor;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
+import io.leangen.geantyref.AnnotationFormatException;
+import io.leangen.geantyref.TypeFactory;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -15,7 +17,10 @@ import java.lang.reflect.Array;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+
+import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.*;
 
 @Retention(RetentionPolicy.RUNTIME)
 public @interface IOValue{
@@ -27,11 +32,20 @@ public @interface IOValue{
 			var type=field.getType();
 			if(!type.isArray()) return List.of();
 			
-			return List.of(new VirtualFieldDefinition<T, Integer>(true, IOFieldTools.makeArrayLenName(field), Integer.class, (instance, dependencies, value)->{
-				var arr=field.get(instance);
-				if(arr!=null) return Array.getLength(arr);
-				return value==null?0:value;
-			}));
+			var arrayLengthSizeName=field.getAnnotation(IODependency.ArrayLenSize.class)
+			                             .map(IODependency.ArrayLenSize::name)
+			                             .orElseGet(()->IOFieldTools.makeArrayLenName(field)+".nSiz");
+			
+			try{
+				return List.of(new VirtualFieldDefinition<T, Integer>(IO, IOFieldTools.makeArrayLenName(field), Integer.class, (instance, dependencies, value)->{
+					if(value!=null) return value;
+					var arr=field.get(instance);
+					if(arr!=null) return Array.getLength(arr);
+					return -1;
+				}, List.of(TypeFactory.annotation(IODependency.VirtualNumSize.class, Map.of("name", arrayLengthSizeName)))));
+			}catch(AnnotationFormatException e){
+				throw new RuntimeException(e);
+			}
 		}
 		@NotNull
 		@Override

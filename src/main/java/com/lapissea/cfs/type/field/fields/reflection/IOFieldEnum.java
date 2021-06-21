@@ -7,6 +7,7 @@ import com.lapissea.cfs.io.bit.EnumUniverse;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.IFieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
@@ -26,7 +27,7 @@ public class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> extends IOF
 	public IOFieldEnum(IFieldAccessor<T> field){
 		super(field);
 		
-		mode=field.getAnnotation(IONullability.class).map(IONullability::value).orElse(NOT_NULL);
+		mode=IOFieldTools.getNullability(field);
 		nullable=switch(mode){
 			case NULLABLE -> true;
 			case NOT_NULL, DEFAULT_IF_NULL -> false;

@@ -13,6 +13,7 @@ import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.IFieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
@@ -37,7 +38,7 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 		super(accessor);
 		this.fixed=fixed;
 		
-		nullability=accessor.getAnnotation(IONullability.class).map(IONullability::value).orElse(IONullability.Mode.NOT_NULL);
+		nullability=IOFieldTools.getNullability(accessor);
 		
 		var struct=(Struct<ValueType>)Struct.ofUnknown(getAccessor().getType());
 		instancePipe=fixed?FixedContiguousStructPipe.of(struct):ContiguousStructPipe.of(struct);
@@ -51,7 +52,12 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 			descriptor=new SizeDescriptor.Unknown<>(desc.getWordSpace(), nullability==NULLABLE?nullSize:desc.getMin(), Utils.addIfBoth(OptionalLong.of(nullSize), desc.getMax())){
 				@Override
 				public long calcUnknown(CTyp instance){
-					return desc.calcUnknown(get(instance))+nullSize;
+					var val=get(instance);
+					if(val==null){
+						if(nullability==NULLABLE) return nullSize;
+						throw new NullPointerException();
+					}
+					return desc.calcUnknown(val)+nullSize;
 				}
 			};
 		}

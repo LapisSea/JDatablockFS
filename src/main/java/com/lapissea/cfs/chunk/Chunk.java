@@ -27,7 +27,7 @@ import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.*;
 
-public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator{
+public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, ChunkDataProvider.Holder{
 	
 	private static final Struct<Chunk>     STRUCT=Struct.of(Chunk.class);
 	private static final StructPipe<Chunk> PIPE  =ContiguousStructPipe.of(STRUCT);
@@ -201,7 +201,8 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator{
 		return bodyNumSize;
 	}
 	
-	public ChunkDataProvider getProvider(){
+	@Override
+	public ChunkDataProvider getChunkProvider(){
 		return provider;
 	}
 	

@@ -24,15 +24,17 @@ public class IOFieldByteArray<T extends IOInstance<T>> extends IOField<T, byte[]
 		descriptor=new SizeDescriptor.Unknown<>(0, OptionalLong.empty()){
 			@Override
 			public long calcUnknown(T instance){
-				var val=get(instance);
-				return val.length;
+				var siz=arraySize.get(instance);
+				if(siz>0) return siz;
+				var arr=get(instance);
+				return arr.length;
 			}
 		};
 	}
 	@Override
 	public void init(){
 		super.init();
-		arraySize=getStruct().getFields().exact(Integer.class, IOFieldTools.makeArrayLenName(getAccessor())).orElseThrow();
+		arraySize=declaringStruct().getFields().exact(Integer.class, IOFieldTools.makeArrayLenName(getAccessor())).orElseThrow();
 	}
 	
 	@Override
@@ -41,11 +43,13 @@ public class IOFieldByteArray<T extends IOInstance<T>> extends IOField<T, byte[]
 	}
 	@Override
 	public void write(ContentWriter dest, T instance) throws IOException{
-		dest.writeInts1(get(instance));
+		var arr=get(instance);
+		dest.writeInts1(arr);
 	}
 	@Override
 	public void read(ChunkDataProvider provider, ContentReader src, T instance) throws IOException{
-		byte[] data=new byte[arraySize.get(instance)];
+		int    size=arraySize.get(instance);
+		byte[] data=new byte[size];
 		src.readFully(data);
 		set(instance, data);
 	}

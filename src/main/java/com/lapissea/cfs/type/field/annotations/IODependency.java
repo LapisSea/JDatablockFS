@@ -1,5 +1,6 @@
 package com.lapissea.cfs.type.field.annotations;
 
+import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.compilation.AnnotationLogic;
@@ -14,6 +15,7 @@ import java.util.Set;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.type.field.IOField.UsageHintType.*;
+import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.*;
 import static com.lapissea.cfs.type.field.annotations.IODependency.VirtualNumSize.RetentionPolicy.*;
 
 @Retention(RetentionPolicy.RUNTIME)
@@ -46,6 +48,21 @@ public @interface IODependency{
 	}
 	
 	@Retention(RetentionPolicy.RUNTIME)
+	@interface ArrayLenSize{
+		
+		AnnotationLogic<ArrayLenSize> LOGIC=new AnnotationLogic<>(){
+			@Override
+			public void validate(IFieldAccessor<?> field, ArrayLenSize annotation){
+				if(!field.getType().isArray()){
+					throw new MalformedStructLayout(ArrayLenSize.class.getSimpleName()+" can be used only on arrays");
+				}
+			}
+		};
+		
+		String name();
+	}
+	
+	@Retention(RetentionPolicy.RUNTIME)
 	@interface VirtualNumSize{
 		
 		enum RetentionPolicy{
@@ -68,7 +85,7 @@ public @interface IODependency{
 			@Override
 			public <T extends IOInstance<T>> List<VirtualFieldDefinition<T, ?>> injectPerInstanceValue(IFieldAccessor<T> field, VirtualNumSize ann){
 				return List.of(new VirtualFieldDefinition<>(
-					ann.retention()!=GHOST,
+					ann.retention()==GHOST?IO:INSTANCE,
 					ann.name(),
 					NumberSize.class,
 					new VirtualFieldDefinition.GetterFilter<T, NumberSize>(){
@@ -78,12 +95,11 @@ public @interface IODependency{
 						@Override
 						public NumberSize filter(T inst, List<IFieldAccessor<T>> deps, NumberSize val){
 							NumberSize s=(switch(ann.retention()){
-								case GHOST -> calcMax(inst, deps);
 								case GROW_ONLY -> {
 									if(val==ann.max()) yield ann.max();
 									yield calcMax(inst, deps).max(val==null?NumberSize.VOID:val);
 								}
-								case RIGID_INITIAL -> val==null?calcMax(inst, deps):val;
+								case RIGID_INITIAL, GHOST -> val==null?calcMax(inst, deps):val;
 							}).max(ann.min());
 							
 							if(s.greaterThan(ann.max())){

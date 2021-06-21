@@ -30,6 +30,7 @@ import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.*;
 import static java.util.function.Function.*;
 
 public abstract class FieldCompiler{
@@ -44,9 +45,6 @@ public abstract class FieldCompiler{
 		IOField<T, ?> field,
 		List<LogicalAnnotation<Annotation>> annotations
 	) implements Comparable<AnnotatedField<T>>{
-		public AnnotatedField(IOField<T, ?> field){
-			this(field, List.of());
-		}
 		@Override
 		public int compareTo(AnnotatedField<T> o){
 			return field().getAccessor().compareTo(o.field.getAccessor());
@@ -112,29 +110,46 @@ public abstract class FieldCompiler{
 	
 	private <T extends IOInstance<T>> void generateVirtualFields(List<AnnotatedField<T>> parsed, Struct<T> struct){
 		
-		Map<String, IFieldAccessor<T>> virtualData=new HashMap<>();
-		int                            accessIndex=0;
-		for(var pair : parsed){
-			for(var logicalAnn : pair.annotations){
-				for(var s : logicalAnn.logic().injectPerInstanceValue(pair.field.getAccessor(), logicalAnn.annotation())){
-					var existing=virtualData.get(s.getName());
-					if(existing!=null){
-						if(!existing.getGenericType().equals(s.getType())){
-							throw new MalformedStructLayout("Virtual field "+existing.getName()+" already defined but has a type conflict of "+existing.getGenericType()+" and "+s.getType());
+		Map<VirtualFieldDefinition.StoragePool, Integer> accessIndex   =new EnumMap<>(VirtualFieldDefinition.StoragePool.class);
+		Map<String, IFieldAccessor<T>>                   virtualData   =new HashMap<>();
+		Map<String, IFieldAccessor<T>>                   newVirtualData=new HashMap<>();
+		
+		List<AnnotatedField<T>> toRun=new ArrayList<>(parsed);
+		
+		while(true){
+			for(var pair : toRun){
+				for(var logicalAnn : pair.annotations){
+					for(var s : logicalAnn.logic().injectPerInstanceValue(pair.field.getAccessor(), logicalAnn.annotation())){
+						var existing=virtualData.get(s.getName());
+						if(existing!=null){
+							if(!existing.getGenericType().equals(s.getType())){
+								throw new MalformedStructLayout("Virtual field "+existing.getName()+" already defined but has a type conflict of "+existing.getGenericType()+" and "+s.getType());
+							}
+							continue;
 						}
-						continue;
+						IFieldAccessor<T> accessor=new VirtualAccessor<>(
+							struct,
+							(VirtualFieldDefinition<T, Object>)s,
+							accessIndex.compute(s.getStoragePool(), (k, v)->{
+								if(k==NONE) return -1;
+								else{
+									return v==null?0:v+1;
+								}
+							}));
+						virtualData.put(s.getName(), accessor);
+						newVirtualData.put(s.getName(), accessor);
 					}
-					int index;
-					if(s.isStored()){
-						index=accessIndex;
-						accessIndex++;
-					}else index=-1;
-					virtualData.put(s.getName(), new VirtualAccessor<>(struct, (VirtualFieldDefinition<T, Object>)s, index));
 				}
 			}
-		}
-		for(var virtual : virtualData.values()){
-			UtilL.addRemainSorted(parsed, new AnnotatedField<>(registry().create(virtual)));
+			toRun.clear();
+			for(var virtual : newVirtualData.values()){
+				var field    =registry().create(virtual);
+				var annotated=new AnnotatedField<>(field, scanAnnotations(field));
+				toRun.add(annotated);
+				UtilL.addRemainSorted(parsed, annotated);
+			}
+			newVirtualData.clear();
+			if(toRun.isEmpty()) break;
 		}
 	}
 	

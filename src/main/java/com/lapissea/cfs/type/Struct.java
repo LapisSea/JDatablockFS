@@ -1,5 +1,6 @@
 package com.lapissea.cfs.type;
 
+import com.lapissea.cfs.ConsoleColors;
 import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.ChunkDataProvider;
@@ -7,6 +8,7 @@ import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.compilation.FieldCompiler;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.VirtualFieldDefinition;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.util.*;
 
@@ -131,7 +133,7 @@ public class Struct<T extends IOInstance<T>>{
 			STRUCT_CACHE.put(instanceClass, struct);
 			
 			if(GlobalConfig.PRINT_COMPILATION){
-				LogUtil.println(TextUtil.toTable("Compiled: "+struct.getType().getName(), struct.getFields()));
+				LogUtil.println(ConsoleColors.GREEN_BRIGHT+TextUtil.toTable("Compiled: "+struct.getType().getName(), struct.getFields())+ConsoleColors.RESET);
 			}
 			
 			return struct;
@@ -153,6 +155,7 @@ public class Struct<T extends IOInstance<T>>{
 	
 	private final FieldSet<T, ?> fields;
 	private final FieldSet<T, ?> virtualFields;
+	private final int[]          poolSizes;
 	
 	private Supplier<T> emptyConstructor;
 	
@@ -161,6 +164,12 @@ public class Struct<T extends IOInstance<T>>{
 		fields=FieldCompiler.create().compile(this);
 		fields.forEach(IOField::init);
 		virtualFields=new FieldSet<>(fields.stream().filter(f->f.getAccessor() instanceof VirtualAccessor));
+		
+		var pools=VirtualFieldDefinition.StoragePool.values();
+		poolSizes=new int[pools.length];
+		for(var pool : pools){
+			poolSizes[pool.ordinal()]=(int)getVirtualFields().stream().filter(c->((VirtualAccessor<T>)c.getAccessor()).getStoragePool()==pool).count();
+		}
 	}
 	
 	@Override
@@ -198,5 +207,12 @@ public class Struct<T extends IOInstance<T>>{
 	public Supplier<T> requireEmptyConstructor(){
 		if(emptyConstructor==null) emptyConstructor=Utils.findConstructor(getType(), Supplier.class);
 		return emptyConstructor;
+	}
+	
+	@Nullable
+	public Object[] allocVirtualVarPool(VirtualFieldDefinition.StoragePool pool){
+		if(pool==VirtualFieldDefinition.StoragePool.NONE) throw new IllegalArgumentException();
+		var count=poolSizes[pool.ordinal()];
+		return count==0?null:new Object[count];
 	}
 }

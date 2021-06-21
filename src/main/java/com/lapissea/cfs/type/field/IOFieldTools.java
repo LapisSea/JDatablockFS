@@ -8,6 +8,7 @@ import com.lapissea.cfs.type.DepSort;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.access.IFieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IODependency;
+import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
@@ -17,6 +18,8 @@ import java.util.function.Function;
 import java.util.function.ToLongFunction;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.*;
 
 public class IOFieldTools{
 	
@@ -83,7 +86,7 @@ public class IOFieldTools{
 		).filter(Optional::isPresent).map(Optional::get).findAny();
 		
 		if(dynSiz.isEmpty()) return null;
-		var opt=field.getStruct().getFields().exact(NumberSize.class, dynSiz.get());
+		var opt=field.getDeclaringStruct().getFields().exact(NumberSize.class, dynSiz.get());
 		if(opt.isEmpty()) throw new ShouldNeverHappenError("This should have been checked in annotation logic");
 		return opt.get();
 	}
@@ -96,6 +99,13 @@ public class IOFieldTools{
 	}
 	
 	public static <T extends IOInstance<T>> String makeArrayLenName(IFieldAccessor<T> field){
-		return field.getName()+".length";
+		return field.getName()+".len";
+	}
+	
+	public static IONullability.Mode getNullability(IFieldAccessor<?> field){
+		return getNullability(field, NOT_NULL);
+	}
+	public static IONullability.Mode getNullability(IFieldAccessor<?> field, IONullability.Mode defaultMode){
+		return field.getAnnotation(IONullability.class).map(IONullability::value).orElse(defaultMode);
 	}
 }

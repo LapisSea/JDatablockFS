@@ -23,7 +23,7 @@ public class ChunkChainIO implements RandomIO{
 	public ChunkChainIO(Chunk head) throws IOException{
 		this.head=head;
 		restartCursor();
-		source=head.getProvider().getSource().io();
+		source=head.getChunkProvider().getSource().io();
 	}
 	
 	public void revalidate() throws IOException{
@@ -247,7 +247,7 @@ public class ChunkChainIO implements RandomIO{
 		if(amount<=remaining) return;
 		
 		if(DEBUG_VALIDATION){
-			cursor.getProvider().checkCached(cursor);
+			cursor.getChunkProvider().checkCached(cursor);
 			checkCursorInChain();
 		}
 		

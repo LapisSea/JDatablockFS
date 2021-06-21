@@ -18,6 +18,8 @@ import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CharsetEncoder;
 import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
 import java.util.function.Predicate;
 import java.util.stream.IntStream;
 
@@ -80,7 +82,7 @@ class Encoding{
 			}
 		}
 		
-		String read(ContentInputStream w, AbstractText<?> text) throws IOException{
+		String read(ContentInputStream w, AutoText text) throws IOException{
 			StringBuilder sb=new StringBuilder(text.charCount());
 			
 			try(var stream=new BitInputStream(w)){
@@ -105,25 +107,30 @@ class Encoding{
 	}
 	
 	enum CharEncoding{
-		BASE_16(TableCoding.of(
+		BASE_16(0.5F, TableCoding.of(
 			'0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
 			'A', 'B', 'C', 'D', 'E', 'F'
 		)),
-		BASE_64(TableCoding.of(
+		BASE_64(0.66F, TableCoding.of(
 			'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
 			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
 			'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ' ', '.'
 		)),
 		ASCII(
-			String::length,
+			1, String::length,
 			s->s.chars().allMatch(c->c<=0xFF),
 			(w, text)->w.write(text.getBytes(US_ASCII)),
 			(r, text)->new String(r.readInts1(text.charCount()), US_ASCII)),
 		UTF8(
-			CharEncoding::utf8Len,
+			1.1F, CharEncoding::utf8Len,
 			s->tryEncode(UTF.get().utf8Enc(), s),
 			(w, s)->encode(UTF.get().utf8Enc(), s, w),
 			(w, text)->decode(UTF.get().utf8Dec(), w, text));
+		
+		private static final List<CharEncoding> SORTED=Arrays.stream(CharEncoding.values()).sorted(Comparator.comparingDouble(c->c.sizeWeight)).toList();
+		public static CharEncoding findBest(String data){
+			return SORTED.stream().filter(f->f.canEncode(data)).findFirst().orElseThrow();
+		}
 		
 		private static int utf8Len(String s){
 			int count=0;
@@ -148,7 +155,7 @@ class Encoding{
 				throw new RuntimeException(e);
 			}
 		}
-		private static String decode(CharsetDecoder en, ContentInputStream in, AbstractText<?> text) throws IOException{
+		private static String decode(CharsetDecoder en, ContentInputStream in, AutoText text) throws IOException{
 			
 			char[] str      =new char[text.charCount()];
 			int    remaining=str.length;
@@ -180,18 +187,21 @@ class Encoding{
 			}
 		}
 		
+		public final float sizeWeight;
+		
 		private final FunctionOI<String> calcSize;
 		private final Predicate<String>  canEncode;
 		
-		private final UnsafeBiConsumer<ContentWriter, String, IOException>                       write;
-		private final UnsafeBiFunction<ContentInputStream, AbstractText<?>, String, IOException> read;
+		private final UnsafeBiConsumer<ContentWriter, String, IOException>                write;
+		private final UnsafeBiFunction<ContentInputStream, AutoText, String, IOException> read;
 		
-		CharEncoding(TableCoding coder){ this(coder::calcSize, coder::isCompatible, coder::write, coder::read); }
-		CharEncoding(FunctionOI<String> calcSize,
+		CharEncoding(float sizeWeight, TableCoding coder){ this(sizeWeight, coder::calcSize, coder::isCompatible, coder::write, coder::read); }
+		CharEncoding(float sizeWeight, FunctionOI<String> calcSize,
 		             Predicate<String> canEncode,
 		             UnsafeBiConsumer<ContentWriter, String, IOException> write,
-		             UnsafeBiFunction<ContentInputStream, AbstractText<?>, String, IOException> read
+		             UnsafeBiFunction<ContentInputStream, AutoText, String, IOException> read
 		){
+			this.sizeWeight=sizeWeight;
 			this.calcSize=calcSize;
 			this.canEncode=canEncode;
 			this.write=write;
@@ -207,7 +217,7 @@ class Encoding{
 		public void write(ContentWriter dest, String str) throws IOException{
 			write.accept(dest, str);
 		}
-		public String read(ContentInputStream src, AbstractText<?> dest) throws IOException{
+		public String read(ContentInputStream src, AutoText dest) throws IOException{
 			return read.apply(src, dest);
 		}
 	}

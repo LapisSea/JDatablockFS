@@ -17,6 +17,7 @@ import com.lapissea.util.TextUtil;
 import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.*;
 
@@ -54,12 +55,8 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 		try(var stream=new BitOutputStream(dest)){
 			for(var fi : group){
 				if(DEBUG_VALIDATION){
-					var  sizeD=fi.getSizeDescriptor();
-					long size;
-					var  fixed=sizeD.getFixed();
-					if(fixed.isPresent()) size=fixed.getAsLong();
-					else size=sizeD.calcUnknown(instance);
-					var oldW=stream.getTotalBits();
+					long size=fi.getSizeDescriptor().calcUnknown(instance);
+					var  oldW=stream.getTotalBits();
 					
 					try{
 						fi.writeBits(stream, instance);
@@ -84,14 +81,11 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 		try(var stream=new BitInputStream(src)){
 			for(var fi : group){
 				if(DEBUG_VALIDATION){
-					var  sizeD=fi.getSizeDescriptor();
-					long size;
-					var  fixed=sizeD.getFixed();
-					if(fixed.isPresent()) size=fixed.getAsLong();
-					else size=sizeD.calcUnknown(instance);
-					var oldW=stream.getTotalBits();
+					long size=fi.getSizeDescriptor().calcUnknown(instance);
+					var  oldW=stream.getTotalBits();
 					
 					fi.readBits(stream, instance);
+					var val =fi.get(instance);
 					var read=stream.getTotalBits()-oldW;
 					if(read!=size) throw new RuntimeException("Read bits "+read+" but "+size+" expected on "+fi);
 				}else{
@@ -101,6 +95,10 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 		}
 	}
 	
+	@Override
+	public String toString(){
+		return group.stream().map(IOField::getName).collect(Collectors.joining("+"));
+	}
 	@Override
 	public Object get(T instance){
 		throw new UnsupportedOperationException();
@@ -118,5 +116,10 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 	@Override
 	public IOField<T, Object> implMaxAsFixedSize(){
 		return new BitFieldMerger<>(group.stream().<Bit<T, ?>>map(Bit::implMaxAsFixedSize).toList());
+	}
+	
+	@Override
+	public Stream<? extends IOField<T, ?>> streamUnpackedFields(){
+		return group.stream();
 	}
 }

@@ -34,8 +34,8 @@ public interface IFieldAccessor<CTyp extends IOInstance<CTyp>> extends Comparabl
 		
 		
 		@Override
-		public Struct<CTyp> getStruct(){
-			return source.getStruct();
+		public Struct<CTyp> getDeclaringStruct(){
+			return source.getDeclaringStruct();
 		}
 		@Override
 		public <T extends Annotation> Optional<T> getAnnotation(Class<T> annotationClass){
@@ -115,7 +115,7 @@ public interface IFieldAccessor<CTyp extends IOInstance<CTyp>> extends Comparabl
 		}
 	}
 	
-	Struct<CTyp> getStruct();
+	Struct<CTyp> getDeclaringStruct();
 	
 	@NotNull
 	<T extends Annotation> Optional<T> getAnnotation(Class<T> annotationClass);

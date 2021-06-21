@@ -85,7 +85,7 @@ public class ReflectionAccessor<CTyp extends IOInstance<CTyp>> implements IField
 	}
 	
 	@Override
-	public Struct<CTyp> getStruct(){
+	public Struct<CTyp> getDeclaringStruct(){
 		return struct;
 	}
 	
@@ -106,10 +106,10 @@ public class ReflectionAccessor<CTyp extends IOInstance<CTyp>> implements IField
 	}
 	@Override
 	public String toString(){
-		return getStruct().getType().getName()+"#"+name;
+		return getDeclaringStruct().getType().getName()+"#"+name;
 	}
 	public String toShortString(){
-		return getStruct().getType().getSimpleName()+"#"+name;
+		return getDeclaringStruct().getType().getSimpleName()+"#"+name;
 	}
 	
 	@Override

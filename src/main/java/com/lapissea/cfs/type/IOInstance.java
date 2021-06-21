@@ -11,6 +11,8 @@ import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import java.io.IOException;
 import java.util.Objects;
 
+import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.*;
+
 public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 	
 	public abstract static class Unmanaged<SELF extends Unmanaged<SELF>> extends IOInstance<SELF>{
@@ -65,31 +67,25 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 	
 	public IOInstance(){
 		this.thisStruct=Struct.of((Class<SELF>)getClass());
-		virtualFields=allocVirtual();
+		virtualFields=getThisStruct().allocVirtualVarPool(INSTANCE);
 	}
 	public IOInstance(Struct<SELF> thisStruct){
 		this.thisStruct=thisStruct;
-		virtualFields=allocVirtual();
+		virtualFields=getThisStruct().allocVirtualVarPool(INSTANCE);
 	}
 	
-	private Object[] allocVirtual(){
-		var count=(int)getThisStruct().getVirtualFields().stream().filter(c->((VirtualAccessor<SELF>)c.getAccessor()).getAccessIndex()!=-1).count();
-		return count==0?null:new Object[count];
-	}
 	
 	public Struct<SELF> getThisStruct(){
 		return thisStruct;
 	}
 	
 	//used in VirtualAccessor
-	private Object accessVirtual(VirtualAccessor<SELF> accessor){
+	protected Object accessVirtual(VirtualAccessor<SELF> accessor){
 		int index=accessor.getAccessIndex();
-		if(index==-1) return null;
 		return virtualFields[index];
 	}
-	private void accessVirtual(VirtualAccessor<SELF> accessor, Object value){
+	protected void accessVirtual(VirtualAccessor<SELF> accessor, Object value){
 		int index=accessor.getAccessIndex();
-		if(index==-1) return;
 		virtualFields[index]=value;
 	}
 	

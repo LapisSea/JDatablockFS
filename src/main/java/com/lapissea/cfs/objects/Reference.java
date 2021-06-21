@@ -53,6 +53,10 @@ public final class Reference extends IOInstance<Reference>{
 		return ptr+"+"+offset;
 	}
 	
+	public boolean isNull(){
+		return ptr.isNull();
+	}
+	
 	public Reference requireNonNull(){
 		ptr.requireNonNull();
 		return this;

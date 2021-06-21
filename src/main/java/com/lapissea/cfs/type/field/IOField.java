@@ -2,6 +2,7 @@ package com.lapissea.cfs.type.field;
 
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.ChunkDataProvider;
+import com.lapissea.cfs.exceptions.FixedFormatNotSupportedException;
 import com.lapissea.cfs.io.bit.BitInputStream;
 import com.lapissea.cfs.io.bit.BitOutputStream;
 import com.lapissea.cfs.io.bit.BitReader;
@@ -20,7 +21,6 @@ import java.io.IOException;
 import java.util.EnumSet;
 import java.util.Objects;
 import java.util.OptionalLong;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.*;
@@ -164,30 +164,30 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	
 	
 	public String getName()                      { return getAccessor().getName(); }
-	public Struct<T> getStruct()                 { return getAccessor().getStruct(); }
+	public Struct<T> declaringStruct()           { return getAccessor().getDeclaringStruct(); }
 	public IFieldAccessor<T> getAccessor()       { return accessor; }
 	public FieldSet<T, ?> getDependencies()      { return Objects.requireNonNull(dependencies); }
 	public EnumSet<UsageHintType> getUsageHints(){ return Objects.requireNonNull(usageHints); }
 	
 	public String toShortString(){
-		return Objects.requireNonNull(getName())+"{"+
-		       "size: "+TextUtil.toShortString(getSizeDescriptor())+
-		       switch(getDependencies().size()){
-			       case 0 -> "";
-			       case 1 -> ", dep: "+getDependencies().get(0).getName();
-			       default -> getDependencies().stream().map(IOField::getName).collect(Collectors.joining(",", ", deps: ", ""));
-		       }+
-		       '}';
+		return Objects.requireNonNull(getName());
 	}
 	@Override
 	public String toString(){
-		return getAccessor().getType().getSimpleName()+"#"+toShortString();
+		return getAccessor().getDeclaringStruct().getType().getSimpleName()+"#"+toShortString();
 	}
 	
 	
+	/**
+	 * @return a stream of fields that are directly referenced by the struct. (field that represents a group of fields should return the containing fields)
+	 */
+	public Stream<? extends IOField<T, ?>> streamUnpackedFields(){
+		return Stream.of(this);
+	}
+	
 	public IOField<T, ValueType> forceMaxAsFixedSize(){
 		if(getSizeDescriptor().hasFixed()) return this;
-		if(!getSizeDescriptor().hasMax()) throw new UnsupportedOperationException(this+" does not have a reasonable maximum size");
+		if(!getSizeDescriptor().hasMax()) throw new FixedFormatNotSupportedException(this);
 		var f=implMaxAsFixedSize();
 		f.initLateData(getDependencies(), getUsageHints().stream());
 		f.init();

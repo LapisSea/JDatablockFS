@@ -5,7 +5,6 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
-import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.function.TriConsumer;
 
@@ -35,6 +34,7 @@ public class VirtualAccessor<CTyp extends IOInstance<CTyp>> implements IFieldAcc
 	private final VirtualFieldDefinition<CTyp, Object> type;
 	private final int                                  accessIndex;
 	private       List<IFieldAccessor<CTyp>>           deps;
+	private       Object[]                             ioPool;
 	
 	public VirtualAccessor(Struct<CTyp> struct, VirtualFieldDefinition<CTyp, Object> type, int accessIndex){
 		this.struct=struct;
@@ -42,20 +42,36 @@ public class VirtualAccessor<CTyp extends IOInstance<CTyp>> implements IFieldAcc
 		this.accessIndex=accessIndex;
 	}
 	
+	public void popIoPool(){
+		ioPool=null;
+	}
+	public void pushIoPool(Object[] ioPool){
+		this.ioPool=ioPool;
+	}
+	
 	public int getAccessIndex(){
 		return accessIndex;
 	}
 	
+	public VirtualFieldDefinition.StoragePool getStoragePool(){
+		return type.getStoragePool();
+	}
+	
 	@Override
-	public Struct<CTyp> getStruct(){
+	public Struct<CTyp> getDeclaringStruct(){
 		return struct;
 	}
 	
 	@Nullable
 	@Override
 	public <T extends Annotation> Optional<T> getAnnotation(Class<T> annotationClass){
-		return Optional.empty();
+		return Optional.ofNullable(type.getAnnotations().get(annotationClass));
 	}
+	@Override
+	public boolean hasAnnotation(Class<? extends Annotation> annotationClass){
+		return type.getAnnotations().isPresent(annotationClass);
+	}
+	
 	@Override
 	public String getName(){
 		return type.getName();
@@ -71,16 +87,39 @@ public class VirtualAccessor<CTyp extends IOInstance<CTyp>> implements IFieldAcc
 	
 	@Override
 	public void init(IOField<CTyp, ?> field){
-		deps=struct.getFields().stream().filter(f->f.getDependencies().contains(field)).map(IOField::getAccessor).collect(Collectors.toList());
+		if(type.getGetFilter()!=null){
+			deps=struct.getFields().stream().filter(f->f.getDependencies().contains(field)).map(IOField::getAccessor).collect(Collectors.toList());
+		}
 	}
 	
 	@Override
 	public Object get(CTyp instance){
-		return type.getGetFilter().filter(instance, deps, GETTER.apply(instance, this));
+		var rawVal=switch(getStoragePool()){
+			case INSTANCE -> GETTER.apply(instance, this);
+			case IO -> {
+				if(ioPool==null) yield null;
+				yield ioPool[getAccessIndex()];
+			}
+			case NONE -> null;
+		};
+		var filter=type.getGetFilter();
+		if(filter==null){
+			return rawVal;
+		}
+		return filter.filter(instance, deps, rawVal);
 	}
 	@Override
 	public void set(CTyp instance, Object value){
-		SETTER.accept(instance, this, value);
+		switch(getStoragePool()){
+		case INSTANCE -> SETTER.accept(instance, this, value);
+		case IO -> {
+			if(ioPool!=null){
+				ioPool[getAccessIndex()]=value;
+			}
+		}
+		case NONE -> {}
+		}
+		
 	}
 	
 	@Override
@@ -117,7 +156,10 @@ public class VirtualAccessor<CTyp extends IOInstance<CTyp>> implements IFieldAcc
 	}
 	@Override
 	public long getLong(CTyp instance){
-		return (long)get(instance);
+		var val=get(instance);
+		if(val instanceof Long l) return l;
+		if(val instanceof Integer l) return l;
+		throw new ClassCastException(val.getClass()+" is not long");
 	}
 	@Override
 	public void setLong(CTyp instance, long value){
