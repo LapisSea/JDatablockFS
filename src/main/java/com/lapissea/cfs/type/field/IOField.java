@@ -14,6 +14,7 @@ import com.lapissea.cfs.type.FieldSet;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.access.IFieldAccessor;
+import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
 
@@ -97,11 +98,13 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	
 	private final IFieldAccessor<T> accessor;
 	
-	private FieldSet<T, ?>         dependencies;
-	private EnumSet<UsageHintType> usageHints;
+	private       FieldSet<T, ?>         dependencies;
+	private       EnumSet<UsageHintType> usageHints;
+	private final IONullability.Mode     nullability;
 	
 	public IOField(IFieldAccessor<T> accessor){
 		this.accessor=accessor;
+		nullability=accessor==null?IONullability.Mode.NULLABLE:IOFieldTools.getNullability(accessor);
 	}
 	
 	public void initLateData(FieldSet<T, ?> deps, Stream<UsageHintType> hints){
@@ -199,4 +202,10 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		throw new NotImplementedException();
 	}
 	
+	public IONullability.Mode getNullability(){
+		return nullability;
+	}
+	public boolean nullable(){
+		return getNullability()==IONullability.Mode.NULLABLE;
+	}
 }

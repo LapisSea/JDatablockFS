@@ -14,14 +14,10 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.TypeDefinition;
 import com.lapissea.cfs.type.field.IOField;
-import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.IFieldAccessor;
-import com.lapissea.cfs.type.field.annotations.IONullability;
-import com.lapissea.util.NotNull;
 
 import java.io.IOException;
-import java.util.Objects;
 
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.*;
 
@@ -32,19 +28,15 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 	private final Struct.Unmanaged<ValueType> struct;
 	private final StructPipe<ValueType>       instancePipe;
 	private final StructPipe<Reference>       referencePipe;
-	private final boolean                     nullable;
 	
 	public IOFieldUnmanagedObjectReference(IFieldAccessor<T> accessor){
 		this(accessor, false);
 	}
 	public IOFieldUnmanagedObjectReference(IFieldAccessor<T> accessor, boolean fixed){
 		super(accessor);
-		
-		nullable=switch(IOFieldTools.getNullability(accessor)){
-			case NOT_NULL -> false;
-			case NULLABLE -> true;
-			case DEFAULT_IF_NULL -> throw new MalformedStructLayout(DEFAULT_IF_NULL+" is not supported for unmanaged objects");
-		};
+		if(getNullability()==DEFAULT_IF_NULL){
+			throw new MalformedStructLayout(DEFAULT_IF_NULL+" is not supported for unmanaged objects");
+		}
 		
 		if(fixed){
 			referencePipe=FixedContiguousStructPipe.of(Reference.class);
@@ -71,7 +63,7 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 	public ValueType get(T instance){
 		var val=super.get(instance);
 		if(val==null){
-			if(nullable) return null;
+			if(nullable()) return null;
 			throw new NullPointerException();
 		}
 		return val;
@@ -87,14 +79,14 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 	
 	private Reference getReference(ValueType val){
 		if(val==null){
-			if(nullable) return new Reference();
+			if(nullable()) return new Reference();
 			throw new NullPointerException();
 		}
 		return val.getReference();
 	}
 	private ValueType makeValueObject(ChunkDataProvider provider, Reference readNew){
 		if(readNew.isNull()){
-			if(nullable) return null;
+			if(nullable()) return null;
 			throw new NullPointerException();
 		}
 		return struct.requireUnmanagedConstructor().create(provider, readNew, TypeDefinition.of(getAccessor().getGenericType()));

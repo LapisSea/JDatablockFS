@@ -90,15 +90,14 @@ public class FixedContiguousStructPipe<T extends IOInstance<T>> extends StructPi
 		}
 	}
 	@Override
-	public void write(ContentWriter dest, T instance) throws IOException{
+	protected void doWrite(ContentWriter dest, T instance) throws IOException{
 		maxValues.forEach((k, v)->k.set(instance, v));
 		writeIOFields(dest, instance);
 	}
 	
 	@Override
-	public T read(ChunkDataProvider provider, ContentReader src, T instance) throws IOException{
+	protected T doRead(ChunkDataProvider provider, ContentReader src, T instance) throws IOException{
 		maxValues.forEach((k, v)->k.set(instance, v));
-		
 		readIOFields(provider, src, instance);
 		return instance;
 	}

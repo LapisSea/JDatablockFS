@@ -32,13 +32,12 @@ public class ContiguousStructPipe<T extends IOInstance<T>> extends StructPipe<T>
 	}
 	
 	@Override
-	public void write(ContentWriter dest, T instance) throws IOException{
+	protected void doWrite(ContentWriter dest, T instance) throws IOException{
 		writeIOFields(dest, instance);
 	}
 	
 	@Override
-	public T read(ChunkDataProvider provider, ContentReader src, T instance) throws IOException{
-		readIOFields(provider, src, instance);
+	protected T doRead(ChunkDataProvider provider, ContentReader src, T instance) throws IOException{
 		return instance;
 	}
 }

@@ -14,17 +14,21 @@ import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
+import com.lapissea.cfs.type.field.access.IFieldAccessor;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
+import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
+import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.*;
 
@@ -77,26 +81,37 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	private final SizeDescriptor<T>        sizeDescription;
 	private final FieldSet<T, ?>           ioFields;
 	private final List<VirtualAccessor<T>> ioPoolAccessors;
+	private final List<IFieldAccessor<T>>  earlyNullChecks;
 	
 	public StructPipe(Struct<T> type){
 		this.type=type;
 		List<IOField<T, ?>> ioFields=initFields();
 		this.ioFields=new FieldSet<>(ioFields);
 		sizeDescription=calcSize();
-		ioPoolAccessors=calcIOPoolAccessors();
+		ioPoolAccessors=nullIfEmpty(calcIOPoolAccessors());
+		earlyNullChecks=nullIfEmpty(getNonNulls());
+	}
+	
+	private List<IFieldAccessor<T>> getNonNulls(){
+		return unpackedFields().filter(f->f.getNullability()==IONullability.Mode.NOT_NULL).map(IOField::getAccessor).toList();
 	}
 	
 	protected abstract List<IOField<T, ?>> initFields();
 	
+	private Stream<? extends IOField<T, ?>> unpackedFields(){
+		return ioFields.stream().flatMap(IOField::streamUnpackedFields);
+	}
+	
 	private List<VirtualAccessor<T>> calcIOPoolAccessors(){
-		var accessors=ioFields.stream()
-		                      .flatMap(IOField::streamUnpackedFields)
-		                      .map(IOField::getAccessor)
-		                      .filter(a->a instanceof VirtualAccessor)
-		                      .map(a->(VirtualAccessor<T>)a)
-		                      .filter(a->a.getStoragePool()==VirtualFieldDefinition.StoragePool.IO)
-		                      .toList();
-		return accessors.isEmpty()?null:accessors;
+		return unpackedFields().map(IOField::getAccessor)
+		                       .filter(a->a instanceof VirtualAccessor)
+		                       .map(a->(VirtualAccessor<T>)a)
+		                       .filter(a->a.getStoragePool()==VirtualFieldDefinition.StoragePool.IO)
+		                       .toList();
+	}
+	private <E, C extends Collection<E>> C nullIfEmpty(C collection){
+		if(collection.isEmpty()) return null;
+		return collection;
 	}
 	
 	private SizeDescriptor<T> calcSize(){
@@ -105,7 +120,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		if(fixed.isPresent()) return new SizeDescriptor.Fixed<>(fixed.getAsLong());
 		else{
 			var unknownFields=fields.stream().filter(f->!f.getSizeDescriptor().hasFixed()).toList();
-			var knownFixed   =IOFieldTools.sumVars(fields, d->d.getFixed().orElse(0));
+			var knownFixed   =IOFieldTools.sumVars(fields, d->d.toBytes(d.getFixed().orElse(0)));
 			return new SizeDescriptor.Unknown<>(IOFieldTools.sumVars(fields, siz->siz.toBytes(siz.getMin())), IOFieldTools.sumVarsIfAll(fields, siz->siz.toBytes(siz.getMax()))){
 				@Override
 				public long calcUnknown(T instance){
@@ -117,11 +132,16 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	
 	
 	public void write(RandomIO.Creator dest, T instance) throws IOException{
+		earlyCheckNulls(instance);
 		try(var io=dest.io()){
-			write(io, instance);
+			doWrite(io, instance);
 		}
 	}
-	public abstract void write(ContentWriter dest, T instance) throws IOException;
+	public void write(ContentWriter dest, T instance) throws IOException{
+		earlyCheckNulls(instance);
+		doWrite(dest, instance);
+	}
+	protected abstract void doWrite(ContentWriter dest, T instance) throws IOException;
 	
 	
 	public <Prov extends ChunkDataProvider.Holder&RandomIO.Creator> T readNew(Prov src) throws IOException{
@@ -136,20 +156,23 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	}
 	public T readNew(ChunkDataProvider provider, ContentReader src) throws IOException{
 		T instance=type.requireEmptyConstructor().get();
-		return read(provider, src, instance);
+		return doRead(provider, src, instance);
 	}
 	
 	public T read(ChunkDataProvider provider, RandomIO.Creator src, T instance) throws IOException{
 		try(var io=src.io()){
-			return read(provider, io, instance);
+			return doRead(provider, io, instance);
 		}
 	}
 	public <Prov extends ChunkDataProvider.Holder&RandomIO.Creator> T read(Prov src, T instance) throws IOException{
 		try(var io=src.io()){
-			return read(src.getChunkProvider(), io, instance);
+			return doRead(src.getChunkProvider(), io, instance);
 		}
 	}
-	public abstract T read(ChunkDataProvider provider, ContentReader src, T instance) throws IOException;
+	public T read(ChunkDataProvider provider, ContentReader src, T instance) throws IOException{
+		return doRead(provider, src, instance);
+	}
+	protected abstract T doRead(ChunkDataProvider provider, ContentReader src, T instance) throws IOException;
 	
 	
 	public SizeDescriptor<T> getSizeDescriptor(){
@@ -168,6 +191,15 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		return ioPoolAccessors;
 	}
 	
+	public void earlyCheckNulls(T instance){
+		if(earlyNullChecks==null) return;
+		for(var accessor : earlyNullChecks){
+			if(accessor.get(instance)==null){
+				throw new NullPointerException(accessor+" is null");
+			}
+		}
+	}
+	
 	protected void writeIOFields(ContentWriter dest, T instance) throws IOException{
 		Object[] ioPool=makeIOPool();
 		try{
@@ -175,8 +207,6 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 			
 			if(DEBUG_VALIDATION){
 				for(IOField<T, ?> field : getSpecificFields()){
-					var debStr=instance.getThisStruct().instanceToString(instance, false);
-					
 					var  desc =field.getSizeDescriptor();
 					long bytes=desc.toBytes(desc.calcUnknown(instance));
 					
