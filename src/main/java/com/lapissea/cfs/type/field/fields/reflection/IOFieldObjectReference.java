@@ -17,10 +17,12 @@ import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.IFieldAccessor;
+import com.lapissea.cfs.type.field.annotations.IOValue;
 
 import java.io.IOException;
 
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.*;
+import static com.lapissea.cfs.type.field.annotations.IOValue.Reference.PipeType.*;
 
 public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends IOInstance<ValueType>> extends IOField.Ref<T, ValueType>{
 	
@@ -41,7 +43,13 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 			throw new MalformedStructLayout(DEFAULT_IF_NULL+" is not supported for unmanaged objects");
 		}
 		
-		if(fixed){
+		boolean actuallyFixed=fixed;
+		if(!actuallyFixed){
+			var typ=accessor.getAnnotation(IOValue.Reference.class).map(IOValue.Reference::pipeType).orElseThrow();
+			actuallyFixed=typ==FIXED;
+		}
+		
+		if(actuallyFixed){
 			referencePipe=FixedContiguousStructPipe.of(Reference.class);
 			descriptor=new SizeDescriptor.Fixed<>(referencePipe.getSizeDescriptor().requireFixed());
 		}else{
@@ -127,13 +135,16 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 		if(val!=null&&(ref==null||ref.isNull())){
 			alloc(instance, provider, val);
 			ref=getReference(instance);
-		}
-		
-		try(var io=ref.io(provider)){
-			instancePipe.write(provider, io, val);
+			ref.requireNonNull();
 		}
 		
 		referencePipe.write(provider, dest, ref);
+		
+		if(val!=null){
+			try(var io=ref.io(provider)){
+				instancePipe.write(provider, io, val);
+			}
+		}
 	}
 	
 	@Override

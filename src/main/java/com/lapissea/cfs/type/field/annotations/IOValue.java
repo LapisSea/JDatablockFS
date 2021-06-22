@@ -81,6 +81,13 @@ public @interface IOValue{
 				return Set.of(IOFieldTools.makeRefName(field));
 			}
 		};
+		
+		enum PipeType{
+			FLEXIBLE,
+			FIXED
+		}
+		
+		PipeType pipeType() default PipeType.FLEXIBLE;
 	}
 	
 	@Retention(RetentionPolicy.RUNTIME)
