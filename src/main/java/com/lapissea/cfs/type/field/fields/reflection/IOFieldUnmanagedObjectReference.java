@@ -98,8 +98,8 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 	}
 	
 	@Override
-	public void write(ContentWriter dest, T instance) throws IOException{
-		referencePipe.write(dest, getReference(instance));
+	public void write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
+		referencePipe.write(provider, dest, getReference(instance));
 	}
 	
 	@Override

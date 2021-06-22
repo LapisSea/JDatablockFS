@@ -42,7 +42,7 @@ public class IOFieldByteArray<T extends IOInstance<T>> extends IOField<T, byte[]
 		return descriptor;
 	}
 	@Override
-	public void write(ContentWriter dest, T instance) throws IOException{
+	public void write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
 		var arr=get(instance);
 		dest.writeInts1(arr);
 	}

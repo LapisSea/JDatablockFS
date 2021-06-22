@@ -50,7 +50,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 	}
 	
 	@Override
-	public void write(ContentWriter dest, T instance) throws IOException{
+	public void write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
 		
 		try(var stream=new BitOutputStream(dest)){
 			for(var fi : group){

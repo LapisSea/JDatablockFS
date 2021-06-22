@@ -56,7 +56,7 @@ public class ContiguousIOList<T extends IOInstance<T>> extends IOInstance.Unmana
 			var skipped=io.skip(pos);
 			if(skipped!=pos) throw new IOException();
 			
-			elementPipe.write(io, value);
+			elementPipe.write(this, io, value);
 		}
 	}
 	private T readAt(long index) throws IOException{
@@ -65,7 +65,7 @@ public class ContiguousIOList<T extends IOInstance<T>> extends IOInstance.Unmana
 			var skipped=io.skip(pos);
 			if(skipped!=pos) throw new IOException();
 			
-			return elementPipe.readNew(getProvider(), io);
+			return elementPipe.readNew(getChunkProvider(), io);
 		}
 	}
 	

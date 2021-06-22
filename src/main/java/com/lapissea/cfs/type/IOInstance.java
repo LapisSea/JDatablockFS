@@ -15,7 +15,7 @@ import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.*;
 
 public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 	
-	public abstract static class Unmanaged<SELF extends Unmanaged<SELF>> extends IOInstance<SELF>{
+	public abstract static class Unmanaged<SELF extends Unmanaged<SELF>> extends IOInstance<SELF> implements ChunkDataProvider.Holder{
 		
 		private final ChunkDataProvider provider;
 		private final Reference         reference;
@@ -27,7 +27,8 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 			this.reference=reference.requireNonNull();
 		}
 		
-		public ChunkDataProvider getProvider(){
+		@Override
+		public ChunkDataProvider getChunkProvider(){
 			return provider;
 		}
 		
@@ -42,7 +43,7 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 		
 		protected void writeManagedFields() throws IOException{
 			try(var io=selfIO()){
-				getPipe().write(io, self());
+				getPipe().write(provider, io, self());
 			}
 		}
 		protected void readManagedFields() throws IOException{

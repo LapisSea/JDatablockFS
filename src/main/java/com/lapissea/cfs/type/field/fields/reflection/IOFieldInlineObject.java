@@ -91,7 +91,7 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 	}
 	
 	@Override
-	public void write(ContentWriter dest, CTyp instance) throws IOException{
+	public void write(ChunkDataProvider provider, ContentWriter dest, CTyp instance) throws IOException{
 		var val=get(instance);
 		if(nullable()){
 			try(var flags=new FlagWriter.AutoPop(NumberSize.BYTE, dest)){
@@ -102,7 +102,7 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 			}
 			if(val==null) return;
 		}
-		instancePipe.write(dest, val);
+		instancePipe.write(provider, dest, val);
 	}
 	
 	@Override

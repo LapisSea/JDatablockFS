@@ -28,7 +28,7 @@ public record AllocateTicket(long bytes, boolean disableResizing, ChunkPointer n
 	}
 	
 	public static <IO extends IOInstance<IO>> AllocateTicket withData(StructPipe<IO> pipe, IO data){
-		return bytes(pipe.getSizeDescriptor().calcUnknown(data)).withDataPopulated((p, io)->pipe.write(io, data));
+		return bytes(pipe.getSizeDescriptor().calcUnknown(data)).withDataPopulated((provider, io)->pipe.write(provider, io, data));
 	}
 	
 	public static AllocateTicket bytes(long requestedBytes){
@@ -59,7 +59,7 @@ public record AllocateTicket(long bytes, boolean disableResizing, ChunkPointer n
 	public <IO extends IOInstance<IO>> AllocateTicket withDataPopulated(StructPipe<IO> pipe, IO data){
 		Objects.requireNonNull(pipe);
 		Objects.requireNonNull(data);
-		return withDataPopulated((p, io)->pipe.write(io, data));
+		return withDataPopulated((provider, io)->pipe.write(provider, io, data));
 	}
 	
 	public AllocateTicket withDataPopulated(UnsafeBiConsumer<ChunkDataProvider, RandomIO, IOException> dataPopulator){

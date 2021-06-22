@@ -107,7 +107,7 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 	}
 	public void writeHeader(ContentWriter dest) throws IOException{
 		dirty=false;
-		PIPE.write(dest, this);
+		PIPE.write(provider, dest, this);
 	}
 	
 	public void readHeader() throws IOException{

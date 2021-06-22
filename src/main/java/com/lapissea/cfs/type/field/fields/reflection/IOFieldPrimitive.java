@@ -75,7 +75,7 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
-		public void write(ContentWriter dest, T instance) throws IOException{
+		public void write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
 			var size=getSize(instance);
 			size.writeFloating(dest, getValue(instance));
 		}
@@ -130,7 +130,7 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
-		public void write(ContentWriter dest, T instance) throws IOException{
+		public void write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
 			var size=getSize(instance);
 			size.writeFloating(dest, getValue(instance));
 		}
@@ -180,7 +180,7 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
-		public void write(ContentWriter dest, T instance) throws IOException{
+		public void write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
 			var size=getSize(instance);
 			size.write(dest, getValue(instance));
 		}
@@ -237,7 +237,7 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
-		public void write(ContentWriter dest, T instance) throws IOException{
+		public void write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
 			var size=getSize(instance);
 			size.write(dest, getValue(instance));
 		}
@@ -294,7 +294,7 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
-		public void write(ContentWriter dest, T instance) throws IOException{
+		public void write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
 			dest.writeInt1(getValue(instance));
 		}
 		

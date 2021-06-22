@@ -142,7 +142,7 @@ public class GeneralTests{
 		var text=new AutoText(data);
 		
 		LogUtil.println(text.getEncoding());
-		pipe.write(chunk, text);
+		pipe.write(provider, chunk, text);
 		var read=pipe.readNew(chunk);
 		
 		LogUtil.println(text);

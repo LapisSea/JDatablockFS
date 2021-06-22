@@ -67,7 +67,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		
 		@Deprecated
 		@Override
-		public final void write(ContentWriter dest, T instance) throws IOException{
+		public final void write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
 			try(var writer=new BitOutputStream(dest)){
 				writeBits(writer, instance);
 				if(DEBUG_VALIDATION){
@@ -126,10 +126,10 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	
 	public abstract SizeDescriptor<T> getSizeDescriptor();
 	
-	public abstract void write(ContentWriter dest, T instance) throws IOException;
-	public final void writeReported(ContentWriter dest, T instance) throws IOException{
+	public abstract void write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException;
+	public final void writeReported(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
 		try{
-			write(dest, instance);
+			write(provider, dest, instance);
 		}catch(Exception e){
 			throw new IOException("Failed to write "+TextUtil.toString(this), e);
 		}

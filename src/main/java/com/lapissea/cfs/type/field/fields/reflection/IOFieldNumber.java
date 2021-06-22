@@ -60,7 +60,7 @@ public class IOFieldNumber<T extends IOInstance<T>, E extends INumber> extends I
 	}
 	
 	@Override
-	public void write(ContentWriter dest, T instance) throws IOException{
+	public void write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
 		var size=getSize(instance);
 		size.write(dest, get(instance));
 	}

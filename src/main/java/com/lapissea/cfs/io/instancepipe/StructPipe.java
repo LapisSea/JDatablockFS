@@ -21,10 +21,7 @@ import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
@@ -131,17 +128,21 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	}
 	
 	
-	public void write(RandomIO.Creator dest, T instance) throws IOException{
+	public void write(ChunkDataProvider provider, RandomIO.Creator dest, T instance) throws IOException{
 		earlyCheckNulls(instance);
 		try(var io=dest.io()){
-			doWrite(io, instance);
+			doWrite(provider, io, instance);
 		}
 	}
-	public void write(ContentWriter dest, T instance) throws IOException{
+	public void write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
 		earlyCheckNulls(instance);
-		doWrite(dest, instance);
+		doWrite(provider, dest, instance);
 	}
-	protected abstract void doWrite(ContentWriter dest, T instance) throws IOException;
+	public void write(ChunkDataProvider.Holder holder, ContentWriter dest, T instance) throws IOException{
+		earlyCheckNulls(instance);
+		doWrite(holder.getChunkProvider(), dest, instance);
+	}
+	protected abstract void doWrite(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException;
 	
 	
 	public <Prov extends ChunkDataProvider.Holder&RandomIO.Creator> T readNew(Prov src) throws IOException{
@@ -200,7 +201,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		}
 	}
 	
-	protected void writeIOFields(ContentWriter dest, T instance) throws IOException{
+	protected void writeIOFields(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
 		Object[] ioPool=makeIOPool();
 		try{
 			pushPool(ioPool);
@@ -211,7 +212,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 					long bytes=desc.toBytes(desc.calcUnknown(instance));
 					
 					var buf=dest.writeTicket(bytes).requireExact().submit();
-					field.writeReported(buf, instance);
+					field.writeReported(provider, buf, instance);
 					
 					try{
 						buf.close();
@@ -221,7 +222,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 				}
 			}else{
 				for(IOField<T, ?> field : getSpecificFields()){
-					field.writeReported(dest, instance);
+					field.writeReported(provider, dest, instance);
 				}
 			}
 			
@@ -229,8 +230,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 			popPool();
 		}
 	}
-	public void readIOFields(ChunkDataProvider provider, ContentReader src,
-	                         T instance)
+	public void readIOFields(ChunkDataProvider provider, ContentReader src, T instance)
 		throws IOException{
 		Object[] ioPool=makeIOPool();
 		try{
