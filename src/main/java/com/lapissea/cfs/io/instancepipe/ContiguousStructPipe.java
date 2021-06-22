@@ -38,6 +38,7 @@ public class ContiguousStructPipe<T extends IOInstance<T>> extends StructPipe<T>
 	
 	@Override
 	protected T doRead(ChunkDataProvider provider, ContentReader src, T instance) throws IOException{
+		readIOFields(provider, src, instance);
 		return instance;
 	}
 }
