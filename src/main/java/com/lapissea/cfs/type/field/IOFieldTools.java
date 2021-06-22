@@ -20,6 +20,7 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.function.ToLongFunction;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.*;
@@ -68,15 +69,20 @@ public class IOFieldTools{
 	
 	public static <T extends IOInstance<T>> Index computeDependencyIndex(List<IOField<T, ?>> fields){
 		try{
-			return new DepSort<>(fields, f->f.getDependencies().stream().mapToInt(fields::indexOf))
-				       .sort(Comparator.comparingInt((IOField<T, ?> f)->f.getSizeDescriptor().getWordSpace().sortOrder)
-				                       .thenComparingInt(f->f.getSizeDescriptor().getFixed().isPresent()?0:1)
-				                       .thenComparing(f->switch(f.getDependencies().size()){
-					                       case 0 -> "";
-					                       case 1 -> f.getDependencies().get(0).getName();
-					                       default -> f.getDependencies().stream().map(IOField::getName).collect(Collectors.joining("+"));
-				                       })
-				       );
+			return new DepSort<>(fields, f->f.getDependencies()
+			                                 .stream()
+			                                 .mapToInt(o->IntStream.range(0, fields.size())
+			                                                       .filter(i->fields.get(i).getAccessor()==o.getAccessor())
+			                                                       .findAny()
+			                                                       .orElseThrow())
+			).sort(Comparator.comparingInt((IOField<T, ?> f)->f.getSizeDescriptor().getWordSpace().sortOrder)
+			                 .thenComparingInt(f->f.getSizeDescriptor().getFixed().isPresent()?0:1)
+			                 .thenComparing(f->switch(f.getDependencies().size()){
+				                 case 0 -> "";
+				                 case 1 -> f.getDependencies().get(0).getName();
+				                 default -> f.getDependencies().stream().map(IOField::getName).collect(Collectors.joining("+"));
+			                 })
+			);
 		}catch(DepSort.CycleException e){
 			throw new MalformedStructLayout("Field dependency cycle detected:\n"+TextUtil.toTable(e.cycle.mapData(fields)), e);
 		}
