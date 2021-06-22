@@ -223,7 +223,7 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 	}
 	
 	@IOValue
-	private void setNextPtr(ChunkPointer nextPtr){
+	public void setNextPtr(ChunkPointer nextPtr){
 		forbidReadOnly();
 		Objects.requireNonNull(nextPtr);
 		if(this.nextPtr.equals(nextPtr)) return;

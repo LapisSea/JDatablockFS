@@ -36,6 +36,12 @@ public class VerySimpleMemoryManager implements MemoryManager{
 		}
 		return 0;
 	}
+	private long simplePin(Chunk target, long toAllocate) throws IOException{
+		var toPin=AllocateTicket.bytes(toAllocate).withApproval(c->target.getBodyNumSize().canFit(c.getPtr())).submit(this);
+		if(toPin==null) return 0;
+		target.modifyAndSave(c->c.setNextPtr(toPin.getPtr()));
+		return toPin.getCapacity();
+	}
 	
 	@Override
 	public void allocTo(Chunk firstChunk, Chunk target, long toAllocate) throws IOException{
@@ -46,8 +52,10 @@ public class VerySimpleMemoryManager implements MemoryManager{
 			
 			remaining-=(aloc=growFileAloc(target, remaining));
 			if(aloc>0) continue;
+			remaining-=(aloc=simplePin(target, remaining));
+			if(aloc>0) continue;
 			
-			throw new NotImplementedException();
+			throw new NotImplementedException("Tried to allocate "+toAllocate+" bytes to "+target.getPtr()+" but there is no known way to do that");
 		}
 		
 	}
