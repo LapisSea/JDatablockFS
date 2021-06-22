@@ -8,9 +8,7 @@ import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeRunnable;
 
-import java.io.BufferedInputStream;
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.net.*;
 import java.util.Arrays;
 import java.util.Map;
@@ -61,16 +59,11 @@ public class DisplayServer implements DataLogger{
 					try{
 						switch(Action.values()[content.readInt1()]){
 						case LOG -> {
-							byte[] bb =content.readInts1(content.readInt4());
-							long[] ids=content.readInts8(content.readInt4());
-							
-							String[] stackTrace=new String[content.readInt4()];
-							for(int i=0;i<stackTrace.length;i++){
-								char[] data=content.readChars2(content.readInt4());
-								stackTrace[i]=new String(data);
+							MemFrame frame;
+							try(var i=new ObjectInputStream(new ByteArrayInputStream(content.readInts1(content.readInt4())))){
+								frame=(MemFrame)i.readObject();
 							}
-							
-							display.log(new MemFrame(bb, ids, stackTrace));
+							display.log(frame);
 						}
 						case RESET -> {
 							display.reset();
@@ -151,15 +144,16 @@ public class DisplayServer implements DataLogger{
 					try{
 						sendAction.accept(Action.LOG);
 						
-						writer.writeInt4(frame.data().length);
-						writer.writeInts1(frame.data());
-						writer.writeInt4(frame.ids().length);
-						writer.writeInts8(frame.ids());
-						writer.writeInt4(frame.e().length);
-						for(String s : frame.e()){
-							writer.writeInt4(s.length());
-							writer.writeChars2(s);
+						
+						var bb=new ByteArrayOutputStream();
+						try(var o=new ObjectOutputStream(bb)){
+							o.writeObject(frame);
+						}catch(IOException ioException){
+							ioException.printStackTrace();
 						}
+						
+						writer.writeInt4(bb.size());
+						bb.writeTo(writer);
 						flush.run();
 					}catch(SocketException ignored){
 					}catch(IOException e){

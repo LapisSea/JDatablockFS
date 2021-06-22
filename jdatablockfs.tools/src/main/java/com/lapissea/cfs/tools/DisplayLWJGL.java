@@ -95,7 +95,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 				}
 				
 			});
-			window.registryMouseScroll.register(vec->setFrame((int)(getFramePos()+vec.y())));
+			window.registryMouseScroll.register(vec->setFrame(Math.max(0, (int)(getFramePos()+vec.y()))));
 			
 			
 			Vec2i lastPos=new Vec2i();
@@ -157,7 +157,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 						find:
 						{
 							for(int i=0;i<frames.size();i++){
-								boolean match=!filter.isEmpty()&&Arrays.stream(frames.get(i).e()).anyMatch(l->l.contains(filter));
+								boolean match=!filter.isEmpty()&&Arrays.stream(frames.get(i).e().getStackTrace()).map(Object::toString).anyMatch(l->l.contains(filter));
 								if(match==lastMatch){
 									continue;
 								}
@@ -359,20 +359,18 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			var magic=Cluster.getMagicId();
 			
 			var hasMagic=bytes.length>=magic.limit()&&IntStream.range(0, magic.limit()).allMatch(i->magic.get(i)==bytes[i]);
-			if(!hasMagic) return;
-			
+			setColor(Color.BLUE);
 			for(int i=0;i<magic.limit();i++){
-				drawByte.draw(i, Color.BLUE, false, true);
+				drawByte.draw(i, bytes.length>i&&magic.get(i)==bytes[i]?Color.BLUE:Color.RED, false, true);
+			}
+			if(!hasMagic&&!errorMode){
+				throw new RuntimeException("No magic bytes");
 			}
 			
 			setStroke(2F);
 			outlineByteRange(Color.WHITE, width, 0, magic.limit());
 			setColor(Color.WHITE);
 			drawStringIn(new String(bytes, 0, magic.limit()), new Rectangle(0, 0, pixelsPerByte*Math.min(magic.limit(), width), pixelsPerByte), false);
-			
-			int xByte    =window.mousePos.x()/pixelsPerByte;
-			int yByte    =window.mousePos.y()/pixelsPerByte;
-			int byteIndex=yByte*width+xByte;
 			
 			setColor(alpha(Color.WHITE, 0.5F));
 			
@@ -382,9 +380,9 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 				cluster=new Cluster(MemoryData.build().withRaw(bytes).asReadOnly().build());
 				
 				annotateStruct(width, drawByte, cluster, cluster.getRoot(), 0, ptrs::add);
-				for(Chunk chunk : new PhysicalChunkWalker(cluster.getFirstChunk())){
-					fillChunk(drawByte, chunk, c->alpha(mix(c, Color.RED, 0.6F), c.getAlpha()/255F*0.7F));
-				}
+//				for(Chunk chunk : new PhysicalChunkWalker(cluster.getFirstChunk())){
+//					fillChunk(drawByte, chunk, c->alpha(mix(c, Color.RED, 0.6F), c.getAlpha()/255F*0.7F));
+//				}
 				for(Chunk chunk : new PhysicalChunkWalker(cluster.getFirstChunk())){
 					annotateStruct(width, drawByte, cluster, chunk, chunk.getPtr().getValue(), ptrs::add);
 				}
@@ -455,10 +453,17 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 					}
 				}
 			}
+			drawMouse:
 			{
+				int xByte=window.mousePos.x()/pixelsPerByte;
+				if(xByte>=width) break drawMouse;
+				int yByte    =window.mousePos.y()/pixelsPerByte;
+				int byteIndex=yByte*width+xByte;
+				if(byteIndex>=bytes.length) break drawMouse;
+				
 				translate(0.5, 0.5);
 				
-				String s=byteIndex+"";
+				String s=""+(bytes[byteIndex]&0xFF)+" @"+byteIndex;
 				
 				setColor(Color.BLACK);
 				setStroke(2);
@@ -468,13 +473,13 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 				setStroke(1);
 				outlineQuad(xByte*pixelsPerByte, yByte*pixelsPerByte, pixelsPerByte, pixelsPerByte);
 				
-				initFont(1);
+				initFont(0.5F);
 				GL11.glPushMatrix();
 				int x=xByte*pixelsPerByte;
-				int y=yByte*pixelsPerByte;
+				int y=(int)((yByte-0.1)*pixelsPerByte);
 				
 				float[] bounds=getStringBounds(s);
-				x=Math.min(x, window.size.x()-(int)Math.ceil(bounds[0]));
+				x=(int)Math.min(Math.max(0, x-bounds[0]/2+pixelsPerByte/2F), window.size.x()-Math.ceil(bounds[0]));
 				y=Math.max(y, (int)Math.ceil(bounds[1]));
 				
 				setColor(Color.BLACK);
@@ -484,6 +489,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 				fillString(s, x, y);
 				
 				GL11.glPopMatrix();
+				initFont(1);
 				
 				if(cluster!=null){
 					try{
@@ -522,7 +528,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			fillQuad(frameIndex*w-0.75, 0, 1.5, height*1.5);
 			
 			for(int i=0;i<frames.size();i++){
-				boolean match=!filter.isEmpty()&&Arrays.stream(frames.get(i).e()).anyMatch(l->l.contains(filter));
+				boolean match=!filter.isEmpty()&&Arrays.stream(frames.get(i).e().getStackTrace()).map(Object::toString).anyMatch(l->l.contains(filter));
 				if(match==lastMatch){
 					continue;
 				}
@@ -761,8 +767,8 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	
 	private void handleError(Throwable e){
 		if(errorMode){
-//			LogUtil.println(e);
-			e.printStackTrace();
+			LogUtil.println(e);
+//			e.printStackTrace();
 //			new RuntimeException("Failed to process frame "+getFramePos(), e).printStackTrace();
 		}else throw UtilL.uncheckedThrow(e);
 	}
