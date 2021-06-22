@@ -4,10 +4,7 @@ import com.lapissea.cfs.Index;
 import com.lapissea.util.ZeroArrays;
 
 import java.io.Serial;
-import java.util.Arrays;
-import java.util.BitSet;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.IntStream;
 
@@ -98,7 +95,10 @@ public class DepSort<T>{
 			}
 			stack.add(i);
 			
-			getDependencies(i).forEach(this::walkGraph);
+			getDependencies(i).forEach(index->{
+				Objects.checkIndex(index, data.size());
+				walkGraph(index);
+			});
 			
 			if(visit(i)){
 				index.add(i);
