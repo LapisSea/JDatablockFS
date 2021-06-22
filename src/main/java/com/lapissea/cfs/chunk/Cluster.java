@@ -3,10 +3,9 @@ package com.lapissea.cfs.chunk;
 import com.lapissea.cfs.exceptions.MalformedFileException;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.content.ContentReader;
-import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
+import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
-import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.collections.ContiguousIOList;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.text.AutoText;
@@ -14,24 +13,21 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
-import com.lapissea.util.LogUtil;
-import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import static com.lapissea.cfs.objects.NumberSize.*;
 import static com.lapissea.cfs.type.field.annotations.IODependency.VirtualNumSize.RetentionPolicy.*;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.*;
+import static com.lapissea.cfs.type.field.annotations.IOValue.Reference.PipeType.*;
 import static java.nio.charset.StandardCharsets.*;
 
 public class Cluster implements ChunkDataProvider{
 	
 	private static final ByteBuffer MAGIC_ID=ByteBuffer.wrap("BYTE-BABE".getBytes(UTF_8)).asReadOnlyBuffer();
 	
-	private static final NumberSize          FIRST_CHUNK_PTR_SIZE=LARGEST;
-	private static final ChunkPointer        FIRST_CHUNK_PTR     =ChunkPointer.of(MAGIC_ID.limit()+FIRST_CHUNK_PTR_SIZE.bytes);
-	private static final StructPipe<RootRef> ROOT_PIPE           =ContiguousStructPipe.of(RootRef.class);
+	private static final StructPipe<RootRef> ROOT_PIPE      =FixedContiguousStructPipe.of(RootRef.class);
+	private static final ChunkPointer        FIRST_CHUNK_PTR=ChunkPointer.of(MAGIC_ID.limit());
 	
 	public static ByteBuffer getMagicId(){
 		return MAGIC_ID.asReadOnlyBuffer();
@@ -46,25 +42,23 @@ public class Cluster implements ChunkDataProvider{
 	
 	public static void init(IOInterface data) throws IOException{
 		
+		var provider=ChunkDataProvider.newVerySimpleProvider(data);
+		
+		Chunk firstChunk;
 		try(var io=data.write(true)){
 			io.write(MAGIC_ID);
-			FIRST_CHUNK_PTR_SIZE.write(io, FIRST_CHUNK_PTR);
 		}
+		firstChunk=AllocateTicket.withData(ROOT_PIPE, new RootRef())
+		                         .withApproval(c->c.getPtr().equals(FIRST_CHUNK_PTR))
+		                         .submit(provider);
 		
-		var provider=ChunkDataProvider.newVerySimpleProvider(data);
 		
 		Metadata metadata=new Metadata();
 		metadata.value1=300;
-		
-		Chunk ch=AllocateTicket.bytes(30)
-		                       .withApproval(c->c.getPtr().equals(FIRST_CHUNK_PTR))
-		                       .submit(provider);
-		
-		ROOT_PIPE.write(provider, ch, new RootRef(metadata));
 		metadata.allocateNulls(provider);
-		ROOT_PIPE.write(provider, ch, new RootRef(metadata));
 		metadata.list.add(new Dummy(4124));
-		LogUtil.println(TextUtil.toNamedPrettyJson(metadata));
+		
+		ROOT_PIPE.write(provider, firstChunk, new RootRef(metadata));
 	}
 	
 	static class Dummy extends IOInstance<Dummy>{
@@ -81,12 +75,17 @@ public class Cluster implements ChunkDataProvider{
 	private static class RootRef extends IOInstance<RootRef>{
 		
 		@IOValue
-		@IOValue.Reference
-		Metadata metadata;
+		@IOValue.Reference(pipeType=FIXED)
+		@IONullability(NULLABLE)
+		private Metadata metadata;
 		
 		public RootRef(){ }
 		RootRef(Metadata metadata){
 			this.metadata=metadata;
+		}
+		
+		public Metadata getMetadata(){
+			return metadata;
 		}
 	}
 	
@@ -120,16 +119,12 @@ public class Cluster implements ChunkDataProvider{
 	public Cluster(IOInterface source) throws IOException{
 		this.source=source;
 		
-		ChunkPointer mainChunkPtr;
 		try(var io=source.read()){
 			readMagic(io);
-			mainChunkPtr=ChunkPointer.read(FIRST_CHUNK_PTR_SIZE, io);
 		}
 		
-		var ch=mainChunkPtr.dereference(this);
+		var ch=getFirstChunk();
 		root=ROOT_PIPE.readNew(this, ch);
-		
-		LogUtil.println(TextUtil.toNamedPrettyJson(root));
 	}
 	
 	public Chunk getFirstChunk() throws IOException{
