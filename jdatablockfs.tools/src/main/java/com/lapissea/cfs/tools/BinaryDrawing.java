@@ -1,6 +1,7 @@
 package com.lapissea.cfs.tools;
 
-import com.lapissea.cfs.objects.chunk.Chunk;
+
+import com.lapissea.cfs.chunk.Chunk;
 
 import java.awt.*;
 import java.util.function.Function;
@@ -67,7 +68,8 @@ public abstract class BinaryDrawing{
 	}
 	
 	protected Color chunkBaseColor(Chunk chunk){
-		return chunk.isUsed()?chunk.isUserData()?Color.blue.brighter():Color.GREEN:Color.CYAN;
+		return Color.GREEN;
+//		return chunk.isUsed()?chunk.isUserData()?Color.blue.brighter():Color.GREEN:Color.CYAN;
 	}
 	
 	protected void fillChunk(DrawB drawByte, Chunk chunk, Function<Color, Color> filter){

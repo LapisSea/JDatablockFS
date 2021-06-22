@@ -5,13 +5,11 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<properties>
-		<javafxVersion>15</javafxVersion>
-		<javafxPath>${java.home}/../javafx-sdk-${javafxVersion}/lib</javafxPath>
 
 		<cfsVersion>1.0-SNAPSHOT</cfsVersion>
 
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<maven.compiler.release>15</maven.compiler.release>
+		<maven.compiler.release>16</maven.compiler.release>
 		<lwjgl.version>3.2.4-SNAPSHOT</lwjgl.version>
 		<joml.version>1.9.15</joml.version>
 		<lwjgl.natives>natives-windows</lwjgl.natives>
@@ -31,28 +29,6 @@
 			<artifactId>glfw-window</artifactId>
 			<version>1.0.0</version>
 		</dependency>
-
-		<dependency>
-			<groupId>org.openjfx</groupId>
-			<artifactId>javafx-base</artifactId>
-			<version>${javafxVersion}</version>
-		</dependency>
-		<dependency>
-			<groupId>org.openjfx</groupId>
-			<artifactId>javafx-controls</artifactId>
-			<version>${javafxVersion}</version>
-		</dependency>
-		<dependency>
-			<groupId>org.openjfx</groupId>
-			<artifactId>javafx-fxml</artifactId>
-			<version>${javafxVersion}</version>
-		</dependency>
-		<dependency>
-			<groupId>org.openjfx</groupId>
-			<artifactId>javafx-graphics</artifactId>
-			<version>${javafxVersion}</version>
-		</dependency>
-
 
 		<dependency>
 			<groupId>org.lwjgl</groupId>

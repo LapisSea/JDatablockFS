@@ -1,14 +1,11 @@
 package com.lapissea.cfs.tools;
 
-import com.lapissea.cfs.cluster.Cluster;
-import com.lapissea.cfs.io.SelfPoint;
+import com.lapissea.cfs.chunk.Chunk;
+import com.lapissea.cfs.chunk.Cluster;
+import com.lapissea.cfs.chunk.PhysicalChunkWalker;
 import com.lapissea.cfs.io.bit.FlagReader;
-import com.lapissea.cfs.io.struct.IOInstance;
-import com.lapissea.cfs.io.struct.Offset;
-import com.lapissea.cfs.io.struct.VariableNode;
-import com.lapissea.cfs.objects.chunk.Chunk;
-import com.lapissea.cfs.objects.chunk.ChunkPointer;
-import com.lapissea.cfs.objects.chunk.ObjectPointer;
+import com.lapissea.cfs.io.impl.MemoryData;
+import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.glfw.GlfwKeyboardEvent;
 import com.lapissea.glfw.GlfwMonitor;
 import com.lapissea.glfw.GlfwWindow;
@@ -261,16 +258,17 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 		
 		
 		GL.createCapabilities();
+		glErrorPrint();
 		
 		window.show();
 		
 		
 		GL11.glClearColor(0.5F, 0.5F, 0.5F, 1.0f);
+		glErrorPrint();
 		
 		GL11.glDisable(GL11.GL_DEPTH_TEST);
+		glErrorPrint();
 		GL11.glDepthMask(false);
-		GL11.glCullFace(GL11.GL_NONE);
-		
 		glErrorPrint();
 	}
 	
@@ -354,6 +352,24 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 				}
 			}
 			
+			var siz  =Math.max(1, pixelsPerByte/8F);
+			var sFul =siz;
+			var sHalf=siz/2;
+			
+			var magic=Cluster.getMagicId();
+			
+			var hasMagic=bytes.length>=magic.limit()&&IntStream.range(0, magic.limit()).allMatch(i->magic.get(i)==bytes[i]);
+			if(!hasMagic) return;
+			
+			for(int i=0;i<magic.limit();i++){
+				drawByte.draw(i, Color.BLUE, false, true);
+			}
+			
+			setStroke(2F);
+			outlineByteRange(Color.WHITE, width, 0, magic.limit());
+			setColor(Color.WHITE);
+			drawStringIn(new String(bytes, 0, magic.limit()), new Rectangle(0, 0, pixelsPerByte*Math.min(magic.limit(), width), pixelsPerByte), false);
+			
 			int xByte    =window.mousePos.x()/pixelsPerByte;
 			int yByte    =window.mousePos.y()/pixelsPerByte;
 			int byteIndex=yByte*width+xByte;
@@ -363,13 +379,13 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			List<Pointer> ptrs=new ArrayList<>();
 			Cluster       cluster;
 			try{
-				cluster=Cluster.build(b->b.withMemoryView(bytes));
+				cluster=new Cluster(MemoryData.build().withRaw(bytes).asReadOnly().build());
 				
-				annotateStruct(width, drawByte, cluster, cluster, 0, ptrs::add);
-				for(Chunk chunk : cluster.getFirstChunk().physicalIterator()){
+				annotateStruct(width, drawByte, cluster, cluster.getRoot(), 0, ptrs::add);
+				for(Chunk chunk : new PhysicalChunkWalker(cluster.getFirstChunk())){
 					fillChunk(drawByte, chunk, c->alpha(mix(c, Color.RED, 0.6F), c.getAlpha()/255F*0.7F));
 				}
-				for(Chunk chunk : cluster.getFirstChunk().physicalIterator()){
+				for(Chunk chunk : new PhysicalChunkWalker(cluster.getFirstChunk())){
 					annotateStruct(width, drawByte, cluster, chunk, chunk.getPtr().getValue(), ptrs::add);
 				}
 			}catch(Throwable e){
@@ -380,12 +396,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			setColor(alpha(Color.GRAY, 0.5F));
 			for(int i=0;i<bytes.length;i++){
 				if(drawn.get(i)) continue;
-				int b=bytes[i]|0xFF;
-				
-				int xi=i%width;
-				int yi=i/width;
-				
-				renderByte(b, pixelsPerByte, true, xi*pixelsPerByte, yi*pixelsPerByte);
+				drawByte.draw(i, alpha(Color.GRAY, 0.5F), true, false);
 			}
 			
 			
@@ -398,10 +409,6 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 				
 				fillBit(8, xi*pixelsPerByte, yi*pixelsPerByte);
 			}
-			
-			var siz  =Math.max(1, pixelsPerByte/8F);
-			var sFul =siz;
-			var sHalf=siz/2;
 			
 			setStroke(sFul);
 			for(Pointer ptr : ptrs){
@@ -480,7 +487,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 				
 				if(cluster!=null){
 					try{
-						for(Chunk chunk : cluster.getFirstChunk().physicalIterator()){
+						for(Chunk chunk : new PhysicalChunkWalker(cluster.getFirstChunk())){
 							if(chunk.rangeIntersects(byteIndex)){
 								setStroke(1);
 								outlineChunk(width, pixelsPerByte, chunk, mix(chunkBaseColor(chunk), Color.WHITE, 0.4F));
@@ -533,9 +540,21 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	}
 	
 	private void outlineChunk(int width, int pixelsPerByte, Chunk chunk, Color color){
-		setColor(color);
+		int start=chunk.getPtr().getValueInt();
+		int end  =Math.toIntExact(chunk.dataEnd());
 		
-		for(int start=chunk.getPtr().getValueInt(), end=Math.toIntExact(chunk.dataEnd()), i=start;i<end;i++){
+		outlineByteRange(color, width, start, end);
+		if(chunk.hasNextPtr()){
+			try{
+				outlineChunk(width, pixelsPerByte, chunk.next(), alpha(color, color.getAlpha()/255F*0.5F));
+			}catch(IOException e){
+				handleError(e);
+			}
+		}
+	}
+	private void outlineByteRange(Color color, int width, int start, int end){
+		setColor(color);
+		for(int i=start;i<end;i++){
 			int x =i%width, y=i/width;
 			int x1=x, y1=y;
 			int x2=x1+1, y2=y1+1;
@@ -544,13 +563,6 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			if(end-i<=width) drawLine(x1, y2, x2, y2);
 			if(x==0||i==start) drawLine(x1, y1, x1, y2);
 			if(x2==width||i==end-1) drawLine(x2, y1, x2, y2);
-		}
-		if(chunk.hasNext()){
-			try{
-				outlineChunk(width, pixelsPerByte, chunk.next(), alpha(color, color.getAlpha()/255F*0.5F));
-			}catch(IOException e){
-				handleError(e);
-			}
 		}
 	}
 	
@@ -579,154 +591,154 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			
 			List<PairM<Long, IOInstance>> recurse=new ArrayList<>();
 			
-			var typeHash=instance.getStruct().instanceClass.getName().hashCode()&0xffffffffL;
+			var typeHash=instance.getThisStruct().getType().getName().hashCode()&0xffffffffL;
 			
 			Random rand=new Random();
-			instance.iterateOffsets((VariableNode<?> var, Offset off)->{
-				try{
-					rand.setSeed((((long)var.info.name().hashCode())<<32)|typeHash);
-					
-					var col=new Color(
-						Color.HSBtoRGB(
-							rand.nextFloat(),
-							rand.nextFloat()/0.4F+0.6F,
-							1F
-						              )
-					);
-					
-					setColor(alpha(col, 0.5F));
-					
-					Rectangle area;
-					
-					var varSize=(int)VariableNode.FixedSize.getSizeUnknown(instance, var);
-					
-					if(off instanceof Offset.BitOffset){
-						final var from    =(int)(instanceOffset+off.getOffset());
-						int       xPosFrom=from%width, yPosFrom=from/width;
-						
-						int fromB=Math.toIntExact(instanceOffset+off.getOffset());
-						int toB  =fromB;
-						
-						var fl=(VariableNode.Flag<?>)var;
-						
-						int ib     =off.inByteBitOffset();
-						var bitSize=Math.min(fl.getBitSize(), 8-ib);
-						
-						for(int i=0;i<bitSize;i++){
-							toB++;
-							if(toB%3==0) break;
-						}
-						
-						
-						int xi=ib%3;
-						int yi=ib/3;
-						
-						area=new Rectangle(
-							(int)(pixelsPerByte*(xPosFrom+xi/3D)), (int)(pixelsPerByte*(yPosFrom+yi/3D)),
-							(int)(pixelsPerByte/3D*(toB-fromB)),
-							pixelsPerByte/3*Math.max(1, bitSize/3));
-						initFont(1/3F);
-						
-					}else{
-						
-						int from=Math.toIntExact(instanceOffset+off.getOffset());
-						int to  =from;
-						
-						for(int i=0;i<varSize;i++){
-							to++;
-							if(to%width==0) break;
-						}
-						
-						int xPosFrom=from%width, yPosFrom=from/width;
-						area=new Rectangle(pixelsPerByte*xPosFrom, pixelsPerByte*yPosFrom, pixelsPerByte*(to-from), pixelsPerByte);
-						initFont();
-						
-						IntStream.range(from, from+varSize).forEach(i->drawByte.draw(i, alpha(col, 1F), false, false));
-						
-						setColor(alpha(col, 0.8F));
-					}
-					
-					Object valVal=var.getValueAsObj(instance);
-					
-					if(var instanceof VariableNode.SelfPointer<?>&&valVal instanceof IOInstance inst){
-						var ptr   =((SelfPoint<?>)inst).getSelfPtr();
-						var c     =ptr.getBlock(cluster);
-						var valOff=ptr.globalOffset(cluster);
-						
-						pointerRecord.accept(new Pointer((int)(instanceOffset+off.getOffset()), (int)valOff, varSize, col, ""));
-						
-						recurse.add(new PairM<>(c.getPtr().getValue(), c));
-						recurse.add(new PairM<>(valOff, inst));
-					}else if(valVal instanceof IOInstance inst){
-						try{
-							long valOff=instanceOffset+off.getOffset();
-							annotateStruct(width, drawByte, cluster, stack, inst, valOff, pointerRecord);
-							area.width=0;
-						}catch(IOException e){
-							handleError(e);
-						}
-					}else if(valVal instanceof ChunkPointer ptr){
-						var color  =col;
-						var message="";
-						try{
-							recurse.add(new PairM<>(ptr.getValue(), ptr.dereference(cluster)));
-						}catch(Throwable e){
-							handleError(e);
-							message=errorToMessage(e);
-							color=Color.RED;
-						}
-						
-						pointerRecord.accept(new Pointer((int)(instanceOffset+off.getOffset()), ptr.getValueInt(), varSize, color, message));
-					}else if(valVal instanceof ObjectPointer<?> ptr&&ptr.hasPtr()){
-						
-						if(ptr.getOffset()==0){
-							annotateStruct(width, drawByte, cluster, stack, ptr.getBlock(cluster), ptr.getDataBlock().getValue(), pointerRecord);
-						}
-						
-						var color  =col;
-						var message="";
-						try{
-							Object o=ptr.read(cluster);
-							if(o instanceof IOInstance i){
-								var oOff=ptr.globalOffset(cluster);
-								recurse.add(new PairM<>(oOff, i));
-							}
-						}catch(Throwable e){
-							handleError(e);
-							message=errorToMessage(e);
-							color=Color.RED;
-						}
-						
-						pointerRecord.accept(new Pointer((int)(instanceOffset+off.getOffset()), (int)ptr.globalOffset(cluster), varSize, color, message));
-					}
-					
-					if(area.width>0){
-						setColor(alpha(col, 0.8F));
-						try{
-							String text=TextUtil.toShortString(valVal)
-							                    .replace('\t', '↹')
-							                    .replace('\n', '↵');
-							if(text.contains("AutoText")){
-								int i0=0;
-							}
-							drawStringIn(text, area, true);
-						}catch(Throwable e){
-							handleError(e);
-						}
-						setColor(mul(readColor(), 0.4F));
-						outlineQuad(area.x, area.y, area.width, area.height);
-					}
-					
-				}catch(Throwable e){
-					try{
-						int from   =Math.toIntExact(instanceOffset+off.getOffset());
-						var varSize=(int)VariableNode.FixedSize.getSizeUnknown(instance, var);
-						IntStream.range(from, from+varSize).forEach(i->drawByte.draw(i, Color.RED, false, true));
-					}catch(Throwable ignored){ }
-					handleError(e);
-				}
-				
-			});
+//			instance.iterateOffsets((IOField<?, ?> var, Offset off)->{
+//				try{
+//					rand.setSeed((((long)var.info.name().hashCode())<<32)|typeHash);
+//
+//					var col=new Color(
+//						Color.HSBtoRGB(
+//							rand.nextFloat(),
+//							rand.nextFloat()/0.4F+0.6F,
+//							1F
+//						)
+//					);
+//
+//					setColor(alpha(col, 0.5F));
+//
+//					Rectangle area;
+//
+//					var varSize=(int)VariableNode.FixedSize.getSizeUnknown(instance, var);
+//
+//					if(off instanceof Offset.BitOffset){
+//						final var from    =(int)(instanceOffset+off.getOffset());
+//						int       xPosFrom=from%width, yPosFrom=from/width;
+//
+//						int fromB=Math.toIntExact(instanceOffset+off.getOffset());
+//						int toB  =fromB;
+//
+//						var fl=(VariableNode.Flag<?>)var;
+//
+//						int ib     =off.inByteBitOffset();
+//						var bitSize=Math.min(fl.getBitSize(), 8-ib);
+//
+//						for(int i=0;i<bitSize;i++){
+//							toB++;
+//							if(toB%3==0) break;
+//						}
+//
+//
+//						int xi=ib%3;
+//						int yi=ib/3;
+//
+//						area=new Rectangle(
+//							(int)(pixelsPerByte*(xPosFrom+xi/3D)), (int)(pixelsPerByte*(yPosFrom+yi/3D)),
+//							(int)(pixelsPerByte/3D*(toB-fromB)),
+//							pixelsPerByte/3*Math.max(1, bitSize/3));
+//						initFont(1/3F);
+//
+//					}else{
+//
+//						int from=Math.toIntExact(instanceOffset+off.getOffset());
+//						int to  =from;
+//
+//						for(int i=0;i<varSize;i++){
+//							to++;
+//							if(to%width==0) break;
+//						}
+//
+//						int xPosFrom=from%width, yPosFrom=from/width;
+//						area=new Rectangle(pixelsPerByte*xPosFrom, pixelsPerByte*yPosFrom, pixelsPerByte*(to-from), pixelsPerByte);
+//						initFont();
+//
+//						IntStream.range(from, from+varSize).forEach(i->drawByte.draw(i, alpha(col, 1F), false, false));
+//
+//						setColor(alpha(col, 0.8F));
+//					}
+//
+//					Object valVal=var.getValueAsObj(instance);
+//
+//					if(var instanceof VariableNode.SelfPointer<?>&&valVal instanceof IOInstance inst){
+//						var ptr   =((SelfPoint<?>)inst).getSelfPtr();
+//						var c     =ptr.getBlock(cluster);
+//						var valOff=ptr.globalOffset(cluster);
+//
+//						pointerRecord.accept(new Pointer((int)(instanceOffset+off.getOffset()), (int)valOff, varSize, col, ""));
+//
+//						recurse.add(new PairM<>(c.getPtr().getValue(), c));
+//						recurse.add(new PairM<>(valOff, inst));
+//					}else if(valVal instanceof IOInstance inst){
+//						try{
+//							long valOff=instanceOffset+off.getOffset();
+//							annotateStruct(width, drawByte, cluster, stack, inst, valOff, pointerRecord);
+//							area.width=0;
+//						}catch(IOException e){
+//							handleError(e);
+//						}
+//					}else if(valVal instanceof ChunkPointer ptr){
+//						var color  =col;
+//						var message="";
+//						try{
+//							recurse.add(new PairM<>(ptr.getValue(), ptr.dereference(cluster)));
+//						}catch(Throwable e){
+//							handleError(e);
+//							message=errorToMessage(e);
+//							color=Color.RED;
+//						}
+//
+//						pointerRecord.accept(new Pointer((int)(instanceOffset+off.getOffset()), ptr.getValueInt(), varSize, color, message));
+//					}else if(valVal instanceof ObjectPointer<?> ptr&&ptr.hasPtr()){
+//
+//						if(ptr.getOffset()==0){
+//							annotateStruct(width, drawByte, cluster, stack, ptr.getBlock(cluster), ptr.getDataBlock().getValue(), pointerRecord);
+//						}
+//
+//						var color  =col;
+//						var message="";
+//						try{
+//							Object o=ptr.read(cluster);
+//							if(o instanceof IOInstance i){
+//								var oOff=ptr.globalOffset(cluster);
+//								recurse.add(new PairM<>(oOff, i));
+//							}
+//						}catch(Throwable e){
+//							handleError(e);
+//							message=errorToMessage(e);
+//							color=Color.RED;
+//						}
+//
+//						pointerRecord.accept(new Pointer((int)(instanceOffset+off.getOffset()), (int)ptr.globalOffset(cluster), varSize, color, message));
+//					}
+//
+//					if(area.width>0){
+//						setColor(alpha(col, 0.8F));
+//						try{
+//							String text=TextUtil.toShortString(valVal)
+//							                    .replace('\t', '↹')
+//							                    .replace('\n', '↵');
+//							if(text.contains("AutoText")){
+//								int i0=0;
+//							}
+//							drawStringIn(text, area, true);
+//						}catch(Throwable e){
+//							handleError(e);
+//						}
+//						setColor(mul(readColor(), 0.4F));
+//						outlineQuad(area.x, area.y, area.width, area.height);
+//					}
+//
+//				}catch(Throwable e){
+//					try{
+//						int from   =Math.toIntExact(instanceOffset+off.getOffset());
+//						var varSize=(int)VariableNode.FixedSize.getSizeUnknown(instance, var);
+//						IntStream.range(from, from+varSize).forEach(i->drawByte.draw(i, Color.RED, false, true));
+//					}catch(Throwable ignored){ }
+//					handleError(e);
+//				}
+//
+//			});
 			
 			for(var i : recurse){
 				annotateStruct(width, drawByte, cluster, stack, i.obj2, i.obj1, pointerRecord);

@@ -17,6 +17,8 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import static com.lapissea.util.LogUtil.Init.*;
+
 public class DisplayServer implements DataLogger{
 	
 	enum Action{
@@ -35,8 +37,12 @@ public class DisplayServer implements DataLogger{
 	}
 	
 	public static void main(String[] args) throws IOException{
+		LogUtil.Init.attach(USE_CALL_POS|USE_TABULATED_HEADER);
 		
-		ServerSocket server=new ServerSocket(666);
+		var config=Common.readConfig();
+		int port  =(int)config.getOrDefault("port", 666);
+		
+		ServerSocket server=new ServerSocket(port);
 		
 		DataLogger display=Arrays.asList(args).contains("lazy")?null:getRealLogger();
 		
@@ -80,7 +86,7 @@ public class DisplayServer implements DataLogger{
 						}
 						}
 					}catch(SocketException e){
-						if(e.getMessage().equals("Connection reset")){
+						if("Connection reset".equals(e.getMessage())){
 							LogUtil.println("disconnected");
 							break;
 						}
@@ -102,12 +108,14 @@ public class DisplayServer implements DataLogger{
 	final DataLogger proxy;
 	
 	public DisplayServer(Map<String, Object> config){
-		final boolean threadedOutput=Boolean.parseBoolean(config.getOrDefault("threadedOutput", "false").toString());
-		DataLogger    proxy;
+		boolean threadedOutput=Boolean.parseBoolean(config.getOrDefault("threadedOutput", "false").toString());
+		int     port          =(int)config.getOrDefault("port", 666);
+		
+		DataLogger proxy;
 		try{
 			var socketMake=new Socket();
 			try{
-				socketMake.connect(new InetSocketAddress(InetAddress.getLocalHost(), 666), 100);
+				socketMake.connect(new InetSocketAddress(InetAddress.getLocalHost(), port), 100);
 			}catch(SocketTimeoutException e){
 				String jarPath=config.getOrDefault("jar", "").toString();
 				socketMake.close();
@@ -119,7 +127,7 @@ public class DisplayServer implements DataLogger{
 				p.getInputStream().read();
 				
 				socketMake=new Socket();
-				socketMake.connect(new InetSocketAddress(InetAddress.getLocalHost(), 666), 100);
+				socketMake.connect(new InetSocketAddress(InetAddress.getLocalHost(), port), 100);
 			}
 			var socket=socketMake;
 			

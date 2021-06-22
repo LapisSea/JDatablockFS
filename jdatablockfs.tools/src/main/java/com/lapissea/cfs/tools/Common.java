@@ -1,25 +1,30 @@
 package com.lapissea.cfs.tools;
 
 import com.google.gson.GsonBuilder;
+import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.LogUtil;
-import com.lapissea.util.ZeroArrays;
 
-import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.stream.LongStream;
 
 public class Common{
 	
-	public static LateInit<DataLogger> initAndLogger(){
+	public static Map<String, Object> readConfig(){
 		
 		Map<String, Object> config=new HashMap<>();
-		try(var r=new FileReader(new File("config.json"))){
+		try(var r=new FileReader("config.json")){
 			new GsonBuilder().create().<Map<String, Object>>fromJson(r, HashMap.class).forEach(config::put);
 		}catch(Exception ignored){ }
+		return config;
+	}
+	
+	public static LateInit<DataLogger> initAndLogger(){
+		var config=readConfig();
 		
 		LogUtil.Init.attach(Boolean.parseBoolean(config.getOrDefault("fancyPrint", "true").toString())?LogUtil.Init.USE_CALL_POS|LogUtil.Init.USE_TABULATED_HEADER:0);
 		
@@ -44,20 +49,19 @@ public class Common{
 		});
 	}
 	
-	public static MemoryData newLoggedMemory(LateInit<DataLogger> display) throws IOException{
-		
-		var mem=new MemoryData();
-		
+	public static MemoryData<?> newLoggedMemory(LateInit<DataLogger> display) throws IOException{
 		var preBuf=new LinkedList<MemFrame>();
-		mem.onWrite=ids->{
-			preBuf.add(new MemFrame(mem.readAll(), ids, new Throwable()));
+		
+		MemoryData<?> mem=MemoryData.build().withOnWrite((data, ids)->{
+			preBuf.add(new MemFrame(data.readAll(), ids.toArray(), new Throwable()));
 			display.ifInited(d->{
 				while(!preBuf.isEmpty()){
 					d.log(preBuf.remove(0));
 				}
 			});
-		};
-		mem.onWrite.accept(ZeroArrays.ZERO_LONG);
+		}).build();
+		
+		mem.onWrite.log(mem, LongStream.of());
 		
 		return mem;
 	}
