@@ -170,6 +170,10 @@ public abstract class MemoryData<DataType> implements IOInterface{
 			
 			return result.toString();
 		}
+		@Override
+		public boolean isDirect(){
+			return true;
+		}
 	}
 	
 	public transient EventLogger onWrite;

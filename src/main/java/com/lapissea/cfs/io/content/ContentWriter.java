@@ -9,6 +9,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+@SuppressWarnings({"PointlessBitwiseExpression", "PointlessArithmeticExpression", "unused"})
 public interface ContentWriter extends AutoCloseable, ContentBuff{
 	
 	default void write(ByteBuffer b) throws IOException{
@@ -293,4 +294,10 @@ public interface ContentWriter extends AutoCloseable, ContentBuff{
 	default BufferTicket writeTicket(long amount){ return writeTicket(Math.toIntExact(amount)); }
 	default BufferTicket writeTicket(int amount) { return new BufferTicket(this, amount, null, null); }
 	
+	/**
+	 * @return if true, this asks the writing agent to buffer chunks of data. False should be returned if cost of writing is minimal
+	 */
+	default boolean isDirect(){
+		return false;
+	}
 }

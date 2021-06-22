@@ -353,7 +353,10 @@ public class ChunkChainIO implements RandomIO{
 	public long getSize() throws IOException{
 		return mapSum(Chunk::getSize);
 	}
-	
+	@Override
+	public boolean isDirect(){
+		return true;
+	}
 	@Override
 	public String toString(){
 		return this.getClass().getSimpleName()+"{"+head.getPtr()+", pos="+cursor.getPtr()+"+"+calcCursorOffset()+"}";
