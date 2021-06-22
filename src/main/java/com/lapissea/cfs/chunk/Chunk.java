@@ -39,7 +39,11 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 	public static Chunk readChunk(@NotNull ChunkDataProvider provider, @NotNull ChunkPointer pointer) throws IOException{
 		if(provider.getSource().getIOSize()<pointer.add(PIPE.getSizeDescriptor().getMin())) throw new MalformedPointerException(pointer.toString());
 		Chunk chunk=new Chunk(provider, pointer);
-		chunk.readHeader();
+		try{
+			chunk.readHeader();
+		}catch(Exception e){
+			throw new MalformedPointerException("No valid chunk at "+pointer, e);
+		}
 		return chunk;
 	}
 	
@@ -69,8 +73,8 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 	
 	
 	private int     headerSize;
-	private boolean dirty;
-	private Chunk   nextCache;
+	private boolean dirty, reading;
+	private Chunk nextCache;
 	
 	private Chunk(ChunkDataProvider provider, ChunkPointer ptr){
 		super(STRUCT);
@@ -116,7 +120,12 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		}
 	}
 	public void readHeader(ContentReader src) throws IOException{
-		PIPE.read(provider, src, this);
+		reading=true;
+		try{
+			PIPE.read(provider, src, this);
+		}finally{
+			reading=false;
+		}
 		calcHeaderSize();
 	}
 	
@@ -183,6 +192,7 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 	}
 	
 	public void forbidReadOnly(){
+		if(reading) return;
 		if(isReadOnly()){
 			throw new UnsupportedOperationException();
 		}
@@ -327,6 +337,7 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 	}
 	
 	private void markDirty(){
+		if(reading) return;
 		forbidReadOnly();
 		dirty=true;
 	}
