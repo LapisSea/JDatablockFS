@@ -10,7 +10,6 @@ import com.lapissea.util.LogUtil;
 import java.io.IOException;
 import java.util.stream.LongStream;
 
-import static com.lapissea.cfs.GlobalConfig.*;
 import static com.lapissea.util.LogUtil.Init.*;
 
 class FSFTest{
@@ -21,7 +20,7 @@ class FSFTest{
 		try{
 			LateInit<DataLogger> display=Common.initAndLogger();
 			
-			if(DEBUG_VALIDATION) display.block();
+//			if(DEBUG_VALIDATION) display.block();
 			
 			MemoryData<?> mem=Common.newLoggedMemory(display);
 			Cluster.init(mem);

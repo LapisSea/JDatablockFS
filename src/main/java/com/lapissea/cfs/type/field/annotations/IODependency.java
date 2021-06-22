@@ -40,7 +40,7 @@ public @interface IODependency{
 			}
 			@Override
 			public Stream<IOField.UsageHint> getHints(NumSize annotation){
-				return Stream.of(new IOField.UsageHint(DYNAMIC_SIZE_RESOLVE_DATA, annotation.value()));
+				return Stream.of(new IOField.UsageHint(SIZE_DATA, annotation.value()));
 			}
 		};
 		
@@ -79,7 +79,7 @@ public @interface IODependency{
 			
 			@Override
 			public Stream<IOField.UsageHint> getHints(VirtualNumSize annotation){
-				return Stream.of(new IOField.UsageHint(DYNAMIC_SIZE_RESOLVE_DATA, annotation.name()));
+				return Stream.of(new IOField.UsageHint(SIZE_DATA, annotation.name()));
 			}
 			
 			@Override

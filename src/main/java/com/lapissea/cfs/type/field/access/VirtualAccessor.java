@@ -175,7 +175,7 @@ public class VirtualAccessor<CTyp extends IOInstance<CTyp>> implements IFieldAcc
 	}
 	
 	private String namString(){
-		return "#("+getName()+")"+(getAccessIndex()==-1?"":"@"+getAccessIndex());
+		return "#("+getName()+")"+"@"+getStoragePool().shortName+(getAccessIndex()==-1?"":getAccessIndex());
 	}
 	
 	@Override

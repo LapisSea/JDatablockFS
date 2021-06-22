@@ -16,8 +16,8 @@ public final class VirtualFieldDefinition<IO extends IOInstance<IO>, T>{
 	}
 	
 	public enum StoragePool{
-		INSTANCE("this"),
-		IO("io"),
+		INSTANCE("<<"),
+		IO("IO"),
 		NONE("x");
 		
 		public final String shortName;

@@ -34,7 +34,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	
 	
 	public enum UsageHintType{
-		DYNAMIC_SIZE_RESOLVE_DATA
+		SIZE_DATA
 	}
 	
 	public static record UsageHint(UsageHintType type, String target){

@@ -46,7 +46,7 @@ public class FixedContiguousStructPipe<T extends IOInstance<T>> extends StructPi
 		
 		Map<IOField<T, NumberSize>, List<IOField<T, ?>>> sizeDeps=
 			getType().getFields().byType(NumberSize.class)
-			         .filter(f->f.getUsageHints().contains(DYNAMIC_SIZE_RESOLVE_DATA))
+			         .filter(f->f.getUsageHints().contains(SIZE_DATA))
 			         .collect(Collectors.toMap(
 				         em->em,
 				         em->getType().getFields()
