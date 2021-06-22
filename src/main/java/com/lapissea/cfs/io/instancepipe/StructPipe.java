@@ -6,6 +6,7 @@ import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.ChunkDataProvider;
 import com.lapissea.cfs.exceptions.UnknownSizePredictionException;
 import com.lapissea.cfs.io.RandomIO;
+import com.lapissea.cfs.io.content.ContentOutputBuilder;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.type.FieldSet;
@@ -204,9 +205,20 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	}
 	
 	protected void writeIOFields(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
+		
 		Object[] ioPool=makeIOPool();
 		try{
 			pushPool(ioPool);
+			
+			final ContentWriter destBuff;
+			final boolean       isBuffered;
+			if(dest.isDirect()){
+				isBuffered=true;
+				destBuff=new ContentOutputBuilder((int)getSizeDescriptor().fixedOrMax().orElse(32));
+			}else{
+				isBuffered=false;
+				destBuff=dest;
+			}
 			
 			if(DEBUG_VALIDATION){
 				for(IOField<T, ?> field : getSpecificFields()){
@@ -215,23 +227,27 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 						var desc=field.getSizeDescriptor();
 						bytes=desc.toBytes(desc.calcUnknown(instance));
 					}catch(UnknownSizePredictionException e){
-						field.writeReported(provider, dest, instance);
+						field.writeReported(provider, destBuff, instance);
 						continue;
 					}
 					
-					var buf=dest.writeTicket(bytes).requireExact().submit();
-					field.writeReported(provider, buf, instance);
+					var safeBuff=destBuff.writeTicket(bytes).requireExact().submit();
+					field.writeReported(provider, safeBuff, instance);
 					
 					try{
-						buf.close();
+						safeBuff.close();
 					}catch(Exception e){
 						throw new IOException(TextUtil.toString(field)+" did not write correctly", e);
 					}
 				}
 			}else{
 				for(IOField<T, ?> field : getSpecificFields()){
-					field.writeReported(provider, dest, instance);
+					field.writeReported(provider, destBuff, instance);
 				}
+			}
+			
+			if(isBuffered){
+				((ContentOutputBuilder)destBuff).writeTo(dest);
 			}
 			
 		}finally{
@@ -274,7 +290,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		}
 	}
 	private void pushPool(Object[] ioPool){
-		if(ioPool==null) return;
+		if(getIoPoolAccessors()==null) return;
 		for(var a : getIoPoolAccessors()){
 			a.pushIoPool(ioPool);
 		}
