@@ -8,8 +8,6 @@ import com.lapissea.cfs.type.field.VirtualFieldDefinition;
 import com.lapissea.cfs.type.field.access.IFieldAccessor;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
-import io.leangen.geantyref.AnnotationFormatException;
-import io.leangen.geantyref.TypeFactory;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -36,16 +34,12 @@ public @interface IOValue{
 			                             .map(IODependency.ArrayLenSize::name)
 			                             .orElseGet(()->IOFieldTools.makeArrayLenName(field)+".nSiz");
 			
-			try{
-				return List.of(new VirtualFieldDefinition<T, Integer>(IO, IOFieldTools.makeArrayLenName(field), Integer.class, (instance, dependencies, value)->{
-					if(value!=null) return value;
-					var arr=field.get(instance);
-					if(arr!=null) return Array.getLength(arr);
-					return -1;
-				}, List.of(TypeFactory.annotation(IODependency.VirtualNumSize.class, Map.of("name", arrayLengthSizeName)))));
-			}catch(AnnotationFormatException e){
-				throw new RuntimeException(e);
-			}
+			return List.of(new VirtualFieldDefinition<T, Integer>(IO, IOFieldTools.makeArrayLenName(field), Integer.class, (instance, dependencies, value)->{
+				if(value!=null) return value;
+				var arr=field.get(instance);
+				if(arr!=null) return Array.getLength(arr);
+				return -1;
+			}, List.of(IOFieldTools.makeAnnotation(IODependency.VirtualNumSize.class, Map.of("name", arrayLengthSizeName)))));
 		}
 		@NotNull
 		@Override
@@ -70,6 +64,21 @@ public @interface IOValue{
 				if(UtilL.instanceOf(field.getType(), IOInstance.Unmanaged.class)){
 					throw new MalformedStructLayout("Reference annotation can be used only in IOInstance regular types but "+field+" is unmanaged");
 				}
+			}
+			@NotNull
+			@Override
+			public <T extends IOInstance<T>> List<VirtualFieldDefinition<T, ?>> injectPerInstanceValue(IFieldAccessor<T> field, Reference annotation){
+				return List.of(new VirtualFieldDefinition<T, com.lapissea.cfs.objects.Reference>(
+					INSTANCE,
+					IOFieldTools.makeRefName(field),
+					com.lapissea.cfs.objects.Reference.class,
+					List.of(IOFieldTools.makeAnnotation(IONullability.class, Map.of("value", IONullability.Mode.DEFAULT_IF_NULL)))
+				));
+			}
+			@NotNull
+			@Override
+			public Set<String> getDependencyValueNames(IFieldAccessor<?> field, Reference annotation){
+				return Set.of(IOFieldTools.makeRefName(field));
 			}
 		};
 	}

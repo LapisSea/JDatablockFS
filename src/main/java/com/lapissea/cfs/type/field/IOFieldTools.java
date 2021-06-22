@@ -12,7 +12,10 @@ import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
+import io.leangen.geantyref.AnnotationFormatException;
+import io.leangen.geantyref.TypeFactory;
 
+import java.lang.annotation.Annotation;
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.ToLongFunction;
@@ -107,5 +110,17 @@ public class IOFieldTools{
 	}
 	public static IONullability.Mode getNullability(IFieldAccessor<?> field, IONullability.Mode defaultMode){
 		return field.getAnnotation(IONullability.class).map(IONullability::value).orElse(defaultMode);
+	}
+	public static <T extends IOInstance<T>> String makeRefName(IFieldAccessor<T> accessor){
+		
+		return accessor.getName()+".ref";
+	}
+	
+	public static <A extends Annotation> A makeAnnotation(Class<A> annotationType, Map<String, Object> values){
+		try{
+			return TypeFactory.annotation(annotationType, values);
+		}catch(AnnotationFormatException e){
+			throw new RuntimeException(e);
+		}
 	}
 }

@@ -29,9 +29,9 @@ public class Cluster implements ChunkDataProvider{
 	
 	private static final ByteBuffer MAGIC_ID=ByteBuffer.wrap("BYTE-BABE".getBytes(UTF_8)).asReadOnlyBuffer();
 	
-	private static final NumberSize           FIRST_CHUNK_PTR_SIZE=LARGEST;
-	private static final ChunkPointer         FIRST_CHUNK_PTR     =ChunkPointer.of(MAGIC_ID.limit()+FIRST_CHUNK_PTR_SIZE.bytes);
-	private static final StructPipe<Metadata> METADATA_PIPE       =ContiguousStructPipe.of(Metadata.class);
+	private static final NumberSize          FIRST_CHUNK_PTR_SIZE=LARGEST;
+	private static final ChunkPointer        FIRST_CHUNK_PTR     =ChunkPointer.of(MAGIC_ID.limit()+FIRST_CHUNK_PTR_SIZE.bytes);
+	private static final StructPipe<RootRef> ROOT_PIPE           =ContiguousStructPipe.of(RootRef.class);
 	
 	public static ByteBuffer getMagicId(){
 		return MAGIC_ID.asReadOnlyBuffer();
@@ -60,9 +60,9 @@ public class Cluster implements ChunkDataProvider{
 		                       .withApproval(c->c.getPtr().equals(FIRST_CHUNK_PTR))
 		                       .submit(provider);
 		
-		METADATA_PIPE.write(ch, metadata);
+		ROOT_PIPE.write(provider, ch, new RootRef(metadata));
 		metadata.allocateNulls(provider);
-		METADATA_PIPE.write(ch, metadata);
+		ROOT_PIPE.write(provider, ch, new RootRef(metadata));
 		metadata.list.add(new Dummy(4124));
 		LogUtil.println(TextUtil.toNamedPrettyJson(metadata));
 	}
@@ -75,6 +75,18 @@ public class Cluster implements ChunkDataProvider{
 		public Dummy(){ }
 		public Dummy(int dummyValue){
 			this.dummyValue=dummyValue;
+		}
+	}
+	
+	private static class RootRef extends IOInstance<RootRef>{
+		
+		@IOValue
+		@IOValue.Reference
+		Metadata metadata;
+		
+		public RootRef(){ }
+		RootRef(Metadata metadata){
+			this.metadata=metadata;
 		}
 	}
 	
@@ -103,7 +115,7 @@ public class Cluster implements ChunkDataProvider{
 	private final IOInterface   source;
 	private final MemoryManager memoryManager=new VerySimpleMemoryManager(this);
 	
-	private final Metadata metadata;
+	private final RootRef root;
 	
 	public Cluster(IOInterface source) throws IOException{
 		this.source=source;
@@ -115,9 +127,17 @@ public class Cluster implements ChunkDataProvider{
 		}
 		
 		var ch=mainChunkPtr.dereference(this);
-		metadata=METADATA_PIPE.readNew(this, ch);
+		root=ROOT_PIPE.readNew(this, ch);
 		
-		LogUtil.println(TextUtil.toNamedPrettyJson(metadata));
+		LogUtil.println(TextUtil.toNamedPrettyJson(root));
+	}
+	
+	public Chunk getFirstChunk() throws IOException{
+		return getChunk(FIRST_CHUNK_PTR);
+	}
+	
+	public RootRef getRoot(){
+		return root;
 	}
 	
 	@Override

@@ -8,7 +8,6 @@ import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.reflection.*;
-import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.UtilL;
 
 import java.lang.annotation.Annotation;
@@ -73,7 +72,7 @@ public class ReflectionFieldCompiler extends FieldCompiler{
 					return new IOFieldUnmanagedObjectReference<>(field);
 				}
 				if(field.hasAnnotation(IOValue.Reference.class)){
-					throw new NotImplementedException("reference managed instance reference");
+					return new IOFieldObjectReference<>(field);
 				}
 				return new IOFieldInlineObject<>(field);
 			}

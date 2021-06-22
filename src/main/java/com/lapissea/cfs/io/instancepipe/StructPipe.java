@@ -4,6 +4,7 @@ import com.lapissea.cfs.ConsoleColors;
 import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.ChunkDataProvider;
+import com.lapissea.cfs.exceptions.UnknownSizePredictionException;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
@@ -121,6 +122,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 			return new SizeDescriptor.Unknown<>(IOFieldTools.sumVars(fields, siz->siz.toBytes(siz.getMin())), IOFieldTools.sumVarsIfAll(fields, siz->siz.toBytes(siz.getMax()))){
 				@Override
 				public long calcUnknown(T instance){
+					Objects.requireNonNull(instance);
 					return knownFixed+IOFieldTools.sumVars(unknownFields, d->d.calcUnknown(instance));
 				}
 			};
@@ -208,8 +210,14 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 			
 			if(DEBUG_VALIDATION){
 				for(IOField<T, ?> field : getSpecificFields()){
-					var  desc =field.getSizeDescriptor();
-					long bytes=desc.toBytes(desc.calcUnknown(instance));
+					long bytes;
+					try{
+						var desc=field.getSizeDescriptor();
+						bytes=desc.toBytes(desc.calcUnknown(instance));
+					}catch(UnknownSizePredictionException e){
+						field.writeReported(provider, dest, instance);
+						continue;
+					}
 					
 					var buf=dest.writeTicket(bytes).requireExact().submit();
 					field.writeReported(provider, buf, instance);

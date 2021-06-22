@@ -367,4 +367,10 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		
 		return result;
 	}
+	
+	public boolean rangeIntersects(long index){
+		long start=ptr.getValue();
+		long end  =dataEnd();
+		return index>=start&&index<end;
+	}
 }
