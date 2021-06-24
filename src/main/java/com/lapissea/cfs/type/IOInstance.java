@@ -11,6 +11,7 @@ import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import java.io.IOException;
 import java.util.Objects;
 
+import static com.lapissea.cfs.GlobalConfig.*;
 import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.*;
 
 public abstract class IOInstance<SELF extends IOInstance<SELF>>{
@@ -36,7 +37,7 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 			return reference.io(provider);
 		}
 		
-		private StructPipe<SELF> getPipe(){
+		public StructPipe<SELF> getPipe(){
 			if(pipe==null) pipe=ContiguousStructPipe.of(getThisStruct());
 			return pipe;
 		}
@@ -82,6 +83,11 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 	
 	//used in VirtualAccessor
 	protected Object accessVirtual(VirtualAccessor<SELF> accessor){
+		if(DEBUG_VALIDATION){
+			if(accessor.getDeclaringStruct()!=getThisStruct()){
+				throw new IllegalArgumentException(accessor.getDeclaringStruct()+" != "+getThisStruct());
+			}
+		}
 		int index=accessor.getAccessIndex();
 		return virtualFields[index];
 	}

@@ -14,8 +14,13 @@ public interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 	final class Fixed<T extends IOInstance<T>> implements SizeDescriptor<T>{
 		
 		private static final SizeDescriptor<?> SINGLE_BIT=new Fixed<>(WordSpace.BIT, 1);
+		private static final SizeDescriptor<?> EMPTY     =new Fixed<>(WordSpace.BYTE, 0);
+		
 		public static <T extends IOInstance<T>> SizeDescriptor<T> singleBit(){
 			return (SizeDescriptor<T>)SINGLE_BIT;
+		}
+		public static <T extends IOInstance<T>> SizeDescriptor<T> empty(){
+			return (SizeDescriptor<T>)EMPTY;
 		}
 		
 		

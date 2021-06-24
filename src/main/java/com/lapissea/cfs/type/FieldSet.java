@@ -38,6 +38,11 @@ public final class FieldSet<T extends IOInstance<T>, ValueType> extends Abstract
 	public <E> Stream<IOField<T, E>> byType(Class<E> type){
 		return stream().filter(f->UtilL.instanceOf(f.getAccessor().getType(), type)).map(f->(IOField<T, E>)f);
 	}
+	
+	public <E extends IOField<T, ?>> Stream<? extends E> byFieldType(Class<E> type){
+		return stream().filter(type::isInstance).map(type::cast);
+	}
+	
 	public <E> Optional<IOField<T, E>> exact(Class<E> type, String name){
 		return byType(type).filter(f->f.getName().equals(name)).findAny();
 	}

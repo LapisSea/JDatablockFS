@@ -1,6 +1,7 @@
 package com.lapissea.cfs.objects;
 
 import com.lapissea.cfs.chunk.ChunkDataProvider;
+import com.lapissea.cfs.io.ChunkChainIO;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.annotations.IODependency;
@@ -62,4 +63,13 @@ public final class Reference extends IOInstance<Reference>{
 		return this;
 	}
 	
+	public Reference addOffset(long offset){
+		return new Reference(getPtr(), getOffset()+offset);
+	}
+	public long calcGlobalOffset(ChunkDataProvider provider) throws IOException{
+		try(var io=new ChunkChainIO(getPtr().dereference(provider))){
+			io.setPos(getOffset());
+			return io.calcGlobalPos();
+		}
+	}
 }

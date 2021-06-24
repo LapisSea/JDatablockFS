@@ -117,6 +117,10 @@ public class IOFileData implements IOInterface, AutoCloseable{
 		public boolean isReadOnly(){
 			return readOnly;
 		}
+		@Override
+		public boolean isDirect(){
+			return true;
+		}
 	}
 	
 	
