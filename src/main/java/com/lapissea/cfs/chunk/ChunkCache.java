@@ -29,7 +29,8 @@ public class ChunkCache{
 		return new ChunkCache(()->Collections.synchronizedMap(new HashMap<>()));
 	}
 	public static ChunkCache weak(){
-		return new ChunkCache(()->Collections.synchronizedMap(new WeakValueHashMap<ChunkPointer, Chunk>().defineStayAlivePolicy(1)));
+		return new ChunkCache(()->Collections.synchronizedMap(new WeakValueHashMap<>()));
+//		return new ChunkCache(()->Collections.synchronizedMap(new WeakValueHashMap<ChunkPointer, Chunk>().defineStayAlivePolicy(1))); TODO: fix define policy
 	}
 	
 	private final Map<ChunkPointer, Chunk> data;
