@@ -18,17 +18,22 @@ import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.IntFunction;
 import java.util.stream.IntStream;
+
+import static com.lapissea.util.PoolOwnThread.*;
 
 public class TTFont{
 	
 	private static Boolean ANOSOTROPIC_SUPPORTED;
 	
 	
-	private final	int replacer;
+	private final int           replacer;
 	private final STBTTFontinfo info;
 	private final ByteBuffer    ttfBB;
 	
@@ -96,18 +101,19 @@ public class TTFont{
 					int b   =get.get(x, y);
 					int diff=0;
 					
-					if(x>0)diff=Math.max(diff, Math.abs(get.get(x-1, y)-b));
-					if(y>0)diff=Math.max(diff, Math.abs(get.get(x, y-1)-b));
-					if(x<bitmapWidth-1)diff=Math.max(diff, Math.abs(get.get(x+1, y)-b));
-					if(y<bitmapHeight-1)diff=Math.max(diff, Math.abs(get.get(x, y+1)-b));
+					if(x>0) diff=Math.max(diff, Math.abs(get.get(x-1, y)-b));
+					if(y>0) diff=Math.max(diff, Math.abs(get.get(x, y-1)-b));
+					if(x<bitmapWidth-1) diff=Math.max(diff, Math.abs(get.get(x+1, y)-b));
+					if(y<bitmapHeight-1) diff=Math.max(diff, Math.abs(get.get(x, y+1)-b));
 					
 					
 					int index=x*bitmapWidth+y;
 					outlineBitmap.put(index, (byte)diff);
 				}
 			}
-			
+			boolean[] instant={false};
 			openglTask.accept(()->{
+				instant[0]=true;
 				texture=GL11.glGenTextures();
 				Function<ByteBuffer, Integer> uploadTexture=bb->{
 					var texture=GL11.glGenTextures();
@@ -133,6 +139,9 @@ public class TTFont{
 				outlineTexture=uploadTexture.apply(outlineBitmap);
 				
 			});
+			if(!instant[0]){
+				renderRequest.run();
+			}
 		}
 		
 		void free(){
@@ -144,6 +153,7 @@ public class TTFont{
 		}
 	}
 	
+	private final ReadWriteLock              cacheLock  =new ReentrantReadWriteLock();
 	private final List<Bitmap>               bitmapCache=new ArrayList<>();
 	private final IntFunction<AutoCloseable> bulkHook;
 	private final Runnable                   renderRequest;
@@ -155,8 +165,8 @@ public class TTFont{
 		this.openglTask=openglTask;
 		
 		byte[] ttfData;
-		try{
-			ttfData=getClass().getResourceAsStream(ttfPath).readAllBytes();
+		try(var io=Objects.requireNonNull(getClass().getResourceAsStream(ttfPath))){
+			ttfData=io.readAllBytes();
 		}catch(IOException e){
 			throw new RuntimeException(e);
 		}
@@ -182,7 +192,7 @@ public class TTFont{
 		replacer=STBTruetype.stbtt_FindGlyphIndex(info, 11111);
 		int min=255;
 		for(int i=0;i<256;i++){
-			int g       =STBTruetype.stbtt_FindGlyphIndex(info, i);
+			int g=STBTruetype.stbtt_FindGlyphIndex(info, i);
 			if(g!=replacer){
 				min=i;
 				break;
@@ -197,9 +207,12 @@ public class TTFont{
 	
 	private Bitmap getBitmap(float pixelHeight){
 		
+		var    r=cacheLock.readLock();
 		Bitmap best;
-		synchronized(bitmapCache){
-			if(bitmapCache.isEmpty()) bitmapCache.add(new Bitmap(pixelHeight));
+		try{
+			r.lock();
+			
+			if(bitmapCache.isEmpty()) bitmapCache.add(new Bitmap(Math.min(pixelHeight, 20)));
 			best=bitmapCache.get(0);
 			for(Bitmap bitmap : bitmapCache){
 				if(bitmap.texture==-1) continue;
@@ -213,23 +226,30 @@ public class TTFont{
 				if(thisDist<bestDist) best=bitmap;
 				
 			}
+		}finally{
+			r.unlock();
 		}
 		
 		gen:
 		if(!generating){
-			synchronized(bitmapCache){
+			try{
+				r.lock();
+				
 				for(Bitmap bitmap : bitmapCache){
 					var thisDist=Math.abs(bitmap.pixelHeight-pixelHeight);
 					if(thisDist<0.5) break gen;
 				}
+			}finally{
+				r.unlock();
 			}
 			
 			generating=true;
-			new Thread(()->{
+			async(()->{
 				try{
 					Bitmap bitmap=new Bitmap(pixelHeight);
 					
-					synchronized(bitmapCache){
+					try{
+						r.lock();
 						if(bitmapCache.size()>7){
 							IntStream.range(0, bitmapCache.size())
 							         .boxed()
@@ -237,34 +257,25 @@ public class TTFont{
 							         .ifPresent(i->bitmapCache.remove((int)i).free());
 						}
 						bitmap.lastUsed=System.currentTimeMillis();
+					}finally{
+						r.unlock();
+					}
+					var w=cacheLock.writeLock();
+					try{
+						w.lock();
 						bitmapCache.add(bitmap);
+					}finally{
+						w.unlock();
 					}
 					renderRequest.run();
 				}finally{
 					generating=false;
 				}
-			}).start();
+			});
 		}
 		
 		best.lastUsed=System.currentTimeMillis();
 		return best;
-	}
-	
-	private float getStringWidth(STBTTFontinfo info, String text, float fontHeight){
-		int width=0;
-		
-		try(MemoryStack stack=MemoryStack.stackPush()){
-			IntBuffer pAdvancedWidth  =stack.mallocInt(1);
-			IntBuffer pLeftSideBearing=stack.mallocInt(1);
-			
-			
-			for(int i=0;i<text.length();i++){
-				STBTruetype.stbtt_GetCodepointHMetrics(info, text.charAt(i), pAdvancedWidth, pLeftSideBearing);
-				width+=pAdvancedWidth.get(0);
-			}
-		}
-		
-		return width*STBTruetype.stbtt_ScaleForPixelHeight(info, fontHeight);
 	}
 	
 	public float[] getStringBounds(String string, float pixelHeight){
@@ -288,19 +299,22 @@ public class TTFont{
 			
 			for(int i=0;i<string.length();i++){
 				char cp=string.charAt(i);
-				
-				STBTruetype.stbtt_GetBakedQuad(bitmap.charInfo, bitmap.bitmapWidth, bitmap.bitmapHeight, cp-min, x, y, q, true);
-				
-				minX=Math.min(q.x0(), minX);
-				minX=Math.min(q.x1(), minX);
-				minY=Math.min(q.y0(), minY);
-				minY=Math.min(q.y1(), minY);
-				
-				maxX=Math.max(q.x0(), maxX);
-				maxX=Math.max(q.x1(), maxX);
-				maxY=Math.max(q.y0(), maxY);
-				maxY=Math.max(q.y1(), maxY);
-				
+				if(cp<=31) cp=' ';
+				try{
+					STBTruetype.stbtt_GetBakedQuad(bitmap.charInfo, bitmap.bitmapWidth, bitmap.bitmapHeight, cp-min, x, y, q, true);
+					
+					minX=Math.min(q.x0(), minX);
+					minX=Math.min(q.x1(), minX);
+					minY=Math.min(q.y0(), minY);
+					minY=Math.min(q.y1(), minY);
+					
+					maxX=Math.max(q.x0(), maxX);
+					maxX=Math.max(q.x1(), maxX);
+					maxY=Math.max(q.y0(), maxY);
+					maxY=Math.max(q.y1(), maxY);
+				}catch(IllegalArgumentException e){
+					LogUtil.printlnEr(e, cp);
+				}
 			}
 		}
 		return new float[]{(maxX-minX)*scale, (maxY-minY)*scale};
@@ -311,28 +325,40 @@ public class TTFont{
 		for(int i=0;i<string.length();i++){
 			int cp=string.charAt(i);
 			if(cp>255) continue;
+			if(cp<=31) continue;
 			maxRequested=Math.max(maxRequested, cp+1);
 		}
 		if(max<maxRequested){
 			max=maxRequested;
-			bitmapCache.forEach(Bitmap::free);
-			bitmapCache.clear();
+			
+			var r=cacheLock.readLock();
+			try{
+				r.lock();
+				bitmapCache.forEach(Bitmap::free);
+				bitmapCache.clear();
+			}finally{
+				r.unlock();
+			}
 		}
 	}
 	
 	public void outlineString(String string, float pixelHeight, float x, float y){
-		drawString(string, pixelHeight, x,y,bitmap->bitmap.outlineTexture);
+		drawString(string, pixelHeight, x, y, bitmap->bitmap.outlineTexture);
 	}
 	
 	public void fillString(String string, float pixelHeight, float x, float y){
-		drawString(string, pixelHeight,x,y, bitmap->bitmap.texture);
+		drawString(string, pixelHeight, x, y, bitmap->bitmap.texture);
 	}
 	
 	private void drawString(String string, float pixelHeight, float xOff, float yOff, Function<Bitmap, Integer> getTex){
 		pushMax(string);
 		
 		Bitmap bitmap=getBitmap(pixelHeight);
-		float  scale =pixelHeight/bitmap.pixelHeight;
+		var    tex   =getTex.apply(bitmap);
+		if(tex==-1){
+			return;
+		}
+		float scale=pixelHeight/bitmap.pixelHeight;
 		
 		try(MemoryStack stack=MemoryStack.stackPush()){
 			
@@ -340,13 +366,13 @@ public class TTFont{
 			FloatBuffer y=stack.floats(0.0f);
 			
 			STBTTAlignedQuad q=STBTTAlignedQuad.mallocStack(stack);
-			
-			GL11.glBindTexture(GL11.GL_TEXTURE_2D, getTex.apply(bitmap));
+			GL11.glBindTexture(GL11.GL_TEXTURE_2D, tex);
 			GL11.glEnable(GL11.GL_TEXTURE_2D);
 			
 			try(var apply=bulkHook.apply(GL11.GL_QUADS)){
 				for(int i=0;i<string.length();i++){
 					char cp=string.charAt(i);
+					if(cp<=31) cp=' ';
 					
 					
 					STBTruetype.stbtt_GetBakedQuad(bitmap.charInfo, bitmap.bitmapWidth, bitmap.bitmapHeight, cp-min, x, y, q, true);
@@ -376,7 +402,7 @@ public class TTFont{
 			}
 			
 			GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
-			GL11.glDisable(GL11.GL_TEXTURE);
+			GL11.glDisable(GL11.GL_TEXTURE_2D);
 		}
 	}
 	
