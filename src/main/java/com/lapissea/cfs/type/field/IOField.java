@@ -9,6 +9,7 @@ import com.lapissea.cfs.io.bit.BitReader;
 import com.lapissea.cfs.io.bit.BitWriter;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
+import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.FieldSet;
 import com.lapissea.cfs.type.IOInstance;
@@ -20,6 +21,7 @@ import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.stream.Stream;
@@ -44,7 +46,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	}
 	
 	
-	public abstract static class Ref<T extends IOInstance<T>, Type> extends IOField<T, Type>{
+	public abstract static class Ref<T extends IOInstance<T>, Type extends IOInstance<Type>> extends IOField<T, Type>{
 		
 		public Ref(IFieldAccessor<T> accessor){
 			super(accessor);
@@ -52,6 +54,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		
 		public abstract void allocate(T instance, ChunkDataProvider provider) throws IOException;
 		public abstract Reference getReference(T instance);
+		public abstract StructPipe<Type> getReferencedPipe(T instance);
 		
 		@Override
 		public IOField.Ref<T, Type> implMaxAsFixedSize(){
@@ -207,5 +210,17 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	}
 	public boolean nullable(){
 		return getNullability()==IONullability.Mode.NULLABLE;
+	}
+	
+	@Override
+	public boolean equals(Object o){
+		if(this==o) return true;
+		if(!(o instanceof IOField<?, ?> ioField)) return false;
+		
+		return getAccessor()!=null?getAccessor().equals(ioField.getAccessor()):ioField.getAccessor()==null;
+	}
+	@Override
+	public int hashCode(){
+		return getAccessor()!=null?getAccessor().hashCode():0;
 	}
 }

@@ -73,6 +73,11 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 		return getReference(get(instance));
 	}
 	@Override
+	public StructPipe<ValueType> getReferencedPipe(T instance){
+		var val=get(instance);
+		return val!=null?val.getPipe():null;
+	}
+	@Override
 	public Ref<T, ValueType> implMaxAsFixedSize(){
 		return new IOFieldUnmanagedObjectReference<>(getAccessor(), true);
 	}

@@ -99,6 +99,10 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 		return getRef(instance);
 	}
 	@Override
+	public StructPipe<ValueType> getReferencedPipe(T instance){
+		return instancePipe;
+	}
+	@Override
 	public Ref<T, ValueType> implMaxAsFixedSize(){
 		return new IOFieldObjectReference<>(getAccessor(), true);
 	}
