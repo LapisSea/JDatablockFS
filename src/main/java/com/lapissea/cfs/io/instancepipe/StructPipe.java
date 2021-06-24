@@ -21,11 +21,13 @@ import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
+import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
@@ -210,45 +212,50 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		try{
 			pushPool(ioPool);
 			
-			final ContentWriter destBuff;
-			final boolean       isBuffered;
-			if(dest.isDirect()){
-				isBuffered=true;
-				destBuff=new ContentOutputBuilder((int)getSizeDescriptor().fixedOrMax().orElse(32));
-			}else{
-				isBuffered=false;
-				destBuff=dest;
-			}
+			final ContentOutputBuilder destBuff=new ContentOutputBuilder((int)getSizeDescriptor().fixedOrMax().orElse(32));
 			
-			if(DEBUG_VALIDATION){
-				for(IOField<T, ?> field : getSpecificFields()){
-					long bytes;
-					try{
-						var desc=field.getSizeDescriptor();
-						bytes=desc.toBytes(desc.calcUnknown(instance));
-					}catch(UnknownSizePredictionException e){
-						field.writeReported(provider, destBuff, instance);
-						continue;
-					}
-					
-					var safeBuff=destBuff.writeTicket(bytes).requireExact().submit();
-					field.writeReported(provider, safeBuff, instance);
-					
-					try{
-						safeBuff.close();
-					}catch(Exception e){
-						throw new IOException(TextUtil.toString(field)+" did not write correctly", e);
+			Collection<IOField<T, ?>> dirtyMarked=new HashSet<>();
+			Consumer<List<IOField<T, ?>>> logDirty=dirt->{
+				if(dirt.isEmpty()) return;
+				if(DEBUG_VALIDATION){
+					var spec=getSpecificFields();
+					for(IOField<T, ?> dirtyField : dirt){
+						if(!spec.contains(dirtyField)){
+							throw new RuntimeException(dirtyField+" not in "+spec);
+						}
 					}
 				}
-			}else{
+				dirtyMarked.addAll(dirt);
+			};
+			do{
+				destBuff.reset();
 				for(IOField<T, ?> field : getSpecificFields()){
-					field.writeReported(provider, destBuff, instance);
+					dirtyMarked.remove(field);
+					if(DEBUG_VALIDATION){
+						long bytes;
+						try{
+							var desc=field.getSizeDescriptor();
+							bytes=desc.toBytes(desc.calcUnknown(instance));
+						}catch(UnknownSizePredictionException e){
+							logDirty.accept(field.writeReported(provider, destBuff, instance));
+							continue;
+						}
+						
+						var safeBuff=destBuff.writeTicket(bytes).requireExact().submit();
+						logDirty.accept(field.writeReported(provider, safeBuff, instance));
+						
+						try{
+							safeBuff.close();
+						}catch(Exception e){
+							throw new IOException(TextUtil.toString(field)+" did not write correctly", e);
+						}
+					}else{
+						logDirty.accept(field.writeReported(provider, destBuff, instance));
+					}
 				}
-			}
+			}while(!dirtyMarked.isEmpty());
 			
-			if(isBuffered){
-				((ContentOutputBuilder)destBuff).writeTo(dest);
-			}
+			destBuff.writeTo(dest);
 			
 		}finally{
 			popPool();

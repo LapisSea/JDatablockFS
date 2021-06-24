@@ -17,6 +17,7 @@ import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.IFieldAccessor;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Objects;
 import java.util.OptionalLong;
 
@@ -91,7 +92,7 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 	}
 	
 	@Override
-	public void write(ChunkDataProvider provider, ContentWriter dest, CTyp instance) throws IOException{
+	public List<IOField<CTyp, ?>> write(ChunkDataProvider provider, ContentWriter dest, CTyp instance) throws IOException{
 		var val=get(instance);
 		if(nullable()){
 			try(var flags=new FlagWriter.AutoPop(NumberSize.BYTE, dest)){
@@ -100,9 +101,10 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 			if(fixed){
 				Utils.zeroFill(dest::write, (int)getSizeDescriptor().requireFixed()-1);
 			}
-			if(val==null) return;
+			if(val==null) return List.of();
 		}
 		instancePipe.write(provider, dest, val);
+		return List.of();
 	}
 	
 	@Override

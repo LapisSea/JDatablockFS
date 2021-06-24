@@ -15,6 +15,7 @@ import com.lapissea.cfs.type.field.access.IFieldAccessor;
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 
@@ -75,9 +76,10 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
-		public void write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
+		public List<IOField<T, ?>> write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
 			var size=getSize(instance);
 			size.writeFloating(dest, getValue(instance));
+			return List.of();
 		}
 		
 		@Override
@@ -130,9 +132,10 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
-		public void write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
+		public List<IOField<T, ?>> write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
 			var size=getSize(instance);
 			size.writeFloating(dest, getValue(instance));
+			return List.of();
 		}
 		
 		@Override
@@ -180,9 +183,10 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
-		public void write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
+		public List<IOField<T, ?>> write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
 			var size=getSize(instance);
 			size.write(dest, getValue(instance));
+			return List.of();
 		}
 		
 		@Override
@@ -237,9 +241,10 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
-		public void write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
+		public List<IOField<T, ?>> write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
 			var size=getSize(instance);
 			size.write(dest, getValue(instance));
+			return List.of();
 		}
 		
 		@Override
@@ -294,8 +299,9 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
-		public void write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
+		public List<IOField<T, ?>> write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
 			dest.writeInt1(getValue(instance));
+			return List.of();
 		}
 		
 		@Override

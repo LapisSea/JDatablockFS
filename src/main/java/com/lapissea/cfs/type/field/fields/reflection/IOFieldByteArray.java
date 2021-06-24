@@ -10,6 +10,7 @@ import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.IFieldAccessor;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.OptionalLong;
 
 public class IOFieldByteArray<T extends IOInstance<T>> extends IOField<T, byte[]>{
@@ -42,9 +43,10 @@ public class IOFieldByteArray<T extends IOInstance<T>> extends IOField<T, byte[]
 		return descriptor;
 	}
 	@Override
-	public void write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
+	public List<IOField<T, ?>> write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
 		var arr=get(instance);
 		dest.writeInts1(arr);
+		return List.of();
 	}
 	@Override
 	public void read(ChunkDataProvider provider, ContentReader src, T instance) throws IOException{

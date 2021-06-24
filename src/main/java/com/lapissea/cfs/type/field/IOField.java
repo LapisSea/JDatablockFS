@@ -70,13 +70,14 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		
 		@Deprecated
 		@Override
-		public final void write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
+		public final List<IOField<T, ?>> write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
 			try(var writer=new BitOutputStream(dest)){
 				writeBits(writer, instance);
 				if(DEBUG_VALIDATION){
 					writer.requireWritten(getSizeDescriptor().calcUnknown(instance));
 				}
 			}
+			return List.of();
 		}
 		
 		@Deprecated
@@ -129,10 +130,13 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	
 	public abstract SizeDescriptor<T> getSizeDescriptor();
 	
-	public abstract void write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException;
-	public final void writeReported(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
+	/**
+	 * @return a list of fields that have to be written after this function has executed. Never return null, if no fields are required, return {@link List#of()}
+	 */
+	public abstract List<IOField<T, ?>> write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException;
+	public final List<IOField<T, ?>> writeReported(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
 		try{
-			write(provider, dest, instance);
+			return write(provider, dest, instance);
 		}catch(Exception e){
 			throw new IOException("Failed to write "+TextUtil.toString(this), e);
 		}

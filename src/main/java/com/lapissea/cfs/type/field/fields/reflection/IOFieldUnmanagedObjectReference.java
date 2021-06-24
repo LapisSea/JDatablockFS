@@ -18,6 +18,7 @@ import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.IFieldAccessor;
 
 import java.io.IOException;
+import java.util.List;
 
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.*;
 
@@ -103,8 +104,9 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 	}
 	
 	@Override
-	public void write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
+	public List<IOField<T, ?>> write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
 		referencePipe.write(provider, dest, getReference(instance));
+		return List.of();
 	}
 	
 	@Override

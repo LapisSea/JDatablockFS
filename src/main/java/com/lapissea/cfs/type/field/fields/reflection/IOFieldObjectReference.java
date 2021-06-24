@@ -20,6 +20,7 @@ import com.lapissea.cfs.type.field.access.IFieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 
 import java.io.IOException;
+import java.util.List;
 
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.*;
 import static com.lapissea.cfs.type.field.annotations.IOValue.Reference.PipeType.*;
@@ -133,7 +134,7 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	}
 	
 	@Override
-	public void write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
+	public List<IOField<T, ?>> write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
 		var val=get(instance);
 		var ref=getReference(instance);
 		if(val!=null&&(ref==null||ref.isNull())){
@@ -149,6 +150,7 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 				instancePipe.write(provider, io, val);
 			}
 		}
+		return List.of();
 	}
 	
 	@Override
