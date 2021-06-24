@@ -1,6 +1,7 @@
 package com.lapissea.cfs.chunk;
 
 import com.lapissea.cfs.exceptions.MalformedFileException;
+import com.lapissea.cfs.exceptions.MalformedPointerException;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
@@ -14,12 +15,12 @@ import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import static com.lapissea.cfs.type.field.annotations.IODependency.VirtualNumSize.RetentionPolicy.*;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.*;
-import static com.lapissea.cfs.type.field.annotations.IOValue.Reference.PipeType.*;
 import static java.nio.charset.StandardCharsets.*;
 
 public class Cluster implements ChunkDataProvider{
@@ -57,13 +58,12 @@ public class Cluster implements ChunkDataProvider{
 		                         .withApproval(c->c.getPtr().equals(FIRST_CHUNK_PTR))
 		                         .submit(provider);
 		
-		
-		Metadata metadata=new Metadata();
-		metadata.value1=300;
-		metadata.allocateNulls(provider);
-		metadata.list.add(new Dummy(4124));
-		
-		ROOT_PIPE.write(provider, firstChunk, new RootRef(metadata));
+		ROOT_PIPE.modify(firstChunk, root->{
+			Metadata metadata=root.metadata;
+			metadata.value1=300;
+			metadata.allocateNulls(provider);
+			metadata.list.add(new Dummy(4124));
+		});
 	}
 	
 	static class Dummy extends IOInstance<Dummy>{
@@ -77,11 +77,11 @@ public class Cluster implements ChunkDataProvider{
 		}
 	}
 	
-	private static class RootRef extends IOInstance<RootRef>{
+	public static class RootRef extends IOInstance<RootRef>{
 		
 		@IOValue
-		@IOValue.Reference(pipeType=FIXED)
-		@IONullability(NULLABLE)
+		@IOValue.Reference
+		@IONullability(DEFAULT_IF_NULL)
 		private Metadata metadata;
 		
 		public RootRef(){ }

@@ -22,6 +22,7 @@ import com.lapissea.util.function.UnsafeConsumer;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -30,7 +31,7 @@ import static com.lapissea.cfs.GlobalConfig.*;
 public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, ChunkDataProvider.Holder{
 	
 	private static final Struct<Chunk>     STRUCT=Struct.of(Chunk.class);
-	private static final StructPipe<Chunk> PIPE  =ContiguousStructPipe.of(STRUCT);
+	public static final  StructPipe<Chunk> PIPE  =ContiguousStructPipe.of(STRUCT);
 	
 	public static ChunkPointer getPtr(Chunk chunk){
 		return chunk==null?null:chunk.getPtr();
@@ -128,8 +129,9 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		}
 		calcHeaderSize();
 	}
-	
-	
+	public int getHeaderSize(){
+		return headerSize;
+	}
 	private RandomIO clusterIoAtHead() throws IOException{
 		return getSource().ioAt(getPtr().getValue());
 	}
@@ -232,6 +234,9 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		markDirty();
 	}
 	
+	public Optional<Chunk> nextOpt() throws IOException{
+		return Optional.ofNullable(next());
+	}
 	public Chunk next() throws IOException{
 		if(nextCache==null){
 			if(!hasNextPtr()) return null;
