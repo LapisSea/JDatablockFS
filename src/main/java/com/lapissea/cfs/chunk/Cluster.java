@@ -34,7 +34,12 @@ public class Cluster implements ChunkDataProvider{
 	}
 	
 	private static void readMagic(ContentReader src) throws IOException{
-		var magicId=ByteBuffer.wrap(src.readInts1(MAGIC_ID.limit()));
+		ByteBuffer magicId;
+		try{
+			magicId=ByteBuffer.wrap(src.readInts1(MAGIC_ID.limit()));
+		}catch(EOFException e){
+			throw new MalformedFileException("There is no magic id");
+		}
 		if(!magicId.equals(MAGIC_ID)){
 			throw new MalformedFileException(UTF_8.decode(magicId)+" is not a valid magic id");
 		}
@@ -123,12 +128,19 @@ public class Cluster implements ChunkDataProvider{
 			readMagic(io);
 		}
 		
-		var ch=getFirstChunk();
+		Chunk ch=getFirstChunk();
+		if(ROOT_PIPE.getSizeDescriptor().fixedOrMin()>ch.getSize()){
+			throw new IOException("no valid cluster data");
+		}
 		root=ROOT_PIPE.readNew(this, ch);
 	}
 	
 	public Chunk getFirstChunk() throws IOException{
-		return getChunk(FIRST_CHUNK_PTR);
+		try{
+			return getChunk(FIRST_CHUNK_PTR);
+		}catch(MalformedPointerException e){
+			throw new IOException("First chunk does not exist", e);
+		}
 	}
 	
 	public RootRef getRoot(){
