@@ -3,6 +3,7 @@ package com.lapissea.cfs.chunk;
 import com.lapissea.cfs.IterablePP;
 
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 
 public class ChainWalker implements IterablePP<Chunk>{
 	
@@ -15,12 +16,12 @@ public class ChainWalker implements IterablePP<Chunk>{
 		
 		@Override
 		public boolean hasNext(){
-			return chunk.hasNextPtr();
+			return chunk!=null;
 		}
 		@Override
 		public Chunk next(){
 			Chunk c=chunk;
-			if(c==null) return null;
+			if(c==null) throw new NoSuchElementException();
 			chunk=c.nextUnsafe();
 			return c;
 		}
