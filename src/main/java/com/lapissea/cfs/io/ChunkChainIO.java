@@ -51,11 +51,11 @@ public class ChunkChainIO implements RandomIO{
 		return cursorStart+cursorEffectiveCapacity();
 	}
 	
-	private long calcCursorOffset(){
+	public long calcCursorOffset(){
 		return localPos-cursorStart;
 	}
 	
-	private long calcGlobalPos(){
+	public long calcGlobalPos(){
 		return calcGlobalPos(calcCursorOffset());
 	}
 	private long calcGlobalPos(long offset){
@@ -128,6 +128,9 @@ public class ChunkChainIO implements RandomIO{
 		
 	}
 	
+	public Chunk getCursor(){
+		return cursor;
+	}
 	
 	@Override
 	public long getPos(){ return localPos; }
@@ -285,7 +288,7 @@ public class ChunkChainIO implements RandomIO{
 		while(remaining>0){
 			long offset=calcCursorOffset();
 			long cRem  =cursor.getCapacity()-offset;
-			if(cRem==0&&!cursor.hasNextPtr()){
+			if(cRem<remaining&&!cursor.hasNextPtr()){
 				ensureForwardCapacity(remaining);
 				continue;
 			}
