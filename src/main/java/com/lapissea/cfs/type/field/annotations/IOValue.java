@@ -87,7 +87,7 @@ public @interface IOValue{
 			FIXED
 		}
 		
-		PipeType pipeType() default PipeType.FLEXIBLE;
+		PipeType dataPipeType() default PipeType.FLEXIBLE;
 	}
 	
 	@Retention(RetentionPolicy.RUNTIME)

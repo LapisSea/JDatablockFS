@@ -3,8 +3,6 @@ package com.lapissea.cfs.type.field.fields.reflection;
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.ChunkDataProvider;
-import com.lapissea.cfs.exceptions.MalformedStructLayout;
-import com.lapissea.cfs.exceptions.UnknownSizePredictionException;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
@@ -17,13 +15,14 @@ import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.IFieldAccessor;
+import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Objects;
 
-import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.*;
-import static com.lapissea.cfs.type.field.annotations.IOValue.Reference.PipeType.*;
+import static com.lapissea.cfs.GlobalConfig.*;
 
 public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends IOInstance<ValueType>> extends IOField.Ref<T, ValueType>{
 	
@@ -31,7 +30,6 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	private final SizeDescriptor<T>     descriptor;
 	private final Struct<ValueType>     struct;
 	private final StructPipe<ValueType> instancePipe;
-	private final StructPipe<Reference> referencePipe;
 	
 	private IOField<T, Reference> referenceField;
 	
@@ -40,33 +38,15 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	}
 	public IOFieldObjectReference(IFieldAccessor<T> accessor, boolean fixed){
 		super(accessor);
-		if(getNullability()==DEFAULT_IF_NULL){
-			throw new MalformedStructLayout(DEFAULT_IF_NULL+" is not supported for unmanaged objects");
-		}
 		
-		boolean actuallyFixed=fixed;
-		if(!actuallyFixed){
-			var typ=accessor.getAnnotation(IOValue.Reference.class).map(IOValue.Reference::pipeType).orElseThrow();
-			actuallyFixed=typ==FIXED;
-		}
-		
-		if(actuallyFixed){
-			referencePipe=FixedContiguousStructPipe.of(Reference.class);
-			descriptor=new SizeDescriptor.Fixed<>(referencePipe.getSizeDescriptor().requireFixed());
-		}else{
-			referencePipe=ContiguousStructPipe.of(Reference.class);
-			
-			SizeDescriptor<Reference> s=referencePipe.getSizeDescriptor();
-			descriptor=SizeDescriptor.overrideUnknown(s, instance->{
-				var ref=getReference(instance);
-				if(ref==null) throw new UnknownSizePredictionException();
-				return s.calcUnknown(ref);
-			});
-		}
+		descriptor=SizeDescriptor.Fixed.empty();
 		
 		struct=(Struct<ValueType>)Struct.ofUnknown(getAccessor().getType());
-		instancePipe=ContiguousStructPipe.of(struct);
-		
+		var typ=accessor.getAnnotation(IOValue.Reference.class).map(IOValue.Reference::dataPipeType).orElseThrow();
+		instancePipe=switch(typ){
+			case FIXED -> FixedContiguousStructPipe.of(struct);
+			case FLEXIBLE -> ContiguousStructPipe.of(struct);
+		};
 		
 	}
 	@Override
@@ -89,11 +69,10 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	@Override
 	public ValueType get(T instance){
 		var val=super.get(instance);
-		if(val==null){
-			if(nullable()) return null;
-			throw new NullPointerException();
-		}
-		return val;
+		return switch(getNullability()){
+			case NULLABLE, DEFAULT_IF_NULL -> val;
+			case NOT_NULL -> Objects.requireNonNull(val);
+		};
 	}
 	@Override
 	public Reference getReference(T instance){
@@ -110,16 +89,23 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	
 	private Reference getRef(T instance){
 		var ref=referenceField.get(instance);
-		if(ref.isNull()&&!nullable()){
-			if(get(instance)!=null) return null;
-			throw new NullPointerException();
+		if(ref.isNull()){
+			return switch(getNullability()){
+				case NOT_NULL -> throw new NullPointerException();
+				case NULLABLE -> get(instance)!=null?null:ref;
+				case DEFAULT_IF_NULL -> null;
+			};
+			
 		}
 		return ref;
 	}
 	private ValueType readValue(ChunkDataProvider provider, Reference readNew) throws IOException{
 		if(readNew.isNull()){
-			if(nullable()) return null;
-			throw new NullPointerException();
+			return switch(getNullability()){
+				case NULLABLE -> null;
+				case NOT_NULL -> throw new NullPointerException();
+				case DEFAULT_IF_NULL -> struct.requireEmptyConstructor().get();
+			};
 		}
 		ValueType val=struct.requireEmptyConstructor().get();
 		try(var io=readNew.io(provider)){
@@ -136,14 +122,17 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	@Override
 	public List<IOField<T, ?>> write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
 		var val=get(instance);
+		if(val==null&&getNullability()==IONullability.Mode.DEFAULT_IF_NULL){
+			val=struct.requireEmptyConstructor().get();
+		}
 		var ref=getReference(instance);
 		if(val!=null&&(ref==null||ref.isNull())){
 			alloc(instance, provider, val);
-			ref=getReference(instance);
-			ref.requireNonNull();
+			if(DEBUG_VALIDATION){
+				getReference(instance).requireNonNull();
+			}
+			return List.of(referenceField);
 		}
-		
-		referencePipe.write(provider, dest, ref);
 		
 		if(val!=null){
 			try(var io=ref.io(provider)){
@@ -155,6 +144,6 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	
 	@Override
 	public void read(ChunkDataProvider provider, ContentReader src, T instance) throws IOException{
-		set(instance, readValue(provider, referencePipe.readNew(provider, src)));
+		set(instance, readValue(provider, Objects.requireNonNull(getRef(instance))));
 	}
 }
