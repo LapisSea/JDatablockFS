@@ -15,17 +15,12 @@ import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
-import com.lapissea.util.LogUtil;
-import com.lapissea.util.MathUtil;
-import com.lapissea.util.TextUtil;
-import com.lapissea.util.UtilL;
-import com.lapissea.util.function.UnsafePredicate;
+import com.lapissea.util.*;
 import org.joml.SimplexNoise;
 
 import java.awt.*;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
-import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.*;
 import java.util.function.Consumer;
@@ -85,9 +80,13 @@ public abstract class BinaryDrawing{
 	private static record Pointer(int from, int to, int size, Color color, String message, float widthFactor){}
 	
 	protected static final class ParsedFrame{
+		final int index;
 		WeakReference<Cluster> cluster=new WeakReference<>(null);
 		Throwable              displayError;
 		Chunk                  lastHoverChunk;
+		public ParsedFrame(int index){
+			this.index=index;
+		}
 		
 		public Optional<Cluster> getCluster(){
 			return Optional.ofNullable(cluster.get());
@@ -196,6 +195,8 @@ public abstract class BinaryDrawing{
 		long start=chunk.getPtr().getValue();
 		long end  =chunk.dataEnd();
 		
+		fillByteRange(alpha(color, color.getAlpha()/255F*0.2F), ctx, new Range(start, end));
+		setStroke(4);
 		outlineByteRange(color, ctx, new Range(start, end));
 		var next=chunk.next();
 		if(next!=null){
@@ -450,9 +451,9 @@ public abstract class BinaryDrawing{
 		pixelsPerByteChange(newPixelsPerByte);
 	}
 	
-	private void handleError(Throwable e, int frameIndex){
+	private void handleError(Throwable e, ParsedFrame parsed){
 		if(errorMode){
-			getFrame(frameIndex).parsed().displayError=e;
+			parsed.displayError=e;
 //			LogUtil.println(e);
 //			e.printStackTrace();
 //			new RuntimeException("Failed to process frame "+getFramePos(), e).printStackTrace();
@@ -514,9 +515,9 @@ public abstract class BinaryDrawing{
 			return;
 		}
 		
-		var      cFrame=getFrame(frameIndex);
-		MemFrame frame =cFrame.data();
-		var      bytes =frame.data();
+		CachedFrame cFrame=getFrame(frameIndex);
+		MemFrame    frame =cFrame.data();
+		var         bytes =frame.data();
 		
 		
 		var magic=Cluster.getMagicId();
@@ -566,22 +567,24 @@ public abstract class BinaryDrawing{
 		
 		setColor(alpha(Color.WHITE, 0.5F));
 		
-		List<Pointer> ptrs  =new ArrayList<>();
-		ParsedFrame   parsed=cFrame.parsed();
-		Cluster       cluster;
+		List<Pointer>     ptrs    =new ArrayList<>();
+		ParsedFrame       parsed  =cFrame.parsed();
+		ChunkDataProvider provider=null;
+		
 		try{
-			cluster=parsed.getCluster().orElseGet(()->{
+			Cluster cluster=parsed.getCluster().orElseGet(()->{
 				try{
 					var c=new Cluster(MemoryData.build().withRaw(bytes).asReadOnly().build());
 					LogUtil.println("parsed cluster at frame", frameIndex);
 					parsed.cluster=new WeakReference<>(c);
 					return c;
 				}catch(Exception e){
-					handleError(new RuntimeException("failed to read cluster on frame "+frameIndex, e), frameIndex);
+					handleError(new RuntimeException("failed to read cluster on frame "+frameIndex, e), parsed);
 				}
 				return null;
 			});
 			if(cluster!=null){
+				provider=cluster;
 				var        cl        =cluster;
 				var        root      =cluster.getRoot();
 				Set<Chunk> referenced=new HashSet<>();
@@ -612,16 +615,22 @@ public abstract class BinaryDrawing{
 				               FixedContiguousStructPipe.of(root.getThisStruct()),
 				               ptrs::add);
 			}else{
-				var simple=ChunkDataProvider.newVerySimpleProvider(MemoryData.build().withRaw(bytes).build());
+				provider=ChunkDataProvider.newVerySimpleProvider(MemoryData.build().withRaw(bytes).build());
 				
-				for(Chunk chunk : new PhysicalChunkWalker(simple.getChunk(ChunkPointer.of(magic.limit())))){
-					annotateStruct(ctx, simple, new LinkedList<>(), chunk, null, Chunk.PIPE, ptrs::add);
+				for(Chunk chunk : new PhysicalChunkWalker(provider.getFirstChunk())){
+					annotateStruct(ctx, provider, new LinkedList<>(), chunk, null, Chunk.PIPE, ptrs::add);
 				}
 				
 			}
 		}catch(Throwable e){
-			handleError(e, frameIndex);
-			cluster=null;
+			handleError(e, parsed);
+		}
+		if(provider==null){
+			try{
+				provider=ChunkDataProvider.newVerySimpleProvider(MemoryData.build().withRaw(bytes).build());
+			}catch(IOException e1){
+				throw new ShouldNeverHappenError(e1);
+			}
 		}
 		
 		for(int i=0;i<bytes.length;i++){
@@ -629,10 +638,13 @@ public abstract class BinaryDrawing{
 			drawByte.draw(i, alpha(Color.GRAY, 0.5F), true, false);
 		}
 		
-		drawWriteIndex(frame, ctx);
+		findHoverChunk(ctx, parsed, provider);
 		
-		drawPointers(ctx, ptrs);
-		drawMouse(frameIndex, bytes, magic, ctx, parsed, cluster);
+		drawWriteIndex(frame, ctx);
+		for(Pointer ptr : ptrs){
+			drawPointer(ctx, parsed, ptr);
+		}
+		drawMouse(ctx, cFrame);
 		drawError(parsed);
 		
 		drawFilter();
@@ -706,54 +718,60 @@ public abstract class BinaryDrawing{
 		}
 	}
 	
-	private void drawPointers(RenderContext ctx, List<Pointer> ptrs){
+	private void drawPointer(RenderContext ctx, ParsedFrame parsed, Pointer ptr){
+		
 		var siz  =Math.max(1, ctx.pixelsPerByte()/8F);
 		var sFul =siz;
 		var sHalf=siz/2;
+		setStroke(sFul*ptr.widthFactor());
 		
-		for(Pointer ptr : ptrs){
+		int start=ptr.from();
+		int end  =ptr.to();
+		
+		int pSiz=ptr.size();
+		
+		Color col;
+		if(parsed.lastHoverChunk!=null&&new ChainWalker(parsed.lastHoverChunk).stream().anyMatch(ch->ch.rangeIntersects(ptr.from()))){
+			col=mix(chunkBaseColor(parsed.lastHoverChunk), ptr.color(), 0.5F);
+		}else{
+			col=ptr.color();
+		}
+		
+		setColor(alpha(col, 0.5F));
+		
+		if(pSiz>1&&IntStream.range(start, start+pSiz).noneMatch(i->i%ctx.width()==0)){
+			setColor(alpha(col, 0.1F));
+			setStroke(sHalf*ptr.widthFactor());
+			drawLine(ctx.width(), start, start+pSiz-1);
 			setStroke(sFul*ptr.widthFactor());
+			setColor(alpha(col, 0.5F));
+		}
+		
+		drawArrow(ctx.width(), start, end);
+		
+		if(!ptr.message().isEmpty()){
+			int xPosFrom=start%ctx.width(), yPosFrom=start/ctx.width();
+			int xPosTo  =end%ctx.width(), yPosTo=end/ctx.width();
 			
-			int start=ptr.from();
-			int end  =ptr.to();
+			float xFrom=xPosFrom+0.5F, yFrom=yPosFrom+0.5F;
+			float xTo  =xPosTo+0.5F, yTo=yPosTo+0.5F;
+			float x    =(xFrom+xTo)/2*ctx.pixelsPerByte(), y=(yFrom+yTo)/2*ctx.pixelsPerByte();
+			setColor(col);
+			initFont(0.3F*ptr.widthFactor());
+			fontScale=Math.max(fontScale, 15);
+			int msgWidth=ptr.message().length();
+			int space   =(int)(getWidth()-x);
 			
-			int pSiz=ptr.size();
-			
-			setColor(alpha(ptr.color(), 0.5F));
-			
-			if(pSiz>1&&IntStream.range(start, start+pSiz).noneMatch(i->i%ctx.width()==0)){
-				setColor(alpha(ptr.color(), 0.1F));
-				setStroke(sHalf*ptr.widthFactor());
-				drawLine(ctx.width(), start, start+pSiz-1);
-				setStroke(sFul*ptr.widthFactor());
-				setColor(alpha(ptr.color(), 0.5F));
+			var w=getStringBounds(ptr.message())[0];
+			while(w>space*1.5){
+				msgWidth--;
+				w=getStringBounds(ptr.message().substring(0, msgWidth))[0];
 			}
-			
-			drawArrow(ctx.width(), start, end);
-			
-			if(!ptr.message().isEmpty()){
-				int xPosFrom=start%ctx.width(), yPosFrom=start/ctx.width();
-				int xPosTo  =end%ctx.width(), yPosTo=end/ctx.width();
-				
-				float xFrom=xPosFrom+0.5F, yFrom=yPosFrom+0.5F;
-				float xTo  =xPosTo+0.5F, yTo=yPosTo+0.5F;
-				float x    =(xFrom+xTo)/2*ctx.pixelsPerByte(), y=(yFrom+yTo)/2*ctx.pixelsPerByte();
-				setColor(ptr.color());
-				initFont(0.6F*ptr.widthFactor());
-				int msgWidth=ptr.message().length();
-				int space   =(int)(getWidth()-x);
-				
-				var w=getStringBounds(ptr.message())[0];
-				while(w>space*1.5){
-					msgWidth--;
-					w=getStringBounds(ptr.message().substring(0, msgWidth))[0];
-				}
-				var lines=TextUtil.wrapLongString(ptr.message(), msgWidth);
-				y-=fontScale/2F*lines.size();
-				for(String line : lines){
-					drawStringIn(line, new Rectangle((int)x, (int)y, space, ctx.pixelsPerByte()), false, true);
-					y+=fontScale;
-				}
+			var lines=TextUtil.wrapLongString(ptr.message(), msgWidth);
+			y-=fontScale/2F*lines.size();
+			for(String line : lines){
+				drawStringIn(line, new Rectangle((int)x, (int)y, space, ctx.pixelsPerByte()), false, true);
+				y+=fontScale;
 			}
 		}
 	}
@@ -784,7 +802,10 @@ public abstract class BinaryDrawing{
 		}
 	}
 	
-	private void drawMouse(int frameIndex, byte[] bytes, ByteBuffer magic, RenderContext ctx, ParsedFrame parsed, ChunkDataProvider provider){
+	private void drawMouse(RenderContext ctx, CachedFrame frame){
+		var bytes =frame.data().data();
+		var parsed=frame.parsed;
+		
 		int xByte=getMouseX()/ctx.pixelsPerByte();
 		if(xByte>=ctx.width()) return;
 		int yByte    =getMouseY()/ctx.pixelsPerByte();
@@ -822,33 +843,40 @@ public abstract class BinaryDrawing{
 		popMatrix();
 		initFont(1);
 		
-		if(provider!=null&&byteIndex>=magic.limit()){
+		if(parsed.lastHoverChunk!=null){
+			var chunk=parsed.lastHoverChunk;
+			setStroke(1);
 			try{
-				UnsafePredicate<Chunk, IOException> doOutline=chunk->{
-					if(chunk.rangeIntersects(byteIndex)){
-						setStroke(1);
-						for(Chunk c : new ChainWalker(chunk)){
-							outlineChunk(ctx, c, mix(chunkBaseColor(c), Color.WHITE, 0.4F));
-						}
-						return true;
-					}
-					return false;
-				};
-				if(parsed.lastHoverChunk==null||!doOutline.test(parsed.lastHoverChunk)){
-					parsed.lastHoverChunk=null;
-					for(Chunk chunk : new PhysicalChunkWalker(provider.getFirstChunk())){
-						if(doOutline.test(chunk)){
-							//LogUtil.println("hovering over new chunk", chunk);
-							parsed.lastHoverChunk=chunk;
-							break;
-						}
-					}
-				}
+				outlineChunk(ctx, chunk, mix(chunkBaseColor(chunk), Color.WHITE, 0.4F));
 			}catch(IOException e){
-				handleError(e, frameIndex);
+				handleError(e, parsed);
 			}
 		}
+		
 		translate(-0.5, -0.5);
+	}
+	private void findHoverChunk(RenderContext ctx, ParsedFrame parsed, ChunkDataProvider provider){
+		int xByte=getMouseX()/ctx.pixelsPerByte();
+		if(xByte>=ctx.width()){
+			parsed.lastHoverChunk=null;
+			return;
+		}
+		int yByte    =getMouseY()/ctx.pixelsPerByte();
+		int byteIndex=yByte*ctx.width()+xByte;
+		
+		try{
+			if(parsed.lastHoverChunk==null||!parsed.lastHoverChunk.rangeIntersects(byteIndex)){
+				parsed.lastHoverChunk=null;
+				for(Chunk chunk : new PhysicalChunkWalker(provider.getFirstChunk())){
+					if(chunk.rangeIntersects(byteIndex)){
+						parsed.lastHoverChunk=chunk;
+						break;
+					}
+				}
+			}
+		}catch(IOException e){
+			handleError(e, parsed);
+		}
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -900,7 +928,7 @@ public abstract class BinaryDrawing{
 						IOField.Ref<T, T> refField=(IOField.Ref<T, T>)refO;
 						var               ref     =refField.getReference(instance);
 						if(!ref.isNull()){
-							pointerRecord.accept(new Pointer((int)trueOffset, (int)ref.calcGlobalOffset(cluster), (int)size, col, "", 1));
+							pointerRecord.accept(new Pointer((int)trueOffset, (int)ref.calcGlobalOffset(cluster), (int)size, col, refField.toString(), 1));
 						}
 						annotateStruct(ctx, cluster, stack, refField.get(instance), refField.getReference(instance), refField.getReferencedPipe(instance), pointerRecord);
 					}else if(field instanceof BitFieldMerger<?> merger){
@@ -927,11 +955,11 @@ public abstract class BinaryDrawing{
 						annotateByteField(cluster, ctx, pointerRecord, instance, field, col, reference, Range.fromSize(fieldOffset, size));
 						
 						if(!ch.isNull()){
-							var msg="";
+							var msg=field.toString();
 							try{
 								annotateStruct(ctx, cluster, stack, ch.dereference(cluster), null, Chunk.PIPE, pointerRecord);
 							}catch(Exception e){
-								msg=DrawUtils.errorToMessage(e);
+								msg=msg+"\n"+DrawUtils.errorToMessage(e);
 								col=Color.RED;
 							}
 							pointerRecord.accept(new Pointer((int)trueOffset, ch.getValueInt(), (int)size, col, msg, 0.8F));

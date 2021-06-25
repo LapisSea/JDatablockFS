@@ -446,7 +446,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	
 	@Override
 	public synchronized void log(MemFrame frame){
-		frames.add(new CachedFrame(frame, new ParsedFrame()));
+		frames.add(new CachedFrame(frame, new ParsedFrame(frames.size())));
 		synchronized(framePos){
 			framePos.set(-1);
 		}

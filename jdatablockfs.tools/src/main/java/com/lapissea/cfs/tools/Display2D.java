@@ -342,7 +342,7 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 	
 	@Override
 	public synchronized void log(MemFrame frame){
-		frames.add(new CachedFrame(frame, new ParsedFrame()));
+		frames.add(new CachedFrame(frame, new ParsedFrame(frames.size())));
 		setPos(frames.size()-1);
 		this.frame.repaint();
 	}
