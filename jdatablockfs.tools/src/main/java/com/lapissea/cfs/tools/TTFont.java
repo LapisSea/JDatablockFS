@@ -23,7 +23,6 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.IntFunction;
 import java.util.stream.IntStream;
 
 import static com.lapissea.util.PoolOwnThread.*;
@@ -153,13 +152,13 @@ public class TTFont{
 		}
 	}
 	
-	private final ReadWriteLock              cacheLock  =new ReentrantReadWriteLock();
-	private final List<Bitmap>               bitmapCache=new ArrayList<>();
-	private final IntFunction<AutoCloseable> bulkHook;
-	private final Runnable                   renderRequest;
-	private final Consumer<Runnable>         openglTask;
+	private final ReadWriteLock                                   cacheLock  =new ReentrantReadWriteLock();
+	private final List<Bitmap>                                    bitmapCache=new ArrayList<>();
+	private final Function<BinaryDrawing.DrawMode, AutoCloseable> bulkHook;
+	private final Runnable                                        renderRequest;
+	private final Consumer<Runnable>                              openglTask;
 	
-	public TTFont(String ttfPath, IntFunction<AutoCloseable> bulkHook, Runnable renderRequest, Consumer<Runnable> openglTask){
+	public TTFont(String ttfPath, Function<BinaryDrawing.DrawMode, AutoCloseable> bulkHook, Runnable renderRequest, Consumer<Runnable> openglTask){
 		this.bulkHook=bulkHook;
 		this.renderRequest=renderRequest;
 		this.openglTask=openglTask;
@@ -369,7 +368,7 @@ public class TTFont{
 			GL11.glBindTexture(GL11.GL_TEXTURE_2D, tex);
 			GL11.glEnable(GL11.GL_TEXTURE_2D);
 			
-			try(var apply=bulkHook.apply(GL11.GL_QUADS)){
+			try(var apply=bulkHook.apply(BinaryDrawing.DrawMode.QUADS)){
 				for(int i=0;i<string.length();i++){
 					char cp=string.charAt(i);
 					if(cp<=31) cp=' ';
