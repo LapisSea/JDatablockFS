@@ -15,7 +15,10 @@ import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
-import com.lapissea.util.*;
+import com.lapissea.util.LogUtil;
+import com.lapissea.util.MathUtil;
+import com.lapissea.util.TextUtil;
+import com.lapissea.util.UtilL;
 import org.joml.SimplexNoise;
 
 import java.awt.*;
@@ -453,7 +456,7 @@ public abstract class BinaryDrawing{
 	
 	private void handleError(Throwable e, ParsedFrame parsed){
 		if(errorMode){
-			parsed.displayError=e;
+			if(parsed.displayError==null) parsed.displayError=e;
 //			LogUtil.println(e);
 //			e.printStackTrace();
 //			new RuntimeException("Failed to process frame "+getFramePos(), e).printStackTrace();
@@ -629,7 +632,7 @@ public abstract class BinaryDrawing{
 			try{
 				provider=ChunkDataProvider.newVerySimpleProvider(MemoryData.build().withRaw(bytes).build());
 			}catch(IOException e1){
-				throw new ShouldNeverHappenError(e1);
+				handleError(e1, parsed);
 			}
 		}
 		
