@@ -1,6 +1,6 @@
 package com.lapissea.cfs.chunk;
 
-import com.lapissea.cfs.exceptions.MalformedFileException;
+import com.lapissea.cfs.exceptions.InvalidMagicIDException;
 import com.lapissea.cfs.exceptions.MalformedPointerException;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.content.ContentReader;
@@ -15,7 +15,6 @@ import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 
-import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
@@ -34,15 +33,15 @@ public class Cluster implements ChunkDataProvider{
 		return MAGIC_ID.asReadOnlyBuffer();
 	}
 	
-	private static void readMagic(ContentReader src) throws IOException{
+	private static void readMagic(ContentReader src) throws InvalidMagicIDException{
 		ByteBuffer magicId;
 		try{
 			magicId=ByteBuffer.wrap(src.readInts1(MAGIC_ID.limit()));
-		}catch(EOFException e){
-			throw new MalformedFileException("There is no magic id");
+		}catch(IOException e){
+			throw new InvalidMagicIDException("There is no magic id");
 		}
 		if(!magicId.equals(MAGIC_ID)){
-			throw new MalformedFileException(UTF_8.decode(magicId)+" is not a valid magic id");
+			throw new InvalidMagicIDException(UTF_8.decode(magicId)+" is not a valid magic id");
 		}
 	}
 	
@@ -135,6 +134,7 @@ public class Cluster implements ChunkDataProvider{
 		root=ROOT_PIPE.readNew(this, ch);
 	}
 	
+	@Override
 	public Chunk getFirstChunk() throws IOException{
 		try{
 			return getChunk(FIRST_CHUNK_PTR);
