@@ -52,7 +52,7 @@ public final class ChunkPointer implements INumber{
 	
 	@Override
 	public String toString(){
-		return "*"+getValue();
+		return isNull()?"NULL":"*"+getValue();
 	}
 	
 	public ChunkPointer addPtr(INumber value){

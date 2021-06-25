@@ -38,6 +38,10 @@ public interface ChunkDataProvider{
 			return cache;
 		}
 		@Override
+		public Chunk getFirstChunk() throws IOException{
+			return getChunk(ChunkPointer.of(Cluster.getMagicId().limit()));
+		}
+		@Override
 		public String toString(){
 			return "DummyCache";
 		}
@@ -98,4 +102,6 @@ public interface ChunkDataProvider{
 		Chunk cached=getChunkCached(chunk.getPtr());
 		assert cached==chunk:"Fake "+chunk;
 	}
+	
+	Chunk getFirstChunk() throws IOException;
 }
