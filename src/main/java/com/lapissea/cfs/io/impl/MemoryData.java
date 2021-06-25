@@ -183,7 +183,7 @@ public abstract class MemoryData<DataType> implements IOInterface{
 	
 	private final boolean readOnly;
 	
-	public MemoryData(DataType data, Builder info) throws IOException{
+	public MemoryData(DataType data, Builder info){
 		
 		var ok=getLength(data)>=used;
 		if(!ok) throw new IllegalArgumentException(TextUtil.toString(getLength(data), ">=", used));
@@ -346,7 +346,7 @@ public abstract class MemoryData<DataType> implements IOInterface{
 	
 	private static final class Arr extends MemoryData<byte[]>{
 		
-		public Arr(byte[] data, Builder info) throws IOException{
+		public Arr(byte[] data, Builder info){
 			super(data, info);
 		}
 		
@@ -378,7 +378,7 @@ public abstract class MemoryData<DataType> implements IOInterface{
 	
 	private static final class Buff extends MemoryData<ByteBuffer>{
 		
-		public Buff(ByteBuffer data, Builder info) throws IOException{
+		public Buff(ByteBuffer data, Builder info){
 			super(data, info);
 		}
 		
