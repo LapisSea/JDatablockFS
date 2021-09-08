@@ -18,6 +18,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Objects;
 
+@SuppressWarnings("unused")
 public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 	
 	enum Mode{
@@ -65,6 +66,7 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 		
 		default void ioAt(long offset, UnsafeConsumer<RandomIO, IOException> session) throws IOException{
 			Objects.requireNonNull(session);
+			
 			try(var io=ioAt(offset)){
 				session.accept(io);
 			}
@@ -76,6 +78,7 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 		
 		default <T> T ioMapAt(long offset, UnsafeFunction<RandomIO, T, IOException> session) throws IOException{
 			Objects.requireNonNull(session);
+			
 			try(var io=ioAt(offset)){
 				return session.apply(io);
 			}
@@ -87,12 +90,14 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 		
 		default <T> T ioMap(UnsafeFunction<RandomIO, T, IOException> session) throws IOException{
 			Objects.requireNonNull(session);
+			
 			try(var io=io()){
 				return session.apply(io);
 			}
 		}
 		default void io(UnsafeConsumer<RandomIO, IOException> session) throws IOException{
 			Objects.requireNonNull(session);
+			
 			try(var io=io()){
 				session.accept(io);
 			}
@@ -106,6 +111,7 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 		
 		default void write(long offset, boolean trimOnClose, int length, byte[] data) throws IOException{
 			Objects.requireNonNull(data);
+			
 			try(var io=ioAt(offset)){
 				io.write(data, 0, length);
 				if(trimOnClose) io.trim();
@@ -127,6 +133,7 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 		@NotNull
 		default <T> T read(long offset, @NotNull UnsafeFunction<ContentInputStream, T, IOException> reader) throws IOException{
 			Objects.requireNonNull(reader);
+			
 			try(var io=read(offset)){
 				return Objects.requireNonNull(reader.apply(io));
 			}
@@ -240,6 +247,7 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 	@Override
 	default int read(byte[] b, int off, int len) throws IOException{
 		Objects.checkFromIndexSize(off, len, b.length);
+		
 		int i=off;
 		for(int j=off+len;i<j;i++){
 			var bi=read();
@@ -259,6 +267,7 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 	@Override
 	default void write(byte[] b, int off, int len) throws IOException{
 		Objects.checkFromIndexSize(off, len, b.length);
+		
 		for(int i=off, j=off+len;i<j;i++){
 			write(b[i]);
 		}

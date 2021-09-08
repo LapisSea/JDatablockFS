@@ -12,6 +12,7 @@ import com.lapissea.util.UtilL;
 import java.io.FileReader;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
@@ -35,7 +36,7 @@ public class LoggedMemoryUtils{
 			newConf=new HashMap<>();
 		}
 		
-		CONFIG=new WeakReference<>(newConf);
+		CONFIG=new WeakReference<>(Collections.unmodifiableMap(newConf));
 		return newConf;
 	}
 	
@@ -47,7 +48,7 @@ public class LoggedMemoryUtils{
 			LogUtil.Init.attach(fancy?USE_CALL_POS|USE_TABULATED_HEADER:0);
 		}
 		
-		Map<String, Object> loggerConfig=(Map<String, Object>)config.getOrDefault("logger", Map.of());
+		var loggerConfig=(Map<String, Object>)config.getOrDefault("logger", Map.of());
 		
 		var type=loggerConfig.getOrDefault("type", "").toString();
 		

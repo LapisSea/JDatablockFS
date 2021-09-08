@@ -16,17 +16,16 @@ import com.lapissea.util.LogUtil;
 import java.io.IOException;
 import java.util.stream.LongStream;
 
-import static com.lapissea.util.LogUtil.Init.*;
-
 class FSFTest{
 	
 	public static void main(String[] args){
-		LogUtil.Init.attach(USE_CALL_POS|USE_TABULATED_HEADER);
+//		LogUtil.Init.attach(USE_CALL_POS|USE_TABULATED_HEADER);
+		LogUtil.Init.attach(0);
 		
 		try{
 			String               sessionName="default";
-			LateInit<DataLogger> display    =LoggedMemoryUtils.createLoggerFromConfig();
-			MemoryData<?>        mem        =LoggedMemoryUtils.newLoggedMemory(sessionName, display);
+			LateInit<DataLogger> logger     =LoggedMemoryUtils.createLoggerFromConfig();
+			MemoryData<?>        mem        =LoggedMemoryUtils.newLoggedMemory(sessionName, logger);
 			
 			Cluster.init(mem);
 			Cluster cluster=new Cluster(mem);
@@ -34,9 +33,9 @@ class FSFTest{
 			try{
 				doTests(cluster);
 			}finally{
-				display.block();
+				logger.block();
 				mem.onWrite.log(mem, LongStream.of());
-				display.get().getSession(sessionName).finish();
+				logger.ifInited(DataLogger::destroy);
 			}
 			
 		}catch(Throwable e){
