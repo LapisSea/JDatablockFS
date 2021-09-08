@@ -10,6 +10,7 @@ import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.INumber;
 import com.lapissea.cfs.objects.Reference;
+import com.lapissea.cfs.tools.logging.MemFrame;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
@@ -902,7 +903,16 @@ public abstract class BinaryDrawing{
 			Random rand=new Random();
 			setStroke(4);
 			var fieldOffset=0L;
-			for(IOField<T, ?> field : pipe.getSpecificFields()){
+			
+			Iterator<IOField<T, ?>> iterator;
+			if(instance instanceof IOInstance.Unmanaged unmanaged){
+				iterator=Stream.concat(pipe.getSpecificFields().stream(), unmanaged.listUnmanagedFields()).iterator();
+			}else{
+				iterator=(Iterator<IOField<T, ?>>)pipe.getSpecificFields().iterator();
+			}
+			
+			while(iterator.hasNext()){
+				IOField<T, ?> field=iterator.next();
 				rand.setSeed((((long)field.getName().hashCode())<<32)|typeHash);
 				
 				var col=new Color(

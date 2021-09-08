@@ -1,5 +1,7 @@
 package com.lapissea.cfs.tools;
 
+import com.lapissea.cfs.tools.logging.DataLogger;
+import com.lapissea.cfs.tools.logging.MemFrame;
 import com.lapissea.glfw.GlfwKeyboardEvent;
 import com.lapissea.glfw.GlfwMonitor;
 import com.lapissea.glfw.GlfwWindow;
@@ -20,10 +22,48 @@ import java.io.File;
 import java.util.List;
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.function.IntConsumer;
 
 import static org.lwjgl.glfw.GLFW.*;
 
 public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
+	
+	private static class Session implements DataLogger.Session{
+		private final List<CachedFrame> frames  =new ArrayList<>();
+		private final ChangeRegistryInt framePos=new ChangeRegistryInt(0);
+		
+		private final Runnable    setDirty;
+		private final IntConsumer onFrameChange;
+		
+		private Session(Runnable setDirty, IntConsumer onFrameChange){
+			this.setDirty=setDirty;
+			this.onFrameChange=onFrameChange;
+		}
+		
+		@Override
+		public synchronized void log(MemFrame frame){
+			frames.add(new CachedFrame(frame, new ParsedFrame(frames.size())));
+			synchronized(framePos){
+				framePos.set(-1);
+			}
+			setDirty.run();
+		}
+		
+		@Override
+		public void finish(){}
+		
+		@Override
+		public void reset(){
+			setDirty.run();
+			frames.clear();
+			setFrame(0);
+		}
+		private void setFrame(int frame){
+			if(frame>frames.size()-1) frame=frames.size()-1;
+			framePos.set(frame);
+			onFrameChange.accept(frame);
+		}
+	}
 	
 	protected class BulkDrawGL extends BulkDraw{
 		
@@ -51,10 +91,11 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	
 	private final List<Runnable> glTasks=Collections.synchronizedList(new LinkedList<>());
 	
-	private final List<CachedFrame> frames       =new ArrayList<>();
-	private final ChangeRegistryInt pixelsPerByte=new ChangeRegistryInt(300);
-	private final ChangeRegistryInt framePos     =new ChangeRegistryInt(0);
-	private       boolean           shouldRender =true;
+	private final Map<String, Session> sessions        =new LinkedHashMap<>();
+	private       Optional<Session>    activeSession   =Optional.empty();
+	private final ChangeRegistryInt    pixelsPerByte   =new ChangeRegistryInt(300);
+	private       boolean              shouldRender    =true;
+	private       boolean              destroyRequested=false;
 	
 	private String  filter     ="";
 	private boolean filterMake =false;
@@ -65,151 +106,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	private final TTFont font;
 	
 	public DisplayLWJGL(){
-		glThread=new Thread(()->{
-			
-			initWindow();
-			
-			ChangeRegistryInt byteIndex=new ChangeRegistryInt(-1);
-			byteIndex.register(e->shouldRender=true);
-			framePos.register(e->shouldRender=true);
-			
-			double[] travel={0};
-			
-			window.registryMouseButton.register(e->{
-				if(e.getKey()!=GLFW_MOUSE_BUTTON_LEFT) return;
-				switch(e.getType()){
-				case DOWN:
-					travel[0]=0;
-					break;
-				case UP:
-					if(travel[0]<30){
-						ifFrame(MemFrame::printStackTrace);
-					}
-					break;
-				}
-				
-			});
-			window.registryMouseScroll.register(vec->setFrame(Math.max(0, (int)(getFramePos()+vec.y()))));
-			
-			
-			Vec2i lastPos=new Vec2i();
-			window.mousePos.register(pos->{
-				
-				travel[0]+=lastPos.distanceTo(pos);
-				lastPos.set(pos);
-				
-				var pixelsPerByte=getPixelsPerByte();
-				
-				int xByte=window.mousePos.x()/pixelsPerByte;
-				int yByte=window.mousePos.y()/pixelsPerByte;
-				
-				int width=Math.max(1, this.getWidth()/pixelsPerByte);
-				
-				byteIndex.set(yByte*width+xByte);
-				
-				if(!window.isMouseKeyDown(GLFW.GLFW_MOUSE_BUTTON_LEFT)) return;
-				
-				float percent=MathUtil.snap((pos.x()-10F)/(window.size.x()-20F), 0, 1);
-				if(scrollRange!=null){
-					setFrame(Math.round(scrollRange[0]+(scrollRange[1]-scrollRange[0]+1)*percent));
-				}else{
-					setFrame(Math.round((frames.size()-1)*percent));
-				}
-			});
-			
-			window.size.register(()->{
-				ifFrame(frame->calcSize(frame.data().length, true));
-				render();
-			});
-			
-			window.registryKeyboardKey.register(e->{
-				if(!filter.isEmpty()&&e.getKey()==GLFW_KEY_ESCAPE){
-					filter="";
-					scrollRange=null;
-					shouldRender=true;
-				}
-				
-				if(filterMake){
-					shouldRender=true;
-					
-					if(e.getType()!=GlfwKeyboardEvent.Type.UP&&e.getKey()==GLFW_KEY_BACKSPACE){
-						if(!filter.isEmpty()){
-							filter=filter.substring(0, filter.length()-1);
-						}
-						return;
-					}
-					
-					if(e.getType()!=GlfwKeyboardEvent.Type.DOWN) return;
-					if(e.getKey()==GLFW_KEY_ENTER){
-						filterMake=false;
-						
-						
-						boolean lastMatch=false;
-						int     start    =0;
-						
-						int frameIndex=getFramePos();
-						find:
-						{
-							for(int i=0;i<frames.size();i++){
-								boolean match=!filter.isEmpty()&&Arrays.stream(frames.get(i).data().e().getStackTrace()).map(Object::toString).anyMatch(l->l.contains(filter));
-								if(match==lastMatch){
-									continue;
-								}
-								if(frameIndex>=start&&frameIndex<=i){
-									scrollRange=new int[]{start, i};
-									break find;
-								}
-								lastMatch=match;
-								start=i;
-							}
-							int i=frames.size()-1;
-							if(frameIndex>=start&&frameIndex<=i){
-								scrollRange=new int[]{start, i};
-							}
-						}
-						
-						return;
-					}
-					if(e.getKey()==GLFW_KEY_V&&window.isKeyDown(GLFW_KEY_LEFT_CONTROL)){
-						try{
-							String data=(String)Toolkit.getDefaultToolkit().getSystemClipboard().getData(DataFlavor.stringFlavor);
-							filter+=data;
-						}catch(Exception ignored){ }
-						return;
-					}
-					var cg=(char)e.getKey();
-					if(!window.isKeyDown(GLFW_KEY_LEFT_SHIFT)) cg=Character.toLowerCase(cg);
-					if(canFontDisplay(cg)){
-						filter+=cg;
-					}
-					return;
-				}else if(e.getKey()==GLFW_KEY_F){
-					filter="";
-					scrollRange=null;
-					filterMake=true;
-				}
-				
-				int delta;
-				if(e.getKey()==GLFW_KEY_LEFT||e.getKey()==GLFW_KEY_A) delta=-1;
-				else if(e.getKey()==GLFW_KEY_RIGHT||e.getKey()==GLFW_KEY_D) delta=1;
-				else return;
-				if(e.getType()==GlfwKeyboardEvent.Type.UP) return;
-				setFrame(getFramePos()+delta);
-			});
-			
-			window.autoF11Toggle();
-			window.whileOpen(()->{
-				if(shouldRender){
-					shouldRender=false;
-					render();
-				}
-				UtilL.sleep(0, 1000);
-				window.pollEvents();
-			});
-			window.hide();
-			
-			window.destroy();
-		}, "display");
+		glThread=new Thread(this::displayLifecycle, "display");
 		
 		font=new TTFont("/CourierPrime-Regular.ttf", this::bulkDraw, ()->shouldRender=true, task->{
 			if(Thread.currentThread()==glThread){
@@ -225,9 +122,209 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 		
 	}
 	
+	private void displayLifecycle(){
+		initWindow();
+		
+		ChangeRegistryInt byteIndex=new ChangeRegistryInt(-1);
+		byteIndex.register(e->shouldRender=true);
+		
+		double[] travel={0};
+		
+		window.registryMouseButton.register(e->{
+			if(e.getKey()!=GLFW_MOUSE_BUTTON_LEFT) return;
+			switch(e.getType()){
+			case DOWN:
+				travel[0]=0;
+				break;
+			case UP:
+				if(travel[0]<30){
+					ifFrame(MemFrame::printStackTrace);
+				}
+				break;
+			}
+			
+		});
+		window.registryMouseScroll.register(vec->activeSession.ifPresent(ses->ses.setFrame(Math.max(0, (int)(getFramePos()+vec.y())))));
+		
+		
+		Vec2i lastPos=new Vec2i();
+		window.mousePos.register(pos->{
+			
+			travel[0]+=lastPos.distanceTo(pos);
+			lastPos.set(pos);
+			
+			var pixelsPerByte=getPixelsPerByte();
+			
+			int xByte=window.mousePos.x()/pixelsPerByte;
+			int yByte=window.mousePos.y()/pixelsPerByte;
+			
+			int width=Math.max(1, this.getWidth()/pixelsPerByte);
+			
+			byteIndex.set(yByte*width+xByte);
+			
+			if(!window.isMouseKeyDown(GLFW.GLFW_MOUSE_BUTTON_LEFT)) return;
+			activeSession.ifPresent(ses->{
+				float percent=MathUtil.snap((pos.x()-10F)/(window.size.x()-20F), 0, 1);
+				if(scrollRange!=null){
+					ses.setFrame(Math.round(scrollRange[0]+(scrollRange[1]-scrollRange[0]+1)*percent));
+				}else{
+					ses.setFrame(Math.round((ses.frames.size()-1)*percent));
+				}
+			});
+		});
+		
+		window.size.register(()->{
+			ifFrame(frame->calcSize(frame.data().length, true));
+			render();
+		});
+		
+		window.registryKeyboardKey.register(e->{
+			if(e.getType()!=GlfwKeyboardEvent.Type.DOWN&&activeSession.isPresent()&&sessions.size()>1){
+				switch(e.getKey()){
+				case GLFW_KEY_UP -> {
+					boolean found=false;
+					Session ses;
+					find:
+					{
+						for(var value : sessions.values()){
+							if(found){
+								ses=value;
+								break find;
+							}
+							found=value==activeSession.get();
+						}
+						ses=sessions.values().iterator().next();
+					}
+					setActiveSession(ses);
+					return;
+				}
+				case GLFW_KEY_DOWN -> {
+					Session ses;
+					find:
+					{
+						Session last=null;
+						for(var value : sessions.values()){
+							ses=last;
+							last=value;
+							if(value==activeSession.get()){
+								if(ses==null){
+									for(var session : sessions.values()){
+										last=session;
+									}
+									ses=last;
+								}
+								break find;
+							}
+						}
+						ses=sessions.values().iterator().next();
+					}
+					setActiveSession(ses);
+					return;
+				}
+				}
+			}
+			
+			if(!filter.isEmpty()&&e.getKey()==GLFW_KEY_ESCAPE){
+				filter="";
+				scrollRange=null;
+				shouldRender=true;
+			}
+			
+			if(filterMake){
+				shouldRender=true;
+				
+				if(e.getType()!=GlfwKeyboardEvent.Type.UP&&e.getKey()==GLFW_KEY_BACKSPACE){
+					if(!filter.isEmpty()){
+						filter=filter.substring(0, filter.length()-1);
+					}
+					return;
+				}
+				
+				if(e.getType()!=GlfwKeyboardEvent.Type.DOWN) return;
+				if(e.getKey()==GLFW_KEY_ENTER){
+					filterMake=false;
+					
+					
+					boolean lastMatch=false;
+					int     start    =0;
+					
+					int frameIndex=getFramePos();
+					find:
+					{
+						var frames=activeSession.map(s->s.frames).orElse(List.of());
+						
+						for(int i=0;i<frames.size();i++){
+							boolean match=!filter.isEmpty()&&Arrays.stream(frames.get(i).data().e().getStackTrace()).map(Object::toString).anyMatch(l->l.contains(filter));
+							if(match==lastMatch){
+								continue;
+							}
+							if(frameIndex>=start&&frameIndex<=i){
+								scrollRange=new int[]{start, i};
+								break find;
+							}
+							lastMatch=match;
+							start=i;
+						}
+						int i=frames.size()-1;
+						if(frameIndex>=start&&frameIndex<=i){
+							scrollRange=new int[]{start, i};
+						}
+					}
+					
+					return;
+				}
+				if(e.getKey()==GLFW_KEY_V&&window.isKeyDown(GLFW_KEY_LEFT_CONTROL)){
+					try{
+						String data=(String)Toolkit.getDefaultToolkit().getSystemClipboard().getData(DataFlavor.stringFlavor);
+						filter+=data;
+					}catch(Exception ignored){}
+					return;
+				}
+				var cg=(char)e.getKey();
+				if(!window.isKeyDown(GLFW_KEY_LEFT_SHIFT)) cg=Character.toLowerCase(cg);
+				if(canFontDisplay(cg)){
+					filter+=cg;
+				}
+				return;
+			}else if(e.getKey()==GLFW_KEY_F){
+				filter="";
+				scrollRange=null;
+				filterMake=true;
+			}
+			
+			int delta;
+			if(e.getKey()==GLFW_KEY_LEFT||e.getKey()==GLFW_KEY_A) delta=-1;
+			else if(e.getKey()==GLFW_KEY_RIGHT||e.getKey()==GLFW_KEY_D) delta=1;
+			else return;
+			if(e.getType()==GlfwKeyboardEvent.Type.UP) return;
+			activeSession.ifPresent(ses->ses.setFrame(getFramePos()+delta));
+		});
+		
+		window.autoF11Toggle();
+		if(!destroyRequested){
+			window.whileOpen(()->{
+				if(destroyRequested){
+					destroyRequested=false;
+					window.requestClose();
+				}
+				if(shouldRender){
+					shouldRender=false;
+					render();
+				}
+				UtilL.sleep(0, 1000);
+				window.pollEvents();
+			});
+		}
+		window.hide();
+		
+		window.destroy();
+	}
+	
 	private void ifFrame(Consumer<MemFrame> o){
-		if(frames.isEmpty()) return;
-		o.accept(frames.get(getFramePos()).data());
+		activeSession.map(s->s.frames).ifPresent(frames->{
+			if(frames.isEmpty()) return;
+			o.accept(frames.get(getFramePos()).data());
+		});
 	}
 	
 	private synchronized void initWindow(){
@@ -265,8 +362,9 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 		GL.createCapabilities();
 		glErrorPrint();
 		
-		window.show();
-		
+		if(!destroyRequested){
+			window.show();
+		}else return;
 		
 		GL11.glClearColor(0.5F, 0.5F, 0.5F, 1.0f);
 		
@@ -276,18 +374,14 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 		font.fillString("a", 8, -100, 0);
 	}
 	
-	private void setFrame(int frame){
-		if(frame>frames.size()-1) frame=frames.size()-1;
-		framePos.set(frame);
-		window.title.set("Binary display - frame: "+frame);
-	}
-	
 	@Override
 	protected int getFramePos(){
-		synchronized(framePos){
-			if(framePos.get()==-1) setFrame(frames.size()-1);
-			return framePos.get();
-		}
+		return activeSession.map(ses->{
+			synchronized(ses.framePos){
+				if(ses.framePos.get()==-1) ses.setFrame(ses.frames.size()-1);
+				return ses.framePos.get();
+			}
+		}).orElse(0);
 	}
 	@Override
 	protected void postRender(){
@@ -351,11 +445,11 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	}
 	@Override
 	protected int getFrameCount(){
-		return frames.size();
+		return activeSession.map(s->s.frames.size()).orElse(0);
 	}
 	@Override
 	protected CachedFrame getFrame(int index){
-		return frames.get(index);
+		return activeSession.map(s->s.frames.get(index)).orElse(null);
 	}
 	@Override
 	protected void translate(double x, double y){
@@ -445,22 +539,25 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	}
 	
 	@Override
-	public synchronized void log(MemFrame frame){
-		frames.add(new CachedFrame(frame, new ParsedFrame(frames.size())));
-		synchronized(framePos){
-			framePos.set(-1);
-		}
-		shouldRender=true;
+	public Session getSession(String name){
+		if(destroyRequested) return null;
+		
+		var ses=sessions.computeIfAbsent(
+			name,
+			nam->new Session(()->shouldRender=true, frame->{
+				shouldRender=true;
+				window.title.set("Binary display - frame: "+frame+" @"+name);
+			})
+		);
+		setActiveSession(ses);
+		return ses;
 	}
-	
 	@Override
-	public void finish(){ }
-	
-	@Override
-	public void reset(){
-		scrollRange=null;
-		frames.clear();
-		setFrame(0);
+	public void destroy(){
+		destroyRequested=true;
+		sessions.values().forEach(Session::finish);
+		activeSession=Optional.empty();
+		sessions.clear();
 	}
 	
 	@Override
@@ -488,5 +585,10 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	@Override
 	protected void pixelsPerByteChange(int newPixelsPerByte){
 		pixelsPerByte.set(newPixelsPerByte);
+	}
+	
+	private void setActiveSession(Session session){
+		session.onFrameChange.accept(getFramePos());
+		this.activeSession=Optional.of(session);
 	}
 }

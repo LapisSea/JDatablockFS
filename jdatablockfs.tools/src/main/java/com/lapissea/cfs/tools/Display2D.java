@@ -1,5 +1,7 @@
 package com.lapissea.cfs.tools;
 
+import com.lapissea.cfs.tools.logging.DataLogger;
+import com.lapissea.cfs.tools.logging.MemFrame;
 import com.lapissea.util.MathUtil;
 
 import javax.swing.*;
@@ -11,13 +13,52 @@ import java.awt.geom.Line2D;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.io.*;
-import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
+import java.util.*;
+import java.util.function.IntConsumer;
+
+import static javax.swing.SwingUtilities.*;
 
 @SuppressWarnings("AutoBoxing")
 public class Display2D extends BinaryDrawing implements DataLogger{
+	
+	private static class Session implements DataLogger.Session{
+		private final List<CachedFrame> frames=new ArrayList<>();
+		private       int               pos;
+		
+		private final Runnable setDirty;
+		
+		private Session(Runnable setDirty, IntConsumer onFrameChange){
+			this.setDirty=setDirty;
+		}
+		
+		@Override
+		public synchronized void log(MemFrame frame){
+			frames.add(new CachedFrame(frame, new ParsedFrame(frames.size())));
+			setPos(frames.size()-1);
+		}
+		
+		@Override
+		public void finish(){}
+		
+		@Override
+		public void reset(){
+			frames.clear();
+			setPos(0);
+			setDirty.run();
+		}
+		public void setPos(int pos){
+			if(this.pos==pos) return;
+			
+			this.pos=pos;
+			setDirty.run();
+		}
+		
+		public int getPos(){
+			return pos;
+		}
+	}
 	
 	private Graphics2D             currentGraphics;
 	private Queue<AffineTransform> transformStack=new LinkedList<>();
@@ -34,7 +75,7 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 		
 		public void paint(Graphics2D g){
 			try{
-				if(frames.isEmpty()) return;
+				if(activeSession.isEmpty()||activeSession.get().frames.isEmpty()) return;
 				
 				var image=render;
 				
@@ -68,13 +109,12 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 		}
 	}
 	
-	
-	private int pos;
 	private int pixelsPerByte=300;
 	
-	private final List<CachedFrame> frames=new ArrayList<>();
-	private final JFrame            frame =new JFrame();
-	private final Pan               pan;
+	private final Map<String, Session> sessions     =new HashMap<>();
+	private       Optional<Session>    activeSession=Optional.empty();
+	private final JFrame               frame        =new JFrame();
+	private final Pan                  pan;
 	
 	public Display2D(){
 		File f=new File("wind");
@@ -96,25 +136,27 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 		frame.addKeyListener(new KeyAdapter(){
 			@Override
 			public void keyPressed(KeyEvent e){
-				if(e.getKeyChar()=='a'||e.getKeyCode()==37) setPos(getPos()-1);
-				if(e.getKeyChar()=='d'||e.getKeyCode()==39) setPos(getPos()+1);
-				setPos(MathUtil.snap(getPos(), 0, frames.size()-1));
-				frame.repaint();
-				
-				if(e.getKeyCode()==122){
-					frame.dispose();
-					if(frame.isUndecorated()){
-						frame.setUndecorated(false);
-						frame.setExtendedState(JFrame.NORMAL);
-						frame.setSize(800, 800);
-						frame.setVisible(true);
-						
-					}else{
-						frame.setUndecorated(true);
-						frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
-						frame.setVisible(true);
+				activeSession.ifPresent(ses->{
+					if(e.getKeyChar()=='a'||e.getKeyCode()==37) ses.setPos(ses.getPos()-1);
+					if(e.getKeyChar()=='d'||e.getKeyCode()==39) ses.setPos(ses.getPos()+1);
+					ses.setPos(MathUtil.snap(ses.getPos(), 0, ses.frames.size()-1));
+					frame.repaint();
+					
+					if(e.getKeyCode()==122){
+						frame.dispose();
+						if(frame.isUndecorated()){
+							frame.setUndecorated(false);
+							frame.setExtendedState(JFrame.NORMAL);
+							frame.setSize(800, 800);
+							frame.setVisible(true);
+							
+						}else{
+							frame.setUndecorated(true);
+							frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
+							frame.setVisible(true);
+						}
 					}
-				}
+				});
 			}
 		});
 		
@@ -138,7 +180,7 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 						in.newLine();
 						in.write(Integer.toString(frame.getSize().height));
 						in.newLine();
-					}catch(Throwable ignored){ }
+					}catch(Throwable ignored){}
 				}
 			}
 		});
@@ -162,7 +204,7 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 				
 				float val=x/(float)width;
 				
-				setPos((int)(val*(frames.size()-1)));
+				activeSession.ifPresent(ses->ses.setPos((int)(val*(ses.frames.size()-1))));
 				
 				pan.repaint();
 			}
@@ -171,22 +213,16 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 		pan.addMouseListener(new MouseAdapter(){
 			@Override
 			public void mouseClicked(MouseEvent e){
-				if(frames.isEmpty()) return;
-				frames.get(getPos()).data().printStackTrace();
-				frame.repaint();
+				activeSession.ifPresent(ses->{
+					if(ses.frames.isEmpty()) return;
+					ses.frames.get(ses.getPos()).data().printStackTrace();
+					frame.repaint();
+				});
 			}
 		});
 		
 		frame.setVisible(true);
 		frame.createBufferStrategy(2);
-	}
-	
-	
-	public void setPos(int pos){
-		if(this.pos==pos) return;
-		
-		this.pos=pos;
-		shouldRerender=true;
 	}
 	
 	boolean       shouldRerender=true;
@@ -323,15 +359,15 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 	}
 	@Override
 	protected int getFrameCount(){
-		return frames.size();
+		return activeSession.map(ses->ses.frames.size()).orElse(0);
 	}
 	@Override
 	protected CachedFrame getFrame(int index){
-		return frames.get(index);
+		return activeSession.map(ses->ses.frames.get(index)).orElse(null);
 	}
 	@Override
 	protected int getFramePos(){
-		return pos;
+		return activeSession.map(ses->ses.pos).orElse(0);
 	}
 	@Override
 	protected void preRender(){
@@ -341,23 +377,30 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 	}
 	
 	@Override
-	public synchronized void log(MemFrame frame){
-		frames.add(new CachedFrame(frame, new ParsedFrame(frames.size())));
-		setPos(frames.size()-1);
-		this.frame.repaint();
+	public Session getSession(String name){
+		var ses=sessions.computeIfAbsent(
+			name,
+			nam->new Session(()->{
+				frame.repaint();
+				shouldRerender=true;
+			}, frame->{
+				this.frame.repaint();
+				shouldRerender=true;
+				this.frame.setTitle("Binary display - frame: "+frame+" @"+name);
+			})
+		);
+		activeSession=Optional.of(ses);
+		return ses;
 	}
 	
 	@Override
-	public void finish(){ }
-	
-	@Override
-	public void reset(){
-		frames.clear();
-		setPos(0);
-		frame.repaint();
-	}
-	
-	public int getPos(){
-		return pos;
+	public void destroy(){
+		invokeLater(()->{
+			frame.setVisible(false);
+			frame.dispose();
+		});
+		sessions.values().forEach(Session::finish);
+		activeSession=Optional.empty();
+		sessions.clear();
 	}
 }
