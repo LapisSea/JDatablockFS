@@ -20,14 +20,14 @@ public class ChainWalker implements IterablePP<Chunk>{
 		}
 		@Override
 		public Chunk next(){
-			Chunk c=chunk;
+			var c=chunk;
 			if(c==null) throw new NoSuchElementException();
 			chunk=c.nextUnsafe();
 			return c;
 		}
 	}
 	
-	private Chunk head;
+	private final Chunk head;
 	public ChainWalker(Chunk head){
 		this.head=head;
 	}

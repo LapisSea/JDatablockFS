@@ -24,7 +24,7 @@ public final class VirtualFieldDefinition<IO extends IOInstance<IO>, T>{
 		StoragePool(String shortName){this.shortName=shortName;}
 	}
 	
-	private final StoragePool         storagePool;
+	public final  StoragePool         storagePool;
 	private final String              name;
 	private final Type                type;
 	private final GetterFilter<IO, T> getFilter;
@@ -51,6 +51,5 @@ public final class VirtualFieldDefinition<IO extends IOInstance<IO>, T>{
 	public String getName()                  { return name; }
 	public Type getType()                    { return type; }
 	public GetterFilter<IO, T> getGetFilter(){ return getFilter; }
-	public StoragePool getStoragePool()      { return storagePool; }
 	public GetAnnotation getAnnotations()    { return annotations; }
 }

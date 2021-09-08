@@ -13,7 +13,6 @@ import java.lang.annotation.Annotation;
 import java.lang.invoke.MethodHandle;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.Optional;
 import java.util.function.LongFunction;
@@ -56,8 +55,8 @@ public class ReflectionAccessor<CTyp extends IOInstance<CTyp>> implements IField
 		this.struct=struct;
 		this.field=field;
 		this.name=name;
-		this.genericType=genericType;
-		this.rawType=(Class<?>)(genericType instanceof ParameterizedType p?p.getRawType():genericType);
+		this.genericType=Utils.prottectFromVarType(genericType);
+		this.rawType=Utils.typeToRaw(this.genericType);
 		
 		getter.ifPresent(get->{
 			if(!Utils.genericInstanceOf(get.getReturnType(), genericType)){

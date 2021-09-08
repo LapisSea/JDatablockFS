@@ -9,7 +9,7 @@ import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.function.ToLongFunction;
 
-public interface SizeDescriptor<Inst extends IOInstance<Inst>>{
+public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 	
 	final class Fixed<T extends IOInstance<T>> implements SizeDescriptor<T>{
 		
@@ -36,18 +36,20 @@ public interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 		}
 		
 		@Override
-		public WordSpace getWordSpace(){ return wordSpace; }
+		public WordSpace getWordSpace(){return wordSpace;}
 		@Override
 		public long calcUnknown(T instance){
 			return size;
 			//throw new ShouldNeverHappenError("Do not calculate unknown, use getFixed when it is provided");
 		}
+		
+		public long get(){return size;}
 		@Override
-		public OptionalLong getFixed(){ return OptionalLong.of(size); }
+		public OptionalLong getFixed(){return OptionalLong.of(size);}
 		@Override
-		public OptionalLong getMax(){ return OptionalLong.of(size); }
+		public OptionalLong getMax(){return OptionalLong.of(size);}
 		@Override
-		public long getMin(){ return size; }
+		public long getMin(){return size;}
 		
 		public String toShortString(){
 			return "{"+size+" "+TextUtil.plural(getWordSpace().friendlyName, (int)size)+"}";
@@ -58,7 +60,7 @@ public interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 		}
 	}
 	
-	abstract class Unknown<Inst extends IOInstance<Inst>> implements SizeDescriptor<Inst>{
+	abstract non-sealed class Unknown<Inst extends IOInstance<Inst>> implements SizeDescriptor<Inst>{
 		
 		private final WordSpace    wordSpace;
 		private final long         min;

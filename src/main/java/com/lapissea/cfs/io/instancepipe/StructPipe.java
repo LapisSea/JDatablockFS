@@ -110,6 +110,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		                       .filter(a->a.getStoragePool()==VirtualFieldDefinition.StoragePool.IO)
 		                       .toList();
 	}
+	
 	private <E, C extends Collection<E>> C nullIfEmpty(C collection){
 		if(collection.isEmpty()) return null;
 		return collection;
@@ -227,7 +228,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 			
 			Collection<IOField<T, ?>> dirtyMarked=new HashSet<>();
 			Consumer<List<IOField<T, ?>>> logDirty=dirt->{
-				if(dirt.isEmpty()) return;
+				if(dirt==null||dirt.isEmpty()) return;
 				if(DEBUG_VALIDATION){
 					var spec=getSpecificFields();
 					for(IOField<T, ?> dirtyField : dirt){

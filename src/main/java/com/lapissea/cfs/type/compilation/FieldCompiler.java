@@ -15,7 +15,12 @@ import com.lapissea.cfs.type.field.access.FunctionalReflectionAccessor;
 import com.lapissea.cfs.type.field.access.IFieldAccessor;
 import com.lapissea.cfs.type.field.access.ReflectionAccessor;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
+import com.lapissea.cfs.type.field.annotations.IODependency;
+import com.lapissea.cfs.type.field.annotations.IONullability;
+import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.cfs.type.field.fields.reflection.*;
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.PairM;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
@@ -33,12 +38,13 @@ import java.util.stream.Stream;
 import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.*;
 import static java.util.function.Function.*;
 
-public abstract class FieldCompiler{
+@SuppressWarnings("rawtypes")
+public class FieldCompiler{
 	
 	protected record LogicalAnnotation<T extends Annotation>(T annotation, AnnotationLogic<T> logic){}
 	
 	public static FieldCompiler create(){
-		return new ReflectionFieldCompiler();
+		return new FieldCompiler();
 	}
 	
 	private static record AnnotatedField<T extends IOInstance<T>>(
@@ -49,6 +55,9 @@ public abstract class FieldCompiler{
 		public int compareTo(AnnotatedField<T> o){
 			return field().getAccessor().compareTo(o.field.getAccessor());
 		}
+	}
+	
+	protected FieldCompiler(){
 	}
 	
 	public <T extends IOInstance<T>> FieldSet<T, ?> compile(Struct<T> struct){
@@ -130,7 +139,7 @@ public abstract class FieldCompiler{
 						IFieldAccessor<T> accessor=new VirtualAccessor<>(
 							struct,
 							(VirtualFieldDefinition<T, Object>)s,
-							accessIndex.compute(s.getStoragePool(), (k, v)->{
+							accessIndex.compute(s.storagePool, (k, v)->{
 								if(k==NONE) return -1;
 								else{
 									return v==null?0:v+1;
@@ -153,7 +162,6 @@ public abstract class FieldCompiler{
 		}
 	}
 	
-	protected abstract RegistryNode.Registry registry();
 	
 	protected IterablePP<Field> deepFieldsByAnnotation(Class<?> clazz, Class<? extends Annotation> type){
 		return IterablePP
@@ -349,6 +357,100 @@ public abstract class FieldCompiler{
 			       })).filter(Optional::isPresent).map(Optional::get).toList();
 	}
 	
-	protected abstract Set<Class<? extends Annotation>> activeAnnotations();
+	
+	private static final RegistryNode.Registry REGISTRY=new RegistryNode.Registry();
+	
+	static{
+		REGISTRY.register(new RegistryNode(){
+			@Override
+			public boolean canCreate(Type type){
+				return IOFieldPrimitive.isPrimitive(type);
+			}
+			@Override
+			public <T extends IOInstance<T>> IOField<T, ?> create(IFieldAccessor<T> field){
+				return IOFieldPrimitive.make(field);
+			}
+		});
+		REGISTRY.register(new RegistryNode.InstanceOf<Enum>(){
+			@Override
+			public Class<Enum> getType(){
+				return Enum.class;
+			}
+			@Override
+			public <T extends IOInstance<T>> IOField<T, Enum> create(IFieldAccessor<T> field){
+				return new IOFieldEnum<>(field);
+			}
+		});
+		REGISTRY.register(new RegistryNode.InstanceOf<INumber>(){
+			@Override
+			public Class<INumber> getType(){
+				return INumber.class;
+			}
+			@Override
+			public <T extends IOInstance<T>> IOField<T, INumber> create(IFieldAccessor<T> field){
+				return new IOFieldNumber<>(field);
+			}
+		});
+		REGISTRY.register(new RegistryNode.InstanceOf<byte[]>(){
+			@Override
+			public Class<byte[]> getType(){
+				return byte[].class;
+			}
+			@Override
+			public <T extends IOInstance<T>> IOField<T, byte[]> create(IFieldAccessor<T> field){
+				return new IOFieldByteArray<>(field);
+			}
+		});
+		REGISTRY.register(new RegistryNode.InstanceOf<String>(){
+			@Override
+			public Class<String> getType(){
+				return String.class;
+			}
+			@Override
+			public <T extends IOInstance<T>> IOField<T, String> create(IFieldAccessor<T> field){
+				throw new NotImplementedException();
+			}
+		});
+		REGISTRY.register(new RegistryNode.InstanceOf<IOInstance>(){
+			@Override
+			public Class<IOInstance> getType(){
+				return IOInstance.class;
+			}
+			@Override
+			public <T extends IOInstance<T>> IOField<T, ? extends IOInstance> create(IFieldAccessor<T> field){
+				Class<?> raw      =field.getType();
+				var      unmanaged=UtilL.instanceOf(raw, IOInstance.Unmanaged.class);
+				
+				if(field.hasAnnotation(IOType.Dynamic.class)){
+					if(unmanaged) throw new MalformedStructLayout("can't use unmanged on");
+					
+					if(field.hasAnnotation(IOValue.Reference.class)){
+						throw new NotImplementedException();
+					}
+					return new IOFieldDynamicInlineObject<>(field);
+				}
+				
+				if(unmanaged){
+					return new IOFieldUnmanagedObjectReference<>(field);
+				}
+				if(field.hasAnnotation(IOValue.Reference.class)){
+					return new IOFieldObjectReference<>(field);
+				}
+				return new IOFieldInlineObject<>(field);
+			}
+		});
+	}
+	
+	protected RegistryNode.Registry registry(){
+		return REGISTRY;
+	}
+	protected Set<Class<? extends Annotation>> activeAnnotations(){
+		return Set.of(
+			IOValue.class,
+			IODependency.class,
+			IONullability.class,
+			IOType.class
+		);
+	}
 	
 }

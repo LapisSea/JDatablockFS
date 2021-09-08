@@ -13,7 +13,6 @@ import com.lapissea.util.UtilL;
 import java.lang.annotation.Annotation;
 import java.lang.invoke.MethodHandle;
 import java.lang.reflect.Method;
-import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.Optional;
 import java.util.function.LongFunction;
@@ -58,7 +57,7 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> impleme
 		this.annotations=annotations;
 		this.name=name;
 		this.genericType=genericType;
-		this.rawType=(Class<?>)(genericType instanceof ParameterizedType p?p.getRawType():genericType);
+		this.rawType=Utils.typeToRaw(genericType);
 		
 		if(!Utils.genericInstanceOf(getter.getReturnType(), genericType)){
 			throw new MalformedStructLayout("getter returns "+getter.getReturnType()+" but "+genericType+" is required\n"+getter);

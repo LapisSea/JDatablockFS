@@ -12,7 +12,6 @@ import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
-import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
 import java.util.List;
@@ -32,6 +31,9 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 		super(null);
 		assert !group.isEmpty();
 		this.group=List.copyOf(group);
+		
+		commonSense:
+		break commonSense;
 		
 		var fixedSize=Utils.bitToByte(IOFieldTools.sumVarsIfAll(group, SizeDescriptor::getFixed));
 		if(fixedSize.isPresent()) sizeDescriptor=new SizeDescriptor.Fixed<>(WordSpace.BYTE, fixedSize.getAsLong());
@@ -61,7 +63,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 					try{
 						fi.writeBits(stream, instance);
 					}catch(Exception e){
-						throw new IOException("Failed to write "+TextUtil.toShortString(fi), e);
+						throw reportWriteFail(fi, e);
 					}
 					var written=stream.getTotalBits()-oldW;
 					if(written!=size) throw new RuntimeException("Written bits "+written+" but "+size+" expected on "+fi);
@@ -69,12 +71,12 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 					try{
 						fi.writeBits(stream, instance);
 					}catch(Exception e){
-						throw new IOException("Failed to write "+TextUtil.toShortString(fi), e);
+						throw reportWriteFail(fi, e);
 					}
 				}
 			}
 		}
-		return List.of();
+		return null;
 	}
 	
 	@Override

@@ -10,6 +10,7 @@ import com.lapissea.cfs.type.field.access.VirtualAccessor;
 
 import java.io.IOException;
 import java.util.Objects;
+import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.*;
 import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.*;
@@ -20,12 +21,20 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 		
 		private final ChunkDataProvider provider;
 		private final Reference         reference;
+		private final TypeDefinition    typeDef;
 		
 		private StructPipe<SELF> pipe;
 		
-		public Unmanaged(ChunkDataProvider provider, Reference reference){
+		public Unmanaged(ChunkDataProvider provider, Reference reference, TypeDefinition typeDef){
 			this.provider=Objects.requireNonNull(provider);
 			this.reference=reference.requireNonNull();
+			this.typeDef=typeDef;
+		}
+		
+		public abstract Stream<IOField<SELF, ?>> listUnmanagedFields();
+		
+		public TypeDefinition getTypeDef(){
+			return typeDef;
 		}
 		
 		@Override
@@ -81,17 +90,20 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 		return thisStruct;
 	}
 	
-	//used in VirtualAccessor
-	protected Object accessVirtual(VirtualAccessor<SELF> accessor){
+	private void protectAccessor(VirtualAccessor<SELF> accessor){
 		if(DEBUG_VALIDATION){
 			if(accessor.getDeclaringStruct()!=getThisStruct()){
 				throw new IllegalArgumentException(accessor.getDeclaringStruct()+" != "+getThisStruct());
 			}
 		}
+	}
+	protected Object accessVirtual(VirtualAccessor<SELF> accessor){
+		protectAccessor(accessor);
 		int index=accessor.getAccessIndex();
 		return virtualFields[index];
 	}
 	protected void accessVirtual(VirtualAccessor<SELF> accessor, Object value){
+		protectAccessor(accessor);
 		int index=accessor.getAccessIndex();
 		virtualFields[index]=value;
 	}

@@ -54,7 +54,7 @@ public class VirtualAccessor<CTyp extends IOInstance<CTyp>> implements IFieldAcc
 	}
 	
 	public VirtualFieldDefinition.StoragePool getStoragePool(){
-		return type.getStoragePool();
+		return type.storagePool;
 	}
 	
 	@Override

@@ -20,6 +20,7 @@ public interface ContentWriter extends AutoCloseable, ContentBuff{
 		if(b.hasArray()&&!b.isReadOnly()){
 			write(b.array(), off+b.arrayOffset(), len);
 		}else{
+			//// FIXME: 21/07/2021 this i slow but reuses existing code, custom 0 copy implementation?
 			try(var io=MemoryData.build().withRaw(b.slice(off, len)).build().io()){
 				io.transferTo(this);
 			}

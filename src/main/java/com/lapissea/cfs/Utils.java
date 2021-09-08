@@ -3,7 +3,9 @@ package com.lapissea.cfs;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
+import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
@@ -253,6 +255,18 @@ public class Utils{
 		return OptionalLong.of(a.getAsLong()+b.getAsLong());
 	}
 	
+	public static OptionalLong maxIfBoth(OptionalLong a, OptionalLong b){
+		if(a.isEmpty()) return a;
+		if(b.isEmpty()) return b;
+		return OptionalLong.of(Math.max(a.getAsLong(), b.getAsLong()));
+	}
+	
+	public static OptionalLong minIfBoth(OptionalLong a, OptionalLong b){
+		if(a.isEmpty()) return a;
+		if(b.isEmpty()) return b;
+		return OptionalLong.of(Math.min(a.getAsLong(), b.getAsLong()));
+	}
+	
 	public static String byteArrayToBitString(byte[] data){
 		return byteArrayToBitString(data, 0, data.length);
 	}
@@ -274,10 +288,33 @@ public class Utils{
 	public static Class<?> typeToRaw(Type type){
 		if(type instanceof Class<?> c) return c;
 		if(type instanceof ParameterizedType c) return (Class<?>)c.getRawType();
+		if(type instanceof TypeVariable<?> c){
+			return typeToRaw(extractFromVarType(c));
+		}
 		throw new IllegalArgumentException(type.toString());
 	}
+	
+	public static Type prottectFromVarType(Type type){
+		if(type instanceof TypeVariable<?> c){
+			return extractFromVarType(c);
+		}
+		return type;
+	}
+	
+	public static Type extractFromVarType(TypeVariable<?> c){
+		var bounds=c.getBounds();
+		if(bounds.length==1){
+			var typ=bounds[0];
+			return typ;
+		}
+		throw new NotImplementedException(TextUtil.toString("wut? ", bounds));
+	}
+	
 	public static boolean genericInstanceOf(Type testType, Type type){
 		if(testType.equals(type)) return true;
+		
+		if(testType instanceof TypeVariable<?> c) return genericInstanceOf(extractFromVarType(c), type);
+		if(type instanceof TypeVariable<?> c) return genericInstanceOf(testType, extractFromVarType(c));
 		
 		if(type instanceof ParameterizedType parm){
 			Type[] args=parm.getActualTypeArguments(), testArgs;

@@ -17,6 +17,7 @@ import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.access.IFieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.Nullable;
 import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
@@ -39,11 +40,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		SIZE_DATA
 	}
 	
-	public static record UsageHint(UsageHintType type, String target){
-		public UsageHint(UsageHintType type){
-			this(type, null);
-		}
-	}
+	public static record UsageHint(UsageHintType type, String target){}
 	
 	
 	public abstract static class Ref<T extends IOInstance<T>, Type extends IOInstance<Type>> extends IOField<T, Type>{
@@ -120,6 +117,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		usageHints=h;
 	}
 	
+	@SuppressWarnings("unchecked")
 	public ValueType get(T instance){
 		return (ValueType)getAccessor().get(instance);
 	}
@@ -131,15 +129,24 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	public abstract SizeDescriptor<T> getSizeDescriptor();
 	
 	/**
-	 * @return a list of fields that have to be written after this function has executed. Never return null, if no fields are required, return {@link List#of()}
+	 * @return a list of fields that have to be written after this function has executed. If no fields are required, return {@link List#of()} or null
 	 */
+	@Nullable
 	public abstract List<IOField<T, ?>> write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException;
+	@Nullable
 	public final List<IOField<T, ?>> writeReported(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
 		try{
 			return write(provider, dest, instance);
 		}catch(Exception e){
-			throw new IOException("Failed to write "+TextUtil.toString(this), e);
+			throw reportWriteFail(this, e);
 		}
+	}
+	
+	protected IOException reportWriteFail(IOField<T, ?> fi, Exception e) throws IOException{
+		throw new IOException("Failed to write "+TextUtil.toShortString(fi), e);
+	}
+	protected IOException reportReadFail(IOField<T, ?> fi, Exception e) throws IOException{
+		throw new IOException("Failed to read "+TextUtil.toShortString(fi), e);
 	}
 	
 	public abstract void read(ChunkDataProvider provider, ContentReader src, T instance) throws IOException;
@@ -147,7 +154,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		try{
 			read(provider, src, instance);
 		}catch(Exception e){
-			throw new IOException("Failed to read "+TextUtil.toString(this), e);
+			throw reportReadFail(this, e);
 		}
 	}
 	

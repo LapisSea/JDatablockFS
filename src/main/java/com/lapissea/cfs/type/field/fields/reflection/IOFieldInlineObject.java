@@ -66,7 +66,9 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 			case NULLABLE -> value;
 			case DEFAULT_IF_NULL -> {
 				if(value==null){
-					yield instancePipe.getType().requireEmptyConstructor().get();
+					var newVal=instancePipe.getType().requireEmptyConstructor().get();
+					set(instance, newVal);
+					yield newVal;
 				}
 				yield value;
 			}

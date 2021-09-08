@@ -6,13 +6,19 @@ import com.lapissea.cfs.io.bit.BitUtils;
 import com.lapissea.cfs.io.bit.EnumUniverse;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
+import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.field.SizeDescriptor;
+import com.lapissea.cfs.type.field.SizeDescriptor.Fixed;
+import com.lapissea.cfs.type.field.SizeDescriptor.Unknown;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
 
 import java.io.IOException;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
+import java.util.function.ToLongFunction;
 
+@SuppressWarnings("unused")
 public enum NumberSize{
 	
 	VOID('V', 0x0, 0, in->0, (out, num)->{}, in->0, (out, num)->{}),
@@ -24,8 +30,8 @@ public enum NumberSize{
 	SMALL_LONG('l', 0xFFFFFFFFFFFFL, 6, ContentReader::readUnsignedInt6, ContentWriter::writeInt6, NumberSize::RNS, NumberSize::WNS),
 	LONG('L', 0X7FFFFFFFFFFFFFFFL, 8, ContentReader::readInt8, ContentWriter::writeInt8, in->Double.longBitsToDouble(in.readInt8()), (out, num)->out.writeInt8(Double.doubleToLongBits(num)));
 	
-	private static double RNS(ContentReader src)             { throw new UnsupportedOperationException(); }
-	private static void WNS(ContentWriter dest, double value){ throw new UnsupportedOperationException(); }
+	private static double RNS(ContentReader src)             {throw new UnsupportedOperationException();}
+	private static void WNS(ContentWriter dest, double value){throw new UnsupportedOperationException();}
 	
 	private interface WriterI{
 		void write(ContentWriter dest, long value) throws IOException;
@@ -61,10 +67,9 @@ public enum NumberSize{
 	}
 	
 	public static NumberSize bySize(long size){
-		for(NumberSize value : FLAG_INFO){
-			if(value.maxSize>=size) return value;
-		}
-		throw new RuntimeException("Extremely large value");
+		var value=searchSizeByVal(NumberSize::maxSize, size);
+		if(value!=null) return value;
+		throw new RuntimeException("Extremely large value: "+size);
 	}
 	
 	public static NumberSize byBits(int bits){
@@ -72,10 +77,35 @@ public enum NumberSize{
 	}
 	
 	public static NumberSize byBytes(long bytes){
-		for(NumberSize value : FLAG_INFO){
-			if(value.bytes>=bytes) return value;
-		}
+		var value=searchSizeByVal(NumberSize::bytes, bytes);
+		if(value!=null) return value;
 		throw new RuntimeException("Extremely large byte length: "+bytes);
+	}
+	public static <T extends IOInstance<T>> NumberSize by(SizeDescriptor.Fixed<T> size){
+		var value=searchSizeByVal(NumberSize::bytes, size.get());
+		if(value!=null) return value;
+		
+		throw new RuntimeException("Extremely large size: "+size);
+	}
+	public static <T extends IOInstance<T>> NumberSize by(SizeDescriptor<T> size, T instance){
+		var value=searchSizeByVal(
+			NumberSize::bytes,
+			switch(size){
+				case Fixed f -> f.get();
+				case Unknown<T> u -> u.calcUnknown(instance);
+			}
+		);
+		if(value!=null) return value;
+		
+		throw new RuntimeException("Extremely large size: "+size);
+	}
+	
+	private static <T> NumberSize searchSizeByVal(ToLongFunction<NumberSize> mapper, long key){
+		//TODO: maybe something more intelligent?
+		for(var value : FLAG_INFO){
+			if(mapper.applyAsLong(value)>=key) return value;
+		}
+		return null;
 	}
 	
 	public final int  bytes;
@@ -211,5 +241,18 @@ public enum NumberSize{
 		String bits    =Long.toBinaryString(value&BitUtils.makeMask(bitCount));
 		if(bits.length()==bitCount) return bits;
 		return "0".repeat(bitCount-bits.length())+bits;
+	}
+	
+	public long maxSize(){
+		return maxSize;
+	}
+	public char shortName(){
+		return shortName;
+	}
+	public OptionalInt optionalBytes(){
+		return optionalBytes;
+	}
+	public OptionalLong optionalBytesLong(){
+		return optionalBytesLong;
 	}
 }

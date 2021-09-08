@@ -4,8 +4,11 @@ import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.ChunkDataProvider;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
+import com.lapissea.cfs.objects.GenericContainer;
 import com.lapissea.cfs.objects.collections.ContiguousIOList;
+import com.lapissea.cfs.objects.collections.HashIOMap;
 import com.lapissea.cfs.objects.collections.IOList;
+import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.TypeDefinition;
@@ -120,6 +123,46 @@ public class GeneralTests{
 		IOList<Dummy> read=new ContiguousIOList<>(provider, ref, typ);
 		
 		assertEquals(list, read);
+	}
+	@Test
+	void testHashIOMap() throws IOException{
+		var provider=ChunkDataProvider.newVerySimpleProvider();
+//		var provider=ChunkDataProvider.newVerySimpleProvider((data, ids)->LogUtil.println(data));
+		
+		
+		var chunk=AllocateTicket.bytes(64).submit(provider);
+		
+		var ref=chunk.getPtr().makeReference(0);
+		var typ=TypeDefinition.of(HashIOMap.class, Integer.class, Integer.class);
+		
+		IOMap<Integer, Integer> map=new HashIOMap<>(provider, ref, typ);
+		
+		map.put(1, 11);
+		map.put(2, 12);
+		map.put(3, 13);
+		map.put(16, 21);
+		map.put(17, 22);
+		map.put(18, 23);
+		
+		
+		IOMap<Integer, Integer> read=new HashIOMap<>(provider, ref, typ);
+		
+		assertEquals(map, read);
+	}
+	
+	@Test
+	void genericTest() throws IOException{
+		var pipe=ContiguousStructPipe.of(GenericContainer.class);
+		
+		var provider=ChunkDataProvider.newVerySimpleProvider();
+		var chunk   =AllocateTicket.bytes(64).submit(provider);
+		
+		var container=new GenericContainer(new Dummy(123));
+		
+		pipe.write(chunk, container);
+		var read=pipe.readNew(chunk);
+		
+		assertEquals(container, read);
 	}
 	
 	@ParameterizedTest

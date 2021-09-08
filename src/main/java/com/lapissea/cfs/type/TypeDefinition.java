@@ -1,6 +1,9 @@
 package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.SyntheticParameterizedType;
+import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.util.NotImplementedException;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -26,7 +29,7 @@ public class TypeDefinition{
 		}
 		
 		public String findProblem(TypeDefinition type){
-			if(!rawCheck.test(type.getRaw())) return "Raw type in "+type+" is not valid";
+			if(!rawCheck.test(type.getTypeClass())) return "Raw type in "+type+" is not valid";
 			if(type.argCount()!=argChecks.size()) return "Argument count in "+type+" should be "+argChecks.size()+" but is "+type.argCount();
 			int[] badIndex=IntStream.range(0, type.argCount()).filter(i->argChecks.get(i).test(type.arg(i))).toArray();
 			return switch(badIndex.length){
@@ -51,23 +54,45 @@ public class TypeDefinition{
 	
 	public static TypeDefinition of(Type genericType){
 		Objects.requireNonNull(genericType);
+		genericType=Utils.prottectFromVarType(genericType);
+		
 		if(genericType instanceof ParameterizedType parm) return new TypeDefinition(
-			(Class<?>)parm.getRawType(),
+			parm.getRawType().getTypeName(),
 			Arrays.stream(parm.getActualTypeArguments()).map(TypeDefinition::of).toArray(TypeDefinition[]::new)
 		);
-		return new TypeDefinition((Class<?>)genericType, NO_ARGS);
+		return new TypeDefinition(genericType.getTypeName(), NO_ARGS);
 	}
 	
-	private final Class<?>         raw;
-	private final TypeDefinition[] args;
+	private Class<?> typeClass;
+	@IOValue
+	private String   typeName;
 	
-	public TypeDefinition(Class<?> raw, TypeDefinition... args){
-		this.raw=raw;
-		this.args=args;
+	@IOValue
+	private TypeDefinition[] args;
+	
+	private Type generic;
+	
+	public TypeDefinition(){ }
+	
+	
+	public TypeDefinition(String typeName, TypeDefinition... args){
+		this.typeName=typeName;
+		this.args=args.clone();
 	}
 	
-	public Class<?> getRaw(){
-		return raw;
+	public String getTypeName(){
+		return typeName;
+	}
+	
+	public Class<?> getTypeClass(){
+		if(typeClass==null){
+			try{
+				typeClass=Class.forName(getTypeName());
+			}catch(ClassNotFoundException e){
+				throw new NotImplementedException("implement generic ioinstance from stored data");
+			}
+		}
+		return typeClass;
 	}
 	
 	public int argCount(){
@@ -78,14 +103,18 @@ public class TypeDefinition{
 		return args[index];
 	}
 	public Struct<?> argAsStruct(int index){
-		return Struct.ofUnknown(arg(index).getRaw());
+		return Struct.ofUnknown(arg(index).getTypeClass());
 	}
 	
 	@Override
 	public String toString(){
-		return raw.getName()+(args.length==0?"":Arrays.stream(args).map(TypeDefinition::toString).collect(Collectors.joining(", ", "<", ">")));
+		return getTypeClass().getName()+(args.length==0?"":Arrays.stream(args).map(TypeDefinition::toString).collect(Collectors.joining(", ", "<", ">")));
 	}
 	public String toShortString(){
-		return raw.getSimpleName()+(args.length==0?"":Arrays.stream(args).map(TypeDefinition::toShortString).collect(Collectors.joining(", ", "<", ">")));
+		return getTypeClass().getSimpleName()+(args.length==0?"":Arrays.stream(args).map(TypeDefinition::toShortString).collect(Collectors.joining(", ", "<", ">")));
+	}
+	public Type generic(){
+		if(generic==null) generic=new SyntheticParameterizedType(null, getTypeClass(), Arrays.stream(args).map(TypeDefinition::getTypeClass).toArray(Type[]::new));
+		return generic;
 	}
 }

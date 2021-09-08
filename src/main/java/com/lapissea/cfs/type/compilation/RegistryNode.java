@@ -12,12 +12,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 public interface RegistryNode{
-	interface InstanceOf extends RegistryNode{
-		Class<?> getType();
+	interface InstanceOf<ValTyp> extends RegistryNode{
+		Class<ValTyp> getType();
 		@Override
 		default boolean canCreate(Type type){
 			return UtilL.instanceOf(Utils.typeToRaw(type), getType());
 		}
+		@Override
+		<T extends IOInstance<T>> IOField<T, ? extends ValTyp> create(IFieldAccessor<T> field);
 	}
 	
 	class Registry implements RegistryNode{

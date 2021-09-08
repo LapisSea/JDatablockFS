@@ -12,6 +12,7 @@ import com.lapissea.util.function.UnsafeSupplier;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 
@@ -296,7 +297,15 @@ public abstract class MemoryData<DataType> implements IOInterface{
 			return this;
 		}
 		
-		public Builder withRaw(Object data){
+		public Builder withRaw(byte[] data){
+			return withRaw0(data);
+		}
+		public Builder withRaw(ByteBuffer data){
+			return withRaw0(data);
+		}
+		
+		private Builder withRaw0(Object data){
+			Objects.requireNonNull(data);
 			this.dataProducer=()->data;
 			return this;
 		}
@@ -337,8 +346,12 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		public MemoryData<?> build() throws IOException{
 			var actualData=readData();
 			
-			if(actualData instanceof byte[] data) return new Arr(data, this);
-			if(actualData instanceof ByteBuffer data) return new Buff(data.slice(), this);
+			try{
+				if(actualData instanceof byte[] data) return new Arr(data, this);
+				if(actualData instanceof ByteBuffer data) return new Buff(data.slice(), this);
+			}finally{
+				dataProducer=null;
+			}
 			
 			throw new RuntimeException("unknown data tyoe "+actualData);
 		}

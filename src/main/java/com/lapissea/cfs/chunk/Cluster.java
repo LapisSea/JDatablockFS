@@ -7,18 +7,19 @@ import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
+import com.lapissea.cfs.objects.GenericContainer;
 import com.lapissea.cfs.objects.collections.ContiguousIOList;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.field.annotations.IODependency;
+import com.lapissea.cfs.type.StructLayout;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.List;
 
-import static com.lapissea.cfs.type.field.annotations.IODependency.VirtualNumSize.RetentionPolicy.*;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.*;
 import static java.nio.charset.StandardCharsets.*;
 
@@ -38,7 +39,7 @@ public class Cluster implements ChunkDataProvider{
 		try{
 			magicId=ByteBuffer.wrap(src.readInts1(MAGIC_ID.limit()));
 		}catch(IOException e){
-			throw new InvalidMagicIDException("There is no magic id");
+			throw new InvalidMagicIDException("There is no magic id, was data initialized?");
 		}
 		if(!magicId.equals(MAGIC_ID)){
 			throw new InvalidMagicIDException(UTF_8.decode(magicId)+" is not a valid magic id");
@@ -59,22 +60,10 @@ public class Cluster implements ChunkDataProvider{
 		
 		ROOT_PIPE.modify(firstChunk, root->{
 			Metadata metadata=root.metadata;
-			metadata.value1=300;
 			metadata.allocateNulls(provider);
-			metadata.list.add(new Dummy(4124));
 		});
 	}
 	
-	static class Dummy extends IOInstance<Dummy>{
-		
-		@IOValue
-		int dummyValue;
-		
-		public Dummy(){ }
-		public Dummy(int dummyValue){
-			this.dummyValue=dummyValue;
-		}
-	}
 	
 	public static class RootRef extends IOInstance<RootRef>{
 		
@@ -97,20 +86,18 @@ public class Cluster implements ChunkDataProvider{
 	private static class Metadata extends IOInstance<Metadata>{
 		
 		@IOValue
-		@IODependency.VirtualNumSize(name="ayyyy", retention=GROW_ONLY)
-		public int value1=255;
-		@IOValue
-		@IODependency.VirtualNumSize(name="ayyyy", retention=GROW_ONLY)
-		public int value2=69;
-		
-		@IOValue
 		@IONullability(NULLABLE)
 		@IOValue.OverrideType(value=ContiguousIOList.class)
-		public IOList<Dummy> list;
+		public IOList<GenericContainer<?>> rootReferences;
 		
 		@IOValue
 		@IONullability(NULLABLE)
 		public AutoText text;
+		
+		@IOValue
+		@IONullability(NULLABLE)
+		@IOValue.OverrideType(value=ContiguousIOList.class)
+		public List<StructLayout> types;
 	}
 	
 	private final ChunkCache chunkCache=ChunkCache.weak();
@@ -145,6 +132,10 @@ public class Cluster implements ChunkDataProvider{
 	
 	public RootRef getRoot(){
 		return root;
+	}
+	
+	public IOList<GenericContainer<?>> getRootReferences(){
+		return root.getMetadata().rootReferences;
 	}
 	
 	@Override
