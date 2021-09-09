@@ -165,20 +165,20 @@ public class FieldCompiler{
 	
 	protected IterablePP<Field> deepFieldsByAnnotation(Class<?> clazz, Class<? extends Annotation> type){
 		return IterablePP
-			       .nullTerminated(()->new Supplier<Class<?>>(){
-				       Class<?> c=clazz;
-				       @Override
-				       public Class<?> get(){
-					       if(c==null) return null;
-					       var tmp=c;
-					       var cp =c.getSuperclass();
-					       c=cp==c?null:cp;
+			.nullTerminated(()->new Supplier<Class<?>>(){
+				Class<?> c=clazz;
+				@Override
+				public Class<?> get(){
+					if(c==null) return null;
+					var tmp=c;
+					var cp =c.getSuperclass();
+					c=cp==c?null:cp;
 					
-					       return tmp;
-				       }
-			       })
-			       .flatMap(c->Arrays.asList(c.getDeclaredFields()).iterator())
-			       .filtered(f->f.isAnnotationPresent(type));
+					return tmp;
+				}
+			})
+			.flatMap(c->Arrays.asList(c.getDeclaredFields()).iterator())
+			.filtered(f->f.isAnnotationPresent(type));
 	}
 	
 	protected <T extends IOInstance<T>> List<IOField<T, ?>> scanFields(Struct<T> struct){
@@ -308,15 +308,9 @@ public class FieldCompiler{
 		Type type        =defaultType;
 		var  typeOverride=getAnnotation.get(IOValue.OverrideType.class);
 		if(typeOverride!=null){
-			Class<?> raw;
-			Type[]   parms;
-			if(type instanceof ParameterizedType parmType){
-				raw=(Class<?>)parmType.getRawType();
-				parms=parmType.getActualTypeArguments();
-			}else{
-				raw=(Class<?>)type;
-				parms=new Type[0];
-			}
+			var      rawType=SyntheticParameterizedType.generalize(type);
+			Class<?> raw    =rawType.getRawType();
+			Type[]   parms  =rawType.getActualTypeArguments();
 			
 			if(typeOverride.value()!=Object.class) raw=typeOverride.value();
 			if(typeOverride.genericArgs().length!=0) parms=typeOverride.genericArgs();
@@ -337,24 +331,24 @@ public class FieldCompiler{
 	
 	protected <T extends IOInstance<T>> List<LogicalAnnotation<Annotation>> scanAnnotations(IOField<T, ?> field){
 		return activeAnnotations()
-			       .stream()
-			       .flatMap(ann->Stream.concat(Stream.of(ann), Arrays.stream(ann.getClasses())))
-			       .map(t->field.getAccessor().getAnnotation((Class<? extends Annotation>)t).map(ann->{
-				       try{
-					       Field logic=t.getField("LOGIC");
+			.stream()
+			.flatMap(ann->Stream.concat(Stream.of(ann), Arrays.stream(ann.getClasses())))
+			.map(t->field.getAccessor().getAnnotation((Class<? extends Annotation>)t).map(ann->{
+				try{
+					Field logic=t.getField("LOGIC");
 					
-					       if(!(logic.getGenericType() instanceof ParameterizedType parmType&&
-					            AnnotationLogic.class.equals(parmType.getRawType())&&
-					            Arrays.equals(parmType.getActualTypeArguments(), new Type[]{t}))){
+					if(!(logic.getGenericType() instanceof ParameterizedType parmType&&
+					     AnnotationLogic.class.equals(parmType.getRawType())&&
+					     Arrays.equals(parmType.getActualTypeArguments(), new Type[]{t}))){
 						
-						       throw new ClassCastException(logic+" is not a type of "+AnnotationLogic.class.getName()+"<"+t.getName()+">");
-					       }
+						throw new ClassCastException(logic+" is not a type of "+AnnotationLogic.class.getName()+"<"+t.getName()+">");
+					}
 					
-					       return new LogicalAnnotation<>(ann, (AnnotationLogic<Annotation>)logic.get(null));
-				       }catch(NoSuchFieldException|IllegalAccessException e){
-					       throw new RuntimeException("Class "+t.getName()+" does not contain an AnnotationLogic LOGIC field", e);
-				       }
-			       })).filter(Optional::isPresent).map(Optional::get).toList();
+					return new LogicalAnnotation<>(ann, (AnnotationLogic<Annotation>)logic.get(null));
+				}catch(NoSuchFieldException|IllegalAccessException e){
+					throw new RuntimeException("Class "+t.getName()+" does not contain an AnnotationLogic LOGIC field", e);
+				}
+			})).filter(Optional::isPresent).map(Optional::get).toList();
 	}
 	
 	

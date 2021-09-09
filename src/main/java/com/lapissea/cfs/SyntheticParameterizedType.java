@@ -2,11 +2,23 @@ package com.lapissea.cfs;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.lang.reflect.TypeVariable;
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
+import static com.lapissea.cfs.Utils.*;
+
 public final class SyntheticParameterizedType implements ParameterizedType{
+	
+	public static SyntheticParameterizedType generalize(Type type){
+		return switch(type){
+			case ParameterizedType t -> new SyntheticParameterizedType((Class<?>)t.getRawType(), t.getActualTypeArguments());
+			case TypeVariable t -> new SyntheticParameterizedType((Class<?>)extractFromVarType(t));
+			default -> new SyntheticParameterizedType((Class<?>)type);
+		};
+	}
+	
 	private final Type[]   actualTypeArguments;
 	private final Type     ownerType;
 	private final Class<?> rawType;
@@ -24,6 +36,13 @@ public final class SyntheticParameterizedType implements ParameterizedType{
 	@Override
 	public Type[] getActualTypeArguments(){
 		return actualTypeArguments.clone();
+	}
+	
+	public Type getActualTypeArgument(int index){
+		return actualTypeArguments[index];
+	}
+	public int getActualTypeArgumentCount(){
+		return actualTypeArguments.length;
 	}
 	
 	@Override

@@ -1,5 +1,6 @@
 package com.lapissea.cfs.type.field.annotations;
 
+import com.lapissea.cfs.SyntheticParameterizedType;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.compilation.AnnotationLogic;
@@ -12,7 +13,7 @@ import com.lapissea.util.UtilL;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Array;
-import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Map;
@@ -49,6 +50,19 @@ public @interface IOValue{
 			if(!type.isArray()) return Set.of();
 			
 			return Set.of(IOFieldTools.makeArrayLenName(field));
+		}
+		@Override
+		public void validate(IFieldAccessor<?> field, IOValue annotation){
+			try{
+				var refF=field.getDeclaringStruct().getType().getDeclaredField(field.getName());
+				
+				if(Modifier.isStatic(refF.getModifiers())){
+					throw new MalformedStructLayout(field+" can not be static!");
+				}
+				if(Modifier.isFinal(refF.getModifiers())){
+					throw new MalformedStructLayout(field+" can not be final!");
+				}
+			}catch(NoSuchFieldException ignored){}
 		}
 	};
 	
@@ -99,30 +113,22 @@ public @interface IOValue{
 			public void validate(IFieldAccessor<?> field, OverrideType typeOverride){
 				Type type=field.getGenericType();
 				
-				Class<?> raw;
-				Type[]   parms;
-				if(type instanceof ParameterizedType parmType){
-					raw=(Class<?>)parmType.getRawType();
-					parms=parmType.getActualTypeArguments();
-				}else{
-					raw=(Class<?>)type;
-					parms=new Type[0];
-				}
+				var rawType=SyntheticParameterizedType.generalize(type);
 				
 				if(typeOverride.value()!=Object.class){
-					if(!UtilL.instanceOf(typeOverride.value(), raw)){
-						throw new MalformedStructLayout(typeOverride.value().getName()+" is not a valid override of "+raw.getName()+" on field "+field.getName());
+					if(!UtilL.instanceOf(typeOverride.value(), rawType.getRawType())){
+						throw new MalformedStructLayout(typeOverride.value().getName()+" is not a valid override of "+rawType.getRawType().getName()+" on field "+field.getName());
 					}
 				}
 				
 				var overridingArgs=typeOverride.genericArgs();
 				if(overridingArgs.length!=0){
-					if(parms.length!=overridingArgs.length) throw new MalformedStructLayout(
+					if(rawType.getActualTypeArgumentCount()!=overridingArgs.length) throw new MalformedStructLayout(
 						field.getName()+" "+IOValue.OverrideType.class.getSimpleName()+
-						" generic arguments do not match the count of "+parms.length);
+						" generic arguments do not match the count of "+rawType.getActualTypeArgumentCount());
 					
-					for(int i=0;i<parms.length;i++){
-						var parmType      =(Class<?>)parms[i];
+					for(int i=0;i<rawType.getActualTypeArgumentCount();i++){
+						var parmType      =(Class<?>)rawType.getActualTypeArgument(i);
 						var overridingType=(Class<?>)overridingArgs[i];
 						if(!UtilL.instanceOf(overridingType, parmType)){
 							throw new MalformedStructLayout("Parm "+overridingType.getName()+" @"+i+" is not a valid override of "+parmType.getName()+" on field "+field.getName());
