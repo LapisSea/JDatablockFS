@@ -13,8 +13,8 @@
 		<lwjgl.version>3.2.4-SNAPSHOT</lwjgl.version>
 		<joml.version>1.9.15</joml.version>
 		<lwjgl.natives>natives-windows</lwjgl.natives>
-		<maven.compiler.source>16</maven.compiler.source>
-		<maven.compiler.target>16</maven.compiler.target>
+		<maven.compiler.source>17</maven.compiler.source>
+		<maven.compiler.target>17</maven.compiler.target>
 	</properties>
 	<groupId>com.github.lapissea</groupId>
 	<artifactId>jdatablockfs.tools</artifactId>

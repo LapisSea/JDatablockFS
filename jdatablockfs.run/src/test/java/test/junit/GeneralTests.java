@@ -7,13 +7,15 @@ import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.GenericContainer;
 import com.lapissea.cfs.objects.collections.ContiguousIOList;
 import com.lapissea.cfs.objects.collections.HashIOMap;
-import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.collections.IOMap;
+import com.lapissea.cfs.objects.collections.LinkedIOList;
 import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.TypeDefinition;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.LogUtil;
+import com.lapissea.util.function.UnsafeConsumer;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -94,11 +96,15 @@ public class GeneralTests{
 	
 	static class Dummy extends IOInstance<Dummy>{
 		
+		private static int COUNT=0;
+		
+		static Dummy first(){return new Dummy(COUNT=0);}
+		static Dummy auto() {return new Dummy(COUNT++);}
+		
 		@IOValue
 		int dummyValue;
 		
-		public Dummy(){
-		}
+		public Dummy(){}
 		public Dummy(int dummyValue){
 			this.dummyValue=dummyValue;
 		}
@@ -106,23 +112,15 @@ public class GeneralTests{
 	
 	@Test
 	void testContiguousIOList() throws IOException{
-		var provider=ChunkDataProvider.newVerySimpleProvider();
-//		var provider=ChunkDataProvider.newVerySimpleProvider((data, ids)->LogUtil.println(data));
-		
-		
-		var chunk=AllocateTicket.bytes(64).submit(provider);
-		
-		var ref=chunk.getPtr().makeReference(0);
-		var typ=TypeDefinition.of(ContiguousIOList.class, Dummy.class);
-		
-		IOList<Dummy> list=new ContiguousIOList<>(provider, ref, typ);
-		
-		list.add(new Dummy(69));
-		list.add(new Dummy(420));
-		
-		IOList<Dummy> read=new ContiguousIOList<>(provider, ref, typ);
-		
-		assertEquals(list, read);
+		complexObjectEqualityTest(
+			64,
+			ContiguousIOList<Dummy>::new,
+			TypeDefinition.of(ContiguousIOList.class, Dummy.class),
+			list->{
+				list.add(new Dummy(69));
+				list.add(new Dummy(420));
+			}
+		);
 	}
 	@Test
 	void testHashIOMap() throws IOException{
@@ -157,7 +155,7 @@ public class GeneralTests{
 		var provider=ChunkDataProvider.newVerySimpleProvider();
 		var chunk   =AllocateTicket.bytes(64).submit(provider);
 		
-		var container=new GenericContainer(new Dummy(123));
+		var container=new GenericContainer<>(new Dummy(123));
 		
 		pipe.write(chunk, container);
 		var read=pipe.readNew(chunk);
@@ -195,4 +193,51 @@ public class GeneralTests{
 		assertEquals(text, read);
 	}
 	
+	
+	static <T extends IOInstance.Unmanaged<?>> void complexObjectEqualityTest(
+		int initalCapacity,
+		Struct.Unmanaged.Constr<T> constr,
+		TypeDefinition typeDef,
+		UnsafeConsumer<T, IOException> session
+	) throws IOException{
+		var provider=ChunkDataProvider.newVerySimpleProvider();
+//		var provider=ChunkDataProvider.newVerySimpleProvider((data, ids)->LogUtil.println(data));
+		
+		var chunk=AllocateTicket.bytes(initalCapacity).submit(provider);
+		var ref  =chunk.getPtr().makeReference(0);
+		
+		T obj=constr.create(provider, ref, typeDef);
+		
+		session.accept(obj);
+		
+		T read=constr.create(provider, ref, typeDef);
+		
+		assertEquals(obj, read);
+	}
+	
+	@Test
+	static <T extends IOInstance<T>> void linkedListEqualityTest(Class<T> typ, UnsafeConsumer<LinkedIOList<T>, IOException> session) throws IOException{
+		complexObjectEqualityTest(
+			32,
+			LinkedIOList<T>::new,
+			TypeDefinition.of(LinkedIOList.class, typ),
+			session
+		);
+	}
+	
+	@Test
+	void linkedListSingleAdd() throws IOException{
+		linkedListEqualityTest(Dummy.class, list->{
+			list.add(Dummy.first());
+		});
+	}
+	
+	@Test
+	void linkedListMultiAdd() throws IOException{
+		linkedListEqualityTest(Dummy.class, list->{
+			list.add(Dummy.first());
+			list.add(Dummy.auto());
+			list.add(Dummy.auto());
+		});
+	}
 }

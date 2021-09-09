@@ -1,4 +1,4 @@
-package test;
+package com.lapisseqa.cfs.run;
 
 import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.Cluster;

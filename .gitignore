@@ -6,6 +6,7 @@
 !/README.md
 !/CODE_OF_CONDUCT.md
 !/jdatablockfs.tools/
+!/jdatablockfs.run/
 !pom.xml
 !.editorconfig
 /*/target/
