@@ -12,6 +12,7 @@ import com.lapissea.cfs.type.field.VirtualFieldDefinition;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.util.*;
 
+import java.io.IOException;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.Collections;
@@ -29,7 +30,7 @@ public class Struct<T extends IOInstance<T>>{
 	public static class Unmanaged<T extends IOInstance.Unmanaged<T>> extends Struct<T>{
 		
 		public interface Constr<T>{
-			T create(ChunkDataProvider provider, Reference reference, TypeDefinition type);
+			T create(ChunkDataProvider provider, Reference reference, TypeDefinition type) throws IOException;
 		}
 		
 		public static Unmanaged<?> thisClass(){

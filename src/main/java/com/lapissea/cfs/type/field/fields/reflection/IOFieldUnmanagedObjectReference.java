@@ -90,7 +90,7 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 		}
 		return val.getReference();
 	}
-	private ValueType makeValueObject(ChunkDataProvider provider, Reference readNew){
+	private ValueType makeValueObject(ChunkDataProvider provider, Reference readNew) throws IOException{
 		if(readNew.isNull()){
 			if(nullable()) return null;
 			throw new NullPointerException();
