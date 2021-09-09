@@ -1,4 +1,4 @@
-package test.junit;
+package com.lapisseqa.cfs.run.test;
 
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.ChunkDataProvider;

@@ -9,4 +9,6 @@
 !/jdatablockfs.run/
 !pom.xml
 !.editorconfig
+!/.idea/
+!*.iml
 /*/target/

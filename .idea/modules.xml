@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/JDatablockFS.iml" filepath="$PROJECT_DIR$/JDatablockFS.iml" />
+      <module fileurl="file://$PROJECT_DIR$/jdatablockfs.run/jdatablockfs.run.iml" filepath="$PROJECT_DIR$/jdatablockfs.run/jdatablockfs.run.iml" />
+      <module fileurl="file://$PROJECT_DIR$/jdatablockfs.tools/jdatablockfs.tools.iml" filepath="$PROJECT_DIR$/jdatablockfs.tools/jdatablockfs.tools.iml" />
+    </modules>
+  </component>
+</project>
