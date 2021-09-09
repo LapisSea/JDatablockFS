@@ -1,21 +1,13 @@
 package com.lapissea.cfs.io;
 
-import java.awt.*;
 import java.io.IOException;
 import java.util.BitSet;
 
 public class HexDump{
 	
-	private static final BitSet DISPLAYABLE=new BitSet(256);
+	private static final BitSet DISPLAYABLE=BitSet.valueOf(new long[]{-4294953471L, -1L, -4294967296L, -1L});
 	
 	public static int DEFAULT_MAX_WIDTH=32;
-	
-	static{
-		Font font=new Font("SERIF", Font.PLAIN, 1);
-		for(int i=0;i<DISPLAYABLE.size();i++){
-			DISPLAYABLE.set(i, font.canDisplay(i));
-		}
-	}
 	
 	public static StringBuilder hexDump(RandomIO data, String title, int maxWidth) throws IOException{
 		
