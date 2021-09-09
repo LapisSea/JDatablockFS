@@ -15,8 +15,8 @@ import java.util.stream.Stream;
 public class LinkedIOList<T extends IOInstance<T>> extends IOInstance.Unmanaged<ContiguousIOList<T>> implements IOList<T>{
 	
 	private static final TypeDefinition.Check TYPE_CHECK=new TypeDefinition.Check(
-		ContiguousIOList.class,
-		List.of(c->UtilL.instanceOf(c, IOInstance.class)&&!UtilL.instanceOf(c, IOInstance.Unmanaged.class))
+		LinkedIOList.class,
+		List.of(not(IOInstance::isManaged))
 	);
 	
 	public LinkedIOList(ChunkDataProvider provider, Reference reference, TypeDefinition typeDef){

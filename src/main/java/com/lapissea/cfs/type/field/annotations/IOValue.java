@@ -20,6 +20,7 @@ import java.util.Set;
 
 import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.*;
 
+@SuppressWarnings("unused")
 @Retention(RetentionPolicy.RUNTIME)
 public @interface IOValue{
 	

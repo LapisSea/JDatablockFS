@@ -42,7 +42,10 @@ public class TypeDefinition{
 			return findProblem(type)==null;
 		}
 		public void ensureValid(TypeDefinition type){
-			if(!isValid(type)) throw new IllegalArgumentException(type.toShortString()+" is not valid");
+			var problem=findProblem(type);
+			if(problem!=null){
+				throw new IllegalArgumentException(type.toShortString()+" is not valid! Reason: "+problem);
+			}
 		}
 	}
 	
@@ -72,7 +75,7 @@ public class TypeDefinition{
 	
 	private Type generic;
 	
-	public TypeDefinition(){ }
+	public TypeDefinition(){}
 	
 	
 	public TypeDefinition(String typeName, TypeDefinition... args){

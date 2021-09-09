@@ -9,6 +9,10 @@ import java.lang.reflect.Type;
 import java.util.Collection;
 import java.util.List;
 
+/**
+ * This class holds the necessary information to request the struct compiler
+ * to create an additional field that is not explicitly defined by an {@link IOInstance} type.
+ */
 public final class VirtualFieldDefinition<IO extends IOInstance<IO>, T>{
 	
 	public interface GetterFilter<IO extends IOInstance<IO>, T>{

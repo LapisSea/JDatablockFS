@@ -7,6 +7,7 @@ import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
+import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.util.Objects;
@@ -15,6 +16,7 @@ import java.util.stream.Stream;
 import static com.lapissea.cfs.GlobalConfig.*;
 import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.*;
 
+@SuppressWarnings("UnusedReturnValue")
 public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 	
 	public abstract static class Unmanaged<SELF extends Unmanaged<SELF>> extends IOInstance<SELF> implements ChunkDataProvider.Holder{
@@ -137,11 +139,13 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 		}
 		return result;
 	}
+	
 	public boolean allocateNulls(ChunkDataProvider provider) throws IOException{
 		boolean dirty=false;
 		for(IOField<SELF, ?> f : getThisStruct().getFields()){
 			if(!(f instanceof IOField.Ref)) continue;
 			
+			//noinspection unchecked
 			IOField.Ref<SELF, ?> selfRef=(IOField.Ref<SELF, ?>)f;
 			if(selfRef.get(self())!=null) continue;
 			
@@ -149,5 +153,15 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 			dirty=true;
 		}
 		return dirty;
+	}
+	
+	public static boolean isManaged(TypeDefinition type){
+		return isManaged(type.getTypeClass());
+	}
+	
+	public static boolean isManaged(Class<?> type){
+		var isInstance =UtilL.instanceOf(type, IOInstance.class);
+		var isUnmanaged=UtilL.instanceOf(type, IOInstance.Unmanaged.class);
+		return isInstance&&!isUnmanaged;
 	}
 }

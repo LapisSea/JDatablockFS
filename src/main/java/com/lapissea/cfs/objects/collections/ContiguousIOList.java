@@ -16,7 +16,6 @@ import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.TextUtil;
-import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
@@ -26,12 +25,13 @@ import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
+import static java.util.function.Predicate.*;
+
 public class ContiguousIOList<T extends IOInstance<T>> extends IOInstance.Unmanaged<ContiguousIOList<T>> implements IOList<T>{
-	
 	
 	private static final TypeDefinition.Check TYPE_CHECK=new TypeDefinition.Check(
 		ContiguousIOList.class,
-		List.of(c->UtilL.instanceOf(c, IOInstance.class)&&!UtilL.instanceOf(c, IOInstance.Unmanaged.class))
+		List.of(not(IOInstance::isManaged))
 	);
 	
 	@IOValue
@@ -52,6 +52,8 @@ public class ContiguousIOList<T extends IOInstance<T>> extends IOInstance.Unmana
 		try(var io=reference.io(provider)){
 			if(io.getSize()==0) writeManagedFields();
 		}
+		
+		//read data needed for proper function such as number of elements
 		readManagedFields();
 	}
 	
