@@ -23,14 +23,14 @@ public class DisplayHost{
 		LogUtil.Init.attach(USE_CALL_POS|USE_TABULATED_HEADER);
 		
 		var config=LoggedMemoryUtils.readConfig();
-		int port  =(int)config.getOrDefault("port", 666);
+		int port  =((Number)config.getOrDefault("port", 666)).intValue();
 		
 		ServerSocket server=new ServerSocket(port);
 		
 		DataLogger display=Arrays.asList(args).contains("lazy")?null:getLocalLoggerImpl();
 		
 		
-		LogUtil.println("started");
+		LogUtil.println("Started on port", port);
 		int sesCounter=1;
 		while(true){
 			ServerSocket sessionServer;

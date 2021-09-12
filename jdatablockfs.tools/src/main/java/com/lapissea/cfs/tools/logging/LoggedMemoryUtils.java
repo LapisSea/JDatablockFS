@@ -65,7 +65,7 @@ public class LoggedMemoryUtils{
 			case "lwjgl" -> new DisplayLWJGL();
 			case "swing" -> new Display2D();
 			case "server" -> new DisplayServer(loggerConfig);
-			default -> throw new IllegalArgumentException("logger.type unknown value "+type);
+			default -> throw new IllegalArgumentException("logger.type unknown value \""+type+"\"");
 		});
 	}
 	
