@@ -1,17 +1,14 @@
-package com.lapissea.cfs.tools;
+package com.lapissea.cfs.tools.server;
 
 import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.tools.logging.DataLogger;
-import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.cfs.tools.logging.MemFrame;
 import com.lapissea.util.LogUtil;
-import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeRunnable;
 
 import java.io.*;
 import java.net.*;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -19,105 +16,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Function;
 
-import static com.lapissea.util.LogUtil.Init.*;
+import static com.lapissea.cfs.tools.server.ServerCommons.*;
 
 public class DisplayServer implements DataLogger{
-	
-	enum Action{
-		LOG,
-		RESET,
-		FINISH,
-		PING
-	}
-	
-	private static synchronized DataLogger getLocalLoggerImpl(){
-		try{
-			return new DisplayLWJGL();
-		}catch(Throwable e){
-			return new Display2D();
-		}
-	}
-	
-	public static void main(String[] args) throws IOException{
-		LogUtil.Init.attach(USE_CALL_POS|USE_TABULATED_HEADER);
-		
-		var config=LoggedMemoryUtils.readConfig();
-		int port  =(int)config.getOrDefault("port", 666);
-		
-		ServerSocket server=new ServerSocket(port);
-		
-		DataLogger display=Arrays.asList(args).contains("lazy")?null:getLocalLoggerImpl();
-		
-		
-		LogUtil.println("started");
-		int sesCounter=1;
-		while(true){
-			ServerSocket sessionServer;
-			String       sessionName;
-			try(Socket client=server.accept()){
-				sessionServer=new ServerSocket(0);
-				var out=new DataOutputStream(client.getOutputStream());
-				out.writeInt(sessionServer.getLocalPort());
-				out.flush();
-				var in=new DataInputStream(client.getInputStream());
-				sessionName=in.readUTF();
-			}catch(Exception e){
-				e.printStackTrace();
-				continue;
-			}
-			
-			if(display==null) display=getLocalLoggerImpl();
-			
-			DataLogger.Session session=display.getSession(sessionName);
-			new Thread(()->{
-				try(Socket client=sessionServer.accept()){
-					session(session, client);
-				}catch(Exception e){
-					e.printStackTrace();
-				}finally{
-					UtilL.closeSilenty(sessionServer);
-				}
-				System.gc();
-			}, "Session: "+sesCounter+"/"+sessionName).start();
-		}
-		
-	}
-	private static void session(DataLogger.Session display, Socket client) throws IOException{
-		LogUtil.println("connected", client);
-		var objInput=new ObjectInputStream(client.getInputStream());
-		var out     =client.getOutputStream();
-		
-		run:
-		while(true){
-			try{
-				switch(Action.values()[objInput.readByte()]){
-				case LOG -> display.log((MemFrame)objInput.readObject());
-				case RESET -> {
-					display.reset();
-					System.gc();
-				}
-				case FINISH -> {
-					client.close();
-					break run;
-				}
-				case PING -> {
-					out.write(2);
-					out.flush();
-				}
-				}
-			}catch(SocketException e){
-				if("Connection reset".equals(e.getMessage())){
-					LogUtil.println("disconnected");
-					break;
-				}
-				e.printStackTrace();
-				break;
-			}catch(Exception e){
-				e.printStackTrace();
-				break;
-			}
-		}
-	}
 	
 	private static class ServerSession implements DataLogger.Session{
 		

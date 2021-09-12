@@ -4,7 +4,7 @@ import com.google.gson.GsonBuilder;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.tools.Display2D;
 import com.lapissea.cfs.tools.DisplayLWJGL;
-import com.lapissea.cfs.tools.DisplayServer;
+import com.lapissea.cfs.tools.server.DisplayServer;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.UtilL;
