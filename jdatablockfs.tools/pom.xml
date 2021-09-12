@@ -10,8 +10,8 @@
 
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<maven.compiler.release>17</maven.compiler.release>
-		<lwjgl.version>3.2.4-SNAPSHOT</lwjgl.version>
-		<joml.version>1.9.15</joml.version>
+		<lwjgl.version>3.3.0-SNAPSHOT</lwjgl.version>
+		<joml.version>1.10.2</joml.version>
 		<lwjgl.natives>natives-windows</lwjgl.natives>
 		<maven.compiler.source>17</maven.compiler.source>
 		<maven.compiler.target>17</maven.compiler.target>

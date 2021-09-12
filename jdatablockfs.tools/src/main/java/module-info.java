@@ -9,6 +9,7 @@ module JDatablockFS.tools {
 	requires org.lwjgl.opengl;
 	requires org.lwjgl.stb;
 	requires gson;
+	requires java.sql;
 	
 	exports com.lapissea.cfs.tools;
 	exports com.lapissea.cfs.tools.logging;

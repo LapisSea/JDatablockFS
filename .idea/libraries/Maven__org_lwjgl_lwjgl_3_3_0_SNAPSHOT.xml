@@ -1,0 +1,13 @@
+<component name="libraryTable">
+  <library name="Maven: org.lwjgl:lwjgl:3.3.0-SNAPSHOT">
+    <CLASSES>
+      <root url="jar://$MAVEN_REPOSITORY$/org/lwjgl/lwjgl/3.3.0-SNAPSHOT/lwjgl-3.3.0-20210907.210233-8.jar!/" />
+    </CLASSES>
+    <JAVADOC>
+      <root url="jar://$MAVEN_REPOSITORY$/org/lwjgl/lwjgl/3.3.0-SNAPSHOT/lwjgl-3.3.0-20210907.210233-8-javadoc.jar!/" />
+    </JAVADOC>
+    <SOURCES>
+      <root url="jar://$MAVEN_REPOSITORY$/org/lwjgl/lwjgl/3.3.0-SNAPSHOT/lwjgl-3.3.0-20210907.210233-8-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

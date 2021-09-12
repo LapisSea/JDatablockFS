@@ -14,22 +14,22 @@
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="module" module-name="JDatablockFS" />
     <orderEntry type="library" name="Maven: com.github.lapissea:jlapisutil:1.0.11" level="project" />
-    <orderEntry type="library" name="Maven: io.leangen.geantyref:geantyref:1.3.4" level="project" />
+    <orderEntry type="library" name="Maven: io.leangen.geantyref:geantyref:1.3.11" level="project" />
     <orderEntry type="library" name="Maven: com.github.lapissea:glfw-window:1.0.0" level="project" />
-    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-assimp:3.2.4-SNAPSHOT" level="project" />
-    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-vulkan:3.2.4-SNAPSHOT" level="project" />
-    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-assimp:natives-windows:3.2.4-SNAPSHOT" level="project" />
+    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-assimp:3.3.0-SNAPSHOT" level="project" />
+    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-vulkan:3.3.0-SNAPSHOT" level="project" />
+    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-assimp:natives-windows:3.3.0-SNAPSHOT" level="project" />
     <orderEntry type="library" name="Maven: com.google.code.gson:gson:2.8.2" level="project" />
     <orderEntry type="library" name="Maven: com.github.lapissea:jlapisvector:1.0.7" level="project" />
     <orderEntry type="library" name="Maven: net.sf.trove4j:trove4j:3.0.3" level="project" />
-    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl:3.2.4-SNAPSHOT" level="project" />
-    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-glfw:3.2.4-SNAPSHOT" level="project" />
-    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-opengl:3.2.4-SNAPSHOT" level="project" />
-    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-stb:3.2.4-SNAPSHOT" level="project" />
-    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl:natives-windows:3.2.4-SNAPSHOT" level="project" />
-    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-glfw:natives-windows:3.2.4-SNAPSHOT" level="project" />
-    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-opengl:natives-windows:3.2.4-SNAPSHOT" level="project" />
-    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-stb:natives-windows:3.2.4-SNAPSHOT" level="project" />
-    <orderEntry type="library" name="Maven: org.joml:joml:1.9.15" level="project" />
+    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl:3.3.0-SNAPSHOT" level="project" />
+    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-glfw:3.3.0-SNAPSHOT" level="project" />
+    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-opengl:3.3.0-SNAPSHOT" level="project" />
+    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-stb:3.3.0-SNAPSHOT" level="project" />
+    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl:natives-windows:3.3.0-SNAPSHOT" level="project" />
+    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-glfw:natives-windows:3.3.0-SNAPSHOT" level="project" />
+    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-opengl:natives-windows:3.3.0-SNAPSHOT" level="project" />
+    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-stb:natives-windows:3.3.0-SNAPSHOT" level="project" />
+    <orderEntry type="library" name="Maven: org.joml:joml:1.10.2" level="project" />
   </component>
 </module>
