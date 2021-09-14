@@ -16,6 +16,7 @@ import com.lapissea.util.function.UnsafeFunction;
 import java.io.Flushable;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
 import java.util.Objects;
 
 @SuppressWarnings("unused")
@@ -105,15 +106,26 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 		
 		RandomIO io() throws IOException;
 		
-		default void write(boolean trimOnClose, byte[] data) throws IOException             { write(0, trimOnClose, data); }
+		default void write(boolean trimOnClose, ByteBuffer data) throws IOException         {write(0, trimOnClose, data);}
 		
-		default void write(long offset, boolean trimOnClose, byte[] data) throws IOException{ write(offset, trimOnClose, data.length, data); }
+		default void write(boolean trimOnClose, byte[] data) throws IOException             {write(0, trimOnClose, data);}
+		
+		default void write(long offset, boolean trimOnClose, byte[] data) throws IOException{write(offset, trimOnClose, data.length, data);}
 		
 		default void write(long offset, boolean trimOnClose, int length, byte[] data) throws IOException{
 			Objects.requireNonNull(data);
 			
 			try(var io=ioAt(offset)){
 				io.write(data, 0, length);
+				if(trimOnClose) io.trim();
+			}
+		}
+		
+		default void write(long offset, boolean trimOnClose, ByteBuffer data) throws IOException{
+			Objects.requireNonNull(data);
+			
+			try(var io=ioAt(offset)){
+				io.write(data);
 				if(trimOnClose) io.trim();
 			}
 		}
