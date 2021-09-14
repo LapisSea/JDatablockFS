@@ -10,6 +10,7 @@ module JDatablockFS {
 	exports com.lapissea.cfs;
 	exports com.lapissea.cfs.chunk;
 	exports com.lapissea.cfs.io;
+	exports com.lapissea.cfs.io.content;
 	exports com.lapissea.cfs.io.bit;
 	exports com.lapissea.cfs.io.impl;
 	exports com.lapissea.cfs.io.instancepipe;

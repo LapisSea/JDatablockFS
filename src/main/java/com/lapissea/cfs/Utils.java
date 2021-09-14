@@ -17,11 +17,13 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.function.IntFunction;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static com.lapissea.util.UtilL.*;
 
+@SuppressWarnings({"unchecked", "unused"})
 public class Utils{
 	
 	public interface ConsumerBaII{
@@ -92,7 +94,7 @@ public class Utils{
 	
 	public static <FInter, T extends FInter> T makeLambda(Method method, Class<FInter> functionalInterface){
 		try{
-			var lookup=MethodHandles.privateLookupIn(method.getDeclaringClass(), MethodHandles.lookup());
+			var lookup=getLookup(method.getDeclaringClass(), method.getModifiers());
 			method.setAccessible(true);
 			var handle=lookup.unreflect(method);
 			
@@ -129,7 +131,7 @@ public class Utils{
 	
 	public static <FInter, T extends FInter> T makeLambda(Constructor<?> constructor, Class<FInter> functionalInterface){
 		try{
-			var lookup=MethodHandles.privateLookupIn(constructor.getDeclaringClass(), MethodHandles.lookup());
+			var lookup=getLookup(constructor.getDeclaringClass(), constructor.getModifiers());
 			constructor.setAccessible(true);
 			var handle=lookup.unreflectConstructor(constructor);
 			
@@ -137,12 +139,20 @@ public class Utils{
 			
 			MethodType signature=MethodType.methodType(functionalInterfaceFunction.getReturnType(), functionalInterfaceFunction.getParameterTypes());
 			
-			CallSite site=LambdaMetafactory.metafactory(lookup,
-			                                            functionalInterfaceFunction.getName(),
-			                                            MethodType.methodType(functionalInterface),
-			                                            signature,
-			                                            handle,
-			                                            handle.type());
+			CallSite site;
+			try{
+				site=LambdaMetafactory.metafactory(lookup,
+				                                   functionalInterfaceFunction.getName(),
+				                                   MethodType.methodType(functionalInterface),
+				                                   signature,
+				                                   handle,
+				                                   handle.type());
+			}catch(LambdaConversionException e){
+				T val=tryRecoverWithOld(constructor, functionalInterface);
+				if(val!=null) return val;
+				//TODO: figure out how to hack this? Really bad workaround the lambda factory.
+				throw new NotImplementedException("java modules cause this not to be supported", e);
+			}
 			
 			return Objects.requireNonNull((T)site.getTarget().invoke());
 		}catch(Throwable e){
@@ -150,9 +160,37 @@ public class Utils{
 		}
 	}
 	
+	private static <FInter, T extends FInter> T tryRecoverWithOld(Constructor<?> constructor, Class<FInter> functionalInterface){
+		if(functionalInterface==Supplier.class){
+			return (T)(Supplier<Object>)()->{
+				try{
+					return constructor.newInstance();
+				}catch(ReflectiveOperationException ex){
+					throw new RuntimeException(ex);
+				}
+			};
+		}
+		return null;
+	}
+	
+	private static MethodHandles.Lookup getLookup(Class<?> clazz, int modifiers) throws IllegalAccessException{
+		allowModule(clazz);
+		var local=MethodHandles.lookup();
+		if(Modifier.isPublic(modifiers)) return local;
+		return MethodHandles.privateLookupIn(clazz, local);
+	}
+	private static void allowModule(Class<?> clazz){
+		var classModule=clazz.getModule();
+		var thisModule =Utils.class.getModule();
+		if(!thisModule.canRead(classModule)){
+			thisModule.addReads(classModule);
+			thisModule.addOpens(Utils.class.getPackageName(), classModule);
+		}
+	}
+	
 	public static VarHandle makeVarHandle(Field field){
 		try{
-			var lookup=MethodHandles.privateLookupIn(field.getDeclaringClass(), MethodHandles.lookup());
+			var lookup=getLookup(field.getDeclaringClass(), field.getModifiers());
 			field.setAccessible(true);
 			return lookup.findVarHandle(field.getDeclaringClass(), field.getName(), field.getType());
 		}catch(Throwable e){
@@ -162,7 +200,7 @@ public class Utils{
 	
 	public static MethodHandle makeMethodHandle(@NotNull Method method){
 		try{
-			var lookup=MethodHandles.privateLookupIn(method.getDeclaringClass(), MethodHandles.lookup());
+			var lookup=getLookup(method.getDeclaringClass(), method.getModifiers());
 			method.setAccessible(true);
 			return lookup.unreflect(method);
 		}catch(Throwable e){
