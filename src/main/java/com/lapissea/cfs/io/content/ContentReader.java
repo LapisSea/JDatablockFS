@@ -359,8 +359,8 @@ public interface ContentReader extends AutoCloseable, ContentBuff{
 		}
 	}
 	
-	default BufferTicket readTicket(long amount){ return readTicket(Math.toIntExact(amount)); }
-	default BufferTicket readTicket(int amount) { return new BufferTicket(this, amount, null); }
+	default BufferTicket readTicket(long amount){return readTicket(Math.toIntExact(amount));}
+	default BufferTicket readTicket(int amount) {return new BufferTicket(this, amount, null);}
 	
 	static boolean isDirect(ContentReader in){
 		return

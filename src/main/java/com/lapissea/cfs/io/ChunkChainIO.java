@@ -133,7 +133,7 @@ public class ChunkChainIO implements RandomIO{
 	}
 	
 	@Override
-	public long getPos(){ return localPos; }
+	public long getPos(){return localPos;}
 	
 	@Override
 	public RandomIO setPos(long pos) throws IOException{
@@ -343,7 +343,7 @@ public class ChunkChainIO implements RandomIO{
 			long oldSize=chunk.getSize();
 			
 			long newSize=Math.min(remaining, oldSize);
-
+			
 			chunk.modifyAndSave(c->c.setSize(newSize));
 			
 			remaining=Math.max(0, remaining-newSize);

@@ -35,23 +35,23 @@ public interface IFieldAccessor<CTyp extends IOInstance<CTyp>> extends Comparabl
 	Object get(CTyp instance);
 	void set(CTyp instance, Object value);
 	
-	default double getDouble(CTyp instance)              { return (double)get(instance); }
-	default void setDouble(CTyp instance, double value)  { set(instance, value); }
+	default double getDouble(CTyp instance)              {return (double)get(instance);}
+	default void setDouble(CTyp instance, double value)  {set(instance, value);}
 	
-	default float getFloat(CTyp instance)                { return (float)get(instance); }
-	default void setFloat(CTyp instance, float value)    { set(instance, value); }
+	default float getFloat(CTyp instance)                {return (float)get(instance);}
+	default void setFloat(CTyp instance, float value)    {set(instance, value);}
 	
-	default byte getByte(CTyp instance)                  { return (byte)get(instance); }
-	default void setByte(CTyp instance, byte value)      { set(instance, value); }
+	default byte getByte(CTyp instance)                  {return (byte)get(instance);}
+	default void setByte(CTyp instance, byte value)      {set(instance, value);}
 	
-	default boolean getBoolean(CTyp instance)            { return (boolean)get(instance); }
-	default void setBoolean(CTyp instance, boolean value){ set(instance, value); }
+	default boolean getBoolean(CTyp instance)            {return (boolean)get(instance);}
+	default void setBoolean(CTyp instance, boolean value){set(instance, value);}
 	
-	default long getLong(CTyp instance)                  { return (long)get(instance); }
-	default void setLong(CTyp instance, long value)      { set(instance, value); }
+	default long getLong(CTyp instance)                  {return (long)get(instance);}
+	default void setLong(CTyp instance, long value)      {set(instance, value);}
 	
-	default int getInt(CTyp instance)                    { return (int)get(instance); }
-	default void setInt(CTyp instance, int value)        { set(instance, value); }
+	default int getInt(CTyp instance)                    {return (int)get(instance);}
+	default void setInt(CTyp instance, int value)        {set(instance, value);}
 	
 	@Override
 	default int compareTo(IFieldAccessor<CTyp> o){

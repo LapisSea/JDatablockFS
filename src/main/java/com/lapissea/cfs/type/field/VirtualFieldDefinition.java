@@ -52,8 +52,8 @@ public final class VirtualFieldDefinition<IO extends IOInstance<IO>, T>{
 		this.annotations=GetAnnotation.from(annotations);
 	}
 	
-	public String getName()                  { return name; }
-	public Type getType()                    { return type; }
-	public GetterFilter<IO, T> getGetFilter(){ return getFilter; }
-	public GetAnnotation getAnnotations()    { return annotations; }
+	public String getName()                  {return name;}
+	public Type getType()                    {return type;}
+	public GetterFilter<IO, T> getGetFilter(){return getFilter;}
+	public GetAnnotation getAnnotations()    {return annotations;}
 }

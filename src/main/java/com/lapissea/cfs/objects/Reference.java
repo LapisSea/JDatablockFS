@@ -34,8 +34,8 @@ public final class Reference extends IOInstance<Reference>{
 		return ptr.dereference(provider).ioAt(offset);
 	}
 	
-	public ChunkPointer getPtr(){ return ptr; }
-	public long getOffset()     { return offset; }
+	public ChunkPointer getPtr(){return ptr;}
+	public long getOffset()     {return offset;}
 	
 	@Override
 	public boolean equals(Object obj){

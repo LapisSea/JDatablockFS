@@ -131,7 +131,7 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 		}
 		
 		@NotNull
-		default ContentOutputStream write(boolean trimOnClose) throws IOException{ return write(0, trimOnClose); }
+		default ContentOutputStream write(boolean trimOnClose) throws IOException{return write(0, trimOnClose);}
 		
 		@NotNull
 		default ContentOutputStream write(long offset, boolean trimOnClose) throws IOException{
@@ -140,7 +140,7 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 		
 		
 		@NotNull
-		default <T> T read(UnsafeFunction<ContentInputStream, T, IOException> reader) throws IOException{ return read(0, reader); }
+		default <T> T read(UnsafeFunction<ContentInputStream, T, IOException> reader) throws IOException{return read(0, reader);}
 		
 		@NotNull
 		default <T> T read(long offset, @NotNull UnsafeFunction<ContentInputStream, T, IOException> reader) throws IOException{
@@ -151,7 +151,7 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 			}
 		}
 		
-		default void read(UnsafeConsumer<ContentInputStream, IOException> reader) throws IOException{ read(0, reader); }
+		default void read(UnsafeConsumer<ContentInputStream, IOException> reader) throws IOException{read(0, reader);}
 		
 		default void read(long offset, @NotNull UnsafeConsumer<ContentInputStream, IOException> reader) throws IOException{
 			Objects.requireNonNull(reader);
@@ -162,7 +162,7 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 		}
 		
 		@NotNull
-		default ContentInputStream read() throws IOException{ return read(0); }
+		default ContentInputStream read() throws IOException{return read(0);}
 		
 		@NotNull
 		default ContentInputStream read(long offset) throws IOException{
@@ -176,7 +176,7 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 			return dest;
 		}
 		
-		default void read(long offset, byte[] dest) throws IOException{ read(offset, dest.length, dest); }
+		default void read(long offset, byte[] dest) throws IOException{read(offset, dest.length, dest);}
 		
 		default void read(long offset, int length, byte[] dest) throws IOException{
 			if(length==0) return;
@@ -305,8 +305,8 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 	}
 	
 	@Override
-	default ContentOutputStream outStream(){ return outStream(true); }
-	default ContentOutputStream outStream(boolean trimOnClose){ return new RandomOutputStream(this, trimOnClose); }
+	default ContentOutputStream outStream(){return outStream(true);}
+	default ContentOutputStream outStream(boolean trimOnClose){return new RandomOutputStream(this, trimOnClose);}
 	
 	default ChunkPointer posAsPtr() throws IOException{
 		return ChunkPointer.of(getPos());

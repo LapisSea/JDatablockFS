@@ -14,5 +14,5 @@ public class GenericContainer<T extends IOInstance<T>> extends IOInstance<Generi
 		this.value=value;
 	}
 	
-	public GenericContainer(){ }
+	public GenericContainer(){}
 }

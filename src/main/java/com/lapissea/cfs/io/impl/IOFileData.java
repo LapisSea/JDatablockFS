@@ -58,7 +58,7 @@ public class IOFileData implements IOInterface, AutoCloseable{
 		}
 		
 		@Override
-		public void flush(){ }
+		public void flush(){}
 		
 		private void snapPos() throws IOException{
 			var pos=getPos();
@@ -146,7 +146,7 @@ public class IOFileData implements IOInterface, AutoCloseable{
 	}
 	
 	@Override
-	public String toString(){ return path; }
+	public String toString(){return path;}
 	
 	private void pushOnWrite(long[] ids){
 		try{
@@ -158,22 +158,22 @@ public class IOFileData implements IOInterface, AutoCloseable{
 	
 	@Override
 	@NotNull
-	public RandomIO io(){ return new FIleRandomIO(); }
+	public RandomIO io(){return new FIleRandomIO();}
 	
 	@Override
-	public void setIOSize(long requestedSize){ throw new UnsupportedOperationException(); }
+	public void setIOSize(long requestedSize){throw new UnsupportedOperationException();}
 	
 	@Override
-	public long getIOSize() throws IOException{ return getSource().length(); }
+	public long getIOSize() throws IOException{return getSource().length();}
 	
-	public long getCapacity() throws IOException{ return getSource().length(); }
+	public long getCapacity() throws IOException{return getSource().length();}
 	
 	@Override
 	public boolean isReadOnly(){
 		return readOnly;
 	}
 	
-	public void setCapacity(long newCapacity) throws IOException{ getSource().setLength(newCapacity); }
+	public void setCapacity(long newCapacity) throws IOException{getSource().setLength(newCapacity);}
 	
 	@Override
 	public void close() throws Exception{

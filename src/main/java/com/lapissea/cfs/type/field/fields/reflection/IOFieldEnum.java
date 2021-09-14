@@ -17,8 +17,8 @@ import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.*;
 
 public class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> extends IOField.Bit<T, E>{
 	
-	private final EnumUniverse<E>    enumUniverse;
-	private final SizeDescriptor<T>  sizeDescriptor;
+	private final EnumUniverse<E>   enumUniverse;
+	private final SizeDescriptor<T> sizeDescriptor;
 	
 	public IOFieldEnum(IFieldAccessor<T> field){
 		super(field);

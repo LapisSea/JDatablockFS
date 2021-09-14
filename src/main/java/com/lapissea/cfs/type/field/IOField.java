@@ -180,11 +180,11 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	}
 	
 	
-	public String getName()                      { return getAccessor().getName(); }
-	public Struct<T> declaringStruct()           { return getAccessor().getDeclaringStruct(); }
-	public IFieldAccessor<T> getAccessor()       { return accessor; }
-	public FieldSet<T, ?> getDependencies()      { return Objects.requireNonNull(dependencies); }
-	public EnumSet<UsageHintType> getUsageHints(){ return Objects.requireNonNull(usageHints); }
+	public String getName()                      {return getAccessor().getName();}
+	public Struct<T> declaringStruct()           {return getAccessor().getDeclaringStruct();}
+	public IFieldAccessor<T> getAccessor()       {return accessor;}
+	public FieldSet<T, ?> getDependencies()      {return Objects.requireNonNull(dependencies);}
+	public EnumSet<UsageHintType> getUsageHints(){return Objects.requireNonNull(usageHints);}
 	
 	public String toShortString(){
 		return Objects.requireNonNull(getName());

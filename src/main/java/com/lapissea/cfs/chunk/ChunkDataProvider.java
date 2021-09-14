@@ -53,9 +53,9 @@ public interface ChunkDataProvider{
 	
 	static ChunkDataProvider newVerySimpleProvider(MemoryData.EventLogger onWrite) throws IOException{
 		var data=new MemoryData.Builder()
-			         .withOnWrite(onWrite)
-			         .withInitial(dest->dest.write(Cluster.getMagicId()))
-			         .build();
+			.withOnWrite(onWrite)
+			.withInitial(dest->dest.write(Cluster.getMagicId()))
+			.build();
 		return newVerySimpleProvider(data);
 	}
 	

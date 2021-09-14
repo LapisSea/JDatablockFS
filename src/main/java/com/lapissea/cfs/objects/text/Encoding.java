@@ -36,7 +36,7 @@ class Encoding{
 		
 		private static final ThreadLocal<UTF> UTFS=ThreadLocal.withInitial(UTF::new);
 		
-		private static UTF get(){ return UTFS.get(); }
+		private static UTF get(){return UTFS.get();}
 	}
 	
 	private record TableCoding(byte[] table, int offset, char[] chars, int bits){
@@ -60,8 +60,8 @@ class Encoding{
 			return new TableCoding(tableIndex, min, table, bits);
 		}
 		
-		int encode(char c)    { return table[c-offset]; }
-		char decode(int index){ return chars[index]; }
+		int encode(char c)    {return table[c-offset];}
+		char decode(int index){return chars[index];}
 		
 		int calcSize(String str){
 			return calcSize(str.length());
@@ -195,7 +195,7 @@ class Encoding{
 		private final UnsafeBiConsumer<ContentWriter, String, IOException>                write;
 		private final UnsafeBiFunction<ContentInputStream, AutoText, String, IOException> read;
 		
-		CharEncoding(float sizeWeight, TableCoding coder){ this(sizeWeight, coder::calcSize, coder::isCompatible, coder::write, coder::read); }
+		CharEncoding(float sizeWeight, TableCoding coder){this(sizeWeight, coder::calcSize, coder::isCompatible, coder::write, coder::read);}
 		CharEncoding(float sizeWeight, FunctionOI<String> calcSize,
 		             Predicate<String> canEncode,
 		             UnsafeBiConsumer<ContentWriter, String, IOException> write,

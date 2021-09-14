@@ -72,7 +72,7 @@ public class Cluster implements ChunkDataProvider{
 		@IONullability(DEFAULT_IF_NULL)
 		private Metadata metadata;
 		
-		public RootRef(){ }
+		public RootRef(){}
 		RootRef(Metadata metadata){
 			this.metadata=metadata;
 		}

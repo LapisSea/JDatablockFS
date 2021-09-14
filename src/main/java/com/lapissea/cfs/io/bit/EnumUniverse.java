@@ -31,7 +31,7 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
 			Field f=Unsafe.class.getDeclaredField("theUnsafe");
 			f.setAccessible(true);
 			us=(Unsafe)f.get(null);
-		}catch(Throwable ignored){ }
+		}catch(Throwable ignored){}
 		
 		if(us!=null){
 			try{
@@ -70,9 +70,9 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
 		}
 	}
 	
-	private static <T extends Enum<T>> T[] getUniverseUnsafe(Class<T> type){ return UNSAFE_GETTER==null?null:UNSAFE_GETTER.get(type); }
+	private static <T extends Enum<T>> T[] getUniverseUnsafe(Class<T> type){return UNSAFE_GETTER==null?null:UNSAFE_GETTER.get(type);}
 	
-	private static <T extends Enum<T>> T[] getUniverseSafe(Class<T> type)  { return type.getEnumConstants(); }
+	private static <T extends Enum<T>> T[] getUniverseSafe(Class<T> type)  {return type.getEnumConstants();}
 	
 	private static <T extends Enum<T>> T[] getUniverse(Class<T> type){
 		T[] universe=getUniverseUnsafe(type);
@@ -139,7 +139,7 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
 		return Math.max(1, (int)Math.ceil(Math.log(size)/Math.log(2)));
 	}
 	
-	public T read(BitReader source) throws IOException{ return read(source, false); }
+	public T read(BitReader source) throws IOException{return read(source, false);}
 	public T read(BitReader source, boolean nullable) throws IOException{
 		int ordinal=(int)source.readBits(getBitSize(nullable));
 		if(nullable){
@@ -149,7 +149,7 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
 		return get(ordinal);
 	}
 	
-	public void write(T source, BitWriter<?> dest) throws IOException{ write(source, dest, false); }
+	public void write(T source, BitWriter<?> dest) throws IOException{write(source, dest, false);}
 	public void write(T source, BitWriter<?> dest, boolean nullable) throws IOException{
 		int index;
 		if(nullable){

@@ -90,13 +90,13 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 		}
 		
 		@Override
-		public WordSpace getWordSpace(){ return wordSpace; }
+		public WordSpace getWordSpace(){return wordSpace;}
 		@Override
-		public OptionalLong getFixed(){ return OptionalLong.empty(); }
+		public OptionalLong getFixed(){return OptionalLong.empty();}
 		@Override
-		public OptionalLong getMax(){ return max; }
+		public OptionalLong getMax(){return max;}
 		@Override
-		public long getMin(){ return min; }
+		public long getMin(){return min;}
 		
 		@Override
 		public String toString(){
