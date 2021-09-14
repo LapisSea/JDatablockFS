@@ -14,68 +14,37 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
 import java.util.Arrays;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
 
 import static com.lapissea.cfs.tools.server.ServerCommons.*;
 import static com.lapissea.util.LogUtil.Init.*;
+import static com.lapissea.util.PoolOwnThread.*;
 
 public class DisplayHost{
 	public static void main(String[] args) throws IOException{
 		LogUtil.Init.attach(USE_CALL_POS|USE_TABULATED_HEADER);
 		
-		var config=LoggedMemoryUtils.readConfig();
-		int port  =((Number)config.getOrDefault("port", 666)).intValue();
-		
-		ServerSocket server=new ServerSocket(port);
-		
-		DataLogger display=Arrays.asList(args).contains("lazy")?null:getLocalLoggerImpl();
-		
-		
-		LogUtil.println("Started on port", port);
-		int sesCounter=1;
-		while(true){
-			ServerSocket sessionServer;
-			String       sessionName;
-			try(Socket client=server.accept()){
-				sessionServer=new ServerSocket(0);
-				var out=new DataOutputStream(client.getOutputStream());
-				out.writeInt(sessionServer.getLocalPort());
-				out.flush();
-				var in=new DataInputStream(client.getInputStream());
-				sessionName=in.readUTF();
-			}catch(Exception e){
-				e.printStackTrace();
-				continue;
-			}
-			
-			if(display==null) display=getLocalLoggerImpl();
-			
-			DataLogger.Session session=display.getSession(sessionName);
-			new Thread(()->{
-				try(Socket client=sessionServer.accept()){
-					session(session, client);
-				}catch(Exception e){
-					e.printStackTrace();
-				}finally{
-					UtilL.closeSilenty(sessionServer);
-				}
-				System.gc();
-			}, "Session: "+sesCounter+"/"+sessionName).start();
-		}
-		
+		new DisplayHost().start(Arrays.asList(args).contains("lazy"));
 	}
-	private static void session(DataLogger.Session display, Socket client) throws IOException{
+	
+	private void session(String name, Socket client) throws IOException{
 		LogUtil.println("connected", client);
 		var objInput=new ObjectInputStream(client.getInputStream());
 		var out     =client.getOutputStream();
+		
+		Supplier<DataLogger.Session> ses=()->getDisplay().join().getSession(name);
 		
 		run:
 		while(true){
 			try{
 				switch(Action.values()[objInput.readByte()]){
-				case LOG -> display.log((MemFrame)objInput.readObject());
+				case LOG -> ses.get().log((MemFrame)objInput.readObject());
 				case RESET -> {
-					display.reset();
-					System.gc();
+					if(display!=null){
+						ses.get().reset();
+						System.gc();
+					}
 				}
 				case FINISH -> {
 					client.close();
@@ -98,5 +67,59 @@ public class DisplayHost{
 				break;
 			}
 		}
+	}
+	
+	private CompletableFuture<DataLogger> display;
+	
+	private record NegotiatedSession(ServerSocket sessionServer, String sessionName) implements AutoCloseable{
+		static NegotiatedSession negotiate(ServerSocket source) throws IOException{
+			try(Socket client=source.accept()){
+				var sessionServer=new ServerSocket(0);
+				var out          =new DataOutputStream(client.getOutputStream());
+				out.writeInt(sessionServer.getLocalPort());
+				out.flush();
+				var in         =new DataInputStream(client.getInputStream());
+				var sessionName=in.readUTF();
+				return new NegotiatedSession(sessionServer, sessionName);
+			}
+		}
+		
+		Socket open() throws IOException{
+			return sessionServer.accept();
+		}
+		
+		@Override
+		public void close(){
+			UtilL.closeSilenty(sessionServer);
+		}
+	}
+	
+	public void start(boolean lazyStart) throws IOException{
+		var config=LoggedMemoryUtils.readConfig();
+		int port  =((Number)config.getOrDefault("port", 666)).intValue();
+		
+		ServerSocket server=new ServerSocket(port);
+		LogUtil.println("Started on port", port);
+		
+		if(!lazyStart) getDisplay();
+		
+		int sesCounter=1;
+		while(true){
+			var ses=NegotiatedSession.negotiate(server);
+			
+			new Thread(()->{
+				try(ses;var client=ses.open()){
+					session(ses.sessionName, client);
+				}catch(Exception e){
+					e.printStackTrace();
+				}
+				System.gc();
+			}, "Session: "+sesCounter+"/"+ses.sessionName).start();
+		}
+	}
+	
+	public synchronized CompletableFuture<DataLogger> getDisplay(){
+		if(display==null) display=async(ServerCommons::getLocalLoggerImpl);
+		return display;
 	}
 }

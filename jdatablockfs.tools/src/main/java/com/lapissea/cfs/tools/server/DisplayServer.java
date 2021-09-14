@@ -165,18 +165,35 @@ public class DisplayServer implements DataLogger{
 	public DisplayServer(Map<String, Object> config){
 		this.config=config;
 		
+		initSession();
+	}
+	
+	private void initSession(){
 		sessionCreator=name->{
 			try{
-				return new ServerSession(new ServerSession.Info(InetAddress.getLocalHost(), 100), name, this.config);
+				return new ServerSession(new ServerSession.Info(InetAddress.getLocalHost(), 100), name, config);
 			}catch(SocketTimeoutException e){
 				LogUtil.printlnEr("Could not contact or start the server!");
 			}catch(Throwable e){
 				e.printStackTrace();
 			}
 			
-			LogUtil.printlnEr("Switching to local server session.");
+			var type=config.getOrDefault("server-fallback", "local").toString();
 			
-			sessionCreator=getLocalLoggerImpl()::getSession;
+			sessionCreator=switch(type){
+				case "local" -> {
+					LogUtil.printlnEr("Switching to local server session.");
+					yield getLocalLoggerImpl()::getSession;
+				}
+				case "none" -> {
+					LogUtil.printlnEr("Switching to no output.");
+					yield s->Session.Blank.INSTANCE;
+				}
+				default -> {
+					LogUtil.printlnEr("Unknown type \""+type+"\", defaulting to no output.");
+					yield s->Session.Blank.INSTANCE;
+				}
+			};
 			
 			return sessionCreator.apply(name);
 		};

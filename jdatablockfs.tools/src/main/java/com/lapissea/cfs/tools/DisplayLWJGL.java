@@ -321,6 +321,8 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 					window.pollEvents();
 				});
 			}
+		}catch(Throwable e){
+			e.printStackTrace();
 		}finally{
 			window.hide();
 			
@@ -331,7 +333,9 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	private void ifFrame(Consumer<MemFrame> o){
 		displayedSession.map(s->s.frames).ifPresent(frames->{
 			if(frames.isEmpty()) return;
-			o.accept(frames.get(getFramePos()).data());
+			try{
+				o.accept(frames.get(getFramePos()).data());
+			}catch(IndexOutOfBoundsException ignored){}
 		});
 	}
 	
