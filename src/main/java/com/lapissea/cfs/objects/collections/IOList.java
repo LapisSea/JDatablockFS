@@ -42,4 +42,8 @@ public interface IOList<T> extends IterablePP<T>{
 			set(index, newObj);
 		}
 	}
+	
+	default boolean isEmpty(){
+		return size()==0;
+	}
 }

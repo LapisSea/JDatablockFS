@@ -1,24 +1,22 @@
 package com.lapissea.cfs.objects.collections;
 
+import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.ChunkDataProvider;
-import com.lapissea.cfs.io.content.ContentReader;
-import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
+import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.TypeDefinition;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
-import com.lapissea.cfs.type.field.access.IFieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.NotImplementedException;
-import com.lapissea.util.NotNull;
 
 import java.io.IOException;
-import java.lang.reflect.Type;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Stream;
 
 import static java.util.function.Predicate.*;
@@ -26,8 +24,29 @@ import static java.util.function.Predicate.*;
 public class LinkedIOList<T extends IOInstance<T>> extends IOInstance.Unmanaged<LinkedIOList<T>> implements IOList<T>{
 	
 	
-	private static class Node<T extends IOInstance<T>> extends IOInstance<Node<T>>{
-	
+	private static class Node<T extends IOInstance<T>> extends IOInstance.Unmanaged<Node<T>>{
+		
+		public Node(ChunkDataProvider provider, Reference reference, TypeDefinition typeDef){
+			super(provider, reference, typeDef);
+		}
+		
+		@Override
+		public Stream<IOField<Node<T>, ?>> listUnmanagedFields(){
+			return Stream.of();
+		}
+		
+		T getValue(){
+			throw NotImplementedException.infer();//TODO
+		}
+		void setValue(T value){
+			throw NotImplementedException.infer();//TODO
+		}
+		Node<T> getNext(){
+			throw NotImplementedException.infer();//TODO
+		}
+		public void setNext(Node<T> next){
+			throw NotImplementedException.infer();//TODO
+		}
 	}
 	
 	private static final TypeDefinition.Check TYPE_CHECK=new TypeDefinition.Check(
@@ -43,6 +62,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends IOInstance.Unmanaged<
 	private final StructPipe<T> elementPipe;
 	
 	
+	@SuppressWarnings("unchecked")
 	public LinkedIOList(ChunkDataProvider provider, Reference reference, TypeDefinition typeDef) throws IOException{
 		super(provider, reference, typeDef);
 		TYPE_CHECK.ensureValid(typeDef);
@@ -63,67 +83,54 @@ public class LinkedIOList<T extends IOInstance<T>> extends IOInstance.Unmanaged<
 	@Override
 	public long size(){return size;}
 	
+	private Node<T> getNode(long index){
+		var node=readHead();
+		for(long i=0;i<index;i++){
+			node=node.getNext();
+		}
+		return node;
+	}
+	
 	@Override
 	public T get(long index) throws IOException{
-		throw NotImplementedException.infer();//TODO: implement LinkedIOList.get()
+		Objects.checkIndex(index, size());
+		return getNode(index).getValue();
 	}
+	
 	@Override
 	public void set(long index, T value) throws IOException{
-		throw NotImplementedException.infer();//TODO: implement LinkedIOList.set()
+		Objects.checkIndex(index, size());
+		getNode(index).setValue(value);
 	}
+	
 	@Override
 	public void add(T value) throws IOException{
-		throw NotImplementedException.infer();//TODO: implement LinkedIOList.add()
+		var chunk=AllocateTicket.bytes(NumberSize.LARGEST.bytes+switch(elementPipe.getSizeDescriptor()){
+			case SizeDescriptor.Fixed<T> f -> f.get();
+			case SizeDescriptor.Unknown<T> f -> f.calcUnknown(value);
+		}).submit(getChunkProvider());
+		var nood=new Node<T>(getChunkProvider(), chunk.getPtr().makeReference(), getTypeDef().arg(0));
+		nood.setValue(value);
+		
+		if(isEmpty()){
+			writeHead(nood);
+		}else{
+			getLastNode().setNext(nood);
+		}
 	}
 	
 	@Override
 	public Stream<IOField<LinkedIOList<T>, ?>> listUnmanagedFields(){
-		return Stream.of(new IOField<LinkedIOList<T>, Node<?>>(new IFieldAccessor<>(){
-			@Override
-			public Struct<LinkedIOList<T>> getDeclaringStruct(){
-				throw new NotImplementedException();
-			}
-			@NotNull
-			@Override
-			public String getName(){
-				return "head";
-			}
-			@Override
-			public Type getGenericType(){
-				return Node.class;
-			}
-			@Override
-			public Object get(LinkedIOList<T> instance){
-				return instance.readHead();
-			}
-			@Override
-			public void set(LinkedIOList<T> instance, Object value){
-				try{
-					instance.writeHead((Node<T>)value);
-				}catch(IOException e){
-					throw new RuntimeException(e);
-				}
-			}
-		}){
-			@Override
-			public SizeDescriptor<LinkedIOList<T>> getSizeDescriptor(){
-				throw NotImplementedException.infer();//TODO: implement .getSizeDescriptor()
-			}
-			@Override
-			public List<IOField<LinkedIOList<T>, ?>> write(ChunkDataProvider provider, ContentWriter dest, LinkedIOList<T> instance) throws IOException{
-				throw NotImplementedException.infer();//TODO: implement .write()
-			}
-			@Override
-			public void read(ChunkDataProvider provider, ContentReader src, LinkedIOList<T> instance) throws IOException{
-				throw NotImplementedException.infer();//TODO: implement .read()
-			}
-		});
+		return Stream.of();
 	}
 	
+	private Node<T> getLastNode(){
+		throw NotImplementedException.infer();//TODO
+	}
 	private Node<T> readHead(){
-		throw NotImplementedException.infer();
+		throw NotImplementedException.infer();//TODO
 	}
 	private void writeHead(Node<T> head) throws IOException{
-		throw NotImplementedException.infer();
+		throw NotImplementedException.infer();//TODO
 	}
 }
