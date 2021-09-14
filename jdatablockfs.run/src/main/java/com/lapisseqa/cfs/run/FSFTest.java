@@ -27,15 +27,15 @@ class FSFTest{
 			LateInit<DataLogger> logger     =LoggedMemoryUtils.createLoggerFromConfig();
 			MemoryData<?>        mem        =LoggedMemoryUtils.newLoggedMemory(sessionName, logger);
 			
-			Cluster.init(mem);
-			Cluster cluster=new Cluster(mem);
-			
 			try{
+				Cluster.init(mem);
+				Cluster cluster=new Cluster(mem);
+				
 				doTests(cluster);
 			}finally{
 				logger.block();
 				mem.onWrite.log(mem, LongStream.of());
-				logger.ifInited(DataLogger::destroy);
+				logger.get().destroy();
 			}
 			
 		}catch(Throwable e){
