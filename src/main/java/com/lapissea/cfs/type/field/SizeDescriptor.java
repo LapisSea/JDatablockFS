@@ -8,27 +8,41 @@ import com.lapissea.util.TextUtil;
 import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.function.ToLongFunction;
+import java.util.stream.LongStream;
+
+import static com.lapissea.cfs.type.WordSpace.*;
 
 public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 	
+	@SuppressWarnings("unchecked")
 	final class Fixed<T extends IOInstance<T>> implements SizeDescriptor<T>{
 		
-		private static final SizeDescriptor<?> SINGLE_BIT=new Fixed<>(WordSpace.BIT, 1);
-		private static final SizeDescriptor<?> EMPTY     =new Fixed<>(WordSpace.BYTE, 0);
+		private static final Fixed<?>[] BIT_CACHE =LongStream.range(0, 8).mapToObj(i->new Fixed<>(BIT, i)).toArray(Fixed<?>[]::new);
+		private static final Fixed<?>[] BYTE_CACHE=LongStream.range(0, 16).mapToObj(i->new Fixed<>(BYTE, i)).toArray(Fixed<?>[]::new);
 		
-		public static <T extends IOInstance<T>> SizeDescriptor<T> singleBit(){
-			return (SizeDescriptor<T>)SINGLE_BIT;
+		public static <T extends IOInstance<T>> SizeDescriptor.Fixed<T> of(long bytes){
+			if(bytes>=BYTE_CACHE.length){
+				return new Fixed<>(BYTE, bytes);
+			}
+			return (Fixed<T>)BYTE_CACHE[(int)bytes];
 		}
-		public static <T extends IOInstance<T>> SizeDescriptor<T> empty(){
-			return (SizeDescriptor<T>)EMPTY;
+		public static <T extends IOInstance<T>> SizeDescriptor.Fixed<T> of(WordSpace wordSpace, long size){
+			Fixed<T>[] pool=(Fixed<T>[])switch(wordSpace){
+				case BIT -> BIT_CACHE;
+				case BYTE -> BYTE_CACHE;
+			};
+			if(size>=pool.length){
+				return new Fixed<>(wordSpace, size);
+			}
+			return pool[(int)size];
 		}
 		
 		
 		private final WordSpace wordSpace;
 		private final long      size;
 		
-		public Fixed(long size){
-			this(WordSpace.BYTE, size);
+		public Fixed(long bytes){
+			this(BYTE, bytes);
 		}
 		public Fixed(WordSpace wordSpace, long size){
 			this.wordSpace=wordSpace;
@@ -67,7 +81,7 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 		private final OptionalLong max;
 		
 		public Unknown(long min, OptionalLong max){
-			this(WordSpace.BYTE, min, max);
+			this(BYTE, min, max);
 		}
 		public Unknown(WordSpace wordSpace, long min, OptionalLong max){
 			this.wordSpace=wordSpace;

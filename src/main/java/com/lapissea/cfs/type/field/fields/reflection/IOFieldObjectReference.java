@@ -36,10 +36,11 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	public IOFieldObjectReference(IFieldAccessor<T> accessor){
 		this(accessor, false);
 	}
+	@SuppressWarnings("unchecked")
 	public IOFieldObjectReference(IFieldAccessor<T> accessor, boolean fixed){
 		super(accessor);
 		
-		descriptor=SizeDescriptor.Fixed.empty();
+		descriptor=SizeDescriptor.Fixed.of(0);
 		
 		struct=(Struct<ValueType>)Struct.ofUnknown(getAccessor().getType());
 		var typ=accessor.getAnnotation(IOValue.Reference.class).map(IOValue.Reference::dataPipeType).orElseThrow();

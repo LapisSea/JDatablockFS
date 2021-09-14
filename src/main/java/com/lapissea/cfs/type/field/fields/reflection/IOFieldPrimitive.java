@@ -19,7 +19,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 
+import static com.lapissea.cfs.objects.NumberSize.BYTE;
 import static com.lapissea.cfs.objects.NumberSize.*;
+import static com.lapissea.cfs.type.WordSpace.*;
 
 public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> extends IOField<T, ValueType>{
 	
@@ -364,7 +366,7 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		
 		@Override
 		public SizeDescriptor<T> getSizeDescriptor(){
-			return SizeDescriptor.Fixed.singleBit();
+			return SizeDescriptor.Fixed.of(BIT, 1);
 		}
 	}
 	
