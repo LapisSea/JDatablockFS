@@ -185,6 +185,7 @@ public class Struct<T extends IOInstance<T>>{
 	
 	private Supplier<T> emptyConstructor;
 	
+	
 	public Struct(Class<T> type){
 		this.type=type;
 		fields=FieldCompiler.create().compile(this);

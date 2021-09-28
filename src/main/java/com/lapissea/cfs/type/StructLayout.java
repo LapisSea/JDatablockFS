@@ -2,7 +2,7 @@ package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.type.field.annotations.IOValue;
 
-public class StructLayout{
+public class StructLayout extends IOInstance<StructLayout>{
 	
 	@IOValue
 	private String typeName;

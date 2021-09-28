@@ -78,6 +78,7 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 	private final Struct<SELF> thisStruct;
 	private final Object[]     virtualFields;
 	
+	@SuppressWarnings("unchecked")
 	public IOInstance(){
 		this.thisStruct=Struct.of((Class<SELF>)getClass());
 		virtualFields=getThisStruct().allocVirtualVarPool(INSTANCE);
@@ -110,6 +111,7 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 		virtualFields[index]=value;
 	}
 	
+	@SuppressWarnings("unchecked")
 	protected final SELF self(){return (SELF)this;}
 	
 	@Override

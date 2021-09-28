@@ -221,8 +221,6 @@ public class Utils{
 			return Utils.makeLambda(lconst, functionalInterface);
 		}catch(ReflectiveOperationException ce){
 			
-			
-			
 			try{
 				Method of=clazz.getMethod("of", parameterTypes);
 				if(!Modifier.isStatic(of.getModifiers())) throw new ReflectiveOperationException(of+" not static");
