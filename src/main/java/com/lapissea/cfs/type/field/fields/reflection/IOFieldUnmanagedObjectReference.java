@@ -10,6 +10,7 @@ import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
+import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.TypeDefinition;
@@ -54,9 +55,9 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 	}
 	
 	@Override
-	public void allocate(T instance, ChunkDataProvider provider) throws IOException{
+	public void allocate(T instance, ChunkDataProvider provider, GenericContext genericContext) throws IOException{
 		Chunk chunk=AllocateTicket.bytes(instancePipe.getSizeDescriptor().fixedOrMin()).submit(provider);
-		var   val  =makeValueObject(provider, chunk.getPtr().makeReference());
+		var   val  =makeValueObject(provider, chunk.getPtr().makeReference(), genericContext);
 		set(instance, val);
 	}
 	
@@ -90,12 +91,12 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 		}
 		return val.getReference();
 	}
-	private ValueType makeValueObject(ChunkDataProvider provider, Reference readNew) throws IOException{
+	private ValueType makeValueObject(ChunkDataProvider provider, Reference readNew, GenericContext genericContext) throws IOException{
 		if(readNew.isNull()){
 			if(nullable()) return null;
 			throw new NullPointerException();
 		}
-		return struct.requireUnmanagedConstructor().create(provider, readNew, TypeDefinition.of(getAccessor().getGenericType()));
+		return struct.requireUnmanagedConstructor().create(provider, readNew, TypeDefinition.of(getAccessor().getGenericType(genericContext)));
 	}
 	
 	@Override
@@ -110,7 +111,18 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 	}
 	
 	@Override
-	public void read(ChunkDataProvider provider, ContentReader src, T instance) throws IOException{
-		set(instance, makeValueObject(provider, referencePipe.readNew(provider, src)));
+	public void read(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		set(instance, makeValueObject(provider, referencePipe.readNew(provider, src, null), genericContext));
+	}
+	
+	@Override
+	public void skipRead(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		var fixed=referencePipe.getSizeDescriptor().getFixed();
+		if(fixed.isPresent()){
+			src.skipExact(fixed.getAsLong());
+			return;
+		}
+		
+		referencePipe.readNew(provider, src, genericContext);
 	}
 }

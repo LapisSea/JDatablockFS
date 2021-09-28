@@ -29,6 +29,9 @@ public final class Reference extends IOInstance<Reference>{
 		if(offset<0) throw new IllegalArgumentException("Offset can not be negative");
 	}
 	
+	public RandomIO io(ChunkDataProvider.Holder holder) throws IOException{
+		return io(holder.getChunkProvider());
+	}
 	public RandomIO io(ChunkDataProvider provider) throws IOException{
 		ptr.requireNonNull();
 		return ptr.dereference(provider).ioAt(offset);

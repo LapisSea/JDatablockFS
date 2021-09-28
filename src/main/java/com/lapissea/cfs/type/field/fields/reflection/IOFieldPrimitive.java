@@ -6,6 +6,7 @@ import com.lapissea.cfs.io.bit.BitWriter;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.objects.NumberSize;
+import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
@@ -85,7 +86,7 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
-		public void read(ChunkDataProvider provider, ContentReader src, T instance) throws IOException{
+		public void read(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			var size=getSize(instance);
 			setValue(instance, size.readFloating(src));
 		}
@@ -141,7 +142,7 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
-		public void read(ChunkDataProvider provider, ContentReader src, T instance) throws IOException{
+		public void read(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			var size=getSize(instance);
 			setValue(instance, (float)size.readFloating(src));
 		}
@@ -192,7 +193,7 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
-		public void read(ChunkDataProvider provider, ContentReader src, T instance) throws IOException{
+		public void read(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			var size=getSize(instance);
 			setValue(instance, size.read(src));
 		}
@@ -250,7 +251,7 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
-		public void read(ChunkDataProvider provider, ContentReader src, T instance) throws IOException{
+		public void read(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			var size=getSize(instance);
 			setValue(instance, (int)size.read(src));
 		}
@@ -307,7 +308,7 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
-		public void read(ChunkDataProvider provider, ContentReader src, T instance) throws IOException{
+		public void read(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			setValue(instance, src.readInt1());
 		}
 		
@@ -353,6 +354,10 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		@Override
 		public void readBits(BitReader src, T instance) throws IOException{
 			setValue(instance, src.readBoolBit());
+		}
+		@Override
+		public void skipReadBits(BitReader src, T instance) throws IOException{
+			src.skip(1);
 		}
 		
 		@Override
@@ -403,6 +408,12 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}else{
 			sizeDescriptor=new SizeDescriptor.Fixed<>(size.bytes);
 		}
+	}
+	
+	@Override
+	public void skipRead(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		var size=getSize(instance);
+		src.skipExact(size.bytes);
 	}
 	
 	protected EnumSet<NumberSize> allowedSizes(){

@@ -139,6 +139,11 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
 		return Math.max(1, (int)Math.ceil(Math.log(size)/Math.log(2)));
 	}
 	
+	public void readSkip(BitReader source) throws IOException{readSkip(source, false);}
+	public void readSkip(BitReader source, boolean nullable) throws IOException{
+		source.skip(getBitSize(nullable));
+	}
+	
 	public T read(BitReader source) throws IOException{return read(source, false);}
 	public T read(BitReader source, boolean nullable) throws IOException{
 		int ordinal=(int)source.readBits(getBitSize(nullable));

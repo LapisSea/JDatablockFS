@@ -5,10 +5,10 @@ import java.util.List;
 
 public interface MemoryManager{
 	
-	default void free(Chunk tofree){
-		free(List.of(tofree));
+	default void free(Chunk toFree) throws IOException{
+		free(List.of(toFree));
 	}
-	void free(List<Chunk> tofree);
+	void free(List<Chunk> toFree) throws IOException;
 	
 	void allocTo(Chunk firstChunk, Chunk target, long toAllocate) throws IOException;
 	

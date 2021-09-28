@@ -5,10 +5,7 @@ import com.lapissea.cfs.SyntheticParameterizedType;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.objects.INumber;
-import com.lapissea.cfs.type.FieldSet;
-import com.lapissea.cfs.type.GetAnnotation;
-import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
 import com.lapissea.cfs.type.field.access.FunctionalReflectionAccessor;
@@ -131,8 +128,9 @@ public class FieldCompiler{
 					for(var s : logicalAnn.logic().injectPerInstanceValue(pair.field.getAccessor(), logicalAnn.annotation())){
 						var existing=virtualData.get(s.getName());
 						if(existing!=null){
-							if(!existing.getGenericType().equals(s.getType())){
-								throw new MalformedStructLayout("Virtual field "+existing.getName()+" already defined but has a type conflict of "+existing.getGenericType()+" and "+s.getType());
+							var gTyp=existing.getGenericType(null);
+							if(!gTyp.equals(s.getType())){
+								throw new MalformedStructLayout("Virtual field "+existing.getName()+" already defined but has a type conflict of "+gTyp+" and "+s.getType());
 							}
 							continue;
 						}
@@ -152,7 +150,7 @@ public class FieldCompiler{
 			}
 			toRun.clear();
 			for(var virtual : newVirtualData.values()){
-				var field    =registry().create(virtual);
+				var field    =registry().create(virtual, null);
 				var annotated=new AnnotatedField<>(field, scanAnnotations(field));
 				toRun.add(annotated);
 				UtilL.addRemainSorted(parsed, annotated);
@@ -268,7 +266,7 @@ public class FieldCompiler{
 		
 		List<IOField<T, ?>> parsed=new ArrayList<>(fields.size());
 		for(var f : fields){
-			parsed.add(registry.create(f));
+			parsed.add(registry.create(f, null));
 		}
 		
 		return parsed;
@@ -361,7 +359,7 @@ public class FieldCompiler{
 				return IOFieldPrimitive.isPrimitive(type);
 			}
 			@Override
-			public <T extends IOInstance<T>> IOField<T, ?> create(IFieldAccessor<T> field){
+			public <T extends IOInstance<T>> IOField<T, ?> create(IFieldAccessor<T> field, GenericContext genericContext){
 				return IOFieldPrimitive.make(field);
 			}
 		});
@@ -371,7 +369,7 @@ public class FieldCompiler{
 				return Enum.class;
 			}
 			@Override
-			public <T extends IOInstance<T>> IOField<T, Enum> create(IFieldAccessor<T> field){
+			public <T extends IOInstance<T>> IOField<T, Enum> create(IFieldAccessor<T> field, GenericContext genericContext){
 				return new IOFieldEnum<>(field);
 			}
 		});
@@ -381,7 +379,7 @@ public class FieldCompiler{
 				return INumber.class;
 			}
 			@Override
-			public <T extends IOInstance<T>> IOField<T, INumber> create(IFieldAccessor<T> field){
+			public <T extends IOInstance<T>> IOField<T, INumber> create(IFieldAccessor<T> field, GenericContext genericContext){
 				return new IOFieldNumber<>(field);
 			}
 		});
@@ -391,7 +389,7 @@ public class FieldCompiler{
 				return byte[].class;
 			}
 			@Override
-			public <T extends IOInstance<T>> IOField<T, byte[]> create(IFieldAccessor<T> field){
+			public <T extends IOInstance<T>> IOField<T, byte[]> create(IFieldAccessor<T> field, GenericContext genericContext){
 				return new IOFieldByteArray<>(field);
 			}
 		});
@@ -401,8 +399,8 @@ public class FieldCompiler{
 				return String.class;
 			}
 			@Override
-			public <T extends IOInstance<T>> IOField<T, String> create(IFieldAccessor<T> field){
-				throw new NotImplementedException();
+			public <T extends IOInstance<T>> IOField<T, String> create(IFieldAccessor<T> field, GenericContext genericContext){
+				return new IOFieldInlineString<>(field);
 			}
 		});
 		REGISTRY.register(new RegistryNode.InstanceOf<IOInstance>(){
@@ -411,9 +409,9 @@ public class FieldCompiler{
 				return IOInstance.class;
 			}
 			@Override
-			public <T extends IOInstance<T>> IOField<T, ? extends IOInstance> create(IFieldAccessor<T> field){
+			public <T extends IOInstance<T>> IOField<T, ? extends IOInstance> create(IFieldAccessor<T> field, GenericContext genericContext){
 				Class<?> raw      =field.getType();
-				var      unmanaged=UtilL.instanceOf(raw, IOInstance.Unmanaged.class);
+				var      unmanaged=!IOInstance.isManaged(raw);
 				
 				if(field.hasAnnotation(IOType.Dynamic.class)){
 					if(unmanaged) throw new MalformedStructLayout("can't use unmanged on");

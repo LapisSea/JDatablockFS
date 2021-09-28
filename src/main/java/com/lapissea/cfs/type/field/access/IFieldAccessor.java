@@ -1,5 +1,6 @@
 package com.lapissea.cfs.type.field.access;
 
+import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.IOField;
@@ -25,10 +26,10 @@ public interface IFieldAccessor<CTyp extends IOInstance<CTyp>> extends Comparabl
 	@NotNull
 	String getName();
 	
-	Type getGenericType();
+	Type getGenericType(GenericContext genericContext);
 	
 	default Class<?> getType(){
-		var generic=getGenericType();
+		var generic=getGenericType(null);
 		return (Class<?>)(generic instanceof ParameterizedType p?p.getRawType():generic);
 	}
 	

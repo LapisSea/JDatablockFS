@@ -7,9 +7,7 @@ import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
-import com.lapissea.cfs.objects.GenericContainer;
 import com.lapissea.cfs.objects.collections.ContiguousIOList;
-import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.StructLayout;
@@ -61,7 +59,7 @@ public class Cluster implements ChunkDataProvider{
 		ROOT_PIPE.modify(firstChunk, root->{
 			Metadata metadata=root.metadata;
 			metadata.allocateNulls(provider);
-		});
+		}, null);
 	}
 	
 	
@@ -84,11 +82,11 @@ public class Cluster implements ChunkDataProvider{
 	
 	
 	private static class Metadata extends IOInstance<Metadata>{
-		
-		@IOValue
-		@IONullability(NULLABLE)
-		@IOValue.OverrideType(value=ContiguousIOList.class)
-		public IOList<GenericContainer<?>> rootReferences;
+
+//		@IOValue
+//		@IONullability(NULLABLE)
+//		@IOValue.OverrideType(value=ContiguousIOList.class)
+//		public IOList<GenericContainer<?>> rootReferences;
 		
 		@IOValue
 		@IONullability(NULLABLE)
@@ -118,7 +116,7 @@ public class Cluster implements ChunkDataProvider{
 		if(ROOT_PIPE.getSizeDescriptor().fixedOrMin()>ch.getSize()){
 			throw new IOException("no valid cluster data");
 		}
-		root=ROOT_PIPE.readNew(this, ch);
+		root=ROOT_PIPE.readNew(this, ch, null);
 	}
 	
 	@Override
@@ -133,10 +131,10 @@ public class Cluster implements ChunkDataProvider{
 	public RootRef getRoot(){
 		return root;
 	}
-	
-	public IOList<GenericContainer<?>> getRootReferences(){
-		return root.getMetadata().rootReferences;
-	}
+
+//	public IOList<GenericContainer<?>> getRootReferences(){
+//		return root.getMetadata().rootReferences;
+//	}
 	
 	@Override
 	public IOInterface getSource(){

@@ -6,6 +6,7 @@ import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.objects.NumberSize;
+import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.IOField;
@@ -96,9 +97,9 @@ public class FixedContiguousStructPipe<T extends IOInstance<T>> extends StructPi
 	}
 	
 	@Override
-	protected T doRead(ChunkDataProvider provider, ContentReader src, T instance) throws IOException{
+	protected T doRead(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		maxValues.forEach((k, v)->k.set(instance, v));
-		readIOFields(provider, src, instance);
+		readIOFields(provider, src, instance, genericContext);
 		return instance;
 	}
 }

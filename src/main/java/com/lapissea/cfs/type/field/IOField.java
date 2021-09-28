@@ -12,6 +12,7 @@ import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.FieldSet;
+import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.access.IFieldAccessor;
@@ -49,7 +50,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 			super(accessor);
 		}
 		
-		public abstract void allocate(T instance, ChunkDataProvider provider) throws IOException;
+		public abstract void allocate(T instance, ChunkDataProvider provider, GenericContext genericContext) throws IOException;
 		public abstract Reference getReference(T instance);
 		public abstract StructPipe<Type> getReferencedPipe(T instance);
 		
@@ -79,7 +80,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		
 		@Deprecated
 		@Override
-		public final void read(ChunkDataProvider provider, ContentReader src, T instance) throws IOException{
+		public final void read(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			try(var reader=new BitInputStream(src)){
 				readBits(reader, instance);
 				if(DEBUG_VALIDATION){
@@ -88,8 +89,20 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 			}
 		}
 		
+		@Deprecated
+		@Override
+		public final void skipRead(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+			try(var reader=new BitInputStream(src)){
+				skipReadBits(reader, instance);
+				if(DEBUG_VALIDATION){
+					reader.requireRead(getSizeDescriptor().calcUnknown(instance));
+				}
+			}
+		}
+		
 		public abstract void writeBits(BitWriter<?> dest, T instance) throws IOException;
 		public abstract void readBits(BitReader src, T instance) throws IOException;
+		public abstract void skipReadBits(BitReader src, T instance) throws IOException;
 		
 		@Override
 		public IOField.Bit<T, Type> implMaxAsFixedSize(){
@@ -145,18 +158,31 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	protected IOException reportWriteFail(IOField<T, ?> fi, Exception e) throws IOException{
 		throw new IOException("Failed to write "+TextUtil.toShortString(fi), e);
 	}
-	protected IOException reportReadFail(IOField<T, ?> fi, Exception e) throws IOException{
-		throw new IOException("Failed to read "+TextUtil.toShortString(fi), e);
-	}
 	
-	public abstract void read(ChunkDataProvider provider, ContentReader src, T instance) throws IOException;
-	public final void readReported(ChunkDataProvider provider, ContentReader src, T instance) throws IOException{
+	public abstract void read(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException;
+	public final void readReported(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		try{
-			read(provider, src, instance);
+			read(provider, src, instance, genericContext);
 		}catch(Exception e){
 			throw reportReadFail(this, e);
 		}
 	}
+	protected IOException reportReadFail(IOField<T, ?> fi, Exception e) throws IOException{
+		throw new IOException("Failed to read "+TextUtil.toShortString(fi), e);
+	}
+	
+	public abstract void skipRead(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException;
+	public final void skipReadReported(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		try{
+			skipRead(provider, src, instance, genericContext);
+		}catch(Exception e){
+			throw reportSkipReadFail(this, e);
+		}
+	}
+	protected IOException reportSkipReadFail(IOField<T, ?> fi, Exception e) throws IOException{
+		throw new IOException("Failed to skip read "+TextUtil.toShortString(fi), e);
+	}
+	
 	
 	/**
 	 * @return string of the resolved value or null if string has no substance

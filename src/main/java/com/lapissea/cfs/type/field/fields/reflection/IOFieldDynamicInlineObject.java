@@ -7,6 +7,7 @@ import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.objects.Reference;
+import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.IOField;
@@ -35,7 +36,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		
 		int nullSize=nullable()?1:0;
 		
-		Type type=accessor.getGenericType();
+		Type type=accessor.getGenericType(null);
 		
 		
 		long minKnownTypeSize=Long.MAX_VALUE;
@@ -93,7 +94,12 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 	}
 	
 	@Override
-	public void read(ChunkDataProvider provider, ContentReader src, CTyp instance) throws IOException{
+	public void read(ChunkDataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
 		throw new NotImplementedException();
+	}
+	
+	@Override
+	public void skipRead(ChunkDataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
+		throw NotImplementedException.infer();//TODO: implement IOFieldDynamicInlineObject.skipRead()
 	}
 }

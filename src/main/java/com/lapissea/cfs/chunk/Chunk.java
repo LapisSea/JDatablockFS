@@ -28,6 +28,7 @@ import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.*;
 
+@SuppressWarnings("unused")
 public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, ChunkDataProvider.Holder{
 	
 	private static final Struct<Chunk>     STRUCT=Struct.of(Chunk.class);
@@ -123,7 +124,7 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 	public void readHeader(ContentReader src) throws IOException{
 		reading=true;
 		try{
-			PIPE.read(provider, src, this);
+			PIPE.read(provider, src, this, null);
 		}finally{
 			reading=false;
 		}

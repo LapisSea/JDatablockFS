@@ -10,6 +10,7 @@ import com.lapissea.cfs.io.content.ContentOutputBuilder;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.type.FieldSet;
+import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.IOField;
@@ -20,6 +21,7 @@ import com.lapissea.cfs.type.field.access.IFieldAccessor;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.util.LogUtil;
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.function.UnsafeConsumer;
 
@@ -157,40 +159,42 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	protected abstract void doWrite(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException;
 	
 	
-	public <Prov extends ChunkDataProvider.Holder&RandomIO.Creator> void modify(Prov src, UnsafeConsumer<T, IOException> modifier) throws IOException{
-		T val=readNew(src);
+	public <Prov extends ChunkDataProvider.Holder&RandomIO.Creator> void modify(Prov src, UnsafeConsumer<T, IOException> modifier, GenericContext genericContext) throws IOException{
+		T val=readNew(src, genericContext);
 		modifier.accept(val);
 		write(src, val);
 	}
-	public <Prov extends ChunkDataProvider.Holder&RandomIO.Creator> T readNew(Prov src) throws IOException{
+	public <Prov extends ChunkDataProvider.Holder&RandomIO.Creator> T readNew(Prov src, GenericContext genericContext) throws IOException{
 		try(var io=src.io()){
-			return readNew(src.getChunkProvider(), io);
+			return readNew(src.getChunkProvider(), io, genericContext);
 		}
 	}
-	public T readNew(ChunkDataProvider provider, RandomIO.Creator src) throws IOException{
+	public T readNew(ChunkDataProvider provider, RandomIO.Creator src, GenericContext genericContext) throws IOException{
 		try(var io=src.io()){
-			return readNew(provider, io);
+			return readNew(provider, io, genericContext);
 		}
 	}
-	public T readNew(ChunkDataProvider provider, ContentReader src) throws IOException{
+	public T readNew(ChunkDataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
 		T instance=type.requireEmptyConstructor().get();
-		return doRead(provider, src, instance);
+		return doRead(provider, src, instance, genericContext);
 	}
 	
-	public T read(ChunkDataProvider provider, RandomIO.Creator src, T instance) throws IOException{
+	public T read(ChunkDataProvider provider, RandomIO.Creator src, T instance, GenericContext genericContext) throws IOException{
 		try(var io=src.io()){
-			return doRead(provider, io, instance);
+			return doRead(provider, io, instance, genericContext);
 		}
 	}
-	public <Prov extends ChunkDataProvider.Holder&RandomIO.Creator> T read(Prov src, T instance) throws IOException{
+	public <Prov extends ChunkDataProvider.Holder&RandomIO.Creator> T read(Prov src, T instance, GenericContext genericContext) throws IOException{
 		try(var io=src.io()){
-			return doRead(src.getChunkProvider(), io, instance);
+			return doRead(src.getChunkProvider(), io, instance, genericContext);
 		}
 	}
-	public T read(ChunkDataProvider provider, ContentReader src, T instance) throws IOException{
-		return doRead(provider, src, instance);
+	
+	public T read(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		return doRead(provider, src, instance, genericContext);
 	}
-	protected abstract T doRead(ChunkDataProvider provider, ContentReader src, T instance) throws IOException;
+	
+	protected abstract T doRead(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException;
 	
 	
 	public SizeDescriptor<T> getSizeDescriptor(){
@@ -252,15 +256,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 							logDirty.accept(field.writeReported(provider, destBuff, instance));
 							continue;
 						}
-						
-						var safeBuff=destBuff.writeTicket(bytes).requireExact().submit();
-						logDirty.accept(field.writeReported(provider, safeBuff, instance));
-						
-						try{
-							safeBuff.close();
-						}catch(Exception e){
-							throw new IOException(TextUtil.toString(field)+" did not write correctly", e);
-						}
+						writeFieldKnownSize(provider, instance, logDirty, field, destBuff.writeTicket(bytes));
 					}else{
 						logDirty.accept(field.writeReported(provider, destBuff, instance));
 					}
@@ -273,34 +269,66 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 			popPool();
 		}
 	}
-	public void readIOFields(ChunkDataProvider provider, ContentReader src, T instance)
-		throws IOException{
+	
+	private void writeFieldKnownSize(ChunkDataProvider provider, T instance, Consumer<List<IOField<T, ?>>> logDirty, IOField<T, ?> field, ContentWriter.BufferTicket ticket) throws IOException{
+		var safeBuff=ticket.requireExact().submit();
+		logDirty.accept(field.writeReported(provider, safeBuff, instance));
+		
+		try{
+			safeBuff.close();
+		}catch(Exception e){
+			throw new IOException(TextUtil.toString(field)+" did not write correctly", e);
+		}
+	}
+	
+	public void writeSingleField(ChunkDataProvider provider, RandomIO dest, IOField<T, ?> selectedField, T instance) throws IOException{
+		temp_disableDependencyFields(selectedField);
+		
+		Object[] ioPool=makeIOPool();
+		try{
+			pushPool(ioPool);
+			
+			for(IOField<T, ?> field : getSpecificFields()){
+				checkExistenceOfField(selectedField);
+				
+				long bytes;
+				try{
+					var desc=field.getSizeDescriptor();
+					bytes=desc.toBytes(desc.calcUnknown(instance));
+				}catch(UnknownSizePredictionException e){
+					throw new RuntimeException("Single field write of "+selectedField+" is not currently supported!");
+				}
+				if(field==selectedField){
+					writeFieldKnownSize(provider, instance, l->{}, field, dest.writeTicket(bytes));
+					return;
+				}
+				
+				dest.skipExact(bytes);
+			}
+			
+		}finally{
+			popPool();
+		}
+	}
+	
+	private void temp_disableDependencyFields(IOField<T, ?> field){
+		if(!field.getDependencies().isEmpty()){
+			throw new NotImplementedException("Single field IO with dependencies is currently not possible");//TODO
+		}
+	}
+	
+	protected void readIOFields(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		Object[] ioPool=makeIOPool();
 		try{
 			pushPool(ioPool);
 			
 			if(DEBUG_VALIDATION){
 				for(IOField<T, ?> field : getSpecificFields()){
-//					var debStr=instance.getThisStruct().instanceToString(instance, false);
-					
-					var desc=field.getSizeDescriptor();
-					if(desc.hasFixed()){
-						long bytes=desc.toBytes(desc.requireFixed());
-						
-						var buf=src.readTicket(bytes).requireExact().submit();
-						field.readReported(provider, buf, instance);
-						try{
-							buf.close();
-						}catch(Exception e){
-							throw new IOException(TextUtil.toString(field)+" did not read correctly", e);
-						}
-					}else{
-						field.readReported(provider, src, instance);
-					}
+					readFieldSafe(provider, src, instance, field, genericContext);
 				}
 			}else{
 				for(IOField<T, ?> field : getSpecificFields()){
-					field.readReported(provider, src, instance);
+					field.readReported(provider, src, instance, genericContext);
 				}
 			}
 			
@@ -308,6 +336,68 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 			popPool();
 		}
 	}
+	
+	public void readSingleField(ChunkDataProvider provider, ContentReader src, IOField<T, ?> selectedField, T instance, GenericContext genericContext) throws IOException{
+		temp_disableDependencyFields(selectedField);
+		
+		Object[] ioPool=makeIOPool();
+		try{
+			pushPool(ioPool);
+			
+			if(DEBUG_VALIDATION){
+				checkExistenceOfField(selectedField);
+				for(IOField<T, ?> field : getSpecificFields()){
+					if(field==selectedField){
+						readFieldSafe(provider, src, instance, field, genericContext);
+						return;
+					}
+					
+					field.skipReadReported(provider, src, instance, genericContext);
+				}
+			}else{
+				for(IOField<T, ?> field : getSpecificFields()){
+					if(field==selectedField){
+						field.readReported(provider, src, instance, genericContext);
+						return;
+					}
+					
+					field.skipReadReported(provider, src, instance, genericContext);
+				}
+				throw new IllegalArgumentException(selectedField+" is not listed!");
+			}
+			
+		}finally{
+			popPool();
+		}
+	}
+	
+	private void checkExistenceOfField(IOField<T, ?> selectedField){
+		for(IOField<T, ?> field : getSpecificFields()){
+			if(field==selectedField){
+				return;
+			}
+		}
+		throw new IllegalArgumentException(selectedField+" is not listed!");
+	}
+	
+	private void readFieldSafe(ChunkDataProvider provider, ContentReader src, T instance, IOField<T, ?> field, GenericContext genericContext) throws IOException{
+		var desc=field.getSizeDescriptor();
+		
+		if(desc.hasFixed()){
+			long bytes=desc.toBytes(desc.requireFixed());
+			
+			var buf=src.readTicket(bytes).requireExact().submit();
+			field.readReported(provider, buf, instance, genericContext);
+			try{
+				buf.close();
+			}catch(Exception e){
+				throw new IOException(TextUtil.toString(field)+" did not read correctly", e);
+			}
+		}else{
+			field.readReported(provider, src, instance, genericContext);
+		}
+	}
+	
 	private void pushPool(Object[] ioPool){
 		if(getIoPoolAccessors()==null) return;
 		for(var a : getIoPoolAccessors()){

@@ -3,6 +3,7 @@ package com.lapissea.cfs.io.instancepipe;
 import com.lapissea.cfs.chunk.ChunkDataProvider;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
+import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.IOField;
@@ -23,6 +24,8 @@ public class ContiguousStructPipe<T extends IOInstance<T>> extends StructPipe<T>
 	public ContiguousStructPipe(Struct<T> type){
 		super(type);
 	}
+	
+	@SuppressWarnings("unchecked")
 	@Override
 	protected List<IOField<T, ?>> initFields(){
 		return IOFieldTools.stepFinal((List<IOField<T, ?>>)getType().getFields(), List.of(
@@ -37,8 +40,8 @@ public class ContiguousStructPipe<T extends IOInstance<T>> extends StructPipe<T>
 	}
 	
 	@Override
-	protected T doRead(ChunkDataProvider provider, ContentReader src, T instance) throws IOException{
-		readIOFields(provider, src, instance);
+	protected T doRead(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		readIOFields(provider, src, instance, genericContext);
 		return instance;
 	}
 }

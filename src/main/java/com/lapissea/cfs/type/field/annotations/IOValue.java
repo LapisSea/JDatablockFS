@@ -111,7 +111,7 @@ public @interface IOValue{
 		AnnotationLogic<OverrideType> LOGIC=new AnnotationLogic<>(){
 			@Override
 			public void validate(IFieldAccessor<?> field, OverrideType typeOverride){
-				Type type=field.getGenericType();
+				Type type=field.getGenericType(null);
 				
 				var rawType=SyntheticParameterizedType.generalize(type);
 				

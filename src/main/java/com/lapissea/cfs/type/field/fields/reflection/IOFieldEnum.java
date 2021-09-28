@@ -55,6 +55,11 @@ public class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> extends IOF
 	}
 	
 	@Override
+	public void skipReadBits(BitReader src, T instance) throws IOException{
+		src.skipEnum(enumUniverse, nullable());
+	}
+	
+	@Override
 	public boolean instancesEqual(T inst1, T inst2){
 		return get(inst1)==get(inst2);
 	}
@@ -63,4 +68,5 @@ public class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> extends IOF
 	public SizeDescriptor<T> getSizeDescriptor(){
 		return sizeDescriptor;
 	}
+	
 }

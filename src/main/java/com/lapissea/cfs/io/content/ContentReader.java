@@ -2,6 +2,7 @@ package com.lapissea.cfs.io.content;
 
 import com.lapissea.cfs.BufferErrorSupplier;
 import com.lapissea.cfs.io.ContentBuff;
+import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.util.ZeroArrays;
 
 import java.io.ByteArrayInputStream;
@@ -10,6 +11,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Objects;
 
+@SuppressWarnings({"PointlessArithmeticExpression", "PointlessBitwiseExpression", "unused", "UnusedReturnValue"})
 public interface ContentReader extends AutoCloseable, ContentBuff{
 	
 	default void read(ByteBuffer buff) throws IOException{
@@ -42,7 +44,34 @@ public interface ContentReader extends AutoCloseable, ContentBuff{
 	/**
 	 * @return number of bytes skipped
 	 */
+	default long skip(NumberSize toSkip) throws IOException{
+		return skip(toSkip.bytes);
+	}
+	/**
+	 * @return number of bytes skipped
+	 */
 	long skip(long toSkip) throws IOException;
+	
+	
+	default void skipExact(NumberSize toSkip) throws IOException{
+		skipExact(toSkip.bytes);
+	}
+	
+	default void skipExact(long toSkip) throws IOException{
+		if(toSkip<0) throw new IllegalArgumentException("toSkip can not be negative");
+		long skipped=0;
+		while(skipped<toSkip){
+			long remaining   =toSkip-skipped;
+			var  skippedChunk=skip(remaining);
+			if(skippedChunk==0){
+				throw new IOException("Failed to skip "+toSkip+" bytes! Actually skipped: "+skipped);
+			}
+			skipped+=skippedChunk;
+		}
+		if(skipped!=toSkip){
+			throw new IOException("Failed to skip "+toSkip+" bytes! Actually skipped: "+skipped);
+		}
+	}
 	
 	default char[] readChars2(int elementsToRead) throws IOException{
 		int bytesPerElement =2;

@@ -7,8 +7,8 @@ import com.lapissea.cfs.io.bit.BitOutputStream;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.type.FieldSet;
+import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
@@ -32,12 +32,9 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 		assert !group.isEmpty();
 		this.group=List.copyOf(group);
 		
-		commonSense:
-		break commonSense;
-		
 		var fixedSize=Utils.bitToByte(IOFieldTools.sumVarsIfAll(group, SizeDescriptor::getFixed));
-		if(fixedSize.isPresent()) sizeDescriptor=new SizeDescriptor.Fixed<>(WordSpace.BYTE, fixedSize.getAsLong());
-		else sizeDescriptor=new SizeDescriptor.Unknown<>(WordSpace.BYTE, IOFieldTools.sumVars(group, SizeDescriptor::getMin), IOFieldTools.sumVarsIfAll(group, SizeDescriptor::getMax)){
+		if(fixedSize.isPresent()) sizeDescriptor=SizeDescriptor.Fixed.of(fixedSize.getAsLong());
+		else sizeDescriptor=new SizeDescriptor.Unknown<>(IOFieldTools.sumVars(group, SizeDescriptor::getMin), IOFieldTools.sumVarsIfAll(group, SizeDescriptor::getMax)){
 			@Override
 			public long calcUnknown(T instance){
 				return Utils.bitToByte(group.stream().mapToLong(s->s.getSizeDescriptor().calcUnknown(instance)).sum());
@@ -80,7 +77,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 	}
 	
 	@Override
-	public void read(ChunkDataProvider provider, ContentReader src, T instance) throws IOException{
+	public void read(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		try(var stream=new BitInputStream(src)){
 			for(var fi : group){
 				if(DEBUG_VALIDATION){
@@ -88,11 +85,35 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 					var  oldW=stream.getTotalBits();
 					
 					fi.readBits(stream, instance);
-					var val =fi.get(instance);
 					var read=stream.getTotalBits()-oldW;
 					if(read!=size) throw new RuntimeException("Read bits "+read+" but "+size+" expected on "+fi);
 				}else{
 					fi.readBits(stream, instance);
+				}
+			}
+		}
+	}
+	
+	@Override
+	public void skipRead(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		
+		var fixed=getSizeDescriptor().getFixed();
+		if(fixed.isPresent()){
+			src.skip(fixed.getAsLong());
+			return;
+		}
+		
+		try(var stream=new BitInputStream(src)){
+			for(var fi : group){
+				if(DEBUG_VALIDATION){
+					long size=fi.getSizeDescriptor().calcUnknown(instance);
+					var  oldW=stream.getTotalBits();
+					
+					fi.skipReadBits(stream, instance);
+					var read=stream.getTotalBits()-oldW;
+					if(read!=size) throw new RuntimeException("Read bits "+read+" but "+size+" expected on "+fi);
+				}else{
+					fi.skipReadBits(stream, instance);
 				}
 			}
 		}

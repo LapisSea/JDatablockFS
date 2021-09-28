@@ -3,6 +3,7 @@ package com.lapissea.cfs.type.field.access;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.objects.INumber;
+import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.util.NotNull;
@@ -117,8 +118,11 @@ public class ReflectionAccessor<CTyp extends IOInstance<CTyp>> implements IField
 	}
 	
 	@Override
-	public Type getGenericType(){
-		return genericType;
+	public Type getGenericType(GenericContext genericContext){
+		if(genericContext==null){
+			return genericType;
+		}
+		return genericContext.resolveType(genericType);
 	}
 	
 	@Override

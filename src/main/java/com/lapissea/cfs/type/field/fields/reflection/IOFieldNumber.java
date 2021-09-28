@@ -6,6 +6,7 @@ import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.objects.INumber;
 import com.lapissea.cfs.objects.NumberSize;
+import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
@@ -68,9 +69,14 @@ public class IOFieldNumber<T extends IOInstance<T>, E extends INumber> extends I
 	}
 	
 	@Override
-	public void read(ChunkDataProvider provider, ContentReader src, T instance) throws IOException{
+	public void read(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		var size=getSize(instance);
 		set(instance, constructor.apply(size.read(src)));
+	}
+	@Override
+	public void skipRead(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		var size=getSize(instance);
+		size.read(src);
 	}
 	
 	@Override

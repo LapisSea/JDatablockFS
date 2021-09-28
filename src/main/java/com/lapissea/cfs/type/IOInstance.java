@@ -8,15 +8,17 @@ import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.util.UtilL;
+import com.lapissea.util.function.TriConsumer;
 
 import java.io.IOException;
 import java.util.Objects;
+import java.util.function.BiFunction;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.*;
 import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.*;
 
-@SuppressWarnings("UnusedReturnValue")
+@SuppressWarnings({"UnusedReturnValue", "unused"})
 public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 	
 	public abstract static class Unmanaged<SELF extends Unmanaged<SELF>> extends IOInstance<SELF> implements ChunkDataProvider.Holder{
@@ -26,6 +28,11 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 		private final TypeDefinition    typeDef;
 		
 		private StructPipe<SELF> pipe;
+		
+		public Unmanaged(ChunkDataProvider provider, Reference reference, TypeDefinition typeDef, TypeDefinition.Check check){
+			this(provider, reference, typeDef);
+			check.ensureValid(typeDef);
+		}
 		
 		public Unmanaged(ChunkDataProvider provider, Reference reference, TypeDefinition typeDef){
 			this.provider=Objects.requireNonNull(provider);
@@ -37,6 +44,10 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 		
 		public TypeDefinition getTypeDef(){
 			return typeDef;
+		}
+		
+		public GenericContext getGenerics(){
+			return getThisStruct().describeGenerics(typeDef);
 		}
 		
 		@Override
@@ -60,9 +71,22 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 		}
 		protected void readManagedFields() throws IOException{
 			try(var io=selfIO()){
-				getPipe().read(provider, io, self());
+				getPipe().read(provider, io, self(), getGenerics());
 			}
 		}
+		
+		protected void readManagedField(IOField<SELF, ?> field) throws IOException{
+			try(var io=getReference().io(this)){
+				getPipe().readSingleField(provider, io, field, self(), getGenerics());
+			}
+		}
+		
+		protected void writeManagedField(IOField<SELF, ?> field) throws IOException{
+			try(var io=getReference().io(this)){
+				getPipe().writeSingleField(provider, io, field, self());
+			}
+		}
+		
 		protected long calcSize(){
 			var siz=getPipe().getSizeDescriptor();
 			var f  =siz.getFixed();
@@ -100,12 +124,16 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 			}
 		}
 	}
-	protected Object accessVirtual(VirtualAccessor<SELF> accessor){
+	
+	private static <T extends IOInstance<T>> BiFunction<IOInstance<T>, VirtualAccessor<T>, Object> getVirtualRef() {return IOInstance::getVirtual;}
+	private static <T extends IOInstance<T>> TriConsumer<IOInstance<T>, VirtualAccessor<T>, Object> setVirtualRef(){return IOInstance::setVirtual;}
+	
+	private Object getVirtual(VirtualAccessor<SELF> accessor){
 		protectAccessor(accessor);
 		int index=accessor.getAccessIndex();
 		return virtualFields[index];
 	}
-	protected void accessVirtual(VirtualAccessor<SELF> accessor, Object value){
+	private void setVirtual(VirtualAccessor<SELF> accessor, Object value){
 		protectAccessor(accessor);
 		int index=accessor.getAccessIndex();
 		virtualFields[index]=value;
@@ -151,10 +179,15 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 			IOField.Ref<SELF, ?> selfRef=(IOField.Ref<SELF, ?>)f;
 			if(selfRef.get(self())!=null) continue;
 			
-			selfRef.allocate(self(), provider);
+			selfRef.allocate(self(), provider, getGenericContext());
 			dirty=true;
 		}
 		return dirty;
+	}
+	
+	private GenericContext getGenericContext(){
+		//TODO: find generic context?
+		return null;
 	}
 	
 	public static boolean isManaged(TypeDefinition type){

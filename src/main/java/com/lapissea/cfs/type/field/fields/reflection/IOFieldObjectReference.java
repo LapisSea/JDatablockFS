@@ -9,6 +9,7 @@ import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
+import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.IOField;
@@ -17,6 +18,7 @@ import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.IFieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.util.NotImplementedException;
 
 import java.io.IOException;
 import java.util.List;
@@ -57,7 +59,7 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	}
 	
 	@Override
-	public void allocate(T instance, ChunkDataProvider provider) throws IOException{
+	public void allocate(T instance, ChunkDataProvider provider, GenericContext genericContext) throws IOException{
 		ValueType val=struct.requireEmptyConstructor().get();
 		alloc(instance, provider, val);
 		set(instance, val);
@@ -100,7 +102,7 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 		}
 		return ref;
 	}
-	private ValueType readValue(ChunkDataProvider provider, Reference readNew) throws IOException{
+	private ValueType readValue(ChunkDataProvider provider, Reference readNew, GenericContext genericContext) throws IOException{
 		if(readNew.isNull()){
 			return switch(getNullability()){
 				case NULLABLE -> null;
@@ -110,7 +112,7 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 		}
 		ValueType val=struct.requireEmptyConstructor().get();
 		try(var io=readNew.io(provider)){
-			instancePipe.read(provider, io, val);
+			instancePipe.read(provider, io, val, genericContext);
 		}
 		return val;
 	}
@@ -144,7 +146,12 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	}
 	
 	@Override
-	public void read(ChunkDataProvider provider, ContentReader src, T instance) throws IOException{
-		set(instance, readValue(provider, Objects.requireNonNull(getRef(instance))));
+	public void read(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		set(instance, readValue(provider, Objects.requireNonNull(getRef(instance)), genericContext));
+	}
+	
+	@Override
+	public void skipRead(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		throw NotImplementedException.infer();//TODO: implement IOFieldObjectReference.skipRead()
 	}
 }

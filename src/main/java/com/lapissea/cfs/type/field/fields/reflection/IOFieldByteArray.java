@@ -3,6 +3,7 @@ package com.lapissea.cfs.type.field.fields.reflection;
 import com.lapissea.cfs.chunk.ChunkDataProvider;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
+import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
@@ -49,10 +50,16 @@ public class IOFieldByteArray<T extends IOInstance<T>> extends IOField<T, byte[]
 		return List.of();
 	}
 	@Override
-	public void read(ChunkDataProvider provider, ContentReader src, T instance) throws IOException{
+	public void read(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		int    size=arraySize.get(instance);
 		byte[] data=new byte[size];
 		src.readFully(data);
 		set(instance, data);
+	}
+	
+	@Override
+	public void skipRead(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		int size=arraySize.get(instance);
+		src.skipExact(size);
 	}
 }

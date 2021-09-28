@@ -274,4 +274,15 @@ public class Struct<T extends IOInstance<T>>{
 		var count=poolSizes[pool.ordinal()];
 		return count==0?null:new Object[count];
 	}
+	
+	public GenericContext describeGenerics(TypeDefinition def){
+		return new GenericContext.Deferred(()->{
+			var parms=getClass().getTypeParameters();
+			var types=IntStream.range(0, parms.length)
+			                   .boxed()
+			                   .collect(Collectors.toMap(i->parms[i].getName(), i->def.arg(i).generic()));
+			return new GenericContext.MapConstant(types);
+		});
+	}
+	
 }

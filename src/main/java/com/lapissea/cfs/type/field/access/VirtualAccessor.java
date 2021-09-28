@@ -1,6 +1,6 @@
 package com.lapissea.cfs.type.field.access;
 
-import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.IOField;
@@ -21,13 +21,20 @@ public class VirtualAccessor<CTyp extends IOInstance<CTyp>> implements IFieldAcc
 	private static final BiFunction<IOInstance<?>, VirtualAccessor<?>, Object>  GETTER;
 	private static final TriConsumer<IOInstance<?>, VirtualAccessor<?>, Object> SETTER;
 	
-	static{
+	@SuppressWarnings("unchecked")
+	private static <T> T sneakyGet(String name){
 		try{
-			GETTER=Utils.makeLambda(IOInstance.class.getDeclaredMethod("accessVirtual", VirtualAccessor.class), BiFunction.class);
-			SETTER=Utils.makeLambda(IOInstance.class.getDeclaredMethod("accessVirtual", VirtualAccessor.class, Object.class), TriConsumer.class);
-		}catch(NoSuchMethodException e){
+			var fun=IOInstance.class.getDeclaredMethod(name);
+			fun.setAccessible(true);
+			return (T)fun.invoke(null);
+		}catch(ReflectiveOperationException e){
 			throw new RuntimeException(e);
 		}
+	}
+	
+	static{
+		GETTER=sneakyGet("getVirtualRef");
+		SETTER=sneakyGet("setVirtualRef");
 	}
 	
 	private final Struct<CTyp>                         struct;
@@ -81,7 +88,7 @@ public class VirtualAccessor<CTyp extends IOInstance<CTyp>> implements IFieldAcc
 		return type.getType() instanceof Class<?> c?c:(Class<?>)((ParameterizedType)type.getType()).getRawType();
 	}
 	@Override
-	public Type getGenericType(){
+	public Type getGenericType(GenericContext genericContext){
 		return type.getType();
 	}
 	
