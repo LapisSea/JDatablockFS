@@ -108,6 +108,11 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 		virtualFields=getThisStruct().allocVirtualVarPool(INSTANCE);
 	}
 	public IOInstance(Struct<SELF> thisStruct){
+		if(DEBUG_VALIDATION){
+			if(!thisStruct.getType().equals(getClass())){
+				throw new IllegalArgumentException(thisStruct+" is not "+getClass());
+			}
+		}
 		this.thisStruct=thisStruct;
 		virtualFields=getThisStruct().allocVirtualVarPool(INSTANCE);
 	}
