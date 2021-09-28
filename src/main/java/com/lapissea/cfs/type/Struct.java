@@ -13,6 +13,7 @@ import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.util.*;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.Collections;
@@ -23,6 +24,8 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 public class Struct<T extends IOInstance<T>>{
@@ -78,6 +81,35 @@ public class Struct<T extends IOInstance<T>>{
 		@Override
 		public Supplier<T> requireEmptyConstructor(){
 			throw new UnsupportedOperationException();
+		}
+		
+		@Override
+		public String instanceToString(T instance, boolean doShort){
+			StringBuilder sb=new StringBuilder();
+			if(!doShort) sb.append(getType().getSimpleName());
+			sb.append('{');
+			boolean comma=false;
+			for(var field : getFields()){
+				var str=field.instanceToString(instance, doShort);
+				if(str==null) continue;
+				
+				if(comma) sb.append(", ");
+				
+				sb.append(field.getName()).append("=").append(str);
+				comma=true;
+			}
+			var iter=instance.listUnmanagedFields().iterator();
+			while(iter.hasNext()){
+				var field=iter.next();
+				var str  =field.instanceToString(instance, doShort);
+				if(str==null) continue;
+				
+				if(comma) sb.append(", ");
+				
+				sb.append(field.getName()).append("=").append(str);
+				comma=true;
+			}
+			return sb.append('}').toString();
 		}
 	}
 	
@@ -209,10 +241,14 @@ public class Struct<T extends IOInstance<T>>{
 	public FieldSet<T, ?> getFields(){
 		return fields;
 	}
+	public IOField<T, ?> toIOField(Field field){
+		if(field.getDeclaringClass()!=getType()) throw new IllegalArgumentException();
+		return getFields().byName(field.getName()).orElseThrow();
+	}
 	
 	public String instanceToString(T instance, boolean doShort){
 		StringBuilder sb=new StringBuilder();
-		if(!doShort) sb.append(type.getSimpleName());
+		if(!doShort) sb.append(getType().getSimpleName());
 		sb.append('{');
 		boolean comma=false;
 		for(var field : fields){
