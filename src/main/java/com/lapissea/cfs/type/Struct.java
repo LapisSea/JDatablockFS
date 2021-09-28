@@ -34,7 +34,7 @@ public class Struct<T extends IOInstance<T>>{
 		}
 		
 		public static Unmanaged<?> thisClass(){
-			return ofUnknown(getStack(s->s.skip(1)));
+			return ofUnknown(getStack(s->s.skip(2)));
 		}
 		
 		public static Unmanaged<?> ofUnknown(@NotNull Type instanceType){
@@ -93,7 +93,7 @@ public class Struct<T extends IOInstance<T>>{
 	}
 	
 	public static Struct<?> thisClass(){
-		return ofUnknown(getStack(s->s.skip(1)));
+		return ofUnknown(getStack(s->s.skip(2)));
 	}
 	
 	public static Struct<?> ofUnknown(@NotNull Type instanceType){
