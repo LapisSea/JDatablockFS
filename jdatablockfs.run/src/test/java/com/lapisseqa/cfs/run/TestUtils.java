@@ -10,6 +10,7 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.TypeDefinition;
 import com.lapissea.util.LateInit;
+import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeConsumer;
 import org.junit.jupiter.api.TestInfo;
 
@@ -25,20 +26,40 @@ public class TestUtils{
 	
 	static void testChunkProvider(TestInfo info, UnsafeConsumer<ChunkDataProvider, IOException> session) throws IOException{
 		
-		var mn=info.getTestMethod().map(Method::getName).orElse(null);
-		String sessionName=info.getDisplayName();
-		if(mn!=null&&!sessionName.contains(mn)){
-			sessionName=mn+": "+sessionName;
-		}
+		boolean shouldDeleteOk=false;
+		try{
+			shouldDeleteOk=Boolean.parseBoolean(System.getProperty("deleteOk"));
+		}catch(Throwable e){}
+		
+		
+		String sessionName=getSessionName(info);
 		
 		MemoryData<?> mem=LoggedMemoryUtils.newLoggedMemory(sessionName, LOGGER);
 		mem.write(true, Cluster.getMagicId());
-		
+		boolean deleting=false;
 		try{
 			session.accept(ChunkDataProvider.newVerySimpleProvider(mem));
+			if(shouldDeleteOk){
+				deleting=true;
+			}
 		}finally{
-			LOGGER.get().getSession(sessionName).finish();
+			var ses=LOGGER.get().getSession(sessionName);
+			if(deleting){
+				LogUtil.println("deleting ok session", sessionName);
+				ses.delete();
+			}else{
+				ses.finish();
+			}
 		}
+	}
+	
+	private static String getSessionName(TestInfo info){
+		var    mn         =info.getTestMethod().map(Method::getName).orElse(null);
+		String sessionName=info.getDisplayName();
+		if(mn!=null&&!sessionName.contains(mn)){
+			return mn+": "+sessionName;
+		}
+		return sessionName;
 	}
 	
 	static <T extends IOInstance.Unmanaged<?>> void complexObjectEqualityTest(
@@ -55,7 +76,12 @@ public class TestUtils{
 			
 			session.accept(obj);
 			
-			T read=constr.create(provider, ref, typeDef);
+			T read;
+			try{
+				read=constr.create(provider, ref, typeDef);
+			}catch(Throwable e){
+				throw new RuntimeException("Failed to read object with data", e);
+			}
 			
 			assertEquals(obj, read);
 		});

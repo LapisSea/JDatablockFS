@@ -31,12 +31,18 @@ public class GeneralTests{
 	
 	@BeforeAll
 	static void init() throws IOException{
-		System.setProperty("com.lapissea.cfs.GlobalConfig.printCompilation", "true");
+//		System.setProperty("com.lapissea.cfs.GlobalConfig.printCompilation", "true");
 //		LogUtil.Init.attach(USE_CALL_POS|USE_TABULATED_HEADER);
 		
 		ChunkDataProvider.newVerySimpleProvider();
-		
-//		Stream.of(Chunk.class, Reference.class, AutoText.class).forEach(Struct::ofUnknown);
+
+//		for(var c : Arrays.asList(Chunk.class, Reference.class, AutoText.class)){
+//			try{
+//				Struct.ofUnknown(c);
+//			}catch(Throwable e){
+//				LogUtil.printlnEr(e);
+//			}
+//		}
 	}
 	
 	@ParameterizedTest
@@ -139,9 +145,31 @@ public class GeneralTests{
 			var container=new GenericContainer<>(new Dummy(123));
 			
 			pipe.write(chunk, container);
-			var read=pipe.readNew(chunk);
+			var read=pipe.readNew(chunk, null);
 			
 			assertEquals(container, read);
+		});
+	}
+	
+	@Test
+	void stringTest(TestInfo info) throws IOException{
+		TestUtils.testChunkProvider(info, provider->{
+			String data="this is a test!";
+			
+			StructPipe<StringContainer> pipe=ContiguousStructPipe.of(StringContainer.class);
+			
+			var chunk=AllocateTicket.bytes(64).submit(provider);
+			
+			var text=new StringContainer(data);
+			
+			pipe.write(provider, chunk, text);
+			var read=pipe.readNew(chunk, null);
+			
+			LogUtil.println(text);
+			LogUtil.println(read);
+			LogUtil.println(chunk);
+			
+			assertEquals(text, read);
 		});
 	}
 	
@@ -162,9 +190,8 @@ public class GeneralTests{
 			
 			var text=new AutoText(data);
 			
-			LogUtil.println(text.getEncoding());
 			pipe.write(provider, chunk, text);
-			var read=pipe.readNew(chunk);
+			var read=pipe.readNew(chunk, null);
 			
 			LogUtil.println(text);
 			LogUtil.println(read);
@@ -176,7 +203,7 @@ public class GeneralTests{
 	
 	static <T extends IOInstance<T>> void linkedListEqualityTest(TestInfo info, Class<T> typ, UnsafeConsumer<LinkedIOList<T>, IOException> session) throws IOException{
 		TestUtils.complexObjectEqualityTest(
-			info, 32,
+			info, 10,
 			LinkedIOList<T>::new,
 			TypeDefinition.of(LinkedIOList.class, typ),
 			session

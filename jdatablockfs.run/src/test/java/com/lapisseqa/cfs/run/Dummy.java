@@ -7,7 +7,7 @@ public class Dummy extends IOInstance<Dummy>{
 	
 	private static int COUNT=0;
 	
-	static Dummy first(){return new Dummy(COUNT=0);}
+	static Dummy first(){return new Dummy(COUNT=123);}
 	static Dummy auto() {return new Dummy(COUNT++);}
 	
 	@IOValue

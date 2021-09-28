@@ -3,7 +3,6 @@ package com.lapisseqa.cfs.run;
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.io.impl.MemoryData;
-import com.lapissea.cfs.objects.GenericContainer;
 import com.lapissea.cfs.objects.collections.ContiguousIOList;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
@@ -57,7 +56,7 @@ class FSFTest{
 	
 	private static void doTests(Cluster provider) throws IOException{
 		
-		var roots=provider.getRootReferences();
+//		var roots=provider.getRootReferences();
 		
 		var chunk=AllocateTicket.bytes(64).submit(provider);
 		
@@ -68,8 +67,8 @@ class FSFTest{
 		
 		list.add(new Dummy(69));
 		list.add(new Dummy(420));
-		
-		roots.add(new GenericContainer<>(list));
+
+//		roots.add(new GenericContainer<>(list));
 
 
 //		var chunk=AllocateTicket.bytes(64).submit(provider);
