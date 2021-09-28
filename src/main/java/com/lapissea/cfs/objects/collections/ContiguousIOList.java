@@ -6,6 +6,7 @@ import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
+import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.TypeDefinition;
@@ -73,7 +74,7 @@ public class ContiguousIOList<T extends IOInstance<T>> extends IOInstance.Unmana
 					return "ArrayElement["+index+"]";
 				}
 				@Override
-				public Type getGenericType(){
+				public Type getGenericType(GenericContext genericContext){
 					return getTypeDef().arg(0).generic();
 				}
 				@Override
@@ -98,7 +99,11 @@ public class ContiguousIOList<T extends IOInstance<T>> extends IOInstance.Unmana
 					throw new UnsupportedOperationException();
 				}
 				@Override
-				public void read(ChunkDataProvider provider, ContentReader src, ContiguousIOList<T> instance) throws IOException{
+				public void read(ChunkDataProvider provider, ContentReader src, ContiguousIOList<T> instance, GenericContext genericContext) throws IOException{
+					throw new UnsupportedOperationException();
+				}
+				@Override
+				public void skipRead(ChunkDataProvider provider, ContentReader src, ContiguousIOList<T> instance, GenericContext genericContext) throws IOException{
 					throw new UnsupportedOperationException();
 				}
 			};
@@ -125,7 +130,7 @@ public class ContiguousIOList<T extends IOInstance<T>> extends IOInstance.Unmana
 			var skipped=io.skip(pos);
 			if(skipped!=pos) throw new IOException();
 			
-			return elementPipe.readNew(getChunkProvider(), io);
+			return elementPipe.readNew(getChunkProvider(), io, getGenerics());
 		}
 	}
 	
