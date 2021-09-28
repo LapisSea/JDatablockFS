@@ -9,6 +9,7 @@ class ServerCommons{
 	enum Action{
 		LOG,
 		RESET,
+		DELETE,
 		FINISH,
 		PING
 	}

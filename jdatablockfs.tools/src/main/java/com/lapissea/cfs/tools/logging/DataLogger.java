@@ -15,6 +15,8 @@ public interface DataLogger{
 			
 			@Override
 			public void reset(){}
+			@Override
+			public void delete(){}
 		}
 		
 		void log(MemFrame frame);
@@ -22,6 +24,8 @@ public interface DataLogger{
 		void finish();
 		
 		void reset();
+		
+		void delete();
 	}
 	
 	class Blank implements DataLogger{

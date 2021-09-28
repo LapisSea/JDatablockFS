@@ -34,6 +34,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 		
 		private final Runnable    setDirty;
 		private final IntConsumer onFrameChange;
+		private       boolean     markForDeletion;
 		
 		private Session(Runnable setDirty, IntConsumer onFrameChange){
 			this.setDirty=setDirty;
@@ -58,6 +59,13 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			frames.clear();
 			setFrame(0);
 		}
+		
+		@Override
+		public void delete(){
+			reset();
+			markForDeletion=true;
+		}
+		
 		private void setFrame(int frame){
 			if(frame>frames.size()-1) frame=frames.size()-1;
 			framePos.set(frame);
@@ -102,12 +110,10 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	private boolean filterMake =false;
 	private int[]   scrollRange=null;
 	
-	private final Thread glThread;
-	
 	private final TTFont font;
 	
 	public DisplayLWJGL(){
-		glThread=new Thread(this::displayLifecycle, "display");
+		var glThread=new Thread(this::displayLifecycle, "display");
 		
 		font=new TTFont("/CourierPrime-Regular.ttf", this::bulkDraw, ()->shouldRender=true, task->{
 			if(Thread.currentThread()==glThread){
@@ -145,7 +151,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			}
 			
 		});
-		window.registryMouseScroll.register(vec->displayedSession.ifPresent(ses->ses.setFrame(Math.max(0, (int)(getFramePos()+vec.y())))));
+		window.registryMouseScroll.register(vec->displayedSession.ifPresent(ses->ses.setFrame(Math.max(0, (int)(getFramePos()-vec.y())))));
 		
 		
 		Vec2i lastPos=new Vec2i();
@@ -180,6 +186,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 		});
 		
 		window.registryKeyboardKey.register(e->{
+			cleanUpSessions();
 			if(e.getType()!=GlfwKeyboardEvent.Type.DOWN&&displayedSession.isPresent()&&sessions.size()>1){
 				switch(e.getKey()){
 				case GLFW_KEY_UP -> {
@@ -305,6 +312,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 		try{
 			if(!destroyRequested){
 				window.whileOpen(()->{
+					cleanUpSessions();
 					if(!displayedSession.equals(activeSession)){
 						displayedSession=activeSession;
 						ifFrame(frame->calcSize(frame.data().length, true));
@@ -328,6 +336,10 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			
 			window.destroy();
 		}
+	}
+	private void cleanUpSessions(){
+		sessions.values().removeIf(s->s.markForDeletion);
+		activeSession.filter(s->s.markForDeletion).flatMap(s->sessions.values().stream().findAny()).ifPresent(this::setActiveSession);
 	}
 	
 	private void ifFrame(Consumer<MemFrame> o){
@@ -549,7 +561,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	}
 	
 	@Override
-	public Session getSession(String name){
+	public DataLogger.Session getSession(String name){
 		if(destroyRequested) return null;
 		
 		var ses=sessions.computeIfAbsent(

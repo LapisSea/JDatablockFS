@@ -28,6 +28,7 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 		private       int               pos;
 		
 		private final Runnable setDirty;
+		private       boolean  markForDeletion;
 		
 		private Session(Runnable setDirty, IntConsumer onFrameChange){
 			this.setDirty=setDirty;
@@ -47,6 +48,10 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 			frames.clear();
 			setPos(0);
 			setDirty.run();
+		}
+		@Override
+		public void delete(){
+			markForDeletion=true;
 		}
 		public void setPos(int pos){
 			if(this.pos==pos) return;
@@ -75,6 +80,7 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 		
 		public void paint(Graphics2D g){
 			try{
+				cleanUpSessions();
 				if(activeSession.isEmpty()||activeSession.get().frames.isEmpty()) return;
 				
 				var image=render;
@@ -136,6 +142,7 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 		frame.addKeyListener(new KeyAdapter(){
 			@Override
 			public void keyPressed(KeyEvent e){
+				cleanUpSessions();
 				activeSession.ifPresent(ses->{
 					if(e.getKeyChar()=='a'||e.getKeyCode()==37) ses.setPos(ses.getPos()-1);
 					if(e.getKeyChar()=='d'||e.getKeyCode()==39) ses.setPos(ses.getPos()+1);
@@ -204,6 +211,7 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 				
 				float val=x/(float)width;
 				
+				cleanUpSessions();
 				activeSession.ifPresent(ses->ses.setPos((int)(val*(ses.frames.size()-1))));
 				
 				pan.repaint();
@@ -213,6 +221,7 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 		pan.addMouseListener(new MouseAdapter(){
 			@Override
 			public void mouseClicked(MouseEvent e){
+				cleanUpSessions();
 				activeSession.ifPresent(ses->{
 					if(ses.frames.isEmpty()) return;
 					ses.frames.get(ses.getPos()).data().printStackTrace();
@@ -227,6 +236,11 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 	
 	boolean       shouldRerender=true;
 	BufferedImage render        =null;
+	
+	private void cleanUpSessions(){
+		sessions.values().removeIf(s->s.markForDeletion);
+		activeSession.filter(s->s.markForDeletion).ifPresent(s->activeSession=sessions.values().stream().findAny());
+	}
 	
 	@Override
 	protected BulkDraw bulkDraw(DrawMode mode){
@@ -377,7 +391,7 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 	}
 	
 	@Override
-	public Session getSession(String name){
+	public DataLogger.Session getSession(String name){
 		var ses=sessions.computeIfAbsent(
 			name,
 			nam->new Session(()->{

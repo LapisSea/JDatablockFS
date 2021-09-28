@@ -35,29 +35,39 @@ public class DisplayHost{
 		
 		Supplier<DataLogger.Session> ses=()->getDisplay().join().getSession(name);
 		
-		run:
-		while(true){
+		boolean running=true;
+		while(running){
 			try{
-				switch(Action.values()[objInput.readByte()]){
-				case LOG -> ses.get().log((MemFrame)objInput.readObject());
-				case RESET -> {
-					if(display!=null){
-						ses.get().reset();
-						System.gc();
+				running=switch(Action.values()[objInput.readByte()]){
+					case LOG -> {
+						ses.get().log((MemFrame)objInput.readObject());
+						yield true;
 					}
-				}
-				case FINISH -> {
-					client.close();
-					break run;
-				}
-				case PING -> {
-					out.write(2);
-					out.flush();
-				}
-				}
+					case RESET -> {
+						if(display!=null){
+							ses.get().reset();
+							System.gc();
+						}
+						yield true;
+					}
+					case FINISH -> {
+						ses.get().finish();
+						LogUtil.println("finishing");
+						yield false;
+					}
+					case PING -> {
+						out.write(2);
+						out.flush();
+						yield true;
+					}
+					case DELETE -> {
+						LogUtil.println("DELETE ORDER", name);
+						ses.get().delete();
+						yield false;
+					}
+				};
 			}catch(SocketException e){
 				if("Connection reset".equals(e.getMessage())){
-					LogUtil.println("disconnected");
 					break;
 				}
 				e.printStackTrace();
@@ -67,6 +77,7 @@ public class DisplayHost{
 				break;
 			}
 		}
+		LogUtil.println("disconnected", client);
 	}
 	
 	private CompletableFuture<DataLogger> display;

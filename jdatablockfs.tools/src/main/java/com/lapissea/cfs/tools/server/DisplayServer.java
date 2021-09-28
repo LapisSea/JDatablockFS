@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
 import static com.lapissea.cfs.tools.server.ServerCommons.*;
@@ -67,11 +68,18 @@ public class DisplayServer implements DataLogger{
 						e.printStackTrace();
 					}
 				}
+				@Override
+				public void delete(){
+					terminating(Action.DELETE);
+				}
 				
 				@Override
 				public void finish(){
+					terminating(Action.FINISH);
+				}
+				public void terminating(Action action){
 					try{
-						sendAction.accept(Action.FINISH);
+						sendAction.accept(action);
 						writer.flush();
 						is.read();
 						socket.close();
@@ -86,20 +94,45 @@ public class DisplayServer implements DataLogger{
 				ExecutorService    exec  =Executors.newSingleThreadExecutor();
 				DataLogger.Session logger=proxy;
 				proxy=new Session(){
+					
+					private boolean deleting;
+					
+					private void stop(){
+						exec.shutdown();
+						try{
+							exec.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+						}catch(InterruptedException ignored){}
+					}
+					
 					@Override
 					public void log(MemFrame frame){
-						exec.execute(()->logger.log(frame));
+						exec.execute(()->{
+							if(deleting) return;
+							logger.log(frame);
+						});
 					}
 					
 					@Override
 					public void reset(){
-						exec.execute(logger::reset);
+						exec.execute(()->{
+							if(deleting) return;
+							logger.reset();
+						});
+					}
+					@Override
+					public void delete(){
+						deleting=true;
+						exec.execute(logger::delete);
+						stop();
 					}
 					
 					@Override
 					public void finish(){
-						exec.execute(logger::finish);
-						exec.shutdown();
+						exec.execute(()->{
+							if(deleting) return;
+							logger.finish();
+						});
+						stop();
 					}
 				};
 			}
@@ -153,6 +186,10 @@ public class DisplayServer implements DataLogger{
 		@Override
 		public void reset(){
 			proxy.reset();
+		}
+		@Override
+		public void delete(){
+			proxy.delete();
 		}
 	}
 	
