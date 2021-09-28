@@ -176,7 +176,7 @@ public class Utils{
 	private static MethodHandles.Lookup getLookup(Class<?> clazz, int modifiers) throws IllegalAccessException{
 		allowModule(clazz);
 		var local=MethodHandles.lookup();
-		if(Modifier.isPublic(modifiers)) return local;
+		if(Modifier.isPublic(clazz.getModifiers())&&Modifier.isPublic(modifiers)) return local;
 		return MethodHandles.privateLookupIn(clazz, local);
 	}
 	private static void allowModule(Class<?> clazz){
