@@ -53,11 +53,6 @@ public class AutoText extends IOInstance<AutoText> implements CharSequence{
 		data=encoding.read(new ContentInputStream.BA(bytes), this);
 	}
 	
-	@IOValue
-	public CharEncoding getEncoding(){
-		return encoding;
-	}
-	
 	protected int charCount(){
 		return charCount;
 	}

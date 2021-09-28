@@ -18,7 +18,11 @@ public final class FieldSet<T extends IOInstance<T>, ValueType> extends Abstract
 	}
 	
 	public FieldSet(Collection<IOField<T, ? extends ValueType>> data){
-		this.data=List.copyOf(data);
+		this.data=switch(data){
+			case null -> throw new NullPointerException("data can not be null");
+			case FieldSet<T, ValueType> f -> f.data;
+			default -> List.copyOf(data);
+		};
 	}
 	
 	@Override

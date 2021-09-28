@@ -43,7 +43,7 @@ public interface ChunkDataProvider{
 		}
 		@Override
 		public String toString(){
-			return "DummyCache";
+			return "Very simple provider";
 		}
 	}
 	
@@ -65,8 +65,9 @@ public interface ChunkDataProvider{
 	
 	IOInterface getSource();
 	MemoryManager getMemoryManager();
-	
 	ChunkCache getChunkCache();
+	
+	Chunk getFirstChunk() throws IOException;
 	
 	default Chunk getChunkCached(ChunkPointer ptr){
 		Objects.requireNonNull(ptr);
@@ -75,10 +76,11 @@ public interface ChunkDataProvider{
 	default Chunk getChunk(ChunkPointer ptr) throws IOException{
 		Objects.requireNonNull(ptr);
 		
-		var cached=getChunkCached(ptr);
-		if(cached!=null){
-			var read=Chunk.readChunk(this, ptr);
-			if(!read.equals(cached)) throw new DesyncedCacheException(read, cached);
+		if(DEBUG_VALIDATION){
+			getChunkCache().ifCached(ptr, cached->{
+				var read=readChunk(ptr);
+				if(!read.equals(cached)) throw new DesyncedCacheException(read, cached);
+			});
 		}
 		
 		return getChunkCache().getOr(ptr, this::readChunk);
@@ -102,6 +104,4 @@ public interface ChunkDataProvider{
 		Chunk cached=getChunkCached(chunk.getPtr());
 		assert cached==chunk:"Fake "+chunk;
 	}
-	
-	Chunk getFirstChunk() throws IOException;
 }

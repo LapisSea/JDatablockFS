@@ -54,6 +54,7 @@ public final class Reference extends IOInstance<Reference>{
 	}
 	@Override
 	public String toString(){
+		if(ptr.isNull()) return ptr.toString();
 		return ptr+"+"+offset;
 	}
 	

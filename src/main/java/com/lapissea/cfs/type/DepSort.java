@@ -3,7 +3,6 @@ package com.lapissea.cfs.type;
 import com.lapissea.cfs.Index;
 import com.lapissea.util.ZeroArrays;
 
-import java.io.Serial;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.IntStream;
@@ -11,8 +10,6 @@ import java.util.stream.IntStream;
 public class DepSort<T>{
 	
 	public static class CycleException extends RuntimeException{
-		@Serial
-		private static final long serialVersionUID=-3414961779662539033L;
 		
 		public final Index cycle;
 		
@@ -126,9 +123,7 @@ public class DepSort<T>{
 	}
 	
 	public Index sort(IntStream orderSuggestion){
-		int[] arr=orderSuggestion.toArray();
-		
-		return new TSort().sort(Arrays.stream(arr));
+		return new TSort().sort(orderSuggestion);
 	}
 	
 	private IntStream getDependencies(int i){

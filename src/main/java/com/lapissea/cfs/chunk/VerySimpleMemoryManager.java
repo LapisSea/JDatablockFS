@@ -3,9 +3,12 @@ package com.lapissea.cfs.chunk;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
 import java.util.List;
+
+import static com.lapissea.cfs.GlobalConfig.*;
 
 public class VerySimpleMemoryManager implements MemoryManager{
 	
@@ -16,8 +19,8 @@ public class VerySimpleMemoryManager implements MemoryManager{
 	}
 	
 	@Override
-	public void free(List<Chunk> tofree){
-		throw NotImplementedException.infer();
+	public void free(List<Chunk> tofree) throws IOException{
+		throw new IOException("not supported");
 	}
 	
 	private long growFileAloc(Chunk target, long toAllocate) throws IOException{
@@ -45,6 +48,12 @@ public class VerySimpleMemoryManager implements MemoryManager{
 	
 	@Override
 	public void allocTo(Chunk firstChunk, Chunk target, long toAllocate) throws IOException{
+		
+		if(DEBUG_VALIDATION){
+			if(firstChunk.streamNext().noneMatch(c->c==target)){
+				throw new IllegalArgumentException(TextUtil.toString(target, "is in the chain of", firstChunk, "descendents:", firstChunk.collectNext()));
+			}
+		}
 		
 		long remaining=toAllocate;
 		while(remaining>0){

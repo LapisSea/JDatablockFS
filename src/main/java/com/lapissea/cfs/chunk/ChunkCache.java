@@ -5,6 +5,7 @@ import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.WeakValueHashMap;
+import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;
 
 import java.util.*;
@@ -35,8 +36,8 @@ public class ChunkCache{
 	
 	private final Map<ChunkPointer, Chunk> data;
 	
-	public ChunkCache(Supplier<Map<ChunkPointer, Chunk>> newData){
-		data=Objects.requireNonNull(newData.get());
+	public ChunkCache(Supplier<Map<ChunkPointer, Chunk>> dataInitializer){
+		data=Objects.requireNonNull(dataInitializer.get());
 	}
 	
 	public void add(Chunk chunk){
@@ -46,6 +47,13 @@ public class ChunkCache{
 	@Nullable
 	public Chunk get(ChunkPointer pointer){
 		return data.get(pointer);
+	}
+	
+	public <T extends Throwable> void ifCached(ChunkPointer pointer, UnsafeConsumer<Chunk, T> onPresent) throws T{
+		var chunk=get(pointer);
+		if(chunk!=null){
+			onPresent.accept(chunk);
+		}
 	}
 	
 	@NotNull
@@ -61,7 +69,7 @@ public class ChunkCache{
 		return generated;
 	}
 	
-	public boolean isReal(Chunk chunk) throws DesyncedCacheException{
+	public boolean isReal(Chunk chunk){
 		var cached=get(chunk.getPtr());
 		return chunk==cached;
 	}

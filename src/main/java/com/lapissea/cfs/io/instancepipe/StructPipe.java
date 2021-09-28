@@ -415,4 +415,9 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		return getType().allocVirtualVarPool(VirtualFieldDefinition.StoragePool.IO);
 	}
 	
+	
+	@Override
+	public String toString(){
+		return getClass().getSimpleName()+"{"+type.getType().getSimpleName()+"}";
+	}
 }
