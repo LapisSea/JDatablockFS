@@ -81,7 +81,7 @@ public class TTFont{
 			this.bitmapWidth=bitmapWidth;
 			this.bitmapHeight=bitmapHeight;
 			
-			LogUtil.println("Font map compiled:", pixelHeight, min, "->", max, "Size:", bitmapWidth+"x"+bitmapHeight);
+			//LogUtil.println("Font map compiled:", pixelHeight, min, "->", max, "Size:", bitmapWidth+"x"+bitmapHeight);
 			
 			ByteBuffer fillBitmap   =bitmap;
 			ByteBuffer outlineBitmap=BufferUtils.createByteBuffer(fillBitmap.capacity());
@@ -158,17 +158,21 @@ public class TTFont{
 	private final Runnable                                        renderRequest;
 	private final Consumer<Runnable>                              openglTask;
 	
-	public TTFont(String ttfPath, Function<BinaryDrawing.DrawMode, AutoCloseable> bulkHook, Runnable renderRequest, Consumer<Runnable> openglTask){
-		this.bulkHook=bulkHook;
-		this.renderRequest=renderRequest;
-		this.openglTask=openglTask;
-		
-		byte[] ttfData;
-		try(var io=Objects.requireNonNull(getClass().getResourceAsStream(ttfPath))){
-			ttfData=io.readAllBytes();
+	private static byte[] readData(String ttfPath){
+		try(var io=Objects.requireNonNull(TTFont.class.getResourceAsStream(ttfPath))){
+			return io.readAllBytes();
 		}catch(IOException e){
 			throw new RuntimeException(e);
 		}
+	}
+	
+	public TTFont(String ttfPath, Function<BinaryDrawing.DrawMode, AutoCloseable> bulkHook, Runnable renderRequest, Consumer<Runnable> openglTask){
+		this(readData(ttfPath), bulkHook, renderRequest, openglTask);
+	}
+	public TTFont(byte[] ttfData, Function<BinaryDrawing.DrawMode, AutoCloseable> bulkHook, Runnable renderRequest, Consumer<Runnable> openglTask){
+		this.bulkHook=bulkHook;
+		this.renderRequest=renderRequest;
+		this.openglTask=openglTask;
 		
 		
 		ttfBB=ByteBuffer.allocateDirect(ttfData.length).order(ByteOrder.nativeOrder());
@@ -294,7 +298,7 @@ public class TTFont{
 			FloatBuffer x=stack.floats(0.0f);
 			FloatBuffer y=stack.floats(0.0f);
 			
-			STBTTAlignedQuad q=STBTTAlignedQuad.mallocStack(stack);
+			STBTTAlignedQuad q=STBTTAlignedQuad.malloc(stack);
 			
 			for(int i=0;i<string.length();i++){
 				char cp=string.charAt(i);
@@ -330,7 +334,7 @@ public class TTFont{
 		if(max<maxRequested){
 			max=maxRequested;
 			
-			var r=cacheLock.readLock();
+			var r=cacheLock.writeLock();
 			try{
 				r.lock();
 				bitmapCache.forEach(Bitmap::free);
@@ -364,7 +368,7 @@ public class TTFont{
 			FloatBuffer x=stack.floats(0.0f);
 			FloatBuffer y=stack.floats(0.0f);
 			
-			STBTTAlignedQuad q=STBTTAlignedQuad.mallocStack(stack);
+			STBTTAlignedQuad q=STBTTAlignedQuad.malloc(stack);
 			GL11.glBindTexture(GL11.GL_TEXTURE_2D, tex);
 			GL11.glEnable(GL11.GL_TEXTURE_2D);
 			
