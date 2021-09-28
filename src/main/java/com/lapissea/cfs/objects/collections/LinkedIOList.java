@@ -19,8 +19,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Stream;
 
-import static java.util.function.Predicate.*;
-
+@SuppressWarnings("unchecked")
 public class LinkedIOList<T extends IOInstance<T>> extends IOInstance.Unmanaged<LinkedIOList<T>> implements IOList<T>{
 	
 	
@@ -49,9 +48,11 @@ public class LinkedIOList<T extends IOInstance<T>> extends IOInstance.Unmanaged<
 		}
 	}
 	
-	private static final TypeDefinition.Check TYPE_CHECK=new TypeDefinition.Check(
+	private static final TypeDefinition.Check LIST_TYPE_CHECK=new TypeDefinition.Check(
 		LinkedIOList.class,
-		List.of(not(IOInstance::isManaged))
+		List.of(t->{
+			if(!IOInstance.isManaged(t)) throw new ClassCastException("not managed");
+		})
 	);
 	
 	@IOValue

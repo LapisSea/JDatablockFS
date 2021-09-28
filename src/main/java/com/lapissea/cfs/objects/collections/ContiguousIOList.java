@@ -25,13 +25,14 @@ import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
-import static java.util.function.Predicate.*;
-
+@SuppressWarnings("unchecked")
 public class ContiguousIOList<T extends IOInstance<T>> extends IOInstance.Unmanaged<ContiguousIOList<T>> implements IOList<T>{
 	
 	private static final TypeDefinition.Check TYPE_CHECK=new TypeDefinition.Check(
 		ContiguousIOList.class,
-		List.of(not(IOInstance::isManaged))
+		List.of(t->{
+			if(!IOInstance.isManaged(t)) throw new ClassCastException("not a managed "+IOInstance.class.getSimpleName());
+		})
 	);
 	
 	@IOValue

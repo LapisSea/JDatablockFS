@@ -3,48 +3,60 @@ package com.lapissea.cfs.type;
 import com.lapissea.cfs.SyntheticParameterizedType;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.lang.reflect.WildcardType;
 import java.util.Arrays;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
-import java.util.function.Predicate;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 public class TypeDefinition{
 	
 	public static class Check{
-		private final Predicate<Class<?>>             rawCheck;
-		private final List<Predicate<TypeDefinition>> argChecks;
+		private final Consumer<Class<?>>             rawCheck;
+		private final List<Consumer<TypeDefinition>> argChecks;
 		
-		public Check(Class<?> rawType, List<Predicate<TypeDefinition>> argChecks){
-			this(t->t.equals(rawType), argChecks);
+		public Check(Class<?> rawType, List<Consumer<TypeDefinition>> argChecks){
+			this(t->{
+				if(!t.equals(rawType)) throw new ClassCastException(rawType+" is not "+t);
+			}, argChecks);
 		}
-		public Check(Predicate<Class<?>> rawCheck, List<Predicate<TypeDefinition>> argChecks){
+		public Check(Consumer<Class<?>> rawCheck, List<Consumer<TypeDefinition>> argChecks){
 			this.rawCheck=rawCheck;
 			this.argChecks=List.copyOf(argChecks);
 		}
 		
-		public String findProblem(TypeDefinition type){
-			if(!rawCheck.test(type.getTypeClass())) return "Raw type in "+type+" is not valid";
-			if(type.argCount()!=argChecks.size()) return "Argument count in "+type+" should be "+argChecks.size()+" but is "+type.argCount();
-			int[] badIndex=IntStream.range(0, type.argCount()).filter(i->argChecks.get(i).test(type.arg(i))).toArray();
-			return switch(badIndex.length){
-				case 0 -> null;
-				case 1 -> "Argument "+badIndex[0]+" in "+type+" is not valid";
-				default -> "Arguments "+Arrays.toString(badIndex)+" in "+type+" are not valid";
-			};
-		}
-		public boolean isValid(TypeDefinition type){
-			return findProblem(type)==null;
-		}
 		public void ensureValid(TypeDefinition type){
-			var problem=findProblem(type);
-			if(problem!=null){
-				throw new IllegalArgumentException(type.toShortString()+" is not valid! Reason: "+problem);
+			try{
+				rawCheck.accept(type.getTypeClass());
+				if(type.argCount()!=argChecks.size()) throw new IllegalArgumentException("Argument count in "+type+" should be "+argChecks.size()+" but is "+type.argCount());
+				
+				var errs=new LinkedList<Throwable>();
+				
+				for(int i=0;i<argChecks.size();i++){
+					var typ=type.arg(i);
+					var ch =argChecks.get(i);
+					
+					try{
+						ch.accept(typ);
+					}catch(Throwable e){
+						errs.add(new IllegalArgumentException("Argument "+typ+" at "+i+" is not valid!", e));
+					}
+				}
+				
+				if(!errs.isEmpty()){
+					var err=new IllegalArgumentException("Generic arguments are invalid");
+					errs.forEach(err::addSuppressed);
+					throw err;
+				}
+			}catch(Throwable e){
+				throw new IllegalArgumentException(type.toShortString()+" is not valid!", e);
 			}
 		}
 	}
@@ -57,13 +69,21 @@ public class TypeDefinition{
 	
 	public static TypeDefinition of(Type genericType){
 		Objects.requireNonNull(genericType);
-		genericType=Utils.prottectFromVarType(genericType);
+		var cleanGenericType=Utils.prottectFromVarType(genericType);
 		
-		if(genericType instanceof ParameterizedType parm) return new TypeDefinition(
-			parm.getRawType().getTypeName(),
-			Arrays.stream(parm.getActualTypeArguments()).map(TypeDefinition::of).toArray(TypeDefinition[]::new)
-		);
-		return new TypeDefinition(genericType.getTypeName(), NO_ARGS);
+		if(cleanGenericType instanceof WildcardType wild){
+			LogUtil.println(wild.getLowerBounds());
+			LogUtil.println(wild.getUpperBounds());
+		}
+		
+		if(cleanGenericType instanceof ParameterizedType parm){
+			var args=parm.getActualTypeArguments();
+			return new TypeDefinition(
+				(Class<?>)parm.getRawType(),
+				Arrays.stream(args).filter(arg->!arg.equals(genericType)).map(TypeDefinition::of).toArray(TypeDefinition[]::new)
+			);
+		}
+		return new TypeDefinition((Class<?>)cleanGenericType, NO_ARGS);
 	}
 	
 	private Class<?> typeClass;
@@ -78,9 +98,14 @@ public class TypeDefinition{
 	public TypeDefinition(){}
 	
 	
+	public TypeDefinition(Class<?> type, TypeDefinition... args){
+		this(type.getName(), args.clone());
+		this.typeClass=type;
+	}
+	
 	public TypeDefinition(String typeName, TypeDefinition... args){
 		this.typeName=typeName;
-		this.args=args.clone();
+		this.args=args.length==0?args:args.clone();
 	}
 	
 	public String getTypeName(){
