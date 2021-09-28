@@ -5,16 +5,17 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<properties>
+		<java.version>17</java.version>
+		<maven.compiler.release>${java.version}</maven.compiler.release>
+		<maven.compiler.target>${java.version}</maven.compiler.target>
+		<maven.compiler.source>${java.version}</maven.compiler.source>
 
 		<cfsVersion>1.0-SNAPSHOT</cfsVersion>
 
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<maven.compiler.release>17</maven.compiler.release>
 		<lwjgl.version>3.3.0-SNAPSHOT</lwjgl.version>
 		<joml.version>1.10.2</joml.version>
 		<lwjgl.natives>natives-windows</lwjgl.natives>
-		<maven.compiler.source>17</maven.compiler.source>
-		<maven.compiler.target>17</maven.compiler.target>
 	</properties>
 	<groupId>com.github.lapissea</groupId>
 	<artifactId>jdatablockfs.tools</artifactId>
