@@ -5,7 +5,7 @@ import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.ChunkDataProvider;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
-import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
+import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
@@ -46,14 +46,14 @@ public class LinkedIOList<T extends IOInstance<T>> extends IOInstance.Unmanaged<
 		
 		private static final NumberSize SIZE_VAL_SIZE=NumberSize.LARGEST;
 		
-		private final StructPipe<T> elementPipe;
+		private final StructPipe<T> valuePipe;
 		
 		public Node(ChunkDataProvider provider, Reference reference, TypeDefinition typeDef) throws IOException{
 			super(provider, reference, typeDef, NODE_TYPE_CHECK);
 			
 			var type=(Struct<T>)typeDef.argAsStruct(0);
 			type.requireEmptyConstructor();
-			this.elementPipe=FixedContiguousStructPipe.of(type);
+			this.valuePipe=ContiguousStructPipe.of(type);
 			
 			try(var io=this.getReference().io(this)){
 				var skipped=io.skip(SIZE_VAL_SIZE.bytes);
@@ -65,7 +65,8 @@ public class LinkedIOList<T extends IOInstance<T>> extends IOInstance.Unmanaged<
 		@Override
 		public Stream<IOField<Node<T>, ?>> listUnmanagedFields(){
 			var that=this;
-			return Stream.of(new IOField<Node<T>, T>(new IFieldAccessor<>(){
+			
+			var valueAccessor=new IFieldAccessor<Node<T>>(){
 				@Override
 				public Struct<Node<T>> getDeclaringStruct(){
 					throw NotImplementedException.infer();//TODO: implement .getDeclaringStruct()
@@ -80,7 +81,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends IOInstance.Unmanaged<
 					return that.getTypeDef().arg(0).generic();
 				}
 				@Override
-				public Object get(Node<T> instance){
+				public T get(Node<T> instance){
 					try{
 						return instance.getValue();
 					}catch(IOException e){
@@ -91,10 +92,23 @@ public class LinkedIOList<T extends IOInstance<T>> extends IOInstance.Unmanaged<
 				public void set(Node<T> instance, Object value){
 					throw NotImplementedException.infer();//TODO: implement .set()
 				}
-			}){
+			};
+			
+			return Stream.of(new IOField<Node<T>, T>(valueAccessor){
 				@Override
 				public SizeDescriptor<Node<T>> getSizeDescriptor(){
-					throw NotImplementedException.infer();//TODO: implement .getSizeDescriptor()
+					var desc=valuePipe.getSizeDescriptor();
+					{
+						var fixed=desc.getFixed();
+						if(fixed.isPresent()) return SizeDescriptor.Fixed.of(desc.getWordSpace(), fixed.getAsLong());
+					}
+					
+					return new SizeDescriptor.Unknown<>(desc.getWordSpace(), desc.getMin(), desc.getMax()){
+						@Override
+						public long calcUnknown(Node<T> instance){
+							return desc.calcUnknown(valueAccessor.get(instance));
+						}
+					};
 				}
 				@Override
 				public List<IOField<Node<T>, ?>> write(ChunkDataProvider provider, ContentWriter dest, Node<T> instance) throws IOException{
@@ -164,7 +178,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends IOInstance.Unmanaged<
 				if(io.remaining()==0){
 					return null;
 				}
-				return elementPipe.readNew(getChunkProvider(), io, getGenerics());
+				return valuePipe.readNew(getChunkProvider(), io, getGenerics());
 			}
 		}
 		
@@ -172,7 +186,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends IOInstance.Unmanaged<
 			try(var io=this.getReference().io(this)){
 				io.skipExact(SIZE_VAL_SIZE.bytes);
 				if(value!=null){
-					elementPipe.write(this, io, value);
+					valuePipe.write(this, io, value);
 				}
 				io.trim();
 			}
@@ -226,10 +240,12 @@ public class LinkedIOList<T extends IOInstance<T>> extends IOInstance.Unmanaged<
 		
 		var type=(Struct<T>)typeDef.argAsStruct(0);
 		type.requireEmptyConstructor();
-		this.elementPipe=FixedContiguousStructPipe.of(type);
+		this.elementPipe=ContiguousStructPipe.of(type);
 		
 		try(var io=reference.io(provider)){
-			if(io.getSize()==0) writeManagedFields();
+			if(io.getSize()==0){
+				writeManagedFields();
+			}
 		}
 		
 		//read data needed for proper function such as number of elements
