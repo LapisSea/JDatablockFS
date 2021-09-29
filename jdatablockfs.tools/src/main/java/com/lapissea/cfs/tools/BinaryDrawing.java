@@ -987,15 +987,19 @@ public abstract class BinaryDrawing{
 							annotateByteField(cluster, ctx, pointerRecord, instance, field, col, reference, Range.fromSize(fieldOffset, size));
 						}
 					}else{
-						if(UtilL.instanceOf(field.getAccessor().getType(), IOInstance.class)){
+						var typ=field.getAccessor().getType();
+						if(UtilL.instanceOf(typ, IOInstance.class)){
 							var inst=(IOInstance<?>)field.get(instance);
 							if(inst!=null){
 								annotateStruct(ctx, cluster, stack, (T)inst, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), inst.getThisStruct()), pointerRecord);
 							}
 							continue;
 						}
-						var typ=field.getAccessor().getType();
-						LogUtil.println(typ, "unamanaged");
+						if(typ==String.class){
+							annotateByteField(cluster, ctx, pointerRecord, instance, field, col, reference, Range.fromSize(fieldOffset, size));
+							continue;
+						}
+						LogUtil.printlnEr("unamanaged draw type:", typ);
 					}
 				}finally{
 					fieldOffset+=field.getSizeDescriptor().toBytes(size);
