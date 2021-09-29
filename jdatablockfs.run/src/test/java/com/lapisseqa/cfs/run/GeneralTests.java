@@ -1,32 +1,32 @@
 package com.lapisseqa.cfs.run;
 
 import com.lapissea.cfs.chunk.AllocateTicket;
+import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.ChunkDataProvider;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.GenericContainer;
+import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.objects.collections.ContiguousIOList;
 import com.lapissea.cfs.objects.collections.HashIOMap;
-import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.objects.collections.LinkedIOList;
 import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.TypeDefinition;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeConsumer;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
-import org.junit.jupiter.api.parallel.Execution;
-import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
+import java.util.Arrays;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@Execution(ExecutionMode.CONCURRENT)
 public class GeneralTests{
 	
 	@BeforeAll
@@ -35,14 +35,14 @@ public class GeneralTests{
 //		LogUtil.Init.attach(USE_CALL_POS|USE_TABULATED_HEADER);
 		
 		ChunkDataProvider.newVerySimpleProvider();
-
-//		for(var c : Arrays.asList(Chunk.class, Reference.class, AutoText.class)){
-//			try{
-//				Struct.ofUnknown(c);
-//			}catch(Throwable e){
-//				LogUtil.printlnEr(e);
-//			}
-//		}
+		
+		for(var c : Arrays.asList(Chunk.class, Reference.class, AutoText.class)){
+			try{
+				Struct.ofUnknown(c);
+			}catch(Throwable e){
+				LogUtil.printlnEr(e);
+			}
+		}
 	}
 	
 	@ParameterizedTest
@@ -100,7 +100,12 @@ public class GeneralTests{
 	}
 	
 	@Test
-	void testContiguousIOList(TestInfo info) throws IOException{
+	void blankCluster(TestInfo info) throws IOException{
+		TestUtils.testCluster(info, ses->{});
+	}
+	
+	@Test
+	void contiguousIOList(TestInfo info) throws IOException{
 		TestUtils.complexObjectEqualityTest(
 			info, 64,
 			ContiguousIOList<Dummy>::new,
@@ -111,28 +116,22 @@ public class GeneralTests{
 			}
 		);
 	}
+	
 	@Test
 	void testHashIOMap(TestInfo info) throws IOException{
-		TestUtils.testChunkProvider(info, provider->{
-			var chunk=AllocateTicket.bytes(64).submit(provider);
-			
-			var ref=chunk.getPtr().makeReference(0);
-			var typ=TypeDefinition.of(HashIOMap.class, Integer.class, Integer.class);
-			
-			IOMap<Integer, Integer> map=new HashIOMap<>(provider, ref, typ);
-			
-			map.put(1, 11);
-			map.put(2, 12);
-			map.put(3, 13);
-			map.put(16, 21);
-			map.put(17, 22);
-			map.put(18, 23);
-			
-			
-			IOMap<Integer, Integer> read=new HashIOMap<>(provider, ref, typ);
-			
-			assertEquals(map, read);
-		});
+		TestUtils.complexObjectEqualityTest(
+			info, 64,
+			HashIOMap<Integer, Integer>::new,
+			TypeDefinition.of(HashIOMap.class, Integer.class, Integer.class),
+			map->{
+				map.put(1, 11);
+				map.put(2, 12);
+				map.put(3, 13);
+				map.put(16, 21);
+				map.put(17, 22);
+				map.put(18, 23);
+			}
+		);
 	}
 	
 	@Test
@@ -223,6 +222,18 @@ public class GeneralTests{
 			list.add(Dummy.first());
 			list.add(Dummy.auto());
 			list.add(Dummy.auto());
+		});
+	}
+	@Test
+	void linkedListAddRemove(TestInfo info) throws IOException{
+		linkedListEqualityTest(info, Dummy.class, list->{
+			list.add(Dummy.first());
+			list.add(Dummy.auto());
+			list.add(Dummy.auto());
+			list.add(Dummy.auto());
+			list.add(Dummy.auto());
+			
+			//TODO
 		});
 	}
 }

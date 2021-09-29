@@ -6,9 +6,8 @@ import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.objects.collections.ContiguousIOList;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
-import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.StructLayout;
 import com.lapissea.cfs.type.TypeDefinition;
-import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.LogUtil;
 
@@ -42,23 +41,11 @@ class FSFTest{
 		}
 	}
 	
-	static class Dummy extends IOInstance<Dummy>{
-		
-		@IOValue
-		int dummyValue;
-		
-		public Dummy(){
-		}
-		public Dummy(int dummyValue){
-			this.dummyValue=dummyValue;
-		}
-	}
-	
 	private static void doTests(Cluster provider) throws IOException{
 		
 //		var roots=provider.getRootReferences();
 		
-		var chunk=AllocateTicket.bytes(64).submit(provider);
+		var chunk=AllocateTicket.bytes(32).submit(provider);
 		
 		var ref=chunk.getPtr().makeReference(0);
 		var typ=TypeDefinition.of(ContiguousIOList.class, Dummy.class);
@@ -67,6 +54,9 @@ class FSFTest{
 		
 		list.add(new Dummy(69));
 		list.add(new Dummy(420));
+		
+		var meta=provider.getGenericTypes();
+		meta.add(new StructLayout("This is a test!"));
 
 //		roots.add(new GenericContainer<>(list));
 

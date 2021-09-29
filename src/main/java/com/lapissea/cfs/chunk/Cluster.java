@@ -7,7 +7,8 @@ import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
-import com.lapissea.cfs.objects.collections.ContiguousIOList;
+import com.lapissea.cfs.objects.collections.IOList;
+import com.lapissea.cfs.objects.collections.LinkedIOList;
 import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.StructLayout;
@@ -16,7 +17,6 @@ import com.lapissea.cfs.type.field.annotations.IOValue;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.List;
 
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.*;
 import static java.nio.charset.StandardCharsets.*;
@@ -94,8 +94,8 @@ public class Cluster implements ChunkDataProvider{
 		
 		@IOValue
 		@IONullability(NULLABLE)
-		@IOValue.OverrideType(value=ContiguousIOList.class)
-		public List<StructLayout> types;
+		@IOValue.OverrideType(value=LinkedIOList.class)
+		public IOList<StructLayout> types;
 	}
 	
 	private final ChunkCache chunkCache=ChunkCache.weak();
@@ -131,10 +131,13 @@ public class Cluster implements ChunkDataProvider{
 	public RootRef getRoot(){
 		return root;
 	}
-
-//	public IOList<GenericContainer<?>> getRootReferences(){
+	
+	//	public IOList<GenericContainer<?>> getRootReferences(){
 //		return root.getMetadata().rootReferences;
 //	}
+	public IOList<StructLayout> getGenericTypes(){
+		return root.getMetadata().types;
+	}
 	
 	@Override
 	public IOInterface getSource(){

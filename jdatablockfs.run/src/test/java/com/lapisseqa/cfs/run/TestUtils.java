@@ -3,7 +3,7 @@ package com.lapisseqa.cfs.run;
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.ChunkDataProvider;
 import com.lapissea.cfs.chunk.Cluster;
-import com.lapissea.cfs.io.impl.MemoryData;
+import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.cfs.type.IOInstance;
@@ -24,7 +24,7 @@ public class TestUtils{
 	private static final LateInit<DataLogger> LOGGER=LoggedMemoryUtils.createLoggerFromConfig();
 	
 	
-	static void testChunkProvider(TestInfo info, UnsafeConsumer<ChunkDataProvider, IOException> session) throws IOException{
+	static void testRawMem(TestInfo info, UnsafeConsumer<IOInterface, IOException> session) throws IOException{
 		
 		boolean shouldDeleteOk=false;
 		try{
@@ -34,11 +34,10 @@ public class TestUtils{
 		
 		String sessionName=getSessionName(info);
 		
-		MemoryData<?> mem=LoggedMemoryUtils.newLoggedMemory(sessionName, LOGGER);
-		mem.write(true, Cluster.getMagicId());
-		boolean deleting=false;
+		IOInterface mem     =LoggedMemoryUtils.newLoggedMemory(sessionName, LOGGER);
+		boolean     deleting=false;
 		try{
-			session.accept(ChunkDataProvider.newVerySimpleProvider(mem));
+			session.accept(mem);
 			if(shouldDeleteOk){
 				deleting=true;
 			}
@@ -51,6 +50,20 @@ public class TestUtils{
 				ses.finish();
 			}
 		}
+	}
+	
+	static void testChunkProvider(TestInfo info, UnsafeConsumer<ChunkDataProvider, IOException> session) throws IOException{
+		testRawMem(info, mem->{
+			mem.write(true, Cluster.getMagicId());
+			session.accept(ChunkDataProvider.newVerySimpleProvider(mem));
+		});
+	}
+	
+	static void testCluster(TestInfo info, UnsafeConsumer<Cluster, IOException> session) throws IOException{
+		testRawMem(info, mem->{
+			Cluster.init(mem);
+			session.accept(new Cluster(mem));
+		});
 	}
 	
 	private static String getSessionName(TestInfo info){
