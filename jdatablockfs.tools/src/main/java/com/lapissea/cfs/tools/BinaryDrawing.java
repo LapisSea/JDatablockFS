@@ -512,10 +512,16 @@ public abstract class BinaryDrawing{
 		}
 		postRender();
 	}
+	private void startFrame(){
+		clearFrame();
+		initRenderState();
+		initFont();
+		
+		drawBackgroundDots();
+	}
 	private void render(int frameIndex){
 		if(getFrameCount()==0){
-			clearFrame();
-			drawBackgroundDots();
+			startFrame();
 			return;
 		}
 		
@@ -553,11 +559,7 @@ public abstract class BinaryDrawing{
 			renderByte(b, ctx, withChar, xi, yi);
 		};
 		
-		clearFrame();
-		initRenderState();
-		initFont();
-		
-		drawBackgroundDots();
+		startFrame();
 		
 		setColor(Color.BLUE);
 		for(int i=0;i<magic.limit();i++){
