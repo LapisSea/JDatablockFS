@@ -230,13 +230,22 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	
 	public IOField<T, ValueType> forceMaxAsFixedSize(){
 		if(getSizeDescriptor().hasFixed()) return this;
-		if(!getSizeDescriptor().hasMax()) throw new FixedFormatNotSupportedException(this);
+		if(!getSizeDescriptor().hasMax()){
+			try{
+				throwInformativeFixedSizeError();
+			}catch(Throwable e){
+				throw new FixedFormatNotSupportedException(this, e);
+			}
+			throw new FixedFormatNotSupportedException(this);
+		}
 		var f=implMaxAsFixedSize();
 		f.initLateData(getDependencies(), getUsageHints().stream());
 		f.init();
 		if(!f.getSizeDescriptor().hasFixed()) throw new RuntimeException(this+" failed to make itslef fixed");
 		return f;
 	}
+	
+	protected void throwInformativeFixedSizeError(){}
 	
 	protected IOField<T, ValueType> implMaxAsFixedSize(){
 		throw new NotImplementedException();

@@ -8,6 +8,10 @@ public class FixedFormatNotSupportedException extends UnsupportedOperationExcept
 		super(field+" can not create a fixed form of itself");
 		this.field=field;
 	}
+	public FixedFormatNotSupportedException(IOField<?, ?> field, Throwable cause){
+		super(field+" can not create a fixed form of itself", cause);
+		this.field=field;
+	}
 	public IOField<?, ?> getField(){
 		return field;
 	}

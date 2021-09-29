@@ -119,4 +119,10 @@ public class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends IOField<
 	public void skipRead(ChunkDataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
 		readNew(provider, src, genericContext);
 	}
+	
+	@Override
+	protected void throwInformativeFixedSizeError(){
+		//TODO
+		throw new RuntimeException("Strings do not support fixed size yet. In future a max string size will be defined by the user if they wish for it to be fixed size compatible.");
+	}
 }
