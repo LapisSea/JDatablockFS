@@ -1,8 +1,11 @@
 package com.lapissea.cfs.chunk;
 
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.exceptions.BitDepthOutOfSpaceException;
 import com.lapissea.cfs.objects.ChunkPointer;
+import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
@@ -31,7 +34,10 @@ public class VerySimpleMemoryManager implements MemoryManager{
 			var toGrow   =Math.min(toAllocate, remaining);
 			if(toGrow>0){
 				try(var io=context.getSource().io()){
-					io.setCapacity(io.getCapacity()+toGrow);
+					var old=io.getCapacity();
+					io.setCapacity(old+toGrow);
+					io.setPos(old);
+					Utils.zeroFill(io::write, toGrow);
 				}
 				target.modifyAndSave(ch->ch.setCapacity(ch.getCapacity()+toGrow));
 				return toGrow;
@@ -40,9 +46,15 @@ public class VerySimpleMemoryManager implements MemoryManager{
 		return 0;
 	}
 	private long simplePin(Chunk target, long toAllocate) throws IOException{
-		var toPin=AllocateTicket.bytes(toAllocate).withApproval(c->target.getBodyNumSize().canFit(c.getPtr())).submit(this);
+		var toPin=AllocateTicket.bytes(Math.max(toAllocate, 8)).withApproval(c->target.getNextSize().canFit(c.getPtr())).submit(this);
 		if(toPin==null) return 0;
-		target.modifyAndSave(c->c.setNextPtr(toPin.getPtr()));
+		target.modifyAndSave(c->{
+			try{
+				c.setNextPtr(toPin.getPtr());
+			}catch(BitDepthOutOfSpaceException e){
+				throw new ShouldNeverHappenError(e);
+			}
+		});
 		return toPin.getCapacity();
 	}
 	
@@ -50,6 +62,13 @@ public class VerySimpleMemoryManager implements MemoryManager{
 	public void allocTo(Chunk firstChunk, Chunk target, long toAllocate) throws IOException{
 		
 		if(DEBUG_VALIDATION){
+			var ptr =firstChunk.getPtr();
+			var prev=new PhysicalChunkWalker(context.getFirstChunk()).stream().filter(Chunk::hasNextPtr).map(Chunk::getNextPtr).filter(p->p.equals(ptr)).findAny();
+			if(prev.isPresent()){
+				var ch=context.getChunk(prev.get());
+				throw new IllegalArgumentException(firstChunk+" is not the first chunk! "+ch+" declares it as next.");
+			}
+			
 			if(firstChunk.streamNext().noneMatch(c->c==target)){
 				throw new IllegalArgumentException(TextUtil.toString(target, "is in the chain of", firstChunk, "descendents:", firstChunk.collectNext()));
 			}
@@ -71,10 +90,12 @@ public class VerySimpleMemoryManager implements MemoryManager{
 	@Override
 	public Chunk alloc(AllocateTicket ticket) throws IOException{
 		var src=context.getSource();
-		
-		var siz    =src.getIOSize();
-		var builder=new ChunkBuilder(context, ChunkPointer.of(siz)).withCapacity(ticket.bytes()).withNext(ticket.next());
-		var chunk  =builder.create();
+		var siz=src.getIOSize();
+		var builder=new ChunkBuilder(context, ChunkPointer.of(siz))
+			.withCapacity(ticket.bytes())
+			.withNext(ticket.next())
+			.withExplicitNextSize(ticket.disableResizing()?NumberSize.VOID:NumberSize.bySize(ticket.next()).max(NumberSize.SHORT));
+		var chunk=builder.create();
 		if(!ticket.approve(chunk)) return null;
 		
 		try(var io=src.ioAt(chunk.getPtr().getValue())){

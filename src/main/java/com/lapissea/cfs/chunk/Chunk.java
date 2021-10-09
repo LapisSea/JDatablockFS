@@ -1,5 +1,6 @@
 package com.lapissea.cfs.chunk;
 
+import com.lapissea.cfs.exceptions.BitDepthOutOfSpaceException;
 import com.lapissea.cfs.exceptions.DesyncedCacheException;
 import com.lapissea.cfs.exceptions.MalformedPointerException;
 import com.lapissea.cfs.io.ChunkChainIO;
@@ -17,6 +18,7 @@ import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
+import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
@@ -91,7 +93,11 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		this.capacity=capacity;
 		this.size=size;
 		this.nextSize=Objects.requireNonNull(nextSize);
-		setNextPtr(nextPtr);
+		try{
+			setNextPtr(nextPtr);
+		}catch(BitDepthOutOfSpaceException e){
+			throw new RuntimeException(e);
+		}
 		
 		assert capacity>=size;
 		
@@ -194,7 +200,7 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		markDirty();
 	}
 	
-	public void forbidReadOnly(){
+	private void forbidReadOnly(){
 		if(reading) return;
 		if(isReadOnly()){
 			throw new UnsupportedOperationException();
@@ -214,6 +220,10 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		return bodyNumSize;
 	}
 	
+	public NumberSize getNextSize(){
+		return nextSize;
+	}
+	
 	@Override
 	public ChunkDataProvider getChunkProvider(){
 		return provider;
@@ -226,10 +236,13 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 	}
 	
 	@IOValue
-	public void setNextPtr(ChunkPointer nextPtr){
+	public void setNextPtr(ChunkPointer nextPtr) throws BitDepthOutOfSpaceException{
 		forbidReadOnly();
 		Objects.requireNonNull(nextPtr);
 		if(this.nextPtr.equals(nextPtr)) return;
+		if(!nextSize.canFit(nextPtr)){
+			throw new BitDepthOutOfSpaceException(nextSize, nextPtr.getValue());
+		}
 		this.nextPtr=nextPtr;
 		nextCache=null;
 		markDirty();
@@ -247,7 +260,11 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 	}
 	
 	public void clearNextPtr(){
-		setNextPtr(ChunkPointer.NULL);
+		try{
+			setNextPtr(ChunkPointer.NULL);
+		}catch(BitDepthOutOfSpaceException e){
+			throw new ShouldNeverHappenError(e);
+		}
 	}
 	
 	public Chunk nextUnsafe(){
