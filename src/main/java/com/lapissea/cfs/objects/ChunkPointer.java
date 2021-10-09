@@ -11,6 +11,7 @@ public final class ChunkPointer implements INumber{
 	
 	public static final ChunkPointer NULL=new ChunkPointer(0);
 	
+	@NotNull
 	public static ChunkPointer read(NumberSize size, ContentReader src) throws IOException{
 		return ChunkPointer.of(size.read(src));
 	}

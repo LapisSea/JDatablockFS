@@ -345,15 +345,13 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		
 		public MemoryData<?> build() throws IOException{
 			var actualData=readData();
+			dataProducer=null;
 			
-			try{
-				if(actualData instanceof byte[] data) return new Arr(data, this);
-				if(actualData instanceof ByteBuffer data) return new Buff(data.slice(), this);
-			}finally{
-				dataProducer=null;
-			}
-			
-			throw new RuntimeException("unknown data tyoe "+actualData);
+			return switch(actualData){
+				case byte[] data -> new Arr(data, this);
+				case ByteBuffer data -> new Buff(data, this);
+				default -> throw new RuntimeException("unknown data type "+actualData);
+			};
 		}
 	}
 	

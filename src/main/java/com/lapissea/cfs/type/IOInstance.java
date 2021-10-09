@@ -29,7 +29,7 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 		
 		private StructPipe<SELF> pipe;
 		
-		public Unmanaged(ChunkDataProvider provider, Reference reference, TypeDefinition typeDef, TypeDefinition.Check check){
+		protected Unmanaged(ChunkDataProvider provider, Reference reference, TypeDefinition typeDef, TypeDefinition.Check check){
 			this(provider, reference, typeDef);
 			check.ensureValid(typeDef);
 		}
@@ -53,6 +53,12 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 		@Override
 		public ChunkDataProvider getChunkProvider(){
 			return provider;
+		}
+		
+		protected boolean isSelfDataEmpty() throws IOException{
+			try(var io=selfIO()){
+				return io.getSize()==0;
+			}
 		}
 		
 		protected RandomIO selfIO() throws IOException{
@@ -96,6 +102,10 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 		
 		public Reference getReference(){
 			return reference;
+		}
+		
+		protected final boolean allocateNulls() throws IOException{
+			return allocateNulls(getChunkProvider());
 		}
 	}
 	
@@ -150,6 +160,9 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 	@Override
 	public String toString(){
 		return getThisStruct().instanceToString(self(), false);
+	}
+	public String toShortString(){
+		return getThisStruct().instanceToString(self(), true);
 	}
 	
 	@Override

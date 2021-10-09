@@ -104,6 +104,23 @@ public interface IterablePP<T> extends Iterable<T>{
 			}
 		};
 	}
+	
+	default <L> IterablePP<L> map(Function<T, L> mapper){
+		var that=this;
+		return ()->new Iterator<>(){
+			final Iterator<T> src=that.iterator();
+			
+			@Override
+			public boolean hasNext(){
+				return src.hasNext();
+			}
+			@Override
+			public L next(){
+				return mapper.apply(src.next());
+			}
+		};
+	}
+	
 	static <T> IterablePP<T> nullTerminated(Supplier<Supplier<T>> supplier){
 		return ()->new Iterator<T>(){
 			final Supplier<T> src=supplier.get();

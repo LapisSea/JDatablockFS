@@ -252,7 +252,7 @@ public class Struct<T extends IOInstance<T>>{
 		sb.append('{');
 		boolean comma=false;
 		for(var field : fields){
-			var str=field.instanceToString(instance, doShort);
+			var str=field.instanceToString(instance, doShort||TextUtil.USE_SHORT_IN_COLLECTIONS);
 			if(str==null) continue;
 			
 			if(comma) sb.append(", ");
@@ -285,4 +285,15 @@ public class Struct<T extends IOInstance<T>>{
 		});
 	}
 	
+	@Override
+	public boolean equals(Object o){
+		return this==o||
+		       o instanceof Struct<?> that&&
+		       type.equals(that.type);
+	}
+	
+	@Override
+	public int hashCode(){
+		return type.hashCode();
+	}
 }

@@ -379,4 +379,13 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		long end  =dataEnd();
 		return index>=start&&index<end;
 	}
+	
+	@Override
+	public String toString(){
+		StringBuilder sb=new StringBuilder().append("Chunk{").append(getPtr()).append(" ").append(getSize()).append("/").append(getCapacity()).append(bodyNumSize.shortName);
+		if(hasNextPtr()){
+			sb.append(" -> ").append(getNextPtr()).append(nextSize.shortName);
+		}
+		return sb.append("}").toString();
+	}
 }

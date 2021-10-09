@@ -508,7 +508,11 @@ public abstract class BinaryDrawing{
 			render(getFramePos());
 		}catch(Throwable e){
 			errorMode=true;
-			render(getFramePos());
+			try{
+				render(getFramePos());
+			}catch(Throwable e1){
+				e1.printStackTrace();
+			}
 		}
 		postRender();
 	}

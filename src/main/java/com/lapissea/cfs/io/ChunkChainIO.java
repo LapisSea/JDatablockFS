@@ -211,6 +211,7 @@ public class ChunkChainIO implements RandomIO{
 	@Override
 	public void close() throws IOException{
 		cursor.syncStruct();
+		source.close();
 	}
 	
 	@Override
@@ -362,6 +363,19 @@ public class ChunkChainIO implements RandomIO{
 	}
 	@Override
 	public String toString(){
-		return this.getClass().getSimpleName()+"{"+head.getPtr()+", pos="+cursor.getPtr()+"+"+calcCursorOffset()+"}";
+		String siz;
+		try{
+			siz=getSize()+"";
+		}catch(IOException e){
+			siz="?";
+		}
+		String cap;
+		try{
+			cap=getCapacity()+"";
+		}catch(IOException e){
+			cap="?";
+		}
+		return this.getClass().getSimpleName()+"{@"+getPos()+" / "+siz+"("+cap+")"+""+
+		       " pos="+cursor.getPtr()+"+"+calcCursorOffset()+"}";
 	}
 }
