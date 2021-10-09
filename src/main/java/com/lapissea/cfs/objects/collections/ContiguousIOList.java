@@ -13,21 +13,18 @@ import com.lapissea.cfs.type.TypeDefinition;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.IFieldAccessor;
-import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
-import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Objects;
-import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
 @SuppressWarnings("unchecked")
-public class ContiguousIOList<T extends IOInstance<T>> extends IOInstance.Unmanaged<ContiguousIOList<T>> implements IOList<T>{
+public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOList<T, ContiguousIOList<T>>{
 	
 	private static final TypeDefinition.Check TYPE_CHECK=new TypeDefinition.Check(
 		ContiguousIOList.class,
@@ -36,23 +33,19 @@ public class ContiguousIOList<T extends IOInstance<T>> extends IOInstance.Unmana
 		})
 	);
 	
-	@IOValue
-	private long size;
-	
-	private final Struct<T>     type;
 	private final long          sizePerElement;
 	private final StructPipe<T> elementPipe;
 	
 	public ContiguousIOList(ChunkDataProvider provider, Reference reference, TypeDefinition typeDef) throws IOException{
 		super(provider, reference, typeDef);
 		TYPE_CHECK.ensureValid(typeDef);
-		this.type=(Struct<T>)typeDef.argAsStruct(0);
+		var type=(Struct<T>)typeDef.argAsStruct(0);
 		type.requireEmptyConstructor();
 		this.elementPipe=FixedContiguousStructPipe.of(type);
 		sizePerElement=elementPipe.getSizeDescriptor().getFixed().orElseThrow();
 		
-		try(var io=reference.io(provider)){
-			if(io.getSize()==0) writeManagedFields();
+		if(isSelfDataEmpty()){
+			writeManagedFields();
 		}
 		
 		//read data needed for proper function such as number of elements
@@ -110,14 +103,13 @@ public class ContiguousIOList<T extends IOInstance<T>> extends IOInstance.Unmana
 		});
 	}
 	
-	@Override
-	public long size(){
-		return size;
+	private long calcElementOffset(long index){
+		var siz=calcSize();
+		return siz+sizePerElement*index;
 	}
-	
 	private void writeAt(long index, T value) throws IOException{
 		try(var io=selfIO()){
-			var pos    =calcSize()+sizePerElement*index;
+			var pos    =calcElementOffset(index);
 			var skipped=io.skip(pos);
 			if(skipped!=pos) throw new IOException();
 			
@@ -126,7 +118,7 @@ public class ContiguousIOList<T extends IOInstance<T>> extends IOInstance.Unmana
 	}
 	private T readAt(long index) throws IOException{
 		try(var io=selfIO()){
-			var pos    =calcSize()+sizePerElement*index;
+			var pos    =calcElementOffset(index);
 			var skipped=io.skip(pos);
 			if(skipped!=pos) throw new IOException();
 			
@@ -136,46 +128,100 @@ public class ContiguousIOList<T extends IOInstance<T>> extends IOInstance.Unmana
 	
 	@Override
 	public T get(long index) throws IOException{
-		Objects.checkIndex(index, size);
+		checkSize(index);
 		return readAt(index);
 	}
 	
 	@Override
 	public void set(long index, T value) throws IOException{
-		Objects.checkIndex(index, size);
+		checkSize(index);
 		writeAt(index, value);
+	}
+	
+	@Override
+	public void add(long index, T value) throws IOException{
+		checkSize(index, 1);
+		if(index==size()){
+			add(value);
+			return;
+		}
+		
+		shift(index, ShiftAction.FORWARD_DUP);
+		writeAt(index, value);
+		deltaSize(1);
 	}
 	
 	@Override
 	public void add(T value) throws IOException{
 		Objects.requireNonNull(value);
 		
-		writeAt(size, value);
-		size++;
-		writeManagedFields();
+		writeAt(size(), value);
+		deltaSize(1);
 	}
 	
 	@Override
-	public boolean equals(Object o){
-		if(this==o) return true;
-		if(!(o instanceof ContiguousIOList<?> that)) return false;
+	public void remove(long index) throws IOException{
+		checkSize(index);
 		
-		if(size!=that.size) return false;
-		if(!type.equals(that.type)) return false;
+		shift(index, ShiftAction.SQUASH);
 		
-		for(long i=0;i<size;i++){
-			try{
-				if(!get(i).equals(that.get(i))) return false;
-			}catch(IOException e){
-				throw new RuntimeException(e);
-			}
+		deltaSize(-1);
+	}
+	
+	private enum ShiftAction{
+		SQUASH, FORWARD_DUP
+	}
+	
+	private void shift(long index, ShiftAction action) throws IOException{
+		try(var io=selfIO()){
+			byte[] buff=new byte[Math.toIntExact(sizePerElement)];
+			
+			int dummy=switch(action){
+				case SQUASH -> {
+					for(long i=index;i<size()-1;i++){
+						var nextPos=calcElementOffset(i+1);
+						io.setPos(nextPos);
+						io.readFully(buff);
+						
+						var pos=calcElementOffset(i);
+						io.setPos(pos);
+						io.write(buff);
+					}
+					
+					var lastOff=calcElementOffset(size()-1);
+					io.setCapacity(lastOff);
+					yield 0;
+				}
+				case FORWARD_DUP -> {
+					var lastOff=calcElementOffset(size()+1);
+					io.setCapacity(lastOff);
+					
+					for(long i=index;i<size();i++){
+						
+						var pos=calcElementOffset(i);
+						io.setPos(pos);
+						io.readFully(buff);
+						
+						var nextPos=calcElementOffset(i+1);
+						io.setPos(nextPos);
+						io.write(buff);
+					}
+					yield 0;
+				}
+			};
 		}
-		
-		return true;
 	}
 	
 	@Override
-	public String toString(){
-		return stream().map(TextUtil::toShortString).collect(Collectors.joining(", ", "[", "]"));
+	public void requestCapacity(long capacity) throws IOException{
+		try(var io=selfIO()){
+			var cap=calcElementOffset(capacity);
+			io.ensureCapacity(cap);
+		}
+	}
+	
+	@Override
+	public Struct<T> getElementType(){
+		return elementPipe.getType();
 	}
 }

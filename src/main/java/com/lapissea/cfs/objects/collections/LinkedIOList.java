@@ -26,11 +26,10 @@ import java.io.IOException;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.List;
-import java.util.Objects;
 import java.util.stream.Stream;
 
 @SuppressWarnings("unchecked")
-public class LinkedIOList<T extends IOInstance<T>> extends IOInstance.Unmanaged<LinkedIOList<T>> implements IOList<T>{
+public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>{
 	
 	
 	private static class Node<T extends IOInstance<T>> extends IOInstance.Unmanaged<Node<T>>{
@@ -47,6 +46,12 @@ public class LinkedIOList<T extends IOInstance<T>> extends IOInstance.Unmanaged<
 		private static final NumberSize SIZE_VAL_SIZE=NumberSize.LARGEST;
 		
 		private final StructPipe<T> valuePipe;
+		
+		public Node(ChunkDataProvider provider, Reference reference, TypeDefinition typeDef, T val, Node<T> next) throws IOException{
+			this(provider, reference, typeDef);
+			if(next!=null) setNext(next);
+			if(val!=null) setValue(val);
+		}
 		
 		public Node(ChunkDataProvider provider, Reference reference, TypeDefinition typeDef) throws IOException{
 			super(provider, reference, typeDef, NODE_TYPE_CHECK);
@@ -186,19 +191,24 @@ public class LinkedIOList<T extends IOInstance<T>> extends IOInstance.Unmanaged<
 				io.trim();
 			}
 		}
-		
-		Node<T> getNext() throws IOException{
+		private ChunkPointer readNextPtr() throws IOException{
 			ChunkPointer chunk;
 			try(var io=getReference().io(this)){
 				if(io.remaining()==0){
-					return null;
+					return ChunkPointer.NULL;
 				}
 				chunk=ChunkPointer.read(SIZE_VAL_SIZE, io);
 			}
-			if(chunk.isNull()) return null;
-			
-			return new Node<>(getChunkProvider(), new Reference(chunk, 0), getTypeDef());
+			return chunk;
 		}
+		
+		Node<T> getNext() throws IOException{
+			var ptr=readNextPtr();
+			if(ptr.isNull()) return null;
+			
+			return new Node<>(getChunkProvider(), new Reference(ptr, 0), getTypeDef());
+		}
+		
 		public void setNext(Node<T> next) throws IOException{
 			try(var io=getReference().io(this)){
 				ChunkPointer ptr;
@@ -206,6 +216,107 @@ public class LinkedIOList<T extends IOInstance<T>> extends IOInstance.Unmanaged<
 				else ptr=next.getReference().getPtr();
 				SIZE_VAL_SIZE.write(io, ptr);
 			}
+		}
+		@Override
+		public String toString(){
+			try{
+				var result=new StringBuilder().append("Node{").append(getValue());
+				
+				var next=readNextPtr();
+				if(!next.isNull()){
+					result.append(" -> ").append(next);
+				}
+				return result.append("}").toString();
+			}catch(IOException e){
+				throw new RuntimeException(e);
+			}
+		}
+	}
+	
+	private class LinkedIterator implements IOIterator.Iter<T>{
+		
+		private Node<T> node;
+		
+		private LinkedIterator(Node<T> node){
+			this.node=node;
+		}
+		
+		@Override
+		public boolean hasNext(){
+			return node!=null;
+		}
+		
+		@Override
+		public T ioNext() throws IOException{
+			var next=node.getNext();
+			var val =node.getValue();
+			node=next;
+			return val;
+		}
+	}
+	
+	private class LinkedListIterator extends IOListIterator.AbstractIndex<T>{
+		
+		private Node<T> node;
+		private long    nodeIndex;
+		
+		public LinkedListIterator(long cursorStart){
+			super(cursorStart);
+		}
+		
+		
+		private void resetNode() throws IOException{
+			node=getHead();
+			nodeIndex=0;
+		}
+		private void walkNode(long index) throws IOException{
+			if(node==null){
+				resetNode();
+			}
+			if(nodeIndex==index) return;
+			if(nodeIndex>index){
+				resetNode();
+			}
+			
+			node=getNode(node, nodeIndex, index);
+			nodeIndex=index;
+		}
+		
+		@Override
+		protected T getElement(long index) throws IOException{
+			walkNode(index);
+			return node.getValue();
+		}
+		
+		@Override
+		protected void removeElement(long index) throws IOException{
+			if(index>0){
+				walkNode(index-1);
+				popNodeFromPrev(node);
+			}else{
+				LinkedIOList.this.remove(index);
+				resetNode();
+			}
+		}
+		
+		@Override
+		protected void setElement(long index, T value) throws IOException{
+			walkNode(index);
+			node.setValue(value);
+		}
+		@Override
+		protected void addElement(long index, T value) throws IOException{
+			if(index>0){
+				walkNode(index-1);
+				insertNodeInFrontOf(node, value);
+			}else{
+				LinkedIOList.this.add(index, value);
+				resetNode();
+			}
+		}
+		@Override
+		protected long getSize(){
+			return LinkedIOList.this.size();
 		}
 	}
 	
@@ -217,10 +328,6 @@ public class LinkedIOList<T extends IOInstance<T>> extends IOInstance.Unmanaged<
 	);
 	
 	private final IOField<LinkedIOList<T>, Node<T>> headField=(IOField<LinkedIOList<T>, Node<T>>)Struct.Unmanaged.thisClass().getFields().byName("head").orElseThrow();
-	private final IOField<LinkedIOList<T>, Long>    sizeField=(IOField<LinkedIOList<T>, Long>)Struct.Unmanaged.thisClass().getFields().byName("size").orElseThrow();
-	
-	@IOValue
-	private long size;
 	
 	@IOValue
 	@IONullability(IONullability.Mode.NULLABLE)
@@ -237,10 +344,8 @@ public class LinkedIOList<T extends IOInstance<T>> extends IOInstance.Unmanaged<
 		type.requireEmptyConstructor();
 		this.elementPipe=ContiguousStructPipe.of(type);
 		
-		try(var io=reference.io(provider)){
-			if(io.getSize()==0){
-				writeManagedFields();
-			}
+		if(isSelfDataEmpty()){
+			writeManagedFields();
 		}
 		
 		//read data needed for proper function such as number of elements
@@ -248,11 +353,16 @@ public class LinkedIOList<T extends IOInstance<T>> extends IOInstance.Unmanaged<
 	}
 	
 	@Override
-	public long size(){return size;}
+	public Struct<T> getElementType(){
+		return elementPipe.getType();
+	}
 	
 	private Node<T> getNode(long index) throws IOException{
-		var node=readHead();
-		for(long i=0;i<index;i++){
+		return getNode(getHead(), 0, index);
+	}
+	private Node<T> getNode(Node<T> start, long startIndex, long index) throws IOException{
+		var node=start;
+		for(long i=startIndex;i<index;i++){
 			node=node.getNext();
 		}
 		return node;
@@ -260,13 +370,13 @@ public class LinkedIOList<T extends IOInstance<T>> extends IOInstance.Unmanaged<
 	
 	@Override
 	public T get(long index) throws IOException{
-		Objects.checkIndex(index, size());
+		checkSize(index);
 		return getNode(index).getValue();
 	}
 	
 	@Override
 	public void set(long index, T value) throws IOException{
-		Objects.checkIndex(index, size());
+		checkSize(index);
 		getNode(index).setValue(value);
 	}
 	
@@ -278,22 +388,80 @@ public class LinkedIOList<T extends IOInstance<T>> extends IOInstance.Unmanaged<
 	}
 	
 	@Override
+	public void add(long index, T value) throws IOException{
+		checkSize(index, 1);
+		
+		if(index==size()){
+			add(value);
+			return;
+		}
+		
+		if(index==0){
+			var head=getHead();
+			setHead(allocValNode(value, head));
+			return;
+		}
+		
+		var prevNode=getNode(index-1);
+		
+		insertNodeInFrontOf(prevNode, value);
+	}
+	private void insertNodeInFrontOf(Node<T> prevNode, T value) throws IOException{
+		var     node   =prevNode.getNext();
+		Node<T> newNode=allocValNode(value, node);
+		prevNode.setNext(newNode);
+		deltaSize(1);
+	}
+	
+	@Override
 	public void add(T value) throws IOException{
+		Node<T> newNode=allocValNode(value, null);
+		
+		if(isEmpty()){
+			setHead(newNode);
+		}else{
+			getLastNode().setNext(newNode);
+		}
+		
+		deltaSize(1);
+	}
+	
+	private Node<T> allocValNode(T value, Node<T> next) throws IOException{
 		var chunk=AllocateTicket.bytes(NumberSize.LARGEST.bytes+switch(elementPipe.getSizeDescriptor()){
 			case SizeDescriptor.Fixed<T> f -> f.get();
 			case SizeDescriptor.Unknown<T> f -> f.calcUnknown(value);
 		}).submit(getChunkProvider());
-		var nood=new Node<T>(getChunkProvider(), chunk.getPtr().makeReference(), nodeType());
-		nood.setValue(value);
+		return new Node<>(getChunkProvider(), chunk.getPtr().makeReference(), nodeType(), value, next);
+	}
+	
+	@Override
+	public void remove(long index) throws IOException{
+		checkSize(index);
 		
-		if(isEmpty()){
-			writeHead(nood);
+		if(index==0){
+			if(isLast(index)){
+				setHead(null);
+			}else{
+				var newHead=getNode(1);
+				setHead(newHead);
+			}
+			deltaSize(-1);
 		}else{
-			getLastNode().setNext(nood);
+			popNodeFromPrev(getNode(index-1));
 		}
+	}
+	
+	private void popNodeFromPrev(Node<T> prevNode) throws IOException{
+		var toPop=prevNode.getNext();
+		if(toPop==null) return;
+		var nextNode=toPop.getNext();
 		
-		size++;
-		writeManagedField(sizeField);
+		prevNode.setNext(nextNode);
+		deltaSize(-1);
+	}
+	
+	private boolean isLast(long index){
+		return index==size()-1;
 	}
 	
 	@Override
@@ -305,15 +473,26 @@ public class LinkedIOList<T extends IOInstance<T>> extends IOInstance.Unmanaged<
 		return getNode(size()-1);
 	}
 	
-	private Node<T> readHead() throws IOException{
+	private Node<T> getHead() throws IOException{
 		readManagedField(headField);
-		if(head==null){
-			allocateNulls(getChunkProvider());
-		}
 		return head;
 	}
-	private void writeHead(Node<T> head) throws IOException{
+	private void setHead(Node<T> head) throws IOException{
 		this.head=head;
 		writeManagedField(headField);
+	}
+	
+	@Override
+	public IOIterator.Iter<T> iterator(){
+		try{
+			return new LinkedIterator(getHead());
+		}catch(IOException e){
+			throw new RuntimeException(e);
+		}
+	}
+	
+	@Override
+	public IOListIterator<T> listIterator(long startIndex){
+		return new LinkedListIterator(startIndex);
 	}
 }
