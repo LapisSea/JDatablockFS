@@ -353,15 +353,15 @@ public class Utils{
 		if(type instanceof TypeVariable<?> c) return genericInstanceOf(testType, extractFromVarType(c));
 		
 		if(type instanceof ParameterizedType parm){
-			Type[] args=parm.getActualTypeArguments(), testArgs;
-			if(testType instanceof ParameterizedType p) testArgs=p.getActualTypeArguments();
-			else return false;
-			if(testArgs.length!=0){
-				if(args.length!=testArgs.length) return false;
-				for(int i=0;i<args.length;i++){
-					if(!genericInstanceOf(testArgs[i], args[i])) return false;
-				}
-			}
+//			Type[] args=parm.getActualTypeArguments(), testArgs;
+//			if(testType instanceof ParameterizedType p) testArgs=p.getActualTypeArguments();
+//			else return false;
+//			if(testArgs.length!=0){
+//				if(args.length!=testArgs.length) return false;
+//				for(int i=0;i<args.length;i++){
+//					if(!genericInstanceOf(testArgs[i], args[i])) return false;
+//				}
+//			}
 			
 			return UtilL.instanceOf((Class<?>)((ParameterizedType)testType).getRawType(), (Class<?>)parm.getRawType());
 		}
