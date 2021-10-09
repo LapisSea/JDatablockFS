@@ -190,7 +190,7 @@ public class FieldCompiler{
 		for(Field field : deepFieldsByAnnotation(cl, IOValue.class)){
 			Type type=getType(field);
 			
-			registry.requireCanCreate(type);
+			registry.requireCanCreate(type, field::getAnnotation);
 			field.setAccessible(true);
 			
 			String fieldName=getFieldName(field);
@@ -355,7 +355,20 @@ public class FieldCompiler{
 	static{
 		REGISTRY.register(new RegistryNode(){
 			@Override
-			public boolean canCreate(Type type){
+			public boolean canCreate(Type type, GetAnnotation annotations){
+				return annotations.isPresent(IOType.Dynamic.class);
+			}
+			@Override
+			public <T extends IOInstance<T>> IOField<T, ?> create(IFieldAccessor<T> field, GenericContext genericContext){
+				if(field.hasAnnotation(IOValue.Reference.class)){
+					throw new NotImplementedException();
+				}
+				return new IOFieldDynamicInlineObject<>(field);
+			}
+		});
+		REGISTRY.register(new RegistryNode(){
+			@Override
+			public boolean canCreate(Type type, GetAnnotation annotations){
 				return IOFieldPrimitive.isPrimitive(type);
 			}
 			@Override
@@ -412,15 +425,6 @@ public class FieldCompiler{
 			public <T extends IOInstance<T>> IOField<T, ? extends IOInstance> create(IFieldAccessor<T> field, GenericContext genericContext){
 				Class<?> raw      =field.getType();
 				var      unmanaged=!IOInstance.isManaged(raw);
-				
-				if(field.hasAnnotation(IOType.Dynamic.class)){
-					if(unmanaged) throw new MalformedStructLayout("can't use unmanged on");
-					
-					if(field.hasAnnotation(IOValue.Reference.class)){
-						throw new NotImplementedException();
-					}
-					return new IOFieldDynamicInlineObject<>(field);
-				}
 				
 				if(unmanaged){
 					return new IOFieldUnmanagedObjectReference<>(field);
