@@ -91,7 +91,7 @@ public class IOFieldTools{
 	public static <T extends IOInstance<T>> IOField<T, NumberSize> getDynamicSize(IFieldAccessor<T> field){
 		Optional<String> dynSiz=Stream.of(
 			field.getAnnotation(IODependency.NumSize.class).map(IODependency.NumSize::value),
-			field.getAnnotation(IODependency.VirtualNumSize.class).map(IODependency.VirtualNumSize::name)
+			field.getAnnotation(IODependency.VirtualNumSize.class).map(e->IODependency.VirtualNumSize.Logic.getName(field, e))
 		).filter(Optional::isPresent).map(Optional::get).findAny();
 		
 		if(dynSiz.isEmpty()) return null;

@@ -39,7 +39,7 @@ public @interface IODependency{
 				return Set.of(annotation.value());
 			}
 			@Override
-			public Stream<IOField.UsageHint> getHints(NumSize annotation){
+			public <T extends IOInstance<T>> Stream<IOField.UsageHint> getHints(IFieldAccessor<T> field, NumSize annotation){
 				return Stream.of(new IOField.UsageHint(SIZE_DATA, annotation.value()));
 			}
 		};
@@ -71,22 +71,30 @@ public @interface IODependency{
 			RIGID_INITIAL
 		}
 		
-		AnnotationLogic<VirtualNumSize> LOGIC=new AnnotationLogic<>(){
+		class Logic implements AnnotationLogic<VirtualNumSize>{
 			@Override
 			public Set<String> getDependencyValueNames(IFieldAccessor<?> field, VirtualNumSize annotation){
-				return Set.of(annotation.name());
+				return Set.of(getName(field, annotation));
+			}
+			
+			public static String getName(IFieldAccessor<?> field, VirtualNumSize size){
+				var nam=size.name();
+				if(nam.isEmpty()){
+					return field.getName()+"Siz";
+				}
+				return nam;
 			}
 			
 			@Override
-			public Stream<IOField.UsageHint> getHints(VirtualNumSize annotation){
-				return Stream.of(new IOField.UsageHint(SIZE_DATA, annotation.name()));
+			public <T extends IOInstance<T>> Stream<IOField.UsageHint> getHints(IFieldAccessor<T> field, VirtualNumSize annotation){
+				return Stream.of(new IOField.UsageHint(SIZE_DATA, getName(field, annotation)));
 			}
 			
 			@Override
 			public <T extends IOInstance<T>> List<VirtualFieldDefinition<T, ?>> injectPerInstanceValue(IFieldAccessor<T> field, VirtualNumSize ann){
 				return List.of(new VirtualFieldDefinition<>(
 					ann.retention()==GHOST?IO:INSTANCE,
-					ann.name(),
+					getName(field, ann),
 					NumberSize.class,
 					new VirtualFieldDefinition.GetterFilter<T, NumberSize>(){
 						private NumberSize calcMax(T inst, List<IFieldAccessor<T>> deps){
@@ -110,9 +118,12 @@ public @interface IODependency{
 						}
 					}));
 			}
-		};
+		}
 		
-		String name();
+		AnnotationLogic<VirtualNumSize> LOGIC=new Logic();
+		
+		
+		String name() default "";
 		
 		NumberSize min() default NumberSize.VOID;
 		NumberSize max() default NumberSize.LONG;

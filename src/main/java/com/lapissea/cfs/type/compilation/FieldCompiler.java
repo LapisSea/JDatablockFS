@@ -71,7 +71,7 @@ public class FieldCompiler{
 			field.initLateData(new FieldSet<>(generateDependencies(fields, depAn, field)),
 			                   fields.stream()
 			                         .flatMap(f->f.annotations.stream()
-			                                                  .flatMap(an->an.logic.getHints(an.annotation)
+			                                                  .flatMap(an->an.logic.getHints(f.field.getAccessor(), an.annotation)
 			                                                                       .map(h->h.target()==null?
 			                                                                               new IOField.UsageHint(h.type(), f.field.getName()):
 			                                                                               h)
