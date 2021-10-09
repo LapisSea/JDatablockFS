@@ -1,11 +1,26 @@
 package com.lapissea.cfs.type;
 
+import com.lapissea.cfs.type.field.access.IFieldAccessor;
+
 import java.lang.annotation.Annotation;
 import java.util.Collection;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 public interface GetAnnotation{
+	
+	static GetAnnotation from(IFieldAccessor<?> accessor){
+		return new GetAnnotation(){
+			@Override
+			public <A extends Annotation> A get(Class<A> annotationClass){
+				return accessor.getAnnotation(annotationClass).orElse(null);
+			}
+			@Override
+			public boolean isPresent(Class<? extends Annotation> annotationClass){
+				return accessor.hasAnnotation(annotationClass);
+			}
+		};
+	}
 	
 	static GetAnnotation from(Collection<? extends Annotation> data){
 		return from(data.stream().collect(Collectors.toMap(Annotation::annotationType, an->an)));

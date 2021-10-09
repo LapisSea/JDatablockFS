@@ -17,7 +17,7 @@ public @interface IONullability{
 		@Override
 		public void validate(IFieldAccessor<?> field, IONullability annotation){
 			var typ=field.getType();
-			if(Stream.of(IOInstance.class, Enum.class).noneMatch(c->UtilL.instanceOf(typ, c))){
+			if(Stream.of(IOInstance.class, Enum.class).noneMatch(c->UtilL.instanceOf(typ, c))&&!field.hasAnnotation(IOType.Dynamic.class)){
 				throw new MalformedStructLayout(field+" is not a supported field");
 			}
 		}
