@@ -1,6 +1,7 @@
 package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.chunk.ChunkDataProvider;
+import com.lapissea.cfs.exceptions.FieldIsNullException;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
@@ -195,7 +196,18 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 			
 			//noinspection unchecked
 			IOField.Ref<SELF, ?> selfRef=(IOField.Ref<SELF, ?>)f;
-			if(selfRef.get(self())!=null) continue;
+			boolean              isNull;
+			try{
+				Object val=selfRef.get(self());
+				isNull=val==null;
+			}catch(FieldIsNullException npe){
+				if(npe.field==selfRef){
+					isNull=true;
+				}else{
+					throw npe;
+				}
+			}
+			if(!isNull) continue;
 			
 			selfRef.allocate(self(), provider, getGenericContext());
 			dirty=true;
