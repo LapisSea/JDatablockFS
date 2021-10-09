@@ -11,9 +11,11 @@ import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.collections.LinkedIOList;
 import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.IOTypeDB;
 import com.lapissea.cfs.type.StructLayout;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.util.NotImplementedException;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -137,6 +139,11 @@ public class Cluster implements ChunkDataProvider{
 //	}
 	public IOList<StructLayout> getGenericTypes(){
 		return root.getMetadata().types;
+	}
+	
+	@Override
+	public IOTypeDB getTypeDb(){
+		throw new NotImplementedException();
 	}
 	
 	@Override

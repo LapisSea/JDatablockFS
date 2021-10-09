@@ -4,6 +4,7 @@ import com.lapissea.cfs.exceptions.DesyncedCacheException;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.objects.ChunkPointer;
+import com.lapissea.cfs.type.IOTypeDB;
 
 import java.io.IOException;
 import java.util.Objects;
@@ -17,6 +18,7 @@ public interface ChunkDataProvider{
 	}
 	
 	class VerySimple implements ChunkDataProvider{
+		private final IOTypeDB      typeDB       =new IOTypeDB.MemoryOnlyDB();
 		private final ChunkCache    cache        =ChunkCache.strong();
 		private final MemoryManager memoryManager=new VerySimpleMemoryManager(this);
 		private final IOInterface   data;
@@ -25,6 +27,10 @@ public interface ChunkDataProvider{
 			this.data=data;
 		}
 		
+		@Override
+		public IOTypeDB getTypeDb(){
+			return typeDB;
+		}
 		@Override
 		public IOInterface getSource(){
 			return data;
@@ -62,6 +68,8 @@ public interface ChunkDataProvider{
 	static ChunkDataProvider newVerySimpleProvider(IOInterface data){
 		return new VerySimple(data);
 	}
+	
+	IOTypeDB getTypeDb();
 	
 	IOInterface getSource();
 	MemoryManager getMemoryManager();
