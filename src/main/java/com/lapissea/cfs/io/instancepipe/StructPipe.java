@@ -4,6 +4,7 @@ import com.lapissea.cfs.ConsoleColors;
 import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.ChunkDataProvider;
+import com.lapissea.cfs.exceptions.FieldIsNullException;
 import com.lapissea.cfs.exceptions.UnknownSizePredictionException;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.content.ContentOutputBuilder;
@@ -17,7 +18,6 @@ import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
-import com.lapissea.cfs.type.field.access.IFieldAccessor;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.util.LogUtil;
@@ -84,7 +84,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	private final SizeDescriptor<T>        sizeDescription;
 	private final FieldSet<T, ?>           ioFields;
 	private final List<VirtualAccessor<T>> ioPoolAccessors;
-	private final List<IFieldAccessor<T>>  earlyNullChecks;
+	private final List<IOField<T, ?>>      earlyNullChecks;
 	
 	public StructPipe(Struct<T> type){
 		this.type=type;
@@ -95,13 +95,13 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		earlyNullChecks=nullIfEmpty(getNonNulls());
 	}
 	
-	private List<IFieldAccessor<T>> getNonNulls(){
-		return unpackedFields().filter(f->f.getNullability()==IONullability.Mode.NOT_NULL).map(IOField::getAccessor).toList();
+	private List<IOField<T, ?>> getNonNulls(){
+		return unpackedFields().filter(f->f.getNullability()==IONullability.Mode.NOT_NULL).toList();
 	}
 	
 	protected abstract List<IOField<T, ?>> initFields();
 	
-	private Stream<? extends IOField<T, ?>> unpackedFields(){
+	private Stream<IOField<T, ?>> unpackedFields(){
 		return ioFields.stream().flatMap(IOField::streamUnpackedFields);
 	}
 	
@@ -215,9 +215,9 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	
 	public void earlyCheckNulls(T instance){
 		if(earlyNullChecks==null) return;
-		for(var accessor : earlyNullChecks){
-			if(accessor.get(instance)==null){
-				throw new NullPointerException(accessor+" is null");
+		for(var field : earlyNullChecks){
+			if(field.get(instance)==null){
+				throw new FieldIsNullException(field);
 			}
 		}
 	}

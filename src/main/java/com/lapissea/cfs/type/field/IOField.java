@@ -2,6 +2,7 @@ package com.lapissea.cfs.type.field;
 
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.ChunkDataProvider;
+import com.lapissea.cfs.exceptions.FieldIsNullException;
 import com.lapissea.cfs.exceptions.FixedFormatNotSupportedException;
 import com.lapissea.cfs.io.bit.BitInputStream;
 import com.lapissea.cfs.io.bit.BitOutputStream;
@@ -256,6 +257,10 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	}
 	public boolean nullable(){
 		return getNullability()==IONullability.Mode.NULLABLE;
+	}
+	
+	protected final ValueType requireValNN(ValueType value){
+		return FieldIsNullException.requireNonNull(this, value);
 	}
 	
 	@Override

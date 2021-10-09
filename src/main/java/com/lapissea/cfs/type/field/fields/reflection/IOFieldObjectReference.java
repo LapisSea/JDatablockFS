@@ -74,7 +74,7 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 		var val=super.get(instance);
 		return switch(getNullability()){
 			case NULLABLE, DEFAULT_IF_NULL -> val;
-			case NOT_NULL -> Objects.requireNonNull(val);
+			case NOT_NULL -> requireValNN(val);
 		};
 	}
 	@Override

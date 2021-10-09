@@ -65,7 +65,7 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 	public ValueType get(CTyp instance){
 		ValueType value=super.get(instance);
 		return switch(getNullability()){
-			case NOT_NULL -> Objects.requireNonNull(value);
+			case NOT_NULL -> requireValNN(value);
 			case NULLABLE -> value;
 			case DEFAULT_IF_NULL -> {
 				if(value==null){

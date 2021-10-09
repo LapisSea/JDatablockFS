@@ -60,7 +60,7 @@ public class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends IOField<
 	public String get(CTyp instance){
 		String value=super.get(instance);
 		return switch(getNullability()){
-			case NOT_NULL -> Objects.requireNonNull(value);
+			case NOT_NULL -> requireValNN(value);
 			case NULLABLE -> value;
 			case DEFAULT_IF_NULL -> {
 				if(value==null){
