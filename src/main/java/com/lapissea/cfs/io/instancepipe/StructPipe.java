@@ -119,19 +119,31 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	}
 	
 	private SizeDescriptor<T> calcSize(){
-		var fields=getSpecificFields();
-		var fixed =IOFieldTools.sumVarsIfAll(fields, desc->desc.toBytes(desc.getFixed()));
+		var          fields=getSpecificFields();
+		OptionalLong fixed;
+		if(type instanceof Struct.Unmanaged) fixed=OptionalLong.empty();
+		else fixed=IOFieldTools.sumVarsIfAll(fields, desc->desc.toBytes(desc.getFixed()));
 		if(fixed.isPresent()) return new SizeDescriptor.Fixed<>(fixed.getAsLong());
 		else{
 			var unknownFields=fields.stream().filter(f->!f.getSizeDescriptor().hasFixed()).toList();
 			var knownFixed   =IOFieldTools.sumVars(fields, d->d.toBytes(d.getFixed().orElse(0)));
-			return new SizeDescriptor.Unknown<>(IOFieldTools.sumVars(fields, siz->siz.toBytes(siz.getMin())), IOFieldTools.sumVarsIfAll(fields, siz->siz.toBytes(siz.getMax()))){
-				@Override
-				public long calcUnknown(T instance){
-					Objects.requireNonNull(instance);
-					return knownFixed+IOFieldTools.sumVars(unknownFields, d->d.calcUnknown(instance));
-				}
-			};
+			
+			var min=IOFieldTools.sumVars(fields, siz->siz.toBytes(siz.getMin()));
+			var max=IOFieldTools.sumVarsIfAll(fields, siz->siz.toBytes(siz.getMax()));
+			
+			if(unknownFields.size()==1){
+				var unknownField=unknownFields.get(0);
+				return new SizeDescriptor.Unknown<>(min, max, inst->{
+					Objects.requireNonNull(inst);
+					var d=unknownField.getSizeDescriptor();
+					return knownFixed+d.calcUnknown(inst);
+				});
+			}
+			
+			return new SizeDescriptor.Unknown<>(min, max, inst->{
+				Objects.requireNonNull(inst);
+				return knownFixed+IOFieldTools.sumVars(unknownFields, d->d.calcUnknown(inst));
+			});
 		}
 	}
 	
