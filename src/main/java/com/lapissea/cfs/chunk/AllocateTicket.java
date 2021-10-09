@@ -49,7 +49,7 @@ public record AllocateTicket(long bytes, boolean disableResizing, ChunkPointer n
 	}
 	
 	public AllocateTicket withApproval(Predicate<Chunk> approve){
-		return new AllocateTicket(bytes, disableResizing, next, this.approve.map(approve::and), dataPopulator);
+		return new AllocateTicket(bytes, disableResizing, next, Optional.of(this.approve.map(p->p.and(approve)).orElse(approve)), dataPopulator);
 	}
 	
 	public <IO extends IOInstance<IO>> AllocateTicket withDataPopulated(Class<? extends StructPipe> pipeType, IO data){
