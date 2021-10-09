@@ -148,21 +148,21 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	}
 	
 	
-	public void write(ChunkDataProvider provider, RandomIO.Creator dest, T instance) throws IOException{
+	public final void write(ChunkDataProvider provider, RandomIO.Creator dest, T instance) throws IOException{
 		earlyCheckNulls(instance);
 		try(var io=dest.io()){
 			doWrite(provider, io, instance);
 		}
 	}
-	public void write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
+	public final void write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
 		earlyCheckNulls(instance);
 		doWrite(provider, dest, instance);
 	}
-	public void write(ChunkDataProvider.Holder holder, ContentWriter dest, T instance) throws IOException{
+	public final void write(ChunkDataProvider.Holder holder, ContentWriter dest, T instance) throws IOException{
 		earlyCheckNulls(instance);
 		doWrite(holder.getChunkProvider(), dest, instance);
 	}
-	public <Prov extends ChunkDataProvider.Holder&RandomIO.Creator> void write(Prov dest, T instance) throws IOException{
+	public final <Prov extends ChunkDataProvider.Holder&RandomIO.Creator> void write(Prov dest, T instance) throws IOException{
 		earlyCheckNulls(instance);
 		try(var io=dest.io()){
 			doWrite(dest.getChunkProvider(), io, instance);

@@ -4,6 +4,7 @@ import com.lapissea.cfs.ConsoleColors;
 import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.ChunkDataProvider;
+import com.lapissea.cfs.exceptions.FieldIsNullException;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.compilation.FieldCompiler;
@@ -252,7 +253,13 @@ public class Struct<T extends IOInstance<T>>{
 		sb.append('{');
 		boolean comma=false;
 		for(var field : fields){
-			var str=field.instanceToString(instance, doShort||TextUtil.USE_SHORT_IN_COLLECTIONS);
+			String str;
+			try{
+				str=field.instanceToString(instance, doShort||TextUtil.USE_SHORT_IN_COLLECTIONS);
+			}catch(FieldIsNullException e){
+				str="<ERR: "+e.getMessage()+">";
+			}
+			
 			if(str==null) continue;
 			
 			if(comma) sb.append(", ");
@@ -260,7 +267,8 @@ public class Struct<T extends IOInstance<T>>{
 			sb.append(field.getName()).append("=").append(str);
 			comma=true;
 		}
-		return sb.append('}').toString();
+		sb.append('}');
+		return sb.toString();
 	}
 	
 	public Supplier<T> requireEmptyConstructor(){

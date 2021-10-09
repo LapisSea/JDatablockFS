@@ -87,7 +87,9 @@ public interface ChunkDataProvider{
 		if(DEBUG_VALIDATION){
 			getChunkCache().ifCached(ptr, cached->{
 				var read=readChunk(ptr);
-				if(!read.equals(cached)) throw new DesyncedCacheException(read, cached);
+				if(!read.equals(cached)){
+					throw new DesyncedCacheException(read, cached);
+				}
 			});
 		}
 		
