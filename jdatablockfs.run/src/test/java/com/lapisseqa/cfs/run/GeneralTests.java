@@ -5,10 +5,10 @@ import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.ChunkDataProvider;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
-import com.lapissea.cfs.objects.GenericContainer;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.objects.collections.ContiguousIOList;
 import com.lapissea.cfs.objects.collections.HashIOMap;
+import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.collections.LinkedIOList;
 import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.cfs.type.IOInstance;
@@ -106,30 +106,50 @@ public class GeneralTests{
 	
 	@Test
 	void contiguousIOList(TestInfo info) throws IOException{
-		TestUtils.complexObjectEqualityTest(
-			info, 64,
-			ContiguousIOList<Dummy>::new,
-			TypeDefinition.of(ContiguousIOList.class, Dummy.class),
-			list->{
-				list.add(new Dummy(69));
-				list.add(new Dummy(420));
-			}
-		);
+		contiguousListEqualityTest(info, Dummy.class, list->{
+			list.add(new Dummy(69));
+			list.add(new Dummy(420));
+		});
+	}
+	
+	@Test
+	void contiguousIOListInsert(TestInfo info) throws IOException{
+		contiguousListEqualityTest(info, Dummy.class, list->{
+			list.add(new Dummy(69));
+			list.add(new Dummy(420));
+			
+			list.add(1, new Dummy(360));
+		});
+	}
+	
+	@Test
+	void contiguousIOListRemove(TestInfo info) throws IOException{
+		contiguousListEqualityTest(info, Dummy.class, list->{
+			list.add(new Dummy(69));
+			list.add(new Dummy(360));
+			list.add(new Dummy(420));
+			list.remove(1);
+			list.remove(1);
+		});
 	}
 	
 	@Test
 	void testHashIOMap(TestInfo info) throws IOException{
-		TestUtils.complexObjectEqualityTest(
-			info, 64,
+		TestUtils.ioMapComplianceSequence(
+			info,
 			HashIOMap<Integer, Integer>::new,
 			TypeDefinition.of(HashIOMap.class, Integer.class, Integer.class),
 			map->{
-				map.put(1, 11);
-				map.put(2, 12);
-				map.put(3, 13);
+				map.put(0, 10);
+				map.put(0, 11);
+				map.put(1, 12);
+				map.put(2, 13);
 				map.put(16, 21);
 				map.put(17, 22);
 				map.put(18, 23);
+				map.put(3, 31);
+				map.put(4, 32);
+				map.put(5, 33);
 			}
 		);
 	}
@@ -141,10 +161,20 @@ public class GeneralTests{
 			
 			var chunk=AllocateTicket.bytes(64).submit(provider);
 			
-			var container=new GenericContainer<>(new Dummy(123));
+			var container=new GenericContainer<>();
+			
+			container.value=new Dummy(123);
 			
 			pipe.write(chunk, container);
 			var read=pipe.readNew(chunk, null);
+			
+			assertEquals(container, read);
+			
+			
+			container.value="This is a test.";
+			
+			pipe.write(chunk, container);
+			read=pipe.readNew(chunk, null);
 			
 			assertEquals(container, read);
 		});
@@ -163,10 +193,6 @@ public class GeneralTests{
 			
 			pipe.write(provider, chunk, text);
 			var read=pipe.readNew(chunk, null);
-			
-			LogUtil.println(text);
-			LogUtil.println(read);
-			LogUtil.println(chunk);
 			
 			assertEquals(text, read);
 		});
@@ -192,19 +218,23 @@ public class GeneralTests{
 			pipe.write(provider, chunk, text);
 			var read=pipe.readNew(chunk, null);
 			
-			LogUtil.println(text);
-			LogUtil.println(read);
-			LogUtil.println(chunk);
-			
 			assertEquals(text, read);
 		});
 	}
 	
-	static <T extends IOInstance<T>> void linkedListEqualityTest(TestInfo info, Class<T> typ, UnsafeConsumer<LinkedIOList<T>, IOException> session) throws IOException{
-		TestUtils.complexObjectEqualityTest(
+	static <T extends IOInstance<T>> void linkedListEqualityTest(TestInfo info, Class<T> typ, UnsafeConsumer<IOList<T>, IOException> session) throws IOException{
+		TestUtils.ioListComplianceSequence(
 			info, 10,
 			LinkedIOList<T>::new,
 			TypeDefinition.of(LinkedIOList.class, typ),
+			session
+		);
+	}
+	static <T extends IOInstance<T>> void contiguousListEqualityTest(TestInfo info, Class<T> typ, UnsafeConsumer<IOList<T>, IOException> session) throws IOException{
+		TestUtils.ioListComplianceSequence(
+			info, 64,
+			ContiguousIOList<T>::new,
+			TypeDefinition.of(ContiguousIOList.class, typ),
 			session
 		);
 	}
@@ -233,7 +263,11 @@ public class GeneralTests{
 			list.add(Dummy.auto());
 			list.add(Dummy.auto());
 			
-			//TODO
+			list.remove(2);
+			list.remove(3);
+			list.remove(0);
+			list.remove(1);
+			list.remove(0);
 		});
 	}
 }

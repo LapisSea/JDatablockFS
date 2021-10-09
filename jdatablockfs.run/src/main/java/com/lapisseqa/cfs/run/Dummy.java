@@ -8,13 +8,13 @@ public class Dummy extends IOInstance<Dummy>{
 	private static int COUNT=0;
 	
 	static Dummy first(){return new Dummy(COUNT=123);}
-	static Dummy auto() {return new Dummy(COUNT++);}
+	static Dummy auto() {return new Dummy(++COUNT);}
 	
 	@IOValue
-	int dummyValue;
+	public int val;
 	
 	public Dummy(){}
-	public Dummy(int dummyValue){
-		this.dummyValue=dummyValue;
+	public Dummy(int val){
+		this.val=val;
 	}
 }

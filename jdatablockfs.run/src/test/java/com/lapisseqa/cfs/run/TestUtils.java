@@ -4,6 +4,8 @@ import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.ChunkDataProvider;
 import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.io.IOInterface;
+import com.lapissea.cfs.objects.collections.IOList;
+import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.cfs.type.IOInstance;
@@ -75,7 +77,7 @@ public class TestUtils{
 		return sessionName;
 	}
 	
-	static <T extends IOInstance.Unmanaged<?>> void complexObjectEqualityTest(
+	static <T extends IOInstance.Unmanaged<?>> void complexObjectIntegrityTest(
 		TestInfo info, int initalCapacity,
 		Struct.Unmanaged.Constr<T> constr,
 		TypeDefinition typeDef,
@@ -97,6 +99,39 @@ public class TestUtils{
 			}
 			
 			assertEquals(obj, read);
+		});
+	}
+	
+	private static <T> void checkCompliance(T test, T compliance){
+		if(!test.equals(compliance)){
+			throw new RuntimeException(test.getClass().getSimpleName()+" is not compliant!\n"
+			                           +test+" different to: \n"
+			                           +compliance);
+		}
+	}
+	
+	static <E, T extends IOInstance.Unmanaged<?>&IOList<E>> void ioListComplianceSequence(
+		TestInfo info, int initalCapacity,
+		Struct.Unmanaged.Constr<T> constr,
+		TypeDefinition typeDef,
+		UnsafeConsumer<IOList<E>, IOException> session
+	) throws IOException{
+		complexObjectIntegrityTest(info, initalCapacity, constr, typeDef, list->{
+			var splitter=Splitter.list(list, new ReferenceMemoryIOList<>(), TestUtils::checkCompliance);
+			session.accept(splitter);
+		});
+	}
+	
+	
+	static <K, V, T extends IOInstance.Unmanaged<?>&IOMap<K, V>> void ioMapComplianceSequence(
+		TestInfo info,
+		Struct.Unmanaged.Constr<T> constr,
+		TypeDefinition typeDef,
+		UnsafeConsumer<IOMap<K, V>, IOException> session
+	) throws IOException{
+		TestUtils.complexObjectIntegrityTest(info, 8, constr, typeDef, map->{
+			var splitter=Splitter.map(map, new ReferenceMemoryIOMap<>(), TestUtils::checkCompliance);
+			session.accept(splitter);
 		});
 	}
 	
