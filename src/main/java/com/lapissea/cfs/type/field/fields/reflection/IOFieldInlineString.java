@@ -35,17 +35,19 @@ public class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends IOField<
 		int nullSize=nullable()?1:0;
 		
 		var desc=instancePipe.getSizeDescriptor();
-		descriptor=new SizeDescriptor.Unknown<>(desc.getWordSpace(), nullable()?nullSize:desc.getMin(), Utils.addIfBoth(OptionalLong.of(nullSize), desc.getMax())){
-			@Override
-			public long calcUnknown(CTyp instance){
-				var val=getWrapped(instance);
+		descriptor=new SizeDescriptor.Unknown<>(
+			desc.getWordSpace(),
+			nullable()?nullSize:desc.getMin(),
+			Utils.addIfBoth(OptionalLong.of(nullSize), desc.getMax()),
+			inst->{
+				var val=getWrapped(inst);
 				if(val==null){
 					if(nullable()) return nullSize;
 					throw new NullPointerException();
 				}
 				return desc.calcUnknown(val)+nullSize;
 			}
-		};
+		);
 	}
 	
 	private AutoText getWrapped(CTyp instance){

@@ -23,15 +23,12 @@ public class IOFieldByteArray<T extends IOInstance<T>> extends IOField<T, byte[]
 	public IOFieldByteArray(IFieldAccessor<T> accessor){
 		super(accessor);
 		
-		descriptor=new SizeDescriptor.Unknown<>(0, OptionalLong.empty()){
-			@Override
-			public long calcUnknown(T instance){
-				var siz=arraySize.get(instance);
-				if(siz>0) return siz;
-				var arr=get(instance);
-				return arr.length;
-			}
-		};
+		descriptor=new SizeDescriptor.Unknown<>(0, OptionalLong.empty(), inst->{
+			var siz=arraySize.get(inst);
+			if(siz>0) return siz;
+			var arr=get(inst);
+			return arr.length;
+		});
 	}
 	@Override
 	public void init(){

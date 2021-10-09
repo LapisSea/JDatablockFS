@@ -103,12 +103,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends IOInstance.Unmanaged<
 						if(fixed.isPresent()) return SizeDescriptor.Fixed.of(desc.getWordSpace(), fixed.getAsLong());
 					}
 					
-					return new SizeDescriptor.Unknown<>(desc.getWordSpace(), desc.getMin(), desc.getMax()){
-						@Override
-						public long calcUnknown(Node<T> instance){
-							return desc.calcUnknown(valueAccessor.get(instance));
-						}
-					};
+					return new SizeDescriptor.Unknown<>(desc.getWordSpace(), desc.getMin(), desc.getMax(), inst->desc.calcUnknown(valueAccessor.get(inst)));
 				}
 				@Override
 				public List<IOField<Node<T>, ?>> write(ChunkDataProvider provider, ContentWriter dest, Node<T> instance) throws IOException{

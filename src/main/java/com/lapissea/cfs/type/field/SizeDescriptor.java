@@ -74,23 +74,29 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 		}
 	}
 	
-	abstract non-sealed class Unknown<Inst extends IOInstance<Inst>> implements SizeDescriptor<Inst>{
+	final class Unknown<Inst extends IOInstance<Inst>> implements SizeDescriptor<Inst>{
 		
-		private final WordSpace    wordSpace;
-		private final long         min;
-		private final OptionalLong max;
+		private final WordSpace            wordSpace;
+		private final long                 min;
+		private final OptionalLong         max;
+		private final ToLongFunction<Inst> unknownSize;
 		
-		public Unknown(long min, OptionalLong max){
-			this(BYTE, min, max);
-		}
-		public Unknown(WordSpace wordSpace, long min, OptionalLong max){
+		public Unknown(long min, OptionalLong max, ToLongFunction<Inst> unknownSize){this(BYTE, min, max, unknownSize);}
+		public Unknown(WordSpace wordSpace, long min, OptionalLong max, ToLongFunction<Inst> unknownSize){
 			this.wordSpace=wordSpace;
 			this.min=min;
 			this.max=Objects.requireNonNull(max);
+			this.unknownSize=unknownSize;
 		}
 		
 		@Override
 		public WordSpace getWordSpace(){return wordSpace;}
+		
+		@Override
+		public long calcUnknown(Inst instance){
+			return unknownSize.applyAsLong(instance);
+		}
+		
 		@Override
 		public OptionalLong getFixed(){return OptionalLong.empty();}
 		@Override
@@ -118,12 +124,7 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 	
 	static <T extends IOInstance<T>> SizeDescriptor<T> overrideUnknown(SizeDescriptor<?> source, ToLongFunction<T> override){
 		if(source.getFixed().isPresent()) return source instanceof Fixed<?> f?(SizeDescriptor<T>)f:new Fixed<>(source.getFixed().getAsLong());
-		return new Unknown<>(source.getWordSpace(), source.getMin(), source.getMax()){
-			@Override
-			public long calcUnknown(T instance){
-				return override.applyAsLong(instance);
-			}
-		};
+		return new Unknown<>(source.getWordSpace(), source.getMin(), source.getMax(), override);
 	}
 	
 	default OptionalLong toBytes(OptionalLong val){

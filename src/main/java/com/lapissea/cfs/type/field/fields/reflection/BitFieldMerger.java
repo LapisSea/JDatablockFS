@@ -34,12 +34,11 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 		
 		var fixedSize=Utils.bitToByte(IOFieldTools.sumVarsIfAll(group, SizeDescriptor::getFixed));
 		if(fixedSize.isPresent()) sizeDescriptor=SizeDescriptor.Fixed.of(fixedSize.getAsLong());
-		else sizeDescriptor=new SizeDescriptor.Unknown<>(IOFieldTools.sumVars(group, SizeDescriptor::getMin), IOFieldTools.sumVarsIfAll(group, SizeDescriptor::getMax)){
-			@Override
-			public long calcUnknown(T instance){
-				return Utils.bitToByte(group.stream().mapToLong(s->s.getSizeDescriptor().calcUnknown(instance)).sum());
-			}
-		};
+		else sizeDescriptor=new SizeDescriptor.Unknown<>(
+			IOFieldTools.sumVars(group, SizeDescriptor::getMin),
+			IOFieldTools.sumVarsIfAll(group, SizeDescriptor::getMax),
+			inst->Utils.bitToByte(group.stream().mapToLong(s->s.getSizeDescriptor().calcUnknown(inst)).sum())
+		);
 		initLateData(new FieldSet<>(group.stream().flatMap(f->f.getDependencies().stream())), group.stream().flatMap(f->f.getUsageHints().stream()));
 	}
 	

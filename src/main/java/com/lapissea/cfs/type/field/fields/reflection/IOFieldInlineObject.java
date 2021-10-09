@@ -45,17 +45,19 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 			descriptor=new SizeDescriptor.Fixed<>(instancePipe.getSizeDescriptor().requireFixed()+nullSize);
 		}else{
 			var desc=instancePipe.getSizeDescriptor();
-			descriptor=new SizeDescriptor.Unknown<>(desc.getWordSpace(), nullable()?nullSize:desc.getMin(), Utils.addIfBoth(OptionalLong.of(nullSize), desc.getMax())){
-				@Override
-				public long calcUnknown(CTyp instance){
-					var val=get(instance);
+			descriptor=new SizeDescriptor.Unknown<>(
+				desc.getWordSpace(),
+				nullable()?nullSize:desc.getMin(),
+				Utils.addIfBoth(OptionalLong.of(nullSize), desc.getMax()),
+				inst->{
+					var val=get(inst);
 					if(val==null){
 						if(nullable()) return nullSize;
 						throw new NullPointerException();
 					}
 					return desc.calcUnknown(val)+nullSize;
 				}
-			};
+			);
 		}
 	}
 	

@@ -34,6 +34,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 			throw new MalformedStructLayout("DEFAULT_IF_NULL is not supported on dynamic fields!");
 		}
 		
+		int idSize  =4;
 		int nullSize=nullable()?1:0;
 		
 		Type type=accessor.getGenericType(null);
@@ -41,26 +42,31 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		
 		long minKnownTypeSize=Long.MAX_VALUE;
 		try{
-			@SuppressWarnings("unchecked")
-			Struct<ValueType> struct=(Struct<ValueType>)Struct.ofUnknown(Utils.typeToRaw(type));
-			SizeDescriptor<ValueType> typDesc=ContiguousStructPipe.of(struct).getSizeDescriptor();
+			Struct<?>         struct =Struct.ofUnknown(Utils.typeToRaw(type));
+			SizeDescriptor<?> typDesc=ContiguousStructPipe.of(struct).getSizeDescriptor();
 			minKnownTypeSize=typDesc.getMin();
 		}catch(IllegalArgumentException ignored){}
 		
 		var refDesc=ContiguousStructPipe.of(Reference.class).getSizeDescriptor();
 		
-		long minSize=nullSize+Math.min(refDesc.getMin(), minKnownTypeSize);
+		long minSize=idSize+nullSize+Math.min(refDesc.getMin(), minKnownTypeSize);
 		
-		descriptor=new SizeDescriptor.Unknown<>(minSize, OptionalLong.empty()){
-			@Override
-			public long calcUnknown(CTyp instance){
-				var val=get(instance);
-				return nullSize+switch(getNullability()){
-					case NOT_NULL -> ContiguousStructPipe.of(val.getThisStruct()).getSizeDescriptor().calcUnknown(val);
-					case NULLABLE -> val==null?0:ContiguousStructPipe.of(val.getThisStruct()).getSizeDescriptor().calcUnknown(val);
-					case DEFAULT_IF_NULL -> throw new ShouldNeverHappenError();
-				};
-			}
+		descriptor=new SizeDescriptor.Unknown<>(minSize, OptionalLong.empty(), inst->{
+			var val=get(inst);
+			if(val==null) return nullSize;
+			return nullSize+idSize+calcSize(val);
+		});
+	}
+	
+	@SuppressWarnings({"unchecked", "DuplicateBranchesInSwitch"})
+	private static long calcSize(Object val){
+		return switch(val){
+			case Boolean ignored -> 1;
+			case Integer ignored -> 4;
+			case Float ignored -> 4;
+			case Long ignored -> 8;
+			case Double ignored -> 8;
+			default -> throw new NotImplementedException(val.getClass()+"");
 		};
 	}
 	
