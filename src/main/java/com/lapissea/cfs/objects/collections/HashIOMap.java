@@ -110,8 +110,6 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 	@IOValue.OverrideType(ContiguousIOList.class)
 	private IOList<Bucket<K, V>> buckets;
 	
-	private long size;
-	
 	private int datasetID;
 	
 	public HashIOMap(ChunkDataProvider provider, Reference reference, TypeDefinition typeDef) throws IOException{
@@ -123,8 +121,6 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 			writeManagedFields();
 		}
 		readManagedFields();
-		
-		size=buckets.stream().mapToLong(Bucket::size).sum();
 	}
 	
 	private void reflow() throws IOException{
@@ -170,12 +166,6 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 			putEntry(newBuckets, newSize, e.getKey(), e.getValue());
 		}
 	}
-	
-	@Override
-	public long size(){
-		return size;
-	}
-	
 	
 	private class ModifiableEntry extends Entry.Abstract<K, V>{
 		
@@ -252,7 +242,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 	public void put(K key, V value) throws IOException{
 		var b=putEntry(buckets, bucketSize, key, value);
 		if(b==null) return;
-		size++;
+		deltaSize(1);
 		if(b.size()>RESIZE_TRIGGER){
 			reflow();
 		}
