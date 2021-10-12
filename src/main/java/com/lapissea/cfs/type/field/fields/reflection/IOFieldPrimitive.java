@@ -39,6 +39,7 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		if(clazz==float.class||clazz==Float.class) return FFloat::new;
 		if(clazz==long.class||clazz==Long.class) return FLong::new;
 		if(clazz==int.class||clazz==Integer.class) return FInt::new;
+		if(clazz==short.class||clazz==Short.class) return FShort::new;
 		if(clazz==byte.class||clazz==Byte.class) return FByte::new;
 		if(clazz==boolean.class||clazz==Boolean.class) return FBoolean::new;
 		
@@ -263,6 +264,64 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		@Override
 		public int instanceHashCode(T instance){
 			return Integer.hashCode(getValue(instance));
+		}
+	}
+	
+	public static class FShort<T extends IOInstance<T>> extends IOFieldPrimitive<T, Short>{
+		
+		
+		public FShort(IFieldAccessor<T> field){
+			this(field, false);
+		}
+		public FShort(IFieldAccessor<T> field, boolean forceFixed){
+			super(field, forceFixed, SHORT);
+		}
+		@Override
+		protected EnumSet<NumberSize> allowedSizes(){
+			var all=EnumSet.allOf(NumberSize.class);
+			all.removeIf(s->s.greaterThan(SHORT));
+			return all;
+		}
+		
+		private short getValue(T instance){
+			return getAccessor().getShort(instance);
+		}
+		
+		public void setValue(T instance, short value){
+			getAccessor().setShort(instance, value);
+		}
+		
+		@Deprecated
+		@Override
+		public Short get(T instance){
+			return getValue(instance);
+		}
+		@Deprecated
+		@Override
+		public void set(T instance, Short value){
+			setValue(instance, value);
+		}
+		
+		@Override
+		public List<IOField<T, ?>> write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
+			var size=getSize(instance);
+			size.write(dest, getValue(instance));
+			return List.of();
+		}
+		
+		@Override
+		public void read(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+			var size=getSize(instance);
+			setValue(instance, (short)size.read(src));
+		}
+		
+		@Override
+		public boolean instancesEqual(T inst1, T inst2){
+			return getValue(inst1)==getValue(inst2);
+		}
+		@Override
+		public int instanceHashCode(T instance){
+			return Short.hashCode(getValue(instance));
 		}
 	}
 	

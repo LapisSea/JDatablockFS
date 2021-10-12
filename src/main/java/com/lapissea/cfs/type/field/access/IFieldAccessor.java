@@ -54,6 +54,9 @@ public interface IFieldAccessor<CTyp extends IOInstance<CTyp>> extends Comparabl
 	default int getInt(CTyp instance)                    {return (int)get(instance);}
 	default void setInt(CTyp instance, int value)        {set(instance, value);}
 	
+	default short getShort(CTyp instance)                {return (short)get(instance);}
+	default void setShort(CTyp instance, short value)    {set(instance, value);}
+	
 	@Override
 	default int compareTo(IFieldAccessor<CTyp> o){
 		return getName().compareTo(o.getName());
