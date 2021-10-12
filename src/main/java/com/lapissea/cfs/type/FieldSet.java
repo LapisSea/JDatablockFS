@@ -47,7 +47,22 @@ public final class FieldSet<T extends IOInstance<T>, ValueType> extends Abstract
 		return stream().filter(type::isInstance).map(type::cast);
 	}
 	
+	public <E extends IOField<T, ?>> Iterable<? extends E> byFieldTypeIter(Class<E> type){
+		return ()->stream().filter(type::isInstance).map(type::cast).iterator();
+	}
+	
+	public <E> IOField<T, E> requireExact(Class<E> type, String name){
+		return exact(type, name).orElseThrow();
+	}
+	
 	public <E> Optional<IOField<T, E>> exact(Class<E> type, String name){
 		return byType(type).filter(f->f.getName().equals(name)).findAny();
+	}
+	
+	public <E extends IOField<T, ?>> Optional<? extends E> exactFieldType(Class<E> type, String name){
+		return byFieldType(type).filter(f->f.getName().equals(name)).findAny();
+	}
+	public <E extends IOField<T, ?>> E requireExactFieldType(Class<E> type, String name){
+		return exactFieldType(type, name).orElseThrow();
 	}
 }

@@ -131,6 +131,19 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		usageHints=h;
 	}
 	
+	public boolean isNull(T instance){
+		try{
+			var val=get(instance);
+			return val==null;
+		}catch(FieldIsNullException npe){
+			if(npe.field==this){
+				return true;
+			}else{
+				throw npe;
+			}
+		}
+	}
+	
 	@SuppressWarnings("unchecked")
 	public ValueType get(T instance){
 		return (ValueType)getAccessor().get(instance);

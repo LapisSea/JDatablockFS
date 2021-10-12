@@ -1,7 +1,6 @@
 package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.chunk.ChunkDataProvider;
-import com.lapissea.cfs.exceptions.FieldIsNullException;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
@@ -109,8 +108,8 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 			return reference;
 		}
 		
-		protected final boolean allocateNulls() throws IOException{
-			return allocateNulls(getChunkProvider());
+		protected void allocateNulls() throws IOException{
+			allocateNulls(getChunkProvider());
 		}
 	}
 	
@@ -193,30 +192,13 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 		return result;
 	}
 	
-	public boolean allocateNulls(ChunkDataProvider provider) throws IOException{
-		boolean dirty=false;
-		for(IOField<SELF, ?> f : getThisStruct().getFields()){
-			if(!(f instanceof IOField.Ref)) continue;
-			
-			//noinspection unchecked
-			IOField.Ref<SELF, ?> selfRef=(IOField.Ref<SELF, ?>)f;
-			boolean              isNull;
-			try{
-				Object val=selfRef.get(self());
-				isNull=val==null;
-			}catch(FieldIsNullException npe){
-				if(npe.field==selfRef){
-					isNull=true;
-				}else{
-					throw npe;
-				}
-			}
-			if(!isNull) continue;
-			
-			selfRef.allocate(self(), provider, getGenericContext());
-			dirty=true;
+	public void allocateNulls(ChunkDataProvider provider) throws IOException{
+		//noinspection unchecked
+		for(var ref : getThisStruct().getFields().byFieldTypeIter((Class<IOField.Ref<SELF, ?>>)(Object)IOField.Ref.class)){
+			if(!ref.isNull(self()))
+				continue;
+			ref.allocate(self(), provider, getGenericContext());
 		}
-		return dirty;
 	}
 	
 	private GenericContext getGenericContext(){
