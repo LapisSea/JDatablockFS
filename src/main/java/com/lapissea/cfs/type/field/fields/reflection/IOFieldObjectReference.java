@@ -55,7 +55,7 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	@Override
 	public void init(){
 		super.init();
-		referenceField=getDependencies().exact(Reference.class, IOFieldTools.makeRefName(getAccessor())).orElseThrow();
+		referenceField=getDependencies().requireExact(Reference.class, IOFieldTools.makeRefName(getAccessor()));
 	}
 	
 	@Override

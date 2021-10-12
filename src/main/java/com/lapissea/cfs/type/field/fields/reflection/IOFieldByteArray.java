@@ -33,7 +33,7 @@ public class IOFieldByteArray<T extends IOInstance<T>> extends IOField<T, byte[]
 	@Override
 	public void init(){
 		super.init();
-		arraySize=declaringStruct().getFields().exact(Integer.class, IOFieldTools.makeArrayLenName(getAccessor())).orElseThrow();
+		arraySize=declaringStruct().getFields().requireExact(Integer.class, IOFieldTools.makeArrayLenName(getAccessor()));
 	}
 	
 	@Override

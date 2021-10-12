@@ -51,6 +51,11 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 			super(accessor);
 		}
 		
+		public void allocateUnmanaged(T instance) throws IOException{
+			IOInstance.Unmanaged<?> unmanaged=(IOInstance.Unmanaged<?>)instance;
+			allocate(instance, unmanaged.getChunkProvider(), unmanaged.getGenerics());
+		}
+		
 		public abstract void allocate(T instance, ChunkDataProvider provider, GenericContext genericContext) throws IOException;
 		public abstract Reference getReference(T instance);
 		public abstract StructPipe<Type> getReferencedPipe(T instance);
