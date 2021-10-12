@@ -8,6 +8,7 @@ import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
+import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.TriConsumer;
 
@@ -41,7 +42,10 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 			this.typeDef=typeDef;
 		}
 		
-		public abstract Stream<IOField<SELF, ?>> listUnmanagedFields();
+		@NotNull
+		public Stream<IOField<SELF, ?>> listUnmanagedFields(){
+			return Stream.of();
+		}
 		
 		public TypeDefinition getTypeDef(){
 			return typeDef;

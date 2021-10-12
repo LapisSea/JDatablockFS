@@ -145,4 +145,19 @@ public class TypeDefinition{
 		if(generic==null) generic=new SyntheticParameterizedType(null, getTypeClass(), Arrays.stream(args).map(TypeDefinition::getTypeClass).toArray(Type[]::new));
 		return generic;
 	}
+	
+	@Override
+	public boolean equals(Object o){
+		return this==o||
+		       o instanceof TypeDefinition that&&
+		       getTypeName().equals(that.getTypeName())&&
+		       Arrays.equals(args, that.args);
+	}
+	
+	@Override
+	public int hashCode(){
+		int result=getTypeName().hashCode();
+		result=31*result+Arrays.hashCode(args);
+		return result;
+	}
 }

@@ -297,7 +297,13 @@ public class Struct<T extends IOInstance<T>>{
 	public boolean equals(Object o){
 		return this==o||
 		       o instanceof Struct<?> that&&
-		       type.equals(that.type);
+		       equals(that);
+	}
+	
+	public boolean equals(Struct<?> o){
+		return this==o||
+		       o!=null&&
+		       type.equals(o.type);
 	}
 	
 	@Override

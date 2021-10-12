@@ -464,11 +464,6 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		return index==size()-1;
 	}
 	
-	@Override
-	public Stream<IOField<LinkedIOList<T>, ?>> listUnmanagedFields(){
-		return Stream.of();
-	}
-	
 	private Node<T> getLastNode() throws IOException{
 		return getNode(size()-1);
 	}

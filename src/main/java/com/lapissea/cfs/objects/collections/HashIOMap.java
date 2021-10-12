@@ -5,7 +5,6 @@ import com.lapissea.cfs.chunk.ChunkDataProvider;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.TypeDefinition;
-import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOType;
@@ -16,7 +15,6 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Stream;
 
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.*;
 
@@ -34,11 +32,11 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 		@IOType.Dynamic
 		private V value;
 		
-		private Entry<K, V> e;
+		private Entry<K, V> unmodifiable;
 		
 		public Entry<K, V> unmodifiable(){
-			if(e==null){
-				e=new Entry.Abstract<>(){
+			if(unmodifiable==null){
+				unmodifiable=new Entry.Abstract<>(){
 					@Override
 					public K getKey(){
 						return key;
@@ -53,7 +51,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 					}
 				};
 			}
-			return e;
+			return unmodifiable;
 		}
 	}
 	
@@ -113,7 +111,8 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 	private IOList<Bucket<K, V>> buckets;
 	
 	private long size;
-	private int  datasetID;
+	
+	private int datasetID;
 	
 	public HashIOMap(ChunkDataProvider provider, Reference reference, TypeDefinition typeDef) throws IOException{
 		super(provider, reference, typeDef);
@@ -124,13 +123,8 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 			writeManagedFields();
 		}
 		readManagedFields();
+		
 		size=buckets.stream().mapToLong(Bucket::size).sum();
-	}
-	
-	
-	@Override
-	public Stream<IOField<HashIOMap<K, V>, ?>> listUnmanagedFields(){
-		return Stream.of();
 	}
 	
 	private void reflow() throws IOException{
@@ -181,6 +175,54 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 	public long size(){
 		return size;
 	}
+	
+	
+	private class ModifiableEntry extends Entry.Abstract<K, V>{
+		
+		private       int               currentDatasetID=datasetID;
+		private       Bucket<K, V>      currentBucket;
+		private final BucketEntry<K, V> data;
+		
+		public ModifiableEntry(Bucket<K, V> bucket, BucketEntry<K, V> entry){
+			currentBucket=bucket;
+			this.data=entry;
+		}
+		
+		@Override
+		public K getKey(){return data.key;}
+		@Override
+		public V getValue(){return data.value;}
+		
+		private void fastSet(V value) throws IOException{
+			data.value=value;
+			currentBucket.put(data);
+		}
+		private void mapSet(V value) throws IOException{
+			data.value=value;
+			HashIOMap.this.put(getKey(), value);
+		}
+		
+		@Override
+		public void set(V value) throws IOException{
+			if(datasetID!=currentDatasetID){
+				if(tryUpdateData()){
+					fastSet(value);
+				}else mapSet(value);
+			}else fastSet(value);
+		}
+		
+		private boolean tryUpdateData(){
+			int smallHash=toSmallHash(getKey(), bucketSize);
+			
+			Bucket<K, V> bucket=getByHash(buckets, smallHash);
+			if(bucket==null) return false;
+			
+			currentBucket=bucket;
+			currentDatasetID=datasetID;
+			return true;
+		}
+	}
+	
 	@Override
 	public Entry<K, V> getEntry(K key) throws IOException{
 		int smallHash=toSmallHash(key, bucketSize);
@@ -195,36 +237,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 			return null;
 		}
 		
-		
-		return new Entry.Abstract<>(){
-			private int currentDatasetID=datasetID;
-			private Bucket<K, V> currentBucket=bucket;
-			
-			@Override
-			public K getKey(){
-				return entry.key;
-			}
-			@Override
-			public V getValue(){
-				return entry.value;
-			}
-			@Override
-			public void set(V value) throws IOException{
-				entry.value=value;
-				
-				if(datasetID!=currentDatasetID){
-					int          smallHash=toSmallHash(key, bucketSize);
-					Bucket<K, V> bucket   =getByHash(buckets, smallHash);
-					if(bucket==null){
-						put(getKey(), getValue());
-						return;
-					}
-					currentBucket=bucket;
-					currentDatasetID=datasetID;
-				}
-				currentBucket.put(entry);
-			}
-		};
+		return new ModifiableEntry(bucket, entry);
 	}
 	@Override
 	public IterablePP<Entry<K, V>> entries(){
@@ -278,6 +291,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 		}
 		return null;
 	}
+	
 	private Bucket<K, V> getByHash(IOList<Bucket<K, V>> buckets, int hash){
 		for(var bucket : buckets){
 			if(bucket.hash==hash){
@@ -291,9 +305,11 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 		int hash=toHash(key);
 		return hashToSmall(hash, bucketSize);
 	}
+	
 	private int hashToSmall(int hash, int bucketSize){
 		return Math.abs(hash)%bucketSize;
 	}
+	
 	private int toHash(K key){
 		if(key==null){
 			return 0;

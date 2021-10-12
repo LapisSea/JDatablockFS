@@ -84,18 +84,18 @@ public interface IOMap<K, V>{
 	void put(K key, V value) throws IOException;
 	
 	
-	static String toString(IOMap<?, ?> map){
+	static <K, V> String toString(IOMap<K, V> map){
 		if(map.isEmpty()) return "{}";
 		var i=map.entries().iterator();
 		
 		StringBuilder sb=new StringBuilder();
 		sb.append('{');
-		for(;;){
+		while(true){
 			var e=i.next();
 			
-			Object key=e.getKey();
-			Object value;
-			value=e.getValue();
+			K key  =e.getKey();
+			V value=e.getValue();
+			
 			sb.append(TextUtil.toShortString(key));
 			sb.append('=');
 			sb.append(TextUtil.toShortString(value));

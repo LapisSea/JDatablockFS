@@ -251,6 +251,8 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 	public Optional<Chunk> nextOpt() throws IOException{
 		return Optional.ofNullable(next());
 	}
+	
+	@Nullable
 	public Chunk next() throws IOException{
 		if(nextCache==null){
 			if(!hasNextPtr()) return null;
