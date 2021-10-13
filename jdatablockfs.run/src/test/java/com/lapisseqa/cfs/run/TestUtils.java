@@ -4,6 +4,7 @@ import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.ChunkDataProvider;
 import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.io.IOInterface;
+import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.tools.logging.DataLogger;
@@ -77,7 +78,7 @@ public class TestUtils{
 		return sessionName;
 	}
 	
-	static <T extends IOInstance.Unmanaged<?>> void complexObjectIntegrityTest(
+	static <T extends IOInstance.Unmanaged<T>> void complexObjectIntegrityTest(
 		TestInfo info, int initalCapacity,
 		Struct.Unmanaged.Constr<T> constr,
 		TypeDefinition typeDef,
@@ -88,6 +89,12 @@ public class TestUtils{
 			var ref  =chunk.getPtr().makeReference(0);
 			
 			T obj=constr.create(provider, ref, typeDef);
+			
+			var actualSize=ContiguousStructPipe.sizeOfUnknown(obj);
+			
+			if(actualSize>initalCapacity){
+				LogUtil.printlnEr("WARNING: initial capacity is", initalCapacity, "but object has allocated", actualSize);
+			}
 			
 			session.accept(obj);
 			
@@ -110,7 +117,7 @@ public class TestUtils{
 		}
 	}
 	
-	static <E, T extends IOInstance.Unmanaged<?>&IOList<E>> void ioListComplianceSequence(
+	static <E, T extends IOInstance.Unmanaged<T>&IOList<E>> void ioListComplianceSequence(
 		TestInfo info, int initalCapacity,
 		Struct.Unmanaged.Constr<T> constr,
 		TypeDefinition typeDef,
@@ -123,13 +130,14 @@ public class TestUtils{
 	}
 	
 	
-	static <K, V, T extends IOInstance.Unmanaged<?>&IOMap<K, V>> void ioMapComplianceSequence(
+	static <K, V, T extends IOInstance.Unmanaged<T>&IOMap<K, V>> void ioMapComplianceSequence(
 		TestInfo info,
 		Struct.Unmanaged.Constr<T> constr,
 		TypeDefinition typeDef,
 		UnsafeConsumer<IOMap<K, V>, IOException> session
 	) throws IOException{
-		TestUtils.complexObjectIntegrityTest(info, 8, constr, typeDef, map->{
+		int initial=(int)ContiguousStructPipe.of(Struct.ofUnknown(typeDef.getTypeClass())).getSizeDescriptor().getMax().orElse(8);
+		complexObjectIntegrityTest(info, initial, constr, typeDef, map->{
 			var splitter=Splitter.map(map, new ReferenceMemoryIOMap<>(), TestUtils::checkCompliance);
 			session.accept(splitter);
 		});
