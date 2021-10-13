@@ -108,10 +108,6 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		headerSize=(int)PIPE.getSizeDescriptor().calcUnknown(this);
 	}
 	
-	private NumberSize calcBodyNumSize(){
-		return NumberSize.bySize(Math.max(getCapacity(), getSize()));
-	}
-	
 	public void writeHeader() throws IOException{
 		try(var io=clusterIoAtHead()){
 			writeHeader(io);
@@ -162,16 +158,33 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 	}
 	
 	
-	public void pushSize(long newSize){
+	public void pushSize(long newSize) throws BitDepthOutOfSpaceException{
 		if(newSize>getSize()) setSize(newSize);
 	}
 	public void clampSize(long newSize){
-		if(newSize<getSize()) setSize(newSize);
+		if(newSize<getSize()){
+			try{
+				setSize(newSize);
+			}catch(BitDepthOutOfSpaceException e){
+				/*
+				 * The size only gets smaller. This can theoretically happen if the chunk is in a corrupt state.
+				 * */
+				throw new ShouldNeverHappenError(e);
+			}
+		}
 	}
 	
 	
-	public void incrementSize(long amount){
+	public void incrementSize(long amount) throws BitDepthOutOfSpaceException{
 		setSize(getSize()+amount);
+	}
+	
+	public void sizeSetZero(){
+		try{
+			setSize(0);
+		}catch(BitDepthOutOfSpaceException e){
+			throw new ShouldNeverHappenError(e);
+		}
 	}
 	
 	@IOValue
@@ -179,10 +192,11 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		return size;
 	}
 	@IOValue
-	public void setSize(long newSize){
+	public void setSize(long newSize) throws BitDepthOutOfSpaceException{
 		forbidReadOnly();
 		if(this.size==newSize) return;
 		assert newSize<=getCapacity():newSize+" > "+getCapacity();
+		getBodyNumSize().ensureCanFit(newSize);
 		
 		markDirty();
 		this.size=newSize;
@@ -193,13 +207,38 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		return capacity;
 	}
 	@IOValue
-	public void setCapacity(long newCapacity){
+	public void setCapacity(long newCapacity) throws BitDepthOutOfSpaceException{
 		forbidReadOnly();
 		if(this.capacity==newCapacity) return;
+		getBodyNumSize().ensureCanFit(newCapacity);
 		this.capacity=newCapacity;
 		markDirty();
 	}
 	
+	public void setCapacityAndModifyNumSize(long newCapacity){
+		forbidReadOnly();
+		if(this.capacity==newCapacity) return;
+		
+		var end=dataEnd();
+		
+		var newNum    =NumberSize.bySize(newCapacity);
+		var prevNum   =newNum.prev();
+		var diff      =newNum.bytes-prevNum.bytes;
+		var safeTarget=newCapacity+diff;
+		
+		bodyNumSize=NumberSize.bySize(safeTarget);
+		calcHeaderSize();
+		
+		this.capacity=end-dataStart();
+		markDirty();
+		
+		assert dataEnd()==end:dataEnd()+" != "+end;
+	}
+	
+	/**
+	 * Should be put before any early termination. If any forbidden function in
+	 * correct state is called, it should fail 100% of the time no matter the input.
+	 */
 	private void forbidReadOnly(){
 		if(reading) return;
 		if(isReadOnly()){
@@ -240,9 +279,7 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		forbidReadOnly();
 		Objects.requireNonNull(nextPtr);
 		if(this.nextPtr.equals(nextPtr)) return;
-		if(!nextSize.canFit(nextPtr)){
-			throw new BitDepthOutOfSpaceException(nextSize, nextPtr.getValue());
-		}
+		getNextSize().ensureCanFit(nextPtr);
 		this.nextPtr=nextPtr;
 		nextCache=null;
 		markDirty();
@@ -329,8 +366,8 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		getSource().ioAt(dataStart()+from, io->io.fillZero(amount));
 	}
 	
-	public void zeroOutHead() throws IOException{
-		getSource().ioAt(getPtr().getValue(), io->io.fillZero(headerSize));
+	public void destroy() throws IOException{
+		getSource().ioAt(getPtr().getValue(), io->io.fillZero(getHeaderSize()+getSize()));
 	}
 	public void freeChaining() throws IOException{
 		provider.validate();
@@ -361,9 +398,13 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		return checkLastPhysical()?null:provider.getChunk(ChunkPointer.of(dataEnd()));
 	}
 	
+	public boolean isNextPhysical(Chunk other){
+		return other.getPtr().equals(dataEnd());
+	}
+	
 	private void markDirty(){
-		if(reading) return;
 		forbidReadOnly();
+		if(reading) return;
 		dirty=true;
 	}
 	

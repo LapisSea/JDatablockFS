@@ -39,7 +39,17 @@ public class VerySimpleMemoryManager implements MemoryManager{
 					io.setPos(old);
 					Utils.zeroFill(io::write, toGrow);
 				}
-				target.modifyAndSave(ch->ch.setCapacity(ch.getCapacity()+toGrow));
+				target.modifyAndSave(ch->{
+					try{
+						ch.setCapacity(ch.getCapacity()+toGrow);
+					}catch(BitDepthOutOfSpaceException e){
+						/*
+						 * toGrow is clamped to the remaining bitspace of body num size. If this happens
+						 * something has gone horribly wrong and life choices should be reconsidered
+						 * */
+						throw new ShouldNeverHappenError(e);
+					}
+				});
 				return toGrow;
 			}
 		}

@@ -2,6 +2,8 @@ package com.lapissea.cfs.io;
 
 import com.lapissea.cfs.chunk.ChainWalker;
 import com.lapissea.cfs.chunk.Chunk;
+import com.lapissea.cfs.exceptions.BitDepthOutOfSpaceException;
+import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.function.FunctionOL;
 
 import java.io.IOException;
@@ -296,7 +298,17 @@ public class ChunkChainIO implements RandomIO{
 			int toWrite=(int)Math.min(remaining, cRem);
 			
 			syncedSource().write(b, offAdd, toWrite);
-			cursor.modifyAndSave(c->c.pushSize(offset+toWrite));
+			cursor.modifyAndSave(c->{
+				try{
+					c.pushSize(offset+toWrite);
+				}catch(BitDepthOutOfSpaceException e){
+					/*
+					 * size can not exceed capacity. If it somehow does and capacity
+					 * did not throw bitdepth then this should not be the biggest concern.
+					 * */
+					throw new ShouldNeverHappenError(e);
+				}
+			});
 			advanceCursorBy(toWrite);
 			
 			offAdd+=toWrite;
@@ -341,12 +353,10 @@ public class ChunkChainIO implements RandomIO{
 		
 		Chunk chunk=head;
 		do{
-			long oldSize=chunk.getSize();
+			chunk.clampSize(remaining);
+			chunk.syncStruct();
 			
-			long newSize=Math.min(remaining, oldSize);
-			
-			chunk.modifyAndSave(c->c.setSize(newSize));
-			
+			var newSize=chunk.getSize();
 			remaining=Math.max(0, remaining-newSize);
 		}while((chunk=chunk.next())!=null);
 		
