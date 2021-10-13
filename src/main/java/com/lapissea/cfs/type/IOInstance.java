@@ -65,6 +65,8 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 			}
 		}
 		
+		public void free() throws IOException{}
+		
 		protected RandomIO selfIO() throws IOException{
 			return reference.io(provider);
 		}

@@ -176,10 +176,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 		datasetID++;
 		transfer(old, buckets, bucketPO2);
 		
-		((Unmanaged<?>)old).getReference()
-		                   .getPtr()
-		                   .dereference(getChunkProvider())
-		                   .freeChaining();
+		((Unmanaged<?>)old).free();
 		
 		writeManagedFields();
 	}

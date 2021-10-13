@@ -9,11 +9,14 @@ import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 import static com.lapissea.cfs.GlobalConfig.*;
 
 public class VerySimpleMemoryManager implements MemoryManager{
+	
+	private final List<Chunk> freeChunks=new ArrayList<>();
 	
 	private final ChunkDataProvider context;
 	
@@ -22,8 +25,55 @@ public class VerySimpleMemoryManager implements MemoryManager{
 	}
 	
 	@Override
-	public void free(List<Chunk> tofree) throws IOException{
-		throw new IOException("not supported");
+	public void free(List<Chunk> toFree) throws IOException{
+		
+		List<Chunk> toAdd=mergeChunks(toFree);
+		freeChunks.addAll(toAdd);
+		
+		var mergedFree=mergeChunks(freeChunks);
+		freeChunks.clear();
+		freeChunks.addAll(mergedFree);
+	}
+	
+	private List<Chunk> mergeChunks(List<Chunk> data) throws IOException{
+		List<Chunk> toAdd;
+		
+		boolean     dirty;
+		List<Chunk> chunks=data;
+		toAdd=new ArrayList<>(chunks.size());
+		
+		while(true){
+			toAdd.clear();
+			dirty=false;
+			for(Chunk chunk : chunks){
+				
+				var optPrev=chunks.stream().filter(c->c.isNextPhysical(chunk)).findAny();
+				if(optPrev.isPresent()){
+					var prev=optPrev.get();
+					
+					var wholeSize=chunk.getHeaderSize()+chunk.getCapacity();
+					chunk.destroy();
+					
+					prev.sizeSetZero();
+					prev.setCapacityAndModifyNumSize(prev.getCapacity()+wholeSize);
+					prev.writeHeader();
+					
+					dirty=true;
+					continue;
+				}
+				
+				chunk.modifyAndSave(Chunk::sizeSetZero);
+				toAdd.add(chunk);
+			}
+			
+			if(dirty){
+				if(toAdd.size()==1){
+					break;
+				}
+				chunks=new ArrayList<>(toAdd);
+			}else break;
+		}
+		return toAdd;
 	}
 	
 	private long growFileAloc(Chunk target, long toAllocate) throws IOException{

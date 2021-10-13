@@ -15,7 +15,6 @@ import com.lapissea.cfs.type.IOTypeDB;
 import com.lapissea.cfs.type.StructLayout;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
-import com.lapissea.util.NotImplementedException;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -105,6 +104,8 @@ public class Cluster implements ChunkDataProvider{
 	private final IOInterface   source;
 	private final MemoryManager memoryManager=new VerySimpleMemoryManager(this);
 	
+	private final IOTypeDB db=new IOTypeDB.MemoryOnlyDB();
+	
 	private final RootRef root;
 	
 	public Cluster(IOInterface source) throws IOException{
@@ -143,7 +144,7 @@ public class Cluster implements ChunkDataProvider{
 	
 	@Override
 	public IOTypeDB getTypeDb(){
-		throw new NotImplementedException();
+		return db;
 	}
 	
 	@Override

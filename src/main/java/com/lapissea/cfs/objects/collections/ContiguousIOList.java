@@ -1,25 +1,23 @@
 package com.lapissea.cfs.objects.collections;
 
+import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.ChunkDataProvider;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
-import com.lapissea.cfs.type.GenericContext;
-import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.Struct;
-import com.lapissea.cfs.type.TypeDefinition;
+import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.IFieldAccessor;
+import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
@@ -223,5 +221,24 @@ public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanaged
 	@Override
 	public Struct<T> getElementType(){
 		return elementPipe.getType();
+	}
+	
+	@Override
+	public void free() throws IOException{
+		Set<Chunk> chunks=new HashSet<>();
+		var        prov  =getChunkProvider();
+		new MemoryWalker().walk(prov, this, getReference(), getPipe(), ref->chunks.add(ref.getPtr().dereference(prov)));
+		
+		LogUtil.println(chunks);
+		LogUtil.println(getReference()
+			                .getPtr()
+			                .dereference(prov));
+		
+		prov.getMemoryManager().free(new ArrayList<>(chunks));
+		
+		getReference()
+			.getPtr()
+			.dereference(prov)
+			.freeChaining();
 	}
 }
