@@ -1,13 +1,13 @@
 <component name="libraryTable">
   <library name="Maven: org.lwjgl:lwjgl-stb:natives-windows:3.3.0-SNAPSHOT">
     <CLASSES>
-      <root url="jar://$MAVEN_REPOSITORY$/org/lwjgl/lwjgl-stb/3.3.0-SNAPSHOT/lwjgl-stb-3.3.0-20210907.210233-8-natives-windows.jar!/" />
+      <root url="jar://$MAVEN_REPOSITORY$/org/lwjgl/lwjgl-stb/3.3.0-SNAPSHOT/lwjgl-stb-3.3.0-20211011.082627-10-natives-windows.jar!/" />
     </CLASSES>
     <JAVADOC>
-      <root url="jar://$MAVEN_REPOSITORY$/org/lwjgl/lwjgl-stb/3.3.0-SNAPSHOT/lwjgl-stb-3.3.0-20210907.210233-8-javadoc.jar!/" />
+      <root url="jar://$MAVEN_REPOSITORY$/org/lwjgl/lwjgl-stb/3.3.0-SNAPSHOT/lwjgl-stb-3.3.0-20211011.082627-10-javadoc.jar!/" />
     </JAVADOC>
     <SOURCES>
-      <root url="jar://$MAVEN_REPOSITORY$/org/lwjgl/lwjgl-stb/3.3.0-SNAPSHOT/lwjgl-stb-3.3.0-20210907.210233-8-sources.jar!/" />
+      <root url="jar://$MAVEN_REPOSITORY$/org/lwjgl/lwjgl-stb/3.3.0-SNAPSHOT/lwjgl-stb-3.3.0-20211011.082627-10-sources.jar!/" />
     </SOURCES>
   </library>
 </component>

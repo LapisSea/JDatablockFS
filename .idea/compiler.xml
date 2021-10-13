@@ -9,8 +9,8 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
-        <module name="jdatablockfs.tools" />
         <module name="jdatablockfs.run" />
+        <module name="jdatablockfs.tools" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel target="17">
@@ -18,5 +18,13 @@
       <module name="jdatablockfs.run" target="17" />
       <module name="jdatablockfs.tools" target="17" />
     </bytecodeTargetLevel>
+  </component>
+  <component name="JavacSettings">
+    <option name="ADDITIONAL_OPTIONS_STRING" value="--enable-preview" />
+    <option name="ADDITIONAL_OPTIONS_OVERRIDE">
+      <module name="JDatablockFS" options="" />
+      <module name="jdatablockfs.run" options="" />
+      <module name="jdatablockfs.tools" options="" />
+    </option>
   </component>
 </project>
