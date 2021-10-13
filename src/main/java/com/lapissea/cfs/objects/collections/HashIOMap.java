@@ -5,7 +5,7 @@ import com.lapissea.cfs.chunk.ChunkDataProvider;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.TypeDefinition;
-import com.lapissea.cfs.type.field.annotations.IODependency;
+import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.cfs.type.field.annotations.IOValue;
@@ -56,11 +56,6 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 	}
 	
 	private static class Bucket<K, V> extends IOInstance<Bucket<K, V>>{
-		
-		@IOValue
-		@IODependency.VirtualNumSize(name="hSiz")
-		private int hash;
-		
 		@IOValue
 		@IOValue.OverrideType(LinkedIOList.class)
 		private IOList<BucketEntry<K, V>> entries;
@@ -103,8 +98,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 	private static final int RESIZE_TRIGGER=4;
 	
 	@IOValue
-	@IODependency.VirtualNumSize(name="bSiz")
-	private int bucketSize=1;
+	private short bucketPO2=1;
 	
 	@IOValue
 	@IOValue.OverrideType(ContiguousIOList.class)
@@ -116,26 +110,31 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 		super(provider, reference, typeDef);
 		
 		if(isSelfDataEmpty()){
-			allocateNulls();
-			buckets.requestCapacity(bucketSize);
+			newBuckets();
 			writeManagedFields();
+			fillBuckets();
 		}
 		readManagedFields();
 	}
 	
-	private void reflow() throws IOException{
-		
+	private short calcNewSize(IOList<Bucket<K, V>> buckets, short bucketPO2){
 		Map<Integer, ObjectHolder<Integer>> counts=new HashMap<>();
 		
-		int newSize=bucketSize;
+		short newBucketPO2=bucketPO2;
 		
-		int[] hashes=entries().stream().map(Entry::getKey).mapToInt(this::toHash).toArray();
+		int[] hashes=entries(buckets).stream().map(Entry::getKey).mapToInt(this::toHash).toArray();
 		
 		boolean overflow=true;
 		while(overflow){
 			overflow=false;
 			counts.clear();
-			newSize++;
+			
+			if((((int)newBucketPO2)+1)>Short.MAX_VALUE){
+				throw new IndexOutOfBoundsException();
+			}
+			
+			newBucketPO2++;
+			int newSize=1<<newBucketPO2;
 			
 			for(int hash : hashes){
 				int smallHash=hash%newSize;
@@ -147,23 +146,47 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 				}
 			}
 		}
+		return newBucketPO2;
+	}
+	
+	
+	private void fillBuckets() throws IOException{
+		var siz=1L<<bucketPO2;
+		buckets.requestCapacity(siz);
+		while(buckets.size()<siz){
+			buckets.addNew(b->b.allocateNulls(getChunkProvider()));
+		}
+	}
+	
+	@SuppressWarnings("unchecked")
+	private void newBuckets() throws IOException{
+		getThisStruct().getFields()
+		               .requireExactFieldType(IOField.Ref.class, "buckets")
+		               .allocateUnmanaged(this);
+	}
+	
+	private void reflow() throws IOException{
 		
 		var old=buckets;
 		
 		buckets=null;
-		bucketSize=newSize;
-		
-		allocateNulls();
-		buckets.requestCapacity(counts.size());
+		bucketPO2=calcNewSize(old, bucketPO2);
+		newBuckets();
+		fillBuckets();
 		datasetID++;
-		transfer(old, buckets, newSize);
+		transfer(old, buckets, bucketPO2);
+		
+		((Unmanaged<?>)old).getReference()
+		                   .getPtr()
+		                   .dereference(getChunkProvider())
+		                   .freeChaining();
 		
 		writeManagedFields();
 	}
 	
-	private void transfer(IOList<Bucket<K, V>> oldBuckets, IOList<Bucket<K, V>> newBuckets, int newSize) throws IOException{
+	private void transfer(IOList<Bucket<K, V>> oldBuckets, IOList<Bucket<K, V>> newBuckets, short newPO2) throws IOException{
 		for(var e : entries(oldBuckets)){
-			putEntry(newBuckets, newSize, e.getKey(), e.getValue());
+			putEntry(newBuckets, newPO2, e.getKey(), e.getValue());
 		}
 	}
 	
@@ -201,10 +224,8 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 			}else fastSet(value);
 		}
 		
-		private boolean tryUpdateData(){
-			int smallHash=toSmallHash(getKey(), bucketSize);
-			
-			Bucket<K, V> bucket=getByHash(buckets, smallHash);
+		private boolean tryUpdateData() throws IOException{
+			Bucket<K, V> bucket=getBucket(buckets, getKey(), bucketPO2);
 			if(bucket==null) return false;
 			
 			currentBucket=bucket;
@@ -215,9 +236,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 	
 	@Override
 	public Entry<K, V> getEntry(K key) throws IOException{
-		int smallHash=toSmallHash(key, bucketSize);
-		
-		Bucket<K, V> bucket=getByHash(buckets, smallHash);
+		Bucket<K, V> bucket=getBucket(buckets, key, bucketPO2);
 		if(bucket==null){
 			return null;
 		}
@@ -240,7 +259,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 	
 	@Override
 	public void put(K key, V value) throws IOException{
-		var b=putEntry(buckets, bucketSize, key, value);
+		var b=putEntry(buckets, bucketPO2, key, value);
 		if(b==null) return;
 		deltaSize(1);
 		if(b.size()>RESIZE_TRIGGER){
@@ -248,16 +267,9 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 		}
 	}
 	
-	private Bucket<K, V> putEntry(IOList<Bucket<K, V>> buckets, int bucketSize, K key, V value) throws IOException{
-		int smallHash=toSmallHash(key, bucketSize);
+	private Bucket<K, V> putEntry(IOList<Bucket<K, V>> buckets, short bucketPO2, K key, V value) throws IOException{
 		
-		Bucket<K, V> bucket=getByHash(buckets, smallHash);
-		if(bucket==null){
-			bucket=buckets.addNew(b->{
-				b.hash=smallHash;
-				b.allocateNulls(getChunkProvider());
-			});
-		}
+		Bucket<K, V> bucket=getBucket(buckets, key, bucketPO2);
 		
 		var entry=getBucketEntry(bucket, key);
 		if(entry!=null){
@@ -282,22 +294,21 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 		return null;
 	}
 	
-	private Bucket<K, V> getByHash(IOList<Bucket<K, V>> buckets, int hash){
-		for(var bucket : buckets){
-			if(bucket.hash==hash){
-				return bucket;
-			}
-		}
-		return null;
+	private Bucket<K, V> getBucket(IOList<Bucket<K, V>> buckets, K key, short bucketPO2) throws IOException{
+		int smallHash=toSmallHash(key, bucketPO2);
+		return getBySmallHash(buckets, smallHash);
+	}
+	private Bucket<K, V> getBySmallHash(IOList<Bucket<K, V>> buckets, int smallHash) throws IOException{
+		return buckets.get(smallHash);
 	}
 	
-	private int toSmallHash(K key, int bucketSize){
+	private int toSmallHash(K key, short bucketPO2){
 		int hash=toHash(key);
-		return hashToSmall(hash, bucketSize);
+		return hashToSmall(hash, bucketPO2);
 	}
 	
-	private int hashToSmall(int hash, int bucketSize){
-		return Math.abs(hash)%bucketSize;
+	private int hashToSmall(int hash, short bucketPO2){
+		return Math.abs(hash)%(1<<bucketPO2);
 	}
 	
 	private int toHash(K key){
