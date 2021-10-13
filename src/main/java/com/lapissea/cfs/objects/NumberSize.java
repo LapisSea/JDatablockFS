@@ -198,7 +198,7 @@ public enum NumberSize{
 	}
 	
 	public boolean canFit(long num){
-		return num<maxSize;
+		return num<=maxSize;
 	}
 	
 	public long remaining(long num){
