@@ -16,6 +16,7 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.ShouldNeverHappenError;
@@ -219,6 +220,10 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		forbidReadOnly();
 		if(this.capacity==newCapacity) return;
 		
+		if(capacity<newCapacity){
+			throw new NotImplementedException("not sure when destructive shrinking will be needed");
+		}
+		
 		var end=dataEnd();
 		
 		var newNum    =NumberSize.bySize(newCapacity);
@@ -228,11 +233,10 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		
 		bodyNumSize=NumberSize.bySize(safeTarget);
 		calcHeaderSize();
-		
-		this.capacity=end-dataStart();
+		var growth=newCapacity-capacity;
+		var start =dataStart();
+		this.capacity=end-start+growth;
 		markDirty();
-		
-		assert dataEnd()==end:dataEnd()+" != "+end;
 	}
 	
 	/**
@@ -348,10 +352,6 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 	}
 	public void zeroOutCapacity() throws IOException{
 		zeroOutFromTo(0, getCapacity());
-	}
-	
-	public void zeroOutFromTo(long from) throws IOException{
-		zeroOutFromTo(from, getSize());
 	}
 	
 	public void zeroOutFromTo(long from, long to) throws IOException{

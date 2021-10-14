@@ -36,44 +36,33 @@ public class VerySimpleMemoryManager implements MemoryManager{
 	}
 	
 	private List<Chunk> mergeChunks(List<Chunk> data) throws IOException{
-		List<Chunk> toAdd;
-		
-		boolean     dirty;
-		List<Chunk> chunks=data;
-		toAdd=new ArrayList<>(chunks.size());
-		
-		while(true){
-			toAdd.clear();
-			dirty=false;
-			for(Chunk chunk : chunks){
+		List<Chunk> chunks=new ArrayList<>(data);
+		whil:
+		while(chunks.size()>1){
+			for(var iter=chunks.iterator();iter.hasNext();){
+				var chunk=iter.next();
 				
 				var optPrev=chunks.stream().filter(c->c.isNextPhysical(chunk)).findAny();
 				if(optPrev.isPresent()){
 					var prev=optPrev.get();
 					
 					var wholeSize=chunk.getHeaderSize()+chunk.getCapacity();
-					chunk.destroy();
-					
+					prev.zeroOutFromTo(0, prev.getSize());
 					prev.sizeSetZero();
 					prev.setCapacityAndModifyNumSize(prev.getCapacity()+wholeSize);
 					prev.writeHeader();
 					
-					dirty=true;
-					continue;
+					chunk.destroy();
+					iter.remove();
+					continue whil;
 				}
 				
 				chunk.modifyAndSave(Chunk::sizeSetZero);
-				toAdd.add(chunk);
 			}
 			
-			if(dirty){
-				if(toAdd.size()==1){
-					break;
-				}
-				chunks=new ArrayList<>(toAdd);
-			}else break;
+			break;
 		}
-		return toAdd;
+		return chunks;
 	}
 	
 	private long growFileAloc(Chunk target, long toAllocate) throws IOException{

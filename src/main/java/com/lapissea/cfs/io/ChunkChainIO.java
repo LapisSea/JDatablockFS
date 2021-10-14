@@ -184,7 +184,7 @@ public class ChunkChainIO implements RandomIO{
 					ch.clearNextPtr();
 				});
 				if(chunkSpace<chunk.getSize()){
-					chunk.zeroOutFromTo(chunkSpace);
+					chunk.zeroOutFromTo(chunkSpace, chunk.getSize());
 				}
 				
 				if(next!=null){
