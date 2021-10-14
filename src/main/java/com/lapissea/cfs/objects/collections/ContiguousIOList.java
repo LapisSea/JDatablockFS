@@ -12,7 +12,6 @@ import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.IFieldAccessor;
 import com.lapissea.util.LogUtil;
-import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 
 import java.io.IOException;
@@ -57,7 +56,7 @@ public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanaged
 			return new IOField<ContiguousIOList<T>, T>(new IFieldAccessor<>(){
 				@Override
 				public Struct<ContiguousIOList<T>> getDeclaringStruct(){
-					throw new NotImplementedException();
+					return null;
 				}
 				@NotNull
 				@Override

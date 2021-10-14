@@ -78,7 +78,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			var valueAccessor=new IFieldAccessor<Node<T>>(){
 				@Override
 				public Struct<Node<T>> getDeclaringStruct(){
-					throw NotImplementedException.infer();//TODO: implement .getDeclaringStruct()
+					return null;
 				}
 				@NotNull
 				@Override

@@ -236,7 +236,8 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	}
 	@Override
 	public String toString(){
-		return getAccessor().getDeclaringStruct().getType().getSimpleName()+"#"+toShortString();
+		var struct=getAccessor().getDeclaringStruct();
+		return (struct==null?"":struct.getType().getSimpleName())+"#"+toShortString();
 	}
 	
 	
