@@ -3,6 +3,7 @@ package com.lapisseqa.cfs.run;
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.ChunkDataProvider;
+import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
@@ -36,7 +37,7 @@ public class GeneralTests{
 		
 		ChunkDataProvider.newVerySimpleProvider();
 		
-		for(var c : Arrays.asList(Chunk.class, Reference.class, AutoText.class)){
+		for(var c : Arrays.asList(Chunk.class, Reference.class, AutoText.class, Cluster.class)){
 			try{
 				Struct.ofUnknown(c);
 			}catch(Throwable e){

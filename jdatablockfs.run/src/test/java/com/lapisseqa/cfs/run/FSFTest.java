@@ -1,17 +1,15 @@
 package com.lapisseqa.cfs.run;
 
-import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.io.impl.MemoryData;
-import com.lapissea.cfs.objects.collections.ContiguousIOList;
+import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
-import com.lapissea.cfs.type.StructLayout;
-import com.lapissea.cfs.type.TypeDefinition;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.LogUtil;
 
 import java.io.IOException;
+import java.util.Random;
 import java.util.stream.LongStream;
 
 class FSFTest{
@@ -20,21 +18,29 @@ class FSFTest{
 //		LogUtil.Init.attach(USE_CALL_POS|USE_TABULATED_HEADER);
 		LogUtil.Init.attach(0);
 		
+		
 		try{
 			String               sessionName="default";
 			LateInit<DataLogger> logger     =LoggedMemoryUtils.createLoggerFromConfig();
-			MemoryData<?>        mem        =LoggedMemoryUtils.newLoggedMemory(sessionName, logger);
-			
 			try{
-				Cluster.init(mem);
-				Cluster cluster=new Cluster(mem);
-				
-				doTests(cluster);
+				for(int i=0;i<50;i++){
+					MemoryData<?> mem=LoggedMemoryUtils.newLoggedMemory(sessionName, logger);
+					logger.ifInited(l->l.getSession(sessionName).reset());
+					
+					try{
+						Cluster.init(mem);
+						Cluster cluster=new Cluster(mem);
+						
+						doTests(cluster);
+					}finally{
+						logger.block();
+						mem.onWrite.log(mem, LongStream.of());
+					}
+				}
 			}finally{
-				logger.block();
-				mem.onWrite.log(mem, LongStream.of());
 				logger.get().destroy();
 			}
+			
 			
 		}catch(Throwable e){
 			e.printStackTrace();
@@ -42,46 +48,27 @@ class FSFTest{
 	}
 	
 	private static void doTests(Cluster provider) throws IOException{
-		
-//		var roots=provider.getRootReferences();
-		
-		var chunk=AllocateTicket.bytes(32).submit(provider);
-		
-		var ref=chunk.getPtr().makeReference(0);
-		var typ=TypeDefinition.of(ContiguousIOList.class, Dummy.class);
-		
-		ContiguousIOList<Dummy> list=new ContiguousIOList<>(provider, ref, typ);
-		
-		list.add(new Dummy(69));
-		list.add(new Dummy(420));
-		
-		var meta=provider.getGenericTypes();
-		meta.add(new StructLayout("This is a test!"));
 
-//		roots.add(new GenericContainer<>(list));
-
-
-//		var chunk=AllocateTicket.bytes(64).submit(provider);
+//		var chunk=AllocateTicket.bytes(32).submit(provider);
 //
 //		var ref=chunk.getPtr().makeReference(0);
-//		var typ=TypeDefinition.of(HashIOMap.class, Integer.class, Integer.class);
+//		var typ=TypeDefinition.of(ContiguousIOList.class, Dummy.class);
 //
-//		IOMap<Integer, Integer> map=new HashIOMap<>(provider, ref, typ);
+//		ContiguousIOList<Dummy> list=new ContiguousIOList<>(provider, ref, typ);
 //
-//		map.put(1, 11);
-//		map.put(2, 12);
-//		map.put(3, 13);
-//		map.put(16, 21);
-//		map.put(17, 22);
-//		map.put(18, 23);
+//		list.add(new Dummy(69));
+//		list.add(new Dummy(420));
 //
-//
-//		IOMap<Integer, Integer> read=new HashIOMap<>(provider, ref, typ);
-//
-//		LogUtil.println(map);
-//		LogUtil.println(read);
-//
-//		assert map.equals(read);
+//		var meta=provider.getGenericTypes();
+//		meta.add(new StructLayout("This is a test!"));
+		
+		IOMap<Integer, Integer> map=provider.getTemp();
+		
+		Random r=new Random();
+		r.setSeed(1);
+		for(int i=0;i<40;i++){
+			map.put(i, r.nextInt());
+		}
 	}
 	
 }
