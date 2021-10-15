@@ -166,19 +166,20 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 	}
 	
 	private void reflow() throws IOException{
-		
 		var old=buckets;
 		
-		buckets=null;
 		bucketPO2=calcNewSize(old, bucketPO2);
+		
 		newBuckets();
 		fillBuckets();
+		
 		datasetID++;
 		transfer(old, buckets, bucketPO2);
 		
+		writeManagedFields();
+		
 		((Unmanaged<?>)old).free();
 		
-		writeManagedFields();
 	}
 	
 	private void transfer(IOList<Bucket<K, V>> oldBuckets, IOList<Bucket<K, V>> newBuckets, short newPO2) throws IOException{
