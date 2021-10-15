@@ -213,8 +213,8 @@ public class Struct<T extends IOInstance<T>>{
 	
 	private final Class<T> type;
 	
-	private final FieldSet<T, ?> fields;
-	private final int[]          poolSizes;
+	private final FieldSet<T> fields;
+	private final int[]       poolSizes;
 	
 	private Supplier<T> emptyConstructor;
 	
@@ -239,7 +239,7 @@ public class Struct<T extends IOInstance<T>>{
 		return type;
 	}
 	
-	public FieldSet<T, ?> getFields(){
+	public FieldSet<T> getFields(){
 		return fields;
 	}
 	public IOField<T, ?> toIOField(Field field){

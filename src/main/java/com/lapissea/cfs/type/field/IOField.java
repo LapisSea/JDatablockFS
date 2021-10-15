@@ -118,7 +118,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	
 	private final IFieldAccessor<T> accessor;
 	
-	private       FieldSet<T, ?>         dependencies;
+	private       FieldSet<T>            dependencies;
 	private       EnumSet<UsageHintType> usageHints;
 	private final IONullability.Mode     nullability;
 	
@@ -127,7 +127,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		nullability=accessor==null?IONullability.Mode.NULLABLE:IOFieldTools.getNullability(accessor);
 	}
 	
-	public void initLateData(FieldSet<T, ?> deps, Stream<UsageHintType> hints){
+	public void initLateData(FieldSet<T> deps, Stream<UsageHintType> hints){
 		Utils.requireNull(dependencies);
 		Utils.requireNull(usageHints);
 		dependencies=deps;
@@ -228,7 +228,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	public String getName()                      {return getAccessor().getName();}
 	public Struct<T> declaringStruct()           {return getAccessor().getDeclaringStruct();}
 	public IFieldAccessor<T> getAccessor()       {return accessor;}
-	public FieldSet<T, ?> getDependencies()      {return Objects.requireNonNull(dependencies);}
+	public FieldSet<T> getDependencies()         {return Objects.requireNonNull(dependencies);}
 	public EnumSet<UsageHintType> getUsageHints(){return Objects.requireNonNull(usageHints);}
 	
 	public String toShortString(){

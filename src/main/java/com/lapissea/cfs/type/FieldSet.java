@@ -9,24 +9,24 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-public final class FieldSet<T extends IOInstance<T>, ValueType> extends AbstractList<IOField<T, ? extends ValueType>>{
+public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOField<T, ?>>{
 	
-	private final List<IOField<T, ? extends ValueType>> data;
+	private final List<IOField<T, ?>> data;
 	
-	public FieldSet(Stream<IOField<T, ? extends ValueType>> stream){
+	public FieldSet(Stream<IOField<T, ?>> stream){
 		this.data=stream.distinct().toList();
 	}
 	
-	public FieldSet(Collection<IOField<T, ? extends ValueType>> data){
+	public FieldSet(Collection<IOField<T, ?>> data){
 		this.data=switch(data){
 			case null -> throw new NullPointerException("data can not be null");
-			case FieldSet<T, ValueType> f -> f.data;
+			case FieldSet<T> f -> f.data;
 			default -> List.copyOf(data);
 		};
 	}
 	
 	@Override
-	public IOField<T, ? extends ValueType> get(int index){
+	public IOField<T, ?> get(int index){
 		return data.get(index);
 	}
 	@Override
@@ -34,7 +34,7 @@ public final class FieldSet<T extends IOInstance<T>, ValueType> extends Abstract
 		return data.size();
 	}
 	
-	public Optional<IOField<T, ? extends ValueType>> byName(String name){
+	public Optional<IOField<T, ?>> byName(String name){
 		return stream().filter(f->f.getName().equals(name)).findAny();
 	}
 	

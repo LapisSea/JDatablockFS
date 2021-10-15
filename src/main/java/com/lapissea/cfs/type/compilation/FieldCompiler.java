@@ -57,7 +57,7 @@ public class FieldCompiler{
 	protected FieldCompiler(){
 	}
 	
-	public <T extends IOInstance<T>> FieldSet<T, ?> compile(Struct<T> struct){
+	public <T extends IOInstance<T>> FieldSet<T> compile(Struct<T> struct){
 		var fields=scanFields(struct).stream().map(f->new AnnotatedField<>(f, scanAnnotations(f))).collect(Collectors.toList());
 		
 		generateVirtualFields(fields, struct);

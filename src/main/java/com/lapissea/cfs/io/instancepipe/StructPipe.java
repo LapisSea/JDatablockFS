@@ -82,7 +82,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	
 	private final Struct<T>                type;
 	private final SizeDescriptor<T>        sizeDescription;
-	private final FieldSet<T, ?>           ioFields;
+	private final FieldSet<T>              ioFields;
 	private final List<VirtualAccessor<T>> ioPoolAccessors;
 	private final List<IOField<T, ?>>      earlyNullChecks;
 	
@@ -217,7 +217,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		return type;
 	}
 	
-	public FieldSet<T, ?> getSpecificFields(){
+	public FieldSet<T> getSpecificFields(){
 		return ioFields;
 	}
 	
