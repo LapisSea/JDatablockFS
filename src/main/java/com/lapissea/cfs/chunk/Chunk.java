@@ -220,7 +220,7 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		forbidReadOnly();
 		if(this.capacity==newCapacity) return;
 		
-		if(capacity<newCapacity){
+		if(capacity>newCapacity){
 			throw new NotImplementedException("not sure when destructive shrinking will be needed");
 		}
 		

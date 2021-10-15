@@ -77,7 +77,7 @@ public class LoggedMemoryUtils{
 		}else{
 			var preBuf=new LinkedList<MemFrame>();
 			new Thread(()->{
-				UtilL.sleepWhile(display::isInited, 20);
+				UtilL.sleepUntil(display::isInited, 20);
 				synchronized(preBuf){
 					var ses=display.get().getSession(sessionName);
 					while(!preBuf.isEmpty()){
