@@ -5,17 +5,17 @@ import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.cfs.tools.logging.MemFrame;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.UtilL;
+import com.lapissea.util.function.UnsafeRunnable;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.io.ObjectInputStream;
+import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
 import java.util.Arrays;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.Supplier;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ForkJoinPool;
 
 import static com.lapissea.cfs.tools.server.ServerCommons.*;
 import static com.lapissea.util.LogUtil.Init.*;
@@ -28,59 +28,145 @@ public class DisplayHost{
 		new DisplayHost().start(Arrays.asList(args).contains("lazy"));
 	}
 	
-	private void session(String name, Socket client) throws IOException{
-		LogUtil.println("connected", client);
-		var objInput=new ObjectInputStream(client.getInputStream());
-		var out     =client.getOutputStream();
+	private class Sess{
 		
-		Supplier<DataLogger.Session> ses=()->getDisplay().join().getSession(name);
+		private final String name;
+		private final Socket client;
 		
-		boolean running=true;
-		while(running){
-			try{
-				running=switch(Action.values()[objInput.readByte()]){
-					case LOG -> {
-						ses.get().log((MemFrame)objInput.readObject());
-						yield true;
-					}
-					case RESET -> {
-						if(display!=null){
-							ses.get().reset();
-							System.gc();
-						}
-						yield true;
-					}
-					case FINISH -> {
-						ses.get().finish();
-						LogUtil.println("finishing");
-						yield false;
-					}
-					case PING -> {
-						out.write(2);
-						out.flush();
-						yield true;
-					}
-					case DELETE -> {
-						LogUtil.println("DELETE ORDER", name);
-						ses.get().delete();
-						yield false;
-					}
-				};
-			}catch(SocketException e){
-				if("Connection reset".equals(e.getMessage())){
-					break;
-				}
-				e.printStackTrace();
-				break;
-			}catch(Exception e){
-				e.printStackTrace();
-				break;
+		
+		private final Map<Long, UnsafeRunnable<IOException>> readyTasks=new ConcurrentHashMap<>();
+		
+		private long doneCounter;
+		private long taskCounter;
+		
+		private boolean running=true;
+		
+		private Sess(String name, Socket client){
+			this.name=name;
+			this.client=client;
+		}
+		
+		private boolean hasNext(){
+			return readyTasks.containsKey(doneCounter);
+		}
+		private DataLogger.Session getSession(){
+			return getDisplay().join().getSession(name);
+		}
+		private void doTasks() throws IOException{
+			while(hasNext()){
+				var task=readyTasks.remove(doneCounter++);
+				task.run();
 			}
 		}
-		LogUtil.println("disconnected", client);
+		
+		private void run() throws IOException{
+			LogUtil.println("connected", client);
+			
+			var objInput=new DataInputStream(new BufferedInputStream(client.getInputStream()));
+			var io      =ServerCommons.makeIO();
+			
+			var out=client.getOutputStream();
+			
+			var runner=async(()->{
+				try{
+					while(running){
+						if(readyTasks.isEmpty()){
+							UtilL.sleep(1);
+							continue;
+						}
+						UtilL.sleep(0.1);
+						doTasks();
+					}
+					
+					while(doneCounter!=taskCounter){
+						LogUtil.println("finishing up", doneCounter, "/", taskCounter);
+						while(!hasNext()) UtilL.sleep(1);
+						doTasks();
+					}
+					
+					client.close();
+					
+				}catch(Throwable e){
+					e.printStackTrace();
+				}
+			}, e->new Thread(e).start());
+			
+			while(running){
+				try{
+					
+					Action action;
+					byte[] data;
+					try{
+						action=Action.values()[objInput.readByte()];
+						data=ServerCommons.readSafe(objInput);
+					}catch(EOFException e1){
+						doTasks();
+						continue;
+					}
+					
+					while(doneCounter+1<<12<taskCounter){
+						UtilL.sleep(1);
+					}
+					
+					var id=taskCounter++;
+					
+					ForkJoinPool.commonPool().submit(()->{
+						UnsafeRunnable<IOException> readyTask=switch(action){
+							case LOG -> {
+								MemFrame frame;
+								try{
+									frame=io.readFrame(new DataInputStream(new ByteArrayInputStream(data)));
+								}catch(IOException e){
+									throw new RuntimeException(e);
+								}
+								var s=getSession();
+								yield ()->s.log(frame);
+							}
+							case RESET -> ()->{
+								getSession().reset();
+								System.gc();
+							};
+							case FINISH -> ()->{
+								getSession().finish();
+								LogUtil.println("finishing");
+								running=false;
+							};
+							case PING -> ()->{
+								out.write(2);
+								out.flush();
+							};
+							case DELETE -> ()->{
+//								LogUtil.println("DELETE ORDER", name);
+								getSession().delete();
+								running=false;
+							};
+						};
+						readyTasks.put(id, readyTask);
+					});
+					
+				}catch(SocketException e){
+					if("Connection reset".equals(e.getMessage())){
+						break;
+					}
+					if("Socket closed".equals(e.getMessage())){
+						break;
+					}
+					e.printStackTrace();
+					break;
+				}catch(Exception e){
+					e.printStackTrace();
+					break;
+				}
+			}
+			
+			runner.join();
+			
+			
+			LogUtil.println("disconnected", client);
+		}
 	}
 	
-	private CompletableFuture<DataLogger> display;
+	private volatile CompletableFuture<DataLogger> display;
 	
 	private record NegotiatedSession(ServerSocket sessionServer, String sessionName) implements AutoCloseable{
 		static NegotiatedSession negotiate(ServerSocket source) throws IOException{
@@ -120,7 +206,7 @@ public class DisplayHost{
 			
 			new Thread(()->{
 				try(ses;var client=ses.open()){
-					session(ses.sessionName, client);
+					new Sess(ses.sessionName, client).run();
 				}catch(Exception e){
 					e.printStackTrace();
 				}
@@ -129,8 +215,14 @@ public class DisplayHost{
 		}
 	}
 	
-	public synchronized CompletableFuture<DataLogger> getDisplay(){
-		if(display==null) display=async(ServerCommons::getLocalLoggerImpl);
+	public CompletableFuture<DataLogger> getDisplay(){
+		if(display==null){
+			synchronized(this){
+				if(display==null){
+					display=async(ServerCommons::getLocalLoggerImpl);
+				}
+			}
+		}
 		return display;
 	}
 }

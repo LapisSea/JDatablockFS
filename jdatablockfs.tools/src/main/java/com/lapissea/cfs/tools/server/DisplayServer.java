@@ -4,10 +4,13 @@ import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.MemFrame;
 import com.lapissea.util.LogUtil;
+import com.lapissea.util.function.UnsafeBiConsumer;
 import com.lapissea.util.function.UnsafeConsumer;
-import com.lapissea.util.function.UnsafeRunnable;
 
-import java.io.*;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.IOException;
 import java.net.*;
 import java.util.HashMap;
 import java.util.Map;
@@ -32,11 +35,14 @@ public class DisplayServer implements DataLogger{
 			boolean threadedOutput=Boolean.parseBoolean(config.getOrDefault("threadedOutput", "false").toString());
 			
 			var is    =socket.getInputStream();
-			var writer=new ObjectOutputStream(socket.getOutputStream());
+			var writer=new DataOutputStream(socket.getOutputStream());
 			
-			UnsafeConsumer<Action, IOException> sendAction=(Action a)->writer.writeByte(a.ordinal());
+			var io=ServerCommons.makeIO();
 			
-			UnsafeRunnable<IOException> flush=()->{
+			UnsafeBiConsumer<Action, UnsafeConsumer<DataOutputStream, IOException>, IOException> sendAction=(a, data)->{
+				writer.writeByte(a.ordinal());
+				ServerCommons.writeSafe(writer, data);
+				
 				if(threadedOutput) return;
 				writer.flush();
 			};
@@ -49,9 +55,7 @@ public class DisplayServer implements DataLogger{
 				@Override
 				public void log(MemFrame frame){
 					try{
-						sendAction.accept(Action.LOG);
-						writer.writeObject(frame);
-						flush.run();
+						sendAction.accept(Action.LOG, buff->io.writeFrame(buff, frame));
 					}catch(SocketException ignored){
 					}catch(IOException e){
 						throw new RuntimeException(e);
@@ -61,8 +65,7 @@ public class DisplayServer implements DataLogger{
 				@Override
 				public void reset(){
 					try{
-						sendAction.accept(Action.RESET);
-						flush.run();
+						sendAction.accept(Action.RESET, buff->{});
 					}catch(SocketException ignored){
 					}catch(IOException e){
 						e.printStackTrace();
@@ -79,9 +82,8 @@ public class DisplayServer implements DataLogger{
 				}
 				public void terminating(Action action){
 					try{
-						sendAction.accept(action);
+						sendAction.accept(action, buff->{});
 						writer.flush();
-						is.read();
 						socket.close();
 					}catch(SocketException ignored){
 					}catch(IOException e){
@@ -208,7 +210,7 @@ public class DisplayServer implements DataLogger{
 	private void initSession(){
 		sessionCreator=name->{
 			try{
-				return new ServerSession(new ServerSession.Info(InetAddress.getLocalHost(), 100), name, config);
+				return new ServerSession(new ServerSession.Info(InetAddress.getLocalHost(), 20), name, config);
 			}catch(SocketTimeoutException e){
 				LogUtil.printlnEr("Could not contact or start the server!");
 			}catch(Throwable e){
