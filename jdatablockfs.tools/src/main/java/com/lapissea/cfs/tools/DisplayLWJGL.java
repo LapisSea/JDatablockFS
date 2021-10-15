@@ -140,14 +140,14 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 		window.registryMouseButton.register(e->{
 			if(e.getKey()!=GLFW_MOUSE_BUTTON_LEFT) return;
 			switch(e.getType()){
-			case DOWN:
-				travel[0]=0;
-				break;
-			case UP:
-				if(travel[0]<30){
-					ifFrame(MemFrame::printStackTrace);
-				}
-				break;
+				case DOWN:
+					travel[0]=0;
+					break;
+				case UP:
+					if(travel[0]<30){
+						ifFrame(MemFrame::printStackTrace);
+					}
+					break;
 			}
 			
 		});
@@ -189,46 +189,46 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			cleanUpSessions();
 			if(e.getType()!=GlfwKeyboardEvent.Type.DOWN&&displayedSession.isPresent()&&sessions.size()>1){
 				switch(e.getKey()){
-				case GLFW_KEY_UP -> {
-					boolean found=false;
-					Session ses;
-					find:
-					{
-						for(var value : sessions.values()){
-							if(found){
-								ses=value;
-								break find;
-							}
-							found=value==displayedSession.get();
-						}
-						ses=sessions.values().iterator().next();
-					}
-					setActiveSession(ses);
-					return;
-				}
-				case GLFW_KEY_DOWN -> {
-					Session ses;
-					find:
-					{
-						Session last=null;
-						for(var value : sessions.values()){
-							ses=last;
-							last=value;
-							if(value==displayedSession.get()){
-								if(ses==null){
-									for(var session : sessions.values()){
-										last=session;
-									}
-									ses=last;
+					case GLFW_KEY_UP -> {
+						boolean found=false;
+						Session ses;
+						find:
+						{
+							for(var value : sessions.values()){
+								if(found){
+									ses=value;
+									break find;
 								}
-								break find;
+								found=value==displayedSession.get();
 							}
+							ses=sessions.values().iterator().next();
 						}
-						ses=sessions.values().iterator().next();
+						setActiveSession(ses);
+						return;
 					}
-					setActiveSession(ses);
-					return;
-				}
+					case GLFW_KEY_DOWN -> {
+						Session ses;
+						find:
+						{
+							Session last=null;
+							for(var value : sessions.values()){
+								ses=last;
+								last=value;
+								if(value==displayedSession.get()){
+									if(ses==null){
+										for(var session : sessions.values()){
+											last=session;
+										}
+										ses=last;
+									}
+									break find;
+								}
+							}
+							ses=sessions.values().iterator().next();
+						}
+						setActiveSession(ses);
+						return;
+					}
 				}
 			}
 			
@@ -262,7 +262,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 						var frames=displayedSession.map(s->s.frames).orElse(List.of());
 						
 						for(int i=0;i<frames.size();i++){
-							boolean match=!filter.isEmpty()&&Arrays.stream(frames.get(i).data().e().getStackTrace()).map(Object::toString).anyMatch(l->l.contains(filter));
+							boolean match=!filter.isEmpty()&&filterMatchAt(i);
 							if(match==lastMatch){
 								continue;
 							}

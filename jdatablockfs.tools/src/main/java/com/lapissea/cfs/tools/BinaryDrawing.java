@@ -14,6 +14,7 @@ import com.lapissea.cfs.tools.logging.MemFrame;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.cfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.util.LogUtil;
@@ -286,7 +287,25 @@ public abstract class BinaryDrawing{
 		}
 		
 		setColor(alpha(col, 0.7F));
-		drawStringIn(Objects.toString(field.instanceToString(instance, true)), bestRange.toRect(ctx), false);
+		var str =field.instanceToString(instance, true);
+		var fStr=field.toShortString();
+		var both=fStr+(str==null?"":" "+str);
+		
+		if(getStringBounds(both)[0]>bestRange.toRect(ctx).width){
+			var font=fontScale;
+			pushMatrix();
+			initFont(0.4F);
+			translate(0, fontScale*-0.8);
+			drawStringIn(field.toShortString(), bestRange.toRect(ctx), false);
+			popMatrix();
+			fontScale=font;
+			
+			drawStringIn((str==null?"":str), bestRange.toRect(ctx), false);
+		}else{
+			drawStringIn(both, bestRange.toRect(ctx), false);
+		}
+		
+		
 	}
 	
 	private void drawArrow(int width, int from, int to){
@@ -511,7 +530,8 @@ public abstract class BinaryDrawing{
 			try{
 				render(getFramePos());
 			}catch(Throwable e1){
-				e1.printStackTrace();
+				LogUtil.println(e1);
+//				e1.printStackTrace();
 			}
 		}
 		postRender();
@@ -585,7 +605,7 @@ public abstract class BinaryDrawing{
 			Cluster cluster=parsed.getCluster().orElseGet(()->{
 				try{
 					var c=new Cluster(MemoryData.build().withRaw(bytes).asReadOnly().build());
-					LogUtil.println("parsed cluster at frame", frameIndex);
+//					LogUtil.println("parsed cluster at frame", frameIndex);
 					parsed.cluster=new WeakReference<>(c);
 					return c;
 				}catch(Exception e){
@@ -696,7 +716,7 @@ public abstract class BinaryDrawing{
 		fillQuad(frameIndex*w-0.75, 0, 1.5, height*1.5);
 		
 		for(int i=0;i<getFrameCount();i++){
-			boolean match=!getFilter().isEmpty()&&Arrays.stream(getFrame(i).data().e().getStackTrace()).map(Object::toString).anyMatch(l->l.contains(getFilter()));
+			boolean match=!getFilter().isEmpty()&&filterMatchAt(i);
 			if(match==lastMatch){
 				continue;
 			}
@@ -709,6 +729,11 @@ public abstract class BinaryDrawing{
 		setColor(alpha(lastMatch?Color.RED.darker():Color.WHITE, frameIndex>=start&&frameIndex<=i?0.6F:0.3F));
 		fillQuad(start*w, 0, w*(i-start), height);
 	}
+	
+	protected boolean filterMatchAt(int i){
+		return getFrame(i).data().exceptionContains(getFilter());
+	}
+	
 	private void drawFilter(){
 		if(!isWritingFilter()) return;
 		setColor(Color.WHITE);
@@ -900,6 +925,7 @@ public abstract class BinaryDrawing{
 			reference=new Reference(off, c.getPtr().getValue()-off.getValue());
 		}
 		if(reference==null||reference.isNull()) return;
+		var fieldOffset=0L;
 		try{
 			if(stack.contains(instance)) return;
 			stack.add(instance);
@@ -908,26 +934,20 @@ public abstract class BinaryDrawing{
 			
 			Random rand=new Random();
 			setStroke(4);
-			var fieldOffset=0L;
 			
-			Iterator<IOField<T, ?>> iterator;
+			Iterator<IOField<T, Object>> iterator;
+			var                          fields=pipe.getSpecificFields();
 			if(instance instanceof IOInstance.Unmanaged unmanaged){
-				iterator=Stream.concat(pipe.getSpecificFields().stream(), unmanaged.listUnmanagedFields()).iterator();
+				iterator=Stream.concat(fields.stream(), unmanaged.listUnmanagedFields()).iterator();
 			}else{
-				iterator=(Iterator<IOField<T, ?>>)pipe.getSpecificFields().iterator();
+				iterator=(Iterator<IOField<T, Object>>)(Object)fields.iterator();
 			}
 			
 			while(iterator.hasNext()){
-				IOField<T, ?> field=iterator.next();
+				IOField<T, Object> field=iterator.next();
 				rand.setSeed((((long)field.getName().hashCode())<<32)|typeHash);
 				
-				var col=new Color(
-					Color.HSBtoRGB(
-						rand.nextFloat(),
-						rand.nextFloat()/0.4F+0.6F,
-						1F
-					)
-				);
+				var col=new Color(Color.HSBtoRGB(rand.nextFloat(), rand.nextFloat()/0.4F+0.6F, 1F));
 				
 				final long size;
 				long       offsetStart;
@@ -943,16 +963,35 @@ public abstract class BinaryDrawing{
 				size=sizeDesc.calcUnknown(instance);
 				
 				try{
-					if(field instanceof IOField.Ref<?, ?> refO){
+					var acc=field.getAccessor();
+					if(acc!=null&&acc.hasAnnotation(IOType.Dynamic.class)){
+						
+						var inst=field.get(instance);
+						if(inst instanceof IOInstance<?> ioi){
+							annotateStruct(ctx, cluster, stack, (T)ioi, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), ioi.getThisStruct()), pointerRecord);
+							continue;
+						}
+						
+						LogUtil.printlnEr("unmanaged dynamic type");
+						
+						continue;
+					}
+					
+					if(field instanceof IOField.Ref refO){
 						IOField.Ref<T, T> refField=(IOField.Ref<T, T>)refO;
 						var               ref     =refField.getReference(instance);
 						if(!ref.isNull()){
+							if(refField.toString().contains("entries")){
+								var a=0;
+							}
 							pointerRecord.accept(new Pointer((int)trueOffset, (int)ref.calcGlobalOffset(cluster), (int)size, col, refField.toString(), 1));
 						}
+						annotateByteField(cluster, ctx, pointerRecord, instance, field, col, reference, Range.fromSize(fieldOffset, size));
+						
 						annotateStruct(ctx, cluster, stack, refField.get(instance), refField.getReference(instance), refField.getReferencedPipe(instance), pointerRecord);
-					}else if(field instanceof BitFieldMerger<?> merger){
+					}else if(field instanceof BitFieldMerger<T> merger){
 						int bitOffset=0;
-						for(IOField.Bit<T, ?> bit : ((BitFieldMerger<T>)merger).getGroup()){
+						for(IOField.Bit<T, ?> bit : merger.getGroup()){
 							rand.setSeed((((long)bit.getName().hashCode())<<32)|typeHash);
 							
 							col=new Color(
@@ -1010,6 +1049,14 @@ public abstract class BinaryDrawing{
 				}
 			}
 		}finally{
+			if(!(instance instanceof Chunk)){
+				var siz=reference.getPtr().dereference(cluster).io().getSize();
+				if(siz!=fieldOffset){
+					pipe.getSizeDescriptor().calcUnknown(instance);
+					LogUtil.println(instance, siz, fieldOffset);
+				}
+			}
+			
 			stack.remove(instance);
 		}
 	}
