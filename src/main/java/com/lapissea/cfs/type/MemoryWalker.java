@@ -6,6 +6,7 @@ import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.UtilL;
@@ -15,7 +16,6 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Random;
 import java.util.stream.Stream;
 
 public class MemoryWalker{
@@ -38,9 +38,6 @@ public class MemoryWalker{
 			if(stack.contains(instance)) return;
 			stack.add(instance);
 			
-			var typeHash=instance.getThisStruct().getType().getName().hashCode()&0xffffffffL;
-			
-			Random rand       =new Random();
 			var    fieldOffset=0L;
 			
 			Iterator<IOField<T, ?>> iterator;
@@ -52,7 +49,6 @@ public class MemoryWalker{
 			
 			while(iterator.hasNext()){
 				IOField<T, ?> field=iterator.next();
-				rand.setSeed((((long)field.getName().hashCode())<<32)|typeHash);
 				
 				final long size;
 				var        sizeDesc=field.getSizeDescriptor();
@@ -83,6 +79,17 @@ public class MemoryWalker{
 							continue;
 						}
 						if(typ==String.class){
+							continue;
+						}
+						if(field.getAccessor().hasAnnotation(IOType.Dynamic.class)){
+							var inst=field.get(instance);
+							if(inst==null) continue;
+							
+							if(inst instanceof IOInstance i){
+								walkStruct(cluster, stack, i, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), i.getThisStruct()), pointerRecord);
+								continue;
+							}
+							
 							continue;
 						}
 						LogUtil.printlnEr("unamanaged draw type:", typ);

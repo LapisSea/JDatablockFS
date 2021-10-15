@@ -10,9 +10,11 @@ import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -74,7 +76,11 @@ class FieldWalking{
 			if(stack.contains(instance)) return;
 			stack.add(instance);
 			
-			for(IOField<T, ?> field : pipe.getSpecificFields()){
+			var set=new HashSet<IOField<T, ?>>(pipe.getSpecificFields());
+			var tyo=pipe.getType().getFields();
+			set.addAll(tyo);
+			
+			for(IOField<T, ?> field : set){
 				if(field instanceof IOField.Ref<?, ?> refO){
 					IOField.Ref<T, T> refField=(IOField.Ref<T, T>)refO;
 					walkReferences(cluster, stack, refField.get(instance), refField.getReference(instance), refField.getReferencedPipe(instance), referenceRecord);
@@ -83,13 +89,20 @@ class FieldWalking{
 				var acc=field.getAccessor();
 				if(acc==null) continue;
 				
-				if(acc.getType()==ChunkPointer.class){
+				var type=acc.getType();
+				
+				if(acc.hasAnnotation(IOType.Dynamic.class)){
+					var inst=acc.get(instance);
+					if(inst!=null) type=inst.getClass();
+				}
+				
+				if(type==ChunkPointer.class){
 					var ch=(ChunkPointer)field.get(instance);
 					if(!ch.isNull()){
 						referenceRecord.accept(ch.makeReference());
 					}
 				}else{
-					if(UtilL.instanceOf(acc.getType(), IOInstance.class)){
+					if(UtilL.instanceOf(type, IOInstance.class)){
 						var inst=(IOInstance<?>)field.get(instance);
 						if(inst!=null){
 							walkReferences(cluster, stack, (T)inst, reference, StructPipe.of(pipe.getClass(), inst.getThisStruct()), referenceRecord);

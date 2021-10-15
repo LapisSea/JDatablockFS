@@ -226,18 +226,14 @@ public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanaged
 	public void free() throws IOException{
 		Set<Chunk> chunks=new HashSet<>();
 		var        prov  =getChunkProvider();
-		new MemoryWalker().walk(prov, this, getReference(), getPipe(), ref->chunks.add(ref.getPtr().dereference(prov)));
+		
+		new MemoryWalker().walk(prov, this, getReference(), getPipe(),
+		                        ref->ref.getPtr().dereference(prov).streamNext().forEach(chunks::add));
+		
+		getReference().getPtr().dereference(prov).streamNext().forEach(chunks::add);
 		
 		LogUtil.println(chunks);
-		LogUtil.println(getReference()
-			                .getPtr()
-			                .dereference(prov));
 		
 		prov.getMemoryManager().free(new ArrayList<>(chunks));
-		
-		getReference()
-			.getPtr()
-			.dereference(prov)
-			.freeChaining();
 	}
 }
