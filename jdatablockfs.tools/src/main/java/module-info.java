@@ -10,6 +10,7 @@ module JDatablockFS.tools {
 	requires org.lwjgl.stb;
 	requires gson;
 	requires java.sql;
+	requires com.esotericsoftware.kryo;
 	
 	exports com.lapissea.cfs.tools;
 	exports com.lapissea.cfs.tools.logging;
