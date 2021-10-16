@@ -16,7 +16,7 @@ import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
-public class VirtualAccessor<CTyp extends IOInstance<CTyp>> implements IFieldAccessor<CTyp>{
+public class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends AbstractFieldAccessor<CTyp>{
 	
 	private static final BiFunction<IOInstance<?>, VirtualAccessor<?>, Object>  GETTER;
 	private static final TriConsumer<IOInstance<?>, VirtualAccessor<?>, Object> SETTER;
@@ -37,14 +37,13 @@ public class VirtualAccessor<CTyp extends IOInstance<CTyp>> implements IFieldAcc
 		SETTER=sneakyGet("setVirtualRef");
 	}
 	
-	private final Struct<CTyp>                         struct;
 	private final VirtualFieldDefinition<CTyp, Object> type;
 	private final int                                  accessIndex;
-	private       List<IFieldAccessor<CTyp>>           deps;
+	private       List<FieldAccessor<CTyp>>            deps;
 	private       Object[]                             ioPool;
 	
 	public VirtualAccessor(Struct<CTyp> struct, VirtualFieldDefinition<CTyp, Object> type, int accessIndex){
-		this.struct=struct;
+		super(struct, type.getName());
 		this.type=type;
 		this.accessIndex=accessIndex;
 	}
@@ -64,11 +63,6 @@ public class VirtualAccessor<CTyp extends IOInstance<CTyp>> implements IFieldAcc
 		return type.storagePool;
 	}
 	
-	@Override
-	public Struct<CTyp> getDeclaringStruct(){
-		return struct;
-	}
-	
 	@Nullable
 	@Override
 	public <T extends Annotation> Optional<T> getAnnotation(Class<T> annotationClass){
@@ -79,10 +73,6 @@ public class VirtualAccessor<CTyp extends IOInstance<CTyp>> implements IFieldAcc
 		return type.getAnnotations().isPresent(annotationClass);
 	}
 	
-	@Override
-	public String getName(){
-		return type.getName();
-	}
 	@Override
 	public Class<?> getType(){
 		return type.getType() instanceof Class<?> c?c:(Class<?>)((ParameterizedType)type.getType()).getRawType();
@@ -95,7 +85,12 @@ public class VirtualAccessor<CTyp extends IOInstance<CTyp>> implements IFieldAcc
 	@Override
 	public void init(IOField<CTyp, ?> field){
 		if(type.getGetFilter()!=null){
-			deps=struct.getFields().stream().filter(f->f.getDependencies().contains(field)).map(IOField::getAccessor).collect(Collectors.toList());
+			deps=getDeclaringStruct()
+				.getFields()
+				.stream()
+				.filter(f->f.getDependencies().contains(field))
+				.map(IOField::getAccessor)
+				.collect(Collectors.toList());
 		}
 	}
 	
@@ -181,15 +176,8 @@ public class VirtualAccessor<CTyp extends IOInstance<CTyp>> implements IFieldAcc
 		set(instance, value);
 	}
 	
-	private String namString(){
-		return "#("+getName()+")"+"@"+getStoragePool().shortName+(getAccessIndex()==-1?"":getAccessIndex());
-	}
-	
 	@Override
-	public String toString(){
-		return struct.getType().getName()+namString();
-	}
-	public String toShortString(){
-		return struct.getType().getSimpleName()+namString();
+	protected String strName(){
+		return "("+getName()+")"+"@"+getStoragePool().shortName+(getAccessIndex()==-1?"":getAccessIndex());
 	}
 }

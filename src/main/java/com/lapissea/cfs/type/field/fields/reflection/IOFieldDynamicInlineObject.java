@@ -15,7 +15,7 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
-import com.lapissea.cfs.type.field.access.IFieldAccessor;
+import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
@@ -33,7 +33,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 	
 	private final SizeDescriptor<CTyp> descriptor;
 	
-	public IOFieldDynamicInlineObject(IFieldAccessor<CTyp> accessor){
+	public IOFieldDynamicInlineObject(FieldAccessor<CTyp> accessor){
 		super(accessor);
 		
 		if(getNullability()==IONullability.Mode.DEFAULT_IF_NULL){

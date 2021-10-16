@@ -11,7 +11,7 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.Optional;
 
-public interface IFieldAccessor<CTyp extends IOInstance<CTyp>> extends Comparable<IFieldAccessor<CTyp>>{
+public interface FieldAccessor<CTyp extends IOInstance<CTyp>> extends Comparable<FieldAccessor<CTyp>>{
 	
 	@NotNull
 	default <T extends Annotation> Optional<T> getAnnotation(Class<T> annotationClass){
@@ -58,7 +58,7 @@ public interface IFieldAccessor<CTyp extends IOInstance<CTyp>> extends Comparabl
 	default void setShort(CTyp instance, short value)    {set(instance, value);}
 	
 	@Override
-	default int compareTo(IFieldAccessor<CTyp> o){
+	default int compareTo(FieldAccessor<CTyp> o){
 		return getName().compareTo(o.getName());
 	}
 	

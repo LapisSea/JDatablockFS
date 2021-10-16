@@ -11,7 +11,7 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
-import com.lapissea.cfs.type.field.access.IFieldAccessor;
+import com.lapissea.cfs.type.field.access.FieldAccessor;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
@@ -30,11 +30,11 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		return getFieldMaker(clazz)!=null;
 	}
 	
-	public static <T extends IOInstance<T>> IOField<T, ?> make(IFieldAccessor<T> field){
+	public static <T extends IOInstance<T>> IOField<T, ?> make(FieldAccessor<T> field){
 		return Objects.requireNonNull(IOFieldPrimitive.<T>getFieldMaker(field.getType())).apply(field);
 	}
 	
-	public static <T extends IOInstance<T>> Function<IFieldAccessor<T>, IOField<T, ?>> getFieldMaker(Type clazz){
+	public static <T extends IOInstance<T>> Function<FieldAccessor<T>, IOField<T, ?>> getFieldMaker(Type clazz){
 		if(clazz==double.class||clazz==Double.class) return FDouble::new;
 		if(clazz==float.class||clazz==Float.class) return FFloat::new;
 		if(clazz==long.class||clazz==Long.class) return FLong::new;
@@ -49,10 +49,10 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 	public static class FDouble<T extends IOInstance<T>> extends IOFieldPrimitive<T, Double>{
 		
 		
-		public FDouble(IFieldAccessor<T> field){
+		public FDouble(FieldAccessor<T> field){
 			this(field, false);
 		}
-		public FDouble(IFieldAccessor<T> field, boolean forceFixed){
+		public FDouble(FieldAccessor<T> field, boolean forceFixed){
 			super(field, forceFixed, LONG);
 		}
 		@Override
@@ -105,10 +105,10 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 	public static class FFloat<T extends IOInstance<T>> extends IOFieldPrimitive<T, Float>{
 		
 		
-		public FFloat(IFieldAccessor<T> field){
+		public FFloat(FieldAccessor<T> field){
 			this(field, false);
 		}
-		public FFloat(IFieldAccessor<T> field, boolean forceFixed){
+		public FFloat(FieldAccessor<T> field, boolean forceFixed){
 			super(field, forceFixed, INT);
 		}
 		@Override
@@ -160,10 +160,10 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 	
 	public static class FLong<T extends IOInstance<T>> extends IOFieldPrimitive<T, Long>{
 		
-		public FLong(IFieldAccessor<T> field){
+		public FLong(FieldAccessor<T> field){
 			this(field, false);
 		}
-		public FLong(IFieldAccessor<T> field, boolean forceFixed){
+		public FLong(FieldAccessor<T> field, boolean forceFixed){
 			super(field, forceFixed, LONG);
 		}
 		
@@ -212,10 +212,10 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 	public static class FInt<T extends IOInstance<T>> extends IOFieldPrimitive<T, Integer>{
 		
 		
-		public FInt(IFieldAccessor<T> field){
+		public FInt(FieldAccessor<T> field){
 			this(field, false);
 		}
-		public FInt(IFieldAccessor<T> field, boolean forceFixed){
+		public FInt(FieldAccessor<T> field, boolean forceFixed){
 			super(field, forceFixed, INT);
 		}
 		@Override
@@ -270,10 +270,10 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 	public static class FShort<T extends IOInstance<T>> extends IOFieldPrimitive<T, Short>{
 		
 		
-		public FShort(IFieldAccessor<T> field){
+		public FShort(FieldAccessor<T> field){
 			this(field, false);
 		}
-		public FShort(IFieldAccessor<T> field, boolean forceFixed){
+		public FShort(FieldAccessor<T> field, boolean forceFixed){
 			super(field, forceFixed, SHORT);
 		}
 		@Override
@@ -327,11 +327,11 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 	
 	public static class FByte<T extends IOInstance<T>> extends IOFieldPrimitive<T, Byte>{
 		
-		public FByte(IFieldAccessor<T> field){
+		public FByte(FieldAccessor<T> field){
 			this(field, false);
 		}
 		
-		public FByte(IFieldAccessor<T> field, boolean forceFixed){
+		public FByte(FieldAccessor<T> field, boolean forceFixed){
 			super(field, forceFixed, BYTE);
 		}
 		@Override
@@ -383,7 +383,7 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 	
 	public static class FBoolean<T extends IOInstance<T>> extends IOField.Bit<T, Boolean>{
 		
-		protected FBoolean(IFieldAccessor<T> field){
+		protected FBoolean(FieldAccessor<T> field){
 			super(field);
 		}
 		
@@ -439,7 +439,7 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 	private       Function<T, NumberSize> dynamicSize;
 	private       SizeDescriptor<T>       sizeDescriptor;
 	
-	protected IOFieldPrimitive(IFieldAccessor<T> field, boolean forceFixed, NumberSize size){
+	protected IOFieldPrimitive(FieldAccessor<T> field, boolean forceFixed, NumberSize size){
 		super(field);
 		this.forceFixed=forceFixed;
 		this.size=size;
@@ -490,7 +490,7 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 	@Override
 	public IOField<T, ValueType> implMaxAsFixedSize(){
 		try{
-			return (IOField<T, ValueType>)getClass().getConstructor(IFieldAccessor.class, boolean.class).newInstance(getAccessor(), true);
+			return (IOField<T, ValueType>)getClass().getConstructor(FieldAccessor.class, boolean.class).newInstance(getAccessor(), true);
 		}catch(ReflectiveOperationException e){
 			throw new RuntimeException(e);
 		}

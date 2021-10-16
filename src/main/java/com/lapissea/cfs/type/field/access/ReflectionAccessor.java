@@ -6,7 +6,6 @@ import com.lapissea.cfs.objects.INumber;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
-import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.UtilL;
 
@@ -18,13 +17,13 @@ import java.lang.reflect.Type;
 import java.util.Optional;
 import java.util.function.LongFunction;
 
-public class ReflectionAccessor<CTyp extends IOInstance<CTyp>> implements IFieldAccessor<CTyp>{
+public class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends AbstractFieldAccessor<CTyp>{
 	
-	public static class INum<CTyp extends IOInstance<CTyp>> extends ReflectionAccessor<CTyp>{
+	public static class Num<CTyp extends IOInstance<CTyp>> extends ReflectionAccessor<CTyp>{
 		
 		private final LongFunction<INumber> constructor;
 		
-		public INum(Struct<CTyp> struct, Field field, Optional<Method> getter, Optional<Method> setter, String name, Type genericType){
+		public Num(Struct<CTyp> struct, Field field, Optional<Method> getter, Optional<Method> setter, String name, Type genericType){
 			super(struct, field, getter, setter, name, genericType);
 			constructor=Utils.findConstructor(getType(), LongFunction.class, long.class);
 		}
@@ -42,9 +41,6 @@ public class ReflectionAccessor<CTyp extends IOInstance<CTyp>> implements IField
 		}
 	}
 	
-	private final Struct<CTyp> struct;
-	private final String       name;
-	
 	private final Type     genericType;
 	private final Class<?> rawType;
 	
@@ -53,9 +49,8 @@ public class ReflectionAccessor<CTyp extends IOInstance<CTyp>> implements IField
 	private final MethodHandle setter;
 	
 	public ReflectionAccessor(Struct<CTyp> struct, Field field, Optional<Method> getter, Optional<Method> setter, String name, Type genericType){
-		this.struct=struct;
+		super(struct, name);
 		this.field=field;
-		this.name=name;
 		this.genericType=Utils.prottectFromVarType(genericType);
 		this.rawType=Utils.typeToRaw(this.genericType);
 		
@@ -84,11 +79,6 @@ public class ReflectionAccessor<CTyp extends IOInstance<CTyp>> implements IField
 		this.setter=setter.map(Utils::makeMethodHandle).orElse(null);
 	}
 	
-	@Override
-	public Struct<CTyp> getDeclaringStruct(){
-		return struct;
-	}
-	
 	@Nullable
 	@Override
 	public <T extends Annotation> Optional<T> getAnnotation(Class<T> annotationClass){
@@ -97,19 +87,6 @@ public class ReflectionAccessor<CTyp extends IOInstance<CTyp>> implements IField
 	@Override
 	public boolean hasAnnotation(Class<? extends Annotation> annotationClass){
 		return field.isAnnotationPresent(annotationClass);
-	}
-	
-	@NotNull
-	@Override
-	public String getName(){
-		return name;
-	}
-	@Override
-	public String toString(){
-		return getDeclaringStruct().getType().getName()+"#"+name;
-	}
-	public String toShortString(){
-		return getDeclaringStruct().getType().getSimpleName()+"#"+name;
 	}
 	
 	@Override

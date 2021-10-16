@@ -8,7 +8,7 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
-import com.lapissea.cfs.type.field.access.IFieldAccessor;
+import com.lapissea.cfs.type.field.access.FieldAccessor;
 
 import java.io.IOException;
 import java.util.Objects;
@@ -20,7 +20,7 @@ public class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> extends IOF
 	private final EnumUniverse<E>   enumUniverse;
 	private final SizeDescriptor<T> sizeDescriptor;
 	
-	public IOFieldEnum(IFieldAccessor<T> field){
+	public IOFieldEnum(FieldAccessor<T> field){
 		super(field);
 		
 		enumUniverse=EnumUniverse.getUnknown(field.getType());

@@ -8,7 +8,7 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
-import com.lapissea.cfs.type.field.access.IFieldAccessor;
+import com.lapissea.cfs.type.field.access.FieldAccessor;
 
 import java.io.IOException;
 import java.util.List;
@@ -20,7 +20,7 @@ public class IOFieldByteArray<T extends IOInstance<T>> extends IOField<T, byte[]
 	private       IOField<T, Integer> arraySize;
 	
 	
-	public IOFieldByteArray(IFieldAccessor<T> accessor){
+	public IOFieldByteArray(FieldAccessor<T> accessor){
 		super(accessor);
 		
 		descriptor=new SizeDescriptor.Unknown<>(0, OptionalLong.empty(), inst->{

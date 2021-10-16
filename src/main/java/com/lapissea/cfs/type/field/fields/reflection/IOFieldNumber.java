@@ -11,7 +11,7 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
-import com.lapissea.cfs.type.field.access.IFieldAccessor;
+import com.lapissea.cfs.type.field.access.FieldAccessor;
 
 import java.io.IOException;
 import java.util.List;
@@ -26,10 +26,10 @@ public class IOFieldNumber<T extends IOInstance<T>, E extends INumber> extends I
 	private       LongFunction<E>         constructor;
 	private       SizeDescriptor<T>       sizeDescriptor;
 	
-	public IOFieldNumber(IFieldAccessor<T> accessor){
+	public IOFieldNumber(FieldAccessor<T> accessor){
 		this(accessor, false);
 	}
-	public IOFieldNumber(IFieldAccessor<T> accessor, boolean forceFixed){
+	public IOFieldNumber(FieldAccessor<T> accessor, boolean forceFixed){
 		super(accessor);
 		this.forceFixed=forceFixed;
 	}

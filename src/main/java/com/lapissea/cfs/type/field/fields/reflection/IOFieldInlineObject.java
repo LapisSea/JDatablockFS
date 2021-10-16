@@ -15,7 +15,7 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
-import com.lapissea.cfs.type.field.access.IFieldAccessor;
+import com.lapissea.cfs.type.field.access.FieldAccessor;
 
 import java.io.IOException;
 import java.util.List;
@@ -28,10 +28,10 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 	private final StructPipe<ValueType> instancePipe;
 	private final boolean               fixed;
 	
-	public IOFieldInlineObject(IFieldAccessor<CTyp> accessor){
+	public IOFieldInlineObject(FieldAccessor<CTyp> accessor){
 		this(accessor, false);
 	}
-	public IOFieldInlineObject(IFieldAccessor<CTyp> accessor, boolean fixed){
+	public IOFieldInlineObject(FieldAccessor<CTyp> accessor, boolean fixed){
 		super(accessor);
 		this.fixed=fixed;
 		

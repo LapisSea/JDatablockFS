@@ -7,7 +7,6 @@ import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
-import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.UtilL;
 
@@ -18,13 +17,13 @@ import java.lang.reflect.Type;
 import java.util.Optional;
 import java.util.function.LongFunction;
 
-public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> implements IFieldAccessor<CTyp>{
+public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends AbstractFieldAccessor<CTyp>{
 	
-	public static class INum<CTyp extends IOInstance<CTyp>> extends FunctionalReflectionAccessor<CTyp>{
+	public static class Num<CTyp extends IOInstance<CTyp>> extends FunctionalReflectionAccessor<CTyp>{
 		
 		private final LongFunction<INumber> constructor;
 		
-		public INum(Struct<CTyp> struct, GetAnnotation annotations, Method getter, Method setter, String name, Type genericType){
+		public Num(Struct<CTyp> struct, GetAnnotation annotations, Method getter, Method setter, String name, Type genericType){
 			super(struct, annotations, getter, setter, name, genericType);
 			constructor=Utils.findConstructor(getType(), LongFunction.class, long.class);
 		}
@@ -42,9 +41,6 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> impleme
 		}
 	}
 	
-	private final Struct<CTyp> struct;
-	private final String       name;
-	
 	private final Type     genericType;
 	private final Class<?> rawType;
 	
@@ -54,9 +50,8 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> impleme
 	private final GetAnnotation annotations;
 	
 	public FunctionalReflectionAccessor(Struct<CTyp> struct, GetAnnotation annotations, Method getter, Method setter, String name, Type genericType){
-		this.struct=struct;
+		super(struct, name);
 		this.annotations=annotations;
-		this.name=name;
 		this.genericType=genericType;
 		this.rawType=Utils.typeToRaw(genericType);
 		
@@ -81,29 +76,12 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> impleme
 		this.setter=Utils.makeMethodHandle(setter);
 	}
 	
-	@Override
-	public Struct<CTyp> getDeclaringStruct(){
-		return struct;
-	}
-	
 	@Nullable
 	@Override
 	public <T extends Annotation> Optional<T> getAnnotation(Class<T> annotationClass){
 		return Optional.ofNullable(annotations.get(annotationClass));
 	}
 	
-	@NotNull
-	@Override
-	public String getName(){
-		return name;
-	}
-	@Override
-	public String toString(){
-		return getDeclaringStruct().getType().getName()+"#"+name;
-	}
-	public String toShortString(){
-		return getDeclaringStruct().getType().getSimpleName()+"#"+name;
-	}
 	
 	@Override
 	public Class<?> getType(){

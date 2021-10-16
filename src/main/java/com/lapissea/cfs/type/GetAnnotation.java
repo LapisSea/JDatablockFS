@@ -1,6 +1,6 @@
 package com.lapissea.cfs.type;
 
-import com.lapissea.cfs.type.field.access.IFieldAccessor;
+import com.lapissea.cfs.type.field.access.FieldAccessor;
 
 import java.lang.annotation.Annotation;
 import java.util.Collection;
@@ -9,7 +9,7 @@ import java.util.stream.Collectors;
 
 public interface GetAnnotation{
 	
-	static GetAnnotation from(IFieldAccessor<?> accessor){
+	static GetAnnotation from(FieldAccessor<?> accessor){
 		return new GetAnnotation(){
 			@Override
 			public <A extends Annotation> A get(Class<A> annotationClass){

@@ -6,7 +6,7 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.compilation.AnnotationLogic;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
-import com.lapissea.cfs.type.field.access.IFieldAccessor;
+import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
 
@@ -28,7 +28,7 @@ public @interface IOValue{
 	AnnotationLogic<IOValue> LOGIC=new AnnotationLogic<>(){
 		@NotNull
 		@Override
-		public <T extends IOInstance<T>> List<VirtualFieldDefinition<T, ?>> injectPerInstanceValue(IFieldAccessor<T> field, IOValue annotation){
+		public <T extends IOInstance<T>> List<VirtualFieldDefinition<T, ?>> injectPerInstanceValue(FieldAccessor<T> field, IOValue annotation){
 			var type=field.getType();
 			if(!type.isArray()) return List.of();
 			
@@ -45,14 +45,14 @@ public @interface IOValue{
 		}
 		@NotNull
 		@Override
-		public Set<String> getDependencyValueNames(IFieldAccessor<?> field, IOValue annotation){
+		public Set<String> getDependencyValueNames(FieldAccessor<?> field, IOValue annotation){
 			var type=field.getType();
 			if(!type.isArray()) return Set.of();
 			
 			return Set.of(IOFieldTools.makeArrayLenName(field));
 		}
 		@Override
-		public void validate(IFieldAccessor<?> field, IOValue annotation){
+		public void validate(FieldAccessor<?> field, IOValue annotation){
 			try{
 				var refF=field.getDeclaringStruct().getType().getDeclaredField(field.getName());
 				
@@ -72,7 +72,7 @@ public @interface IOValue{
 	@interface Reference{
 		AnnotationLogic<Reference> LOGIC=new AnnotationLogic<>(){
 			@Override
-			public void validate(IFieldAccessor<?> field, Reference annotation){
+			public void validate(FieldAccessor<?> field, Reference annotation){
 				if(!UtilL.instanceOf(field.getType(), IOInstance.class)){
 					throw new MalformedStructLayout("Reference annotation can be used only in IOInstance types but "+field+" is not");
 				}
@@ -82,7 +82,7 @@ public @interface IOValue{
 			}
 			@NotNull
 			@Override
-			public <T extends IOInstance<T>> List<VirtualFieldDefinition<T, ?>> injectPerInstanceValue(IFieldAccessor<T> field, Reference annotation){
+			public <T extends IOInstance<T>> List<VirtualFieldDefinition<T, ?>> injectPerInstanceValue(FieldAccessor<T> field, Reference annotation){
 				return List.of(new VirtualFieldDefinition<T, com.lapissea.cfs.objects.Reference>(
 					INSTANCE,
 					IOFieldTools.makeRefName(field),
@@ -92,7 +92,7 @@ public @interface IOValue{
 			}
 			@NotNull
 			@Override
-			public Set<String> getDependencyValueNames(IFieldAccessor<?> field, Reference annotation){
+			public Set<String> getDependencyValueNames(FieldAccessor<?> field, Reference annotation){
 				return Set.of(IOFieldTools.makeRefName(field));
 			}
 		};
@@ -110,7 +110,7 @@ public @interface IOValue{
 		
 		AnnotationLogic<OverrideType> LOGIC=new AnnotationLogic<>(){
 			@Override
-			public void validate(IFieldAccessor<?> field, OverrideType typeOverride){
+			public void validate(FieldAccessor<?> field, OverrideType typeOverride){
 				Type type=field.getGenericType(null);
 				
 				var rawType=SyntheticParameterizedType.generalize(type);

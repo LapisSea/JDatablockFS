@@ -8,8 +8,8 @@ import com.lapissea.cfs.objects.INumber;
 import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
+import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.access.FunctionalReflectionAccessor;
-import com.lapissea.cfs.type.field.access.IFieldAccessor;
 import com.lapissea.cfs.type.field.access.ReflectionAccessor;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.cfs.type.field.annotations.IODependency;
@@ -117,8 +117,8 @@ public class FieldCompiler{
 	private <T extends IOInstance<T>> void generateVirtualFields(List<AnnotatedField<T>> parsed, Struct<T> struct){
 		
 		Map<VirtualFieldDefinition.StoragePool, Integer> accessIndex   =new EnumMap<>(VirtualFieldDefinition.StoragePool.class);
-		Map<String, IFieldAccessor<T>>                   virtualData   =new HashMap<>();
-		Map<String, IFieldAccessor<T>>                   newVirtualData=new HashMap<>();
+		Map<String, FieldAccessor<T>>                    virtualData   =new HashMap<>();
+		Map<String, FieldAccessor<T>>                    newVirtualData=new HashMap<>();
 		
 		List<AnnotatedField<T>> toRun=new ArrayList<>(parsed);
 		
@@ -134,7 +134,7 @@ public class FieldCompiler{
 							}
 							continue;
 						}
-						IFieldAccessor<T> accessor=new VirtualAccessor<>(
+						FieldAccessor<T> accessor=new VirtualAccessor<>(
 							struct,
 							(VirtualFieldDefinition<T, Object>)s,
 							accessIndex.compute(s.storagePool, (k, v)->{
@@ -182,8 +182,8 @@ public class FieldCompiler{
 	protected <T extends IOInstance<T>> List<IOField<T, ?>> scanFields(Struct<T> struct){
 		var cl=struct.getType();
 		
-		List<IFieldAccessor<T>> fields    =new ArrayList<>();
-		List<Method>            usedFields=new ArrayList<>();
+		List<FieldAccessor<T>> fields    =new ArrayList<>();
+		List<Method>           usedFields=new ArrayList<>();
 		
 		var registry=registry();
 		
@@ -203,8 +203,8 @@ public class FieldCompiler{
 			getter.ifPresent(usedFields::add);
 			setter.ifPresent(usedFields::add);
 			
-			IFieldAccessor<T> accessor;
-			if(type instanceof Class<?> c&&UtilL.instanceOf(c, INumber.class)) accessor=new ReflectionAccessor.INum<>(struct, field, getter, setter, fieldName, type);
+			FieldAccessor<T> accessor;
+			if(type instanceof Class<?> c&&UtilL.instanceOf(c, INumber.class)) accessor=new ReflectionAccessor.Num<>(struct, field, getter, setter, fieldName, type);
 			else accessor=new ReflectionAccessor<>(struct, field, getter, setter, fieldName, type);
 			
 			UtilL.addRemainSorted(fields, accessor);
@@ -242,7 +242,7 @@ public class FieldCompiler{
 			throw new MalformedStructLayout("There are unused or invalid methods marked with "+IOValue.class.getSimpleName()+"\n"+unusedWaning);
 		}
 		
-		transientFieldsMap.entrySet().stream().<IFieldAccessor<T>>map(e->{
+		transientFieldsMap.entrySet().stream().<FieldAccessor<T>>map(e->{
 			String name=e.getKey();
 			var    p   =e.getValue();
 			
@@ -259,7 +259,7 @@ public class FieldCompiler{
 				throw new MalformedStructLayout(setType+" is not a valid argument in\n"+setter);
 			}
 			
-			if(UtilL.instanceOf(p.obj1.getReturnType(), INumber.class)) return new FunctionalReflectionAccessor.INum<>(struct, annotations, getter, setter, name, type);
+			if(UtilL.instanceOf(p.obj1.getReturnType(), INumber.class)) return new FunctionalReflectionAccessor.Num<>(struct, annotations, getter, setter, name, type);
 			else return new FunctionalReflectionAccessor<>(struct, annotations, getter, setter, name, type);
 		}).forEach(fields::add);
 		
@@ -359,7 +359,7 @@ public class FieldCompiler{
 				return annotations.isPresent(IOType.Dynamic.class);
 			}
 			@Override
-			public <T extends IOInstance<T>> IOField<T, ?> create(IFieldAccessor<T> field, GenericContext genericContext){
+			public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
 				if(field.hasAnnotation(IOValue.Reference.class)){
 					throw new NotImplementedException();
 				}
@@ -372,7 +372,7 @@ public class FieldCompiler{
 				return IOFieldPrimitive.isPrimitive(type);
 			}
 			@Override
-			public <T extends IOInstance<T>> IOField<T, ?> create(IFieldAccessor<T> field, GenericContext genericContext){
+			public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
 				return IOFieldPrimitive.make(field);
 			}
 		});
@@ -382,7 +382,7 @@ public class FieldCompiler{
 				return Enum.class;
 			}
 			@Override
-			public <T extends IOInstance<T>> IOField<T, Enum> create(IFieldAccessor<T> field, GenericContext genericContext){
+			public <T extends IOInstance<T>> IOField<T, Enum> create(FieldAccessor<T> field, GenericContext genericContext){
 				return new IOFieldEnum<>(field);
 			}
 		});
@@ -392,7 +392,7 @@ public class FieldCompiler{
 				return INumber.class;
 			}
 			@Override
-			public <T extends IOInstance<T>> IOField<T, INumber> create(IFieldAccessor<T> field, GenericContext genericContext){
+			public <T extends IOInstance<T>> IOField<T, INumber> create(FieldAccessor<T> field, GenericContext genericContext){
 				return new IOFieldNumber<>(field);
 			}
 		});
@@ -402,7 +402,7 @@ public class FieldCompiler{
 				return byte[].class;
 			}
 			@Override
-			public <T extends IOInstance<T>> IOField<T, byte[]> create(IFieldAccessor<T> field, GenericContext genericContext){
+			public <T extends IOInstance<T>> IOField<T, byte[]> create(FieldAccessor<T> field, GenericContext genericContext){
 				return new IOFieldByteArray<>(field);
 			}
 		});
@@ -412,7 +412,7 @@ public class FieldCompiler{
 				return String.class;
 			}
 			@Override
-			public <T extends IOInstance<T>> IOField<T, String> create(IFieldAccessor<T> field, GenericContext genericContext){
+			public <T extends IOInstance<T>> IOField<T, String> create(FieldAccessor<T> field, GenericContext genericContext){
 				return new IOFieldInlineString<>(field);
 			}
 		});
@@ -422,7 +422,7 @@ public class FieldCompiler{
 				return IOInstance.class;
 			}
 			@Override
-			public <T extends IOInstance<T>> IOField<T, ? extends IOInstance> create(IFieldAccessor<T> field, GenericContext genericContext){
+			public <T extends IOInstance<T>> IOField<T, ? extends IOInstance> create(FieldAccessor<T> field, GenericContext genericContext){
 				Class<?> raw      =field.getType();
 				var      unmanaged=!IOInstance.isManaged(raw);
 				

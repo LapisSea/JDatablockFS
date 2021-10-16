@@ -6,7 +6,7 @@ import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.DepSort;
 import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.field.access.IFieldAccessor;
+import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.fields.reflection.BitFieldMerger;
@@ -88,7 +88,7 @@ public class IOFieldTools{
 		}
 	}
 	
-	public static <T extends IOInstance<T>> IOField<T, NumberSize> getDynamicSize(IFieldAccessor<T> field){
+	public static <T extends IOInstance<T>> IOField<T, NumberSize> getDynamicSize(FieldAccessor<T> field){
 		Optional<String> dynSiz=Stream.of(
 			field.getAnnotation(IODependency.NumSize.class).map(IODependency.NumSize::value),
 			field.getAnnotation(IODependency.VirtualNumSize.class).map(e->IODependency.VirtualNumSize.Logic.getName(field, e))
@@ -107,17 +107,17 @@ public class IOFieldTools{
 		return fields.stream().map(IOField::getSizeDescriptor).mapToLong(mapper).sum();
 	}
 	
-	public static <T extends IOInstance<T>> String makeArrayLenName(IFieldAccessor<T> field){
+	public static <T extends IOInstance<T>> String makeArrayLenName(FieldAccessor<T> field){
 		return field.getName()+".len";
 	}
 	
-	public static IONullability.Mode getNullability(IFieldAccessor<?> field){
+	public static IONullability.Mode getNullability(FieldAccessor<?> field){
 		return getNullability(field, NOT_NULL);
 	}
-	public static IONullability.Mode getNullability(IFieldAccessor<?> field, IONullability.Mode defaultMode){
+	public static IONullability.Mode getNullability(FieldAccessor<?> field, IONullability.Mode defaultMode){
 		return field.getAnnotation(IONullability.class).map(IONullability::value).orElse(defaultMode);
 	}
-	public static <T extends IOInstance<T>> String makeRefName(IFieldAccessor<T> accessor){
+	public static <T extends IOInstance<T>> String makeRefName(FieldAccessor<T> accessor){
 		
 		return accessor.getName()+".ref";
 	}

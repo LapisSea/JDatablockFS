@@ -18,11 +18,10 @@ import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.TypeDefinition;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
-import com.lapissea.cfs.type.field.access.IFieldAccessor;
+import com.lapissea.cfs.type.field.access.AbstractFieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.NotImplementedException;
-import com.lapissea.util.NotNull;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
@@ -75,16 +74,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		public Stream<IOField<Node<T>, ?>> listUnmanagedFields(){
 			var that=this;
 			
-			var valueAccessor=new IFieldAccessor<Node<T>>(){
-				@Override
-				public Struct<Node<T>> getDeclaringStruct(){
-					return null;
-				}
-				@NotNull
-				@Override
-				public String getName(){
-					return "value";
-				}
+			var valueAccessor=new AbstractFieldAccessor<Node<T>>(null, "value"){
 				@Override
 				public Type getGenericType(GenericContext genericContext){
 					return that.getTypeDef().arg(0).generic();
@@ -126,16 +116,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 				public void skipRead(ChunkDataProvider provider, ContentReader src, Node<T> instance, GenericContext genericContext) throws IOException{
 					throw NotImplementedException.infer();//TODO: implement .skipRead()
 				}
-			}, new IOField<Node<T>, Node<T>>(new IFieldAccessor<>(){
-				@Override
-				public Struct<Node<T>> getDeclaringStruct(){
-					throw NotImplementedException.infer();//TODO: implement .getDeclaringStruct()
-				}
-				@NotNull
-				@Override
-				public String getName(){
-					return "next";
-				}
+			}, new IOField<Node<T>, Node<T>>(new AbstractFieldAccessor<>(null, "next"){
 				@Override
 				public Type getGenericType(GenericContext genericContext){
 					return that.getTypeDef().generic();

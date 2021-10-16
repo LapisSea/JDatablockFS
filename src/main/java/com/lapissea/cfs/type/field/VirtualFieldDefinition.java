@@ -2,7 +2,7 @@ package com.lapissea.cfs.type.field;
 
 import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.field.access.IFieldAccessor;
+import com.lapissea.cfs.type.field.access.FieldAccessor;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Type;
@@ -16,7 +16,7 @@ import java.util.List;
 public final class VirtualFieldDefinition<IO extends IOInstance<IO>, T>{
 	
 	public interface GetterFilter<IO extends IOInstance<IO>, T>{
-		T filter(IO instance, List<IFieldAccessor<IO>> dependencies, T value);
+		T filter(IO instance, List<FieldAccessor<IO>> dependencies, T value);
 	}
 	
 	public enum StoragePool{

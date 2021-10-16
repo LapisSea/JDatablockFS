@@ -10,9 +10,8 @@ import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
-import com.lapissea.cfs.type.field.access.IFieldAccessor;
+import com.lapissea.cfs.type.field.access.AbstractFieldAccessor;
 import com.lapissea.util.LogUtil;
-import com.lapissea.util.NotNull;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
@@ -53,16 +52,7 @@ public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanaged
 	public Stream<IOField<ContiguousIOList<T>, ?>> listUnmanagedFields(){
 		SizeDescriptor<ContiguousIOList<T>> descriptor=new SizeDescriptor.Fixed<>(sizePerElement);
 		return LongStream.range(0, size()).mapToObj(index->{
-			return new IOField<ContiguousIOList<T>, T>(new IFieldAccessor<>(){
-				@Override
-				public Struct<ContiguousIOList<T>> getDeclaringStruct(){
-					return null;
-				}
-				@NotNull
-				@Override
-				public String getName(){
-					return "ArrayElement["+index+"]";
-				}
+			return new IOField<ContiguousIOList<T>, T>(new AbstractFieldAccessor<>(null, "ArrayElement["+index+"]"){
 				@Override
 				public Type getGenericType(GenericContext genericContext){
 					return getTypeDef().arg(0).generic();

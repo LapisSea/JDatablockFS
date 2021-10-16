@@ -16,7 +16,7 @@ import com.lapissea.cfs.type.FieldSet;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
-import com.lapissea.cfs.type.field.access.IFieldAccessor;
+import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.Nullable;
@@ -47,7 +47,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	
 	public abstract static class Ref<T extends IOInstance<T>, Type extends IOInstance<Type>> extends IOField<T, Type>{
 		
-		public Ref(IFieldAccessor<T> accessor){
+		public Ref(FieldAccessor<T> accessor){
 			super(accessor);
 		}
 		
@@ -68,7 +68,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	
 	public abstract static class Bit<T extends IOInstance<T>, Type> extends IOField<T, Type>{
 		
-		protected Bit(IFieldAccessor<T> field){
+		protected Bit(FieldAccessor<T> field){
 			super(field);
 		}
 		
@@ -116,13 +116,13 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		}
 	}
 	
-	private final IFieldAccessor<T> accessor;
+	private final FieldAccessor<T> accessor;
 	
 	private       FieldSet<T>            dependencies;
 	private       EnumSet<UsageHintType> usageHints;
 	private final IONullability.Mode     nullability;
 	
-	public IOField(IFieldAccessor<T> accessor){
+	public IOField(FieldAccessor<T> accessor){
 		this.accessor=accessor;
 		nullability=accessor==null?IONullability.Mode.NULLABLE:IOFieldTools.getNullability(accessor);
 	}
@@ -227,7 +227,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	
 	public String getName()                      {return getAccessor().getName();}
 	public Struct<T> declaringStruct()           {return getAccessor().getDeclaringStruct();}
-	public IFieldAccessor<T> getAccessor()       {return accessor;}
+	public FieldAccessor<T> getAccessor()        {return accessor;}
 	public FieldSet<T> getDependencies()         {return Objects.requireNonNull(dependencies);}
 	public EnumSet<UsageHintType> getUsageHints(){return Objects.requireNonNull(usageHints);}
 	

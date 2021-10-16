@@ -6,7 +6,7 @@ import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.IOField;
-import com.lapissea.cfs.type.field.access.IFieldAccessor;
+import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.util.UtilL;
 
 import java.lang.reflect.Type;
@@ -21,7 +21,7 @@ public interface RegistryNode{
 			return UtilL.instanceOf(Utils.typeToRaw(type), getType());
 		}
 		@Override
-		<T extends IOInstance<T>> IOField<T, ? extends ValTyp> create(IFieldAccessor<T> field, GenericContext genericContext);
+		<T extends IOInstance<T>> IOField<T, ? extends ValTyp> create(FieldAccessor<T> field, GenericContext genericContext);
 	}
 	
 	class Registry implements RegistryNode{
@@ -54,7 +54,7 @@ public interface RegistryNode{
 		}
 		
 		@Override
-		public <T extends IOInstance<T>> IOField<T, ?> create(IFieldAccessor<T> field, GenericContext genericContext){
+		public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
 			var node=find(field.getGenericType(genericContext), GetAnnotation.from(field));
 			if(node!=null) return node.create(field, genericContext);
 			throw fail(field.getGenericType(genericContext));
@@ -62,5 +62,5 @@ public interface RegistryNode{
 	}
 	
 	boolean canCreate(Type type, GetAnnotation annotations);
-	<T extends IOInstance<T>> IOField<T, ?> create(IFieldAccessor<T> field, GenericContext genericContext);
+	<T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext);
 }

@@ -6,7 +6,7 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.compilation.AnnotationLogic;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
-import com.lapissea.cfs.type.field.access.IFieldAccessor;
+import com.lapissea.cfs.type.field.access.FieldAccessor;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -23,7 +23,7 @@ public @interface IODependency{
 	
 	AnnotationLogic<IODependency> LOGIC=new AnnotationLogic<>(){
 		@Override
-		public Set<String> getDependencyValueNames(IFieldAccessor<?> field, IODependency annotation){
+		public Set<String> getDependencyValueNames(FieldAccessor<?> field, IODependency annotation){
 			return Set.of(annotation.value());
 		}
 	};
@@ -35,11 +35,11 @@ public @interface IODependency{
 		
 		AnnotationLogic<NumSize> LOGIC=new AnnotationLogic<>(){
 			@Override
-			public Set<String> getDependencyValueNames(IFieldAccessor<?> field, NumSize annotation){
+			public Set<String> getDependencyValueNames(FieldAccessor<?> field, NumSize annotation){
 				return Set.of(annotation.value());
 			}
 			@Override
-			public <T extends IOInstance<T>> Stream<IOField.UsageHint> getHints(IFieldAccessor<T> field, NumSize annotation){
+			public <T extends IOInstance<T>> Stream<IOField.UsageHint> getHints(FieldAccessor<T> field, NumSize annotation){
 				return Stream.of(new IOField.UsageHint(SIZE_DATA, annotation.value()));
 			}
 		};
@@ -52,7 +52,7 @@ public @interface IODependency{
 		
 		AnnotationLogic<ArrayLenSize> LOGIC=new AnnotationLogic<>(){
 			@Override
-			public void validate(IFieldAccessor<?> field, ArrayLenSize annotation){
+			public void validate(FieldAccessor<?> field, ArrayLenSize annotation){
 				if(!field.getType().isArray()){
 					throw new MalformedStructLayout(ArrayLenSize.class.getSimpleName()+" can be used only on arrays");
 				}
@@ -73,11 +73,11 @@ public @interface IODependency{
 		
 		class Logic implements AnnotationLogic<VirtualNumSize>{
 			@Override
-			public Set<String> getDependencyValueNames(IFieldAccessor<?> field, VirtualNumSize annotation){
+			public Set<String> getDependencyValueNames(FieldAccessor<?> field, VirtualNumSize annotation){
 				return Set.of(getName(field, annotation));
 			}
 			
-			public static String getName(IFieldAccessor<?> field, VirtualNumSize size){
+			public static String getName(FieldAccessor<?> field, VirtualNumSize size){
 				var nam=size.name();
 				if(nam.isEmpty()){
 					return field.getName()+"Siz";
@@ -86,22 +86,22 @@ public @interface IODependency{
 			}
 			
 			@Override
-			public <T extends IOInstance<T>> Stream<IOField.UsageHint> getHints(IFieldAccessor<T> field, VirtualNumSize annotation){
+			public <T extends IOInstance<T>> Stream<IOField.UsageHint> getHints(FieldAccessor<T> field, VirtualNumSize annotation){
 				return Stream.of(new IOField.UsageHint(SIZE_DATA, getName(field, annotation)));
 			}
 			
 			@Override
-			public <T extends IOInstance<T>> List<VirtualFieldDefinition<T, ?>> injectPerInstanceValue(IFieldAccessor<T> field, VirtualNumSize ann){
+			public <T extends IOInstance<T>> List<VirtualFieldDefinition<T, ?>> injectPerInstanceValue(FieldAccessor<T> field, VirtualNumSize ann){
 				return List.of(new VirtualFieldDefinition<>(
 					ann.retention()==GHOST?IO:INSTANCE,
 					getName(field, ann),
 					NumberSize.class,
 					new VirtualFieldDefinition.GetterFilter<T, NumberSize>(){
-						private NumberSize calcMax(T inst, List<IFieldAccessor<T>> deps){
+						private NumberSize calcMax(T inst, List<FieldAccessor<T>> deps){
 							return NumberSize.bySize(deps.stream().mapToLong(d->d.getLong(inst)).max().orElse(0L));
 						}
 						@Override
-						public NumberSize filter(T inst, List<IFieldAccessor<T>> deps, NumberSize val){
+						public NumberSize filter(T inst, List<FieldAccessor<T>> deps, NumberSize val){
 							NumberSize s=(switch(ann.retention()){
 								case GROW_ONLY -> {
 									if(val==ann.max()) yield ann.max();

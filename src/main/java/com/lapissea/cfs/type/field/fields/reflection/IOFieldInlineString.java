@@ -14,7 +14,7 @@ import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
-import com.lapissea.cfs.type.field.access.IFieldAccessor;
+import com.lapissea.cfs.type.field.access.FieldAccessor;
 
 import java.io.IOException;
 import java.util.List;
@@ -26,7 +26,7 @@ public class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends IOField<
 	private final SizeDescriptor<CTyp> descriptor;
 	private final StructPipe<AutoText> instancePipe;
 	
-	public IOFieldInlineString(IFieldAccessor<CTyp> accessor){
+	public IOFieldInlineString(FieldAccessor<CTyp> accessor){
 		super(accessor);
 		
 		

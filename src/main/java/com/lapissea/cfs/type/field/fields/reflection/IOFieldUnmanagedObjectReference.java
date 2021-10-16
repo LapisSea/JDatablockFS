@@ -17,7 +17,7 @@ import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.TypeDefinition;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
-import com.lapissea.cfs.type.field.access.IFieldAccessor;
+import com.lapissea.cfs.type.field.access.FieldAccessor;
 
 import java.io.IOException;
 import java.util.List;
@@ -32,10 +32,10 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 	private final StructPipe<ValueType>       instancePipe;
 	private final StructPipe<Reference>       referencePipe;
 	
-	public IOFieldUnmanagedObjectReference(IFieldAccessor<T> accessor){
+	public IOFieldUnmanagedObjectReference(FieldAccessor<T> accessor){
 		this(accessor, false);
 	}
-	public IOFieldUnmanagedObjectReference(IFieldAccessor<T> accessor, boolean fixed){
+	public IOFieldUnmanagedObjectReference(FieldAccessor<T> accessor, boolean fixed){
 		super(accessor);
 		if(getNullability()==DEFAULT_IF_NULL){
 			throw new MalformedStructLayout(DEFAULT_IF_NULL+" is not supported for unmanaged objects");

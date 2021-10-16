@@ -15,7 +15,7 @@ import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
-import com.lapissea.cfs.type.field.access.IFieldAccessor;
+import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.NotImplementedException;
@@ -35,11 +35,11 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	
 	private IOField<T, Reference> referenceField;
 	
-	public IOFieldObjectReference(IFieldAccessor<T> accessor){
+	public IOFieldObjectReference(FieldAccessor<T> accessor){
 		this(accessor, false);
 	}
 	@SuppressWarnings("unchecked")
-	public IOFieldObjectReference(IFieldAccessor<T> accessor, boolean fixed){
+	public IOFieldObjectReference(FieldAccessor<T> accessor, boolean fixed){
 		super(accessor);
 		
 		descriptor=SizeDescriptor.Fixed.of(0);
