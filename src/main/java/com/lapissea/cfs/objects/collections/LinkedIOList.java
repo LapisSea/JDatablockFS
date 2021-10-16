@@ -5,8 +5,6 @@ import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.ChainWalker;
 import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.ChunkDataProvider;
-import com.lapissea.cfs.io.content.ContentReader;
-import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
@@ -93,30 +91,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 				}
 			};
 			
-			return Stream.of(new IOField<Node<T>, T>(valueAccessor){
-				@Override
-				public SizeDescriptor<Node<T>> getSizeDescriptor(){
-					var desc=valuePipe.getSizeDescriptor();
-					{
-						var fixed=desc.getFixed();
-						if(fixed.isPresent()) return SizeDescriptor.Fixed.of(desc.getWordSpace(), fixed.getAsLong());
-					}
-					
-					return new SizeDescriptor.Unknown<>(desc.getWordSpace(), desc.getMin(), desc.getMax(), inst->desc.calcUnknown(valueAccessor.get(inst)));
-				}
-				@Override
-				public List<IOField<Node<T>, ?>> write(ChunkDataProvider provider, ContentWriter dest, Node<T> instance) throws IOException{
-					throw NotImplementedException.infer();//TODO: implement .write()
-				}
-				@Override
-				public void read(ChunkDataProvider provider, ContentReader src, Node<T> instance, GenericContext genericContext) throws IOException{
-					throw NotImplementedException.infer();//TODO: implement .read()
-				}
-				@Override
-				public void skipRead(ChunkDataProvider provider, ContentReader src, Node<T> instance, GenericContext genericContext) throws IOException{
-					throw NotImplementedException.infer();//TODO: implement .skipRead()
-				}
-			}, new IOField<Node<T>, Node<T>>(new AbstractFieldAccessor<>(null, "next"){
+			var nextAccessor=new AbstractFieldAccessor<Node<T>>(null, "next"){
 				@Override
 				public Type getGenericType(GenericContext genericContext){
 					return that.getTypeDef().generic();
@@ -137,24 +112,19 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 						throw new RuntimeException(e);
 					}
 				}
-			}){
-				@Override
-				public SizeDescriptor<Node<T>> getSizeDescriptor(){
-					return SizeDescriptor.Fixed.of(SIZE_VAL_SIZE.bytes);
-				}
-				@Override
-				public List<IOField<Node<T>, ?>> write(ChunkDataProvider provider, ContentWriter dest, Node<T> instance) throws IOException{
-					throw NotImplementedException.infer();//TODO: implement .write()
-				}
-				@Override
-				public void read(ChunkDataProvider provider, ContentReader src, Node<T> instance, GenericContext genericContext) throws IOException{
-					throw NotImplementedException.infer();//TODO: implement .read()
-				}
-				@Override
-				public void skipRead(ChunkDataProvider provider, ContentReader src, Node<T> instance, GenericContext genericContext) throws IOException{
-					throw NotImplementedException.infer();//TODO: implement .skipRead()
-				}
-			});
+			};
+			
+			SizeDescriptor<Node<T>> valDesc;
+			{
+				var desc =valuePipe.getSizeDescriptor();
+				var fixed=desc.getFixed();
+				if(fixed.isPresent()) valDesc=SizeDescriptor.Fixed.of(desc.getWordSpace(), fixed.getAsLong());
+				else valDesc=new SizeDescriptor.Unknown<>(desc.getWordSpace(), desc.getMin(), desc.getMax(), inst->desc.calcUnknown(valueAccessor.get(inst)));
+			}
+			
+			return Stream.of(
+				new IOField.NoIO<Node<T>, T>(valueAccessor, valDesc),
+				new IOField.NoIO<Node<T>, Node<T>>(nextAccessor, SizeDescriptor.Fixed.of(SIZE_VAL_SIZE.bytes)));
 		}
 		
 		T getValue() throws IOException{

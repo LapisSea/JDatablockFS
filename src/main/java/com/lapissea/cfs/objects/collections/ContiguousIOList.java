@@ -52,7 +52,7 @@ public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanaged
 	public Stream<IOField<ContiguousIOList<T>, ?>> listUnmanagedFields(){
 		SizeDescriptor<ContiguousIOList<T>> descriptor=new SizeDescriptor.Fixed<>(sizePerElement);
 		return LongStream.range(0, size()).mapToObj(index->{
-			return new IOField<ContiguousIOList<T>, T>(new AbstractFieldAccessor<>(null, "ArrayElement["+index+"]"){
+			return new IOField.NoIO<>(new AbstractFieldAccessor<>(null, "ArrayElement["+index+"]"){
 				@Override
 				public Type getGenericType(GenericContext genericContext){
 					return getTypeDef().arg(0).generic();
@@ -69,24 +69,7 @@ public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanaged
 						throw new RuntimeException(e);
 					}
 				}
-			}){
-				@Override
-				public SizeDescriptor<ContiguousIOList<T>> getSizeDescriptor(){
-					return descriptor;
-				}
-				@Override
-				public List<IOField<ContiguousIOList<T>, ?>> write(ChunkDataProvider provider, ContentWriter dest, ContiguousIOList<T> instance){
-					throw new UnsupportedOperationException();
-				}
-				@Override
-				public void read(ChunkDataProvider provider, ContentReader src, ContiguousIOList<T> instance, GenericContext genericContext) throws IOException{
-					throw new UnsupportedOperationException();
-				}
-				@Override
-				public void skipRead(ChunkDataProvider provider, ContentReader src, ContiguousIOList<T> instance, GenericContext genericContext) throws IOException{
-					throw new UnsupportedOperationException();
-				}
-			};
+			}, descriptor);
 		});
 	}
 	

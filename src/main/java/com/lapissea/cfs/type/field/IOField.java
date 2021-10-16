@@ -45,6 +45,34 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	public static record UsageHint(UsageHintType type, String target){}
 	
 	
+	public static class NoIO<T extends IOInstance<T>, ValueType> extends IOField<T, ValueType>{
+		
+		private final SizeDescriptor<T> sizeDescriptor;
+		
+		public NoIO(FieldAccessor<T> accessor, SizeDescriptor<T> sizeDescriptor){
+			super(accessor);
+			this.sizeDescriptor=sizeDescriptor;
+		}
+		
+		@Override
+		public SizeDescriptor<T> getSizeDescriptor(){
+			return sizeDescriptor;
+		}
+		
+		@Override
+		public List<IOField<T, ?>> write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
+			throw new UnsupportedOperationException();
+		}
+		@Override
+		public void read(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+			throw new UnsupportedOperationException();
+		}
+		@Override
+		public void skipRead(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+			throw new UnsupportedOperationException();
+		}
+	}
+	
 	public abstract static class Ref<T extends IOInstance<T>, Type extends IOInstance<Type>> extends IOField<T, Type>{
 		
 		public Ref(FieldAccessor<T> accessor){
