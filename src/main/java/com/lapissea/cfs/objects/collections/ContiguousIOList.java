@@ -2,8 +2,6 @@ package com.lapissea.cfs.objects.collections;
 
 import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.ChunkDataProvider;
-import com.lapissea.cfs.io.content.ContentReader;
-import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
@@ -38,7 +36,8 @@ public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanaged
 		var type=(Struct<T>)typeDef.argAsStruct(0);
 		type.requireEmptyConstructor();
 		this.elementPipe=FixedContiguousStructPipe.of(type);
-		sizePerElement=elementPipe.getSizeDescriptor().getFixed().orElseThrow();
+		var desc=elementPipe.getSizeDescriptor();
+		sizePerElement=desc.toBytes(desc.getFixed()).orElseThrow();
 		
 		if(isSelfDataEmpty()){
 			writeManagedFields();

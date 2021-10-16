@@ -41,10 +41,11 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 		
 		int nullSize=nullable()?1:0;
 		
-		if(fixed||instancePipe.getSizeDescriptor().hasFixed()){
-			descriptor=new SizeDescriptor.Fixed<>(instancePipe.getSizeDescriptor().requireFixed()+nullSize);
+		var desc    =instancePipe.getSizeDescriptor();
+		var fixedSiz=desc.getFixed();
+		if(fixedSiz.isPresent()){
+			descriptor=new SizeDescriptor.Fixed<>(fixedSiz.getAsLong()+nullSize);
 		}else{
-			var desc=instancePipe.getSizeDescriptor();
 			descriptor=new SizeDescriptor.Unknown<>(
 				desc.getWordSpace(),
 				nullable()?nullSize:desc.getMin(),

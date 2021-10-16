@@ -393,10 +393,10 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	}
 	
 	private void readFieldSafe(ChunkDataProvider provider, ContentReader src, T instance, IOField<T, ?> field, GenericContext genericContext) throws IOException{
-		var desc=field.getSizeDescriptor();
-		
-		if(desc.hasFixed()){
-			long bytes=desc.toBytes(desc.requireFixed());
+		var desc =field.getSizeDescriptor();
+		var fixed=desc.getFixed();
+		if(fixed.isPresent()){
+			long bytes=desc.toBytes(fixed.getAsLong());
 			
 			var buf=src.readTicket(bytes).requireExact().submit();
 			field.readReported(provider, buf, instance, genericContext);

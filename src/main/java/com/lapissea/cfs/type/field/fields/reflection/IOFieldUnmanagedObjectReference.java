@@ -57,11 +57,13 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 	
 	@Override
 	public void allocate(T instance, ChunkDataProvider provider, GenericContext genericContext) throws IOException{
-		var            desc=instancePipe.getSizeDescriptor();
 		AllocateTicket t;
 		
-		if(desc.hasFixed()) t=AllocateTicket.bytes(desc.getFixed().orElseThrow()).withDisabledResizing();
-		else{
+		var desc =instancePipe.getSizeDescriptor();
+		var fixed=desc.getFixed();
+		if(fixed.isPresent()){
+			t=AllocateTicket.bytes(fixed.getAsLong()).withDisabledResizing();
+		}else{
 			var min=desc.getMin();
 			var max=desc.getMax().orElse(min+8);
 			t=AllocateTicket.bytes((min*2+max)/3);
