@@ -17,10 +17,9 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
@@ -117,7 +116,7 @@ public class Struct<T extends IOInstance<T>>{
 	private static final Lock STRUCT_CACHE_LOCK=new ReentrantLock();
 	
 	private static final Map<Class<?>, Struct<?>> STRUCT_CACHE  =new WeakValueHashMap<>();
-	private static final Map<Class<?>, Thread>    STRUCT_COMPILE=Collections.synchronizedMap(new HashMap<>());
+	private static final Map<Class<?>, Thread>    STRUCT_COMPILE=new ConcurrentHashMap<>();
 	
 	
 	private static Class<?> getStack(Function<Stream<StackWalker.StackFrame>, Stream<StackWalker.StackFrame>> stream){
@@ -155,50 +154,45 @@ public class Struct<T extends IOInstance<T>>{
 			return (Struct<T>)Unmanaged.ofUnknown(instanceClass);
 		}
 		return compile(instanceClass, t->{
-			if(UtilL.instanceOf(t, IOInstance.Unmanaged.class)) throw new ClassCastException();
+			if(!UtilL.instanceOf(t, IOInstance.class)) throw new ClassCastException(t.getName()+" is not an "+IOInstance.class.getSimpleName());
+			if(UtilL.instanceOf(t, IOInstance.Unmanaged.class)) throw new ClassCastException(t.getName()+" is unmanaged!");
 			return new Struct<>(t);
 		});
 	}
 	
 	@SuppressWarnings("unchecked")
 	private static <T extends IOInstance<T>, S extends Struct<T>> S compile(Class<T> instanceClass, Function<Class<T>, S> newStruct){
-		if(Modifier.isAbstract(instanceClass.getModifiers())) throw new IllegalArgumentException("Can not compile "+instanceClass.getName()+" because it is abstract");
+		if(Modifier.isAbstract(instanceClass.getModifiers())){
+			throw new IllegalArgumentException("Can not compile "+instanceClass.getName()+" because it is abstract");
+		}
 		
 		Thread thread=STRUCT_COMPILE.get(instanceClass);
-		if(thread!=null){
-			if(thread==Thread.currentThread()) throw new MalformedStructLayout("Recursive struct compilation");
-			UtilL.sleepWhile(()->STRUCT_COMPILE.containsKey(instanceClass));
-			return Objects.requireNonNull((S)getCached(instanceClass));
+		if(thread!=null&&thread==Thread.currentThread()){
+			throw new MalformedStructLayout("Recursive struct compilation");
 		}
 		
 		S struct;
 		try{
 			STRUCT_CACHE_LOCK.lock();
-			
+			//If class was compiled in another thread this should early exit
+			var existing=STRUCT_CACHE.get(instanceClass);
+			if(existing!=null) return (S)existing;
 			STRUCT_COMPILE.put(instanceClass, Thread.currentThread());
 			
 			struct=newStruct.apply(instanceClass);
-			STRUCT_CACHE.put(instanceClass, struct);
 			
 			if(GlobalConfig.PRINT_COMPILATION){
 				LogUtil.println(ConsoleColors.GREEN_BRIGHT+TextUtil.toTable("Compiled: "+struct.getType().getName(), struct.getFields())+ConsoleColors.RESET);
 			}
 			
+			STRUCT_CACHE.put(instanceClass, struct);
+			return struct;
 		}catch(Throwable e){
 			throw new MalformedStructLayout("Failed to compile "+instanceClass.getName(), e);
 		}finally{
 			STRUCT_COMPILE.remove(instanceClass);
 			STRUCT_CACHE_LOCK.unlock();
 		}
-		
-		for(IOField<T, ?> f : struct.getFields()){
-			var type=f.getAccessor().getType();
-			if(!UtilL.instanceOf(type, IOInstance.class)) continue;
-			if(getCached(instanceClass)!=null) continue;
-			ofUnknown(type);
-		}
-		
-		return struct;
 	}
 	
 	@SuppressWarnings("unchecked")
