@@ -42,8 +42,9 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 		}
 		
 		if(fixed){
-			referencePipe=FixedContiguousStructPipe.of(Reference.class);
-			descriptor=new SizeDescriptor.Fixed<>(referencePipe.getSizeDescriptor().requireFixed());
+			var pip=FixedContiguousStructPipe.of(Reference.class);
+			referencePipe=pip;
+			descriptor=pip.getFixedDescriptor();
 		}else{
 			referencePipe=ContiguousStructPipe.of(Reference.class);
 			
@@ -51,7 +52,7 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 			descriptor=SizeDescriptor.overrideUnknown(s, instance->s.calcUnknown(getReference(instance)));
 		}
 		
-		struct=(Struct.Unmanaged<ValueType>)Struct.Unmanaged.ofUnknown(getAccessor().getType());
+		struct=Struct.Unmanaged.ofUnmanaged((Class<ValueType>)getAccessor().getType());
 		instancePipe=ContiguousStructPipe.of(struct);
 	}
 	

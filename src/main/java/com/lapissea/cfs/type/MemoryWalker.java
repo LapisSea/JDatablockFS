@@ -44,7 +44,7 @@ public class MemoryWalker{
 			if(instance instanceof IOInstance.Unmanaged unmanaged){
 				iterator=Stream.concat(pipe.getSpecificFields().stream(), unmanaged.listUnmanagedFields()).iterator();
 			}else{
-				iterator=(Iterator<IOField<T, ?>>)pipe.getSpecificFields().iterator();
+				iterator=pipe.getSpecificFields().iterator();
 			}
 			
 			while(iterator.hasNext()){

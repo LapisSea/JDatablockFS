@@ -27,8 +27,7 @@ import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Stream;
@@ -37,9 +36,9 @@ import static com.lapissea.cfs.GlobalConfig.*;
 
 public abstract class StructPipe<T extends IOInstance<T>>{
 	
-	private static class StructGroup extends HashMap<Struct<?>, StructPipe<?>>{
+	private static class StructGroup<T extends IOInstance<T>, P extends StructPipe<T>> extends ConcurrentHashMap<Struct<T>, P>{
 		
-		private final Function<Struct<?>, StructPipe<?>> lConstructor;
+		private final Function<Struct<?>, P> lConstructor;
 		
 		private StructGroup(Class<? extends StructPipe<?>> type){
 			try{
@@ -49,35 +48,27 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 			}
 		}
 		
-		@SuppressWarnings("unchecked")
-		<T extends IOInstance<T>> StructPipe<T> make(Struct<T> struct){
-			StructPipe<?> cached=get(struct);
-			if(cached!=null) return (StructPipe<T>)cached;
+		P make(Struct<T> struct){
+			var cached=get(struct);
+			if(cached!=null) return cached;
 			
-			StructPipe<?> created=lConstructor.apply(struct);
+			P created=lConstructor.apply(struct);
 			
 			if(GlobalConfig.PRINT_COMPILATION){
 				LogUtil.println(ConsoleColors.CYAN_BRIGHT+"Compiled "+struct.getType().getSimpleName()+" with "+TextUtil.toNamedPrettyJson(created, true)+ConsoleColors.RESET);
 			}
 			
 			put(struct, created);
-			return (StructPipe<T>)created;
+			return created;
 		}
 	}
 	
-	private static final Map<Class<? extends StructPipe<?>>, StructGroup> CACHE     =new HashMap<>();
-	private static final Lock                                             CACHE_LOCK=new ReentrantLock();
+	private static final ConcurrentHashMap<Class<? extends StructPipe<?>>, StructGroup<?, ?>> CACHE=new ConcurrentHashMap<>();
 	
-	public static <T extends IOInstance<T>, P extends StructPipe<T>> StructPipe<T> of(Class<P> type, Struct<T> struct){
-		try{
-			CACHE_LOCK.lock();
-			
-			StructGroup group=CACHE.computeIfAbsent(type, StructGroup::new);
-			
-			return group.make(struct);
-		}finally{
-			CACHE_LOCK.unlock();
-		}
+	@SuppressWarnings("unchecked")
+	public static <T extends IOInstance<T>, P extends StructPipe<T>> P of(Class<P> type, Struct<T> struct){
+		var group=(StructGroup<T, P>)CACHE.computeIfAbsent(type, StructGroup::new);
+		return group.make(struct);
 	}
 	
 	private final Struct<T>                type;
@@ -209,7 +200,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	protected abstract T doRead(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException;
 	
 	
-	public SizeDescriptor<T> getSizeDescriptor(){
+	public final SizeDescriptor<T> getSizeDescriptor(){
 		return sizeDescription;
 	}
 	

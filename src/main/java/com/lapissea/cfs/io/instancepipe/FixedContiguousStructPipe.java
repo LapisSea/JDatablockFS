@@ -11,6 +11,7 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
+import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 
@@ -26,10 +27,10 @@ import static java.util.function.Predicate.*;
 
 public class FixedContiguousStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 	
-	public static <T extends IOInstance<T>> StructPipe<T> of(Class<T> type){
+	public static <T extends IOInstance<T>> FixedContiguousStructPipe<T> of(Class<T> type){
 		return of(Struct.of(type));
 	}
-	public static <T extends IOInstance<T>> StructPipe<T> of(Struct<T> struct){
+	public static <T extends IOInstance<T>> FixedContiguousStructPipe<T> of(Struct<T> struct){
 		return of(FixedContiguousStructPipe.class, struct);
 	}
 	
@@ -90,6 +91,11 @@ public class FixedContiguousStructPipe<T extends IOInstance<T>> extends StructPi
 			throw new MalformedStructLayout(getType().getType().getName()+" does not support fixed size layout because of "+e.getField(), e);
 		}
 	}
+	
+	public <E extends IOInstance<E>> SizeDescriptor.Fixed<E> getFixedDescriptor(){
+		return (SizeDescriptor.Fixed<E>)super.getSizeDescriptor();
+	}
+	
 	@Override
 	protected void doWrite(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
 		maxValues.forEach((k, v)->k.set(instance, v));

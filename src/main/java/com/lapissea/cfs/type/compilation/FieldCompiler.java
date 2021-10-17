@@ -58,7 +58,10 @@ public class FieldCompiler{
 	}
 	
 	public <T extends IOInstance<T>> FieldSet<T> compile(Struct<T> struct){
-		var fields=scanFields(struct).stream().map(f->new AnnotatedField<>(f, scanAnnotations(f))).collect(Collectors.toList());
+		var fields=scanFields(struct)
+			.map(f->registry().create(f, null))
+			.map(f->new AnnotatedField<>(f, scanAnnotations(f)))
+			.collect(Collectors.toList());
 		
 		generateVirtualFields(fields, struct);
 		
@@ -179,18 +182,16 @@ public class FieldCompiler{
 			.filtered(f->f.isAnnotationPresent(type));
 	}
 	
-	protected <T extends IOInstance<T>> List<IOField<T, ?>> scanFields(Struct<T> struct){
+	protected <T extends IOInstance<T>> Stream<FieldAccessor<T>> scanFields(Struct<T> struct){
 		var cl=struct.getType();
 		
 		List<FieldAccessor<T>> fields    =new ArrayList<>();
 		List<Method>           usedFields=new ArrayList<>();
 		
-		var registry=registry();
-		
 		for(Field field : deepFieldsByAnnotation(cl, IOValue.class)){
 			Type type=getType(field);
 			
-			registry.requireCanCreate(type, field::getAnnotation);
+			registry().requireCanCreate(type, field::getAnnotation);
 			field.setAccessible(true);
 			
 			String fieldName=getFieldName(field);
@@ -207,7 +208,7 @@ public class FieldCompiler{
 			if(type instanceof Class<?> c&&UtilL.instanceOf(c, INumber.class)) accessor=new ReflectionAccessor.Num<>(struct, field, getter, setter, fieldName, type);
 			else accessor=new ReflectionAccessor<>(struct, field, getter, setter, fieldName, type);
 			
-			UtilL.addRemainSorted(fields, accessor);
+			fields.add(accessor);
 		}
 		
 		var hangingMethods=scanMethods(cl, method->method.isAnnotationPresent(IOValue.class)&&!usedFields.contains(method)).toList();
@@ -242,34 +243,29 @@ public class FieldCompiler{
 			throw new MalformedStructLayout("There are unused or invalid methods marked with "+IOValue.class.getSimpleName()+"\n"+unusedWaning);
 		}
 		
-		transientFieldsMap.entrySet().stream().<FieldAccessor<T>>map(e->{
-			String name=e.getKey();
-			var    p   =e.getValue();
-			
-			Method getter=p.obj1, setter=p.obj2;
-			
-			var annotations=GetAnnotation.from(Stream.of(getter.getAnnotations(), setter.getAnnotations())
-			                                         .flatMap(Arrays::stream)
-			                                         .distinct()
-			                                         .collect(Collectors.toMap(Annotation::annotationType, identity())));
-			Type type=getType(getter.getGenericReturnType(), annotations);
-			
-			Type setType=setter.getGenericParameterTypes()[0];
-			if(!Utils.genericInstanceOf(type, setType)){
-				throw new MalformedStructLayout(setType+" is not a valid argument in\n"+setter);
-			}
-			
-			if(UtilL.instanceOf(p.obj1.getReturnType(), INumber.class)) return new FunctionalReflectionAccessor.Num<>(struct, annotations, getter, setter, name, type);
-			else return new FunctionalReflectionAccessor<>(struct, annotations, getter, setter, name, type);
-		}).forEach(fields::add);
-		
-		
-		List<IOField<T, ?>> parsed=new ArrayList<>(fields.size());
-		for(var f : fields){
-			parsed.add(registry.create(f, null));
-		}
-		
-		return parsed;
+		return Stream.concat(
+			fields.stream(),
+			transientFieldsMap.entrySet().stream().<FieldAccessor<T>>map(e->{
+				String name=e.getKey();
+				var    p   =e.getValue();
+				
+				Method getter=p.obj1, setter=p.obj2;
+				
+				var annotations=GetAnnotation.from(Stream.of(getter.getAnnotations(), setter.getAnnotations())
+				                                         .flatMap(Arrays::stream)
+				                                         .distinct()
+				                                         .collect(Collectors.toMap(Annotation::annotationType, identity())));
+				Type type=getType(getter.getGenericReturnType(), annotations);
+				
+				Type setType=setter.getGenericParameterTypes()[0];
+				if(!Utils.genericInstanceOf(type, setType)){
+					throw new MalformedStructLayout(setType+" is not a valid argument in\n"+setter);
+				}
+				
+				if(UtilL.instanceOf(p.obj1.getReturnType(), INumber.class)) return new FunctionalReflectionAccessor.Num<>(struct, annotations, getter, setter, name, type);
+				else return new FunctionalReflectionAccessor<>(struct, annotations, getter, setter, name, type);
+			})
+		).sorted();
 	}
 	private Optional<String> getMethodFieldName(String prefix, Method m){
 		IOValue ann  =m.getAnnotation(IOValue.class);
@@ -331,22 +327,28 @@ public class FieldCompiler{
 		return activeAnnotations()
 			.stream()
 			.flatMap(ann->Stream.concat(Stream.of(ann), Arrays.stream(ann.getClasses())))
-			.map(t->field.getAccessor().getAnnotation((Class<? extends Annotation>)t).map(ann->{
-				try{
-					Field logic=t.getField("LOGIC");
-					
-					if(!(logic.getGenericType() instanceof ParameterizedType parmType&&
-					     AnnotationLogic.class.equals(parmType.getRawType())&&
-					     Arrays.equals(parmType.getActualTypeArguments(), new Type[]{t}))){
-						
-						throw new ClassCastException(logic+" is not a type of "+AnnotationLogic.class.getName()+"<"+t.getName()+">");
-					}
-					
-					return new LogicalAnnotation<>(ann, (AnnotationLogic<Annotation>)logic.get(null));
-				}catch(NoSuchFieldException|IllegalAccessException e){
-					throw new RuntimeException("Class "+t.getName()+" does not contain an AnnotationLogic LOGIC field", e);
-				}
-			})).filter(Optional::isPresent).map(Optional::get).toList();
+			.map(t->field.getAccessor().getAnnotation((Class<Annotation>)t).map(ann->new LogicalAnnotation<>(ann, getAnnotation(t))))
+			.filter(Optional::isPresent)
+			.map(Optional::get)
+			.toList();
+	}
+	
+	@SuppressWarnings("unchecked")
+	private AnnotationLogic<Annotation> getAnnotation(Class<?> t){
+		try{
+			Field logic=t.getField("LOGIC");
+			
+			if(!(logic.getGenericType() instanceof ParameterizedType parmType&&
+			     AnnotationLogic.class.equals(parmType.getRawType())&&
+			     Arrays.equals(parmType.getActualTypeArguments(), new Type[]{t}))){
+				
+				throw new ClassCastException(logic+" is not a type of "+AnnotationLogic.class.getName()+"<"+t.getName()+">");
+			}
+			
+			return (AnnotationLogic<Annotation>)logic.get(null);
+		}catch(NoSuchFieldException|IllegalAccessException e){
+			throw new RuntimeException("Class "+t.getName()+" does not contain an AnnotationLogic LOGIC field", e);
+		}
 	}
 	
 	
