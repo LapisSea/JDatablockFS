@@ -7,6 +7,7 @@ import com.lapissea.util.TextUtil;
 
 import java.util.Objects;
 import java.util.OptionalLong;
+import java.util.function.Function;
 import java.util.function.ToLongFunction;
 import java.util.stream.LongStream;
 
@@ -27,7 +28,7 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 			return (Fixed<T>)BYTE_CACHE[(int)bytes];
 		}
 		public static <T extends IOInstance<T>> SizeDescriptor.Fixed<T> of(WordSpace wordSpace, long size){
-			Fixed<T>[] pool=(Fixed<T>[])switch(wordSpace){
+			var pool=(Fixed<T>[])switch(wordSpace){
 				case BIT -> BIT_CACHE;
 				case BYTE -> BYTE_CACHE;
 			};
@@ -47,6 +48,11 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 		public Fixed(WordSpace wordSpace, long size){
 			this.wordSpace=wordSpace;
 			this.size=size;
+		}
+		
+		@Override
+		public <T1 extends IOInstance<T1>> Fixed<T1> map(Function<T1, T> mapping){
+			return (Fixed<T1>)this;
 		}
 		
 		@Override
@@ -90,6 +96,12 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 		}
 		
 		@Override
+		public <T extends IOInstance<T>> Unknown<T> map(Function<T, Inst> mapping){
+			var unk=unknownSize;
+			return new Unknown<>(getWordSpace(), getMin(), getMax(), tInst->unk.applyAsLong(mapping.apply(tInst)));
+		}
+		
+		@Override
 		public WordSpace getWordSpace(){return wordSpace;}
 		
 		@Override
@@ -120,11 +132,6 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 			sb.append(TextUtil.plural(getWordSpace().friendlyName));
 			return sb.append('}').toString();
 		}
-	}
-	
-	static <T extends IOInstance<T>> SizeDescriptor<T> overrideUnknown(SizeDescriptor<?> source, ToLongFunction<T> override){
-		if(source.getFixed().isPresent()) return source instanceof Fixed<?> f?(SizeDescriptor<T>)f:new Fixed<>(source.getFixed().getAsLong());
-		return new Unknown<>(source.getWordSpace(), source.getMin(), source.getMax(), override);
 	}
 	
 	default OptionalLong toBytes(OptionalLong val){
@@ -167,6 +174,8 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 	default boolean hasMax(){
 		return getMax().isPresent();
 	}
+	
+	<T extends IOInstance<T>> SizeDescriptor<T> map(Function<T, Inst> mapping);
 	
 	WordSpace getWordSpace();
 	

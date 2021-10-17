@@ -47,9 +47,7 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 			descriptor=pip.getFixedDescriptor();
 		}else{
 			referencePipe=ContiguousStructPipe.of(Reference.class);
-			
-			SizeDescriptor<Reference> s=referencePipe.getSizeDescriptor();
-			descriptor=SizeDescriptor.overrideUnknown(s, instance->s.calcUnknown(getReference(instance)));
+			descriptor=referencePipe.getSizeDescriptor().map(this::getReference);
 		}
 		
 		struct=Struct.Unmanaged.ofUnmanaged((Class<ValueType>)getAccessor().getType());
