@@ -29,10 +29,9 @@ public class ContiguousStructPipe<T extends IOInstance<T>> extends StructPipe<T>
 		super(type);
 	}
 	
-	@SuppressWarnings("unchecked")
 	@Override
 	protected List<IOField<T, ?>> initFields(){
-		return IOFieldTools.stepFinal((List<IOField<T, ?>>)getType().getFields(), List.of(
+		return IOFieldTools.stepFinal(getType().getFields(), List.of(
 			IOFieldTools::dependencyReorder,
 			IOFieldTools::mergeBitSpace
 		));
