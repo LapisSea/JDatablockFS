@@ -76,9 +76,12 @@ class FieldWalking{
 			if(stack.contains(instance)) return;
 			stack.add(instance);
 			
-			var set=new HashSet<IOField<T, ?>>(pipe.getSpecificFields());
+			var set=new HashSet<>(pipe.getSpecificFields());
 			var tyo=pipe.getType().getFields();
 			set.addAll(tyo);
+			if(instance instanceof IOInstance.Unmanaged<?> u){
+				u.listUnmanagedFields().map(f->(IOField<T, ?>)f).forEach(set::add);
+			}
 			
 			for(IOField<T, ?> field : set){
 				if(field instanceof IOField.Ref<?, ?> refO){
