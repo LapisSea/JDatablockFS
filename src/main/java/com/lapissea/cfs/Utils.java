@@ -12,10 +12,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.invoke.*;
 import java.lang.reflect.*;
-import java.util.Arrays;
-import java.util.Map;
-import java.util.Objects;
-import java.util.OptionalLong;
+import java.util.*;
 import java.util.function.IntFunction;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -367,5 +364,14 @@ public class Utils{
 		}
 		
 		return UtilL.instanceOf((Class<?>)testType, (Class<?>)type);
+	}
+	
+	public static <E, C extends Collection<E>> C nullIfEmpty(C collection){
+		if(collection.isEmpty()) return null;
+		return collection;
+	}
+	public static <K, V, C extends Map<K, V>> C nullIfEmpty(C map){
+		if(map.isEmpty()) return null;
+		return map;
 	}
 }

@@ -82,8 +82,8 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		List<IOField<T, ?>> ioFields=initFields();
 		this.ioFields=new FieldSet<>(ioFields);
 		sizeDescription=calcSize();
-		ioPoolAccessors=nullIfEmpty(calcIOPoolAccessors());
-		earlyNullChecks=nullIfEmpty(getNonNulls());
+		ioPoolAccessors=Utils.nullIfEmpty(calcIOPoolAccessors());
+		earlyNullChecks=Utils.nullIfEmpty(getNonNulls());
 	}
 	
 	private List<IOField<T, ?>> getNonNulls(){
@@ -102,11 +102,6 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		                       .map(a->(VirtualAccessor<T>)a)
 		                       .filter(a->a.getStoragePool()==VirtualFieldDefinition.StoragePool.IO)
 		                       .toList();
-	}
-	
-	private <E, C extends Collection<E>> C nullIfEmpty(C collection){
-		if(collection.isEmpty()) return null;
-		return collection;
 	}
 	
 	private SizeDescriptor<T> calcSize(){

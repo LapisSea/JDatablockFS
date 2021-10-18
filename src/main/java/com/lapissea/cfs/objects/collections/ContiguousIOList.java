@@ -87,9 +87,8 @@ public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanaged
 	}
 	private T readAt(long index) throws IOException{
 		try(var io=selfIO()){
-			var pos    =calcElementOffset(index);
-			var skipped=io.skip(pos);
-			if(skipped!=pos) throw new IOException();
+			var pos=calcElementOffset(index);
+			io.skipExact(pos);
 			
 			return elementPipe.readNew(getChunkProvider(), io, getGenerics());
 		}

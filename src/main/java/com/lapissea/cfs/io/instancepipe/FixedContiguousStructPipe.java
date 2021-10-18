@@ -1,5 +1,6 @@
 package com.lapissea.cfs.io.instancepipe;
 
+import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.ChunkDataProvider;
 import com.lapissea.cfs.exceptions.FixedFormatNotSupportedException;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
@@ -57,25 +58,28 @@ public class FixedContiguousStructPipe<T extends IOInstance<T>> extends StructPi
 				                      .collect(Collectors.toList()))
 			         );
 		
-		maxValues=sizeDeps.entrySet()
-		                  .stream()
-		                  .map(e->{
-			                  var sizes=e.getValue()
-			                             .stream()
-			                             .mapToLong(v->v.getSizeDescriptor().requireMax())
-			                             .distinct()
-			                             .mapToObj(l->NumberSize.FLAG_INFO.stream()
-			                                                              .filter(s->s.bytes==l)
-			                                                              .findAny().orElseThrow())
-			                             .toList();
-			                  if(sizes.size()!=1) throw new MalformedStructLayout("inconsistent dependency sizes\n"+TextUtil.toNamedPrettyJson(e));
-			                  return new AbstractMap.SimpleEntry<>(e.getKey(), sizes.get(0));
-		                  })
-		                  .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+		var maxValues=sizeDeps.entrySet()
+		                      .stream()
+		                      .map(e->{
+			                      var sizes=e.getValue()
+			                                 .stream()
+			                                 .mapToLong(v->v.getSizeDescriptor().requireMax())
+			                                 .distinct()
+			                                 .mapToObj(l->NumberSize.FLAG_INFO.stream()
+			                                                                  .filter(s->s.bytes==l)
+			                                                                  .findAny().orElseThrow())
+			                                 .toList();
+			                      if(sizes.size()!=1) throw new MalformedStructLayout("inconsistent dependency sizes\n"+TextUtil.toNamedPrettyJson(e));
+			                      return new AbstractMap.SimpleEntry<>(e.getKey(), sizes.get(0));
+		                      })
+		                      .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 		
 		for(IOField<T, NumberSize> f : maxValues.keySet()){
-			if(!f.getDependencies().isEmpty()) throw new ShouldNeverHappenError("this value should not have deps?");
+			//TODO: see how to properly handle max values with dependencies
+			if(!f.getDependencies().isEmpty()) throw new ShouldNeverHappenError(f+" should not have deps?");
 		}
+		this.maxValues=Utils.nullIfEmpty(maxValues);
+		
 		try{
 			return IOFieldTools.stepFinal(
 				getType().getFields()
@@ -96,15 +100,20 @@ public class FixedContiguousStructPipe<T extends IOInstance<T>> extends StructPi
 		return (SizeDescriptor.Fixed<E>)super.getSizeDescriptor();
 	}
 	
+	private void setMax(T instance){
+		if(maxValues==null) return;
+		maxValues.forEach((k, v)->k.set(instance, v));
+	}
+	
 	@Override
 	protected void doWrite(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
-		maxValues.forEach((k, v)->k.set(instance, v));
+		setMax(instance);
 		writeIOFields(provider, dest, instance);
 	}
 	
 	@Override
 	protected T doRead(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		maxValues.forEach((k, v)->k.set(instance, v));
+		setMax(instance);
 		readIOFields(provider, src, instance, genericContext);
 		return instance;
 	}
