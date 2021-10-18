@@ -25,7 +25,11 @@ public interface IOTypeDB{
 		
 		@Override
 		public Class<?> fromID(int id){
-			return data.get(id);
+			var type=data.get(id);
+			if(type==null){
+				throw new RuntimeException("Unknown type from ID of "+id);
+			}
+			return type;
 		}
 	}
 	
