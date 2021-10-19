@@ -14,36 +14,45 @@ public interface IOTypeDB{
 	
 	class MemoryOnlyDB implements IOTypeDB{
 		
-		private final Map<Integer, Class<?>> data=new HashMap<>();
+		private final Map<Integer, Class<?>> idToTyp=new HashMap<>();
+		private final Map<Class<?>, Integer> typToID=new HashMap<>();
 		
 		@Override
 		public int toID(Class<?> type){
-			int max=0;
-			for(var e : data.entrySet()){
-				if(e.getValue()==type){
-					return e.getKey();
-				}
-				max=Math.max(e.getKey(), max);
+			synchronized(typToID){
+				var id=typToID.get(type);
+				if(id!=null) return id;
+				return newID(type);
 			}
-			var newID=max+1;
-			data.put(newID, type);
+		}
+		
+		private int newID(Class<?> type){
+			var newID=maxID()+1;
+			idToTyp.put(newID, type);
+			typToID.put(type, newID);
 			return newID;
 		}
 		
 		@Override
 		public Class<?> fromID(int id){
-			var type=data.get(id);
-			if(type==null){
-				throw new RuntimeException("Unknown type from ID of "+id);
+			synchronized(typToID){
+				var type=idToTyp.get(id);
+				if(type==null){
+					throw new RuntimeException("Unknown type from ID of "+id);
+				}
+				return type;
 			}
-			return type;
 		}
 		
 		public boolean hasType(Class<?> type){
-			return data.containsValue(type);
+			return typToID.containsKey(type);
 		}
 		public boolean hasID(int id){
-			return data.containsKey(id);
+			return idToTyp.containsKey(id);
+		}
+		
+		private int maxID(){
+			return idToTyp.keySet().stream().mapToInt(i->i).max().orElse(0);
 		}
 	}
 	
@@ -74,6 +83,8 @@ public interface IOTypeDB{
 				}
 				max=Math.max(entry.getKey(), max);
 			}
+			
+			max=Math.max(BUILT_IN.maxID(), max);
 			
 			var newID=max+1;
 			data.put(newID, nam);
