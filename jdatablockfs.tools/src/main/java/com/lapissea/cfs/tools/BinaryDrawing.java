@@ -30,6 +30,8 @@ import java.util.List;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.IntPredicate;
+import java.util.function.Supplier;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -61,7 +63,7 @@ public abstract class BinaryDrawing{
 	}
 	
 	private interface DrawB{
-		void draw(int index, Color color, boolean withChar, boolean force);
+		void draw(Supplier<IntStream> index, Color color, boolean withChar, boolean force);
 	}
 	
 	static record RenderContext(int width, int pixelsPerByte){}
@@ -351,13 +353,11 @@ public abstract class BinaryDrawing{
 		dataColor=filter.apply(dataColor);
 		freeColor=filter.apply(freeColor);
 		
-		for(int i=(int)chunk.getPtr().getValue();i<chunk.dataStart();i++){
-			drawByte.draw(i, chunkColor, false, false);
-		}
-		
-		for(int i=0, j=(int)chunk.getCapacity();i<j;i++){
-			drawByte.draw((int)(i+chunk.dataStart()), i>=chunk.getSize()?freeColor:dataColor, withChar, force);
-		}
+		drawByte.draw(()->IntStream.range((int)chunk.getPtr().getValue(), (int)chunk.dataStart()), chunkColor, false, false);
+		int from=(int)chunk.dataStart();
+		int to  =(int)(chunk.dataStart()+chunk.getCapacity());
+		drawByte.draw(()->IntStream.range(from, to).filter(i->i>=chunk.getSize()), freeColor, withChar, force);
+		drawByte.draw(()->IntStream.range(from, to).filter(i->i<chunk.getSize()), dataColor, withChar, force);
 	}
 	
 	private void fillBit(float x, float y, int index, float xOff, float yOff){
@@ -483,42 +483,6 @@ public abstract class BinaryDrawing{
 		}else throw UtilL.uncheckedThrow(e);
 	}
 	
-	private void renderByte(int b, RenderContext ctx, boolean withChar, int x, int y){
-		int   xF   =ctx.pixelsPerByte()*x, yF=ctx.pixelsPerByte()*y;
-		Color color=readColor();
-		
-		setColor(mul(color, 0.5F));
-		fillQuad(xF, yF, ctx.pixelsPerByte(), ctx.pixelsPerByte());
-		
-		setColor(color);
-		
-		
-		try(var bulkDraw=bulkDraw(DrawMode.QUADS)){
-			for(FlagReader flags=new FlagReader(b, 8);flags.remainingCount()>0;){
-				try{
-					if(flags.readBoolBit()){
-						fillBit(xF, yF, flags.readCount()-1, 0, 0);
-					}
-				}catch(IOException e){
-					throw new RuntimeException(e);
-				}
-			}
-		}
-		
-		
-		if(withChar){
-			
-			char c=(char)((byte)b);
-			if(canFontDisplay(c)){
-				String s=Character.toString(c);
-				setColor(new Color(1, 1, 1, color.getAlpha()/255F*0.6F));
-				
-				drawStringIn(s, new Rectangle(xF, yF, ctx.pixelsPerByte(), ctx.pixelsPerByte()), false);
-			}
-		}
-		setColor(color);
-	}
-	
 	protected void render(){
 		renderCount++;
 		preRender();
@@ -567,28 +531,12 @@ public abstract class BinaryDrawing{
 		
 		RenderContext ctx=new RenderContext(Math.max(1, this.getWidth()/getPixelsPerByte()), getPixelsPerByte());
 		
-		DrawB drawByte=(i, color, withChar, force)->{
-			if(i<bytes.length){
-				if(!force&&filled.get(i)) return;
-				filled.set(i);
-			}
-			
-			if(i>=bytes.length) color=alpha(Color.RED, 0.4F);
-			
-			int b =i>=bytes.length?0xFF:bytes[i]&0xFF;
-			int xi=i%ctx.width();
-			int yi=i/ctx.width();
-			
-			setColor(color);
-			renderByte(b, ctx, withChar, xi, yi);
-		};
-		
 		startFrame();
 		
 		setColor(Color.BLUE);
-		for(int i=0;i<magic.limit();i++){
-			drawByte.draw(i, bytes.length>i&&magic.get(i)==bytes[i]?Color.BLUE:Color.RED, false, true);
-		}
+		IntPredicate isValidMagicByte=i->bytes.length>i&&magic.get(i)==bytes[i];
+		drawByte(bytes, filled, ctx, ()->IntStream.range(0, magic.limit()).filter(isValidMagicByte), Color.BLUE, false, true);
+		drawByte(bytes, filled, ctx, ()->IntStream.range(0, magic.limit()).filter(isValidMagicByte.negate()), Color.RED, false, true);
 		
 		setStroke(2F);
 		outlineByteRange(Color.WHITE, ctx, new Range(0, magic.limit()));
@@ -631,12 +579,18 @@ public abstract class BinaryDrawing{
 							}
 						}
 					});
+
+//				LogUtil.printTable("instance", "");
 				
+				DrawB drawByte=(stream, color, withChar, force)->drawByte(bytes, filled, ctx, stream, color, withChar, force);
 				for(Chunk chunk : new PhysicalChunkWalker(cluster.getFirstChunk())){
 					if(referenced.contains(chunk)){
 						fillChunk(drawByte, chunk, ch->ch, true, true);
 					}
 					annotateStruct(ctx, cluster, new LinkedList<>(), chunk, null, Chunk.PIPE, ptrs::add);
+					if(chunk.dataEnd()>bytes.length){
+						drawByte(bytes, filled, ctx, ()->IntStream.range(bytes.length, (int)chunk.dataEnd()), new Color(0, 0, 0, 0.2F), false, true);
+					}
 				}
 				
 				annotateStruct(ctx, cluster,
@@ -663,10 +617,7 @@ public abstract class BinaryDrawing{
 			}
 		}
 		
-		for(int i=0;i<bytes.length;i++){
-			if(filled.get(i)) continue;
-			drawByte.draw(i, alpha(Color.GRAY, 0.5F), true, false);
-		}
+		drawByte(bytes, filled, ctx, ()->IntStream.range(0, bytes.length).filter(((IntPredicate)filled::get).negate()), alpha(Color.GRAY, 0.5F), true, false);
 		
 		findHoverChunk(ctx, parsed, provider);
 		
@@ -680,6 +631,74 @@ public abstract class BinaryDrawing{
 		drawFilter();
 		
 		drawTimeline(frameIndex);
+	}
+	private void drawByte(byte[] bytes, BitSet filled, RenderContext ctx, Supplier<IntStream> stream, Color color, boolean withChar, boolean force){
+		Supplier<IntStream> ints=()->stream.get().filter(i->{
+			if(i<bytes.length){
+				if(!force&&filled.get(i)){
+					return false;
+				}
+			}
+			return true;
+		});
+		
+		var col       =color;
+		var bitColor  =col;
+		var background=mul(col, 0.5F);
+		
+		setColor(background);
+		try(var ignored=bulkDraw(DrawMode.QUADS)){
+			ints.get().filter(i->i<bytes.length).forEach(i->{
+				int xi=i%ctx.width(), yi=i/ctx.width();
+				int xF=ctx.pixelsPerByte()*xi, yF=ctx.pixelsPerByte()*yi;
+				
+				fillQuad(xF, yF, ctx.pixelsPerByte(), ctx.pixelsPerByte());
+			});
+		}
+		
+		setColor(alpha(Color.RED, color.getAlpha()/255F));
+		try(var ignored=bulkDraw(DrawMode.QUADS)){
+			ints.get().filter(i->i>=bytes.length).forEach(i->{
+				int xi=i%ctx.width(), yi=i/ctx.width();
+				int xF=ctx.pixelsPerByte()*xi, yF=ctx.pixelsPerByte()*yi;
+				
+				fillQuad(xF, yF, ctx.pixelsPerByte(), ctx.pixelsPerByte());
+			});
+		}
+		
+		setColor(bitColor);
+		try(var ignored=bulkDraw(DrawMode.QUADS)){
+			ints.get().filter(i->i<bytes.length).forEach(i->{
+				int b =bytes[i]&0xFF;
+				int xi=i%ctx.width(), yi=i/ctx.width();
+				int xF=ctx.pixelsPerByte()*xi, yF=ctx.pixelsPerByte()*yi;
+				
+				for(FlagReader flags=new FlagReader(b, 8);flags.remainingCount()>0;){
+					try{
+						if(flags.readBoolBit()){
+							fillBit(xF, yF, flags.readCount()-1, 0, 0);
+						}
+					}catch(IOException e){
+						throw new RuntimeException(e);
+					}
+				}
+			});
+		}
+		
+		if(withChar){
+			setColor(new Color(1, 1, 1, bitColor.getAlpha()/255F*0.6F));
+			ints.get().filter(i->i<bytes.length).forEach(i->{
+				char c=(char)bytes[i];
+				if(!canFontDisplay(c)) return;
+				
+				int xi=i%ctx.width(), yi=i/ctx.width();
+				int xF=ctx.pixelsPerByte()*xi, yF=ctx.pixelsPerByte()*yi;
+				
+				drawStringIn(Character.toString(c), new Rectangle(xF, yF, ctx.pixelsPerByte(), ctx.pixelsPerByte()), false);
+			});
+		}
+		
+		ints.get().filter(i->i<bytes.length).forEach(filled::set);
 	}
 	private void drawBackgroundDots(){
 		setColor(errorMode?Color.RED.darker():Color.LIGHT_GRAY);
