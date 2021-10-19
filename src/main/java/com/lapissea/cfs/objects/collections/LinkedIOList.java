@@ -5,6 +5,7 @@ import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.ChainWalker;
 import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.ChunkDataProvider;
+import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
@@ -60,12 +61,12 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			var type=(Struct<T>)typeDef.argAsStruct(0);
 			type.requireEmptyConstructor();
 			this.valuePipe=ContiguousStructPipe.of(type);
-			
-			try(var io=this.getReference().io(this)){
-				var skipped=io.skip(SIZE_VAL_SIZE.bytes);
-				var toWrite=SIZE_VAL_SIZE.bytes-skipped;
-				Utils.zeroFill(io::write, toWrite);
-			}
+		}
+		private void ensureNextSpace(RandomIO io) throws IOException{
+			var skipped=io.skip(SIZE_VAL_SIZE.bytes);
+			var toWrite=SIZE_VAL_SIZE.bytes-skipped;
+			Utils.zeroFill(io::write, toWrite);
+			io.setPos(0);
 		}
 		
 		@Override
@@ -144,6 +145,9 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		
 		T getValue() throws IOException{
 			try(var io=this.getReference().io(this)){
+				if(io.getSize()<SIZE_VAL_SIZE.bytes){
+					return null;
+				}
 				io.skipExact(SIZE_VAL_SIZE.bytes);
 				if(io.remaining()==0){
 					return null;
@@ -154,6 +158,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		
 		void setValue(T value) throws IOException{
 			try(var io=this.getReference().io(this)){
+				ensureNextSpace(io);
 				io.skipExact(SIZE_VAL_SIZE.bytes);
 				if(value!=null){
 					valuePipe.write(this, io, value);
