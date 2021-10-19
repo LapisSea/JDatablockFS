@@ -291,6 +291,11 @@ public abstract class BinaryDrawing{
 		setColor(alpha(col, 0.7F));
 		var str =field.instanceToString(instance, true);
 		var fStr=field.toShortString();
+		if(field instanceof IOField.Ref refField){
+			//noinspection unchecked
+			var ref=refField.getReference(instance);
+			if(ref!=null&&!ref.isNull()) fStr+=" @ "+ref;
+		}
 		var both=fStr+(str==null?"":": "+str);
 		
 		if(getStringBounds(both)[0]>bestRange.toRect(ctx).width){
@@ -298,7 +303,7 @@ public abstract class BinaryDrawing{
 			pushMatrix();
 			initFont(0.4F);
 			translate(0, fontScale*-0.8);
-			drawStringIn(field.toShortString(), bestRange.toRect(ctx), false);
+			drawStringIn(fStr, bestRange.toRect(ctx), false);
 			popMatrix();
 			fontScale=font;
 			
@@ -832,7 +837,7 @@ public abstract class BinaryDrawing{
 	
 	private void drawError(ParsedFrame parsed){
 		if(parsed.displayError==null) return;
-		
+//		parsed.displayError.printStackTrace();
 		initFont(0.2F);
 		fontScale=Math.max(fontScale, 12);
 		
@@ -933,9 +938,11 @@ public abstract class BinaryDrawing{
 		}
 	}
 	
+	private record AnnotateStackFrame(IOInstance<?> instance, Reference ref){}
+	
 	@SuppressWarnings("unchecked")
 	private <T extends IOInstance<T>> void annotateStruct(RenderContext ctx,
-	                                                      ChunkDataProvider cluster, List<IOInstance<?>> stack,
+	                                                      ChunkDataProvider cluster, List<AnnotateStackFrame> stack,
 	                                                      T instance, Reference instanceReference, StructPipe<T> pipe,
 	                                                      Consumer<Pointer> pointerRecord) throws IOException{
 		var reference=instanceReference;
@@ -945,22 +952,18 @@ public abstract class BinaryDrawing{
 		}
 		if(reference==null||reference.isNull()) return;
 		var fieldOffset=0L;
+		
+		AnnotateStackFrame frame=new AnnotateStackFrame(instance, reference);
 		try{
-			if(stack.contains(instance)) return;
-			stack.add(instance);
+			if(stack.contains(frame)) return;
+			stack.add(frame);
 			
 			var typeHash=instance.getThisStruct().getType().getName().hashCode()&0xffffffffL;
 			
 			Random rand=new Random();
 			setStroke(4);
 			
-			Iterator<IOField<T, Object>> iterator;
-			var                          fields=pipe.getSpecificFields();
-			if(instance instanceof IOInstance.Unmanaged unmanaged){
-				iterator=Stream.concat(fields.stream(), unmanaged.listUnmanagedFields()).iterator();
-			}else{
-				iterator=(Iterator<IOField<T, Object>>)(Object)fields.iterator();
-			}
+			var iterator=makeFieldIterator(instance, pipe);
 			
 			while(iterator.hasNext()){
 				IOField<T, Object> field=iterator.next();
@@ -986,12 +989,15 @@ public abstract class BinaryDrawing{
 					if(acc!=null&&acc.hasAnnotation(IOType.Dynamic.class)){
 						
 						var inst=field.get(instance);
+						if(inst==null||IOFieldPrimitive.isPrimitive(inst.getClass())||inst.getClass()==String.class){
+							annotateByteField(cluster, ctx, pointerRecord, instance, field, col, reference, Range.fromSize(fieldOffset, size));
+							continue;
+						}
 						if(inst instanceof IOInstance<?> ioi){
 							annotateStruct(ctx, cluster, stack, (T)ioi, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), ioi.getThisStruct()), pointerRecord);
 							continue;
 						}
-						
-						LogUtil.printlnEr("unmanaged dynamic type");
+						LogUtil.printlnEr("unmanaged dynamic type", inst);
 						
 						continue;
 					}
@@ -1000,14 +1006,11 @@ public abstract class BinaryDrawing{
 						IOField.Ref<T, T> refField=(IOField.Ref<T, T>)refO;
 						var               ref     =refField.getReference(instance);
 						if(!ref.isNull()){
-							if(refField.toString().contains("entries")){
-								var a=0;
-							}
 							pointerRecord.accept(new Pointer((int)trueOffset, (int)ref.calcGlobalOffset(cluster), (int)size, col, refField.toString(), 1));
 						}
 						annotateByteField(cluster, ctx, pointerRecord, instance, field, col, reference, Range.fromSize(fieldOffset, size));
 						
-						annotateStruct(ctx, cluster, stack, refField.get(instance), refField.getReference(instance), refField.getReferencedPipe(instance), pointerRecord);
+						annotateStruct(ctx, cluster, stack, refField.get(instance), ref, refField.getReferencedPipe(instance), pointerRecord);
 					}else if(field instanceof BitFieldMerger<T> merger){
 						int bitOffset=0;
 						for(IOField.Bit<T, ?> bit : merger.getGroup()){
@@ -1068,15 +1071,29 @@ public abstract class BinaryDrawing{
 				}
 			}
 		}finally{
-			if(!(instance instanceof Chunk)){
-				var siz=reference.getPtr().dereference(cluster).io().getSize();
-				if(siz!=fieldOffset){
-					pipe.getSizeDescriptor().calcUnknown(instance);
-					LogUtil.println(instance, siz, fieldOffset);
-				}
-			}
+//			if(!(instance instanceof Chunk)&&reference.getOffset()==0){
+//				var siz=reference.getPtr().dereference(cluster).io().getSize();
+//				if(siz!=fieldOffset){
+//					pipe.getSizeDescriptor().calcUnknown(instance);
+//					LogUtil.printTable(
+//						"instance", instance.toString(),
+//						"reference", reference,
+//						"siz", siz,
+//						"fieldOffset", fieldOffset);
+//				}
+//			}
 			
-			stack.remove(instance);
+			stack.remove(frame);
+		}
+	}
+	
+	@SuppressWarnings("unchecked")
+	private <T extends IOInstance<T>> Iterator<IOField<T, Object>> makeFieldIterator(T instance, StructPipe<T> pipe){
+		var fields=pipe.getSpecificFields();
+		if(instance instanceof IOInstance.Unmanaged unmanaged){
+			return Stream.concat(fields.stream(), unmanaged.listUnmanagedFields()).iterator();
+		}else{
+			return (Iterator<IOField<T, Object>>)(Object)fields.iterator();
 		}
 	}
 	
