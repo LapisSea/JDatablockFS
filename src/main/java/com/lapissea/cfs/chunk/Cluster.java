@@ -8,12 +8,9 @@ import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.collections.HashIOMap;
-import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.collections.IOMap;
-import com.lapissea.cfs.objects.collections.LinkedIOList;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.IOTypeDB;
-import com.lapissea.cfs.type.StructLayout;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 
@@ -58,8 +55,12 @@ public class Cluster implements ChunkDataProvider{
 		                         .withApproval(c->c.getPtr().equals(FIRST_CHUNK_PTR))
 		                         .submit(provider);
 		
+		var db=new IOTypeDB.PersistentDB();
+		db.init(provider);
+		
 		ROOT_PIPE.modify(firstChunk, root->{
 			Metadata metadata=root.metadata;
+			metadata.db=db;
 			metadata.allocateNulls(provider);
 		}, null);
 	}
@@ -82,21 +83,18 @@ public class Cluster implements ChunkDataProvider{
 		
 		@IOValue
 		@IONullability(NULLABLE)
-		@IOValue.OverrideType(value=LinkedIOList.class)
-		public IOList<StructLayout> types;
+		@IOValue.OverrideType(value=HashIOMap.class)
+		public IOMap<Integer, Object> temp;
 		
 		@IOValue
 		@IONullability(NULLABLE)
-		@IOValue.OverrideType(value=HashIOMap.class)
-		public IOMap<Integer, Integer> temp;
+		private IOTypeDB.PersistentDB db;
 	}
 	
 	private final ChunkCache chunkCache=ChunkCache.weak();
 	
 	private final IOInterface   source;
 	private final MemoryManager memoryManager=new VerySimpleMemoryManager(this);
-	
-	private final IOTypeDB db=new IOTypeDB.MemoryOnlyDB();
 	
 	private final RootRef root;
 	
@@ -127,16 +125,17 @@ public class Cluster implements ChunkDataProvider{
 		return root;
 	}
 	
-	public IOList<StructLayout> getGenericTypes(){
-		return root.metadata.types;
+	private Metadata meta(){
+		return getRoot().metadata;
 	}
-	public IOMap<Integer, Integer> getTemp(){
-		return root.metadata.temp;
+	
+	public IOMap<Integer, Object> getTemp(){
+		return meta().temp;
 	}
 	
 	@Override
 	public IOTypeDB getTypeDb(){
-		return db;
+		return meta().db;
 	}
 	
 	@Override
