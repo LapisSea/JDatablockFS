@@ -1,12 +1,10 @@
 package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
-import java.util.AbstractList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Stream;
 
 public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOField<T, ?>>{
@@ -25,6 +23,37 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		};
 	}
 	
+	@Override
+	public String toString(){
+		if(isEmpty()) return "[]";
+		
+		var it=iterator();
+		if(!it.hasNext())
+			return "[]";
+		
+		StringBuilder sb=new StringBuilder();
+		sb.append('[');
+		Struct<?> last=null;
+		while(true){
+			var e=it.next();
+			
+			Struct<?> now=null;
+			if(e.getAccessor()!=null){
+				now=e.getAccessor().getDeclaringStruct();
+			}
+			
+			if(!Objects.equals(now, last)){
+				last=now;
+				sb.append(TextUtil.toShortString(now)).append(": ");
+			}
+			
+			sb.append(e.toShortString());
+			if(!it.hasNext()){
+				return sb.append(']').toString();
+			}
+			sb.append(',').append(' ');
+		}
+	}
 	@Override
 	public IOField<T, ?> get(int index){
 		return data.get(index);
