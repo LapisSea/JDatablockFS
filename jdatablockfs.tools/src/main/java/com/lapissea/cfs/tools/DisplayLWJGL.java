@@ -407,6 +407,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	}
 	@Override
 	protected void postRender(){
+		shouldRender=false;
 		window.swapBuffers();
 	}
 	@Override

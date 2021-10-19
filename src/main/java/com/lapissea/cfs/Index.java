@@ -9,7 +9,7 @@ import java.util.stream.IntStream;
 
 public class Index{
 	
-	public abstract sealed class Bound<T> extends AbstractList<T> permits BList, BArr{
+	private abstract sealed class Bound<T> extends AbstractList<T> permits BList, BArr{
 		protected abstract T getUnmapped(int index);
 		
 		@Override
@@ -20,10 +20,6 @@ public class Index{
 		@Override
 		public int size(){
 			return Index.this.size();
-		}
-		
-		public List<T> mappedCopy(){
-			return List.copyOf(this);
 		}
 	}
 	
@@ -61,10 +57,10 @@ public class Index{
 		return data[i];
 	}
 	
-	public <T> Bound<T> mapData(List<T> data){
+	public <T> List<T> mapData(List<T> data){
 		return new BList<>(data);
 	}
-	public <T> Bound<T> mapData(T[] data){
+	public <T> List<T> mapData(T[] data){
 		return new BArr<>(data);
 	}
 	

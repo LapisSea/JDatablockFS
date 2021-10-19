@@ -71,4 +71,8 @@ public abstract class AbstractUnmanagedIOMap<K, V, SELF extends AbstractUnmanage
 	public String toString(){
 		return IOMap.toString(this);
 	}
+	@Override
+	public String toShortString(){
+		return IOMap.toString(this);
+	}
 }

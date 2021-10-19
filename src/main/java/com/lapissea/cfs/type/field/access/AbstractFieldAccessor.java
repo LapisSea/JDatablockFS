@@ -31,7 +31,8 @@ public abstract class AbstractFieldAccessor<CTyp extends IOInstance<CTyp>> imple
 	
 	@Override
 	public String toString(){
-		return getDeclaringStruct().getType().getSimpleName()+"#"+strName();
+		var struct=getDeclaringStruct();
+		return (struct==null?"":struct.getType().getSimpleName())+"#"+strName();
 	}
 	public String toShortString(){
 		return strName();
@@ -41,13 +42,14 @@ public abstract class AbstractFieldAccessor<CTyp extends IOInstance<CTyp>> imple
 	public boolean equals(Object o){
 		return this==o||
 		       o instanceof FieldAccessor<?> that&&
-		       getDeclaringStruct().equals(that.getDeclaringStruct())&&
+		       Objects.equals(getDeclaringStruct(), that.getDeclaringStruct())&&
 		       getName().equals(that.getName());
 	}
 	
 	@Override
 	public int hashCode(){
-		int result=getDeclaringStruct().hashCode();
+		var struct=getDeclaringStruct();
+		int result=struct==null?0:struct.hashCode();
 		result=31*result+getName().hashCode();
 		return result;
 	}

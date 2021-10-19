@@ -53,6 +53,10 @@ public final class Reference extends IOInstance<Reference>{
 		return Objects.hash(ptr, offset);
 	}
 	@Override
+	public String toShortString(){
+		return toString();
+	}
+	@Override
 	public String toString(){
 		if(ptr.isNull()) return ptr.toString();
 		return ptr+"+"+offset;

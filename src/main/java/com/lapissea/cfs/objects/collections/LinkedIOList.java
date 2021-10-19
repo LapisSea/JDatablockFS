@@ -188,9 +188,10 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			}
 		}
 		@Override
-		public String toString(){
+		public String toShortString(){
 			try{
-				var result=new StringBuilder().append("Node{").append(getValue());
+				var val   =getValue();
+				var result=new StringBuilder().append("{").append(val==null?null:val.toShortString());
 				
 				var next=readNextPtr();
 				if(!next.isNull()){
@@ -200,6 +201,10 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			}catch(IOException e){
 				throw new RuntimeException(e);
 			}
+		}
+		@Override
+		public String toString(){
+			return "Node"+toShortString();
 		}
 	}
 	

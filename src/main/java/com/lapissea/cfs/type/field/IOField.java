@@ -269,7 +269,14 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	public String instanceToString(T instance, boolean doShort){
 		var val=get(instance);
 		if(val==null) return null;
-		return doShort?TextUtil.toShortString(val):TextUtil.toString(val);
+		
+		if(doShort){
+			if(val instanceof IOInstance inst){
+				return inst.toShortString();
+			}
+			return TextUtil.toShortString(val);
+		}
+		return TextUtil.toString(val);
 	}
 	
 	public boolean instancesEqual(T inst1, T inst2){

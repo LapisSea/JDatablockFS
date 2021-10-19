@@ -79,8 +79,7 @@ public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanaged
 	private void writeAt(long index, T value) throws IOException{
 		try(var io=selfIO()){
 			var pos    =calcElementOffset(index);
-			var skipped=io.skip(pos);
-			if(skipped!=pos) throw new IOException();
+			io.skipExact(pos);
 			
 			elementPipe.write(this, io, value);
 		}

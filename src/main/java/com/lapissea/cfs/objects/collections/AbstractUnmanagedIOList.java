@@ -78,7 +78,7 @@ public abstract class AbstractUnmanagedIOList<T extends IOInstance<T>, SELF exte
 	}
 	@Override
 	public String toShortString(){
-		return stream().map(TextUtil::toShortString).collect(Collectors.joining(", ", "[", "]"));
+		return stream().map(e->e==null?null:e.toShortString()).collect(Collectors.joining(", ", "[", "]"));
 	}
 	
 	@Override

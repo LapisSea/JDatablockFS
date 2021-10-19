@@ -10,6 +10,7 @@ import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.ObjectHolder;
+import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -31,6 +32,15 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 		@IONullability(NULLABLE)
 		@IOType.Dynamic
 		private V value;
+		
+		@Override
+		public String toString(){
+			return this.getClass().getSimpleName()+toShortString();
+		}
+		@Override
+		public String toShortString(){
+			return "{"+TextUtil.toShortString(key)+" = "+TextUtil.toShortString(value)+"}";
+		}
 		
 		private Entry<K, V> unmodifiable;
 		
