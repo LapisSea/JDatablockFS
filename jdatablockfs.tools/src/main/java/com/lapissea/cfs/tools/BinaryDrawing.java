@@ -291,7 +291,7 @@ public abstract class BinaryDrawing{
 		setColor(alpha(col, 0.7F));
 		var str =field.instanceToString(instance, true);
 		var fStr=field.toShortString();
-		var both=fStr+(str==null?"":" "+str);
+		var both=fStr+(str==null?"":": "+str);
 		
 		if(getStringBounds(both)[0]>bestRange.toRect(ctx).width){
 			var font=fontScale;
@@ -339,7 +339,7 @@ public abstract class BinaryDrawing{
 	}
 	
 	private Color chunkBaseColor(Chunk chunk){
-		return Color.GREEN;
+		return Color.BLACK;
 //		return chunk.isUsed()?chunk.isUserData()?Color.blue.brighter():Color.GREEN:Color.CYAN;
 	}
 	
