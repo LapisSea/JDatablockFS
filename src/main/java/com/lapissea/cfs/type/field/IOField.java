@@ -75,6 +75,38 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	
 	public abstract static class Ref<T extends IOInstance<T>, Type extends IOInstance<Type>> extends IOField<T, Type>{
 		
+		public abstract static class NoIO<T extends IOInstance<T>, ValueType extends IOInstance<ValueType>> extends IOField.Ref<T, ValueType>{
+			
+			private final SizeDescriptor<T> sizeDescriptor;
+			
+			public NoIO(FieldAccessor<T> accessor, SizeDescriptor<T> sizeDescriptor){
+				super(accessor);
+				this.sizeDescriptor=sizeDescriptor;
+			}
+			
+			@Override
+			public SizeDescriptor<T> getSizeDescriptor(){
+				return sizeDescriptor;
+			}
+			
+			@Override
+			public List<IOField<T, ?>> write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
+				throw new UnsupportedOperationException();
+			}
+			@Override
+			public void read(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+				throw new UnsupportedOperationException();
+			}
+			@Override
+			public void skipRead(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+				throw new UnsupportedOperationException();
+			}
+			@Override
+			public void allocate(T instance, ChunkDataProvider provider, GenericContext genericContext) throws IOException{
+				throw new UnsupportedOperationException();
+			}
+		}
+		
 		public Ref(FieldAccessor<T> accessor){
 			super(accessor);
 		}

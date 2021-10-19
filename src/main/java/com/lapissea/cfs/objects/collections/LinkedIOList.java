@@ -123,8 +123,23 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			}
 			
 			return Stream.of(
-				new IOField.NoIO<Node<T>, T>(valueAccessor, valDesc),
-				new IOField.NoIO<Node<T>, Node<T>>(nextAccessor, SizeDescriptor.Fixed.of(SIZE_VAL_SIZE.bytes)));
+				new IOField.Ref.NoIO<Node<T>, Node<T>>(nextAccessor, SizeDescriptor.Fixed.of(SIZE_VAL_SIZE.bytes)){
+					@Override
+					public Reference getReference(Node<T> instance){
+						ChunkPointer next;
+						try{
+							next=readNextPtr();
+						}catch(IOException e){
+							throw new RuntimeException();
+						}
+						return next.isNull()?new Reference():next.makeReference();
+					}
+					@Override
+					public StructPipe<Node<T>> getReferencedPipe(Node<T> instance){
+						return getPipe();
+					}
+				},
+				new IOField.NoIO<Node<T>, T>(valueAccessor, valDesc));
 		}
 		
 		T getValue() throws IOException{
