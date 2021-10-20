@@ -203,7 +203,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		return ioFields;
 	}
 	
-	protected List<VirtualAccessor<T>> getIoPoolAccessors(){
+	protected final List<VirtualAccessor<T>> getIoPoolAccessors(){
 		return ioPoolAccessors;
 	}
 	

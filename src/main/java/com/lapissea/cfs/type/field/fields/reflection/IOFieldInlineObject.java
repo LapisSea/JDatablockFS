@@ -87,6 +87,17 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 		});
 	}
 	
+	private void writeIsNull(ContentWriter dest, ValueType val) throws IOException{
+		try(var flags=new FlagWriter.AutoPop(NumberSize.BYTE, dest)){
+			flags.writeBoolBit(val==null);
+		}
+	}
+	private boolean readIsNull(ContentReader src) throws IOException{
+		try(var flags=FlagReader.read(src, NumberSize.BYTE)){
+			return flags.readBoolBit();
+		}
+	}
+	
 	@Override
 	public IOField<CTyp, ValueType> implMaxAsFixedSize(){
 		return new IOFieldInlineObject<>(getAccessor(), true);
@@ -101,13 +112,13 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 	public List<IOField<CTyp, ?>> write(ChunkDataProvider provider, ContentWriter dest, CTyp instance) throws IOException{
 		var val=get(instance);
 		if(nullable()){
-			try(var flags=new FlagWriter.AutoPop(NumberSize.BYTE, dest)){
-				flags.writeBoolBit(val==null);
+			writeIsNull(dest, val);
+			if(val==null){
+				if(fixed){
+					Utils.zeroFill(dest::write, (int)getSizeDescriptor().requireFixed()-1);
+				}
+				return List.of();
 			}
-			if(fixed){
-				Utils.zeroFill(dest::write, (int)getSizeDescriptor().requireFixed()-1);
-			}
-			if(val==null) return List.of();
 		}
 		instancePipe.write(provider, dest, val);
 		return List.of();
@@ -115,13 +126,12 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 	
 	private ValueType readNew(ChunkDataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
 		if(nullable()){
-			try(var flags=FlagReader.read(src, NumberSize.BYTE)){
-				if(flags.readBoolBit()){
-					if(fixed){
-						src.readInts1((int)getSizeDescriptor().requireFixed()-1);
-					}
-					return null;
+			boolean isNull=readIsNull(src);
+			if(isNull){
+				if(fixed){
+					src.readInts1((int)getSizeDescriptor().requireFixed()-1);
 				}
+				return null;
 			}
 		}
 		

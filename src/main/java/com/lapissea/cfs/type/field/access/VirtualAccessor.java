@@ -180,6 +180,7 @@ public class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends AbstractFiel
 	
 	@Override
 	protected String strName(){
-		return "("+getName()+")"+"@"+getStoragePool().shortName+(getAccessIndex()==-1?"":getAccessIndex());
+		var index=getAccessIndex();
+		return getStoragePool().shortName+(index==-1?"":index)+"("+getName()+")";
 	}
 }

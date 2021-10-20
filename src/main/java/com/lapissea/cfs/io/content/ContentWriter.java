@@ -3,6 +3,7 @@ package com.lapissea.cfs.io.content;
 import com.lapissea.cfs.BufferErrorSupplier;
 import com.lapissea.cfs.io.ContentBuff;
 import com.lapissea.cfs.io.impl.MemoryData;
+import com.lapissea.util.UtilL;
 import com.lapissea.util.function.BiIntConsumer;
 
 import java.io.ByteArrayOutputStream;
@@ -279,6 +280,23 @@ public interface ContentWriter extends AutoCloseable, ContentBuff{
 					onFinish.accept(count, buf);
 				}
 				target.write(buf, 0, count);
+			}
+			
+			@Override
+			public synchronized void write(byte[] b, int off, int len){
+				super.write(b, off, len);
+				earlyCheck();
+			}
+			
+			@Override
+			public synchronized void write(int b){
+				super.write(b);
+				earlyCheck();
+			}
+			private void earlyCheck(){
+				if(errorOnMismatch!=null){
+					if(count>amount) throw UtilL.uncheckedThrow(errorOnMismatch.apply(this.size(), amount));
+				}
 			}
 			
 			@Override

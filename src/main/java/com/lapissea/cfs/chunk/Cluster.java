@@ -18,6 +18,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.*;
+import static com.lapissea.cfs.type.field.annotations.IOValue.Reference.PipeType.*;
 import static java.nio.charset.StandardCharsets.*;
 
 public class Cluster implements ChunkDataProvider{
@@ -68,7 +69,7 @@ public class Cluster implements ChunkDataProvider{
 	
 	public static class RootRef extends IOInstance<RootRef>{
 		@IOValue
-		@IOValue.Reference
+		@IOValue.Reference(dataPipeType=FIXED)
 		@IONullability(DEFAULT_IF_NULL)
 		private Metadata metadata;
 	}
