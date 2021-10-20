@@ -110,7 +110,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	private boolean filterMake =false;
 	private int[]   scrollRange=null;
 	
-	private final TTFont font;
+	private final GLFont font;
 	
 	public DisplayLWJGL(){
 		var glThread=new Thread(this::displayLifecycle, "display");

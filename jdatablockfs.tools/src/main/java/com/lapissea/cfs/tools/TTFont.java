@@ -2,7 +2,6 @@ package com.lapissea.cfs.tools;
 
 import com.lapissea.util.LogUtil;
 import org.lwjgl.BufferUtils;
-import org.lwjgl.opengl.EXTTextureFilterAnisotropic;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.stb.STBTTAlignedQuad;
 import org.lwjgl.stb.STBTTBakedChar;
@@ -26,10 +25,9 @@ import java.util.function.Function;
 import java.util.stream.IntStream;
 
 import static com.lapissea.util.PoolOwnThread.*;
+import static org.lwjgl.system.MemoryStack.*;
 
-public class TTFont{
-	
-	private static Boolean ANOSOTROPIC_SUPPORTED;
+public class TTFont extends GLFont{
 	
 	
 	private final int           replacer;
@@ -41,8 +39,8 @@ public class TTFont{
 	
 	private class Bitmap{
 		final STBTTBakedChar.Buffer charInfo;
-		int texture       =-1;
-		int outlineTexture=-1;
+		Texture texture;
+		Texture outlineTexture;
 		final float pixelHeight;
 		final int   bitmapWidth;
 		final int   bitmapHeight;
@@ -113,30 +111,8 @@ public class TTFont{
 			boolean[] instant={false};
 			openglTask.accept(()->{
 				instant[0]=true;
-				texture=GL11.glGenTextures();
-				Function<ByteBuffer, Integer> uploadTexture=bb->{
-					var texture=GL11.glGenTextures();
-					GL11.glBindTexture(GL11.GL_TEXTURE_2D, texture);
-					GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_ALPHA, this.bitmapWidth, this.bitmapHeight, 0, GL11.GL_ALPHA, GL11.GL_UNSIGNED_BYTE, bb);
-					GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
-					GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
-					
-					if(ANOSOTROPIC_SUPPORTED==null){
-						String str=GL11.glGetString(GL11.GL_EXTENSIONS);
-						ANOSOTROPIC_SUPPORTED=str!=null&&str.contains("GL_EXT_texture_filter_anisotropic");
-					}
-					
-					if(ANOSOTROPIC_SUPPORTED){
-						float[] aniso={0};
-						GL11.glGetFloatv(EXTTextureFilterAnisotropic.GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, aniso);
-						GL11.glTexParameterf(GL11.GL_TEXTURE_2D, EXTTextureFilterAnisotropic.GL_TEXTURE_MAX_ANISOTROPY_EXT, aniso[0]);
-					}
-					return texture;
-				};
-				
-				texture=uploadTexture.apply(fillBitmap);
-				outlineTexture=uploadTexture.apply(outlineBitmap);
-				
+				texture=uploadTexture(this.bitmapWidth, this.bitmapHeight, GL11.GL_ALPHA, fillBitmap);
+				outlineTexture=uploadTexture(this.bitmapWidth, this.bitmapHeight, GL11.GL_ALPHA, outlineBitmap);
 			});
 			if(!instant[0]){
 				renderRequest.run();
@@ -146,17 +122,17 @@ public class TTFont{
 		void free(){
 			openglTask.accept(()->{
 				charInfo.free();
-				GL11.glDeleteTextures(texture);
-				GL11.glDeleteTextures(outlineTexture);
+				texture.delete();
+				outlineTexture.delete();
 			});
 		}
 	}
 	
-	private final ReadWriteLock                                   cacheLock  =new ReentrantReadWriteLock();
-	private final List<Bitmap>                                    bitmapCache=new ArrayList<>();
-	private final Function<BinaryDrawing.DrawMode, AutoCloseable> bulkHook;
-	private final Runnable                                        renderRequest;
-	private final Consumer<Runnable>                              openglTask;
+	private final ReadWriteLock                                            cacheLock  =new ReentrantReadWriteLock();
+	private final List<Bitmap>                                             bitmapCache=new ArrayList<>();
+	private final Function<BinaryDrawing.DrawMode, BinaryDrawing.BulkDraw> bulkHook;
+	private final Runnable                                                 renderRequest;
+	private final Consumer<Runnable>                                       openglTask;
 	
 	private static byte[] readData(String ttfPath){
 		try(var io=Objects.requireNonNull(TTFont.class.getResourceAsStream(ttfPath))){
@@ -166,10 +142,10 @@ public class TTFont{
 		}
 	}
 	
-	public TTFont(String ttfPath, Function<BinaryDrawing.DrawMode, AutoCloseable> bulkHook, Runnable renderRequest, Consumer<Runnable> openglTask){
+	public TTFont(String ttfPath, Function<BinaryDrawing.DrawMode, BinaryDrawing.BulkDraw> bulkHook, Runnable renderRequest, Consumer<Runnable> openglTask){
 		this(readData(ttfPath), bulkHook, renderRequest, openglTask);
 	}
-	public TTFont(byte[] ttfData, Function<BinaryDrawing.DrawMode, AutoCloseable> bulkHook, Runnable renderRequest, Consumer<Runnable> openglTask){
+	public TTFont(byte[] ttfData, Function<BinaryDrawing.DrawMode, BinaryDrawing.BulkDraw> bulkHook, Runnable renderRequest, Consumer<Runnable> openglTask){
 		this.bulkHook=bulkHook;
 		this.renderRequest=renderRequest;
 		this.openglTask=openglTask;
@@ -184,7 +160,7 @@ public class TTFont{
 			throw new IllegalStateException("Failed to initialize font information.");
 		}
 		
-		try(MemoryStack stack=MemoryStack.stackPush()){
+		try(MemoryStack stack=stackPush()){
 			IntBuffer pAscent =stack.mallocInt(1);
 			IntBuffer pDescent=stack.mallocInt(1);
 			IntBuffer pLineGap=stack.mallocInt(1);
@@ -218,7 +194,7 @@ public class TTFont{
 			if(bitmapCache.isEmpty()) bitmapCache.add(new Bitmap(Math.min(pixelHeight, 20)));
 			best=bitmapCache.get(0);
 			for(Bitmap bitmap : bitmapCache){
-				if(bitmap.texture==-1) continue;
+				if(bitmap.texture==null) continue;
 				
 				var bestDist=Math.abs(best.pixelHeight-pixelHeight);
 				var thisDist=Math.abs(bitmap.pixelHeight-pixelHeight);
@@ -281,7 +257,8 @@ public class TTFont{
 		return best;
 	}
 	
-	public float[] getStringBounds(String string, float pixelHeight){
+	@Override
+	public Bounds getStringBounds(String string, float pixelHeight){
 		pushMax(string);
 		
 		float minX=0;
@@ -293,7 +270,7 @@ public class TTFont{
 		
 		float scale=pixelHeight/bitmap.pixelHeight;
 		
-		try(MemoryStack stack=MemoryStack.stackPush()){
+		try(MemoryStack stack=stackPush()){
 			
 			FloatBuffer x=stack.floats(0.0f);
 			FloatBuffer y=stack.floats(0.0f);
@@ -320,7 +297,7 @@ public class TTFont{
 				}
 			}
 		}
-		return new float[]{(maxX-minX)*scale, (maxY-minY)*scale};
+		return new Bounds((maxX-minX)*scale, (maxY-minY)*scale);
 	}
 	
 	private void pushMax(String string){
@@ -345,31 +322,33 @@ public class TTFont{
 		}
 	}
 	
+	@Override
 	public void outlineString(String string, float pixelHeight, float x, float y){
 		drawString(string, pixelHeight, x, y, bitmap->bitmap.outlineTexture);
 	}
 	
+	@Override
 	public void fillString(String string, float pixelHeight, float x, float y){
 		drawString(string, pixelHeight, x, y, bitmap->bitmap.texture);
 	}
 	
-	private void drawString(String string, float pixelHeight, float xOff, float yOff, Function<Bitmap, Integer> getTex){
+	private void drawString(String string, float pixelHeight, float xOff, float yOff, Function<Bitmap, Texture> getTex){
 		pushMax(string);
 		
 		Bitmap bitmap=getBitmap(pixelHeight);
 		var    tex   =getTex.apply(bitmap);
-		if(tex==-1){
+		if(tex==null){
 			return;
 		}
 		float scale=pixelHeight/bitmap.pixelHeight;
 		
-		try(MemoryStack stack=MemoryStack.stackPush()){
+		try(MemoryStack stack=stackPush()){
 			
 			FloatBuffer x=stack.floats(0.0f);
 			FloatBuffer y=stack.floats(0.0f);
 			
 			STBTTAlignedQuad q=STBTTAlignedQuad.malloc(stack);
-			GL11.glBindTexture(GL11.GL_TEXTURE_2D, tex);
+			tex.bind(GL11.GL_TEXTURE_2D);
 			GL11.glEnable(GL11.GL_TEXTURE_2D);
 			
 			try(var apply=bulkHook.apply(BinaryDrawing.DrawMode.QUADS)){
@@ -400,8 +379,6 @@ public class TTFont{
 					GL11.glVertex2f(x0, y1);
 					
 				}
-			}catch(Exception e){
-				e.printStackTrace();
 			}
 			
 			GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
@@ -409,7 +386,8 @@ public class TTFont{
 		}
 	}
 	
-	public boolean canFontDisplay(int c){
+	@Override
+	public boolean canFontDisplay(char c){
 		if(c<min) return false;
 		if(c>max) return false;
 		int g=STBTruetype.stbtt_FindGlyphIndex(info, c);
