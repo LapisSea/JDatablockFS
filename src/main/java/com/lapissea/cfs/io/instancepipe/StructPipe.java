@@ -218,55 +218,48 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	
 	protected void writeIOFields(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
 		
-		Object[] ioPool=makeIOPool();
-		try{
-			pushPool(ioPool);
-			
-			final ContentOutputBuilder destBuff=new ContentOutputBuilder((int)getSizeDescriptor().fixedOrMax().orElse(32));
-			
-			Collection<IOField<T, ?>> dirtyMarked=new HashSet<>();
-			Consumer<List<IOField<T, ?>>> logDirty=dirt->{
-				if(dirt==null||dirt.isEmpty()) return;
+		final ContentOutputBuilder destBuff=new ContentOutputBuilder((int)getSizeDescriptor().fixedOrMax().orElse(32));
+		
+		Collection<IOField<T, ?>> dirtyMarked=new HashSet<>();
+		Consumer<List<IOField<T, ?>>> logDirty=dirt->{
+			if(dirt==null||dirt.isEmpty()) return;
+			if(DEBUG_VALIDATION){
+				var spec=getSpecificFields();
+				for(IOField<T, ?> dirtyField : dirt){
+					if(!spec.contains(dirtyField)){
+						throw new RuntimeException(dirtyField+" not in "+spec);
+					}
+				}
+			}
+			dirtyMarked.addAll(dirt);
+		};
+		do{
+			destBuff.reset();
+			for(IOField<T, ?> field : getSpecificFields()){
+				dirtyMarked.remove(field);
 				if(DEBUG_VALIDATION){
-					var spec=getSpecificFields();
-					for(IOField<T, ?> dirtyField : dirt){
-						if(!spec.contains(dirtyField)){
-							throw new RuntimeException(dirtyField+" not in "+spec);
-						}
-					}
-				}
-				dirtyMarked.addAll(dirt);
-			};
-			do{
-				destBuff.reset();
-				for(IOField<T, ?> field : getSpecificFields()){
-					dirtyMarked.remove(field);
-					if(DEBUG_VALIDATION){
-						long bytes;
-						try{
-							var desc=field.getSizeDescriptor();
-							bytes=desc.toBytes(desc.calcUnknown(instance));
-						}catch(UnknownSizePredictionException e){
-							logDirty.accept(field.writeReported(provider, destBuff, instance));
-							continue;
-						}
-						writeFieldKnownSize(provider, instance, logDirty, field, destBuff.writeTicket(bytes));
-					}else{
+					long bytes;
+					try{
+						var desc=field.getSizeDescriptor();
+						bytes=desc.toBytes(desc.calcUnknown(instance));
+					}catch(UnknownSizePredictionException e){
 						logDirty.accept(field.writeReported(provider, destBuff, instance));
+						continue;
 					}
+					writeFieldKnownSize(provider, instance, logDirty, field, destBuff.writeTicket(bytes));
+				}else{
+					logDirty.accept(field.writeReported(provider, destBuff, instance));
 				}
-			}while(!dirtyMarked.isEmpty());
-			
-			destBuff.writeTo(dest);
-			
-		}finally{
-			popPool();
-		}
+			}
+		}while(!dirtyMarked.isEmpty());
+		
+		destBuff.writeTo(dest);
 	}
 	
 	private void writeFieldKnownSize(ChunkDataProvider provider, T instance, Consumer<List<IOField<T, ?>>> logDirty, IOField<T, ?> field, ContentWriter.BufferTicket ticket) throws IOException{
 		var safeBuff=ticket.requireExact().submit();
-		logDirty.accept(field.writeReported(provider, safeBuff, instance));
+		var d       =field.writeReported(provider, safeBuff, instance);
+		logDirty.accept(d);
 		
 		try{
 			safeBuff.close();
@@ -312,22 +305,14 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	}
 	
 	protected void readIOFields(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		Object[] ioPool=makeIOPool();
-		try{
-			pushPool(ioPool);
-			
-			if(DEBUG_VALIDATION){
-				for(IOField<T, ?> field : getSpecificFields()){
-					readFieldSafe(provider, src, instance, field, genericContext);
-				}
-			}else{
-				for(IOField<T, ?> field : getSpecificFields()){
-					field.readReported(provider, src, instance, genericContext);
-				}
+		if(DEBUG_VALIDATION){
+			for(IOField<T, ?> field : getSpecificFields()){
+				readFieldSafe(provider, src, instance, field, genericContext);
 			}
-			
-		}finally{
-			popPool();
+		}else{
+			for(IOField<T, ?> field : getSpecificFields()){
+				field.readReported(provider, src, instance, genericContext);
+			}
 		}
 	}
 	
@@ -392,15 +377,17 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		}
 	}
 	
-	private void pushPool(Object[] ioPool){
-		if(getIoPoolAccessors()==null) return;
-		for(var a : getIoPoolAccessors()){
+	protected void pushPool(Object[] ioPool){
+		var acc=getIoPoolAccessors();
+		if(acc==null) return;
+		for(var a : acc){
 			a.pushIoPool(ioPool);
 		}
 	}
-	private void popPool(){
-		if(getIoPoolAccessors()==null) return;
-		for(var a : getIoPoolAccessors()){
+	protected void popPool(){
+		var acc=getIoPoolAccessors();
+		if(acc==null) return;
+		for(var a : acc){
 			a.popIoPool();
 		}
 	}
