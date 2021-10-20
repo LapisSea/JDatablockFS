@@ -1,0 +1,1 @@
+msdf-atlas-gen.exe -font font.ttf -size 40 -imageout atlas.png -json atlas.json -charset charset.txt -pots
