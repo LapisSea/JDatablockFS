@@ -309,7 +309,7 @@ public abstract class BinaryDrawing{
 			
 			drawStringIn((str==null?"":str), bestRange.toRect(ctx), false);
 		}else{
-			drawStringIn(both, bestRange.toRect(ctx), false);
+			drawStringIn(both, bestRange.toRect(ctx), true);
 		}
 		
 		
@@ -699,7 +699,7 @@ public abstract class BinaryDrawing{
 				int xi=i%ctx.width(), yi=i/ctx.width();
 				int xF=ctx.pixelsPerByte()*xi, yF=ctx.pixelsPerByte()*yi;
 				
-				drawStringIn(Character.toString(c), new Rectangle(xF, yF, ctx.pixelsPerByte(), ctx.pixelsPerByte()), false);
+				drawStringIn(Character.toString(c), new Rectangle(xF, yF, ctx.pixelsPerByte(), ctx.pixelsPerByte()), true);
 			});
 		}
 		
