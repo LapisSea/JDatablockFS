@@ -30,7 +30,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.*;
 
@@ -87,21 +86,18 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	}
 	
 	private List<IOField<T, ?>> getNonNulls(){
-		return unpackedFields().filter(f->f.getNullability()==IONullability.Mode.NOT_NULL).toList();
+		return ioFields.unpackedStream().filter(f->f.getNullability()==IONullability.Mode.NOT_NULL).toList();
 	}
 	
 	protected abstract List<IOField<T, ?>> initFields();
 	
-	private Stream<IOField<T, ?>> unpackedFields(){
-		return ioFields.stream().flatMap(IOField::streamUnpackedFields);
-	}
-	
 	private List<VirtualAccessor<T>> calcIOPoolAccessors(){
-		return unpackedFields().map(IOField::getAccessor)
-		                       .filter(a->a instanceof VirtualAccessor)
-		                       .map(a->(VirtualAccessor<T>)a)
-		                       .filter(a->a.getStoragePool()==VirtualFieldDefinition.StoragePool.IO)
-		                       .toList();
+		return type.getFields().unpackedStream()
+		           .map(IOField::getAccessor)
+		           .filter(a->a instanceof VirtualAccessor)
+		           .map(a->(VirtualAccessor<T>)a)
+		           .filter(a->a.getStoragePool()==VirtualFieldDefinition.StoragePool.IO)
+		           .toList();
 	}
 	
 	private SizeDescriptor<T> calcSize(){

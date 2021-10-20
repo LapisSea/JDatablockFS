@@ -94,4 +94,11 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	public <E extends IOField<T, ?>> E requireExactFieldType(Class<E> type, String name){
 		return exactFieldType(type, name).orElseThrow();
 	}
+	
+	public Stream<IOField<T, ?>> unpackedStream(){
+		return stream().flatMap(IOField::streamUnpackedFields);
+	}
+	public FieldSet<T> unpacked(){
+		return new FieldSet<>(unpackedStream());
+	}
 }
