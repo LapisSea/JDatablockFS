@@ -4,6 +4,7 @@ import com.lapissea.cfs.io.bit.BitInputStream;
 import com.lapissea.cfs.io.bit.BitOutputStream;
 import com.lapissea.cfs.io.content.ContentInputStream;
 import com.lapissea.cfs.io.content.ContentWriter;
+import com.lapissea.util.PairM;
 import com.lapissea.util.function.FunctionOI;
 import com.lapissea.util.function.UnsafeBiConsumer;
 import com.lapissea.util.function.UnsafeBiFunction;
@@ -17,12 +18,14 @@ import java.nio.CharBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CharsetEncoder;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.function.Predicate;
 import java.util.stream.IntStream;
 
+import static com.lapissea.cfs.GlobalConfig.*;
 import static java.nio.charset.CodingErrorAction.*;
 import static java.nio.charset.StandardCharsets.*;
 
@@ -39,7 +42,7 @@ class Encoding{
 		private static UTF get(){return UTFS.get();}
 	}
 	
-	private record TableCoding(byte[] table, int offset, char[] chars, int bits){
+	private record TableCoding(byte[] table, int offset, char[] chars, int bits, char[] ranges){
 		static TableCoding of(char... table){
 			assert table.length<=Byte.MAX_VALUE;
 			
@@ -57,7 +60,95 @@ class Encoding{
 				char c=table[i];
 				tableIndex[c-min]=(byte)i;
 			}
-			return new TableCoding(tableIndex, min, table, bits);
+			
+			var ranges=buildRanges(table);
+			
+			return new TableCoding(tableIndex, min, table, bits, ranges);
+		}
+		
+		@SuppressWarnings("PointlessArithmeticExpression")
+		private static char[] buildRanges(char[] table){
+			List<PairM<Character, Character>> rangeBuilder=new ArrayList<>();
+			cLoop:
+			for(char c : table){
+				
+				merging:
+				while(rangeBuilder.size()>1){
+					for(int beforeIndex=0;beforeIndex<rangeBuilder.size();beforeIndex++){
+						var before=rangeBuilder.get(beforeIndex);
+						
+						for(int afterIndex=0;afterIndex<rangeBuilder.size();afterIndex++){
+							if(afterIndex==beforeIndex) continue;
+							var after=rangeBuilder.get(afterIndex);
+							
+							if(before.obj2.equals(after.obj1)){
+								before.obj2=after.obj2;
+								rangeBuilder.remove(afterIndex);
+								continue merging;
+							}
+						}
+					}
+					break;
+				}
+				
+				for(var range : rangeBuilder){
+					var from=range.obj1;
+					var to  =range.obj2;
+					if(from<=c&&c<=to){
+						continue cLoop;
+					}
+					if(from-1==c){
+						range.obj1--;
+						continue cLoop;
+					}
+					if(to+1==c){
+						range.obj2++;
+						continue cLoop;
+					}
+				}
+				
+				rangeBuilder.add(new PairM<>(c, c));
+			}
+			
+			char[] ranges=new char[rangeBuilder.size()*2];
+			for(int i=0;i<rangeBuilder.size();i++){
+				var r=rangeBuilder.get(i);
+				ranges[i*2+0]=r.obj1;
+				ranges[i*2+1]=r.obj2;
+			}
+			
+			if(DEBUG_VALIDATION){
+				validateRanges(table, ranges);
+			}
+			
+			return ranges;
+		}
+		
+		private static void validateRanges(char[] table, char[] ranges){
+			for(char c=Character.MIN_VALUE;c<Character.MAX_VALUE;c++){
+				
+				boolean oldR=false;
+				for(char t : table){
+					if(t==c){
+						oldR=true;
+						break;
+					}
+				}
+				
+				boolean newR=false;
+				for(int i=0;i<ranges.length;i+=2){
+					int from=ranges[i];
+					int to  =ranges[i+1];
+					if(from<=c&&c<=to){
+						newR=true;
+						break;
+					}
+				}
+				
+				if(oldR!=newR){
+					throw new RuntimeException(c+"");
+				}
+			}
 		}
 		
 		int encode(char c)    {return table[c-offset];}
@@ -97,8 +188,12 @@ class Encoding{
 		}
 		boolean isCompatible(String s){
 			return s.chars().allMatch(c->{
-				for(char t : chars){
-					if(t==c) return true;
+				for(int i=0;i<ranges.length;i+=2){
+					int from=ranges[i];
+					int to  =ranges[i+1];
+					if(from<=c&&c<=to){
+						return true;
+					}
 				}
 				return false;
 			});
@@ -127,9 +222,17 @@ class Encoding{
 			(w, s)->encode(UTF.get().utf8Enc(), s, w),
 			(w, text)->decode(UTF.get().utf8Dec(), w, text));
 		
-		private static final List<CharEncoding> SORTED=Arrays.stream(CharEncoding.values()).sorted(Comparator.comparingDouble(c->c.sizeWeight)).toList();
+		private static final CharEncoding[] SORTED=Arrays.stream(CharEncoding.values()).sorted(Comparator.comparingDouble(c->c.sizeWeight)).toArray(CharEncoding[]::new);
 		public static CharEncoding findBest(String data){
-			return SORTED.stream().filter(f->f.canEncode(data)).findFirst().orElseThrow();
+			if(data.isEmpty()){
+				return CharEncoding.ASCII;
+			}
+			for(CharEncoding f : SORTED){
+				if(f.canEncode(data)){
+					return f;
+				}
+			}
+			throw new RuntimeException("Unable to encode \""+data+'"');
 		}
 		
 		private static int utf8Len(String s){
