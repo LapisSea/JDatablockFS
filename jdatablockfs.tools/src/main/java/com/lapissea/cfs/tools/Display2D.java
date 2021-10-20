@@ -312,10 +312,10 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 		currentGraphics.setTransform(transformStack.remove());
 	}
 	@Override
-	protected float[] getStringBounds(String str){
+	protected GLFont.Bounds getStringBounds(String str){
 		currentGraphics.setFont(currentGraphics.getFont().deriveFont(getFontScale()/2));
 		var rect=currentGraphics.getFontMetrics().getStringBounds(str, currentGraphics);
-		return new float[]{(float)(rect.getWidth()), (float)(rect.getHeight())};
+		return new GLFont.Bounds((float)(rect.getWidth()), (float)(rect.getHeight()));
 	}
 	@Override
 	protected void translate(double x, double y){

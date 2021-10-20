@@ -446,7 +446,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	}
 	
 	@Override
-	protected float[] getStringBounds(String str){
+	protected GLFont.Bounds getStringBounds(String str){
 		return font.getStringBounds(str, getFontScale());
 	}
 	

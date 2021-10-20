@@ -157,7 +157,7 @@ public abstract class BinaryDrawing{
 	protected abstract void pushMatrix();
 	protected abstract void popMatrix();
 	
-	protected abstract float[] getStringBounds(String str);
+	protected abstract GLFont.Bounds getStringBounds(String str);
 	
 	protected abstract void translate(double x, double y);
 	protected abstract Color readColor();
@@ -298,7 +298,7 @@ public abstract class BinaryDrawing{
 		}
 		var both=fStr+(str==null?"":": "+str);
 		
-		if(getStringBounds(both)[0]>bestRange.toRect(ctx).width){
+		if(getStringBounds(both).width()>bestRange.toRect(ctx).width){
 			var font=fontScale;
 			pushMatrix();
 			initFont(0.4F);
@@ -393,8 +393,8 @@ public abstract class BinaryDrawing{
 	private void drawStringIn(String s, Rectangle area, boolean doStroke, boolean alignLeft){
 		var rect=getStringBounds(s);
 		
-		float w=rect[0];
-		float h=rect[1];
+		float w=rect.width();
+		float h=rect.height();
 		
 		float fontScale=this.fontScale;
 		
@@ -404,8 +404,8 @@ public abstract class BinaryDrawing{
 				
 				rect=getStringBounds(s);
 				
-				w=rect[0];
-				h=rect[1];
+				w=rect.width();
+				h=rect.height();
 			}
 		}
 		
@@ -416,8 +416,8 @@ public abstract class BinaryDrawing{
 				
 				rect=getStringBounds(s);
 				
-				w=rect[0];
-				h=rect[1];
+				w=rect.width();
+				h=rect.height();
 			}
 			while((area.width-1)/w<0.5){
 				if(s.isEmpty()) return;
@@ -428,8 +428,8 @@ public abstract class BinaryDrawing{
 				s=s.substring(0, s.length()-4)+"...";
 				rect=getStringBounds(s);
 				
-				w=rect[0];
-				h=rect[1];
+				w=rect.width();
+				h=rect.height();
 			}
 		}
 		
@@ -821,10 +821,10 @@ public abstract class BinaryDrawing{
 			int msgWidth=ptr.message().length();
 			int space   =(int)(getWidth()-x);
 			
-			var w=getStringBounds(ptr.message())[0];
+			var w=getStringBounds(ptr.message()).width();
 			while(w>space*1.5){
 				msgWidth--;
-				w=getStringBounds(ptr.message().substring(0, msgWidth))[0];
+				w=getStringBounds(ptr.message().substring(0, msgWidth)).width();
 			}
 			var lines=TextUtil.wrapLongString(ptr.message(), msgWidth);
 			y-=fontScale/2F*lines.size();
@@ -845,18 +845,18 @@ public abstract class BinaryDrawing{
 		var msg       =DrawUtils.errorToMessage(parsed.displayError);
 		var lines     =msg.split("\n");
 		var bounds    =Arrays.stream(lines).map(this::getStringBounds).toList();
-		var totalBound=bounds.stream().reduce((l, r)->new float[]{Math.max(l[0], r[0]), l[1]+r[1]}).orElseThrow();
+		var totalBound=bounds.stream().reduce((l, r)->new GLFont.Bounds(Math.max(l.width(), r.width()), l.height()+r.height())).orElseThrow();
 		
 		setColor(alpha(Color.RED.darker(), 0.2F));
-		fillQuad(0, getHeight()-totalBound[1]-25, totalBound[0]+20, totalBound[1]+20);
+		fillQuad(0, getHeight()-totalBound.height()-25, totalBound.width()+20, totalBound.height()+20);
 		setColor(alpha(Color.WHITE, 0.8F));
 		
-		var rect=new Rectangle(10, Math.round(getHeight()-totalBound[1])-20, Math.round(totalBound[0]), (int)fontScale);
+		var rect=new Rectangle(10, Math.round(getHeight()-totalBound.height())-20, Math.round(totalBound.width()), (int)fontScale);
 		for(int i=0;i<lines.length;i++){
 			String line =lines[i];
 			var    bound=bounds.get(i);
-			rect.height=(int)bound[1];
-			rect.y=(int)(Math.round(getHeight()-totalBound[1]+bounds.stream().limit(i).mapToDouble(b->b[1]).sum())-15);
+			rect.height=(int)bound.height();
+			rect.y=(int)(Math.round(getHeight()-totalBound.height()+bounds.stream().limit(i).mapToDouble(b->b.height()).sum())-15);
 			drawStringIn(line, rect, false, true);
 		}
 	}
@@ -889,9 +889,9 @@ public abstract class BinaryDrawing{
 		int x=xByte*ctx.pixelsPerByte();
 		int y=(int)((yByte-0.1)*ctx.pixelsPerByte());
 		
-		float[] bounds=getStringBounds(s);
-		x=(int)Math.min(Math.max(0, x-bounds[0]/2+ctx.pixelsPerByte()/2F), getWidth()-Math.ceil(bounds[0]));
-		y=Math.max(y, (int)Math.ceil(bounds[1]));
+		var bounds=getStringBounds(s);
+		x=(int)Math.min(Math.max(0, x-bounds.width()/2+ctx.pixelsPerByte()/2F), getWidth()-Math.ceil(bounds.width()));
+		y=Math.max(y, (int)Math.ceil(bounds.height()));
 		
 		setColor(Color.BLACK);
 		outlineString(s, x, y);
