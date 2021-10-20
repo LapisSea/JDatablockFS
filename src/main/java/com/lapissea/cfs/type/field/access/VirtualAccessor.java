@@ -117,6 +117,8 @@ public class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends AbstractFiel
 		case IO -> {
 			if(ioPool!=null){
 				ioPool[getAccessIndex()]=value;
+			}else{
+				throw new IllegalStateException(this+" is an IO pool accessor. IO pool must be bound before setting");
 			}
 		}
 		case NONE -> {}
