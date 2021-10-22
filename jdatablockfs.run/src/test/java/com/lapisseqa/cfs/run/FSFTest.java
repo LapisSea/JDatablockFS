@@ -23,7 +23,6 @@ class FSFTest{
 			String               sessionName="default";
 			LateInit<DataLogger> logger     =LoggedMemoryUtils.createLoggerFromConfig();
 			try{
-				for(int i=0;i<50;i++){
 					MemoryData<?> mem=LoggedMemoryUtils.newLoggedMemory(sessionName, logger);
 					logger.ifInited(l->l.getSession(sessionName).reset());
 					
@@ -36,7 +35,6 @@ class FSFTest{
 						logger.block();
 						mem.onWrite.log(mem, LongStream.of());
 					}
-				}
 			}finally{
 				logger.get().destroy();
 			}
@@ -62,12 +60,12 @@ class FSFTest{
 //		var meta=provider.getGenericTypes();
 //		meta.add(new StructLayout("This is a test!"));
 		
-		IOMap<Integer, Integer> map=provider.getTemp();
+		IOMap<Integer, Object> map=provider.getTemp();
 		
 		Random r=new Random();
 		r.setSeed(1);
-		for(int i=0;i<40;i++){
-			map.put(i, r.nextInt());
+		for(int i=0;i<4;i++){
+			map.put(i, "int("+i+")");
 		}
 	}
 	
