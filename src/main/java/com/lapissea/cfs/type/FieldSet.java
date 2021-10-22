@@ -101,4 +101,8 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	public FieldSet<T> unpacked(){
 		return new FieldSet<>(unpackedStream());
 	}
+	
+	public Stream<IOField<T, ?>> streamDependentOn(IOField<T, ?> field){
+		return stream().filter(f->f.getDependencies().contains(field));
+	}
 }

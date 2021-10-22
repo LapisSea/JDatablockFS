@@ -27,6 +27,10 @@ import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.*;
 
 public class IOFieldTools{
 	
+	public static <T extends IOInstance<T>> Function<List<IOField<T, ?>>, List<IOField<T, ?>>> streamStep(Function<Stream<IOField<T, ?>>, Stream<IOField<T, ?>>> map){
+		return list->map.apply(list.stream()).toList();
+	}
+	
 	public static <T extends IOInstance<T>> List<IOField<T, ?>> stepFinal(List<IOField<T, ?>> data, Iterable<Function<List<IOField<T, ?>>, List<IOField<T, ?>>>> steps){
 		List<IOField<T, ?>> d=data;
 		for(Function<List<IOField<T, ?>>, List<IOField<T, ?>>> step : steps){
@@ -41,12 +45,12 @@ public class IOFieldTools{
 		
 		Runnable pushBuilt=()->{
 			switch(bitBuilder.size()){
-			case 0 -> {}
-			case 1 -> result.add(bitBuilder.remove(0));
-			default -> {
-				result.add(new BitFieldMerger<>(bitBuilder));
-				bitBuilder.clear();
-			}
+				case 0 -> {}
+				case 1 -> result.add(bitBuilder.remove(0));
+				default -> {
+					result.add(new BitFieldMerger<>(bitBuilder));
+					bitBuilder.clear();
+				}
 			}
 		};
 		

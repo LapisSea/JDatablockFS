@@ -13,14 +13,14 @@ import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
-import com.lapissea.util.ShouldNeverHappenError;
-import com.lapissea.util.TextUtil;
+import com.lapissea.util.NotImplementedException;
 
 import java.io.IOException;
 import java.util.AbstractMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.*;
 import static com.lapissea.cfs.type.field.IOField.UsageHintType.*;
@@ -35,10 +35,12 @@ public class FixedContiguousStructPipe<T extends IOInstance<T>> extends StructPi
 		return of(FixedContiguousStructPipe.class, struct);
 	}
 	
-	private Map<IOField<T, NumberSize>, NumberSize> maxValues;
+	private final Map<IOField<T, NumberSize>, NumberSize> maxValues;
 	
 	public FixedContiguousStructPipe(Struct<T> type){
 		super(type);
+		
+		maxValues=Utils.nullIfEmpty(computeMaxValues());
 		
 		if(DEBUG_VALIDATION){
 			getSizeDescriptor().requireFixed();
@@ -46,54 +48,49 @@ public class FixedContiguousStructPipe<T extends IOInstance<T>> extends StructPi
 	}
 	@Override
 	protected List<IOField<T, ?>> initFields(){
-		
-		Map<IOField<T, NumberSize>, List<IOField<T, ?>>> sizeDeps=
-			getType().getFields().byType(NumberSize.class)
-			         .filter(f->f.getUsageHints().contains(SIZE_DATA))
-			         .collect(Collectors.toMap(
-				         em->em,
-				         em->getType().getFields()
-				                      .stream()
-				                      .filter(f->f.getDependencies().contains(em))
-				                      .collect(Collectors.toList()))
-			         );
-		
-		var maxValues=sizeDeps.entrySet()
-		                      .stream()
-		                      .map(e->{
-			                      var sizes=e.getValue()
-			                                 .stream()
-			                                 .mapToLong(v->v.getSizeDescriptor().requireMax())
-			                                 .distinct()
-			                                 .mapToObj(l->NumberSize.FLAG_INFO.stream()
-			                                                                  .filter(s->s.bytes==l)
-			                                                                  .findAny().orElseThrow())
-			                                 .toList();
-			                      if(sizes.size()!=1) throw new MalformedStructLayout("inconsistent dependency sizes\n"+TextUtil.toNamedPrettyJson(e));
-			                      return new AbstractMap.SimpleEntry<>(e.getKey(), sizes.get(0));
-		                      })
-		                      .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-		
-		for(IOField<T, NumberSize> f : maxValues.keySet()){
-			//TODO: see how to properly handle max values with dependencies
-			if(!f.getDependencies().isEmpty()) throw new ShouldNeverHappenError(f+" should not have deps?");
-		}
-		this.maxValues=Utils.nullIfEmpty(maxValues);
-		
+		var sizeFields=sizeFieldStream().collect(Collectors.toSet());
 		try{
 			return IOFieldTools.stepFinal(
-				getType().getFields()
-				         .stream()
-				         .map(f->sizeDeps.containsKey(f)?f:f.forceMaxAsFixedSize())
-				         .collect(Collectors.toList()),
+				getType().getFields(),
 				List.of(
+					IOFieldTools.streamStep(s->s.map(f->sizeFields.contains(f)?f:f.forceMaxAsFixedSize())),
 					IOFieldTools::dependencyReorder,
-					list->list.stream().filter(not(sizeDeps::containsKey)).toList(),
+					IOFieldTools.streamStep(s->s.filter(not(sizeFields::contains))),
 					IOFieldTools::mergeBitSpace
 				));
 		}catch(FixedFormatNotSupportedException e){
 			throw new MalformedStructLayout(getType().getType().getName()+" does not support fixed size layout because of "+e.getField(), e);
 		}
+	}
+	private Map<IOField<T, NumberSize>, NumberSize> computeMaxValues(){
+		//TODO: see how to properly handle max values with dependencies
+		var badFields=sizeFieldStream().filter(f->!f.getDependencies().isEmpty()).map(IOField::toString).collect(Collectors.joining(", "));
+		if(!badFields.isEmpty()){
+			throw new NotImplementedException(badFields+" should not have dependencies");
+		}
+		
+		return sizeFieldStream()
+			.map(sizingField->{
+				var size=getType().getFields().streamDependentOn(sizingField)
+				                  .mapToLong(v->v.getSizeDescriptor().requireMax())
+				                  .distinct()
+				                  .mapToObj(l->NumberSize.FLAG_INFO.stream()
+				                                                   .filter(s->s.bytes==l)
+				                                                   .findAny().orElseThrow())
+				                  .reduce((a, b)->{
+					                  if(a!=b){
+						                  throw new MalformedStructLayout("inconsistent dependency sizes"+sizingField);
+					                  }
+					                  return a;
+				                  })
+				                  .orElse(NumberSize.LARGEST);
+				return new AbstractMap.SimpleEntry<>(sizingField, size);
+			})
+			.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+	}
+	
+	private Stream<IOField<T, NumberSize>> sizeFieldStream(){
+		return getType().getFields().byType(NumberSize.class).filter(f->f.getUsageHints().contains(SIZE_DATA));
 	}
 	
 	public <E extends IOInstance<E>> SizeDescriptor.Fixed<E> getFixedDescriptor(){
