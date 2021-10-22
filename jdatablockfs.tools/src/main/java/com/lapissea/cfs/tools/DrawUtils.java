@@ -1,9 +1,7 @@
 package com.lapissea.cfs.tools;
 
-import java.awt.*;
-
 class DrawUtils{
-	static Rectangle makeBitRect(BinaryDrawing.RenderContext ctx, long trueOffset, int bitOffset, long siz){
+	static BinaryDrawing.Rect makeBitRect(BinaryDrawing.RenderContext ctx, long trueOffset, int bitOffset, long siz){
 		var bitCtx  =new BinaryDrawing.RenderContext(3, ctx.pixelsPerByte()/3);
 		var range   =findBestContiguousRange(bitCtx, new BinaryDrawing.Range(bitOffset, bitOffset+siz));
 		var byteRect=new BinaryDrawing.Range(trueOffset, trueOffset).toRect(ctx);

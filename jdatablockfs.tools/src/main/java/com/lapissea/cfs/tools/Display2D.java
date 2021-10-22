@@ -115,7 +115,7 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 		}
 	}
 	
-	private int pixelsPerByte=300;
+	private float pixelsPerByte=300;
 	
 	private final Map<String, Session> sessions     =new HashMap<>();
 	private       Optional<Session>    activeSession=Optional.empty();
@@ -265,7 +265,7 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 	}
 	
 	@Override
-	protected int getPixelsPerByte(){
+	protected float getPixelsPerByte(){
 		return pixelsPerByte;
 	}
 	
@@ -295,7 +295,7 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 		return pan.mouseY;
 	}
 	@Override
-	protected void pixelsPerByteChange(int newPixelsPerByte){
+	protected void pixelsPerByteChange(float newPixelsPerByte){
 		shouldRerender=true;
 		pixelsPerByte=newPixelsPerByte;
 	}

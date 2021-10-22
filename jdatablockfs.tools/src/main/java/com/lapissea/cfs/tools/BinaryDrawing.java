@@ -18,7 +18,6 @@ import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.cfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.util.LogUtil;
-import com.lapissea.util.MathUtil;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 import org.joml.SimplexNoise;
@@ -66,7 +65,18 @@ public abstract class BinaryDrawing{
 		void draw(Supplier<IntStream> index, Color color, boolean withChar, boolean force);
 	}
 	
-	static record RenderContext(int width, int pixelsPerByte){}
+	static record RenderContext(int width, float pixelsPerByte){}
+	
+	static class Rect{
+		float x, y, width, height;
+		
+		public Rect(float x, float y, float width, float height){
+			this.x=x;
+			this.y=y;
+			this.width=width;
+			this.height=height;
+		}
+	}
 	
 	protected static record Range(long from, long to){
 		static Range fromSize(long start, long size){
@@ -75,12 +85,12 @@ public abstract class BinaryDrawing{
 		long size(){
 			return to-from;
 		}
-		Rectangle toRect(RenderContext ctx){
+		Rect toRect(RenderContext ctx){
 			var xByteFrom=(from%ctx.width)*ctx.pixelsPerByte;
 			var yByteFrom=(from/ctx.width)*ctx.pixelsPerByte;
 			var xByteTo  =xByteFrom+ctx.pixelsPerByte*size();
 			var yByteTo  =yByteFrom+ctx.pixelsPerByte;
-			return new Rectangle((int)xByteFrom, (int)yByteFrom, (int)(xByteTo-xByteFrom), (int)(yByteTo-yByteFrom));
+			return new Rect(xByteFrom, yByteFrom, xByteTo-xByteFrom, yByteTo-yByteFrom);
 		}
 	}
 	
@@ -141,7 +151,7 @@ public abstract class BinaryDrawing{
 	
 	protected abstract void outlineQuad(double x, double y, double width, double height);
 	
-	protected abstract int getPixelsPerByte();
+	protected abstract float getPixelsPerByte();
 	
 	protected abstract void drawLine(double xFrom, double yFrom, double xTo, double yTo);
 	
@@ -151,7 +161,7 @@ public abstract class BinaryDrawing{
 	protected abstract int getMouseX();
 	protected abstract int getMouseY();
 	
-	protected abstract void pixelsPerByteChange(int newPixelsPerByte);
+	protected abstract void pixelsPerByteChange(float newPixelsPerByte);
 	
 	protected abstract void setColor(Color color);
 	protected abstract void pushMatrix();
@@ -236,7 +246,7 @@ public abstract class BinaryDrawing{
 		T instance, IOField<T, ?> field,
 		Color col, int bitOffset, long bitSize, Reference reference, long fieldOffset
 	) throws IOException{
-		Consumer<Rectangle> doSegment=bitRect->{
+		Consumer<Rect> doSegment=bitRect->{
 			setColor(alpha(col, 0.7F));
 			drawStringIn(Objects.toString(field.instanceToString(instance, true)), bitRect, false);
 			setColor(alpha(col, 0.3F));
@@ -386,11 +396,11 @@ public abstract class BinaryDrawing{
 		fontScale=getPixelsPerByte()*sizeMul;
 	}
 	
-	private void drawStringIn(String s, Rectangle area, boolean doStroke){
+	private void drawStringIn(String s, Rect area, boolean doStroke){
 		drawStringIn(s, area, doStroke, false);
 	}
 	
-	private void drawStringIn(String s, Rectangle area, boolean doStroke, boolean alignLeft){
+	private void drawStringIn(String s, Rect area, boolean doStroke, boolean alignLeft){
 		var rect=getStringBounds(s);
 		
 		float w=rect.width();
@@ -461,22 +471,30 @@ public abstract class BinaryDrawing{
 	}
 	
 	protected void calcSize(int bytesCount, boolean restart){
+		var screenHeight=this.getHeight();
+		var screenWidth =this.getWidth();
 		
-		int newPixelsPerByte=MathUtil.snap(restart?500:getPixelsPerByte(), 3, getWidth());
+		int columns;
+		if(restart) columns=1;
+		else{
+			columns=(int)(getWidth()/getPixelsPerByte()+0.0001F);
+		}
 		
 		while(true){
-			int width         =getWidth()/newPixelsPerByte;
-			int rows          =(int)Math.ceil(bytesCount/(double)width);
-			int requiredHeight=rows*newPixelsPerByte;
+			float newPixelsPerByte=(getWidth()-0.5F)/columns;
 			
-			if(this.getHeight()<requiredHeight){
-				newPixelsPerByte--;
+			float width         =screenWidth/newPixelsPerByte;
+			int   rows          =(int)Math.ceil(bytesCount/width);
+			int   requiredHeight=(int)Math.ceil(rows*newPixelsPerByte);
+			
+			if(screenHeight<requiredHeight){
+				columns++;
 			}else{
 				break;
 			}
 		}
 		
-		pixelsPerByteChange(newPixelsPerByte);
+		pixelsPerByteChange((getWidth()-0.5F)/columns);
 	}
 	
 	private void handleError(Throwable e, ParsedFrame parsed){
@@ -534,7 +552,7 @@ public abstract class BinaryDrawing{
 		
 		calcSize(bytes.length, false);
 		
-		RenderContext ctx=new RenderContext(Math.max(1, this.getWidth()/getPixelsPerByte()), getPixelsPerByte());
+		RenderContext ctx=new RenderContext((int)Math.max(1, this.getWidth()/getPixelsPerByte()), getPixelsPerByte());
 		
 		startFrame();
 		
@@ -546,7 +564,7 @@ public abstract class BinaryDrawing{
 		setStroke(2F);
 		outlineByteRange(Color.WHITE, ctx, new Range(0, magic.limit()));
 		setColor(Color.WHITE);
-		drawStringIn(new String(bytes, 0, magic.limit()), new Rectangle(0, 0, ctx.pixelsPerByte()*Math.min(magic.limit(), ctx.width()), ctx.pixelsPerByte()), false);
+		drawStringIn(new String(bytes, 0, magic.limit()), new Rect(0, 0, ctx.pixelsPerByte()*Math.min(magic.limit(), ctx.width()), ctx.pixelsPerByte()), false);
 		
 		setColor(alpha(Color.WHITE, 0.5F));
 		
@@ -654,8 +672,8 @@ public abstract class BinaryDrawing{
 		setColor(background);
 		try(var ignored=bulkDraw(DrawMode.QUADS)){
 			ints.get().filter(i->i<bytes.length).forEach(i->{
-				int xi=i%ctx.width(), yi=i/ctx.width();
-				int xF=ctx.pixelsPerByte()*xi, yF=ctx.pixelsPerByte()*yi;
+				int   xi=i%ctx.width(), yi=i/ctx.width();
+				float xF=ctx.pixelsPerByte()*xi, yF=ctx.pixelsPerByte()*yi;
 				
 				fillQuad(xF, yF, ctx.pixelsPerByte(), ctx.pixelsPerByte());
 			});
@@ -664,8 +682,8 @@ public abstract class BinaryDrawing{
 		setColor(alpha(Color.RED, color.getAlpha()/255F));
 		try(var ignored=bulkDraw(DrawMode.QUADS)){
 			ints.get().filter(i->i>=bytes.length).forEach(i->{
-				int xi=i%ctx.width(), yi=i/ctx.width();
-				int xF=ctx.pixelsPerByte()*xi, yF=ctx.pixelsPerByte()*yi;
+				int   xi=i%ctx.width(), yi=i/ctx.width();
+				float xF=ctx.pixelsPerByte()*xi, yF=ctx.pixelsPerByte()*yi;
 				
 				fillQuad(xF, yF, ctx.pixelsPerByte(), ctx.pixelsPerByte());
 			});
@@ -674,9 +692,9 @@ public abstract class BinaryDrawing{
 		setColor(bitColor);
 		try(var ignored=bulkDraw(DrawMode.QUADS)){
 			ints.get().filter(i->i<bytes.length).forEach(i->{
-				int b =bytes[i]&0xFF;
-				int xi=i%ctx.width(), yi=i/ctx.width();
-				int xF=ctx.pixelsPerByte()*xi, yF=ctx.pixelsPerByte()*yi;
+				int   b =bytes[i]&0xFF;
+				int   xi=i%ctx.width(), yi=i/ctx.width();
+				float xF=ctx.pixelsPerByte()*xi, yF=ctx.pixelsPerByte()*yi;
 				
 				for(FlagReader flags=new FlagReader(b, 8);flags.remainingCount()>0;){
 					try{
@@ -696,10 +714,10 @@ public abstract class BinaryDrawing{
 				char c=(char)bytes[i];
 				if(!canFontDisplay(c)) return;
 				
-				int xi=i%ctx.width(), yi=i/ctx.width();
-				int xF=ctx.pixelsPerByte()*xi, yF=ctx.pixelsPerByte()*yi;
+				int   xi=i%ctx.width(), yi=i/ctx.width();
+				float xF=ctx.pixelsPerByte()*xi, yF=ctx.pixelsPerByte()*yi;
 				
-				drawStringIn(Character.toString(c), new Rectangle(xF, yF, ctx.pixelsPerByte(), ctx.pixelsPerByte()), true);
+				drawStringIn(Character.toString(c), new Rect(xF, yF, ctx.pixelsPerByte(), ctx.pixelsPerByte()), true);
 			});
 		}
 		
@@ -762,7 +780,7 @@ public abstract class BinaryDrawing{
 		if(!isWritingFilter()) return;
 		setColor(Color.WHITE);
 		initFont(1);
-		drawStringIn("Filter: "+getFilter(), new Rectangle(0, 0, getWidth(), getHeight()), true, true);
+		drawStringIn("Filter: "+getFilter(), new Rect(0, 0, getWidth(), getHeight()), true, true);
 	}
 	
 	private void drawWriteIndex(MemFrame frame, RenderContext ctx){
@@ -829,7 +847,7 @@ public abstract class BinaryDrawing{
 			var lines=TextUtil.wrapLongString(ptr.message(), msgWidth);
 			y-=fontScale/2F*lines.size();
 			for(String line : lines){
-				drawStringIn(line, new Rectangle((int)x, (int)y, space, ctx.pixelsPerByte()), false, true);
+				drawStringIn(line, new Rect(x, y, space, ctx.pixelsPerByte()), false, true);
 				y+=fontScale;
 			}
 		}
@@ -851,12 +869,12 @@ public abstract class BinaryDrawing{
 		fillQuad(0, getHeight()-totalBound.height()-25, totalBound.width()+20, totalBound.height()+20);
 		setColor(alpha(Color.WHITE, 0.8F));
 		
-		var rect=new Rectangle(10, Math.round(getHeight()-totalBound.height())-20, Math.round(totalBound.width()), (int)fontScale);
+		var rect=new Rect(10, getHeight()-totalBound.height()-20, totalBound.width(), fontScale);
 		for(int i=0;i<lines.length;i++){
 			String line =lines[i];
 			var    bound=bounds.get(i);
-			rect.height=(int)bound.height();
-			rect.y=(int)(Math.round(getHeight()-totalBound.height()+bounds.stream().limit(i).mapToDouble(b->b.height()).sum())-15);
+			rect.height=bound.height();
+			rect.y=(Math.round(getHeight()-totalBound.height()+bounds.stream().limit(i).mapToDouble(GLFont.Bounds::height).sum())-15);
 			drawStringIn(line, rect, false, true);
 		}
 	}
@@ -865,9 +883,9 @@ public abstract class BinaryDrawing{
 		var bytes =frame.data().data();
 		var parsed=frame.parsed;
 		
-		int xByte=getMouseX()/ctx.pixelsPerByte();
+		int xByte=(int)(getMouseX()/ctx.pixelsPerByte());
 		if(xByte>=ctx.width()) return;
-		int yByte    =getMouseY()/ctx.pixelsPerByte();
+		int yByte    =(int)(getMouseY()/ctx.pixelsPerByte());
 		int byteIndex=yByte*ctx.width()+xByte;
 		if(byteIndex>=bytes.length) return;
 		
@@ -886,7 +904,7 @@ public abstract class BinaryDrawing{
 		
 		initFont(0.5F);
 		pushMatrix();
-		int x=xByte*ctx.pixelsPerByte();
+		int x=(int)(xByte*ctx.pixelsPerByte());
 		int y=(int)((yByte-0.1)*ctx.pixelsPerByte());
 		
 		var bounds=getStringBounds(s);
@@ -915,12 +933,12 @@ public abstract class BinaryDrawing{
 		translate(-0.5, -0.5);
 	}
 	private void findHoverChunk(RenderContext ctx, ParsedFrame parsed, ChunkDataProvider provider){
-		int xByte=getMouseX()/ctx.pixelsPerByte();
+		int xByte=(int)(getMouseX()/ctx.pixelsPerByte());
 		if(xByte>=ctx.width()){
 			parsed.lastHoverChunk=null;
 			return;
 		}
-		int yByte    =getMouseY()/ctx.pixelsPerByte();
+		int yByte    =(int)(getMouseY()/ctx.pixelsPerByte());
 		int byteIndex=yByte*ctx.width()+xByte;
 		
 		try{

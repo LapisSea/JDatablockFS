@@ -8,6 +8,7 @@ import com.lapissea.glfw.GlfwWindow;
 import com.lapissea.glfw.GlfwWindow.SurfaceAPI;
 import com.lapissea.util.MathUtil;
 import com.lapissea.util.UtilL;
+import com.lapissea.util.event.change.ChangeRegistry;
 import com.lapissea.util.event.change.ChangeRegistryInt;
 import com.lapissea.vec.Vec2i;
 import org.lwjgl.glfw.GLFW;
@@ -100,12 +101,12 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	
 	private final List<Runnable> glTasks=Collections.synchronizedList(new LinkedList<>());
 	
-	private final Map<String, Session> sessions        =new LinkedHashMap<>();
-	private       Optional<Session>    activeSession   =Optional.empty();
-	private       Optional<Session>    displayedSession=Optional.empty();
-	private final ChangeRegistryInt    pixelsPerByte   =new ChangeRegistryInt(300);
-	private       boolean              shouldRender    =true;
-	private       boolean              destroyRequested=false;
+	private final Map<String, Session>  sessions        =new LinkedHashMap<>();
+	private       Optional<Session>     activeSession   =Optional.empty();
+	private       Optional<Session>     displayedSession=Optional.empty();
+	private final ChangeRegistry<Float> pixelsPerByte   =new ChangeRegistry<>(300F);
+	private       boolean               shouldRender    =true;
+	private       boolean               destroyRequested=false;
 	
 	private String  filter     ="";
 	private boolean filterMake =false;
@@ -179,10 +180,10 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			
 			var pixelsPerByte=getPixelsPerByte();
 			
-			int xByte=window.mousePos.x()/pixelsPerByte;
-			int yByte=window.mousePos.y()/pixelsPerByte;
+			int xByte=(int)(window.mousePos.x()/pixelsPerByte);
+			int yByte=(int)(window.mousePos.y()/pixelsPerByte);
 			
-			int width=Math.max(1, this.getWidth()/pixelsPerByte);
+			int width=(int)Math.max(1, this.getWidth()/pixelsPerByte);
 			
 			byteIndex.set(yByte*width+xByte);
 			
@@ -617,11 +618,11 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	}
 	
 	@Override
-	public int getPixelsPerByte(){
+	public float getPixelsPerByte(){
 		return pixelsPerByte.get();
 	}
 	@Override
-	protected void pixelsPerByteChange(int newPixelsPerByte){
+	protected void pixelsPerByteChange(float newPixelsPerByte){
 		pixelsPerByte.set(newPixelsPerByte);
 	}
 	
