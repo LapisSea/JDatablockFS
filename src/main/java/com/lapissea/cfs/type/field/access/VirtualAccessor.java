@@ -1,46 +1,41 @@
 package com.lapissea.cfs.type.field.access;
 
+import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
 import com.lapissea.util.Nullable;
-import com.lapissea.util.function.TriConsumer;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Optional;
-import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends AbstractFieldAccessor<CTyp>{
 	
-	private static final BiFunction<IOInstance<?>, VirtualAccessor<?>, Object>  GETTER;
-	private static final TriConsumer<IOInstance<?>, VirtualAccessor<?>, Object> SETTER;
+	private static final Function<IOInstance<?>, Struct.Pool<?>> GETTER;
 	
 	@SuppressWarnings("unchecked")
-	private static <T> T sneakyGet(String name){
+	private static <T extends IOInstance<T>> Struct.Pool<T> getVirtualPool(T instance){return (Struct.Pool<T>)GETTER.apply(instance);}
+	
+	static{
 		try{
-			var fun=IOInstance.class.getDeclaredMethod(name);
-			fun.setAccessible(true);
-			return (T)fun.invoke(null);
+			var fun=IOInstance.class.getDeclaredMethod("getVirtualPool");
+			GETTER=Utils.makeLambda(fun, Function.class);
 		}catch(ReflectiveOperationException e){
 			throw new RuntimeException(e);
 		}
 	}
 	
-	static{
-		GETTER=sneakyGet("getVirtualRef");
-		SETTER=sneakyGet("setVirtualRef");
-	}
-	
 	private final VirtualFieldDefinition<CTyp, Object> type;
 	private final int                                  accessIndex;
 	private       List<FieldAccessor<CTyp>>            deps;
-	private       Object[]                             ioPool;
+	private       Struct.Pool<CTyp>                    ioPool;
 	
 	public VirtualAccessor(Struct<CTyp> struct, VirtualFieldDefinition<CTyp, Object> type, int accessIndex){
 		super(struct, type.getName());
@@ -51,7 +46,7 @@ public class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends AbstractFiel
 	public void popIoPool(){
 		ioPool=null;
 	}
-	public void pushIoPool(Object[] ioPool){
+	public void pushIoPool(Struct.Pool<CTyp> ioPool){
 		this.ioPool=ioPool;
 	}
 	
@@ -97,10 +92,10 @@ public class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends AbstractFiel
 	@Override
 	public Object get(CTyp instance){
 		var rawVal=switch(getStoragePool()){
-			case INSTANCE -> GETTER.apply(instance, this);
+			case INSTANCE -> getVirtualPool(instance).get(this);
 			case IO -> {
 				if(ioPool==null) yield null;
-				yield ioPool[getAccessIndex()];
+				yield ioPool.get(this);
 			}
 			case NONE -> null;
 		};
@@ -113,15 +108,15 @@ public class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends AbstractFiel
 	@Override
 	public void set(CTyp instance, Object value){
 		switch(getStoragePool()){
-		case INSTANCE -> SETTER.accept(instance, this, value);
-		case IO -> {
-			if(ioPool!=null){
-				ioPool[getAccessIndex()]=value;
-			}else{
-				throw new IllegalStateException(this+" is an IO pool accessor. IO pool must be bound before setting");
+			case INSTANCE -> getVirtualPool(instance).set(this, value);
+			case IO -> {
+				if(ioPool!=null){
+					ioPool.set(this, value);
+				}else{
+					throw new IllegalStateException(this+" is an IO pool accessor. IO pool must be bound before setting");
+				}
 			}
-		}
-		case NONE -> {}
+			case NONE -> {}
 		}
 		
 	}

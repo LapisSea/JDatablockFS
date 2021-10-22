@@ -107,7 +107,7 @@ public class FixedContiguousStructPipe<T extends IOInstance<T>> extends StructPi
 	
 	@Override
 	protected void doWrite(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
-		Object[] ioPool=makeIOPool();
+		var ioPool=makeIOPool();
 		try{
 			pushPool(ioPool);
 			setMax(instance);
@@ -119,7 +119,7 @@ public class FixedContiguousStructPipe<T extends IOInstance<T>> extends StructPi
 	
 	@Override
 	protected T doRead(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		Object[] ioPool=makeIOPool();
+		var ioPool=makeIOPool();
 		try{
 			pushPool(ioPool);
 			setMax(instance);

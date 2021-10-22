@@ -6,14 +6,11 @@ import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.field.IOField;
-import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
-import com.lapissea.util.function.TriConsumer;
 
 import java.io.IOException;
 import java.util.Objects;
-import java.util.function.BiFunction;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.*;
@@ -115,8 +112,8 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 		}
 	}
 	
-	private final Struct<SELF> thisStruct;
-	private final Object[]     virtualFields;
+	private final Struct<SELF>      thisStruct;
+	private final Struct.Pool<SELF> virtualFields;
 	
 	@SuppressWarnings("unchecked")
 	public IOInstance(){
@@ -138,27 +135,7 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 		return thisStruct;
 	}
 	
-	private void protectAccessor(VirtualAccessor<SELF> accessor){
-		if(DEBUG_VALIDATION){
-			if(accessor.getDeclaringStruct()!=getThisStruct()){
-				throw new IllegalArgumentException(accessor.getDeclaringStruct()+" != "+getThisStruct());
-			}
-		}
-	}
-	
-	private static <T extends IOInstance<T>> BiFunction<IOInstance<T>, VirtualAccessor<T>, Object> getVirtualRef() {return IOInstance::getVirtual;}
-	private static <T extends IOInstance<T>> TriConsumer<IOInstance<T>, VirtualAccessor<T>, Object> setVirtualRef(){return IOInstance::setVirtual;}
-	
-	private Object getVirtual(VirtualAccessor<SELF> accessor){
-		protectAccessor(accessor);
-		int index=accessor.getAccessIndex();
-		return virtualFields[index];
-	}
-	private void setVirtual(VirtualAccessor<SELF> accessor, Object value){
-		protectAccessor(accessor);
-		int index=accessor.getAccessIndex();
-		virtualFields[index]=value;
-	}
+	private Struct.Pool<SELF> getVirtualPool(){return virtualFields;}
 	
 	@SuppressWarnings("unchecked")
 	protected final SELF self(){return (SELF)this;}

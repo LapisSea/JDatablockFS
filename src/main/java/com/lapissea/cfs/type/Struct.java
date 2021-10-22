@@ -28,7 +28,48 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+import static com.lapissea.cfs.GlobalConfig.*;
+
 public class Struct<T extends IOInstance<T>>{
+	
+	public interface Pool<T extends IOInstance<T>>{
+		
+		class StructArray<T extends IOInstance<T>> implements Pool<T>{
+			
+			private final Struct<T> typ;
+			private final Object[]  pool;
+			public StructArray(Struct<T> typ, VirtualFieldDefinition.StoragePool pool){
+				this.typ=typ;
+				if(pool==VirtualFieldDefinition.StoragePool.NONE) throw new IllegalArgumentException();
+				var count=typ.poolSizes[pool.ordinal()];
+				this.pool=count==0?null:new Object[count];
+			}
+			
+			@Override
+			public void set(VirtualAccessor<T> accessor, Object value){
+				protectAccessor(accessor);
+				int index=accessor.getAccessIndex();
+				pool[index]=value;
+			}
+			@Override
+			public Object get(VirtualAccessor<T> accessor){
+				protectAccessor(accessor);
+				int index=accessor.getAccessIndex();
+				return pool[index];
+			}
+			
+			private void protectAccessor(VirtualAccessor<T> accessor){
+				if(DEBUG_VALIDATION){
+					if(accessor.getDeclaringStruct()!=typ){
+						throw new IllegalArgumentException(accessor.getDeclaringStruct()+" != "+typ);
+					}
+				}
+			}
+		}
+		
+		void set(VirtualAccessor<T> accessor, Object value);
+		Object get(VirtualAccessor<T> accessor);
+	}
 	
 	public static class Unmanaged<T extends IOInstance.Unmanaged<T>> extends Struct<T>{
 		
@@ -271,10 +312,8 @@ public class Struct<T extends IOInstance<T>>{
 	}
 	
 	@Nullable
-	public Object[] allocVirtualVarPool(VirtualFieldDefinition.StoragePool pool){
-		if(pool==VirtualFieldDefinition.StoragePool.NONE) throw new IllegalArgumentException();
-		var count=poolSizes[pool.ordinal()];
-		return count==0?null:new Object[count];
+	public Pool<T> allocVirtualVarPool(VirtualFieldDefinition.StoragePool pool){
+		return new Pool.StructArray<>(this, pool);
 	}
 	
 	public GenericContext describeGenerics(TypeDefinition def){

@@ -39,7 +39,7 @@ public class ContiguousStructPipe<T extends IOInstance<T>> extends StructPipe<T>
 	
 	@Override
 	protected void doWrite(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
-		Object[] ioPool=makeIOPool();
+		var ioPool=makeIOPool();
 		try{
 			pushPool(ioPool);
 			writeIOFields(provider, dest, instance);
@@ -50,7 +50,7 @@ public class ContiguousStructPipe<T extends IOInstance<T>> extends StructPipe<T>
 	
 	@Override
 	protected T doRead(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		Object[] ioPool=makeIOPool();
+		var ioPool=makeIOPool();
 		try{
 			pushPool(ioPool);
 			readIOFields(provider, src, instance, genericContext);

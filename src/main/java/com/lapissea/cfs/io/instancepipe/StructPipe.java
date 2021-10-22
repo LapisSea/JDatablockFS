@@ -271,7 +271,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	public void writeSingleField(ChunkDataProvider provider, RandomIO dest, IOField<T, ?> selectedField, T instance) throws IOException{
 		temp_disableDependencyFields(selectedField);
 		
-		Object[] ioPool=makeIOPool();
+		var ioPool=makeIOPool();
 		try{
 			pushPool(ioPool);
 			
@@ -319,7 +319,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	public void readSingleField(ChunkDataProvider provider, ContentReader src, IOField<T, ?> selectedField, T instance, GenericContext genericContext) throws IOException{
 		temp_disableDependencyFields(selectedField);
 		
-		Object[] ioPool=makeIOPool();
+		var ioPool=makeIOPool();
 		try{
 			pushPool(ioPool);
 			
@@ -377,7 +377,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		}
 	}
 	
-	protected void pushPool(Object[] ioPool){
+	protected void pushPool(Struct.Pool<T> ioPool){
 		var acc=getIoPoolAccessors();
 		if(acc==null) return;
 		for(var a : acc){
@@ -392,7 +392,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		}
 	}
 	
-	protected Object[] makeIOPool(){
+	protected Struct.Pool<T> makeIOPool(){
 		return getType().allocVirtualVarPool(VirtualFieldDefinition.StoragePool.IO);
 	}
 	
