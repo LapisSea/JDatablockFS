@@ -1,7 +1,9 @@
 package com.lapissea.cfs.chunk;
 
 import com.lapissea.cfs.IterablePP;
+import com.lapissea.util.UtilL;
 
+import java.io.IOException;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
@@ -9,7 +11,9 @@ public class ChainWalker implements IterablePP<Chunk>{
 	
 	private static class ChainIter implements Iterator<Chunk>{
 		
-		private Chunk chunk;
+		private Chunk       chunk;
+		private IOException e;
+		
 		public ChainIter(Chunk chunk){
 			this.chunk=chunk;
 		}
@@ -20,9 +24,16 @@ public class ChainWalker implements IterablePP<Chunk>{
 		}
 		@Override
 		public Chunk next(){
+			if(e!=null){
+				throw UtilL.uncheckedThrow(e);
+			}
 			var c=chunk;
 			if(c==null) throw new NoSuchElementException();
-			chunk=c.nextUnsafe();
+			try{
+				chunk=c.next();
+			}catch(IOException e){
+				this.e=e;
+			}
 			return c;
 		}
 	}

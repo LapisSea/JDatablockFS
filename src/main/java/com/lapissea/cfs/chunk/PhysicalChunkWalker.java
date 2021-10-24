@@ -1,6 +1,7 @@
 package com.lapissea.cfs.chunk;
 
 import com.lapissea.cfs.IterablePP;
+import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.util.Iterator;
@@ -9,7 +10,9 @@ public class PhysicalChunkWalker implements IterablePP<Chunk>{
 	
 	private static class ChainIter implements Iterator<Chunk>{
 		
-		private Chunk chunk;
+		private Chunk       chunk;
+		private IOException e;
+		
 		public ChainIter(Chunk chunk){
 			this.chunk=chunk;
 		}
@@ -20,18 +23,22 @@ public class PhysicalChunkWalker implements IterablePP<Chunk>{
 		}
 		@Override
 		public Chunk next(){
+			if(e!=null){
+				throw UtilL.uncheckedThrow(e);
+			}
+			
 			Chunk c=chunk;
 			if(c==null) return null;
 			try{
 				chunk=c.nextPhysical();
 			}catch(IOException e){
-				throw new RuntimeException(e);
+				this.e=e;
 			}
 			return c;
 		}
 	}
 	
-	private Chunk start;
+	private final Chunk start;
 	public PhysicalChunkWalker(Chunk start){
 		this.start=start;
 	}
