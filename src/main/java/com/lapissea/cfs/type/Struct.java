@@ -341,6 +341,6 @@ public class Struct<T extends IOInstance<T>>{
 	
 	@Override
 	public int hashCode(){
-		return type.hashCode();
+		return type.getName().hashCode();
 	}
 }

@@ -47,29 +47,42 @@ public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanaged
 		readManagedFields();
 	}
 	
+	private static <T extends IOInstance<T>> IOField<ContiguousIOList<T>, ?> eField(Type elementType, long sizePerElement, long index){
+		return new IOField.Ref.NoIO<ContiguousIOList<T>, T>(new AbstractFieldAccessor<>(null, "ArrayElement["+index+"]"){
+			@Override
+			public Type getGenericType(GenericContext genericContext){
+				return elementType;
+			}
+			
+			@Override
+			public T get(ContiguousIOList<T> instance){
+				return instance.getUnsafe(index);
+			}
+			@Override
+			public void set(ContiguousIOList<T> instance, Object value){
+				try{
+					instance.set(index, (T)value);
+				}catch(IOException e){
+					throw new RuntimeException(e);
+				}
+			}
+		}, SizeDescriptor.Fixed.of(sizePerElement)){
+			@Override
+			public Reference getReference(ContiguousIOList<T> instance){
+				return instance.getReference().addOffset(instance.calcElementOffset(index));
+			}
+			@Override
+			public StructPipe<T> getReferencedPipe(ContiguousIOList<T> instance){
+				return instance.elementPipe;
+			}
+		};
+	}
+	
 	@Override
 	public Stream<IOField<ContiguousIOList<T>, ?>> listUnmanagedFields(){
-		SizeDescriptor<ContiguousIOList<T>> descriptor=new SizeDescriptor.Fixed<>(sizePerElement);
-		return LongStream.range(0, size()).mapToObj(index->{
-			return new IOField.NoIO<>(new AbstractFieldAccessor<>(null, "ArrayElement["+index+"]"){
-				@Override
-				public Type getGenericType(GenericContext genericContext){
-					return getTypeDef().arg(0).generic();
-				}
-				@Override
-				public Object get(ContiguousIOList<T> instance){
-					return ContiguousIOList.this.getUnsafe(index);
-				}
-				@Override
-				public void set(ContiguousIOList<T> instance, Object value){
-					try{
-						ContiguousIOList.this.set(index, (T)value);
-					}catch(IOException e){
-						throw new RuntimeException(e);
-					}
-				}
-			}, descriptor);
-		});
+		var typ=getTypeDef().arg(0).generic();
+		var siz=sizePerElement;
+		return LongStream.range(0, size()).mapToObj(index->eField(typ, siz, index));
 	}
 	
 	private long calcElementOffset(long index){
@@ -78,7 +91,7 @@ public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanaged
 	}
 	private void writeAt(long index, T value) throws IOException{
 		try(var io=selfIO()){
-			var pos    =calcElementOffset(index);
+			var pos=calcElementOffset(index);
 			io.skipExact(pos);
 			
 			elementPipe.write(this, io, value);

@@ -354,10 +354,15 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		if(this==o) return true;
 		if(!(o instanceof IOField<?, ?> ioField)) return false;
 		
-		return getAccessor()!=null?getAccessor().equals(ioField.getAccessor()):ioField.getAccessor()==null;
+		var acc=getAccessor();
+		if(acc==null){
+			if(ioField.getAccessor()!=null) return false;
+			return getName().equals(ioField.getName());
+		}
+		return acc.equals(ioField.getAccessor());
 	}
 	@Override
 	public int hashCode(){
-		return getAccessor()!=null?getAccessor().hashCode():0;
+		return getAccessor()!=null?getAccessor().hashCode():getName().hashCode();
 	}
 }
