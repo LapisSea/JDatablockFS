@@ -2,6 +2,7 @@ package com.lapissea.cfs.tools;
 
 
 import com.lapissea.cfs.chunk.*;
+import com.lapissea.cfs.exceptions.MalformedPointerException;
 import com.lapissea.cfs.io.ChunkChainIO;
 import com.lapissea.cfs.io.bit.FlagReader;
 import com.lapissea.cfs.io.impl.MemoryData;
@@ -18,6 +19,7 @@ import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.cfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.util.LogUtil;
+import com.lapissea.util.MathUtil;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 import org.joml.SimplexNoise;
@@ -36,6 +38,12 @@ import java.util.stream.Stream;
 
 @SuppressWarnings({"UnnecessaryLocalVariable", "SameParameterValue"})
 public abstract class BinaryDrawing{
+	
+	enum ErrorLogLevel{
+		NAME,
+		STACK,
+		NAMED_STACK
+	}
 	
 	public enum DrawMode{
 		QUADS
@@ -144,6 +152,14 @@ public abstract class BinaryDrawing{
 	private float   lineWidth;
 	private long    renderCount;
 	
+	private final ErrorLogLevel errorLogLevel=UtilL.sysPropertyByClass(BinaryDrawing.class, "errorLogLevel").map(String::toUpperCase).map(v->{
+		try{
+			return ErrorLogLevel.valueOf(v);
+		}catch(IllegalArgumentException e){
+			return ErrorLogLevel.NAMED_STACK;
+		}
+	}).orElse(ErrorLogLevel.NAMED_STACK);
+	
 	
 	protected abstract BulkDraw bulkDraw(DrawMode mode);
 	
@@ -185,6 +201,9 @@ public abstract class BinaryDrawing{
 	protected abstract void outlineString(String str, float x, float y);
 	protected abstract void fillString(String str, float x, float y);
 	protected abstract boolean canFontDisplay(char c);
+	private boolean canFontDisplay(int code){
+		return canFontDisplay((char)code);
+	}
 	
 	protected abstract int getFrameCount();
 	protected abstract CachedFrame getFrame(int index);
@@ -295,10 +314,10 @@ public abstract class BinaryDrawing{
 			}
 			if(lastRange!=null) pointerRecord.accept(new Pointer((int)lastRange.to()-1, (int)range.from(), 0, col, field.toString(), 0.2F));
 			lastRange=range;
-			fillByteRange(alpha(col, 0.3F), ctx, range);
+			fillByteRange(alpha(mul(col, 0.8F), 0.4F), ctx, range);
 		}
 		
-		setColor(alpha(col, 0.7F));
+		setColor(alpha(mix(col, Color.WHITE, 0.2F), 0.7F));
 		var str =field.instanceToString(instance, true);
 		var fStr=field.toShortString();
 		if(field instanceof IOField.Ref refField){
@@ -317,7 +336,7 @@ public abstract class BinaryDrawing{
 			popMatrix();
 			fontScale=font;
 			
-			drawStringIn((str==null?"":str), bestRange.toRect(ctx), false);
+			drawStringIn((str==null?"":str), bestRange.toRect(ctx), true);
 		}else{
 			drawStringIn(both, bestRange.toRect(ctx), true);
 		}
@@ -354,7 +373,7 @@ public abstract class BinaryDrawing{
 	}
 	
 	private Color chunkBaseColor(Chunk chunk){
-		return Color.BLACK;
+		return Color.GRAY;
 //		return chunk.isUsed()?chunk.isUserData()?Color.blue.brighter():Color.GREEN:Color.CYAN;
 	}
 	
@@ -364,15 +383,16 @@ public abstract class BinaryDrawing{
 		var dataColor =mul(chunkColor, 0.5F);
 		var freeColor =alpha(chunkColor, 0.4F);
 		
-		chunkColor=filter.apply(chunkColor);
+		chunkColor=filter.apply(alpha(chunkColor, 0.6F));
 		dataColor=filter.apply(dataColor);
 		freeColor=filter.apply(freeColor);
 		
 		drawByte.draw(()->IntStream.range((int)chunk.getPtr().getValue(), (int)chunk.dataStart()), chunkColor, false, false);
-		int from=(int)chunk.dataStart();
-		int to  =(int)(chunk.dataStart()+chunk.getCapacity());
-		drawByte.draw(()->IntStream.range(from, to).filter(i->i>=chunk.getSize()), freeColor, withChar, force);
-		drawByte.draw(()->IntStream.range(from, to).filter(i->i<chunk.getSize()), dataColor, withChar, force);
+		int start=(int)chunk.dataStart();
+		int cap  =(int)chunk.getCapacity();
+		int siz  =(int)chunk.getSize();
+		drawByte.draw(()->IntStream.range(0, cap).filter(i->i>=siz).map(i->i+start), freeColor, withChar, force);
+		drawByte.draw(()->IntStream.range(0, cap).filter(i->i<siz).map(i->i+start), dataColor, withChar, force);
 	}
 	
 	private void fillBit(float x, float y, int index, float xOff, float yOff){
@@ -454,6 +474,7 @@ public abstract class BinaryDrawing{
 			}
 		}
 		
+		fillString(s, 0, 0);
 		if(doStroke){
 			Color c=readColor();
 			
@@ -464,7 +485,6 @@ public abstract class BinaryDrawing{
 			
 			setColor(c);
 		}
-		fillString(s, 0, 0);
 		
 		this.fontScale=fontScale;
 		popMatrix();
@@ -500,9 +520,11 @@ public abstract class BinaryDrawing{
 	private void handleError(Throwable e, ParsedFrame parsed){
 		if(errorMode){
 			if(parsed.displayError==null) parsed.displayError=e;
-//			LogUtil.println(e);
-//			e.printStackTrace();
-//			new RuntimeException("Failed to process frame "+getFramePos(), e).printStackTrace();
+			switch(errorLogLevel){
+				case NAME -> LogUtil.printlnEr(e);
+				case STACK -> e.printStackTrace();
+				case NAMED_STACK -> new RuntimeException("Failed to process frame "+getFramePos(), e).printStackTrace();
+			}
 		}else throw UtilL.uncheckedThrow(e);
 	}
 	
@@ -558,8 +580,8 @@ public abstract class BinaryDrawing{
 		
 		setColor(Color.BLUE);
 		IntPredicate isValidMagicByte=i->bytes.length>i&&magic.get(i)==bytes[i];
-		drawByte(bytes, filled, ctx, ()->IntStream.range(0, magic.limit()).filter(isValidMagicByte), Color.BLUE, false, true);
-		drawByte(bytes, filled, ctx, ()->IntStream.range(0, magic.limit()).filter(isValidMagicByte.negate()), Color.RED, false, true);
+		drawBytes(bytes, filled, ctx, ()->IntStream.range(0, magic.limit()).filter(isValidMagicByte), Color.BLUE, false, true);
+		drawBytes(bytes, filled, ctx, ()->IntStream.range(0, magic.limit()).filter(isValidMagicByte.negate()), Color.RED, false, true);
 		
 		setStroke(2F);
 		outlineByteRange(Color.WHITE, ctx, new Range(0, magic.limit()));
@@ -605,14 +627,21 @@ public abstract class BinaryDrawing{
 
 //				LogUtil.printTable("instance", "");
 				
-				DrawB drawByte=(stream, color, withChar, force)->drawByte(bytes, filled, ctx, stream, color, withChar, force);
-				for(Chunk chunk : new PhysicalChunkWalker(cluster.getFirstChunk())){
-					if(referenced.contains(chunk)){
-						fillChunk(drawByte, chunk, ch->ch, true, true);
-					}
-					annotateStruct(ctx, cluster, new LinkedList<>(), chunk, null, Chunk.PIPE, ptrs::add);
-					if(chunk.dataEnd()>bytes.length){
-						drawByte(bytes, filled, ctx, ()->IntStream.range(bytes.length, (int)chunk.dataEnd()), new Color(0, 0, 0, 0.2F), false, true);
+				DrawB drawByte=(stream, color, withChar, force)->drawBytes(bytes, filled, ctx, stream, color, withChar, force);
+				long  pos     =cluster.getFirstChunk().getPtr().getValue();
+				while(pos<bytes.length){
+					try{
+						for(Chunk chunk : new PhysicalChunkWalker(cluster.getChunk(ChunkPointer.of(pos)))){
+							pos=chunk.dataEnd();
+							if(referenced.contains(chunk)){
+								fillChunk(drawByte, chunk, ch->ch, true, true);
+							}
+							fillChunk(bytes, filled, ctx, ptrs, cluster, chunk);
+						}
+					}catch(MalformedPointerException e){
+						var p=(int)pos;
+						drawBytes(bytes, filled, ctx, ()->IntStream.of(p), Color.RED, true, true);
+						pos++;
 					}
 				}
 				
@@ -624,8 +653,23 @@ public abstract class BinaryDrawing{
 			}else{
 				provider=ChunkDataProvider.newVerySimpleProvider(MemoryData.build().withRaw(bytes).build());
 				
-				for(Chunk chunk : new PhysicalChunkWalker(provider.getFirstChunk())){
-					annotateStruct(ctx, provider, new LinkedList<>(), chunk, null, Chunk.PIPE, ptrs::add);
+				long pos;
+				try{
+					pos=provider.getFirstChunk().getPtr().getValue();
+				}catch(Throwable e){
+					pos=magic.limit();
+				}
+				while(pos<bytes.length){
+					try{
+						for(Chunk chunk : new PhysicalChunkWalker(provider.getChunk(ChunkPointer.of(pos)))){
+							pos=chunk.dataEnd();
+							fillChunk(bytes, filled, ctx, ptrs, provider, chunk);
+						}
+					}catch(MalformedPointerException e){
+						var p=(int)pos;
+						drawBytes(bytes, filled, ctx, ()->IntStream.of(p), Color.RED, true, true);
+						pos++;
+					}
 				}
 				
 			}
@@ -640,7 +684,7 @@ public abstract class BinaryDrawing{
 			}
 		}
 		
-		drawByte(bytes, filled, ctx, ()->IntStream.range(0, bytes.length).filter(((IntPredicate)filled::get).negate()), alpha(Color.GRAY, 0.5F), true, false);
+		drawBytes(bytes, filled, ctx, ()->IntStream.range(0, bytes.length).filter(((IntPredicate)filled::get).negate()), alpha(Color.GRAY, 0.5F), true, false);
 		
 		findHoverChunk(ctx, parsed, provider);
 		
@@ -655,12 +699,18 @@ public abstract class BinaryDrawing{
 		
 		drawTimeline(frameIndex);
 	}
-	private void drawByte(byte[] bytes, BitSet filled, RenderContext ctx, Supplier<IntStream> stream, Color color, boolean withChar, boolean force){
+	
+	private void fillChunk(byte[] bytes, BitSet filled, RenderContext ctx, List<Pointer> ptrs, ChunkDataProvider provider, Chunk chunk) throws IOException{
+		annotateStruct(ctx, provider, new LinkedList<>(), chunk, null, Chunk.PIPE, ptrs::add);
+		if(chunk.dataEnd()>bytes.length){
+			drawBytes(bytes, filled, ctx, ()->IntStream.range(bytes.length, (int)chunk.dataEnd()), new Color(0, 0, 0, 0.2F), false, true);
+		}
+	}
+	
+	private void drawBytes(byte[] bytes, BitSet filled, RenderContext ctx, Supplier<IntStream> stream, Color color, boolean withChar, boolean force){
 		Supplier<IntStream> ints=()->stream.get().filter(i->{
 			if(i<bytes.length){
-				if(!force&&filled.get(i)){
-					return false;
-				}
+				return force||!filled.get(i);
 			}
 			return true;
 		});
@@ -710,14 +760,11 @@ public abstract class BinaryDrawing{
 		
 		if(withChar){
 			setColor(new Color(1, 1, 1, bitColor.getAlpha()/255F*0.6F));
-			ints.get().filter(i->i<bytes.length).forEach(i->{
-				char c=(char)bytes[i];
-				if(!canFontDisplay(c)) return;
-				
+			ints.get().filter(i->i<bytes.length).filter(i->canFontDisplay(bytes[i])).forEach(i->{
 				int   xi=i%ctx.width(), yi=i/ctx.width();
 				float xF=ctx.pixelsPerByte()*xi, yF=ctx.pixelsPerByte()*yi;
 				
-				drawStringIn(Character.toString(c), new Rect(xF, yF, ctx.pixelsPerByte(), ctx.pixelsPerByte()), true);
+				drawStringIn(Character.toString((char)bytes[i]), new Rect(xF, yF, ctx.pixelsPerByte(), ctx.pixelsPerByte()), true);
 			});
 		}
 		
@@ -726,7 +773,7 @@ public abstract class BinaryDrawing{
 	private void drawBackgroundDots(){
 		setColor(errorMode?Color.RED.darker():Color.LIGHT_GRAY);
 		
-		try(var bulkDraw=bulkDraw(DrawMode.QUADS)){
+		try(var ignored=bulkDraw(DrawMode.QUADS)){
 			float jiter       =2;
 			int   step        =10;
 			float randX       =renderCount/6f;
@@ -976,7 +1023,7 @@ public abstract class BinaryDrawing{
 			if(stack.contains(frame)) return;
 			stack.add(frame);
 			
-			var typeHash=instance.getThisStruct().getType().getName().hashCode()&0xffffffffL;
+			var typeHash=instance.getThisStruct().getType().getName().hashCode();
 			
 			Random rand=new Random();
 			setStroke(4);
@@ -985,9 +1032,8 @@ public abstract class BinaryDrawing{
 			
 			while(iterator.hasNext()){
 				IOField<T, Object> field=iterator.next();
-				rand.setSeed((((long)field.getName().hashCode())<<32)|typeHash);
 				
-				var col=new Color(Color.HSBtoRGB(rand.nextFloat(), rand.nextFloat()/0.4F+0.6F, 1F));
+				var col=makeCol(rand, typeHash, field);
 				
 				final long size;
 				long       offsetStart;
@@ -1024,29 +1070,34 @@ public abstract class BinaryDrawing{
 						IOField.Ref<T, T> refField=(IOField.Ref<T, T>)refO;
 						var               ref     =refField.getReference(instance);
 						if(!ref.isNull()){
-							pointerRecord.accept(new Pointer((int)trueOffset, (int)ref.calcGlobalOffset(cluster), (int)size, col, refField.toString(), 1));
+							var from=(int)trueOffset;
+							var to  =(int)ref.calcGlobalOffset(cluster);
+							if(from!=to){
+								pointerRecord.accept(new Pointer(from, to, (int)size, col, refField.toString(), 1));
+							}
 						}
 						annotateByteField(cluster, ctx, pointerRecord, instance, field, col, reference, Range.fromSize(fieldOffset, size));
 						
 						annotateStruct(ctx, cluster, stack, refField.get(instance), ref, refField.getReferencedPipe(instance), pointerRecord);
-					}else if(field instanceof BitFieldMerger<T> merger){
+						continue;
+					}
+					if(field instanceof BitFieldMerger<T> merger){
 						int bitOffset=0;
 						for(IOField.Bit<T, ?> bit : merger.getGroup()){
-							rand.setSeed((((long)bit.getName().hashCode())<<32)|typeHash);
 							
-							col=new Color(
-								Color.HSBtoRGB(
-									rand.nextFloat(),
-									rand.nextFloat()/0.4F+0.6F,
-									1F
-								)
-							);
-							var siz=bit.getSizeDescriptor().calcUnknown(instance);
+							var bCol=makeCol(rand, typeHash, bit);
+							var siz =bit.getSizeDescriptor().calcUnknown(instance);
 							
-							annotateBitField(cluster, ctx, instance, bit, col, bitOffset, siz, reference, fieldOffset);
+							annotateBitField(cluster, ctx, instance, bit, bCol, bitOffset, siz, reference, fieldOffset);
 							bitOffset+=siz;
 						}
-					}else if(UtilL.instanceOf(field.getAccessor().getType(), ChunkPointer.class)){
+						continue;
+					}
+					if(acc==null){
+						throw new RuntimeException("unknown field "+field);
+					}
+					
+					if(UtilL.instanceOf(acc.getType(), ChunkPointer.class)){
 						
 						var ch=(ChunkPointer)field.get(instance);
 						
@@ -1062,7 +1113,7 @@ public abstract class BinaryDrawing{
 							}
 							pointerRecord.accept(new Pointer((int)trueOffset, ch.getValueInt(), (int)size, col, msg, 0.8F));
 						}
-					}else if(IOFieldPrimitive.isPrimitive(field.getAccessor().getType())||Stream.of(INumber.class, Enum.class).anyMatch(c->UtilL.instanceOf(field.getAccessor().getType(), c))){
+					}else if(IOFieldPrimitive.isPrimitive(acc.getType())||Stream.of(INumber.class, Enum.class).anyMatch(c->UtilL.instanceOf(acc.getType(), c))){
 						setColor(col);
 						if(sizeDesc.getWordSpace()==WordSpace.BIT){
 							annotateBitField(cluster, ctx, instance, field, col, 0, size, reference, fieldOffset);
@@ -1070,7 +1121,7 @@ public abstract class BinaryDrawing{
 							annotateByteField(cluster, ctx, pointerRecord, instance, field, col, reference, Range.fromSize(fieldOffset, size));
 						}
 					}else{
-						var typ=field.getAccessor().getType();
+						var typ=acc.getType();
 						if(UtilL.instanceOf(typ, IOInstance.class)){
 							var inst=(IOInstance<?>)field.get(instance);
 							if(inst!=null){
@@ -1089,20 +1140,49 @@ public abstract class BinaryDrawing{
 				}
 			}
 		}finally{
-//			if(!(instance instanceof Chunk)&&reference.getOffset()==0){
-//				var siz=reference.getPtr().dereference(cluster).io().getSize();
-//				if(siz!=fieldOffset){
-//					pipe.getSizeDescriptor().calcUnknown(instance);
-//					LogUtil.printTable(
-//						"instance", instance.toString(),
-//						"reference", reference,
-//						"siz", siz,
-//						"fieldOffset", fieldOffset);
-//				}
-//			}
-			
 			stack.remove(frame);
 		}
+	}
+	private Color makeCol(Random rand, int typeHash, IOField<?, ?> field){
+		
+		rand.setSeed(typeHash);
+		float typeHue=calcHue(rand);
+		
+		rand.setSeed(field.getName().hashCode());
+		float fieldHue=calcHue(rand);
+		
+		float mix=0.4F;
+//		var   hue=typeHue;
+		var hue=typeHue*mix+fieldHue*(1-mix);
+		
+		float brightness=1;
+		float saturation=calcSaturation(rand);
+		
+		return new Color(Color.HSBtoRGB(hue, saturation, brightness));
+	}
+	
+	private float calcSaturation(Random rand){
+		float saturation;
+//		saturation=0.8F;
+		saturation=rand.nextFloat()*0.4F+0.6F;
+		return saturation;
+	}
+	
+	private float calcHue(Random rand){
+		float[] hues={
+			0.1F,
+			1,
+			2
+		};
+		
+		float hueStep=hues[rand.nextInt(hues.length)]/3F;
+		
+		float hueOffset=MathUtil.sq(rand.nextFloat());
+		if(rand.nextBoolean()) hueOffset*=-1;
+		hueOffset/=600;
+//		LogUtil.printTable("col", hueStep, "off", hueOffset);
+		var hue=hueStep+hueOffset;
+		return hue;
 	}
 	
 	@SuppressWarnings("unchecked")

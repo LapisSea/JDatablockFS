@@ -170,7 +170,7 @@ public class AtlasFont extends GLFont{
 		texture.bind(GL_TEXTURE_2D);
 		glEnable(GL_TEXTURE_2D);
 		
-		try(var apply=bulkHook.apply(BinaryDrawing.DrawMode.QUADS)){
+		try(var ignored=bulkHook.apply(BinaryDrawing.DrawMode.QUADS)){
 			for(int i=0;i<string.length();i++){
 				char c    =string.charAt(i);
 				var  glyph=atlas.getGlyph(c);

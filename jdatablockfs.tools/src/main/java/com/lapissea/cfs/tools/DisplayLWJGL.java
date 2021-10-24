@@ -76,20 +76,26 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	}
 	
 	protected class BulkDrawGL extends BulkDraw{
-		
+		boolean active;
 		public BulkDrawGL(DrawMode mode){
 			super(mode);
 		}
 		@Override
 		protected void start(DrawMode mode){
-			if(isBulkDrawing()) GL11.glEnd();
-			GL11.glBegin(switch(mode){
-				case QUADS -> GL11.GL_QUADS;
-			});
+			active=!isBulkDrawing();
+			if(active){
+				glErrorPrint();
+				GL11.glBegin(switch(mode){
+					case QUADS -> GL11.GL_QUADS;
+				});
+			}
 		}
 		@Override
 		protected void end(){
-			GL11.glEnd();
+			if(active){
+				GL11.glEnd();
+				glErrorPrint();
+			}
 		}
 	}
 	@Override
@@ -468,13 +474,11 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	@Override
 	protected void outlineString(String str, float x, float y){
 		font.outlineString(str, getFontScale(), x, y);
-		glErrorPrint();
 	}
 	
 	@Override
 	protected void fillString(String str, float x, float y){
 		font.fillString(str, getFontScale(), x, y);
-		glErrorPrint();
 	}
 	
 	@Override
@@ -564,7 +568,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 		int errorCode=GL11.glGetError();
 		if(errorCode==GL11.GL_NO_ERROR) return;
 		
-		new RuntimeException(switch(errorCode){
+		var err=switch(errorCode){
 			case GL11.GL_INVALID_ENUM -> "INVALID_ENUM";
 			case GL11.GL_INVALID_VALUE -> "INVALID_VALUE";
 			case GL11.GL_INVALID_OPERATION -> "INVALID_OPERATION";
@@ -573,7 +577,9 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			case GL11.GL_OUT_OF_MEMORY -> "OUT_OF_MEMORY";
 			case GL30.GL_INVALID_FRAMEBUFFER_OPERATION -> "INVALID_FRAMEBUFFER_OPERATION";
 			default -> "Unknown error"+errorCode;
-		}).printStackTrace();
+		};
+		
+		new RuntimeException(err).printStackTrace();
 	}
 	
 	@Override
