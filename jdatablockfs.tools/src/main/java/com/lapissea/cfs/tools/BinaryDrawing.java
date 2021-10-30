@@ -34,12 +34,14 @@ import java.util.function.Function;
 import java.util.function.IntPredicate;
 import java.util.function.Supplier;
 import java.util.stream.IntStream;
+import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
 @SuppressWarnings({"UnnecessaryLocalVariable", "SameParameterValue"})
 public abstract class BinaryDrawing{
 	
 	enum ErrorLogLevel{
+		NONE,
 		NAME,
 		STACK,
 		NAMED_STACK
@@ -102,7 +104,7 @@ public abstract class BinaryDrawing{
 		}
 	}
 	
-	private static record Pointer(int from, int to, int size, Color color, String message, float widthFactor){}
+	private static record Pointer(long from, long to, int size, Color color, String message, float widthFactor){}
 	
 	protected static final class ParsedFrame{
 		final int index;
@@ -317,22 +319,34 @@ public abstract class BinaryDrawing{
 				var contiguousRange=DrawUtils.findBestContiguousRange(ctx, range);
 				if(bestRange.size()<contiguousRange.size()) bestRange=contiguousRange;
 			}
-			if(lastRange!=null) pointerRecord.accept(new Pointer((int)lastRange.to()-1, (int)range.from(), 0, col, field.toString(), 0.2F));
+			if(lastRange!=null) pointerRecord.accept(new Pointer(lastRange.to()-1, range.from(), 0, col, field.toString(), 0.2F));
 			lastRange=range;
 			fillByteRange(alpha(mul(col, 0.8F), 0.4F), ctx, range);
 		}
 		
 		setColor(alpha(mix(col, Color.WHITE, 0.2F), 0.7F));
-		var str =field.instanceToString(instance, true);
+		
+		var rectWidth=bestRange.toRect(ctx).width;
+		
+		String str     =field.instanceToString(instance, false);
+		String shortStr=null;
+		String both;
+		
 		var fStr=field.toShortString();
 		if(field instanceof IOField.Ref refField){
 			//noinspection unchecked
 			var ref=refField.getReference(instance);
 			if(ref!=null&&!ref.isNull()) fStr+=" @ "+ref;
 		}
-		var both=fStr+(str==null?"":": "+str);
 		
-		if(getStringBounds(both).width()>bestRange.toRect(ctx).width){
+		both=fStr+(str==null?"":": "+str);
+		if(getStringBounds(both).width()>rectWidth){
+			shortStr=field.instanceToString(instance, true);
+			both=fStr+(shortStr==null?"":": "+shortStr);
+		}
+		
+		
+		if(getStringBounds(both).width()>rectWidth){
 			var font=fontScale;
 			pushMatrix();
 			initFont(0.4F);
@@ -341,7 +355,14 @@ public abstract class BinaryDrawing{
 			popMatrix();
 			fontScale=font;
 			
-			drawStringIn((str==null?"":str), bestRange.toRect(ctx), true);
+			var drawStr=str;
+			
+			if(getStringBounds(drawStr).width()>rectWidth){
+				if(shortStr==null) shortStr=field.instanceToString(instance, true);
+				drawStr=shortStr;
+			}
+			
+			drawStringIn((drawStr==null?"":drawStr), bestRange.toRect(ctx), true);
 		}else{
 			drawStringIn(both, bestRange.toRect(ctx), true);
 		}
@@ -349,13 +370,90 @@ public abstract class BinaryDrawing{
 		
 	}
 	
-	private void drawArrow(int width, int from, int to){
-		int xPosFrom=from%width, yPosFrom=from/width;
-		int xPosTo  =to%width, yPosTo=to/width;
+	private double[] deBoor(int k, int degree, int i, double x, double[] knots, double[][] ctrlPoints){
+		if(k==0){
+			i=Math.max(0, Math.min(ctrlPoints.length-1, i));
+			return ctrlPoints[i];
+		}else{
+			double   alpha=(x-knots[i])/(knots[i+degree+1-k]-knots[i]);
+			double[] p0   =deBoor(k-1, degree, i-1, x, knots, ctrlPoints);
+			double[] p1   =deBoor(k-1, degree, i, x, knots, ctrlPoints);
+			double[] p    =new double[2];
+			p[0]=p0[0]*(1-alpha)+p1[0]*alpha;
+			p[1]=p0[1]*(1-alpha)+p1[1]*alpha;
+			return p;
+		}
+	}
+	
+	private int WhichInterval(double x, double[] knot, int ti){
+		int index=-1;
 		
-		double xFrom=xPosFrom+0.5, yFrom=yPosFrom+0.5;
-		double xTo  =xPosTo+0.5, yTo=yPosTo+0.5;
+		for(int i=1;i<=ti-1;i++){
+			if(x<knot[i]){
+				index=i-1;
+				break;
+			}
+		}
+		if(x==knot[ti-1]){
+			index=ti-1;
+		}
+		return index;
+	}
+	
+	private double[] DeBoor(int _k, double[] T, double[][] handles, double t){
+		int i=WhichInterval(t, T, T.length);
+		return deBoor(_k, 3, i, t, T, handles);
+	}
+	
+	private void drawPath(double[][] handles, boolean arrow){
+		final int _k=3;
 		
+		var    tPoints=new double[_k+handles.length+1];
+		double d      =1.0/(tPoints.length-1);
+		for(int i=0;i<tPoints.length;i++){
+			tPoints[i]=i*d;
+		}
+		
+		
+		if(handles.length<2) return;
+		
+		try(var ignored=bulkDraw(DrawMode.QUADS)){
+			double[] lastPoint=null;
+			double   lastAngle=0;
+			double   delta    =1/64.0;
+			for(double t=tPoints[2];t<tPoints[5];t+=delta){
+				double[] newPoint=DeBoor(_k, tPoints, handles, t);
+				draw:
+				if(lastPoint!=null){
+					var angle=Math.atan2(lastPoint[0]-newPoint[0], lastPoint[1]-newPoint[1]);
+					if(angle<0) angle+=Math.PI;
+					var angleDiff=Math.abs(angle-lastAngle);
+					lastAngle=angle;
+					
+					var minAngle=0.1;
+					
+					if(angleDiff<minAngle/2){
+						delta=Math.min(1/32D, delta*3/2D);
+					}else if(angleDiff>minAngle){
+						t-=delta;
+						delta/=3/2D;
+						continue;
+					}
+					if(arrow){
+						var mid=(tPoints[5]+tPoints[2])/2;
+						if(t<mid&&(t+delta)>mid){
+							drawArrow(lastPoint[0], lastPoint[1], newPoint[0], newPoint[1]);
+							break draw;
+						}
+					}
+					drawLine(lastPoint[0], lastPoint[1], newPoint[0], newPoint[1]);
+				}
+				lastPoint=newPoint;
+			}
+		}
+	}
+	
+	private void drawArrow(double xFrom, double yFrom, double xTo, double yTo){
 		double xMid=(xFrom+xTo)/2, yMid=(yFrom+yTo)/2;
 		
 		double angle=Math.atan2(xTo-xFrom, yTo-yFrom);
@@ -370,9 +468,9 @@ public abstract class BinaryDrawing{
 		drawLine(xFrom, yFrom, xTo, yTo);
 	}
 	
-	private void drawLine(int width, int from, int to){
-		int xPosFrom=from%width, yPosFrom=from/width;
-		int xPosTo  =to%width, yPosTo=to/width;
+	private void drawLine(int width, long from, long to){
+		long xPosFrom=from%width, yPosFrom=from/width;
+		long xPosTo  =to%width, yPosTo=to/width;
 		
 		drawLine(xPosFrom+0.5, yPosFrom+0.5, xPosTo+0.5, yPosTo+0.5);
 	}
@@ -654,7 +752,7 @@ public abstract class BinaryDrawing{
 				               new LinkedList<>(), root,
 				               cluster.getFirstChunk().getPtr().makeReference(),
 				               FixedContiguousStructPipe.of(root.getThisStruct()),
-				               ptrs::add);
+				               ptrs::add, true);
 			}else{
 				provider=ChunkDataProvider.newVerySimpleProvider(MemoryData.build().withRaw(bytes).build());
 				
@@ -706,7 +804,7 @@ public abstract class BinaryDrawing{
 	}
 	
 	private void fillChunk(byte[] bytes, BitSet filled, RenderContext ctx, List<Pointer> ptrs, ChunkDataProvider provider, Chunk chunk) throws IOException{
-		annotateStruct(ctx, provider, new LinkedList<>(), chunk, null, Chunk.PIPE, ptrs::add);
+		annotateStruct(ctx, provider, new LinkedList<>(), chunk, null, Chunk.PIPE, ptrs::add, true);
 		if(chunk.dataEnd()>bytes.length){
 			drawBytes(bytes, filled, ctx, ()->IntStream.range(bytes.length, (int)chunk.dataEnd()), new Color(0, 0, 0, 0.2F), false, true);
 		}
@@ -854,8 +952,8 @@ public abstract class BinaryDrawing{
 		var sHalf=siz/2;
 		setStroke(sFul*ptr.widthFactor());
 		
-		int start=ptr.from();
-		int end  =ptr.to();
+		var start=ptr.from();
+		var end  =ptr.to();
 		
 		int pSiz=ptr.size();
 		
@@ -868,7 +966,7 @@ public abstract class BinaryDrawing{
 		
 		setColor(alpha(col, 0.5F));
 		
-		if(pSiz>1&&IntStream.range(start, start+pSiz).noneMatch(i->i%ctx.width()==0)){
+		if(pSiz>1&&LongStream.range(start, start+pSiz).noneMatch(i->i%ctx.width()==0)){
 			setColor(alpha(col, 0.1F));
 			setStroke(sHalf*ptr.widthFactor());
 			drawLine(ctx.width(), start, start+pSiz-1);
@@ -876,15 +974,54 @@ public abstract class BinaryDrawing{
 			setColor(alpha(col, 0.5F));
 		}
 		
-		drawArrow(ctx.width(), start, end);
+		long
+			xPosFrom=start%ctx.width(),
+			yPosFrom=start/ctx.width(),
+			xPosTo=end%ctx.width(),
+			yPosTo=end/ctx.width();
+		
+		var rand=new Random((start<<32)+end);
+		double
+			offScale=Math.sqrt(MathUtil.sq(xPosFrom-xPosTo)+MathUtil.sq(yPosFrom-yPosTo))/3,
+			xFromOff=(rand.nextDouble()-0.5)*offScale,
+			yFromOff=(rand.nextDouble()-0.5)*offScale,
+			xToOff=(rand.nextDouble()-0.5)*offScale,
+			yToOff=(rand.nextDouble()-0.5)*offScale,
+			
+			xFromOrg=xPosFrom+0.5,
+			yFromOrg=yPosFrom+0.5,
+			xToOrg=xPosTo+0.5,
+			yToOrg=yPosTo+0.5,
+			
+			xFrom=xFromOrg+xFromOff,
+			yFrom=yFromOrg+yFromOff,
+			xTo=xToOrg+xToOff,
+			yTo=yToOrg+yToOff;
+		
+		if(xFrom<0||xFrom>getWidth()) xFrom=xFromOrg-xFromOff;
+		if(yFrom<0||yFrom>getHeight()) yFrom=yFromOrg-yFromOff;
+		if(xTo<0||xTo>getWidth()) xTo=xToOrg-xToOff;
+		if(yTo<0||yTo>getHeight()) yTo=yToOrg-yToOff;
+		
+		var handles=new double[4][2];
+		handles[0][0]=xFromOrg;
+		handles[0][1]=yFromOrg;
+		handles[1][0]=xFrom;
+		handles[1][1]=yFrom;
+		handles[2][0]=xTo;
+		handles[2][1]=yTo;
+		handles[3][0]=xToOrg;
+		handles[3][1]=yToOrg;
+		drawPath(handles, true);
+
+//		drawLine(xFromOrg, yFromOrg, xFrom, yFrom);
+//		drawLine(xToOrg, yToOrg, xTo, yTo);
+//		drawArrow(xFrom, yFrom, xTo, yTo);
 		
 		if(!ptr.message().isEmpty()){
-			int xPosFrom=start%ctx.width(), yPosFrom=start/ctx.width();
-			int xPosTo  =end%ctx.width(), yPosTo=end/ctx.width();
-			
-			float xFrom=xPosFrom+0.5F, yFrom=yPosFrom+0.5F;
-			float xTo  =xPosTo+0.5F, yTo=yPosTo+0.5F;
-			float x    =(xFrom+xTo)/2*ctx.pixelsPerByte(), y=(yFrom+yTo)/2*ctx.pixelsPerByte();
+			float
+				x=(float)(xFrom+xTo)/2*ctx.pixelsPerByte(),
+				y=(float)(yFrom+yTo)/2*ctx.pixelsPerByte();
 			setColor(col);
 			initFont(0.3F*ptr.widthFactor());
 			fontScale=Math.max(fontScale, 15);
@@ -1014,7 +1151,7 @@ public abstract class BinaryDrawing{
 	private <T extends IOInstance<T>> void annotateStruct(RenderContext ctx,
 	                                                      ChunkDataProvider cluster, List<AnnotateStackFrame> stack,
 	                                                      T instance, Reference instanceReference, StructPipe<T> pipe,
-	                                                      Consumer<Pointer> pointerRecord) throws IOException{
+	                                                      Consumer<Pointer> pointerRecord, boolean annotate) throws IOException{
 		var reference=instanceReference;
 		if(instance instanceof Chunk c){
 			var off=cluster.getFirstChunk().getPtr();
@@ -1037,117 +1174,149 @@ public abstract class BinaryDrawing{
 			
 			while(iterator.hasNext()){
 				IOField<T, Object> field=iterator.next();
-				
-				var col=makeCol(rand, typeHash, field);
-				
-				final long size;
-				long       offsetStart;
-				
-				if(instance instanceof Chunk){
-					offsetStart=reference.getPtr().add(reference.getOffset());
-				}else{
-					offsetStart=reference.calcGlobalOffset(cluster);
-				}
-				
-				long trueOffset=offsetStart+fieldOffset;
-				var  sizeDesc  =field.getSizeDescriptor();
-				size=sizeDesc.calcUnknown(instance);
-				
 				try{
-					var acc=field.getAccessor();
-					if(acc!=null&&acc.hasAnnotation(IOType.Dynamic.class)){
-						
-						var inst=field.get(instance);
-						if(inst==null||IOFieldPrimitive.isPrimitive(inst.getClass())||inst.getClass()==String.class){
-							annotateByteField(cluster, ctx, pointerRecord, instance, field, col, reference, Range.fromSize(fieldOffset, size));
-							continue;
-						}
-						if(inst instanceof IOInstance<?> ioi){
-							annotateStruct(ctx, cluster, stack, (T)ioi, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), ioi.getThisStruct()), pointerRecord);
-							continue;
-						}
-						LogUtil.printlnEr("unmanaged dynamic type", inst);
-						
-						continue;
-					}
 					
-					if(field instanceof IOField.Ref refO){
-						IOField.Ref<T, T> refField=(IOField.Ref<T, T>)refO;
-						var               ref     =refField.getReference(instance);
-						if(!ref.isNull()){
-							var from=(int)trueOffset;
-							var to  =(int)ref.calcGlobalOffset(cluster);
-							if(from!=to){
-								pointerRecord.accept(new Pointer(from, to, (int)size, col, refField.toString(), 1));
-							}
-						}
-						annotateByteField(cluster, ctx, pointerRecord, instance, field, col, reference, Range.fromSize(fieldOffset, size));
-						
-						annotateStruct(ctx, cluster, stack, refField.get(instance), ref, refField.getReferencedPipe(instance), pointerRecord);
-						continue;
-					}
-					if(field instanceof BitFieldMerger<T> merger){
-						int bitOffset=0;
-						for(IOField.Bit<T, ?> bit : merger.getGroup()){
-							
-							var bCol=makeCol(rand, typeHash, bit);
-							var siz =bit.getSizeDescriptor().calcUnknown(instance);
-							
-							annotateBitField(cluster, ctx, instance, bit, bCol, bitOffset, siz, reference, fieldOffset);
-							bitOffset+=siz;
-						}
-						continue;
-					}
-					if(acc==null){
-						throw new RuntimeException("unknown field "+field);
-					}
+					var col=makeCol(rand, typeHash, field);
 					
-					if(UtilL.instanceOf(acc.getType(), ChunkPointer.class)){
-						
-						var ch=(ChunkPointer)field.get(instance);
-						
-						annotateByteField(cluster, ctx, pointerRecord, instance, field, col, reference, Range.fromSize(fieldOffset, size));
-						
-						if(!ch.isNull()){
-							var msg=field.toString();
-							try{
-								annotateStruct(ctx, cluster, stack, ch.dereference(cluster), null, Chunk.PIPE, pointerRecord);
-							}catch(Exception e){
-								msg=msg+"\n"+DrawUtils.errorToMessage(e);
-								col=Color.RED;
-							}
-							pointerRecord.accept(new Pointer((int)trueOffset, ch.getValueInt(), (int)size, col, msg, 0.8F));
-						}
-					}else if(IOFieldPrimitive.isPrimitive(acc.getType())||Stream.of(INumber.class, Enum.class).anyMatch(c->UtilL.instanceOf(acc.getType(), c))){
-						setColor(col);
-						if(sizeDesc.getWordSpace()==WordSpace.BIT){
-							annotateBitField(cluster, ctx, instance, field, col, 0, size, reference, fieldOffset);
-						}else{
-							annotateByteField(cluster, ctx, pointerRecord, instance, field, col, reference, Range.fromSize(fieldOffset, size));
-						}
+					final long size;
+					long       offsetStart;
+					
+					if(instance instanceof Chunk){
+						offsetStart=reference.getPtr().add(reference.getOffset());
 					}else{
-						var typ=acc.getType();
-						if(UtilL.instanceOf(typ, IOInstance.class)){
-							var inst=(IOInstance<?>)field.get(instance);
-							if(inst!=null){
-								annotateStruct(ctx, cluster, stack, (T)inst, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), inst.getThisStruct()), pointerRecord);
+						offsetStart=reference.calcGlobalOffset(cluster);
+					}
+					
+					long trueOffset=offsetStart+fieldOffset;
+					var  sizeDesc  =field.getSizeDescriptor();
+					size=sizeDesc.calcUnknown(instance);
+					
+					try{
+						var acc=field.getAccessor();
+						if(acc!=null&&acc.hasAnnotation(IOType.Dynamic.class)){
+							
+							var inst=field.get(instance);
+							if(inst==null||IOFieldPrimitive.isPrimitive(inst.getClass())||inst.getClass()==String.class){
+								if(annotate) annotateByteField(cluster, ctx, pointerRecord, instance, field, col, reference, Range.fromSize(fieldOffset, size));
+								continue;
+							}
+							if(inst instanceof IOInstance<?> ioi){
+								annotateStruct(ctx, cluster, stack, (T)ioi, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), ioi.getThisStruct()), pointerRecord, annotate);
+								continue;
+							}
+							LogUtil.printlnEr("unmanaged dynamic type", inst);
+							
+							continue;
+						}
+						
+						if(field instanceof IOField.Ref refO){
+							IOField.Ref<T, T> refField=(IOField.Ref<T, T>)refO;
+							var               ref     =refField.getReference(instance);
+							boolean           diffPos =true;
+							if(!ref.isNull()){
+								var from=(int)trueOffset;
+								var to  =(int)ref.calcGlobalOffset(cluster);
+								diffPos=from!=to;
+								if(diffPos){
+									pointerRecord.accept(new Pointer(from, to, (int)size, col, refField.toString(), 1));
+								}
+							}
+							
+							if(annotate) annotateByteField(cluster, ctx, pointerRecord, instance, field, col, reference, Range.fromSize(fieldOffset, size));
+							if(!diffPos){
+								int xByte    =(int)(getMouseX()/ctx.pixelsPerByte());
+								int yByte    =(int)(getMouseY()/ctx.pixelsPerByte());
+								int byteIndex=yByte*ctx.width()+xByte;
+								
+								var from=trueOffset;
+								var to  =from+size;
+								if(from<=byteIndex&&byteIndex<to){
+									diffPos=true;
+								}
+							}
+							annotateStruct(ctx, cluster, stack, refField.get(instance), ref, refField.getReferencedPipe(instance), pointerRecord, diffPos);
+							
+							continue;
+						}
+						if(field instanceof BitFieldMerger<T> merger){
+							int bitOffset=0;
+							for(IOField.Bit<T, ?> bit : merger.getGroup()){
+								
+								var bCol=makeCol(rand, typeHash, bit);
+								var siz =bit.getSizeDescriptor().calcUnknown(instance);
+								
+								if(annotate) annotateBitField(cluster, ctx, instance, bit, bCol, bitOffset, siz, reference, fieldOffset);
+								bitOffset+=siz;
 							}
 							continue;
 						}
-						if(typ==String.class){
-							annotateByteField(cluster, ctx, pointerRecord, instance, field, col, reference, Range.fromSize(fieldOffset, size));
-							continue;
+						if(acc==null){
+							throw new RuntimeException("unknown field "+field);
 						}
-						LogUtil.printlnEr("unamanaged draw type:", typ);
+						
+						if(UtilL.instanceOf(acc.getType(), ChunkPointer.class)){
+							
+							var ch=(ChunkPointer)field.get(instance);
+							
+							if(annotate) annotateByteField(cluster, ctx, pointerRecord, instance, field, col, reference, Range.fromSize(fieldOffset, size));
+							
+							if(!ch.isNull()){
+								var msg=field.toString();
+								try{
+									annotateStruct(ctx, cluster, stack, ch.dereference(cluster), null, Chunk.PIPE, pointerRecord, true);
+								}catch(Exception e){
+									msg=msg+"\n"+DrawUtils.errorToMessage(e);
+									col=Color.RED;
+								}
+								pointerRecord.accept(new Pointer(trueOffset, ch.getValue(), (int)size, col, msg, 0.8F));
+							}
+						}else if(IOFieldPrimitive.isPrimitive(acc.getType())||Stream.of(INumber.class, Enum.class).anyMatch(c->UtilL.instanceOf(acc.getType(), c))){
+							if(annotate){
+								setColor(col);
+								if(sizeDesc.getWordSpace()==WordSpace.BIT){
+									annotateBitField(cluster, ctx, instance, field, col, 0, size, reference, fieldOffset);
+								}else{
+									annotateByteField(cluster, ctx, pointerRecord, instance, field, col, reference, Range.fromSize(fieldOffset, size));
+								}
+							}
+						}else{
+							var typ=acc.getType();
+							if(UtilL.instanceOf(typ, IOInstance.class)){
+								var inst=(IOInstance<?>)field.get(instance);
+								if(inst!=null){
+									annotateStruct(ctx, cluster, stack, (T)inst, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), inst.getThisStruct()), pointerRecord, annotate);
+								}
+								continue;
+							}
+							if(typ==String.class){
+								if(annotate) annotateByteField(cluster, ctx, pointerRecord, instance, field, col, reference, Range.fromSize(fieldOffset, size));
+								continue;
+							}
+							LogUtil.printlnEr("unamanaged draw type:", typ);
+						}
+					}finally{
+						fieldOffset+=field.getSizeDescriptor().toBytes(size);
 					}
-				}finally{
-					fieldOffset+=field.getSizeDescriptor().toBytes(size);
+				}catch(Throwable e){
+					String instStr=instanceErrStr(instance);
+					throw new RuntimeException("failed to annotate "+field+" in "+instStr, e);
 				}
 			}
 		}finally{
 			stack.remove(frame);
 		}
 	}
+	
+	private <T extends IOInstance<T>> String instanceErrStr(T instance){
+		String instStr;
+		try{
+			instStr=instance.toString();
+		}catch(Throwable e1){
+			instStr="<err toString "+e1.getMessage()+" for "+instance.getClass().getName()+">";
+		}
+		return instStr;
+	}
+	
 	private Color makeCol(Random rand, int typeHash, IOField<?, ?> field){
 		
 		rand.setSeed(typeHash);
