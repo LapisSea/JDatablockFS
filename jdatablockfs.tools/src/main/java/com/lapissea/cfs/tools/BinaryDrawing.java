@@ -241,22 +241,27 @@ public abstract class BinaryDrawing{
 	}
 	private void fillByteRange(Color color, RenderContext ctx, Range range){
 		setColor(color);
-		for(var i=range.from();i<range.to();i++){
-			long x=i%ctx.width(), y=i/ctx.width();
-			fillQuad(x*ctx.pixelsPerByte(), y*ctx.pixelsPerByte(), ctx.pixelsPerByte(), ctx.pixelsPerByte());
+		try(var ignored=bulkDraw(DrawMode.QUADS)){
+			for(var i=range.from();i<range.to();i++){
+				long x=i%ctx.width(), y=i/ctx.width();
+				fillQuad(x*ctx.pixelsPerByte(), y*ctx.pixelsPerByte(), ctx.pixelsPerByte(), ctx.pixelsPerByte());
+			}
 		}
 	}
 	private void outlineByteRange(Color color, RenderContext ctx, Range range){
 		setColor(color);
-		for(var i=range.from();i<range.to();i++){
-			long x =i%ctx.width(), y=i/ctx.width();
-			long x1=x, y1=y;
-			long x2=x1+1, y2=y1+1;
-			
-			if(i-range.from()<ctx.width()) drawLine(x1, y1, x2, y1);
-			if(range.to()-i<=ctx.width()) drawLine(x1, y2, x2, y2);
-			if(x==0||i==range.from()) drawLine(x1, y1, x1, y2);
-			if(x2==ctx.width()||i==range.to()-1) drawLine(x2, y1, x2, y2);
+		
+		try(var ignored=bulkDraw(DrawMode.QUADS)){
+			for(var i=range.from();i<range.to();i++){
+				long x =i%ctx.width(), y=i/ctx.width();
+				long x1=x, y1=y;
+				long x2=x1+1, y2=y1+1;
+				
+				if(i-range.from()<ctx.width()) drawLine(x1, y1, x2, y1);
+				if(range.to()-i<=ctx.width()) drawLine(x1, y2, x2, y2);
+				if(x==0||i==range.from()) drawLine(x1, y1, x1, y2);
+				if(x2==ctx.width()||i==range.to()-1) drawLine(x2, y1, x2, y2);
+			}
 		}
 	}
 	
