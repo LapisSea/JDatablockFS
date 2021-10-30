@@ -1,5 +1,6 @@
 package com.lapissea.cfs.objects.collections;
 
+import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.ChainWalker;
@@ -33,7 +34,7 @@ import java.util.stream.Stream;
 public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>{
 	
 	
-	private static class Node<T extends IOInstance<T>> extends IOInstance.Unmanaged<Node<T>>{
+	public static class Node<T extends IOInstance<T>> extends IOInstance.Unmanaged<Node<T>> implements IterablePP<Node<T>>{
 		
 		private static final TypeDefinition.Check NODE_TYPE_CHECK=new TypeDefinition.Check(
 			LinkedIOList.Node.class,
@@ -45,6 +46,14 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		);
 		
 		private static final NumberSize SIZE_VAL_SIZE=NumberSize.LARGEST;
+		
+		public static <T extends IOInstance<T>> Node<T> allocValNode(T value, Node<T> next, SizeDescriptor<T> sizeDescriptor, TypeDefinition nodeType, ChunkDataProvider provider) throws IOException{
+			var chunk=AllocateTicket.bytes(SIZE_VAL_SIZE.bytes+switch(sizeDescriptor){
+				case SizeDescriptor.Fixed<T> f -> f.get();
+				case SizeDescriptor.Unknown<T> f -> f.calcUnknown(value);
+			}).submit(provider);
+			return new Node<>(provider, chunk.getPtr().makeReference(), nodeType, value, next);
+		}
 		
 		private final StructPipe<T> valuePipe;
 		
@@ -119,7 +128,11 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 				var desc =valuePipe.getSizeDescriptor();
 				var fixed=desc.getFixed();
 				if(fixed.isPresent()) valDesc=SizeDescriptor.Fixed.of(desc.getWordSpace(), fixed.getAsLong());
-				else valDesc=new SizeDescriptor.Unknown<>(desc.getWordSpace(), desc.getMin(), desc.getMax(), inst->desc.calcUnknown(valueAccessor.get(inst)));
+				else valDesc=new SizeDescriptor.Unknown<>(desc.getWordSpace(), desc.getMin(), desc.getMax(), inst->{
+					var val=valueAccessor.get(inst);
+					if(val==null) return 0;
+					return desc.calcUnknown(val);
+				});
 			}
 			
 			return Stream.of(
@@ -152,6 +165,15 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 					return null;
 				}
 				return valuePipe.readNew(getChunkProvider(), io, getGenerics());
+			}
+		}
+		boolean hasValue() throws IOException{
+			try(var io=this.getReference().io(this)){
+				if(io.getSize()<SIZE_VAL_SIZE.bytes){
+					return false;
+				}
+				io.skipExact(SIZE_VAL_SIZE.bytes);
+				return io.remaining()!=0;
 			}
 		}
 		
@@ -210,27 +232,71 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		public String toString(){
 			return "Node"+toShortString();
 		}
+		
+		private static class NodeIterator<T extends IOInstance<T>> implements IOIterator.Iter<Node<T>>{
+			
+			private Node<T>     node;
+			private IOException e;
+			
+			private NodeIterator(Node<T> node){
+				this.node=node;
+			}
+			
+			@Override
+			public boolean hasNext(){
+				return node!=null;
+			}
+			
+			@Override
+			public Node<T> ioNext() throws IOException{
+				
+				if(e!=null){
+					throw e;
+				}
+				
+				Node<T> next;
+				try{
+					next=node.getNext();
+				}catch(IOException e){
+					this.e=e;
+					next=null;
+				}
+				
+				var current=node;
+				node=next;
+				return current;
+			}
+		}
+		@Override
+		public final IOIterator.Iter<Node<T>> iterator(){
+			return new NodeIterator<>(this);
+		}
+		public final IOIterator.Iter<T> valueIterator(){
+			return new LinkedValueIterator<>(this);
+		}
 	}
 	
-	private class LinkedIterator implements IOIterator.Iter<T>{
+	private static class LinkedValueIterator<T extends IOInstance<T>> implements IOIterator.Iter<T>{
 		
-		private Node<T> node;
+		private final Iter<Node<T>> nodes;
 		
-		private LinkedIterator(Node<T> node){
-			this.node=node;
+		private LinkedValueIterator(Node<T> node){
+			if(node==null){
+				nodes=Utils.emptyIter();
+			}else{
+				nodes=node.iterator();
+			}
 		}
 		
 		@Override
 		public boolean hasNext(){
-			return node!=null;
+			return nodes.hasNext();
 		}
 		
 		@Override
 		public T ioNext() throws IOException{
-			var next=node.getNext();
-			var val =node.getValue();
-			node=next;
-			return val;
+			var node=nodes.next();
+			return node.getValue();
 		}
 	}
 	
@@ -377,7 +443,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		
 		if(index==0){
 			var head=getHead();
-			setHead(allocValNode(value, head));
+			setHead(Node.allocValNode(value, head, elementPipe.getSizeDescriptor(), nodeType(), getChunkProvider()));
 			return;
 		}
 		
@@ -387,14 +453,14 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 	}
 	private void insertNodeInFrontOf(Node<T> prevNode, T value) throws IOException{
 		var     node   =prevNode.getNext();
-		Node<T> newNode=allocValNode(value, node);
+		Node<T> newNode=Node.allocValNode(value, node, elementPipe.getSizeDescriptor(), nodeType(), getChunkProvider());
 		prevNode.setNext(newNode);
 		deltaSize(1);
 	}
 	
 	@Override
 	public void add(T value) throws IOException{
-		Node<T> newNode=allocValNode(value, null);
+		Node<T> newNode=Node.allocValNode(value, null, elementPipe.getSizeDescriptor(), nodeType(), getChunkProvider());
 		
 		if(isEmpty()){
 			setHead(newNode);
@@ -403,14 +469,6 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		}
 		
 		deltaSize(1);
-	}
-	
-	private Node<T> allocValNode(T value, Node<T> next) throws IOException{
-		var chunk=AllocateTicket.bytes(NumberSize.LARGEST.bytes+switch(elementPipe.getSizeDescriptor()){
-			case SizeDescriptor.Fixed<T> f -> f.get();
-			case SizeDescriptor.Unknown<T> f -> f.calcUnknown(value);
-		}).submit(getChunkProvider());
-		return new Node<>(getChunkProvider(), chunk.getPtr().makeReference(), nodeType(), value, next);
 	}
 	
 	@Override
@@ -459,7 +517,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 	@Override
 	public IOIterator.Iter<T> iterator(){
 		try{
-			return new LinkedIterator(getHead());
+			return new LinkedValueIterator<>(getHead());
 		}catch(IOException e){
 			throw new RuntimeException(e);
 		}

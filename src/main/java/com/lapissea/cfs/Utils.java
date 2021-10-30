@@ -3,6 +3,7 @@ package com.lapissea.cfs;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
+import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.TextUtil;
@@ -373,5 +374,21 @@ public class Utils{
 	public static <K, V, C extends Map<K, V>> C nullIfEmpty(C map){
 		if(map.isEmpty()) return null;
 		return map;
+	}
+	
+	
+	private static final IOList.IOIterator.Iter<?> EMPTY_ITER=new IOList.IOIterator.Iter<>(){
+		@Override
+		public boolean hasNext(){
+			return false;
+		}
+		@Override
+		public Object ioNext(){
+			throw new NoSuchElementException();
+		}
+	};
+	
+	public static <T> IOList.IOIterator.Iter<T> emptyIter(){
+		return (IOList.IOIterator.Iter<T>)EMPTY_ITER;
 	}
 }
