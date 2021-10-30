@@ -19,6 +19,8 @@ import org.lwjgl.opengl.GL30;
 
 import java.awt.*;
 import java.awt.datatransfer.DataFlavor;
+import java.awt.geom.AffineTransform;
+import java.awt.geom.Point2D;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
@@ -533,14 +535,37 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	@Override
 	protected void drawLine(double xFrom, double yFrom, double xTo, double yTo){
 		var pixelsPerByte=getPixelsPerByte();
-		var angle        =-Math.toDegrees(Math.atan2(xTo-xFrom, yTo-yFrom));
+		var angle        =-Math.atan2(xTo-xFrom, yTo-yFrom);
 		var length       =MathUtil.length(xFrom-xTo, yTo-yFrom)*pixelsPerByte;
-		GL11.glPushMatrix();
-		translate(xFrom*pixelsPerByte, yFrom*pixelsPerByte);
-		rotate(angle);
 		
-		fillQuad(-getLineWidth()/2, 0, getLineWidth(), length);
-		GL11.glPopMatrix();
+		Point2D.Double  p=new Point2D.Double();
+		AffineTransform t=new AffineTransform();
+		t.setToIdentity();
+		t.translate(xFrom*pixelsPerByte, yFrom*pixelsPerByte);
+		t.rotate(angle);
+		
+		double x    =-getLineWidth()/2;
+		double width=getLineWidth();
+		
+		if(!isBulkDrawing()) GL11.glBegin(GL11.GL_QUADS);
+		
+		p.setLocation(x, 0);
+		t.transform(p, p);
+		GL11.glVertex3d(p.x, p.y, 0);
+		
+		p.setLocation(x+width, 0);
+		t.transform(p, p);
+		GL11.glVertex3d(p.x, p.y, 0);
+		
+		p.setLocation(x+width, length);
+		t.transform(p, p);
+		GL11.glVertex3d(p.x, p.y, 0);
+		
+		p.setLocation(x, length);
+		t.transform(p, p);
+		GL11.glVertex3d(p.x, p.y, 0);
+		
+		if(!isBulkDrawing()) GL11.glEnd();
 	}
 	
 	
