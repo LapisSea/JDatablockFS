@@ -2,6 +2,7 @@ package com.lapissea.cfs.objects.collections;
 
 import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.chunk.ChunkDataProvider;
+import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.TypeDefinition;
@@ -11,12 +12,13 @@ import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.ObjectHolder;
 import com.lapissea.util.TextUtil;
+import com.lapissea.util.UtilL;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
+import java.util.stream.Stream;
 
+import static com.lapissea.cfs.GlobalConfig.*;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.*;
 
 public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V>>{
@@ -44,6 +46,12 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 		
 		private Entry<K, V> unmodifiable;
 		
+		public BucketEntry(){}
+		public BucketEntry(K key, V value){
+			this.key=key;
+			this.value=value;
+		}
+		
 		public Entry<K, V> unmodifiable(){
 			if(unmodifiable==null){
 				unmodifiable=new Entry.Abstract<>(){
@@ -65,22 +73,17 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 		}
 	}
 	
-	private static class Bucket<K, V> extends IOInstance<Bucket<K, V>>{
+	private static class Bucket<K, V> extends IOInstance<Bucket<K, V>> implements Iterable<BucketEntry<K, V>>{
 		@IOValue
-		@IOValue.OverrideType(LinkedIOList.class)
-		private IOList<BucketEntry<K, V>> entries;
-		
-		public void newEntry(K key, V value) throws IOException{
-			entries.addNew(e->{
-				e.key=key;
-				e.value=value;
-			});
-		}
+		@IONullability(NULLABLE)
+		private LinkedIOList.Node<BucketEntry<K, V>> node;
 		
 		public BucketEntry<K, V> entry(K key) throws IOException{
-			for(var entry : entries){
-				if(Objects.equals(entry.key, key)){
-					return entry;
+			if(node==null) return null;
+			for(LinkedIOList.Node<BucketEntry<K, V>> entry : node){
+				var value=entry.getValue();
+				if(value!=null&&Objects.equals(value.key, key)){
+					return value;
 				}
 			}
 			
@@ -88,20 +91,36 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 		}
 		
 		public void put(BucketEntry<K, V> entry) throws IOException{
-			var iter=entries.listIterator();
-			
-			while(iter.hasNext()){
-				var e=iter.ioNext();
-				
-				if(Objects.equals(e.key, entry.key)){
-					iter.ioSet(entry);
-					break;
+			for(var node : node){
+				var e=node.getValue();
+				if(e!=null&&Objects.equals(e.key, entry.key)){
+					node.setValue(entry);
+					return;
 				}
 			}
+			throw new RuntimeException("bucket entry not found");
 		}
 		
-		private long size(){
-			return entries.size();
+		private Stream<BucketEntry<K, V>> stream(){
+			if(node==null) return Stream.of();
+			return UtilL.stream(node.valueIterator());
+		}
+		public BucketEntry<K, V> getEntryByKey(K key) throws IOException{
+			if(node==null) return null;
+			for(var entry : node){
+				var value=entry.getValue();
+				if(value!=null&&Objects.equals(value.key, key)){
+					return value;
+				}
+			}
+			
+			return null;
+		}
+		
+		@Override
+		public Iterator<BucketEntry<K, V>> iterator(){
+			if(node==null) return Collections.emptyIterator();
+			return node.valueIterator();
 		}
 	}
 	
@@ -164,7 +183,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 		var siz=1L<<bucketPO2;
 		buckets.requestCapacity(siz);
 		while(buckets.size()<siz){
-			buckets.addNew(b->b.allocateNulls(getChunkProvider()));
+			buckets.addNew(b->{});
 		}
 	}
 	
@@ -262,52 +281,88 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 	}
 	
 	private IterablePP<Entry<K, V>> entries(IOList<Bucket<K, V>> buckets){
-		return ()->buckets.stream().flatMap(e->e.entries.stream().map(BucketEntry::unmodifiable)).iterator();
+		return ()->buckets.stream().flatMap(e->e.stream().filter(Objects::nonNull).map(BucketEntry::unmodifiable)).iterator();
 	}
 	
 	@Override
 	public void put(K key, V value) throws IOException{
-		var b=putEntry(buckets, bucketPO2, key, value);
-		if(b==null) return;
+		var sizeFlag=putEntry(buckets, bucketPO2, key, value);
+		if(sizeFlag==OVERWRITE) return;
+		
 		deltaSize(1);
-		if(b.size()>RESIZE_TRIGGER){
+		if(sizeFlag==OVERWRITE_EMPTY) return;
+		if(sizeFlag>RESIZE_TRIGGER){
 			reflow();
 		}
 	}
 	
-	private Bucket<K, V> putEntry(IOList<Bucket<K, V>> buckets, short bucketPO2, K key, V value) throws IOException{
+	private static final long OVERWRITE      =-1;
+	private static final long OVERWRITE_EMPTY=-2;
+	
+	private long putEntry(IOList<Bucket<K, V>> buckets, short bucketPO2, K key, V value) throws IOException{
 		
 		Bucket<K, V> bucket=getBucket(buckets, key, bucketPO2);
 		
-		var entry=getBucketEntry(bucket, key);
+		var entry=bucket.getEntryByKey(key);
 		if(entry!=null){
 			entry.value=value;
 			bucket.put(entry);
-			return null;
+			return OVERWRITE;
 		}
 		
-		bucket.newEntry(key, value);
-		return bucket;
-	}
-	
-	
-	private BucketEntry<K, V> getBucketEntry(Bucket<K, V> bucket, K key){
-		if(bucket.entries!=null){
-			for(var e : bucket.entries){
-				if(Objects.equals(e.key, key)){
-					return e;
-				}
-			}
+		BucketEntry<K, V> newEntry=new BucketEntry<>(key, value);
+		
+		if(bucket.node==null){
+			bucket.allocateNulls(getChunkProvider());
+			setBucket(buckets, key, bucketPO2, bucket);
 		}
-		return null;
+		
+		long count=0;
+		
+		LinkedIOList.Node<BucketEntry<K, V>> last=bucket.node;
+		for(var node : bucket.node){
+			if(!node.hasValue()){
+				if(DEBUG_VALIDATION){
+					var val=node.getValue();
+					if(val!=null) throw new RuntimeException(node+" hasValue is not correct");
+				}
+				
+				node.setValue(newEntry);
+				return OVERWRITE_EMPTY;
+			}
+			
+			last=node;
+			count++;
+		}
+		
+		
+		LinkedIOList.Node<BucketEntry<K, V>> newNode=allocNewNode(newEntry);
+		
+		last.setNext(newNode);
+		
+		return count;
 	}
+	private LinkedIOList.Node<BucketEntry<K, V>> allocNewNode(BucketEntry<K, V> newEntry) throws IOException{
+		return LinkedIOList.Node.allocValNode(
+			newEntry,
+			null,
+			ContiguousStructPipe.of((Class<BucketEntry<K, V>>)(Object)BucketEntry.class).getSizeDescriptor(),
+			new TypeDefinition(
+				LinkedIOList.Node.class,
+				TypeDefinition.of(BucketEntry.class)
+			),
+			getChunkProvider()
+		);
+	}
+	
 	
 	private Bucket<K, V> getBucket(IOList<Bucket<K, V>> buckets, K key, short bucketPO2) throws IOException{
 		int smallHash=toSmallHash(key, bucketPO2);
-		return getBySmallHash(buckets, smallHash);
-	}
-	private Bucket<K, V> getBySmallHash(IOList<Bucket<K, V>> buckets, int smallHash) throws IOException{
 		return buckets.get(smallHash);
+	}
+	private void setBucket(IOList<Bucket<K, V>> buckets, K key, short bucketPO2, Bucket<K, V> bucket) throws IOException{
+		int smallHash=toSmallHash(key, bucketPO2);
+		buckets.set(smallHash, bucket);
 	}
 	
 	private int toSmallHash(K key, short bucketPO2){
