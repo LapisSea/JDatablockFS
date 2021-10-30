@@ -107,8 +107,9 @@ public class Cluster implements ChunkDataProvider{
 		}
 		
 		Chunk ch=getFirstChunk();
-		if(ROOT_PIPE.getSizeDescriptor().fixedOrMin()>ch.getSize()){
-			throw new IOException("no valid cluster data");
+		var   s =ROOT_PIPE.getSizeDescriptor().fixedOrMin();
+		if(s>ch.getSize()){
+			throw new IOException("no valid cluster data "+s+" "+ch.getSize()+" "+ch.io().getSize());
 		}
 		root=ROOT_PIPE.readNew(this, ch, null);
 	}

@@ -48,7 +48,7 @@ public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanaged
 	}
 	
 	private static <T extends IOInstance<T>> IOField<ContiguousIOList<T>, ?> eField(Type elementType, long sizePerElement, long index){
-		return new IOField.Ref.NoIO<ContiguousIOList<T>, T>(new AbstractFieldAccessor<>(null, "ArrayElement["+index+"]"){
+		return new IOField.Ref.NoIO<ContiguousIOList<T>, T>(new AbstractFieldAccessor<>(null, "Element["+index+"]"){
 			@Override
 			public Type getGenericType(GenericContext genericContext){
 				return elementType;

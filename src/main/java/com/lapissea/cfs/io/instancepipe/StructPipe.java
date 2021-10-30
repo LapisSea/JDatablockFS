@@ -116,14 +116,14 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 			if(unknownFields.size()==1){
 				var unknownField=unknownFields.get(0);
 				return new SizeDescriptor.Unknown<>(min, max, inst->{
-					Objects.requireNonNull(inst);
+					Objects.requireNonNull(inst, ()->"instance of type "+getType()+" is null!");
 					var d=unknownField.getSizeDescriptor();
 					return knownFixed+d.calcUnknown(inst);
 				});
 			}
 			
 			return new SizeDescriptor.Unknown<>(min, max, inst->{
-				Objects.requireNonNull(inst);
+				Objects.requireNonNull(inst, ()->"instance of type "+getType()+" is null!");
 				return knownFixed+IOFieldTools.sumVars(unknownFields, d->d.calcUnknown(inst));
 			});
 		}

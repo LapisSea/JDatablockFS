@@ -148,7 +148,8 @@ public interface IOList<T> extends IterablePP<T>{
 				if(!it.hasNext()){
 					return false;
 				}
-				action.accept(it.next());
+				var val=it.next();
+				action.accept(val);
 				return true;
 			}
 			@Override
