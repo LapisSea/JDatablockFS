@@ -173,11 +173,11 @@ class Encoding{
 			}
 		}
 		
-		String read(ContentInputStream w, AutoText text) throws IOException{
-			StringBuilder sb=new StringBuilder(text.charCount());
+		String read(ContentInputStream w, int charCount) throws IOException{
+			StringBuilder sb=new StringBuilder(charCount);
 			
 			try(var stream=new BitInputStream(w)){
-				for(int i=0;i<text.charCount();i++){
+				for(int i=0;i<charCount;i++){
 					int  index=(int)stream.readBits(bits);
 					char c    =decode(index);
 					
@@ -215,12 +215,12 @@ class Encoding{
 			1, String::length,
 			s->s.chars().allMatch(c->c<=0xFF),
 			(w, text)->w.write(text.getBytes(US_ASCII)),
-			(r, text)->new String(r.readInts1(text.charCount()), US_ASCII)),
+			(r, charCount)->new String(r.readInts1(charCount), US_ASCII)),
 		UTF8(
 			1.1F, CharEncoding::utf8Len,
 			s->tryEncode(UTF.get().utf8Enc(), s),
 			(w, s)->encode(UTF.get().utf8Enc(), s, w),
-			(w, text)->decode(UTF.get().utf8Dec(), w, text));
+			(w, charCount)->decode(UTF.get().utf8Dec(), w, charCount));
 		
 		private static final CharEncoding[] SORTED=Arrays.stream(CharEncoding.values()).sorted(Comparator.comparingDouble(c->c.sizeWeight)).toArray(CharEncoding[]::new);
 		public static CharEncoding findBest(String data){
@@ -258,9 +258,9 @@ class Encoding{
 				throw new RuntimeException(e);
 			}
 		}
-		private static String decode(CharsetDecoder en, ContentInputStream in, AutoText text) throws IOException{
+		private static String decode(CharsetDecoder en, ContentInputStream in, int charCount) throws IOException{
 			
-			char[] str      =new char[text.charCount()];
+			char[] str      =new char[charCount];
 			int    remaining=str.length;
 			int    off      =0;
 			
@@ -295,14 +295,14 @@ class Encoding{
 		private final FunctionOI<String> calcSize;
 		private final Predicate<String>  canEncode;
 		
-		private final UnsafeBiConsumer<ContentWriter, String, IOException>                write;
-		private final UnsafeBiFunction<ContentInputStream, AutoText, String, IOException> read;
+		private final UnsafeBiConsumer<ContentWriter, String, IOException>               write;
+		private final UnsafeBiFunction<ContentInputStream, Integer, String, IOException> read;
 		
 		CharEncoding(float sizeWeight, TableCoding coder){this(sizeWeight, coder::calcSize, coder::isCompatible, coder::write, coder::read);}
 		CharEncoding(float sizeWeight, FunctionOI<String> calcSize,
 		             Predicate<String> canEncode,
 		             UnsafeBiConsumer<ContentWriter, String, IOException> write,
-		             UnsafeBiFunction<ContentInputStream, AutoText, String, IOException> read
+		             UnsafeBiFunction<ContentInputStream, Integer, String, IOException> read
 		){
 			this.sizeWeight=sizeWeight;
 			this.calcSize=calcSize;
@@ -320,8 +320,8 @@ class Encoding{
 		public void write(ContentWriter dest, String str) throws IOException{
 			write.accept(dest, str);
 		}
-		public String read(ContentInputStream src, AutoText dest) throws IOException{
-			return read.apply(src, dest);
+		public String read(ContentInputStream src, int charCount) throws IOException{
+			return read.apply(src, charCount);
 		}
 	}
 }

@@ -50,11 +50,7 @@ public class AutoText extends IOInstance<AutoText> implements CharSequence{
 	
 	@IOValue
 	private void setTextBytes(byte[] bytes) throws IOException{
-		data=encoding.read(new ContentInputStream.BA(bytes), this);
-	}
-	
-	protected int charCount(){
-		return charCount;
+		data=encoding.read(new ContentInputStream.BA(bytes), charCount);
 	}
 	
 	@NotNull
