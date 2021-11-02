@@ -11,10 +11,7 @@ import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Reference;
-import com.lapissea.cfs.type.GenericContext;
-import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.Struct;
-import com.lapissea.cfs.type.TypeDefinition;
+import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.AbstractFieldAccessor;
@@ -49,8 +46,8 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		
 		public static <T extends IOInstance<T>> Node<T> allocValNode(T value, Node<T> next, SizeDescriptor<T> sizeDescriptor, TypeDefinition nodeType, ChunkDataProvider provider) throws IOException{
 			var chunk=AllocateTicket.bytes(SIZE_VAL_SIZE.bytes+switch(sizeDescriptor){
-				case SizeDescriptor.Fixed<T> f -> f.get();
-				case SizeDescriptor.Unknown<T> f -> f.calcUnknown(value);
+				case SizeDescriptor.Fixed<T> f -> f.get(WordSpace.BYTE);
+				case SizeDescriptor.Unknown<T> f -> f.calcUnknown(value, WordSpace.BYTE);
 			}).submit(provider);
 			return new Node<>(provider, chunk.getPtr().makeReference(), nodeType, value, next);
 		}
@@ -126,8 +123,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			SizeDescriptor<Node<T>> valDesc;
 			{
 				var desc =valuePipe.getSizeDescriptor();
-				var fixed=desc.getFixed();
-				if(fixed.isPresent()) valDesc=SizeDescriptor.Fixed.of(desc.getWordSpace(), fixed.getAsLong());
+				if(desc.hasFixed()) valDesc=SizeDescriptor.Fixed.of(desc);
 				else valDesc=new SizeDescriptor.Unknown<>(desc.getWordSpace(), desc.getMin(), desc.getMax(), inst->{
 					var val=valueAccessor.get(inst);
 					if(val==null) return 0;

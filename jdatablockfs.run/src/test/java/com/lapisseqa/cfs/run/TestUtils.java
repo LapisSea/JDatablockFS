@@ -12,6 +12,7 @@ import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.TypeDefinition;
+import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeConsumer;
@@ -90,7 +91,7 @@ public class TestUtils{
 			
 			T obj=constr.create(provider, ref, typeDef);
 			
-			var actualSize=ContiguousStructPipe.sizeOfUnknown(obj);
+			var actualSize=ContiguousStructPipe.sizeOfUnknown(obj, WordSpace.BYTE);
 			
 			if(actualSize>initalCapacity){
 				LogUtil.printlnEr("WARNING: initial capacity is", initalCapacity, "but object has allocated", actualSize);
@@ -136,7 +137,7 @@ public class TestUtils{
 		TypeDefinition typeDef,
 		UnsafeConsumer<IOMap<K, V>, IOException> session
 	) throws IOException{
-		int initial=(int)ContiguousStructPipe.of(Struct.ofUnknown(typeDef.getTypeClass())).getSizeDescriptor().getMax().orElse(8);
+		int initial=(int)ContiguousStructPipe.of(Struct.ofUnknown(typeDef.getTypeClass())).getSizeDescriptor().getMax(WordSpace.BYTE).orElse(8);
 		complexObjectIntegrityTest(info, initial, constr, typeDef, map->{
 			var splitter=Splitter.map(map, new ReferenceMemoryIOMap<>(), TestUtils::checkCompliance);
 			session.accept(splitter);

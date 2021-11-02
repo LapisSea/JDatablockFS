@@ -13,6 +13,7 @@ import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
@@ -39,12 +40,12 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 		var struct=(Struct<ValueType>)Struct.ofUnknown(getAccessor().getType());
 		instancePipe=fixed?FixedContiguousStructPipe.of(struct):ContiguousStructPipe.of(struct);
 		
-		int nullSize=nullable()?1:0;
-		
 		var desc    =instancePipe.getSizeDescriptor();
+		var nullSize=WordSpace.mapSize(WordSpace.BYTE, desc.getWordSpace(), nullable()?1:0);
+		
 		var fixedSiz=desc.getFixed();
 		if(fixedSiz.isPresent()){
-			descriptor=new SizeDescriptor.Fixed<>(fixedSiz.getAsLong()+nullSize);
+			descriptor=new SizeDescriptor.Fixed<>(desc.getWordSpace(), fixedSiz.getAsLong()+nullSize);
 		}else{
 			descriptor=new SizeDescriptor.Unknown<>(
 				desc.getWordSpace(),
@@ -115,7 +116,7 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 			writeIsNull(dest, val);
 			if(val==null){
 				if(fixed){
-					Utils.zeroFill(dest::write, (int)getSizeDescriptor().requireFixed()-1);
+					Utils.zeroFill(dest::write, (int)getSizeDescriptor().requireFixed(WordSpace.BYTE)-1);
 				}
 				return List.of();
 			}
@@ -129,7 +130,7 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 			boolean isNull=readIsNull(src);
 			if(isNull){
 				if(fixed){
-					src.readInts1((int)getSizeDescriptor().requireFixed()-1);
+					src.readInts1((int)getSizeDescriptor().requireFixed(WordSpace.BYTE)-1);
 				}
 				return null;
 			}
@@ -145,7 +146,7 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 	
 	@Override
 	public void skipRead(ChunkDataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
-		var fixed=descriptor.getFixed();
+		var fixed=descriptor.getFixed(WordSpace.BYTE);
 		if(fixed.isPresent()){
 			src.skipExact(fixed.getAsLong());
 			return;

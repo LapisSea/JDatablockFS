@@ -95,7 +95,7 @@ public class MemoryWalker{
 						LogUtil.printlnEr("unamanaged draw type:", typ);
 					}
 				}finally{
-					fieldOffset+=field.getSizeDescriptor().toBytes(size);
+					fieldOffset+=field.getSizeDescriptor().mapSize(WordSpace.BYTE, size);
 				}
 			}
 		}finally{

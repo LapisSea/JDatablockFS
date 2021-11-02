@@ -1295,7 +1295,7 @@ public abstract class BinaryDrawing{
 							LogUtil.printlnEr("unamanaged draw type:", typ);
 						}
 					}finally{
-						fieldOffset+=field.getSizeDescriptor().toBytes(size);
+						fieldOffset+=sizeDesc.mapSize(WordSpace.BYTE, size);
 					}
 				}catch(Throwable e){
 					String instStr=instanceErrStr(instance);

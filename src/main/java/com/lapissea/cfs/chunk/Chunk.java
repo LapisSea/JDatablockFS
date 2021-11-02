@@ -14,6 +14,7 @@ import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.NotImplementedException;
@@ -42,7 +43,7 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 	}
 	
 	public static Chunk readChunk(@NotNull ChunkDataProvider provider, @NotNull ChunkPointer pointer) throws IOException{
-		if(provider.getSource().getIOSize()<pointer.add(PIPE.getSizeDescriptor().getMin())) throw new MalformedPointerException(pointer+" points outside of available data");
+		if(provider.getSource().getIOSize()<pointer.add(PIPE.getSizeDescriptor().getMin(WordSpace.BYTE))) throw new MalformedPointerException(pointer+" points outside of available data");
 		Chunk chunk=new Chunk(provider, pointer);
 		try{
 			chunk.readHeader();
@@ -106,7 +107,7 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 	}
 	
 	private void calcHeaderSize(){
-		headerSize=(int)PIPE.getSizeDescriptor().calcUnknown(this);
+		headerSize=(int)PIPE.getSizeDescriptor().calcUnknown(this, WordSpace.BYTE);
 	}
 	
 	public void writeHeader() throws IOException{

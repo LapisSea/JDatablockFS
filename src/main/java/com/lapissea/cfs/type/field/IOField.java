@@ -12,10 +12,7 @@ import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
-import com.lapissea.cfs.type.FieldSet;
-import com.lapissea.cfs.type.GenericContext;
-import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.util.NotImplementedException;
@@ -138,7 +135,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 			try(var writer=new BitOutputStream(dest)){
 				writeBits(writer, instance);
 				if(DEBUG_VALIDATION){
-					writer.requireWritten(getSizeDescriptor().calcUnknown(instance));
+					writer.requireWritten(getSizeDescriptor().calcUnknown(instance, WordSpace.BIT));
 				}
 			}
 			return List.of();
@@ -150,7 +147,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 			try(var reader=new BitInputStream(src)){
 				readBits(reader, instance);
 				if(DEBUG_VALIDATION){
-					reader.requireRead(getSizeDescriptor().calcUnknown(instance));
+					reader.requireRead(getSizeDescriptor().calcUnknown(instance, WordSpace.BIT));
 				}
 			}
 		}
@@ -161,7 +158,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 			try(var reader=new BitInputStream(src)){
 				skipReadBits(reader, instance);
 				if(DEBUG_VALIDATION){
-					reader.requireRead(getSizeDescriptor().calcUnknown(instance));
+					reader.requireRead(getSizeDescriptor().calcUnknown(instance, WordSpace.BIT));
 				}
 			}
 		}

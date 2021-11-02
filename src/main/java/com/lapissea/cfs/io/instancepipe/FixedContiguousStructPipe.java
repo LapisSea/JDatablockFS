@@ -10,6 +10,7 @@ import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
@@ -43,7 +44,7 @@ public class FixedContiguousStructPipe<T extends IOInstance<T>> extends StructPi
 		maxValues=Utils.nullIfEmpty(computeMaxValues());
 		
 		if(DEBUG_VALIDATION){
-			getSizeDescriptor().requireFixed();
+			getSizeDescriptor().requireFixed(WordSpace.BYTE);
 		}
 	}
 	@Override
@@ -72,7 +73,7 @@ public class FixedContiguousStructPipe<T extends IOInstance<T>> extends StructPi
 		return sizeFieldStream()
 			.map(sizingField->{
 				var size=getType().getFields().streamDependentOn(sizingField)
-				                  .mapToLong(v->v.getSizeDescriptor().requireMax())
+				                  .mapToLong(v->v.getSizeDescriptor().requireMax(WordSpace.BYTE))
 				                  .distinct()
 				                  .mapToObj(l->NumberSize.FLAG_INFO.stream()
 				                                                   .filter(s->s.bytes==l)

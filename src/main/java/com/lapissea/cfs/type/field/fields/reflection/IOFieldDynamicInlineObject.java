@@ -13,6 +13,7 @@ import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
@@ -50,12 +51,12 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		try{
 			Struct<?>         struct =Struct.ofUnknown(Utils.typeToRaw(type));
 			SizeDescriptor<?> typDesc=ContiguousStructPipe.of(struct).getSizeDescriptor();
-			minKnownTypeSize=typDesc.getMin();
+			minKnownTypeSize=typDesc.getMin(WordSpace.BYTE);
 		}catch(IllegalArgumentException ignored){}
 		
 		var refDesc=ContiguousStructPipe.of(Reference.class).getSizeDescriptor();
 		
-		long minSize=idSize+nullSize+Math.min(refDesc.getMin(), minKnownTypeSize);
+		long minSize=idSize+nullSize+Math.min(refDesc.getMin(WordSpace.BYTE), minKnownTypeSize);
 		
 		descriptor=new SizeDescriptor.Unknown<>(minSize, OptionalLong.empty(), inst->{
 			var val=get(inst);
@@ -72,8 +73,8 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 			case Float ignored -> 4;
 			case Long ignored -> 8;
 			case Double ignored -> 8;
-			case String str -> STR_DESC.getSizeDescriptor().calcUnknown(new AutoText(str));
-			case IOInstance inst -> ContiguousStructPipe.sizeOfUnknown(inst);
+			case String str -> STR_DESC.getSizeDescriptor().calcUnknown(new AutoText(str), WordSpace.BYTE);
+			case IOInstance inst -> ContiguousStructPipe.sizeOfUnknown(inst, WordSpace.BYTE);
 			default -> throw new NotImplementedException(val.getClass()+"");
 		};
 	}
@@ -128,7 +129,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 	}
 	private void skipReadStruct(ChunkDataProvider provider, ContentReader src, GenericContext genericContext, Struct<?> struct) throws IOException{
 		var pipe =ContiguousStructPipe.of(struct);
-		var fixed=pipe.getSizeDescriptor().getFixed();
+		var fixed=pipe.getSizeDescriptor().getFixed(WordSpace.BYTE);
 		if(fixed.isPresent()){
 			src.skip(fixed.getAsLong());
 			return;

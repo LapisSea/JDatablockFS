@@ -4,6 +4,7 @@ import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.function.UnsafeBiConsumer;
@@ -32,7 +33,7 @@ public record AllocateTicket(long bytes, boolean disableResizing, ChunkPointer n
 		SizeDescriptor<IO> size=pipe.getSizeDescriptor();
 		return bytes(switch(size){
 			case SizeDescriptor.Fixed<IO> f -> f.get();
-			case SizeDescriptor.Unknown<IO> u -> Math.max(8, u.calcUnknown(data));
+			case SizeDescriptor.Unknown<IO> u -> Math.max(8, u.calcUnknown(data, WordSpace.BYTE));
 		}).shouldDisableResizing(size.hasFixed())
 		  .withDataPopulated((provider, io)->pipe.write(provider, io, data));
 	}

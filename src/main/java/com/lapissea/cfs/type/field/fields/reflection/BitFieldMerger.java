@@ -9,6 +9,7 @@ import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.type.FieldSet;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
@@ -30,6 +31,11 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 	public BitFieldMerger(List<IOField.Bit<T, ?>> group){
 		super(null);
 		assert !group.isEmpty();
+		
+		if(group.stream().anyMatch(g->g.getSizeDescriptor().getWordSpace()!=WordSpace.BIT)){
+			throw new IllegalArgumentException(group+"");
+		}
+		
 		this.group=List.copyOf(group);
 		
 		var fixedSize=Utils.bitToByte(IOFieldTools.sumVarsIfAll(group, SizeDescriptor::getFixed));
@@ -96,7 +102,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 	@Override
 	public void skipRead(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		
-		var fixed=getSizeDescriptor().getFixed();
+		var fixed=getSizeDescriptor().getFixed(WordSpace.BYTE);
 		if(fixed.isPresent()){
 			src.skip(fixed.getAsLong());
 			return;

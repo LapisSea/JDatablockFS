@@ -11,10 +11,7 @@ import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
-import com.lapissea.cfs.type.GenericContext;
-import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.Struct;
-import com.lapissea.cfs.type.TypeDefinition;
+import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
@@ -59,12 +56,12 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 		AllocateTicket t;
 		
 		var desc =instancePipe.getSizeDescriptor();
-		var fixed=desc.getFixed();
+		var fixed=desc.getFixed(WordSpace.BYTE);
 		if(fixed.isPresent()){
 			t=AllocateTicket.bytes(fixed.getAsLong()).withDisabledResizing();
 		}else{
-			var min=desc.getMin();
-			var max=desc.getMax().orElse(min+8);
+			var min=desc.getMin(WordSpace.BYTE);
+			var max=desc.getMax(WordSpace.BYTE).orElse(min+8);
 			t=AllocateTicket.bytes((min*2+max)/3);
 		}
 		Chunk chunk=t.submit(provider);
@@ -128,7 +125,7 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 	
 	@Override
 	public void skipRead(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		var fixed=referencePipe.getSizeDescriptor().getFixed();
+		var fixed=referencePipe.getSizeDescriptor().getFixed(WordSpace.BYTE);
 		if(fixed.isPresent()){
 			src.skipExact(fixed.getAsLong());
 			return;

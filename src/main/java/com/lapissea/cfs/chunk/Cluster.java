@@ -11,6 +11,7 @@ import com.lapissea.cfs.objects.collections.HashIOMap;
 import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.IOTypeDB;
+import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 
@@ -107,7 +108,7 @@ public class Cluster implements ChunkDataProvider{
 		}
 		
 		Chunk ch=getFirstChunk();
-		var   s =ROOT_PIPE.getSizeDescriptor().fixedOrMin();
+		var   s =ROOT_PIPE.getSizeDescriptor().fixedOrMin(WordSpace.BYTE);
 		if(s>ch.getSize()){
 			throw new IOException("no valid cluster data "+s+" "+ch.getSize()+" "+ch.io().getSize());
 		}

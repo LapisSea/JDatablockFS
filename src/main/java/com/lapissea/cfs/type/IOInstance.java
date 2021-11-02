@@ -96,11 +96,11 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 			}
 		}
 		
-		protected long calcSize(){
+		protected long calcSize(WordSpace wordSpace){
 			var siz=getPipe().getSizeDescriptor();
-			var f  =siz.getFixed();
+			var f  =siz.getFixed(wordSpace);
 			if(f.isPresent()) return f.getAsLong();
-			return siz.calcUnknown(self());
+			return siz.calcUnknown(self(), wordSpace);
 		}
 		
 		public Reference getReference(){

@@ -1,6 +1,5 @@
 package com.lapissea.cfs.type.field;
 
-import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.util.TextUtil;
@@ -20,6 +19,12 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 		
 		private static final Fixed<?>[] BIT_CACHE =LongStream.range(0, 8).mapToObj(i->new Fixed<>(BIT, i)).toArray(Fixed<?>[]::new);
 		private static final Fixed<?>[] BYTE_CACHE=LongStream.range(0, 16).mapToObj(i->new Fixed<>(BYTE, i)).toArray(Fixed<?>[]::new);
+		
+		public static <T extends IOInstance<T>> SizeDescriptor.Fixed<T> of(SizeDescriptor<?> size){
+			if(!size.hasFixed()) throw new IllegalArgumentException("Can not create fixed size from a non fixed descriptor "+size);
+			if(size instanceof Fixed) return (Fixed<T>)size;
+			return of(size.getWordSpace(), size.getFixed().orElseThrow());
+		}
 		
 		public static <T extends IOInstance<T>> SizeDescriptor.Fixed<T> of(long bytes){
 			if(bytes>=BYTE_CACHE.length){
@@ -63,7 +68,8 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 			//throw new ShouldNeverHappenError("Do not calculate unknown, use getFixed when it is provided");
 		}
 		
-		public long get(){return size;}
+		public long get(WordSpace wordSpace){return mapSize(wordSpace, get());}
+		public long get()                   {return size;}
 		@Override
 		public OptionalLong getFixed(){return OptionalLong.of(size);}
 		@Override
@@ -134,38 +140,22 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 		}
 	}
 	
-	default OptionalLong toBytes(OptionalLong val){
-		if(val.isEmpty()) return val;
-		return OptionalLong.of(toBytes(val.getAsLong()));
+	default long requireFixed(WordSpace wordSpace){
+		return getFixed(wordSpace).orElseThrow(()->new IllegalStateException("Fixed size is required"));
 	}
-	default long toBytes(long val){
-		return switch(getWordSpace()){
-			case BIT -> Utils.bitToByte(val);
-			case BYTE -> val;
-		};
+	default long requireMax(WordSpace wordSpace){
+		return getMax(wordSpace).orElseThrow();
 	}
 	
-	default long requireFixed(){
-		return getFixed().orElseThrow(()->new IllegalStateException("Fixed size is required"));
-	}
-	default long requireMax(){
-		return getMax().orElseThrow();
-	}
-	
-	default SizeDescriptor<Inst> maxAsFixed(){
-		if(getFixed().isPresent()) return this;
-		return new Fixed<>(getWordSpace(), requireMax());
-	}
-	
-	default long fixedOrMin(){
-		var fixed=getFixed();
+	default long fixedOrMin(WordSpace wordSpace){
+		var fixed=getFixed(wordSpace);
 		if(fixed.isPresent()) return fixed.getAsLong();
-		return getMin();
+		return getMin(wordSpace);
 	}
-	default OptionalLong fixedOrMax(){
-		var fixed=getFixed();
+	default OptionalLong fixedOrMax(WordSpace wordSpace){
+		var fixed=getFixed(wordSpace);
 		if(fixed.isPresent()) return fixed;
-		return getMax();
+		return getMax(wordSpace);
 	}
 	
 	default boolean hasFixed(){
@@ -184,4 +174,26 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 	
 	OptionalLong getMax();
 	long getMin();
+	
+	default long getMin(WordSpace wordSpace){
+		return mapSize(wordSpace, getMin());
+	}
+	default OptionalLong getMax(WordSpace wordSpace){
+		return mapSize(wordSpace, getMax());
+	}
+	default OptionalLong getFixed(WordSpace wordSpace){
+		return mapSize(wordSpace, getFixed());
+	}
+	default long calcUnknown(Inst instance, WordSpace wordSpace){
+		return mapSize(wordSpace, calcUnknown(instance));
+	}
+	
+	default OptionalLong mapSize(WordSpace targetSpace, OptionalLong val){
+		if(val.isEmpty()) return val;
+		return OptionalLong.of(mapSize(targetSpace, val.getAsLong()));
+	}
+	
+	default long mapSize(WordSpace targetSpace, long val){
+		return WordSpace.mapSize(getWordSpace(), targetSpace, val);
+	}
 }

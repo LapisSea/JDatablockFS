@@ -12,6 +12,7 @@ import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
@@ -32,9 +33,9 @@ public class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends IOField<
 		
 		instancePipe=ContiguousStructPipe.of(AutoText.class);
 		
-		int nullSize=nullable()?1:0;
+		var desc    =instancePipe.getSizeDescriptor();
+		var nullSize=WordSpace.mapSize(WordSpace.BYTE, desc.getWordSpace(), nullable()?1:0);
 		
-		var desc=instancePipe.getSizeDescriptor();
 		descriptor=new SizeDescriptor.Unknown<>(
 			desc.getWordSpace(),
 			nullable()?nullSize:desc.getMin(),

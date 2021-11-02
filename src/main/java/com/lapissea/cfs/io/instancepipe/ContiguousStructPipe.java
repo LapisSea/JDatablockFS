@@ -6,6 +6,7 @@ import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 
@@ -14,8 +15,8 @@ import java.util.List;
 
 public class ContiguousStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 	
-	public static <T extends IOInstance<T>> long sizeOfUnknown(T instance){
-		return ContiguousStructPipe.of(instance.getThisStruct()).getSizeDescriptor().calcUnknown(instance);
+	public static <T extends IOInstance<T>> long sizeOfUnknown(T instance, WordSpace wordSpace){
+		return ContiguousStructPipe.of(instance.getThisStruct()).getSizeDescriptor().calcUnknown(instance, wordSpace);
 	}
 	
 	public static <T extends IOInstance<T>> StructPipe<T> of(Class<T> type){

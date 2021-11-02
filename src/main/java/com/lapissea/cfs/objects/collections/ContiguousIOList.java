@@ -37,7 +37,7 @@ public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanaged
 		type.requireEmptyConstructor();
 		this.elementPipe=FixedContiguousStructPipe.of(type);
 		var desc=elementPipe.getSizeDescriptor();
-		sizePerElement=desc.toBytes(desc.getFixed()).orElseThrow();
+		sizePerElement=desc.getFixed(WordSpace.BYTE).orElseThrow();
 		
 		if(isSelfDataEmpty()){
 			writeManagedFields();
@@ -86,7 +86,7 @@ public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanaged
 	}
 	
 	private long calcElementOffset(long index){
-		var siz=calcSize();
+		var siz=calcSize(WordSpace.BYTE);
 		return siz+sizePerElement*index;
 	}
 	private void writeAt(long index, T value) throws IOException{

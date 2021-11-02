@@ -6,6 +6,7 @@ import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.DepSort;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IONullability;
@@ -80,7 +81,7 @@ public class IOFieldTools{
 			                                                       .findAny()
 			                                                       .orElseThrow())
 			).sort(Comparator.comparingInt((IOField<T, ?> f)->f.getSizeDescriptor().getWordSpace().sortOrder)
-			                 .thenComparingInt(f->f.getSizeDescriptor().getFixed().isPresent()?0:1)
+			                 .thenComparingInt(f->f.getSizeDescriptor().hasFixed()?0:1)
 			                 .thenComparing(f->switch(f.getDependencies().size()){
 				                 case 0 -> "";
 				                 case 1 -> f.getDependencies().get(0).getName();
@@ -109,6 +110,10 @@ public class IOFieldTools{
 	}
 	public static <T extends IOInstance<T>> long sumVars(List<? extends IOField<T, ?>> fields, ToLongFunction<SizeDescriptor<T>> mapper){
 		return fields.stream().map(IOField::getSizeDescriptor).mapToLong(mapper).sum();
+	}
+	
+	public static <T extends IOInstance<T>> WordSpace minWordSpace(List<? extends IOField<T, ?>> fields){
+		return fields.stream().map(IOField::getSizeDescriptor).map(SizeDescriptor::getWordSpace).reduce(WordSpace.MIN, WordSpace::min);
 	}
 	
 	public static <T extends IOInstance<T>> String makeArrayLenName(FieldAccessor<T> field){

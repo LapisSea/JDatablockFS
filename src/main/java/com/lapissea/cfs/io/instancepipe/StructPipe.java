@@ -10,10 +10,7 @@ import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.content.ContentOutputBuilder;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
-import com.lapissea.cfs.type.FieldSet;
-import com.lapissea.cfs.type.GenericContext;
-import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
@@ -101,32 +98,41 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	}
 	
 	private SizeDescriptor<T> calcSize(){
-		var          fields=getSpecificFields();
-		OptionalLong fixed;
-		if(type instanceof Struct.Unmanaged) fixed=OptionalLong.empty();
-		else fixed=IOFieldTools.sumVarsIfAll(fields, desc->desc.toBytes(desc.getFixed()));
-		if(fixed.isPresent()) return new SizeDescriptor.Fixed<>(fixed.getAsLong());
-		else{
-			var unknownFields=fields.stream().filter(f->!f.getSizeDescriptor().hasFixed()).toList();
-			var knownFixed   =IOFieldTools.sumVars(fields, d->d.toBytes(d.getFixed().orElse(0)));
+		var fields=getSpecificFields();
+		
+		var wordSpace  =IOFieldTools.minWordSpace(fields);
+		var isUnmanaged=type instanceof Struct.Unmanaged;
+		if(!isUnmanaged){
 			
-			var min=IOFieldTools.sumVars(fields, siz->siz.toBytes(siz.getMin()));
-			var max=IOFieldTools.sumVarsIfAll(fields, siz->siz.toBytes(siz.getMax()));
-			
-			if(unknownFields.size()==1){
-				var unknownField=unknownFields.get(0);
-				return new SizeDescriptor.Unknown<>(min, max, inst->{
-					Objects.requireNonNull(inst, ()->"instance of type "+getType()+" is null!");
-					var d=unknownField.getSizeDescriptor();
-					return knownFixed+d.calcUnknown(inst);
-				});
+			var bitSpace=IOFieldTools.sumVarsIfAll(fields, desc->desc.getFixed(wordSpace));
+			if(bitSpace.isPresent()){
+				return SizeDescriptor.Fixed.of(wordSpace, bitSpace.getAsLong());
 			}
-			
-			return new SizeDescriptor.Unknown<>(min, max, inst->{
-				Objects.requireNonNull(inst, ()->"instance of type "+getType()+" is null!");
-				return knownFixed+IOFieldTools.sumVars(unknownFields, d->d.calcUnknown(inst));
+		}
+		
+		var unknownFields=fields.stream().filter(f->!f.getSizeDescriptor().hasFixed()).toList();
+		var knownFixed   =IOFieldTools.sumVars(fields, d->d.getFixed(wordSpace).orElse(0));
+		
+		var min=IOFieldTools.sumVars(fields, siz->siz.getMin(wordSpace));
+		var max=isUnmanaged?OptionalLong.empty():IOFieldTools.sumVarsIfAll(fields, siz->siz.getMax(wordSpace));
+		
+		if(unknownFields.size()==1){
+			//TODO: support unknown bit size?
+			var unknownField=unknownFields.get(0);
+			return new SizeDescriptor.Unknown<>(wordSpace, min, max, inst->{
+				checkNull(inst);
+				var d=unknownField.getSizeDescriptor();
+				return knownFixed+d.calcUnknown(inst, wordSpace);
 			});
 		}
+		
+		return new SizeDescriptor.Unknown<>(wordSpace, min, max, inst->{
+			checkNull(inst);
+			return knownFixed+IOFieldTools.sumVars(unknownFields, d->d.calcUnknown(inst, wordSpace));
+		});
+	}
+	private void checkNull(T inst){
+		Objects.requireNonNull(inst, ()->"instance of type "+getType()+" is null!");
 	}
 	
 	
@@ -218,7 +224,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	
 	protected void writeIOFields(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
 		
-		final ContentOutputBuilder destBuff=new ContentOutputBuilder((int)getSizeDescriptor().fixedOrMax().orElse(32));
+		final ContentOutputBuilder destBuff=new ContentOutputBuilder((int)getSizeDescriptor().fixedOrMax(WordSpace.BYTE).orElse(32));
 		
 		Collection<IOField<T, ?>> dirtyMarked=new HashSet<>();
 		Consumer<List<IOField<T, ?>>> logDirty=dirt->{
@@ -241,7 +247,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 					long bytes;
 					try{
 						var desc=field.getSizeDescriptor();
-						bytes=desc.toBytes(desc.calcUnknown(instance));
+						bytes=desc.calcUnknown(instance, WordSpace.BYTE);
 					}catch(UnknownSizePredictionException e){
 						logDirty.accept(field.writeReported(provider, destBuff, instance));
 						continue;
@@ -281,7 +287,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 				long bytes;
 				try{
 					var desc=field.getSizeDescriptor();
-					bytes=desc.toBytes(desc.calcUnknown(instance));
+					bytes=desc.calcUnknown(instance, WordSpace.BYTE);
 				}catch(UnknownSizePredictionException e){
 					throw new RuntimeException("Single field write of "+selectedField+" is not currently supported!");
 				}
@@ -361,9 +367,9 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	
 	private void readFieldSafe(ChunkDataProvider provider, ContentReader src, T instance, IOField<T, ?> field, GenericContext genericContext) throws IOException{
 		var desc =field.getSizeDescriptor();
-		var fixed=desc.getFixed();
+		var fixed=desc.getFixed(WordSpace.BYTE);
 		if(fixed.isPresent()){
-			long bytes=desc.toBytes(fixed.getAsLong());
+			long bytes=fixed.getAsLong();
 			
 			var buf=src.readTicket(bytes).requireExact().submit();
 			field.readReported(provider, buf, instance, genericContext);
