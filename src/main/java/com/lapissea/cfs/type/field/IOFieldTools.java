@@ -113,7 +113,7 @@ public class IOFieldTools{
 	}
 	
 	public static <T extends IOInstance<T>> WordSpace minWordSpace(List<? extends IOField<T, ?>> fields){
-		return fields.stream().map(IOField::getSizeDescriptor).map(SizeDescriptor::getWordSpace).reduce(WordSpace.MIN, WordSpace::min);
+		return fields.stream().map(IOField::getSizeDescriptor).map(SizeDescriptor::getWordSpace).reduce(WordSpace::min).orElse(WordSpace.MIN);
 	}
 	
 	public static <T extends IOInstance<T>> String makeArrayLenName(FieldAccessor<T> field){
