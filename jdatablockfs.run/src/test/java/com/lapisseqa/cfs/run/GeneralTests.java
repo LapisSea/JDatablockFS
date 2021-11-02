@@ -16,6 +16,7 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.TypeDefinition;
 import com.lapissea.util.LogUtil;
+import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeConsumer;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -26,22 +27,30 @@ import org.junit.jupiter.params.provider.ValueSource;
 import java.io.IOException;
 import java.util.Arrays;
 
+import static com.lapissea.util.LogUtil.Init.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class GeneralTests{
 	
 	@BeforeAll
 	static void init() throws IOException{
-//		System.setProperty("com.lapissea.cfs.GlobalConfig.printCompilation", "true");
-//		LogUtil.Init.attach(USE_CALL_POS|USE_TABULATED_HEADER);
+		if(Boolean.parseBoolean(UtilL.sysPropertyByClass(GeneralTests.class, "tabPrint").orElse("false"))){
+			LogUtil.Init.attach(USE_CALL_POS|USE_TABULATED_HEADER);
+		}
 		
-		ChunkDataProvider.newVerySimpleProvider();
+		if(Boolean.parseBoolean(UtilL.sysPropertyByClass(GeneralTests.class, "earlyRunCode").orElse("true"))){
+			try(var dummy=ChunkDataProvider.newVerySimpleProvider().getSource().io()){
+				dummy.write(1);
+			}
+		}
 		
-		for(var c : Arrays.asList(Chunk.class, Reference.class, AutoText.class, Cluster.class)){
-			try{
-				Struct.ofUnknown(c);
-			}catch(Throwable e){
-				LogUtil.printlnEr(e);
+		if(Boolean.parseBoolean(UtilL.sysPropertyByClass(GeneralTests.class, "standardInit").orElse("false"))){
+			for(var c : Arrays.asList(Chunk.class, Reference.class, AutoText.class, Cluster.class, ContiguousIOList.class, LinkedIOList.class, HashIOMap.class)){
+				try{
+					Struct.ofUnknown(c);
+				}catch(Throwable e){
+					LogUtil.printlnEr(e);
+				}
 			}
 		}
 	}
