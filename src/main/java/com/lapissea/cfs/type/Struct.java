@@ -41,8 +41,12 @@ public class Struct<T extends IOInstance<T>>{
 			public StructArray(Struct<T> typ, VirtualFieldDefinition.StoragePool pool){
 				this.typ=typ;
 				if(pool==VirtualFieldDefinition.StoragePool.NONE) throw new IllegalArgumentException();
-				var count=typ.poolSizes[pool.ordinal()];
-				this.pool=count==0?null:new Object[count];
+				var sizes=typ.poolSizes;
+				if(sizes==null) this.pool=null;
+				else{
+					var count=sizes[pool.ordinal()];
+					this.pool=count==0?null:new Object[count];
+				}
 			}
 			
 			@Override
@@ -258,12 +262,17 @@ public class Struct<T extends IOInstance<T>>{
 		this.type=type;
 		fields=FieldCompiler.create().compile(this);
 		fields.forEach(IOField::init);
-		
+		poolSizes=calcPoolSizes();
+	}
+	
+	private int[] calcPoolSizes(){
 		var vPools=fields.stream().map(IOField::getAccessor).filter(f->f instanceof VirtualAccessor).map(c->((VirtualAccessor<T>)c).getStoragePool()).toList();
-		poolSizes=new int[VirtualFieldDefinition.StoragePool.values().length];
+		if(vPools.isEmpty()) return null;
+		var poolSizes=new int[VirtualFieldDefinition.StoragePool.values().length];
 		for(var vPool : vPools){
 			poolSizes[vPool.ordinal()]++;
 		}
+		return poolSizes;
 	}
 	
 	@Override
