@@ -91,12 +91,13 @@ public class Utils{
 	}
 	
 	public static <FInter, T extends FInter> T makeLambda(Method method, Class<FInter> functionalInterface){
+		Method functionalInterfaceFunction=null;
 		try{
 			var lookup=getLookup(method.getDeclaringClass(), method.getModifiers());
 			method.setAccessible(true);
 			var handle=lookup.unreflect(method);
 			
-			Method functionalInterfaceFunction=Arrays.stream(functionalInterface.getMethods()).filter(m->!Modifier.isStatic(m.getModifiers())).findAny().orElseThrow();
+			functionalInterfaceFunction=getFunctionalMethod(functionalInterface);
 			
 			MethodType signature=MethodType.methodType(functionalInterfaceFunction.getReturnType(), functionalInterfaceFunction.getParameterTypes());
 			
@@ -109,7 +110,7 @@ public class Utils{
 			
 			return (T)site.getTarget().invoke();
 		}catch(Throwable e){
-			throw new RuntimeException("failed to create lambda\n"+method+"\n"+functionalInterface, e);
+			throw new RuntimeException("failed to create lambda\n"+method+"\n"+functionalInterface+(functionalInterfaceFunction!=null?" ("+functionalInterfaceFunction.getName()+")":""), e);
 		}
 	}
 	
