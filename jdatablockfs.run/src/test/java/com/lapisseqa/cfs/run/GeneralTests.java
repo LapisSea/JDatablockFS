@@ -123,6 +123,14 @@ public class GeneralTests{
 	}
 	
 	@Test
+	void contiguousIOListBit(TestInfo info) throws IOException{
+		contiguousListEqualityTest(info, BooleanContainer.class, list->{
+			list.add(new BooleanContainer(true));
+			list.add(new BooleanContainer(false));
+		});
+	}
+	
+	@Test
 	void contiguousIOListInsert(TestInfo info) throws IOException{
 		contiguousListEqualityTest(info, Dummy.class, list->{
 			list.add(new Dummy(69));
