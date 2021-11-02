@@ -38,19 +38,19 @@ public class GeneralTests{
 			LogUtil.Init.attach(USE_CALL_POS|USE_TABULATED_HEADER);
 		}
 		
-		if(Boolean.parseBoolean(UtilL.sysPropertyByClass(GeneralTests.class, "earlyRunCode").orElse("true"))){
-			try(var dummy=ChunkDataProvider.newVerySimpleProvider().getSource().io()){
-				dummy.write(1);
-			}
-		}
-		
 		if(Boolean.parseBoolean(UtilL.sysPropertyByClass(GeneralTests.class, "standardInit").orElse("false"))){
-			for(var c : Arrays.asList(Chunk.class, Reference.class, AutoText.class, Cluster.class, ContiguousIOList.class, LinkedIOList.class, HashIOMap.class)){
+			for(var c : Arrays.asList(Chunk.class, Reference.class, AutoText.class, Cluster.RootRef.class, ContiguousIOList.class, LinkedIOList.class, HashIOMap.class)){
 				try{
 					Struct.ofUnknown(c);
 				}catch(Throwable e){
 					LogUtil.printlnEr(e);
 				}
+			}
+		}
+		
+		if(Boolean.parseBoolean(UtilL.sysPropertyByClass(GeneralTests.class, "earlyRunCode").orElse("true"))){
+			try(var dummy=AllocateTicket.bytes(1).submit(ChunkDataProvider.newVerySimpleProvider()).io()){
+				dummy.write(1);
 			}
 		}
 	}

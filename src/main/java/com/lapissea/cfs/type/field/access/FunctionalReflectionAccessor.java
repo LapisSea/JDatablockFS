@@ -219,4 +219,9 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 			throw UtilL.uncheckedThrow(e);
 		}
 	}
+	
+	@Override
+	protected String strName(){
+		return getName()+"(F)";
+	}
 }

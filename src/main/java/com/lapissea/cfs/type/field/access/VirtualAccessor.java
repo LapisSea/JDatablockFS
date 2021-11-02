@@ -6,6 +6,7 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
+import com.lapissea.util.LogUtil;
 import com.lapissea.util.Nullable;
 
 import java.lang.annotation.Annotation;
@@ -26,7 +27,19 @@ public class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends AbstractFiel
 	static{
 		try{
 			var fun=IOInstance.class.getDeclaredMethod("getVirtualPool");
-			GETTER=Utils.makeLambda(fun, Function.class);
+			
+			Function<IOInstance<?>, Struct.Pool<?>> g;
+			try{
+				g=Utils.makeLambda(fun, Function.class);
+			}catch(Throwable e){
+				//TODO: spooky error? Happens only when running with jUnit. Find out why and what
+				e.printStackTrace();
+				var s=fun.toString();
+				LogUtil.println(s);
+				Utils.makeLambda(fun, Function.class);
+				throw e;
+			}
+			GETTER=g;
 		}catch(ReflectiveOperationException e){
 			throw new RuntimeException(e);
 		}

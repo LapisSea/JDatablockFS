@@ -134,6 +134,8 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 				if(max.isPresent()) sb.append('-').append(max.getAsLong());
 				else sb.append("<?");
 				sb.append(' ');
+			}else{
+				sb.append("? ");
 			}
 			sb.append(TextUtil.plural(getWordSpace().friendlyName));
 			return sb.append('}').toString();

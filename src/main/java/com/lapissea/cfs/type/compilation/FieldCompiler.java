@@ -125,7 +125,7 @@ public class FieldCompiler{
 		
 		List<AnnotatedField<T>> toRun=new ArrayList<>(parsed);
 		
-		while(true){
+		do{
 			for(var pair : toRun){
 				for(var logicalAnn : pair.annotations){
 					for(var s : logicalAnn.logic().injectPerInstanceValue(pair.field.getAccessor(), logicalAnn.annotation())){
@@ -159,8 +159,7 @@ public class FieldCompiler{
 				UtilL.addRemainSorted(parsed, annotated);
 			}
 			newVirtualData.clear();
-			if(toRun.isEmpty()) break;
-		}
+		}while(!toRun.isEmpty());
 	}
 	
 	
