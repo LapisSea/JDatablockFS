@@ -78,26 +78,26 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	}
 	
 	protected class BulkDrawGL extends BulkDraw{
-		boolean active;
+		private boolean inactive;
 		public BulkDrawGL(DrawMode mode){
 			super(mode);
 		}
 		@Override
 		protected void start(DrawMode mode){
-			active=!isBulkDrawing();
-			if(active){
-				glErrorPrint();
-				GL11.glBegin(switch(mode){
-					case QUADS -> GL11.GL_QUADS;
-				});
-			}
+			inactive=isBulkDrawing();
+			if(inactive) return;
+			
+			glErrorPrint();
+			GL11.glBegin(switch(mode){
+				case QUADS -> GL11.GL_QUADS;
+			});
 		}
 		@Override
 		protected void end(){
-			if(active){
-				GL11.glEnd();
-				glErrorPrint();
-			}
+			if(inactive) return;
+			
+			GL11.glEnd();
+			glErrorPrint();
 		}
 	}
 	@Override

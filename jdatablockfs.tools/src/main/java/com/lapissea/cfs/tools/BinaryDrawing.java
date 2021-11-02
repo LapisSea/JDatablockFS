@@ -1013,10 +1013,6 @@ public abstract class BinaryDrawing{
 		handles[3][0]=xToOrg;
 		handles[3][1]=yToOrg;
 		drawPath(handles, true);
-
-//		drawLine(xFromOrg, yFromOrg, xFrom, yFrom);
-//		drawLine(xToOrg, yToOrg, xTo, yTo);
-//		drawArrow(xFrom, yFrom, xTo, yTo);
 		
 		if(!ptr.message().isEmpty()){
 			float
@@ -1292,7 +1288,7 @@ public abstract class BinaryDrawing{
 								if(annotate) annotateByteField(cluster, ctx, pointerRecord, instance, field, col, reference, Range.fromSize(fieldOffset, size));
 								continue;
 							}
-							LogUtil.printlnEr("unamanaged draw type:", typ);
+							LogUtil.printlnEr("unmanaged draw type:", typ);
 						}
 					}finally{
 						fieldOffset+=sizeDesc.mapSize(WordSpace.BYTE, size);
