@@ -26,6 +26,9 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Random;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static com.lapissea.util.LogUtil.Init.*;
 import static org.junit.jupiter.api.Assertions.*;
@@ -119,15 +122,18 @@ public class GeneralTests{
 		contiguousListEqualityTest(info, Dummy.class, list->{
 			list.add(new Dummy(69));
 			list.add(new Dummy(420));
-		});
+		}, false);
 	}
 	
 	@Test
 	void contiguousIOListBit(TestInfo info) throws IOException{
 		contiguousListEqualityTest(info, BooleanContainer.class, list->{
-			list.add(new BooleanContainer(true));
-			list.add(new BooleanContainer(false));
-		});
+			var rand=new Random(1);
+			var vals=IntStream.range(0, 100)
+			                  .mapToObj(i->new BooleanContainer(rand.nextBoolean()))
+			                  .collect(Collectors.toList());
+			list.addAll(vals);
+		}, true);
 	}
 	
 	@Test
@@ -137,7 +143,7 @@ public class GeneralTests{
 			list.add(new Dummy(420));
 			
 			list.add(1, new Dummy(360));
-		});
+		}, false);
 	}
 	
 	@Test
@@ -148,7 +154,7 @@ public class GeneralTests{
 			list.add(new Dummy(420));
 			list.remove(1);
 			list.remove(1);
-		});
+		}, false);
 	}
 	
 	@Test
@@ -240,20 +246,20 @@ public class GeneralTests{
 		});
 	}
 	
-	static <T extends IOInstance<T>> void linkedListEqualityTest(TestInfo info, Class<T> typ, UnsafeConsumer<IOList<T>, IOException> session) throws IOException{
+	static <T extends IOInstance<T>> void linkedListEqualityTest(TestInfo info, Class<T> typ, UnsafeConsumer<IOList<T>, IOException> session, boolean useCluster) throws IOException{
 		TestUtils.ioListComplianceSequence(
 			info, 10,
 			LinkedIOList<T>::new,
 			TypeDefinition.of(LinkedIOList.class, typ),
-			session
+			session, useCluster
 		);
 	}
-	static <T extends IOInstance<T>> void contiguousListEqualityTest(TestInfo info, Class<T> typ, UnsafeConsumer<IOList<T>, IOException> session) throws IOException{
+	static <T extends IOInstance<T>> void contiguousListEqualityTest(TestInfo info, Class<T> typ, UnsafeConsumer<IOList<T>, IOException> session, boolean useCluster) throws IOException{
 		TestUtils.ioListComplianceSequence(
 			info, 64,
 			ContiguousIOList<T>::new,
 			TypeDefinition.of(ContiguousIOList.class, typ),
-			session
+			session, useCluster
 		);
 	}
 	
@@ -261,7 +267,7 @@ public class GeneralTests{
 	void linkedListSingleAdd(TestInfo info) throws IOException{
 		linkedListEqualityTest(info, Dummy.class, list->{
 			list.add(Dummy.first());
-		});
+		}, false);
 	}
 	
 	@Test
@@ -270,7 +276,7 @@ public class GeneralTests{
 			list.add(Dummy.first());
 			list.add(Dummy.auto());
 			list.add(Dummy.auto());
-		});
+		}, false);
 	}
 	@Test
 	void linkedListAddRemove(TestInfo info) throws IOException{
@@ -286,6 +292,6 @@ public class GeneralTests{
 			list.remove(0);
 			list.remove(1);
 			list.remove(0);
-		});
+		}, false);
 	}
 }

@@ -83,9 +83,10 @@ public class TestUtils{
 		TestInfo info, int initalCapacity,
 		Struct.Unmanaged.Constr<T> constr,
 		TypeDefinition typeDef,
-		UnsafeConsumer<T, IOException> session
+		UnsafeConsumer<T, IOException> session,
+		boolean useCluster
 	) throws IOException{
-		testChunkProvider(info, provider->{
+		UnsafeConsumer<ChunkDataProvider, IOException> ses=provider->{
 			var chunk=AllocateTicket.bytes(initalCapacity).submit(provider);
 			var ref  =chunk.getPtr().makeReference(0);
 			
@@ -95,6 +96,10 @@ public class TestUtils{
 			
 			if(actualSize>initalCapacity){
 				LogUtil.printlnEr("WARNING: initial capacity is", initalCapacity, "but object has allocated", actualSize);
+			}
+			
+			if(provider instanceof Cluster c){
+				c.getTemp().put("test_obj", obj);
 			}
 			
 			session.accept(obj);
@@ -107,7 +112,13 @@ public class TestUtils{
 			}
 			
 			assertEquals(obj, read);
-		});
+		};
+		
+		if(useCluster){
+			testCluster(info, ses::accept);
+		}else{
+			testChunkProvider(info, ses);
+		}
 	}
 	
 	private static <T> void checkCompliance(T test, T compliance){
@@ -122,12 +133,12 @@ public class TestUtils{
 		TestInfo info, int initalCapacity,
 		Struct.Unmanaged.Constr<T> constr,
 		TypeDefinition typeDef,
-		UnsafeConsumer<IOList<E>, IOException> session
+		UnsafeConsumer<IOList<E>, IOException> session, boolean useCluster
 	) throws IOException{
 		complexObjectIntegrityTest(info, initalCapacity, constr, typeDef, list->{
 			var splitter=Splitter.list(list, new ReferenceMemoryIOList<>(), TestUtils::checkCompliance);
 			session.accept(splitter);
-		});
+		}, useCluster);
 	}
 	
 	
@@ -141,7 +152,7 @@ public class TestUtils{
 		complexObjectIntegrityTest(info, initial, constr, typeDef, map->{
 			var splitter=Splitter.map(map, new ReferenceMemoryIOMap<>(), TestUtils::checkCompliance);
 			session.accept(splitter);
-		});
+		}, false);
 	}
 	
 }
