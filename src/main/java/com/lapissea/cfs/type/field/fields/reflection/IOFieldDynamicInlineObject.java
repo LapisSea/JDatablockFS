@@ -10,10 +10,7 @@ import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.objects.text.AutoText;
-import com.lapissea.cfs.type.GenericContext;
-import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.Struct;
-import com.lapissea.cfs.type.WordSpace;
+import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
@@ -91,7 +88,8 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 			default -> throw new NotImplementedException(val.getClass()+"");
 		}
 	}
-	private Object readTyp(Class<?> typ, ChunkDataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+	private Object readTyp(TypeDefinition typDef, ChunkDataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+		var typ=typDef.getTypeClass();
 		if(typ==Boolean.class) return src.readBoolean();
 		if(typ==Integer.class) return (int)NumberSize.INT.read(src);
 		if(typ==Float.class) return (float)NumberSize.INT.readFloating(src);
@@ -101,7 +99,8 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		if(UtilL.instanceOf(typ, IOInstance.class)) return readStruct(provider, src, genericContext, Struct.ofUnknown(typ));
 		throw new NotImplementedException(typ+"");
 	}
-	private void skipReadTyp(Class<?> typ, ChunkDataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+	private void skipReadTyp(TypeDefinition typDef, ChunkDataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+		var        typ=typDef.getTypeClass();
 		NumberSize siz=null;
 		if(typ==Boolean.class) siz=NumberSize.BYTE;
 		else if(typ==Integer.class||typ==Float.class) siz=NumberSize.INT;
@@ -180,7 +179,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		return List.of();
 	}
 	
-	private Class<?> readType(ChunkDataProvider provider, ContentReader src) throws IOException{
+	private TypeDefinition readType(ChunkDataProvider provider, ContentReader src) throws IOException{
 		int id=src.readInt4();
 		return provider.getTypeDb().fromID(id);
 	}
@@ -197,7 +196,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 				}
 			}
 			
-			Class<?> typ=readType(provider, src);
+			TypeDefinition typ=readType(provider, src);
 			val=readTyp(typ, provider, src, genericContext);
 		}
 		//noinspection unchecked
@@ -212,7 +211,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 			}
 		}
 		
-		Class<?> typ=readType(provider, src);
+		TypeDefinition typ=readType(provider, src);
 		skipReadTyp(typ, provider, src, genericContext);
 	}
 }

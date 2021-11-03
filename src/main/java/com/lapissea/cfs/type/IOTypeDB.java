@@ -4,7 +4,6 @@ import com.lapissea.cfs.chunk.ChunkDataProvider;
 import com.lapissea.cfs.objects.collections.HashIOMap;
 import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.type.field.annotations.IOValue;
-import com.lapissea.util.NotImplementedException;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -14,11 +13,15 @@ public interface IOTypeDB{
 	
 	class MemoryOnlyDB implements IOTypeDB{
 		
-		private final Map<Integer, Class<?>> idToTyp=new HashMap<>();
-		private final Map<Class<?>, Integer> typToID=new HashMap<>();
+		private final Map<Integer, TypeDefinition> idToTyp=new HashMap<>();
+		private final Map<TypeDefinition, Integer> typToID=new HashMap<>();
 		
 		@Override
 		public int toID(Class<?> type){
+			return toID(TypeDefinition.of(type));
+		}
+		@Override
+		public int toID(TypeDefinition type){
 			synchronized(typToID){
 				var id=typToID.get(type);
 				if(id!=null) return id;
@@ -26,7 +29,7 @@ public interface IOTypeDB{
 			}
 		}
 		
-		private int newID(Class<?> type){
+		private int newID(TypeDefinition type){
 			var newID=maxID()+1;
 			idToTyp.put(newID, type);
 			typToID.put(type, newID);
@@ -34,7 +37,7 @@ public interface IOTypeDB{
 		}
 		
 		@Override
-		public Class<?> fromID(int id){
+		public TypeDefinition fromID(int id){
 			synchronized(typToID){
 				var type=idToTyp.get(id);
 				if(type==null){
@@ -44,7 +47,7 @@ public interface IOTypeDB{
 			}
 		}
 		
-		public boolean hasType(Class<?> type){
+		public boolean hasType(TypeDefinition type){
 			return typToID.containsKey(type);
 		}
 		public boolean hasID(int id){
@@ -60,7 +63,7 @@ public interface IOTypeDB{
 		
 		@IOValue
 		@IOValue.OverrideType(HashIOMap.class)
-		private IOMap<Integer, String> data;
+		private IOMap<Integer, TypeDefinition> data;
 		
 		private static final MemoryOnlyDB BUILT_IN=new MemoryOnlyDB();
 		
@@ -70,15 +73,14 @@ public interface IOTypeDB{
 		}
 		
 		@Override
-		public int toID(Class<?> type) throws IOException{
+		public int toID(TypeDefinition type) throws IOException{
 			if(BUILT_IN.hasType(type)){
 				return BUILT_IN.toID(type);
 			}
 			
-			String nam=type.getName();
-			int    max=0;
+			int max=0;
 			for(var entry : data.entries()){
-				if(entry.getValue().equals(nam)){
+				if(entry.getValue().equals(type)){
 					return entry.getKey();
 				}
 				max=Math.max(entry.getKey(), max);
@@ -87,12 +89,12 @@ public interface IOTypeDB{
 			max=Math.max(BUILT_IN.maxID(), max);
 			
 			var newID=max+1;
-			data.put(newID, nam);
+			data.put(newID, type);
 			return newID;
 		}
 		
 		@Override
-		public Class<?> fromID(int id) throws IOException{
+		public TypeDefinition fromID(int id) throws IOException{
 			if(BUILT_IN.hasID(id)){
 				return BUILT_IN.fromID(id);
 			}
@@ -101,19 +103,19 @@ public interface IOTypeDB{
 			if(type==null){
 				throw new RuntimeException("Unknown type from ID of "+id);
 			}
-			try{
-				return Class.forName(type);
-			}catch(ClassNotFoundException e){
-				//TODO: Need to generate classes when their backing code is missing
-				throw NotImplementedException.infer();
-			}
+			
+			return type;
 		}
 		public void init(ChunkDataProvider provider) throws IOException{
 			allocateNulls(provider);
 		}
 	}
 	
-	int toID(Class<?> type) throws IOException;
-	Class<?> fromID(int id) throws IOException;
+	default int toID(Class<?> type) throws IOException{
+		return toID(TypeDefinition.of(type));
+	}
+	
+	int toID(TypeDefinition type) throws IOException;
+	TypeDefinition fromID(int id) throws IOException;
 	
 }

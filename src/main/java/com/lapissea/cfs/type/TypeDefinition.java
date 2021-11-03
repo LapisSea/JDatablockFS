@@ -16,7 +16,7 @@ import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
-public class TypeDefinition{
+public class TypeDefinition extends IOInstance<TypeDefinition>{
 	
 	public static class Check{
 		private final Consumer<Class<?>>             rawCheck;
@@ -138,6 +138,7 @@ public class TypeDefinition{
 	public String toString(){
 		return getTypeClass().getName()+(args.length==0?"":Arrays.stream(args).map(TypeDefinition::toString).collect(Collectors.joining(", ", "<", ">")));
 	}
+	@Override
 	public String toShortString(){
 		return getTypeClass().getSimpleName()+(args.length==0?"":Arrays.stream(args).map(TypeDefinition::toShortString).collect(Collectors.joining(", ", "<", ">")));
 	}
