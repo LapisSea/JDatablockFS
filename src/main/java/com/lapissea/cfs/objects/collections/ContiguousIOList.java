@@ -2,6 +2,7 @@ package com.lapissea.cfs.objects.collections;
 
 import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.ChunkDataProvider;
+import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
@@ -10,6 +11,7 @@ import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.AbstractFieldAccessor;
 import com.lapissea.util.LogUtil;
+import com.lapissea.util.function.UnsafeLongConsumer;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
@@ -27,8 +29,7 @@ public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanaged
 		})
 	);
 	
-	private final long          sizePerElement;
-	private final StructPipe<T> elementPipe;
+	private final FixedContiguousStructPipe<T> elementPipe;
 	
 	public ContiguousIOList(ChunkDataProvider provider, Reference reference, TypeDefinition typeDef) throws IOException{
 		super(provider, reference, typeDef);
@@ -36,8 +37,6 @@ public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanaged
 		var type=(Struct<T>)typeDef.argAsStruct(0);
 		type.requireEmptyConstructor();
 		this.elementPipe=FixedContiguousStructPipe.of(type);
-		var desc=elementPipe.getSizeDescriptor();
-		sizePerElement=desc.getFixed(WordSpace.BYTE).orElseThrow();
 		
 		if(isSelfDataEmpty()){
 			writeManagedFields();
@@ -47,8 +46,13 @@ public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanaged
 		readManagedFields();
 	}
 	
-	private static <T extends IOInstance<T>> IOField<ContiguousIOList<T>, ?> eField(Type elementType, long sizePerElement, long index){
-		return new IOField.Ref.NoIO<ContiguousIOList<T>, T>(new AbstractFieldAccessor<>(null, "Element["+index+"]"){
+	@Override
+	protected StructPipe<ContiguousIOList<T>> newPipe(){
+		return FixedContiguousStructPipe.of(getThisStruct());
+	}
+	
+	private static <T extends IOInstance<T>> IOField<ContiguousIOList<T>, ?> eField(Type elementType, SizeDescriptor.Fixed<T> desc, long index){
+		return new IOField.NoIO<ContiguousIOList<T>, T>(new AbstractFieldAccessor<>(null, "Element["+index+"]"){
 			@Override
 			public Type getGenericType(GenericContext genericContext){
 				return elementType;
@@ -66,28 +70,23 @@ public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanaged
 					throw new RuntimeException(e);
 				}
 			}
-		}, SizeDescriptor.Fixed.of(sizePerElement)){
-			@Override
-			public Reference getReference(ContiguousIOList<T> instance){
-				return instance.getReference().addOffset(instance.calcElementOffset(index));
-			}
-			@Override
-			public StructPipe<T> getReferencedPipe(ContiguousIOList<T> instance){
-				return instance.elementPipe;
-			}
-		};
+		}, SizeDescriptor.Fixed.of(desc));
 	}
 	
 	@Override
 	public Stream<IOField<ContiguousIOList<T>, ?>> listUnmanagedFields(){
-		var typ=getTypeDef().arg(0).generic();
-		var siz=sizePerElement;
-		return LongStream.range(0, size()).mapToObj(index->eField(typ, siz, index));
+		var                     typ =getTypeDef().arg(0).generic();
+		SizeDescriptor.Fixed<T> desc=elementPipe.getFixedDescriptor();
+		return LongStream.range(0, size()).mapToObj(index->eField(typ, desc, index));
 	}
 	
 	private long calcElementOffset(long index){
-		var siz=calcSize(WordSpace.BYTE);
-		return siz+sizePerElement*index;
+		var headSiz=calcInstanceSize(WordSpace.BYTE);
+		var siz    =getElementSize();
+		return headSiz+siz*index;
+	}
+	private long getElementSize(){
+		return elementPipe.getFixedDescriptor().get();
 	}
 	private void writeAt(long index, T value) throws IOException{
 		try(var io=selfIO()){
@@ -140,6 +139,51 @@ public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanaged
 	}
 	
 	@Override
+	public void addAll(Collection<T> values) throws IOException{
+		requestCapacity(size()+values.size());
+		
+		try(var io=selfIO()){
+			var pos=calcElementOffset(size());
+			io.skipExact(pos);
+			var elSiz=getElementSize();
+			io.setSize(pos+values.size()*elSiz);
+			
+			long targetBytes=512;
+			long targetCount=Math.min(values.size(), Math.max(1, targetBytes/elSiz));
+			
+			var targetCap=targetCount*elSiz;
+			
+			var mem=MemoryData.build().withCapacity((int)targetCap).build();
+			try(var buffIo=mem.io()){
+				UnsafeLongConsumer<IOException> flush=change->{
+					buffIo.setCapacity(buffIo.getPos());
+					mem.transferTo(io);
+					deltaSize(change);
+					buffIo.setPos(0);
+				};
+				
+				long lastI=0;
+				long i    =0;
+				for(T value : values){
+					elementPipe.write(this, buffIo, value);
+					i++;
+					var s=buffIo.getPos();
+					if(s>=targetCap){
+						var change=i-lastI;
+						lastI=i;
+						flush.accept(change);
+					}
+				}
+				
+				if(buffIo.getPos()>0){
+					var change=i-lastI;
+					flush.accept(change);
+				}
+			}
+		}
+	}
+	
+	@Override
 	public void remove(long index) throws IOException{
 		checkSize(index);
 		
@@ -154,7 +198,8 @@ public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanaged
 	
 	private void shift(long index, ShiftAction action) throws IOException{
 		try(var io=selfIO()){
-			byte[] buff=new byte[Math.toIntExact(sizePerElement)];
+			var    siz =getElementSize();
+			byte[] buff=new byte[Math.toIntExact(siz)];
 			
 			int dummy=switch(action){
 				case SQUASH -> {

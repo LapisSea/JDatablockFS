@@ -100,7 +100,7 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 			}
 		}
 		
-		protected long calcSize(WordSpace wordSpace){
+		protected long calcInstanceSize(WordSpace wordSpace){
 			var siz=getPipe().getSizeDescriptor();
 			var f  =siz.getFixed(wordSpace);
 			if(f.isPresent()) return f.getAsLong();
