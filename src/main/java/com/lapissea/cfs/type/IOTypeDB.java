@@ -66,10 +66,14 @@ public interface IOTypeDB{
 		private IOMap<Integer, TypeDefinition> data;
 		
 		private static final MemoryOnlyDB BUILT_IN=new MemoryOnlyDB();
+		private static final int          FIRST_ID;
 		
 		static{
 			BUILT_IN.toID(Integer.class);
 			BUILT_IN.toID(String.class);
+			BUILT_IN.toID(TypeDefinition.class);
+			
+			FIRST_ID=BUILT_IN.maxID();
 		}
 		
 		@Override
@@ -86,7 +90,7 @@ public interface IOTypeDB{
 				max=Math.max(entry.getKey(), max);
 			}
 			
-			max=Math.max(BUILT_IN.maxID(), max);
+			max=Math.max(FIRST_ID, max);
 			
 			var newID=max+1;
 			data.put(newID, type);

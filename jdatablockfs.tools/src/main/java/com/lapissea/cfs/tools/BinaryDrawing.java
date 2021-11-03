@@ -6,6 +6,7 @@ import com.lapissea.cfs.exceptions.MalformedPointerException;
 import com.lapissea.cfs.io.ChunkChainIO;
 import com.lapissea.cfs.io.bit.FlagReader;
 import com.lapissea.cfs.io.impl.MemoryData;
+import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
@@ -13,6 +14,7 @@ import com.lapissea.cfs.objects.INumber;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.tools.logging.MemFrame;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.annotations.IOType;
@@ -27,6 +29,7 @@ import org.joml.SimplexNoise;
 import java.awt.*;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
+import java.lang.reflect.Array;
 import java.util.List;
 import java.util.*;
 import java.util.function.Consumer;
@@ -1284,11 +1287,24 @@ public abstract class BinaryDrawing{
 								}
 								continue;
 							}
+							if(typ.isArray()&&IOInstance.isManaged(typ.componentType())){
+								var inst  =(IOInstance<?>[])field.get(instance);
+								var arrSiz=Array.getLength(inst);
+								
+								StructPipe elementPipe=ContiguousStructPipe.of(Struct.ofUnknown(typ.componentType()));
+								long       arrOffset  =0;
+								for(int i=0;i<arrSiz;i++){
+									var val=(IOInstance)Array.get(inst, i);
+									annotateStruct(ctx, cluster, stack, val, reference.addOffset(fieldOffset+arrOffset), elementPipe, pointerRecord, annotate);
+									arrOffset+=elementPipe.getSizeDescriptor().calcUnknown(val, WordSpace.BYTE);
+								}
+								continue;
+							}
 							if(typ==String.class){
 								if(annotate) annotateByteField(cluster, ctx, pointerRecord, instance, field, col, reference, Range.fromSize(fieldOffset, size));
 								continue;
 							}
-							LogUtil.printlnEr("unmanaged draw type:", typ);
+							LogUtil.printlnEr("unmanaged draw type:", typ.toString());
 						}
 					}finally{
 						fieldOffset+=sizeDesc.mapSize(WordSpace.BYTE, size);

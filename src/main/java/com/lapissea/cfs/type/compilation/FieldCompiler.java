@@ -407,6 +407,18 @@ public class FieldCompiler{
 				return new IOFieldByteArray<>(field);
 			}
 		});
+		REGISTRY.register(new RegistryNode(){
+			@Override
+			public boolean canCreate(Type type, GetAnnotation annotations){
+				var raw=Utils.typeToRaw(type);
+				if(!raw.isArray()) return false;
+				return IOInstance.isManaged(raw.componentType());
+			}
+			@Override
+			public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
+				return new IOFieldInstanceArray<>(field);
+			}
+		});
 		REGISTRY.register(new RegistryNode.InstanceOf<String>(){
 			@Override
 			public Class<String> getType(){
