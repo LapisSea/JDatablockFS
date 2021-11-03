@@ -60,7 +60,7 @@ class FSFTest{
 //		var meta=provider.getGenericTypes();
 //		meta.add(new StructLayout("This is a test!"));
 		
-		IOMap<Integer, Object> map=provider.getTemp();
+		IOMap<Object, Object> map=provider.getTemp();
 		
 		Random r=new Random();
 		r.setSeed(1);

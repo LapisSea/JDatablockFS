@@ -68,8 +68,12 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 			return reference.io(provider);
 		}
 		
+		protected StructPipe<SELF> newPipe(){
+			return ContiguousStructPipe.of(getThisStruct());
+		}
+		
 		public StructPipe<SELF> getPipe(){
-			if(pipe==null) pipe=ContiguousStructPipe.of(getThisStruct());
+			if(pipe==null) pipe=newPipe();
 			return pipe;
 		}
 		

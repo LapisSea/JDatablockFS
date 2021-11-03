@@ -86,7 +86,7 @@ public class Cluster implements ChunkDataProvider{
 		@IOValue
 		@IONullability(NULLABLE)
 		@IOValue.OverrideType(value=HashIOMap.class)
-		public IOMap<Integer, Object> temp;
+		public IOMap<Object, Object> temp;
 		
 		@IOValue
 		@IONullability(NULLABLE)
@@ -132,7 +132,7 @@ public class Cluster implements ChunkDataProvider{
 		return getRoot().metadata;
 	}
 	
-	public IOMap<Integer, Object> getTemp(){
+	public IOMap<Object, Object> getTemp(){
 		return meta().temp;
 	}
 	

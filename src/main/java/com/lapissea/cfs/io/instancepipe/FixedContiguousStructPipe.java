@@ -44,7 +44,9 @@ public class FixedContiguousStructPipe<T extends IOInstance<T>> extends StructPi
 		maxValues=Utils.nullIfEmpty(computeMaxValues());
 		
 		if(DEBUG_VALIDATION){
-			getSizeDescriptor().requireFixed(WordSpace.BYTE);
+			if(!(type instanceof Struct.Unmanaged)){
+				getSizeDescriptor().requireFixed(WordSpace.BYTE);
+			}
 		}
 	}
 	@Override

@@ -143,7 +143,7 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 	}
 	
 	default long requireFixed(WordSpace wordSpace){
-		return getFixed(wordSpace).orElseThrow(()->new IllegalStateException("Fixed size is required"));
+		return getFixed(wordSpace).orElseThrow(()->new IllegalStateException("Fixed size is required "+this));
 	}
 	default long requireMax(WordSpace wordSpace){
 		return getMax(wordSpace).orElseThrow();
