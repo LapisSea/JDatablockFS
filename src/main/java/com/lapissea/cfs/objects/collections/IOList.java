@@ -5,6 +5,7 @@ import com.lapissea.util.Nullable;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.Spliterator;
 import java.util.function.Consumer;
@@ -133,6 +134,13 @@ public interface IOList<T> extends IterablePP<T>{
 	
 	void add(long index, T value) throws IOException;
 	void add(T value) throws IOException;
+	
+	default void addAll(Collection<T> values) throws IOException{
+		requestCapacity(size()+values.size());
+		for(T value : values){
+			add(value);
+		}
+	}
 	
 	void remove(long index) throws IOException;
 	

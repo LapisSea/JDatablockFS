@@ -7,6 +7,7 @@ import com.lapissea.util.function.UnsafeBiConsumer;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
+import java.util.Collection;
 
 public class Splitter{
 	
@@ -82,6 +83,12 @@ public class Splitter{
 			public void add(E value) throws IOException{
 				a.add(value);
 				b.add(value);
+				test();
+			}
+			@Override
+			public void addAll(Collection<E> values) throws IOException{
+				a.addAll(values);
+				b.addAll(values);
 				test();
 			}
 			@Override
