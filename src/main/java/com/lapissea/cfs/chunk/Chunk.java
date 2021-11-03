@@ -175,10 +175,15 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 			}
 		}
 	}
-	
-	
-	public void incrementSize(long amount) throws BitDepthOutOfSpaceException{
-		setSize(getSize()+amount);
+	public void growSizeAndZeroOut(long newSize) throws IOException{
+		if(newSize>getCapacity()){
+			throw new IllegalArgumentException("newSize("+newSize+") is bigger than capacity("+getCapacity()+") on "+this);
+		}
+		
+		var oldSize=getSize();
+		zeroOutFromTo(oldSize, newSize);
+		setSizeUnsafe(newSize);
+		
 	}
 	
 	public void sizeSetZero(){
@@ -200,6 +205,10 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		assert newSize<=getCapacity():newSize+" > "+getCapacity();
 		getBodyNumSize().ensureCanFit(newSize);
 		
+		setSizeUnsafe(newSize);
+	}
+	
+	private void setSizeUnsafe(long newSize){
 		markDirty();
 		this.size=newSize;
 	}

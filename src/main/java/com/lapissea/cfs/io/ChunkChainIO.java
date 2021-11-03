@@ -351,9 +351,15 @@ public class ChunkChainIO implements RandomIO{
 	public void setSize(long targetSize) throws IOException{
 		long remaining=targetSize;
 		
+		assert getCapacity()>=targetSize:getCapacity()+">="+targetSize;
+		
 		Chunk chunk=head;
 		while(true){
-			chunk.clampSize(remaining);
+			if(remaining<chunk.getSize()){
+				chunk.clampSize(remaining);
+			}else{
+				chunk.growSizeAndZeroOut(Math.min(chunk.getCapacity(), remaining));
+			}
 			chunk.syncStruct();
 			
 			var newSize=chunk.getSize();
@@ -370,7 +376,7 @@ public class ChunkChainIO implements RandomIO{
 			var siz   =chunk.getSize();
 			var cap   =chunk.getCapacity();
 			var newSiz=siz+remaining;
-			if(cap<newSiz) throw new IOException("size too big!");
+			if(cap<newSiz) throw new IOException("size too big! "+cap+" "+newSiz);
 			
 			try{
 				chunk.setSize(newSiz);
