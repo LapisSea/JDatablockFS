@@ -352,13 +352,34 @@ public class ChunkChainIO implements RandomIO{
 		long remaining=targetSize;
 		
 		Chunk chunk=head;
-		do{
+		while(true){
 			chunk.clampSize(remaining);
 			chunk.syncStruct();
 			
 			var newSize=chunk.getSize();
 			remaining=Math.max(0, remaining-newSize);
-		}while((chunk=chunk.next())!=null);
+			
+			var next=chunk.next();
+			if(next==null){
+				break;
+			}
+			chunk=next;
+		}
+		
+		if(remaining>0){
+			var siz   =chunk.getSize();
+			var cap   =chunk.getCapacity();
+			var newSiz=siz+remaining;
+			if(cap<newSiz) throw new IOException("size too big!");
+			
+			try{
+				chunk.setSize(newSiz);
+			}catch(BitDepthOutOfSpaceException e){
+				//capacity ensures bitspace is large enough
+				throw new ShouldNeverHappenError();
+			}
+			chunk.syncStruct();
+		}
 		
 		assert targetSize==getSize():targetSize+"!="+getSize();
 	}
