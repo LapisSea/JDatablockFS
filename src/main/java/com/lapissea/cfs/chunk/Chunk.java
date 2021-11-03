@@ -102,6 +102,11 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		}
 		
 		assert capacity>=size;
+		try{
+			bodyNumSize.ensureCanFit(capacity);
+		}catch(BitDepthOutOfSpaceException e){
+			throw new IllegalArgumentException("capacity("+capacity+") can not fit in to "+bodyNumSize, e);
+		}
 		
 		calcHeaderSize();
 	}

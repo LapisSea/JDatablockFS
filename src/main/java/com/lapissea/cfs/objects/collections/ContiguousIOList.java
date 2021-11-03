@@ -11,6 +11,7 @@ import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.AbstractFieldAccessor;
 import com.lapissea.util.LogUtil;
+import com.lapissea.util.NotNull;
 import com.lapissea.util.function.UnsafeLongConsumer;
 
 import java.io.IOException;
@@ -140,13 +141,14 @@ public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanaged
 	
 	@Override
 	public void addAll(Collection<T> values) throws IOException{
-		requestCapacity(size()+values.size());
 		
 		try(var io=selfIO()){
 			var pos=calcElementOffset(size());
 			io.skipExact(pos);
-			var elSiz=getElementSize();
-			io.setSize(pos+values.size()*elSiz);
+			var elSiz   =getElementSize();
+			var totalPos=pos+values.size()*elSiz;
+			io.ensureCapacity(totalPos);
+			io.setSize(totalPos);
 			
 			long targetBytes=512;
 			long targetCount=Math.min(values.size(), Math.max(1, targetBytes/elSiz));
@@ -263,5 +265,10 @@ public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanaged
 		LogUtil.println(chunks);
 		
 		prov.getMemoryManager().free(new ArrayList<>(chunks));
+	}
+	@NotNull
+	@Override
+	protected String getStringPrefix(){
+		return "C";
 	}
 }
