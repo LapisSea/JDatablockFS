@@ -76,7 +76,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		}
 		
 		@Override
-		public Stream<IOField<Node<T>, ?>> listUnmanagedFields(){
+		public Stream<IOField<Node<T>, ?>> listDynamicUnmanagedFields(){
 			var that=this;
 			
 			var valueAccessor=new AbstractFieldAccessor<Node<T>>(null, "value"){

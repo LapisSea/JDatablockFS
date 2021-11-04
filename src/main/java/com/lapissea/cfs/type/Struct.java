@@ -110,11 +110,33 @@ public class Struct<T extends IOInstance<T>>{
 			return compile(instanceClass, Unmanaged::new);
 		}
 		
-		private Constr<T> unmanagedConstructor;
+		private       Constr<T>   unmanagedConstructor;
+		private final boolean     overridingDynamicUnmanaged;
+		private final FieldSet<T> staticUnmanagedFields;
 		
 		public Unmanaged(Class<T> type){
 			super(type);
+			overridingDynamicUnmanaged=checkOverridingUnmanaged();
+			staticUnmanagedFields=FieldCompiler.create().compileStaticUnmanaged(this);
 		}
+		
+		private boolean checkOverridingUnmanaged(){
+			boolean u;
+			try{
+				u=!getType().getMethod("listDynamicUnmanagedFields").getDeclaringClass().equals(IOInstance.Unmanaged.class);
+			}catch(NoSuchMethodException e){
+				throw new RuntimeException(e);
+			}
+			return u;
+		}
+		
+		public FieldSet<T> getStaticUnmanagedFields(){
+			return staticUnmanagedFields;
+		}
+		public boolean isOverridingDynamicUnmanaged(){
+			return overridingDynamicUnmanaged;
+		}
+		
 		public Constr<T> requireUnmanagedConstructor(){
 			if(unmanagedConstructor==null){
 				unmanagedConstructor=Utils.findConstructor(getType(), Constr.class, Utils.getFunctionalMethod(Constr.class).getParameterTypes());
@@ -143,7 +165,7 @@ public class Struct<T extends IOInstance<T>>{
 				sb.append(field.getName()).append("=").append(str);
 				comma=true;
 			}
-			var iter=instance.listUnmanagedFields().iterator();
+			var iter=instance.listDynamicUnmanagedFields().iterator();
 			while(iter.hasNext()){
 				var field=iter.next();
 				var str  =field.instanceToString(instance, doShort);

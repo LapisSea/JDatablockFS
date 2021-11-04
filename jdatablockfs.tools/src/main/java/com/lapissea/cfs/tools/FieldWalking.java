@@ -80,7 +80,7 @@ class FieldWalking{
 			var tyo=pipe.getType().getFields();
 			set.addAll(tyo);
 			if(instance instanceof IOInstance.Unmanaged<?> u){
-				u.listUnmanagedFields().map(f->(IOField<T, ?>)f).forEach(set::add);
+				u.listDynamicUnmanagedFields().map(f->(IOField<T, ?>)f).forEach(set::add);
 			}
 			
 			for(IOField<T, ?> field : set){

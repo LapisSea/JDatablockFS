@@ -57,6 +57,10 @@ public class FieldCompiler{
 	protected FieldCompiler(){
 	}
 	
+	public <T extends IOInstance.Unmanaged<T>> FieldSet<T> compileStaticUnmanaged(Struct.Unmanaged<T> struct){
+		throw new NotImplementedException();//TODO
+	}
+	
 	public <T extends IOInstance<T>> FieldSet<T> compile(Struct<T> struct){
 		var fields=scanFields(struct)
 			.map(f->registry().create(f, null))

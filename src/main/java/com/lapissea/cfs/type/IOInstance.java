@@ -39,7 +39,7 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 		}
 		
 		@NotNull
-		public Stream<IOField<SELF, ?>> listUnmanagedFields(){
+		public Stream<IOField<SELF, ?>> listDynamicUnmanagedFields(){
 			return Stream.of();
 		}
 		
