@@ -358,14 +358,16 @@ public abstract class BinaryDrawing{
 			popMatrix();
 			fontScale=font;
 			
-			var drawStr=str;
-			
-			if(getStringBounds(drawStr).width()>rectWidth){
-				if(shortStr==null) shortStr=field.instanceToString(instance, true);
-				drawStr=shortStr;
+			if(str!=null){
+				var drawStr=str;
+				
+				if(getStringBounds(drawStr).width()>rectWidth){
+					if(shortStr==null) shortStr=field.instanceToString(instance, true);
+					drawStr=shortStr;
+				}
+				
+				drawStringIn((drawStr==null?"":drawStr), bestRange.toRect(ctx), true);
 			}
-			
-			drawStringIn((drawStr==null?"":drawStr), bestRange.toRect(ctx), true);
 		}else{
 			drawStringIn(both, bestRange.toRect(ctx), true);
 		}
