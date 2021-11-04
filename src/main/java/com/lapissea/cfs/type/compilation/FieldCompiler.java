@@ -188,26 +188,30 @@ public class FieldCompiler{
 		List<Method>           usedFields=new ArrayList<>();
 		
 		for(Field field : deepFieldsByAnnotation(cl, IOValue.class)){
-			Type type=getType(field);
-			
-			registry().requireCanCreate(type, field::getAnnotation);
-			field.setAccessible(true);
-			
-			String fieldName=getFieldName(field);
-			
-			Function<String, Optional<Method>> getMethod=prefix->scanMethod(cl, m->checkMethod(fieldName, prefix, m));
-			
-			var getter=getMethod.apply("get");
-			var setter=getMethod.apply("set");
-			
-			getter.ifPresent(usedFields::add);
-			setter.ifPresent(usedFields::add);
-			
-			FieldAccessor<T> accessor;
-			if(type instanceof Class<?> c&&UtilL.instanceOf(c, INumber.class)) accessor=new ReflectionAccessor.Num<>(struct, field, getter, setter, fieldName, type);
-			else accessor=new ReflectionAccessor<>(struct, field, getter, setter, fieldName, type);
-			
-			fields.add(accessor);
+			try{
+				Type type=getType(field);
+				
+				registry().requireCanCreate(type, field::getAnnotation);
+				field.setAccessible(true);
+				
+				String fieldName=getFieldName(field);
+				
+				Function<String, Optional<Method>> getMethod=prefix->scanMethod(cl, m->checkMethod(fieldName, prefix, m));
+				
+				var getter=getMethod.apply("get");
+				var setter=getMethod.apply("set");
+				
+				getter.ifPresent(usedFields::add);
+				setter.ifPresent(usedFields::add);
+				
+				FieldAccessor<T> accessor;
+				if(type instanceof Class<?> c&&UtilL.instanceOf(c, INumber.class)) accessor=new ReflectionAccessor.Num<>(struct, field, getter, setter, fieldName, type);
+				else accessor=new ReflectionAccessor<>(struct, field, getter, setter, fieldName, type);
+				
+				fields.add(accessor);
+			}catch(Throwable e){
+				throw new MalformedStructLayout("Failed to scan field #"+field.getName(), e);
+			}
 		}
 		
 		var hangingMethods=scanMethods(cl, method->method.isAnnotationPresent(IOValue.class)&&!usedFields.contains(method)).toList();

@@ -117,7 +117,7 @@ public class TypeDefinition extends IOInstance<TypeDefinition>{
 			try{
 				typeClass=Class.forName(getTypeName());
 			}catch(ClassNotFoundException e){
-				throw new NotImplementedException("implement generic ioinstance from stored data");
+				throw new NotImplementedException("implement generic ioinstance from stored data: "+getTypeName());
 			}
 		}
 		return typeClass;
