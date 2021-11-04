@@ -35,17 +35,15 @@ public class IOFieldInstanceArray<T extends IOInstance<T>, ValType extends IOIns
 		component=(Class<ValType>)type.getComponentType();
 		if(component.isArray()) throw new MalformedStructLayout("Multi dimension arrays are not supported (yet)");
 		
-		descriptor=new SizeDescriptor.Unknown<>(0, OptionalLong.empty(), inst->{
-			var siz=getArraySize(inst);
-			if(siz==0) return 0;
-			
+		descriptor=new SizeDescriptor.Unknown<>(WordSpace.BYTE, 0, OptionalLong.empty(), inst->{
 			var arr=get(inst);
+			if(arr.length==0) return 0;
 			
 			var desc=getValPipe().getSizeDescriptor();
 			if(desc.hasFixed()){
 				return arr.length*desc.requireFixed(WordSpace.BYTE);
 			}
-			return Arrays.stream(arr).mapToLong(desc::calcUnknown).sum();
+			return Arrays.stream(arr).mapToLong(instance->desc.calcUnknown(instance, WordSpace.BYTE)).sum();
 		});
 	}
 	
