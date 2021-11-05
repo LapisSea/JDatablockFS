@@ -17,6 +17,7 @@ import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.AbstractFieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.cfs.type.field.annotations.IOValueUnmanaged;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.function.UnsafeConsumer;
@@ -26,6 +27,8 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.OptionalLong;
 import java.util.stream.Stream;
 
 @SuppressWarnings("unchecked")
@@ -33,6 +36,80 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 	
 	
 	public static class Node<T extends IOInstance<T>> extends IOInstance.Unmanaged<Node<T>> implements IterablePP<Node<T>>{
+		
+		@IOValueUnmanaged
+		private static <T extends IOInstance<T>> IOField<Node<T>, ?> makeValField(){
+			var valueAccessor=new AbstractFieldAccessor<Node<T>>(null, "value"){
+				@Override
+				public Type getGenericType(GenericContext genericContext){
+					return Object.class;
+				}
+				@Override
+				public T get(Node<T> instance){
+					try{
+						return instance.getValue();
+					}catch(IOException e){
+						throw new RuntimeException(e);
+					}
+				}
+				@Override
+				public void set(Node<T> instance, Object value){
+					throw NotImplementedException.infer();//TODO: implement .set()
+				}
+			};
+			
+			SizeDescriptor<Node<T>> valDesc=new SizeDescriptor.Unknown<>(WordSpace.BYTE, 0, OptionalLong.empty(), inst->{
+				var val=valueAccessor.get(inst);
+				if(val==null) return 0;
+				return inst.valuePipe.getSizeDescriptor().calcUnknown(val);
+			});
+			
+			return new IOField.NoIO<>(valueAccessor, valDesc);
+		}
+		
+		@IOValueUnmanaged
+		private IOField<Node<T>, ?> makeNextField(){
+			var nextAccessor=new AbstractFieldAccessor<Node<T>>(null, "next"){
+				@Override
+				public Type getGenericType(GenericContext genericContext){
+					return getTypeDef().generic();
+				}
+				@Override
+				public Object get(Node<T> instance){
+					try{
+						return getNext();
+					}catch(IOException e){
+						throw new RuntimeException(e);
+					}
+				}
+				@Override
+				public void set(Node<T> instance, Object value){
+					try{
+						instance.setNext((Node<T>)value);
+					}catch(IOException e){
+						throw new RuntimeException(e);
+					}
+				}
+			};
+			
+			return new IOField.Ref.NoIO<Node<T>, Node<T>>(nextAccessor, SizeDescriptor.Fixed.of(SIZE_VAL_SIZE.bytes)){
+				@Override
+				public Reference getReference(Node<T> instance){
+					ChunkPointer next;
+					try{
+						next=readNextPtr();
+					}catch(IOException e){
+						throw new RuntimeException();
+					}
+					return next.isNull()?new Reference():next.makeReference();
+				}
+				@Override
+				public StructPipe<Node<T>> getReferencedPipe(Node<T> instance){
+					return getPipe();
+				}
+			};
+			
+		}
 		
 		private static final TypeDefinition.Check NODE_TYPE_CHECK=new TypeDefinition.Check(
 			LinkedIOList.Node.class,
@@ -68,88 +145,51 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			type.requireEmptyConstructor();
 			this.valuePipe=StructPipe.of(getPipe().getClass(), type);
 		}
+		
+		@NotNull
+		@Override
+		public Stream<IOField<Node<T>, ?>> listDynamicUnmanagedFields(){
+			return Stream.of(makeNextField(), makeValField());
+		}
+		
+		@Override
+		public boolean equals(Object o){
+			if(this==o) return true;
+			if(!(o instanceof Node<?> other)) return false;
+			
+			if(!getReference().equals(other.getReference())){
+				return false;
+			}
+			if(!getTypeDef().equals(other.getTypeDef())){
+				return false;
+			}
+			
+			try{
+				if(!readNextPtr().equals(other.readNextPtr())){
+					return false;
+				}
+				if(hasValue()!=other.hasValue()){
+					return false;
+				}
+				if(!Objects.equals(getValue(), other.getValue())){
+					return false;
+				}
+				return true;
+			}catch(IOException e){
+				throw new RuntimeException(e);
+			}
+		}
+		
+		@Override
+		public int hashCode(){
+			return getReference().hashCode();
+		}
+		
 		private void ensureNextSpace(RandomIO io) throws IOException{
 			var skipped=io.skip(SIZE_VAL_SIZE.bytes);
 			var toWrite=SIZE_VAL_SIZE.bytes-skipped;
 			Utils.zeroFill(io::write, toWrite);
 			io.setPos(0);
-		}
-		
-		@Override
-		public Stream<IOField<Node<T>, ?>> listDynamicUnmanagedFields(){
-			var that=this;
-			
-			var valueAccessor=new AbstractFieldAccessor<Node<T>>(null, "value"){
-				@Override
-				public Type getGenericType(GenericContext genericContext){
-					return that.getTypeDef().arg(0).generic();
-				}
-				@Override
-				public T get(Node<T> instance){
-					try{
-						return instance.getValue();
-					}catch(IOException e){
-						throw new RuntimeException(e);
-					}
-				}
-				@Override
-				public void set(Node<T> instance, Object value){
-					throw NotImplementedException.infer();//TODO: implement .set()
-				}
-			};
-			
-			var nextAccessor=new AbstractFieldAccessor<Node<T>>(null, "next"){
-				@Override
-				public Type getGenericType(GenericContext genericContext){
-					return that.getTypeDef().generic();
-				}
-				@Override
-				public Object get(Node<T> instance){
-					try{
-						return getNext();
-					}catch(IOException e){
-						throw new RuntimeException(e);
-					}
-				}
-				@Override
-				public void set(Node<T> instance, Object value){
-					try{
-						instance.setNext((Node<T>)value);
-					}catch(IOException e){
-						throw new RuntimeException(e);
-					}
-				}
-			};
-			
-			SizeDescriptor<Node<T>> valDesc;
-			{
-				var desc =valuePipe.getSizeDescriptor();
-				if(desc.hasFixed()) valDesc=SizeDescriptor.Fixed.of(desc);
-				else valDesc=new SizeDescriptor.Unknown<>(desc.getWordSpace(), desc.getMin(), desc.getMax(), inst->{
-					var val=valueAccessor.get(inst);
-					if(val==null) return 0;
-					return desc.calcUnknown(val);
-				});
-			}
-			
-			return Stream.of(
-				new IOField.Ref.NoIO<Node<T>, Node<T>>(nextAccessor, SizeDescriptor.Fixed.of(SIZE_VAL_SIZE.bytes)){
-					@Override
-					public Reference getReference(Node<T> instance){
-						ChunkPointer next;
-						try{
-							next=readNextPtr();
-						}catch(IOException e){
-							throw new RuntimeException();
-						}
-						return next.isNull()?new Reference():next.makeReference();
-					}
-					@Override
-					public StructPipe<Node<T>> getReferencedPipe(Node<T> instance){
-						return getPipe();
-					}
-				},
-				new IOField.NoIO<Node<T>, T>(valueAccessor, valDesc));
 		}
 		
 		T getValue() throws IOException{

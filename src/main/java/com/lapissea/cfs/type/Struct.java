@@ -110,14 +110,12 @@ public class Struct<T extends IOInstance<T>>{
 			return compile(instanceClass, Unmanaged::new);
 		}
 		
-		private       Constr<T>   unmanagedConstructor;
-		private final boolean     overridingDynamicUnmanaged;
-		private final FieldSet<T> staticUnmanagedFields;
+		private       Constr<T> unmanagedConstructor;
+		private final boolean   overridingDynamicUnmanaged;
 		
 		public Unmanaged(Class<T> type){
 			super(type);
 			overridingDynamicUnmanaged=checkOverridingUnmanaged();
-			staticUnmanagedFields=FieldCompiler.create().compileStaticUnmanaged(this);
 		}
 		
 		private boolean checkOverridingUnmanaged(){
@@ -130,9 +128,6 @@ public class Struct<T extends IOInstance<T>>{
 			return u;
 		}
 		
-		public FieldSet<T> getStaticUnmanagedFields(){
-			return staticUnmanagedFields;
-		}
 		public boolean isOverridingDynamicUnmanaged(){
 			return overridingDynamicUnmanaged;
 		}
@@ -282,9 +277,20 @@ public class Struct<T extends IOInstance<T>>{
 	
 	public Struct(Class<T> type){
 		this.type=type;
-		fields=FieldCompiler.create().compile(this);
-		fields.forEach(IOField::init);
+		this.fields=computeFields();
+		this.fields.forEach(IOField::init);
 		poolSizes=calcPoolSizes();
+	}
+	
+	private FieldSet<T> computeFields(){
+		FieldSet<T> fields=FieldCompiler.create().compile(this);
+		if(!(this instanceof Unmanaged<?> unmanaged)){
+			return fields;
+		}
+		
+		//noinspection unchecked
+		var staticFields=(FieldSet<T>)FieldCompiler.create().compileStaticUnmanaged(unmanaged);
+		return new FieldSet<>(Stream.concat(fields.stream(), staticFields.stream()));
 	}
 	
 	private int[] calcPoolSizes(){

@@ -58,7 +58,8 @@ public class FieldCompiler{
 	}
 	
 	public <T extends IOInstance.Unmanaged<T>> FieldSet<T> compileStaticUnmanaged(Struct.Unmanaged<T> struct){
-		throw new NotImplementedException();//TODO
+		var type=struct.getType();
+		return new FieldSet<>(List.of());
 	}
 	
 	public <T extends IOInstance<T>> FieldSet<T> compile(Struct<T> struct){
