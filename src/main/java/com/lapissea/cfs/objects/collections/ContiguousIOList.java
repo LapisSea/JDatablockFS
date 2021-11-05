@@ -257,8 +257,10 @@ public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanaged
 		Set<Chunk> chunks=new HashSet<>();
 		var        prov  =getChunkProvider();
 		
-		new MemoryWalker().walk(prov, this, getReference(), getPipe(),
-		                        ref->ref.getPtr().dereference(prov).streamNext().forEach(chunks::add));
+		new MemoryWalker().walk(this, ref->{
+			if(ref.isNull()) return;
+			ref.getPtr().dereference(prov).streamNext().forEach(chunks::add);
+		});
 		
 		getReference().getPtr().dereference(prov).streamNext().forEach(chunks::add);
 		

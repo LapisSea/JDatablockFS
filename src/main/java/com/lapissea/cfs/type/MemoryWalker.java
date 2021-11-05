@@ -9,6 +9,7 @@ import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.util.LogUtil;
+import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeConsumer;
 
@@ -18,7 +19,13 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.stream.Stream;
 
+import static com.lapissea.cfs.GlobalConfig.*;
+
 public class MemoryWalker{
+	
+	public <T extends IOInstance.Unmanaged<T>> void walk(T root, UnsafeConsumer<Reference, IOException> consumer) throws IOException{
+		walk(root.getChunkProvider(), root, root.getReference(), root.getPipe(), consumer);
+	}
 	
 	public <T extends IOInstance<T>> void walk(ChunkDataProvider cluster, T root, Reference instanceReference, StructPipe<T> pipe, UnsafeConsumer<Reference, IOException> consumer) throws IOException{
 		walkStruct(cluster, new LinkedList<>(), root, instanceReference, pipe, consumer);
@@ -35,10 +42,29 @@ public class MemoryWalker{
 		}
 		if(reference==null||reference.isNull()) return;
 		try{
-			if(stack.contains(instance)) return;
+			if(stack.contains(instance)){
+				if(DEBUG_VALIDATION){
+					for(IOInstance<?> ioInstance : stack){
+						if(ioInstance.equals(instance)){
+							var problem=false;
+							if(ioInstance instanceof IOInstance.Unmanaged<?> u1&&instance instanceof IOInstance.Unmanaged<?> u2&&(
+								!u1.getReference().equals(u2.getReference())||
+								!u1.getTypeDef().equals(u2.getTypeDef())
+							)) problem=true;
+							if(!ioInstance.toString().equals(instance.toString())) problem=true;
+							
+							if(problem){
+								LogUtil.printlnEr("Possible equality problem?\n"+ioInstance+"\n"+instance);
+							}
+							break;
+						}
+					}
+				}
+				return;
+			}
 			stack.add(instance);
 			
-			var    fieldOffset=0L;
+			var fieldOffset=0L;
 			
 			Iterator<IOField<T, ?>> iterator;
 			if(instance instanceof IOInstance.Unmanaged unmanaged){
@@ -55,12 +81,29 @@ public class MemoryWalker{
 				size=sizeDesc.calcUnknown(instance);
 				
 				try{
+					if(field.getAccessor()==null){
+						continue;
+					}
+					
+					Class<?> type=field.getAccessor().getType();
+					
+					if(field.getAccessor().hasAnnotation(IOType.Dynamic.class)){
+						var inst=field.get(instance);
+						if(inst==null) continue;
+						type=inst.getClass();
+						
+						if(inst instanceof IOInstance.Unmanaged valueInstance){
+							walkStruct(cluster, stack, valueInstance, valueInstance.getReference(), valueInstance.getPipe(), pointerRecord);
+							continue;
+						}
+					}
+					
 					if(field instanceof IOField.Ref<?, ?> refO){
 						IOField.Ref<T, T> refField=(IOField.Ref<T, T>)refO;
 						var               ref     =refField.getReference(instance);
 						walkStruct(cluster, stack, refField.get(instance), refField.getReference(instance), refField.getReferencedPipe(instance), pointerRecord);
 						pointerRecord.accept(ref);
-					}else if(UtilL.instanceOf(field.getAccessor().getType(), ChunkPointer.class)){
+					}else if(UtilL.instanceOf(type, ChunkPointer.class)){
 						
 						var ch=(ChunkPointer)field.get(instance);
 						
@@ -69,8 +112,15 @@ public class MemoryWalker{
 							pointerRecord.accept(ch.makeReference());
 						}
 					}else{
-						var typ=field.getAccessor().getType();
-						if(IOFieldPrimitive.isPrimitive(typ))continue;
+						var typ=type;
+						if(typ==Object.class){
+							var inst=field.get(instance);
+							if(inst==null){
+								continue;
+							}
+							typ=inst.getClass();
+						}
+						if(IOFieldPrimitive.isPrimitive(typ)) continue;
 						if(UtilL.instanceOf(typ, IOInstance.class)){
 							var inst=(IOInstance<?>)field.get(instance);
 							if(inst!=null){
@@ -92,7 +142,8 @@ public class MemoryWalker{
 							
 							continue;
 						}
-						LogUtil.printlnEr("unamanaged draw type:", typ);
+						
+						throw new RuntimeException(TextUtil.toString("unmanaged walk type:", typ, field.getAccessor()));
 					}
 				}finally{
 					fieldOffset+=field.getSizeDescriptor().mapSize(WordSpace.BYTE, size);
