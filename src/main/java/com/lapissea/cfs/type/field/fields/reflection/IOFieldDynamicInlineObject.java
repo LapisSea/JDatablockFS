@@ -3,6 +3,8 @@ package com.lapissea.cfs.type.field.fields.reflection;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.ChunkDataProvider;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
+import com.lapissea.cfs.io.bit.FlagReader;
+import com.lapissea.cfs.io.bit.FlagWriter;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
@@ -72,6 +74,10 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 			case Long ignored -> 8;
 			case Double ignored -> 8;
 			case String str -> STR_PIPE.getSizeDescriptor().calcUnknown(new AutoText(str), WordSpace.BYTE);
+			case byte[] array -> {
+				var num=NumberSize.bySize(array.length);
+				yield 1+num.bytes+array.length;
+			}
 			case IOInstance inst -> {
 				if(inst instanceof IOInstance.Unmanaged<?> u){
 					yield REF_PIPE.getSizeDescriptor().calcUnknown(u.getReference(), WordSpace.BYTE);
@@ -91,6 +97,12 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 			case Long v -> NumberSize.LONG.write(dest, v);
 			case Double v -> NumberSize.LONG.writeFloating(dest, v);
 			case String str -> STR_PIPE.write(provider, dest, new AutoText(str));
+			case byte[] array -> {
+				var num=NumberSize.bySize(array.length);
+				FlagWriter.writeSingle(dest, NumberSize.BYTE, NumberSize.FLAG_INFO, false, num);
+				num.write(dest, array.length);
+				dest.writeInts1(array);
+			}
 			case IOInstance.Unmanaged inst -> {
 				REF_PIPE.write(provider, dest, inst.getReference());
 			}
@@ -107,6 +119,11 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		if(typ==Long.class) return NumberSize.LONG.read(src);
 		if(typ==Double.class) return NumberSize.LONG.readFloating(src);
 		if(typ==String.class) return STR_PIPE.readNew(provider, src, genericContext).getData();
+		if(typ==byte[].class){
+			var num=FlagReader.readSingle(src, NumberSize.BYTE, NumberSize.FLAG_INFO, false);
+			var len=(int)num.read(src);
+			return src.readInts1(len);
+		}
 		if(UtilL.instanceOf(typ, IOInstance.Unmanaged.class)){
 			var uStruct=Struct.Unmanaged.ofUnknown(typ);
 			var ref    =REF_PIPE.readNew(provider, src, genericContext);
