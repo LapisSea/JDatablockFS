@@ -161,7 +161,7 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 		if(that.getThisStruct()!=struct) return false;
 		
 		for(var field : struct.getFields()){
-			if(!field.instancesEqual(self(), self())) return false;
+			if(!field.instancesEqual(self(), (SELF)that)) return false;
 		}
 		
 		return true;

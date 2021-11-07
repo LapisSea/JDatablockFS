@@ -100,9 +100,11 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	private SizeDescriptor<T> calcSize(){
 		var fields=getSpecificFields();
 		
-		var wordSpace  =IOFieldTools.minWordSpace(fields);
-		var isUnmanaged=type instanceof Struct.Unmanaged;
-		if(!isUnmanaged){
+		var wordSpace=IOFieldTools.minWordSpace(fields);
+		
+		var hasDynamicFields=type instanceof Struct.Unmanaged<?> u&&u.isOverridingDynamicUnmanaged();
+		
+		if(!hasDynamicFields){
 			
 			var bitSpace=IOFieldTools.sumVarsIfAll(fields, desc->desc.getFixed(wordSpace));
 			if(bitSpace.isPresent()){
@@ -114,7 +116,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		var knownFixed   =IOFieldTools.sumVars(fields, d->d.getFixed(wordSpace).orElse(0));
 		
 		var min=IOFieldTools.sumVars(fields, siz->siz.getMin(wordSpace));
-		var max=isUnmanaged?OptionalLong.empty():IOFieldTools.sumVarsIfAll(fields, siz->siz.getMax(wordSpace));
+		var max=hasDynamicFields?OptionalLong.empty():IOFieldTools.sumVarsIfAll(fields, siz->siz.getMax(wordSpace));
 		
 		if(unknownFields.size()==1){
 			//TODO: support unknown bit size?
