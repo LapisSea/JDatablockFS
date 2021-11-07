@@ -426,7 +426,6 @@ public abstract class BinaryDrawing{
 			double   delta    =1/64.0;
 			for(double t=tPoints[2];t<tPoints[5];t+=delta){
 				double[] newPoint=DeBoor(_k, tPoints, handles, t);
-				draw:
 				if(lastPoint!=null){
 					var angle=Math.atan2(lastPoint[0]-newPoint[0], lastPoint[1]-newPoint[1]);
 					if(angle<0) angle+=Math.PI;
@@ -442,16 +441,24 @@ public abstract class BinaryDrawing{
 						delta/=3/2D;
 						continue;
 					}
+					boolean didArrow=false;
 					if(arrow){
 						var mid=(tPoints[5]+tPoints[2])/2;
 						if(t<mid&&(t+delta)>mid){
 							drawArrow(lastPoint[0], lastPoint[1], newPoint[0], newPoint[1]);
-							break draw;
+							didArrow=true;
 						}
 					}
-					drawLine(lastPoint[0], lastPoint[1], newPoint[0], newPoint[1]);
+					if(!didArrow){
+						drawLine(lastPoint[0], lastPoint[1], newPoint[0], newPoint[1]);
+					}
+				}else{
+					drawLine(handles[0][0], handles[0][1], newPoint[0], newPoint[1]);
 				}
 				lastPoint=newPoint;
+			}
+			if(lastPoint!=null){
+				drawLine(handles[handles.length-1][0], handles[handles.length-1][1], lastPoint[0], lastPoint[1]);
 			}
 		}
 	}
