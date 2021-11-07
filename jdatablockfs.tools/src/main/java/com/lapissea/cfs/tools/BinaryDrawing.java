@@ -30,10 +30,8 @@ import java.lang.ref.WeakReference;
 import java.lang.reflect.Array;
 import java.util.List;
 import java.util.*;
-import java.util.function.Consumer;
-import java.util.function.Function;
-import java.util.function.IntPredicate;
-import java.util.function.Supplier;
+import java.util.function.*;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
@@ -90,6 +88,15 @@ public abstract class BinaryDrawing{
 	}
 	
 	protected static record Range(long from, long to){
+		
+		static class Builder{
+			long start;
+			long end;
+			Range build(){
+				return new Range(start, end);
+			}
+		}
+		
 		static Range fromSize(long start, long size){
 			return new Range(start, start+size);
 		}
@@ -155,10 +162,13 @@ public abstract class BinaryDrawing{
 	private float   lineWidth;
 	private long    renderCount;
 	
+	private final NanoTimer frameTimer=new NanoTimer();
+	
 	private final ErrorLogLevel errorLogLevel=UtilL.sysPropertyByClass(BinaryDrawing.class, "errorLogLevel").map(String::toUpperCase).map(v->{
 		try{
 			return ErrorLogLevel.valueOf(v);
 		}catch(IllegalArgumentException e){
+			LogUtil.printlnEr("Unknown value", v, "for errorLogLevel");
 			return ErrorLogLevel.NAMED_STACK;
 		}
 	}).orElse(ErrorLogLevel.NAMED_STACK);
@@ -205,6 +215,7 @@ public abstract class BinaryDrawing{
 	protected abstract void fillString(String str, float x, float y);
 	protected abstract boolean canFontDisplay(char c);
 	private boolean canFontDisplay(int code){
+		if(code==0) return false;
 		return canFontDisplay((char)code);
 	}
 	
@@ -244,11 +255,39 @@ public abstract class BinaryDrawing{
 	}
 	private void fillByteRange(Color color, RenderContext ctx, Range range){
 		setColor(color);
-		try(var ignored=bulkDraw(DrawMode.QUADS)){
-			for(var i=range.from();i<range.to();i++){
-				long x=i%ctx.width(), y=i/ctx.width();
-				fillQuad(x*ctx.pixelsPerByte(), y*ctx.pixelsPerByte(), ctx.pixelsPerByte(), ctx.pixelsPerByte());
-			}
+		fillByteRange(ctx, range);
+	}
+	
+	private void fillByteRect(RenderContext ctx, long start, long width, long columnCount){
+		long xi    =start%ctx.width();
+		long yStart=start/ctx.width();
+		fillQuad(ctx.pixelsPerByte()*xi,
+		         ctx.pixelsPerByte()*yStart,
+		         ctx.pixelsPerByte()*width,
+		         ctx.pixelsPerByte()*columnCount);
+	}
+	private void fillByteRange(RenderContext ctx, Range range){
+		long from=range.from;
+		long to  =range.to;
+		
+		//tail
+		long fromX     =from%ctx.width();
+		long rightSpace=Math.min(ctx.width-fromX, to-from);
+		if(rightSpace>0){
+			fillByteRect(ctx, from, rightSpace, 1);
+			from+=rightSpace;
+		}
+		
+		//bulk
+		long bulkColumns=(to-from)/ctx.width;
+		if(bulkColumns>0){
+			fillByteRect(ctx, from, ctx.width, bulkColumns);
+			from+=bulkColumns*ctx.width;
+		}
+		
+		//head
+		if(to>from){
+			fillByteRect(ctx, from, to-from, 1);
 		}
 	}
 	private void outlineByteRange(Color color, RenderContext ctx, Range range){
@@ -642,8 +681,7 @@ public abstract class BinaryDrawing{
 	}
 	
 	protected void render(){
-		NanoTimer timer=new NanoTimer();
-		timer.start();
+		frameTimer.start();
 		
 		renderCount++;
 		preRender();
@@ -655,15 +693,16 @@ public abstract class BinaryDrawing{
 			try{
 				render(getFramePos());
 			}catch(Throwable e1){
-				LogUtil.println(e1);
-//				e1.printStackTrace();
+//				LogUtil.println(e1);
+				e1.printStackTrace();
 			}
 		}
 		postRender();
 		
-		timer.end();
-		if(timer.ms()>16){
-			LogUtil.println("Frame time:", timer.ms());
+		frameTimer.end();
+		var tim=frameTimer.msAvrg100();
+		if(tim>16){
+			LogUtil.println("Frame time:", tim);
 		}
 	}
 	private void startFrame(){
@@ -803,15 +842,16 @@ public abstract class BinaryDrawing{
 				handleError(e1, parsed);
 			}
 		}
-		
-		drawBytes(bytes, filled, ctx, ()->IntStream.range(0, bytes.length).filter(((IntPredicate)filled::get).negate()), alpha(Color.GRAY, 0.5F), true, false);
+		drawBytes(bytes, filled, ctx, ()->IntStream.range(0, bytes.length).filter(((IntPredicate)filled::get).negate()), alpha(Color.GRAY, 0.5F), true, true);
 		
 		findHoverChunk(ctx, parsed, provider);
 		
 		drawWriteIndex(frame, ctx);
+		
 		for(Pointer ptr : ptrs){
 			drawPointer(ctx, parsed, ptr);
 		}
+		
 		drawMouse(ctx, cFrame);
 		drawError(parsed);
 		
@@ -823,46 +863,111 @@ public abstract class BinaryDrawing{
 	private void fillChunk(byte[] bytes, BitSet filled, RenderContext ctx, List<Pointer> ptrs, ChunkDataProvider provider, Chunk chunk) throws IOException{
 		annotateStruct(ctx, provider, new LinkedList<>(), chunk, null, Chunk.PIPE, ptrs::add, true);
 		if(chunk.dataEnd()>bytes.length){
-			drawBytes(bytes, filled, ctx, ()->IntStream.range(bytes.length, (int)chunk.dataEnd()), new Color(0, 0, 0, 0.2F), false, true);
+			drawByteRanges(bytes, filled, ctx, List.of(new Range(bytes.length, (int)chunk.dataEnd())), new Color(0, 0, 0, 0.2F), false, true);
 		}
 	}
 	
 	private void drawBytes(byte[] bytes, BitSet filled, RenderContext ctx, Supplier<IntStream> stream, Color color, boolean withChar, boolean force){
-		Supplier<IntStream> ints=()->stream.get().filter(i->{
-			if(i<bytes.length){
-				return force||!filled.get(i);
-			}
-			return true;
-		});
+		List<Range.Builder> rangesBuild=new ArrayList<>();
 		
+		stream.get().forEach(i->{
+			for(var rowRange : rangesBuild){
+				if(rowRange.end==i){
+					rowRange.end++;
+					return;
+				}
+				if(rowRange.start-1==i){
+					rowRange.start--;
+					return;
+				}
+			}
+			var r=new Range.Builder();
+			r.start=i;
+			r.end=i+1;
+			rangesBuild.add(r);
+		});
+		drawByteRanges(bytes, filled, ctx, rangesBuild.stream().map(r->new BinaryDrawing.Range(r.start, r.end)).collect(Collectors.toList()), color, withChar, force);
+	}
+	
+	private void drawByteRanges(byte[] bytes, BitSet filled, RenderContext ctx, List<Range> ranges, Color color, boolean withChar, boolean force){
+		List<Range> actualRanges;
+		if(force) actualRanges=ranges;
+		else actualRanges=filterRangeValues(ranges, i->!filled.get((int)i));
+		
+		drawByteRangesForced(bytes, filled, ctx, actualRanges, color, withChar);
+	}
+	
+	private List<Range> filterRangeValues(List<Range> ranges, LongPredicate filter){
+		List<Range> actualRanges=new ArrayList<>();
+		var         b           =new Range.Builder();
+		
+		for(Range range : ranges){
+			b.start=range.from();
+			b.end=range.from()+1;
+			for(long i=range.from();i<range.to();i++){
+				if(filter.test(i)){
+					b.end=i+1;
+				}else{
+					actualRanges.add(b.build());
+					for(;i<range.to();i++){
+						if(filter.test(i)) break;
+					}
+					if(i==range.to()) return actualRanges;
+					b.start=i;
+					b.end=i+1;
+				}
+			}
+			if(b.start!=b.end){
+				if(b.start==range.from()&&b.end==range.to()){
+					actualRanges.add(range);
+				}else{
+					actualRanges.add(b.build());
+				}
+			}
+		}
+		return actualRanges;
+	}
+	
+	private void drawByteRangesForced(byte[] bytes, BitSet filled, RenderContext ctx, List<Range> ranges, Color color, boolean withChar){
 		var col       =color;
 		var bitColor  =col;
 		var background=mul(col, 0.5F);
 		
+		Consumer<Stream<Range>> drawIndex=r->{
+			try(var ignored=bulkDraw(DrawMode.QUADS)){
+				r.forEach(range->fillByteRange(ctx, range));
+			}
+		};
+		
+		if(ranges.stream().mapToLong(Range::size).sum()>1000){
+			int i=0;
+		}
+		List<Range> clampedOverflow=clampRanges(ranges, bytes.length);
+		
+		Supplier<IntStream> clampedInts=()->clampedOverflow.stream().flatMapToInt(r->IntStream.range((int)r.from(), (int)r.to()));
+		
+		
 		setColor(background);
 		try(var ignored=bulkDraw(DrawMode.QUADS)){
-			ints.get().filter(i->i<bytes.length).forEach(i->{
-				int   xi=i%ctx.width(), yi=i/ctx.width();
-				float xF=ctx.pixelsPerByte()*xi, yF=ctx.pixelsPerByte()*yi;
-				
-				fillQuad(xF, yF, ctx.pixelsPerByte(), ctx.pixelsPerByte());
-			});
+			for(Range range : clampedOverflow){
+				fillByteRange(ctx, range);
+			}
 		}
 		
+		drawIndex.accept(clampedOverflow.stream());
+		
 		setColor(alpha(Color.RED, color.getAlpha()/255F));
-		try(var ignored=bulkDraw(DrawMode.QUADS)){
-			ints.get().filter(i->i>=bytes.length).forEach(i->{
-				int   xi=i%ctx.width(), yi=i/ctx.width();
-				float xF=ctx.pixelsPerByte()*xi, yF=ctx.pixelsPerByte()*yi;
-				
-				fillQuad(xF, yF, ctx.pixelsPerByte(), ctx.pixelsPerByte());
-			});
-		}
+		drawIndex.accept(ranges.stream().map(r->{
+			if(r.to<bytes.length) return null;
+			if(r.from<bytes.length) return new Range(bytes.length, r.to);
+			return r;
+		}).filter(Objects::nonNull));
 		
 		setColor(bitColor);
 		try(var ignored=bulkDraw(DrawMode.QUADS)){
-			ints.get().filter(i->i<bytes.length).forEach(i->{
-				int   b =bytes[i]&0xFF;
+			clampedInts.get().forEach(i->{
+				int b=bytes[i]&0xFF;
+				if(b==0) return;
 				int   xi=i%ctx.width(), yi=i/ctx.width();
 				float xF=ctx.pixelsPerByte()*xi, yF=ctx.pixelsPerByte()*yi;
 				
@@ -875,20 +980,48 @@ public abstract class BinaryDrawing{
 						throw new RuntimeException(e);
 					}
 				}
+				
 			});
 		}
 		
 		if(withChar){
 			setColor(new Color(1, 1, 1, bitColor.getAlpha()/255F*0.6F));
-			ints.get().filter(i->i<bytes.length).filter(i->canFontDisplay(bytes[i])).forEach(i->{
+			clampedInts.get().filter(i->canFontDisplay(bytes[i])).forEach(i->{
 				int   xi=i%ctx.width(), yi=i/ctx.width();
 				float xF=ctx.pixelsPerByte()*xi, yF=ctx.pixelsPerByte()*yi;
 				
 				drawStringIn(Character.toString((char)bytes[i]), new Rect(xF, yF, ctx.pixelsPerByte(), ctx.pixelsPerByte()), true);
 			});
 		}
-		
-		ints.get().filter(i->i<bytes.length).forEach(filled::set);
+		for(Range range : clampedOverflow){
+			filled.set((int)range.from(), (int)range.to());
+		}
+	}
+	private List<Range> clampRanges(List<Range> ranges, long len){
+		List<Range> build=null;
+		{
+			boolean same=true;
+			for(int i=0;i<ranges.size();i++){
+				Range r=ranges.get(i);
+				if(same){
+					if(r.from>=len||r.to>=len){
+						build=new ArrayList<>(ranges.size());
+						for(int j=0;j<i;j++){
+							build.add(ranges.get(i));
+						}
+						same=false;
+					}
+				}
+				if(!same){
+					if(r.from>=len) continue;
+					if(r.to>=len) build.add(new Range(r.from, len));
+				}
+			}
+			if(build==null){
+				build=ranges;
+			}
+		}
+		return build;
 	}
 	private void drawBackgroundDots(){
 		setColor(errorMode?Color.RED.darker():Color.LIGHT_GRAY);
@@ -1048,7 +1181,7 @@ public abstract class BinaryDrawing{
 				msgWidth--;
 				w=getStringBounds(ptr.message().substring(0, msgWidth)).width();
 			}
-			var lines=TextUtil.wrapLongString(ptr.message(), msgWidth);
+			List<String> lines=msgWidth==0?List.of(ptr.message()):TextUtil.wrapLongString(ptr.message(), msgWidth);
 			y-=fontScale/2F*lines.size();
 			for(String line : lines){
 				drawStringIn(line, new Rect(x, y, space, ctx.pixelsPerByte()), false, true);
