@@ -153,7 +153,7 @@ public class AtlasFont extends GLFont{
 		float fsScale=(float)(1/(metrics.getAscender()-metrics.getDescender()));
 		var   scale  =(pixelHeight*fsScale);
 		
-		float x=xOff, y=yOff+(float)metrics.getDescender();
+		float x=0, y=(float)metrics.getDescender();
 		
 		int aw, ah;
 		{
@@ -184,10 +184,10 @@ public class AtlasFont extends GLFont{
 				
 				
 				float
-					x0=(bounds.getLeft()+x)*scale,
-					x1=(bounds.getRight()+x)*scale,
-					y0=((-bounds.getBottom())+y)*scale,
-					y1=((-bounds.getTop())+y)*scale;
+					x0=(bounds.getLeft()+x)*scale+xOff,
+					x1=(bounds.getRight()+x)*scale+xOff,
+					y0=((-bounds.getBottom())+y)*scale+yOff,
+					y1=((-bounds.getTop())+y)*scale+yOff;
 				
 				float
 					u0=uvBounds.getLeft()/aw,
