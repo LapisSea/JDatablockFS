@@ -14,16 +14,14 @@ import com.lapissea.cfs.objects.INumber;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.tools.logging.MemFrame;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.MemoryWalker;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.cfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
-import com.lapissea.util.LogUtil;
-import com.lapissea.util.MathUtil;
-import com.lapissea.util.TextUtil;
-import com.lapissea.util.UtilL;
+import com.lapissea.util.*;
 import org.joml.SimplexNoise;
 
 import java.awt.*;
@@ -637,6 +635,9 @@ public abstract class BinaryDrawing{
 	}
 	
 	protected void render(){
+		NanoTimer timer=new NanoTimer();
+		timer.start();
+		
 		renderCount++;
 		preRender();
 		try{
@@ -652,6 +653,11 @@ public abstract class BinaryDrawing{
 			}
 		}
 		postRender();
+		
+		timer.end();
+		if(timer.ms()>16){
+			LogUtil.println("Frame time:", timer.ms());
+		}
 	}
 	private void startFrame(){
 		clearFrame();
@@ -881,8 +887,8 @@ public abstract class BinaryDrawing{
 		setColor(errorMode?Color.RED.darker():Color.LIGHT_GRAY);
 		
 		try(var ignored=bulkDraw(DrawMode.QUADS)){
-			float jiter       =2;
-			int   step        =10;
+			float jitter      =2;
+			int   step        =15;
 			float randX       =renderCount/6f;
 			float randY       =renderCount/6f+10000;
 			float simplexScale=50;
@@ -890,13 +896,14 @@ public abstract class BinaryDrawing{
 				for(int y=(x/step)%step;y<getHeight()+2;y+=step){
 					float xf=x/simplexScale;
 					float yf=y/simplexScale;
-					fillQuad(x+SimplexNoise.noise(xf, yf, randX)*jiter, y+SimplexNoise.noise(xf, yf, randY)*jiter, 1.5, 1.5);
+					fillQuad(x+SimplexNoise.noise(xf, yf, randX)*jitter, y+SimplexNoise.noise(xf, yf, randY)*jitter, 1.5, 1.5);
 				}
 			}
 		}
 	}
 	
 	private void drawTimeline(int frameIndex){
+		pushMatrix();
 		translate(0, getHeight());
 		scale(1, -1);
 		
@@ -924,6 +931,7 @@ public abstract class BinaryDrawing{
 		int i=getFrameCount();
 		setColor(alpha(lastMatch?Color.RED.darker():Color.WHITE, frameIndex>=start&&frameIndex<=i?0.6F:0.3F));
 		fillQuad(start*w, 0, w*(i-start), height);
+		popMatrix();
 	}
 	
 	protected boolean filterMatchAt(int i){
@@ -1196,7 +1204,8 @@ public abstract class BinaryDrawing{
 						if(acc!=null&&acc.hasAnnotation(IOType.Dynamic.class)){
 							
 							var inst=field.get(instance);
-							if(inst==null||IOFieldPrimitive.isPrimitive(inst.getClass())||inst.getClass()==String.class){
+							if(inst==null) continue;
+							if(IOFieldPrimitive.isPrimitive(inst.getClass())||inst.getClass()==String.class){
 								if(annotate) annotateByteField(cluster, ctx, pointerRecord, instance, field, col, reference, Range.fromSize(fieldOffset, size));
 								continue;
 							}
@@ -1281,6 +1290,14 @@ public abstract class BinaryDrawing{
 							}
 						}else{
 							var typ=acc.getType();
+							if(typ==Object.class){
+								var inst=field.get(instance);
+								if(inst==null){
+									continue;
+								}else{
+									typ=inst.getClass();
+								}
+							}
 							if(UtilL.instanceOf(typ, IOInstance.class)){
 								var inst=(IOInstance<?>)field.get(instance);
 								if(inst!=null){
@@ -1305,7 +1322,7 @@ public abstract class BinaryDrawing{
 								if(annotate) annotateByteField(cluster, ctx, pointerRecord, instance, field, col, reference, Range.fromSize(fieldOffset, size));
 								continue;
 							}
-							LogUtil.printlnEr("unmanaged draw type:", typ.toString());
+							LogUtil.printlnEr("unmanaged draw type:", typ.toString(), acc);
 						}
 					}finally{
 						fieldOffset+=sizeDesc.mapSize(WordSpace.BYTE, size);
