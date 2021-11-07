@@ -25,9 +25,11 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 
+import static com.lapissea.util.PoolOwnThread.*;
 import static org.lwjgl.glfw.GLFW.*;
 
 public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
@@ -120,8 +122,9 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	private boolean filterMake =false;
 	private int[]   scrollRange=null;
 	
-	private final Thread glThread;
-	private final GLFont font;
+	private       CompletableFuture<?> glInit;
+	private final Thread               glThread;
+	private final GLFont               font;
 	
 	public DisplayLWJGL(){
 		glThread=new Thread(this::displayLifecycle, "display");
@@ -141,7 +144,9 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 		glThread.setDaemon(false);
 		glThread.start();
 		
-		
+		UtilL.sleepWhile(()->glInit==null);
+		glInit.join();
+		glInit=null;
 	}
 	
 	private void markFrameDirty(){
@@ -156,7 +161,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	}
 	
 	private void displayLifecycle(){
-		initWindow();
+		glInit=async(this::initWindow, Runnable::run);
 		
 		ChangeRegistryInt byteIndex=new ChangeRegistryInt(-1);
 		byteIndex.register(e->shouldRender=true);
@@ -394,6 +399,12 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 		});
 		
 		GLFW.glfwWindowHint(GLFW.GLFW_SAMPLES, 8);
+		
+		if(UtilL.sysPropertyByClass(DisplayLWJGL.class, "emulateNoGLSupport").map(Boolean::parseBoolean).orElse(false)){
+			throw new RuntimeException("gl disabled");
+		}
+		
+		glfwWindowHint(GLFW_DOUBLEBUFFER, GLFW_TRUE);
 		
 		window.init(SurfaceAPI.OPENGL);
 		

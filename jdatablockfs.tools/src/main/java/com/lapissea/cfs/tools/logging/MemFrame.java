@@ -28,7 +28,7 @@ public record MemFrame(byte[] data, long[] ids, String e) implements Serializabl
 	}
 	
 	public void printStackTrace(){
-		LogUtil.printlnEr(e);
+		LogUtil.println(e);
 	}
 	
 	public boolean exceptionContains(String match){

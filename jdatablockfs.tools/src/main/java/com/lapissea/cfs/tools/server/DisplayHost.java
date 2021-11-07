@@ -13,9 +13,7 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.util.Arrays;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.*;
 
 import static com.lapissea.cfs.tools.server.ServerCommons.*;
 import static com.lapissea.util.LogUtil.Init.*;
@@ -91,6 +89,8 @@ public class DisplayHost{
 				}
 			}, e->new Thread(e).start());
 			
+			var workerPool=Executors.newFixedThreadPool(ForkJoinPool.getCommonPoolParallelism());
+			
 			while(running){
 				try{
 					
@@ -110,7 +110,7 @@ public class DisplayHost{
 					
 					var id=taskCounter++;
 					
-					ForkJoinPool.commonPool().submit(()->{
+					workerPool.submit(()->{
 						UnsafeRunnable<IOException> readyTask=switch(action){
 							case LOG -> {
 								MemFrame frame;
@@ -158,7 +158,10 @@ public class DisplayHost{
 					break;
 				}
 			}
-			
+			workerPool.shutdown();
+			try{
+				workerPool.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+			}catch(InterruptedException ignored){}
 			runner.join();
 			
 			

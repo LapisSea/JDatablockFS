@@ -72,8 +72,13 @@ public class LoggedMemoryUtils{
 	public static MemoryData<?> newLoggedMemory(String sessionName, LateInit<DataLogger> display) throws IOException{
 		MemoryData.EventLogger logger;
 		if(display.isInited()){
-			var ses=display.get().getSession(sessionName);
-			logger=(data, ids)->ses.log(new MemFrame(data.readAll(), ids.toArray(), new Throwable()));
+			DataLogger disp=display.get();
+			if(disp instanceof DataLogger.Blank){
+				logger=(d, i)->{};
+			}else{
+				var ses=disp.getSession(sessionName);
+				logger=(data, ids)->ses.log(new MemFrame(data.readAll(), ids.toArray(), new Throwable()));
+			}
 		}else{
 			var preBuf=new LinkedList<MemFrame>();
 			new Thread(()->{
@@ -87,6 +92,11 @@ public class LoggedMemoryUtils{
 			}).start();
 			
 			logger=(data, ids)->{
+				if(display.isInited()){
+					if(display.get() instanceof DataLogger.Blank){
+						return;
+					}
+				}
 				var memFrame=new MemFrame(data.readAll(), ids.toArray(), new Throwable());
 				synchronized(preBuf){
 					if(display.isInited()){
