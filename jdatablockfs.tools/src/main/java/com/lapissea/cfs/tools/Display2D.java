@@ -14,7 +14,6 @@ import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.util.List;
-import java.util.Queue;
 import java.util.*;
 import java.util.function.IntConsumer;
 
@@ -27,11 +26,13 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 		private final List<CachedFrame> frames=new ArrayList<>();
 		private       int               pos;
 		
-		private final Runnable setDirty;
-		private       boolean  markForDeletion;
+		private final IntConsumer onFrameChange;
+		private final Runnable    setDirty;
+		private       boolean     markForDeletion;
 		
 		private Session(Runnable setDirty, IntConsumer onFrameChange){
 			this.setDirty=setDirty;
+			this.onFrameChange=onFrameChange;
 		}
 		
 		@Override
@@ -58,6 +59,7 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 			
 			this.pos=pos;
 			setDirty.run();
+			onFrameChange.accept(getPos());
 		}
 		
 		public int getPos(){
@@ -66,13 +68,17 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 	}
 	
 	private Graphics2D             currentGraphics;
-	private Queue<AffineTransform> transformStack=new LinkedList<>();
+	private Deque<AffineTransform> transformStack=new LinkedList<>();
 	
-	private class Pan extends JPanel{
+	private class Pan extends Panel{
 		
 		public int mouseX;
 		public int mouseY;
 		
+		@Override
+		public void update(Graphics g){
+			paint((Graphics2D)g);
+		}
 		@Override
 		public void paint(Graphics g){
 			paint((Graphics2D)g);
@@ -81,7 +87,13 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 		public void paint(Graphics2D g){
 			try{
 				cleanUpSessions();
-				if(activeSession.isEmpty()||activeSession.get().frames.isEmpty()) return;
+				
+				if(visibleSession!=activeSession){
+					visibleSession=activeSession;
+					shouldRerender=true;
+				}
+				
+				if(visibleSession.isEmpty()||visibleSession.get().frames.isEmpty()) return;
 				
 				var image=render;
 				
@@ -117,9 +129,10 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 	
 	private float pixelsPerByte=300;
 	
-	private final Map<String, Session> sessions     =new HashMap<>();
-	private       Optional<Session>    activeSession=Optional.empty();
-	private final JFrame               frame        =new JFrame();
+	private final Map<String, Session> sessions      =new HashMap<>();
+	private       Optional<Session>    activeSession =Optional.empty();
+	private       Optional<Session>    visibleSession=Optional.empty();
+	private final Frame                frame         =new Frame();
 	private final Pan                  pan;
 	
 	public Display2D(){
@@ -135,15 +148,21 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 		
 		pan=new Pan();
 		pan.setBackground(Color.GRAY);
-		frame.setContentPane(pan);
+		frame.setLayout(new BorderLayout());
+		frame.add(pan);
 		
-		frame.setDefaultCloseOperation(frame.EXIT_ON_CLOSE);
+		frame.addWindowListener(
+			new WindowAdapter(){
+				@Override
+				public void windowClosed(WindowEvent e){System.exit(0);}
+			}
+		);
 		
 		frame.addKeyListener(new KeyAdapter(){
 			@Override
 			public void keyPressed(KeyEvent e){
 				cleanUpSessions();
-				activeSession.ifPresent(ses->{
+				visibleSession.ifPresent(ses->{
 					if(e.getKeyChar()=='a'||e.getKeyCode()==37) ses.setPos(ses.getPos()-1);
 					if(e.getKeyChar()=='d'||e.getKeyCode()==39) ses.setPos(ses.getPos()+1);
 					ses.setPos(MathUtil.snap(ses.getPos(), 0, ses.frames.size()-1));
@@ -170,7 +189,9 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 		frame.addComponentListener(new ComponentAdapter(){
 			@Override
 			public void componentResized(ComponentEvent e){
-				calcSize(getFrame(getFramePos()).data().data().length, true);
+				if(visibleSession.isPresent()){
+					calcSize(getFrame(getFramePos()).data().data().length, true);
+				}
 				frame.repaint();
 			}
 			
@@ -212,7 +233,7 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 				float val=x/(float)width;
 				
 				cleanUpSessions();
-				activeSession.ifPresent(ses->ses.setPos((int)(val*(ses.frames.size()-1))));
+				visibleSession.ifPresent(ses->ses.setPos((int)(val*(ses.frames.size()-1))));
 				
 				pan.repaint();
 			}
@@ -222,7 +243,7 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 			@Override
 			public void mouseClicked(MouseEvent e){
 				cleanUpSessions();
-				activeSession.ifPresent(ses->{
+				visibleSession.ifPresent(ses->{
 					if(ses.frames.isEmpty()) return;
 					ses.frames.get(ses.getPos()).data().printStackTrace();
 					frame.repaint();
@@ -231,7 +252,7 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 		});
 		
 		frame.setVisible(true);
-		frame.createBufferStrategy(2);
+//		frame.createBufferStrategy(2);
 	}
 	
 	boolean       shouldRerender=true;
@@ -260,7 +281,7 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 	
 	@Override
 	protected void outlineQuad(double x, double y, double width, double height){
-		currentGraphics.setStroke(new BasicStroke(getLineWidth()));
+		setStrokeWidth(getLineWidth());
 		currentGraphics.draw(new Rectangle2D.Double(x, y, width, height));
 	}
 	
@@ -271,10 +292,13 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 	
 	@Override
 	protected void drawLine(double xFrom, double yFrom, double xTo, double yTo){
-		currentGraphics.setStroke(new BasicStroke(getLineWidth()));
-		currentGraphics.draw(new Line2D.Double(
-			xFrom*pixelsPerByte, yFrom*pixelsPerByte,
-			xTo*pixelsPerByte, yTo*pixelsPerByte)
+		setStrokeWidth(getLineWidth());
+		
+		currentGraphics.draw(
+			new Line2D.Double(
+				xFrom*pixelsPerByte, yFrom*pixelsPerByte,
+				xTo*pixelsPerByte, yTo*pixelsPerByte
+			)
 		);
 	}
 	
@@ -305,11 +329,11 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 	}
 	@Override
 	protected void pushMatrix(){
-		transformStack.add(currentGraphics.getTransform());
+		transformStack.push(currentGraphics.getTransform());
 	}
 	@Override
 	protected void popMatrix(){
-		currentGraphics.setTransform(transformStack.remove());
+		currentGraphics.setTransform(transformStack.pop());
 	}
 	@Override
 	protected GLFont.Bounds getStringBounds(String str){
@@ -355,12 +379,15 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 	}
 	@Override
 	protected void outlineString(String str, float x, float y){
-		currentGraphics.setStroke(new BasicStroke(1));
+		setStrokeWidth(1);
 		currentGraphics.setFont(currentGraphics.getFont().deriveFont(getFontScale()/2));
 		var transform=new AffineTransform();
 		transform.translate(x, y);
 		Shape shape=new TextLayout(str, currentGraphics.getFont(), currentGraphics.getFontRenderContext()).getOutline(transform);
 		currentGraphics.draw(shape);
+	}
+	private void setStrokeWidth(float i){
+		currentGraphics.setStroke(new BasicStroke(i, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER));
 	}
 	@Override
 	protected void fillString(String str, float x, float y){
@@ -373,15 +400,15 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 	}
 	@Override
 	protected int getFrameCount(){
-		return activeSession.map(ses->ses.frames.size()).orElse(0);
+		return visibleSession.map(ses->ses.frames.size()).orElse(0);
 	}
 	@Override
 	protected CachedFrame getFrame(int index){
-		return activeSession.map(ses->ses.frames.get(index)).orElse(null);
+		return visibleSession.map(ses->ses.frames.get(index)).orElse(null);
 	}
 	@Override
 	protected int getFramePos(){
-		return activeSession.map(ses->ses.pos).orElse(0);
+		return visibleSession.map(ses->ses.pos).orElse(0);
 	}
 	@Override
 	protected void preRender(){
@@ -397,13 +424,16 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 			nam->new Session(()->{
 				frame.repaint();
 				shouldRerender=true;
+				invokeLater(pan::repaint);
 			}, frame->{
 				this.frame.repaint();
 				shouldRerender=true;
 				this.frame.setTitle("Binary display - frame: "+frame+" @"+name);
+				invokeLater(pan::repaint);
 			})
 		);
 		activeSession=Optional.of(ses);
+		invokeLater(pan::repaint);
 		return ses;
 	}
 	
@@ -415,6 +445,7 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 		});
 		sessions.values().forEach(Session::finish);
 		activeSession=Optional.empty();
+		visibleSession=Optional.empty();
 		sessions.clear();
 	}
 }
