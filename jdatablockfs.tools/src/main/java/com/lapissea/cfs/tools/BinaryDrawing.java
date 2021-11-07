@@ -702,6 +702,7 @@ public abstract class BinaryDrawing{
 		ParsedFrame       parsed  =cFrame.parsed();
 		ChunkDataProvider provider=null;
 		
+		Set<Chunk> referenced=new HashSet<>();
 		try{
 			Cluster cluster=parsed.getCluster().orElseGet(()->{
 				try{
@@ -716,22 +717,20 @@ public abstract class BinaryDrawing{
 			});
 			if(cluster!=null){
 				provider=cluster;
-				var        cl        =cluster;
-				var        root      =cluster.getRoot();
-				Set<Chunk> referenced=new HashSet<>();
-				FieldWalking.walkReferences(cluster, new LinkedList<>(), root,
-				                            cluster.getFirstChunk().getPtr().makeReference(),
-				                            FixedContiguousStructPipe.of(root.getThisStruct()), ref->{
-						if(!ref.isNull()){
-							try{
-								for(Chunk chunk : new ChainWalker(ref.getPtr().dereference(cl))){
-									referenced.add(chunk);
-								}
-							}catch(IOException e){
-								throw UtilL.uncheckedThrow(e);
+				var cl  =cluster;
+				var root=cluster.getRoot();
+				
+				new MemoryWalker().walk(cluster, cluster.getRoot(), cluster.getFirstChunk().getPtr().makeReference(), Cluster.ROOT_PIPE, ref->{
+					if(!ref.isNull()){
+						try{
+							for(Chunk chunk : new ChainWalker(ref.getPtr().dereference(cl))){
+								referenced.add(chunk);
 							}
+						}catch(IOException e){
+							throw UtilL.uncheckedThrow(e);
 						}
-					});
+					}
+				});
 
 //				LogUtil.printTable("instance", "");
 				
