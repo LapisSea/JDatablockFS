@@ -46,14 +46,14 @@ public class MemoryWalker{
 				if(DEBUG_VALIDATION){
 					for(IOInstance<?> ioInstance : stack){
 						if(ioInstance.equals(instance)){
-							var problem=false;
-							if(ioInstance instanceof IOInstance.Unmanaged<?> u1&&instance instanceof IOInstance.Unmanaged<?> u2&&(
-								!u1.getReference().equals(u2.getReference())||
-								!u1.getTypeDef().equals(u2.getTypeDef())
-							)) problem=true;
-							if(!ioInstance.toString().equals(instance.toString())) problem=true;
 							
-							if(problem){
+							if(
+								ioInstance instanceof IOInstance.Unmanaged<?> u1&&instance instanceof IOInstance.Unmanaged<?> u2&&(
+									!u1.getReference().equals(u2.getReference())||
+									!u1.getTypeDef().equals(u2.getTypeDef())
+								)||
+								!ioInstance.toString().equals(instance.toString())
+							){
 								LogUtil.printlnEr("Possible equality problem?\n"+ioInstance+"\n"+instance);
 							}
 							break;
