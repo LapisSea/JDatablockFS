@@ -50,7 +50,7 @@ public class LoggedMemoryUtils{
 		
 		var loggerConfig=(Map<String, Object>)config.getOrDefault("logger", Map.of());
 		
-		var type=loggerConfig.getOrDefault("type", "").toString();
+		var type=loggerConfig.getOrDefault("type", "none").toString();
 		
 		return new LateInit<>(()->switch(type){
 			case "none" -> DataLogger.Blank.INSTANCE;
