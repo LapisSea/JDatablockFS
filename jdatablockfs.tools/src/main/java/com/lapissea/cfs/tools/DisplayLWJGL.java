@@ -2,26 +2,22 @@ package com.lapissea.cfs.tools;
 
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.MemFrame;
+import com.lapissea.cfs.tools.render.OpenGLBackend;
 import com.lapissea.glfw.GlfwKeyboardEvent;
 import com.lapissea.glfw.GlfwMonitor;
 import com.lapissea.glfw.GlfwWindow;
 import com.lapissea.glfw.GlfwWindow.SurfaceAPI;
 import com.lapissea.util.MathUtil;
 import com.lapissea.util.UtilL;
-import com.lapissea.util.event.change.ChangeRegistry;
 import com.lapissea.util.event.change.ChangeRegistryInt;
 import com.lapissea.vec.Vec2i;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.glfw.GLFWErrorCallback;
 import org.lwjgl.opengl.GL;
 
-import java.awt.Color;
 import java.awt.Toolkit;
 import java.awt.datatransfer.DataFlavor;
-import java.awt.geom.AffineTransform;
-import java.awt.geom.Point2D;
 import java.io.File;
-import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
@@ -29,8 +25,10 @@ import java.util.function.IntConsumer;
 
 import static com.lapissea.util.PoolOwnThread.async;
 import static org.lwjgl.glfw.GLFW.*;
-import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.opengl.GL30.GL_INVALID_FRAMEBUFFER_OPERATION;
+import static org.lwjgl.opengl.GL11.GL_DEPTH_TEST;
+import static org.lwjgl.opengl.GL11.glClearColor;
+import static org.lwjgl.opengl.GL11.glDepthMask;
+import static org.lwjgl.opengl.GL11.glDisable;
 
 public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	
@@ -79,67 +77,22 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 		}
 	}
 	
-	protected class BulkDrawGL extends BulkDraw{
-		private boolean inactive;
-		public BulkDrawGL(DrawMode mode){
-			super(mode);
-		}
-		@Override
-		protected void start(DrawMode mode){
-			inactive=isBulkDrawing();
-			if(inactive) return;
-			
-			glErrorPrint();
-			glBegin(switch(mode){
-				case QUADS -> GL_QUADS;
-			});
-		}
-		@Override
-		protected void end(){
-			if(inactive) return;
-			
-			glEnd();
-			glErrorPrint();
-		}
-	}
-	@Override
-	protected BulkDraw bulkDraw(DrawMode mode){
-		return new BulkDrawGL(mode);
-	}
-	
 	private final GlfwWindow window=new GlfwWindow();
-	
-	private final List<Runnable> glTasks=Collections.synchronizedList(new LinkedList<>());
 	
 	private final Map<String, Session>  sessions        =new LinkedHashMap<>();
 	private       Optional<Session>     activeSession   =Optional.empty();
 	private       Optional<Session>     displayedSession=Optional.empty();
-	private final ChangeRegistry<Float> pixelsPerByte   =new ChangeRegistry<>(300F);
-	private       boolean               shouldRender    =true;
 	private       boolean               destroyRequested=false;
 	
 	private String  filter     ="";
 	private boolean filterMake =false;
 	private int[]   scrollRange=null;
 	
-	private       CompletableFuture<?> glInit;
-	private final Thread               glThread;
-	private final GLFont               font;
+	private CompletableFuture<?> glInit;
 	
 	public DisplayLWJGL(){
-		glThread=new Thread(this::displayLifecycle, "display");
-
-//		var path="/roboto/regular";
-		var path="/CourierPrime/Regular";
-
-//		font=new TTFont(path+"/font.ttf", this::bulkDraw, this::markFrameDirty, this::runInGl);
-		try{
-			var atlas=new MSDFAtlas(path);
-			
-			font=new AtlasFont(atlas, this::bulkDraw, this::markFrameDirty, this::runInGl);
-		}catch(IOException e){
-			throw new RuntimeException("failed to load font", e);
-		}
+		Thread glThread=new Thread(this::displayLifecycle, "display");
+		renderer=new OpenGLBackend(window, glThread);
 		
 		glThread.setDaemon(false);
 		glThread.start();
@@ -149,22 +102,11 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 		glInit=null;
 	}
 	
-	private void markFrameDirty(){
-		shouldRender=true;
-	}
-	private void runInGl(Runnable task){
-		if(Thread.currentThread()==glThread){
-			task.run();
-		}else{
-			glTasks.add(task);
-		}
-	}
-	
 	private void displayLifecycle(){
 		glInit=async(this::initWindow, Runnable::run);
 		
 		ChangeRegistryInt byteIndex=new ChangeRegistryInt(-1);
-		byteIndex.register(e->shouldRender=true);
+		byteIndex.register(e->renderer.markFrameDirty());
 		
 		double[] travel={0};
 		
@@ -191,12 +133,12 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			travel[0]+=lastPos.distanceTo(pos);
 			lastPos.set(pos);
 			
-			var pixelsPerByte=getPixelsPerByte();
+			var pixelsPerByte=renderer.getPixelsPerByte();
 			
 			int xByte=(int)(window.mousePos.x()/pixelsPerByte);
 			int yByte=(int)(window.mousePos.y()/pixelsPerByte);
 			
-			int width=(int)Math.max(1, this.getWidth()/pixelsPerByte);
+			int width=(int)Math.max(1, renderer.getWidth()/pixelsPerByte);
 			
 			byteIndex.set(yByte*width+xByte);
 			
@@ -266,11 +208,11 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			if(!filter.isEmpty()&&e.getKey()==GLFW_KEY_ESCAPE){
 				filter="";
 				scrollRange=null;
-				shouldRender=true;
+				renderer.markFrameDirty();
 			}
 			
 			if(filterMake){
-				shouldRender=true;
+				renderer.markFrameDirty();
 				
 				if(e.getType()!=GlfwKeyboardEvent.Type.UP&&e.getKey()==GLFW_KEY_BACKSPACE){
 					if(!filter.isEmpty()){
@@ -321,7 +263,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 				}
 				var cg=(char)e.getKey();
 				if(!window.isKeyDown(GLFW_KEY_LEFT_SHIFT)) cg=Character.toLowerCase(cg);
-				if(canFontDisplay(cg)){
+				if(renderer.canFontDisplay(cg)){
 					filter+=cg;
 				}
 				return;
@@ -357,13 +299,12 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 						destroyRequested=false;
 						window.requestClose();
 					}
-					if(shouldRender){
-						shouldRender=false;
+					if(renderer.notifyDirtyFrame()){
 						render();
 					}
 					UtilL.sleep(0, 1000);
 					window.pollEvents();
-					postRender();
+					renderer.postRender();
 					
 				});
 			}
@@ -430,7 +371,6 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 		
 		
 		GL.createCapabilities();
-		glErrorPrint();
 		
 		if(!destroyRequested){
 			window.show();
@@ -441,7 +381,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 		glDisable(GL_DEPTH_TEST);
 		glDepthMask(false);
 		
-		font.fillString("a", 8, -100, 0);
+		renderer.fillString("a", 8, -100);
 	}
 	
 	@Override
@@ -450,16 +390,6 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			if(ses.framePos.get()==-1) ses.setFrame(ses.frames.size()-1);
 			return ses.framePos.get();
 		}).orElse(0);
-	}
-	@Override
-	protected void postRender(){
-		window.swapBuffers();
-	}
-	@Override
-	protected void preRender(){
-		while(!glTasks.isEmpty()){
-			glTasks.remove(0).run();
-		}
 	}
 	
 	@Override
@@ -473,43 +403,6 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	
 	
 	@Override
-	protected void clearFrame(){
-		glViewport(0, 0, getWidth(), getHeight());
-		glClear(GL_COLOR_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
-	}
-	
-	
-	@Override
-	protected void initRenderState(){
-		glEnable(GL_BLEND);
-		glDisable(GL_TEXTURE_2D);
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-		
-		glLoadIdentity();
-		translate(-1, 1);
-		scale(2F/getWidth(), -2F/getHeight());
-	}
-	
-	@Override
-	protected GLFont.Bounds getStringBounds(String str){
-		return font.getStringBounds(str, getFontScale());
-	}
-	
-	@Override
-	protected void outlineString(String str, float x, float y){
-		font.outlineString(str, getFontScale(), x, y);
-	}
-	
-	@Override
-	protected void fillString(String str, float x, float y){
-		font.fillString(str, getFontScale(), x, y);
-	}
-	
-	@Override
-	protected boolean canFontDisplay(char c){
-		return font.canFontDisplay(c);
-	}
-	@Override
 	protected int getFrameCount(){
 		return displayedSession.map(s->s.frames.size()).orElse(0);
 	}
@@ -517,109 +410,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	protected CachedFrame getFrame(int index){
 		return displayedSession.map(s->s.frames.get(index)).orElse(null);
 	}
-	@Override
-	protected void translate(double x, double y){
-		glTranslated(x, y, 0);
-	}
 	
-	@Override
-	protected void scale(double x, double y){
-		glScaled(x, y, 1);
-	}
-	
-	@Override
-	protected void rotate(double angle){
-		glRotated(angle, 0, 0, 1);
-	}
-	
-	@Override
-	protected void pushMatrix(){
-		glPushMatrix();
-	}
-	@Override
-	protected void popMatrix(){
-		glPopMatrix();
-	}
-	
-	@Override
-	protected void setColor(Color color){
-		glErrorPrint();
-		glColor4f(color.getRed()/255F, color.getGreen()/255F, color.getBlue()/255F, color.getAlpha()/255F);
-	}
-	
-	@Override
-	protected Color readColor(){
-		float[] color=new float[4];
-		glGetFloatv(GL_CURRENT_COLOR, color);
-		return new Color(color[0], color[1], color[2], color[3]);
-	}
-	
-	@Override
-	protected void drawLine(double xFrom, double yFrom, double xTo, double yTo){
-		var pixelsPerByte=getPixelsPerByte();
-		var angle        =-Math.atan2(xTo-xFrom, yTo-yFrom);
-		var length       =MathUtil.length(xFrom-xTo, yTo-yFrom)*pixelsPerByte;
-		
-		Point2D.Double  p=new Point2D.Double();
-		AffineTransform t=new AffineTransform();
-		t.setToIdentity();
-		t.translate(xFrom*pixelsPerByte, yFrom*pixelsPerByte);
-		t.rotate(angle);
-		
-		double x    =-getLineWidth()/2;
-		double width=getLineWidth();
-		
-		if(!isBulkDrawing()) glBegin(GL_QUADS);
-		
-		vertex2dCpuTrans(p, t, x, 0);
-		vertex2dCpuTrans(p, t, x+width, 0);
-		vertex2dCpuTrans(p, t, x+width, length);
-		vertex2dCpuTrans(p, t, x, length);
-		
-		if(!isBulkDrawing()) glEnd();
-	}
-	private void vertex2dCpuTrans(Point2D.Double p, AffineTransform t, double x, double y){
-		p.setLocation(x, y);
-		t.transform(p, p);
-		glVertex3d(p.x, p.y, 0);
-	}
-	
-	
-	@Override
-	protected void fillQuad(double x, double y, double width, double height){
-		draw4Points(x, y, width, height, GL_QUADS);
-	}
-	@Override
-	protected void outlineQuad(double x, double y, double width, double height){
-		draw4Points(x, y, width, height, GL_LINE_LOOP);
-	}
-	
-	private void draw4Points(double x, double y, double width, double height, int drawMode){
-		if(!isBulkDrawing()) glBegin(drawMode);
-		glVertex3d(x, y, 0);
-		glVertex3d(x+width, y, 0);
-		glVertex3d(x+width, y+height, 0);
-		glVertex3d(x, y+height, 0);
-		if(!isBulkDrawing()) glEnd();
-	}
-	
-	public static void glErrorPrint(){
-		int errorCode=glGetError();
-		if(errorCode==GL_NO_ERROR) return;
-		
-		var err=switch(errorCode){
-			case GL_INVALID_ENUM -> "INVALID_ENUM";
-			case GL_INVALID_VALUE -> "INVALID_VALUE";
-			case GL_INVALID_OPERATION -> "INVALID_OPERATION";
-			case GL_STACK_OVERFLOW -> "STACK_OVERFLOW";
-			case GL_STACK_UNDERFLOW -> "STACK_UNDERFLOW";
-			case GL_OUT_OF_MEMORY -> "OUT_OF_MEMORY";
-			case GL_INVALID_FRAMEBUFFER_OPERATION -> "INVALID_FRAMEBUFFER_OPERATION";
-			default -> "Unknown error"+errorCode;
-		};
-		
-		new RuntimeException(err).printStackTrace();
-	}
 	
 	@Override
 	public DataLogger.Session getSession(String name){
@@ -627,8 +418,8 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 		
 		var ses=sessions.computeIfAbsent(
 			name,
-			nam->new Session(()->shouldRender=true, frame->{
-				shouldRender=true;
+			nam->new Session(()->renderer.markFrameDirty(), frame->{
+				renderer.markFrameDirty();
 				window.title.set("Binary display - frame: "+frame+" @"+name);
 			})
 		);
@@ -642,33 +433,6 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 		activeSession=Optional.empty();
 		displayedSession=Optional.empty();
 		sessions.clear();
-	}
-	
-	@Override
-	protected int getWidth(){
-		return window.size.x();
-	}
-	
-	@Override
-	protected int getHeight(){
-		return window.size.y();
-	}
-	@Override
-	protected int getMouseX(){
-		return window.mousePos.x();
-	}
-	@Override
-	protected int getMouseY(){
-		return window.mousePos.y();
-	}
-	
-	@Override
-	public float getPixelsPerByte(){
-		return pixelsPerByte.get();
-	}
-	@Override
-	protected void pixelsPerByteChange(float newPixelsPerByte){
-		pixelsPerByte.set(newPixelsPerByte);
 	}
 	
 	private void setActiveSession(Session session){

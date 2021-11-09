@@ -1,5 +1,6 @@
 package com.lapissea.cfs.tools;
 
+import com.lapissea.cfs.tools.render.RenderBackend;
 import com.lapissea.util.LogUtil;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
@@ -130,7 +131,7 @@ public class TTFont extends GLFont{
 	
 	private final ReadWriteLock                                            cacheLock  =new ReentrantReadWriteLock();
 	private final List<Bitmap>                                             bitmapCache=new ArrayList<>();
-	private final Function<BinaryDrawing.DrawMode, BinaryDrawing.BulkDraw> bulkHook;
+	private final Function<RenderBackend.DrawMode, RenderBackend.BulkDraw> bulkHook;
 	private final Runnable                                                 renderRequest;
 	private final Consumer<Runnable>                                       openglTask;
 	
@@ -142,10 +143,10 @@ public class TTFont extends GLFont{
 		}
 	}
 	
-	public TTFont(String ttfPath, Function<BinaryDrawing.DrawMode, BinaryDrawing.BulkDraw> bulkHook, Runnable renderRequest, Consumer<Runnable> openglTask){
+	public TTFont(String ttfPath, Function<RenderBackend.DrawMode, RenderBackend.BulkDraw> bulkHook, Runnable renderRequest, Consumer<Runnable> openglTask){
 		this(readData(ttfPath), bulkHook, renderRequest, openglTask);
 	}
-	public TTFont(byte[] ttfData, Function<BinaryDrawing.DrawMode, BinaryDrawing.BulkDraw> bulkHook, Runnable renderRequest, Consumer<Runnable> openglTask){
+	public TTFont(byte[] ttfData, Function<RenderBackend.DrawMode, RenderBackend.BulkDraw> bulkHook, Runnable renderRequest, Consumer<Runnable> openglTask){
 		this.bulkHook=bulkHook;
 		this.renderRequest=renderRequest;
 		this.openglTask=openglTask;
@@ -351,7 +352,7 @@ public class TTFont extends GLFont{
 			tex.bind(GL11.GL_TEXTURE_2D);
 			GL11.glEnable(GL11.GL_TEXTURE_2D);
 			
-			try(var ignored=bulkHook.apply(BinaryDrawing.DrawMode.QUADS)){
+			try(var ignored=bulkHook.apply(RenderBackend.DrawMode.QUADS)){
 				for(int i=0;i<string.length();i++){
 					char cp=string.charAt(i);
 					if(cp<=31) cp=' ';

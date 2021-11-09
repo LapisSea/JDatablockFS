@@ -1,5 +1,6 @@
 package com.lapissea.cfs.tools;
 
+import com.lapissea.cfs.tools.render.RenderBackend;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
 
@@ -8,7 +9,7 @@ import java.nio.ByteBuffer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-import static com.lapissea.util.PoolOwnThread.*;
+import static com.lapissea.util.PoolOwnThread.async;
 import static org.lwjgl.opengl.GL20.*;
 
 public class AtlasFont extends GLFont{
@@ -52,7 +53,7 @@ public class AtlasFont extends GLFont{
 	
 	private final MSDFAtlas atlas;
 	
-	private final Function<BinaryDrawing.DrawMode, BinaryDrawing.BulkDraw> bulkHook;
+	private final Function<RenderBackend.DrawMode, RenderBackend.BulkDraw> bulkHook;
 	private final Runnable                                                 renderRequest;
 	private final Consumer<Runnable>                                       openglTask;
 	
@@ -61,7 +62,7 @@ public class AtlasFont extends GLFont{
 	private int     outlineU;
 	private Texture texture;
 	
-	public AtlasFont(MSDFAtlas atlas, Function<BinaryDrawing.DrawMode, BinaryDrawing.BulkDraw> bulkHook, Runnable renderRequest, Consumer<Runnable> openglTask){
+	public AtlasFont(MSDFAtlas atlas, Function<RenderBackend.DrawMode, RenderBackend.BulkDraw> bulkHook, Runnable renderRequest, Consumer<Runnable> openglTask){
 		this.atlas=atlas;
 		this.bulkHook=bulkHook;
 		this.renderRequest=renderRequest;
@@ -173,7 +174,7 @@ public class AtlasFont extends GLFont{
 		texture.bind(GL_TEXTURE_2D);
 		glEnable(GL_TEXTURE_2D);
 		
-		try(var ignored=bulkHook.apply(BinaryDrawing.DrawMode.QUADS)){
+		try(var ignored=bulkHook.apply(RenderBackend.DrawMode.QUADS)){
 			for(int i=0;i<string.length();i++){
 				char c    =string.charAt(i);
 				var  glyph=atlas.getGlyph(c);
