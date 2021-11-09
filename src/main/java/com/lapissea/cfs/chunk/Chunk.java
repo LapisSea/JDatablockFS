@@ -17,7 +17,6 @@ import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IOValue;
-import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.ShouldNeverHappenError;
@@ -234,10 +233,10 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 	public void setCapacityAndModifyNumSize(long newCapacity){
 		forbidReadOnly();
 		if(this.capacity==newCapacity) return;
-		
-		if(capacity>newCapacity){
-			throw new NotImplementedException("not sure when destructive shrinking will be needed");
-		}
+
+//		if(capacity>newCapacity){
+//			throw new NotImplementedException("not sure when destructive shrinking will be needed");
+//		}
 		
 		var end=dataEnd();
 		

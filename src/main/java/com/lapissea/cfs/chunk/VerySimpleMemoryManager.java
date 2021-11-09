@@ -29,7 +29,7 @@ public class VerySimpleMemoryManager implements MemoryManager{
 	@Override
 	public void free(List<Chunk> toFree) throws IOException{
 		
-		List<Chunk> toAdd=mergeChunks(toFree);
+		List<Chunk> toAdd=mergeChunks(toFree.stream().sorted(Comparator.comparingLong(c->c.getPtr().getValue())).collect(Collectors.toList()));
 		freeChunks.addAll(toAdd);
 		
 		var mergedFree=mergeChunks(freeChunks);
