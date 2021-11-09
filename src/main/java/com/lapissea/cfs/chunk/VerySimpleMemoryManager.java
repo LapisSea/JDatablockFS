@@ -10,9 +10,11 @@ import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Collectors;
 
-import static com.lapissea.cfs.GlobalConfig.*;
+import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
 public class VerySimpleMemoryManager implements MemoryManager{
 	
@@ -111,8 +113,15 @@ public class VerySimpleMemoryManager implements MemoryManager{
 	public void allocTo(Chunk firstChunk, Chunk target, long toAllocate) throws IOException{
 		
 		if(DEBUG_VALIDATION){
-			var ptr =firstChunk.getPtr();
-			var prev=new PhysicalChunkWalker(context.getFirstChunk()).stream().filter(Chunk::hasNextPtr).map(Chunk::getNextPtr).filter(p->p.equals(ptr)).findAny();
+			var ptr=firstChunk.getPtr();
+			
+			var prev=new PhysicalChunkWalker(context.getFirstChunk())
+				.stream()
+				.filter(Chunk::hasNextPtr)
+				.map(Chunk::getNextPtr)
+				.filter(p->p.equals(ptr))
+				.findAny();
+			
 			if(prev.isPresent()){
 				var ch=context.getChunk(prev.get());
 				throw new IllegalArgumentException(firstChunk+" is not the first chunk! "+ch+" declares it as next.");
@@ -138,18 +147,53 @@ public class VerySimpleMemoryManager implements MemoryManager{
 	}
 	@Override
 	public Chunk alloc(AllocateTicket ticket) throws IOException{
-		var src=context.getSource();
-		var siz=src.getIOSize();
-		var builder=new ChunkBuilder(context, ChunkPointer.of(siz))
-			.withCapacity(ticket.bytes())
-			.withNext(ticket.next())
-			.withExplicitNextSize(ticket.disableResizing()?NumberSize.VOID:NumberSize.bySize(ticket.next()).max(NumberSize.SHORT));
-		var chunk=builder.create();
-		if(!ticket.approve(chunk)) return null;
 		
-		try(var io=src.ioAt(chunk.getPtr().getValue())){
-			chunk.writeHeader(io);
-			Utils.zeroFill(io::write, chunk.getCapacity());
+		Chunk chunk=null;
+		
+		var reallocateO=freeChunks.stream().filter(c->(c.getCapacity()-c.getHeaderSize()*2L)>ticket.bytes()).findAny();
+		if(reallocateO.isPresent()){
+			var ch=reallocateO.get();
+			
+			var builder=new ChunkBuilder(context, ch.getPtr())
+				.withCapacity(ticket.bytes())
+				.withNext(ticket.next())
+				.withExplicitNextSize(ticket.disableResizing()?NumberSize.VOID:NumberSize.bySize(ticket.next()).max(NumberSize.SHORT));
+			chunk=builder.create();
+			
+			var siz=chunk.totalSize();
+			var end=ch.dataEnd();
+			builder.withPtr(ChunkPointer.of(end-siz));
+			chunk=builder.create();
+			
+			assert chunk.dataEnd()==ch.dataEnd();
+			
+			if(ticket.approve(chunk)){
+				var start=chunk.dataEnd();
+				
+				chunk.writeHeader();
+				
+				ch.setCapacityAndModifyNumSize(ch.getCapacity()-chunk.totalSize());
+				ch.writeHeader();
+			}else{
+				chunk=null;
+			}
+		}
+		
+		var src=context.getSource();
+		
+		if(chunk==null){
+			var siz=src.getIOSize();
+			var builder=new ChunkBuilder(context, ChunkPointer.of(siz))
+				.withCapacity(ticket.bytes())
+				.withNext(ticket.next())
+				.withExplicitNextSize(ticket.disableResizing()?NumberSize.VOID:NumberSize.bySize(ticket.next()).max(NumberSize.SHORT));
+			chunk=builder.create();
+			if(!ticket.approve(chunk)) return null;
+			
+			try(var io=src.ioAt(chunk.getPtr().getValue())){
+				chunk.writeHeader(io);
+				Utils.zeroFill(io::write, chunk.getCapacity());
+			}
 		}
 		
 		context.getChunkCache().add(chunk);
