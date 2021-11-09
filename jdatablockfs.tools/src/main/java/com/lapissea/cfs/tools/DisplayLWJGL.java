@@ -14,23 +14,23 @@ import com.lapissea.vec.Vec2i;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.glfw.GLFWErrorCallback;
 import org.lwjgl.opengl.GL;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL30;
 
-import java.awt.*;
+import java.awt.Color;
+import java.awt.Toolkit;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.Point2D;
 import java.io.File;
 import java.io.IOException;
-import java.util.List;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 
-import static com.lapissea.util.PoolOwnThread.*;
+import static com.lapissea.util.PoolOwnThread.async;
 import static org.lwjgl.glfw.GLFW.*;
+import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL30.GL_INVALID_FRAMEBUFFER_OPERATION;
 
 public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	
@@ -90,15 +90,15 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			if(inactive) return;
 			
 			glErrorPrint();
-			GL11.glBegin(switch(mode){
-				case QUADS -> GL11.GL_QUADS;
+			glBegin(switch(mode){
+				case QUADS -> GL_QUADS;
 			});
 		}
 		@Override
 		protected void end(){
 			if(inactive) return;
 			
-			GL11.glEnd();
+			glEnd();
 			glErrorPrint();
 		}
 	}
@@ -340,8 +340,13 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 		});
 		
 		window.autoF11Toggle();
+
+//		var imguiCtx =new Context();
+//		var imguiImpl=new ImplGL3();
+		
 		try{
 			if(!destroyRequested){
+				
 				window.whileOpen(()->{
 					cleanUpSessions();
 					if(!displayedSession.equals(activeSession)){
@@ -358,6 +363,8 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 					}
 					UtilL.sleep(0, 1000);
 					window.pollEvents();
+					postRender();
+					
 				});
 			}
 		}catch(Throwable e){
@@ -366,6 +373,11 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			window.destroy();
 		}
 	}
+	
+	private void doRender(){
+	
+	}
+	
 	private void cleanUpSessions(){
 		sessions.values().removeIf(s->s.markForDeletion);
 		activeSession.filter(s->s.markForDeletion).flatMap(s->sessions.values().stream().findAny()).ifPresent(this::setActiveSession);
@@ -424,10 +436,10 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			window.show();
 		}else return;
 		
-		GL11.glClearColor(0.5F, 0.5F, 0.5F, 1.0f);
+		glClearColor(0.5F, 0.5F, 0.5F, 1.0f);
 		
-		GL11.glDisable(GL11.GL_DEPTH_TEST);
-		GL11.glDepthMask(false);
+		glDisable(GL_DEPTH_TEST);
+		glDepthMask(false);
 		
 		font.fillString("a", 8, -100, 0);
 	}
@@ -441,7 +453,6 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	}
 	@Override
 	protected void postRender(){
-		shouldRender=false;
 		window.swapBuffers();
 	}
 	@Override
@@ -463,18 +474,18 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	
 	@Override
 	protected void clearFrame(){
-		GL11.glViewport(0, 0, getWidth(), getHeight());
-		GL11.glClear(GL11.GL_COLOR_BUFFER_BIT);
+		glViewport(0, 0, getWidth(), getHeight());
+		glClear(GL_COLOR_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
 	}
 	
 	
 	@Override
 	protected void initRenderState(){
-		GL11.glEnable(GL11.GL_BLEND);
-		GL11.glDisable(GL11.GL_TEXTURE_2D);
-		GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+		glEnable(GL_BLEND);
+		glDisable(GL_TEXTURE_2D);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		
-		GL11.glLoadIdentity();
+		glLoadIdentity();
 		translate(-1, 1);
 		scale(2F/getWidth(), -2F/getHeight());
 	}
@@ -508,38 +519,38 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	}
 	@Override
 	protected void translate(double x, double y){
-		GL11.glTranslated(x, y, 0);
+		glTranslated(x, y, 0);
 	}
 	
 	@Override
 	protected void scale(double x, double y){
-		GL11.glScaled(x, y, 1);
+		glScaled(x, y, 1);
 	}
 	
 	@Override
 	protected void rotate(double angle){
-		GL11.glRotated(angle, 0, 0, 1);
+		glRotated(angle, 0, 0, 1);
 	}
 	
 	@Override
 	protected void pushMatrix(){
-		GL11.glPushMatrix();
+		glPushMatrix();
 	}
 	@Override
 	protected void popMatrix(){
-		GL11.glPopMatrix();
+		glPopMatrix();
 	}
 	
 	@Override
 	protected void setColor(Color color){
 		glErrorPrint();
-		GL11.glColor4f(color.getRed()/255F, color.getGreen()/255F, color.getBlue()/255F, color.getAlpha()/255F);
+		glColor4f(color.getRed()/255F, color.getGreen()/255F, color.getBlue()/255F, color.getAlpha()/255F);
 	}
 	
 	@Override
 	protected Color readColor(){
 		float[] color=new float[4];
-		GL11.glGetFloatv(GL11.GL_CURRENT_COLOR, color);
+		glGetFloatv(GL_CURRENT_COLOR, color);
 		return new Color(color[0], color[1], color[2], color[3]);
 	}
 	
@@ -558,60 +569,52 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 		double x    =-getLineWidth()/2;
 		double width=getLineWidth();
 		
-		if(!isBulkDrawing()) GL11.glBegin(GL11.GL_QUADS);
+		if(!isBulkDrawing()) glBegin(GL_QUADS);
 		
-		p.setLocation(x, 0);
+		vertex2dCpuTrans(p, t, x, 0);
+		vertex2dCpuTrans(p, t, x+width, 0);
+		vertex2dCpuTrans(p, t, x+width, length);
+		vertex2dCpuTrans(p, t, x, length);
+		
+		if(!isBulkDrawing()) glEnd();
+	}
+	private void vertex2dCpuTrans(Point2D.Double p, AffineTransform t, double x, double y){
+		p.setLocation(x, y);
 		t.transform(p, p);
-		GL11.glVertex3d(p.x, p.y, 0);
-		
-		p.setLocation(x+width, 0);
-		t.transform(p, p);
-		GL11.glVertex3d(p.x, p.y, 0);
-		
-		p.setLocation(x+width, length);
-		t.transform(p, p);
-		GL11.glVertex3d(p.x, p.y, 0);
-		
-		p.setLocation(x, length);
-		t.transform(p, p);
-		GL11.glVertex3d(p.x, p.y, 0);
-		
-		if(!isBulkDrawing()) GL11.glEnd();
+		glVertex3d(p.x, p.y, 0);
 	}
 	
 	
 	@Override
 	protected void fillQuad(double x, double y, double width, double height){
-		if(!isBulkDrawing()) GL11.glBegin(GL11.GL_QUADS);
-		GL11.glVertex3d(x, y, 0);
-		GL11.glVertex3d(x+width, y, 0);
-		GL11.glVertex3d(x+width, y+height, 0);
-		GL11.glVertex3d(x, y+height, 0);
-		if(!isBulkDrawing()) GL11.glEnd();
+		draw4Points(x, y, width, height, GL_QUADS);
 	}
-	
 	@Override
 	protected void outlineQuad(double x, double y, double width, double height){
-		if(!isBulkDrawing()) GL11.glBegin(GL11.GL_LINE_LOOP);
-		GL11.glVertex3d(x, y, 0);
-		GL11.glVertex3d(x+width, y, 0);
-		GL11.glVertex3d(x+width, y+height, 0);
-		GL11.glVertex3d(x, y+height, 0);
-		if(!isBulkDrawing()) GL11.glEnd();
+		draw4Points(x, y, width, height, GL_LINE_LOOP);
+	}
+	
+	private void draw4Points(double x, double y, double width, double height, int drawMode){
+		if(!isBulkDrawing()) glBegin(drawMode);
+		glVertex3d(x, y, 0);
+		glVertex3d(x+width, y, 0);
+		glVertex3d(x+width, y+height, 0);
+		glVertex3d(x, y+height, 0);
+		if(!isBulkDrawing()) glEnd();
 	}
 	
 	public static void glErrorPrint(){
-		int errorCode=GL11.glGetError();
-		if(errorCode==GL11.GL_NO_ERROR) return;
+		int errorCode=glGetError();
+		if(errorCode==GL_NO_ERROR) return;
 		
 		var err=switch(errorCode){
-			case GL11.GL_INVALID_ENUM -> "INVALID_ENUM";
-			case GL11.GL_INVALID_VALUE -> "INVALID_VALUE";
-			case GL11.GL_INVALID_OPERATION -> "INVALID_OPERATION";
-			case GL11.GL_STACK_OVERFLOW -> "STACK_OVERFLOW";
-			case GL11.GL_STACK_UNDERFLOW -> "STACK_UNDERFLOW";
-			case GL11.GL_OUT_OF_MEMORY -> "OUT_OF_MEMORY";
-			case GL30.GL_INVALID_FRAMEBUFFER_OPERATION -> "INVALID_FRAMEBUFFER_OPERATION";
+			case GL_INVALID_ENUM -> "INVALID_ENUM";
+			case GL_INVALID_VALUE -> "INVALID_VALUE";
+			case GL_INVALID_OPERATION -> "INVALID_OPERATION";
+			case GL_STACK_OVERFLOW -> "STACK_OVERFLOW";
+			case GL_STACK_UNDERFLOW -> "STACK_UNDERFLOW";
+			case GL_OUT_OF_MEMORY -> "OUT_OF_MEMORY";
+			case GL_INVALID_FRAMEBUFFER_OPERATION -> "INVALID_FRAMEBUFFER_OPERATION";
 			default -> "Unknown error"+errorCode;
 		};
 		

@@ -24,17 +24,18 @@ import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.util.*;
 import org.joml.SimplexNoise;
 
-import java.awt.*;
+import java.awt.Color;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Array;
-import java.util.List;
 import java.util.*;
 import java.util.function.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
+
+import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
 @SuppressWarnings({"UnnecessaryLocalVariable", "SameParameterValue"})
 public abstract class BinaryDrawing{
@@ -70,11 +71,7 @@ public abstract class BinaryDrawing{
 		protected abstract void end();
 	}
 	
-	private interface DrawB{
-		void draw(Supplier<IntStream> index, Color color, boolean withChar, boolean force);
-	}
-	
-	static record RenderContext(int width, float pixelsPerByte){}
+	static record RenderContext(byte[] bytes, BitSet filled, int width, float pixelsPerByte){}
 	
 	static class Rect{
 		float x, y, width, height;
@@ -361,10 +358,10 @@ public abstract class BinaryDrawing{
 			}
 			if(lastRange!=null) pointerRecord.accept(new Pointer(lastRange.to()-1, range.from(), 0, col, field.toString(), 0.2F));
 			lastRange=range;
-			fillByteRange(alpha(mul(col, 0.8F), 0.4F), ctx, range);
+			drawByteRanges(ctx, List.of(range), alpha(mul(col, 0.8F), 0.6F), false, true);
 		}
 		
-		setColor(alpha(mix(col, Color.WHITE, 0.2F), 0.7F));
+		setColor(alpha(mix(col, Color.WHITE, 0.2F), 1));
 		
 		var rectWidth=bestRange.toRect(ctx).width;
 		
@@ -529,7 +526,7 @@ public abstract class BinaryDrawing{
 //		return chunk.isUsed()?chunk.isUserData()?Color.blue.brighter():Color.GREEN:Color.CYAN;
 	}
 	
-	private void fillChunk(DrawB drawByte, Chunk chunk, Function<Color, Color> filter, boolean withChar, boolean force){
+	private void fillChunk(RenderContext ctx, Chunk chunk, Function<Color, Color> filter, boolean withChar, boolean force){
 		
 		var chunkColor=chunkBaseColor(chunk);
 		var dataColor =mul(chunkColor, 0.5F);
@@ -539,12 +536,12 @@ public abstract class BinaryDrawing{
 		dataColor=filter.apply(dataColor);
 		freeColor=filter.apply(freeColor);
 		
-		drawByte.draw(()->IntStream.range((int)chunk.getPtr().getValue(), (int)chunk.dataStart()), chunkColor, false, false);
+		drawByteRanges(ctx, List.of(new Range(chunk.getPtr().getValue(), chunk.dataStart())), chunkColor, false, false);
 		int start=(int)chunk.dataStart();
 		int cap  =(int)chunk.getCapacity();
 		int siz  =(int)chunk.getSize();
-		drawByte.draw(()->IntStream.range(0, cap).filter(i->i>=siz).map(i->i+start), freeColor, withChar, force);
-		drawByte.draw(()->IntStream.range(0, cap).filter(i->i<siz).map(i->i+start), dataColor, withChar, force);
+		drawByteRanges(ctx, List.of(new Range(start+siz, start+cap)), freeColor, withChar, force);
+		//drawByteRanges(ctx, List.of(new Range(start, start+siz)), dataColor, withChar, force);
 	}
 	
 	private void fillBit(float x, float y, int index, float xOff, float yOff){
@@ -734,15 +731,17 @@ public abstract class BinaryDrawing{
 		
 		calcSize(bytes.length, false);
 		
-		RenderContext ctx=new RenderContext((int)Math.max(1, this.getWidth()/getPixelsPerByte()), getPixelsPerByte());
+		RenderContext ctx=new RenderContext(bytes, filled, (int)Math.max(1, this.getWidth()/getPixelsPerByte()), getPixelsPerByte());
 		
 		startFrame();
 		
-		setColor(Color.BLUE);
-		IntPredicate isValidMagicByte=i->bytes.length>i&&magic.get(i)==bytes[i];
-		drawBytes(bytes, filled, ctx, ()->IntStream.range(0, magic.limit()).filter(isValidMagicByte), Color.BLUE, false, true);
-		drawBytes(bytes, filled, ctx, ()->IntStream.range(0, magic.limit()).filter(isValidMagicByte.negate()), Color.RED, false, true);
-		
+		if(hasMagic){
+			drawByteRanges(ctx, List.of(new Range(0, magic.limit())), Color.BLUE, false, true);
+		}else{
+			IntPredicate isValidMagicByte=i->bytes.length>i&&magic.get(i)==bytes[i];
+			drawBytes(ctx, IntStream.range(0, magic.limit()).filter(isValidMagicByte), Color.BLUE, true, true);
+			drawBytes(ctx, IntStream.range(0, magic.limit()).filter(isValidMagicByte.negate()), Color.RED, true, true);
+		}
 		setStroke(2F);
 		outlineByteRange(Color.WHITE, ctx, new Range(0, magic.limit()));
 		setColor(Color.WHITE);
@@ -783,32 +782,30 @@ public abstract class BinaryDrawing{
 						}
 					}
 				});
-
-//				LogUtil.printTable("instance", "");
-				
-				DrawB drawByte=(stream, color, withChar, force)->drawBytes(bytes, filled, ctx, stream, color, withChar, force);
-				long  pos     =cluster.getFirstChunk().getPtr().getValue();
-				while(pos<bytes.length){
-					try{
-						for(Chunk chunk : new PhysicalChunkWalker(cluster.getChunk(ChunkPointer.of(pos)))){
-							pos=chunk.dataEnd();
-							if(referenced.contains(chunk)){
-								fillChunk(drawByte, chunk, ch->ch, true, true);
-							}
-							fillChunk(bytes, filled, ctx, ptrs, cluster, chunk);
-						}
-					}catch(MalformedPointerException e){
-						var p=(int)pos;
-						drawBytes(bytes, filled, ctx, ()->IntStream.of(p), Color.RED, true, true);
-						pos++;
-					}
-				}
 				
 				annotateStruct(ctx, cluster,
 				               new LinkedList<>(), root,
 				               cluster.getFirstChunk().getPtr().makeReference(),
 				               FixedContiguousStructPipe.of(root.getThisStruct()),
 				               ptrs::add, true);
+				
+				long pos=cluster.getFirstChunk().getPtr().getValue();
+				while(pos<bytes.length){
+					try{
+						for(Chunk chunk : new PhysicalChunkWalker(cluster.getChunk(ChunkPointer.of(pos)))){
+							pos=chunk.dataEnd();
+							if(referenced.contains(chunk)){
+								fillChunk(ctx, chunk, ch->ch, true, false);
+							}
+							fillChunk(ctx, ptrs, cluster, chunk);
+						}
+					}catch(MalformedPointerException e){
+						var p=(int)pos;
+						drawBytes(ctx, IntStream.of(p), Color.RED, true, true);
+						pos++;
+					}
+				}
+				
 			}else{
 				provider=ChunkDataProvider.newVerySimpleProvider(MemoryData.build().withRaw(bytes).build());
 				
@@ -822,11 +819,11 @@ public abstract class BinaryDrawing{
 					try{
 						for(Chunk chunk : new PhysicalChunkWalker(provider.getChunk(ChunkPointer.of(pos)))){
 							pos=chunk.dataEnd();
-							fillChunk(bytes, filled, ctx, ptrs, provider, chunk);
+							fillChunk(ctx, ptrs, provider, chunk);
 						}
 					}catch(MalformedPointerException e){
 						var p=(int)pos;
-						drawBytes(bytes, filled, ctx, ()->IntStream.of(p), Color.RED, true, true);
+						drawBytes(ctx, IntStream.of(p), Color.RED, true, true);
 						pos++;
 					}
 				}
@@ -842,7 +839,8 @@ public abstract class BinaryDrawing{
 				handleError(e1, parsed);
 			}
 		}
-		drawBytes(bytes, filled, ctx, ()->IntStream.range(0, bytes.length).filter(((IntPredicate)filled::get).negate()), alpha(Color.GRAY, 0.5F), true, true);
+		
+		drawBytes(ctx, IntStream.range(0, bytes.length).filter(((IntPredicate)filled::get).negate()), alpha(Color.GRAY, 0.5F), true, true);
 		
 		findHoverChunk(ctx, parsed, provider);
 		
@@ -860,17 +858,27 @@ public abstract class BinaryDrawing{
 		drawTimeline(frameIndex);
 	}
 	
-	private void fillChunk(byte[] bytes, BitSet filled, RenderContext ctx, List<Pointer> ptrs, ChunkDataProvider provider, Chunk chunk) throws IOException{
+	private void fillChunk(RenderContext ctx, List<Pointer> ptrs, ChunkDataProvider provider, Chunk chunk) throws IOException{
 		annotateStruct(ctx, provider, new LinkedList<>(), chunk, null, Chunk.PIPE, ptrs::add, true);
-		if(chunk.dataEnd()>bytes.length){
-			drawByteRanges(bytes, filled, ctx, List.of(new Range(bytes.length, (int)chunk.dataEnd())), new Color(0, 0, 0, 0.2F), false, true);
+		if(chunk.dataEnd()>ctx.bytes.length){
+			drawByteRanges(ctx, List.of(new Range(ctx.bytes.length, chunk.dataEnd())), new Color(0, 0, 0, 0.2F), false, false);
 		}
 	}
 	
-	private void drawBytes(byte[] bytes, BitSet filled, RenderContext ctx, Supplier<IntStream> stream, Color color, boolean withChar, boolean force){
+	private void drawBytes(RenderContext ctx, IntStream stream, Color color, boolean withChar, boolean force){
+		drawByteRanges(ctx, indicesToRanges(stream), color, withChar, force);
+	}
+	
+	private List<Range> indicesToRanges(IntStream stream){
 		List<Range.Builder> rangesBuild=new ArrayList<>();
 		
-		stream.get().forEach(i->{
+		int[] ids=null;
+		if(DEBUG_VALIDATION){
+			ids=stream.toArray();
+			stream=Arrays.stream(ids);
+		}
+		
+		stream.forEach(i->{
 			for(var rowRange : rangesBuild){
 				if(rowRange.end==i){
 					rowRange.end++;
@@ -886,15 +894,25 @@ public abstract class BinaryDrawing{
 			r.end=i+1;
 			rangesBuild.add(r);
 		});
-		drawByteRanges(bytes, filled, ctx, rangesBuild.stream().map(r->new BinaryDrawing.Range(r.start, r.end)).collect(Collectors.toList()), color, withChar, force);
+		
+		var ranges=rangesBuild.stream().map(r->new Range(r.start, r.end)).collect(Collectors.toList());
+		
+		if(DEBUG_VALIDATION){
+			var genIds=rangesToIndecies(ranges).toArray();
+			if(!Arrays.equals(genIds, ids)){
+				throw new RuntimeException(TextUtil.toString("range generation failed\n", genIds, "\n", ids));
+			}
+		}
+		
+		return ranges;
 	}
 	
-	private void drawByteRanges(byte[] bytes, BitSet filled, RenderContext ctx, List<Range> ranges, Color color, boolean withChar, boolean force){
+	private void drawByteRanges(RenderContext ctx, List<Range> ranges, Color color, boolean withChar, boolean force){
 		List<Range> actualRanges;
 		if(force) actualRanges=ranges;
-		else actualRanges=filterRangeValues(ranges, i->!filled.get((int)i));
+		else actualRanges=filterRangeValues(ranges, i->!ctx.filled.get((int)i));
 		
-		drawByteRangesForced(bytes, filled, ctx, actualRanges, color, withChar);
+		drawByteRangesForced(ctx, actualRanges, color, withChar);
 	}
 	
 	private List<Range> filterRangeValues(List<Range> ranges, LongPredicate filter){
@@ -928,7 +946,7 @@ public abstract class BinaryDrawing{
 		return actualRanges;
 	}
 	
-	private void drawByteRangesForced(byte[] bytes, BitSet filled, RenderContext ctx, List<Range> ranges, Color color, boolean withChar){
+	private void drawByteRangesForced(RenderContext ctx, List<Range> ranges, Color color, boolean withChar){
 		var col       =color;
 		var bitColor  =col;
 		var background=mul(col, 0.5F);
@@ -939,12 +957,9 @@ public abstract class BinaryDrawing{
 			}
 		};
 		
-		if(ranges.stream().mapToLong(Range::size).sum()>1000){
-			int i=0;
-		}
-		List<Range> clampedOverflow=clampRanges(ranges, bytes.length);
+		List<Range> clampedOverflow=clampRanges(ranges, ctx.bytes.length);
 		
-		Supplier<IntStream> clampedInts=()->clampedOverflow.stream().flatMapToInt(r->IntStream.range((int)r.from(), (int)r.to()));
+		Supplier<IntStream> clampedInts=()->rangesToIndecies(clampedOverflow);
 		
 		
 		setColor(background);
@@ -958,15 +973,15 @@ public abstract class BinaryDrawing{
 		
 		setColor(alpha(Color.RED, color.getAlpha()/255F));
 		drawIndex.accept(ranges.stream().map(r->{
-			if(r.to<bytes.length) return null;
-			if(r.from<bytes.length) return new Range(bytes.length, r.to);
+			if(r.to<ctx.bytes.length) return null;
+			if(r.from<ctx.bytes.length) return new Range(ctx.bytes.length, r.to);
 			return r;
 		}).filter(Objects::nonNull));
 		
 		setColor(bitColor);
 		try(var ignored=bulkDraw(DrawMode.QUADS)){
 			clampedInts.get().forEach(i->{
-				int b=bytes[i]&0xFF;
+				int b=ctx.bytes[i]&0xFF;
 				if(b==0) return;
 				int   xi=i%ctx.width(), yi=i/ctx.width();
 				float xF=ctx.pixelsPerByte()*xi, yF=ctx.pixelsPerByte()*yi;
@@ -986,16 +1001,19 @@ public abstract class BinaryDrawing{
 		
 		if(withChar){
 			setColor(new Color(1, 1, 1, bitColor.getAlpha()/255F*0.6F));
-			clampedInts.get().filter(i->canFontDisplay(bytes[i])).forEach(i->{
+			clampedInts.get().filter(i->canFontDisplay(ctx.bytes[i])).forEach(i->{
 				int   xi=i%ctx.width(), yi=i/ctx.width();
 				float xF=ctx.pixelsPerByte()*xi, yF=ctx.pixelsPerByte()*yi;
 				
-				drawStringIn(Character.toString((char)bytes[i]), new Rect(xF, yF, ctx.pixelsPerByte(), ctx.pixelsPerByte()), true);
+				drawStringIn(Character.toString((char)ctx.bytes[i]), new Rect(xF, yF, ctx.pixelsPerByte(), ctx.pixelsPerByte()), true);
 			});
 		}
 		for(Range range : clampedOverflow){
-			filled.set((int)range.from(), (int)range.to());
+			ctx.filled.set((int)range.from(), (int)range.to());
 		}
+	}
+	private IntStream rangesToIndecies(List<Range> clampedOverflow){
+		return clampedOverflow.stream().flatMapToInt(r->IntStream.range((int)r.from(), (int)r.to()));
 	}
 	private List<Range> clampRanges(List<Range> ranges, long len){
 		List<Range> build=null;
@@ -1007,7 +1025,7 @@ public abstract class BinaryDrawing{
 					if(r.from>=len||r.to>=len){
 						build=new ArrayList<>(ranges.size());
 						for(int j=0;j<i;j++){
-							build.add(ranges.get(i));
+							build.add(ranges.get(j));
 						}
 						same=false;
 					}
@@ -1134,7 +1152,7 @@ public abstract class BinaryDrawing{
 		
 		var rand=new Random((start<<32)+end);
 		double
-			offScale=Math.sqrt(MathUtil.sq(xPosFrom-xPosTo)+MathUtil.sq(yPosFrom-yPosTo))/3,
+			offScale=Math.sqrt(MathUtil.sq(xPosFrom-xPosTo)+MathUtil.sq(yPosFrom-yPosTo))/5,
 			xFromOff=(rand.nextDouble()-0.5)*offScale,
 			yFromOff=(rand.nextDouble()-0.5)*offScale,
 			xToOff=(rand.nextDouble()-0.5)*offScale,
@@ -1297,12 +1315,12 @@ public abstract class BinaryDrawing{
 	
 	@SuppressWarnings("unchecked")
 	private <T extends IOInstance<T>> void annotateStruct(RenderContext ctx,
-	                                                      ChunkDataProvider cluster, List<AnnotateStackFrame> stack,
+	                                                      ChunkDataProvider provider, List<AnnotateStackFrame> stack,
 	                                                      T instance, Reference instanceReference, StructPipe<T> pipe,
 	                                                      Consumer<Pointer> pointerRecord, boolean annotate) throws IOException{
 		var reference=instanceReference;
 		if(instance instanceof Chunk c){
-			var off=cluster.getFirstChunk().getPtr();
+			var off=provider.getFirstChunk().getPtr();
 			reference=new Reference(off, c.getPtr().getValue()-off.getValue());
 		}
 		if(reference==null||reference.isNull()) return;
@@ -1332,7 +1350,7 @@ public abstract class BinaryDrawing{
 					if(instance instanceof Chunk){
 						offsetStart=reference.getPtr().add(reference.getOffset());
 					}else{
-						offsetStart=reference.calcGlobalOffset(cluster);
+						offsetStart=reference.calcGlobalOffset(provider);
 					}
 					
 					long trueOffset=offsetStart+fieldOffset;
@@ -1346,11 +1364,11 @@ public abstract class BinaryDrawing{
 							var inst=field.get(instance);
 							if(inst==null) continue;
 							if(IOFieldPrimitive.isPrimitive(inst.getClass())||inst.getClass()==String.class){
-								if(annotate) annotateByteField(cluster, ctx, pointerRecord, instance, field, col, reference, Range.fromSize(fieldOffset, size));
+								if(annotate) annotateByteField(provider, ctx, pointerRecord, instance, field, col, reference, Range.fromSize(fieldOffset, size));
 								continue;
 							}
 							if(inst instanceof IOInstance<?> ioi){
-								annotateStruct(ctx, cluster, stack, (T)ioi, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), ioi.getThisStruct()), pointerRecord, annotate);
+								annotateStruct(ctx, provider, stack, (T)ioi, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), ioi.getThisStruct()), pointerRecord, annotate);
 								continue;
 							}
 							LogUtil.printlnEr("unmanaged dynamic type", inst);
@@ -1363,15 +1381,15 @@ public abstract class BinaryDrawing{
 							var               ref     =refField.getReference(instance);
 							boolean           diffPos =true;
 							if(!ref.isNull()){
-								var from=(int)trueOffset;
-								var to  =(int)ref.calcGlobalOffset(cluster);
+								var from=trueOffset;
+								var to  =ref.calcGlobalOffset(provider);
 								diffPos=from!=to;
 								if(diffPos){
-									pointerRecord.accept(new Pointer(from, to, (int)size, col, refField.toString(), 1));
+									pointerRecord.accept(new Pointer(from+size/2, to, (int)size, col, refField.toString(), 1));
 								}
 							}
 							
-							if(annotate) annotateByteField(cluster, ctx, pointerRecord, instance, field, col, reference, Range.fromSize(fieldOffset, size));
+							if(annotate) annotateByteField(provider, ctx, pointerRecord, instance, field, col, reference, Range.fromSize(fieldOffset, size));
 							if(!diffPos){
 								int xByte    =(int)(getMouseX()/ctx.pixelsPerByte());
 								int yByte    =(int)(getMouseY()/ctx.pixelsPerByte());
@@ -1383,18 +1401,19 @@ public abstract class BinaryDrawing{
 									diffPos=true;
 								}
 							}
-							annotateStruct(ctx, cluster, stack, refField.get(instance), ref, refField.getReferencedPipe(instance), pointerRecord, diffPos);
+							annotateStruct(ctx, provider, stack, refField.get(instance), ref, refField.getReferencedPipe(instance), pointerRecord, diffPos);
 							
 							continue;
 						}
 						if(field instanceof BitFieldMerger<T> merger){
 							int bitOffset=0;
+							drawByteRanges(ctx, List.of(Range.fromSize(trueOffset, size)), chunkBaseColor(reference.getPtr().dereference(provider)), false, true);
 							for(IOField.Bit<T, ?> bit : merger.getGroup()){
 								
 								var bCol=makeCol(rand, typeHash, bit);
 								var siz =bit.getSizeDescriptor().calcUnknown(instance);
 								
-								if(annotate) annotateBitField(cluster, ctx, instance, bit, bCol, bitOffset, siz, reference, fieldOffset);
+								if(annotate) annotateBitField(provider, ctx, instance, bit, bCol, bitOffset, siz, reference, fieldOffset);
 								bitOffset+=siz;
 							}
 							continue;
@@ -1407,12 +1426,12 @@ public abstract class BinaryDrawing{
 							
 							var ch=(ChunkPointer)field.get(instance);
 							
-							if(annotate) annotateByteField(cluster, ctx, pointerRecord, instance, field, col, reference, Range.fromSize(fieldOffset, size));
+							if(annotate) annotateByteField(provider, ctx, pointerRecord, instance, field, col, reference, Range.fromSize(fieldOffset, size));
 							
 							if(!ch.isNull()){
 								var msg=field.toString();
 								try{
-									annotateStruct(ctx, cluster, stack, ch.dereference(cluster), null, Chunk.PIPE, pointerRecord, true);
+									annotateStruct(ctx, provider, stack, ch.dereference(provider), null, Chunk.PIPE, pointerRecord, true);
 								}catch(Exception e){
 									msg=msg+"\n"+DrawUtils.errorToMessage(e);
 									col=Color.RED;
@@ -1423,9 +1442,9 @@ public abstract class BinaryDrawing{
 							if(annotate){
 								setColor(col);
 								if(sizeDesc.getWordSpace()==WordSpace.BIT){
-									annotateBitField(cluster, ctx, instance, field, col, 0, size, reference, fieldOffset);
+									annotateBitField(provider, ctx, instance, field, col, 0, size, reference, fieldOffset);
 								}else{
-									annotateByteField(cluster, ctx, pointerRecord, instance, field, col, reference, Range.fromSize(fieldOffset, size));
+									annotateByteField(provider, ctx, pointerRecord, instance, field, col, reference, Range.fromSize(fieldOffset, size));
 								}
 							}
 						}else{
@@ -1441,7 +1460,7 @@ public abstract class BinaryDrawing{
 							if(UtilL.instanceOf(typ, IOInstance.class)){
 								var inst=(IOInstance<?>)field.get(instance);
 								if(inst!=null){
-									annotateStruct(ctx, cluster, stack, (T)inst, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), inst.getThisStruct()), pointerRecord, annotate);
+									annotateStruct(ctx, provider, stack, (T)inst, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), inst.getThisStruct()), pointerRecord, annotate);
 								}
 								continue;
 							}
@@ -1453,13 +1472,13 @@ public abstract class BinaryDrawing{
 								long       arrOffset  =0;
 								for(int i=0;i<arrSiz;i++){
 									var val=(IOInstance)Array.get(inst, i);
-									annotateStruct(ctx, cluster, stack, val, reference.addOffset(fieldOffset+arrOffset), elementPipe, pointerRecord, annotate);
+									annotateStruct(ctx, provider, stack, val, reference.addOffset(fieldOffset+arrOffset), elementPipe, pointerRecord, annotate);
 									arrOffset+=elementPipe.getSizeDescriptor().calcUnknown(val, WordSpace.BYTE);
 								}
 								continue;
 							}
 							if(typ==String.class){
-								if(annotate) annotateByteField(cluster, ctx, pointerRecord, instance, field, col, reference, Range.fromSize(fieldOffset, size));
+								if(annotate) annotateByteField(provider, ctx, pointerRecord, instance, field, col, reference, Range.fromSize(fieldOffset, size));
 								continue;
 							}
 							LogUtil.printlnEr("unmanaged draw type:", typ.toString(), acc);

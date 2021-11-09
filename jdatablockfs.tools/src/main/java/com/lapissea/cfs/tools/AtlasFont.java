@@ -152,7 +152,7 @@ public class AtlasFont extends GLFont{
 		var   metrics=atlas.getInfo().getMetrics();
 		float fsScale=(float)(1/(metrics.getAscender()-metrics.getDescender()));
 		var   scale  =(pixelHeight*fsScale);
-		if(outline&&scale<20){
+		if(scale<(outline?20:5)){
 			return;
 		}
 		

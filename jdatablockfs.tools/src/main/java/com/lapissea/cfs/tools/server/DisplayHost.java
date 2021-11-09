@@ -15,9 +15,10 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.*;
 
-import static com.lapissea.cfs.tools.server.ServerCommons.*;
-import static com.lapissea.util.LogUtil.Init.*;
-import static com.lapissea.util.PoolOwnThread.*;
+import static com.lapissea.cfs.tools.server.ServerCommons.Action;
+import static com.lapissea.util.LogUtil.Init.USE_CALL_POS;
+import static com.lapissea.util.LogUtil.Init.USE_TABULATED_HEADER;
+import static com.lapissea.util.PoolOwnThread.async;
 
 public class DisplayHost{
 	public static void main(String[] args) throws IOException{
@@ -120,7 +121,9 @@ public class DisplayHost{
 									throw new RuntimeException(e);
 								}
 								var s=getSession();
-								yield ()->s.log(frame);
+								yield ()->{
+									s.log(frame);
+								};
 							}
 							case RESET -> ()->{
 								getSession().reset();

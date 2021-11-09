@@ -18,23 +18,22 @@ class FSFTest{
 //		LogUtil.Init.attach(USE_CALL_POS|USE_TABULATED_HEADER);
 		LogUtil.Init.attach(0);
 		
-		
 		try{
 			String               sessionName="default";
 			LateInit<DataLogger> logger     =LoggedMemoryUtils.createLoggerFromConfig();
 			try{
-					MemoryData<?> mem=LoggedMemoryUtils.newLoggedMemory(sessionName, logger);
-					logger.ifInited(l->l.getSession(sessionName).reset());
+				MemoryData<?> mem=LoggedMemoryUtils.newLoggedMemory(sessionName, logger);
+				logger.ifInited(l->l.getSession(sessionName).reset());
+				
+				try{
+					Cluster.init(mem);
+					Cluster cluster=new Cluster(mem);
 					
-					try{
-						Cluster.init(mem);
-						Cluster cluster=new Cluster(mem);
-						
-						doTests(cluster);
-					}finally{
-						logger.block();
-						mem.onWrite.log(mem, LongStream.of());
-					}
+					doTests(cluster);
+				}finally{
+					logger.block();
+					mem.onWrite.log(mem, LongStream.of());
+				}
 			}finally{
 				logger.get().destroy();
 			}
@@ -64,7 +63,7 @@ class FSFTest{
 		
 		Random r=new Random();
 		r.setSeed(1);
-		for(int i=0;i<4;i++){
+		for(int i=0;i<80;i++){
 			map.put(i, "int("+i+")");
 		}
 	}

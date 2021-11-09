@@ -24,8 +24,8 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.IntStream;
 
-import static com.lapissea.util.PoolOwnThread.*;
-import static org.lwjgl.system.MemoryStack.*;
+import static com.lapissea.util.PoolOwnThread.async;
+import static org.lwjgl.system.MemoryStack.stackPush;
 
 public class TTFont extends GLFont{
 	
@@ -351,7 +351,7 @@ public class TTFont extends GLFont{
 			tex.bind(GL11.GL_TEXTURE_2D);
 			GL11.glEnable(GL11.GL_TEXTURE_2D);
 			
-			try(var apply=bulkHook.apply(BinaryDrawing.DrawMode.QUADS)){
+			try(var ignored=bulkHook.apply(BinaryDrawing.DrawMode.QUADS)){
 				for(int i=0;i<string.length();i++){
 					char cp=string.charAt(i);
 					if(cp<=31) cp=' ';
