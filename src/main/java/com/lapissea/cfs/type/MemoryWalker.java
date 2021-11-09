@@ -29,6 +29,7 @@ public class MemoryWalker{
 	
 	public <T extends IOInstance<T>> void walk(ChunkDataProvider cluster, T root, Reference instanceReference, StructPipe<T> pipe, UnsafeConsumer<Reference, IOException> consumer) throws IOException{
 		walkStruct(cluster, new LinkedList<>(), root, instanceReference, pipe, consumer);
+		consumer.accept(instanceReference);
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -120,7 +121,7 @@ public class MemoryWalker{
 							}
 							typ=inst.getClass();
 						}
-						if(IOFieldPrimitive.isPrimitive(typ)) continue;
+						if(IOFieldPrimitive.isPrimitive(typ)||typ.isEnum()) continue;
 						if(UtilL.instanceOf(typ, IOInstance.class)){
 							var inst=(IOInstance<?>)field.get(instance);
 							if(inst!=null){

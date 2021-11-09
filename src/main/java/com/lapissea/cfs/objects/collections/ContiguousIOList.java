@@ -10,7 +10,6 @@ import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.AbstractFieldAccessor;
-import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.function.UnsafeLongConsumer;
 
@@ -261,10 +260,6 @@ public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanaged
 			if(ref.isNull()) return;
 			ref.getPtr().dereference(prov).streamNext().forEach(chunks::add);
 		});
-		
-		getReference().getPtr().dereference(prov).streamNext().forEach(chunks::add);
-		
-		LogUtil.println(chunks);
 		
 		prov.getMemoryManager().free(new ArrayList<>(chunks));
 	}
