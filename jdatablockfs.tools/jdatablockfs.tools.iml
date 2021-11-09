@@ -27,6 +27,8 @@
     <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-glfw:3.3.0-SNAPSHOT" level="project" />
     <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-opengl:3.3.0-SNAPSHOT" level="project" />
     <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-stb:3.3.0-SNAPSHOT" level="project" />
+    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-jemalloc:3.3.0-SNAPSHOT" level="project" />
+    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-jemalloc:natives-windows:3.3.0-SNAPSHOT" level="project" />
     <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-nanovg:3.3.0-SNAPSHOT" level="project" />
     <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-nanovg:natives-windows:3.3.0-SNAPSHOT" level="project" />
     <orderEntry type="library" name="Maven: org.lwjgl:lwjgl:natives-windows:3.3.0-SNAPSHOT" level="project" />
@@ -78,7 +80,6 @@
     <orderEntry type="library" scope="RUNTIME" name="Maven: com.twelvemonkeys.imageio:imageio-tga:3.5" level="project" />
     <orderEntry type="library" scope="RUNTIME" name="Maven: com.twelvemonkeys.imageio:imageio-thumbsdb:3.5" level="project" />
     <orderEntry type="library" scope="RUNTIME" name="Maven: com.twelvemonkeys.imageio:imageio-tiff:3.5" level="project" />
-    <orderEntry type="library" scope="RUNTIME" name="Maven: org.lwjgl:lwjgl-jemalloc:3.3.0-SNAPSHOT" level="project" />
     <orderEntry type="library" scope="RUNTIME" name="Maven: org.lwjgl:lwjgl:natives-linux:3.3.0-SNAPSHOT" level="project" />
     <orderEntry type="library" scope="RUNTIME" name="Maven: org.lwjgl:lwjgl-jemalloc:natives-linux:3.3.0-SNAPSHOT" level="project" />
     <orderEntry type="library" scope="RUNTIME" name="Maven: org.lwjgl:lwjgl-stb:natives-linux:3.3.0-SNAPSHOT" level="project" />
