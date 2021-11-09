@@ -4,7 +4,7 @@ import com.lapissea.cfs.chunk.ChunkDataProvider;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.TypeDefinition;
-import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 
 import java.io.IOException;
@@ -12,9 +12,11 @@ import java.io.IOException;
 public abstract class AbstractUnmanagedIOMap<K, V, SELF extends AbstractUnmanagedIOMap<K, V, SELF>> extends IOInstance.Unmanaged<SELF> implements IOMap<K, V>{
 	
 	@IOValue
+	@IODependency.VirtualNumSize
 	private long size;
 	
-	private final IOField<SELF, ?> sizeField=getThisStruct().getFields().byName("size").orElseThrow();
+	//TODO: use sizeField when single field with dependencies is implemented
+//	private final IOField<SELF, ?> sizeField=getThisStruct().getFields().byName("size").orElseThrow();
 	
 	protected AbstractUnmanagedIOMap(ChunkDataProvider provider, Reference reference, TypeDefinition typeDef, TypeDefinition.Check check){super(provider, reference, typeDef, check);}
 	public AbstractUnmanagedIOMap(ChunkDataProvider provider, Reference reference, TypeDefinition typeDef)                               {super(provider, reference, typeDef);}
@@ -24,7 +26,8 @@ public abstract class AbstractUnmanagedIOMap<K, V, SELF extends AbstractUnmanage
 	
 	protected void deltaSize(long delta) throws IOException{
 		this.size+=delta;
-		writeManagedField(sizeField);
+		writeManagedFields();
+//		writeManagedField(sizeField); //TODO: see L19
 	}
 	
 	@Override
