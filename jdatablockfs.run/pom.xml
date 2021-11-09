@@ -30,7 +30,13 @@
 			<version>5.7.2</version>
 			<scope>test</scope>
 		</dependency>
-	</dependencies>
+        <dependency>
+            <groupId>org.lwjgl</groupId>
+            <artifactId>lwjgl-jemalloc</artifactId>
+            <version>3.3.0-SNAPSHOT</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
 
 	<build>
 		<plugins>

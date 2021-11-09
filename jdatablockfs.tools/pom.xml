@@ -51,6 +51,15 @@
 		</dependency>
 		<dependency>
 			<groupId>org.lwjgl</groupId>
+			<artifactId>lwjgl-nanovg</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.lwjgl</groupId>
+			<artifactId>lwjgl-nanovg</artifactId>
+			<classifier>${lwjgl.natives}</classifier>
+		</dependency>
+		<dependency>
+			<groupId>org.lwjgl</groupId>
 			<artifactId>lwjgl</artifactId>
 			<classifier>${lwjgl.natives}</classifier>
 		</dependency>
@@ -79,6 +88,17 @@
 			<groupId>com.esotericsoftware</groupId>
 			<artifactId>kryo</artifactId>
 			<version>5.2.0</version>
+		</dependency>
+
+		<dependency>
+			<groupId>com.github.kotlin-graphics.imgui</groupId>
+			<artifactId>core</artifactId>
+			<version>v1.79</version>
+		</dependency>
+		<dependency>
+			<groupId>com.github.kotlin-graphics.imgui</groupId>
+			<artifactId>gl</artifactId>
+			<version>v1.79</version>
 		</dependency>
 	</dependencies>
 
@@ -116,6 +136,31 @@
 				<enabled>true</enabled>
 			</snapshots>
 		</repository>
+		<repository>
+			<id>sonatype-snapshots</id>
+			<url>https://oss.sonatype.org/content/repositories/releases/</url>
+			<releases>
+				<enabled>true</enabled>
+			</releases>
+			<snapshots>
+				<enabled>false</enabled>
+			</snapshots>
+		</repository>
+		<repository>
+			<id>sonatype-snapshots</id>
+			<url>https://raw.github.com/SpinyOwl/repo/releases</url>
+			<releases>
+				<enabled>true</enabled>
+			</releases>
+			<snapshots>
+				<enabled>false</enabled>
+			</snapshots>
+		</repository>
+		<repository>
+			<id>jitpack.io</id>
+			<url>https://jitpack.io</url>
+		</repository>
+
 	</repositories>
 
 	<dependencyManagement>
