@@ -8,6 +8,7 @@ import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
 import java.util.Collection;
+import java.util.stream.Stream;
 
 public class Splitter{
 	
@@ -29,6 +30,10 @@ public class Splitter{
 			@Override
 			public IterablePP<Entry<K, V>> entries(){
 				return a.entries();
+			}
+			@Override
+			public Stream<Entry<K, V>> stream(){
+				return a.stream();
 			}
 			@Override
 			public void put(K key, V value) throws IOException{

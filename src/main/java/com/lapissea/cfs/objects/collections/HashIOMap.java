@@ -151,7 +151,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 		
 		short newBucketPO2=bucketPO2;
 		
-		int[] hashes=entries(buckets).stream().map(Entry::getKey).mapToInt(this::toHash).toArray();
+		int[] hashes=rawEntryStream(buckets).map(e->e.key).mapToInt(this::toHash).toArray();
 		
 		boolean overflow=true;
 		while(overflow){
@@ -275,13 +275,16 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 		
 		return new ModifiableEntry(bucket, entry);
 	}
-	@Override
-	public IterablePP<Entry<K, V>> entries(){
-		return entries(buckets);
-	}
 	
-	private IterablePP<Entry<K, V>> entries(IOList<Bucket<K, V>> buckets){
-		return ()->buckets.stream().flatMap(e->e.stream().filter(Objects::nonNull).map(BucketEntry::unmodifiable)).iterator();
+	@Override
+	public Stream<Entry<K, V>> stream(){
+		return rawEntryStream(buckets).map(BucketEntry::unmodifiable);
+	}
+	private IterablePP<BucketEntry<K, V>> rawEntries(IOList<Bucket<K, V>> buckets){
+		return ()->rawEntryStream(buckets).iterator();
+	}
+	private Stream<BucketEntry<K, V>> rawEntryStream(IOList<Bucket<K, V>> buckets){
+		return buckets.stream().flatMap(e->e.stream().filter(Objects::nonNull));
 	}
 	
 	@Override

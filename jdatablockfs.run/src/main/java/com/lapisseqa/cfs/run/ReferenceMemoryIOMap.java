@@ -1,9 +1,9 @@
 package com.lapisseqa.cfs.run;
 
-import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.objects.collections.IOMap;
 
 import java.util.HashMap;
+import java.util.stream.Stream;
 
 public class ReferenceMemoryIOMap<K, V> implements IOMap<K, V>{
 	
@@ -36,8 +36,8 @@ public class ReferenceMemoryIOMap<K, V> implements IOMap<K, V>{
 	}
 	
 	@Override
-	public IterablePP<Entry<K, V>> entries(){
-		return ()->data.entrySet().stream().map(Entry::viewOf).iterator();
+	public Stream<Entry<K, V>> stream(){
+		return data.entrySet().stream().map(Entry::viewOf);
 	}
 	
 	@Override

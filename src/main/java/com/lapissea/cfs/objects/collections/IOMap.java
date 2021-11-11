@@ -6,6 +6,7 @@ import com.lapissea.util.TextUtil;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Stream;
 
 public interface IOMap<K, V>{
 	
@@ -73,7 +74,11 @@ public interface IOMap<K, V>{
 		return getEntry(key)!=null;
 	}
 	
-	IterablePP<Entry<K, V>> entries();
+	Stream<Entry<K, V>> stream();
+	
+	default IterablePP<Entry<K, V>> entries(){
+		return ()->stream().iterator();
+	}
 	
 	default V get(K key) throws IOException{
 		var e=getEntry(key);
