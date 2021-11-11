@@ -3,13 +3,13 @@ package com.lapissea.cfs.objects.collections;
 import com.lapissea.cfs.IterablePP;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.function.UnsafeConsumer;
+import com.lapissea.util.function.UnsafeFunction;
 
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.Spliterator;
 import java.util.function.Consumer;
-import java.util.function.Function;
 
 @SuppressWarnings("unused")
 public interface IOList<T> extends IterablePP<T>{
@@ -229,7 +229,7 @@ public interface IOList<T> extends IterablePP<T>{
 		return new IndexAccessListIterator(startIndex);
 	}
 	
-	default void modify(long index, Function<T, T> modifier) throws IOException{
+	default void modify(long index, UnsafeFunction<T, T, IOException> modifier) throws IOException{
 		T oldObj=get(index);
 		T newObj=modifier.apply(oldObj);
 		if(oldObj==newObj||!oldObj.equals(newObj)){
