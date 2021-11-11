@@ -18,8 +18,8 @@ import java.io.IOException;
 import java.util.*;
 import java.util.stream.Stream;
 
-import static com.lapissea.cfs.GlobalConfig.*;
-import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.*;
+import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NULLABLE;
 
 public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V>>{
 	
@@ -195,25 +195,55 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 	}
 	
 	private void reflow() throws IOException{
-		var old=buckets;
+		var oldBuckets  =buckets;
+		var oldBucketPO2=bucketPO2;
 		
-		bucketPO2=calcNewSize(old, bucketPO2);
+		bucketPO2=calcNewSize(oldBuckets, oldBucketPO2);
 		
 		newBuckets();
 		fillBuckets();
 		
 		datasetID++;
-		transfer(old, buckets, bucketPO2);
+		transfer(oldBuckets, buckets, bucketPO2, size()<256);
 		
 		writeManagedFields();
 		
-		((Unmanaged<?>)old).free();
+		((Unmanaged<?>)oldBuckets).free();
 		
 	}
 	
-	private void transfer(IOList<Bucket<K, V>> oldBuckets, IOList<Bucket<K, V>> newBuckets, short newPO2) throws IOException{
-		for(var e : entries(oldBuckets)){
-			putEntry(newBuckets, newPO2, e.getKey(), e.getValue());
+	private void transfer(IOList<Bucket<K, V>> oldBuckets, IOList<Bucket<K, V>> newBuckets, short newPO2, boolean optimizedOrder) throws IOException{
+		if(optimizedOrder){
+			Map<Integer, List<BucketEntry<K, V>>> hashGroupings=new TreeMap<>();
+			
+			for(var e : rawEntries(oldBuckets)){
+				hashGroupings.computeIfAbsent(toSmallHash(e.key, newPO2), i->new ArrayList<>()).add(e);
+			}
+			for(var group : hashGroupings.values()){
+				var key=group.get(0).key;
+				
+				Bucket<K, V> bucket=getBucket(newBuckets, key, newPO2);
+				assert bucket.node==null;
+				bucket.allocateNulls(getChunkProvider());
+				setBucket(newBuckets, key, newPO2, bucket);
+				
+				Iterator<BucketEntry<K, V>> iter=group.iterator();
+				assert iter.hasNext();
+				
+				var node=bucket.node;
+				node.setValue(iter.next());
+				
+				while(iter.hasNext()){
+					var newNode=allocNewNode(iter.next());
+					
+					node.setNext(newNode);
+					node=newNode;
+				}
+			}
+		}else{
+			for(var e : rawEntries(oldBuckets)){
+				putEntry(newBuckets, newPO2, e.key, e.value);
+			}
 		}
 	}
 	
