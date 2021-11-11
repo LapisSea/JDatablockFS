@@ -3,10 +3,11 @@ package com.lapissea.cfs.tools;
 import org.lwjgl.opengl.EXTTextureFilterAnisotropic;
 import org.lwjgl.opengl.GL11;
 
+import java.awt.Color;
 import java.nio.ByteBuffer;
 
 import static org.lwjgl.opengl.GL20.*;
-import static org.lwjgl.opengl.GL32.*;
+import static org.lwjgl.opengl.GL32.GL_GEOMETRY_SHADER;
 
 public abstract class GLFont{
 	
@@ -103,8 +104,8 @@ public abstract class GLFont{
 	
 	public static record Bounds(float width, float height){}
 	
-	public abstract void fillString(String string, float pixelHeight, float x, float y);
-	public abstract void outlineString(String string, float pixelHeight, float x, float y);
+	public abstract void fillString(Color color, String string, float pixelHeight, float x, float y);
+	public abstract void outlineString(Color color, String string, float pixelHeight, float x, float y);
 	
 	public abstract Bounds getStringBounds(String string, float pixelHeight);
 	public abstract boolean canFontDisplay(char c);

@@ -10,6 +10,7 @@ import org.lwjgl.stb.STBTTFontinfo;
 import org.lwjgl.stb.STBTruetype;
 import org.lwjgl.system.MemoryStack;
 
+import java.awt.Color;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -26,6 +27,7 @@ import java.util.function.Function;
 import java.util.stream.IntStream;
 
 import static com.lapissea.util.PoolOwnThread.async;
+import static org.lwjgl.opengl.GL11.glColor4f;
 import static org.lwjgl.system.MemoryStack.stackPush;
 
 public class TTFont extends GLFont{
@@ -324,16 +326,16 @@ public class TTFont extends GLFont{
 	}
 	
 	@Override
-	public void outlineString(String string, float pixelHeight, float x, float y){
-		drawString(string, pixelHeight, x, y, bitmap->bitmap.outlineTexture);
+	public void outlineString(Color color, String string, float pixelHeight, float x, float y){
+		drawString(color, string, pixelHeight, x, y, bitmap->bitmap.outlineTexture);
 	}
 	
 	@Override
-	public void fillString(String string, float pixelHeight, float x, float y){
-		drawString(string, pixelHeight, x, y, bitmap->bitmap.texture);
+	public void fillString(Color color, String string, float pixelHeight, float x, float y){
+		drawString(color, string, pixelHeight, x, y, bitmap->bitmap.texture);
 	}
 	
-	private void drawString(String string, float pixelHeight, float xOff, float yOff, Function<Bitmap, Texture> getTex){
+	private void drawString(Color color, String string, float pixelHeight, float xOff, float yOff, Function<Bitmap, Texture> getTex){
 		pushMax(string);
 		
 		Bitmap bitmap=getBitmap(pixelHeight);
@@ -341,6 +343,7 @@ public class TTFont extends GLFont{
 		if(tex==null){
 			return;
 		}
+		glColor4f(color.getRed()/255F, color.getGreen()/255F, color.getBlue()/255F, color.getAlpha()/255F);
 		float scale=pixelHeight/bitmap.pixelHeight;
 		
 		try(MemoryStack stack=stackPush()){

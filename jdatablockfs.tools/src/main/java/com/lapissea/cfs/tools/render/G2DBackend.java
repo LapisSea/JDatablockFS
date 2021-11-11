@@ -145,7 +145,8 @@ public class G2DBackend extends RenderBackend{
 		currentGraphics.rotate(angle);
 	}
 	@Override
-	public void outlineString(String str, float x, float y){
+	public void outlineString(Color color, String str, float x, float y){
+		currentGraphics.setColor(color);
 		setStrokeWidth(1);
 		currentGraphics.setFont(currentGraphics.getFont().deriveFont(getFontScale()/2));
 		var transform=new AffineTransform();
@@ -154,7 +155,8 @@ public class G2DBackend extends RenderBackend{
 		currentGraphics.draw(shape);
 	}
 	@Override
-	public void fillString(String str, float x, float y){
+	public void fillString(Color color, String str, float x, float y){
+		currentGraphics.setColor(color);
 		currentGraphics.setFont(currentGraphics.getFont().deriveFont(getFontScale()/2));
 		currentGraphics.drawString(str, x, y);
 	}

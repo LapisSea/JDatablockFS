@@ -148,7 +148,6 @@ public abstract class BinaryDrawing{
 	}).orElse(ErrorLogLevel.NAMED_STACK);
 	
 	
-	
 	protected abstract boolean isWritingFilter();
 	protected abstract String getFilter();
 	
@@ -230,8 +229,7 @@ public abstract class BinaryDrawing{
 		Color col, int bitOffset, long bitSize, Reference reference, long fieldOffset
 	) throws IOException{
 		Consumer<Rect> doSegment=bitRect->{
-			renderer.setColor(alpha(col, 0.7F));
-			drawStringIn(Objects.toString(field.instanceToString(instance, true)), bitRect, false);
+			drawStringIn(alpha(col, 0.7F), Objects.toString(field.instanceToString(instance, true)), bitRect, false);
 			renderer.setColor(alpha(col, 0.3F));
 			renderer.fillQuad(bitRect.x, bitRect.y, bitRect.width, bitRect.height);
 		};
@@ -281,7 +279,7 @@ public abstract class BinaryDrawing{
 			drawByteRanges(ctx, List.of(range), alpha(mul(col, 0.8F), 0.6F), false, true);
 		}
 		
-		renderer.setColor(alpha(mix(col, Color.WHITE, 0.2F), 1));
+		var color=alpha(mix(col, Color.WHITE, 0.2F), 1);
 		
 		var rectWidth=bestRange.toRect(ctx).width;
 		
@@ -308,7 +306,7 @@ public abstract class BinaryDrawing{
 			renderer.pushMatrix();
 			initFont(0.4F);
 			renderer.translate(0, renderer.getFontScale()*-0.8);
-			drawStringIn(fStr, bestRange.toRect(ctx), false);
+			drawStringIn(color, fStr, bestRange.toRect(ctx), false);
 			renderer.popMatrix();
 			renderer.setFontScale(font);
 			
@@ -320,11 +318,11 @@ public abstract class BinaryDrawing{
 					drawStr=shortStr;
 				}
 				
-				drawStringIn((drawStr==null?"":drawStr), bestRange.toRect(ctx), true);
+				drawStringIn(color, (drawStr==null?"":drawStr), bestRange.toRect(ctx), true);
 			}
 		}else{
 			initFont(1);
-			drawStringIn(both, bestRange.toRect(ctx), true);
+			drawStringIn(color, both, bestRange.toRect(ctx), true);
 		}
 		
 		
@@ -486,11 +484,11 @@ public abstract class BinaryDrawing{
 		renderer.setFontScale(renderer.getPixelsPerByte()*sizeMul);
 	}
 	
-	private void drawStringIn(String s, Rect area, boolean doStroke){
-		drawStringIn(s, area, doStroke, false);
+	private void drawStringIn(Color color, String s, Rect area, boolean doStroke){
+		drawStringIn(color, s, area, doStroke, false);
 	}
 	
-	private void drawStringIn(String s, Rect area, boolean doStroke, boolean alignLeft){
+	private void drawStringIn(Color color, String s, Rect area, boolean doStroke, boolean alignLeft){
 		var rect=renderer.getStringBounds(s);
 		
 		float w=rect.width();
@@ -544,14 +542,13 @@ public abstract class BinaryDrawing{
 			}
 		}
 		
-		renderer.fillString(s, 0, 0);
+		renderer.fillString(color, s, 0, 0);
 		if(doStroke){
 			Color c=renderer.readColor();
 			
-			renderer.setColor(new Color(0, 0, 0, 0.5F));
 			renderer.setLineWidth(1);
 			
-			renderer.outlineString(s, 0, 0);
+			renderer.outlineString(new Color(0, 0, 0, 0.5F), s, 0, 0);
 			
 			renderer.setColor(c);
 		}
@@ -665,8 +662,7 @@ public abstract class BinaryDrawing{
 		}
 		renderer.setLineWidth(2F);
 		outlineByteRange(Color.WHITE, ctx, new Range(0, magic.limit()));
-		renderer.setColor(Color.WHITE);
-		drawStringIn(new String(bytes, 0, magic.limit()), new Rect(0, 0, ctx.pixelsPerByte()*Math.min(magic.limit(), ctx.width()), ctx.pixelsPerByte()), false);
+		drawStringIn(Color.WHITE, new String(bytes, 0, magic.limit()), new Rect(0, 0, ctx.pixelsPerByte()*Math.min(magic.limit(), ctx.width()), ctx.pixelsPerByte()), false);
 		
 		renderer.setColor(alpha(Color.WHITE, 0.5F));
 		
@@ -921,12 +917,12 @@ public abstract class BinaryDrawing{
 		}
 		
 		if(withChar){
-			renderer.setColor(new Color(1, 1, 1, bitColor.getAlpha()/255F*0.6F));
+			var c=new Color(1, 1, 1, bitColor.getAlpha()/255F*0.6F);
 			clampedInts.get().filter(i->renderer.canFontDisplay(ctx.bytes[i])).forEach(i->{
 				int   xi=i%ctx.width(), yi=i/ctx.width();
 				float xF=ctx.pixelsPerByte()*xi, yF=ctx.pixelsPerByte()*yi;
 				
-				drawStringIn(Character.toString((char)ctx.bytes[i]), new Rect(xF, yF, ctx.pixelsPerByte(), ctx.pixelsPerByte()), true);
+				drawStringIn(c, Character.toString((char)ctx.bytes[i]), new Rect(xF, yF, ctx.pixelsPerByte(), ctx.pixelsPerByte()), true);
 			});
 		}
 		for(Range range : clampedOverflow){
@@ -1019,9 +1015,8 @@ public abstract class BinaryDrawing{
 	
 	private void drawFilter(){
 		if(!isWritingFilter()) return;
-		renderer.setColor(Color.WHITE);
 		initFont(1);
-		drawStringIn("Filter: "+getFilter(), new Rect(0, 0, renderer.getWidth(), renderer.getHeight()), true, true);
+		drawStringIn(Color.WHITE, "Filter: "+getFilter(), new Rect(0, 0, renderer.getWidth(), renderer.getHeight()), true, true);
 	}
 	
 	private void drawWriteIndex(MemFrame frame, RenderContext ctx){
@@ -1109,7 +1104,6 @@ public abstract class BinaryDrawing{
 			float
 				x=(float)(xFrom+xTo)/2*ctx.pixelsPerByte(),
 				y=(float)(yFrom+yTo)/2*ctx.pixelsPerByte();
-			renderer.setColor(col);
 			initFont(0.3F*ptr.widthFactor());
 			renderer.setFontScale(Math.max(renderer.getFontScale(), 15));
 			int msgWidth=ptr.message().length();
@@ -1124,7 +1118,7 @@ public abstract class BinaryDrawing{
 			List<String> lines=msgWidth==0?List.of(ptr.message()):TextUtil.wrapLongString(ptr.message(), msgWidth);
 			y-=renderer.getLineWidth()/2F*lines.size();
 			for(String line : lines){
-				drawStringIn(line, new Rect(x, y, space, ctx.pixelsPerByte()), false, true);
+				drawStringIn(col, line, new Rect(x, y, space, ctx.pixelsPerByte()), false, true);
 				y+=renderer.getLineWidth();
 			}
 		}
@@ -1144,15 +1138,15 @@ public abstract class BinaryDrawing{
 		
 		renderer.setColor(alpha(Color.RED.darker(), 0.2F));
 		renderer.fillQuad(0, renderer.getHeight()-totalBound.height()-25, totalBound.width()+20, totalBound.height()+20);
-		renderer.setColor(alpha(Color.WHITE, 0.8F));
 		
+		var col =alpha(Color.WHITE, 0.8F);
 		var rect=new Rect(10, renderer.getHeight()-totalBound.height()-20, totalBound.width(), renderer.getLineWidth());
 		for(int i=0;i<lines.length;i++){
 			String line =lines[i];
 			var    bound=bounds.get(i);
 			rect.height=bound.height();
 			rect.y=(Math.round(renderer.getHeight()-totalBound.height()+bounds.stream().limit(i).mapToDouble(GLFont.Bounds::height).sum())-15);
-			drawStringIn(line, rect, false, true);
+			drawStringIn(col, line, rect, false, true);
 		}
 	}
 	
@@ -1188,11 +1182,9 @@ public abstract class BinaryDrawing{
 		x=(int)Math.min(Math.max(0, x-bounds.width()/2+ctx.pixelsPerByte()/2F), renderer.getWidth()-Math.ceil(bounds.width()));
 		y=Math.max(y, (int)Math.ceil(bounds.height()));
 		
-		renderer.setColor(Color.BLACK);
-		renderer.outlineString(s, x, y);
+		renderer.outlineString(Color.BLACK, s, x, y);
 		
-		renderer.setColor(Color.WHITE);
-		renderer.fillString(s, x, y);
+		renderer.fillString(Color.WHITE, s, x, y);
 		
 		renderer.popMatrix();
 		initFont(1);

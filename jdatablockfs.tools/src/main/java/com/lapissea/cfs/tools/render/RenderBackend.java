@@ -106,8 +106,8 @@ public abstract class RenderBackend{
 	public abstract void postRender();
 	
 	public abstract GLFont.Bounds getStringBounds(String str);
-	public abstract void outlineString(String str, float x, float y);
-	public abstract void fillString(String str, float x, float y);
+	public abstract void outlineString(Color color, String str, float x, float y);
+	public abstract void fillString(Color color, String str, float x, float y);
 	public abstract boolean canFontDisplay(char c);
 	public boolean canFontDisplay(int code){
 		if(code==0) return false;

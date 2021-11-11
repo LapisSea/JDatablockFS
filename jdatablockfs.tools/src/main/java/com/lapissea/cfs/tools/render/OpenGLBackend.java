@@ -154,13 +154,13 @@ public class OpenGLBackend extends RenderBackend{
 	}
 	
 	@Override
-	public void outlineString(String str, float x, float y){
-		font.outlineString(str, getFontScale(), x, y);
+	public void outlineString(Color color, String str, float x, float y){
+		font.outlineString(color, str, getFontScale(), x, y);
 	}
 	
 	@Override
-	public void fillString(String str, float x, float y){
-		font.fillString(str, getFontScale(), x, y);
+	public void fillString(Color color, String str, float x, float y){
+		font.fillString(color, str, getFontScale(), x, y);
 	}
 	
 	@Override

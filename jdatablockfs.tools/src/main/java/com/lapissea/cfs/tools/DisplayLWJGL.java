@@ -380,8 +380,6 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 		
 		glDisable(GL_DEPTH_TEST);
 		glDepthMask(false);
-		
-		renderer.fillString("a", 8, -100);
 	}
 	
 	@Override

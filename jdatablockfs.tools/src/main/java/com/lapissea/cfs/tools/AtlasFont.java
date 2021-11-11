@@ -4,6 +4,7 @@ import com.lapissea.cfs.tools.render.RenderBackend;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
 
+import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.nio.ByteBuffer;
 import java.util.function.Consumer;
@@ -138,18 +139,22 @@ public class AtlasFont extends GLFont{
 	
 	
 	@Override
-	public void fillString(String string, float pixelHeight, float x, float y){
-		drawString(string, pixelHeight, x, y, false);
+	public void fillString(Color color, String string, float pixelHeight, float x, float y){
+		drawString(color, string, pixelHeight, x, y, false);
 	}
 	@Override
-	public void outlineString(String string, float pixelHeight, float x, float y){
-		drawString(string, pixelHeight, x, y, true);
+	public void outlineString(Color color, String string, float pixelHeight, float x, float y){
+		drawString(color, string, pixelHeight, x, y, true);
 	}
-	private void drawString(String string, float pixelHeight, float xOff, float yOff, boolean outline){
+	private void drawString(Color color, String string, float pixelHeight, float xOff, float yOff, boolean outline){
+		
 		if(texture==null) return;
 		if(!isMask()){
 			if(program==0) return;
 		}
+		
+		glColor4f(color.getRed()/255F, color.getGreen()/255F, color.getBlue()/255F, color.getAlpha()/255F);
+		
 		var   metrics=atlas.getInfo().getMetrics();
 		float fsScale=(float)(1/(metrics.getAscender()-metrics.getDescender()));
 		var   scale  =(pixelHeight*fsScale);
