@@ -134,9 +134,12 @@ public abstract class BinaryDrawing{
 	private boolean errorMode;
 	private long    renderCount;
 	
-	protected RenderBackend renderer;
+	private RenderBackend renderer;
 	
 	private final NanoTimer frameTimer=new NanoTimer();
+	
+	
+	private float pixelsPerByte=300;
 	
 	private final ErrorLogLevel errorLogLevel=UtilL.sysPropertyByClass(BinaryDrawing.class, "errorLogLevel").map(String::toUpperCase).map(v->{
 		try{
@@ -147,6 +150,9 @@ public abstract class BinaryDrawing{
 		}
 	}).orElse(ErrorLogLevel.NAMED_STACK);
 	
+	protected void setRenderer(RenderBackend renderer){
+		this.renderer=renderer;
+	}
 	
 	protected abstract boolean isWritingFilter();
 	protected abstract String getFilter();
@@ -156,6 +162,15 @@ public abstract class BinaryDrawing{
 	
 	protected abstract int getFramePos();
 	
+	
+	public float getPixelsPerByte(){
+		return pixelsPerByte;
+	}
+	public void pixelsPerByteChange(float newPixelsPerByte){
+		if(Math.abs(pixelsPerByte-newPixelsPerByte)<0.0001) return;
+		pixelsPerByte=newPixelsPerByte;
+		renderer.markFrameDirty();
+	}
 	
 	private void outlineChunk(RenderContext ctx, Chunk chunk, Color color) throws IOException{
 		long start=chunk.getPtr().getValue();
@@ -215,12 +230,16 @@ public abstract class BinaryDrawing{
 				long x1=x, y1=y;
 				long x2=x1+1, y2=y1+1;
 				
-				if(i-range.from()<ctx.width()) renderer.drawLine(x1, y1, x2, y1);
-				if(range.to()-i<=ctx.width()) renderer.drawLine(x1, y2, x2, y2);
-				if(x==0||i==range.from()) renderer.drawLine(x1, y1, x1, y2);
-				if(x2==ctx.width()||i==range.to()-1) renderer.drawLine(x2, y1, x2, y2);
+				if(i-range.from()<ctx.width()) drawPixelLine(x1, y1, x2, y1);
+				if(range.to()-i<=ctx.width()) drawPixelLine(x1, y2, x2, y2);
+				if(x==0||i==range.from()) drawPixelLine(x1, y1, x1, y2);
+				if(x2==ctx.width()||i==range.to()-1) drawPixelLine(x2, y1, x2, y2);
 			}
 		}
+	}
+	
+	private void drawPixelLine(double xFrom, double yFrom, double xTo, double yTo){
+		renderer.drawLine(xFrom*getPixelsPerByte(), yFrom*getPixelsPerByte(), xTo*getPixelsPerByte(), yTo*getPixelsPerByte());
 	}
 	
 	private <T extends IOInstance<T>> void annotateBitField(
@@ -405,15 +424,15 @@ public abstract class BinaryDrawing{
 						}
 					}
 					if(!didArrow){
-						renderer.drawLine(lastPoint[0], lastPoint[1], newPoint[0], newPoint[1]);
+						drawPixelLine(lastPoint[0], lastPoint[1], newPoint[0], newPoint[1]);
 					}
 				}else{
-					renderer.drawLine(handles[0][0], handles[0][1], newPoint[0], newPoint[1]);
+					drawPixelLine(handles[0][0], handles[0][1], newPoint[0], newPoint[1]);
 				}
 				lastPoint=newPoint;
 			}
 			if(lastPoint!=null){
-				renderer.drawLine(handles[handles.length-1][0], handles[handles.length-1][1], lastPoint[0], lastPoint[1]);
+				drawPixelLine(handles[handles.length-1][0], handles[handles.length-1][1], lastPoint[0], lastPoint[1]);
 			}
 		}
 	}
@@ -428,16 +447,16 @@ public abstract class BinaryDrawing{
 		double sin=Math.sin(angle)*arrowSize/2;
 		double cos=Math.cos(angle)*arrowSize/2;
 		
-		renderer.drawLine(xMid+sin, yMid+cos, xMid-sin-cos, yMid-cos+sin);
-		renderer.drawLine(xMid+sin, yMid+cos, xMid-sin+cos, yMid-cos-sin);
-		renderer.drawLine(xFrom, yFrom, xTo, yTo);
+		drawPixelLine(xMid+sin, yMid+cos, xMid-sin-cos, yMid-cos+sin);
+		drawPixelLine(xMid+sin, yMid+cos, xMid-sin+cos, yMid-cos-sin);
+		drawPixelLine(xFrom, yFrom, xTo, yTo);
 	}
 	
 	private void drawLine(int width, long from, long to){
 		long xPosFrom=from%width, yPosFrom=from/width;
 		long xPosTo  =to%width, yPosTo=to/width;
 		
-		renderer.drawLine(xPosFrom+0.5, yPosFrom+0.5, xPosTo+0.5, yPosTo+0.5);
+		drawPixelLine(xPosFrom+0.5, yPosFrom+0.5, xPosTo+0.5, yPosTo+0.5);
 	}
 	
 	private Color chunkBaseColor(Chunk chunk){
@@ -466,7 +485,7 @@ public abstract class BinaryDrawing{
 	private void fillBit(float x, float y, int index, float xOff, float yOff){
 		int   xi =index%3;
 		int   yi =index/3;
-		float pxS=renderer.getPixelsPerByte()/3F;
+		float pxS=getPixelsPerByte()/3F;
 		
 		float x1=xi*pxS;
 		float y1=yi*pxS;
@@ -481,7 +500,7 @@ public abstract class BinaryDrawing{
 	}
 	
 	private void initFont(float sizeMul){
-		renderer.setFontScale(renderer.getPixelsPerByte()*sizeMul);
+		renderer.setFontScale(getPixelsPerByte()*sizeMul);
 	}
 	
 	private void drawStringIn(Color color, String s, Rect area, boolean doStroke){
@@ -558,17 +577,17 @@ public abstract class BinaryDrawing{
 	}
 	
 	protected void calcSize(int bytesCount, boolean restart){
-		var screenHeight=renderer.getHeight();
-		var screenWidth =renderer.getWidth();
+		var screenHeight=renderer.getDisplay().getHeight();
+		var screenWidth =renderer.getDisplay().getWidth();
 		
 		int columns;
 		if(restart) columns=1;
 		else{
-			columns=(int)(renderer.getWidth()/renderer.getPixelsPerByte()+0.0001F);
+			columns=(int)(screenWidth/getPixelsPerByte()+0.0001F);
 		}
 		
 		while(true){
-			float newPixelsPerByte=(renderer.getWidth()-0.5F)/columns;
+			float newPixelsPerByte=(screenWidth-0.5F)/columns;
 			
 			float width         =screenWidth/newPixelsPerByte;
 			int   rows          =(int)Math.ceil(bytesCount/width);
@@ -581,7 +600,7 @@ public abstract class BinaryDrawing{
 			}
 		}
 		
-		renderer.pixelsPerByteChange((renderer.getWidth()-0.5F)/columns);
+		pixelsPerByteChange((screenWidth-0.5F)/columns);
 	}
 	
 	private void handleError(Throwable e, ParsedFrame parsed){
@@ -649,7 +668,7 @@ public abstract class BinaryDrawing{
 		
 		calcSize(bytes.length, false);
 		
-		RenderContext ctx=new RenderContext(bytes, filled, (int)Math.max(1, renderer.getWidth()/renderer.getPixelsPerByte()), renderer.getPixelsPerByte());
+		RenderContext ctx=new RenderContext(bytes, filled, (int)Math.max(1, renderer.getDisplay().getWidth()/getPixelsPerByte()), getPixelsPerByte());
 		
 		startFrame();
 		
@@ -961,14 +980,17 @@ public abstract class BinaryDrawing{
 	private void drawBackgroundDots(){
 		renderer.setColor(errorMode?Color.RED.darker():Color.LIGHT_GRAY);
 		
+		var screenHeight=renderer.getDisplay().getHeight();
+		var screenWidth =renderer.getDisplay().getWidth();
+		
 		try(var ignored=renderer.bulkDraw(DrawMode.QUADS)){
 			float jitter      =2;
 			int   step        =15;
 			float randX       =renderCount/6f;
 			float randY       =renderCount/6f+10000;
 			float simplexScale=50;
-			for(int x=0;x<renderer.getWidth()+2;x+=step){
-				for(int y=(x/step)%step;y<renderer.getHeight()+2;y+=step){
+			for(int x=0;x<screenWidth+2;x+=step){
+				for(int y=(x/step)%step;y<screenHeight+2;y+=step){
 					float xf=x/simplexScale;
 					float yf=y/simplexScale;
 					renderer.fillQuad(x+SimplexNoise.noise(xf, yf, randX)*jitter, y+SimplexNoise.noise(xf, yf, randY)*jitter, 1.5, 1.5);
@@ -978,11 +1000,14 @@ public abstract class BinaryDrawing{
 	}
 	
 	private void drawTimeline(int frameIndex){
+		var screenHeight=renderer.getDisplay().getHeight();
+		var screenWidth =renderer.getDisplay().getWidth();
+		
 		renderer.pushMatrix();
-		renderer.translate(0, renderer.getHeight());
+		renderer.translate(0, screenHeight);
 		renderer.scale(1, -1);
 		
-		double w=renderer.getWidth()/(double)getFrameCount();
+		double w=screenWidth/(double)getFrameCount();
 		
 		boolean lastMatch=false;
 		int     start    =0;
@@ -1016,7 +1041,7 @@ public abstract class BinaryDrawing{
 	private void drawFilter(){
 		if(!isWritingFilter()) return;
 		initFont(1);
-		drawStringIn(Color.WHITE, "Filter: "+getFilter(), new Rect(0, 0, renderer.getWidth(), renderer.getHeight()), true, true);
+		drawStringIn(Color.WHITE, "Filter: "+getFilter(), new Rect(0, 0, renderer.getDisplay().getWidth(), renderer.getDisplay().getHeight()), true, true);
 	}
 	
 	private void drawWriteIndex(MemFrame frame, RenderContext ctx){
@@ -1084,10 +1109,13 @@ public abstract class BinaryDrawing{
 			xTo=xToOrg+xToOff,
 			yTo=yToOrg+yToOff;
 		
-		if(xFrom<0||xFrom>renderer.getWidth()) xFrom=xFromOrg-xFromOff;
-		if(yFrom<0||yFrom>renderer.getHeight()) yFrom=yFromOrg-yFromOff;
-		if(xTo<0||xTo>renderer.getWidth()) xTo=xToOrg-xToOff;
-		if(yTo<0||yTo>renderer.getHeight()) yTo=yToOrg-yToOff;
+		var screenHeight=renderer.getDisplay().getHeight();
+		var screenWidth =renderer.getDisplay().getWidth();
+		
+		if(xFrom<0||xFrom>screenWidth) xFrom=xFromOrg-xFromOff;
+		if(yFrom<0||yFrom>screenHeight) yFrom=yFromOrg-yFromOff;
+		if(xTo<0||xTo>screenWidth) xTo=xToOrg-xToOff;
+		if(yTo<0||yTo>screenHeight) yTo=yToOrg-yToOff;
 		
 		var handles=new double[4][2];
 		handles[0][0]=xFromOrg;
@@ -1107,7 +1135,7 @@ public abstract class BinaryDrawing{
 			initFont(0.3F*ptr.widthFactor());
 			renderer.setFontScale(Math.max(renderer.getFontScale(), 15));
 			int msgWidth=ptr.message().length();
-			int space   =(int)(renderer.getWidth()-x);
+			int space   =(int)(screenWidth-x);
 			
 			var w=renderer.getStringBounds(ptr.message()).width();
 			while(w>space*1.5){
@@ -1126,6 +1154,8 @@ public abstract class BinaryDrawing{
 	
 	private void drawError(ParsedFrame parsed){
 		if(parsed.displayError==null) return;
+		var screenHeight=renderer.getDisplay().getHeight();
+
 //		parsed.displayError.printStackTrace();
 		initFont(0.2F);
 		renderer.setFontScale(Math.max(renderer.getFontScale(), 12));
@@ -1137,26 +1167,29 @@ public abstract class BinaryDrawing{
 		var totalBound=bounds.stream().reduce((l, r)->new GLFont.Bounds(Math.max(l.width(), r.width()), l.height()+r.height())).orElseThrow();
 		
 		renderer.setColor(alpha(Color.RED.darker(), 0.2F));
-		renderer.fillQuad(0, renderer.getHeight()-totalBound.height()-25, totalBound.width()+20, totalBound.height()+20);
+		renderer.fillQuad(0, screenHeight-totalBound.height()-25, totalBound.width()+20, totalBound.height()+20);
 		
 		var col =alpha(Color.WHITE, 0.8F);
-		var rect=new Rect(10, renderer.getHeight()-totalBound.height()-20, totalBound.width(), renderer.getLineWidth());
+		var rect=new Rect(10, screenHeight-totalBound.height()-20, totalBound.width(), renderer.getLineWidth());
 		for(int i=0;i<lines.length;i++){
 			String line =lines[i];
 			var    bound=bounds.get(i);
 			rect.height=bound.height();
-			rect.y=(Math.round(renderer.getHeight()-totalBound.height()+bounds.stream().limit(i).mapToDouble(GLFont.Bounds::height).sum())-15);
+			rect.y=(Math.round(screenHeight-totalBound.height()+bounds.stream().limit(i).mapToDouble(GLFont.Bounds::height).sum())-15);
 			drawStringIn(col, line, rect, false, true);
 		}
 	}
 	
 	private void drawMouse(RenderContext ctx, CachedFrame frame){
+		var screenHeight=renderer.getDisplay().getHeight();
+		var screenWidth =renderer.getDisplay().getWidth();
+		
 		var bytes =frame.data().data();
 		var parsed=frame.parsed;
 		
-		int xByte=(int)(renderer.getMouseX()/ctx.pixelsPerByte());
+		int xByte=(int)(renderer.getDisplay().getMouseX()/ctx.pixelsPerByte());
 		if(xByte>=ctx.width()) return;
-		int yByte    =(int)(renderer.getMouseY()/ctx.pixelsPerByte());
+		int yByte    =(int)(renderer.getDisplay().getMouseY()/ctx.pixelsPerByte());
 		int byteIndex=yByte*ctx.width()+xByte;
 		if(byteIndex>=bytes.length) return;
 		
@@ -1179,7 +1212,7 @@ public abstract class BinaryDrawing{
 		int y=(int)((yByte-0.1)*ctx.pixelsPerByte());
 		
 		var bounds=renderer.getStringBounds(s);
-		x=(int)Math.min(Math.max(0, x-bounds.width()/2+ctx.pixelsPerByte()/2F), renderer.getWidth()-Math.ceil(bounds.width()));
+		x=(int)Math.min(Math.max(0, x-bounds.width()/2+ctx.pixelsPerByte()/2F), screenWidth-Math.ceil(bounds.width()));
 		y=Math.max(y, (int)Math.ceil(bounds.height()));
 		
 		renderer.outlineString(Color.BLACK, s, x, y);
@@ -1202,12 +1235,12 @@ public abstract class BinaryDrawing{
 		renderer.translate(-0.5, -0.5);
 	}
 	private void findHoverChunk(RenderContext ctx, ParsedFrame parsed, ChunkDataProvider provider){
-		int xByte=(int)(renderer.getMouseX()/ctx.pixelsPerByte());
+		int xByte=(int)(renderer.getDisplay().getMouseX()/ctx.pixelsPerByte());
 		if(xByte>=ctx.width()){
 			parsed.lastHoverChunk=null;
 			return;
 		}
-		int yByte    =(int)(renderer.getMouseY()/ctx.pixelsPerByte());
+		int yByte    =(int)(renderer.getDisplay().getMouseY()/ctx.pixelsPerByte());
 		int byteIndex=yByte*ctx.width()+xByte;
 		
 		try{
@@ -1305,8 +1338,8 @@ public abstract class BinaryDrawing{
 							
 							if(annotate) annotateByteField(provider, ctx, pointerRecord, instance, field, col, reference, Range.fromSize(fieldOffset, size));
 							if(!diffPos){
-								int xByte    =(int)(renderer.getMouseX()/ctx.pixelsPerByte());
-								int yByte    =(int)(renderer.getMouseY()/ctx.pixelsPerByte());
+								int xByte    =(int)(renderer.getDisplay().getMouseX()/ctx.pixelsPerByte());
+								int yByte    =(int)(renderer.getDisplay().getMouseY()/ctx.pixelsPerByte());
 								int byteIndex=yByte*ctx.width()+xByte;
 								
 								var from=trueOffset;

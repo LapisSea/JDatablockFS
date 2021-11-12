@@ -62,12 +62,13 @@ public class OpenGLBackend extends RenderBackend{
 	
 	private final Deque<Runnable> glTasks=new LinkedList<>();
 	
-	private final GlfwWindow window;
-	private final Thread     glThread;
-	private final GLFont     font;
+	private final Thread glThread;
+	private final GLFont font;
 	
-	public OpenGLBackend(GlfwWindow window, Thread glThread){
-		this.window=window;
+	public final  GlfwWindow       window=new GlfwWindow();
+	private final DisplayInterface displayInterface;
+	
+	public OpenGLBackend(Thread glThread){
 		this.glThread=glThread;
 
 
@@ -82,12 +83,37 @@ public class OpenGLBackend extends RenderBackend{
 		}catch(IOException e){
 			throw new RuntimeException("failed to load font", e);
 		}
+		
+		displayInterface=new DisplayInterface(){
+			@Override
+			public int getWidth(){
+				return window.size.x();
+			}
+			@Override
+			public int getHeight(){
+				return window.size.y();
+			}
+			@Override
+			public int getMouseX(){
+				return window.mousePos.x();
+			}
+			@Override
+			public int getMouseY(){
+				return window.mousePos.y();
+			}
+		};
 	}
 	
 	
 	@Override
 	public BulkDraw bulkDraw(DrawMode mode){
 		return new BulkDrawGL(mode);
+	}
+	
+	
+	@Override
+	public DisplayInterface getDisplay(){
+		return displayInterface;
 	}
 	
 	@Override
@@ -97,24 +123,6 @@ public class OpenGLBackend extends RenderBackend{
 		}else{
 			glTasks.add(task);
 		}
-	}
-	
-	@Override
-	public int getWidth(){
-		return window.size.x();
-	}
-	
-	@Override
-	public int getHeight(){
-		return window.size.y();
-	}
-	@Override
-	public int getMouseX(){
-		return window.mousePos.x();
-	}
-	@Override
-	public int getMouseY(){
-		return window.mousePos.y();
 	}
 	
 	@Override
@@ -132,7 +140,7 @@ public class OpenGLBackend extends RenderBackend{
 	
 	@Override
 	public void clearFrame(){
-		glViewport(0, 0, getWidth(), getHeight());
+		glViewport(0, 0, getDisplay().getWidth(), getDisplay().getHeight());
 		glClear(GL_COLOR_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
 	}
 	
@@ -145,7 +153,7 @@ public class OpenGLBackend extends RenderBackend{
 		
 		glLoadIdentity();
 		translate(-1, 1);
-		scale(2F/getWidth(), -2F/getHeight());
+		scale(2F/getDisplay().getWidth(), -2F/getDisplay().getHeight());
 	}
 	
 	@Override
@@ -206,14 +214,13 @@ public class OpenGLBackend extends RenderBackend{
 	
 	@Override
 	public void drawLine(double xFrom, double yFrom, double xTo, double yTo){
-		var pixelsPerByte=getPixelsPerByte();
-		var angle        =-Math.atan2(xTo-xFrom, yTo-yFrom);
-		var length       =MathUtil.length(xFrom-xTo, yTo-yFrom)*pixelsPerByte;
+		var angle =-Math.atan2(xTo-xFrom, yTo-yFrom);
+		var length=MathUtil.length(xFrom-xTo, yTo-yFrom);
 		
 		Point2D.Double  p=new Point2D.Double();
 		AffineTransform t=new AffineTransform();
 		t.setToIdentity();
-		t.translate(xFrom*pixelsPerByte, yFrom*pixelsPerByte);
+		t.translate(xFrom, yFrom);
 		t.rotate(angle);
 		
 		double x    =-getLineWidth()/2;

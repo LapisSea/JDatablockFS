@@ -71,6 +71,8 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 	private final Frame                frame         =new Frame();
 	private final Panel                pan;
 	
+	private G2DBackend g2dRenderer;
+	
 	public Display2D(){
 		File f=new File("wind");
 		
@@ -107,10 +109,11 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 				}catch(Throwable e){
 					new RuntimeException("Failed to complete frame render", e).printStackTrace();
 				}
-				g.drawImage(((G2DBackend)renderer).getRender(), 0, 0, null);
+				g.drawImage(g2dRenderer.getRender(), 0, 0, null);
 			}
 		};
-		renderer=new G2DBackend(pan);
+		g2dRenderer=new G2DBackend(pan);
+		setRenderer(g2dRenderer);
 		
 		frame.setLayout(new BorderLayout());
 		frame.add(pan);
@@ -130,7 +133,7 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 					if(e.getKeyChar()=='a'||e.getKeyCode()==37) ses.setPos(ses.getPos()-1);
 					if(e.getKeyChar()=='d'||e.getKeyCode()==39) ses.setPos(ses.getPos()+1);
 					ses.setPos(MathUtil.snap(ses.getPos(), 0, ses.frames.size()-1));
-					renderer.markFrameDirty();
+					g2dRenderer.markFrameDirty();
 					
 					if(e.getKeyCode()==122){
 						frame.dispose();
@@ -156,7 +159,7 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 				if(visibleSession.isPresent()){
 					calcSize(getFrame(getFramePos()).data().data().length, true);
 				}
-				renderer.markFrameDirty();
+				g2dRenderer.markFrameDirty();
 			}
 			
 			@Override
@@ -180,7 +183,7 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 		pan.addMouseMotionListener(new MouseMotionAdapter(){
 			@Override
 			public void mouseMoved(MouseEvent e){
-				renderer.markFrameDirty();
+				g2dRenderer.markFrameDirty();
 			}
 			
 			@Override
@@ -193,7 +196,7 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 				cleanUpSessions();
 				visibleSession.ifPresent(ses->ses.setPos((int)(val*(ses.frames.size()-1))));
 				
-				renderer.markFrameDirty();
+				g2dRenderer.markFrameDirty();
 			}
 		});
 		
@@ -204,7 +207,7 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 				visibleSession.ifPresent(ses->{
 					if(ses.frames.isEmpty()) return;
 					ses.frames.get(ses.getPos()).data().printStackTrace();
-					renderer.markFrameDirty();
+					g2dRenderer.markFrameDirty();
 				});
 			}
 		});
@@ -217,12 +220,12 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 		
 		if(visibleSession!=activeSession){
 			visibleSession=activeSession;
-			renderer.markFrameDirty();
+			g2dRenderer.markFrameDirty();
 		}
 		
 		if(visibleSession.isEmpty()||visibleSession.get().frames.isEmpty()) return;
 		
-		if(renderer.notifyDirtyFrame()){
+		if(g2dRenderer.notifyDirtyFrame()){
 			invokeLater(pan::repaint);
 		}
 	}
@@ -258,13 +261,13 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 	public DataLogger.Session getSession(String name){
 		var ses=sessions.computeIfAbsent(
 			name,
-			nam->new Session(()->renderer.markFrameDirty(), frame->{
+			nam->new Session(()->g2dRenderer.markFrameDirty(), frame->{
 				this.frame.setTitle("Binary display - frame: "+frame+" @"+name);
-				renderer.markFrameDirty();
+				g2dRenderer.markFrameDirty();
 			})
 		);
 		activeSession=Optional.of(ses);
-		renderer.markFrameDirty();
+		g2dRenderer.markFrameDirty();
 		return ses;
 	}
 	

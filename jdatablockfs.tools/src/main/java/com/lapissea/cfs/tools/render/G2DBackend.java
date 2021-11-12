@@ -22,6 +22,8 @@ public class G2DBackend extends RenderBackend{
 	
 	private final Deque<AffineTransform> transformStack=new LinkedList<>();
 	
+	private final DisplayInterface displayInterface;
+	
 	private final Panel target;
 	private       int   mouseX;
 	private       int   mouseY;
@@ -42,6 +44,25 @@ public class G2DBackend extends RenderBackend{
 				mouseY=e.getY();
 			}
 		});
+		
+		displayInterface=new DisplayInterface(){
+			@Override
+			public int getWidth(){
+				return target.getWidth();
+			}
+			@Override
+			public int getHeight(){
+				return target.getHeight();
+			}
+			@Override
+			public int getMouseX(){
+				return mouseX;
+			}
+			@Override
+			public int getMouseY(){
+				return mouseY;
+			}
+		};
 	}
 	
 	@Override
@@ -54,6 +75,10 @@ public class G2DBackend extends RenderBackend{
 			protected void end(){
 			}
 		};
+	}
+	@Override
+	public DisplayInterface getDisplay(){
+		return displayInterface;
 	}
 	
 	@Override
@@ -76,28 +101,12 @@ public class G2DBackend extends RenderBackend{
 		
 		currentGraphics.draw(
 			new Line2D.Double(
-				xFrom*getPixelsPerByte(), yFrom*getPixelsPerByte(),
-				xTo*getPixelsPerByte(), yTo*getPixelsPerByte()
+				xFrom, yFrom,
+				xTo, yTo
 			)
 		);
 	}
 	
-	@Override
-	public int getWidth(){
-		return target.getWidth();
-	}
-	@Override
-	public int getHeight(){
-		return target.getHeight();
-	}
-	@Override
-	public int getMouseX(){
-		return mouseX;
-	}
-	@Override
-	public int getMouseY(){
-		return mouseY;
-	}
 	@Override
 	public void setColor(Color color){
 		currentGraphics.setColor(color);
@@ -133,7 +142,7 @@ public class G2DBackend extends RenderBackend{
 	public void clearFrame(){
 		var col=readColor();
 		currentGraphics.setColor(Color.GRAY);
-		currentGraphics.fillRect(0, 0, getWidth(), getHeight());
+		currentGraphics.fillRect(0, 0, getDisplay().getWidth(), getDisplay().getHeight());
 		currentGraphics.setColor(col);
 	}
 	@Override
@@ -166,10 +175,11 @@ public class G2DBackend extends RenderBackend{
 	}
 	@Override
 	public void preRender(){
-		BufferedImage image=render;
-		
-		if(image==null||image.getWidth()!=getWidth()||image.getHeight()!=getHeight()){
-			image=target.getGraphicsConfiguration().createCompatibleImage(getWidth(), getHeight(), Transparency.TRANSLUCENT);
+		var image=render;
+		int w    =getDisplay().getWidth();
+		int h    =getDisplay().getHeight();
+		if(image==null||image.getWidth()!=w||image.getHeight()!=h){
+			image=target.getGraphicsConfiguration().createCompatibleImage(w, h, Transparency.TRANSLUCENT);
 			render=image;
 		}
 		

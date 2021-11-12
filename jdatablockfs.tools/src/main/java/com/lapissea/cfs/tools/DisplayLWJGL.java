@@ -77,22 +77,25 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 		}
 	}
 	
-	private final GlfwWindow window=new GlfwWindow();
-	
-	private final Map<String, Session>  sessions        =new LinkedHashMap<>();
-	private       Optional<Session>     activeSession   =Optional.empty();
-	private       Optional<Session>     displayedSession=Optional.empty();
-	private       boolean               destroyRequested=false;
+	private final Map<String, Session> sessions        =new LinkedHashMap<>();
+	private       Optional<Session>    activeSession   =Optional.empty();
+	private       Optional<Session>    displayedSession=Optional.empty();
+	private       boolean              destroyRequested=false;
 	
 	private String  filter     ="";
 	private boolean filterMake =false;
 	private int[]   scrollRange=null;
 	
 	private CompletableFuture<?> glInit;
+	GlfwWindow window;
+	
+	OpenGLBackend glRenderer;
 	
 	public DisplayLWJGL(){
 		Thread glThread=new Thread(this::displayLifecycle, "display");
-		renderer=new OpenGLBackend(window, glThread);
+		glRenderer=new OpenGLBackend(glThread);
+		window=glRenderer.window;
+		setRenderer(glRenderer);
 		
 		glThread.setDaemon(false);
 		glThread.start();
@@ -104,9 +107,6 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	
 	private void displayLifecycle(){
 		glInit=async(this::initWindow, Runnable::run);
-		
-		ChangeRegistryInt byteIndex=new ChangeRegistryInt(-1);
-		byteIndex.register(e->renderer.markFrameDirty());
 		
 		double[] travel={0};
 		
@@ -122,8 +122,8 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 					}
 					break;
 			}
-			
 		});
+		
 		window.registryMouseScroll.register(vec->displayedSession.ifPresent(ses->ses.setFrame(Math.max(0, (int)(getFramePos()-vec.y())))));
 		
 		
@@ -133,14 +133,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			travel[0]+=lastPos.distanceTo(pos);
 			lastPos.set(pos);
 			
-			var pixelsPerByte=renderer.getPixelsPerByte();
-			
-			int xByte=(int)(window.mousePos.x()/pixelsPerByte);
-			int yByte=(int)(window.mousePos.y()/pixelsPerByte);
-			
-			int width=(int)Math.max(1, renderer.getWidth()/pixelsPerByte);
-			
-			byteIndex.set(yByte*width+xByte);
+			glRenderer.markFrameDirty();
 			
 			if(!window.isMouseKeyDown(GLFW.GLFW_MOUSE_BUTTON_LEFT)) return;
 			displayedSession.ifPresent(ses->{
@@ -208,11 +201,11 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			if(!filter.isEmpty()&&e.getKey()==GLFW_KEY_ESCAPE){
 				filter="";
 				scrollRange=null;
-				renderer.markFrameDirty();
+				glRenderer.markFrameDirty();
 			}
 			
 			if(filterMake){
-				renderer.markFrameDirty();
+				glRenderer.markFrameDirty();
 				
 				if(e.getType()!=GlfwKeyboardEvent.Type.UP&&e.getKey()==GLFW_KEY_BACKSPACE){
 					if(!filter.isEmpty()){
@@ -263,7 +256,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 				}
 				var cg=(char)e.getKey();
 				if(!window.isKeyDown(GLFW_KEY_LEFT_SHIFT)) cg=Character.toLowerCase(cg);
-				if(renderer.canFontDisplay(cg)){
+				if(glRenderer.canFontDisplay(cg)){
 					filter+=cg;
 				}
 				return;
@@ -282,9 +275,6 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 		});
 		
 		window.autoF11Toggle();
-
-//		var imguiCtx =new Context();
-//		var imguiImpl=new ImplGL3();
 		
 		try{
 			if(!destroyRequested){
@@ -299,12 +289,12 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 						destroyRequested=false;
 						window.requestClose();
 					}
-					if(renderer.notifyDirtyFrame()){
+					if(glRenderer.notifyDirtyFrame()){
 						render();
 					}
 					UtilL.sleep(0, 1000);
 					window.pollEvents();
-					renderer.postRender();
+					glRenderer.postRender();
 					
 				});
 			}
@@ -416,8 +406,8 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 		
 		var ses=sessions.computeIfAbsent(
 			name,
-			nam->new Session(()->renderer.markFrameDirty(), frame->{
-				renderer.markFrameDirty();
+			nam->new Session(()->glRenderer.markFrameDirty(), frame->{
+				glRenderer.markFrameDirty();
 				window.title.set("Binary display - frame: "+frame+" @"+name);
 			})
 		);

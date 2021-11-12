@@ -6,6 +6,26 @@ import java.awt.Color;
 
 public abstract class RenderBackend{
 	
+	public interface DisplayInterface{
+		
+		enum MouseClick{
+			LEFT, RIGHT
+		}
+		
+		enum ActionType{
+			DOWN, UP, HOLD
+		}
+		
+		
+		int getWidth();
+		int getHeight();
+		
+		int getMouseX();
+		int getMouseY();
+		
+	}
+	
+	
 	public enum DrawMode{
 		QUADS
 	}
@@ -34,18 +54,7 @@ public abstract class RenderBackend{
 	private float   fontScale;
 	private float   lineWidth;
 	
-	private float pixelsPerByte=300;
-	
 	private boolean shouldRender=true;
-	
-	public float getPixelsPerByte(){
-		return pixelsPerByte;
-	}
-	public void pixelsPerByteChange(float newPixelsPerByte){
-		if(Math.abs(pixelsPerByte-newPixelsPerByte)<0.0001) return;
-		pixelsPerByte=newPixelsPerByte;
-		markFrameDirty();
-	}
 	
 	public void markFrameDirty(){
 		shouldRender=true;
@@ -75,13 +84,9 @@ public abstract class RenderBackend{
 		lineWidth=line;
 	}
 	
-	public abstract int getWidth();
-	public abstract int getHeight();
+	public abstract DisplayInterface getDisplay();
 	
 	public abstract void runLater(Runnable task);
-	
-	public abstract int getMouseX();
-	public abstract int getMouseY();
 	
 	public abstract void fillQuad(double x, double y, double width, double height);
 	public abstract void outlineQuad(double x, double y, double width, double height);
