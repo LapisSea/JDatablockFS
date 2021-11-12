@@ -12,6 +12,8 @@ import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.INumber;
 import com.lapissea.cfs.objects.Reference;
+import com.lapissea.cfs.tools.SessionHost.CachedFrame;
+import com.lapissea.cfs.tools.SessionHost.ParsedFrame;
 import com.lapissea.cfs.tools.logging.MemFrame;
 import com.lapissea.cfs.tools.render.RenderBackend;
 import com.lapissea.cfs.type.IOInstance;
@@ -88,22 +90,6 @@ public abstract class BinaryDrawing{
 	}
 	
 	private static record Pointer(long from, long to, int size, Color color, String message, float widthFactor){}
-	
-	protected static final class ParsedFrame{
-		final int index;
-		WeakReference<Cluster> cluster=new WeakReference<>(null);
-		Throwable              displayError;
-		Chunk                  lastHoverChunk;
-		public ParsedFrame(int index){
-			this.index=index;
-		}
-		
-		public Optional<Cluster> getCluster(){
-			return Optional.ofNullable(cluster.get());
-		}
-	}
-	
-	protected record CachedFrame(MemFrame data, ParsedFrame parsed){}
 	
 	private static Color mul(Color color, float mul){
 		return new Color(Math.round(color.getRed()*mul), Math.round(color.getGreen()*mul), Math.round(color.getBlue()*mul), color.getAlpha());
@@ -1189,7 +1175,7 @@ public abstract class BinaryDrawing{
 		var screenWidth =renderer.getDisplay().getWidth();
 		
 		var bytes =frame.data().data();
-		var parsed=frame.parsed;
+		var parsed=frame.parsed();
 		
 		int xByte=(int)(renderer.getDisplay().getMouseX()/ctx.pixelsPerByte());
 		if(xByte>=ctx.width()) return;

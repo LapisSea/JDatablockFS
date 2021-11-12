@@ -1,8 +1,8 @@
 package com.lapissea.cfs.tools;
 
 
+import com.lapissea.cfs.tools.SessionHost.CachedFrame;
 import com.lapissea.cfs.tools.logging.DataLogger;
-import com.lapissea.cfs.tools.logging.MemFrame;
 import com.lapissea.cfs.tools.render.G2DBackend;
 import com.lapissea.util.MathUtil;
 import com.lapissea.util.UtilL;
@@ -11,65 +11,18 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.io.*;
-import java.util.List;
-import java.util.*;
-import java.util.function.IntConsumer;
+import java.util.Optional;
 
 import static javax.swing.SwingUtilities.invokeLater;
 
 @SuppressWarnings("AutoBoxing")
 public class Display2D extends BinaryDrawing implements DataLogger{
 	
-	private static class Session implements DataLogger.Session{
-		private final List<CachedFrame> frames=new ArrayList<>();
-		private       int               pos;
-		
-		private final IntConsumer onFrameChange;
-		private final Runnable    setDirty;
-		private       boolean     markForDeletion;
-		
-		private Session(Runnable setDirty, IntConsumer onFrameChange){
-			this.setDirty=setDirty;
-			this.onFrameChange=onFrameChange;
-		}
-		
-		@Override
-		public synchronized void log(MemFrame frame){
-			frames.add(new CachedFrame(frame, new ParsedFrame(frames.size())));
-			setPos(frames.size()-1);
-		}
-		
-		@Override
-		public void finish(){}
-		
-		@Override
-		public void reset(){
-			frames.clear();
-			setPos(0);
-			setDirty.run();
-		}
-		@Override
-		public void delete(){
-			markForDeletion=true;
-		}
-		public void setPos(int pos){
-			if(this.pos==pos) return;
-			
-			this.pos=pos;
-			setDirty.run();
-			onFrameChange.accept(getPos());
-		}
-		
-		public int getPos(){
-			return pos;
-		}
-	}
+	private       Optional<SessionHost.HostedSession> visibleSession=Optional.empty();
+	private final Frame                               frame         =new Frame();
+	private final Panel                               pan;
 	
-	private final Map<String, Session> sessions      =new HashMap<>();
-	private       Optional<Session>    activeSession =Optional.empty();
-	private       Optional<Session>    visibleSession=Optional.empty();
-	private final Frame                frame         =new Frame();
-	private final Panel                pan;
+	private final SessionHost sessionHost=new SessionHost();
 	
 	private G2DBackend g2dRenderer;
 	
@@ -128,11 +81,11 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 		frame.addKeyListener(new KeyAdapter(){
 			@Override
 			public void keyPressed(KeyEvent e){
-				cleanUpSessions();
+				sessionHost.cleanUpSessions();
 				visibleSession.ifPresent(ses->{
-					if(e.getKeyChar()=='a'||e.getKeyCode()==37) ses.setPos(ses.getPos()-1);
-					if(e.getKeyChar()=='d'||e.getKeyCode()==39) ses.setPos(ses.getPos()+1);
-					ses.setPos(MathUtil.snap(ses.getPos(), 0, ses.frames.size()-1));
+					if(e.getKeyChar()=='a'||e.getKeyCode()==37) ses.framePos.set(ses.framePos.get()-1);
+					if(e.getKeyChar()=='d'||e.getKeyCode()==39) ses.framePos.set(ses.framePos.get()+1);
+					ses.framePos.set(MathUtil.snap(ses.framePos.get(), 0, ses.frames.size()-1));
 					g2dRenderer.markFrameDirty();
 					
 					if(e.getKeyCode()==122){
@@ -193,8 +146,8 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 				
 				float val=x/(float)width;
 				
-				cleanUpSessions();
-				visibleSession.ifPresent(ses->ses.setPos((int)(val*(ses.frames.size()-1))));
+				sessionHost.cleanUpSessions();
+				visibleSession.ifPresent(ses->ses.framePos.set((int)(val*(ses.frames.size()-1))));
 				
 				g2dRenderer.markFrameDirty();
 			}
@@ -203,10 +156,10 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 		pan.addMouseListener(new MouseAdapter(){
 			@Override
 			public void mouseClicked(MouseEvent e){
-				cleanUpSessions();
+				sessionHost.cleanUpSessions();
 				visibleSession.ifPresent(ses->{
 					if(ses.frames.isEmpty()) return;
-					ses.frames.get(ses.getPos()).data().printStackTrace();
+					ses.frames.get(ses.framePos.get()).data().printStackTrace();
 					g2dRenderer.markFrameDirty();
 				});
 			}
@@ -216,8 +169,9 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 //		frame.createBufferStrategy(2);
 	}
 	private void watchLoop(){
-		cleanUpSessions();
+		sessionHost.cleanUpSessions();
 		
+		var activeSession=sessionHost.activeSession.get();
 		if(visibleSession!=activeSession){
 			visibleSession=activeSession;
 			g2dRenderer.markFrameDirty();
@@ -230,11 +184,6 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 		}
 	}
 	
-	private void cleanUpSessions(){
-		sessions.values().removeIf(s->s.markForDeletion);
-		activeSession.filter(s->s.markForDeletion).ifPresent(s->activeSession=sessions.values().stream().findAny());
-	}
-	
 	@Override
 	protected int getFrameCount(){
 		return visibleSession.map(ses->ses.frames.size()).orElse(0);
@@ -245,21 +194,13 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 	}
 	@Override
 	protected int getFramePos(){
-		return visibleSession.map(ses->ses.pos).orElse(0);
+		return visibleSession.map(ses->ses.framePos.get()).orElse(0);
 	}
 	
 	@Override
 	public DataLogger.Session getSession(String name){
-		var ses=sessions.computeIfAbsent(
-			name,
-			nam->new Session(()->g2dRenderer.markFrameDirty(), frame->{
-				this.frame.setTitle("Binary display - frame: "+frame+" @"+name);
-				g2dRenderer.markFrameDirty();
-			})
-		);
-		activeSession=Optional.of(ses);
 		g2dRenderer.markFrameDirty();
-		return ses;
+		return sessionHost.getSession(name);
 	}
 	
 	@Override
@@ -268,9 +209,7 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 			frame.setVisible(false);
 			frame.dispose();
 		});
-		sessions.values().forEach(Session::finish);
-		activeSession=Optional.empty();
+		sessionHost.destroy();
 		visibleSession=Optional.empty();
-		sessions.clear();
 	}
 }

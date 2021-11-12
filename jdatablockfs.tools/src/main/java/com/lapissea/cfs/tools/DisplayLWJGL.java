@@ -9,17 +9,15 @@ import com.lapissea.glfw.GlfwWindow;
 import com.lapissea.glfw.GlfwWindow.SurfaceAPI;
 import com.lapissea.util.MathUtil;
 import com.lapissea.util.UtilL;
-import com.lapissea.util.event.change.ChangeRegistryInt;
 import com.lapissea.vec.Vec2i;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.glfw.GLFWErrorCallback;
 import org.lwjgl.opengl.GL;
 
 import java.io.File;
-import java.util.*;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
-import java.util.function.IntConsumer;
 
 import static com.lapissea.util.PoolOwnThread.async;
 import static org.lwjgl.glfw.GLFW.*;
@@ -30,60 +28,15 @@ import static org.lwjgl.opengl.GL11.glDisable;
 
 public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	
-	private static class Session implements DataLogger.Session{
-		private final List<CachedFrame> frames  =new ArrayList<>();
-		private final ChangeRegistryInt framePos=new ChangeRegistryInt(0);
-		
-		private final Runnable    setDirty;
-		private final IntConsumer onFrameChange;
-		private       boolean     markForDeletion;
-		
-		private Session(Runnable setDirty, IntConsumer onFrameChange){
-			this.setDirty=setDirty;
-			this.onFrameChange=onFrameChange;
-		}
-		
-		@Override
-		public synchronized void log(MemFrame frame){
-			frames.add(new CachedFrame(frame, new ParsedFrame(frames.size())));
-			synchronized(framePos){
-				framePos.set(-1);
-			}
-			setDirty.run();
-		}
-		
-		@Override
-		public void finish(){}
-		
-		@Override
-		public void reset(){
-			setDirty.run();
-			frames.clear();
-			setFrame(0);
-		}
-		
-		@Override
-		public void delete(){
-			reset();
-			markForDeletion=true;
-		}
-		
-		private void setFrame(int frame){
-			if(frame>frames.size()-1) frame=frames.size()-1;
-			framePos.set(frame);
-			onFrameChange.accept(frame);
-		}
-	}
-	
-	private final Map<String, Session> sessions        =new LinkedHashMap<>();
-	private       Optional<Session>    activeSession   =Optional.empty();
-	private       Optional<Session>    displayedSession=Optional.empty();
-	private       boolean              destroyRequested=false;
+	private Optional<SessionHost.HostedSession> displayedSession=Optional.empty();
+	private boolean                             destroyRequested=false;
 	
 	private CompletableFuture<?> glInit;
-	GlfwWindow window;
+	private GlfwWindow           window;
 	
-	OpenGLBackend glRenderer;
+	private OpenGLBackend glRenderer;
+	
+	private final SessionHost sessionHost=new SessionHost();
 	
 	public DisplayLWJGL(){
 		Thread glThread=new Thread(this::displayLifecycle, "display");
@@ -132,7 +85,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			if(!window.isMouseKeyDown(GLFW.GLFW_MOUSE_BUTTON_LEFT)) return;
 			displayedSession.ifPresent(ses->{
 				float percent=MathUtil.snap((pos.x()-10F)/(window.size.x()-20F), 0, 1);
-					ses.setFrame(Math.round((ses.frames.size()-1)*percent));
+				ses.setFrame(Math.round((ses.frames.size()-1)*percent));
 			});
 		});
 		
@@ -142,47 +95,15 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 		});
 		
 		window.registryKeyboardKey.register(e->{
-			cleanUpSessions();
-			if(e.getType()!=GlfwKeyboardEvent.Type.DOWN&&displayedSession.isPresent()&&sessions.size()>1){
+			sessionHost.cleanUpSessions();
+			if(e.getType()!=GlfwKeyboardEvent.Type.DOWN&&displayedSession.isPresent()){
 				switch(e.getKey()){
 					case GLFW_KEY_UP -> {
-						boolean found=false;
-						Session ses;
-						find:
-						{
-							for(var value : sessions.values()){
-								if(found){
-									ses=value;
-									break find;
-								}
-								found=value==displayedSession.get();
-							}
-							ses=sessions.values().iterator().next();
-						}
-						setActiveSession(ses);
+						sessionHost.nextSession();
 						return;
 					}
 					case GLFW_KEY_DOWN -> {
-						Session ses;
-						find:
-						{
-							Session last=null;
-							for(var value : sessions.values()){
-								ses=last;
-								last=value;
-								if(value==displayedSession.get()){
-									if(ses==null){
-										for(var session : sessions.values()){
-											last=session;
-										}
-										ses=last;
-									}
-									break find;
-								}
-							}
-							ses=sessions.values().iterator().next();
-						}
-						setActiveSession(ses);
+						sessionHost.prevSession();
 						return;
 					}
 				}
@@ -202,7 +123,8 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			if(!destroyRequested){
 				
 				window.whileOpen(()->{
-					cleanUpSessions();
+					sessionHost.cleanUpSessions();
+					var activeSession=sessionHost.activeSession.get();
 					if(!displayedSession.equals(activeSession)){
 						displayedSession=activeSession;
 						ifFrame(frame->calcSize(frame.data().length, true));
@@ -225,15 +147,6 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 		}finally{
 			window.destroy();
 		}
-	}
-	
-	private void doRender(){
-	
-	}
-	
-	private void cleanUpSessions(){
-		sessions.values().removeIf(s->s.markForDeletion);
-		activeSession.filter(s->s.markForDeletion).flatMap(s->sessions.values().stream().findAny()).ifPresent(this::setActiveSession);
 	}
 	
 	private void ifFrame(Consumer<MemFrame> o){
@@ -307,36 +220,21 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 		return displayedSession.map(s->s.frames.size()).orElse(0);
 	}
 	@Override
-	protected CachedFrame getFrame(int index){
+	protected SessionHost.CachedFrame getFrame(int index){
 		return displayedSession.map(s->s.frames.get(index)).orElse(null);
 	}
 	
 	
 	@Override
 	public DataLogger.Session getSession(String name){
-		if(destroyRequested) return null;
-		
-		var ses=sessions.computeIfAbsent(
-			name,
-			nam->new Session(()->glRenderer.markFrameDirty(), frame->{
-				glRenderer.markFrameDirty();
-				window.title.set("Binary display - frame: "+frame+" @"+name);
-			})
-		);
-		setActiveSession(ses);
-		return ses;
+		glRenderer.markFrameDirty();
+		return sessionHost.getSession(name);
 	}
 	@Override
 	public void destroy(){
 		destroyRequested=true;
-		sessions.values().forEach(Session::finish);
-		activeSession=Optional.empty();
+		sessionHost.destroy();
 		displayedSession=Optional.empty();
-		sessions.clear();
-	}
-	
-	private void setActiveSession(Session session){
-		session.onFrameChange.accept(getFramePos());
-		this.activeSession=Optional.of(session);
+		glRenderer.markFrameDirty();
 	}
 }
