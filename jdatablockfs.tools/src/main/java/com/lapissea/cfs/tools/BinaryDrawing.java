@@ -42,7 +42,7 @@ import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.tools.render.RenderBackend.DrawMode;
 
 @SuppressWarnings({"UnnecessaryLocalVariable", "SameParameterValue"})
-public abstract class BinaryDrawing{
+public class BinaryDrawing{
 	
 	enum ErrorLogLevel{
 		NONE,
@@ -120,10 +120,11 @@ public abstract class BinaryDrawing{
 	private boolean errorMode;
 	private long    renderCount;
 	
-	private RenderBackend renderer;
+	private final RenderBackend renderer;
 	
 	private final NanoTimer frameTimer=new NanoTimer();
 	
+	public Optional<SessionHost.HostedSession> displayedSession=Optional.empty();
 	
 	private float pixelsPerByte=300;
 	
@@ -136,14 +137,22 @@ public abstract class BinaryDrawing{
 		}
 	}).orElse(ErrorLogLevel.NAMED_STACK);
 	
-	protected void setRenderer(RenderBackend renderer){
+	public BinaryDrawing(RenderBackend renderer){
 		this.renderer=renderer;
 	}
 	
-	protected abstract int getFrameCount();
-	protected abstract CachedFrame getFrame(int index);
-	
-	protected abstract int getFramePos();
+	private int getFrameCount(){
+		return displayedSession.map(s->s.frames.size()).orElse(0);
+	}
+	public SessionHost.CachedFrame getFrame(int index){
+		return displayedSession.map(s->s.frames.get(index)).orElse(null);
+	}
+	public int getFramePos(){
+		return displayedSession.map(ses->{
+			if(ses.framePos.get()==-1) ses.setFrame(ses.frames.size()-1);
+			return ses.framePos.get();
+		}).orElse(0);
+	}
 	
 	
 	public float getPixelsPerByte(){

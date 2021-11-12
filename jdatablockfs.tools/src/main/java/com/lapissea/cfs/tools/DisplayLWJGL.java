@@ -26,23 +26,24 @@ import static org.lwjgl.opengl.GL11.glClearColor;
 import static org.lwjgl.opengl.GL11.glDepthMask;
 import static org.lwjgl.opengl.GL11.glDisable;
 
-public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
+public class DisplayLWJGL implements DataLogger{
 	
-	private Optional<SessionHost.HostedSession> displayedSession=Optional.empty();
-	private boolean                             destroyRequested=false;
+	private boolean destroyRequested=false;
 	
 	private CompletableFuture<?> glInit;
 	private GlfwWindow           window;
 	
-	private OpenGLBackend glRenderer;
+	private final OpenGLBackend renderer;
 	
-	private final SessionHost sessionHost=new SessionHost();
+	private final SessionHost   sessionHost=new SessionHost();
+	private final BinaryDrawing drawing;
 	
 	public DisplayLWJGL(){
 		Thread glThread=new Thread(this::displayLifecycle, "display");
-		glRenderer=new OpenGLBackend(glThread);
-		window=glRenderer.window;
-		setRenderer(glRenderer);
+		renderer=new OpenGLBackend(glThread);
+		window=renderer.window;
+		
+		drawing=new BinaryDrawing(renderer);
 		
 		glThread.setDaemon(false);
 		glThread.start();
@@ -71,7 +72,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			}
 		});
 		
-		window.registryMouseScroll.register(vec->displayedSession.ifPresent(ses->ses.setFrame(Math.max(0, (int)(getFramePos()-vec.y())))));
+		window.registryMouseScroll.register(vec->drawing.displayedSession.ifPresent(ses->ses.setFrame(Math.max(0, (int)(drawing.getFramePos()-vec.y())))));
 		
 		
 		Vec2i lastPos=new Vec2i();
@@ -80,23 +81,23 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			travel[0]+=lastPos.distanceTo(pos);
 			lastPos.set(pos);
 			
-			glRenderer.markFrameDirty();
+			renderer.markFrameDirty();
 			
 			if(!window.isMouseKeyDown(GLFW.GLFW_MOUSE_BUTTON_LEFT)) return;
-			displayedSession.ifPresent(ses->{
+			drawing.displayedSession.ifPresent(ses->{
 				float percent=MathUtil.snap((pos.x()-10F)/(window.size.x()-20F), 0, 1);
 				ses.setFrame(Math.round((ses.frames.size()-1)*percent));
 			});
 		});
 		
 		window.size.register(()->{
-			ifFrame(frame->calcSize(frame.data().length, true));
-			render();
+			ifFrame(frame->drawing.calcSize(frame.data().length, true));
+			drawing.render();
 		});
 		
 		window.registryKeyboardKey.register(e->{
 			sessionHost.cleanUpSessions();
-			if(e.getType()!=GlfwKeyboardEvent.Type.DOWN&&displayedSession.isPresent()){
+			if(e.getType()!=GlfwKeyboardEvent.Type.DOWN&&drawing.displayedSession.isPresent()){
 				switch(e.getKey()){
 					case GLFW_KEY_UP -> {
 						sessionHost.nextSession();
@@ -114,7 +115,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			else if(e.getKey()==GLFW_KEY_RIGHT||e.getKey()==GLFW_KEY_D) delta=1;
 			else return;
 			if(e.getType()==GlfwKeyboardEvent.Type.UP) return;
-			displayedSession.ifPresent(ses->ses.setFrame(getFramePos()+delta));
+			drawing.displayedSession.ifPresent(ses->ses.setFrame(drawing.getFramePos()+delta));
 		});
 		
 		window.autoF11Toggle();
@@ -125,20 +126,20 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 				window.whileOpen(()->{
 					sessionHost.cleanUpSessions();
 					var activeSession=sessionHost.activeSession.get();
-					if(!displayedSession.equals(activeSession)){
-						displayedSession=activeSession;
-						ifFrame(frame->calcSize(frame.data().length, true));
+					if(!drawing.displayedSession.equals(activeSession)){
+						drawing.displayedSession=activeSession;
+						ifFrame(frame->drawing.calcSize(frame.data().length, true));
 					}
 					if(destroyRequested){
 						destroyRequested=false;
 						window.requestClose();
 					}
-					if(glRenderer.notifyDirtyFrame()){
-						render();
+					if(renderer.notifyDirtyFrame()){
+						drawing.render();
 					}
 					UtilL.sleep(0, 1000);
 					window.pollEvents();
-					glRenderer.postRender();
+					renderer.postRender();
 					
 				});
 			}
@@ -150,10 +151,10 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	}
 	
 	private void ifFrame(Consumer<MemFrame> o){
-		displayedSession.map(s->s.frames).ifPresent(frames->{
+		drawing.displayedSession.map(s->s.frames).ifPresent(frames->{
 			if(frames.isEmpty()) return;
 			try{
-				o.accept(frames.get(getFramePos()).data());
+				o.accept(frames.get(drawing.getFramePos()).data());
 			}catch(IndexOutOfBoundsException ignored){}
 		});
 	}
@@ -208,33 +209,15 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	}
 	
 	@Override
-	protected int getFramePos(){
-		return displayedSession.map(ses->{
-			if(ses.framePos.get()==-1) ses.setFrame(ses.frames.size()-1);
-			return ses.framePos.get();
-		}).orElse(0);
-	}
-	
-	@Override
-	protected int getFrameCount(){
-		return displayedSession.map(s->s.frames.size()).orElse(0);
-	}
-	@Override
-	protected SessionHost.CachedFrame getFrame(int index){
-		return displayedSession.map(s->s.frames.get(index)).orElse(null);
-	}
-	
-	
-	@Override
 	public DataLogger.Session getSession(String name){
-		glRenderer.markFrameDirty();
+		renderer.markFrameDirty();
 		return sessionHost.getSession(name);
 	}
 	@Override
 	public void destroy(){
 		destroyRequested=true;
 		sessionHost.destroy();
-		displayedSession=Optional.empty();
-		glRenderer.markFrameDirty();
+		drawing.displayedSession=Optional.empty();
+		renderer.markFrameDirty();
 	}
 }
