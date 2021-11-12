@@ -235,15 +235,6 @@ public class Display2D extends BinaryDrawing implements DataLogger{
 		activeSession.filter(s->s.markForDeletion).ifPresent(s->activeSession=sessions.values().stream().findAny());
 	}
 	
-	
-	@Override
-	protected boolean isWritingFilter(){
-		return false;
-	}
-	@Override
-	protected String getFilter(){
-		return "";
-	}
 	@Override
 	protected int getFrameCount(){
 		return visibleSession.map(ses->ses.frames.size()).orElse(0);

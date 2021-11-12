@@ -15,8 +15,6 @@ import org.lwjgl.glfw.GLFW;
 import org.lwjgl.glfw.GLFWErrorCallback;
 import org.lwjgl.opengl.GL;
 
-import java.awt.Toolkit;
-import java.awt.datatransfer.DataFlavor;
 import java.io.File;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -82,10 +80,6 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 	private       Optional<Session>    displayedSession=Optional.empty();
 	private       boolean              destroyRequested=false;
 	
-	private String  filter     ="";
-	private boolean filterMake =false;
-	private int[]   scrollRange=null;
-	
 	private CompletableFuture<?> glInit;
 	GlfwWindow window;
 	
@@ -138,11 +132,7 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			if(!window.isMouseKeyDown(GLFW.GLFW_MOUSE_BUTTON_LEFT)) return;
 			displayedSession.ifPresent(ses->{
 				float percent=MathUtil.snap((pos.x()-10F)/(window.size.x()-20F), 0, 1);
-				if(scrollRange!=null){
-					ses.setFrame(Math.round(scrollRange[0]+(scrollRange[1]-scrollRange[0]+1)*percent));
-				}else{
 					ses.setFrame(Math.round((ses.frames.size()-1)*percent));
-				}
 			});
 		});
 		
@@ -196,74 +186,6 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 						return;
 					}
 				}
-			}
-			
-			if(!filter.isEmpty()&&e.getKey()==GLFW_KEY_ESCAPE){
-				filter="";
-				scrollRange=null;
-				glRenderer.markFrameDirty();
-			}
-			
-			if(filterMake){
-				glRenderer.markFrameDirty();
-				
-				if(e.getType()!=GlfwKeyboardEvent.Type.UP&&e.getKey()==GLFW_KEY_BACKSPACE){
-					if(!filter.isEmpty()){
-						filter=filter.substring(0, filter.length()-1);
-					}
-					return;
-				}
-				
-				if(e.getType()!=GlfwKeyboardEvent.Type.DOWN) return;
-				if(e.getKey()==GLFW_KEY_ENTER){
-					filterMake=false;
-					
-					
-					boolean lastMatch=false;
-					int     start    =0;
-					
-					int frameIndex=getFramePos();
-					find:
-					{
-						var frames=displayedSession.map(s->s.frames).orElse(List.of());
-						
-						for(int i=0;i<frames.size();i++){
-							boolean match=!filter.isEmpty()&&filterMatchAt(i);
-							if(match==lastMatch){
-								continue;
-							}
-							if(frameIndex>=start&&frameIndex<=i){
-								scrollRange=new int[]{start, i};
-								break find;
-							}
-							lastMatch=match;
-							start=i;
-						}
-						int i=frames.size()-1;
-						if(frameIndex>=start&&frameIndex<=i){
-							scrollRange=new int[]{start, i};
-						}
-					}
-					
-					return;
-				}
-				if(e.getKey()==GLFW_KEY_V&&window.isKeyDown(GLFW_KEY_LEFT_CONTROL)){
-					try{
-						String data=(String)Toolkit.getDefaultToolkit().getSystemClipboard().getData(DataFlavor.stringFlavor);
-						filter+=data;
-					}catch(Exception ignored){}
-					return;
-				}
-				var cg=(char)e.getKey();
-				if(!window.isKeyDown(GLFW_KEY_LEFT_SHIFT)) cg=Character.toLowerCase(cg);
-				if(glRenderer.canFontDisplay(cg)){
-					filter+=cg;
-				}
-				return;
-			}else if(e.getKey()==GLFW_KEY_F){
-				filter="";
-				scrollRange=null;
-				filterMake=true;
 			}
 			
 			int delta;
@@ -379,16 +301,6 @@ public class DisplayLWJGL extends BinaryDrawing implements DataLogger{
 			return ses.framePos.get();
 		}).orElse(0);
 	}
-	
-	@Override
-	protected boolean isWritingFilter(){
-		return filterMake;
-	}
-	@Override
-	protected String getFilter(){
-		return filter;
-	}
-	
 	
 	@Override
 	protected int getFrameCount(){

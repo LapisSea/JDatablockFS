@@ -154,9 +154,6 @@ public abstract class BinaryDrawing{
 		this.renderer=renderer;
 	}
 	
-	protected abstract boolean isWritingFilter();
-	protected abstract String getFilter();
-	
 	protected abstract int getFrameCount();
 	protected abstract CachedFrame getFrame(int index);
 	
@@ -1032,6 +1029,13 @@ public abstract class BinaryDrawing{
 		renderer.setColor(alpha(lastMatch?Color.RED.darker():Color.WHITE, frameIndex>=start&&frameIndex<=i?0.6F:0.3F));
 		renderer.fillQuad(start*w, 0, w*(i-start), height);
 		renderer.popMatrix();
+	}
+	
+	private String getFilter(){
+		return "";
+	}
+	private boolean isWritingFilter(){
+		return false;
 	}
 	
 	protected boolean filterMatchAt(int i){
