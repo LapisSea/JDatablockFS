@@ -42,7 +42,7 @@ import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.tools.render.RenderBackend.DrawMode;
 
 @SuppressWarnings({"UnnecessaryLocalVariable", "SameParameterValue"})
-public class BinaryDrawing{
+public class BinaryGridRenderer{
 	
 	enum ErrorLogLevel{
 		NONE,
@@ -128,7 +128,7 @@ public class BinaryDrawing{
 	
 	private float pixelsPerByte=300;
 	
-	private final ErrorLogLevel errorLogLevel=UtilL.sysPropertyByClass(BinaryDrawing.class, "errorLogLevel").map(String::toUpperCase).map(v->{
+	private final ErrorLogLevel errorLogLevel=UtilL.sysPropertyByClass(BinaryGridRenderer.class, "errorLogLevel").map(String::toUpperCase).map(v->{
 		try{
 			return ErrorLogLevel.valueOf(v);
 		}catch(IllegalArgumentException e){
@@ -137,7 +137,7 @@ public class BinaryDrawing{
 		}
 	}).orElse(ErrorLogLevel.NAMED_STACK);
 	
-	public BinaryDrawing(RenderBackend renderer){
+	public BinaryGridRenderer(RenderBackend renderer){
 		this.renderer=renderer;
 	}
 	
@@ -1180,7 +1180,6 @@ public class BinaryDrawing{
 	}
 	
 	private void drawMouse(RenderContext ctx, CachedFrame frame){
-		var screenHeight=renderer.getDisplay().getHeight();
 		var screenWidth =renderer.getDisplay().getWidth();
 		
 		var bytes =frame.data().data();

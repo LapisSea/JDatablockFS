@@ -11,7 +11,7 @@ import java.util.function.Supplier;
 
 class FieldWalking{
 	
-	static IterablePP<BinaryDrawing.Range> chainRangeResolve(ChunkDataProvider cluster, Reference ref, int fieldOffset, int size){
+	static IterablePP<BinaryGridRenderer.Range> chainRangeResolve(ChunkDataProvider cluster, Reference ref, int fieldOffset, int size){
 		return IterablePP.nullTerminated(()->new Supplier<>(){
 			int remaining=size;
 			final ChunkChainIO io;
@@ -26,7 +26,7 @@ class FieldWalking{
 			}
 			
 			@Override
-			public BinaryDrawing.Range get(){
+			public BinaryGridRenderer.Range get(){
 				try{
 					while(remaining>0){
 						var  cursorOff=io.calcCursorOffset();
@@ -40,7 +40,7 @@ class FieldWalking{
 						io.skip(cRem);
 						remaining-=cRem;
 						var start=cursor.dataStart()+cursorOff;
-						return new BinaryDrawing.Range(start, start+cRem);
+						return new BinaryGridRenderer.Range(start, start+cRem);
 					}
 					return null;
 				}catch(IOException e){

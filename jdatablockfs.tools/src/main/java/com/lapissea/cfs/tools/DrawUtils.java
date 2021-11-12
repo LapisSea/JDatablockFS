@@ -1,17 +1,17 @@
 package com.lapissea.cfs.tools;
 
 class DrawUtils{
-	static BinaryDrawing.Rect makeBitRect(BinaryDrawing.RenderContext ctx, long trueOffset, int bitOffset, long siz){
-		var bitCtx  =new BinaryDrawing.RenderContext(ctx.bytes(), ctx.filled(), 3, ctx.pixelsPerByte()/3);
-		var range   =findBestContiguousRange(bitCtx, new BinaryDrawing.Range(bitOffset, bitOffset+siz));
-		var byteRect=new BinaryDrawing.Range(trueOffset, trueOffset).toRect(ctx);
+	static BinaryGridRenderer.Rect makeBitRect(BinaryGridRenderer.RenderContext ctx, long trueOffset, int bitOffset, long siz){
+		var bitCtx  =new BinaryGridRenderer.RenderContext(ctx.bytes(), ctx.filled(), 3, ctx.pixelsPerByte()/3);
+		var range   =findBestContiguousRange(bitCtx, new BinaryGridRenderer.Range(bitOffset, bitOffset+siz));
+		var byteRect=new BinaryGridRenderer.Range(trueOffset, trueOffset).toRect(ctx);
 		var bitRect =range.toRect(bitCtx);
 		
 		bitRect.x+=byteRect.x;
 		bitRect.y+=byteRect.y;
 		return bitRect;
 	}
-	static BinaryDrawing.Range findBestContiguousRange(BinaryDrawing.RenderContext ctx, BinaryDrawing.Range range){
+	static BinaryGridRenderer.Range findBestContiguousRange(BinaryGridRenderer.RenderContext ctx, BinaryGridRenderer.Range range){
 		var start       =(range.from()/ctx.width())*ctx.width();
 		var nextLineFrom=start+ctx.width();
 		if(nextLineFrom>=range.to()) return range;
@@ -19,8 +19,8 @@ class DrawUtils{
 		var siz      =range.size();
 		var sizBefore=nextLineFrom-range.from();
 		var sizAfter =Math.min(ctx.width(), siz-sizBefore);
-		if(sizBefore>sizAfter) return new BinaryDrawing.Range(range.from(), nextLineFrom);
-		return new BinaryDrawing.Range(nextLineFrom, nextLineFrom+sizAfter);
+		if(sizBefore>sizAfter) return new BinaryGridRenderer.Range(range.from(), nextLineFrom);
+		return new BinaryGridRenderer.Range(nextLineFrom, nextLineFrom+sizAfter);
 	}
 	static String errorToMessage(Throwable e){
 		StringBuilder message=new StringBuilder(e.getMessage()==null?"":e.getMessage());

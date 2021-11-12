@@ -29,7 +29,7 @@ public class SessionHost implements DataLogger{
 	
 	public static record CachedFrame(MemFrame data, ParsedFrame parsed){}
 	
-	public static class HostedSession implements Session{
+	public class HostedSession implements Session{
 		public final List<CachedFrame> frames  =new ArrayList<>();
 		public final ChangeRegistryInt framePos=new ChangeRegistryInt(-1);
 		
@@ -60,6 +60,7 @@ public class SessionHost implements DataLogger{
 		public void delete(){
 			reset();
 			markForDeletion=true;
+			sessionMarkedForDeletion=true;
 		}
 		
 		public void setFrame(int frame){
@@ -68,8 +69,10 @@ public class SessionHost implements DataLogger{
 		}
 	}
 	
-	private       boolean                    destroyed=false;
-	private final Map<String, HostedSession> sessions =new LinkedHashMap<>();
+	private boolean sessionMarkedForDeletion=false;
+	private boolean destroyed               =false;
+	
+	private final Map<String, HostedSession> sessions=new LinkedHashMap<>();
 	
 	public final ChangeRegistry<Optional<HostedSession>> activeSession=new ChangeRegistry<>(Optional.empty());
 	public final ChangeRegistryInt                       activeFrame  =new ChangeRegistryInt();
@@ -88,6 +91,9 @@ public class SessionHost implements DataLogger{
 	}
 	
 	public void cleanUpSessions(){
+		if(!sessionMarkedForDeletion) return;
+		sessionMarkedForDeletion=false;
+		
 		sessions.values().removeIf(s->s.markForDeletion);
 		activeSession.get().filter(s->s.markForDeletion).flatMap(s->sessions.values().stream().findAny()).ifPresent(this::setActiveSession);
 	}

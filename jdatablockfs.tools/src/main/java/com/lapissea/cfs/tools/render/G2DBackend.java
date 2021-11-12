@@ -1,18 +1,22 @@
 package com.lapissea.cfs.tools.render;
 
 import com.lapissea.cfs.tools.GLFont;
+import com.lapissea.util.NotImplementedException;
 
 import java.awt.*;
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseMotionAdapter;
+import java.awt.event.*;
 import java.awt.font.TextLayout;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.Line2D;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.util.Deque;
+import java.util.EnumSet;
 import java.util.LinkedList;
+import java.util.function.Consumer;
 
+import static java.awt.event.MouseEvent.BUTTON1;
+import static java.awt.event.MouseEvent.BUTTON2;
 import static javax.swing.SwingUtilities.invokeLater;
 
 public class G2DBackend extends RenderBackend{
@@ -28,20 +32,45 @@ public class G2DBackend extends RenderBackend{
 	private       int   mouseX;
 	private       int   mouseY;
 	
+	private EnumSet<DisplayInterface.MouseKey> mouseDowns=EnumSet.noneOf(DisplayInterface.MouseKey.class);
+	
+	private static DisplayInterface.MouseKey getKey(MouseEvent e){
+		return switch(e.getButton()){
+			case BUTTON1 -> DisplayInterface.MouseKey.LEFT;
+			case BUTTON2 -> DisplayInterface.MouseKey.RIGHT;
+			default -> {
+				throw new RuntimeException("Unknown event"+e);
+			}
+		};
+	}
+	
 	public G2DBackend(Panel target){
 		this.target=target;
+		target.setFocusable(true);
+		target.requestFocus();
 		
 		target.addMouseMotionListener(new MouseMotionAdapter(){
-			@Override
-			public void mouseMoved(MouseEvent e){
+			public void ev(MouseEvent e){
 				mouseX=e.getX();
 				mouseY=e.getY();
 			}
-			
+			@Override
+			public void mouseMoved(MouseEvent e){
+				ev(e);
+			}
 			@Override
 			public void mouseDragged(MouseEvent e){
-				mouseX=e.getX();
-				mouseY=e.getY();
+				ev(e);
+			}
+		});
+		target.addMouseListener(new MouseAdapter(){
+			@Override
+			public void mousePressed(java.awt.event.MouseEvent e){
+				mouseDowns.add(getKey(e));
+			}
+			@Override
+			public void mouseReleased(java.awt.event.MouseEvent e){
+				mouseDowns.remove(getKey(e));
 			}
 		});
 		
@@ -61,6 +90,95 @@ public class G2DBackend extends RenderBackend{
 			@Override
 			public int getMouseY(){
 				return mouseY;
+			}
+			
+			@Override
+			public void registerDisplayResize(Runnable listener){
+				target.addComponentListener(new ComponentAdapter(){
+					@Override
+					public void componentResized(ComponentEvent e){
+						listener.run();
+					}
+				});
+			}
+			
+			@Override
+			public void registerKeyboardButton(Consumer<KeyboardEvent> listener){
+				target.addKeyListener(new KeyAdapter(){
+					public void ev(KeyEvent e, ActionType typ){
+						//TODO: fix GLFW/Swing codes
+						listener.accept(new KeyboardEvent(typ, e.getKeyCode()));
+					}
+					@Override
+					public void keyPressed(KeyEvent e){
+						ev(e, ActionType.DOWN);
+					}
+					@Override
+					public void keyReleased(KeyEvent e){
+						ev(e, ActionType.UP);
+					}
+				});
+			}
+			@Override
+			public void registerMouseButton(Consumer<MouseEvent> listener){
+				target.addMouseListener(new MouseAdapter(){
+					public void ev(java.awt.event.MouseEvent e, ActionType type){
+						listener.accept(new MouseEvent(getKey(e), type));
+					}
+					@Override
+					public void mousePressed(java.awt.event.MouseEvent e){
+						ev(e, ActionType.DOWN);
+					}
+					@Override
+					public void mouseReleased(java.awt.event.MouseEvent e){
+						ev(e, ActionType.UP);
+					}
+				});
+			}
+			@Override
+			public void registerMouseScroll(Consumer<Integer> listener){
+				target.addMouseListener(new MouseAdapter(){
+					@Override
+					public void mouseWheelMoved(MouseWheelEvent e){
+						listener.accept(e.getY());
+					}
+				});
+			}
+			
+			@Override
+			public void registerMouseMove(Runnable listener){
+				target.addMouseListener(new MouseAdapter(){
+					@Override
+					public void mouseDragged(java.awt.event.MouseEvent e){
+						listener.run();
+					}
+					@Override
+					public void mouseMoved(java.awt.event.MouseEvent e){
+						listener.run();
+					}
+				});
+			}
+			
+			@Override
+			public boolean isMouseKeyDown(MouseKey key){
+				return mouseDowns.contains(key);
+			}
+			
+			@Override
+			public boolean isOpen(){
+				throw NotImplementedException.infer();//TODO: implement .isOpen()
+			}
+			@Override
+			public void requestClose(){
+				throw NotImplementedException.infer();//TODO: implement .requestClose()
+			}
+			@Override
+			public void pollEvents(){
+				throw NotImplementedException.infer();//TODO: implement .pollEvents()
+			}
+			@Override
+			public void destroy(){
+				throw NotImplementedException.infer();//TODO: implement .destroy()
 			}
 		};
 	}

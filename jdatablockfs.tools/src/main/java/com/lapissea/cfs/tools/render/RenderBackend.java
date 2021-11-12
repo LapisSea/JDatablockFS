@@ -3,12 +3,13 @@ package com.lapissea.cfs.tools.render;
 import com.lapissea.cfs.tools.GLFont;
 
 import java.awt.Color;
+import java.util.function.Consumer;
 
 public abstract class RenderBackend{
 	
 	public interface DisplayInterface{
 		
-		enum MouseClick{
+		enum MouseKey{
 			LEFT, RIGHT
 		}
 		
@@ -16,6 +17,9 @@ public abstract class RenderBackend{
 			DOWN, UP, HOLD
 		}
 		
+		record MouseEvent(MouseKey click, ActionType type){}
+		
+		record KeyboardEvent(ActionType type, int key){}
 		
 		int getWidth();
 		int getHeight();
@@ -23,6 +27,20 @@ public abstract class RenderBackend{
 		int getMouseX();
 		int getMouseY();
 		
+		void registerDisplayResize(Runnable listener);
+		
+		void registerKeyboardButton(Consumer<KeyboardEvent> listener);
+		
+		void registerMouseButton(Consumer<MouseEvent> listener);
+		void registerMouseScroll(Consumer<Integer> listener);
+		void registerMouseMove(Runnable listener);
+		
+		boolean isMouseKeyDown(MouseKey key);
+		
+		boolean isOpen();
+		void requestClose();
+		void pollEvents();
+		void destroy();
 	}
 	
 	

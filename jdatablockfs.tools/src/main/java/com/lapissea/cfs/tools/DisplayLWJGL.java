@@ -3,102 +3,83 @@ package com.lapissea.cfs.tools;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.MemFrame;
 import com.lapissea.cfs.tools.render.OpenGLBackend;
-import com.lapissea.glfw.GlfwKeyboardEvent;
-import com.lapissea.glfw.GlfwMonitor;
-import com.lapissea.glfw.GlfwWindow;
-import com.lapissea.glfw.GlfwWindow.SurfaceAPI;
+import com.lapissea.cfs.tools.render.RenderBackend;
 import com.lapissea.util.MathUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.vec.Vec2i;
-import org.lwjgl.glfw.GLFW;
-import org.lwjgl.glfw.GLFWErrorCallback;
-import org.lwjgl.opengl.GL;
 
-import java.io.File;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
-import static com.lapissea.util.PoolOwnThread.async;
+import static com.lapissea.cfs.tools.render.RenderBackend.DisplayInterface.ActionType.DOWN;
+import static com.lapissea.cfs.tools.render.RenderBackend.DisplayInterface.ActionType.UP;
 import static org.lwjgl.glfw.GLFW.*;
-import static org.lwjgl.opengl.GL11.GL_DEPTH_TEST;
-import static org.lwjgl.opengl.GL11.glClearColor;
-import static org.lwjgl.opengl.GL11.glDepthMask;
-import static org.lwjgl.opengl.GL11.glDisable;
 
 public class DisplayLWJGL implements DataLogger{
 	
 	private boolean destroyRequested=false;
 	
-	private CompletableFuture<?> glInit;
-	private GlfwWindow           window;
-	
 	private final OpenGLBackend renderer;
 	
-	private final SessionHost   sessionHost=new SessionHost();
-	private final BinaryDrawing drawing;
+	private final SessionHost        sessionHost=new SessionHost();
+	private final BinaryGridRenderer gridRenderer;
 	
 	public DisplayLWJGL(){
-		Thread glThread=new Thread(this::displayLifecycle, "display");
-		renderer=new OpenGLBackend(glThread);
-		window=renderer.window;
+		renderer=new OpenGLBackend();
+		gridRenderer=new BinaryGridRenderer(renderer);
 		
-		drawing=new BinaryDrawing(renderer);
-		
-		glThread.setDaemon(false);
-		glThread.start();
-		
-		UtilL.sleepWhile(()->glInit==null);
-		glInit.join();
-		glInit=null;
+		renderer.runLater(this::initEvents);
 	}
 	
-	private void displayLifecycle(){
-		glInit=async(this::initWindow, Runnable::run);
+	private void initEvents(){
 		
 		double[] travel={0};
 		
-		window.registryMouseButton.register(e->{
-			if(e.getKey()!=GLFW_MOUSE_BUTTON_LEFT) return;
-			switch(e.getType()){
-				case DOWN:
-					travel[0]=0;
-					break;
-				case UP:
+		var display=renderer.getDisplay();
+		display.registerMouseButton(e->{
+			if(e.click()!=RenderBackend.DisplayInterface.MouseKey.LEFT) return;
+			switch(e.type()){
+				case DOWN -> travel[0]=0;
+				case UP -> {
 					if(travel[0]<30){
 						ifFrame(MemFrame::printStackTrace);
 					}
-					break;
+				}
 			}
 		});
 		
-		window.registryMouseScroll.register(vec->drawing.displayedSession.ifPresent(ses->ses.setFrame(Math.max(0, (int)(drawing.getFramePos()-vec.y())))));
-		
+		display.registerMouseScroll(delta->{
+			gridRenderer.displayedSession.ifPresent(ses->{
+				ses.setFrame(Math.max(0, gridRenderer.getFramePos()-delta));
+			});
+		});
 		
 		Vec2i lastPos=new Vec2i();
-		window.mousePos.register(pos->{
-			
+		display.registerMouseMove(()->{
+			Vec2i pos=new Vec2i(display.getMouseX(), display.getMouseY());
 			travel[0]+=lastPos.distanceTo(pos);
 			lastPos.set(pos);
 			
 			renderer.markFrameDirty();
 			
-			if(!window.isMouseKeyDown(GLFW.GLFW_MOUSE_BUTTON_LEFT)) return;
-			drawing.displayedSession.ifPresent(ses->{
-				float percent=MathUtil.snap((pos.x()-10F)/(window.size.x()-20F), 0, 1);
+			if(!display.isMouseKeyDown(RenderBackend.DisplayInterface.MouseKey.LEFT)) return;
+			
+			gridRenderer.displayedSession.ifPresent(ses->{
+				float percent=MathUtil.snap((pos.x()-10F)/(display.getWidth()-20F), 0, 1);
 				ses.setFrame(Math.round((ses.frames.size()-1)*percent));
 			});
 		});
 		
-		window.size.register(()->{
-			ifFrame(frame->drawing.calcSize(frame.data().length, true));
-			drawing.render();
+		display.registerDisplayResize(()->{
+			sessionHost.cleanUpSessions();
+			ifFrame(frame->gridRenderer.calcSize(frame.data().length, true));
+			gridRenderer.render();
 		});
 		
-		window.registryKeyboardKey.register(e->{
+		display.registerKeyboardButton(e->{
 			sessionHost.cleanUpSessions();
-			if(e.getType()!=GlfwKeyboardEvent.Type.DOWN&&drawing.displayedSession.isPresent()){
-				switch(e.getKey()){
+			if(e.type()!=DOWN&&gridRenderer.displayedSession.isPresent()){
+				switch(e.key()){
 					case GLFW_KEY_UP -> {
 						sessionHost.nextSession();
 						return;
@@ -111,102 +92,51 @@ public class DisplayLWJGL implements DataLogger{
 			}
 			
 			int delta;
-			if(e.getKey()==GLFW_KEY_LEFT||e.getKey()==GLFW_KEY_A) delta=-1;
-			else if(e.getKey()==GLFW_KEY_RIGHT||e.getKey()==GLFW_KEY_D) delta=1;
+			if(e.key()==GLFW_KEY_LEFT||e.key()==GLFW_KEY_A) delta=-1;
+			else if(e.key()==GLFW_KEY_RIGHT||e.key()==GLFW_KEY_D) delta=1;
 			else return;
-			if(e.getType()==GlfwKeyboardEvent.Type.UP) return;
-			drawing.displayedSession.ifPresent(ses->ses.setFrame(drawing.getFramePos()+delta));
+			if(e.type()==UP) return;
+			gridRenderer.displayedSession.ifPresent(ses->ses.setFrame(gridRenderer.getFramePos()+delta));
 		});
-		
-		window.autoF11Toggle();
 		
 		try{
 			if(!destroyRequested){
-				
-				window.whileOpen(()->{
+				while(display.isOpen()){
+					
 					sessionHost.cleanUpSessions();
 					var activeSession=sessionHost.activeSession.get();
-					if(!drawing.displayedSession.equals(activeSession)){
-						drawing.displayedSession=activeSession;
-						ifFrame(frame->drawing.calcSize(frame.data().length, true));
+					if(!gridRenderer.displayedSession.equals(activeSession)){
+						gridRenderer.displayedSession=activeSession;
+						ifFrame(frame->gridRenderer.calcSize(frame.data().length, true));
 					}
 					if(destroyRequested){
 						destroyRequested=false;
-						window.requestClose();
+						display.requestClose();
 					}
 					if(renderer.notifyDirtyFrame()){
-						drawing.render();
+						gridRenderer.render();
 					}
 					UtilL.sleep(0, 1000);
-					window.pollEvents();
+					display.pollEvents();
 					renderer.postRender();
-					
-				});
+				}
 			}
 		}catch(Throwable e){
 			e.printStackTrace();
 		}finally{
-			window.destroy();
+			display.destroy();
 		}
 	}
 	
 	private void ifFrame(Consumer<MemFrame> o){
-		drawing.displayedSession.map(s->s.frames).ifPresent(frames->{
+		gridRenderer.displayedSession.map(s->s.frames).ifPresent(frames->{
 			if(frames.isEmpty()) return;
 			try{
-				o.accept(frames.get(drawing.getFramePos()).data());
+				o.accept(frames.get(gridRenderer.getFramePos()).data());
 			}catch(IndexOutOfBoundsException ignored){}
 		});
 	}
 	
-	private synchronized void initWindow(){
-		GlfwMonitor.init();
-		GLFWErrorCallback.createPrint(System.err).set();
-		
-		
-		window.title.set("Binary display - frame: "+"NaN");
-		window.size.set(600, 600);
-		window.centerWindow();
-		
-		var stateFile=new File("glfw-win.json");
-		window.loadState(stateFile);
-		new Thread(()->window.autoHandleStateSaving(stateFile), "glfw watch").start();
-		
-		window.onDestroy(()->{
-			window.saveState(stateFile);
-			System.exit(0);
-		});
-		
-		GLFW.glfwWindowHint(GLFW.GLFW_SAMPLES, 8);
-		
-		if(UtilL.sysPropertyByClass(DisplayLWJGL.class, "emulateNoGLSupport").map(Boolean::parseBoolean).orElse(false)){
-			throw new RuntimeException("gl disabled");
-		}
-		
-		glfwWindowHint(GLFW_DOUBLEBUFFER, GLFW_TRUE);
-		
-		window.init(SurfaceAPI.OPENGL);
-		
-		window.grabContext();
-		
-		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
-		glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-		glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
-		glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
-		
-		
-		GL.createCapabilities();
-		
-		if(!destroyRequested){
-			window.show();
-		}else return;
-		
-		glClearColor(0.5F, 0.5F, 0.5F, 1.0f);
-		
-		glDisable(GL_DEPTH_TEST);
-		glDepthMask(false);
-	}
 	
 	@Override
 	public DataLogger.Session getSession(String name){
@@ -217,7 +147,7 @@ public class DisplayLWJGL implements DataLogger{
 	public void destroy(){
 		destroyRequested=true;
 		sessionHost.destroy();
-		drawing.displayedSession=Optional.empty();
+		gridRenderer.displayedSession=Optional.empty();
 		renderer.markFrameDirty();
 	}
 }

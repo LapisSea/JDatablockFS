@@ -22,8 +22,8 @@ public class Display2D implements DataLogger{
 	
 	private final SessionHost sessionHost=new SessionHost();
 	
-	private final G2DBackend    renderer;
-	private final BinaryDrawing drawing;
+	private final G2DBackend         renderer;
+	private final BinaryGridRenderer drawing;
 	
 	public Display2D(){
 		File f=new File("wind");
@@ -65,7 +65,7 @@ public class Display2D implements DataLogger{
 			}
 		};
 		renderer=new G2DBackend(pan);
-		drawing=new BinaryDrawing(renderer);
+		drawing=new BinaryGridRenderer(renderer);
 		
 		frame.setLayout(new BorderLayout());
 		frame.add(pan);
