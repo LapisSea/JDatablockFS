@@ -26,7 +26,7 @@ import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.stream.Stream;
 
-import static com.lapissea.cfs.GlobalConfig.*;
+import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
 public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	
@@ -360,6 +360,6 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	}
 	@Override
 	public int hashCode(){
-		return getAccessor()!=null?getAccessor().hashCode():getName().hashCode();
+		return getName().hashCode();
 	}
 }

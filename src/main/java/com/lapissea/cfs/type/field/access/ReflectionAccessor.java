@@ -6,6 +6,7 @@ import com.lapissea.cfs.objects.INumber;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
+import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.UtilL;
 
@@ -79,6 +80,7 @@ public class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends AbstractF
 		this.setter=setter.map(Utils::makeMethodHandle).orElse(null);
 	}
 	
+	@NotNull
 	@Nullable
 	@Override
 	public <T extends Annotation> Optional<T> getAnnotation(Class<T> annotationClass){

@@ -81,7 +81,7 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 	private boolean dirty, reading;
 	private Chunk nextCache;
 	
-	private Chunk(ChunkDataProvider provider, ChunkPointer ptr){
+	private Chunk(@NotNull ChunkDataProvider provider, @NotNull ChunkPointer ptr){
 		super(STRUCT);
 		this.provider=provider;
 		this.ptr=ptr;
@@ -159,6 +159,7 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		return start+cap;
 	}
 	
+	@NotNull
 	public ChunkPointer getPtr(){
 		return ptr;
 	}

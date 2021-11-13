@@ -99,7 +99,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 					try{
 						next=readNextPtr();
 					}catch(IOException e){
-						throw new RuntimeException();
+						throw new RuntimeException(e);
 					}
 					return next.isNull()?new Reference():next.makeReference();
 				}

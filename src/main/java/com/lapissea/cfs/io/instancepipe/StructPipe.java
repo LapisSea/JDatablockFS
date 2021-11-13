@@ -28,7 +28,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-import static com.lapissea.cfs.GlobalConfig.*;
+import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
 public abstract class StructPipe<T extends IOInstance<T>>{
 	
@@ -75,8 +75,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	
 	public StructPipe(Struct<T> type){
 		this.type=type;
-		List<IOField<T, ?>> ioFields=initFields();
-		this.ioFields=new FieldSet<>(ioFields);
+		this.ioFields=new FieldSet<>(initFields());
 		sizeDescription=calcSize();
 		ioPoolAccessors=Utils.nullIfEmpty(calcIOPoolAccessors());
 		earlyNullChecks=Utils.nullIfEmpty(getNonNulls());
@@ -404,9 +403,23 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		return getType().allocVirtualVarPool(VirtualFieldDefinition.StoragePool.IO);
 	}
 	
-	
 	@Override
 	public String toString(){
 		return getClass().getSimpleName()+"{"+type.getType().getSimpleName()+"}";
+	}
+	
+	@Override
+	public boolean equals(Object o){
+		if(this==o) return true;
+		if(!(o instanceof StructPipe<?> that)) return false;
+		
+		if(!type.equals(that.type)) return false;
+		return ioFields.equals(that.ioFields);
+	}
+	@Override
+	public int hashCode(){
+		int result=type.hashCode();
+		result=31*result+ioFields.hashCode();
+		return result;
 	}
 }

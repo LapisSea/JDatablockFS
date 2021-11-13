@@ -6,6 +6,7 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
+import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
 
 import java.lang.annotation.Annotation;
@@ -58,6 +59,7 @@ public class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends AbstractFiel
 		return type.storagePool;
 	}
 	
+	@NotNull
 	@Nullable
 	@Override
 	public <T extends Annotation> Optional<T> getAnnotation(Class<T> annotationClass){
