@@ -16,17 +16,25 @@ import com.lapissea.cfs.type.field.SizeDescriptor;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static com.lapissea.cfs.GlobalConfig.*;
+import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
 public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
+	
+	public static record BitLayout(long usedBits, int safetyBits){
+		BitLayout(long bits){
+			this(bits, (int)(Utils.bitToByte(bits)*8-bits));
+		}
+	}
 	
 	private final List<IOField.Bit<T, ?>> group;
 	
 	private final SizeDescriptor<T> sizeDescriptor;
 	
+	private final Optional<BitLayout> safetyBits;
 	
 	public BitFieldMerger(List<IOField.Bit<T, ?>> group){
 		super(null);
@@ -38,13 +46,19 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 		
 		this.group=List.copyOf(group);
 		
-		var fixedSize=Utils.bitToByte(IOFieldTools.sumVarsIfAll(group, SizeDescriptor::getFixed));
-		if(fixedSize.isPresent()) sizeDescriptor=SizeDescriptor.Fixed.of(fixedSize.getAsLong());
-		else sizeDescriptor=new SizeDescriptor.Unknown<>(
-			IOFieldTools.sumVars(group, SizeDescriptor::getMin),
-			IOFieldTools.sumVarsIfAll(group, SizeDescriptor::getMax),
-			inst->Utils.bitToByte(group.stream().mapToLong(s->s.getSizeDescriptor().calcUnknown(inst)).sum())
-		);
+		var bits     =IOFieldTools.sumVarsIfAll(group, SizeDescriptor::getFixed);
+		var fixedSize=Utils.bitToByte(bits);
+		if(fixedSize.isPresent()){
+			sizeDescriptor=SizeDescriptor.Fixed.of(fixedSize.getAsLong());
+			safetyBits=bits.stream().mapToObj(BitLayout::new).findAny();
+		}else{
+			safetyBits=Optional.empty();
+			sizeDescriptor=new SizeDescriptor.Unknown<>(
+				IOFieldTools.sumVars(group, SizeDescriptor::getMin),
+				IOFieldTools.sumVarsIfAll(group, SizeDescriptor::getMax),
+				inst->Utils.bitToByte(group.stream().mapToLong(s->s.getSizeDescriptor().calcUnknown(inst)).sum())
+			);
+		}
 		initLateData(new FieldSet<>(group.stream().flatMap(f->f.getDependencies().stream())), group.stream().flatMap(f->f.getUsageHints().stream()));
 	}
 	
@@ -154,5 +168,9 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 	
 	public List<Bit<T, ?>> getGroup(){
 		return group;
+	}
+	
+	public Optional<BitLayout> getSafetyBits(){
+		return safetyBits;
 	}
 }
