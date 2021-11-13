@@ -11,16 +11,21 @@ import com.lapissea.cfs.objects.collections.HashIOMap;
 import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.IOTypeDB;
+import com.lapissea.cfs.type.MemoryWalker;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.HashSet;
+import java.util.Set;
 
-import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.*;
-import static com.lapissea.cfs.type.field.annotations.IOValue.Reference.PipeType.*;
-import static java.nio.charset.StandardCharsets.*;
+import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
+import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NULLABLE;
+import static com.lapissea.cfs.type.field.annotations.IOValue.Reference.PipeType.FIXED;
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 public class Cluster implements ChunkDataProvider{
 	
@@ -160,5 +165,54 @@ public class Cluster implements ChunkDataProvider{
 		return "Cluster{"+
 		       "source="+source+
 		       '}';
+	}
+	
+	
+	public static record ChunkStatistics(
+		long totalBytes,
+		long chunkCount,
+		double usefulDataRatio,
+		double chunkFragmentation,
+		double usedChunkEfficiency
+	){}
+	
+	public ChunkStatistics gatherStatistics() throws IOException{
+		
+		long totalBytes       =getSource().getIOSize();
+		long usedChunkCapacity=0;
+		long usefulBytes      =0;
+		long chunkCount       =0;
+		long hasNextCount     =0;
+		
+		Set<ChunkPointer> referenced=new HashSet<>();
+		
+		new MemoryWalker().walk(this, getRoot(), getFirstChunk().getPtr().makeReference(), Cluster.ROOT_PIPE, ref->{
+			if(!ref.isNull()){
+				try{
+					for(Chunk chunk : new ChainWalker(ref.getPtr().dereference(this))){
+						referenced.add(chunk.getPtr());
+					}
+				}catch(IOException e){
+					throw UtilL.uncheckedThrow(e);
+				}
+			}
+		});
+		
+		for(Chunk chunk : new PhysicalChunkWalker(getFirstChunk())){
+			if(referenced.contains(chunk.getPtr())){
+				usefulBytes+=chunk.getSize();
+				usedChunkCapacity+=chunk.getCapacity();
+			}
+			chunkCount++;
+			if(chunk.hasNextPtr()) hasNextCount++;
+		}
+		
+		return new ChunkStatistics(
+			totalBytes,
+			chunkCount,
+			usefulBytes/(double)totalBytes,
+			hasNextCount/(double)chunkCount,
+			usefulBytes/(double)usedChunkCapacity
+		);
 	}
 }
