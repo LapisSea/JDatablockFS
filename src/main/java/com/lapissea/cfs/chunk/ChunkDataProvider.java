@@ -9,7 +9,7 @@ import com.lapissea.cfs.type.IOTypeDB;
 import java.io.IOException;
 import java.util.Objects;
 
-import static com.lapissea.cfs.GlobalConfig.*;
+import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
 public interface ChunkDataProvider{
 	
