@@ -1,11 +1,43 @@
 package com.lapissea.cfs.tools.render;
 
-import com.lapissea.cfs.tools.GLFont;
+import com.lapissea.cfs.tools.DrawFont;
 
 import java.awt.Color;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Consumer;
 
 public abstract class RenderBackend{
+	
+	public interface CreatorSource{
+		record CreationAttempt(RenderBackend backend, Throwable failure){
+			public boolean isOk(){
+				return failure==null;
+			}
+		}
+		default CreationAttempt tryCreate(){
+			try{
+				return new CreationAttempt(create(), null);
+			}catch(Throwable e){
+				return new CreationAttempt(null, e);
+			}
+		}
+		
+		RenderBackend create();
+	}
+	
+	private static List<CreatorSource> BACKEND_SOURCES;
+	
+	public static synchronized List<CreatorSource> getBackendSources(){
+		if(BACKEND_SOURCES==null){
+			BACKEND_SOURCES=new ArrayList<>(List.of(
+				OpenGLBackend::new,
+				G2DBackend::new
+			));
+		}
+		return BACKEND_SOURCES;
+	}
+	
 	
 	public interface DisplayInterface{
 		
@@ -41,6 +73,8 @@ public abstract class RenderBackend{
 		void requestClose();
 		void pollEvents();
 		void destroy();
+		
+		void setTitle(String title);
 	}
 	
 	
@@ -73,6 +107,8 @@ public abstract class RenderBackend{
 	private float   lineWidth;
 	
 	private boolean shouldRender=true;
+	
+	public abstract void start(Runnable start);
 	
 	public void markFrameDirty(){
 		shouldRender=true;
@@ -128,9 +164,8 @@ public abstract class RenderBackend{
 	public abstract void preRender();
 	public abstract void postRender();
 	
-	public abstract GLFont.Bounds getStringBounds(String str);
-	public abstract void outlineString(Color color, String str, float x, float y);
-	public abstract void fillString(Color color, String str, float x, float y);
+	public abstract DrawFont getFont();
+	
 	public abstract boolean canFontDisplay(char c);
 	public boolean canFontDisplay(int code){
 		if(code==0) return false;

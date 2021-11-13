@@ -1,6 +1,5 @@
 package com.lapissea.cfs.tools.server;
 
-import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.MemFrame;
 import com.lapissea.util.LogUtil;
@@ -9,18 +8,17 @@ import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.io.File;
 import java.io.IOException;
 import java.net.*;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
-import static com.lapissea.cfs.tools.server.ServerCommons.*;
+import static com.lapissea.cfs.tools.server.ServerCommons.Action;
+import static com.lapissea.cfs.tools.server.ServerCommons.getLocalLoggerImpl;
 
 public class DisplayServer implements DataLogger{
 	
@@ -30,7 +28,7 @@ public class DisplayServer implements DataLogger{
 		
 		public ServerSession(Info conn, String name, Map<String, Object> config) throws IOException{
 			var socket=sessionConnection(conn, name, config);
-			LogUtil.println("connected", socket);
+			LogUtil.println("Server session("+name+") established");
 			
 			boolean threadedOutput=Boolean.parseBoolean(config.getOrDefault("threadedOutput", "false").toString());
 			
@@ -51,7 +49,10 @@ public class DisplayServer implements DataLogger{
 			DataLogger.Session proxy;
 			
 			proxy=new DataLogger.Session(){
-				
+				@Override
+				public String getName(){
+					return name;
+				}
 				@Override
 				public void log(MemFrame frame){
 					try{
@@ -98,6 +99,10 @@ public class DisplayServer implements DataLogger{
 				proxy=new Session(){
 					
 					private boolean deleting;
+					@Override
+					public String getName(){
+						return logger.getName();
+					}
 					
 					private void stop(){
 						exec.shutdown();
@@ -149,21 +154,7 @@ public class DisplayServer implements DataLogger{
 			int port=((Number)config.getOrDefault("port", 666)).intValue();
 			
 			var socketMake=new Socket();
-			try{
-				socketMake.connect(new InetSocketAddress(con.addr, port), con.timeout);
-			}catch(SocketTimeoutException e){
-				
-				String jarPath=config.getOrDefault("jar", "").toString();
-				socketMake.close();
-				if(jarPath.isEmpty()) throw e;
-				var     debugMode=GlobalConfig.DEBUG_VALIDATION;
-				var     args     =Objects.requireNonNull((String)config.get("startArgs"));
-				Process p        =Runtime.getRuntime().exec("java -jar "+(debugMode?"-ea ":"")+args+" \""+new File(jarPath).getAbsolutePath()+"\" lazy");
-				p.getInputStream().read();
-				
-				socketMake=new Socket();
-				socketMake.connect(new InetSocketAddress(con.addr, port), con.timeout);
-			}
+			socketMake.connect(new InetSocketAddress(con.addr, port), con.timeout);
 			
 			int realPort;
 			try(var preSocket=socketMake){
@@ -193,6 +184,10 @@ public class DisplayServer implements DataLogger{
 		public void delete(){
 			proxy.delete();
 		}
+		@Override
+		public String getName(){
+			return proxy.getName();
+		}
 	}
 	
 	
@@ -212,7 +207,7 @@ public class DisplayServer implements DataLogger{
 			try{
 				return new ServerSession(new ServerSession.Info(InetAddress.getLocalHost(), 20), name, config);
 			}catch(SocketTimeoutException e){
-				LogUtil.printlnEr("Could not contact or start the server!");
+				LogUtil.printlnEr("Could not contact the server!");
 			}catch(Throwable e){
 				e.printStackTrace();
 			}

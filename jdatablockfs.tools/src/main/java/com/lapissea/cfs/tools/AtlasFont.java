@@ -1,5 +1,6 @@
 package com.lapissea.cfs.tools;
 
+import com.lapissea.cfs.tools.render.GlUtils;
 import com.lapissea.cfs.tools.render.RenderBackend;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
@@ -7,13 +8,13 @@ import org.lwjgl.opengl.GL11;
 import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.function.Consumer;
-import java.util.function.Function;
 
 import static com.lapissea.util.PoolOwnThread.async;
 import static org.lwjgl.opengl.GL20.*;
 
-public class AtlasFont extends GLFont{
+public class AtlasFont extends DrawFont{
 	
 	private static ByteBuffer convertImageRGB(BufferedImage image){
 		
@@ -54,20 +55,16 @@ public class AtlasFont extends GLFont{
 	
 	private final MSDFAtlas atlas;
 	
-	private final Function<RenderBackend.DrawMode, RenderBackend.BulkDraw> bulkHook;
-	private final Runnable                                                 renderRequest;
-	private final Consumer<Runnable>                                       openglTask;
+	private final RenderBackend renderer;
 	
-	private int     program;
-	private int     drawSizeU;
-	private int     outlineU;
-	private Texture texture;
+	private int             program;
+	private int             drawSizeU;
+	private int             outlineU;
+	private GlUtils.Texture texture;
 	
-	public AtlasFont(MSDFAtlas atlas, Function<RenderBackend.DrawMode, RenderBackend.BulkDraw> bulkHook, Runnable renderRequest, Consumer<Runnable> openglTask){
+	public AtlasFont(MSDFAtlas atlas, RenderBackend renderer, Runnable renderRequest, Consumer<Runnable> openglTask){
 		this.atlas=atlas;
-		this.bulkHook=bulkHook;
-		this.renderRequest=renderRequest;
-		this.openglTask=openglTask;
+		this.renderer=renderer;
 		
 		if(!isMask()){
 			var atlasInfo=atlas.getInfo().getAtlas();
@@ -114,8 +111,8 @@ public class AtlasFont extends GLFont{
 				.replace("$size", atlasInfo.getSize()+"");
 			
 			openglTask.accept(()->{
-				program=makeShaderProgram(
-					compileShader(GL_FRAGMENT_SHADER, frag)
+				program=GlUtils.makeShaderProgram(
+					GlUtils.compileShader(GL_FRAGMENT_SHADER, frag)
 				);
 				drawSizeU=glGetUniformLocation(program, "drawSize");
 				outlineU=glGetUniformLocation(program, "outline");
@@ -125,10 +122,10 @@ public class AtlasFont extends GLFont{
 			var img=atlas.getImage();
 			if(isMask()){
 				ByteBuffer bb=convertImageA(img);
-				openglTask.accept(()->texture=uploadTexture(img.getWidth(), img.getHeight(), GL11.GL_ALPHA, bb));
+				openglTask.accept(()->texture=GlUtils.uploadTexture(img.getWidth(), img.getHeight(), GL11.GL_ALPHA, bb));
 			}else{
 				ByteBuffer bb=convertImageRGB(img);
-				openglTask.accept(()->texture=uploadTexture(img.getWidth(), img.getHeight(), GL11.GL_RGB, bb));
+				openglTask.accept(()->texture=GlUtils.uploadTexture(img.getWidth(), img.getHeight(), GL11.GL_RGB, bb));
 			}
 			renderRequest.run();
 		});
@@ -137,12 +134,21 @@ public class AtlasFont extends GLFont{
 		return atlas.getInfo().getAtlas().getType().contains("mask");
 	}
 	
-	
 	@Override
+	public void fillStrings(List<StringDraw> strings){
+		for(StringDraw string : strings){
+			fillString(string.color(), string.string(), string.pixelHeight(), string.x(), string.y());
+		}
+	}
+	@Override
+	public void outlineStrings(List<StringDraw> strings){
+		for(StringDraw string : strings){
+			outlineString(string.color(), string.string(), string.pixelHeight(), string.x(), string.y());
+		}
+	}
 	public void fillString(Color color, String string, float pixelHeight, float x, float y){
 		drawString(color, string, pixelHeight, x, y, false);
 	}
-	@Override
 	public void outlineString(Color color, String string, float pixelHeight, float x, float y){
 		drawString(color, string, pixelHeight, x, y, true);
 	}
@@ -179,7 +185,7 @@ public class AtlasFont extends GLFont{
 		texture.bind(GL_TEXTURE_2D);
 		glEnable(GL_TEXTURE_2D);
 		
-		try(var ignored=bulkHook.apply(RenderBackend.DrawMode.QUADS)){
+		try(var ignored=renderer.bulkDraw(RenderBackend.DrawMode.QUADS)){
 			for(int i=0;i<string.length();i++){
 				char c    =string.charAt(i);
 				var  glyph=atlas.getGlyph(c);
@@ -228,13 +234,12 @@ public class AtlasFont extends GLFont{
 		if(!isMask()) glUseProgram(0);
 	}
 	
-	
 	@Override
-	public Bounds getStringBounds(String string, float pixelHeight){
+	public Bounds getStringBounds(String string){
 		var width=string.chars().mapToDouble(c->atlas.getGlyph(c).getAdvance()).sum();
 		return new Bounds(
-			(float)(width*pixelHeight),
-			(float)(atlas.getInfo().getMetrics().getLineHeight()*pixelHeight)
+			(float)(width*renderer.getFontScale()),
+			(float)(atlas.getInfo().getMetrics().getLineHeight()*renderer.getFontScale())
 		);
 	}
 	

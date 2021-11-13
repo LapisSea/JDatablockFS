@@ -2,7 +2,6 @@ package com.lapissea.cfs.tools;
 
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.MemFrame;
-import com.lapissea.cfs.tools.render.OpenGLBackend;
 import com.lapissea.cfs.tools.render.RenderBackend;
 import com.lapissea.util.MathUtil;
 import com.lapissea.util.UtilL;
@@ -15,23 +14,40 @@ import static com.lapissea.cfs.tools.render.RenderBackend.DisplayInterface.Actio
 import static com.lapissea.cfs.tools.render.RenderBackend.DisplayInterface.ActionType.UP;
 import static org.lwjgl.glfw.GLFW.*;
 
-public class DisplayLWJGL implements DataLogger{
+public class DisplayManager implements DataLogger{
 	
 	private boolean destroyRequested=false;
 	
-	private final OpenGLBackend renderer;
+	private final RenderBackend renderer;
 	
 	private final SessionHost        sessionHost=new SessionHost();
 	private final BinaryGridRenderer gridRenderer;
 	
-	public DisplayLWJGL(){
-		renderer=new OpenGLBackend();
-		gridRenderer=new BinaryGridRenderer(renderer);
+	public DisplayManager(){
+		renderer=RenderBackend.getBackendSources()
+		                      .stream()
+		                      .map(RenderBackend.CreatorSource::tryCreate)
+		                      .filter(RenderBackend.CreatorSource.CreationAttempt::isOk)
+		                      .findFirst()
+		                      .orElseThrow()
+		                      .backend();
 		
-		renderer.runLater(this::initEvents);
+		gridRenderer=new BinaryGridRenderer(renderer);
+		Runnable updateTitle=()->{
+			var f=sessionHost.activeFrame.get();
+			renderer.getDisplay().setTitle(
+				"Binary display - frame: "+(f==-1?"NaN":f)+
+				sessionHost.activeSession.get().map(s->" - Session: "+s.getName()).orElse("")
+			);
+			renderer.markFrameDirty();
+		};
+		sessionHost.activeFrame.register(i->updateTitle.run());
+		sessionHost.activeSession.register(ses->updateTitle.run());
+		renderer.start(this::start);
+		updateTitle.run();
 	}
 	
-	private void initEvents(){
+	private void start(){
 		
 		double[] travel={0};
 		
@@ -73,7 +89,7 @@ public class DisplayLWJGL implements DataLogger{
 		display.registerDisplayResize(()->{
 			sessionHost.cleanUpSessions();
 			ifFrame(frame->gridRenderer.calcSize(frame.data().length, true));
-			gridRenderer.render();
+			doRender();
 		});
 		
 		display.registerKeyboardButton(e->{
@@ -105,6 +121,12 @@ public class DisplayLWJGL implements DataLogger{
 					
 					sessionHost.cleanUpSessions();
 					var activeSession=sessionHost.activeSession.get();
+					
+					activeSession.ifPresent(ses->{
+						if(ses.framePos.get()==-1){
+							renderer.markFrameDirty();
+						}
+					});
 					if(!gridRenderer.displayedSession.equals(activeSession)){
 						gridRenderer.displayedSession=activeSession;
 						ifFrame(frame->gridRenderer.calcSize(frame.data().length, true));
@@ -114,11 +136,10 @@ public class DisplayLWJGL implements DataLogger{
 						display.requestClose();
 					}
 					if(renderer.notifyDirtyFrame()){
-						gridRenderer.render();
+						doRender();
 					}
 					UtilL.sleep(0, 1000);
 					display.pollEvents();
-					renderer.postRender();
 				}
 			}
 		}catch(Throwable e){
@@ -126,6 +147,14 @@ public class DisplayLWJGL implements DataLogger{
 		}finally{
 			display.destroy();
 		}
+	}
+	
+	private void doRender(){
+		renderer.preRender();
+		
+		gridRenderer.render();
+		
+		renderer.postRender();
 	}
 	
 	private void ifFrame(Consumer<MemFrame> o){
@@ -140,7 +169,6 @@ public class DisplayLWJGL implements DataLogger{
 	
 	@Override
 	public DataLogger.Session getSession(String name){
-		renderer.markFrameDirty();
 		return sessionHost.getSession(name);
 	}
 	@Override

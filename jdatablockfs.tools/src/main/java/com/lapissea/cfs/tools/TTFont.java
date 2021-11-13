@@ -1,5 +1,6 @@
 package com.lapissea.cfs.tools;
 
+import com.lapissea.cfs.tools.render.GlUtils;
 import com.lapissea.cfs.tools.render.RenderBackend;
 import com.lapissea.util.LogUtil;
 import org.lwjgl.BufferUtils;
@@ -30,7 +31,7 @@ import static com.lapissea.util.PoolOwnThread.async;
 import static org.lwjgl.opengl.GL11.glColor4f;
 import static org.lwjgl.system.MemoryStack.stackPush;
 
-public class TTFont extends GLFont{
+public class TTFont extends DrawFont{
 	
 	
 	private final int           replacer;
@@ -42,8 +43,8 @@ public class TTFont extends GLFont{
 	
 	private class Bitmap{
 		final STBTTBakedChar.Buffer charInfo;
-		Texture texture;
-		Texture outlineTexture;
+		GlUtils.Texture texture;
+		GlUtils.Texture outlineTexture;
 		final float pixelHeight;
 		final int   bitmapWidth;
 		final int   bitmapHeight;
@@ -114,8 +115,8 @@ public class TTFont extends GLFont{
 			boolean[] instant={false};
 			openglTask.accept(()->{
 				instant[0]=true;
-				texture=uploadTexture(this.bitmapWidth, this.bitmapHeight, GL11.GL_ALPHA, fillBitmap);
-				outlineTexture=uploadTexture(this.bitmapWidth, this.bitmapHeight, GL11.GL_ALPHA, outlineBitmap);
+				texture=GlUtils.uploadTexture(this.bitmapWidth, this.bitmapHeight, GL11.GL_ALPHA, fillBitmap);
+				outlineTexture=GlUtils.uploadTexture(this.bitmapWidth, this.bitmapHeight, GL11.GL_ALPHA, outlineBitmap);
 			});
 			if(!instant[0]){
 				renderRequest.run();
@@ -131,11 +132,11 @@ public class TTFont extends GLFont{
 		}
 	}
 	
-	private final ReadWriteLock                                            cacheLock  =new ReentrantReadWriteLock();
-	private final List<Bitmap>                                             bitmapCache=new ArrayList<>();
-	private final Function<RenderBackend.DrawMode, RenderBackend.BulkDraw> bulkHook;
-	private final Runnable                                                 renderRequest;
-	private final Consumer<Runnable>                                       openglTask;
+	private final ReadWriteLock      cacheLock  =new ReentrantReadWriteLock();
+	private final List<Bitmap>       bitmapCache=new ArrayList<>();
+	private final RenderBackend      renderer;
+	private final Runnable           renderRequest;
+	private final Consumer<Runnable> openglTask;
 	
 	private static byte[] readData(String ttfPath){
 		try(var io=Objects.requireNonNull(TTFont.class.getResourceAsStream(ttfPath))){
@@ -145,11 +146,11 @@ public class TTFont extends GLFont{
 		}
 	}
 	
-	public TTFont(String ttfPath, Function<RenderBackend.DrawMode, RenderBackend.BulkDraw> bulkHook, Runnable renderRequest, Consumer<Runnable> openglTask){
-		this(readData(ttfPath), bulkHook, renderRequest, openglTask);
+	public TTFont(String ttfPath, RenderBackend renderer, Runnable renderRequest, Consumer<Runnable> openglTask){
+		this(readData(ttfPath), renderer, renderRequest, openglTask);
 	}
-	public TTFont(byte[] ttfData, Function<RenderBackend.DrawMode, RenderBackend.BulkDraw> bulkHook, Runnable renderRequest, Consumer<Runnable> openglTask){
-		this.bulkHook=bulkHook;
+	public TTFont(byte[] ttfData, RenderBackend renderer, Runnable renderRequest, Consumer<Runnable> openglTask){
+		this.renderer=renderer;
 		this.renderRequest=renderRequest;
 		this.openglTask=openglTask;
 		
@@ -261,7 +262,7 @@ public class TTFont extends GLFont{
 	}
 	
 	@Override
-	public Bounds getStringBounds(String string, float pixelHeight){
+	public Bounds getStringBounds(String string){
 		pushMax(string);
 		
 		float minX=0;
@@ -269,9 +270,9 @@ public class TTFont extends GLFont{
 		float maxX=Float.MIN_VALUE;
 		float maxY=Float.MIN_VALUE;
 		
-		Bitmap bitmap=getBitmap(pixelHeight);
+		Bitmap bitmap=getBitmap(renderer.getFontScale());
 		
-		float scale=pixelHeight/bitmap.pixelHeight;
+		float scale=renderer.getFontScale()/bitmap.pixelHeight;
 		
 		try(MemoryStack stack=stackPush()){
 			
@@ -326,16 +327,26 @@ public class TTFont extends GLFont{
 	}
 	
 	@Override
+	public void outlineStrings(List<StringDraw> strings){
+		for(StringDraw string : strings){
+			outlineString(string.color(), string.string(), string.pixelHeight(), string.x(), string.y());
+		}
+	}
 	public void outlineString(Color color, String string, float pixelHeight, float x, float y){
 		drawString(color, string, pixelHeight, x, y, bitmap->bitmap.outlineTexture);
 	}
 	
 	@Override
+	public void fillStrings(List<StringDraw> strings){
+		for(StringDraw string : strings){
+			fillString(string.color(), string.string(), string.pixelHeight(), string.x(), string.y());
+		}
+	}
 	public void fillString(Color color, String string, float pixelHeight, float x, float y){
 		drawString(color, string, pixelHeight, x, y, bitmap->bitmap.texture);
 	}
 	
-	private void drawString(Color color, String string, float pixelHeight, float xOff, float yOff, Function<Bitmap, Texture> getTex){
+	private void drawString(Color color, String string, float pixelHeight, float xOff, float yOff, Function<Bitmap, GlUtils.Texture> getTex){
 		pushMax(string);
 		
 		Bitmap bitmap=getBitmap(pixelHeight);
@@ -355,7 +366,7 @@ public class TTFont extends GLFont{
 			tex.bind(GL11.GL_TEXTURE_2D);
 			GL11.glEnable(GL11.GL_TEXTURE_2D);
 			
-			try(var ignored=bulkHook.apply(RenderBackend.DrawMode.QUADS)){
+			try(var ignored=renderer.bulkDraw(RenderBackend.DrawMode.QUADS)){
 				for(int i=0;i<string.length();i++){
 					char cp=string.charAt(i);
 					if(cp<=31) cp=' ';

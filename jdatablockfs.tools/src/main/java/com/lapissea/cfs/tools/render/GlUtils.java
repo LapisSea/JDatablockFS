@@ -1,17 +1,15 @@
-package com.lapissea.cfs.tools;
+package com.lapissea.cfs.tools.render;
 
 import org.lwjgl.opengl.EXTTextureFilterAnisotropic;
 import org.lwjgl.opengl.GL11;
 
-import java.awt.Color;
 import java.nio.ByteBuffer;
 
 import static org.lwjgl.opengl.GL20.*;
 import static org.lwjgl.opengl.GL32.GL_GEOMETRY_SHADER;
 
-public abstract class GLFont{
-	
-	protected static class Texture{
+public class GlUtils{
+	public static class Texture{
 		private int id;
 		private Texture(int id){
 			this.id=id;
@@ -41,8 +39,7 @@ public abstract class GLFont{
 		}
 		return ANOSOTROPIC_SUPPORTED;
 	}
-	
-	protected static int makeShaderProgram(int... shaders){
+	public static int makeShaderProgram(int... shaders){
 		var program=glCreateProgram();
 		for(int shader : shaders){
 			glAttachShader(program, shader);
@@ -59,7 +56,7 @@ public abstract class GLFont{
 		}
 		return program;
 	}
-	protected static int compileShader(int type, String source){
+	public static int compileShader(int type, String source){
 		int shader=glCreateShader(type);
 		if(shader==0)
 			throw new RuntimeException(
@@ -86,8 +83,7 @@ public abstract class GLFont{
 			default -> "shader "+type;
 		};
 	}
-	
-	protected Texture uploadTexture(int width, int height, int format, ByteBuffer data){
+	public static Texture uploadTexture(int width, int height, int format, ByteBuffer data){
 		var id=GL11.glGenTextures();
 		GL11.glBindTexture(GL11.GL_TEXTURE_2D, id);
 		GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, format, width, height, 0, format, GL11.GL_UNSIGNED_BYTE, data);
@@ -101,12 +97,4 @@ public abstract class GLFont{
 		}
 		return new Texture(id);
 	}
-	
-	public static record Bounds(float width, float height){}
-	
-	public abstract void fillString(Color color, String string, float pixelHeight, float x, float y);
-	public abstract void outlineString(Color color, String string, float pixelHeight, float x, float y);
-	
-	public abstract Bounds getStringBounds(String string, float pixelHeight);
-	public abstract boolean canFontDisplay(char c);
 }

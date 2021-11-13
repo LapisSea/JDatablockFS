@@ -1,8 +1,8 @@
 package com.lapissea.cfs.tools.render;
 
 import com.lapissea.cfs.tools.AtlasFont;
-import com.lapissea.cfs.tools.DisplayLWJGL;
-import com.lapissea.cfs.tools.GLFont;
+import com.lapissea.cfs.tools.DisplayManager;
+import com.lapissea.cfs.tools.DrawFont;
 import com.lapissea.cfs.tools.MSDFAtlas;
 import com.lapissea.glfw.GlfwMonitor;
 import com.lapissea.glfw.GlfwWindow;
@@ -76,15 +76,16 @@ public class OpenGLBackend extends RenderBackend{
 	
 	private final Deque<Runnable> glTasks=new LinkedList<>();
 	
-	private final Thread glThread;
-	private final GLFont font;
+	private final Thread   glThread;
+	private final DrawFont font;
 	
 	public final  GlfwWindow       window=new GlfwWindow();
 	private final DisplayInterface displayInterface;
 	
 	private CompletableFuture<?> glInit;
+	private Runnable             start;
+	
 	public OpenGLBackend(){
-		
 		Thread glThread=new Thread(this::displayLifecycle, "display");
 		glThread.setDaemon(false);
 		glThread.start();
@@ -99,11 +100,11 @@ public class OpenGLBackend extends RenderBackend{
 //		var path="/roboto/regular";
 		var path="/CourierPrime/Regular";
 
-//		font=new TTFont(path+"/font.ttf", this::bulkDraw, this::markFrameDirty, this::runLater);
+//		font=new TTFont(path+"/font.ttf", this, this::markFrameDirty, this::runLater);
 		try{
 			var atlas=new MSDFAtlas(path);
 			
-			font=new AtlasFont(atlas, this::bulkDraw, this::markFrameDirty, this::runLater);
+			font=new AtlasFont(atlas, this, this::markFrameDirty, this::runLater);
 		}catch(IOException e){
 			throw new RuntimeException("failed to load font", e);
 		}
@@ -187,6 +188,10 @@ public class OpenGLBackend extends RenderBackend{
 			public void destroy(){
 				window.destroy();
 			}
+			@Override
+			public void setTitle(String title){
+				window.title.set(title);
+			}
 		};
 	}
 	
@@ -195,8 +200,6 @@ public class OpenGLBackend extends RenderBackend{
 		GlfwMonitor.init();
 		GLFWErrorCallback.createPrint(System.err).set();
 		
-		
-		window.title.set("Binary display - frame: "+"NaN");
 		window.size.set(600, 600);
 		window.centerWindow();
 		
@@ -211,7 +214,7 @@ public class OpenGLBackend extends RenderBackend{
 		
 		org.lwjgl.glfw.GLFW.glfwWindowHint(GLFW.GLFW_SAMPLES, 8);
 		
-		if(UtilL.sysPropertyByClass(DisplayLWJGL.class, "emulateNoGLSupport").map(Boolean::parseBoolean).orElse(false)){
+		if(UtilL.sysPropertyByClass(DisplayManager.class, "emulateNoGLSupport").map(Boolean::parseBoolean).orElse(false)){
 			throw new RuntimeException("gl disabled");
 		}
 		
@@ -244,9 +247,17 @@ public class OpenGLBackend extends RenderBackend{
 		glInit=async(this::initWindow, Runnable::run);
 		
 		window.whileOpen(()->{
-			UtilL.sleep(10);
-			flushTasks();
+			UtilL.sleepWhile(()->start==null, 10);
+			start.run();
 		});
+		destroyRequested=true;
+		window.requestClose();
+		window.destroy();
+	}
+	
+	@Override
+	public void start(Runnable start){
+		this.start=start;
 	}
 	
 	@Override
@@ -272,6 +283,10 @@ public class OpenGLBackend extends RenderBackend{
 	@Override
 	public void postRender(){
 		window.swapBuffers();
+	}
+	@Override
+	public DrawFont getFont(){
+		return font;
 	}
 	@Override
 	public void preRender(){
@@ -301,21 +316,6 @@ public class OpenGLBackend extends RenderBackend{
 		glLoadIdentity();
 		translate(-1, 1);
 		scale(2F/getDisplay().getWidth(), -2F/getDisplay().getHeight());
-	}
-	
-	@Override
-	public GLFont.Bounds getStringBounds(String str){
-		return font.getStringBounds(str, getFontScale());
-	}
-	
-	@Override
-	public void outlineString(Color color, String str, float x, float y){
-		font.outlineString(color, str, getFontScale(), x, y);
-	}
-	
-	@Override
-	public void fillString(Color color, String str, float x, float y){
-		font.fillString(color, str, getFontScale(), x, y);
 	}
 	
 	@Override

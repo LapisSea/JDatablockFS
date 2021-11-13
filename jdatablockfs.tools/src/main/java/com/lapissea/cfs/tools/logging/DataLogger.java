@@ -17,6 +17,10 @@ public interface DataLogger{
 			public void reset(){}
 			@Override
 			public void delete(){}
+			@Override
+			public String getName(){
+				return "";
+			}
 		}
 		
 		void log(MemFrame frame);
@@ -26,6 +30,8 @@ public interface DataLogger{
 		void reset();
 		
 		void delete();
+		
+		String getName();
 	}
 	
 	class Blank implements DataLogger{

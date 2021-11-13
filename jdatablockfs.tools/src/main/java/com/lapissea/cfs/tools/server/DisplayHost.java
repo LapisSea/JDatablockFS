@@ -12,8 +12,13 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.TimeUnit;
 
 import static com.lapissea.cfs.tools.server.ServerCommons.Action;
 import static com.lapissea.util.LogUtil.Init.USE_CALL_POS;
@@ -33,7 +38,7 @@ public class DisplayHost{
 		private final Socket client;
 		
 		
-		private final Map<Long, UnsafeRunnable<IOException>> readyTasks=new ConcurrentHashMap<>();
+		private final Map<Long, UnsafeRunnable<IOException>> readyTasks=Collections.synchronizedMap(new HashMap<>());
 		
 		private long doneCounter;
 		private long taskCounter;

@@ -1,6 +1,6 @@
 package com.lapissea.cfs.tools.render;
 
-import com.lapissea.cfs.tools.GLFont;
+import com.lapissea.cfs.tools.DrawFont;
 import com.lapissea.util.NotImplementedException;
 
 import java.awt.*;
@@ -10,9 +10,13 @@ import java.awt.geom.AffineTransform;
 import java.awt.geom.Line2D;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
 import java.util.Deque;
 import java.util.EnumSet;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.function.Consumer;
 
 import static java.awt.event.MouseEvent.BUTTON1;
@@ -28,11 +32,53 @@ public class G2DBackend extends RenderBackend{
 	
 	private final DisplayInterface displayInterface;
 	
+	private final Frame frame;
 	private final Panel target;
-	private       int   mouseX;
-	private       int   mouseY;
+	
+	private int mouseX;
+	private int mouseY;
 	
 	private EnumSet<DisplayInterface.MouseKey> mouseDowns=EnumSet.noneOf(DisplayInterface.MouseKey.class);
+	
+	private final DrawFont font=new DrawFont(){
+		@Override
+		public void fillStrings(List<StringDraw> strings){
+			for(StringDraw string : strings){
+				fillString(string.color(), string.string(), string.x(), string.y());
+			}
+		}
+		@Override
+		public void outlineStrings(List<StringDraw> strings){
+			for(StringDraw string : strings){
+				outlineString(string.color(), string.string(), string.x(), string.y());
+			}
+		}
+		@Override
+		public Bounds getStringBounds(String string){
+			currentGraphics.setFont(currentGraphics.getFont().deriveFont(getFontScale()/2));
+			var rect=currentGraphics.getFontMetrics().getStringBounds(string, currentGraphics);
+			return new DrawFont.Bounds((float)(rect.getWidth()), (float)(rect.getHeight()));
+		}
+		@Override
+		public boolean canFontDisplay(char c){
+			throw NotImplementedException.infer();//TODO: implement .canFontDisplay()
+		}
+		
+		public void fillString(Color color, String str, float x, float y){
+			currentGraphics.setColor(color);
+			currentGraphics.setFont(currentGraphics.getFont().deriveFont(getFontScale()/2));
+			currentGraphics.drawString(str, x, y);
+		}
+		public void outlineString(Color color, String str, float x, float y){
+			currentGraphics.setColor(color);
+			setStrokeWidth(1);
+			currentGraphics.setFont(currentGraphics.getFont().deriveFont(getFontScale()/2));
+			var transform=new AffineTransform();
+			transform.translate(x, y);
+			Shape shape=new TextLayout(str, currentGraphics.getFont(), currentGraphics.getFontRenderContext()).getOutline(transform);
+			currentGraphics.draw(shape);
+		}
+	};
 	
 	private static DisplayInterface.MouseKey getKey(MouseEvent e){
 		return switch(e.getButton()){
@@ -44,8 +90,33 @@ public class G2DBackend extends RenderBackend{
 		};
 	}
 	
-	public G2DBackend(Panel target){
-		this.target=target;
+	public G2DBackend(){
+		frame=new Frame();
+		
+		File f=new File("wind");
+		try(var in=new BufferedReader(new FileReader(f))){
+			frame.setLocation(Integer.parseInt(in.readLine()), Integer.parseInt(in.readLine()));
+			frame.setSize(Integer.parseInt(in.readLine()), Integer.parseInt(in.readLine()));
+		}catch(Throwable ignored){
+			frame.setSize(800, 800);
+			frame.setLocationRelativeTo(null);
+		}
+		
+		this.target=new Panel(){
+			@Override
+			public void update(Graphics g){
+				paint((Graphics2D)g);
+			}
+			@Override
+			public void paint(Graphics g){
+				paint((Graphics2D)g);
+			}
+			
+			public void paint(Graphics2D g){
+				g.drawImage(render, 0, 0, null);
+			}
+		};
+		
 		target.setFocusable(true);
 		target.requestFocus();
 		
@@ -180,7 +251,18 @@ public class G2DBackend extends RenderBackend{
 			public void destroy(){
 				throw NotImplementedException.infer();//TODO: implement .destroy()
 			}
+			@Override
+			public void setTitle(String title){
+				frame.setTitle(title);
+			}
 		};
+	}
+	
+	@Override
+	public void start(Runnable start){
+		Thread glThread=new Thread(start, "display");
+		glThread.setDaemon(false);
+		glThread.start();
 	}
 	
 	@Override
@@ -238,12 +320,6 @@ public class G2DBackend extends RenderBackend{
 		currentGraphics.setTransform(transformStack.pop());
 	}
 	@Override
-	public GLFont.Bounds getStringBounds(String str){
-		currentGraphics.setFont(currentGraphics.getFont().deriveFont(getFontScale()/2));
-		var rect=currentGraphics.getFontMetrics().getStringBounds(str, currentGraphics);
-		return new GLFont.Bounds((float)(rect.getWidth()), (float)(rect.getHeight()));
-	}
-	@Override
 	public void translate(double x, double y){
 		currentGraphics.translate(x, y);
 	}
@@ -272,22 +348,6 @@ public class G2DBackend extends RenderBackend{
 		currentGraphics.rotate(angle);
 	}
 	@Override
-	public void outlineString(Color color, String str, float x, float y){
-		currentGraphics.setColor(color);
-		setStrokeWidth(1);
-		currentGraphics.setFont(currentGraphics.getFont().deriveFont(getFontScale()/2));
-		var transform=new AffineTransform();
-		transform.translate(x, y);
-		Shape shape=new TextLayout(str, currentGraphics.getFont(), currentGraphics.getFontRenderContext()).getOutline(transform);
-		currentGraphics.draw(shape);
-	}
-	@Override
-	public void fillString(Color color, String str, float x, float y){
-		currentGraphics.setColor(color);
-		currentGraphics.setFont(currentGraphics.getFont().deriveFont(getFontScale()/2));
-		currentGraphics.drawString(str, x, y);
-	}
-	@Override
 	public boolean canFontDisplay(char c){
 		return currentGraphics.getFont().canDisplay(c);
 	}
@@ -310,13 +370,15 @@ public class G2DBackend extends RenderBackend{
 	public void postRender(){
 		currentGraphics.dispose();
 		currentGraphics=null;
+		
+		target.repaint();
+	}
+	@Override
+	public DrawFont getFont(){
+		return font;
 	}
 	@Override
 	public void runLater(Runnable task){
 		invokeLater(task);
-	}
-	
-	public BufferedImage getRender(){
-		return render;
 	}
 }

@@ -9,7 +9,6 @@ import com.lapissea.util.event.change.ChangeRegistryInt;
 
 import java.lang.ref.WeakReference;
 import java.util.*;
-import java.util.function.IntConsumer;
 
 public class SessionHost implements DataLogger{
 	
@@ -35,8 +34,16 @@ public class SessionHost implements DataLogger{
 		
 		private boolean markForDeletion;
 		
-		private HostedSession(IntConsumer onFrameChange){
-			framePos.register(onFrameChange);
+		private final String name;
+		
+		private HostedSession(String name){
+			this.name=name;
+			framePos.register(activeFrame::set);
+		}
+		
+		@Override
+		public String getName(){
+			return name;
 		}
 		
 		@Override
@@ -82,7 +89,7 @@ public class SessionHost implements DataLogger{
 	public Session getSession(String name){
 		if(destroyed) throw new IllegalStateException();
 		
-		var ses=sessions.computeIfAbsent(name, nam->new HostedSession(activeFrame::set));
+		var ses=sessions.computeIfAbsent(name, HostedSession::new);
 		setActiveSession(ses);
 		return ses;
 	}

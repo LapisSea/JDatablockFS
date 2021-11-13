@@ -2,8 +2,7 @@ package com.lapissea.cfs.tools.logging;
 
 import com.google.gson.GsonBuilder;
 import com.lapissea.cfs.io.impl.MemoryData;
-import com.lapissea.cfs.tools.Display2D;
-import com.lapissea.cfs.tools.DisplayLWJGL;
+import com.lapissea.cfs.tools.DisplayManager;
 import com.lapissea.cfs.tools.server.DisplayServer;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.LogUtil;
@@ -18,7 +17,8 @@ import java.util.LinkedList;
 import java.util.Map;
 import java.util.stream.LongStream;
 
-import static com.lapissea.util.LogUtil.Init.*;
+import static com.lapissea.util.LogUtil.Init.USE_CALL_POS;
+import static com.lapissea.util.LogUtil.Init.USE_TABULATED_HEADER;
 
 public class LoggedMemoryUtils{
 	
@@ -54,16 +54,7 @@ public class LoggedMemoryUtils{
 		
 		return new LateInit<>(()->switch(type){
 			case "none" -> DataLogger.Blank.INSTANCE;
-			case "direct" -> {
-				try{
-					yield new DisplayLWJGL();
-				}catch(Throwable e){
-					LogUtil.printEr("Failed to use LWJGL display, reason:", e);
-					yield new Display2D();
-				}
-			}
-			case "lwjgl" -> new DisplayLWJGL();
-			case "swing" -> new Display2D();
+			case "direct" -> new DisplayManager();
 			case "server" -> new DisplayServer(loggerConfig);
 			default -> throw new IllegalArgumentException("logger.type unknown value \""+type+"\"");
 		});

@@ -3,8 +3,7 @@ package com.lapissea.cfs.tools.server;
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
-import com.lapissea.cfs.tools.Display2D;
-import com.lapissea.cfs.tools.DisplayLWJGL;
+import com.lapissea.cfs.tools.DisplayManager;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.MemFrame;
 import com.lapissea.util.function.UnsafeConsumer;
@@ -29,12 +28,7 @@ class ServerCommons{
 	}
 	
 	static synchronized DataLogger getLocalLoggerImpl(){
-		try{
-			return new DisplayLWJGL();
-		}catch(Throwable e){
-			e.printStackTrace();
-			return new Display2D();
-		}
+		return new DisplayManager();
 	}
 	
 	static byte[] readSafe(DataInputStream in) throws IOException{

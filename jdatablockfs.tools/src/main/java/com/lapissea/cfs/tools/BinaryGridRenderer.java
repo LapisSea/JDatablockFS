@@ -145,7 +145,13 @@ public class BinaryGridRenderer{
 		return displayedSession.map(s->s.frames.size()).orElse(0);
 	}
 	public SessionHost.CachedFrame getFrame(int index){
-		return displayedSession.map(s->s.frames.get(index)).orElse(null);
+		return displayedSession.map(s->{
+			if(index==-1){
+				if(s.frames.isEmpty()) return null;
+				return s.frames.get(s.frames.size()-1);
+			}
+			return s.frames.get(index);
+		}).orElse(null);
 	}
 	public int getFramePos(){
 		return displayedSession.map(ses->{
@@ -306,13 +312,13 @@ public class BinaryGridRenderer{
 		}
 		
 		both=fStr+(str==null?"":": "+str);
-		if(renderer.getStringBounds(both).width()>rectWidth){
+		if(renderer.getFont().getStringBounds(both).width()>rectWidth){
 			shortStr=field.instanceToString(instance, true);
 			both=fStr+(shortStr==null?"":": "+shortStr);
 		}
 		
 		
-		if(renderer.getStringBounds(both).width()>rectWidth){
+		if(renderer.getFont().getStringBounds(both).width()>rectWidth){
 			var font=renderer.getFontScale();
 			renderer.pushMatrix();
 			initFont(0.4F);
@@ -324,7 +330,7 @@ public class BinaryGridRenderer{
 			if(str!=null){
 				var drawStr=str;
 				
-				if(renderer.getStringBounds(drawStr).width()>rectWidth){
+				if(renderer.getFont().getStringBounds(drawStr).width()>rectWidth){
 					if(shortStr==null) shortStr=field.instanceToString(instance, true);
 					drawStr=shortStr;
 				}
@@ -500,7 +506,7 @@ public class BinaryGridRenderer{
 	}
 	
 	private void drawStringIn(Color color, String s, Rect area, boolean doStroke, boolean alignLeft){
-		var rect=renderer.getStringBounds(s);
+		var rect=renderer.getFont().getStringBounds(s);
 		
 		float w=rect.width();
 		float h=rect.height();
@@ -511,7 +517,7 @@ public class BinaryGridRenderer{
 			if(area.height<h){
 				renderer.setFontScale(area.height);
 				
-				rect=renderer.getStringBounds(s);
+				rect=renderer.getFont().getStringBounds(s);
 				
 				w=rect.width();
 				h=rect.height();
@@ -523,7 +529,7 @@ public class BinaryGridRenderer{
 			if(scale<0.5){
 				renderer.setFontScale(renderer.getFontScale()/(scale<0.25?3:2));
 				
-				rect=renderer.getStringBounds(s);
+				rect=renderer.getFont().getStringBounds(s);
 				
 				w=rect.width();
 				h=rect.height();
@@ -535,7 +541,7 @@ public class BinaryGridRenderer{
 					break;
 				}
 				s=s.substring(0, s.length()-4)+"...";
-				rect=renderer.getStringBounds(s);
+				rect=renderer.getFont().getStringBounds(s);
 				
 				w=rect.width();
 				h=rect.height();
@@ -553,13 +559,13 @@ public class BinaryGridRenderer{
 			}
 		}
 		
-		renderer.fillString(color, s, 0, 0);
+		renderer.getFont().fillStrings(new DrawFont.StringDraw(renderer.getFontScale(), color, s, 0, 0));
 		if(doStroke){
 			Color c=renderer.readColor();
 			
 			renderer.setLineWidth(1);
 			
-			renderer.outlineString(new Color(0, 0, 0, 0.5F), s, 0, 0);
+			renderer.getFont().outlineStrings(new DrawFont.StringDraw(renderer.getFontScale(), new Color(0, 0, 0, 0.5F), s, 0, 0));
 			
 			renderer.setColor(c);
 		}
@@ -610,7 +616,6 @@ public class BinaryGridRenderer{
 		frameTimer.start();
 		
 		renderCount++;
-		renderer.preRender();
 		try{
 			errorMode=false;
 			render(getFramePos());
@@ -623,7 +628,6 @@ public class BinaryGridRenderer{
 				e1.printStackTrace();
 			}
 		}
-		renderer.postRender();
 		
 		frameTimer.end();
 		var tim=frameTimer.msAvrg100();
@@ -1136,11 +1140,11 @@ public class BinaryGridRenderer{
 			int msgWidth=ptr.message().length();
 			int space   =(int)(screenWidth-x);
 			
-			var w=renderer.getStringBounds(ptr.message()).width();
+			var w=renderer.getFont().getStringBounds(ptr.message()).width();
 			while(w>space*1.5){
 				msgWidth--;
 				if(msgWidth==0) break;
-				w=renderer.getStringBounds(ptr.message().substring(0, msgWidth)).width();
+				w=renderer.getFont().getStringBounds(ptr.message().substring(0, msgWidth)).width();
 			}
 			List<String> lines=msgWidth==0?List.of(ptr.message()):TextUtil.wrapLongString(ptr.message(), msgWidth);
 			y-=renderer.getLineWidth()/2F*lines.size();
@@ -1162,8 +1166,8 @@ public class BinaryGridRenderer{
 		
 		var msg       =DrawUtils.errorToMessage(parsed.displayError);
 		var lines     =msg.split("\n");
-		var bounds    =Arrays.stream(lines).map(renderer::getStringBounds).toList();
-		var totalBound=bounds.stream().reduce((l, r)->new GLFont.Bounds(Math.max(l.width(), r.width()), l.height()+r.height())).orElseThrow();
+		var bounds    =Arrays.stream(lines).map(renderer.getFont()::getStringBounds).toList();
+		var totalBound=bounds.stream().reduce((l, r)->new DrawFont.Bounds(Math.max(l.width(), r.width()), l.height()+r.height())).orElseThrow();
 		
 		renderer.setColor(alpha(Color.RED.darker(), 0.2F));
 		renderer.fillQuad(0, screenHeight-totalBound.height()-25, totalBound.width()+20, totalBound.height()+20);
@@ -1174,13 +1178,13 @@ public class BinaryGridRenderer{
 			String line =lines[i];
 			var    bound=bounds.get(i);
 			rect.height=bound.height();
-			rect.y=(Math.round(screenHeight-totalBound.height()+bounds.stream().limit(i).mapToDouble(GLFont.Bounds::height).sum())-15);
+			rect.y=(Math.round(screenHeight-totalBound.height()+bounds.stream().limit(i).mapToDouble(DrawFont.Bounds::height).sum())-15);
 			drawStringIn(col, line, rect, false, true);
 		}
 	}
 	
 	private void drawMouse(RenderContext ctx, CachedFrame frame){
-		var screenWidth =renderer.getDisplay().getWidth();
+		var screenWidth=renderer.getDisplay().getWidth();
 		
 		var bytes =frame.data().data();
 		var parsed=frame.parsed();
@@ -1209,13 +1213,13 @@ public class BinaryGridRenderer{
 		int x=(int)(xByte*ctx.pixelsPerByte());
 		int y=(int)((yByte-0.1)*ctx.pixelsPerByte());
 		
-		var bounds=renderer.getStringBounds(s);
+		var bounds=renderer.getFont().getStringBounds(s);
 		x=(int)Math.min(Math.max(0, x-bounds.width()/2+ctx.pixelsPerByte()/2F), screenWidth-Math.ceil(bounds.width()));
 		y=Math.max(y, (int)Math.ceil(bounds.height()));
 		
-		renderer.outlineString(Color.BLACK, s, x, y);
+		renderer.getFont().outlineStrings(new DrawFont.StringDraw(renderer.getFontScale(), Color.BLACK, s, x, y));
 		
-		renderer.fillString(Color.WHITE, s, x, y);
+		renderer.getFont().fillStrings(new DrawFont.StringDraw(renderer.getFontScale(), Color.WHITE, s, x, y));
 		
 		renderer.popMatrix();
 		initFont(1);
