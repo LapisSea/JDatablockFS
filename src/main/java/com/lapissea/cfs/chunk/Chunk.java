@@ -1,11 +1,13 @@
 package com.lapissea.cfs.chunk;
 
+import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.BitDepthOutOfSpaceException;
 import com.lapissea.cfs.exceptions.DesyncedCacheException;
 import com.lapissea.cfs.exceptions.MalformedPointerException;
 import com.lapissea.cfs.io.ChunkChainIO;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.RandomIO;
+import com.lapissea.cfs.io.bit.BitUtils;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
@@ -17,6 +19,7 @@ import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.cfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.ShouldNeverHappenError;
@@ -29,7 +32,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static com.lapissea.cfs.GlobalConfig.*;
+import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
 @SuppressWarnings("unused")
 public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, ChunkDataProvider.Holder{
@@ -37,11 +40,31 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 	private static final Struct<Chunk>     STRUCT=Struct.of(Chunk.class);
 	public static final  StructPipe<Chunk> PIPE  =ContiguousStructPipe.of(STRUCT);
 	
+	private static final int  CHECK_BYTE_OFF;
+	private static final byte CHECK_BIT_MASK;
+	
+	static{
+		if(PIPE.getSpecificFields().get(0) instanceof BitFieldMerger<?> bf){
+			var layout=bf.getSafetyBits().orElseThrow();
+			
+			CHECK_BYTE_OFF=(int)(Utils.bitToByte(layout.usedBits())-1);
+			
+			int offset=(int)(layout.usedBits()-CHECK_BYTE_OFF*Byte.SIZE);
+			CHECK_BIT_MASK=(byte)(BitUtils.makeMask(layout.safetyBits())<<offset);
+			
+			assert offset+layout.safetyBits()==8;
+		}else{
+			throw new ShouldNeverHappenError("Update the early check logic!");
+		}
+	}
+	
+	
 	public static ChunkPointer getPtr(Chunk chunk){
 		return chunk==null?null:chunk.getPtr();
 	}
 	
 	public static Chunk readChunk(@NotNull ChunkDataProvider provider, @NotNull ChunkPointer pointer) throws IOException{
+		if(!earlyCheckChunkAt(provider, pointer)) throw new IOException("Invalid chunk at "+pointer);
 		if(provider.getSource().getIOSize()<pointer.add(PIPE.getSizeDescriptor().getMin(WordSpace.BYTE))) throw new MalformedPointerException(pointer+" points outside of available data");
 		Chunk chunk=new Chunk(provider, pointer);
 		try{
@@ -50,6 +73,17 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 			throw new MalformedPointerException("No valid chunk at "+pointer, e);
 		}
 		return chunk;
+	}
+	
+	public static boolean earlyCheckChunkAt(ChunkDataProvider provider, ChunkPointer pointer) throws IOException{
+		try(var io=provider.getSource().ioAt(pointer.add(CHECK_BYTE_OFF))){
+			return earlyCheckChunkAt(io);
+		}
+	}
+	public static boolean earlyCheckChunkAt(ContentReader reader) throws IOException{
+		var flags =reader.readInt1();
+		int masked=flags&CHECK_BIT_MASK;
+		return masked==CHECK_BIT_MASK;
 	}
 	
 	@IOValue
