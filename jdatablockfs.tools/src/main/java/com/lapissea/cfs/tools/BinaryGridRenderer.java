@@ -649,8 +649,8 @@ public class BinaryGridRenderer{
 		}
 		
 		CachedFrame cFrame=getFrame(frameIndex);
-		MemFrame    frame =cFrame.data();
-		var         bytes =frame.data();
+		MemFrame    frame =cFrame.memData();
+		var         bytes =frame.bytes();
 		
 		
 		var magic=Cluster.getMagicId();
@@ -1038,7 +1038,7 @@ public class BinaryGridRenderer{
 	}
 	
 	protected boolean filterMatchAt(int i){
-		return getFrame(i).data().exceptionContains(getFilter());
+		return getFrame(i).memData().exceptionContains(getFilter());
 	}
 	
 	private void drawFilter(){
@@ -1050,7 +1050,7 @@ public class BinaryGridRenderer{
 	private void drawWriteIndex(MemFrame frame, RenderContext ctx){
 		renderer.setColor(Color.YELLOW);
 		for(long id : frame.ids()){
-			if(id>=frame.data().length) continue;
+			if(id>=frame.bytes().length) continue;
 			int i =(int)id;
 			int xi=i%ctx.width();
 			int yi=i/ctx.width();
@@ -1186,7 +1186,7 @@ public class BinaryGridRenderer{
 	private void drawMouse(RenderContext ctx, CachedFrame frame){
 		var screenWidth=renderer.getDisplay().getWidth();
 		
-		var bytes =frame.data().data();
+		var bytes =frame.memData().bytes();
 		var parsed=frame.parsed();
 		
 		int xByte=(int)(renderer.getDisplay().getMouseX()/ctx.pixelsPerByte());

@@ -126,7 +126,7 @@ class ServerCommons{
 			}
 			@Override
 			public void writeFrame(DataOutputStream stream, MemFrame frame) throws IOException{
-				boolean big=(frame.ids().length*8+frame.data().length)>8192;
+				boolean big=(frame.ids().length*8+frame.bytes().length)>8192;
 				stream.writeBoolean(big);
 				if(big){
 					try(var z=new GZIPOutputStream(stream, 2048)){

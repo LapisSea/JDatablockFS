@@ -6,7 +6,7 @@ import java.io.PrintWriter;
 import java.io.Serializable;
 import java.io.Writer;
 
-public record MemFrame(byte[] data, long[] ids, String e) implements Serializable{
+public record MemFrame(byte[] bytes, long[] ids, String e) implements Serializable{
 	
 	public MemFrame(byte[] data, long[] ids, Throwable e){
 		this(data, ids, toStr(e));

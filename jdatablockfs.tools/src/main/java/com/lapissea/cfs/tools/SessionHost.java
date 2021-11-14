@@ -26,7 +26,7 @@ public class SessionHost implements DataLogger{
 		}
 	}
 	
-	public static record CachedFrame(MemFrame data, ParsedFrame parsed){}
+	public static record CachedFrame(MemFrame memData, ParsedFrame parsed){}
 	
 	public class HostedSession implements Session{
 		public final List<CachedFrame> frames  =new ArrayList<>();

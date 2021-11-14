@@ -88,7 +88,7 @@ public class DisplayManager implements DataLogger{
 		
 		display.registerDisplayResize(()->{
 			sessionHost.cleanUpSessions();
-			ifFrame(frame->gridRenderer.calcSize(frame.data().length, true));
+			ifFrame(frame->gridRenderer.calcSize(frame.bytes().length, true));
 			doRender();
 		});
 		
@@ -129,7 +129,7 @@ public class DisplayManager implements DataLogger{
 					});
 					if(!gridRenderer.displayedSession.equals(activeSession)){
 						gridRenderer.displayedSession=activeSession;
-						ifFrame(frame->gridRenderer.calcSize(frame.data().length, true));
+						ifFrame(frame->gridRenderer.calcSize(frame.bytes().length, true));
 					}
 					if(destroyRequested){
 						destroyRequested=false;
@@ -161,7 +161,7 @@ public class DisplayManager implements DataLogger{
 		gridRenderer.displayedSession.map(s->s.frames).ifPresent(frames->{
 			if(frames.isEmpty()) return;
 			try{
-				o.accept(frames.get(gridRenderer.getFramePos()).data());
+				o.accept(frames.get(gridRenderer.getFramePos()).memData());
 			}catch(IndexOutOfBoundsException ignored){}
 		});
 	}
