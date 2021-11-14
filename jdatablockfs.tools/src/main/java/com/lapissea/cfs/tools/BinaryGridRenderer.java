@@ -980,10 +980,10 @@ public class BinaryGridRenderer{
 		var screenWidth =renderer.getDisplay().getWidth();
 		
 		try(var ignored=renderer.bulkDraw(DrawMode.QUADS)){
-			float jitter      =2;
+			float jitter      =4;
 			int   step        =15;
-			float randX       =renderCount/6f;
-			float randY       =renderCount/6f+10000;
+			float randX       =renderCount/20f;
+			float randY       =renderCount/20f+10000;
 			float simplexScale=50;
 			for(int x=0;x<screenWidth+2;x+=step){
 				for(int y=(x/step)%step;y<screenHeight+2;y+=step){

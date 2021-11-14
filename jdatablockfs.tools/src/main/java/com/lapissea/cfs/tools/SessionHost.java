@@ -82,7 +82,7 @@ public class SessionHost implements DataLogger{
 	private final Map<String, HostedSession> sessions=new LinkedHashMap<>();
 	
 	public final ChangeRegistry<Optional<HostedSession>> activeSession=new ChangeRegistry<>(Optional.empty());
-	public final ChangeRegistryInt                       activeFrame  =new ChangeRegistryInt();
+	public final ChangeRegistryInt                       activeFrame  =new ChangeRegistryInt(-1);
 	
 	
 	@Override

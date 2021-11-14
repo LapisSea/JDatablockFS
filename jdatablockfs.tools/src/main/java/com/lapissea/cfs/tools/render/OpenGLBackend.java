@@ -26,6 +26,7 @@ import java.util.function.Consumer;
 import static com.lapissea.util.PoolOwnThread.async;
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL20.glUseProgram;
 import static org.lwjgl.opengl.GL30.GL_INVALID_FRAMEBUFFER_OPERATION;
 
 public class OpenGLBackend extends RenderBackend{
@@ -291,7 +292,10 @@ public class OpenGLBackend extends RenderBackend{
 	@Override
 	public void preRender(){
 		flushTasks();
+		glDisable(GL_TEXTURE_2D);
+		glUseProgram(0);
 	}
+	
 	private void flushTasks(){
 		synchronized(glTasks){
 			while(!glTasks.isEmpty()){

@@ -13,7 +13,8 @@ import com.lapissea.util.LogUtil;
 import java.io.IOException;
 import java.util.stream.Stream;
 
-import static com.lapissea.util.LogUtil.Init.*;
+import static com.lapissea.util.LogUtil.Init.USE_CALL_POS;
+import static com.lapissea.util.LogUtil.Init.USE_TABULATED_HEADER;
 
 public class TestRun{
 	public static void main(String[] args) throws IOException{

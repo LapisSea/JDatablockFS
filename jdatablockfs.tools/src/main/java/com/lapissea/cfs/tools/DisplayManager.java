@@ -117,16 +117,29 @@ public class DisplayManager implements DataLogger{
 		
 		try{
 			if(!destroyRequested){
+				int count=0;
 				while(display.isOpen()){
 					
 					sessionHost.cleanUpSessions();
 					var activeSession=sessionHost.activeSession.get();
 					
-					activeSession.ifPresent(ses->{
-						if(ses.framePos.get()==-1){
+					if(activeSession.isPresent()){
+						if(activeSession.get().framePos.get()==-1){
 							renderer.markFrameDirty();
 						}
-					});
+						
+						//Warm up JIT
+						if(count<120){
+							count++;
+							renderer.markFrameDirty();
+						}
+					}else{
+						if(count<20){
+							count++;
+							renderer.markFrameDirty();
+						}
+					}
+					
 					if(!gridRenderer.displayedSession.equals(activeSession)){
 						gridRenderer.displayedSession=activeSession;
 						ifFrame(frame->gridRenderer.calcSize(frame.bytes().length, true));
