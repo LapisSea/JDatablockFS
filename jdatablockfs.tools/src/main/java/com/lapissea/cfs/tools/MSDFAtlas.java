@@ -247,7 +247,8 @@ public class MSDFAtlas{
 	private       WeakReference<BufferedImage>               imageRef;
 	private final UnsafeSupplier<BufferedImage, IOException> image;
 	
-	private final Map<Character, Glyph> glyphCache=new HashMap<>();
+	private final Glyph[]               glyphCacheArray=new Glyph[256];
+	private final Map<Character, Glyph> glyphCache     =new HashMap<>();
 	
 	public MSDFAtlas(String atlasFolder) throws IOException{
 		this(atlasFolder, "atlas");
@@ -282,6 +283,13 @@ public class MSDFAtlas{
 		return getGlyph((char)ch);
 	}
 	public Glyph getGlyph(char ch){
+		if(ch<glyphCacheArray.length){
+			var glyph=glyphCacheArray[ch];
+			if(glyph==null){
+				glyphCacheArray[ch]=glyph=getGlyph0(ch);
+			}
+			return glyph;
+		}
 		return glyphCache.computeIfAbsent(ch, this::getGlyph0);
 	}
 	private Glyph getGlyph0(char ch){

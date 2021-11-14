@@ -5,11 +5,13 @@ import com.lapissea.cfs.tools.render.RenderBackend;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
 
-import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static com.lapissea.util.PoolOwnThread.async;
 import static org.lwjgl.opengl.GL20.*;
@@ -56,15 +58,30 @@ public class AtlasFont extends DrawFont{
 	private final MSDFAtlas atlas;
 	
 	private final RenderBackend renderer;
+	private final boolean       monospace;
 	
 	private int             program;
 	private int             drawSizeU;
 	private int             outlineU;
 	private GlUtils.Texture texture;
 	
+	private final float[] advanceCache;
+	
 	public AtlasFont(MSDFAtlas atlas, RenderBackend renderer, Runnable renderRequest, Consumer<Runnable> openglTask){
 		this.atlas=atlas;
 		this.renderer=renderer;
+		
+		
+		var advanceCache=new float[256];
+		for(int i=0;i<advanceCache.length;i++){
+			advanceCache[i]=atlas.getGlyph(i).getAdvance();
+		}
+		var stats=IntStream.range(0, advanceCache.length).mapToDouble(i->advanceCache[i]).summaryStatistics();
+		monospace=stats.getMax()-stats.getMin()<0.0001;
+		if(monospace) this.advanceCache=new float[]{(float)stats.getMax()};
+		else{
+			this.advanceCache=advanceCache;
+		}
 		
 		if(!isMask()){
 			var atlasInfo=atlas.getInfo().getAtlas();
@@ -74,6 +91,7 @@ public class AtlasFont extends DrawFont{
 				uniform sampler2D msdf;
 				uniform float drawSize;
 				uniform bool outline;
+				uniform vec4 color;
 				
 				float median(float r, float g, float b) {
 					return max(min(r, g), min(max(r, g), b));
@@ -136,39 +154,24 @@ public class AtlasFont extends DrawFont{
 	
 	@Override
 	public void fillStrings(List<StringDraw> strings){
-		for(StringDraw string : strings){
-			fillString(string.color(), string.string(), string.pixelHeight(), string.x(), string.y());
-		}
+		drawString(strings, false);
 	}
 	@Override
 	public void outlineStrings(List<StringDraw> strings){
-		for(StringDraw string : strings){
-			outlineString(string.color(), string.string(), string.pixelHeight(), string.x(), string.y());
-		}
+		drawString(strings, true);
 	}
-	public void fillString(Color color, String string, float pixelHeight, float x, float y){
-		drawString(color, string, pixelHeight, x, y, false);
-	}
-	public void outlineString(Color color, String string, float pixelHeight, float x, float y){
-		drawString(color, string, pixelHeight, x, y, true);
-	}
-	private void drawString(Color color, String string, float pixelHeight, float xOff, float yOff, boolean outline){
-		
+	
+	private void drawString(List<StringDraw> strings, boolean outline){
 		if(texture==null) return;
 		if(!isMask()){
 			if(program==0) return;
 		}
-		
-		glColor4f(color.getRed()/255F, color.getGreen()/255F, color.getBlue()/255F, color.getAlpha()/255F);
+		if(strings.isEmpty()) return;
 		
 		var   metrics=atlas.getInfo().getMetrics();
 		float fsScale=(float)(1/(metrics.getAscender()-metrics.getDescender()));
-		var   scale  =(pixelHeight*fsScale);
-		if(scale<(outline?20:5)){
-			return;
-		}
 		
-		float x=0, y=(float)metrics.getDescender();
+		var minSpace=outline?20:5;
 		
 		int aw, ah;
 		{
@@ -176,71 +179,117 @@ public class AtlasFont extends DrawFont{
 			aw=a.getWidth();
 			ah=a.getHeight();
 		}
-		
-		if(!isMask()){
-			glUseProgram(program);
-			glUniform1f(drawSizeU, scale);
-			glUniform1i(outlineU, outline?1:0);
-		}
 		texture.bind(GL_TEXTURE_2D);
 		glEnable(GL_TEXTURE_2D);
 		
-		try(var ignored=renderer.bulkDraw(RenderBackend.DrawMode.QUADS)){
-			for(int i=0;i<string.length();i++){
-				char c    =string.charAt(i);
-				var  glyph=atlas.getGlyph(c);
-				
-				var bounds  =glyph.getPlaneBounds();
-				var uvBounds=glyph.getAtlasBounds();
-				if(bounds==null||uvBounds==null){
-					x+=glyph.getAdvance();
-					continue;
+		if(!isMask()){
+			glUseProgram(program);
+			glUniform1i(outlineU, outline?1:0);
+		}
+		
+		Map<Integer, List<StringDraw>> sizeGropus=strings.stream().collect(Collectors.groupingBy(draw->(int)(draw.pixelHeight()*100)));
+		for(var draws : sizeGropus.values()){
+			var scale=(draws.get(0).pixelHeight()*fsScale);
+			
+			
+			if(!isMask()){
+				glUniform1f(drawSizeU, scale);
+			}
+			
+			if(scale<minSpace){
+				continue;
+			}
+			
+			float alphaMul=Math.min(1, (scale-minSpace)/6);
+			
+			try(var ignored=renderer.bulkDraw(RenderBackend.DrawMode.QUADS)){
+				for(StringDraw draw : draws){
+					var   col=draw.color();
+					float r  =col.getRed()/255F, g=col.getGreen()/255F, b=col.getBlue()/255F, a=(col.getAlpha()/255F)*alphaMul;
+					
+					String string=draw.string();
+					float  xScale=draw.xScale();
+					float  xOff  =draw.x();
+					float  yOff  =draw.y();
+					
+					float x=0, y=(float)metrics.getDescender();
+					
+					
+					
+					for(int i=0;i<string.length();i++){
+						char c    =string.charAt(i);
+						var  glyph=atlas.getGlyph(c);
+						
+						var bounds  =glyph.getPlaneBounds();
+						var uvBounds=glyph.getAtlasBounds();
+						if(bounds==null||uvBounds==null){
+							x+=glyph.getAdvance();
+							continue;
+						}
+						
+						
+						float
+							x0=(bounds.getLeft()+x)*scale*xScale+xOff,
+							x1=(bounds.getRight()+x)*scale*xScale+xOff,
+							y0=((-bounds.getBottom())+y)*scale+yOff,
+							y1=((-bounds.getTop())+y)*scale+yOff;
+						
+						float
+							u0=uvBounds.getLeft()/aw,
+							u1=uvBounds.getRight()/aw,
+							v0=uvBounds.getBottom()/ah,
+							v1=uvBounds.getTop()/ah;
+						
+						v0=1-v0;
+						v1=1-v1;
+						
+						
+						doVert(x0, y0, u0, v0, r, g, b, a);
+						doVert(x1, y0, u1, v0, r, g, b, a);
+						doVert(x1, y1, u1, v1, r, g, b, a);
+						doVert(x0, y1, u0, v1, r, g, b, a);
+						
+						x+=glyph.getAdvance();
+					}
 				}
-				
-				
-				float
-					x0=(bounds.getLeft()+x)*scale+xOff,
-					x1=(bounds.getRight()+x)*scale+xOff,
-					y0=((-bounds.getBottom())+y)*scale+yOff,
-					y1=((-bounds.getTop())+y)*scale+yOff;
-				
-				float
-					u0=uvBounds.getLeft()/aw,
-					u1=uvBounds.getRight()/aw,
-					v0=uvBounds.getBottom()/ah,
-					v1=uvBounds.getTop()/ah;
-				
-				v0=1-v0;
-				v1=1-v1;
-				
-				GL11.glTexCoord2f(u0, v0);
-				GL11.glVertex2f(x0, y0);
-				
-				GL11.glTexCoord2f(u1, v0);
-				GL11.glVertex2f(x1, y0);
-				
-				GL11.glTexCoord2f(u1, v1);
-				GL11.glVertex2f(x1, y1);
-				
-				GL11.glTexCoord2f(u0, v1);
-				GL11.glVertex2f(x0, y1);
-				
-				x+=glyph.getAdvance();
 			}
 		}
 		
-		GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
-		GL11.glDisable(GL11.GL_TEXTURE_2D);
-		if(!isMask()) glUseProgram(0);
+		glBindTexture(GL_TEXTURE_2D, 0);
+		glDisable(GL_TEXTURE_2D);
+		glUseProgram(0);
+	}
+	
+	private void doVert(float x, float y, float u, float v, float r, float g, float b, float a){
+		GL11.glColor4f(r, g, b, a);
+		GL11.glTexCoord2f(u, v);
+		GL11.glVertex2f(x, y);
 	}
 	
 	@Override
 	public Bounds getStringBounds(String string){
-		var width=string.chars().mapToDouble(c->atlas.getGlyph(c).getAdvance()).sum();
+		double width=calcWidth(string);
+		var    s    =renderer.getFontScale();
 		return new Bounds(
-			(float)(width*renderer.getFontScale()),
+			(float)(width*s),
 			(float)(atlas.getInfo().getMetrics().getLineHeight()*renderer.getFontScale())
 		);
+	}
+	
+	private double calcWidth(String string){
+		if(monospace){
+			return string.length()*advanceCache[0];
+		}
+		var width=0D;
+		for(int i=0;i<string.length();i++){
+			var c=string.charAt(i);
+			if(c<advanceCache.length){
+				width+=advanceCache[c];
+			}else{
+				width+=atlas.getGlyph(c).getAdvance();
+			}
+		}
+		return width;
 	}
 	
 	@Override

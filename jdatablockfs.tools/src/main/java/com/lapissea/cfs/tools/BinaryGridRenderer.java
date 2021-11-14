@@ -312,13 +312,13 @@ public class BinaryGridRenderer{
 		}
 		
 		both=fStr+(str==null?"":": "+str);
-		if(renderer.getFont().getStringBounds(both).width()>rectWidth){
+		if(getStringBounds(both).width()>rectWidth){
 			shortStr=field.instanceToString(instance, true);
 			both=fStr+(shortStr==null?"":": "+shortStr);
 		}
 		
 		
-		if(renderer.getFont().getStringBounds(both).width()>rectWidth){
+		if(getStringBounds(both).width()>rectWidth){
 			var font=renderer.getFontScale();
 			renderer.pushMatrix();
 			initFont(0.4F);
@@ -330,7 +330,7 @@ public class BinaryGridRenderer{
 			if(str!=null){
 				var drawStr=str;
 				
-				if(renderer.getFont().getStringBounds(drawStr).width()>rectWidth){
+				if(getStringBounds(drawStr).width()>rectWidth){
 					if(shortStr==null) shortStr=field.instanceToString(instance, true);
 					drawStr=shortStr;
 				}
@@ -506,7 +506,7 @@ public class BinaryGridRenderer{
 	}
 	
 	private void drawStringIn(Color color, String s, Rect area, boolean doStroke, boolean alignLeft){
-		var rect=renderer.getFont().getStringBounds(s);
+		var rect=getStringBounds(s);
 		
 		float w=rect.width();
 		float h=rect.height();
@@ -517,7 +517,7 @@ public class BinaryGridRenderer{
 			if(area.height<h){
 				renderer.setFontScale(area.height);
 				
-				rect=renderer.getFont().getStringBounds(s);
+				rect=getStringBounds(s);
 				
 				w=rect.width();
 				h=rect.height();
@@ -529,7 +529,7 @@ public class BinaryGridRenderer{
 			if(scale<0.5){
 				renderer.setFontScale(renderer.getFontScale()/(scale<0.25?3:2));
 				
-				rect=renderer.getFont().getStringBounds(s);
+				rect=getStringBounds(s);
 				
 				w=rect.width();
 				h=rect.height();
@@ -541,37 +541,39 @@ public class BinaryGridRenderer{
 					break;
 				}
 				s=s.substring(0, s.length()-4)+"...";
-				rect=renderer.getFont().getStringBounds(s);
+				rect=getStringBounds(s);
 				
 				w=rect.width();
 				h=rect.height();
 			}
 		}
 		
-		renderer.pushMatrix();
-		renderer.translate(area.x, area.y);
-		renderer.translate(alignLeft?0:Math.max(0, area.width-w)/2D, h+(area.height-h)/2);
+		float x=area.x;
+		float y=area.y;
 		
+		x+=alignLeft?0:Math.max(0, area.width-w)/2D;
+		y+=h+(area.height-h)/2;
+		
+		float xScale=1;
 		if(w>0){
 			double scale=(area.width-1)/w;
 			if(scale<1){
-				renderer.scale(scale, 1);
+				xScale=(float)scale;
 			}
 		}
 		
-		renderer.getFont().fillStrings(new DrawFont.StringDraw(renderer.getFontScale(), color, s, 0, 0));
+		renderer.getFont().fillStrings(new DrawFont.StringDraw(renderer.getFontScale(), xScale, color, s, x, y));
 		if(doStroke){
 			Color c=renderer.readColor();
 			
 			renderer.setLineWidth(1);
 			
-			renderer.getFont().outlineStrings(new DrawFont.StringDraw(renderer.getFontScale(), new Color(0, 0, 0, 0.5F), s, 0, 0));
+			renderer.getFont().outlineStrings(new DrawFont.StringDraw(renderer.getFontScale(), xScale, new Color(0, 0, 0, 0.5F), s, x, y));
 			
 			renderer.setColor(c);
 		}
 		
 		renderer.setFontScale(fontScale);
-		renderer.popMatrix();
 	}
 	
 	protected void calcSize(int bytesCount, boolean restart){
@@ -645,6 +647,11 @@ public class BinaryGridRenderer{
 	private void render(int frameIndex){
 		if(getFrameCount()==0){
 			startFrame();
+			var str="No data!";
+			
+			int w=renderer.getDisplay().getWidth(), h=renderer.getDisplay().getHeight();
+			renderer.setFontScale(Math.min(h, w/(str.length()*0.8F)));
+			drawStringIn(Color.LIGHT_GRAY, str, new Rect(0, 0, w, h), true);
 			return;
 		}
 		
@@ -1140,11 +1147,11 @@ public class BinaryGridRenderer{
 			int msgWidth=ptr.message().length();
 			int space   =(int)(screenWidth-x);
 			
-			var w=renderer.getFont().getStringBounds(ptr.message()).width();
+			var w=getStringBounds(ptr.message()).width();
 			while(w>space*1.5){
 				msgWidth--;
 				if(msgWidth==0) break;
-				w=renderer.getFont().getStringBounds(ptr.message().substring(0, msgWidth)).width();
+				w=getStringBounds(ptr.message().substring(0, msgWidth)).width();
 			}
 			List<String> lines=msgWidth==0?List.of(ptr.message()):TextUtil.wrapLongString(ptr.message(), msgWidth);
 			y-=renderer.getLineWidth()/2F*lines.size();
@@ -1166,7 +1173,7 @@ public class BinaryGridRenderer{
 		
 		var msg       =DrawUtils.errorToMessage(parsed.displayError);
 		var lines     =msg.split("\n");
-		var bounds    =Arrays.stream(lines).map(renderer.getFont()::getStringBounds).toList();
+		var bounds    =Arrays.stream(lines).map(this::getStringBounds).toList();
 		var totalBound=bounds.stream().reduce((l, r)->new DrawFont.Bounds(Math.max(l.width(), r.width()), l.height()+r.height())).orElseThrow();
 		
 		renderer.setColor(alpha(Color.RED.darker(), 0.2F));
@@ -1213,7 +1220,7 @@ public class BinaryGridRenderer{
 		int x=(int)(xByte*ctx.pixelsPerByte());
 		int y=(int)((yByte-0.1)*ctx.pixelsPerByte());
 		
-		var bounds=renderer.getFont().getStringBounds(s);
+		var bounds=getStringBounds(s);
 		x=(int)Math.min(Math.max(0, x-bounds.width()/2+ctx.pixelsPerByte()/2F), screenWidth-Math.ceil(bounds.width()));
 		y=Math.max(y, (int)Math.ceil(bounds.height()));
 		
@@ -1236,6 +1243,11 @@ public class BinaryGridRenderer{
 		
 		renderer.translate(-0.5, -0.5);
 	}
+	
+	private DrawFont.Bounds getStringBounds(String s){
+		return renderer.getFont().getStringBounds(s);
+	}
+	
 	private void findHoverChunk(RenderContext ctx, ParsedFrame parsed, ChunkDataProvider provider){
 		int xByte=(int)(renderer.getDisplay().getMouseX()/ctx.pixelsPerByte());
 		if(xByte>=ctx.width()){

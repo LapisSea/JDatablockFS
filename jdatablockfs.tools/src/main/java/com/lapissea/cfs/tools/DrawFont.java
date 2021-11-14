@@ -7,7 +7,11 @@ import java.util.List;
 public abstract class DrawFont{
 	public static record Bounds(float width, float height){}
 	
-	public static record StringDraw(float pixelHeight, Color color, String string, float x, float y){}
+	public static record StringDraw(float pixelHeight, float xScale, Color color, String string, float x, float y){
+		public StringDraw(float pixelHeight, Color color, String string, float x, float y){
+			this(pixelHeight, 1, color, string, x, y);
+		}
+	}
 	
 	public void fillStrings(StringDraw... strings){
 		fillStrings(Arrays.asList(strings));
