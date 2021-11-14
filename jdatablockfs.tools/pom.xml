@@ -146,7 +146,7 @@
 			</snapshots>
 		</repository>
 		<repository>
-			<id>sonatype-snapshots</id>
+			<id>sonatype-releases</id>
 			<url>https://oss.sonatype.org/content/repositories/releases/</url>
 			<releases>
 				<enabled>true</enabled>
@@ -156,7 +156,7 @@
 			</snapshots>
 		</repository>
 		<repository>
-			<id>sonatype-snapshots</id>
+			<id>SpinyOwl</id>
 			<url>https://raw.github.com/SpinyOwl/repo/releases</url>
 			<releases>
 				<enabled>true</enabled>

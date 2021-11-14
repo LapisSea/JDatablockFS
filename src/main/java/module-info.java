@@ -2,7 +2,8 @@ module JDatablockFS {
 	requires jdk.unsupported;
 	
 	requires jlapisutil;
-	requires geantyref;
+	requires io.leangen.geantyref;
+	requires RoaringBitmap;
 	
 	exports com.lapissea.cfs.type.field.annotations;
 	exports com.lapissea.cfs.objects;

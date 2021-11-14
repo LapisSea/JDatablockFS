@@ -7,23 +7,24 @@ import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
+import org.roaringbitmap.RoaringBitmap;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.BitSet;
 import java.util.List;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
 public class MemoryOperations{
+	
 	public static void purgePossibleChunkHeaders(ChunkDataProvider provider, long from, long size) throws IOException{
 		var maxHeaderSize=(int)Chunk.PIPE.getSizeDescriptor().requireMax(WordSpace.BYTE);
 		
-		BitSet possibleHeaders=new BitSet((int)size);
+		RoaringBitmap possibleHeaders=new RoaringBitmap();
 		try(var io=provider.getSource().read(from)){
 			for(int i=0;i<size;i++){
 				if(Chunk.earlyCheckChunkAt(io)){
-					possibleHeaders.set(i);
+					possibleHeaders.add(i);
 				}
 			}
 		}
@@ -51,10 +52,10 @@ public class MemoryOperations{
 				try(var io=provider.getSource().write(pos, false)){
 					io.writeInt1(0);
 				}
-				possibleHeaders.clear(headIndex);
+				possibleHeaders.remove(headIndex);
 			}
 			if(lastUnknown!=-1){
-				possibleHeaders.clear(lastUnknown);
+				possibleHeaders.remove(lastUnknown);
 			}
 			
 			if(possibleHeaders.isEmpty()) break;
@@ -67,7 +68,7 @@ public class MemoryOperations{
 				var nextIndex=iter.nextInt();
 				
 				if(Math.min(Math.abs(lastIndex-index), Math.abs(nextIndex-index))>maxHeaderSize){
-					possibleHeaders.clear(index);
+					possibleHeaders.remove(index);
 				}else{
 					lastIndex=index;
 				}
