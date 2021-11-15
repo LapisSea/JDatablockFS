@@ -1,7 +1,6 @@
 package com.lapissea.cfs.tools.render;
 
 import com.lapissea.cfs.tools.AtlasFont;
-import com.lapissea.cfs.tools.DisplayManager;
 import com.lapissea.cfs.tools.DrawFont;
 import com.lapissea.cfs.tools.MSDFAtlas;
 import com.lapissea.glfw.GlfwMonitor;
@@ -9,7 +8,6 @@ import com.lapissea.glfw.GlfwWindow;
 import com.lapissea.util.MathUtil;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.UtilL;
-import org.lwjgl.glfw.GLFW;
 import org.lwjgl.glfw.GLFWErrorCallback;
 import org.lwjgl.opengl.GL;
 
@@ -91,12 +89,7 @@ public class OpenGLBackend extends RenderBackend{
 		glThread.setDaemon(false);
 		glThread.start();
 		
-		UtilL.sleepWhile(()->glInit==null);
-		glInit.join();
-		glInit=null;
-		
 		this.glThread=glThread;
-
 
 //		var path="/roboto/regular";
 		var path="/CourierPrime/Regular";
@@ -109,6 +102,10 @@ public class OpenGLBackend extends RenderBackend{
 		}catch(IOException e){
 			throw new RuntimeException("failed to load font", e);
 		}
+		
+		UtilL.sleepWhile(()->glInit==null);
+		glInit.join();
+		glInit=null;
 		
 		displayInterface=new DisplayInterface(){
 			@Override
@@ -213,12 +210,11 @@ public class OpenGLBackend extends RenderBackend{
 			System.exit(0);
 		});
 		
-		org.lwjgl.glfw.GLFW.glfwWindowHint(GLFW.GLFW_SAMPLES, 8);
-		
-		if(UtilL.sysPropertyByClass(DisplayManager.class, "emulateNoGLSupport").map(Boolean::parseBoolean).orElse(false)){
+		if(UtilL.sysPropertyByClass(OpenGLBackend.class, "emulateNoGLSupport").map(Boolean::parseBoolean).orElse(false)){
 			throw new RuntimeException("gl disabled");
 		}
 		
+		glfwWindowHint(GLFW_SAMPLES, 8);
 		glfwWindowHint(GLFW_DOUBLEBUFFER, GLFW_TRUE);
 		
 		window.init(GlfwWindow.SurfaceAPI.OPENGL);
@@ -252,8 +248,10 @@ public class OpenGLBackend extends RenderBackend{
 			start.run();
 		});
 		destroyRequested=true;
-		window.requestClose();
-		window.destroy();
+		if(window.isCreated()){
+			window.requestClose();
+			window.destroy();
+		}
 	}
 	
 	@Override

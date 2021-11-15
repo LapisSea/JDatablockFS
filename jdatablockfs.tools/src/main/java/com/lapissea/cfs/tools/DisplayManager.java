@@ -90,7 +90,12 @@ public class DisplayManager implements DataLogger{
 		display.registerDisplayResize(()->{
 			sessionHost.cleanUpSessions();
 			ifFrame(frame->gridRenderer.calcSize(frame.bytes().length, true));
-			doRender();
+			renderer.markFrameDirty();
+			renderer.runLater(()->{
+				if(renderer.notifyDirtyFrame()){
+					doRender();
+				}
+			});
 		});
 		
 		display.registerKeyboardButton(e->{
