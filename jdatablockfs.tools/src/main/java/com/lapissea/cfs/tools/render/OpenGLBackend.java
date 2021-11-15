@@ -323,10 +323,6 @@ public class OpenGLBackend extends RenderBackend{
 	}
 	
 	@Override
-	public boolean canFontDisplay(char c){
-		return font.canFontDisplay(c);
-	}
-	@Override
 	public void translate(double x, double y){
 		glTranslated(x, y, 0);
 	}

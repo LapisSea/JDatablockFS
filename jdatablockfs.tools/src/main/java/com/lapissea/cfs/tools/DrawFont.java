@@ -25,9 +25,9 @@ public abstract class DrawFont{
 	
 	public abstract Bounds getStringBounds(String string);
 	
-	public boolean canFontDisplay(int c){
+	public boolean canFontDisplay(byte c){
 		if(c==0) return false;
-		return canFontDisplay(c);
+		return canFontDisplay((char)(c&0xFF));
 	}
 	public abstract boolean canFontDisplay(char c);
 }

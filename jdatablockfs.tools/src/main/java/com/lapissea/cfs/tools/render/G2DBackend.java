@@ -348,10 +348,6 @@ public class G2DBackend extends RenderBackend{
 		currentGraphics.rotate(angle);
 	}
 	@Override
-	public boolean canFontDisplay(char c){
-		return currentGraphics.getFont().canDisplay(c);
-	}
-	@Override
 	public void preRender(){
 		var image=render;
 		int w    =getDisplay().getWidth();

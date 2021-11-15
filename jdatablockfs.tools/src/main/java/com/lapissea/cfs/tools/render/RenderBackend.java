@@ -165,10 +165,4 @@ public abstract class RenderBackend{
 	public abstract void postRender();
 	
 	public abstract DrawFont getFont();
-	
-	public abstract boolean canFontDisplay(char c);
-	public boolean canFontDisplay(int code){
-		if(code==0) return false;
-		return canFontDisplay((char)code);
-	}
 }
