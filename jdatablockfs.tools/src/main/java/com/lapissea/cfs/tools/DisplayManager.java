@@ -4,6 +4,7 @@ import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.MemFrame;
 import com.lapissea.cfs.tools.render.RenderBackend;
 import com.lapissea.util.MathUtil;
+import com.lapissea.util.Rand;
 import com.lapissea.util.UtilL;
 import com.lapissea.vec.Vec2i;
 
@@ -117,7 +118,7 @@ public class DisplayManager implements DataLogger{
 		
 		try{
 			if(!destroyRequested){
-				int count=0;
+				int jitWarmup=0;
 				while(display.isOpen()){
 					
 					sessionHost.cleanUpSessions();
@@ -128,14 +129,13 @@ public class DisplayManager implements DataLogger{
 							renderer.markFrameDirty();
 						}
 						
-						//Warm up JIT
-						if(count<120){
-							count++;
+						if(jitWarmup<150&&Rand.b(0.1F)){
+							jitWarmup++;
 							renderer.markFrameDirty();
 						}
 					}else{
-						if(count<20){
-							count++;
+						if(jitWarmup<20&&Rand.b(0.1F)){
+							jitWarmup++;
 							renderer.markFrameDirty();
 						}
 					}
@@ -150,7 +150,7 @@ public class DisplayManager implements DataLogger{
 					}
 					if(renderer.notifyDirtyFrame()){
 						doRender();
-					}
+					}else UtilL.sleep(2);
 					UtilL.sleep(0, 1000);
 					display.pollEvents();
 				}

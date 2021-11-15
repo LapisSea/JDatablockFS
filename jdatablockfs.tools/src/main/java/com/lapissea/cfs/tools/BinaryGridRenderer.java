@@ -241,12 +241,12 @@ public class BinaryGridRenderer{
 	}
 	
 	private <T extends IOInstance<T>> void annotateBitField(
-		ChunkDataProvider provider, RenderContext ctx,
+		AnnotateCtx ctx,
 		T instance, IOField<T, ?> field,
 		Color col, int bitOffset, long bitSize, Reference reference, long fieldOffset
 	) throws IOException{
 		Consumer<Rect> doSegment=bitRect->{
-			drawStringIn(alpha(col, 0.7F), Objects.toString(field.instanceToString(instance, true)), bitRect, false);
+			drawStringInInfo(alpha(col, 0.7F), Objects.toString(field.instanceToString(instance, true)), bitRect, false, ctx.strings);
 			renderer.setColor(alpha(col, 0.3F));
 			renderer.fillQuad(bitRect.x, bitRect.y, bitRect.width, bitRect.height);
 		};
@@ -256,20 +256,20 @@ public class BinaryGridRenderer{
 			var remaining =bitSize;
 			var bitOff    =bitOffset;
 			while(remaining>0){
-				doSegment.accept(DrawUtils.makeBitRect(ctx, trueOffset, bitOff, remaining));
+				doSegment.accept(DrawUtils.makeBitRect(ctx.renderCtx, trueOffset, bitOff, remaining));
 				remaining-=Math.min(8, remaining);
 				bitOff=0;
 				trueOffset++;
 			}
 		}else{
-			try(var io=new ChunkChainIO(reference.getPtr().dereference(provider))){
+			try(var io=new ChunkChainIO(reference.getPtr().dereference(ctx.provider))){
 				io.setPos(reference.getOffset()+fieldOffset);
 				
 				var trueOffset=io.calcGlobalPos();
 				var remaining =bitSize;
 				var bitOff    =bitOffset;
 				while(remaining>0){
-					doSegment.accept(DrawUtils.makeBitRect(ctx, trueOffset, bitOff, remaining));
+					doSegment.accept(DrawUtils.makeBitRect(ctx.renderCtx, trueOffset, bitOff, remaining));
 					remaining-=Math.min(8, remaining);
 					bitOff=0;
 					io.skip(1);
@@ -278,7 +278,7 @@ public class BinaryGridRenderer{
 		}
 	}
 	private <T extends IOInstance<T>> void annotateByteField(
-		ChunkDataProvider provider, RenderContext ctx, Consumer<Pointer> pointerRecord,
+		AnnotateCtx ctx,
 		T instance, IOField<T, ?> field,
 		Color col, Reference reference, Range fieldRange
 	){
@@ -286,19 +286,19 @@ public class BinaryGridRenderer{
 		Range lastRange=null;
 		for(Range range : instance instanceof Chunk ch?
 		                  List.of(Range.fromSize(ch.getPtr().getValue()+fieldRange.from(), fieldRange.size())):
-		                  FieldWalking.chainRangeResolve(provider, reference, (int)fieldRange.from(), (int)fieldRange.size())){
-			if(bestRange.size()<ctx.width()){
-				var contiguousRange=DrawUtils.findBestContiguousRange(ctx, range);
+		                  FieldWalking.chainRangeResolve(ctx.provider, reference, (int)fieldRange.from(), (int)fieldRange.size())){
+			if(bestRange.size()<ctx.renderCtx.width()){
+				var contiguousRange=DrawUtils.findBestContiguousRange(ctx.renderCtx, range);
 				if(bestRange.size()<contiguousRange.size()) bestRange=contiguousRange;
 			}
-			if(lastRange!=null) pointerRecord.accept(new Pointer(lastRange.to()-1, range.from(), 0, col, field.toString(), 0.2F));
+			if(lastRange!=null) ctx.recordPointer(new Pointer(lastRange.to()-1, range.from(), 0, col, field.toString(), 0.2F));
 			lastRange=range;
-			drawByteRanges(ctx, List.of(range), alpha(mul(col, 0.8F), 0.6F), false, true);
+			drawByteRanges(ctx.renderCtx, List.of(range), alpha(mul(col, 0.8F), 0.6F), false, true);
 		}
 		
 		var color=alpha(mix(col, Color.WHITE, 0.2F), 1);
 		
-		var rectWidth=bestRange.toRect(ctx).width;
+		var rectWidth=bestRange.toRect(ctx.renderCtx).width;
 		
 		String str     =field.instanceToString(instance, false);
 		String shortStr=null;
@@ -320,11 +320,10 @@ public class BinaryGridRenderer{
 		
 		if(getStringBounds(both).width()>rectWidth){
 			var font=renderer.getFontScale();
-			renderer.pushMatrix();
 			initFont(0.4F);
-			renderer.translate(0, renderer.getFontScale()*-0.8);
-			drawStringIn(color, fStr, bestRange.toRect(ctx), false);
-			renderer.popMatrix();
+			var rect=bestRange.toRect(ctx.renderCtx);
+			rect.y+=renderer.getFontScale()*-0.8;
+			drawStringInInfo(color, fStr, rect, false, ctx.strings);
 			renderer.setFontScale(font);
 			
 			if(str!=null){
@@ -335,14 +334,12 @@ public class BinaryGridRenderer{
 					drawStr=shortStr;
 				}
 				
-				drawStringIn(color, (drawStr==null?"":drawStr), bestRange.toRect(ctx), true);
+				drawStringInInfo(color, (drawStr==null?"":drawStr), bestRange.toRect(ctx.renderCtx), false, ctx.strings, ctx.stringOutlines);
 			}
 		}else{
 			initFont(1);
-			drawStringIn(color, both, bestRange.toRect(ctx), true);
+			drawStringInInfo(color, both, bestRange.toRect(ctx.renderCtx), false, ctx.strings, ctx.stringOutlines);
 		}
-		
-		
 	}
 	
 	private double[] deBoor(int k, int degree, int i, double x, double[] knots, double[][] ctrlPoints){
@@ -477,7 +474,7 @@ public class BinaryGridRenderer{
 		int cap  =(int)chunk.getCapacity();
 		int siz  =(int)chunk.getSize();
 		drawByteRanges(ctx, List.of(new Range(start+siz, start+cap)), freeColor, withChar, force);
-		//drawByteRanges(ctx, List.of(new Range(start, start+siz)), dataColor, withChar, force);
+		//drawByteRanges(renderCtx, List.of(new Range(start, start+siz)), dataColor, withChar, force);
 	}
 	
 	private void fillBit(float x, float y, int index, float xOff, float yOff){
@@ -506,74 +503,85 @@ public class BinaryGridRenderer{
 	}
 	
 	private void drawStringIn(Color color, String s, Rect area, boolean doStroke, boolean alignLeft){
-		var rect=getStringBounds(s);
+		var info=drawStringInInfo(color, s, area, alignLeft);
+		if(info==null) return;
 		
-		float w=rect.width();
-		float h=rect.height();
+		renderer.getFont().fillStrings(info);
+		if(doStroke){
+			renderer.getFont().outlineStrings(new DrawFont.StringDraw(info.pixelHeight(), info.xScale(), new Color(0, 0, 0, 0.5F), info.string(), info.x(), info.y()));
+		}
+	}
+	
+	private void drawStringInInfo(Color color, String s, Rect area, boolean alignLeft, List<DrawFont.StringDraw> strings, List<DrawFont.StringDraw> stringStrokes){
+		var info=drawStringInInfo(color, s, area, alignLeft);
+		if(info!=null){
+			strings.add(info);
+			stringStrokes.add(new DrawFont.StringDraw(info.pixelHeight(), info.xScale(), new Color(0, 0, 0, 0.5F), info.string(), info.x(), info.y()));
+		}
+	}
+	private void drawStringInInfo(Color color, String s, Rect area, boolean alignLeft, List<DrawFont.StringDraw> strings){
+		var info=drawStringInInfo(color, s, area, alignLeft);
+		if(info!=null) strings.add(info);
+	}
+	private DrawFont.StringDraw drawStringInInfo(Color color, String s, Rect area, boolean alignLeft){
+		if(s.isEmpty()) return null;
 		
 		float fontScale=renderer.getFontScale();
-		
-		if(h>0){
-			if(area.height<h){
+		try{
+			if(area.height<fontScale){
 				renderer.setFontScale(area.height);
-				
-				rect=getStringBounds(s);
+			}
+			
+			float w, h;
+			{
+				var rect=getStringBounds(s);
 				
 				w=rect.width();
 				h=rect.height();
-			}
-		}
-		
-		if(w>0){
-			double scale=(area.width-1)/w;
-			if(scale<0.5){
-				renderer.setFontScale(renderer.getFontScale()/(scale<0.25?3:2));
 				
-				rect=getStringBounds(s);
-				
-				w=rect.width();
-				h=rect.height();
-			}
-			while((area.width-1)/w<0.5){
-				if(s.isEmpty()) return;
-				if(s.length()<=4){
-					s=s.charAt(0)+"";
-					break;
+				if(w>0){
+					double scale=(area.width-1)/w;
+					if(scale<0.5){
+						float div=scale<0.25?3:2;
+						renderer.setFontScale(renderer.getFontScale()/div);
+						w=rect.width()/div;
+						h=rect.height()/div;
+					}
+					DrawFont.Bounds sbDots=null;
+					while((area.width-1)/w<0.5){
+						if(s.isEmpty()) return null;
+						if(s.length()==1){
+							break;
+						}
+						s=s.substring(0, s.length()-1).trim();
+						rect=getStringBounds(s);
+						if(sbDots==null){
+							sbDots=getStringBounds("...");
+						}
+						w=rect.width()+sbDots.width();
+						h=Math.max(rect.height(), sbDots.height());
+					}
 				}
-				s=s.substring(0, s.length()-4)+"...";
-				rect=getStringBounds(s);
-				
-				w=rect.width();
-				h=rect.height();
 			}
-		}
-		
-		float x=area.x;
-		float y=area.y;
-		
-		x+=alignLeft?0:Math.max(0, area.width-w)/2D;
-		y+=h+(area.height-h)/2;
-		
-		float xScale=1;
-		if(w>0){
-			double scale=(area.width-1)/w;
-			if(scale<1){
-				xScale=(float)scale;
+			
+			float x=area.x;
+			float y=area.y;
+			
+			x+=alignLeft?0:Math.max(0, area.width-w)/2D;
+			y+=h+(area.height-h)/2;
+			
+			float xScale=1;
+			if(w>0){
+				double scale=(area.width-1)/w;
+				if(scale<1){
+					xScale=(float)scale;
+				}
 			}
+			
+			return new DrawFont.StringDraw(renderer.getFontScale(), xScale, color, s, x, y);
+		}finally{
+			renderer.setFontScale(fontScale);
 		}
-		
-		renderer.getFont().fillStrings(new DrawFont.StringDraw(renderer.getFontScale(), xScale, color, s, x, y));
-		if(doStroke){
-			Color c=renderer.readColor();
-			
-			renderer.setLineWidth(1);
-			
-			renderer.getFont().outlineStrings(new DrawFont.StringDraw(renderer.getFontScale(), xScale, new Color(0, 0, 0, 0.5F), s, x, y));
-			
-			renderer.setColor(c);
-		}
-		
-		renderer.setFontScale(fontScale);
 	}
 	
 	protected void calcSize(int bytesCount, boolean restart){
@@ -633,9 +641,7 @@ public class BinaryGridRenderer{
 		
 		frameTimer.end();
 		var tim=frameTimer.msAvrg100();
-		if(tim>16){
-			LogUtil.println("Frame time:", tim);
-		}
+		LogUtil.println("Frame time:", tim);
 	}
 	private void startFrame(){
 		renderer.clearFrame();
@@ -721,12 +727,14 @@ public class BinaryGridRenderer{
 						}
 					}
 				});
-				
-				annotateStruct(ctx, cluster,
-				               new LinkedList<>(), root,
+				AnnotateCtx annCtx=new AnnotateCtx(ctx, provider, new LinkedList<>(), ptrs::add, new ArrayList<>(), new ArrayList<>());
+				annotateStruct(annCtx, root,
 				               cluster.getFirstChunk().getPtr().makeReference(),
 				               FixedContiguousStructPipe.of(root.getThisStruct()),
-				               ptrs::add, true);
+				               true);
+				
+				assert annCtx.stack.isEmpty();
+				annCtx.stack.add(null);
 				
 				long pos=cluster.getFirstChunk().getPtr().getValue();
 				while(pos<bytes.length){
@@ -736,7 +744,7 @@ public class BinaryGridRenderer{
 							if(referenced.contains(chunk)){
 								fillChunk(ctx, chunk, ch->ch, true, false);
 							}
-							fillChunk(ctx, ptrs, cluster, chunk);
+							annotateChunk(annCtx, chunk);
 						}
 					}catch(MalformedPointerException e){
 						var p=(int)pos;
@@ -744,10 +752,12 @@ public class BinaryGridRenderer{
 						pos++;
 					}
 				}
+				annCtx.popStrings(renderer);
 				
 			}else{
 				provider=ChunkDataProvider.newVerySimpleProvider(MemoryData.build().withRaw(bytes).build());
-				
+				AnnotateCtx annCtx=new AnnotateCtx(ctx, provider, new LinkedList<>(), ptrs::add, new ArrayList<>(), new ArrayList<>());
+				annCtx.stack.add(null);
 				long pos;
 				try{
 					pos=provider.getFirstChunk().getPtr().getValue();
@@ -758,7 +768,7 @@ public class BinaryGridRenderer{
 					try{
 						for(Chunk chunk : new PhysicalChunkWalker(provider.getChunk(ChunkPointer.of(pos)))){
 							pos=chunk.dataEnd();
-							fillChunk(ctx, ptrs, provider, chunk);
+							annotateChunk(annCtx, chunk);
 						}
 					}catch(MalformedPointerException e){
 						var p=(int)pos;
@@ -766,7 +776,7 @@ public class BinaryGridRenderer{
 						pos++;
 					}
 				}
-				
+				annCtx.popStrings(renderer);
 			}
 		}catch(Throwable e){
 			handleError(e, parsed);
@@ -785,9 +795,7 @@ public class BinaryGridRenderer{
 		
 		drawWriteIndex(frame, ctx);
 		
-		for(Pointer ptr : ptrs){
-			drawPointer(ctx, parsed, ptr);
-		}
+		drawPointers(ctx, parsed, ptrs);
 		
 		drawMouse(ctx, cFrame);
 		drawError(parsed);
@@ -797,10 +805,11 @@ public class BinaryGridRenderer{
 		drawTimeline(frameIndex);
 	}
 	
-	private void fillChunk(RenderContext ctx, List<Pointer> ptrs, ChunkDataProvider provider, Chunk chunk) throws IOException{
-		annotateStruct(ctx, provider, new LinkedList<>(), chunk, null, Chunk.PIPE, ptrs::add, true);
-		if(chunk.dataEnd()>ctx.bytes.length){
-			drawByteRanges(ctx, List.of(new Range(ctx.bytes.length, chunk.dataEnd())), new Color(0, 0, 0, 0.2F), false, false);
+	private void annotateChunk(AnnotateCtx ctx, Chunk chunk) throws IOException{
+		annotateStruct(ctx, chunk, null, Chunk.PIPE, true);
+		var rctx=ctx.renderCtx;
+		if(chunk.dataEnd()>rctx.bytes.length){
+			drawByteRanges(rctx, List.of(new Range(rctx.bytes.length, chunk.dataEnd())), new Color(0, 0, 0, 0.2F), false, false);
 		}
 	}
 	
@@ -940,12 +949,33 @@ public class BinaryGridRenderer{
 		
 		if(withChar){
 			var c=new Color(1, 1, 1, bitColor.getAlpha()/255F*0.6F);
-			clampedInts.get().filter(i->renderer.canFontDisplay(ctx.bytes[i])).forEach(i->{
-				int   xi=i%ctx.width(), yi=i/ctx.width();
-				float xF=ctx.pixelsPerByte()*xi, yF=ctx.pixelsPerByte()*yi;
-				
-				drawStringIn(c, Character.toString((char)ctx.bytes[i]), new Rect(xF, yF, ctx.pixelsPerByte(), ctx.pixelsPerByte()), true);
-			});
+			
+			List<DrawFont.StringDraw> chars=null;
+			if(clampedOverflow.size()==1){
+				var r=clampedOverflow.get(0);
+				if(r.size()==1){
+					var  i=(int)r.from();
+					char b=(char)(ctx.bytes[i]&0xFF);
+					if(renderer.getFont().canFontDisplay(b)){
+						int   xi  =i%ctx.width(), yi=i/ctx.width();
+						float xF  =ctx.pixelsPerByte()*xi, yF=ctx.pixelsPerByte()*yi;
+						var   info=drawStringInInfo(c, Character.toString(b), new Rect(xF, yF, ctx.pixelsPerByte(), ctx.pixelsPerByte()), false);
+						if(info!=null) chars=List.of(info);
+					}
+				}
+			}
+			
+			if(chars==null){
+				chars=clampedInts.get().filter(i->renderer.getFont().canFontDisplay(ctx.bytes[i])).mapToObj(i->{
+					int   xi=i%ctx.width(), yi=i/ctx.width();
+					float xF=ctx.pixelsPerByte()*xi, yF=ctx.pixelsPerByte()*yi;
+					
+					return drawStringInInfo(c, Character.toString((char)(ctx.bytes[i]&0xFF)), new Rect(xF, yF, ctx.pixelsPerByte(), ctx.pixelsPerByte()), false);
+				}).filter(Objects::nonNull).toList();
+			}
+			if(!chars.isEmpty()){
+				renderer.getFont().fillStrings(chars);
+			}
 		}
 		for(Range range : clampedOverflow){
 			ctx.filled.set((int)range.from(), (int)range.to());
@@ -1066,100 +1096,104 @@ public class BinaryGridRenderer{
 		}
 	}
 	
-	private void drawPointer(RenderContext ctx, ParsedFrame parsed, Pointer ptr){
-		
-		var siz  =Math.max(1, ctx.pixelsPerByte()/8F);
-		var sFul =siz;
-		var sHalf=siz/2;
-		renderer.setLineWidth(sFul*ptr.widthFactor());
-		
-		var start=ptr.from();
-		var end  =ptr.to();
-		
-		int pSiz=ptr.size();
-		
-		Color col;
-		if(parsed.lastHoverChunk!=null&&new ChainWalker(parsed.lastHoverChunk).stream().anyMatch(ch->ch.rangeIntersects(ptr.from()))){
-			col=mix(chunkBaseColor(parsed.lastHoverChunk), ptr.color(), 0.5F);
-		}else{
-			col=ptr.color();
-		}
-		
-		renderer.setColor(alpha(col, 0.5F));
-		
-		if(pSiz>1&&LongStream.range(start, start+pSiz).noneMatch(i->i%ctx.width()==0)){
-			renderer.setColor(alpha(col, 0.1F));
-			renderer.setLineWidth(sHalf*ptr.widthFactor());
-			drawLine(ctx.width(), start, start+pSiz-1);
+	private void drawPointers(RenderContext ctx, ParsedFrame parsed, List<Pointer> ptrs){
+		List<DrawFont.StringDraw> strings=new ArrayList<>(ptrs.size());
+		for(Pointer ptr : ptrs){
+			
+			var siz  =Math.max(1, ctx.pixelsPerByte()/8F);
+			var sFul =siz;
+			var sHalf=siz/2;
 			renderer.setLineWidth(sFul*ptr.widthFactor());
+			
+			var start=ptr.from();
+			var end  =ptr.to();
+			
+			int pSiz=ptr.size();
+			
+			Color col;
+			if(parsed.lastHoverChunk!=null&&new ChainWalker(parsed.lastHoverChunk).stream().anyMatch(ch->ch.rangeIntersects(ptr.from()))){
+				col=mix(chunkBaseColor(parsed.lastHoverChunk), ptr.color(), 0.5F);
+			}else{
+				col=ptr.color();
+			}
+			
 			renderer.setColor(alpha(col, 0.5F));
-		}
-		
-		long
-			xPosFrom=start%ctx.width(),
-			yPosFrom=start/ctx.width(),
-			xPosTo=end%ctx.width(),
-			yPosTo=end/ctx.width();
-		
-		var rand=new Random((start<<32)+end);
-		double
-			offScale=Math.sqrt(MathUtil.sq(xPosFrom-xPosTo)+MathUtil.sq(yPosFrom-yPosTo))/5,
-			xFromOff=(rand.nextDouble()-0.5)*offScale,
-			yFromOff=(rand.nextDouble()-0.5)*offScale,
-			xToOff=(rand.nextDouble()-0.5)*offScale,
-			yToOff=(rand.nextDouble()-0.5)*offScale,
 			
-			xFromOrg=xPosFrom+0.5,
-			yFromOrg=yPosFrom+0.5,
-			xToOrg=xPosTo+0.5,
-			yToOrg=yPosTo+0.5,
-			
-			xFrom=xFromOrg+xFromOff,
-			yFrom=yFromOrg+yFromOff,
-			xTo=xToOrg+xToOff,
-			yTo=yToOrg+yToOff;
-		
-		var screenHeight=renderer.getDisplay().getHeight();
-		var screenWidth =renderer.getDisplay().getWidth();
-		
-		if(xFrom<0||xFrom>screenWidth) xFrom=xFromOrg-xFromOff;
-		if(yFrom<0||yFrom>screenHeight) yFrom=yFromOrg-yFromOff;
-		if(xTo<0||xTo>screenWidth) xTo=xToOrg-xToOff;
-		if(yTo<0||yTo>screenHeight) yTo=yToOrg-yToOff;
-		
-		var handles=new double[4][2];
-		handles[0][0]=xFromOrg;
-		handles[0][1]=yFromOrg;
-		handles[1][0]=xFrom;
-		handles[1][1]=yFrom;
-		handles[2][0]=xTo;
-		handles[2][1]=yTo;
-		handles[3][0]=xToOrg;
-		handles[3][1]=yToOrg;
-		drawPath(handles, true);
-		
-		if(!ptr.message().isEmpty()){
-			float
-				x=(float)(xFrom+xTo)/2*ctx.pixelsPerByte(),
-				y=(float)(yFrom+yTo)/2*ctx.pixelsPerByte();
-			initFont(0.3F*ptr.widthFactor());
-			renderer.setFontScale(Math.max(renderer.getFontScale(), 15));
-			int msgWidth=ptr.message().length();
-			int space   =(int)(screenWidth-x);
-			
-			var w=getStringBounds(ptr.message()).width();
-			while(w>space*1.5){
-				msgWidth--;
-				if(msgWidth==0) break;
-				w=getStringBounds(ptr.message().substring(0, msgWidth)).width();
+			if(pSiz>1&&LongStream.range(start, start+pSiz).noneMatch(i->i%ctx.width()==0)){
+				renderer.setColor(alpha(col, 0.1F));
+				renderer.setLineWidth(sHalf*ptr.widthFactor());
+				drawLine(ctx.width(), start, start+pSiz-1);
+				renderer.setLineWidth(sFul*ptr.widthFactor());
+				renderer.setColor(alpha(col, 0.5F));
 			}
-			List<String> lines=msgWidth==0?List.of(ptr.message()):TextUtil.wrapLongString(ptr.message(), msgWidth);
-			y-=renderer.getLineWidth()/2F*lines.size();
-			for(String line : lines){
-				drawStringIn(col, line, new Rect(x, y, space, ctx.pixelsPerByte()), false, true);
-				y+=renderer.getLineWidth();
+			
+			long
+				xPosFrom=start%ctx.width(),
+				yPosFrom=start/ctx.width(),
+				xPosTo=end%ctx.width(),
+				yPosTo=end/ctx.width();
+			
+			var rand=new Random((start<<32)+end);
+			double
+				offScale=Math.sqrt(MathUtil.sq(xPosFrom-xPosTo)+MathUtil.sq(yPosFrom-yPosTo))/5,
+				xFromOff=(rand.nextDouble()-0.5)*offScale,
+				yFromOff=(rand.nextDouble()-0.5)*offScale,
+				xToOff=(rand.nextDouble()-0.5)*offScale,
+				yToOff=(rand.nextDouble()-0.5)*offScale,
+				
+				xFromOrg=xPosFrom+0.5,
+				yFromOrg=yPosFrom+0.5,
+				xToOrg=xPosTo+0.5,
+				yToOrg=yPosTo+0.5,
+				
+				xFrom=xFromOrg+xFromOff,
+				yFrom=yFromOrg+yFromOff,
+				xTo=xToOrg+xToOff,
+				yTo=yToOrg+yToOff;
+			
+			var screenHeight=renderer.getDisplay().getHeight();
+			var screenWidth =renderer.getDisplay().getWidth();
+			
+			if(xFrom<0||xFrom>screenWidth) xFrom=xFromOrg-xFromOff;
+			if(yFrom<0||yFrom>screenHeight) yFrom=yFromOrg-yFromOff;
+			if(xTo<0||xTo>screenWidth) xTo=xToOrg-xToOff;
+			if(yTo<0||yTo>screenHeight) yTo=yToOrg-yToOff;
+			
+			var handles=new double[4][2];
+			handles[0][0]=xFromOrg;
+			handles[0][1]=yFromOrg;
+			handles[1][0]=xFrom;
+			handles[1][1]=yFrom;
+			handles[2][0]=xTo;
+			handles[2][1]=yTo;
+			handles[3][0]=xToOrg;
+			handles[3][1]=yToOrg;
+			drawPath(handles, true);
+			
+			if(!ptr.message().isEmpty()){
+				float
+					x=(float)(xFrom+xTo)/2*ctx.pixelsPerByte(),
+					y=(float)(yFrom+yTo)/2*ctx.pixelsPerByte();
+				initFont(0.3F*ptr.widthFactor());
+				renderer.setFontScale(Math.max(renderer.getFontScale(), 15));
+				int msgWidth=ptr.message().length();
+				int space   =(int)(screenWidth-x);
+				
+				var w=getStringBounds(ptr.message()).width();
+				while(w>space*1.5){
+					msgWidth--;
+					if(msgWidth==0) break;
+					w=getStringBounds(ptr.message().substring(0, msgWidth)).width();
+				}
+				List<String> lines=msgWidth==0?List.of(ptr.message()):TextUtil.wrapLongString(ptr.message(), msgWidth);
+				y-=renderer.getLineWidth()/2F*lines.size();
+				for(String line : lines){
+					drawStringInInfo(col, line, new Rect(x, y, space, ctx.pixelsPerByte()), true, strings);
+					y+=renderer.getLineWidth();
+				}
 			}
 		}
+		renderer.getFont().fillStrings(strings);
 	}
 	
 	private void drawError(ParsedFrame parsed){
@@ -1181,13 +1215,17 @@ public class BinaryGridRenderer{
 		
 		var col =alpha(Color.WHITE, 0.8F);
 		var rect=new Rect(10, screenHeight-totalBound.height()-20, totalBound.width(), renderer.getLineWidth());
+		
+		List<DrawFont.StringDraw> strings=new ArrayList<>(lines.length);
+		
 		for(int i=0;i<lines.length;i++){
 			String line =lines[i];
 			var    bound=bounds.get(i);
 			rect.height=bound.height();
 			rect.y=(Math.round(screenHeight-totalBound.height()+bounds.stream().limit(i).mapToDouble(DrawFont.Bounds::height).sum())-15);
-			drawStringIn(col, line, rect, false, true);
+			drawStringInInfo(col, line, rect, true, strings);
 		}
+		renderer.getFont().fillStrings(strings);
 	}
 	
 	private void drawMouse(RenderContext ctx, CachedFrame frame){
@@ -1274,14 +1312,30 @@ public class BinaryGridRenderer{
 	
 	private record AnnotateStackFrame(IOInstance<?> instance, Reference ref){}
 	
+	private record AnnotateCtx(RenderContext renderCtx,
+	                           ChunkDataProvider provider, List<AnnotateStackFrame> stack,
+	                           Consumer<Pointer> pointerRecord, List<DrawFont.StringDraw> strings, List<DrawFont.StringDraw> stringOutlines){
+		void recordPointer(Pointer pointer){
+			pointerRecord.accept(pointer);
+		}
+		void popStrings(RenderBackend renderer){
+			if(!strings.isEmpty()){
+				renderer.getFont().fillStrings(strings);
+				strings.clear();
+			}
+			if(!stringOutlines.isEmpty()){
+				renderer.getFont().outlineStrings(stringOutlines);
+				stringOutlines.clear();
+			}
+		}
+	}
+	
 	@SuppressWarnings("unchecked")
-	private <T extends IOInstance<T>> void annotateStruct(RenderContext ctx,
-	                                                      ChunkDataProvider provider, List<AnnotateStackFrame> stack,
-	                                                      T instance, Reference instanceReference, StructPipe<T> pipe,
-	                                                      Consumer<Pointer> pointerRecord, boolean annotate) throws IOException{
+	private <T extends IOInstance<T>> void annotateStruct(AnnotateCtx ctx,
+	                                                      T instance, Reference instanceReference, StructPipe<T> pipe, boolean annotate) throws IOException{
 		var reference=instanceReference;
 		if(instance instanceof Chunk c){
-			var off=provider.getFirstChunk().getPtr();
+			var off=ctx.provider.getFirstChunk().getPtr();
 			reference=new Reference(off, c.getPtr().getValue()-off.getValue());
 		}
 		if(reference==null||reference.isNull()) return;
@@ -1289,8 +1343,8 @@ public class BinaryGridRenderer{
 		
 		AnnotateStackFrame frame=new AnnotateStackFrame(instance, reference);
 		try{
-			if(stack.contains(frame)) return;
-			stack.add(frame);
+			if(ctx.stack.contains(frame)) return;
+			ctx.stack.add(frame);
 			
 			var typeHash=instance.getThisStruct().getType().getName().hashCode();
 			
@@ -1311,7 +1365,7 @@ public class BinaryGridRenderer{
 					if(instance instanceof Chunk){
 						offsetStart=reference.getPtr().add(reference.getOffset());
 					}else{
-						offsetStart=reference.calcGlobalOffset(provider);
+						offsetStart=reference.calcGlobalOffset(ctx.provider);
 					}
 					
 					long trueOffset=offsetStart+fieldOffset;
@@ -1325,11 +1379,11 @@ public class BinaryGridRenderer{
 							var inst=field.get(instance);
 							if(inst==null) continue;
 							if(IOFieldPrimitive.isPrimitive(inst.getClass())||inst.getClass()==String.class){
-								if(annotate) annotateByteField(provider, ctx, pointerRecord, instance, field, col, reference, Range.fromSize(fieldOffset, size));
+								if(annotate) annotateByteField(ctx, instance, field, col, reference, Range.fromSize(fieldOffset, size));
 								continue;
 							}
 							if(inst instanceof IOInstance<?> ioi){
-								annotateStruct(ctx, provider, stack, (T)ioi, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), ioi.getThisStruct()), pointerRecord, annotate);
+								annotateStruct(ctx, (T)ioi, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), ioi.getThisStruct()), annotate);
 								continue;
 							}
 							LogUtil.printlnEr("unmanaged dynamic type", inst);
@@ -1343,18 +1397,19 @@ public class BinaryGridRenderer{
 							boolean           diffPos =true;
 							if(!ref.isNull()){
 								var from=trueOffset;
-								var to  =ref.calcGlobalOffset(provider);
+								var to  =ref.calcGlobalOffset(ctx.provider);
 								diffPos=from!=to;
 								if(diffPos){
-									pointerRecord.accept(new Pointer(from+size/2, to, (int)size, col, refField.toString(), 1));
+									ctx.recordPointer(new Pointer(from+size/2, to, (int)size, col, refField.toString(), 1));
 								}
 							}
 							
-							if(annotate) annotateByteField(provider, ctx, pointerRecord, instance, field, col, reference, Range.fromSize(fieldOffset, size));
+							if(annotate) annotateByteField(ctx, instance, field, col, reference, Range.fromSize(fieldOffset, size));
 							if(!diffPos){
-								int xByte    =(int)(renderer.getDisplay().getMouseX()/ctx.pixelsPerByte());
-								int yByte    =(int)(renderer.getDisplay().getMouseY()/ctx.pixelsPerByte());
-								int byteIndex=yByte*ctx.width()+xByte;
+								var rctx     =ctx.renderCtx;
+								int xByte    =(int)(renderer.getDisplay().getMouseX()/rctx.pixelsPerByte());
+								int yByte    =(int)(renderer.getDisplay().getMouseY()/rctx.pixelsPerByte());
+								int byteIndex=yByte*rctx.width()+xByte;
 								
 								var from=trueOffset;
 								var to  =from+size;
@@ -1362,19 +1417,20 @@ public class BinaryGridRenderer{
 									diffPos=true;
 								}
 							}
-							annotateStruct(ctx, provider, stack, refField.get(instance), ref, refField.getReferencedPipe(instance), pointerRecord, diffPos);
+							if(!diffPos) ctx.popStrings(renderer);
+							annotateStruct(ctx, refField.get(instance), ref, refField.getReferencedPipe(instance), diffPos);
 							
 							continue;
 						}
 						if(field instanceof BitFieldMerger<T> merger){
 							int bitOffset=0;
-							drawByteRanges(ctx, List.of(Range.fromSize(trueOffset, size)), chunkBaseColor(reference.getPtr().dereference(provider)), false, true);
+							drawByteRanges(ctx.renderCtx, List.of(Range.fromSize(trueOffset, size)), chunkBaseColor(reference.getPtr().dereference(ctx.provider)), false, true);
 							for(IOField.Bit<T, ?> bit : merger.getGroup()){
 								
 								var bCol=makeCol(rand, typeHash, bit);
 								var siz =bit.getSizeDescriptor().calcUnknown(instance);
 								
-								if(annotate) annotateBitField(provider, ctx, instance, bit, bCol, bitOffset, siz, reference, fieldOffset);
+								if(annotate) annotateBitField(ctx, instance, bit, bCol, bitOffset, siz, reference, fieldOffset);
 								bitOffset+=siz;
 							}
 							continue;
@@ -1387,25 +1443,26 @@ public class BinaryGridRenderer{
 							
 							var ch=(ChunkPointer)field.get(instance);
 							
-							if(annotate) annotateByteField(provider, ctx, pointerRecord, instance, field, col, reference, Range.fromSize(fieldOffset, size));
+							if(annotate) annotateByteField(ctx, instance, field, col, reference, Range.fromSize(fieldOffset, size));
 							
 							if(!ch.isNull()){
 								var msg=field.toString();
 								try{
-									annotateStruct(ctx, provider, stack, ch.dereference(provider), null, Chunk.PIPE, pointerRecord, true);
+									ctx.popStrings(renderer);
+									annotateStruct(ctx, ch.dereference(ctx.provider), null, Chunk.PIPE, true);
 								}catch(Exception e){
 									msg=msg+"\n"+DrawUtils.errorToMessage(e);
 									col=Color.RED;
 								}
-								pointerRecord.accept(new Pointer(trueOffset, ch.getValue(), (int)size, col, msg, 0.8F));
+								ctx.recordPointer(new Pointer(trueOffset, ch.getValue(), (int)size, col, msg, 0.8F));
 							}
 						}else if(IOFieldPrimitive.isPrimitive(acc.getType())||Stream.of(INumber.class, Enum.class).anyMatch(c->UtilL.instanceOf(acc.getType(), c))){
 							if(annotate){
 								renderer.setColor(col);
 								if(sizeDesc.getWordSpace()==WordSpace.BIT){
-									annotateBitField(provider, ctx, instance, field, col, 0, size, reference, fieldOffset);
+									annotateBitField(ctx, instance, field, col, 0, size, reference, fieldOffset);
 								}else{
-									annotateByteField(provider, ctx, pointerRecord, instance, field, col, reference, Range.fromSize(fieldOffset, size));
+									annotateByteField(ctx, instance, field, col, reference, Range.fromSize(fieldOffset, size));
 								}
 							}
 						}else{
@@ -1421,7 +1478,7 @@ public class BinaryGridRenderer{
 							if(UtilL.instanceOf(typ, IOInstance.class)){
 								var inst=(IOInstance<?>)field.get(instance);
 								if(inst!=null){
-									annotateStruct(ctx, provider, stack, (T)inst, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), inst.getThisStruct()), pointerRecord, annotate);
+									annotateStruct(ctx, (T)inst, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), inst.getThisStruct()), annotate);
 								}
 								continue;
 							}
@@ -1433,13 +1490,13 @@ public class BinaryGridRenderer{
 								long       arrOffset  =0;
 								for(int i=0;i<arrSiz;i++){
 									var val=(IOInstance)Array.get(inst, i);
-									annotateStruct(ctx, provider, stack, val, reference.addOffset(fieldOffset+arrOffset), elementPipe, pointerRecord, annotate);
+									annotateStruct(ctx, val, reference.addOffset(fieldOffset+arrOffset), elementPipe, annotate);
 									arrOffset+=elementPipe.getSizeDescriptor().calcUnknown(val, WordSpace.BYTE);
 								}
 								continue;
 							}
 							if(typ==String.class){
-								if(annotate) annotateByteField(provider, ctx, pointerRecord, instance, field, col, reference, Range.fromSize(fieldOffset, size));
+								if(annotate) annotateByteField(ctx, instance, field, col, reference, Range.fromSize(fieldOffset, size));
 								continue;
 							}
 							LogUtil.printlnEr("unmanaged draw type:", typ.toString(), acc);
@@ -1453,7 +1510,10 @@ public class BinaryGridRenderer{
 				}
 			}
 		}finally{
-			stack.remove(frame);
+			ctx.stack.remove(frame);
+			if(ctx.stack.isEmpty()||ctx.strings.size()>64){
+				ctx.popStrings(renderer);
+			}
 		}
 	}
 	
