@@ -11,6 +11,7 @@ import org.roaringbitmap.RoaringBitmap;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.PrimitiveIterator;
 import java.util.stream.IntStream;
@@ -179,33 +180,49 @@ public class MemoryOperations{
 	}
 	
 	
-	public static Chunk allocateReuseFreeChunk(ChunkDataProvider context, AllocateTicket ticket, List<Chunk> freeChunks) throws IOException{
-		
-		var reallocateO=freeChunks.stream().filter(c->(c.getCapacity()-c.getHeaderSize()*2L)>ticket.bytes()).findAny();
-		if(reallocateO.isPresent()){
-			var ch=reallocateO.get();
+	public static Chunk allocateReuseFreeChunk(ChunkDataProvider context, AllocateTicket ticket, Iterable<Chunk> freeChunks) throws IOException{
+		for(Iterator<Chunk> iterator=freeChunks.iterator();iterator.hasNext();){
+			Chunk c=iterator.next();
+			if(c.getCapacity()<ticket.bytes()) continue;
 			
-			var builder=new ChunkBuilder(context, ch.getPtr())
-				.withCapacity(ticket.bytes())
-				.withNext(ticket.next())
-				.withExplicitNextSize(ticket.disableResizing()?NumberSize.VOID:NumberSize.bySize(ticket.next()).max(NumberSize.SHORT));
+			var freeSpace=c.getCapacity()-ticket.bytes();
 			
-			var reallocate=builder.create();
-			
-			var siz=reallocate.totalSize();
-			var end=ch.dataEnd();
-			builder.withPtr(ChunkPointer.of(end-siz));
-			reallocate=builder.create();
-			
-			assert reallocate.dataEnd()==ch.dataEnd();
-			
-			if(ticket.approve(reallocate)){
-				reallocate.writeHeader();
-				
-				ch.setCapacityAndModifyNumSize(ch.getCapacity()-reallocate.totalSize());
-				ch.writeHeader();
-				return reallocate;
+			if(freeSpace>c.getHeaderSize()*2L){
+				Chunk reallocate=chipEndProbe(context, ticket, c);
+				if(reallocate!=null) return reallocate;
 			}
+			
+			if(!ticket.disableResizing()&&freeSpace<8){
+				if(ticket.approve(c)){
+					iterator.remove();
+					return c;
+				}
+			}
+		}
+		return null;
+	}
+	
+	private static Chunk chipEndProbe(ChunkDataProvider context, AllocateTicket ticket, Chunk ch) throws IOException{
+		var builder=new ChunkBuilder(context, ch.getPtr())
+			.withCapacity(ticket.bytes())
+			.withNext(ticket.next())
+			.withExplicitNextSize(ticket.disableResizing()?NumberSize.VOID:NumberSize.bySize(ticket.next()).max(NumberSize.SHORT));
+		
+		var reallocate=builder.create();
+		
+		var siz=reallocate.totalSize();
+		var end=ch.dataEnd();
+		builder.withPtr(ChunkPointer.of(end-siz));
+		reallocate=builder.create();
+		
+		assert reallocate.dataEnd()==ch.dataEnd();
+		
+		if(ticket.approve(reallocate)){
+			reallocate.writeHeader();
+			
+			ch.setCapacityAndModifyNumSize(ch.getCapacity()-reallocate.totalSize());
+			ch.writeHeader();
+			return reallocate;
 		}
 		return null;
 	}
