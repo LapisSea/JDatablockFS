@@ -19,24 +19,24 @@
     <orderEntry type="library" name="Maven: org.roaringbitmap:RoaringBitmap:0.9.23" level="project" />
     <orderEntry type="library" scope="RUNTIME" name="Maven: org.roaringbitmap:shims:0.9.23" level="project" />
     <orderEntry type="library" name="Maven: com.github.lapissea:glfw-window:1.0.0" level="project" />
-    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-assimp:3.3.0-SNAPSHOT" level="project" />
-    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-vulkan:3.3.0-SNAPSHOT" level="project" />
-    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-assimp:natives-windows:3.3.0-SNAPSHOT" level="project" />
+    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-assimp:3.3.0" level="project" />
+    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-vulkan:3.3.0" level="project" />
+    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-assimp:natives-windows:3.3.0" level="project" />
     <orderEntry type="library" name="Maven: com.google.code.gson:gson:2.8.2" level="project" />
     <orderEntry type="library" name="Maven: com.github.lapissea:jlapisvector:1.0.7" level="project" />
     <orderEntry type="library" name="Maven: net.sf.trove4j:trove4j:3.0.3" level="project" />
-    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl:3.3.0-SNAPSHOT" level="project" />
-    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-glfw:3.3.0-SNAPSHOT" level="project" />
-    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-opengl:3.3.0-SNAPSHOT" level="project" />
-    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-stb:3.3.0-SNAPSHOT" level="project" />
-    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-jemalloc:3.3.0-SNAPSHOT" level="project" />
-    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-jemalloc:natives-windows:3.3.0-SNAPSHOT" level="project" />
-    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-nanovg:3.3.0-SNAPSHOT" level="project" />
-    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-nanovg:natives-windows:3.3.0-SNAPSHOT" level="project" />
-    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl:natives-windows:3.3.0-SNAPSHOT" level="project" />
-    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-glfw:natives-windows:3.3.0-SNAPSHOT" level="project" />
-    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-opengl:natives-windows:3.3.0-SNAPSHOT" level="project" />
-    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-stb:natives-windows:3.3.0-SNAPSHOT" level="project" />
+    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl:3.3.0" level="project" />
+    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-glfw:3.3.0" level="project" />
+    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-opengl:3.3.0" level="project" />
+    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-stb:3.3.0" level="project" />
+    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-jemalloc:3.3.0" level="project" />
+    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-jemalloc:natives-windows:3.3.0" level="project" />
+    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-nanovg:3.3.0" level="project" />
+    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-nanovg:natives-windows:3.3.0" level="project" />
+    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl:natives-windows:3.3.0" level="project" />
+    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-glfw:natives-windows:3.3.0" level="project" />
+    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-opengl:natives-windows:3.3.0" level="project" />
+    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-stb:natives-windows:3.3.0" level="project" />
     <orderEntry type="library" name="Maven: org.joml:joml:1.10.2" level="project" />
     <orderEntry type="library" name="Maven: com.esotericsoftware:kryo:5.2.0" level="project" />
     <orderEntry type="library" name="Maven: com.esotericsoftware:reflectasm:1.11.9" level="project" />
@@ -47,11 +47,11 @@
     <orderEntry type="library" scope="RUNTIME" name="Maven: org.jetbrains.kotlin:kotlin-stdlib:1.4.0" level="project" />
     <orderEntry type="library" scope="RUNTIME" name="Maven: org.jetbrains.kotlin:kotlin-stdlib-common:1.4.0" level="project" />
     <orderEntry type="library" scope="RUNTIME" name="Maven: org.jetbrains:annotations:13.0" level="project" />
-    <orderEntry type="library" scope="RUNTIME" name="Maven: org.lwjgl:lwjgl-openal:3.3.0-SNAPSHOT" level="project" />
-    <orderEntry type="library" scope="RUNTIME" name="Maven: org.lwjgl:lwjgl-openal:natives-linux:3.3.0-SNAPSHOT" level="project" />
+    <orderEntry type="library" scope="RUNTIME" name="Maven: org.lwjgl:lwjgl-openal:3.3.0" level="project" />
+    <orderEntry type="library" scope="RUNTIME" name="Maven: org.lwjgl:lwjgl-openal:natives-linux:3.3.0" level="project" />
     <orderEntry type="library" name="Maven: com.github.kotlin-graphics:uno-sdk:2b06aa78" level="project" />
     <orderEntry type="library" name="Maven: com.github.kotlin-graphics.uno-sdk:awt:2b06aa78" level="project" />
-    <orderEntry type="library" scope="RUNTIME" name="Maven: org.lwjgl:lwjgl-jawt:3.3.0-SNAPSHOT" level="project" />
+    <orderEntry type="library" scope="RUNTIME" name="Maven: org.lwjgl:lwjgl-jawt:3.3.0" level="project" />
     <orderEntry type="library" name="Maven: com.github.kotlin-graphics.uno-sdk:uno:2b06aa78" level="project" />
     <orderEntry type="library" name="Maven: com.github.kotlin-graphics.uno-sdk:vk:2b06aa78" level="project" />
     <orderEntry type="library" scope="RUNTIME" name="Maven: com.github.kotlin-graphics:vkk:b06075d1" level="project" />
@@ -82,18 +82,18 @@
     <orderEntry type="library" scope="RUNTIME" name="Maven: com.twelvemonkeys.imageio:imageio-tga:3.5" level="project" />
     <orderEntry type="library" scope="RUNTIME" name="Maven: com.twelvemonkeys.imageio:imageio-thumbsdb:3.5" level="project" />
     <orderEntry type="library" scope="RUNTIME" name="Maven: com.twelvemonkeys.imageio:imageio-tiff:3.5" level="project" />
-    <orderEntry type="library" scope="RUNTIME" name="Maven: org.lwjgl:lwjgl:natives-linux:3.3.0-SNAPSHOT" level="project" />
-    <orderEntry type="library" scope="RUNTIME" name="Maven: org.lwjgl:lwjgl-jemalloc:natives-linux:3.3.0-SNAPSHOT" level="project" />
-    <orderEntry type="library" scope="RUNTIME" name="Maven: org.lwjgl:lwjgl-stb:natives-linux:3.3.0-SNAPSHOT" level="project" />
+    <orderEntry type="library" scope="RUNTIME" name="Maven: org.lwjgl:lwjgl:natives-linux:3.3.0" level="project" />
+    <orderEntry type="library" scope="RUNTIME" name="Maven: org.lwjgl:lwjgl-jemalloc:natives-linux:3.3.0" level="project" />
+    <orderEntry type="library" scope="RUNTIME" name="Maven: org.lwjgl:lwjgl-stb:natives-linux:3.3.0" level="project" />
     <orderEntry type="library" name="Maven: com.github.kotlin-graphics.imgui:gl:v1.79" level="project" />
     <orderEntry type="library" scope="RUNTIME" name="Maven: com.github.kotlin-graphics.imgui:glfw:v1.79" level="project" />
     <orderEntry type="library" scope="RUNTIME" name="Maven: com.github.kotlin-graphics:gln:3e59f9ea" level="project" />
-    <orderEntry type="library" scope="RUNTIME" name="Maven: org.lwjgl:lwjgl-opengles:3.3.0-SNAPSHOT" level="project" />
-    <orderEntry type="library" scope="RUNTIME" name="Maven: org.lwjgl:lwjgl-opengles:natives-linux:3.3.0-SNAPSHOT" level="project" />
+    <orderEntry type="library" scope="RUNTIME" name="Maven: org.lwjgl:lwjgl-opengles:3.3.0" level="project" />
+    <orderEntry type="library" scope="RUNTIME" name="Maven: org.lwjgl:lwjgl-opengles:natives-linux:3.3.0" level="project" />
     <orderEntry type="library" name="Maven: com.github.kotlin-graphics.uno-sdk:core:2b06aa78" level="project" />
-    <orderEntry type="library" scope="RUNTIME" name="Maven: org.lwjgl:lwjgl-remotery:3.3.0-SNAPSHOT" level="project" />
-    <orderEntry type="library" scope="RUNTIME" name="Maven: org.lwjgl:lwjgl-glfw:natives-linux:3.3.0-SNAPSHOT" level="project" />
-    <orderEntry type="library" scope="RUNTIME" name="Maven: org.lwjgl:lwjgl-opengl:natives-linux:3.3.0-SNAPSHOT" level="project" />
-    <orderEntry type="library" scope="RUNTIME" name="Maven: org.lwjgl:lwjgl-remotery:natives-linux:3.3.0-SNAPSHOT" level="project" />
+    <orderEntry type="library" scope="RUNTIME" name="Maven: org.lwjgl:lwjgl-remotery:3.3.0" level="project" />
+    <orderEntry type="library" scope="RUNTIME" name="Maven: org.lwjgl:lwjgl-glfw:natives-linux:3.3.0" level="project" />
+    <orderEntry type="library" scope="RUNTIME" name="Maven: org.lwjgl:lwjgl-opengl:natives-linux:3.3.0" level="project" />
+    <orderEntry type="library" scope="RUNTIME" name="Maven: org.lwjgl:lwjgl-remotery:natives-linux:3.3.0" level="project" />
   </component>
 </module>
