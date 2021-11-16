@@ -19,7 +19,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.stream.Stream;
 
-import static com.lapissea.cfs.GlobalConfig.*;
+import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
 public class MemoryWalker{
 	
@@ -144,7 +144,7 @@ public class MemoryWalker{
 							continue;
 						}
 						
-						throw new RuntimeException(TextUtil.toString("unmanaged walk type:", typ, field.getAccessor()));
+						throw new RuntimeException(TextUtil.toString("unmanaged walk type:", typ.toString(), field.getAccessor()));
 					}
 				}finally{
 					fieldOffset+=field.getSizeDescriptor().mapSize(WordSpace.BYTE, size);

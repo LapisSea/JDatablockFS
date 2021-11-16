@@ -394,6 +394,10 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 	private void setBucket(IOList<Bucket<K, V>> buckets, K key, short bucketPO2, Bucket<K, V> bucket) throws IOException{
 		int smallHash=toSmallHash(key, bucketPO2);
 		buckets.set(smallHash, bucket);
+		if(DEBUG_VALIDATION){
+			var read=buckets.get(smallHash);
+			assert read.equals(bucket);
+		}
 	}
 	
 	private int toSmallHash(K key, short bucketPO2){
