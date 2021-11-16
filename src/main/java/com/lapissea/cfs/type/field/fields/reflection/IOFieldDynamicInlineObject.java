@@ -65,14 +65,13 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		});
 	}
 	
-	@SuppressWarnings({"unchecked", "DuplicateBranchesInSwitch"})
+	@SuppressWarnings({"unchecked"})
 	private static long calcSize(Object val){
 		return switch(val){
 			case Boolean ignored -> 1;
-			case Integer ignored -> 4;
 			case Float ignored -> 4;
-			case Long ignored -> 8;
 			case Double ignored -> 8;
+			case Number integer -> 1+NumberSize.bySize(numToLong(integer)).bytes;
 			case String str -> STR_PIPE.getSizeDescriptor().calcUnknown(new AutoText(str), WordSpace.BYTE);
 			case byte[] array -> {
 				var num=NumberSize.bySize(array.length);
@@ -92,10 +91,14 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 	private void writeValue(ChunkDataProvider provider, ContentWriter dest, Object val) throws IOException{
 		switch(val){
 			case Boolean v -> dest.writeBoolean(v);
-			case Integer v -> NumberSize.INT.write(dest, v);
 			case Float v -> NumberSize.INT.writeFloating(dest, v);
-			case Long v -> NumberSize.LONG.write(dest, v);
 			case Double v -> NumberSize.LONG.writeFloating(dest, v);
+			case Number integer -> {
+				long value=numToLong(integer);
+				var  num  =NumberSize.bySize(value);
+				FlagWriter.writeSingle(dest, NumberSize.FLAG_INFO, false, num);
+				num.write(dest, value);
+			}
 			case String str -> STR_PIPE.write(provider, dest, new AutoText(str));
 			case byte[] array -> {
 				var num=NumberSize.bySize(array.length);
@@ -111,13 +114,32 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 			default -> throw new NotImplementedException(val.getClass()+"");
 		}
 	}
+	private static long numToLong(Number integer){
+		ensureInt(integer.getClass());
+		return switch(integer){
+			case Byte b -> b&0xFF;
+			default -> integer.longValue();
+		};
+	}
+	private static void ensureInt(Class<?> tyo){
+		assert List.<Class<? extends Number>>of(Byte.class, Short.class, Integer.class, Long.class).contains(tyo);
+	}
+	
 	private Object readTyp(TypeDefinition typDef, ChunkDataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
 		var typ=typDef.getTypeClass();
 		if(typ==Boolean.class) return src.readBoolean();
-		if(typ==Integer.class) return (int)NumberSize.INT.read(src);
 		if(typ==Float.class) return (float)NumberSize.INT.readFloating(src);
-		if(typ==Long.class) return NumberSize.LONG.read(src);
 		if(typ==Double.class) return NumberSize.LONG.readFloating(src);
+		if(UtilL.instanceOf(typ, Number.class)){
+			ensureInt(typ);
+			var num    =FlagReader.readSingle(src, NumberSize.FLAG_INFO, false);
+			var longNum=num.read(src);
+			if(typ==Byte.class) return (byte)longNum;
+			if(typ==Short.class) return (short)longNum;
+			if(typ==Integer.class) return (int)longNum;
+			if(typ==Long.class) return longNum;
+			throw new NotImplementedException("Unkown integer type"+typ);
+		}
 		if(typ==String.class) return STR_PIPE.readNew(provider, src, genericContext).getData();
 		if(typ==byte[].class){
 			var num=FlagReader.readSingle(src, NumberSize.BYTE, NumberSize.FLAG_INFO, false);
@@ -140,8 +162,12 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		var        typ=typDef.getTypeClass();
 		NumberSize siz=null;
 		if(typ==Boolean.class) siz=NumberSize.BYTE;
-		else if(typ==Integer.class||typ==Float.class) siz=NumberSize.INT;
-		else if(typ==Long.class||typ==Double.class) siz=NumberSize.LONG;
+		else if(typ==Float.class) siz=NumberSize.INT;
+		else if(typ==Double.class) siz=NumberSize.LONG;
+		else if(UtilL.instanceOf(typ, Number.class)){
+			ensureInt(typ);
+			siz=FlagReader.readSingle(src, NumberSize.FLAG_INFO, false);
+		}
 		if(siz!=null){
 			src.skipExact(siz);
 			return;
