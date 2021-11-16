@@ -31,6 +31,8 @@ import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.stream.Stream;
 
+import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+
 @SuppressWarnings("unchecked")
 public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>{
 	
@@ -92,7 +94,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 				}
 			};
 			
-			return new IOField.Ref.NoIO<Node<T>, Node<T>>(nextAccessor, SizeDescriptor.Fixed.of(SIZE_VAL_SIZE.bytes)){
+			var next=new IOField.Ref.NoIO<Node<T>, Node<T>>(nextAccessor, new SizeDescriptor.Unknown<>(WordSpace.BYTE, 0, NumberSize.LARGEST.optionalBytesLong, node->node.nextSize.bytes)){
 				@Override
 				public Reference getReference(Node<T> instance){
 					ChunkPointer next;
@@ -108,6 +110,9 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 					return getPipe();
 				}
 			};
+			next.initLateData(new FieldSet<>(List.of(getNextSizeField())), Stream.of());
+			
+			return next;
 			
 		}
 		
@@ -120,30 +125,53 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			})
 		);
 		
-		private static final NumberSize SIZE_VAL_SIZE=NumberSize.LARGEST;
-		
+		private static NumberSize calcOptimalNextSize(ChunkDataProvider provider) throws IOException{
+			return NumberSize.bySize(provider.getSource().getIOSize());
+		}
 		public static <T extends IOInstance<T>> Node<T> allocValNode(T value, Node<T> next, SizeDescriptor<T> sizeDescriptor, TypeDefinition nodeType, ChunkDataProvider provider) throws IOException{
-			var chunk=AllocateTicket.bytes(SIZE_VAL_SIZE.bytes+switch(sizeDescriptor){
+			int nextBytes;
+			if(next!=null) nextBytes=NumberSize.bySize(next.getReference().getPtr()).bytes;
+			else nextBytes=calcOptimalNextSize(provider).bytes;
+			
+			var bytes=1+nextBytes+switch(sizeDescriptor){
 				case SizeDescriptor.Fixed<T> f -> f.get(WordSpace.BYTE);
 				case SizeDescriptor.Unknown<T> f -> f.calcUnknown(value, WordSpace.BYTE);
-			}).submit(provider);
+			};
+			var chunk=AllocateTicket.bytes(bytes).submit(provider);
 			return new Node<>(provider, chunk.getPtr().makeReference(), nodeType, value, next);
 		}
 		
 		private final StructPipe<T> valuePipe;
 		
+		@IOValue
+		private NumberSize nextSize;
+		
 		public Node(ChunkDataProvider provider, Reference reference, TypeDefinition typeDef, T val, Node<T> next) throws IOException{
 			this(provider, reference, typeDef);
+			
+			var newSiz=calcOptimalNextSize(provider);
+			if(newSiz.greaterThan(nextSize)){
+				nextSize=newSiz;
+				writeManagedFields();
+			}
+			
 			if(next!=null) setNext(next);
 			if(val!=null) setValue(val);
 		}
 		
-		public Node(ChunkDataProvider provider, Reference reference, TypeDefinition typeDef){
+		public Node(ChunkDataProvider provider, Reference reference, TypeDefinition typeDef) throws IOException{
 			super(provider, reference, typeDef, NODE_TYPE_CHECK);
 			
 			var type=(Struct<T>)typeDef.argAsStruct(0);
 			type.requireEmptyConstructor();
 			this.valuePipe=StructPipe.of(getPipe().getClass(), type);
+			
+			if(isSelfDataEmpty()){
+				nextSize=calcOptimalNextSize(provider);
+				writeManagedFields();
+			}else{
+				readManagedFields();
+			}
 		}
 		
 		@NotNull
@@ -186,18 +214,20 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		}
 		
 		private void ensureNextSpace(RandomIO io) throws IOException{
-			var skipped=io.skip(SIZE_VAL_SIZE.bytes);
-			var toWrite=SIZE_VAL_SIZE.bytes-skipped;
+			var valueStart=valueStart();
+			var skipped   =io.skip(valueStart);
+			var toWrite   =valueStart-skipped;
 			Utils.zeroFill(io::write, toWrite);
 			io.setPos(0);
 		}
 		
 		T getValue() throws IOException{
+			var start=valueStart();
 			try(var io=this.getReference().io(this)){
-				if(io.getSize()<SIZE_VAL_SIZE.bytes){
+				if(io.getSize()<start){
 					return null;
 				}
-				io.skipExact(SIZE_VAL_SIZE.bytes);
+				io.skipExact(start);
 				if(io.remaining()==0){
 					return null;
 				}
@@ -205,11 +235,17 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			}
 		}
 		boolean hasValue() throws IOException{
+			var nextStart=nextStart();
 			try(var io=this.getReference().io(this)){
-				if(io.getSize()<SIZE_VAL_SIZE.bytes){
+				if(io.remaining()<nextStart){
 					return false;
 				}
-				io.skipExact(SIZE_VAL_SIZE.bytes);
+				io.skipExact(nextStart);
+				if(io.remaining()<nextSize.bytes){
+					return false;
+				}
+				io.skipExact(nextSize.bytes);
+				assert valueStart()==io.getPos();
 				return io.remaining()!=0;
 			}
 		}
@@ -217,9 +253,16 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		void setValue(T value) throws IOException{
 			try(var io=this.getReference().io(this)){
 				ensureNextSpace(io);
-				io.skipExact(SIZE_VAL_SIZE.bytes);
+				io.skipExact(valueStart());
 				if(value!=null){
-					valuePipe.write(this, io, value);
+					if(DEBUG_VALIDATION){
+						var size=valuePipe.getSizeDescriptor().calcUnknown(value, WordSpace.BYTE);
+						try(var buff=io.writeTicket(size).requireExact().submit()){
+							valuePipe.write(this, buff, value);
+						}
+					}else{
+						valuePipe.write(this, io, value);
+					}
 				}
 				io.trim();
 			}
@@ -227,10 +270,12 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		private ChunkPointer readNextPtr() throws IOException{
 			ChunkPointer chunk;
 			try(var io=getReference().io(this)){
-				if(io.remaining()==0){
+				var start=nextStart();
+				if(io.remaining()<=start){
 					return ChunkPointer.NULL;
 				}
-				chunk=ChunkPointer.read(SIZE_VAL_SIZE, io);
+				io.skipExact(start);
+				chunk=ChunkPointer.read(nextSize, io);
 			}
 			return chunk;
 		}
@@ -242,12 +287,36 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			return new Node<>(getChunkProvider(), new Reference(ptr, 0), getTypeDef());
 		}
 		
+		private long nextStart(){
+			IOField<Node<T>, NumberSize> field=getNextSizeField();
+			var                          desc =field.getSizeDescriptor();
+			return desc.calcUnknown(this, WordSpace.BYTE);
+		}
+		
+		private IOField<Node<T>, NumberSize> getNextSizeField(){
+			return getPipe().getSpecificFields().requireExact(NumberSize.class, "nextSize");
+		}
+		
+		private long valueStart(){
+			return nextStart()+nextSize.bytes;
+		}
+		
 		public void setNext(Node<T> next) throws IOException{
+			ChunkPointer ptr;
+			if(next==null) ptr=ChunkPointer.NULL;
+			else ptr=next.getReference().getPtr();
+			
+			var newSiz=NumberSize.bySize(ptr);
+			if(newSiz.greaterThan(nextSize)){
+				var val=getValue();
+				nextSize=newSiz;
+				writeManagedFields();
+				setValue(val);
+			}
+			
 			try(var io=getReference().io(this)){
-				ChunkPointer ptr;
-				if(next==null) ptr=ChunkPointer.NULL;
-				else ptr=next.getReference().getPtr();
-				SIZE_VAL_SIZE.write(io, ptr);
+				io.skipExact(nextStart());
+				nextSize.write(io, ptr);
 			}
 		}
 		@Override
