@@ -295,8 +295,6 @@ public class MSDFAtlas{
 		);
 	}
 	public Optional<Glyph> getGlyphOptional(char ch){
-		var c=glyphCache.get(ch);
-		if(c!=null) return Optional.of(c);
 		var opt=getGlyphOptional0(ch);
 		opt.ifPresent(glyph->glyphCache.put(ch, glyph));
 		return opt;
