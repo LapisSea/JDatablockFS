@@ -12,6 +12,8 @@ import org.roaringbitmap.RoaringBitmap;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.PrimitiveIterator;
+import java.util.stream.IntStream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
@@ -29,15 +31,19 @@ public class MemoryOperations{
 			}
 		}
 		
+		boolean noTrim=false;
+		
 		while(!possibleHeaders.isEmpty()){
 			
 			int lastUnknown=-1;
+			int removeCount=0;
 			
 			//test unknowns
-			var iter=possibleHeaders.stream().iterator();
+			PrimitiveIterator.OfInt iter=(noTrim?IntStream.of(possibleHeaders.last()):possibleHeaders.stream()).iterator();
 			while(iter.hasNext()){
 				var headIndex=iter.nextInt();
-				var pos      =headIndex+from;
+				
+				var pos=headIndex+from;
 				
 				try{
 					Chunk.readChunk(provider, ChunkPointer.of(pos));
@@ -53,13 +59,17 @@ public class MemoryOperations{
 					io.writeInt1(0);
 				}
 				possibleHeaders.remove(headIndex);
+				removeCount++;
 			}
 			if(lastUnknown!=-1){
 				possibleHeaders.remove(lastUnknown);
 			}
-			
 			if(possibleHeaders.isEmpty()) break;
 			
+			if(removeCount>1) noTrim=false;
+			if(noTrim) continue;
+			
+			noTrim=true;
 			//pop alone headers, no change will make them valid
 			iter=possibleHeaders.stream().iterator();
 			int lastIndex=-maxHeaderSize*2;
@@ -69,6 +79,7 @@ public class MemoryOperations{
 				
 				if(Math.min(Math.abs(lastIndex-index), Math.abs(nextIndex-index))>maxHeaderSize){
 					possibleHeaders.remove(index);
+					noTrim=false;
 				}else{
 					lastIndex=index;
 				}
