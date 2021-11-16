@@ -11,7 +11,9 @@ import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.AbstractFieldAccessor;
 import com.lapissea.util.NotNull;
+import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeLongConsumer;
+import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
@@ -140,17 +142,21 @@ public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanaged
 	
 	@Override
 	public void addAll(Collection<T> values) throws IOException{
+		addMany(values.size(), values.iterator()::next);
+	}
+	
+	private void addMany(long count, UnsafeSupplier<T, IOException> source) throws IOException{
 		
 		try(var io=selfIO()){
 			var pos=calcElementOffset(size());
 			io.skipExact(pos);
 			var elSiz   =getElementSize();
-			var totalPos=pos+values.size()*elSiz;
+			var totalPos=pos+count*elSiz;
 			io.ensureCapacity(totalPos);
 			io.setSize(totalPos);
 			
 			long targetBytes=512;
-			long targetCount=Math.min(values.size(), Math.max(1, targetBytes/elSiz));
+			long targetCount=Math.min(count, Math.max(1, targetBytes/elSiz));
 			
 			var targetCap=targetCount*elSiz;
 			
@@ -165,7 +171,10 @@ public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanaged
 				
 				long lastI=0;
 				long i    =0;
-				for(T value : values){
+				
+				for(long c=0;c<count;c++){
+					T value=source.get();
+					
 					elementPipe.write(this, buffIo, value);
 					i++;
 					var s=buffIo.getPos();
@@ -191,6 +200,21 @@ public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanaged
 		shift(index, ShiftAction.SQUASH);
 		
 		deltaSize(-1);
+	}
+	
+	@Override
+	public void addMultipleNew(long count, UnsafeConsumer<T, IOException> initializer) throws IOException{
+		if(count==0) return;
+		if(count<0) throw new IllegalArgumentException("Count must be positive!");
+		
+		T val=getElementType().requireEmptyConstructor().get();
+		
+		addMany(count, ()->{
+			if(initializer!=null){
+				initializer.accept(val);
+			}
+			return val;
+		});
 	}
 	
 	private enum ShiftAction{

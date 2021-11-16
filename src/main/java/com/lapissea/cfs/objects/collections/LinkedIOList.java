@@ -635,6 +635,34 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 	}
 	
 	@Override
+	public void addMultipleNew(long count, UnsafeConsumer<T, IOException> initializer) throws IOException{
+		if(count==0) return;
+		if(count<0) throw new IllegalArgumentException("Count must be positive!");
+		
+		T   val=getElementType().requireEmptyConstructor().get();
+		var typ=nodeType();
+		
+		
+		Node<T> chainStart=null;
+		
+		for(long i=0;i<count;i++){
+			if(initializer!=null){
+				initializer.accept(val);
+			}
+			//inverse order add, reduce chance for fragmentation by providing next node immediately
+			var nextNode=chainStart;
+			chainStart=Node.allocValNode(val, nextNode, elementPipe.getSizeDescriptor(), typ, getChunkProvider());
+		}
+		
+		var last=getLastNode();
+		if(last==null){
+			setHead(chainStart);
+		}else{
+			last.setNext(chainStart);
+		}
+	}
+	
+	@Override
 	public void free() throws IOException{
 		
 		List<Chunk> chunks=new ArrayList<>(Math.toIntExact(size()+1));

@@ -109,6 +109,12 @@ public class Splitter{
 				test();
 				return val;
 			}
+			@Override
+			public void addMultipleNew(long count, UnsafeConsumer<E, IOException> initializer) throws IOException{
+				a.addMultipleNew(count, initializer);
+				b.addMultipleNew(count, initializer);
+				test();
+			}
 		};
 	}
 	

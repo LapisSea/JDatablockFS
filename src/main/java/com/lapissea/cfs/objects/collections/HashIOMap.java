@@ -16,6 +16,7 @@ import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
@@ -181,10 +182,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 	
 	private void fillBuckets() throws IOException{
 		var siz=1L<<bucketPO2;
-		buckets.requestCapacity(siz);
-		while(buckets.size()<siz){
-			buckets.addNew(b->{});
-		}
+		buckets.addAll(LongStream.range(0, siz-buckets.size()).mapToObj(i->new Bucket<K, V>()).toList());
 	}
 	
 	@SuppressWarnings("unchecked")

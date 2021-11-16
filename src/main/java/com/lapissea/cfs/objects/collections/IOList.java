@@ -247,6 +247,11 @@ public interface IOList<T> extends IterablePP<T>{
 	
 	T addNew(@Nullable UnsafeConsumer<T, IOException> initializer) throws IOException;
 	
+	default void addMultipleNew(long count) throws IOException{
+		addMultipleNew(count, null);
+	}
+	void addMultipleNew(long count, @Nullable UnsafeConsumer<T, IOException> initializer) throws IOException;
+	
 	/**
 	 * The list can allocate space for data that may come later here.
 	 * It is not required to do so but is desirable. No exact capacity allocation is required.
