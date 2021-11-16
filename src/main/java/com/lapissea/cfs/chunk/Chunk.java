@@ -269,10 +269,6 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		forbidReadOnly();
 		if(this.capacity==newCapacity) return;
 
-//		if(capacity>newCapacity){
-//			throw new NotImplementedException("not sure when destructive shrinking will be needed");
-//		}
-		
 		var end=dataEnd();
 		
 		var newNum    =NumberSize.bySize(newCapacity);
@@ -284,7 +280,17 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		calcHeaderSize();
 		var growth=newCapacity-capacity;
 		var start =dataStart();
-		this.capacity=end-start+growth;
+		
+		var cap=end-start+growth;
+		if(!bodyNumSize.canFit(cap)){
+			bodyNumSize=bodyNumSize.next();
+			calcHeaderSize();
+			growth=newCapacity-capacity;
+			start=dataStart();
+			cap=end-start+growth;
+		}
+		
+		this.capacity=cap;
 		markDirty();
 	}
 	
