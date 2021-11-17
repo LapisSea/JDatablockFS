@@ -478,7 +478,7 @@ public class BinaryGridRenderer{
 		
 		var magic=Cluster.getMagicId();
 		
-		var hasMagic=magic.mismatch(ByteBuffer.wrap(bytes))==-1;
+		var hasMagic=magic.mismatch(ByteBuffer.wrap(bytes).limit(magic.limit()))==-1;
 		if(!hasMagic&&!errorMode){
 			throw new RuntimeException("No magic bytes");
 		}
