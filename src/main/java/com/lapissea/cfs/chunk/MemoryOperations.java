@@ -11,7 +11,6 @@ import org.roaringbitmap.RoaringBitmap;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.PrimitiveIterator;
 import java.util.stream.IntStream;
@@ -180,9 +179,9 @@ public class MemoryOperations{
 	}
 	
 	
-	public static Chunk allocateReuseFreeChunk(ChunkDataProvider context, AllocateTicket ticket, Iterable<Chunk> freeChunks) throws IOException{
-		for(Iterator<Chunk> iterator=freeChunks.iterator();iterator.hasNext();){
-			Chunk c=iterator.next();
+	public static Chunk allocateReuseFreeChunk(ChunkDataProvider context, AllocateTicket ticket) throws IOException{
+		for(var iterator=context.getMemoryManager().getFreeChunks().iterator();iterator.hasNext();){
+			Chunk c=iterator.next().dereference(context);
 			if(c.getCapacity()<ticket.bytes()) continue;
 			
 			var freeSpace=c.getCapacity()-ticket.bytes();
@@ -238,6 +237,11 @@ public class MemoryOperations{
 		
 		var chunk=builder.create();
 		if(!ticket.approve(chunk)) return null;
+		
+		try(var io=src.ioAt(chunk.getPtr().getValue())){
+			chunk.writeHeader(io);
+			Utils.zeroFill(io::write, chunk.getCapacity());
+		}
 		
 		return chunk;
 	}

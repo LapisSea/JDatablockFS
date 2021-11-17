@@ -462,6 +462,9 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		if(reading) return;
 		dirty=true;
 	}
+	public boolean dirty(){
+		return dirty;
+	}
 	
 	@Override
 	public boolean equals(Object o){
