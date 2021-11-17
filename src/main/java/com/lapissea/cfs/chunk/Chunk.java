@@ -35,7 +35,7 @@ import java.util.stream.Stream;
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
 @SuppressWarnings("unused")
-public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, ChunkDataProvider.Holder{
+public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, ChunkDataProvider.Holder, Comparable<Chunk>{
 	
 	private static final Struct<Chunk>     STRUCT=Struct.of(Chunk.class);
 	public static final  StructPipe<Chunk> PIPE  =ContiguousStructPipe.of(STRUCT);
@@ -268,7 +268,7 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 	public void setCapacityAndModifyNumSize(long newCapacity){
 		forbidReadOnly();
 		if(this.capacity==newCapacity) return;
-
+		
 		var end=dataEnd();
 		
 		var newNum    =NumberSize.bySize(newCapacity);
@@ -291,6 +291,7 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		}
 		
 		this.capacity=cap;
+		this.size=Math.min(this.size, this.capacity);
 		markDirty();
 	}
 	
@@ -453,8 +454,11 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		return checkLastPhysical()?null:provider.getChunk(ChunkPointer.of(dataEnd()));
 	}
 	
+	public boolean isNextPhysical(ChunkPointer other){
+		return other.equals(dataEnd());
+	}
 	public boolean isNextPhysical(Chunk other){
-		return other.getPtr().equals(dataEnd());
+		return isNextPhysical(other.getPtr());
 	}
 	
 	private void markDirty(){
@@ -513,5 +517,10 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 			sb.append(" -> ").append(getNextPtr()).append(nextSize.shortName);
 		}
 		return sb.append("}").toString();
+	}
+	
+	@Override
+	public int compareTo(Chunk o){
+		return getPtr().compareTo(o.getPtr());
 	}
 }

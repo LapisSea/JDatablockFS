@@ -7,7 +7,7 @@ import com.lapissea.util.NotNull;
 
 import java.io.IOException;
 
-public final class ChunkPointer implements INumber{
+public final class ChunkPointer implements INumber, Comparable<ChunkPointer>{
 	
 	public static final ChunkPointer NULL=new ChunkPointer(0);
 	
@@ -101,5 +101,10 @@ public final class ChunkPointer implements INumber{
 	}
 	public boolean isNull(){
 		return getValue()==0;
+	}
+	
+	@Override
+	public int compareTo(ChunkPointer o){
+		return compareTo(o.getValue());
 	}
 }
