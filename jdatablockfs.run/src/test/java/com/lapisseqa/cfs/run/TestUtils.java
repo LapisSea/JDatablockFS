@@ -20,6 +20,7 @@ import org.junit.jupiter.api.TestInfo;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -136,7 +137,7 @@ public class TestUtils{
 		UnsafeConsumer<IOList<E>, IOException> session, boolean useCluster
 	) throws IOException{
 		complexObjectIntegrityTest(info, initalCapacity, constr, typeDef, list->{
-			var splitter=Splitter.list(list, new ReferenceMemoryIOList<>(), TestUtils::checkCompliance);
+			var splitter=Splitter.list(list, IOList.wrap(new ArrayList<>(), ()->{throw new UnsupportedOperationException();}), TestUtils::checkCompliance);
 			session.accept(splitter);
 		}, useCluster);
 	}

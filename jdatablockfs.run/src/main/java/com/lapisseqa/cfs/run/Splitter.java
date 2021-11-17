@@ -115,6 +115,11 @@ public class Splitter{
 				b.addMultipleNew(count, initializer);
 				test();
 			}
+			@Override
+			public void clear() throws IOException{
+				a.clear();
+				b.clear();
+			}
 		};
 	}
 	

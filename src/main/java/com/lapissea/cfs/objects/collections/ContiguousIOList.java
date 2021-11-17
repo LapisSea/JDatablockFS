@@ -216,6 +216,14 @@ public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanaged
 			return val;
 		});
 	}
+	@Override
+	public void clear() throws IOException{
+		if(isEmpty()) return;
+		deltaSize(-size());
+		try(var io=selfIO()){
+			io.setCapacity(calcElementOffset(0));
+		}
+	}
 	
 	private enum ShiftAction{
 		SQUASH, FORWARD_DUP

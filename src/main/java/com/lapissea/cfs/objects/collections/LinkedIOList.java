@@ -3,7 +3,6 @@ package com.lapissea.cfs.objects.collections;
 import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.AllocateTicket;
-import com.lapissea.cfs.chunk.ChainWalker;
 import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.ChunkDataProvider;
 import com.lapissea.cfs.io.RandomIO;
@@ -25,10 +24,7 @@ import com.lapissea.util.function.UnsafeConsumer;
 import java.io.IOException;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.OptionalLong;
+import java.util.*;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
@@ -661,34 +657,32 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			last.setNext(chainStart);
 		}
 	}
-	
 	@Override
-	public void free() throws IOException{
+	public void clear() throws IOException{
+		if(isEmpty()) return;
 		
-		List<Chunk> chunks=new ArrayList<>(Math.toIntExact(size()+1));
+		var head=getHead();
+		setHead(null);
+		deltaSize(-size());
 		
-		UnsafeConsumer<IOInstance.Unmanaged<?>, IOException> yum=inst->{
-			var c=inst.getReference()
-			          .getPtr()
-			          .dereference(getChunkProvider());
-			
-			for(Chunk chunk : new ChainWalker(c)){
-				chunks.add(chunk);
-			}
-		};
+		freeUnmanaged(head);
+	}
+	
+	private <U extends IOInstance.Unmanaged<U>> void freeUnmanaged(U val) throws IOException{
+		Set<Chunk> chunks=new HashSet<>();
 		
-		var node=getHead();
-		
-		do{
-			yum.accept(node);
-		}while((node=node.getNext())!=null);
-		
-		yum.accept(this);
+		new MemoryWalker().walk(val, ref->ref.getPtr().dereference(getChunkProvider()).streamNext().forEach(chunks::add));
 		
 		getChunkProvider()
 			.getMemoryManager()
 			.free(chunks);
 	}
+	
+	@Override
+	public void free() throws IOException{
+		freeUnmanaged(this);
+	}
+	
 	@NotNull
 	@Override
 	protected String getStringPrefix(){
