@@ -583,10 +583,15 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		
 		if(index==0){
 			if(isLast(index)){
+				var oldHead=getHead();
 				setHead(null);
+				freeUnmanaged(oldHead);
 			}else{
+				var oldHead=getHead();
 				var newHead=getNode(1);
 				setHead(newHead);
+				oldHead.setNext(null);
+				freeUnmanaged(oldHead);
 			}
 			deltaSize(-1);
 		}else{
@@ -598,9 +603,10 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		var toPop=prevNode.getNext();
 		if(toPop==null) return;
 		var nextNode=toPop.getNext();
-		
 		prevNode.setNext(nextNode);
 		deltaSize(-1);
+		toPop.setNext(null);
+		freeUnmanaged(toPop);
 	}
 	
 	private boolean isLast(long index){
@@ -675,7 +681,12 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 	private <U extends IOInstance.Unmanaged<U>> void freeUnmanaged(U val) throws IOException{
 		Set<Chunk> chunks=new HashSet<>();
 		
-		new MemoryWalker().walk(val, ref->ref.getPtr().dereference(getChunkProvider()).streamNext().forEach(chunks::add));
+		new MemoryWalker().walk(val, ref->{
+			if(ref.isNull()){
+				return;
+			}
+			ref.getPtr().dereference(getChunkProvider()).streamNext().forEach(chunks::add);
+		});
 		
 		getChunkProvider()
 			.getMemoryManager()
