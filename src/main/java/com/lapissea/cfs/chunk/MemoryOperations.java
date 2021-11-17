@@ -4,6 +4,7 @@ import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.BitDepthOutOfSpaceException;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
+import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
@@ -11,6 +12,7 @@ import org.roaringbitmap.RoaringBitmap;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.PrimitiveIterator;
 import java.util.stream.IntStream;
@@ -88,8 +90,147 @@ public class MemoryOperations{
 		}
 	}
 	
-	public static List<Chunk> mergeChunks(List<Chunk> data, boolean purgeAccidental) throws IOException{
-		List<Chunk> chunks   =new ArrayList<>(data);
+	private static long binaryFindWedge(IOList<ChunkPointer> a, ChunkPointer key) throws IOException{
+		long low =0;
+		long high=a.size()-1;
+		
+		while(low<=high){
+			long mid   =(low+high) >>> 1;
+			var  midVal=a.get(mid);
+			
+			int cmp;
+			int cmp1=midVal.compareTo(key);
+			if(cmp1<0){
+				var nextMid=mid+1;
+				if(nextMid>=a.size()){
+					return nextMid;
+				}
+				var nextMidVal=a.get(nextMid);
+				int cmp2      =nextMidVal.compareTo(key);
+				if(cmp2>=0){
+					return nextMid;
+				}
+				cmp=cmp1;
+			}else if(mid==0){
+				return mid;
+			}else{
+				cmp=cmp1;
+			}
+			
+			if(cmp<0) low=mid+1;
+			else if(cmp>0) high=mid-1;
+			else return mid; // key found
+		}
+		return -1;  // key not found.
+	}
+	
+	public static void mergeFreeChunksSorted(ChunkDataProvider provider, IOList<ChunkPointer> data, List<Chunk> newData) throws IOException{
+		for(Chunk newCh : newData){
+			checkOptimal(provider, data);
+			
+			var newPtr=newCh.getPtr();
+			if(data.isEmpty()){
+				data.add(newPtr);
+				continue;
+			}
+			var insertIndex=binaryFindWedge(data, newPtr);
+			if(insertIndex==0){
+				var existing=data.get(0).dereference(provider);
+				var next    =newCh;
+				if(existing.compareTo(next)<0){
+					var tmp=next;
+					next=existing;
+					existing=tmp;
+				}
+				if(next.isNextPhysical(existing)){
+					freeListReplace(data, 0, newCh);
+					mergeFreeChunks(next, existing);
+					//check if next element in free list is now next physical and merge+remove from list
+					if(data.size()>1){
+						var ptr=data.get(1);
+						if(existing.isNextPhysical(ptr)){
+							var ch=ptr.dereference(provider);
+							data.remove(1);
+							mergeFreeChunks(existing, ch);
+						}
+					}
+					continue;
+				}
+				
+				freeListAdd(data, insertIndex, newCh);
+				continue;
+			}
+			
+			var prev=data.get(insertIndex-1).dereference(provider);
+			if(prev.isNextPhysical(newCh)){
+				mergeFreeChunks(prev, newCh);
+				//check if next element in free list is now next physical and merge+remove from list
+				if(data.size()>insertIndex){
+					var ch=data.get(insertIndex).dereference(provider);
+					if(prev.isNextPhysical(ch)){
+						data.remove(insertIndex);
+						mergeFreeChunks(prev, ch);
+					}
+				}
+			}else{
+				if(data.size()>insertIndex){
+					var next=data.get(insertIndex).dereference(provider);
+					
+					if(newCh.isNextPhysical(next)){
+						freeListReplace(data, insertIndex, newCh);
+						mergeFreeChunks(newCh, next);
+						continue;
+					}
+				}
+				freeListAdd(data, insertIndex, newCh);
+			}
+		}
+		checkOptimal(provider, data);
+	}
+	
+	private static void freeListReplace(IOList<ChunkPointer> data, long replaceIndex, Chunk newCh) throws IOException{
+		clearFree(newCh);
+		data.set(replaceIndex, newCh.getPtr());
+	}
+	private static void freeListAdd(IOList<ChunkPointer> data, long insertIndex, Chunk newCh) throws IOException{
+		clearFree(newCh);
+		data.add(insertIndex, newCh.getPtr());
+	}
+	
+	private static void checkOptimal(ChunkDataProvider provider, IOList<ChunkPointer> data) throws IOException{
+		ChunkPointer last=null;
+		for(ChunkPointer val : data){
+			if(last!=null){
+				assert last.compareTo(val)<0:last+" "+val+" "+data;
+				var prev=last.dereference(provider);
+				var c   =val.dereference(provider);
+				assert !prev.isNextPhysical(c):prev+" "+c+" "+data;
+			}
+			last=val;
+		}
+	}
+	private static void clearFree(Chunk newCh) throws IOException{
+		newCh.sizeSetZero();
+		newCh.clearNextPtr();
+		newCh.syncStruct();
+	}
+	
+	private static void mergeFreeChunks(Chunk prev, Chunk next) throws IOException{
+		prepareFreeChunkMerge(prev, next);
+		prev.syncStruct();
+		next.destroy(true);
+		next.getChunkProvider().getChunkCache().notifyDestroyed(next);
+	}
+	
+	private static void prepareFreeChunkMerge(Chunk prev, Chunk next){
+		var wholeSize=next.getHeaderSize()+next.getCapacity();
+		prev.setCapacityAndModifyNumSize(prev.getCapacity()+wholeSize);
+		assert prev.dataEnd()==next.dataEnd();
+	}
+	
+	public static List<Chunk> mergeChunks(Collection<Chunk> data, boolean purgeAccidental) throws IOException{
+		List<Chunk> chunks=new ArrayList<>(data);
+		chunks.sort(Chunk::compareTo);
 		List<Chunk> toDestroy=new ArrayList<>();
 		iter:
 		while(chunks.size()>1){
@@ -99,11 +240,7 @@ public class MemoryOperations{
 				var optPrev=chunks.stream().filter(c->c.isNextPhysical(chunk)).findAny();
 				if(optPrev.isPresent()){
 					var prev=optPrev.get();
-					
-					var wholeSize=chunk.getHeaderSize()+chunk.getCapacity();
-					prev.sizeSetZero();
-					prev.setCapacityAndModifyNumSize(prev.getCapacity()+wholeSize);
-					
+					prepareFreeChunkMerge(prev, chunk);
 					toDestroy.add(chunk);
 					iter.remove();
 					continue iter;
@@ -116,11 +253,10 @@ public class MemoryOperations{
 		}
 		
 		for(Chunk chunk : chunks){
-			chunk.clearNextPtr();
-			chunk.syncStruct();
+			clearFree(chunk);
 			
 			if(purgeAccidental){
-				MemoryOperations.purgePossibleChunkHeaders(chunk.getChunkProvider(), chunk.dataStart(), chunk.getCapacity());
+				purgePossibleChunkHeaders(chunk.getChunkProvider(), chunk.dataStart(), chunk.getCapacity());
 			}
 		}
 		

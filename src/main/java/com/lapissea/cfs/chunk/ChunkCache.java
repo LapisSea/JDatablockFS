@@ -11,6 +11,8 @@ import com.lapissea.util.function.UnsafeFunction;
 import java.util.*;
 import java.util.function.Supplier;
 
+import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+
 public class ChunkCache{
 	
 	public static ChunkCache none(){
@@ -47,6 +49,21 @@ public class ChunkCache{
 	@Nullable
 	public Chunk get(ChunkPointer pointer){
 		return data.get(pointer);
+	}
+	
+	public void notifyDestroyed(Chunk chunk){
+		if(DEBUG_VALIDATION){
+			var fail=false;
+			try{
+				Chunk.readChunk(chunk.getChunkProvider(), chunk.getPtr());
+			}catch(Throwable e){
+				fail=true;
+			}
+			if(!fail){
+				throw new IllegalStateException("Chunk at "+chunk.getPtr()+" is still valid!");
+			}
+		}
+		data.remove(chunk.getPtr());
 	}
 	
 	public <T extends Throwable> void ifCached(ChunkPointer pointer, UnsafeConsumer<Chunk, T> onPresent) throws T{
