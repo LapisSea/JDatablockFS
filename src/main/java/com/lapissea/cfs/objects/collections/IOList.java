@@ -87,6 +87,73 @@ public interface IOList<T> extends IterablePP<T>{
 		return new MemoryWrappedIOList<>(data, typeConstructor);
 	}
 	
+	
+	static <T extends Comparable<T>> long addRemainSorted(IOList<T> list, T value) throws IOException{
+		if(list.isEmpty()){
+			list.add(value);
+			return 0;
+		}
+		
+		if(value.compareTo(list.get(0))<0){
+			list.add(0, value);
+			return 0;
+		}
+		if(value.compareTo(list.get(list.size()-1))>0){
+			var index=list.size();
+			list.add(value);
+			return index;
+		}
+		
+		long lo=0;
+		long hi=list.size()-1;
+		
+		while(lo<=hi){
+			long mid=(hi+lo)/2;
+			
+			int comp=value.compareTo(list.get(mid));
+			if(comp<0){
+				hi=mid-1;
+			}else if(comp>0){
+				lo=mid+1;
+			}else{
+				list.add(mid, value);
+				return mid;
+			}
+		}
+		
+		list.add(lo, value);
+		return lo;
+	}
+	
+	static <T extends Comparable<T>> void scuffedCycleSort(IOList<T> list) throws IOException{
+		
+		// Loop through the array to find cycles to rotate.
+		for(long cycleStart=0;cycleStart<list.size()-1;cycleStart++){
+			T item=list.get(cycleStart);
+			
+			// Find where to put the item.
+			long pos=cycleStart;
+			for(long i=cycleStart+1;i<list.size();i++){
+				if(list.get(i).compareTo(item)<0) pos++;
+			}
+			
+			// If the item is already there, this is not a cycle.
+			if(pos==cycleStart) continue;
+			
+			// Otherwise, put the item there or right after any duplicates.
+			while(item.equals(list.get(pos))){
+				pos++;
+			}
+			{
+				T temp=list.get(pos);
+				list.set(pos, item);
+				
+				list.set(cycleStart, temp);
+				cycleStart--;
+			}
+		}
+	}
+	
 	interface IOIterator<T>{
 		interface Iter<T> extends IOIterator<T>, Iterator<T>{
 			@Override
