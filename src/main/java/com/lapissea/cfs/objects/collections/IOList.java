@@ -79,7 +79,7 @@ public interface IOList<T> extends IterablePP<T>{
 		
 		@Override
 		public String toString(){
-			return stream().map(TextUtil::toShortString).collect(Collectors.joining(", ", "[", "]"));
+			return stream().map(TextUtil::toShortString).collect(Collectors.joining(", ", "Ram[", "]"));
 		}
 	}
 	
@@ -97,10 +97,21 @@ public interface IOList<T> extends IterablePP<T>{
 					throw new RuntimeException(e);
 				}
 			}
+			@Override
+			default void remove(){
+				try{
+					ioRemove();
+				}catch(IOException e){
+					throw new RuntimeException(e);
+				}
+			}
 		}
 		
 		boolean hasNext();
 		T ioNext() throws IOException;
+		default void ioRemove() throws IOException{
+			throw new UnsupportedOperationException(getClass().toString());
+		}
 	}
 	
 	
@@ -187,6 +198,7 @@ public interface IOList<T> extends IterablePP<T>{
 		long nextIndex();
 		long previousIndex();
 		
+		@Override
 		void ioRemove() throws IOException;
 		void ioSet(T t) throws IOException;
 		void ioAdd(T t) throws IOException;
@@ -263,6 +275,10 @@ public interface IOList<T> extends IterablePP<T>{
 			@Override
 			public T ioNext() throws IOException{
 				return get(index++);
+			}
+			@Override
+			public void ioRemove() throws IOException{
+				IOList.this.remove(--index);
 			}
 		}
 		return new IndexAccessIterator();

@@ -400,6 +400,10 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			var node=nodes.next();
 			return node.getValue();
 		}
+		@Override
+		public void ioRemove() throws IOException{
+			nodes.ioRemove();
+		}
 	}
 	
 	private class LinkedListIterator extends IOListIterator.AbstractIndex<T>{
