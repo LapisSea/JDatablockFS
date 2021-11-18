@@ -1,7 +1,7 @@
 package com.lapissea.cfs.objects.collections;
 
 import com.lapissea.cfs.chunk.Chunk;
-import com.lapissea.cfs.chunk.ChunkDataProvider;
+import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
@@ -33,7 +33,7 @@ public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanaged
 	
 	private final FixedContiguousStructPipe<T> elementPipe;
 	
-	public ContiguousIOList(ChunkDataProvider provider, Reference reference, TypeDefinition typeDef) throws IOException{
+	public ContiguousIOList(DataProvider provider, Reference reference, TypeDefinition typeDef) throws IOException{
 		super(provider, reference, typeDef);
 		TYPE_CHECK.ensureValid(typeDef);
 		var type=(Struct<T>)typeDef.argAsStruct(0);
@@ -288,7 +288,7 @@ public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanaged
 		Set<Chunk> chunks=new HashSet<>();
 		var        prov  =getChunkProvider();
 		
-		new MemoryWalker().walk(this, ref->{
+		new MemoryWalker(this).walk(true, ref->{
 			if(ref.isNull()) return;
 			ref.getPtr().dereference(prov).streamNext().forEach(chunks::add);
 		});

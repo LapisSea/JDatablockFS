@@ -1,6 +1,6 @@
 package com.lapissea.cfs.type.field.fields.reflection;
 
-import com.lapissea.cfs.chunk.ChunkDataProvider;
+import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.bit.BitReader;
 import com.lapissea.cfs.io.bit.BitWriter;
 import com.lapissea.cfs.io.content.ContentReader;
@@ -20,9 +20,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 
-import static com.lapissea.cfs.objects.NumberSize.BYTE;
 import static com.lapissea.cfs.objects.NumberSize.*;
-import static com.lapissea.cfs.type.WordSpace.*;
+import static com.lapissea.cfs.type.WordSpace.BIT;
 
 public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> extends IOField<T, ValueType>{
 	
@@ -80,14 +79,14 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
-		public List<IOField<T, ?>> write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
+		public List<IOField<T, ?>> write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 			var size=getSize(instance);
 			size.writeFloating(dest, getValue(instance));
 			return List.of();
 		}
 		
 		@Override
-		public void read(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		public void read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			var size=getSize(instance);
 			setValue(instance, size.readFloating(src));
 		}
@@ -136,14 +135,14 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
-		public List<IOField<T, ?>> write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
+		public List<IOField<T, ?>> write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 			var size=getSize(instance);
 			size.writeFloating(dest, getValue(instance));
 			return List.of();
 		}
 		
 		@Override
-		public void read(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		public void read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			var size=getSize(instance);
 			setValue(instance, (float)size.readFloating(src));
 		}
@@ -187,14 +186,14 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
-		public List<IOField<T, ?>> write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
+		public List<IOField<T, ?>> write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 			var size=getSize(instance);
 			size.write(dest, getValue(instance));
 			return List.of();
 		}
 		
 		@Override
-		public void read(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		public void read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			var size=getSize(instance);
 			setValue(instance, size.read(src));
 		}
@@ -245,14 +244,14 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
-		public List<IOField<T, ?>> write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
+		public List<IOField<T, ?>> write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 			var size=getSize(instance);
 			size.write(dest, getValue(instance));
 			return List.of();
 		}
 		
 		@Override
-		public void read(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		public void read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			var size=getSize(instance);
 			setValue(instance, (int)size.read(src));
 		}
@@ -303,14 +302,14 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
-		public List<IOField<T, ?>> write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
+		public List<IOField<T, ?>> write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 			var size=getSize(instance);
 			size.write(dest, getValue(instance));
 			return List.of();
 		}
 		
 		@Override
-		public void read(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		public void read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			var size=getSize(instance);
 			setValue(instance, (short)size.read(src));
 		}
@@ -361,13 +360,13 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
-		public List<IOField<T, ?>> write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
+		public List<IOField<T, ?>> write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 			dest.writeInt1(getValue(instance));
 			return List.of();
 		}
 		
 		@Override
-		public void read(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		public void read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			setValue(instance, src.readInt1());
 		}
 		
@@ -466,7 +465,7 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 	}
 	
 	@Override
-	public void skipRead(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public void skipRead(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		var size=getSize(instance);
 		src.skipExact(size.bytes);
 	}

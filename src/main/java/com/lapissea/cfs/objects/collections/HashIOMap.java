@@ -1,7 +1,7 @@
 package com.lapissea.cfs.objects.collections;
 
 import com.lapissea.cfs.IterablePP;
-import com.lapissea.cfs.chunk.ChunkDataProvider;
+import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.IOInstance;
@@ -136,7 +136,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 	
 	private int datasetID;
 	
-	public HashIOMap(ChunkDataProvider provider, Reference reference, TypeDefinition typeDef) throws IOException{
+	public HashIOMap(DataProvider provider, Reference reference, TypeDefinition typeDef) throws IOException{
 		super(provider, reference, typeDef);
 		
 		if(isSelfDataEmpty()){

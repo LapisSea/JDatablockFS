@@ -1,7 +1,7 @@
 package com.lapissea.cfs.type.field.fields.reflection;
 
 import com.lapissea.cfs.Utils;
-import com.lapissea.cfs.chunk.ChunkDataProvider;
+import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.bit.FlagReader;
 import com.lapissea.cfs.io.bit.FlagWriter;
 import com.lapissea.cfs.io.content.ContentReader;
@@ -88,7 +88,7 @@ public class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends IOField<
 	}
 	
 	@Override
-	public List<IOField<CTyp, ?>> write(ChunkDataProvider provider, ContentWriter dest, CTyp instance) throws IOException{
+	public List<IOField<CTyp, ?>> write(DataProvider provider, ContentWriter dest, CTyp instance) throws IOException{
 		var val=getWrapped(instance);
 		if(nullable()){
 			try(var flags=new FlagWriter.AutoPop(NumberSize.BYTE, dest)){
@@ -100,7 +100,7 @@ public class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends IOField<
 		return List.of();
 	}
 	
-	private AutoText readNew(ChunkDataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+	private AutoText readNew(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
 		if(nullable()){
 			try(var flags=FlagReader.read(src, NumberSize.BYTE)){
 				if(flags.readBoolBit()){
@@ -113,13 +113,13 @@ public class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends IOField<
 	}
 	
 	@Override
-	public void read(ChunkDataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
+	public void read(DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
 		var text=readNew(provider, src, genericContext);
 		set(instance, text==null?null:text.getData());
 	}
 	
 	@Override
-	public void skipRead(ChunkDataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
+	public void skipRead(DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
 		readNew(provider, src, genericContext);
 	}
 	

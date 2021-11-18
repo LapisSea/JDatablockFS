@@ -44,6 +44,8 @@ class FSFTest{
 					
 					intMapRun(cluster);
 					LogUtil.println(TextUtil.toNamedPrettyJson(cluster.gatherStatistics()));
+					cluster.defragment();
+					LogUtil.println(TextUtil.toNamedPrettyJson(cluster.gatherStatistics()));
 				}finally{
 					logger.block();
 					mem.onWrite.log(mem, LongStream.of());

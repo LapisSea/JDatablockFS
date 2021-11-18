@@ -11,13 +11,13 @@ import java.util.Objects;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
-public interface ChunkDataProvider{
+public interface DataProvider{
 	
 	interface Holder{
-		ChunkDataProvider getChunkProvider();
+		DataProvider getChunkProvider();
 	}
 	
-	class VerySimple implements ChunkDataProvider{
+	class VerySimple implements DataProvider{
 		private final IOTypeDB      typeDB       =new IOTypeDB.MemoryOnlyDB();
 		private final ChunkCache    cache        =ChunkCache.strong();
 		private final MemoryManager memoryManager=new VerySimpleMemoryManager(this);
@@ -53,11 +53,11 @@ public interface ChunkDataProvider{
 		}
 	}
 	
-	static ChunkDataProvider newVerySimpleProvider() throws IOException{
+	static DataProvider newVerySimpleProvider() throws IOException{
 		return newVerySimpleProvider((MemoryData.EventLogger)null);
 	}
 	
-	static ChunkDataProvider newVerySimpleProvider(MemoryData.EventLogger onWrite) throws IOException{
+	static DataProvider newVerySimpleProvider(MemoryData.EventLogger onWrite) throws IOException{
 		var data=new MemoryData.Builder()
 			.withOnWrite(onWrite)
 			.withInitial(dest->dest.write(Cluster.getMagicId()))
@@ -65,7 +65,7 @@ public interface ChunkDataProvider{
 		return newVerySimpleProvider(data);
 	}
 	
-	static ChunkDataProvider newVerySimpleProvider(IOInterface data){
+	static DataProvider newVerySimpleProvider(IOInterface data){
 		return new VerySimple(data);
 	}
 	

@@ -21,7 +21,7 @@ import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
 public class MemoryOperations{
 	
-	public static void purgePossibleChunkHeaders(ChunkDataProvider provider, long from, long size) throws IOException{
+	public static void purgePossibleChunkHeaders(DataProvider provider, long from, long size) throws IOException{
 		var maxHeaderSize=(int)Chunk.PIPE.getSizeDescriptor().requireMax(WordSpace.BYTE);
 		
 		RoaringBitmap possibleHeaders=new RoaringBitmap();
@@ -124,7 +124,7 @@ public class MemoryOperations{
 		return -1;  // key not found.
 	}
 	
-	public static void mergeFreeChunksSorted(ChunkDataProvider provider, IOList<ChunkPointer> data, List<Chunk> newData) throws IOException{
+	public static void mergeFreeChunksSorted(DataProvider provider, IOList<ChunkPointer> data, List<Chunk> newData) throws IOException{
 		for(Chunk newCh : newData){
 			checkOptimal(provider, data);
 			
@@ -197,7 +197,7 @@ public class MemoryOperations{
 		data.add(insertIndex, newCh.getPtr());
 	}
 	
-	private static void checkOptimal(ChunkDataProvider provider, IOList<ChunkPointer> data) throws IOException{
+	private static void checkOptimal(DataProvider provider, IOList<ChunkPointer> data) throws IOException{
 		ChunkPointer last=null;
 		for(ChunkPointer val : data){
 			if(last!=null){
@@ -272,7 +272,7 @@ public class MemoryOperations{
 	public static long growFileAlloc(Chunk target, long toAllocate) throws IOException{
 //		LogUtil.println("growing file by:", toAllocate);
 		
-		ChunkDataProvider context=target.getChunkProvider();
+		DataProvider context=target.getChunkProvider();
 		
 		if(context.isLastPhysical(target)){
 			var remaining=target.getBodyNumSize().remaining(target.getCapacity());
@@ -315,7 +315,7 @@ public class MemoryOperations{
 	}
 	
 	
-	public static Chunk allocateReuseFreeChunk(ChunkDataProvider context, AllocateTicket ticket) throws IOException{
+	public static Chunk allocateReuseFreeChunk(DataProvider context, AllocateTicket ticket) throws IOException{
 		for(var iterator=context.getMemoryManager().getFreeChunks().iterator();iterator.hasNext();){
 			Chunk c=iterator.next().dereference(context);
 			if(c.getCapacity()<ticket.bytes()) continue;
@@ -337,7 +337,7 @@ public class MemoryOperations{
 		return null;
 	}
 	
-	private static Chunk chipEndProbe(ChunkDataProvider context, AllocateTicket ticket, Chunk ch) throws IOException{
+	private static Chunk chipEndProbe(DataProvider context, AllocateTicket ticket, Chunk ch) throws IOException{
 		var builder=new ChunkBuilder(context, ch.getPtr())
 			.withCapacity(ticket.bytes())
 			.withNext(ticket.next())
@@ -362,7 +362,7 @@ public class MemoryOperations{
 		return null;
 	}
 	
-	public static Chunk allocateAppendToFile(ChunkDataProvider context, AllocateTicket ticket) throws IOException{
+	public static Chunk allocateAppendToFile(DataProvider context, AllocateTicket ticket) throws IOException{
 		
 		var src=context.getSource();
 		
@@ -382,7 +382,7 @@ public class MemoryOperations{
 		return chunk;
 	}
 	
-	public static void checkValidityOfChainAlloc(ChunkDataProvider context, Chunk firstChunk, Chunk target) throws IOException{
+	public static void checkValidityOfChainAlloc(DataProvider context, Chunk firstChunk, Chunk target) throws IOException{
 		if(DEBUG_VALIDATION){
 			assert firstChunk.getChunkProvider()==context;
 			assert target.getChunkProvider()==context;

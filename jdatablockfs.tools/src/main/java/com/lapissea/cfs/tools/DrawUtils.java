@@ -1,7 +1,7 @@
 package com.lapissea.cfs.tools;
 
 import com.lapissea.cfs.IterablePP;
-import com.lapissea.cfs.chunk.ChunkDataProvider;
+import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.ChunkChainIO;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.tools.render.RenderBackend;
@@ -321,7 +321,7 @@ class DrawUtils{
 	public static void drawPixelLine(BinaryGridRenderer.RenderContext ctx, double xFrom, double yFrom, double xTo, double yTo){
 		ctx.renderer().drawLine(xFrom*ctx.pixelsPerByte(), yFrom*ctx.pixelsPerByte(), xTo*ctx.pixelsPerByte(), yTo*ctx.pixelsPerByte());
 	}
-	static IterablePP<Range> chainRangeResolve(ChunkDataProvider cluster, Reference ref, int fieldOffset, int size){
+	static IterablePP<Range> chainRangeResolve(DataProvider cluster, Reference ref, int fieldOffset, int size){
 		return IterablePP.nullTerminated(()->new Supplier<>(){
 			int remaining=size;
 			final ChunkChainIO io;

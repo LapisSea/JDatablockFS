@@ -1,7 +1,7 @@
 package com.lapissea.cfs.io.instancepipe;
 
 import com.lapissea.cfs.Utils;
-import com.lapissea.cfs.chunk.ChunkDataProvider;
+import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.FixedFormatNotSupportedException;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.io.content.ContentReader;
@@ -23,9 +23,9 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static com.lapissea.cfs.GlobalConfig.*;
-import static com.lapissea.cfs.type.field.IOField.UsageHintType.*;
-import static java.util.function.Predicate.*;
+import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.type.field.IOField.UsageHintType.SIZE_DATA;
+import static java.util.function.Predicate.not;
 
 public class FixedContiguousStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 	
@@ -106,7 +106,7 @@ public class FixedContiguousStructPipe<T extends IOInstance<T>> extends StructPi
 	}
 	
 	@Override
-	protected void doWrite(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
+	protected void doWrite(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		var ioPool=makeIOPool();
 		try{
 			pushPool(ioPool);
@@ -118,7 +118,7 @@ public class FixedContiguousStructPipe<T extends IOInstance<T>> extends StructPi
 	}
 	
 	@Override
-	protected T doRead(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	protected T doRead(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		var ioPool=makeIOPool();
 		try{
 			pushPool(ioPool);

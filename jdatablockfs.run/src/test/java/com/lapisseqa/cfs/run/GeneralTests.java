@@ -2,8 +2,8 @@ package com.lapisseqa.cfs.run;
 
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.Chunk;
-import com.lapissea.cfs.chunk.ChunkDataProvider;
 import com.lapissea.cfs.chunk.Cluster;
+import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
@@ -30,8 +30,10 @@ import java.util.Random;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import static com.lapissea.util.LogUtil.Init.*;
-import static org.junit.jupiter.api.Assertions.*;
+import static com.lapissea.util.LogUtil.Init.USE_CALL_POS;
+import static com.lapissea.util.LogUtil.Init.USE_TABULATED_HEADER;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class GeneralTests{
 	
@@ -52,7 +54,7 @@ public class GeneralTests{
 		}
 		
 		if(Boolean.parseBoolean(UtilL.sysPropertyByClass(GeneralTests.class, "earlyRunCode").orElse("true"))){
-			try(var dummy=AllocateTicket.bytes(1).submit(ChunkDataProvider.newVerySimpleProvider()).io()){
+			try(var dummy=AllocateTicket.bytes(1).submit(DataProvider.newVerySimpleProvider()).io()){
 				dummy.write(1);
 			}
 		}
@@ -64,7 +66,7 @@ public class GeneralTests{
 		TestUtils.testChunkProvider(info, provider->{
 			var chunk=AllocateTicket.bytes(capacity).submit(provider);
 			
-			var providerRead=ChunkDataProvider.newVerySimpleProvider(provider.getSource());
+			var providerRead=DataProvider.newVerySimpleProvider(provider.getSource());
 			var readChunk   =providerRead.getChunk(chunk.getPtr());
 			
 			assertEquals(chunk, readChunk);
@@ -117,17 +119,27 @@ public class GeneralTests{
 		TestUtils.testCluster(info, ses->{});
 	}
 	
-	@Test
-	void contiguousIOList(TestInfo info) throws IOException{
-		contiguousListEqualityTest(info, Dummy.class, list->{
+	@ParameterizedTest
+	@ValueSource(classes={ContiguousIOList.class, LinkedIOList.class})
+	<L extends IOInstance.Unmanaged<L>&IOList<Dummy>> void listTestSimpleAdd(Class<L> listType, TestInfo info) throws IOException{
+		listEqualityTest(info, listType, Dummy.class, list->{
 			list.add(new Dummy(69));
 			list.add(new Dummy(420));
 		}, false);
 	}
 	
-	@Test
-	void contiguousIOListBit(TestInfo info) throws IOException{
-		contiguousListEqualityTest(info, BooleanContainer.class, list->{
+	@ParameterizedTest
+	@ValueSource(classes={ContiguousIOList.class, LinkedIOList.class})
+	<L extends IOInstance.Unmanaged<L>&IOList<Dummy>> void listSingleAdd(Class<L> listType, TestInfo info) throws IOException{
+		listEqualityTest(info, listType, Dummy.class, list->{
+			list.add(Dummy.first());
+		}, false);
+	}
+	
+	@ParameterizedTest
+	@ValueSource(classes={ContiguousIOList.class, LinkedIOList.class})
+	<L extends IOInstance.Unmanaged<L>&IOList<BooleanContainer>> void listBitValue(Class<L> listType, TestInfo info) throws IOException{
+		listEqualityTest(info, listType, BooleanContainer.class, list->{
 			var rand=new Random(1);
 			var vals=IntStream.range(0, 100)
 			                  .mapToObj(i->new BooleanContainer(rand.nextBoolean()))
@@ -136,9 +148,10 @@ public class GeneralTests{
 		}, true);
 	}
 	
-	@Test
-	void contiguousIOListInsert(TestInfo info) throws IOException{
-		contiguousListEqualityTest(info, Dummy.class, list->{
+	@ParameterizedTest
+	@ValueSource(classes={ContiguousIOList.class, LinkedIOList.class})
+	<L extends IOInstance.Unmanaged<L>&IOList<Dummy>> void listInsert(Class<L> listType, TestInfo info) throws IOException{
+		listEqualityTest(info, listType, Dummy.class, list->{
 			list.add(new Dummy(69));
 			list.add(new Dummy(420));
 			
@@ -146,14 +159,32 @@ public class GeneralTests{
 		}, false);
 	}
 	
-	@Test
-	void contiguousIOListRemove(TestInfo info) throws IOException{
-		contiguousListEqualityTest(info, Dummy.class, list->{
+	@ParameterizedTest
+	@ValueSource(classes={ContiguousIOList.class, LinkedIOList.class})
+	<L extends IOInstance.Unmanaged<L>&IOList<Dummy>> void listIndexRemove(Class<L> listType, TestInfo info) throws IOException{
+		listEqualityTest(info, listType, Dummy.class, list->{
 			list.add(new Dummy(69));
 			list.add(new Dummy(360));
 			list.add(new Dummy(420));
 			list.remove(1);
 			list.remove(1);
+		}, false);
+	}
+	@ParameterizedTest
+	@ValueSource(classes={ContiguousIOList.class, LinkedIOList.class})
+	<L extends IOInstance.Unmanaged<L>&IOList<Dummy>> void listComplexIndexRemove(Class<L> listType, TestInfo info) throws IOException{
+		listEqualityTest(info, listType, Dummy.class, list->{
+			list.add(Dummy.first());
+			list.add(Dummy.auto());
+			list.add(Dummy.auto());
+			list.add(Dummy.auto());
+			list.add(Dummy.auto());
+			
+			list.remove(2);
+			list.remove(3);
+			list.remove(0);
+			list.remove(1);
+			list.remove(0);
 		}, false);
 	}
 	
@@ -246,52 +277,24 @@ public class GeneralTests{
 		});
 	}
 	
+	@SuppressWarnings("unchecked")
 	static <T extends IOInstance<T>> void linkedListEqualityTest(TestInfo info, Class<T> typ, UnsafeConsumer<IOList<T>, IOException> session, boolean useCluster) throws IOException{
-		TestUtils.ioListComplianceSequence(
-			info, 10,
-			LinkedIOList<T>::new,
-			TypeDefinition.of(LinkedIOList.class, typ),
-			session, useCluster
-		);
+		listEqualityTest(info, LinkedIOList.class, typ, session, useCluster);
 	}
+	@SuppressWarnings("unchecked")
 	static <T extends IOInstance<T>> void contiguousListEqualityTest(TestInfo info, Class<T> typ, UnsafeConsumer<IOList<T>, IOException> session, boolean useCluster) throws IOException{
+		listEqualityTest(info, ContiguousIOList.class, typ, session, useCluster);
+	}
+	
+	static <T extends IOInstance<T>, L extends IOInstance.Unmanaged<L>&IOList<T>> void listEqualityTest(TestInfo info, Class<L> listType, Class<T> typ, UnsafeConsumer<IOList<T>, IOException> session, boolean useCluster) throws IOException{
 		TestUtils.ioListComplianceSequence(
 			info, 64,
-			ContiguousIOList<T>::new,
-			TypeDefinition.of(ContiguousIOList.class, typ),
+			(provider, reference, typeDef)->{
+				var lTyp=Struct.Unmanaged.ofUnmanaged(listType);
+				return lTyp.requireUnmanagedConstructor().create(provider, reference, typeDef);
+			},
+			TypeDefinition.of(listType, typ),
 			session, useCluster
 		);
-	}
-	
-	@Test
-	void linkedListSingleAdd(TestInfo info) throws IOException{
-		linkedListEqualityTest(info, Dummy.class, list->{
-			list.add(Dummy.first());
-		}, false);
-	}
-	
-	@Test
-	void linkedListMultiAdd(TestInfo info) throws IOException{
-		linkedListEqualityTest(info, Dummy.class, list->{
-			list.add(Dummy.first());
-			list.add(Dummy.auto());
-			list.add(Dummy.auto());
-		}, false);
-	}
-	@Test
-	void linkedListAddRemove(TestInfo info) throws IOException{
-		linkedListEqualityTest(info, Dummy.class, list->{
-			list.add(Dummy.first());
-			list.add(Dummy.auto());
-			list.add(Dummy.auto());
-			list.add(Dummy.auto());
-			list.add(Dummy.auto());
-			
-			list.remove(2);
-			list.remove(3);
-			list.remove(0);
-			list.remove(1);
-			list.remove(0);
-		}, false);
 	}
 }

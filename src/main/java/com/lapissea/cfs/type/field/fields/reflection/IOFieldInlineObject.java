@@ -1,7 +1,7 @@
 package com.lapissea.cfs.type.field.fields.reflection;
 
 import com.lapissea.cfs.Utils;
-import com.lapissea.cfs.chunk.ChunkDataProvider;
+import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.bit.FlagReader;
 import com.lapissea.cfs.io.bit.FlagWriter;
 import com.lapissea.cfs.io.content.ContentReader;
@@ -110,7 +110,7 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 	}
 	
 	@Override
-	public List<IOField<CTyp, ?>> write(ChunkDataProvider provider, ContentWriter dest, CTyp instance) throws IOException{
+	public List<IOField<CTyp, ?>> write(DataProvider provider, ContentWriter dest, CTyp instance) throws IOException{
 		var val=get(instance);
 		if(nullable()){
 			writeIsNull(dest, val);
@@ -125,7 +125,7 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 		return List.of();
 	}
 	
-	private ValueType readNew(ChunkDataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+	private ValueType readNew(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
 		if(nullable()){
 			boolean isNull=readIsNull(src);
 			if(isNull){
@@ -140,12 +140,12 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 	}
 	
 	@Override
-	public void read(ChunkDataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
+	public void read(DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
 		set(instance, readNew(provider, src, genericContext));
 	}
 	
 	@Override
-	public void skipRead(ChunkDataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
+	public void skipRead(DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
 		var fixed=descriptor.getFixed(WordSpace.BYTE);
 		if(fixed.isPresent()){
 			src.skipExact(fixed.getAsLong());

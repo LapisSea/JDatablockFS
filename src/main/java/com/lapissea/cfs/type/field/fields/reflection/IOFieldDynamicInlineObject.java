@@ -1,7 +1,7 @@
 package com.lapissea.cfs.type.field.fields.reflection;
 
 import com.lapissea.cfs.Utils;
-import com.lapissea.cfs.chunk.ChunkDataProvider;
+import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.io.bit.FlagReader;
 import com.lapissea.cfs.io.bit.FlagWriter;
@@ -88,7 +88,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		};
 	}
 	@SuppressWarnings("unchecked")
-	private void writeValue(ChunkDataProvider provider, ContentWriter dest, Object val) throws IOException{
+	private void writeValue(DataProvider provider, ContentWriter dest, Object val) throws IOException{
 		switch(val){
 			case Boolean v -> dest.writeBoolean(v);
 			case Float v -> NumberSize.INT.writeFloating(dest, v);
@@ -125,7 +125,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		assert List.<Class<? extends Number>>of(Byte.class, Short.class, Integer.class, Long.class).contains(tyo);
 	}
 	
-	private Object readTyp(TypeDefinition typDef, ChunkDataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+	private Object readTyp(TypeDefinition typDef, DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
 		var typ=typDef.getTypeClass();
 		if(typ==Boolean.class) return src.readBoolean();
 		if(typ==Float.class) return (float)NumberSize.INT.readFloating(src);
@@ -158,7 +158,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		}
 		throw new NotImplementedException(typ+"");
 	}
-	private void skipReadTyp(TypeDefinition typDef, ChunkDataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+	private void skipReadTyp(TypeDefinition typDef, DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
 		var        typ=typDef.getTypeClass();
 		NumberSize siz=null;
 		if(typ==Boolean.class) siz=NumberSize.BYTE;
@@ -187,13 +187,13 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		
 		throw new NotImplementedException(typ+"");
 	}
-	private <T extends IOInstance<T>> T readStruct(ChunkDataProvider provider, ContentReader src, GenericContext genericContext, Struct<T> struct) throws IOException{
+	private <T extends IOInstance<T>> T readStruct(DataProvider provider, ContentReader src, GenericContext genericContext, Struct<T> struct) throws IOException{
 		var pipe=ContiguousStructPipe.of(struct);
 		var inst=struct.requireEmptyConstructor().get();
 		pipe.read(provider, src, inst, genericContext);
 		return inst;
 	}
-	private void skipReadStruct(ChunkDataProvider provider, ContentReader src, GenericContext genericContext, Struct<?> struct) throws IOException{
+	private void skipReadStruct(DataProvider provider, ContentReader src, GenericContext genericContext, Struct<?> struct) throws IOException{
 		var pipe =ContiguousStructPipe.of(struct);
 		var fixed=pipe.getSizeDescriptor().getFixed(WordSpace.BYTE);
 		if(fixed.isPresent()){
@@ -227,7 +227,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 	}
 	
 	@Override
-	public List<IOField<CTyp, ?>> write(ChunkDataProvider provider, ContentWriter dest, CTyp instance) throws IOException{
+	public List<IOField<CTyp, ?>> write(DataProvider provider, ContentWriter dest, CTyp instance) throws IOException{
 		var val=get(instance);
 		
 		if(nullable()){
@@ -252,13 +252,13 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		return List.of();
 	}
 	
-	private TypeDefinition readType(ChunkDataProvider provider, ContentReader src) throws IOException{
+	private TypeDefinition readType(DataProvider provider, ContentReader src) throws IOException{
 		int id=src.readInt4();
 		return provider.getTypeDb().fromID(id);
 	}
 	
 	@Override
-	public void read(ChunkDataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
+	public void read(DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
 		Object val;
 		read:
 		{
@@ -277,7 +277,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 	}
 	
 	@Override
-	public void skipRead(ChunkDataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
+	public void skipRead(DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
 		if(nullable()){
 			if(!src.readBoolean()){
 				return;

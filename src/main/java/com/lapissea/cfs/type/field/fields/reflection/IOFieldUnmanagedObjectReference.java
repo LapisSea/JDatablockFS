@@ -2,7 +2,7 @@ package com.lapissea.cfs.type.field.fields.reflection;
 
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.Chunk;
-import com.lapissea.cfs.chunk.ChunkDataProvider;
+import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.FieldIsNullException;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.io.content.ContentReader;
@@ -19,7 +19,7 @@ import com.lapissea.cfs.type.field.access.FieldAccessor;
 import java.io.IOException;
 import java.util.List;
 
-import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.*;
+import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 
 public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType extends IOInstance.Unmanaged<ValueType>> extends IOField.Ref<T, ValueType>{
 	
@@ -52,7 +52,7 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 	}
 	
 	@Override
-	public void allocate(T instance, ChunkDataProvider provider, GenericContext genericContext) throws IOException{
+	public void allocate(T instance, DataProvider provider, GenericContext genericContext) throws IOException{
 		AllocateTicket t;
 		
 		var desc =instancePipe.getSizeDescriptor();
@@ -99,7 +99,7 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 		}
 		return val.getReference();
 	}
-	private ValueType makeValueObject(ChunkDataProvider provider, Reference readNew, GenericContext genericContext) throws IOException{
+	private ValueType makeValueObject(DataProvider provider, Reference readNew, GenericContext genericContext) throws IOException{
 		if(readNew.isNull()){
 			if(nullable()) return null;
 			throw new NullPointerException();
@@ -113,18 +113,18 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 	}
 	
 	@Override
-	public List<IOField<T, ?>> write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
+	public List<IOField<T, ?>> write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		referencePipe.write(provider, dest, getReference(instance));
 		return List.of();
 	}
 	
 	@Override
-	public void read(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public void read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		set(instance, makeValueObject(provider, referencePipe.readNew(provider, src, null), genericContext));
 	}
 	
 	@Override
-	public void skipRead(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public void skipRead(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		var fixed=referencePipe.getSizeDescriptor().getFixed(WordSpace.BYTE);
 		if(fixed.isPresent()){
 			src.skipExact(fixed.getAsLong());

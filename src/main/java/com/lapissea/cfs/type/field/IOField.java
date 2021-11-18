@@ -1,7 +1,7 @@
 package com.lapissea.cfs.type.field;
 
 import com.lapissea.cfs.Utils;
-import com.lapissea.cfs.chunk.ChunkDataProvider;
+import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.FieldIsNullException;
 import com.lapissea.cfs.exceptions.FixedFormatNotSupportedException;
 import com.lapissea.cfs.io.bit.BitInputStream;
@@ -57,15 +57,15 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		}
 		
 		@Override
-		public List<IOField<Inst, ?>> write(ChunkDataProvider provider, ContentWriter dest, Inst instance) throws IOException{
+		public List<IOField<Inst, ?>> write(DataProvider provider, ContentWriter dest, Inst instance) throws IOException{
 			throw new UnsupportedOperationException();
 		}
 		@Override
-		public void read(ChunkDataProvider provider, ContentReader src, Inst instance, GenericContext genericContext) throws IOException{
+		public void read(DataProvider provider, ContentReader src, Inst instance, GenericContext genericContext) throws IOException{
 			throw new UnsupportedOperationException();
 		}
 		@Override
-		public void skipRead(ChunkDataProvider provider, ContentReader src, Inst instance, GenericContext genericContext) throws IOException{
+		public void skipRead(DataProvider provider, ContentReader src, Inst instance, GenericContext genericContext) throws IOException{
 			throw new UnsupportedOperationException();
 		}
 	}
@@ -87,19 +87,19 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 			}
 			
 			@Override
-			public List<IOField<T, ?>> write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
+			public List<IOField<T, ?>> write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 				throw new UnsupportedOperationException();
 			}
 			@Override
-			public void read(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+			public void read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 				throw new UnsupportedOperationException();
 			}
 			@Override
-			public void skipRead(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+			public void skipRead(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 				throw new UnsupportedOperationException();
 			}
 			@Override
-			public void allocate(T instance, ChunkDataProvider provider, GenericContext genericContext) throws IOException{
+			public void allocate(T instance, DataProvider provider, GenericContext genericContext) throws IOException{
 				throw new UnsupportedOperationException();
 			}
 		}
@@ -113,7 +113,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 			allocate(instance, unmanaged.getChunkProvider(), unmanaged.getGenerics());
 		}
 		
-		public abstract void allocate(T instance, ChunkDataProvider provider, GenericContext genericContext) throws IOException;
+		public abstract void allocate(T instance, DataProvider provider, GenericContext genericContext) throws IOException;
 		public abstract Reference getReference(T instance);
 		public abstract StructPipe<Type> getReferencedPipe(T instance);
 		
@@ -131,7 +131,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		
 		@Deprecated
 		@Override
-		public final List<IOField<T, ?>> write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
+		public final List<IOField<T, ?>> write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 			try(var writer=new BitOutputStream(dest)){
 				writeBits(writer, instance);
 				if(DEBUG_VALIDATION){
@@ -143,7 +143,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		
 		@Deprecated
 		@Override
-		public final void read(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		public final void read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			try(var reader=new BitInputStream(src)){
 				readBits(reader, instance);
 				if(DEBUG_VALIDATION){
@@ -154,7 +154,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		
 		@Deprecated
 		@Override
-		public final void skipRead(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		public final void skipRead(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			try(var reader=new BitInputStream(src)){
 				skipReadBits(reader, instance);
 				if(DEBUG_VALIDATION){
@@ -221,9 +221,9 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	 * @return a list of fields that have to be written after this function has executed. If no fields are required, return {@link List#of()} or null
 	 */
 	@Nullable
-	public abstract List<IOField<T, ?>> write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException;
+	public abstract List<IOField<T, ?>> write(DataProvider provider, ContentWriter dest, T instance) throws IOException;
 	@Nullable
-	public final List<IOField<T, ?>> writeReported(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
+	public final List<IOField<T, ?>> writeReported(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		try{
 			return write(provider, dest, instance);
 		}catch(Exception e){
@@ -235,8 +235,8 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		throw new IOException("Failed to write "+TextUtil.toShortString(fi), e);
 	}
 	
-	public abstract void read(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException;
-	public final void readReported(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public abstract void read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException;
+	public final void readReported(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		try{
 			read(provider, src, instance, genericContext);
 		}catch(Exception e){
@@ -247,8 +247,8 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		throw new IOException("Failed to read "+TextUtil.toShortString(fi), e);
 	}
 	
-	public abstract void skipRead(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException;
-	public final void skipReadReported(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public abstract void skipRead(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException;
+	public final void skipReadReported(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		try{
 			skipRead(provider, src, instance, genericContext);
 		}catch(Exception e){

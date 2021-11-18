@@ -1,7 +1,7 @@
 package com.lapissea.cfs.objects;
 
 import com.lapissea.cfs.chunk.Chunk;
-import com.lapissea.cfs.chunk.ChunkDataProvider;
+import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.util.NotNull;
 
@@ -46,7 +46,7 @@ public final class ChunkPointer implements INumber, Comparable<ChunkPointer>{
 		return value;
 	}
 	
-	public Chunk dereference(ChunkDataProvider provider) throws IOException{
+	public Chunk dereference(DataProvider provider) throws IOException{
 		requireNonNull();
 		return provider.getChunk(this);
 	}

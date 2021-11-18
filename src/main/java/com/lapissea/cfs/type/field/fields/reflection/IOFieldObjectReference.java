@@ -2,7 +2,7 @@ package com.lapissea.cfs.type.field.fields.reflection;
 
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.Chunk;
-import com.lapissea.cfs.chunk.ChunkDataProvider;
+import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
@@ -24,7 +24,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 
-import static com.lapissea.cfs.GlobalConfig.*;
+import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
 public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends IOInstance<ValueType>> extends IOField.Ref<T, ValueType>{
 	
@@ -59,12 +59,12 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	}
 	
 	@Override
-	public void allocate(T instance, ChunkDataProvider provider, GenericContext genericContext) throws IOException{
+	public void allocate(T instance, DataProvider provider, GenericContext genericContext) throws IOException{
 		ValueType val=struct.requireEmptyConstructor().get();
 		alloc(instance, provider, val);
 		set(instance, val);
 	}
-	private void alloc(T instance, ChunkDataProvider provider, ValueType val) throws IOException{
+	private void alloc(T instance, DataProvider provider, ValueType val) throws IOException{
 		Chunk chunk=AllocateTicket.withData(instancePipe, val).submit(provider);
 		referenceField.set(instance, chunk.getPtr().makeReference());
 	}
@@ -102,7 +102,7 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 		}
 		return ref;
 	}
-	private ValueType readValue(ChunkDataProvider provider, Reference readNew, GenericContext genericContext) throws IOException{
+	private ValueType readValue(DataProvider provider, Reference readNew, GenericContext genericContext) throws IOException{
 		if(readNew.isNull()){
 			return switch(getNullability()){
 				case NULLABLE -> null;
@@ -123,7 +123,7 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	}
 	
 	@Override
-	public List<IOField<T, ?>> write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
+	public List<IOField<T, ?>> write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		var val=get(instance);
 		if(val==null&&getNullability()==IONullability.Mode.DEFAULT_IF_NULL){
 			val=struct.requireEmptyConstructor().get();
@@ -146,12 +146,12 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	}
 	
 	@Override
-	public void read(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public void read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		set(instance, readValue(provider, Objects.requireNonNull(getRef(instance)), genericContext));
 	}
 	
 	@Override
-	public void skipRead(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public void skipRead(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		throw NotImplementedException.infer();//TODO: implement IOFieldObjectReference.skipRead()
 	}
 }

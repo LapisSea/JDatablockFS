@@ -35,7 +35,7 @@ import java.util.stream.Stream;
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
 @SuppressWarnings("unused")
-public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, ChunkDataProvider.Holder, Comparable<Chunk>{
+public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, DataProvider.Holder, Comparable<Chunk>{
 	
 	private static final Struct<Chunk>     STRUCT=Struct.of(Chunk.class);
 	public static final  StructPipe<Chunk> PIPE  =ContiguousStructPipe.of(STRUCT);
@@ -63,7 +63,7 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		return chunk==null?null:chunk.getPtr();
 	}
 	
-	public static Chunk readChunk(@NotNull ChunkDataProvider provider, @NotNull ChunkPointer pointer) throws IOException{
+	public static Chunk readChunk(@NotNull DataProvider provider, @NotNull ChunkPointer pointer) throws IOException{
 		if(!earlyCheckChunkAt(provider, pointer)) throw new IOException("Invalid chunk at "+pointer);
 		if(provider.getSource().getIOSize()<pointer.add(PIPE.getSizeDescriptor().getMin(WordSpace.BYTE))) throw new MalformedPointerException(pointer+" points outside of available data");
 		Chunk chunk=new Chunk(provider, pointer);
@@ -75,7 +75,7 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		return chunk;
 	}
 	
-	public static boolean earlyCheckChunkAt(ChunkDataProvider provider, ChunkPointer pointer) throws IOException{
+	public static boolean earlyCheckChunkAt(DataProvider provider, ChunkPointer pointer) throws IOException{
 		try(var io=provider.getSource().ioAt(pointer.add(CHECK_BYTE_OFF))){
 			return earlyCheckChunkAt(io);
 		}
@@ -106,22 +106,22 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 	
 	
 	@NotNull
-	private final ChunkDataProvider provider;
+	private final DataProvider provider;
 	@NotNull
-	private final ChunkPointer      ptr;
+	private final ChunkPointer ptr;
 	
 	
 	private int     headerSize;
 	private boolean dirty, reading;
 	private Chunk nextCache;
 	
-	private Chunk(@NotNull ChunkDataProvider provider, @NotNull ChunkPointer ptr){
+	private Chunk(@NotNull DataProvider provider, @NotNull ChunkPointer ptr){
 		super(STRUCT);
 		this.provider=provider;
 		this.ptr=ptr;
 	}
 	
-	public Chunk(@NotNull ChunkDataProvider provider, @NotNull ChunkPointer ptr, @NotNull NumberSize bodyNumSize, long capacity, long size, NumberSize nextSize, ChunkPointer nextPtr){
+	public Chunk(@NotNull DataProvider provider, @NotNull ChunkPointer ptr, @NotNull NumberSize bodyNumSize, long capacity, long size, NumberSize nextSize, ChunkPointer nextPtr){
 		this.provider=Objects.requireNonNull(provider);
 		this.ptr=Objects.requireNonNull(ptr);
 		this.bodyNumSize=Objects.requireNonNull(bodyNumSize);
@@ -324,7 +324,7 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 	}
 	
 	@Override
-	public ChunkDataProvider getChunkProvider(){
+	public DataProvider getChunkProvider(){
 		return provider;
 	}
 	

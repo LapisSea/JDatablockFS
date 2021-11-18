@@ -1,6 +1,6 @@
 package com.lapissea.cfs.io.instancepipe;
 
-import com.lapissea.cfs.chunk.ChunkDataProvider;
+import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.type.GenericContext;
@@ -39,7 +39,7 @@ public class ContiguousStructPipe<T extends IOInstance<T>> extends StructPipe<T>
 	}
 	
 	@Override
-	protected void doWrite(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
+	protected void doWrite(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		var ioPool=makeIOPool();
 		try{
 			pushPool(ioPool);
@@ -50,7 +50,7 @@ public class ContiguousStructPipe<T extends IOInstance<T>> extends StructPipe<T>
 	}
 	
 	@Override
-	protected T doRead(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	protected T doRead(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		var ioPool=makeIOPool();
 		try{
 			pushPool(ioPool);

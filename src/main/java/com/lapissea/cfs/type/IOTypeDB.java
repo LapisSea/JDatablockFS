@@ -1,6 +1,6 @@
 package com.lapissea.cfs.type;
 
-import com.lapissea.cfs.chunk.ChunkDataProvider;
+import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.objects.collections.HashIOMap;
 import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.type.field.annotations.IOValue;
@@ -110,7 +110,7 @@ public interface IOTypeDB{
 			
 			return type;
 		}
-		public void init(ChunkDataProvider provider) throws IOException{
+		public void init(DataProvider provider) throws IOException{
 			allocateNulls(provider);
 		}
 	}

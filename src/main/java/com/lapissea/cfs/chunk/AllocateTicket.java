@@ -69,7 +69,7 @@ public record AllocateTicket(long bytes, boolean disableResizing, ChunkPointer n
 		return withDataPopulated((provider, io)->pipe.write(provider, io, data));
 	}
 	
-	public AllocateTicket withDataPopulated(UnsafeBiConsumer<ChunkDataProvider, RandomIO, IOException> dataPopulator){
+	public AllocateTicket withDataPopulated(UnsafeBiConsumer<DataProvider, RandomIO, IOException> dataPopulator){
 		return withDataPopulated(c->{
 			try(var io=c.io()){
 				dataPopulator.accept(c.getChunkProvider(), io);
@@ -93,7 +93,7 @@ public record AllocateTicket(long bytes, boolean disableResizing, ChunkPointer n
 		return new AllocateTicket(bytes, disableResizing, next, approve, dataPopulator);
 	}
 	
-	public Chunk submit(ChunkDataProvider provider) throws IOException{
+	public Chunk submit(DataProvider provider) throws IOException{
 		return provider.getMemoryManager().alloc(this);
 	}
 	public Chunk submit(MemoryManager manager) throws IOException{

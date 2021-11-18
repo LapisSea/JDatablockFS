@@ -9,7 +9,7 @@ import com.lapissea.util.function.FunctionOL;
 import java.io.IOException;
 import java.util.Objects;
 
-import static com.lapissea.cfs.GlobalConfig.*;
+import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
 public class ChunkChainIO implements RandomIO{
 	

@@ -23,7 +23,7 @@ public interface MemoryManager{
 			 * @return a chunk that has been newly allocated from context. Returned chunk should always have a size of 0,
 			 * capacity greater or equal to the ticket request. (optimally equal capacity but greater is also fine)
 			 */
-			Chunk alloc(@NotNull ChunkDataProvider context, @NotNull AllocateTicket ticket) throws IOException;
+			Chunk alloc(@NotNull DataProvider context, @NotNull AllocateTicket ticket) throws IOException;
 		}
 		
 		public interface AllocToStrategy{
@@ -39,11 +39,11 @@ public interface MemoryManager{
 			long allocTo(@NotNull Chunk firstChunk, @NotNull Chunk target, long toAllocate) throws IOException;
 		}
 		
-		protected final ChunkDataProvider     context;
+		protected final DataProvider          context;
 		private final   List<AllocStrategy>   allocs;
 		private final   List<AllocToStrategy> allocTos;
 		
-		public StrategyImpl(ChunkDataProvider context){
+		public StrategyImpl(DataProvider context){
 			this.context=context;
 			this.allocs=List.copyOf(createAllocs());
 			this.allocTos=List.copyOf(createAllocTos());

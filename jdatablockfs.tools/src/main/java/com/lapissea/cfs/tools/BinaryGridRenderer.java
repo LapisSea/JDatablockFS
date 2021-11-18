@@ -2,7 +2,6 @@ package com.lapissea.cfs.tools;
 
 
 import com.lapissea.cfs.chunk.*;
-import com.lapissea.cfs.exceptions.MalformedPointerException;
 import com.lapissea.cfs.io.ChunkChainIO;
 import com.lapissea.cfs.io.bit.FlagReader;
 import com.lapissea.cfs.io.impl.MemoryData;
@@ -17,7 +16,6 @@ import com.lapissea.cfs.tools.SessionHost.ParsedFrame;
 import com.lapissea.cfs.tools.logging.MemFrame;
 import com.lapissea.cfs.tools.render.RenderBackend;
 import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.MemoryWalker;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
@@ -516,9 +514,9 @@ public class BinaryGridRenderer{
 		
 		renderer.setColor(ColorUtils.alpha(Color.WHITE, 0.5F));
 		
-		List<Pointer>     ptrs    =new ArrayList<>();
-		ParsedFrame       parsed  =cFrame.parsed();
-		ChunkDataProvider provider=null;
+		List<Pointer> ptrs    =new ArrayList<>();
+		ParsedFrame   parsed  =cFrame.parsed();
+		DataProvider  provider=null;
 		
 		Set<Chunk> referenced=new HashSet<>();
 		try{
@@ -538,7 +536,7 @@ public class BinaryGridRenderer{
 				var cl  =cluster;
 				var root=cluster.getRoot();
 				
-				new MemoryWalker().walk(cluster, cluster.getRoot(), cluster.getFirstChunk().getPtr().makeReference(), Cluster.ROOT_PIPE, ref->{
+				cluster.rootWalker().walk(true, ref->{
 					if(!ref.isNull()){
 						try{
 							for(Chunk chunk : new ChainWalker(ref.getPtr().dereference(cl))){
@@ -568,7 +566,7 @@ public class BinaryGridRenderer{
 							}
 							annotateChunk(annCtx, chunk);
 						}
-					}catch(MalformedPointerException e){
+					}catch(IOException e){
 						var p=(int)pos;
 						drawBytes(ctx, IntStream.of(p), Color.RED, true, true);
 						pos++;
@@ -577,7 +575,7 @@ public class BinaryGridRenderer{
 				annCtx.popStrings(renderer);
 				
 			}else{
-				provider=ChunkDataProvider.newVerySimpleProvider(MemoryData.build().withRaw(bytes).build());
+				provider=DataProvider.newVerySimpleProvider(MemoryData.build().withRaw(bytes).build());
 				AnnotateCtx annCtx=new AnnotateCtx(ctx, provider, new LinkedList<>(), ptrs::add, new ArrayList<>(), new ArrayList<>());
 				annCtx.stack.add(null);
 				long pos;
@@ -592,7 +590,7 @@ public class BinaryGridRenderer{
 							pos=chunk.dataEnd();
 							annotateChunk(annCtx, chunk);
 						}
-					}catch(MalformedPointerException e){
+					}catch(IOException e){
 						var p=(int)pos;
 						drawBytes(ctx, IntStream.of(p), Color.RED, true, true);
 						pos++;
@@ -605,7 +603,7 @@ public class BinaryGridRenderer{
 		}
 		if(provider==null){
 			try{
-				provider=ChunkDataProvider.newVerySimpleProvider(MemoryData.build().withRaw(bytes).build());
+				provider=DataProvider.newVerySimpleProvider(MemoryData.build().withRaw(bytes).build());
 			}catch(IOException e1){
 				handleError(e1, parsed);
 			}
@@ -996,7 +994,7 @@ public class BinaryGridRenderer{
 		return renderer.getFont().getStringBounds(s);
 	}
 	
-	private void findHoverChunk(RenderContext ctx, ParsedFrame parsed, ChunkDataProvider provider){
+	private void findHoverChunk(RenderContext ctx, ParsedFrame parsed, DataProvider provider){
 		int byteIndex=ctx.hoverByteIndex;
 		if(byteIndex==-1){
 			parsed.lastHoverChunk=null;
@@ -1014,14 +1012,15 @@ public class BinaryGridRenderer{
 				}
 			}
 		}catch(IOException e){
-			handleError(e, parsed);
+			parsed.lastHoverChunk=null;
+			ctx.hoverMessages.add("Unable to find hover chunk");
 		}
 	}
 	
 	private record AnnotateStackFrame(IOInstance<?> instance, Reference ref){}
 	
 	private record AnnotateCtx(RenderContext renderCtx,
-	                           ChunkDataProvider provider, List<AnnotateStackFrame> stack,
+	                           DataProvider provider, List<AnnotateStackFrame> stack,
 	                           Consumer<Pointer> pointerRecord, List<DrawFont.StringDraw> strings, List<DrawFont.StringDraw> stringOutlines){
 		void recordPointer(Pointer pointer){
 			pointerRecord.accept(pointer);

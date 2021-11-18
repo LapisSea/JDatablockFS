@@ -3,7 +3,7 @@ package com.lapissea.cfs.io.instancepipe;
 import com.lapissea.cfs.ConsoleColors;
 import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.Utils;
-import com.lapissea.cfs.chunk.ChunkDataProvider;
+import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.FieldIsNullException;
 import com.lapissea.cfs.exceptions.UnknownSizePredictionException;
 import com.lapissea.cfs.io.RandomIO;
@@ -137,65 +137,65 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	}
 	
 	
-	public final void write(ChunkDataProvider provider, RandomIO.Creator dest, T instance) throws IOException{
+	public final void write(DataProvider provider, RandomIO.Creator dest, T instance) throws IOException{
 		earlyCheckNulls(instance);
 		try(var io=dest.io()){
 			doWrite(provider, io, instance);
 		}
 	}
-	public final void write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
+	public final void write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		earlyCheckNulls(instance);
 		doWrite(provider, dest, instance);
 	}
-	public final void write(ChunkDataProvider.Holder holder, ContentWriter dest, T instance) throws IOException{
+	public final void write(DataProvider.Holder holder, ContentWriter dest, T instance) throws IOException{
 		earlyCheckNulls(instance);
 		doWrite(holder.getChunkProvider(), dest, instance);
 	}
-	public final <Prov extends ChunkDataProvider.Holder&RandomIO.Creator> void write(Prov dest, T instance) throws IOException{
+	public final <Prov extends DataProvider.Holder&RandomIO.Creator> void write(Prov dest, T instance) throws IOException{
 		earlyCheckNulls(instance);
 		try(var io=dest.io()){
 			doWrite(dest.getChunkProvider(), io, instance);
 		}
 	}
-	protected abstract void doWrite(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException;
+	protected abstract void doWrite(DataProvider provider, ContentWriter dest, T instance) throws IOException;
 	
 	
-	public <Prov extends ChunkDataProvider.Holder&RandomIO.Creator> void modify(Prov src, UnsafeConsumer<T, IOException> modifier, GenericContext genericContext) throws IOException{
+	public <Prov extends DataProvider.Holder&RandomIO.Creator> void modify(Prov src, UnsafeConsumer<T, IOException> modifier, GenericContext genericContext) throws IOException{
 		T val=readNew(src, genericContext);
 		modifier.accept(val);
 		write(src, val);
 	}
-	public <Prov extends ChunkDataProvider.Holder&RandomIO.Creator> T readNew(Prov src, GenericContext genericContext) throws IOException{
+	public <Prov extends DataProvider.Holder&RandomIO.Creator> T readNew(Prov src, GenericContext genericContext) throws IOException{
 		try(var io=src.io()){
 			return readNew(src.getChunkProvider(), io, genericContext);
 		}
 	}
-	public T readNew(ChunkDataProvider provider, RandomIO.Creator src, GenericContext genericContext) throws IOException{
+	public T readNew(DataProvider provider, RandomIO.Creator src, GenericContext genericContext) throws IOException{
 		try(var io=src.io()){
 			return readNew(provider, io, genericContext);
 		}
 	}
-	public T readNew(ChunkDataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+	public T readNew(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
 		T instance=type.requireEmptyConstructor().get();
 		return doRead(provider, src, instance, genericContext);
 	}
 	
-	public T read(ChunkDataProvider provider, RandomIO.Creator src, T instance, GenericContext genericContext) throws IOException{
+	public T read(DataProvider provider, RandomIO.Creator src, T instance, GenericContext genericContext) throws IOException{
 		try(var io=src.io()){
 			return doRead(provider, io, instance, genericContext);
 		}
 	}
-	public <Prov extends ChunkDataProvider.Holder&RandomIO.Creator> T read(Prov src, T instance, GenericContext genericContext) throws IOException{
+	public <Prov extends DataProvider.Holder&RandomIO.Creator> T read(Prov src, T instance, GenericContext genericContext) throws IOException{
 		try(var io=src.io()){
 			return doRead(src.getChunkProvider(), io, instance, genericContext);
 		}
 	}
 	
-	public T read(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public T read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		return doRead(provider, src, instance, genericContext);
 	}
 	
-	protected abstract T doRead(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException;
+	protected abstract T doRead(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException;
 	
 	
 	public final SizeDescriptor<T> getSizeDescriptor(){
@@ -223,7 +223,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		}
 	}
 	
-	protected void writeIOFields(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
+	protected void writeIOFields(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		
 		final ContentOutputBuilder destBuff=new ContentOutputBuilder((int)getSizeDescriptor().fixedOrMax(WordSpace.BYTE).orElse(32));
 		
@@ -263,7 +263,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		destBuff.writeTo(dest);
 	}
 	
-	private void writeFieldKnownSize(ChunkDataProvider provider, T instance, Consumer<List<IOField<T, ?>>> logDirty, IOField<T, ?> field, ContentWriter.BufferTicket ticket) throws IOException{
+	private void writeFieldKnownSize(DataProvider provider, T instance, Consumer<List<IOField<T, ?>>> logDirty, IOField<T, ?> field, ContentWriter.BufferTicket ticket) throws IOException{
 		var safeBuff=ticket.requireExact().submit();
 		var d       =field.writeReported(provider, safeBuff, instance);
 		logDirty.accept(d);
@@ -275,7 +275,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		}
 	}
 	
-	public void writeSingleField(ChunkDataProvider provider, RandomIO dest, IOField<T, ?> selectedField, T instance) throws IOException{
+	public void writeSingleField(DataProvider provider, RandomIO dest, IOField<T, ?> selectedField, T instance) throws IOException{
 		temp_disableDependencyFields(selectedField);
 		
 		var ioPool=makeIOPool();
@@ -311,7 +311,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		}
 	}
 	
-	protected void readIOFields(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	protected void readIOFields(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		if(DEBUG_VALIDATION){
 			for(IOField<T, ?> field : getSpecificFields()){
 				readFieldSafe(provider, src, instance, field, genericContext);
@@ -323,7 +323,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		}
 	}
 	
-	public void readSingleField(ChunkDataProvider provider, ContentReader src, IOField<T, ?> selectedField, T instance, GenericContext genericContext) throws IOException{
+	public void readSingleField(DataProvider provider, ContentReader src, IOField<T, ?> selectedField, T instance, GenericContext genericContext) throws IOException{
 		temp_disableDependencyFields(selectedField);
 		
 		var ioPool=makeIOPool();
@@ -366,7 +366,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		throw new IllegalArgumentException(selectedField+" is not listed!");
 	}
 	
-	private void readFieldSafe(ChunkDataProvider provider, ContentReader src, T instance, IOField<T, ?> field, GenericContext genericContext) throws IOException{
+	private void readFieldSafe(DataProvider provider, ContentReader src, T instance, IOField<T, ?> field, GenericContext genericContext) throws IOException{
 		var desc =field.getSizeDescriptor();
 		var fixed=desc.getFixed(WordSpace.BYTE);
 		if(fixed.isPresent()){

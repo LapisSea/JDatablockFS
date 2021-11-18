@@ -1,6 +1,6 @@
 package com.lapissea.cfs.objects;
 
-import com.lapissea.cfs.chunk.ChunkDataProvider;
+import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.ChunkChainIO;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.type.IOInstance;
@@ -29,10 +29,10 @@ public final class Reference extends IOInstance<Reference>{
 		if(offset<0) throw new IllegalArgumentException("Offset can not be negative");
 	}
 	
-	public RandomIO io(ChunkDataProvider.Holder holder) throws IOException{
+	public RandomIO io(DataProvider.Holder holder) throws IOException{
 		return io(holder.getChunkProvider());
 	}
-	public RandomIO io(ChunkDataProvider provider) throws IOException{
+	public RandomIO io(DataProvider provider) throws IOException{
 		ptr.requireNonNull();
 		return ptr.dereference(provider).ioAt(offset);
 	}
@@ -74,7 +74,7 @@ public final class Reference extends IOInstance<Reference>{
 	public Reference addOffset(long offset){
 		return new Reference(getPtr(), getOffset()+offset);
 	}
-	public long calcGlobalOffset(ChunkDataProvider provider) throws IOException{
+	public long calcGlobalOffset(DataProvider provider) throws IOException{
 		try(var io=new ChunkChainIO(getPtr().dereference(provider))){
 			io.setPos(getOffset());
 			return io.calcGlobalPos();

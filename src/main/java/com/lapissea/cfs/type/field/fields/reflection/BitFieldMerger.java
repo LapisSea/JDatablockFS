@@ -1,7 +1,7 @@
 package com.lapissea.cfs.type.field.fields.reflection;
 
 import com.lapissea.cfs.Utils;
-import com.lapissea.cfs.chunk.ChunkDataProvider;
+import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.bit.BitInputStream;
 import com.lapissea.cfs.io.bit.BitOutputStream;
 import com.lapissea.cfs.io.content.ContentReader;
@@ -68,7 +68,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 	}
 	
 	@Override
-	public List<IOField<T, ?>> write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
+	public List<IOField<T, ?>> write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		
 		try(var stream=new BitOutputStream(dest)){
 			for(var fi : group){
@@ -96,7 +96,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 	}
 	
 	@Override
-	public void read(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public void read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		try(var stream=new BitInputStream(src)){
 			for(var fi : group){
 				if(DEBUG_VALIDATION){
@@ -114,7 +114,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 	}
 	
 	@Override
-	public void skipRead(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public void skipRead(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		
 		var fixed=getSizeDescriptor().getFixed(WordSpace.BYTE);
 		if(fixed.isPresent()){

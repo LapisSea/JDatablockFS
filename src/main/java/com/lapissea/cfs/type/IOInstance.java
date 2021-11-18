@@ -1,6 +1,6 @@
 package com.lapissea.cfs.type;
 
-import com.lapissea.cfs.chunk.ChunkDataProvider;
+import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
@@ -13,26 +13,26 @@ import java.io.IOException;
 import java.util.Objects;
 import java.util.stream.Stream;
 
-import static com.lapissea.cfs.GlobalConfig.*;
-import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.*;
+import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.INSTANCE;
 
 @SuppressWarnings({"UnusedReturnValue", "unused"})
 public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 	
-	public abstract static class Unmanaged<SELF extends Unmanaged<SELF>> extends IOInstance<SELF> implements ChunkDataProvider.Holder{
+	public abstract static class Unmanaged<SELF extends Unmanaged<SELF>> extends IOInstance<SELF> implements DataProvider.Holder{
 		
-		private final ChunkDataProvider provider;
-		private final Reference         reference;
-		private final TypeDefinition    typeDef;
+		private final DataProvider   provider;
+		private final Reference      reference;
+		private final TypeDefinition typeDef;
 		
 		private StructPipe<SELF> pipe;
 		
-		protected Unmanaged(ChunkDataProvider provider, Reference reference, TypeDefinition typeDef, TypeDefinition.Check check){
+		protected Unmanaged(DataProvider provider, Reference reference, TypeDefinition typeDef, TypeDefinition.Check check){
 			this(provider, reference, typeDef);
 			check.ensureValid(typeDef);
 		}
 		
-		public Unmanaged(ChunkDataProvider provider, Reference reference, TypeDefinition typeDef){
+		public Unmanaged(DataProvider provider, Reference reference, TypeDefinition typeDef){
 			this.provider=Objects.requireNonNull(provider);
 			this.reference=reference.requireNonNull();
 			this.typeDef=typeDef;
@@ -52,7 +52,7 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 		}
 		
 		@Override
-		public ChunkDataProvider getChunkProvider(){
+		public DataProvider getChunkProvider(){
 			return provider;
 		}
 		
@@ -175,7 +175,7 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 		return result;
 	}
 	
-	public void allocateNulls(ChunkDataProvider provider) throws IOException{
+	public void allocateNulls(DataProvider provider) throws IOException{
 		//noinspection unchecked
 		for(var ref : getThisStruct().getFields().byFieldTypeIter((Class<IOField.Ref<SELF, ?>>)(Object)IOField.Ref.class)){
 			if(!ref.isNull(self()))

@@ -7,14 +7,17 @@ import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
+import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.objects.collections.HashIOMap;
 import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.IOTypeDB;
 import com.lapissea.cfs.type.MemoryWalker;
 import com.lapissea.cfs.type.WordSpace;
+import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.util.LogUtil;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
@@ -27,7 +30,7 @@ import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NULLABL
 import static com.lapissea.cfs.type.field.annotations.IOValue.Reference.PipeType.FIXED;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-public class Cluster implements ChunkDataProvider{
+public class Cluster implements DataProvider{
 	
 	private static final ByteBuffer MAGIC_ID=ByteBuffer.wrap("BYT-BAE".getBytes(UTF_8)).asReadOnlyBuffer();
 	
@@ -52,7 +55,7 @@ public class Cluster implements ChunkDataProvider{
 	
 	public static void init(IOInterface data) throws IOException{
 		
-		var provider=ChunkDataProvider.newVerySimpleProvider(data);
+		var provider=DataProvider.newVerySimpleProvider(data);
 		
 		Chunk firstChunk;
 		try(var io=data.write(true)){
@@ -186,7 +189,7 @@ public class Cluster implements ChunkDataProvider{
 		
 		Set<ChunkPointer> referenced=new HashSet<>();
 		
-		new MemoryWalker().walk(this, getRoot(), getFirstChunk().getPtr().makeReference(), Cluster.ROOT_PIPE, ref->{
+		rootWalker().walk(true, ref->{
 			if(!ref.isNull()){
 				try{
 					for(Chunk chunk : new ChainWalker(ref.getPtr().dereference(this))){
@@ -214,5 +217,23 @@ public class Cluster implements ChunkDataProvider{
 			hasNextCount/(double)chunkCount,
 			usefulBytes/(double)usedChunkCapacity
 		);
+	}
+	
+	public MemoryWalker rootWalker() throws IOException{
+		return new MemoryWalker(this, getRoot(), getFirstChunk().getPtr().makeReference(), Cluster.ROOT_PIPE);
+	}
+	
+	public void defragment() throws IOException{
+		LogUtil.println("Defragmenting...");
+		
+		rootWalker().walk(new MemoryWalker.PointerRecord(){
+			@Override
+			public <T extends IOInstance<T>> void log(IOField.Ref<T, ?> field, T instance, Reference value) throws IOException{
+				LogUtil.println(field, value);
+			}
+			@Override
+			public <T extends IOInstance<T>> void logChunkPointer(IOField<T, ChunkPointer> field, T instance, ChunkPointer value) throws IOException{
+			}
+		});
 	}
 }

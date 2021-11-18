@@ -7,8 +7,8 @@ import java.util.Objects;
 
 public final class ChunkBuilder{
 	
-	private ChunkDataProvider provider;
-	private ChunkPointer      ptr;
+	private DataProvider provider;
+	private ChunkPointer ptr;
 	
 	private NumberSize bodyNumSize;
 	private long       capacity;
@@ -17,12 +17,12 @@ public final class ChunkBuilder{
 	private NumberSize   nextSize;
 	private ChunkPointer nextPtr=ChunkPointer.NULL;
 	
-	public ChunkBuilder(ChunkDataProvider provider, ChunkPointer ptr){
+	public ChunkBuilder(DataProvider provider, ChunkPointer ptr){
 		this.provider=provider;
 		this.ptr=ptr;
 	}
 	
-	public ChunkBuilder withProvider(ChunkDataProvider provider){
+	public ChunkBuilder withProvider(DataProvider provider){
 		this.provider=provider;
 		return this;
 	}

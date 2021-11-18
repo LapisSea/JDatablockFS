@@ -14,7 +14,7 @@ public class VerySimpleMemoryManager extends MemoryManager.StrategyImpl{
 	
 	private final IOList<ChunkPointer> freeChunks=IOList.wrap(new ArrayList<>(), ()->null);
 	
-	public VerySimpleMemoryManager(ChunkDataProvider context){
+	public VerySimpleMemoryManager(DataProvider context){
 		super(context);
 	}
 	

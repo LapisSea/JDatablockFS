@@ -4,7 +4,7 @@ import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.Chunk;
-import com.lapissea.cfs.chunk.ChunkDataProvider;
+import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
@@ -121,10 +121,10 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			})
 		);
 		
-		private static NumberSize calcOptimalNextSize(ChunkDataProvider provider) throws IOException{
+		private static NumberSize calcOptimalNextSize(DataProvider provider) throws IOException{
 			return NumberSize.bySize(provider.getSource().getIOSize());
 		}
-		public static <T extends IOInstance<T>> Node<T> allocValNode(T value, Node<T> next, SizeDescriptor<T> sizeDescriptor, TypeDefinition nodeType, ChunkDataProvider provider) throws IOException{
+		public static <T extends IOInstance<T>> Node<T> allocValNode(T value, Node<T> next, SizeDescriptor<T> sizeDescriptor, TypeDefinition nodeType, DataProvider provider) throws IOException{
 			int nextBytes;
 			if(next!=null) nextBytes=NumberSize.bySize(next.getReference().getPtr()).bytes;
 			else nextBytes=calcOptimalNextSize(provider).bytes;
@@ -142,7 +142,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		@IOValue
 		private NumberSize nextSize;
 		
-		public Node(ChunkDataProvider provider, Reference reference, TypeDefinition typeDef, T val, Node<T> next) throws IOException{
+		public Node(DataProvider provider, Reference reference, TypeDefinition typeDef, T val, Node<T> next) throws IOException{
 			this(provider, reference, typeDef);
 			
 			var newSiz=calcOptimalNextSize(provider);
@@ -155,7 +155,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			if(val!=null) setValue(val);
 		}
 		
-		public Node(ChunkDataProvider provider, Reference reference, TypeDefinition typeDef) throws IOException{
+		public Node(DataProvider provider, Reference reference, TypeDefinition typeDef) throws IOException{
 			super(provider, reference, typeDef, NODE_TYPE_CHECK);
 			
 			var type=(Struct<T>)typeDef.argAsStruct(0);
@@ -488,7 +488,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 	
 	
 	@SuppressWarnings("unchecked")
-	public LinkedIOList(ChunkDataProvider provider, Reference reference, TypeDefinition typeDef) throws IOException{
+	public LinkedIOList(DataProvider provider, Reference reference, TypeDefinition typeDef) throws IOException{
 		super(provider, reference, typeDef, LIST_TYPE_CHECK);
 		
 		var type=(Struct<T>)typeDef.argAsStruct(0);
@@ -681,7 +681,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 	private <U extends IOInstance.Unmanaged<U>> void freeUnmanaged(U val) throws IOException{
 		Set<Chunk> chunks=new HashSet<>();
 		
-		new MemoryWalker().walk(val, ref->{
+		new MemoryWalker(val).walk(true, ref->{
 			if(ref.isNull()){
 				return;
 			}

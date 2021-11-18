@@ -3,7 +3,7 @@ package com.lapissea.cfs.type;
 import com.lapissea.cfs.ConsoleColors;
 import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.Utils;
-import com.lapissea.cfs.chunk.ChunkDataProvider;
+import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.FieldIsNullException;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.objects.Reference;
@@ -28,7 +28,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-import static com.lapissea.cfs.GlobalConfig.*;
+import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
 public class Struct<T extends IOInstance<T>>{
 	
@@ -78,7 +78,7 @@ public class Struct<T extends IOInstance<T>>{
 	public static class Unmanaged<T extends IOInstance.Unmanaged<T>> extends Struct<T>{
 		
 		public interface Constr<T>{
-			T create(ChunkDataProvider provider, Reference reference, TypeDefinition type) throws IOException;
+			T create(DataProvider provider, Reference reference, TypeDefinition type) throws IOException;
 		}
 		
 		public static Unmanaged<?> thisClass(){

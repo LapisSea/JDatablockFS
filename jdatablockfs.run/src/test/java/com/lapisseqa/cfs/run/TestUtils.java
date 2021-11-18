@@ -1,8 +1,8 @@
 package com.lapisseqa.cfs.run;
 
 import com.lapissea.cfs.chunk.AllocateTicket;
-import com.lapissea.cfs.chunk.ChunkDataProvider;
 import com.lapissea.cfs.chunk.Cluster;
+import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.objects.collections.IOList;
@@ -57,10 +57,10 @@ public class TestUtils{
 		}
 	}
 	
-	static void testChunkProvider(TestInfo info, UnsafeConsumer<ChunkDataProvider, IOException> session) throws IOException{
+	static void testChunkProvider(TestInfo info, UnsafeConsumer<DataProvider, IOException> session) throws IOException{
 		testRawMem(info, mem->{
 			mem.write(true, Cluster.getMagicId());
-			session.accept(ChunkDataProvider.newVerySimpleProvider(mem));
+			session.accept(DataProvider.newVerySimpleProvider(mem));
 		});
 	}
 	
@@ -87,7 +87,7 @@ public class TestUtils{
 		UnsafeConsumer<T, IOException> session,
 		boolean useCluster
 	) throws IOException{
-		UnsafeConsumer<ChunkDataProvider, IOException> ses=provider->{
+		UnsafeConsumer<DataProvider, IOException> ses=provider->{
 			var chunk=AllocateTicket.bytes(initalCapacity).submit(provider);
 			var ref  =chunk.getPtr().makeReference(0);
 			

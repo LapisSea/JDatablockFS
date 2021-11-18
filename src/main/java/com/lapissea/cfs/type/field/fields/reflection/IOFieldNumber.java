@@ -1,7 +1,7 @@
 package com.lapissea.cfs.type.field.fields.reflection;
 
 import com.lapissea.cfs.Utils;
-import com.lapissea.cfs.chunk.ChunkDataProvider;
+import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.objects.INumber;
@@ -57,19 +57,19 @@ public class IOFieldNumber<T extends IOInstance<T>, E extends INumber> extends I
 	}
 	
 	@Override
-	public List<IOField<T, ?>> write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
+	public List<IOField<T, ?>> write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		var size=getSize(instance);
 		size.write(dest, get(instance));
 		return List.of();
 	}
 	
 	@Override
-	public void read(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public void read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		var size=getSize(instance);
 		set(instance, constructor.apply(size.read(src)));
 	}
 	@Override
-	public void skipRead(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public void skipRead(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		var size=getSize(instance);
 		size.read(src);
 	}

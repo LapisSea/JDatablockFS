@@ -1,6 +1,6 @@
 package com.lapissea.cfs.type.field.fields.reflection;
 
-import com.lapissea.cfs.chunk.ChunkDataProvider;
+import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
@@ -67,7 +67,7 @@ public class IOFieldInstanceArray<T extends IOInstance<T>, ValType extends IOIns
 		return descriptor;
 	}
 	@Override
-	public List<IOField<T, ?>> write(ChunkDataProvider provider, ContentWriter dest, T instance) throws IOException{
+	public List<IOField<T, ?>> write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		var pip=getValPipe();
 		
 		var arr=get(instance);
@@ -77,7 +77,7 @@ public class IOFieldInstanceArray<T extends IOInstance<T>, ValType extends IOIns
 		return List.of();
 	}
 	@Override
-	public void read(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public void read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		var pip=getValPipe();
 		
 		int       size=getArraySize(instance);
@@ -89,7 +89,7 @@ public class IOFieldInstanceArray<T extends IOInstance<T>, ValType extends IOIns
 	}
 	
 	@Override
-	public void skipRead(ChunkDataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public void skipRead(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		var pip=getValPipe();
 		
 		int     size=getArraySize(instance);
