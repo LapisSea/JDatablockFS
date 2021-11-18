@@ -19,22 +19,19 @@ import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.util.Objects;
 
+/**
+ * This interface represents a session where data can be read and optionally modified. Once
+ * an instance with this interface is created, it should always be closed as the underlying
+ * providers may be locking resources.
+ */
 @SuppressWarnings("unused")
 public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 	
-	enum Mode{
-		READ_ONLY(true, false),
-		READ_WRITE(true, true);
-		
-		public final boolean canRead;
-		public final boolean canWrite;
-		
-		Mode(boolean canRead, boolean canWrite){
-			this.canRead=canRead;
-			this.canWrite=canWrite;
-		}
-	}
-	
+	/**
+	 * This interface signifies that a type can provide instances of {@link RandomIO}. All the
+	 * default functions are related quality of life helpers that hide away the somewhat verbose
+	 * nature of {@link RandomIO}.
+	 */
 	interface Creator{
 		
 		default StringBuilder hexdump() throws IOException{
@@ -53,6 +50,9 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 			return ioMap(io->HexDump.hexDump(io, title, maxWidth));
 		}
 		
+		/**
+		 * Reads all bytes from start to end in to a byte[]. This method may fail if the data size is larger than {@link Integer#MAX_VALUE}.
+		 */
 		default byte[] readAll() throws IOException{
 			try(var io=io()){
 				byte[] data=new byte[Math.toIntExact(io.getSize())];
@@ -61,10 +61,57 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 			}
 		}
 		
+		/**
+		 * Provides a less user error-prone way to access a {@link RandomIO} instance with an ability to return a result.
+		 *
+		 * @param ptr represents the place where the position will be placed relative to the start of the data.
+		 */
+		default <T> T ioMapAt(ChunkPointer ptr, UnsafeFunction<RandomIO, T, IOException> session) throws IOException{
+			return ioMapAt(ptr.getValue(), session);
+		}
+		
+		/**
+		 * Provides a less user error-prone way to access a {@link RandomIO} instance with an ability to return a result.
+		 *
+		 * @param offset represents the place where the position will be placed relative to the start of the data.
+		 */
+		default <T> T ioMapAt(long offset, UnsafeFunction<RandomIO, T, IOException> session) throws IOException{
+			Objects.requireNonNull(session);
+			
+			try(var io=ioAt(offset)){
+				return session.apply(io);
+			}
+		}
+		/**
+		 * Provides a new instance of {@link RandomIO} where its initial position will be at the specified offset.
+		 */
+		default RandomIO ioAt(long offset) throws IOException{
+			return io().setPos(offset);
+		}
+		
+		/**
+		 * Provides an easy way to parse something. If a function takes {@link RandomIO}, reads and parses the data in to an object, it can be used here.
+		 */
+		default <T> T ioMap(UnsafeFunction<RandomIO, T, IOException> session) throws IOException{
+			Objects.requireNonNull(session);
+			
+			try(var io=io()){
+				return session.apply(io);
+			}
+		}
+		
+		/**
+		 * Provides a less user error-prone way to access a {@link RandomIO} instance.
+		 */
 		default void ioAt(ChunkPointer ptr, UnsafeConsumer<RandomIO, IOException> session) throws IOException{
 			ioAt(ptr.getValue(), session);
 		}
 		
+		/**
+		 * Provides a less user error-prone way to access a {@link RandomIO} instance. No way to forget to close it!
+		 *
+		 * @param offset represents the place where the position will be placed relative to the start of the data.
+		 */
 		default void ioAt(long offset, UnsafeConsumer<RandomIO, IOException> session) throws IOException{
 			Objects.requireNonNull(session);
 			
@@ -73,29 +120,9 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 			}
 		}
 		
-		default <T> T ioMapAt(ChunkPointer ptr, UnsafeFunction<RandomIO, T, IOException> session) throws IOException{
-			return ioMapAt(ptr.getValue(), session);
-		}
-		
-		default <T> T ioMapAt(long offset, UnsafeFunction<RandomIO, T, IOException> session) throws IOException{
-			Objects.requireNonNull(session);
-			
-			try(var io=ioAt(offset)){
-				return session.apply(io);
-			}
-		}
-		
-		default RandomIO ioAt(long offset) throws IOException{
-			return io().setPos(offset);
-		}
-		
-		default <T> T ioMap(UnsafeFunction<RandomIO, T, IOException> session) throws IOException{
-			Objects.requireNonNull(session);
-			
-			try(var io=io()){
-				return session.apply(io);
-			}
-		}
+		/**
+		 * Provides a less user error-prone way to access a {@link RandomIO} instance. No way to forget to close it!
+		 */
 		default void io(UnsafeConsumer<RandomIO, IOException> session) throws IOException{
 			Objects.requireNonNull(session);
 			
@@ -104,6 +131,9 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 			}
 		}
 		
+		/**
+		 * Provides a new instance of {@link RandomIO}. It is open on creation and can be used immediately. Once operations with it are done, it must be closed!
+		 */
 		RandomIO io() throws IOException;
 		
 		default void write(boolean trimOnClose, ByteBuffer data) throws IOException         {write(0, trimOnClose, data);}
@@ -130,9 +160,38 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 			}
 		}
 		
+		/**
+		 * Provides an {@link OutputStream} that can be used as a specialised write only version of {@link RandomIO}.
+		 *
+		 * @param trimOnClose signifies if data should be trunctuated / trimmed once writing is done.
+		 *                    Example:<br>
+		 *                    Existing/old data:<br>
+		 *                    0, 1, 2, 3, 4, 5<br>
+		 *                    written data:<br>
+		 *                    7, 8, 9<br>
+		 *                    new data if true:<br>
+		 *                    7, 8, 9<br>
+		 *                    new data if false:<br>
+		 *                    7, 8, 9, 3, 4, 5
+		 */
 		@NotNull
 		default ContentOutputStream write(boolean trimOnClose) throws IOException{return write(0, trimOnClose);}
 		
+		/**
+		 * Provides an {@link OutputStream} that can be used as a specialised write only version of {@link RandomIO}.
+		 *
+		 * @param offset      the initial bytes to skip from the start of the data
+		 * @param trimOnClose signifies if data should be trunctuated / trimmed once writing is done.
+		 *                    Example:<br>
+		 *                    Existing/old data:<br>
+		 *                    0, 1, 2, 3, 4, 5<br>
+		 *                    written data:<br>
+		 *                    7, 8, 9<br>
+		 *                    new data if true:<br>
+		 *                    7, 8, 9<br>
+		 *                    new data if false:<br>
+		 *                    7, 8, 9, 3, 4, 5
+		 */
 		@NotNull
 		default ContentOutputStream write(long offset, boolean trimOnClose) throws IOException{
 			return ioAt(offset).outStream(trimOnClose);

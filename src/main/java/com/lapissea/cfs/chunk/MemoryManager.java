@@ -11,6 +11,13 @@ import java.util.List;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
+/**
+ * This interface handles the management of memory (duh). This includes allocation of new independent {@link Chunk}s or
+ * can extend a chunk by allocation extra capacity to it or its children (next chunk(s)) and on the other side, it can
+ * provide a way to handle free/unused data by noting the free chunks down and shredding any sensitive garbage data.<br>
+ * Sensitive garbage data is defined as any data that can be accessed and read easily. This in practice means any sequence of
+ * bytes that can be interpreted as a valid chunk header.
+ */
 public interface MemoryManager{
 	
 	/**
@@ -112,14 +119,42 @@ public interface MemoryManager{
 		}
 	}
 	
+	/**
+	 * Lists locations of all KNOWN chunks. This may not be a complete list of unused chunks.
+	 */
 	IOList<ChunkPointer> getFreeChunks();
 	
+	/**
+	 * Explicitly frees a chunk.<br>
+	 * <br>
+	 * This may alter the chunks contents, properties or completely destroy it. Do not use this chunk or any object that could
+	 * use it after its freed! Any data that was, is assumed to be gone permanently and will never be accessible trough normal means.
+	 * Usage of this chunk after it has been freed can cause crashes or serious data corruption.
+	 */
 	default void free(Chunk toFree) throws IOException{
 		free(List.of(toFree));
 	}
+	/**
+	 * Explicitly frees a collection of chunks.<br>
+	 * It is preferable (within reason) to free as many chunks at once. The manager can more efficiently handle them if they are presented at once.<br>
+	 * <br>
+	 * This may alter any/all of the chunks contents, properties or completely destroy them. Do not use this chunk or any object that could
+	 * use them after they are freed! Any data that was, is assumed to be gone permanently and will never be accessible trough normal means.
+	 * Usage of any chunks after they have been freed can cause crashes or serious data corruption.
+	 */
 	void free(Collection<Chunk> toFree) throws IOException;
 	
+	/**
+	 * Allocates additional capacity to the target chunk. The additional capacity may be equal to the toAllocate parm but can also be greater.
+	 *
+	 * @param firstChunk the first chunk in the chain. May be used to reallocate the complete chain and modify all references to it.
+	 * @param target     the last chunk in the chain. Will most commonly be modified to achieve extra capacity.
+	 * @param toAllocate Minimum number of additional bytes to allocate to the capacity
+	 */
 	void allocTo(Chunk firstChunk, Chunk target, long toAllocate) throws IOException;
 	
+	/**
+	 * Allocates a new independent chunk, unreferenced by anything. All instructions on what and how to allocate it are provided in the ticket.
+	 */
 	Chunk alloc(AllocateTicket ticket) throws IOException;
 }

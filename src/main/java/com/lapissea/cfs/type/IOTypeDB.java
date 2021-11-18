@@ -9,6 +9,12 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
+
+/**
+ * This interface provides a simple protocol to convert a lengthy type definition in to an ID and back.
+ * The implementation is expected to be used mainly as a way to remove excessive repeating when
+ * interacting with a value of unknown implicit type.
+ */
 public interface IOTypeDB{
 	
 	class MemoryOnlyDB implements IOTypeDB{
