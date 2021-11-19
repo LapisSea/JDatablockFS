@@ -11,6 +11,7 @@ import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.INumber;
 import com.lapissea.cfs.objects.Reference;
+import com.lapissea.cfs.tools.DrawUtils.Range;
 import com.lapissea.cfs.tools.SessionHost.CachedFrame;
 import com.lapissea.cfs.tools.SessionHost.ParsedFrame;
 import com.lapissea.cfs.tools.logging.MemFrame;
@@ -149,7 +150,7 @@ public class BinaryGridRenderer{
 		Color col, int bitOffset, long bitSize, Reference reference, long fieldOffset
 	) throws IOException{
 		Consumer<DrawUtils.Rect> doSegment=bitRect->{
-			renderer.setColor(ColorUtils.alpha(col, 0.6F).darker());
+			renderer.setColor(ColorUtils.alpha(col, 0.8F).darker());
 			renderer.fillQuad(bitRect.x, bitRect.y, bitRect.width, bitRect.height);
 			drawStringInInfo(col, Objects.toString(field.instanceToString(instance, true)), bitRect, false, ctx.strings);
 		};
@@ -159,6 +160,7 @@ public class BinaryGridRenderer{
 			var remaining =bitSize;
 			var bitOff    =bitOffset;
 			while(remaining>0){
+				fillBitByte(ctx, trueOffset);
 				doSegment.accept(DrawUtils.makeBitRect(ctx.renderCtx, trueOffset, bitOff, remaining));
 				remaining-=Math.min(8, remaining);
 				bitOff=0;
@@ -172,6 +174,7 @@ public class BinaryGridRenderer{
 				var remaining =bitSize;
 				var bitOff    =bitOffset;
 				while(remaining>0){
+					fillBitByte(ctx, trueOffset);
 					doSegment.accept(DrawUtils.makeBitRect(ctx.renderCtx, trueOffset, bitOff, remaining));
 					remaining-=Math.min(8, remaining);
 					bitOff=0;
@@ -180,6 +183,11 @@ public class BinaryGridRenderer{
 			}
 		}
 	}
+	private void fillBitByte(AnnotateCtx ctx, long trueOffset){
+		if(ctx.renderCtx.filled.contains((int)trueOffset)) return;
+		drawByteRanges(ctx.renderCtx, List.of(Range.fromSize(trueOffset, 1)), Color.GREEN.darker(), false, true);
+	}
+	
 	private <T extends IOInstance<T>> void annotateByteField(
 		AnnotateCtx ctx,
 		T instance, IOField<T, ?> field,
@@ -270,7 +278,7 @@ public class BinaryGridRenderer{
 	private void fillChunk(RenderContext ctx, Chunk chunk, Function<Color, Color> filter, boolean withChar, boolean force){
 		
 		var chunkColor=chunkBaseColor();
-		var dataColor =ColorUtils.mul(chunkColor, 0.5F);
+		var dataColor =ColorUtils.alpha(ColorUtils.mul(chunkColor, 0.5F), 0.7F);
 		var freeColor =ColorUtils.alpha(chunkColor, 0.4F);
 		
 		chunkColor=filter.apply(ColorUtils.alpha(chunkColor, 0.6F));
@@ -816,6 +824,8 @@ public class BinaryGridRenderer{
 				renderer.setColor(ColorUtils.alpha(col, 0.5F));
 			}
 			
+			start+=pSiz/2;
+			
 			long
 				xPosFrom=start%ctx.width(),
 				yPosFrom=start/ctx.width(),
@@ -830,7 +840,7 @@ public class BinaryGridRenderer{
 				xToOff=(rand.nextDouble()-0.5)*offScale,
 				yToOff=(rand.nextDouble()-0.5)*offScale,
 				
-				xFromOrg=xPosFrom+0.5,
+				xFromOrg=xPosFrom+(pSiz==0?0:0.5),
 				yFromOrg=yPosFrom+0.5,
 				xToOrg=xPosTo+0.5,
 				yToOrg=yPosTo+0.5,
@@ -1107,7 +1117,7 @@ public class BinaryGridRenderer{
 								var to  =ref.calcGlobalOffset(ctx.provider);
 								diffPos=from!=to;
 								if(diffPos){
-									ctx.recordPointer(new Pointer(from+size/2, to, (int)size, col, refField.toString(), 1));
+									ctx.recordPointer(new Pointer(from, to, (int)size, col, refField.toString(), 1));
 								}
 							}
 							

@@ -26,6 +26,13 @@ class DrawUtils{
 			Range build(){
 				return new Range(start, end);
 			}
+			@Override
+			public String toString(){
+				return "Builder{"+
+				       "start="+start+
+				       ", end="+end+
+				       '}';
+			}
 		}
 		
 		static Range fromSize(long start, long size){
@@ -60,7 +67,7 @@ class DrawUtils{
 			
 			for(Range range : ranges){
 				b.start=range.from();
-				b.end=range.from()+1;
+				b.end=range.from();
 				for(long i=range.from();i<range.to();i++){
 					if(filter.test(i)){
 						b.end=i+1;
