@@ -10,6 +10,7 @@ import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Objects;
 import java.util.stream.Stream;
 
@@ -22,7 +23,7 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 	public abstract static class Unmanaged<SELF extends Unmanaged<SELF>> extends IOInstance<SELF> implements DataProvider.Holder{
 		
 		private final DataProvider   provider;
-		private final Reference      reference;
+		private       Reference      reference;
 		private final TypeDefinition typeDef;
 		
 		private StructPipe<SELF> pipe;
@@ -60,6 +61,25 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 			try(var io=selfIO()){
 				return io.getSize()==0;
 			}
+		}
+		
+		public void notifyReferenceMovement(Reference newRef){
+			newRef.requireNonNull();
+			
+			if(DEBUG_VALIDATION){
+				byte[] oldData, newData;
+				try(var oldIo=reference.io(this);
+				    var newIo=newRef.io(this)
+				){
+					oldData=oldIo.readRemaining();
+					newData=newIo.readRemaining();
+				}catch(IOException e){
+					throw new RuntimeException(e);
+				}
+				assert Arrays.equals(oldData, newData):"Data changed when moving reference! This is invalid behaviour";
+			}
+			
+			reference=newRef;
 		}
 		
 		public void free() throws IOException{}
