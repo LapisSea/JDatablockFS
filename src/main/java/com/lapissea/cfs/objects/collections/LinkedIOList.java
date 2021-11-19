@@ -92,6 +92,15 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			
 			var next=new IOField.Ref.NoIO<Node<T>, Node<T>>(nextAccessor, new SizeDescriptor.Unknown<>(WordSpace.BYTE, 0, NumberSize.LARGEST.optionalBytesLong, node->node.nextSize.bytes)){
 				@Override
+				public void setReference(Node<T> instance, Reference newRef){
+					if(newRef.getOffset()!=0) throw new NotImplementedException();
+					try{
+						instance.setNextRaw(newRef.getPtr());
+					}catch(IOException e){
+						throw new RuntimeException(e);
+					}
+				}
+				@Override
 				public Reference getReference(Node<T> instance){
 					ChunkPointer next;
 					try{
@@ -301,6 +310,10 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			ChunkPointer ptr;
 			if(next==null) ptr=ChunkPointer.NULL;
 			else ptr=next.getReference().getPtr();
+			
+			setNextRaw(ptr);
+		}
+		private void setNextRaw(ChunkPointer ptr) throws IOException{
 			
 			var newSiz=NumberSize.bySize(ptr);
 			if(newSiz.greaterThan(nextSize)){

@@ -114,6 +114,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		}
 		
 		public abstract void allocate(T instance, DataProvider provider, GenericContext genericContext) throws IOException;
+		public abstract void setReference(T instance, Reference newRef);
 		public abstract Reference getReference(T instance);
 		public abstract StructPipe<Type> getReferencedPipe(T instance);
 		

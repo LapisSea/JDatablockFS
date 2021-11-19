@@ -64,6 +64,17 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 		alloc(instance, provider, val);
 		set(instance, val);
 	}
+	@Override
+	public void setReference(T instance, Reference newRef){
+		Objects.requireNonNull(newRef);
+		if(newRef.isNull()){
+			if(getNullability()==IONullability.Mode.NOT_NULL){
+				throw new NullPointerException();
+			}
+		}
+		referenceField.set(instance, newRef);
+	}
+	
 	private void alloc(T instance, DataProvider provider, ValueType val) throws IOException{
 		Chunk chunk=AllocateTicket.withData(instancePipe, val).submit(provider);
 		referenceField.set(instance, chunk.getPtr().makeReference());

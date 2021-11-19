@@ -15,6 +15,7 @@ import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
+import com.lapissea.util.NotImplementedException;
 
 import java.io.IOException;
 import java.util.List;
@@ -67,6 +68,18 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 		Chunk chunk=t.submit(provider);
 		var   val  =makeValueObject(provider, chunk.getPtr().makeReference(), genericContext);
 		set(instance, val);
+	}
+	
+	@Override
+	public void setReference(T instance, Reference newRef){
+		var old=get(instance);
+		if(old==null) throw new NotImplementedException();
+		
+		try{
+			set(instance, makeValueObject(old.getDataProvider(), newRef, old.getGenerics()));
+		}catch(IOException e){
+			throw new RuntimeException(e);
+		}
 	}
 	
 	@Override
