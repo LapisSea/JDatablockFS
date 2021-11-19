@@ -22,7 +22,9 @@ import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
@@ -57,13 +59,12 @@ public class Cluster implements DataProvider{
 		
 		var provider=DataProvider.newVerySimpleProvider(data);
 		
-		Chunk firstChunk;
 		try(var io=data.write(true)){
 			io.write(MAGIC_ID);
 		}
-		firstChunk=AllocateTicket.withData(ROOT_PIPE, new RootRef())
-		                         .withApproval(c->c.getPtr().equals(FIRST_CHUNK_PTR))
-		                         .submit(provider);
+		var firstChunk=AllocateTicket.withData(ROOT_PIPE, new RootRef())
+		                             .withApproval(c->c.getPtr().equals(FIRST_CHUNK_PTR))
+		                             .submit(provider);
 		
 		var db=new IOTypeDB.PersistentDB();
 		db.init(provider);
@@ -226,14 +227,93 @@ public class Cluster implements DataProvider{
 	public void defragment() throws IOException{
 		LogUtil.println("Defragmenting...");
 		
+		reallocateUnmanaged((HashIOMap<?, ?>)getTemp());
+		
+		tmp_realocMetadata();
+	}
+	
+	private void tmp_realocMetadata() throws IOException{
+		
+		var refF  =root.getThisStruct().getFields().requireExact(Reference.class, "metadata.ref");
+		var oldRef=refF.get(root);
+		
+		var pipeType=FixedContiguousStructPipe.class;
+		
+		var pip=(StructPipe<Metadata>)StructPipe.of(pipeType, root.metadata.getThisStruct());
+		
+		var siz=pip.getSizeDescriptor().calcUnknown(root.metadata);
+		
+		var newCh=AllocateTicket.bytes(siz).withDataPopulated((p, io)->{
+			try(var src=oldRef.io(p)){
+				src.transferTo(io);
+			}
+		}).submit(this);
+		
+		var newRef=newCh.getPtr().makeReference();
+		
+		moveReference(oldRef, newRef);
+	}
+	
+	private <T extends IOInstance.Unmanaged<T>> void reallocateUnmanaged(T instance) throws IOException{
+		var oldRef=instance.getReference();
+		var pip   =instance.getPipe();
+		
+		var siz=pip.getSizeDescriptor().calcUnknown(instance, WordSpace.BYTE);
+		
+		var newCh=AllocateTicket.bytes(siz).withDataPopulated((p, io)->{
+			try(var src=oldRef.io(p)){
+				src.transferTo(io);
+			}
+		}).submit(this);
+		var newRef=newCh.getPtr().makeReference();
+		
+		var ptrsToFree=moveReference(oldRef, newRef);
+		instance.notifyReferenceMovement(newRef);
+		
+		List<Chunk> toFree=new ArrayList<>();
+		for(var ptr : ptrsToFree){
+			ptr.dereference(this).freeChainingList(toFree);
+		}
+		getMemoryManager().free(toFree);
+	}
+	
+	private Set<ChunkPointer> moveReference(Reference oldRef, Reference newRef) throws IOException{
+		boolean[]         found ={false};
+		Set<ChunkPointer> toFree=new HashSet<>();
 		rootWalker().walk(new MemoryWalker.PointerRecord(){
+			boolean foundCh;
 			@Override
-			public <T extends IOInstance<T>> void log(IOField.Ref<T, ?> field, T instance, Reference value) throws IOException{
-				LogUtil.println(field, value);
+			public <T extends IOInstance<T>> boolean log(StructPipe<T> pipe, Reference instanceReference, IOField.Ref<T, ?> field, T instance, Reference value) throws IOException{
+				var ptr=oldRef.getPtr();
+				if(value.getPtr().equals(ptr)){
+					
+					if(toFree.contains(ptr)){
+						toFree.remove(ptr);
+					}else if(!foundCh){
+						toFree.add(ptr);
+						foundCh=true;
+					}
+				}
+				
+				if(value.equals(oldRef)){
+					field.setReference(instance, newRef);
+					try(var io=instanceReference.io(Cluster.this)){
+						pipe.write(Cluster.this, io, instance);
+					}
+					found[0]=true;
+					return false;
+				}
+				return true;
 			}
 			@Override
-			public <T extends IOInstance<T>> void logChunkPointer(IOField<T, ChunkPointer> field, T instance, ChunkPointer value) throws IOException{
+			public <T extends IOInstance<T>> boolean logChunkPointer(StructPipe<T> pipe, Reference instanceReference, IOField<T, ChunkPointer> field, T instance, ChunkPointer value) throws IOException{
+				return true;
 			}
 		});
+		if(!found[0]){
+			throw new IOException("Failed to find "+oldRef);
+		}
+		return toFree;
 	}
+	
 }
