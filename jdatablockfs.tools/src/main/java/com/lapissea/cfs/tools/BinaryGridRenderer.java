@@ -118,16 +118,16 @@ public class BinaryGridRenderer{
 		long start=chunk.getPtr().getValue();
 		long end  =chunk.dataEnd();
 		
-		DrawUtils.fillByteRange(ColorUtils.alpha(color, color.getAlpha()/255F*0.2F), ctx, new DrawUtils.Range(start, end));
+		DrawUtils.fillByteRange(ColorUtils.alpha(color, color.getAlpha()/255F*0.2F), ctx, new Range(start, end));
 		renderer.setLineWidth(4);
-		outlineByteRange(color, ctx, new DrawUtils.Range(start, end));
+		outlineByteRange(color, ctx, new Range(start, end));
 		var next=chunk.next();
 		if(next!=null){
 			outlineChunk(ctx, next, ColorUtils.alpha(color, color.getAlpha()/255F*0.5F));
 		}
 	}
 	
-	public static void outlineByteRange(Color color, RenderContext ctx, DrawUtils.Range range){
+	public static void outlineByteRange(Color color, RenderContext ctx, Range range){
 		ctx.renderer.setColor(color);
 		
 		try(var ignored=ctx.renderer.bulkDraw(DrawMode.QUADS)){
@@ -191,14 +191,14 @@ public class BinaryGridRenderer{
 	private <T extends IOInstance<T>> void annotateByteField(
 		AnnotateCtx ctx,
 		T instance, IOField<T, ?> field,
-		Color col, Reference reference, DrawUtils.Range fieldRange
+		Color col, Reference reference, Range fieldRange
 	){
-		boolean         hover    =false;
-		DrawUtils.Range bestRange=new DrawUtils.Range(0, 0);
-		DrawUtils.Range lastRange=null;
-		for(DrawUtils.Range range : instance instanceof Chunk ch?
-		                            List.of(DrawUtils.Range.fromSize(ch.getPtr().getValue()+fieldRange.from(), fieldRange.size())):
-		                            DrawUtils.chainRangeResolve(ctx.provider, reference, (int)fieldRange.from(), (int)fieldRange.size())){
+		boolean hover    =false;
+		Range   bestRange=new Range(0, 0);
+		Range   lastRange=null;
+		for(Range range : instance instanceof Chunk ch?
+		                  List.of(Range.fromSize(ch.getPtr().getValue()+fieldRange.from(), fieldRange.size())):
+		                  DrawUtils.chainRangeResolve(ctx.provider, reference, (int)fieldRange.from(), (int)fieldRange.size())){
 			if(bestRange.size()<ctx.renderCtx.width()){
 				var contiguousRange=DrawUtils.findBestContiguousRange(ctx.renderCtx.width, range);
 				if(bestRange.size()<contiguousRange.size()) bestRange=contiguousRange;
@@ -285,11 +285,11 @@ public class BinaryGridRenderer{
 		dataColor=filter.apply(dataColor);
 		freeColor=filter.apply(freeColor);
 		
-		drawByteRanges(ctx, List.of(new DrawUtils.Range(chunk.getPtr().getValue(), chunk.dataStart())), chunkColor, false, false);
+		drawByteRanges(ctx, List.of(new Range(chunk.getPtr().getValue(), chunk.dataStart())), chunkColor, false, false);
 		int start=(int)chunk.dataStart();
 		int cap  =(int)chunk.getCapacity();
 		int siz  =(int)chunk.getSize();
-		drawByteRanges(ctx, List.of(new DrawUtils.Range(start+siz, start+cap)), freeColor, withChar, force);
+		drawByteRanges(ctx, List.of(new Range(start+siz, start+cap)), freeColor, withChar, force);
 		drawByteRanges(ctx, List.of(new DrawUtils.Range(start, start+siz)), dataColor, withChar, force);
 	}
 	
@@ -510,14 +510,14 @@ public class BinaryGridRenderer{
 		startFrame();
 		
 		if(hasMagic){
-			drawByteRanges(ctx, List.of(new DrawUtils.Range(0, magic.limit())), Color.BLUE, false, true);
+			drawByteRanges(ctx, List.of(new Range(0, magic.limit())), Color.BLUE, false, true);
 		}else{
 			IntPredicate isValidMagicByte=i->bytes.length>i&&magic.get(i)==bytes[i];
 			drawBytes(ctx, IntStream.range(0, magic.limit()).filter(isValidMagicByte), Color.BLUE, true, true);
 			drawBytes(ctx, IntStream.range(0, magic.limit()).filter(isValidMagicByte.negate()), Color.RED, true, true);
 		}
 		renderer.setLineWidth(2F);
-		outlineByteRange(Color.WHITE, ctx, new DrawUtils.Range(0, magic.limit()));
+		outlineByteRange(Color.WHITE, ctx, new Range(0, magic.limit()));
 		drawStringIn(Color.WHITE, new String(bytes, 0, magic.limit()), new DrawUtils.Rect(0, 0, ctx.pixelsPerByte()*Math.min(magic.limit(), ctx.width()), ctx.pixelsPerByte()), false);
 		
 		renderer.setColor(ColorUtils.alpha(Color.WHITE, 0.5F));
@@ -636,41 +636,41 @@ public class BinaryGridRenderer{
 		annotateStruct(ctx, chunk, null, Chunk.PIPE, true);
 		var rctx=ctx.renderCtx;
 		if(chunk.dataEnd()>rctx.bytes.length){
-			drawByteRanges(rctx, List.of(new DrawUtils.Range(rctx.bytes.length, chunk.dataEnd())), new Color(0, 0, 0, 0.2F), false, false);
+			drawByteRanges(rctx, List.of(new Range(rctx.bytes.length, chunk.dataEnd())), new Color(0, 0, 0, 0.2F), false, false);
 		}
 	}
 	
 	private void drawBytes(RenderContext ctx, IntStream stream, Color color, boolean withChar, boolean force){
-		drawByteRanges(ctx, DrawUtils.Range.fromInts(stream), color, withChar, force);
+		drawByteRanges(ctx, Range.fromInts(stream), color, withChar, force);
 	}
 	
-	private void drawByteRanges(RenderContext ctx, List<DrawUtils.Range> ranges, Color color, boolean withChar, boolean force){
-		List<DrawUtils.Range> actualRanges;
+	private void drawByteRanges(RenderContext ctx, List<Range> ranges, Color color, boolean withChar, boolean force){
+		List<Range> actualRanges;
 		if(force) actualRanges=ranges;
-		else actualRanges=DrawUtils.Range.filterRanges(ranges, i->!ctx.filled.contains((int)i));
+		else actualRanges=Range.filterRanges(ranges, i->!ctx.filled.contains((int)i));
 		
 		drawByteRangesForced(ctx, actualRanges, color, withChar);
 	}
 	
-	private void drawByteRangesForced(RenderContext ctx, List<DrawUtils.Range> ranges, Color color, boolean withChar){
+	private void drawByteRangesForced(RenderContext ctx, List<Range> ranges, Color color, boolean withChar){
 		var col       =color;
 		var bitColor  =col;
 		var background=ColorUtils.mul(col, 0.5F);
 		
-		Consumer<Stream<DrawUtils.Range>> drawIndex=r->{
+		Consumer<Stream<Range>> drawIndex=r->{
 			try(var ignored=renderer.bulkDraw(DrawMode.QUADS)){
 				r.forEach(range->DrawUtils.fillByteRange(ctx, range));
 			}
 		};
 		
-		List<DrawUtils.Range> clampedOverflow=DrawUtils.Range.clamp(ranges, ctx.bytes.length);
+		List<Range> clampedOverflow=Range.clamp(ranges, ctx.bytes.length);
 		
-		Supplier<IntStream> clampedInts=()->DrawUtils.Range.toInts(clampedOverflow);
+		Supplier<IntStream> clampedInts=()->Range.toInts(clampedOverflow);
 		
 		
 		renderer.setColor(background);
 		try(var ignored=renderer.bulkDraw(DrawMode.QUADS)){
-			for(DrawUtils.Range range : clampedOverflow){
+			for(Range range : clampedOverflow){
 				DrawUtils.fillByteRange(ctx, range);
 			}
 		}
@@ -680,7 +680,7 @@ public class BinaryGridRenderer{
 		renderer.setColor(ColorUtils.alpha(Color.RED, color.getAlpha()/255F));
 		drawIndex.accept(ranges.stream().map(r->{
 			if(r.to()<ctx.bytes.length) return null;
-			if(r.from()<ctx.bytes.length) return new DrawUtils.Range(ctx.bytes.length, r.to());
+			if(r.from()<ctx.bytes.length) return new Range(ctx.bytes.length, r.to());
 			return r;
 		}).filter(Objects::nonNull));
 		
@@ -734,7 +734,7 @@ public class BinaryGridRenderer{
 				renderer.getFont().fillStrings(chars);
 			}
 		}
-		for(DrawUtils.Range range : clampedOverflow){
+		for(Range range : clampedOverflow){
 			ctx.filled.add(range.from(), range.to());
 		}
 	}
@@ -953,11 +953,11 @@ public class BinaryGridRenderer{
 		ctx.hoverMessages().addAll(0, List.of("@"+byteIndex, bStr));
 		
 		renderer.setLineWidth(3);
-		outlineByteRange(Color.BLACK, ctx, DrawUtils.Range.fromSize(byteIndex, 1));
+		outlineByteRange(Color.BLACK, ctx, Range.fromSize(byteIndex, 1));
 		
 		renderer.setColor(Color.WHITE);
 		renderer.setLineWidth(1);
-		outlineByteRange(Color.WHITE, ctx, DrawUtils.Range.fromSize(byteIndex, 1));
+		outlineByteRange(Color.WHITE, ctx, Range.fromSize(byteIndex, 1));
 		
 		initFont(0.5F);
 		renderer.pushMatrix();
@@ -1096,7 +1096,7 @@ public class BinaryGridRenderer{
 							var inst=field.get(instance);
 							if(inst==null) continue;
 							if(IOFieldPrimitive.isPrimitive(inst.getClass())||inst.getClass()==String.class){
-								if(annotate) annotateByteField(ctx, instance, field, col, reference, DrawUtils.Range.fromSize(fieldOffset, size));
+								if(annotate) annotateByteField(ctx, instance, field, col, reference, Range.fromSize(fieldOffset, size));
 								continue;
 							}
 							if(inst instanceof IOInstance<?> ioi){
@@ -1121,7 +1121,7 @@ public class BinaryGridRenderer{
 								}
 							}
 							
-							if(annotate) annotateByteField(ctx, instance, field, col, reference, DrawUtils.Range.fromSize(fieldOffset, size));
+							if(annotate) annotateByteField(ctx, instance, field, col, reference, Range.fromSize(fieldOffset, size));
 							if(!diffPos){
 								var rctx     =ctx.renderCtx;
 								int xByte    =(int)(renderer.getDisplay().getMouseX()/rctx.pixelsPerByte());
@@ -1141,7 +1141,7 @@ public class BinaryGridRenderer{
 						}
 						if(field instanceof BitFieldMerger<T> merger){
 							int bitOffset=0;
-							drawByteRanges(ctx.renderCtx, List.of(DrawUtils.Range.fromSize(trueOffset, size)), chunkBaseColor(), false, true);
+							drawByteRanges(ctx.renderCtx, List.of(Range.fromSize(trueOffset, size)), chunkBaseColor(), false, true);
 							for(IOField.Bit<T, ?> bit : merger.getGroup()){
 								
 								var bCol=ColorUtils.makeCol(rand, typeHash, bit);
@@ -1160,7 +1160,7 @@ public class BinaryGridRenderer{
 							
 							var ch=(ChunkPointer)field.get(instance);
 							
-							if(annotate) annotateByteField(ctx, instance, field, col, reference, DrawUtils.Range.fromSize(fieldOffset, size));
+							if(annotate) annotateByteField(ctx, instance, field, col, reference, Range.fromSize(fieldOffset, size));
 							
 							if(!ch.isNull()){
 								var msg=field.toString();
@@ -1179,7 +1179,7 @@ public class BinaryGridRenderer{
 								if(sizeDesc.getWordSpace()==WordSpace.BIT){
 									annotateBitField(ctx, instance, field, col, 0, size, reference, fieldOffset);
 								}else{
-									annotateByteField(ctx, instance, field, col, reference, DrawUtils.Range.fromSize(fieldOffset, size));
+									annotateByteField(ctx, instance, field, col, reference, Range.fromSize(fieldOffset, size));
 								}
 							}
 						}else{
@@ -1213,7 +1213,7 @@ public class BinaryGridRenderer{
 								continue;
 							}
 							if(typ==String.class){
-								if(annotate) annotateByteField(ctx, instance, field, col, reference, DrawUtils.Range.fromSize(fieldOffset, size));
+								if(annotate) annotateByteField(ctx, instance, field, col, reference, Range.fromSize(fieldOffset, size));
 								continue;
 							}
 							LogUtil.printlnEr("unmanaged draw type:", typ.toString(), acc);
