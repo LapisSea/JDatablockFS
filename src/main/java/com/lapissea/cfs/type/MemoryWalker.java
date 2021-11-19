@@ -24,8 +24,14 @@ import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 public class MemoryWalker{
 	
 	public interface PointerRecord{
-		<T extends IOInstance<T>> void log(IOField.Ref<T, ?> field, T instance, Reference value) throws IOException;
-		<T extends IOInstance<T>> void logChunkPointer(IOField<T, ChunkPointer> field, T instance, ChunkPointer value) throws IOException;
+		/**
+		 * @return if walking should continue
+		 */
+		<T extends IOInstance<T>> boolean log(StructPipe<T> pipe, Reference instanceReference, IOField.Ref<T, ?> field, T instance, Reference value) throws IOException;
+		/**
+		 * @return if walking should continue
+		 */
+		<T extends IOInstance<T>> boolean logChunkPointer(StructPipe<T> pipe, Reference instanceReference, IOField<T, ChunkPointer> field, T instance, ChunkPointer value) throws IOException;
 	}
 	
 	private final DataProvider cluster;
@@ -47,12 +53,14 @@ public class MemoryWalker{
 		if(self) consumer.accept(rootReference);
 		walkStructFull(cluster, new LinkedList<>(), (T)root, rootReference, (StructPipe<T>)pipe, new PointerRecord(){
 			@Override
-			public <I extends IOInstance<I>> void log(IOField.Ref<I, ?> field, I instance, Reference value) throws IOException{
+			public <I extends IOInstance<I>> boolean log(StructPipe<I> pipe, Reference instanceReference, IOField.Ref<I, ?> field, I instance, Reference value) throws IOException{
 				consumer.accept(value);
+				return true;
 			}
 			@Override
-			public <I extends IOInstance<I>> void logChunkPointer(IOField<I, ChunkPointer> field, I instance, ChunkPointer value) throws IOException{
+			public <I extends IOInstance<I>> boolean logChunkPointer(StructPipe<I> pipe, Reference instanceReference, IOField<I, ChunkPointer> field, I instance, ChunkPointer value) throws IOException{
 				consumer.accept(value.makeReference());
+				return true;
 			}
 		});
 	}
@@ -62,15 +70,15 @@ public class MemoryWalker{
 	}
 	
 	@SuppressWarnings("unchecked")
-	private <T extends IOInstance<T>> void walkStructFull(DataProvider cluster, List<IOInstance<?>> stack,
-	                                                      T instance, Reference instanceReference, StructPipe<T> pipe,
-	                                                      PointerRecord pointerRecord) throws IOException{
+	private <T extends IOInstance<T>> boolean walkStructFull(DataProvider cluster, List<IOInstance<?>> stack,
+	                                                         T instance, Reference instanceReference, StructPipe<T> pipe,
+	                                                         PointerRecord pointerRecord) throws IOException{
 		var reference=instanceReference;
 		if(instance instanceof Chunk c){
 			var off=cluster.getFirstChunk().getPtr();
 			reference=new Reference(off, c.getPtr().getValue()-off.getValue());
 		}
-		if(reference==null||reference.isNull()) return;
+		if(reference==null||reference.isNull()) return true;
 		try{
 			if(stack.contains(instance)){
 				if(DEBUG_VALIDATION){
@@ -90,7 +98,7 @@ public class MemoryWalker{
 						}
 					}
 				}
-				return;
+				return true;
 			}
 			stack.add(instance);
 			
@@ -123,7 +131,7 @@ public class MemoryWalker{
 						type=inst.getClass();
 						
 						if(inst instanceof IOInstance.Unmanaged valueInstance){
-							walkStructFull(cluster, stack, valueInstance, valueInstance.getReference(), valueInstance.getPipe(), pointerRecord);
+							if(!walkStructFull(cluster, stack, valueInstance, valueInstance.getReference(), valueInstance.getPipe(), pointerRecord)) return false;
 							continue;
 						}
 					}
@@ -131,16 +139,16 @@ public class MemoryWalker{
 					if(field instanceof IOField.Ref<?, ?> refO){
 						IOField.Ref<T, T> refField=(IOField.Ref<T, T>)refO;
 						var               ref     =refField.getReference(instance);
-						pointerRecord.log(refField, instance, ref);
-						walkStructFull(cluster, stack, refField.get(instance), ref, refField.getReferencedPipe(instance), pointerRecord);
+						if(!pointerRecord.log(pipe, instanceReference, refField, instance, ref)) return false;
+						if(!walkStructFull(cluster, stack, refField.get(instance), ref, refField.getReferencedPipe(instance), pointerRecord)) return false;
 					}else if(UtilL.instanceOf(type, ChunkPointer.class)){
 						var ptrField=(IOField<T, ChunkPointer>)field;
 						
 						var ch=ptrField.get(instance);
 						
 						if(!ch.isNull()){
-							pointerRecord.logChunkPointer(ptrField, instance, ch);
-							walkStructFull(cluster, stack, ch.dereference(cluster), null, Chunk.PIPE, pointerRecord);
+							if(!pointerRecord.logChunkPointer(pipe, instanceReference, ptrField, instance, ch)) return false;
+							if(!walkStructFull(cluster, stack, ch.dereference(cluster), null, Chunk.PIPE, pointerRecord)) return false;
 						}
 					}else{
 						var typ=type;
@@ -155,7 +163,7 @@ public class MemoryWalker{
 						if(UtilL.instanceOf(typ, IOInstance.class)){
 							var inst=(IOInstance<?>)field.get(instance);
 							if(inst!=null){
-								walkStructFull(cluster, stack, (T)inst, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), inst.getThisStruct()), pointerRecord);
+								if(!walkStructFull(cluster, stack, (T)inst, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), inst.getThisStruct()), pointerRecord)) return false;
 							}
 							continue;
 						}
@@ -167,7 +175,7 @@ public class MemoryWalker{
 							if(inst==null) continue;
 							
 							if(inst instanceof IOInstance i){
-								walkStructFull(cluster, stack, i, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), i.getThisStruct()), pointerRecord);
+								if(!walkStructFull(cluster, stack, i, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), i.getThisStruct()), pointerRecord)) return false;
 								continue;
 							}
 							
@@ -186,6 +194,7 @@ public class MemoryWalker{
 		}finally{
 			stack.remove(instance);
 		}
+		return true;
 	}
 	
 	private <T extends IOInstance<T>> String instanceErrStr(T instance){
