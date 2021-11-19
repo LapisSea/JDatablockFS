@@ -222,7 +222,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 				
 				Bucket<K, V> bucket=getBucket(newBuckets, key, newPO2);
 				assert bucket.node==null;
-				bucket.allocateNulls(getChunkProvider());
+				bucket.allocateNulls(getDataProvider());
 				setBucket(newBuckets, key, newPO2, bucket);
 				
 				Iterator<BucketEntry<K, V>> iter=group.iterator();
@@ -344,7 +344,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 		BucketEntry<K, V> newEntry=new BucketEntry<>(key, value);
 		
 		if(bucket.node==null){
-			bucket.allocateNulls(getChunkProvider());
+			bucket.allocateNulls(getDataProvider());
 			setBucket(buckets, key, bucketPO2, bucket);
 		}
 		
@@ -382,7 +382,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 				LinkedIOList.Node.class,
 				TypeDefinition.of(BucketEntry.class)
 			),
-			getChunkProvider()
+			getDataProvider()
 		);
 	}
 	

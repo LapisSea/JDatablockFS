@@ -110,7 +110,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		
 		public void allocateUnmanaged(T instance) throws IOException{
 			IOInstance.Unmanaged<?> unmanaged=(IOInstance.Unmanaged<?>)instance;
-			allocate(instance, unmanaged.getChunkProvider(), unmanaged.getGenerics());
+			allocate(instance, unmanaged.getDataProvider(), unmanaged.getGenerics());
 		}
 		
 		public abstract void allocate(T instance, DataProvider provider, GenericContext genericContext) throws IOException;

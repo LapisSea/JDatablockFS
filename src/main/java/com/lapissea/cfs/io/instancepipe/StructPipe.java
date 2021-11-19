@@ -149,12 +149,12 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	}
 	public final void write(DataProvider.Holder holder, ContentWriter dest, T instance) throws IOException{
 		earlyCheckNulls(instance);
-		doWrite(holder.getChunkProvider(), dest, instance);
+		doWrite(holder.getDataProvider(), dest, instance);
 	}
 	public final <Prov extends DataProvider.Holder&RandomIO.Creator> void write(Prov dest, T instance) throws IOException{
 		earlyCheckNulls(instance);
 		try(var io=dest.io()){
-			doWrite(dest.getChunkProvider(), io, instance);
+			doWrite(dest.getDataProvider(), io, instance);
 		}
 	}
 	protected abstract void doWrite(DataProvider provider, ContentWriter dest, T instance) throws IOException;
@@ -167,7 +167,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	}
 	public <Prov extends DataProvider.Holder&RandomIO.Creator> T readNew(Prov src, GenericContext genericContext) throws IOException{
 		try(var io=src.io()){
-			return readNew(src.getChunkProvider(), io, genericContext);
+			return readNew(src.getDataProvider(), io, genericContext);
 		}
 	}
 	public T readNew(DataProvider provider, RandomIO.Creator src, GenericContext genericContext) throws IOException{
@@ -187,7 +187,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	}
 	public <Prov extends DataProvider.Holder&RandomIO.Creator> T read(Prov src, T instance, GenericContext genericContext) throws IOException{
 		try(var io=src.io()){
-			return doRead(src.getChunkProvider(), io, instance, genericContext);
+			return doRead(src.getDataProvider(), io, instance, genericContext);
 		}
 	}
 	

@@ -75,6 +75,7 @@ public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanaged
 		}, SizeDescriptor.Fixed.of(desc));
 	}
 	
+	@NotNull
 	@Override
 	public Stream<IOField<ContiguousIOList<T>, ?>> listDynamicUnmanagedFields(){
 		var                     typ =getTypeDef().arg(0).generic();
@@ -103,7 +104,7 @@ public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanaged
 			var pos=calcElementOffset(index);
 			io.skipExact(pos);
 			
-			return elementPipe.readNew(getChunkProvider(), io, getGenerics());
+			return elementPipe.readNew(getDataProvider(), io, getGenerics());
 		}
 	}
 	
@@ -286,7 +287,7 @@ public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanaged
 	@Override
 	public void free() throws IOException{
 		Set<Chunk> chunks=new HashSet<>();
-		var        prov  =getChunkProvider();
+		var        prov  =getDataProvider();
 		
 		new MemoryWalker(this).walk(true, ref->{
 			if(ref.isNull()) return;

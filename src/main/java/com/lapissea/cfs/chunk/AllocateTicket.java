@@ -72,7 +72,7 @@ public record AllocateTicket(long bytes, boolean disableResizing, ChunkPointer n
 	public AllocateTicket withDataPopulated(UnsafeBiConsumer<DataProvider, RandomIO, IOException> dataPopulator){
 		return withDataPopulated(c->{
 			try(var io=c.io()){
-				dataPopulator.accept(c.getChunkProvider(), io);
+				dataPopulator.accept(c.getDataProvider(), io);
 			}
 		});
 	}

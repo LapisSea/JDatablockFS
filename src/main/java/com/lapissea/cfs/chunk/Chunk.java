@@ -324,7 +324,7 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 	}
 	
 	@Override
-	public DataProvider getChunkProvider(){
+	public DataProvider getDataProvider(){
 		return provider;
 	}
 	
@@ -434,7 +434,6 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 			var tofree=collectNext();
 			provider.getMemoryManager().free(tofree);
 		}
-		
 	}
 	
 	public void growBy(Chunk firstChunk, long amount) throws IOException{

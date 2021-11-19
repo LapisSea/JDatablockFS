@@ -30,7 +30,7 @@ public final class Reference extends IOInstance<Reference>{
 	}
 	
 	public RandomIO io(DataProvider.Holder holder) throws IOException{
-		return io(holder.getChunkProvider());
+		return io(holder.getDataProvider());
 	}
 	public RandomIO io(DataProvider provider) throws IOException{
 		ptr.requireNonNull();

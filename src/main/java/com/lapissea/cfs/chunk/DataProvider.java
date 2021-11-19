@@ -14,7 +14,7 @@ import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 public interface DataProvider{
 	
 	interface Holder{
-		DataProvider getChunkProvider();
+		DataProvider getDataProvider();
 	}
 	
 	class VerySimple implements DataProvider{

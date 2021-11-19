@@ -219,7 +219,7 @@ public class MemoryOperations{
 		prepareFreeChunkMerge(prev, next);
 		prev.syncStruct();
 		next.destroy(true);
-		next.getChunkProvider().getChunkCache().notifyDestroyed(next);
+		next.getDataProvider().getChunkCache().notifyDestroyed(next);
 	}
 	
 	private static void prepareFreeChunkMerge(Chunk prev, Chunk next){
@@ -256,7 +256,7 @@ public class MemoryOperations{
 			clearFree(chunk);
 			
 			if(purgeAccidental){
-				purgePossibleChunkHeaders(chunk.getChunkProvider(), chunk.dataStart(), chunk.getCapacity());
+				purgePossibleChunkHeaders(chunk.getDataProvider(), chunk.dataStart(), chunk.getCapacity());
 			}
 		}
 		
@@ -272,7 +272,7 @@ public class MemoryOperations{
 	public static long growFileAlloc(Chunk target, long toAllocate) throws IOException{
 //		LogUtil.println("growing file by:", toAllocate);
 		
-		DataProvider context=target.getChunkProvider();
+		DataProvider context=target.getDataProvider();
 		
 		if(context.isLastPhysical(target)){
 			var remaining=target.getBodyNumSize().remaining(target.getCapacity());
@@ -384,8 +384,8 @@ public class MemoryOperations{
 	
 	public static void checkValidityOfChainAlloc(DataProvider context, Chunk firstChunk, Chunk target) throws IOException{
 		if(DEBUG_VALIDATION){
-			assert firstChunk.getChunkProvider()==context;
-			assert target.getChunkProvider()==context;
+			assert firstChunk.getDataProvider()==context;
+			assert target.getDataProvider()==context;
 			
 			var ptr=firstChunk.getPtr();
 			

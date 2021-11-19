@@ -227,7 +227,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 				if(io.remaining()==0){
 					return null;
 				}
-				return valuePipe.readNew(getChunkProvider(), io, getGenerics());
+				return valuePipe.readNew(getDataProvider(), io, getGenerics());
 			}
 		}
 		boolean hasValue() throws IOException{
@@ -280,7 +280,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			var ptr=readNextPtr();
 			if(ptr.isNull()) return null;
 			
-			return new Node<>(getChunkProvider(), new Reference(ptr, 0), getTypeDef());
+			return new Node<>(getDataProvider(), new Reference(ptr, 0), getTypeDef());
 		}
 		
 		private long nextStart(){
@@ -315,6 +315,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 				nextSize.write(io, ptr);
 			}
 		}
+		
 		@Override
 		public String toShortString(){
 			try{
@@ -549,7 +550,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		
 		if(index==0){
 			var head=getHead();
-			setHead(Node.allocValNode(value, head, elementPipe.getSizeDescriptor(), nodeType(), getChunkProvider()));
+			setHead(Node.allocValNode(value, head, elementPipe.getSizeDescriptor(), nodeType(), getDataProvider()));
 			return;
 		}
 		
@@ -559,14 +560,14 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 	}
 	private void insertNodeInFrontOf(Node<T> prevNode, T value) throws IOException{
 		var     node   =prevNode.getNext();
-		Node<T> newNode=Node.allocValNode(value, node, elementPipe.getSizeDescriptor(), nodeType(), getChunkProvider());
+		Node<T> newNode=Node.allocValNode(value, node, elementPipe.getSizeDescriptor(), nodeType(), getDataProvider());
 		prevNode.setNext(newNode);
 		deltaSize(1);
 	}
 	
 	@Override
 	public void add(T value) throws IOException{
-		Node<T> newNode=Node.allocValNode(value, null, elementPipe.getSizeDescriptor(), nodeType(), getChunkProvider());
+		Node<T> newNode=Node.allocValNode(value, null, elementPipe.getSizeDescriptor(), nodeType(), getDataProvider());
 		
 		if(isEmpty()){
 			setHead(newNode);
@@ -657,7 +658,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			}
 			//inverse order add, reduce chance for fragmentation by providing next node immediately
 			var nextNode=chainStart;
-			chainStart=Node.allocValNode(val, nextNode, elementPipe.getSizeDescriptor(), typ, getChunkProvider());
+			chainStart=Node.allocValNode(val, nextNode, elementPipe.getSizeDescriptor(), typ, getDataProvider());
 		}
 		
 		var last=getLastNode();
@@ -685,10 +686,10 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			if(ref.isNull()){
 				return;
 			}
-			ref.getPtr().dereference(getChunkProvider()).streamNext().forEach(chunks::add);
+			ref.getPtr().dereference(getDataProvider()).streamNext().forEach(chunks::add);
 		});
 		
-		getChunkProvider()
+		getDataProvider()
 			.getMemoryManager()
 			.free(chunks);
 	}

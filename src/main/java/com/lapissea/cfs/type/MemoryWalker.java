@@ -34,7 +34,7 @@ public class MemoryWalker{
 	private final StructPipe   pipe;
 	
 	public <T extends IOInstance.Unmanaged<T>> MemoryWalker(T root){
-		this(root.getChunkProvider(), root, root.getReference(), root.getPipe());
+		this(root.getDataProvider(), root, root.getReference(), root.getPipe());
 	}
 	public <T extends IOInstance<T>> MemoryWalker(DataProvider cluster, T root, Reference rootReference, StructPipe<T> pipe){
 		this.cluster=cluster;

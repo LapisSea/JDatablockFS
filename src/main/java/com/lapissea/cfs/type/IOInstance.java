@@ -52,7 +52,7 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 		}
 		
 		@Override
-		public DataProvider getChunkProvider(){
+		public DataProvider getDataProvider(){
 			return provider;
 		}
 		
@@ -112,7 +112,7 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 		}
 		
 		protected void allocateNulls() throws IOException{
-			allocateNulls(getChunkProvider());
+			allocateNulls(getDataProvider());
 		}
 	}
 	

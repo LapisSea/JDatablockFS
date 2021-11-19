@@ -55,7 +55,7 @@ public class ChunkCache{
 		if(DEBUG_VALIDATION){
 			var fail=false;
 			try{
-				Chunk.readChunk(chunk.getChunkProvider(), chunk.getPtr());
+				Chunk.readChunk(chunk.getDataProvider(), chunk.getPtr());
 			}catch(Throwable e){
 				fail=true;
 			}
