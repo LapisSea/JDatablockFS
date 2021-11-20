@@ -166,7 +166,7 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 			super(field, forceFixed, LONG);
 		}
 		
-		private long getValue(T instance){
+		public long getValue(T instance){
 			return getAccessor().getLong(instance);
 		}
 		
@@ -224,7 +224,7 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 			return all;
 		}
 		
-		private int getValue(T instance){
+		public int getValue(T instance){
 			return getAccessor().getInt(instance);
 		}
 		

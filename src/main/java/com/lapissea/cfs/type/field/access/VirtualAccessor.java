@@ -107,6 +107,7 @@ public class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends AbstractFiel
 		}
 		return filter.filter(instance, deps, rawVal);
 	}
+	
 	@Override
 	public void set(CTyp instance, Object value){
 		switch(getStoragePool()){

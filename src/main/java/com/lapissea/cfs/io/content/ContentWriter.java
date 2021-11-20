@@ -314,7 +314,9 @@ public interface ContentWriter extends AutoCloseable, ContentBuff{
 	default BufferTicket writeTicket(int amount) {return new BufferTicket(this, amount, null, null);}
 	
 	/**
-	 * @return if true, this asks the writing agent to buffer chunks of data. False should be returned if cost of writing is minimal
+	 * @return a flag that signifies if this writer has significant overhead when calling many small write operations.<br>
+	 * true = writing to this object has noticeable overhead. Write calls should be buffered.<br>
+	 * false = cost of writing is minimal or none, buffering may not increase performance
 	 */
 	default boolean isDirect(){
 		return false;

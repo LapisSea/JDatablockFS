@@ -233,7 +233,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	}
 	
 	protected IOException reportWriteFail(IOField<T, ?> fi, Exception e) throws IOException{
-		throw new IOException("Failed to write "+TextUtil.toShortString(fi), e);
+		throw new IOException("Failed to write "+fi, e);
 	}
 	
 	public abstract void read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException;

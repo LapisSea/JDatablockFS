@@ -86,7 +86,9 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 		 * Provides a new instance of {@link RandomIO} where its initial position will be at the specified offset.
 		 */
 		default RandomIO ioAt(long offset) throws IOException{
-			return io().setPos(offset);
+			var io=io();
+			io.skipExact(offset);
+			return io;
 		}
 		
 		/**
@@ -322,7 +324,10 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 		int i=off;
 		for(int j=off+len;i<j;i++){
 			var bi=read();
-			if(bi<0) break;
+			if(bi<0){
+				if(i==off) return -1;
+				break;
+			}
 			b[i]=(byte)bi;
 		}
 		return i-off;

@@ -86,11 +86,6 @@ public class Cluster implements DataProvider{
 	
 	
 	private static class Metadata extends IOInstance<Metadata>{
-
-//		@IOValue
-//		@IONullability(NULLABLE)
-//		@IOValue.OverrideType(value=ContiguousIOList.class)
-//		public IOList<GenericContainer<?>> rootReferences;
 		
 		@IOValue
 		@IONullability(NULLABLE)

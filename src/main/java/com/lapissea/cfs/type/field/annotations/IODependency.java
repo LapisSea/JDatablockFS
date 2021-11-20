@@ -7,6 +7,7 @@ import com.lapissea.cfs.type.compilation.AnnotationLogic;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
+import com.lapissea.util.NotNull;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -14,9 +15,10 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
 
-import static com.lapissea.cfs.type.field.IOField.UsageHintType.*;
-import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.*;
-import static com.lapissea.cfs.type.field.annotations.IODependency.VirtualNumSize.RetentionPolicy.*;
+import static com.lapissea.cfs.type.field.IOField.UsageHintType.SIZE_DATA;
+import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.INSTANCE;
+import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
+import static com.lapissea.cfs.type.field.annotations.IODependency.VirtualNumSize.RetentionPolicy.GHOST;
 
 @Retention(RetentionPolicy.RUNTIME)
 public @interface IODependency{
@@ -34,6 +36,7 @@ public @interface IODependency{
 	@interface NumSize{
 		
 		AnnotationLogic<NumSize> LOGIC=new AnnotationLogic<>(){
+			@NotNull
 			@Override
 			public Set<String> getDependencyValueNames(FieldAccessor<?> field, NumSize annotation){
 				return Set.of(annotation.value());
@@ -72,6 +75,7 @@ public @interface IODependency{
 		}
 		
 		class Logic implements AnnotationLogic<VirtualNumSize>{
+			@NotNull
 			@Override
 			public Set<String> getDependencyValueNames(FieldAccessor<?> field, VirtualNumSize annotation){
 				return Set.of(getName(field, annotation));
@@ -90,6 +94,7 @@ public @interface IODependency{
 				return Stream.of(new IOField.UsageHint(SIZE_DATA, getName(field, annotation)));
 			}
 			
+			@NotNull
 			@Override
 			public <T extends IOInstance<T>> List<VirtualFieldDefinition<T, ?>> injectPerInstanceValue(FieldAccessor<T> field, VirtualNumSize ann){
 				return List.of(new VirtualFieldDefinition<>(

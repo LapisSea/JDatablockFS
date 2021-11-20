@@ -18,7 +18,7 @@ import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
  * Sensitive garbage data is defined as any data that can be accessed and read easily. This in practice means any sequence of
  * bytes that can be interpreted as a valid chunk header.
  */
-public interface MemoryManager{
+public interface MemoryManager extends DataProvider.Holder{
 	
 	/**
 	 * Partial implementation of {@link MemoryManager} that reduces boilerplate for allocation and bookkeeping
@@ -58,6 +58,11 @@ public interface MemoryManager{
 		
 		protected abstract List<AllocStrategy> createAllocs();
 		protected abstract List<AllocToStrategy> createAllocTos();
+		
+		@Override
+		public DataProvider getDataProvider(){
+			return context;
+		}
 		
 		@Override
 		public void allocTo(Chunk firstChunk, Chunk target, long toAllocate) throws IOException{
