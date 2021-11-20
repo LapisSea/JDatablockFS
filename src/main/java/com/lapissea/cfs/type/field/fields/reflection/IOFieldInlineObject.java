@@ -117,6 +117,7 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 				if(fixed){
 					Utils.zeroFill(dest::write, (int)getSizeDescriptor().requireFixed(WordSpace.BYTE)-1);
 				}
+				return;
 			}
 		}
 		instancePipe.write(provider, dest, val);
