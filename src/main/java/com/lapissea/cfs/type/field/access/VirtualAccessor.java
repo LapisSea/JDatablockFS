@@ -12,6 +12,8 @@ import com.lapissea.util.Nullable;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.util.Deque;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
@@ -36,7 +38,9 @@ public class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends AbstractFiel
 	private final VirtualFieldDefinition<CTyp, Object> type;
 	private final int                                  accessIndex;
 	private       List<FieldAccessor<CTyp>>            deps;
-	private       Struct.Pool<CTyp>                    ioPool;
+	
+	private Deque<Struct.Pool<CTyp>> ioPoolStack;
+	private Struct.Pool<CTyp>        ioPool;
 	
 	public VirtualAccessor(Struct<CTyp> struct, VirtualFieldDefinition<CTyp, Object> type, int accessIndex){
 		super(struct, type.getName());
@@ -45,9 +49,21 @@ public class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends AbstractFiel
 	}
 	
 	public void popIoPool(){
+		if(this.ioPoolStack!=null){
+			if(!ioPoolStack.isEmpty()){
+				ioPool=ioPoolStack.pop();
+				return;
+			}
+		}
 		ioPool=null;
 	}
 	public void pushIoPool(Struct.Pool<CTyp> ioPool){
+		if(this.ioPool!=null){
+			if(ioPoolStack==null){
+				ioPoolStack=new LinkedList<>();
+			}
+			ioPoolStack.push(this.ioPool);
+		}
 		this.ioPool=ioPool;
 	}
 	
