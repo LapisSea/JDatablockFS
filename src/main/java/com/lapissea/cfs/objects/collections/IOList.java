@@ -415,4 +415,15 @@ public interface IOList<T> extends IterablePP<T>{
 	 * It is not required to do so but is desirable. No exact capacity allocation is required.
 	 */
 	default void requestCapacity(long capacity) throws IOException{}
+	
+	default boolean contains(T value) throws IOException{
+		var iter=iterator();
+		while(iter.hasNext()){
+			var el=iter.ioNext();
+			if(Objects.equals(el, value)){
+				return true;
+			}
+		}
+		return false;
+	}
 }

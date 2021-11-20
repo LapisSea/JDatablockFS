@@ -116,7 +116,11 @@ public class Cluster implements DataProvider{
 		if(s>ch.getSize()){
 			throw new IOException("no valid cluster data "+s+" "+ch.getSize()+" "+ch.io().getSize());
 		}
-		root=ROOT_PIPE.readNew(this, ch, null);
+		root=readRootRef();
+	}
+	
+	private RootRef readRootRef() throws IOException{
+		return ROOT_PIPE.readNew(this, getFirstChunk(), null);
 	}
 	
 	@Override
@@ -256,20 +260,13 @@ public class Cluster implements DataProvider{
 		var siz=pip.getSizeDescriptor().calcUnknown(instance, WordSpace.BYTE);
 		
 		var newCh=AllocateTicket.bytes(siz).withDataPopulated((p, io)->{
-			try(var src=oldRef.io(p)){
-				src.transferTo(io);
-			}
+			oldRef.withContext(p).io(src->src.transferTo(io));
 		}).submit(this);
 		var newRef=newCh.getPtr().makeReference();
 		
 		var ptrsToFree=moveReference(oldRef, newRef);
 		instance.notifyReferenceMovement(newRef);
-		
-		List<Chunk> toFree=new ArrayList<>();
-		for(var ptr : ptrsToFree){
-			ptr.dereference(this).freeChainingList(toFree);
-		}
-		getMemoryManager().free(toFree);
+		getMemoryManager().freeChains(ptrsToFree);
 	}
 	
 	private Set<ChunkPointer> moveReference(Reference oldRef, Reference newRef) throws IOException{

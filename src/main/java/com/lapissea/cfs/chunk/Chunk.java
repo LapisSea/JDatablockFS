@@ -26,7 +26,6 @@ import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
-import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -425,15 +424,6 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 	
 	public void destroy(boolean zeroSize) throws IOException{
 		getSource().ioAt(getPtr().getValue(), io->io.fillZero(getHeaderSize()+(zeroSize?getSize():0)));
-	}
-	
-	public void freeChainingList(Collection<Chunk> freeChunks){
-		provider.validate();
-		if(!hasNextPtr()){
-			freeChunks.add(this);
-		}else{
-			streamNext().forEach(freeChunks::add);
-		}
 	}
 	
 	public void freeChaining() throws IOException{

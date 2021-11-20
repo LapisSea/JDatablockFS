@@ -6,6 +6,7 @@ import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
@@ -128,6 +129,22 @@ public interface MemoryManager extends DataProvider.Holder{
 	 * Lists locations of all KNOWN chunks. This may not be a complete list of unused chunks.
 	 */
 	IOList<ChunkPointer> getFreeChunks();
+	
+	/**
+	 * Frees a set of chunks listed in the pointers parameter and all their next chunks
+	 */
+	default void freeChains(Collection<ChunkPointer> chainStarts) throws IOException{
+		List<Chunk> chunks=new ArrayList<>(chainStarts.size());
+		for(var ptr : chainStarts){
+			if(DEBUG_VALIDATION){
+				if(chunks.stream().anyMatch(c->c.getPtr().equals(ptr))){
+					throw new RuntimeException("Duplicate pointer passed "+ptr);
+				}
+			}
+			ptr.dereference(getDataProvider()).streamNext().forEach(chunks::add);
+		}
+		free(chunks);
+	}
 	
 	/**
 	 * Explicitly frees a chunk.<br>
