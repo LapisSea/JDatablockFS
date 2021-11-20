@@ -2,6 +2,7 @@ package com.lapissea.cfs.objects;
 
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.ChunkChainIO;
+import com.lapissea.cfs.io.OffsetIO;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.annotations.IODependency;
@@ -11,6 +12,26 @@ import java.io.IOException;
 import java.util.Objects;
 
 public final class Reference extends IOInstance<Reference>{
+	
+	private static final class IOContext implements RandomIO.Creator{
+		private final Reference    ref;
+		private final DataProvider provider;
+		
+		public IOContext(Reference ref, DataProvider provider){
+			this.ref=ref;
+			this.provider=provider;
+		}
+		
+		@Override
+		public RandomIO io() throws IOException{
+			return ref.io(provider);
+		}
+		
+		@Override
+		public String toString(){
+			return "{"+provider+" @ "+ref+"}";
+		}
+	}
 	
 	@IOValue
 	@IODependency.VirtualNumSize(name="ptrSize")
@@ -29,12 +50,18 @@ public final class Reference extends IOInstance<Reference>{
 		if(offset<0) throw new IllegalArgumentException("Offset can not be negative");
 	}
 	
+	public RandomIO.Creator withContext(DataProvider provider){
+		return new IOContext(this, provider);
+	}
+	public RandomIO.Creator withContext(DataProvider.Holder holder){
+		return new IOContext(this, holder.getDataProvider());
+	}
+	
 	public RandomIO io(DataProvider.Holder holder) throws IOException{
 		return io(holder.getDataProvider());
 	}
 	public RandomIO io(DataProvider provider) throws IOException{
-		ptr.requireNonNull();
-		return ptr.dereference(provider).ioAt(offset);
+		return new OffsetIO(ptr.dereference(provider), offset);
 	}
 	
 	public ChunkPointer getPtr(){return ptr;}
