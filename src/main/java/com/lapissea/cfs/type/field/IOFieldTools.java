@@ -11,12 +11,15 @@ import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.fields.reflection.BitFieldMerger;
+import com.lapissea.util.NotNull;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
-import io.leangen.geantyref.AnnotationFormatException;
-import io.leangen.geantyref.TypeFactory;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Array;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.ToLongFunction;
@@ -24,7 +27,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.*;
+import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NOT_NULL;
 
 public class IOFieldTools{
 	
@@ -119,6 +122,9 @@ public class IOFieldTools{
 	public static <T extends IOInstance<T>> String makeArrayLenName(FieldAccessor<T> field){
 		return field.getName()+".len";
 	}
+	public static <T extends IOInstance<T>> String makeGenericIDFieldName(FieldAccessor<T> field){
+		return field.getName()+".typeID";
+	}
 	
 	public static IONullability.Mode getNullability(FieldAccessor<?> field){
 		return getNullability(field, NOT_NULL);
@@ -131,11 +137,104 @@ public class IOFieldTools{
 		return accessor.getName()+".ref";
 	}
 	
-	public static <A extends Annotation> A makeAnnotation(Class<A> annotationType, Map<String, Object> values){
-		try{
-			return TypeFactory.annotation(annotationType, values);
-		}catch(AnnotationFormatException e){
-			throw new RuntimeException(e);
+	public static <E extends Annotation> E makeAnnotation(Class<E> annotationType, @NotNull Map<String, Object> values){
+		Objects.requireNonNull(values);
+		Class<?>[] interfaces=annotationType.getInterfaces();
+		if(!annotationType.isAnnotation()||interfaces.length!=1||interfaces[0]!=Annotation.class){
+			throw new IllegalArgumentException(annotationType.getName()+" not an annotation");
 		}
+		
+		var safeValues=Arrays.stream(annotationType.getDeclaredMethods()).map(element->{
+			String elementName=element.getName();
+			if(values.containsKey(elementName)){
+				Class<?> returnType=element.getReturnType();
+				
+				if(returnType.isPrimitive()){
+					if(returnType==boolean.class) returnType=Boolean.class;
+					else if(returnType==char.class) returnType=Character.class;
+					else if(returnType==float.class) returnType=Float.class;
+					else if(returnType==double.class) returnType=Double.class;
+					else if(returnType==byte.class) returnType=Byte.class;
+					else if(returnType==short.class) returnType=Short.class;
+					else if(returnType==int.class) returnType=Integer.class;
+					else if(returnType==long.class) returnType=Long.class;
+					else throw new ShouldNeverHappenError(returnType.toString());
+				}
+				
+				if(returnType.isInstance(values.get(elementName))){
+					return Map.entry(elementName, values.get(elementName));
+				}else{
+					throw new IllegalArgumentException("Incompatible type for "+elementName);
+				}
+			}else{
+				if(element.getDefaultValue()!=null){
+					return Map.entry(elementName, element.getDefaultValue());
+				}else{
+					throw new IllegalArgumentException("Missing value "+elementName);
+				}
+			}
+		}).collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
+		
+		int hash=values.entrySet().stream().mapToInt(element->{
+			int    res;
+			Object val=element.getValue();
+			if(val.getClass().isArray()){
+				res=1;
+				for(int i=0;i<Array.getLength(val);i++){
+					var el=Array.get(val, i);
+					res=31*res+Objects.hashCode(el);
+				}
+			}else res=Objects.hashCode(val);
+			return (127*element.getKey().hashCode())^res;
+		}).sum();
+		
+		class FakeAnnotation implements Annotation, InvocationHandler{
+			
+			@Override
+			public Object invoke(Object proxy, Method method, Object[] args) throws Throwable{
+				if(safeValues.containsKey(method.getName())){
+					return safeValues.get(method.getName());
+				}
+				return method.invoke(this, args);
+			}
+			
+			@Override
+			public Class<? extends Annotation> annotationType(){
+				return annotationType;
+			}
+			
+			@Override
+			public boolean equals(Object other){
+				if(this==other) return true;
+				if(!annotationType.isInstance(other)) return false;
+				
+				var that   =annotationType.cast(other);
+				var thatAnn=that.annotationType();
+				
+				return safeValues.entrySet().stream().allMatch(element->{
+					try{
+						var thatVal=thatAnn.getMethod(element.getKey()).invoke(that);
+						return Objects.deepEquals(element.getValue(), thatVal);
+					}catch(ReflectiveOperationException e){
+						throw new RuntimeException(e);
+					}
+				});
+			}
+			
+			@Override
+			public int hashCode(){
+				return hash;
+			}
+			
+			@Override
+			public String toString(){
+				return '@'+annotationType.getName()+TextUtil.toString(safeValues);
+			}
+		}
+		
+		//noinspection unchecked
+		return (E)Proxy.newProxyInstance(annotationType.getClassLoader(),
+		                                 new Class[]{annotationType},
+		                                 new FakeAnnotation());
 	}
 }
