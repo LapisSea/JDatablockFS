@@ -22,7 +22,7 @@ public class IOFieldByteArray<T extends IOInstance<T>> extends IOField<T, byte[]
 	public IOFieldByteArray(FieldAccessor<T> accessor){
 		super(accessor);
 		
-		descriptor=new SizeDescriptor.Unknown<>(0, OptionalLong.empty(), inst->{
+		descriptor=new SizeDescriptor.Unknown<>(0, OptionalLong.empty(), (prov, inst)->{
 			var siz=arraySize.getValue(inst);
 			if(siz>0) return siz;
 			var arr=get(inst);

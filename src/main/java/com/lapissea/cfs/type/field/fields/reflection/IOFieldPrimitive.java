@@ -452,7 +452,7 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 			sizeDescriptor=new SizeDescriptor.Unknown<>(
 				allowed.stream().mapToLong(NumberSize::bytes).min().orElse(0),
 				allowed.stream().mapToLong(NumberSize::bytes).max(),
-				inst->getSize(inst).bytes);
+				(prov, inst)->getSize(inst).bytes);
 		}else{
 			sizeDescriptor=new SizeDescriptor.Fixed<>(size.bytes);
 		}

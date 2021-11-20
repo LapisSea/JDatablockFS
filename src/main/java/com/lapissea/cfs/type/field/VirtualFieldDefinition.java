@@ -28,7 +28,7 @@ public final class VirtualFieldDefinition<IO extends IOInstance<IO>, T>{
 		 * Values in this storage pool remain as long as there is an IO operation is executing.
 		 * Used for fields that are only needed to correctly read another field such as length of an array.
 		 */
-		IO("IO"),
+		IO("IO"),//TODO: make IO fields readable or at least size computable when displaying them
 		/**
 		 * Values in this storage pool are never stored.
 		 */

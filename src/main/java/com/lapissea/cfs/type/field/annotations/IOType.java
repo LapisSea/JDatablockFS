@@ -24,7 +24,7 @@ public @interface IOType{
 			@Override
 			public <T extends IOInstance<T>> List<VirtualFieldDefinition<T, ?>> injectPerInstanceValue(FieldAccessor<T> field, Dynamic annotation){
 				var f=new VirtualFieldDefinition<T, Integer>(
-					VirtualFieldDefinition.StoragePool.IO,
+					VirtualFieldDefinition.StoragePool.INSTANCE,//FIXME: this should be changed IO once IO reading or sizing is implemented
 					IOFieldTools.makeGenericIDFieldName(field),
 					Integer.class,
 					(instance, dependencies, value)->value==null?0:value,

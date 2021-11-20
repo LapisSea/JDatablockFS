@@ -50,13 +50,13 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 				desc.getWordSpace(),
 				nullable()?nullSize:desc.getMin(),
 				Utils.addIfBoth(OptionalLong.of(nullSize), desc.getMax()),
-				inst->{
+				(prov, inst)->{
 					var val=get(inst);
 					if(val==null){
 						if(nullable()) return nullSize;
 						throw new NullPointerException();
 					}
-					return desc.calcUnknown(val)+nullSize;
+					return desc.calcUnknown(prov, val)+nullSize;
 				}
 			);
 		}

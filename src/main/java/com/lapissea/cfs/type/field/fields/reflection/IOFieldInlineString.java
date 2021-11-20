@@ -39,13 +39,13 @@ public class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends IOField<
 			desc.getWordSpace(),
 			nullable()?nullSize:desc.getMin(),
 			Utils.addIfBoth(OptionalLong.of(nullSize), desc.getMax()),
-			inst->{
+			(prov, inst)->{
 				var val=getWrapped(inst);
 				if(val==null){
 					if(nullable()) return nullSize;
 					throw new NullPointerException();
 				}
-				return desc.calcUnknown(val)+nullSize;
+				return desc.calcUnknown(prov, val)+nullSize;
 			}
 		);
 	}

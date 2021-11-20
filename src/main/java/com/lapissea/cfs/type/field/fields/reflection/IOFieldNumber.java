@@ -43,7 +43,7 @@ public class IOFieldNumber<T extends IOInstance<T>, E extends INumber> extends I
 		dynamicSize=field==null?null:field::get;
 		
 		if(dynamicSize==null) sizeDescriptor=new SizeDescriptor.Fixed<>(size.bytes);
-		else sizeDescriptor=new SizeDescriptor.Unknown<>(0, NumberSize.LARGEST.optionalBytesLong, inst->getSize(inst).bytes);
+		else sizeDescriptor=new SizeDescriptor.Unknown<>(0, NumberSize.LARGEST.optionalBytesLong, (prov, inst)->getSize(inst).bytes);
 	}
 	@Override
 	public IOField<T, E> implMaxAsFixedSize(){

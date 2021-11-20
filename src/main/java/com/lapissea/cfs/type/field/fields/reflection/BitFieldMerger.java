@@ -56,7 +56,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 			sizeDescriptor=new SizeDescriptor.Unknown<>(
 				IOFieldTools.sumVars(group, SizeDescriptor::getMin),
 				IOFieldTools.sumVarsIfAll(group, SizeDescriptor::getMax),
-				inst->Utils.bitToByte(group.stream().mapToLong(s->s.getSizeDescriptor().calcUnknown(inst)).sum())
+				(prov, inst)->Utils.bitToByte(group.stream().mapToLong(s->s.getSizeDescriptor().calcUnknown(prov, inst)).sum())
 			);
 		}
 		initLateData(new FieldSet<>(group.stream().flatMap(f->f.getDependencies().stream())), group.stream().flatMap(f->f.getUsageHints().stream()));
@@ -72,7 +72,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 		try(var stream=new BitOutputStream(dest)){
 			for(var fi : group){
 				if(DEBUG_VALIDATION){
-					long size=fi.getSizeDescriptor().calcUnknown(instance);
+					long size=fi.getSizeDescriptor().calcUnknown(provider, instance);
 					var  oldW=stream.getTotalBits();
 					
 					try{
@@ -98,7 +98,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 		try(var stream=new BitInputStream(src)){
 			for(var fi : group){
 				if(DEBUG_VALIDATION){
-					long size=fi.getSizeDescriptor().calcUnknown(instance);
+					long size=fi.getSizeDescriptor().calcUnknown(provider, instance);
 					var  oldW=stream.getTotalBits();
 					
 					fi.readBits(stream, instance);
@@ -123,7 +123,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 		try(var stream=new BitInputStream(src)){
 			for(var fi : group){
 				if(DEBUG_VALIDATION){
-					long size=fi.getSizeDescriptor().calcUnknown(instance);
+					long size=fi.getSizeDescriptor().calcUnknown(provider, instance);
 					var  oldW=stream.getTotalBits();
 					
 					fi.skipReadBits(stream, instance);

@@ -25,17 +25,17 @@ public record AllocateTicket(long bytes, boolean disableResizing, ChunkPointer n
 		Objects.requireNonNull(approve);
 	}
 	
-	public static <IO extends IOInstance<IO>> AllocateTicket withData(Class<? extends StructPipe> pipeType, IO data){
-		return withData(StructPipe.of(pipeType, data.getThisStruct()), data);
+	public static <IO extends IOInstance<IO>> AllocateTicket withData(Class<? extends StructPipe> pipeType, DataProvider provider, IO data){
+		return withData(StructPipe.of(pipeType, data.getThisStruct()), provider, data);
 	}
 	
-	public static <IO extends IOInstance<IO>> AllocateTicket withData(StructPipe<IO> pipe, IO data){
+	public static <IO extends IOInstance<IO>> AllocateTicket withData(StructPipe<IO> pipe, DataProvider provider, IO data){
 		SizeDescriptor<IO> size=pipe.getSizeDescriptor();
 		return bytes(switch(size){
 			case SizeDescriptor.Fixed<IO> f -> f.get();
-			case SizeDescriptor.Unknown<IO> u -> Math.max(8, u.calcUnknown(data, WordSpace.BYTE));
+			case SizeDescriptor.Unknown<IO> u -> Math.max(8, u.calcUnknown(provider, data, WordSpace.BYTE));
 		}).shouldDisableResizing(size.hasFixed())
-		  .withDataPopulated((provider, io)->pipe.write(provider, io, data));
+		  .withDataPopulated((prov, io)->pipe.write(prov, io, data));
 	}
 	
 	public static AllocateTicket bytes(long requestedBytes){

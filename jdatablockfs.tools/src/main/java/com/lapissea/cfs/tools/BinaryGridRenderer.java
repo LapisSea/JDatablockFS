@@ -1089,7 +1089,7 @@ public class BinaryGridRenderer{
 					
 					long trueOffset=offsetStart+fieldOffset;
 					var  sizeDesc  =field.getSizeDescriptor();
-					size=sizeDesc.calcUnknown(instance);
+					size=sizeDesc.calcUnknown(ctx.provider, instance);
 					
 					try{
 						var acc=field.getAccessor();
@@ -1146,7 +1146,7 @@ public class BinaryGridRenderer{
 							for(IOField.Bit<T, ?> bit : merger.getGroup()){
 								
 								var bCol=ColorUtils.makeCol(rand, typeHash, bit);
-								var siz =bit.getSizeDescriptor().calcUnknown(instance);
+								var siz =bit.getSizeDescriptor().calcUnknown(ctx.provider, instance);
 								
 								if(annotate) annotateBitField(ctx, instance, bit, bCol, bitOffset, siz, reference, fieldOffset);
 								bitOffset+=siz;
@@ -1209,7 +1209,7 @@ public class BinaryGridRenderer{
 								for(int i=0;i<arrSiz;i++){
 									var val=(IOInstance)Array.get(inst, i);
 									annotateStruct(ctx, val, reference.addOffset(fieldOffset+arrOffset), elementPipe, annotate);
-									arrOffset+=elementPipe.getSizeDescriptor().calcUnknown(val, WordSpace.BYTE);
+									arrOffset+=elementPipe.getSizeDescriptor().calcUnknown(ctx.provider, val, WordSpace.BYTE);
 								}
 								continue;
 							}

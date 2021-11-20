@@ -136,7 +136,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 			try(var writer=new BitOutputStream(dest)){
 				writeBits(writer, instance);
 				if(DEBUG_VALIDATION){
-					writer.requireWritten(getSizeDescriptor().calcUnknown(instance, WordSpace.BIT));
+					writer.requireWritten(getSizeDescriptor().calcUnknown(provider, instance, WordSpace.BIT));
 				}
 			}
 		}
@@ -147,7 +147,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 			try(var reader=new BitInputStream(src)){
 				readBits(reader, instance);
 				if(DEBUG_VALIDATION){
-					reader.requireRead(getSizeDescriptor().calcUnknown(instance, WordSpace.BIT));
+					reader.requireRead(getSizeDescriptor().calcUnknown(provider, instance, WordSpace.BIT));
 				}
 			}
 		}
@@ -158,7 +158,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 			try(var reader=new BitInputStream(src)){
 				skipReadBits(reader, instance);
 				if(DEBUG_VALIDATION){
-					reader.requireRead(getSizeDescriptor().calcUnknown(instance, WordSpace.BIT));
+					reader.requireRead(getSizeDescriptor().calcUnknown(provider, instance, WordSpace.BIT));
 				}
 			}
 		}
@@ -217,9 +217,27 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	
 	public abstract SizeDescriptor<T> getSizeDescriptor();
 	
-	/**
-	 * @return a list of fields that have to be written after this function has executed. If no fields are required, return {@link List#of()} or null
-	 */
+	public interface ValueGenerator<T extends IOInstance<T>, ValType>{
+		boolean shouldGenerate(DataProvider provider, T instance) throws IOException;
+		ValType generate(DataProvider provider, T instance, boolean allowExternalMod) throws IOException;
+	}
+	
+	public static record ValueGeneratorInfo<T extends IOInstance<T>, ValType>(
+		IOField<T, ValType> field,
+		ValueGenerator<T, ValType> generator
+	){
+		public void generate(DataProvider provider, T instance, boolean allowExternalMod) throws IOException{
+			if(generator.shouldGenerate(provider, instance)){
+				var val=generator.generate(provider, instance, allowExternalMod);
+				field.set(instance, val);
+			}
+		}
+	}
+	
+	public List<ValueGeneratorInfo<T, ?>> getGenerators(){
+		return null;
+	}
+	
 	@Nullable
 	public abstract void write(DataProvider provider, ContentWriter dest, T instance) throws IOException;
 	@Nullable

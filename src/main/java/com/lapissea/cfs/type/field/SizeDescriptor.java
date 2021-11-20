@@ -1,5 +1,6 @@
 package com.lapissea.cfs.type.field;
 
+import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.util.TextUtil;
@@ -7,10 +8,10 @@ import com.lapissea.util.TextUtil;
 import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.function.Function;
-import java.util.function.ToLongFunction;
 import java.util.stream.LongStream;
 
-import static com.lapissea.cfs.type.WordSpace.*;
+import static com.lapissea.cfs.type.WordSpace.BIT;
+import static com.lapissea.cfs.type.WordSpace.BYTE;
 
 public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 	
@@ -63,7 +64,7 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 		@Override
 		public WordSpace getWordSpace(){return wordSpace;}
 		@Override
-		public long calcUnknown(T instance){
+		public long calcUnknown(DataProvider provider, T instance){
 			return size;
 			//throw new ShouldNeverHappenError("Do not calculate unknown, use getFixed when it is provided");
 		}
@@ -88,13 +89,17 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 	
 	final class Unknown<Inst extends IOInstance<Inst>> implements SizeDescriptor<Inst>{
 		
-		private final WordSpace            wordSpace;
-		private final long                 min;
-		private final OptionalLong         max;
-		private final ToLongFunction<Inst> unknownSize;
+		public interface Sizer<T>{
+			long applyAsLong(DataProvider prov, T value);
+		}
 		
-		public Unknown(long min, OptionalLong max, ToLongFunction<Inst> unknownSize){this(BYTE, min, max, unknownSize);}
-		public Unknown(WordSpace wordSpace, long min, OptionalLong max, ToLongFunction<Inst> unknownSize){
+		private final WordSpace    wordSpace;
+		private final long         min;
+		private final OptionalLong max;
+		private final Sizer<Inst>  unknownSize;
+		
+		public Unknown(long min, OptionalLong max, Sizer<Inst> unknownSize){this(BYTE, min, max, unknownSize);}
+		public Unknown(WordSpace wordSpace, long min, OptionalLong max, Sizer<Inst> unknownSize){
 			this.wordSpace=wordSpace;
 			this.min=min;
 			this.max=Objects.requireNonNull(max);
@@ -104,15 +109,15 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 		@Override
 		public <T extends IOInstance<T>> Unknown<T> map(Function<T, Inst> mapping){
 			var unk=unknownSize;
-			return new Unknown<>(getWordSpace(), getMin(), getMax(), tInst->unk.applyAsLong(mapping.apply(tInst)));
+			return new Unknown<>(getWordSpace(), getMin(), getMax(), (prov, tInst)->unk.applyAsLong(prov, mapping.apply(tInst)));
 		}
 		
 		@Override
 		public WordSpace getWordSpace(){return wordSpace;}
 		
 		@Override
-		public long calcUnknown(Inst instance){
-			return unknownSize.applyAsLong(instance);
+		public long calcUnknown(DataProvider provider, Inst instance){
+			return unknownSize.applyAsLong(provider, instance);
 		}
 		
 		@Override
@@ -171,7 +176,7 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 	
 	WordSpace getWordSpace();
 	
-	long calcUnknown(Inst instance);
+	long calcUnknown(DataProvider provider, Inst instance);
 	OptionalLong getFixed();
 	
 	OptionalLong getMax();
@@ -186,8 +191,8 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 	default OptionalLong getFixed(WordSpace wordSpace){
 		return mapSize(wordSpace, getFixed());
 	}
-	default long calcUnknown(Inst instance, WordSpace wordSpace){
-		return mapSize(wordSpace, calcUnknown(instance));
+	default long calcUnknown(DataProvider provider, Inst instance, WordSpace wordSpace){
+		return mapSize(wordSpace, calcUnknown(provider, instance));
 	}
 	
 	default OptionalLong mapSize(WordSpace targetSpace, OptionalLong val){

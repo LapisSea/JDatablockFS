@@ -23,6 +23,7 @@ import com.lapissea.util.TextUtil;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.OptionalLong;
@@ -74,12 +75,15 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	private final List<VirtualAccessor<T>> ioPoolAccessors;
 	private final List<IOField<T, ?>>      earlyNullChecks;
 	
+	protected final List<IOField.ValueGeneratorInfo<T, ?>> generators;
+	
 	public StructPipe(Struct<T> type){
 		this.type=type;
 		this.ioFields=new FieldSet<>(initFields());
 		sizeDescription=calcSize();
 		ioPoolAccessors=Utils.nullIfEmpty(calcIOPoolAccessors());
 		earlyNullChecks=Utils.nullIfEmpty(getNonNulls());
+		generators=Utils.nullIfEmpty(ioFields.stream().map(IOField::getGenerators).filter(Objects::nonNull).flatMap(Collection::stream).toList());
 	}
 	
 	private List<IOField<T, ?>> getNonNulls(){
@@ -121,18 +125,49 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		if(unknownFields.size()==1){
 			//TODO: support unknown bit size?
 			var unknownField=unknownFields.get(0);
-			return new SizeDescriptor.Unknown<>(wordSpace, min, max, inst->{
+			return new SizeDescriptor.Unknown<>(wordSpace, min, max, (prov, inst)->{
 				checkNull(inst);
+				if(generators!=null){
+					var ioPool=makeIOPool();
+					try{
+						pushPool(ioPool);
+						generateAll(prov, inst, false);
+						
+						var d=unknownField.getSizeDescriptor();
+						return knownFixed+d.calcUnknown(prov, inst, wordSpace);
+					}catch(IOException e){
+						throw new RuntimeException(e);
+					}finally{
+						popPool();
+					}
+				}
+				
 				var d=unknownField.getSizeDescriptor();
-				return knownFixed+d.calcUnknown(inst, wordSpace);
+				return knownFixed+d.calcUnknown(prov, inst, wordSpace);
 			});
 		}
 		
-		return new SizeDescriptor.Unknown<>(wordSpace, min, max, inst->{
+		return new SizeDescriptor.Unknown<>(wordSpace, min, max, (prov, inst)->{
 			checkNull(inst);
-			return knownFixed+IOFieldTools.sumVars(unknownFields, d->d.calcUnknown(inst, wordSpace));
+			
+			if(generators!=null){
+				var ioPool=makeIOPool();
+				try{
+					pushPool(ioPool);
+					generateAll(prov, inst, false);
+					
+					return knownFixed+IOFieldTools.sumVars(unknownFields, d->d.calcUnknown(prov, inst, wordSpace));
+				}catch(IOException e){
+					throw new RuntimeException(e);
+				}finally{
+					popPool();
+				}
+			}
+			
+			return knownFixed+IOFieldTools.sumVars(unknownFields, d->d.calcUnknown(prov, inst, wordSpace));
 		});
 	}
+	
 	private void checkNull(T inst){
 		Objects.requireNonNull(inst, ()->"instance of type "+getType()+" is null!");
 	}
@@ -198,7 +233,6 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	
 	protected abstract T doRead(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException;
 	
-	
 	public final SizeDescriptor<T> getSizeDescriptor(){
 		return sizeDescription;
 	}
@@ -239,12 +273,14 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 			target=dest;
 		}
 		
+		generateAll(provider, instance, true);
+		
 		for(IOField<T, ?> field : getSpecificFields()){
 			if(DEBUG_VALIDATION){
 				long bytes;
 				try{
 					var desc=field.getSizeDescriptor();
-					bytes=desc.calcUnknown(instance, WordSpace.BYTE);
+					bytes=desc.calcUnknown(provider, instance, WordSpace.BYTE);
 				}catch(UnknownSizePredictionException e){
 					field.writeReported(provider, target, instance);
 					continue;
@@ -257,6 +293,13 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		
 		if(destBuff!=null){
 			destBuff.writeTo(dest);
+		}
+	}
+	
+	private void generateAll(DataProvider provider, T instance, boolean allowExternalMod) throws IOException{
+		if(generators==null) return;
+		for(var generator : generators){
+			generator.generate(provider, instance, allowExternalMod);
 		}
 	}
 	
@@ -284,7 +327,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 				long bytes;
 				try{
 					var desc=field.getSizeDescriptor();
-					bytes=desc.calcUnknown(instance, WordSpace.BYTE);
+					bytes=desc.calcUnknown(provider, instance, WordSpace.BYTE);
 				}catch(UnknownSizePredictionException e){
 					throw new RuntimeException("Single field write of "+selectedField+" is not currently supported!");
 				}
