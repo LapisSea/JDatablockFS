@@ -22,9 +22,7 @@ import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
@@ -228,7 +226,25 @@ public class Cluster implements DataProvider{
 		
 		reallocateUnmanaged((HashIOMap<?, ?>)getTemp());
 		
-		tmp_realocMetadata();
+		new MemoryWalker((HashIOMap<?, ?>)getTemp()).walk(new MemoryWalker.PointerRecord(){
+			@Override
+			public <T extends IOInstance<T>> boolean log(StructPipe<T> pipe, Reference instanceReference, IOField.Ref<T, ?> field, T instance, Reference value) throws IOException{
+				if(instance instanceof IOInstance.Unmanaged u){
+					LogUtil.println(u);
+					reallocateUnmanaged(u);
+					LogUtil.println(getTemp());
+				}
+				return true;
+			}
+			@Override
+			public <T extends IOInstance<T>> boolean logChunkPointer(StructPipe<T> pipe, Reference instanceReference, IOField<T, ChunkPointer> field, T instance, ChunkPointer value) throws IOException{
+				return true;
+			}
+		});
+
+
+
+//		tmp_realocMetadata();
 	}
 	
 	private void tmp_realocMetadata() throws IOException{

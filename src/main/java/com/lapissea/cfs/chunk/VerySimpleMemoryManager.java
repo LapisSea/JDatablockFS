@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Random;
 
 public class VerySimpleMemoryManager extends MemoryManager.StrategyImpl{
 	
@@ -21,7 +22,7 @@ public class VerySimpleMemoryManager extends MemoryManager.StrategyImpl{
 	@Override
 	protected List<AllocStrategy> createAllocs(){
 		return List.of(
-			MemoryOperations::allocateReuseFreeChunk,
+//			MemoryOperations::allocateReuseFreeChunk,
 			MemoryOperations::allocateAppendToFile
 		);
 	}
@@ -42,6 +43,12 @@ public class VerySimpleMemoryManager extends MemoryManager.StrategyImpl{
 	@Override
 	public void free(Collection<Chunk> toFree) throws IOException{
 		List<Chunk> toAdd=MemoryOperations.mergeChunks(toFree, PURGE_ACCIDENTAL);
+		for(Chunk chunk : toAdd){
+			var    r    =new Random(chunk.getPtr().getValue());
+			byte[] noise=new byte[(int)chunk.getCapacity()];
+			r.nextBytes(noise);
+			context.getSource().write(chunk.dataStart(), false, noise);
+		}
 		MemoryOperations.mergeFreeChunksSorted(context, freeChunks, toAdd);
 	}
 }
