@@ -14,7 +14,6 @@ import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.function.Function;
 import java.util.function.LongFunction;
 
@@ -57,10 +56,9 @@ public class IOFieldNumber<T extends IOInstance<T>, E extends INumber> extends I
 	}
 	
 	@Override
-	public List<IOField<T, ?>> write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
+	public void write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		var size=getSize(instance);
 		size.write(dest, get(instance));
-		return List.of();
 	}
 	
 	@Override

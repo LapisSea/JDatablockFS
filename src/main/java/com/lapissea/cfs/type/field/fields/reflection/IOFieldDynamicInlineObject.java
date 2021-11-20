@@ -231,13 +231,13 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 	}
 	
 	@Override
-	public List<IOField<CTyp, ?>> write(DataProvider provider, ContentWriter dest, CTyp instance) throws IOException{
+	public void write(DataProvider provider, ContentWriter dest, CTyp instance) throws IOException{
 		var val=get(instance);
 		
 		if(nullable()){
 			if(val==null){
 				dest.writeBoolean(false);
-				return List.of();
+				return;
 			}
 			dest.writeBoolean(true);
 		}
@@ -254,10 +254,9 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		writeValue(provider, dest, val);
 		
 		if(writtenId!=id){
-			typeID.setValue(instance, id);
-			return List.of(typeID);
+//			typeID.setValue(instance, id); TODO: generate this
+			throw new NotImplementedException("handle the type ID generation!");
 		}
-		return List.of();
 	}
 	
 	private TypeDefinition getType(DataProvider provider, CTyp instance) throws IOException{

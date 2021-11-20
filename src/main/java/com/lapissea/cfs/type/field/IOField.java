@@ -57,7 +57,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		}
 		
 		@Override
-		public List<IOField<Inst, ?>> write(DataProvider provider, ContentWriter dest, Inst instance) throws IOException{
+		public void write(DataProvider provider, ContentWriter dest, Inst instance) throws IOException{
 			throw new UnsupportedOperationException();
 		}
 		@Override
@@ -87,7 +87,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 			}
 			
 			@Override
-			public List<IOField<T, ?>> write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
+			public void write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 				throw new UnsupportedOperationException();
 			}
 			@Override
@@ -132,14 +132,13 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		
 		@Deprecated
 		@Override
-		public final List<IOField<T, ?>> write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
+		public final void write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 			try(var writer=new BitOutputStream(dest)){
 				writeBits(writer, instance);
 				if(DEBUG_VALIDATION){
 					writer.requireWritten(getSizeDescriptor().calcUnknown(instance, WordSpace.BIT));
 				}
 			}
-			return List.of();
 		}
 		
 		@Deprecated
@@ -222,11 +221,11 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	 * @return a list of fields that have to be written after this function has executed. If no fields are required, return {@link List#of()} or null
 	 */
 	@Nullable
-	public abstract List<IOField<T, ?>> write(DataProvider provider, ContentWriter dest, T instance) throws IOException;
+	public abstract void write(DataProvider provider, ContentWriter dest, T instance) throws IOException;
 	@Nullable
-	public final List<IOField<T, ?>> writeReported(DataProvider provider, ContentWriter dest, T instance) throws IOException{
+	public final void writeReported(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		try{
-			return write(provider, dest, instance);
+			write(provider, dest, instance);
 		}catch(Exception e){
 			throw reportWriteFail(this, e);
 		}

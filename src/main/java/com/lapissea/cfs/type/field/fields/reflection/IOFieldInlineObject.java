@@ -19,7 +19,6 @@ import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.Objects;
 import java.util.OptionalLong;
 
@@ -110,7 +109,7 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 	}
 	
 	@Override
-	public List<IOField<CTyp, ?>> write(DataProvider provider, ContentWriter dest, CTyp instance) throws IOException{
+	public void write(DataProvider provider, ContentWriter dest, CTyp instance) throws IOException{
 		var val=get(instance);
 		if(nullable()){
 			writeIsNull(dest, val);
@@ -118,11 +117,9 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 				if(fixed){
 					Utils.zeroFill(dest::write, (int)getSizeDescriptor().requireFixed(WordSpace.BYTE)-1);
 				}
-				return List.of();
 			}
 		}
 		instancePipe.write(provider, dest, val);
-		return List.of();
 	}
 	
 	private ValueType readNew(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{

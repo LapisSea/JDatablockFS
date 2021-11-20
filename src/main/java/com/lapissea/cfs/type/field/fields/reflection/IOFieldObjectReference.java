@@ -21,7 +21,6 @@ import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.NotImplementedException;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.Objects;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
@@ -134,7 +133,7 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	}
 	
 	@Override
-	public List<IOField<T, ?>> write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
+	public void write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		var val=get(instance);
 		if(val==null&&getNullability()==IONullability.Mode.DEFAULT_IF_NULL){
 			val=struct.requireEmptyConstructor().get();
@@ -145,7 +144,8 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 			if(DEBUG_VALIDATION){
 				getReference(instance).requireNonNull();
 			}
-			return List.of(referenceField);
+			throw new NotImplementedException("implement generation of reference field!");
+//			return List.of(referenceField); TODO: implement this you lazy bastard
 		}
 		
 		if(val!=null){
@@ -153,7 +153,6 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 				instancePipe.write(provider, io, val);
 			}
 		}
-		return List.of();
 	}
 	
 	@Override

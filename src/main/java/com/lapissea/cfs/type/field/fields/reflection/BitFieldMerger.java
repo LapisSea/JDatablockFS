@@ -68,8 +68,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 	}
 	
 	@Override
-	public List<IOField<T, ?>> write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
-		
+	public void write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		try(var stream=new BitOutputStream(dest)){
 			for(var fi : group){
 				if(DEBUG_VALIDATION){
@@ -92,7 +91,6 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 				}
 			}
 		}
-		return null;
 	}
 	
 	@Override

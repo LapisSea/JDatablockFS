@@ -18,7 +18,6 @@ import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.util.NotImplementedException;
 
 import java.io.IOException;
-import java.util.List;
 
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 
@@ -126,9 +125,8 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 	}
 	
 	@Override
-	public List<IOField<T, ?>> write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
+	public void write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		referencePipe.write(provider, dest, getReference(instance));
-		return List.of();
 	}
 	
 	@Override

@@ -17,7 +17,6 @@ import com.lapissea.cfs.type.field.access.FieldAccessor;
 import java.io.IOException;
 import java.lang.reflect.Array;
 import java.util.Arrays;
-import java.util.List;
 import java.util.OptionalLong;
 
 public class IOFieldInstanceArray<T extends IOInstance<T>, ValType extends IOInstance<ValType>> extends IOField<T, ValType[]>{
@@ -67,14 +66,13 @@ public class IOFieldInstanceArray<T extends IOInstance<T>, ValType extends IOIns
 		return descriptor;
 	}
 	@Override
-	public List<IOField<T, ?>> write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
+	public void write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		var pip=getValPipe();
 		
 		var arr=get(instance);
 		for(ValType el : arr){
 			pip.write(provider, dest, el);
 		}
-		return List.of();
 	}
 	@Override
 	public void read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
