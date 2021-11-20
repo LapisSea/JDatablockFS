@@ -16,15 +16,15 @@ import java.util.OptionalLong;
 
 public class IOFieldByteArray<T extends IOInstance<T>> extends IOField<T, byte[]>{
 	
-	private final SizeDescriptor<T>   descriptor;
-	private       IOField<T, Integer> arraySize;
+	private final SizeDescriptor<T>        descriptor;
+	private       IOFieldPrimitive.FInt<T> arraySize;
 	
 	
 	public IOFieldByteArray(FieldAccessor<T> accessor){
 		super(accessor);
 		
 		descriptor=new SizeDescriptor.Unknown<>(0, OptionalLong.empty(), inst->{
-			var siz=arraySize.get(inst);
+			var siz=arraySize.getValue(inst);
 			if(siz>0) return siz;
 			var arr=get(inst);
 			return arr.length;
@@ -33,7 +33,7 @@ public class IOFieldByteArray<T extends IOInstance<T>> extends IOField<T, byte[]
 	@Override
 	public void init(){
 		super.init();
-		arraySize=declaringStruct().getFields().requireExact(Integer.class, IOFieldTools.makeArrayLenName(getAccessor()));
+		arraySize=declaringStruct().getFields().requireExactInt(IOFieldTools.makeArrayLenName(getAccessor()));
 	}
 	
 	@Override
@@ -48,7 +48,7 @@ public class IOFieldByteArray<T extends IOInstance<T>> extends IOField<T, byte[]
 	}
 	@Override
 	public void read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		int    size=arraySize.get(instance);
+		int    size=arraySize.getValue(instance);
 		byte[] data=new byte[size];
 		src.readFully(data);
 		set(instance, data);
@@ -56,7 +56,7 @@ public class IOFieldByteArray<T extends IOInstance<T>> extends IOField<T, byte[]
 	
 	@Override
 	public void skipRead(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		int size=arraySize.get(instance);
+		int size=arraySize.getValue(instance);
 		src.skipExact(size);
 	}
 }

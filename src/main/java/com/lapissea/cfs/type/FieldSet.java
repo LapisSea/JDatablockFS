@@ -1,6 +1,7 @@
 package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
@@ -93,6 +94,10 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	}
 	public <E extends IOField<T, ?>> E requireExactFieldType(Class<E> type, String name){
 		return exactFieldType(type, name).orElseThrow();
+	}
+	public <E extends IOInstance<E>> IOFieldPrimitive.FInt<E> requireExactInt(String name){
+		//noinspection unchecked
+		return requireExactFieldType(IOFieldPrimitive.FInt.class, name);
 	}
 	
 	public Stream<IOField<T, ?>> unpackedStream(){
