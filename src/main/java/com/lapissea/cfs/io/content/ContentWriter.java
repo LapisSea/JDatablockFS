@@ -2,7 +2,7 @@ package com.lapissea.cfs.io.content;
 
 import com.lapissea.cfs.BufferErrorSupplier;
 import com.lapissea.cfs.io.ContentBuff;
-import com.lapissea.cfs.io.impl.MemoryData;
+import com.lapissea.util.MathUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.BiIntConsumer;
 
@@ -18,12 +18,20 @@ public interface ContentWriter extends AutoCloseable, ContentBuff{
 	}
 	
 	default void write(ByteBuffer b, int off, int len) throws IOException{
+		if(len==0) return;
 		if(b.hasArray()&&!b.isReadOnly()){
 			write(b.array(), off+b.arrayOffset(), len);
 		}else{
-			//// FIXME: 21/07/2021 this i slow but reuses existing code, custom 0 copy implementation?
-			try(var io=MemoryData.build().withRaw(b.slice(off, len)).build().io()){
-				io.transferTo(this);
+			byte[] buff=new byte[MathUtil.snap(len, 8, 1024)];
+			
+			int remaining=len;
+			int pos      =off+b.position();
+			while(remaining>0){
+				int toCpy=Math.min(remaining, buff.length);
+				b.get(pos, buff, 0, toCpy);
+				pos+=toCpy;
+				remaining-=toCpy;
+				this.write(buff, 0, toCpy);
 			}
 		}
 	}

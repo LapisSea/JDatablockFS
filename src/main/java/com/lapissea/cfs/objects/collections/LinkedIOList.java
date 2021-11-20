@@ -19,6 +19,7 @@ import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.annotations.IOValueUnmanaged;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
+import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
@@ -52,7 +53,16 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 				}
 				@Override
 				public void set(Node<T> instance, Object value){
-					throw NotImplementedException.infer();//TODO: implement .set()
+					try{
+						if(value!=null){
+							var arg=instance.getTypeDef().arg(0);
+							if(!UtilL.instanceOf(value, arg.getTypeClass())) throw new ClassCastException(arg+" not compatible with "+value);
+						}
+						
+						instance.setValue((T)value);
+					}catch(IOException e){
+						throw new RuntimeException(e);
+					}
 				}
 			};
 			
