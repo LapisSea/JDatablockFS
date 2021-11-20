@@ -93,7 +93,7 @@ public class TestUtils{
 			
 			T obj=constr.create(provider, ref, typeDef);
 			
-			var actualSize=ContiguousStructPipe.sizeOfUnknown(obj, WordSpace.BYTE);
+			var actualSize=ContiguousStructPipe.sizeOfUnknown(provider, obj, WordSpace.BYTE);
 			
 			if(actualSize>initalCapacity){
 				LogUtil.printlnEr("WARNING: initial capacity is", initalCapacity, "but object has allocated", actualSize);

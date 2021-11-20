@@ -15,8 +15,8 @@ import java.util.List;
 
 public class ContiguousStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 	
-	public static <T extends IOInstance<T>> long sizeOfUnknown(T instance, WordSpace wordSpace){
-		return ContiguousStructPipe.of(instance.getThisStruct()).getSizeDescriptor().calcUnknown(instance, wordSpace);
+	public static <T extends IOInstance<T>> long sizeOfUnknown(DataProvider provider, T instance, WordSpace wordSpace){
+		return ContiguousStructPipe.of(instance.getThisStruct()).getSizeDescriptor().calcUnknown(provider, instance, wordSpace);
 	}
 	
 	public static <T extends IOInstance<T>> StructPipe<T> of(Class<T> type){

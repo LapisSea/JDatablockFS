@@ -23,9 +23,11 @@ import com.lapissea.util.TextUtil;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.Collection;
+import java.util.List;
+import java.util.Objects;
+import java.util.OptionalLong;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Consumer;
 import java.util.function.Function;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
@@ -73,12 +75,15 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	private final List<VirtualAccessor<T>> ioPoolAccessors;
 	private final List<IOField<T, ?>>      earlyNullChecks;
 	
+	protected final List<IOField.ValueGeneratorInfo<T, ?>> generators;
+	
 	public StructPipe(Struct<T> type){
 		this.type=type;
 		this.ioFields=new FieldSet<>(initFields());
 		sizeDescription=calcSize();
 		ioPoolAccessors=Utils.nullIfEmpty(calcIOPoolAccessors());
 		earlyNullChecks=Utils.nullIfEmpty(getNonNulls());
+		generators=Utils.nullIfEmpty(ioFields.stream().map(IOField::getGenerators).filter(Objects::nonNull).flatMap(Collection::stream).toList());
 	}
 	
 	private List<IOField<T, ?>> getNonNulls(){
@@ -120,18 +125,49 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		if(unknownFields.size()==1){
 			//TODO: support unknown bit size?
 			var unknownField=unknownFields.get(0);
-			return new SizeDescriptor.Unknown<>(wordSpace, min, max, inst->{
+			return new SizeDescriptor.Unknown<>(wordSpace, min, max, (prov, inst)->{
 				checkNull(inst);
+				if(generators!=null){
+					var ioPool=makeIOPool();
+					try{
+						pushPool(ioPool);
+						generateAll(prov, inst, false);
+						
+						var d=unknownField.getSizeDescriptor();
+						return knownFixed+d.calcUnknown(prov, inst, wordSpace);
+					}catch(IOException e){
+						throw new RuntimeException(e);
+					}finally{
+						popPool();
+					}
+				}
+				
 				var d=unknownField.getSizeDescriptor();
-				return knownFixed+d.calcUnknown(inst, wordSpace);
+				return knownFixed+d.calcUnknown(prov, inst, wordSpace);
 			});
 		}
 		
-		return new SizeDescriptor.Unknown<>(wordSpace, min, max, inst->{
+		return new SizeDescriptor.Unknown<>(wordSpace, min, max, (prov, inst)->{
 			checkNull(inst);
-			return knownFixed+IOFieldTools.sumVars(unknownFields, d->d.calcUnknown(inst, wordSpace));
+			
+			if(generators!=null){
+				var ioPool=makeIOPool();
+				try{
+					pushPool(ioPool);
+					generateAll(prov, inst, false);
+					
+					return knownFixed+IOFieldTools.sumVars(unknownFields, d->d.calcUnknown(prov, inst, wordSpace));
+				}catch(IOException e){
+					throw new RuntimeException(e);
+				}finally{
+					popPool();
+				}
+			}
+			
+			return knownFixed+IOFieldTools.sumVars(unknownFields, d->d.calcUnknown(prov, inst, wordSpace));
 		});
 	}
+	
 	private void checkNull(T inst){
 		Objects.requireNonNull(inst, ()->"instance of type "+getType()+" is null!");
 	}
@@ -197,7 +233,6 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	
 	protected abstract T doRead(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException;
 	
-	
 	public final SizeDescriptor<T> getSizeDescriptor(){
 		return sizeDescription;
 	}
@@ -225,48 +260,52 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	
 	protected void writeIOFields(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		
-		final ContentOutputBuilder destBuff=new ContentOutputBuilder((int)getSizeDescriptor().fixedOrMax(WordSpace.BYTE).orElse(32));
+		ContentOutputBuilder destBuff=null;
+		ContentWriter        target;
 		
-		Collection<IOField<T, ?>> dirtyMarked=new HashSet<>();
-		Consumer<List<IOField<T, ?>>> logDirty=dirt->{
-			if(dirt==null||dirt.isEmpty()) return;
+		if(dest.isDirect()){
+			var desc=getSizeDescriptor();
+			var max =desc.getMax(WordSpace.BYTE);
+			var min =desc.getMin(WordSpace.BYTE);
+			destBuff=new ContentOutputBuilder((int)max.orElse(Math.max(min, 32)));
+			target=destBuff;
+		}else{
+			target=dest;
+		}
+		
+		generateAll(provider, instance, true);
+		
+		for(IOField<T, ?> field : getSpecificFields()){
 			if(DEBUG_VALIDATION){
-				var spec=getSpecificFields();
-				for(IOField<T, ?> dirtyField : dirt){
-					if(!spec.contains(dirtyField)){
-						throw new RuntimeException(dirtyField+" not in "+spec);
-					}
+				long bytes;
+				try{
+					var desc=field.getSizeDescriptor();
+					bytes=desc.calcUnknown(provider, instance, WordSpace.BYTE);
+				}catch(UnknownSizePredictionException e){
+					field.writeReported(provider, target, instance);
+					continue;
 				}
+				writeFieldKnownSize(provider, instance, field, target.writeTicket(bytes));
+			}else{
+				field.writeReported(provider, target, instance);
 			}
-			dirtyMarked.addAll(dirt);
-		};
-		do{
-			destBuff.reset();
-			for(IOField<T, ?> field : getSpecificFields()){
-				dirtyMarked.remove(field);
-				if(DEBUG_VALIDATION){
-					long bytes;
-					try{
-						var desc=field.getSizeDescriptor();
-						bytes=desc.calcUnknown(instance, WordSpace.BYTE);
-					}catch(UnknownSizePredictionException e){
-						logDirty.accept(field.writeReported(provider, destBuff, instance));
-						continue;
-					}
-					writeFieldKnownSize(provider, instance, logDirty, field, destBuff.writeTicket(bytes));
-				}else{
-					logDirty.accept(field.writeReported(provider, destBuff, instance));
-				}
-			}
-		}while(!dirtyMarked.isEmpty());
+		}
 		
-		destBuff.writeTo(dest);
+		if(destBuff!=null){
+			destBuff.writeTo(dest);
+		}
 	}
 	
-	private void writeFieldKnownSize(DataProvider provider, T instance, Consumer<List<IOField<T, ?>>> logDirty, IOField<T, ?> field, ContentWriter.BufferTicket ticket) throws IOException{
+	private void generateAll(DataProvider provider, T instance, boolean allowExternalMod) throws IOException{
+		if(generators==null) return;
+		for(var generator : generators){
+			generator.generate(provider, instance, allowExternalMod);
+		}
+	}
+	
+	private void writeFieldKnownSize(DataProvider provider, T instance, IOField<T, ?> field, ContentWriter.BufferTicket ticket) throws IOException{
 		var safeBuff=ticket.requireExact().submit();
-		var d       =field.writeReported(provider, safeBuff, instance);
-		logDirty.accept(d);
+		field.writeReported(provider, safeBuff, instance);
 		
 		try{
 			safeBuff.close();
@@ -288,12 +327,12 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 				long bytes;
 				try{
 					var desc=field.getSizeDescriptor();
-					bytes=desc.calcUnknown(instance, WordSpace.BYTE);
+					bytes=desc.calcUnknown(provider, instance, WordSpace.BYTE);
 				}catch(UnknownSizePredictionException e){
 					throw new RuntimeException("Single field write of "+selectedField+" is not currently supported!");
 				}
 				if(field==selectedField){
-					writeFieldKnownSize(provider, instance, l->{}, field, dest.writeTicket(bytes));
+					writeFieldKnownSize(provider, instance, field, dest.writeTicket(bytes));
 					return;
 				}
 				

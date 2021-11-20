@@ -61,7 +61,7 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	@Override
 	public void allocate(T instance, DataProvider provider, GenericContext genericContext) throws IOException{
 		ValueType val=struct.requireEmptyConstructor().get();
-		alloc(instance, provider, val);
+		allocAndSet(instance, provider, val);
 		set(instance, val);
 	}
 	@Override
@@ -75,9 +75,13 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 		referenceField.set(instance, newRef);
 	}
 	
-	private void alloc(T instance, DataProvider provider, ValueType val) throws IOException{
-		Chunk chunk=AllocateTicket.withData(instancePipe, val).submit(provider);
-		referenceField.set(instance, chunk.getPtr().makeReference());
+	private void allocAndSet(T instance, DataProvider provider, ValueType val) throws IOException{
+		var ref=allocNew(provider, val);
+		referenceField.set(instance, ref);
+	}
+	private Reference allocNew(DataProvider provider, ValueType val) throws IOException{
+		Chunk chunk=AllocateTicket.withData(instancePipe, provider, val).submit(provider);
+		return chunk.getPtr().makeReference();
 	}
 	
 	@Override
@@ -134,18 +138,58 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	}
 	
 	@Override
-	public List<IOField<T, ?>> write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
+	public List<ValueGeneratorInfo<T, ?>> getGenerators(){
+		return List.of(new ValueGeneratorInfo<>(referenceField, new ValueGenerator<T, Reference>(){
+			@Override
+			public boolean shouldGenerate(DataProvider provider, T instance){
+				boolean refNull=switch(getNullability()){
+					case NOT_NULL -> false;
+					case DEFAULT_IF_NULL -> false;
+					case NULLABLE -> {
+						var val=get(instance);
+						yield val==null;
+					}
+				};
+				
+				var     ref      =getRef(instance);
+				boolean isRefNull=ref==null||ref.isNull();
+				
+				return refNull!=isRefNull;
+			}
+			@Override
+			public Reference generate(DataProvider provider, T instance, boolean allowExternalMod) throws IOException{
+				var val=get(instance);
+				if(val==null&&getNullability()==IONullability.Mode.DEFAULT_IF_NULL){
+					val=struct.requireEmptyConstructor().get();
+				}
+				
+				if(val==null){
+					return new Reference();
+				}
+				
+				if(DEBUG_VALIDATION){
+					var ref=getReference(instance);
+					assert ref==null||ref.isNull();
+				}
+				if(!allowExternalMod) throw new RuntimeException("data modification should not be done here");
+				return allocNew(provider, val);
+			}
+		}));
+	}
+	@Override
+	public void write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		var val=get(instance);
 		if(val==null&&getNullability()==IONullability.Mode.DEFAULT_IF_NULL){
 			val=struct.requireEmptyConstructor().get();
 		}
 		var ref=getReference(instance);
 		if(val!=null&&(ref==null||ref.isNull())){
-			alloc(instance, provider, val);
+			allocAndSet(instance, provider, val);
 			if(DEBUG_VALIDATION){
 				getReference(instance).requireNonNull();
 			}
-			return List.of(referenceField);
+			throw new NotImplementedException("implement generation of reference field!");
+//			return List.of(referenceField); TODO: implement this you lazy bastard
 		}
 		
 		if(val!=null){
@@ -153,7 +197,6 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 				instancePipe.write(provider, io, val);
 			}
 		}
-		return List.of();
 	}
 	
 	@Override

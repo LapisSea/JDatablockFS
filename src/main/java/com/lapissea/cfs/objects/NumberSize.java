@@ -6,11 +6,6 @@ import com.lapissea.cfs.io.bit.BitUtils;
 import com.lapissea.cfs.io.bit.EnumUniverse;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
-import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.WordSpace;
-import com.lapissea.cfs.type.field.SizeDescriptor;
-import com.lapissea.cfs.type.field.SizeDescriptor.Fixed;
-import com.lapissea.cfs.type.field.SizeDescriptor.Unknown;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
 
@@ -83,27 +78,10 @@ public enum NumberSize{
 		if(value!=null) return value;
 		throw new RuntimeException("Extremely large byte length: "+bytes);
 	}
-	public static <T extends IOInstance<T>> NumberSize by(SizeDescriptor.Fixed<T> size){
-		var value=searchSizeByVal(NumberSize::bytes, size.get());
-		if(value!=null) return value;
-		
-		throw new RuntimeException("Extremely large size: "+size);
-	}
-	public static <T extends IOInstance<T>> NumberSize by(SizeDescriptor<T> size, T instance){
-		var value=searchSizeByVal(
-			NumberSize::bytes,
-			switch(size){
-				case Fixed f -> f.get(WordSpace.BYTE);
-				case Unknown<T> u -> u.calcUnknown(instance, WordSpace.BYTE);
-			}
-		);
-		if(value!=null) return value;
-		
-		throw new RuntimeException("Extremely large size: "+size);
-	}
 	
 	private static <T> NumberSize searchSizeByVal(ToLongFunction<NumberSize> mapper, long key){
 		//TODO: maybe something more intelligent?
+		//nah, premature optimization for now
 		for(var value : FLAG_INFO){
 			if(mapper.applyAsLong(value)>=key) return value;
 		}

@@ -19,7 +19,6 @@ import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.Objects;
 import java.util.OptionalLong;
 
@@ -51,13 +50,13 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 				desc.getWordSpace(),
 				nullable()?nullSize:desc.getMin(),
 				Utils.addIfBoth(OptionalLong.of(nullSize), desc.getMax()),
-				inst->{
+				(prov, inst)->{
 					var val=get(inst);
 					if(val==null){
 						if(nullable()) return nullSize;
 						throw new NullPointerException();
 					}
-					return desc.calcUnknown(val)+nullSize;
+					return desc.calcUnknown(prov, val)+nullSize;
 				}
 			);
 		}
@@ -110,7 +109,7 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 	}
 	
 	@Override
-	public List<IOField<CTyp, ?>> write(DataProvider provider, ContentWriter dest, CTyp instance) throws IOException{
+	public void write(DataProvider provider, ContentWriter dest, CTyp instance) throws IOException{
 		var val=get(instance);
 		if(nullable()){
 			writeIsNull(dest, val);
@@ -118,11 +117,10 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 				if(fixed){
 					Utils.zeroFill(dest::write, (int)getSizeDescriptor().requireFixed(WordSpace.BYTE)-1);
 				}
-				return List.of();
+				return;
 			}
 		}
 		instancePipe.write(provider, dest, val);
-		return List.of();
 	}
 	
 	private ValueType readNew(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{

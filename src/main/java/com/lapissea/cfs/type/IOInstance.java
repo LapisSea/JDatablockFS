@@ -124,7 +124,7 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 			var siz=getPipe().getSizeDescriptor();
 			var f  =siz.getFixed(wordSpace);
 			if(f.isPresent()) return f.getAsLong();
-			return siz.calcUnknown(self(), wordSpace);
+			return siz.calcUnknown(getDataProvider(), self(), wordSpace);
 		}
 		
 		public Reference getReference(){

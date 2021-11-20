@@ -20,6 +20,7 @@ import com.lapissea.cfs.type.field.annotations.IOValueUnmanaged;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
+import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
@@ -53,14 +54,23 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 				}
 				@Override
 				public void set(Node<T> instance, Object value){
-					throw NotImplementedException.infer();//TODO: implement .set()
+					try{
+						if(value!=null){
+							var arg=instance.getTypeDef().arg(0);
+							if(!UtilL.instanceOf(value, arg.getTypeClass())) throw new ClassCastException(arg+" not compatible with "+value);
+						}
+						
+						instance.setValue((T)value);
+					}catch(IOException e){
+						throw new RuntimeException(e);
+					}
 				}
 			};
 			
-			SizeDescriptor<Node<T>> valDesc=new SizeDescriptor.Unknown<>(WordSpace.BYTE, 0, OptionalLong.empty(), inst->{
+			SizeDescriptor<Node<T>> valDesc=new SizeDescriptor.Unknown<>(WordSpace.BYTE, 0, OptionalLong.empty(), (prov, inst)->{
 				var val=valueAccessor.get(inst);
 				if(val==null) return 0;
-				return inst.valuePipe.getSizeDescriptor().calcUnknown(val);
+				return inst.valuePipe.getSizeDescriptor().calcUnknown(prov, val);
 			});
 			
 			return new IOField.NoIO<>(valueAccessor, valDesc);
@@ -91,7 +101,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 				}
 			};
 			
-			var next=new IOField.Ref.NoIO<Node<T>, Node<T>>(nextAccessor, new SizeDescriptor.Unknown<>(WordSpace.BYTE, 0, NumberSize.LARGEST.optionalBytesLong, node->node.nextSize.bytes)){
+			var next=new IOField.Ref.NoIO<Node<T>, Node<T>>(nextAccessor, new SizeDescriptor.Unknown<>(WordSpace.BYTE, 0, NumberSize.LARGEST.optionalBytesLong, (prov, node)->node.nextSize.bytes)){
 				@Override
 				public void setReference(Node<T> instance, Reference newRef){
 					if(newRef.getOffset()!=0) throw new NotImplementedException();
@@ -141,7 +151,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			
 			var bytes=1+nextBytes+switch(sizeDescriptor){
 				case SizeDescriptor.Fixed<T> f -> f.get(WordSpace.BYTE);
-				case SizeDescriptor.Unknown<T> f -> f.calcUnknown(value, WordSpace.BYTE);
+				case SizeDescriptor.Unknown<T> f -> f.calcUnknown(provider, value, WordSpace.BYTE);
 			};
 			var chunk=AllocateTicket.bytes(bytes).submit(provider);
 			return new Node<>(provider, chunk.getPtr().makeReference(), nodeType, value, next);
@@ -272,9 +282,9 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 				io.skipExact(valueStart());
 				if(value!=null){
 					if(DEBUG_VALIDATION){
-						var size=valuePipe.getSizeDescriptor().calcUnknown(value, WordSpace.BYTE);
+						var size=valuePipe.getSizeDescriptor().calcUnknown(getDataProvider(), value, WordSpace.BYTE);
 						try(var buff=io.writeTicket(size).requireExact().submit()){
-							valuePipe.write(this, buff, value);
+							valuePipe.write(getDataProvider(), buff, value);
 						}
 					}else{
 						valuePipe.write(this, io, value);
@@ -306,7 +316,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		private long nextStart(){
 			IOField<Node<T>, NumberSize> field=getNextSizeField();
 			var                          desc =field.getSizeDescriptor();
-			return desc.calcUnknown(this, WordSpace.BYTE);
+			return desc.calcUnknown(getDataProvider(), this, WordSpace.BYTE);
 		}
 		
 		private IOField<Node<T>, NumberSize> getNextSizeField(){

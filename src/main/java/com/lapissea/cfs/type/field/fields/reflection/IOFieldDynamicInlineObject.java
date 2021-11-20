@@ -59,10 +59,10 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		
 		long minSize=nullSize+Math.min(refDesc.getMin(WordSpace.BYTE), minKnownTypeSize);
 		
-		descriptor=new SizeDescriptor.Unknown<>(minSize, OptionalLong.empty(), inst->{
+		descriptor=new SizeDescriptor.Unknown<>(minSize, OptionalLong.empty(), (prov, inst)->{
 			var val=get(inst);
 			if(val==null) return nullSize;
-			return nullSize+calcSize(val);
+			return nullSize+calcSize(prov, val);
 		});
 	}
 	
@@ -72,22 +72,22 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 	}
 	
 	@SuppressWarnings({"unchecked"})
-	private static long calcSize(Object val){
+	private static long calcSize(DataProvider prov, Object val){
 		return switch(val){
 			case Boolean ignored -> 1;
 			case Float ignored -> 4;
 			case Double ignored -> 8;
 			case Number integer -> 1+NumberSize.bySize(numToLong(integer)).bytes;
-			case String str -> STR_PIPE.getSizeDescriptor().calcUnknown(new AutoText(str), WordSpace.BYTE);
+			case String str -> STR_PIPE.getSizeDescriptor().calcUnknown(prov, new AutoText(str), WordSpace.BYTE);
 			case byte[] array -> {
 				var num=NumberSize.bySize(array.length);
 				yield 1+num.bytes+array.length;
 			}
 			case IOInstance inst -> {
 				if(inst instanceof IOInstance.Unmanaged<?> u){
-					yield REF_PIPE.getSizeDescriptor().calcUnknown(u.getReference(), WordSpace.BYTE);
+					yield REF_PIPE.getSizeDescriptor().calcUnknown(prov, u.getReference(), WordSpace.BYTE);
 				}else{
-					yield ContiguousStructPipe.sizeOfUnknown(inst, WordSpace.BYTE);
+					yield ContiguousStructPipe.sizeOfUnknown(prov, inst, WordSpace.BYTE);
 				}
 			}
 			default -> throw new NotImplementedException(val.getClass()+"");
@@ -231,33 +231,45 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 	}
 	
 	@Override
-	public List<IOField<CTyp, ?>> write(DataProvider provider, ContentWriter dest, CTyp instance) throws IOException{
+	public List<ValueGeneratorInfo<CTyp, ?>> getGenerators(){
+		return List.of(new ValueGeneratorInfo<>(typeID, new ValueGenerator<CTyp, Integer>(){
+			private int getId(DataProvider provider, CTyp instance) throws IOException{
+				var val=get(instance);
+				if(val==null) return 0;
+				
+				TypeDefinition def;
+				if(val instanceof IOInstance.Unmanaged<?> unmanaged){
+					def=unmanaged.getTypeDef();
+				}else{
+					def=TypeDefinition.of(val.getClass());
+				}
+				return provider.getTypeDb().toID(def);
+			}
+			@Override
+			public boolean shouldGenerate(DataProvider provider, CTyp instance) throws IOException{
+				int id       =getId(provider, instance);
+				var writtenId=typeID.getValue(instance);
+				return id!=writtenId;
+			}
+			@Override
+			public Integer generate(DataProvider provider, CTyp instance, boolean allowExternalMod) throws IOException{
+				return getId(provider, instance);
+			}
+		}));
+	}
+	@Override
+	public void write(DataProvider provider, ContentWriter dest, CTyp instance) throws IOException{
 		var val=get(instance);
 		
 		if(nullable()){
 			if(val==null){
 				dest.writeBoolean(false);
-				return List.of();
+				return;
 			}
 			dest.writeBoolean(true);
 		}
 		
-		TypeDefinition def;
-		if(val instanceof IOInstance.Unmanaged<?> unmanaged){
-			def=unmanaged.getTypeDef();
-		}else{
-			def=TypeDefinition.of(val.getClass());
-		}
-		int id       =provider.getTypeDb().toID(def);
-		var writtenId=typeID.getValue(instance);
-		
 		writeValue(provider, dest, val);
-		
-		if(writtenId!=id){
-			typeID.setValue(instance, id);
-			return List.of(typeID);
-		}
-		return List.of();
 	}
 	
 	private TypeDefinition getType(DataProvider provider, CTyp instance) throws IOException{

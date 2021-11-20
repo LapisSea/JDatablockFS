@@ -16,7 +16,6 @@ import com.lapissea.cfs.type.field.access.FieldAccessor;
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.EnumSet;
-import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 
@@ -79,10 +78,9 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
-		public List<IOField<T, ?>> write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
+		public void write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 			var size=getSize(instance);
 			size.writeFloating(dest, getValue(instance));
-			return List.of();
 		}
 		
 		@Override
@@ -135,10 +133,9 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
-		public List<IOField<T, ?>> write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
+		public void write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 			var size=getSize(instance);
 			size.writeFloating(dest, getValue(instance));
-			return List.of();
 		}
 		
 		@Override
@@ -186,10 +183,9 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
-		public List<IOField<T, ?>> write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
+		public void write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 			var size=getSize(instance);
 			size.write(dest, getValue(instance));
-			return List.of();
 		}
 		
 		@Override
@@ -244,10 +240,9 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
-		public List<IOField<T, ?>> write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
+		public void write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 			var size=getSize(instance);
 			size.write(dest, getValue(instance));
-			return List.of();
 		}
 		
 		@Override
@@ -302,10 +297,9 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
-		public List<IOField<T, ?>> write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
+		public void write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 			var size=getSize(instance);
 			size.write(dest, getValue(instance));
-			return List.of();
 		}
 		
 		@Override
@@ -360,9 +354,9 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
-		public List<IOField<T, ?>> write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
+		public void write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 			dest.writeInt1(getValue(instance));
-			return List.of();
+			
 		}
 		
 		@Override
@@ -458,7 +452,7 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 			sizeDescriptor=new SizeDescriptor.Unknown<>(
 				allowed.stream().mapToLong(NumberSize::bytes).min().orElse(0),
 				allowed.stream().mapToLong(NumberSize::bytes).max(),
-				inst->getSize(inst).bytes);
+				(prov, inst)->getSize(inst).bytes);
 		}else{
 			sizeDescriptor=new SizeDescriptor.Fixed<>(size.bytes);
 		}
@@ -478,14 +472,13 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		if(dynamicSize!=null) return dynamicSize.apply(instance);
 		return size;
 	}
-	protected Function<T, NumberSize> getDynamicSize(){
-		return dynamicSize;
-	}
 	
 	@Override
 	public SizeDescriptor<T> getSizeDescriptor(){
 		return sizeDescriptor;
 	}
+	
+	@SuppressWarnings("unchecked")
 	@Override
 	public IOField<T, ValueType> implMaxAsFixedSize(){
 		try{

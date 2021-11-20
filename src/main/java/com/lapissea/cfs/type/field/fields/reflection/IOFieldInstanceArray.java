@@ -17,7 +17,6 @@ import com.lapissea.cfs.type.field.access.FieldAccessor;
 import java.io.IOException;
 import java.lang.reflect.Array;
 import java.util.Arrays;
-import java.util.List;
 import java.util.OptionalLong;
 
 public class IOFieldInstanceArray<T extends IOInstance<T>, ValType extends IOInstance<ValType>> extends IOField<T, ValType[]>{
@@ -35,7 +34,7 @@ public class IOFieldInstanceArray<T extends IOInstance<T>, ValType extends IOIns
 		component=(Class<ValType>)type.getComponentType();
 		if(component.isArray()) throw new MalformedStructLayout("Multi dimension arrays are not supported (yet)");
 		
-		descriptor=new SizeDescriptor.Unknown<>(WordSpace.BYTE, 0, OptionalLong.empty(), inst->{
+		descriptor=new SizeDescriptor.Unknown<>(WordSpace.BYTE, 0, OptionalLong.empty(), (prov, inst)->{
 			var arr=get(inst);
 			if(arr.length==0) return 0;
 			
@@ -43,7 +42,7 @@ public class IOFieldInstanceArray<T extends IOInstance<T>, ValType extends IOIns
 			if(desc.hasFixed()){
 				return arr.length*desc.requireFixed(WordSpace.BYTE);
 			}
-			return Arrays.stream(arr).mapToLong(instance->desc.calcUnknown(instance, WordSpace.BYTE)).sum();
+			return Arrays.stream(arr).mapToLong(instance->desc.calcUnknown(prov, instance, WordSpace.BYTE)).sum();
 		});
 	}
 	
@@ -67,14 +66,13 @@ public class IOFieldInstanceArray<T extends IOInstance<T>, ValType extends IOIns
 		return descriptor;
 	}
 	@Override
-	public List<IOField<T, ?>> write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
+	public void write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		var pip=getValPipe();
 		
 		var arr=get(instance);
 		for(ValType el : arr){
 			pip.write(provider, dest, el);
 		}
-		return List.of();
 	}
 	@Override
 	public void read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
