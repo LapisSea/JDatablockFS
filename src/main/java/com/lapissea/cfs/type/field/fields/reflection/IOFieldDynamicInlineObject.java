@@ -14,6 +14,7 @@ import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
@@ -32,7 +33,8 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 	private static final StructPipe<AutoText>  STR_PIPE=ContiguousStructPipe.of(AutoText.class);
 	private static final StructPipe<Reference> REF_PIPE=ContiguousStructPipe.of(Reference.class);
 	
-	private final SizeDescriptor<CTyp> descriptor;
+	private final SizeDescriptor<CTyp>        descriptor;
+	private       IOFieldPrimitive.FInt<CTyp> typeID;
 	
 	public IOFieldDynamicInlineObject(FieldAccessor<CTyp> accessor){
 		super(accessor);
@@ -41,7 +43,6 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 			throw new MalformedStructLayout("DEFAULT_IF_NULL is not supported on dynamic fields!");
 		}
 		
-		int idSize  =4;
 		int nullSize=nullable()?1:0;
 		
 		Type type=accessor.getGenericType(null);
@@ -56,13 +57,18 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		
 		var refDesc=ContiguousStructPipe.of(Reference.class).getSizeDescriptor();
 		
-		long minSize=idSize+nullSize+Math.min(refDesc.getMin(WordSpace.BYTE), minKnownTypeSize);
+		long minSize=nullSize+Math.min(refDesc.getMin(WordSpace.BYTE), minKnownTypeSize);
 		
 		descriptor=new SizeDescriptor.Unknown<>(minSize, OptionalLong.empty(), inst->{
 			var val=get(inst);
 			if(val==null) return nullSize;
-			return nullSize+idSize+calcSize(val);
+			return nullSize+calcSize(val);
 		});
+	}
+	
+	@Override
+	public void init(){
+		typeID=declaringStruct().getFields().requireExactInt(IOFieldTools.makeGenericIDFieldName(getAccessor()));
 	}
 	
 	@SuppressWarnings({"unchecked"})
@@ -106,9 +112,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 				num.write(dest, array.length);
 				dest.writeInts1(array);
 			}
-			case IOInstance.Unmanaged inst -> {
-				REF_PIPE.write(provider, dest, inst.getReference());
-			}
+			case IOInstance.Unmanaged inst -> REF_PIPE.write(provider, dest, inst.getReference());
 			case IOInstance inst -> ContiguousStructPipe.of(inst.getThisStruct()).write(provider, dest, inst);
 			
 			default -> throw new NotImplementedException(val.getClass()+"");
@@ -244,16 +248,20 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		}else{
 			def=TypeDefinition.of(val.getClass());
 		}
-		int id=provider.getTypeDb().toID(def);
-		dest.writeInt4(id);
+		int id       =provider.getTypeDb().toID(def);
+		var writtenId=typeID.getValue(instance);
 		
 		writeValue(provider, dest, val);
 		
+		if(writtenId!=id){
+			typeID.setValue(instance, id);
+			return List.of(typeID);
+		}
 		return List.of();
 	}
 	
-	private TypeDefinition readType(DataProvider provider, ContentReader src) throws IOException{
-		int id=src.readInt4();
+	private TypeDefinition getType(DataProvider provider, CTyp instance) throws IOException{
+		int id=typeID.getValue(instance);
 		return provider.getTypeDb().fromID(id);
 	}
 	
@@ -269,7 +277,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 				}
 			}
 			
-			TypeDefinition typ=readType(provider, src);
+			TypeDefinition typ=getType(provider, instance);
 			val=readTyp(typ, provider, src, genericContext);
 		}
 		//noinspection unchecked
@@ -284,7 +292,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 			}
 		}
 		
-		TypeDefinition typ=readType(provider, src);
+		TypeDefinition typ=getType(provider, instance);
 		skipReadTyp(typ, provider, src, genericContext);
 	}
 }
