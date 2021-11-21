@@ -455,8 +455,7 @@ public class BinaryGridRenderer{
 		}
 		
 		frameTimer.end();
-		var tim=frameTimer.msAvrg100();
-		LogUtil.println("Frame time:", tim);
+//		LogUtil.println("Frame time:", frameTimer.msAvrg100());
 	}
 	private void startFrame(){
 		renderer.clearFrame();
