@@ -129,4 +129,16 @@ public final class OffsetIO implements RandomIO{
 	public boolean isDirect(){
 		return parent.isDirect();
 	}
+	@Override
+	public String toString(){
+		return "OffsetIO{"+
+		       "parent="+parent+
+		       ", offset="+offset+
+		       '}';
+	}
+	
+	public String toShortString(){
+		return "{"+parent+" +"+offset+'}';
+	}
+	
 }

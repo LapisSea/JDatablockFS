@@ -84,7 +84,7 @@ public @interface IODependency{
 			public static String getName(FieldAccessor<?> field, VirtualNumSize size){
 				var nam=size.name();
 				if(nam.isEmpty()){
-					return field.getName()+"Siz";
+					return field.getName()+".siz";
 				}
 				return nam;
 			}
@@ -112,7 +112,9 @@ public @interface IODependency{
 									if(val==ann.max()) yield ann.max();
 									yield calcMax(inst, deps).max(val==null?NumberSize.VOID:val);
 								}
-								case RIGID_INITIAL, GHOST -> val==null?calcMax(inst, deps):val;
+								case RIGID_INITIAL, GHOST -> {
+									yield val==null?calcMax(inst, deps):val;
+								}
 							}).max(ann.min());
 							
 							if(s.greaterThan(ann.max())){

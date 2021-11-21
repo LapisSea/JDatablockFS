@@ -245,12 +245,8 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		try{
 			write(provider, dest, instance);
 		}catch(Exception e){
-			throw reportWriteFail(this, e);
+			throw new IOException("Failed to write "+this, e);
 		}
-	}
-	
-	protected IOException reportWriteFail(IOField<T, ?> fi, Exception e) throws IOException{
-		throw new IOException("Failed to write "+fi, e);
 	}
 	
 	public abstract void read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException;
@@ -258,11 +254,8 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		try{
 			read(provider, src, instance, genericContext);
 		}catch(Exception e){
-			throw reportReadFail(this, e);
+			throw new IOException("Failed to read "+this, e);
 		}
-	}
-	protected IOException reportReadFail(IOField<T, ?> fi, Exception e) throws IOException{
-		throw new IOException("Failed to read "+TextUtil.toShortString(fi), e);
 	}
 	
 	public abstract void skipRead(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException;
@@ -274,7 +267,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		}
 	}
 	protected IOException reportSkipReadFail(IOField<T, ?> fi, Exception e) throws IOException{
-		throw new IOException("Failed to skip read "+TextUtil.toShortString(fi), e);
+		throw new IOException("Failed to skip read "+fi, e);
 	}
 	
 	

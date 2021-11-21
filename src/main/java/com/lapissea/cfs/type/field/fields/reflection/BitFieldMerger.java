@@ -2,6 +2,7 @@ package com.lapissea.cfs.type.field.fields.reflection;
 
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
+import com.lapissea.cfs.exceptions.FieldIsNullException;
 import com.lapissea.cfs.io.bit.BitInputStream;
 import com.lapissea.cfs.io.bit.BitOutputStream;
 import com.lapissea.cfs.io.content.ContentReader;
@@ -13,6 +14,7 @@ import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
+import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
 import java.util.List;
@@ -78,7 +80,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 					try{
 						fi.writeBits(stream, instance);
 					}catch(Exception e){
-						throw reportWriteFail(fi, e);
+						throw new IOException("Failed to write "+fi, e);
 					}
 					var written=stream.getTotalBits()-oldW;
 					if(written!=size) throw new RuntimeException("Written bits "+written+" but "+size+" expected on "+fi);
@@ -86,7 +88,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 					try{
 						fi.writeBits(stream, instance);
 					}catch(Exception e){
-						throw reportWriteFail(fi, e);
+						throw new IOException("Failed to write "+fi, e);
 					}
 				}
 			}
@@ -136,6 +138,29 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 		}
 	}
 	
+	@Override
+	public String instanceToString(T instance, boolean doShort){
+		StringBuilder sb=new StringBuilder();
+		sb.append('{');
+		boolean separator=false;
+		for(var field : group){
+			String str;
+			try{
+				str=field.instanceToString(instance, doShort||TextUtil.USE_SHORT_IN_COLLECTIONS);
+			}catch(FieldIsNullException e){
+				str="<ERR: "+e.getMessage()+">";
+			}
+			
+			if(str==null) continue;
+			
+			if(separator) sb.append(" + ");
+			
+			sb.append(field.getName()).append("=").append(str);
+			separator=true;
+		}
+		sb.append('}');
+		return sb.toString();
+	}
 	@Override
 	public String toString(){
 		return group.stream().map(IOField::getName).collect(Collectors.joining("+"));
