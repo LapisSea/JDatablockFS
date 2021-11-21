@@ -21,6 +21,11 @@ import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
  */
 public interface MemoryManager extends DataProvider.Holder{
 	
+	interface DefragSes extends AutoCloseable{
+		@Override
+		void close();
+	}
+	
 	/**
 	 * Partial implementation of {@link MemoryManager} that reduces boilerplate for allocation and bookkeeping
 	 */
@@ -29,7 +34,8 @@ public interface MemoryManager extends DataProvider.Holder{
 		public interface AllocStrategy{
 			/**
 			 * @return a chunk that has been newly allocated from context. Returned chunk should always have a size of 0,
-			 * capacity greater or equal to the ticket request. (optimally equal capacity but greater is also fine)
+			 * capacity greater or equal to the ticket request. (optimally equal capacity but greater is also fine) If
+			 * null, the strategy signals that it has failed.
 			 */
 			Chunk alloc(@NotNull DataProvider context, @NotNull AllocateTicket ticket) throws IOException;
 		}
@@ -125,6 +131,8 @@ public interface MemoryManager extends DataProvider.Holder{
 		}
 	}
 	
+	DefragSes openDefragmentMode();
+	
 	/**
 	 * Lists locations of all KNOWN chunks. This may not be a complete list of unused chunks.
 	 */
@@ -145,6 +153,7 @@ public interface MemoryManager extends DataProvider.Holder{
 		}
 		free(chunks);
 	}
+	
 	
 	/**
 	 * Explicitly frees a chunk.<br>

@@ -222,29 +222,28 @@ public class Cluster implements DataProvider{
 	}
 	
 	public void defragment() throws IOException{
-		LogUtil.println("Defragmenting...");
-		
-		reallocateUnmanaged((HashIOMap<?, ?>)getTemp());
-		
-		new MemoryWalker((HashIOMap<?, ?>)getTemp()).walk(new MemoryWalker.PointerRecord(){
-			@Override
-			public <T extends IOInstance<T>> boolean log(StructPipe<T> pipe, Reference instanceReference, IOField.Ref<T, ?> field, T instance, Reference value) throws IOException{
-				if(instance instanceof IOInstance.Unmanaged u){
-					LogUtil.println(u);
-					reallocateUnmanaged(u);
-					LogUtil.println(getTemp());
+		try(var ignored=getMemoryManager().openDefragmentMode()){
+			LogUtil.println("Defragmenting...");
+			
+			
+			reallocateUnmanaged((HashIOMap<?, ?>)getTemp());
+			
+			new MemoryWalker((HashIOMap<?, ?>)getTemp()).walk(new MemoryWalker.PointerRecord(){
+				@Override
+				public <T extends IOInstance<T>> boolean log(StructPipe<T> pipe, Reference instanceReference, IOField.Ref<T, ?> field, T instance, Reference value) throws IOException{
+					if(instance instanceof IOInstance.Unmanaged u){
+						LogUtil.println(u);
+						reallocateUnmanaged(u);
+						LogUtil.println(getTemp());
+					}
+					return true;
 				}
-				return true;
-			}
-			@Override
-			public <T extends IOInstance<T>> boolean logChunkPointer(StructPipe<T> pipe, Reference instanceReference, IOField<T, ChunkPointer> field, T instance, ChunkPointer value) throws IOException{
-				return true;
-			}
-		});
-
-
-
-//		tmp_realocMetadata();
+				@Override
+				public <T extends IOInstance<T>> boolean logChunkPointer(StructPipe<T> pipe, Reference instanceReference, IOField<T, ChunkPointer> field, T instance, ChunkPointer value) throws IOException{
+					return true;
+				}
+			});
+		}
 	}
 	
 	private void tmp_realocMetadata() throws IOException{
