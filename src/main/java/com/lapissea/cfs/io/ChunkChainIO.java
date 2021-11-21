@@ -412,7 +412,6 @@ public class ChunkChainIO implements RandomIO{
 		}catch(IOException e){
 			cap="?";
 		}
-		return this.getClass().getSimpleName()+"{@"+getPos()+" / "+siz+"("+cap+")"+""+
-		       " pos="+cursor.getPtr()+"+"+calcCursorOffset()+"}";
+		return this.getClass().getSimpleName()+"{@"+getPos()+" / "+siz+"("+cap+"), pos="+cursor.getPtr()+"+"+calcCursorOffset()+"}";
 	}
 }

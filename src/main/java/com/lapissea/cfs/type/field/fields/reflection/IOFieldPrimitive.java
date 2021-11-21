@@ -446,7 +446,7 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		if(field!=null){
 			dynamicSize=instance->{
 				var val=field.get(instance);
-				if(!allowed.contains(val)) throw new IllegalStateException(val+" is not an allowed size in "+allowed);
+				if(!allowed.contains(val)) throw new IllegalStateException(val+" is not an allowed size in "+allowed+" at "+this+" with dynamic size "+field);
 				return val;
 			};
 			sizeDescriptor=new SizeDescriptor.Unknown<>(
