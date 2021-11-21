@@ -116,7 +116,14 @@ public class MemoryWalker{
 				
 				final long size;
 				var        sizeDesc=field.getSizeDescriptor();
-				size=sizeDesc.calcUnknown(cluster, instance);
+				try{
+					if(stack.size()==4&&field.toString().equals("#value")){
+						LogUtil.println("AAAAAA");
+					}
+					size=sizeDesc.calcUnknown(cluster, instance);
+				}catch(Throwable e){
+					throw e;
+				}
 				
 				try{
 					if(field.getAccessor()==null){
