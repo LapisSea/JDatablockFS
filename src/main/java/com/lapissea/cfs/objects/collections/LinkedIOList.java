@@ -338,8 +338,10 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			
 			var newSiz=NumberSize.bySize(ptr);
 			if(newSiz.greaterThan(nextSize)){
-				var val=getValue();
+				var val =getValue();
+				var grow=newSiz.bytes-nextSize.bytes;
 				nextSize=newSiz;
+				getReference().withContext(this).io(io->io.ensureCapacity(io.getCapacity()+grow));
 				writeManagedFields();
 				setValue(val);
 			}

@@ -139,12 +139,11 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	
 	@Override
 	public List<ValueGeneratorInfo<T, ?>> getGenerators(){
-		return List.of(new ValueGeneratorInfo<>(referenceField, new ValueGenerator<T, Reference>(){
+		return List.of(new ValueGeneratorInfo<>(referenceField, new ValueGenerator<>(){
 			@Override
 			public boolean shouldGenerate(DataProvider provider, T instance){
 				boolean refNull=switch(getNullability()){
-					case NOT_NULL -> false;
-					case DEFAULT_IF_NULL -> false;
+					case NOT_NULL, DEFAULT_IF_NULL -> false;
 					case NULLABLE -> {
 						var val=get(instance);
 						yield val==null;
