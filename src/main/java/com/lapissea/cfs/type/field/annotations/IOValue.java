@@ -19,7 +19,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.*;
+import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.INSTANCE;
+import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 
 @SuppressWarnings("unused")
 @Retention(RetentionPolicy.RUNTIME)
@@ -36,9 +37,9 @@ public @interface IOValue{
 			                             .map(IODependency.ArrayLenSize::name)
 			                             .orElseGet(()->IOFieldTools.makeArrayLenName(field)+".nSiz");
 			
-			return List.of(new VirtualFieldDefinition<T, Integer>(IO, IOFieldTools.makeArrayLenName(field), Integer.class, (instance, dependencies, value)->{
+			return List.of(new VirtualFieldDefinition<T, Integer>(IO, IOFieldTools.makeArrayLenName(field), Integer.class, (ioPool, instance, dependencies, value)->{
 				if(value!=null) return value;
-				var arr=field.get(instance);
+				var arr=field.get(ioPool, instance);
 				if(arr!=null) return Array.getLength(arr);
 				return -1;
 			}, List.of(IOFieldTools.makeAnnotation(IODependency.VirtualNumSize.class, Map.of("name", arrayLengthSizeName)))));

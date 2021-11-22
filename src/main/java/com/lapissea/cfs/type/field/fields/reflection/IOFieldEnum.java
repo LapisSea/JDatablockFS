@@ -5,6 +5,7 @@ import com.lapissea.cfs.io.bit.BitReader;
 import com.lapissea.cfs.io.bit.BitWriter;
 import com.lapissea.cfs.io.bit.EnumUniverse;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
@@ -13,7 +14,7 @@ import com.lapissea.cfs.type.field.access.FieldAccessor;
 import java.io.IOException;
 import java.util.Objects;
 
-import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.*;
+import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 
 public class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> extends IOField.Bit<T, E>{
 	
@@ -32,26 +33,26 @@ public class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> extends IOF
 	}
 	
 	@Override
-	public E get(T instance){
-		E e=super.get(instance);
+	public E get(Struct.Pool<T> ioPool, T instance){
+		E e=super.get(ioPool, instance);
 		if(e==null&&getNullability()==DEFAULT_IF_NULL) e=enumUniverse.get(0);
 		return e;
 	}
 	@Override
-	public void set(T instance, E value){
-		super.set(instance, switch(getNullability()){
+	public void set(Struct.Pool<T> ioPool, T instance, E value){
+		super.set(ioPool, instance, switch(getNullability()){
 			case NULLABLE, DEFAULT_IF_NULL -> value;
 			case NOT_NULL -> Objects.requireNonNull(value);
 		});
 	}
 	@Override
-	public void writeBits(BitWriter<?> dest, T instance) throws IOException{
-		dest.writeEnum(enumUniverse, get(instance), nullable());
+	public void writeBits(Struct.Pool<T> ioPool, BitWriter<?> dest, T instance) throws IOException{
+		dest.writeEnum(enumUniverse, get(ioPool, instance), nullable());
 	}
 	
 	@Override
-	public void readBits(BitReader src, T instance) throws IOException{
-		set(instance, src.readEnum(enumUniverse, nullable()));
+	public void readBits(Struct.Pool<T> ioPool, BitReader src, T instance) throws IOException{
+		set(ioPool, instance, src.readEnum(enumUniverse, nullable()));
 	}
 	
 	@Override
@@ -60,8 +61,8 @@ public class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> extends IOF
 	}
 	
 	@Override
-	public boolean instancesEqual(T inst1, T inst2){
-		return get(inst1)==get(inst2);
+	public boolean instancesEqual(Struct.Pool<T> ioPool1, T inst1, Struct.Pool<T> ioPool2, T inst2){
+		return get(ioPool1, inst1)==get(ioPool2, inst2);
 	}
 	
 	@Override

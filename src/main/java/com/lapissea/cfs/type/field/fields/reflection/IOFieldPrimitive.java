@@ -8,6 +8,7 @@ import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
@@ -17,6 +18,7 @@ import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.EnumSet;
 import java.util.Objects;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 
 import static com.lapissea.cfs.objects.NumberSize.*;
@@ -58,44 +60,44 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 			return EnumSet.of(VOID, SHORT, INT, LONG);
 		}
 		
-		private double getValue(T instance){
-			return getAccessor().getDouble(instance);
+		private double getValue(Struct.Pool<T> ioPool, T instance){
+			return getAccessor().getDouble(ioPool, instance);
 		}
 		
-		public void setValue(T instance, double value){
-			getAccessor().setDouble(instance, value);
+		public void setValue(Struct.Pool<T> ioPool, T instance, double value){
+			getAccessor().setDouble(ioPool, instance, value);
 		}
 		
 		@Deprecated
 		@Override
-		public Double get(T instance){
-			return getValue(instance);
+		public Double get(Struct.Pool<T> ioPool, T instance){
+			return getValue(ioPool, instance);
 		}
 		@Deprecated
 		@Override
-		public void set(T instance, Double value){
-			setValue(instance, value);
+		public void set(Struct.Pool<T> ioPool, T instance, Double value){
+			setValue(ioPool, instance, value);
 		}
 		
 		@Override
-		public void write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
-			var size=getSize(instance);
-			size.writeFloating(dest, getValue(instance));
+		public void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+			var size=getSize(ioPool, instance);
+			size.writeFloating(dest, getValue(ioPool, instance));
 		}
 		
 		@Override
-		public void read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-			var size=getSize(instance);
-			setValue(instance, size.readFloating(src));
+		public void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+			var size=getSize(ioPool, instance);
+			setValue(ioPool, instance, size.readFloating(src));
 		}
 		
 		@Override
-		public boolean instancesEqual(T inst1, T inst2){
-			return getValue(inst1)==getValue(inst2);
+		public boolean instancesEqual(Struct.Pool<T> ioPool1, T inst1, Struct.Pool<T> ioPool2, T inst2){
+			return getValue(ioPool1, inst1)==getValue(ioPool2, inst2);
 		}
 		@Override
-		public int instanceHashCode(T instance){
-			return Double.hashCode(getValue(instance));
+		public int instanceHashCode(Struct.Pool<T> ioPool, T instance){
+			return Double.hashCode(getValue(ioPool, instance));
 		}
 	}
 	
@@ -113,44 +115,44 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 			return EnumSet.of(VOID, SHORT, INT);
 		}
 		
-		private float getValue(T instance){
-			return getAccessor().getFloat(instance);
+		private float getValue(Struct.Pool<T> ioPool, T instance){
+			return getAccessor().getFloat(ioPool, instance);
 		}
 		
-		public void setValue(T instance, float value){
-			getAccessor().setFloat(instance, value);
+		public void setValue(Struct.Pool<T> ioPool, T instance, float value){
+			getAccessor().setFloat(ioPool, instance, value);
 		}
 		
 		@Deprecated
 		@Override
-		public Float get(T instance){
-			return getValue(instance);
+		public Float get(Struct.Pool<T> ioPool, T instance){
+			return getValue(ioPool, instance);
 		}
 		@Deprecated
 		@Override
-		public void set(T instance, Float value){
-			setValue(instance, value);
+		public void set(Struct.Pool<T> ioPool, T instance, Float value){
+			setValue(ioPool, instance, value);
 		}
 		
 		@Override
-		public void write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
-			var size=getSize(instance);
-			size.writeFloating(dest, getValue(instance));
+		public void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+			var size=getSize(ioPool, instance);
+			size.writeFloating(dest, getValue(ioPool, instance));
 		}
 		
 		@Override
-		public void read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-			var size=getSize(instance);
-			setValue(instance, (float)size.readFloating(src));
+		public void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+			var size=getSize(ioPool, instance);
+			setValue(ioPool, instance, (float)size.readFloating(src));
 		}
 		
 		@Override
-		public boolean instancesEqual(T inst1, T inst2){
-			return getValue(inst1)==getValue(inst2);
+		public boolean instancesEqual(Struct.Pool<T> ioPool1, T inst1, Struct.Pool<T> ioPool2, T inst2){
+			return getValue(ioPool1, inst1)==getValue(ioPool2, inst2);
 		}
 		@Override
-		public int instanceHashCode(T instance){
-			return Float.hashCode(getValue(instance));
+		public int instanceHashCode(Struct.Pool<T> ioPool, T instance){
+			return Float.hashCode(getValue(ioPool, instance));
 		}
 	}
 	
@@ -163,44 +165,44 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 			super(field, forceFixed, LONG);
 		}
 		
-		public long getValue(T instance){
-			return getAccessor().getLong(instance);
+		public long getValue(Struct.Pool<T> ioPool, T instance){
+			return getAccessor().getLong(ioPool, instance);
 		}
 		
-		public void setValue(T instance, long value){
-			getAccessor().setLong(instance, value);
+		public void setValue(Struct.Pool<T> ioPool, T instance, long value){
+			getAccessor().setLong(instance, value, ioPool);
 		}
 		
 		@Deprecated
 		@Override
-		public Long get(T instance){
-			return getValue(instance);
+		public Long get(Struct.Pool<T> ioPool, T instance){
+			return getValue(ioPool, instance);
 		}
 		@Deprecated
 		@Override
-		public void set(T instance, Long value){
-			setValue(instance, value);
+		public void set(Struct.Pool<T> ioPool, T instance, Long value){
+			setValue(ioPool, instance, value);
 		}
 		
 		@Override
-		public void write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
-			var size=getSize(instance);
-			size.write(dest, getValue(instance));
+		public void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+			var size=getSize(ioPool, instance);
+			size.write(dest, getValue(ioPool, instance));
 		}
 		
 		@Override
-		public void read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-			var size=getSize(instance);
-			setValue(instance, size.read(src));
+		public void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+			var size=getSize(ioPool, instance);
+			setValue(ioPool, instance, size.read(src));
 		}
 		
 		@Override
-		public boolean instancesEqual(T inst1, T inst2){
-			return getValue(inst1)==getValue(inst2);
+		public boolean instancesEqual(Struct.Pool<T> ioPool1, T inst1, Struct.Pool<T> ioPool2, T inst2){
+			return getValue(ioPool1, inst1)==getValue(ioPool2, inst2);
 		}
 		@Override
-		public int instanceHashCode(T instance){
-			return Long.hashCode(getValue(instance));
+		public int instanceHashCode(Struct.Pool<T> ioPool, T instance){
+			return Long.hashCode(getValue(ioPool, instance));
 		}
 	}
 	
@@ -220,44 +222,44 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 			return all;
 		}
 		
-		public int getValue(T instance){
-			return getAccessor().getInt(instance);
+		public int getValue(Struct.Pool<T> ioPool, T instance){
+			return getAccessor().getInt(ioPool, instance);
 		}
 		
-		public void setValue(T instance, int value){
-			getAccessor().setInt(instance, value);
+		public void setValue(Struct.Pool<T> ioPool, T instance, int value){
+			getAccessor().setInt(ioPool, instance, value);
 		}
 		
 		@Deprecated
 		@Override
-		public Integer get(T instance){
-			return getValue(instance);
+		public Integer get(Struct.Pool<T> ioPool, T instance){
+			return getValue(ioPool, instance);
 		}
 		@Deprecated
 		@Override
-		public void set(T instance, Integer value){
-			setValue(instance, value);
+		public void set(Struct.Pool<T> ioPool, T instance, Integer value){
+			setValue(ioPool, instance, value);
 		}
 		
 		@Override
-		public void write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
-			var size=getSize(instance);
-			size.write(dest, getValue(instance));
+		public void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+			var size=getSize(ioPool, instance);
+			size.write(dest, getValue(ioPool, instance));
 		}
 		
 		@Override
-		public void read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-			var size=getSize(instance);
-			setValue(instance, (int)size.read(src));
+		public void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+			var size=getSize(ioPool, instance);
+			setValue(ioPool, instance, (int)size.read(src));
 		}
 		
 		@Override
-		public boolean instancesEqual(T inst1, T inst2){
-			return getValue(inst1)==getValue(inst2);
+		public boolean instancesEqual(Struct.Pool<T> ioPool1, T inst1, Struct.Pool<T> ioPool2, T inst2){
+			return getValue(ioPool1, inst1)==getValue(ioPool2, inst2);
 		}
 		@Override
-		public int instanceHashCode(T instance){
-			return Integer.hashCode(getValue(instance));
+		public int instanceHashCode(Struct.Pool<T> ioPool, T instance){
+			return Integer.hashCode(getValue(ioPool, instance));
 		}
 	}
 	
@@ -277,44 +279,44 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 			return all;
 		}
 		
-		private short getValue(T instance){
-			return getAccessor().getShort(instance);
+		private short getValue(Struct.Pool<T> ioPool, T instance){
+			return getAccessor().getShort(ioPool, instance);
 		}
 		
-		public void setValue(T instance, short value){
-			getAccessor().setShort(instance, value);
+		public void setValue(Struct.Pool<T> ioPool, T instance, short value){
+			getAccessor().setShort(ioPool, instance, value);
 		}
 		
 		@Deprecated
 		@Override
-		public Short get(T instance){
-			return getValue(instance);
+		public Short get(Struct.Pool<T> ioPool, T instance){
+			return getValue(ioPool, instance);
 		}
 		@Deprecated
 		@Override
-		public void set(T instance, Short value){
-			setValue(instance, value);
+		public void set(Struct.Pool<T> ioPool, T instance, Short value){
+			setValue(ioPool, instance, value);
 		}
 		
 		@Override
-		public void write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
-			var size=getSize(instance);
-			size.write(dest, getValue(instance));
+		public void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+			var size=getSize(ioPool, instance);
+			size.write(dest, getValue(ioPool, instance));
 		}
 		
 		@Override
-		public void read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-			var size=getSize(instance);
-			setValue(instance, (short)size.read(src));
+		public void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+			var size=getSize(ioPool, instance);
+			setValue(ioPool, instance, (short)size.read(src));
 		}
 		
 		@Override
-		public boolean instancesEqual(T inst1, T inst2){
-			return getValue(inst1)==getValue(inst2);
+		public boolean instancesEqual(Struct.Pool<T> ioPool1, T inst1, Struct.Pool<T> ioPool2, T inst2){
+			return getValue(ioPool1, inst1)==getValue(ioPool2, inst2);
 		}
 		@Override
-		public int instanceHashCode(T instance){
-			return Short.hashCode(getValue(instance));
+		public int instanceHashCode(Struct.Pool<T> ioPool, T instance){
+			return Short.hashCode(getValue(ioPool, instance));
 		}
 	}
 	
@@ -334,43 +336,43 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 			return all;
 		}
 		
-		private byte getValue(T instance){
-			return getAccessor().getByte(instance);
+		private byte getValue(Struct.Pool<T> ioPool, T instance){
+			return getAccessor().getByte(ioPool, instance);
 		}
 		
-		public void setValue(T instance, byte value){
-			getAccessor().setByte(instance, value);
+		public void setValue(Struct.Pool<T> ioPool, T instance, byte value){
+			getAccessor().setByte(ioPool, instance, value);
 		}
 		
 		@Deprecated
 		@Override
-		public Byte get(T instance){
-			return getValue(instance);
+		public Byte get(Struct.Pool<T> ioPool, T instance){
+			return getValue(ioPool, instance);
 		}
 		@Deprecated
 		@Override
-		public void set(T instance, Byte value){
-			setValue(instance, value);
+		public void set(Struct.Pool<T> ioPool, T instance, Byte value){
+			setValue(ioPool, instance, value);
 		}
 		
 		@Override
-		public void write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
-			dest.writeInt1(getValue(instance));
+		public void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+			dest.writeInt1(getValue(ioPool, instance));
 			
 		}
 		
 		@Override
-		public void read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-			setValue(instance, src.readInt1());
+		public void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+			setValue(ioPool, instance, src.readInt1());
 		}
 		
 		@Override
-		public boolean instancesEqual(T inst1, T inst2){
-			return getValue(inst1)==getValue(inst2);
+		public boolean instancesEqual(Struct.Pool<T> ioPool1, T inst1, Struct.Pool<T> ioPool2, T inst2){
+			return getValue(ioPool2, inst1)==getValue(ioPool1, inst2);
 		}
 		@Override
-		public int instanceHashCode(T instance){
-			return Byte.hashCode(getValue(instance));
+		public int instanceHashCode(Struct.Pool<T> ioPool, T instance){
+			return Byte.hashCode(getValue(ioPool, instance));
 		}
 	}
 	
@@ -380,32 +382,32 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 			super(field);
 		}
 		
-		private boolean getValue(T instance){
-			return getAccessor().getBoolean(instance);
+		private boolean getValue(Struct.Pool<T> ioPool, T instance){
+			return getAccessor().getBoolean(ioPool, instance);
 		}
 		
-		public void setValue(T instance, boolean value){
-			getAccessor().setBoolean(instance, value);
+		public void setValue(Struct.Pool<T> ioPool, T instance, boolean value){
+			getAccessor().setBoolean(ioPool, instance, value);
 		}
 		
 		@Deprecated
 		@Override
-		public Boolean get(T instance){
-			return getValue(instance);
+		public Boolean get(Struct.Pool<T> ioPool, T instance){
+			return getValue(ioPool, instance);
 		}
 		@Deprecated
 		@Override
-		public void set(T instance, Boolean value){
-			setValue(instance, value);
+		public void set(Struct.Pool<T> ioPool, T instance, Boolean value){
+			setValue(ioPool, instance, value);
 		}
 		
 		@Override
-		public void writeBits(BitWriter<?> dest, T instance) throws IOException{
-			dest.writeBoolBit(getValue(instance));
+		public void writeBits(Struct.Pool<T> ioPool, BitWriter<?> dest, T instance) throws IOException{
+			dest.writeBoolBit(getValue(ioPool, instance));
 		}
 		@Override
-		public void readBits(BitReader src, T instance) throws IOException{
-			setValue(instance, src.readBoolBit());
+		public void readBits(Struct.Pool<T> ioPool, BitReader src, T instance) throws IOException{
+			setValue(ioPool, instance, src.readBoolBit());
 		}
 		@Override
 		public void skipReadBits(BitReader src, T instance) throws IOException{
@@ -413,12 +415,12 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
-		public boolean instancesEqual(T inst1, T inst2){
-			return getValue(inst1)==getValue(inst2);
+		public boolean instancesEqual(Struct.Pool<T> ioPool1, T inst1, Struct.Pool<T> ioPool2, T inst2){
+			return getValue(ioPool1, inst1)==getValue(ioPool2, inst2);
 		}
 		@Override
-		public int instanceHashCode(T instance){
-			return Boolean.hashCode(getValue(instance));
+		public int instanceHashCode(Struct.Pool<T> ioPool, T instance){
+			return Boolean.hashCode(getValue(ioPool, instance));
 		}
 		
 		@Override
@@ -427,10 +429,10 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 	}
 	
-	private final boolean                 forceFixed;
-	private final NumberSize              size;
-	private       Function<T, NumberSize> dynamicSize;
-	private       SizeDescriptor<T>       sizeDescriptor;
+	private final boolean                                   forceFixed;
+	private final NumberSize                                size;
+	private       BiFunction<Struct.Pool<T>, T, NumberSize> dynamicSize;
+	private       SizeDescriptor<T>                         sizeDescriptor;
 	
 	protected IOFieldPrimitive(FieldAccessor<T> field, boolean forceFixed, NumberSize size){
 		super(field);
@@ -444,23 +446,23 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		var field  =forceFixed?null:IOFieldTools.getDynamicSize(getAccessor());
 		var allowed=allowedSizes();
 		if(field!=null){
-			dynamicSize=instance->{
-				var val=field.get(instance);
+			dynamicSize=(ioPool, instance)->{
+				var val=field.get(ioPool, instance);
 				if(!allowed.contains(val)) throw new IllegalStateException(val+" is not an allowed size in "+allowed+" at "+this+" with dynamic size "+field);
 				return val;
 			};
 			sizeDescriptor=new SizeDescriptor.Unknown<>(
 				allowed.stream().mapToLong(NumberSize::bytes).min().orElse(0),
 				allowed.stream().mapToLong(NumberSize::bytes).max(),
-				(prov, inst)->getSize(inst).bytes);
+				(ioPool, prov, inst)->getSize(ioPool, inst).bytes);
 		}else{
 			sizeDescriptor=new SizeDescriptor.Fixed<>(size.bytes);
 		}
 	}
 	
 	@Override
-	public void skipRead(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		var size=getSize(instance);
+	public void skipRead(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		var size=getSize(ioPool, instance);
 		src.skipExact(size.bytes);
 	}
 	
@@ -468,8 +470,8 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		return EnumSet.allOf(NumberSize.class);
 	}
 	
-	protected NumberSize getSize(T instance){
-		if(dynamicSize!=null) return dynamicSize.apply(instance);
+	protected NumberSize getSize(Struct.Pool<T> ioPool, T instance){
+		if(dynamicSize!=null) return dynamicSize.apply(ioPool, instance);
 		return size;
 	}
 	

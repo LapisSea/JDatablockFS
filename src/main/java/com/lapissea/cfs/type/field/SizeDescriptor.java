@@ -2,6 +2,7 @@ package com.lapissea.cfs.type.field;
 
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.util.TextUtil;
 
@@ -64,7 +65,7 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 		@Override
 		public WordSpace getWordSpace(){return wordSpace;}
 		@Override
-		public long calcUnknown(DataProvider provider, T instance){
+		public long calcUnknown(Struct.Pool<T> ioPool, DataProvider provider, T instance){
 			return size;
 			//throw new ShouldNeverHappenError("Do not calculate unknown, use getFixed when it is provided");
 		}
@@ -89,8 +90,8 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 	
 	final class Unknown<Inst extends IOInstance<Inst>> implements SizeDescriptor<Inst>{
 		
-		public interface Sizer<T>{
-			long applyAsLong(DataProvider prov, T value);
+		public interface Sizer<T extends IOInstance<T>>{
+			long applyAsLong(Struct.Pool<T> ioPool, DataProvider prov, T value);
 		}
 		
 		private final WordSpace    wordSpace;
@@ -109,15 +110,15 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 		@Override
 		public <T extends IOInstance<T>> Unknown<T> map(Function<T, Inst> mapping){
 			var unk=unknownSize;
-			return new Unknown<>(getWordSpace(), getMin(), getMax(), (prov, tInst)->unk.applyAsLong(prov, mapping.apply(tInst)));
+			return new Unknown<>(getWordSpace(), getMin(), getMax(), (ioPool, prov, tInst)->unk.applyAsLong(null, prov, mapping.apply(tInst)));//TODO: uuuuuh ioPool null?
 		}
 		
 		@Override
 		public WordSpace getWordSpace(){return wordSpace;}
 		
 		@Override
-		public long calcUnknown(DataProvider provider, Inst instance){
-			return unknownSize.applyAsLong(provider, instance);
+		public long calcUnknown(Struct.Pool<Inst> ioPool, DataProvider provider, Inst instance){
+			return unknownSize.applyAsLong(ioPool, provider, instance);
 		}
 		
 		@Override
@@ -176,7 +177,7 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 	
 	WordSpace getWordSpace();
 	
-	long calcUnknown(DataProvider provider, Inst instance);
+	long calcUnknown(Struct.Pool<Inst> ioPool, DataProvider provider, Inst instance);
 	OptionalLong getFixed();
 	
 	OptionalLong getMax();
@@ -191,8 +192,8 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 	default OptionalLong getFixed(WordSpace wordSpace){
 		return mapSize(wordSpace, getFixed());
 	}
-	default long calcUnknown(DataProvider provider, Inst instance, WordSpace wordSpace){
-		return mapSize(wordSpace, calcUnknown(provider, instance));
+	default long calcUnknown(Struct.Pool<Inst> ioPool, DataProvider provider, Inst instance, WordSpace wordSpace){
+		return mapSize(wordSpace, calcUnknown(ioPool, provider, instance));
 	}
 	
 	default OptionalLong mapSize(WordSpace targetSpace, OptionalLong val){

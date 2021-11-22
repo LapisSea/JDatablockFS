@@ -20,6 +20,7 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.cfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
@@ -41,6 +42,7 @@ import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.tools.render.RenderBackend.DrawMode;
+import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 
 @SuppressWarnings({"UnnecessaryLocalVariable", "SameParameterValue"})
 public class BinaryGridRenderer{
@@ -156,13 +158,13 @@ public class BinaryGridRenderer{
 	
 	private <T extends IOInstance<T>> void annotateBitField(
 		AnnotateCtx ctx,
-		T instance, IOField<T, ?> field,
+		Struct.Pool<T> ioPool, T instance, IOField<T, ?> field,
 		Color col, int bitOffset, long bitSize, Reference reference, long fieldOffset
 	) throws IOException{
 		Consumer<DrawUtils.Rect> doSegment=bitRect->{
 			renderer.setColor(ColorUtils.alpha(col, 0.8F).darker());
 			renderer.fillQuad(bitRect.x, bitRect.y, bitRect.width, bitRect.height);
-			drawStringInInfo(col, Objects.toString(field.instanceToString(instance, true)), bitRect, false, ctx.strings);
+			drawStringInInfo(col, Objects.toString(field.instanceToString(ioPool, instance, true)), bitRect, false, ctx.strings);
 		};
 		
 		if(instance instanceof Chunk ch){
@@ -200,7 +202,7 @@ public class BinaryGridRenderer{
 	
 	private <T extends IOInstance<T>> void annotateByteField(
 		AnnotateCtx ctx,
-		T instance, IOField<T, ?> field,
+		Struct.Pool<T> ioPool, T instance, IOField<T, ?> field,
 		Color col, Reference reference, Range fieldRange
 	){
 		boolean hover    =false;
@@ -225,7 +227,7 @@ public class BinaryGridRenderer{
 		
 		var rectWidth=bestRange.toRect(ctx.renderCtx).width;
 		
-		String str     =field.instanceToString(instance, false);
+		String str     =field.instanceToString(ioPool, instance, false);
 		String shortStr=null;
 		String both;
 		
@@ -238,7 +240,7 @@ public class BinaryGridRenderer{
 		
 		both=fStr+(str==null?"":": "+str);
 		if(str!=null&&getStringBounds(both).width()>rectWidth){
-			shortStr=field.instanceToString(instance, true);
+			shortStr=field.instanceToString(ioPool, instance, true);
 			both=fStr+(shortStr==null?"":": "+shortStr);
 		}
 		
@@ -257,7 +259,7 @@ public class BinaryGridRenderer{
 			var drawStr=str;
 			
 			if(getStringBounds(drawStr).width()>rectWidth){
-				if(shortStr==null) shortStr=field.instanceToString(instance, true);
+				if(shortStr==null) shortStr=field.instanceToString(ioPool, instance, true);
 				drawStr=shortStr;
 			}
 			var r=bestRange.toRect(ctx.renderCtx);
@@ -1078,9 +1080,19 @@ public class BinaryGridRenderer{
 				offsetStart=reference.calcGlobalOffset(ctx.provider);
 			}
 			
+			var ioPool=instance.getThisStruct().allocVirtualVarPool(IO);
+			var read  =false;
 			while(iterator.hasNext()){
 				IOField<T, Object> field=iterator.next();
 				try{
+					
+					var acc=field.getAccessor();
+					if(!read&&acc instanceof VirtualAccessor<T> vAcc&&vAcc.getStoragePool()==IO){
+						read=true;
+						reference.withContext(ctx.provider).io(io->{
+							pipe.read(ioPool, ctx.provider, io, instance, null);
+						});
+					}
 					
 					var col=ColorUtils.makeCol(rand, typeHash, field);
 					
@@ -1088,16 +1100,15 @@ public class BinaryGridRenderer{
 					
 					long trueOffset=offsetStart+fieldOffset;
 					var  sizeDesc  =field.getSizeDescriptor();
-					size=sizeDesc.calcUnknown(ctx.provider, instance);
+					size=sizeDesc.calcUnknown(ioPool, ctx.provider, instance);
 					
 					try{
-						var acc=field.getAccessor();
 						if(acc!=null&&acc.hasAnnotation(IOType.Dynamic.class)){
 							
-							var inst=field.get(instance);
+							var inst=field.get(ioPool, instance);
 							if(inst==null) continue;
 							if(IOFieldPrimitive.isPrimitive(inst.getClass())||inst.getClass()==String.class){
-								if(annotate) annotateByteField(ctx, instance, field, col, reference, Range.fromSize(fieldOffset, size));
+								if(annotate) annotateByteField(ctx, ioPool, instance, field, col, reference, Range.fromSize(fieldOffset, size));
 								continue;
 							}
 							if(inst instanceof IOInstance<?> ioi){
@@ -1122,7 +1133,7 @@ public class BinaryGridRenderer{
 								}
 							}
 							
-							if(annotate) annotateByteField(ctx, instance, field, col, reference, Range.fromSize(fieldOffset, size));
+							if(annotate) annotateByteField(ctx, ioPool, instance, field, col, reference, Range.fromSize(fieldOffset, size));
 							if(!diffPos){
 								int xByte    =(int)(renderer.getDisplay().getMouseX()/rctx.pixelsPerByte());
 								int yByte    =(int)(renderer.getDisplay().getMouseY()/rctx.pixelsPerByte());
@@ -1135,7 +1146,7 @@ public class BinaryGridRenderer{
 								}
 							}
 							if(!diffPos) ctx.popStrings(renderer);
-							annotateStruct(ctx, refField.get(instance), ref, refField.getReferencedPipe(instance), diffPos);
+							annotateStruct(ctx, refField.get(ioPool, instance), ref, refField.getReferencedPipe(instance), diffPos);
 							
 							continue;
 						}
@@ -1145,9 +1156,9 @@ public class BinaryGridRenderer{
 							for(IOField.Bit<T, ?> bit : merger.getGroup()){
 								
 								var bCol=ColorUtils.makeCol(rand, typeHash, bit);
-								var siz =bit.getSizeDescriptor().calcUnknown(ctx.provider, instance);
+								var siz =bit.getSizeDescriptor().calcUnknown(ioPool, ctx.provider, instance);
 								
-								if(annotate) annotateBitField(ctx, instance, bit, bCol, bitOffset, siz, reference, fieldOffset);
+								if(annotate) annotateBitField(ctx, ioPool, instance, bit, bCol, bitOffset, siz, reference, fieldOffset);
 								bitOffset+=siz;
 							}
 							continue;
@@ -1158,9 +1169,9 @@ public class BinaryGridRenderer{
 						
 						if(UtilL.instanceOf(acc.getType(), ChunkPointer.class)){
 							
-							var ch=(ChunkPointer)field.get(instance);
+							var ch=(ChunkPointer)field.get(ioPool, instance);
 							
-							if(annotate) annotateByteField(ctx, instance, field, col, reference, Range.fromSize(fieldOffset, size));
+							if(annotate) annotateByteField(ctx, ioPool, instance, field, col, reference, Range.fromSize(fieldOffset, size));
 							
 							if(!ch.isNull()){
 								var msg=field.toString();
@@ -1177,15 +1188,15 @@ public class BinaryGridRenderer{
 							if(annotate){
 								renderer.setColor(col);
 								if(sizeDesc.getWordSpace()==WordSpace.BIT){
-									annotateBitField(ctx, instance, field, col, 0, size, reference, fieldOffset);
+									annotateBitField(ctx, ioPool, instance, field, col, 0, size, reference, fieldOffset);
 								}else{
-									annotateByteField(ctx, instance, field, col, reference, Range.fromSize(fieldOffset, size));
+									annotateByteField(ctx, ioPool, instance, field, col, reference, Range.fromSize(fieldOffset, size));
 								}
 							}
 						}else{
 							var typ=acc.getType();
 							if(typ==Object.class){
-								var inst=field.get(instance);
+								var inst=field.get(ioPool, instance);
 								if(inst==null){
 									continue;
 								}else{
@@ -1193,14 +1204,14 @@ public class BinaryGridRenderer{
 								}
 							}
 							if(UtilL.instanceOf(typ, IOInstance.class)){
-								var inst=(IOInstance<?>)field.get(instance);
+								var inst=(IOInstance<?>)field.get(ioPool, instance);
 								if(inst!=null){
 									annotateStruct(ctx, (T)inst, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), inst.getThisStruct()), annotate);
 								}
 								continue;
 							}
 							if(typ.isArray()&&IOInstance.isManaged(typ.componentType())){
-								var inst  =(IOInstance<?>[])field.get(instance);
+								var inst  =(IOInstance<?>[])field.get(ioPool, instance);
 								var arrSiz=Array.getLength(inst);
 								
 								StructPipe elementPipe=ContiguousStructPipe.of(Struct.ofUnknown(typ.componentType()));
@@ -1208,12 +1219,12 @@ public class BinaryGridRenderer{
 								for(int i=0;i<arrSiz;i++){
 									var val=(IOInstance)Array.get(inst, i);
 									annotateStruct(ctx, val, reference.addOffset(fieldOffset+arrOffset), elementPipe, annotate);
-									arrOffset+=elementPipe.getSizeDescriptor().calcUnknown(ctx.provider, val, WordSpace.BYTE);
+									arrOffset+=elementPipe.getSizeDescriptor().calcUnknown(ioPool, ctx.provider, val, WordSpace.BYTE);
 								}
 								continue;
 							}
 							if(typ==String.class){
-								if(annotate) annotateByteField(ctx, instance, field, col, reference, Range.fromSize(fieldOffset, size));
+								if(annotate) annotateByteField(ctx, ioPool, instance, field, col, reference, Range.fromSize(fieldOffset, size));
 								continue;
 							}
 							LogUtil.printlnEr("unmanaged draw type:", typ.toString(), acc);

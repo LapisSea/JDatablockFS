@@ -16,7 +16,8 @@ import java.util.List;
 public class ContiguousStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 	
 	public static <T extends IOInstance<T>> long sizeOfUnknown(DataProvider provider, T instance, WordSpace wordSpace){
-		return ContiguousStructPipe.of(instance.getThisStruct()).getSizeDescriptor().calcUnknown(provider, instance, wordSpace);
+		var pip=ContiguousStructPipe.of(instance.getThisStruct());
+		return pip.calcUnknownSize(provider, instance, wordSpace);
 	}
 	
 	public static <T extends IOInstance<T>> StructPipe<T> of(Class<T> type){
@@ -41,23 +42,12 @@ public class ContiguousStructPipe<T extends IOInstance<T>> extends StructPipe<T>
 	@Override
 	protected void doWrite(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		var ioPool=makeIOPool();
-		try{
-			pushPool(ioPool);
-			writeIOFields(provider, dest, instance);
-		}finally{
-			popPool();
-		}
+		writeIOFields(ioPool, provider, dest, instance);
 	}
 	
 	@Override
-	protected T doRead(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		var ioPool=makeIOPool();
-		try{
-			pushPool(ioPool);
-			readIOFields(provider, src, instance, genericContext);
-		}finally{
-			popPool();
-		}
+	protected T doRead(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		readIOFields(ioPool, provider, src, instance, genericContext);
 		return instance;
 	}
 }

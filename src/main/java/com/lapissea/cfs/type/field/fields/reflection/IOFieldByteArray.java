@@ -5,6 +5,7 @@ import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
@@ -22,10 +23,10 @@ public class IOFieldByteArray<T extends IOInstance<T>> extends IOField<T, byte[]
 	public IOFieldByteArray(FieldAccessor<T> accessor){
 		super(accessor);
 		
-		descriptor=new SizeDescriptor.Unknown<>(0, OptionalLong.empty(), (prov, inst)->{
-			var siz=arraySize.getValue(inst);
+		descriptor=new SizeDescriptor.Unknown<>(0, OptionalLong.empty(), (ioPool, prov, inst)->{
+			var siz=arraySize.getValue(ioPool, inst);
 			if(siz>0) return siz;
-			var arr=get(inst);
+			var arr=get(ioPool, inst);
 			return arr.length;
 		});
 	}
@@ -40,21 +41,21 @@ public class IOFieldByteArray<T extends IOInstance<T>> extends IOField<T, byte[]
 		return descriptor;
 	}
 	@Override
-	public void write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
-		var arr=get(instance);
+	public void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+		var arr=get(ioPool, instance);
 		dest.writeInts1(arr);
 	}
 	@Override
-	public void read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		int    size=arraySize.getValue(instance);
+	public void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		int    size=arraySize.getValue(ioPool, instance);
 		byte[] data=new byte[size];
 		src.readFully(data);
-		set(instance, data);
+		set(ioPool, instance, data);
 	}
 	
 	@Override
-	public void skipRead(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		int size=arraySize.getValue(instance);
+	public void skipRead(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		int size=arraySize.getValue(ioPool, instance);
 		src.skipExact(size);
 	}
 }

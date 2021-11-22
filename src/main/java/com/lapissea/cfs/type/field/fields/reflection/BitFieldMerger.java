@@ -7,10 +7,7 @@ import com.lapissea.cfs.io.bit.BitInputStream;
 import com.lapissea.cfs.io.bit.BitOutputStream;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
-import com.lapissea.cfs.type.FieldSet;
-import com.lapissea.cfs.type.GenericContext;
-import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.WordSpace;
+import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
@@ -58,7 +55,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 			sizeDescriptor=new SizeDescriptor.Unknown<>(
 				IOFieldTools.sumVars(group, SizeDescriptor::getMin),
 				IOFieldTools.sumVarsIfAll(group, SizeDescriptor::getMax),
-				(prov, inst)->Utils.bitToByte(group.stream().mapToLong(s->s.getSizeDescriptor().calcUnknown(prov, inst)).sum())
+				(ioPool, prov, inst)->Utils.bitToByte(group.stream().mapToLong(s->s.getSizeDescriptor().calcUnknown(ioPool, prov, inst)).sum())
 			);
 		}
 		initLateData(new FieldSet<>(group.stream().flatMap(f->f.getDependencies().stream())), group.stream().flatMap(f->f.getUsageHints().stream()));
@@ -70,15 +67,15 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 	}
 	
 	@Override
-	public void write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
+	public void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		try(var stream=new BitOutputStream(dest)){
 			for(var fi : group){
 				if(DEBUG_VALIDATION){
-					long size=fi.getSizeDescriptor().calcUnknown(provider, instance);
+					long size=fi.getSizeDescriptor().calcUnknown(ioPool, provider, instance);
 					var  oldW=stream.getTotalBits();
 					
 					try{
-						fi.writeBits(stream, instance);
+						fi.writeBits(ioPool, stream, instance);
 					}catch(Exception e){
 						throw new IOException("Failed to write "+fi, e);
 					}
@@ -86,7 +83,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 					if(written!=size) throw new RuntimeException("Written bits "+written+" but "+size+" expected on "+fi);
 				}else{
 					try{
-						fi.writeBits(stream, instance);
+						fi.writeBits(ioPool, stream, instance);
 					}catch(Exception e){
 						throw new IOException("Failed to write "+fi, e);
 					}
@@ -96,25 +93,25 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 	}
 	
 	@Override
-	public void read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		try(var stream=new BitInputStream(src)){
 			for(var fi : group){
 				if(DEBUG_VALIDATION){
-					long size=fi.getSizeDescriptor().calcUnknown(provider, instance);
+					long size=fi.getSizeDescriptor().calcUnknown(ioPool, provider, instance);
 					var  oldW=stream.getTotalBits();
 					
-					fi.readBits(stream, instance);
+					fi.readBits(ioPool, stream, instance);
 					var read=stream.getTotalBits()-oldW;
 					if(read!=size) throw new RuntimeException("Read bits "+read+" but "+size+" expected on "+fi);
 				}else{
-					fi.readBits(stream, instance);
+					fi.readBits(ioPool, stream, instance);
 				}
 			}
 		}
 	}
 	
 	@Override
-	public void skipRead(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public void skipRead(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		
 		var fixed=getSizeDescriptor().getFixed(WordSpace.BYTE);
 		if(fixed.isPresent()){
@@ -125,7 +122,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 		try(var stream=new BitInputStream(src)){
 			for(var fi : group){
 				if(DEBUG_VALIDATION){
-					long size=fi.getSizeDescriptor().calcUnknown(provider, instance);
+					long size=fi.getSizeDescriptor().calcUnknown(ioPool, provider, instance);
 					var  oldW=stream.getTotalBits();
 					
 					fi.skipReadBits(stream, instance);
@@ -139,14 +136,14 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 	}
 	
 	@Override
-	public String instanceToString(T instance, boolean doShort){
+	public String instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort){
 		StringBuilder sb=new StringBuilder();
 		sb.append('{');
 		boolean separator=false;
 		for(var field : group){
 			String str;
 			try{
-				str=field.instanceToString(instance, doShort||TextUtil.USE_SHORT_IN_COLLECTIONS);
+				str=field.instanceToString(ioPool, instance, doShort||TextUtil.USE_SHORT_IN_COLLECTIONS);
 			}catch(FieldIsNullException e){
 				str="<ERR: "+e.getMessage()+">";
 			}
@@ -166,11 +163,11 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 		return group.stream().map(IOField::getName).collect(Collectors.joining("+"));
 	}
 	@Override
-	public Object get(T instance){
+	public Object get(Struct.Pool<T> ioPool, T instance){
 		throw new UnsupportedOperationException();
 	}
 	@Override
-	public void set(T instance, Object value){
+	public void set(Struct.Pool<T> ioPool, T instance, Object value){
 		throw new UnsupportedOperationException();
 	}
 	

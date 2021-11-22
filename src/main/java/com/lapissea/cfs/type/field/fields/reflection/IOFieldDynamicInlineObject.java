@@ -59,8 +59,8 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		
 		long minSize=nullSize+Math.min(refDesc.getMin(WordSpace.BYTE), minKnownTypeSize);
 		
-		descriptor=new SizeDescriptor.Unknown<>(minSize, OptionalLong.empty(), (prov, inst)->{
-			var val=get(inst);
+		descriptor=new SizeDescriptor.Unknown<>(minSize, OptionalLong.empty(), (ioPool, prov, inst)->{
+			var val=get(null, inst);
 			if(val==null) return nullSize;
 			return nullSize+calcSize(prov, val);
 		});
@@ -78,14 +78,14 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 			case Float ignored -> 4;
 			case Double ignored -> 8;
 			case Number integer -> 1+NumberSize.bySize(numToLong(integer)).bytes;
-			case String str -> STR_PIPE.getSizeDescriptor().calcUnknown(prov, new AutoText(str), WordSpace.BYTE);
+			case String str -> STR_PIPE.calcUnknownSize(prov, new AutoText(str), WordSpace.BYTE);
 			case byte[] array -> {
 				var num=NumberSize.bySize(array.length);
 				yield 1+num.bytes+array.length;
 			}
 			case IOInstance inst -> {
 				if(inst instanceof IOInstance.Unmanaged<?> u){
-					yield REF_PIPE.getSizeDescriptor().calcUnknown(prov, u.getReference(), WordSpace.BYTE);
+					yield REF_PIPE.calcUnknownSize(prov, u.getReference(), WordSpace.BYTE);
 				}else{
 					yield ContiguousStructPipe.sizeOfUnknown(prov, inst, WordSpace.BYTE);
 				}
@@ -208,8 +208,8 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 	}
 	
 	@Override
-	public ValueType get(CTyp instance){
-		ValueType value=super.get(instance);
+	public ValueType get(Struct.Pool<CTyp> ioPool, CTyp instance){
+		ValueType value=super.get(ioPool, instance);
 		return switch(getNullability()){
 			case NOT_NULL -> requireValNN(value);
 			case NULLABLE -> value;
@@ -218,8 +218,8 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 	}
 	
 	@Override
-	public void set(CTyp instance, ValueType value){
-		super.set(instance, switch(getNullability()){
+	public void set(Struct.Pool<CTyp> ioPool, CTyp instance, ValueType value){
+		super.set(ioPool, instance, switch(getNullability()){
 			case DEFAULT_IF_NULL, NULLABLE -> value;
 			case NOT_NULL -> Objects.requireNonNull(value);
 		});
@@ -233,8 +233,8 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 	@Override
 	public List<ValueGeneratorInfo<CTyp, ?>> getGenerators(){
 		return List.of(new ValueGeneratorInfo<>(typeID, new ValueGenerator<CTyp, Integer>(){
-			private int getId(DataProvider provider, CTyp instance) throws IOException{
-				var val=get(instance);
+			private int getId(Struct.Pool<CTyp> ioPool, DataProvider provider, CTyp instance) throws IOException{
+				var val=get(ioPool, instance);
 				if(val==null) return 0;
 				
 				TypeDefinition def;
@@ -246,20 +246,20 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 				return provider.getTypeDb().toID(def);
 			}
 			@Override
-			public boolean shouldGenerate(DataProvider provider, CTyp instance) throws IOException{
-				int id       =getId(provider, instance);
-				var writtenId=typeID.getValue(instance);
+			public boolean shouldGenerate(Struct.Pool<CTyp> ioPool, DataProvider provider, CTyp instance) throws IOException{
+				int id       =getId(ioPool, provider, instance);
+				var writtenId=typeID.getValue(ioPool, instance);
 				return id!=writtenId;
 			}
 			@Override
-			public Integer generate(DataProvider provider, CTyp instance, boolean allowExternalMod) throws IOException{
-				return getId(provider, instance);
+			public Integer generate(Struct.Pool<CTyp> ioPool, DataProvider provider, CTyp instance, boolean allowExternalMod) throws IOException{
+				return getId(ioPool, provider, instance);
 			}
 		}));
 	}
 	@Override
-	public void write(DataProvider provider, ContentWriter dest, CTyp instance) throws IOException{
-		var val=get(instance);
+	public void write(Struct.Pool<CTyp> ioPool, DataProvider provider, ContentWriter dest, CTyp instance) throws IOException{
+		var val=get(ioPool, instance);
 		
 		if(nullable()){
 			if(val==null){
@@ -272,13 +272,13 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		writeValue(provider, dest, val);
 	}
 	
-	private TypeDefinition getType(DataProvider provider, CTyp instance) throws IOException{
-		int id=typeID.getValue(instance);
+	private TypeDefinition getType(Struct.Pool<CTyp> ioPool, DataProvider provider, CTyp instance) throws IOException{
+		int id=typeID.getValue(ioPool, instance);
 		return provider.getTypeDb().fromID(id);
 	}
 	
 	@Override
-	public void read(DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
+	public void read(Struct.Pool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
 		Object val;
 		read:
 		{
@@ -289,22 +289,22 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 				}
 			}
 			
-			TypeDefinition typ=getType(provider, instance);
+			TypeDefinition typ=getType(ioPool, provider, instance);
 			val=readTyp(typ, provider, src, genericContext);
 		}
 		//noinspection unchecked
-		set(instance, (ValueType)val);
+		set(ioPool, instance, (ValueType)val);
 	}
 	
 	@Override
-	public void skipRead(DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
+	public void skipRead(Struct.Pool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
 		if(nullable()){
 			if(!src.readBoolean()){
 				return;
 			}
 		}
 		
-		TypeDefinition typ=getType(provider, instance);
+		TypeDefinition typ=getType(ioPool, provider, instance);
 		skipReadTyp(typ, provider, src, genericContext);
 	}
 }

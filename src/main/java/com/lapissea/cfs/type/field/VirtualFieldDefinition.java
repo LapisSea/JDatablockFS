@@ -2,6 +2,7 @@ package com.lapissea.cfs.type.field;
 
 import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 
 import java.lang.annotation.Annotation;
@@ -16,7 +17,7 @@ import java.util.List;
 public final class VirtualFieldDefinition<IO extends IOInstance<IO>, T>{
 	
 	public interface GetterFilter<IO extends IOInstance<IO>, T>{
-		T filter(IO instance, List<FieldAccessor<IO>> dependencies, T value);
+		T filter(Struct.Pool<IO> ioPool, IO instance, List<FieldAccessor<IO>> dependencies, T value);
 	}
 	
 	public enum StoragePool{
@@ -28,7 +29,7 @@ public final class VirtualFieldDefinition<IO extends IOInstance<IO>, T>{
 		 * Values in this storage pool remain as long as there is an IO operation is executing.
 		 * Used for fields that are only needed to correctly read another field such as length of an array.
 		 */
-		IO("IO"),//TODO: make IO fields readable or at least size computable when displaying them
+		IO("IO"),
 		/**
 		 * Values in this storage pool are never stored.
 		 */

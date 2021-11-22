@@ -12,8 +12,6 @@ import com.lapissea.util.Nullable;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
-import java.util.Deque;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
@@ -39,32 +37,10 @@ public class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends AbstractFiel
 	private final int                                  accessIndex;
 	private       List<FieldAccessor<CTyp>>            deps;
 	
-	private Deque<Struct.Pool<CTyp>> ioPoolStack;
-	private Struct.Pool<CTyp>        ioPool;
-	
 	public VirtualAccessor(Struct<CTyp> struct, VirtualFieldDefinition<CTyp, Object> type, int accessIndex){
 		super(struct, type.getName());
 		this.type=type;
 		this.accessIndex=accessIndex;
-	}
-	
-	public void popIoPool(){
-		if(this.ioPoolStack!=null){
-			if(!ioPoolStack.isEmpty()){
-				ioPool=ioPoolStack.pop();
-				return;
-			}
-		}
-		ioPool=null;
-	}
-	public void pushIoPool(Struct.Pool<CTyp> ioPool){
-		if(this.ioPool!=null){
-			if(ioPoolStack==null){
-				ioPoolStack=new LinkedList<>();
-			}
-			ioPoolStack.push(this.ioPool);
-		}
-		this.ioPool=ioPool;
 	}
 	
 	public int getAccessIndex(){
@@ -108,7 +84,7 @@ public class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends AbstractFiel
 	}
 	
 	@Override
-	public Object get(CTyp instance){
+	public Object get(Struct.Pool<CTyp> ioPool, CTyp instance){
 		var rawVal=switch(getStoragePool()){
 			case INSTANCE -> getVirtualPool(instance).get(this);
 			case IO -> {
@@ -121,11 +97,11 @@ public class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends AbstractFiel
 		if(filter==null){
 			return rawVal;
 		}
-		return filter.filter(instance, deps, rawVal);
+		return filter.filter(ioPool, instance, deps, rawVal);
 	}
 	
 	@Override
-	public void set(CTyp instance, Object value){
+	public void set(Struct.Pool<CTyp> ioPool, CTyp instance, Object value){
 		switch(getStoragePool()){
 			case INSTANCE -> getVirtualPool(instance).set(this, value);
 			case IO -> {
@@ -141,55 +117,55 @@ public class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends AbstractFiel
 	}
 	
 	@Override
-	public double getDouble(CTyp instance){
-		return (double)get(instance);
+	public double getDouble(Struct.Pool<CTyp> ioPool, CTyp instance){
+		return (double)get(ioPool, instance);
 	}
 	@Override
-	public void setDouble(CTyp instance, double value){
-		set(instance, value);
+	public void setDouble(Struct.Pool<CTyp> ioPool, CTyp instance, double value){
+		set(ioPool, instance, value);
 	}
 	@Override
-	public float getFloat(CTyp instance){
-		return (float)get(instance);
+	public float getFloat(Struct.Pool<CTyp> ioPool, CTyp instance){
+		return (float)get(ioPool, instance);
 	}
 	@Override
-	public void setFloat(CTyp instance, float value){
-		set(instance, value);
+	public void setFloat(Struct.Pool<CTyp> ioPool, CTyp instance, float value){
+		set(ioPool, instance, value);
 	}
 	@Override
-	public byte getByte(CTyp instance){
-		return (byte)get(instance);
+	public byte getByte(Struct.Pool<CTyp> ioPool, CTyp instance){
+		return (byte)get(ioPool, instance);
 	}
 	@Override
-	public void setByte(CTyp instance, byte value){
-		set(instance, value);
+	public void setByte(Struct.Pool<CTyp> ioPool, CTyp instance, byte value){
+		set(ioPool, instance, value);
 	}
 	@Override
-	public boolean getBoolean(CTyp instance){
-		return (boolean)get(instance);
+	public boolean getBoolean(Struct.Pool<CTyp> ioPool, CTyp instance){
+		return (boolean)get(ioPool, instance);
 	}
 	@Override
-	public void setBoolean(CTyp instance, boolean value){
-		set(instance, value);
+	public void setBoolean(Struct.Pool<CTyp> ioPool, CTyp instance, boolean value){
+		set(ioPool, instance, value);
 	}
 	@Override
-	public long getLong(CTyp instance){
-		var val=get(instance);
+	public long getLong(Struct.Pool<CTyp> ioPool, CTyp instance){
+		var val=get(ioPool, instance);
 		if(val instanceof Long l) return l;
 		if(val instanceof Integer l) return l;
 		throw new ClassCastException(val.getClass()+" is not long");
 	}
 	@Override
-	public void setLong(CTyp instance, long value){
-		set(instance, value);
+	public void setLong(CTyp instance, long value, Struct.Pool<CTyp> ioPool){
+		set(ioPool, instance, value);
 	}
 	@Override
-	public int getInt(CTyp instance){
-		return (int)get(instance);
+	public int getInt(Struct.Pool<CTyp> ioPool, CTyp instance){
+		return (int)get(ioPool, instance);
 	}
 	@Override
-	public void setInt(CTyp instance, int value){
-		set(instance, value);
+	public void setInt(Struct.Pool<CTyp> ioPool, CTyp instance, int value){
+		set(ioPool, instance, value);
 	}
 	
 	@Override

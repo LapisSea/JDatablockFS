@@ -146,13 +146,13 @@ public class Struct<T extends IOInstance<T>>{
 		}
 		
 		@Override
-		public String instanceToString(T instance, boolean doShort){
+		public String instanceToString(Pool<T> ioPool, T instance, boolean doShort){
 			StringBuilder sb=new StringBuilder();
 			if(!doShort) sb.append(getType().getSimpleName());
 			sb.append('{');
 			boolean comma=false;
 			for(var field : getFields()){
-				var str=field.instanceToString(instance, doShort);
+				var str=field.instanceToString(ioPool, instance, doShort);
 				if(str==null) continue;
 				
 				if(comma) sb.append(", ");
@@ -163,7 +163,7 @@ public class Struct<T extends IOInstance<T>>{
 			var iter=instance.listDynamicUnmanagedFields().iterator();
 			while(iter.hasNext()){
 				var field=iter.next();
-				var str  =field.instanceToString(instance, doShort);
+				var str  =field.instanceToString(ioPool, instance, doShort);
 				if(str==null) continue;
 				
 				if(comma) sb.append(", ");
@@ -319,7 +319,7 @@ public class Struct<T extends IOInstance<T>>{
 		return getFields().byName(field.getName()).orElseThrow();
 	}
 	
-	public String instanceToString(T instance, boolean doShort){
+	public String instanceToString(Pool<T> ioPool, T instance, boolean doShort){
 		StringBuilder sb=new StringBuilder();
 		if(!doShort) sb.append(getType().getSimpleName());
 		sb.append('{');
@@ -327,7 +327,7 @@ public class Struct<T extends IOInstance<T>>{
 		for(var field : fields){
 			String str;
 			try{
-				str=field.instanceToString(instance, doShort||TextUtil.USE_SHORT_IN_COLLECTIONS);
+				str=field.instanceToString(ioPool, instance, doShort||TextUtil.USE_SHORT_IN_COLLECTIONS);
 			}catch(FieldIsNullException e){
 				str="<ERR: "+e.getMessage()+">";
 			}

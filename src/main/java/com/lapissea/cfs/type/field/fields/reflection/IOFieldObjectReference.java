@@ -62,7 +62,7 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	public void allocate(T instance, DataProvider provider, GenericContext genericContext) throws IOException{
 		ValueType val=struct.requireEmptyConstructor().get();
 		allocAndSet(instance, provider, val);
-		set(instance, val);
+		set(null, instance, val);
 	}
 	@Override
 	public void setReference(T instance, Reference newRef){
@@ -72,12 +72,12 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 				throw new NullPointerException();
 			}
 		}
-		referenceField.set(instance, newRef);
+		referenceField.set(null, instance, newRef);
 	}
 	
 	private void allocAndSet(T instance, DataProvider provider, ValueType val) throws IOException{
 		var ref=allocNew(provider, val);
-		referenceField.set(instance, ref);
+		referenceField.set(null, instance, ref);
 	}
 	private Reference allocNew(DataProvider provider, ValueType val) throws IOException{
 		Chunk chunk=AllocateTicket.withData(instancePipe, provider, val).submit(provider);
@@ -85,8 +85,8 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	}
 	
 	@Override
-	public ValueType get(T instance){
-		var val=super.get(instance);
+	public ValueType get(Struct.Pool<T> ioPool, T instance){
+		var val=super.get(ioPool, instance);
 		return switch(getNullability()){
 			case NULLABLE, DEFAULT_IF_NULL -> val;
 			case NOT_NULL -> requireValNN(val);
@@ -106,11 +106,11 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	}
 	
 	private Reference getRef(T instance){
-		var ref=referenceField.get(instance);
+		var ref=referenceField.get(null, instance);
 		if(ref.isNull()){
 			return switch(getNullability()){
 				case NOT_NULL -> throw new NullPointerException();
-				case NULLABLE -> get(instance)!=null?null:ref;
+				case NULLABLE -> get(null, instance)!=null?null:ref;
 				case DEFAULT_IF_NULL -> null;
 			};
 			
@@ -141,11 +141,11 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	public List<ValueGeneratorInfo<T, ?>> getGenerators(){
 		return List.of(new ValueGeneratorInfo<>(referenceField, new ValueGenerator<>(){
 			@Override
-			public boolean shouldGenerate(DataProvider provider, T instance){
+			public boolean shouldGenerate(Struct.Pool<T> ioPool, DataProvider provider, T instance){
 				boolean refNull=switch(getNullability()){
 					case NOT_NULL, DEFAULT_IF_NULL -> false;
 					case NULLABLE -> {
-						var val=get(instance);
+						var val=get(ioPool, instance);
 						yield val==null;
 					}
 				};
@@ -156,8 +156,8 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 				return refNull!=isRefNull;
 			}
 			@Override
-			public Reference generate(DataProvider provider, T instance, boolean allowExternalMod) throws IOException{
-				var val=get(instance);
+			public Reference generate(Struct.Pool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException{
+				var val=get(ioPool, instance);
 				if(val==null&&getNullability()==IONullability.Mode.DEFAULT_IF_NULL){
 					val=struct.requireEmptyConstructor().get();
 				}
@@ -176,8 +176,8 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 		}));
 	}
 	@Override
-	public void write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
-		var val=get(instance);
+	public void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+		var val=get(ioPool, instance);
 		if(val==null&&getNullability()==IONullability.Mode.DEFAULT_IF_NULL){
 			val=struct.requireEmptyConstructor().get();
 		}
@@ -199,12 +199,12 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	}
 	
 	@Override
-	public void read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		set(instance, readValue(provider, Objects.requireNonNull(getRef(instance)), genericContext));
+	public void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		set(ioPool, instance, readValue(provider, Objects.requireNonNull(getRef(instance)), genericContext));
 	}
 	
 	@Override
-	public void skipRead(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public void skipRead(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		throw NotImplementedException.infer();//TODO: implement IOFieldObjectReference.skipRead()
 	}
 }

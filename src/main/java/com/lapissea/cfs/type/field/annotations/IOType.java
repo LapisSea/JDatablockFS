@@ -24,10 +24,10 @@ public @interface IOType{
 			@Override
 			public <T extends IOInstance<T>> List<VirtualFieldDefinition<T, ?>> injectPerInstanceValue(FieldAccessor<T> field, Dynamic annotation){
 				var f=new VirtualFieldDefinition<T, Integer>(
-					VirtualFieldDefinition.StoragePool.INSTANCE,//FIXME: this should be changed IO once IO reading or sizing is implemented
+					VirtualFieldDefinition.StoragePool.IO,
 					IOFieldTools.makeGenericIDFieldName(field),
 					Integer.class,
-					(instance, dependencies, value)->value==null?0:value,
+					(ioPool, instance, dependencies, value)->value==null?0:value,
 					List.of(IOFieldTools.makeAnnotation(IODependency.VirtualNumSize.class, Map.of()))
 				);
 				return List.of(f);
