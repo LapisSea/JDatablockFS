@@ -121,7 +121,7 @@ public class MemoryWalker{
 					if(stack.size()==4&&field.toString().equals("#value")){
 						LogUtil.println("AAAAAA");
 					}
-					size=sizeDesc.calcUnknown(cluster, instance);
+					size=sizeDesc.calcUnknown(ioPool, cluster, instance);
 				}catch(Throwable e){
 					throw e;
 				}
