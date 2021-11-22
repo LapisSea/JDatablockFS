@@ -93,7 +93,7 @@ public class FixedContiguousStructPipe<T extends IOInstance<T>> extends StructPi
 	}
 	
 	private Stream<IOField<T, NumberSize>> sizeFieldStream(){
-		return getType().getFields().byType(NumberSize.class).filter(f->f.getUsageHints().contains(SIZE_DATA));
+		return getType().getFields().byType(NumberSize.class).filter(f->f.hasUsageHint(SIZE_DATA));
 	}
 	
 	public <E extends IOInstance<E>> SizeDescriptor.Fixed<E> getFixedDescriptor(){
