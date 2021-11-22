@@ -58,7 +58,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 				(ioPool, prov, inst)->Utils.bitToByte(group.stream().mapToLong(s->s.getSizeDescriptor().calcUnknown(ioPool, prov, inst)).sum())
 			);
 		}
-		initLateData(new FieldSet<>(group.stream().flatMap(f->f.getDependencies().stream())), group.stream().flatMap(IOField::usageHintsStream));
+		initLateData(FieldSet.of(group.stream().flatMap(f->f.getDependencies().stream())), group.stream().flatMap(IOField::usageHintsStream));
 	}
 	
 	@Override

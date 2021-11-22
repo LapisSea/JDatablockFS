@@ -108,14 +108,14 @@ public class IOFieldTools{
 		return opt.get();
 	}
 	
-	public static <T extends IOInstance<T>> OptionalLong sumVarsIfAll(List<? extends IOField<T, ?>> fields, Function<SizeDescriptor<T>, OptionalLong> mapper){
+	public static <T extends IOInstance<T>> OptionalLong sumVarsIfAll(Collection<? extends IOField<T, ?>> fields, Function<SizeDescriptor<T>, OptionalLong> mapper){
 		return fields.stream().map(IOField::getSizeDescriptor).map(mapper).reduce(OptionalLong.of(0), Utils::addIfBoth);
 	}
-	public static <T extends IOInstance<T>> long sumVars(List<? extends IOField<T, ?>> fields, ToLongFunction<SizeDescriptor<T>> mapper){
+	public static <T extends IOInstance<T>> long sumVars(Collection<? extends IOField<T, ?>> fields, ToLongFunction<SizeDescriptor<T>> mapper){
 		return fields.stream().map(IOField::getSizeDescriptor).mapToLong(mapper).sum();
 	}
 	
-	public static <T extends IOInstance<T>> WordSpace minWordSpace(List<? extends IOField<T, ?>> fields){
+	public static <T extends IOInstance<T>> WordSpace minWordSpace(Collection<? extends IOField<T, ?>> fields){
 		return fields.stream().map(IOField::getSizeDescriptor).map(SizeDescriptor::getWordSpace).reduce(WordSpace::min).orElse(WordSpace.MIN);
 	}
 	

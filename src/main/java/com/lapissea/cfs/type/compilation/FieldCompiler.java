@@ -32,8 +32,8 @@ import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.*;
-import static java.util.function.Function.*;
+import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.NONE;
+import static java.util.function.Function.identity;
 
 @SuppressWarnings("rawtypes")
 public class FieldCompiler{
@@ -59,7 +59,7 @@ public class FieldCompiler{
 	
 	public <T extends IOInstance.Unmanaged<T>> FieldSet<T> compileStaticUnmanaged(Struct.Unmanaged<T> struct){
 		var type=struct.getType();
-		return new FieldSet<>(List.of());
+		return FieldSet.of();
 	}
 	
 	public <T extends IOInstance<T>> FieldSet<T> compile(Struct<T> struct){
@@ -76,7 +76,7 @@ public class FieldCompiler{
 			var depAn=pair.annotations;
 			var field=pair.field;
 			
-			field.initLateData(new FieldSet<>(generateDependencies(fields, depAn, field)),
+			field.initLateData(FieldSet.of(generateDependencies(fields, depAn, field)),
 			                   fields.stream()
 			                         .flatMap(f->f.annotations.stream()
 			                                                  .flatMap(an->an.logic.getHints(f.field.getAccessor(), an.annotation)
@@ -90,7 +90,7 @@ public class FieldCompiler{
 			);
 		}
 		
-		return new FieldSet<>(fields.stream().map(AnnotatedField::field));
+		return FieldSet.of(fields.stream().map(AnnotatedField::field));
 	}
 	
 	private <T extends IOInstance<T>> Collection<IOField<T, ?>> generateDependencies(List<AnnotatedField<T>> fields, List<LogicalAnnotation<Annotation>> depAn, IOField<T, ?> field){

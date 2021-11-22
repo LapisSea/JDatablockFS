@@ -126,7 +126,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 					return getPipe();
 				}
 			};
-			next.initLateData(new FieldSet<>(List.of(getNextSizeField())), Stream.of());
+			next.initLateData(FieldSet.of(List.of(getNextSizeField())), Stream.of());
 			
 			return next;
 			

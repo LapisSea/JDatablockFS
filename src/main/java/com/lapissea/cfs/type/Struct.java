@@ -290,7 +290,7 @@ public class Struct<T extends IOInstance<T>>{
 		
 		//noinspection unchecked
 		var staticFields=(FieldSet<T>)FieldCompiler.create().compileStaticUnmanaged(unmanaged);
-		return new FieldSet<>(Stream.concat(fields.stream(), staticFields.stream()));
+		return FieldSet.of(Stream.concat(fields.stream(), staticFields.stream()));
 	}
 	
 	private int[] calcPoolSizes(){
