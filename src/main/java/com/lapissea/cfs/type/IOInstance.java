@@ -16,6 +16,7 @@ import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.INSTANCE;
+import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 
 @SuppressWarnings({"UnusedReturnValue", "unused"})
 public abstract class IOInstance<SELF extends IOInstance<SELF>>{
@@ -124,7 +125,7 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 			var siz=getPipe().getSizeDescriptor();
 			var f  =siz.getFixed(wordSpace);
 			if(f.isPresent()) return f.getAsLong();
-			return siz.calcUnknown(getDataProvider(), self(), wordSpace);
+			return siz.calcUnknown(getPipe().makeIOPool(), getDataProvider(), self(), wordSpace);
 		}
 		
 		public Reference getReference(){
@@ -166,10 +167,10 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 	
 	@Override
 	public String toString(){
-		return getThisStruct().instanceToString(self(), false);
+		return getThisStruct().instanceToString(getThisStruct().allocVirtualVarPool(IO), self(), false);
 	}
 	public String toShortString(){
-		return getThisStruct().instanceToString(self(), true);
+		return getThisStruct().instanceToString(getThisStruct().allocVirtualVarPool(IO), self(), true);
 	}
 	
 	@Override
@@ -180,8 +181,10 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 		var struct=getThisStruct();
 		if(that.getThisStruct()!=struct) return false;
 		
+		var ioPool1=struct.allocVirtualVarPool(IO);
+		var ioPool2=struct.allocVirtualVarPool(IO);
 		for(var field : struct.getFields()){
-			if(!field.instancesEqual(self(), (SELF)that)) return false;
+			if(!field.instancesEqual(ioPool1, self(), ioPool2, (SELF)that)) return false;
 		}
 		
 		return true;
@@ -189,8 +192,9 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 	@Override
 	public int hashCode(){
 		int result=1;
+		var ioPool=getThisStruct().allocVirtualVarPool(IO);
 		for(var field : thisStruct.getFields()){
-			result=31*result+field.instanceHashCode(self());
+			result=31*result+field.instanceHashCode(ioPool, self());
 		}
 		return result;
 	}
@@ -198,7 +202,7 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 	public void allocateNulls(DataProvider provider) throws IOException{
 		//noinspection unchecked
 		for(var ref : getThisStruct().getFields().byFieldTypeIter((Class<IOField.Ref<SELF, ?>>)(Object)IOField.Ref.class)){
-			if(!ref.isNull(self()))
+			if(!ref.isNull(getThisStruct().allocVirtualVarPool(IO), self()))
 				continue;
 			ref.allocate(self(), provider, getGenericContext());
 		}

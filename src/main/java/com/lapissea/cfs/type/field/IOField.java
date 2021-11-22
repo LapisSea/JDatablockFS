@@ -57,15 +57,15 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		}
 		
 		@Override
-		public void write(DataProvider provider, ContentWriter dest, Inst instance) throws IOException{
+		public void write(Struct.Pool<Inst> ioPool, DataProvider provider, ContentWriter dest, Inst instance) throws IOException{
 			throw new UnsupportedOperationException();
 		}
 		@Override
-		public void read(DataProvider provider, ContentReader src, Inst instance, GenericContext genericContext) throws IOException{
+		public void read(Struct.Pool<Inst> ioPool, DataProvider provider, ContentReader src, Inst instance, GenericContext genericContext) throws IOException{
 			throw new UnsupportedOperationException();
 		}
 		@Override
-		public void skipRead(DataProvider provider, ContentReader src, Inst instance, GenericContext genericContext) throws IOException{
+		public void skipRead(Struct.Pool<Inst> ioPool, DataProvider provider, ContentReader src, Inst instance, GenericContext genericContext) throws IOException{
 			throw new UnsupportedOperationException();
 		}
 	}
@@ -87,15 +87,15 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 			}
 			
 			@Override
-			public void write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
+			public void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 				throw new UnsupportedOperationException();
 			}
 			@Override
-			public void read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+			public void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 				throw new UnsupportedOperationException();
 			}
 			@Override
-			public void skipRead(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+			public void skipRead(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 				throw new UnsupportedOperationException();
 			}
 			@Override
@@ -132,39 +132,39 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		
 		@Deprecated
 		@Override
-		public final void write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
+		public final void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 			try(var writer=new BitOutputStream(dest)){
-				writeBits(writer, instance);
+				writeBits(ioPool, writer, instance);
 				if(DEBUG_VALIDATION){
-					writer.requireWritten(getSizeDescriptor().calcUnknown(provider, instance, WordSpace.BIT));
+					writer.requireWritten(getSizeDescriptor().calcUnknown(ioPool, provider, instance, WordSpace.BIT));
 				}
 			}
 		}
 		
 		@Deprecated
 		@Override
-		public final void read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		public final void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			try(var reader=new BitInputStream(src)){
-				readBits(reader, instance);
+				readBits(ioPool, reader, instance);
 				if(DEBUG_VALIDATION){
-					reader.requireRead(getSizeDescriptor().calcUnknown(provider, instance, WordSpace.BIT));
+					reader.requireRead(getSizeDescriptor().calcUnknown(ioPool, provider, instance, WordSpace.BIT));
 				}
 			}
 		}
 		
 		@Deprecated
 		@Override
-		public final void skipRead(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		public final void skipRead(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			try(var reader=new BitInputStream(src)){
 				skipReadBits(reader, instance);
 				if(DEBUG_VALIDATION){
-					reader.requireRead(getSizeDescriptor().calcUnknown(provider, instance, WordSpace.BIT));
+					reader.requireRead(getSizeDescriptor().calcUnknown(ioPool, provider, instance, WordSpace.BIT));
 				}
 			}
 		}
 		
-		public abstract void writeBits(BitWriter<?> dest, T instance) throws IOException;
-		public abstract void readBits(BitReader src, T instance) throws IOException;
+		public abstract void writeBits(Struct.Pool<T> ioPool, BitWriter<?> dest, T instance) throws IOException;
+		public abstract void readBits(Struct.Pool<T> ioPool, BitReader src, T instance) throws IOException;
 		public abstract void skipReadBits(BitReader src, T instance) throws IOException;
 		
 		@Override
@@ -193,9 +193,9 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		usageHints=h;
 	}
 	
-	public boolean isNull(T instance){
+	public boolean isNull(Struct.Pool<T> ioPool, T instance){
 		try{
-			var val=get(instance);
+			var val=get(ioPool, instance);
 			return val==null;
 		}catch(FieldIsNullException npe){
 			if(npe.field==this){
@@ -207,29 +207,29 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	}
 	
 	@SuppressWarnings("unchecked")
-	public ValueType get(T instance){
-		return (ValueType)getAccessor().get(instance);
+	public ValueType get(Struct.Pool<T> ioPool, T instance){
+		return (ValueType)getAccessor().get(ioPool, instance);
 	}
 	
-	public void set(T instance, ValueType value){
-		getAccessor().set(instance, value);
+	public void set(Struct.Pool<T> ioPool, T instance, ValueType value){
+		getAccessor().set(ioPool, instance, value);
 	}
 	
 	public abstract SizeDescriptor<T> getSizeDescriptor();
 	
 	public interface ValueGenerator<T extends IOInstance<T>, ValType>{
-		boolean shouldGenerate(DataProvider provider, T instance) throws IOException;
-		ValType generate(DataProvider provider, T instance, boolean allowExternalMod) throws IOException;
+		boolean shouldGenerate(Struct.Pool<T> ioPool, DataProvider provider, T instance) throws IOException;
+		ValType generate(Struct.Pool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException;
 	}
 	
 	public static record ValueGeneratorInfo<T extends IOInstance<T>, ValType>(
 		IOField<T, ValType> field,
 		ValueGenerator<T, ValType> generator
 	){
-		public void generate(DataProvider provider, T instance, boolean allowExternalMod) throws IOException{
-			if(generator.shouldGenerate(provider, instance)){
-				var val=generator.generate(provider, instance, allowExternalMod);
-				field.set(instance, val);
+		public void generate(Struct.Pool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException{
+			if(generator.shouldGenerate(ioPool, provider, instance)){
+				var val=generator.generate(ioPool, provider, instance, allowExternalMod);
+				field.set(ioPool, instance, val);
 			}
 		}
 	}
@@ -239,29 +239,29 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	}
 	
 	@Nullable
-	public abstract void write(DataProvider provider, ContentWriter dest, T instance) throws IOException;
+	public abstract void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException;
 	@Nullable
-	public final void writeReported(DataProvider provider, ContentWriter dest, T instance) throws IOException{
+	public final void writeReported(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		try{
-			write(provider, dest, instance);
+			write(ioPool, provider, dest, instance);
 		}catch(Exception e){
 			throw new IOException("Failed to write "+this, e);
 		}
 	}
 	
-	public abstract void read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException;
-	public final void readReported(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public abstract void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException;
+	public final void readReported(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		try{
-			read(provider, src, instance, genericContext);
+			read(ioPool, provider, src, instance, genericContext);
 		}catch(Exception e){
 			throw new IOException("Failed to read "+this, e);
 		}
 	}
 	
-	public abstract void skipRead(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException;
-	public final void skipReadReported(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public abstract void skipRead(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException;
+	public final void skipReadReported(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		try{
-			skipRead(provider, src, instance, genericContext);
+			skipRead(ioPool, provider, src, instance, genericContext);
 		}catch(Exception e){
 			throw reportSkipReadFail(this, e);
 		}
@@ -274,8 +274,8 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	/**
 	 * @return string of the resolved value or null if string has no substance
 	 */
-	public String instanceToString(T instance, boolean doShort){
-		var val=get(instance);
+	public String instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort){
+		var val=get(ioPool, instance);
 		if(val==null) return null;
 		
 		if(doShort){
@@ -287,12 +287,12 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		return TextUtil.toString(val);
 	}
 	
-	public boolean instancesEqual(T inst1, T inst2){
-		return Objects.equals(get(inst1), get(inst2));
+	public boolean instancesEqual(Struct.Pool<T> ioPool1, T inst1, Struct.Pool<T> ioPool2, T inst2){
+		return Objects.equals(get(ioPool1, inst1), get(ioPool2, inst2));
 	}
 	
-	public int instanceHashCode(T instance){
-		return Objects.hashCode(get(instance));
+	public int instanceHashCode(Struct.Pool<T> ioPool, T instance){
+		return Objects.hashCode(get(ioPool, instance));
 	}
 	
 	public void init(){

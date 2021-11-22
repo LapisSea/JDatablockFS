@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 
 public class MemoryWalker{
 	
@@ -110,7 +111,7 @@ public class MemoryWalker{
 			}else{
 				iterator=pipe.getSpecificFields().iterator();
 			}
-			
+			var ioPool=instance.getThisStruct().allocVirtualVarPool(IO);
 			while(iterator.hasNext()){
 				IOField<T, ?> field=iterator.next();
 				
@@ -133,7 +134,7 @@ public class MemoryWalker{
 					Class<?> type=field.getAccessor().getType();
 					
 					if(field.getAccessor().hasAnnotation(IOType.Dynamic.class)){
-						var inst=field.get(instance);
+						var inst=field.get(ioPool, instance);
 						if(inst==null) continue;
 						type=inst.getClass();
 						
@@ -147,11 +148,11 @@ public class MemoryWalker{
 						IOField.Ref<T, T> refField=(IOField.Ref<T, T>)refO;
 						var               ref     =refField.getReference(instance);
 						if(!pointerRecord.log(pipe, instanceReference, refField, instance, ref)) return false;
-						if(!walkStructFull(cluster, stack, refField.get(instance), ref, refField.getReferencedPipe(instance), pointerRecord)) return false;
+						if(!walkStructFull(cluster, stack, refField.get(ioPool, instance), ref, refField.getReferencedPipe(instance), pointerRecord)) return false;
 					}else if(UtilL.instanceOf(type, ChunkPointer.class)){
 						var ptrField=(IOField<T, ChunkPointer>)field;
 						
-						var ch=ptrField.get(instance);
+						var ch=ptrField.get(ioPool, instance);
 						
 						if(!ch.isNull()){
 							if(!pointerRecord.logChunkPointer(pipe, instanceReference, ptrField, instance, ch)) return false;
@@ -160,7 +161,7 @@ public class MemoryWalker{
 					}else{
 						var typ=type;
 						if(typ==Object.class){
-							var inst=field.get(instance);
+							var inst=field.get(ioPool, instance);
 							if(inst==null){
 								continue;
 							}
@@ -168,7 +169,7 @@ public class MemoryWalker{
 						}
 						if(IOFieldPrimitive.isPrimitive(typ)||typ.isEnum()) continue;
 						if(UtilL.instanceOf(typ, IOInstance.class)){
-							var inst=(IOInstance<?>)field.get(instance);
+							var inst=(IOInstance<?>)field.get(ioPool, instance);
 							if(inst!=null){
 								if(!walkStructFull(cluster, stack, (T)inst, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), inst.getThisStruct()), pointerRecord)) return false;
 							}
@@ -178,7 +179,7 @@ public class MemoryWalker{
 							continue;
 						}
 						if(field.getAccessor().hasAnnotation(IOType.Dynamic.class)){
-							var inst=field.get(instance);
+							var inst=field.get(ioPool, instance);
 							if(inst==null) continue;
 							
 							if(inst instanceof IOInstance i){

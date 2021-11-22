@@ -50,28 +50,28 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 				desc.getWordSpace(),
 				nullable()?nullSize:desc.getMin(),
 				Utils.addIfBoth(OptionalLong.of(nullSize), desc.getMax()),
-				(prov, inst)->{
-					var val=get(inst);
+				(ioPool, prov, inst)->{
+					var val=get(null, inst);
 					if(val==null){
 						if(nullable()) return nullSize;
 						throw new NullPointerException();
 					}
-					return desc.calcUnknown(prov, val)+nullSize;
+					return desc.calcUnknown(instancePipe.makeIOPool(), prov, val)+nullSize;
 				}
 			);
 		}
 	}
 	
 	@Override
-	public ValueType get(CTyp instance){
-		ValueType value=super.get(instance);
+	public ValueType get(Struct.Pool<CTyp> ioPool, CTyp instance){
+		ValueType value=super.get(ioPool, instance);
 		return switch(getNullability()){
 			case NOT_NULL -> requireValNN(value);
 			case NULLABLE -> value;
 			case DEFAULT_IF_NULL -> {
 				if(value==null){
 					var newVal=instancePipe.getType().requireEmptyConstructor().get();
-					set(instance, newVal);
+					set(ioPool, instance, newVal);
 					yield newVal;
 				}
 				yield value;
@@ -80,8 +80,8 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 	}
 	
 	@Override
-	public void set(CTyp instance, ValueType value){
-		super.set(instance, switch(getNullability()){
+	public void set(Struct.Pool<CTyp> ioPool, CTyp instance, ValueType value){
+		super.set(ioPool, instance, switch(getNullability()){
 			case DEFAULT_IF_NULL, NULLABLE -> value;
 			case NOT_NULL -> Objects.requireNonNull(value);
 		});
@@ -109,8 +109,8 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 	}
 	
 	@Override
-	public void write(DataProvider provider, ContentWriter dest, CTyp instance) throws IOException{
-		var val=get(instance);
+	public void write(Struct.Pool<CTyp> ioPool, DataProvider provider, ContentWriter dest, CTyp instance) throws IOException{
+		var val=get(ioPool, instance);
 		if(nullable()){
 			writeIsNull(dest, val);
 			if(val==null){
@@ -138,12 +138,12 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 	}
 	
 	@Override
-	public void read(DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
-		set(instance, readNew(provider, src, genericContext));
+	public void read(Struct.Pool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
+		set(ioPool, instance, readNew(provider, src, genericContext));
 	}
 	
 	@Override
-	public void skipRead(DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
+	public void skipRead(Struct.Pool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
 		var fixed=descriptor.getFixed(WordSpace.BYTE);
 		if(fixed.isPresent()){
 			src.skipExact(fixed.getAsLong());

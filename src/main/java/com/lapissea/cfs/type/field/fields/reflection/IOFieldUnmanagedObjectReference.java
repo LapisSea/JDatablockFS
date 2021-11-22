@@ -66,24 +66,24 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 		}
 		Chunk chunk=t.submit(provider);
 		var   val  =makeValueObject(provider, chunk.getPtr().makeReference(), genericContext);
-		set(instance, val);
+		set(null, instance, val);
 	}
 	
 	@Override
 	public void setReference(T instance, Reference newRef){
-		var old=get(instance);
+		var old=get(null, instance);
 		if(old==null) throw new NotImplementedException();
 		
 		try{
-			set(instance, makeValueObject(old.getDataProvider(), newRef, old.getGenerics()));
+			set(null, instance, makeValueObject(old.getDataProvider(), newRef, old.getGenerics()));
 		}catch(IOException e){
 			throw new RuntimeException(e);
 		}
 	}
 	
 	@Override
-	public ValueType get(T instance){
-		var val=super.get(instance);
+	public ValueType get(Struct.Pool<T> ioPool, T instance){
+		var val=super.get(ioPool, instance);
 		if(val==null){
 			if(nullable()) return null;
 			throw new FieldIsNullException(this);
@@ -92,11 +92,11 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 	}
 	@Override
 	public Reference getReference(T instance){
-		return getReference(get(instance));
+		return getReference(get(null, instance));
 	}
 	@Override
 	public StructPipe<ValueType> getReferencedPipe(T instance){
-		var val=get(instance);
+		var val=get(null, instance);
 		return val!=null?val.getPipe():null;
 	}
 	@Override
@@ -125,17 +125,17 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 	}
 	
 	@Override
-	public void write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
+	public void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		referencePipe.write(provider, dest, getReference(instance));
 	}
 	
 	@Override
-	public void read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		set(instance, makeValueObject(provider, referencePipe.readNew(provider, src, null), genericContext));
+	public void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		set(ioPool, instance, makeValueObject(provider, referencePipe.readNew(provider, src, null), genericContext));
 	}
 	
 	@Override
-	public void skipRead(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public void skipRead(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		var fixed=referencePipe.getSizeDescriptor().getFixed(WordSpace.BYTE);
 		if(fixed.isPresent()){
 			src.skipExact(fixed.getAsLong());

@@ -249,13 +249,13 @@ public class Cluster implements DataProvider{
 	private void tmp_realocMetadata() throws IOException{
 		
 		var refF  =root.getThisStruct().getFields().requireExact(Reference.class, "metadata.ref");
-		var oldRef=refF.get(root);
+		var oldRef=refF.get(null, root);
 		
 		var pipeType=FixedContiguousStructPipe.class;
 		
 		var pip=(StructPipe<Metadata>)StructPipe.of(pipeType, root.metadata.getThisStruct());
 		
-		var siz=pip.getSizeDescriptor().calcUnknown(this, root.metadata);
+		var siz=pip.calcUnknownSize(this, root.metadata, WordSpace.BYTE);
 		
 		var newCh=AllocateTicket.bytes(siz).withDataPopulated((p, io)->{
 			try(var src=oldRef.io(p)){
@@ -272,7 +272,7 @@ public class Cluster implements DataProvider{
 		var oldRef=instance.getReference();
 		var pip   =instance.getPipe();
 		
-		var siz=pip.getSizeDescriptor().calcUnknown(this, instance, WordSpace.BYTE);
+		var siz=pip.calcUnknownSize(this, instance, WordSpace.BYTE);
 		
 		var newCh=AllocateTicket.bytes(siz).withDataPopulated((p, io)->{
 			oldRef.withContext(p).io(src->src.transferTo(io));

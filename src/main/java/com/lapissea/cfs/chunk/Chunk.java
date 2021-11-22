@@ -145,7 +145,7 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 	}
 	
 	private void calcHeaderSize(){
-		headerSize=(int)PIPE.getSizeDescriptor().calcUnknown(getDataProvider(), this, WordSpace.BYTE);
+		headerSize=(int)PIPE.calcUnknownSize(getDataProvider(), this, WordSpace.BYTE);
 	}
 	
 	public void writeHeader() throws IOException{

@@ -12,6 +12,7 @@ import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
@@ -39,33 +40,33 @@ public class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends IOField<
 			desc.getWordSpace(),
 			nullable()?nullSize:desc.getMin(),
 			Utils.addIfBoth(OptionalLong.of(nullSize), desc.getMax()),
-			(prov, inst)->{
-				var val=getWrapped(inst);
+			(ioPool, prov, inst)->{
+				var val=getWrapped(null, inst);
 				if(val==null){
 					if(nullable()) return nullSize;
 					throw new NullPointerException();
 				}
-				return desc.calcUnknown(prov, val)+nullSize;
+				return desc.calcUnknown(instancePipe.makeIOPool(), prov, val)+nullSize;
 			}
 		);
 	}
 	
-	private AutoText getWrapped(CTyp instance){
-		var raw=get(instance);
+	private AutoText getWrapped(Struct.Pool<CTyp> ioPool, CTyp instance){
+		var raw=get(ioPool, instance);
 		if(raw==null) return null;
 		return new AutoText(raw);
 	}
 	
 	@Override
-	public String get(CTyp instance){
-		String value=super.get(instance);
+	public String get(Struct.Pool<CTyp> ioPool, CTyp instance){
+		String value=super.get(ioPool, instance);
 		return switch(getNullability()){
 			case NOT_NULL -> requireValNN(value);
 			case NULLABLE -> value;
 			case DEFAULT_IF_NULL -> {
 				if(value==null){
 					var newVal="";
-					set(instance, newVal);
+					set(ioPool, instance, newVal);
 					yield newVal;
 				}
 				yield value;
@@ -74,8 +75,8 @@ public class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends IOField<
 	}
 	
 	@Override
-	public void set(CTyp instance, String value){
-		super.set(instance, switch(getNullability()){
+	public void set(Struct.Pool<CTyp> ioPool, CTyp instance, String value){
+		super.set(ioPool, instance, switch(getNullability()){
 			case DEFAULT_IF_NULL, NULLABLE -> value;
 			case NOT_NULL -> Objects.requireNonNull(value);
 		});
@@ -87,8 +88,8 @@ public class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends IOField<
 	}
 	
 	@Override
-	public void write(DataProvider provider, ContentWriter dest, CTyp instance) throws IOException{
-		var val=getWrapped(instance);
+	public void write(Struct.Pool<CTyp> ioPool, DataProvider provider, ContentWriter dest, CTyp instance) throws IOException{
+		var val=getWrapped(ioPool, instance);
 		if(nullable()){
 			try(var flags=new FlagWriter.AutoPop(NumberSize.BYTE, dest)){
 				flags.writeBoolBit(val==null);
@@ -111,13 +112,13 @@ public class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends IOField<
 	}
 	
 	@Override
-	public void read(DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
+	public void read(Struct.Pool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
 		var text=readNew(provider, src, genericContext);
-		set(instance, text==null?null:text.getData());
+		set(ioPool, instance, text==null?null:text.getData());
 	}
 	
 	@Override
-	public void skipRead(DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
+	public void skipRead(Struct.Pool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
 		readNew(provider, src, genericContext);
 	}
 	

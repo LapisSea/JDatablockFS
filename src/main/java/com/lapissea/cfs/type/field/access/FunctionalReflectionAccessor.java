@@ -29,16 +29,16 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 			constructor=Utils.findConstructor(getType(), LongFunction.class, long.class);
 		}
 		@Override
-		public long getLong(CTyp instance){
-			var num=(INumber)get(instance);
+		public long getLong(Struct.Pool<CTyp> ioPool, CTyp instance){
+			var num=(INumber)get(ioPool, instance);
 			if(num==null){
 				throw new NullPointerException("value in "+getType().getName()+"#"+getName()+" is null but INumber is a non nullable type");
 			}
 			return num.getValue();
 		}
 		@Override
-		public void setLong(CTyp instance, long value){
-			set(instance, constructor.apply(value));
+		public void setLong(CTyp instance, long value, Struct.Pool<CTyp> ioPool){
+			set(ioPool, instance, constructor.apply(value));
 		}
 	}
 	
@@ -96,7 +96,7 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 	}
 	
 	@Override
-	public Object get(CTyp instance){
+	public Object get(Struct.Pool<CTyp> ioPool, CTyp instance){
 		try{
 			return getter.invoke(instance);
 		}catch(Throwable e){
@@ -105,7 +105,7 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 	}
 	
 	@Override
-	public void set(CTyp instance, Object value){
+	public void set(Struct.Pool<CTyp> ioPool, CTyp instance, Object value){
 		try{
 			setter.invoke(instance, value);
 		}catch(Throwable e){
@@ -114,7 +114,7 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 	}
 	
 	@Override
-	public double getDouble(CTyp instance){
+	public double getDouble(Struct.Pool<CTyp> ioPool, CTyp instance){
 		try{
 			return (double)getter.invoke(instance);
 		}catch(Throwable e){
@@ -123,7 +123,7 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 	}
 	
 	@Override
-	public void setDouble(CTyp instance, double value){
+	public void setDouble(Struct.Pool<CTyp> ioPool, CTyp instance, double value){
 		try{
 			setter.invoke(instance, value);
 		}catch(Throwable e){
@@ -132,7 +132,7 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 	}
 	
 	@Override
-	public float getFloat(CTyp instance){
+	public float getFloat(Struct.Pool<CTyp> ioPool, CTyp instance){
 		try{
 			return (float)getter.invoke(instance);
 		}catch(Throwable e){
@@ -141,7 +141,7 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 	}
 	
 	@Override
-	public void setFloat(CTyp instance, float value){
+	public void setFloat(Struct.Pool<CTyp> ioPool, CTyp instance, float value){
 		try{
 			setter.invoke(instance, value);
 		}catch(Throwable e){
@@ -150,7 +150,7 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 	}
 	
 	@Override
-	public byte getByte(CTyp instance){
+	public byte getByte(Struct.Pool<CTyp> ioPool, CTyp instance){
 		try{
 			return (byte)getter.invoke(instance);
 		}catch(Throwable e){
@@ -159,7 +159,7 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 	}
 	
 	@Override
-	public void setByte(CTyp instance, byte value){
+	public void setByte(Struct.Pool<CTyp> ioPool, CTyp instance, byte value){
 		try{
 			setter.invoke(instance, value);
 		}catch(Throwable e){
@@ -168,7 +168,7 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 	}
 	
 	@Override
-	public boolean getBoolean(CTyp instance){
+	public boolean getBoolean(Struct.Pool<CTyp> ioPool, CTyp instance){
 		try{
 			return (boolean)getter.invoke(instance);
 		}catch(Throwable e){
@@ -177,7 +177,7 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 	}
 	
 	@Override
-	public void setBoolean(CTyp instance, boolean value){
+	public void setBoolean(Struct.Pool<CTyp> ioPool, CTyp instance, boolean value){
 		try{
 			setter.invoke(instance, value);
 		}catch(Throwable e){
@@ -187,7 +187,7 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 	
 	
 	@Override
-	public long getLong(CTyp instance){
+	public long getLong(Struct.Pool<CTyp> ioPool, CTyp instance){
 		try{
 			return (long)getter.invoke(instance);
 		}catch(Throwable e){
@@ -196,7 +196,7 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 	}
 	
 	@Override
-	public void setLong(CTyp instance, long value){
+	public void setLong(CTyp instance, long value, Struct.Pool<CTyp> ioPool){
 		try{
 			setter.invoke(instance, value);
 		}catch(Throwable e){
@@ -205,7 +205,7 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 	}
 	
 	@Override
-	public int getInt(CTyp instance){
+	public int getInt(Struct.Pool<CTyp> ioPool, CTyp instance){
 		try{
 			return (int)getter.invoke(instance);
 		}catch(Throwable e){
@@ -214,7 +214,7 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 	}
 	
 	@Override
-	public void setInt(CTyp instance, int value){
+	public void setInt(Struct.Pool<CTyp> ioPool, CTyp instance, int value){
 		try{
 			setter.invoke(instance, value);
 		}catch(Throwable e){

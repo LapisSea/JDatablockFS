@@ -100,33 +100,22 @@ public class FixedContiguousStructPipe<T extends IOInstance<T>> extends StructPi
 		return (SizeDescriptor.Fixed<E>)super.getSizeDescriptor();
 	}
 	
-	private void setMax(T instance){
+	private void setMax(T instance, Struct.Pool<T> ioPool){
 		if(maxValues==null) return;
-		maxValues.forEach((k, v)->k.set(instance, v));
+		maxValues.forEach((k, v)->k.set(ioPool, instance, v));
 	}
 	
 	@Override
 	protected void doWrite(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		var ioPool=makeIOPool();
-		try{
-			pushPool(ioPool);
-			setMax(instance);
-			writeIOFields(provider, dest, instance);
-		}finally{
-			popPool();
-		}
+		setMax(instance, ioPool);
+		writeIOFields(ioPool, provider, dest, instance);
 	}
 	
 	@Override
-	protected T doRead(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		var ioPool=makeIOPool();
-		try{
-			pushPool(ioPool);
-			setMax(instance);
-			readIOFields(provider, src, instance, genericContext);
-		}finally{
-			popPool();
-		}
+	protected T doRead(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		setMax(instance, ioPool);
+		readIOFields(ioPool, provider, src, instance, genericContext);
 		return instance;
 	}
 }
