@@ -74,11 +74,8 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 		var old=get(null, instance);
 		if(old==null) throw new NotImplementedException();
 		
-		try{
-			set(null, instance, makeValueObject(old.getDataProvider(), newRef, old.getGenerics()));
-		}catch(IOException e){
-			throw new RuntimeException(e);
-		}
+		old.notifyReferenceMovement(newRef);
+		assert old.getReference().equals(newRef);
 	}
 	
 	@Override

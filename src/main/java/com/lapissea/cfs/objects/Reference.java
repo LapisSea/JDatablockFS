@@ -107,4 +107,7 @@ public final class Reference extends IOInstance<Reference>{
 			return io.calcGlobalPos();
 		}
 	}
+	public String infoString(DataProvider provider) throws IOException{
+		return toString()+" / "+calcGlobalOffset(provider);
+	}
 }
