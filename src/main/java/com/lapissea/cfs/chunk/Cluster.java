@@ -225,7 +225,6 @@ public class Cluster implements DataProvider{
 		try(var ignored=getMemoryManager().openDefragmentMode()){
 			LogUtil.println("Defragmenting...");
 			
-			
 			reallocateUnmanaged((HashIOMap<?, ?>)getTemp());
 			
 			new MemoryWalker((HashIOMap<?, ?>)getTemp()).walk(new MemoryWalker.PointerRecord(){
@@ -234,7 +233,6 @@ public class Cluster implements DataProvider{
 					if(instance instanceof IOInstance.Unmanaged u){
 						LogUtil.println(u);
 						reallocateUnmanaged(u);
-						LogUtil.println(getTemp());
 					}
 					return true;
 				}
@@ -244,28 +242,6 @@ public class Cluster implements DataProvider{
 				}
 			});
 		}
-	}
-	
-	private void tmp_realocMetadata() throws IOException{
-		
-		var refF  =root.getThisStruct().getFields().requireExact(Reference.class, "metadata.ref");
-		var oldRef=refF.get(null, root);
-		
-		var pipeType=FixedContiguousStructPipe.class;
-		
-		var pip=(StructPipe<Metadata>)StructPipe.of(pipeType, root.metadata.getThisStruct());
-		
-		var siz=pip.calcUnknownSize(this, root.metadata, WordSpace.BYTE);
-		
-		var newCh=AllocateTicket.bytes(siz).withDataPopulated((p, io)->{
-			try(var src=oldRef.io(p)){
-				src.transferTo(io);
-			}
-		}).submit(this);
-		
-		var newRef=newCh.getPtr().makeReference();
-		
-		moveReference(oldRef, newRef);
 	}
 	
 	private <T extends IOInstance.Unmanaged<T>> void reallocateUnmanaged(T instance) throws IOException{
@@ -285,6 +261,7 @@ public class Cluster implements DataProvider{
 	}
 	
 	private Set<ChunkPointer> moveReference(Reference oldRef, Reference newRef) throws IOException{
+		LogUtil.println("moving", oldRef, "to", newRef);
 		boolean[]         found ={false};
 		Set<ChunkPointer> toFree=new HashSet<>();
 		rootWalker().walk(new MemoryWalker.PointerRecord(){
