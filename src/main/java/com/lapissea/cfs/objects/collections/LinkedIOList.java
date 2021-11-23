@@ -238,6 +238,8 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		}
 		
 		T getValue() throws IOException{
+			readManagedFields();
+			
 			var start=valueStart();
 			try(var io=this.getReference().io(this)){
 				if(io.getSize()<start){
@@ -248,6 +250,8 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 					return null;
 				}
 				return valuePipe.readNew(getDataProvider(), io, getGenerics());
+			}catch(Throwable e){
+				throw new IOException("failed to get value on "+this.getReference().addOffset(start).infoString(getDataProvider()), e);
 			}
 		}
 		boolean hasValue() throws IOException{
@@ -284,6 +288,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			}
 		}
 		private ChunkPointer readNextPtr() throws IOException{
+			readManagedFields();
 			ChunkPointer chunk;
 			try(var io=getReference().io(this)){
 				var start=nextStart();
