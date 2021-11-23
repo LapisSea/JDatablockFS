@@ -175,9 +175,11 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	
 	private final FieldAccessor<T> accessor;
 	
-	private       FieldSet<T>            dependencies;
-	private       EnumSet<UsageHintType> usageHints;
-	private final IONullability.Mode     nullability;
+	private boolean                initialized;
+	private FieldSet<T>            dependencies;
+	private EnumSet<UsageHintType> usageHints;
+	
+	private final IONullability.Mode nullability;
 	
 	public IOField(FieldAccessor<T> accessor){
 		this.accessor=accessor;
@@ -190,7 +192,8 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		dependencies=deps;
 		var h=EnumSet.noneOf(UsageHintType.class);
 		hints.forEach(h::add);
-		usageHints=h;
+		usageHints=Utils.nullIfEmpty(h);
+		initialized=true;
 	}
 	
 	public boolean isNull(Struct.Pool<T> ioPool, T instance){
@@ -231,6 +234,13 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 				var val=generator.generate(ioPool, provider, instance, allowExternalMod);
 				field.set(ioPool, instance, val);
 			}
+		}
+		@Override
+		public String toString(){
+			return ValueGeneratorInfo.class.getSimpleName()+"{modifies "+field+"}";
+		}
+		public String toShortString(){
+			return "{modifies "+TextUtil.toShortString(field)+"}";
 		}
 	}
 	
@@ -300,11 +310,29 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	}
 	
 	
-	public String getName()                      {return getAccessor().getName();}
-	public Struct<T> declaringStruct()           {return getAccessor().getDeclaringStruct();}
-	public FieldAccessor<T> getAccessor()        {return accessor;}
-	public FieldSet<T> getDependencies()         {return Objects.requireNonNull(dependencies);}
-	public EnumSet<UsageHintType> getUsageHints(){return Objects.requireNonNull(usageHints);}
+	public String getName()              {return getAccessor().getName();}
+	public Struct<T> declaringStruct()   {return getAccessor().getDeclaringStruct();}
+	public FieldAccessor<T> getAccessor(){return accessor;}
+	public FieldSet<T> getDependencies(){
+		if(!initialized) throw new IllegalStateException();
+		return Objects.requireNonNull(dependencies);
+	}
+	
+	public boolean hasUsageHint(UsageHintType hint){
+		var hints=getUsageHints();
+		if(hints==null) return false;
+		return hints.contains(hint);
+	}
+	public Stream<UsageHintType> usageHintsStream(){
+		var hints=getUsageHints();
+		if(hints==null) return Stream.of();
+		return hints.stream();
+	}
+	@Nullable
+	public EnumSet<UsageHintType> getUsageHints(){
+		if(!initialized) throw new IllegalStateException();
+		return usageHints;
+	}
 	
 	public String toShortString(){
 		return Objects.requireNonNull(getName());
@@ -334,7 +362,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 			throw new FixedFormatNotSupportedException(this);
 		}
 		var f=implMaxAsFixedSize();
-		f.initLateData(getDependencies(), getUsageHints().stream());
+		f.initLateData(getDependencies(), usageHintsStream());
 		f.init();
 		if(!f.getSizeDescriptor().hasFixed()) throw new RuntimeException(this+" failed to make itslef fixed");
 		return f;

@@ -79,7 +79,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	
 	public StructPipe(Struct<T> type){
 		this.type=type;
-		this.ioFields=new FieldSet<>(initFields());
+		this.ioFields=FieldSet.of(initFields());
 		sizeDescription=calcSize();
 		ioPoolAccessors=Utils.nullIfEmpty(calcIOPoolAccessors());
 		earlyNullChecks=Utils.nullIfEmpty(getNonNulls());
