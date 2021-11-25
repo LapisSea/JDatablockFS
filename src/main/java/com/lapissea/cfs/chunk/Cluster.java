@@ -19,11 +19,11 @@ import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.UtilL;
+import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NULLABLE;
@@ -199,7 +199,7 @@ public class Cluster implements DataProvider{
 			}
 		});
 		
-		for(Chunk chunk : new PhysicalChunkWalker(getFirstChunk())){
+		for(Chunk chunk : getFirstChunk().chunksAhead()){
 			if(referenced.contains(chunk.getPtr())){
 				usefulBytes+=chunk.getSize();
 				usedChunkCapacity+=chunk.getCapacity();
@@ -224,6 +224,32 @@ public class Cluster implements DataProvider{
 	public void defragment() throws IOException{
 		try(var ignored=getMemoryManager().openDefragmentMode()){
 			LogUtil.println("Defragmenting...");
+
+
+//			while(true){
+//				Chunk fragmentedChunk;
+//				{
+//					var fragmentedChunkOpt=getFirstChunk().chunksAhead().stream().skip(1).filter(Chunk::hasNextPtr).findFirst();
+//					if(fragmentedChunkOpt.isEmpty()) break;
+//					fragmentedChunk=fragmentedChunkOpt.get();
+//				}
+//
+//				long size=fragmentedChunk.chainSize();
+//
+//				if(fragmentedChunk.getBodyNumSize().canFit(size)){
+//
+//
+//
+//				}else{
+//					throw new NotImplementedException("if chunk can't fit its chain size then create new chunk and move references");
+//				}
+//
+////				getMemoryManager().getFreeChunks().contains()
+//			}
+			
+			
+			scanFreeChunks();
+			System.exit(0);
 			
 			reallocateUnmanaged((HashIOMap<?, ?>)getTemp());
 			
@@ -231,7 +257,6 @@ public class Cluster implements DataProvider{
 				@Override
 				public <T extends IOInstance<T>> boolean log(StructPipe<T> pipe, Reference instanceReference, IOField.Ref<T, ?> field, T instance, Reference value) throws IOException{
 					if(instance instanceof IOInstance.Unmanaged u){
-						LogUtil.println(u);
 						reallocateUnmanaged(u);
 					}
 					return true;
@@ -242,6 +267,94 @@ public class Cluster implements DataProvider{
 				}
 			});
 		}
+	}
+	
+	private void scanFreeChunks() throws IOException{
+		
+		var activeChunks      =new ChunkSet();
+		var unreferencedChunks=new ChunkSet();
+		var knownFree         =new ChunkSet(memoryManager.getFreeChunks());
+		
+		activeChunks.add(getFirstChunk());
+		unreferencedChunks.add(getFirstChunk());
+		
+		UnsafeConsumer<Chunk, IOException> pushChunk=chunk->{
+			var ptr=chunk.getPtr();
+			if(activeChunks.min()>ptr.getValue()) return;
+			if(activeChunks.contains(ptr)&&!unreferencedChunks.contains(ptr)) return;
+			
+			while(true){
+				if(activeChunks.isEmpty()) break;
+				
+				var last=activeChunks.last();
+				
+				if(last.compareTo(ptr)>=0){
+					break;
+				}
+				var next=last.dereference(this).nextPhysical();
+				if(next==null) break;
+				activeChunks.add(next);
+				if(next.getPtr().equals(ptr)||!knownFree.contains(next)){
+					unreferencedChunks.add(next);
+				}
+			}
+			
+			unreferencedChunks.remove(ptr);
+			if(activeChunks.size()>1&&activeChunks.first().equals(ptr)){
+				activeChunks.removeFirst();
+			}
+			
+			var o=unreferencedChunks.optionalMin();
+			if(o.isEmpty()&&activeChunks.size()>1){
+				var last=activeChunks.last();
+				activeChunks.clear();
+				activeChunks.add(last);
+			}
+			
+			while(o.isPresent()){
+				var minPtr=o.getAsLong();
+				o=OptionalLong.empty();
+				while(activeChunks.size()>1&&(ptr.equals(activeChunks.first())||activeChunks.first().compareTo(minPtr)<0||knownFree.contains(activeChunks.first()))){
+					activeChunks.removeFirst();
+				}
+			}
+		};
+		
+		rootWalker().walk(true, ref->{
+			if(ref.isNull()) return;
+			for(Chunk chunk : ref.getPtr().dereference(this).collectNext()){
+				pushChunk.accept(chunk);
+			}
+		});
+		
+		if(!unreferencedChunks.isEmpty()){
+			List<Chunk> unreferenced=new ArrayList<>(Math.toIntExact(unreferencedChunks.size()));
+			for(var ptr : unreferencedChunks){
+				unreferenced.add(ptr.dereference(this));
+			}
+			
+			LogUtil.println("found unknown free chunks:", unreferenced);
+			
+			memoryManager.free(unreferenced);
+		}
+	}
+	
+	private void moveChunkExact(Chunk oldChunk, Chunk newChunk) throws IOException{
+		
+		rootWalker().walk(new MemoryWalker.PointerRecord(){
+			boolean foundCh;
+			@Override
+			public <T extends IOInstance<T>> boolean log(StructPipe<T> pipe, Reference instanceReference, IOField.Ref<T, ?> field, T instance, Reference value) throws IOException{
+				
+				return true;
+			}
+			@Override
+			public <T extends IOInstance<T>> boolean logChunkPointer(StructPipe<T> pipe, Reference instanceReference, IOField<T, ChunkPointer> field, T instance, ChunkPointer value) throws IOException{
+				
+				return true;
+			}
+		});
+		
 	}
 	
 	private <T extends IOInstance.Unmanaged<T>> void reallocateUnmanaged(T instance) throws IOException{
@@ -261,7 +374,7 @@ public class Cluster implements DataProvider{
 	}
 	
 	private Set<ChunkPointer> moveReference(Reference oldRef, Reference newRef) throws IOException{
-		LogUtil.println("moving", oldRef, "to", newRef);
+//		LogUtil.println("moving", oldRef, "to", newRef);
 		boolean[]         found ={false};
 		Set<ChunkPointer> toFree=new HashSet<>();
 		rootWalker().walk(new MemoryWalker.PointerRecord(){
