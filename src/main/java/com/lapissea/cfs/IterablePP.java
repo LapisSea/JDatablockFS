@@ -120,6 +120,17 @@ public interface IterablePP<T> extends Iterable<T>{
 			}
 		};
 	}
+	default IterablePP<T> skip(int count){
+		var that=this;
+		return ()->{
+			var iter=that.iterator();
+			for(int i=0;i<count;i++){
+				if(!iter.hasNext()) break;
+				iter.next();
+			}
+			return iter;
+		};
+	}
 	
 	static <T> IterablePP<T> nullTerminated(Supplier<Supplier<T>> supplier){
 		return ()->new Iterator<T>(){

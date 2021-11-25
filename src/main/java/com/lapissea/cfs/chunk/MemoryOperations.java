@@ -198,6 +198,8 @@ public class MemoryOperations{
 	}
 	
 	private static void checkOptimal(DataProvider provider, IOList<ChunkPointer> data) throws IOException{
+		if(!DEBUG_VALIDATION) return;
+		
 		ChunkPointer last=null;
 		for(ChunkPointer val : data){
 			if(last!=null){

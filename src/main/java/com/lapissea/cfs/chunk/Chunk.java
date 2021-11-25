@@ -1,5 +1,6 @@
 package com.lapissea.cfs.chunk;
 
+import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.BitDepthOutOfSpaceException;
 import com.lapissea.cfs.exceptions.DesyncedCacheException;
@@ -59,7 +60,7 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 	}
 	
 	
-	public static ChunkPointer getPtr(Chunk chunk){
+	public static ChunkPointer getPtrNullable(Chunk chunk){
 		return chunk==null?null:chunk.getPtr();
 	}
 	
@@ -461,6 +462,10 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		return isNextPhysical(other.getPtr());
 	}
 	
+	public IterablePP<Chunk> chunksAhead(){
+		return new PhysicalChunkWalker(this);
+	}
+	
 	private void markDirty(){
 		forbidReadOnly();
 		if(reading) return;
@@ -522,5 +527,11 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 	@Override
 	public int compareTo(Chunk o){
 		return getPtr().compareTo(o.getPtr());
+	}
+	
+	public long chainSize() throws IOException{
+		try(var io=io()){
+			return io.getSize();
+		}
 	}
 }
