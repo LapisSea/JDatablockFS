@@ -108,6 +108,6 @@ public final class Reference extends IOInstance<Reference>{
 		}
 	}
 	public String infoString(DataProvider provider) throws IOException{
-		return toString()+" / "+calcGlobalOffset(provider);
+		return this+" / "+calcGlobalOffset(provider);
 	}
 }

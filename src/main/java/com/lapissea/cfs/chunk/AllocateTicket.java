@@ -86,7 +86,7 @@ public record AllocateTicket(long bytes, boolean disableResizing, ChunkPointer n
 		return new AllocateTicket(bytes, disableResizing, next, approve, dataPopulator);
 	}
 	public AllocateTicket withNext(Chunk next){
-		return withNext(Chunk.getPtr(next));
+		return withNext(Chunk.getPtrNullable(next));
 	}
 	public AllocateTicket withNext(ChunkPointer next){
 		if(Objects.equals(this.next, next)) return this;
