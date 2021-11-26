@@ -96,6 +96,9 @@ public record AllocateTicket(long bytes, boolean disableResizing, ChunkPointer n
 	public Chunk submit(DataProvider provider) throws IOException{
 		return provider.getMemoryManager().alloc(this);
 	}
+	public Chunk submit(DataProvider.Holder provider) throws IOException{
+		return provider.getDataProvider().getMemoryManager().alloc(this);
+	}
 	public Chunk submit(MemoryManager manager) throws IOException{
 		return manager.alloc(this);
 	}

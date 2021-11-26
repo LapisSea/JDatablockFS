@@ -5,7 +5,6 @@ import com.lapissea.cfs.io.ContentBuff;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.util.ZeroArrays;
 
-import java.io.ByteArrayInputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -390,13 +389,6 @@ public interface ContentReader extends AutoCloseable, ContentBuff{
 	
 	default BufferTicket readTicket(long amount){return readTicket(Math.toIntExact(amount));}
 	default BufferTicket readTicket(int amount) {return new BufferTicket(this, amount, null);}
-	
-	static boolean isDirect(ContentReader in){
-		return
-			in instanceof ContentInputStream.BA||
-			in instanceof ContentInputStream.BB||
-			in instanceof ByteArrayInputStream;
-	}
 	
 	default long transferTo(ContentWriter out) throws IOException{
 		return transferTo(out, 8192);
