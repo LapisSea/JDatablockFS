@@ -173,7 +173,11 @@ public class BinaryGridRenderer{
 			var bitOff    =bitOffset;
 			while(remaining>0){
 				fillBitByte(ctx, trueOffset);
-				doSegment.accept(DrawUtils.makeBitRect(ctx.renderCtx, trueOffset, bitOff, remaining));
+				var bitRect=DrawUtils.makeBitRect(ctx.renderCtx, trueOffset, bitOff, remaining);
+				if(ctx.renderCtx.isRangeHovered(Range.fromSize(trueOffset, 1))){
+					ctx.renderCtx.hoverMessages.add(field+": "+field.instanceToString(ioPool, instance, false));
+				}
+				doSegment.accept(bitRect);
 				remaining-=Math.min(8, remaining);
 				bitOff=0;
 				trueOffset++;
@@ -187,7 +191,11 @@ public class BinaryGridRenderer{
 				var bitOff    =bitOffset;
 				while(remaining>0){
 					fillBitByte(ctx, trueOffset);
-					doSegment.accept(DrawUtils.makeBitRect(ctx.renderCtx, trueOffset, bitOff, remaining));
+					var bitRect=DrawUtils.makeBitRect(ctx.renderCtx, trueOffset, bitOff, remaining);
+					if(ctx.renderCtx.isRangeHovered(Range.fromSize(trueOffset, 1))){
+						ctx.renderCtx.hoverMessages.add(field+" "+field.instanceToString(ioPool, instance, false));
+					}
+					doSegment.accept(bitRect);
 					remaining-=Math.min(8, remaining);
 					bitOff=0;
 					io.skip(1);
@@ -245,7 +253,7 @@ public class BinaryGridRenderer{
 		}
 		
 		if(hover){
-			ctx.renderCtx.hoverMessages.add(both);
+			ctx.renderCtx.hoverMessages.add(field+": "+str);
 		}
 		
 		if(str!=null&&getStringBounds(both).width()>rectWidth){
