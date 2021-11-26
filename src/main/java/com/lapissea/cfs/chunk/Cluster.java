@@ -1,5 +1,6 @@
 package com.lapissea.cfs.chunk;
 
+import com.lapissea.cfs.exceptions.BitDepthOutOfSpaceException;
 import com.lapissea.cfs.exceptions.InvalidMagicIDException;
 import com.lapissea.cfs.exceptions.MalformedPointerException;
 import com.lapissea.cfs.io.IOInterface;
@@ -7,6 +8,7 @@ import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
+import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.objects.collections.HashIOMap;
 import com.lapissea.cfs.objects.collections.IOMap;
@@ -18,6 +20,8 @@ import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.LogUtil;
+import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeConsumer;
 
@@ -25,6 +29,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.*;
 
+import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NULLABLE;
 import static com.lapissea.cfs.type.field.annotations.IOValue.Reference.PipeType.FIXED;
@@ -224,48 +229,139 @@ public class Cluster implements DataProvider{
 	public void defragment() throws IOException{
 		try(var ignored=getMemoryManager().openDefragmentMode()){
 			LogUtil.println("Defragmenting...");
-
-
-//			while(true){
-//				Chunk fragmentedChunk;
-//				{
-//					var fragmentedChunkOpt=getFirstChunk().chunksAhead().stream().skip(1).filter(Chunk::hasNextPtr).findFirst();
-//					if(fragmentedChunkOpt.isEmpty()) break;
-//					fragmentedChunk=fragmentedChunkOpt.get();
-//				}
-//
-//				long size=fragmentedChunk.chainSize();
-//
-//				if(fragmentedChunk.getBodyNumSize().canFit(size)){
-//
-//
-//
-//				}else{
-//					throw new NotImplementedException("if chunk can't fit its chain size then create new chunk and move references");
-//				}
-//
-////				getMemoryManager().getFreeChunks().contains()
-//			}
-			
 			
 			scanFreeChunks();
-			System.exit(0);
 			
-			reallocateUnmanaged((HashIOMap<?, ?>)getTemp());
+			mergeChains();
+			scanFreeChunks();
 			
-			new MemoryWalker((HashIOMap<?, ?>)getTemp()).walk(new MemoryWalker.PointerRecord(){
-				@Override
-				public <T extends IOInstance<T>> boolean log(StructPipe<T> pipe, Reference instanceReference, IOField.Ref<T, ?> field, T instance, Reference value) throws IOException{
-					if(instance instanceof IOInstance.Unmanaged u){
-						reallocateUnmanaged(u);
+			reorder();
+			
+			mergeChains();
+			scanFreeChunks();
+		}
+	}
+	
+	private void reorder() throws IOException{
+		reallocateUnmanaged((HashIOMap<?, ?>)getTemp());
+		
+		new MemoryWalker((HashIOMap<?, ?>)getTemp()).walk(new MemoryWalker.PointerRecord(){
+			@Override
+			public <T extends IOInstance<T>> boolean log(StructPipe<T> pipe, Reference instanceReference, IOField.Ref<T, ?> field, T instance, Reference value) throws IOException{
+				if(instance instanceof IOInstance.Unmanaged u){
+					reallocateUnmanaged(u);
+				}
+				return true;
+			}
+			@Override
+			public <T extends IOInstance<T>> boolean logChunkPointer(StructPipe<T> pipe, Reference instanceReference, IOField<T, ChunkPointer> field, T instance, ChunkPointer value) throws IOException{
+				return true;
+			}
+		});
+	}
+	
+	private void mergeChains() throws IOException{
+		while(true){
+			Chunk fragmentedChunk;
+			{
+				var fragmentedChunkOpt=getFirstChunk().chunksAhead().stream().skip(1).filter(Chunk::hasNextPtr).findFirst();
+				if(fragmentedChunkOpt.isEmpty()) break;
+				fragmentedChunk=fragmentedChunkOpt.get();
+			}
+			
+			long requiredSize=fragmentedChunk.chainSize();
+			
+			
+			if(fragmentedChunk.getBodyNumSize().canFit(requiredSize)){
+				
+				long createdCapacity=0;
+				{
+					Chunk next=fragmentedChunk;
+					while(fragmentedChunk.getCapacity()+createdCapacity<requiredSize+fragmentedChunk.getHeaderSize()+1){
+						next=next.nextPhysical();
+						if(next==null) throw new NotImplementedException("last but has next?");
+						
+						var frees=getMemoryManager().getFreeChunks();
+						
+						var freeIndex=frees.indexOf(next.getPtr());
+						if(freeIndex!=-1){
+							frees.remove(freeIndex);
+						}else{
+							if(DEBUG_VALIDATION){
+								var chain=fragmentedChunk.collectNext();
+								if(chain.contains(next)){
+									throw new NotImplementedException("Special handling for already chained?");
+								}
+							}
+							
+							Chunk c=next;
+							var newChunk=AllocateTicket
+								.bytes(next.getSize())
+								.shouldDisableResizing(next.getNextSize()==NumberSize.VOID)
+								.withNext(next.getNextPtr())
+								.withDataPopulated((p, io)->{
+									byte[] data=p.getSource().read(c.dataStart(), Math.toIntExact(c.getSize()));
+									io.write(data);
+								})
+								.submit(this);
+							
+							moveChunkExact(next.getPtr(), newChunk.getPtr());
+						}
+						
+						createdCapacity+=next.totalSize();
 					}
-					return true;
 				}
-				@Override
-				public <T extends IOInstance<T>> boolean logChunkPointer(StructPipe<T> pipe, Reference instanceReference, IOField<T, ChunkPointer> field, T instance, ChunkPointer value) throws IOException{
-					return true;
+				
+				
+				var grow          =requiredSize-fragmentedChunk.getCapacity();
+				var remainingSpace=createdCapacity-grow;
+				
+				try{
+					fragmentedChunk.setCapacity(requiredSize);
+				}catch(BitDepthOutOfSpaceException e){
+					throw new ShouldNeverHappenError("This should be guarded by the canFit check");
 				}
-			});
+				
+				var remainingData=
+					new ChunkBuilder(this, ChunkPointer.of(fragmentedChunk.dataEnd()))
+						.withExplicitNextSize(NumberSize.bySize(getSource().getIOSize()))
+						.withCapacity(0)
+						.create();
+				
+				remainingData.setCapacityAndModifyNumSize(remainingSpace-remainingData.getHeaderSize());
+				assert remainingData.getCapacity()>0:remainingData;
+				
+				remainingData.writeHeader();
+				remainingData=getChunk(remainingData.getPtr());
+				
+				fragmentedChunk.syncStruct();
+				
+				var fragmentData=fragmentedChunk.next();
+				fragmentedChunk.clearNextPtr();
+				
+				try(var dest=fragmentedChunk.ioAt(fragmentedChunk.getSize());
+				    var src=fragmentData.io()){
+					src.transferTo(dest);
+				}
+				
+				
+				fragmentData.freeChaining();
+				remainingData.freeChaining();
+				
+			}else{
+				var newChunk=AllocateTicket
+					.bytes(requiredSize)
+					.shouldDisableResizing(fragmentedChunk.getNextSize()==NumberSize.VOID)
+					.withDataPopulated((p, io)->{
+						try(var old=fragmentedChunk.io()){
+							old.transferTo(io);
+						}
+					})
+					.submit(this);
+				
+				moveChunkExact(fragmentedChunk.getPtr(), newChunk.getPtr());
+				fragmentedChunk.freeChaining();
+			}
 		}
 	}
 	
@@ -339,18 +435,27 @@ public class Cluster implements DataProvider{
 		}
 	}
 	
-	private void moveChunkExact(Chunk oldChunk, Chunk newChunk) throws IOException{
+	private void moveChunkExact(ChunkPointer oldChunk, ChunkPointer newChunk) throws IOException{
 		
 		rootWalker().walk(new MemoryWalker.PointerRecord(){
-			boolean foundCh;
 			@Override
 			public <T extends IOInstance<T>> boolean log(StructPipe<T> pipe, Reference instanceReference, IOField.Ref<T, ?> field, T instance, Reference value) throws IOException{
-				
+				if(value.getPtr().equals(oldChunk)){
+					field.setReference(instance, new Reference(newChunk, value.getOffset()));
+					try(var io=instanceReference.io(Cluster.this)){
+						pipe.write(Cluster.this, io, instance);
+					}
+				}
 				return true;
 			}
 			@Override
 			public <T extends IOInstance<T>> boolean logChunkPointer(StructPipe<T> pipe, Reference instanceReference, IOField<T, ChunkPointer> field, T instance, ChunkPointer value) throws IOException{
-				
+				if(value.equals(oldChunk)){
+					field.set(null, instance, newChunk);
+					try(var io=instanceReference.io(Cluster.this)){
+						pipe.write(Cluster.this, io, instance);
+					}
+				}
 				return true;
 			}
 		});
