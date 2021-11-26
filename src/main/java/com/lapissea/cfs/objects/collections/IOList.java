@@ -417,13 +417,19 @@ public interface IOList<T> extends IterablePP<T>{
 	default void requestCapacity(long capacity) throws IOException{}
 	
 	default boolean contains(T value) throws IOException{
-		var iter=iterator();
+		return indexOf(value)!=-1;
+	}
+	
+	default long indexOf(T value) throws IOException{
+		var  iter =iterator();
+		long index=0;
 		while(iter.hasNext()){
 			var el=iter.ioNext();
 			if(Objects.equals(el, value)){
-				return true;
+				return index;
 			}
+			index++;
 		}
-		return false;
+		return -1;
 	}
 }

@@ -11,6 +11,7 @@ import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
+import java.util.HexFormat;
 import java.util.Random;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
@@ -43,6 +44,8 @@ class FSFTest{
 					Cluster cluster=new Cluster(mem);
 					
 					intMapRun(cluster);
+//					generateHex(cluster);
+					
 					LogUtil.println(TextUtil.toNamedPrettyJson(cluster.gatherStatistics()));
 					cluster.defragment();
 					LogUtil.println(TextUtil.toNamedPrettyJson(cluster.gatherStatistics()));
@@ -58,6 +61,12 @@ class FSFTest{
 		}catch(Throwable e){
 			e.printStackTrace();
 		}
+	}
+	private static void generateHex(Cluster cluster) throws IOException{
+		var bytes=cluster.getSource().readAll();
+		var hex  =HexFormat.of().formatHex(UtilL.compress(bytes));
+		LogUtil.println(hex);
+		System.exit(0);
 	}
 	
 	private static void intMapRun(Cluster provider) throws IOException{
