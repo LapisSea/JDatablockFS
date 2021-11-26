@@ -961,8 +961,8 @@ public class BinaryGridRenderer{
 		
 		initFont(0.5F);
 		renderer.pushMatrix();
-		float x=xByte*ctx.pixelsPerByte();
-		float y=(yByte-0.1F)*ctx.pixelsPerByte();
+		float x=ctx.renderer.getDisplay().getMouseX();
+		float y=ctx.renderer.getDisplay().getMouseY();
 		
 		float minScale=20;
 		if(renderer.getFontScale()<minScale) renderer.setFontScale(minScale);
