@@ -39,7 +39,7 @@ public class ChunkSet implements Iterable<ChunkPointer>{
 		return end-1;
 	}
 	public boolean isEmpty(){
-		return start==end;
+		return size==0;
 	}
 	public long rageSize(){
 		return end-start;

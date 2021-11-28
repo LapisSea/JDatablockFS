@@ -8,14 +8,12 @@ import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
-import org.roaringbitmap.RoaringBitmap;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.PrimitiveIterator;
-import java.util.stream.IntStream;
+import java.util.stream.LongStream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
@@ -24,7 +22,7 @@ public class MemoryOperations{
 	public static void purgePossibleChunkHeaders(DataProvider provider, long from, long size) throws IOException{
 		var maxHeaderSize=(int)Chunk.PIPE.getSizeDescriptor().requireMax(WordSpace.BYTE);
 		
-		RoaringBitmap possibleHeaders=new RoaringBitmap();
+		ChunkSet possibleHeaders=new ChunkSet();
 		try(var io=provider.getSource().read(from)){
 			for(int i=0;i<size;i++){
 				if(Chunk.earlyCheckChunkAt(io)){
@@ -37,13 +35,13 @@ public class MemoryOperations{
 		
 		while(!possibleHeaders.isEmpty()){
 			
-			int lastUnknown=-1;
-			int removeCount=0;
+			long lastUnknown=-1;
+			int  removeCount=0;
 			
 			//test unknowns
-			PrimitiveIterator.OfInt iter=(noTrim?IntStream.of(possibleHeaders.last()):possibleHeaders.stream()).iterator();
+			var iter=(noTrim?LongStream.of(possibleHeaders.last().getValue()):possibleHeaders.longStream()).iterator();
 			while(iter.hasNext()){
-				var headIndex=iter.nextInt();
+				var headIndex=iter.nextLong();
 				
 				var pos=headIndex+from;
 				
@@ -73,11 +71,11 @@ public class MemoryOperations{
 			
 			noTrim=true;
 			//pop alone headers, no change will make them valid
-			iter=possibleHeaders.stream().iterator();
-			int lastIndex=-maxHeaderSize*2;
-			var index    =iter.nextInt();
+			iter=possibleHeaders.longStream().iterator();
+			long lastIndex=-maxHeaderSize*2L;
+			var  index    =iter.nextLong();
 			while(iter.hasNext()){
-				var nextIndex=iter.nextInt();
+				var nextIndex=iter.nextLong();
 				
 				if(Math.min(Math.abs(lastIndex-index), Math.abs(nextIndex-index))>maxHeaderSize){
 					possibleHeaders.remove(index);
