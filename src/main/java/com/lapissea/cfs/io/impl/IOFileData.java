@@ -3,6 +3,7 @@ package com.lapissea.cfs.io.impl;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.RandomIO;
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.function.UnsafeConsumer;
 
@@ -12,7 +13,7 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.stream.LongStream;
 
-import static com.lapissea.util.UtilL.*;
+import static com.lapissea.util.UtilL.Assert;
 
 public class IOFileData implements IOInterface, AutoCloseable{
 	
@@ -171,6 +172,11 @@ public class IOFileData implements IOInterface, AutoCloseable{
 	@Override
 	public boolean isReadOnly(){
 		return readOnly;
+	}
+	
+	@Override
+	public Trans openIOTransaction(){
+		throw new NotImplementedException();//TODO: implement transaction handling for IOFile
 	}
 	
 	public void setCapacity(long newCapacity) throws IOException{getSource().setLength(newCapacity);}

@@ -1,5 +1,6 @@
 package com.lapissea.cfs.io;
 
+import java.io.Closeable;
 import java.io.IOException;
 
 
@@ -7,6 +8,8 @@ import java.io.IOException;
  * This interface is a container or accessor of binary data that can provide a way to write/read contents in a random or sequential manner.
  */
 public interface IOInterface extends RandomIO.Creator{
+	
+	interface Trans extends Closeable{}
 	
 	default void setIOSize(long requestedSize) throws IOException{
 		try(var io=io()){
@@ -28,4 +31,5 @@ public interface IOInterface extends RandomIO.Creator{
 	
 	boolean isReadOnly();
 	
+	Trans openIOTransaction();
 }
