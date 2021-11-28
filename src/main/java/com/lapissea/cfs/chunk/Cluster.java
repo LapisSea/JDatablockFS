@@ -233,6 +233,7 @@ public class Cluster implements DataProvider{
 			scanFreeChunks();
 			
 			mergeChains();
+			if(true) return;
 			scanFreeChunks();
 			
 			reorder();
@@ -316,34 +317,37 @@ public class Cluster implements DataProvider{
 				var grow          =requiredSize-fragmentedChunk.getCapacity();
 				var remainingSpace=createdCapacity-grow;
 				
-				try{
-					fragmentedChunk.setCapacity(requiredSize);
-				}catch(BitDepthOutOfSpaceException e){
-					throw new ShouldNeverHappenError("This should be guarded by the canFit check");
-				}
 				
 				var remainingData=
-					new ChunkBuilder(this, ChunkPointer.of(fragmentedChunk.dataEnd()))
+					new ChunkBuilder(this, ChunkPointer.of(fragmentedChunk.dataStart()+requiredSize))
 						.withExplicitNextSize(NumberSize.bySize(getSource().getIOSize()))
 						.withCapacity(0)
 						.create();
 				
-				remainingData.setCapacityAndModifyNumSize(remainingSpace-remainingData.getHeaderSize());
-				assert remainingData.getCapacity()>0:remainingData;
-				
-				remainingData.writeHeader();
-				remainingData=getChunk(remainingData.getPtr());
-				
-				fragmentedChunk.syncStruct();
-				
-				var fragmentData=fragmentedChunk.next();
-				fragmentedChunk.clearNextPtr();
-				
-				try(var dest=fragmentedChunk.ioAt(fragmentedChunk.getSize());
-				    var src=fragmentData.io()){
-					src.transferTo(dest);
+				Chunk fragmentData;
+				try(var ignored=getSource().openIOTransaction()){
+					
+					remainingData.setCapacityAndModifyNumSize(remainingSpace-remainingData.getHeaderSize());
+					assert remainingData.getCapacity()>0:remainingData;
+					
+					remainingData.writeHeader();
+					remainingData=getChunk(remainingData.getPtr());
+					
+					try{
+						fragmentedChunk.setCapacity(requiredSize);
+					}catch(BitDepthOutOfSpaceException e){
+						throw new ShouldNeverHappenError("This should be guarded by the canFit check");
+					}
+					
+					fragmentData=fragmentedChunk.next();
+					fragmentedChunk.clearNextPtr();
+					
+					try(var dest=fragmentedChunk.ioAt(fragmentedChunk.getSize());
+					    var src=fragmentData.io()){
+						src.transferTo(dest);
+					}
+					fragmentedChunk.syncStruct();
 				}
-				
 				
 				fragmentData.freeChaining();
 				remainingData.freeChaining();
