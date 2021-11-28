@@ -2,9 +2,11 @@ package com.lapissea.cfs.io.impl;
 
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.io.IOInterface;
+import com.lapissea.cfs.io.IOTransactionBuffer;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.content.ContentOutputBuilder;
 import com.lapissea.cfs.io.content.ContentWriter;
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.function.UnsafeSupplier;
@@ -52,6 +54,9 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		@Override
 		public RandomIO setCapacity(long newCapacity){
 			if(readOnly) throw new UnsupportedOperationException();
+			if(transactionOpen){
+				throw new NotImplementedException();//TODO implement capacity changing when in transaction
+			}
 			
 			MemoryData.this.setCapacity(newCapacity);
 			pos=Math.min(pos, used);
@@ -65,20 +70,38 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		public void flush(){}
 		
 		@Override
-		public int read(){
+		public int read() throws IOException{
+			if(transactionOpen){
+				return transactions.readByte(this::readAt, pos++);
+			}
+			
 			int remaining=(int)(getSize()-getPos());
 			if(remaining<=0) return -1;
 			return read1(data, pos++)&0xFF;
 		}
 		
 		@Override
-		public int read(byte[] b, int off, int len){
-			int remaining=(int)(getSize()-getPos());
+		public int read(byte[] b, int off, int len) throws IOException{
+			if(transactionOpen){
+				var oldPos=pos;
+				int read  =transactions.read(this::readAt, pos, b, off, len);
+				pos=oldPos+read;
+				return read;
+			}
+			
+			return readAt(pos, b, off, len);
+		}
+		
+		private int readAt(long pos, byte[] b, int off, int len){
+			return readAt((int)pos, b, off, len);
+		}
+		private int readAt(int pos, byte[] b, int off, int len){
+			int remaining=(int)(getSize()-pos);
 			if(remaining<=0) return -1;
 			
 			int clampedLen=Math.min(remaining, len);
 			readN(data, pos, b, off, clampedLen);
-			pos+=clampedLen;
+			this.pos+=clampedLen;
 			return clampedLen;
 		}
 		
@@ -94,6 +117,11 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		@Override
 		public void write(int b){
 			if(readOnly) throw new UnsupportedOperationException();
+			if(transactionOpen){
+				transactions.writeByte(pos, b);
+				pos++;
+				return;
+			}
 			
 			int remaining=(int)(getCapacity()-getPos());
 			if(remaining<=0) setCapacity(Math.max(4, Math.max(getCapacity()+1, getCapacity()+1-remaining)));
@@ -110,6 +138,12 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		
 		public void write(byte[] b, int off, int len, boolean pushPos){
 			if(readOnly) throw new UnsupportedOperationException();
+			if(transactionOpen){
+				transactions.write(pos, b, off, len);
+				if(pushPos) pos+=len;
+				return;
+			}
+			
 			if(len==0) return;
 			
 			int remaining=(int)(getCapacity()-getPos());
@@ -184,6 +218,9 @@ public abstract class MemoryData<DataType> implements IOInterface{
 	
 	private final boolean readOnly;
 	
+	private       boolean             transactionOpen;
+	private final IOTransactionBuffer transactions=new IOTransactionBuffer();
+	
 	public MemoryData(DataType data, Builder info){
 		
 		var ok=getLength(data)>=used;
@@ -225,11 +262,14 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		return used;
 	}
 	
-	public void setCapacity(long newCapacity){
+	private void setCapacity(long newCapacity){
 		setCapacity(Math.toIntExact(newCapacity));
 	}
 	private void setCapacity(int newCapacity){
 		if(readOnly) throw new UnsupportedOperationException();
+		if(transactionOpen){
+			transactions.capacityChange(newCapacity);
+		}
 		
 		long lastCapacity=getIOSize();
 		if(lastCapacity==newCapacity) return;
@@ -243,6 +283,18 @@ public abstract class MemoryData<DataType> implements IOInterface{
 	@Override
 	public boolean isReadOnly(){
 		return readOnly;
+	}
+	
+	@Override
+	public Trans openIOTransaction(){
+		var oldTransactionOpen=transactionOpen;
+		transactionOpen=true;
+		return ()->{
+			transactionOpen=oldTransactionOpen;
+			if(!oldTransactionOpen){
+				transactions.merge(this);
+			}
+		};
 	}
 	
 	public String toShortString(){
