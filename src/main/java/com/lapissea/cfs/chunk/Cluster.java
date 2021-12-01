@@ -400,12 +400,12 @@ public class Cluster implements DataProvider{
 			}
 			
 			unreferencedChunks.remove(ptr);
-			if(activeChunks.size()>1&&activeChunks.first().equals(ptr)){
+			if(activeChunks.trueSize()>1&&activeChunks.first().equals(ptr)){
 				activeChunks.removeFirst();
 			}
 			
 			var o=unreferencedChunks.optionalMin();
-			if(o.isEmpty()&&activeChunks.size()>1){
+			if(o.isEmpty()&&activeChunks.trueSize()>1){
 				var last=activeChunks.last();
 				activeChunks.clear();
 				activeChunks.add(last);
@@ -414,7 +414,7 @@ public class Cluster implements DataProvider{
 			while(o.isPresent()){
 				var minPtr=o.getAsLong();
 				o=OptionalLong.empty();
-				while(activeChunks.size()>1&&(ptr.equals(activeChunks.first())||activeChunks.first().compareTo(minPtr)<0||knownFree.contains(activeChunks.first()))){
+				while(activeChunks.trueSize()>1&&(ptr.equals(activeChunks.first())||activeChunks.first().compareTo(minPtr)<0||knownFree.contains(activeChunks.first()))){
 					activeChunks.removeFirst();
 				}
 			}
