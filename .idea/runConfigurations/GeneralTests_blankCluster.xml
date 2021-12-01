@@ -1,0 +1,23 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="GeneralTests.blankCluster" type="JUnit" factoryName="JUnit" nameIsGenerated="true">
+    <module name="jdatablockfs.run" />
+    <selectedOptions>
+      <option name="environmentVariables" visible="false" />
+    </selectedOptions>
+    <extension name="coverage">
+      <pattern>
+        <option name="PATTERN" value="com.lapisseqa.cfs.run.run.*" />
+        <option name="ENABLED" value="true" />
+      </pattern>
+    </extension>
+    <option name="PACKAGE_NAME" value="com.lapisseqa.cfs.run" />
+    <option name="MAIN_CLASS_NAME" value="com.lapisseqa.cfs.run.GeneralTests" />
+    <option name="METHOD_NAME" value="blankCluster(org.junit.jupiter.api.TestInfo)" />
+    <option name="TEST_OBJECT" value="method" />
+    <option name="VM_PARAMETERS" value="-ea -DdeleteOk=false" />
+    <option name="WORKING_DIRECTORY" value="$ProjectFileDir$/run/test" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>
