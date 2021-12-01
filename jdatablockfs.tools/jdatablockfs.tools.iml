@@ -15,7 +15,6 @@
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="module" module-name="JDatablockFS" />
     <orderEntry type="library" name="Maven: com.github.lapissea:jlapisutil:1.0.11" level="project" />
-    <orderEntry type="library" name="Maven: io.leangen.geantyref:geantyref:1.3.12" level="project" />
     <orderEntry type="library" name="Maven: org.roaringbitmap:RoaringBitmap:0.9.23" level="project" />
     <orderEntry type="library" scope="RUNTIME" name="Maven: org.roaringbitmap:shims:0.9.23" level="project" />
     <orderEntry type="library" name="Maven: com.github.lapissea:glfw-window:1.0.0" level="project" />

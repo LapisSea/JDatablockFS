@@ -181,9 +181,11 @@ public class ChunkSet implements Set<ChunkPointer>{
 		assert size()==longStream().count():
 			size()+" "+stream().count();
 		if(!isEmpty()){
-			assert index.contains(start):
+			var s=calcStart(index);
+			var e=calcEnd(index);
+			assert s==start:
 				start+" "+index.toString();
-			assert index.contains(lastIndex()):
+			assert e==end:
 				lastIndex()+" "+index;
 		}
 	}
