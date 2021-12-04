@@ -25,7 +25,7 @@ public class SlowTests{
 		
 		var rand=new Random(1);
 		//Dumb brute force all possible edge cases
-		for(int run=0;run<100000;run++){
+		for(int run=0;run<50000;run++){
 			if(run%10000==0) LogUtil.println(run);
 			
 			try(var ignored=data.openIOTransaction()){
