@@ -72,7 +72,11 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		@Override
 		public int read() throws IOException{
 			if(transactionOpen){
-				return transactions.readByte(this::readAt, pos++);
+				int b=transactions.readByte(this::readAt, pos);
+				if(b>=0){
+					this.pos++;
+				}
+				return b;
 			}
 			
 			int remaining=(int)(getSize()-getPos());
@@ -83,13 +87,14 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		@Override
 		public int read(byte[] b, int off, int len) throws IOException{
 			if(transactionOpen){
-				var oldPos=pos;
-				int read  =transactions.read(this::readAt, pos, b, off, len);
-				pos=oldPos+read;
+				int read=transactions.read(this::readAt, pos, b, off, len);
+				pos+=read;
 				return read;
 			}
 			
-			return readAt(pos, b, off, len);
+			int read=readAt(pos, b, off, len);
+			if(read>=0) pos+=read;
+			return read;
 		}
 		
 		private int readAt(long pos, byte[] b, int off, int len){
@@ -101,7 +106,6 @@ public abstract class MemoryData<DataType> implements IOInterface{
 			
 			int clampedLen=Math.min(remaining, len);
 			readN(data, pos, b, off, clampedLen);
-			this.pos+=clampedLen;
 			return clampedLen;
 		}
 		
