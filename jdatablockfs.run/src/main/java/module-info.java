@@ -4,4 +4,5 @@ module JDatablockFS.run {
 	requires jlapisutil;
 	
 	opens com.lapisseqa.cfs.run;
+	opens com.lapisseqa.cfs.run.sparseimage;
 }
