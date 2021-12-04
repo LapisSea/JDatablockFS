@@ -178,6 +178,8 @@ public abstract class MemoryData<DataType> implements IOInterface{
 			
 			int start=pos, end=start+count;
 			
+			var used=(int)getSize();
+			
 			int overshoot=end-used;
 			if(overshoot>0){
 //				start-=overshoot;
@@ -196,15 +198,22 @@ public abstract class MemoryData<DataType> implements IOInterface{
 			var result=new StringBuilder(name.length()+pre.length()+post.length()+end-start);
 			
 			result.append(name).append(pre);
-			for(int i=start;i<end;i++){
-				char c=(char)read1(data, i);
-				result.append(switch(c){
-					case 0 -> '␀';
-					case '\n' -> '↵';
-					case '\t' -> '↹';
-					default -> c;
-				});
+			try(var io=ioAt(start)){
+				for(int i=start;i<end-1;i++){
+					char c=(char)io.readInt1();
+					result.append(switch(c){
+						case 0 -> '␀';
+						case '\n' -> '↵';
+						case '\r' -> '®';
+						case '\b' -> '␈';
+						case '\t' -> '↹';
+						default -> c;
+					});
+				}
+			}catch(IOException e){
+				throw new RuntimeException(e);
 			}
+			
 			result.append(post);
 			
 			return result.toString();
