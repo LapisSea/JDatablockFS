@@ -14,14 +14,23 @@ import java.util.ArrayList;
 import java.util.List;
 
 public interface RegistryNode{
-	interface InstanceOf<ValTyp> extends RegistryNode{
-		Class<ValTyp> getType();
+	abstract class InstanceOf<ValTyp> implements RegistryNode{
+		
+		private final Class<ValTyp> typ;
+		public InstanceOf(Class<ValTyp> typ){
+			this.typ=typ;
+		}
+		
+		public Class<ValTyp> getType(){
+			return typ;
+		}
+		
 		@Override
-		default boolean canCreate(Type type, GetAnnotation annotations){
+		public boolean canCreate(Type type, GetAnnotation annotations){
 			return UtilL.instanceOf(Utils.typeToRaw(type), getType());
 		}
 		@Override
-		<T extends IOInstance<T>> IOField<T, ? extends ValTyp> create(FieldAccessor<T> field, GenericContext genericContext);
+		public abstract <T extends IOInstance<T>> IOField<T, ? extends ValTyp> create(FieldAccessor<T> field, GenericContext genericContext);
 	}
 	
 	class Registry implements RegistryNode{

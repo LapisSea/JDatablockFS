@@ -17,10 +17,7 @@ import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.reflection.*;
-import com.lapissea.util.NotImplementedException;
-import com.lapissea.util.PairM;
-import com.lapissea.util.TextUtil;
-import com.lapissea.util.UtilL;
+import com.lapissea.util.*;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
@@ -386,31 +383,19 @@ public class FieldCompiler{
 				return IOFieldPrimitive.make(field);
 			}
 		});
-		REGISTRY.register(new RegistryNode.InstanceOf<Enum>(){
-			@Override
-			public Class<Enum> getType(){
-				return Enum.class;
-			}
+		REGISTRY.register(new RegistryNode.InstanceOf<>(Enum.class){
 			@Override
 			public <T extends IOInstance<T>> IOField<T, Enum> create(FieldAccessor<T> field, GenericContext genericContext){
 				return new IOFieldEnum<>(field);
 			}
 		});
-		REGISTRY.register(new RegistryNode.InstanceOf<INumber>(){
-			@Override
-			public Class<INumber> getType(){
-				return INumber.class;
-			}
+		REGISTRY.register(new RegistryNode.InstanceOf<>(INumber.class){
 			@Override
 			public <T extends IOInstance<T>> IOField<T, INumber> create(FieldAccessor<T> field, GenericContext genericContext){
 				return new IOFieldNumber<>(field);
 			}
 		});
-		REGISTRY.register(new RegistryNode.InstanceOf<byte[]>(){
-			@Override
-			public Class<byte[]> getType(){
-				return byte[].class;
-			}
+		REGISTRY.register(new RegistryNode.InstanceOf<>(byte[].class){
 			@Override
 			public <T extends IOInstance<T>> IOField<T, byte[]> create(FieldAccessor<T> field, GenericContext genericContext){
 				return new IOFieldByteArray<>(field);
@@ -428,21 +413,13 @@ public class FieldCompiler{
 				return new IOFieldInstanceArray<>(field);
 			}
 		});
-		REGISTRY.register(new RegistryNode.InstanceOf<String>(){
-			@Override
-			public Class<String> getType(){
-				return String.class;
-			}
+		REGISTRY.register(new RegistryNode.InstanceOf<>(String.class){
 			@Override
 			public <T extends IOInstance<T>> IOField<T, String> create(FieldAccessor<T> field, GenericContext genericContext){
 				return new IOFieldInlineString<>(field);
 			}
 		});
-		REGISTRY.register(new RegistryNode.InstanceOf<IOInstance>(){
-			@Override
-			public Class<IOInstance> getType(){
-				return IOInstance.class;
-			}
+		REGISTRY.register(new RegistryNode.InstanceOf<>(IOInstance.class){
 			@Override
 			public <T extends IOInstance<T>> IOField<T, ? extends IOInstance> create(FieldAccessor<T> field, GenericContext genericContext){
 				Class<?> raw      =field.getType();
