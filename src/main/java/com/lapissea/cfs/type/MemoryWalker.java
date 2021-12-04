@@ -161,6 +161,19 @@ public class MemoryWalker{
 							typ=inst.getClass();
 						}
 						if(IOFieldPrimitive.isPrimitive(typ)||typ.isEnum()) continue;
+						if(typ.isArray()){
+							var component=typ.componentType();
+							if(UtilL.instanceOf(component, IOInstance.class)){
+								var array=(IOInstance<?>[])field.get(ioPool, instance);
+								if(array==null||array.length==0) continue;
+								var pip=StructPipe.of(pipe.getClass(), array[0].getThisStruct());
+								for(IOInstance<?> inst : array){
+									if(!walkStructFull(cluster, stack, (T)inst, reference.addOffset(fieldOffset), pip, pointerRecord)) return false;
+									fieldOffset+=pip.calcUnknownSize(cluster, inst, WordSpace.BYTE);
+								}
+								continue;
+							}
+						}
 						if(UtilL.instanceOf(typ, IOInstance.class)){
 							var inst=(IOInstance<?>)field.get(ioPool, instance);
 							if(inst!=null){

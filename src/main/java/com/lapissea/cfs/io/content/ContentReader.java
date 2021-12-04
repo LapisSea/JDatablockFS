@@ -333,6 +333,49 @@ public interface ContentReader extends AutoCloseable, ContentBuff{
 		return result;
 	}
 	
+	default float readFloat4() throws IOException{
+		byte[] readBuffer=contentBuf();
+		readFully(readBuffer, 0, 4);
+		return readFloat4(readBuffer, 0);
+	}
+	default float[] readFloats4(int count) throws IOException{
+		var buff=new float[count];
+		readFloats4(buff);
+		return buff;
+	}
+	default void readFloats4(float[] f) throws IOException{
+		int    numSize=4;
+		byte[] bb     =readInts1(f.length*numSize);
+		for(int i=0;i<f.length;i++){
+			f[i]=readFloat4(bb, i*numSize);
+		}
+	}
+	
+	private float readFloat4(byte[] srcBuffer, int off){
+		return Float.intBitsToFloat(readInt4(srcBuffer, off));
+	}
+	
+	default double readFloat8() throws IOException{
+		byte[] readBuffer=contentBuf();
+		readFully(readBuffer, 0, 8);
+		return readFloat8(readBuffer, 0);
+	}
+	default double[] readFloats8(int count) throws IOException{
+		var buff=new double[count];
+		readFloats8(buff);
+		return buff;
+	}
+	default void readFloats8(double[] f) throws IOException{
+		int    numSize=8;
+		byte[] bb     =readInts1(f.length*numSize);
+		for(int i=0;i<f.length;i++){
+			f[i]=readFloat8(bb, i*numSize);
+		}
+	}
+	
+	private double readFloat8(byte[] srcBuffer, int off){
+		return Double.longBitsToDouble(readInt8(srcBuffer, off));
+	}
 	
 	default byte[] readFully(byte[] b) throws IOException{
 		return readFully(b, 0, b.length);

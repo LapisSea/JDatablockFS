@@ -136,11 +136,20 @@ public class TypeDefinition extends IOInstance<TypeDefinition>{
 	
 	@Override
 	public String toString(){
-		return getTypeClass().getName()+(args.length==0?"":Arrays.stream(args).map(TypeDefinition::toString).collect(Collectors.joining(", ", "<", ">")));
+		return shortTypeString()+(args.length==0?"":Arrays.stream(args).map(TypeDefinition::toString).collect(Collectors.joining(", ", "<", ">")));
 	}
 	@Override
 	public String toShortString(){
-		return getTypeClass().getSimpleName()+(args.length==0?"":Arrays.stream(args).map(TypeDefinition::toShortString).collect(Collectors.joining(", ", "<", ">")));
+		String nam=shortTypeString();
+		return nam+(args.length==0?"":Arrays.stream(args).map(TypeDefinition::toShortString).collect(Collectors.joining(", ", "<", ">")));
+	}
+	private String shortTypeString(){
+		var nam=getTypeName();
+		var last=nam.lastIndexOf('.');
+		if(last!=-1){
+			nam=nam.substring(last+1);
+		}
+		return nam;
 	}
 	public Type generic(){
 		if(generic==null) generic=new SyntheticParameterizedType(null, getTypeClass(), Arrays.stream(args).map(TypeDefinition::getTypeClass).toArray(Type[]::new));

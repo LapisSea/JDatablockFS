@@ -200,7 +200,7 @@ public class FieldCompiler{
 				
 				Function<String, Optional<Method>> getMethod=prefix->scanMethod(cl, m->checkMethod(fieldName, prefix, m));
 				
-				var getter=getMethod.apply("get");
+				var getter=getMethod.apply(getPrefix(field));
 				var setter=getMethod.apply("set");
 				
 				getter.ifPresent(usedFields::add);
@@ -221,7 +221,8 @@ public class FieldCompiler{
 		Map<String, PairM<Method, Method>> transientFieldsMap=new HashMap<>();
 		
 		for(Method hangingMethod : hangingMethods){
-			getMethodFieldName("get", hangingMethod).ifPresent(s->transientFieldsMap.computeIfAbsent(s, n->new PairM<>()).obj1=hangingMethod);
+			String getPrefix=getPrefix(hangingMethod);
+			getMethodFieldName(getPrefix, hangingMethod).ifPresent(s->transientFieldsMap.computeIfAbsent(s, n->new PairM<>()).obj1=hangingMethod);
 			getMethodFieldName("set", hangingMethod).ifPresent(s->transientFieldsMap.computeIfAbsent(s, n->new PairM<>()).obj2=hangingMethod);
 		}
 		
@@ -242,7 +243,7 @@ public class FieldCompiler{
 		                                                            .stream()
 		                                                            .flatMap(PairM::<Method>stream)
 		                                                            .noneMatch(mt->mt==m))
-		                               .map(Method::toString)
+		                               .map(method->method+""+(fields.stream().anyMatch(f->f.getName().equals(method.getName()))?(" did you mean "+getPrefix(method)+TextUtil.firstToUpperCase(method.getName())+"?"):""))
 		                               .collect(Collectors.joining("\n"));
 		if(!unusedWaning.isEmpty()){
 			throw new MalformedStructLayout("There are unused or invalid methods marked with "+IOValue.class.getSimpleName()+"\n"+unusedWaning);
@@ -272,6 +273,18 @@ public class FieldCompiler{
 			})
 		).sorted();
 	}
+	
+	private String getPrefix(Field field){
+		var typ=field.getType();
+		var isBool=typ==boolean.class||typ==Boolean.class;
+		return isBool?"is":"get";
+	}
+	private String getPrefix(Method method){
+		var typ=method.getReturnType();
+		var isBool=typ==boolean.class||typ==Boolean.class;
+		return isBool?"is":"get";
+	}
+	
 	private Optional<String> getMethodFieldName(String prefix, Method m){
 		IOValue ann  =m.getAnnotation(IOValue.class);
 		var     mName=m.getName();

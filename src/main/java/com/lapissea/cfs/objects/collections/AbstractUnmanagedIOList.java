@@ -118,6 +118,6 @@ public abstract class AbstractUnmanagedIOList<T extends IOInstance<T>, SELF exte
 		checkSize(index, 0);
 	}
 	protected final void checkSize(long index, long sizeMod){
-		Objects.checkIndex(index, size());
+		Objects.checkIndex(index, size()+sizeMod);
 	}
 }
