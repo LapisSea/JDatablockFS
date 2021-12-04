@@ -68,7 +68,7 @@ public class BinaryGridRenderer{
 		
 	}
 	
-	private static record Pointer(long from, long to, int size, Color color, String message, float widthFactor){}
+	private record Pointer(long from, long to, int size, Color color, String message, float widthFactor){}
 	
 	private boolean errorMode;
 	private long    renderCount;
@@ -552,44 +552,57 @@ public class BinaryGridRenderer{
 				var cl  =cluster;
 				var root=cluster.getRoot();
 				
-				cluster.rootWalker().walk(true, ref->{
-					if(!ref.isNull()){
+				Throwable e1    =null;
+				var       annCtx=new AnnotateCtx(ctx, provider, new LinkedList<>(), ptrs::add, new ArrayList<>(), new ArrayList<>());
+				
+				try{
+					
+					cluster.rootWalker().walk(true, ref->{
+						if(!ref.isNull()){
+							try{
+								for(Chunk chunk : new ChainWalker(ref.getPtr().dereference(cl))){
+									referenced.add(chunk);
+								}
+							}catch(IOException e){
+								throw UtilL.uncheckedThrow(e);
+							}
+						}
+					});
+					annotateStruct(annCtx, root,
+					               cluster.getFirstChunk().getPtr().makeReference(),
+					               FixedContiguousStructPipe.of(root.getThisStruct()),
+					               true);
+					
+				}catch(Throwable e){
+					e1=e;
+				}
+				try{
+					assert annCtx.stack.isEmpty();
+					annCtx.stack.add(null);
+					
+					long pos=cluster.getFirstChunk().getPtr().getValue();
+					while(pos<bytes.length){
 						try{
-							for(Chunk chunk : new ChainWalker(ref.getPtr().dereference(cl))){
-								referenced.add(chunk);
+							for(Chunk chunk : new PhysicalChunkWalker(cluster.getChunk(ChunkPointer.of(pos)))){
+								pos=chunk.dataEnd();
+								if(referenced.contains(chunk)){
+									fillChunk(ctx, chunk, true, false);
+								}
+								annotateChunk(annCtx, chunk);
 							}
 						}catch(IOException e){
-							throw UtilL.uncheckedThrow(e);
+							var p=(int)pos;
+							drawBytes(ctx, IntStream.of(p), Color.RED, true, true);
+							pos++;
 						}
 					}
-				});
-				AnnotateCtx annCtx=new AnnotateCtx(ctx, provider, new LinkedList<>(), ptrs::add, new ArrayList<>(), new ArrayList<>());
-				annotateStruct(annCtx, root,
-				               cluster.getFirstChunk().getPtr().makeReference(),
-				               FixedContiguousStructPipe.of(root.getThisStruct()),
-				               true);
-				
-				assert annCtx.stack.isEmpty();
-				annCtx.stack.add(null);
-				
-				long pos=cluster.getFirstChunk().getPtr().getValue();
-				while(pos<bytes.length){
-					try{
-						for(Chunk chunk : new PhysicalChunkWalker(cluster.getChunk(ChunkPointer.of(pos)))){
-							pos=chunk.dataEnd();
-							if(referenced.contains(chunk)){
-								fillChunk(ctx, chunk, true, false);
-							}
-							annotateChunk(annCtx, chunk);
-						}
-					}catch(IOException e){
-						var p=(int)pos;
-						drawBytes(ctx, IntStream.of(p), Color.RED, true, true);
-						pos++;
-					}
+					annCtx.popStrings(renderer);
+				}catch(Throwable e){
+					if(e1!=null) e1.addSuppressed(e);
+					else e1=e;
 				}
-				annCtx.popStrings(renderer);
 				
+				if(e1!=null) throw e1;
 			}else{
 				provider=DataProvider.newVerySimpleProvider(MemoryData.build().withRaw(bytes).build());
 				AnnotateCtx annCtx=new AnnotateCtx(ctx, provider, new LinkedList<>(), ptrs::add, new ArrayList<>(), new ArrayList<>());
@@ -1074,7 +1087,8 @@ public class BinaryGridRenderer{
 			
 			var rctx=ctx.renderCtx;
 			
-			Random rand=new Random();
+			RuntimeException fieldErr=null;
+			Random           rand    =new Random();
 			renderer.setLineWidth(4);
 			
 			var iterator=makeFieldIterator(instance, pipe);
@@ -1242,8 +1256,17 @@ public class BinaryGridRenderer{
 					}
 				}catch(Throwable e){
 					String instStr=instanceErrStr(instance);
-					throw new RuntimeException("failed to annotate "+field+" in "+instStr, e);
+					var    err    =new RuntimeException("failed to annotate "+field+" in "+instStr, e);
+					
+					if(fieldErr==null){
+						fieldErr=err;
+					}else{
+						fieldErr.addSuppressed(err);
+					}
 				}
+			}
+			if(fieldErr!=null){
+				throw fieldErr;
 			}
 			if(rctx.isRangeHovered(Range.fromSize(offsetStart, fieldOffset))){
 				rctx.hoverMessages.add(instance.toString());
