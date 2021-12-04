@@ -5,7 +5,8 @@ import com.lapissea.cfs.io.content.ContentReader;
 import java.io.EOFException;
 import java.io.IOException;
 
-import static com.lapissea.cfs.io.bit.BitUtils.*;
+import static com.lapissea.cfs.io.bit.BitUtils.bitsToBytes;
+import static com.lapissea.cfs.io.bit.BitUtils.makeMask;
 
 public class BitInputStream implements BitReader, AutoCloseable{
 	

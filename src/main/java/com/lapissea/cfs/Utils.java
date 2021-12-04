@@ -19,7 +19,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import static com.lapissea.util.UtilL.*;
+import static com.lapissea.util.UtilL.Assert;
 
 @SuppressWarnings({"unchecked", "unused"})
 public class Utils{

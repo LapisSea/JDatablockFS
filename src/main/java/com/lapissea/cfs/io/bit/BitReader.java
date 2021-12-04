@@ -5,7 +5,7 @@ import com.lapissea.cfs.exceptions.IllegalBitValueException;
 import java.io.IOException;
 import java.util.function.IntFunction;
 
-import static com.lapissea.cfs.io.bit.BitUtils.*;
+import static com.lapissea.cfs.io.bit.BitUtils.binaryRangeFindZero;
 
 public interface BitReader{
 	

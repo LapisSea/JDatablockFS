@@ -7,7 +7,7 @@ import java.util.Arrays;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-import static com.lapissea.cfs.Utils.*;
+import static com.lapissea.cfs.Utils.extractFromVarType;
 
 public final class SyntheticParameterizedType implements ParameterizedType{
 	

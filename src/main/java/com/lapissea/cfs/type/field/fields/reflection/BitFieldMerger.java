@@ -11,7 +11,6 @@ import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
-import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
