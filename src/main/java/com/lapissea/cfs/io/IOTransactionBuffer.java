@@ -1,6 +1,5 @@
 package com.lapissea.cfs.io;
 
-import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
@@ -140,8 +139,33 @@ public class IOTransactionBuffer{
 		return len;
 	}
 	
+	private long modifiedCapacity=-1;
+	
+	public long getCapacity(long fallback){
+		if(modifiedCapacity==-1) return fallback;
+		return modifiedCapacity;
+	}
+	
 	public void capacityChange(long newCapacity){
-		throw new NotImplementedException();
+		if(newCapacity<0) throw new IllegalArgumentException();
+		modifiedCapacity=newCapacity;
+		
+		for(int i=writeEvents.size()-1;i>=0;i--){
+			var e=writeEvents.get(i);
+			if(e.start()>newCapacity){
+				writeEvents.remove(i);
+				continue;
+			}
+			if(e.end()>newCapacity){
+				int shrink=(int)(e.end()-newCapacity);
+				assert shrink<e.data.length;
+				assert shrink>0;
+				writeEvents.set(i, makeEvent(e.offset, e.data, 0, e.data.length-shrink));
+				continue;
+			}
+			break;
+		}
+		
 	}
 	
 	public void writeByte(long offset, int b){
@@ -224,6 +248,12 @@ public class IOTransactionBuffer{
 			}
 			UtilL.addRemainSorted(writeEvents, makeEvent(offset, b, off, len));
 		}finally{
+			if(modifiedCapacity!=-1){
+				var last=writeEvents.get(writeEvents.size()-1);
+				if(last.end()>modifiedCapacity) {
+					modifiedCapacity=last.end();
+				}
+			}
 			if(DEBUG_VALIDATION){
 				var copy=new ArrayList<>(writeEvents);
 				copy.sort(IOEvent.Write::compareTo);
@@ -286,6 +316,7 @@ public class IOTransactionBuffer{
 		}
 		return false;
 	}
+	
 	private IOEvent.Write makeEvent(long offset, byte[] b, int off, int len){
 		byte[] data=new byte[len];
 		System.arraycopy(b, off, data, 0, len);
@@ -295,6 +326,11 @@ public class IOTransactionBuffer{
 	public void merge(IOInterface dest) throws IOException{
 		if(writeEvents.isEmpty()) return;
 		try(var io=dest.io()){
+			
+			if(modifiedCapacity!=-1){
+				io.setCapacity(modifiedCapacity);
+			}
+			
 			while(writeEvents.size()>1){
 				var e1=writeEvents.get(0);
 				var e2=writeEvents.get(1);
@@ -306,7 +342,13 @@ public class IOTransactionBuffer{
 			}
 			var event=writeEvents.get(0);
 			io.setPos(event.offset).write(event.data);
-			writeEvents.clear();
+			
 		}
+		reset();
+	}
+	
+	private void reset(){
+		writeEvents.clear();
+		modifiedCapacity=-1;
 	}
 }
