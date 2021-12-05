@@ -6,7 +6,6 @@ import com.lapissea.cfs.io.IOTransactionBuffer;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.content.ContentOutputBuilder;
 import com.lapissea.cfs.io.content.ContentWriter;
-import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.function.UnsafeSupplier;
@@ -33,12 +32,12 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		
 		@Override
 		public long getPos(){
-			return Math.min(pos, used);
+			return Math.min(pos, getSize());
 		}
 		
 		@Override
 		public long getSize(){
-			return used;
+			return getCapacity();
 		}
 		
 		@Override
@@ -48,18 +47,18 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		
 		@Override
 		public long getCapacity(){
+			if(transactionOpen){
+				return transactions.getCapacity(used);
+			}
 			return used;
 		}
 		
 		@Override
 		public RandomIO setCapacity(long newCapacity){
 			if(readOnly) throw new UnsupportedOperationException();
-			if(transactionOpen){
-				throw new NotImplementedException();//TODO implement capacity changing when in transaction
-			}
 			
 			MemoryData.this.setCapacity(newCapacity);
-			pos=Math.min(pos, used);
+			pos=(int)Math.min(pos, getSize());
 			return this;
 		}
 		
@@ -272,6 +271,9 @@ public abstract class MemoryData<DataType> implements IOInterface{
 	
 	@Override
 	public long getIOSize(){
+		if(transactionOpen){
+			return transactions.getCapacity(used);
+		}
 		return used;
 	}
 	
@@ -281,7 +283,9 @@ public abstract class MemoryData<DataType> implements IOInterface{
 	private void setCapacity(int newCapacity){
 		if(readOnly) throw new UnsupportedOperationException();
 		if(transactionOpen){
-			transactions.capacityChange(newCapacity);
+			var siz=transactions.getCapacity(used);
+			transactions.capacityChange(Math.min(siz, newCapacity));
+			return;
 		}
 		
 		long lastCapacity=getIOSize();
