@@ -32,33 +32,44 @@ public class SlowTests{
 				var runSize=rand.nextInt(40);
 				for(int j=1;j<runSize+1;j++){
 					runIndex++;
+					var failS="failed on run "+runIndex;
 					
-					int off=rand.nextInt(cap);
-					int siz=rand.nextInt(10);
-					
-					byte[] buf=new byte[siz];
-					Arrays.fill(buf, (byte)j);
-
-//					LogUtil.println("================================");
-					
-					mirror.write(off, false, buf);
-//					LogUtil.println("  ", HexFormat.of().formatHex(mirror.readAll()).replace('0', '.'));
-//					LogUtil.println(HexFormat.of().formatHex(buf).replace('0', '.'));
-
-//					LogUtil.println("a ", HexFormat.of().formatHex(data.readAll()).replace('0', '.'));
-					data.write(off, false, buf);
-//					LogUtil.println("b ", HexFormat.of().formatHex(data.readAll()).replace('0', '.'));
-					
-					for(int i=0;i<100;i++){
-						var rSiz=rand.nextInt(20);
-						var rOff=rand.nextInt(cap+10-rSiz);
-						Assertions.assertArrayEquals(mirror.read(rOff, rSiz),
-						                             data.read(rOff, rSiz), ""+i);
+					if(rand.nextFloat()<0.1){
+						var newSiz=rand.nextInt(cap*2)+21;
+						
+						try(var io=mirror.io()){
+							io.setCapacity(newSiz);
+						}
+						try(var io=data.io()){
+							io.setCapacity(newSiz);
+						}
+					}else{
+						
+						int off=rand.nextInt((int)data.getIOSize()-10);
+						int siz=rand.nextInt(10);
+						
+						byte[] buf=new byte[siz];
+						Arrays.fill(buf, (byte)j);
+						
+						mirror.write(off, false, buf);
+						data.write(off, false, buf);
+						
+						Assertions.assertArrayEquals(mirror.read(off+1, 9),
+						                             data.read(off+1, 9),
+						                             failS);
 					}
 					
-					Assertions.assertArrayEquals(mirror.read(off+1, 9),
-					                             data.read(off+1, 9));
-					check(mirror, data, "failed on run "+runIndex);
+					Assertions.assertEquals(mirror.getIOSize(), data.getIOSize(), failS);
+					
+					for(int i=0;i<100;i++){
+						var rSiz  =rand.nextInt(20);
+						var rOff  =rand.nextInt((int)(data.getIOSize()-rSiz));
+						int finalI=i;
+						Assertions.assertArrayEquals(mirror.read(rOff, rSiz),
+						                             data.read(rOff, rSiz), ()->failS+" "+finalI);
+					}
+					
+					check(mirror, data, failS);
 				}
 			}catch(Throwable e){
 				throw new RuntimeException("failed on run "+runIndex, e);
