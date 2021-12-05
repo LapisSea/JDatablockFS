@@ -5,6 +5,7 @@ import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.UtilL;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -93,6 +94,11 @@ public class TypeDefinition extends IOInstance<TypeDefinition>{
 	@IOValue
 	private TypeDefinition[] args;
 	
+	@IOValue
+	private boolean unmanaged;
+	
+	private boolean calculatedProps;
+	
 	private Type generic;
 	
 	public TypeDefinition(){}
@@ -101,11 +107,29 @@ public class TypeDefinition extends IOInstance<TypeDefinition>{
 	public TypeDefinition(Class<?> type, TypeDefinition... args){
 		this(type.getName(), args.clone());
 		this.typeClass=type;
+		setUnmanaged(calcUnmanaged(type));
 	}
 	
 	public TypeDefinition(String typeName, TypeDefinition... args){
 		this.typeName=typeName;
 		this.args=args.length==0?args:args.clone();
+	}
+	
+	private boolean calcUnmanaged(Class<?> type){
+		return UtilL.instanceOf(type, IOInstance.Unmanaged.class);
+	}
+	
+	@IOValue
+	private void setUnmanaged(boolean unmanaged){
+		this.unmanaged=unmanaged;
+		calculatedProps=true;
+	}
+	@IOValue
+	public boolean isUnmanaged(){
+		if(!calculatedProps){
+			setUnmanaged(calcUnmanaged(getTypeClass()));
+		}
+		return unmanaged;
 	}
 	
 	public String getTypeName(){
@@ -114,13 +138,45 @@ public class TypeDefinition extends IOInstance<TypeDefinition>{
 	
 	public Class<?> getTypeClass(){
 		if(typeClass==null){
-			try{
-				typeClass=Class.forName(getTypeName());
-			}catch(ClassNotFoundException e){
-				throw new NotImplementedException("implement generic ioinstance from stored data: "+getTypeName());
-			}
+			typeClass=loadClass();
 		}
 		return typeClass;
+	}
+	private Class<?> loadClass(){
+		try{
+			return Class.forName(getTypeName());
+		}catch(ClassNotFoundException e){
+			if(isUnmanaged()){
+				throw new UnsupportedOperationException(getTypeName()+" is unmanaged! All unmanaged types must be present! Unmanaged types may contain mechanism not understood by the base IO engine.");
+			}
+			return createTemplateClass();
+		}
+		
+	}
+	private Class<?> createTemplateClass(){
+		var toLoad=getTypeName();
+		var loader=new ClassLoader("loader of: "+shortTypeString(), getClass().getClassLoader()){
+			@Override
+			protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException{
+				if(name.equals(toLoad)){
+					synchronized(getClassLoadingLock(name)){
+						return generate();
+					}
+				}
+				return getParent().loadClass(name);
+			}
+			
+			private Class<?> generate(){
+				//TODO: create class definition and generate it
+				throw new NotImplementedException("implement generic ioinstance from stored data: "+getTypeName());
+			}
+			
+		};
+		try{
+			return Class.forName(toLoad, false, loader);
+		}catch(Throwable e){
+			throw new RuntimeException("Failed to load: "+toLoad, e);
+		}
 	}
 	
 	public int argCount(){
@@ -136,15 +192,15 @@ public class TypeDefinition extends IOInstance<TypeDefinition>{
 	
 	@Override
 	public String toString(){
-		return shortTypeString()+(args.length==0?"":Arrays.stream(args).map(TypeDefinition::toString).collect(Collectors.joining(", ", "<", ">")));
+		return getClass().getSimpleName()+"("+shortTypeString()+(args.length==0?"":Arrays.stream(args).map(TypeDefinition::toString).collect(Collectors.joining(", ", "<", ">")))+")";
 	}
 	@Override
 	public String toShortString(){
 		String nam=shortTypeString();
-		return nam+(args.length==0?"":Arrays.stream(args).map(TypeDefinition::toShortString).collect(Collectors.joining(", ", "<", ">")));
+		return "Typ("+nam+(args.length==0?"":Arrays.stream(args).map(TypeDefinition::toShortString).collect(Collectors.joining(", ", "<", ">")))+")";
 	}
 	private String shortTypeString(){
-		var nam=getTypeName();
+		var nam =getTypeName();
 		var last=nam.lastIndexOf('.');
 		if(last!=-1){
 			nam=nam.substring(last+1);
