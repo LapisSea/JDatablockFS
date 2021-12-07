@@ -22,7 +22,7 @@ import java.util.stream.Stream;
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NULLABLE;
 
-public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V>>{
+public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	
 	private static class BucketEntry<K, V> extends IOInstance<BucketEntry<K, V>>{
 		

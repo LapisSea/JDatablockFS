@@ -9,7 +9,7 @@ import com.lapissea.cfs.type.field.annotations.IOValue;
 
 import java.io.IOException;
 
-public abstract class AbstractUnmanagedIOMap<K, V, SELF extends AbstractUnmanagedIOMap<K, V, SELF>> extends IOInstance.Unmanaged<SELF> implements IOMap<K, V>{
+public abstract class AbstractUnmanagedIOMap<K, V> extends IOInstance.Unmanaged<AbstractUnmanagedIOMap<K, V>> implements IOMap<K, V>{
 	
 	@IOValue
 	@IODependency.VirtualNumSize
