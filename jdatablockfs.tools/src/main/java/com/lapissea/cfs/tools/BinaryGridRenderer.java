@@ -41,6 +41,7 @@ import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
+import static com.lapissea.cfs.tools.ColorUtils.alpha;
 import static com.lapissea.cfs.tools.render.RenderBackend.DrawMode;
 import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 
@@ -127,7 +128,7 @@ public class BinaryGridRenderer{
 		long start=chunk.getPtr().getValue();
 		long end  =chunk.dataEnd();
 		
-		DrawUtils.fillByteRange(ColorUtils.alpha(color, color.getAlpha()/255F*0.2F), ctx, new Range(start, end));
+		DrawUtils.fillByteRange(alpha(color, color.getAlpha()/255F*0.2F), ctx, new Range(start, end));
 		renderer.setLineWidth(2);
 		outlineByteRange(color, ctx, new Range(start, chunk.dataStart()));
 		renderer.setLineWidth(3);
@@ -135,7 +136,7 @@ public class BinaryGridRenderer{
 		renderer.setLineWidth(1);
 		var next=chunk.next();
 		if(next!=null){
-			outlineChunk(ctx, next, ColorUtils.alpha(color, color.getAlpha()/255F*0.5F));
+			outlineChunk(ctx, next, alpha(color, color.getAlpha()/255F*0.5F));
 		}
 	}
 	
@@ -162,7 +163,7 @@ public class BinaryGridRenderer{
 		Color col, int bitOffset, long bitSize, Reference reference, long fieldOffset
 	) throws IOException{
 		Consumer<DrawUtils.Rect> doSegment=bitRect->{
-			renderer.setColor(ColorUtils.alpha(col, 0.8F).darker());
+			renderer.setColor(alpha(col, 0.8F).darker());
 			renderer.fillQuad(bitRect.x, bitRect.y, bitRect.width, bitRect.height);
 			drawStringInInfo(col, Objects.toString(field.instanceToString(ioPool, instance, true)), bitRect, false, ctx.strings);
 		};
@@ -225,13 +226,15 @@ public class BinaryGridRenderer{
 			}
 			if(lastRange!=null) ctx.recordPointer(new Pointer(lastRange.to()-1, range.from(), 0, col, field.toString(), 0.2F));
 			lastRange=range;
+			drawByteRanges(ctx.renderCtx, List.of(range), alpha(ColorUtils.mul(col, 0.8F), 0.6F), false, true);
 			if(!hover&&ctx.renderCtx.isRangeHovered(range)){
+				outlineByteRange(col, ctx.renderCtx, range);
+				DrawUtils.fillByteRange(alpha(col, 0.2F), ctx.renderCtx, range);
 				hover=true;
 			}
-			drawByteRanges(ctx.renderCtx, List.of(range), ColorUtils.alpha(ColorUtils.mul(col, 0.8F), 0.6F), false, true);
 		}
 		
-		var color=ColorUtils.alpha(ColorUtils.mix(col, Color.WHITE, 0.2F), 1);
+		var color=alpha(ColorUtils.mix(col, Color.WHITE, 0.2F), 1);
 		
 		var rectWidth=bestRange.toRect(ctx.renderCtx).width;
 		
@@ -292,8 +295,8 @@ public class BinaryGridRenderer{
 	
 	private void fillChunk(RenderContext ctx, Chunk chunk, boolean withChar, boolean force){
 		var chunkColor=chunkBaseColor();
-		var dataColor =ColorUtils.alpha(ColorUtils.mul(chunkColor, 0.5F), 0.7F);
-		var freeColor =ColorUtils.alpha(chunkColor, 0.4F);
+		var dataColor =alpha(ColorUtils.mul(chunkColor, 0.5F), 0.7F);
+		var freeColor =alpha(chunkColor, 0.4F);
 		
 		int start=(int)chunk.dataStart();
 		int cap  =(int)chunk.getCapacity();
@@ -528,7 +531,7 @@ public class BinaryGridRenderer{
 		outlineByteRange(Color.WHITE, ctx, new Range(0, magic.limit()));
 		drawStringIn(Color.WHITE, new String(bytes, 0, magic.limit()), new DrawUtils.Rect(0, 0, ctx.pixelsPerByte()*Math.min(magic.limit(), ctx.width()), ctx.pixelsPerByte()), false);
 		
-		renderer.setColor(ColorUtils.alpha(Color.WHITE, 0.5F));
+		renderer.setColor(alpha(Color.WHITE, 0.5F));
 		
 		List<Pointer> ptrs    =new ArrayList<>();
 		ParsedFrame   parsed  =cFrame.parsed();
@@ -639,7 +642,7 @@ public class BinaryGridRenderer{
 		}
 		
 		var f=renderer.getFont();
-		drawBytes(ctx, IntStream.range(0, bytes.length).filter(((IntPredicate)filled::contains).negate()), ColorUtils.alpha(Color.GRAY, 0.5F), true, true);
+		drawBytes(ctx, IntStream.range(0, bytes.length).filter(((IntPredicate)filled::contains).negate()), alpha(Color.GRAY, 0.5F), true, true);
 		
 		findHoverChunk(ctx, parsed, provider);
 		
@@ -698,7 +701,7 @@ public class BinaryGridRenderer{
 		
 		drawIndex.accept(clampedOverflow.stream());
 		
-		renderer.setColor(ColorUtils.alpha(Color.RED, color.getAlpha()/255F));
+		renderer.setColor(alpha(Color.RED, color.getAlpha()/255F));
 		drawIndex.accept(ranges.stream().map(r->{
 			if(r.to()<ctx.bytes.length) return null;
 			if(r.from()<ctx.bytes.length) return new Range(ctx.bytes.length, r.to());
@@ -797,7 +800,7 @@ public class BinaryGridRenderer{
 		renderer.fillQuad(frameIndex*w, 0, w, height*1.5);
 		renderer.fillQuad(frameIndex*w-0.75, 0, 1.5, height*1.5);
 		
-		renderer.setColor(ColorUtils.alpha(Color.WHITE, 0.3F));
+		renderer.setColor(alpha(Color.WHITE, 0.3F));
 		renderer.fillQuad(w, 0, screenWidth, height);
 		renderer.popMatrix();
 	}
@@ -835,14 +838,14 @@ public class BinaryGridRenderer{
 				col=ptr.color();
 			}
 			
-			renderer.setColor(ColorUtils.alpha(col, 0.5F));
+			renderer.setColor(alpha(col, 0.5F));
 			
 			if(pSiz>1&&LongStream.range(start, start+pSiz).noneMatch(i->i%ctx.width()==0)){
-				renderer.setColor(ColorUtils.alpha(col, 0.1F));
+				renderer.setColor(alpha(col, 0.1F));
 				renderer.setLineWidth(sHalf*ptr.widthFactor());
 				drawLine(ctx, start, start+pSiz-1);
 				renderer.setLineWidth(sFul*ptr.widthFactor());
-				renderer.setColor(ColorUtils.alpha(col, 0.5F));
+				renderer.setColor(alpha(col, 0.5F));
 			}
 			
 			start+=pSiz/2;
@@ -926,10 +929,10 @@ public class BinaryGridRenderer{
 		var bounds    =Arrays.stream(lines).map(this::getStringBounds).toList();
 		var totalBound=bounds.stream().reduce((l, r)->new DrawFont.Bounds(Math.max(l.width(), r.width()), l.height()+r.height())).orElseThrow();
 		
-		renderer.setColor(ColorUtils.alpha(Color.RED.darker(), 0.2F));
+		renderer.setColor(alpha(Color.RED.darker(), 0.2F));
 		renderer.fillQuad(0, screenHeight-totalBound.height()-25, totalBound.width()+20, totalBound.height()+20);
 		
-		var col =ColorUtils.alpha(Color.WHITE, 0.8F);
+		var col =alpha(Color.WHITE, 0.8F);
 		var rect=new DrawUtils.Rect(10, screenHeight-totalBound.height()-20, totalBound.width(), renderer.getLineWidth());
 		
 		List<DrawFont.StringDraw> strings=new ArrayList<>(lines.length);
@@ -1011,7 +1014,7 @@ public class BinaryGridRenderer{
 		for(int i=0;i<ctx.hoverMessages.size();i++){
 			strings.add(new DrawFont.StringDraw(renderer.getFontScale(), col, ctx.hoverMessages.get(i), x, y+i*renderer.getFontScale()));
 		}
-		renderer.setColor(ColorUtils.alpha(Color.BLACK, 0.3F));
+		renderer.setColor(alpha(Color.BLACK, 0.3F));
 		renderer.fillQuad(x, y-renderer.getFontScale(), w, h);
 		renderer.getFont().fillStrings(strings);
 		
@@ -1256,7 +1259,7 @@ public class BinaryGridRenderer{
 					}
 				}catch(Throwable e){
 					String instStr=instanceErrStr(instance);
-					var    err    =new RuntimeException("failed to annotate "+field+" in "+instStr, e);
+					var    err    =new RuntimeException("failed to annotate "+field+" at "+reference.addOffset(fieldOffset)+" in "+instStr+" at "+reference, e);
 					
 					if(fieldErr==null){
 						fieldErr=err;
@@ -1268,7 +1271,10 @@ public class BinaryGridRenderer{
 			if(fieldErr!=null){
 				throw fieldErr;
 			}
-			if(rctx.isRangeHovered(Range.fromSize(offsetStart, fieldOffset))){
+			var rang=Range.fromSize(offsetStart, fieldOffset);
+			if(rctx.isRangeHovered(rang)){
+				outlineByteRange(Color.WHITE, ctx.renderCtx, rang);
+				DrawUtils.fillByteRange(alpha(Color.WHITE, 0.2F), ctx.renderCtx, rang);
 				rctx.hoverMessages.add(instance.toString());
 			}
 		}finally{

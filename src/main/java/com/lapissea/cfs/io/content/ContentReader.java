@@ -110,7 +110,9 @@ public interface ContentReader extends AutoCloseable, ContentBuff{
 	
 	default int readUnsignedInt1() throws IOException{
 		int ch=read();
-		if(ch<0) throw new EOFException();
+		if(ch<0){
+			throw new EOFException();
+		}
 		return ch;
 	}
 	

@@ -14,7 +14,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Objects;
-import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 
 public abstract class MemoryData<DataType> implements IOInterface{
@@ -108,15 +107,6 @@ public abstract class MemoryData<DataType> implements IOInterface{
 			return clampedLen;
 		}
 		
-		private void pushUsed(){
-			if(used<pos){
-				var old=used;
-				used=pos;
-				
-				logWriteEvent(old, used);
-			}
-		}
-		
 		@Override
 		public void write(int b){
 			if(readOnly) throw new UnsupportedOperationException();
@@ -131,7 +121,7 @@ public abstract class MemoryData<DataType> implements IOInterface{
 			write1(data, pos, (byte)b);
 			logWriteEvent(pos);
 			pos++;
-			pushUsed();
+			used=Math.max(used, pos);
 		}
 		
 		@Override
@@ -153,11 +143,12 @@ public abstract class MemoryData<DataType> implements IOInterface{
 			if(remaining<len) setCapacity(Math.max(4, Math.max((int)(getCapacity()*4D/3), getCapacity()+len-remaining)));
 			
 			writeN(b, off, data, pos, len);
-			logWriteEvent(pos, pos+len);
+			var oldPos=pos;
 			if(pushPos){
 				pos+=len;
-				pushUsed();
+				used=Math.max(used, pos);
 			}
+			logWriteEvent(oldPos, oldPos+len);
 		}
 		
 		@Override
@@ -181,18 +172,18 @@ public abstract class MemoryData<DataType> implements IOInterface{
 			
 			int overshoot=end-used;
 			if(overshoot>0){
-//				start-=overshoot;
+				start=Math.max(0, start-overshoot);
 				end=used;
 			}
 			
-			String name=getClass().getSimpleName();
-			String pre;
-			if(start<0){
-				start=0;
-				pre="{pos="+pos+", data=";
-			}else pre="{";
+			String transactionStr=transactionOpen?", transaction: {"+transactions.infoString()+"}":"";
 			
-			var post=overshoot==0?"}":" + "+overshoot+" more}";
+			String name=getClass().getSimpleName();
+			String pre ="{pos="+pos+transactionStr+", data=";
+			if(start!=0) pre+=start+" ... ";
+			
+			var more=used-end;
+			var post=more==0?"}":" ... "+more+"}";
 			
 			var result=new StringBuilder(name.length()+pre.length()+post.length()+end-start);
 			
@@ -288,7 +279,7 @@ public abstract class MemoryData<DataType> implements IOInterface{
 			return;
 		}
 		
-		long lastCapacity=getIOSize();
+		long lastCapacity=getLength(data);
 		if(lastCapacity==newCapacity) return;
 		
 		data=resize(data, newCapacity);
@@ -314,12 +305,21 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		};
 	}
 	
-	public String toShortString(){
-		return TextUtil.mapObjectValues(this).entrySet().stream().map(TextUtil::toShortString).collect(Collectors.joining(", ", "{", "}"));
-	}
 	@Override
 	public String toString(){
-		return MemoryData.class.getSimpleName()+toShortString();
+		return MemoryData.class.getSimpleName()+"."+getClass().getSimpleName()+"#"+Integer.toHexString(hashCode());
+	}
+	
+	@Override
+	public boolean equals(Object o){
+		return this==o||
+		       o instanceof MemoryData<?> that&&
+		       data.equals(that.data);
+	}
+	
+	@Override
+	public int hashCode(){
+		return data.hashCode();
 	}
 	
 	protected abstract int getLength(DataType data);

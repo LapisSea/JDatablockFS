@@ -250,7 +250,7 @@ public class IOTransactionBuffer{
 		}finally{
 			if(modifiedCapacity!=-1){
 				var last=writeEvents.get(writeEvents.size()-1);
-				if(last.end()>modifiedCapacity) {
+				if(last.end()>modifiedCapacity){
 					modifiedCapacity=last.end();
 				}
 			}
@@ -350,5 +350,10 @@ public class IOTransactionBuffer{
 	private void reset(){
 		writeEvents.clear();
 		modifiedCapacity=-1;
+	}
+	
+	public String infoString(){
+		if(writeEvents.isEmpty()) return "no data";
+		return writeEvents.stream().mapToInt(e->e.data.length).sum()+" bytes overridden in range "+writeEvents.get(0).start()+" - "+writeEvents.get(writeEvents.size()-1).end();
 	}
 }

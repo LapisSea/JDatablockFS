@@ -93,10 +93,6 @@ public interface IOTypeDB{
 	
 	class PersistentDB extends IOInstance<PersistentDB> implements IOTypeDB{
 		
-		@IOValue
-		@IOValue.OverrideType(HashIOMap.class)
-		private IOMap<Integer, TypeDefinition> data;
-		
 		private static final MemoryOnlyDB BUILT_IN=new MemoryOnlyDB();
 		private static final int          FIRST_ID;
 		
@@ -108,6 +104,9 @@ public interface IOTypeDB{
 			FIRST_ID=BUILT_IN.maxID();
 		}
 		
+		@IOValue
+		@IOValue.OverrideType(HashIOMap.class)
+		private AbstractUnmanagedIOMap<Integer, TypeDefinition> data;
 		
 		private WeakReference<ClassLoader> templateLoader=new WeakReference<>(null);
 		
@@ -177,6 +176,15 @@ public interface IOTypeDB{
 				}
 				return l;
 			}
+		}
+		@Override
+		public String toString(){
+			return getClass().getSimpleName()+toShortString();
+		}
+		
+		@Override
+		public String toShortString(){
+			return "{owner="+data.getDataProvider()+"}";
 		}
 	}
 	

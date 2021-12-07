@@ -4,7 +4,6 @@ import com.lapissea.cfs.SyntheticParameterizedType;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.LogUtil;
-import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.UtilL;
 
 import java.lang.reflect.ParameterizedType;
@@ -17,7 +16,7 @@ import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
-public class TypeDefinition extends IOInstance<TypeDefinition>{
+public final class TypeDefinition extends IOInstance<TypeDefinition>{
 	
 	public static class Check{
 		private final Consumer<Class<?>>             rawCheck;
@@ -164,7 +163,7 @@ public class TypeDefinition extends IOInstance<TypeDefinition>{
 	
 	@Override
 	public String toString(){
-		return getClass().getSimpleName()+"("+shortTypeString()+(args.length==0?"":Arrays.stream(args).map(TypeDefinition::toString).collect(Collectors.joining(", ", "<", ">")))+")";
+		return getClass().getSimpleName()+"("+getTypeName()+(args.length==0?"":Arrays.stream(args).map(TypeDefinition::toString).collect(Collectors.joining(", ", "<", ">")))+")";
 	}
 	@Override
 	public String toShortString(){
