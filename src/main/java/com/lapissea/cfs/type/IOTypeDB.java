@@ -1,11 +1,12 @@
 package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.chunk.DataProvider;
+import com.lapissea.cfs.objects.collections.AbstractUnmanagedIOMap;
 import com.lapissea.cfs.objects.collections.HashIOMap;
-import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 
 import java.io.IOException;
+import java.lang.ref.WeakReference;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -21,6 +22,8 @@ public interface IOTypeDB{
 		
 		private final Map<Integer, TypeDefinition> idToTyp=new HashMap<>();
 		private final Map<TypeDefinition, Integer> typToID=new HashMap<>();
+		
+		private WeakReference<ClassLoader> templateLoader=new WeakReference<>(null);
 		
 		@Override
 		public int toID(Class<?> type){
@@ -63,6 +66,29 @@ public interface IOTypeDB{
 		private int maxID(){
 			return idToTyp.keySet().stream().mapToInt(i->i).max().orElse(0);
 		}
+		@Override
+		public ClassLoader getTemplateLoader(){
+			synchronized(this){
+				var l=templateLoader.get();
+				if(l==null){
+					templateLoader=new WeakReference<>(l=new TemplateClassLoader(this, getClass().getClassLoader()));
+				}
+				return l;
+			}
+		}
+		
+		@Override
+		public TypeDefinition getDefinitionFromClassName(String className){
+			if(className==null||className.isEmpty()) return null;
+			
+			for(var val : idToTyp.values()){
+				if(val.getTypeName().equals(className)){
+					return val;
+				}
+			}
+			
+			return null;
+		}
 	}
 	
 	class PersistentDB extends IOInstance<PersistentDB> implements IOTypeDB{
@@ -82,6 +108,9 @@ public interface IOTypeDB{
 			FIRST_ID=BUILT_IN.maxID();
 		}
 		
+		
+		private WeakReference<ClassLoader> templateLoader=new WeakReference<>(null);
+		
 		@Override
 		public int toID(TypeDefinition type) throws IOException{
 			if(BUILT_IN.hasType(type)){
@@ -90,10 +119,11 @@ public interface IOTypeDB{
 			
 			int max=0;
 			for(var entry : data.entries()){
+				var key=entry.getKey();
 				if(entry.getValue().equals(type)){
-					return entry.getKey();
+					return key;
 				}
-				max=Math.max(entry.getKey(), max);
+				max=Math.max(key, max);
 			}
 			
 			max=Math.max(FIRST_ID, max);
@@ -116,8 +146,37 @@ public interface IOTypeDB{
 			
 			return type;
 		}
+		
+		@Override
+		public TypeDefinition getDefinitionFromClassName(String className) throws IOException{
+			if(className==null||className.isEmpty()) return null;
+			{
+				var def=BUILT_IN.getDefinitionFromClassName(className);
+				if(def!=null) return def;
+			}
+			
+			for(var entry : data.entries()){
+				var val=entry.getValue();
+				if(val.getTypeName().equals(className)){
+					return val;
+				}
+			}
+			
+			return null;
+		}
+		
 		public void init(DataProvider provider) throws IOException{
 			allocateNulls(provider);
+		}
+		@Override
+		public ClassLoader getTemplateLoader(){
+			synchronized(this){
+				var l=templateLoader.get();
+				if(l==null){
+					templateLoader=new WeakReference<>(l=new TemplateClassLoader(this, getClass().getClassLoader()));
+				}
+				return l;
+			}
 		}
 	}
 	
@@ -128,4 +187,7 @@ public interface IOTypeDB{
 	int toID(TypeDefinition type) throws IOException;
 	TypeDefinition fromID(int id) throws IOException;
 	
+	TypeDefinition getDefinitionFromClassName(String className) throws IOException;
+	
+	ClassLoader getTemplateLoader();
 }

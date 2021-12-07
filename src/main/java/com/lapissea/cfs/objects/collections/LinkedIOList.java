@@ -57,7 +57,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 					try{
 						if(value!=null){
 							var arg=instance.getTypeDef().arg(0);
-							if(!UtilL.instanceOf(value, arg.getTypeClass())) throw new ClassCastException(arg+" not compatible with "+value);
+							if(!UtilL.instanceOf(value, arg.getTypeClass(instance.getDataProvider().getTypeDb()))) throw new ClassCastException(arg+" not compatible with "+value);
 						}
 						
 						instance.setValue((T)value);
@@ -81,7 +81,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			var nextAccessor=new AbstractFieldAccessor<Node<T>>(null, "next"){
 				@Override
 				public Type getGenericType(GenericContext genericContext){
-					return getTypeDef().generic();
+					return getTypeDef().generic(null);
 				}
 				@Override
 				public Object get(Struct.Pool<Node<T>> ioPool, Node<T> instance){
@@ -135,7 +135,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		private static final TypeDefinition.Check NODE_TYPE_CHECK=new TypeDefinition.Check(
 			LinkedIOList.Node.class,
 			List.of(t->{
-				var c=t.getTypeClass();
+				var c=t.getTypeClass(null);
 				if(!IOInstance.isManaged(c)) throw new ClassCastException("not managed");
 				if(Modifier.isAbstract(c.getModifiers())) throw new ClassCastException(c+" is abstract");
 			})

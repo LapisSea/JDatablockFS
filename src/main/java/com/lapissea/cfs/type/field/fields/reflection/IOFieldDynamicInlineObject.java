@@ -130,7 +130,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 	}
 	
 	private Object readTyp(TypeDefinition typDef, DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
-		var typ=typDef.getTypeClass();
+		var typ=typDef.getTypeClass(provider.getTypeDb());
 		if(typ==Boolean.class) return src.readBoolean();
 		if(typ==Float.class) return (float)NumberSize.INT.readFloating(src);
 		if(typ==Double.class) return NumberSize.LONG.readFloating(src);
@@ -163,7 +163,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		throw new NotImplementedException(typ+"");
 	}
 	private void skipReadTyp(TypeDefinition typDef, DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
-		var        typ=typDef.getTypeClass();
+		var        typ=typDef.getTypeClass(provider.getTypeDb());
 		NumberSize siz=null;
 		if(typ==Boolean.class) siz=NumberSize.BYTE;
 		else if(typ==Float.class) siz=NumberSize.INT;

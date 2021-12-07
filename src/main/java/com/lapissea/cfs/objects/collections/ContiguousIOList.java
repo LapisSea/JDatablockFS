@@ -78,7 +78,7 @@ public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanaged
 	@NotNull
 	@Override
 	public Stream<IOField<ContiguousIOList<T>, ?>> listDynamicUnmanagedFields(){
-		var                     typ =getTypeDef().arg(0).generic();
+		var                     typ =getTypeDef().arg(0).generic(getDataProvider().getTypeDb());
 		SizeDescriptor.Fixed<T> desc=elementPipe.getFixedDescriptor();
 		return LongStream.range(0, size()).mapToObj(index->eField(typ, desc, index));
 	}

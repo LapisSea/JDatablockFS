@@ -214,7 +214,7 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 	}
 	
 	public static boolean isManaged(TypeDefinition type){
-		return isManaged(type.getTypeClass());
+		return isManaged(type.getTypeClass(null));
 	}
 	
 	public static boolean isManaged(Class<?> type){

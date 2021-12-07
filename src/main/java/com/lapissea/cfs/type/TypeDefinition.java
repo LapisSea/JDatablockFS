@@ -35,7 +35,7 @@ public class TypeDefinition extends IOInstance<TypeDefinition>{
 		
 		public void ensureValid(TypeDefinition type){
 			try{
-				rawCheck.accept(type.getTypeClass());
+				rawCheck.accept(type.getTypeClass(null));
 				if(type.argCount()!=argChecks.size()) throw new IllegalArgumentException("Argument count in "+type+" should be "+argChecks.size()+" but is "+type.argCount());
 				
 				var errs=new LinkedList<Throwable>();
@@ -95,9 +95,9 @@ public class TypeDefinition extends IOInstance<TypeDefinition>{
 	private TypeDefinition[] args;
 	
 	@IOValue
+	private boolean ioInstance;
+	@IOValue
 	private boolean unmanaged;
-	
-	private boolean calculatedProps;
 	
 	private Type generic;
 	
@@ -105,9 +105,13 @@ public class TypeDefinition extends IOInstance<TypeDefinition>{
 	
 	
 	public TypeDefinition(Class<?> type, TypeDefinition... args){
-		this(type.getName(), args.clone());
+		this.typeName=type.getName();
+		this.args=args.length==0?args:args.clone();
+		
 		this.typeClass=type;
-		setUnmanaged(calcUnmanaged(type));
+		
+		ioInstance=UtilL.instanceOf(type, IOInstance.class);
+		unmanaged=UtilL.instanceOf(type, IOInstance.Unmanaged.class);
 	}
 	
 	public TypeDefinition(String typeName, TypeDefinition... args){
@@ -115,68 +119,36 @@ public class TypeDefinition extends IOInstance<TypeDefinition>{
 		this.args=args.length==0?args:args.clone();
 	}
 	
-	private boolean calcUnmanaged(Class<?> type){
-		return UtilL.instanceOf(type, IOInstance.Unmanaged.class);
-	}
-	
-	@IOValue
-	private void setUnmanaged(boolean unmanaged){
-		this.unmanaged=unmanaged;
-		calculatedProps=true;
-	}
-	@IOValue
-	public boolean isUnmanaged(){
-		if(!calculatedProps){
-			setUnmanaged(calcUnmanaged(getTypeClass()));
-		}
-		return unmanaged;
-	}
+	public boolean isIoInstance(){return ioInstance;}
+	public boolean isUnmanaged() {return unmanaged;}
 	
 	public String getTypeName(){
 		return typeName;
 	}
 	
-	public Class<?> getTypeClass(){
+	public Class<?> getTypeClass(IOTypeDB db){
 		if(typeClass==null){
-			typeClass=loadClass();
+			typeClass=loadClass(db);
 		}
 		return typeClass;
 	}
-	private Class<?> loadClass(){
+	
+	private Class<?> loadClass(IOTypeDB db){
+		var name=getTypeName();
 		try{
-			return Class.forName(getTypeName());
+			return Class.forName(name);
 		}catch(ClassNotFoundException e){
 			if(isUnmanaged()){
 				throw new UnsupportedOperationException(getTypeName()+" is unmanaged! All unmanaged types must be present! Unmanaged types may contain mechanism not understood by the base IO engine.");
 			}
-			return createTemplateClass();
+			Objects.requireNonNull(db);
+			try{
+				return Class.forName(name, false, db.getTemplateLoader());
+			}catch(ClassNotFoundException e1){
+				throw new RuntimeException(e1);
+			}
 		}
 		
-	}
-	private Class<?> createTemplateClass(){
-		var toLoad=getTypeName();
-		var loader=new ClassLoader("loader of: "+shortTypeString(), getClass().getClassLoader()){
-			@Override
-			protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException{
-				if(name.equals(toLoad)){
-					synchronized(getClassLoadingLock(name)){
-						return generate();
-					}
-				}
-				return getParent().loadClass(name);
-			}
-			
-			private Class<?> generate(){
-				//TODO: create class definition and generate it
-				throw new NotImplementedException("implement generic ioinstance from stored data: "+getTypeName());
-			}
-			
-		};
-		try{
-			return Class.forName(toLoad, false, loader);
-		}catch(Throwable e){
-			throw new RuntimeException("Failed to load: "+toLoad, e);
-		}
 	}
 	
 	public int argCount(){
@@ -187,7 +159,7 @@ public class TypeDefinition extends IOInstance<TypeDefinition>{
 		return args[index];
 	}
 	public Struct<?> argAsStruct(int index){
-		return Struct.ofUnknown(arg(index).getTypeClass());
+		return Struct.ofUnknown(arg(index).getTypeClass(null));
 	}
 	
 	@Override
@@ -207,8 +179,8 @@ public class TypeDefinition extends IOInstance<TypeDefinition>{
 		}
 		return nam;
 	}
-	public Type generic(){
-		if(generic==null) generic=new SyntheticParameterizedType(null, getTypeClass(), Arrays.stream(args).map(TypeDefinition::getTypeClass).toArray(Type[]::new));
+	public Type generic(IOTypeDB db){
+		if(generic==null) generic=new SyntheticParameterizedType(null, getTypeClass(db), Arrays.stream(args).map(t->t.getTypeClass(db)).toArray(Type[]::new));
 		return generic;
 	}
 	

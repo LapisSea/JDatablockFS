@@ -358,7 +358,7 @@ public class Struct<T extends IOInstance<T>>{
 			var parms=getClass().getTypeParameters();
 			var types=IntStream.range(0, parms.length)
 			                   .boxed()
-			                   .collect(Collectors.toMap(i->parms[i].getName(), i->def.arg(i).generic()));
+			                   .collect(Collectors.toMap(i->parms[i].getName(), i->def.arg(i).generic(null)));
 			return new GenericContext.MapConstant(types);
 		});
 	}

@@ -149,7 +149,7 @@ public class TestUtils{
 		TypeDefinition typeDef,
 		UnsafeConsumer<IOMap<K, V>, IOException> session
 	) throws IOException{
-		int initial=(int)ContiguousStructPipe.of(Struct.ofUnknown(typeDef.getTypeClass())).getSizeDescriptor().getMax(WordSpace.BYTE).orElse(8);
+		int initial=(int)ContiguousStructPipe.of(Struct.ofUnknown(typeDef.getTypeClass(null))).getSizeDescriptor().getMax(WordSpace.BYTE).orElse(8);
 		complexObjectIntegrityTest(info, initial, constr, typeDef, map->{
 			var splitter=Splitter.map(map, new ReferenceMemoryIOMap<>(), TestUtils::checkCompliance);
 			session.accept(splitter);
