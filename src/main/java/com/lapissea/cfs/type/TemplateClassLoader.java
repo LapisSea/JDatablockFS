@@ -1,5 +1,7 @@
 package com.lapissea.cfs.type;
 
+import com.lapissea.jorth.JorthCompiler;
+import com.lapissea.jorth.MalformedJorthException;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
 
@@ -15,16 +17,25 @@ public class TemplateClassLoader extends ClassLoader{
 	}
 	
 	@Override
-	protected Class<?> findClass(String name) throws ClassNotFoundException{
-		TypeDefinition def=getDef(name);
-		if(!def.isIoInstance()){
-			throw new UnsupportedOperationException("Can not generate: "+name+". It is not an "+IOInstance.class.getSimpleName());
+	protected Class<?> findClass(String className) throws ClassNotFoundException{
+		TypeDefinition typeDefinition=getDef(className);
+		if(!typeDefinition.isIoInstance()){
+			throw new UnsupportedOperationException("Can not generate: "+className+". It is not an "+IOInstance.class.getSimpleName());
 		}
 		
-		LogUtil.println(def);
+		LogUtil.println("generating", className, "from", typeDefinition);
 		
-		//TODO: create class definition and generate it
-		throw new NotImplementedException();
+		var jorth=new JorthCompiler();
+		
+		try(var writer=jorth.writeCode()){
+			
+			if(true)throw new NotImplementedException();
+			
+		}catch(MalformedJorthException e){
+			throw new RuntimeException("Failed to generate class "+className, e);
+		}
+		
+		return defineClass(className, jorth.classBytecode(), null);
 	}
 	
 	private TypeDefinition getDef(String name) throws ClassNotFoundException{

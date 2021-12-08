@@ -7,6 +7,8 @@
 !/CODE_OF_CONDUCT.md
 !/jdatablockfs.tools/
 !/jdatablockfs.run/
+!/jdatablockfs.gui/
+!/Jorth/
 !pom.xml
 !.editorconfig
 !/.idea/

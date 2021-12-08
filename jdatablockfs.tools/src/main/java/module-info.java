@@ -11,7 +11,6 @@ module JDatablockFS.tools {
 	requires gson;
 	requires java.sql;
 	requires com.esotericsoftware.kryo;
-	requires com.github.kotlin_graphics.imgui.core;
 	requires RoaringBitmap;
 	
 	exports com.lapissea.cfs.tools;

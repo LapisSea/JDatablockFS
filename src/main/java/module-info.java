@@ -3,6 +3,7 @@ module JDatablockFS {
 	
 	requires jlapisutil;
 	requires RoaringBitmap;
+	requires Jorth;
 	
 	exports com.lapissea.cfs.type.field.annotations;
 	exports com.lapissea.cfs.objects;
