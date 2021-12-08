@@ -55,7 +55,7 @@ public class SparseImage{
 		image.allocateNulls(cluster);
 		cluster.getTemp().put(0, image);
 		
-		image.set(0, 0, 1, 1, 1);
+//		image.set(0, 0, 1, 1, 1);
 		
 	}
 	
