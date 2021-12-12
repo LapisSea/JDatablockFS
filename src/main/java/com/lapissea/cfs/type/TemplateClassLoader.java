@@ -6,6 +6,7 @@ import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 public class TemplateClassLoader extends ClassLoader{
 	
@@ -35,7 +36,7 @@ public class TemplateClassLoader extends ClassLoader{
 			throw new RuntimeException("Failed to generate class "+className, e);
 		}
 		
-		return defineClass(className, jorth.classBytecode(), null);
+		return defineClass(className, ByteBuffer.wrap(jorth.classBytecode()), null);
 	}
 	
 	private TypeDefinition getDef(String name) throws ClassNotFoundException{

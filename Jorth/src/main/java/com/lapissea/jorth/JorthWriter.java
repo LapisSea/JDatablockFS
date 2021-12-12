@@ -1,7 +1,8 @@
 package com.lapissea.jorth;
 
+import com.lapissea.jorth.lang.Token;
 import com.lapissea.util.ShouldNeverHappenError;
-import com.lapissea.util.function.UnsafeConsumer;
+import com.lapissea.util.function.UnsafeBiConsumer;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -41,10 +42,12 @@ public class JorthWriter implements AutoCloseable{
 		char next();
 	}
 	
-	private final UnsafeConsumer<String, MalformedJorthException> rawTokens;
-	private final Map<String, String>                             overrides=new HashMap<>();
+	private final UnsafeBiConsumer<JorthWriter, Token, MalformedJorthException> rawTokens;
+	private final Map<String, String>                                           overrides=new HashMap<>();
 	
-	public JorthWriter(UnsafeConsumer<String, MalformedJorthException> rawTokens){
+	private int line;
+	JorthWriter(int startingLine, UnsafeBiConsumer<JorthWriter, Token, MalformedJorthException> rawTokens){
+		this.line=startingLine;
 		this.rawTokens=rawTokens;
 	}
 	
@@ -271,8 +274,11 @@ public class JorthWriter implements AutoCloseable{
 	
 	private void pushToken(String tokenStr) throws MalformedJorthException{
 		var override=overrides.get(tokenStr);
-		if(override!=null) rawTokens.accept(override);
-		else rawTokens.accept(tokenStr);
+		if(override!=null){
+			rawTokens.accept(this, new Token(line, override));
+		}else{
+			rawTokens.accept(this, new Token(line, tokenStr));
+		}
 	}
 	
 	private CharIterator.Sequence seq(CharSequence codeChunk){

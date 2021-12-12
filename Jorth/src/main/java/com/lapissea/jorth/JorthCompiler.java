@@ -1,83 +1,198 @@
 package com.lapissea.jorth;
 
-import com.lapissea.util.LogUtil;
+import com.lapissea.jorth.lang.GenType;
+import com.lapissea.jorth.lang.Token;
+import com.lapissea.jorth.lang.Visibility;
+import com.lapissea.util.NotImplementedException;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
 
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Deque;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static org.objectweb.asm.Opcodes.*;
 
 public class JorthCompiler{
 	
-	private record GenericSig(String type, List<GenericSig> args){}
+	private final Deque<Token> rawTokens=new LinkedList<>();
 	
-	private final JorthWriter stream=new JorthWriter(this::consumeRawToken);
+	private int lastLine;
 	
-	private final Deque<String> rawTokens=new LinkedList<>();
-	
-	private String className;
+	private String               className;
+	private Map<String, GenType> classFields=new HashMap<>();
 	
 	private ClassWriter   currentClass;
 	private MethodVisitor currentMethod;
+	private boolean       isStatic;
 	
-	private GenericSig       classExtension =new GenericSig(Object.class.getName(), List.of());
-	private GenericSig       returnType;
-	private List<GenericSig> classInterfaces=new ArrayList<>();
-	private int              visibility     =ACC_PUBLIC;
+	private GenType classExtension=new GenType(Object.class.getName(), List.of());
+	private GenType returnType;
 	
-	private void consumeRawToken(String tokenStr) throws MalformedJorthException{
-		if(tokenStr.startsWith("'")&&tokenStr.endsWith("'")){
-			var str=tokenStr.substring(1, tokenStr.length()-1);
-			currentMethod.visitLdcInsn(str);
-			return;
+	private List<GenType> classInterfaces=new ArrayList<>();
+	private Visibility    classVisibility;
+	private boolean       addedInit;
+	private boolean       addedClinit;
+	private Visibility    visibility     =Visibility.PUBLIC;
+	
+	private boolean isEmpty(){
+		return rawTokens.isEmpty();
+	}
+	private Token pop(){
+		return rawTokens.removeLast();
+	}
+	private Token peek(){
+		return rawTokens.getLast();
+	}
+	private void push(Token token){
+		rawTokens.addLast(token);
+	}
+	
+	private void consumeRawToken(JorthWriter writer, Token token) throws MalformedJorthException{
+		if(consume(writer, token)){
+			functionLogLine(token);
+		}
+	}
+	
+	private void functionLogLine(Token token){
+	}
+	
+	private boolean consume(JorthWriter writer, Token token) throws MalformedJorthException{
+		
+		// string literal
+		if(token.isStringLiteral()){
+			currentMethod.visitLdcInsn(token.getStringLiteralValue());
+			return true;
 		}
 		
-		LogUtil.println(tokenStr+" "+rawTokens);
-		String lowerToken=tokenStr.toLowerCase();
-		switch(lowerToken){
+		switch(token.lower()){
+			case "static" -> {
+				isStatic=true;
+				return true;
+			}
 			case "define" -> {
 				requireTokenCount(2);
-				var tokenName=rawTokens.pop();
-				var value    =rawTokens.pop();
-				stream.addDefinition(tokenName, value);
-				return;
+				var tokenName=pop();
+				var value    =pop();
+				writer.addDefinition(tokenName.source, value.source);
+				return true;
 			}
 			case "extends" -> {
 				classExtension=readGenericType();
-				return;
+				return true;
 			}
 			case "returns" -> {
 				returnType=readGenericType();
-				return;
+				return true;
 			}
 			case "implements" -> {
 				classInterfaces.add(readGenericType());
-				return;
+				return true;
 			}
 			case "visibility" -> {
 				requireTokenCount(1);
-				var visibilityStr=rawTokens.pop();
-				this.visibility=switch(visibilityStr.toLowerCase()){
-					case "public" -> ACC_PUBLIC;
-					case "private" -> ACC_PRIVATE;
-					case "protected" -> ACC_PROTECTED;
-					default -> throw new MalformedJorthException("Unknown visibility "+visibilityStr);
-				};
-				return;
+				this.visibility=pop().asVisibility();
+				return true;
+			}
+			case "get" -> {
+				requireTokenCount(2);
+				var name =pop();
+				var owner=pop();
+				
+				if(owner.source.equals("this")){
+					loadThis();
+					
+					var type=classFields.get(name.source);
+					if(type==null) throw new MalformedJorthException(name.source+" does not exist in "+currentClass);
+					
+					getFieldIns(className, name.source, type);
+				}else{
+					throw new NotImplementedException("don't know how to load from "+owner);
+				}
+				
+				return true;
+			}
+			case "field" -> {
+				requireTokenCount(2);
+				var name=pop().source;
+				var type=readGenericType();
+				
+				if(classFields.containsKey(name)){
+					throw new MalformedJorthException("field "+name+" already exists!");
+				}
+				classFields.put(name, type);
+				
+				currentClass.visitField(visibility.opCode, name, genericSignature(new GenType(type.typeName, List.of())), genericSignature(type), null);
+				visibility=Visibility.PUBLIC;
+				return true;
+			}
+			case "start" -> {
+				requireTokenCount(1);
+				var subject=pop();
+				
+				
+				switch(subject.lower()){
+					case "class" -> {
+						if(currentClass!=null) throw new MalformedJorthException("Class "+currentClass+" already started!");
+						requireTokenCount(1);
+						className=pop().source;
+						
+						classVisibility=visibility;
+						currentClass=new ClassWriter(ClassWriter.COMPUTE_MAXS|ClassWriter.COMPUTE_FRAMES);
+						
+						
+						var signature=new StringBuilder();
+						signature.append(genericSignature(classExtension));
+						for(GenType sig : classInterfaces){
+							signature.append(genericSignature(sig));
+						}
+						
+						var interfaces=classInterfaces.stream().map(sig->undotify(sig.typeName)).toArray(String[]::new);
+						if(interfaces.length==0) interfaces=null;
+						
+						var nam=undotify(className);
+						var ext=undotify(classExtension.typeName);
+						
+						currentClass.visit(V11, classVisibility.opCode+ACC_SUPER, nam, signature.toString(), ext, interfaces);
+						
+						visibility=Visibility.PUBLIC;
+						
+					}
+					case "function" -> {
+						requireTokenCount(1);
+						var functionName=pop();
+						
+						String returnStr;
+						if(returnType!=null) returnStr=genericSignature(returnType);
+						else returnStr="V";
+						
+						var staticOo=isStatic?ACC_STATIC:0;
+						
+						currentMethod=currentClass.visitMethod(visibility.opCode+staticOo, functionName.source, "()"+returnStr, null, null);
+						currentMethod.visitCode();
+						
+						if("<clinit>".equals(functionName.source)){
+							addedClinit=true;
+						}
+						if("<init>".equals(functionName.source)){
+							addedInit=true;
+							currentMethod.visitVarInsn(ALOAD, 0);
+							currentMethod.visitMethodInsn(INVOKESPECIAL, undotify(classExtension.typeName), functionName.source, "()V", false);
+						}
+					}
+					default -> throw new MalformedJorthException("Unknown subject "+subject+". Can not start it");
+				}
+				
+				return true;
 			}
 			case "end" -> {
 				requireTokenCount(1);
-				var subject=rawTokens.pop();
-				switch(subject.toLowerCase()){
+				var subject=pop();
+				switch(subject.lower()){
 					case "function" -> {
 						if(returnType!=null){
 							currentMethod.visitInsn(ARETURN);
+						}else{
+							currentMethod.visitInsn(RETURN);
 						}
 						
 						currentMethod.visitMaxs(0, 0);
@@ -88,92 +203,36 @@ public class JorthCompiler{
 					
 					default -> throw new MalformedJorthException("Unknown subject "+subject+". Can not end it");
 				}
-				return;
-			}
-			case "start" -> {
-				requireTokenCount(1);
-				var subject=rawTokens.pop();
-				
-				
-				switch(subject.toLowerCase()){
-					case "function" -> {
-						requireTokenCount(1);
-						var functionName=rawTokens.pop();
-						
-						String returnStr;
-						if(returnType!=null) returnStr=genericSignature(returnType);
-						else returnStr="V";
-						
-						currentMethod=currentClass.visitMethod(visibility, functionName, "()"+returnStr, null, null);
-						currentMethod.visitCode();
-						
-						if("<init>".equals(functionName)){
-							currentMethod.visitVarInsn(ALOAD, 0);
-							currentMethod.visitMethodInsn(INVOKESPECIAL, undotify(classExtension.type), functionName, "()V", false);
-							currentMethod.visitInsn(RETURN);
-						}
-					}
-					case "class" -> {
-						if(currentClass!=null) throw new MalformedJorthException("Class "+currentClass+" already started!");
-						requireTokenCount(1);
-						className=rawTokens.pop();
-						
-						currentClass=new ClassWriter(ClassWriter.COMPUTE_MAXS|ClassWriter.COMPUTE_FRAMES);
-						
-						var signature=new StringBuilder();
-						signature.append(genericSignature(classExtension));
-						for(GenericSig sig : classInterfaces){
-							signature.append(genericSignature(sig));
-						}
-						
-						var interfaces=classInterfaces.stream().map(sig->undotify(sig.type)).toArray(String[]::new);
-						if(interfaces.length==0) interfaces=null;
-						
-						var nam=undotify(className);
-						var ext=undotify(classExtension.type);
-						
-						LogUtil.println(visibility+ACC_FINAL,
-						                nam,
-						                signature.toString(),
-						                ext,
-						                interfaces
-						);
-						
-						currentClass.visit(V11,
-						                   visibility+ACC_SUPER,
-						                   nam,
-						                   signature.toString(),
-						                   ext,
-						                   interfaces);
-						
-						visibility=ACC_PUBLIC;
-						
-						LogUtil.println("starting", subject);
-						
-					}
-					default -> throw new MalformedJorthException("Unknown subject "+subject+". Can not start it");
-				}
-				
-				return;
+				return true;
 			}
 		}
-		rawTokens.push(tokenStr);
+		
+		push(token);
+		return false;
 	}
 	
-	private GenericSig readGenericType() throws MalformedJorthException{
+	private void getFieldIns(String owner, String name, GenType fieldType){
+		currentMethod.visitFieldInsn(GETFIELD, undotify(owner), name, genericSignature(fieldType));
+	}
+	
+	private void loadThis(){
+		currentMethod.visitVarInsn(ALOAD, 0);
+	}
+	
+	private GenType readGenericType() throws MalformedJorthException{
 		requireTokenCount(1);
-		var              typeName=rawTokens.pop();
-		List<GenericSig> args    =new ArrayList<>(4);
+		var           typeName=pop();
+		List<GenType> args    =new ArrayList<>(4);
 		
-		if(!rawTokens.isEmpty()){
-			var first=rawTokens.peekFirst();
-			if("]".equals(first)){
-				rawTokens.pop();
+		if(!isEmpty()){
+			var first=peek();
+			if("]".equals(first.source)){
+				pop();
 				
 				while(true){
-					var token=rawTokens.peekFirst();
-					if("[".equals(token)){
-						rawTokens.removeFirst();
+					var token=peek();
+					if("[".equals(token.source)){
+						pop();
 						break;
 					}
 					var subType=readGenericType();
@@ -182,16 +241,16 @@ public class JorthCompiler{
 			}
 		}
 		
-		return new GenericSig(typeName, List.copyOf(args));
+		return new GenType(typeName.source, List.copyOf(args));
 	}
 	
-	private String genericSignature(GenericSig sig){
+	private String genericSignature(GenType sig){
 		String argStr;
 		if(sig.args.isEmpty()) argStr="";
 		else{
 			argStr=sig.args.stream().map(this::genericSignature).collect(Collectors.joining("", "<", ">"));
 		}
-		return "L"+undotify(sig.type)+argStr+";";
+		return "L"+undotify(sig.typeName)+argStr+";";
 	}
 	
 	private String undotify(String className){
@@ -203,17 +262,33 @@ public class JorthCompiler{
 	}
 	
 	public JorthWriter writeCode(){
-		return stream;
+		return new JorthWriter(lastLine, this::consumeRawToken);
 	}
 	
 	
-	public ByteBuffer classBytecode(){
-		currentClass.visitEnd();
-		if(!rawTokens.isEmpty()){
-			LogUtil.println("Remaining data!");
-			LogUtil.println(rawTokens);
-			throw new IllegalStateException();
+	public byte[] classBytecode(){
+		
+		if(!addedInit){
+			try(var writer=writeCode()){
+				writer.write(classVisibility.lower).write("visibility <init> function start function end");
+			}catch(MalformedJorthException e){
+				throw new RuntimeException(e);
+			}
 		}
-		return ByteBuffer.wrap(currentClass.toByteArray());
+		if(!addedClinit){
+			try(var writer=writeCode()){
+				writer.write(classVisibility.lower).write("visibility <clinit> static function start function end");
+			}catch(MalformedJorthException e){
+				throw new RuntimeException(e);
+			}
+		}
+		
+		currentClass.visitEnd();
+		
+		if(!rawTokens.isEmpty()){
+			throw new IllegalStateException("Remaining data! "+rawTokens);
+		}
+		
+		return currentClass.toByteArray();
 	}
 }
