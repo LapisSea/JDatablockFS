@@ -6,6 +6,7 @@ import com.lapissea.jorth.lang.Visibility;
 import com.lapissea.util.NotImplementedException;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.Opcodes;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -13,6 +14,7 @@ import java.util.stream.Collectors;
 import static org.objectweb.asm.Opcodes.*;
 
 public class JorthCompiler{
+	
 	
 	private final Deque<Token> rawTokens=new LinkedList<>();
 	
@@ -26,7 +28,12 @@ public class JorthCompiler{
 	private boolean       isStatic;
 	
 	private GenType classExtension=new GenType(Object.class.getName(), List.of());
+	
 	private GenType returnType;
+	
+	private record FunctArg(int index, String name, GenType type){}
+	
+	private Map<String, FunctArg> arguments=new HashMap<>();
 	
 	private List<GenType> classInterfaces=new ArrayList<>();
 	private Visibility    classVisibility;
@@ -84,6 +91,11 @@ public class JorthCompiler{
 				returnType=readGenericType();
 				return true;
 			}
+			case "arg" -> {
+				var name=pop();
+				arguments.put(name.source, new FunctArg(arguments.size(), name.source, readGenericType()));
+				return true;
+			}
 			case "implements" -> {
 				classInterfaces.add(readGenericType());
 				return true;
@@ -93,20 +105,54 @@ public class JorthCompiler{
 				this.visibility=pop().asVisibility();
 				return true;
 			}
+			case "set" -> {
+				requireTokenCount(2);
+				var name =pop();
+				var owner=pop();
+				
+				switch(owner.source){
+					case "this" -> {
+						loadThis();
+						swap();
+						var type=classFields.get(name.source);
+						if(type==null) throw new MalformedJorthException(name+" does not exist in "+currentClass);
+						
+						setFieldIns(className, name.source, type);
+					}
+					case "<arg>" -> {
+						throw new MalformedJorthException("can't set arguments! argument: "+name);
+					}
+					default -> throw new NotImplementedException("don't know how to load from "+owner);
+				}
+				
+				return true;
+			}
 			case "get" -> {
 				requireTokenCount(2);
 				var name =pop();
 				var owner=pop();
 				
-				if(owner.source.equals("this")){
-					loadThis();
-					
-					var type=classFields.get(name.source);
-					if(type==null) throw new MalformedJorthException(name.source+" does not exist in "+currentClass);
-					
-					getFieldIns(className, name.source, type);
-				}else{
-					throw new NotImplementedException("don't know how to load from "+owner);
+				
+				switch(owner.source){
+					case "this" -> {
+						loadThis();
+						
+						var type=classFields.get(name.source);
+						if(type==null) throw new MalformedJorthException(name+" does not exist in "+currentClass);
+						
+						getFieldIns(className, name.source, type);
+					}
+					case "<arg>" -> {
+						var arg=arguments.values()
+						                 .stream()
+						                 .filter(a->a.name.equals(name.source))
+						                 .findAny();
+						if(arg.isEmpty()){
+							throw new MalformedJorthException("argument "+name+" does not exist");
+						}
+						loadArgument(arg.get());
+					}
+					default -> throw new NotImplementedException("don't know how to load from "+owner);
 				}
 				
 				return true;
@@ -167,7 +213,14 @@ public class JorthCompiler{
 						
 						var staticOo=isStatic?ACC_STATIC:0;
 						
-						currentMethod=currentClass.visitMethod(visibility.opCode+staticOo, functionName.source, "()"+returnStr, null, null);
+						var args=arguments.values()
+						                  .stream()
+						                  .sorted(Comparator.comparingInt(FunctArg::index))
+						                  .map(FunctArg::type)
+						                  .map(this::genericSignature)
+						                  .collect(Collectors.joining());
+						
+						currentMethod=currentClass.visitMethod(visibility.opCode+staticOo, functionName.source, "("+args+")"+returnStr, null, null);
 						currentMethod.visitCode();
 						
 						if("<clinit>".equals(functionName.source)){
@@ -199,6 +252,7 @@ public class JorthCompiler{
 						currentMethod.visitEnd();
 						currentMethod=null;
 						returnType=null;
+						arguments.clear();
 					}
 					
 					default -> throw new MalformedJorthException("Unknown subject "+subject+". Can not end it");
@@ -211,8 +265,19 @@ public class JorthCompiler{
 		return false;
 	}
 	
+	private void swap(){
+		currentMethod.visitInsn(Opcodes.SWAP);
+	}
+	
 	private void getFieldIns(String owner, String name, GenType fieldType){
 		currentMethod.visitFieldInsn(GETFIELD, undotify(owner), name, genericSignature(fieldType));
+	}
+	private void setFieldIns(String owner, String name, GenType fieldType){
+		currentMethod.visitFieldInsn(PUTFIELD, undotify(owner), name, genericSignature(fieldType));
+	}
+	
+	private void loadArgument(FunctArg arg){
+		currentMethod.visitVarInsn(ALOAD, arg.index+1);
 	}
 	
 	private void loadThis(){
@@ -245,6 +310,22 @@ public class JorthCompiler{
 	}
 	
 	private String genericSignature(GenType sig){
+		var primitive=switch(sig.typeName){
+			case "boolean" -> "Z";
+			case "void" -> "V";
+			case "char" -> "C";
+			case "byte" -> "B";
+			case "short" -> "S";
+			case "int" -> "I";
+			case "long" -> "J";
+			case "float" -> "F";
+			case "double" -> "D";
+			default -> null;
+		};
+		if(primitive!=null){
+			return primitive;
+		}
+		
 		String argStr;
 		if(sig.args.isEmpty()) argStr="";
 		else{

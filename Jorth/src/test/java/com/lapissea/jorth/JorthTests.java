@@ -55,13 +55,30 @@ public class JorthTests{
 					this testString get
 					function end
 					""");
+			
+			writer.write(
+				"""
+					Str testString arg
+					init function start
+					
+					<arg> testString get
+					this testString set
+					
+					function end
+					""");
 		});
 		
 		var constr=cls.getConstructor();
 		var inst  =constr.newInstance();
+		
+		var msg="this is a test";
+		
+		cls.getMethod("init",String.class).invoke(inst,msg);
+		
 		var str   =inst.toString();
 		
 		LogUtil.println(cls, "says", str);
+		assertEquals(msg, str);
 	}
 	
 	@Test
