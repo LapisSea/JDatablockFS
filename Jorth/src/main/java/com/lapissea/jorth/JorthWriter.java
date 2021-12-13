@@ -265,7 +265,7 @@ public class JorthWriter implements AutoCloseable{
 		}
 	}
 	private void add(StringBuilder tokenBuffer, char ch) throws MalformedJorthException{
-		List<Character> specials=List.of('[', ']');
+		List<Character> specials=List.of('[', ']','{','}');
 		
 		char spec=0;
 		

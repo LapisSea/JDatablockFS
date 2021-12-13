@@ -3,20 +3,26 @@ package com.lapissea.jorth;
 import com.lapissea.jorth.lang.GenType;
 import com.lapissea.jorth.lang.Token;
 import com.lapissea.jorth.lang.Visibility;
+import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.NotNull;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.objectweb.asm.Opcodes.*;
 
 public class JorthCompiler{
 	
+	private record Macro(String name, Set<String> arguments, Token.Sequence.Writable data){}
 	
-	private final Deque<Token> rawTokens=new LinkedList<>();
+	private record FunctArg(int index, String name, GenType type){}
+	
+	private final Token.Sequence.Writable rawTokens=new Token.Sequence.Writable();
 	
 	private int lastLine;
 	
@@ -31,7 +37,8 @@ public class JorthCompiler{
 	
 	private GenType returnType;
 	
-	private record FunctArg(int index, String name, GenType type){}
+	private Map<String, Macro> macros=new HashMap<>();
+	private Macro              currentMacro;
 	
 	private Map<String, FunctArg> arguments=new HashMap<>();
 	
@@ -41,21 +48,34 @@ public class JorthCompiler{
 	private boolean       addedClinit;
 	private Visibility    visibility     =Visibility.PUBLIC;
 	
-	private boolean isEmpty(){
-		return rawTokens.isEmpty();
+	private Token peek() throws MalformedJorthException{
+		return rawTokens.peek();
 	}
-	private Token pop(){
-		return rawTokens.removeLast();
-	}
-	private Token peek(){
-		return rawTokens.getLast();
-	}
-	private void push(Token token){
-		rawTokens.addLast(token);
+	private Token pop() throws MalformedJorthException{
+		return rawTokens.pop();
 	}
 	
 	private void consumeRawToken(JorthWriter writer, Token token) throws MalformedJorthException{
+		
+		if(currentMacro!=null){
+			var d=currentMacro.data;
+			
+			if(token.source.equals("end")){
+				var subject=d.peek();
+				if(subject.source.equals("macro")){
+					d.pop();
+					currentMacro=null;
+					return;
+				}
+			}
+			
+			d.write(token);
+			return;
+		}
+		
+//		var deb=rawTokens+" "+token;
 		if(consume(writer, token)){
+//			LogUtil.println(deb);
 			functionLogLine(token);
 		}
 	}
@@ -74,6 +94,10 @@ public class JorthCompiler{
 		switch(token.lower()){
 			case "static" -> {
 				isStatic=true;
+				return true;
+			}
+			case "concat" -> {
+				if(true) throw new NotImplementedException("concat not implemented");
 				return true;
 			}
 			case "define" -> {
@@ -114,8 +138,7 @@ public class JorthCompiler{
 					case "this" -> {
 						loadThis();
 						swap();
-						var type=classFields.get(name.source);
-						if(type==null) throw new MalformedJorthException(name+" does not exist in "+currentClass);
+						GenType type=classField(name);
 						
 						setFieldIns(className, name.source, type);
 					}
@@ -138,7 +161,7 @@ public class JorthCompiler{
 						loadThis();
 						
 						var type=classFields.get(name.source);
-						if(type==null) throw new MalformedJorthException(name+" does not exist in "+currentClass);
+						if(type==null) throw new MalformedJorthException(name+" does not exist in "+className);
 						
 						getFieldIns(className, name.source, type);
 					}
@@ -155,6 +178,66 @@ public class JorthCompiler{
 					default -> throw new NotImplementedException("don't know how to load from "+owner);
 				}
 				
+				return true;
+			}
+			case "resolve" -> {
+				requireTokenCount(1);
+				var subject=pop();
+				
+				switch(subject.source){
+					case "macro" -> {
+						requireTokenCount(1);
+						var name=pop();
+						
+						var macro =getMacro(name);
+						var tokens=readSequence(rawTokens, "{", "}");
+						
+						var m=tokens.parseStream(e->{
+							var argName=e.pop().source;
+							var raw    =e.pop();
+							
+							Token.Sequence value;
+							if(raw.isStringLiteral()){
+								var w=new Token.Sequence.Writable();
+								try(var writ=new JorthWriter(raw.line, (__, t)->w.write(t))){
+									writ.write(raw.getStringLiteralValue());
+								}
+								value=w;
+							}else{
+								value=Token.Sequence.of(raw);
+							}
+							
+							return Map.entry(argName, value);
+						}).collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
+						
+						var builder=new LinkedList<Token>();
+						macro.data.cloneTokens().flatMap(t->{
+							if(t.isStringLiteral()){
+								var str=t.getStringLiteralValue();
+								for(var e : m.entrySet()){
+									var b=new LinkedList<String>();
+									e.getValue().cloneTokens().map(Token::getSource).forEach(b::addFirst);
+									str=str.replace(e.getKey(), String.join(" ", b));//TODO: escape ' to prevent string breaking
+								}
+								return Stream.of(new Token(t.line, "'"+str+"'"));
+							}
+							var arg=m.get(t.source);
+							if(arg!=null){
+								var line=t.line;
+								return arg.cloneTokens().map(Token::getSource).map(src->new Token(line, src));
+							}
+							return Stream.of(t);
+						}).forEach(builder::addFirst);
+						
+						for(Token t : builder){
+							consumeRawToken(null, t);
+						}
+					}
+					case "nothing" -> {
+						LogUtil.println("congrats you just resolved nothing. Think about your life choices.");
+					}
+					default -> throw new MalformedJorthException("unknown resolve subject: "+subject);
+				}
 				return true;
 			}
 			case "field" -> {
@@ -175,8 +258,20 @@ public class JorthCompiler{
 				requireTokenCount(1);
 				var subject=pop();
 				
-				
 				switch(subject.lower()){
+					case "macro" -> {
+						requireTokenCount(1);
+						var name=pop();
+						
+						Set<String> arguments;
+						try{
+							arguments=Set.copyOf(readSequence(rawTokens, "[", "]").parseAll(r->r.pop().source));
+						}catch(IllegalArgumentException e){
+							throw new IllegalArgumentException("Bad arguments: "+this.arguments, e);
+						}
+						currentMacro=new Macro(name.source, arguments, new Token.Sequence.Writable());
+						macros.put(currentMacro.name, currentMacro);
+					}
 					case "class" -> {
 						if(currentClass!=null) throw new MalformedJorthException("Class "+currentClass+" already started!");
 						requireTokenCount(1);
@@ -212,6 +307,7 @@ public class JorthCompiler{
 						else returnStr="V";
 						
 						var staticOo=isStatic?ACC_STATIC:0;
+						isStatic=false;
 						
 						var args=arguments.values()
 						                  .stream()
@@ -261,8 +357,19 @@ public class JorthCompiler{
 			}
 		}
 		
-		push(token);
+		rawTokens.write(token);
 		return false;
+	}
+	
+	private GenType classField(Token name) throws MalformedJorthException{
+		var type=classFields.get(name.source);
+		if(type==null) throw new MalformedJorthException(name+" does not exist in "+className);
+		return type;
+	}
+	private Macro getMacro(Token name) throws MalformedJorthException{
+		var type=macros.get(name.source);
+		if(type==null) throw new MalformedJorthException("macro "+name+" does not exist");
+		return type;
 	}
 	
 	private void swap(){
@@ -284,27 +391,42 @@ public class JorthCompiler{
 		currentMethod.visitVarInsn(ALOAD, 0);
 	}
 	
-	private GenType readGenericType() throws MalformedJorthException{
-		requireTokenCount(1);
-		var           typeName=pop();
-		List<GenType> args    =new ArrayList<>(4);
+	@NotNull
+	private Token.Sequence readSequence(Token.Sequence tokens, String open, String close) throws MalformedJorthException{
+		if(tokens.isEmpty()) return Token.Sequence.EMPTY;
 		
-		if(!isEmpty()){
-			var first=peek();
-			if("]".equals(first.source)){
-				pop();
-				
-				while(true){
-					var token=peek();
-					if("[".equals(token.source)){
-						pop();
-						break;
-					}
-					var subType=readGenericType();
-					args.add(subType);
-				}
+		var builder=new LinkedList<Token>();
+		
+		var first=tokens.peek();
+		if(!close.equals(first.source)) return Token.Sequence.EMPTY;
+		
+		tokens.pop();
+		
+		int depth=1;
+		
+		while(true){
+			var token=tokens.pop();
+			if(token.source.equals(close)){
+				depth++;
+			}else if(token.source.equals(open)){
+				depth--;
 			}
+			if(depth==0) return Token.Sequence.of(builder);
+			builder.addFirst(token);
 		}
+		
+	}
+	
+	private GenType readGenericType() throws MalformedJorthException{
+		return readGenericType(rawTokens);
+	}
+	
+	private GenType readGenericType(Token.Sequence tokens) throws MalformedJorthException{
+		tokens.requireCount(1);
+		var typeName=tokens.pop();
+		
+		Token.Sequence argTokens=readSequence(tokens, "[", "]");
+		List<GenType>  args     =argTokens.parseAll(this::readGenericType);
 		
 		return new GenType(typeName.source, List.copyOf(args));
 	}
@@ -339,7 +461,7 @@ public class JorthCompiler{
 	}
 	
 	private void requireTokenCount(int minWordCount) throws MalformedJorthException{
-		if(rawTokens.size()<minWordCount) throw new MalformedJorthException("token requires at least "+minWordCount+" words!");
+		rawTokens.requireCount(minWordCount);
 	}
 	
 	public JorthWriter writeCode(){
