@@ -23,6 +23,57 @@ public class JorthTests{
 	}
 	
 	@Test
+	void mathClass() throws ReflectiveOperationException{
+		
+		var className="jorth.Gen$$";
+		
+		var cls=generateAndLoadInstance(className, writer->{
+			
+			//Define constants / imports
+			writer.write("#TOKEN(0) Str define", String.class.getName());
+			
+			//define class
+			writer.write(
+				"""
+					public visibility
+					#TOKEN(0) class start
+					""",
+				className
+			);
+			
+			writer.write(
+				"""
+					[$type] myMacro macro start
+						static
+						$type myArgumentName arg
+						Str returns
+						myFunctionName function start
+							
+							<arg> myArgumentName get
+							' string concat works with $type'
+							concat
+							
+						function end
+					macro end
+					""");
+			writer.write(
+				"""
+					{java.lang.String $type} myMacro macro resolve
+					{int $type}              myMacro macro resolve
+					{float $type}            myMacro macro resolve
+					{double $type}           myMacro macro resolve
+					""");
+		});
+		
+		var constr=cls.getConstructor();
+		
+		LogUtil.println(cls.getMethod("myFunctionName", String.class).invoke(null, "this is a test"));
+		LogUtil.println(cls.getMethod("myFunctionName", int.class).invoke(null, 123));
+		LogUtil.println(cls.getMethod("myFunctionName", float.class).invoke(null, 0.123F));
+		LogUtil.println(cls.getMethod("myFunctionName", double.class).invoke(null, 0.345));
+		
+	}
+	@Test
 	void fieldClass() throws ReflectiveOperationException{
 		
 		var className="jorth.Gen$$";
@@ -73,9 +124,9 @@ public class JorthTests{
 		
 		var msg="this is a test";
 		
-		cls.getMethod("init",String.class).invoke(inst,msg);
+		cls.getMethod("init", String.class).invoke(inst, msg);
 		
-		var str   =inst.toString();
+		var str=inst.toString();
 		
 		LogUtil.println(cls, "says", str);
 		assertEquals(msg, str);
