@@ -215,7 +215,19 @@ public class JorthWriter implements AutoCloseable{
 		
 		StringBuilder tokenBuffer=new StringBuilder();
 		while(codeChunk.hasNext()){
+			
+			if(tokenBuffer.length()==2&&tokenBuffer.indexOf("//")==0){
+				tokenBuffer.setLength(0);
+				while(codeChunk.hasNext()){
+					var c=codeChunk.next();
+					if(c=='\n')break;
+				}
+				continue;
+			}
+			
 			char c=codeChunk.next();
+			
+			if(c=='\n')line++;
 			
 			if(c=='\\'){
 				var ch=readOrUnexpected(codeChunk);
