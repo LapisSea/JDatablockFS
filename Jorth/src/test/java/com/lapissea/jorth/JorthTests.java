@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 public class JorthTests{
 	
 	public static void main(String[] args) throws Throwable{
-		new JorthTests().fieldClass();
+		new JorthTests().mathClass();
 	}
 	
 	public static class ISayHello{
@@ -50,7 +50,7 @@ public class JorthTests{
 						myFunctionName function start
 							
 							<arg> myArgumentName get
-							' string concat works with $type'
+							'string concat works with $type:\n'
 							concat
 							
 						function end
@@ -58,14 +58,13 @@ public class JorthTests{
 					""");
 			writer.write(
 				"""
-					{java.lang.String $type} myMacro macro resolve
-					{int $type}              myMacro macro resolve
-					{float $type}            myMacro macro resolve
-					{double $type}           myMacro macro resolve
+					{Str $type}    myMacro macro resolve
+					{int $type}    myMacro macro resolve
+					{float $type}  myMacro macro resolve
+					{double $type} myMacro macro resolve
 					""");
 		});
 		
-		var constr=cls.getConstructor();
 		
 		LogUtil.println(cls.getMethod("myFunctionName", String.class).invoke(null, "this is a test"));
 		LogUtil.println(cls.getMethod("myFunctionName", int.class).invoke(null, 123));
@@ -203,7 +202,7 @@ public class JorthTests{
 	
 	Class<?> generateAndLoadInstance(String className, UnsafeConsumer<JorthWriter, MalformedJorthException> generator) throws ReflectiveOperationException{
 		
-		var cls=Class.forName(className, false, new ClassLoader(){
+		var cls=Class.forName(className, true, new ClassLoader(){
 			@Override
 			protected Class<?> findClass(String name) throws ClassNotFoundException{
 				if(name.equals(className)){
