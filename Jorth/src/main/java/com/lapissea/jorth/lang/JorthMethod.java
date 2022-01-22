@@ -99,7 +99,7 @@ public class JorthMethod{
 			type=CallType.VIRTUAL;
 		}
 		
-		invoke(type, Utils.undotify(method.getDeclaringClass().getName()), method.getName(), Arrays.stream(method.getGenericParameterTypes()).map(this::getGenType).toList(), getGenType(method.getGenericReturnType()), method.getDeclaringClass().isInterface());
+		invoke(type, method.getDeclaringClass().getName(), method.getName(), Arrays.stream(method.getGenericParameterTypes()).map(this::getGenType).toList(), getGenType(method.getGenericReturnType()), method.getDeclaringClass().isInterface());
 	}
 	
 	private GenType getGenType(Type typ){
@@ -107,17 +107,21 @@ public class JorthMethod{
 		throw new NotImplementedException(typ.getClass().getName());
 	}
 	
-	public void invoke(CallType type, String undottedClassName, String methodName, List<GenType> args, GenType returnType, boolean isInterface) throws MalformedJorthException{
+	public void invoke(CallType type, String className, String methodName, List<GenType> args, GenType returnType, boolean isInterface) throws MalformedJorthException{
+		String undottedClassName=Utils.undotify(className);
 		
-		popAndCheckArguments(undottedClassName, methodName, args);
+		popAndCheckArguments(className, methodName, args);
 		
+		check:
 		if(type!=CallType.STATIC){
 			var owner=popTypeStack();
-			if(!undottedClassName.equals(Utils.undotify(owner.typeName()))){
-				if(!undottedClassName.equals("java/lang/Object")){
-					throw new MalformedJorthException("Method "+methodName+" belongs to "+undottedClassName+" but got "+owner);
-				}
-			}
+			if(undottedClassName.equals(Utils.undotify(owner.typeName()))) break check;
+			if(undottedClassName.equals("java/lang/Object")) break check;
+			
+			var clazz=context.getClassInfo(className);
+			if(clazz.instanceOf(className)) break check;
+			
+			throw new MalformedJorthException("Method "+methodName+" belongs to "+className+" but got "+owner);
 		}
 		
 		pushTypeStack(returnType);
@@ -130,11 +134,13 @@ public class JorthMethod{
 	private void popAndCheckArguments(String className, String methodName, List<GenType> args) throws MalformedJorthException{
 		for(int i=args.size()-1;i>=0;i--){
 			var popped=popTypeStack();
-			if(!popped.equals(args.get(i))){
-				if(!args.get(i).typeName().equals("java/lang/Object")){
-					throw new MalformedJorthException("Argument "+i+" in "+className+"#"+methodName+" is "+args.get(i)+" but got "+popped);
-				}
-			}
+			if(popped.equals(args.get(i))) continue;
+			if(args.get(i).typeName().equals("java.lang.Object")) continue;
+			
+			var clazz=context.getClassInfo(className);
+			if(clazz.instanceOf(className)) continue;
+			
+			throw new MalformedJorthException("Argument "+i+" in "+className+"#"+methodName+" is "+args.get(i)+" but got "+popped);
 		}
 	}
 	

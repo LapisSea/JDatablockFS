@@ -22,6 +22,25 @@ public class JorthCompiler{
 	
 	public record FunctArg(int index, String name, GenType type){}
 	
+	public record ClassInfo(String name, List<ClassInfo> parents){
+		
+		private static final ClassInfo OBJECT=new ClassInfo(Object.class.getName(), List.of());
+		
+		public static ClassInfo fromClass(Class<?> clazz){
+			if(clazz.equals(Object.class)) return OBJECT;
+			return new ClassInfo(clazz.getName(), Stream.concat(Stream.of(clazz.getSuperclass()), Arrays.stream(clazz.getInterfaces())).filter(Objects::nonNull).map(ClassInfo::fromClass).toList());
+		}
+		
+		public boolean instanceOf(String className){
+			if(className.equals(name)) return true;
+			for(ClassInfo parent : parents){
+				if(parent.instanceOf(className)) return true;
+			}
+			return false;
+		}
+	}
+	
+	private final ClassLoader             classLoader;
 	private final Token.Sequence.Writable rawTokens=new Token.Sequence.Writable();
 	
 	private int lastLine;
@@ -47,6 +66,10 @@ public class JorthCompiler{
 	private       boolean       addedInit;
 	private       boolean       addedClinit;
 	private       Visibility    visibility     =Visibility.PUBLIC;
+	
+	public JorthCompiler(ClassLoader classLoader){
+		this.classLoader=classLoader;
+	}
 	
 	private Token peek() throws MalformedJorthException{
 		return rawTokens.peek();
@@ -478,8 +501,22 @@ public class JorthCompiler{
 		
 		if(!rawTokens.isEmpty()){
 			throw new IllegalStateException("Remaining data! "+rawTokens);
+	
+	public ClassInfo getClassInfo(String name) throws MalformedJorthException{
+		if(name.contains("/")){
+			throw new IllegalArgumentException(name);
+		}
+		if(className.equals(name)){
+			throw new NotImplementedException();
 		}
 		
-		return currentClass.toByteArray();
+		Class<?> clazz;
+		try{
+			clazz=Class.forName(name, false, classLoader);
+		}catch(ClassNotFoundException e){
+			throw new MalformedJorthException(e);
+		}
+		
+		return ClassInfo.fromClass(clazz);
 	}
 }

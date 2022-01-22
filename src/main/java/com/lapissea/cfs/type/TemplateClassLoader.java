@@ -26,7 +26,7 @@ public class TemplateClassLoader extends ClassLoader{
 		
 		LogUtil.println("generating", className, "from", typeDefinition);
 		
-		var jorth=new JorthCompiler();
+		var jorth=new JorthCompiler(this);
 		
 		try(var writer=jorth.writeCode()){
 			
@@ -36,7 +36,11 @@ public class TemplateClassLoader extends ClassLoader{
 			throw new RuntimeException("Failed to generate class "+className, e);
 		}
 		
-		return defineClass(className, ByteBuffer.wrap(jorth.classBytecode()), null);
+		try{
+			return defineClass(className, ByteBuffer.wrap(jorth.classBytecode()), null);
+		}catch(MalformedJorthException e){
+			throw new RuntimeException(e);
+		}
 	}
 	
 	private TypeDefinition getDef(String name) throws ClassNotFoundException{

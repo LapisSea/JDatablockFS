@@ -202,22 +202,24 @@ public class JorthTests{
 	
 	Class<?> generateAndLoadInstance(String className, UnsafeConsumer<JorthWriter, MalformedJorthException> generator) throws ReflectiveOperationException{
 		
-		var cls=Class.forName(className, true, new ClassLoader(){
+		var cls=Class.forName(className, true, new ClassLoader(this.getClass().getClassLoader()){
 			@Override
 			protected Class<?> findClass(String name) throws ClassNotFoundException{
 				if(name.equals(className)){
-					var jorth=new JorthCompiler();
-					
-					try(var writer=jorth.writeCode()){
-						generator.accept(writer);
+					var jorth=new JorthCompiler(this);
+					try{
+						
+						try(var writer=jorth.writeCode()){
+							generator.accept(writer);
+						}
+						
+						var byt=jorth.classBytecode();
+						BytecodeUtils.printClass(byt);
+						
+						return defineClass(name, ByteBuffer.wrap(byt), null);
 					}catch(MalformedJorthException e){
 						throw new RuntimeException("Failed to generate class "+className, e);
 					}
-					
-					var byt=jorth.classBytecode();
-					BytecodeUtils.printClass(byt);
-					
-					return defineClass(name, ByteBuffer.wrap(byt), null);
 				}
 				return super.findClass(name);
 			}
