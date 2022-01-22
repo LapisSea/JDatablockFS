@@ -5,10 +5,12 @@ import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.ShouldNeverHappenError;
+import com.lapissea.util.function.UnsafeBiFunction;
+import com.lapissea.util.function.UnsafeFunction;
+import com.lapissea.util.function.UnsafeSupplier;
 import org.objectweb.asm.ClassWriter;
 
 import java.util.*;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -18,7 +20,7 @@ import static org.objectweb.asm.Opcodes.V11;
 
 public class JorthCompiler{
 	
-	private record Macro(String name, Set<String> arguments, Token.Sequence.Writable data){}
+	private record Macro(String name, List<String> orderedArguments, Set<String> arguments, Token.Sequence.Writable data){}
 	
 	public record FunctArg(int index, String name, GenType type){}
 	
@@ -59,7 +61,9 @@ public class JorthCompiler{
 	private final Map<String, Macro> macros=new HashMap<>();
 	private       Macro              currentMacro;
 	
-	private final Map<String, FunctArg> arguments=new HashMap<>();
+	private final LocalVariableStack methodArguments=new LocalVariableStack();
+	
+	private final List<Token> startStack=new ArrayList<>();
 	
 	private final List<GenType> classInterfaces=new ArrayList<>();
 	private       Visibility    classVisibility;
@@ -79,6 +83,8 @@ public class JorthCompiler{
 	}
 	
 	private void consumeRawToken(JorthWriter writer, Token token) throws MalformedJorthException{
+		
+		lastLine=Math.max(token.line, lastLine);
 		
 		if(currentMacro!=null){
 			var d=currentMacro.data;
@@ -107,12 +113,165 @@ public class JorthCompiler{
 	}
 	
 	private boolean consume(JorthWriter writer, Token token) throws MalformedJorthException{
+//		LogUtil.println(currentMethod,token.source);
 		
 		// string literal
 		if(token.isStringLiteral()){
 			var str=token.getStringLiteralValue();
 			currentMethod.loadString(str);
 			return true;
+		}
+		
+		if(currentMethod!=null){
+			
+			if(token.isInteger()){
+				currentMethod.loadInt(Integer.parseInt(token.source));
+				return true;
+			}
+			
+			if(token.isFloating()){
+				throw new NotImplementedException();
+			}
+			
+			interface DoMath{
+				void run(String opName, UnsafeBiFunction<Types, Types, Boolean, MalformedJorthException> exec) throws MalformedJorthException;
+			}
+			
+			DoMath math=(name, exec)->{
+				var stack=currentMethod.getStack();
+				if(stack.size()<2) throw new MalformedJorthException(name+" operation requires 2 operands on the stack");
+				
+				var a=stack.peek(0);
+				var b=stack.peek(1);
+				
+				if(exec.apply(a.type(), b.type())) return;
+				if(exec.apply(b.type(), a.type())) return;
+				
+				throw new MalformedJorthException("Unable to find match for "+name+" with "+a+", "+b);
+			};
+			
+			switch(token.lower()){
+				case "cast" -> {
+					
+					requireTokenCount(1);
+					var castType=readGenericType();
+					
+					var type=currentMethod.getStack().peek();
+					if(castType.equals(type)) return true;
+					
+					switch(type.type()){
+						case INT -> {
+							switch(castType.type()){
+								case BYTE -> currentMethod.intToByte();
+								case SHORT -> currentMethod.intToShort();
+								case LONG -> currentMethod.intToLong();
+								case FLOAT -> currentMethod.intToFloat();
+								case DOUBLE -> currentMethod.intToDouble();
+								default -> throw new NotImplementedException(castType+"");
+							}
+						}
+						default -> throw new NotImplementedException(castType+"");
+					}
+					
+					LogUtil.println(type+" to "+castType);
+					
+					return true;
+				}
+				case "+" -> {
+					math.run("add", (a, b)->{
+						if(a==b){
+							switch(a){
+								case BYTE, SHORT, INT -> currentMethod.integerAdd();
+								case FLOAT -> currentMethod.floatAdd();
+								case LONG -> currentMethod.longAdd();
+								case DOUBLE -> currentMethod.doubleAdd();
+								default -> throw new NotImplementedException(a+"");
+							}
+							return true;
+						}
+						return false;
+					});
+					return true;
+				}
+				case "-" -> {
+					math.run("subtract", (a, b)->{
+						if(a==b){
+							switch(a){
+								case BYTE, SHORT, INT -> currentMethod.integerSub();
+								case FLOAT -> currentMethod.floatSub();
+								case LONG -> currentMethod.longSub();
+								case DOUBLE -> currentMethod.doubleSub();
+								default -> throw new NotImplementedException(a+"");
+							}
+							return true;
+						}
+						return false;
+					});
+					return true;
+				}
+				case "/" -> {
+					math.run("divide", (a, b)->{
+						if(a==b){
+							switch(a){
+								case BYTE, SHORT, INT -> currentMethod.integerDiv();
+								case FLOAT -> currentMethod.floatDiv();
+								case LONG -> currentMethod.longDiv();
+								case DOUBLE -> currentMethod.doubleDiv();
+								default -> throw new NotImplementedException(a+"");
+							}
+							return true;
+						}
+						return false;
+					});
+					return true;
+				}
+				case "*" -> {
+					math.run("multiply", (a, b)->{
+						if(a==b){
+							switch(a){
+								case BYTE, SHORT, INT -> currentMethod.integerMul();
+								case FLOAT -> currentMethod.floatMul();
+								case LONG -> currentMethod.longMul();
+								case DOUBLE -> currentMethod.doubleMul();
+								default -> throw new NotImplementedException(a+"");
+							}
+							return true;
+						}
+						return false;
+					});
+					return true;
+				}
+				case "==" -> {
+					var left =currentMethod.getStack().peek(0);
+					var right=currentMethod.getStack().peek(1);
+					
+					var lbc=left.type();
+					var rbc=right.type();
+					
+					try{
+						if(lbc!=rbc){
+							throw new NotImplementedException(left+" "+right+" comparison");
+						}
+						
+						if(lbc==Types.OBJECT){
+							currentMethod.invoke(Objects.class.getMethod("equals", Object.class, Object.class));
+							return true;
+						}
+					}catch(NoSuchMethodException e){
+						throw new ShouldNeverHappenError(e);
+					}
+					
+					throw new NotImplementedException(left+" "+right+" comparison");
+				}
+				case "if" -> {
+					if(currentMethod.getStack().peek().equals(new GenType(Boolean.class))){
+						unbox();
+					}
+//					currentMethod.makeJumpMarker();
+					
+					return true;
+				}
+			}
 		}
 		
 		switch(token.lower()){
@@ -126,9 +285,9 @@ public class JorthCompiler{
 					if(stack.peek().equals(GenType.STRING)&&stack.peek(1).equals(GenType.STRING)){
 						
 						currentMethod.dupAB();
-						currentMethod.invoke(String.class.getMethod("length"));
+						nullSafeStringLength();
 						currentMethod.swap();
-						currentMethod.invoke(String.class.getMethod("length"));
+						nullSafeStringLength();
 						currentMethod.add();
 						
 						currentMethod.newObject(StringBuilder.class);
@@ -136,14 +295,22 @@ public class JorthCompiler{
 						currentMethod.swap();
 						currentMethod.callInit(List.of(new GenType(int.class.getName())));
 					}else{
-						currentMethod.newObject(StringBuilder.class, List.of());
+						currentMethod.newObject(StringBuilder.class);
+						currentMethod.dup();
+						currentMethod.callInit(List.of());
 					}
 					
-					Supplier<Class<?>> getTyp=()->{
+					currentMethod.getStack().checkTop(List.of(GenType.STRING_BUILDER));
+					
+					UnsafeSupplier<Class<?>, MalformedJorthException> getTyp=()->{
 						Class<?> cls;
-						var      peek=stack.peek();
+						var      peek=currentMethod.getStack().peek();
+						if(List.of(Types.BYTE, Types.CHAR, Types.SHORT).contains(peek.type())){
+							currentMethod.growToInt();
+							peek=currentMethod.getStack().peek();
+						}
 						if(peek.typeName().equals(String.class.getName())) cls=String.class;
-						else cls=Objects.requireNonNull(stack.peek().type().baseClass);
+						else cls=Objects.requireNonNull(peek.type().baseClass);
 						return cls;
 					};
 					
@@ -177,7 +344,8 @@ public class JorthCompiler{
 			}
 			case "arg" -> {
 				var name=pop();
-				arguments.put(name.source, new FunctArg(arguments.size(), name.source, readGenericType()));
+				var type=readGenericType();
+				methodArguments.make(name.source, type);
 				return true;
 			}
 			case "implements" -> {
@@ -226,10 +394,7 @@ public class JorthCompiler{
 						currentMethod.getFieldIns(className, name.source, type);
 					}
 					case "<arg>" -> {
-						var arg=arguments.values()
-						                 .stream()
-						                 .filter(a->a.name.equals(name.source))
-						                 .findAny();
+						var arg=methodArguments.get(name.source);
 						if(arg.isEmpty()){
 							throw new MalformedJorthException("argument "+name+" does not exist");
 						}
@@ -249,39 +414,75 @@ public class JorthCompiler{
 						requireTokenCount(1);
 						var name=pop();
 						
-						var macro =getMacro(name);
-						var tokens=readSequence(rawTokens, "{", "}");
+						var macro=getMacro(name);
 						
-						var m=tokens.parseStream(e->{
-							var argName=e.pop().source;
-							var raw    =e.pop();
+						UnsafeFunction<Token, Token.Sequence, MalformedJorthException> interpretArg=raw->{
 							
-							Token.Sequence value;
 							if(raw.isStringLiteral()){
 								var w=new Token.Sequence.Writable();
 								try(var writ=new JorthWriter(raw.line, (__, t)->w.write(t))){
 									writ.write(raw.getStringLiteralValue());
 								}
-								value=w;
-							}else{
-								value=Token.Sequence.of(raw);
+								return w;
 							}
 							
-							return Map.entry(argName, value);
-						}).collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
+							return Token.Sequence.of(raw);
+							
+						};
+						
+						Map<String, Token.Sequence> macroArgumentMap=switch(peek().source){
+							
+							case "]" -> {
+								var tokens=readSequence(rawTokens, "[", "]");
+								
+								
+								Map<String, Token.Sequence> result=new HashMap<>();
+								
+								int index=0;
+								while(!tokens.isEmpty()){
+									Token raw=tokens.pop();
+									var   seq=interpretArg.apply(raw);
+									
+									result.put(macro.orderedArguments.get(index), seq);
+									index++;
+								}
+								
+								yield Map.copyOf(result);
+							}
+							case "}" -> {
+								var tokens=readSequence(rawTokens, "{", "}");
+								yield tokens.parseStream(e->{
+									var argName=e.pop().source;
+									
+									var raw  =e.pop();
+									var value=interpretArg.apply(raw);
+									
+									if(!macro.arguments.contains(argName)) throw new MalformedJorthException(argName+" argument does not exist in macro "+macro.name());
+									return Map.entry(argName, value);
+								}).collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
+							}
+							default -> throw new MalformedJorthException("unexpected token: "+peek());
+						};
+						
+						if(macroArgumentMap.size()!=macro.arguments.size()){
+							var set=new HashSet<>(macro.arguments);
+							set.removeAll(macroArgumentMap.keySet());
+							
+							throw new MalformedJorthException("Undefined arguments: "+set);
+						}
 						
 						var builder=new LinkedList<Token>();
 						macro.data.cloneTokens().flatMap(t->{
 							if(t.isStringLiteral()){
 								var str=t.getStringLiteralValue();
-								for(var e : m.entrySet()){
+								for(var e : macroArgumentMap.entrySet()){
 									var b=new LinkedList<String>();
 									e.getValue().cloneTokens().map(Token::getSource).forEach(b::addFirst);
 									str=str.replace(e.getKey(), String.join(" ", b));//TODO: escape ' to prevent string breaking
 								}
 								return Stream.of(new Token(t.line, "'"+str+"'"));
 							}
-							var arg=m.get(t.source);
+							var arg=macroArgumentMap.get(t.source);
 							if(arg!=null){
 								var line=t.line;
 								return arg.cloneTokens().map(Token::getSource).map(src->new Token(line, src));
@@ -318,18 +519,21 @@ public class JorthCompiler{
 				requireTokenCount(1);
 				var subject=pop();
 				
+				startStack.add(subject);
+				
 				switch(subject.lower()){
 					case "macro" -> {
 						requireTokenCount(1);
 						var name=pop();
 						
-						Set<String> arguments;
+						List<String> orderedArgs;
 						try{
-							arguments=Set.copyOf(readSequence(rawTokens, "[", "]").parseAll(r->r.pop().source));
+							orderedArgs=readSequence(rawTokens, "[", "]").parseAll(r->r.pop().source);
 						}catch(IllegalArgumentException e){
-							throw new IllegalArgumentException("Bad arguments: "+this.arguments, e);
+							throw new IllegalArgumentException("Bad arguments: "+this.methodArguments, e);
 						}
-						currentMacro=new Macro(name.source, arguments, new Token.Sequence.Writable());
+						
+						currentMacro=new Macro(name.source, orderedArgs, Set.copyOf(orderedArgs), new Token.Sequence.Writable());
 						macros.put(currentMacro.name, currentMacro);
 					}
 					case "class" -> {
@@ -368,17 +572,16 @@ public class JorthCompiler{
 						
 						var staticOo=isStatic?ACC_STATIC:0;
 						
-						var args=arguments.values()
-						                  .stream()
-						                  .sorted(Comparator.comparingInt(FunctArg::index))
-						                  .map(FunctArg::type)
-						                  .map(Utils::genericSignature)
-						                  .collect(Collectors.joining());
+						var args=methodArguments.stream()
+						                        .sorted(Comparator.comparingInt(LocalVariableStack.Variable::accessIndex))
+						                        .map(LocalVariableStack.Variable::type)
+						                        .map(Utils::genericSignature)
+						                        .collect(Collectors.joining());
 						
 						
 						var dest=currentClass.visitMethod(visibility.opCode+staticOo, functionName.source, "("+args+")"+returnStr, null, null);
 						
-						currentMethod=new JorthMethod(dest, className, returnType, isStatic);
+						currentMethod=new JorthMethod(this, dest, functionName.source, className, returnType, isStatic);
 						currentMethod.start();
 						
 						isStatic=false;
@@ -389,7 +592,7 @@ public class JorthCompiler{
 						if("<init>".equals(functionName.source)){
 							addedInit=true;
 							currentMethod.loadThis();
-							currentMethod.invoke(CallType.SPECIAL, Utils.undotify(classExtension.typeName()), functionName.source, List.of(), GenType.VOID, false);
+							currentMethod.invoke(CallType.SPECIAL, classExtension.typeName(), functionName.source, List.of(), GenType.VOID, false);
 						}
 					}
 					default -> throw new MalformedJorthException("Unknown subject "+subject+". Can not start it");
@@ -398,26 +601,57 @@ public class JorthCompiler{
 				return true;
 			}
 			case "end" -> {
-				requireTokenCount(1);
-				var subject=pop();
+				var subject=startStack.remove(startStack.size()-1);
+				
 				switch(subject.lower()){
 					case "function" -> {
-						currentMethod.returnOp();
-						
-						currentMethod.end();
-						currentMethod=null;
-						returnType=null;
-						arguments.clear();
+						requireEmptyWords();
+						try{
+							currentMethod.returnOp();
+							
+							currentMethod.end();
+							currentMethod=null;
+							returnType=null;
+							methodArguments.clear();
+							
+						}catch(Throwable e){
+							throw new MalformedJorthException("Failed to end function ", e);
+						}
 					}
 					
 					default -> throw new MalformedJorthException("Unknown subject "+subject+". Can not end it");
 				}
 				return true;
 			}
+			case "???" -> {
+				if(currentMethod==null) throw new MalformedJorthException("Token ??? can only be used in a method body.");
+				throw new MalformedJorthException("Debug token '???' at line "+token.line+" encountered. Current type stack:\n"+currentMethod.getStack());
+			}
 		}
 		
 		rawTokens.write(token);
 		return false;
+	}
+	
+	private void unbox(){
+		throw new NotImplementedException();
+	}
+	
+	
+	private void nullSafeStringLength() throws MalformedJorthException{
+		currentMethod.getStack().checkTop(GenType.STRING);
+		currentMethod.dup();
+		
+		currentMethod.nullBlock(()->{
+			currentMethod.pop();
+			currentMethod.loadInt(4);
+		}, ()->{
+			try{
+				currentMethod.invoke(String.class.getMethod("length"));
+			}catch(NoSuchMethodException e){
+				throw new ShouldNeverHappenError("no.");
+			}
+		});
 	}
 	
 	private GenType classField(Token name) throws MalformedJorthException{
@@ -480,18 +714,18 @@ public class JorthCompiler{
 	}
 	
 	
-	public byte[] classBytecode(){
+	public byte[] classBytecode() throws MalformedJorthException{
 		
-//		if(!addedInit){
-//			try(var writer=writeCode()){
-//				writer.write(classVisibility.lower).write("visibility <init> function start function end");
-//			}catch(MalformedJorthException e){
-//				throw new RuntimeException(e);
-//			}
-//		}
+		if(!addedInit){
+			try(var writer=writeCode()){
+				writer.write(classVisibility.lower).write("visibility <init> function start end");
+			}catch(MalformedJorthException e){
+				throw new RuntimeException(e);
+			}
+		}
 //		if(!addedClinit){
 //			try(var writer=writeCode()){
-//				writer.write(classVisibility.lower).write("visibility <clinit> static function start function end");
+//				writer.write(classVisibility.lower).write("visibility <clinit> static function start end");
 //			}catch(MalformedJorthException e){
 //				throw new RuntimeException(e);
 //			}
@@ -499,8 +733,16 @@ public class JorthCompiler{
 		
 		currentClass.visitEnd();
 		
+		requireEmptyWords();
+		
+		return currentClass.toByteArray();
+	}
+	
+	private void requireEmptyWords() throws MalformedJorthException{
 		if(!rawTokens.isEmpty()){
-			throw new IllegalStateException("Remaining data! "+rawTokens);
+			throw new MalformedJorthException("Remaining words! "+rawTokens);
+		}
+	}
 	
 	public ClassInfo getClassInfo(String name) throws MalformedJorthException{
 		if(name.contains("/")){

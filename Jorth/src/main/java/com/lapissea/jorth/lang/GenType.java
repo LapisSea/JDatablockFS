@@ -7,11 +7,16 @@ import java.util.stream.Collectors;
 public record GenType(String typeName, List<GenType> args, Types type){
 	
 	public static final GenType VOID  =new GenType("void");
+	public static final GenType STRING_BUILDER=new GenType(StringBuilder.class.getTypeName());
 	public static final GenType STRING=new GenType(String.class.getTypeName());
 	
 	private static Types makeTyp(String typeName){
 		var lower=typeName.toLowerCase();
 		return Arrays.stream(Types.values()).filter(e->e.lower.equals(lower)).findAny().orElse(Types.OBJECT);
+	}
+	
+	public GenType(Class<?> type){
+		this(type.getName());
 	}
 	
 	public GenType(String typeName){

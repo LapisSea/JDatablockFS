@@ -4,16 +4,16 @@ import static org.objectweb.asm.Opcodes.*;
 
 public enum Types{
 	
-	VOID  (RETURN , -1, 1, null),
-	OBJECT(ARETURN, ALOAD, 1, Object.class),
-	CHAR  (IRETURN, ILOAD, 1, char.class),
-	FLOAT (FRETURN, FLOAD, 1, float.class),
-	DOUBLE(DRETURN, DLOAD, 2, double.class),
-	BYTE  (IRETURN, ILOAD, 1, byte.class),
-	SHORT (IRETURN, ILOAD, 1, short.class),
-	INT   (IRETURN, ILOAD, 1, int.class),
-	LONG  (LRETURN, LLOAD, 2, long.class),
-	BOOL  (IRETURN, ILOAD, 1, boolean.class);
+	VOID   (RETURN , -1, 1, null),
+	OBJECT (ARETURN, ALOAD, 1, Object.class),
+	CHAR   (IRETURN, ILOAD, 1, char.class),
+	FLOAT  (FRETURN, FLOAD, 1, float.class),
+	DOUBLE (DRETURN, DLOAD, 2, double.class),
+	BYTE   (IRETURN, ILOAD, 1, byte.class),
+	SHORT  (IRETURN, ILOAD, 1, short.class),
+	INT    (IRETURN, ILOAD, 1, int.class),
+	LONG   (LRETURN, LLOAD, 2, long.class),
+	BOOLEAN(IRETURN, ILOAD, 1, boolean.class);
 	
 	public final int returnOp;
 	public final int loadOp;

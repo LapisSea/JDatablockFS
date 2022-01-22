@@ -33,6 +33,10 @@ public class Token{
 		}
 	}
 	
+	public boolean isNumber(){
+		return isInteger()||isFloating();
+	}
+	
 	public boolean isInteger(){
 		try{
 			Long.parseLong(source);

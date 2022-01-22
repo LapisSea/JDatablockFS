@@ -206,8 +206,10 @@ public class JorthWriter implements AutoCloseable{
 		throw new MalformedJorthException("Unknown # token \""+sb+"\"");
 	}
 	
+	public JorthWriter write(String codeChunk, String... values) throws MalformedJorthException      {return write(seq(requireNonNull(codeChunk)), values);}
 	public JorthWriter write(CharSequence codeChunk, String... values) throws MalformedJorthException{return write(seq(requireNonNull(codeChunk)), values);}
 	public JorthWriter write(CharIterator codeChunk, String... values) throws MalformedJorthException{return write(inlineCodeValues(requireNonNull(codeChunk), values));}
+	public JorthWriter write(String codeChunk) throws MalformedJorthException                        {return write(seq(requireNonNull(codeChunk)));}
 	public JorthWriter write(CharSequence codeChunk) throws MalformedJorthException                  {return write(seq(requireNonNull(codeChunk)));}
 	public JorthWriter write(CharIterator codeChunk) throws MalformedJorthException{
 		requireNonNull(codeChunk);
@@ -220,14 +222,14 @@ public class JorthWriter implements AutoCloseable{
 				tokenBuffer.setLength(0);
 				while(codeChunk.hasNext()){
 					var c=codeChunk.next();
-					if(c=='\n')break;
+					if(c=='\n') break;
 				}
 				continue;
 			}
 			
 			char c=codeChunk.next();
 			
-			if(c=='\n')line++;
+			if(c=='\n') line++;
 			
 			if(c=='\\'){
 				var ch=readOrUnexpected(codeChunk);
@@ -265,7 +267,7 @@ public class JorthWriter implements AutoCloseable{
 		}
 	}
 	private void add(StringBuilder tokenBuffer, char ch) throws MalformedJorthException{
-		List<Character> specials=List.of('[', ']','{','}');
+		List<Character> specials=List.of('[', ']', '{', '}');
 		
 		char spec=0;
 		
