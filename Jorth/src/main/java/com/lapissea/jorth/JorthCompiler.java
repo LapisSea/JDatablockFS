@@ -63,6 +63,8 @@ public class JorthCompiler{
 	
 	private final LocalVariableStack methodArguments=new LocalVariableStack();
 	
+	private final List<JorthMethod.CodePoint> ifStack=new ArrayList<>();
+	
 	private final List<Token> startStack=new ArrayList<>();
 	
 	private final List<GenType> classInterfaces=new ArrayList<>();
@@ -253,6 +255,10 @@ public class JorthCompiler{
 							throw new NotImplementedException(left+" "+right+" comparison");
 						}
 						
+						if(lbc==Types.INT){
+							currentMethod.intIntEqualityToBool();
+							return true;
+						}
 						if(lbc==Types.OBJECT){
 							currentMethod.invoke(Objects.class.getMethod("equals", Object.class, Object.class));
 							return true;
@@ -261,13 +267,47 @@ public class JorthCompiler{
 						throw new ShouldNeverHappenError(e);
 					}
 					
-					throw new NotImplementedException(left+" "+right+" comparison");
+					throw new NotImplementedException(left+" "+right+" not supported yet");
 				}
 				case "if" -> {
 					if(currentMethod.getStack().peek().equals(new GenType(Boolean.class))){
 						unbox();
 					}
-//					currentMethod.makeJumpMarker();
+					
+					var ifEnd=currentMethod.new CodePoint();
+					
+					currentMethod.jumpToIfFalse(ifEnd);
+					ifStack.add(ifEnd);
+					startStack.add(token);
+					
+					var ifStart=currentMethod.new CodePoint();
+					ifStart.record();
+					
+					ifEnd.prev=ifStart;
+					
+					ifEnd.last=currentMethod.new CodePoint();
+					return true;
+				}
+				case "else" -> {
+					if(ifStack.isEmpty())throw new MalformedJorthException("Else must follow an if block");
+					
+					var ifEnd=ifStack.remove(ifStack.size()-1);
+					
+					var first=ifEnd;
+					while(first.prev!=null){
+						first=first.prev;
+					}
+					
+					currentMethod.jumpTo(ifEnd.last);
+					
+					ifEnd.plant();
+					first.restoreStack();
+					
+					var elseEnd=currentMethod.new CodePoint();
+					elseEnd.prev=ifEnd;
+					elseEnd.last=ifEnd.last;
+					
+					ifStack.add(elseEnd);
 					
 					return true;
 				}
@@ -281,6 +321,7 @@ public class JorthCompiler{
 			}
 			case "concat" -> {
 				try{
+					currentMethod.swap();
 					var stack=currentMethod.getStack();
 					if(stack.peek().equals(GenType.STRING)&&stack.peek(1).equals(GenType.STRING)){
 						
@@ -603,9 +644,10 @@ public class JorthCompiler{
 			case "end" -> {
 				var subject=startStack.remove(startStack.size()-1);
 				
+				requireEmptyWords();
+				
 				switch(subject.lower()){
 					case "function" -> {
-						requireEmptyWords();
 						try{
 							currentMethod.returnOp();
 							
@@ -617,6 +659,24 @@ public class JorthCompiler{
 						}catch(Throwable e){
 							throw new MalformedJorthException("Failed to end function ", e);
 						}
+					}
+					case "if" -> {
+						var lastEnd=ifStack.remove(ifStack.size()-1);
+						
+						lastEnd.plant();
+						lastEnd.last.plant();
+						
+						var point=lastEnd;
+						while(point.prev!=null){
+							LogUtil.println(point.getStackState());
+							
+							if(!point.getStackState().equals(lastEnd.getStackState())){
+								throw new MalformedJorthException("Stack mismatch \n"+point.getStackState()+"\n"+lastEnd.getStackState());
+							}
+							
+							point=point.prev;
+						}
+						
 					}
 					
 					default -> throw new MalformedJorthException("Unknown subject "+subject+". Can not end it");

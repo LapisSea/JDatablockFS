@@ -1,10 +1,12 @@
 package com.lapissea.jorth.lang;
 
+import java.util.List;
+
 import static org.objectweb.asm.Opcodes.*;
 
 public enum Types{
 	
-	VOID   (RETURN , -1, 1, null),
+	VOID   (RETURN , -1, 1, void.class),
 	OBJECT (ARETURN, ALOAD, 1, Object.class),
 	CHAR   (IRETURN, ILOAD, 1, char.class),
 	FLOAT  (FRETURN, FLOAD, 1, float.class),
@@ -15,11 +17,12 @@ public enum Types{
 	LONG   (LRETURN, LLOAD, 2, long.class),
 	BOOLEAN(IRETURN, ILOAD, 1, boolean.class);
 	
-	public final int returnOp;
-	public final int loadOp;
-	public final int slotCount;
+	public final int      returnOp;
+	public final int      loadOp;
+	public final int      slotCount;
 	public final Class<?> baseClass;
-	public final String lower;
+	public final String   lower;
+	public final GenType  genTyp;
 	
 	Types(int returnOp, int loadOp, int slotCount, Class<?> baseClass){
 		this.returnOp=returnOp;
@@ -27,5 +30,7 @@ public enum Types{
 		this.slotCount=slotCount;
 		this.baseClass=baseClass;
 		lower=name().toLowerCase();
+		genTyp=new GenType(baseClass.getName(), List.of(), this);
 	}
+	
 }

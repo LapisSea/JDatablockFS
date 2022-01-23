@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 public class JorthTests{
 	
 	public static void main(String[] args) throws Throwable{
-		new JorthTests().comparisonTest();
+		new JorthTests().ifTest();
 	}
 	
 	public static class ISayHello{
@@ -215,14 +215,14 @@ public class JorthTests{
 		
 		var testStr=cls.getMethod("compare", String.class, String.class);
 		assertEquals(false, testStr.invoke(null, "0", "1"));
-		assertEquals(true, testStr.invoke(null, "1", "1"));
+		assertEquals(true , testStr.invoke(null, "1", "1"));
 		assertEquals(false, testStr.invoke(null, null, "1"));
 		assertEquals(false, testStr.invoke(null, "0", null));
-		assertEquals(true, testStr.invoke(null, null, null));
+		assertEquals(true , testStr.invoke(null, null, null));
 		
 		var test=cls.getMethod("compare", int.class, int.class);
-		assertEquals(false, test.invoke(null, 0, 1));
-		assertEquals(true, test.invoke(null, 1, 1));
+		assertEquals(false, test.invoke(null, 11, 10));
+		assertEquals(true, test.invoke(null, 10, 10));
 	}
 	
 	@Test
@@ -255,7 +255,7 @@ public class JorthTests{
 						<arg> index get 1 == if
 							'ay'
 						else
-							lmao
+							'lmao ' <arg> index get concat
 						end
 						
 					end

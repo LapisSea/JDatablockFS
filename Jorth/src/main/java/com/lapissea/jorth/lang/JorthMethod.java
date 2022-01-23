@@ -19,6 +19,33 @@ import static org.objectweb.asm.Opcodes.*;
 
 public class JorthMethod{
 	
+	public class CodePoint{
+		
+		public CodePoint prev;
+		public CodePoint last;
+		
+		public final Label asmLabel=new Label();
+		
+		private Stack stackState;
+		
+		public void plant(){
+			record();
+			mv.visitLabel(asmLabel);
+		}
+		public void record(){
+			if(stackState!=null) throw new IllegalStateException();
+			this.stackState=getStack().clone();
+		}
+		
+		public JorthMethod.Stack getStackState(){
+			return Objects.requireNonNull(stackState);
+		}
+		
+		public void restoreStack(){
+			typeStack=getStackState().clone();
+		}
+	}
+	
 	public static class Stack{
 		private final List<GenType> data=new ArrayList<>();
 		
@@ -326,7 +353,7 @@ public class JorthMethod{
 					switch(b.type()){
 						case INT -> {
 							mv.visitInsn(IADD);
-							pushTypeStack(new GenType(int.class.getName()));
+							pushTypeStack(Types.INT.genTyp);
 							return;
 						}
 					}
@@ -348,7 +375,7 @@ public class JorthMethod{
 		
 		mv.visitInsn(op);
 		
-		pushTypeStack(new GenType(int.class.getName()));
+		pushTypeStack(Types.INT.genTyp);
 	}
 	
 	private void LLToLOp(int op) throws MalformedJorthException{
@@ -359,7 +386,7 @@ public class JorthMethod{
 		
 		mv.visitInsn(op);
 		
-		pushTypeStack(new GenType(long.class.getName()));
+		pushTypeStack(Types.LONG.genTyp);
 	}
 	
 	private void FFToFOp(int op) throws MalformedJorthException{
@@ -370,7 +397,7 @@ public class JorthMethod{
 		
 		mv.visitInsn(op);
 		
-		pushTypeStack(new GenType(float.class.getName()));
+		pushTypeStack(Types.FLOAT.genTyp);
 		
 	}
 	
@@ -382,7 +409,7 @@ public class JorthMethod{
 		
 		mv.visitInsn(op);
 		
-		pushTypeStack(new GenType(double.class.getName()));
+		pushTypeStack(Types.DOUBLE.genTyp);
 		
 	}
 	
@@ -423,7 +450,7 @@ public class JorthMethod{
 	public void growToInt() throws MalformedJorthException{
 		var typ=popTypeStack();
 		if(!List.of(Types.BYTE, Types.CHAR, Types.SHORT).contains(typ.type())) throw new MalformedJorthException(typ+" is not a smaller int");
-		pushTypeStack(new GenType(int.class.getName()));
+		pushTypeStack(Types.INT.genTyp);
 	}
 	
 	
@@ -459,8 +486,21 @@ public class JorthMethod{
 		mv.visitLabel(endLabel);
 	}
 	
+	public void jumpToIfFalse(CodePoint point) throws MalformedJorthException{
+		
+		var typ=popTypeStack();
+		if(typ.type()!=Types.BOOLEAN) throw new MalformedJorthException(typ+" is not a boolean");
+		
+		mv.visitJumpInsn(IFEQ, point.asmLabel);
+		
+	}
+	
+	public void jumpTo(CodePoint point) throws MalformedJorthException{
+		mv.visitJumpInsn(GOTO, point.asmLabel);
+	}
+	
 	public void loadInt(int value){
-		pushTypeStack(new GenType(int.class.getName()));
+		pushTypeStack(Types.INT.genTyp);
 		switch(value){
 			case 0 -> mv.visitInsn(ICONST_0);
 			case 1 -> mv.visitInsn(ICONST_1);
@@ -471,4 +511,35 @@ public class JorthMethod{
 			default -> mv.visitIntInsn(SIPUSH, value);
 		}
 	}
+	
+	public void loadBoolean(boolean value){
+		pushTypeStack(Types.BOOLEAN.genTyp);
+		if(value){
+			mv.visitInsn(ICONST_1);
+		}else{
+			mv.visitInsn(ICONST_0);
+		}
+	}
+	
+	
+	public void intIntEqualityToBool() throws MalformedJorthException{
+		GenType typ;
+		if((typ=popTypeStack()).type()!=Types.INT) throw new MalformedJorthException(typ+" (arg1) is not an int");
+		if((typ=popTypeStack()).type()!=Types.INT) throw new MalformedJorthException(typ+" (arg2) is not an int");
+		pushTypeStack(Types.BOOLEAN.genTyp);
+		
+		comparisonToBool(IF_ICMPNE);
+	}
+	
+	private void comparisonToBool(int ifNotOp){
+		Label falseL=new Label();
+		mv.visitJumpInsn(ifNotOp, falseL);
+		mv.visitInsn(ICONST_1);
+		Label endL=new Label();
+		mv.visitJumpInsn(GOTO, endL);
+		mv.visitLabel(falseL);
+		mv.visitInsn(ICONST_0);
+		mv.visitLabel(endL);
+	}
+	
 }
