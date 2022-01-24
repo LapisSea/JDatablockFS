@@ -1,18 +1,21 @@
 package com.lapissea.jorth;
 
-import com.lapissea.jorth.lang.BytecodeUtils;
 import com.lapissea.util.LogUtil;
-import com.lapissea.util.function.UnsafeConsumer;
 import org.junit.jupiter.api.Test;
 
-import java.nio.ByteBuffer;
+import java.util.function.Function;
 
+import static com.lapissea.jorth.TestUtils.generateAndLoadInstance;
+import static com.lapissea.jorth.TestUtils.generateAndLoadInstanceSimple;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class JorthTests{
 	
 	public static void main(String[] args) throws Throwable{
-		new JorthTests().ifTest();
+		new JorthTests().functionCallTest();
 	}
 	
 	public static class ISayHello{
@@ -121,22 +124,9 @@ public class JorthTests{
 	void concatTest() throws ReflectiveOperationException{
 		
 		var className="jorth.Gen$$";
+		var str      ="string concat works with $type: ";
 		
-		var cls=generateAndLoadInstance(className, writer->{
-			
-			//Define constants / imports
-			writer.write("#TOKEN(0) Str define", String.class.getName());
-			writer.write("#TOKEN(0) Obj define", Object.class.getName());
-			
-			//define class
-			writer.write(
-				"""
-					public visibility
-					#TOKEN(0) class start
-					""",
-				className
-			);
-			
+		var cls=generateAndLoadInstanceSimple(className, writer->{
 			writer.write(
 				"""
 					[$type] myMacro macro start
@@ -145,13 +135,14 @@ public class JorthTests{
 						Str returns
 						myFunctionName function start
 							
+							'#RAW(0)'
 							<arg> myArgumentName get
-							'string concat works with $type:\n'
 							concat
 							
 						end
 					macro end
-					""");
+					""",
+				str);
 			writer.write(
 				"""
 					{Str $type}    myMacro macro resolve
@@ -164,11 +155,13 @@ public class JorthTests{
 					{double $type} myMacro macro resolve
 					""");
 		});
-
-
-//		LogUtil.println(cls.getMethod("myFunctionName", String.class).invoke(null, (Object)null));
+		
+		
+		LogUtil.println(cls.getMethod("myFunctionName", Object.class).invoke(null, new ISayHello()));
+		LogUtil.println(cls.getMethod("myFunctionName", String.class).invoke(null, (Object)null));
 		LogUtil.println(cls.getMethod("myFunctionName", String.class).invoke(null, "this is a test"));
 		LogUtil.println(cls.getMethod("myFunctionName", int.class).invoke(null, 123));
+		LogUtil.println(cls.getMethod("myFunctionName", long.class).invoke(null, 123L));
 		LogUtil.println(cls.getMethod("myFunctionName", float.class).invoke(null, 0.123F));
 		LogUtil.println(cls.getMethod("myFunctionName", double.class).invoke(null, 0.345));
 		
@@ -179,21 +172,7 @@ public class JorthTests{
 		
 		var className="jorth.Gen$$";
 		
-		var cls=generateAndLoadInstance(className, writer->{
-			
-			//Define constants / imports
-			writer.write("#TOKEN(0) Str define", String.class.getName());
-			writer.write("#TOKEN(0) Obj define", Object.class.getName());
-			
-			//define class
-			writer.write(
-				"""
-					public visibility
-					#TOKEN(0) class start
-					""",
-				className
-			);
-			
+		var cls=generateAndLoadInstanceSimple(className, writer->{
 			writer.write(
 				"""
 					[$typ] compareFunct macro start
@@ -215,10 +194,10 @@ public class JorthTests{
 		
 		var testStr=cls.getMethod("compare", String.class, String.class);
 		assertEquals(false, testStr.invoke(null, "0", "1"));
-		assertEquals(true , testStr.invoke(null, "1", "1"));
+		assertEquals(true, testStr.invoke(null, "1", "1"));
 		assertEquals(false, testStr.invoke(null, null, "1"));
 		assertEquals(false, testStr.invoke(null, "0", null));
-		assertEquals(true , testStr.invoke(null, null, null));
+		assertEquals(true, testStr.invoke(null, null, null));
 		
 		var test=cls.getMethod("compare", int.class, int.class);
 		assertEquals(false, test.invoke(null, 11, 10));
@@ -230,21 +209,7 @@ public class JorthTests{
 		
 		var className="jorth.Gen$$";
 		
-		var cls=generateAndLoadInstance(className, writer->{
-			
-			//Define constants / imports
-			writer.write("#TOKEN(0) Str define", String.class.getName());
-			writer.write("#TOKEN(0) Obj define", Object.class.getName());
-			
-			//define class
-			writer.write(
-				"""
-					public visibility
-					#TOKEN(0) class start
-					""",
-				className
-			);
-			
+		var cls=generateAndLoadInstanceSimple(className, writer->{
 			writer.write(
 				"""
 					static
@@ -270,23 +235,81 @@ public class JorthTests{
 	}
 	
 	@Test
+	void whileTest() throws ReflectiveOperationException{
+		
+		var className="jorth.Gen$$";
+		
+		var cls=generateAndLoadInstanceSimple(className, writer->{
+			writer.write(
+				"""
+					static
+					int start arg
+					Str returns
+					testWhile function start
+						<arg> start get
+						while dup 0 > start
+							5 -
+						end
+					end
+					""");
+		});
+		
+		Function<Integer, Integer> testWhileControl=start->{
+			int val=start;
+			while(val>0){
+				val-=5;
+			}
+			return val;
+		};
+		
+		var testWhile=cls.getMethod("testWhile", int.class);
+		
+		int[] a=new int[20];
+		int[] b=new int[20];
+		for(int i=0;i<20;i++){
+			a[i]=testWhileControl.apply(i);
+			b[i]=(int)testWhile.invoke(null, i);
+		}
+		
+		assertArrayEquals(a, b);
+	}
+	
+	@Test
+	void functionCallTest() throws ReflectiveOperationException{
+		
+		class Test{
+			boolean flag=false;
+			void flag(){
+				flag=true;
+			}
+		}
+		
+		var cls=generateAndLoadInstanceSimple("jorth.Gen$$", writer->{
+			writer.write(
+				"""
+					static
+					#TOKEN(0) obj arg
+					testFlag function start
+						<arg> obj get
+						flag call
+					end
+					""",
+				Test.class.getName());
+		});
+		
+		Test test=new Test();
+		assertFalse(test.flag);
+		cls.getMethod("testFlag", Test.class).invoke(null, test);
+		assertTrue(test.flag);
+		
+	}
+	
+	@Test
 	void fieldClass() throws ReflectiveOperationException{
 		
 		var className="jorth.Gen$$";
 		
-		var cls=generateAndLoadInstance(className, writer->{
-			
-			//Define constants / imports
-			writer.write("#TOKEN(0) Str define", String.class.getName());
-			
-			//define class
-			writer.write(
-				"""
-					public visibility
-					#TOKEN(0) class start
-					""",
-				className
-			);
+		var cls=generateAndLoadInstanceSimple(className, writer->{
 			
 			writer.write(
 				"""
@@ -365,20 +388,7 @@ public class JorthTests{
 		var msg="Ayyyy it works!";
 		
 		var className="jorth.Gen$$";
-		var cls=generateAndLoadInstance(className, writer->{
-			
-			//Define constants / imports
-			writer.write("#TOKEN(0) Str define", String.class.getName());
-			
-			//define class
-			writer.write(
-				"""
-					public visibility
-					#TOKEN(0) class start
-					""",
-				className
-			);
-			
+		var cls=generateAndLoadInstanceSimple(className, writer->{
 			writer.write(
 				"""
 					Str returns
@@ -395,39 +405,6 @@ public class JorthTests{
 		
 		LogUtil.println(cls, "says", str);
 		assertEquals(msg, str);
-	}
-	
-	Class<?> generateAndLoadInstance(String className, UnsafeConsumer<JorthWriter, MalformedJorthException> generator) throws ReflectiveOperationException{
-		
-		var cls=Class.forName(className, true, new ClassLoader(this.getClass().getClassLoader()){
-			@Override
-			protected Class<?> findClass(String name) throws ClassNotFoundException{
-				if(name.equals(className)){
-					var jorth=new JorthCompiler(this);
-					try{
-						
-						try(var writer=jorth.writeCode()){
-							generator.accept(writer);
-						}
-						
-						var byt=jorth.classBytecode();
-						BytecodeUtils.printClass(byt);
-						
-						return defineClass(name, ByteBuffer.wrap(byt), null);
-					}catch(MalformedJorthException e){
-						throw new RuntimeException("Failed to generate class "+className, e);
-					}
-				}
-				return super.findClass(name);
-			}
-		});
-		assert cls.getName().equals(className);
-		
-		LogUtil.println("Compiled:", cls);
-		LogUtil.println("========================================================================");
-		LogUtil.println();
-		
-		return cls;
 	}
 	
 }
