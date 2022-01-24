@@ -238,18 +238,24 @@ public class JorthMethod{
 		switch(top.type().slotCount){
 			case 1 -> {
 				switch(belowTop.type().slotCount){
-					case 1 -> mv.visitInsn(Opcodes.SWAP);
+					case 1 -> mv.visitInsn(SWAP);
 					case 2 -> {
-						mv.visitInsn(Opcodes.DUP_X2);
-						mv.visitInsn(Opcodes.POP);
+						mv.visitInsn(DUP_X2);
+						mv.visitInsn(POP);
 					}
 					default -> throw new NotImplementedException(belowTop.toString());
 				}
 			}
 			case 2 -> {
 				switch(belowTop.type().slotCount){
-					case 1 -> mv.visitInsn(Opcodes.DUP2_X1);
-					case 2 -> mv.visitInsn(Opcodes.DUP2_X2);
+					case 1 -> {
+						mv.visitInsn(DUP2_X1);
+						mv.visitInsn(POP2);
+					}
+					case 2 -> {
+						mv.visitInsn(DUP2_X2);
+						mv.visitInsn(POP2);
+					}
 					default -> throw new NotImplementedException(belowTop.toString());
 				}
 			}
