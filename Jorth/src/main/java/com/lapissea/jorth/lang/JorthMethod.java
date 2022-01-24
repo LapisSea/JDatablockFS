@@ -7,7 +7,6 @@ import com.lapissea.util.TextUtil;
 import com.lapissea.util.function.UnsafeRunnable;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
-import org.objectweb.asm.Opcodes;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -32,12 +31,13 @@ public class JorthMethod{
 			record();
 			mv.visitLabel(asmLabel);
 		}
+		
 		public void record(){
 			if(stackState!=null) throw new IllegalStateException();
 			this.stackState=getStack().clone();
 		}
 		
-		public JorthMethod.Stack getStackState(){
+		public Stack getStackState(){
 			return Objects.requireNonNull(stackState);
 		}
 		
@@ -501,7 +501,7 @@ public class JorthMethod{
 		
 	}
 	
-	public void jumpTo(CodePoint point) throws MalformedJorthException{
+	public void jumpTo(CodePoint point){
 		mv.visitJumpInsn(GOTO, point.asmLabel);
 	}
 	

@@ -289,7 +289,7 @@ public class JorthCompiler{
 					return true;
 				}
 				case "else" -> {
-					if(ifStack.isEmpty())throw new MalformedJorthException("Else must follow an if block");
+					if(ifStack.isEmpty()) throw new MalformedJorthException("Else must follow an if block");
 					
 					var ifEnd=ifStack.remove(ifStack.size()-1);
 					
