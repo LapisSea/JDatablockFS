@@ -322,24 +322,10 @@ public class JorthCompiler{
 			case "concat" -> {
 				try{
 					currentMethod.swap();
-					var stack=currentMethod.getStack();
-					if(stack.peek().equals(GenType.STRING)&&stack.peek(1).equals(GenType.STRING)){
-						
-						currentMethod.dupAB();
-						nullSafeStringLength();
-						currentMethod.swap();
-						nullSafeStringLength();
-						currentMethod.add();
-						
-						currentMethod.newObject(StringBuilder.class);
-						currentMethod.dupTo1Below();
-						currentMethod.swap();
-						currentMethod.callInit(List.of(new GenType(int.class.getName())));
-					}else{
-						currentMethod.newObject(StringBuilder.class);
-						currentMethod.dup();
-						currentMethod.callInit(List.of());
-					}
+					
+					currentMethod.newObject(StringBuilder.class);
+					currentMethod.dup();
+					currentMethod.callInit(List.of());
 					
 					currentMethod.getStack().checkTop(List.of(GenType.STRING_BUILDER));
 					
