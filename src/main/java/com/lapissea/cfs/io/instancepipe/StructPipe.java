@@ -6,6 +6,7 @@ import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.FieldIsNullException;
 import com.lapissea.cfs.exceptions.UnknownSizePredictionException;
+import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.content.ContentOutputBuilder;
 import com.lapissea.cfs.io.content.ContentReader;
@@ -40,7 +41,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		
 		private StructGroup(Class<? extends StructPipe<?>> type){
 			try{
-				lConstructor=Utils.makeLambda(type.getConstructor(Struct.class), Function.class);
+				lConstructor=Access.makeLambda(type.getConstructor(Struct.class), Function.class);
 			}catch(ReflectiveOperationException e){
 				throw new RuntimeException("Failed to get pipe constructor", e);
 			}

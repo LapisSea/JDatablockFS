@@ -6,6 +6,7 @@ import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.FieldIsNullException;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
+import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.compilation.FieldCompiler;
 import com.lapissea.cfs.type.field.IOField;
@@ -134,7 +135,7 @@ public class Struct<T extends IOInstance<T>>{
 		
 		public Constr<T> requireUnmanagedConstructor(){
 			if(unmanagedConstructor==null){
-				unmanagedConstructor=Utils.findConstructor(getType(), Constr.class, Utils.getFunctionalMethod(Constr.class).getParameterTypes());
+				unmanagedConstructor=Access.findConstructor(getType(), Constr.class, Access.getFunctionalMethod(Constr.class).getParameterTypes());
 			}
 			return unmanagedConstructor;
 		}
@@ -344,7 +345,7 @@ public class Struct<T extends IOInstance<T>>{
 	}
 	
 	public Supplier<T> requireEmptyConstructor(){
-		if(emptyConstructor==null) emptyConstructor=Utils.findConstructor(getType(), Supplier.class);
+		if(emptyConstructor==null) emptyConstructor=Access.findConstructor(getType(), Supplier.class);
 		return emptyConstructor;
 	}
 	

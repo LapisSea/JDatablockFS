@@ -1,6 +1,6 @@
 package com.lapissea.cfs.type.field.access;
 
-import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
@@ -27,7 +27,7 @@ public class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends AbstractFiel
 	static{
 		try{
 			var fun=IOInstance.class.getDeclaredMethod("getVirtualPool");
-			GETTER=Utils.makeLambda(fun, Function.class);
+			GETTER=Access.makeLambda(fun, Function.class);
 		}catch(ReflectiveOperationException e){
 			throw new RuntimeException(e);
 		}
