@@ -289,11 +289,12 @@ public class JorthMethod{
 	
 	public void returnOp() throws MalformedJorthException{
 		if(returnType!=null){
+			if(typeStack.size()!=1)throw new MalformedJorthException("Returning "+returnType+" but current stack is "+typeStack);
 			var popped=popTypeStack();
 			if(!popped.equals(returnType)) throw new MalformedJorthException("Method returns "+returnType+" but "+popped+" is on stack");
 			mv.visitInsn(popped.type().returnOp);
 		}else{
-//			if(!typeStack.isEmpty())throw new
+			if(typeStack.size()>0)throw new MalformedJorthException("Returning nothing (void) but there are values "+typeStack+" on the stack");
 			mv.visitInsn(RETURN);
 		}
 	}
