@@ -333,6 +333,89 @@ public class JorthCompiler{
 					
 					throw new NotImplementedException(left+" "+right+" not supported yet");
 				}
+				case "concat" -> {
+					try{
+						currentMethod.swap();
+						
+						currentMethod.newObject(StringBuilder.class);
+						currentMethod.dup();
+						currentMethod.callInit(List.of());
+						
+						currentMethod.getStack().checkTop(List.of(GenType.STRING_BUILDER));
+						
+						UnsafeSupplier<Class<?>, MalformedJorthException> getTyp=()->{
+							Class<?> cls;
+							var      peek=currentMethod.getStack().peek();
+							if(List.of(Types.BYTE, Types.CHAR, Types.SHORT).contains(peek.type())){
+								currentMethod.growToInt();
+								peek=currentMethod.getStack().peek();
+							}
+							if(peek.typeName().equals(String.class.getName())) cls=String.class;
+							else cls=Objects.requireNonNull(peek.type().baseClass);
+							return cls;
+						};
+						
+						currentMethod.swap();
+						currentMethod.invoke(StringBuilder.class.getMethod("append", getTyp.get()));
+						
+						currentMethod.swap();
+						currentMethod.invoke(StringBuilder.class.getMethod("append", getTyp.get()));
+						
+						currentMethod.invoke(StringBuilder.class.getMethod("toString"));
+						
+						return true;
+					}catch(NoSuchMethodException e){
+						throw new ShouldNeverHappenError(e);
+					}
+				}
+				case "set" -> {
+					requireTokenCount(2);
+					var name =pop();
+					var owner=pop();
+					
+					switch(owner.source){
+						case "this" -> {
+							currentMethod.loadThis();
+							currentMethod.swap();
+							GenType type=classField(name);
+							
+							currentMethod.setFieldIns(className, name.source, type);
+						}
+						case "<arg>" -> {
+							throw new MalformedJorthException("can't set arguments! argument: "+name);
+						}
+						default -> throw new NotImplementedException("don't know how to load from "+owner);
+					}
+					
+					return true;
+				}
+				case "get" -> {
+					requireTokenCount(2);
+					var name =pop();
+					var owner=pop();
+					
+					
+					switch(owner.source){
+						case "this" -> {
+							currentMethod.loadThis();
+							
+							var type=classFields.get(name.source);
+							if(type==null) throw new MalformedJorthException(name+" does not exist in "+className);
+							
+							currentMethod.getFieldIns(className, name.source, type);
+						}
+						case "<arg>" -> {
+							var arg=methodArguments.get(name.source);
+							if(arg.isEmpty()){
+								throw new MalformedJorthException("argument "+name+" does not exist");
+							}
+							currentMethod.loadArgument(arg.get());
+						}
+						default -> throw new NotImplementedException("don't know how to load from "+owner);
+					}
+					
+					return true;
+				}
 				case "if" -> {
 					if(currentMethod.getStack().peek().equals(new GenType(Boolean.class))){
 						unbox();
@@ -377,123 +460,57 @@ public class JorthCompiler{
 				}
 			}
 		}
-		
-		switch(token.lower()){
-			case "static" -> {
-				isStatic=true;
-				return true;
-			}
-			case "concat" -> {
-				try{
-					currentMethod.swap();
-					
-					currentMethod.newObject(StringBuilder.class);
-					currentMethod.dup();
-					currentMethod.callInit(List.of());
-					
-					currentMethod.getStack().checkTop(List.of(GenType.STRING_BUILDER));
-					
-					UnsafeSupplier<Class<?>, MalformedJorthException> getTyp=()->{
-						Class<?> cls;
-						var      peek=currentMethod.getStack().peek();
-						if(List.of(Types.BYTE, Types.CHAR, Types.SHORT).contains(peek.type())){
-							currentMethod.growToInt();
-							peek=currentMethod.getStack().peek();
-						}
-						if(peek.typeName().equals(String.class.getName())) cls=String.class;
-						else cls=Objects.requireNonNull(peek.type().baseClass);
-						return cls;
-					};
-					
-					currentMethod.swap();
-					currentMethod.invoke(StringBuilder.class.getMethod("append", getTyp.get()));
-					
-					currentMethod.swap();
-					currentMethod.invoke(StringBuilder.class.getMethod("append", getTyp.get()));
-					
-					currentMethod.invoke(StringBuilder.class.getMethod("toString"));
-					
+		else{
+			switch(token.lower()){
+				case "static" -> {
+					isStatic=true;
 					return true;
-				}catch(NoSuchMethodException e){
-					throw new ShouldNeverHappenError(e);
+				}
+				case "extends" -> {
+					classExtension=readGenericType();
+					return true;
+				}
+				case "returns" -> {
+					returnType=readGenericType();
+					return true;
+				}
+				case "arg" -> {
+					var name=pop();
+					var type=readGenericType();
+					methodArguments.make(name.source, type);
+					return true;
+				}
+				case "implements" -> {
+					classInterfaces.add(readGenericType());
+					return true;
+				}
+				case "visibility" -> {
+					requireTokenCount(1);
+					this.visibility=pop().asVisibility();
+					return true;
+				}
+				case "field" -> {
+					requireTokenCount(2);
+					var name=pop().source;
+					var type=readGenericType();
+					
+					if(classFields.containsKey(name)){
+						throw new MalformedJorthException("field "+name+" already exists!");
+					}
+					classFields.put(name, type);
+					
+					currentClass.visitField(visibility.opCode, name, Utils.genericSignature(new GenType(type.typeName())), Utils.genericSignature(type), null);
+					visibility=Visibility.PUBLIC;
+					return true;
 				}
 			}
+		}
+		switch(token.lower()){
 			case "define" -> {
 				requireTokenCount(2);
 				var tokenName=pop();
 				var value    =pop();
 				writer.addDefinition(tokenName.source, value.source);
-				return true;
-			}
-			case "extends" -> {
-				classExtension=readGenericType();
-				return true;
-			}
-			case "returns" -> {
-				returnType=readGenericType();
-				return true;
-			}
-			case "arg" -> {
-				var name=pop();
-				var type=readGenericType();
-				methodArguments.make(name.source, type);
-				return true;
-			}
-			case "implements" -> {
-				classInterfaces.add(readGenericType());
-				return true;
-			}
-			case "visibility" -> {
-				requireTokenCount(1);
-				this.visibility=pop().asVisibility();
-				return true;
-			}
-			case "set" -> {
-				requireTokenCount(2);
-				var name =pop();
-				var owner=pop();
-				
-				switch(owner.source){
-					case "this" -> {
-						currentMethod.loadThis();
-						currentMethod.swap();
-						GenType type=classField(name);
-						
-						currentMethod.setFieldIns(className, name.source, type);
-					}
-					case "<arg>" -> {
-						throw new MalformedJorthException("can't set arguments! argument: "+name);
-					}
-					default -> throw new NotImplementedException("don't know how to load from "+owner);
-				}
-				
-				return true;
-			}
-			case "get" -> {
-				requireTokenCount(2);
-				var name =pop();
-				var owner=pop();
-				
-				
-				switch(owner.source){
-					case "this" -> {
-						currentMethod.loadThis();
-						
-						var type=classFields.get(name.source);
-						if(type==null) throw new MalformedJorthException(name+" does not exist in "+className);
-						
-						currentMethod.getFieldIns(className, name.source, type);
-					}
-					case "<arg>" -> {
-						var arg=methodArguments.get(name.source);
-						if(arg.isEmpty()){
-							throw new MalformedJorthException("argument "+name+" does not exist");
-						}
-						currentMethod.loadArgument(arg.get());
-					}
-					default -> throw new NotImplementedException("don't know how to load from "+owner);
-				}
-				
 				return true;
 			}
 			case "resolve" -> {
@@ -590,20 +607,6 @@ public class JorthCompiler{
 					}
 					default -> throw new MalformedJorthException("unknown resolve subject: "+subject);
 				}
-				return true;
-			}
-			case "field" -> {
-				requireTokenCount(2);
-				var name=pop().source;
-				var type=readGenericType();
-				
-				if(classFields.containsKey(name)){
-					throw new MalformedJorthException("field "+name+" already exists!");
-				}
-				classFields.put(name, type);
-				
-				currentClass.visitField(visibility.opCode, name, Utils.genericSignature(new GenType(type.typeName())), Utils.genericSignature(type), null);
-				visibility=Visibility.PUBLIC;
 				return true;
 			}
 			case "start" -> {
