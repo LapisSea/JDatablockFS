@@ -1,10 +1,7 @@
 package com.lapissea.jorth;
 
 import com.lapissea.jorth.lang.*;
-import com.lapissea.util.LogUtil;
-import com.lapissea.util.NotImplementedException;
-import com.lapissea.util.NotNull;
-import com.lapissea.util.ShouldNeverHappenError;
+import com.lapissea.util.*;
 import com.lapissea.util.function.UnsafeBiFunction;
 import com.lapissea.util.function.UnsafeFunction;
 import com.lapissea.util.function.UnsafeSupplier;
@@ -74,7 +71,8 @@ public class JorthCompiler{
 	
 	private int lastLine;
 	
-	private       String               className;
+	private ClassInfo classInfo;
+	
 	private final Map<String, GenType> classFields=new HashMap<>();
 	
 	private ClassWriter currentClass;
@@ -181,8 +179,13 @@ public class JorthCompiler{
 			
 			switch(token.lower()){
 				case "call" -> {
+					boolean staticCall;
 					requireTokenCount(2);
-					var argCountStr =pop();
+					var argCountStr=pop();
+					if(argCountStr.source.equals("static")){
+						staticCall=true;
+						argCountStr=pop();
+					}else staticCall=false;
 					var functionName=pop();
 					
 					var argStr=argCountStr.source;
@@ -204,13 +207,37 @@ public class JorthCompiler{
 					
 					List<GenType> argTypes=new ArrayList<>(argCount);
 					for(int i=0;i<argCount;i++){
-						argTypes.add(stack.peek(argCount-i));
+						argTypes.add(stack.peek(i));
 					}
-					var callerType=stack.peek(argCount);
 					
-					var callerInfo=getClassInfo(callerType.typeName());
+					ClassInfo callerInfo;
+					if(staticCall){
+						var className=pop();
+						
+						callerInfo=getClassInfo(className.source);
+					}else{
+						var callerType=stack.peek(argCount);
+						
+						callerInfo=getClassInfo(callerType.typeName());
+					}
 					
-					var functO=callerInfo.functions().stream().filter(f->f.name.equals(functionName.source)).filter(f->f.arguments().size()==argCount).findAny();
+					var functO=callerInfo.functions().stream()
+					                     .filter(f->(f.callType==CallType.STATIC)==staticCall)
+					                     .filter(f->f.name.equals(functionName.source))
+					                     .filter(f->f.arguments().size()==argCount)
+					                     .filter(f->{
+						                     for(int i=0;i<f.arguments().size();i++){
+							                     try{
+								                     if(!f.arguments().get(i).instanceOf(this, currentMethod.getStack().peek(i))){
+														 return false;
+								                     }
+							                     }catch(MalformedJorthException e){
+								                     throw UtilL.uncheckedThrow(e);
+							                     }
+						                     }
+											 return true;
+					                     })
+					                     .findAny();
 					if(functO.isEmpty()) throw new MalformedJorthException("No function "+functionName.source+" with "+argCount+" arguments");
 					var funct=functO.get();
 					
@@ -379,7 +406,7 @@ public class JorthCompiler{
 							currentMethod.swap();
 							GenType type=classField(name);
 							
-							currentMethod.setFieldIns(className, name.source, type);
+							currentMethod.setFieldIns(classInfo.name, name.source, type);
 						}
 						case "<arg>" -> {
 							throw new MalformedJorthException("can't set arguments! argument: "+name);
@@ -398,11 +425,14 @@ public class JorthCompiler{
 					switch(owner.source){
 						case "this" -> {
 							currentMethod.loadThis();
-							
-							var type=classFields.get(name.source);
-							if(type==null) throw new MalformedJorthException(name+" does not exist in "+className);
-							
-							currentMethod.getFieldIns(className, name.source, type);
+							if(name.source.equals("this")){
+								if(currentMethod.isStatic())throw new MalformedJorthException("can't get this in static method");
+							}else{
+								var type=classFields.get(name.source);
+								if(type==null) throw new MalformedJorthException(name+" does not exist in "+classInfo.name);
+								
+								currentMethod.getFieldIns(classInfo.name, name.source, type);
+							}
 						}
 						case "<arg>" -> {
 							var arg=methodArguments.get(name.source);
@@ -459,8 +489,7 @@ public class JorthCompiler{
 					return true;
 				}
 			}
-		}
-		else{
+		}else{
 			switch(token.lower()){
 				case "static" -> {
 					isStatic=true;
@@ -633,7 +662,14 @@ public class JorthCompiler{
 					case "class" -> {
 						if(currentClass!=null) throw new MalformedJorthException("Class "+currentClass+" already started!");
 						requireTokenCount(1);
-						className=pop().source;
+						var className=pop().source;
+						classInfo=new ClassInfo(className, Stream.concat(Stream.of(classExtension), classInterfaces.stream()).map(g->{
+							try{
+								return getClassInfo(g.typeName());
+							}catch(MalformedJorthException e){
+								throw UtilL.uncheckedThrow(e);
+							}
+						}).toList(), List.of());
 						
 						classVisibility=visibility;
 						currentClass=new ClassWriter(ClassWriter.COMPUTE_MAXS|ClassWriter.COMPUTE_FRAMES);
@@ -675,7 +711,10 @@ public class JorthCompiler{
 						
 						var dest=currentClass.visitMethod(visibility.opCode+staticOo, functionName.source, "("+args+")"+returnStr, null, null);
 						
-						currentMethod=new JorthMethod(this, dest, functionName.source, className, returnType, isStatic);
+						var info=new FunctionInfo(functionName.source, classInfo.name, returnType, methodArguments.stream().map(LocalVariableStack.Variable::type).toList(), isStatic?CallType.STATIC:CallType.VIRTUAL);
+						classInfo=new ClassInfo(classInfo.name, classInfo.parents, Stream.concat(classInfo.functions.stream(), Stream.of(info)).toList());
+						
+						currentMethod=new JorthMethod(this, dest, functionName.source, classInfo.name, returnType, isStatic);
 						currentMethod.start();
 						
 						isStatic=false;
@@ -769,7 +808,7 @@ public class JorthCompiler{
 	
 	private GenType classField(Token name) throws MalformedJorthException{
 		var type=classFields.get(name.source);
-		if(type==null) throw new MalformedJorthException(name+" does not exist in "+className);
+		if(type==null) throw new MalformedJorthException(name+" does not exist in "+classInfo.name);
 		return type;
 	}
 	private Macro getMacro(Token name) throws MalformedJorthException{
@@ -861,8 +900,8 @@ public class JorthCompiler{
 		if(name.contains("/")){
 			throw new IllegalArgumentException(name);
 		}
-		if(className.equals(name)){
-			throw new NotImplementedException();
+		if(classInfo!=null&&classInfo.name.equals(name)){
+			return classInfo;
 		}
 		
 		Class<?> clazz;

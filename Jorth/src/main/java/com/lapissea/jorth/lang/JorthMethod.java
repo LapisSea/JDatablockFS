@@ -516,4 +516,7 @@ public class JorthMethod{
 		mv.visitLabel(endL);
 	}
 	
+	public boolean isStatic(){
+		return isStatic;
+	}
 }

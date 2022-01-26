@@ -292,15 +292,40 @@ public class JorthTests{
 	void functionCallTest() throws ReflectiveOperationException{
 		
 		var cls=generateAndLoadInstanceSimple(TestCls.class.getPackageName()+".Gen$$", writer->{
+			writer.write("#TOKEN(0) LogUtil define", LogUtil.class.getName());
 			writer.write(
 				"""
+					
+					static
+					printToConsole function start
+						'AAAYYYY LMAO'
+						LogUtil println (1) static call
+					end
+					
 					static
 					#TOKEN(0) obj arg
 					testFlag function start
 						<arg> obj get
 						flag (0) call
 						
-//						flag (0) static call
+						#TOKEN(0) staticFlag (0) static call
+					end
+					
+					Str a arg
+					Str b arg
+					Str returns
+					concatCall function start
+						<arg> a get
+						<arg> b get
+						concat
+					end
+					
+					Str returns
+					useCall function start
+						
+						this this get
+						'ay ' 'lmao'
+						concatCall (2) call
 					end
 					""",
 				TestCls.class.getName());
@@ -311,6 +336,10 @@ public class JorthTests{
 		cls.getMethod("testFlag", TestCls.class).invoke(null, test);
 		assertTrue(test.flag);
 		
+		var inst=cls.getConstructor().newInstance();
+		LogUtil.println(cls.getMethod("useCall").invoke(inst));
+		
+		cls.getMethod("printToConsole").invoke(null);
 	}
 	
 	@Test

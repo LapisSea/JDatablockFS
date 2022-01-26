@@ -1,6 +1,7 @@
 package com.lapissea.jorth.lang;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -9,7 +10,7 @@ public class LocalVariableStack{
 	
 	public record Variable(int accessIndex, String name, GenType type){}
 	
-	private final Map<String, Variable> stack=new HashMap<>();
+	private final Map<String, Variable> stack=new LinkedHashMap<>();
 	private       int                   accessCounter;
 	
 	
