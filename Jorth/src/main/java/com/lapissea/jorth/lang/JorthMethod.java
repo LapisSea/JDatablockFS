@@ -182,7 +182,9 @@ public class JorthMethod{
 			throw new MalformedJorthException("Method "+methodName+" belongs to "+className+" but got "+owner);
 		}
 		
-		pushTypeStack(returnType);
+		if(returnType.type()!=Types.VOID){
+			pushTypeStack(returnType);
+		}
 		
 		var sig="("+args.stream().map(Utils::genericSignature).collect(Collectors.joining())+")"+Utils.genericSignature(returnType);
 		
