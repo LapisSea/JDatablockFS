@@ -24,13 +24,38 @@ public class JorthCompiler{
 	
 	public record FunctArg(int index, String name, GenType type){}
 	
-	public record ClassInfo(String name, List<ClassInfo> parents){
+	public record FunctionInfo(String name, String declaringClass, GenType returnType, List<GenType> arguments, CallType callType){
+		private static CallType getCallType(Method method){
+			if(Modifier.isStatic(method.getModifiers())){
+				return CallType.STATIC;
+			}else if(Modifier.isPrivate(method.getModifiers())){
+				return CallType.SPECIAL;
+			}else{
+				return CallType.VIRTUAL;
+			}
+		}
 		
-		private static final ClassInfo OBJECT=new ClassInfo(Object.class.getName(), List.of());
-		
-		public static ClassInfo fromClass(Class<?> clazz){
-			if(clazz.equals(Object.class)) return OBJECT;
-			return new ClassInfo(clazz.getName(), Stream.concat(Stream.of(clazz.getSuperclass()), Arrays.stream(clazz.getInterfaces())).filter(Objects::nonNull).map(ClassInfo::fromClass).toList());
+		FunctionInfo(Method method){
+			this(method.getName(),
+			     method.getDeclaringClass().getName(),
+			     new GenType(method.getGenericReturnType()),
+			     Arrays.stream(method.getGenericParameterTypes()).map(GenType::new).toList(),
+			     getCallType(method)
+			);
+			
+		}
+	}
+	
+	public record ClassInfo(String name, List<ClassInfo> parents, List<FunctionInfo> functions){
+		ClassInfo(Class<?> clazz){
+			this(
+				clazz.getName(),
+				Stream.concat(Stream.of(clazz.getSuperclass()), Arrays.stream(clazz.getInterfaces()))
+				      .filter(Objects::nonNull)
+				      .map(ClassInfo::new)
+				      .toList(),
+				Arrays.stream(clazz.getDeclaredMethods()).map(FunctionInfo::new).toList()
+			);
 		}
 		
 		public boolean instanceOf(String className){
@@ -805,6 +830,6 @@ public class JorthCompiler{
 			throw new MalformedJorthException(e);
 		}
 		
-		return ClassInfo.fromClass(clazz);
+		return new ClassInfo(clazz);
 	}
 }
