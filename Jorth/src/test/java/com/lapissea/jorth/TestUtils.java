@@ -4,6 +4,7 @@ import com.lapissea.jorth.lang.BytecodeUtils;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeConsumer;
 
+import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 
 public class TestUtils{
@@ -30,9 +31,10 @@ public class TestUtils{
 	
 	static Class<?> generateAndLoadInstance(String className, UnsafeConsumer<JorthWriter, MalformedJorthException> generator) throws ReflectiveOperationException{
 		
-		var cls=Class.forName(className, true, new ClassLoader(TestUtils.class.getClassLoader()){
+		var loader=new ClassLoader(TestUtils.class.getClassLoader()){
 			@Override
 			protected Class<?> findClass(String name) throws ClassNotFoundException{
+				
 				if(name.equals(className)){
 					var jorth=new JorthCompiler(this);
 					try{
@@ -51,13 +53,14 @@ public class TestUtils{
 				}
 				return super.findClass(name);
 			}
-		});
+		};
+		
+		var cls=Class.forName(className, true, loader);
 		assert cls.getName().equals(className);
 		
 		LogUtil.println("Compiled:", cls);
 		LogUtil.println("========================================================================");
 		LogUtil.println();
-		
 		return cls;
 	}
 }

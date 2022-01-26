@@ -99,8 +99,8 @@ public class JorthMethod{
 		@Override
 		public boolean equals(Object o){
 			return this==o||o instanceof Stack stack&&data.equals(stack.data);
-			
 		}
+		
 		@Override
 		public int hashCode(){
 			return data.hashCode();
@@ -144,10 +144,6 @@ public class JorthMethod{
 	public void end(){
 		mv.visitMaxs(0, 0);
 		mv.visitEnd();
-	}
-	
-	public void invoke(Class<?> clas, String methodName){
-		throw new NotImplementedException();
 	}
 	
 	public void invoke(Method method) throws MalformedJorthException{
@@ -373,49 +369,21 @@ public class JorthMethod{
 		throw new MalformedJorthException("Unable to add "+a+" and "+b);
 	}
 	
-	private void IIToIOp(int op) throws MalformedJorthException{
-		for(int i=0;i<2;i++){
-			var operand=popTypeStack();
-			if(!List.of(Types.BYTE, Types.SHORT, Types.INT).contains(operand.type())) throw new MalformedJorthException("argument "+i+": "+operand+" is not valid");
-		}
-		
-		mv.visitInsn(op);
-		
-		pushTypeStack(Types.INT.genTyp);
-	}
 	
-	private void LLToLOp(int op) throws MalformedJorthException{
-		for(int i=0;i<2;i++){
-			var operand=popTypeStack();
-			if(operand.type()!=Types.LONG) throw new MalformedJorthException("argument "+i+": "+operand+" is not valid");
-		}
-		
-		mv.visitInsn(op);
-		
-		pushTypeStack(Types.LONG.genTyp);
-	}
+	private void IIToIOp(int op) throws MalformedJorthException{numNumToOp(List.of(Types.BYTE, Types.SHORT, Types.INT), Types.INT, op);}
+	private void LLToLOp(int op) throws MalformedJorthException{numNumToOp(List.of(Types.LONG), Types.LONG, op);}
+	private void FFToFOp(int op) throws MalformedJorthException{numNumToOp(List.of(Types.FLOAT), Types.FLOAT, op);}
+	private void DDToDOp(int op) throws MalformedJorthException{numNumToOp(List.of(Types.DOUBLE), Types.DOUBLE, op);}
 	
-	private void FFToFOp(int op) throws MalformedJorthException{
+	private void numNumToOp(List<Types> input, Types result, int op) throws MalformedJorthException{
 		for(int i=0;i<2;i++){
 			var operand=popTypeStack();
-			if(operand.type()!=Types.FLOAT) throw new MalformedJorthException("argument "+i+": "+operand+" is not a float");
+			if(!input.contains(operand.type())) throw new MalformedJorthException("argument "+i+": "+operand+" is not "+input);
 		}
 		
 		mv.visitInsn(op);
 		
-		pushTypeStack(Types.FLOAT.genTyp);
-		
-	}
-	
-	private void DDToDOp(int op) throws MalformedJorthException{
-		for(int i=0;i<2;i++){
-			var operand=popTypeStack();
-			if(operand.type()!=Types.DOUBLE) throw new MalformedJorthException("argument "+i+": "+operand+" is not a float");
-		}
-		
-		mv.visitInsn(op);
-		
-		pushTypeStack(Types.DOUBLE.genTyp);
+		pushTypeStack(result.genTyp);
 		
 	}
 	
@@ -442,7 +410,7 @@ public class JorthMethod{
 	private void intTo(int op, Types type) throws MalformedJorthException{
 		var typ=popTypeStack();
 		if(typ.type()!=Types.INT) throw new MalformedJorthException(typ+" is not int");
-		pushTypeStack(new GenType(type.baseClass.getName()));
+		pushTypeStack(type.genTyp);
 		
 		mv.visitInsn(op);
 	}
