@@ -1,10 +1,13 @@
 package com.lapissea.jorth.lang;
 
-import com.lapissea.util.LogUtil;
+import com.lapissea.jorth.JorthCompiler;
+import com.lapissea.jorth.MalformedJorthException;
 import com.lapissea.util.NotImplementedException;
 
+import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.lang.reflect.TypeVariable;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -25,7 +28,13 @@ public record GenType(String typeName, List<GenType> args, Types type){
 		if(type instanceof ParameterizedType p){
 			return (Class<?>)p.getRawType();
 		}
-		throw new NotImplementedException(type.getClass().getName());
+		if(type instanceof GenericArrayType p){
+			return fromTyp(p.getGenericComponentType()).arrayType();
+		}
+		if(type instanceof TypeVariable p){
+			return fromTyp(p.getBounds()[0]);
+		}
+		throw new NotImplementedException(type+" "+type.getClass().getName());
 	}
 	
 	public GenType(Type type){
@@ -45,5 +54,17 @@ public record GenType(String typeName, List<GenType> args, Types type){
 	@Override
 	public String toString(){
 		return typeName+(args.isEmpty()?"":args.stream().map(GenType::toString).collect(Collectors.joining(", ", "<", ">")));
+	}
+	public boolean instanceOf(JorthCompiler context, GenType popped) throws MalformedJorthException{
+		if(popped.equals(this)) return true;
+		if(popped.type()!=this.type())return false;
+		
+		if(popped.type()==Types.OBJECT){
+			if(typeName().equals("java.lang.Object")) return true;
+			
+			var clazz=context.getClassInfo(popped.typeName);
+			return clazz.instanceOf(popped.typeName);
+		}
+		return false;
 	}
 }

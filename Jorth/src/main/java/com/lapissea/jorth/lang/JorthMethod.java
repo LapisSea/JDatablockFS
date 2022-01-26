@@ -194,11 +194,8 @@ public class JorthMethod{
 	private void popAndCheckArguments(String className, String methodName, List<GenType> args) throws MalformedJorthException{
 		for(int i=args.size()-1;i>=0;i--){
 			var popped=popTypeStack();
-			if(popped.equals(args.get(i))) continue;
-			if(args.get(i).typeName().equals("java.lang.Object")) continue;
-			
-			var clazz=context.getClassInfo(className);
-			if(clazz.instanceOf(className)) continue;
+			var arg=args.get(i);
+			if(arg.instanceOf(context,popped))continue;
 			
 			throw new MalformedJorthException("Argument "+i+" in "+className+"#"+methodName+" is "+args.get(i)+" but got "+popped);
 		}
