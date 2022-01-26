@@ -18,6 +18,20 @@ public class JorthTests{
 		new JorthTests().functionCallTest();
 	}
 	
+	
+	public static class TestCls{
+		boolean flag=false;
+		static boolean staticFlag=false;
+		
+		public void flag(){
+			flag=true;
+		}
+		
+		public static void staticFlag(){
+			staticFlag=true;
+		}
+	}
+	
 	public static class ISayHello{
 		@Override
 		public String toString(){
@@ -277,29 +291,24 @@ public class JorthTests{
 	@Test
 	void functionCallTest() throws ReflectiveOperationException{
 		
-		class Test{
-			boolean flag=false;
-			void flag(){
-				flag=true;
-			}
-		}
-		
-		var cls=generateAndLoadInstanceSimple("jorth.Gen$$", writer->{
+		var cls=generateAndLoadInstanceSimple(TestCls.class.getPackageName()+".Gen$$", writer->{
 			writer.write(
 				"""
 					static
 					#TOKEN(0) obj arg
 					testFlag function start
 						<arg> obj get
-						flag call
+						flag (0) call
+						
+//						flag (0) static call
 					end
 					""",
-				Test.class.getName());
+				TestCls.class.getName());
 		});
 		
-		Test test=new Test();
+		TestCls test=new TestCls();
 		assertFalse(test.flag);
-		cls.getMethod("testFlag", Test.class).invoke(null, test);
+		cls.getMethod("testFlag", TestCls.class).invoke(null, test);
 		assertTrue(test.flag);
 		
 	}

@@ -10,6 +10,8 @@ import com.lapissea.util.function.UnsafeFunction;
 import com.lapissea.util.function.UnsafeSupplier;
 import org.objectweb.asm.ClassWriter;
 
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -178,6 +180,43 @@ public class JorthCompiler{
 			};
 			
 			switch(token.lower()){
+				case "call" -> {
+					requireTokenCount(2);
+					var argCountStr =pop();
+					var functionName=pop();
+					
+					var argStr=argCountStr.source;
+					var validMsg="""
+						Needed argument count in (number) format. Valid call example:\s
+						this mathField get
+						1 2
+						add2Numbers (2) call""";
+					if(!argStr.startsWith("(")) throw new MalformedJorthException(validMsg);
+					if(!argStr.endsWith(")")) throw new MalformedJorthException(validMsg);
+					int argCount;
+					try{
+						argCount=Integer.parseInt(argStr.substring(1, argStr.length()-1));
+					}catch(NumberFormatException e){
+						throw new MalformedJorthException(validMsg, e);
+					}
+					
+					var stack=currentMethod.getStack();
+					
+					List<GenType> argTypes=new ArrayList<>(argCount);
+					for(int i=0;i<argCount;i++){
+						argTypes.add(stack.peek(argCount-i));
+					}
+					var callerType=stack.peek(argCount);
+					
+					var callerInfo=getClassInfo(callerType.typeName());
+					
+					var functO=callerInfo.functions().stream().filter(f->f.name.equals(functionName.source)).filter(f->f.arguments().size()==argCount).findAny();
+					if(functO.isEmpty()) throw new MalformedJorthException("No function "+functionName.source+" with "+argCount+" arguments");
+					var funct=functO.get();
+					
+					currentMethod.invoke(funct.callType, funct.declaringClass, funct.name, funct.arguments, funct.returnType(), false);
+					return true;
+				}
 				case "cast" -> {
 					
 					requireTokenCount(1);
