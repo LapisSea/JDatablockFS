@@ -1,6 +1,7 @@
 package com.lapissea.jorth.lang;
 
 import com.lapissea.jorth.MalformedJorthException;
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeFunction;
 
@@ -74,7 +75,7 @@ public class Token{
 			throw new MalformedJorthException("Unexpected end of tokens");
 		}
 		
-		Sequence EMPTY=new Sized(){
+		Sized EMPTY=new Sized(){
 			@Override
 			public Token pop() throws MalformedJorthException{
 				throw fail();
@@ -88,7 +89,7 @@ public class Token{
 				return this;
 			}
 			@Override
-			protected int getRemaining(){
+			public int getRemaining(){
 				return 0;
 			}
 			@Override
@@ -97,11 +98,11 @@ public class Token{
 			}
 		};
 		
-		static Sequence of(){
+		static Sized of(){
 			return EMPTY;
 		}
 		
-		static Sequence of(Collection<Token> token){
+		static Sized of(Collection<Token> token){
 			return new Writable(token);
 		}
 		
@@ -125,7 +126,7 @@ public class Token{
 					return read?EMPTY:of(token);
 				}
 				@Override
-				protected int getRemaining(){
+				public int getRemaining(){
 					return read?0:1;
 				}
 				@Override
@@ -135,7 +136,7 @@ public class Token{
 			};
 		}
 		abstract class Sized implements Sequence{
-			protected abstract int getRemaining();
+			public abstract int getRemaining();
 			
 			@Override
 			public boolean isEmpty(){
@@ -149,7 +150,7 @@ public class Token{
 			public abstract Sequence clone();
 		}
 		
-		final class Writable implements Sequence{
+		final class Writable extends Sized{
 			private final List<Token> buffer=new ArrayList<>();
 			
 			public Writable(){}
@@ -179,6 +180,10 @@ public class Token{
 			@Override
 			public Sequence clone(){
 				return new Writable(buffer, 0);
+			}
+			@Override
+			public int getRemaining(){
+				return buffer.size();
 			}
 			@Override
 			public boolean isEmpty(){

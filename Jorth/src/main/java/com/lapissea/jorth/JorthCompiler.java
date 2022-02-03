@@ -2,11 +2,13 @@ package com.lapissea.jorth;
 
 import com.lapissea.jorth.lang.*;
 import com.lapissea.util.*;
+import com.lapissea.util.function.UnsafeBiConsumer;
 import com.lapissea.util.function.UnsafeBiFunction;
 import com.lapissea.util.function.UnsafeFunction;
 import com.lapissea.util.function.UnsafeSupplier;
 import org.objectweb.asm.ClassWriter;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.*;
@@ -23,7 +25,7 @@ public class JorthCompiler{
 	
 	public record FunctArg(int index, String name, GenType type){}
 	
-	public record FunctionInfo(String name, String declaringClass, GenType returnType, List<GenType> arguments, CallType callType){
+	public record FunctionInfo(String name, String declaringClass, GenType returnType, List<GenType> arguments, CallType callType, boolean isStatic, Object defaultValue){
 		private static CallType getCallType(Method method){
 			if(Modifier.isStatic(method.getModifiers())){
 				return CallType.STATIC;
@@ -39,7 +41,9 @@ public class JorthCompiler{
 			     method.getDeclaringClass().getName(),
 			     new GenType(method.getGenericReturnType()),
 			     Arrays.stream(method.getGenericParameterTypes()).map(GenType::new).toList(),
-			     getCallType(method)
+			     getCallType(method),
+			     Modifier.isStatic(method.getModifiers()),
+			     method.getDefaultValue()
 			);
 			
 		}
@@ -66,6 +70,8 @@ public class JorthCompiler{
 		}
 	}
 	
+	public record AnnotationData(String className, Map<String, Object> args){}
+	
 	private final ClassLoader             classLoader;
 	private final Token.Sequence.Writable rawTokens=new Token.Sequence.Writable();
 	
@@ -73,6 +79,7 @@ public class JorthCompiler{
 	
 	private ClassInfo classInfo;
 	
+	private final List<AnnotationData> annotations=new ArrayList<>();
 	private final Map<String, GenType> classFields=new HashMap<>();
 	
 	private ClassWriter currentClass;
@@ -142,14 +149,13 @@ public class JorthCompiler{
 	private boolean consume(JorthWriter writer, Token token) throws MalformedJorthException{
 //		LogUtil.println(currentMethod,token.source);
 		
-		// string literal
-		if(token.isStringLiteral()){
-			var str=token.getStringLiteralValue();
-			currentMethod.loadString(str);
-			return true;
-		}
-		
 		if(currentMethod!=null){
+			
+			if(token.isStringLiteral()){
+				var str=token.getStringLiteralValue();
+				currentMethod.loadString(str);
+				return true;
+			}
 			
 			if(token.isInteger()){
 				currentMethod.loadInt(Integer.parseInt(token.source));
@@ -179,95 +185,11 @@ public class JorthCompiler{
 			
 			switch(token.lower()){
 				case "call" -> {
-					boolean staticCall;
-					requireTokenCount(2);
-					var argCountStr=pop();
-					if(argCountStr.source.equals("static")){
-						staticCall=true;
-						argCountStr=pop();
-					}else staticCall=false;
-					var functionName=pop();
-					
-					var argStr=argCountStr.source;
-					var validMsg="""
-						Needed argument count in (number) format. Valid call example:\s
-						this mathField get
-						1 2
-						add2Numbers (2) call""";
-					if(!argStr.startsWith("(")) throw new MalformedJorthException(validMsg);
-					if(!argStr.endsWith(")")) throw new MalformedJorthException(validMsg);
-					int argCount;
-					try{
-						argCount=Integer.parseInt(argStr.substring(1, argStr.length()-1));
-					}catch(NumberFormatException e){
-						throw new MalformedJorthException(validMsg, e);
-					}
-					
-					var stack=currentMethod.getStack();
-					
-					List<GenType> argTypes=new ArrayList<>(argCount);
-					for(int i=0;i<argCount;i++){
-						argTypes.add(stack.peek(i));
-					}
-					
-					ClassInfo callerInfo;
-					if(staticCall){
-						var className=pop();
-						
-						callerInfo=getClassInfo(className.source);
-					}else{
-						var callerType=stack.peek(argCount);
-						
-						callerInfo=getClassInfo(callerType.typeName());
-					}
-					
-					var functO=callerInfo.functions().stream()
-					                     .filter(f->(f.callType==CallType.STATIC)==staticCall)
-					                     .filter(f->f.name.equals(functionName.source))
-					                     .filter(f->f.arguments().size()==argCount)
-					                     .filter(f->{
-						                     for(int i=0;i<f.arguments().size();i++){
-							                     try{
-								                     if(!f.arguments().get(i).instanceOf(this, currentMethod.getStack().peek(i))){
-														 return false;
-								                     }
-							                     }catch(MalformedJorthException e){
-								                     throw UtilL.uncheckedThrow(e);
-							                     }
-						                     }
-											 return true;
-					                     })
-					                     .findAny();
-					if(functO.isEmpty()) throw new MalformedJorthException("No function "+functionName.source+" with "+argCount+" arguments");
-					var funct=functO.get();
-					
-					currentMethod.invoke(funct.callType, funct.declaringClass, funct.name, funct.arguments, funct.returnType(), false);
+					doCall();
 					return true;
 				}
 				case "cast" -> {
-					
-					requireTokenCount(1);
-					var castType=readGenericType();
-					
-					var type=currentMethod.getStack().peek();
-					if(castType.equals(type)) return true;
-					
-					switch(type.type()){
-						case INT -> {
-							switch(castType.type()){
-								case BYTE -> currentMethod.intToByte();
-								case SHORT -> currentMethod.intToShort();
-								case LONG -> currentMethod.intToLong();
-								case FLOAT -> currentMethod.intToFloat();
-								case DOUBLE -> currentMethod.intToDouble();
-								default -> throw new NotImplementedException(castType+"");
-							}
-						}
-						default -> throw new NotImplementedException(castType+"");
-					}
-					
-					LogUtil.println(type+" to "+castType);
-					
+					doCast();
 					return true;
 				}
 				case "+" -> {
@@ -426,7 +348,7 @@ public class JorthCompiler{
 						case "this" -> {
 							currentMethod.loadThis();
 							if(name.source.equals("this")){
-								if(currentMethod.isStatic())throw new MalformedJorthException("can't get this in static method");
+								if(currentMethod.isStatic()) throw new MalformedJorthException("can't get this in static method");
 							}else{
 								var type=classFields.get(name.source);
 								if(type==null) throw new MalformedJorthException(name+" does not exist in "+classInfo.name);
@@ -528,8 +450,69 @@ public class JorthCompiler{
 					}
 					classFields.put(name, type);
 					
-					currentClass.visitField(visibility.opCode, name, Utils.genericSignature(new GenType(type.typeName())), Utils.genericSignature(type), null);
+					var fieldVisitor=currentClass.visitField(visibility.opCode, name, Utils.genericSignature(new GenType(type.typeName())), Utils.genericSignature(type), null);
+					
+					for(AnnotationData annotation : annotations){
+						var annV=fieldVisitor.visitAnnotation(Utils.genericSignature(new GenType(annotation.className(), List.of())), true);
+						annotation.args.forEach(annV::visit);
+						annV.visitEnd();
+					}
+					annotations.clear();
+					
+					fieldVisitor.visitEnd();
 					visibility=Visibility.PUBLIC;
+					return true;
+				}
+				case "@" -> {
+					requireTokenCount(1);
+					var className=pop().source;
+					
+					if(annotations.stream().anyMatch(a->a.className.equals(className))){
+						throw new MalformedJorthException("annotation "+className+" already exists!");
+					}
+					
+					var info=getClassInfo(className);
+					if(!info.instanceOf(Annotation.class.getName())) throw new MalformedJorthException(className+" is not an annotation type!");
+					
+					var map=info.functions.stream()
+					                      .filter(f->!f.isStatic)
+					                      .map(f->Map.entry(f, Optional.ofNullable(f.defaultValue())))
+					                      .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+					
+					boolean hasArgs=!rawTokens.isEmpty()&&rawTokens.peek().source.equals("}");
+					if(hasArgs){
+						var sequence=readSequence(rawTokens, "{", "}");
+						UnsafeBiConsumer<FunctionInfo, Token, MalformedJorthException> addVal=(name, tok)->{
+							map.put(name, Optional.of(switch(name.returnType.type()){
+								case INT -> Integer.parseInt(tok.source);
+								case OBJECT -> {
+									if(name.returnType.equals(GenType.STRING)){
+										yield tok.getStringLiteralValue();
+									}
+									throw new MalformedJorthException(name.returnType.toString());
+								}
+								default -> throw new NotImplementedException(name.returnType.type().toString());
+							}));
+						};
+						
+						if(sequence.getRemaining()==1&&map.keySet().stream().map(FunctionInfo::name).toList().equals(List.of("value"))){
+							addVal.accept(map.keySet().stream().filter(e->e.name.equals("value")).findAny().orElseThrow(), sequence.pop());
+						}else{
+							for(var e : sequence.parseAll(e->Map.entry(e.pop().source, e.pop()))){
+								var fun=info.functions.stream().filter(f->!f.isStatic).filter(f->f.name.equals(e.getKey()))
+								                      .findAny().orElseThrow(()->new MalformedJorthException(e.getKey()+" does not exist in "+info.name));
+								
+								addVal.accept(fun, e.getValue());
+							}
+						}
+					}
+					
+					if(map.values().stream().anyMatch(Optional::isEmpty)){
+						throw new MalformedJorthException("Missing annotation arguments: "+
+						                                  map.entrySet().stream().filter(e->e.getValue().isEmpty()).map(e->e.getKey().name).collect(Collectors.joining(", ")));
+					}
+					
+					annotations.add(new AnnotationData(className, map.entrySet().stream().collect(Collectors.toMap(e->e.getKey().name(), e->e.getValue().orElseThrow()))));
 					return true;
 				}
 			}
@@ -711,7 +694,7 @@ public class JorthCompiler{
 						
 						var dest=currentClass.visitMethod(visibility.opCode+staticOo, functionName.source, "("+args+")"+returnStr, null, null);
 						
-						var info=new FunctionInfo(functionName.source, classInfo.name, returnType, methodArguments.stream().map(LocalVariableStack.Variable::type).toList(), isStatic?CallType.STATIC:CallType.VIRTUAL);
+						var info=new FunctionInfo(functionName.source, classInfo.name, returnType, methodArguments.stream().map(LocalVariableStack.Variable::type).toList(), isStatic?CallType.STATIC:CallType.VIRTUAL, isStatic, null);
 						classInfo=new ClassInfo(classInfo.name, classInfo.parents, Stream.concat(classInfo.functions.stream(), Stream.of(info)).toList());
 						
 						currentMethod=new JorthMethod(this, dest, functionName.source, classInfo.name, returnType, isStatic);
@@ -785,6 +768,96 @@ public class JorthCompiler{
 		return false;
 	}
 	
+	private void doCast() throws MalformedJorthException{
+		requireTokenCount(1);
+		var castType=readGenericType();
+		
+		var type=currentMethod.getStack().peek();
+		if(castType.equals(type)) return;
+		
+		switch(type.type()){
+			case INT -> {
+				switch(castType.type()){
+					case BYTE -> currentMethod.intToByte();
+					case SHORT -> currentMethod.intToShort();
+					case LONG -> currentMethod.intToLong();
+					case FLOAT -> currentMethod.intToFloat();
+					case DOUBLE -> currentMethod.intToDouble();
+					default -> throw new NotImplementedException(castType+"");
+				}
+			}
+			default -> throw new NotImplementedException(castType+"");
+		}
+		
+		LogUtil.println(type+" to "+castType);
+	}
+	
+	private void doCall() throws MalformedJorthException{
+		boolean staticCall;
+		requireTokenCount(2);
+		var argCountStr=pop();
+		if(argCountStr.source.equals("static")){
+			staticCall=true;
+			argCountStr=pop();
+		}else staticCall=false;
+		var functionName=pop();
+		
+		var argStr=argCountStr.source;
+		var validMsg="""
+			Needed argument count in (number) format. Valid call example:\s
+			this mathField get
+			1 2
+			add2Numbers (2) call""";
+		if(!argStr.startsWith("(")) throw new MalformedJorthException(validMsg);
+		if(!argStr.endsWith(")")) throw new MalformedJorthException(validMsg);
+		int argCount;
+		try{
+			argCount=Integer.parseInt(argStr.substring(1, argStr.length()-1));
+		}catch(NumberFormatException e){
+			throw new MalformedJorthException(validMsg, e);
+		}
+		
+		var stack=currentMethod.getStack();
+		
+		List<GenType> argTypes=new ArrayList<>(argCount);
+		for(int i=0;i<argCount;i++){
+			argTypes.add(stack.peek(i));
+		}
+		
+		ClassInfo callerInfo;
+		if(staticCall){
+			var className=pop();
+			
+			callerInfo=getClassInfo(className.source);
+		}else{
+			var callerType=stack.peek(argCount);
+			
+			callerInfo=getClassInfo(callerType.typeName());
+		}
+		
+		var functO=callerInfo.functions().stream()
+		                     .filter(f->(f.callType==CallType.STATIC)==staticCall)
+		                     .filter(f->f.name.equals(functionName.source))
+		                     .filter(f->f.arguments().size()==argCount)
+		                     .filter(f->{
+			                     for(int i=0;i<f.arguments().size();i++){
+				                     try{
+					                     if(!f.arguments().get(i).instanceOf(this, currentMethod.getStack().peek(i))){
+						                     return false;
+					                     }
+				                     }catch(MalformedJorthException e){
+					                     throw UtilL.uncheckedThrow(e);
+				                     }
+			                     }
+			                     return true;
+		                     })
+		                     .findAny();
+		if(functO.isEmpty()) throw new MalformedJorthException("No function "+functionName.source+" with "+argCount+" arguments");
+		var funct=functO.get();
+		
+		currentMethod.invoke(funct.callType, funct.declaringClass, funct.name, funct.arguments, funct.returnType(), false);
+	}
+	
 	private void unbox(){
 		throw new NotImplementedException();
 	}
@@ -818,7 +891,7 @@ public class JorthCompiler{
 	}
 	
 	@NotNull
-	private Token.Sequence readSequence(Token.Sequence tokens, String open, String close) throws MalformedJorthException{
+	private Token.Sequence.Sized readSequence(Token.Sequence tokens, String open, String close) throws MalformedJorthException{
 		if(tokens.isEmpty()) return Token.Sequence.EMPTY;
 		
 		var builder=new LinkedList<Token>();

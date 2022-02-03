@@ -3,6 +3,8 @@ package com.lapissea.jorth;
 import com.lapissea.util.LogUtil;
 import org.junit.jupiter.api.Test;
 
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 import java.util.function.Function;
 
 import static com.lapissea.jorth.TestUtils.generateAndLoadInstance;
@@ -15,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class JorthTests{
 	
 	public static void main(String[] args) throws Throwable{
-		new JorthTests().functionCallTest();
+		new JorthTests().fieldAnnotationClass();
 	}
 	
 	
@@ -387,6 +389,47 @@ public class JorthTests{
 		
 		LogUtil.println(cls, "says", str);
 		assertEquals(msg, str);
+	}
+	
+	@Retention(RetentionPolicy.RUNTIME)
+	@interface ValueAnn{
+		int value();
+	}
+	
+	@Retention(RetentionPolicy.RUNTIME)
+	@interface DefaultAnn{
+		int value() default 123;
+	}
+	@Retention(RetentionPolicy.RUNTIME)
+	@interface MultiAnn{
+		int value();
+		String lol();
+	}
+	
+	static class ay{
+		
+		@DefaultAnn(1234)
+		public String field;
+	}
+	
+	@Test
+	void fieldAnnotationClass() throws ReflectiveOperationException{
+		
+		var className="jorth.Gen$$";
+		
+		var cls=generateAndLoadInstanceSimple(className, writer->{
+			writer.write("#TOKEN(0) Ann define", MultiAnn.class.getName());
+			writer.write(
+				"""
+					public visibility
+					{141 value 'xD' lol} Ann @
+					Str testString field
+					"""
+			);
+		});
+		
+		LogUtil.println(cls.getFields()[0].getDeclaredAnnotations());
+		
 	}
 	
 	@Test
