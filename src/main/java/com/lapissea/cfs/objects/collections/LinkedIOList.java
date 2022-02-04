@@ -582,6 +582,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		if(index==0){
 			var head=getHead();
 			setHead(Node.allocValNode(value, head, elementPipe.getSizeDescriptor(), nodeType(), getDataProvider()));
+			deltaSize(1);
 			return;
 		}
 		
