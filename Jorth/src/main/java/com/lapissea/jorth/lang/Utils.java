@@ -5,28 +5,26 @@ import java.util.stream.Collectors;
 public class Utils{
 	
 	public static String genericSignature(GenType sig){
-		var primitive=switch(sig.typeName()){
-			case "boolean" -> "Z";
-			case "void" -> "V";
-			case "char" -> "C";
-			case "byte" -> "B";
-			case "short" -> "S";
-			case "int" -> "I";
-			case "long" -> "J";
-			case "float" -> "F";
-			case "double" -> "D";
-			default -> null;
+		return switch(sig.type()){
+			case BOOLEAN -> "Z";
+			case VOID -> "V";
+			case CHAR -> "C";
+			case BYTE -> "B";
+			case SHORT -> "S";
+			case INT -> "I";
+			case LONG -> "J";
+			case FLOAT -> "F";
+			case DOUBLE -> "D";
+			default -> {
+				String argStr;
+				if(sig.args().isEmpty()) argStr="";
+				else{
+					argStr=sig.args().stream().map(Utils::genericSignature).collect(Collectors.joining("", "<", ">"));
+				}
+				yield "L"+undotify(sig.typeName())+argStr+";";
+			}
 		};
-		if(primitive!=null){
-			return primitive;
-		}
 		
-		String argStr;
-		if(sig.args().isEmpty()) argStr="";
-		else{
-			argStr=sig.args().stream().map(Utils::genericSignature).collect(Collectors.joining("", "<", ">"));
-		}
-		return "L"+undotify(sig.typeName())+argStr+";";
 	}
 	
 	public static String undotify(String className){

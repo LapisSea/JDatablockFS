@@ -30,6 +30,14 @@ public class TemplateClassLoader extends ClassLoader{
 		
 		try(var writer=jorth.writeCode()){
 			
+			writer.write(
+				"""
+					public visibility
+					#TOKEN(0) class start
+					""",
+				className
+			);
+			
 			if(true)throw new NotImplementedException();
 			
 		}catch(MalformedJorthException e){
