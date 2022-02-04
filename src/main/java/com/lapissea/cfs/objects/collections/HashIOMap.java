@@ -5,7 +5,7 @@ import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.TypeDefinition;
+import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOType;
@@ -136,7 +136,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	
 	private int datasetID;
 	
-	public HashIOMap(DataProvider provider, Reference reference, TypeDefinition typeDef) throws IOException{
+	public HashIOMap(DataProvider provider, Reference reference, TypeLink typeDef) throws IOException{
 		super(provider, reference, typeDef);
 		
 		if(isSelfDataEmpty()){
@@ -378,9 +378,9 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 			newEntry,
 			null,
 			ContiguousStructPipe.of((Class<BucketEntry<K, V>>)(Object)BucketEntry.class).getSizeDescriptor(),
-			new TypeDefinition(
+			new TypeLink(
 				LinkedIOList.Node.class,
-				TypeDefinition.of(BucketEntry.class)
+				TypeLink.of(BucketEntry.class)
 			),
 			getDataProvider()
 		);

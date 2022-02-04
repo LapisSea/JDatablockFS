@@ -132,7 +132,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			
 		}
 		
-		private static final TypeDefinition.Check NODE_TYPE_CHECK=new TypeDefinition.Check(
+		private static final TypeLink.Check NODE_TYPE_CHECK=new TypeLink.Check(
 			LinkedIOList.Node.class,
 			List.of(t->{
 				var c=t.getTypeClass(null);
@@ -144,7 +144,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		private static NumberSize calcOptimalNextSize(DataProvider provider) throws IOException{
 			return NumberSize.bySize(provider.getSource().getIOSize());
 		}
-		public static <T extends IOInstance<T>> Node<T> allocValNode(T value, Node<T> next, SizeDescriptor<T> sizeDescriptor, TypeDefinition nodeType, DataProvider provider) throws IOException{
+		public static <T extends IOInstance<T>> Node<T> allocValNode(T value, Node<T> next, SizeDescriptor<T> sizeDescriptor, TypeLink nodeType, DataProvider provider) throws IOException{
 			int nextBytes;
 			if(next!=null) nextBytes=NumberSize.bySize(next.getReference().getPtr()).bytes;
 			else nextBytes=calcOptimalNextSize(provider).bytes;
@@ -162,7 +162,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		@IOValue
 		private NumberSize nextSize;
 		
-		public Node(DataProvider provider, Reference reference, TypeDefinition typeDef, T val, Node<T> next) throws IOException{
+		public Node(DataProvider provider, Reference reference, TypeLink typeDef, T val, Node<T> next) throws IOException{
 			this(provider, reference, typeDef);
 			
 			var newSiz=calcOptimalNextSize(provider);
@@ -175,7 +175,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			if(val!=null) setValue(val);
 		}
 		
-		public Node(DataProvider provider, Reference reference, TypeDefinition typeDef) throws IOException{
+		public Node(DataProvider provider, Reference reference, TypeLink typeDef) throws IOException{
 			super(provider, reference, typeDef, NODE_TYPE_CHECK);
 			
 			var type=(Struct<T>)typeDef.argAsStruct(0);
@@ -503,7 +503,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		}
 	}
 	
-	private static final TypeDefinition.Check LIST_TYPE_CHECK=new TypeDefinition.Check(
+	private static final TypeLink.Check LIST_TYPE_CHECK=new TypeLink.Check(
 		LinkedIOList.class,
 		List.of(t->{
 			if(!IOInstance.isManaged(t)) throw new ClassCastException("not managed");
@@ -520,7 +520,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 	
 	
 	@SuppressWarnings("unchecked")
-	public LinkedIOList(DataProvider provider, Reference reference, TypeDefinition typeDef) throws IOException{
+	public LinkedIOList(DataProvider provider, Reference reference, TypeLink typeDef) throws IOException{
 		super(provider, reference, typeDef, LIST_TYPE_CHECK);
 		
 		var type=(Struct<T>)typeDef.argAsStruct(0);
@@ -563,8 +563,8 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		getNode(index).setValue(value);
 	}
 	
-	private TypeDefinition nodeType(){
-		return new TypeDefinition(
+	private TypeLink nodeType(){
+		return new TypeLink(
 			LinkedIOList.Node.class,
 			getTypeDef().arg(0)
 		);

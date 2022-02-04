@@ -35,7 +35,7 @@ public @interface IOValue{
 			
 			var arrayLengthSizeName=field.getAnnotation(IODependency.ArrayLenSize.class)
 			                             .map(IODependency.ArrayLenSize::name)
-			                             .orElseGet(()->IOFieldTools.makeArrayLenName(field)+".nSiz");
+			                             .orElseGet(()->IOFieldTools.makeNumberSizeName(IOFieldTools.makeArrayLenName(field)));
 			
 			return List.of(new VirtualFieldDefinition<T, Integer>(IO, IOFieldTools.makeArrayLenName(field), Integer.class, (ioPool, instance, dependencies, value)->{
 				if(value!=null) return value;

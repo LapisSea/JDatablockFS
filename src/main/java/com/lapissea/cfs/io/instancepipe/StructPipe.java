@@ -401,8 +401,19 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		if(fixed.isPresent()){
 			long bytes=fixed.getAsLong();
 			
+			String extra="";
+			if(DEBUG_VALIDATION){
+				extra=" started on: "+src;
+			}
+			
 			var buf=src.readTicket(bytes).requireExact().submit();
-			field.readReported(ioPool, provider, buf, instance, genericContext);
+			
+			try{
+				field.readReported(ioPool, provider, buf, instance, genericContext);
+			}catch(Exception e){
+				throw new IOException(TextUtil.toString(field)+" failed to read!"+extra, e);
+			}
+			
 			try{
 				buf.close();
 			}catch(Exception e){

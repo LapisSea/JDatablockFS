@@ -120,10 +120,16 @@ public class IOFieldTools{
 	}
 	
 	public static <T extends IOInstance<T>> String makeArrayLenName(FieldAccessor<T> field){
-		return field.getName()+".len";
+		return field.getName()+":len";
+	}
+	public static <T extends IOInstance<T>> String makeNumberSizeName(String name){
+		return name+":nSiz";
 	}
 	public static <T extends IOInstance<T>> String makeGenericIDFieldName(FieldAccessor<T> field){
-		return field.getName()+".typeID";
+		return field.getName()+":typeID";
+	}
+	public static <T extends IOInstance<T>> String makeNullFlagName(FieldAccessor<T> field){
+		return field.getName()+":isNull";
 	}
 	
 	public static IONullability.Mode getNullability(FieldAccessor<?> field){
@@ -134,7 +140,7 @@ public class IOFieldTools{
 	}
 	public static <T extends IOInstance<T>> String makeRefName(FieldAccessor<T> accessor){
 		
-		return accessor.getName()+".ref";
+		return accessor.getName()+":ref";
 	}
 	
 	public static <E extends Annotation> E makeAnnotation(Class<E> annotationType, @NotNull Map<String, Object> values){

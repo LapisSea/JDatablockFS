@@ -1,9 +1,10 @@
 package com.lapissea.cfs.type;
 
+import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.jorth.JorthCompiler;
 import com.lapissea.jorth.MalformedJorthException;
 import com.lapissea.util.LogUtil;
-import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -19,12 +20,15 @@ public class TemplateClassLoader extends ClassLoader{
 	
 	@Override
 	protected Class<?> findClass(String className) throws ClassNotFoundException{
-		TypeDefinition typeDefinition=getDef(className);
-		if(!typeDefinition.isIoInstance()){
+		TypeDef def=getDef(className);
+		if(def.isUnmanaged()){
+			throw new UnsupportedOperationException(className+" is unmanaged! All unmanaged types must be present! Unmanaged types may contain mechanism not understood by the base IO engine.");
+		}
+		if(!def.isIoInstance()){
 			throw new UnsupportedOperationException("Can not generate: "+className+". It is not an "+IOInstance.class.getSimpleName());
 		}
 		
-		LogUtil.println("generating", className, "from", typeDefinition);
+//		LogUtil.println("generating", className, "from", "\n"+TextUtil.toTable(def.getFields()));
 		
 		var jorth=new JorthCompiler(this);
 		
@@ -32,27 +36,79 @@ public class TemplateClassLoader extends ClassLoader{
 			
 			writer.write(
 				"""
+					[#TOKEN(0)] #TOKEN(1) extends
 					public visibility
 					#TOKEN(0) class start
 					""",
-				className
+				className, IOInstance.class.getName()
 			);
 			
-			if(true)throw new NotImplementedException();
+			for(var field : def.getFields()){
+				
+				writer.write(
+					"""
+						private visibility
+						#TOKEN(0) @
+						#RAW(1) #TOKEN(2) field
+						
+//						#RAW(1) returns
+//						#TOKEN(3) function start
+//							this #TOKEN(2) get
+//						end
+						""",
+					IOValue.class.getName(),
+					toJorthGeneric(field.getType()),
+					field.getName(),
+					"get"+TextUtil.firstToUpperCase(field.getName()));
+			}
 			
 		}catch(MalformedJorthException e){
 			throw new RuntimeException("Failed to generate class "+className, e);
 		}
 		
 		try{
-			return defineClass(className, ByteBuffer.wrap(jorth.classBytecode()), null);
+			var byt=jorth.classBytecode(false);
+			return defineClass(className, ByteBuffer.wrap(byt), null);
 		}catch(MalformedJorthException e){
 			throw new RuntimeException(e);
 		}
 	}
 	
-	private TypeDefinition getDef(String name) throws ClassNotFoundException{
-		TypeDefinition def;
+	private String toJorthGeneric(TypeLink typ){
+		StringBuilder sb=new StringBuilder();
+		if(typ.argCount()>0){
+			sb.append("[");
+			for(int i=0;i<typ.argCount();i++){
+				var arg=typ.arg(i);
+				sb.append(toJorthGeneric(arg)).append(" ");
+			}
+			sb.append("] ");
+		}
+		if(typ.getTypeName().startsWith("[")){
+			var nam=typ.getTypeName();
+			while(nam.startsWith("[")){
+				sb.append("array ");
+				nam=nam.substring(1);
+			}
+			sb.append(switch(nam){
+				case "B" -> "byte";
+				case "S" -> "short";
+				case "I" -> "int";
+				case "J" -> "long";
+				case "F" -> "float";
+				case "D" -> "double";
+				case "C" -> "char";
+				case "Z" -> "boolean";
+				default -> throw new RuntimeException(nam);
+			});
+			return sb.toString();
+		}
+		sb.append(typ.getTypeName());
+		return sb.toString();
+	}
+	
+	private TypeDef getDef(String name) throws ClassNotFoundException{
+		TypeDef def;
 		try{
 			def=db.getDefinitionFromClassName(name);
 		}catch(IOException e){

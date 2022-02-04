@@ -9,6 +9,7 @@ import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
+import java.util.Random;
 import java.util.stream.LongStream;
 
 import static com.lapissea.util.LogUtil.Init.USE_CALL_POS;
@@ -55,7 +56,13 @@ public class SparseImage{
 		image.allocateNulls(cluster);
 		cluster.getTemp().put(0, image);
 		
-//		image.set(0, 0, 1, 1, 1);
+		Random r=new Random(1);
+		for(int i=0;i<10;i++){
+			int x=(int)(Math.pow(r.nextFloat(), 3)*32);
+			int y=(int)(Math.pow(r.nextFloat(), 3)*32);
+			LogUtil.println(x, y);
+			image.set(x, y, x, y, 0.2F);
+		}
 		
 	}
 	

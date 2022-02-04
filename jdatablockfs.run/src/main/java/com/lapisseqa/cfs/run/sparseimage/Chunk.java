@@ -27,4 +27,12 @@ public class Chunk extends IOInstance<Chunk>{
 	public boolean isXY(int chunkX, int chunkY){
 		return x==chunkX&&y==chunkY;
 	}
+	@Override
+	public String toShortString(){
+		return "CH{"+x+", "+y+"}";
+	}
+	@Override
+	public String toString(){
+		return "Chunk{"+x+", "+y+"}";
+	}
 }

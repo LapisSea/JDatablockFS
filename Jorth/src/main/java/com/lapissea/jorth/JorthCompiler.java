@@ -450,10 +450,10 @@ public class JorthCompiler{
 					}
 					classFields.put(name, type);
 					
-					var fieldVisitor=currentClass.visitField(visibility.opCode, name, Utils.genericSignature(new GenType(type.typeName())), Utils.genericSignature(type), null);
+					var fieldVisitor=currentClass.visitField(visibility.opCode, name, Utils.genericSignature(new GenType(type.typeName(), type.arrayDimensions(), List.of())), Utils.genericSignature(type), null);
 					
 					for(AnnotationData annotation : annotations){
-						var annV=fieldVisitor.visitAnnotation(Utils.genericSignature(new GenType(annotation.className(), List.of())), true);
+						var annV=fieldVisitor.visitAnnotation(Utils.genericSignature(new GenType(annotation.className(), 0, List.of())), true);
 						annotation.args.forEach(annV::visit);
 						annV.visitEnd();
 					}
@@ -924,10 +924,16 @@ public class JorthCompiler{
 		tokens.requireCount(1);
 		var typeName=tokens.pop();
 		
+		var arrayDimensions=0;
+		while(!tokens.isEmpty()&&tokens.peek().source.equals("array")){
+			tokens.pop();
+			arrayDimensions++;
+		}
+		
 		Token.Sequence argTokens=readSequence(tokens, "[", "]");
 		List<GenType>  args     =argTokens.parseAll(this::readGenericType);
 		
-		return new GenType(typeName.source, List.copyOf(args));
+		return new GenType(typeName.source, arrayDimensions, List.copyOf(args));
 	}
 	
 	private void requireTokenCount(int minWordCount) throws MalformedJorthException{
@@ -939,7 +945,8 @@ public class JorthCompiler{
 	}
 	
 	
-	public byte[] classBytecode() throws MalformedJorthException{
+	public byte[] classBytecode() throws MalformedJorthException{return classBytecode(false);}
+	public byte[] classBytecode(boolean printBytecode) throws MalformedJorthException{
 		
 		if(!addedInit){
 			try(var writer=writeCode()){
@@ -960,7 +967,11 @@ public class JorthCompiler{
 		
 		requireEmptyWords();
 		
-		return currentClass.toByteArray();
+		var ba=currentClass.toByteArray();
+		if(printBytecode){
+			BytecodeUtils.printClass(ba);
+		}
+		return ba;
 	}
 	
 	private void requireEmptyWords() throws MalformedJorthException{

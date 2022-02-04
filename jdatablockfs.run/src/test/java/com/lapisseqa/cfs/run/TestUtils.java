@@ -11,7 +11,7 @@ import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
-import com.lapissea.cfs.type.TypeDefinition;
+import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.LogUtil;
@@ -83,7 +83,7 @@ public class TestUtils{
 	static <T extends IOInstance.Unmanaged<T>> void complexObjectIntegrityTest(
 		TestInfo info, int initalCapacity,
 		Struct.Unmanaged.Constr<T> constr,
-		TypeDefinition typeDef,
+		TypeLink typeDef,
 		UnsafeConsumer<T, IOException> session,
 		boolean useCluster
 	) throws IOException{
@@ -133,7 +133,7 @@ public class TestUtils{
 	static <E, T extends IOInstance.Unmanaged<T>&IOList<E>> void ioListComplianceSequence(
 		TestInfo info, int initalCapacity,
 		Struct.Unmanaged.Constr<T> constr,
-		TypeDefinition typeDef,
+		TypeLink typeDef,
 		UnsafeConsumer<IOList<E>, IOException> session, boolean useCluster
 	) throws IOException{
 		complexObjectIntegrityTest(info, initalCapacity, constr, typeDef, list->{
@@ -146,7 +146,7 @@ public class TestUtils{
 	static <K, V, T extends IOInstance.Unmanaged<T>&IOMap<K, V>> void ioMapComplianceSequence(
 		TestInfo info,
 		Struct.Unmanaged.Constr<T> constr,
-		TypeDefinition typeDef,
+		TypeLink typeDef,
 		UnsafeConsumer<IOMap<K, V>, IOException> session
 	) throws IOException{
 		int initial=(int)ContiguousStructPipe.of(Struct.ofUnknown(typeDef.getTypeClass(null))).getSizeDescriptor().getMax(WordSpace.BYTE).orElse(8);

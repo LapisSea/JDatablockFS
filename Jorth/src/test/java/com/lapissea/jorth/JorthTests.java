@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.reflect.Field;
 import java.util.function.Function;
 
 import static com.lapissea.jorth.TestUtils.generateAndLoadInstance;
@@ -17,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class JorthTests{
 	
 	public static void main(String[] args) throws Throwable{
-		new JorthTests().fieldAnnotationClass();
+		new JorthTests().fieldArrayClass();
 	}
 	
 	
@@ -391,6 +392,31 @@ public class JorthTests{
 		assertEquals(msg, str);
 	}
 	
+	@Test
+	void fieldArrayClass() throws ReflectiveOperationException{
+		
+		var className="jorth.Gen$$";
+		
+		var cls=generateAndLoadInstanceSimple(className, writer->{
+			
+			writer.write(
+				"""
+					public visibility
+					Str noArray field
+					array Str 1dArray field
+					array array Str 2dArray field
+					"""
+			);
+		});
+		
+		LogUtil.println(cls.getField("noArray").getType().isArray());
+		LogUtil.println(cls.getField("1dArray").getType().isArray());
+		
+		for(Field field : cls.getFields()){
+			LogUtil.println(field.toString(), field.getGenericType().toString());
+		}
+	}
+	
 	@Retention(RetentionPolicy.RUNTIME)
 	@interface ValueAnn{
 		int value();
@@ -400,6 +426,7 @@ public class JorthTests{
 	@interface DefaultAnn{
 		int value() default 123;
 	}
+	
 	@Retention(RetentionPolicy.RUNTIME)
 	@interface MultiAnn{
 		int value();
@@ -410,6 +437,10 @@ public class JorthTests{
 		
 		@DefaultAnn(1234)
 		public String field;
+		
+		public String a;
+		public String[] b;
+		public String[][] c;
 	}
 	
 	@Test

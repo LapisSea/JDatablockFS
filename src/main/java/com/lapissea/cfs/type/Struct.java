@@ -79,7 +79,7 @@ public class Struct<T extends IOInstance<T>>{
 	public static class Unmanaged<T extends IOInstance.Unmanaged<T>> extends Struct<T>{
 		
 		public interface Constr<T>{
-			T create(DataProvider provider, Reference reference, TypeDefinition type) throws IOException;
+			T create(DataProvider provider, Reference reference, TypeLink type) throws IOException;
 		}
 		
 		public static Unmanaged<?> thisClass(){
@@ -354,7 +354,7 @@ public class Struct<T extends IOInstance<T>>{
 		return new Pool.StructArray<>(this, pool);
 	}
 	
-	public GenericContext describeGenerics(TypeDefinition def){
+	public GenericContext describeGenerics(TypeLink def){
 		return new GenericContext.Deferred(()->{
 			var parms=getClass().getTypeParameters();
 			var types=IntStream.range(0, parms.length)

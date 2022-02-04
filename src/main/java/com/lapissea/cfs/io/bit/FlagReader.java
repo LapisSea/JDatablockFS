@@ -66,13 +66,6 @@ public class FlagReader implements BitReader, AutoCloseable{
 		return result;
 	}
 	
-	
-	@Override
-	public void checkNOneAndThrow(int n) throws IOException{
-		int readBits=readCount();
-		checkNOneAndThrow(n, bit->"Illegal bit at "+(readBits+bit));
-	}
-	
 	public void checkRestAllOneAndThrow() throws IOException{
 		checkNOneAndThrow(remainingCount());
 	}

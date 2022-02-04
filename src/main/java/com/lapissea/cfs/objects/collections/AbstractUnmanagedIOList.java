@@ -4,7 +4,7 @@ import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
-import com.lapissea.cfs.type.TypeDefinition;
+import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.NotNull;
@@ -22,8 +22,8 @@ public abstract class AbstractUnmanagedIOList<T extends IOInstance<T>, SELF exte
 	
 	private final IOField<SELF, ?> sizeField=getThisStruct().getFields().byName("size").orElseThrow();
 	
-	public AbstractUnmanagedIOList(DataProvider provider, Reference reference, TypeDefinition typeDef, TypeDefinition.Check check){super(provider, reference, typeDef, check);}
-	public AbstractUnmanagedIOList(DataProvider provider, Reference reference, TypeDefinition typeDef)                            {super(provider, reference, typeDef);}
+	public AbstractUnmanagedIOList(DataProvider provider, Reference reference, TypeLink typeDef, TypeLink.Check check){super(provider, reference, typeDef, check);}
+	public AbstractUnmanagedIOList(DataProvider provider, Reference reference, TypeLink typeDef)                      {super(provider, reference, typeDef);}
 	
 	public abstract Struct<T> getElementType();
 	

@@ -16,10 +16,12 @@ import com.lapissea.cfs.tools.SessionHost.CachedFrame;
 import com.lapissea.cfs.tools.SessionHost.ParsedFrame;
 import com.lapissea.cfs.tools.logging.MemFrame;
 import com.lapissea.cfs.tools.render.RenderBackend;
+import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.cfs.type.field.fields.reflection.BitFieldMerger;
@@ -32,6 +34,7 @@ import java.awt.Color;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Array;
+import java.lang.reflect.Type;
 import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.function.Consumer;
@@ -1235,18 +1238,63 @@ public class BinaryGridRenderer{
 								}
 								continue;
 							}
-							if(typ.isArray()&&IOInstance.isManaged(typ.componentType())){
-								var inst  =(IOInstance<?>[])field.get(ioPool, instance);
-								var arrSiz=Array.getLength(inst);
-								
-								StructPipe elementPipe=ContiguousStructPipe.of(Struct.ofUnknown(typ.componentType()));
-								long       arrOffset  =0;
-								for(int i=0;i<arrSiz;i++){
-									var val=(IOInstance)Array.get(inst, i);
-									annotateStruct(ctx, val, reference.addOffset(fieldOffset+arrOffset), elementPipe, annotate);
-									arrOffset+=elementPipe.getSizeDescriptor().calcUnknown(ioPool, ctx.provider, val, WordSpace.BYTE);
+							if(typ.isArray()){
+								var comp=typ.componentType();
+								if(IOInstance.isManaged(comp)){
+									var inst  =(IOInstance<?>[])field.get(ioPool, instance);
+									var arrSiz=Array.getLength(inst);
+									
+									StructPipe elementPipe=ContiguousStructPipe.of(Struct.ofUnknown(typ.componentType()));
+									long       arrOffset  =0;
+									for(int i=0;i<arrSiz;i++){
+										var val=(IOInstance)Array.get(inst, i);
+										annotateStruct(ctx, val, reference.addOffset(fieldOffset+arrOffset), elementPipe, annotate);
+										arrOffset+=elementPipe.getSizeDescriptor().calcUnknown(ioPool, ctx.provider, val, WordSpace.BYTE);
+									}
+									continue;
 								}
-								continue;
+								if(comp==float.class){
+									var inst  =(float[])field.get(ioPool, instance);
+									var arrSiz=inst.length;
+									
+									if(size==arrSiz*4L){
+										long arrOffset=0;
+										int[] index={0};
+										var f=new IOFieldPrimitive.FFloat<T>(new FieldAccessor<>(){
+											@Override
+											public Struct<T> getDeclaringStruct(){
+												return instance.getThisStruct();
+											}
+											@NotNull
+											@Override
+											public String getName(){
+												return "["+index[0]+"]";
+											}
+											@Override
+											public Type getGenericType(GenericContext genericContext){
+												return Float.class;
+											}
+											@Override
+											public Object get(Struct.Pool<T> ioPool, T instance){
+												return inst[index[0]];
+											}
+											@Override
+											public void set(Struct.Pool<T> ioPool, T instance, Object value){
+												throw new UnsupportedOperationException();
+											}
+										});
+										for(int i=0;i<arrSiz;i++){
+											index[0]=i;
+											annotateByteField(
+												ctx, ioPool, instance, f,
+												col,
+												reference,
+												Range.fromSize(fieldOffset+arrOffset, 4));
+											arrOffset+=4;
+										}
+										continue;
+									}
+								}
 							}
 							if(typ==String.class){
 								if(annotate) annotateByteField(ctx, ioPool, instance, field, col, reference, Range.fromSize(fieldOffset, size));
@@ -1266,6 +1314,9 @@ public class BinaryGridRenderer{
 					}else{
 						fieldErr.addSuppressed(err);
 					}
+					var sizeDesc=field.getSizeDescriptor();
+					var size    =sizeDesc.calcUnknown(ioPool, ctx.provider, instance);
+					outlineByteRange(alpha(Color.RED, (float)Math.pow(Thread.currentThread().getStackTrace().length/20F, 2)), ctx.renderCtx, Range.fromSize(offsetStart+fieldOffset-size, size));
 				}
 			}
 			if(fieldErr!=null){

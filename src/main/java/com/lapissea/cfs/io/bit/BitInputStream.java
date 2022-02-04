@@ -1,5 +1,6 @@
 package com.lapissea.cfs.io.bit;
 
+import com.lapissea.cfs.exceptions.IllegalBitValueException;
 import com.lapissea.cfs.io.content.ContentReader;
 
 import java.io.EOFException;
@@ -56,7 +57,13 @@ public class BitInputStream implements BitReader, AutoCloseable{
 	
 	@Override
 	public void close() throws IOException{
-		checkNOneAndThrow(bufferedBits);
+		var start=totalBits;
+		try{
+			checkNOneAndThrow(bufferedBits);
+		}catch(IllegalBitValueException e){
+			var b=e.bit+start;
+			throw new IllegalBitValueException(b,"Illegal bit found at "+b,e);
+		}
 	}
 	
 	public long getTotalBits(){

@@ -4,11 +4,14 @@ import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.objects.collections.AbstractUnmanagedIOMap;
 import com.lapissea.cfs.objects.collections.HashIOMap;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.lang.ref.WeakReference;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.Stream;
 
 
 /**
@@ -20,33 +23,50 @@ public interface IOTypeDB{
 	
 	class MemoryOnlyDB implements IOTypeDB{
 		
-		private final Map<Integer, TypeDefinition> idToTyp=new HashMap<>();
-		private final Map<TypeDefinition, Integer> typToID=new HashMap<>();
+		private final Map<String, TypeDef> defs=new HashMap<>();
+		
+		private final Map<Integer, TypeLink> idToTyp=new HashMap<>();
+		private final Map<TypeLink, Integer> typToID=new HashMap<>();
 		
 		private WeakReference<ClassLoader> templateLoader=new WeakReference<>(null);
 		
 		@Override
-		public int toID(Class<?> type){
-			return toID(TypeDefinition.of(type));
-		}
-		@Override
-		public int toID(TypeDefinition type){
+		public TypeID toID(TypeLink type, boolean recordNew){
 			synchronized(typToID){
 				var id=typToID.get(type);
-				if(id!=null) return id;
-				return newID(type);
+				if(id!=null) return new TypeID(id, true);
+				return newID(type, recordNew);
 			}
 		}
 		
-		private int newID(TypeDefinition type){
+		private TypeID newID(TypeLink type, boolean recordNew){
 			var newID=maxID()+1;
+			if(!recordNew) return new TypeID(newID, false);
 			idToTyp.put(newID, type);
 			typToID.put(type, newID);
-			return newID;
+			
+			recordType(type);
+			return new TypeID(newID, true);
+		}
+		
+		private void recordType(TypeLink type){
+			if(!defs.containsKey(type.getTypeName())){
+				var def=new TypeDef(type.getTypeClass(null));
+				if(!def.isUnmanaged()){
+					defs.computeIfAbsent(type.getTypeName(), n->new TypeDef(type.getTypeClass(null)));
+				}
+				
+				for(TypeDef.FieldDef field : def.getFields()){
+					recordType(field.getType());
+				}
+			}
+			for(int i=0;i<type.argCount();i++){
+				recordType(type.arg(i));
+			}
 		}
 		
 		@Override
-		public TypeDefinition fromID(int id){
+		public TypeLink fromID(int id){
 			synchronized(typToID){
 				var type=idToTyp.get(id);
 				if(type==null){
@@ -56,7 +76,7 @@ public interface IOTypeDB{
 			}
 		}
 		
-		public boolean hasType(TypeDefinition type){
+		public boolean hasType(TypeLink type){
 			return typToID.containsKey(type);
 		}
 		public boolean hasID(int id){
@@ -78,16 +98,9 @@ public interface IOTypeDB{
 		}
 		
 		@Override
-		public TypeDefinition getDefinitionFromClassName(String className){
+		public TypeDef getDefinitionFromClassName(String className){
 			if(className==null||className.isEmpty()) return null;
-			
-			for(var val : idToTyp.values()){
-				if(val.getTypeName().equals(className)){
-					return val;
-				}
-			}
-			
-			return null;
+			return defs.get(className);
 		}
 	}
 	
@@ -97,30 +110,44 @@ public interface IOTypeDB{
 		private static final int          FIRST_ID;
 		
 		static{
-			BUILT_IN.toID(Integer.class);
-			BUILT_IN.toID(String.class);
-			BUILT_IN.toID(TypeDefinition.class);
+			Stream.of(
+				      Integer.class,
+				      String.class,
+				      TypeLink.class,
+				      TypeDef.class,
+				      IOInstance.class
+			      ).flatMap(csrc->Stream.concat(Stream.of(csrc), Arrays.stream(csrc.getDeclaredClasses()).filter(c->UtilL.instanceOf(c, IOInstance.class))))
+			      .forEach(c->{
+				      try{
+					      BUILT_IN.toID(c, true);
+				      }catch(IOException e){
+					      throw new RuntimeException(e);
+				      }
+			      });
 			
 			FIRST_ID=BUILT_IN.maxID();
 		}
 		
 		@IOValue
 		@IOValue.OverrideType(HashIOMap.class)
-		private AbstractUnmanagedIOMap<Integer, TypeDefinition> data;
+		private AbstractUnmanagedIOMap<Integer, TypeLink> data;
+		
+		@IOValue
+		@IOValue.OverrideType(HashIOMap.class)
+		private AbstractUnmanagedIOMap<String, TypeDef> defs;
 		
 		private WeakReference<ClassLoader> templateLoader=new WeakReference<>(null);
 		
 		@Override
-		public int toID(TypeDefinition type) throws IOException{
-			if(BUILT_IN.hasType(type)){
-				return BUILT_IN.toID(type);
-			}
+		public TypeID toID(TypeLink type, boolean recordNew) throws IOException{
+			var id=BUILT_IN.toID(type, false);
+			if(id.stored()) return id;
 			
 			int max=0;
 			for(var entry : data.entries()){
 				var key=entry.getKey();
 				if(entry.getValue().equals(type)){
-					return key;
+					return new TypeID(key, true);
 				}
 				max=Math.max(key, max);
 			}
@@ -128,12 +155,31 @@ public interface IOTypeDB{
 			max=Math.max(FIRST_ID, max);
 			
 			var newID=max+1;
+			if(!recordNew) return new TypeID(newID, false);
+			
 			data.put(newID, type);
-			return newID;
+			recordType(type);
+			return new TypeID(newID, true);
+		}
+		
+		private void recordType(TypeLink type) throws IOException{
+			if(!defs.containsKey(type.getTypeName())){
+				var def=new TypeDef(type.getTypeClass(null));
+				if(!def.isUnmanaged()&&BUILT_IN.getDefinitionFromClassName(type.getTypeName())==null){
+					defs.put(type.getTypeName(), def);
+				}
+				
+				for(TypeDef.FieldDef field : def.getFields()){
+					recordType(field.getType());
+				}
+			}
+			for(int i=0;i<type.argCount();i++){
+				recordType(type.arg(i));
+			}
 		}
 		
 		@Override
-		public TypeDefinition fromID(int id) throws IOException{
+		public TypeLink fromID(int id) throws IOException{
 			if(BUILT_IN.hasID(id)){
 				return BUILT_IN.fromID(id);
 			}
@@ -147,21 +193,14 @@ public interface IOTypeDB{
 		}
 		
 		@Override
-		public TypeDefinition getDefinitionFromClassName(String className) throws IOException{
+		public TypeDef getDefinitionFromClassName(String className) throws IOException{
 			if(className==null||className.isEmpty()) return null;
 			{
 				var def=BUILT_IN.getDefinitionFromClassName(className);
 				if(def!=null) return def;
 			}
 			
-			for(var entry : data.entries()){
-				var val=entry.getValue();
-				if(val.getTypeName().equals(className)){
-					return val;
-				}
-			}
-			
-			return null;
+			return defs.get(className);
 		}
 		
 		public void init(DataProvider provider) throws IOException{
@@ -188,14 +227,16 @@ public interface IOTypeDB{
 		}
 	}
 	
-	default int toID(Class<?> type) throws IOException{
-		return toID(TypeDefinition.of(type));
+	default TypeID toID(Class<?> type, boolean recordNew) throws IOException{
+		return toID(TypeLink.of(type), recordNew);
 	}
 	
-	int toID(TypeDefinition type) throws IOException;
-	TypeDefinition fromID(int id) throws IOException;
+	record TypeID(int val, boolean stored){}
 	
-	TypeDefinition getDefinitionFromClassName(String className) throws IOException;
+	TypeID toID(TypeLink type, boolean recordNew) throws IOException;
+	TypeLink fromID(int id) throws IOException;
+	
+	TypeDef getDefinitionFromClassName(String className) throws IOException;
 	
 	ClassLoader getTemplateLoader();
 }

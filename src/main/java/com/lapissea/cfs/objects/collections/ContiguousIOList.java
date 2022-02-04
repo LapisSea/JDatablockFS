@@ -24,7 +24,7 @@ import java.util.stream.Stream;
 @SuppressWarnings("unchecked")
 public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOList<T, ContiguousIOList<T>>{
 	
-	private static final TypeDefinition.Check TYPE_CHECK=new TypeDefinition.Check(
+	private static final TypeLink.Check TYPE_CHECK=new TypeLink.Check(
 		ContiguousIOList.class,
 		List.of(t->{
 			if(!IOInstance.isManaged(t)) throw new ClassCastException("not a managed "+IOInstance.class.getSimpleName());
@@ -33,7 +33,7 @@ public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanaged
 	
 	private final FixedContiguousStructPipe<T> elementPipe;
 	
-	public ContiguousIOList(DataProvider provider, Reference reference, TypeDefinition typeDef) throws IOException{
+	public ContiguousIOList(DataProvider provider, Reference reference, TypeLink typeDef) throws IOException{
 		super(provider, reference, typeDef);
 		TYPE_CHECK.ensureValid(typeDef);
 		var type=(Struct<T>)typeDef.argAsStruct(0);

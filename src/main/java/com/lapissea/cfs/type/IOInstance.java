@@ -24,17 +24,17 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 	public abstract static class Unmanaged<SELF extends Unmanaged<SELF>> extends IOInstance<SELF> implements DataProvider.Holder{
 		
 		private final DataProvider   provider;
-		private       Reference      reference;
-		private final TypeDefinition typeDef;
+		private       Reference reference;
+		private final TypeLink  typeDef;
 		
 		private StructPipe<SELF> pipe;
 		
-		protected Unmanaged(DataProvider provider, Reference reference, TypeDefinition typeDef, TypeDefinition.Check check){
+		protected Unmanaged(DataProvider provider, Reference reference, TypeLink typeDef, TypeLink.Check check){
 			this(provider, reference, typeDef);
 			check.ensureValid(typeDef);
 		}
 		
-		public Unmanaged(DataProvider provider, Reference reference, TypeDefinition typeDef){
+		public Unmanaged(DataProvider provider, Reference reference, TypeLink typeDef){
 			this.provider=Objects.requireNonNull(provider);
 			this.reference=reference.requireNonNull();
 			this.typeDef=typeDef;
@@ -45,7 +45,7 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 			return Stream.of();
 		}
 		
-		public TypeDefinition getTypeDef(){
+		public TypeLink getTypeDef(){
 			return typeDef;
 		}
 		
@@ -213,7 +213,7 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 		return null;
 	}
 	
-	public static boolean isManaged(TypeDefinition type){
+	public static boolean isManaged(TypeLink type){
 		return isManaged(type.getTypeClass(null));
 	}
 	

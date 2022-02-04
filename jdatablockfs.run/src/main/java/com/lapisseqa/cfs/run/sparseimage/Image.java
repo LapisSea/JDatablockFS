@@ -4,12 +4,13 @@ import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.collections.LinkedIOList;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.util.LogUtil;
 
 import java.io.IOException;
 
 public class Image extends IOInstance<Image>{
 	
-	private static final int chunkSize=8;
+	private static final int chunkSize=4;
 	
 	@IOValue
 	@IOValue.OverrideType(LinkedIOList.class)
@@ -37,6 +38,7 @@ public class Image extends IOInstance<Image>{
 			c.pixels[index*3+2]=b;
 			
 			iter.ioSet(c);
+			LogUtil.println(chunks.size());
 			return;
 		}
 		

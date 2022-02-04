@@ -12,7 +12,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
-public record GenType(String typeName, List<GenType> args, Types type){
+public record GenType(String typeName, int arrayDimensions, List<GenType> args, Types type){
 	
 	public static final GenType VOID  =new GenType("void");
 	public static final GenType STRING_BUILDER=new GenType(StringBuilder.class.getTypeName());
@@ -45,15 +45,15 @@ public record GenType(String typeName, List<GenType> args, Types type){
 	}
 	
 	public GenType(String typeName){
-		this(typeName, List.of());
+		this(typeName, 0, List.of());
 	}
-	public GenType(String typeName, List<GenType> args){
-		this(typeName, List.copyOf(args), makeTyp(typeName));
+	public GenType(String typeName, int arrayDimensions, List<GenType> args){
+		this(typeName,arrayDimensions, List.copyOf(args), makeTyp(typeName));
 	}
 	
 	@Override
 	public String toString(){
-		return typeName+(args.isEmpty()?"":args.stream().map(GenType::toString).collect(Collectors.joining(", ", "<", ">")));
+		return typeName+(args.isEmpty()?"":args.stream().map(GenType::toString).collect(Collectors.joining(", ", "<", ">")))+"[]".repeat(arrayDimensions);
 	}
 	public boolean instanceOf(JorthCompiler context, GenType popped) throws MalformedJorthException{
 		if(popped.equals(this)) return true;

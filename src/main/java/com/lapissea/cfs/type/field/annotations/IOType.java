@@ -30,12 +30,19 @@ public @interface IOType{
 					(ioPool, instance, dependencies, value)->value==null?0:value,
 					List.of(IOFieldTools.makeAnnotation(IODependency.VirtualNumSize.class, Map.of()))
 				);
-				return List.of(f);
+				var f1=new VirtualFieldDefinition<T, Boolean>(
+					VirtualFieldDefinition.StoragePool.IO,
+					IOFieldTools.makeNullFlagName(field),
+					Boolean.class,
+					(ioPool, instance, dependencies, value)->value==null||value,
+					List.of()
+				);
+				return List.of(f, f1);
 			}
 			@NotNull
 			@Override
 			public Set<String> getDependencyValueNames(FieldAccessor<?> field, Dynamic annotation){
-				return Set.of(IOFieldTools.makeGenericIDFieldName(field));
+				return Set.of(IOFieldTools.makeGenericIDFieldName(field), IOFieldTools.makeNullFlagName(field));
 			}
 		};
 		

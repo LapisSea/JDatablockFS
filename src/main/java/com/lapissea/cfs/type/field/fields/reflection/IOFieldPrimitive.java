@@ -336,7 +336,7 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 			return all;
 		}
 		
-		private byte getValue(Struct.Pool<T> ioPool, T instance){
+		public byte getValue(Struct.Pool<T> ioPool, T instance){
 			return getAccessor().getByte(ioPool, instance);
 		}
 		
@@ -382,7 +382,7 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 			super(field);
 		}
 		
-		private boolean getValue(Struct.Pool<T> ioPool, T instance){
+		public boolean getValue(Struct.Pool<T> ioPool, T instance){
 			return getAccessor().getBoolean(ioPool, instance);
 		}
 		

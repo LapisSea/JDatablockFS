@@ -30,7 +30,7 @@ public enum Types{
 		this.slotCount=slotCount;
 		this.baseClass=baseClass;
 		lower=name().toLowerCase();
-		genTyp=new GenType(baseClass.getName(), List.of(), this);
+		genTyp=new GenType(baseClass.getName(), 0, List.of(),this);
 	}
 	
 }

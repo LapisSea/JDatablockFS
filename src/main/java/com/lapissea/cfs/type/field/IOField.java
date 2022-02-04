@@ -261,10 +261,14 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	
 	public abstract void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException;
 	public final void readReported(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		String extra="";
+		if(DEBUG_VALIDATION){
+			extra=" started on: "+src;
+		}
 		try{
 			read(ioPool, provider, src, instance, genericContext);
 		}catch(Exception e){
-			throw new IOException("Failed to read "+this, e);
+			throw new IOException("Failed to read "+this+extra, e);
 		}
 	}
 	
