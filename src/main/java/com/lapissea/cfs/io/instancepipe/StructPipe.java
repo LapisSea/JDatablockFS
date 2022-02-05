@@ -150,14 +150,14 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 			if(generators!=null){
 				try{
 					generateAll(ioPool, prov, inst, false);
-					
-					return knownFixed+IOFieldTools.sumVars(unknownFields, d->d.calcUnknown(ioPool, prov, inst, wordSpace));
 				}catch(IOException e){
 					throw new RuntimeException(e);
 				}
 			}
 			
-			return knownFixed+IOFieldTools.sumVars(unknownFields, d->d.calcUnknown(ioPool, prov, inst, wordSpace));
+			return knownFixed+IOFieldTools.sumVars(unknownFields, d->{
+				return d.calcUnknown(ioPool, prov, inst, wordSpace);
+			});
 		});
 	}
 	

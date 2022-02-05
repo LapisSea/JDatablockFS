@@ -91,7 +91,7 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 	final class Unknown<Inst extends IOInstance<Inst>> implements SizeDescriptor<Inst>{
 		
 		public interface Sizer<T extends IOInstance<T>>{
-			long applyAsLong(Struct.Pool<T> ioPool, DataProvider prov, T value);
+			long calc(Struct.Pool<T> ioPool, DataProvider prov, T value);
 		}
 		
 		private final WordSpace    wordSpace;
@@ -110,7 +110,7 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 		@Override
 		public <T extends IOInstance<T>> Unknown<T> map(Function<T, Inst> mapping){
 			var unk=unknownSize;
-			return new Unknown<>(getWordSpace(), getMin(), getMax(), (ioPool, prov, tInst)->unk.applyAsLong(null, prov, mapping.apply(tInst)));//TODO: uuuuuh ioPool null?
+			return new Unknown<>(getWordSpace(), getMin(), getMax(), (ioPool, prov, tInst)->unk.calc(null, prov, mapping.apply(tInst)));//TODO: uuuuuh ioPool null?
 		}
 		
 		@Override
@@ -118,7 +118,7 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 		
 		@Override
 		public long calcUnknown(Struct.Pool<Inst> ioPool, DataProvider provider, Inst instance){
-			return unknownSize.applyAsLong(ioPool, provider, instance);
+			return unknownSize.calc(ioPool, provider, instance);
 		}
 		
 		@Override
