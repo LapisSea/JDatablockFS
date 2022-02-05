@@ -14,7 +14,7 @@
 		<cfsVersion>1.0-SNAPSHOT</cfsVersion>
 
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<imgui.java.version>1.85.0</imgui.java.version>
+		<imgui.java.version>1.86.1</imgui.java.version>
 	</properties>
 
 	<groupId>com.github.lapissea</groupId>
