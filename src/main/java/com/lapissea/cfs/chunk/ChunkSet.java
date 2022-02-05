@@ -3,10 +3,12 @@ package com.lapissea.cfs.chunk;
 import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.util.NotNull;
+import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.longlong.Roaring64Bitmap;
 
 import java.lang.reflect.Array;
 import java.util.*;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
@@ -14,10 +16,141 @@ import java.util.stream.Stream;
 @SuppressWarnings({"SimplifyStreamApiCallChains", "unused"})
 public class ChunkSet implements Set<ChunkPointer>{
 	
-	private final Roaring64Bitmap index=new Roaring64Bitmap();
-	private       long            end  =-1;
-	private       long            start=-1;
-	private       long            size;
+	
+	private sealed interface Index{
+		final class Bitmap32 implements Index{
+			private final RoaringBitmap data=new RoaringBitmap();
+			
+			@Override
+			public boolean isEmpty(){
+				return data.isEmpty();
+			}
+			@Override
+			public void add(long index){
+				data.add(Math.toIntExact(index));
+			}
+			@Override
+			public boolean contains(long index){
+				if(index>Integer.MAX_VALUE||index<0) return false;
+				return data.contains((int)index);
+			}
+			
+			@Override
+			public void remove(long index){
+				if(index>Integer.MAX_VALUE) return;
+				data.remove((int)index);
+			}
+			@Override
+			public void clear(){
+				data.clear();
+			}
+			@Override
+			public void or(Index other){
+				var d=((Bitmap32)other).data;
+				data.or(d);
+			}
+			@Override
+			public void and(Index other){
+				var d=((Bitmap32)other).data;
+				data.and(d);
+			}
+			@Override
+			public void andNot(Index other){
+				var d=((Bitmap32)other).data;
+				data.andNot(d);
+			}
+			@Override
+			public LongStream stream(){
+				return data.stream().mapToLong(i->i);
+			}
+			@Override
+			public long calcEnd(){
+				return data.getReverseIntIterator().next()+1;
+			}
+			@Override
+			public long calcStart(){
+				return data.getIntIterator().next();
+			}
+		}
+		
+		final class Bitmap64 implements Index{
+			private final Roaring64Bitmap data=new Roaring64Bitmap();
+			
+			@Override
+			public boolean isEmpty(){
+				return data.isEmpty();
+			}
+			@Override
+			public void add(long index){
+				data.add(index);
+			}
+			@Override
+			public boolean contains(long index){
+				return data.contains(index);
+			}
+			
+			@Override
+			public void remove(long index){
+				data.removeLong(index);
+			}
+			@Override
+			public void clear(){
+				data.clear();
+			}
+			@Override
+			public void or(Index other){
+				var d=((Bitmap64)other).data;
+				data.or(d);
+			}
+			@Override
+			public void and(Index other){
+				var d=((Bitmap64)other).data;
+				data.and(d);
+			}
+			@Override
+			public void andNot(Index other){
+				var d=((Bitmap64)other).data;
+				data.andNot(d);
+			}
+			@Override
+			public LongStream stream(){
+				return data.stream();
+			}
+			@Override
+			public long calcEnd(){
+				return data.getReverseLongIterator().next()+1;
+			}
+			@Override
+			public long calcStart(){
+				return data.getLongIterator().next();
+			}
+		}
+		
+		boolean isEmpty();
+		
+		void add(long index);
+		boolean contains(long index);
+		void remove(long index);
+		void clear();
+		
+		void or(Index other);
+		void and(Index other);
+		void andNot(Index other);
+		
+		LongStream stream();
+		
+		
+		long calcEnd();
+		long calcStart();
+	}
+	
+	private static final Supplier<Index> NEW_INDEX=Index.Bitmap32::new;
+	
+	private final Index           index=NEW_INDEX.get();
+	
+	private long end  =-1;
+	private long start=-1;
+	private long size;
 	
 	public ChunkSet(){
 	}
@@ -88,8 +221,7 @@ public class ChunkSet implements Set<ChunkPointer>{
 	public boolean addAll(Collection<? extends ChunkPointer> c){
 		if(c.isEmpty()) return false;
 		
-		Roaring64Bitmap toAdd=new Roaring64Bitmap();
-		c.stream().mapToLong(ChunkPointer::getValue).forEach(toAdd::add);
+		var toAdd=ptrsToIndex(c.stream());
 		
 		boolean change=calcStart(toAdd)<start||calcEnd(toAdd)>end;
 		
@@ -102,11 +234,17 @@ public class ChunkSet implements Set<ChunkPointer>{
 		return true;
 	}
 	
-	private long calcEnd(Roaring64Bitmap toAdd){
-		return toAdd.getReverseLongIterator().next()+1;
+	private Index ptrsToIndex(Stream<? extends ChunkPointer> c){
+		var bitmap=NEW_INDEX.get();
+		c.mapToInt(ChunkPointer::getValueInt).forEach(bitmap::add);
+		return bitmap;
 	}
-	private long calcStart(Roaring64Bitmap toAdd){
-		return toAdd.getLongIterator().next();
+	
+	private long calcEnd(Index toAdd){
+		return toAdd.calcEnd();
+	}
+	private long calcStart(Index toAdd){
+		return toAdd.calcStart();
 	}
 	private void recalcInfo(){
 		calcStart();
@@ -122,8 +260,7 @@ public class ChunkSet implements Set<ChunkPointer>{
 			return hadData;
 		}
 		
-		Roaring64Bitmap toRetain=new Roaring64Bitmap();
-		ptrStream(c).mapToLong(ChunkPointer::getValue).forEach(toRetain::add);
+		var toRetain=ptrsToIndex(ptrStream(c));
 		
 		if(toRetain.isEmpty()){
 			return retainAll(List.of());
@@ -142,8 +279,7 @@ public class ChunkSet implements Set<ChunkPointer>{
 	public boolean removeAll(Collection<?> c){
 		if(c.isEmpty()) return false;
 		
-		Roaring64Bitmap toRemove=new Roaring64Bitmap();
-		ptrStream(c).mapToLong(ChunkPointer::getValue).forEach(toRemove::add);
+		var toRemove=ptrsToIndex(ptrStream(c));
 		
 		if(toRemove.isEmpty()) return false;
 		
@@ -169,7 +305,7 @@ public class ChunkSet implements Set<ChunkPointer>{
 			start=Math.min(start, ptr);
 		}
 		size++;
-		index.add(ptr);
+		index.add(Math.toIntExact(ptr));
 		
 		checkData();
 		return true;
@@ -203,7 +339,7 @@ public class ChunkSet implements Set<ChunkPointer>{
 		}else{
 			assert index.contains(ptr);
 			size--;
-			index.removeLong(ptr);
+			index.remove(ptr);
 			
 			if(ptr==start) calcStart();
 			if(ptr==lastIndex()) calcEnd();
@@ -224,8 +360,8 @@ public class ChunkSet implements Set<ChunkPointer>{
 		if(rageSize()==1){
 			clear();
 		}else{
-			assert index.contains(start);
-			index.removeLong(start);
+			assert index.contains(Math.toIntExact(start));
+			index.remove(Math.toIntExact(start));
 			size--;
 			calcStart();
 		}
@@ -237,8 +373,8 @@ public class ChunkSet implements Set<ChunkPointer>{
 		if(rageSize()==1){
 			clear();
 		}else{
-			assert index.contains(lastIndex());
-			index.removeLong(lastIndex());
+			assert index.contains(Math.toIntExact(lastIndex()));
+			index.remove((int)lastIndex());
 			size--;
 			calcEnd();
 		}
@@ -265,7 +401,7 @@ public class ChunkSet implements Set<ChunkPointer>{
 		var last=lastIndex();
 		if(ptr<start||last<ptr) return false;
 		if(ptr==start||ptr==last) return true;
-		return index.contains(ptr);
+		return index.contains(Math.toIntExact(ptr));
 	}
 	
 	public LongStream longStream(){
