@@ -142,7 +142,16 @@ public class IOTransactionBuffer{
 	private long modifiedCapacity=-1;
 	
 	public long getCapacity(long fallback){
-		if(modifiedCapacity==-1) return fallback;
+		if(modifiedCapacity==-1){
+			if(!writeEvents.isEmpty()){
+				var last=writeEvents.get(writeEvents.size()-1);
+				if(last.end()>fallback){
+					modifiedCapacity=last.end();
+					return last.end();
+				}
+			}
+			return fallback;
+		}
 		return modifiedCapacity;
 	}
 	
