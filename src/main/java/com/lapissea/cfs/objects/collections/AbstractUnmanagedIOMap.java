@@ -3,13 +3,13 @@ package com.lapissea.cfs.objects.collections;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.TypeDefinition;
+import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 
 import java.io.IOException;
 
-public abstract class AbstractUnmanagedIOMap<K, V, SELF extends AbstractUnmanagedIOMap<K, V, SELF>> extends IOInstance.Unmanaged<SELF> implements IOMap<K, V>{
+public abstract class AbstractUnmanagedIOMap<K, V> extends IOInstance.Unmanaged<AbstractUnmanagedIOMap<K, V>> implements IOMap<K, V>{
 	
 	@IOValue
 	@IODependency.VirtualNumSize
@@ -18,8 +18,8 @@ public abstract class AbstractUnmanagedIOMap<K, V, SELF extends AbstractUnmanage
 	//TODO: use sizeField when single field with dependencies is implemented
 //	private final IOField<SELF, ?> sizeField=getThisStruct().getFields().byName("size").orElseThrow();
 	
-	protected AbstractUnmanagedIOMap(DataProvider provider, Reference reference, TypeDefinition typeDef, TypeDefinition.Check check){super(provider, reference, typeDef, check);}
-	public AbstractUnmanagedIOMap(DataProvider provider, Reference reference, TypeDefinition typeDef)                               {super(provider, reference, typeDef);}
+	protected AbstractUnmanagedIOMap(DataProvider provider, Reference reference, TypeLink typeDef, TypeLink.Check check){super(provider, reference, typeDef, check);}
+	public AbstractUnmanagedIOMap(DataProvider provider, Reference reference, TypeLink typeDef)                         {super(provider, reference, typeDef);}
 	
 	@Override
 	public long size(){return size;}

@@ -195,6 +195,10 @@ public class OpenGLBackend extends RenderBackend{
 	
 	
 	private synchronized void initWindow(){
+		if(UtilL.sysPropertyByClass(OpenGLBackend.class, "emulateNoGLSupport").map(Boolean::parseBoolean).orElse(false)){
+			throw new RuntimeException("gl disabled");
+		}
+		
 		GlfwMonitor.init();
 		GLFWErrorCallback.createPrint(System.err).set();
 		
@@ -209,10 +213,6 @@ public class OpenGLBackend extends RenderBackend{
 			window.saveState(stateFile);
 			System.exit(0);
 		});
-		
-		if(UtilL.sysPropertyByClass(OpenGLBackend.class, "emulateNoGLSupport").map(Boolean::parseBoolean).orElse(false)){
-			throw new RuntimeException("gl disabled");
-		}
 		
 		glfwWindowHint(GLFW_SAMPLES, 8);
 		glfwWindowHint(GLFW_DOUBLEBUFFER, GLFW_TRUE);

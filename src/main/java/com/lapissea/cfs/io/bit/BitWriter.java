@@ -34,16 +34,27 @@ public interface BitWriter<SELF extends BitWriter<SELF>>{
 	}
 	
 	default SELF writeBits(boolean[] data) throws IOException{
-		for(boolean f : data){
-			writeBoolBit(f);
+		int maxBatch=64;
+		for(int start=0;start<data.length;start+=maxBatch){
+			var batchSize=Math.min(data.length-start, maxBatch);
+			
+			long batch=0;
+			for(int i=0;i<batchSize;i++){
+				batch|=(data[i+start]?1L:0L)<<i;
+			}
+			
+			writeBits(batch, batchSize);
 		}
 		return self();
 	}
 	
 	
 	default SELF fillNOne(int n) throws IOException{
-		for(int i=0;i<n;i++){
-			writeBoolBit(true);
+		int maxBatch=63;
+		for(int start=0;start<n;start+=maxBatch){
+			var batchSize=Math.min(n-start, maxBatch);
+			
+			writeBits((1L<<batchSize)-1L, batchSize);
 		}
 		return self();
 	}

@@ -5,7 +5,7 @@ import com.lapissea.cfs.exceptions.IllegalBitValueException;
 import java.io.IOException;
 import java.util.function.IntFunction;
 
-import static com.lapissea.cfs.io.bit.BitUtils.*;
+import static com.lapissea.cfs.io.bit.BitUtils.binaryRangeFindZero;
 
 public interface BitReader{
 	
@@ -23,13 +23,9 @@ public interface BitReader{
 	}
 	
 	default void checkNOneAndThrow(int n) throws IOException{
-		checkNOneAndThrow(n, bit->"Illegal bit at "+bit);
-	}
-	
-	default void checkNOneAndThrow(int n, IntFunction<String> message) throws IOException{
 		int errorBit=checkNOne(n);
 		if(errorBit!=-1){
-			throw new IllegalBitValueException(message.apply(errorBit));
+			throw new IllegalBitValueException(errorBit);
 		}
 	}
 	

@@ -196,6 +196,10 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		//noinspection unchecked
 		return requireExactFieldType(IOFieldPrimitive.FInt.class, name);
 	}
+	public <E extends IOInstance<E>> IOFieldPrimitive.FBoolean<E> requireExactBoolean(String name){
+		//noinspection unchecked
+		return requireExactFieldType(IOFieldPrimitive.FBoolean.class, name);
+	}
 	
 	public Stream<IOField<T, ?>> unpackedStream(){
 		return stream().flatMap(IOField::streamUnpackedFields);

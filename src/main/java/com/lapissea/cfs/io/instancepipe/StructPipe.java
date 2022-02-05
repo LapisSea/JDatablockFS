@@ -6,6 +6,7 @@ import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.FieldIsNullException;
 import com.lapissea.cfs.exceptions.UnknownSizePredictionException;
+import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.content.ContentOutputBuilder;
 import com.lapissea.cfs.io.content.ContentReader;
@@ -40,7 +41,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		
 		private StructGroup(Class<? extends StructPipe<?>> type){
 			try{
-				lConstructor=Utils.makeLambda(type.getConstructor(Struct.class), Function.class);
+				lConstructor=Access.makeLambda(type.getConstructor(Struct.class), Function.class);
 			}catch(ReflectiveOperationException e){
 				throw new RuntimeException("Failed to get pipe constructor", e);
 			}
@@ -400,8 +401,19 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		if(fixed.isPresent()){
 			long bytes=fixed.getAsLong();
 			
+			String extra="";
+			if(DEBUG_VALIDATION){
+				extra=" started on: "+src;
+			}
+			
 			var buf=src.readTicket(bytes).requireExact().submit();
-			field.readReported(ioPool, provider, buf, instance, genericContext);
+			
+			try{
+				field.readReported(ioPool, provider, buf, instance, genericContext);
+			}catch(Exception e){
+				throw new IOException(TextUtil.toString(field)+" failed to read!"+extra, e);
+			}
+			
 			try{
 				buf.close();
 			}catch(Exception e){

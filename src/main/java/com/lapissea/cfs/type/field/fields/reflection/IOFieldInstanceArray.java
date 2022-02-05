@@ -39,6 +39,9 @@ public class IOFieldInstanceArray<T extends IOInstance<T>, ValType extends IOIns
 		
 		descriptor=new SizeDescriptor.Unknown<>(WordSpace.BYTE, 0, OptionalLong.empty(), (ioPool, prov, inst)->{
 			var arr=get(null, inst);
+			if(arr==null){
+				int a=0;
+			}
 			if(arr.length==0) return 0;
 			
 			var desc=getValPipe().getSizeDescriptor();

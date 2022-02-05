@@ -5,7 +5,7 @@ import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.TypeDefinition;
+import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOType;
@@ -22,7 +22,7 @@ import java.util.stream.Stream;
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NULLABLE;
 
-public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V>>{
+public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	
 	private static class BucketEntry<K, V> extends IOInstance<BucketEntry<K, V>>{
 		
@@ -136,7 +136,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 	
 	private int datasetID;
 	
-	public HashIOMap(DataProvider provider, Reference reference, TypeDefinition typeDef) throws IOException{
+	public HashIOMap(DataProvider provider, Reference reference, TypeLink typeDef) throws IOException{
 		super(provider, reference, typeDef);
 		
 		if(isSelfDataEmpty()){
@@ -204,7 +204,9 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 		datasetID++;
 		transfer(oldBuckets, buckets, bucketPO2, size()<256);
 		
-		writeManagedFields();
+		try(var ignored=getDataProvider().getSource().openIOTransaction()){
+			writeManagedFields();
+		}
 		
 		((Unmanaged<?>)oldBuckets).free();
 		
@@ -317,7 +319,10 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 	
 	@Override
 	public void put(K key, V value) throws IOException{
-		var sizeFlag=putEntry(buckets, bucketPO2, key, value);
+		long sizeFlag;
+		try(var ignored=getDataProvider().getSource().openIOTransaction()){
+			sizeFlag=putEntry(buckets, bucketPO2, key, value);
+		}
 		if(sizeFlag==OVERWRITE) return;
 		
 		deltaSize(1);
@@ -378,9 +383,9 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V, HashIOMap<K, V
 			newEntry,
 			null,
 			ContiguousStructPipe.of((Class<BucketEntry<K, V>>)(Object)BucketEntry.class).getSizeDescriptor(),
-			new TypeDefinition(
+			new TypeLink(
 				LinkedIOList.Node.class,
-				TypeDefinition.of(BucketEntry.class)
+				TypeLink.of(BucketEntry.class)
 			),
 			getDataProvider()
 		);

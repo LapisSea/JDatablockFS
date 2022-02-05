@@ -5,7 +5,7 @@ import com.lapissea.cfs.io.content.ContentWriter;
 
 import java.io.IOException;
 
-import static com.lapissea.cfs.io.bit.BitUtils.*;
+import static com.lapissea.cfs.io.bit.BitUtils.makeMask;
 
 public class BitOutputStream implements BitWriter<BitOutputStream>, AutoCloseable{
 	

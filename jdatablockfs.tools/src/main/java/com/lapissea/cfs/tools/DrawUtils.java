@@ -174,9 +174,12 @@ class DrawUtils{
 	
 	public static String errorToMessage(Throwable e){
 		StringBuilder message=new StringBuilder(e.getMessage()==null?"":e.getMessage());
-		while(e.getCause()!=null){
-			message.append("\nCause: ").append(e.getCause().getMessage());
-			e=e.getCause();
+		var           cause  =e.getCause();
+		while(cause!=null){
+			message.append("\nCause: ");
+			if(cause.getMessage()==null) message.append(cause.getClass());
+			else message.append(cause.getMessage());
+			cause=cause.getCause();
 		}
 		return message.toString();
 	}

@@ -6,8 +6,8 @@ import com.lapissea.cfs.objects.NumberSize;
 
 import java.io.IOException;
 
-import static com.lapissea.cfs.GlobalConfig.*;
-import static com.lapissea.cfs.io.bit.BitUtils.*;
+import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.io.bit.BitUtils.makeMask;
 
 public class FlagReader implements BitReader, AutoCloseable{
 	
@@ -64,13 +64,6 @@ public class FlagReader implements BitReader, AutoCloseable{
 		data >>>= numOBits;
 		bitCount-=numOBits;
 		return result;
-	}
-	
-	
-	@Override
-	public void checkNOneAndThrow(int n) throws IOException{
-		int readBits=readCount();
-		checkNOneAndThrow(n, bit->"Illegal bit at "+(readBits+bit));
 	}
 	
 	public void checkRestAllOneAndThrow() throws IOException{

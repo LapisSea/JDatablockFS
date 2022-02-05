@@ -1,7 +1,7 @@
 package com.lapissea.cfs.type.field.fields.reflection;
 
-import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
+import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.objects.INumber;
@@ -37,7 +37,7 @@ public class IOFieldNumber<T extends IOInstance<T>, E extends INumber> extends I
 	@Override
 	public void init(){
 		super.init();
-		this.constructor=Utils.findConstructor(getAccessor().getType(), LongFunction.class, long.class);
+		this.constructor=Access.findConstructor(getAccessor().getType(), LongFunction.class, long.class);
 		
 		var field=forceFixed?null:IOFieldTools.getDynamicSize(getAccessor());
 		

@@ -4,7 +4,6 @@ import com.lapissea.cfs.SyntheticParameterizedType;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.LogUtil;
-import com.lapissea.util.NotImplementedException;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -16,25 +15,25 @@ import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
-public class TypeDefinition extends IOInstance<TypeDefinition>{
+public final class TypeLink extends IOInstance<TypeLink>{
 	
 	public static class Check{
-		private final Consumer<Class<?>>             rawCheck;
-		private final List<Consumer<TypeDefinition>> argChecks;
+		private final Consumer<Class<?>>       rawCheck;
+		private final List<Consumer<TypeLink>> argChecks;
 		
-		public Check(Class<?> rawType, List<Consumer<TypeDefinition>> argChecks){
+		public Check(Class<?> rawType, List<Consumer<TypeLink>> argChecks){
 			this(t->{
 				if(!t.equals(rawType)) throw new ClassCastException(rawType+" is not "+t);
 			}, argChecks);
 		}
-		public Check(Consumer<Class<?>> rawCheck, List<Consumer<TypeDefinition>> argChecks){
+		public Check(Consumer<Class<?>> rawCheck, List<Consumer<TypeLink>> argChecks){
 			this.rawCheck=rawCheck;
 			this.argChecks=List.copyOf(argChecks);
 		}
 		
-		public void ensureValid(TypeDefinition type){
+		public void ensureValid(TypeLink type){
 			try{
-				rawCheck.accept(type.getTypeClass());
+				rawCheck.accept(type.getTypeClass(null));
 				if(type.argCount()!=argChecks.size()) throw new IllegalArgumentException("Argument count in "+type+" should be "+argChecks.size()+" but is "+type.argCount());
 				
 				var errs=new LinkedList<Throwable>();
@@ -61,13 +60,13 @@ public class TypeDefinition extends IOInstance<TypeDefinition>{
 		}
 	}
 	
-	private static final TypeDefinition[] NO_ARGS=new TypeDefinition[0];
+	private static final TypeLink[] NO_ARGS=new TypeLink[0];
 	
-	public static TypeDefinition of(Class<?> raw, Type... args){
+	public static TypeLink of(Class<?> raw, Type... args){
 		return of(new SyntheticParameterizedType(raw, args));
 	}
 	
-	public static TypeDefinition of(Type genericType){
+	public static TypeLink of(Type genericType){
 		Objects.requireNonNull(genericType);
 		var cleanGenericType=Utils.prottectFromVarType(genericType);
 		
@@ -78,32 +77,34 @@ public class TypeDefinition extends IOInstance<TypeDefinition>{
 		
 		if(cleanGenericType instanceof ParameterizedType parm){
 			var args=parm.getActualTypeArguments();
-			return new TypeDefinition(
+			return new TypeLink(
 				(Class<?>)parm.getRawType(),
-				Arrays.stream(args).filter(arg->!arg.equals(genericType)).map(TypeDefinition::of).toArray(TypeDefinition[]::new)
+				Arrays.stream(args).filter(arg->!arg.equals(genericType)).map(TypeLink::of).toArray(TypeLink[]::new)
 			);
 		}
-		return new TypeDefinition((Class<?>)cleanGenericType, NO_ARGS);
+		return new TypeLink((Class<?>)cleanGenericType, NO_ARGS);
 	}
 	
 	private Class<?> typeClass;
-	@IOValue
-	private String   typeName;
 	
 	@IOValue
-	private TypeDefinition[] args;
+	private String     typeName;
+	@IOValue
+	private TypeLink[] args;
 	
 	private Type generic;
 	
-	public TypeDefinition(){}
+	public TypeLink(){}
 	
 	
-	public TypeDefinition(Class<?> type, TypeDefinition... args){
-		this(type.getName(), args.clone());
+	public TypeLink(Class<?> type, TypeLink... args){
+		this.typeName=type.getName();
+		this.args=args.length==0?args:args.clone();
+		
 		this.typeClass=type;
 	}
 	
-	public TypeDefinition(String typeName, TypeDefinition... args){
+	public TypeLink(String typeName, TypeLink... args){
 		this.typeName=typeName;
 		this.args=args.length==0?args:args.clone();
 	}
@@ -112,45 +113,67 @@ public class TypeDefinition extends IOInstance<TypeDefinition>{
 		return typeName;
 	}
 	
-	public Class<?> getTypeClass(){
+	public Class<?> getTypeClass(IOTypeDB db){
 		if(typeClass==null){
-			try{
-				typeClass=Class.forName(getTypeName());
-			}catch(ClassNotFoundException e){
-				throw new NotImplementedException("implement generic ioinstance from stored data: "+getTypeName());
-			}
+			typeClass=loadClass(db);
 		}
 		return typeClass;
+	}
+	
+	private Class<?> loadClass(IOTypeDB db){
+		var name=getTypeName();
+		try{
+			return Class.forName(name);
+		}catch(ClassNotFoundException e){
+			Objects.requireNonNull(db);
+			try{
+				return Class.forName(name, true, db.getTemplateLoader());
+			}catch(Throwable e1){
+				e1.printStackTrace();
+				System.exit(-1);
+				throw new RuntimeException(e1);
+			}
+		}
+		
 	}
 	
 	public int argCount(){
 		return args.length;
 	}
 	
-	public TypeDefinition arg(int index){
+	public TypeLink arg(int index){
 		return args[index];
 	}
 	public Struct<?> argAsStruct(int index){
-		return Struct.ofUnknown(arg(index).getTypeClass());
+		return Struct.ofUnknown(arg(index).getTypeClass(null));
 	}
 	
 	@Override
 	public String toString(){
-		return getTypeClass().getName()+(args.length==0?"":Arrays.stream(args).map(TypeDefinition::toString).collect(Collectors.joining(", ", "<", ">")));
+		return getClass().getSimpleName()+"("+getTypeName()+(args.length==0?"":Arrays.stream(args).map(TypeLink::toString).collect(Collectors.joining(", ", "<", ">")))+")";
 	}
 	@Override
 	public String toShortString(){
-		return getTypeClass().getSimpleName()+(args.length==0?"":Arrays.stream(args).map(TypeDefinition::toShortString).collect(Collectors.joining(", ", "<", ">")));
+		String nam=shortTypeString();
+		return "Typ("+nam+(args.length==0?"":Arrays.stream(args).map(TypeLink::toShortString).collect(Collectors.joining(", ", "<", ">")))+")";
 	}
-	public Type generic(){
-		if(generic==null) generic=new SyntheticParameterizedType(null, getTypeClass(), Arrays.stream(args).map(TypeDefinition::getTypeClass).toArray(Type[]::new));
+	private String shortTypeString(){
+		var nam =getTypeName();
+		var last=nam.lastIndexOf('.');
+		if(last!=-1){
+			nam=nam.substring(last+1);
+		}
+		return nam;
+	}
+	public Type generic(IOTypeDB db){
+		if(generic==null) generic=new SyntheticParameterizedType(null, getTypeClass(db), Arrays.stream(args).map(t->t.getTypeClass(db)).toArray(Type[]::new));
 		return generic;
 	}
 	
 	@Override
 	public boolean equals(Object o){
 		return this==o||
-		       o instanceof TypeDefinition that&&
+		       o instanceof TypeLink that&&
 		       getTypeName().equals(that.getTypeName())&&
 		       Arrays.equals(args, that.args);
 	}

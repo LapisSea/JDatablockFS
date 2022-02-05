@@ -58,7 +58,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 					try{
 						if(value!=null){
 							var arg=instance.getTypeDef().arg(0);
-							if(!UtilL.instanceOf(value, arg.getTypeClass())) throw new ClassCastException(arg+" not compatible with "+value);
+							if(!UtilL.instanceOf(value, arg.getTypeClass(instance.getDataProvider().getTypeDb()))) throw new ClassCastException(arg+" not compatible with "+value);
 						}
 						
 						instance.setValue((T)value);
@@ -82,7 +82,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			var nextAccessor=new AbstractFieldAccessor<Node<T>>(null, "next"){
 				@Override
 				public Type getGenericType(GenericContext genericContext){
-					return getTypeDef().generic();
+					return getTypeDef().generic(null);
 				}
 				@Override
 				public Object get(Struct.Pool<Node<T>> ioPool, Node<T> instance){
@@ -133,10 +133,10 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			
 		}
 		
-		private static final TypeDefinition.Check NODE_TYPE_CHECK=new TypeDefinition.Check(
+		private static final TypeLink.Check NODE_TYPE_CHECK=new TypeLink.Check(
 			LinkedIOList.Node.class,
 			List.of(t->{
-				var c=t.getTypeClass();
+				var c=t.getTypeClass(null);
 				if(!IOInstance.isManaged(c)) throw new ClassCastException("not managed");
 				if(Modifier.isAbstract(c.getModifiers())) throw new ClassCastException(c+" is abstract");
 			})
@@ -145,7 +145,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		private static NumberSize calcOptimalNextSize(DataProvider provider) throws IOException{
 			return NumberSize.bySize(provider.getSource().getIOSize());
 		}
-		public static <T extends IOInstance<T>> Node<T> allocValNode(T value, Node<T> next, SizeDescriptor<T> sizeDescriptor, TypeDefinition nodeType, DataProvider provider) throws IOException{
+		public static <T extends IOInstance<T>> Node<T> allocValNode(T value, Node<T> next, SizeDescriptor<T> sizeDescriptor, TypeLink nodeType, DataProvider provider) throws IOException{
 			int nextBytes;
 			if(next!=null) nextBytes=NumberSize.bySize(next.getReference().getPtr()).bytes;
 			else nextBytes=calcOptimalNextSize(provider).bytes;
@@ -163,7 +163,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		@IOValue
 		private NumberSize nextSize;
 		
-		public Node(DataProvider provider, Reference reference, TypeDefinition typeDef, T val, Node<T> next) throws IOException{
+		public Node(DataProvider provider, Reference reference, TypeLink typeDef, T val, Node<T> next) throws IOException{
 			this(provider, reference, typeDef);
 			
 			var newSiz=calcOptimalNextSize(provider);
@@ -176,7 +176,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			if(val!=null) setValue(val);
 		}
 		
-		public Node(DataProvider provider, Reference reference, TypeDefinition typeDef) throws IOException{
+		public Node(DataProvider provider, Reference reference, TypeLink typeDef) throws IOException{
 			super(provider, reference, typeDef, NODE_TYPE_CHECK);
 			
 			var type=(Struct<T>)typeDef.argAsStruct(0);
@@ -511,7 +511,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		}
 	}
 	
-	private static final TypeDefinition.Check LIST_TYPE_CHECK=new TypeDefinition.Check(
+	private static final TypeLink.Check LIST_TYPE_CHECK=new TypeLink.Check(
 		LinkedIOList.class,
 		List.of(t->{
 			if(!IOInstance.isManaged(t)) throw new ClassCastException("not managed");
@@ -528,7 +528,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 	
 	
 	@SuppressWarnings("unchecked")
-	public LinkedIOList(DataProvider provider, Reference reference, TypeDefinition typeDef) throws IOException{
+	public LinkedIOList(DataProvider provider, Reference reference, TypeLink typeDef) throws IOException{
 		super(provider, reference, typeDef, LIST_TYPE_CHECK);
 		
 		var type=(Struct<T>)typeDef.argAsStruct(0);
@@ -571,8 +571,8 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		getNode(index).setValue(value);
 	}
 	
-	private TypeDefinition nodeType(){
-		return new TypeDefinition(
+	private TypeLink nodeType(){
+		return new TypeLink(
 			LinkedIOList.Node.class,
 			getTypeDef().arg(0)
 		);
@@ -590,6 +590,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		if(index==0){
 			var head=getHead();
 			setHead(Node.allocValNode(value, head, elementPipe.getSizeDescriptor(), nodeType(), getDataProvider()));
+			deltaSize(1);
 			return;
 		}
 		

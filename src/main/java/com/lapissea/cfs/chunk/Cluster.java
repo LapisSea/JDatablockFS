@@ -59,24 +59,27 @@ public class Cluster implements DataProvider{
 	}
 	
 	public static void init(IOInterface data) throws IOException{
-		
-		var provider=DataProvider.newVerySimpleProvider(data);
-		
-		try(var io=data.write(true)){
-			io.write(MAGIC_ID);
+		try(var ignored=data.openIOTransaction()){
+			
+			var provider=DataProvider.newVerySimpleProvider(data);
+			
+			try(var io=data.write(true)){
+				io.write(MAGIC_ID);
+			}
+			
+			var firstChunk=AllocateTicket.withData(ROOT_PIPE, provider, new RootRef())
+			                             .withApproval(c->c.getPtr().equals(FIRST_CHUNK_PTR))
+			                             .submit(provider);
+			
+			var db=new IOTypeDB.PersistentDB();
+			db.init(provider);
+			
+			ROOT_PIPE.modify(firstChunk, root->{
+				Metadata metadata=root.metadata;
+				metadata.db=db;
+				metadata.allocateNulls(provider);
+			}, null);
 		}
-		var firstChunk=AllocateTicket.withData(ROOT_PIPE, provider, new RootRef())
-		                             .withApproval(c->c.getPtr().equals(FIRST_CHUNK_PTR))
-		                             .submit(provider);
-		
-		var db=new IOTypeDB.PersistentDB();
-		db.init(provider);
-		
-		ROOT_PIPE.modify(firstChunk, root->{
-			Metadata metadata=root.metadata;
-			metadata.db=db;
-			metadata.allocateNulls(provider);
-		}, null);
 	}
 	
 	

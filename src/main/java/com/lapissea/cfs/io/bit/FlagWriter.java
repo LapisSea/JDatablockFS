@@ -6,8 +6,8 @@ import com.lapissea.cfs.objects.NumberSize;
 
 import java.io.IOException;
 
-import static com.lapissea.cfs.GlobalConfig.*;
-import static com.lapissea.cfs.io.bit.BitUtils.*;
+import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.io.bit.BitUtils.makeMask;
 
 public class FlagWriter implements BitWriter<FlagWriter>{
 	
@@ -71,8 +71,7 @@ public class FlagWriter implements BitWriter<FlagWriter>{
 	}
 	
 	public FlagWriter fillRestAllOne() throws IOException{
-		fillNOne(remainingCount());
-		return this;
+		return fillNOne(remainingCount());
 	}
 	
 	public int remainingCount(){

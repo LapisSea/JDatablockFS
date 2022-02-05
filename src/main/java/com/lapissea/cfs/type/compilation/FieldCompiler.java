@@ -203,7 +203,7 @@ public class FieldCompiler{
 				
 				Function<String, Optional<Method>> getMethod=prefix->scanMethod(cl, m->checkMethod(fieldName, prefix, m));
 				
-				var getter=getMethod.apply("get");
+				var getter=getMethod.apply(getPrefix(field));
 				var setter=getMethod.apply("set");
 				
 				getter.ifPresent(usedFields::add);
@@ -224,7 +224,8 @@ public class FieldCompiler{
 		Map<String, PairM<Method, Method>> transientFieldsMap=new HashMap<>();
 		
 		for(Method hangingMethod : hangingMethods){
-			getMethodFieldName("get", hangingMethod).ifPresent(s->transientFieldsMap.computeIfAbsent(s, n->new PairM<>()).obj1=hangingMethod);
+			String getPrefix=getPrefix(hangingMethod);
+			getMethodFieldName(getPrefix, hangingMethod).ifPresent(s->transientFieldsMap.computeIfAbsent(s, n->new PairM<>()).obj1=hangingMethod);
 			getMethodFieldName("set", hangingMethod).ifPresent(s->transientFieldsMap.computeIfAbsent(s, n->new PairM<>()).obj2=hangingMethod);
 		}
 		
@@ -245,7 +246,7 @@ public class FieldCompiler{
 		                                                            .stream()
 		                                                            .flatMap(PairM::<Method>stream)
 		                                                            .noneMatch(mt->mt==m))
-		                               .map(Method::toString)
+		                               .map(method->method+""+(fields.stream().anyMatch(f->f.getName().equals(method.getName()))?(" did you mean "+getPrefix(method)+TextUtil.firstToUpperCase(method.getName())+"?"):""))
 		                               .collect(Collectors.joining("\n"));
 		if(!unusedWaning.isEmpty()){
 			throw new MalformedStructLayout("There are unused or invalid methods marked with "+IOValue.class.getSimpleName()+"\n"+unusedWaning);
@@ -275,6 +276,18 @@ public class FieldCompiler{
 			})
 		).sorted();
 	}
+	
+	private String getPrefix(Field field){
+		var typ=field.getType();
+		var isBool=typ==boolean.class||typ==Boolean.class;
+		return isBool?"is":"get";
+	}
+	private String getPrefix(Method method){
+		var typ=method.getReturnType();
+		var isBool=typ==boolean.class||typ==Boolean.class;
+		return isBool?"is":"get";
+	}
+	
 	private Optional<String> getMethodFieldName(String prefix, Method m){
 		IOValue ann  =m.getAnnotation(IOValue.class);
 		var     mName=m.getName();
@@ -386,34 +399,28 @@ public class FieldCompiler{
 				return IOFieldPrimitive.make(field);
 			}
 		});
-		REGISTRY.register(new RegistryNode.InstanceOf<Enum>(){
-			@Override
-			public Class<Enum> getType(){
-				return Enum.class;
-			}
+		REGISTRY.register(new RegistryNode.InstanceOf<>(Enum.class){
 			@Override
 			public <T extends IOInstance<T>> IOField<T, Enum> create(FieldAccessor<T> field, GenericContext genericContext){
 				return new IOFieldEnum<>(field);
 			}
 		});
-		REGISTRY.register(new RegistryNode.InstanceOf<INumber>(){
-			@Override
-			public Class<INumber> getType(){
-				return INumber.class;
-			}
+		REGISTRY.register(new RegistryNode.InstanceOf<>(INumber.class){
 			@Override
 			public <T extends IOInstance<T>> IOField<T, INumber> create(FieldAccessor<T> field, GenericContext genericContext){
 				return new IOFieldNumber<>(field);
 			}
 		});
-		REGISTRY.register(new RegistryNode.InstanceOf<byte[]>(){
-			@Override
-			public Class<byte[]> getType(){
-				return byte[].class;
-			}
+		REGISTRY.register(new RegistryNode.InstanceOf<>(byte[].class){
 			@Override
 			public <T extends IOInstance<T>> IOField<T, byte[]> create(FieldAccessor<T> field, GenericContext genericContext){
 				return new IOFieldByteArray<>(field);
+			}
+		});
+		REGISTRY.register(new RegistryNode.InstanceOf<>(float[].class){
+			@Override
+			public <T extends IOInstance<T>> IOField<T, float[]> create(FieldAccessor<T> field, GenericContext genericContext){
+				return new IOFieldFloatArray<>(field);
 			}
 		});
 		REGISTRY.register(new RegistryNode(){
@@ -428,21 +435,13 @@ public class FieldCompiler{
 				return new IOFieldInstanceArray<>(field);
 			}
 		});
-		REGISTRY.register(new RegistryNode.InstanceOf<String>(){
-			@Override
-			public Class<String> getType(){
-				return String.class;
-			}
+		REGISTRY.register(new RegistryNode.InstanceOf<>(String.class){
 			@Override
 			public <T extends IOInstance<T>> IOField<T, String> create(FieldAccessor<T> field, GenericContext genericContext){
 				return new IOFieldInlineString<>(field);
 			}
 		});
-		REGISTRY.register(new RegistryNode.InstanceOf<IOInstance>(){
-			@Override
-			public Class<IOInstance> getType(){
-				return IOInstance.class;
-			}
+		REGISTRY.register(new RegistryNode.InstanceOf<>(IOInstance.class){
 			@Override
 			public <T extends IOInstance<T>> IOField<T, ? extends IOInstance> create(FieldAccessor<T> field, GenericContext genericContext){
 				Class<?> raw      =field.getType();

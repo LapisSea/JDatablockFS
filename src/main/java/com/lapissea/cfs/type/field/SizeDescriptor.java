@@ -193,7 +193,8 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 		return mapSize(wordSpace, getFixed());
 	}
 	default long calcUnknown(Struct.Pool<Inst> ioPool, DataProvider provider, Inst instance, WordSpace wordSpace){
-		return mapSize(wordSpace, calcUnknown(ioPool, provider, instance));
+		var unknown=calcUnknown(ioPool, provider, instance);
+		return mapSize(wordSpace, unknown);
 	}
 	
 	default OptionalLong mapSize(WordSpace targetSpace, OptionalLong val){

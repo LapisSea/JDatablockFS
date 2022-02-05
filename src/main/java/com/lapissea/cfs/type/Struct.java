@@ -6,6 +6,7 @@ import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.FieldIsNullException;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
+import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.compilation.FieldCompiler;
 import com.lapissea.cfs.type.field.IOField;
@@ -78,7 +79,7 @@ public class Struct<T extends IOInstance<T>>{
 	public static class Unmanaged<T extends IOInstance.Unmanaged<T>> extends Struct<T>{
 		
 		public interface Constr<T>{
-			T create(DataProvider provider, Reference reference, TypeDefinition type) throws IOException;
+			T create(DataProvider provider, Reference reference, TypeLink type) throws IOException;
 		}
 		
 		public static Unmanaged<?> thisClass(){
@@ -134,7 +135,7 @@ public class Struct<T extends IOInstance<T>>{
 		
 		public Constr<T> requireUnmanagedConstructor(){
 			if(unmanagedConstructor==null){
-				unmanagedConstructor=Utils.findConstructor(getType(), Constr.class, Utils.getFunctionalMethod(Constr.class).getParameterTypes());
+				unmanagedConstructor=Access.findConstructor(getType(), Constr.class, Access.getFunctionalMethod(Constr.class).getParameterTypes());
 			}
 			return unmanagedConstructor;
 		}
@@ -344,7 +345,7 @@ public class Struct<T extends IOInstance<T>>{
 	}
 	
 	public Supplier<T> requireEmptyConstructor(){
-		if(emptyConstructor==null) emptyConstructor=Utils.findConstructor(getType(), Supplier.class);
+		if(emptyConstructor==null) emptyConstructor=Access.findConstructor(getType(), Supplier.class);
 		return emptyConstructor;
 	}
 	
@@ -353,12 +354,12 @@ public class Struct<T extends IOInstance<T>>{
 		return new Pool.StructArray<>(this, pool);
 	}
 	
-	public GenericContext describeGenerics(TypeDefinition def){
+	public GenericContext describeGenerics(TypeLink def){
 		return new GenericContext.Deferred(()->{
 			var parms=getClass().getTypeParameters();
 			var types=IntStream.range(0, parms.length)
 			                   .boxed()
-			                   .collect(Collectors.toMap(i->parms[i].getName(), i->def.arg(i).generic()));
+			                   .collect(Collectors.toMap(i->parms[i].getName(), i->def.arg(i).generic(null)));
 			return new GenericContext.MapConstant(types);
 		});
 	}

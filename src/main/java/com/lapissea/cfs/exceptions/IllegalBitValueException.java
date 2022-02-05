@@ -2,18 +2,21 @@ package com.lapissea.cfs.exceptions;
 
 public class IllegalBitValueException extends RuntimeException{
 	
-	public IllegalBitValueException(){
+	public final long bit;
+	
+	public IllegalBitValueException(long bit){
+		this.bit=bit;
 	}
-	public IllegalBitValueException(String message){
+	public IllegalBitValueException(long bit, String message){
 		super(message);
+		this.bit=bit;
 	}
-	public IllegalBitValueException(String message, Throwable cause){
+	public IllegalBitValueException(long bit, String message, Throwable cause){
 		super(message, cause);
+		this.bit=bit;
 	}
-	public IllegalBitValueException(Throwable cause){
+	public IllegalBitValueException(long bit, Throwable cause){
 		super(cause);
-	}
-	public IllegalBitValueException(String message, Throwable cause, boolean enableSuppression, boolean writableStackTrace){
-		super(message, cause, enableSuppression, writableStackTrace);
+		this.bit=bit;
 	}
 }

@@ -6,7 +6,6 @@ import com.lapissea.cfs.io.IOTransactionBuffer;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.content.ContentOutputBuilder;
 import com.lapissea.cfs.io.content.ContentWriter;
-import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.function.UnsafeSupplier;
@@ -15,7 +14,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Objects;
-import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 
 public abstract class MemoryData<DataType> implements IOInterface{
@@ -33,12 +31,12 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		
 		@Override
 		public long getPos(){
-			return Math.min(pos, used);
+			return Math.min(pos, getSize());
 		}
 		
 		@Override
 		public long getSize(){
-			return used;
+			return getCapacity();
 		}
 		
 		@Override
@@ -48,18 +46,18 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		
 		@Override
 		public long getCapacity(){
+			if(transactionOpen){
+				return transactions.getCapacity(used);
+			}
 			return used;
 		}
 		
 		@Override
 		public RandomIO setCapacity(long newCapacity){
 			if(readOnly) throw new UnsupportedOperationException();
-			if(transactionOpen){
-				throw new NotImplementedException();//TODO implement capacity changing when in transaction
-			}
 			
 			MemoryData.this.setCapacity(newCapacity);
-			pos=Math.min(pos, used);
+			pos=(int)Math.min(pos, getSize());
 			return this;
 		}
 		
@@ -72,7 +70,11 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		@Override
 		public int read() throws IOException{
 			if(transactionOpen){
-				return transactions.readByte(this::readAt, pos++);
+				int b=transactions.readByte(this::readAt, pos);
+				if(b>=0){
+					this.pos++;
+				}
+				return b;
 			}
 			
 			int remaining=(int)(getSize()-getPos());
@@ -83,13 +85,14 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		@Override
 		public int read(byte[] b, int off, int len) throws IOException{
 			if(transactionOpen){
-				var oldPos=pos;
-				int read  =transactions.read(this::readAt, pos, b, off, len);
-				pos=oldPos+read;
+				int read=transactions.read(this::readAt, pos, b, off, len);
+				pos+=read;
 				return read;
 			}
 			
-			return readAt(pos, b, off, len);
+			int read=readAt(pos, b, off, len);
+			if(read>=0) pos+=read;
+			return read;
 		}
 		
 		private int readAt(long pos, byte[] b, int off, int len){
@@ -101,17 +104,7 @@ public abstract class MemoryData<DataType> implements IOInterface{
 			
 			int clampedLen=Math.min(remaining, len);
 			readN(data, pos, b, off, clampedLen);
-			this.pos+=clampedLen;
 			return clampedLen;
-		}
-		
-		private void pushUsed(){
-			if(used<pos){
-				var old=used;
-				used=pos;
-				
-				logWriteEvent(old, used);
-			}
 		}
 		
 		@Override
@@ -128,7 +121,7 @@ public abstract class MemoryData<DataType> implements IOInterface{
 			write1(data, pos, (byte)b);
 			logWriteEvent(pos);
 			pos++;
-			pushUsed();
+			used=Math.max(used, pos);
 		}
 		
 		@Override
@@ -150,11 +143,12 @@ public abstract class MemoryData<DataType> implements IOInterface{
 			if(remaining<len) setCapacity(Math.max(4, Math.max((int)(getCapacity()*4D/3), getCapacity()+len-remaining)));
 			
 			writeN(b, off, data, pos, len);
-			logWriteEvent(pos, pos+len);
+			var oldPos=pos;
 			if(pushPos){
 				pos+=len;
-				pushUsed();
+				used=Math.max(used, pos);
 			}
+			logWriteEvent(oldPos, oldPos+len);
 		}
 		
 		@Override
@@ -174,33 +168,42 @@ public abstract class MemoryData<DataType> implements IOInterface{
 			
 			int start=pos, end=start+count;
 			
+			var used=(int)getSize();
+			
 			int overshoot=end-used;
 			if(overshoot>0){
-//				start-=overshoot;
+				start=Math.max(0, start-overshoot);
 				end=used;
 			}
 			
-			String name=getClass().getSimpleName();
-			String pre;
-			if(start<0){
-				start=0;
-				pre="{pos="+pos+", data=";
-			}else pre="{";
+			String transactionStr=transactionOpen?", transaction: {"+transactions.infoString()+"}":"";
 			
-			var post=overshoot==0?"}":" + "+overshoot+" more}";
+			String name=getClass().getSimpleName();
+			String pre ="{pos="+pos+transactionStr+", data=";
+			if(start!=0) pre+=start+" ... ";
+			
+			var more=used-end;
+			var post=more==0?"}":" ... "+more+"}";
 			
 			var result=new StringBuilder(name.length()+pre.length()+post.length()+end-start);
 			
 			result.append(name).append(pre);
-			for(int i=start;i<end;i++){
-				char c=(char)read1(data, i);
-				result.append(switch(c){
-					case 0 -> '␀';
-					case '\n' -> '↵';
-					case '\t' -> '↹';
-					default -> c;
-				});
+			try(var io=ioAt(start)){
+				for(int i=start;i<end-1;i++){
+					char c=(char)io.readInt1();
+					result.append(switch(c){
+						case 0 -> '␀';
+						case '\n' -> '↵';
+						case '\r' -> '®';
+						case '\b' -> '␈';
+						case '\t' -> '↹';
+						default -> c;
+					});
+				}
+			}catch(IOException e){
+				throw new RuntimeException(e);
 			}
+			
 			result.append(post);
 			
 			return result.toString();
@@ -259,6 +262,9 @@ public abstract class MemoryData<DataType> implements IOInterface{
 	
 	@Override
 	public long getIOSize(){
+		if(transactionOpen){
+			return transactions.getCapacity(used);
+		}
 		return used;
 	}
 	
@@ -268,10 +274,12 @@ public abstract class MemoryData<DataType> implements IOInterface{
 	private void setCapacity(int newCapacity){
 		if(readOnly) throw new UnsupportedOperationException();
 		if(transactionOpen){
-			transactions.capacityChange(newCapacity);
+			var siz=transactions.getCapacity(used);
+			transactions.capacityChange(Math.min(siz, newCapacity));
+			return;
 		}
 		
-		long lastCapacity=getIOSize();
+		long lastCapacity=getLength(data);
 		if(lastCapacity==newCapacity) return;
 		
 		data=resize(data, newCapacity);
@@ -297,12 +305,21 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		};
 	}
 	
-	public String toShortString(){
-		return TextUtil.mapObjectValues(this).entrySet().stream().map(TextUtil::toShortString).collect(Collectors.joining(", ", "{", "}"));
-	}
 	@Override
 	public String toString(){
-		return MemoryData.class.getSimpleName()+toShortString();
+		return MemoryData.class.getSimpleName()+"."+getClass().getSimpleName()+"#"+Integer.toHexString(hashCode());
+	}
+	
+	@Override
+	public boolean equals(Object o){
+		return this==o||
+		       o instanceof MemoryData<?> that&&
+		       data.equals(that.data);
+	}
+	
+	@Override
+	public int hashCode(){
+		return data.hashCode();
 	}
 	
 	protected abstract int getLength(DataType data);

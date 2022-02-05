@@ -17,6 +17,8 @@ import static org.lwjgl.glfw.GLFW.*;
 
 public class DisplayManager implements DataLogger{
 	
+	private static final boolean DO_JIT_WARMUP=false;
+	
 	private boolean destroyRequested=false;
 	
 	private final RenderBackend renderer;
@@ -123,7 +125,7 @@ public class DisplayManager implements DataLogger{
 		
 		try{
 			if(!destroyRequested){
-				int jitWarmup=0;
+				int jitWarmup=DO_JIT_WARMUP?0:Integer.MAX_VALUE;
 				while(display.isOpen()){
 					
 					sessionHost.cleanUpSessions();

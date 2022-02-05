@@ -1,7 +1,8 @@
 module JDatablockFS.run {
-	requires JDatablockFS;
-//	requires JDatablockFS.tools;
+	requires JDatablockFS.tools;
 	requires jlapisutil;
+	requires Jorth;
 	
 	opens com.lapisseqa.cfs.run;
+	opens com.lapisseqa.cfs.run.sparseimage;
 }

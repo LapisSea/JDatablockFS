@@ -16,10 +16,12 @@ import com.lapissea.cfs.tools.SessionHost.CachedFrame;
 import com.lapissea.cfs.tools.SessionHost.ParsedFrame;
 import com.lapissea.cfs.tools.logging.MemFrame;
 import com.lapissea.cfs.tools.render.RenderBackend;
+import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.cfs.type.field.fields.reflection.BitFieldMerger;
@@ -32,6 +34,7 @@ import java.awt.Color;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Array;
+import java.lang.reflect.Type;
 import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.function.Consumer;
@@ -41,6 +44,7 @@ import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
+import static com.lapissea.cfs.tools.ColorUtils.alpha;
 import static com.lapissea.cfs.tools.render.RenderBackend.DrawMode;
 import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 
@@ -68,7 +72,7 @@ public class BinaryGridRenderer{
 		
 	}
 	
-	private static record Pointer(long from, long to, int size, Color color, String message, float widthFactor){}
+	private record Pointer(long from, long to, int size, Color color, String message, float widthFactor){}
 	
 	private boolean errorMode;
 	private long    renderCount;
@@ -127,7 +131,7 @@ public class BinaryGridRenderer{
 		long start=chunk.getPtr().getValue();
 		long end  =chunk.dataEnd();
 		
-		DrawUtils.fillByteRange(ColorUtils.alpha(color, color.getAlpha()/255F*0.2F), ctx, new Range(start, end));
+		DrawUtils.fillByteRange(alpha(color, color.getAlpha()/255F*0.2F), ctx, new Range(start, end));
 		renderer.setLineWidth(2);
 		outlineByteRange(color, ctx, new Range(start, chunk.dataStart()));
 		renderer.setLineWidth(3);
@@ -135,7 +139,7 @@ public class BinaryGridRenderer{
 		renderer.setLineWidth(1);
 		var next=chunk.next();
 		if(next!=null){
-			outlineChunk(ctx, next, ColorUtils.alpha(color, color.getAlpha()/255F*0.5F));
+			outlineChunk(ctx, next, alpha(color, color.getAlpha()/255F*0.5F));
 		}
 	}
 	
@@ -162,7 +166,7 @@ public class BinaryGridRenderer{
 		Color col, int bitOffset, long bitSize, Reference reference, long fieldOffset
 	) throws IOException{
 		Consumer<DrawUtils.Rect> doSegment=bitRect->{
-			renderer.setColor(ColorUtils.alpha(col, 0.8F).darker());
+			renderer.setColor(alpha(col, 0.8F).darker());
 			renderer.fillQuad(bitRect.x, bitRect.y, bitRect.width, bitRect.height);
 			drawStringInInfo(col, Objects.toString(field.instanceToString(ioPool, instance, true)), bitRect, false, ctx.strings);
 		};
@@ -225,13 +229,15 @@ public class BinaryGridRenderer{
 			}
 			if(lastRange!=null) ctx.recordPointer(new Pointer(lastRange.to()-1, range.from(), 0, col, field.toString(), 0.2F));
 			lastRange=range;
+			drawByteRanges(ctx.renderCtx, List.of(range), alpha(ColorUtils.mul(col, 0.8F), 0.6F), false, true);
 			if(!hover&&ctx.renderCtx.isRangeHovered(range)){
+				outlineByteRange(col, ctx.renderCtx, range);
+				DrawUtils.fillByteRange(alpha(col, 0.2F), ctx.renderCtx, range);
 				hover=true;
 			}
-			drawByteRanges(ctx.renderCtx, List.of(range), ColorUtils.alpha(ColorUtils.mul(col, 0.8F), 0.6F), false, true);
 		}
 		
-		var color=ColorUtils.alpha(ColorUtils.mix(col, Color.WHITE, 0.2F), 1);
+		var color=alpha(ColorUtils.mix(col, Color.WHITE, 0.2F), 1);
 		
 		var rectWidth=bestRange.toRect(ctx.renderCtx).width;
 		
@@ -292,8 +298,8 @@ public class BinaryGridRenderer{
 	
 	private void fillChunk(RenderContext ctx, Chunk chunk, boolean withChar, boolean force){
 		var chunkColor=chunkBaseColor();
-		var dataColor =ColorUtils.alpha(ColorUtils.mul(chunkColor, 0.5F), 0.7F);
-		var freeColor =ColorUtils.alpha(chunkColor, 0.4F);
+		var dataColor =alpha(ColorUtils.mul(chunkColor, 0.5F), 0.7F);
+		var freeColor =alpha(chunkColor, 0.4F);
 		
 		int start=(int)chunk.dataStart();
 		int cap  =(int)chunk.getCapacity();
@@ -528,7 +534,7 @@ public class BinaryGridRenderer{
 		outlineByteRange(Color.WHITE, ctx, new Range(0, magic.limit()));
 		drawStringIn(Color.WHITE, new String(bytes, 0, magic.limit()), new DrawUtils.Rect(0, 0, ctx.pixelsPerByte()*Math.min(magic.limit(), ctx.width()), ctx.pixelsPerByte()), false);
 		
-		renderer.setColor(ColorUtils.alpha(Color.WHITE, 0.5F));
+		renderer.setColor(alpha(Color.WHITE, 0.5F));
 		
 		List<Pointer> ptrs    =new ArrayList<>();
 		ParsedFrame   parsed  =cFrame.parsed();
@@ -552,44 +558,57 @@ public class BinaryGridRenderer{
 				var cl  =cluster;
 				var root=cluster.getRoot();
 				
-				cluster.rootWalker().walk(true, ref->{
-					if(!ref.isNull()){
+				Throwable e1    =null;
+				var       annCtx=new AnnotateCtx(ctx, provider, new LinkedList<>(), ptrs::add, new ArrayList<>(), new ArrayList<>());
+				
+				try{
+					
+					cluster.rootWalker().walk(true, ref->{
+						if(!ref.isNull()){
+							try{
+								for(Chunk chunk : new ChainWalker(ref.getPtr().dereference(cl))){
+									referenced.add(chunk);
+								}
+							}catch(IOException e){
+								throw UtilL.uncheckedThrow(e);
+							}
+						}
+					});
+					annotateStruct(annCtx, root,
+					               cluster.getFirstChunk().getPtr().makeReference(),
+					               FixedContiguousStructPipe.of(root.getThisStruct()),
+					               true);
+					
+				}catch(Throwable e){
+					e1=e;
+				}
+				try{
+					assert annCtx.stack.isEmpty();
+					annCtx.stack.add(null);
+					
+					long pos=cluster.getFirstChunk().getPtr().getValue();
+					while(pos<bytes.length){
 						try{
-							for(Chunk chunk : new ChainWalker(ref.getPtr().dereference(cl))){
-								referenced.add(chunk);
+							for(Chunk chunk : new PhysicalChunkWalker(cluster.getChunk(ChunkPointer.of(pos)))){
+								pos=chunk.dataEnd();
+								if(referenced.contains(chunk)){
+									fillChunk(ctx, chunk, true, false);
+								}
+								annotateChunk(annCtx, chunk);
 							}
 						}catch(IOException e){
-							throw UtilL.uncheckedThrow(e);
+							var p=(int)pos;
+							drawBytes(ctx, IntStream.of(p), Color.RED, true, true);
+							pos++;
 						}
 					}
-				});
-				AnnotateCtx annCtx=new AnnotateCtx(ctx, provider, new LinkedList<>(), ptrs::add, new ArrayList<>(), new ArrayList<>());
-				annotateStruct(annCtx, root,
-				               cluster.getFirstChunk().getPtr().makeReference(),
-				               FixedContiguousStructPipe.of(root.getThisStruct()),
-				               true);
-				
-				assert annCtx.stack.isEmpty();
-				annCtx.stack.add(null);
-				
-				long pos=cluster.getFirstChunk().getPtr().getValue();
-				while(pos<bytes.length){
-					try{
-						for(Chunk chunk : new PhysicalChunkWalker(cluster.getChunk(ChunkPointer.of(pos)))){
-							pos=chunk.dataEnd();
-							if(referenced.contains(chunk)){
-								fillChunk(ctx, chunk, true, false);
-							}
-							annotateChunk(annCtx, chunk);
-						}
-					}catch(IOException e){
-						var p=(int)pos;
-						drawBytes(ctx, IntStream.of(p), Color.RED, true, true);
-						pos++;
-					}
+					annCtx.popStrings(renderer);
+				}catch(Throwable e){
+					if(e1!=null) e1.addSuppressed(e);
+					else e1=e;
 				}
-				annCtx.popStrings(renderer);
 				
+				if(e1!=null) throw e1;
 			}else{
 				provider=DataProvider.newVerySimpleProvider(MemoryData.build().withRaw(bytes).build());
 				AnnotateCtx annCtx=new AnnotateCtx(ctx, provider, new LinkedList<>(), ptrs::add, new ArrayList<>(), new ArrayList<>());
@@ -626,7 +645,7 @@ public class BinaryGridRenderer{
 		}
 		
 		var f=renderer.getFont();
-		drawBytes(ctx, IntStream.range(0, bytes.length).filter(((IntPredicate)filled::contains).negate()), ColorUtils.alpha(Color.GRAY, 0.5F), true, true);
+		drawBytes(ctx, IntStream.range(0, bytes.length).filter(((IntPredicate)filled::contains).negate()), alpha(Color.GRAY, 0.5F), true, true);
 		
 		findHoverChunk(ctx, parsed, provider);
 		
@@ -685,7 +704,7 @@ public class BinaryGridRenderer{
 		
 		drawIndex.accept(clampedOverflow.stream());
 		
-		renderer.setColor(ColorUtils.alpha(Color.RED, color.getAlpha()/255F));
+		renderer.setColor(alpha(Color.RED, color.getAlpha()/255F));
 		drawIndex.accept(ranges.stream().map(r->{
 			if(r.to()<ctx.bytes.length) return null;
 			if(r.from()<ctx.bytes.length) return new Range(ctx.bytes.length, r.to());
@@ -784,7 +803,7 @@ public class BinaryGridRenderer{
 		renderer.fillQuad(frameIndex*w, 0, w, height*1.5);
 		renderer.fillQuad(frameIndex*w-0.75, 0, 1.5, height*1.5);
 		
-		renderer.setColor(ColorUtils.alpha(Color.WHITE, 0.3F));
+		renderer.setColor(alpha(Color.WHITE, 0.3F));
 		renderer.fillQuad(w, 0, screenWidth, height);
 		renderer.popMatrix();
 	}
@@ -822,14 +841,14 @@ public class BinaryGridRenderer{
 				col=ptr.color();
 			}
 			
-			renderer.setColor(ColorUtils.alpha(col, 0.5F));
+			renderer.setColor(alpha(col, 0.5F));
 			
 			if(pSiz>1&&LongStream.range(start, start+pSiz).noneMatch(i->i%ctx.width()==0)){
-				renderer.setColor(ColorUtils.alpha(col, 0.1F));
+				renderer.setColor(alpha(col, 0.1F));
 				renderer.setLineWidth(sHalf*ptr.widthFactor());
 				drawLine(ctx, start, start+pSiz-1);
 				renderer.setLineWidth(sFul*ptr.widthFactor());
-				renderer.setColor(ColorUtils.alpha(col, 0.5F));
+				renderer.setColor(alpha(col, 0.5F));
 			}
 			
 			start+=pSiz/2;
@@ -913,10 +932,10 @@ public class BinaryGridRenderer{
 		var bounds    =Arrays.stream(lines).map(this::getStringBounds).toList();
 		var totalBound=bounds.stream().reduce((l, r)->new DrawFont.Bounds(Math.max(l.width(), r.width()), l.height()+r.height())).orElseThrow();
 		
-		renderer.setColor(ColorUtils.alpha(Color.RED.darker(), 0.2F));
+		renderer.setColor(alpha(Color.RED.darker(), 0.2F));
 		renderer.fillQuad(0, screenHeight-totalBound.height()-25, totalBound.width()+20, totalBound.height()+20);
 		
-		var col =ColorUtils.alpha(Color.WHITE, 0.8F);
+		var col =alpha(Color.WHITE, 0.8F);
 		var rect=new DrawUtils.Rect(10, screenHeight-totalBound.height()-20, totalBound.width(), renderer.getLineWidth());
 		
 		List<DrawFont.StringDraw> strings=new ArrayList<>(lines.length);
@@ -998,7 +1017,7 @@ public class BinaryGridRenderer{
 		for(int i=0;i<ctx.hoverMessages.size();i++){
 			strings.add(new DrawFont.StringDraw(renderer.getFontScale(), col, ctx.hoverMessages.get(i), x, y+i*renderer.getFontScale()));
 		}
-		renderer.setColor(ColorUtils.alpha(Color.BLACK, 0.3F));
+		renderer.setColor(alpha(Color.BLACK, 0.3F));
 		renderer.fillQuad(x, y-renderer.getFontScale(), w, h);
 		renderer.getFont().fillStrings(strings);
 		
@@ -1074,7 +1093,8 @@ public class BinaryGridRenderer{
 			
 			var rctx=ctx.renderCtx;
 			
-			Random rand=new Random();
+			RuntimeException fieldErr=null;
+			Random           rand    =new Random();
 			renderer.setLineWidth(4);
 			
 			var iterator=makeFieldIterator(instance, pipe);
@@ -1218,18 +1238,63 @@ public class BinaryGridRenderer{
 								}
 								continue;
 							}
-							if(typ.isArray()&&IOInstance.isManaged(typ.componentType())){
-								var inst  =(IOInstance<?>[])field.get(ioPool, instance);
-								var arrSiz=Array.getLength(inst);
-								
-								StructPipe elementPipe=ContiguousStructPipe.of(Struct.ofUnknown(typ.componentType()));
-								long       arrOffset  =0;
-								for(int i=0;i<arrSiz;i++){
-									var val=(IOInstance)Array.get(inst, i);
-									annotateStruct(ctx, val, reference.addOffset(fieldOffset+arrOffset), elementPipe, annotate);
-									arrOffset+=elementPipe.getSizeDescriptor().calcUnknown(ioPool, ctx.provider, val, WordSpace.BYTE);
+							if(typ.isArray()){
+								var comp=typ.componentType();
+								if(IOInstance.isManaged(comp)){
+									var inst  =(IOInstance<?>[])field.get(ioPool, instance);
+									var arrSiz=Array.getLength(inst);
+									
+									StructPipe elementPipe=ContiguousStructPipe.of(Struct.ofUnknown(typ.componentType()));
+									long       arrOffset  =0;
+									for(int i=0;i<arrSiz;i++){
+										var val=(IOInstance)Array.get(inst, i);
+										annotateStruct(ctx, val, reference.addOffset(fieldOffset+arrOffset), elementPipe, annotate);
+										arrOffset+=elementPipe.getSizeDescriptor().calcUnknown(ioPool, ctx.provider, val, WordSpace.BYTE);
+									}
+									continue;
 								}
-								continue;
+								if(comp==float.class){
+									var inst  =(float[])field.get(ioPool, instance);
+									var arrSiz=inst.length;
+									
+									if(size==arrSiz*4L){
+										long arrOffset=0;
+										int[] index={0};
+										var f=new IOFieldPrimitive.FFloat<T>(new FieldAccessor<>(){
+											@Override
+											public Struct<T> getDeclaringStruct(){
+												return instance.getThisStruct();
+											}
+											@NotNull
+											@Override
+											public String getName(){
+												return "["+index[0]+"]";
+											}
+											@Override
+											public Type getGenericType(GenericContext genericContext){
+												return Float.class;
+											}
+											@Override
+											public Object get(Struct.Pool<T> ioPool, T instance){
+												return inst[index[0]];
+											}
+											@Override
+											public void set(Struct.Pool<T> ioPool, T instance, Object value){
+												throw new UnsupportedOperationException();
+											}
+										});
+										for(int i=0;i<arrSiz;i++){
+											index[0]=i;
+											annotateByteField(
+												ctx, ioPool, instance, f,
+												col,
+												reference,
+												Range.fromSize(fieldOffset+arrOffset, 4));
+											arrOffset+=4;
+										}
+										continue;
+									}
+								}
 							}
 							if(typ==String.class){
 								if(annotate) annotateByteField(ctx, ioPool, instance, field, col, reference, Range.fromSize(fieldOffset, size));
@@ -1242,10 +1307,25 @@ public class BinaryGridRenderer{
 					}
 				}catch(Throwable e){
 					String instStr=instanceErrStr(instance);
-					throw new RuntimeException("failed to annotate "+field+" in "+instStr, e);
+					var    err    =new RuntimeException("failed to annotate "+field+" at "+reference.addOffset(fieldOffset)+" in "+instStr+" at "+reference, e);
+					
+					if(fieldErr==null){
+						fieldErr=err;
+					}else{
+						fieldErr.addSuppressed(err);
+					}
+					var sizeDesc=field.getSizeDescriptor();
+					var size    =sizeDesc.calcUnknown(ioPool, ctx.provider, instance);
+					outlineByteRange(alpha(Color.RED, (float)Math.pow(Thread.currentThread().getStackTrace().length/20F, 2)), ctx.renderCtx, Range.fromSize(offsetStart+fieldOffset-size, size));
 				}
 			}
-			if(rctx.isRangeHovered(Range.fromSize(offsetStart, fieldOffset))){
+			if(fieldErr!=null){
+				throw fieldErr;
+			}
+			var rang=Range.fromSize(offsetStart, fieldOffset);
+			if(rctx.isRangeHovered(rang)){
+				outlineByteRange(Color.WHITE, ctx.renderCtx, rang);
+				DrawUtils.fillByteRange(alpha(Color.WHITE, 0.2F), ctx.renderCtx, rang);
 				rctx.hoverMessages.add(instance.toString());
 			}
 		}finally{

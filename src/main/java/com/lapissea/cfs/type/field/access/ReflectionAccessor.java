@@ -2,6 +2,7 @@ package com.lapissea.cfs.type.field.access;
 
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
+import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.objects.INumber;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
@@ -26,7 +27,7 @@ public class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends AbstractF
 		
 		public Num(Struct<CTyp> struct, Field field, Optional<Method> getter, Optional<Method> setter, String name, Type genericType){
 			super(struct, field, getter, setter, name, genericType);
-			constructor=Utils.findConstructor(getType(), LongFunction.class, long.class);
+			constructor=Access.findConstructor(getType(), LongFunction.class, long.class);
 		}
 		@Override
 		public long getLong(Struct.Pool<CTyp> ioPool, CTyp instance){
@@ -76,8 +77,8 @@ public class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends AbstractF
 			}
 		});
 		
-		this.getter=getter.map(Utils::makeMethodHandle).orElse(null);
-		this.setter=setter.map(Utils::makeMethodHandle).orElse(null);
+		this.getter=getter.map(Access::makeMethodHandle).orElse(null);
+		this.setter=setter.map(Access::makeMethodHandle).orElse(null);
 	}
 	
 	@NotNull

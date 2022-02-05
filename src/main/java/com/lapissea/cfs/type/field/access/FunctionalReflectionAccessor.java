@@ -2,6 +2,7 @@ package com.lapissea.cfs.type.field.access;
 
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
+import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.objects.INumber;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.GetAnnotation;
@@ -26,7 +27,7 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 		
 		public Num(Struct<CTyp> struct, GetAnnotation annotations, Method getter, Method setter, String name, Type genericType){
 			super(struct, annotations, getter, setter, name, genericType);
-			constructor=Utils.findConstructor(getType(), LongFunction.class, long.class);
+			constructor=Access.findConstructor(getType(), LongFunction.class, long.class);
 		}
 		@Override
 		public long getLong(Struct.Pool<CTyp> ioPool, CTyp instance){
@@ -73,8 +74,8 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 			throw new MalformedStructLayout("setter argument is "+setter.getGenericParameterTypes()[0]+" but "+genericType+" is required\n"+setter);
 		}
 		
-		this.getter=Utils.makeMethodHandle(getter);
-		this.setter=Utils.makeMethodHandle(setter);
+		this.getter=Access.makeMethodHandle(getter);
+		this.setter=Access.makeMethodHandle(setter);
 	}
 	
 	@NotNull
