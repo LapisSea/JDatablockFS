@@ -35,4 +35,10 @@ public class Chunk extends IOInstance<Chunk>{
 	public String toString(){
 		return "Chunk{"+x+", "+y+"}";
 	}
+	public int getX(){
+		return x;
+	}
+	public int getY(){
+		return y;
+	}
 }

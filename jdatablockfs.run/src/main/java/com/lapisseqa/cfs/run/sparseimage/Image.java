@@ -4,13 +4,12 @@ import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.collections.LinkedIOList;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.annotations.IOValue;
-import com.lapissea.util.LogUtil;
 
 import java.io.IOException;
 
 public class Image extends IOInstance<Image>{
 	
-	private static final int chunkSize=4;
+	private static final int chunkSize=2;
 	
 	@IOValue
 	@IOValue.OverrideType(LinkedIOList.class)
@@ -22,10 +21,20 @@ public class Image extends IOInstance<Image>{
 		int chunkX=x/chunkSize;
 		int chunkY=y/chunkSize;
 		
+		var  dist    =Double.MAX_VALUE;
+		long addIndex=-1;
+		
 		var iter=chunks.listIterator();
 		while(iter.hasNext()){
 			var c=iter.ioNext();
 			if(!c.isXY(chunkX, chunkY)){
+				int xDif=chunkX-c.getX();
+				int yDif=chunkY-c.getY();
+				var d   =Math.sqrt(xDif*xDif+yDif*yDif);
+				if(d<dist){
+					dist=d;
+					addIndex=iter.nextIndex();
+				}
 				continue;
 			}
 			
@@ -38,11 +47,15 @@ public class Image extends IOInstance<Image>{
 			c.pixels[index*3+2]=b;
 			
 			iter.ioSet(c);
-			LogUtil.println(chunks.size());
 			return;
 		}
 		
-		chunks.add(0, new Chunk(chunkX, chunkY, chunkSize));
+		var ch=new Chunk(chunkX, chunkY, chunkSize);
+		if(addIndex!=-1){
+			chunks.add(addIndex, ch);
+		}else{
+			chunks.add(0, ch);
+		}
 		set(x, y, r, g, b);
 	}
 }
