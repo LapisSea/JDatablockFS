@@ -204,7 +204,9 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		datasetID++;
 		transfer(oldBuckets, buckets, bucketPO2, size()<256);
 		
-		writeManagedFields();
+		try(var ignored=getDataProvider().getSource().openIOTransaction()){
+			writeManagedFields();
+		}
 		
 		((Unmanaged<?>)oldBuckets).free();
 		
@@ -317,7 +319,10 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	
 	@Override
 	public void put(K key, V value) throws IOException{
-		var sizeFlag=putEntry(buckets, bucketPO2, key, value);
+		long sizeFlag;
+		try(var ignored=getDataProvider().getSource().openIOTransaction()){
+			sizeFlag=putEntry(buckets, bucketPO2, key, value);
+		}
 		if(sizeFlag==OVERWRITE) return;
 		
 		deltaSize(1);
