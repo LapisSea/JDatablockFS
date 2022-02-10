@@ -1,6 +1,8 @@
 package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.chunk.DataProvider;
+import com.lapissea.cfs.io.impl.MemoryData;
+import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.objects.collections.AbstractUnmanagedIOMap;
 import com.lapissea.cfs.objects.collections.HashIOMap;
 import com.lapissea.cfs.type.field.annotations.IOValue;
@@ -13,15 +15,17 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Stream;
 
+import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+
 
 /**
  * This interface provides a simple protocol to convert a lengthy type definition in to an ID and back.
  * The implementation is expected to be used mainly as a way to remove excessive repeating when
  * interacting with a value of unknown implicit type.
  */
-public interface IOTypeDB{
+public sealed interface IOTypeDB{
 	
-	class MemoryOnlyDB implements IOTypeDB{
+	final class MemoryOnlyDB implements IOTypeDB{
 		
 		private final Map<String, TypeDef> defs=new HashMap<>();
 		
@@ -104,26 +108,32 @@ public interface IOTypeDB{
 		}
 	}
 	
-	class PersistentDB extends IOInstance<PersistentDB> implements IOTypeDB{
+	final class PersistentDB extends IOInstance<PersistentDB> implements IOTypeDB{
 		
 		private static final MemoryOnlyDB BUILT_IN=new MemoryOnlyDB();
 		private static final int          FIRST_ID;
 		
 		static{
-			Stream.of(
-				      Integer.class,
-				      String.class,
-				      TypeLink.class,
-				      TypeDef.class,
-				      IOInstance.class
-			      ).flatMap(csrc->Stream.concat(Stream.of(csrc), Arrays.stream(csrc.getDeclaredClasses()).filter(c->UtilL.instanceOf(c, IOInstance.class))))
-			      .forEach(c->{
-				      try{
-					      BUILT_IN.toID(c, true);
-				      }catch(IOException e){
-					      throw new RuntimeException(e);
-				      }
-			      });
+			try{
+				Stream.of(
+					      int.class,
+					      float.class,
+					      Integer.class,
+					      String.class,
+					      TypeLink.class,
+					      TypeDef.class,
+					      IOInstance.class
+				      ).flatMap(csrc->Stream.concat(Stream.of(csrc), Arrays.stream(csrc.getDeclaredClasses()).filter(c->UtilL.instanceOf(c, IOInstance.class))))
+				      .forEach(c->{
+					      try{
+						      BUILT_IN.toID(c, true);
+					      }catch(IOException e){
+						      throw new RuntimeException(e);
+					      }
+				      });
+			}catch(Throwable e){
+				throw new RuntimeException(e);
+			}
 			
 			FIRST_ID=BUILT_IN.maxID();
 		}
@@ -158,23 +168,47 @@ public interface IOTypeDB{
 			if(!recordNew) return new TypeID(newID, false);
 			
 			data.put(newID, type);
-			recordType(type);
+			var newDefs=new HashMap<String, TypeDef>();
+			recordType(type, newDefs);
+			defs.putAll(newDefs);
 			return new TypeID(newID, true);
 		}
 		
-		private void recordType(TypeLink type) throws IOException{
-			if(!defs.containsKey(type.getTypeName())){
-				var def=new TypeDef(type.getTypeClass(null));
-				if(!def.isUnmanaged()&&BUILT_IN.getDefinitionFromClassName(type.getTypeName())==null){
-					defs.put(type.getTypeName(), def);
+		private void recordType(TypeLink type, Map<String, TypeDef> newDefs) throws IOException{
+			var isBuiltIn=BUILT_IN.getDefinitionFromClassName(type.getTypeName())!=null;
+			if(isBuiltIn) return;
+			
+			var added  =newDefs.containsKey(type.getTypeName());
+			var defined=defs.containsKey(type.getTypeName());
+			
+			if(added||defined) return;
+			
+			var typ=type.getTypeClass(null);
+			if(typ.isArray()){
+				var base=typ;
+				while(base.isArray()){
+					base=base.componentType();
 				}
-				
-				for(TypeDef.FieldDef field : def.getFields()){
-					recordType(field.getType());
-				}
+				recordType(new TypeLink(base), newDefs);
+				return;
 			}
+			
+			var def=new TypeDef(typ);
+			newDefs.put(type.getTypeName(), def);
+			
 			for(int i=0;i<type.argCount();i++){
-				recordType(type.arg(i));
+				recordType(type.arg(i), newDefs);
+			}
+			
+			if(def.isUnmanaged()) return;
+			
+			if(DEBUG_VALIDATION){
+				ContiguousStructPipe.of(type.getThisStruct()).checkTypeIntegrity(type);
+			}
+			
+			
+			for(TypeDef.FieldDef field : def.getFields()){
+				recordType(field.getType(), newDefs);
 			}
 		}
 		
