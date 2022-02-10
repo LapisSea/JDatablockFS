@@ -2,6 +2,7 @@ package com.lapissea.cfs.objects.collections;
 
 import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.chunk.DataProvider;
+import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.IOInstance;
@@ -203,10 +204,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		
 		datasetID++;
 		transfer(oldBuckets, buckets, bucketPO2, size()<256);
-		
-		try(var ignored=getDataProvider().getSource().openIOTransaction()){
-			writeManagedFields();
-		}
+		writeManagedFields();
 		
 		((Unmanaged<?>)oldBuckets).free();
 		
@@ -319,10 +317,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	
 	@Override
 	public void put(K key, V value) throws IOException{
-		long sizeFlag;
-		try(var ignored=getDataProvider().getSource().openIOTransaction()){
-			sizeFlag=putEntry(buckets, bucketPO2, key, value);
-		}
+		long sizeFlag=putEntry(buckets, bucketPO2, key, value);
 		if(sizeFlag==OVERWRITE) return;
 		
 		deltaSize(1);

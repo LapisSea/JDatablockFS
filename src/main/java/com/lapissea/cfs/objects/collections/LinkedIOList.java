@@ -659,7 +659,9 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 	}
 	private void setHead(Node<T> head) throws IOException{
 		this.head=head;
-		writeManagedField(headField);
+		try(var ignored=getDataProvider().getSource().openIOTransaction()){
+			writeManagedField(headField);
+		}
 	}
 	
 	@Override

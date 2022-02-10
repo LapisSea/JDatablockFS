@@ -18,12 +18,10 @@ import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.TextUtil;
+import com.lapissea.util.UtilL;
 
 import java.io.IOException;
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Objects;
-import java.util.OptionalLong;
+import java.util.*;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
@@ -39,7 +37,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		SIZE_DATA
 	}
 	
-	public static record UsageHint(UsageHintType type, String target){}
+	public record UsageHint(UsageHintType type, String target){}
 	
 	
 	public static class NoIO<Inst extends IOInstance<Inst>, ValueType> extends IOField<Inst, ValueType>{
