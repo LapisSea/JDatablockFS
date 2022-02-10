@@ -289,9 +289,12 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		
 		if(dest.isDirect()){
 			var desc=getSizeDescriptor();
-			var max =desc.getMax(WordSpace.BYTE);
-			var min =desc.getMin(WordSpace.BYTE);
-			destBuff=new ContentOutputBuilder((int)max.orElse(Math.max(min, 32)));
+			var siz=desc.getFixed(WordSpace.BYTE).orElseGet(()->{
+				var max =desc.getMax(WordSpace.BYTE);
+				var min =desc.getMin(WordSpace.BYTE);
+				return max.orElse(Math.max(min, 32));
+			});
+			destBuff=new ContentOutputBuilder((int)siz);
 			target=destBuff;
 		}else{
 			target=dest;
