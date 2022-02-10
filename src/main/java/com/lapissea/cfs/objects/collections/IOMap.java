@@ -87,6 +87,7 @@ public interface IOMap<K, V>{
 	}
 	
 	void put(K key, V value) throws IOException;
+	void putAll(Map<K, V> values) throws IOException;
 	
 	
 	static <K, V> String toString(IOMap<K, V> map){

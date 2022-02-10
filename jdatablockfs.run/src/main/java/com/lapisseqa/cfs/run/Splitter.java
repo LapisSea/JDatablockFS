@@ -3,11 +3,13 @@ package com.lapisseqa.cfs.run;
 import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.collections.IOMap;
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.function.UnsafeBiConsumer;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
 import java.util.Collection;
+import java.util.Map;
 import java.util.stream.Stream;
 
 public class Splitter{
@@ -39,6 +41,12 @@ public class Splitter{
 			public void put(K key, V value) throws IOException{
 				a.put(key, value);
 				b.put(key, value);
+				test();
+			}
+			@Override
+			public void putAll(Map<K, V> values) throws IOException{
+				a.putAll(values);
+				b.putAll(values);
 				test();
 			}
 			@Override
