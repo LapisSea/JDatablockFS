@@ -299,8 +299,30 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		return TextUtil.toString(val);
 	}
 	
+	@SuppressWarnings("unchecked")
 	public boolean instancesEqual(Struct.Pool<T> ioPool1, T inst1, Struct.Pool<T> ioPool2, T inst2){
-		return Objects.equals(get(ioPool1, inst1), get(ioPool2, inst2));
+		var o1=get(ioPool1, inst1);
+		var o2=get(ioPool2, inst2);
+		
+		if(nullability==IONullability.Mode.DEFAULT_IF_NULL&&(o1==null||o2==null)){
+			if(o1==null&&o2==null)return true;
+			var acc=getAccessor();
+			
+			if(UtilL.instanceOf(acc.getType(), IOInstance.class)){
+				var typ=Struct.ofUnknown(acc.getType());
+				
+				if(o1==null)o1=(ValueType)typ.requireEmptyConstructor().get();
+				if(o2==null)o2=(ValueType)typ.requireEmptyConstructor().get();
+			}else{
+				throw new NotImplementedException(acc.getType()+"");//TODO
+			}
+		}
+		
+		if(getAccessor().getType().isArray()){
+			return Arrays.equals((Object[])o1, (Object[])o2);
+		}
+		
+		return Objects.equals(o1,o2);
 	}
 	
 	public int instanceHashCode(Struct.Pool<T> ioPool, T instance){
