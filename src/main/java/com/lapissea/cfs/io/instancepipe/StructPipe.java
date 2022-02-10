@@ -5,12 +5,14 @@ import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.FieldIsNullException;
+import com.lapissea.cfs.exceptions.MalformedObjectException;
 import com.lapissea.cfs.exceptions.UnknownSizePredictionException;
 import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.content.ContentOutputBuilder;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
+import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
@@ -21,6 +23,7 @@ import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
+import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
@@ -58,6 +61,27 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 			}
 			
 			put(struct, created);
+			
+			
+			if(DEBUG_VALIDATION){
+				
+				T inst;
+				try{
+					inst=created.getType().requireEmptyConstructor().get();
+				}catch(Throwable e){
+					inst=null;
+				}
+				if(inst!=null){
+					try{
+						created.checkTypeIntegrity(inst);
+					}catch(FieldIsNullException e){
+//						LogUtil.println("warning, "+struct+" is non conforming");
+					}catch(IOException e){
+						throw new RuntimeException(e);
+					}
+				}
+			}
+			
 			return created;
 		}
 	}
@@ -430,6 +454,24 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	
 	public long calcUnknownSize(DataProvider provider, T instance, WordSpace wordSpace){
 		return getSizeDescriptor().calcUnknown(makeIOPool(), provider, instance, wordSpace);
+	}
+	
+	
+	public void checkTypeIntegrity(T inst) throws IOException{
+		var tmp=MemoryData.build().build();
+		var man=DataProvider.newVerySimpleProvider(tmp);
+		
+		T instRead;
+		try{
+			write(man, tmp, inst);
+			instRead=readNew(man, tmp, null);
+		}catch(IOException e){
+			throw new MalformedObjectException("Failed object IO "+getType(),e);
+		}
+		
+		if(!instRead.equals(inst)){
+			throw new MalformedObjectException(getType()+" has failed integrity check. Source/read:\n"+inst+"\n"+instRead);
+		}
 	}
 	
 	@Override
