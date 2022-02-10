@@ -1,5 +1,7 @@
 package com.lapissea.cfs.io;
 
+import com.lapissea.util.TextUtil;
+
 import java.io.Closeable;
 import java.io.IOException;
 
@@ -32,4 +34,30 @@ public interface IOInterface extends RandomIO.Creator{
 	boolean isReadOnly();
 	
 	Trans openIOTransaction();
+	
+	default IOInterface asReadOnly(){
+		if(isReadOnly()) return this;
+		var that=this;
+		return new IOInterface(){
+			@Override
+			public boolean isReadOnly(){
+				return true;
+			}
+			@Override
+			public Trans openIOTransaction(){
+				return that.openIOTransaction();
+			}
+			@Override
+			public RandomIO io() throws IOException{
+				return that.io().readOnly();
+			}
+			@Override
+			public String toString(){
+				return that.toString();
+			}
+			public String toShortString(){
+				return TextUtil.toShortString(that);
+			}
+		};
+	}
 }

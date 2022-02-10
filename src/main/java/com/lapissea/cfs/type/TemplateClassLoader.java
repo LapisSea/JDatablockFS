@@ -3,7 +3,7 @@ package com.lapissea.cfs.type;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.jorth.JorthCompiler;
 import com.lapissea.jorth.MalformedJorthException;
-import com.lapissea.util.LogUtil;
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
@@ -99,7 +99,10 @@ public class TemplateClassLoader extends ClassLoader{
 				case "D" -> "double";
 				case "C" -> "char";
 				case "Z" -> "boolean";
-				default -> throw new RuntimeException(nam);
+				default -> {
+					if(!nam.startsWith("L")||!nam.endsWith(";"))throw new NotImplementedException("Unknown tyoe: "+nam);
+					yield nam.substring(1, nam.length()-1);
+				}
 			});
 			return sb.toString();
 		}

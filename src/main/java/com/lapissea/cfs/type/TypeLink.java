@@ -88,9 +88,9 @@ public final class TypeLink extends IOInstance<TypeLink>{
 	private Class<?> typeClass;
 	
 	@IOValue
-	private String     typeName;
+	private String     typeName="";
 	@IOValue
-	private TypeLink[] args;
+	private TypeLink[] args=new TypeLink[0];
 	
 	private Type generic;
 	
@@ -150,12 +150,20 @@ public final class TypeLink extends IOInstance<TypeLink>{
 	
 	@Override
 	public String toString(){
-		return getClass().getSimpleName()+"("+getTypeName()+(args.length==0?"":Arrays.stream(args).map(TypeLink::toString).collect(Collectors.joining(", ", "<", ">")))+")";
+		String argStr;
+		if(args.length==0)argStr="";
+		else argStr=Arrays.stream(args).map(TypeLink::toString).collect(Collectors.joining(", ", "<", ">"));
+		
+		return getClass().getSimpleName()+"("+getTypeName()+argStr+")";
 	}
 	@Override
 	public String toShortString(){
+		String argStr;
+		if(args.length==0)argStr="";
+		else argStr=Arrays.stream(args).map(TypeLink::toShortString).collect(Collectors.joining(", ", "<", ">"));
+		
 		String nam=shortTypeString();
-		return "Typ("+nam+(args.length==0?"":Arrays.stream(args).map(TypeLink::toShortString).collect(Collectors.joining(", ", "<", ">")))+")";
+		return "Typ("+nam+argStr+")";
 	}
 	private String shortTypeString(){
 		var nam =getTypeName();

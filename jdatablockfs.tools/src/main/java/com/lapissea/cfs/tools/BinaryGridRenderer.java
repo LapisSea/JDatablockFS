@@ -58,7 +58,7 @@ public class BinaryGridRenderer{
 		NAMED_STACK
 	}
 	
-	static record RenderContext(
+	record RenderContext(
 		RenderBackend renderer,
 		byte[] bytes, RoaringBitmap filled,
 		int width, float pixelsPerByte, int hoverByteX, int hoverByteY, int hoverByteIndex,
@@ -1258,8 +1258,8 @@ public class BinaryGridRenderer{
 									var arrSiz=inst.length;
 									
 									if(size==arrSiz*4L){
-										long arrOffset=0;
-										int[] index={0};
+										long  arrOffset=0;
+										int[] index    ={0};
 										var f=new IOFieldPrimitive.FFloat<T>(new FieldAccessor<>(){
 											@Override
 											public Struct<T> getDeclaringStruct(){

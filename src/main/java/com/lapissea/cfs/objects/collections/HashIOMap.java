@@ -2,6 +2,7 @@ package com.lapissea.cfs.objects.collections;
 
 import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.chunk.DataProvider;
+import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.IOInstance;
@@ -203,10 +204,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		
 		datasetID++;
 		transfer(oldBuckets, buckets, bucketPO2, size()<256);
-		
-		try(var ignored=getDataProvider().getSource().openIOTransaction()){
-			writeManagedFields();
-		}
+		writeManagedFields();
 		
 		((Unmanaged<?>)oldBuckets).free();
 		
@@ -319,15 +317,47 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	
 	@Override
 	public void put(K key, V value) throws IOException{
-		long sizeFlag;
-		try(var ignored=getDataProvider().getSource().openIOTransaction()){
-			sizeFlag=putEntry(buckets, bucketPO2, key, value);
-		}
+		long sizeFlag=putEntry(buckets, bucketPO2, key, value);
 		if(sizeFlag==OVERWRITE) return;
 		
 		deltaSize(1);
 		if(sizeFlag==OVERWRITE_EMPTY) return;
 		if(sizeFlag>RESIZE_TRIGGER){
+			reflow();
+		}
+	}
+	
+	@Override
+	public void putAll(Map<K, V> values) throws IOException{
+		if(values.isEmpty()) return;
+		
+		Map<Integer, List<Map.Entry<K, V>>> sorted=new HashMap<>();
+		
+		for(Map.Entry<K, V> kvEntry : values.entrySet()){
+			sorted.computeIfAbsent(toSmallHash(kvEntry.getKey(), bucketPO2), i->new ArrayList<>()).add(kvEntry);
+		}
+		
+		var  shouldReflow=false;
+		long deltaSize   =0;
+		for(var group : sorted.values()){
+			IOInterface.Trans ignored=null;
+			for(int i=0;i<group.size();i++){
+				if(i==1) ignored=getDataProvider().getSource().openIOTransaction();
+				var e    =group.get(i);
+				var key  =e.getKey();
+				var value=e.getValue();
+				
+				long sizeFlag;
+				sizeFlag=putEntry(buckets, bucketPO2, key, value);
+				if(sizeFlag==OVERWRITE) continue;
+				deltaSize++;
+				if(sizeFlag>RESIZE_TRIGGER) shouldReflow=true;
+			}
+			if(ignored!=null) ignored.close();
+		}
+		
+		deltaSize(deltaSize);
+		if(shouldReflow){
 			reflow();
 		}
 	}

@@ -154,8 +154,11 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 				case SizeDescriptor.Fixed<T> f -> f.get(WordSpace.BYTE);
 				case SizeDescriptor.Unknown<T> f -> f.calcUnknown(value.getThisStruct().allocVirtualVarPool(IO), provider, value, WordSpace.BYTE);
 			};
-			var chunk=AllocateTicket.bytes(bytes).submit(provider);
-			return new Node<>(provider, chunk.getPtr().makeReference(), nodeType, value, next);
+			
+			try(var ignored=provider.getSource().openIOTransaction()){
+				var chunk=AllocateTicket.bytes(bytes).submit(provider);
+				return new Node<>(provider, chunk.getPtr().makeReference(), nodeType, value, next);
+			}
 		}
 		
 		private final StructPipe<T> valuePipe;
@@ -664,7 +667,9 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 	}
 	private void setHead(Node<T> head) throws IOException{
 		this.head=head;
-		writeManagedField(headField);
+		try(var ignored=getDataProvider().getSource().openIOTransaction()){
+			writeManagedField(headField);
+		}
 	}
 	
 	@Override

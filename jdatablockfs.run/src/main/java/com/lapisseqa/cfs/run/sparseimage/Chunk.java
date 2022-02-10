@@ -12,7 +12,7 @@ public class Chunk extends IOInstance<Chunk>{
 	private int y;
 	
 	@IOValue
-	public float[] pixels;
+	public Image.Pixel[] pixels;
 	
 	public Chunk(){
 	
@@ -21,7 +21,10 @@ public class Chunk extends IOInstance<Chunk>{
 	public Chunk(int x, int y, int chunkSize){
 		this.x=x;
 		this.y=y;
-		pixels=new float[chunkSize*chunkSize*3];
+		pixels=new Image.Pixel[chunkSize*chunkSize];
+		for(int i=0;i<pixels.length;i++){
+			pixels[i]=new Image.Pixel();
+		}
 	}
 	
 	public boolean isXY(int chunkX, int chunkY){

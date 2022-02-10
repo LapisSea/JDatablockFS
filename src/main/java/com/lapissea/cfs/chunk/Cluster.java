@@ -224,5 +224,4 @@ public class Cluster implements DataProvider{
 	public void defragment() throws IOException{
 		new DefragmentManager().defragment(this);
 	}
-	
 }

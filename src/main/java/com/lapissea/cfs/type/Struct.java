@@ -322,7 +322,13 @@ public class Struct<T extends IOInstance<T>>{
 	
 	public String instanceToString(Pool<T> ioPool, T instance, boolean doShort){
 		StringBuilder sb=new StringBuilder();
-		if(!doShort) sb.append(getType().getSimpleName());
+		if(!doShort){
+			var simple=getType().getSimpleName();
+			var index=simple.lastIndexOf('$');
+			if(index!=-1)simple=simple.substring(index+1);
+			
+			sb.append(simple);
+		}
 		sb.append('{');
 		boolean comma=false;
 		for(var field : fields){
