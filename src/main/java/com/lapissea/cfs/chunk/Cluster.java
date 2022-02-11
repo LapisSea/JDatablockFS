@@ -95,7 +95,7 @@ public class Cluster implements DataProvider{
 		private IOTypeDB.PersistentDB db;
 	}
 	
-	private final ChunkCache chunkCache=ChunkCache.weak();
+	private final ChunkCache chunkCache=ChunkCache.strong();
 	
 	private final IOInterface   source;
 	private final MemoryManager memoryManager=new VerySimpleMemoryManager(this);
