@@ -9,6 +9,7 @@ import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.util.LogUtil;
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeConsumer;
@@ -24,15 +25,22 @@ import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 
 public class MemoryWalker{
 	
+	public record IterationOptions(boolean shouldContinue, boolean shouldSave){
+		public static final IterationOptions CONTINUE_NO_SAVE=new IterationOptions(true, false);
+		public static final IterationOptions END             =new IterationOptions(false, false);
+		public static final IterationOptions SAVE_AND_END    =new IterationOptions(false, true);
+		
+	}
+	
 	public interface PointerRecord{
 		/**
 		 * @return if walking should continue
 		 */
-		<T extends IOInstance<T>> boolean log(StructPipe<T> pipe, Reference instanceReference, IOField.Ref<T, ?> field, T instance, Reference value) throws IOException;
+		<T extends IOInstance<T>> IterationOptions log(StructPipe<T> pipe, Reference instanceReference, IOField.Ref<T, ?> field, T instance, Reference value) throws IOException;
 		/**
 		 * @return if walking should continue
 		 */
-		<T extends IOInstance<T>> boolean logChunkPointer(StructPipe<T> pipe, Reference instanceReference, IOField<T, ChunkPointer> field, T instance, ChunkPointer value) throws IOException;
+		<T extends IOInstance<T>> IterationOptions logChunkPointer(StructPipe<T> pipe, Reference instanceReference, IOField<T, ChunkPointer> field, T instance, ChunkPointer value) throws IOException;
 	}
 	
 	private final DataProvider cluster;
@@ -54,32 +62,32 @@ public class MemoryWalker{
 		if(self) consumer.accept(rootReference);
 		walkStructFull(cluster, new LinkedList<>(), (T)root, rootReference, (StructPipe<T>)pipe, new PointerRecord(){
 			@Override
-			public <I extends IOInstance<I>> boolean log(StructPipe<I> pipe, Reference instanceReference, IOField.Ref<I, ?> field, I instance, Reference value) throws IOException{
+			public <I extends IOInstance<I>> IterationOptions log(StructPipe<I> pipe, Reference instanceReference, IOField.Ref<I, ?> field, I instance, Reference value) throws IOException{
 				consumer.accept(value);
-				return true;
+				return IterationOptions.CONTINUE_NO_SAVE;
 			}
 			@Override
-			public <I extends IOInstance<I>> boolean logChunkPointer(StructPipe<I> pipe, Reference instanceReference, IOField<I, ChunkPointer> field, I instance, ChunkPointer value) throws IOException{
+			public <I extends IOInstance<I>> IterationOptions logChunkPointer(StructPipe<I> pipe, Reference instanceReference, IOField<I, ChunkPointer> field, I instance, ChunkPointer value) throws IOException{
 				consumer.accept(value.makeReference());
-				return true;
+				return IterationOptions.CONTINUE_NO_SAVE;
 			}
-		});
+		}, false);
 	}
 	
 	public <T extends IOInstance<T>> void walk(PointerRecord consumer) throws IOException{
-		walkStructFull(cluster, new LinkedList<>(), (T)root, rootReference, (StructPipe<T>)pipe, consumer);
+		walkStructFull(cluster, new LinkedList<>(), (T)root, rootReference, (StructPipe<T>)pipe, consumer, false);
 	}
 	
 	@SuppressWarnings("unchecked")
-	private <T extends IOInstance<T>> boolean walkStructFull(DataProvider cluster, List<IOInstance<?>> stack,
-	                                                         T instance, Reference instanceReference, StructPipe<T> pipe,
-	                                                         PointerRecord pointerRecord) throws IOException{
+	private <T extends IOInstance<T>> IterationOptions walkStructFull(DataProvider cluster, List<IOInstance<?>> stack,
+	                                                                  T instance, Reference instanceReference, StructPipe<T> pipe,
+	                                                                  PointerRecord pointerRecord, boolean inlinedParent) throws IOException{
 		var reference=instanceReference;
 		if(instance instanceof Chunk c){
 			var off=cluster.getFirstChunk().getPtr();
 			reference=new Reference(off, c.getPtr().getValue()-off.getValue());
 		}
-		if(reference==null||reference.isNull()) return true;
+		if(reference==null||reference.isNull()) return IterationOptions.CONTINUE_NO_SAVE;
 		try{
 			if(stack.contains(instance)){
 				if(DEBUG_VALIDATION){
@@ -99,7 +107,7 @@ public class MemoryWalker{
 						}
 					}
 				}
-				return true;
+				return IterationOptions.CONTINUE_NO_SAVE;
 			}
 			stack.add(instance);
 			
@@ -136,7 +144,11 @@ public class MemoryWalker{
 						type=inst.getClass();
 						
 						if(inst instanceof IOInstance.Unmanaged valueInstance){
-							if(!walkStructFull(cluster, stack, valueInstance, valueInstance.getReference(), valueInstance.getPipe(), pointerRecord)) return false;
+							var res=walkStructFull(cluster, stack, valueInstance, valueInstance.getReference(), valueInstance.getPipe(), pointerRecord, false);
+							if(res.shouldSave){
+								throw new NotImplementedException();//TODO
+							}
+							if(!res.shouldContinue) return IterationOptions.END;
 							continue;
 						}
 					}
@@ -144,16 +156,45 @@ public class MemoryWalker{
 					if(field instanceof IOField.Ref<?, ?> refO){
 						IOField.Ref<T, T> refField=(IOField.Ref<T, T>)refO;
 						var               ref     =refField.getReference(instance);
-						if(!pointerRecord.log(pipe, instanceReference, refField, instance, ref)) return false;
-						if(!walkStructFull(cluster, stack, refField.get(ioPool, instance), ref, refField.getReferencedPipe(instance), pointerRecord)) return false;
+						
+						{
+							var res=pointerRecord.log(pipe, instanceReference, refField, instance, ref);
+							if(res.shouldSave){
+								if(inlinedParent) return new IterationOptions(res.shouldContinue, true);
+								
+								try(var io=instanceReference.io(cluster)){
+									pipe.write(cluster, io, instance);
+								}
+							}
+							if(!res.shouldContinue) return IterationOptions.END;
+						}
+						{
+							var res=walkStructFull(cluster, stack, refField.get(ioPool, instance), ref, refField.getReferencedPipe(instance), pointerRecord, false);
+							if(res.shouldSave){
+								throw new NotImplementedException();//TODO
+							}
+							if(!res.shouldContinue) return IterationOptions.END;
+						}
 					}else if(UtilL.instanceOf(type, ChunkPointer.class)){
 						var ptrField=(IOField<T, ChunkPointer>)field;
 						
 						var ch=ptrField.get(ioPool, instance);
 						
 						if(!ch.isNull()){
-							if(!pointerRecord.logChunkPointer(pipe, instanceReference, ptrField, instance, ch)) return false;
-							if(!walkStructFull(cluster, stack, ch.dereference(cluster), null, Chunk.PIPE, pointerRecord)) return false;
+							{
+								var res=pointerRecord.logChunkPointer(pipe, instanceReference, ptrField, instance, ch);
+								if(res.shouldSave){
+									throw new NotImplementedException();//TODO
+								}
+								if(!res.shouldContinue) return IterationOptions.END;
+							}
+							{
+								var res=walkStructFull(cluster, stack, ch.dereference(cluster), null, Chunk.PIPE, pointerRecord, false);
+								if(res.shouldSave){
+									throw new NotImplementedException();//TODO
+								}
+								if(!res.shouldContinue) return IterationOptions.END;
+							}
 						}
 					}else{
 						var typ=type;
@@ -172,7 +213,13 @@ public class MemoryWalker{
 								if(array==null||array.length==0) continue;
 								var pip=StructPipe.of(pipe.getClass(), array[0].getThisStruct());
 								for(IOInstance<?> inst : array){
-									if(!walkStructFull(cluster, stack, (T)inst, reference.addOffset(fieldOffset), pip, pointerRecord)) return false;
+									{
+										var res=walkStructFull(cluster, stack, (T)inst, reference.addOffset(fieldOffset), pip, pointerRecord, true);
+										if(res.shouldSave){
+											throw new NotImplementedException();//TODO
+										}
+										if(!res.shouldContinue) return IterationOptions.END;
+									}
 									fieldOffset+=pip.calcUnknownSize(cluster, inst, WordSpace.BYTE);
 								}
 								continue;
@@ -182,9 +229,22 @@ public class MemoryWalker{
 							}
 						}
 						if(UtilL.instanceOf(typ, IOInstance.class)){
-							var inst=(IOInstance<?>)field.get(ioPool, instance);
+							var inst=(IOInstance)field.get(ioPool, instance);
 							if(inst!=null){
-								if(!walkStructFull(cluster, stack, (T)inst, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), inst.getThisStruct()), pointerRecord)) return false;
+								{
+									var res=walkStructFull(cluster, stack, (T)inst, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), inst.getThisStruct()), pointerRecord, true);
+									if(res.shouldSave){
+										if(inlinedParent) return new IterationOptions(res.shouldContinue, true);
+										if(instance instanceof IOInstance.Unmanaged<?>){
+											((IOField)field).set(ioPool,instance, inst);
+										}else{
+											try(var io=instanceReference.io(cluster)){
+												pipe.write(cluster, io, instance);
+											}
+										}
+									}
+									if(!res.shouldContinue) return IterationOptions.END;
+								}
 							}
 							continue;
 						}
@@ -196,7 +256,13 @@ public class MemoryWalker{
 							if(inst==null) continue;
 							
 							if(inst instanceof IOInstance i){
-								if(!walkStructFull(cluster, stack, i, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), i.getThisStruct()), pointerRecord)) return false;
+								{
+									var res=walkStructFull(cluster, stack, i, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), i.getThisStruct()), pointerRecord, true);
+									if(res.shouldSave){
+										throw new NotImplementedException();//TODO
+									}
+									if(!res.shouldContinue) return IterationOptions.END;
+								}
 								continue;
 							}
 							
@@ -215,7 +281,7 @@ public class MemoryWalker{
 		}finally{
 			stack.remove(instance);
 		}
-		return true;
+		return IterationOptions.CONTINUE_NO_SAVE;
 	}
 	
 	private <T extends IOInstance<T>> String instanceErrStr(T instance){

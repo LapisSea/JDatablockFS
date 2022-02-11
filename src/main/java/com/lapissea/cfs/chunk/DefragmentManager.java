@@ -44,15 +44,15 @@ public class DefragmentManager{
 		
 		new MemoryWalker((HashIOMap<?, ?>)cluster.getTemp()).walk(new MemoryWalker.PointerRecord(){
 			@Override
-			public <T extends IOInstance<T>> boolean log(StructPipe<T> pipe, Reference instanceReference, IOField.Ref<T, ?> field, T instance, Reference value) throws IOException{
+			public <T extends IOInstance<T>> MemoryWalker.IterationOptions log(StructPipe<T> pipe, Reference instanceReference, IOField.Ref<T, ?> field, T instance, Reference value) throws IOException{
 				if(instance instanceof IOInstance.Unmanaged u){
 					reallocateUnmanaged(cluster, u);
 				}
-				return true;
+				return MemoryWalker.IterationOptions.CONTINUE_NO_SAVE;
 			}
 			@Override
-			public <T extends IOInstance<T>> boolean logChunkPointer(StructPipe<T> pipe, Reference instanceReference, IOField<T, ChunkPointer> field, T instance, ChunkPointer value) throws IOException{
-				return true;
+			public <T extends IOInstance<T>> MemoryWalker.IterationOptions logChunkPointer(StructPipe<T> pipe, Reference instanceReference, IOField<T, ChunkPointer> field, T instance, ChunkPointer value) throws IOException{
+				return MemoryWalker.IterationOptions.CONTINUE_NO_SAVE;
 			}
 		});
 	}
@@ -239,24 +239,24 @@ public class DefragmentManager{
 		
 		cluster.rootWalker().walk(new MemoryWalker.PointerRecord(){
 			@Override
-			public <T extends IOInstance<T>> boolean log(StructPipe<T> pipe, Reference instanceReference, IOField.Ref<T, ?> field, T instance, Reference value) throws IOException{
+			public <T extends IOInstance<T>> MemoryWalker.IterationOptions log(StructPipe<T> pipe, Reference instanceReference, IOField.Ref<T, ?> field, T instance, Reference value) throws IOException{
 				if(value.getPtr().equals(oldChunk)){
 					field.setReference(instance, new Reference(newChunk, value.getOffset()));
 					try(var io=instanceReference.io(cluster)){
 						pipe.write(cluster, io, instance);
 					}
 				}
-				return true;
+				return MemoryWalker.IterationOptions.CONTINUE_NO_SAVE;
 			}
 			@Override
-			public <T extends IOInstance<T>> boolean logChunkPointer(StructPipe<T> pipe, Reference instanceReference, IOField<T, ChunkPointer> field, T instance, ChunkPointer value) throws IOException{
+			public <T extends IOInstance<T>> MemoryWalker.IterationOptions logChunkPointer(StructPipe<T> pipe, Reference instanceReference, IOField<T, ChunkPointer> field, T instance, ChunkPointer value) throws IOException{
 				if(value.equals(oldChunk)){
 					field.set(null, instance, newChunk);
 					try(var io=instanceReference.io(cluster)){
 						pipe.write(cluster, io, instance);
 					}
 				}
-				return true;
+				return MemoryWalker.IterationOptions.CONTINUE_NO_SAVE;
 			}
 		});
 		
@@ -285,7 +285,7 @@ public class DefragmentManager{
 		cluster.rootWalker().walk(new MemoryWalker.PointerRecord(){
 			boolean foundCh;
 			@Override
-			public <T extends IOInstance<T>> boolean log(StructPipe<T> pipe, Reference instanceReference, IOField.Ref<T, ?> field, T instance, Reference value) throws IOException{
+			public <T extends IOInstance<T>> MemoryWalker.IterationOptions log(StructPipe<T> pipe, Reference instanceReference, IOField.Ref<T, ?> field, T instance, Reference value) throws IOException{
 				var ptr=oldRef.getPtr();
 				if(value.getPtr().equals(ptr)){
 					
@@ -299,17 +299,14 @@ public class DefragmentManager{
 				
 				if(value.equals(oldRef)){
 					field.setReference(instance, newRef);
-					try(var io=instanceReference.io(cluster)){
-						pipe.write(cluster, io, instance);
-					}
 					found[0]=true;
-					return false;
+					return MemoryWalker.IterationOptions.SAVE_AND_END;
 				}
-				return true;
+				return MemoryWalker.IterationOptions.CONTINUE_NO_SAVE;
 			}
 			@Override
-			public <T extends IOInstance<T>> boolean logChunkPointer(StructPipe<T> pipe, Reference instanceReference, IOField<T, ChunkPointer> field, T instance, ChunkPointer value) throws IOException{
-				return true;
+			public <T extends IOInstance<T>> MemoryWalker.IterationOptions logChunkPointer(StructPipe<T> pipe, Reference instanceReference, IOField<T, ChunkPointer> field, T instance, ChunkPointer value) throws IOException{
+				return MemoryWalker.IterationOptions.CONTINUE_NO_SAVE;
 			}
 		});
 		if(!found[0]){
@@ -317,5 +314,5 @@ public class DefragmentManager{
 		}
 		return toFree;
 	}
-
+	
 }
