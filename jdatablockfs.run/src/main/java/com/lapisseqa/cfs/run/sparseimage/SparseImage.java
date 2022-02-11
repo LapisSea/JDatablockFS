@@ -57,13 +57,13 @@ public class SparseImage{
 		cluster.getTemp().put(0, image);
 		
 		Random r=new Random(1);
-		for(int i=0;i<100;i++){
-			int x=(int)(Math.pow(r.nextFloat(), 3)*10);
-			int y=(int)(Math.pow(r.nextFloat(), 3)*10);
+		for(int i=0;i<10;i++){
+			int x=(int)(Math.pow(r.nextFloat(), 3)*5);
+			int y=(int)(Math.pow(r.nextFloat(), 3)*5);
 			image.set(x, y, r.nextFloat(), r.nextFloat(), 1);
 		}
 		
-		//cluster.defragment();
+		cluster.defragment();
 		
 	}
 	
