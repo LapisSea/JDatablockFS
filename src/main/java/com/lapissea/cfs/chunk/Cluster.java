@@ -7,17 +7,14 @@ import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
-import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.objects.collections.HashIOMap;
 import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.IOTypeDB;
 import com.lapissea.cfs.type.MemoryWalker;
 import com.lapissea.cfs.type.WordSpace;
-import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
-import com.lapissea.util.LogUtil;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
@@ -100,8 +97,9 @@ public class Cluster implements DataProvider{
 	
 	private final ChunkCache chunkCache=ChunkCache.strong();
 	
-	private final IOInterface   source;
-	private final MemoryManager memoryManager=new VerySimpleMemoryManager(this);
+	private final IOInterface       source;
+	private final MemoryManager     memoryManager    =new VerySimpleMemoryManager(this);
+	private final DefragmentManager defragmentManager=new DefragmentManager(this);
 	
 	private final RootRef root;
 	
@@ -172,7 +170,7 @@ public class Cluster implements DataProvider{
 	}
 	
 	
-	public static record ChunkStatistics(
+	public record ChunkStatistics(
 		long totalBytes,
 		long chunkCount,
 		double usefulDataRatio,
@@ -202,7 +200,7 @@ public class Cluster implements DataProvider{
 			}
 		});
 		
-		for(Chunk chunk : new PhysicalChunkWalker(getFirstChunk())){
+		for(Chunk chunk : getFirstChunk().chunksAhead()){
 			if(referenced.contains(chunk.getPtr())){
 				usefulBytes+=chunk.getSize();
 				usedChunkCapacity+=chunk.getCapacity();
@@ -225,6 +223,6 @@ public class Cluster implements DataProvider{
 	}
 	
 	public void defragment() throws IOException{
-		//TODO
+		defragmentManager.defragment();
 	}
 }
