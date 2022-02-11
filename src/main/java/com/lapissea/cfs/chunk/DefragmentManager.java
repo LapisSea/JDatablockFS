@@ -8,7 +8,6 @@ import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.objects.collections.HashIOMap;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.MemoryWalker;
-import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
@@ -23,20 +22,17 @@ import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 public class DefragmentManager{
 	
 	public void defragment(Cluster cluster) throws IOException{
-		try(var ignored=cluster.getMemoryManager().openDefragmentMode()){
-			LogUtil.println("Defragmenting...");
-			
-			scanFreeChunks(cluster);
-			
-			mergeChains(cluster);
-			
-			scanFreeChunks(cluster);
-			
-			reorder(cluster);
-			
-			mergeChains(cluster);
-			scanFreeChunks(cluster);
-		}
+		LogUtil.println("Defragmenting...");
+		
+		scanFreeChunks(cluster);
+		
+		mergeChains(cluster);
+		
+		scanFreeChunks(cluster);
+		
+		reorder(cluster);
+		
+		mergeChains(cluster);
 	}
 	
 	private void reorder(final Cluster cluster) throws IOException{
@@ -68,100 +64,111 @@ public class DefragmentManager{
 			
 			long requiredSize=fragmentedChunk.chainSize();
 			
+			reallocateAndMove(cluster, fragmentedChunk, requiredSize);
 			
-			if(fragmentedChunk.getBodyNumSize().canFit(requiredSize)){
-				
-				long createdCapacity=0;
-				{
-					Chunk next=fragmentedChunk;
-					while(fragmentedChunk.getCapacity()+createdCapacity<requiredSize+fragmentedChunk.getHeaderSize()+1){
-						next=next.nextPhysical();
-						if(next==null) throw new NotImplementedException("last but has next?");
-						
-						var frees=cluster.getMemoryManager().getFreeChunks();
-						
-						var freeIndex=frees.indexOf(next.getPtr());
-						if(freeIndex!=-1){
-							frees.remove(freeIndex);
-						}else{
-							if(DEBUG_VALIDATION){
-								var chain=fragmentedChunk.collectNext();
-								if(chain.contains(next)){
-									throw new NotImplementedException("Special handling for already chained?");
-								}
+			
+			//TODO: moveNextAndMerge is not stable. Figure out what's wrong before enabling
+//			if(fragmentedChunk.getBodyNumSize().canFit(requiredSize)){
+//				TODO: make better logic for deciding if moving next is good
+//				moveNextAndMerge(cluster, fragmentedChunk, requiredSize);
+//			}else{
+//				reallocateAndMove(cluster, fragmentedChunk, requiredSize);
+//			}
+		}
+	}
+	
+	private void reallocateAndMove(Cluster cluster, Chunk fragmentedChunk, long requiredSize) throws IOException{
+		var newChunk=AllocateTicket
+			.bytes(requiredSize)
+			.shouldDisableResizing(fragmentedChunk.getNextSize()==NumberSize.VOID)
+			.withDataPopulated((p, io)->{
+				try(var old=fragmentedChunk.io()){
+					old.transferTo(io);
+				}
+			})
+			.submit(cluster);
+		
+		moveChunkExact(cluster, fragmentedChunk.getPtr(), newChunk.getPtr());
+		fragmentedChunk.freeChaining();
+	}
+	private void moveNextAndMerge(Cluster cluster, Chunk fragmentedChunk, long requiredSize) throws IOException{
+		try(var ignored1=cluster.getMemoryManager().openDefragmentMode()){
+			long createdCapacity=0;
+			{
+				Chunk next=fragmentedChunk;
+				while(fragmentedChunk.getCapacity()+createdCapacity<requiredSize+fragmentedChunk.getHeaderSize()+1){
+					next=next.nextPhysical();
+					if(next==null) throw new NotImplementedException("last but has next?");
+					
+					var frees=cluster.getMemoryManager().getFreeChunks();
+					
+					var freeIndex=frees.indexOf(next.getPtr());
+					if(freeIndex!=-1){
+						frees.remove(freeIndex);
+					}else{
+						if(DEBUG_VALIDATION){
+							var chain=fragmentedChunk.collectNext();
+							if(chain.contains(next)){
+								throw new NotImplementedException("Special handling for already chained?");
 							}
-							
-							Chunk c=next;
-							var newChunk=AllocateTicket
-								.bytes(next.getSize())
-								.shouldDisableResizing(next.getNextSize()==NumberSize.VOID)
-								.withNext(next.getNextPtr())
-								.withDataPopulated((p, io)->{
-									byte[] data=p.getSource().read(c.dataStart(), Math.toIntExact(c.getSize()));
-									io.write(data);
-								})
-								.submit(cluster);
-							
-							moveChunkExact(cluster, next.getPtr(), newChunk.getPtr());
 						}
 						
-						createdCapacity+=next.totalSize();
+						Chunk c=next;
+						var newChunk=AllocateTicket
+							.bytes(next.getSize())
+							.shouldDisableResizing(next.getNextSize()==NumberSize.VOID)
+							.withNext(next.getNextPtr())
+							.withDataPopulated((p, io)->{
+								byte[] data=p.getSource().read(c.dataStart(), Math.toIntExact(c.getSize()));
+								io.write(data);
+							})
+							.submit(cluster);
+						
+						moveChunkExact(cluster, next.getPtr(), newChunk.getPtr());
 					}
+					
+					createdCapacity+=next.totalSize();
 				}
-				
-				
-				var grow          =requiredSize-fragmentedChunk.getCapacity();
-				var remainingSpace=createdCapacity-grow;
-				
-				
-				var remainingData=
-					new ChunkBuilder(cluster, ChunkPointer.of(fragmentedChunk.dataStart()+requiredSize))
-						.withExplicitNextSize(NumberSize.bySize(cluster.getSource().getIOSize()))
-						.withCapacity(0)
-						.create();
-				
-				Chunk fragmentData;
-				try(var ignored=cluster.getSource().openIOTransaction()){
-					
-					remainingData.setCapacityAndModifyNumSize(remainingSpace-remainingData.getHeaderSize());
-					assert remainingData.getCapacity()>0:remainingData;
-					
-					remainingData.writeHeader();
-					remainingData=cluster.getChunk(remainingData.getPtr());
-					
-					try{
-						fragmentedChunk.setCapacity(requiredSize);
-					}catch(BitDepthOutOfSpaceException e){
-						throw new ShouldNeverHappenError("This should be guarded by the canFit check");
-					}
-					
-					fragmentData=fragmentedChunk.next();
-					fragmentedChunk.clearNextPtr();
-					
-					try(var dest=fragmentedChunk.ioAt(fragmentedChunk.getSize());
-					    var src=fragmentData.io()){
-						src.transferTo(dest);
-					}
-					fragmentedChunk.syncStruct();
-				}
-				
-				fragmentData.freeChaining();
-				remainingData.freeChaining();
-				
-			}else{
-				var newChunk=AllocateTicket
-					.bytes(requiredSize)
-					.shouldDisableResizing(fragmentedChunk.getNextSize()==NumberSize.VOID)
-					.withDataPopulated((p, io)->{
-						try(var old=fragmentedChunk.io()){
-							old.transferTo(io);
-						}
-					})
-					.submit(cluster);
-				
-				moveChunkExact(cluster, fragmentedChunk.getPtr(), newChunk.getPtr());
-				fragmentedChunk.freeChaining();
 			}
+			
+			
+			var grow          =requiredSize-fragmentedChunk.getCapacity();
+			var remainingSpace=createdCapacity-grow;
+			
+			
+			var remainingData=
+				new ChunkBuilder(cluster, ChunkPointer.of(fragmentedChunk.dataStart()+requiredSize))
+					.withExplicitNextSize(NumberSize.bySize(cluster.getSource().getIOSize()))
+					.withCapacity(0)
+					.create();
+			
+			Chunk fragmentData;
+			try(var ignored=cluster.getSource().openIOTransaction()){
+				
+				remainingData.setCapacityAndModifyNumSize(remainingSpace-remainingData.getHeaderSize());
+				assert remainingData.getCapacity()>0:remainingData;
+				
+				remainingData.writeHeader();
+				remainingData=cluster.getChunk(remainingData.getPtr());
+				
+				try{
+					fragmentedChunk.setCapacity(requiredSize);
+				}catch(BitDepthOutOfSpaceException e){
+					throw new ShouldNeverHappenError("This should be guarded by the canFit check");
+				}
+				
+				fragmentData=Objects.requireNonNull(fragmentedChunk.next());
+				fragmentedChunk.clearNextPtr();
+				
+				try(var dest=fragmentedChunk.ioAt(fragmentedChunk.getSize());
+				    var src=fragmentData.io()){
+					src.transferTo(dest);
+				}
+				fragmentedChunk.syncStruct();
+			}
+			
+			fragmentData.freeChaining();
+			remainingData.freeChaining();
 		}
 	}
 	
@@ -224,7 +231,7 @@ public class DefragmentManager{
 		});
 		
 		if(!unreferencedChunks.isEmpty()){
-			List<Chunk> unreferenced=new ArrayList<>(Math.toIntExact(unreferencedChunks.size()));
+			List<Chunk> unreferenced=new ArrayList<>(Math.toIntExact(unreferencedChunks.trueSize()));
 			for(var ptr : unreferencedChunks){
 				unreferenced.add(ptr.dereference(cluster));
 			}
@@ -239,22 +246,18 @@ public class DefragmentManager{
 		
 		cluster.rootWalker().walk(new MemoryWalker.PointerRecord(){
 			@Override
-			public <T extends IOInstance<T>> MemoryWalker.IterationOptions log(StructPipe<T> pipe, Reference instanceReference, IOField.Ref<T, ?> field, T instance, Reference value) throws IOException{
+			public <T extends IOInstance<T>> MemoryWalker.IterationOptions log(StructPipe<T> pipe, Reference instanceReference, IOField.Ref<T, ?> field, T instance, Reference value){
 				if(value.getPtr().equals(oldChunk)){
 					field.setReference(instance, new Reference(newChunk, value.getOffset()));
-					try(var io=instanceReference.io(cluster)){
-						pipe.write(cluster, io, instance);
-					}
+					return MemoryWalker.IterationOptions.CONTINUE_AND_SAVE;
 				}
 				return MemoryWalker.IterationOptions.CONTINUE_NO_SAVE;
 			}
 			@Override
-			public <T extends IOInstance<T>> MemoryWalker.IterationOptions logChunkPointer(StructPipe<T> pipe, Reference instanceReference, IOField<T, ChunkPointer> field, T instance, ChunkPointer value) throws IOException{
+			public <T extends IOInstance<T>> MemoryWalker.IterationOptions logChunkPointer(StructPipe<T> pipe, Reference instanceReference, IOField<T, ChunkPointer> field, T instance, ChunkPointer value){
 				if(value.equals(oldChunk)){
 					field.set(null, instance, newChunk);
-					try(var io=instanceReference.io(cluster)){
-						pipe.write(cluster, io, instance);
-					}
+					return MemoryWalker.IterationOptions.CONTINUE_AND_SAVE;
 				}
 				return MemoryWalker.IterationOptions.CONTINUE_NO_SAVE;
 			}
@@ -264,9 +267,8 @@ public class DefragmentManager{
 	
 	private <T extends IOInstance.Unmanaged<T>> void reallocateUnmanaged(Cluster cluster, T instance) throws IOException{
 		var oldRef=instance.getReference();
-		var pip   =instance.getPipe();
 		
-		var siz=pip.calcUnknownSize(cluster, instance, WordSpace.BYTE);
+		var siz=instance.getReference().getPtr().dereference(cluster).chainSize();
 		
 		var newCh=AllocateTicket.bytes(siz).withDataPopulated((p, io)->{
 			oldRef.withContext(p).io(src->src.transferTo(io));
@@ -285,7 +287,7 @@ public class DefragmentManager{
 		cluster.rootWalker().walk(new MemoryWalker.PointerRecord(){
 			boolean foundCh;
 			@Override
-			public <T extends IOInstance<T>> MemoryWalker.IterationOptions log(StructPipe<T> pipe, Reference instanceReference, IOField.Ref<T, ?> field, T instance, Reference value) throws IOException{
+			public <T extends IOInstance<T>> MemoryWalker.IterationOptions log(StructPipe<T> pipe, Reference instanceReference, IOField.Ref<T, ?> field, T instance, Reference value) {
 				var ptr=oldRef.getPtr();
 				if(value.getPtr().equals(ptr)){
 					
@@ -305,7 +307,7 @@ public class DefragmentManager{
 				return MemoryWalker.IterationOptions.CONTINUE_NO_SAVE;
 			}
 			@Override
-			public <T extends IOInstance<T>> MemoryWalker.IterationOptions logChunkPointer(StructPipe<T> pipe, Reference instanceReference, IOField<T, ChunkPointer> field, T instance, ChunkPointer value) throws IOException{
+			public <T extends IOInstance<T>> MemoryWalker.IterationOptions logChunkPointer(StructPipe<T> pipe, Reference instanceReference, IOField<T, ChunkPointer> field, T instance, ChunkPointer value) {
 				return MemoryWalker.IterationOptions.CONTINUE_NO_SAVE;
 			}
 		});

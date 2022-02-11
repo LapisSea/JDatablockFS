@@ -26,9 +26,10 @@ import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 public class MemoryWalker{
 	
 	public record IterationOptions(boolean shouldContinue, boolean shouldSave){
-		public static final IterationOptions CONTINUE_NO_SAVE=new IterationOptions(true, false);
-		public static final IterationOptions END             =new IterationOptions(false, false);
-		public static final IterationOptions SAVE_AND_END    =new IterationOptions(false, true);
+		public static final IterationOptions CONTINUE_NO_SAVE =new IterationOptions(true, false);
+		public static final IterationOptions CONTINUE_AND_SAVE=new IterationOptions(true, true);
+		public static final IterationOptions END              =new IterationOptions(false, false);
+		public static final IterationOptions SAVE_AND_END     =new IterationOptions(false, true);
 		
 	}
 	
@@ -88,6 +89,7 @@ public class MemoryWalker{
 			reference=new Reference(off, c.getPtr().getValue()-off.getValue());
 		}
 		if(reference==null||reference.isNull()) return IterationOptions.CONTINUE_NO_SAVE;
+		boolean inlineDirtyButContinue=false;
 		try{
 			if(stack.contains(instance)){
 				if(DEBUG_VALIDATION){
@@ -159,14 +161,21 @@ public class MemoryWalker{
 						
 						{
 							var res=pointerRecord.log(pipe, instanceReference, refField, instance, ref);
-							if(res.shouldSave){
-								if(inlinedParent) return new IterationOptions(res.shouldContinue, true);
-								
-								try(var io=instanceReference.io(cluster)){
-									pipe.write(cluster, io, instance);
+							checkResult(res);
+							if(res.shouldSave&&res.shouldContinue&&inlinedParent){
+								inlineDirtyButContinue=true;
+							}else{
+								if(res.shouldSave){
+									if(inlinedParent){
+										return IterationOptions.SAVE_AND_END;
+									}
+									
+									try(var io=instanceReference.io(cluster)){
+										pipe.write(cluster, io, instance);
+									}
 								}
+								if(!res.shouldContinue) return IterationOptions.END;
 							}
-							if(!res.shouldContinue) return IterationOptions.END;
 						}
 						{
 							var res=walkStructFull(cluster, stack, refField.get(ioPool, instance), ref, refField.getReferencedPipe(instance), pointerRecord, false);
@@ -183,6 +192,7 @@ public class MemoryWalker{
 						if(!ch.isNull()){
 							{
 								var res=pointerRecord.logChunkPointer(pipe, instanceReference, ptrField, instance, ch);
+								checkResult(res);
 								if(res.shouldSave){
 									throw new NotImplementedException();//TODO
 								}
@@ -233,17 +243,22 @@ public class MemoryWalker{
 							if(inst!=null){
 								{
 									var res=walkStructFull(cluster, stack, (T)inst, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), inst.getThisStruct()), pointerRecord, true);
-									if(res.shouldSave){
-										if(inlinedParent) return new IterationOptions(res.shouldContinue, true);
-										if(instance instanceof IOInstance.Unmanaged<?>){
-											((IOField)field).set(ioPool,instance, inst);
-										}else{
-											try(var io=instanceReference.io(cluster)){
-												pipe.write(cluster, io, instance);
+									if(res.shouldSave&&res.shouldContinue&&inlinedParent){
+										inlineDirtyButContinue=true;
+									}else{
+										if(res.shouldSave){
+											if(inlinedParent) return IterationOptions.SAVE_AND_END;
+											if(instance instanceof IOInstance.Unmanaged<?>){
+												((IOField)field).set(ioPool, instance, inst);
+											}else{
+												try(var io=instanceReference.io(cluster)){
+													pipe.write(cluster, io, instance);
+												}
 											}
 										}
+										
+										if(!res.shouldContinue) return IterationOptions.END;
 									}
-									if(!res.shouldContinue) return IterationOptions.END;
 								}
 							}
 							continue;
@@ -281,7 +296,18 @@ public class MemoryWalker{
 		}finally{
 			stack.remove(instance);
 		}
+		if(inlineDirtyButContinue){
+			return IterationOptions.CONTINUE_AND_SAVE;
+		}
 		return IterationOptions.CONTINUE_NO_SAVE;
+	}
+	
+	private void checkResult(IterationOptions res){
+		if(cluster.isReadOnly()){
+			if(res.shouldSave()){
+				throw new IllegalStateException("Tried to save on read only walk");
+			}
+		}
 	}
 	
 	private <T extends IOInstance<T>> String instanceErrStr(T instance){
