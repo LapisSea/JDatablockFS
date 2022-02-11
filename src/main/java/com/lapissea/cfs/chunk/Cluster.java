@@ -97,8 +97,9 @@ public class Cluster implements DataProvider{
 	
 	private final ChunkCache chunkCache=ChunkCache.strong();
 	
-	private final IOInterface   source;
-	private final MemoryManager memoryManager=new VerySimpleMemoryManager(this);
+	private final IOInterface       source;
+	private final MemoryManager     memoryManager    =new VerySimpleMemoryManager(this);
+	private final DefragmentManager defragmentManager=new DefragmentManager(this);
 	
 	private final RootRef root;
 	
@@ -222,6 +223,6 @@ public class Cluster implements DataProvider{
 	}
 	
 	public void defragment() throws IOException{
-		new DefragmentManager().defragment(this);
+		defragmentManager.defragment();
 	}
 }

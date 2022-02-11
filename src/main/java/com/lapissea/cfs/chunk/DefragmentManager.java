@@ -21,18 +21,24 @@ import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
 public class DefragmentManager{
 	
-	public void defragment(Cluster cluster) throws IOException{
+	private final Cluster parent;
+	
+	public DefragmentManager(Cluster parent){
+		this.parent=parent;
+	}
+	
+	public void defragment() throws IOException{
 		LogUtil.println("Defragmenting...");
 		
-		scanFreeChunks(cluster);
+		scanFreeChunks(parent);
 		
-		mergeChains(cluster);
+		mergeChains(parent);
 		
-		scanFreeChunks(cluster);
+		scanFreeChunks(parent);
 		
-		reorder(cluster);
+		reorder(parent);
 		
-		mergeChains(cluster);
+		mergeChains(parent);
 	}
 	
 	private void reorder(final Cluster cluster) throws IOException{
@@ -287,7 +293,7 @@ public class DefragmentManager{
 		cluster.rootWalker().walk(new MemoryWalker.PointerRecord(){
 			boolean foundCh;
 			@Override
-			public <T extends IOInstance<T>> MemoryWalker.IterationOptions log(StructPipe<T> pipe, Reference instanceReference, IOField.Ref<T, ?> field, T instance, Reference value) {
+			public <T extends IOInstance<T>> MemoryWalker.IterationOptions log(StructPipe<T> pipe, Reference instanceReference, IOField.Ref<T, ?> field, T instance, Reference value){
 				var ptr=oldRef.getPtr();
 				if(value.getPtr().equals(ptr)){
 					
@@ -307,7 +313,7 @@ public class DefragmentManager{
 				return MemoryWalker.IterationOptions.CONTINUE_NO_SAVE;
 			}
 			@Override
-			public <T extends IOInstance<T>> MemoryWalker.IterationOptions logChunkPointer(StructPipe<T> pipe, Reference instanceReference, IOField<T, ChunkPointer> field, T instance, ChunkPointer value) {
+			public <T extends IOInstance<T>> MemoryWalker.IterationOptions logChunkPointer(StructPipe<T> pipe, Reference instanceReference, IOField<T, ChunkPointer> field, T instance, ChunkPointer value){
 				return MemoryWalker.IterationOptions.CONTINUE_NO_SAVE;
 			}
 		});
