@@ -32,7 +32,7 @@ public record AllocateTicket(long bytes, boolean disableResizing, ChunkPointer n
 	public static <IO extends IOInstance<IO>> AllocateTicket withData(StructPipe<IO> pipe, DataProvider provider, IO data){
 		SizeDescriptor<IO> size=pipe.getSizeDescriptor();
 		return bytes(switch(size){
-			case SizeDescriptor.Fixed<IO> f -> f.get();
+			case SizeDescriptor.Fixed<IO> f -> f.get(WordSpace.BYTE);
 			case SizeDescriptor.Unknown<IO> u -> Math.max(8, u.calcUnknown(pipe.makeIOPool(), provider, data, WordSpace.BYTE));
 		}).shouldDisableResizing(size.hasFixed())
 		  .withDataPopulated((prov, io)->pipe.write(prov, io, data));

@@ -89,7 +89,7 @@ public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanaged
 		return headSiz+siz*index;
 	}
 	private long getElementSize(){
-		return elementPipe.getFixedDescriptor().get();
+		return elementPipe.getFixedDescriptor().get(WordSpace.BYTE);
 	}
 	private void writeAt(long index, T value) throws IOException{
 		try(var io=selfIO()){
