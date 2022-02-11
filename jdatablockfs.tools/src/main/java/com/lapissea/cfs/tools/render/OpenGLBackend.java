@@ -6,7 +6,6 @@ import com.lapissea.cfs.tools.MSDFAtlas;
 import com.lapissea.glfw.GlfwMonitor;
 import com.lapissea.glfw.GlfwWindow;
 import com.lapissea.util.MathUtil;
-import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.UtilL;
 import org.lwjgl.glfw.GLFWErrorCallback;
 import org.lwjgl.opengl.GL;
@@ -143,11 +142,13 @@ public class OpenGLBackend extends RenderBackend{
 			@Override
 			public void registerMouseButton(Consumer<MouseEvent> listener){
 				window.registryMouseButton.register(e->{
-					listener.accept(new MouseEvent((switch(e.getKey()){
+					var key=switch(e.getKey()){
 						case GLFW_MOUSE_BUTTON_LEFT -> MouseKey.LEFT;
 						case GLFW_MOUSE_BUTTON_RIGHT -> MouseKey.RIGHT;
-						default -> throw new NotImplementedException("unkown event "+e);
-					}), switch(e.getType()){
+						default -> null;
+					};
+					if(key==null) return;
+					listener.accept(new MouseEvent(key, switch(e.getType()){
 						case DOWN -> ActionType.DOWN;
 						case UP -> ActionType.UP;
 						case HOLD -> ActionType.HOLD;
