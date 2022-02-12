@@ -2,31 +2,31 @@ package com.lapissea.cfs.type.field.fields.reflection;
 
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
-import com.lapissea.cfs.io.bit.FlagReader;
-import com.lapissea.cfs.io.bit.FlagWriter;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
-import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Objects;
-import java.util.OptionalLong;
 
 public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extends IOInstance<ValueType>> extends IOField<CTyp, ValueType>{
 	
 	private final SizeDescriptor<CTyp>  descriptor;
 	private final StructPipe<ValueType> instancePipe;
 	private final boolean               fixed;
+	
+	private IOFieldPrimitive.FBoolean<CTyp> isNull;
 	
 	public IOFieldInlineObject(FieldAccessor<CTyp> accessor){
 		this(accessor, false);
@@ -39,27 +39,56 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 		var struct=(Struct<ValueType>)Struct.ofUnknown(getAccessor().getType());
 		instancePipe=fixed?FixedContiguousStructPipe.of(struct):ContiguousStructPipe.of(struct);
 		
-		var desc    =instancePipe.getSizeDescriptor();
-		var nullSize=WordSpace.mapSize(WordSpace.BYTE, desc.getWordSpace(), nullable()?1:0);
+		var desc=instancePipe.getSizeDescriptor();
 		
 		var fixedSiz=desc.getFixed();
 		if(fixedSiz.isPresent()){
-			descriptor=new SizeDescriptor.Fixed<>(desc.getWordSpace(), fixedSiz.getAsLong()+nullSize);
+			descriptor=new SizeDescriptor.Fixed<>(desc.getWordSpace(), fixedSiz.getAsLong());
 		}else{
 			descriptor=new SizeDescriptor.Unknown<>(
 				desc.getWordSpace(),
-				nullable()?nullSize:desc.getMin(),
-				Utils.addIfBoth(OptionalLong.of(nullSize), desc.getMax()),
+				desc.getMin(),
+				desc.getMax(),
 				(ioPool, prov, inst)->{
 					var val=get(null, inst);
 					if(val==null){
-						if(nullable()) return nullSize;
-						throw new NullPointerException();
+						if(!nullable()) throw new NullPointerException();
 					}
-					return desc.calcUnknown(instancePipe.makeIOPool(), prov, val)+nullSize;
+					return desc.calcUnknown(instancePipe.makeIOPool(), prov, val);
 				}
 			);
 		}
+	}
+	
+	@Override
+	public void init(){
+		super.init();
+		if(nullable()){
+			isNull=declaringStruct().getFields().requireExactBoolean(IOFieldTools.makeNullFlagName(getAccessor()));
+		}
+	}
+	
+	@Override
+	public List<ValueGeneratorInfo<CTyp, ?>> getGenerators(){
+		
+		if(!nullable()) return List.of();
+		
+		return List.of(new ValueGeneratorInfo<>(isNull, new ValueGenerator<CTyp, Boolean>(){
+			@Override
+			public boolean shouldGenerate(Struct.Pool<CTyp> ioPool, DataProvider provider, CTyp instance){
+				var isNullRec    =get(ioPool, instance)==null;
+				var writtenIsNull=isNull.getValue(ioPool, instance);
+				return writtenIsNull!=isNullRec;
+			}
+			@Override
+			public Boolean generate(Struct.Pool<CTyp> ioPool, DataProvider provider, CTyp instance, boolean allowExternalMod){
+				return get(ioPool, instance)==null;
+			}
+		}));
+	}
+	
+	private boolean getIsNull(Struct.Pool<CTyp> ioPool, CTyp instance){
+		return isNull.getValue(ioPool, instance);
 	}
 	
 	@Override
@@ -87,17 +116,6 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 		});
 	}
 	
-	private void writeIsNull(ContentWriter dest, ValueType val) throws IOException{
-		try(var flags=new FlagWriter.AutoPop(NumberSize.BYTE, dest)){
-			flags.writeBoolBit(val==null);
-		}
-	}
-	private boolean readIsNull(ContentReader src) throws IOException{
-		try(var flags=FlagReader.read(src, NumberSize.BYTE)){
-			return flags.readBoolBit();
-		}
-	}
-	
 	@Override
 	public IOField<CTyp, ValueType> implMaxAsFixedSize(){
 		return new IOFieldInlineObject<>(getAccessor(), true);
@@ -112,10 +130,9 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 	public void write(Struct.Pool<CTyp> ioPool, DataProvider provider, ContentWriter dest, CTyp instance) throws IOException{
 		var val=get(ioPool, instance);
 		if(nullable()){
-			writeIsNull(dest, val);
 			if(val==null){
 				if(fixed){
-					Utils.zeroFill(dest::write, (int)getSizeDescriptor().requireFixed(WordSpace.BYTE)-1);
+					Utils.zeroFill(dest::write, (int)getSizeDescriptor().requireFixed(WordSpace.BYTE));
 				}
 				return;
 			}
@@ -123,12 +140,12 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 		instancePipe.write(provider, dest, val);
 	}
 	
-	private ValueType readNew(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+	private ValueType readNew(Struct.Pool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
 		if(nullable()){
-			boolean isNull=readIsNull(src);
+			boolean isNull=getIsNull(ioPool, instance);
 			if(isNull){
 				if(fixed){
-					src.readInts1((int)getSizeDescriptor().requireFixed(WordSpace.BYTE)-1);
+					src.readInts1((int)getSizeDescriptor().requireFixed(WordSpace.BYTE));
 				}
 				return null;
 			}
@@ -139,7 +156,7 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 	
 	@Override
 	public void read(Struct.Pool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
-		set(ioPool, instance, readNew(provider, src, genericContext));
+		set(ioPool, instance, readNew(ioPool, provider, src, instance, genericContext));
 	}
 	
 	@Override
@@ -150,6 +167,6 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 			return;
 		}
 		
-		readNew(provider, src, genericContext);
+		readNew(ioPool, provider, src, instance, genericContext);
 	}
 }
