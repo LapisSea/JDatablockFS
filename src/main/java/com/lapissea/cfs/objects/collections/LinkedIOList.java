@@ -17,6 +17,7 @@ import com.lapissea.cfs.type.field.access.AbstractFieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.annotations.IOValueUnmanaged;
+import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
@@ -244,6 +245,13 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			readManagedFields();
 			
 			var start=valueStart();
+			
+			var ch   =this.getReference().getPtr();
+			var frees=getDataProvider().getMemoryManager().getFreeChunks();
+			
+			if(frees.contains(ch)){
+				throw new RuntimeException(frees+" "+ch);
+			}
 			try(var io=this.getReference().io(this)){
 				if(io.getSize()<start){
 					return null;

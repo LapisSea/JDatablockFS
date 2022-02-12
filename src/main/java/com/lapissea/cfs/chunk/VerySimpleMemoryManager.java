@@ -13,6 +13,7 @@ public class VerySimpleMemoryManager extends MemoryManager.StrategyImpl{
 	private static final boolean PURGE_ACCIDENTAL=true;
 	
 	private final IOList<ChunkPointer> freeChunks=IOList.wrap(new ArrayList<>(), ()->null);
+	private       boolean              defragmentMode;
 	
 	public VerySimpleMemoryManager(DataProvider context){
 		super(context);
@@ -21,7 +22,10 @@ public class VerySimpleMemoryManager extends MemoryManager.StrategyImpl{
 	@Override
 	protected List<AllocStrategy> createAllocs(){
 		return List.of(
-			MemoryOperations::allocateReuseFreeChunk,
+			(context1, ticket)->{
+				if(defragmentMode) return null;
+				return MemoryOperations.allocateReuseFreeChunk(context1, ticket);
+			},
 			MemoryOperations::allocateAppendToFile
 		);
 	}
@@ -35,12 +39,19 @@ public class VerySimpleMemoryManager extends MemoryManager.StrategyImpl{
 	}
 	
 	@Override
+	public DefragSes openDefragmentMode(){
+		boolean oldDefrag=defragmentMode;
+		defragmentMode=true;
+		return ()->defragmentMode=oldDefrag;
+	}
+	@Override
 	public IOList<ChunkPointer> getFreeChunks(){
 		return freeChunks;
 	}
 	
 	@Override
 	public void free(Collection<Chunk> toFree) throws IOException{
+		if(toFree.isEmpty()) return;
 		List<Chunk> toAdd=MemoryOperations.mergeChunks(toFree, PURGE_ACCIDENTAL);
 		MemoryOperations.mergeFreeChunksSorted(context, freeChunks, toAdd);
 	}
