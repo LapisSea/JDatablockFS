@@ -9,7 +9,9 @@ import com.lapissea.util.NotNull;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Retention(RetentionPolicy.RUNTIME)
 public @interface IOType{

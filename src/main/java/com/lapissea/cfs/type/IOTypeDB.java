@@ -1,7 +1,6 @@
 package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.chunk.DataProvider;
-import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.objects.collections.AbstractUnmanagedIOMap;
 import com.lapissea.cfs.objects.collections.HashIOMap;

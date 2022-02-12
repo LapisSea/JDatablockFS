@@ -3,11 +3,16 @@ package com.lapissea.cfs;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.objects.collections.IOList;
-import com.lapissea.util.*;
+import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.TextUtil;
+import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.lang.reflect.*;
+import java.lang.reflect.Array;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.lang.reflect.TypeVariable;
 import java.util.*;
 import java.util.function.IntFunction;
 import java.util.stream.Collectors;
