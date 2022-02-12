@@ -577,7 +577,7 @@ public class BinaryGridRenderer{
 					annotateStruct(annCtx, root,
 					               cluster.getFirstChunk().getPtr().makeReference(),
 					               FixedContiguousStructPipe.of(root.getThisStruct()),
-					               true);
+					               null, true);
 					
 				}catch(Throwable e){
 					e1=e;
@@ -660,7 +660,7 @@ public class BinaryGridRenderer{
 	}
 	
 	private void annotateChunk(AnnotateCtx ctx, Chunk chunk) throws IOException{
-		annotateStruct(ctx, chunk, null, Chunk.PIPE, true);
+		annotateStruct(ctx, chunk, null, Chunk.PIPE, null, true);
 		var rctx=ctx.renderCtx;
 		if(chunk.dataEnd()>rctx.bytes.length){
 			drawByteRanges(rctx, List.of(new Range(rctx.bytes.length, chunk.dataEnd())), new Color(0, 0, 0, 0.2F), false, false);
@@ -1076,7 +1076,7 @@ public class BinaryGridRenderer{
 	
 	@SuppressWarnings("unchecked")
 	private <T extends IOInstance<T>> void annotateStruct(AnnotateCtx ctx,
-	                                                      T instance, Reference instanceReference, StructPipe<T> pipe, boolean annotate) throws IOException{
+	                                                      T instance, Reference instanceReference, StructPipe<T> pipe, GenericContext parentGenerics, boolean annotate) throws IOException{
 		var reference=instanceReference;
 		if(instance instanceof Chunk c){
 			var off=ctx.provider.getFirstChunk().getPtr();
@@ -1117,9 +1117,14 @@ public class BinaryGridRenderer{
 					var acc=field.getAccessor();
 					if(!read&&acc instanceof VirtualAccessor<T> vAcc&&vAcc.getStoragePool()==IO){
 						read=true;
-						reference.withContext(ctx.provider).io(io->{
-							pipe.read(ioPool, ctx.provider, io, instance, null);
-						});
+						try{
+							reference.withContext(ctx.provider).io(io->{
+								pipe.read(ioPool, ctx.provider, io, instance, generics(instance, parentGenerics));
+							});
+						}catch(Throwable e){
+							drawByteRangesForced(ctx.renderCtx, List.of(Range.fromSize(reference.calcGlobalOffset(ctx.provider), 1)), Color.RED, false);
+//							throw new RuntimeException("Failed to read full object data"+reference, e);
+						}
 					}
 					
 					var col=ColorUtils.makeCol(rand, typeHash, field);
@@ -1140,7 +1145,7 @@ public class BinaryGridRenderer{
 								continue;
 							}
 							if(inst instanceof IOInstance<?> ioi){
-								annotateStruct(ctx, (T)ioi, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), ioi.getThisStruct()), annotate);
+								annotateStruct(ctx, (T)ioi, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), ioi.getThisStruct()), generics(instance, parentGenerics), annotate);
 								continue;
 							}
 							LogUtil.printlnEr("unmanaged dynamic type", inst);
@@ -1174,7 +1179,7 @@ public class BinaryGridRenderer{
 								}
 							}
 							if(!diffPos) ctx.popStrings(renderer);
-							annotateStruct(ctx, refField.get(ioPool, instance), ref, refField.getReferencedPipe(instance), diffPos);
+							annotateStruct(ctx, refField.get(ioPool, instance), ref, refField.getReferencedPipe(instance), generics(instance, parentGenerics), diffPos);
 							
 							continue;
 						}
@@ -1205,7 +1210,7 @@ public class BinaryGridRenderer{
 								var msg=field.toString();
 								try{
 									ctx.popStrings(renderer);
-									annotateStruct(ctx, ch.dereference(ctx.provider), null, Chunk.PIPE, true);
+									annotateStruct(ctx, ch.dereference(ctx.provider), null, Chunk.PIPE, generics(instance, parentGenerics), true);
 								}catch(Exception e){
 									msg=msg+"\n"+DrawUtils.errorToMessage(e);
 									col=Color.RED;
@@ -1234,7 +1239,7 @@ public class BinaryGridRenderer{
 							if(UtilL.instanceOf(typ, IOInstance.class)){
 								var inst=(IOInstance<?>)field.get(ioPool, instance);
 								if(inst!=null){
-									annotateStruct(ctx, (T)inst, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), inst.getThisStruct()), annotate);
+									annotateStruct(ctx, (T)inst, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), inst.getThisStruct()), generics(instance, parentGenerics), annotate);
 								}
 								continue;
 							}
@@ -1248,7 +1253,7 @@ public class BinaryGridRenderer{
 									long       arrOffset  =0;
 									for(int i=0;i<arrSiz;i++){
 										var val=(IOInstance)Array.get(inst, i);
-										annotateStruct(ctx, val, reference.addOffset(fieldOffset+arrOffset), elementPipe, annotate);
+										annotateStruct(ctx, val, reference.addOffset(fieldOffset+arrOffset), elementPipe, generics(instance, parentGenerics), annotate);
 										arrOffset+=elementPipe.getSizeDescriptor().calcUnknown(ioPool, ctx.provider, val, WordSpace.BYTE);
 									}
 									continue;
@@ -1334,6 +1339,9 @@ public class BinaryGridRenderer{
 				ctx.popStrings(renderer);
 			}
 		}
+	}
+	private <T extends IOInstance<T>> GenericContext generics(T instance, GenericContext parentGenerics){
+		return instance instanceof IOInstance.Unmanaged<?> u?u.getGenerics():null;
 	}
 	
 	private <T extends IOInstance<T>> String instanceErrStr(T instance){

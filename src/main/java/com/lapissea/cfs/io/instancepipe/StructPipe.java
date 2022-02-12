@@ -23,7 +23,6 @@ import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
-import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
@@ -171,12 +170,10 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		return new SizeDescriptor.Unknown<>(wordSpace, min, max, (ioPool, prov, inst)->{
 			checkNull(inst);
 			
-			if(generators!=null){
-				try{
-					generateAll(ioPool, prov, inst, false);
-				}catch(IOException e){
-					throw new RuntimeException(e);
-				}
+			try{
+				generateAll(ioPool, prov, inst, false);
+			}catch(IOException e){
+				throw new RuntimeException(e);
 			}
 			
 			return knownFixed+IOFieldTools.sumVars(unknownFields, d->{
@@ -290,8 +287,8 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		if(dest.isDirect()){
 			var desc=getSizeDescriptor();
 			var siz=desc.getFixed(WordSpace.BYTE).orElseGet(()->{
-				var max =desc.getMax(WordSpace.BYTE);
-				var min =desc.getMin(WordSpace.BYTE);
+				var max=desc.getMax(WordSpace.BYTE);
+				var min=desc.getMin(WordSpace.BYTE);
 				return max.orElse(Math.max(min, 32));
 			});
 			destBuff=new ContentOutputBuilder((int)siz);
@@ -469,7 +466,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 			write(man, tmp, inst);
 			instRead=readNew(man, tmp, null);
 		}catch(IOException e){
-			throw new MalformedObjectException("Failed object IO "+getType(),e);
+			throw new MalformedObjectException("Failed object IO "+getType(), e);
 		}
 		
 		if(!instRead.equals(inst)){
