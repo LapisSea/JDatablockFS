@@ -7,7 +7,9 @@ import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
+import com.lapisseqa.cfs.run.Configuration;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.Random;
 import java.util.stream.LongStream;
@@ -18,6 +20,13 @@ import static com.lapissea.util.LogUtil.Init.USE_TABULATED_HEADER;
 public class SparseImage{
 	
 	public static void main(String[] args) throws IOException{
+		Configuration config=new Configuration();
+		config.load(new Configuration.Loader.JsonArgs(new File("SparseImage.json"), true));
+		config.load(new Configuration.Loader.DashedNameValueArgs(args));
+		main(config.getView());
+	}
+	
+	public static void main(Configuration.View args) throws IOException{
 		
 		var config  =LoggedMemoryUtils.readConfig();
 		var logFlags=0;
@@ -40,7 +49,7 @@ public class SparseImage{
 				Cluster cluster=new Cluster(mem);
 				
 				
-				run(cluster);
+				run(cluster, args);
 				
 			}finally{
 				logger.block();
@@ -50,16 +59,19 @@ public class SparseImage{
 			logger.get().destroy();
 		}
 	}
-	private static void run(Cluster cluster) throws IOException{
+	private static void run(Cluster cluster, Configuration.View args) throws IOException{
+		
+		int radius    =args.getInt("radius", 10);
+		int iterations=args.getInt("iterations", 100);
 		
 		var image=new Image();
 		image.allocateNulls(cluster);
 		cluster.getTemp().put(0, image);
 		
 		Random r=new Random(1);
-		for(int i=0;i<10;i++){
-			int x=(int)(Math.pow(r.nextFloat(), 3)*5);
-			int y=(int)(Math.pow(r.nextFloat(), 3)*5);
+		for(int i=0;i<iterations;i++){
+			int x=(int)(Math.pow(r.nextFloat(), 3)*radius);
+			int y=(int)(Math.pow(r.nextFloat(), 3)*radius);
 			image.set(x, y, r.nextFloat(), r.nextFloat(), 1);
 		}
 		

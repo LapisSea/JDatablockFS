@@ -336,7 +336,7 @@ public class Struct<T extends IOInstance<T>>{
 			try{
 				str=field.instanceToString(ioPool, instance, doShort||TextUtil.USE_SHORT_IN_COLLECTIONS);
 			}catch(FieldIsNullException e){
-				str="<ERR: "+e.getMessage()+">";
+				str="<UNINITIALIZED>";
 			}
 			
 			if(str==null) continue;

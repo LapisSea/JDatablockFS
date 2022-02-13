@@ -17,7 +17,7 @@ import static org.lwjgl.glfw.GLFW.*;
 
 public class DisplayManager implements DataLogger{
 	
-	private static final boolean DO_JIT_WARMUP=false;
+	private static final boolean DO_JIT_WARMUP=UtilL.sysPropertyByClass(DisplayManager.class, "DO_JIT_WARMUP", true, Boolean::parseBoolean);
 	
 	private boolean destroyRequested=false;
 	
@@ -158,7 +158,7 @@ public class DisplayManager implements DataLogger{
 					if(renderer.notifyDirtyFrame()){
 						doRender();
 					}else UtilL.sleep(2);
-					UtilL.sleep(0, 1000);
+					if(jitWarmup>=150) UtilL.sleep(0, 1000);
 					display.pollEvents();
 				}
 			}
