@@ -4,7 +4,9 @@ import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.chunk.DataProvider;
+import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
+import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.objects.collections.ContiguousIOList;
@@ -22,6 +24,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
@@ -29,6 +32,7 @@ import java.util.Arrays;
 import java.util.Random;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static com.lapissea.util.LogUtil.Init.USE_CALL_POS;
 import static com.lapissea.util.LogUtil.Init.USE_TABULATED_HEADER;
@@ -296,5 +300,42 @@ public class GeneralTests{
 			TypeLink.of(listType, typ),
 			session, useCluster
 		);
+	}
+	
+	@ParameterizedTest
+	@MethodSource("types")
+	<T extends IOInstance<T>> void checkIntegrity(Struct<T> struct) throws IOException{
+		if(struct instanceof Struct.Unmanaged){
+			return;
+		}
+		
+		StructPipe<T> pipe=null;
+		try{
+			pipe=ContiguousStructPipe.of(struct);
+		}catch(MalformedStructLayout ignored){}
+		if(pipe!=null){
+			pipe.checkTypeIntegrity(struct.requireEmptyConstructor().get());
+		}
+		try{
+			pipe=FixedContiguousStructPipe.of(struct);
+		}catch(MalformedStructLayout ignored){}
+		if(pipe!=null){
+			pipe.checkTypeIntegrity(struct.requireEmptyConstructor().get());
+		}
+	}
+	
+	@SuppressWarnings("unchecked")
+	private static <T extends IOInstance<T>> Stream<Struct<T>> types(){
+		return (Stream<Struct<T>>)(Object)Stream
+			.of(
+				Reference.class,
+				AutoText.class,
+				Cluster.class,
+				ContiguousIOList.class,
+				LinkedIOList.class,
+				HashIOMap.class
+			).flatMap(p->Stream.concat(Stream.of(p), Arrays.stream(p.getDeclaredClasses())))
+			.filter(c->UtilL.instanceOf(c, IOInstance.class))
+			.map(Struct::ofUnknown);
 	}
 }
