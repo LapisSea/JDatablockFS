@@ -156,6 +156,11 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	public IOField<T, ?> get(int index){
 		return data.get(index);
 	}
+	
+	public IOField<T, ?> getLast(){
+		return data.get(data.size()-1);
+	}
+	
 	@Override
 	public int size(){
 		return data.size();
@@ -191,6 +196,10 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	}
 	public <E extends IOField<T, ?>> E requireExactFieldType(Class<E> type, String name){
 		return exactFieldType(type, name).orElseThrow();
+	}
+	public <E extends IOInstance<E>> IOFieldPrimitive.FLong<E> requireExactLong(String name){
+		//noinspection unchecked
+		return requireExactFieldType(IOFieldPrimitive.FLong.class, name);
 	}
 	public <E extends IOInstance<E>> IOFieldPrimitive.FInt<E> requireExactInt(String name){
 		//noinspection unchecked
