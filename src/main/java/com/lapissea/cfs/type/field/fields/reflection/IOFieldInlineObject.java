@@ -47,12 +47,13 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 		}else{
 			descriptor=new SizeDescriptor.Unknown<>(
 				desc.getWordSpace(),
-				desc.getMin(),
+				nullable()?0:desc.getMin(),
 				desc.getMax(),
 				(ioPool, prov, inst)->{
 					var val=get(null, inst);
 					if(val==null){
 						if(!nullable()) throw new NullPointerException();
+						return 0;
 					}
 					return desc.calcUnknown(instancePipe.makeIOPool(), prov, val);
 				}
