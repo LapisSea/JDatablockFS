@@ -333,7 +333,9 @@ public class GeneralTests{
 				Cluster.class,
 				ContiguousIOList.class,
 				LinkedIOList.class,
-				HashIOMap.class
+				HashIOMap.class,
+				BooleanContainer.class,
+				Dummy.class
 			).flatMap(p->Stream.concat(Stream.of(p), Arrays.stream(p.getDeclaredClasses())))
 			.filter(c->UtilL.instanceOf(c, IOInstance.class))
 			.map(Struct::ofUnknown);

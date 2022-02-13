@@ -62,7 +62,7 @@ public class BitInputStream implements BitReader, AutoCloseable{
 			checkNOneAndThrow(bufferedBits);
 		}catch(IllegalBitValueException e){
 			var b=e.bit+start;
-			throw new IllegalBitValueException(b,"Illegal bit found at "+b,e);
+			throw new IllegalBitValueException(b, "Illegal bit found at "+b, e);
 		}
 	}
 	

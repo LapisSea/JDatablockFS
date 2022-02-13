@@ -194,8 +194,8 @@ public class JorthMethod{
 	private void popAndCheckArguments(String className, String methodName, List<GenType> args) throws MalformedJorthException{
 		for(int i=args.size()-1;i>=0;i--){
 			var popped=popTypeStack();
-			var arg=args.get(i);
-			if(arg.instanceOf(context,popped))continue;
+			var arg   =args.get(i);
+			if(arg.instanceOf(context, popped)) continue;
 			
 			throw new MalformedJorthException("Argument "+i+" in "+className+"#"+methodName+" is "+args.get(i)+" but got "+popped);
 		}
@@ -290,7 +290,7 @@ public class JorthMethod{
 			if(!popped.equals(returnType)) throw new MalformedJorthException("Method returns "+returnType+" but "+popped+" is on stack");
 			mv.visitInsn(popped.type().returnOp);
 		}else{
-			if(typeStack.size()>0)throw new MalformedJorthException("Returning nothing (void) but there are values "+typeStack+" on the stack");
+			if(typeStack.size()>0) throw new MalformedJorthException("Returning nothing (void) but there are values "+typeStack+" on the stack");
 			mv.visitInsn(RETURN);
 		}
 	}

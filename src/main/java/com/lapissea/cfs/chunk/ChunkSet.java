@@ -146,7 +146,7 @@ public class ChunkSet implements Set<ChunkPointer>{
 	
 	private static final Supplier<Index> NEW_INDEX=Index.Bitmap32::new;
 	
-	private final Index           index=NEW_INDEX.get();
+	private final Index index=NEW_INDEX.get();
 	
 	private long end  =-1;
 	private long start=-1;

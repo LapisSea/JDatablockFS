@@ -256,7 +256,7 @@ public sealed interface IOTypeDB{
 		
 		@Override
 		public String toShortString(){
-			if(data==null)return "{uninitialized}";
+			if(data==null) return "{uninitialized}";
 			return "{owner="+data.getDataProvider()+"}";
 		}
 	}

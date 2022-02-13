@@ -11,14 +11,14 @@ import java.nio.ByteBuffer;
 
 public class BytecodeUtils{
 	
-	public static void printClass(ByteBuffer in) {
+	public static void printClass(ByteBuffer in){
 		try{
 			printClass(new ByteBufferBackedInputStream(in.asReadOnlyBuffer()));
 		}catch(Exception e){
 			throw new RuntimeException(e);
 		}
 	}
-	public static void printClass(byte[] in) {
+	public static void printClass(byte[] in){
 		try{
 			printClass(new ByteArrayInputStream(in));
 		}catch(Exception e){

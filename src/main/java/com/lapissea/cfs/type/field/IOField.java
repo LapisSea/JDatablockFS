@@ -223,7 +223,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		ValType generate(Struct.Pool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException;
 	}
 	
-	public static record ValueGeneratorInfo<T extends IOInstance<T>, ValType>(
+	public record ValueGeneratorInfo<T extends IOInstance<T>, ValType>(
 		IOField<T, ValType> field,
 		ValueGenerator<T, ValType> generator
 	){
@@ -238,7 +238,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 			return ValueGeneratorInfo.class.getSimpleName()+"{modifies "+field+"}";
 		}
 		public String toShortString(){
-			return "{modifies "+TextUtil.toShortString(field)+"}";
+			return "{mod "+TextUtil.toShortString(field)+"}";
 		}
 	}
 	
@@ -305,14 +305,14 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		var o2=get(ioPool2, inst2);
 		
 		if(nullability==IONullability.Mode.DEFAULT_IF_NULL&&(o1==null||o2==null)){
-			if(o1==null&&o2==null)return true;
+			if(o1==null&&o2==null) return true;
 			var acc=getAccessor();
 			
 			if(UtilL.instanceOf(acc.getType(), IOInstance.class)){
 				var typ=Struct.ofUnknown(acc.getType());
 				
-				if(o1==null)o1=(ValueType)typ.requireEmptyConstructor().get();
-				if(o2==null)o2=(ValueType)typ.requireEmptyConstructor().get();
+				if(o1==null) o1=(ValueType)typ.requireEmptyConstructor().get();
+				if(o2==null) o2=(ValueType)typ.requireEmptyConstructor().get();
 			}else{
 				throw new NotImplementedException(acc.getType()+"");//TODO
 			}
@@ -322,7 +322,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 			return Arrays.equals((Object[])o1, (Object[])o2);
 		}
 		
-		return Objects.equals(o1,o2);
+		return Objects.equals(o1, o2);
 	}
 	
 	public int instanceHashCode(Struct.Pool<T> ioPool, T instance){

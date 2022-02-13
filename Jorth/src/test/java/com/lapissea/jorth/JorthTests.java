@@ -438,8 +438,8 @@ public class JorthTests{
 		@DefaultAnn(1234)
 		public String field;
 		
-		public String a;
-		public String[] b;
+		public String     a;
+		public String[]   b;
 		public String[][] c;
 	}
 	

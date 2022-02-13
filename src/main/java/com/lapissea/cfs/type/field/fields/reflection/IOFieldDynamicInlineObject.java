@@ -279,7 +279,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 	}
 	@Override
 	public void write(Struct.Pool<CTyp> ioPool, DataProvider provider, ContentWriter dest, CTyp instance) throws IOException{
-		if(nullable()&&getIsNull(ioPool, instance))return;
+		if(nullable()&&getIsNull(ioPool, instance)) return;
 		var val=get(ioPool, instance);
 		writeValue(provider, dest, val);
 	}
