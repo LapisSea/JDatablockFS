@@ -81,7 +81,6 @@ public class Access{
 				
 				T val=tryRecoverWithOld(constructor, functionalInterface);
 				if(val!=null) return val;
-				//TODO: figure out how to hack this? Really bad workaround the lambda factory.
 				throw new NotImplementedException("java modules cause this not to be supported", e);
 			}
 			
