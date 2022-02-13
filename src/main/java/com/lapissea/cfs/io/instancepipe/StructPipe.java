@@ -26,11 +26,10 @@ import com.lapissea.util.TextUtil;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
-import java.util.Collection;
-import java.util.List;
-import java.util.Objects;
-import java.util.OptionalLong;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
@@ -338,35 +337,116 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		}
 	}
 	
-	public void writeSingleField(DataProvider provider, RandomIO dest, IOField<T, ?> selectedField, T instance) throws IOException{
-		temp_disableDependencyFields(selectedField);
+	private final Map<IOField<T, ?>, List<IOField<T, ?>>> singleDependencyCache    =new HashMap<>();
+	private final ReadWriteLock                           singleDependencyCacheLock=new ReentrantReadWriteLock();
+	
+	private List<IOField<T, ?>> getFilter(IOField<T, ?> selectedField){
+		var r=singleDependencyCacheLock.readLock();
+		r.lock();
+		try{
+			List<IOField<T, ?>> cached;
+			cached=singleDependencyCache.get(selectedField);
+			if(cached!=null) return cached;
+		}finally{
+			r.unlock();
+		}
 		
+		var w=singleDependencyCacheLock.writeLock();
+		w.lock();
+		try{
+			return singleDependencyCache.computeIfAbsent(selectedField, this::generateFieldDependency);
+		}finally{
+			w.unlock();
+		}
+	}
+	
+	private List<IOField<T, ?>> generateFieldDependency(IOField<T, ?> selectedField){
+		Set<IOField<T, ?>> selectedFieldsSet=new HashSet<>();
+		selectedFieldsSet.add(selectedField);
+		
+		boolean shouldRun=true;
+		while(shouldRun){
+			shouldRun=false;
+			
+			for(IOField<T, ?> field : selectedFieldsSet){
+				var deps=field.getDependencies();
+				if(!deps.isEmpty()){
+					if(selectedFieldsSet.addAll(deps)) shouldRun=true;
+				}
+				var gens=field.getGenerators();
+				if(gens!=null){
+					for(var gen : gens){
+						if(selectedFieldsSet.add(gen.field())) shouldRun=true;
+					}
+				}
+			}
+			
+			for(IOField<T, ?> field : selectedFieldsSet){
+				if(field.getSizeDescriptor().hasFixed()){
+					continue;
+				}
+				
+				var fields=getSpecificFields();
+				var index =fields.indexOf(field);
+				assert index!=-1;//TODO handle fields in fields
+				for(int i=index+1;i<fields.size();i++){
+					if(selectedFieldsSet.add(fields.get(i))) shouldRun=true;
+				}
+			}
+			
+		}
+		List<IOField<T, ?>> result;
+		if(selectedFieldsSet.size()==1){
+			result=List.copyOf(selectedFieldsSet);
+			getSpecificFields().forEach(selectedFieldsSet::remove);
+		}else{
+			result=new ArrayList<>(selectedFieldsSet.size());
+			for(IOField<T, ?> f : getSpecificFields()){
+				if(!selectedFieldsSet.remove(f)) continue;
+				result.add(f);
+			}
+		}
+		if(!selectedFieldsSet.isEmpty()){
+			throw new NotImplementedException();//TODO handle fields in fields
+		}
+		return List.copyOf(result);
+	}
+	
+	
+	public void writeSingleField(DataProvider provider, RandomIO dest, IOField<T, ?> selectedField, T instance) throws IOException{
+		if(DEBUG_VALIDATION){
+			checkExistenceOfField(selectedField);
+		}
+		
+		var filter=getFilter(selectedField);
 		var ioPool=makeIOPool();
 		
+		int checkIndex=0;
+		
 		for(IOField<T, ?> field : getSpecificFields()){
-			checkExistenceOfField(selectedField);
 			
 			long bytes;
 			try{
 				var desc=field.getSizeDescriptor();
 				bytes=desc.calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
 			}catch(UnknownSizePredictionException e){
-				throw new RuntimeException("Single field write of "+selectedField+" is not currently supported!");
+				throw new RuntimeException("Write of "+filter+" is not currently supported!");
 			}
-			if(field==selectedField){
+			
+			if(filter.get(checkIndex)==field){
+				checkIndex++;
 				writeFieldKnownSize(ioPool, provider, instance, field, dest.writeTicket(bytes));
-				return;
+				
+				if(checkIndex==filter.size()){
+					return;
+				}
+				
+				continue;
 			}
 			
 			dest.skipExact(bytes);
 		}
 		
-	}
-	
-	private void temp_disableDependencyFields(IOField<T, ?> field){
-		if(!field.getDependencies().isEmpty()){
-			throw new NotImplementedException("Single field IO with dependencies is currently not possible");//TODO
-		}
 	}
 	
 	protected void readIOFields(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
@@ -382,25 +462,41 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	}
 	
 	public void readSingleField(DataProvider provider, ContentReader src, IOField<T, ?> selectedField, T instance, GenericContext genericContext) throws IOException{
-		temp_disableDependencyFields(selectedField);
-		
-		var ioPool=makeIOPool();
-		
 		if(DEBUG_VALIDATION){
 			checkExistenceOfField(selectedField);
+		}
+		
+		
+		var filter    =getFilter(selectedField);
+		var ioPool    =makeIOPool();
+		int checkIndex=0;
+		
+		if(DEBUG_VALIDATION){
 			for(IOField<T, ?> field : getSpecificFields()){
-				if(field==selectedField){
+				if(filter.get(checkIndex)==field){
+					checkIndex++;
 					readFieldSafe(ioPool, provider, src, instance, field, genericContext);
-					return;
+					
+					if(checkIndex==filter.size()){
+						return;
+					}
+					
+					continue;
 				}
 				
 				field.skipReadReported(ioPool, provider, src, instance, genericContext);
 			}
 		}else{
 			for(IOField<T, ?> field : getSpecificFields()){
-				if(field==selectedField){
+				if(filter.get(checkIndex)==field){
+					checkIndex++;
 					field.readReported(ioPool, provider, src, instance, genericContext);
-					return;
+					
+					if(checkIndex==filter.size()){
+						return;
+					}
+					
+					continue;
 				}
 				
 				field.skipReadReported(ioPool, provider, src, instance, genericContext);

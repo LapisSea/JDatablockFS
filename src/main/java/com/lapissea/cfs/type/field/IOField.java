@@ -360,7 +360,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 				if(o1==null) o1=(ValueType)typ.requireEmptyConstructor().get();
 				if(o2==null) o2=(ValueType)typ.requireEmptyConstructor().get();
 			}else{
-				throw new NotImplementedException(acc.getType()+"");//TODO
+				throw new NotImplementedException(acc.getType()+"");//TODO implement equals of numbers?
 			}
 		}
 		

@@ -18,7 +18,7 @@ import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
-import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.ShouldNeverHappenError;
 
 import java.io.IOException;
 import java.util.List;
@@ -35,11 +35,8 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	
 	private IOField<T, Reference> referenceField;
 	
-	public IOFieldObjectReference(FieldAccessor<T> accessor){
-		this(accessor, false);
-	}
 	@SuppressWarnings("unchecked")
-	public IOFieldObjectReference(FieldAccessor<T> accessor, boolean fixed){
+	public IOFieldObjectReference(FieldAccessor<T> accessor){
 		super(accessor);
 		
 		descriptor=SizeDescriptor.Fixed.of(0);
@@ -99,10 +96,6 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	@Override
 	public StructPipe<ValueType> getReferencedPipe(T instance){
 		return instancePipe;
-	}
-	@Override
-	public Ref<T, ValueType> implMaxAsFixedSize(){
-		return new IOFieldObjectReference<>(getAccessor(), true);
 	}
 	
 	private Reference getRef(T instance){
@@ -183,12 +176,7 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 		}
 		var ref=getReference(instance);
 		if(val!=null&&(ref==null||ref.isNull())){
-			allocAndSet(instance, provider, val);
-			if(DEBUG_VALIDATION){
-				getReference(instance).requireNonNull();
-			}
-			throw new NotImplementedException("implement generation of reference field!");
-//			return List.of(referenceField); TODO: implement this you lazy bastard
+			throw new ShouldNeverHappenError();//Generators have not been called if this is true
 		}
 		
 		if(val!=null){
@@ -205,6 +193,6 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	
 	@Override
 	public void skipRead(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		throw NotImplementedException.infer();//TODO: implement IOFieldObjectReference.skipRead()
+		//nothing to do. Reference field stores the actual pointer
 	}
 }

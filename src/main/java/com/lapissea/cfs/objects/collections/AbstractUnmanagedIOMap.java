@@ -6,6 +6,7 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
 
 import java.io.IOException;
 
@@ -15,8 +16,7 @@ public abstract class AbstractUnmanagedIOMap<K, V> extends IOInstance.Unmanaged<
 	@IODependency.VirtualNumSize
 	private long size;
 	
-	//TODO: use sizeField when single field with dependencies is implemented
-//	private final IOField<SELF, ?> sizeField=getThisStruct().getFields().byName("size").orElseThrow();
+	private final IOFieldPrimitive.FLong<AbstractUnmanagedIOMap<K, V>> sizeField=getThisStruct().getFields().requireExactLong("size");
 	
 	protected AbstractUnmanagedIOMap(DataProvider provider, Reference reference, TypeLink typeDef, TypeLink.Check check){super(provider, reference, typeDef, check);}
 	public AbstractUnmanagedIOMap(DataProvider provider, Reference reference, TypeLink typeDef)                         {super(provider, reference, typeDef);}
@@ -27,9 +27,8 @@ public abstract class AbstractUnmanagedIOMap<K, V> extends IOInstance.Unmanaged<
 	protected void deltaSize(long delta) throws IOException{
 		this.size+=delta;
 		try(var ignored=getDataProvider().getSource().openIOTransaction()){
-			writeManagedFields();
+			writeManagedField(sizeField);
 		}
-//		writeManagedField(sizeField); //TODO: see L19
 	}
 	
 	@Override

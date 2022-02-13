@@ -661,15 +661,13 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 	}
 	
 	private Node<T> getHead() throws IOException{
-//		readManagedFields(headField); //TODO: Implement single field with deps!!!
-		readManagedFields();
+		readManagedField(headField);
 		return head;
 	}
 	private void setHead(Node<T> head) throws IOException{
 		this.head=head;
 		try(var ignored=getDataProvider().getSource().openIOTransaction()){
-//			writeManagedField(headField); //TODO: Implement single field with deps!!!
-			writeManagedFields();
+			writeManagedField(headField);
 		}
 	}
 	
