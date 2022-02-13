@@ -15,6 +15,7 @@ import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
+import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.TextUtil;
@@ -169,6 +170,51 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		public IOField.Bit<T, Type> implMaxAsFixedSize(){
 			throw new NotImplementedException();
 		}
+	}
+	
+	public abstract static class NullFlagCompany<T extends IOInstance<T>, Type> extends IOField<T, Type>{
+		
+		private IOFieldPrimitive.FBoolean<T> isNull;
+		
+		protected NullFlagCompany(FieldAccessor<T> field){
+			super(field);
+		}
+		
+		@Override
+		public void init(){
+			super.init();
+			if(nullable()){
+				isNull=declaringStruct().getFields().requireExactBoolean(IOFieldTools.makeNullFlagName(getAccessor()));
+			}
+		}
+		
+		@Override
+		public List<ValueGeneratorInfo<T, ?>> getGenerators(){
+			
+			if(!nullable()) return List.of();
+			
+			return List.of(new ValueGeneratorInfo<>(isNull, new ValueGenerator<T, Boolean>(){
+				@Override
+				public boolean shouldGenerate(Struct.Pool<T> ioPool, DataProvider provider, T instance){
+					var isNullRec    =get(ioPool, instance)==null;
+					var writtenIsNull=isNull.getValue(ioPool, instance);
+					return writtenIsNull!=isNullRec;
+				}
+				@Override
+				public Boolean generate(Struct.Pool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod){
+					return get(ioPool, instance)==null;
+				}
+			}));
+		}
+		
+		protected final boolean getIsNull(Struct.Pool<T> ioPool, T instance){
+			if(DEBUG_VALIDATION){
+				if(!nullable()) throw new RuntimeException("Checking if null on a non nullable field");
+			}
+			
+			return isNull.getValue(ioPool, instance);
+		}
+		
 	}
 	
 	private final FieldAccessor<T> accessor;

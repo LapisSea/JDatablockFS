@@ -27,15 +27,15 @@ import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Objects;
 import java.util.OptionalLong;
+import java.util.stream.Stream;
 
-public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType> extends IOField<CTyp, ValueType>{
+public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType> extends IOField.NullFlagCompany<CTyp, ValueType>{
 	
 	private static final StructPipe<AutoText>  STR_PIPE=ContiguousStructPipe.of(AutoText.class);
 	private static final StructPipe<Reference> REF_PIPE=ContiguousStructPipe.of(Reference.class);
 	
-	private final SizeDescriptor<CTyp>            descriptor;
-	private       IOFieldPrimitive.FInt<CTyp>     typeID;
-	private       IOFieldPrimitive.FBoolean<CTyp> isNull;
+	private final SizeDescriptor<CTyp>        descriptor;
+	private       IOFieldPrimitive.FInt<CTyp> typeID;
 	
 	public IOFieldDynamicInlineObject(FieldAccessor<CTyp> accessor){
 		super(accessor);
@@ -67,10 +67,8 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 	
 	@Override
 	public void init(){
+		super.init();
 		typeID=declaringStruct().getFields().requireExactInt(IOFieldTools.makeGenericIDFieldName(getAccessor()));
-		if(nullable()){
-			isNull=declaringStruct().getFields().requireExactBoolean(IOFieldTools.makeNullFlagName(getAccessor()));
-		}
 	}
 	
 	@SuppressWarnings({"unchecked"})
@@ -260,32 +258,13 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 			}
 		});
 		
-		if(!nullable()) return List.of(idGenerator);
-		
-		var nullGenerator=new ValueGeneratorInfo<>(isNull, new ValueGenerator<CTyp, Boolean>(){
-			@Override
-			public boolean shouldGenerate(Struct.Pool<CTyp> ioPool, DataProvider provider, CTyp instance){
-				var isNullRec    =get(ioPool, instance)==null;
-				var writtenIsNull=isNull.getValue(ioPool, instance);
-				return writtenIsNull!=isNullRec;
-			}
-			@Override
-			public Boolean generate(Struct.Pool<CTyp> ioPool, DataProvider provider, CTyp instance, boolean allowExternalMod){
-				return get(ioPool, instance)==null;
-			}
-		});
-		
-		return List.of(idGenerator, nullGenerator);
+		return Stream.concat(super.getGenerators().stream(), Stream.of(idGenerator)).toList();
 	}
 	@Override
 	public void write(Struct.Pool<CTyp> ioPool, DataProvider provider, ContentWriter dest, CTyp instance) throws IOException{
 		if(nullable()&&getIsNull(ioPool, instance)) return;
 		var val=get(ioPool, instance);
 		writeValue(provider, dest, val);
-	}
-	
-	private boolean getIsNull(Struct.Pool<CTyp> ioPool, CTyp instance){
-		return isNull.getValue(ioPool, instance);
 	}
 	
 	private TypeLink getType(Struct.Pool<CTyp> ioPool, DataProvider provider, CTyp instance) throws IOException{

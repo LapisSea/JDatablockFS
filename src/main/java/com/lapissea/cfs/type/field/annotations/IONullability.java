@@ -22,7 +22,7 @@ public @interface IONullability{
 		@Override
 		public void validate(FieldAccessor<?> field, IONullability annotation){
 			var typ=field.getType();
-			if(Stream.of(IOInstance.class, Enum.class).noneMatch(c->UtilL.instanceOf(typ, c))&&!field.hasAnnotation(IOType.Dynamic.class)){
+			if(Stream.of(IOInstance.class, Enum.class, String.class).noneMatch(c->UtilL.instanceOf(typ, c))&&!field.hasAnnotation(IOType.Dynamic.class)){
 				throw new MalformedStructLayout(field+" is not a supported field");
 			}
 		}
@@ -34,7 +34,7 @@ public @interface IONullability{
 		
 		private <T extends IOInstance<T>> boolean canHaveNullabilityField(FieldAccessor<T> field){
 			if(field.hasAnnotation(IOValue.Reference.class)) return false;
-			return UtilL.instanceOf(field.getType(), IOInstance.class)||field.hasAnnotation(IOType.Dynamic.class);
+			return UtilL.instanceOf(field.getType(), IOInstance.class)||UtilL.instanceOf(field.getType(), String.class)||field.hasAnnotation(IOType.Dynamic.class);
 		}
 		
 		@NotNull

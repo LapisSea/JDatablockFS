@@ -12,21 +12,17 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
-import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.Objects;
 
-public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extends IOInstance<ValueType>> extends IOField<CTyp, ValueType>{
+public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extends IOInstance<ValueType>> extends IOField.NullFlagCompany<CTyp, ValueType>{
 	
 	private final SizeDescriptor<CTyp>  descriptor;
 	private final StructPipe<ValueType> instancePipe;
 	private final boolean               fixed;
-	
-	private IOFieldPrimitive.FBoolean<CTyp> isNull;
 	
 	public IOFieldInlineObject(FieldAccessor<CTyp> accessor){
 		this(accessor, false);
@@ -34,7 +30,6 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 	public IOFieldInlineObject(FieldAccessor<CTyp> accessor, boolean fixed){
 		super(accessor);
 		this.fixed=fixed;
-		
 		
 		var struct=(Struct<ValueType>)Struct.ofUnknown(getAccessor().getType());
 		instancePipe=fixed?FixedContiguousStructPipe.of(struct):ContiguousStructPipe.of(struct);
@@ -59,37 +54,6 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 				}
 			);
 		}
-	}
-	
-	@Override
-	public void init(){
-		super.init();
-		if(nullable()){
-			isNull=declaringStruct().getFields().requireExactBoolean(IOFieldTools.makeNullFlagName(getAccessor()));
-		}
-	}
-	
-	@Override
-	public List<ValueGeneratorInfo<CTyp, ?>> getGenerators(){
-		
-		if(!nullable()) return List.of();
-		
-		return List.of(new ValueGeneratorInfo<>(isNull, new ValueGenerator<CTyp, Boolean>(){
-			@Override
-			public boolean shouldGenerate(Struct.Pool<CTyp> ioPool, DataProvider provider, CTyp instance){
-				var isNullRec    =get(ioPool, instance)==null;
-				var writtenIsNull=isNull.getValue(ioPool, instance);
-				return writtenIsNull!=isNullRec;
-			}
-			@Override
-			public Boolean generate(Struct.Pool<CTyp> ioPool, DataProvider provider, CTyp instance, boolean allowExternalMod){
-				return get(ioPool, instance)==null;
-			}
-		}));
-	}
-	
-	private boolean getIsNull(Struct.Pool<CTyp> ioPool, CTyp instance){
-		return isNull.getValue(ioPool, instance);
 	}
 	
 	@Override
