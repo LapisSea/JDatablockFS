@@ -31,7 +31,7 @@ public interface GenericContext{
 			return "Ctx"+TextUtil.toString(actualTypes);
 		}
 		public String toShortString(){
-			return "Ctx"+TextUtil.toShortString(actualTypes);
+			return "Ctx"+Utils.toShortString(actualTypes);
 		}
 	}
 	

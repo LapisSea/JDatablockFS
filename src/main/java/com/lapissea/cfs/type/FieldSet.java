@@ -1,8 +1,8 @@
 package com.lapissea.cfs.type;
 
+import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
-import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
 import java.util.*;
@@ -138,7 +138,7 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 			
 			if(!Objects.equals(now, last)){
 				last=now;
-				sb.append(TextUtil.toShortString(now)).append(": ");
+				sb.append(Utils.toShortString(now)).append(": ");
 			}
 			
 			sb.append(e.toShortString());

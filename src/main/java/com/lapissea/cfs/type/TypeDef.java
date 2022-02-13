@@ -1,10 +1,10 @@
 package com.lapissea.cfs.type;
 
+import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.ArrayViewList;
 import com.lapissea.util.NotNull;
-import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
 import java.lang.reflect.Modifier;
@@ -41,7 +41,7 @@ public class TypeDef extends IOInstance<TypeDef>{
 		}
 		@Override
 		public String toShortString(){
-			return name+": "+TextUtil.toShortString(type);
+			return name+": "+Utils.toShortString(type);
 		}
 	}
 	

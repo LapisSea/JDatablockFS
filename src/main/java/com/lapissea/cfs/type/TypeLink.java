@@ -163,7 +163,7 @@ public final class TypeLink extends IOInstance<TypeLink>{
 		else argStr=Arrays.stream(args).map(TypeLink::toShortString).collect(Collectors.joining(", ", "<", ">"));
 		
 		String nam=shortTypeString();
-		return "Typ("+nam+argStr+")";
+		return nam+argStr;
 	}
 	private String shortTypeString(){
 		var nam =getTypeName();

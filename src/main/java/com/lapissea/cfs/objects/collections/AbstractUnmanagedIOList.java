@@ -1,5 +1,6 @@
 package com.lapissea.cfs.objects.collections;
 
+import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.IOInstance;
@@ -8,7 +9,6 @@ import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.NotNull;
-import com.lapissea.util.TextUtil;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
@@ -74,7 +74,7 @@ public abstract class AbstractUnmanagedIOList<T extends IOInstance<T>, SELF exte
 	
 	@Override
 	public String toString(){
-		return stream().map(TextUtil::toShortString).collect(Collectors.joining(", ", getStringPrefix()+"[", "]"));
+		return stream().map(Utils::toShortString).collect(Collectors.joining(", ", getStringPrefix()+"[", "]"));
 	}
 	@Override
 	public String toShortString(){

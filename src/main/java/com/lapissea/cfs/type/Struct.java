@@ -10,6 +10,7 @@ import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.compilation.FieldCompiler;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.util.*;
@@ -18,6 +19,7 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
@@ -329,6 +331,10 @@ public class Struct<T extends IOInstance<T>>{
 			
 			sb.append(simple);
 		}
+		
+		var fields=new ArrayList<>(this.fields);
+		fields.removeIf(toRem->toRem.getName().contains(IOFieldTools.GENERATED_FIELD_SEPARATOR));
+		
 		sb.append('{');
 		boolean comma=false;
 		for(var field : fields){

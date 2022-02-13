@@ -1,7 +1,7 @@
 package com.lapissea.cfs.objects.collections;
 
 import com.lapissea.cfs.IterablePP;
-import com.lapissea.util.TextUtil;
+import com.lapissea.cfs.Utils;
 
 import java.io.IOException;
 import java.util.Map;
@@ -15,10 +15,10 @@ public interface IOMap<K, V>{
 		abstract class Abstract<K, V> implements Entry<K, V>{
 			@Override
 			public String toString(){
-				return this.getClass().getSimpleName()+"{"+TextUtil.toShortString(getKey())+" = "+TextUtil.toShortString(getValue())+"}";
+				return this.getClass().getSimpleName()+"{"+Utils.toShortString(getKey())+" = "+Utils.toShortString(getValue())+"}";
 			}
 			public String toShortString(){
-				return "{"+TextUtil.toShortString(getKey())+" = "+TextUtil.toShortString(getValue())+"}";
+				return "{"+Utils.toShortString(getKey())+" = "+Utils.toShortString(getValue())+"}";
 			}
 			@Override
 			public boolean equals(Object obj){
@@ -102,9 +102,9 @@ public interface IOMap<K, V>{
 			K key  =e.getKey();
 			V value=e.getValue();
 			
-			sb.append(TextUtil.toShortString(key));
+			sb.append(Utils.toShortString(key));
 			sb.append('=');
-			sb.append(TextUtil.toShortString(value));
+			sb.append(Utils.toShortString(value));
 			if(!i.hasNext()) return sb.append('}').toString();
 			sb.append(',').append(' ');
 		}

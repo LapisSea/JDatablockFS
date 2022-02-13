@@ -31,6 +31,8 @@ import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NOT_NUL
 
 public class IOFieldTools{
 	
+	public static final String GENERATED_FIELD_SEPARATOR=":";
+	
 	public static <T extends IOInstance<T>> Function<List<IOField<T, ?>>, List<IOField<T, ?>>> streamStep(Function<Stream<IOField<T, ?>>, Stream<IOField<T, ?>>> map){
 		return list->map.apply(list.stream()).toList();
 	}
@@ -120,16 +122,16 @@ public class IOFieldTools{
 	}
 	
 	public static <T extends IOInstance<T>> String makeArrayLenName(FieldAccessor<T> field){
-		return field.getName()+":len";
+		return field.getName()+GENERATED_FIELD_SEPARATOR+"len";
 	}
 	public static <T extends IOInstance<T>> String makeNumberSizeName(String name){
-		return name+":nSiz";
+		return name+GENERATED_FIELD_SEPARATOR+"nSiz";
 	}
 	public static <T extends IOInstance<T>> String makeGenericIDFieldName(FieldAccessor<T> field){
-		return field.getName()+":typeID";
+		return field.getName()+GENERATED_FIELD_SEPARATOR+"typeID";
 	}
 	public static <T extends IOInstance<T>> String makeNullFlagName(FieldAccessor<T> field){
-		return field.getName()+":isNull";
+		return field.getName()+GENERATED_FIELD_SEPARATOR+"isNull";
 	}
 	
 	public static IONullability.Mode getNullability(FieldAccessor<?> field){
@@ -140,7 +142,7 @@ public class IOFieldTools{
 	}
 	public static <T extends IOInstance<T>> String makeRefName(FieldAccessor<T> accessor){
 		
-		return accessor.getName()+":ref";
+		return accessor.getName()+GENERATED_FIELD_SEPARATOR+"ref";
 	}
 	
 	public static <E extends Annotation> E makeAnnotation(Class<E> annotationType, @NotNull Map<String, Object> values){

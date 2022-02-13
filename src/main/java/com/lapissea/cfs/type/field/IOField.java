@@ -284,7 +284,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 			return ValueGeneratorInfo.class.getSimpleName()+"{modifies "+field+"}";
 		}
 		public String toShortString(){
-			return "{mod "+TextUtil.toShortString(field)+"}";
+			return "{mod "+Utils.toShortString(field)+"}";
 		}
 	}
 	
@@ -340,7 +340,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 			if(val instanceof IOInstance inst){
 				return inst.toShortString();
 			}
-			return TextUtil.toShortString(val);
+			return Utils.toShortString(val);
 		}
 		return TextUtil.toString(val);
 	}

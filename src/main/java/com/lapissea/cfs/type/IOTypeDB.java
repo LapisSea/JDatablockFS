@@ -109,6 +109,29 @@ public sealed interface IOTypeDB{
 	
 	final class PersistentDB extends IOInstance<PersistentDB> implements IOTypeDB{
 		
+		private static final class TypeName extends IOInstance<TypeName>{
+			@IOValue
+			private String typeName;
+			
+			public TypeName(){}
+			public TypeName(String typeName){
+				this.typeName=typeName;
+			}
+			
+			@Override
+			public String toString(){
+				return typeName;
+			}
+			
+			@Override
+			public String toShortString(){
+				var nam  =typeName;
+				var index=nam.lastIndexOf('.');
+				if(index!=-1) return nam.substring(index+1);
+				return nam;
+			}
+		}
+		
 		private static final MemoryOnlyDB BUILT_IN=new MemoryOnlyDB();
 		private static final int          FIRST_ID;
 		
@@ -121,6 +144,7 @@ public sealed interface IOTypeDB{
 					      String.class,
 					      TypeLink.class,
 					      TypeDef.class,
+					      PersistentDB.class,
 					      IOInstance.class
 				      ).flatMap(csrc->Stream.concat(Stream.of(csrc), Arrays.stream(csrc.getDeclaredClasses()).filter(c->UtilL.instanceOf(c, IOInstance.class))))
 				      .forEach(c->{
@@ -143,7 +167,7 @@ public sealed interface IOTypeDB{
 		
 		@IOValue
 		@IOValue.OverrideType(HashIOMap.class)
-		private AbstractUnmanagedIOMap<String, TypeDef> defs;
+		private AbstractUnmanagedIOMap<TypeName, TypeDef> defs;
 		
 		private WeakReference<ClassLoader> templateLoader=new WeakReference<>(null);
 		
@@ -167,18 +191,20 @@ public sealed interface IOTypeDB{
 			if(!recordNew) return new TypeID(newID, false);
 			
 			data.put(newID, type);
-			var newDefs=new HashMap<String, TypeDef>();
+			var newDefs=new HashMap<TypeName, TypeDef>();
 			recordType(type, newDefs);
 			defs.putAll(newDefs);
 			return new TypeID(newID, true);
 		}
 		
-		private void recordType(TypeLink type, Map<String, TypeDef> newDefs) throws IOException{
+		private void recordType(TypeLink type, Map<TypeName, TypeDef> newDefs) throws IOException{
 			var isBuiltIn=BUILT_IN.getDefinitionFromClassName(type.getTypeName())!=null;
 			if(isBuiltIn) return;
 			
-			var added  =newDefs.containsKey(type.getTypeName());
-			var defined=defs.containsKey(type.getTypeName());
+			var typeName=new TypeName(type.getTypeName());
+			
+			var added  =newDefs.containsKey(typeName);
+			var defined=defs.containsKey(typeName);
 			
 			if(added||defined) return;
 			
@@ -193,7 +219,7 @@ public sealed interface IOTypeDB{
 			}
 			
 			var def=new TypeDef(typ);
-			newDefs.put(type.getTypeName(), def);
+			newDefs.put(typeName, def);
 			
 			for(int i=0;i<type.argCount();i++){
 				recordType(type.arg(i), newDefs);
@@ -233,7 +259,7 @@ public sealed interface IOTypeDB{
 				if(def!=null) return def;
 			}
 			
-			return defs.get(className);
+			return defs.get(new TypeName(className));
 		}
 		
 		public void init(DataProvider provider) throws IOException{
