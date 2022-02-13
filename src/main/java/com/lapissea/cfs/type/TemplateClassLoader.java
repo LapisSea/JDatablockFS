@@ -100,7 +100,7 @@ public class TemplateClassLoader extends ClassLoader{
 				case "C" -> "char";
 				case "Z" -> "boolean";
 				default -> {
-					if(!nam.startsWith("L")||!nam.endsWith(";"))throw new NotImplementedException("Unknown tyoe: "+nam);
+					if(!nam.startsWith("L")||!nam.endsWith(";")) throw new NotImplementedException("Unknown tyoe: "+nam);
 					yield nam.substring(1, nam.length()-1);
 				}
 			});

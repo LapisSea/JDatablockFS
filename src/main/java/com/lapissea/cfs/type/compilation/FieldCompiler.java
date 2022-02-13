@@ -278,12 +278,12 @@ public class FieldCompiler{
 	}
 	
 	private String getPrefix(Field field){
-		var typ=field.getType();
+		var typ   =field.getType();
 		var isBool=typ==boolean.class||typ==Boolean.class;
 		return isBool?"is":"get";
 	}
 	private String getPrefix(Method method){
-		var typ=method.getReturnType();
+		var typ   =method.getReturnType();
 		var isBool=typ==boolean.class||typ==Boolean.class;
 		return isBool?"is":"get";
 	}

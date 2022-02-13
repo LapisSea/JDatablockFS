@@ -1,7 +1,6 @@
 package com.lapisseqa.cfs.run;
 
 import com.lapissea.cfs.objects.collections.IOMap;
-import com.lapissea.util.NotImplementedException;
 
 import java.io.IOException;
 import java.util.HashMap;

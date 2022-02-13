@@ -1,7 +1,6 @@
 package com.lapissea.jorth.lang;
 
 import com.lapissea.jorth.MalformedJorthException;
-import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeFunction;
 

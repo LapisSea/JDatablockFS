@@ -77,7 +77,7 @@ public class Access{
 				                                   handle,
 				                                   handle.type());
 			}catch(LambdaConversionException e){
-				if(USE_UNSAFE_LOOKUP)throw new ShouldNeverHappenError("Unsafe lookup should solve this");
+				if(USE_UNSAFE_LOOKUP) throw new ShouldNeverHappenError("Unsafe lookup should solve this");
 				
 				T val=tryRecoverWithOld(constructor, functionalInterface);
 				if(val!=null) return val;

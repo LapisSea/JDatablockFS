@@ -1,6 +1,5 @@
 package com.lapissea.jorth.lang;
 
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;

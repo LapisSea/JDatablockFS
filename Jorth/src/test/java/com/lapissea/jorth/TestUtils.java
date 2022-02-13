@@ -4,7 +4,6 @@ import com.lapissea.jorth.lang.BytecodeUtils;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeConsumer;
 
-import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 
 public class TestUtils{

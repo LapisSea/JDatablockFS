@@ -14,9 +14,9 @@ import java.util.stream.Collectors;
 
 public record GenType(String typeName, int arrayDimensions, List<GenType> args, Types type){
 	
-	public static final GenType VOID  =new GenType("void");
+	public static final GenType VOID          =new GenType("void");
 	public static final GenType STRING_BUILDER=new GenType(StringBuilder.class.getTypeName());
-	public static final GenType STRING=new GenType(String.class.getTypeName());
+	public static final GenType STRING        =new GenType(String.class.getTypeName());
 	
 	private static Types makeTyp(String typeName){
 		var lower=typeName.toLowerCase();
@@ -24,7 +24,7 @@ public record GenType(String typeName, int arrayDimensions, List<GenType> args, 
 	}
 	
 	private static Class<?> fromTyp(Type type){
-		if(type instanceof Class<?> c)return c;
+		if(type instanceof Class<?> c) return c;
 		if(type instanceof ParameterizedType p){
 			return (Class<?>)p.getRawType();
 		}
@@ -48,7 +48,7 @@ public record GenType(String typeName, int arrayDimensions, List<GenType> args, 
 		this(typeName, 0, List.of());
 	}
 	public GenType(String typeName, int arrayDimensions, List<GenType> args){
-		this(typeName,arrayDimensions, List.copyOf(args), makeTyp(typeName));
+		this(typeName, arrayDimensions, List.copyOf(args), makeTyp(typeName));
 	}
 	
 	@Override
@@ -57,7 +57,7 @@ public record GenType(String typeName, int arrayDimensions, List<GenType> args, 
 	}
 	public boolean instanceOf(JorthCompiler context, GenType popped) throws MalformedJorthException{
 		if(popped.equals(this)) return true;
-		if(popped.type()!=this.type())return false;
+		if(popped.type()!=this.type()) return false;
 		
 		if(popped.type()==Types.OBJECT){
 			if(typeName().equals("java.lang.Object")) return true;

@@ -23,9 +23,9 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 	
 	public abstract static class Unmanaged<SELF extends Unmanaged<SELF>> extends IOInstance<SELF> implements DataProvider.Holder{
 		
-		private final DataProvider   provider;
-		private       Reference reference;
-		private final TypeLink  typeDef;
+		private final DataProvider provider;
+		private       Reference    reference;
+		private final TypeLink     typeDef;
 		
 		private StructPipe<SELF> pipe;
 		

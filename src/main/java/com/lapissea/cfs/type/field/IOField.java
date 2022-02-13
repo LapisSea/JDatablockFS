@@ -15,6 +15,7 @@ import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
+import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.TextUtil;
@@ -171,6 +172,51 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		}
 	}
 	
+	public abstract static class NullFlagCompany<T extends IOInstance<T>, Type> extends IOField<T, Type>{
+		
+		private IOFieldPrimitive.FBoolean<T> isNull;
+		
+		protected NullFlagCompany(FieldAccessor<T> field){
+			super(field);
+		}
+		
+		@Override
+		public void init(){
+			super.init();
+			if(nullable()){
+				isNull=declaringStruct().getFields().requireExactBoolean(IOFieldTools.makeNullFlagName(getAccessor()));
+			}
+		}
+		
+		@Override
+		public List<ValueGeneratorInfo<T, ?>> getGenerators(){
+			
+			if(!nullable()) return List.of();
+			
+			return List.of(new ValueGeneratorInfo<>(isNull, new ValueGenerator<T, Boolean>(){
+				@Override
+				public boolean shouldGenerate(Struct.Pool<T> ioPool, DataProvider provider, T instance){
+					var isNullRec    =get(ioPool, instance)==null;
+					var writtenIsNull=isNull.getValue(ioPool, instance);
+					return writtenIsNull!=isNullRec;
+				}
+				@Override
+				public Boolean generate(Struct.Pool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod){
+					return get(ioPool, instance)==null;
+				}
+			}));
+		}
+		
+		protected final boolean getIsNull(Struct.Pool<T> ioPool, T instance){
+			if(DEBUG_VALIDATION){
+				if(!nullable()) throw new RuntimeException("Checking if null on a non nullable field");
+			}
+			
+			return isNull.getValue(ioPool, instance);
+		}
+		
+	}
+	
 	private final FieldAccessor<T> accessor;
 	
 	private boolean                initialized;
@@ -223,7 +269,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		ValType generate(Struct.Pool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException;
 	}
 	
-	public static record ValueGeneratorInfo<T extends IOInstance<T>, ValType>(
+	public record ValueGeneratorInfo<T extends IOInstance<T>, ValType>(
 		IOField<T, ValType> field,
 		ValueGenerator<T, ValType> generator
 	){
@@ -238,7 +284,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 			return ValueGeneratorInfo.class.getSimpleName()+"{modifies "+field+"}";
 		}
 		public String toShortString(){
-			return "{modifies "+TextUtil.toShortString(field)+"}";
+			return "{mod "+TextUtil.toShortString(field)+"}";
 		}
 	}
 	
@@ -305,14 +351,14 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		var o2=get(ioPool2, inst2);
 		
 		if(nullability==IONullability.Mode.DEFAULT_IF_NULL&&(o1==null||o2==null)){
-			if(o1==null&&o2==null)return true;
+			if(o1==null&&o2==null) return true;
 			var acc=getAccessor();
 			
 			if(UtilL.instanceOf(acc.getType(), IOInstance.class)){
 				var typ=Struct.ofUnknown(acc.getType());
 				
-				if(o1==null)o1=(ValueType)typ.requireEmptyConstructor().get();
-				if(o2==null)o2=(ValueType)typ.requireEmptyConstructor().get();
+				if(o1==null) o1=(ValueType)typ.requireEmptyConstructor().get();
+				if(o2==null) o2=(ValueType)typ.requireEmptyConstructor().get();
 			}else{
 				throw new NotImplementedException(acc.getType()+"");//TODO
 			}
@@ -322,7 +368,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 			return Arrays.equals((Object[])o1, (Object[])o2);
 		}
 		
-		return Objects.equals(o1,o2);
+		return Objects.equals(o1, o2);
 	}
 	
 	public int instanceHashCode(Struct.Pool<T> ioPool, T instance){

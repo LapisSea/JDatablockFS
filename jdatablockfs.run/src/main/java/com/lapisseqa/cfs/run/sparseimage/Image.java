@@ -59,7 +59,7 @@ public class Image extends IOInstance<Image>{
 			int localY=y-chunkY*chunkSize;
 			int index =localX+localY*chunkSize;
 			
-			c.pixels[index]=new Pixel(r,g,b);
+			c.pixels[index]=new Pixel(r, g, b);
 			
 			iter.ioSet(c);
 			return;

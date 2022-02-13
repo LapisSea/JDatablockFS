@@ -324,8 +324,8 @@ public class Struct<T extends IOInstance<T>>{
 		StringBuilder sb=new StringBuilder();
 		if(!doShort){
 			var simple=getType().getSimpleName();
-			var index=simple.lastIndexOf('$');
-			if(index!=-1)simple=simple.substring(index+1);
+			var index =simple.lastIndexOf('$');
+			if(index!=-1) simple=simple.substring(index+1);
 			
 			sb.append(simple);
 		}

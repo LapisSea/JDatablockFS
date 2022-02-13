@@ -90,7 +90,7 @@ public final class TypeLink extends IOInstance<TypeLink>{
 	@IOValue
 	private String     typeName="";
 	@IOValue
-	private TypeLink[] args=new TypeLink[0];
+	private TypeLink[] args    =new TypeLink[0];
 	
 	private Type generic;
 	
@@ -151,7 +151,7 @@ public final class TypeLink extends IOInstance<TypeLink>{
 	@Override
 	public String toString(){
 		String argStr;
-		if(args.length==0)argStr="";
+		if(args.length==0) argStr="";
 		else argStr=Arrays.stream(args).map(TypeLink::toString).collect(Collectors.joining(", ", "<", ">"));
 		
 		return getClass().getSimpleName()+"("+getTypeName()+argStr+")";
@@ -159,7 +159,7 @@ public final class TypeLink extends IOInstance<TypeLink>{
 	@Override
 	public String toShortString(){
 		String argStr;
-		if(args.length==0)argStr="";
+		if(args.length==0) argStr="";
 		else argStr=Arrays.stream(args).map(TypeLink::toShortString).collect(Collectors.joining(", ", "<", ">"));
 		
 		String nam=shortTypeString();

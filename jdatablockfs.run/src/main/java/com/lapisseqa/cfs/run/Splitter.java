@@ -3,7 +3,6 @@ package com.lapisseqa.cfs.run;
 import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.collections.IOMap;
-import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.function.UnsafeBiConsumer;
 import com.lapissea.util.function.UnsafeConsumer;
 
