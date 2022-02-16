@@ -193,4 +193,9 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 	public Optional<BitLayout> getSafetyBits(){
 		return safetyBits;
 	}
+	
+	@Override
+	public List<ValueGeneratorInfo<T, ?>> getGenerators(){
+		return streamUnpackedFields().flatMap(f->f.getGenerators().stream()).toList();
+	}
 }

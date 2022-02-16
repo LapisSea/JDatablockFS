@@ -106,7 +106,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		sizeDescription=calcSize();
 		ioPoolAccessors=Utils.nullIfEmpty(calcIOPoolAccessors());
 		earlyNullChecks=Utils.nullIfEmpty(getNonNulls());
-		generators=Utils.nullIfEmpty(ioFields.stream().map(IOField::getGenerators).filter(Objects::nonNull).flatMap(Collection::stream).toList());
+		generators=Utils.nullIfEmpty(ioFields.stream().map(IOField::getGenerators).flatMap(Collection::stream).toList());
 	}
 	
 	private List<IOField<T, ?>> getNonNulls(){
@@ -374,10 +374,8 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 					if(selectedFieldsSet.addAll(deps)) shouldRun=true;
 				}
 				var gens=field.getGenerators();
-				if(gens!=null){
-					for(var gen : gens){
-						if(selectedFieldsSet.add(gen.field())) shouldRun=true;
-					}
+				for(var gen : gens){
+					if(selectedFieldsSet.add(gen.field())) shouldRun=true;
 				}
 			}
 			
