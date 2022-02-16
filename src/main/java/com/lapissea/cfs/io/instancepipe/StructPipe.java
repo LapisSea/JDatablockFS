@@ -21,7 +21,6 @@ import com.lapissea.cfs.type.field.VirtualFieldDefinition;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.util.LogUtil;
-import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.function.UnsafeConsumer;
 
@@ -337,15 +336,16 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		}
 	}
 	
-	private final Map<IOField<T, ?>, List<IOField<T, ?>>> singleDependencyCache    =new HashMap<>();
-	private final ReadWriteLock                           singleDependencyCacheLock=new ReentrantReadWriteLock();
+	private record IODependency<T extends IOInstance<T>>(List<IOField<T, ?>> writeFields, List<IOField.ValueGeneratorInfo<T, ?>> generators){}
 	
-	private List<IOField<T, ?>> getFilter(IOField<T, ?> selectedField){
+	private final Map<IOField<T, ?>, IODependency<T>> singleDependencyCache    =new HashMap<>();
+	private final ReadWriteLock                       singleDependencyCacheLock=new ReentrantReadWriteLock();
+	
+	private IODependency<T> getDeps(IOField<T, ?> selectedField){
 		var r=singleDependencyCacheLock.readLock();
 		r.lock();
 		try{
-			List<IOField<T, ?>> cached;
-			cached=singleDependencyCache.get(selectedField);
+			var cached=singleDependencyCache.get(selectedField);
 			if(cached!=null) return cached;
 		}finally{
 			r.unlock();
@@ -354,13 +354,15 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		var w=singleDependencyCacheLock.writeLock();
 		w.lock();
 		try{
-			return singleDependencyCache.computeIfAbsent(selectedField, this::generateFieldDependency);
+			var field=generateFieldDependency(selectedField);
+			singleDependencyCache.put(selectedField, field);
+			return field;
 		}finally{
 			w.unlock();
 		}
 	}
 	
-	private List<IOField<T, ?>> generateFieldDependency(IOField<T, ?> selectedField){
+	private IODependency<T> generateFieldDependency(IOField<T, ?> selectedField){
 		Set<IOField<T, ?>> selectedFieldsSet=new HashSet<>();
 		selectedFieldsSet.add(selectedField);
 		
@@ -368,7 +370,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		while(shouldRun){
 			shouldRun=false;
 			
-			for(IOField<T, ?> field : selectedFieldsSet){
+			for(IOField<T, ?> field : new HashSet<>(selectedFieldsSet)){
 				var deps=field.getDependencies();
 				if(!deps.isEmpty()){
 					if(selectedFieldsSet.addAll(deps)) shouldRun=true;
@@ -379,7 +381,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 				}
 			}
 			
-			for(IOField<T, ?> field : selectedFieldsSet){
+			for(IOField<T, ?> field : new HashSet<>(selectedFieldsSet)){
 				if(field.getSizeDescriptor().hasFixed()){
 					continue;
 				}
@@ -393,21 +395,24 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 			}
 			
 		}
-		List<IOField<T, ?>> result;
-		if(selectedFieldsSet.size()==1){
-			result=List.copyOf(selectedFieldsSet);
-			getSpecificFields().forEach(selectedFieldsSet::remove);
-		}else{
-			result=new ArrayList<>(selectedFieldsSet.size());
-			for(IOField<T, ?> f : getSpecificFields()){
-				if(!selectedFieldsSet.remove(f)) continue;
+		List<IOField<T, ?>> result=new ArrayList<>(selectedFieldsSet.size());
+		for(IOField<T, ?> f : getSpecificFields()){
+			var iter      =f.streamUnpackedFields().iterator();
+			var anyRemoved=false;
+			while(iter.hasNext()){
+				var fi=iter.next();
+				if(selectedFieldsSet.remove(fi)) anyRemoved=true;
+			}
+			
+			if(anyRemoved){
 				result.add(f);
 			}
 		}
 		if(!selectedFieldsSet.isEmpty()){
-			throw new NotImplementedException();//TODO handle fields in fields
+			throw new IllegalStateException(selectedFieldsSet+"");
 		}
-		return List.copyOf(result);
+		
+		return new IODependency<>(List.copyOf(result), Utils.nullIfEmpty(result.stream().flatMap(e->e.getGenerators().stream()).toList()));
 	}
 	
 	
@@ -416,8 +421,15 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 			checkExistenceOfField(selectedField);
 		}
 		
-		var filter=getFilter(selectedField);
-		var ioPool=makeIOPool();
+		var deps       =getDeps(selectedField);
+		var writeFields=deps.writeFields;
+		var ioPool     =makeIOPool();
+		
+		if(deps.generators!=null){
+			for(var generator : deps.generators){
+				generator.generate(ioPool, provider, instance, true);
+			}
+		}
 		
 		int checkIndex=0;
 		
@@ -428,14 +440,14 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 				var desc=field.getSizeDescriptor();
 				bytes=desc.calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
 			}catch(UnknownSizePredictionException e){
-				throw new RuntimeException("Write of "+filter+" is not currently supported!");
+				throw new RuntimeException("Write of "+deps+" is not currently supported!");
 			}
 			
-			if(filter.get(checkIndex)==field){
+			if(writeFields.get(checkIndex)==field){
 				checkIndex++;
 				writeFieldKnownSize(ioPool, provider, instance, field, dest.writeTicket(bytes));
 				
-				if(checkIndex==filter.size()){
+				if(checkIndex==writeFields.size()){
 					return;
 				}
 				
@@ -465,17 +477,18 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		}
 		
 		
-		var filter    =getFilter(selectedField);
-		var ioPool    =makeIOPool();
-		int checkIndex=0;
+		var deps       =getDeps(selectedField);
+		var writeFields=deps.writeFields;
+		var ioPool     =makeIOPool();
+		int checkIndex =0;
 		
 		if(DEBUG_VALIDATION){
 			for(IOField<T, ?> field : getSpecificFields()){
-				if(filter.get(checkIndex)==field){
+				if(writeFields.get(checkIndex)==field){
 					checkIndex++;
 					readFieldSafe(ioPool, provider, src, instance, field, genericContext);
 					
-					if(checkIndex==filter.size()){
+					if(checkIndex==writeFields.size()){
 						return;
 					}
 					
@@ -486,11 +499,11 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 			}
 		}else{
 			for(IOField<T, ?> field : getSpecificFields()){
-				if(filter.get(checkIndex)==field){
+				if(writeFields.get(checkIndex)==field){
 					checkIndex++;
 					field.readReported(ioPool, provider, src, instance, genericContext);
 					
-					if(checkIndex==filter.size()){
+					if(checkIndex==writeFields.size()){
 						return;
 					}
 					
