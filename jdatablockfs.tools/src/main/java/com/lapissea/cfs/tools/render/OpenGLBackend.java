@@ -239,6 +239,7 @@ public class OpenGLBackend extends RenderBackend{
 		
 		glDisable(GL_DEPTH_TEST);
 		glDepthMask(false);
+		glfwSwapInterval(0);
 	}
 	
 	private void displayLifecycle(){

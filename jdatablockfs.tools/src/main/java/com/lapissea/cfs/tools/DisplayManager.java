@@ -3,9 +3,7 @@ package com.lapissea.cfs.tools;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.MemFrame;
 import com.lapissea.cfs.tools.render.RenderBackend;
-import com.lapissea.util.MathUtil;
-import com.lapissea.util.Rand;
-import com.lapissea.util.UtilL;
+import com.lapissea.util.*;
 import com.lapissea.vec.Vec2i;
 
 import java.util.Optional;
@@ -17,7 +15,8 @@ import static org.lwjgl.glfw.GLFW.*;
 
 public class DisplayManager implements DataLogger{
 	
-	private static final boolean DO_JIT_WARMUP=UtilL.sysPropertyByClass(DisplayManager.class, "DO_JIT_WARMUP", true, Boolean::parseBoolean);
+	private static final boolean DO_JIT_WARMUP =UtilL.sysPropertyByClass(DisplayManager.class, "DO_JIT_WARMUP", true, Boolean::parseBoolean);
+	private static final boolean LOG_FRAME_TIME=UtilL.sysPropertyByClass(DisplayManager.class, "LOG_FRAME_TIME", false, Boolean::parseBoolean);
 	
 	private boolean destroyRequested=false;
 	
@@ -169,10 +168,22 @@ public class DisplayManager implements DataLogger{
 		}
 	}
 	
+	private final NanoTimer timer=LOG_FRAME_TIME?new NanoTimer():null;
+	
 	private void doRender(){
 		renderer.preRender();
 		
+		if(LOG_FRAME_TIME){
+			timer.end();
+		}
+		
 		gridRenderer.render();
+		
+		if(LOG_FRAME_TIME){
+			timer.start();
+			
+			LogUtil.println(timer.msAvrg100());
+		}
 		
 		renderer.postRender();
 	}

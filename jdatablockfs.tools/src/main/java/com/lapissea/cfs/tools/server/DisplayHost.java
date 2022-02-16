@@ -58,7 +58,9 @@ public class DisplayHost{
 		}
 		private void doTasks() throws IOException{
 			while(hasNext()){
-				var task=readyTasks.remove(doneCounter++);
+				var task=readyTasks.get(doneCounter);
+				if(task==null) continue;
+				readyTasks.remove(doneCounter++);
 				task.run();
 			}
 		}

@@ -9,6 +9,8 @@ import com.lapissea.cfs.tools.logging.MemFrame;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.*;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -93,6 +95,32 @@ class ServerCommons{
 			}
 		};
 	}
+	private static ObjectIO manualIO(){
+		return new ObjectIO(){
+			@Override
+			public MemFrame readFrame(DataInputStream stream) throws IOException{
+				var bytes   =readSafe(stream);
+				var idBuffer=ByteBuffer.wrap(readSafe(stream)).asLongBuffer();
+				var ids     =new long[idBuffer.limit()];
+				idBuffer.get(ids);
+				var e=new String(readSafe(stream), StandardCharsets.UTF_8);
+				
+				return new MemFrame(bytes, ids, e);
+			}
+			
+			@Override
+			public void writeFrame(DataOutputStream stream, MemFrame frame) throws IOException{
+				writeSafe(stream, b->b.write(frame.bytes()));
+				writeSafe(stream, b->{
+					var data=new byte[frame.ids().length*Long.BYTES];
+					ByteBuffer.wrap(data).asLongBuffer().put(frame.ids());
+					b.write(data);
+				});
+				writeSafe(stream, b->b.write(frame.e().getBytes(StandardCharsets.UTF_8)));
+				
+			}
+		};
+	}
 	
 	private static ObjectIO dummyIO(){
 		
@@ -138,7 +166,7 @@ class ServerCommons{
 	}
 	
 	static ObjectIO makeIO(){
-		var io=kryoIO();
+		var io=manualIO();
 		io=compressed(io);
 		return io;
 	}
