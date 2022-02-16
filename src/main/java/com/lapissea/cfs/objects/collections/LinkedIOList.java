@@ -14,6 +14,7 @@ import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.AbstractFieldAccessor;
+import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.annotations.IOValueUnmanaged;
@@ -526,6 +527,10 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 	@IONullability(IONullability.Mode.NULLABLE)
 	private Node<T> head;
 	
+	@IOValue
+	@IODependency.VirtualNumSize
+	private long size;
+	
 	private final StructPipe<T> elementPipe;
 	
 	
@@ -559,6 +564,15 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			node=node.getNext();
 		}
 		return node;
+	}
+	
+	@Override
+	public long size(){
+		return size;
+	}
+	@Override
+	protected void setSize(long size){
+		this.size=size;
 	}
 	
 	@Override

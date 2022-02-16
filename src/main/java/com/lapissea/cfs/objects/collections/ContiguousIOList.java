@@ -10,6 +10,7 @@ import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.AbstractFieldAccessor;
+import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeLongConsumer;
@@ -30,6 +31,10 @@ public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanaged
 			if(!IOInstance.isManaged(t)) throw new ClassCastException("not a managed "+IOInstance.class.getSimpleName());
 		})
 	);
+	
+	
+	@IOValue
+	private long size;
 	
 	private final FixedContiguousStructPipe<T> elementPipe;
 	
@@ -106,6 +111,15 @@ public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanaged
 			
 			return elementPipe.readNew(getDataProvider(), io, getGenerics());
 		}
+	}
+	
+	@Override
+	public long size(){
+		return size;
+	}
+	@Override
+	protected void setSize(long size){
+		this.size=size;
 	}
 	
 	@Override

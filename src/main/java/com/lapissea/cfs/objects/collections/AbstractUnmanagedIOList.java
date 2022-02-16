@@ -7,7 +7,6 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.field.IOField;
-import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.function.UnsafeConsumer;
 
@@ -17,10 +16,7 @@ import java.util.stream.Collectors;
 
 public abstract class AbstractUnmanagedIOList<T extends IOInstance<T>, SELF extends AbstractUnmanagedIOList<T, SELF>> extends IOInstance.Unmanaged<SELF> implements IOList<T>{
 	
-	@IOValue
-	private long size;
-	
-	private final IOField<SELF, ?> sizeField=getThisStruct().getFields().byName("size").orElseThrow();
+	private IOField<SELF, ?> sizeField;
 	
 	public AbstractUnmanagedIOList(DataProvider provider, Reference reference, TypeLink typeDef, TypeLink.Check check){super(provider, reference, typeDef, check);}
 	public AbstractUnmanagedIOList(DataProvider provider, Reference reference, TypeLink typeDef)                      {super(provider, reference, typeDef);}
@@ -104,15 +100,16 @@ public abstract class AbstractUnmanagedIOList<T extends IOInstance<T>, SELF exte
 		return val;
 	}
 	
-	@Override
-	public long size(){
-		return size;
-	}
-	
 	protected void deltaSize(long delta) throws IOException{
-		this.size+=delta;
+		if(sizeField==null){
+			var pipe=newPipe();
+			sizeField=pipe.getSpecificFields().byName("size").orElseThrow();
+		}
+		setSize(size()+delta);
 		writeManagedField(sizeField);
 	}
+	
+	protected abstract void setSize(long size);
 	
 	protected final void checkSize(long index){
 		checkSize(index, 0);
