@@ -2,7 +2,7 @@
   <configuration default="false" name="SparseImage" type="Application" factoryName="Application" nameIsGenerated="true">
     <option name="MAIN_CLASS_NAME" value="com.lapisseqa.cfs.run.sparseimage.SparseImage" />
     <module name="jdatablockfs.run" />
-    <option name="VM_PARAMETERS" value="-ea" />
+    <option name="VM_PARAMETERS" value="-ea -Dcom.lapissea.cfs.GlobalConfig.printCompilation=true" />
     <option name="WORKING_DIRECTORY" value="$ProjectFileDir$/run" />
     <extension name="coverage">
       <pattern>
