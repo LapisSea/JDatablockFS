@@ -710,6 +710,13 @@ public class JorthCompiler{
 						
 						var dest=currentClass.visitMethod(visibility.opCode+staticOo, functionName.source, descriptor, signature, null);
 						
+						for(AnnotationData annotation : annotations){
+							var annV=dest.visitAnnotation(Utils.genericSignature(new GenType(annotation.className(), 0, List.of())), true);
+							annotation.args.forEach(annV::visit);
+							annV.visitEnd();
+						}
+						annotations.clear();
+						
 						var info=new FunctionInfo(functionName.source, classInfo.name, returnType, methodArguments.stream().map(LocalVariableStack.Variable::type).toList(), isStatic?CallType.STATIC:CallType.VIRTUAL, isStatic, null);
 						classInfo=new ClassInfo(classInfo.name, classInfo.parents, Stream.concat(classInfo.functions.stream(), Stream.of(info)).toList());
 						
