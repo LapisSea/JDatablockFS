@@ -67,4 +67,9 @@ public record GenType(String typeName, int arrayDimensions, List<GenType> args, 
 		}
 		return false;
 	}
+	
+	public GenType rawType(){
+		if(args.isEmpty()) return this;
+		return new GenType(typeName, arrayDimensions, List.of());
+	}
 }

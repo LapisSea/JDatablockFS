@@ -12,6 +12,7 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.*;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -450,7 +451,11 @@ public class JorthCompiler{
 					}
 					classFields.put(name, type);
 					
-					var fieldVisitor=currentClass.visitField(visibility.opCode, name, Utils.genericSignature(new GenType(type.typeName(), type.arrayDimensions(), List.of())), Utils.genericSignature(type), null);
+					var descriptor=Utils.genericSignature(type.rawType());
+					var signature =Utils.genericSignature(type);
+					if(signature.equals(descriptor)) signature=null;
+					
+					var fieldVisitor=currentClass.visitField(visibility.opCode, name, descriptor, signature, null);
 					
 					for(AnnotationData annotation : annotations){
 						var annV=fieldVisitor.visitAnnotation(Utils.genericSignature(new GenType(annotation.className(), 0, List.of())), true);
@@ -679,20 +684,31 @@ public class JorthCompiler{
 						requireTokenCount(1);
 						var functionName=pop();
 						
-						String returnStr;
-						if(returnType!=null) returnStr=Utils.genericSignature(returnType);
-						else returnStr="V";
-						
 						var staticOo=isStatic?ACC_STATIC:0;
 						
-						var args=methodArguments.stream()
-						                        .sorted(Comparator.comparingInt(LocalVariableStack.Variable::accessIndex))
-						                        .map(LocalVariableStack.Variable::type)
+						String genericReturnStr=returnType!=null?Utils.genericSignature(returnType):"V";
+						
+						Supplier<Stream<GenType>> argTypes=
+							()->methodArguments.stream()
+							                   .sorted(Comparator.comparingInt(LocalVariableStack.Variable::accessIndex))
+							                   .map(LocalVariableStack.Variable::type);
+						
+						var genericArgs=argTypes.get()
 						                        .map(Utils::genericSignature)
 						                        .collect(Collectors.joining());
 						
+						String returnStr=returnType!=null?Utils.genericSignature(returnType.rawType()):"V";
 						
-						var dest=currentClass.visitMethod(visibility.opCode+staticOo, functionName.source, "("+args+")"+returnStr, null, null);
+						var args=argTypes.get()
+						                 .map(GenType::rawType)
+						                 .map(Utils::genericSignature)
+						                 .collect(Collectors.joining());
+						
+						
+						String descriptor="("+args+")"+returnStr, signature="("+genericArgs+")"+genericReturnStr;
+						if(signature.equals(descriptor)) signature=null;
+						
+						var dest=currentClass.visitMethod(visibility.opCode+staticOo, functionName.source, descriptor, signature, null);
 						
 						var info=new FunctionInfo(functionName.source, classInfo.name, returnType, methodArguments.stream().map(LocalVariableStack.Variable::type).toList(), isStatic?CallType.STATIC:CallType.VIRTUAL, isStatic, null);
 						classInfo=new ClassInfo(classInfo.name, classInfo.parents, Stream.concat(classInfo.functions.stream(), Stream.of(info)).toList());

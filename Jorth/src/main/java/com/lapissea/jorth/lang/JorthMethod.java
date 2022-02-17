@@ -264,12 +264,12 @@ public class JorthMethod{
 	}
 	
 	public void getFieldIns(String owner, String name, GenType fieldType){
-		mv.visitFieldInsn(GETFIELD, Utils.undotify(owner), name, Utils.genericSignature(fieldType));
+		mv.visitFieldInsn(GETFIELD, Utils.undotify(owner), name, Utils.genericSignature(fieldType.rawType()));
 		pushTypeStack(fieldType);
 	}
 	
 	public void setFieldIns(String owner, String name, GenType fieldType){
-		mv.visitFieldInsn(PUTFIELD, Utils.undotify(owner), name, Utils.genericSignature(fieldType));
+		mv.visitFieldInsn(PUTFIELD, Utils.undotify(owner), name, Utils.genericSignature(fieldType.rawType()));
 		popTypeStack();
 		popTypeStack();
 	}
