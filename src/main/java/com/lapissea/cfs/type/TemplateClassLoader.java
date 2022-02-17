@@ -3,13 +3,21 @@ package com.lapissea.cfs.type;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.jorth.JorthCompiler;
 import com.lapissea.jorth.MalformedJorthException;
-import com.lapissea.util.NotImplementedException;
-import com.lapissea.util.TextUtil;
+import com.lapissea.util.*;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Collections;
+import java.util.Map;
 
 public class TemplateClassLoader extends ClassLoader{
+	
+	private record TypeNamed(String name, TypeDef def){}
+	
+	private static final Map<TypeNamed, byte[]> CLASS_DATA_CACHE=Collections.synchronizedMap(new WeakValueHashMap<>());
+	
+	private static final boolean PRINT_GENERATING_INFO=UtilL.sysPropertyByClass(TemplateClassLoader.class, "PRINT_GENERATING_INFO", false, Boolean::parseBoolean);
+	private static final boolean PRINT_BYTECODE       =UtilL.sysPropertyByClass(TemplateClassLoader.class, "PRINT_BYTECODE", false, Boolean::parseBoolean);
 	
 	private final IOTypeDB db;
 	
@@ -27,14 +35,25 @@ public class TemplateClassLoader extends ClassLoader{
 		if(!def.isIoInstance()){
 			throw new UnsupportedOperationException("Can not generate: "+className+". It is not an "+IOInstance.class.getSimpleName());
 		}
-
-//		LogUtil.println("generating", className, "from", "\n"+TextUtil.toTable(def.getFields()));
+		
+		var classData=CLASS_DATA_CACHE.get(new TypeNamed(className, def));
+		if(classData==null){
+			var typ=new TypeNamed(className, def.clone());
+			classData=generateBytecode(typ);
+			CLASS_DATA_CACHE.put(typ, classData);
+		}
+		
+		return defineClass(className, ByteBuffer.wrap(classData), null);
+	}
+	
+	private byte[] generateBytecode(TypeNamed classType){
+		if(PRINT_GENERATING_INFO) LogUtil.println("generating", "\n"+TextUtil.toTable(classType.name, classType.def.getFields()));
 		
 		var jorth=new JorthCompiler(this);
 		
 		try(var writer=jorth.writeCode()){
 			
-			writer.write("#TOKEN(0) genClassName define", className);
+			writer.write("#TOKEN(0) genClassName define", classType.name);
 			writer.write("#TOKEN(0) IOInstance define", IOInstance.class.getName());
 			writer.write("#TOKEN(0) IOValue define", IOValue.class.getName());
 			
@@ -46,7 +65,7 @@ public class TemplateClassLoader extends ClassLoader{
 					"""
 			);
 			
-			for(var field : def.getFields()){
+			for(var field : classType.def.getFields()){
 				var type=toJorthGeneric(field.getType());
 				
 				writer.write(
@@ -73,15 +92,17 @@ public class TemplateClassLoader extends ClassLoader{
 			}
 			
 		}catch(MalformedJorthException e){
-			throw new RuntimeException("Failed to generate class "+className, e);
+			throw new RuntimeException("Failed to generate class "+classType.name, e);
 		}
 		
+		byte[] byt;
 		try{
-			var byt=jorth.classBytecode(false);
-			return defineClass(className, ByteBuffer.wrap(byt), null);
+			byt=jorth.classBytecode(PRINT_BYTECODE);
+			
 		}catch(MalformedJorthException e){
 			throw new RuntimeException(e);
 		}
+		return byt;
 	}
 	
 	private String toJorthGeneric(TypeLink typ){
