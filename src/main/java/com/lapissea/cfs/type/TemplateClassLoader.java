@@ -27,39 +27,49 @@ public class TemplateClassLoader extends ClassLoader{
 		if(!def.isIoInstance()){
 			throw new UnsupportedOperationException("Can not generate: "+className+". It is not an "+IOInstance.class.getSimpleName());
 		}
-		
+
 //		LogUtil.println("generating", className, "from", "\n"+TextUtil.toTable(def.getFields()));
 		
 		var jorth=new JorthCompiler(this);
 		
 		try(var writer=jorth.writeCode()){
 			
+			writer.write("#TOKEN(0) genClassName define", className);
+			writer.write("#TOKEN(0) IOInstance define", IOInstance.class.getName());
+			writer.write("#TOKEN(0) IOValue define", IOValue.class.getName());
+			
 			writer.write(
 				"""
-					[#TOKEN(0)] #TOKEN(1) extends
+					[genClassName] IOInstance extends
 					public visibility
-					#TOKEN(0) class start
-					""",
-				className, IOInstance.class.getName()
+					genClassName class start
+					"""
 			);
 			
 			for(var field : def.getFields()){
+				var type=toJorthGeneric(field.getType());
 				
 				writer.write(
 					"""
 						private visibility
-						#TOKEN(0) @
-						#RAW(1) #TOKEN(2) field
-						
-//						#RAW(1) returns
-//						#TOKEN(3) function start
-//							this #TOKEN(2) get
-//						end
+						IOValue @
+						#RAW(0) #TOKEN(1) field
 						""",
-					IOValue.class.getName(),
-					toJorthGeneric(field.getType()),
-					field.getName(),
-					"get"+TextUtil.firstToUpperCase(field.getName()));
+					type,
+					field.getName());
+				
+				writer.write(
+					"""
+						IOValue @
+						public visibility
+						#RAW(0) returns
+						#TOKEN(1) function start
+							this #TOKEN(2) get
+						end
+						""",
+					type,
+					"get"+TextUtil.firstToUpperCase(field.getName()),
+					field.getName());
 			}
 			
 		}catch(MalformedJorthException e){

@@ -57,8 +57,8 @@ public class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends AbstractF
 		this.rawType=Utils.typeToRaw(this.genericType);
 		
 		getter.ifPresent(get->{
-			if(!Utils.genericInstanceOf(get.getReturnType(), genericType)){
-				throw new MalformedStructLayout("getter returns "+get.getReturnType()+" but "+genericType+" is required\n"+get);
+			if(!Utils.genericInstanceOf(get.getGenericReturnType(), genericType)){
+				throw new MalformedStructLayout("getter returns "+get.getGenericReturnType()+" but "+genericType+" is required\n"+get);
 			}
 			if(get.getParameterCount()!=0){
 				throw new MalformedStructLayout("getter must not have arguments\n"+get);
