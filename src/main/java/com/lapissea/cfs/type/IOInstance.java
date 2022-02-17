@@ -6,6 +6,7 @@ import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
 
@@ -19,7 +20,7 @@ import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.INS
 import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 
 @SuppressWarnings({"UnusedReturnValue", "unused"})
-public abstract class IOInstance<SELF extends IOInstance<SELF>>{
+public abstract class IOInstance<SELF extends IOInstance<SELF>> implements Cloneable{
 	
 	public abstract static class Unmanaged<SELF extends Unmanaged<SELF>> extends IOInstance<SELF> implements DataProvider.Holder{
 		
@@ -221,5 +222,59 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>>{
 		var isInstance =UtilL.instanceOf(type, IOInstance.class);
 		var isUnmanaged=UtilL.instanceOf(type, IOInstance.Unmanaged.class);
 		return isInstance&&!isUnmanaged;
+	}
+	
+	@SuppressWarnings("unchecked")
+	@Override
+	protected SELF clone(){
+		if(this instanceof IOInstance.Unmanaged){
+			throw new UnsupportedOperationException("Unmanaged objects can not be cloned");
+		}
+		
+		SELF c;
+		try{
+			c=(SELF)super.clone();
+		}catch(CloneNotSupportedException e){
+			throw new RuntimeException(e);
+		}
+		
+		for(IOField<SELF, ?> field : getThisStruct().getFields()){
+			if(field.getAccessor() instanceof VirtualAccessor acc&&acc.getStoragePool()==IO){
+				continue;
+			}
+			var typ=field.getAccessor().getType();
+			if(typ.isArray()){
+				var arrField=(IOField<SELF, Object[]>)field;
+				
+				var arr=arrField.get(null, (SELF)this);
+				if(arr==null) continue;
+				
+				arr=arr.clone();
+				
+				if(UtilL.instanceOf(typ.componentType(), IOInstance.class)){
+					var iArr=(IOInstance<?>[])arr;
+					for(int i=0;i<iArr.length;i++){
+						var el=iArr[i];
+						iArr[i]=el.clone();
+					}
+				}
+				
+				arrField.set(null, c, arr);
+				continue;
+			}
+			
+			if(!UtilL.instanceOf(typ, IOInstance.class)) continue;
+			if(UtilL.instanceOf(typ, IOInstance.Unmanaged.class)) continue;
+			var instField=(IOField<SELF, IOInstance<?>>)field;
+			
+			var val=instField.get(null, (SELF)this);
+			if(val==null) continue;
+			
+			val=val.clone();
+			
+			instField.set(null, c, val);
+		}
+		
+		return c;
 	}
 }
