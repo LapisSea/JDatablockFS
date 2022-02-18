@@ -155,6 +155,7 @@ public sealed interface IOTypeDB{
 					      }
 				      });
 			}catch(Throwable e){
+				e.printStackTrace();
 				throw new RuntimeException(e);
 			}
 			

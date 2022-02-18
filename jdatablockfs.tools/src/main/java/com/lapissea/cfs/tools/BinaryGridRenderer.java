@@ -1321,7 +1321,7 @@ public class BinaryGridRenderer{
 					}
 					var sizeDesc=field.getSizeDescriptor();
 					var size    =sizeDesc.calcUnknown(ioPool, ctx.provider, instance);
-					outlineByteRange(alpha(Color.RED, (float)Math.pow(Thread.currentThread().getStackTrace().length/20F, 2)), ctx.renderCtx, Range.fromSize(offsetStart+fieldOffset-size, size));
+					outlineByteRange(Color.RED, ctx.renderCtx, Range.fromSize(offsetStart+fieldOffset-size, size));
 				}
 			}
 			if(fieldErr!=null){

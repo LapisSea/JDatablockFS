@@ -332,7 +332,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		try{
 			safeBuff.close();
 		}catch(Exception e){
-			throw new IOException(TextUtil.toString(field)+" did not write correctly", e);
+			throw new IOException(TextUtil.toString(field)+" ("+field.get(ioPool, instance)+") did not write correctly", e);
 		}
 	}
 	
