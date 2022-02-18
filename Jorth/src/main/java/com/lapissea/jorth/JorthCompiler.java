@@ -459,7 +459,13 @@ public class JorthCompiler{
 					
 					for(AnnotationData annotation : annotations){
 						var annV=fieldVisitor.visitAnnotation(Utils.genericSignature(new GenType(annotation.className(), 0, List.of())), true);
-						annotation.args.forEach(annV::visit);
+						annotation.args.forEach((name1, value)->{
+							if(value instanceof Enum e){
+								annV.visitEnum(name1, Utils.genericSignature(new GenType(e.getClass().getName())), e.name());
+							}else{
+								annV.visit(name1, value);
+							}
+						});
 						annV.visitEnd();
 					}
 					annotations.clear();
@@ -493,6 +499,21 @@ public class JorthCompiler{
 								case OBJECT -> {
 									if(name.returnType.equals(GenType.STRING)){
 										yield tok.getStringLiteralValue();
+									}
+									var typInfo=getClassInfo(name.returnType.typeName());
+									if(typInfo.instanceOf(Enum.class.getName())){
+										Class<Enum> ec;
+										try{
+											ec=(Class<Enum>)Class.forName(typInfo.name);
+										}catch(ClassNotFoundException e){
+											throw new RuntimeException(e);
+										}
+										for(var e : ec.getEnumConstants()){
+											if(e.name().equals(tok.source)){
+												yield e;
+											}
+										}
+										throw new MalformedJorthException(tok.source+" enum can not be found in "+typInfo.name);
 									}
 									throw new MalformedJorthException(name.returnType.toString());
 								}
