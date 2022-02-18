@@ -31,7 +31,6 @@ import java.util.stream.Stream;
 
 public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType> extends IOField.NullFlagCompany<CTyp, ValueType>{
 	
-	private static final StructPipe<AutoText>  STR_PIPE=ContiguousStructPipe.of(AutoText.class);
 	private static final StructPipe<Reference> REF_PIPE=ContiguousStructPipe.of(Reference.class);
 	
 	private final SizeDescriptor<CTyp>        descriptor;
@@ -78,7 +77,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 			case Float ignored -> 4;
 			case Double ignored -> 8;
 			case Number integer -> 1+NumberSize.bySize(numToLong(integer)).bytes;
-			case String str -> STR_PIPE.calcUnknownSize(prov, new AutoText(str), WordSpace.BYTE);
+			case String str -> AutoText.PIPE.calcUnknownSize(prov, new AutoText(str), WordSpace.BYTE);
 			case byte[] array -> {
 				var num=NumberSize.bySize(array.length);
 				yield 1+num.bytes+array.length;
@@ -105,7 +104,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 				FlagWriter.writeSingle(dest, NumberSize.FLAG_INFO, false, num);
 				num.write(dest, value);
 			}
-			case String str -> STR_PIPE.write(provider, dest, new AutoText(str));
+			case String str -> AutoText.PIPE.write(provider, dest, new AutoText(str));
 			case byte[] array -> {
 				var num=NumberSize.bySize(array.length);
 				FlagWriter.writeSingle(dest, NumberSize.BYTE, NumberSize.FLAG_INFO, false, num);
@@ -144,7 +143,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 			if(typ==Long.class) return longNum;
 			throw new NotImplementedException("Unkown integer type"+typ);
 		}
-		if(typ==String.class) return STR_PIPE.readNew(provider, src, genericContext).getData();
+		if(typ==String.class) return AutoText.PIPE.readNew(provider, src, genericContext).getData();
 		if(typ==byte[].class){
 			var num=FlagReader.readSingle(src, NumberSize.BYTE, NumberSize.FLAG_INFO, false);
 			var len=(int)num.read(src);
@@ -178,7 +177,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		}
 		
 		if(typ==String.class){
-			STR_PIPE.readNew(provider, src, genericContext);
+			AutoText.PIPE.readNew(provider, src, genericContext);
 			return;
 		}
 		if(UtilL.instanceOf(typ, IOInstance.class)){
