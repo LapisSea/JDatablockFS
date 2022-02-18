@@ -139,31 +139,17 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		}
 		
 		var unknownFields=fields.stream().filter(f->!f.getSizeDescriptor().hasFixed()).toList();
-		var knownFixed   =IOFieldTools.sumVars(fields, d->d.getFixed(wordSpace).orElse(0));
+		var knownFixed=IOFieldTools.sumVars(fields, d->{
+			var fixed=d.getFixed(wordSpace);
+			if(fixed.isPresent()){
+				var siz=fixed.getAsLong();
+				return clampMinBit(wordSpace, siz);
+			}
+			return 0;
+		});
 		
 		var min=IOFieldTools.sumVars(fields, siz->siz.getMin(wordSpace));
 		var max=hasDynamicFields?OptionalLong.empty():IOFieldTools.sumVarsIfAll(fields, siz->siz.getMax(wordSpace));
-		
-		if(unknownFields.size()==1){
-			//TODO: support unknown bit size?
-			var unknownField=unknownFields.get(0);
-			return new SizeDescriptor.Unknown<>(wordSpace, min, max, (ioPool, prov, inst)->{
-				checkNull(inst);
-				if(generators!=null){
-					try{
-						generateAll(ioPool, prov, inst, false);
-						
-						var d=unknownField.getSizeDescriptor();
-						return knownFixed+d.calcUnknown(ioPool, prov, inst, wordSpace);
-					}catch(IOException e){
-						throw new RuntimeException(e);
-					}
-				}
-				
-				var d=unknownField.getSizeDescriptor();
-				return knownFixed+d.calcUnknown(ioPool, prov, inst, wordSpace);
-			});
-		}
 		
 		return new SizeDescriptor.Unknown<>(wordSpace, min, max, (ioPool, prov, inst)->{
 			checkNull(inst);
@@ -174,10 +160,21 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 				throw new RuntimeException(e);
 			}
 			
+			if(unknownFields.size()==1){
+				var field=unknownFields.get(0);
+				var d    =field.getSizeDescriptor();
+				return knownFixed+d.calcUnknown(ioPool, prov, inst, wordSpace);
+			}
+			
 			return knownFixed+IOFieldTools.sumVars(unknownFields, d->{
 				return d.calcUnknown(ioPool, prov, inst, wordSpace);
 			});
 		});
+	}
+	
+	private long clampMinBit(WordSpace wordSpace, long siz){
+		var bytes=WordSpace.mapSize(wordSpace, WordSpace.BYTE, siz);
+		return WordSpace.mapSize(WordSpace.BYTE, wordSpace, bytes);
 	}
 	
 	private void checkNull(T inst){
