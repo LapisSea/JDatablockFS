@@ -441,6 +441,12 @@ public class FieldCompiler{
 				return new IOFieldInlineString<>(field);
 			}
 		});
+		REGISTRY.register(new RegistryNode.InstanceOf<>(String[].class){
+			@Override
+			public <T extends IOInstance<T>> IOField<T, String[]> create(FieldAccessor<T> field, GenericContext genericContext){
+				return new IOFieldStringArray<>(field);
+			}
+		});
 		REGISTRY.register(new RegistryNode.InstanceOf<>(IOInstance.class){
 			@Override
 			public <T extends IOInstance<T>> IOField<T, ? extends IOInstance> create(FieldAccessor<T> field, GenericContext genericContext){

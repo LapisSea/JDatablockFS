@@ -2,8 +2,11 @@ package com.lapissea.cfs.objects.text;
 
 import com.lapissea.cfs.io.content.ContentInputStream;
 import com.lapissea.cfs.io.content.ContentOutputStream;
+import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
+import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.text.Encoding.CharEncoding;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.NotNull;
@@ -13,6 +16,8 @@ import java.util.Objects;
 
 public class AutoText extends IOInstance<AutoText> implements CharSequence{
 	
+	public static final Struct<AutoText>     STRUCT=Struct.of(AutoText.class);
+	public static final StructPipe<AutoText> PIPE  =ContiguousStructPipe.of(STRUCT);
 	
 	private String       data;
 	@IOValue
@@ -22,6 +27,7 @@ public class AutoText extends IOInstance<AutoText> implements CharSequence{
 	private int          charCount;
 	
 	public AutoText(){
+		super(STRUCT);
 		data="";
 		encoding=CharEncoding.BASE_16;
 		charCount=0;
