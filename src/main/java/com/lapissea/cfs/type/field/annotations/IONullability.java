@@ -34,7 +34,10 @@ public @interface IONullability{
 		
 		private <T extends IOInstance<T>> boolean canHaveNullabilityField(FieldAccessor<T> field){
 			if(field.hasAnnotation(IOValue.Reference.class)) return false;
-			return UtilL.instanceOf(field.getType(), IOInstance.class)||UtilL.instanceOf(field.getType(), String.class)||field.hasAnnotation(IOType.Dynamic.class);
+			if(UtilL.instanceOf(field.getType(), IOInstance.class)){
+				return !UtilL.instanceOf(field.getType(), IOInstance.Unmanaged.class);
+			}
+			return UtilL.instanceOf(field.getType(), String.class)||field.hasAnnotation(IOType.Dynamic.class);
 		}
 		
 		@NotNull
