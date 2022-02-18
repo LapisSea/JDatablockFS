@@ -11,6 +11,7 @@ import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.INumber;
 import com.lapissea.cfs.objects.Reference;
+import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.cfs.tools.DrawUtils.Range;
 import com.lapissea.cfs.tools.SessionHost.CachedFrame;
 import com.lapissea.cfs.tools.SessionHost.ParsedFrame;
@@ -1254,7 +1255,7 @@ public class BinaryGridRenderer{
 									for(int i=0;i<arrSiz;i++){
 										var val=(IOInstance)Array.get(inst, i);
 										annotateStruct(ctx, val, reference.addOffset(fieldOffset+arrOffset), elementPipe, generics(instance, parentGenerics), annotate);
-										arrOffset+=elementPipe.getSizeDescriptor().calcUnknown(ioPool, ctx.provider, val, WordSpace.BYTE);
+										arrOffset+=elementPipe.getSizeDescriptor().calcUnknown(elementPipe.makeIOPool(), ctx.provider, val, WordSpace.BYTE);
 									}
 									continue;
 								}
@@ -1299,6 +1300,47 @@ public class BinaryGridRenderer{
 										}
 										continue;
 									}
+								}
+								if(comp==String.class){
+									var inst  =(String[])field.get(ioPool, instance);
+									var arrSiz=inst.length;
+									
+									long  arrOffset=0;
+									int[] index    ={0};
+									var f=new IOField.NoIO<T, String>(new FieldAccessor<>(){
+										@Override
+										public Struct<T> getDeclaringStruct(){
+											return instance.getThisStruct();
+										}
+										@NotNull
+										@Override
+										public String getName(){
+											return "["+index[0]+"]";
+										}
+										@Override
+										public Type getGenericType(GenericContext genericContext){
+											return String.class;
+										}
+										@Override
+										public Object get(Struct.Pool<T> ioPool, T instance){
+											return inst[index[0]];
+										}
+										@Override
+										public void set(Struct.Pool<T> ioPool, T instance, Object value){
+											throw new UnsupportedOperationException();
+										}
+									}, null);
+									for(int i=0;i<arrSiz;i++){
+										index[0]=i;
+										var siz=AutoText.PIPE.calcUnknownSize(ctx.provider, new AutoText(inst[i]), WordSpace.BYTE);
+										annotateByteField(
+											ctx, ioPool, instance, f,
+											col,
+											reference,
+											Range.fromSize(fieldOffset+arrOffset, siz));
+										arrOffset+=siz;
+									}
+									continue;
 								}
 							}
 							if(typ==String.class){
