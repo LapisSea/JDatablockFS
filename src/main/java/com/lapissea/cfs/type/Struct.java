@@ -39,9 +39,11 @@ public class Struct<T extends IOInstance<T>>{
 		
 		class StructArray<T extends IOInstance<T>> implements Pool<T>{
 			
-			private final Struct<T> typ;
-			private final Object[]  pool;
+			private final Struct<T>                          typ;
+			private final Object[]                           pool;
+			private final VirtualFieldDefinition.StoragePool poolType;
 			public StructArray(Struct<T> typ, VirtualFieldDefinition.StoragePool pool){
+				this.poolType=pool;
 				this.typ=typ;
 				if(pool==VirtualFieldDefinition.StoragePool.NONE) throw new IllegalArgumentException();
 				var sizes=typ.poolSizes;
@@ -71,6 +73,18 @@ public class Struct<T extends IOInstance<T>>{
 						throw new IllegalArgumentException(accessor.getDeclaringStruct()+" != "+typ);
 					}
 				}
+			}
+			
+			@Override
+			public String toString(){
+				return typ.getType().getName()+
+				       typ.getFields()
+				          .stream()
+				          .map(IOField::getAccessor)
+				          .filter(f->f instanceof VirtualAccessor acc&&acc.getStoragePool()==poolType)
+				          .map(f->(VirtualAccessor<T>)f)
+				          .map(c->c.getName()+": "+Utils.toShortString(get(c)))
+				          .collect(Collectors.joining(", ", "{", "}"));
 			}
 		}
 		

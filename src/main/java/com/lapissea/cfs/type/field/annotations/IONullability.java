@@ -47,11 +47,11 @@ public @interface IONullability{
 			if(!isNullable(field)) return List.of();
 			
 			return List.of(new VirtualFieldDefinition<T, Boolean>(
-				VirtualFieldDefinition.StoragePool.IO,
-				IOFieldTools.makeNullFlagName(field),
-				Boolean.class,
-				(ioPool, instance, dependencies, value)->value==null||value,
-				List.of()
+					VirtualFieldDefinition.StoragePool.IO,
+					IOFieldTools.makeNullFlagName(field),
+					Boolean.class,
+					(ioPool, instance, dependencies, value)->value==null||value,
+					List.of()
 			));
 		}
 		
@@ -66,9 +66,12 @@ public @interface IONullability{
 	};
 	
 	enum Mode{
-		NOT_NULL,
-		NULLABLE,
-		DEFAULT_IF_NULL
+		NOT_NULL("NN"),
+		NULLABLE("n"),
+		DEFAULT_IF_NULL("DN");
+		
+		public final String shortName;
+		Mode(String shortName){this.shortName=shortName;}
 	}
 	
 	Mode value() default Mode.NOT_NULL;
