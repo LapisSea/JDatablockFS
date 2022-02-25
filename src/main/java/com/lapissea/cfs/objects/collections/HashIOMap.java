@@ -1,6 +1,7 @@
 package com.lapissea.cfs.objects.collections;
 
 import com.lapissea.cfs.IterablePP;
+import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
@@ -12,7 +13,6 @@ import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.ObjectHolder;
-import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
@@ -43,7 +43,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		}
 		@Override
 		public String toShortString(){
-			return "{"+TextUtil.toShortString(key)+" = "+TextUtil.toShortString(value)+"}";
+			return "{"+Utils.toShortString(key)+" = "+Utils.toShortString(value)+"}";
 		}
 		
 		private Entry<K, V> unmodifiable;

@@ -13,8 +13,8 @@
 		<cfsVersion>1.0-SNAPSHOT</cfsVersion>
 
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<lwjgl.version>3.3.0</lwjgl.version>
-		<joml.version>1.10.2</joml.version>
+		<lwjgl.version>3.3.1</lwjgl.version>
+		<joml.version>1.10.4</joml.version>
 		<lwjgl.natives>natives-windows</lwjgl.natives>
 	</properties>
 	<groupId>com.github.lapissea</groupId>
@@ -51,24 +51,6 @@
 		</dependency>
 		<dependency>
 			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-jemalloc</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-jemalloc</artifactId>
-			<classifier>${lwjgl.natives}</classifier>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-nanovg</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-nanovg</artifactId>
-			<classifier>${lwjgl.natives}</classifier>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
 			<artifactId>lwjgl</artifactId>
 			<classifier>${lwjgl.natives}</classifier>
 		</dependency>
@@ -99,6 +81,19 @@
 			<version>5.2.1</version>
 		</dependency>
 
+		<dependency>
+			<groupId>io.github.spair</groupId>
+			<artifactId>imgui-java-binding</artifactId>
+			<version>1.86.2</version>
+			<scope>compile</scope>
+		</dependency>
+		<dependency>
+			<groupId>io.github.spair</groupId>
+			<artifactId>imgui-java-lwjgl3</artifactId>
+			<version>1.86.2</version>
+			<scope>compile</scope>
+		</dependency>
+
 	</dependencies>
 
 	<dependencyManagement>
@@ -113,6 +108,32 @@
 		</dependencies>
 	</dependencyManagement>
 
+	<profiles>
+		<profile>
+			<id>lwjgl-natives-linux-amd64</id>
+			<activation>
+				<os>
+					<family>unix</family>
+					<arch>amd64</arch>
+				</os>
+			</activation>
+			<properties>
+				<lwjgl.natives>natives-linux</lwjgl.natives>
+			</properties>
+		</profile>
+		<profile>
+			<id>lwjgl-natives-windows-amd64</id>
+			<activation>
+				<os>
+					<family>windows</family>
+					<arch>amd64</arch>
+				</os>
+			</activation>
+			<properties>
+				<lwjgl.natives>natives-windows</lwjgl.natives>
+			</properties>
+		</profile>
+	</profiles>
 	<build>
 		<plugins>
 			<plugin>

@@ -237,6 +237,9 @@ public class MemoryWalker{
 							if(IOFieldPrimitive.isPrimitive(component)){
 								continue;
 							}
+							if(component==String.class){
+								continue;
+							}
 						}
 						if(UtilL.instanceOf(typ, IOInstance.class)){
 							var inst=(IOInstance)field.get(ioPool, instance);

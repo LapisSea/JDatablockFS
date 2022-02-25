@@ -4,6 +4,7 @@ import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.collections.LinkedIOList;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 
@@ -26,17 +27,16 @@ public class Image extends IOInstance<Image>{
 		}
 	}
 	
-	private static final int chunkSize=2;
+	private static final int CHUNK_SIZE=UtilL.sysPropertyByClass(Image.class, "CHUNK_SIZE", 2, Integer::parseInt);
 	
 	@IOValue
 	@IOValue.OverrideType(LinkedIOList.class)
 	private IOList<Chunk> chunks;
 	
 	
-	@SuppressWarnings("PointlessArithmeticExpression")
 	public void set(int x, int y, float r, float g, float b) throws IOException{
-		int chunkX=x/chunkSize;
-		int chunkY=y/chunkSize;
+		int chunkX=x/CHUNK_SIZE;
+		int chunkY=y/CHUNK_SIZE;
 		
 		var  dist    =Double.MAX_VALUE;
 		long addIndex=0;
@@ -55,9 +55,9 @@ public class Image extends IOInstance<Image>{
 				continue;
 			}
 			
-			int localX=x-chunkX*chunkSize;
-			int localY=y-chunkY*chunkSize;
-			int index =localX+localY*chunkSize;
+			int localX=x-chunkX*CHUNK_SIZE;
+			int localY=y-chunkY*CHUNK_SIZE;
+			int index =localX+localY*CHUNK_SIZE;
 			
 			c.pixels[index]=new Pixel(r, g, b);
 			
@@ -65,7 +65,7 @@ public class Image extends IOInstance<Image>{
 			return;
 		}
 		
-		var ch=new Chunk(chunkX, chunkY, chunkSize);
+		var ch=new Chunk(chunkX, chunkY, CHUNK_SIZE);
 		chunks.add(addIndex, ch);
 		set(x, y, r, g, b);
 	}

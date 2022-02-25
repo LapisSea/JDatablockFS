@@ -32,7 +32,6 @@ public class DisplayServer implements DataLogger{
 			
 			boolean threadedOutput=Boolean.parseBoolean(config.getOrDefault("threadedOutput", "false").toString());
 			
-			var is    =socket.getInputStream();
 			var writer=new DataOutputStream(socket.getOutputStream());
 			
 			var io=ServerCommons.makeIO();
@@ -148,7 +147,7 @@ public class DisplayServer implements DataLogger{
 			
 		}
 		
-		public static record Info(InetAddress addr, int timeout){}
+		public record Info(InetAddress addr, int timeout){}
 		
 		private static Socket sessionConnection(Info con, String sessionName, Map<String, Object> config) throws IOException{
 			int port=((Number)config.getOrDefault("port", 666)).intValue();

@@ -10,6 +10,7 @@ import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.compilation.FieldCompiler;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.util.*;
@@ -18,6 +19,7 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
@@ -37,9 +39,11 @@ public class Struct<T extends IOInstance<T>>{
 		
 		class StructArray<T extends IOInstance<T>> implements Pool<T>{
 			
-			private final Struct<T> typ;
-			private final Object[]  pool;
+			private final Struct<T>                          typ;
+			private final Object[]                           pool;
+			private final VirtualFieldDefinition.StoragePool poolType;
 			public StructArray(Struct<T> typ, VirtualFieldDefinition.StoragePool pool){
+				this.poolType=pool;
 				this.typ=typ;
 				if(pool==VirtualFieldDefinition.StoragePool.NONE) throw new IllegalArgumentException();
 				var sizes=typ.poolSizes;
@@ -69,6 +73,18 @@ public class Struct<T extends IOInstance<T>>{
 						throw new IllegalArgumentException(accessor.getDeclaringStruct()+" != "+typ);
 					}
 				}
+			}
+			
+			@Override
+			public String toString(){
+				return typ.getType().getName()+
+				       typ.getFields()
+				          .stream()
+				          .map(IOField::getAccessor)
+				          .filter(f->f instanceof VirtualAccessor acc&&acc.getStoragePool()==poolType)
+				          .map(f->(VirtualAccessor<T>)f)
+				          .map(c->c.getName()+": "+Utils.toShortString(get(c)))
+				          .collect(Collectors.joining(", ", "{", "}"));
 			}
 		}
 		
@@ -329,6 +345,10 @@ public class Struct<T extends IOInstance<T>>{
 			
 			sb.append(simple);
 		}
+		
+		var fields=new ArrayList<>(this.fields);
+		fields.removeIf(toRem->toRem.getName().contains(IOFieldTools.GENERATED_FIELD_SEPARATOR));
+		
 		sb.append('{');
 		boolean comma=false;
 		for(var field : fields){

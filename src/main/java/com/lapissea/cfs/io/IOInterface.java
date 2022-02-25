@@ -1,6 +1,6 @@
 package com.lapissea.cfs.io;
 
-import com.lapissea.util.TextUtil;
+import com.lapissea.cfs.Utils;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -56,7 +56,7 @@ public interface IOInterface extends RandomIO.Creator{
 				return that.toString();
 			}
 			public String toShortString(){
-				return TextUtil.toShortString(that);
+				return Utils.toShortString(that);
 			}
 		};
 	}

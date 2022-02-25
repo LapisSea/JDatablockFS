@@ -18,14 +18,16 @@ import java.util.function.ToLongFunction;
 @SuppressWarnings("unused")
 public enum NumberSize{
 	
-	VOID/*      */('V', 0, in->0, (out, num)->{}, in->0, (out, num)->{}),
-	BYTE/*      */('B', 1, ContentReader::readUnsignedInt1, (out, num)->out.writeInt1((int)num), NumberSize::RNS, NumberSize::WNS),
-	SHORT/*     */('s', 2, ContentReader::readUnsignedInt2, (out, num)->out.writeInt2((int)num), in->Utils.shortBitsToFloat(in.readInt2()), (out, num)->out.writeInt2(Utils.floatToShortBits((float)num))),
-	SMALL_INT/* */('S', 3, ContentReader::readUnsignedInt3, (out, num)->out.writeInt3((int)num), NumberSize::RNS, NumberSize::WNS),
-	INT/*       */('i', 4, ContentReader::readUnsignedInt4, (out, num)->out.writeInt4((int)num), in->Float.intBitsToFloat(in.readInt4()), (out, num)->out.writeInt4(Float.floatToIntBits((float)num))),
-	BIG_INT/*   */('I', 5, ContentReader::readUnsignedInt5, ContentWriter::writeInt5, NumberSize::RNS, NumberSize::WNS),
-	SMALL_LONG/**/('l', 6, ContentReader::readUnsignedInt6, ContentWriter::writeInt6, NumberSize::RNS, NumberSize::WNS),
-	LONG/*      */('L', 8, ContentReader::readInt8, ContentWriter::writeInt8, in->Double.longBitsToDouble(in.readInt8()), (out, num)->out.writeInt8(Double.doubleToLongBits(num)));
+	// @formatter:off
+	VOID      ('V', 0, in->0,                           (out, num)->{},                      in->0,                                      (out, num)->{}),
+	BYTE      ('B', 1, ContentReader::readUnsignedInt1, (out, num)->out.writeInt1((int)num), NumberSize::RNS,                            NumberSize::WNS),
+	SHORT     ('s', 2, ContentReader::readUnsignedInt2, (out, num)->out.writeInt2((int)num), in->Utils.shortBitsToFloat(in.readInt2()),  (out, num)->out.writeInt2(Utils.floatToShortBits((float)num))),
+	SMALL_INT ('S', 3, ContentReader::readUnsignedInt3, (out, num)->out.writeInt3((int)num), NumberSize::RNS,                            NumberSize::WNS),
+	INT       ('i', 4, ContentReader::readUnsignedInt4, (out, num)->out.writeInt4((int)num), in->Float.intBitsToFloat(in.readInt4()),    (out, num)->out.writeInt4(Float.floatToIntBits((float)num))),
+	BIG_INT   ('I', 5, ContentReader::readUnsignedInt5, ContentWriter::writeInt5,            NumberSize::RNS,                            NumberSize::WNS),
+	SMALL_LONG('l', 6, ContentReader::readUnsignedInt6, ContentWriter::writeInt6,            NumberSize::RNS,                            NumberSize::WNS),
+	LONG      ('L', 8, ContentReader::readInt8,         ContentWriter::writeInt8,            in->Double.longBitsToDouble(in.readInt8()), (out, num)->out.writeInt8(Double.doubleToLongBits(num)));
+	// @formatter:on
 	
 	private static double RNS(ContentReader src)             {throw new UnsupportedOperationException();}
 	private static void WNS(ContentWriter dest, double value){throw new UnsupportedOperationException();}

@@ -23,7 +23,7 @@ import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
 public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 	
-	public static record BitLayout(long usedBits, int safetyBits){
+	public record BitLayout(long usedBits, int safetyBits){
 		BitLayout(long bits){
 			this(bits, (int)(Utils.bitToByte(bits)*8-bits));
 		}
@@ -192,5 +192,10 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 	
 	public Optional<BitLayout> getSafetyBits(){
 		return safetyBits;
+	}
+	
+	@Override
+	public List<ValueGeneratorInfo<T, ?>> getGenerators(){
+		return streamUnpackedFields().flatMap(f->f.getGenerators().stream()).toList();
 	}
 }

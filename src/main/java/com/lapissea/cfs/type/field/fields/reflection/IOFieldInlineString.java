@@ -3,8 +3,6 @@ package com.lapissea.cfs.type.field.fields.reflection;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
-import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
-import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
@@ -19,15 +17,12 @@ import java.util.Objects;
 public class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends IOField.NullFlagCompany<CTyp, String>{
 	
 	private final SizeDescriptor<CTyp> descriptor;
-	private final StructPipe<AutoText> instancePipe;
 	
 	public IOFieldInlineString(FieldAccessor<CTyp> accessor){
 		super(accessor);
 		
 		
-		instancePipe=ContiguousStructPipe.of(AutoText.class);
-		
-		var desc=instancePipe.getSizeDescriptor();
+		var desc=AutoText.PIPE.getSizeDescriptor();
 		
 		descriptor=new SizeDescriptor.Unknown<>(
 			desc.getWordSpace(),
@@ -39,7 +34,7 @@ public class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends IOField.
 					if(nullable()) return 0;
 					throw new NullPointerException();
 				}
-				return desc.calcUnknown(instancePipe.makeIOPool(), prov, val);
+				return desc.calcUnknown(AutoText.PIPE.makeIOPool(), prov, val);
 			}
 		);
 	}
@@ -87,7 +82,7 @@ public class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends IOField.
 		if(val==null&&!nullable()){
 			throw new NullPointerException();
 		}
-		instancePipe.write(provider, dest, val);
+		AutoText.PIPE.write(provider, dest, val);
 	}
 	
 	private AutoText readNew(Struct.Pool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
@@ -95,7 +90,7 @@ public class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends IOField.
 			if(getIsNull(ioPool, instance)) return null;
 		}
 		
-		return instancePipe.readNew(provider, src, genericContext);
+		return AutoText.PIPE.readNew(provider, src, genericContext);
 	}
 	
 	@Override

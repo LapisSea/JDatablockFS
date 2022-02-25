@@ -16,10 +16,7 @@ import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
-import com.lapissea.util.NotImplementedException;
-import com.lapissea.util.Nullable;
-import com.lapissea.util.TextUtil;
-import com.lapissea.util.UtilL;
+import com.lapissea.util.*;
 
 import java.io.IOException;
 import java.util.*;
@@ -284,12 +281,13 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 			return ValueGeneratorInfo.class.getSimpleName()+"{modifies "+field+"}";
 		}
 		public String toShortString(){
-			return "{mod "+TextUtil.toShortString(field)+"}";
+			return "{mod "+Utils.toShortString(field)+"}";
 		}
 	}
 	
+	@NotNull
 	public List<ValueGeneratorInfo<T, ?>> getGenerators(){
-		return null;
+		return List.of();
 	}
 	
 	@Nullable
@@ -340,7 +338,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 			if(val instanceof IOInstance inst){
 				return inst.toShortString();
 			}
-			return TextUtil.toShortString(val);
+			return Utils.toShortString(val);
 		}
 		return TextUtil.toString(val);
 	}

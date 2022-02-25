@@ -20,6 +20,7 @@ import java.lang.reflect.Array;
 import java.util.Arrays;
 import java.util.OptionalLong;
 
+import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 
 public class IOFieldInstanceArray<T extends IOInstance<T>, ValType extends IOInstance<ValType>> extends IOField<T, ValType[]>{
@@ -74,7 +75,15 @@ public class IOFieldInstanceArray<T extends IOInstance<T>, ValType extends IOIns
 		
 		var arr=get(ioPool, instance);
 		for(ValType el : arr){
-			pip.write(provider, dest, el);
+			if(DEBUG_VALIDATION){
+				var siz=pip.calcUnknownSize(provider, el, WordSpace.BYTE);
+				
+				try(var buff=dest.writeTicket(siz).requireExact().submit()){
+					pip.write(provider, buff, el);
+				}
+			}else{
+				pip.write(provider, dest, el);
+			}
 		}
 	}
 	@Override

@@ -9,9 +9,9 @@ import java.io.Writer;
 public record MemFrame(byte[] bytes, long[] ids, String e) implements Serializable{
 	
 	public MemFrame(byte[] data, long[] ids, Throwable e){
-		this(data, ids, toStr(e));
+		this(data, ids, errorToStr(e));
 	}
-	private static String toStr(Throwable e){
+	public static String errorToStr(Throwable e){
 		StringBuffer b=new StringBuffer();
 		
 		e.printStackTrace(new PrintWriter(new Writer(){

@@ -1,8 +1,8 @@
 package com.lapissea.cfs.objects.collections;
 
 import com.lapissea.cfs.IterablePP;
+import com.lapissea.cfs.Utils;
 import com.lapissea.util.Nullable;
-import com.lapissea.util.TextUtil;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;
 
@@ -79,7 +79,7 @@ public interface IOList<T> extends IterablePP<T>{
 		
 		@Override
 		public String toString(){
-			return stream().map(TextUtil::toShortString).collect(Collectors.joining(", ", "Ram[", "]"));
+			return stream().map(Utils::toShortString).collect(Collectors.joining(", ", "Ram[", "]"));
 		}
 	}
 	

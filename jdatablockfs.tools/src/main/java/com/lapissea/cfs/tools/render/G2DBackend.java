@@ -271,6 +271,18 @@ public class G2DBackend extends RenderBackend{
 			public void setTitle(String title){
 				frame.setTitle(title);
 			}
+			@Override
+			public boolean isFocused(){
+				return frame.isFocused();
+			}
+			@Override
+			public int getPositionX(){
+				return frame.getLocationOnScreen().x;
+			}
+			@Override
+			public int getPositionY(){
+				return frame.getLocationOnScreen().y;
+			}
 		};
 		markFrameDirty();
 	}

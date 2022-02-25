@@ -3,6 +3,7 @@ package com.lapissea.cfs;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.objects.collections.IOList;
+import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
@@ -253,5 +254,10 @@ public class Utils{
 	
 	public static <T> IOList.IOIterator.Iter<T> emptyIter(){
 		return (IOList.IOIterator.Iter<T>)EMPTY_ITER;
+	}
+	
+	public static String toShortString(Object o){
+		if(o instanceof IOInstance<?> i) return i.toShortString();
+		return TextUtil.toShortString(o);
 	}
 }

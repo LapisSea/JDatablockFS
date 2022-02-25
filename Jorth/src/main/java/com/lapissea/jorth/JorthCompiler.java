@@ -9,9 +9,11 @@ import com.lapissea.util.function.UnsafeSupplier;
 import org.objectweb.asm.ClassWriter;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Array;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.*;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -450,11 +452,28 @@ public class JorthCompiler{
 					}
 					classFields.put(name, type);
 					
-					var fieldVisitor=currentClass.visitField(visibility.opCode, name, Utils.genericSignature(new GenType(type.typeName(), type.arrayDimensions(), List.of())), Utils.genericSignature(type), null);
+					var descriptor=Utils.genericSignature(type.rawType());
+					var signature =Utils.genericSignature(type);
+					if(signature.equals(descriptor)) signature=null;
+					
+					var fieldVisitor=currentClass.visitField(visibility.opCode, name, descriptor, signature, null);
 					
 					for(AnnotationData annotation : annotations){
 						var annV=fieldVisitor.visitAnnotation(Utils.genericSignature(new GenType(annotation.className(), 0, List.of())), true);
-						annotation.args.forEach(annV::visit);
+						annotation.args.forEach((name1, value)->{
+							if(value.getClass().isArray()){
+								var arrAnn=annV.visitArray(name1);
+								for(int i=0;i<Array.getLength(value);i++){
+									arrAnn.visit(null, Array.get(value, i));
+								}
+								arrAnn.visitEnd();
+								
+							}else if(value instanceof Enum e){
+								annV.visitEnum(name1, Utils.genericSignature(new GenType(e.getClass().getName())), e.name());
+							}else{
+								annV.visit(name1, value);
+							}
+						});
 						annV.visitEnd();
 					}
 					annotations.clear();
@@ -481,13 +500,59 @@ public class JorthCompiler{
 					
 					boolean hasArgs=!rawTokens.isEmpty()&&rawTokens.peek().source.equals("}");
 					if(hasArgs){
+						class ArrToken extends Token{
+							final String[] arr;
+							public ArrToken(int line, String source, String[] arr){
+								super(line, source);
+								this.arr=arr;
+							}
+						}
+						
 						var sequence=readSequence(rawTokens, "{", "}");
+						var builder =new LinkedList<Token>();
+						while(!sequence.isEmpty()){
+							var t=sequence.peek();
+							if(t.source.equals("]")){
+								var s  =readSequence(sequence, "[", "]");
+								var str=s.parseStream(sq->sq.pop().source).toArray(String[]::new);
+								builder.add(0, new ArrToken(t.line, "", str));
+								continue;
+							}
+							
+							builder.add(0, t);
+						}
+						sequence=Token.Sequence.of(builder);
+						
 						UnsafeBiConsumer<FunctionInfo, Token, MalformedJorthException> addVal=(name, tok)->{
 							map.put(name, Optional.of(switch(name.returnType.type()){
 								case INT -> Integer.parseInt(tok.source);
 								case OBJECT -> {
+									if(tok instanceof ArrToken arTok){
+										var arr=arTok.arr;
+										
+										if(name.returnType.equals(new GenType(String[].class))){
+											yield arr;
+										}
+										
+										throw new MalformedJorthException(name.returnType.toString());
+									}
 									if(name.returnType.equals(GenType.STRING)){
 										yield tok.getStringLiteralValue();
+									}
+									var typInfo=getClassInfo(name.returnType.typeName());
+									if(typInfo.instanceOf(Enum.class.getName())){
+										Class<Enum> ec;
+										try{
+											ec=(Class<Enum>)Class.forName(typInfo.name);
+										}catch(ClassNotFoundException e){
+											throw new RuntimeException(e);
+										}
+										for(var e : ec.getEnumConstants()){
+											if(e.name().equals(tok.source)){
+												yield e;
+											}
+										}
+										throw new MalformedJorthException(tok.source+" enum can not be found in "+typInfo.name);
 									}
 									throw new MalformedJorthException(name.returnType.toString());
 								}
@@ -679,20 +744,38 @@ public class JorthCompiler{
 						requireTokenCount(1);
 						var functionName=pop();
 						
-						String returnStr;
-						if(returnType!=null) returnStr=Utils.genericSignature(returnType);
-						else returnStr="V";
-						
 						var staticOo=isStatic?ACC_STATIC:0;
 						
-						var args=methodArguments.stream()
-						                        .sorted(Comparator.comparingInt(LocalVariableStack.Variable::accessIndex))
-						                        .map(LocalVariableStack.Variable::type)
+						String genericReturnStr=returnType!=null?Utils.genericSignature(returnType):"V";
+						
+						Supplier<Stream<GenType>> argTypes=
+							()->methodArguments.stream()
+							                   .sorted(Comparator.comparingInt(LocalVariableStack.Variable::accessIndex))
+							                   .map(LocalVariableStack.Variable::type);
+						
+						var genericArgs=argTypes.get()
 						                        .map(Utils::genericSignature)
 						                        .collect(Collectors.joining());
 						
+						String returnStr=returnType!=null?Utils.genericSignature(returnType.rawType()):"V";
 						
-						var dest=currentClass.visitMethod(visibility.opCode+staticOo, functionName.source, "("+args+")"+returnStr, null, null);
+						var args=argTypes.get()
+						                 .map(GenType::rawType)
+						                 .map(Utils::genericSignature)
+						                 .collect(Collectors.joining());
+						
+						
+						String descriptor="("+args+")"+returnStr, signature="("+genericArgs+")"+genericReturnStr;
+						if(signature.equals(descriptor)) signature=null;
+						
+						var dest=currentClass.visitMethod(visibility.opCode+staticOo, functionName.source, descriptor, signature, null);
+						
+						for(AnnotationData annotation : annotations){
+							var annV=dest.visitAnnotation(Utils.genericSignature(new GenType(annotation.className(), 0, List.of())), true);
+							annotation.args.forEach(annV::visit);
+							annV.visitEnd();
+						}
+						annotations.clear();
 						
 						var info=new FunctionInfo(functionName.source, classInfo.name, returnType, methodArguments.stream().map(LocalVariableStack.Variable::type).toList(), isStatic?CallType.STATIC:CallType.VIRTUAL, isStatic, null);
 						classInfo=new ClassInfo(classInfo.name, classInfo.parents, Stream.concat(classInfo.functions.stream(), Stream.of(info)).toList());
