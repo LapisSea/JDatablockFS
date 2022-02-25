@@ -7,6 +7,8 @@ import com.lapissea.glfw.GlfwMonitor;
 import com.lapissea.glfw.GlfwWindow;
 import com.lapissea.util.MathUtil;
 import com.lapissea.util.UtilL;
+import imgui.ImGui;
+import imgui.gl3.ImGuiImplGl3;
 import org.lwjgl.glfw.GLFWErrorCallback;
 import org.lwjgl.opengl.GL;
 
@@ -82,6 +84,8 @@ public class OpenGLBackend extends RenderBackend{
 	
 	private CompletableFuture<?> glInit;
 	private Runnable             start;
+	
+	private final ImGuiImplGl3 imGuiGl3=new ImGuiImplGl3();
 	
 	public OpenGLBackend(){
 		Thread glThread=new Thread(this::displayLifecycle, "display");
@@ -168,6 +172,7 @@ public class OpenGLBackend extends RenderBackend{
 				return window.isMouseKeyDown(switch(key){
 					case LEFT -> GLFW_MOUSE_BUTTON_LEFT;
 					case RIGHT -> GLFW_MOUSE_BUTTON_RIGHT;
+					case MIDDLE -> GLFW_MOUSE_BUTTON_MIDDLE;
 				});
 			}
 			@Override
@@ -190,6 +195,18 @@ public class OpenGLBackend extends RenderBackend{
 			@Override
 			public void setTitle(String title){
 				window.title.set(title);
+			}
+			@Override
+			public boolean isFocused(){
+				return window.isFocused();
+			}
+			@Override
+			public int getPositionX(){
+				return window.pos.x();
+			}
+			@Override
+			public int getPositionY(){
+				return window.pos.y();
 			}
 		};
 	}
@@ -240,6 +257,8 @@ public class OpenGLBackend extends RenderBackend{
 		glDisable(GL_DEPTH_TEST);
 		glDepthMask(false);
 		glfwSwapInterval(0);
+		
+		imGuiGl3.init("#version 130");
 	}
 	
 	private void displayLifecycle(){
@@ -283,6 +302,8 @@ public class OpenGLBackend extends RenderBackend{
 	
 	@Override
 	public void postRender(){
+		imGuiGl3.renderDrawData(ImGui.getDrawData());
+		
 		window.swapBuffers();
 	}
 	@Override

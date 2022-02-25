@@ -10,19 +10,6 @@ import java.util.function.Consumer;
 public abstract class RenderBackend{
 	
 	public interface CreatorSource{
-		record CreationAttempt(RenderBackend backend, Throwable failure){
-			public boolean isOk(){
-				return failure==null;
-			}
-		}
-		default CreationAttempt tryCreate(){
-			try{
-				return new CreationAttempt(create(), null);
-			}catch(Throwable e){
-				return new CreationAttempt(null, e);
-			}
-		}
-		
 		RenderBackend create();
 	}
 	
@@ -42,7 +29,12 @@ public abstract class RenderBackend{
 	public interface DisplayInterface{
 		
 		enum MouseKey{
-			LEFT, RIGHT
+			LEFT(0),
+			RIGHT(1),
+			MIDDLE(2);
+			
+			public final int id;
+			MouseKey(int id){this.id=id;}
 		}
 		
 		enum ActionType{
@@ -75,6 +67,9 @@ public abstract class RenderBackend{
 		void destroy();
 		
 		void setTitle(String title);
+		boolean isFocused();
+		int getPositionX();
+		int getPositionY();
 	}
 	
 	
@@ -118,7 +113,9 @@ public abstract class RenderBackend{
 		shouldRender=false;
 		return true;
 	}
-	
+	public boolean isFrameDirty(){
+		return shouldRender;
+	}
 	public abstract BulkDraw bulkDraw(DrawMode mode);
 	public boolean isBulkDrawing(){
 		return bulkDrawing;

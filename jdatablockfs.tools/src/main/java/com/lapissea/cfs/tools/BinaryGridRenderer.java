@@ -645,7 +645,6 @@ public class BinaryGridRenderer{
 			}
 		}
 		
-		var f=renderer.getFont();
 		drawBytes(ctx, IntStream.range(0, bytes.length).filter(((IntPredicate)filled::contains).negate()), alpha(Color.GRAY, 0.5F), true, true);
 		
 		findHoverChunk(ctx, parsed, provider);
@@ -655,7 +654,9 @@ public class BinaryGridRenderer{
 		drawPointers(ctx, parsed, ptrs);
 		
 		drawMouse(ctx, cFrame);
-		drawError(parsed);
+		
+		// replaced by imgui
+		// drawError(parsed);
 		
 		drawTimeline(frameIndex);
 	}
@@ -986,6 +987,10 @@ public class BinaryGridRenderer{
 		renderer.setColor(Color.WHITE);
 		renderer.setLineWidth(1);
 		outlineByteRange(Color.WHITE, ctx, Range.fromSize(byteIndex, 1));
+		
+		
+		//TODO: add imgui hover window
+		//if(true) return;
 		
 		initFont(0.5F);
 		renderer.pushMatrix();
