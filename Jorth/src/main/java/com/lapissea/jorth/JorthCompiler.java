@@ -9,6 +9,7 @@ import com.lapissea.util.function.UnsafeSupplier;
 import org.objectweb.asm.ClassWriter;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Array;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.*;
@@ -460,7 +461,14 @@ public class JorthCompiler{
 					for(AnnotationData annotation : annotations){
 						var annV=fieldVisitor.visitAnnotation(Utils.genericSignature(new GenType(annotation.className(), 0, List.of())), true);
 						annotation.args.forEach((name1, value)->{
-							if(value instanceof Enum e){
+							if(value.getClass().isArray()){
+								var arrAnn=annV.visitArray(name1);
+								for(int i=0;i<Array.getLength(value);i++){
+									arrAnn.visit(null, Array.get(value, i));
+								}
+								arrAnn.visitEnd();
+								
+							}else if(value instanceof Enum e){
 								annV.visitEnum(name1, Utils.genericSignature(new GenType(e.getClass().getName())), e.name());
 							}else{
 								annV.visit(name1, value);
@@ -492,11 +500,42 @@ public class JorthCompiler{
 					
 					boolean hasArgs=!rawTokens.isEmpty()&&rawTokens.peek().source.equals("}");
 					if(hasArgs){
+						class ArrToken extends Token{
+							final String[] arr;
+							public ArrToken(int line, String source, String[] arr){
+								super(line, source);
+								this.arr=arr;
+							}
+						}
+						
 						var sequence=readSequence(rawTokens, "{", "}");
+						var builder =new LinkedList<Token>();
+						while(!sequence.isEmpty()){
+							var t=sequence.peek();
+							if(t.source.equals("]")){
+								var s  =readSequence(sequence, "[", "]");
+								var str=s.parseStream(sq->sq.pop().source).toArray(String[]::new);
+								builder.add(0, new ArrToken(t.line, "", str));
+								continue;
+							}
+							
+							builder.add(0, t);
+						}
+						sequence=Token.Sequence.of(builder);
+						
 						UnsafeBiConsumer<FunctionInfo, Token, MalformedJorthException> addVal=(name, tok)->{
 							map.put(name, Optional.of(switch(name.returnType.type()){
 								case INT -> Integer.parseInt(tok.source);
 								case OBJECT -> {
+									if(tok instanceof ArrToken arTok){
+										var arr=arTok.arr;
+										
+										if(name.returnType.equals(new GenType(String[].class))){
+											yield arr;
+										}
+										
+										throw new MalformedJorthException(name.returnType.toString());
+									}
 									if(name.returnType.equals(GenType.STRING)){
 										yield tok.getStringLiteralValue();
 									}
