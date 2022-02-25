@@ -1,5 +1,7 @@
 package com.lapissea.cfs.type;
 
+import com.lapissea.cfs.type.field.annotations.IODependency;
+import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.jorth.JorthCompiler;
 import com.lapissea.jorth.MalformedJorthException;
@@ -9,6 +11,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 public class TemplateClassLoader extends ClassLoader{
 	
@@ -56,6 +59,8 @@ public class TemplateClassLoader extends ClassLoader{
 			writer.write("#TOKEN(0) genClassName define", classType.name);
 			writer.write("#TOKEN(0) IOInstance define", IOInstance.class.getName());
 			writer.write("#TOKEN(0) IOValue define", IOValue.class.getName());
+			writer.write("#TOKEN(0) IONullability define", IONullability.class.getName());
+			writer.write("#TOKEN(0) IODependency define", IODependency.class.getName());
 			
 			writer.write(
 				"""
@@ -67,6 +72,14 @@ public class TemplateClassLoader extends ClassLoader{
 			
 			for(var field : classType.def.getFields()){
 				var type=toJorthGeneric(field.getType());
+				
+				if(field.getNullability()!=null){
+					writer.write("{#TOKEN(0)} IONullability @", field.getNullability().toString());
+				}
+				if(!field.getDependencies().isEmpty()){
+					LogUtil.println(field.getDependencies());
+					writer.write("{#RAW(0)} IODependency @", field.getDependencies().stream().collect(Collectors.joining(" ", "[", "]")));
+				}
 				
 				writer.write(
 					"""

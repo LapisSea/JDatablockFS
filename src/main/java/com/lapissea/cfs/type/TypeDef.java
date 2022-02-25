@@ -2,6 +2,7 @@ package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.ArrayViewList;
 import com.lapissea.util.NotNull;
@@ -22,11 +23,20 @@ public class TypeDef extends IOInstance<TypeDef>{
 		@IOValue
 		private String name;
 		
+		@IOValue
+		@IONullability(IONullability.Mode.NULLABLE)
+		private IONullability.Mode nullability;
+		
+		@IOValue
+		private String[] dependencies;
+		
 		public FieldDef(){}
 		
 		public FieldDef(IOField<?, ?> field){
 			type=TypeLink.of(field.getAccessor().getGenericType(null));
 			name=field.getName();
+			nullability=field.getAccessor().getAnnotation(IONullability.class).map(IONullability::value).orElse(null);
+			dependencies=field.getDependencies().stream().map(IOField::getName).toArray(String[]::new);
 		}
 		
 		public TypeLink getType(){
@@ -35,13 +45,20 @@ public class TypeDef extends IOInstance<TypeDef>{
 		public String getName(){
 			return name;
 		}
+		public IONullability.Mode getNullability(){
+			return nullability;
+		}
+		public List<String> getDependencies(){
+			return dependencies==null?List.of():ArrayViewList.create(dependencies, null);
+		}
+		
 		@Override
 		public String toString(){
-			return name+": "+type;
+			return name+(nullability!=null?" "+nullability:"")+": "+type+(dependencies==null||dependencies.length==0?"":"(deps = ["+String.join(", ", dependencies)+"])");
 		}
 		@Override
 		public String toShortString(){
-			return name+": "+Utils.toShortString(type);
+			return name+(nullability!=null?" "+nullability.shortName:"")+": "+Utils.toShortString(type);
 		}
 	}
 	

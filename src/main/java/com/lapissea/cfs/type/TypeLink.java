@@ -154,7 +154,7 @@ public final class TypeLink extends IOInstance<TypeLink>{
 		if(args.length==0) argStr="";
 		else argStr=Arrays.stream(args).map(TypeLink::toString).collect(Collectors.joining(", ", "<", ">"));
 		
-		return getClass().getSimpleName()+"("+getTypeName()+argStr+")";
+		return getTypeName()+argStr;
 	}
 	@Override
 	public String toShortString(){
