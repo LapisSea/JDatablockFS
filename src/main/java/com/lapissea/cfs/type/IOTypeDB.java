@@ -2,9 +2,10 @@ package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
-import com.lapissea.cfs.objects.collections.AbstractUnmanagedIOMap;
 import com.lapissea.cfs.objects.collections.HashIOMap;
+import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
@@ -12,6 +13,7 @@ import java.lang.ref.WeakReference;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
@@ -164,11 +166,11 @@ public sealed interface IOTypeDB{
 		
 		@IOValue
 		@IOValue.OverrideType(HashIOMap.class)
-		private AbstractUnmanagedIOMap<Integer, TypeLink> data;
+		private IOMap<Integer, TypeLink> data;
 		
 		@IOValue
 		@IOValue.OverrideType(HashIOMap.class)
-		private AbstractUnmanagedIOMap<TypeName, TypeDef> defs;
+		private IOMap<TypeName, TypeDef> defs;
 		
 		private WeakReference<ClassLoader> templateLoader=new WeakReference<>(null);
 		
@@ -194,7 +196,41 @@ public sealed interface IOTypeDB{
 			data.put(newID, type);
 			var newDefs=new HashMap<TypeName, TypeDef>();
 			recordType(type, newDefs);
+			
 			defs.putAll(newDefs);
+			
+			if(DEBUG_VALIDATION){
+				if(!newDefs.isEmpty()){
+					var names=newDefs.entrySet().stream().filter(e->!e.getValue().isUnmanaged()).map(e->e.getKey().typeName).collect(Collectors.toSet());
+					var classLoader=new TemplateClassLoader(this, this.getClass().getClassLoader()){
+						@Override
+						protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException{
+							if(names.contains(name)){
+								synchronized(getClassLoadingLock(name)){
+									Class<?> c=findLoadedClass(name);
+									if(c==null){
+										c=findClass(name);
+									}
+									if(resolve){
+										resolveClass(c);
+									}
+									return c;
+								}
+							}
+							return super.loadClass(name, resolve);
+						}
+					};
+					
+					for(var name : names){
+						try{
+							var cls=Class.forName(name, true, classLoader);
+							Struct.ofUnknown(cls);
+						}catch(Throwable ex){
+							throw new RuntimeException("Invalid stored class "+name+"\n"+TextUtil.toNamedPrettyJson(newDefs.get(new TypeName(name))), ex);
+						}
+					}
+				}
+			}
 			return new TypeID(newID, true);
 		}
 		
@@ -220,7 +256,9 @@ public sealed interface IOTypeDB{
 			}
 			
 			var def=new TypeDef(typ);
-			newDefs.put(typeName, def);
+			if(!def.isUnmanaged()){
+				newDefs.put(typeName, def);
+			}
 			
 			for(int i=0;i<type.argCount();i++){
 				recordType(type.arg(i), newDefs);
@@ -284,7 +322,7 @@ public sealed interface IOTypeDB{
 		@Override
 		public String toShortString(){
 			if(data==null) return "{uninitialized}";
-			return "{owner="+data.getDataProvider()+"}";
+			return "{"+data.size()+" links, "+defs.size()+" class definitions}";
 		}
 	}
 	
