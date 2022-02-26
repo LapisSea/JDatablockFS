@@ -203,7 +203,7 @@ public class FieldCompiler{
 				
 				Function<String, Optional<Method>> getMethod=prefix->scanMethod(cl, m->checkMethod(fieldName, prefix, m));
 				
-				var getter=getMethod.apply(getPrefix(field));
+				var getter=calcGetPrefixes(field).map(getMethod).filter(Optional::isPresent).map(Optional::get).findAny();
 				var setter=getMethod.apply("set");
 				
 				getter.ifPresent(usedFields::add);
@@ -277,10 +277,11 @@ public class FieldCompiler{
 		).sorted();
 	}
 	
-	private String getPrefix(Field field){
+	private Stream<String> calcGetPrefixes(Field field){
 		var typ   =field.getType();
 		var isBool=typ==boolean.class||typ==Boolean.class;
-		return isBool?"is":"get";
+		if(isBool) return Stream.of("is", "get");
+		return Stream.of("get");
 	}
 	private String getPrefix(Method method){
 		var typ   =method.getReturnType();
