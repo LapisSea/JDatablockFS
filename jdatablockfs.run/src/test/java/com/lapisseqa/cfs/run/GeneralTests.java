@@ -17,6 +17,8 @@ import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.TypeLink;
+import com.lapissea.cfs.type.field.annotations.IODependency;
+import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeConsumer;
@@ -121,6 +123,51 @@ public class GeneralTests{
 	@Test
 	void blankCluster(TestInfo info) throws IOException{
 		TestUtils.testCluster(info, ses->{});
+	}
+	
+	public static class Deps extends IOInstance<Deps>{
+		
+		@IOValue
+		@IODependency("b")
+		public int a;
+		
+		@IOValue
+		@IODependency("c")
+		public int b;
+		
+		@IOValue
+		public int c;
+		
+		@IOValue
+		@IODependency({"c", "b"})
+		public int d;
+	}
+	
+	public static class Arr extends IOInstance<Arr>{
+		@IOValue
+		public float[] arr;
+	}
+	
+	static Stream<IOInstance<?>> genericObjects(){
+		var deps=new Deps();
+		deps.a=1;
+		deps.b=2;
+		deps.c=3;
+		deps.d=4;
+		var arr=new Arr();
+		arr.arr=new float[]{1, 2, 3, 4, 5};
+		return Stream.of(Dummy.first(), deps, arr);
+	}
+	
+	@ParameterizedTest
+	@MethodSource({"genericObjects"})
+	void genericStorage(IOInstance<?> obj, TestInfo info) throws IOException{
+		TestUtils.testCluster(info, ses->{
+			ses.getTemp().put(0, obj);
+			
+			var read=ses.getTemp().get(0);
+			assertEquals(obj, read);
+		});
 	}
 	
 	@ParameterizedTest
