@@ -19,6 +19,7 @@ import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.util.*;
 
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.util.*;
 import java.util.stream.Stream;
 
@@ -363,7 +364,23 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		}
 		
 		if(getAccessor().getType().isArray()){
-			return Arrays.equals((Object[])o1, (Object[])o2);
+			if(o1==o2) return true;
+			if(o1==null||o2==null) return false;
+			int l1=Array.getLength(o1);
+			int l2=Array.getLength(o2);
+			if(l1!=l2) return false;
+			return switch(o1){
+				case byte[] arr -> Arrays.equals(arr, (byte[])o2);
+				case short[] arr -> Arrays.equals(arr, (short[])o2);
+				case int[] arr -> Arrays.equals(arr, (int[])o2);
+				case long[] arr -> Arrays.equals(arr, (long[])o2);
+				case float[] arr -> Arrays.equals(arr, (float[])o2);
+				case double[] arr -> Arrays.equals(arr, (double[])o2);
+				case char[] arr -> Arrays.equals(arr, (char[])o2);
+				case boolean[] arr -> Arrays.equals(arr, (boolean[])o2);
+				case Object[] arr -> Arrays.equals(arr, (Object[])o2);
+				default -> throw new NotImplementedException(o1.getClass().getName());
+			};
 		}
 		
 		return Objects.equals(o1, o2);
