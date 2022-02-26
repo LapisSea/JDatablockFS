@@ -2,6 +2,7 @@ package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.ArrayViewList;
@@ -36,7 +37,9 @@ public class TypeDef extends IOInstance<TypeDef>{
 			type=TypeLink.of(field.getAccessor().getGenericType(null));
 			name=field.getName();
 			nullability=field.getAccessor().getAnnotation(IONullability.class).map(IONullability::value).orElse(null);
-			dependencies=field.getDependencies().stream().map(IOField::getName).toArray(String[]::new);
+			var deps=field.getDependencies().stream().map(IOField::getName).collect(Collectors.toSet());
+			if(field.getAccessor().getType().isArray()) deps.remove(IOFieldTools.makeArrayLenName(field.getAccessor()));
+			dependencies=deps.toArray(String[]::new);
 		}
 		
 		public TypeLink getType(){
