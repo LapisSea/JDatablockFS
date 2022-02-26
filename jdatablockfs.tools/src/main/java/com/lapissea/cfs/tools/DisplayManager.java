@@ -233,9 +233,6 @@ public class DisplayManager implements DataLogger{
 	
 	private void doRender(){
 		updateImgui();
-		ImGui.newFrame();
-		drawImgui();
-		ImGui.render();
 		
 		renderer.preRender();
 		
@@ -250,6 +247,10 @@ public class DisplayManager implements DataLogger{
 			
 			LogUtil.println(timer.msAvrg100());
 		}
+		
+		ImGui.newFrame();
+		drawImgui();
+		ImGui.render();
 		
 		renderer.postRender();
 		
