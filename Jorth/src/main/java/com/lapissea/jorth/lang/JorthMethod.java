@@ -288,7 +288,11 @@ public class JorthMethod{
 		if(returnType!=null){
 			var popped=popTypeStack();
 			if(!popped.equals(returnType)) throw new MalformedJorthException("Method returns "+returnType+" but "+popped+" is on stack");
-			mv.visitInsn(popped.type().returnOp);
+			if(popped.arrayDimensions()==0){
+				mv.visitInsn(popped.type().returnOp);
+			}else{
+				mv.visitInsn(Types.OBJECT.returnOp);
+			}
 		}else{
 			if(typeStack.size()>0) throw new MalformedJorthException("Returning nothing (void) but there are values "+typeStack+" on the stack");
 			mv.visitInsn(RETURN);
