@@ -337,6 +337,9 @@ public class Struct<T extends IOInstance<T>>{
 	}
 	
 	public String instanceToString(Pool<T> ioPool, T instance, boolean doShort){
+		return instanceToString(ioPool, instance, doShort, "{", "}", "=", ", ");
+	}
+	public String instanceToString(Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
 		StringBuilder sb=new StringBuilder();
 		if(!doShort){
 			var simple=getType().getSimpleName();
@@ -349,7 +352,7 @@ public class Struct<T extends IOInstance<T>>{
 		var fields=new ArrayList<>(this.fields);
 		fields.removeIf(toRem->toRem.getName().contains(IOFieldTools.GENERATED_FIELD_SEPARATOR));
 		
-		sb.append('{');
+		sb.append(start);
 		boolean comma=false;
 		for(var field : fields){
 			String str;
@@ -361,12 +364,12 @@ public class Struct<T extends IOInstance<T>>{
 			
 			if(str==null) continue;
 			
-			if(comma) sb.append(", ");
+			if(comma) sb.append(fieldSeparator);
 			
-			sb.append(field.getName()).append("=").append(str);
+			sb.append(field.getName()).append(fieldValueSeparator).append(str);
 			comma=true;
 		}
-		sb.append('}');
+		sb.append(end);
 		return sb.toString();
 	}
 	

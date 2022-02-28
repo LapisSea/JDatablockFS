@@ -24,6 +24,7 @@ import java.util.*;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 
 public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	
@@ -332,13 +333,21 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	 * @return string of the resolved value or null if string has no substance
 	 */
 	public String instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort){
+		return instanceToString(ioPool, instance, doShort, "{", "}", "=", ", ");
+	}
+	
+	/**
+	 * @return string of the resolved value or null if string has no substance
+	 */
+	public String instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
 		var val=get(ioPool, instance);
 		if(val==null) return null;
 		
+		if(val instanceof IOInstance inst){
+			var struct=inst.getThisStruct();
+			return struct.instanceToString(struct.allocVirtualVarPool(IO), inst, doShort, start, end, fieldValueSeparator, fieldSeparator);
+		}
 		if(doShort){
-			if(val instanceof IOInstance inst){
-				return inst.toShortString();
-			}
 			return Utils.toShortString(val);
 		}
 		return TextUtil.toString(val);
