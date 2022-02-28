@@ -11,6 +11,7 @@ import imgui.ImGui;
 import imgui.ImVec2;
 import imgui.flag.ImGuiConfigFlags;
 
+import java.awt.Color;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
@@ -37,7 +38,8 @@ public class DisplayManager implements DataLogger{
 	
 	private boolean destroyRequested=false;
 	
-	private final RenderBackend renderer;
+	private final RenderBackend          renderer;
+	private final RenderBackend.Buffered gridBuff;
 	
 	private final SessionHost        sessionHost=new SessionHost();
 	private final BinaryGridRenderer gridRenderer;
@@ -45,8 +47,9 @@ public class DisplayManager implements DataLogger{
 	public DisplayManager(){
 		
 		renderer=createBackend();
+		gridBuff=renderer.buffer();
 		
-		gridRenderer=new BinaryGridRenderer(renderer);
+		gridRenderer=new BinaryGridRenderer(gridBuff);
 		
 		Runnable updateTitle=()->{
 			var f=sessionHost.activeFrame.get();
@@ -125,8 +128,9 @@ public class DisplayManager implements DataLogger{
 				return;
 			}
 			
-			gridRenderer.displayedSession.ifPresent(ses->{
+			gridRenderer.getDisplayedSession().ifPresent(ses->{
 				ses.setFrame(Math.max(0, gridRenderer.getFramePos()-delta));
+				gridRenderer.markDirty();
 			});
 		});
 		
@@ -136,9 +140,10 @@ public class DisplayManager implements DataLogger{
 			if(!display.isMouseKeyDown(RenderBackend.DisplayInterface.MouseKey.LEFT)) return;
 			if(ImGui.getIO().getWantCaptureMouse()) return;
 			
-			gridRenderer.displayedSession.ifPresent(ses->{
+			gridRenderer.getDisplayedSession().ifPresent(ses->{
 				float percent=MathUtil.snap((display.getMouseX()-10F)/(display.getWidth()-20F), 0, 1);
 				ses.setFrame(Math.round((ses.frames.size()-1)*percent));
+				gridRenderer.markDirty();
 			});
 		});
 		
@@ -146,6 +151,7 @@ public class DisplayManager implements DataLogger{
 			sessionHost.cleanUpSessions();
 			ifFrame(frame->gridRenderer.calcSize(frame.bytes().length, true));
 			renderer.markFrameDirty();
+			gridRenderer.markDirty();
 			renderer.runLater(()->{
 				if(renderer.notifyDirtyFrame()){
 					doRender();
@@ -155,7 +161,7 @@ public class DisplayManager implements DataLogger{
 		
 		display.registerKeyboardButton(e->{
 			sessionHost.cleanUpSessions();
-			if(e.type()!=DOWN&&gridRenderer.displayedSession.isPresent()){
+			if(e.type()!=DOWN&&gridRenderer.getDisplayedSession().isPresent()){
 				switch(e.key()){
 					case GLFW_KEY_UP -> {
 						sessionHost.nextSession();
@@ -173,7 +179,8 @@ public class DisplayManager implements DataLogger{
 			else if(e.key()==GLFW_KEY_RIGHT||e.key()==GLFW_KEY_D) delta=1;
 			else return;
 			if(e.type()==UP) return;
-			gridRenderer.displayedSession.ifPresent(ses->ses.setFrame(gridRenderer.getFramePos()+delta));
+			gridRenderer.markDirty();
+			gridRenderer.getDisplayedSession().ifPresent(ses->ses.setFrame(gridRenderer.getFramePos()+delta));
 		});
 		
 		try{
@@ -201,8 +208,8 @@ public class DisplayManager implements DataLogger{
 						}
 					}
 					
-					if(!gridRenderer.displayedSession.equals(activeSession)){
-						gridRenderer.displayedSession=activeSession;
+					if(!gridRenderer.getDisplayedSession().equals(activeSession)){
+						gridRenderer.setDisplayedSession(activeSession);
 						ifFrame(frame->gridRenderer.calcSize(frame.bytes().length, true));
 					}
 					if(destroyRequested){
@@ -231,28 +238,19 @@ public class DisplayManager implements DataLogger{
 	
 	private final NanoTimer timer=LOG_FRAME_TIME?new NanoTimer():null;
 	
-	private List<Object[]> hover;
+	private List<BinaryGridRenderer.HoverMessage> hover=List.of();
 	
 	private void doRender(){
 		updateImgui();
 		
 		renderer.preRender();
 		
-		if(LOG_FRAME_TIME){
-			timer.end();
-		}
-		
-		var newHover=gridRenderer.render();
-		
-		if(LOG_FRAME_TIME){
-			timer.start();
-			
-			LogUtil.println(timer.msAvrg100());
-		}
-		
 		if(!ImGui.getIO().getWantCaptureMouse()){
-			hover=newHover;
+			gridBuff.clear();
+			hover=gridRenderer.render();
 		}
+		
+		gridBuff.draw();
 		
 		ImGui.newFrame();
 		drawImgui();
@@ -291,7 +289,7 @@ public class DisplayManager implements DataLogger{
 			
 			ImGui.end();
 		});
-		gridRenderer.displayedSession.map(s->s.frames).ifPresent(frames->{
+		gridRenderer.getDisplayedSession().map(s->s.frames).ifPresent(frames->{
 			if(frames.isEmpty()) return;
 			SessionHost.ParsedFrame f;
 			try{
@@ -323,29 +321,38 @@ public class DisplayManager implements DataLogger{
 		
 		if(!hover.isEmpty()){
 			ImGui.begin("Hover data:");
-			for(Object[] objects : hover){
-				for(Object object : objects){
+			for(var msg : hover){
+				for(Object object : msg.data()){
 					ImGui.sameLine();
-					if(object instanceof String str) ImGui.textColored(200, 255, 200, 255, str);
-					else{
+					if(object instanceof String str){
+						var col=msg.color();
+						if(col==null) col=new Color(200, 255, 200);
+						ImGui.textColored(col.getRed(), col.getGreen(), col.getBlue(), 255, str);
+					}else{
 						switch(object){
 							case IOInstance inst -> {
 								var str=inst.getThisStruct().instanceToString(null, inst, false, "{\n\t", "\n}", ": ", ",\n\t");
 								
 								if(str==null) str="";
-								ImGui.textColored(100, 100, 255, 255, str);
+								var col=msg.color();
+								if(col==null) col=new Color(100, 100, 255);
+								ImGui.textColored(col.getRed(), col.getGreen(), col.getBlue(), 255, str);
 							}
 							case BinaryGridRenderer.FieldVal inst -> {
 								var str=inst.field().instanceToString(inst.ioPool(), inst.instance(), false, "{\n\t", "\n}", ": ", ",\n\t");
 								
 								if(str==null) str="";
-								ImGui.textColored(100, 255, 100, 255, str);
+								var col=msg.color();
+								if(col==null) col=new Color(100, 255, 100);
+								ImGui.textColored(col.getRed(), col.getGreen(), col.getBlue(), 255, str);
 							}
 							default -> {
 								var str=Objects.toString(object);
 								
 								if(str==null) str="";
-								ImGui.text(str);
+								var col=msg.color();
+								if(col==null) col=Color.WHITE;
+								ImGui.textColored(col.getRed(), col.getGreen(), col.getBlue(), 255, str);
 							}
 						}
 					}
@@ -567,7 +574,7 @@ public class DisplayManager implements DataLogger{
 	}
 	
 	private void ifFrame(Consumer<MemFrame> o){
-		gridRenderer.displayedSession.map(s->s.frames).ifPresent(frames->{
+		gridRenderer.getDisplayedSession().map(s->s.frames).ifPresent(frames->{
 			if(frames.isEmpty()) return;
 			try{
 				o.accept(frames.get(gridRenderer.getFramePos()).memData());
@@ -584,7 +591,7 @@ public class DisplayManager implements DataLogger{
 	public void destroy(){
 		destroyRequested=true;
 		sessionHost.destroy();
-		gridRenderer.displayedSession=Optional.empty();
+		gridRenderer.setDisplayedSession(Optional.empty());
 		renderer.markFrameDirty();
 	}
 }
