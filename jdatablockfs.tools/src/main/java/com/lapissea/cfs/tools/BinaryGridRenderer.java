@@ -52,6 +52,8 @@ import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 @SuppressWarnings({"UnnecessaryLocalVariable", "SameParameterValue"})
 public class BinaryGridRenderer{
 	
+	public record FieldVal<T extends IOInstance<T>>(Struct.Pool<T> ioPool, T instance, IOField<T, ?> field){}
+	
 	enum ErrorLogLevel{
 		NONE,
 		NAME,
@@ -63,7 +65,7 @@ public class BinaryGridRenderer{
 		RenderBackend renderer,
 		byte[] bytes, RoaringBitmap filled,
 		int width, float pixelsPerByte, int hoverByteX, int hoverByteY, int hoverByteIndex,
-		List<String> hoverMessages){
+		List<Object[]> hoverMessages){
 		
 		boolean isRangeHovered(Range range){
 			var f=range.from();
@@ -180,7 +182,7 @@ public class BinaryGridRenderer{
 				fillBitByte(ctx, trueOffset);
 				var bitRect=DrawUtils.makeBitRect(ctx.renderCtx, trueOffset, bitOff, remaining);
 				if(ctx.renderCtx.isRangeHovered(Range.fromSize(trueOffset, 1))){
-					ctx.renderCtx.hoverMessages.add(field+": "+field.instanceToString(ioPool, instance, false));
+					ctx.renderCtx.hoverMessages.add(new Object[]{field+": ", new FieldVal<>(ioPool, instance, field)});
 				}
 				doSegment.accept(bitRect);
 				remaining-=Math.min(8, remaining);
@@ -198,7 +200,7 @@ public class BinaryGridRenderer{
 					fillBitByte(ctx, trueOffset);
 					var bitRect=DrawUtils.makeBitRect(ctx.renderCtx, trueOffset, bitOff, remaining);
 					if(ctx.renderCtx.isRangeHovered(Range.fromSize(trueOffset, 1))){
-						ctx.renderCtx.hoverMessages.add(field+" "+field.instanceToString(ioPool, instance, false));
+						ctx.renderCtx.hoverMessages.add(new Object[]{field+": ", new FieldVal<>(ioPool, instance, field)});
 					}
 					doSegment.accept(bitRect);
 					remaining-=Math.min(8, remaining);
@@ -260,7 +262,7 @@ public class BinaryGridRenderer{
 		}
 		
 		if(hover){
-			ctx.renderCtx.hoverMessages.add(field+": "+str);
+			ctx.renderCtx.hoverMessages.add(new Object[]{field+": ", new FieldVal<>(ioPool, instance, field)});
 		}
 		
 		if(str!=null&&getStringBounds(both).width()>rectWidth){
@@ -454,17 +456,17 @@ public class BinaryGridRenderer{
 		}else throw UtilL.uncheckedThrow(e);
 	}
 	
-	protected void render(){
+	protected List<Object[]> render(){
 		frameTimer.start();
 		
 		renderCount++;
 		try{
 			errorMode=false;
-			render(getFramePos());
+			return render(getFramePos());
 		}catch(Throwable e){
 			errorMode=true;
 			try{
-				render(getFramePos());
+				return render(getFramePos());
 			}catch(Throwable e1){
 //				LogUtil.println(e1);
 				e1.printStackTrace();
@@ -473,6 +475,7 @@ public class BinaryGridRenderer{
 		
 		frameTimer.end();
 //		LogUtil.println("Frame time:", frameTimer.msAvrg100());
+		return List.of();
 	}
 	private void startFrame(){
 		renderer.clearFrame();
@@ -481,7 +484,7 @@ public class BinaryGridRenderer{
 		
 		drawBackgroundDots();
 	}
-	private void render(int frameIndex){
+	private List<Object[]> render(int frameIndex){
 		if(getFrameCount()==0){
 			startFrame();
 			var str="No data!";
@@ -489,7 +492,7 @@ public class BinaryGridRenderer{
 			int w=renderer.getDisplay().getWidth(), h=renderer.getDisplay().getHeight();
 			renderer.setFontScale(Math.min(h, w/(str.length()*0.8F)));
 			drawStringIn(Color.LIGHT_GRAY, str, new DrawUtils.Rect(0, 0, w, h), true);
-			return;
+			return List.of();
 		}
 		
 		CachedFrame cFrame=getFrame(frameIndex);
@@ -659,6 +662,8 @@ public class BinaryGridRenderer{
 		// drawError(parsed);
 		
 		drawTimeline(frameIndex);
+		
+		return ctx.hoverMessages;
 	}
 	
 	private void annotateChunk(AnnotateCtx ctx, Chunk chunk) throws IOException{
@@ -979,7 +984,7 @@ public class BinaryGridRenderer{
 		var bStr=b+"";
 		while(bStr.length()<3) bStr+=" ";
 		bStr=bStr+(renderer.getFont().canFontDisplay(bytes[byteIndex])?" = "+(char)b:"");
-		ctx.hoverMessages().addAll(0, List.of("@"+byteIndex, bStr));
+		ctx.hoverMessages().addAll(0, List.of(new Object[]{"@"+byteIndex}, new Object[]{bStr}));
 		
 		renderer.setLineWidth(3);
 		outlineByteRange(Color.BLACK, ctx, Range.fromSize(byteIndex, 1));
@@ -988,49 +993,6 @@ public class BinaryGridRenderer{
 		renderer.setLineWidth(1);
 		outlineByteRange(Color.WHITE, ctx, Range.fromSize(byteIndex, 1));
 		
-		
-		//TODO: add imgui hover window
-		//if(true) return;
-		
-		initFont(0.5F);
-		renderer.pushMatrix();
-		float x=ctx.renderer.getDisplay().getMouseX();
-		float y=ctx.renderer.getDisplay().getMouseY();
-		
-		float minScale=20;
-		if(renderer.getFontScale()<minScale) renderer.setFontScale(minScale);
-		
-		
-		float w=0;
-		float h=0;
-		
-		for(var s : ctx.hoverMessages){
-			var bounds=getStringBounds(s);
-			w=Math.max(bounds.width(), w);
-			h+=bounds.height();
-		}
-		y-=h-renderer.getFontScale();
-		
-		x=Math.max(0, Math.min(x, screenWidth-w));
-		if(y<h){
-			y+=h+ctx.pixelsPerByte();
-		}
-		y=Math.max(y, h);
-		
-		List<DrawFont.StringDraw> strings=new ArrayList<>(ctx.hoverMessages.size());
-		
-		var col=Color.WHITE;
-		for(int i=0;i<ctx.hoverMessages.size();i++){
-			strings.add(new DrawFont.StringDraw(renderer.getFontScale(), col, ctx.hoverMessages.get(i), x, y+i*renderer.getFontScale()));
-		}
-		renderer.setColor(alpha(Color.BLACK, 0.3F));
-		renderer.fillQuad(x, y-renderer.getFontScale(), w, h);
-		renderer.getFont().fillStrings(strings);
-		
-		renderer.popMatrix();
-		initFont(1);
-		
-		renderer.translate(-0.5, -0.5);
 	}
 	
 	private DrawFont.Bounds getStringBounds(String s){
@@ -1056,7 +1018,7 @@ public class BinaryGridRenderer{
 			}
 		}catch(IOException e){
 			parsed.lastHoverChunk=null;
-			ctx.hoverMessages.add("Unable to find hover chunk");
+			ctx.hoverMessages.add(new Object[]{"Unable to find hover chunk"});
 		}
 	}
 	
@@ -1379,7 +1341,7 @@ public class BinaryGridRenderer{
 			if(rctx.isRangeHovered(rang)){
 				outlineByteRange(Color.WHITE, ctx.renderCtx, rang);
 				DrawUtils.fillByteRange(alpha(Color.WHITE, 0.2F), ctx.renderCtx, rang);
-				rctx.hoverMessages.add(instance.toString());
+				rctx.hoverMessages.add(new Object[]{instance});
 			}
 		}finally{
 			ctx.stack.remove(frame);

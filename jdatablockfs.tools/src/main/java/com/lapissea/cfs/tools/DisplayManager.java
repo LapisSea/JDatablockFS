@@ -3,6 +3,7 @@ package com.lapissea.cfs.tools;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.MemFrame;
 import com.lapissea.cfs.tools.render.RenderBackend;
+import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.util.*;
 import com.lapissea.vec.Vec2iFinal;
 import com.lapissea.vec.interf.IVec2iR;
@@ -10,9 +11,7 @@ import imgui.ImGui;
 import imgui.ImVec2;
 import imgui.flag.ImGuiConfigFlags;
 
-import java.util.EnumSet;
-import java.util.LinkedList;
-import java.util.Optional;
+import java.util.*;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -48,6 +47,7 @@ public class DisplayManager implements DataLogger{
 		renderer=createBackend();
 		
 		gridRenderer=new BinaryGridRenderer(renderer);
+		
 		Runnable updateTitle=()->{
 			var f=sessionHost.activeFrame.get();
 			renderer.getDisplay().setTitle(
@@ -231,6 +231,8 @@ public class DisplayManager implements DataLogger{
 	
 	private final NanoTimer timer=LOG_FRAME_TIME?new NanoTimer():null;
 	
+	private List<Object[]> hover;
+	
 	private void doRender(){
 		updateImgui();
 		
@@ -240,12 +242,16 @@ public class DisplayManager implements DataLogger{
 			timer.end();
 		}
 		
-		gridRenderer.render();
+		var newHover=gridRenderer.render();
 		
 		if(LOG_FRAME_TIME){
 			timer.start();
 			
 			LogUtil.println(timer.msAvrg100());
+		}
+		
+		if(!ImGui.getIO().getWantCaptureMouse()){
+			hover=newHover;
 		}
 		
 		ImGui.newFrame();
@@ -313,6 +319,41 @@ public class DisplayManager implements DataLogger{
 			
 			ImGui.end();
 		});
+		
+		
+		if(!hover.isEmpty()){
+			ImGui.begin("Hover data:");
+			for(Object[] objects : hover){
+				for(Object object : objects){
+					ImGui.sameLine();
+					if(object instanceof String str) ImGui.textColored(200, 255, 200, 255, str);
+					else{
+						switch(object){
+							case IOInstance inst -> {
+								var str=inst.getThisStruct().instanceToString(null, inst, false, "{\n\t", "\n}", ": ", ",\n\t");
+								
+								if(str==null) str="";
+								ImGui.textColored(100, 100, 255, 255, str);
+							}
+							case BinaryGridRenderer.FieldVal inst -> {
+								var str=inst.field().instanceToString(inst.ioPool(), inst.instance(), false, "{\n\t", "\n}", ": ", ",\n\t");
+								
+								if(str==null) str="";
+								ImGui.textColored(100, 255, 100, 255, str);
+							}
+							default -> {
+								var str=Objects.toString(object);
+								
+								if(str==null) str="";
+								ImGui.text(str);
+							}
+						}
+					}
+				}
+				ImGui.separator();
+			}
+			ImGui.end();
+		}
 		
 		lastSiz=new Vec2iFinal(renderer.getDisplay().getWidth(), renderer.getDisplay().getHeight());
 	}
