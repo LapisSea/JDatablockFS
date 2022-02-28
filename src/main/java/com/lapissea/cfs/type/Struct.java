@@ -163,32 +163,53 @@ public class Struct<T extends IOInstance<T>>{
 		}
 		
 		@Override
-		public String instanceToString(Pool<T> ioPool, T instance, boolean doShort){
+		public String instanceToString(Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
 			StringBuilder sb=new StringBuilder();
-			if(!doShort) sb.append(getType().getSimpleName());
-			sb.append('{');
+			if(!doShort){
+				var simple=getType().getSimpleName();
+				var index =simple.lastIndexOf('$');
+				if(index!=-1) simple=simple.substring(index+1);
+				
+				sb.append(simple);
+			}
+			
+			var fields=new ArrayList<>(this.getFields());
+			fields.removeIf(toRem->toRem.getName().contains(IOFieldTools.GENERATED_FIELD_SEPARATOR));
+			
+			sb.append(start);
 			boolean comma=false;
-			for(var field : getFields()){
-				var str=field.instanceToString(ioPool, instance, doShort);
+			for(var field : fields){
+				String str;
+				try{
+					str=field.instanceToString(ioPool, instance, doShort||TextUtil.USE_SHORT_IN_COLLECTIONS);
+				}catch(FieldIsNullException e){
+					str="<UNINITIALIZED>";
+				}
 				if(str==null) continue;
 				
-				if(comma) sb.append(", ");
+				if(comma) sb.append(fieldSeparator);
 				
-				sb.append(field.getName()).append("=").append(str);
+				sb.append(field.getName()).append(fieldValueSeparator).append(str);
 				comma=true;
 			}
-			var iter=instance.listDynamicUnmanagedFields().iterator();
-			while(iter.hasNext()){
-				var field=iter.next();
-				var str  =field.instanceToString(ioPool, instance, doShort);
+			for(var iter=instance.listDynamicUnmanagedFields().iterator();iter.hasNext();){
+				var    field=iter.next();
+				String str;
+				try{
+					str=field.instanceToString(ioPool, instance, doShort||TextUtil.USE_SHORT_IN_COLLECTIONS);
+				}catch(FieldIsNullException e){
+					str="<UNINITIALIZED>";
+				}
 				if(str==null) continue;
 				
-				if(comma) sb.append(", ");
+				if(comma) sb.append(fieldSeparator);
 				
-				sb.append(field.getName()).append("=").append(str);
+				sb.append(field.getName()).append(fieldValueSeparator).append(str);
 				comma=true;
 			}
-			return sb.append('}').toString();
+			
+			sb.append(end);
+			return sb.toString();
 		}
 	}
 	
