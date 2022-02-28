@@ -331,9 +331,9 @@ class DrawUtils{
 	public static void drawPixelLine(BinaryGridRenderer.RenderContext ctx, double xFrom, double yFrom, double xTo, double yTo){
 		ctx.renderer().drawLine(xFrom*ctx.pixelsPerByte(), yFrom*ctx.pixelsPerByte(), xTo*ctx.pixelsPerByte(), yTo*ctx.pixelsPerByte());
 	}
-	static IterablePP<Range> chainRangeResolve(DataProvider cluster, Reference ref, int fieldOffset, int size){
+	static IterablePP<Range> chainRangeResolve(DataProvider cluster, Reference ref, long fieldOffset, long size){
 		return IterablePP.nullTerminated(()->new Supplier<>(){
-			int remaining=size;
+			long remaining=size;
 			final ChunkChainIO io;
 			
 			{
