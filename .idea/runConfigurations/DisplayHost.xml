@@ -2,7 +2,7 @@
   <configuration default="false" name="DisplayHost" type="Application" factoryName="Application" nameIsGenerated="true">
     <option name="MAIN_CLASS_NAME" value="com.lapissea.cfs.tools.server.DisplayHost" />
     <module name="jdatablockfs.tools" />
-    <option name="VM_PARAMETERS" value="-ea -Dcom.lapissea.cfs.tools.BinaryGridRenderer.errorLogLevel=STACK -Dcom.lapissea.cfs.tools.DisplayManager.DO_JIT_WARMUP=true" />
+    <option name="VM_PARAMETERS" value="-ea -Dcom.lapissea.cfs.tools.BinaryGridRenderer.errorLogLevel=NONE -Dcom.lapissea.cfs.tools.DisplayManager.DO_JIT_WARMUP=true" />
     <option name="WORKING_DIRECTORY" value="$ProjectFileDir$/run" />
     <extension name="coverage">
       <pattern>

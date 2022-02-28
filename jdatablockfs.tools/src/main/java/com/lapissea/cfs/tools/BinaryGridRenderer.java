@@ -1250,6 +1250,7 @@ public class BinaryGridRenderer{
 								continue;
 							}
 							if(typ.isArray()){
+								
 								var comp=typ.componentType();
 								if(IOInstance.isManaged(comp)){
 									var inst  =(IOInstance<?>[])field.get(ioPool, instance);

@@ -77,7 +77,6 @@ public class TemplateClassLoader extends ClassLoader{
 					writer.write("{#TOKEN(0)} IONullability @", field.getNullability().toString());
 				}
 				if(!field.getDependencies().isEmpty()){
-					LogUtil.println(field.getDependencies());
 					writer.write("{#RAW(0)} IODependency @", field.getDependencies().stream().collect(Collectors.joining(" ", "[", "]")));
 				}
 				
