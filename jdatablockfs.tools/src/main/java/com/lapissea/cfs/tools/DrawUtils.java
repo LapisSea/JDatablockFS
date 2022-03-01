@@ -15,6 +15,7 @@ import java.util.function.LongPredicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.LongStream;
 
 class DrawUtils{
 	
@@ -137,6 +138,9 @@ class DrawUtils{
 		
 		public IntStream ints(){
 			return IntStream.range(Math.toIntExact(from), Math.toIntExact(to));
+		}
+		public LongStream longs(){
+			return LongStream.range(from, to);
 		}
 	}
 	
