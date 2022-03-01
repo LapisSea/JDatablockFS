@@ -37,23 +37,7 @@ public abstract class RenderBackend{
 				}
 			}
 			
-			final class FillQuads implements Command{
-				private double[] data=new double[8];
-				private int      len =0;
-				private int      cap =2;
-				
-				void add(double x, double y, double width, double height){
-					if(len==cap){
-						cap=(int)(cap*3F/2);
-						data=Arrays.copyOf(data, cap*4);
-					}
-					data[len*4]=x;
-					data[len*4+1]=y;
-					data[len*4+2]=width;
-					data[len*4+3]=height;
-					len++;
-				}
-				
+			final class FillQuads extends ArgBuff4<FillQuads>{
 				@Override
 				public void draw(RenderBackend backend){
 					for(int i=0;i<len;i++){
@@ -61,10 +45,6 @@ public abstract class RenderBackend{
 							backend.outlineQuad(data[i*4], data[i*4+1], data[i*4+2], data[i*4+3]);
 						}
 					}
-				}
-				@Override
-				public String toString(){
-					return "FillQuad{"+len+" quads}";
 				}
 			}
 			
@@ -82,23 +62,7 @@ public abstract class RenderBackend{
 				}
 			}
 			
-			final class DrawLines implements Command{
-				private double[] data=new double[8];
-				private int      len =0;
-				private int      cap =2;
-				
-				void add(double xFrom, double yFrom, double xTo, double yTo){
-					if(len==cap){
-						cap=(int)(cap*3F/2);
-						data=Arrays.copyOf(data, cap*4);
-					}
-					data[len*4]=xFrom;
-					data[len*4+1]=yFrom;
-					data[len*4+2]=xTo;
-					data[len*4+3]=yTo;
-					len++;
-				}
-				
+			final class DrawLines extends ArgBuff4<DrawLines>{
 				@Override
 				public void draw(RenderBackend backend){
 					for(int i=0;i<len;i++){
@@ -107,9 +71,57 @@ public abstract class RenderBackend{
 						}
 					}
 				}
+			}
+			
+			abstract non-sealed class ArgBuff4<SELF extends ArgBuff4<SELF>> implements Cloneable, Command{
+				protected double[] data;
+				protected int      len=0;
+				private   int      cap=0;
+				private   boolean  protecc;
+				
+				private SELF snap;
+				
+				void add(double a, double b, double c, double d){
+					snap=null;
+					if(protecc){
+						cap=(int)(cap*3F/2);
+						data=Arrays.copyOf(data, cap*4);
+						protecc=false;
+					}
+					
+					if(cap==0){
+						cap=2;
+						data=new double[8];
+					}else if(len==cap){
+						cap=(int)(cap*3F/2);
+						data=Arrays.copyOf(data, cap*4);
+					}
+					
+					data[len*4]=a;
+					data[len*4+1]=b;
+					data[len*4+2]=c;
+					data[len*4+3]=d;
+					len++;
+				}
+				
 				@Override
 				public String toString(){
-					return "DrawLines{"+len+" lines}";
+					return this.getClass().getSimpleName()+"{"+len+"}";
+				}
+				
+				@SuppressWarnings("unchecked")
+				public SELF snap(){
+					if(snap==null){
+						try{
+							var q=(ArgBuff4<SELF>)clone();
+							q.cap=len;
+							q.protecc=true;
+							snap=(SELF)q;
+						}catch(Throwable e){
+							throw new RuntimeException(e);
+						}
+					}
+					return snap;
 				}
 			}
 			
@@ -186,7 +198,7 @@ public abstract class RenderBackend{
 		
 		private final RenderBackend backend;
 		
-		private final List<Command> buffer=new ArrayList<>();
+		private final ArrayList<Command> buffer=new ArrayList<>();
 		
 		private final DrawFont font=new DrawFont(){
 			@Override
@@ -218,7 +230,10 @@ public abstract class RenderBackend{
 		
 		public void draw(){
 			if(backend instanceof Buffered b){
-				b.buffer.addAll(buffer);
+				b.buffer.ensureCapacity(b.buffer.size()+buffer.size());
+				for(Command command : buffer){
+					b.buffer.add(command instanceof Command.ArgBuff4 buf?buf.snap():command);
+				}
 				return;
 			}
 			
