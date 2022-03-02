@@ -56,20 +56,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		
 		public Entry<K, V> unmodifiable(){
 			if(unmodifiable==null){
-				unmodifiable=new Entry.Abstract<>(){
-					@Override
-					public K getKey(){
-						return key;
-					}
-					@Override
-					public V getValue(){
-						return value;
-					}
-					@Override
-					public void set(V value){
-						throw new UnsupportedOperationException();
-					}
-				};
+				unmodifiable=Entry.of(key, value);
 			}
 			return unmodifiable;
 		}
@@ -135,12 +122,18 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	@IOValue.OverrideType(ContiguousIOList.class)
 	private IOList<Bucket<K, V>> buckets;
 	
-	private int datasetID;
+	private       int     datasetID;
+	private final boolean readOnly;
+	
+	private final Map<K, Entry<K, V>> cache;
+	
 	
 	public HashIOMap(DataProvider provider, Reference reference, TypeLink typeDef) throws IOException{
 		super(provider, reference, typeDef);
+		readOnly=getDataProvider().isReadOnly();
+		cache=readOnly?new HashMap<>():null;
 		
-		if(isSelfDataEmpty()){
+		if(isSelfDataEmpty()&&!readOnly){
 			newBuckets();
 			writeManagedFields();
 			fillBuckets();
@@ -291,16 +284,28 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	
 	@Override
 	public Entry<K, V> getEntry(K key) throws IOException{
+		if(readOnly){
+			if(cache.containsKey(key)){
+				return cache.get(key);
+			}
+		}
 		Bucket<K, V> bucket=getBucket(buckets, key, bucketPO2);
 		if(bucket==null){
+			if(readOnly) cache.put(key, null);
 			return null;
 		}
 		
 		var entry=bucket.entry(key);
 		if(entry==null){
+			if(readOnly) cache.put(key, null);
 			return null;
 		}
 		
+		if(readOnly){
+			var e=entry.unmodifiable();
+			cache.put(key, e);
+			return e;
+		}
 		return new ModifiableEntry(bucket, entry);
 	}
 	

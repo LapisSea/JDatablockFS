@@ -38,6 +38,8 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 	
 	public static class Node<T extends IOInstance<T>> extends IOInstance.Unmanaged<Node<T>> implements IterablePP<Node<T>>{
 		
+		private final boolean readOnly;
+		
 		@IOValueUnmanaged
 		private static <T extends IOInstance<T>> IOField<Node<T>, ?> makeValField(){
 			var valueAccessor=new AbstractFieldAccessor<Node<T>>(null, "value"){
@@ -116,7 +118,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 				public Reference getReference(Node<T> instance){
 					ChunkPointer next;
 					try{
-						next=readNextPtr();
+						next=getNextPtr();
 					}catch(IOException e){
 						throw new RuntimeException(e);
 					}
@@ -181,6 +183,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		
 		public Node(DataProvider provider, Reference reference, TypeLink typeDef) throws IOException{
 			super(provider, reference, typeDef, NODE_TYPE_CHECK);
+			readOnly=getDataProvider().isReadOnly();
 			
 			var type=(Struct<T>)typeDef.argAsStruct(0);
 			type.requireEmptyConstructor();
@@ -188,7 +191,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			
 			if(isSelfDataEmpty()){
 				nextSize=calcOptimalNextSize(provider);
-				writeManagedFields();
+				if(!readOnly) writeManagedFields();
 			}else{
 				readManagedFields();
 			}
@@ -213,7 +216,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			}
 			
 			try{
-				if(!readNextPtr().equals(other.readNextPtr())){
+				if(!getNextPtr().equals(other.getNextPtr())){
 					return false;
 				}
 				if(hasValue()!=other.hasValue()){
@@ -241,7 +244,22 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			io.setPos(0);
 		}
 		
+		private T       valueCache;
+		private boolean valueRead;
+		
 		T getValue() throws IOException{
+			if(readOnly){
+				if(!valueRead){
+					valueRead=true;
+					valueCache=readValue();
+				}
+				return valueCache;
+			}
+			return readValue();
+		}
+		
+		private T readValue() throws IOException{
+			
 			readManagedFields();
 			
 			var start=valueStart();
@@ -265,6 +283,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 				throw new IOException("failed to get value on "+this.getReference().addOffset(start).infoString(getDataProvider()), e);
 			}
 		}
+		
 		boolean hasValue() throws IOException{
 			var nextStart=nextStart();
 			try(var io=this.getReference().io(this)){
@@ -282,6 +301,9 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		}
 		
 		void setValue(T value) throws IOException{
+			if(readOnly){
+				throw new UnsupportedOperationException();
+			}
 			try(var io=this.getReference().io(this)){
 				ensureNextSpace(io);
 				io.skipExact(valueStart());
@@ -298,6 +320,19 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 				io.trim();
 			}
 		}
+		
+		private ChunkPointer nextPtrCache;
+		private boolean      nextPtrRead;
+		private ChunkPointer getNextPtr() throws IOException{
+			if(readOnly){
+				if(!nextPtrRead){
+					nextPtrRead=true;
+					nextPtrCache=readNextPtr();
+				}
+				return nextPtrCache;
+			}
+			return readNextPtr();
+		}
 		private ChunkPointer readNextPtr() throws IOException{
 			readManagedFields();
 			ChunkPointer chunk;
@@ -312,8 +347,23 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			return chunk;
 		}
 		
+		private Node<T> nextCache;
+		private boolean nextRead;
+		
 		Node<T> getNext() throws IOException{
-			var ptr=readNextPtr();
+			if(readOnly){
+				if(!nextRead){
+					nextRead=true;
+					nextCache=readNext();
+				}
+				return nextCache;
+			}
+			return readNext();
+		}
+		
+		private Node<T> readNext() throws IOException{
+			
+			var ptr=getNextPtr();
 			if(ptr.isNull()) return null;
 			
 			return new Node<>(getDataProvider(), new Reference(ptr, 0), getTypeDef());
@@ -364,7 +414,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 				var val   =getValue();
 				var result=new StringBuilder().append("{").append(val==null?null:val.toShortString());
 				
-				var next=readNextPtr();
+				var next=getNextPtr();
 				if(!next.isNull()){
 					result.append(" -> ").append(next);
 				}
@@ -533,10 +583,15 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 	
 	private final StructPipe<T> elementPipe;
 	
+	private final boolean      readOnly;
+	private final Map<Long, T> cache;
+	
 	
 	@SuppressWarnings("unchecked")
 	public LinkedIOList(DataProvider provider, Reference reference, TypeLink typeDef) throws IOException{
 		super(provider, reference, typeDef, LIST_TYPE_CHECK);
+		readOnly=getDataProvider().isReadOnly();
+		cache=readOnly?new HashMap<>():null;
 		
 		var type=(Struct<T>)typeDef.argAsStruct(0);
 		type.requireEmptyConstructor();
@@ -578,6 +633,14 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 	@Override
 	public T get(long index) throws IOException{
 		checkSize(index);
+		if(readOnly){
+			if(cache.containsKey(index)){
+				return cache.get(index);
+			}
+			var val=getNode(index).getValue();
+			cache.put(index, val);
+			return val;
+		}
 		return getNode(index).getValue();
 	}
 	
@@ -675,7 +738,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 	}
 	
 	private Node<T> getHead() throws IOException{
-		readManagedField(headField);
+		if(!readOnly||head==null) readManagedField(headField);
 		return head;
 	}
 	private void setHead(Node<T> head) throws IOException{
@@ -687,6 +750,30 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 	
 	@Override
 	public IOIterator.Iter<T> iterator(){
+		if(readOnly){
+			return new IOIterator.Iter<>(){
+				LinkedListIterator src;
+				long index;
+				@Override
+				public boolean hasNext(){
+					return index<size();
+				}
+				@Override
+				public T ioNext() throws IOException{
+					try{
+						if(cache.containsKey(index)){
+							return cache.get(index);
+						}
+						if(src==null) src=new LinkedListIterator(index);
+						var e=src.getElement(index);
+						cache.put(index, e);
+						return e;
+					}finally{
+						index++;
+					}
+				}
+			};
+		}
 		try{
 			return new LinkedValueIterator<>(getHead());
 		}catch(IOException e){

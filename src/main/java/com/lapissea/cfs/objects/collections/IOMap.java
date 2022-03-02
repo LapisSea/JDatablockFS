@@ -39,6 +39,22 @@ public interface IOMap<K, V>{
 			}
 		}
 		
+		static <K, V> Entry<K, V> of(K key, V value){
+			return new Entry.Abstract<>(){
+				@Override
+				public K getKey(){
+					return key;
+				}
+				@Override
+				public V getValue(){
+					return value;
+				}
+				@Override
+				public void set(V value){
+					throw new UnsupportedOperationException();
+				}
+			};
+		}
 		static <K, V> Entry<K, V> viewOf(Map.Entry<K, V> entry){
 			return new Entry.Abstract<>(){
 				@Override
