@@ -211,8 +211,9 @@ public abstract class RenderBackend{
 			}
 			@Override
 			public Bounds getStringBounds(String string){
-				backend.setFontScale(getFontScale());
-				return backend.getFont().getStringBounds(string);
+				var mul=getFontScale()/backend.getFontScale();
+				var b  =backend.getFont().getStringBounds(string);
+				return new Bounds(b.width()*mul, b.height()*mul);
 			}
 			@Override
 			public boolean canFontDisplay(char c){

@@ -57,6 +57,7 @@ public class DisplayManager implements DataLogger{
 				"Binary display - frame: "+(f==-1?"NaN":f)+
 				sessionHost.activeSession.get().map(s->" - Session: "+s.getName()).orElse("")
 			);
+			gridRenderer.markDirty();
 			renderer.markFrameDirty();
 		};
 		sessionHost.activeFrame.register(i->updateTitle.run());
@@ -99,11 +100,11 @@ public class DisplayManager implements DataLogger{
 		display.registerMouseScroll(delta->{
 			
 			new Thread(()->{
-				int     steps =5;
+				int     steps =10;
 				float[] deltas=new float[steps];
 				for(int i=0;i<deltas.length;i++){
 					var val=steps-i;
-					deltas[i]=val*val;
+					deltas[i]=(float)Math.pow(val, 3);
 				}
 				
 				float sum=0;
@@ -111,18 +112,17 @@ public class DisplayManager implements DataLogger{
 					sum+=v;
 				}
 				for(int i=0;i<deltas.length;i++){
-					deltas[i]/=sum*2;
+					deltas[i]/=sum;
 					deltas[i]*=delta;
 				}
 				
-				for(int i=0;i<deltas.length;i++){
-					ImGui.getIO().setMouseWheel(ImGui.getIO().getMouseWheel()+deltas[i]);
+				for(float v : deltas){
+					ImGui.getIO().setMouseWheel(ImGui.getIO().getMouseWheel()+v);
 					renderer.markFrameDirty();
 					UtilL.sleep(16);
 				}
 			}).start();
 			
-			ImGui.getIO().setMouseWheel(delta);
 			if(ImGui.getIO().getWantCaptureMouse()){
 				renderer.markFrameDirty();
 				return;
@@ -149,7 +149,7 @@ public class DisplayManager implements DataLogger{
 		
 		display.registerDisplayResize(()->{
 			sessionHost.cleanUpSessions();
-			ifFrame(frame->gridRenderer.calcSize(frame.bytes().length, true));
+			ifFrame(frame->gridRenderer.calcSize(display, frame.bytes().length, true));
 			renderer.markFrameDirty();
 			gridRenderer.markDirty();
 			renderer.runLater(()->{
@@ -210,7 +210,7 @@ public class DisplayManager implements DataLogger{
 					
 					if(!gridRenderer.getDisplayedSession().equals(activeSession)){
 						gridRenderer.setDisplayedSession(activeSession);
-						ifFrame(frame->gridRenderer.calcSize(frame.bytes().length, true));
+						ifFrame(frame->gridRenderer.calcSize(display, frame.bytes().length, true));
 					}
 					if(destroyRequested){
 						destroyRequested=false;
@@ -245,7 +245,7 @@ public class DisplayManager implements DataLogger{
 		
 		renderer.preRender();
 		
-		if(!ImGui.getIO().getWantCaptureMouse()){
+		if(!ImGui.getIO().getWantCaptureMouse()||gridRenderer.isDirty()){
 			gridBuff.clear();
 			hover=gridRenderer.render();
 		}
