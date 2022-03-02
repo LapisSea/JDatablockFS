@@ -2,9 +2,12 @@ package com.lapisseqa.cfs.run;
 
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.impl.MemoryData;
+import com.lapissea.cfs.objects.NumberSize;
+import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.util.LogUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInfo;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -90,4 +93,22 @@ public class SlowTests{
 		                                       HexFormat.of().formatHex(d)+"\n"
 		);
 	}
+	
+	@Test
+	void bigMap(TestInfo info) throws IOException{
+		TestUtils.testCluster(info, provider->{
+			IOMap<Object, Object> map=provider.getTemp();
+			
+			var splitter=Splitter.map(map, new ReferenceMemoryIOMap<>(), TestUtils::checkCompliance);
+			
+			int i=0;
+			while(provider.getSource().getIOSize()<NumberSize.SHORT.maxSize){
+				splitter.put(i, "int("+i+")");
+				if(i%100==0) LogUtil.println(i, provider.getSource().getIOSize()/(float)NumberSize.SHORT.maxSize);
+				i++;
+			}
+			LogUtil.println(i, provider.getSource().getIOSize()/(float)NumberSize.SHORT.maxSize);
+		});
+	}
+	
 }

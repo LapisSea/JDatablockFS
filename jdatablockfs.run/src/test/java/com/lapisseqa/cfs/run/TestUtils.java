@@ -122,7 +122,7 @@ public class TestUtils{
 		}
 	}
 	
-	private static <T> void checkCompliance(T test, T compliance){
+	public static <T> void checkCompliance(T test, T compliance){
 		if(!test.equals(compliance)){
 			throw new RuntimeException(test.getClass().getSimpleName()+" is not compliant!\n"
 			                           +test+" different to: \n"
