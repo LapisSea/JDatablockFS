@@ -112,7 +112,7 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>> implements Clone
 		
 		protected void readManagedField(IOField<SELF, ?> field) throws IOException{
 			try(var io=getReference().io(this)){
-				getPipe().readSingleField(provider, io, field, self(), getGenerics());
+				getPipe().readSingleField(getPipe().makeIOPool(), provider, io, field, self(), getGenerics());
 			}
 		}
 		

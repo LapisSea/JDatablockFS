@@ -1183,17 +1183,15 @@ public class BinaryGridRenderer{
 			}
 			
 			var ioPool=instance.getThisStruct().allocVirtualVarPool(IO);
-			var read  =false;
 			while(iterator.hasNext()){
 				IOField<T, Object> field=iterator.next();
 				try{
 					
 					var acc=field.getAccessor();
-					if(!read&&acc instanceof VirtualAccessor<T> vAcc&&vAcc.getStoragePool()==IO){
-						read=true;
+					if(acc instanceof VirtualAccessor<T> vAcc&&vAcc.getStoragePool()==IO){
 						try{
 							reference.withContext(ctx.provider).io(io->{
-								pipe.read(ioPool, ctx.provider, io, instance, generics(instance, parentGenerics));
+								pipe.readSingleField(ioPool, ctx.provider, io, field, instance, generics(instance, parentGenerics));
 							});
 						}catch(Throwable e){
 							drawByteRangesForced(ctx.renderCtx, List.of(Range.fromSize(reference.calcGlobalOffset(ctx.provider), 1)), Color.RED, false);

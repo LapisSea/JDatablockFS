@@ -468,7 +468,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		}
 	}
 	
-	public void readSingleField(DataProvider provider, ContentReader src, IOField<T, ?> selectedField, T instance, GenericContext genericContext) throws IOException{
+	public void readSingleField(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, IOField<T, ?> selectedField, T instance, GenericContext genericContext) throws IOException{
 		if(DEBUG_VALIDATION){
 			checkExistenceOfField(selectedField);
 		}
@@ -476,7 +476,6 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		
 		var deps       =getDeps(selectedField);
 		var writeFields=deps.writeFields;
-		var ioPool     =makeIOPool();
 		int checkIndex =0;
 		
 		if(DEBUG_VALIDATION){
