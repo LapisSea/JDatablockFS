@@ -23,7 +23,7 @@ public abstract class DrawFont{
 	public abstract void fillStrings(List<StringDraw> strings);
 	public abstract void outlineStrings(List<StringDraw> strings);
 	
-	public abstract Bounds getStringBounds(String string);
+	public abstract Bounds getStringBounds(String string, float fontScale);
 	
 	public boolean canFontDisplay(byte c){
 		if(c==0) return false;

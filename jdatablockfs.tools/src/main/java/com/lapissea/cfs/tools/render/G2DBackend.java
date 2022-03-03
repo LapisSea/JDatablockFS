@@ -61,8 +61,8 @@ public class G2DBackend extends RenderBackend{
 			}
 		}
 		@Override
-		public Bounds getStringBounds(String string){
-			currentGraphics.setFont(currentGraphics.getFont().deriveFont(getFontScale()/2));
+		public Bounds getStringBounds(String string, float fontScale){
+			currentGraphics.setFont(currentGraphics.getFont().deriveFont(fontScale/2));
 			var rect=currentGraphics.getFontMetrics().getStringBounds(string, currentGraphics);
 			return new DrawFont.Bounds((float)(rect.getWidth()), (float)(rect.getHeight()));
 		}

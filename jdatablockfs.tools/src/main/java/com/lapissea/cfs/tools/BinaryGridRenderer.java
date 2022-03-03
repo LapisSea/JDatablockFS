@@ -69,6 +69,27 @@ public class BinaryGridRenderer{
 		int width, float pixelsPerByte, int hoverByteX, int hoverByteY, int hoverByteIndex,
 		List<HoverMessage> hoverMessages){
 		
+		private static int calcIndex(byte[] bytes, RenderBackend.DisplayInterface dis, float pixelsPerByte){
+			int width    =(int)Math.max(1, dis.getWidth()/pixelsPerByte);
+			int xByte    =(int)(dis.getMouseX()/pixelsPerByte);
+			int yByte    =(int)(dis.getMouseY()/pixelsPerByte);
+			int byteIndex=yByte*width+xByte;
+			if(xByte>=width||byteIndex>=bytes.length) return -1;
+			else return byteIndex;
+		}
+		
+		RenderContext(RenderBackend renderer,
+		              byte[] bytes,
+		              float pixelsPerByte, RenderBackend.DisplayInterface dis,
+		              List<HoverMessage> hoverMessages){
+			this(renderer, bytes, new RoaringBitmap(),
+			     (int)Math.max(1, dis.getWidth()/pixelsPerByte), pixelsPerByte,
+			     (int)(dis.getMouseX()/pixelsPerByte),
+			     (int)(dis.getMouseY()/pixelsPerByte),
+			     calcIndex(bytes, dis, pixelsPerByte),
+			     hoverMessages);
+		}
+		
 		boolean isRangeHovered(Range range){
 			var f=range.from();
 			var t=range.to();
@@ -499,53 +520,22 @@ public class BinaryGridRenderer{
 	}
 	
 	private List<HoverMessage> render(int frameIndex){
-		
 		if(getFrameCount()==0){
-			var renderer=direct;
-			startFrame(new RenderContext(
-				renderer,
-				null, null,
-				0, getPixelsPerByte(), 0, 0, 0,
-				new ArrayList<>()
-			));
-			var str="No data!";
-			
-			int w=renderer.getDisplay().getWidth(), h=renderer.getDisplay().getHeight();
-			renderer.setFontScale(Math.min(h, w/(str.length()*0.8F)));
-			drawStringIn(renderer, Color.LIGHT_GRAY, str, new DrawUtils.Rect(0, 0, w, h), true);
+			renderNoData(direct);
 			return List.of();
 		}
-		
 		
 		CachedFrame cFrame=getFrame(frameIndex);
 		MemFrame    frame =cFrame.memData();
 		var         bytes =frame.bytes();
 		
 		
-		var magic=Cluster.getMagicId();
-		
-		var hasMagic=magic.mismatch(ByteBuffer.wrap(bytes).limit(magic.limit()))==-1;
-		if(!hasMagic&&!errorMode){
-			throw new RuntimeException("No magic bytes");
-		}
-		
-		RoaringBitmap filled=new RoaringBitmap();
-		var           dis   =direct.getDisplay();
+		var dis=direct.getDisplay();
 		calcSize(dis, bytes.length, false);
-		
-		int width=(int)Math.max(1, dis.getWidth()/getPixelsPerByte());
-		int xByte=(int)(dis.getMouseX()/getPixelsPerByte());
-		int yByte=(int)(dis.getMouseY()/getPixelsPerByte());
-		int byteIndex;
-		{
-			int bi=yByte*width+xByte;
-			if(xByte>=width||bi>=bytes.length) byteIndex=-1;
-			else byteIndex=bi;
-		}
 		
 		ParsedFrame parsed=cFrame.parsed();
 		if(!renderStatic){
-			var ctx=new RenderContext(null, null, null, 0, 0, 0, 0, byteIndex, null);
+			var ctx=new RenderContext(null, bytes, getPixelsPerByte(), dis, null);
 			if(lastHoverMessages.stream().anyMatch(m->!ctx.isRangeHovered(m.range))){
 				renderStatic=true;
 			}
@@ -554,22 +544,13 @@ public class BinaryGridRenderer{
 		if(renderStatic){
 			renderStatic=false;
 			buff.clear();
-			RenderContext rCtx=new RenderContext(
-				buff,
-				bytes, filled,
-				width, getPixelsPerByte(), xByte, yByte, byteIndex,
-				new ArrayList<>()
-			);
-			drawStatic(frameIndex, frame, bytes, magic, hasMagic, filled, rCtx, parsed);
+			
+			var rCtx=new RenderContext(buff, bytes, getPixelsPerByte(), dis, new ArrayList<>());
+			drawStatic(frame, rCtx, parsed);
 			this.lastHoverMessages=List.copyOf(rCtx.hoverMessages);
 		}
 		
-		var ctx=new RenderContext(
-			direct,
-			bytes, filled,
-			width, getPixelsPerByte(), xByte, yByte, byteIndex,
-			new ArrayList<>(lastHoverMessages)
-		);
+		var ctx=new RenderContext(direct, bytes, getPixelsPerByte(), dis, new ArrayList<>(lastHoverMessages));
 		
 		buff.draw();
 		
@@ -583,14 +564,36 @@ public class BinaryGridRenderer{
 		
 		return ctx.hoverMessages;
 	}
+	private void renderNoData(RenderBackend renderer){
+		startFrame(new RenderContext(
+			renderer,
+			null, null,
+			0, getPixelsPerByte(), 0, 0, 0,
+			new ArrayList<>()
+		));
+		var str="No data!";
+		
+		int w=renderer.getDisplay().getWidth(), h=renderer.getDisplay().getHeight();
+		renderer.setFontScale(Math.min(h, w/(str.length()*0.8F)));
+		drawStringIn(renderer, Color.LIGHT_GRAY, str, new DrawUtils.Rect(0, 0, w, h), true);
+	}
 	public void markDirty(){
 		renderStatic=true;
 	}
 	public boolean isDirty(){
 		return renderStatic;
 	}
-	private void drawStatic(int frameIndex, MemFrame frame, byte[] bytes, ByteBuffer magic, boolean hasMagic, RoaringBitmap filled, RenderContext ctx, ParsedFrame parsed){
+	private void drawStatic(MemFrame frame, RenderContext ctx, ParsedFrame parsed){
+		int frameIndex=parsed.index;
 		startFrame(ctx);
+		
+		byte[] bytes=ctx.bytes;
+		var    magic=Cluster.getMagicId();
+		
+		var hasMagic=magic.mismatch(ByteBuffer.wrap(bytes).limit(magic.limit()))==-1;
+		if(!hasMagic&&!errorMode){
+			throw new RuntimeException("No magic bytes");
+		}
 		
 		if(hasMagic){
 			drawByteRanges(ctx, List.of(new Range(0, magic.limit())), Color.BLUE, false, true);
@@ -605,8 +608,7 @@ public class BinaryGridRenderer{
 		
 		ctx.renderer.setColor(alpha(Color.WHITE, 0.5F));
 		
-		List<Pointer> ptrs    =new ArrayList<>();
-		DataProvider  provider=null;
+		List<Pointer> ptrs=new ArrayList<>();
 		
 		Set<Chunk> referenced=new HashSet<>();
 		try{
@@ -622,9 +624,9 @@ public class BinaryGridRenderer{
 				return null;
 			});
 			if(cluster!=null){
-				provider=cluster;
-				var cl  =cluster;
-				var root=cluster.getRoot();
+				DataProvider provider=cluster;
+				var          cl      =cluster;
+				var          root    =cluster.getRoot();
 				
 				Throwable e1    =null;
 				var       annCtx=new AnnotateCtx(ctx, provider, new LinkedList<>(), ptrs::add, new ArrayList<>(), new ArrayList<>());
@@ -678,8 +680,8 @@ public class BinaryGridRenderer{
 				
 				if(e1!=null) throw e1;
 			}else{
-				provider=DataProvider.newVerySimpleProvider(MemoryData.build().withRaw(bytes).build());
-				AnnotateCtx annCtx=new AnnotateCtx(ctx, provider, new LinkedList<>(), ptrs::add, new ArrayList<>(), new ArrayList<>());
+				var         provider=DataProvider.newVerySimpleProvider(MemoryData.build().withRaw(bytes).build());
+				AnnotateCtx annCtx  =new AnnotateCtx(ctx, provider, new LinkedList<>(), ptrs::add, new ArrayList<>(), new ArrayList<>());
 				annCtx.stack.add(null);
 				long pos;
 				try{
@@ -704,22 +706,12 @@ public class BinaryGridRenderer{
 		}catch(Throwable e){
 			handleError(e, parsed);
 		}
-		if(provider==null){
-			try{
-				provider=DataProvider.newVerySimpleProvider(MemoryData.build().withRaw(bytes).asReadOnly().build());
-			}catch(IOException e1){
-				handleError(e1, parsed);
-			}
-		}
 		
-		drawBytes(ctx, IntStream.range(0, bytes.length).filter(((IntPredicate)filled::contains).negate()), alpha(Color.GRAY, 0.5F), true, true);
+		drawBytes(ctx, IntStream.range(0, bytes.length).filter(((IntPredicate)ctx.filled::contains).negate()), alpha(Color.GRAY, 0.5F), true, true);
 		
 		drawWriteIndex(frame, ctx);
 		
 		drawPointers(ctx, parsed, ptrs);
-		
-		// replaced by imgui
-		// drawError(parsed);
 		
 		drawTimeline(ctx.renderer, frameIndex);
 	}
@@ -1098,7 +1090,7 @@ public class BinaryGridRenderer{
 	}
 	
 	private DrawFont.Bounds getStringBounds(RenderBackend renderer, String s){
-		return renderer.getFont().getStringBounds(s);
+		return renderer.getFont().getStringBounds(s, renderer.getFontScale());
 	}
 	
 	private void findHoverChunk(RenderContext ctx, ParsedFrame parsed, DataProvider provider){

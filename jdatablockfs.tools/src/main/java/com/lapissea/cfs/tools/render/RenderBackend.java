@@ -210,10 +210,8 @@ public abstract class RenderBackend{
 				buffer.add(new Command.OutlineStrings(List.copyOf(strings)));
 			}
 			@Override
-			public Bounds getStringBounds(String string){
-				var mul=getFontScale()/backend.getFontScale();
-				var b  =backend.getFont().getStringBounds(string);
-				return new Bounds(b.width()*mul, b.height()*mul);
+			public Bounds getStringBounds(String string, float fontScale){
+				return backend.getFont().getStringBounds(string, fontScale);
 			}
 			@Override
 			public boolean canFontDisplay(char c){
