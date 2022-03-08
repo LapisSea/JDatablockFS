@@ -174,7 +174,7 @@ public class Struct<T extends IOInstance<T>>{
 			}
 			
 			var fields=new ArrayList<>(this.getFields());
-			fields.removeIf(toRem->toRem.getName().contains(IOFieldTools.GENERATED_FIELD_SEPARATOR));
+			fields.removeIf(toRem->toRem.getName().indexOf(IOFieldTools.GENERATED_FIELD_SEPARATOR)!=-1);
 			
 			sb.append(start);
 			boolean comma=false;
@@ -371,7 +371,7 @@ public class Struct<T extends IOInstance<T>>{
 		}
 		
 		var fields=new ArrayList<>(this.fields);
-		fields.removeIf(toRem->toRem.getName().contains(IOFieldTools.GENERATED_FIELD_SEPARATOR));
+		fields.removeIf(toRem->toRem.getName().indexOf(IOFieldTools.GENERATED_FIELD_SEPARATOR)!=-1);
 		
 		sb.append(start);
 		boolean comma=false;

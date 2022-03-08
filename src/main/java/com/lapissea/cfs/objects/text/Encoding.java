@@ -4,7 +4,9 @@ import com.lapissea.cfs.io.bit.BitInputStream;
 import com.lapissea.cfs.io.bit.BitOutputStream;
 import com.lapissea.cfs.io.content.ContentInputStream;
 import com.lapissea.cfs.io.content.ContentWriter;
+import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.util.PairM;
+import com.lapissea.util.TextUtil;
 import com.lapissea.util.function.FunctionOI;
 import com.lapissea.util.function.UnsafeBiConsumer;
 import com.lapissea.util.function.UnsafeBiFunction;
@@ -43,7 +45,7 @@ class Encoding{
 		private static UTF get(){return UTFS.get();}
 	}
 	
-	private record TableCoding(byte[] table, int offset, char[] chars, int bits, char[] ranges){
+	private record TableCoding(byte[] indexTable, int offset, char[] chars, int bits, char[] ranges){
 		static TableCoding of(char... table){
 			assert table.length<=Byte.MAX_VALUE;
 			
@@ -55,13 +57,12 @@ class Encoding{
 			int max=IntStream.range(0, table.length).map(i->table[i]).max().orElse(-2)+1;
 			
 			byte[] tableIndex=new byte[max-min];
-			Arrays.fill(tableIndex, (byte)-1);
+			Arrays.fill(tableIndex, (byte)0xFF);
 			
 			for(int i=0, j=table.length;i<j;i++){
 				char c=table[i];
 				tableIndex[c-min]=(byte)i;
 			}
-			
 			var ranges=buildRanges(table);
 			
 			return new TableCoding(tableIndex, min, table, bits, ranges);
@@ -152,7 +153,7 @@ class Encoding{
 			}
 		}
 		
-		int encode(char c)    {return table[c-offset];}
+		int encode(char c)    {return indexTable[c-offset];}
 		char decode(int index){return chars[index];}
 		
 		int calcSize(String str){
@@ -168,7 +169,7 @@ class Encoding{
 				for(int i=0;i<s.length();i++){
 					char c    =s.charAt(i);
 					int  index=encode(c);
-					
+					assert (index&0xFF)!=0xFF:"Illegal char: "+c+" for table "+TextUtil.toString(chars)+" in "+s;
 					stream.writeBits(index, bits);
 				}
 			}
@@ -203,18 +204,36 @@ class Encoding{
 	}
 	
 	enum CharEncoding{
-		BASE_16(0.5F, TableCoding.of(
+		BASE_16_U(TableCoding.of(
 			'0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
 			'A', 'B', 'C', 'D', 'E', 'F'
 		)),
-		BASE_64(0.66F, TableCoding.of(
+		BASE_16_L(TableCoding.of(
+			'0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+			'a', 'b', 'c', 'd', 'e', 'f'
+		)),
+		BASE_32_U(TableCoding.of(
+			'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+			'0', '1', '2', '3', '4', '5'
+		)),
+		BASE_32_L(TableCoding.of(
+			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+			'0', '1', '2', '3', '4', '5'
+		)),
+		BASE_64(TableCoding.of(
 			'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
 			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
-			'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ' ', '.'
+			'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '/'
+		)),
+		BASE_64_CNAME(TableCoding.of(
+			//Variation of base 64 optimized for storing class names and fields.
+			'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+			'0', '1', '2', '3', '4', '5', '6', '$', '[', ';', '.', IOFieldTools.GENERATED_FIELD_SEPARATOR
 		)),
 		ASCII(
 			1, String::length,
-			s->s.chars().allMatch(c->c<=0xFF),
+			s->s.chars().allMatch(c->c<0xFF),
 			(w, text)->w.write(text.getBytes(US_ASCII)),
 			(r, charCount)->new String(r.readInts1(charCount), US_ASCII)),
 		UTF8(
@@ -223,10 +242,18 @@ class Encoding{
 			(w, s)->encode(UTF.get().utf8Enc(), s, w),
 			(w, charCount)->decode(UTF.get().utf8Dec(), w, charCount));
 		
+		public static final CharEncoding DEFAULT=ASCII;
+		
 		private static final CharEncoding[] SORTED=Arrays.stream(CharEncoding.values()).sorted(Comparator.comparingDouble(c->c.sizeWeight)).toArray(CharEncoding[]::new);
 		public static CharEncoding findBest(String data){
 			if(data.isEmpty()){
-				return CharEncoding.ASCII;
+				return DEFAULT;
+			}
+			if(data.length()==1){
+				//Can't do better than 1 byte. Prefer ASCII if possible because ASCII fast as fuck boi
+				if(ASCII.canEncode(data)){
+					return ASCII;
+				}
 			}
 			for(CharEncoding f : SORTED){
 				if(f.canEncode(data)){
@@ -299,7 +326,7 @@ class Encoding{
 		private final UnsafeBiConsumer<ContentWriter, String, IOException>               write;
 		private final UnsafeBiFunction<ContentInputStream, Integer, String, IOException> read;
 		
-		CharEncoding(float sizeWeight, TableCoding coder){this(sizeWeight, coder::calcSize, coder::isCompatible, coder::write, coder::read);}
+		CharEncoding(TableCoding coder){this(coder.bits/8F, coder::calcSize, coder::isCompatible, coder::write, coder::read);}
 		CharEncoding(float sizeWeight, FunctionOI<String> calcSize,
 		             Predicate<String> canEncode,
 		             UnsafeBiConsumer<ContentWriter, String, IOException> write,

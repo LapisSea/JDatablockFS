@@ -32,7 +32,7 @@ import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NOT_NUL
 
 public class IOFieldTools{
 	
-	public static final String GENERATED_FIELD_SEPARATOR=":";
+	public static final char GENERATED_FIELD_SEPARATOR=':';
 	
 	public static <T extends IOInstance<T>> Function<List<IOField<T, ?>>, List<IOField<T, ?>>> streamStep(Function<Stream<IOField<T, ?>>, Stream<IOField<T, ?>>> map){
 		return list->map.apply(list.stream()).toList();

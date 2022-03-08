@@ -311,7 +311,8 @@ public class GeneralTests{
 		"this works",
 		"hey does this work?",
 		"dgasf_gfao124581z523tg eagdgisndgim315   qTGE254ghaerza573q6 wr gewr2$afas -.,/7-+41561552030,15.ds",
-		"I ❤️ you"
+		"I ❤️ you",
+		"\u00ff"
 	})
 	void autoTextTest(String data, TestInfo info) throws IOException{
 		TestUtils.testChunkProvider(info, provider->{

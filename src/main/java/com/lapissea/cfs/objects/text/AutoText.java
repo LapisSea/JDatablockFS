@@ -29,7 +29,7 @@ public class AutoText extends IOInstance<AutoText> implements CharSequence{
 	public AutoText(){
 		super(STRUCT);
 		data="";
-		encoding=CharEncoding.BASE_16;
+		encoding=CharEncoding.DEFAULT;
 		charCount=0;
 	}
 	
