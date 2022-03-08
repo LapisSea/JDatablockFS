@@ -21,6 +21,6 @@ public interface AnnotationLogic<Ann extends Annotation>{
 	@NotNull
 	default <T extends IOInstance<T>> List<VirtualFieldDefinition<T, ?>> injectPerInstanceValue(FieldAccessor<T> field, Ann annotation){return List.of();}
 	
-	default <T extends IOInstance<T>> Stream<IOField.UsageHint> getHints(FieldAccessor<T> field, Ann annotation){return Stream.empty();}
+	default <T extends IOInstance<T>> Stream<IOField.UsageHintDefinition> getHints(FieldAccessor<T> field, Ann annotation){return Stream.empty();}
 	
 }

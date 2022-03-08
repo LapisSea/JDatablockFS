@@ -44,8 +44,8 @@ public @interface IODependency{
 				return Set.of(annotation.value());
 			}
 			@Override
-			public <T extends IOInstance<T>> Stream<IOField.UsageHint> getHints(FieldAccessor<T> field, NumSize annotation){
-				return Stream.of(new IOField.UsageHint(SIZE_DATA, annotation.value()));
+			public <T extends IOInstance<T>> Stream<IOField.UsageHintDefinition> getHints(FieldAccessor<T> field, NumSize annotation){
+				return Stream.of(new IOField.UsageHintDefinition(SIZE_DATA, annotation.value()));
 			}
 		};
 		
@@ -92,8 +92,8 @@ public @interface IODependency{
 			}
 			
 			@Override
-			public <T extends IOInstance<T>> Stream<IOField.UsageHint> getHints(FieldAccessor<T> field, VirtualNumSize annotation){
-				return Stream.of(new IOField.UsageHint(SIZE_DATA, getName(field, annotation)));
+			public <T extends IOInstance<T>> Stream<IOField.UsageHintDefinition> getHints(FieldAccessor<T> field, VirtualNumSize annotation){
+				return Stream.of(new IOField.UsageHintDefinition(SIZE_DATA, getName(field, annotation)));
 			}
 			
 			@NotNull

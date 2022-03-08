@@ -37,7 +37,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		SIZE_DATA
 	}
 	
-	public record UsageHint(UsageHintType type, String target){}
+	public record UsageHintDefinition(UsageHintType type, String target){}
 	
 	
 	public static class NoIO<Inst extends IOInstance<Inst>, ValueType> extends IOField<Inst, ValueType>{

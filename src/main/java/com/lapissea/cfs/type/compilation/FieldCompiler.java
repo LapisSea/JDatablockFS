@@ -82,12 +82,12 @@ public class FieldCompiler{
 			                         .flatMap(f->f.annotations.stream()
 			                                                  .flatMap(an->an.logic.getHints(f.field.getAccessor(), an.annotation)
 			                                                                       .map(h->h.target()==null?
-			                                                                               new IOField.UsageHint(h.type(), f.field.getName()):
+			                                                                               new IOField.UsageHintDefinition(h.type(), f.field.getName()):
 			                                                                               h)
 			                                                  )
 			                         )
 			                         .filter(t->t.target().equals(field.getName()))
-			                         .map(IOField.UsageHint::type)
+			                         .map(IOField.UsageHintDefinition::type)
 			);
 		}
 		
