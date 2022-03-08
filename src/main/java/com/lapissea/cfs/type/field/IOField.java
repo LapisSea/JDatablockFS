@@ -405,8 +405,11 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	
 	
 	public String getName()              {return getAccessor().getName();}
-	public Struct<T> declaringStruct()   {return getAccessor().getDeclaringStruct();}
 	public FieldAccessor<T> getAccessor(){return accessor;}
+	public Struct<T> declaringStruct(){
+		var acc=getAccessor();
+		return acc==null?null:acc.getDeclaringStruct();
+	}
 	public FieldSet<T> getDependencies(){
 		if(!initialized) throw new IllegalStateException();
 		return Objects.requireNonNull(dependencies);
