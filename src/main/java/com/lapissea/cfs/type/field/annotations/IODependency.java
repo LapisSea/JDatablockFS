@@ -6,6 +6,7 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.compilation.AnnotationLogic;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.util.NotNull;
@@ -85,7 +86,7 @@ public @interface IODependency{
 			public static String getName(FieldAccessor<?> field, VirtualNumSize size){
 				var nam=size.name();
 				if(nam.isEmpty()){
-					return field.getName()+".siz";
+					return IOFieldTools.makeNumberSizeName(field.getName());
 				}
 				return nam;
 			}

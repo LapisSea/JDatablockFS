@@ -30,6 +30,7 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.NONE;
@@ -117,6 +118,13 @@ public class FieldCompiler{
 	
 	private <T extends IOInstance<T>> void validate(List<AnnotatedField<T>> parsed){
 		for(var pair : parsed){
+			var nam=pair.field.getName();
+			var err=IntStream.of('.', '/', '\\', ' ')
+			                 .filter(c->nam.indexOf((char)c)!=-1)
+			                 .mapToObj(c->"Character "+((char)c)+" is not allowed in field name \""+nam+"\"! ")
+			                 .findAny();
+			if(err.isPresent()) throw new MalformedStructLayout(err.get());
+			
 			var field=pair.field.getAccessor();
 			pair.annotations.forEach(ann->ann.logic().validate(field, ann.annotation()));
 		}
