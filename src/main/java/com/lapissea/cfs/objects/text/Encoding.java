@@ -2,11 +2,12 @@ package com.lapissea.cfs.objects.text;
 
 import com.lapissea.cfs.io.bit.BitInputStream;
 import com.lapissea.cfs.io.bit.BitOutputStream;
+import com.lapissea.cfs.io.bit.BitUtils;
 import com.lapissea.cfs.io.content.ContentInputStream;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.util.PairM;
-import com.lapissea.util.TextUtil;
+import com.lapissea.util.UtilL;
 import com.lapissea.util.function.FunctionOI;
 import com.lapissea.util.function.UnsafeBiConsumer;
 import com.lapissea.util.function.UnsafeBiFunction;
@@ -16,6 +17,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.CharBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CharsetDecoder;
@@ -45,7 +47,7 @@ class Encoding{
 		private static UTF get(){return UTFS.get();}
 	}
 	
-	private record TableCoding(byte[] indexTable, int offset, char[] chars, int bits, char[] ranges){
+	private record TableCoding(byte[] indexTable, int offset, char[] chars, int bits, char[] ranges, int optimizedBlockCharCount, int optimizedBlockBytes){
 		static TableCoding of(char... table){
 			assert table.length<=Byte.MAX_VALUE;
 			
@@ -65,7 +67,36 @@ class Encoding{
 			}
 			var ranges=buildRanges(table);
 			
-			return new TableCoding(tableIndex, min, table, bits, ranges);
+			
+			
+			int optimizedBlockCount;
+			if(UtilL.sysPropertyByClass(Encoding.class, "DISABLE_BLOCK_CODING", false, Boolean::parseBoolean)){
+				optimizedBlockCount=-1;
+			}else{
+				optimizedBlockCount=1;
+				while((optimizedBlockCount*bits)%Byte.SIZE!=0){
+					optimizedBlockCount++;
+					if(optimizedBlockCount*bits>Long.SIZE){
+						optimizedBlockCount=-1;
+						break;
+					}
+				}
+			}
+			
+			if(optimizedBlockCount!=-1){
+				int optimizedBlockFillRepeats=1;
+				while(true){
+					var newOptimizedBlockCount=optimizedBlockCount*(optimizedBlockFillRepeats+1);
+					if(newOptimizedBlockCount*bits>Long.SIZE) break;
+					optimizedBlockFillRepeats++;
+				}
+				optimizedBlockCount*=optimizedBlockFillRepeats;
+			}
+			
+			int optimizedBlockBytes=optimizedBlockCount*bits/Byte.SIZE;
+			
+			
+			return new TableCoding(tableIndex, min, table, bits, ranges, optimizedBlockCount, optimizedBlockBytes);
 		}
 		
 		@SuppressWarnings("PointlessArithmeticExpression")
@@ -153,42 +184,78 @@ class Encoding{
 			}
 		}
 		
-		int encode(char c)    {return indexTable[c-offset];}
-		char decode(int index){return chars[index];}
+		private int encode(char c)    {return indexTable[c-offset];}
+		private char decode(int index){return chars[index];}
 		
-		int calcSize(String str){
+		private int calcSize(String str){
 			return calcSize(str.length());
 		}
-		int calcSize(int len){
+		private int calcSize(int len){
 			return (int)Math.ceil(len*(double)bits/8D);
 		}
 		
 		
-		void write(ContentWriter w, String s) throws IOException{
-			try(var stream=new BitOutputStream(w)){
-				for(int i=0;i<s.length();i++){
-					char c    =s.charAt(i);
-					int  index=encode(c);
-					assert (index&0xFF)!=0xFF:"Illegal char: "+c+" for table "+TextUtil.toString(chars)+" in "+s;
-					stream.writeBits(index, bits);
+		private void write(ContentWriter w, String s) throws IOException{
+			int i=0;
+			
+			if(optimizedBlockCharCount!=-1&&s.length()>=optimizedBlockCharCount){
+				byte[] buf=new byte[Long.BYTES];
+				var    lb =ByteBuffer.wrap(buf).order(ByteOrder.LITTLE_ENDIAN).asLongBuffer();
+				
+				while(s.length()-i>=optimizedBlockCharCount){
+					long acum =0;
+					int  start=i;
+					for(int j=0;j<optimizedBlockCharCount;j++){
+						acum|=((long)encode(s.charAt(start+j)))<<(bits*j);
+					}
+					lb.put(0, acum);
+					w.write(buf, 0, optimizedBlockBytes);
+					i+=optimizedBlockCharCount;
+				}
+			}
+			if(i<s.length()){
+				try(var stream=new BitOutputStream(w)){
+					for(;i<s.length();i++){
+						stream.writeBits(encode(s.charAt(i)), bits);
+					}
 				}
 			}
 		}
 		
-		String read(ContentInputStream w, int charCount) throws IOException{
+		private String read(ContentInputStream w, int charCount) throws IOException{
 			StringBuilder sb=new StringBuilder(charCount);
+			int           i =0;
 			
-			try(var stream=new BitInputStream(w)){
-				for(int i=0;i<charCount;i++){
-					int  index=(int)stream.readBits(bits);
-					char c    =decode(index);
-					
-					sb.append(c);
+			if(optimizedBlockCharCount!=-1&&charCount>=optimizedBlockCharCount){
+				byte[] buf =new byte[Long.BYTES];
+				var    lb  =ByteBuffer.wrap(buf).order(ByteOrder.LITTLE_ENDIAN).asLongBuffer();
+				var    mask=BitUtils.makeMask(bits);
+				
+				char[] dest=new char[optimizedBlockCharCount];
+				
+				while(charCount-i>=optimizedBlockCharCount){
+					w.readFully(buf, 0, optimizedBlockBytes);
+					var acum=lb.get(0);
+					for(int j=0;j<optimizedBlockCharCount;j++){
+						dest[j]=decode((int)((acum >> (bits*j))&mask));
+					}
+					sb.append(dest);
+					i+=optimizedBlockCharCount;
+				}
+			}
+			if(i<charCount){
+				try(var stream=new BitInputStream(w)){
+					for(;i<charCount;i++){
+						int  index=(int)stream.readBits(bits);
+						char c    =decode(index);
+						
+						sb.append(c);
+					}
 				}
 			}
 			return sb.toString();
 		}
-		boolean isCompatible(String s){
+		private boolean isCompatible(String s){
 			return s.chars().allMatch(c->{
 				for(int i=0;i<ranges.length;i+=2){
 					int from=ranges[i];
