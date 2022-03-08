@@ -54,7 +54,9 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 			P created=lConstructor.apply(struct);
 			
 			if(GlobalConfig.PRINT_COMPILATION){
-				LogUtil.println(ConsoleColors.CYAN_BRIGHT+"Compiled "+struct.getType().getSimpleName()+" with "+TextUtil.toNamedPrettyJson(created, true)+ConsoleColors.RESET);
+				LogUtil.println(ConsoleColors.CYAN_BRIGHT+
+				                "Compiled "+struct.getType().getSimpleName()+" with "+TextUtil.toNamedPrettyJson(created, true)+"\n"+
+				                TextUtil.toTable(created.getSpecificFields())+ConsoleColors.RESET);
 			}
 			
 			put(struct, created);

@@ -112,7 +112,7 @@ public class BinaryGridRenderer{
 	private Optional<SessionHost.HostedSession> displayedSession=Optional.empty();
 	
 	private float              pixelsPerByte    =300;
-	private boolean            renderStatic     =true;
+	private boolean            renderStatic     =false;
 	private List<HoverMessage> lastHoverMessages=List.of();
 	
 	
@@ -522,6 +522,7 @@ public class BinaryGridRenderer{
 	private List<HoverMessage> render(int frameIndex){
 		if(getFrameCount()==0){
 			renderNoData(direct);
+			renderStatic=false;
 			return List.of();
 		}
 		
@@ -1250,7 +1251,7 @@ public class BinaryGridRenderer{
 						if(field instanceof BitFieldMerger<T> merger){
 							int bitOffset=0;
 							drawByteRanges(rctx, List.of(Range.fromSize(trueOffset, size)), chunkBaseColor(), false, true);
-							for(IOField.Bit<T, ?> bit : merger.getGroup()){
+							for(IOField.Bit<T, ?> bit : merger.fieldGroup()){
 								
 								var bCol=ColorUtils.makeCol(rand, typeHash, bit);
 								var siz =bit.getSizeDescriptor().calcUnknown(ioPool, ctx.provider, instance);

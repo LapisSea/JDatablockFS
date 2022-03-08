@@ -27,6 +27,10 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 		BitLayout(long bits){
 			this(bits, (int)(Utils.bitToByte(bits)*8-bits));
 		}
+		@Override
+		public String toString(){
+			return usedBits+" + "+safetyBits;
+		}
 	}
 	
 	private final List<IOField.Bit<T, ?>> group;
@@ -186,7 +190,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 		return group.stream();
 	}
 	
-	public List<Bit<T, ?>> getGroup(){
+	public List<Bit<T, ?>> fieldGroup(){
 		return group;
 	}
 	

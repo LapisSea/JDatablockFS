@@ -45,7 +45,7 @@ public class FieldCompiler{
 		return new FieldCompiler();
 	}
 	
-	private static record AnnotatedField<T extends IOInstance<T>>(
+	private record AnnotatedField<T extends IOInstance<T>>(
 		IOField<T, ?> field,
 		List<LogicalAnnotation<Annotation>> annotations
 	) implements Comparable<AnnotatedField<T>>{
@@ -58,7 +58,7 @@ public class FieldCompiler{
 	protected FieldCompiler(){
 	}
 	
-	public <T extends IOInstance.Unmanaged<T>> FieldSet<T> compileStaticUnmanaged(Struct.Unmanaged<T> struct){
+	public <T extends IOInstance.Unmanaged<T>> FieldSet<T> compileStaticUnmanaged(Struct.Unmanaged<T> struct){//TODO: implement static unmanaged fields
 		var type=struct.getType();
 		return FieldSet.of();
 	}

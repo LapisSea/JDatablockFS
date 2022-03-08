@@ -216,13 +216,13 @@ public class DisplayManager implements DataLogger{
 						destroyRequested=false;
 						display.requestClose();
 					}
-					long tim=System.currentTimeMillis();
-					if(tim-lastFrameTime>1000){
-						lastFrameTime=tim;
-						renderer.markFrameDirty();
-					}
+//					long tim=System.currentTimeMillis();
+//					if(tim-lastFrameTime>1000){
+//						lastFrameTime=tim;
+//						renderer.markFrameDirty();
+//					}
 					
-					if(renderer.notifyDirtyFrame()){
+					if(renderer.notifyDirtyFrame()||gridRenderer.isDirty()){
 						doRender();
 					}else UtilL.sleep(16);
 					if(jitWarmup>=150) UtilL.sleep(0, 1000);
