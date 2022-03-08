@@ -10,7 +10,6 @@
 	<version>1.0-SNAPSHOT</version>
 	<modules>
 		<module>jdatablockfs.run</module>
-		<module>jdatablockfs.gui</module>
 		<module>Jorth</module>
 	</modules>
 
