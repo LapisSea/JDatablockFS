@@ -8,6 +8,7 @@ import com.lapissea.cfs.type.DepSort;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
+import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.fields.reflection.BitFieldMerger;
@@ -85,13 +86,21 @@ public class IOFieldTools{
 			                                                       .filter(i->fields.get(i).getAccessor()==o.getAccessor())
 			                                                       .findAny()
 			                                                       .orElseThrow())
-			).sort(Comparator.comparingInt((IOField<T, ?> f)->f.getSizeDescriptor().getWordSpace().sortOrder)
-			                 .thenComparingInt(f->f.getSizeDescriptor().hasFixed()?0:1)
-			                 .thenComparing(f->switch(f.getDependencies().size()){
-				                 case 0 -> "";
-				                 case 1 -> f.getDependencies().get(0).getName();
-				                 default -> f.getDependencies().stream().map(IOField::getName).collect(Collectors.joining("+"));
+			).sort(Comparator.comparingInt((IOField<T, ?> f)->{//Pull fixed fields back and enforce word space sort order
+				                 var order=f.getSizeDescriptor().getWordSpace().sortOrder;
+				                 if(!f.getSizeDescriptor().hasFixed()){
+					                 order+=100000;
+				                 }
+				                 return order;
 			                 })
+			                 //Pull any temporary fields back to reduce unessecary field skipping when re-reading them
+			                 .thenComparingInt(f->f.getAccessor() instanceof VirtualAccessor<T> a&&a.getStoragePool()!=VirtualFieldDefinition.StoragePool.INSTANCE?0:1)
+			                 //pull any cheap to read/write fields back
+			                 .thenComparingInt(f->f.getAccessor().getType().isEnum()||f.getAccessor().getType().isPrimitive()?0:1)
+			                 //Encourage fields with similar dependencies to be next to each other
+			                 .thenComparing(f->f.getDependencies().stream().map(IOField::getName).collect(Collectors.joining(" / ")))
+			                 //Eliminate JVM entropy. Make initial field order irrelevant
+			                 .thenComparing(IOField::getName)
 			);
 		}catch(DepSort.CycleException e){
 			throw new MalformedStructLayout("Field dependency cycle detected:\n"+TextUtil.toTable(e.cycle.mapData(fields)), e);
