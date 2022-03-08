@@ -50,6 +50,11 @@ public class IOFieldInstanceArray<T extends IOInstance<T>, ValType extends IOIns
 		});
 	}
 	
+	@Override
+	public ValType[] get(Struct.Pool<T> ioPool, T instance){
+		return getNullable(ioPool, instance);
+	}
+	
 	private StructPipe<ValType> getValPipe(){
 		if(valPipe==null) valPipe=ContiguousStructPipe.of(component);
 		return valPipe;

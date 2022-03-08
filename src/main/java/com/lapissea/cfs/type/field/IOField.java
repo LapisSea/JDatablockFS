@@ -21,6 +21,7 @@ import com.lapissea.util.*;
 import java.io.IOException;
 import java.lang.reflect.Array;
 import java.util.*;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
@@ -252,8 +253,34 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		}
 	}
 	
-	@SuppressWarnings("unchecked")
+	protected final ValueType getNullable(Struct.Pool<T> ioPool, T instance, Supplier<ValueType> createDefaultIfNull){
+		var value=get0(ioPool, instance);
+		return switch(getNullability()){
+			case NOT_NULL -> requireValNN(value);
+			case NULLABLE -> value;
+			case DEFAULT_IF_NULL -> {
+				if(value!=null) yield value;
+				var newVal=createDefaultIfNull.get();
+				set(ioPool, instance, newVal);
+				yield newVal;
+			}
+		};
+	}
+	
+	protected final ValueType getNullable(Struct.Pool<T> ioPool, T instance){
+		var value=get0(ioPool, instance);
+		return switch(getNullability()){
+			case NOT_NULL -> requireValNN(value);
+			case NULLABLE -> value;
+			case DEFAULT_IF_NULL -> throw new IllegalStateException(this+" does not support "+IONullability.Mode.DEFAULT_IF_NULL);
+		};
+	}
+	
 	public ValueType get(Struct.Pool<T> ioPool, T instance){
+		return get0(ioPool, instance);
+	}
+	@SuppressWarnings("unchecked")
+	private ValueType get0(Struct.Pool<T> ioPool, T instance){
 		return (ValueType)getAccessor().get(ioPool, instance);
 	}
 	

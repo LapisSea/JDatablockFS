@@ -58,19 +58,7 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 	
 	@Override
 	public ValueType get(Struct.Pool<CTyp> ioPool, CTyp instance){
-		ValueType value=super.get(ioPool, instance);
-		return switch(getNullability()){
-			case NOT_NULL -> requireValNN(value);
-			case NULLABLE -> value;
-			case DEFAULT_IF_NULL -> {
-				if(value==null){
-					var newVal=instancePipe.getType().requireEmptyConstructor().get();
-					set(ioPool, instance, newVal);
-					yield newVal;
-				}
-				yield value;
-			}
-		};
+		return getNullable(ioPool, instance, ()->instancePipe.getType().requireEmptyConstructor().get());
 	}
 	
 	@Override
