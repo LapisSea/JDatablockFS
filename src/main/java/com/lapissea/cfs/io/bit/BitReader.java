@@ -61,8 +61,16 @@ public interface BitReader{
 	}
 	
 	default boolean[] readBits(boolean[] data) throws IOException{
-		for(int i=0;i<data.length;i++){
-			data[i]=readBoolBit();
+		
+		int maxBatch=60;
+		for(int start=0;start<data.length;start+=maxBatch){
+			var batchSize=Math.min(data.length-start, maxBatch);
+			
+			long batch=readBits(batchSize);
+			
+			for(int i=0;i<batchSize;i++){
+				data[i+start]=((batch >>> i)&1)==1;
+			}
 		}
 		return data;
 	}

@@ -5,6 +5,9 @@ import com.lapissea.cfs.io.content.ContentReader;
 
 import java.io.EOFException;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.LongBuffer;
 
 import static com.lapissea.cfs.io.bit.BitUtils.bitsToBytes;
 import static com.lapissea.cfs.io.bit.BitUtils.makeMask;
@@ -17,8 +20,14 @@ public class BitInputStream implements BitReader, AutoCloseable{
 	private int  bufferedBits;
 	private long totalBits;
 	
-	public BitInputStream(ContentReader source){
+	private final long expectedBits;
+	
+	private final byte[]     byteBuf=new byte[Long.BYTES];
+	private final LongBuffer lb     =ByteBuffer.wrap(byteBuf).order(ByteOrder.LITTLE_ENDIAN).asLongBuffer();
+	
+	public BitInputStream(ContentReader source, long expectedBits){
 		this.source=source;
+		this.expectedBits=expectedBits;
 	}
 	
 	private void prepareBits(int numOBits) throws IOException{
@@ -27,6 +36,15 @@ public class BitInputStream implements BitReader, AutoCloseable{
 		if(bitsToRead>0){
 			int toRead=bitsToBytes(bitsToRead);
 			
+			if(expectedBits>0){
+				int remainingExpected=(int)(expectedBits-totalBits);
+				if(remainingExpected>0){
+					var alreadyBuffered=bitsToBytes(bufferedBits);
+					var maxToRead      =8-alreadyBuffered;
+					toRead=Math.min(Math.max(toRead, remainingExpected/8), maxToRead);
+				}
+			}
+			
 			if(toRead==1){
 				int byt=source.read();
 				if(byt==-1) throw new EOFException();
@@ -34,11 +52,10 @@ public class BitInputStream implements BitReader, AutoCloseable{
 				buffer|=(long)byt<<bufferedBits;
 				bufferedBits+=Byte.SIZE;
 			}else{
-				for(byte byt : source.readInts1(toRead)){
-					buffer|=(long)byt<<bufferedBits;
-					bufferedBits+=Byte.SIZE;
-				}
-				
+				lb.put(0, 0);
+				source.readFully(byteBuf, 0, toRead);
+				buffer|=lb.get(0)<<bufferedBits;
+				bufferedBits+=toRead*Byte.SIZE;
 			}
 		}
 	}

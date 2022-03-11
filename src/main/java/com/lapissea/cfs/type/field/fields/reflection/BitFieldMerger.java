@@ -98,7 +98,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 	
 	@Override
 	public void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		try(var stream=new BitInputStream(src)){
+		try(var stream=new BitInputStream(src, safetyBits.isPresent()?getSizeDescriptor().requireFixed(WordSpace.BIT):-1)){
 			for(var fi : group){
 				if(DEBUG_VALIDATION){
 					long size=fi.getSizeDescriptor().calcUnknown(ioPool, provider, instance);
@@ -123,7 +123,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 			return;
 		}
 		
-		try(var stream=new BitInputStream(src)){
+		try(var stream=new BitInputStream(src, getSizeDescriptor().getMin(WordSpace.BIT))){
 			for(var fi : group){
 				if(DEBUG_VALIDATION){
 					long size=fi.getSizeDescriptor().calcUnknown(ioPool, provider, instance);

@@ -244,7 +244,7 @@ class Encoding{
 				}
 			}
 			if(i<charCount){
-				try(var stream=new BitInputStream(w)){
+				try(var stream=new BitInputStream(w, charCount-i)){
 					for(;i<charCount;i++){
 						int  index=(int)stream.readBits(bits);
 						char c    =decode(index);

@@ -143,7 +143,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		@Deprecated
 		@Override
 		public final void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-			try(var reader=new BitInputStream(src)){
+			try(var reader=new BitInputStream(src, getSizeDescriptor().getFixed(WordSpace.BIT).orElse(-1))){
 				readBits(ioPool, reader, instance);
 				if(DEBUG_VALIDATION){
 					reader.requireRead(getSizeDescriptor().calcUnknown(ioPool, provider, instance, WordSpace.BIT));
@@ -155,6 +155,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		@Override
 		public final void skipRead(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			try(var reader=new BitInputStream(src)){
+			try(var reader=new BitInputStream(src, -1)){
 				skipReadBits(reader, instance);
 				if(DEBUG_VALIDATION){
 					reader.requireRead(getSizeDescriptor().calcUnknown(ioPool, provider, instance, WordSpace.BIT));
