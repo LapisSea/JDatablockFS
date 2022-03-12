@@ -10,7 +10,6 @@ import com.lapissea.util.PairM;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.FunctionOI;
 import com.lapissea.util.function.UnsafeBiConsumer;
-import com.lapissea.util.function.UnsafeBiFunction;
 
 import java.io.EOFException;
 import java.io.IOException;
@@ -191,7 +190,7 @@ class Encoding{
 			return calcSize(str.length());
 		}
 		private int calcSize(int len){
-			return (int)Math.ceil(len*(double)bits/8D);
+			return BitUtils.bitsToBytes(len*bits);
 		}
 		
 		
@@ -222,9 +221,8 @@ class Encoding{
 			}
 		}
 		
-		private String read(ContentInputStream w, int charCount) throws IOException{
-			StringBuilder sb=new StringBuilder(charCount);
-			int           i =0;
+		private void read(ContentInputStream w, int charCount, StringBuilder sb) throws IOException{
+			int i=0;
 			
 			if(optimizedBlockCharCount!=-1&&charCount>=optimizedBlockCharCount){
 				byte[] buf =new byte[Long.BYTES];
@@ -253,7 +251,6 @@ class Encoding{
 					}
 				}
 			}
-			return sb.toString();
 		}
 		private boolean isCompatible(String s){
 			return s.chars().allMatch(c->{
@@ -302,12 +299,41 @@ class Encoding{
 			1, String::length,
 			s->s.chars().allMatch(c->c<0xFF),
 			(w, text)->w.write(text.getBytes(US_ASCII)),
-			(r, charCount)->new String(r.readInts1(charCount), US_ASCII)),
+			(r, charCount, dest)->{
+				var data=r.readInts1(charCount);
+				dest.append(new CharSequence(){
+					@Override
+					public int length(){
+						return data.length;
+					}
+					@Override
+					public char charAt(int index){
+						return (char)data[index];
+					}
+					@Override
+					public CharSequence subSequence(int start, int end){
+						throw new UnsupportedOperationException();
+					}
+				});
+			}),
 		UTF8(
 			1.1F, CharEncoding::utf8Len,
 			s->tryEncode(UTF.get().utf8Enc(), s),
 			(w, s)->encode(UTF.get().utf8Enc(), s, w),
-			(w, charCount)->decode(UTF.get().utf8Dec(), w, charCount));
+			(w, charCount, dest)->{
+				char[] buff     =new char[Math.min(1024, charCount)];
+				int    remaining=charCount;
+				
+				try(Reader reader=new InputStreamReader(w, UTF.get().utf8Dec())){
+					while(remaining>0){
+						int read=reader.read(buff, 0, Math.min(buff.length, remaining));
+						if(read==-1) throw new EOFException();
+						dest.append(buff, 0, read);
+						remaining-=read;
+					}
+				}
+				
+			});
 		
 		public static final CharEncoding DEFAULT=ASCII;
 		
@@ -353,23 +379,6 @@ class Encoding{
 				throw new RuntimeException(e);
 			}
 		}
-		private static String decode(CharsetDecoder en, ContentInputStream in, int charCount) throws IOException{
-			
-			char[] str      =new char[charCount];
-			int    remaining=str.length;
-			int    off      =0;
-			
-			try(Reader reader=new InputStreamReader(in, en)){
-				while(remaining>0){
-					int read=reader.read(str, off, remaining);
-					if(read==-1) throw new EOFException();
-					remaining-=read;
-					off+=read;
-				}
-			}
-			
-			return new String(str);
-		}
 		
 		private static void encode(CharsetEncoder en, String s, ContentWriter w) throws IOException{
 			var b=encode(en, s);
@@ -385,19 +394,23 @@ class Encoding{
 			}
 		}
 		
+		private interface Read{
+			void read(ContentInputStream src, int charCount, StringBuilder dest) throws IOException;
+		}
+		
 		public final float sizeWeight;
 		
 		private final FunctionOI<String> calcSize;
 		private final Predicate<String>  canEncode;
 		
-		private final UnsafeBiConsumer<ContentWriter, String, IOException>               write;
-		private final UnsafeBiFunction<ContentInputStream, Integer, String, IOException> read;
+		private final UnsafeBiConsumer<ContentWriter, String, IOException> write;
+		private final Read                                                 read;
 		
 		CharEncoding(TableCoding coder){this(coder.bits/8F, coder::calcSize, coder::isCompatible, coder::write, coder::read);}
 		CharEncoding(float sizeWeight, FunctionOI<String> calcSize,
 		             Predicate<String> canEncode,
 		             UnsafeBiConsumer<ContentWriter, String, IOException> write,
-		             UnsafeBiFunction<ContentInputStream, Integer, String, IOException> read
+		             Read read
 		){
 			this.sizeWeight=sizeWeight;
 			this.calcSize=calcSize;
@@ -415,8 +428,8 @@ class Encoding{
 		public void write(ContentWriter dest, String str) throws IOException{
 			write.accept(dest, str);
 		}
-		public String read(ContentInputStream src, int charCount) throws IOException{
-			return read.apply(src, charCount);
+		public void read(ContentInputStream src, int charCount, StringBuilder dest) throws IOException{
+			read.read(src, charCount, dest);
 		}
 	}
 }

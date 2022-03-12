@@ -2,6 +2,7 @@ package com.lapissea.cfs.objects.text;
 
 import com.lapissea.cfs.io.content.ContentInputStream;
 import com.lapissea.cfs.io.content.ContentOutputStream;
+import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.text.Encoding.CharEncoding;
@@ -14,7 +15,7 @@ import com.lapissea.util.NotNull;
 import java.io.IOException;
 import java.util.Objects;
 
-public class AutoText extends IOInstance<AutoText> implements CharSequence{
+public final class AutoText extends IOInstance<AutoText> implements CharSequence{
 	
 	public static final Struct<AutoText>     STRUCT=Struct.of(AutoText.class);
 	public static final StructPipe<AutoText> PIPE  =ContiguousStructPipe.of(STRUCT);
@@ -50,14 +51,24 @@ public class AutoText extends IOInstance<AutoText> implements CharSequence{
 	@IODependency.ArrayLenSize(name="numSize")
 	private byte[] getTextBytes() throws IOException{
 		byte[] buff=new byte[encoding.calcSize(data)];
-		encoding.write(new ContentOutputStream.BA(buff), data);
+		writeTextBytes(new ContentOutputStream.BA(buff));
 		return buff;
 	}
 	
 	@IOValue
 	private void setTextBytes(byte[] bytes) throws IOException{
-		data=encoding.read(new ContentInputStream.BA(bytes), charCount);
+		StringBuilder sb=new StringBuilder();
+		readTextBytes(new ContentInputStream.BA(bytes), sb);
+		data=sb.toString();
 	}
+	
+	public void writeTextBytes(ContentWriter dest) throws IOException{
+		encoding.write(dest, data);
+	}
+	public void readTextBytes(ContentInputStream src, StringBuilder dest) throws IOException{
+		encoding.read(src, charCount, dest);
+	}
+	
 	
 	@NotNull
 	@Override
