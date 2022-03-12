@@ -6,6 +6,6 @@ module JDatablockFS.run {
 	requires jmh.generator.annprocess;
 	requires gson;
 	
-	opens com.lapisseqa.cfs.run;
-	opens com.lapisseqa.cfs.run.sparseimage;
+	opens com.lapissea.cfs.run;
+	opens com.lapissea.cfs.run.sparseimage;
 }

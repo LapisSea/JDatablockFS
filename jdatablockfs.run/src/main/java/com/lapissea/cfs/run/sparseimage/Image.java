@@ -1,4 +1,4 @@
-package com.lapisseqa.cfs.run.sparseimage;
+package com.lapissea.cfs.run.sparseimage;
 
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.collections.LinkedIOList;

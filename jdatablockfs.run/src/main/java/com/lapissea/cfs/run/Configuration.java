@@ -1,4 +1,4 @@
-package com.lapisseqa.cfs.run;
+package com.lapissea.cfs.run;
 
 import com.google.gson.GsonBuilder;
 

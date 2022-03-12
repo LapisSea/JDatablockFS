@@ -1,4 +1,4 @@
-package com.lapisseqa.cfs.run;
+package com.lapissea.cfs.run;
 
 import com.lapissea.cfs.io.bit.BitInputStream;
 import com.lapissea.cfs.io.bit.BitOutputStream;
@@ -17,23 +17,29 @@ import java.util.Random;
 public class BitTests{
 	
 	@Test
-	void bitStreamIntegrity() throws IOException{
+	void bitStreamIntegrity(){
 		
 		Random r=new Random(1);
 		for(int i=0;i<10000;i++){
-			var bs=new boolean[i];
-			for(int j=0;j<bs.length;j++){
-				bs[j]=r.nextBoolean();
-			}
-			
-			var buff=new ByteArrayOutputStream();
-			try(var out=new BitOutputStream(new ContentOutputStream.Wrapp(buff))){
-				out.writeBits(bs);
-			}
-			
-			var rbs=new boolean[bs.length];
-			try(var in=new BitInputStream(new ContentInputStream.BA(buff.toByteArray()))){
-				in.readBits(rbs);
+			boolean[] bs;
+			boolean[] rbs;
+			try{
+				
+				bs=new boolean[i];
+				for(int j=0;j<bs.length;j++){
+					bs[j]=r.nextBoolean();
+				}
+				
+				var buff=new ByteArrayOutputStream();
+				try(var out=new BitOutputStream(new ContentOutputStream.Wrapp(buff))){
+					out.writeBits(bs);
+				}
+				rbs=new boolean[bs.length];
+				try(var in=new BitInputStream(new ContentInputStream.BA(buff.toByteArray()), rbs.length)){
+					in.readBits(rbs);
+				}
+			}catch(Throwable e){
+				throw new RuntimeException("failed iter "+i, e);
 			}
 			
 			Assertions.assertArrayEquals(bs, rbs, ""+i);

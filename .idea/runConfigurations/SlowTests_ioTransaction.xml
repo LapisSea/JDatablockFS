@@ -7,8 +7,8 @@
         <option name="ENABLED" value="true" />
       </pattern>
     </extension>
-    <option name="PACKAGE_NAME" value="com.lapisseqa.cfs.run" />
-    <option name="MAIN_CLASS_NAME" value="com.lapisseqa.cfs.run.SlowTests" />
+    <option name="PACKAGE_NAME" value="com.lapissea.cfs.run" />
+    <option name="MAIN_CLASS_NAME" value="com.lapissea.cfs.run.SlowTests" />
     <option name="METHOD_NAME" value="ioTransaction" />
     <option name="TEST_OBJECT" value="method" />
     <option name="WORKING_DIRECTORY" value="$MODULE_DIR$" />

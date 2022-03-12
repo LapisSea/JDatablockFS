@@ -1,4 +1,4 @@
-package com.lapisseqa.cfs.run;
+package com.lapissea.cfs.run;
 
 import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.objects.collections.IOList;

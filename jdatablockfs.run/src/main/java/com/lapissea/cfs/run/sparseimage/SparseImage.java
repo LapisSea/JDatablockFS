@@ -1,13 +1,13 @@
-package com.lapisseqa.cfs.run.sparseimage;
+package com.lapissea.cfs.run.sparseimage;
 
 import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.io.impl.MemoryData;
+import com.lapissea.cfs.run.Configuration;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
-import com.lapisseqa.cfs.run.Configuration;
 
 import java.io.File;
 import java.io.IOException;
