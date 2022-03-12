@@ -116,10 +116,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 	
 	@Override
 	public void skipRead(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		
-		var fixed=getSizeDescriptor().getFixed(WordSpace.BYTE);
-		if(fixed.isPresent()){
-			src.skip(fixed.getAsLong());
+		if(src.optionallySkipExact(getSizeDescriptor().getFixed(WordSpace.BYTE))){
 			return;
 		}
 		

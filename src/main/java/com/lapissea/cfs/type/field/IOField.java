@@ -154,7 +154,10 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		@Deprecated
 		@Override
 		public final void skipRead(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-			try(var reader=new BitInputStream(src)){
+			if(src.optionallySkipExact(getSizeDescriptor().getFixed(WordSpace.BYTE))){
+				return;
+			}
+			
 			try(var reader=new BitInputStream(src, -1)){
 				skipReadBits(reader, instance);
 				if(DEBUG_VALIDATION){

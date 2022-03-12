@@ -9,6 +9,8 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Objects;
+import java.util.OptionalInt;
+import java.util.OptionalLong;
 
 @SuppressWarnings({"PointlessArithmeticExpression", "PointlessBitwiseExpression", "unused", "UnusedReturnValue"})
 public interface ContentReader extends AutoCloseable, ContentBuff{
@@ -54,6 +56,21 @@ public interface ContentReader extends AutoCloseable, ContentBuff{
 	
 	default void skipExact(NumberSize toSkip) throws IOException{
 		skipExact(toSkip.bytes);
+	}
+	
+	default boolean optionallySkipExact(OptionalLong toSkip) throws IOException{
+		if(toSkip.isPresent()){
+			skipExact(toSkip.getAsLong());
+			return true;
+		}
+		return false;
+	}
+	default boolean optionallySkipExact(OptionalInt toSkip) throws IOException{
+		if(toSkip.isPresent()){
+			skipExact(toSkip.getAsInt());
+			return true;
+		}
+		return false;
 	}
 	
 	default void skipExact(long toSkip) throws IOException{

@@ -358,10 +358,10 @@ class DrawUtils{
 						long cRem     =Math.min(remaining, cursor.getSize()-cursorOff);
 						if(cRem==0){
 							if(io.remaining()==0) return null;
-							io.skip(cursor.getCapacity()-cursor.getSize());
+							io.skipExact(cursor.getCapacity()-cursor.getSize());
 							continue;
 						}
-						io.skip(cRem);
+						io.skipExact(cRem);
 						remaining-=cRem;
 						var start=cursor.dataStart()+cursorOff;
 						return new Range(start, start+cRem);

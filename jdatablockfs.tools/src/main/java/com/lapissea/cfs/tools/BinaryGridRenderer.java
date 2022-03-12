@@ -237,7 +237,7 @@ public class BinaryGridRenderer{
 					doSegment.accept(bitRect);
 					remaining-=Math.min(8, remaining);
 					bitOff=0;
-					io.skip(1);
+					io.skipExact(1);
 				}
 			}
 		}

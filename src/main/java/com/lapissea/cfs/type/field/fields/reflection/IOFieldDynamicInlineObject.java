@@ -196,10 +196,8 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		return inst;
 	}
 	private void skipReadStruct(DataProvider provider, ContentReader src, GenericContext genericContext, Struct<?> struct) throws IOException{
-		var pipe =ContiguousStructPipe.of(struct);
-		var fixed=pipe.getSizeDescriptor().getFixed(WordSpace.BYTE);
-		if(fixed.isPresent()){
-			src.skip(fixed.getAsLong());
+		var pipe=ContiguousStructPipe.of(struct);
+		if(src.optionallySkipExact(pipe.getSizeDescriptor().getFixed(WordSpace.BYTE))){
 			return;
 		}
 		pipe.readNew(provider, src, genericContext);
