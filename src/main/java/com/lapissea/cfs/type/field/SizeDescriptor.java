@@ -70,6 +70,36 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 			//throw new ShouldNeverHappenError("Do not calculate unknown, use getFixed when it is provided");
 		}
 		
+		private long sizedVal(WordSpace wordSpace){
+			return WordSpace.mapSize(this.wordSpace, wordSpace, size);
+		}
+		
+		@Override
+		public long requireFixed(WordSpace wordSpace){
+			return sizedVal(wordSpace);
+		}
+		
+		@Override
+		public long requireMax(WordSpace wordSpace){
+			return sizedVal(wordSpace);
+		}
+		@Override
+		public long fixedOrMin(WordSpace wordSpace){
+			return sizedVal(wordSpace);
+		}
+		@Override
+		public OptionalLong fixedOrMax(WordSpace wordSpace){
+			return OptionalLong.of(sizedVal(wordSpace));
+		}
+		@Override
+		public boolean hasFixed(){
+			return true;
+		}
+		@Override
+		public boolean hasMax(){
+			return true;
+		}
+		
 		public long get(WordSpace wordSpace){return mapSize(wordSpace, get());}
 		public long get()                   {return size;}
 		@Override

@@ -54,7 +54,7 @@ public interface BitWriter<SELF extends BitWriter<SELF>>{
 		for(int start=0;start<n;start+=maxBatch){
 			var batchSize=Math.min(n-start, maxBatch);
 			
-			writeBits((1L<<batchSize)-1L, batchSize);
+			writeBits(BitUtils.makeMask(batchSize), batchSize);
 		}
 		return self();
 	}
