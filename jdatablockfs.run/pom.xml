@@ -13,6 +13,8 @@
 		<cfsVersion>1.0-SNAPSHOT</cfsVersion>
 
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+		<jmh.version>1.34</jmh.version>
 	</properties>
 	<groupId>com.github.lapissea</groupId>
 	<artifactId>jdatablockfs.run</artifactId>
@@ -24,13 +26,6 @@
 			<artifactId>jdatablockfs.tools</artifactId>
 			<version>${cfsVersion}</version>
 		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-jemalloc</artifactId>
-			<version>3.3.0-SNAPSHOT</version>
-			<scope>test</scope>
-		</dependency>
-
 
 		<dependency>
 			<groupId>org.junit.jupiter</groupId>
@@ -62,6 +57,17 @@
 			<version>2.8.2</version>
 		</dependency>
 
+
+		<dependency>
+			<groupId>org.openjdk.jmh</groupId>
+			<artifactId>jmh-core</artifactId>
+			<version>${jmh.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.openjdk.jmh</groupId>
+			<artifactId>jmh-generator-annprocess</artifactId>
+			<version>${jmh.version}</version>
+		</dependency>
 	</dependencies>
 
 	<build>
