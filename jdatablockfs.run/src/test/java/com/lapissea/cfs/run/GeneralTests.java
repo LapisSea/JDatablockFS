@@ -1,5 +1,6 @@
 package com.lapissea.cfs.run;
 
+import com.lapissea.cfs.SyntheticParameterizedType;
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.Cluster;
@@ -31,6 +32,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
+import java.lang.reflect.Type;
 import java.util.Arrays;
 import java.util.Random;
 import java.util.stream.Collectors;
@@ -164,10 +166,16 @@ public class GeneralTests{
 	@MethodSource({"genericObjects"})
 	<T extends IOInstance<T>> void genericStorage(T obj, TestInfo info) throws IOException{
 		TestUtils.testCluster(info, ses->{
-			IOList<Object> ls=ses.getRootProvider().request(TypeLink.of(LinkedIOList.class, Object.class), new ObjectID("list"));
+			IOList<GenericContainer<?>> ls=ses.getRootProvider().request(
+				TypeLink.of(LinkedIOList.class,
+				            new SyntheticParameterizedType(GenericContainer.class,
+				                                           (Type)Object.class)
+				), new ObjectID("list"));
+			
+			var c=new GenericContainer<>(obj);
 			ls.clear();
-			ls.add(obj);
-			var read=ls.get(0);
+			ls.add(c);
+			var read=ls.get(0).value;
 			assertEquals(obj, read);
 		});
 	}
