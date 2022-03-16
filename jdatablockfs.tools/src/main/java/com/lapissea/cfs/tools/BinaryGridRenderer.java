@@ -627,7 +627,7 @@ public class BinaryGridRenderer{
 			if(cluster!=null){
 				DataProvider provider=cluster;
 				var          cl      =cluster;
-				var          root    =cluster.getRoot();
+				var          root    =cluster.rootWalker().getRoot();
 				
 				Throwable e1    =null;
 				var       annCtx=new AnnotateCtx(ctx, provider, new LinkedList<>(), ptrs::add, new ArrayList<>(), new ArrayList<>());

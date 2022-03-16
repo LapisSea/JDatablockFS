@@ -32,6 +32,8 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
+import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NOT_NULL;
 
 public class Struct<T extends IOInstance<T>>{
 	
@@ -312,6 +314,7 @@ public class Struct<T extends IOInstance<T>>{
 	
 	private Supplier<T> emptyConstructor;
 	
+	private Boolean invalidInitialNulls;
 	
 	public Struct(Class<T> type){
 		this.type=type;
@@ -397,6 +400,22 @@ public class Struct<T extends IOInstance<T>>{
 	public Supplier<T> requireEmptyConstructor(){
 		if(emptyConstructor==null) emptyConstructor=Access.findConstructor(getType(), Supplier.class);
 		return emptyConstructor;
+	}
+	
+	public boolean hasInvalidInitialNulls(){
+		if(invalidInitialNulls==null){
+			boolean inv=false;
+			if(fields.unpackedStream().anyMatch(f->f.getNullability()==NOT_NULL)){
+				var obj =requireEmptyConstructor().get();
+				var pool=allocVirtualVarPool(IO);
+				inv=fields.unpackedStream()
+				          .filter(f->f.getNullability()==NOT_NULL)
+				          .anyMatch(f->f.isNull(pool, obj));
+			}
+			invalidInitialNulls=inv;
+			return inv;
+		}
+		return invalidInitialNulls;
 	}
 	
 	@Nullable

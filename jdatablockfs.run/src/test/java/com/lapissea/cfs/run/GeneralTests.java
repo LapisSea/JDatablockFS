@@ -8,6 +8,7 @@ import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
+import com.lapissea.cfs.objects.ObjectID;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.objects.collections.ContiguousIOList;
 import com.lapissea.cfs.objects.collections.HashIOMap;
@@ -161,11 +162,12 @@ public class GeneralTests{
 	
 	@ParameterizedTest
 	@MethodSource({"genericObjects"})
-	void genericStorage(IOInstance<?> obj, TestInfo info) throws IOException{
+	<T extends IOInstance<T>> void genericStorage(T obj, TestInfo info) throws IOException{
 		TestUtils.testCluster(info, ses->{
-			ses.getTemp().put(0, obj);
-			
-			var read=ses.getTemp().get(0);
+			IOList<Object> ls=ses.getRootProvider().request(TypeLink.of(LinkedIOList.class, Object.class), new ObjectID("list"));
+			ls.clear();
+			ls.add(obj);
+			var read=ls.get(0);
 			assertEquals(obj, read);
 		});
 	}

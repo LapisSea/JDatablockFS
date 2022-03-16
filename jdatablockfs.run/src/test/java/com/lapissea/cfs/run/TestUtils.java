@@ -5,6 +5,7 @@ import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
+import com.lapissea.cfs.objects.ObjectID;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.tools.logging.DataLogger;
@@ -100,7 +101,7 @@ public class TestUtils{
 			}
 			
 			if(provider instanceof Cluster c){
-				c.getTemp().put("test_obj", obj);
+				c.getRootProvider().provide(obj, new ObjectID("test_obj"));
 			}
 			
 			session.accept(obj);

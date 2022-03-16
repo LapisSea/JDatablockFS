@@ -5,7 +5,6 @@ import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Reference;
-import com.lapissea.cfs.objects.collections.HashIOMap;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.MemoryWalker;
 import com.lapissea.cfs.type.field.IOField;
@@ -36,27 +35,7 @@ public class DefragmentManager{
 		
 		scanFreeChunks(parent);
 		
-		reorder(parent);
-		
 		mergeChains(parent);
-	}
-	
-	private void reorder(final Cluster cluster) throws IOException{
-		reallocateUnmanaged(cluster, (HashIOMap<?, ?>)cluster.getTemp());
-		
-		new MemoryWalker((HashIOMap<?, ?>)cluster.getTemp()).walk(new MemoryWalker.PointerRecord(){
-			@Override
-			public <T extends IOInstance<T>> MemoryWalker.IterationOptions log(StructPipe<T> pipe, Reference instanceReference, IOField.Ref<T, ?> field, T instance, Reference value) throws IOException{
-				if(instance instanceof IOInstance.Unmanaged u){
-					reallocateUnmanaged(cluster, u);
-				}
-				return MemoryWalker.IterationOptions.CONTINUE_NO_SAVE;
-			}
-			@Override
-			public <T extends IOInstance<T>> MemoryWalker.IterationOptions logChunkPointer(StructPipe<T> pipe, Reference instanceReference, IOField<T, ChunkPointer> field, T instance, ChunkPointer value) throws IOException{
-				return MemoryWalker.IterationOptions.CONTINUE_NO_SAVE;
-			}
-		});
 	}
 	
 	private void mergeChains(Cluster cluster) throws IOException{

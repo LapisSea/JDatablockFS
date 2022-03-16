@@ -3,7 +3,10 @@ package com.lapissea.cfs.run;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.objects.NumberSize;
+import com.lapissea.cfs.objects.ObjectID;
+import com.lapissea.cfs.objects.collections.HashIOMap;
 import com.lapissea.cfs.objects.collections.IOMap;
+import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.util.LogUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -97,7 +100,7 @@ public class SlowTests{
 	@Test
 	void bigMap(TestInfo info) throws IOException{
 		TestUtils.testCluster(info, provider->{
-			IOMap<Object, Object> map=provider.getTemp();
+			IOMap<Object, Object> map=provider.getRootProvider().request(TypeLink.of(HashIOMap.class, Object.class, Object.class), new ObjectID("map"));
 			
 			var splitter=Splitter.map(map, new ReferenceMemoryIOMap<>(), TestUtils::checkCompliance);
 			

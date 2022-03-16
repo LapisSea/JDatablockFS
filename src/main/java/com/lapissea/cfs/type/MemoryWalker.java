@@ -323,5 +323,7 @@ public class MemoryWalker{
 		return instStr;
 	}
 	
-	
+	public IOInstance getRoot(){
+		return root;
+	}
 }
