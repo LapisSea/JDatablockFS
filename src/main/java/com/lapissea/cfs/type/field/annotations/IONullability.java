@@ -12,11 +12,68 @@ import com.lapissea.util.UtilL;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
 
 @Retention(RetentionPolicy.RUNTIME)
 public @interface IONullability{
+	
+	@interface Elements{
+		
+		
+		AnnotationLogic<Elements> LOGIC=new AnnotationLogic<>(){
+			@Override
+			public void validate(FieldAccessor<?> field, Elements annotation){
+				var typ=field.getType();
+				if(!typ.isArray()) throw new MalformedStructLayout(Elements.class.getName()+" can be used only on arrays");
+				if(UtilL.instanceOf(typ.componentType(), IOInstance.class)){
+					throw new MalformedStructLayout(Elements.class.getName()+" array must be of "+IOInstance.class.getName()+" type");
+				}
+			}
+			
+			@NotNull
+			@Override
+			public <T extends IOInstance<T>> List<VirtualFieldDefinition<T, ?>> injectPerInstanceValue(FieldAccessor<T> field, Elements annotation){
+				if(annotation.value()!=Mode.NULLABLE) return List.of();
+				
+				return List.of(new VirtualFieldDefinition<T, boolean[]>(
+					VirtualFieldDefinition.StoragePool.IO,
+					IOFieldTools.makeNullElementsFlagName(field),
+					boolean[].class,
+					(ioPool, instance, dependencies, value)->{
+						if(value!=null) return value;
+						
+						var instances=(IOInstance<?>[])field.get(ioPool, instance);
+						if(instances==null) return null;
+						
+						var noNulls=true;
+						var gen    =new boolean[instances.length];
+						for(int i=0;i<instances.length;i++){
+							var nl=instances[i]==null;
+							if(nl) noNulls=false;
+							gen[i]=nl;
+						}
+						if(noNulls) return null;
+						return gen;
+					},
+					List.of(IOFieldTools.makeAnnotation(IONullability.class, Map.of("value", field.getAnnotation(IONullability.class).map(IONullability::value).orElse(Mode.NOT_NULL))))
+				));
+			}
+			
+			@NotNull
+			@Override
+			public Set<String> getDependencyValueNames(FieldAccessor<?> field, Elements annotation){
+				if(annotation.value()!=Mode.NULLABLE) return Set.of();
+				
+				return Set.of(IOFieldTools.makeNullElementsFlagName(field));
+			}
+			
+			
+		};
+		
+		Mode value() default Mode.NOT_NULL;
+	}
 	
 	AnnotationLogic<IONullability> LOGIC=new AnnotationLogic<>(){
 		@Override

@@ -142,6 +142,9 @@ public class IOFieldTools{
 	public static <T extends IOInstance<T>> String makeNullFlagName(FieldAccessor<T> field){
 		return field.getName()+GENERATED_FIELD_SEPARATOR+"isNull";
 	}
+	public static <T extends IOInstance<T>> String makeNullElementsFlagName(FieldAccessor<T> field){
+		return field.getName()+GENERATED_FIELD_SEPARATOR+"areNull";
+	}
 	
 	public static IONullability.Mode getNullability(FieldAccessor<?> field){
 		return getNullability(field, NOT_NULL);
