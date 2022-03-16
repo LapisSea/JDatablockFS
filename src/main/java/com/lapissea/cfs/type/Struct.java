@@ -39,12 +39,13 @@ public class Struct<T extends IOInstance<T>>{
 	
 	public interface Pool<T extends IOInstance<T>>{
 		
-		class StructArray<T extends IOInstance<T>> implements Pool<T>{
+		class GeneralStructArray<T extends IOInstance<T>> implements Pool<T>{
 			
 			private final Struct<T>                          typ;
 			private final Object[]                           pool;
 			private final VirtualFieldDefinition.StoragePool poolType;
-			public StructArray(Struct<T> typ, VirtualFieldDefinition.StoragePool pool){
+			
+			public GeneralStructArray(Struct<T> typ, VirtualFieldDefinition.StoragePool pool){
 				this.poolType=pool;
 				this.typ=typ;
 				if(pool==VirtualFieldDefinition.StoragePool.NONE) throw new IllegalArgumentException();
@@ -420,7 +421,7 @@ public class Struct<T extends IOInstance<T>>{
 	
 	@Nullable
 	public Pool<T> allocVirtualVarPool(VirtualFieldDefinition.StoragePool pool){
-		return new Pool.StructArray<>(this, pool);
+		return new Pool.GeneralStructArray<>(this, pool);
 	}
 	
 	public GenericContext describeGenerics(TypeLink def){

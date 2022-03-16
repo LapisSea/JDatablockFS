@@ -235,4 +235,16 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 	default long mapSize(WordSpace targetSpace, long val){
 		return WordSpace.mapSize(getWordSpace(), targetSpace, val);
 	}
+	
+	default long calcAllocSize(WordSpace wordSpace){
+		var val=getFixed();
+		if(val.isEmpty()) val=getMax();
+		if(val.isEmpty()){
+			var min=getMin();
+			var siz=Math.max(min, 32);
+			return mapSize(wordSpace, siz);
+		}
+		
+		return mapSize(wordSpace, val.getAsLong());
+	}
 }

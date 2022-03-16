@@ -201,9 +201,10 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>> implements Clone
 	}
 	
 	public void allocateNulls(DataProvider provider) throws IOException{
+		var pool=getThisStruct().allocVirtualVarPool(IO);
 		//noinspection unchecked
 		for(var ref : getThisStruct().getFields().byFieldTypeIter((Class<IOField.Ref<SELF, ?>>)(Object)IOField.Ref.class)){
-			if(!ref.isNull(getThisStruct().allocVirtualVarPool(IO), self()))
+			if(!ref.isNull(pool, self()))
 				continue;
 			ref.allocate(self(), provider, getGenericContext());
 		}
