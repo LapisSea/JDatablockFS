@@ -70,6 +70,36 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 			//throw new ShouldNeverHappenError("Do not calculate unknown, use getFixed when it is provided");
 		}
 		
+		private long sizedVal(WordSpace wordSpace){
+			return WordSpace.mapSize(this.wordSpace, wordSpace, size);
+		}
+		
+		@Override
+		public long requireFixed(WordSpace wordSpace){
+			return sizedVal(wordSpace);
+		}
+		
+		@Override
+		public long requireMax(WordSpace wordSpace){
+			return sizedVal(wordSpace);
+		}
+		@Override
+		public long fixedOrMin(WordSpace wordSpace){
+			return sizedVal(wordSpace);
+		}
+		@Override
+		public OptionalLong fixedOrMax(WordSpace wordSpace){
+			return OptionalLong.of(sizedVal(wordSpace));
+		}
+		@Override
+		public boolean hasFixed(){
+			return true;
+		}
+		@Override
+		public boolean hasMax(){
+			return true;
+		}
+		
 		public long get(WordSpace wordSpace){return mapSize(wordSpace, get());}
 		public long get()                   {return size;}
 		@Override
@@ -204,5 +234,17 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 	
 	default long mapSize(WordSpace targetSpace, long val){
 		return WordSpace.mapSize(getWordSpace(), targetSpace, val);
+	}
+	
+	default long calcAllocSize(WordSpace wordSpace){
+		var val=getFixed();
+		if(val.isEmpty()) val=getMax();
+		if(val.isEmpty()){
+			var min=getMin();
+			var siz=Math.max(min, 32);
+			return mapSize(wordSpace, siz);
+		}
+		
+		return mapSize(wordSpace, val.getAsLong());
 	}
 }

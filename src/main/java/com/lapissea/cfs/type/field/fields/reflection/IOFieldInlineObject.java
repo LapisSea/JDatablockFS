@@ -58,19 +58,7 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 	
 	@Override
 	public ValueType get(Struct.Pool<CTyp> ioPool, CTyp instance){
-		ValueType value=super.get(ioPool, instance);
-		return switch(getNullability()){
-			case NOT_NULL -> requireValNN(value);
-			case NULLABLE -> value;
-			case DEFAULT_IF_NULL -> {
-				if(value==null){
-					var newVal=instancePipe.getType().requireEmptyConstructor().get();
-					set(ioPool, instance, newVal);
-					yield newVal;
-				}
-				yield value;
-			}
-		};
+		return getNullable(ioPool, instance, ()->instancePipe.getType().requireEmptyConstructor().get());
 	}
 	
 	@Override
@@ -126,9 +114,7 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 	
 	@Override
 	public void skipRead(Struct.Pool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
-		var fixed=descriptor.getFixed(WordSpace.BYTE);
-		if(fixed.isPresent()){
-			src.skipExact(fixed.getAsLong());
+		if(src.optionallySkipExact(descriptor.getFixed(WordSpace.BYTE))){
 			return;
 		}
 		

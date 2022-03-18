@@ -6,6 +6,7 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.compilation.AnnotationLogic;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.util.NotNull;
@@ -43,8 +44,8 @@ public @interface IODependency{
 				return Set.of(annotation.value());
 			}
 			@Override
-			public <T extends IOInstance<T>> Stream<IOField.UsageHint> getHints(FieldAccessor<T> field, NumSize annotation){
-				return Stream.of(new IOField.UsageHint(SIZE_DATA, annotation.value()));
+			public <T extends IOInstance<T>> Stream<IOField.UsageHintDefinition> getHints(FieldAccessor<T> field, NumSize annotation){
+				return Stream.of(new IOField.UsageHintDefinition(SIZE_DATA, annotation.value()));
 			}
 		};
 		
@@ -85,14 +86,14 @@ public @interface IODependency{
 			public static String getName(FieldAccessor<?> field, VirtualNumSize size){
 				var nam=size.name();
 				if(nam.isEmpty()){
-					return field.getName()+".siz";
+					return IOFieldTools.makeNumberSizeName(field.getName());
 				}
 				return nam;
 			}
 			
 			@Override
-			public <T extends IOInstance<T>> Stream<IOField.UsageHint> getHints(FieldAccessor<T> field, VirtualNumSize annotation){
-				return Stream.of(new IOField.UsageHint(SIZE_DATA, getName(field, annotation)));
+			public <T extends IOInstance<T>> Stream<IOField.UsageHintDefinition> getHints(FieldAccessor<T> field, VirtualNumSize annotation){
+				return Stream.of(new IOField.UsageHintDefinition(SIZE_DATA, getName(field, annotation)));
 			}
 			
 			@NotNull

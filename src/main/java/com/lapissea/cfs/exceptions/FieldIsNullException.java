@@ -6,7 +6,7 @@ public class FieldIsNullException extends NullPointerException{
 	
 	public static <T> T requireNonNull(IOField<?, ?> field, T obj){
 		if(obj==null){
-			throw new FieldIsNullException(field, field.toShortString()+" should not be null");
+			throw new FieldIsNullException(field, (field.declaringStruct()!=null?field.declaringStruct().getType().getName()+".":"")+field.toShortString()+" should not be null");
 		}
 		return obj;
 	}

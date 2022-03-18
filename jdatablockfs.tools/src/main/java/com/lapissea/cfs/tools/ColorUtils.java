@@ -36,11 +36,15 @@ public class ColorUtils{
 	
 	
 	public static Color makeCol(Random rand, int typeHash, IOField<?, ?> field){
+		return makeCol(rand, typeHash, field.getName());
+	}
+	
+	public static Color makeCol(Random rand, int typeHash, String fieldName){
 		
 		rand.setSeed(typeHash);
 		float typeHue=calcHue(rand);
 		
-		rand.setSeed(field.getName().hashCode());
+		rand.setSeed(fieldName.hashCode());
 		float fieldHue=calcHue(rand);
 		
 		float mix=0.4F;

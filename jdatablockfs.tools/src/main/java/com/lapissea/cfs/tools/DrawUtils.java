@@ -15,6 +15,7 @@ import java.util.function.LongPredicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.LongStream;
 
 class DrawUtils{
 	
@@ -137,6 +138,9 @@ class DrawUtils{
 		
 		public IntStream ints(){
 			return IntStream.range(Math.toIntExact(from), Math.toIntExact(to));
+		}
+		public LongStream longs(){
+			return LongStream.range(from, to);
 		}
 	}
 	
@@ -331,9 +335,9 @@ class DrawUtils{
 	public static void drawPixelLine(BinaryGridRenderer.RenderContext ctx, double xFrom, double yFrom, double xTo, double yTo){
 		ctx.renderer().drawLine(xFrom*ctx.pixelsPerByte(), yFrom*ctx.pixelsPerByte(), xTo*ctx.pixelsPerByte(), yTo*ctx.pixelsPerByte());
 	}
-	static IterablePP<Range> chainRangeResolve(DataProvider cluster, Reference ref, int fieldOffset, int size){
+	static IterablePP<Range> chainRangeResolve(DataProvider cluster, Reference ref, long fieldOffset, long size){
 		return IterablePP.nullTerminated(()->new Supplier<>(){
-			int remaining=size;
+			long remaining=size;
 			final ChunkChainIO io;
 			
 			{
@@ -354,10 +358,10 @@ class DrawUtils{
 						long cRem     =Math.min(remaining, cursor.getSize()-cursorOff);
 						if(cRem==0){
 							if(io.remaining()==0) return null;
-							io.skip(cursor.getCapacity()-cursor.getSize());
+							io.skipExact(cursor.getCapacity()-cursor.getSize());
 							continue;
 						}
-						io.skip(cRem);
+						io.skipExact(cRem);
 						remaining-=cRem;
 						var start=cursor.dataStart()+cursorOff;
 						return new Range(start, start+cRem);

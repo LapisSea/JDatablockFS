@@ -112,7 +112,7 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>> implements Clone
 		
 		protected void readManagedField(IOField<SELF, ?> field) throws IOException{
 			try(var io=getReference().io(this)){
-				getPipe().readSingleField(provider, io, field, self(), getGenerics());
+				getPipe().readSingleField(getPipe().makeIOPool(), provider, io, field, self(), getGenerics());
 			}
 		}
 		
@@ -201,9 +201,10 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>> implements Clone
 	}
 	
 	public void allocateNulls(DataProvider provider) throws IOException{
+		var pool=getThisStruct().allocVirtualVarPool(IO);
 		//noinspection unchecked
 		for(var ref : getThisStruct().getFields().byFieldTypeIter((Class<IOField.Ref<SELF, ?>>)(Object)IOField.Ref.class)){
-			if(!ref.isNull(getThisStruct().allocVirtualVarPool(IO), self()))
+			if(!ref.isNull(pool, self()))
 				continue;
 			ref.allocate(self(), provider, getGenericContext());
 		}
@@ -214,12 +215,19 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>> implements Clone
 		return null;
 	}
 	
+	public static boolean isInstance(TypeLink type){
+		return isInstance(type.getTypeClass(null));
+	}
+	public static boolean isInstance(Class<?> type){
+		return UtilL.instanceOf(type, IOInstance.class);
+	}
+	
 	public static boolean isManaged(TypeLink type){
 		return isManaged(type.getTypeClass(null));
 	}
 	
 	public static boolean isManaged(Class<?> type){
-		var isInstance =UtilL.instanceOf(type, IOInstance.class);
+		var isInstance =isInstance(type);
 		var isUnmanaged=UtilL.instanceOf(type, IOInstance.Unmanaged.class);
 		return isInstance&&!isUnmanaged;
 	}

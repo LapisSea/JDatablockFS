@@ -47,19 +47,7 @@ public class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends IOField.
 	
 	@Override
 	public String get(Struct.Pool<CTyp> ioPool, CTyp instance){
-		String value=super.get(ioPool, instance);
-		return switch(getNullability()){
-			case NOT_NULL -> requireValNN(value);
-			case NULLABLE -> value;
-			case DEFAULT_IF_NULL -> {
-				if(value==null){
-					var newVal="";
-					set(ioPool, instance, newVal);
-					yield newVal;
-				}
-				yield value;
-			}
-		};
+		return getNullable(ioPool, instance, ()->"");
 	}
 	
 	@Override

@@ -54,7 +54,9 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 			P created=lConstructor.apply(struct);
 			
 			if(GlobalConfig.PRINT_COMPILATION){
-				LogUtil.println(ConsoleColors.CYAN_BRIGHT+"Compiled "+struct.getType().getSimpleName()+" with "+TextUtil.toNamedPrettyJson(created, true)+ConsoleColors.RESET);
+				LogUtil.println(ConsoleColors.CYAN_BRIGHT+
+				                "Compiled "+struct.getType().getSimpleName()+" with "+TextUtil.toNamedPrettyJson(created, true)+"\n"+
+				                TextUtil.toTable(created.getSpecificFields())+ConsoleColors.RESET);
 			}
 			
 			put(struct, created);
@@ -280,12 +282,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		ContentWriter        target;
 		
 		if(dest.isDirect()){
-			var desc=getSizeDescriptor();
-			var siz=desc.getFixed(WordSpace.BYTE).orElseGet(()->{
-				var max=desc.getMax(WordSpace.BYTE);
-				var min=desc.getMin(WordSpace.BYTE);
-				return max.orElse(Math.max(min, 32));
-			});
+			var siz=getSizeDescriptor().calcAllocSize(WordSpace.BYTE);
 			destBuff=new ContentOutputBuilder((int)siz);
 			target=destBuff;
 		}else{
@@ -333,7 +330,11 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		}
 	}
 	
-	private record IODependency<T extends IOInstance<T>>(List<IOField<T, ?>> writeFields, List<IOField.ValueGeneratorInfo<T, ?>> generators){}
+	private record IODependency<T extends IOInstance<T>>(
+		List<IOField<T, ?>> writeFields,
+		List<IOField<T, ?>> readFields,
+		List<IOField.ValueGeneratorInfo<T, ?>> generators
+	){}
 	
 	private final Map<IOField<T, ?>, IODependency<T>> singleDependencyCache    =new HashMap<>();
 	private final ReadWriteLock                       singleDependencyCacheLock=new ReentrantReadWriteLock();
@@ -360,25 +361,33 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	}
 	
 	private IODependency<T> generateFieldDependency(IOField<T, ?> selectedField){
-		Set<IOField<T, ?>> selectedFieldsSet=new HashSet<>();
-		selectedFieldsSet.add(selectedField);
+		Set<IOField<T, ?>> selectedWriteFieldsSet=new HashSet<>();
+		selectedWriteFieldsSet.add(selectedField);
+		Set<IOField<T, ?>> selectedReadFieldsSet=new HashSet<>();
+		selectedReadFieldsSet.add(selectedField);
 		
 		boolean shouldRun=true;
 		while(shouldRun){
 			shouldRun=false;
 			
-			for(IOField<T, ?> field : new HashSet<>(selectedFieldsSet)){
+			for(IOField<T, ?> field : new HashSet<>(selectedWriteFieldsSet)){
 				var deps=field.getDependencies();
 				if(!deps.isEmpty()){
-					if(selectedFieldsSet.addAll(deps)) shouldRun=true;
+					if(selectedWriteFieldsSet.addAll(deps)) shouldRun=true;
 				}
 				var gens=field.getGenerators();
 				for(var gen : gens){
-					if(selectedFieldsSet.add(gen.field())) shouldRun=true;
+					if(selectedWriteFieldsSet.add(gen.field())) shouldRun=true;
+				}
+			}
+			for(IOField<T, ?> field : new HashSet<>(selectedReadFieldsSet)){
+				var deps=field.getDependencies();
+				if(!deps.isEmpty()){
+					if(selectedReadFieldsSet.addAll(deps)) shouldRun=true;
 				}
 			}
 			
-			for(IOField<T, ?> field : new HashSet<>(selectedFieldsSet)){
+			for(IOField<T, ?> field : new HashSet<>(selectedWriteFieldsSet)){
 				if(field.getSizeDescriptor().hasFixed()){
 					continue;
 				}
@@ -387,29 +396,40 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 				var index =fields.indexOf(field);
 				assert index!=-1;//TODO handle fields in fields
 				for(int i=index+1;i<fields.size();i++){
-					if(selectedFieldsSet.add(fields.get(i))) shouldRun=true;
+					if(selectedWriteFieldsSet.add(fields.get(i))) shouldRun=true;
 				}
 			}
-			
 		}
-		List<IOField<T, ?>> result=new ArrayList<>(selectedFieldsSet.size());
+		
+		var writeFields=fieldSetToOrderedList(selectedWriteFieldsSet);
+		var readFields =fieldSetToOrderedList(selectedReadFieldsSet);
+		var generators =writeFields.stream().flatMap(e->e.getGenerators().stream()).toList();
+		
+		return new IODependency<>(
+			writeFields,
+			readFields,
+			Utils.nullIfEmpty(generators)
+		);
+	}
+	
+	private List<IOField<T, ?>> fieldSetToOrderedList(Set<IOField<T, ?>> fieldsSet){
+		List<IOField<T, ?>> result=new ArrayList<>(fieldsSet.size());
 		for(IOField<T, ?> f : getSpecificFields()){
 			var iter      =f.streamUnpackedFields().iterator();
 			var anyRemoved=false;
 			while(iter.hasNext()){
 				var fi=iter.next();
-				if(selectedFieldsSet.remove(fi)) anyRemoved=true;
+				if(fieldsSet.remove(fi)) anyRemoved=true;
 			}
 			
 			if(anyRemoved){
 				result.add(f);
 			}
 		}
-		if(!selectedFieldsSet.isEmpty()){
-			throw new IllegalStateException(selectedFieldsSet+"");
+		if(!fieldsSet.isEmpty()){
+			throw new IllegalStateException(fieldsSet+"");
 		}
-		
-		return new IODependency<>(List.copyOf(result), Utils.nullIfEmpty(result.stream().flatMap(e->e.getGenerators().stream()).toList()));
+		return List.copyOf(result);
 	}
 	
 	
@@ -418,9 +438,9 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 			checkExistenceOfField(selectedField);
 		}
 		
-		var deps       =getDeps(selectedField);
-		var writeFields=deps.writeFields;
-		var ioPool     =makeIOPool();
+		var deps  =getDeps(selectedField);
+		var fields=deps.writeFields;
+		var ioPool=makeIOPool();
 		
 		if(deps.generators!=null){
 			for(var generator : deps.generators){
@@ -440,11 +460,11 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 				throw new RuntimeException("Write of "+deps+" is not currently supported!");
 			}
 			
-			if(writeFields.get(checkIndex)==field){
+			if(fields.get(checkIndex)==field){
 				checkIndex++;
 				writeFieldKnownSize(ioPool, provider, instance, field, dest.writeTicket(bytes));
 				
-				if(checkIndex==writeFields.size()){
+				if(checkIndex==fields.size()){
 					return;
 				}
 				
@@ -468,24 +488,22 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		}
 	}
 	
-	public void readSingleField(DataProvider provider, ContentReader src, IOField<T, ?> selectedField, T instance, GenericContext genericContext) throws IOException{
+	public void readSingleField(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, IOField<T, ?> selectedField, T instance, GenericContext genericContext) throws IOException{
 		if(DEBUG_VALIDATION){
 			checkExistenceOfField(selectedField);
 		}
 		
-		
-		var deps       =getDeps(selectedField);
-		var writeFields=deps.writeFields;
-		var ioPool     =makeIOPool();
-		int checkIndex =0;
+		var deps      =getDeps(selectedField);
+		var fields    =deps.readFields;
+		int checkIndex=0;
 		
 		if(DEBUG_VALIDATION){
-			for(IOField<T, ?> field : getSpecificFields()){
-				if(writeFields.get(checkIndex)==field){
+			for(IOField<T, ?> field : ioFields){
+				if(fields.get(checkIndex)==field){
 					checkIndex++;
 					readFieldSafe(ioPool, provider, src, instance, field, genericContext);
 					
-					if(checkIndex==writeFields.size()){
+					if(checkIndex==fields.size()){
 						return;
 					}
 					
@@ -496,11 +514,11 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 			}
 		}else{
 			for(IOField<T, ?> field : getSpecificFields()){
-				if(writeFields.get(checkIndex)==field){
+				if(fields.get(checkIndex)==field){
 					checkIndex++;
 					field.readReported(ioPool, provider, src, instance, genericContext);
 					
-					if(checkIndex==writeFields.size()){
+					if(checkIndex==fields.size()){
 						return;
 					}
 					

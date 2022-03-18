@@ -2,6 +2,7 @@ package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IONullability;
+import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.jorth.JorthCompiler;
 import com.lapissea.jorth.MalformedJorthException;
@@ -60,6 +61,7 @@ public class TemplateClassLoader extends ClassLoader{
 			writer.write("#TOKEN(0) IOInstance define", IOInstance.class.getName());
 			writer.write("#TOKEN(0) IOValue define", IOValue.class.getName());
 			writer.write("#TOKEN(0) IONullability define", IONullability.class.getName());
+			writer.write("#TOKEN(0) IOType.Dynamic define", IOType.Dynamic.class.getName());
 			writer.write("#TOKEN(0) IODependency define", IODependency.class.getName());
 			
 			writer.write(
@@ -76,8 +78,10 @@ public class TemplateClassLoader extends ClassLoader{
 				if(field.getNullability()!=null){
 					writer.write("{#TOKEN(0)} IONullability @", field.getNullability().toString());
 				}
+				if(field.isDynamic()){
+					writer.write("IOType.Dynamic @");
+				}
 				if(!field.getDependencies().isEmpty()){
-					LogUtil.println(field.getDependencies());
 					writer.write("{#RAW(0)} IODependency @", field.getDependencies().stream().collect(Collectors.joining(" ", "[", "]")));
 				}
 				

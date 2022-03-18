@@ -3,6 +3,7 @@ package com.lapissea.cfs.tools;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.MemFrame;
 import com.lapissea.cfs.tools.render.RenderBackend;
+import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.util.*;
 import com.lapissea.vec.Vec2iFinal;
 import com.lapissea.vec.interf.IVec2iR;
@@ -10,9 +11,8 @@ import imgui.ImGui;
 import imgui.ImVec2;
 import imgui.flag.ImGuiConfigFlags;
 
-import java.util.EnumSet;
-import java.util.LinkedList;
-import java.util.Optional;
+import java.awt.Color;
+import java.util.*;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -38,7 +38,8 @@ public class DisplayManager implements DataLogger{
 	
 	private boolean destroyRequested=false;
 	
-	private final RenderBackend renderer;
+	private final RenderBackend          renderer;
+	private final RenderBackend.Buffered gridBuff;
 	
 	private final SessionHost        sessionHost=new SessionHost();
 	private final BinaryGridRenderer gridRenderer;
@@ -46,14 +47,17 @@ public class DisplayManager implements DataLogger{
 	public DisplayManager(){
 		
 		renderer=createBackend();
+		gridBuff=renderer.buffer();
 		
-		gridRenderer=new BinaryGridRenderer(renderer);
+		gridRenderer=new BinaryGridRenderer(gridBuff);
+		
 		Runnable updateTitle=()->{
 			var f=sessionHost.activeFrame.get();
 			renderer.getDisplay().setTitle(
 				"Binary display - frame: "+(f==-1?"NaN":f)+
 				sessionHost.activeSession.get().map(s->" - Session: "+s.getName()).orElse("")
 			);
+			gridRenderer.markDirty();
 			renderer.markFrameDirty();
 		};
 		sessionHost.activeFrame.register(i->updateTitle.run());
@@ -96,11 +100,11 @@ public class DisplayManager implements DataLogger{
 		display.registerMouseScroll(delta->{
 			
 			new Thread(()->{
-				int     steps =5;
+				int     steps =10;
 				float[] deltas=new float[steps];
 				for(int i=0;i<deltas.length;i++){
 					var val=steps-i;
-					deltas[i]=val*val;
+					deltas[i]=(float)Math.pow(val, 3);
 				}
 				
 				float sum=0;
@@ -108,25 +112,25 @@ public class DisplayManager implements DataLogger{
 					sum+=v;
 				}
 				for(int i=0;i<deltas.length;i++){
-					deltas[i]/=sum*2;
+					deltas[i]/=sum;
 					deltas[i]*=delta;
 				}
 				
-				for(int i=0;i<deltas.length;i++){
-					ImGui.getIO().setMouseWheel(ImGui.getIO().getMouseWheel()+deltas[i]);
+				for(float v : deltas){
+					ImGui.getIO().setMouseWheel(ImGui.getIO().getMouseWheel()+v);
 					renderer.markFrameDirty();
 					UtilL.sleep(16);
 				}
 			}).start();
 			
-			ImGui.getIO().setMouseWheel(delta);
 			if(ImGui.getIO().getWantCaptureMouse()){
 				renderer.markFrameDirty();
 				return;
 			}
 			
-			gridRenderer.displayedSession.ifPresent(ses->{
+			gridRenderer.getDisplayedSession().ifPresent(ses->{
 				ses.setFrame(Math.max(0, gridRenderer.getFramePos()-delta));
+				gridRenderer.markDirty();
 			});
 		});
 		
@@ -136,16 +140,18 @@ public class DisplayManager implements DataLogger{
 			if(!display.isMouseKeyDown(RenderBackend.DisplayInterface.MouseKey.LEFT)) return;
 			if(ImGui.getIO().getWantCaptureMouse()) return;
 			
-			gridRenderer.displayedSession.ifPresent(ses->{
+			gridRenderer.getDisplayedSession().ifPresent(ses->{
 				float percent=MathUtil.snap((display.getMouseX()-10F)/(display.getWidth()-20F), 0, 1);
 				ses.setFrame(Math.round((ses.frames.size()-1)*percent));
+				gridRenderer.markDirty();
 			});
 		});
 		
 		display.registerDisplayResize(()->{
 			sessionHost.cleanUpSessions();
-			ifFrame(frame->gridRenderer.calcSize(frame.bytes().length, true));
+			ifFrame(frame->gridRenderer.calcSize(display, frame.bytes().length, true));
 			renderer.markFrameDirty();
+			gridRenderer.markDirty();
 			renderer.runLater(()->{
 				if(renderer.notifyDirtyFrame()){
 					doRender();
@@ -155,7 +161,7 @@ public class DisplayManager implements DataLogger{
 		
 		display.registerKeyboardButton(e->{
 			sessionHost.cleanUpSessions();
-			if(e.type()!=DOWN&&gridRenderer.displayedSession.isPresent()){
+			if(e.type()!=DOWN&&gridRenderer.getDisplayedSession().isPresent()){
 				switch(e.key()){
 					case GLFW_KEY_UP -> {
 						sessionHost.nextSession();
@@ -173,7 +179,8 @@ public class DisplayManager implements DataLogger{
 			else if(e.key()==GLFW_KEY_RIGHT||e.key()==GLFW_KEY_D) delta=1;
 			else return;
 			if(e.type()==UP) return;
-			gridRenderer.displayedSession.ifPresent(ses->ses.setFrame(gridRenderer.getFramePos()+delta));
+			gridRenderer.markDirty();
+			gridRenderer.getDisplayedSession().ifPresent(ses->ses.setFrame(gridRenderer.getFramePos()+delta));
 		});
 		
 		try{
@@ -201,21 +208,21 @@ public class DisplayManager implements DataLogger{
 						}
 					}
 					
-					if(!gridRenderer.displayedSession.equals(activeSession)){
-						gridRenderer.displayedSession=activeSession;
-						ifFrame(frame->gridRenderer.calcSize(frame.bytes().length, true));
+					if(!gridRenderer.getDisplayedSession().equals(activeSession)){
+						gridRenderer.setDisplayedSession(activeSession);
+						ifFrame(frame->gridRenderer.calcSize(display, frame.bytes().length, true));
 					}
 					if(destroyRequested){
 						destroyRequested=false;
 						display.requestClose();
 					}
-					long tim=System.currentTimeMillis();
-					if(tim-lastFrameTime>1000){
-						lastFrameTime=tim;
-						renderer.markFrameDirty();
-					}
+//					long tim=System.currentTimeMillis();
+//					if(tim-lastFrameTime>1000){
+//						lastFrameTime=tim;
+//						renderer.markFrameDirty();
+//					}
 					
-					if(renderer.notifyDirtyFrame()){
+					if(renderer.notifyDirtyFrame()||gridRenderer.isDirty()){
 						doRender();
 					}else UtilL.sleep(16);
 					if(jitWarmup>=150) UtilL.sleep(0, 1000);
@@ -231,25 +238,23 @@ public class DisplayManager implements DataLogger{
 	
 	private final NanoTimer timer=LOG_FRAME_TIME?new NanoTimer():null;
 	
+	private List<BinaryGridRenderer.HoverMessage> hover=List.of();
+	
 	private void doRender(){
 		updateImgui();
-		ImGui.newFrame();
-		drawImgui();
-		ImGui.render();
 		
 		renderer.preRender();
 		
-		if(LOG_FRAME_TIME){
-			timer.end();
+		if(!ImGui.getIO().getWantCaptureMouse()||gridRenderer.isDirty()){
+			gridBuff.clear();
+			hover=gridRenderer.render();
 		}
 		
-		gridRenderer.render();
+		gridBuff.draw();
 		
-		if(LOG_FRAME_TIME){
-			timer.start();
-			
-			LogUtil.println(timer.msAvrg100());
-		}
+		ImGui.newFrame();
+		drawImgui();
+		ImGui.render();
 		
 		renderer.postRender();
 		
@@ -284,7 +289,7 @@ public class DisplayManager implements DataLogger{
 			
 			ImGui.end();
 		});
-		gridRenderer.displayedSession.map(s->s.frames).ifPresent(frames->{
+		gridRenderer.getDisplayedSession().map(s->s.frames).ifPresent(frames->{
 			if(frames.isEmpty()) return;
 			SessionHost.ParsedFrame f;
 			try{
@@ -312,6 +317,50 @@ public class DisplayManager implements DataLogger{
 			
 			ImGui.end();
 		});
+		
+		
+		if(!hover.isEmpty()){
+			ImGui.begin("Hover data:");
+			for(var msg : hover){
+				for(Object object : msg.data()){
+					ImGui.sameLine();
+					if(object instanceof String str){
+						var col=msg.color();
+						if(col==null) col=new Color(200, 255, 200);
+						ImGui.textColored(col.getRed(), col.getGreen(), col.getBlue(), 255, str);
+					}else{
+						switch(object){
+							case IOInstance inst -> {
+								var str=inst.getThisStruct().instanceToString(null, inst, false, "{\n\t", "\n}", ": ", ",\n\t");
+								
+								if(str==null) str="";
+								var col=msg.color();
+								if(col==null) col=new Color(100, 100, 255);
+								ImGui.textColored(col.getRed(), col.getGreen(), col.getBlue(), 255, str);
+							}
+							case BinaryGridRenderer.FieldVal inst -> {
+								var str=inst.field().instanceToString(inst.ioPool(), inst.instance(), false, "{\n\t", "\n}", ": ", ",\n\t");
+								
+								if(str==null) str="";
+								var col=msg.color();
+								if(col==null) col=new Color(100, 255, 100);
+								ImGui.textColored(col.getRed(), col.getGreen(), col.getBlue(), 255, str);
+							}
+							default -> {
+								var str=Objects.toString(object);
+								
+								if(str==null) str="";
+								var col=msg.color();
+								if(col==null) col=Color.WHITE;
+								ImGui.textColored(col.getRed(), col.getGreen(), col.getBlue(), 255, str);
+							}
+						}
+					}
+				}
+				ImGui.separator();
+			}
+			ImGui.end();
+		}
 		
 		lastSiz=new Vec2iFinal(renderer.getDisplay().getWidth(), renderer.getDisplay().getHeight());
 	}
@@ -525,7 +574,7 @@ public class DisplayManager implements DataLogger{
 	}
 	
 	private void ifFrame(Consumer<MemFrame> o){
-		gridRenderer.displayedSession.map(s->s.frames).ifPresent(frames->{
+		gridRenderer.getDisplayedSession().map(s->s.frames).ifPresent(frames->{
 			if(frames.isEmpty()) return;
 			try{
 				o.accept(frames.get(gridRenderer.getFramePos()).memData());
@@ -542,7 +591,7 @@ public class DisplayManager implements DataLogger{
 	public void destroy(){
 		destroyRequested=true;
 		sessionHost.destroy();
-		gridRenderer.displayedSession=Optional.empty();
+		gridRenderer.setDisplayedSession(Optional.empty());
 		renderer.markFrameDirty();
 	}
 }

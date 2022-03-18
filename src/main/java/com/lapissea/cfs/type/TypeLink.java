@@ -2,16 +2,14 @@ package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.SyntheticParameterizedType;
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
-import com.lapissea.util.LogUtil;
+import com.lapissea.util.NotImplementedException;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.WildcardType;
-import java.util.Arrays;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -62,6 +60,25 @@ public final class TypeLink extends IOInstance<TypeLink>{
 	
 	private static final TypeLink[] NO_ARGS=new TypeLink[0];
 	
+	private static Type readType(Iterator<Class<?>> iter){
+		var cls=iter.next();
+		
+		var parms=cls.getTypeParameters();
+		if(parms.length==0){
+			return cls;
+		}
+		
+		var args=new Type[parms.length];
+		for(int i=0;i<parms.length;i++){
+			args[i]=readType(iter);
+		}
+		return new SyntheticParameterizedType(cls, args);
+	}
+	
+	public static TypeLink ofFlat(Class<?>... args){
+		return of(readType(Arrays.asList(args).iterator()));
+	}
+	
 	public static TypeLink of(Class<?> raw, Type... args){
 		return of(new SyntheticParameterizedType(raw, args));
 	}
@@ -71,15 +88,21 @@ public final class TypeLink extends IOInstance<TypeLink>{
 		var cleanGenericType=Utils.prottectFromVarType(genericType);
 		
 		if(cleanGenericType instanceof WildcardType wild){
-			LogUtil.println(wild.getLowerBounds());
-			LogUtil.println(wild.getUpperBounds());
+			if(wild.getLowerBounds().length==0){
+				var up=wild.getUpperBounds();
+				if(up.length==1&&up[0]==Object.class){
+					return null;
+				}
+				throw new NotImplementedException(wild.toString());
+			}
 		}
 		
 		if(cleanGenericType instanceof ParameterizedType parm){
-			var args=parm.getActualTypeArguments();
+			var args    =parm.getActualTypeArguments();
+			var genLinks=Arrays.stream(args).filter(arg->!arg.equals(genericType)).map(TypeLink::of).toArray(TypeLink[]::new);
 			return new TypeLink(
 				(Class<?>)parm.getRawType(),
-				Arrays.stream(args).filter(arg->!arg.equals(genericType)).map(TypeLink::of).toArray(TypeLink[]::new)
+				genLinks
 			);
 		}
 		return new TypeLink((Class<?>)cleanGenericType, NO_ARGS);
@@ -90,6 +113,7 @@ public final class TypeLink extends IOInstance<TypeLink>{
 	@IOValue
 	private String     typeName="";
 	@IOValue
+	@IONullability.Elements(IONullability.Mode.NULLABLE)
 	private TypeLink[] args    =new TypeLink[0];
 	
 	private Type generic;
@@ -152,7 +176,7 @@ public final class TypeLink extends IOInstance<TypeLink>{
 	public String toString(){
 		String argStr;
 		if(args.length==0) argStr="";
-		else argStr=Arrays.stream(args).map(TypeLink::toString).collect(Collectors.joining(", ", "<", ">"));
+		else argStr=Arrays.stream(args).map(Objects::toString).collect(Collectors.joining(", ", "<", ">"));
 		
 		return getTypeName()+argStr;
 	}
@@ -160,7 +184,7 @@ public final class TypeLink extends IOInstance<TypeLink>{
 	public String toShortString(){
 		String argStr;
 		if(args.length==0) argStr="";
-		else argStr=Arrays.stream(args).map(TypeLink::toShortString).collect(Collectors.joining(", ", "<", ">"));
+		else argStr=Arrays.stream(args).map(t->t==null?"null":t.toShortString()).collect(Collectors.joining(", ", "<", ">"));
 		
 		String nam=shortTypeString();
 		return nam+argStr;

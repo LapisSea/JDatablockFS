@@ -292,10 +292,9 @@ public class AtlasFont extends DrawFont{
 	}
 	
 	@Override
-	public Bounds getStringBounds(String string){
+	public Bounds getStringBounds(String string, float fontScale){
 		float width=calcWidth(string);
-		var   s    =renderer.getFontScale();
-		return new Bounds(width*s, s);
+		return new Bounds(width*fontScale, fontScale);
 	}
 	
 	private float calcWidth(String string){

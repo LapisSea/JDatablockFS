@@ -30,6 +30,7 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.NONE;
@@ -44,7 +45,7 @@ public class FieldCompiler{
 		return new FieldCompiler();
 	}
 	
-	private static record AnnotatedField<T extends IOInstance<T>>(
+	private record AnnotatedField<T extends IOInstance<T>>(
 		IOField<T, ?> field,
 		List<LogicalAnnotation<Annotation>> annotations
 	) implements Comparable<AnnotatedField<T>>{
@@ -57,7 +58,7 @@ public class FieldCompiler{
 	protected FieldCompiler(){
 	}
 	
-	public <T extends IOInstance.Unmanaged<T>> FieldSet<T> compileStaticUnmanaged(Struct.Unmanaged<T> struct){
+	public <T extends IOInstance.Unmanaged<T>> FieldSet<T> compileStaticUnmanaged(Struct.Unmanaged<T> struct){//TODO: implement static unmanaged fields
 		var type=struct.getType();
 		return FieldSet.of();
 	}
@@ -81,12 +82,12 @@ public class FieldCompiler{
 			                         .flatMap(f->f.annotations.stream()
 			                                                  .flatMap(an->an.logic.getHints(f.field.getAccessor(), an.annotation)
 			                                                                       .map(h->h.target()==null?
-			                                                                               new IOField.UsageHint(h.type(), f.field.getName()):
+			                                                                               new IOField.UsageHintDefinition(h.type(), f.field.getName()):
 			                                                                               h)
 			                                                  )
 			                         )
 			                         .filter(t->t.target().equals(field.getName()))
-			                         .map(IOField.UsageHint::type)
+			                         .map(IOField.UsageHintDefinition::type)
 			);
 		}
 		
@@ -117,6 +118,13 @@ public class FieldCompiler{
 	
 	private <T extends IOInstance<T>> void validate(List<AnnotatedField<T>> parsed){
 		for(var pair : parsed){
+			var nam=pair.field.getName();
+			var err=IntStream.of('.', '/', '\\', ' ')
+			                 .filter(c->nam.indexOf((char)c)!=-1)
+			                 .mapToObj(c->"Character "+((char)c)+" is not allowed in field name \""+nam+"\"! ")
+			                 .findAny();
+			if(err.isPresent()) throw new MalformedStructLayout(err.get());
+			
 			var field=pair.field.getAccessor();
 			pair.annotations.forEach(ann->ann.logic().validate(field, ann.annotation()));
 		}
@@ -203,7 +211,7 @@ public class FieldCompiler{
 				
 				Function<String, Optional<Method>> getMethod=prefix->scanMethod(cl, m->checkMethod(fieldName, prefix, m));
 				
-				var getter=getMethod.apply(getPrefix(field));
+				var getter=calcGetPrefixes(field).map(getMethod).filter(Optional::isPresent).map(Optional::get).findAny();
 				var setter=getMethod.apply("set");
 				
 				getter.ifPresent(usedFields::add);
@@ -277,10 +285,11 @@ public class FieldCompiler{
 		).sorted();
 	}
 	
-	private String getPrefix(Field field){
+	private Stream<String> calcGetPrefixes(Field field){
 		var typ   =field.getType();
 		var isBool=typ==boolean.class||typ==Boolean.class;
-		return isBool?"is":"get";
+		if(isBool) return Stream.of("is", "get");
+		return Stream.of("get");
 	}
 	private String getPrefix(Method method){
 		var typ   =method.getReturnType();
@@ -415,6 +424,12 @@ public class FieldCompiler{
 			@Override
 			public <T extends IOInstance<T>> IOField<T, byte[]> create(FieldAccessor<T> field, GenericContext genericContext){
 				return new IOFieldByteArray<>(field);
+			}
+		});
+		REGISTRY.register(new RegistryNode.InstanceOf<>(boolean[].class){
+			@Override
+			public <T extends IOInstance<T>> IOField<T, boolean[]> create(FieldAccessor<T> field, GenericContext genericContext){
+				return new IOFieldBooleanArray<>(field);
 			}
 		});
 		REGISTRY.register(new RegistryNode.InstanceOf<>(float[].class){

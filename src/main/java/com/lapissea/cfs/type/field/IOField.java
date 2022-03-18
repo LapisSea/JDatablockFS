@@ -19,10 +19,13 @@ import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.util.*;
 
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.util.*;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 
 public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	
@@ -35,7 +38,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		SIZE_DATA
 	}
 	
-	public record UsageHint(UsageHintType type, String target){}
+	public record UsageHintDefinition(UsageHintType type, String target){}
 	
 	
 	public static class NoIO<Inst extends IOInstance<Inst>, ValueType> extends IOField<Inst, ValueType>{
@@ -140,7 +143,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		@Deprecated
 		@Override
 		public final void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-			try(var reader=new BitInputStream(src)){
+			try(var reader=new BitInputStream(src, getSizeDescriptor().getFixed(WordSpace.BIT).orElse(-1))){
 				readBits(ioPool, reader, instance);
 				if(DEBUG_VALIDATION){
 					reader.requireRead(getSizeDescriptor().calcUnknown(ioPool, provider, instance, WordSpace.BIT));
@@ -151,7 +154,11 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		@Deprecated
 		@Override
 		public final void skipRead(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-			try(var reader=new BitInputStream(src)){
+			if(src.optionallySkipExact(getSizeDescriptor().getFixed(WordSpace.BYTE))){
+				return;
+			}
+			
+			try(var reader=new BitInputStream(src, -1)){
 				skipReadBits(reader, instance);
 				if(DEBUG_VALIDATION){
 					reader.requireRead(getSizeDescriptor().calcUnknown(ioPool, provider, instance, WordSpace.BIT));
@@ -250,8 +257,34 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		}
 	}
 	
-	@SuppressWarnings("unchecked")
+	protected final ValueType getNullable(Struct.Pool<T> ioPool, T instance, Supplier<ValueType> createDefaultIfNull){
+		var value=get0(ioPool, instance);
+		return switch(getNullability()){
+			case NOT_NULL -> requireValNN(value);
+			case NULLABLE -> value;
+			case DEFAULT_IF_NULL -> {
+				if(value!=null) yield value;
+				var newVal=createDefaultIfNull.get();
+				set(ioPool, instance, newVal);
+				yield newVal;
+			}
+		};
+	}
+	
+	protected final ValueType getNullable(Struct.Pool<T> ioPool, T instance){
+		var value=get0(ioPool, instance);
+		return switch(getNullability()){
+			case NOT_NULL -> requireValNN(value);
+			case NULLABLE -> value;
+			case DEFAULT_IF_NULL -> throw new IllegalStateException(this+" does not support "+IONullability.Mode.DEFAULT_IF_NULL);
+		};
+	}
+	
 	public ValueType get(Struct.Pool<T> ioPool, T instance){
+		return get0(ioPool, instance);
+	}
+	@SuppressWarnings("unchecked")
+	private ValueType get0(Struct.Pool<T> ioPool, T instance){
 		return (ValueType)getAccessor().get(ioPool, instance);
 	}
 	
@@ -331,13 +364,21 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	 * @return string of the resolved value or null if string has no substance
 	 */
 	public String instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort){
+		return instanceToString(ioPool, instance, doShort, "{", "}", "=", ", ");
+	}
+	
+	/**
+	 * @return string of the resolved value or null if string has no substance
+	 */
+	public String instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
 		var val=get(ioPool, instance);
 		if(val==null) return null;
 		
+		if(val instanceof IOInstance inst){
+			var struct=inst.getThisStruct();
+			return struct.instanceToString(struct.allocVirtualVarPool(IO), inst, doShort, start, end, fieldValueSeparator, fieldSeparator);
+		}
 		if(doShort){
-			if(val instanceof IOInstance inst){
-				return inst.toShortString();
-			}
 			return Utils.toShortString(val);
 		}
 		return TextUtil.toString(val);
@@ -363,7 +404,23 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		}
 		
 		if(getAccessor().getType().isArray()){
-			return Arrays.equals((Object[])o1, (Object[])o2);
+			if(o1==o2) return true;
+			if(o1==null||o2==null) return false;
+			int l1=Array.getLength(o1);
+			int l2=Array.getLength(o2);
+			if(l1!=l2) return false;
+			return switch(o1){
+				case byte[] arr -> Arrays.equals(arr, (byte[])o2);
+				case short[] arr -> Arrays.equals(arr, (short[])o2);
+				case int[] arr -> Arrays.equals(arr, (int[])o2);
+				case long[] arr -> Arrays.equals(arr, (long[])o2);
+				case float[] arr -> Arrays.equals(arr, (float[])o2);
+				case double[] arr -> Arrays.equals(arr, (double[])o2);
+				case char[] arr -> Arrays.equals(arr, (char[])o2);
+				case boolean[] arr -> Arrays.equals(arr, (boolean[])o2);
+				case Object[] arr -> Arrays.equals(arr, (Object[])o2);
+				default -> throw new NotImplementedException(o1.getClass().getName());
+			};
 		}
 		
 		return Objects.equals(o1, o2);
@@ -379,8 +436,11 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	
 	
 	public String getName()              {return getAccessor().getName();}
-	public Struct<T> declaringStruct()   {return getAccessor().getDeclaringStruct();}
 	public FieldAccessor<T> getAccessor(){return accessor;}
+	public Struct<T> declaringStruct(){
+		var acc=getAccessor();
+		return acc==null?null:acc.getDeclaringStruct();
+	}
 	public FieldSet<T> getDependencies(){
 		if(!initialized) throw new IllegalStateException();
 		return Objects.requireNonNull(dependencies);

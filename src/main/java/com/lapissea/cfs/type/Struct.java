@@ -32,17 +32,20 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
+import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NOT_NULL;
 
 public class Struct<T extends IOInstance<T>>{
 	
 	public interface Pool<T extends IOInstance<T>>{
 		
-		class StructArray<T extends IOInstance<T>> implements Pool<T>{
+		class GeneralStructArray<T extends IOInstance<T>> implements Pool<T>{
 			
 			private final Struct<T>                          typ;
 			private final Object[]                           pool;
 			private final VirtualFieldDefinition.StoragePool poolType;
-			public StructArray(Struct<T> typ, VirtualFieldDefinition.StoragePool pool){
+			
+			public GeneralStructArray(Struct<T> typ, VirtualFieldDefinition.StoragePool pool){
 				this.poolType=pool;
 				this.typ=typ;
 				if(pool==VirtualFieldDefinition.StoragePool.NONE) throw new IllegalArgumentException();
@@ -163,32 +166,53 @@ public class Struct<T extends IOInstance<T>>{
 		}
 		
 		@Override
-		public String instanceToString(Pool<T> ioPool, T instance, boolean doShort){
+		public String instanceToString(Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
 			StringBuilder sb=new StringBuilder();
-			if(!doShort) sb.append(getType().getSimpleName());
-			sb.append('{');
+			if(!doShort){
+				var simple=getType().getSimpleName();
+				var index =simple.lastIndexOf('$');
+				if(index!=-1) simple=simple.substring(index+1);
+				
+				sb.append(simple);
+			}
+			
+			var fields=new ArrayList<>(this.getFields());
+			fields.removeIf(toRem->toRem.getName().indexOf(IOFieldTools.GENERATED_FIELD_SEPARATOR)!=-1);
+			
+			sb.append(start);
 			boolean comma=false;
-			for(var field : getFields()){
-				var str=field.instanceToString(ioPool, instance, doShort);
+			for(var field : fields){
+				String str;
+				try{
+					str=field.instanceToString(ioPool, instance, doShort||TextUtil.USE_SHORT_IN_COLLECTIONS);
+				}catch(FieldIsNullException e){
+					str="<UNINITIALIZED>";
+				}
 				if(str==null) continue;
 				
-				if(comma) sb.append(", ");
+				if(comma) sb.append(fieldSeparator);
 				
-				sb.append(field.getName()).append("=").append(str);
+				sb.append(field.getName()).append(fieldValueSeparator).append(str);
 				comma=true;
 			}
-			var iter=instance.listDynamicUnmanagedFields().iterator();
-			while(iter.hasNext()){
-				var field=iter.next();
-				var str  =field.instanceToString(ioPool, instance, doShort);
+			for(var iter=instance.listDynamicUnmanagedFields().iterator();iter.hasNext();){
+				var    field=iter.next();
+				String str;
+				try{
+					str=field.instanceToString(ioPool, instance, doShort||TextUtil.USE_SHORT_IN_COLLECTIONS);
+				}catch(FieldIsNullException e){
+					str="<UNINITIALIZED>";
+				}
 				if(str==null) continue;
 				
-				if(comma) sb.append(", ");
+				if(comma) sb.append(fieldSeparator);
 				
-				sb.append(field.getName()).append("=").append(str);
+				sb.append(field.getName()).append(fieldValueSeparator).append(str);
 				comma=true;
 			}
-			return sb.append('}').toString();
+			
+			sb.append(end);
+			return sb.toString();
 		}
 	}
 	
@@ -291,6 +315,7 @@ public class Struct<T extends IOInstance<T>>{
 	
 	private Supplier<T> emptyConstructor;
 	
+	private Boolean invalidInitialNulls;
 	
 	public Struct(Class<T> type){
 		this.type=type;
@@ -337,6 +362,9 @@ public class Struct<T extends IOInstance<T>>{
 	}
 	
 	public String instanceToString(Pool<T> ioPool, T instance, boolean doShort){
+		return instanceToString(ioPool, instance, doShort, "{", "}", "=", ", ");
+	}
+	public String instanceToString(Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
 		StringBuilder sb=new StringBuilder();
 		if(!doShort){
 			var simple=getType().getSimpleName();
@@ -347,9 +375,9 @@ public class Struct<T extends IOInstance<T>>{
 		}
 		
 		var fields=new ArrayList<>(this.fields);
-		fields.removeIf(toRem->toRem.getName().contains(IOFieldTools.GENERATED_FIELD_SEPARATOR));
+		fields.removeIf(toRem->toRem.getName().indexOf(IOFieldTools.GENERATED_FIELD_SEPARATOR)!=-1);
 		
-		sb.append('{');
+		sb.append(start);
 		boolean comma=false;
 		for(var field : fields){
 			String str;
@@ -361,12 +389,12 @@ public class Struct<T extends IOInstance<T>>{
 			
 			if(str==null) continue;
 			
-			if(comma) sb.append(", ");
+			if(comma) sb.append(fieldSeparator);
 			
-			sb.append(field.getName()).append("=").append(str);
+			sb.append(field.getName()).append(fieldValueSeparator).append(str);
 			comma=true;
 		}
-		sb.append('}');
+		sb.append(end);
 		return sb.toString();
 	}
 	
@@ -375,9 +403,25 @@ public class Struct<T extends IOInstance<T>>{
 		return emptyConstructor;
 	}
 	
+	public boolean hasInvalidInitialNulls(){
+		if(invalidInitialNulls==null){
+			boolean inv=false;
+			if(fields.unpackedStream().anyMatch(f->f.getNullability()==NOT_NULL)){
+				var obj =requireEmptyConstructor().get();
+				var pool=allocVirtualVarPool(IO);
+				inv=fields.unpackedStream()
+				          .filter(f->f.getNullability()==NOT_NULL)
+				          .anyMatch(f->f.isNull(pool, obj));
+			}
+			invalidInitialNulls=inv;
+			return inv;
+		}
+		return invalidInitialNulls;
+	}
+	
 	@Nullable
 	public Pool<T> allocVirtualVarPool(VirtualFieldDefinition.StoragePool pool){
-		return new Pool.StructArray<>(this, pool);
+		return new Pool.GeneralStructArray<>(this, pool);
 	}
 	
 	public GenericContext describeGenerics(TypeLink def){

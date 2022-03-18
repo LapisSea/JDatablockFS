@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="ReadyTest" type="Application" factoryName="Application">
-    <option name="MAIN_CLASS_NAME" value="com.lapisseqa.cfs.run.ReadyTest" />
+    <option name="MAIN_CLASS_NAME" value="com.lapissea.cfs.run.ReadyTest" />
     <module name="jdatablockfs.run" />
     <option name="VM_PARAMETERS" value="-ea -Dcom.lapissea.cfs.GlobalConfig.printCompilation=false" />
     <option name="WORKING_DIRECTORY" value="$ProjectFileDir$/run" />

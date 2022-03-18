@@ -262,7 +262,7 @@ public class TTFont extends DrawFont{
 	}
 	
 	@Override
-	public Bounds getStringBounds(String string){
+	public Bounds getStringBounds(String string, float fontScale){
 		pushMax(string);
 		
 		float minX=0;
@@ -270,9 +270,9 @@ public class TTFont extends DrawFont{
 		float maxX=Float.MIN_VALUE;
 		float maxY=Float.MIN_VALUE;
 		
-		Bitmap bitmap=getBitmap(renderer.getFontScale());
+		Bitmap bitmap=getBitmap(fontScale);
 		
-		float scale=renderer.getFontScale()/bitmap.pixelHeight;
+		float scale=fontScale/bitmap.pixelHeight;
 		
 		try(MemoryStack stack=stackPush()){
 			

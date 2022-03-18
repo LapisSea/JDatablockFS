@@ -44,4 +44,17 @@ public class BitUtils{
 	public static int bitsToBytes(int bits){
 		return ceilDiv(bits, Byte.SIZE);
 	}
+	
+	public static String toBinStr(byte[] bb){
+		StringBuilder sb=new StringBuilder(bb.length*8);
+		StringBuilder s =new StringBuilder(8);
+		for(byte b : bb){
+			s.setLength(0);
+			s.append(Integer.toBinaryString(b&0xFF));
+			s.reverse();
+			while(s.length()<8) s.append("0");
+			sb.append(s);
+		}
+		return sb.toString();
+	}
 }

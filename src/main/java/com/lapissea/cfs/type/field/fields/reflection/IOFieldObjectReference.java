@@ -83,12 +83,9 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	
 	@Override
 	public ValueType get(Struct.Pool<T> ioPool, T instance){
-		var val=super.get(ioPool, instance);
-		return switch(getNullability()){
-			case NULLABLE, DEFAULT_IF_NULL -> val;
-			case NOT_NULL -> requireValNN(val);
-		};
+		return getNullable(ioPool, instance, ()->null);
 	}
+	
 	@Override
 	public Reference getReference(T instance){
 		return getRef(instance);

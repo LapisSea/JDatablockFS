@@ -27,6 +27,10 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 		BitLayout(long bits){
 			this(bits, (int)(Utils.bitToByte(bits)*8-bits));
 		}
+		@Override
+		public String toString(){
+			return usedBits+" + "+safetyBits;
+		}
 	}
 	
 	private final List<IOField.Bit<T, ?>> group;
@@ -94,7 +98,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 	
 	@Override
 	public void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		try(var stream=new BitInputStream(src)){
+		try(var stream=new BitInputStream(src, safetyBits.isPresent()?getSizeDescriptor().requireFixed(WordSpace.BIT):-1)){
 			for(var fi : group){
 				if(DEBUG_VALIDATION){
 					long size=fi.getSizeDescriptor().calcUnknown(ioPool, provider, instance);
@@ -112,14 +116,11 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 	
 	@Override
 	public void skipRead(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		
-		var fixed=getSizeDescriptor().getFixed(WordSpace.BYTE);
-		if(fixed.isPresent()){
-			src.skip(fixed.getAsLong());
+		if(src.optionallySkipExact(getSizeDescriptor().getFixed(WordSpace.BYTE))){
 			return;
 		}
 		
-		try(var stream=new BitInputStream(src)){
+		try(var stream=new BitInputStream(src, getSizeDescriptor().getMin(WordSpace.BIT))){
 			for(var fi : group){
 				if(DEBUG_VALIDATION){
 					long size=fi.getSizeDescriptor().calcUnknown(ioPool, provider, instance);
@@ -186,7 +187,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 		return group.stream();
 	}
 	
-	public List<Bit<T, ?>> getGroup(){
+	public List<Bit<T, ?>> fieldGroup(){
 		return group;
 	}
 	

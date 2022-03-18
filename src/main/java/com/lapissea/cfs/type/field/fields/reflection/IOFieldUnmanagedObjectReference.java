@@ -133,9 +133,7 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 	
 	@Override
 	public void skipRead(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		var fixed=referencePipe.getSizeDescriptor().getFixed(WordSpace.BYTE);
-		if(fixed.isPresent()){
-			src.skipExact(fixed.getAsLong());
+		if(src.optionallySkipExact(referencePipe.getSizeDescriptor().getFixed(WordSpace.BYTE))){
 			return;
 		}
 		

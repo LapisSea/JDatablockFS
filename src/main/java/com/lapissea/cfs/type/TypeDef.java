@@ -2,7 +2,9 @@ package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.annotations.IONullability;
+import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.ArrayViewList;
 import com.lapissea.util.NotNull;
@@ -28,6 +30,9 @@ public class TypeDef extends IOInstance<TypeDef>{
 		private IONullability.Mode nullability;
 		
 		@IOValue
+		private boolean isDynamic;
+		
+		@IOValue
 		private String[] dependencies;
 		
 		public FieldDef(){}
@@ -36,7 +41,11 @@ public class TypeDef extends IOInstance<TypeDef>{
 			type=TypeLink.of(field.getAccessor().getGenericType(null));
 			name=field.getName();
 			nullability=field.getAccessor().getAnnotation(IONullability.class).map(IONullability::value).orElse(null);
-			dependencies=field.getDependencies().stream().map(IOField::getName).toArray(String[]::new);
+			isDynamic=field.getAccessor().hasAnnotation(IOType.Dynamic.class);
+			var deps=field.getDependencies().stream().map(IOField::getName).collect(Collectors.toSet());
+			if(field.getAccessor().getType().isArray()) deps.remove(IOFieldTools.makeArrayLenName(field.getAccessor()));
+			if(isDynamic) deps.remove(IOFieldTools.makeGenericIDFieldName(field.getAccessor()));
+			dependencies=deps.toArray(String[]::new);
 		}
 		
 		public TypeLink getType(){
@@ -47,6 +56,9 @@ public class TypeDef extends IOInstance<TypeDef>{
 		}
 		public IONullability.Mode getNullability(){
 			return nullability;
+		}
+		public boolean isDynamic(){
+			return isDynamic;
 		}
 		public List<String> getDependencies(){
 			return dependencies==null?List.of():ArrayViewList.create(dependencies, null);

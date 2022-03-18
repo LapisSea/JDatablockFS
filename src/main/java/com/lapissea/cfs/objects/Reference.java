@@ -5,6 +5,7 @@ import com.lapissea.cfs.io.ChunkChainIO;
 import com.lapissea.cfs.io.OffsetIO;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 
@@ -12,6 +13,9 @@ import java.io.IOException;
 import java.util.Objects;
 
 public final class Reference extends IOInstance<Reference>{
+	
+	@SuppressWarnings("unchecked")
+	private static final Struct<Reference> REFERENCE_STRUCT=(Struct<Reference>)Struct.thisClass();
 	
 	private static final class IOContext implements RandomIO.Creator{
 		private final Reference    ref;
@@ -45,6 +49,7 @@ public final class Reference extends IOInstance<Reference>{
 	}
 	
 	public Reference(ChunkPointer ptr, long offset){
+		super(REFERENCE_STRUCT);
 		this.ptr=Objects.requireNonNull(ptr);
 		this.offset=offset;
 		if(offset<0) throw new IllegalArgumentException("Offset can not be negative");

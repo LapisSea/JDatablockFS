@@ -10,11 +10,11 @@
         <option name="ENABLED" value="true" />
       </pattern>
     </extension>
-    <option name="PACKAGE_NAME" value="com.lapisseqa.cfs.run" />
-    <option name="MAIN_CLASS_NAME" value="com.lapisseqa.cfs.run.GeneralTests" />
+    <option name="PACKAGE_NAME" value="com.lapissea.cfs.run" />
+    <option name="MAIN_CLASS_NAME" value="com.lapissea.cfs.run.GeneralTests" />
     <option name="METHOD_NAME" value="" />
     <option name="TEST_OBJECT" value="class" />
-    <option name="VM_PARAMETERS" value="-ea -DdeleteOk=true -Dcom.lapissea.cfs.GlobalConfig.printCompilation=true -Dcom.lapisseqa.cfs.run.GeneralTests.standardInit=true" />
+    <option name="VM_PARAMETERS" value="-ea -DdeleteOk=true -Dcom.lapissea.cfs.GlobalConfig.printCompilation=true -Dcom.lapisseqa.cfs.run.GeneralTests.standardInit=true -Dcom.lapissea.cfs.type.TemplateClassLoader.PRINT_BYTECODE=true" />
     <option name="WORKING_DIRECTORY" value="$ProjectFileDir$/run/test" />
     <method v="2">
       <option name="Make" enabled="true" />
