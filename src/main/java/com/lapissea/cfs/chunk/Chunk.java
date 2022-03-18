@@ -9,21 +9,27 @@ import com.lapissea.cfs.io.ChunkChainIO;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.bit.BitUtils;
+import com.lapissea.cfs.io.bit.FlagReader;
+import com.lapissea.cfs.io.bit.FlagWriter;
+import com.lapissea.cfs.io.content.ContentOutputBuilder;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
+import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.WordSpace;
+import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.ShouldNeverHappenError;
+import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
@@ -38,8 +44,87 @@ import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 @SuppressWarnings("unused")
 public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, DataProvider.Holder, Comparable<Chunk>{
 	
+	private static class OptimizedChunkPipe extends StructPipe<Chunk>{
+		
+		static{
+			var check="bodyNumSize + nextSize Size{1 byte} capacity Size{0-8 bytes} size Size{0-8 bytes} nextPtr Size{0-8 bytes} ";
+			var sb   =new StringBuilder(check.length());
+			for(IOField<Chunk, ?> specificField : ContiguousStructPipe.of(STRUCT).getSpecificFields()){
+				sb.append(specificField.getName()).append(' ').append(specificField.getSizeDescriptor()).append(' ');
+			}
+			var res=sb.toString();
+			if(!check.equals(res)){
+				throw new ShouldNeverHappenError("\n"+check+"\n"+res);
+			}
+		}
+		
+		public OptimizedChunkPipe(){
+			super(STRUCT);
+		}
+		
+		@Override
+		protected List<IOField<Chunk, ?>> initFields(){
+			var f=getType().getFields();
+			return List.of(
+				new BitFieldMerger<>(List.of(
+					(IOField.Bit<Chunk, ?>)f.requireExact(NumberSize.class, "bodyNumSize"),
+					(IOField.Bit<Chunk, ?>)f.requireExact(NumberSize.class, "nextSize")
+				)),
+				f.requireExact(long.class, "capacity"),
+				f.requireExact(long.class, "size"),
+				f.requireExact(ChunkPointer.class, "nextPtr")
+			);
+		}
+		
+		@Override
+		protected void doWrite(DataProvider provider, ContentWriter dest, Chunk instance) throws IOException{
+			
+			var siz     =getSizeDescriptor().requireMax(WordSpace.BYTE);
+			var destBuff=new ContentOutputBuilder((int)siz);
+			
+			var bns=instance.getBodyNumSize();
+			var nns=instance.getNextSize();
+			
+			new FlagWriter(NumberSize.BYTE)
+				.writeBits(bns.ordinal(), 3)
+				.writeBits(nns.ordinal(), 3)
+				.fillRestAllOne()
+				.export(destBuff);
+			
+			bns.write(destBuff, instance.getCapacity());
+			bns.write(destBuff, instance.getSize());
+			nns.write(destBuff, instance.getNextPtr());
+			
+			destBuff.writeTo(dest);
+		}
+		
+		@Override
+		protected Chunk doRead(Struct.Pool<Chunk> ioPool, DataProvider provider, ContentReader src, Chunk instance, GenericContext genericContext) throws IOException{
+			NumberSize bns;
+			NumberSize nns;
+			try(var f=FlagReader.read(src, NumberSize.BYTE)){
+				bns=NumberSize.FLAG_INFO.get((int)f.readBits(3));
+				nns=NumberSize.FLAG_INFO.get((int)f.readBits(3));
+			}
+			instance.bodyNumSize=bns;
+			instance.nextSize=nns;
+			try{
+				instance.setCapacity(bns.read(src));
+				instance.setSize(bns.read(src));
+				instance.setNextPtr(ChunkPointer.read(nns, src));
+			}catch(BitDepthOutOfSpaceException e){
+				throw new IOException(e);
+			}
+			return instance;
+		}
+	}
+	
+	
 	private static final Struct<Chunk>     STRUCT=Struct.of(Chunk.class);
-	public static final  StructPipe<Chunk> PIPE  =ContiguousStructPipe.of(STRUCT);
+	public static final  StructPipe<Chunk> PIPE  =
+		UtilL.sysPropertyByClass(Chunk.class, "DO_NOT_USE_OPTIMIZED_PIPE", false, Boolean::parseBoolean)?
+		ContiguousStructPipe.of(STRUCT):
+		new OptimizedChunkPipe();
 	
 	private static final int  CHECK_BYTE_OFF;
 	private static final byte CHECK_BIT_MASK;
