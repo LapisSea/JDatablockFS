@@ -5,10 +5,8 @@ import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Reference;
-import com.lapissea.cfs.objects.collections.HashIOMap;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.MemoryWalker;
-import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
@@ -44,19 +42,11 @@ public class DefragmentManager{
 	}
 	
 	private void reorder(final Cluster cluster) throws IOException{
-		{
-			var tmp =(HashIOMap<?, ?>)cluster.getTemp();
-			var user=findReferenceUser(cluster, tmp.getReference());
-			if(user.getPtr().compareTo(tmp.getReference().getPtr())>0){
-				reallocateUnmanaged(cluster, tmp);
-			}
-		}
-		
 		boolean[] run={true};
 		while(run[0]){
 			run[0]=false;
 			
-			new MemoryWalker((HashIOMap<?, ?>)cluster.getTemp()).walk(new MemoryWalker.PointerRecord(){
+			cluster.rootWalker().walk(new MemoryWalker.PointerRecord(){
 				@Override
 				public <T extends IOInstance<T>> MemoryWalker.IterationOptions log(StructPipe<T> pipe, Reference instanceReference, IOField.Ref<T, ?> field, T instance, Reference value) throws IOException{
 					if(instance instanceof IOInstance.Unmanaged u){
