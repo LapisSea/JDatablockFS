@@ -9,10 +9,7 @@ import com.lapissea.util.NotImplementedException;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.WildcardType;
-import java.util.Arrays;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -62,6 +59,25 @@ public final class TypeLink extends IOInstance<TypeLink>{
 	}
 	
 	private static final TypeLink[] NO_ARGS=new TypeLink[0];
+	
+	private static Type readType(Iterator<Class<?>> iter){
+		var cls=iter.next();
+		
+		var parms=cls.getTypeParameters();
+		if(parms.length==0){
+			return cls;
+		}
+		
+		var args=new Type[parms.length];
+		for(int i=0;i<parms.length;i++){
+			args[i]=readType(iter);
+		}
+		return new SyntheticParameterizedType(cls, args);
+	}
+	
+	public static TypeLink ofFlat(Class<?>... args){
+		return of(readType(Arrays.asList(args).iterator()));
+	}
 	
 	public static TypeLink of(Class<?> raw, Type... args){
 		return of(new SyntheticParameterizedType(raw, args));

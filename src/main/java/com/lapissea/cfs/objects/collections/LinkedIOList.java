@@ -136,12 +136,12 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		}
 		
 		private static final TypeLink.Check NODE_TYPE_CHECK=new TypeLink.Check(
-			LinkedIOList.Node.class,
-			List.of(t->{
-				var c=t.getTypeClass(null);
-				if(!IOInstance.isManaged(c)) throw new ClassCastException("not managed");
-				if(Modifier.isAbstract(c.getModifiers())) throw new ClassCastException(c+" is abstract");
-			})
+				LinkedIOList.Node.class,
+				List.of(t->{
+					var c=t.getTypeClass(null);
+					if(!IOInstance.isManaged(c)) throw new ClassCastException("not managed");
+					if(Modifier.isAbstract(c.getModifiers())) throw new ClassCastException(c+" is abstract");
+				})
 		);
 		
 		private static NumberSize calcOptimalNextSize(DataProvider provider) throws IOException{
@@ -565,10 +565,12 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 	}
 	
 	private static final TypeLink.Check LIST_TYPE_CHECK=new TypeLink.Check(
-		LinkedIOList.class,
-		List.of(t->{
-			if(!IOInstance.isManaged(t)) throw new ClassCastException("not managed");
-		})
+			LinkedIOList.class,
+			List.of(t->{
+				if(!IOInstance.isManaged(t)){
+					throw new RuntimeException("not managed");
+				}
+			})
 	);
 	
 	private final IOField<LinkedIOList<T>, Node<T>> headField=(IOField<LinkedIOList<T>, Node<T>>)Struct.Unmanaged.thisClass().getFields().byName("head").orElseThrow();
@@ -652,8 +654,8 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 	
 	private TypeLink nodeType(){
 		return new TypeLink(
-			LinkedIOList.Node.class,
-			getTypeDef().arg(0)
+				LinkedIOList.Node.class,
+				getTypeDef().arg(0)
 		);
 	}
 	
@@ -835,8 +837,8 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		});
 		
 		getDataProvider()
-			.getMemoryManager()
-			.free(chunks);
+				.getMemoryManager()
+				.free(chunks);
 	}
 	
 	@Override

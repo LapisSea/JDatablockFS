@@ -215,12 +215,19 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>> implements Clone
 		return null;
 	}
 	
+	public static boolean isInstance(TypeLink type){
+		return isInstance(type.getTypeClass(null));
+	}
+	public static boolean isInstance(Class<?> type){
+		return UtilL.instanceOf(type, IOInstance.class);
+	}
+	
 	public static boolean isManaged(TypeLink type){
 		return isManaged(type.getTypeClass(null));
 	}
 	
 	public static boolean isManaged(Class<?> type){
-		var isInstance =UtilL.instanceOf(type, IOInstance.class);
+		var isInstance =isInstance(type);
 		var isUnmanaged=UtilL.instanceOf(type, IOInstance.Unmanaged.class);
 		return isInstance&&!isUnmanaged;
 	}
