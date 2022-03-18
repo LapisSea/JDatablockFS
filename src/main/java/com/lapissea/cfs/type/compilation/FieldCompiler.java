@@ -426,6 +426,12 @@ public class FieldCompiler{
 				return new IOFieldByteArray<>(field);
 			}
 		});
+		REGISTRY.register(new RegistryNode.InstanceOf<>(boolean[].class){
+			@Override
+			public <T extends IOInstance<T>> IOField<T, boolean[]> create(FieldAccessor<T> field, GenericContext genericContext){
+				return new IOFieldBooleanArray<>(field);
+			}
+		});
 		REGISTRY.register(new RegistryNode.InstanceOf<>(float[].class){
 			@Override
 			public <T extends IOInstance<T>> IOField<T, float[]> create(FieldAccessor<T> field, GenericContext genericContext){
