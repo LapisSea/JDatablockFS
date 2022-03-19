@@ -174,6 +174,10 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>> implements Clone
 		return getThisStruct().instanceToString(getThisStruct().allocVirtualVarPool(IO), self(), true);
 	}
 	
+	public String toString(boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+		return getThisStruct().instanceToString(getThisStruct().allocVirtualVarPool(IO), self(), doShort, start, end, fieldValueSeparator, fieldSeparator);
+	}
+	
 	@Override
 	public boolean equals(Object o){
 		if(this==o) return true;

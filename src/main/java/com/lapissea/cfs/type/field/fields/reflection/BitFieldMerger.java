@@ -137,28 +137,21 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 	}
 	
 	@Override
-	public String instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort){
-		StringBuilder sb=new StringBuilder();
-		sb.append('{');
-		boolean separator=false;
-		for(var field : group){
-			String str;
+	public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort){
+		var res=group.stream().map(field->{
+			Optional<String> str;
 			try{
 				str=field.instanceToString(ioPool, instance, doShort||TextUtil.USE_SHORT_IN_COLLECTIONS);
 			}catch(FieldIsNullException e){
-				str="<UNINITIALIZED>";
+				str=Optional.of("<UNINITIALIZED>");
 			}
-			
-			if(str==null) continue;
-			
-			if(separator) sb.append(" + ");
-			
-			sb.append(field.getName()).append("=").append(str);
-			separator=true;
-		}
-		sb.append('}');
-		return sb.toString();
+			return str.map(s->field.getName()+"="+s);
+		}).filter(Optional::isPresent).map(Optional::get).collect(Collectors.joining(" + ", "{", "}"));
+		
+		if(res.length()==2) return Optional.empty();
+		return Optional.of(res);
 	}
+	
 	@Override
 	public String toString(){
 		return group.stream().map(IOField::getName).collect(Collectors.joining("+"));

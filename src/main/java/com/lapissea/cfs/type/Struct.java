@@ -22,6 +22,7 @@ import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -182,32 +183,32 @@ public class Struct<T extends IOInstance<T>>{
 			sb.append(start);
 			boolean comma=false;
 			for(var field : fields){
-				String str;
+				Optional<String> str;
 				try{
 					str=field.instanceToString(ioPool, instance, doShort||TextUtil.USE_SHORT_IN_COLLECTIONS);
 				}catch(FieldIsNullException e){
-					str="<UNINITIALIZED>";
+					str=Optional.of("<UNINITIALIZED>");
 				}
-				if(str==null) continue;
+				if(str.isEmpty()) continue;
 				
 				if(comma) sb.append(fieldSeparator);
 				
-				sb.append(field.getName()).append(fieldValueSeparator).append(str);
+				sb.append(field.getName()).append(fieldValueSeparator).append(str.get());
 				comma=true;
 			}
 			for(var iter=instance.listDynamicUnmanagedFields().iterator();iter.hasNext();){
-				var    field=iter.next();
-				String str;
+				var              field=iter.next();
+				Optional<String> str;
 				try{
 					str=field.instanceToString(ioPool, instance, doShort||TextUtil.USE_SHORT_IN_COLLECTIONS);
 				}catch(FieldIsNullException e){
-					str="<UNINITIALIZED>";
+					str=Optional.of("<UNINITIALIZED>");
 				}
-				if(str==null) continue;
+				if(str.isEmpty()) continue;
 				
 				if(comma) sb.append(fieldSeparator);
 				
-				sb.append(field.getName()).append(fieldValueSeparator).append(str);
+				sb.append(field.getName()).append(fieldValueSeparator).append(str.get());
 				comma=true;
 			}
 			
@@ -380,18 +381,18 @@ public class Struct<T extends IOInstance<T>>{
 		sb.append(start);
 		boolean comma=false;
 		for(var field : fields){
-			String str;
+			Optional<String> str;
 			try{
 				str=field.instanceToString(ioPool, instance, doShort||TextUtil.USE_SHORT_IN_COLLECTIONS);
 			}catch(FieldIsNullException e){
-				str="<UNINITIALIZED>";
+				str=Optional.of("<UNINITIALIZED>");
 			}
 			
-			if(str==null) continue;
+			if(str.isEmpty()) continue;
 			
 			if(comma) sb.append(fieldSeparator);
 			
-			sb.append(field.getName()).append(fieldValueSeparator).append(str);
+			sb.append(field.getName()).append(fieldValueSeparator).append(str.get());
 			comma=true;
 		}
 		sb.append(end);

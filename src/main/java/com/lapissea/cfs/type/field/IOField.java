@@ -363,25 +363,25 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	/**
 	 * @return string of the resolved value or null if string has no substance
 	 */
-	public String instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort){
+	public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort){
 		return instanceToString(ioPool, instance, doShort, "{", "}", "=", ", ");
 	}
 	
 	/**
 	 * @return string of the resolved value or null if string has no substance
 	 */
-	public String instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+	public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
 		var val=get(ioPool, instance);
-		if(val==null) return null;
+		if(val==null) return Optional.empty();
 		
 		if(val instanceof IOInstance inst){
 			var struct=inst.getThisStruct();
-			return struct.instanceToString(struct.allocVirtualVarPool(IO), inst, doShort, start, end, fieldValueSeparator, fieldSeparator);
+			return Optional.of(struct.instanceToString(struct.allocVirtualVarPool(IO), inst, doShort, start, end, fieldValueSeparator, fieldSeparator));
 		}
 		if(doShort){
-			return Utils.toShortString(val);
+			return Optional.of(Utils.toShortString(val));
 		}
-		return TextUtil.toString(val);
+		return Optional.of(TextUtil.toString(val));
 	}
 	
 	@SuppressWarnings("unchecked")

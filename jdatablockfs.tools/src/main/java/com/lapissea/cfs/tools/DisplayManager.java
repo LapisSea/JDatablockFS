@@ -330,18 +330,17 @@ public class DisplayManager implements DataLogger{
 						ImGui.textColored(col.getRed(), col.getGreen(), col.getBlue(), 255, str);
 					}else{
 						switch(object){
-							case IOInstance inst -> {
-								var str=inst.getThisStruct().instanceToString(null, inst, false, "{\n\t", "\n}", ": ", ",\n\t");
+							case IOInstance<?> inst -> {
+								var str=inst.toString(false, "{\n\t", "\n}", ": ", ",\n\t");
 								
 								if(str==null) str="";
 								var col=msg.color();
 								if(col==null) col=new Color(100, 100, 255);
 								ImGui.textColored(col.getRed(), col.getGreen(), col.getBlue(), 255, str);
 							}
-							case BinaryGridRenderer.FieldVal inst -> {
-								var str=inst.field().instanceToString(inst.ioPool(), inst.instance(), false, "{\n\t", "\n}", ": ", ",\n\t");
+							case BinaryGridRenderer.FieldVal<?> inst -> {
+								String str=inst.instanceToString(false, "{\n\t", "\n}", ": ", ",\n\t").orElse("");
 								
-								if(str==null) str="";
 								var col=msg.color();
 								if(col==null) col=new Color(100, 255, 100);
 								ImGui.textColored(col.getRed(), col.getGreen(), col.getBlue(), 255, str);

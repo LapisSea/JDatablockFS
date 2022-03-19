@@ -52,7 +52,11 @@ import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 @SuppressWarnings({"UnnecessaryLocalVariable", "SameParameterValue"})
 public class BinaryGridRenderer{
 	
-	public record FieldVal<T extends IOInstance<T>>(Struct.Pool<T> ioPool, T instance, IOField<T, ?> field){}
+	public record FieldVal<T extends IOInstance<T>>(Struct.Pool<T> ioPool, T instance, IOField<T, ?> field){
+		Optional<String> instanceToString(boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+			return field.instanceToString(ioPool, instance, doShort, start, end, fieldValueSeparator, fieldSeparator);
+		}
+	}
 	
 	enum ErrorLogLevel{
 		NONE,
@@ -201,7 +205,8 @@ public class BinaryGridRenderer{
 		Consumer<DrawUtils.Rect> doSegment=bitRect->{
 			renderCtx.renderer.setColor(alpha(col, 0.8F).darker());
 			renderCtx.renderer.fillQuad(bitRect.x, bitRect.y, bitRect.width, bitRect.height);
-			drawStringInInfo(renderCtx.renderer, col, Objects.toString(field.instanceToString(ioPool, instance, true)), bitRect, false, ctx.strings);
+			var str=field.instanceToString(ioPool, instance, true);
+			str.ifPresent(s->drawStringInInfo(renderCtx.renderer, col, s, bitRect, false, ctx.strings));
 		};
 		
 		if(instance instanceof Chunk ch){
@@ -276,9 +281,9 @@ public class BinaryGridRenderer{
 		
 		var rectWidth=bestRange.toRect(ctx.renderCtx).width;
 		
-		String str     =field.instanceToString(ioPool, instance, false);
-		String shortStr=null;
-		String both;
+		Optional<String> str     =field.instanceToString(ioPool, instance, false);
+		Optional<String> shortStr=Optional.empty();
+		String           both;
 		
 		var fStr=field.toShortString();
 		if(field instanceof IOField.Ref refField){
@@ -288,10 +293,10 @@ public class BinaryGridRenderer{
 		}
 		
 		var renderCtx=ctx.renderCtx;
-		both=fStr+(str==null?"":": "+str);
-		if(str!=null&&getStringBounds(renderCtx.renderer, both).width()>rectWidth){
+		both=fStr+(str.isEmpty()?"":": "+str.get());
+		if(str.isPresent()&&getStringBounds(renderCtx.renderer, both).width()>rectWidth){
 			shortStr=field.instanceToString(ioPool, instance, true);
-			both=fStr+(shortStr==null?"":": "+shortStr);
+			both=fStr+(shortStr.isEmpty()?"":": "+shortStr.get());
 		}
 		
 		if(hover!=null){
@@ -299,7 +304,7 @@ public class BinaryGridRenderer{
 		}
 		
 		
-		if(str!=null&&getStringBounds(renderCtx.renderer, both).width()>rectWidth){
+		if(str.isPresent()&&getStringBounds(renderCtx.renderer, both).width()>rectWidth){
 			var font=renderCtx.renderer.getFontScale();
 			initFont(renderCtx, 0.4F);
 			var rect=bestRange.toRect(ctx.renderCtx);
@@ -309,13 +314,14 @@ public class BinaryGridRenderer{
 			
 			var drawStr=str;
 			
-			if(getStringBounds(renderCtx.renderer, drawStr).width()>rectWidth){
-				if(shortStr==null) shortStr=field.instanceToString(ioPool, instance, true);
+			if(getStringBounds(renderCtx.renderer, drawStr.get()).width()>rectWidth){
+				if(shortStr.isEmpty()) shortStr=field.instanceToString(ioPool, instance, true);
 				drawStr=shortStr;
 			}
 			var r=bestRange.toRect(ctx.renderCtx);
 			r.y+=ctx.renderCtx.pixelsPerByte*0.1F;
-			drawStringInInfo(renderCtx.renderer, color, (drawStr==null?"":drawStr), r, false, ctx.strings, ctx.stringOutlines);
+			
+			drawStr.ifPresent(s->drawStringInInfo(renderCtx.renderer, color, s, r, false, ctx.strings, ctx.stringOutlines));
 		}else{
 			initFont(renderCtx, 1);
 			drawStringInInfo(renderCtx.renderer, color, both, bestRange.toRect(ctx.renderCtx), false, ctx.strings, ctx.stringOutlines);
