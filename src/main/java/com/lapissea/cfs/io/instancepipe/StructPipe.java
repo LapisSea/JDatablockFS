@@ -13,11 +13,13 @@ import com.lapissea.cfs.io.content.ContentOutputBuilder;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.impl.MemoryData;
+import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
+import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.util.LogUtil;
@@ -30,6 +32,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
@@ -104,7 +107,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	public StructPipe(Struct<T> type){
 		this.type=type;
 		this.ioFields=FieldSet.of(initFields());
-		sizeDescription=calcSize();
+		sizeDescription=createSizeDescriptor();
 		ioPoolAccessors=Utils.nullIfEmpty(calcIOPoolAccessors());
 		earlyNullChecks=Utils.nullIfEmpty(getNonNulls());
 		generators=Utils.nullIfEmpty(ioFields.stream().map(IOField::getGenerators).flatMap(Collection::stream).toList());
@@ -125,7 +128,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		           .toList();
 	}
 	
-	private SizeDescriptor<T> calcSize(){
+	protected SizeDescriptor<T> createSizeDescriptor(){
 		var fields=getSpecificFields();
 		
 		var wordSpace=IOFieldTools.minWordSpace(fields);
@@ -153,7 +156,37 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		var min=IOFieldTools.sumVars(fields, siz->siz.getMin(wordSpace));
 		var max=hasDynamicFields?OptionalLong.empty():IOFieldTools.sumVarsIfAll(fields, siz->siz.getMax(wordSpace));
 		
-		return new SizeDescriptor.Unknown<>(wordSpace, min, max, (ioPool, prov, inst)->{
+		
+		Map<SizeDescriptor.UnknownNum<T>, List<SizeDescriptor.UnknownNum<T>>> numMap;
+		numMap=unknownFields.stream()
+		                    .filter(f->f.getSizeDescriptor() instanceof SizeDescriptor.UnknownNum)
+		                    .map(f->(SizeDescriptor.UnknownNum<T>)f.getSizeDescriptor())
+		                    .collect(Collectors.groupingBy(f->f));
+		
+		numMap.entrySet().removeIf(e->e.getValue().size()==1);
+		
+		var unknownUnknownFields=unknownFields.stream()
+		                                      .filter(f->!numMap.containsKey(f.getSizeDescriptor()))
+		                                      .toList();
+		
+		FieldAccessor<T>[] unkownNumAcc;
+		int[]              unkownNumAccMul;
+		
+		if(numMap.isEmpty()){
+			unkownNumAcc=null;
+			unkownNumAccMul=null;
+		}else{
+			unkownNumAcc=new FieldAccessor[numMap.size()];
+			unkownNumAccMul=new int[numMap.size()];
+			int i=0;
+			for(var e : numMap.entrySet()){
+				unkownNumAcc[i]=e.getKey().getAccessor();
+				unkownNumAccMul[i]=e.getValue().size();
+				i++;
+			}
+		}
+		
+		return SizeDescriptor.Unknown.of(wordSpace, min, max, (ioPool, prov, inst)->{
 			checkNull(inst);
 			
 			try{
@@ -161,16 +194,19 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 			}catch(IOException e){
 				throw new RuntimeException(e);
 			}
-			
-			if(unknownFields.size()==1){
-				var field=unknownFields.get(0);
-				var d    =field.getSizeDescriptor();
-				return knownFixed+d.calcUnknown(ioPool, prov, inst, wordSpace);
-			}
-			
-			return knownFixed+IOFieldTools.sumVars(unknownFields, d->{
+			var unkownSum=IOFieldTools.sumVars(unknownUnknownFields, d->{
 				return d.calcUnknown(ioPool, prov, inst, wordSpace);
 			});
+			
+			if(unkownNumAcc!=null){
+				for(int i=0;i<unkownNumAcc.length;i++){
+					var acc=unkownNumAcc[i];
+					var num=(NumberSize)acc.get(ioPool, inst);
+					var mul=unkownNumAccMul[i];
+					unkownSum+=num.bytes*mul;
+				}
+			}
+			return knownFixed+unkownSum;
 		});
 	}
 	

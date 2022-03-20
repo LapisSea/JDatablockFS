@@ -23,6 +23,7 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.reflection.BitFieldMerger;
@@ -36,6 +37,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -116,6 +118,16 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 				throw new IOException(e);
 			}
 			return instance;
+		}
+		
+		@Override
+		protected SizeDescriptor<Chunk> createSizeDescriptor(){
+			return SizeDescriptor.Unknown.of(WordSpace.BYTE, 1, OptionalLong.of(1+NumberSize.LARGEST.bytes*3L), (ioPool, prov, value)->{
+				var bns=value.getBodyNumSize();
+				var nns=value.getNextSize();
+				
+				return 1L+bns.bytes*2L+nns.bytes;
+			});
 		}
 	}
 	
@@ -271,7 +283,7 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 	}
 	
 	public long dataStart(){
-		return ptr.add(headerSize);
+		return ptr.add(getHeaderSize());
 	}
 	public long dataEnd(){
 		var start=dataStart();
@@ -397,7 +409,7 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 	
 	
 	public long totalSize(){
-		return headerSize+capacity;
+		return getHeaderSize()+capacity;
 	}
 	
 	@IOValue
