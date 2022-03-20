@@ -56,7 +56,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 			safetyBits=bits.stream().mapToObj(BitLayout::new).findAny();
 		}else{
 			safetyBits=Optional.empty();
-			sizeDescriptor=new SizeDescriptor.Unknown<>(
+			sizeDescriptor=SizeDescriptor.Unknown.of(
 				IOFieldTools.sumVars(group, SizeDescriptor::getMin),
 				IOFieldTools.sumVarsIfAll(group, SizeDescriptor::getMax),
 				(ioPool, prov, inst)->Utils.bitToByte(group.stream().mapToLong(s->s.getSizeDescriptor().calcUnknown(ioPool, prov, inst)).sum())

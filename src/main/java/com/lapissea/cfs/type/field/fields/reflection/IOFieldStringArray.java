@@ -26,7 +26,7 @@ public class IOFieldStringArray<T extends IOInstance<T>> extends IOField<T, Stri
 	public IOFieldStringArray(FieldAccessor<T> accessor){
 		super(accessor);
 		
-		descriptor=new SizeDescriptor.Unknown<>(0, OptionalLong.empty(), (ioPool, prov, inst)->{
+		descriptor=SizeDescriptor.Unknown.of(0, OptionalLong.empty(), (ioPool, prov, inst)->{
 			var arr=get(ioPool, inst);
 			if(arr==null) return 0;
 			return Arrays.stream(arr).map(AutoText::new).mapToLong(t->AutoText.PIPE.calcUnknownSize(prov, t, WordSpace.BYTE)).sum();

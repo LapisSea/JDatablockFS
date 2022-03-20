@@ -38,9 +38,9 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 		
 		var fixedSiz=desc.getFixed();
 		if(fixedSiz.isPresent()){
-			descriptor=new SizeDescriptor.Fixed<>(desc.getWordSpace(), fixedSiz.getAsLong());
+			descriptor=SizeDescriptor.Fixed.of(desc.getWordSpace(), fixedSiz.getAsLong());
 		}else{
-			descriptor=new SizeDescriptor.Unknown<>(
+			descriptor=SizeDescriptor.Unknown.of(
 				desc.getWordSpace(),
 				nullable()?0:desc.getMin(),
 				desc.getMax(),

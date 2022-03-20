@@ -23,7 +23,7 @@ public class IOFieldFloatArray<T extends IOInstance<T>> extends IOField<T, float
 	public IOFieldFloatArray(FieldAccessor<T> accessor){
 		super(accessor);
 		
-		descriptor=new SizeDescriptor.Unknown<>(0, OptionalLong.empty(), (ioPool, prov, inst)->{
+		descriptor=SizeDescriptor.Unknown.of(0, OptionalLong.empty(), (ioPool, prov, inst)->{
 			var siz=arraySize.getValue(ioPool, inst);
 			if(siz>0) return siz*4L;
 			var arr=get(ioPool, inst);

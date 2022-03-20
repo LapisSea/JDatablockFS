@@ -15,6 +15,7 @@ import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 
 import java.io.IOException;
+import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.function.LongFunction;
 
@@ -43,8 +44,8 @@ public class IOFieldNumber<T extends IOInstance<T>, E extends INumber> extends I
 		
 		dynamicSize=field==null?null:field::get;
 		
-		if(dynamicSize==null) sizeDescriptor=new SizeDescriptor.Fixed<>(size.bytes);
-		else sizeDescriptor=new SizeDescriptor.Unknown<>(0, NumberSize.LARGEST.optionalBytesLong, (ioPool, prov, inst)->getSize(null, inst).bytes);
+		if(dynamicSize==null) sizeDescriptor=SizeDescriptor.Fixed.of(size.bytes);
+		else sizeDescriptor=SizeDescriptor.Unknown.of(NumberSize.VOID, Optional.of(NumberSize.LARGEST), field.getAccessor());
 	}
 	@Override
 	public IOField<T, E> implMaxAsFixedSize(){

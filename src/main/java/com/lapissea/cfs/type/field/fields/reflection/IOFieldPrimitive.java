@@ -16,8 +16,10 @@ import com.lapissea.cfs.type.field.access.FieldAccessor;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
+import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
@@ -451,12 +453,12 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 				if(!allowed.contains(val)) throw new IllegalStateException(val+" is not an allowed size in "+allowed+" at "+this+" with dynamic size "+field);
 				return val;
 			};
-			sizeDescriptor=new SizeDescriptor.Unknown<>(
-				allowed.stream().mapToLong(NumberSize::bytes).min().orElse(0),
-				allowed.stream().mapToLong(NumberSize::bytes).max(),
-				(ioPool, prov, inst)->getSize(ioPool, inst).bytes);
+			sizeDescriptor=SizeDescriptor.Unknown.of(
+				allowed.stream().min(Comparator.naturalOrder()).orElse(VOID),
+				allowed.stream().max(Comparator.naturalOrder()),
+				field.getAccessor());
 		}else{
-			sizeDescriptor=new SizeDescriptor.Fixed<>(size.bytes);
+			sizeDescriptor=SizeDescriptor.Fixed.of(size.bytes);
 		}
 	}
 	

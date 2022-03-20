@@ -56,7 +56,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		
 		long minSize=Math.min(refDesc.getMin(WordSpace.BYTE), minKnownTypeSize);
 		
-		descriptor=new SizeDescriptor.Unknown<>(minSize, OptionalLong.empty(), (ioPool, prov, inst)->{
+		descriptor=SizeDescriptor.Unknown.of(minSize, OptionalLong.empty(), (ioPool, prov, inst)->{
 			var val=get(null, inst);
 			if(val==null) return 0;
 			return calcSize(prov, val);

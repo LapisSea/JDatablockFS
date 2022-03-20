@@ -24,7 +24,7 @@ public class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends IOField.
 		
 		var desc=AutoText.PIPE.getSizeDescriptor();
 		
-		descriptor=new SizeDescriptor.Unknown<>(
+		descriptor=SizeDescriptor.Unknown.of(
 			desc.getWordSpace(),
 			nullable()?0:desc.getMin(),
 			desc.getMax(),
