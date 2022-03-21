@@ -445,9 +445,10 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 	@Override
 	public void init(){
 		super.init();
-		var field  =forceFixed?null:IOFieldTools.getDynamicSize(getAccessor());
-		var allowed=allowedSizes();
-		if(field!=null){
+		var fieldOpt=forceFixed?Optional.<IOField<T, NumberSize>>empty():IOFieldTools.getDynamicSize(getAccessor());
+		var allowed =allowedSizes();
+		if(fieldOpt.isPresent()){
+			var field=fieldOpt.get();
 			dynamicSize=(ioPool, instance)->{
 				var val=field.get(ioPool, instance);
 				if(!allowed.contains(val)) throw new IllegalStateException(val+" is not an allowed size in "+allowed+" at "+this+" with dynamic size "+field);
