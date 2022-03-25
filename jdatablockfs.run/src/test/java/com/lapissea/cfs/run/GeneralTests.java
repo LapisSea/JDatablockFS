@@ -390,6 +390,8 @@ public class GeneralTests{
 				LinkedIOList.class,
 				HashIOMap.class,
 				BooleanContainer.class,
+				IntContainer.class,
+				LongContainer.class,
 				Dummy.class
 			).flatMap(p->Stream.concat(Stream.of(p), Arrays.stream(p.getDeclaredClasses())))
 			.filter(c->UtilL.instanceOf(c, IOInstance.class))
