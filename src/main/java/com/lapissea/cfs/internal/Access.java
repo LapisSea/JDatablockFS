@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Supplier;
 
+import static com.lapissea.cfs.internal.MyUnsafe.UNSAFE;
 import static java.lang.invoke.MethodHandles.Lookup.*;
 
 @SuppressWarnings("unchecked")
@@ -141,20 +142,15 @@ public class Access{
 			throw new SecurityException("Unsafe attempt of lookup modification: "+lookup);
 		}
 		
-		
 		var acc=(PUBLIC|PRIVATE|PROTECTED|PACKAGE|MODULE|UNCONDITIONAL|ORIGINAL);
 		try{
-			var f=sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
-			f.setAccessible(true);
-			var unsafe=(sun.misc.Unsafe)f.get(null);
-			
 			//get first field offset to skip any GC/Identity data that would create a segfault
-			var offset=unsafe.objectFieldOffset(Dummy.class.getDeclaredField("a"));
+			var offset=UNSAFE.objectFieldOffset(Dummy.class.getDeclaredField("a"));
 			while(true){
 				//can't get exact offset of lookup permissions flags field so the safest way to do it to probe offsets sequentially
-				var old=unsafe.getAndSetInt(lookup, offset, acc);
+				var old=UNSAFE.getAndSetInt(lookup, offset, acc);
 				if(lookup.hasFullPrivilegeAccess()) break;
-				unsafe.getAndSetInt(lookup, offset, old);
+				UNSAFE.getAndSetInt(lookup, offset, old);
 				offset+=4;
 			}
 			
