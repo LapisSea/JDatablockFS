@@ -122,6 +122,11 @@ public class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends AbstractFiel
 	}
 	
 	@Override
+	public boolean canBeNull(){
+		return typeFlag==OBJECT_FLAG;
+	}
+	
+	@Override
 	public Object get(Struct.Pool<CTyp> ioPool, CTyp instance){
 		var pool  =getTargetPool(ioPool, instance, true);
 		var rawVal=pool==null?null:pool.get(this);

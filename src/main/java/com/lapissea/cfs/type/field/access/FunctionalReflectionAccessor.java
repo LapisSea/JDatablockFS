@@ -224,6 +224,11 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 	}
 	
 	@Override
+	public boolean canBeNull(){
+		return !rawType.isPrimitive();
+	}
+	
+	@Override
 	protected String strName(){
 		return getName()+"(F)";
 	}

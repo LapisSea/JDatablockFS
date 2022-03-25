@@ -114,7 +114,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	}
 	
 	private List<IOField<T, ?>> getNonNulls(){
-		return ioFields.unpackedStream().filter(f->f.getNullability()==IONullability.Mode.NOT_NULL).toList();
+		return ioFields.unpackedStream().filter(f->f.getNullability()==IONullability.Mode.NOT_NULL&&f.getAccessor().canBeNull()).toList();
 	}
 	
 	protected abstract List<IOField<T, ?>> initFields();

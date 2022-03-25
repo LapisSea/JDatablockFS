@@ -64,4 +64,8 @@ public interface FieldAccessor<CTyp extends IOInstance<CTyp>> extends Comparable
 	
 	
 	default void init(IOField<CTyp, ?> field){}
+	
+	default boolean canBeNull(){
+		return true;
+	}
 }

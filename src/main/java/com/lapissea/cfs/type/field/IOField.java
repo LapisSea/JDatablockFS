@@ -245,6 +245,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	}
 	
 	public boolean isNull(Struct.Pool<T> ioPool, T instance){
+		if(!accessor.canBeNull()) return false;
 		try{
 			var val=get(ioPool, instance);
 			return val==null;

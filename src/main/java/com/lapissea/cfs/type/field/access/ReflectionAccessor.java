@@ -287,4 +287,9 @@ public class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends AbstractF
 			throw UtilL.uncheckedThrow(e);
 		}
 	}
+	
+	@Override
+	public boolean canBeNull(){
+		return !rawType.isPrimitive();
+	}
 }
