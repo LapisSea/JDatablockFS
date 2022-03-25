@@ -250,52 +250,10 @@ public class Struct<T extends IOInstance<T>>{
 		
 		@Override
 		public String instanceToString(Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
-			StringBuilder sb=new StringBuilder();
-			if(!doShort){
-				var simple=getType().getSimpleName();
-				var index =simple.lastIndexOf('$');
-				if(index!=-1) simple=simple.substring(index+1);
-				
-				sb.append(simple);
-			}
-			
-			var fields=new ArrayList<>(this.getFields());
-			fields.removeIf(toRem->toRem.getName().indexOf(IOFieldTools.GENERATED_FIELD_SEPARATOR)!=-1);
-			
-			sb.append(start);
-			boolean comma=false;
-			for(var field : fields){
-				Optional<String> str;
-				try{
-					str=field.instanceToString(ioPool, instance, doShort||TextUtil.USE_SHORT_IN_COLLECTIONS);
-				}catch(FieldIsNullException e){
-					str=Optional.of("<UNINITIALIZED>");
-				}
-				if(str.isEmpty()) continue;
-				
-				if(comma) sb.append(fieldSeparator);
-				
-				sb.append(field.getName()).append(fieldValueSeparator).append(str.get());
-				comma=true;
-			}
-			for(var iter=instance.listDynamicUnmanagedFields().iterator();iter.hasNext();){
-				var              field=iter.next();
-				Optional<String> str;
-				try{
-					str=field.instanceToString(ioPool, instance, doShort||TextUtil.USE_SHORT_IN_COLLECTIONS);
-				}catch(FieldIsNullException e){
-					str=Optional.of("<UNINITIALIZED>");
-				}
-				if(str.isEmpty()) continue;
-				
-				if(comma) sb.append(fieldSeparator);
-				
-				sb.append(field.getName()).append(fieldValueSeparator).append(str.get());
-				comma=true;
-			}
-			
-			sb.append(end);
-			return sb.toString();
+			return instanceToString0(
+				ioPool, instance, doShort, start, end, fieldValueSeparator, fieldSeparator,
+				Stream.concat(getFields().stream().filter(f->f.getName().indexOf(IOFieldTools.GENERATED_FIELD_SEPARATOR)!=-1), instance.listDynamicUnmanagedFields())
+			);
 		}
 	}
 	
@@ -486,21 +444,29 @@ public class Struct<T extends IOInstance<T>>{
 		return instanceToString(ioPool, instance, doShort, "{", "}", "=", ", ");
 	}
 	public String instanceToString(Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
-		StringBuilder sb=new StringBuilder();
+		return instanceToString0(
+			ioPool, instance, doShort, start, end, fieldValueSeparator, fieldSeparator,
+			fields.stream().filter(f->f.getName().indexOf(IOFieldTools.GENERATED_FIELD_SEPARATOR)!=-1)
+		);
+	}
+	
+	protected String instanceToString0(Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator, Stream<IOField<T, ?>> fields){
+		var prefix=start;
+		
 		if(!doShort){
 			var simple=getType().getSimpleName();
 			var index =simple.lastIndexOf('$');
 			if(index!=-1) simple=simple.substring(index+1);
 			
-			sb.append(simple);
+			prefix=simple+prefix;
 		}
 		
-		var fields=new ArrayList<>(this.fields);
-		fields.removeIf(toRem->toRem.getName().indexOf(IOFieldTools.GENERATED_FIELD_SEPARATOR)!=-1);
+		StringJoiner joiner=new StringJoiner(fieldSeparator, prefix, end);
 		
-		sb.append(start);
-		boolean comma=false;
-		for(var field : fields){
+		var i=fields.iterator();
+		while(i.hasNext()){
+			var field=i.next();
+			
 			Optional<String> str;
 			try{
 				str=field.instanceToString(ioPool, instance, doShort||TextUtil.USE_SHORT_IN_COLLECTIONS);
@@ -510,13 +476,11 @@ public class Struct<T extends IOInstance<T>>{
 			
 			if(str.isEmpty()) continue;
 			
-			if(comma) sb.append(fieldSeparator);
-			
-			sb.append(field.getName()).append(fieldValueSeparator).append(str.get());
-			comma=true;
+			StringJoiner f=new StringJoiner("");
+			f.add(field.getName()).add(fieldValueSeparator).add(str.get());
+			joiner.merge(f);
 		}
-		sb.append(end);
-		return sb.toString();
+		return joiner.toString();
 	}
 	
 	public Supplier<T> requireEmptyConstructor(){

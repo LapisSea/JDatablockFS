@@ -94,6 +94,11 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
+		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+			return Optional.of(String.valueOf(getValue(ioPool, instance)));
+		}
+		
+		@Override
 		public boolean instancesEqual(Struct.Pool<T> ioPool1, T inst1, Struct.Pool<T> ioPool2, T inst2){
 			return getValue(ioPool1, inst1)==getValue(ioPool2, inst2);
 		}
@@ -149,6 +154,11 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
+		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+			return Optional.of(String.valueOf(getValue(ioPool, instance)));
+		}
+		
+		@Override
 		public boolean instancesEqual(Struct.Pool<T> ioPool1, T inst1, Struct.Pool<T> ioPool2, T inst2){
 			return getValue(ioPool1, inst1)==getValue(ioPool2, inst2);
 		}
@@ -196,6 +206,11 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		public void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			var size=getSize(ioPool, instance);
 			setValue(ioPool, instance, size.read(src));
+		}
+		
+		@Override
+		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+			return Optional.of(String.valueOf(getValue(ioPool, instance)));
 		}
 		
 		@Override
@@ -256,6 +271,11 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
+		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+			return Optional.of(String.valueOf(getValue(ioPool, instance)));
+		}
+		
+		@Override
 		public boolean instancesEqual(Struct.Pool<T> ioPool1, T inst1, Struct.Pool<T> ioPool2, T inst2){
 			return getValue(ioPool1, inst1)==getValue(ioPool2, inst2);
 		}
@@ -310,6 +330,11 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		public void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			var size=getSize(ioPool, instance);
 			setValue(ioPool, instance, (short)size.read(src));
+		}
+		
+		@Override
+		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+			return Optional.of(String.valueOf(getValue(ioPool, instance)));
 		}
 		
 		@Override
@@ -369,6 +394,11 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
+		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+			return Optional.of(String.valueOf(getValue(ioPool, instance)));
+		}
+		
+		@Override
 		public boolean instancesEqual(Struct.Pool<T> ioPool1, T inst1, Struct.Pool<T> ioPool2, T inst2){
 			return getValue(ioPool2, inst1)==getValue(ioPool1, inst2);
 		}
@@ -414,6 +444,11 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		@Override
 		public void skipReadBits(BitReader src, T instance) throws IOException{
 			src.skip(1);
+		}
+		
+		@Override
+		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+			return Optional.of(String.valueOf(getValue(ioPool, instance)));
 		}
 		
 		@Override
