@@ -21,11 +21,13 @@ public final class AutoText extends IOInstance<AutoText> implements CharSequence
 	public static final StructPipe<AutoText> PIPE  =ContiguousStructPipe.of(STRUCT);
 	
 	private String       data;
+	private byte[]       dataSrc;
 	@IOValue
 	private CharEncoding encoding;
 	@IOValue
 	@IODependency.VirtualNumSize(name="numSize")
 	private int          charCount;
+	
 	
 	public AutoText(){
 		super(STRUCT);
@@ -44,12 +46,31 @@ public final class AutoText extends IOInstance<AutoText> implements CharSequence
 		encoding=CharEncoding.findBest(newData);
 		charCount=newData.length();
 		data=newData;
+		dataSrc=null;
+	}
+	
+	@IOValue
+	private void setCharCount(int charCount){
+		this.charCount=charCount;
+		dataSrc=null;
+	}
+	@IOValue
+	private void setEncoding(CharEncoding encoding){
+		this.encoding=encoding;
+		dataSrc=null;
 	}
 	
 	@IOValue
 	@IODependency({"charCount", "encoding"})
 	@IODependency.ArrayLenSize(name="numSize")
 	private byte[] getTextBytes() throws IOException{
+		if(dataSrc==null){
+			dataSrc=generateBytes();
+		}
+		return dataSrc;
+	}
+	
+	private byte[] generateBytes() throws IOException{
 		byte[] buff=new byte[encoding.calcSize(data)];
 		writeTextBytes(new ContentOutputStream.BA(buff));
 		return buff;
@@ -57,6 +78,7 @@ public final class AutoText extends IOInstance<AutoText> implements CharSequence
 	
 	@IOValue
 	private void setTextBytes(byte[] bytes) throws IOException{
+		dataSrc=bytes;
 		StringBuilder sb=new StringBuilder();
 		readTextBytes(new ContentInputStream.BA(bytes), sb);
 		data=sb.toString();
@@ -79,7 +101,7 @@ public final class AutoText extends IOInstance<AutoText> implements CharSequence
 	
 	@Override
 	public int length(){
-		return data.length();
+		return charCount;
 	}
 	@Override
 	public CharSequence subSequence(int start, int end){

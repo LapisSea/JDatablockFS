@@ -7,6 +7,7 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.ShouldNeverHappenError;
+import com.lapissea.util.UtilL;
 
 import java.lang.invoke.*;
 import java.lang.reflect.Constructor;
@@ -127,12 +128,12 @@ public class Access{
 		checkTarget:
 		{
 			var cls=lookup.lookupClass();
-			if(cls.getModule().equals(Dummy.class.getModule())){
-				break checkTarget;
-			}
+//			if(cls.getModule().equals(Dummy.class.getModule())){
+//				break checkTarget;
+//			}
 			
-			for(var rootClass : List.of(IOInstance.class, StructPipe.class)){
-				if(rootClass.isAssignableFrom(cls)){
+			for(var consentClass : List.of(IOInstance.class, StructPipe.class)){
+				if(UtilL.instanceOf(cls, consentClass)){
 					break checkTarget;
 				}
 			}
@@ -147,7 +148,7 @@ public class Access{
 			f.setAccessible(true);
 			var unsafe=(sun.misc.Unsafe)f.get(null);
 			
-			//get first field offset to skip any CG/Identity data that would create a segfault
+			//get first field offset to skip any GC/Identity data that would create a segfault
 			var offset=unsafe.objectFieldOffset(Dummy.class.getDeclaredField("a"));
 			while(true){
 				//can't get exact offset of lookup permissions flags field so the safest way to do it to probe offsets sequentially

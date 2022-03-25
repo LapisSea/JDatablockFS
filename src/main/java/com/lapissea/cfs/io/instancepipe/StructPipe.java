@@ -306,7 +306,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	public void earlyCheckNulls(Struct.Pool<T> ioPool, T instance){
 		if(earlyNullChecks==null) return;
 		for(var field : earlyNullChecks){
-			if(field.get(ioPool, instance)==null){
+			if(field.isNull(ioPool, instance)){
 				throw new FieldIsNullException(field);
 			}
 		}

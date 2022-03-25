@@ -22,6 +22,13 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		
 		private int pos;
 		
+		public MemRandomIO(){}
+		
+		public MemRandomIO(int pos){
+			if(pos<0) throw new IndexOutOfBoundsException(pos);
+			this.pos=pos;
+		}
+		
 		@Override
 		public RandomIO setPos(long pos){
 			if(pos<0) throw new IndexOutOfBoundsException();
@@ -258,6 +265,10 @@ public abstract class MemoryData<DataType> implements IOInterface{
 	@NotNull
 	public MemRandomIO io(){
 		return new MemRandomIO();
+	}
+	@Override
+	public RandomIO ioAt(long offset) throws IOException{
+		return new MemRandomIO((int)offset);
 	}
 	
 	@Override

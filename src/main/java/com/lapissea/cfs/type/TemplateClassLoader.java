@@ -163,9 +163,7 @@ public class TemplateClassLoader extends ClassLoader{
 		try{
 			def=db.getDefinitionFromClassName(name);
 		}catch(IOException e){
-			var e1=new ClassNotFoundException("Failed to fetch data from database");
-			e1.addSuppressed(e);
-			throw e1;
+			throw new RuntimeException("Failed to fetch data from database", e);
 		}
 		if(def==null){
 			throw new ClassNotFoundException(name+" is not defined in database");
