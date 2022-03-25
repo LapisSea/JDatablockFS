@@ -37,12 +37,15 @@ public @interface IOValue{
 			                             .map(IODependency.ArrayLenSize::name)
 			                             .orElseGet(()->IOFieldTools.makeNumberSizeName(IOFieldTools.makeArrayLenName(field)));
 			
-			return List.of(new VirtualFieldDefinition<T, Integer>(IO, IOFieldTools.makeArrayLenName(field), Integer.class, (ioPool, instance, dependencies, value)->{
-				if(value!=null) return value;
-				var arr=field.get(ioPool, instance);
-				if(arr!=null) return Array.getLength(arr);
-				return -1;
-			}, List.of(IOFieldTools.makeAnnotation(IODependency.VirtualNumSize.class, Map.of("name", arrayLengthSizeName)))));
+			return List.of(new VirtualFieldDefinition<>(
+				IO, IOFieldTools.makeArrayLenName(field), int.class,
+				(VirtualFieldDefinition.GetterFilter.I<T>)(ioPool, instance, dependencies, value)->{
+					if(value>0) return value;
+					var arr=field.get(ioPool, instance);
+					if(arr!=null) return Array.getLength(arr);
+					return 0;
+				},
+				List.of(IOFieldTools.makeAnnotation(IODependency.VirtualNumSize.class, Map.of("name", arrayLengthSizeName)))));
 		}
 		@NotNull
 		@Override

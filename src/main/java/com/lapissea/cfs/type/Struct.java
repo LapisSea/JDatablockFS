@@ -7,6 +7,7 @@ import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.FieldIsNullException;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.internal.Access;
+import com.lapissea.cfs.internal.MemPrimitive;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.compilation.FieldCompiler;
 import com.lapissea.cfs.type.field.IOField;
@@ -19,10 +20,7 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
-import java.util.ArrayList;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -43,41 +41,119 @@ public class Struct<T extends IOInstance<T>>{
 		class GeneralStructArray<T extends IOInstance<T>> implements Pool<T>{
 			
 			private final Struct<T>                          typ;
-			private final Object[]                           pool;
 			private final VirtualFieldDefinition.StoragePool poolType;
+			
+			private final int poolSize;
+			private final int primitiveMemorySize;
+			
+			private Object[] pool;
+			private byte[]   primitives;
 			
 			public GeneralStructArray(Struct<T> typ, VirtualFieldDefinition.StoragePool pool){
 				this.poolType=pool;
 				this.typ=typ;
-				if(pool==VirtualFieldDefinition.StoragePool.NONE) throw new IllegalArgumentException();
-				var sizes=typ.poolSizes;
-				if(sizes==null) this.pool=null;
-				else{
-					var count=sizes[pool.ordinal()];
-					this.pool=count==0?null:new Object[count];
+				
+				int poolSize=0;
+				if(typ.poolSizes!=null) poolSize=typ.poolSizes[pool.ordinal()];
+				
+				int primitiveMemorySize=0;
+				if(typ.poolPrimitiveSizes!=null) primitiveMemorySize=typ.poolPrimitiveSizes[pool.ordinal()];
+				
+				assert poolSize>0||primitiveMemorySize>0;
+				
+				this.poolSize=poolSize;
+				this.primitiveMemorySize=primitiveMemorySize;
+			}
+			
+			private void protectAccessor(VirtualAccessor<T> accessor){
+				if(accessor.getDeclaringStruct()!=typ){
+					throw new IllegalArgumentException(accessor.getDeclaringStruct()+" != "+typ);
 				}
+			}
+			
+			private void protectAccessor(VirtualAccessor<T> accessor, List<Class<?>> types){
+				protectAccessor(accessor);
+				
+				if(types.stream().noneMatch(type->accessor.getType()==type)){
+					throw new IllegalArgumentException(accessor.getType()+" != "+types.stream().map(Class::getName).collect(Collectors.joining(" || ", "(", ")")));
+				}
+			}
+			
+			private int getPtrIndex(VirtualAccessor<T> accessor){
+				if(DEBUG_VALIDATION) protectAccessor(accessor);
+				
+				int index=accessor.getPtrIndex();
+				if(index==-1){
+					if(accessor.getPrimitiveOffset()==-1) throw new IllegalStateException(TextUtil.toNamedJson(accessor));
+					throw new ClassCastException(accessor+" is not of an object type!");
+				}
+				return index;
 			}
 			
 			@Override
 			public void set(VirtualAccessor<T> accessor, Object value){
-				protectAccessor(accessor);
-				int index=accessor.getAccessIndex();
+				int index=getPtrIndex(accessor);
+				if(pool==null) pool=new Object[poolSize];
 				pool[index]=value;
+				
 			}
 			@Override
 			public Object get(VirtualAccessor<T> accessor){
-				protectAccessor(accessor);
-				int index=accessor.getAccessIndex();
+				int index=getPtrIndex(accessor);
+				if(pool==null) return null;
 				return pool[index];
+				
 			}
 			
-			private void protectAccessor(VirtualAccessor<T> accessor){
-				if(DEBUG_VALIDATION){
-					if(accessor.getDeclaringStruct()!=typ){
-						throw new IllegalArgumentException(accessor.getDeclaringStruct()+" != "+typ);
-					}
+			
+			@Override
+			public long getLong(VirtualAccessor<T> accessor){
+				if(DEBUG_VALIDATION) protectAccessor(accessor, List.of(long.class, int.class));
+				
+				if(primitives==null) return 0;
+				
+				return switch(accessor.getPrimitiveSize()){
+					case Long.BYTES -> MemPrimitive.getLong(primitives, accessor.getPrimitiveOffset());
+					case Integer.BYTES -> MemPrimitive.getInt(primitives, accessor.getPrimitiveOffset());
+					default -> throw new IllegalStateException();
+				};
+			}
+			
+			@Override
+			public void setLong(VirtualAccessor<T> accessor, long value){
+				if(DEBUG_VALIDATION) protectAccessor(accessor, List.of(long.class));
+				
+				if(primitives==null){
+					if(value==0) return;
+					primitives=new byte[primitiveMemorySize];
+				}
+				MemPrimitive.setLong(primitives, accessor.getPrimitiveOffset(), value);
+			}
+			
+			@Override
+			public int getInt(VirtualAccessor<T> accessor){
+				if(DEBUG_VALIDATION) protectAccessor(accessor, List.of(int.class));
+				
+				if(primitives==null) return 0;
+				return MemPrimitive.getInt(primitives, accessor.getPrimitiveOffset());
+			}
+			
+			@Override
+			public void setInt(VirtualAccessor<T> accessor, int value){
+				if(DEBUG_VALIDATION) protectAccessor(accessor, List.of(int.class, long.class));
+				
+				if(primitives==null){
+					if(value==0) return;
+					primitives=new byte[primitiveMemorySize];
+				}
+				
+				switch(accessor.getPrimitiveSize()){
+					case Long.BYTES -> MemPrimitive.setLong(primitives, accessor.getPrimitiveOffset(), value);
+					case Integer.BYTES -> MemPrimitive.setInt(primitives, accessor.getPrimitiveOffset(), value);
+					default -> throw new IllegalStateException();
 				}
 			}
+			
 			
 			@Override
 			public String toString(){
@@ -94,6 +170,12 @@ public class Struct<T extends IOInstance<T>>{
 		
 		void set(VirtualAccessor<T> accessor, Object value);
 		Object get(VirtualAccessor<T> accessor);
+		
+		long getLong(VirtualAccessor<T> accessor);
+		void setLong(VirtualAccessor<T> accessor, long value);
+		
+		int getInt(VirtualAccessor<T> accessor);
+		void setInt(VirtualAccessor<T> accessor, int value);
 	}
 	
 	public static class Unmanaged<T extends IOInstance.Unmanaged<T>> extends Struct<T>{
@@ -312,7 +394,9 @@ public class Struct<T extends IOInstance<T>>{
 	private final Class<T> type;
 	
 	private final FieldSet<T> fields;
+	private final boolean[]   hasPools;
 	private final int[]       poolSizes;
+	private final int[]       poolPrimitiveSizes;
 	
 	private Supplier<T> emptyConstructor;
 	
@@ -323,6 +407,8 @@ public class Struct<T extends IOInstance<T>>{
 		this.fields=computeFields();
 		this.fields.forEach(IOField::init);
 		poolSizes=calcPoolSizes();
+		poolPrimitiveSizes=calcPoolPrimitiveSizes();
+		hasPools=calcHasPools();
 	}
 	
 	private FieldSet<T> computeFields(){
@@ -344,6 +430,40 @@ public class Struct<T extends IOInstance<T>>{
 			poolSizes[vPool.ordinal()]++;
 		}
 		return poolSizes;
+	}
+	
+	private int[] calcPoolPrimitiveSizes(){
+		var vPools=fields.stream()
+		                 .map(IOField::getAccessor)
+		                 .filter(f->f instanceof VirtualAccessor)
+		                 .map(c->(VirtualAccessor<T>)c)
+		                 .filter(a->a.getPrimitiveSize()>0)
+		                 .collect(Collectors.groupingBy(VirtualAccessor::getStoragePool));
+		if(vPools.isEmpty()) return null;
+		var poolSizes=new int[VirtualFieldDefinition.StoragePool.values().length];
+		for(var e : vPools.entrySet()){
+			poolSizes[e.getKey().ordinal()]=e.getValue()
+			                                 .stream()
+			                                 .mapToInt(a->a.getPrimitiveOffset()+a.getPrimitiveSize())
+			                                 .max()
+			                                 .orElseThrow();
+		}
+		return poolSizes;
+	}
+	
+	private boolean[] calcHasPools(){
+		if(poolSizes==null&&poolPrimitiveSizes==null){
+			return null;
+		}
+		var b=new boolean[poolSizes==null?poolPrimitiveSizes.length:poolSizes.length];
+		for(int i=0;i<b.length;i++){
+			boolean p=poolSizes!=null&&poolSizes[i]>0;
+			boolean n=poolPrimitiveSizes!=null&&poolPrimitiveSizes[i]>0;
+			
+			b[i]=p||n;
+		}
+		
+		return b;
 	}
 	
 	@Override
@@ -422,6 +542,7 @@ public class Struct<T extends IOInstance<T>>{
 	
 	@Nullable
 	public Pool<T> allocVirtualVarPool(VirtualFieldDefinition.StoragePool pool){
+		if(hasPools==null||!hasPools[pool.ordinal()]) return null;
 		return new Pool.GeneralStructArray<>(this, pool);
 	}
 	

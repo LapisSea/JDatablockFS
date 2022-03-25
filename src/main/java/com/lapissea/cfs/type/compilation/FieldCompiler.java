@@ -33,7 +33,6 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.NONE;
 import static java.util.function.Function.identity;
 
 @SuppressWarnings("rawtypes")
@@ -132,9 +131,10 @@ public class FieldCompiler{
 	
 	private <T extends IOInstance<T>> void generateVirtualFields(List<AnnotatedField<T>> parsed, Struct<T> struct){
 		
-		Map<VirtualFieldDefinition.StoragePool, Integer> accessIndex   =new EnumMap<>(VirtualFieldDefinition.StoragePool.class);
-		Map<String, FieldAccessor<T>>                    virtualData   =new HashMap<>();
-		Map<String, FieldAccessor<T>>                    newVirtualData=new HashMap<>();
+		Map<VirtualFieldDefinition.StoragePool, Integer> accessIndex    =new EnumMap<>(VirtualFieldDefinition.StoragePool.class);
+		Map<VirtualFieldDefinition.StoragePool, Integer> primitiveOffset=new EnumMap<>(VirtualFieldDefinition.StoragePool.class);
+		Map<String, FieldAccessor<T>>                    virtualData    =new HashMap<>();
+		Map<String, FieldAccessor<T>>                    newVirtualData =new HashMap<>();
 		
 		List<AnnotatedField<T>> toRun=new ArrayList<>(parsed);
 		
@@ -150,15 +150,26 @@ public class FieldCompiler{
 							}
 							continue;
 						}
-						FieldAccessor<T> accessor=new VirtualAccessor<>(
-							struct,
-							(VirtualFieldDefinition<T, Object>)s,
-							accessIndex.compute(s.storagePool, (k, v)->{
-								if(k==NONE) return -1;
-								else{
-									return v==null?0:v+1;
-								}
-							}));
+						
+						int primitiveSize, off, ptrIndex;
+						
+						if(!(s.getType() instanceof Class<?> c)||!c.isPrimitive()){
+							primitiveSize=off=-1;
+							ptrIndex=accessIndex.compute(s.storagePool, (k, v)->v==null?0:v+1);
+						}else{
+							if(List.of(long.class, double.class).contains(s.getType())){
+								primitiveSize=8;
+							}else{
+								primitiveSize=4;
+							}
+							off=primitiveOffset.getOrDefault(s.storagePool, 0);
+							int offEnd=off+primitiveSize;
+							primitiveOffset.put(s.storagePool, offEnd);
+							
+							ptrIndex=-1;
+						}
+						
+						FieldAccessor<T> accessor=new VirtualAccessor<>(struct, (VirtualFieldDefinition<T, Object>)s, ptrIndex, off, primitiveSize);
 						virtualData.put(s.getName(), accessor);
 						newVirtualData.put(s.getName(), accessor);
 					}

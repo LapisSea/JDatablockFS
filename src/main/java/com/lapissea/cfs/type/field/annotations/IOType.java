@@ -27,8 +27,7 @@ public @interface IOType{
 				return List.of(new VirtualFieldDefinition<T, Integer>(
 					VirtualFieldDefinition.StoragePool.IO,
 					IOFieldTools.makeGenericIDFieldName(field),
-					Integer.class,
-					(ioPool, instance, dependencies, value)->value==null?0:value,
+					int.class,
 					List.of(IOFieldTools.makeAnnotation(IODependency.VirtualNumSize.class, Map.of()))
 				));
 			}

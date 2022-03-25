@@ -105,7 +105,27 @@ public @interface IODependency{
 					NumberSize.class,
 					new VirtualFieldDefinition.GetterFilter<T, NumberSize>(){
 						private NumberSize calcMax(Struct.Pool<T> ioPool, T inst, List<FieldAccessor<T>> deps){
-							return NumberSize.bySize(deps.stream().mapToLong(d->d.getLong(ioPool, inst)).max().orElse(0L));
+							return NumberSize.bySize(calcMaxVal(ioPool, inst, deps));
+						}
+						private long calcMaxVal(Struct.Pool<T> ioPool, T inst, List<FieldAccessor<T>> deps){
+							return switch(deps.size()){
+								case 1 -> deps.get(0).getLong(ioPool, inst);
+								case 2 -> {
+									long a=deps.get(0).getLong(ioPool, inst);
+									long b=deps.get(1).getLong(ioPool, inst);
+									yield Math.max(a, b);
+								}
+								default -> {
+									long best=Long.MIN_VALUE;
+									for(var d : deps){
+										long newVal=d.getLong(ioPool, inst);
+										if(newVal>best){
+											best=newVal;
+										}
+									}
+									yield best;
+								}
+							};
 						}
 						@Override
 						public NumberSize filter(Struct.Pool<T> ioPool, T inst, List<FieldAccessor<T>> deps, NumberSize val){

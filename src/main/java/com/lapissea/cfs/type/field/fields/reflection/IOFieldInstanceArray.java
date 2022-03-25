@@ -63,7 +63,7 @@ public class IOFieldInstanceArray<T extends IOInstance<T>, ValType extends IOIns
 	@Override
 	public void init(){
 		super.init();
-		arraySize=declaringStruct().getFields().requireExact(Integer.class, IOFieldTools.makeArrayLenName(getAccessor()));
+		arraySize=declaringStruct().getFields().requireExact(int.class, IOFieldTools.makeArrayLenName(getAccessor()));
 	}
 	
 	private int getArraySize(Struct.Pool<T> ioPool, T inst){
