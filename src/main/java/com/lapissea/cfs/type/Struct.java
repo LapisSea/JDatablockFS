@@ -34,7 +34,7 @@ import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NOT_NULL;
 
-public class Struct<T extends IOInstance<T>>{
+public sealed class Struct<T extends IOInstance<T>>{
 	
 	public interface Pool<T extends IOInstance<T>>{
 		
@@ -178,7 +178,7 @@ public class Struct<T extends IOInstance<T>>{
 		void setInt(VirtualAccessor<T> accessor, int value);
 	}
 	
-	public static class Unmanaged<T extends IOInstance.Unmanaged<T>> extends Struct<T>{
+	public static final class Unmanaged<T extends IOInstance.Unmanaged<T>> extends Struct<T>{
 		
 		public interface Constr<T>{
 			T create(DataProvider provider, Reference reference, TypeLink type) throws IOException;
