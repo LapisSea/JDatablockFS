@@ -1,7 +1,7 @@
 package com.lapissea.cfs.io.content;
 
 import com.lapissea.cfs.BufferErrorSupplier;
-import com.lapissea.cfs.io.ContentBuff;
+import com.lapissea.cfs.Utils;
 import com.lapissea.util.MathUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.BiIntConsumer;
@@ -11,7 +11,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 @SuppressWarnings({"PointlessBitwiseExpression", "PointlessArithmeticExpression", "unused"})
-public interface ContentWriter extends AutoCloseable, ContentBuff{
+public interface ContentWriter extends AutoCloseable{
 	
 	default void write(ByteBuffer b) throws IOException{
 		write(b, b.position(), b.remaining());
@@ -43,6 +43,17 @@ public interface ContentWriter extends AutoCloseable, ContentBuff{
 	
 	void write(byte[] b, int off, int len) throws IOException;
 	
+	default void write8(long v, int len) throws IOException{
+		byte[]    writeBuffer=new byte[8];
+		final var lm1        =len-1;
+		
+		for(int i=0;i<len;i++){
+			writeBuffer[i]=(byte)(v >>> ((lm1-i)*8));
+		}
+		
+		write(writeBuffer, 0, len);
+	}
+	
 	default void writeBoolean(boolean v) throws IOException{
 		writeInt1(v?1:0);
 	}
@@ -66,9 +77,7 @@ public interface ContentWriter extends AutoCloseable, ContentBuff{
 	}
 	
 	default void writeInt2(int v) throws IOException{
-		byte[] writeBuffer=contentBuf();
-		writeInt2(writeBuffer, 0, v);
-		write(writeBuffer, 0, 2);
+		write8(Integer.toUnsignedLong(v), 2);
 	}
 	
 	private void writeInt2(byte[] writeBuffer, int off, int v){
@@ -86,9 +95,7 @@ public interface ContentWriter extends AutoCloseable, ContentBuff{
 	}
 	
 	default void writeInt3(int v) throws IOException{
-		byte[] writeBuffer=contentBuf();
-		writeInt3(writeBuffer, 0, v);
-		write(writeBuffer, 0, 3);
+		write8(v, 3);
 	}
 	
 	private void writeInt3(byte[] writeBuffer, int off, int v){
@@ -107,9 +114,7 @@ public interface ContentWriter extends AutoCloseable, ContentBuff{
 	}
 	
 	default void writeInt4(int v) throws IOException{
-		byte[] writeBuffer=contentBuf();
-		writeInt4(writeBuffer, 0, v);
-		write(writeBuffer, 0, 4);
+		write8(Integer.toUnsignedLong(v), 4);
 	}
 	
 	private void writeInt4(byte[] writeBuffer, int off, int v){
@@ -129,9 +134,7 @@ public interface ContentWriter extends AutoCloseable, ContentBuff{
 	}
 	
 	default void writeInt5(long v) throws IOException{
-		byte[] writeBuffer=contentBuf();
-		writeInt5(writeBuffer, 0, v);
-		write(writeBuffer, 0, 5);
+		write8(v, 5);
 	}
 	
 	private void writeInt5(byte[] writeBuffer, int off, long v){
@@ -152,9 +155,7 @@ public interface ContentWriter extends AutoCloseable, ContentBuff{
 	}
 	
 	default void writeInt6(long v) throws IOException{
-		byte[] writeBuffer=contentBuf();
-		writeInt6(writeBuffer, 0, v);
-		write(writeBuffer, 0, 6);
+		write8(v, 6);
 	}
 	
 	private void writeInt6(byte[] writeBuffer, int off, long v){
@@ -176,9 +177,7 @@ public interface ContentWriter extends AutoCloseable, ContentBuff{
 	}
 	
 	default void writeInt8(long v) throws IOException{
-		byte[] writeBuffer=contentBuf();
-		writeInt8(writeBuffer, 0, v);
-		write(writeBuffer, 0, 8);
+		write8(v, 8);
 	}
 	
 	private void writeInt8(byte[] writeBuffer, int off, long v){
@@ -202,9 +201,7 @@ public interface ContentWriter extends AutoCloseable, ContentBuff{
 	}
 	
 	default void writeFloat4(float v) throws IOException{
-		byte[] writeBuffer=contentBuf();
-		writeFloat4(writeBuffer, 0, v);
-		write(writeBuffer, 0, 4);
+		writeInt4(Float.floatToIntBits(v));
 	}
 	
 	private void writeFloat4(byte[] writeBuffer, int off, float v){
@@ -246,10 +243,8 @@ public interface ContentWriter extends AutoCloseable, ContentBuff{
 		write(bb, 0, bb.length);
 	}
 	
-	default void writeChar2(int v) throws IOException{
-		byte[] writeBuffer=contentBuf();
-		writeChar2(writeBuffer, 0, v);
-		write(writeBuffer, 0, 2);
+	default void writeChar2(char v) throws IOException{
+		write8(v, 2);
 	}
 	
 	private void writeChar2(byte[] writeBuffer, int off, int v){
@@ -293,6 +288,14 @@ public interface ContentWriter extends AutoCloseable, ContentBuff{
 			@Override
 			public synchronized void write(byte[] b, int off, int len){
 				super.write(b, off, len);
+				earlyCheck();
+			}
+			@Override
+			public void write8(long v, int len) throws IOException{
+				if(count+len<=buf.length){
+					Utils.write8(v, buf, count, len);
+				}
+				count+=len;
 				earlyCheck();
 			}
 			

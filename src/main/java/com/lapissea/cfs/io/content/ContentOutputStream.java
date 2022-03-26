@@ -1,5 +1,6 @@
 package com.lapissea.cfs.io.content;
 
+import com.lapissea.cfs.Utils;
 import com.lapissea.util.NotNull;
 
 import java.io.IOException;
@@ -23,6 +24,11 @@ public abstract class ContentOutputStream extends OutputStream implements Conten
 		@Override
 		public void write(@NotNull byte[] b, int off, int len) throws IOException{
 			System.arraycopy(b, off, ba, pos, len);
+			pos+=len;
+		}
+		@Override
+		public void write8(long v, int len) throws IOException{
+			Utils.write8(v, ba, pos, len);
 			pos+=len;
 		}
 		

@@ -77,10 +77,22 @@ public final class OffsetIO implements RandomIO{
 	public int read(byte[] b, int off, int len) throws IOException{
 		return parent.read(b, off, len);
 	}
+	
+	@Override
+	public long read8(int len) throws IOException{
+		return parent.read8(len);
+	}
+	
 	@Override
 	public void write(byte[] b, int off, int len) throws IOException{
 		parent.write(b, off, len);
 	}
+	
+	@Override
+	public void write8(long v, int len) throws IOException{
+		parent.write8(v, len);
+	}
+	
 	@Override
 	public RandomIO ensureCapacity(long capacity) throws IOException{
 		return parent.ensureCapacity(capacity+offset);

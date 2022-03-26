@@ -19,6 +19,10 @@ public class ContentReaderOutputStream extends ContentOutputStream{
 	public void write(@NotNull byte[] b, int off, int len) throws IOException{
 		writer.write(b, off, len);
 	}
+	@Override
+	public void write8(long v, int len) throws IOException{
+		writer.write8(v, len);
+	}
 	
 	@Override
 	public ContentOutputStream outStream(){

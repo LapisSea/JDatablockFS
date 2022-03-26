@@ -21,6 +21,10 @@ public class RandomOutputStream extends ContentOutputStream{
 	public void write(@NotNull byte[] b, int off, int len) throws IOException{
 		io.write(b, off, len);
 	}
+	@Override
+	public void write8(long v, int len) throws IOException{
+		io.write8(v, len);
+	}
 	
 	@Override
 	public void flush() throws IOException{

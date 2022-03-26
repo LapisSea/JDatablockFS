@@ -10,6 +10,7 @@ import com.lapissea.util.NotNull;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.function.UnsafeSupplier;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
@@ -102,6 +103,22 @@ public abstract class MemoryData<DataType> implements IOInterface{
 			return read;
 		}
 		
+		@Override
+		public long read8(int len) throws IOException{
+			if(transactionOpen){//TODO: Implement transaction read8
+				return RandomIO.super.read8(len);
+			}
+			
+			int remaining=used-pos;
+			if(remaining<len){
+				throw new EOFException();
+			}
+			
+			long val=MemoryData.this.read8(data, pos, len);
+			pos+=len;
+			return val;
+		}
+		
 		private int readAt(long pos, byte[] b, int off, int len){
 			return readAt((int)pos, b, off, len);
 		}
@@ -155,6 +172,25 @@ public abstract class MemoryData<DataType> implements IOInterface{
 				pos+=len;
 				used=Math.max(used, pos);
 			}
+			logWriteEvent(oldPos, oldPos+len);
+		}
+		
+		@Override
+		public void write8(long v, int len) throws IOException{
+			if(transactionOpen){//TODO: Implement transaction read8
+				RandomIO.super.write8(v, len);
+				return;
+			}
+			
+			if(len==0) return;
+			
+			int remaining=(int)(getCapacity()-getPos());
+			if(remaining<len) setCapacity(Math.max(4, Math.max((int)(getCapacity()*4D/3), getCapacity()+len-remaining)));
+			
+			MemoryData.this.write8(v, data, pos, len);
+			var oldPos=pos;
+			pos+=len;
+			used=Math.max(used, pos);
 			logWriteEvent(oldPos, oldPos+len);
 		}
 		
@@ -341,6 +377,9 @@ public abstract class MemoryData<DataType> implements IOInterface{
 	protected abstract void readN(DataType src, int index, byte[] dest, int off, int len);
 	protected abstract void writeN(byte[] src, int index, DataType dest, int off, int len);
 	
+	protected abstract long read8(DataType data, int index, int len);
+	protected abstract void write8(long src, DataType dest, int off, int len);
+	
 	public static Builder build(){
 		return new Builder();
 	}
@@ -465,6 +504,15 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		protected byte[] resize(byte[] oldData, int newSize){
 			return Arrays.copyOf(oldData, newSize);
 		}
+		
+		@Override
+		protected long read8(byte[] data, int index, int len){
+			return Utils.read8(data, index, len);
+		}
+		@Override
+		protected void write8(long src, byte[] dest, int off, int len){
+			Utils.write8(src, dest, off, len);
+		}
 	}
 	
 	private static final class Buff extends MemoryData<ByteBuffer>{
@@ -501,5 +549,25 @@ public abstract class MemoryData<DataType> implements IOInterface{
 			newData.position(0);
 			return newData;
 		}
+		
+		@Override
+		protected long read8(ByteBuffer data, int index, int len){
+			final var lm1=len-1;
+			long      val=0;
+			for(int i=0;i<len;i++){
+				val|=(data.get(index+i)&255L)<<((lm1-i)*8);
+			}
+			return val;
+		}
+		
+		@Override
+		protected void write8(long src, ByteBuffer dest, int off, int len){
+			final var lm1=len-1;
+			
+			for(int i=0;i<len;i++){
+				dest.put(off+i, (byte)(src >>> ((lm1-i)*8)));
+			}
+		}
+		
 	}
 }
