@@ -29,7 +29,17 @@ import static com.lapissea.cfs.type.WordSpace.BIT;
 public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> extends IOField<T, ValueType>{
 	
 	public static boolean isPrimitive(Type clazz){
-		return getFieldMaker(clazz)!=null;
+		return clazz instanceof Class<?> c&&isPrimitive(c);
+	}
+	public static boolean isPrimitive(Class<?> clazz){
+		return clazz.isPrimitive()||
+		       clazz==Double.class||
+		       clazz==Float.class||
+		       clazz==Long.class||
+		       clazz==Integer.class||
+		       clazz==Short.class||
+		       clazz==Byte.class||
+		       clazz==Boolean.class;
 	}
 	
 	public static <T extends IOInstance<T>> IOField<T, ?> make(FieldAccessor<T> field){
