@@ -15,8 +15,8 @@ import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -61,7 +61,7 @@ public class MemoryWalker{
 	
 	public <T extends IOInstance<T>> void walk(boolean self, UnsafeConsumer<Reference, IOException> consumer) throws IOException{
 		if(self) consumer.accept(rootReference);
-		walkStructFull(cluster, new LinkedList<>(), (T)root, rootReference, (StructPipe<T>)pipe, new PointerRecord(){
+		walkStructFull(cluster, new ArrayList<>(), (T)root, rootReference, (StructPipe<T>)pipe, new PointerRecord(){
 			@Override
 			public <I extends IOInstance<I>> IterationOptions log(StructPipe<I> pipe, Reference instanceReference, IOField.Ref<I, ?> field, I instance, Reference value) throws IOException{
 				consumer.accept(value);
@@ -76,7 +76,7 @@ public class MemoryWalker{
 	}
 	
 	public <T extends IOInstance<T>> void walk(PointerRecord consumer) throws IOException{
-		walkStructFull(cluster, new LinkedList<>(), (T)root, rootReference, (StructPipe<T>)pipe, consumer, false);
+		walkStructFull(cluster, new ArrayList<>(), (T)root, rootReference, (StructPipe<T>)pipe, consumer, false);
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -145,14 +145,35 @@ public class MemoryWalker{
 						continue;
 					}
 					
+					if(UtilL.checkFlag(field.getTypeFlags(), IOField.PRIMITIVE_OR_ENUM_FLAG)){
+						continue;
+					}
+					if(UtilL.checkFlag(field.getTypeFlags(), IOField.HAS_NO_POINTERS_FLAG)){
+						continue;
+					}
+					
 					Class<?> type=field.getAccessor().getType();
 					
-					if(field.getAccessor().hasAnnotation(IOType.Dynamic.class)){
+					if(type.isArray()){
+						var pType=type;
+						while(pType.isArray()){
+							pType=pType.componentType();
+						}
+						
+						if(IOFieldPrimitive.isPrimitive(pType)||pType.isEnum()||pType==String.class){
+							continue;
+						}
+					}
+					
+					var dynamic   =UtilL.checkFlag(field.getTypeFlags(), IOField.DYNAMIC_FLAG);
+					var isInstance=UtilL.checkFlag(field.getTypeFlags(), IOField.IOINSTANCE_FLAG);
+					
+					if(dynamic){
 						var inst=field.get(ioPool, instance);
 						if(inst==null) continue;
 						type=inst.getClass();
 						
-						if(inst instanceof IOInstance.Unmanaged valueInstance){
+						if(isInstance&&inst instanceof IOInstance.Unmanaged valueInstance){
 							var res=walkStructFull(cluster, stack, valueInstance, valueInstance.getReference(), valueInstance.getPipe(), pointerRecord, false);
 							if(res.shouldSave){
 								throw new NotImplementedException();//TODO
@@ -164,16 +185,7 @@ public class MemoryWalker{
 					
 					if(field instanceof IOField.Ref<?, ?> refO){
 						IOField.Ref<T, T> refField=(IOField.Ref<T, T>)refO;
-						if(!dynamic){
-							if(isInstance){
-								var typ=refField.getAccessor().getType();
-								if(!Struct.of((Class)typ).getCanHavePointers()){
-									continue;
-								}
-							}
-						}
-						
-						var ref=refField.getReference(instance);
+						var               ref     =refField.getReference(instance);
 						
 						{
 							var res=pointerRecord.log(pipe, instanceReference, refField, instance, ref);
@@ -194,6 +206,14 @@ public class MemoryWalker{
 							}
 						}
 						{
+							if(!dynamic){
+								if(isInstance){
+									var typ=refField.getAccessor().getType();
+									if(!Struct.of((Class)typ).getCanHavePointers()){
+										continue;
+									}
+								}
+							}
 							var res=walkStructFull(cluster, stack, refField.get(ioPool, instance), ref, refField.getReferencedPipe(instance), pointerRecord, false);
 							if(res.shouldSave){
 								throw new NotImplementedException();//TODO
@@ -224,14 +244,6 @@ public class MemoryWalker{
 						}
 					}else{
 						var typ=type;
-						if(typ==Object.class){
-							var inst=field.get(ioPool, instance);
-							if(inst==null){
-								continue;
-							}
-							typ=inst.getClass();
-						}
-						if(IOFieldPrimitive.isPrimitive(typ)||typ.isEnum()) continue;
 						if(typ.isArray()){
 							var component=typ.componentType();
 							if(UtilL.instanceOf(component, IOInstance.class)){
@@ -260,10 +272,7 @@ public class MemoryWalker{
 								continue;
 							}
 						}
-						if(UtilL.instanceOf(typ, IOInstance.class)){
-							if(!Struct.of((Class)typ).getCanHavePointers()){
-								continue;
-							}
+						if(isInstance){
 							var inst=(IOInstance)field.get(ioPool, instance);
 							if(inst!=null){
 								{

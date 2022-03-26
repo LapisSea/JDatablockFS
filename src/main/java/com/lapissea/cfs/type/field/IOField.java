@@ -15,6 +15,7 @@ import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
+import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.util.*;
 
@@ -229,9 +230,35 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	
 	private final IONullability.Mode nullability;
 	
+	public static final int DYNAMIC_FLAG          =1<<0;
+	public static final int IOINSTANCE_FLAG       =1<<1;
+	public static final int PRIMITIVE_OR_ENUM_FLAG=1<<2;
+	public static final int HAS_NO_POINTERS_FLAG  =1<<3;
+	
+	private final int typeFlags;
+	
 	public IOField(FieldAccessor<T> accessor){
 		this.accessor=accessor;
 		nullability=accessor==null?IONullability.Mode.NULLABLE:IOFieldTools.getNullability(accessor);
+		
+		int typeFlags=0;
+		
+		if(accessor!=null){
+			if(accessor.hasAnnotation(IOType.Dynamic.class)){
+				typeFlags|=DYNAMIC_FLAG;
+			}
+			if(IOInstance.isInstance(accessor.getType())){
+				typeFlags|=IOINSTANCE_FLAG;
+				
+				if(!(this instanceof IOField.Ref)&&!Struct.ofUnknown(accessor.getType()).getCanHavePointers()){
+					typeFlags|=HAS_NO_POINTERS_FLAG;
+				}
+			}
+			if(IOFieldPrimitive.isPrimitive(accessor.getType())||accessor.getType().isEnum()){
+				typeFlags|=PRIMITIVE_OR_ENUM_FLAG;
+			}
+		}
+		this.typeFlags=typeFlags;
 	}
 	
 	public void initLateData(FieldSet<T> deps, Stream<UsageHintType> hints){
@@ -242,6 +269,10 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		hints.forEach(h::add);
 		usageHints=Utils.nullIfEmpty(h);
 		initialized=true;
+	}
+	
+	public int getTypeFlags(){
+		return typeFlags;
 	}
 	
 	public boolean isNull(Struct.Pool<T> ioPool, T instance){
