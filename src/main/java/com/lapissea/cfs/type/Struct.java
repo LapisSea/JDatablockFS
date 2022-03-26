@@ -8,12 +8,14 @@ import com.lapissea.cfs.exceptions.FieldIsNullException;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.internal.MemPrimitive;
+import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.compilation.FieldCompiler;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
+import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.util.*;
 
 import java.io.IOException;
@@ -356,6 +358,8 @@ public sealed class Struct<T extends IOInstance<T>>{
 	private final int[]       poolSizes;
 	private final int[]       poolPrimitiveSizes;
 	
+	private final boolean canHavePointers;
+	
 	private Supplier<T> emptyConstructor;
 	
 	private Boolean invalidInitialNulls;
@@ -367,6 +371,7 @@ public sealed class Struct<T extends IOInstance<T>>{
 		poolSizes=calcPoolSizes();
 		poolPrimitiveSizes=calcPoolPrimitiveSizes();
 		hasPools=calcHasPools();
+		canHavePointers=calcCanHavePointers();
 	}
 	
 	private FieldSet<T> computeFields(){
@@ -424,6 +429,24 @@ public sealed class Struct<T extends IOInstance<T>>{
 		return b;
 	}
 	
+	private boolean calcCanHavePointers(){
+		if(this instanceof Struct.Unmanaged) return true;
+		return fields.stream().anyMatch(f->{
+			var acc=f.getAccessor();
+			if(acc==null) return true;
+			if(acc.hasAnnotation(IOType.Dynamic.class)) return true;
+			if(f instanceof IOField.Ref) return true;
+			if(acc.getType()==ChunkPointer.class) return true;
+			if(acc.getType()==Reference.class) return true;
+			if(IOInstance.isInstance(acc.getType())){
+				if(!IOInstance.isManaged(acc.getType())) return true;
+				var s=Struct.ofUnknown(acc.getType());
+				if(s.getCanHavePointers()) return true;
+			}
+			return false;
+		});
+	}
+	
 	@Override
 	public String toString(){
 		return getType().getSimpleName()+"{}";
@@ -438,6 +461,9 @@ public sealed class Struct<T extends IOInstance<T>>{
 	public IOField<T, ?> toIOField(Field field){
 		if(field.getDeclaringClass()!=getType()) throw new IllegalArgumentException();
 		return getFields().byName(field.getName()).orElseThrow();
+	}
+	public boolean getCanHavePointers(){
+		return canHavePointers;
 	}
 	
 	public String instanceToString(Pool<T> ioPool, T instance, boolean doShort){

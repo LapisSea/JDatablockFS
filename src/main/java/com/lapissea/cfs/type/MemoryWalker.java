@@ -83,6 +83,13 @@ public class MemoryWalker{
 	private <T extends IOInstance<T>> IterationOptions walkStructFull(DataProvider cluster, List<IOInstance<?>> stack,
 	                                                                  T instance, Reference instanceReference, StructPipe<T> pipe,
 	                                                                  PointerRecord pointerRecord, boolean inlinedParent) throws IOException{
+		if(instance==null){
+			return IterationOptions.CONTINUE_NO_SAVE;
+		}
+		if(!instance.getThisStruct().getCanHavePointers()){
+			return IterationOptions.CONTINUE_NO_SAVE;
+		}
+		
 		var reference=instanceReference;
 		if(instance instanceof Chunk c){
 			var off=cluster.getFirstChunk().getPtr();
@@ -157,7 +164,16 @@ public class MemoryWalker{
 					
 					if(field instanceof IOField.Ref<?, ?> refO){
 						IOField.Ref<T, T> refField=(IOField.Ref<T, T>)refO;
-						var               ref     =refField.getReference(instance);
+						if(!dynamic){
+							if(isInstance){
+								var typ=refField.getAccessor().getType();
+								if(!Struct.of((Class)typ).getCanHavePointers()){
+									continue;
+								}
+							}
+						}
+						
+						var ref=refField.getReference(instance);
 						
 						{
 							var res=pointerRecord.log(pipe, instanceReference, refField, instance, ref);
@@ -219,6 +235,9 @@ public class MemoryWalker{
 						if(typ.isArray()){
 							var component=typ.componentType();
 							if(UtilL.instanceOf(component, IOInstance.class)){
+								if(!Struct.of((Class)typ).getCanHavePointers()){
+									continue;
+								}
 								var array=(IOInstance<?>[])field.get(ioPool, instance);
 								if(array==null||array.length==0) continue;
 								var pip=StructPipe.of(pipe.getClass(), array[0].getThisStruct());
@@ -242,6 +261,9 @@ public class MemoryWalker{
 							}
 						}
 						if(UtilL.instanceOf(typ, IOInstance.class)){
+							if(!Struct.of((Class)typ).getCanHavePointers()){
+								continue;
+							}
 							var inst=(IOInstance)field.get(ioPool, instance);
 							if(inst!=null){
 								{
@@ -274,6 +296,7 @@ public class MemoryWalker{
 							if(inst==null) continue;
 							
 							if(inst instanceof IOInstance i){
+								if(!i.getThisStruct().getCanHavePointers()) continue;
 								{
 									var res=walkStructFull(cluster, stack, i, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), i.getThisStruct()), pointerRecord, true);
 									if(res.shouldSave){
