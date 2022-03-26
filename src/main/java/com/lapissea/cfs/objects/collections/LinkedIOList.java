@@ -12,18 +12,17 @@ import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.AbstractFieldAccessor;
-import com.lapissea.cfs.type.field.annotations.IODependency;
-import com.lapissea.cfs.type.field.annotations.IONullability;
-import com.lapissea.cfs.type.field.annotations.IOValue;
-import com.lapissea.cfs.type.field.annotations.IOValueUnmanaged;
+import com.lapissea.cfs.type.field.annotations.*;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.*;
@@ -40,9 +39,19 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		
 		private final boolean readOnly;
 		
+		private static final List<Annotation> VALUE_ANNOTATIONS=List.of(
+			IOFieldTools.makeAnnotation(IOType.Dynamic.class, Map.of()),
+			IOFieldTools.makeAnnotation(IONullability.class, Map.of("value", IONullability.Mode.NULLABLE))
+		);
+		
 		@IOValueUnmanaged
 		private static <T extends IOInstance<T>> IOField<Node<T>, ?> makeValField(){
 			var valueAccessor=new AbstractFieldAccessor<Node<T>>(null, "value"){
+				@NotNull
+				@Override
+				public <T extends Annotation> Optional<T> getAnnotation(Class<T> annotationClass){
+					return VALUE_ANNOTATIONS.stream().filter(a->UtilL.instanceOf(a, annotationClass)).map(a->(T)a).findAny();
+				}
 				@Override
 				public Type getGenericType(GenericContext genericContext){
 					return Object.class;
@@ -82,6 +91,11 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		@IOValueUnmanaged
 		private IOField<Node<T>, ?> makeNextField(){
 			var nextAccessor=new AbstractFieldAccessor<Node<T>>(null, "next"){
+				@NotNull
+				@Override
+				public <T extends Annotation> Optional<T> getAnnotation(Class<T> annotationClass){
+					return Optional.empty();
+				}
 				@Override
 				public Type getGenericType(GenericContext genericContext){
 					return getTypeDef().generic(null);

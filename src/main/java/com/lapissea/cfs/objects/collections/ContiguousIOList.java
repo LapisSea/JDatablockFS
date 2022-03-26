@@ -17,6 +17,7 @@ import com.lapissea.util.function.UnsafeLongConsumer;
 import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.IOException;
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Type;
 import java.util.*;
 import java.util.stream.LongStream;
@@ -66,6 +67,11 @@ public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanaged
 	
 	private static <T extends IOInstance<T>> IOField<ContiguousIOList<T>, ?> eField(Type elementType, SizeDescriptor.Fixed<T> desc, long index){
 		return new IOField.NoIO<ContiguousIOList<T>, T>(new AbstractFieldAccessor<>(null, "Element["+index+"]"){
+			@NotNull
+			@Override
+			public <T extends Annotation> Optional<T> getAnnotation(Class<T> annotationClass){
+				return Optional.empty();
+			}
 			@Override
 			public Type getGenericType(GenericContext genericContext){
 				return elementType;

@@ -33,6 +33,7 @@ import org.roaringbitmap.RoaringBitmap;
 
 import java.awt.Color;
 import java.io.IOException;
+import java.lang.annotation.Annotation;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Array;
 import java.lang.reflect.Type;
@@ -1338,6 +1339,11 @@ public class BinaryGridRenderer{
 										long  arrOffset=0;
 										int[] index    ={0};
 										var f=new IOFieldPrimitive.FFloat<T>(new FieldAccessor<>(){
+											@NotNull
+											@Override
+											public <T1 extends Annotation> Optional<T1> getAnnotation(Class<T1> annotationClass){
+												return Optional.empty();
+											}
 											@Override
 											public Struct<T> getDeclaringStruct(){
 												return instance.getThisStruct();
@@ -1379,6 +1385,11 @@ public class BinaryGridRenderer{
 									long  arrOffset=0;
 									int[] index    ={0};
 									var f=new IOField.NoIO<T, String>(new FieldAccessor<>(){
+										@NotNull
+										@Override
+										public <T1 extends Annotation> Optional<T1> getAnnotation(Class<T1> annotationClass){
+											return Optional.empty();
+										}
 										@Override
 										public Struct<T> getDeclaringStruct(){
 											return instance.getThisStruct();

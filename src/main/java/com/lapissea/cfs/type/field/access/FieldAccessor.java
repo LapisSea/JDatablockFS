@@ -14,9 +14,7 @@ import java.util.Optional;
 public interface FieldAccessor<CTyp extends IOInstance<CTyp>> extends Comparable<FieldAccessor<CTyp>>{
 	
 	@NotNull
-	default <T extends Annotation> Optional<T> getAnnotation(Class<T> annotationClass){
-		return Optional.empty();
-	}
+	<T extends Annotation> Optional<T> getAnnotation(Class<T> annotationClass);
 	default boolean hasAnnotation(Class<? extends Annotation> annotationClass){
 		return getAnnotation(annotationClass).isPresent();
 	}
