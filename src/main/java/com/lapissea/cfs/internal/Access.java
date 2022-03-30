@@ -79,7 +79,7 @@ public class Access{
 				                                   handle,
 				                                   handle.type());
 			}catch(LambdaConversionException e){
-				if(USE_UNSAFE_LOOKUP) throw new ShouldNeverHappenError("Unsafe lookup should solve this");
+				if(USE_UNSAFE_LOOKUP) throw new ShouldNeverHappenError("Unsafe lookup should solve this", e);
 				
 				T val=tryRecoverWithOld(constructor, functionalInterface);
 				if(val!=null) return val;
@@ -129,9 +129,6 @@ public class Access{
 		checkTarget:
 		{
 			var cls=lookup.lookupClass();
-//			if(cls.getModule().equals(Dummy.class.getModule())){
-//				break checkTarget;
-//			}
 			
 			for(var consentClass : List.of(IOInstance.class, StructPipe.class)){
 				if(UtilL.instanceOf(cls, consentClass)){

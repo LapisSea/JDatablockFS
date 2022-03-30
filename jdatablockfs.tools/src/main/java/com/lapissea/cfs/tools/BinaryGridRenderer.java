@@ -671,6 +671,8 @@ public class BinaryGridRenderer{
 								pos=chunk.dataEnd();
 								if(referenced.contains(chunk)){
 									fillChunk(ctx, chunk, true, false);
+								}else{
+									drawByteRanges(ctx, List.of(Range.fromSize(chunk.dataStart(), chunk.getCapacity())), alpha(Color.BLUE, 0.1F), false, false);
 								}
 								annotateChunk(annCtx, chunk);
 							}

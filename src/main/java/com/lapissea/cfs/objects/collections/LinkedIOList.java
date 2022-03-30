@@ -39,18 +39,18 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		
 		private final boolean readOnly;
 		
-		private static final List<Annotation> VALUE_ANNOTATIONS=List.of(
+		private static final List<Annotation> ANNOTATIONS=List.of(
 			IOFieldTools.makeAnnotation(IOType.Dynamic.class, Map.of()),
 			IOFieldTools.makeAnnotation(IONullability.class, Map.of("value", IONullability.Mode.NULLABLE))
 		);
 		
 		@IOValueUnmanaged
-		private static <T extends IOInstance<T>> IOField<Node<T>, ?> makeValField(){
+		private static <T extends IOInstance<T>> IOField<Node<T>, Object> makeValField(){
 			var valueAccessor=new AbstractFieldAccessor<Node<T>>(null, "value"){
 				@NotNull
 				@Override
-				public <T extends Annotation> Optional<T> getAnnotation(Class<T> annotationClass){
-					return VALUE_ANNOTATIONS.stream().filter(a->UtilL.instanceOf(a, annotationClass)).map(a->(T)a).findAny();
+				public <T1 extends Annotation> Optional<T1> getAnnotation(Class<T1> annotationClass){
+					return ANNOTATIONS.stream().filter(a->UtilL.instanceOf(a, annotationClass)).map(a->(T1)a).findAny();
 				}
 				@Override
 				public Type getGenericType(GenericContext genericContext){
@@ -89,21 +89,23 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		}
 		
 		@IOValueUnmanaged
-		private IOField<Node<T>, ?> makeNextField(){
+		private static <T extends IOInstance<T>> IOField<Node<T>, Node<T>> makeNextField(){
 			var nextAccessor=new AbstractFieldAccessor<Node<T>>(null, "next"){
 				@NotNull
 				@Override
-				public <T extends Annotation> Optional<T> getAnnotation(Class<T> annotationClass){
-					return Optional.empty();
+				public <T1 extends Annotation> Optional<T1> getAnnotation(Class<T1> annotationClass){
+					if(annotationClass!=IONullability.class) return Optional.empty();
+					return (Optional<T1>)Optional.of(ANNOTATIONS.get(1));
 				}
 				@Override
 				public Type getGenericType(GenericContext genericContext){
-					return getTypeDef().generic(null);
+					if(genericContext==null) return Node.class;
+					throw new NotImplementedException();
 				}
 				@Override
 				public Object get(Struct.Pool<Node<T>> ioPool, Node<T> instance){
 					try{
-						return getNext();
+						return instance.getNext();
 					}catch(IOException e){
 						throw new RuntimeException(e);
 					}
@@ -132,7 +134,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 				public Reference getReference(Node<T> instance){
 					ChunkPointer next;
 					try{
-						next=getNextPtr();
+						next=instance.getNextPtr();
 					}catch(IOException e){
 						throw new RuntimeException(e);
 					}
@@ -140,13 +142,12 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 				}
 				@Override
 				public StructPipe<Node<T>> getReferencedPipe(Node<T> instance){
-					return getPipe();
+					return instance.getPipe();
 				}
 			};
 			next.initLateData(FieldSet.of(List.of(getNextSizeField())), Stream.of());
 			
 			return next;
-			
 		}
 		
 		private static final TypeLink.Check NODE_TYPE_CHECK=new TypeLink.Check(
@@ -157,6 +158,9 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 				if(Modifier.isAbstract(c.getModifiers())) throw new ClassCastException(c+" is abstract");
 			})
 		);
+		
+		private static final IOField<?, NumberSize> NEXT_SIZE_FIELD=Struct.thisClass().getFields().requireExact(NumberSize.class, "nextSize");
+		
 		
 		private static NumberSize calcOptimalNextSize(DataProvider provider) throws IOException{
 			return NumberSize.bySize(provider.getSource().getIOSize());
@@ -389,8 +393,8 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			return desc.calcUnknown(getPipe().makeIOPool(), getDataProvider(), this, WordSpace.BYTE);
 		}
 		
-		private IOField<Node<T>, NumberSize> getNextSizeField(){
-			return getPipe().getSpecificFields().requireExact(NumberSize.class, "nextSize");
+		private static <T extends IOInstance<T>> IOField<Node<T>, NumberSize> getNextSizeField(){
+			return (IOField<Node<T>, NumberSize>)NEXT_SIZE_FIELD;
 		}
 		
 		private long valueStart(){
