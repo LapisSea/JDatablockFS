@@ -14,19 +14,63 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.nio.ByteBuffer;
+import java.security.ProtectionDomain;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.Random;
 import java.util.function.Supplier;
+import java.util.stream.IntStream;
 
 import static com.lapissea.cfs.internal.MyUnsafe.UNSAFE;
-import static java.lang.invoke.MethodHandles.Lookup.*;
+import static java.lang.invoke.MethodHandles.Lookup.MODULE;
+import static java.lang.invoke.MethodHandles.Lookup.PACKAGE;
+import static java.lang.invoke.MethodHandles.Lookup.PRIVATE;
+import static java.lang.invoke.MethodHandles.Lookup.PUBLIC;
 
 @SuppressWarnings("unchecked")
 public class Access{
 	
 	private static final boolean USE_UNSAFE_LOOKUP=true;
 	
+	private static final long ACCESS_OFFSET;
+	
+	static{
+		@SuppressWarnings("all")
+		class Mirror{
+			Class<?> lookupClass;
+			Class<?> prevLookupClass;
+			int      allowedModes;
+			
+			volatile ProtectionDomain cachedProtectionDomain;
+			
+			Mirror(Class<?> lookupClass, Class<?> prevLookupClass, int allowedModes){
+				this.lookupClass=lookupClass;
+				this.prevLookupClass=prevLookupClass;
+				this.allowedModes=allowedModes;
+			}
+		}
+		
+		int offset=0;
+		var mirror=new Mirror(null, null, Integer.MAX_VALUE);
+		while(true){
+			int off=offset;
+			
+			var ok=IntStream.range(0, 100).map(i->i+1234).allMatch(i->{
+				ByteBuffer bb=ByteBuffer.allocate(4);
+				new Random(i).nextBytes(bb.array());
+				mirror.allowedModes=bb.getInt(0);
+				var val=UNSAFE.getInt(mirror, off);
+				return mirror.allowedModes==val;
+			});
+			
+			if(ok) break;
+			
+			offset++;
+		}
+		ACCESS_OFFSET=offset;
+	}
 	
 	public static <FInter, T extends FInter> T makeLambda(Method method, Class<FInter> functionalInterface){
 		Method functionalInterfaceFunction=null;
@@ -121,10 +165,6 @@ public class Access{
 	private static void corruptPermissions(MethodHandles.Lookup lookup){
 		if(lookup.hasFullPrivilegeAccess()) return;
 		
-		class Dummy{
-			int a;
-		}
-		
 		//Ensure only intended/relevant lookup is corrupted
 		checkTarget:
 		{
@@ -139,20 +179,9 @@ public class Access{
 			throw new SecurityException("Unsafe attempt of lookup modification: "+lookup);
 		}
 		
-		var acc=(PUBLIC|PRIVATE|PROTECTED|PACKAGE|MODULE|UNCONDITIONAL|ORIGINAL);
-		try{
-			//get first field offset to skip any GC/Identity data that would create a segfault
-			var offset=UNSAFE.objectFieldOffset(Dummy.class.getDeclaredField("a"));
-			while(true){
-				//can't get exact offset of lookup permissions flags field so the safest way to do it to probe offsets sequentially
-				var old=UNSAFE.getAndSetInt(lookup, offset, acc);
-				if(lookup.hasFullPrivilegeAccess()) break;
-				UNSAFE.getAndSetInt(lookup, offset, old);
-				offset+=4;
-			}
-			
-		}catch(Throwable e){
-			throw new RuntimeException(e);
+		UNSAFE.getAndSetInt(lookup, ACCESS_OFFSET, PUBLIC|MODULE|PACKAGE|PRIVATE);
+		if(!lookup.hasFullPrivilegeAccess()){
+			throw new ShouldNeverHappenError();
 		}
 	}
 	
