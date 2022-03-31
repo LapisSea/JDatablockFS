@@ -312,7 +312,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		}
 	}
 	
-	protected void writeIOFields(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+	protected void writeIOFields(FieldSet<T> fields, Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		
 		ContentOutputBuilder destBuff=null;
 		ContentWriter        target;
@@ -327,7 +327,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		
 		generateAll(ioPool, provider, instance, true);
 		
-		for(IOField<T, ?> field : getSpecificFields()){
+		for(IOField<T, ?> field : fields){
 			if(DEBUG_VALIDATION){
 				long bytes;
 				try{
@@ -512,13 +512,13 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		
 	}
 	
-	protected void readIOFields(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	protected void readIOFields(FieldSet<T> fields, Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		if(DEBUG_VALIDATION){
-			for(IOField<T, ?> field : getSpecificFields()){
+			for(IOField<T, ?> field : fields){
 				readFieldSafe(ioPool, provider, src, instance, field, genericContext);
 			}
 		}else{
-			for(IOField<T, ?> field : getSpecificFields()){
+			for(IOField<T, ?> field : fields){
 				field.readReported(ioPool, provider, src, instance, genericContext);
 			}
 		}
@@ -534,7 +534,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		int checkIndex=0;
 		
 		if(DEBUG_VALIDATION){
-			for(IOField<T, ?> field : ioFields){
+			for(IOField<T, ?> field : getSpecificFields()){
 				if(fields.get(checkIndex)==field){
 					checkIndex++;
 					readFieldSafe(ioPool, provider, src, instance, field, genericContext);

@@ -473,8 +473,18 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		var acc=getAccessor();
 		return acc==null?null:acc.getDeclaringStruct();
 	}
+	
+	private void requireLateData(){
+		if(!lateDataInitialized){
+			throw new IllegalStateException(this.getName()+" late data not initialized");
+		}
+	}
+	public boolean lateDataInitialized(){
+		return lateDataInitialized;
+	}
+	
 	public FieldSet<T> getDependencies(){
-		if(!initialized) throw new IllegalStateException();
+		requireLateData();
 		return Objects.requireNonNull(dependencies);
 	}
 	
@@ -490,7 +500,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	}
 	@Nullable
 	public EnumSet<UsageHintType> getUsageHints(){
-		if(!initialized) throw new IllegalStateException();
+		requireLateData();
 		return usageHints;
 	}
 	
