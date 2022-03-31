@@ -43,6 +43,14 @@ public class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends AbstractF
 		}
 	}
 	
+	public static <T extends IOInstance<T>> FieldAccessor<T> make(Struct<T> struct, Field field, Optional<Method> getter, Optional<Method> setter, String name, Type genericType){
+		if(genericType instanceof Class<?> c&&UtilL.instanceOf(c, INumber.class)){
+			return new ReflectionAccessor.Num<>(struct, field, getter, setter, name, genericType);
+		}else{
+			return new ReflectionAccessor<>(struct, field, getter, setter, name, genericType);
+		}
+	}
+	
 	private final Type     genericType;
 	private final Class<?> rawType;
 	

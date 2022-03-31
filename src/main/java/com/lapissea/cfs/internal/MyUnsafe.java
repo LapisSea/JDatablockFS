@@ -6,7 +6,7 @@ import java.lang.reflect.Constructor;
 
 public class MyUnsafe{
 	
-	static final Unsafe UNSAFE;
+	public static final Unsafe UNSAFE;
 	
 	static{
 		try{

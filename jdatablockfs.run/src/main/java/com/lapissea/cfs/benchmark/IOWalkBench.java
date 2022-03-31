@@ -76,6 +76,18 @@ public class IOWalkBench{
 	}
 	
 	@Benchmark
+	@Fork(jvmArgsAppend = "-Dcom.lapissea.cfs.type.compilation.FieldCompiler.UNSAFE_ACCESS=false")
+	public void walkAccReflection(){
+		doWalk();
+	}
+	
+	@Benchmark
+	@Fork(jvmArgsAppend = "-Dcom.lapissea.cfs.type.compilation.FieldCompiler.UNSAFE_ACCESS=true")
+	public void walkAccUnsafe(){
+		doWalk();
+	}
+	
+	@Benchmark
 	public void walk(){
 		doWalk();
 	}

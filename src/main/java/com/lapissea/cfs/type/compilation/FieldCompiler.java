@@ -229,8 +229,11 @@ public class FieldCompiler{
 				setter.ifPresent(usedFields::add);
 				
 				FieldAccessor<T> accessor;
-				if(type instanceof Class<?> c&&UtilL.instanceOf(c, INumber.class)) accessor=new ReflectionAccessor.Num<>(struct, field, getter, setter, fieldName, type);
-				else accessor=new ReflectionAccessor<>(struct, field, getter, setter, fieldName, type);
+				if(UtilL.sysPropertyByClass(FieldCompiler.class, "UNSAFE_ACCESS", true, Boolean::parseBoolean)){
+					accessor=ReflectionAccessorUnsafe.make(struct, field, getter, setter, fieldName, type);
+				}else{
+					accessor=ReflectionAccessor.make(struct, field, getter, setter, fieldName, type);
+				}
 				
 				fields.add(accessor);
 			}catch(Throwable e){
