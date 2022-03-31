@@ -215,22 +215,26 @@ public sealed class Struct<T extends IOInstance<T>>{
 			return compile(instanceClass, Unmanaged::new);
 		}
 		
-		private       Constr<T> unmanagedConstructor;
-		private final boolean   overridingDynamicUnmanaged;
+		private       Constr<T>   unmanagedConstructor;
+		private final boolean     overridingDynamicUnmanaged;
+		private       boolean     fieldsDirty;
+		private       FieldSet<T> unmanagedStaticFields;
 		
 		public Unmanaged(Class<T> type){
 			super(type);
 			overridingDynamicUnmanaged=checkOverridingUnmanaged();
+			unmanagedStaticFields=FieldCompiler.create().compileStaticUnmanaged(this);
 		}
 		
 		private boolean checkOverridingUnmanaged(){
-			boolean u;
-			try{
-				u=!getType().getMethod("listDynamicUnmanagedFields").getDeclaringClass().equals(IOInstance.Unmanaged.class);
-			}catch(NoSuchMethodException e){
-				throw new RuntimeException(e);
+			Class<?> t=getType();
+			while(true){
+				try{
+					return !t.getDeclaredMethod("listDynamicUnmanagedFields").getDeclaringClass().equals(IOInstance.Unmanaged.class);
+				}catch(NoSuchMethodException e){
+					t=t.getSuperclass();
+				}
 			}
-			return u;
 		}
 		
 		public boolean isOverridingDynamicUnmanaged(){
@@ -254,8 +258,28 @@ public sealed class Struct<T extends IOInstance<T>>{
 		public String instanceToString(Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
 			return instanceToString0(
 				ioPool, instance, doShort, start, end, fieldValueSeparator, fieldSeparator,
-				Stream.concat(getFields().stream().filter(f->f.getName().indexOf(IOFieldTools.GENERATED_FIELD_SEPARATOR)!=-1), instance.listDynamicUnmanagedFields())
+				Stream.concat(getFields().stream().filter(f->f.getName().indexOf(IOFieldTools.GENERATED_FIELD_SEPARATOR)!=-1), instance.listUnmanagedFields())
 			);
+		}
+		
+		public FieldSet<T> getUnmanagedStaticFields(){
+			if(fieldsDirty){
+				fieldsDirty=false;
+				unmanagedStaticFields=FieldSet.of(unmanagedStaticFields.stream().map(f->{
+					if(f instanceof IOField.LateInitField<?, ?> l&&l.actualIfCreated()!=null){
+						return (IOField<T, ?>)l.actualIfCreated();
+					}else{
+						return f;
+					}
+				}));
+			}
+			
+			return unmanagedStaticFields;
+		}
+		
+		
+		public void markFieldsDirty(){
+			fieldsDirty=true;
 		}
 	}
 	
@@ -366,7 +390,7 @@ public sealed class Struct<T extends IOInstance<T>>{
 	
 	public Struct(Class<T> type){
 		this.type=type;
-		this.fields=computeFields();
+		this.fields=FieldCompiler.create().compile(this);
 		this.fields.forEach(IOField::init);
 		poolSizes=calcPoolSizes();
 		poolPrimitiveSizes=calcPoolPrimitiveSizes();
@@ -374,19 +398,15 @@ public sealed class Struct<T extends IOInstance<T>>{
 		canHavePointers=calcCanHavePointers();
 	}
 	
-	private FieldSet<T> computeFields(){
-		FieldSet<T> fields=FieldCompiler.create().compile(this);
-		if(!(this instanceof Unmanaged<?> unmanaged)){
-			return fields;
-		}
-		
-		//noinspection unchecked
-		var staticFields=(FieldSet<T>)FieldCompiler.create().compileStaticUnmanaged(unmanaged);
-		return FieldSet.of(Stream.concat(fields.stream(), staticFields.stream()));
+	private Stream<VirtualAccessor<T>> virtualAccessorStream(){
+		return fields.stream()
+		             .map(IOField::getAccessor)
+		             .filter(f->f instanceof VirtualAccessor)
+		             .map(c->((VirtualAccessor<T>)c));
 	}
 	
 	private int[] calcPoolSizes(){
-		var vPools=fields.stream().map(IOField::getAccessor).filter(f->f instanceof VirtualAccessor).map(c->((VirtualAccessor<T>)c).getStoragePool()).toList();
+		var vPools=virtualAccessorStream().map(VirtualAccessor::getStoragePool).toList();
 		if(vPools.isEmpty()) return null;
 		var poolSizes=new int[VirtualFieldDefinition.StoragePool.values().length];
 		for(var vPool : vPools){
@@ -396,12 +416,7 @@ public sealed class Struct<T extends IOInstance<T>>{
 	}
 	
 	private int[] calcPoolPrimitiveSizes(){
-		var vPools=fields.stream()
-		                 .map(IOField::getAccessor)
-		                 .filter(f->f instanceof VirtualAccessor)
-		                 .map(c->(VirtualAccessor<T>)c)
-		                 .filter(a->a.getPrimitiveSize()>0)
-		                 .collect(Collectors.groupingBy(VirtualAccessor::getStoragePool));
+		var vPools=virtualAccessorStream().filter(a->a.getPrimitiveSize()>0).collect(Collectors.groupingBy(VirtualAccessor::getStoragePool));
 		if(vPools.isEmpty()) return null;
 		var poolSizes=new int[VirtualFieldDefinition.StoragePool.values().length];
 		for(var e : vPools.entrySet()){

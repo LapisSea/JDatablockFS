@@ -42,8 +42,18 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>> implements Clone
 		}
 		
 		@NotNull
-		public Stream<IOField<SELF, ?>> listDynamicUnmanagedFields(){
+		protected Stream<IOField<SELF, ?>> listDynamicUnmanagedFields(){
 			return Stream.of();
+		}
+		
+		@NotNull
+		public final Stream<IOField<SELF, ?>> listUnmanagedFields(){
+			var s =getThisStruct();
+			var fs=s.getUnmanagedStaticFields().stream();
+			if(!s.isOverridingDynamicUnmanaged()){
+				return fs;
+			}
+			return Stream.concat(listDynamicUnmanagedFields(), fs);
 		}
 		
 		public TypeLink getTypeDef(){
@@ -82,6 +92,10 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>> implements Clone
 			}
 			
 			reference=newRef;
+		}
+		
+		public Struct.Unmanaged<SELF> getThisStruct(){
+			return (Struct.Unmanaged<SELF>)super.getThisStruct();
 		}
 		
 		public void free() throws IOException{}

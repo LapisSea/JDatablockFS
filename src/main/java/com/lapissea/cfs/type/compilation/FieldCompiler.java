@@ -54,7 +54,46 @@ public class FieldCompiler{
 	
 	public <T extends IOInstance.Unmanaged<T>> FieldSet<T> compileStaticUnmanaged(Struct.Unmanaged<T> struct){//TODO: implement static unmanaged fields
 		var type=struct.getType();
-		return FieldSet.of();
+		
+		var methods=type.getDeclaredMethods();
+		
+		var valueDefs=Arrays.stream(methods).filter(m->m.isAnnotationPresent(IOValueUnmanaged.class)).toList();
+		if(valueDefs.isEmpty()) return FieldSet.of();
+		
+		for(Method valueMethod : valueDefs){
+			if(!Modifier.isStatic(valueMethod.getModifiers())){
+				throw new MalformedStructLayout(valueMethod+" is not static!");
+			}
+			
+			var context=GenericsResolver.resolve(valueMethod.getDeclaringClass()).method(valueMethod);
+			
+			if(!UtilL.instanceOf(context.resolveReturnClass(), IOField.class)){
+				throw new MalformedStructLayout(valueMethod+" does not return "+IOField.class.getName());
+			}
+			
+			Class<?> ioFieldOwner=context.returnType().type(IOField.class).generic("T");
+			
+			if(ioFieldOwner!=valueMethod.getDeclaringClass()){
+				throw new MalformedStructLayout(valueMethod+" does not return IOField of same owner type!\n"+ioFieldOwner.getName()+"\n"+valueMethod.getDeclaringClass().getName());
+			}
+		}
+		
+		return FieldSet.of(valueDefs.stream().map(valueDef->{
+			valueDef.setAccessible(true);
+			
+			return new IOField.LateInitField<>(()->{
+				IOField<T, ?> f;
+				try{
+					//noinspection unchecked
+					f=(IOField<T, ?>)valueDef.invoke(null);
+				}catch(ReflectiveOperationException e){
+					throw new RuntimeException(e);
+				}
+				
+				struct.markFieldsDirty();
+				return f;
+			});
+		}));
 	}
 	
 	public <T extends IOInstance<T>> FieldSet<T> compile(Struct<T> struct){

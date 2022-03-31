@@ -1483,7 +1483,7 @@ public class BinaryGridRenderer{
 	private <T extends IOInstance<T>> Iterator<IOField<T, Object>> makeFieldIterator(T instance, StructPipe<T> pipe){
 		var fields=pipe.getSpecificFields();
 		if(instance instanceof IOInstance.Unmanaged unmanaged){
-			return Stream.concat(fields.stream(), unmanaged.listDynamicUnmanagedFields()).iterator();
+			return Stream.concat(fields.stream(), unmanaged.listUnmanagedFields()).iterator();
 		}else{
 			return (Iterator<IOField<T, Object>>)(Object)fields.iterator();
 		}

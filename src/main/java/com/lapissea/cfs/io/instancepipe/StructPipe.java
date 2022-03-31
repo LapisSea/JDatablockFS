@@ -33,6 +33,7 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
@@ -129,7 +130,13 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	}
 	
 	protected SizeDescriptor<T> createSizeDescriptor(){
-		var fields=getSpecificFields();
+		FieldSet<T> fields=getSpecificFields();
+		if(type instanceof Struct.Unmanaged<?> u){
+			FieldSet<T> f=(FieldSet<T>)u.getUnmanagedStaticFields();
+			if(!f.isEmpty()){
+				fields=FieldSet.of(Stream.concat(fields.stream(), f.stream()));
+			}
+		}
 		
 		var wordSpace=IOFieldTools.minWordSpace(fields);
 		

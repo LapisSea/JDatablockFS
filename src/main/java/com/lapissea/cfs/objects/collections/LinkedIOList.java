@@ -215,12 +215,6 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			}
 		}
 		
-		@NotNull
-		@Override
-		public Stream<IOField<Node<T>, ?>> listDynamicUnmanagedFields(){
-			return Stream.of(makeNextField(), makeValField());
-		}
-		
 		@Override
 		public boolean equals(Object o){
 			if(this==o) return true;
@@ -278,7 +272,13 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		
 		private T readValue() throws IOException{
 			
-			readManagedFields();
+			try(var io=selfIO()){
+				var s=io.getSize();
+				if(s==0) return null;
+				var min=getNextSizeField().getSizeDescriptor().getMin(WordSpace.BYTE);
+				if(s<min) return null;
+				getPipe().readSingleField(null, getDataProvider(), io, getNextSizeField(), self(), getGenerics());
+			}
 			
 			var start=valueStart();
 			

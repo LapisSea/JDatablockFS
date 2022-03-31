@@ -20,6 +20,7 @@ import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.util.*;
 
 import java.io.IOException;
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Array;
 import java.util.*;
 import java.util.function.Supplier;
@@ -41,6 +42,21 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	
 	public record UsageHintDefinition(UsageHintType type, String target){}
 	
+	
+	public abstract static class FixedSizeDescriptor<Inst extends IOInstance<Inst>, ValueType> extends IOField<Inst, ValueType>{
+		
+		private final SizeDescriptor<Inst> sizeDescriptor;
+		
+		public FixedSizeDescriptor(FieldAccessor<Inst> accessor, SizeDescriptor<Inst> sizeDescriptor){
+			super(accessor);
+			this.sizeDescriptor=sizeDescriptor;
+		}
+		
+		@Override
+		public SizeDescriptor<Inst> getSizeDescriptor(){
+			return sizeDescriptor;
+		}
+	}
 	
 	public static class NoIO<Inst extends IOInstance<Inst>, ValueType> extends IOField<Inst, ValueType>{
 		
@@ -222,24 +238,276 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		
 	}
 	
+	public static class LateInitField<T extends IOInstance<T>, Type> extends IOField<T, Type>{
+		
+		private static class LateAccessor<T extends IOInstance<T>, Type> implements FieldAccessor<T>{
+			
+			private IOField<T, Type>           actual;
+			private Supplier<IOField<T, Type>> source;
+			
+			public LateAccessor(Supplier<IOField<T, Type>> source){
+				this.source=source;
+			}
+			
+			private IOField<T, Type> actual(){
+				if(actual==null){
+					actual=Objects.requireNonNull(source.get());
+					if(!actual.lateDataInitialized()){
+						actual.initLateData(FieldSet.of(), Stream.of());
+					}
+					actual.init();
+					source=null;
+				}
+				return actual;
+			}
+			
+			@NotNull
+			@Override
+			public <T1 extends Annotation> Optional<T1> getAnnotation(Class<T1> annotationClass){
+				return actual().getAccessor().getAnnotation(annotationClass);
+			}
+			@Override
+			public Struct<T> getDeclaringStruct(){
+				return actual().getAccessor().getDeclaringStruct();
+			}
+			@NotNull
+			@Override
+			public String getName(){
+				return actual().getAccessor().getName();
+			}
+			@Override
+			public java.lang.reflect.Type getGenericType(GenericContext genericContext){
+				return actual().getAccessor().getGenericType(genericContext);
+			}
+			@Override
+			public Class<?> getType(){
+				return actual().getAccessor().getType();
+			}
+			@Override
+			public Object get(Struct.Pool<T> ioPool, T instance){
+				return actual().getAccessor().get(ioPool, instance);
+			}
+			@Override
+			public void set(Struct.Pool<T> ioPool, T instance, Object value){
+				actual().getAccessor().set(ioPool, instance, value);
+			}
+			@Override
+			public long getLong(Struct.Pool<T> ioPool, T instance){
+				return actual().getAccessor().getLong(ioPool, instance);
+			}
+			@Override
+			public void setLong(T instance, long value, Struct.Pool<T> ioPool){
+				actual().getAccessor().setLong(instance, value, ioPool);
+			}
+			@Override
+			public int getInt(Struct.Pool<T> ioPool, T instance){
+				return actual().getAccessor().getInt(ioPool, instance);
+			}
+			@Override
+			public void setInt(Struct.Pool<T> ioPool, T instance, int value){
+				actual().getAccessor().setInt(ioPool, instance, value);
+			}
+			@Override
+			public int compareTo(FieldAccessor<T> o){
+				if(o instanceof LateInitField.LateAccessor<T, ?> l){
+					o=l.actual().getAccessor();
+				}
+				return actual().getAccessor().compareTo(o);
+			}
+			@Override
+			public boolean canBeNull(){
+				return actual().getAccessor().canBeNull();
+			}
+		}
+		
+		private final LateAccessor<T, Type> lateAcc;
+		
+		public LateInitField(Supplier<IOField<T, Type>> source){
+			super(new LateAccessor<>(source));
+			lateAcc=(LateAccessor<T, Type>)super.getAccessor();
+		}
+		
+		private IOField<T, Type> actual(){
+			return lateAcc.actual();
+		}
+		
+		public IOField<T, Type> actualIfCreated(){
+			return lateAcc.actual;
+		}
+		
+		@Override
+		public SizeDescriptor<T> getSizeDescriptor(){
+			return actual().getSizeDescriptor();
+		}
+		@Override
+		public void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+			actual().write(ioPool, provider, dest, instance);
+		}
+		@Override
+		public void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+			actual().read(ioPool, provider, src, instance, genericContext);
+		}
+		@Override
+		public void skipRead(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+			actual().skipRead(ioPool, provider, src, instance, genericContext);
+		}
+		
+		@Override
+		public int getTypeFlags(){
+			return actual().getTypeFlags();
+		}
+		@Override
+		public boolean isNull(Struct.Pool<T> ioPool, T instance){
+			return actual().isNull(ioPool, instance);
+		}
+		@Override
+		public Type get(Struct.Pool<T> ioPool, T instance){
+			return actual().get(ioPool, instance);
+		}
+		@Override
+		public void set(Struct.Pool<T> ioPool, T instance, Type value){
+			actual().set(ioPool, instance, value);
+		}
+		@NotNull
+		@Override
+		public List<ValueGeneratorInfo<T, ?>> getGenerators(){
+			return actual().getGenerators();
+		}
+		@Override
+		protected IOException reportSkipReadFail(IOField<T, ?> fi, Exception e) throws IOException{
+			return actual().reportSkipReadFail(fi, e);
+		}
+		@Override
+		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort){
+			return actual().instanceToString(ioPool, instance, doShort);
+		}
+		@Override
+		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+			return actual().instanceToString(ioPool, instance, doShort, start, end, fieldValueSeparator, fieldSeparator);
+		}
+		@Override
+		public boolean instancesEqual(Struct.Pool<T> ioPool1, T inst1, Struct.Pool<T> ioPool2, T inst2){
+			return actual().instancesEqual(ioPool1, inst1, ioPool2, inst2);
+		}
+		@Override
+		public int instanceHashCode(Struct.Pool<T> ioPool, T instance){
+			return actual().instanceHashCode(ioPool, instance);
+		}
+		@Override
+		public void init(){}
+		@Override
+		public String getName(){
+			return actual().getName();
+		}
+		@Override
+		public FieldAccessor<T> getAccessor(){
+			return actual().getAccessor();
+		}
+		@Override
+		public Struct<T> declaringStruct(){
+			return actual().declaringStruct();
+		}
+		@Override
+		public FieldSet<T> getDependencies(){
+			return actual().getDependencies();
+		}
+		@Override
+		public boolean hasUsageHint(UsageHintType hint){
+			return actual().hasUsageHint(hint);
+		}
+		@Override
+		public Stream<UsageHintType> usageHintsStream(){
+			return actual().usageHintsStream();
+		}
+		@Override
+		@Nullable
+		public EnumSet<UsageHintType> getUsageHints(){
+			return actual().getUsageHints();
+		}
+		@Override
+		public String toShortString(){
+			return actual().toShortString();
+		}
+		@Override
+		public String toString(){
+			return actual().toString();
+		}
+		@Override
+		public Stream<? extends IOField<T, ?>> streamUnpackedFields(){
+			return actual().streamUnpackedFields();
+		}
+		@Override
+		public IOField<T, Type> forceMaxAsFixedSize(){
+			return actual().forceMaxAsFixedSize();
+		}
+		@Override
+		protected void throwInformativeFixedSizeError(){
+			actual().throwInformativeFixedSizeError();
+		}
+		@Override
+		protected IOField<T, Type> implMaxAsFixedSize(){
+			return actual().implMaxAsFixedSize();
+		}
+		@Override
+		public IONullability.Mode getNullability(){
+			return actual().getNullability();
+		}
+		@Override
+		public boolean nullable(){
+			return actual().nullable();
+		}
+		@Override
+		public boolean equals(Object o){
+			if(o instanceof IOField.LateInitField<?, ?> that){
+				var thisActual=this.actualIfCreated();
+				var thatActual=that.actualIfCreated();
+				if(thisActual==null&&thatActual==null){
+					return this==that;
+				}
+				return Objects.equals(thisActual, thatActual);
+			}
+			return false;
+			
+		}
+		@Override
+		public int hashCode(){
+			return System.identityHashCode(this);
+		}
+	}
+	
 	private final FieldAccessor<T> accessor;
 	
-	private boolean                initialized;
+	private boolean                lateDataInitialized;
 	private FieldSet<T>            dependencies;
 	private EnumSet<UsageHintType> usageHints;
 	
-	private final IONullability.Mode nullability;
+	private IONullability.Mode nullability;
 	
 	public static final int DYNAMIC_FLAG          =1<<0;
 	public static final int IOINSTANCE_FLAG       =1<<1;
 	public static final int PRIMITIVE_OR_ENUM_FLAG=1<<2;
 	public static final int HAS_NO_POINTERS_FLAG  =1<<3;
 	
-	private final int typeFlags;
+	private int typeFlags=-1;
 	
 	public IOField(FieldAccessor<T> accessor){
 		this.accessor=accessor;
-		nullability=accessor==null?IONullability.Mode.NULLABLE:IOFieldTools.getNullability(accessor);
+	}
+	
+	public void initLateData(FieldSet<T> dependencies, Stream<UsageHintType> usageHints){
+		Utils.requireNull(this.dependencies);
+		Utils.requireNull(this.usageHints);
+		this.dependencies=dependencies;
+		var h=EnumSet.noneOf(UsageHintType.class);
+		usageHints.forEach(h::add);
+		this.usageHints=Utils.nullIfEmpty(h);
+		lateDataInitialized=true;
+	}
+	
+	public int getTypeFlags(){
+		if(typeFlags!=-1){
+			return typeFlags;
+		}
 		
 		int typeFlags=0;
 		
@@ -247,31 +515,19 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 			if(accessor.hasAnnotation(IOType.Dynamic.class)){
 				typeFlags|=DYNAMIC_FLAG;
 			}
-			if(IOInstance.isInstance(accessor.getType())){
+			var type=accessor.getType();
+			if(IOInstance.isInstance(type)){
 				typeFlags|=IOINSTANCE_FLAG;
 				
-				if(!(this instanceof IOField.Ref)&&!Struct.ofUnknown(accessor.getType()).getCanHavePointers()){
+				if(!(this instanceof IOField.Ref)&&!Struct.ofUnknown(type).getCanHavePointers()){
 					typeFlags|=HAS_NO_POINTERS_FLAG;
 				}
 			}
-			if(IOFieldPrimitive.isPrimitive(accessor.getType())||accessor.getType().isEnum()){
+			if(IOFieldPrimitive.isPrimitive(type)||type.isEnum()){
 				typeFlags|=PRIMITIVE_OR_ENUM_FLAG;
 			}
 		}
 		this.typeFlags=typeFlags;
-	}
-	
-	public void initLateData(FieldSet<T> deps, Stream<UsageHintType> hints){
-		Utils.requireNull(dependencies);
-		Utils.requireNull(usageHints);
-		dependencies=deps;
-		var h=EnumSet.noneOf(UsageHintType.class);
-		hints.forEach(h::add);
-		usageHints=Utils.nullIfEmpty(h);
-		initialized=true;
-	}
-	
-	public int getTypeFlags(){
 		return typeFlags;
 	}
 	
@@ -545,6 +801,9 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	}
 	
 	public IONullability.Mode getNullability(){
+		if(nullability==null){
+			nullability=accessor==null?IONullability.Mode.NULLABLE:IOFieldTools.getNullability(accessor);
+		}
 		return nullability;
 	}
 	public boolean nullable(){
