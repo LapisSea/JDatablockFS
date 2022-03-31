@@ -15,9 +15,9 @@ import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
-import java.util.List;
+import java.util.Objects;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
@@ -61,7 +61,7 @@ public class MemoryWalker{
 	
 	public <T extends IOInstance<T>> void walk(boolean self, UnsafeConsumer<Reference, IOException> consumer) throws IOException{
 		if(self) consumer.accept(rootReference);
-		walkStructFull(cluster, new ArrayList<>(), (T)root, rootReference, (StructPipe<T>)pipe, new PointerRecord(){
+		walkStructFull(cluster, (T)root, rootReference, (StructPipe<T>)pipe, new PointerRecord(){
 			@Override
 			public <I extends IOInstance<I>> IterationOptions log(StructPipe<I> pipe, Reference instanceReference, IOField.Ref<I, ?> field, I instance, Reference value) throws IOException{
 				consumer.accept(value);
@@ -76,11 +76,67 @@ public class MemoryWalker{
 	}
 	
 	public <T extends IOInstance<T>> void walk(PointerRecord consumer) throws IOException{
-		walkStructFull(cluster, new ArrayList<>(), (T)root, rootReference, (StructPipe<T>)pipe, consumer, false);
+		walkStructFull(cluster, (T)root, rootReference, (StructPipe<T>)pipe, consumer, false);
+	}
+	
+	private static class RefStack{
+		
+		private IOInstance<?>[] oBuff=new IOInstance[16];
+		private long[]          buff =new long[32];
+		private int             siz;
+		
+		<T extends IOInstance<T>> boolean contains(Reference ref, T inst){
+			if(siz==0) return false;
+			var ptr=ref.getPtr().getValue();
+			var off=ref.getOffset();
+			for(int i=0;i<siz;i++){
+				if(buff[i*2]==ptr&&buff[i*2+1]==off){
+					var o=oBuff[siz];
+					if(!Objects.equals(inst, o)) continue;
+					
+					if(DEBUG_VALIDATION){
+						if(
+							o instanceof IOInstance.Unmanaged<?> u1&&inst instanceof IOInstance.Unmanaged<?> u2&&(
+								!u1.getReference().equals(u2.getReference())||
+								!u1.getTypeDef().equals(u2.getTypeDef())
+							)||
+							!inst.toString().equals(o.toString())
+						){
+							LogUtil.printlnEr("Possible equality problem?\n"+inst+"\n"+o);
+						}
+					}
+					
+					return true;
+				}
+			}
+			return false;
+		}
+		
+		<T extends IOInstance<T>> void push(Reference ref, T inst){
+			if(siz==oBuff.length){
+				buff=Arrays.copyOf(buff, buff.length*2);
+				oBuff=Arrays.copyOf(oBuff, oBuff.length*2);
+			}
+			buff[siz*2]=ref.getPtr().getValue();
+			buff[siz*2+1]=ref.getOffset();
+			oBuff[siz]=inst;
+			siz++;
+		}
+		void pop(){
+			if(siz==0) throw new IllegalStateException();
+			siz--;
+			oBuff[siz]=null;
+		}
+	}
+	
+	private <T extends IOInstance<T>> IterationOptions walkStructFull(DataProvider cluster,
+	                                                                  T instance, Reference instanceReference, StructPipe<T> pipe,
+	                                                                  PointerRecord pointerRecord, boolean inlinedParent) throws IOException{
+		return walkStructFull(cluster, new RefStack(), instance, instanceReference, pipe, pointerRecord, inlinedParent);
 	}
 	
 	@SuppressWarnings("unchecked")
-	private <T extends IOInstance<T>> IterationOptions walkStructFull(DataProvider cluster, List<IOInstance<?>> stack,
+	private <T extends IOInstance<T>> IterationOptions walkStructFull(DataProvider cluster, RefStack stack,
 	                                                                  T instance, Reference instanceReference, StructPipe<T> pipe,
 	                                                                  PointerRecord pointerRecord, boolean inlinedParent) throws IOException{
 		if(instance==null){
@@ -97,28 +153,12 @@ public class MemoryWalker{
 		}
 		if(reference==null||reference.isNull()) return IterationOptions.CONTINUE_NO_SAVE;
 		boolean inlineDirtyButContinue=false;
+		if(stack.contains(reference, instance)){
+			return IterationOptions.CONTINUE_NO_SAVE;
+		}
+		stack.push(reference, instance);
 		try{
-			if(stack.contains(instance)){
-				if(DEBUG_VALIDATION){
-					for(IOInstance<?> ioInstance : stack){
-						if(ioInstance.equals(instance)){
-							
-							if(
-								ioInstance instanceof IOInstance.Unmanaged<?> u1&&instance instanceof IOInstance.Unmanaged<?> u2&&(
-									!u1.getReference().equals(u2.getReference())||
-									!u1.getTypeDef().equals(u2.getTypeDef())
-								)||
-								!ioInstance.toString().equals(instance.toString())
-							){
-								LogUtil.printlnEr("Possible equality problem?\n"+ioInstance+"\n"+instance);
-							}
-							break;
-						}
-					}
-				}
-				return IterationOptions.CONTINUE_NO_SAVE;
-			}
-			stack.add(instance);
+			
 			
 			var fieldOffset=0L;
 			
@@ -188,7 +228,7 @@ public class MemoryWalker{
 						var               ref     =refField.getReference(instance);
 						
 						{
-							var res=pointerRecord.log(pipe, instanceReference, refField, instance, ref);
+							var res=pointerRecord.log(pipe, reference, refField, instance, ref);
 							checkResult(res);
 							if(res.shouldSave&&res.shouldContinue&&inlinedParent){
 								inlineDirtyButContinue=true;
@@ -198,7 +238,7 @@ public class MemoryWalker{
 										return IterationOptions.SAVE_AND_END;
 									}
 									
-									try(var io=instanceReference.io(cluster)){
+									try(var io=reference.io(cluster)){
 										pipe.write(cluster, io, instance);
 									}
 								}
@@ -227,7 +267,7 @@ public class MemoryWalker{
 						
 						if(!ch.isNull()){
 							{
-								var res=pointerRecord.logChunkPointer(pipe, instanceReference, ptrField, instance, ch);
+								var res=pointerRecord.logChunkPointer(pipe, reference, ptrField, instance, ch);
 								checkResult(res);
 								if(res.shouldSave){
 									throw new NotImplementedException();//TODO
@@ -285,7 +325,7 @@ public class MemoryWalker{
 											if(instance instanceof IOInstance.Unmanaged<?>){
 												((IOField)field).set(ioPool, instance, inst);
 											}else{
-												try(var io=instanceReference.io(cluster)){
+												try(var io=reference.io(cluster)){
 													pipe.write(cluster, io, instance);
 												}
 											}
@@ -329,7 +369,7 @@ public class MemoryWalker{
 				}
 			}
 		}finally{
-			stack.remove(instance);
+			stack.pop();
 		}
 		if(inlineDirtyButContinue){
 			return IterationOptions.CONTINUE_AND_SAVE;

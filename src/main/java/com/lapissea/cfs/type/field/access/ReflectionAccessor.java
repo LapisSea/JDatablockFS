@@ -297,6 +297,32 @@ public class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends AbstractF
 	}
 	
 	@Override
+	public short getShort(Struct.Pool<CTyp> ioPool, CTyp instance){
+		try{
+			if(getter!=null){
+				return (Short)getter.invoke(instance);
+			}else{
+				return field.getShort(instance);
+			}
+		}catch(Throwable e){
+			throw UtilL.uncheckedThrow(e);
+		}
+	}
+	
+	@Override
+	public void setShort(Struct.Pool<CTyp> ioPool, CTyp instance, short value){
+		try{
+			if(setter!=null){
+				setter.invoke(instance, value);
+			}else{
+				field.setShort(instance, value);
+			}
+		}catch(Throwable e){
+			throw UtilL.uncheckedThrow(e);
+		}
+	}
+	
+	@Override
 	public boolean canBeNull(){
 		return !rawType.isPrimitive();
 	}

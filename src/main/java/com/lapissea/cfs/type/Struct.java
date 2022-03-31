@@ -372,7 +372,7 @@ public sealed class Struct<T extends IOInstance<T>>{
 	
 	private Supplier<T> emptyConstructor;
 	
-	private Boolean invalidInitialNulls;
+	private int invalidInitialNulls=-1;
 	
 	public Struct(Class<T> type){
 		this.type=type;
@@ -516,7 +516,7 @@ public sealed class Struct<T extends IOInstance<T>>{
 	}
 	
 	public boolean hasInvalidInitialNulls(){
-		if(invalidInitialNulls==null){
+		if(invalidInitialNulls==-1){
 			boolean inv=false;
 			if(fields.unpackedStream().anyMatch(f->f.getNullability()==NOT_NULL)){
 				var obj =requireEmptyConstructor().get();
@@ -525,10 +525,10 @@ public sealed class Struct<T extends IOInstance<T>>{
 				          .filter(f->f.getNullability()==NOT_NULL)
 				          .anyMatch(f->f.isNull(pool, obj));
 			}
-			invalidInitialNulls=inv;
+			invalidInitialNulls=inv?1:0;
 			return inv;
 		}
-		return invalidInitialNulls;
+		return invalidInitialNulls==1;
 	}
 	
 	@Nullable
