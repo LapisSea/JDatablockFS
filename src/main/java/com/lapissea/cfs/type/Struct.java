@@ -217,13 +217,11 @@ public sealed class Struct<T extends IOInstance<T>>{
 		
 		private       Constr<T>   unmanagedConstructor;
 		private final boolean     overridingDynamicUnmanaged;
-		private       boolean     fieldsDirty;
 		private       FieldSet<T> unmanagedStaticFields;
 		
 		public Unmanaged(Class<T> type){
 			super(type);
 			overridingDynamicUnmanaged=checkOverridingUnmanaged();
-			unmanagedStaticFields=FieldCompiler.create().compileStaticUnmanaged(this);
 		}
 		
 		private boolean checkOverridingUnmanaged(){
@@ -263,23 +261,11 @@ public sealed class Struct<T extends IOInstance<T>>{
 		}
 		
 		public FieldSet<T> getUnmanagedStaticFields(){
-			if(fieldsDirty){
-				fieldsDirty=false;
-				unmanagedStaticFields=FieldSet.of(unmanagedStaticFields.stream().map(f->{
-					if(f instanceof IOField.LateInitField<?, ?> l&&l.actualIfCreated()!=null){
-						return (IOField<T, ?>)l.actualIfCreated();
-					}else{
-						return f;
-					}
-				}));
+			if(unmanagedStaticFields==null){
+				unmanagedStaticFields=FieldCompiler.create().compileStaticUnmanaged(this);
 			}
 			
 			return unmanagedStaticFields;
-		}
-		
-		
-		public void markFieldsDirty(){
-			fieldsDirty=true;
 		}
 	}
 	

@@ -81,18 +81,12 @@ public class FieldCompiler{
 		return FieldSet.of(valueDefs.stream().map(valueDef->{
 			valueDef.setAccessible(true);
 			
-			return new IOField.LateInitField<>(()->{
-				IOField<T, ?> f;
-				try{
-					//noinspection unchecked
-					f=(IOField<T, ?>)valueDef.invoke(null);
-				}catch(ReflectiveOperationException e){
-					throw new RuntimeException(e);
-				}
-				
-				struct.markFieldsDirty();
-				return f;
-			});
+			try{
+				//noinspection unchecked
+				return (IOField<T, ?>)valueDef.invoke(null);
+			}catch(ReflectiveOperationException e){
+				throw new RuntimeException(e);
+			}
 		}));
 	}
 	
