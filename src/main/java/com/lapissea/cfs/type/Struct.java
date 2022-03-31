@@ -327,18 +327,18 @@ public sealed class Struct<T extends IOInstance<T>>{
 			
 			struct=newStruct.apply(instanceClass);
 			
-			if(GlobalConfig.PRINT_COMPILATION){
-				LogUtil.println(ConsoleColors.GREEN_BRIGHT+TextUtil.toTable("Compiled: "+struct.getType().getName(), struct.getFields())+ConsoleColors.RESET);
-			}
-			
 			STRUCT_CACHE.put(instanceClass, struct);
-			return struct;
 		}catch(Throwable e){
 			throw new MalformedStructLayout("Failed to compile "+instanceClass.getName(), e);
 		}finally{
 			STRUCT_COMPILE.remove(instanceClass);
 			STRUCT_CACHE_LOCK.unlock();
 		}
+		
+		if(GlobalConfig.PRINT_COMPILATION){
+			LogUtil.println(ConsoleColors.GREEN_BRIGHT+TextUtil.toTable("Compiled: "+struct.getType().getName(), struct.getFields())+ConsoleColors.RESET);
+		}
+		return struct;
 	}
 	
 	@SuppressWarnings("unchecked")

@@ -92,18 +92,18 @@ public class IOWalkBench{
 		doWalk();
 	}
 	@Benchmark
-	@Fork(jvmArgsAppend="-Dradius=2")
+	@Fork(jvmArgsAppend = "-Dradius=2")
 	public void walk2(){
 		doWalk();
 	}
 	@Benchmark
-	@Fork(jvmArgsAppend="-Dradius=30")
+	@Fork(jvmArgsAppend = "-Dradius=30")
 	public void walk30(){
 		doWalk();
 	}
 	
 	@Benchmark
-	@Fork(jvmArgsAppend="-Dread_only_benchy=true")
+	@Fork(jvmArgsAppend = "-Dread_only_benchy=true")
 	public void walkReadOnly(){
 		doWalk();
 	}

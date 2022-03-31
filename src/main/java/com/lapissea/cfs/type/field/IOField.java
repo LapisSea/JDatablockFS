@@ -276,7 +276,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	}
 	
 	public boolean isNull(Struct.Pool<T> ioPool, T instance){
-		if(!accessor.canBeNull()) return false;
+		if(!getAccessor().canBeNull()) return false;
 		try{
 			var val=get(ioPool, instance);
 			return val==null;
@@ -421,7 +421,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		var o1=get(ioPool1, inst1);
 		var o2=get(ioPool2, inst2);
 		
-		if(nullability==IONullability.Mode.DEFAULT_IF_NULL&&(o1==null||o2==null)){
+		if(getNullability()==IONullability.Mode.DEFAULT_IF_NULL&&(o1==null||o2==null)){
 			if(o1==null&&o2==null) return true;
 			var acc=getAccessor();
 			

@@ -59,6 +59,8 @@ public sealed interface IOTypeDB{
 				var def=new TypeDef(type.getTypeClass(null));
 				if(!def.isUnmanaged()){
 					defs.computeIfAbsent(type.getTypeName(), n->new TypeDef(type.getTypeClass(null)));
+				}else{
+					defs.put(type.getTypeName(), null);
 				}
 				
 				for(TypeDef.FieldDef field : def.getFields()){

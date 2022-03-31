@@ -8,19 +8,14 @@ import com.lapissea.cfs.objects.INumber;
 import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
-import com.lapissea.cfs.type.field.access.FieldAccessor;
-import com.lapissea.cfs.type.field.access.FunctionalReflectionAccessor;
-import com.lapissea.cfs.type.field.access.ReflectionAccessor;
-import com.lapissea.cfs.type.field.access.VirtualAccessor;
-import com.lapissea.cfs.type.field.annotations.IODependency;
-import com.lapissea.cfs.type.field.annotations.IONullability;
-import com.lapissea.cfs.type.field.annotations.IOType;
-import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.cfs.type.field.access.*;
+import com.lapissea.cfs.type.field.annotations.*;
 import com.lapissea.cfs.type.field.fields.reflection.*;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.PairM;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
+import ru.vyarus.java.generics.resolver.GenericsResolver;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
@@ -64,9 +59,9 @@ public class FieldCompiler{
 	
 	public <T extends IOInstance<T>> FieldSet<T> compile(Struct<T> struct){
 		var fields=scanFields(struct)
-			.map(f->registry().create(f, null))
-			.map(f->new AnnotatedField<>(f, scanAnnotations(f)))
-			.collect(Collectors.toList());
+			           .map(f->registry().create(f, null))
+			           .map(f->new AnnotatedField<>(f, scanAnnotations(f)))
+			           .collect(Collectors.toList());
 		
 		generateVirtualFields(fields, struct);
 		
@@ -189,20 +184,20 @@ public class FieldCompiler{
 	
 	protected IterablePP<Field> deepFieldsByAnnotation(Class<?> clazz, Class<? extends Annotation> type){
 		return IterablePP
-			.nullTerminated(()->new Supplier<Class<?>>(){
-				Class<?> c=clazz;
-				@Override
-				public Class<?> get(){
-					if(c==null) return null;
-					var tmp=c;
-					var cp =c.getSuperclass();
-					c=cp==c?null:cp;
+			       .nullTerminated(()->new Supplier<Class<?>>(){
+				       Class<?> c=clazz;
+				       @Override
+				       public Class<?> get(){
+					       if(c==null) return null;
+					       var tmp=c;
+					       var cp =c.getSuperclass();
+					       c=cp==c?null:cp;
 					
-					return tmp;
-				}
-			})
-			.flatMap(c->Arrays.asList(c.getDeclaredFields()).iterator())
-			.filtered(f->f.isAnnotationPresent(type));
+					       return tmp;
+				       }
+			       })
+			       .flatMap(c->Arrays.asList(c.getDeclaredFields()).iterator())
+			       .filtered(f->f.isAnnotationPresent(type));
 	}
 	
 	protected <T extends IOInstance<T>> Stream<FieldAccessor<T>> scanFields(Struct<T> struct){
@@ -369,12 +364,12 @@ public class FieldCompiler{
 	
 	protected <T extends IOInstance<T>> List<LogicalAnnotation<Annotation>> scanAnnotations(IOField<T, ?> field){
 		return activeAnnotations()
-			.stream()
-			.flatMap(ann->Stream.concat(Stream.of(ann), Arrays.stream(ann.getClasses())))
-			.map(t->field.getAccessor().getAnnotation((Class<Annotation>)t).map(ann->new LogicalAnnotation<>(ann, getAnnotation(t))))
-			.filter(Optional::isPresent)
-			.map(Optional::get)
-			.toList();
+			       .stream()
+			       .flatMap(ann->Stream.concat(Stream.of(ann), Arrays.stream(ann.getClasses())))
+			       .map(t->field.getAccessor().getAnnotation((Class<Annotation>)t).map(ann->new LogicalAnnotation<>(ann, getAnnotation(t))))
+			       .filter(Optional::isPresent)
+			       .map(Optional::get)
+			       .toList();
 	}
 	
 	@SuppressWarnings("unchecked")

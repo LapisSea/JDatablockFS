@@ -152,10 +152,8 @@ public final class TypeLink extends IOInstance<TypeLink>{
 			Objects.requireNonNull(db);
 			try{
 				return Class.forName(name, true, db.getTemplateLoader());
-			}catch(Throwable e1){
-				e1.printStackTrace();
-				System.exit(-1);
-				throw new RuntimeException(e1);
+			}catch(ClassNotFoundException ex){
+				throw new RuntimeException(ex);
 			}
 		}
 		

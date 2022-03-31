@@ -198,7 +198,7 @@ public class Access{
 		try{
 			var lookup=getLookup(field.getDeclaringClass(), field.getModifiers());
 			field.setAccessible(true);
-			return lookup.findVarHandle(field.getDeclaringClass(), field.getName(), field.getType());
+			return lookup.unreflectVarHandle(field);
 		}catch(Throwable e){
 			throw new RuntimeException("failed to create VarHandle\n"+field, e);
 		}
