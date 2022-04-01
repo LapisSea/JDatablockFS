@@ -19,9 +19,9 @@ import java.lang.reflect.Type;
 import java.util.Optional;
 import java.util.function.LongFunction;
 
-public class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends AbstractFieldAccessor<CTyp>{
+public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends AbstractFieldAccessor<CTyp>{
 	
-	public static class Num<CTyp extends IOInstance<CTyp>> extends ReflectionAccessor<CTyp>{
+	public static final class Num<CTyp extends IOInstance<CTyp>> extends ReflectionAccessor<CTyp>{
 		
 		private final LongFunction<INumber> constructor;
 		

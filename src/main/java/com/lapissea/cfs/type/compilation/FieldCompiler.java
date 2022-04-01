@@ -257,8 +257,8 @@ public class FieldCompiler{
 				setter.ifPresent(usedFields::add);
 				
 				FieldAccessor<T> accessor=switch(UtilL.sysPropertyByClass(FieldCompiler.class, "UNSAFE_ACCESS").orElse("varhandle").toLowerCase()){
-					case "unsafe" -> ReflectionAccessorUnsafe.make(struct, field, getter, setter, fieldName, type);
-					case "varhandle" -> ReflectionAccessorVarHandle.make(struct, field, getter, setter, fieldName, type);
+					case "unsafe" -> UnsafeAccessor.make(struct, field, getter, setter, fieldName, type);
+					case "varhandle" -> VarHandleAccessor.make(struct, field, getter, setter, fieldName, type);
 					default -> ReflectionAccessor.make(struct, field, getter, setter, fieldName, type);
 				};
 				
