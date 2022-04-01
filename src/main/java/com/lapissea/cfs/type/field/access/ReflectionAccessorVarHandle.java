@@ -14,6 +14,7 @@ import com.lapissea.util.UtilL;
 
 import java.lang.annotation.Annotation;
 import java.lang.invoke.MethodHandle;
+import java.lang.invoke.VarHandle;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
@@ -23,11 +24,9 @@ import java.util.Optional;
 import java.util.function.LongFunction;
 import java.util.stream.Collectors;
 
-import static com.lapissea.cfs.internal.MyUnsafe.UNSAFE;
-
-public sealed class ReflectionAccessorUnsafe<CTyp extends IOInstance<CTyp>> extends AbstractFieldAccessor<CTyp>{
+public sealed class ReflectionAccessorVarHandle<CTyp extends IOInstance<CTyp>> extends AbstractFieldAccessor<CTyp>{
 	
-	public static sealed class Funct<CTyp extends IOInstance<CTyp>> extends ReflectionAccessorUnsafe<CTyp>{
+	public static sealed class Funct<CTyp extends IOInstance<CTyp>> extends ReflectionAccessorVarHandle<CTyp>{
 		
 		private final MethodHandle getter;
 		private final MethodHandle setter;
@@ -173,7 +172,7 @@ public sealed class ReflectionAccessorUnsafe<CTyp extends IOInstance<CTyp>> exte
 		}
 	}
 	
-	public static final class Num<CTyp extends IOInstance<CTyp>> extends ReflectionAccessorUnsafe.Funct<CTyp>{
+	public static final class Num<CTyp extends IOInstance<CTyp>> extends ReflectionAccessorVarHandle.Funct<CTyp>{
 		
 		private final LongFunction<INumber> constructor;
 		
@@ -197,12 +196,12 @@ public sealed class ReflectionAccessorUnsafe<CTyp extends IOInstance<CTyp>> exte
 	
 	public static <T extends IOInstance<T>> FieldAccessor<T> make(Struct<T> struct, Field field, Optional<Method> getter, Optional<Method> setter, String name, Type genericType){
 		if(genericType instanceof Class<?> c&&UtilL.instanceOf(c, INumber.class)){
-			return new ReflectionAccessorUnsafe.Num<>(struct, field, getter, setter, name, genericType);
+			return new ReflectionAccessorVarHandle.Num<>(struct, field, getter, setter, name, genericType);
 		}else{
 			if(getter.isEmpty()&&setter.isEmpty()){
-				return new ReflectionAccessorUnsafe<>(struct, field, name, genericType);
+				return new ReflectionAccessorVarHandle<>(struct, field, name, genericType);
 			}
-			return new ReflectionAccessorUnsafe.Funct<>(struct, field, getter, setter, name, genericType);
+			return new ReflectionAccessorVarHandle.Funct<>(struct, field, getter, setter, name, genericType);
 		}
 	}
 	
@@ -219,13 +218,13 @@ public sealed class ReflectionAccessorUnsafe<CTyp extends IOInstance<CTyp>> exte
 	private final Class<?> rawType;
 	private final int      typeID;
 	
-	private final long fieldOffset;
+	private final VarHandle handle;
 	
 	private final Map<Class<? extends Annotation>, ? extends Annotation> annotations;
 	
-	public ReflectionAccessorUnsafe(Struct<CTyp> struct, Field field, String name, Type genericType){
+	public ReflectionAccessorVarHandle(Struct<CTyp> struct, Field field, String name, Type genericType){
 		super(struct, name);
-		this.fieldOffset=UNSAFE.objectFieldOffset(field);
+		this.handle=Access.makeVarHandle(field);
 		
 		var t=field.getType();
 		if(t.isPrimitive()) typeID=Map.of(
@@ -272,59 +271,59 @@ public sealed class ReflectionAccessorUnsafe<CTyp extends IOInstance<CTyp>> exte
 	}
 	
 	private void setShort(CTyp instance, short value){
-		UNSAFE.putShort(instance, fieldOffset, value);
+		handle.set(instance, value);
 	}
 	private short getShort(CTyp instance){
-		return UNSAFE.getShort(instance, fieldOffset);
+		return (short)handle.get(instance);
 	}
 	
 	private long getLong(CTyp instance){
-		return UNSAFE.getLong(instance, fieldOffset);
+		return (long)handle.get(instance);
 	}
 	private void setLong(CTyp instance, long value){
-		UNSAFE.putLong(instance, fieldOffset, value);
+		handle.set(instance, value);
 	}
 	
 	private byte getByte(CTyp instance){
-		return UNSAFE.getByte(instance, fieldOffset);
+		return (byte)handle.get(instance);
 	}
 	private void setByte(CTyp instance, byte value){
-		UNSAFE.putByte(instance, fieldOffset, value);
+		handle.set(instance, value);
 	}
 	
 	private int getInt(CTyp instance){
-		return UNSAFE.getInt(instance, fieldOffset);
+		return (int)handle.get(instance);
 	}
 	private void setInt(CTyp instance, int value){
-		UNSAFE.putInt(instance, fieldOffset, value);
+		handle.set(instance, value);
 	}
 	
 	private double getDouble(CTyp instance){
-		return UNSAFE.getDouble(instance, fieldOffset);
+		return (double)handle.get(instance);
 	}
 	private void setDouble(CTyp instance, double value){
-		UNSAFE.putDouble(instance, fieldOffset, value);
+		handle.set(instance, value);
 	}
 	
 	private void setFloat(CTyp instance, float value){
-		UNSAFE.putFloat(instance, fieldOffset, value);
+		handle.set(instance, value);
 	}
 	private float getFloat(CTyp instance){
-		return UNSAFE.getFloat(instance, fieldOffset);
+		return (float)handle.get(instance);
 	}
 	
 	private void setBoolean(CTyp instance, boolean value){
-		UNSAFE.putBoolean(instance, fieldOffset, value);
+		handle.set(instance, value);
 	}
 	private boolean getBoolean(CTyp instance){
-		return UNSAFE.getBoolean(instance, fieldOffset);
+		return (boolean)handle.get(instance);
 	}
 	
 	private Object getObj(CTyp instance){
-		return UNSAFE.getObject(instance, fieldOffset);
+		return handle.get(instance);
 	}
 	private void setObj(CTyp instance, Object value){
-		UNSAFE.putObject(instance, fieldOffset, getType().cast(value));
+		handle.set(instance, getType().cast(value));
 	}
 	
 	

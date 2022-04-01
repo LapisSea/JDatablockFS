@@ -256,12 +256,11 @@ public class FieldCompiler{
 				getter.ifPresent(usedFields::add);
 				setter.ifPresent(usedFields::add);
 				
-				FieldAccessor<T> accessor;
-				if(UtilL.sysPropertyByClass(FieldCompiler.class, "UNSAFE_ACCESS", true, Boolean::parseBoolean)){
-					accessor=ReflectionAccessorUnsafe.make(struct, field, getter, setter, fieldName, type);
-				}else{
-					accessor=ReflectionAccessor.make(struct, field, getter, setter, fieldName, type);
-				}
+				FieldAccessor<T> accessor=switch(UtilL.sysPropertyByClass(FieldCompiler.class, "UNSAFE_ACCESS").orElse("varhandle").toLowerCase()){
+					case "unsafe" -> ReflectionAccessorUnsafe.make(struct, field, getter, setter, fieldName, type);
+					case "varhandle" -> ReflectionAccessorVarHandle.make(struct, field, getter, setter, fieldName, type);
+					default -> ReflectionAccessor.make(struct, field, getter, setter, fieldName, type);
+				};
 				
 				fields.add(accessor);
 			}catch(Throwable e){
