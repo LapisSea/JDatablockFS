@@ -90,6 +90,10 @@ public class JorthMethod{
 			
 		}
 		
+		public List<GenType> asList(){
+			return List.copyOf(data);
+		}
+		
 		@Override
 		public Stack clone(){
 			var stack=new Stack();
@@ -195,7 +199,7 @@ public class JorthMethod{
 		for(int i=args.size()-1;i>=0;i--){
 			var popped=popTypeStack();
 			var arg   =args.get(i);
-			if(arg.instanceOf(context, popped)) continue;
+			if(popped.instanceOf(context, arg)) continue;
 			
 			throw new MalformedJorthException("Argument "+i+" in "+className+"#"+methodName+" is "+args.get(i)+" but got "+popped);
 		}
@@ -263,10 +267,35 @@ public class JorthMethod{
 		pushTypeStack(GenType.STRING);
 	}
 	
+	public void getFieldIns(JorthCompiler.FieldInfo info){
+		if(info.isStatic()){
+			getFieldStaticIns(info.declaringClass(), info.name(), info.type());
+		}else{
+			getFieldIns(info.declaringClass(), info.name(), info.type());
+		}
+	}
+	public void getFieldStaticIns(String owner, String name, GenType fieldType){
+		mv.visitFieldInsn(GETSTATIC, Utils.undotify(owner), name, Utils.genericSignature(fieldType.rawType()));
+		pushTypeStack(fieldType);
+	}
+	
 	public void getFieldIns(String owner, String name, GenType fieldType){
 		mv.visitFieldInsn(GETFIELD, Utils.undotify(owner), name, Utils.genericSignature(fieldType.rawType()));
 		popTypeStack();
 		pushTypeStack(fieldType);
+	}
+	
+	public void setFieldIns(JorthCompiler.FieldInfo info){
+		if(info.isStatic()){
+			setFieldStaticIns(info.declaringClass(), info.name(), info.type());
+		}else{
+			setFieldIns(info.declaringClass(), info.name(), info.type());
+		}
+	}
+	
+	public void setFieldStaticIns(String owner, String name, GenType fieldType){
+		mv.visitFieldInsn(PUTSTATIC, Utils.undotify(owner), name, Utils.genericSignature(fieldType.rawType()));
+		popTypeStack();
 	}
 	
 	public void setFieldIns(String owner, String name, GenType fieldType){
@@ -535,4 +564,11 @@ public class JorthMethod{
 		
 		pushTypeStack(castType);
 	}
+	
+	public void classToStack(String className){
+		var cType=new GenType(className);
+		mv.visitLdcInsn(org.objectweb.asm.Type.getType(Utils.genericSignature(cType)));
+		pushTypeStack(new GenType(Class.class.getName(), 0, List.of(cType)));
+	}
+	
 }
