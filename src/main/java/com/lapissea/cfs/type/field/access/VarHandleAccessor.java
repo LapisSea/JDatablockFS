@@ -208,7 +208,7 @@ public sealed class VarHandleAccessor<CTyp extends IOInstance<CTyp>> extends Abs
 	private final Map<Class<? extends Annotation>, ? extends Annotation> annotations;
 	
 	public VarHandleAccessor(Struct<CTyp> struct, Field field, String name, Type genericType){
-		super(struct, field, name, genericType);
+		super(struct, field.getType(), name, genericType);
 		handle=Access.makeVarHandle(field);
 		annotations=Arrays.stream(field.getAnnotations()).collect(Collectors.toMap(Annotation::annotationType, a->a));
 	}

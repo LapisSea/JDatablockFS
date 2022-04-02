@@ -6,7 +6,6 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.util.ShouldNeverHappenError;
 
-import java.lang.reflect.Field;
 import java.lang.reflect.Type;
 import java.util.Map;
 
@@ -25,18 +24,17 @@ public abstract class AbstractPrimitiveAccessor<CTyp extends IOInstance<CTyp>> e
 	private final Class<?> rawType;
 	private final int      typeID;
 	
-	public AbstractPrimitiveAccessor(Struct<CTyp> struct, Field field, String name, Type genericType){
+	public AbstractPrimitiveAccessor(Struct<CTyp> struct, Class<?> type, String name, Type genericType){
 		super(struct, name);
 		
-		var t=field.getType();
-		if(t.isPrimitive()) typeID=Map.of(
+		if(type.isPrimitive()) typeID=Map.of(
 			double.class, ID_DOUBLE,
 			float.class, ID_FLOAT,
 			byte.class, ID_BYTE,
 			boolean.class, ID_BOOLEAN,
 			long.class, ID_LONG,
 			int.class, ID_INT,
-			short.class, ID_SHORT).get(t);
+			short.class, ID_SHORT).get(type);
 		else typeID=ID_OBJECT;
 		
 		this.genericType=Utils.prottectFromVarType(genericType);

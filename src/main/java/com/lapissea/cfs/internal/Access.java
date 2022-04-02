@@ -3,6 +3,7 @@ package com.lapissea.cfs.internal;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
+import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
@@ -24,10 +25,7 @@ import java.util.function.Supplier;
 import java.util.stream.IntStream;
 
 import static com.lapissea.cfs.internal.MyUnsafe.UNSAFE;
-import static java.lang.invoke.MethodHandles.Lookup.MODULE;
-import static java.lang.invoke.MethodHandles.Lookup.PACKAGE;
-import static java.lang.invoke.MethodHandles.Lookup.PRIVATE;
-import static java.lang.invoke.MethodHandles.Lookup.PUBLIC;
+import static java.lang.invoke.MethodHandles.Lookup.*;
 
 @SuppressWarnings("unchecked")
 public class Access{
@@ -163,14 +161,18 @@ public class Access{
 	}
 	
 	private static void corruptPermissions(MethodHandles.Lookup lookup){
-		if(lookup.hasFullPrivilegeAccess()) return;
+		int modes=PUBLIC|PRIVATE|PROTECTED|PACKAGE|MODULE|UNCONDITIONAL|ORIGINAL;
+		
+		if(lookup.lookupModes()==modes){
+			return;
+		}
 		
 		//Ensure only intended/relevant lookup is corrupted
 		checkTarget:
 		{
 			var cls=lookup.lookupClass();
 			
-			for(var consentClass : List.of(IOInstance.class, StructPipe.class)){
+			for(var consentClass : List.of(IOInstance.class, StructPipe.class, ChunkPointer.class)){
 				if(UtilL.instanceOf(cls, consentClass)){
 					break checkTarget;
 				}
@@ -178,8 +180,10 @@ public class Access{
 			
 			throw new SecurityException("Unsafe attempt of lookup modification: "+lookup);
 		}
-		
-		UNSAFE.getAndSetInt(lookup, ACCESS_OFFSET, PUBLIC|MODULE|PACKAGE|PRIVATE);
+		UNSAFE.getAndSetInt(lookup, ACCESS_OFFSET, modes);
+		if(lookup.lookupModes()!=modes){
+			throw new ShouldNeverHappenError();
+		}
 		if(!lookup.hasFullPrivilegeAccess()){
 			throw new ShouldNeverHappenError();
 		}

@@ -93,10 +93,12 @@ public class TemplateClassLoader extends ClassLoader{
 						""",
 					type,
 					field.getName());
+			}
+			for(var field : classType.def.getFields()){
+				var type=toJorthGeneric(field.getType());
 				
 				writer.write(
 					"""
-						IOValue @
 						public visibility
 						#RAW(0) returns
 						#TOKEN(1) function start

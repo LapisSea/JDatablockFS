@@ -209,7 +209,7 @@ public sealed class UnsafeAccessor<CTyp extends IOInstance<CTyp>> extends Abstra
 	private final Map<Class<? extends Annotation>, ? extends Annotation> annotations;
 	
 	public UnsafeAccessor(Struct<CTyp> struct, Field field, String name, Type genericType){
-		super(struct, field, name, genericType);
+		super(struct, field.getType(), name, genericType);
 		fieldOffset=UNSAFE.objectFieldOffset(field);
 		annotations=Arrays.stream(field.getAnnotations()).collect(Collectors.toMap(Annotation::annotationType, a->a));
 	}
