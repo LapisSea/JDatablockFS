@@ -38,10 +38,10 @@ public final class Reference extends IOInstance<Reference>{
 	}
 	
 	@IOValue
-	@IODependency.VirtualNumSize(name="ptrSize")
+	@IODependency.VirtualNumSize(name = "ptrSize")
 	private ChunkPointer ptr;
 	@IOValue
-	@IODependency.VirtualNumSize(name="offsetSize")
+	@IODependency.VirtualNumSize(name = "offsetSize")
 	private long         offset;
 	
 	public Reference(){

@@ -235,7 +235,7 @@ class Encoding{
 					w.readFully(buf, 0, optimizedBlockBytes);
 					var acum=lb.get(0);
 					for(int j=0;j<optimizedBlockCharCount;j++){
-						dest[j]=decode((int)((acum >> (bits*j))&mask));
+						dest[j]=decode((int)((acum>>(bits*j))&mask));
 					}
 					sb.append(dest);
 					i+=optimizedBlockCharCount;
