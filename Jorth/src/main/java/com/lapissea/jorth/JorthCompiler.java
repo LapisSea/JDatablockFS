@@ -10,6 +10,7 @@ import org.objectweb.asm.ClassWriter;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Array;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.*;
@@ -51,7 +52,13 @@ public class JorthCompiler{
 		}
 	}
 	
-	public record ClassInfo(String name, List<ClassInfo> parents, List<FunctionInfo> functions){
+	public record FieldInfo(String name, String declaringClass, GenType type){
+		FieldInfo(Field field){
+			this(field.getName(), field.getDeclaringClass().getName(), new GenType(field.getGenericType()));
+		}
+	}
+	
+	public record ClassInfo(String name, List<ClassInfo> parents, List<FunctionInfo> functions, List<FieldInfo> fields){
 		ClassInfo(Class<?> clazz){
 			this(
 				clazz.getName(),
@@ -59,7 +66,8 @@ public class JorthCompiler{
 				      .filter(Objects::nonNull)
 				      .map(ClassInfo::new)
 				      .toList(),
-				Arrays.stream(clazz.getDeclaredMethods()).map(FunctionInfo::new).toList()
+				Arrays.stream(clazz.getDeclaredMethods()).map(FunctionInfo::new).toList(),
+				Arrays.stream(clazz.getDeclaredFields()).map(FieldInfo::new).toList()
 			);
 		}
 		
@@ -335,7 +343,15 @@ public class JorthCompiler{
 						case "<arg>" -> {
 							throw new MalformedJorthException("can't set arguments! argument: "+name);
 						}
-						default -> throw new NotImplementedException("don't know how to load from "+owner);
+						default -> {
+							var ownerType=getClassInfo(owner.source);
+							var field=ownerType.fields.stream()
+							                          .filter(f->f.name.equals(name.source))
+							                          .findAny()
+							                          .orElseThrow(()->new MalformedJorthException(name+" does not exist in "+owner.source));
+							
+							currentMethod.setFieldIns(ownerType.name, field.name, field.type);
+						}
 					}
 					
 					return true;
@@ -365,7 +381,15 @@ public class JorthCompiler{
 							}
 							currentMethod.loadArgument(arg.get());
 						}
-						default -> throw new NotImplementedException("don't know how to load from "+owner);
+						default -> {
+							var ownerType=getClassInfo(owner.source);
+							var field=ownerType.fields.stream()
+							                          .filter(f->f.name.equals(name.source))
+							                          .findAny()
+							                          .orElseThrow(()->new MalformedJorthException(name+" does not exist in "+owner.source));
+							
+							currentMethod.getFieldIns(ownerType.name, field.name, field.type);
+						}
 					}
 					
 					return true;
@@ -414,7 +438,7 @@ public class JorthCompiler{
 				}
 			}
 		}else{
-			switch(token.lower()){
+			switch(token.source){
 				case "static" -> {
 					isStatic=true;
 					return true;
@@ -518,8 +542,7 @@ public class JorthCompiler{
 								builder.add(0, new ArrToken(t.line, "", str));
 								continue;
 							}
-							
-							builder.add(0, t);
+							builder.add(0, sequence.pop());
 						}
 						sequence=Token.Sequence.of(builder);
 						
@@ -717,7 +740,7 @@ public class JorthCompiler{
 							}catch(MalformedJorthException e){
 								throw UtilL.uncheckedThrow(e);
 							}
-						}).toList(), List.of());
+						}).toList(), List.of(), List.of());
 						
 						classVisibility=visibility;
 						currentClass=new ClassWriter(ClassWriter.COMPUTE_MAXS|ClassWriter.COMPUTE_FRAMES);
@@ -778,7 +801,7 @@ public class JorthCompiler{
 						annotations.clear();
 						
 						var info=new FunctionInfo(functionName.source, classInfo.name, returnType, methodArguments.stream().map(LocalVariableStack.Variable::type).toList(), isStatic?CallType.STATIC:CallType.VIRTUAL, isStatic, null);
-						classInfo=new ClassInfo(classInfo.name, classInfo.parents, Stream.concat(classInfo.functions.stream(), Stream.of(info)).toList());
+						classInfo=new ClassInfo(classInfo.name, classInfo.parents, Stream.concat(classInfo.functions.stream(), Stream.of(info)).toList(), classInfo.fields);
 						
 						currentMethod=new JorthMethod(this, dest, functionName.source, classInfo.name, returnType, isStatic);
 						currentMethod.start();
@@ -866,6 +889,14 @@ public class JorthCompiler{
 					case LONG -> currentMethod.intToLong();
 					case FLOAT -> currentMethod.intToFloat();
 					case DOUBLE -> currentMethod.intToDouble();
+					default -> throw new NotImplementedException(castType+"");
+				}
+			}
+			case OBJECT -> {
+				switch(castType.type()){
+					case OBJECT -> {
+						currentMethod.castTo(castType);
+					}
 					default -> throw new NotImplementedException(castType+"");
 				}
 			}

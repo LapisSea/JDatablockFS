@@ -265,6 +265,7 @@ public class JorthMethod{
 	
 	public void getFieldIns(String owner, String name, GenType fieldType){
 		mv.visitFieldInsn(GETFIELD, Utils.undotify(owner), name, Utils.genericSignature(fieldType.rawType()));
+		popTypeStack();
 		pushTypeStack(fieldType);
 	}
 	
@@ -287,7 +288,7 @@ public class JorthMethod{
 	public void returnOp() throws MalformedJorthException{
 		if(returnType!=null){
 			var popped=popTypeStack();
-			if(!popped.equals(returnType)) throw new MalformedJorthException("Method returns "+returnType+" but "+popped+" is on stack");
+			if(!popped.instanceOf(context, returnType)) throw new MalformedJorthException("Method returns "+returnType+" but "+popped+" is on stack");
 			if(popped.arrayDimensions()==0){
 				mv.visitInsn(popped.type().returnOp);
 			}else{
@@ -521,5 +522,17 @@ public class JorthMethod{
 	
 	public boolean isStatic(){
 		return isStatic;
+	}
+	
+	public void castTo(GenType castType) throws MalformedJorthException{
+		var type=popTypeStack();
+		if(!castType.instanceOf(context, type)){
+			throw new MalformedJorthException("cannot cast "+type+" to "+castType);
+		}
+		
+		if(castType.arrayDimensions()!=0) throw new NotImplementedException();
+		mv.visitTypeInsn(CHECKCAST, Utils.undotify(castType.typeName()));
+		
+		pushTypeStack(castType);
 	}
 }
