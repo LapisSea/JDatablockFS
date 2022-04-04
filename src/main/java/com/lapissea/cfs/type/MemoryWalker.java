@@ -7,7 +7,6 @@ import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.annotations.IOType;
-import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
@@ -200,7 +199,7 @@ public class MemoryWalker{
 							pType=pType.componentType();
 						}
 						
-						if(IOFieldPrimitive.isPrimitive(pType)||pType.isEnum()||pType==String.class){
+						if(SupportedPrimitive.isAny(pType)||pType.isEnum()||pType==String.class){
 							continue;
 						}
 					}
@@ -305,7 +304,7 @@ public class MemoryWalker{
 								}
 								continue;
 							}
-							if(IOFieldPrimitive.isPrimitive(component)){
+							if(SupportedPrimitive.isAny(component)){
 								continue;
 							}
 							if(component==String.class){

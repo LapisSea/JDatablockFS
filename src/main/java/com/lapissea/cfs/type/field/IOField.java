@@ -285,7 +285,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 					typeFlags|=HAS_NO_POINTERS_FLAG;
 				}
 			}
-			if(IOFieldPrimitive.isPrimitive(type)||type.isEnum()){
+			if(SupportedPrimitive.isAny(type)||type.isEnum()){
 				typeFlags|=PRIMITIVE_OR_ENUM_FLAG;
 			}
 		}

@@ -17,10 +17,7 @@ import com.lapissea.cfs.tools.SessionHost.CachedFrame;
 import com.lapissea.cfs.tools.SessionHost.ParsedFrame;
 import com.lapissea.cfs.tools.logging.MemFrame;
 import com.lapissea.cfs.tools.render.RenderBackend;
-import com.lapissea.cfs.type.GenericContext;
-import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.Struct;
-import com.lapissea.cfs.type.WordSpace;
+import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
@@ -1214,7 +1211,7 @@ public class BinaryGridRenderer{
 							
 							var inst=field.get(ioPool, instance);
 							if(inst==null) continue;
-							if(IOFieldPrimitive.isPrimitive(inst.getClass())||inst.getClass()==String.class){
+							if(SupportedPrimitive.isAny(inst.getClass())||inst.getClass()==String.class){
 								if(annotate) annotateByteField(ctx, ioPool, instance, field, col, reference, Range.fromSize(fieldOffset, size));
 								continue;
 							}
@@ -1291,7 +1288,7 @@ public class BinaryGridRenderer{
 								}
 								ctx.recordPointer(new Pointer(trueOffset, ch.getValue(), (int)size, col, msg, 0.8F));
 							}
-						}else if(IOFieldPrimitive.isPrimitive(acc.getType())||Stream.of(INumber.class, Enum.class).anyMatch(c->UtilL.instanceOf(acc.getType(), c))){
+						}else if(SupportedPrimitive.isAny(acc.getType())||Stream.of(INumber.class, Enum.class).anyMatch(c->UtilL.instanceOf(acc.getType(), c))){
 							if(annotate){
 								renderer.setColor(col);
 								if(sizeDesc.getWordSpace()==WordSpace.BIT){

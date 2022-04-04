@@ -438,7 +438,7 @@ public class FieldCompiler{
 		REGISTRY.register(new RegistryNode(){
 			@Override
 			public boolean canCreate(Type type, GetAnnotation annotations){
-				return IOFieldPrimitive.isPrimitive(type);
+				return SupportedPrimitive.isAny(type);
 			}
 			@Override
 			public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){

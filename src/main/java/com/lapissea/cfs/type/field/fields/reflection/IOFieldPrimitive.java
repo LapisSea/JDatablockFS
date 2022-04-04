@@ -9,53 +9,33 @@ import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.SupportedPrimitive;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 
 import java.io.IOException;
-import java.lang.reflect.Type;
 import java.util.Comparator;
 import java.util.EnumSet;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BiFunction;
-import java.util.function.Function;
 
 import static com.lapissea.cfs.objects.NumberSize.*;
 import static com.lapissea.cfs.type.WordSpace.BIT;
 
 public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> extends IOField<T, ValueType>{
 	
-	public static boolean isPrimitive(Type clazz){
-		return clazz instanceof Class<?> c&&isPrimitive(c);
-	}
-	public static boolean isPrimitive(Class<?> clazz){
-		return clazz.isPrimitive()||
-		       clazz==Double.class||
-		       clazz==Float.class||
-		       clazz==Long.class||
-		       clazz==Integer.class||
-		       clazz==Short.class||
-		       clazz==Byte.class||
-		       clazz==Boolean.class;
-	}
-	
 	public static <T extends IOInstance<T>> IOField<T, ?> make(FieldAccessor<T> field){
-		return Objects.requireNonNull(IOFieldPrimitive.<T>getFieldMaker(field.getType())).apply(field);
-	}
-	
-	public static <T extends IOInstance<T>> Function<FieldAccessor<T>, IOField<T, ?>> getFieldMaker(Type clazz){
-		if(clazz==double.class||clazz==Double.class) return FDouble::new;
-		if(clazz==float.class||clazz==Float.class) return FFloat::new;
-		if(clazz==long.class||clazz==Long.class) return FLong::new;
-		if(clazz==int.class||clazz==Integer.class) return FInt::new;
-		if(clazz==short.class||clazz==Short.class) return FShort::new;
-		if(clazz==byte.class||clazz==Byte.class) return FByte::new;
-		if(clazz==boolean.class||clazz==Boolean.class) return FBoolean::new;
-		
-		return null;
+		return SupportedPrimitive.get(field.getType()).map(t->switch(t){
+			case DOUBLE -> new FDouble<>(field);
+			case FLOAT -> new FFloat<>(field);
+			case LONG -> new FLong<>(field);
+			case INT -> new FInt<>(field);
+			case SHORT -> new FShort<>(field);
+			case BYTE -> new FByte<>(field);
+			case BOOLEAN -> new FBoolean<>(field);
+		}).orElseThrow();
 	}
 	
 	public static class FDouble<T extends IOInstance<T>> extends IOFieldPrimitive<T, Double>{
