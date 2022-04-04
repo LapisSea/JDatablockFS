@@ -37,8 +37,6 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 	
 	public static class Node<T extends IOInstance<T>> extends IOInstance.Unmanaged<Node<T>> implements IterablePP<Node<T>>{
 		
-		private final boolean readOnly;
-		
 		private static final List<Annotation> ANNOTATIONS=List.of(
 			IOFieldTools.makeAnnotation(IOType.Dynamic.class, Map.of()),
 			IOFieldTools.makeAnnotation(IONullability.class, Map.of("value", IONullability.Mode.NULLABLE))
@@ -201,7 +199,6 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		
 		public Node(DataProvider provider, Reference reference, TypeLink typeDef) throws IOException{
 			super(provider, reference, typeDef, NODE_TYPE_CHECK);
-			readOnly=getDataProvider().isReadOnly();
 			
 			var type=(Struct<T>)typeDef.argAsStruct(0);
 			type.requireEmptyConstructor();

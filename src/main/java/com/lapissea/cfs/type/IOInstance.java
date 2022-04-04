@@ -30,6 +30,8 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>> implements Clone
 		
 		private StructPipe<SELF> pipe;
 		
+		protected final boolean readOnly;
+		
 		protected Unmanaged(DataProvider provider, Reference reference, TypeLink typeDef, TypeLink.Check check){
 			this(provider, reference, typeDef);
 			check.ensureValid(typeDef);
@@ -39,6 +41,7 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>> implements Clone
 			this.provider=Objects.requireNonNull(provider);
 			this.reference=reference.requireNonNull();
 			this.typeDef=typeDef;
+			readOnly=getDataProvider().isReadOnly();
 		}
 		
 		@NotNull
@@ -114,6 +117,9 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>> implements Clone
 		}
 		
 		protected void writeManagedFields() throws IOException{
+			if(readOnly){
+				throw new UnsupportedOperationException();
+			}
 			try(var io=selfIO()){
 				getPipe().write(provider, io, self());
 			}

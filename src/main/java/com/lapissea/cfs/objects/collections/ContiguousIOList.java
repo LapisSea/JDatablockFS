@@ -39,13 +39,11 @@ public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanaged
 	
 	private final FixedContiguousStructPipe<T> elementPipe;
 	
-	private final boolean      readOnly;
 	private final Map<Long, T> cache;
 	
 	public ContiguousIOList(DataProvider provider, Reference reference, TypeLink typeDef) throws IOException{
 		super(provider, reference, typeDef);
 		TYPE_CHECK.ensureValid(typeDef);
-		readOnly=getDataProvider().isReadOnly();
 		cache=readOnly?new HashMap<>():null;
 		
 		var type=(Struct<T>)typeDef.argAsStruct(0);

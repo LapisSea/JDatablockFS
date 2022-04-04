@@ -122,15 +122,13 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	@IOValue.OverrideType(ContiguousIOList.class)
 	private IOList<Bucket<K, V>> buckets;
 	
-	private       int     datasetID;
-	private final boolean readOnly;
+	private int datasetID;
 	
 	private final Map<K, Entry<K, V>> cache;
 	
 	
 	public HashIOMap(DataProvider provider, Reference reference, TypeLink typeDef) throws IOException{
 		super(provider, reference, typeDef);
-		readOnly=getDataProvider().isReadOnly();
 		cache=readOnly?new HashMap<>():null;
 		
 		if(isSelfDataEmpty()&&!readOnly){
