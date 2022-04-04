@@ -192,7 +192,7 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		public void setValue(Struct.Pool<T> ioPool, T instance, long value){
-			getAccessor().setLong(instance, value, ioPool);
+			getAccessor().setLong(ioPool, instance, value);
 		}
 		
 		@Deprecated

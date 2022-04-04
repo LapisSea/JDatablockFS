@@ -140,9 +140,9 @@ public sealed class VarHandleAccessor<CTyp extends IOInstance<CTyp>> extends Abs
 		}
 		
 		@Override
-		public void setLong(CTyp instance, long value, Struct.Pool<CTyp> ioPool){
+		public void setLong(Struct.Pool<CTyp> ioPool, CTyp instance, long value){
 			if(setter!=null) setter(instance, value);
-			else super.setLong(instance, value, ioPool);
+			else super.setLong(ioPool, instance, value);
 		}
 		
 		@Override
@@ -187,7 +187,7 @@ public sealed class VarHandleAccessor<CTyp extends IOInstance<CTyp>> extends Abs
 			return num.getValue();
 		}
 		@Override
-		public void setLong(CTyp instance, long value, Struct.Pool<CTyp> ioPool){
+		public void setLong(Struct.Pool<CTyp> ioPool, CTyp instance, long value){
 			set(ioPool, instance, constructor.apply(value));
 		}
 	}
@@ -208,7 +208,7 @@ public sealed class VarHandleAccessor<CTyp extends IOInstance<CTyp>> extends Abs
 	private final Map<Class<? extends Annotation>, ? extends Annotation> annotations;
 	
 	public VarHandleAccessor(Struct<CTyp> struct, Field field, String name, Type genericType){
-		super(struct, field.getType(), name, genericType);
+		super(struct, name, genericType);
 		handle=Access.makeVarHandle(field);
 		annotations=Arrays.stream(field.getAnnotations()).collect(Collectors.toMap(Annotation::annotationType, a->a));
 	}
@@ -225,74 +225,74 @@ public sealed class VarHandleAccessor<CTyp extends IOInstance<CTyp>> extends Abs
 	}
 	
 	@Override
-	protected void setShort(CTyp instance, short value){
+	protected void setExactShort(Struct.Pool<CTyp> ioPool, CTyp instance, short value){
 		handle.set(instance, value);
 	}
 	@Override
-	protected short getShort(CTyp instance){
+	protected short getExactShort(Struct.Pool<CTyp> ioPool, CTyp instance){
 		return (short)handle.get(instance);
 	}
 	
 	@Override
-	protected long getLong(CTyp instance){
+	protected long getExactLong(Struct.Pool<CTyp> ioPool, CTyp instance){
 		return (long)handle.get(instance);
 	}
 	@Override
-	protected void setLong(CTyp instance, long value){
+	protected void setExactLong(Struct.Pool<CTyp> ioPool, CTyp instance, long value){
 		handle.set(instance, value);
 	}
 	
 	@Override
-	protected byte getByte(CTyp instance){
+	protected byte getExactByte(Struct.Pool<CTyp> ioPool, CTyp instance){
 		return (byte)handle.get(instance);
 	}
 	@Override
-	protected void setByte(CTyp instance, byte value){
+	protected void setExactByte(Struct.Pool<CTyp> ioPool, CTyp instance, byte value){
 		handle.set(instance, value);
 	}
 	
 	@Override
-	protected int getInt(CTyp instance){
+	protected int getExactInt(Struct.Pool<CTyp> ioPool, CTyp instance){
 		return (int)handle.get(instance);
 	}
 	@Override
-	protected void setInt(CTyp instance, int value){
+	protected void setExactInt(Struct.Pool<CTyp> ioPool, CTyp instance, int value){
 		handle.set(instance, value);
 	}
 	
 	@Override
-	protected double getDouble(CTyp instance){
+	protected double getExactDouble(Struct.Pool<CTyp> ioPool, CTyp instance){
 		return (double)handle.get(instance);
 	}
 	@Override
-	protected void setDouble(CTyp instance, double value){
+	protected void setExactDouble(Struct.Pool<CTyp> ioPool, CTyp instance, double value){
 		handle.set(instance, value);
 	}
 	
 	@Override
-	protected void setFloat(CTyp instance, float value){
+	protected void setExactFloat(Struct.Pool<CTyp> ioPool, CTyp instance, float value){
 		handle.set(instance, value);
 	}
 	@Override
-	protected float getFloat(CTyp instance){
+	protected float getExactFloat(Struct.Pool<CTyp> ioPool, CTyp instance){
 		return (float)handle.get(instance);
 	}
 	
 	@Override
-	protected void setBoolean(CTyp instance, boolean value){
+	protected void setExactBoolean(Struct.Pool<CTyp> ioPool, CTyp instance, boolean value){
 		handle.set(instance, value);
 	}
 	@Override
-	protected boolean getBoolean(CTyp instance){
+	protected boolean getExactBoolean(Struct.Pool<CTyp> ioPool, CTyp instance){
 		return (boolean)handle.get(instance);
 	}
 	
 	@Override
-	protected Object getObj(CTyp instance){
+	protected Object getExactObject(Struct.Pool<CTyp> ioPool, CTyp instance){
 		return handle.get(instance);
 	}
 	@Override
-	protected void setObj(CTyp instance, Object value){
+	protected void setExactObject(Struct.Pool<CTyp> ioPool, CTyp instance, Object value){
 		handle.set(instance, getType().cast(value));
 	}
 }

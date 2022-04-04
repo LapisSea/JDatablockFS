@@ -24,8 +24,10 @@ public abstract class AbstractPrimitiveAccessor<CTyp extends IOInstance<CTyp>> e
 	private final Class<?> rawType;
 	private final int      typeID;
 	
-	public AbstractPrimitiveAccessor(Struct<CTyp> struct, Class<?> type, String name, Type genericType){
+	public AbstractPrimitiveAccessor(Struct<CTyp> struct, String name, Type genericType){
 		super(struct, name);
+		
+		Class<?> type=Utils.typeToRaw(genericType);
 		
 		if(type.isPrimitive()) typeID=Map.of(
 			double.class, ID_DOUBLE,
@@ -42,12 +44,12 @@ public abstract class AbstractPrimitiveAccessor<CTyp extends IOInstance<CTyp>> e
 	}
 	
 	@Override
-	public Class<?> getType(){
+	public final Class<?> getType(){
 		return rawType;
 	}
 	
 	@Override
-	public Type getGenericType(GenericContext genericContext){
+	public final Type getGenericType(GenericContext genericContext){
 		if(genericContext==null){
 			return genericType;
 		}
@@ -58,35 +60,35 @@ public abstract class AbstractPrimitiveAccessor<CTyp extends IOInstance<CTyp>> e
 		throw new ClassCastException(rawType.getName());
 	}
 	
-	protected abstract void setShort(CTyp instance, short value);
-	protected abstract short getShort(CTyp instance);
+	protected abstract short getExactShort(Struct.Pool<CTyp> ioPool, CTyp instance);
+	protected abstract void setExactShort(Struct.Pool<CTyp> ioPool, CTyp instance, short value);
 	
-	protected abstract long getLong(CTyp instance);
-	protected abstract void setLong(CTyp instance, long value);
+	protected abstract long getExactLong(Struct.Pool<CTyp> ioPool, CTyp instance);
+	protected abstract void setExactLong(Struct.Pool<CTyp> ioPool, CTyp instance, long value);
 	
-	protected abstract byte getByte(CTyp instance);
-	protected abstract void setByte(CTyp instance, byte value);
+	protected abstract byte getExactByte(Struct.Pool<CTyp> ioPool, CTyp instance);
+	protected abstract void setExactByte(Struct.Pool<CTyp> ioPool, CTyp instance, byte value);
 	
-	protected abstract int getInt(CTyp instance);
-	protected abstract void setInt(CTyp instance, int value);
+	protected abstract int getExactInt(Struct.Pool<CTyp> ioPool, CTyp instance);
+	protected abstract void setExactInt(Struct.Pool<CTyp> ioPool, CTyp instance, int value);
 	
-	protected abstract double getDouble(CTyp instance);
-	protected abstract void setDouble(CTyp instance, double value);
+	protected abstract double getExactDouble(Struct.Pool<CTyp> ioPool, CTyp instance);
+	protected abstract void setExactDouble(Struct.Pool<CTyp> ioPool, CTyp instance, double value);
 	
-	protected abstract void setFloat(CTyp instance, float value);
-	protected abstract float getFloat(CTyp instance);
+	protected abstract float getExactFloat(Struct.Pool<CTyp> ioPool, CTyp instance);
+	protected abstract void setExactFloat(Struct.Pool<CTyp> ioPool, CTyp instance, float value);
 	
-	protected abstract void setBoolean(CTyp instance, boolean value);
-	protected abstract boolean getBoolean(CTyp instance);
+	protected abstract boolean getExactBoolean(Struct.Pool<CTyp> ioPool, CTyp instance);
+	protected abstract void setExactBoolean(Struct.Pool<CTyp> ioPool, CTyp instance, boolean value);
 	
-	protected abstract Object getObj(CTyp instance);
-	protected abstract void setObj(CTyp instance, Object value);
+	protected abstract Object getExactObject(Struct.Pool<CTyp> ioPool, CTyp instance);
+	protected abstract void setExactObject(Struct.Pool<CTyp> ioPool, CTyp instance, Object value);
 	
 	
 	@Override
 	public Object get(Struct.Pool<CTyp> ioPool, CTyp instance){
 		return switch(typeID){
-			case ID_OBJECT -> getObj(instance);
+			case ID_OBJECT -> getExactObject(ioPool, instance);
 			case ID_INT -> getInt(ioPool, instance);
 			case ID_LONG -> getLong(ioPool, instance);
 			case ID_FLOAT -> getFloat(ioPool, instance);
@@ -100,9 +102,9 @@ public abstract class AbstractPrimitiveAccessor<CTyp extends IOInstance<CTyp>> e
 	@Override
 	public void set(Struct.Pool<CTyp> ioPool, CTyp instance, Object value){
 		switch(typeID){
-			case ID_OBJECT -> setObj(instance, value);
+			case ID_OBJECT -> setExactObject(ioPool, instance, value);
 			case ID_INT -> setInt(ioPool, instance, (Integer)value);
-			case ID_LONG -> setLong(instance, (Long)value, ioPool);
+			case ID_LONG -> setLong(ioPool, instance, (Long)value);
 			case ID_FLOAT -> setFloat(ioPool, instance, (Float)value);
 			case ID_DOUBLE -> setDouble(ioPool, instance, (Double)value);
 			case ID_BOOLEAN -> setBoolean(ioPool, instance, (Boolean)value);
@@ -115,8 +117,8 @@ public abstract class AbstractPrimitiveAccessor<CTyp extends IOInstance<CTyp>> e
 	@Override
 	public double getDouble(Struct.Pool<CTyp> ioPool, CTyp instance){
 		return switch(typeID){
-			case ID_DOUBLE -> getDouble(instance);
-			case ID_FLOAT -> getFloat(instance);
+			case ID_DOUBLE -> getExactDouble(ioPool, instance);
+			case ID_FLOAT -> getExactFloat(ioPool, instance);
 			case ID_OBJECT -> switch(get(ioPool, instance)){
 				case Double n -> n;
 				case Float n -> n;
@@ -128,8 +130,8 @@ public abstract class AbstractPrimitiveAccessor<CTyp extends IOInstance<CTyp>> e
 	@Override
 	public void setDouble(Struct.Pool<CTyp> ioPool, CTyp instance, double value){
 		switch(typeID){
-			case ID_DOUBLE -> setDouble(instance, value);
-			case ID_OBJECT -> setObj(instance, value);
+			case ID_DOUBLE -> setExactDouble(ioPool, instance, value);
+			case ID_OBJECT -> setExactObject(ioPool, instance, value);
 			default -> throw classCastThrow();
 		}
 	}
@@ -137,7 +139,7 @@ public abstract class AbstractPrimitiveAccessor<CTyp extends IOInstance<CTyp>> e
 	@Override
 	public float getFloat(Struct.Pool<CTyp> ioPool, CTyp instance){
 		return switch(typeID){
-			case ID_FLOAT -> getFloat(instance);
+			case ID_FLOAT -> getExactFloat(ioPool, instance);
 			case ID_OBJECT -> (Float)get(ioPool, instance);
 			default -> throw classCastThrow();
 		};
@@ -145,9 +147,9 @@ public abstract class AbstractPrimitiveAccessor<CTyp extends IOInstance<CTyp>> e
 	@Override
 	public void setFloat(Struct.Pool<CTyp> ioPool, CTyp instance, float value){
 		switch(typeID){
-			case ID_FLOAT -> setFloat(instance, value);
-			case ID_DOUBLE -> setDouble(instance, value);
-			case ID_OBJECT -> setObj(instance, value);
+			case ID_FLOAT -> setExactFloat(ioPool, instance, value);
+			case ID_DOUBLE -> setExactDouble(ioPool, instance, value);
+			case ID_OBJECT -> setExactObject(ioPool, instance, value);
 			default -> throw classCastThrow();
 		}
 	}
@@ -155,7 +157,7 @@ public abstract class AbstractPrimitiveAccessor<CTyp extends IOInstance<CTyp>> e
 	@Override
 	public byte getByte(Struct.Pool<CTyp> ioPool, CTyp instance){
 		return switch(typeID){
-			case ID_BYTE -> getByte(instance);
+			case ID_BYTE -> getExactByte(ioPool, instance);
 			case ID_OBJECT -> (Byte)get(ioPool, instance);
 			default -> throw classCastThrow();
 		};
@@ -163,11 +165,11 @@ public abstract class AbstractPrimitiveAccessor<CTyp extends IOInstance<CTyp>> e
 	@Override
 	public void setByte(Struct.Pool<CTyp> ioPool, CTyp instance, byte value){
 		switch(typeID){
-			case ID_BYTE -> setByte(instance, value);
-			case ID_INT -> setInt(instance, value);
-			case ID_LONG -> setLong(instance, value);
-			case ID_SHORT -> setShort(instance, value);
-			case ID_OBJECT -> setObj(instance, value);
+			case ID_BYTE -> setExactByte(ioPool, instance, value);
+			case ID_INT -> setExactInt(ioPool, instance, value);
+			case ID_LONG -> setExactLong(ioPool, instance, value);
+			case ID_SHORT -> setExactShort(ioPool, instance, value);
+			case ID_OBJECT -> setExactObject(ioPool, instance, value);
 			default -> throw classCastThrow();
 		}
 	}
@@ -175,7 +177,7 @@ public abstract class AbstractPrimitiveAccessor<CTyp extends IOInstance<CTyp>> e
 	@Override
 	public boolean getBoolean(Struct.Pool<CTyp> ioPool, CTyp instance){
 		return switch(typeID){
-			case ID_BOOLEAN -> getBoolean(instance);
+			case ID_BOOLEAN -> getExactBoolean(ioPool, instance);
 			case ID_OBJECT -> (Boolean)get(ioPool, instance);
 			default -> throw classCastThrow();
 		};
@@ -183,8 +185,8 @@ public abstract class AbstractPrimitiveAccessor<CTyp extends IOInstance<CTyp>> e
 	@Override
 	public void setBoolean(Struct.Pool<CTyp> ioPool, CTyp instance, boolean value){
 		switch(typeID){
-			case ID_BOOLEAN -> setBoolean(instance, value);
-			case ID_OBJECT -> setObj(instance, value);
+			case ID_BOOLEAN -> setExactBoolean(ioPool, instance, value);
+			case ID_OBJECT -> setExactObject(ioPool, instance, value);
 			default -> throw classCastThrow();
 		}
 	}
@@ -192,10 +194,10 @@ public abstract class AbstractPrimitiveAccessor<CTyp extends IOInstance<CTyp>> e
 	@Override
 	public long getLong(Struct.Pool<CTyp> ioPool, CTyp instance){
 		return switch(typeID){
-			case ID_LONG -> getLong(instance);
-			case ID_INT -> getInt(instance);
-			case ID_SHORT -> getShort(instance);
-			case ID_BYTE -> getByte(instance);
+			case ID_LONG -> getExactLong(ioPool, instance);
+			case ID_INT -> getExactInt(ioPool, instance);
+			case ID_SHORT -> getExactShort(ioPool, instance);
+			case ID_BYTE -> getExactByte(ioPool, instance);
 			case ID_OBJECT -> switch(get(ioPool, instance)){
 				case Long n -> n;
 				case Integer n -> n;
@@ -207,10 +209,10 @@ public abstract class AbstractPrimitiveAccessor<CTyp extends IOInstance<CTyp>> e
 		};
 	}
 	@Override
-	public void setLong(CTyp instance, long value, Struct.Pool<CTyp> ioPool){
+	public void setLong(Struct.Pool<CTyp> ioPool, CTyp instance, long value){
 		switch(typeID){
-			case ID_LONG -> setLong(instance, value);
-			case ID_OBJECT -> setObj(instance, value);
+			case ID_LONG -> setExactLong(ioPool, instance, value);
+			case ID_OBJECT -> setExactObject(ioPool, instance, value);
 			default -> throw classCastThrow();
 		}
 	}
@@ -218,9 +220,9 @@ public abstract class AbstractPrimitiveAccessor<CTyp extends IOInstance<CTyp>> e
 	@Override
 	public int getInt(Struct.Pool<CTyp> ioPool, CTyp instance){
 		return switch(typeID){
-			case ID_INT -> getInt(instance);
-			case ID_SHORT -> getShort(instance);
-			case ID_BYTE -> getByte(instance);
+			case ID_INT -> getExactInt(ioPool, instance);
+			case ID_SHORT -> getExactShort(ioPool, instance);
+			case ID_BYTE -> getExactByte(ioPool, instance);
 			case ID_OBJECT -> switch(get(ioPool, instance)){
 				case Integer n -> n;
 				case Short n -> n;
@@ -233,9 +235,9 @@ public abstract class AbstractPrimitiveAccessor<CTyp extends IOInstance<CTyp>> e
 	@Override
 	public void setInt(Struct.Pool<CTyp> ioPool, CTyp instance, int value){
 		switch(typeID){
-			case ID_INT -> setInt(instance, value);
-			case ID_LONG -> setLong(instance, value);
-			case ID_OBJECT -> setObj(instance, value);
+			case ID_INT -> setExactInt(ioPool, instance, value);
+			case ID_LONG -> setExactLong(ioPool, instance, value);
+			case ID_OBJECT -> setExactObject(ioPool, instance, value);
 			default -> throw classCastThrow();
 		}
 	}
@@ -243,8 +245,8 @@ public abstract class AbstractPrimitiveAccessor<CTyp extends IOInstance<CTyp>> e
 	@Override
 	public short getShort(Struct.Pool<CTyp> ioPool, CTyp instance){
 		return switch(typeID){
-			case ID_SHORT -> getShort(instance);
-			case ID_BYTE -> getByte(instance);
+			case ID_SHORT -> getExactShort(ioPool, instance);
+			case ID_BYTE -> getExactByte(ioPool, instance);
 			case ID_OBJECT -> switch(get(ioPool, instance)){
 				case Short n -> n;
 				case Byte n -> n;
@@ -256,16 +258,16 @@ public abstract class AbstractPrimitiveAccessor<CTyp extends IOInstance<CTyp>> e
 	@Override
 	public void setShort(Struct.Pool<CTyp> ioPool, CTyp instance, short value){
 		switch(typeID){
-			case ID_SHORT -> setShort(instance, value);
-			case ID_INT -> setInt(instance, value);
-			case ID_LONG -> setLong(instance, value);
-			case ID_OBJECT -> setObj(instance, value);
+			case ID_SHORT -> setExactShort(ioPool, instance, value);
+			case ID_INT -> setExactInt(ioPool, instance, value);
+			case ID_LONG -> setExactLong(ioPool, instance, value);
+			case ID_OBJECT -> setExactObject(ioPool, instance, value);
 			default -> throw classCastThrow();
 		}
 	}
 	
 	@Override
-	public boolean canBeNull(){
-		return !rawType.isPrimitive();
+	public final boolean canBeNull(){
+		return typeID==ID_OBJECT;
 	}
 }

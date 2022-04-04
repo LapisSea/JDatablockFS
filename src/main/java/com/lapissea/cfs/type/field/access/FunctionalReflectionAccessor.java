@@ -38,7 +38,7 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 			return num.getValue();
 		}
 		@Override
-		public void setLong(CTyp instance, long value, Struct.Pool<CTyp> ioPool){
+		public void setLong(Struct.Pool<CTyp> ioPool, CTyp instance, long value){
 			set(ioPool, instance, constructor.apply(value));
 		}
 	}
@@ -205,7 +205,7 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 	}
 	
 	@Override
-	public void setLong(CTyp instance, long value, Struct.Pool<CTyp> ioPool){
+	public void setLong(Struct.Pool<CTyp> ioPool, CTyp instance, long value){
 		try{
 			setter.invoke(instance, value);
 		}catch(Throwable e){

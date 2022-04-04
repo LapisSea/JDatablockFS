@@ -38,7 +38,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 			return num.getValue();
 		}
 		@Override
-		public void setLong(CTyp instance, long value, Struct.Pool<CTyp> ioPool){
+		public void setLong(Struct.Pool<CTyp> ioPool, CTyp instance, long value){
 			set(ioPool, instance, constructor.apply(value));
 		}
 	}
@@ -258,7 +258,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	}
 	
 	@Override
-	public void setLong(CTyp instance, long value, Struct.Pool<CTyp> ioPool){
+	public void setLong(Struct.Pool<CTyp> ioPool, CTyp instance, long value){
 		try{
 			if(setter!=null){
 				setter.invoke(instance, value);
