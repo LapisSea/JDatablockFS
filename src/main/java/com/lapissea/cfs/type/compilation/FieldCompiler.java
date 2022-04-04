@@ -256,13 +256,12 @@ public class FieldCompiler{
 				getter.ifPresent(usedFields::add);
 				setter.ifPresent(usedFields::add);
 				
-				FieldAccessor<T> accessor=switch(UtilL.sysPropertyByClass(FieldCompiler.class, "UNSAFE_ACCESS").orElse("varhandle").toLowerCase()){
+				var def=Runtime.version().feature()<=18?"unsafe":"varhandle";
+				fields.add(switch(UtilL.sysPropertyByClass(FieldCompiler.class, "UNSAFE_ACCESS").orElse(def).toLowerCase()){
 					case "unsafe" -> UnsafeAccessor.make(struct, field, getter, setter, fieldName, type);
 					case "varhandle" -> VarHandleAccessor.make(struct, field, getter, setter, fieldName, type);
 					default -> ReflectionAccessor.make(struct, field, getter, setter, fieldName, type);
-				};
-				
-				fields.add(accessor);
+				});
 			}catch(Throwable e){
 				throw new MalformedStructLayout("Failed to scan field #"+field.getName(), e);
 			}
@@ -273,8 +272,8 @@ public class FieldCompiler{
 		Map<String, PairM<Method, Method>> transientFieldsMap=new HashMap<>();
 		
 		for(Method hangingMethod : hangingMethods){
-			String getPrefix=getPrefix(hangingMethod);
-			getMethodFieldName(getPrefix, hangingMethod).ifPresent(s->transientFieldsMap.computeIfAbsent(s, n->new PairM<>()).obj1=hangingMethod);
+			calcGetPrefixes(hangingMethod).map(p->getMethodFieldName(p, hangingMethod)).filter(Optional::isPresent).map(Optional::get)
+			                              .findFirst().ifPresent(s->transientFieldsMap.computeIfAbsent(s, n->new PairM<>()).obj1=hangingMethod);
 			getMethodFieldName("set", hangingMethod).ifPresent(s->transientFieldsMap.computeIfAbsent(s, n->new PairM<>()).obj2=hangingMethod);
 		}
 		
@@ -295,7 +294,9 @@ public class FieldCompiler{
 		                                                            .stream()
 		                                                            .flatMap(PairM::<Method>stream)
 		                                                            .noneMatch(mt->mt==m))
-		                               .map(method->method+""+(fields.stream().anyMatch(f->f.getName().equals(method.getName()))?(" did you mean "+getPrefix(method)+TextUtil.firstToUpperCase(method.getName())+"?"):""))
+		                               .map(method->method+""+(fields.stream().anyMatch(f->f.getName().equals(method.getName()))?(
+			                               " did you mean "+calcGetPrefixes(method).map(p->p+TextUtil.firstToUpperCase(method.getName())).collect(Collectors.joining(" or "))+"?"
+		                               ):""))
 		                               .collect(Collectors.joining("\n"));
 		if(!unusedWaning.isEmpty()){
 			throw new MalformedStructLayout("There are unused or invalid methods marked with "+IOValue.class.getSimpleName()+"\n"+unusedWaning);
@@ -320,22 +321,17 @@ public class FieldCompiler{
 					throw new MalformedStructLayout(setType+" is not a valid argument in\n"+setter);
 				}
 				
-				if(UtilL.instanceOf(p.obj1.getReturnType(), INumber.class)) return new FunctionalReflectionAccessor.Num<>(struct, annotations, getter, setter, name, type);
-				else return new FunctionalReflectionAccessor<>(struct, annotations, getter, setter, name, type);
+				return FunctionalReflectionAccessor.make(struct, name, getter, setter, annotations, type);
 			})
 		).sorted();
 	}
 	
-	private Stream<String> calcGetPrefixes(Field field){
-		var typ   =field.getType();
+	private Stream<String> calcGetPrefixes(Field field)  {return calcGetPrefixes(field.getType());}
+	private Stream<String> calcGetPrefixes(Method method){return calcGetPrefixes(method.getReturnType());}
+	private Stream<String> calcGetPrefixes(Class<?> typ){
 		var isBool=typ==boolean.class||typ==Boolean.class;
 		if(isBool) return Stream.of("is", "get");
 		return Stream.of("get");
-	}
-	private String getPrefix(Method method){
-		var typ   =method.getReturnType();
-		var isBool=typ==boolean.class||typ==Boolean.class;
-		return isBool?"is":"get";
 	}
 	
 	private Optional<String> getMethodFieldName(String prefix, Method m){

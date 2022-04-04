@@ -43,6 +43,14 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 		}
 	}
 	
+	public static <T extends IOInstance<T>> FunctionalReflectionAccessor<T> make(Struct<T> struct, String name, Method getter, Method setter, GetAnnotation annotations, Type type){
+		if(UtilL.instanceOf(Utils.typeToRaw(type), INumber.class)){
+			return new FunctionalReflectionAccessor.Num<>(struct, annotations, getter, setter, name, type);
+		}else{
+			return new FunctionalReflectionAccessor<>(struct, annotations, getter, setter, name, type);
+		}
+	}
+	
 	private final Type     genericType;
 	private final Class<?> rawType;
 	

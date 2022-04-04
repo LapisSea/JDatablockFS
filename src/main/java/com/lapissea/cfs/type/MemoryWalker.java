@@ -185,10 +185,10 @@ public class MemoryWalker{
 						continue;
 					}
 					
-					if(UtilL.checkFlag(field.getTypeFlags(), IOField.PRIMITIVE_OR_ENUM_FLAG)){
+					if(UtilL.checkFlag(field.typeFlags(), IOField.PRIMITIVE_OR_ENUM_FLAG)){
 						continue;
 					}
-					if(UtilL.checkFlag(field.getTypeFlags(), IOField.HAS_NO_POINTERS_FLAG)){
+					if(UtilL.checkFlag(field.typeFlags(), IOField.HAS_NO_POINTERS_FLAG)){
 						continue;
 					}
 					
@@ -205,8 +205,8 @@ public class MemoryWalker{
 						}
 					}
 					
-					var dynamic   =UtilL.checkFlag(field.getTypeFlags(), IOField.DYNAMIC_FLAG);
-					var isInstance=UtilL.checkFlag(field.getTypeFlags(), IOField.IOINSTANCE_FLAG);
+					var dynamic   =UtilL.checkFlag(field.typeFlags(), IOField.DYNAMIC_FLAG);
+					var isInstance=UtilL.checkFlag(field.typeFlags(), IOField.IOINSTANCE_FLAG);
 					
 					if(dynamic){
 						var inst=field.get(ioPool, instance);

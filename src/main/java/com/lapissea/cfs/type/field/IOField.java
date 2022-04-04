@@ -266,7 +266,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		lateDataInitialized=true;
 	}
 	
-	public int getTypeFlags(){
+	public int typeFlags(){
 		if(typeFlags!=-1){
 			return typeFlags;
 		}

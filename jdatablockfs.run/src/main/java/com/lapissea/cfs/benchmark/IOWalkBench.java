@@ -18,8 +18,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-@Warmup(iterations = 6, time = 400, timeUnit = TimeUnit.MILLISECONDS)
-@Measurement(iterations = 6, time = 500, timeUnit = TimeUnit.MILLISECONDS)
+@Warmup(iterations=6, time=800, timeUnit=TimeUnit.MILLISECONDS)
+@Measurement(iterations=16, time=500, timeUnit=TimeUnit.MILLISECONDS)
 @State(Scope.Thread)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 public class IOWalkBench{
@@ -76,19 +76,19 @@ public class IOWalkBench{
 	}
 	
 	@Benchmark
-	@Fork(jvmArgsAppend = "-Dcom.lapissea.cfs.type.compilation.FieldCompiler.UNSAFE_ACCESS=varhandle")
+	@Fork(jvmArgsAppend="-Dcom.lapissea.cfs.type.compilation.FieldCompiler.UNSAFE_ACCESS=varhandle")
 	public void walkAccVarHandle(){
 		doWalk();
 	}
 	
 	@Benchmark
-	@Fork(jvmArgsAppend = "-Dcom.lapissea.cfs.type.compilation.FieldCompiler.UNSAFE_ACCESS=reflection")
+	@Fork(jvmArgsAppend="-Dcom.lapissea.cfs.type.compilation.FieldCompiler.UNSAFE_ACCESS=reflection")
 	public void walkAccReflection(){
 		doWalk();
 	}
 	
 	@Benchmark
-	@Fork(jvmArgsAppend = "-Dcom.lapissea.cfs.type.compilation.FieldCompiler.UNSAFE_ACCESS=unsafe")
+	@Fork(jvmArgsAppend="-Dcom.lapissea.cfs.type.compilation.FieldCompiler.UNSAFE_ACCESS=unsafe")
 	public void walkAccUnsafe(){
 		doWalk();
 	}
@@ -98,18 +98,18 @@ public class IOWalkBench{
 		doWalk();
 	}
 	@Benchmark
-	@Fork(jvmArgsAppend = "-Dradius=2")
+	@Fork(jvmArgsAppend="-Dradius=2")
 	public void walk2(){
 		doWalk();
 	}
 	@Benchmark
-	@Fork(jvmArgsAppend = "-Dradius=30")
+	@Fork(jvmArgsAppend="-Dradius=30")
 	public void walk30(){
 		doWalk();
 	}
 	
 	@Benchmark
-	@Fork(jvmArgsAppend = "-Dread_only_benchy=true")
+	@Fork(jvmArgsAppend="-Dread_only_benchy=true")
 	public void walkReadOnly(){
 		doWalk();
 	}

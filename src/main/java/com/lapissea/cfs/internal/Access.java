@@ -32,11 +32,9 @@ public class Access{
 	
 	private static final boolean USE_UNSAFE_LOOKUP=true;
 	
-	private static final long ACCESS_OFFSET;
-	
-	static{
+	private static int calcModesOffset(){
 		@SuppressWarnings("all")
-		class Mirror{
+		final class Mirror{
 			Class<?> lookupClass;
 			Class<?> prevLookupClass;
 			int      allowedModes;
@@ -67,7 +65,7 @@ public class Access{
 			
 			offset++;
 		}
-		ACCESS_OFFSET=offset;
+		return offset;
 	}
 	
 	public static <FInter, T extends FInter> T makeLambda(Method method, Class<FInter> functionalInterface){
@@ -161,9 +159,9 @@ public class Access{
 	}
 	
 	private static void corruptPermissions(MethodHandles.Lookup lookup){
-		int modes=PUBLIC|PRIVATE|PROTECTED|PACKAGE|MODULE|UNCONDITIONAL|ORIGINAL;
+		int allModes=PUBLIC|PRIVATE|PROTECTED|PACKAGE|MODULE|UNCONDITIONAL|ORIGINAL;
 		
-		if(lookup.lookupModes()==modes){
+		if(lookup.lookupModes()==allModes){
 			return;
 		}
 		
@@ -180,8 +178,12 @@ public class Access{
 			
 			throw new SecurityException("Unsafe attempt of lookup modification: "+lookup);
 		}
-		UNSAFE.getAndSetInt(lookup, ACCESS_OFFSET, modes);
-		if(lookup.lookupModes()!=modes){
+		
+		//calculate objectFieldOffset every time as JVM may not keep a constant for a field
+		int offset=calcModesOffset();
+		
+		UNSAFE.getAndSetInt(lookup, offset, allModes);
+		if(lookup.lookupModes()!=allModes){
 			throw new ShouldNeverHappenError();
 		}
 		if(!lookup.hasFullPrivilegeAccess()){
