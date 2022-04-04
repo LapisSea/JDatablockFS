@@ -200,7 +200,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		public Node(DataProvider provider, Reference reference, TypeLink typeDef) throws IOException{
 			super(provider, reference, typeDef, NODE_TYPE_CHECK);
 			
-			var type=(Struct<T>)typeDef.argAsStruct(0);
+			var type=(Struct<T>)typeDef.argAsStruct(0, provider.getTypeDb());
 			type.requireEmptyConstructor();
 			this.valuePipe=StructPipe.of(getPipe().getClass(), type);
 			
@@ -610,7 +610,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		readOnly=getDataProvider().isReadOnly();
 		cache=readOnly?new HashMap<>():null;
 		
-		var type=(Struct<T>)typeDef.argAsStruct(0);
+		var type=(Struct<T>)typeDef.argAsStruct(0, provider.getTypeDb());
 		type.requireEmptyConstructor();
 		this.elementPipe=StructPipe.of(this.getPipe().getClass(), type);
 		

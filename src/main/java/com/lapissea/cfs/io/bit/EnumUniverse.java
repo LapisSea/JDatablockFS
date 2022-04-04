@@ -28,6 +28,7 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
 		long   uOff=-1;
 		
 		try{
+			if(Runtime.version().feature()>18) throw new RuntimeException();
 			Field f=Unsafe.class.getDeclaredField("theUnsafe");
 			f.setAccessible(true);
 			us=(Unsafe)f.get(null);

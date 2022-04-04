@@ -45,8 +45,8 @@ public class ContiguousIOList<T extends IOInstance<T>> extends AbstractUnmanaged
 		super(provider, reference, typeDef);
 		TYPE_CHECK.ensureValid(typeDef);
 		cache=readOnly?new HashMap<>():null;
+		var type=(Struct<T>)typeDef.argAsStruct(0, provider.getTypeDb());
 		
-		var type=(Struct<T>)typeDef.argAsStruct(0);
 		type.requireEmptyConstructor();
 		this.elementPipe=FixedContiguousStructPipe.of(type);
 		

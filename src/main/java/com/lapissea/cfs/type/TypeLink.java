@@ -166,8 +166,8 @@ public final class TypeLink extends IOInstance<TypeLink>{
 	public TypeLink arg(int index){
 		return args[index];
 	}
-	public Struct<?> argAsStruct(int index){
-		return Struct.ofUnknown(arg(index).getTypeClass(null));
+	public Struct<?> argAsStruct(int index, IOTypeDB db){
+		return Struct.ofUnknown(arg(index).getTypeClass(db));
 	}
 	
 	@Override
