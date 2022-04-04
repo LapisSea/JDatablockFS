@@ -623,7 +623,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 	}
 	
 	@Override
-	public Struct<T> getElementType(){
+	public RuntimeType<T> getElementType(){
 		return elementPipe.getType();
 	}
 	

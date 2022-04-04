@@ -36,7 +36,7 @@ import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NOT_NULL;
 
-public sealed class Struct<T extends IOInstance<T>>{
+public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 	
 	public interface Pool<T extends IOInstance<T>>{
 		
@@ -452,6 +452,7 @@ public sealed class Struct<T extends IOInstance<T>>{
 	public String toString(){
 		return getType().getSimpleName()+"{}";
 	}
+	@Override
 	public Class<T> getType(){
 		return type;
 	}
@@ -463,6 +464,7 @@ public sealed class Struct<T extends IOInstance<T>>{
 		if(field.getDeclaringClass()!=getType()) throw new IllegalArgumentException();
 		return getFields().byName(field.getName()).orElseThrow();
 	}
+	@Override
 	public boolean getCanHavePointers(){
 		return canHavePointers;
 	}
@@ -510,6 +512,7 @@ public sealed class Struct<T extends IOInstance<T>>{
 		return joiner.toString();
 	}
 	
+	@Override
 	public Supplier<T> requireEmptyConstructor(){
 		if(emptyConstructor==null) emptyConstructor=Access.findConstructor(getType(), Supplier.class);
 		return emptyConstructor;
