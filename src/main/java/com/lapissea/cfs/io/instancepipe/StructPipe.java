@@ -32,6 +32,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -41,7 +42,8 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	
 	private static class StructGroup<T extends IOInstance<T>, P extends StructPipe<T>> extends ConcurrentHashMap<Struct<T>, P>{
 		
-		private final Function<Struct<?>, P> lConstructor;
+		private final Map<Struct<T>, Supplier<P>> specials=new HashMap<>();
+		private final Function<Struct<?>, P>      lConstructor;
 		
 		private StructGroup(Class<? extends StructPipe<?>> type){
 			try{
@@ -55,7 +57,14 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 			var cached=get(struct);
 			if(cached!=null) return cached;
 			
-			P created=lConstructor.apply(struct);
+			P created;
+			
+			var special=specials.get(struct);
+			if(special!=null){
+				created=special.get();
+			}else{
+				created=lConstructor.apply(struct);
+			}
 			
 			if(GlobalConfig.PRINT_COMPILATION){
 				LogUtil.println(ConsoleColors.CYAN_BRIGHT+
@@ -87,6 +96,10 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 			
 			return created;
 		}
+		
+		private void registerSpecialImpl(Struct<T> struct, Supplier<P> newType){
+			specials.put(struct, newType);
+		}
 	}
 	
 	private static final ConcurrentHashMap<Class<? extends StructPipe<?>>, StructGroup<?, ?>> CACHE=new ConcurrentHashMap<>();
@@ -96,6 +109,13 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		var group=(StructGroup<T, P>)CACHE.computeIfAbsent(type, StructGroup::new);
 		return group.make(struct);
 	}
+	
+	@SuppressWarnings("unchecked")
+	public static <T extends IOInstance<T>, P extends StructPipe<T>> void registerSpecialImpl(Struct<T> struct, Class<P> oldType, Supplier<P> newType){
+		var group=(StructGroup<T, P>)CACHE.computeIfAbsent(oldType, StructGroup::new);
+		group.registerSpecialImpl(struct, newType);
+	}
+	
 	
 	private final Struct<T>                type;
 	private final SizeDescriptor<T>        sizeDescription;

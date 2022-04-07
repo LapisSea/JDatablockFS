@@ -12,6 +12,7 @@ import com.lapissea.cfs.type.field.IOFieldTools;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.function.Supplier;
 
 public class ContiguousStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 	
@@ -25,6 +26,11 @@ public class ContiguousStructPipe<T extends IOInstance<T>> extends StructPipe<T>
 	}
 	public static <T extends IOInstance<T>> StructPipe<T> of(Struct<T> struct){
 		return of(ContiguousStructPipe.class, struct);
+	}
+	
+	@SuppressWarnings("unchecked")
+	public static <T extends IOInstance<T>, P extends ContiguousStructPipe<T>> void registerSpecialImpl(Struct<T> struct, Supplier<P> newType){
+		StructPipe.registerSpecialImpl(struct, (Class<P>)(Object)ContiguousStructPipe.class, newType);
 	}
 	
 	public ContiguousStructPipe(Struct<T> type){
