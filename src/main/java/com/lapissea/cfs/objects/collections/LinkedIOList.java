@@ -42,7 +42,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			IOFieldTools.makeAnnotation(IONullability.class, Map.of("value", IONullability.Mode.NULLABLE))
 		);
 		
-		@IOValueUnmanaged
+		@IOValueUnmanaged(index=0)
 		private static <T extends IOInstance<T>> IOField<Node<T>, Object> makeValField(){
 			var valueAccessor=new AbstractFieldAccessor<Node<T>>(null, "value"){
 				@NotNull
@@ -86,7 +86,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			return new IOField.NoIO<>(valueAccessor, valDesc);
 		}
 		
-		@IOValueUnmanaged
+		@IOValueUnmanaged(index=1)
 		private static <T extends IOInstance<T>> IOField<Node<T>, Node<T>> makeNextField(){
 			var nextAccessor=new AbstractFieldAccessor<Node<T>>(null, "next"){
 				@NotNull

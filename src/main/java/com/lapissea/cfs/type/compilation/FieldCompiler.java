@@ -57,8 +57,25 @@ public class FieldCompiler{
 		
 		var methods=type.getDeclaredMethods();
 		
-		var valueDefs=Arrays.stream(methods).filter(m->m.isAnnotationPresent(IOValueUnmanaged.class)).toList();
+		var valueDefs=Arrays.stream(methods)
+		                    .filter(m->m.isAnnotationPresent(IOValueUnmanaged.class))
+		                    .sorted(Comparator.comparingInt(m->-m.getAnnotation(IOValueUnmanaged.class).index()))
+		                    .toList();
 		if(valueDefs.isEmpty()) return FieldSet.of();
+		
+		var err=valueDefs.stream()
+		                 .collect(Collectors.groupingBy(m->m.getAnnotation(IOValueUnmanaged.class).index()))
+		                 .values()
+		                 .stream()
+		                 .filter(l->l.size()>1)
+		                 .map(l->l.stream()
+		                          .map(Method::getName)
+		                          .collect(Collectors.joining(", ")))
+		                 .collect(Collectors.joining("\t\n"));
+		
+		if(!err.isEmpty()){
+			throw new MalformedStructLayout(type.getSimpleName()+" methods with duplicated indices:\n"+err);
+		}
 		
 		for(Method valueMethod : valueDefs){
 			if(!Modifier.isStatic(valueMethod.getModifiers())){
