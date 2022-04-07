@@ -204,6 +204,9 @@ public final class ChunkChainIO implements RandomIO{
 		}
 		
 		long toGrow=newCapacity-prev;
+		if(toGrow<=0){
+			return this;
+		}
 		
 		chunk.growBy(head, toGrow);
 		
@@ -294,6 +297,7 @@ public final class ChunkChainIO implements RandomIO{
 		long toAllocate=amount-remaining;
 		last.growBy(head, toAllocate);
 		
+		revalidate();
 	}
 	
 	@Override
