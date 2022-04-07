@@ -185,6 +185,7 @@ public class Cluster implements DataProvider{
 	
 	@Override
 	public IOTypeDB getTypeDb(){
+		if(root==null) return null;
 		return meta().db;
 	}
 	

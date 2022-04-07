@@ -302,7 +302,7 @@ public class MemoryOperations{
 	}
 	
 	public static long allocateBySimpleNextAssign(MemoryManager manager, Chunk target, long toAllocate) throws IOException{
-		var toPin=AllocateTicket.bytes(Math.max(toAllocate, 8)).withApproval(c->target.getNextSize().canFit(c.getPtr())).submit(manager);
+		var toPin=AllocateTicket.bytes(Math.max(toAllocate, 8)).withApproval(Chunk.sizeFitsPointer(target.getNextSize())).submit(manager);
 		if(toPin==null) return 0;
 		target.modifyAndSave(c->{
 			try{
@@ -339,9 +339,9 @@ public class MemoryOperations{
 	
 	private static Chunk chipEndProbe(DataProvider context, AllocateTicket ticket, Chunk ch) throws IOException{
 		var builder=new ChunkBuilder(context, ch.getPtr())
-			.withCapacity(ticket.bytes())
-			.withNext(ticket.next())
-			.withExplicitNextSize(ticket.disableResizing()?NumberSize.VOID:NumberSize.bySize(ticket.next()).max(NumberSize.SHORT));
+			            .withCapacity(ticket.bytes())
+			            .withNext(ticket.next())
+			            .withExplicitNextSize(ticket.disableResizing()?NumberSize.VOID:NumberSize.bySize(ticket.next()).max(NumberSize.SHORT));
 		
 		var reallocate=builder.create();
 		
@@ -367,9 +367,9 @@ public class MemoryOperations{
 		var src=context.getSource();
 		
 		var builder=new ChunkBuilder(context, ChunkPointer.of(src.getIOSize()))
-			.withCapacity(ticket.bytes())
-			.withNext(ticket.next())
-			.withExplicitNextSize(ticket.disableResizing()?NumberSize.VOID:NumberSize.bySize(ticket.next()).max(NumberSize.SHORT));
+			            .withCapacity(ticket.bytes())
+			            .withNext(ticket.next())
+			            .withExplicitNextSize(ticket.disableResizing()?NumberSize.VOID:NumberSize.bySize(ticket.next()));
 		
 		var chunk=builder.create();
 		if(!ticket.approve(chunk)) return null;
@@ -383,27 +383,28 @@ public class MemoryOperations{
 	}
 	
 	public static void checkValidityOfChainAlloc(DataProvider context, Chunk firstChunk, Chunk target) throws IOException{
-		if(DEBUG_VALIDATION){
-			assert firstChunk.getDataProvider()==context;
-			assert target.getDataProvider()==context;
-			
-			var ptr=firstChunk.getPtr();
-			
-			var prev=new PhysicalChunkWalker(context.getFirstChunk())
-				.stream()
-				.filter(Chunk::hasNextPtr)
-				.map(Chunk::getNextPtr)
-				.filter(p->p.equals(ptr))
-				.findAny();
-			
-			if(prev.isPresent()){
-				var ch=context.getChunk(prev.get());
-				throw new IllegalArgumentException(firstChunk+" is not the first chunk! "+ch+" declares it as next.");
-			}
-			
-			if(firstChunk.streamNext().noneMatch(c->c==target)){
-				throw new IllegalArgumentException(TextUtil.toString(target, "is in the chain of", firstChunk, "descendents:", firstChunk.collectNext()));
-			}
+		if(!DEBUG_VALIDATION) return;
+		
+		assert firstChunk.getDataProvider()==context;
+		assert target.getDataProvider()==context;
+		
+		var ptr=firstChunk.getPtr();
+		
+		var prev=new PhysicalChunkWalker(context.getFirstChunk())
+			         .stream()
+			         .filter(Chunk::hasNextPtr)
+			         .map(Chunk::getNextPtr)
+			         .filter(p->p.equals(ptr))
+			         .findAny();
+		
+		if(prev.isPresent()){
+			var ch=context.getChunk(prev.get());
+			throw new IllegalArgumentException(firstChunk+" is not the first chunk! "+ch+" declares it as next.");
+		}
+		
+		if(firstChunk.streamNext().noneMatch(c->c==target)){
+			throw new IllegalArgumentException(TextUtil.toString(target, "is in the chain of", firstChunk, "descendents:", firstChunk.collectNext()));
 		}
 	}
+	
 }

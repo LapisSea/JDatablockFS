@@ -38,6 +38,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -419,6 +420,19 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 	
 	public NumberSize getNextSize(){
 		return nextSize;
+	}
+	
+	public static Predicate<Chunk> sizeFitsPointer(NumberSize size){
+		return new Predicate<>(){
+			@Override
+			public boolean test(Chunk o){
+				return size.canFit(o.getPtr());
+			}
+			@Override
+			public String toString(){
+				return "Must fit "+size;
+			}
+		};
 	}
 	
 	@Override

@@ -157,9 +157,12 @@ public class IOFieldTools{
 	public static IONullability.Mode getNullability(FieldAccessor<?> field, IONullability.Mode defaultMode){
 		return field.getAnnotation(IONullability.class).map(IONullability::value).orElse(defaultMode);
 	}
+	
 	public static <T extends IOInstance<T>> String makeRefName(FieldAccessor<T> accessor){
-		
-		return accessor.getName()+GENERATED_FIELD_SEPARATOR+"ref";
+		return makeRefName(accessor.getName());
+	}
+	public static <T extends IOInstance<T>> String makeRefName(String baseName){
+		return baseName+GENERATED_FIELD_SEPARATOR+"ref";
 	}
 	
 	public static <E extends Annotation> E makeAnnotation(Class<E> annotationType, @NotNull Map<String, Object> values){

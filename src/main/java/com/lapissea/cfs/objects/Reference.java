@@ -15,7 +15,7 @@ import java.util.Objects;
 public final class Reference extends IOInstance<Reference>{
 	
 	@SuppressWarnings("unchecked")
-	private static final Struct<Reference> REFERENCE_STRUCT=(Struct<Reference>)Struct.thisClass();
+	public static final Struct<Reference> STRUCT=(Struct<Reference>)Struct.thisClass();
 	
 	private static final class IOContext implements RandomIO.Creator{
 		private final Reference    ref;
@@ -38,10 +38,10 @@ public final class Reference extends IOInstance<Reference>{
 	}
 	
 	@IOValue
-	@IODependency.VirtualNumSize(name = "ptrSize")
+	@IODependency.VirtualNumSize(name="ptrSize")
 	private ChunkPointer ptr;
 	@IOValue
-	@IODependency.VirtualNumSize(name = "offsetSize")
+	@IODependency.VirtualNumSize(name="offsetSize")
 	private long         offset;
 	
 	public Reference(){
@@ -49,7 +49,7 @@ public final class Reference extends IOInstance<Reference>{
 	}
 	
 	public Reference(ChunkPointer ptr, long offset){
-		super(REFERENCE_STRUCT);
+		super(STRUCT);
 		this.ptr=Objects.requireNonNull(ptr);
 		this.offset=offset;
 		if(offset<0) throw new IllegalArgumentException("Offset can not be negative");
