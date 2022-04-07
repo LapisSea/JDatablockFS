@@ -314,6 +314,58 @@ public class MemoryOperations{
 		return toPin.getCapacity();
 	}
 	
+	public static long allocateByGrowingHeaderNextAssign(MemoryManager manager, Chunk target, long toAllocate) throws IOException{
+		if(target.hasNextPtr()) throw new IllegalArgumentException();
+		
+		var siz=target.getNextSize();
+		while(true){
+			if(siz==NumberSize.LARGEST){
+				throw new OutOfMemoryError();
+			}
+			siz=siz.next();
+			
+			var growth=siz.bytes-target.getNextSize().bytes;
+			
+			var aloc=toAllocate+growth;
+			
+			var toPin=AllocateTicket.bytes(Math.max(aloc, 8)).withApproval(Chunk.sizeFitsPointer(siz)).submit(manager);
+			if(toPin==null) continue;
+			
+			var source=target.getDataProvider().getSource();
+			
+			int shiftSize=Math.toIntExact(target.getSize()-growth);
+			if(shiftSize<0){
+				if(target.getCapacity()<growth){
+					return 0;
+				}
+				shiftSize=0;
+			}
+			byte[] toShift;
+			try(var io=target.io()){
+				toShift=io.readInts1(shiftSize);
+				try(var pio=toPin.io()){
+					io.transferTo(pio);
+				}
+			}
+			
+			target.requireReal();
+			try{
+				target.setNextSize(siz);
+				target.setNextPtr(toPin.getPtr());
+				target.setSize(target.getSize()-growth);
+				target.setCapacity(target.getCapacity()-growth);
+			}catch(BitDepthOutOfSpaceException e){
+				throw new ShouldNeverHappenError(e);
+			}
+			try(var ignored=source.openIOTransaction()){
+				target.syncStruct();
+				source.write(target.dataStart(), false, toShift);
+			}
+			
+			return toPin.getCapacity()-growth;
+		}
+	}
+	
 	
 	public static Chunk allocateReuseFreeChunk(DataProvider context, AllocateTicket ticket) throws IOException{
 		for(var iterator=context.getMemoryManager().getFreeChunks().iterator();iterator.hasNext();){
@@ -341,7 +393,7 @@ public class MemoryOperations{
 		var builder=new ChunkBuilder(context, ch.getPtr())
 			            .withCapacity(ticket.bytes())
 			            .withNext(ticket.next())
-			            .withExplicitNextSize(ticket.disableResizing()?NumberSize.VOID:NumberSize.bySize(ticket.next()).max(NumberSize.SHORT));
+			            .withExplicitNextSize(ticket.disableResizing()?NumberSize.VOID:NumberSize.bySize(ticket.next()));
 		
 		var reallocate=builder.create();
 		

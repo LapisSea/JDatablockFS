@@ -428,6 +428,17 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		return nextSize;
 	}
 	
+	public void setNextSize(NumberSize nextSize) throws BitDepthOutOfSpaceException{
+		forbidReadOnly();
+		if(this.nextSize==nextSize) return;
+		nextSize.ensureCanFit(getNextPtr());
+		
+		this.nextSize=nextSize;
+		markDirty();
+		calcHeaderSize();
+	}
+	
+	
 	public static Predicate<Chunk> sizeFitsPointer(NumberSize size){
 		return new Predicate<>(){
 			@Override

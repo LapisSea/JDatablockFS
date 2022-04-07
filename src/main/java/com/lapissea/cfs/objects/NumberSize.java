@@ -11,6 +11,7 @@ import com.lapissea.util.Nullable;
 
 import java.io.IOException;
 import java.math.BigInteger;
+import java.util.Comparator;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
 import java.util.function.ToLongFunction;
@@ -90,6 +91,9 @@ public enum NumberSize{
 		return null;
 	}
 	
+	private int nextId=-2;
+	private int prevId=-2;
+	
 	public final int  bytes;
 	public final long maxSize;
 	public final char shortName;
@@ -137,14 +141,18 @@ public enum NumberSize{
 	}
 	
 	public NumberSize prev(){
-		var prevId=ordinal()-1;
+		if(prevId==-2){
+			prevId=FLAG_INFO.stream().filter(n->n.lesserThan(this)).max(Comparator.comparingInt(NumberSize::bytes)).map(Enum::ordinal).orElse(-1);
+		}
 		if(prevId==-1) return this;
 		return ordinal(prevId);
 	}
 	
 	public NumberSize next(){
-		var nextId=ordinal()+1;
-		if(nextId==FLAG_INFO.size()) return this;
+		if(nextId==-2){
+			nextId=FLAG_INFO.stream().filter(n->n.greaterThan(this)).min(Comparator.comparingInt(NumberSize::bytes)).map(Enum::ordinal).orElse(-1);
+		}
+		if(nextId==-1) return this;
 		return ordinal(nextId);
 	}
 	
