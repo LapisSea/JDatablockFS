@@ -38,8 +38,16 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 			return num.getValue();
 		}
 		@Override
-		public void setLong(CTyp instance, long value, Struct.Pool<CTyp> ioPool){
+		public void setLong(Struct.Pool<CTyp> ioPool, CTyp instance, long value){
 			set(ioPool, instance, constructor.apply(value));
+		}
+	}
+	
+	public static <T extends IOInstance<T>> FunctionalReflectionAccessor<T> make(Struct<T> struct, String name, Method getter, Method setter, GetAnnotation annotations, Type type){
+		if(UtilL.instanceOf(Utils.typeToRaw(type), INumber.class)){
+			return new FunctionalReflectionAccessor.Num<>(struct, annotations, getter, setter, name, type);
+		}else{
+			return new FunctionalReflectionAccessor<>(struct, annotations, getter, setter, name, type);
 		}
 	}
 	
@@ -197,7 +205,7 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 	}
 	
 	@Override
-	public void setLong(CTyp instance, long value, Struct.Pool<CTyp> ioPool){
+	public void setLong(Struct.Pool<CTyp> ioPool, CTyp instance, long value){
 		try{
 			setter.invoke(instance, value);
 		}catch(Throwable e){
@@ -221,6 +229,11 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 		}catch(Throwable e){
 			throw UtilL.uncheckedThrow(e);
 		}
+	}
+	
+	@Override
+	public boolean canBeNull(){
+		return !rawType.isPrimitive();
 	}
 	
 	@Override

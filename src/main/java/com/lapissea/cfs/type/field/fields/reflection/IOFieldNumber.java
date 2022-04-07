@@ -15,11 +15,15 @@ import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 
 import java.io.IOException;
+import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.function.LongFunction;
 
+import static com.lapissea.cfs.objects.NumberSize.LARGEST;
+import static com.lapissea.cfs.objects.NumberSize.VOID;
+
 public class IOFieldNumber<T extends IOInstance<T>, E extends INumber> extends IOField<T, E>{
-	private final NumberSize size=NumberSize.LONG;
+	private static final NumberSize size=NumberSize.LONG;
 	
 	private final boolean                                   forceFixed;
 	private       BiFunction<Struct.Pool<T>, T, NumberSize> dynamicSize;
@@ -39,12 +43,12 @@ public class IOFieldNumber<T extends IOInstance<T>, E extends INumber> extends I
 		super.init();
 		this.constructor=Access.findConstructor(getAccessor().getType(), LongFunction.class, long.class);
 		
-		var field=forceFixed?null:IOFieldTools.getDynamicSize(getAccessor());
+		Optional<IOField<T, NumberSize>> fieldOps=forceFixed?Optional.empty():IOFieldTools.getDynamicSize(getAccessor());
 		
-		dynamicSize=field==null?null:field::get;
+		fieldOps.ifPresent(f->dynamicSize=f::get);
 		
-		if(dynamicSize==null) sizeDescriptor=new SizeDescriptor.Fixed<>(size.bytes);
-		else sizeDescriptor=new SizeDescriptor.Unknown<>(0, NumberSize.LARGEST.optionalBytesLong, (ioPool, prov, inst)->getSize(null, inst).bytes);
+		sizeDescriptor=fieldOps.map(field->SizeDescriptor.Unknown.of(VOID, Optional.of(LARGEST), field.getAccessor()))
+		                       .orElse(SizeDescriptor.Fixed.of(size.bytes));
 	}
 	@Override
 	public IOField<T, E> implMaxAsFixedSize(){

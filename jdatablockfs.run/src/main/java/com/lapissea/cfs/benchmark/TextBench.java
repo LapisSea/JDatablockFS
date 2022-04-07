@@ -12,8 +12,8 @@ import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
 
-@Warmup(iterations=6, time=2000, timeUnit=TimeUnit.MILLISECONDS)
-@Measurement(iterations=6, time=5000, timeUnit=TimeUnit.MILLISECONDS)
+@Warmup(iterations = 6, time = 2000, timeUnit = TimeUnit.MILLISECONDS)
+@Measurement(iterations = 6, time = 5000, timeUnit = TimeUnit.MILLISECONDS)
 @State(Scope.Thread)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 public class TextBench{
@@ -60,7 +60,7 @@ public class TextBench{
 	}
 	
 	@Benchmark
-	@Fork(jvmArgsAppend="-Dcom.lapissea.cfs.objects.text.Encoding.DISABLE_BLOCK_CODING=true")
+	@Fork(jvmArgsAppend = "-Dcom.lapissea.cfs.objects.text.Encoding.DISABLE_BLOCK_CODING=true")
 	public void writeNoBulk() throws IOException{
 		t.writeTextBytes(new ContentWriter(){
 			@Override
@@ -71,7 +71,7 @@ public class TextBench{
 	}
 	
 	@Benchmark
-	@Fork(jvmArgsAppend="-Dcom.lapissea.cfs.objects.text.Encoding.DISABLE_BLOCK_CODING=true")
+	@Fork(jvmArgsAppend = "-Dcom.lapissea.cfs.objects.text.Encoding.DISABLE_BLOCK_CODING=true")
 	public void readNoBulk() throws IOException{
 		sb.setLength(0);
 		t.readTextBytes(new ContentInputStream.BA(bb), sb);

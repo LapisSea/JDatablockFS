@@ -93,10 +93,12 @@ public class TemplateClassLoader extends ClassLoader{
 						""",
 					type,
 					field.getName());
+			}
+			for(var field : classType.def.getFields()){
+				var type=toJorthGeneric(field.getType());
 				
 				writer.write(
 					"""
-						IOValue @
 						public visibility
 						#RAW(0) returns
 						#TOKEN(1) function start
@@ -163,9 +165,7 @@ public class TemplateClassLoader extends ClassLoader{
 		try{
 			def=db.getDefinitionFromClassName(name);
 		}catch(IOException e){
-			var e1=new ClassNotFoundException("Failed to fetch data from database");
-			e1.addSuppressed(e);
-			throw e1;
+			throw new RuntimeException("Failed to fetch data from database", e);
 		}
 		if(def==null){
 			throw new ClassNotFoundException(name+" is not defined in database");

@@ -107,23 +107,28 @@ public class IOFieldTools{
 		}
 	}
 	
-	public static <T extends IOInstance<T>> IOField<T, NumberSize> getDynamicSize(FieldAccessor<T> field){
+	public static <T extends IOInstance<T>> Optional<IOField<T, NumberSize>> getDynamicSize(FieldAccessor<T> field){
 		Optional<String> dynSiz=Stream.of(
 			field.getAnnotation(IODependency.NumSize.class).map(IODependency.NumSize::value),
 			field.getAnnotation(IODependency.VirtualNumSize.class).map(e->IODependency.VirtualNumSize.Logic.getName(field, e))
 		).filter(Optional::isPresent).map(Optional::get).findAny();
 		
-		if(dynSiz.isEmpty()) return null;
+		if(dynSiz.isEmpty()) return Optional.empty();
 		var opt=field.getDeclaringStruct().getFields().exact(NumberSize.class, dynSiz.get());
 		if(opt.isEmpty()) throw new ShouldNeverHappenError("This should have been checked in annotation logic");
-		return opt.get();
+		return opt;
 	}
 	
 	public static <T extends IOInstance<T>> OptionalLong sumVarsIfAll(Collection<? extends IOField<T, ?>> fields, Function<SizeDescriptor<T>, OptionalLong> mapper){
 		return fields.stream().map(IOField::getSizeDescriptor).map(mapper).reduce(OptionalLong.of(0), Utils::addIfBoth);
 	}
 	public static <T extends IOInstance<T>> long sumVars(Collection<? extends IOField<T, ?>> fields, ToLongFunction<SizeDescriptor<T>> mapper){
-		return fields.stream().map(IOField::getSizeDescriptor).mapToLong(mapper).sum();
+		//return fields.stream().map(IOField::getSizeDescriptor).mapToLong(mapper).sum();
+		long sum=0L;
+		for(IOField<T, ?> field : fields){
+			sum+=mapper.applyAsLong(field.getSizeDescriptor());
+		}
+		return sum;
 	}
 	
 	public static <T extends IOInstance<T>> WordSpace minWordSpace(Collection<? extends IOField<T, ?>> fields){
@@ -152,9 +157,12 @@ public class IOFieldTools{
 	public static IONullability.Mode getNullability(FieldAccessor<?> field, IONullability.Mode defaultMode){
 		return field.getAnnotation(IONullability.class).map(IONullability::value).orElse(defaultMode);
 	}
+	
 	public static <T extends IOInstance<T>> String makeRefName(FieldAccessor<T> accessor){
-		
-		return accessor.getName()+GENERATED_FIELD_SEPARATOR+"ref";
+		return makeRefName(accessor.getName());
+	}
+	public static <T extends IOInstance<T>> String makeRefName(String baseName){
+		return baseName+GENERATED_FIELD_SEPARATOR+"ref";
 	}
 	
 	public static <E extends Annotation> E makeAnnotation(Class<E> annotationType, @NotNull Map<String, Object> values){

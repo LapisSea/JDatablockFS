@@ -30,6 +30,8 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>> implements Clone
 		
 		private StructPipe<SELF> pipe;
 		
+		protected final boolean readOnly;
+		
 		protected Unmanaged(DataProvider provider, Reference reference, TypeLink typeDef, TypeLink.Check check){
 			this(provider, reference, typeDef);
 			check.ensureValid(typeDef);
@@ -39,11 +41,22 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>> implements Clone
 			this.provider=Objects.requireNonNull(provider);
 			this.reference=reference.requireNonNull();
 			this.typeDef=typeDef;
+			readOnly=getDataProvider().isReadOnly();
 		}
 		
 		@NotNull
-		public Stream<IOField<SELF, ?>> listDynamicUnmanagedFields(){
+		protected Stream<IOField<SELF, ?>> listDynamicUnmanagedFields(){
 			return Stream.of();
+		}
+		
+		@NotNull
+		public final Stream<IOField<SELF, ?>> listUnmanagedFields(){
+			var s =getThisStruct();
+			var fs=s.getUnmanagedStaticFields().stream();
+			if(!s.isOverridingDynamicUnmanaged()){
+				return fs;
+			}
+			return Stream.concat(listDynamicUnmanagedFields(), fs);
 		}
 		
 		public TypeLink getTypeDef(){
@@ -84,6 +97,10 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>> implements Clone
 			reference=newRef;
 		}
 		
+		public Struct.Unmanaged<SELF> getThisStruct(){
+			return (Struct.Unmanaged<SELF>)super.getThisStruct();
+		}
+		
 		public void free() throws IOException{}
 		
 		protected RandomIO selfIO() throws IOException{
@@ -100,6 +117,9 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>> implements Clone
 		}
 		
 		protected void writeManagedFields() throws IOException{
+			if(readOnly){
+				throw new UnsupportedOperationException();
+			}
 			try(var io=selfIO()){
 				getPipe().write(provider, io, self());
 			}
@@ -172,6 +192,10 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>> implements Clone
 	}
 	public String toShortString(){
 		return getThisStruct().instanceToString(getThisStruct().allocVirtualVarPool(IO), self(), true);
+	}
+	
+	public String toString(boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+		return getThisStruct().instanceToString(getThisStruct().allocVirtualVarPool(IO), self(), doShort, start, end, fieldValueSeparator, fieldSeparator);
 	}
 	
 	@Override

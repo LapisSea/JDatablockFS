@@ -12,18 +12,17 @@ import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.AbstractFieldAccessor;
-import com.lapissea.cfs.type.field.annotations.IODependency;
-import com.lapissea.cfs.type.field.annotations.IONullability;
-import com.lapissea.cfs.type.field.annotations.IOValue;
-import com.lapissea.cfs.type.field.annotations.IOValueUnmanaged;
+import com.lapissea.cfs.type.field.annotations.*;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.*;
@@ -38,11 +37,19 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 	
 	public static class Node<T extends IOInstance<T>> extends IOInstance.Unmanaged<Node<T>> implements IterablePP<Node<T>>{
 		
-		private final boolean readOnly;
+		private static final List<Annotation> ANNOTATIONS=List.of(
+			IOFieldTools.makeAnnotation(IOType.Dynamic.class, Map.of()),
+			IOFieldTools.makeAnnotation(IONullability.class, Map.of("value", IONullability.Mode.NULLABLE))
+		);
 		
-		@IOValueUnmanaged
-		private static <T extends IOInstance<T>> IOField<Node<T>, ?> makeValField(){
+		@IOValueUnmanaged(index=0)
+		private static <T extends IOInstance<T>> IOField<Node<T>, Object> makeValField(){
 			var valueAccessor=new AbstractFieldAccessor<Node<T>>(null, "value"){
+				@NotNull
+				@Override
+				public <T1 extends Annotation> Optional<T1> getAnnotation(Class<T1> annotationClass){
+					return ANNOTATIONS.stream().filter(a->UtilL.instanceOf(a, annotationClass)).map(a->(T1)a).findAny();
+				}
 				@Override
 				public Type getGenericType(GenericContext genericContext){
 					return Object.class;
@@ -70,7 +77,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 				}
 			};
 			
-			SizeDescriptor<Node<T>> valDesc=new SizeDescriptor.Unknown<>(WordSpace.BYTE, 0, OptionalLong.empty(), (ioPool, prov, inst)->{
+			SizeDescriptor<Node<T>> valDesc=SizeDescriptor.Unknown.of(WordSpace.BYTE, 0, OptionalLong.empty(), (ioPool, prov, inst)->{
 				var val=valueAccessor.get(ioPool, inst);
 				if(val==null) return 0;
 				return inst.valuePipe.calcUnknownSize(prov, val, WordSpace.BYTE);
@@ -79,17 +86,24 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			return new IOField.NoIO<>(valueAccessor, valDesc);
 		}
 		
-		@IOValueUnmanaged
-		private IOField<Node<T>, ?> makeNextField(){
+		@IOValueUnmanaged(index=1)
+		private static <T extends IOInstance<T>> IOField<Node<T>, Node<T>> makeNextField(){
 			var nextAccessor=new AbstractFieldAccessor<Node<T>>(null, "next"){
+				@NotNull
+				@Override
+				public <T1 extends Annotation> Optional<T1> getAnnotation(Class<T1> annotationClass){
+					if(annotationClass!=IONullability.class) return Optional.empty();
+					return (Optional<T1>)Optional.of(ANNOTATIONS.get(1));
+				}
 				@Override
 				public Type getGenericType(GenericContext genericContext){
-					return getTypeDef().generic(null);
+					if(genericContext==null) return Node.class;
+					throw new NotImplementedException();
 				}
 				@Override
 				public Object get(Struct.Pool<Node<T>> ioPool, Node<T> instance){
 					try{
-						return getNext();
+						return instance.getNext();
 					}catch(IOException e){
 						throw new RuntimeException(e);
 					}
@@ -104,7 +118,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 				}
 			};
 			
-			var next=new IOField.Ref.NoIO<Node<T>, Node<T>>(nextAccessor, new SizeDescriptor.Unknown<>(WordSpace.BYTE, 0, NumberSize.LARGEST.optionalBytesLong, (ioPool, prov, node)->node.nextSize.bytes)){
+			var next=new IOField.Ref.NoIO<Node<T>, Node<T>>(nextAccessor, SizeDescriptor.Unknown.of(WordSpace.BYTE, 0, NumberSize.LARGEST.optionalBytesLong, (ioPool, prov, node)->node.nextSize.bytes)){
 				@Override
 				public void setReference(Node<T> instance, Reference newRef){
 					if(newRef.getOffset()!=0) throw new NotImplementedException();
@@ -118,7 +132,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 				public Reference getReference(Node<T> instance){
 					ChunkPointer next;
 					try{
-						next=getNextPtr();
+						next=instance.getNextPtr();
 					}catch(IOException e){
 						throw new RuntimeException(e);
 					}
@@ -126,23 +140,25 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 				}
 				@Override
 				public StructPipe<Node<T>> getReferencedPipe(Node<T> instance){
-					return getPipe();
+					return instance.getPipe();
 				}
 			};
 			next.initLateData(FieldSet.of(List.of(getNextSizeField())), Stream.of());
 			
 			return next;
-			
 		}
 		
 		private static final TypeLink.Check NODE_TYPE_CHECK=new TypeLink.Check(
-				LinkedIOList.Node.class,
-				List.of(t->{
-					var c=t.getTypeClass(null);
-					if(!IOInstance.isManaged(c)) throw new ClassCastException("not managed");
-					if(Modifier.isAbstract(c.getModifiers())) throw new ClassCastException(c+" is abstract");
-				})
+			LinkedIOList.Node.class,
+			List.of(t->{
+				var c=t.getTypeClass(null);
+				if(!IOInstance.isManaged(c)) throw new ClassCastException("not managed");
+				if(Modifier.isAbstract(c.getModifiers())) throw new ClassCastException(c+" is abstract");
+			})
 		);
+		
+		private static final IOField<?, NumberSize> NEXT_SIZE_FIELD=Struct.thisClass().getFields().requireExact(NumberSize.class, "nextSize");
+		
 		
 		private static NumberSize calcOptimalNextSize(DataProvider provider) throws IOException{
 			return NumberSize.bySize(provider.getSource().getIOSize());
@@ -183,9 +199,8 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		
 		public Node(DataProvider provider, Reference reference, TypeLink typeDef) throws IOException{
 			super(provider, reference, typeDef, NODE_TYPE_CHECK);
-			readOnly=getDataProvider().isReadOnly();
 			
-			var type=(Struct<T>)typeDef.argAsStruct(0);
+			var type=(Struct<T>)typeDef.argAsStruct(0, provider.getTypeDb());
 			type.requireEmptyConstructor();
 			this.valuePipe=StructPipe.of(getPipe().getClass(), type);
 			
@@ -195,12 +210,6 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			}else{
 				readManagedFields();
 			}
-		}
-		
-		@NotNull
-		@Override
-		public Stream<IOField<Node<T>, ?>> listDynamicUnmanagedFields(){
-			return Stream.of(makeNextField(), makeValField());
 		}
 		
 		@Override
@@ -260,7 +269,13 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		
 		private T readValue() throws IOException{
 			
-			readManagedFields();
+			try(var io=selfIO()){
+				var s=io.getSize();
+				if(s==0) return null;
+				var min=getNextSizeField().getSizeDescriptor().getMin(WordSpace.BYTE);
+				if(s<min) return null;
+				getPipe().readSingleField(null, getDataProvider(), io, getNextSizeField(), self(), getGenerics());
+			}
 			
 			var start=valueStart();
 			
@@ -375,8 +390,8 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			return desc.calcUnknown(getPipe().makeIOPool(), getDataProvider(), this, WordSpace.BYTE);
 		}
 		
-		private IOField<Node<T>, NumberSize> getNextSizeField(){
-			return getPipe().getSpecificFields().requireExact(NumberSize.class, "nextSize");
+		private static <T extends IOInstance<T>> IOField<Node<T>, NumberSize> getNextSizeField(){
+			return (IOField<Node<T>, NumberSize>)NEXT_SIZE_FIELD;
 		}
 		
 		private long valueStart(){
@@ -565,12 +580,12 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 	}
 	
 	private static final TypeLink.Check LIST_TYPE_CHECK=new TypeLink.Check(
-			LinkedIOList.class,
-			List.of(t->{
-				if(!IOInstance.isManaged(t)){
-					throw new RuntimeException("not managed");
-				}
-			})
+		LinkedIOList.class,
+		List.of(t->{
+			if(!IOInstance.isManaged(t)){
+				throw new RuntimeException("not managed");
+			}
+		})
 	);
 	
 	private final IOField<LinkedIOList<T>, Node<T>> headField=(IOField<LinkedIOList<T>, Node<T>>)Struct.Unmanaged.thisClass().getFields().byName("head").orElseThrow();
@@ -595,7 +610,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		readOnly=getDataProvider().isReadOnly();
 		cache=readOnly?new HashMap<>():null;
 		
-		var type=(Struct<T>)typeDef.argAsStruct(0);
+		var type=(Struct<T>)typeDef.argAsStruct(0, provider.getTypeDb());
 		type.requireEmptyConstructor();
 		this.elementPipe=StructPipe.of(this.getPipe().getClass(), type);
 		
@@ -608,7 +623,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 	}
 	
 	@Override
-	public Struct<T> getElementType(){
+	public RuntimeType<T> getElementType(){
 		return elementPipe.getType();
 	}
 	
@@ -654,8 +669,8 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 	
 	private TypeLink nodeType(){
 		return new TypeLink(
-				LinkedIOList.Node.class,
-				getTypeDef().arg(0)
+			LinkedIOList.Node.class,
+			getTypeDef().arg(0)
 		);
 	}
 	
@@ -837,8 +852,8 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		});
 		
 		getDataProvider()
-				.getMemoryManager()
-				.free(chunks);
+			.getMemoryManager()
+			.free(chunks);
 	}
 	
 	@Override

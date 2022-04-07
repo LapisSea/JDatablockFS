@@ -8,19 +8,14 @@ import com.lapissea.cfs.objects.INumber;
 import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
-import com.lapissea.cfs.type.field.access.FieldAccessor;
-import com.lapissea.cfs.type.field.access.FunctionalReflectionAccessor;
-import com.lapissea.cfs.type.field.access.ReflectionAccessor;
-import com.lapissea.cfs.type.field.access.VirtualAccessor;
-import com.lapissea.cfs.type.field.annotations.IODependency;
-import com.lapissea.cfs.type.field.annotations.IONullability;
-import com.lapissea.cfs.type.field.annotations.IOType;
-import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.cfs.type.field.access.*;
+import com.lapissea.cfs.type.field.annotations.*;
 import com.lapissea.cfs.type.field.fields.reflection.*;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.PairM;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
+import ru.vyarus.java.generics.resolver.GenericsResolver;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
@@ -33,7 +28,6 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.NONE;
 import static java.util.function.Function.identity;
 
 @SuppressWarnings("rawtypes")
@@ -60,14 +54,64 @@ public class FieldCompiler{
 	
 	public <T extends IOInstance.Unmanaged<T>> FieldSet<T> compileStaticUnmanaged(Struct.Unmanaged<T> struct){//TODO: implement static unmanaged fields
 		var type=struct.getType();
-		return FieldSet.of();
+		
+		var methods=type.getDeclaredMethods();
+		
+		var valueDefs=Arrays.stream(methods)
+		                    .filter(m->m.isAnnotationPresent(IOValueUnmanaged.class))
+		                    .sorted(Comparator.comparingInt(m->-m.getAnnotation(IOValueUnmanaged.class).index()))
+		                    .toList();
+		if(valueDefs.isEmpty()) return FieldSet.of();
+		
+		var err=valueDefs.stream()
+		                 .collect(Collectors.groupingBy(m->m.getAnnotation(IOValueUnmanaged.class).index()))
+		                 .values()
+		                 .stream()
+		                 .filter(l->l.size()>1)
+		                 .map(l->l.stream()
+		                          .map(Method::getName)
+		                          .collect(Collectors.joining(", ")))
+		                 .collect(Collectors.joining("\t\n"));
+		
+		if(!err.isEmpty()){
+			throw new MalformedStructLayout(type.getSimpleName()+" methods with duplicated indices:\n"+err);
+		}
+		
+		for(Method valueMethod : valueDefs){
+			if(!Modifier.isStatic(valueMethod.getModifiers())){
+				throw new MalformedStructLayout(valueMethod+" is not static!");
+			}
+			
+			var context=GenericsResolver.resolve(valueMethod.getDeclaringClass()).method(valueMethod);
+			
+			if(!UtilL.instanceOf(context.resolveReturnClass(), IOField.class)){
+				throw new MalformedStructLayout(valueMethod+" does not return "+IOField.class.getName());
+			}
+			
+			Class<?> ioFieldOwner=context.returnType().type(IOField.class).generic("T");
+			
+			if(ioFieldOwner!=valueMethod.getDeclaringClass()){
+				throw new MalformedStructLayout(valueMethod+" does not return IOField of same owner type!\n"+ioFieldOwner.getName()+"\n"+valueMethod.getDeclaringClass().getName());
+			}
+		}
+		
+		return FieldSet.of(valueDefs.stream().map(valueDef->{
+			valueDef.setAccessible(true);
+			
+			try{
+				//noinspection unchecked
+				return (IOField<T, ?>)valueDef.invoke(null);
+			}catch(ReflectiveOperationException e){
+				throw new RuntimeException(e);
+			}
+		}));
 	}
 	
 	public <T extends IOInstance<T>> FieldSet<T> compile(Struct<T> struct){
 		var fields=scanFields(struct)
-			.map(f->registry().create(f, null))
-			.map(f->new AnnotatedField<>(f, scanAnnotations(f)))
-			.collect(Collectors.toList());
+			           .map(f->registry().create(f, null))
+			           .map(f->new AnnotatedField<>(f, scanAnnotations(f)))
+			           .collect(Collectors.toList());
 		
 		generateVirtualFields(fields, struct);
 		
@@ -132,9 +176,10 @@ public class FieldCompiler{
 	
 	private <T extends IOInstance<T>> void generateVirtualFields(List<AnnotatedField<T>> parsed, Struct<T> struct){
 		
-		Map<VirtualFieldDefinition.StoragePool, Integer> accessIndex   =new EnumMap<>(VirtualFieldDefinition.StoragePool.class);
-		Map<String, FieldAccessor<T>>                    virtualData   =new HashMap<>();
-		Map<String, FieldAccessor<T>>                    newVirtualData=new HashMap<>();
+		Map<VirtualFieldDefinition.StoragePool, Integer> accessIndex    =new EnumMap<>(VirtualFieldDefinition.StoragePool.class);
+		Map<VirtualFieldDefinition.StoragePool, Integer> primitiveOffset=new EnumMap<>(VirtualFieldDefinition.StoragePool.class);
+		Map<String, FieldAccessor<T>>                    virtualData    =new HashMap<>();
+		Map<String, FieldAccessor<T>>                    newVirtualData =new HashMap<>();
 		
 		List<AnnotatedField<T>> toRun=new ArrayList<>(parsed);
 		
@@ -150,15 +195,26 @@ public class FieldCompiler{
 							}
 							continue;
 						}
-						FieldAccessor<T> accessor=new VirtualAccessor<>(
-							struct,
-							(VirtualFieldDefinition<T, Object>)s,
-							accessIndex.compute(s.storagePool, (k, v)->{
-								if(k==NONE) return -1;
-								else{
-									return v==null?0:v+1;
-								}
-							}));
+						
+						int primitiveSize, off, ptrIndex;
+						
+						if(!(s.getType() instanceof Class<?> c)||!c.isPrimitive()){
+							primitiveSize=off=-1;
+							ptrIndex=accessIndex.compute(s.storagePool, (k, v)->v==null?0:v+1);
+						}else{
+							if(List.of(long.class, double.class).contains(s.getType())){
+								primitiveSize=8;
+							}else{
+								primitiveSize=4;
+							}
+							off=primitiveOffset.getOrDefault(s.storagePool, 0);
+							int offEnd=off+primitiveSize;
+							primitiveOffset.put(s.storagePool, offEnd);
+							
+							ptrIndex=-1;
+						}
+						
+						FieldAccessor<T> accessor=new VirtualAccessor<>(struct, (VirtualFieldDefinition<T, Object>)s, ptrIndex, off, primitiveSize);
 						virtualData.put(s.getName(), accessor);
 						newVirtualData.put(s.getName(), accessor);
 					}
@@ -178,20 +234,20 @@ public class FieldCompiler{
 	
 	protected IterablePP<Field> deepFieldsByAnnotation(Class<?> clazz, Class<? extends Annotation> type){
 		return IterablePP
-			.nullTerminated(()->new Supplier<Class<?>>(){
-				Class<?> c=clazz;
-				@Override
-				public Class<?> get(){
-					if(c==null) return null;
-					var tmp=c;
-					var cp =c.getSuperclass();
-					c=cp==c?null:cp;
+			       .nullTerminated(()->new Supplier<Class<?>>(){
+				       Class<?> c=clazz;
+				       @Override
+				       public Class<?> get(){
+					       if(c==null) return null;
+					       var tmp=c;
+					       var cp =c.getSuperclass();
+					       c=cp==c?null:cp;
 					
-					return tmp;
-				}
-			})
-			.flatMap(c->Arrays.asList(c.getDeclaredFields()).iterator())
-			.filtered(f->f.isAnnotationPresent(type));
+					       return tmp;
+				       }
+			       })
+			       .flatMap(c->Arrays.asList(c.getDeclaredFields()).iterator())
+			       .filtered(f->f.isAnnotationPresent(type));
 	}
 	
 	protected <T extends IOInstance<T>> Stream<FieldAccessor<T>> scanFields(Struct<T> struct){
@@ -217,11 +273,12 @@ public class FieldCompiler{
 				getter.ifPresent(usedFields::add);
 				setter.ifPresent(usedFields::add);
 				
-				FieldAccessor<T> accessor;
-				if(type instanceof Class<?> c&&UtilL.instanceOf(c, INumber.class)) accessor=new ReflectionAccessor.Num<>(struct, field, getter, setter, fieldName, type);
-				else accessor=new ReflectionAccessor<>(struct, field, getter, setter, fieldName, type);
-				
-				fields.add(accessor);
+				var def=Runtime.version().feature()<=18?"unsafe":"varhandle";
+				fields.add(switch(UtilL.sysPropertyByClass(FieldCompiler.class, "UNSAFE_ACCESS").orElse(def).toLowerCase()){
+					case "unsafe" -> UnsafeAccessor.make(struct, field, getter, setter, fieldName, type);
+					case "varhandle" -> VarHandleAccessor.make(struct, field, getter, setter, fieldName, type);
+					default -> ReflectionAccessor.make(struct, field, getter, setter, fieldName, type);
+				});
 			}catch(Throwable e){
 				throw new MalformedStructLayout("Failed to scan field #"+field.getName(), e);
 			}
@@ -232,8 +289,8 @@ public class FieldCompiler{
 		Map<String, PairM<Method, Method>> transientFieldsMap=new HashMap<>();
 		
 		for(Method hangingMethod : hangingMethods){
-			String getPrefix=getPrefix(hangingMethod);
-			getMethodFieldName(getPrefix, hangingMethod).ifPresent(s->transientFieldsMap.computeIfAbsent(s, n->new PairM<>()).obj1=hangingMethod);
+			calcGetPrefixes(hangingMethod).map(p->getMethodFieldName(p, hangingMethod)).filter(Optional::isPresent).map(Optional::get)
+			                              .findFirst().ifPresent(s->transientFieldsMap.computeIfAbsent(s, n->new PairM<>()).obj1=hangingMethod);
 			getMethodFieldName("set", hangingMethod).ifPresent(s->transientFieldsMap.computeIfAbsent(s, n->new PairM<>()).obj2=hangingMethod);
 		}
 		
@@ -254,7 +311,9 @@ public class FieldCompiler{
 		                                                            .stream()
 		                                                            .flatMap(PairM::<Method>stream)
 		                                                            .noneMatch(mt->mt==m))
-		                               .map(method->method+""+(fields.stream().anyMatch(f->f.getName().equals(method.getName()))?(" did you mean "+getPrefix(method)+TextUtil.firstToUpperCase(method.getName())+"?"):""))
+		                               .map(method->method+""+(fields.stream().anyMatch(f->f.getName().equals(method.getName()))?(
+			                               " did you mean "+calcGetPrefixes(method).map(p->p+TextUtil.firstToUpperCase(method.getName())).collect(Collectors.joining(" or "))+"?"
+		                               ):""))
 		                               .collect(Collectors.joining("\n"));
 		if(!unusedWaning.isEmpty()){
 			throw new MalformedStructLayout("There are unused or invalid methods marked with "+IOValue.class.getSimpleName()+"\n"+unusedWaning);
@@ -279,22 +338,17 @@ public class FieldCompiler{
 					throw new MalformedStructLayout(setType+" is not a valid argument in\n"+setter);
 				}
 				
-				if(UtilL.instanceOf(p.obj1.getReturnType(), INumber.class)) return new FunctionalReflectionAccessor.Num<>(struct, annotations, getter, setter, name, type);
-				else return new FunctionalReflectionAccessor<>(struct, annotations, getter, setter, name, type);
+				return FunctionalReflectionAccessor.make(struct, name, getter, setter, annotations, type);
 			})
 		).sorted();
 	}
 	
-	private Stream<String> calcGetPrefixes(Field field){
-		var typ   =field.getType();
+	private Stream<String> calcGetPrefixes(Field field)  {return calcGetPrefixes(field.getType());}
+	private Stream<String> calcGetPrefixes(Method method){return calcGetPrefixes(method.getReturnType());}
+	private Stream<String> calcGetPrefixes(Class<?> typ){
 		var isBool=typ==boolean.class||typ==Boolean.class;
 		if(isBool) return Stream.of("is", "get");
 		return Stream.of("get");
-	}
-	private String getPrefix(Method method){
-		var typ   =method.getReturnType();
-		var isBool=typ==boolean.class||typ==Boolean.class;
-		return isBool?"is":"get";
 	}
 	
 	private Optional<String> getMethodFieldName(String prefix, Method m){
@@ -355,12 +409,12 @@ public class FieldCompiler{
 	
 	protected <T extends IOInstance<T>> List<LogicalAnnotation<Annotation>> scanAnnotations(IOField<T, ?> field){
 		return activeAnnotations()
-			.stream()
-			.flatMap(ann->Stream.concat(Stream.of(ann), Arrays.stream(ann.getClasses())))
-			.map(t->field.getAccessor().getAnnotation((Class<Annotation>)t).map(ann->new LogicalAnnotation<>(ann, getAnnotation(t))))
-			.filter(Optional::isPresent)
-			.map(Optional::get)
-			.toList();
+			       .stream()
+			       .flatMap(ann->Stream.concat(Stream.of(ann), Arrays.stream(ann.getClasses())))
+			       .map(t->field.getAccessor().getAnnotation((Class<Annotation>)t).map(ann->new LogicalAnnotation<>(ann, getAnnotation(t))))
+			       .filter(Optional::isPresent)
+			       .map(Optional::get)
+			       .toList();
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -401,7 +455,7 @@ public class FieldCompiler{
 		REGISTRY.register(new RegistryNode(){
 			@Override
 			public boolean canCreate(Type type, GetAnnotation annotations){
-				return IOFieldPrimitive.isPrimitive(type);
+				return SupportedPrimitive.isAny(type);
 			}
 			@Override
 			public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){

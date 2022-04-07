@@ -7,21 +7,22 @@ import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.FieldIsNullException;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.internal.Access;
+import com.lapissea.cfs.internal.MemPrimitive;
+import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.compilation.FieldCompiler;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
+import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.util.*;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
-import java.util.ArrayList;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -35,48 +36,131 @@ import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NOT_NULL;
 
-public class Struct<T extends IOInstance<T>>{
+public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 	
 	public interface Pool<T extends IOInstance<T>>{
 		
 		class GeneralStructArray<T extends IOInstance<T>> implements Pool<T>{
 			
 			private final Struct<T>                          typ;
-			private final Object[]                           pool;
 			private final VirtualFieldDefinition.StoragePool poolType;
+			
+			private final int poolSize;
+			private final int primitiveMemorySize;
+			
+			private Object[] pool;
+			private byte[]   primitives;
 			
 			public GeneralStructArray(Struct<T> typ, VirtualFieldDefinition.StoragePool pool){
 				this.poolType=pool;
 				this.typ=typ;
-				if(pool==VirtualFieldDefinition.StoragePool.NONE) throw new IllegalArgumentException();
-				var sizes=typ.poolSizes;
-				if(sizes==null) this.pool=null;
-				else{
-					var count=sizes[pool.ordinal()];
-					this.pool=count==0?null:new Object[count];
+				
+				int poolSize=0;
+				if(typ.poolSizes!=null) poolSize=typ.poolSizes[pool.ordinal()];
+				
+				int primitiveMemorySize=0;
+				if(typ.poolPrimitiveSizes!=null) primitiveMemorySize=typ.poolPrimitiveSizes[pool.ordinal()];
+				
+				assert poolSize>0||primitiveMemorySize>0;
+				
+				this.poolSize=poolSize;
+				this.primitiveMemorySize=primitiveMemorySize;
+			}
+			
+			private void protectAccessor(VirtualAccessor<T> accessor){
+				if(accessor.getDeclaringStruct()!=typ){
+					throw new IllegalArgumentException(accessor.getDeclaringStruct()+" != "+typ);
 				}
+			}
+			
+			private void protectAccessor(VirtualAccessor<T> accessor, List<Class<?>> types){
+				protectAccessor(accessor);
+				
+				if(types.stream().noneMatch(type->accessor.getType()==type)){
+					throw new IllegalArgumentException(accessor.getType()+" != "+types.stream().map(Class::getName).collect(Collectors.joining(" || ", "(", ")")));
+				}
+			}
+			
+			private int getPtrIndex(VirtualAccessor<T> accessor){
+				if(DEBUG_VALIDATION) protectAccessor(accessor);
+				
+				int index=accessor.getPtrIndex();
+				if(index==-1){
+					if(accessor.getPrimitiveOffset()==-1) throw new IllegalStateException(TextUtil.toNamedJson(accessor));
+					throw new ClassCastException(accessor+" is not of an object type!");
+				}
+				return index;
 			}
 			
 			@Override
 			public void set(VirtualAccessor<T> accessor, Object value){
-				protectAccessor(accessor);
-				int index=accessor.getAccessIndex();
+				int index=getPtrIndex(accessor);
+				if(pool==null) pool=new Object[poolSize];
 				pool[index]=value;
+				
 			}
 			@Override
 			public Object get(VirtualAccessor<T> accessor){
-				protectAccessor(accessor);
-				int index=accessor.getAccessIndex();
+				if(accessor.getPtrIndex()==-1){
+					var typ=accessor.getType();
+					if(typ==long.class) return getLong(accessor);
+					if(typ==int.class) return getInt(accessor);
+					throw new NotImplementedException(typ.getName());
+				}
+				int index=getPtrIndex(accessor);
+				if(pool==null) return null;
 				return pool[index];
 			}
 			
-			private void protectAccessor(VirtualAccessor<T> accessor){
-				if(DEBUG_VALIDATION){
-					if(accessor.getDeclaringStruct()!=typ){
-						throw new IllegalArgumentException(accessor.getDeclaringStruct()+" != "+typ);
-					}
+			
+			@Override
+			public long getLong(VirtualAccessor<T> accessor){
+				if(DEBUG_VALIDATION) protectAccessor(accessor, List.of(long.class, int.class));
+				
+				if(primitives==null) return 0;
+				
+				return switch(accessor.getPrimitiveSize()){
+					case Long.BYTES -> MemPrimitive.getLong(primitives, accessor.getPrimitiveOffset());
+					case Integer.BYTES -> MemPrimitive.getInt(primitives, accessor.getPrimitiveOffset());
+					default -> throw new IllegalStateException();
+				};
+			}
+			
+			@Override
+			public void setLong(VirtualAccessor<T> accessor, long value){
+				if(DEBUG_VALIDATION) protectAccessor(accessor, List.of(long.class));
+				
+				if(primitives==null){
+					if(value==0) return;
+					primitives=new byte[primitiveMemorySize];
+				}
+				MemPrimitive.setLong(primitives, accessor.getPrimitiveOffset(), value);
+			}
+			
+			@Override
+			public int getInt(VirtualAccessor<T> accessor){
+				if(DEBUG_VALIDATION) protectAccessor(accessor, List.of(int.class));
+				
+				if(primitives==null) return 0;
+				return MemPrimitive.getInt(primitives, accessor.getPrimitiveOffset());
+			}
+			
+			@Override
+			public void setInt(VirtualAccessor<T> accessor, int value){
+				if(DEBUG_VALIDATION) protectAccessor(accessor, List.of(int.class, long.class));
+				
+				if(primitives==null){
+					if(value==0) return;
+					primitives=new byte[primitiveMemorySize];
+				}
+				
+				switch(accessor.getPrimitiveSize()){
+					case Long.BYTES -> MemPrimitive.setLong(primitives, accessor.getPrimitiveOffset(), value);
+					case Integer.BYTES -> MemPrimitive.setInt(primitives, accessor.getPrimitiveOffset(), value);
+					default -> throw new IllegalStateException();
 				}
 			}
+			
 			
 			@Override
 			public String toString(){
@@ -93,9 +177,15 @@ public class Struct<T extends IOInstance<T>>{
 		
 		void set(VirtualAccessor<T> accessor, Object value);
 		Object get(VirtualAccessor<T> accessor);
+		
+		long getLong(VirtualAccessor<T> accessor);
+		void setLong(VirtualAccessor<T> accessor, long value);
+		
+		int getInt(VirtualAccessor<T> accessor);
+		void setInt(VirtualAccessor<T> accessor, int value);
 	}
 	
-	public static class Unmanaged<T extends IOInstance.Unmanaged<T>> extends Struct<T>{
+	public static final class Unmanaged<T extends IOInstance.Unmanaged<T>> extends Struct<T>{
 		
 		public interface Constr<T>{
 			T create(DataProvider provider, Reference reference, TypeLink type) throws IOException;
@@ -130,8 +220,9 @@ public class Struct<T extends IOInstance<T>>{
 			return compile(instanceClass, Unmanaged::new);
 		}
 		
-		private       Constr<T> unmanagedConstructor;
-		private final boolean   overridingDynamicUnmanaged;
+		private       Constr<T>   unmanagedConstructor;
+		private final boolean     overridingDynamicUnmanaged;
+		private       FieldSet<T> unmanagedStaticFields;
 		
 		public Unmanaged(Class<T> type){
 			super(type);
@@ -139,13 +230,14 @@ public class Struct<T extends IOInstance<T>>{
 		}
 		
 		private boolean checkOverridingUnmanaged(){
-			boolean u;
-			try{
-				u=!getType().getMethod("listDynamicUnmanagedFields").getDeclaringClass().equals(IOInstance.Unmanaged.class);
-			}catch(NoSuchMethodException e){
-				throw new RuntimeException(e);
+			Class<?> t=getType();
+			while(true){
+				try{
+					return !t.getDeclaredMethod("listDynamicUnmanagedFields").getDeclaringClass().equals(IOInstance.Unmanaged.class);
+				}catch(NoSuchMethodException e){
+					t=t.getSuperclass();
+				}
 			}
-			return u;
 		}
 		
 		public boolean isOverridingDynamicUnmanaged(){
@@ -167,52 +259,18 @@ public class Struct<T extends IOInstance<T>>{
 		
 		@Override
 		public String instanceToString(Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
-			StringBuilder sb=new StringBuilder();
-			if(!doShort){
-				var simple=getType().getSimpleName();
-				var index =simple.lastIndexOf('$');
-				if(index!=-1) simple=simple.substring(index+1);
-				
-				sb.append(simple);
+			return instanceToString0(
+				ioPool, instance, doShort, start, end, fieldValueSeparator, fieldSeparator,
+				Stream.concat(getFields().stream().filter(f->f.getName().indexOf(IOFieldTools.GENERATED_FIELD_SEPARATOR)!=-1), instance.listUnmanagedFields())
+			);
+		}
+		
+		public FieldSet<T> getUnmanagedStaticFields(){
+			if(unmanagedStaticFields==null){
+				unmanagedStaticFields=FieldCompiler.create().compileStaticUnmanaged(this);
 			}
 			
-			var fields=new ArrayList<>(this.getFields());
-			fields.removeIf(toRem->toRem.getName().indexOf(IOFieldTools.GENERATED_FIELD_SEPARATOR)!=-1);
-			
-			sb.append(start);
-			boolean comma=false;
-			for(var field : fields){
-				String str;
-				try{
-					str=field.instanceToString(ioPool, instance, doShort||TextUtil.USE_SHORT_IN_COLLECTIONS);
-				}catch(FieldIsNullException e){
-					str="<UNINITIALIZED>";
-				}
-				if(str==null) continue;
-				
-				if(comma) sb.append(fieldSeparator);
-				
-				sb.append(field.getName()).append(fieldValueSeparator).append(str);
-				comma=true;
-			}
-			for(var iter=instance.listDynamicUnmanagedFields().iterator();iter.hasNext();){
-				var    field=iter.next();
-				String str;
-				try{
-					str=field.instanceToString(ioPool, instance, doShort||TextUtil.USE_SHORT_IN_COLLECTIONS);
-				}catch(FieldIsNullException e){
-					str="<UNINITIALIZED>";
-				}
-				if(str==null) continue;
-				
-				if(comma) sb.append(fieldSeparator);
-				
-				sb.append(field.getName()).append(fieldValueSeparator).append(str);
-				comma=true;
-			}
-			
-			sb.append(end);
-			return sb.toString();
+			return unmanagedStaticFields;
 		}
 	}
 	
@@ -284,18 +342,18 @@ public class Struct<T extends IOInstance<T>>{
 			
 			struct=newStruct.apply(instanceClass);
 			
-			if(GlobalConfig.PRINT_COMPILATION){
-				LogUtil.println(ConsoleColors.GREEN_BRIGHT+TextUtil.toTable("Compiled: "+struct.getType().getName(), struct.getFields())+ConsoleColors.RESET);
-			}
-			
 			STRUCT_CACHE.put(instanceClass, struct);
-			return struct;
 		}catch(Throwable e){
 			throw new MalformedStructLayout("Failed to compile "+instanceClass.getName(), e);
 		}finally{
 			STRUCT_COMPILE.remove(instanceClass);
 			STRUCT_CACHE_LOCK.unlock();
 		}
+		
+		if(GlobalConfig.PRINT_COMPILATION){
+			LogUtil.println(ConsoleColors.GREEN_BRIGHT+TextUtil.toTable("Compiled: "+struct.getType().getName(), struct.getFields())+ConsoleColors.RESET);
+		}
+		return struct;
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -311,32 +369,35 @@ public class Struct<T extends IOInstance<T>>{
 	private final Class<T> type;
 	
 	private final FieldSet<T> fields;
+	private final boolean[]   hasPools;
 	private final int[]       poolSizes;
+	private final int[]       poolPrimitiveSizes;
+	
+	private final boolean canHavePointers;
 	
 	private Supplier<T> emptyConstructor;
 	
-	private Boolean invalidInitialNulls;
+	private int invalidInitialNulls=-1;
 	
 	public Struct(Class<T> type){
 		this.type=type;
-		this.fields=computeFields();
+		this.fields=FieldCompiler.create().compile(this);
 		this.fields.forEach(IOField::init);
 		poolSizes=calcPoolSizes();
+		poolPrimitiveSizes=calcPoolPrimitiveSizes();
+		hasPools=calcHasPools();
+		canHavePointers=calcCanHavePointers();
 	}
 	
-	private FieldSet<T> computeFields(){
-		FieldSet<T> fields=FieldCompiler.create().compile(this);
-		if(!(this instanceof Unmanaged<?> unmanaged)){
-			return fields;
-		}
-		
-		//noinspection unchecked
-		var staticFields=(FieldSet<T>)FieldCompiler.create().compileStaticUnmanaged(unmanaged);
-		return FieldSet.of(Stream.concat(fields.stream(), staticFields.stream()));
+	private Stream<VirtualAccessor<T>> virtualAccessorStream(){
+		return fields.stream()
+		             .map(IOField::getAccessor)
+		             .filter(f->f instanceof VirtualAccessor)
+		             .map(c->((VirtualAccessor<T>)c));
 	}
 	
 	private int[] calcPoolSizes(){
-		var vPools=fields.stream().map(IOField::getAccessor).filter(f->f instanceof VirtualAccessor).map(c->((VirtualAccessor<T>)c).getStoragePool()).toList();
+		var vPools=virtualAccessorStream().map(VirtualAccessor::getStoragePool).toList();
 		if(vPools.isEmpty()) return null;
 		var poolSizes=new int[VirtualFieldDefinition.StoragePool.values().length];
 		for(var vPool : vPools){
@@ -345,10 +406,58 @@ public class Struct<T extends IOInstance<T>>{
 		return poolSizes;
 	}
 	
+	private int[] calcPoolPrimitiveSizes(){
+		var vPools=virtualAccessorStream().filter(a->a.getPrimitiveSize()>0).collect(Collectors.groupingBy(VirtualAccessor::getStoragePool));
+		if(vPools.isEmpty()) return null;
+		var poolSizes=new int[VirtualFieldDefinition.StoragePool.values().length];
+		for(var e : vPools.entrySet()){
+			poolSizes[e.getKey().ordinal()]=e.getValue()
+			                                 .stream()
+			                                 .mapToInt(a->a.getPrimitiveOffset()+a.getPrimitiveSize())
+			                                 .max()
+			                                 .orElseThrow();
+		}
+		return poolSizes;
+	}
+	
+	private boolean[] calcHasPools(){
+		if(poolSizes==null&&poolPrimitiveSizes==null){
+			return null;
+		}
+		var b=new boolean[poolSizes==null?poolPrimitiveSizes.length:poolSizes.length];
+		for(int i=0;i<b.length;i++){
+			boolean p=poolSizes!=null&&poolSizes[i]>0;
+			boolean n=poolPrimitiveSizes!=null&&poolPrimitiveSizes[i]>0;
+			
+			b[i]=p||n;
+		}
+		
+		return b;
+	}
+	
+	private boolean calcCanHavePointers(){
+		if(this instanceof Struct.Unmanaged) return true;
+		return fields.stream().anyMatch(f->{
+			var acc=f.getAccessor();
+			if(acc==null) return true;
+			if(acc.hasAnnotation(IOType.Dynamic.class)) return true;
+			if(f instanceof IOField.Ref) return true;
+			if(acc.getType()==ChunkPointer.class) return true;
+			if(acc.getType()==Reference.class) return true;
+			if(IOInstance.isInstance(acc.getType())){
+				if(!IOInstance.isManaged(acc.getType())) return true;
+				var s=Struct.ofUnknown(acc.getType());
+				if(s.getCanHavePointers()) return true;
+			}
+			return false;
+		});
+	}
+	
 	@Override
 	public String toString(){
 		return getType().getSimpleName()+"{}";
 	}
+	@Override
 	public Class<T> getType(){
 		return type;
 	}
@@ -360,51 +469,62 @@ public class Struct<T extends IOInstance<T>>{
 		if(field.getDeclaringClass()!=getType()) throw new IllegalArgumentException();
 		return getFields().byName(field.getName()).orElseThrow();
 	}
+	@Override
+	public boolean getCanHavePointers(){
+		return canHavePointers;
+	}
 	
 	public String instanceToString(Pool<T> ioPool, T instance, boolean doShort){
 		return instanceToString(ioPool, instance, doShort, "{", "}", "=", ", ");
 	}
 	public String instanceToString(Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
-		StringBuilder sb=new StringBuilder();
+		return instanceToString0(
+			ioPool, instance, doShort, start, end, fieldValueSeparator, fieldSeparator,
+			fields.stream().filter(f->f.getName().indexOf(IOFieldTools.GENERATED_FIELD_SEPARATOR)!=-1)
+		);
+	}
+	
+	protected String instanceToString0(Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator, Stream<IOField<T, ?>> fields){
+		var prefix=start;
+		
 		if(!doShort){
 			var simple=getType().getSimpleName();
 			var index =simple.lastIndexOf('$');
 			if(index!=-1) simple=simple.substring(index+1);
 			
-			sb.append(simple);
+			prefix=simple+prefix;
 		}
 		
-		var fields=new ArrayList<>(this.fields);
-		fields.removeIf(toRem->toRem.getName().indexOf(IOFieldTools.GENERATED_FIELD_SEPARATOR)!=-1);
+		StringJoiner joiner=new StringJoiner(fieldSeparator, prefix, end);
 		
-		sb.append(start);
-		boolean comma=false;
-		for(var field : fields){
-			String str;
+		var i=fields.iterator();
+		while(i.hasNext()){
+			var field=i.next();
+			
+			Optional<String> str;
 			try{
 				str=field.instanceToString(ioPool, instance, doShort||TextUtil.USE_SHORT_IN_COLLECTIONS);
 			}catch(FieldIsNullException e){
-				str="<UNINITIALIZED>";
+				str=Optional.of("<UNINITIALIZED>");
 			}
 			
-			if(str==null) continue;
+			if(str.isEmpty()) continue;
 			
-			if(comma) sb.append(fieldSeparator);
-			
-			sb.append(field.getName()).append(fieldValueSeparator).append(str);
-			comma=true;
+			StringJoiner f=new StringJoiner("");
+			f.add(field.getName()).add(fieldValueSeparator).add(str.get());
+			joiner.merge(f);
 		}
-		sb.append(end);
-		return sb.toString();
+		return joiner.toString();
 	}
 	
+	@Override
 	public Supplier<T> requireEmptyConstructor(){
 		if(emptyConstructor==null) emptyConstructor=Access.findConstructor(getType(), Supplier.class);
 		return emptyConstructor;
 	}
 	
 	public boolean hasInvalidInitialNulls(){
-		if(invalidInitialNulls==null){
+		if(invalidInitialNulls==-1){
 			boolean inv=false;
 			if(fields.unpackedStream().anyMatch(f->f.getNullability()==NOT_NULL)){
 				var obj =requireEmptyConstructor().get();
@@ -413,14 +533,15 @@ public class Struct<T extends IOInstance<T>>{
 				          .filter(f->f.getNullability()==NOT_NULL)
 				          .anyMatch(f->f.isNull(pool, obj));
 			}
-			invalidInitialNulls=inv;
+			invalidInitialNulls=inv?1:0;
 			return inv;
 		}
-		return invalidInitialNulls;
+		return invalidInitialNulls==1;
 	}
 	
 	@Nullable
 	public Pool<T> allocVirtualVarPool(VirtualFieldDefinition.StoragePool pool){
+		if(hasPools==null||!hasPools[pool.ordinal()]) return null;
 		return new Pool.GeneralStructArray<>(this, pool);
 	}
 	

@@ -9,14 +9,15 @@ import com.lapissea.util.function.UnsafeSupplier;
 import org.objectweb.asm.ClassWriter;
 
 import java.lang.annotation.Annotation;
-import java.lang.reflect.Array;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
+import java.lang.reflect.*;
 import java.util.*;
+import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.objectweb.asm.Opcodes.ACC_FINAL;
 import static org.objectweb.asm.Opcodes.ACC_STATIC;
 import static org.objectweb.asm.Opcodes.ACC_SUPER;
 import static org.objectweb.asm.Opcodes.V11;
@@ -27,7 +28,7 @@ public class JorthCompiler{
 	
 	public record FunctArg(int index, String name, GenType type){}
 	
-	public record FunctionInfo(String name, String declaringClass, GenType returnType, List<GenType> arguments, CallType callType, boolean isStatic, Object defaultValue){
+	public record FunctionInfo(String name, String declaringClass, GenType returnType, List<GenType> arguments, CallType callType, boolean isStatic, boolean polymorphicSignature, Object defaultValue){
 		private static CallType getCallType(Method method){
 			if(Modifier.isStatic(method.getModifiers())){
 				return CallType.STATIC;
@@ -45,13 +46,34 @@ public class JorthCompiler{
 			     Arrays.stream(method.getGenericParameterTypes()).map(GenType::new).toList(),
 			     getCallType(method),
 			     Modifier.isStatic(method.getModifiers()),
+			     Arrays.stream(method.getAnnotations()).anyMatch(a->a.annotationType().getName().endsWith("PolymorphicSignature")),
 			     method.getDefaultValue()
 			);
 			
 		}
 	}
 	
-	public record ClassInfo(String name, List<ClassInfo> parents, List<FunctionInfo> functions){
+	public record FieldInfo(String name, String declaringClass, GenType type, boolean isStatic){
+		FieldInfo(Field field){
+			this(field.getName(), field.getDeclaringClass().getName(), new GenType(field.getGenericType()), Modifier.isStatic(field.getModifiers()));
+		}
+	}
+	
+	public record Parm(String name, GenType type){
+		Parm(Parameter parm){
+			this(parm.getName(), new GenType(parm.getParameterizedType()));
+		}
+	}
+	
+	public record ConstructorInfo(String declaringClass, List<Parm> arguments){
+		ConstructorInfo(Constructor<?> constructor){
+			this(constructor.getDeclaringClass().getName(),
+			     Arrays.stream(constructor.getParameters()).map(Parm::new).toList()
+			);
+		}
+	}
+	
+	public record ClassInfo(String name, List<ClassInfo> parents, List<FunctionInfo> functions, List<ConstructorInfo> constructors, List<FieldInfo> fields){
 		ClassInfo(Class<?> clazz){
 			this(
 				clazz.getName(),
@@ -59,7 +81,9 @@ public class JorthCompiler{
 				      .filter(Objects::nonNull)
 				      .map(ClassInfo::new)
 				      .toList(),
-				Arrays.stream(clazz.getDeclaredMethods()).map(FunctionInfo::new).toList()
+				Arrays.stream(clazz.getDeclaredMethods()).map(FunctionInfo::new).toList(),
+				Arrays.stream(clazz.getDeclaredConstructors()).map(ConstructorInfo::new).toList(),
+				Arrays.stream(clazz.getDeclaredFields()).map(FieldInfo::new).toList()
 			);
 		}
 		
@@ -87,6 +111,7 @@ public class JorthCompiler{
 	private ClassWriter currentClass;
 	private JorthMethod currentMethod;
 	private boolean     isStatic;
+	private boolean     isFinal;
 	
 	private GenType classExtension=new GenType(Object.class.getName());
 	
@@ -335,7 +360,15 @@ public class JorthCompiler{
 						case "<arg>" -> {
 							throw new MalformedJorthException("can't set arguments! argument: "+name);
 						}
-						default -> throw new NotImplementedException("don't know how to load from "+owner);
+						default -> {
+							var ownerType=getClassInfo(owner.source);
+							var field=ownerType.fields.stream()
+							                          .filter(f->f.name.equals(name.source))
+							                          .findAny()
+							                          .orElseThrow(()->new MalformedJorthException(name+" does not exist in "+owner.source));
+							
+							currentMethod.setFieldIns(field);
+						}
 					}
 					
 					return true;
@@ -344,7 +377,7 @@ public class JorthCompiler{
 					requireTokenCount(2);
 					var name =pop();
 					var owner=pop();
-					
+//					LogUtil.println(name, owner);
 					
 					switch(owner.source){
 						case "this" -> {
@@ -365,7 +398,15 @@ public class JorthCompiler{
 							}
 							currentMethod.loadArgument(arg.get());
 						}
-						default -> throw new NotImplementedException("don't know how to load from "+owner);
+						default -> {
+							var ownerType=getClassInfo(owner.source);
+							var field=ownerType.fields.stream()
+							                          .filter(f->f.name.equals(name.source))
+							                          .findAny()
+							                          .orElseThrow(()->new MalformedJorthException(name+" does not exist in "+owner.source));
+							
+							currentMethod.getFieldIns(field);
+						}
 					}
 					
 					return true;
@@ -412,11 +453,45 @@ public class JorthCompiler{
 					
 					return true;
 				}
+				case "super" -> {
+					if(!currentMethod.getName().equals("<init>")){
+						throw new MalformedJorthException("super currently used only in init");
+					}
+					
+					if(currentMethod.getStack().size()==0) throw new MalformedJorthException("super needs this on stack, add \"this this get\" before super");
+					var args=new ArrayList<>(currentMethod.getStack().asList());
+					if(!new GenType(classInfo.name).equals(args.remove(0))){
+						throw new MalformedJorthException("super needs this on stack, add \"this this get\" before super");
+					}
+					
+					var parent=getClassInfo(classExtension.typeName());
+					
+					Supplier<Stream<List<GenType>>> getConstrs=()->parent.constructors.stream().map(c->c.arguments.stream().map(Parm::type).toList());
+					
+					if(getConstrs.get().noneMatch(l->l.equals(args))){
+						throw new MalformedJorthException("super received "+args+" but available constructors are:\n"+
+						                                  getConstrs.get().map(Object::toString).collect(Collectors.joining("\n")));
+					}
+					
+					
+					currentMethod.invoke(CallType.SPECIAL, classExtension.typeName(), currentMethod.getName(), args, GenType.VOID, false);
+					return true;
+				}
+				case "class" -> {
+					var name=pop();
+					var info=getClassInfo(name.source);
+					currentMethod.classToStack(info.name);
+					return true;
+				}
 			}
 		}else{
-			switch(token.lower()){
+			switch(token.source){
 				case "static" -> {
 					isStatic=true;
+					return true;
+				}
+				case "final" -> {
+					isFinal=true;
 					return true;
 				}
 				case "extends" -> {
@@ -456,7 +531,15 @@ public class JorthCompiler{
 					var signature =Utils.genericSignature(type);
 					if(signature.equals(descriptor)) signature=null;
 					
-					var fieldVisitor=currentClass.visitField(visibility.opCode, name, descriptor, signature, null);
+					var access=visibility.opCode;
+					if(isStatic){
+						access|=ACC_STATIC;
+					}
+					if(isFinal){
+						access|=ACC_FINAL;
+					}
+					
+					var fieldVisitor=currentClass.visitField(access, name, descriptor, signature, null);
 					
 					for(AnnotationData annotation : annotations){
 						var annV=fieldVisitor.visitAnnotation(Utils.genericSignature(new GenType(annotation.className(), 0, List.of())), true);
@@ -478,8 +561,13 @@ public class JorthCompiler{
 					}
 					annotations.clear();
 					
+					classInfo=new ClassInfo(classInfo.name, classInfo.parents, classInfo.functions, classInfo.constructors,
+					                        Stream.concat(classInfo.fields.stream(), Stream.of(new FieldInfo(name, classInfo.name, type, isStatic))).toList());
+					
 					fieldVisitor.visitEnd();
 					visibility=Visibility.PUBLIC;
+					isStatic=false;
+					isFinal=false;
 					return true;
 				}
 				case "@" -> {
@@ -518,8 +606,7 @@ public class JorthCompiler{
 								builder.add(0, new ArrToken(t.line, "", str));
 								continue;
 							}
-							
-							builder.add(0, t);
+							builder.add(0, sequence.pop());
 						}
 						sequence=Token.Sequence.of(builder);
 						
@@ -717,7 +804,7 @@ public class JorthCompiler{
 							}catch(MalformedJorthException e){
 								throw UtilL.uncheckedThrow(e);
 							}
-						}).toList(), List.of());
+						}).toList(), List.of(), List.of(), List.of());
 						
 						classVisibility=visibility;
 						currentClass=new ClassWriter(ClassWriter.COMPUTE_MAXS|ClassWriter.COMPUTE_FRAMES);
@@ -735,7 +822,7 @@ public class JorthCompiler{
 						var nam=Utils.undotify(className);
 						var ext=Utils.undotify(classExtension.typeName());
 						
-						currentClass.visit(V11, classVisibility.opCode+ACC_SUPER, nam, signature.toString(), ext, interfaces);
+						currentClass.visit(V11, classVisibility.opCode|ACC_SUPER|ACC_FINAL, nam, signature.toString(), ext, interfaces);
 						
 						visibility=Visibility.PUBLIC;
 						
@@ -777,8 +864,8 @@ public class JorthCompiler{
 						}
 						annotations.clear();
 						
-						var info=new FunctionInfo(functionName.source, classInfo.name, returnType, methodArguments.stream().map(LocalVariableStack.Variable::type).toList(), isStatic?CallType.STATIC:CallType.VIRTUAL, isStatic, null);
-						classInfo=new ClassInfo(classInfo.name, classInfo.parents, Stream.concat(classInfo.functions.stream(), Stream.of(info)).toList());
+						var info=new FunctionInfo(functionName.source, classInfo.name, returnType==null?GenType.VOID:returnType, methodArguments.stream().map(LocalVariableStack.Variable::type).toList(), isStatic?CallType.STATIC:CallType.VIRTUAL, isStatic, false, null);
+						classInfo=new ClassInfo(classInfo.name, classInfo.parents, Stream.concat(classInfo.functions.stream(), Stream.of(info)).toList(), classInfo.constructors, classInfo.fields);
 						
 						currentMethod=new JorthMethod(this, dest, functionName.source, classInfo.name, returnType, isStatic);
 						currentMethod.start();
@@ -790,8 +877,6 @@ public class JorthCompiler{
 						}
 						if("<init>".equals(functionName.source)){
 							addedInit=true;
-							currentMethod.loadThis();
-							currentMethod.invoke(CallType.SPECIAL, classExtension.typeName(), functionName.source, List.of(), GenType.VOID, false);
 						}
 					}
 					default -> throw new MalformedJorthException("Unknown subject "+subject+". Can not start it");
@@ -869,10 +954,18 @@ public class JorthCompiler{
 					default -> throw new NotImplementedException(castType+"");
 				}
 			}
+			case OBJECT -> {
+				switch(castType.type()){
+					case OBJECT -> {
+						currentMethod.castTo(castType);
+					}
+					default -> throw new NotImplementedException(castType+"");
+				}
+			}
 			default -> throw new NotImplementedException(castType+"");
 		}
-		
-		LogUtil.println(type+" to "+castType);
+
+//		LogUtil.println(type+" to "+castType);
 	}
 	
 	private void doCall() throws MalformedJorthException{
@@ -883,7 +976,8 @@ public class JorthCompiler{
 			staticCall=true;
 			argCountStr=pop();
 		}else staticCall=false;
-		var functionName=pop();
+		var functionNameToken=pop();
+		var functionName     =functionNameToken.source.startsWith("!")?functionNameToken.source.substring(1):functionNameToken.source;
 		
 		var argStr=argCountStr.source;
 		var validMsg="""
@@ -918,27 +1012,55 @@ public class JorthCompiler{
 			callerInfo=getClassInfo(callerType.typeName());
 		}
 		
-		var functO=callerInfo.functions().stream()
-		                     .filter(f->(f.callType==CallType.STATIC)==staticCall)
-		                     .filter(f->f.name.equals(functionName.source))
-		                     .filter(f->f.arguments().size()==argCount)
-		                     .filter(f->{
-			                     for(int i=0;i<f.arguments().size();i++){
-				                     try{
-					                     if(!f.arguments().get(i).instanceOf(this, currentMethod.getStack().peek(i))){
-						                     return false;
-					                     }
-				                     }catch(MalformedJorthException e){
-					                     throw UtilL.uncheckedThrow(e);
-				                     }
-			                     }
-			                     return true;
-		                     })
-		                     .findAny();
-		if(functO.isEmpty()) throw new MalformedJorthException("No function "+functionName.source+" with "+argCount+" arguments");
-		var funct=functO.get();
+		Function<Predicate<FunctionInfo>, Optional<FunctionInfo>> make=
+			pred->callerInfo.functions().stream()
+			                .filter(f->(f.callType==CallType.STATIC)==staticCall)
+			                .filter(f->f.name.equals(functionName))
+			                .filter(f->f.arguments().size()==argCount)
+			                .filter(pred)
+			                .findAny();
 		
-		currentMethod.invoke(funct.callType, funct.declaringClass, funct.name, funct.arguments, funct.returnType(), false);
+		var functO=make.apply(f->{
+			for(int i=0;i<f.arguments().size();i++){
+				var a=f.arguments().get(i);
+				var b=currentMethod.getStack().peek(i);
+				if(!a.equals(b)){
+					return false;
+				}
+			}
+			return true;
+		});
+		if(functO.isEmpty()){
+			functO=make.apply(f->{
+				for(int i=0;i<f.arguments().size();i++){
+					try{
+						var a=f.arguments().get(i);
+						var b=currentMethod.getStack().peek(i);
+						if(!b.instanceOf(this, a)){
+							return false;
+						}
+					}catch(MalformedJorthException e){
+						throw UtilL.uncheckedThrow(e);
+					}
+				}
+				return true;
+			});
+		}
+		if(functO.isEmpty()){
+			functO=callerInfo.functions().stream()
+			                 .filter(f->(f.callType==CallType.STATIC)==staticCall)
+			                 .filter(f->f.name.equals(functionName))
+			                 .filter(f->f.polymorphicSignature)
+			                 .findAny();
+		}
+		if(functO.isEmpty()) throw new MalformedJorthException("No function "+functionName+" with "+argCount+" arguments");
+		var funct=functO.get();
+		if(funct.polymorphicSignature){
+			var args=stack.asList().subList(stack.size()-argCount, stack.size());
+			currentMethod.invoke(funct.callType, funct.declaringClass, funct.name, args, funct.returnType(), false);
+		}else{
+			currentMethod.invoke(funct.callType, funct.declaringClass, funct.name, funct.arguments, funct.returnType(), false);
+		}
 	}
 	
 	private void unbox(){
@@ -1033,7 +1155,35 @@ public class JorthCompiler{
 		
 		if(!addedInit){
 			try(var writer=writeCode()){
-				writer.write(classVisibility.lower).write("visibility <init> function start end");
+				var parent=getClassInfo(classExtension.typeName());
+				
+				writer.write(classVisibility.lower).write("visibility");
+				if(parent.constructors.size()==1){
+					var ay=parent.constructors.get(0);
+					
+					for(var argument : ay.arguments){
+						writer.write(argument.type.asJorthString()).write(argument.name).write("arg");
+					}
+					
+					writer.write(
+						"""
+							<init> function start
+								this this get
+							""");
+					
+					for(var argument : ay.arguments){
+						writer.write("<arg>").write(argument.name).write("get");
+					}
+					writer.write("super end");
+				}else{
+					writer.write(
+						"""
+							<init> function start
+								this this get
+								super
+							end
+							""");
+				}
 			}catch(MalformedJorthException e){
 				throw new RuntimeException(e);
 			}

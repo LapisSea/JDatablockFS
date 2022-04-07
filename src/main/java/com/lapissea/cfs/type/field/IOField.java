@@ -15,6 +15,7 @@ import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
+import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.util.*;
 
@@ -40,6 +41,21 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	
 	public record UsageHintDefinition(UsageHintType type, String target){}
 	
+	
+	public abstract static class FixedSizeDescriptor<Inst extends IOInstance<Inst>, ValueType> extends IOField<Inst, ValueType>{
+		
+		private final SizeDescriptor<Inst> sizeDescriptor;
+		
+		public FixedSizeDescriptor(FieldAccessor<Inst> accessor, SizeDescriptor<Inst> sizeDescriptor){
+			super(accessor);
+			this.sizeDescriptor=sizeDescriptor;
+		}
+		
+		@Override
+		public SizeDescriptor<Inst> getSizeDescriptor(){
+			return sizeDescriptor;
+		}
+	}
 	
 	public static class NoIO<Inst extends IOInstance<Inst>, ValueType> extends IOField<Inst, ValueType>{
 		
@@ -223,28 +239,62 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	
 	private final FieldAccessor<T> accessor;
 	
-	private boolean                initialized;
+	private boolean                lateDataInitialized;
 	private FieldSet<T>            dependencies;
 	private EnumSet<UsageHintType> usageHints;
 	
-	private final IONullability.Mode nullability;
+	private IONullability.Mode nullability;
+	
+	public static final int DYNAMIC_FLAG          =1<<0;
+	public static final int IOINSTANCE_FLAG       =1<<1;
+	public static final int PRIMITIVE_OR_ENUM_FLAG=1<<2;
+	public static final int HAS_NO_POINTERS_FLAG  =1<<3;
+	
+	private int typeFlags=-1;
 	
 	public IOField(FieldAccessor<T> accessor){
 		this.accessor=accessor;
-		nullability=accessor==null?IONullability.Mode.NULLABLE:IOFieldTools.getNullability(accessor);
 	}
 	
-	public void initLateData(FieldSet<T> deps, Stream<UsageHintType> hints){
-		Utils.requireNull(dependencies);
-		Utils.requireNull(usageHints);
-		dependencies=deps;
+	public void initLateData(FieldSet<T> dependencies, Stream<UsageHintType> usageHints){
+		Utils.requireNull(this.dependencies);
+		Utils.requireNull(this.usageHints);
+		this.dependencies=dependencies;
 		var h=EnumSet.noneOf(UsageHintType.class);
-		hints.forEach(h::add);
-		usageHints=Utils.nullIfEmpty(h);
-		initialized=true;
+		usageHints.forEach(h::add);
+		this.usageHints=Utils.nullIfEmpty(h);
+		lateDataInitialized=true;
+	}
+	
+	public int typeFlags(){
+		if(typeFlags!=-1){
+			return typeFlags;
+		}
+		
+		int typeFlags=0;
+		
+		if(accessor!=null){
+			if(accessor.hasAnnotation(IOType.Dynamic.class)){
+				typeFlags|=DYNAMIC_FLAG;
+			}
+			var type=accessor.getType();
+			if(IOInstance.isInstance(type)){
+				typeFlags|=IOINSTANCE_FLAG;
+				
+				if(!(this instanceof IOField.Ref)&&!Struct.ofUnknown(type).getCanHavePointers()){
+					typeFlags|=HAS_NO_POINTERS_FLAG;
+				}
+			}
+			if(SupportedPrimitive.isAny(type)||type.isEnum()){
+				typeFlags|=PRIMITIVE_OR_ENUM_FLAG;
+			}
+		}
+		this.typeFlags=typeFlags;
+		return typeFlags;
 	}
 	
 	public boolean isNull(Struct.Pool<T> ioPool, T instance){
+		if(!getAccessor().canBeNull()) return false;
 		try{
 			var val=get(ioPool, instance);
 			return val==null;
@@ -363,25 +413,25 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	/**
 	 * @return string of the resolved value or null if string has no substance
 	 */
-	public String instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort){
+	public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort){
 		return instanceToString(ioPool, instance, doShort, "{", "}", "=", ", ");
 	}
 	
 	/**
 	 * @return string of the resolved value or null if string has no substance
 	 */
-	public String instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+	public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
 		var val=get(ioPool, instance);
-		if(val==null) return null;
+		if(val==null) return Optional.empty();
 		
 		if(val instanceof IOInstance inst){
 			var struct=inst.getThisStruct();
-			return struct.instanceToString(struct.allocVirtualVarPool(IO), inst, doShort, start, end, fieldValueSeparator, fieldSeparator);
+			return Optional.of(struct.instanceToString(struct.allocVirtualVarPool(IO), inst, doShort, start, end, fieldValueSeparator, fieldSeparator));
 		}
 		if(doShort){
-			return Utils.toShortString(val);
+			return Optional.of(Utils.toShortString(val));
 		}
-		return TextUtil.toString(val);
+		return Optional.of(TextUtil.toString(val));
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -389,7 +439,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		var o1=get(ioPool1, inst1);
 		var o2=get(ioPool2, inst2);
 		
-		if(nullability==IONullability.Mode.DEFAULT_IF_NULL&&(o1==null||o2==null)){
+		if(getNullability()==IONullability.Mode.DEFAULT_IF_NULL&&(o1==null||o2==null)){
 			if(o1==null&&o2==null) return true;
 			var acc=getAccessor();
 			
@@ -441,8 +491,18 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		var acc=getAccessor();
 		return acc==null?null:acc.getDeclaringStruct();
 	}
+	
+	private void requireLateData(){
+		if(!lateDataInitialized){
+			throw new IllegalStateException(this.getName()+" late data not initialized");
+		}
+	}
+	public boolean lateDataInitialized(){
+		return lateDataInitialized;
+	}
+	
 	public FieldSet<T> getDependencies(){
-		if(!initialized) throw new IllegalStateException();
+		requireLateData();
 		return Objects.requireNonNull(dependencies);
 	}
 	
@@ -458,7 +518,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	}
 	@Nullable
 	public EnumSet<UsageHintType> getUsageHints(){
-		if(!initialized) throw new IllegalStateException();
+		requireLateData();
 		return usageHints;
 	}
 	
@@ -503,6 +563,9 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	}
 	
 	public IONullability.Mode getNullability(){
+		if(nullability==null){
+			nullability=accessor==null?IONullability.Mode.NULLABLE:IOFieldTools.getNullability(accessor);
+		}
 		return nullability;
 	}
 	public boolean nullable(){

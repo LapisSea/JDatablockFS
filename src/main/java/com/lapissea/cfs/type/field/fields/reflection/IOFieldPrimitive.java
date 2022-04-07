@@ -9,41 +9,33 @@ import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.SupportedPrimitive;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 
 import java.io.IOException;
-import java.lang.reflect.Type;
+import java.util.Comparator;
 import java.util.EnumSet;
-import java.util.Objects;
+import java.util.Optional;
 import java.util.function.BiFunction;
-import java.util.function.Function;
 
 import static com.lapissea.cfs.objects.NumberSize.*;
 import static com.lapissea.cfs.type.WordSpace.BIT;
 
 public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> extends IOField<T, ValueType>{
 	
-	public static boolean isPrimitive(Type clazz){
-		return getFieldMaker(clazz)!=null;
-	}
-	
 	public static <T extends IOInstance<T>> IOField<T, ?> make(FieldAccessor<T> field){
-		return Objects.requireNonNull(IOFieldPrimitive.<T>getFieldMaker(field.getType())).apply(field);
-	}
-	
-	public static <T extends IOInstance<T>> Function<FieldAccessor<T>, IOField<T, ?>> getFieldMaker(Type clazz){
-		if(clazz==double.class||clazz==Double.class) return FDouble::new;
-		if(clazz==float.class||clazz==Float.class) return FFloat::new;
-		if(clazz==long.class||clazz==Long.class) return FLong::new;
-		if(clazz==int.class||clazz==Integer.class) return FInt::new;
-		if(clazz==short.class||clazz==Short.class) return FShort::new;
-		if(clazz==byte.class||clazz==Byte.class) return FByte::new;
-		if(clazz==boolean.class||clazz==Boolean.class) return FBoolean::new;
-		
-		return null;
+		return SupportedPrimitive.get(field.getType()).map(t->switch(t){
+			case DOUBLE -> new FDouble<>(field);
+			case FLOAT -> new FFloat<>(field);
+			case LONG -> new FLong<>(field);
+			case INT -> new FInt<>(field);
+			case SHORT -> new FShort<>(field);
+			case BYTE -> new FByte<>(field);
+			case BOOLEAN -> new FBoolean<>(field);
+		}).orElseThrow();
 	}
 	
 	public static class FDouble<T extends IOInstance<T>> extends IOFieldPrimitive<T, Double>{
@@ -89,6 +81,11 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		public void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			var size=getSize(ioPool, instance);
 			setValue(ioPool, instance, size.readFloating(src));
+		}
+		
+		@Override
+		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+			return Optional.of(String.valueOf(getValue(ioPool, instance)));
 		}
 		
 		@Override
@@ -147,6 +144,11 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
+		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+			return Optional.of(String.valueOf(getValue(ioPool, instance)));
+		}
+		
+		@Override
 		public boolean instancesEqual(Struct.Pool<T> ioPool1, T inst1, Struct.Pool<T> ioPool2, T inst2){
 			return getValue(ioPool1, inst1)==getValue(ioPool2, inst2);
 		}
@@ -170,7 +172,7 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		public void setValue(Struct.Pool<T> ioPool, T instance, long value){
-			getAccessor().setLong(instance, value, ioPool);
+			getAccessor().setLong(ioPool, instance, value);
 		}
 		
 		@Deprecated
@@ -194,6 +196,11 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		public void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			var size=getSize(ioPool, instance);
 			setValue(ioPool, instance, size.read(src));
+		}
+		
+		@Override
+		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+			return Optional.of(String.valueOf(getValue(ioPool, instance)));
 		}
 		
 		@Override
@@ -254,6 +261,11 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
+		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+			return Optional.of(String.valueOf(getValue(ioPool, instance)));
+		}
+		
+		@Override
 		public boolean instancesEqual(Struct.Pool<T> ioPool1, T inst1, Struct.Pool<T> ioPool2, T inst2){
 			return getValue(ioPool1, inst1)==getValue(ioPool2, inst2);
 		}
@@ -308,6 +320,11 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		public void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			var size=getSize(ioPool, instance);
 			setValue(ioPool, instance, (short)size.read(src));
+		}
+		
+		@Override
+		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+			return Optional.of(String.valueOf(getValue(ioPool, instance)));
 		}
 		
 		@Override
@@ -367,6 +384,11 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
+		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+			return Optional.of(String.valueOf(getValue(ioPool, instance)));
+		}
+		
+		@Override
 		public boolean instancesEqual(Struct.Pool<T> ioPool1, T inst1, Struct.Pool<T> ioPool2, T inst2){
 			return getValue(ioPool2, inst1)==getValue(ioPool1, inst2);
 		}
@@ -415,6 +437,11 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
+		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+			return Optional.of(String.valueOf(getValue(ioPool, instance)));
+		}
+		
+		@Override
 		public boolean instancesEqual(Struct.Pool<T> ioPool1, T inst1, Struct.Pool<T> ioPool2, T inst2){
 			return getValue(ioPool1, inst1)==getValue(ioPool2, inst2);
 		}
@@ -443,20 +470,21 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 	@Override
 	public void init(){
 		super.init();
-		var field  =forceFixed?null:IOFieldTools.getDynamicSize(getAccessor());
-		var allowed=allowedSizes();
-		if(field!=null){
+		var fieldOpt=forceFixed?Optional.<IOField<T, NumberSize>>empty():IOFieldTools.getDynamicSize(getAccessor());
+		var allowed =allowedSizes();
+		if(fieldOpt.isPresent()){
+			var field=fieldOpt.get();
 			dynamicSize=(ioPool, instance)->{
 				var val=field.get(ioPool, instance);
 				if(!allowed.contains(val)) throw new IllegalStateException(val+" is not an allowed size in "+allowed+" at "+this+" with dynamic size "+field);
 				return val;
 			};
-			sizeDescriptor=new SizeDescriptor.Unknown<>(
-				allowed.stream().mapToLong(NumberSize::bytes).min().orElse(0),
-				allowed.stream().mapToLong(NumberSize::bytes).max(),
-				(ioPool, prov, inst)->getSize(ioPool, inst).bytes);
+			sizeDescriptor=SizeDescriptor.Unknown.of(
+				allowed.stream().min(Comparator.naturalOrder()).orElse(VOID),
+				allowed.stream().max(Comparator.naturalOrder()),
+				field.getAccessor());
 		}else{
-			sizeDescriptor=new SizeDescriptor.Fixed<>(size.bytes);
+			sizeDescriptor=SizeDescriptor.Fixed.of(size.bytes);
 		}
 	}
 	

@@ -60,7 +60,7 @@ public class SparseImage{
 			logger.get().destroy();
 		}
 	}
-	private static void run(Cluster cluster, Configuration.View args) throws IOException{
+	public static void run(Cluster cluster, Configuration.View args) throws IOException{
 		
 		int radius    =args.getInt("radius", 10);
 		int iterations=args.getInt("iterations", 100);

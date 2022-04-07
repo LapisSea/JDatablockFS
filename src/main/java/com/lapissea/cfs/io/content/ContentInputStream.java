@@ -1,7 +1,9 @@
 package com.lapissea.cfs.io.content;
 
+import com.lapissea.cfs.Utils;
 import com.lapissea.util.NotNull;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -84,6 +86,14 @@ public abstract class ContentInputStream extends InputStream implements ContentR
 			System.arraycopy(ba, pos, b, off, read);
 			pos+=read;
 			return read;
+		}
+		@Override
+		public long read8(int len) throws IOException{
+			int rem=available();
+			if(rem<len) throw new EOFException();
+			var val=Utils.read8(ba, pos, len);
+			pos+=len;
+			return val;
 		}
 		
 		@Override

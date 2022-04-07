@@ -17,6 +17,24 @@ import java.util.List;
 public final class VirtualFieldDefinition<IO extends IOInstance<IO>, T>{
 	
 	public interface GetterFilter<IO extends IOInstance<IO>, T>{
+		interface I<IO extends IOInstance<IO>> extends GetterFilter<IO, Integer>{
+			int filterPrimitive(Struct.Pool<IO> ioPool, IO instance, List<FieldAccessor<IO>> dependencies, int value);
+			@Override
+			@Deprecated
+			default Integer filter(Struct.Pool<IO> ioPool, IO instance, List<FieldAccessor<IO>> dependencies, Integer value){
+				return filterPrimitive(ioPool, instance, dependencies, value);
+			}
+		}
+		
+		interface L<IO extends IOInstance<IO>> extends GetterFilter<IO, Long>{
+			long filterPrimitive(Struct.Pool<IO> ioPool, IO instance, List<FieldAccessor<IO>> dependencies, long value);
+			@Override
+			@Deprecated
+			default Long filter(Struct.Pool<IO> ioPool, IO instance, List<FieldAccessor<IO>> dependencies, Long value){
+				return filterPrimitive(ioPool, instance, dependencies, value);
+			}
+		}
+		
 		T filter(Struct.Pool<IO> ioPool, IO instance, List<FieldAccessor<IO>> dependencies, T value);
 	}
 	
@@ -29,11 +47,7 @@ public final class VirtualFieldDefinition<IO extends IOInstance<IO>, T>{
 		 * Values in this storage pool remain as long as there is an IO operation is executing.
 		 * Used for fields that are only needed to correctly read another field such as length of an array.
 		 */
-		IO("IO"),
-		/**
-		 * Values in this storage pool are never stored.
-		 */
-		NONE("x");
+		IO("IO");
 		
 		public final String shortName;
 		StoragePool(String shortName){this.shortName=shortName;}

@@ -8,17 +8,17 @@ import java.util.Objects;
 
 public abstract class AbstractFieldAccessor<CTyp extends IOInstance<CTyp>> implements FieldAccessor<CTyp>{
 	
-	private final Struct<CTyp> struct;
+	private final Struct<CTyp> declaringStruct;
 	private final String       name;
 	
-	protected AbstractFieldAccessor(Struct<CTyp> struct, String name){
-		this.struct=struct;
+	protected AbstractFieldAccessor(Struct<CTyp> declaringStruct, String name){
+		this.declaringStruct=declaringStruct;
 		this.name=Objects.requireNonNull(name);
 	}
 	
 	@Override
 	public final Struct<CTyp> getDeclaringStruct(){
-		return struct;
+		return declaringStruct;
 	}
 	
 	@NotNull

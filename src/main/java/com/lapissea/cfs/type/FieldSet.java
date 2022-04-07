@@ -91,17 +91,20 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		
 	}
 	
-	private static final FieldSet<?> EMPTY=new FieldSet<>(List.of());
+	private static final FieldSet<?> EMPTY=new FieldSet<>();
 	
 	@SuppressWarnings("unchecked")
 	public static <T extends IOInstance<T>> FieldSet<T> of(){
 		return (FieldSet<T>)EMPTY;
 	}
+	
+	@SuppressWarnings("unchecked")
 	public static <T extends IOInstance<T>> FieldSet<T> of(Stream<IOField<T, ?>> stream){
-		var list=stream.filter(Objects::nonNull).distinct().toList();
-		if(list.isEmpty()) return of();
-		return new FieldSet<>(list);
+		var data=stream.filter(Objects::nonNull).distinct().toArray(IOField[]::new);
+		if(data.length==0) return of();
+		return new FieldSet<>((IOField<T, ?>[])data);
 	}
+	
 	public static <T extends IOInstance<T>> FieldSet<T> of(Collection<IOField<T, ?>> data){
 		if(data==null||data.isEmpty()) return of();
 		return switch(data){
@@ -111,9 +114,14 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	}
 	
 	
-	private final List<IOField<T, ?>> data;
+	private final IOField<T, ?>[] data;
 	
-	private FieldSet(List<IOField<T, ?>> data){
+	@SuppressWarnings("unchecked")
+	private FieldSet(){
+		this.data=(IOField<T, ?>[])new IOField[0];
+	}
+	
+	private FieldSet(IOField<T, ?>[] data){
 		this.data=data;
 	}
 	
@@ -154,16 +162,16 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	}
 	@Override
 	public IOField<T, ?> get(int index){
-		return data.get(index);
+		return data[index];
 	}
 	
 	public IOField<T, ?> getLast(){
-		return data.get(data.size()-1);
+		return data[data.length-1];
 	}
 	
 	@Override
 	public int size(){
-		return data.size();
+		return data.length;
 	}
 	
 	public Optional<IOField<T, ?>> byName(String name){

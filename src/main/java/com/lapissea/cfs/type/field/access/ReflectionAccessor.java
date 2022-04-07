@@ -19,9 +19,9 @@ import java.lang.reflect.Type;
 import java.util.Optional;
 import java.util.function.LongFunction;
 
-public class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends AbstractFieldAccessor<CTyp>{
+public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends AbstractFieldAccessor<CTyp>{
 	
-	public static class Num<CTyp extends IOInstance<CTyp>> extends ReflectionAccessor<CTyp>{
+	public static final class Num<CTyp extends IOInstance<CTyp>> extends ReflectionAccessor<CTyp>{
 		
 		private final LongFunction<INumber> constructor;
 		
@@ -38,8 +38,16 @@ public class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends AbstractF
 			return num.getValue();
 		}
 		@Override
-		public void setLong(CTyp instance, long value, Struct.Pool<CTyp> ioPool){
+		public void setLong(Struct.Pool<CTyp> ioPool, CTyp instance, long value){
 			set(ioPool, instance, constructor.apply(value));
+		}
+	}
+	
+	public static <T extends IOInstance<T>> FieldAccessor<T> make(Struct<T> struct, Field field, Optional<Method> getter, Optional<Method> setter, String name, Type genericType){
+		if(genericType instanceof Class<?> c&&UtilL.instanceOf(c, INumber.class)){
+			return new ReflectionAccessor.Num<>(struct, field, getter, setter, name, genericType);
+		}else{
+			return new ReflectionAccessor<>(struct, field, getter, setter, name, genericType);
 		}
 	}
 	
@@ -250,7 +258,7 @@ public class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends AbstractF
 	}
 	
 	@Override
-	public void setLong(CTyp instance, long value, Struct.Pool<CTyp> ioPool){
+	public void setLong(Struct.Pool<CTyp> ioPool, CTyp instance, long value){
 		try{
 			if(setter!=null){
 				setter.invoke(instance, value);
@@ -286,5 +294,36 @@ public class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends AbstractF
 		}catch(Throwable e){
 			throw UtilL.uncheckedThrow(e);
 		}
+	}
+	
+	@Override
+	public short getShort(Struct.Pool<CTyp> ioPool, CTyp instance){
+		try{
+			if(getter!=null){
+				return (Short)getter.invoke(instance);
+			}else{
+				return field.getShort(instance);
+			}
+		}catch(Throwable e){
+			throw UtilL.uncheckedThrow(e);
+		}
+	}
+	
+	@Override
+	public void setShort(Struct.Pool<CTyp> ioPool, CTyp instance, short value){
+		try{
+			if(setter!=null){
+				setter.invoke(instance, value);
+			}else{
+				field.setShort(instance, value);
+			}
+		}catch(Throwable e){
+			throw UtilL.uncheckedThrow(e);
+		}
+	}
+	
+	@Override
+	public boolean canBeNull(){
+		return !rawType.isPrimitive();
 	}
 }

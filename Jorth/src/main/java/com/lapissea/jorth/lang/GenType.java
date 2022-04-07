@@ -61,8 +61,12 @@ public record GenType(String typeName, int arrayDimensions, List<GenType> args, 
 		
 		if(popped.type()==Types.OBJECT){
 			if(typeName().equals("java.lang.Object")) return true;
+			if(popped.typeName.equals("java.lang.Object")) return true;
 			
-			var clazz=context.getClassInfo(popped.typeName);
+			var clazz=context.getClassInfo(typeName);
+			if(type==Types.OBJECT&&clazz.parents().isEmpty()&&popped.typeName().equals("java.lang.Object")){
+				return true;
+			}
 			return clazz.instanceOf(popped.typeName);
 		}
 		return false;
@@ -72,4 +76,25 @@ public record GenType(String typeName, int arrayDimensions, List<GenType> args, 
 		if(args.isEmpty()) return this;
 		return new GenType(typeName, arrayDimensions, List.of());
 	}
+	
+	
+	public String asJorthString(){
+		if(args.size()==0&&arrayDimensions==0) return typeName;
+		StringBuilder sb=new StringBuilder();
+		if(args.size()>0){
+			sb.append("[");
+			for(GenType arg : args){
+				sb.append(arg.asJorthString()).append(" ");
+			}
+			sb.append("] ");
+		}
+		if(arrayDimensions>0){
+			sb.append("array ".repeat(arrayDimensions));
+			sb.append(typeName);
+			return sb.toString();
+		}
+		sb.append(typeName);
+		return sb.toString();
+	}
+	
 }

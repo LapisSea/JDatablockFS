@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.util.AbstractMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -34,6 +35,11 @@ public class FixedContiguousStructPipe<T extends IOInstance<T>> extends StructPi
 	}
 	public static <T extends IOInstance<T>> FixedContiguousStructPipe<T> of(Struct<T> struct){
 		return of(FixedContiguousStructPipe.class, struct);
+	}
+	
+	@SuppressWarnings("unchecked")
+	public static <T extends IOInstance<T>, P extends FixedContiguousStructPipe<T>> void registerSpecialImpl(Struct<T> struct, Supplier<P> newType){
+		StructPipe.registerSpecialImpl(struct, (Class<P>)(Object)FixedContiguousStructPipe.class, newType);
 	}
 	
 	private final Map<IOField<T, NumberSize>, NumberSize> maxValues;
@@ -109,13 +115,13 @@ public class FixedContiguousStructPipe<T extends IOInstance<T>> extends StructPi
 	protected void doWrite(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		var ioPool=makeIOPool();
 		setMax(instance, ioPool);
-		writeIOFields(ioPool, provider, dest, instance);
+		writeIOFields(getSpecificFields(), ioPool, provider, dest, instance);
 	}
 	
 	@Override
 	protected T doRead(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		setMax(instance, ioPool);
-		readIOFields(ioPool, provider, src, instance, genericContext);
+		readIOFields(getSpecificFields(), ioPool, provider, src, instance, genericContext);
 		return instance;
 	}
 }

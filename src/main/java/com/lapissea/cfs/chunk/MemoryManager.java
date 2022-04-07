@@ -1,14 +1,16 @@
 package com.lapissea.cfs.chunk;
 
+import com.lapissea.cfs.exceptions.UnknownAllocationMethodException;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.collections.IOList;
-import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotNull;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
@@ -73,6 +75,13 @@ public interface MemoryManager extends DataProvider.Holder{
 		
 		@Override
 		public void allocTo(Chunk firstChunk, Chunk target, long toAllocate) throws IOException{
+			Objects.requireNonNull(firstChunk);
+			Objects.requireNonNull(target);
+			if(toAllocate<0){
+				throw new IllegalArgumentException();
+			}
+			
+			LogUtil.println(toAllocate);
 			
 			MemoryOperations.checkValidityOfChainAlloc(context, firstChunk, target);
 			
@@ -81,8 +90,9 @@ public interface MemoryManager extends DataProvider.Holder{
 			long remaining=toAllocate;
 			strategyLoop:
 			while(remaining>0){
-				while(last.hasNextPtr()){
-					last=last.next();
+				Chunk next;
+				while((next=last.next())!=null){
+					last=next;
 				}
 				
 				for(AllocToStrategy allocTo : allocTos){
@@ -101,7 +111,7 @@ public interface MemoryManager extends DataProvider.Holder{
 					}
 				}
 				
-				throw new NotImplementedException("Tried to allocate "+toAllocate+" bytes to "+last.getPtr()+" but there is no known way to do that");
+				throw new UnknownAllocationMethodException("Tried to allocate "+toAllocate+" bytes to "+last.getPtr()+" but there is no known way to do that");
 			}
 			
 		}
@@ -113,11 +123,11 @@ public interface MemoryManager extends DataProvider.Holder{
 			
 			tryStrategies:
 			{
-				for(AllocStrategy alloc : allocs){
+				for(var alloc : allocs){
 					chunk=alloc.alloc(context, ticket);
 					if(chunk!=null) break tryStrategies;
 				}
-				throw new NotImplementedException("Tried to allocate with "+ticket+" but there is no known way to do that");
+				return null;
 			}
 			
 			context.getChunkCache().add(chunk);

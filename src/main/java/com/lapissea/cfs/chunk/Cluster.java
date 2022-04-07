@@ -77,7 +77,7 @@ public class Cluster implements DataProvider{
 	
 	public static class RootRef extends IOInstance<RootRef>{
 		@IOValue
-		@IOValue.Reference(dataPipeType=FIXED)
+		@IOValue.Reference(dataPipeType = FIXED)
 		@IONullability(DEFAULT_IF_NULL)
 		private Metadata metadata;
 	}
@@ -87,7 +87,7 @@ public class Cluster implements DataProvider{
 		
 		@IOValue
 		@IONullability(NULLABLE)
-		@IOValue.OverrideType(value=HashIOMap.class)
+		@IOValue.OverrideType(value = HashIOMap.class)
 		private AbstractUnmanagedIOMap<ObjectID, IOInstance<?>> rootObjects;
 		
 		@IOValue
@@ -185,6 +185,7 @@ public class Cluster implements DataProvider{
 	
 	@Override
 	public IOTypeDB getTypeDb(){
+		if(root==null) return null;
 		return meta().db;
 	}
 	

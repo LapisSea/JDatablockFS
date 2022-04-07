@@ -6,12 +6,13 @@ import com.lapissea.cfs.exceptions.BitDepthOutOfSpaceException;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.function.FunctionOL;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.util.Objects;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
-public class ChunkChainIO implements RandomIO{
+public final class ChunkChainIO implements RandomIO{
 	
 	public final Chunk head;
 	
@@ -203,6 +204,9 @@ public class ChunkChainIO implements RandomIO{
 		}
 		
 		long toGrow=newCapacity-prev;
+		if(toGrow<=0){
+			return this;
+		}
 		
 		chunk.growBy(head, toGrow);
 		
@@ -246,6 +250,28 @@ public class ChunkChainIO implements RandomIO{
 		return read;
 	}
 	
+	@Override
+	public long read8(int len) throws IOException{
+		if(len==0) return 0;
+		
+		long val=0;
+		
+		var toReadReamining=len;
+		while(toReadReamining>0){
+			long cOff     =calcCursorOffset();
+			long remaining=cursor.getSize()-cOff;
+			if(remaining==0) throw new EOFException();
+			
+			int toRead=(int)Math.min(toReadReamining, remaining);
+			toReadReamining-=toRead;
+			val|=syncedSource().read8(toRead)<<(toReadReamining*8);
+			advanceCursorBy(toRead);
+		}
+		
+		return val;
+	}
+	
+	
 	private void ensureForwardCapacity(long amount) throws IOException{
 		long cOff     =calcCursorOffset();
 		long remaining=cursor.getCapacity()-cOff;
@@ -271,6 +297,7 @@ public class ChunkChainIO implements RandomIO{
 		long toAllocate=amount-remaining;
 		last.growBy(head, toAllocate);
 		
+		revalidate();
 	}
 	
 	@Override
@@ -315,6 +342,32 @@ public class ChunkChainIO implements RandomIO{
 			remaining-=toWrite;
 		}
 	}
+	
+	@Override
+	public void write8(long v, int len) throws IOException{
+		long offset=calcCursorOffset();
+		long cRem  =cursor.getCapacity()-offset;
+		
+		if(cRem<len){
+			RandomIO.super.write8(v, len);
+			return;
+		}
+		
+		syncedSource().write8(v, len);
+		cursor.modifyAndSave(c->{
+			try{
+				c.pushSize(offset+len);
+			}catch(BitDepthOutOfSpaceException e){
+				/*
+				 * size can not exceed capacity. If it somehow does and capacity
+				 * did not throw bitdepth then this should not be the biggest concern.
+				 * */
+				throw new ShouldNeverHappenError(e);
+			}
+		});
+		advanceCursorBy(len);
+	}
+	
 	@Override
 	public void fillZero(long requestedMemory) throws IOException{
 		long  remaining=requestedMemory;

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <module org.jetbrains.idea.maven.project.MavenProjectsManager.isMavenModule="true" type="JAVA_MODULE" version="4">
-  <component name="NewModuleRootManager" LANGUAGE_LEVEL="JDK_17_PREVIEW">
+  <component name="NewModuleRootManager" LANGUAGE_LEVEL="JDK_18_PREVIEW">
     <output url="file://$MODULE_DIR$/target/classes" />
     <output-test url="file://$MODULE_DIR$/target/test-classes" />
     <content url="file://$MODULE_DIR$">
@@ -11,7 +11,7 @@
       <excludeFolder url="file://$MODULE_DIR$/src/main/build" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
-    <orderEntry type="jdk" jdkName="17" jdkType="JavaSDK" />
+    <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="module" module-name="JDatablockFS" />
     <orderEntry type="library" name="Maven: com.github.lapissea:jlapisutil:1.0.11" level="project" />
@@ -22,6 +22,7 @@
     <orderEntry type="library" name="Maven: org.ow2.asm:asm-analysis:9.2" level="project" />
     <orderEntry type="library" name="Maven: org.roaringbitmap:RoaringBitmap:0.9.25" level="project" />
     <orderEntry type="library" scope="RUNTIME" name="Maven: org.roaringbitmap:shims:0.9.25" level="project" />
+    <orderEntry type="library" name="Maven: ru.vyarus:generics-resolver:3.0.3" level="project" />
     <orderEntry type="library" name="Maven: com.github.lapissea:glfw-window:1.0.0" level="project" />
     <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-assimp:3.3.1" level="project" />
     <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-vulkan:3.3.1" level="project" />

@@ -17,10 +17,7 @@ import com.lapissea.cfs.tools.SessionHost.CachedFrame;
 import com.lapissea.cfs.tools.SessionHost.ParsedFrame;
 import com.lapissea.cfs.tools.logging.MemFrame;
 import com.lapissea.cfs.tools.render.RenderBackend;
-import com.lapissea.cfs.type.GenericContext;
-import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.Struct;
-import com.lapissea.cfs.type.WordSpace;
+import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
@@ -33,6 +30,7 @@ import org.roaringbitmap.RoaringBitmap;
 
 import java.awt.Color;
 import java.io.IOException;
+import java.lang.annotation.Annotation;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Array;
 import java.lang.reflect.Type;
@@ -52,7 +50,11 @@ import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 @SuppressWarnings({"UnnecessaryLocalVariable", "SameParameterValue"})
 public class BinaryGridRenderer{
 	
-	public record FieldVal<T extends IOInstance<T>>(Struct.Pool<T> ioPool, T instance, IOField<T, ?> field){}
+	public record FieldVal<T extends IOInstance<T>>(Struct.Pool<T> ioPool, T instance, IOField<T, ?> field){
+		Optional<String> instanceToString(boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+			return field.instanceToString(ioPool, instance, doShort, start, end, fieldValueSeparator, fieldSeparator);
+		}
+	}
 	
 	enum ErrorLogLevel{
 		NONE,
@@ -201,7 +203,8 @@ public class BinaryGridRenderer{
 		Consumer<DrawUtils.Rect> doSegment=bitRect->{
 			renderCtx.renderer.setColor(alpha(col, 0.8F).darker());
 			renderCtx.renderer.fillQuad(bitRect.x, bitRect.y, bitRect.width, bitRect.height);
-			drawStringInInfo(renderCtx.renderer, col, Objects.toString(field.instanceToString(ioPool, instance, true)), bitRect, false, ctx.strings);
+			var str=field.instanceToString(ioPool, instance, true);
+			str.ifPresent(s->drawStringInInfo(renderCtx.renderer, col, s, bitRect, false, ctx.strings));
 		};
 		
 		if(instance instanceof Chunk ch){
@@ -276,9 +279,9 @@ public class BinaryGridRenderer{
 		
 		var rectWidth=bestRange.toRect(ctx.renderCtx).width;
 		
-		String str     =field.instanceToString(ioPool, instance, false);
-		String shortStr=null;
-		String both;
+		Optional<String> str     =field.instanceToString(ioPool, instance, false);
+		Optional<String> shortStr=Optional.empty();
+		String           both;
 		
 		var fStr=field.toShortString();
 		if(field instanceof IOField.Ref refField){
@@ -288,10 +291,10 @@ public class BinaryGridRenderer{
 		}
 		
 		var renderCtx=ctx.renderCtx;
-		both=fStr+(str==null?"":": "+str);
-		if(str!=null&&getStringBounds(renderCtx.renderer, both).width()>rectWidth){
+		both=fStr+(str.isEmpty()?"":": "+str.get());
+		if(str.isPresent()&&getStringBounds(renderCtx.renderer, both).width()>rectWidth){
 			shortStr=field.instanceToString(ioPool, instance, true);
-			both=fStr+(shortStr==null?"":": "+shortStr);
+			both=fStr+(shortStr.isEmpty()?"":": "+shortStr.get());
 		}
 		
 		if(hover!=null){
@@ -299,7 +302,7 @@ public class BinaryGridRenderer{
 		}
 		
 		
-		if(str!=null&&getStringBounds(renderCtx.renderer, both).width()>rectWidth){
+		if(str.isPresent()&&getStringBounds(renderCtx.renderer, both).width()>rectWidth){
 			var font=renderCtx.renderer.getFontScale();
 			initFont(renderCtx, 0.4F);
 			var rect=bestRange.toRect(ctx.renderCtx);
@@ -309,13 +312,14 @@ public class BinaryGridRenderer{
 			
 			var drawStr=str;
 			
-			if(getStringBounds(renderCtx.renderer, drawStr).width()>rectWidth){
-				if(shortStr==null) shortStr=field.instanceToString(ioPool, instance, true);
+			if(getStringBounds(renderCtx.renderer, drawStr.get()).width()>rectWidth){
+				if(shortStr.isEmpty()) shortStr=field.instanceToString(ioPool, instance, true);
 				drawStr=shortStr;
 			}
 			var r=bestRange.toRect(ctx.renderCtx);
 			r.y+=ctx.renderCtx.pixelsPerByte*0.1F;
-			drawStringInInfo(renderCtx.renderer, color, (drawStr==null?"":drawStr), r, false, ctx.strings, ctx.stringOutlines);
+			
+			drawStr.ifPresent(s->drawStringInInfo(renderCtx.renderer, color, s, r, false, ctx.strings, ctx.stringOutlines));
 		}else{
 			initFont(renderCtx, 1);
 			drawStringInInfo(renderCtx.renderer, color, both, bestRange.toRect(ctx.renderCtx), false, ctx.strings, ctx.stringOutlines);
@@ -664,6 +668,8 @@ public class BinaryGridRenderer{
 								pos=chunk.dataEnd();
 								if(referenced.contains(chunk)){
 									fillChunk(ctx, chunk, true, false);
+								}else{
+									drawByteRanges(ctx, List.of(Range.fromSize(chunk.dataStart(), chunk.getCapacity())), alpha(Color.BLUE, 0.1F), false, false);
 								}
 								annotateChunk(annCtx, chunk);
 							}
@@ -1205,7 +1211,7 @@ public class BinaryGridRenderer{
 							
 							var inst=field.get(ioPool, instance);
 							if(inst==null) continue;
-							if(IOFieldPrimitive.isPrimitive(inst.getClass())||inst.getClass()==String.class){
+							if(SupportedPrimitive.isAny(inst.getClass())||inst.getClass()==String.class){
 								if(annotate) annotateByteField(ctx, ioPool, instance, field, col, reference, Range.fromSize(fieldOffset, size));
 								continue;
 							}
@@ -1282,7 +1288,7 @@ public class BinaryGridRenderer{
 								}
 								ctx.recordPointer(new Pointer(trueOffset, ch.getValue(), (int)size, col, msg, 0.8F));
 							}
-						}else if(IOFieldPrimitive.isPrimitive(acc.getType())||Stream.of(INumber.class, Enum.class).anyMatch(c->UtilL.instanceOf(acc.getType(), c))){
+						}else if(SupportedPrimitive.isAny(acc.getType())||Stream.of(INumber.class, Enum.class).anyMatch(c->UtilL.instanceOf(acc.getType(), c))){
 							if(annotate){
 								renderer.setColor(col);
 								if(sizeDesc.getWordSpace()==WordSpace.BIT){
@@ -1332,6 +1338,11 @@ public class BinaryGridRenderer{
 										long  arrOffset=0;
 										int[] index    ={0};
 										var f=new IOFieldPrimitive.FFloat<T>(new FieldAccessor<>(){
+											@NotNull
+											@Override
+											public <T1 extends Annotation> Optional<T1> getAnnotation(Class<T1> annotationClass){
+												return Optional.empty();
+											}
 											@Override
 											public Struct<T> getDeclaringStruct(){
 												return instance.getThisStruct();
@@ -1373,6 +1384,11 @@ public class BinaryGridRenderer{
 									long  arrOffset=0;
 									int[] index    ={0};
 									var f=new IOField.NoIO<T, String>(new FieldAccessor<>(){
+										@NotNull
+										@Override
+										public <T1 extends Annotation> Optional<T1> getAnnotation(Class<T1> annotationClass){
+											return Optional.empty();
+										}
 										@Override
 										public Struct<T> getDeclaringStruct(){
 											return instance.getThisStruct();
@@ -1464,7 +1480,7 @@ public class BinaryGridRenderer{
 	private <T extends IOInstance<T>> Iterator<IOField<T, Object>> makeFieldIterator(T instance, StructPipe<T> pipe){
 		var fields=pipe.getSpecificFields();
 		if(instance instanceof IOInstance.Unmanaged unmanaged){
-			return Stream.concat(fields.stream(), unmanaged.listDynamicUnmanagedFields()).iterator();
+			return Stream.concat(fields.stream(), unmanaged.listUnmanagedFields()).iterator();
 		}else{
 			return (Iterator<IOField<T, Object>>)(Object)fields.iterator();
 		}

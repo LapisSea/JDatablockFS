@@ -3,21 +3,28 @@ package com.lapissea.cfs.internal;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
+import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.ShouldNeverHappenError;
+import com.lapissea.util.UtilL;
 
 import java.lang.invoke.*;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.nio.ByteBuffer;
+import java.security.ProtectionDomain;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.Random;
 import java.util.function.Supplier;
+import java.util.stream.IntStream;
 
+import static com.lapissea.cfs.internal.MyUnsafe.UNSAFE;
 import static java.lang.invoke.MethodHandles.Lookup.*;
 
 @SuppressWarnings("unchecked")
@@ -25,6 +32,41 @@ public class Access{
 	
 	private static final boolean USE_UNSAFE_LOOKUP=true;
 	
+	private static int calcModesOffset(){
+		@SuppressWarnings("all")
+		final class Mirror{
+			Class<?> lookupClass;
+			Class<?> prevLookupClass;
+			int      allowedModes;
+			
+			volatile ProtectionDomain cachedProtectionDomain;
+			
+			Mirror(Class<?> lookupClass, Class<?> prevLookupClass, int allowedModes){
+				this.lookupClass=lookupClass;
+				this.prevLookupClass=prevLookupClass;
+				this.allowedModes=allowedModes;
+			}
+		}
+		
+		int offset=0;
+		var mirror=new Mirror(null, null, Integer.MAX_VALUE);
+		while(true){
+			int off=offset;
+			
+			var ok=IntStream.range(0, 100).map(i->i+1234).allMatch(i->{
+				ByteBuffer bb=ByteBuffer.allocate(4);
+				new Random(i).nextBytes(bb.array());
+				mirror.allowedModes=bb.getInt(0);
+				var val=UNSAFE.getInt(mirror, off);
+				return mirror.allowedModes==val;
+			});
+			
+			if(ok) break;
+			
+			offset++;
+		}
+		return offset;
+	}
 	
 	public static <FInter, T extends FInter> T makeLambda(Method method, Class<FInter> functionalInterface){
 		Method functionalInterfaceFunction=null;
@@ -77,7 +119,7 @@ public class Access{
 				                                   handle,
 				                                   handle.type());
 			}catch(LambdaConversionException e){
-				if(USE_UNSAFE_LOOKUP) throw new ShouldNeverHappenError("Unsafe lookup should solve this");
+				if(USE_UNSAFE_LOOKUP) throw new ShouldNeverHappenError("Unsafe lookup should solve this", e);
 				
 				T val=tryRecoverWithOld(constructor, functionalInterface);
 				if(val!=null) return val;
@@ -117,22 +159,19 @@ public class Access{
 	}
 	
 	private static void corruptPermissions(MethodHandles.Lookup lookup){
-		if(lookup.hasFullPrivilegeAccess()) return;
+		int allModes=PUBLIC|PRIVATE|PROTECTED|PACKAGE|MODULE|UNCONDITIONAL|ORIGINAL;
 		
-		class Dummy{
-			int a;
+		if(lookup.lookupModes()==allModes){
+			return;
 		}
 		
 		//Ensure only intended/relevant lookup is corrupted
 		checkTarget:
 		{
 			var cls=lookup.lookupClass();
-			if(cls.getModule().equals(Dummy.class.getModule())){
-				break checkTarget;
-			}
 			
-			for(var rootClass : List.of(IOInstance.class, StructPipe.class)){
-				if(rootClass.isAssignableFrom(cls)){
+			for(var consentClass : List.of(IOInstance.class, StructPipe.class, ChunkPointer.class)){
+				if(UtilL.instanceOf(cls, consentClass)){
 					break checkTarget;
 				}
 			}
@@ -140,25 +179,15 @@ public class Access{
 			throw new SecurityException("Unsafe attempt of lookup modification: "+lookup);
 		}
 		
+		//calculate objectFieldOffset every time as JVM may not keep a constant for a field
+		int offset=calcModesOffset();
 		
-		var acc=(PUBLIC|PRIVATE|PROTECTED|PACKAGE|MODULE|UNCONDITIONAL|ORIGINAL);
-		try{
-			var f=sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
-			f.setAccessible(true);
-			var unsafe=(sun.misc.Unsafe)f.get(null);
-			
-			//get first field offset to skip any CG/Identity data that would create a segfault
-			var offset=unsafe.objectFieldOffset(Dummy.class.getDeclaredField("a"));
-			while(true){
-				//can't get exact offset of lookup permissions flags field so the safest way to do it to probe offsets sequentially
-				var old=unsafe.getAndSetInt(lookup, offset, acc);
-				if(lookup.hasFullPrivilegeAccess()) break;
-				unsafe.getAndSetInt(lookup, offset, old);
-				offset+=4;
-			}
-			
-		}catch(Throwable e){
-			throw new RuntimeException(e);
+		UNSAFE.getAndSetInt(lookup, offset, allModes);
+		if(lookup.lookupModes()!=allModes){
+			throw new ShouldNeverHappenError();
+		}
+		if(!lookup.hasFullPrivilegeAccess()){
+			throw new ShouldNeverHappenError();
 		}
 	}
 	
@@ -175,7 +204,7 @@ public class Access{
 		try{
 			var lookup=getLookup(field.getDeclaringClass(), field.getModifiers());
 			field.setAccessible(true);
-			return lookup.findVarHandle(field.getDeclaringClass(), field.getName(), field.getType());
+			return lookup.unreflectVarHandle(field);
 		}catch(Throwable e){
 			throw new RuntimeException("failed to create VarHandle\n"+field, e);
 		}

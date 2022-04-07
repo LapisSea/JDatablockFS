@@ -4,7 +4,7 @@ import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.RuntimeType;
 import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.util.NotNull;
@@ -14,14 +14,14 @@ import java.io.IOException;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-public abstract class AbstractUnmanagedIOList<T extends IOInstance<T>, SELF extends AbstractUnmanagedIOList<T, SELF>> extends IOInstance.Unmanaged<SELF> implements IOList<T>{
+public abstract class AbstractUnmanagedIOList<T, SELF extends AbstractUnmanagedIOList<T, SELF>> extends IOInstance.Unmanaged<SELF> implements IOList<T>{
 	
 	private IOField<SELF, ?> sizeField;
 	
 	public AbstractUnmanagedIOList(DataProvider provider, Reference reference, TypeLink typeDef, TypeLink.Check check){super(provider, reference, typeDef, check);}
 	public AbstractUnmanagedIOList(DataProvider provider, Reference reference, TypeLink typeDef)                      {super(provider, reference, typeDef);}
 	
-	public abstract Struct<T> getElementType();
+	public abstract RuntimeType<T> getElementType();
 	
 	@Override
 	public boolean equals(Object o){
@@ -74,7 +74,7 @@ public abstract class AbstractUnmanagedIOList<T extends IOInstance<T>, SELF exte
 	}
 	@Override
 	public String toShortString(){
-		return stream().map(e->e==null?null:e.toShortString()).collect(Collectors.joining(", ", "[", "]"));
+		return stream().map(Utils::toShortString).collect(Collectors.joining(", ", "[", "]"));
 	}
 	
 	@Override

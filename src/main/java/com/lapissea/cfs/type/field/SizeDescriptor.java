@@ -1,12 +1,15 @@
 package com.lapissea.cfs.type.field;
 
 import com.lapissea.cfs.chunk.DataProvider;
+import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.WordSpace;
+import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.util.TextUtil;
 
 import java.util.Objects;
+import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.function.Function;
 import java.util.stream.LongStream;
@@ -15,6 +18,10 @@ import static com.lapissea.cfs.type.WordSpace.BIT;
 import static com.lapissea.cfs.type.WordSpace.BYTE;
 
 public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>>{
+	
+	interface Sizer<T extends IOInstance<T>>{
+		long calc(Struct.Pool<T> ioPool, DataProvider prov, T value);
+	}
 	
 	@SuppressWarnings("unchecked")
 	final class Fixed<T extends IOInstance<T>> implements SizeDescriptor<T>{
@@ -49,10 +56,7 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 		private final WordSpace wordSpace;
 		private final long      size;
 		
-		public Fixed(long bytes){
-			this(BYTE, bytes);
-		}
-		public Fixed(WordSpace wordSpace, long size){
+		private Fixed(WordSpace wordSpace, long size){
 			this.wordSpace=wordSpace;
 			this.size=size;
 		}
@@ -118,38 +122,31 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 		}
 	}
 	
-	final class Unknown<Inst extends IOInstance<Inst>> implements SizeDescriptor<Inst>{
+	abstract sealed class Unknown<Inst extends IOInstance<Inst>> implements SizeDescriptor<Inst>{
 		
-		public interface Sizer<T extends IOInstance<T>>{
-			long calc(Struct.Pool<T> ioPool, DataProvider prov, T value);
+		public static <Inst extends IOInstance<Inst>> SizeDescriptor<Inst> of(long min, OptionalLong max, Sizer<Inst> unknownSize){return of(BYTE, min, max, unknownSize);}
+		public static <Inst extends IOInstance<Inst>> SizeDescriptor<Inst> of(WordSpace wordSpace, long min, OptionalLong max, Sizer<Inst> unknownSize){
+			return new UnknownLambda<>(wordSpace, min, max, unknownSize);
 		}
+		
+		public static <Inst extends IOInstance<Inst>> SizeDescriptor<Inst> of(NumberSize min, Optional<NumberSize> max, FieldAccessor<Inst> accessor){
+			return new UnknownNum<>(BYTE, min, max, accessor);
+		}
+		
 		
 		private final WordSpace    wordSpace;
 		private final long         min;
 		private final OptionalLong max;
-		private final Sizer<Inst>  unknownSize;
 		
-		public Unknown(long min, OptionalLong max, Sizer<Inst> unknownSize){this(BYTE, min, max, unknownSize);}
-		public Unknown(WordSpace wordSpace, long min, OptionalLong max, Sizer<Inst> unknownSize){
+		public Unknown(WordSpace wordSpace, long min, OptionalLong max){
 			this.wordSpace=wordSpace;
 			this.min=min;
 			this.max=Objects.requireNonNull(max);
-			this.unknownSize=unknownSize;
 		}
 		
-		@Override
-		public <T extends IOInstance<T>> Unknown<T> map(Function<T, Inst> mapping){
-			var unk=unknownSize;
-			return new Unknown<>(getWordSpace(), getMin(), getMax(), (ioPool, prov, tInst)->unk.calc(null, prov, mapping.apply(tInst)));//TODO: uuuuuh ioPool null?
-		}
 		
 		@Override
 		public WordSpace getWordSpace(){return wordSpace;}
-		
-		@Override
-		public long calcUnknown(Struct.Pool<Inst> ioPool, DataProvider provider, Inst instance){
-			return unknownSize.calc(ioPool, provider, instance);
-		}
 		
 		@Override
 		public OptionalLong getFixed(){return OptionalLong.empty();}
@@ -175,6 +172,87 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>>{
 			}
 			sb.append(TextUtil.plural(getWordSpace().friendlyName));
 			return sb.append('}').toString();
+		}
+		
+		
+		protected boolean equalsVals(Unknown<?> that){
+			return min==that.min&&
+			       wordSpace==that.wordSpace&&
+			       max.equals(that.max);
+		}
+		
+		protected int hashCodeVals(){
+			int result=wordSpace.hashCode();
+			result=31*result+(int)(min^(min >>> 32));
+			result=31*result+max.hashCode();
+			return result;
+		}
+	}
+	
+	final class UnknownLambda<Inst extends IOInstance<Inst>> extends Unknown<Inst>{
+		
+		
+		private final Sizer<Inst> unknownSize;
+		
+		public UnknownLambda(WordSpace wordSpace, long min, OptionalLong max, Sizer<Inst> unknownSize){
+			super(wordSpace, min, max);
+			this.unknownSize=unknownSize;
+		}
+		
+		@Override
+		public <T extends IOInstance<T>> UnknownLambda<T> map(Function<T, Inst> mapping){
+			var unk=unknownSize;
+			return new UnknownLambda<>(getWordSpace(), getMin(), getMax(), (ioPool, prov, tInst)->unk.calc(null, prov, mapping.apply(tInst)));//TODO: uuuuuh ioPool null?
+		}
+		
+		@Override
+		public long calcUnknown(Struct.Pool<Inst> ioPool, DataProvider provider, Inst instance){
+			return unknownSize.calc(ioPool, provider, instance);
+		}
+	}
+	
+	final class UnknownNum<Inst extends IOInstance<Inst>> extends Unknown<Inst>{
+		
+		private final FieldAccessor<Inst> accessor;
+		
+		public UnknownNum(NumberSize min, Optional<NumberSize> max, FieldAccessor<Inst> accessor){this(BYTE, min, max, accessor);}
+		public UnknownNum(WordSpace wordSpace, NumberSize min, Optional<NumberSize> max, FieldAccessor<Inst> accessor){
+			super(wordSpace, min.bytes, max.map(n->OptionalLong.of(n.bytes)).orElse(OptionalLong.empty()));
+			if(accessor.getType()!=NumberSize.class){
+				throw new IllegalArgumentException(accessor+" is not of type "+NumberSize.class.getName());
+			}
+			this.accessor=accessor;
+		}
+		
+		@Override
+		public <T extends IOInstance<T>> UnknownLambda<T> map(Function<T, Inst> mapping){
+			throw new UnsupportedOperationException();
+		}
+		
+		@Override
+		public long calcUnknown(Struct.Pool<Inst> ioPool, DataProvider provider, Inst instance){
+			var num=(NumberSize)accessor.get(ioPool, instance);
+			return num.bytes;
+		}
+		
+		
+		public FieldAccessor<Inst> getAccessor(){
+			return accessor;
+		}
+		
+		@Override
+		public boolean equals(Object o){
+			return this==o||
+			       o instanceof UnknownNum<?> that&&
+			       equalsVals(that)&&
+			       accessor==that.accessor;
+		}
+		
+		@Override
+		public int hashCode(){
+			int result=hashCodeVals();
+			result=31*result+accessor.hashCode();
+			return result;
 		}
 	}
 	

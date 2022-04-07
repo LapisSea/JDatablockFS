@@ -38,7 +38,7 @@ public class IOFieldInstanceArray<T extends IOInstance<T>, ValType extends IOIns
 		component=(Class<ValType>)type.getComponentType();
 		if(component.isArray()) throw new MalformedStructLayout("Multi dimension arrays are not supported (yet)");
 		
-		descriptor=new SizeDescriptor.Unknown<>(WordSpace.BYTE, 0, OptionalLong.empty(), (ioPool, prov, inst)->{
+		descriptor=SizeDescriptor.Unknown.of(WordSpace.BYTE, 0, OptionalLong.empty(), (ioPool, prov, inst)->{
 			var arr=get(null, inst);
 			if(arr.length==0) return 0;
 			
@@ -63,7 +63,7 @@ public class IOFieldInstanceArray<T extends IOInstance<T>, ValType extends IOIns
 	@Override
 	public void init(){
 		super.init();
-		arraySize=declaringStruct().getFields().requireExact(Integer.class, IOFieldTools.makeArrayLenName(getAccessor()));
+		arraySize=declaringStruct().getFields().requireExact(int.class, IOFieldTools.makeArrayLenName(getAccessor()));
 	}
 	
 	private int getArraySize(Struct.Pool<T> ioPool, T inst){

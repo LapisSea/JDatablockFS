@@ -25,7 +25,7 @@ public class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> extends IOF
 		super(field);
 		
 		enumUniverse=EnumUniverse.getUnknown(field.getType());
-		sizeDescriptor=new SizeDescriptor.Fixed<>(WordSpace.BIT, enumUniverse.getBitSize(nullable()));
+		sizeDescriptor=SizeDescriptor.Fixed.of(WordSpace.BIT, enumUniverse.getBitSize(nullable()));
 		
 		if(getNullability()==DEFAULT_IF_NULL&&enumUniverse.isEmpty()){
 			throw new MalformedStructLayout(DEFAULT_IF_NULL+" is not supported for empty enums");

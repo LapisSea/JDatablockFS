@@ -25,8 +25,6 @@ public class FlagWriter implements BitWriter<FlagWriter>{
 		}
 	}
 	
-	private static final ThreadLocal<FlagWriter> INTERNAL_WRITERS=ThreadLocal.withInitial(()->new FlagWriter(NumberSize.VOID));
-	
 	public static <T extends Enum<T>> void writeSingle(ContentWriter target, EnumUniverse<T> enumInfo, boolean nullable, T value) throws IOException{
 		writeSingle(target, enumInfo.numSize(nullable), enumInfo, nullable, value);
 	}
@@ -37,8 +35,7 @@ public class FlagWriter implements BitWriter<FlagWriter>{
 			if(nums.lesserThan(size)) throw new IllegalArgumentException(nums+" <= "+size);
 		}
 		
-		FlagWriter flags=INTERNAL_WRITERS.get();
-		flags.reset(size);
+		var flags=new FlagWriter(size);
 		
 		flags.writeEnum(enumInfo, value, nullable);
 		

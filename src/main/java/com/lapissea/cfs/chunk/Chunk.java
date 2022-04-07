@@ -23,6 +23,7 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.reflection.BitFieldMerger;
@@ -36,6 +37,8 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalLong;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -44,7 +47,7 @@ import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 @SuppressWarnings("unused")
 public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, DataProvider.Holder, Comparable<Chunk>{
 	
-	private static class OptimizedChunkPipe extends StructPipe<Chunk>{
+	private static class OptimizedChunkPipe extends ContiguousStructPipe<Chunk>{
 		
 		static{
 			var check="bodyNumSize + nextSize Size{1 byte} capacity Size{0-8 bytes} size Size{0-8 bytes} nextPtr Size{0-8 bytes} ";
@@ -117,14 +120,30 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 			}
 			return instance;
 		}
+		
+		@Override
+		protected SizeDescriptor<Chunk> createSizeDescriptor(){
+			return SizeDescriptor.Unknown.of(WordSpace.BYTE, 1, OptionalLong.of(1+NumberSize.LARGEST.bytes*3L), (ioPool, prov, value)->{
+				var bns=value.getBodyNumSize();
+				var nns=value.getNextSize();
+				
+				return 1L+bns.bytes*2L+nns.bytes;
+			});
+		}
 	}
 	
 	
-	private static final Struct<Chunk>     STRUCT=Struct.of(Chunk.class);
-	public static final  StructPipe<Chunk> PIPE  =
-		UtilL.sysPropertyByClass(Chunk.class, "DO_NOT_USE_OPTIMIZED_PIPE", false, Boolean::parseBoolean)?
-		ContiguousStructPipe.of(STRUCT):
-		new OptimizedChunkPipe();
+	private static final Struct<Chunk>     STRUCT;
+	public static final  StructPipe<Chunk> PIPE;
+	
+	static{
+		STRUCT=Struct.of(Chunk.class);
+		if(!UtilL.sysPropertyByClass(Chunk.class, "DO_NOT_USE_OPTIMIZED_PIPE", false, Boolean::parseBoolean)){
+			ContiguousStructPipe.registerSpecialImpl(STRUCT, OptimizedChunkPipe::new);
+		}
+		PIPE=ContiguousStructPipe.of(STRUCT);
+	}
+	
 	
 	private static final int  CHECK_BYTE_OFF;
 	private static final byte CHECK_BIT_MASK;
@@ -271,7 +290,7 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 	}
 	
 	public long dataStart(){
-		return ptr.add(headerSize);
+		return ptr.add(getHeaderSize());
 	}
 	public long dataEnd(){
 		var start=dataStart();
@@ -397,7 +416,7 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 	
 	
 	public long totalSize(){
-		return headerSize+capacity;
+		return getHeaderSize()+capacity;
 	}
 	
 	@IOValue
@@ -407,6 +426,30 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 	
 	public NumberSize getNextSize(){
 		return nextSize;
+	}
+	
+	public void setNextSize(NumberSize nextSize) throws BitDepthOutOfSpaceException{
+		forbidReadOnly();
+		if(this.nextSize==nextSize) return;
+		nextSize.ensureCanFit(getNextPtr());
+		
+		this.nextSize=nextSize;
+		markDirty();
+		calcHeaderSize();
+	}
+	
+	
+	public static Predicate<Chunk> sizeFitsPointer(NumberSize size){
+		return new Predicate<>(){
+			@Override
+			public boolean test(Chunk o){
+				return size.canFit(o.getPtr());
+			}
+			@Override
+			public String toString(){
+				return "Must fit "+size;
+			}
+		};
 	}
 	
 	@Override

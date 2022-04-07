@@ -13,11 +13,13 @@ import com.lapissea.cfs.io.content.ContentOutputBuilder;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.impl.MemoryData;
+import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
+import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.util.LogUtil;
@@ -30,6 +32,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
@@ -37,7 +42,8 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	
 	private static class StructGroup<T extends IOInstance<T>, P extends StructPipe<T>> extends ConcurrentHashMap<Struct<T>, P>{
 		
-		private final Function<Struct<?>, P> lConstructor;
+		private final Map<Struct<T>, Supplier<P>> specials=new HashMap<>();
+		private final Function<Struct<?>, P>      lConstructor;
 		
 		private StructGroup(Class<? extends StructPipe<?>> type){
 			try{
@@ -51,7 +57,14 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 			var cached=get(struct);
 			if(cached!=null) return cached;
 			
-			P created=lConstructor.apply(struct);
+			P created;
+			
+			var special=specials.get(struct);
+			if(special!=null){
+				created=special.get();
+			}else{
+				created=lConstructor.apply(struct);
+			}
 			
 			if(GlobalConfig.PRINT_COMPILATION){
 				LogUtil.println(ConsoleColors.CYAN_BRIGHT+
@@ -83,6 +96,10 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 			
 			return created;
 		}
+		
+		private void registerSpecialImpl(Struct<T> struct, Supplier<P> newType){
+			specials.put(struct, newType);
+		}
 	}
 	
 	private static final ConcurrentHashMap<Class<? extends StructPipe<?>>, StructGroup<?, ?>> CACHE=new ConcurrentHashMap<>();
@@ -92,6 +109,13 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		var group=(StructGroup<T, P>)CACHE.computeIfAbsent(type, StructGroup::new);
 		return group.make(struct);
 	}
+	
+	@SuppressWarnings("unchecked")
+	public static <T extends IOInstance<T>, P extends StructPipe<T>> void registerSpecialImpl(Struct<T> struct, Class<P> oldType, Supplier<P> newType){
+		var group=(StructGroup<T, P>)CACHE.computeIfAbsent(oldType, StructGroup::new);
+		group.registerSpecialImpl(struct, newType);
+	}
+	
 	
 	private final Struct<T>                type;
 	private final SizeDescriptor<T>        sizeDescription;
@@ -104,14 +128,14 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	public StructPipe(Struct<T> type){
 		this.type=type;
 		this.ioFields=FieldSet.of(initFields());
-		sizeDescription=calcSize();
+		sizeDescription=createSizeDescriptor();
 		ioPoolAccessors=Utils.nullIfEmpty(calcIOPoolAccessors());
 		earlyNullChecks=Utils.nullIfEmpty(getNonNulls());
 		generators=Utils.nullIfEmpty(ioFields.stream().map(IOField::getGenerators).flatMap(Collection::stream).toList());
 	}
 	
 	private List<IOField<T, ?>> getNonNulls(){
-		return ioFields.unpackedStream().filter(f->f.getNullability()==IONullability.Mode.NOT_NULL).toList();
+		return ioFields.unpackedStream().filter(f->f.getNullability()==IONullability.Mode.NOT_NULL&&f.getAccessor().canBeNull()).toList();
 	}
 	
 	protected abstract List<IOField<T, ?>> initFields();
@@ -125,8 +149,14 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		           .toList();
 	}
 	
-	private SizeDescriptor<T> calcSize(){
-		var fields=getSpecificFields();
+	protected SizeDescriptor<T> createSizeDescriptor(){
+		FieldSet<T> fields=getSpecificFields();
+		if(type instanceof Struct.Unmanaged<?> u){
+			FieldSet<T> f=(FieldSet<T>)u.getUnmanagedStaticFields();
+			if(!f.isEmpty()){
+				fields=FieldSet.of(Stream.concat(fields.stream(), f.stream()));
+			}
+		}
 		
 		var wordSpace=IOFieldTools.minWordSpace(fields);
 		
@@ -153,7 +183,37 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		var min=IOFieldTools.sumVars(fields, siz->siz.getMin(wordSpace));
 		var max=hasDynamicFields?OptionalLong.empty():IOFieldTools.sumVarsIfAll(fields, siz->siz.getMax(wordSpace));
 		
-		return new SizeDescriptor.Unknown<>(wordSpace, min, max, (ioPool, prov, inst)->{
+		
+		Map<SizeDescriptor.UnknownNum<T>, List<SizeDescriptor.UnknownNum<T>>> numMap;
+		numMap=unknownFields.stream()
+		                    .filter(f->f.getSizeDescriptor() instanceof SizeDescriptor.UnknownNum)
+		                    .map(f->(SizeDescriptor.UnknownNum<T>)f.getSizeDescriptor())
+		                    .collect(Collectors.groupingBy(f->f));
+		
+		numMap.entrySet().removeIf(e->e.getValue().size()==1);
+		
+		var unknownUnknownFields=unknownFields.stream()
+		                                      .filter(f->!numMap.containsKey(f.getSizeDescriptor()))
+		                                      .toList();
+		
+		FieldAccessor<T>[] unkownNumAcc;
+		int[]              unkownNumAccMul;
+		
+		if(numMap.isEmpty()){
+			unkownNumAcc=null;
+			unkownNumAccMul=null;
+		}else{
+			unkownNumAcc=new FieldAccessor[numMap.size()];
+			unkownNumAccMul=new int[numMap.size()];
+			int i=0;
+			for(var e : numMap.entrySet()){
+				unkownNumAcc[i]=e.getKey().getAccessor();
+				unkownNumAccMul[i]=e.getValue().size();
+				i++;
+			}
+		}
+		
+		return SizeDescriptor.Unknown.of(wordSpace, min, max, (ioPool, prov, inst)->{
 			checkNull(inst);
 			
 			try{
@@ -161,16 +221,19 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 			}catch(IOException e){
 				throw new RuntimeException(e);
 			}
-			
-			if(unknownFields.size()==1){
-				var field=unknownFields.get(0);
-				var d    =field.getSizeDescriptor();
-				return knownFixed+d.calcUnknown(ioPool, prov, inst, wordSpace);
-			}
-			
-			return knownFixed+IOFieldTools.sumVars(unknownFields, d->{
+			var unkownSum=IOFieldTools.sumVars(unknownUnknownFields, d->{
 				return d.calcUnknown(ioPool, prov, inst, wordSpace);
 			});
+			
+			if(unkownNumAcc!=null){
+				for(int i=0;i<unkownNumAcc.length;i++){
+					var acc=unkownNumAcc[i];
+					var num=(NumberSize)acc.get(ioPool, inst);
+					var mul=unkownNumAccMul[i];
+					unkownSum+=num.bytes*mul;
+				}
+			}
+			return knownFixed+unkownSum;
 		});
 	}
 	
@@ -270,13 +333,13 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	public void earlyCheckNulls(Struct.Pool<T> ioPool, T instance){
 		if(earlyNullChecks==null) return;
 		for(var field : earlyNullChecks){
-			if(field.get(ioPool, instance)==null){
+			if(field.isNull(ioPool, instance)){
 				throw new FieldIsNullException(field);
 			}
 		}
 	}
 	
-	protected void writeIOFields(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+	protected void writeIOFields(FieldSet<T> fields, Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		
 		ContentOutputBuilder destBuff=null;
 		ContentWriter        target;
@@ -291,7 +354,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		
 		generateAll(ioPool, provider, instance, true);
 		
-		for(IOField<T, ?> field : getSpecificFields()){
+		for(IOField<T, ?> field : fields){
 			if(DEBUG_VALIDATION){
 				long bytes;
 				try{
@@ -476,13 +539,13 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		
 	}
 	
-	protected void readIOFields(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	protected void readIOFields(FieldSet<T> fields, Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		if(DEBUG_VALIDATION){
-			for(IOField<T, ?> field : getSpecificFields()){
+			for(IOField<T, ?> field : fields){
 				readFieldSafe(ioPool, provider, src, instance, field, genericContext);
 			}
 		}else{
-			for(IOField<T, ?> field : getSpecificFields()){
+			for(IOField<T, ?> field : fields){
 				field.readReported(ioPool, provider, src, instance, genericContext);
 			}
 		}
@@ -498,7 +561,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		int checkIndex=0;
 		
 		if(DEBUG_VALIDATION){
-			for(IOField<T, ?> field : ioFields){
+			for(IOField<T, ?> field : getSpecificFields()){
 				if(fields.get(checkIndex)==field){
 					checkIndex++;
 					readFieldSafe(ioPool, provider, src, instance, field, genericContext);

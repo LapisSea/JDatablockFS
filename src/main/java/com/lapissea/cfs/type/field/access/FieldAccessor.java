@@ -14,9 +14,7 @@ import java.util.Optional;
 public interface FieldAccessor<CTyp extends IOInstance<CTyp>> extends Comparable<FieldAccessor<CTyp>>{
 	
 	@NotNull
-	default <T extends Annotation> Optional<T> getAnnotation(Class<T> annotationClass){
-		return Optional.empty();
-	}
+	<T extends Annotation> Optional<T> getAnnotation(Class<T> annotationClass);
 	default boolean hasAnnotation(Class<? extends Annotation> annotationClass){
 		return getAnnotation(annotationClass).isPresent();
 	}
@@ -49,7 +47,7 @@ public interface FieldAccessor<CTyp extends IOInstance<CTyp>> extends Comparable
 	default void setBoolean(Struct.Pool<CTyp> ioPool, CTyp instance, boolean value){set(ioPool, instance, value);}
 	
 	default long getLong(Struct.Pool<CTyp> ioPool, CTyp instance)                  {return (long)get(ioPool, instance);}
-	default void setLong(CTyp instance, long value, Struct.Pool<CTyp> ioPool)      {set(ioPool, instance, value);}
+	default void setLong(Struct.Pool<CTyp> ioPool, CTyp instance, long value)      {set(ioPool, instance, value);}
 	
 	default int getInt(Struct.Pool<CTyp> ioPool, CTyp instance)                    {return (int)get(ioPool, instance);}
 	default void setInt(Struct.Pool<CTyp> ioPool, CTyp instance, int value)        {set(ioPool, instance, value);}
@@ -64,4 +62,8 @@ public interface FieldAccessor<CTyp extends IOInstance<CTyp>> extends Comparable
 	
 	
 	default void init(IOField<CTyp, ?> field){}
+	
+	default boolean canBeNull(){
+		return true;
+	}
 }

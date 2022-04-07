@@ -152,10 +152,8 @@ public final class TypeLink extends IOInstance<TypeLink>{
 			Objects.requireNonNull(db);
 			try{
 				return Class.forName(name, true, db.getTemplateLoader());
-			}catch(Throwable e1){
-				e1.printStackTrace();
-				System.exit(-1);
-				throw new RuntimeException(e1);
+			}catch(ClassNotFoundException ex){
+				throw new RuntimeException(ex);
 			}
 		}
 		
@@ -168,8 +166,8 @@ public final class TypeLink extends IOInstance<TypeLink>{
 	public TypeLink arg(int index){
 		return args[index];
 	}
-	public Struct<?> argAsStruct(int index){
-		return Struct.ofUnknown(arg(index).getTypeClass(null));
+	public Struct<?> argAsStruct(int index, IOTypeDB db){
+		return Struct.ofUnknown(arg(index).getTypeClass(db));
 	}
 	
 	@Override

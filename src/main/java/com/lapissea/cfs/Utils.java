@@ -260,4 +260,21 @@ public class Utils{
 		if(o instanceof IOInstance<?> i) return i.toShortString();
 		return TextUtil.toShortString(o);
 	}
+	
+	public static long read8(byte[] data, int off, int len){
+		final var lm1=len-1;
+		long      val=0;
+		for(int i=0;i<len;i++){
+			val|=(data[off+i]&255L)<<((lm1-i)*8);
+		}
+		return val;
+	}
+	
+	public static void write8(long v, byte[] writeBuffer, int off, int len){
+		final var lm1=len-1;
+		
+		for(int i=0;i<len;i++){
+			writeBuffer[off+i]=(byte)(v >>> ((lm1-i)*8));
+		}
+	}
 }

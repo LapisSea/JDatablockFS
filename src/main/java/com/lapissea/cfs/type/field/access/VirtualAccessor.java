@@ -1,28 +1,23 @@
 package com.lapissea.cfs.type.field.access;
 
 import com.lapissea.cfs.internal.Access;
-import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
+import com.lapissea.cfs.type.field.VirtualFieldDefinition.GetterFilter;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
 
 import java.lang.annotation.Annotation;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-public class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends AbstractFieldAccessor<CTyp>{
+public final class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends AbstractPrimitiveAccessor<CTyp>{
 	
 	private static final Function<IOInstance<?>, Struct.Pool<?>> GETTER;
-	
-	@SuppressWarnings("unchecked")
-	private static <T extends IOInstance<T>> Struct.Pool<T> getVirtualPool(T instance){return (Struct.Pool<T>)GETTER.apply(instance);}
 	
 	static{
 		try{
@@ -33,18 +28,41 @@ public class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends AbstractFiel
 		}
 	}
 	
-	private final VirtualFieldDefinition<CTyp, Object> type;
-	private final int                                  accessIndex;
-	private       List<FieldAccessor<CTyp>>            deps;
-	
-	public VirtualAccessor(Struct<CTyp> struct, VirtualFieldDefinition<CTyp, Object> type, int accessIndex){
-		super(struct, type.getName());
-		this.type=type;
-		this.accessIndex=accessIndex;
+	@SuppressWarnings("unchecked")
+	private static <T extends IOInstance<T>> Struct.Pool<T> getVirtualPool(T instance){
+		var pool=(Struct.Pool<T>)GETTER.apply(instance);
+		if(pool==null) throw new NullPointerException("Tried to access instance pool where there is none");
+		return pool;
 	}
 	
-	public int getAccessIndex(){
-		return accessIndex;
+	private final VirtualFieldDefinition<CTyp, Object> type;
+	private final GetterFilter<CTyp, Object>           filter;
+	private       List<FieldAccessor<CTyp>>            deps;
+	
+	private final int ptrIndex;
+	private final int primitiveOffset;
+	private final int primitiveSize;
+	
+	public VirtualAccessor(Struct<CTyp> struct, VirtualFieldDefinition<CTyp, Object> type, int ptrIndex, int primitiveOffset, int primitiveSize){
+		super(struct, type.getName(), type.getType());
+		this.type=type;
+		this.ptrIndex=ptrIndex;
+		this.primitiveOffset=primitiveOffset;
+		this.primitiveSize=primitiveSize;
+		
+		filter=type.getGetFilter();
+	}
+	
+	public int getPtrIndex(){
+		return ptrIndex;
+	}
+	
+	public int getPrimitiveOffset(){
+		return primitiveOffset;
+	}
+	
+	public int getPrimitiveSize(){
+		return primitiveSize;
 	}
 	
 	public VirtualFieldDefinition.StoragePool getStoragePool(){
@@ -63,114 +81,100 @@ public class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends AbstractFiel
 	}
 	
 	@Override
-	public Class<?> getType(){
-		return type.getType() instanceof Class<?> c?c:(Class<?>)((ParameterizedType)type.getType()).getRawType();
-	}
-	@Override
-	public Type getGenericType(GenericContext genericContext){
-		return type.getType();
-	}
-	
-	@Override
 	public void init(IOField<CTyp, ?> field){
 		if(type.getGetFilter()!=null){
 			deps=getDeclaringStruct()
-				.getFields()
-				.stream()
-				.filter(f->f.getDependencies().contains(field))
-				.map(IOField::getAccessor)
-				.collect(Collectors.toList());
+				     .getFields()
+				     .stream()
+				     .filter(f->f.getDependencies().contains(field))
+				     .map(IOField::getAccessor)
+				     .collect(Collectors.toList());
 		}
 	}
 	
+	@SuppressWarnings("unchecked")
 	@Override
-	public Object get(Struct.Pool<CTyp> ioPool, CTyp instance){
-		var rawVal=switch(getStoragePool()){
-			case INSTANCE -> getVirtualPool(instance).get(this);
-			case IO -> {
-				if(ioPool==null) yield null;
-				yield ioPool.get(this);
-			}
-			case NONE -> null;
-		};
-		var filter=type.getGetFilter();
-		if(filter==null){
-			return rawVal;
-		}
+	protected long getExactLong(Struct.Pool<CTyp> ioPool, CTyp instance){
+		long rawVal=getTargetPool(ioPool, instance).getLong(this);
+		if(filter==null) return rawVal;
+		return ((GetterFilter.L<CTyp>)(Object)filter).filterPrimitive(ioPool, instance, deps, rawVal);
+	}
+	@Override
+	protected void setExactLong(Struct.Pool<CTyp> ioPool, CTyp instance, long value){
+		getTargetPool(ioPool, instance).setLong(this, value);
+	}
+	
+	@SuppressWarnings("unchecked")
+	@Override
+	protected int getExactInt(Struct.Pool<CTyp> ioPool, CTyp instance){
+		int rawVal=getTargetPool(ioPool, instance).getInt(this);
+		if(filter==null) return rawVal;
+		return ((GetterFilter.I<CTyp>)(Object)filter).filterPrimitive(ioPool, instance, deps, rawVal);
+	}
+	@Override
+	protected void setExactInt(Struct.Pool<CTyp> ioPool, CTyp instance, int value){
+		getTargetPool(ioPool, instance).setInt(this, value);
+	}
+	
+	@Override
+	protected short getExactShort(Struct.Pool<CTyp> ioPool, CTyp instance){return (short)getExactObject(ioPool, instance);}
+	@Override
+	protected void setExactShort(Struct.Pool<CTyp> ioPool, CTyp instance, short value){setExactObject(ioPool, instance, value);}
+	
+	@Override
+	protected byte getExactByte(Struct.Pool<CTyp> ioPool, CTyp instance){return (byte)getExactObject(ioPool, instance);}
+	@Override
+	protected void setExactByte(Struct.Pool<CTyp> ioPool, CTyp instance, byte value){setExactObject(ioPool, instance, value);}
+	
+	@Override
+	protected double getExactDouble(Struct.Pool<CTyp> ioPool, CTyp instance){return (double)getExactObject(ioPool, instance);}
+	@Override
+	protected void setExactDouble(Struct.Pool<CTyp> ioPool, CTyp instance, double value){setExactObject(ioPool, instance, value);}
+	
+	@Override
+	protected float getExactFloat(Struct.Pool<CTyp> ioPool, CTyp instance){return (float)getExactObject(ioPool, instance);}
+	@Override
+	protected void setExactFloat(Struct.Pool<CTyp> ioPool, CTyp instance, float value){setExactObject(ioPool, instance, value);}
+	
+	@Override
+	protected boolean getExactBoolean(Struct.Pool<CTyp> ioPool, CTyp instance){return (boolean)getExactObject(ioPool, instance);}
+	@Override
+	protected void setExactBoolean(Struct.Pool<CTyp> ioPool, CTyp instance, boolean value){setExactObject(ioPool, instance, value);}
+	
+	@Override
+	protected Object getExactObject(Struct.Pool<CTyp> ioPool, CTyp instance){
+		var pool  =getTargetPool(ioPool, instance, true);
+		var rawVal=pool==null?null:pool.get(this);
+		if(filter==null) return rawVal;
 		return filter.filter(ioPool, instance, deps, rawVal);
 	}
-	
 	@Override
-	public void set(Struct.Pool<CTyp> ioPool, CTyp instance, Object value){
-		switch(getStoragePool()){
-			case INSTANCE -> getVirtualPool(instance).set(this, value);
+	protected void setExactObject(Struct.Pool<CTyp> ioPool, CTyp instance, Object value){
+		getTargetPool(ioPool, instance).set(this, value);
+	}
+	
+	private Struct.Pool<CTyp> getTargetPool(Struct.Pool<CTyp> ioPool, CTyp instance){
+		return getTargetPool(ioPool, instance, false);
+	}
+	private Struct.Pool<CTyp> getTargetPool(Struct.Pool<CTyp> ioPool, CTyp instance, boolean retNull){
+		return switch(getStoragePool()){
+			case INSTANCE -> getVirtualPool(instance);
 			case IO -> {
 				if(ioPool!=null){
-					ioPool.set(this, value);
+					yield ioPool;
 				}else{
-					throw new IllegalStateException(this+" is an IO pool accessor. IO pool must be bound before setting");
+					if(retNull) yield null;
+					throw new IllegalStateException(this+" is an IO pool accessor. IO pool must be provided for access");
 				}
 			}
-			case NONE -> {}
-		}
-		
-	}
-	
-	@Override
-	public double getDouble(Struct.Pool<CTyp> ioPool, CTyp instance){
-		return (double)get(ioPool, instance);
-	}
-	@Override
-	public void setDouble(Struct.Pool<CTyp> ioPool, CTyp instance, double value){
-		set(ioPool, instance, value);
-	}
-	@Override
-	public float getFloat(Struct.Pool<CTyp> ioPool, CTyp instance){
-		return (float)get(ioPool, instance);
-	}
-	@Override
-	public void setFloat(Struct.Pool<CTyp> ioPool, CTyp instance, float value){
-		set(ioPool, instance, value);
-	}
-	@Override
-	public byte getByte(Struct.Pool<CTyp> ioPool, CTyp instance){
-		return (byte)get(ioPool, instance);
-	}
-	@Override
-	public void setByte(Struct.Pool<CTyp> ioPool, CTyp instance, byte value){
-		set(ioPool, instance, value);
-	}
-	@Override
-	public boolean getBoolean(Struct.Pool<CTyp> ioPool, CTyp instance){
-		return (boolean)get(ioPool, instance);
-	}
-	@Override
-	public void setBoolean(Struct.Pool<CTyp> ioPool, CTyp instance, boolean value){
-		set(ioPool, instance, value);
-	}
-	@Override
-	public long getLong(Struct.Pool<CTyp> ioPool, CTyp instance){
-		var val=get(ioPool, instance);
-		if(val instanceof Long l) return l;
-		if(val instanceof Integer l) return l;
-		throw new ClassCastException(val.getClass()+" is not long");
-	}
-	@Override
-	public void setLong(CTyp instance, long value, Struct.Pool<CTyp> ioPool){
-		set(ioPool, instance, value);
-	}
-	@Override
-	public int getInt(Struct.Pool<CTyp> ioPool, CTyp instance){
-		return (int)get(ioPool, instance);
-	}
-	@Override
-	public void setInt(Struct.Pool<CTyp> ioPool, CTyp instance, int value){
-		set(ioPool, instance, value);
+		};
 	}
 	
 	@Override
 	protected String strName(){
-		var index=getAccessIndex();
-		return getStoragePool().shortName+(index==-1?"":index)+"("+getName()+")";
+		String index;
+		if(getPtrIndex()!=-1) index=getPtrIndex()+"*";
+		else index=primitiveOffset+"P";
+		return getStoragePool().shortName+index+"("+getName()+")";
 	}
 }

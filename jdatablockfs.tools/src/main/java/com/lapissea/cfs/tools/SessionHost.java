@@ -89,7 +89,10 @@ public class SessionHost implements DataLogger{
 	public Session getSession(String name){
 		if(destroyed) throw new IllegalStateException();
 		
-		var ses=sessions.computeIfAbsent(name, HostedSession::new);
+		HostedSession ses;
+		synchronized(sessions){
+			ses=sessions.computeIfAbsent(name, HostedSession::new);
+		}
 		setActiveSession(ses);
 		return ses;
 	}
@@ -101,60 +104,69 @@ public class SessionHost implements DataLogger{
 		if(!sessionMarkedForDeletion) return;
 		sessionMarkedForDeletion=false;
 		
-		sessions.values().removeIf(s->s.markForDeletion);
-		activeSession.get().filter(s->s.markForDeletion).flatMap(s->sessions.values().stream().findAny()).ifPresent(this::setActiveSession);
+		synchronized(sessions){
+			sessions.values().removeIf(s->s.markForDeletion);
+			activeSession.get().filter(s->s.markForDeletion).flatMap(s->sessions.values().stream().findAny()).ifPresent(this::setActiveSession);
+		}
 	}
 	
 	@Override
 	public void destroy(){
 		destroyed=true;
-		sessions.values().forEach(Session::finish);
+		synchronized(sessions){
+			sessions.values().forEach(Session::finish);
+			sessions.clear();
+		}
 		activeSession.set(Optional.empty());
-		sessions.clear();
 	}
 	
 	public void prevSession(){
-		if(sessions.size()<=1) return;
 		
 		HostedSession ses;
-		find:
-		{
-			HostedSession last=null;
-			for(var value : sessions.values()){
-				ses=last;
-				last=value;
-				var as=activeSession.get();
-				if(as.isPresent()&&value==as.get()){
-					if(ses==null){
-						for(var session : sessions.values()){
-							last=session;
+		synchronized(sessions){
+			if(sessions.size()<=1) return;
+			
+			find:
+			{
+				HostedSession last=null;
+				for(var value : sessions.values()){
+					ses=last;
+					last=value;
+					var as=activeSession.get();
+					if(as.isPresent()&&value==as.get()){
+						if(ses==null){
+							for(var session : sessions.values()){
+								last=session;
+							}
+							ses=last;
 						}
-						ses=last;
+						break find;
 					}
-					break find;
 				}
+				ses=sessions.values().iterator().next();
 			}
-			ses=sessions.values().iterator().next();
 		}
 		setActiveSession(ses);
 		
 	}
 	public void nextSession(){
-		if(sessions.size()<=1) return;
-		
-		boolean       found=false;
 		HostedSession ses;
-		find:
-		{
-			for(var value : sessions.values()){
-				if(found){
-					ses=value;
-					break find;
+		synchronized(sessions){
+			if(sessions.size()<=1) return;
+			
+			boolean found=false;
+			find:
+			{
+				for(var value : sessions.values()){
+					if(found){
+						ses=value;
+						break find;
+					}
+					var as=activeSession.get();
+					found=as.isPresent()&&value==as.get();
 				}
-				var as=activeSession.get();
-				found=as.isPresent()&&value==as.get();
+				ses=sessions.values().iterator().next();
 			}
-			ses=sessions.values().iterator().next();
 		}
 		setActiveSession(ses);
 	}
