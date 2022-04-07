@@ -1,21 +1,117 @@
 package com.lapissea.cfs.objects;
 
+import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.ChunkChainIO;
 import com.lapissea.cfs.io.OffsetIO;
 import com.lapissea.cfs.io.RandomIO;
+import com.lapissea.cfs.io.content.ContentReader;
+import com.lapissea.cfs.io.content.ContentWriter;
+import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
+import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
+import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.cfs.type.field.fields.reflection.BitFieldMerger;
+import com.lapissea.util.ShouldNeverHappenError;
+import com.lapissea.util.UtilL;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Objects;
 
 public final class Reference extends IOInstance<Reference>{
 	
 	@SuppressWarnings("unchecked")
 	public static final Struct<Reference> STRUCT=(Struct<Reference>)Struct.thisClass();
+	
+	static{
+		boolean useOptimized=!UtilL.sysPropertyByClass(Chunk.class, "DO_NOT_USE_OPTIMIZED_PIPE", false, Boolean::parseBoolean);
+		if(useOptimized){
+			ContiguousStructPipe.registerSpecialImpl(STRUCT, ()->new ContiguousStructPipe<>(STRUCT){
+				@Override
+				protected List<IOField<Reference, ?>> initFields(){
+					var f=super.initFields();
+					if(
+						f.get(0) instanceof BitFieldMerger<?> m&&m.fieldGroup().stream().map(IOField::getName).toList().equals(List.of("offsetSize", "ptrSize"))&&
+						f.get(1).getName().equals("offset")&&
+						f.get(2).getName().equals("ptr")
+					){
+						return f;
+					}
+					
+					throw new ShouldNeverHappenError(f.toString());
+				}
+				@Override
+				protected void doWrite(DataProvider provider, ContentWriter dest, Reference instance) throws IOException{
+					
+					var off=instance.getOffset();
+					var ptr=instance.getPtr();
+					
+					var offsetSize=NumberSize.bySize(off);
+					var ptrSize   =NumberSize.bySize(ptr);
+					
+					var flags=offsetSize.ordinal()|(ptrSize.ordinal()<<3)|(0b11<<6);
+					
+					dest.writeInt1(flags);
+					offsetSize.write(dest, off);
+					ptrSize.write(dest, ptr);
+				}
+				@Override
+				protected Reference doRead(Struct.Pool<Reference> ioPool, DataProvider provider, ContentReader src, Reference instance, GenericContext genericContext) throws IOException{
+					int flags     =src.readInt1()&0xFF;
+					var offsetSize=NumberSize.ordinal(flags&0b111);
+					var ptrSize   =NumberSize.ordinal(flags&(0b111<<3));
+					if((flags&(0b11<<6))!=(0b11<<6)){
+						throw new IOException();
+					}
+					
+					var off=offsetSize.read(src);
+					var ptr=ChunkPointer.of(ptrSize.read(src));
+					
+					instance.offset=off;
+					instance.ptr=ptr;
+					return instance;
+				}
+			});
+			FixedContiguousStructPipe.registerSpecialImpl(STRUCT, ()->new FixedContiguousStructPipe<>(STRUCT){
+				@Override
+				protected List<IOField<Reference, ?>> initFields(){
+					var f=super.initFields();
+					if(
+						f.get(0).getName().equals("offset")&&
+						f.get(1).getName().equals("ptr")
+					){
+						return f;
+					}
+					
+					throw new ShouldNeverHappenError(f.toString());
+				}
+				@Override
+				protected void doWrite(DataProvider provider, ContentWriter dest, Reference instance) throws IOException{
+					
+					var off=instance.getOffset();
+					var ptr=instance.getPtr();
+					
+					dest.writeInt8(off);
+					dest.writeInt8(ptr.getValue());
+				}
+				@Override
+				protected Reference doRead(Struct.Pool<Reference> ioPool, DataProvider provider, ContentReader src, Reference instance, GenericContext genericContext) throws IOException{
+					var off=src.readInt8();
+					var ptr=ChunkPointer.of(src.readInt8());
+					
+					instance.offset=off;
+					instance.ptr=ptr;
+					
+					return instance;
+				}
+			});
+		}
+	}
 	
 	private static final class IOContext implements RandomIO.Creator{
 		private final Reference    ref;

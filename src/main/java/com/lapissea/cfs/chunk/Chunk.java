@@ -47,7 +47,7 @@ import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 @SuppressWarnings("unused")
 public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, DataProvider.Holder, Comparable<Chunk>{
 	
-	private static class OptimizedChunkPipe extends StructPipe<Chunk>{
+	private static class OptimizedChunkPipe extends ContiguousStructPipe<Chunk>{
 		
 		static{
 			var check="bodyNumSize + nextSize Size{1 byte} capacity Size{0-8 bytes} size Size{0-8 bytes} nextPtr Size{0-8 bytes} ";
@@ -133,11 +133,17 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 	}
 	
 	
-	private static final Struct<Chunk>     STRUCT=Struct.of(Chunk.class);
-	public static final  StructPipe<Chunk> PIPE  =
-		UtilL.sysPropertyByClass(Chunk.class, "DO_NOT_USE_OPTIMIZED_PIPE", false, Boolean::parseBoolean)?
-		ContiguousStructPipe.of(STRUCT):
-		new OptimizedChunkPipe();
+	private static final Struct<Chunk>     STRUCT;
+	public static final  StructPipe<Chunk> PIPE;
+	
+	static{
+		STRUCT=Struct.of(Chunk.class);
+		if(!UtilL.sysPropertyByClass(Chunk.class, "DO_NOT_USE_OPTIMIZED_PIPE", false, Boolean::parseBoolean)){
+			ContiguousStructPipe.registerSpecialImpl(STRUCT, OptimizedChunkPipe::new);
+		}
+		PIPE=ContiguousStructPipe.of(STRUCT);
+	}
+	
 	
 	private static final int  CHECK_BYTE_OFF;
 	private static final byte CHECK_BIT_MASK;
