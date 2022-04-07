@@ -101,10 +101,15 @@ public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 			}
 			@Override
 			public Object get(VirtualAccessor<T> accessor){
+				if(accessor.getPtrIndex()==-1){
+					var typ=accessor.getType();
+					if(typ==long.class) return getLong(accessor);
+					if(typ==int.class) return getInt(accessor);
+					throw new NotImplementedException(typ.getName());
+				}
 				int index=getPtrIndex(accessor);
 				if(pool==null) return null;
 				return pool[index];
-				
 			}
 			
 			

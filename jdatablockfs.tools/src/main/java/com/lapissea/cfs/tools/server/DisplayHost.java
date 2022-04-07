@@ -215,7 +215,13 @@ public class DisplayHost{
 		
 		int sesCounter=1;
 		while(true){
-			var ses=NegotiatedSession.negotiate(server);
+			NegotiatedSession ses;
+			try{
+				ses=NegotiatedSession.negotiate(server);
+			}catch(Throwable e){
+				e.printStackTrace();
+				continue;
+			}
 			
 			new Thread(()->{
 				try(ses;var client=ses.open()){
