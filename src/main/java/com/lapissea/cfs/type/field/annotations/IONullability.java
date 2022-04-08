@@ -27,7 +27,7 @@ public @interface IONullability{
 			public void validate(FieldAccessor<?> field, Elements annotation){
 				var typ=field.getType();
 				if(!typ.isArray()) throw new MalformedStructLayout(Elements.class.getName()+" can be used only on arrays");
-				if(UtilL.instanceOf(typ.componentType(), IOInstance.class)){
+				if(IOInstance.isInstance(typ.componentType())){
 					throw new MalformedStructLayout(Elements.class.getName()+" array must be of "+IOInstance.class.getName()+" type");
 				}
 			}
@@ -91,8 +91,8 @@ public @interface IONullability{
 		
 		private <T extends IOInstance<T>> boolean canHaveNullabilityField(FieldAccessor<T> field){
 			if(field.hasAnnotation(IOValue.Reference.class)) return false;
-			if(UtilL.instanceOf(field.getType(), IOInstance.class)){
-				return !UtilL.instanceOf(field.getType(), IOInstance.Unmanaged.class);
+			if(IOInstance.isInstance(field.getType())){
+				return IOInstance.isManaged(field.getType());
 			}
 			return UtilL.instanceOf(field.getType(), String.class)||field.hasAnnotation(IOType.Dynamic.class);
 		}

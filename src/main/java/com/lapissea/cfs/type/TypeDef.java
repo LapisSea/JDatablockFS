@@ -8,7 +8,6 @@ import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.ArrayViewList;
 import com.lapissea.util.NotNull;
-import com.lapissea.util.UtilL;
 
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
@@ -86,8 +85,8 @@ public class TypeDef extends IOInstance<TypeDef>{
 	
 	public TypeDef(@NotNull Class<?> type){
 		Objects.requireNonNull(type);
-		ioInstance=UtilL.instanceOf(type, IOInstance.class);
-		unmanaged=UtilL.instanceOf(type, IOInstance.Unmanaged.class);
+		ioInstance=IOInstance.isInstance(type);
+		unmanaged=IOInstance.isUnmanaged(type);
 		if(ioInstance){
 			if(!Modifier.isAbstract(type.getModifiers())){
 				fields=Struct.ofUnknown(type).getFields().stream().map(FieldDef::new).toArray(FieldDef[]::new);

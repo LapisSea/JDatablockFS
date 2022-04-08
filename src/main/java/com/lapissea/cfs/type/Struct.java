@@ -203,7 +203,7 @@ public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 		public static Unmanaged<?> ofUnknown(@NotNull Class<?> instanceClass){
 			Objects.requireNonNull(instanceClass);
 			
-			if(!UtilL.instanceOf(instanceClass, IOInstance.class)){
+			if(!IOInstance.isInstance(instanceClass)){
 				throw new IllegalArgumentException(instanceClass.getName()+" is not an "+IOInstance.class.getSimpleName());
 			}
 			
@@ -297,7 +297,7 @@ public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 	public static Struct<?> ofUnknown(@NotNull Class<?> instanceClass){
 		Objects.requireNonNull(instanceClass);
 		
-		if(!UtilL.instanceOf(instanceClass, IOInstance.class)){
+		if(!IOInstance.isInstance(instanceClass)){
 			throw new IllegalArgumentException(instanceClass.getName()+" is not an "+IOInstance.class.getSimpleName());
 		}
 		
@@ -311,12 +311,12 @@ public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 		Struct<T> cached=getCached(instanceClass);
 		if(cached!=null) return cached;
 		
-		if(UtilL.instanceOf(instanceClass, IOInstance.Unmanaged.class)){
+		if(IOInstance.isUnmanaged(instanceClass)){
 			return (Struct<T>)Unmanaged.ofUnknown(instanceClass);
 		}
 		return compile(instanceClass, t->{
-			if(!UtilL.instanceOf(t, IOInstance.class)) throw new ClassCastException(t.getName()+" is not an "+IOInstance.class.getSimpleName());
-			if(UtilL.instanceOf(t, IOInstance.Unmanaged.class)) throw new ClassCastException(t.getName()+" is unmanaged!");
+			if(!IOInstance.isInstance(t)) throw new ClassCastException(t.getName()+" is not an "+IOInstance.class.getSimpleName());
+			if(IOInstance.isUnmanaged(t)) throw new ClassCastException(t.getName()+" is unmanaged!");
 			return new Struct<>(t);
 		});
 	}

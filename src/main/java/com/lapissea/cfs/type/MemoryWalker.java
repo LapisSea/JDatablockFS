@@ -6,7 +6,6 @@ import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.field.IOField;
-import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
@@ -285,7 +284,7 @@ public class MemoryWalker{
 						var typ=type;
 						if(typ.isArray()){
 							var component=typ.componentType();
-							if(UtilL.instanceOf(component, IOInstance.class)){
+							if(IOInstance.isInstance(component)){
 								if(!Struct.of((Class)typ).getCanHavePointers()){
 									continue;
 								}
@@ -339,7 +338,7 @@ public class MemoryWalker{
 						if(typ==String.class){
 							continue;
 						}
-						if(field.getAccessor().hasAnnotation(IOType.Dynamic.class)){
+						if(field.typeFlag(IOField.DYNAMIC_FLAG)){
 							var inst=field.get(ioPool, instance);
 							if(inst==null) continue;
 							

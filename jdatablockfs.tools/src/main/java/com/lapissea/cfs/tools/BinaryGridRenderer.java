@@ -1307,7 +1307,7 @@ public class BinaryGridRenderer{
 									typ=inst.getClass();
 								}
 							}
-							if(UtilL.instanceOf(typ, IOInstance.class)){
+							if(IOInstance.isInstance(typ)){
 								var inst=(IOInstance<?>)field.get(ioPool, instance);
 								if(inst!=null){
 									annotateStruct(ctx, (T)inst, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), inst.getThisStruct()), generics(instance, parentGenerics), annotate);

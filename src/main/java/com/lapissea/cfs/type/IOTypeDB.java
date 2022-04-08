@@ -6,7 +6,6 @@ import com.lapissea.cfs.objects.collections.HashIOMap;
 import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.TextUtil;
-import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.lang.ref.WeakReference;
@@ -150,7 +149,7 @@ public sealed interface IOTypeDB{
 					      TypeDef.class,
 					      PersistentDB.class,
 					      IOInstance.class
-				      ).flatMap(csrc->Stream.concat(Stream.of(csrc), Arrays.stream(csrc.getDeclaredClasses()).filter(c->UtilL.instanceOf(c, IOInstance.class))))
+				      ).flatMap(csrc->Stream.concat(Stream.of(csrc), Arrays.stream(csrc.getDeclaredClasses()).filter(IOInstance::isInstance)))
 				      .forEach(c->{
 					      try{
 						      BUILT_IN.toID(c, true);

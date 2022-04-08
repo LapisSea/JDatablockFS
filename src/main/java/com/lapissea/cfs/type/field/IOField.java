@@ -17,7 +17,10 @@ import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
-import com.lapissea.util.*;
+import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.NotNull;
+import com.lapissea.util.Nullable;
+import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
 import java.lang.reflect.Array;
@@ -266,6 +269,9 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		lateDataInitialized=true;
 	}
 	
+	public boolean typeFlag(int flag){
+		return (typeFlags()&flag)==flag;
+	}
 	public int typeFlags(){
 		if(typeFlags!=-1){
 			return typeFlags;
@@ -443,7 +449,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 			if(o1==null&&o2==null) return true;
 			var acc=getAccessor();
 			
-			if(UtilL.instanceOf(acc.getType(), IOInstance.class)){
+			if(IOInstance.isInstance(acc.getType())){
 				var typ=Struct.ofUnknown(acc.getType());
 				
 				if(o1==null) o1=(ValueType)typ.requireEmptyConstructor().get();

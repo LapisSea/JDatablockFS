@@ -250,6 +250,9 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>> implements Clone
 		return isManaged(type.getTypeClass(null));
 	}
 	
+	public static boolean isUnmanaged(Class<?> type){
+		return UtilL.instanceOf(type, IOInstance.Unmanaged.class);
+	}
 	public static boolean isManaged(Class<?> type){
 		var isInstance =isInstance(type);
 		var isUnmanaged=UtilL.instanceOf(type, IOInstance.Unmanaged.class);
@@ -283,7 +286,7 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>> implements Clone
 				
 				arr=arr.clone();
 				
-				if(UtilL.instanceOf(typ.componentType(), IOInstance.class)){
+				if(IOInstance.isInstance(typ.componentType())){
 					var iArr=(IOInstance<?>[])arr;
 					for(int i=0;i<iArr.length;i++){
 						var el=iArr[i];
@@ -295,8 +298,8 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>> implements Clone
 				continue;
 			}
 			
-			if(!UtilL.instanceOf(typ, IOInstance.class)) continue;
-			if(UtilL.instanceOf(typ, IOInstance.Unmanaged.class)) continue;
+			if(!IOInstance.isInstance(typ)) continue;
+			if(IOInstance.isUnmanaged(typ)) continue;
 			var instField=(IOField<SELF, IOInstance<?>>)field;
 			
 			var val=instField.get(null, (SELF)this);

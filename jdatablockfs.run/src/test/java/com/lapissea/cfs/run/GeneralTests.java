@@ -382,19 +382,19 @@ public class GeneralTests{
 	@SuppressWarnings("unchecked")
 	private static <T extends IOInstance<T>> Stream<Struct<T>> types(){
 		return (Stream<Struct<T>>)(Object)Stream
-			.of(
-				Reference.class,
-				AutoText.class,
-				Cluster.class,
-				ContiguousIOList.class,
-				LinkedIOList.class,
-				HashIOMap.class,
-				BooleanContainer.class,
-				IntContainer.class,
-				LongContainer.class,
-				Dummy.class
-			).flatMap(p->Stream.concat(Stream.of(p), Arrays.stream(p.getDeclaredClasses())))
-			.filter(c->UtilL.instanceOf(c, IOInstance.class))
-			.map(Struct::ofUnknown);
+			                                  .of(
+				                                  Reference.class,
+				                                  AutoText.class,
+				                                  Cluster.class,
+				                                  ContiguousIOList.class,
+				                                  LinkedIOList.class,
+				                                  HashIOMap.class,
+				                                  BooleanContainer.class,
+				                                  IntContainer.class,
+				                                  LongContainer.class,
+				                                  Dummy.class
+			                                  ).flatMap(p->Stream.concat(Stream.of(p), Arrays.stream(p.getDeclaredClasses())))
+			                                  .filter(IOInstance::isInstance)
+			                                  .map(Struct::ofUnknown);
 	}
 }
