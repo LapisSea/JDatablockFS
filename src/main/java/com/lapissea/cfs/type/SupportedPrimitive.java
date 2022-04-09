@@ -2,17 +2,19 @@ package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.type.field.SizeDescriptor;
 
+import java.lang.reflect.Array;
 import java.lang.reflect.Type;
 import java.util.Optional;
+import java.util.function.Supplier;
 
-public enum SupportedPrimitive{
-	DOUBLE(double.class, Double.class, new RuntimeType.Lambda<>(double.class, ()->0D), SizeDescriptor.Fixed.of(8)),
-	FLOAT(float.class, Float.class, new RuntimeType.Lambda<>(Float.class, ()->0F), SizeDescriptor.Fixed.of(4)),
-	LONG(long.class, Long.class, new RuntimeType.Lambda<>(Long.class, ()->0L), SizeDescriptor.Fixed.of(8)),
-	INT(int.class, Integer.class, new RuntimeType.Lambda<>(Integer.class, ()->0), SizeDescriptor.Fixed.of(4)),
-	SHORT(short.class, Short.class, new RuntimeType.Lambda<>(Short.class, ()->(short)0), SizeDescriptor.Fixed.of(2)),
-	BYTE(byte.class, Byte.class, new RuntimeType.Lambda<>(Byte.class, ()->(byte)0), SizeDescriptor.Fixed.of(1)),
-	BOOLEAN(boolean.class, Boolean.class, new RuntimeType.Lambda<>(Boolean.class, ()->false), SizeDescriptor.Fixed.of(WordSpace.BIT, 1));
+public enum SupportedPrimitive implements RuntimeType<Object>{
+	DOUBLE(double.class, Double.class, SizeDescriptor.Fixed.of(8)),
+	FLOAT(float.class, Float.class, SizeDescriptor.Fixed.of(4)),
+	LONG(long.class, Long.class, SizeDescriptor.Fixed.of(8)),
+	INT(int.class, Integer.class, SizeDescriptor.Fixed.of(4)),
+	SHORT(short.class, Short.class, SizeDescriptor.Fixed.of(2)),
+	BYTE(byte.class, Byte.class, SizeDescriptor.Fixed.of(1)),
+	BOOLEAN(boolean.class, Boolean.class, SizeDescriptor.Fixed.of(WordSpace.BIT, 1));
 	
 	private static final SupportedPrimitive[] UNIVERSE=values();
 	
@@ -52,17 +54,18 @@ public enum SupportedPrimitive{
 		return false;
 	}
 	
-	public final Class<?>       primitive;
-	public final Class<?>       wrapper;
-	public final RuntimeType<?> runtimeType;
+	public final Class<?> primitive;
+	public final Class<?> wrapper;
 	
 	public final SizeDescriptor.Fixed<?> maxSize;
 	
-	SupportedPrimitive(Class<?> primitive, Class<?> wrapper, RuntimeType<?> runtimeType, SizeDescriptor.Fixed<?> maxSize){
+	private final Object defVal;
+	
+	SupportedPrimitive(Class<?> primitive, Class<?> wrapper, SizeDescriptor.Fixed<?> maxSize){
 		this.primitive=primitive;
 		this.wrapper=wrapper;
-		this.runtimeType=runtimeType;
 		this.maxSize=maxSize;
+		this.defVal=Array.get(Array.newInstance(primitive, 1), 0);
 	}
 	
 	public boolean isStrict(Class<?> clazz){
@@ -73,4 +76,16 @@ public enum SupportedPrimitive{
 	}
 	
 	
+	@Override
+	public boolean getCanHavePointers(){
+		return false;
+	}
+	@Override
+	public Supplier<Object> requireEmptyConstructor(){
+		return ()->defVal;
+	}
+	@Override
+	public Class<Object> getType(){
+		return (Class<Object>)primitive;
+	}
 }
