@@ -104,9 +104,9 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		}
 		
 		@Override
-		public long read8(int len) throws IOException{
+		public long readWord(int len) throws IOException{
 			if(transactionOpen){//TODO: Implement transaction read8
-				return RandomIO.super.read8(len);
+				return RandomIO.super.readWord(len);
 			}
 			
 			int remaining=used-pos;

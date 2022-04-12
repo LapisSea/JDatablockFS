@@ -41,7 +41,7 @@ public interface ContentReader extends AutoCloseable{
 	
 	int read(byte[] b, int off, int len) throws IOException;
 	
-	default long read8(final int len) throws IOException{
+	default long readWord(final int len) throws IOException{
 		byte[] readBuffer=new byte[8];
 		readFully(readBuffer, 0, len);
 		
@@ -125,7 +125,7 @@ public interface ContentReader extends AutoCloseable{
 	}
 	
 	default char readChar2() throws IOException{
-		return (char)read8(2);
+		return (char)readWord(2);
 	}
 	
 	private char readChar2(byte[] readBuffer, int offset){
@@ -186,7 +186,7 @@ public interface ContentReader extends AutoCloseable{
 	}
 	
 	default short readInt2() throws IOException{
-		return (short)read8(2);
+		return (short)readWord(2);
 	}
 	private short readInt2(byte[] readBuffer, int offset){
 		return (short)(((readBuffer[offset+0]&255)<<8)+
@@ -199,7 +199,7 @@ public interface ContentReader extends AutoCloseable{
 	}
 	
 	default int readUnsignedInt2() throws IOException{
-		return (int)read8(2);
+		return (int)readWord(2);
 	}
 	private int readUnsignedInt2(byte[] readBuffer, int offset){
 		return ((readBuffer[offset+0]&255)<<8)+
@@ -212,7 +212,7 @@ public interface ContentReader extends AutoCloseable{
 	}
 	
 	default int readUnsignedInt3() throws IOException{
-		return (int)read8(3);
+		return (int)readWord(3);
 	}
 	private int readUnsignedInt3(byte[] readBuffer, int offset){
 		return (((readBuffer[offset+0]&255)<<16)+
@@ -226,7 +226,7 @@ public interface ContentReader extends AutoCloseable{
 	}
 	
 	default long readUnsignedInt4() throws IOException{
-		return read8(4);
+		return readWord(4);
 	}
 	default long readUnsignedInt4(byte[] readBuffer, int offset){
 		return readInt4(readBuffer, offset)&0xFFFFFFFFL;
@@ -238,7 +238,7 @@ public interface ContentReader extends AutoCloseable{
 	}
 	
 	default int readInt4() throws IOException{
-		return (int)read8(4);
+		return (int)readWord(4);
 	}
 	private int readInt4(byte[] readBuffer, int offset){
 		return (((readBuffer[offset+0]&255)<<24)+
@@ -253,7 +253,7 @@ public interface ContentReader extends AutoCloseable{
 	}
 	
 	default long readUnsignedInt5() throws IOException{
-		return read8(5);
+		return readWord(5);
 	}
 	private long readUnsignedInt5(byte[] readBuffer, int offset){
 		return (((long)(readBuffer[offset+0]&255)<<32)+
@@ -269,7 +269,7 @@ public interface ContentReader extends AutoCloseable{
 	}
 	
 	default long readUnsignedInt6() throws IOException{
-		return read8(6);
+		return readWord(6);
 	}
 	private long readUnsignedInt6(byte[] readBuffer, int offset){
 		return (((long)(readBuffer[offset+0]&255)<<40)+
@@ -285,7 +285,7 @@ public interface ContentReader extends AutoCloseable{
 	}
 	
 	default long readInt8() throws IOException{
-		return read8(8);
+		return readWord(8);
 	}
 	private long readInt8(byte[] readBuffer, int offset){
 		return (((long)readBuffer[offset+0]<<56)+
@@ -346,7 +346,7 @@ public interface ContentReader extends AutoCloseable{
 	}
 	
 	default float readFloat4() throws IOException{
-		return Float.intBitsToFloat((int)read8(4));
+		return Float.intBitsToFloat((int)readWord(4));
 	}
 	default float[] readFloats4(int count) throws IOException{
 		var buff=new float[count];
@@ -366,7 +366,7 @@ public interface ContentReader extends AutoCloseable{
 	}
 	
 	default double readFloat8() throws IOException{
-		return Double.longBitsToDouble(read8(4));
+		return Double.longBitsToDouble(readWord(4));
 	}
 	default double[] readFloats8(int count) throws IOException{
 		var buff=new double[count];

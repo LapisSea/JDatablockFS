@@ -79,8 +79,8 @@ public final class OffsetIO implements RandomIO{
 	}
 	
 	@Override
-	public long read8(int len) throws IOException{
-		return parent.read8(len);
+	public long readWord(int len) throws IOException{
+		return parent.readWord(len);
 	}
 	
 	@Override

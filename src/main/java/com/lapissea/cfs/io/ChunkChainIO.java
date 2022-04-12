@@ -251,7 +251,7 @@ public final class ChunkChainIO implements RandomIO{
 	}
 	
 	@Override
-	public long read8(int len) throws IOException{
+	public long readWord(int len) throws IOException{
 		if(len==0) return 0;
 		
 		long val=0;
@@ -264,7 +264,7 @@ public final class ChunkChainIO implements RandomIO{
 			
 			int toRead=(int)Math.min(toReadReamining, remaining);
 			toReadReamining-=toRead;
-			val|=syncedSource().read8(toRead)<<(toReadReamining*8);
+			val|=syncedSource().readWord(toRead)<<(toReadReamining*8);
 			advanceCursorBy(toRead);
 		}
 		
