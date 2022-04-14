@@ -173,7 +173,7 @@ public class MemoryWalker{
 				final long size;
 				var        sizeDesc=field.getSizeDescriptor();
 				try{
-					size=sizeDesc.calcUnknown(ioPool, cluster, instance);
+					size=sizeDesc.calcUnknown(ioPool, cluster, instance, WordSpace.BYTE);
 				}catch(Throwable e){
 					throw e;
 				}

@@ -59,7 +59,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 			sizeDescriptor=SizeDescriptor.Unknown.of(
 				IOFieldTools.sumVars(group, SizeDescriptor::getMin),
 				IOFieldTools.sumVarsIfAll(group, SizeDescriptor::getMax),
-				(ioPool, prov, inst)->Utils.bitToByte(group.stream().mapToLong(s->s.getSizeDescriptor().calcUnknown(ioPool, prov, inst)).sum())
+				(ioPool, prov, inst)->Utils.bitToByte(IOFieldTools.sumVars(group, s->s.calcUnknown(ioPool, prov, inst, WordSpace.BIT)))
 			);
 		}
 		initLateData(FieldSet.of(group.stream().flatMap(f->f.getDependencies().stream())), group.stream().flatMap(IOField::usageHintsStream));
@@ -75,7 +75,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 		try(var stream=new BitOutputStream(dest)){
 			for(var fi : group){
 				if(DEBUG_VALIDATION){
-					long size=fi.getSizeDescriptor().calcUnknown(ioPool, provider, instance);
+					long size=fi.getSizeDescriptor().calcUnknown(ioPool, provider, instance, WordSpace.BIT);
 					var  oldW=stream.getTotalBits();
 					
 					try{
@@ -101,7 +101,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 		try(var stream=new BitInputStream(src, safetyBits.isPresent()?getSizeDescriptor().requireFixed(WordSpace.BIT):-1)){
 			for(var fi : group){
 				if(DEBUG_VALIDATION){
-					long size=fi.getSizeDescriptor().calcUnknown(ioPool, provider, instance);
+					long size=fi.getSizeDescriptor().calcUnknown(ioPool, provider, instance, WordSpace.BIT);
 					var  oldW=stream.getTotalBits();
 					
 					fi.readBits(ioPool, stream, instance);
@@ -123,7 +123,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 		try(var stream=new BitInputStream(src, getSizeDescriptor().getMin(WordSpace.BIT))){
 			for(var fi : group){
 				if(DEBUG_VALIDATION){
-					long size=fi.getSizeDescriptor().calcUnknown(ioPool, provider, instance);
+					long size=fi.getSizeDescriptor().calcUnknown(ioPool, provider, instance, WordSpace.BIT);
 					var  oldW=stream.getTotalBits();
 					
 					fi.skipReadBits(stream, instance);

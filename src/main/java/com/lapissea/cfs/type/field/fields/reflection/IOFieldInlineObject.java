@@ -50,7 +50,7 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 						if(!nullable()) throw new NullPointerException();
 						return 0;
 					}
-					return desc.calcUnknown(instancePipe.makeIOPool(), prov, val);
+					return desc.calcUnknown(instancePipe.makeIOPool(), prov, val, desc.getWordSpace());
 				}
 			);
 		}

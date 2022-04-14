@@ -1204,7 +1204,7 @@ public class BinaryGridRenderer{
 					
 					long trueOffset=offsetStart+fieldOffset;
 					var  sizeDesc  =field.getSizeDescriptor();
-					size=sizeDesc.calcUnknown(ioPool, ctx.provider, instance);
+					size=sizeDesc.calcUnknown(ioPool, ctx.provider, instance, WordSpace.BYTE);
 					
 					try{
 						if(acc!=null&&acc.hasAnnotation(IOType.Dynamic.class)){
@@ -1260,7 +1260,7 @@ public class BinaryGridRenderer{
 							for(IOField.Bit<T, ?> bit : merger.fieldGroup()){
 								
 								var bCol=ColorUtils.makeCol(rand, typeHash, bit);
-								var siz =bit.getSizeDescriptor().calcUnknown(ioPool, ctx.provider, instance);
+								var siz =bit.getSizeDescriptor().calcUnknown(ioPool, ctx.provider, instance, WordSpace.BYTE);
 								
 								if(annotate) annotateBitField(ctx, ioPool, instance, bit, bCol, bitOffset, siz, reference, fieldOffset);
 								bitOffset+=siz;
@@ -1443,7 +1443,7 @@ public class BinaryGridRenderer{
 						fieldErr.addSuppressed(err);
 					}
 					var sizeDesc=field.getSizeDescriptor();
-					var size    =sizeDesc.calcUnknown(ioPool, ctx.provider, instance);
+					var size    =sizeDesc.calcUnknown(ioPool, ctx.provider, instance, WordSpace.BYTE);
 					outlineByteRange(Color.RED, ctx.renderCtx, Range.fromSize(offsetStart+fieldOffset-size, size));
 				}
 			}
