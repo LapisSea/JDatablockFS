@@ -143,6 +143,8 @@
 				<configuration>
 					<release>${maven.compiler.release}</release>
 					<compilerArgs>--enable-preview</compilerArgs>
+					<source>${java.version}</source>
+					<target>${java.version}</target>
 				</configuration>
 			</plugin>
 			<plugin>
