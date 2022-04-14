@@ -6,11 +6,14 @@ import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.RandomIO;
+import com.lapissea.cfs.io.ValueStorage;
+import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.*;
+import com.lapissea.cfs.type.field.BasicSizeDescriptor;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
@@ -32,10 +35,16 @@ import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 
 @SuppressWarnings("unchecked")
-public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>{
+public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>{
 	
+	private static <T> long calcUnknownSize(ValueStorage<T> storage, DataProvider prov, T value){
+		if(storage instanceof ValueStorage.Instance iStor){
+			return iStor.getPipe().calcUnknownSize(prov, (IOInstance)value, WordSpace.BYTE);
+		}
+		return storage.inlineSize();
+	}
 	
-	public static class Node<T extends IOInstance<T>> extends IOInstance.Unmanaged<Node<T>> implements IterablePP<Node<T>>{
+	public static class Node<T> extends IOInstance.Unmanaged<Node<T>> implements IterablePP<Node<T>>{
 		
 		private static final List<Annotation> ANNOTATIONS=List.of(
 			IOFieldTools.makeAnnotation(IOType.Dynamic.class, Map.of()),
@@ -80,7 +89,14 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			SizeDescriptor<Node<T>> valDesc=SizeDescriptor.Unknown.of(WordSpace.BYTE, 0, OptionalLong.empty(), (ioPool, prov, inst)->{
 				var val=valueAccessor.get(ioPool, inst);
 				if(val==null) return 0;
-				return inst.valuePipe.calcUnknownSize(prov, val, WordSpace.BYTE);
+				if(inst.valueStorage instanceof ValueStorage.Instance<T> iStor){
+					try{
+						return iStor.getPipe().calcUnknownSize(prov, inst.getValue(), WordSpace.BYTE);
+					}catch(IOException e){
+						throw new RuntimeException(e);
+					}
+				}
+				return inst.valueStorage.inlineSize();
 			});
 			
 			return new IOField.NoIO<>(valueAccessor, valDesc);
@@ -152,6 +168,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			LinkedIOList.Node.class,
 			List.of(t->{
 				var c=t.getTypeClass(null);
+				if(SupportedPrimitive.isAny(c)) return;
 				if(!IOInstance.isManaged(c)) throw new ClassCastException("not managed");
 				if(Modifier.isAbstract(c.getModifiers())) throw new ClassCastException(c+" is abstract");
 			})
@@ -163,14 +180,15 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		private static NumberSize calcOptimalNextSize(DataProvider provider) throws IOException{
 			return NumberSize.bySize(provider.getSource().getIOSize());
 		}
-		public static <T extends IOInstance<T>> Node<T> allocValNode(T value, Node<T> next, SizeDescriptor<T> sizeDescriptor, TypeLink nodeType, DataProvider provider) throws IOException{
+		public static <T> Node<T> allocValNode(T value, Node<T> next, BasicSizeDescriptor<T, ?> sizeDescriptor, TypeLink nodeType, DataProvider provider) throws IOException{
 			int nextBytes;
 			if(next!=null) nextBytes=NumberSize.bySize(next.getReference().getPtr()).bytes;
 			else nextBytes=calcOptimalNextSize(provider).bytes;
 			
 			var bytes=1+nextBytes+switch(sizeDescriptor){
-				case SizeDescriptor.Fixed<T> f -> f.get(WordSpace.BYTE);
-				case SizeDescriptor.Unknown<T> f -> f.calcUnknown(value.getThisStruct().allocVirtualVarPool(IO), provider, value, WordSpace.BYTE);
+				case SizeDescriptor.Fixed f -> f.get(WordSpace.BYTE);
+				case SizeDescriptor.Unknown f -> f.calcUnknown(((IOInstance<?>)value).getThisStruct().allocVirtualVarPool(IO), provider, value, WordSpace.BYTE);
+				case BasicSizeDescriptor<T, ?> b -> b.calcUnknown(null, provider, value, WordSpace.BYTE);
 			};
 			
 			try(var ignored=provider.getSource().openIOTransaction()){
@@ -179,7 +197,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			}
 		}
 		
-		private final StructPipe<T> valuePipe;
+		private final ValueStorage<T> valueStorage;
 		
 		@IOValue
 		private NumberSize nextSize;
@@ -200,9 +218,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		public Node(DataProvider provider, Reference reference, TypeLink typeDef) throws IOException{
 			super(provider, reference, typeDef, NODE_TYPE_CHECK);
 			
-			var type=(Struct<T>)typeDef.argAsStruct(0, provider.getTypeDb());
-			type.requireEmptyConstructor();
-			this.valuePipe=StructPipe.of(getPipe().getClass(), type);
+			valueStorage=(ValueStorage<T>)ValueStorage.makeStorage(provider, typeDef.arg(0), getGenerics(), false);
 			
 			if(isSelfDataEmpty()){
 				nextSize=calcOptimalNextSize(provider);
@@ -215,26 +231,25 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		@Override
 		public boolean equals(Object o){
 			if(this==o) return true;
-			if(!(o instanceof Node<?> other)) return false;
+			if(!(o instanceof Node<?> that)) return false;
 			
-			if(!getReference().equals(other.getReference())){
+			if(!this.getReference().equals(that.getReference())){
 				return false;
 			}
-			if(!getTypeDef().equals(other.getTypeDef())){
+			if(!this.getTypeDef().equals(that.getTypeDef())){
 				return false;
 			}
 			
 			try{
-				if(!getNextPtr().equals(other.getNextPtr())){
+				if(!this.getNextPtr().equals(that.getNextPtr())){
 					return false;
 				}
-				if(hasValue()!=other.hasValue()){
+				if(this.hasValue()!=that.hasValue()){
 					return false;
 				}
-				if(!Objects.equals(getValue(), other.getValue())){
-					return false;
-				}
-				return true;
+				var v1=this.getValue();
+				var v2=that.getValue();
+				return Objects.equals(v1, v2);
 			}catch(IOException e){
 				throw new RuntimeException(e);
 			}
@@ -293,7 +308,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 				if(io.remaining()==0){
 					return null;
 				}
-				return valuePipe.readNew(getDataProvider(), io, getGenerics());
+				return valueStorage.readNew(io);
 			}catch(Throwable e){
 				throw new IOException("failed to get value on "+this.getReference().addOffset(start).infoString(getDataProvider()), e);
 			}
@@ -324,12 +339,16 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 				io.skipExact(valueStart());
 				if(value!=null){
 					if(DEBUG_VALIDATION){
-						var size=valuePipe.calcUnknownSize(getDataProvider(), value, WordSpace.BYTE);
+						var size=calcUnknownSize(valueStorage, getDataProvider(), value);
+						var tmp =MemoryData.build().withCapacity(Math.toIntExact(size+1)).withUsedLength(0).build();
+						try(var tio=tmp.io()){
+							valueStorage.write(tio, value);
+						}
 						try(var buff=io.writeTicket(size).requireExact().submit()){
-							valuePipe.write(getDataProvider(), buff, value);
+							tmp.transferTo(buff);
 						}
 					}else{
-						valuePipe.write(this, io, value);
+						valueStorage.write(io, value);
 					}
 				}
 				io.trim();
@@ -385,12 +404,14 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		}
 		
 		private long nextStart(){
-			IOField<Node<T>, NumberSize> field=getNextSizeField();
-			var                          desc =field.getSizeDescriptor();
-			return desc.calcUnknown(getPipe().makeIOPool(), getDataProvider(), this, WordSpace.BYTE);
+			IOField<Node<T>, NumberSize> f=getNextSizeField();
+			return switch(f.getSizeDescriptor()){
+				case SizeDescriptor.Unknown<Node<T>> u -> u.calcUnknown(getPipe().makeIOPool(), getDataProvider(), this, WordSpace.BYTE);
+				case SizeDescriptor.Fixed<Node<T>> fixed -> fixed.get(WordSpace.BYTE);
+			};
 		}
 		
-		private static <T extends IOInstance<T>> IOField<Node<T>, NumberSize> getNextSizeField(){
+		private static <T> IOField<Node<T>, NumberSize> getNextSizeField(){
 			return (IOField<Node<T>, NumberSize>)NEXT_SIZE_FIELD;
 		}
 		
@@ -427,7 +448,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		public String toShortString(){
 			try{
 				var val   =getValue();
-				var result=new StringBuilder().append("{").append(val==null?null:val.toShortString());
+				var result=new StringBuilder().append("{").append(Utils.toShortString(val));
 				
 				var next=getNextPtr();
 				if(!next.isNull()){
@@ -443,7 +464,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			return "Node"+toShortString();
 		}
 		
-		private static class NodeIterator<T extends IOInstance<T>> implements IOIterator.Iter<Node<T>>{
+		private static class NodeIterator<T> implements IOIterator.Iter<Node<T>>{
 			
 			private Node<T>     node;
 			private IOException e;
@@ -486,7 +507,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		}
 	}
 	
-	private static class LinkedValueIterator<T extends IOInstance<T>> implements IOIterator.Iter<T>{
+	private static class LinkedValueIterator<T> implements IOIterator.Iter<T>{
 		
 		private final Iter<Node<T>> nodes;
 		
@@ -582,6 +603,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 	private static final TypeLink.Check LIST_TYPE_CHECK=new TypeLink.Check(
 		LinkedIOList.class,
 		List.of(t->{
+			if(SupportedPrimitive.isAny(t.getTypeClass(null))) return;
 			if(!IOInstance.isManaged(t)){
 				throw new RuntimeException("not managed");
 			}
@@ -598,7 +620,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 	@IODependency.VirtualNumSize
 	private long size;
 	
-	private final StructPipe<T> elementPipe;
+	private final ValueStorage<T> valueStorage;
 	
 	private final boolean      readOnly;
 	private final Map<Long, T> cache;
@@ -610,9 +632,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		readOnly=getDataProvider().isReadOnly();
 		cache=readOnly?new HashMap<>():null;
 		
-		var type=(Struct<T>)typeDef.argAsStruct(0, provider.getTypeDb());
-		type.requireEmptyConstructor();
-		this.elementPipe=StructPipe.of(this.getPipe().getClass(), type);
+		valueStorage=(ValueStorage<T>)ValueStorage.makeStorage(provider, typeDef.arg(0), getGenerics(), false);
 		
 		if(isSelfDataEmpty()){
 			writeManagedFields();
@@ -624,7 +644,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 	
 	@Override
 	public RuntimeType<T> getElementType(){
-		return elementPipe.getType();
+		return valueStorage.getType();
 	}
 	
 	private Node<T> getNode(long index) throws IOException{
@@ -685,7 +705,8 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 		
 		if(index==0){
 			var head=getHead();
-			setHead(Node.allocValNode(value, head, elementPipe.getSizeDescriptor(), nodeType(), getDataProvider()));
+			
+			setHead(Node.allocValNode(value, head, valueStorage.getSizeDescriptor(), nodeType(), getDataProvider()));
 			deltaSize(1);
 			return;
 		}
@@ -696,14 +717,14 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 	}
 	private void insertNodeInFrontOf(Node<T> prevNode, T value) throws IOException{
 		var     node   =prevNode.getNext();
-		Node<T> newNode=Node.allocValNode(value, node, elementPipe.getSizeDescriptor(), nodeType(), getDataProvider());
+		Node<T> newNode=Node.allocValNode(value, node, valueStorage.getSizeDescriptor(), nodeType(), getDataProvider());
 		prevNode.setNext(newNode);
 		deltaSize(1);
 	}
 	
 	@Override
 	public void add(T value) throws IOException{
-		Node<T> newNode=Node.allocValNode(value, null, elementPipe.getSizeDescriptor(), nodeType(), getDataProvider());
+		Node<T> newNode=Node.allocValNode(value, null, valueStorage.getSizeDescriptor(), nodeType(), getDataProvider());
 		
 		if(isEmpty()){
 			setHead(newNode);
@@ -820,7 +841,7 @@ public class LinkedIOList<T extends IOInstance<T>> extends AbstractUnmanagedIOLi
 			}
 			//inverse order add, reduce chance for fragmentation by providing next node immediately
 			var nextNode=chainStart;
-			chainStart=Node.allocValNode(val, nextNode, elementPipe.getSizeDescriptor(), typ, getDataProvider());
+			chainStart=Node.allocValNode(val, nextNode, valueStorage.getSizeDescriptor(), typ, getDataProvider());
 		}
 		
 		var last=getLastNode();

@@ -49,7 +49,7 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 		TYPE_CHECK.ensureValid(typeDef);
 		cache=readOnly?new HashMap<>():null;
 		
-		this.storage=(ValueStorage<T>)ValueStorage.makeStorage(provider, typeDef.arg(0), getGenerics());
+		this.storage=(ValueStorage<T>)ValueStorage.makeStorage(provider, typeDef.arg(0), getGenerics(), true);
 		
 		if(!readOnly&&isSelfDataEmpty()){
 			writeManagedFields();
@@ -233,7 +233,7 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 	}
 	
 	private void addMany(long count, UnsafeSupplier<T, IOException> source) throws IOException{
-		if(storage instanceof ValueStorage.ReferencedInstance||storage instanceof ValueStorage.UnmanagedInstance){//TODO
+		if(storage instanceof ValueStorage.FixedReferencedInstance||storage instanceof ValueStorage.UnmanagedInstance){//TODO
 			for(long i=0;i<count;i++){
 				add(source.get());
 			}

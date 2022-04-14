@@ -9,6 +9,7 @@ import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.*;
+import com.lapissea.cfs.type.field.BasicSizeDescriptor;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
@@ -17,6 +18,70 @@ import com.lapissea.util.function.UnsafeSupplier;
 import java.io.IOException;
 
 public sealed interface ValueStorage<T>{
+	
+	private static <I extends IOInstance<I>, T extends IOInstance<T>> SizeDescriptor<I> makeSizeDescriptor(DataProvider provider, FieldAccessor<I> accessor, StructPipe<T> pipe){
+		SizeDescriptor<I> desc;
+		
+		var pDesc=pipe.getSizeDescriptor();
+		var ws   =pDesc.getWordSpace();
+		if(pDesc.hasFixed()){
+			desc=SizeDescriptor.Fixed.of(ws, pDesc.requireFixed(ws));
+		}else{
+			desc=SizeDescriptor.Unknown.of(
+				ws,
+				pDesc.getMin(ws),
+				pDesc.getMax(ws),
+				(ioPool, prov, value)->pipe.calcUnknownSize(provider, (T)accessor.get(ioPool, value), ws)
+			);
+		}
+		return desc;
+	}
+	
+	final class Instance<T extends IOInstance<T>> implements ValueStorage<T>{
+		
+		private final GenericContext          ctx;
+		private final DataProvider            provider;
+		private final ContiguousStructPipe<T> pipe;
+		
+		public Instance(GenericContext ctx, DataProvider provider, ContiguousStructPipe<T> pipe){
+			this.ctx=ctx;
+			this.provider=provider;
+			this.pipe=pipe;
+		}
+		
+		@Override
+		public T readNew(ContentReader src) throws IOException{
+			return pipe.readNew(provider, src, ctx);
+		}
+		
+		@Override
+		public void write(RandomIO dest, T src) throws IOException{
+			pipe.write(provider, dest, src);
+		}
+		
+		@Override
+		public long inlineSize(){
+			throw new UnsupportedOperationException();
+		}
+		
+		@Override
+		public BasicSizeDescriptor<T, ?> getSizeDescriptor(){
+			return pipe.getSizeDescriptor();
+		}
+		public ContiguousStructPipe<T> getPipe(){
+			return pipe;
+		}
+		
+		@Override
+		public <I extends IOInstance<I>> IOField<I, T> field(FieldAccessor<I> accessor, UnsafeSupplier<RandomIO, IOException> ioAt){
+			return new IOField.NoIO<>(accessor, makeSizeDescriptor(provider, accessor, pipe));
+		}
+		
+		@Override
+		public RuntimeType<T> getType(){
+			return pipe.getType();
+		}
+	}
 	
 	final class FixedInstance<T extends IOInstance<T>> implements ValueStorage<T>{
 		
@@ -62,7 +127,7 @@ public sealed interface ValueStorage<T>{
 		}
 	}
 	
-	final class ReferencedInstance<T extends IOInstance<T>> implements ValueStorage<T>{
+	final class FixedReferencedInstance<T extends IOInstance<T>> implements ValueStorage<T>{
 		
 		private static final FixedContiguousStructPipe<Reference> REF_PIPE=FixedContiguousStructPipe.of(Reference.STRUCT);
 		private static final long                                 SIZE    =REF_PIPE.getFixedDescriptor().get(WordSpace.BYTE);
@@ -71,7 +136,7 @@ public sealed interface ValueStorage<T>{
 		private final DataProvider   provider;
 		private final StructPipe<T>  pipe;
 		
-		public ReferencedInstance(GenericContext ctx, DataProvider provider, StructPipe<T> pipe){
+		public FixedReferencedInstance(GenericContext ctx, DataProvider provider, StructPipe<T> pipe){
 			this.ctx=ctx;
 			this.provider=provider;
 			this.pipe=pipe;
@@ -240,20 +305,23 @@ public sealed interface ValueStorage<T>{
 		}
 	}
 	
-	static ValueStorage<?> makeStorage(DataProvider provider, TypeLink typeDef, GenericContext generics){
+	static ValueStorage<?> makeStorage(DataProvider provider, TypeLink typeDef, GenericContext generics, boolean fixedOnly){
 		Class<?> clazz    =typeDef.getTypeClass(provider.getTypeDb());
 		var      primitive=SupportedPrimitive.get(clazz);
 		if(primitive.isPresent()){
-			return new ValueStorage.Primitive<>(primitive.get());
+			return new Primitive<>(primitive.get());
 		}else if(!IOInstance.isManaged(clazz)){
-			return new ValueStorage.UnmanagedInstance<>(typeDef, provider);
+			return new UnmanagedInstance<>(typeDef, provider);
 		}else{
 			var struct=Struct.ofUnknown(clazz);
-			try{
-				return new ValueStorage.FixedInstance<>(generics, provider, FixedContiguousStructPipe.of(struct));
-			}catch(MalformedStructLayout ignored){
-				return new ValueStorage.ReferencedInstance<>(generics, provider, ContiguousStructPipe.of(struct));
+			if(fixedOnly){
+				try{
+					return new FixedInstance<>(generics, provider, FixedContiguousStructPipe.of(struct));
+				}catch(MalformedStructLayout ignored){
+					return new FixedReferencedInstance<>(generics, provider, ContiguousStructPipe.of(struct));
+				}
 			}
+			return new Instance<>(generics, provider, ContiguousStructPipe.of(struct));
 		}
 	}
 	
@@ -265,4 +333,8 @@ public sealed interface ValueStorage<T>{
 	<I extends IOInstance<I>> IOField<I, T> field(FieldAccessor<I> accessor, UnsafeSupplier<RandomIO, IOException> ioAt);
 	
 	RuntimeType<T> getType();
+	
+	default BasicSizeDescriptor<T, ?> getSizeDescriptor(){
+		return new BasicSizeDescriptor.IFixed.Basic<>(inlineSize(), WordSpace.BYTE);
+	}
 }
