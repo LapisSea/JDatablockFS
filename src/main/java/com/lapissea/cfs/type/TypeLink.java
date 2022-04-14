@@ -196,7 +196,7 @@ public final class TypeLink extends IOInstance<TypeLink>{
 		return nam;
 	}
 	public Type generic(IOTypeDB db){
-		if(generic==null) generic=new SyntheticParameterizedType(null, getTypeClass(db), Arrays.stream(args).map(t->t.getTypeClass(db)).toArray(Type[]::new));
+		if(generic==null) generic=SyntheticParameterizedType.of(getTypeClass(db), Arrays.stream(args).map(t->t.getTypeClass(db)).toArray(Type[]::new));
 		return generic;
 	}
 	
