@@ -46,11 +46,11 @@ public class GeneralTests{
 	
 	@BeforeAll
 	static void init() throws IOException{
-		if(Boolean.parseBoolean(UtilL.sysPropertyByClass(GeneralTests.class, "tabPrint").orElse("false"))){
+		if(UtilL.sysPropertyByClass(GeneralTests.class, "tabPrint", false, Boolean::parseBoolean)){
 			LogUtil.Init.attach(USE_CALL_POS|USE_TABULATED_HEADER);
 		}
 		
-		if(Boolean.parseBoolean(UtilL.sysPropertyByClass(GeneralTests.class, "standardInit").orElse("false"))){
+		if(UtilL.sysPropertyByClass(GeneralTests.class, "standardInit", false, Boolean::parseBoolean)){
 			for(var c : Arrays.asList(Chunk.class, Reference.class, AutoText.class, Cluster.RootRef.class, ContiguousIOList.class, LinkedIOList.class, HashIOMap.class)){
 				try{
 					Struct.ofUnknown(c);

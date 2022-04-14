@@ -911,7 +911,6 @@ public class JorthCompiler{
 						
 						var point=lastEnd;
 						while(point.prev!=null){
-							LogUtil.println(point.getStackState());
 							
 							if(!point.getStackState().equals(lastEnd.getStackState())){
 								throw new MalformedJorthException("Stack mismatch \n"+point.getStackState()+"\n"+lastEnd.getStackState());

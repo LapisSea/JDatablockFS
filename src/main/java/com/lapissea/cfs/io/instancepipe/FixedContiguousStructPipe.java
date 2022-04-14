@@ -79,23 +79,23 @@ public class FixedContiguousStructPipe<T extends IOInstance<T>> extends StructPi
 		}
 		
 		return sizeFieldStream()
-			.map(sizingField->{
-				var size=getType().getFields().streamDependentOn(sizingField)
-				                  .mapToLong(v->v.getSizeDescriptor().requireMax(WordSpace.BYTE))
-				                  .distinct()
-				                  .mapToObj(l->NumberSize.FLAG_INFO.stream()
-				                                                   .filter(s->s.bytes==l)
-				                                                   .findAny().orElseThrow())
-				                  .reduce((a, b)->{
-					                  if(a!=b){
-						                  throw new MalformedStructLayout("inconsistent dependency sizes"+sizingField);
-					                  }
-					                  return a;
-				                  })
-				                  .orElse(NumberSize.LARGEST);
-				return new AbstractMap.SimpleEntry<>(sizingField, size);
-			})
-			.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+			       .map(sizingField->{
+				       var size=getType().getFields().streamDependentOn(sizingField)
+				                         .mapToLong(v->v.getSizeDescriptor().requireMax(WordSpace.BYTE))
+				                         .distinct()
+				                         .mapToObj(l->NumberSize.FLAG_INFO.stream()
+				                                                          .filter(s->s.bytes==l)
+				                                                          .findAny().orElseThrow())
+				                         .reduce((a, b)->{
+					                         if(a!=b){
+						                         throw new MalformedStructLayout("inconsistent dependency sizes"+sizingField);
+					                         }
+					                         return a;
+				                         })
+				                         .orElse(NumberSize.LARGEST);
+				       return new AbstractMap.SimpleEntry<>(sizingField, size);
+			       })
+			       .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 	}
 	
 	private Stream<IOField<T, NumberSize>> sizeFieldStream(){
