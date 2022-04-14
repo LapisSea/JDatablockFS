@@ -18,7 +18,6 @@ import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.util.NotImplementedException;
-import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.TextUtil;
 
@@ -214,7 +213,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		@Override
 		public List<ValueGeneratorInfo<T, ?>> getGenerators(){
 			
-			if(!nullable()) return List.of();
+			if(!nullable()) return null;
 			
 			return List.of(new ValueGeneratorInfo<>(isNull, new ValueGenerator<T, Boolean>(){
 				@Override
@@ -260,9 +259,9 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	}
 	
 	public void initLateData(FieldSet<T> dependencies, Stream<UsageHintType> usageHints){
-		Utils.requireNull(this.dependencies);
-		Utils.requireNull(this.usageHints);
-		this.dependencies=dependencies;
+		if(lateDataInitialized) throw new IllegalStateException("already initialized");
+		
+		this.dependencies=dependencies==null?null:Utils.nullIfEmpty(dependencies);
 		var h=EnumSet.noneOf(UsageHintType.class);
 		usageHints.forEach(h::add);
 		this.usageHints=Utils.nullIfEmpty(h);
@@ -374,10 +373,16 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		}
 	}
 	
-	@NotNull
+	@Nullable
 	public List<ValueGeneratorInfo<T, ?>> getGenerators(){
-		return List.of();
+		return null;
 	}
+	
+	public Stream<ValueGeneratorInfo<T, ?>> generatorStream(){
+		var gens=getGenerators();
+		return gens==null?Stream.of():gens.stream();
+	}
+	
 	
 	@Nullable
 	public abstract void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException;
@@ -507,9 +512,25 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		return lateDataInitialized;
 	}
 	
+	@Nullable
 	public FieldSet<T> getDependencies(){
 		requireLateData();
-		return Objects.requireNonNull(dependencies);
+		return dependencies;
+	}
+	
+	public Stream<IOField<T, ?>> dependencyStream(){
+		requireLateData();
+		return dependencies!=null?dependencies.stream():Stream.of();
+	}
+	
+	public boolean isDependency(IOField<T, ?> depField){
+		requireLateData();
+		return dependencies!=null&&dependencies.contains(depField);
+	}
+	
+	public boolean hasDependencies(){
+		requireLateData();
+		return dependencies!=null&&!dependencies.isEmpty();
 	}
 	
 	public boolean hasUsageHint(UsageHintType hint){

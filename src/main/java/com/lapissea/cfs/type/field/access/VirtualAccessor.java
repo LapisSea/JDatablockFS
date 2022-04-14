@@ -86,7 +86,7 @@ public final class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends Abstra
 			deps=getDeclaringStruct()
 				     .getFields()
 				     .stream()
-				     .filter(f->f.getDependencies().contains(field))
+				     .filter(f->f.isDependency(field))
 				     .map(IOField::getAccessor)
 				     .collect(Collectors.toList());
 		}

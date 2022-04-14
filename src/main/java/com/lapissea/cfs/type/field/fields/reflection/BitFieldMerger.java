@@ -35,6 +35,8 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 	
 	private final List<IOField.Bit<T, ?>> group;
 	
+	private final List<ValueGeneratorInfo<T, ?>> generators;
+	
 	private final SizeDescriptor<T> sizeDescriptor;
 	
 	private final Optional<BitLayout> safetyBits;
@@ -62,7 +64,8 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 				(ioPool, prov, inst)->Utils.bitToByte(IOFieldTools.sumVars(group, s->s.calcUnknown(ioPool, prov, inst, WordSpace.BIT)))
 			);
 		}
-		initLateData(FieldSet.of(group.stream().flatMap(f->f.getDependencies().stream())), group.stream().flatMap(IOField::usageHintsStream));
+		initLateData(FieldSet.of(group.stream().flatMap(IOField::dependencyStream)), group.stream().flatMap(IOField::usageHintsStream));
+		generators=Utils.nullIfEmpty(streamUnpackedFields().flatMap(IOField::generatorStream).toList());
 	}
 	
 	@Override
@@ -190,6 +193,6 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 	
 	@Override
 	public List<ValueGeneratorInfo<T, ?>> getGenerators(){
-		return streamUnpackedFields().flatMap(f->f.getGenerators().stream()).toList();
+		return generators;
 	}
 }

@@ -249,7 +249,9 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 			}
 		});
 		
-		return Stream.concat(super.getGenerators().stream(), Stream.of(idGenerator)).toList();
+		var gens=super.getGenerators();
+		if(gens==null) return List.of(idGenerator);
+		return Stream.concat(gens.stream(), Stream.of(idGenerator)).toList();
 	}
 	@Override
 	public void write(Struct.Pool<CTyp> ioPool, DataProvider provider, ContentWriter dest, CTyp instance) throws IOException{

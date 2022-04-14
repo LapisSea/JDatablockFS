@@ -80,8 +80,7 @@ public class IOFieldTools{
 	
 	public static <T extends IOInstance<T>> Index computeDependencyIndex(List<IOField<T, ?>> fields){
 		try{
-			return new DepSort<>(fields, f->f.getDependencies()
-			                                 .stream()
+			return new DepSort<>(fields, f->f.dependencyStream()
 			                                 .mapToInt(o->IntStream.range(0, fields.size())
 			                                                       .filter(i->fields.get(i).getAccessor()==o.getAccessor())
 			                                                       .findAny()
@@ -98,7 +97,7 @@ public class IOFieldTools{
 			                 //pull any cheap to read/write fields back
 			                 .thenComparingInt(f->f.getAccessor().getType().isEnum()||f.getAccessor().getType().isPrimitive()?0:1)
 			                 //Encourage fields with similar dependencies to be next to each other
-			                 .thenComparing(f->f.getDependencies().stream().map(IOField::getName).collect(Collectors.joining(" / ")))
+			                 .thenComparing(f->f.dependencyStream().map(IOField::getName).collect(Collectors.joining(" / ")))
 			                 //Eliminate JVM entropy. Make initial field order irrelevant
 			                 .thenComparing(IOField::getName)
 			);

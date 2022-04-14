@@ -73,7 +73,7 @@ public class FixedContiguousStructPipe<T extends IOInstance<T>> extends StructPi
 	}
 	private Map<IOField<T, NumberSize>, NumberSize> computeMaxValues(){
 		//TODO: see how to properly handle max values with dependencies
-		var badFields=sizeFieldStream().filter(f->!f.getDependencies().isEmpty()).map(IOField::toString).collect(Collectors.joining(", "));
+		var badFields=sizeFieldStream().filter(IOField::hasDependencies).map(IOField::toString).collect(Collectors.joining(", "));
 		if(!badFields.isEmpty()){
 			throw new NotImplementedException(badFields+" should not have dependencies");
 		}
