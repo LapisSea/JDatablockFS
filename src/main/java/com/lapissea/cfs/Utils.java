@@ -214,21 +214,33 @@ public class Utils{
 		if(testType instanceof TypeVariable<?> c) return genericInstanceOf(extractFromVarType(c), type);
 		if(type instanceof TypeVariable<?> c) return genericInstanceOf(testType, extractFromVarType(c));
 		
-		if(type instanceof ParameterizedType parm){
-//			Type[] args=parm.getActualTypeArguments(), testArgs;
-//			if(testType instanceof ParameterizedType p) testArgs=p.getActualTypeArguments();
-//			else return false;
-//			if(testArgs.length!=0){
-//				if(args.length!=testArgs.length) return false;
-//				for(int i=0;i<args.length;i++){
-//					if(!genericInstanceOf(testArgs[i], args[i])) return false;
-//				}
-//			}
-			
-			return UtilL.instanceOf((Class<?>)((ParameterizedType)testType).getRawType(), (Class<?>)parm.getRawType());
+		if(type instanceof Class||testType instanceof Class<?>){
+			var rawTestType=typeToRaw(testType);
+			var rawType    =typeToRaw(type);
+			return UtilL.instanceOf(rawTestType, rawType);
 		}
 		
-		return UtilL.instanceOf((Class<?>)testType, (Class<?>)type);
+		var pTestType=(ParameterizedType)testType;
+		var pType    =(ParameterizedType)type;
+		
+		var rawTestType=(Class<?>)pTestType.getRawType();
+		var rawType    =(Class<?>)pType.getRawType();
+		
+		var rawCast=UtilL.instanceOf(rawTestType, rawType);
+		if(!rawCast) return false;
+		
+		Type[] testArgs=pTestType.getActualTypeArguments();
+		Type[] args    =pType.getActualTypeArguments();
+		
+		if(testArgs.length!=args.length){
+			return false;
+		}
+		
+		for(int i=0;i<testArgs.length;i++){
+			if(!genericInstanceOf(testArgs[i], args[i])) return false;
+		}
+		
+		return true;
 	}
 	
 	public static <E, C extends Collection<E>> C nullIfEmpty(C collection){
