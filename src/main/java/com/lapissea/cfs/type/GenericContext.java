@@ -112,7 +112,7 @@ public interface GenericContext{
 						}
 					}
 					if(dirty){
-						yield new SyntheticParameterizedType(parmType.getOwnerType(), (Class<?>)parmType.getRawType(), args);
+						yield SyntheticParameterizedType.of(parmType.getOwnerType(), (Class<?>)parmType.getRawType(), args);
 					}
 					yield parmType;
 				}

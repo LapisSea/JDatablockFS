@@ -393,7 +393,7 @@ public class FieldCompiler{
 			if(typeOverride.value()!=Object.class) raw=typeOverride.value();
 			if(typeOverride.genericArgs().length!=0) parms=typeOverride.genericArgs();
 			
-			type=new SyntheticParameterizedType(raw, parms);
+			type=SyntheticParameterizedType.of(raw, parms);
 		}
 		return type;
 	}
