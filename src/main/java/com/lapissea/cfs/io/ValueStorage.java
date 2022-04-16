@@ -335,6 +335,6 @@ public sealed interface ValueStorage<T>{
 	RuntimeType<T> getType();
 	
 	default BasicSizeDescriptor<T, ?> getSizeDescriptor(){
-		return new BasicSizeDescriptor.IFixed.Basic<>(inlineSize(), WordSpace.BYTE);
+		return BasicSizeDescriptor.IFixed.Basic.of(WordSpace.BYTE, inlineSize());
 	}
 }

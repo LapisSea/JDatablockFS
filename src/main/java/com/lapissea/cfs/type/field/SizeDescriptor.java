@@ -6,7 +6,6 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
-import com.lapissea.util.TextUtil;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -26,8 +25,8 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>> extends Ba
 	@SuppressWarnings("unchecked")
 	final class Fixed<T extends IOInstance<T>> implements IFixed<T, Struct.Pool<T>>, SizeDescriptor<T>{
 		
-		private static final Fixed<?>[] BIT_CACHE =LongStream.range(0, 8).mapToObj(i->new Fixed<>(BIT, i)).toArray(Fixed<?>[]::new);
-		private static final Fixed<?>[] BYTE_CACHE=LongStream.range(0, 16).mapToObj(i->new Fixed<>(BYTE, i)).toArray(Fixed<?>[]::new);
+		private static final Fixed<?>[] BIT_CACHE =LongStream.range(0, 9).mapToObj(i->new Fixed<>(BIT, i)).toArray(Fixed<?>[]::new);
+		private static final Fixed<?>[] BYTE_CACHE=LongStream.range(0, 17).mapToObj(i->new Fixed<>(BYTE, i)).toArray(Fixed<?>[]::new);
 		
 		public static <T extends IOInstance<T>> SizeDescriptor.Fixed<T> of(SizeDescriptor<?> size){
 			if(!size.hasFixed()) throw new IllegalArgumentException("Can not create fixed size from a non fixed descriptor "+size);
@@ -35,21 +34,22 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>> extends Ba
 			return of(size.getWordSpace(), size.getFixed().orElseThrow());
 		}
 		
-		public static <T extends IOInstance<T>> SizeDescriptor.Fixed<T> of(long bytes){
-			if(bytes>=BYTE_CACHE.length){
-				return new Fixed<>(BYTE, bytes);
-			}
-			return (Fixed<T>)BYTE_CACHE[(int)bytes];
+		private static <T extends IOInstance<T>> SizeDescriptor.Fixed<T> ofByte(long bytes){
+			return bytes>=BYTE_CACHE.length?new Fixed<>(BYTE, bytes):(Fixed<T>)BYTE_CACHE[(int)bytes];
 		}
+		private static <T extends IOInstance<T>> SizeDescriptor.Fixed<T> ofBit(long bytes){
+			return bytes>=BIT_CACHE.length?new Fixed<>(BIT, bytes):(Fixed<T>)BIT_CACHE[(int)bytes];
+		}
+		
+		public static <T extends IOInstance<T>> SizeDescriptor.Fixed<T> of(long bytes){
+			return ofByte(bytes);
+		}
+		
 		public static <T extends IOInstance<T>> SizeDescriptor.Fixed<T> of(WordSpace wordSpace, long size){
-			var pool=(Fixed<T>[])switch(wordSpace){
-				case BIT -> BIT_CACHE;
-				case BYTE -> BYTE_CACHE;
+			return switch(wordSpace){
+				case BIT -> ofBit(size);
+				case BYTE -> ofByte(size);
 			};
-			if(size>=pool.length){
-				return new Fixed<>(wordSpace, size);
-			}
-			return pool[(int)size];
 		}
 		
 		private final WordSpace wordSpace;
@@ -70,12 +70,25 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>> extends Ba
 		
 		public long get(){return size;}
 		
-		public String toShortString(){
-			return "{"+size+" "+TextUtil.plural(getWordSpace().friendlyName, (int)size)+"}";
-		}
 		@Override
 		public String toString(){
-			return "Size"+toShortString();
+			return BasicSizeDescriptor.toString(this);
+		}
+		
+		@Override
+		public boolean equals(Object o){
+			return this==o||
+			       o instanceof BasicSizeDescriptor<?, ?> that&&
+			       that.hasFixed()&&
+			       this.size==that.getFixed().orElseThrow()&&
+			       this.wordSpace==that.getWordSpace();
+		}
+		
+		@Override
+		public int hashCode(){
+			int result=wordSpace.hashCode();
+			result=31*result+(int)(size^(size >>> 32));
+			return result;
 		}
 	}
 	
@@ -101,10 +114,8 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>> extends Ba
 			this.max=Objects.requireNonNull(max);
 		}
 		
-		
 		@Override
 		public WordSpace getWordSpace(){return wordSpace;}
-		
 		@Override
 		public OptionalLong getFixed(){return OptionalLong.empty();}
 		@Override
@@ -114,35 +125,21 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>> extends Ba
 		
 		@Override
 		public String toString(){
-			return "Size"+toShortString();
-		}
-		public String toShortString(){
-			StringBuilder sb=new StringBuilder();
-			sb.append('{');
-			if(min>0||max.isPresent()){
-				sb.append(min);
-				if(max.isPresent()) sb.append('-').append(max.getAsLong());
-				else sb.append("<?");
-				sb.append(' ');
-			}else{
-				sb.append("? ");
-			}
-			sb.append(TextUtil.plural(getWordSpace().friendlyName));
-			return sb.append('}').toString();
+			return BasicSizeDescriptor.toString(this);
 		}
 		
+		@Override
+		public int hashCode(){
+			int result=wordSpace.hashCode();
+			result=31*result+(int)(min^(min >>> 32));
+			result=31*result+max.hashCode();
+			return result;
+		}
 		
 		protected boolean equalsVals(Unknown<?> that){
 			return min==that.min&&
 			       wordSpace==that.wordSpace&&
 			       max.equals(that.max);
-		}
-		
-		protected int hashCodeVals(){
-			int result=wordSpace.hashCode();
-			result=31*result+(int)(min^(min >>> 32));
-			result=31*result+max.hashCode();
-			return result;
 		}
 	}
 	
@@ -165,6 +162,14 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>> extends Ba
 		@Override
 		public long calcUnknown(Struct.Pool<Inst> ioPool, DataProvider provider, Inst instance, WordSpace wordSpace){
 			return mapSize(wordSpace, unknownSize.calc(ioPool, provider, instance));
+		}
+		
+		@Override
+		public boolean equals(Object o){
+			return this==o||
+			       o instanceof UnknownLambda<?> that&&
+			       equalsVals(that)&&
+			       unknownSize==that.unknownSize;
 		}
 	}
 	
@@ -203,13 +208,6 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>> extends Ba
 			       o instanceof UnknownNum<?> that&&
 			       equalsVals(that)&&
 			       accessor==that.accessor;
-		}
-		
-		@Override
-		public int hashCode(){
-			int result=hashCodeVals();
-			result=31*result+accessor.hashCode();
-			return result;
 		}
 	}
 	

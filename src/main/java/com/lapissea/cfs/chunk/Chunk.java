@@ -50,7 +50,7 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 	private static class OptimizedChunkPipe extends ContiguousStructPipe<Chunk>{
 		
 		static{
-			var check="bodyNumSize + nextSize Size{1 byte} capacity Size{0-8 bytes} size Size{0-8 bytes} nextPtr Size{0-8 bytes} ";
+			var check="bodyNumSize + nextSize 1 byte capacity 0-8 bytes size 0-8 bytes nextPtr 0-8 bytes ";
 			var sb   =new StringBuilder(check.length());
 			for(IOField<Chunk, ?> specificField : ContiguousStructPipe.of(STRUCT).getSpecificFields()){
 				sb.append(specificField.getName()).append(' ').append(specificField.getSizeDescriptor()).append(' ');

@@ -2,21 +2,72 @@ package com.lapissea.cfs.type.field;
 
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.type.WordSpace;
+import com.lapissea.util.TextUtil;
 
 import java.util.OptionalLong;
+import java.util.stream.LongStream;
+
+import static com.lapissea.cfs.type.WordSpace.BIT;
+import static com.lapissea.cfs.type.WordSpace.BYTE;
 
 public interface BasicSizeDescriptor<T, PoolType>{
 	
+	static String toString(BasicSizeDescriptor<?, ?> size){
+		var fixed=size.getFixed();
+		var siz  =size.getWordSpace();
+		if(fixed.isPresent()){
+			var fixedVal=fixed.getAsLong();
+			return fixedVal+" "+TextUtil.plural(siz.friendlyName, (int)fixedVal);
+		}
+		
+		var min=size.getMin();
+		var max=size.getMax();
+		
+		StringBuilder sb=new StringBuilder();
+		if(min>0||max.isPresent()){
+			sb.append(min);
+			if(max.isPresent()) sb.append('-').append(max.getAsLong());
+			else sb.append("<?");
+			sb.append(' ');
+		}else{
+			sb.append("? ");
+		}
+		sb.append(TextUtil.plural(siz.friendlyName));
+		return sb.toString();
+	}
+	
 	interface IFixed<T, PoolType> extends BasicSizeDescriptor<T, PoolType>{
 		
-		class Basic<T, PoolType> implements IFixed<T, PoolType>{
+		@SuppressWarnings("unchecked")
+		final class Basic<T, PoolType> implements IFixed<T, PoolType>{
+			
+			private static final Basic<?, ?>[] BIT_CACHE =LongStream.range(0, 9).mapToObj(i->new Basic<>(BIT, i)).toArray(Basic<?, ?>[]::new);
+			private static final Basic<?, ?>[] BYTE_CACHE=LongStream.range(0, 17).mapToObj(i->new Basic<>(BYTE, i)).toArray(Basic<?, ?>[]::new);
+			
+			private static <T, PoolType> Basic<T, PoolType> ofByte(long bytes){
+				return bytes>=BYTE_CACHE.length?new Basic<>(BYTE, bytes):(Basic<T, PoolType>)BYTE_CACHE[(int)bytes];
+			}
+			private static <T, PoolType> Basic<T, PoolType> ofBit(long bytes){
+				return bytes>=BIT_CACHE.length?new Basic<>(BIT, bytes):(Basic<T, PoolType>)BIT_CACHE[(int)bytes];
+			}
+			
+			public static <T, PoolType> Basic<T, PoolType> of(long bytes){
+				return ofByte(bytes);
+			}
+			
+			public static <T, PoolType> Basic<T, PoolType> of(WordSpace wordSpace, long size){
+				return switch(wordSpace){
+					case BIT -> ofBit(size);
+					case BYTE -> ofByte(size);
+				};
+			}
 			
 			private final long      size;
-			private final WordSpace space;
+			private final WordSpace wordSpace;
 			
-			public Basic(long size, WordSpace space){
+			private Basic(WordSpace wordSpace, long size){
 				this.size=size;
-				this.space=space;
+				this.wordSpace=wordSpace;
 			}
 			
 			@Override
@@ -26,7 +77,28 @@ public interface BasicSizeDescriptor<T, PoolType>{
 			
 			@Override
 			public WordSpace getWordSpace(){
-				return space;
+				return wordSpace;
+			}
+			
+			@Override
+			public String toString(){
+				return BasicSizeDescriptor.toString(this);
+			}
+			
+			@Override
+			public boolean equals(Object o){
+				return this==o||
+				       o instanceof BasicSizeDescriptor<?, ?> that&&
+				       that.hasFixed()&&
+				       this.size==that.getFixed().orElseThrow()&&
+				       this.wordSpace==that.getWordSpace();
+			}
+			
+			@Override
+			public int hashCode(){
+				int result=wordSpace.hashCode();
+				result=31*result+(int)(size^(size >>> 32));
+				return result;
 			}
 		}
 		
