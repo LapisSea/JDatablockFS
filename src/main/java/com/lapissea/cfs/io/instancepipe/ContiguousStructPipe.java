@@ -46,8 +46,7 @@ public class ContiguousStructPipe<T extends IOInstance<T>> extends StructPipe<T>
 	}
 	
 	@Override
-	protected void doWrite(DataProvider provider, ContentWriter dest, T instance) throws IOException{
-		var ioPool=makeIOPool();
+	protected void doWrite(DataProvider provider, ContentWriter dest, Struct.Pool<T> ioPool, T instance) throws IOException{
 		writeIOFields(getSpecificFields(), ioPool, provider, dest, instance);
 	}
 	

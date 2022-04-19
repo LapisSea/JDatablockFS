@@ -252,27 +252,27 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		var ioPool=makeIOPool();
 		earlyCheckNulls(ioPool, instance);
 		try(var io=dest.io()){
-			doWrite(provider, io, instance);
+			doWrite(provider, io, ioPool, instance);
 		}
 	}
 	public final void write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		var ioPool=makeIOPool();
 		earlyCheckNulls(ioPool, instance);
-		doWrite(provider, dest, instance);
+		doWrite(provider, dest, ioPool, instance);
 	}
 	public final void write(DataProvider.Holder holder, ContentWriter dest, T instance) throws IOException{
 		var ioPool=makeIOPool();
 		earlyCheckNulls(ioPool, instance);
-		doWrite(holder.getDataProvider(), dest, instance);
+		doWrite(holder.getDataProvider(), dest, ioPool, instance);
 	}
 	public final <Prov extends DataProvider.Holder&RandomIO.Creator> void write(Prov dest, T instance) throws IOException{
 		var ioPool=makeIOPool();
 		earlyCheckNulls(ioPool, instance);
 		try(var io=dest.io()){
-			doWrite(dest.getDataProvider(), io, instance);
+			doWrite(dest.getDataProvider(), io, ioPool, instance);
 		}
 	}
-	protected abstract void doWrite(DataProvider provider, ContentWriter dest, T instance) throws IOException;
+	protected abstract void doWrite(DataProvider provider, ContentWriter dest, Struct.Pool<T> ioPool, T instance) throws IOException;
 	
 	
 	public <Prov extends DataProvider.Holder&RandomIO.Creator> void modify(Prov src, UnsafeConsumer<T, IOException> modifier, GenericContext genericContext) throws IOException{

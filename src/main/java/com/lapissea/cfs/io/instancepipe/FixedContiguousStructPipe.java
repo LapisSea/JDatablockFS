@@ -112,8 +112,7 @@ public class FixedContiguousStructPipe<T extends IOInstance<T>> extends StructPi
 	}
 	
 	@Override
-	protected void doWrite(DataProvider provider, ContentWriter dest, T instance) throws IOException{
-		var ioPool=makeIOPool();
+	protected void doWrite(DataProvider provider, ContentWriter dest, Struct.Pool<T> ioPool, T instance) throws IOException{
 		setMax(instance, ioPool);
 		writeIOFields(getSpecificFields(), ioPool, provider, dest, instance);
 	}

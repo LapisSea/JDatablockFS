@@ -80,7 +80,7 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		}
 		
 		@Override
-		protected void doWrite(DataProvider provider, ContentWriter dest, Chunk instance) throws IOException{
+		protected void doWrite(DataProvider provider, ContentWriter dest, Struct.Pool<Chunk> ioPool, Chunk instance) throws IOException{
 			
 			var siz     =getSizeDescriptor().requireMax(WordSpace.BYTE);
 			var destBuff=new ContentOutputBuilder((int)siz);
