@@ -127,6 +127,10 @@ public class Splitter{
 				a.clear();
 				b.clear();
 			}
+			@Override
+			public String toString(){
+				return a.toString();
+			}
 		};
 	}
 	

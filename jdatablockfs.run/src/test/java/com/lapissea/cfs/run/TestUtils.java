@@ -68,7 +68,9 @@ public class TestUtils{
 	static void testCluster(TestInfo info, UnsafeConsumer<Cluster, IOException> session) throws IOException{
 		testRawMem(info, mem->{
 			Cluster.init(mem);
-			session.accept(new Cluster(mem));
+			var c=new Cluster(mem);
+			session.accept(c);
+			c.rootWalker().walk(true, r->{});
 		});
 	}
 	

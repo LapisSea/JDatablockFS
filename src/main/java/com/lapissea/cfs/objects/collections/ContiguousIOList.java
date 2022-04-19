@@ -65,7 +65,7 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 	}
 	
 	
-	private static <T extends IOInstance<T>> FieldAccessor<ContiguousIOList<T>> fieldAccessor(Type elementType, long index){
+	private static <T> FieldAccessor<ContiguousIOList<T>> fieldAccessor(Type elementType, long index){
 		return new AbstractFieldAccessor<>(null, elementName(index)){
 			@NotNull
 			@Override
@@ -136,11 +136,12 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 	public Stream<IOField<ContiguousIOList<T>, ?>> listDynamicUnmanagedFields(){
 		var typ=getTypeDef().arg(0).generic(getDataProvider().getTypeDb());
 		
-		return LongStream.range(0, size()).mapToObj(index->(IOField<ContiguousIOList<T>, ?>)(Object)(
-			storage instanceof ValueStorage.UnmanagedInstance?
-			eFieldUnmanagedInst(typ, index):
-			storage.field(fieldAccessor(typ, index), ()->ioAtElement(index))
-		));
+		return LongStream.range(0, size()).mapToObj(index->{
+			if(storage instanceof ValueStorage.UnmanagedInstance){
+				return (IOField<ContiguousIOList<T>, ?>)(Object)eFieldUnmanagedInst(typ, index);
+			}
+			return storage.field(fieldAccessor(typ, index), ()->ioAtElement(index));
+		});
 	}
 	
 	private long calcElementOffset(long index, long siz){

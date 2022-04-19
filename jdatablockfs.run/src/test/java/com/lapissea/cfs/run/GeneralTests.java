@@ -345,7 +345,7 @@ public class GeneralTests{
 		listEqualityTest(info, ContiguousIOList.class, typ, session, useCluster);
 	}
 	
-	static <T extends IOInstance<T>, L extends IOInstance.Unmanaged<L>&IOList<T>> void listEqualityTest(TestInfo info, Class<L> listType, Class<T> typ, UnsafeConsumer<IOList<T>, IOException> session, boolean useCluster) throws IOException{
+	static <T, L extends IOInstance.Unmanaged<L>&IOList<T>> void listEqualityTest(TestInfo info, Class<L> listType, Class<T> typ, UnsafeConsumer<IOList<T>, IOException> session, boolean useCluster) throws IOException{
 		TestUtils.ioListComplianceSequence(
 			info, 64,
 			(provider, reference, typeDef)->{

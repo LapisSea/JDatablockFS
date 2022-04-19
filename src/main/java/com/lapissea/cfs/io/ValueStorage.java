@@ -61,7 +61,7 @@ public sealed interface ValueStorage<T>{
 		
 		@Override
 		public long inlineSize(){
-			throw new UnsupportedOperationException();
+			return -1;
 		}
 		
 		@Override

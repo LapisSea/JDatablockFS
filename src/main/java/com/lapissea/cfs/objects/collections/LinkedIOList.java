@@ -52,7 +52,7 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 		);
 		
 		@IOValueUnmanaged(index=0)
-		private static <T extends IOInstance<T>> IOField<Node<T>, Object> makeValField(){
+		private static <T> IOField<Node<T>, Object> makeValField(){
 			var valueAccessor=new AbstractFieldAccessor<Node<T>>(null, "value"){
 				@NotNull
 				@Override
@@ -89,14 +89,15 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 			SizeDescriptor<Node<T>> valDesc=SizeDescriptor.Unknown.of(WordSpace.BYTE, 0, OptionalLong.empty(), (ioPool, prov, inst)->{
 				var val=valueAccessor.get(ioPool, inst);
 				if(val==null) return 0;
-				if(inst.valueStorage instanceof ValueStorage.Instance<T> iStor){
+				var siz=inst.valueStorage.inlineSize();
+				if(inst.valueStorage instanceof ValueStorage.Instance iStor){
 					try{
-						return iStor.getPipe().calcUnknownSize(prov, inst.getValue(), WordSpace.BYTE);
+						return iStor.getPipe().calcUnknownSize(prov, (IOInstance)inst.getValue(), WordSpace.BYTE);
 					}catch(IOException e){
 						throw new RuntimeException(e);
 					}
 				}
-				return inst.valueStorage.inlineSize();
+				return siz;
 			});
 			
 			return new IOField.NoIO<>(valueAccessor, valDesc);
