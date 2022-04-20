@@ -29,6 +29,7 @@ public class MemPrimitive{
 		checkRange(bb, offset, Long.BYTES);
 		UNSAFE.putLong(bb, calcOff(offset), val);
 	}
+	
 	public static int getInt(final byte[] bb, final int offset){
 		checkRange(bb, offset, Integer.BYTES);
 		return UNSAFE.getInt(bb, calcOff(offset));
@@ -36,5 +37,14 @@ public class MemPrimitive{
 	public static void setInt(final byte[] bb, final int offset, int val){
 		checkRange(bb, offset, Integer.BYTES);
 		UNSAFE.putInt(bb, calcOff(offset), val);
+	}
+	
+	public static byte getByte(final byte[] bb, final int offset){
+		checkRange(bb, offset, Byte.BYTES);
+		return UNSAFE.getByte(bb, calcOff(offset));
+	}
+	public static void setByte(final byte[] bb, final int offset, byte val){
+		checkRange(bb, offset, Byte.BYTES);
+		UNSAFE.putByte(bb, calcOff(offset), val);
 	}
 }

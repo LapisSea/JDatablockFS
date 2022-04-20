@@ -106,9 +106,7 @@ public @interface IONullability{
 			return List.of(new VirtualFieldDefinition<T, Boolean>(
 				VirtualFieldDefinition.StoragePool.IO,
 				IOFieldTools.makeNullFlagName(field),
-				Boolean.class,
-				(ioPool, instance, dependencies, value)->value==null||value,
-				List.of()
+				boolean.class
 			));
 		}
 		

@@ -81,33 +81,46 @@ public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 				}
 			}
 			
-			private int getPtrIndex(VirtualAccessor<T> accessor){
-				if(DEBUG_VALIDATION) protectAccessor(accessor);
-				
+			@Override
+			public void set(VirtualAccessor<T> accessor, Object value){
 				int index=accessor.getPtrIndex();
 				if(index==-1){
-					if(accessor.getPrimitiveOffset()==-1) throw new IllegalStateException(TextUtil.toNamedJson(accessor));
-					throw new ClassCastException(accessor+" is not of an object type!");
+					Objects.requireNonNull(value);
+					var typ=accessor.getType();
+					if(typ==long.class) setLong(accessor, switch(value){
+						case Long n -> n;
+						case Integer n -> n;
+						case Short n -> n;
+						case Byte n -> n;
+						default -> throw new ClassCastException(value.getClass().getName()+" can not be converted to long");
+					});
+					else if(typ==int.class) setInt(accessor, switch(value){
+						case Integer n -> n;
+						case Short n -> n;
+						case Byte n -> n;
+						default -> throw new ClassCastException(value.getClass().getName()+" can not be converted to int");
+					});
+					else if(typ==byte.class) setByte(accessor, (Byte)value);
+					else if(typ==boolean.class) setBoolean(accessor, (Boolean)value);
+					else throw new NotImplementedException(typ.getName());
 				}
-				return index;
+				if(DEBUG_VALIDATION) protectAccessor(accessor);
+				if(pool==null) pool=new Object[poolSize];
+				pool[index]=value;
 			}
 			
 			@Override
-			public void set(VirtualAccessor<T> accessor, Object value){
-				int index=getPtrIndex(accessor);
-				if(pool==null) pool=new Object[poolSize];
-				pool[index]=value;
-				
-			}
-			@Override
 			public Object get(VirtualAccessor<T> accessor){
-				if(accessor.getPtrIndex()==-1){
+				int index=accessor.getPtrIndex();
+				if(index==-1){
 					var typ=accessor.getType();
 					if(typ==long.class) return getLong(accessor);
 					if(typ==int.class) return getInt(accessor);
+					if(typ==boolean.class) return getBoolean(accessor);
+					if(typ==byte.class) return getByte(accessor);
 					throw new NotImplementedException(typ.getName());
 				}
-				int index=getPtrIndex(accessor);
+				if(DEBUG_VALIDATION) protectAccessor(accessor);
 				if(pool==null) return null;
 				return pool[index];
 			}
@@ -160,7 +173,42 @@ public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 					default -> throw new IllegalStateException();
 				}
 			}
+			@Override
+			public boolean getBoolean(VirtualAccessor<T> accessor){
+				if(DEBUG_VALIDATION) protectAccessor(accessor, List.of(boolean.class));
+				return getByte0(accessor)==1;
+			}
 			
+			@Override
+			public void setBoolean(VirtualAccessor<T> accessor, boolean value){
+				if(DEBUG_VALIDATION) protectAccessor(accessor, List.of(boolean.class));
+				setByte0(accessor, (byte)(value?1:0));
+			}
+			
+			@Override
+			public byte getByte(VirtualAccessor<T> accessor){
+				if(DEBUG_VALIDATION) protectAccessor(accessor, List.of(byte.class));
+				return getByte0(accessor);
+			}
+			
+			@Override
+			public void setByte(VirtualAccessor<T> accessor, byte value){
+				if(DEBUG_VALIDATION) protectAccessor(accessor, List.of(byte.class));
+				setByte0(accessor, value);
+			}
+			
+			private byte getByte0(VirtualAccessor<T> accessor){
+				if(primitives==null) return 0;
+				return MemPrimitive.getByte(primitives, accessor.getPrimitiveOffset());
+			}
+			
+			private void setByte0(VirtualAccessor<T> accessor, byte value){
+				if(primitives==null){
+					if(value==0) return;
+					primitives=new byte[primitiveMemorySize];
+				}
+				MemPrimitive.setByte(primitives, accessor.getPrimitiveOffset(), value);
+			}
 			
 			@Override
 			public String toString(){
@@ -183,6 +231,12 @@ public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 		
 		int getInt(VirtualAccessor<T> accessor);
 		void setInt(VirtualAccessor<T> accessor, int value);
+		
+		boolean getBoolean(VirtualAccessor<T> accessor);
+		void setBoolean(VirtualAccessor<T> accessor, boolean value);
+		
+		byte getByte(VirtualAccessor<T> accessor);
+		void setByte(VirtualAccessor<T> accessor, byte value);
 	}
 	
 	public static final class Unmanaged<T extends IOInstance.Unmanaged<T>> extends Struct<T>{
@@ -344,6 +398,7 @@ public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 			
 			STRUCT_CACHE.put(instanceClass, struct);
 		}catch(Throwable e){
+			e.printStackTrace();
 			throw new MalformedStructLayout("Failed to compile "+instanceClass.getName(), e);
 		}finally{
 			STRUCT_COMPILE.remove(instanceClass);

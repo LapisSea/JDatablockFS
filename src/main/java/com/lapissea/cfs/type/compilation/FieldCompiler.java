@@ -204,6 +204,8 @@ public class FieldCompiler{
 						}else{
 							if(List.of(long.class, double.class).contains(s.getType())){
 								primitiveSize=8;
+							}else if(List.of(byte.class, boolean.class).contains(s.getType())){
+								primitiveSize=1;
 							}else{
 								primitiveSize=4;
 							}
