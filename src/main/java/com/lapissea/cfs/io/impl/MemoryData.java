@@ -14,6 +14,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Objects;
 import java.util.stream.LongStream;
 
@@ -153,7 +154,7 @@ public abstract class MemoryData<DataType> implements IOInterface{
 			write(b, off, len, true);
 		}
 		
-		public void write(byte[] b, int off, int len, boolean pushPos){
+		private void write(byte[] b, int off, int len, boolean pushPos){
 			if(readOnly) throw new UnsupportedOperationException();
 			if(transactionOpen){
 				transactions.write(pos, b, off, len);
@@ -161,18 +162,48 @@ public abstract class MemoryData<DataType> implements IOInterface{
 				return;
 			}
 			
+			var oldPos=pos;
+			write0(b, off, len);
+			
+			if(pushPos){
+				pos+=len;
+				used=Math.max(used, pos);
+			}
+			logWriteEvent(oldPos, oldPos+len);
+		}
+		
+		@Override
+		public void writeAtOffsets(Collection<WriteChunk> writeData){
+			if(readOnly) throw new UnsupportedOperationException();
+			if(writeData.isEmpty()) return;
+			if(transactionOpen){
+				for(var e : writeData){
+					transactions.write(e.ioOffset(), e.data(), e.dataOffset(), e.dataLength());
+				}
+				return;
+			}
+			
+			var required=writeData.stream().mapToLong(WriteChunk::ioEnd).max().orElseThrow();
+			if(getCapacity()<required) setCapacity(Math.max(4, Math.max((int)(getCapacity()*4D/3), required)));
+			
+			used=Math.max(used, Math.toIntExact(required));
+			
+			for(var e : writeData){
+				writeN(e.data(), e.dataOffset(), data, Math.toIntExact(e.ioOffset()), e.dataLength());
+			}
+			
+			if(onWrite!=null){
+				logWriteEvent(writeData.stream().flatMapToLong(e->LongStream.range(e.ioOffset(), e.ioOffset()+e.dataLength())));
+			}
+		}
+		
+		private void write0(byte[] b, int off, int len){
 			if(len==0) return;
 			
 			int remaining=(int)(getCapacity()-getPos());
 			if(remaining<len) setCapacity(Math.max(4, Math.max((int)(getCapacity()*4D/3), getCapacity()+len-remaining)));
 			
 			writeN(b, off, data, pos, len);
-			var oldPos=pos;
-			if(pushPos){
-				pos+=len;
-				used=Math.max(used, pos);
-			}
-			logWriteEvent(oldPos, oldPos+len);
 		}
 		
 		@Override
@@ -347,7 +378,14 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		return ()->{
 			transactionOpen=oldTransactionOpen;
 			if(!oldTransactionOpen){
-				transactions.merge(this);
+				var data=transactions.export();
+				try(var io=io()){
+					var cap=data.setCapacity();
+					if(cap.isPresent()){
+						io.setCapacity(cap.getAsLong());
+					}
+					io.writeAtOffsets(data.writes());
+				}
 			}
 		};
 	}

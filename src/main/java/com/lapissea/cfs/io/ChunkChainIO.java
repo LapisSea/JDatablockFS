@@ -3,11 +3,16 @@ package com.lapissea.cfs.io;
 import com.lapissea.cfs.chunk.ChainWalker;
 import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.exceptions.BitDepthOutOfSpaceException;
+import com.lapissea.cfs.io.content.ContentOutputStream;
 import com.lapissea.util.ShouldNeverHappenError;
+import com.lapissea.util.UtilL;
 import com.lapissea.util.function.FunctionOL;
 
 import java.io.EOFException;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedList;
 import java.util.Objects;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
@@ -398,6 +403,104 @@ public final class ChunkChainIO implements RandomIO{
 	@Override
 	public boolean isReadOnly(){
 		return head.isReadOnly();
+	}
+	
+	@Override
+	public void writeAtOffsets(Collection<WriteChunk> data) throws IOException{
+		var requiredCapacity=data.stream().mapToLong(WriteChunk::ioEnd).max().orElse(0);
+		if(requiredCapacity==0) return;
+		ensureCapacity(requiredCapacity);
+		
+		var chunks=head.collectNext();
+		
+		long[] localRanges=new long[chunks.size()*2];
+		
+		var offset=0L;
+		for(int i=0;i<chunks.size();i++){
+			var chunk=chunks.get(i);
+			var cap  =chunk.getCapacity();
+			localRanges[i*2]=offset;
+			localRanges[i*2+1]=offset+cap;
+			offset+=cap;
+		}
+		
+		var mappedChunks=new ArrayList<WriteChunk>((int)(data.size()*1.1));
+		
+		var iter=data.iterator();
+		var redo=new LinkedList<WriteChunk>();
+		
+		int pushIndex=0;
+		
+		while(iter.hasNext()||!redo.isEmpty()){
+			WriteChunk unmapped;
+			if(!redo.isEmpty()) unmapped=redo.remove(0);
+			else{
+				unmapped=iter.next();
+			}
+			
+			var eStart=unmapped.ioOffset();
+			
+			int index=findIndex(localRanges, eStart);
+			
+			var start      =localRanges[index*2];
+			var end        =localRanges[index*2+1];
+			var size       =end-start;
+			var chunkOffset=eStart-start;
+			
+			var remaining=size-chunkOffset;
+			
+			
+			var chunk=chunks.get(index);
+			
+			if(remaining<unmapped.dataLength()){
+				var split=unmapped.split(Math.toIntExact(remaining));
+				unmapped=split.before();
+				redo.add(split.after());
+			}
+			
+			var w=unmapped.withOffset(chunk.dataStart()+chunkOffset);
+			
+			mappedChunks.add(w);
+			try{
+				if(pushIndex<index){
+					for(int j=pushIndex;j<index;j++){
+						var c=chunks.get(j);
+						c.setSize(c.getCapacity());
+					}
+					pushIndex=index;
+				}
+				chunk.pushSize(chunkOffset+unmapped.dataLength());
+			}catch(BitDepthOutOfSpaceException e){
+				throw new ShouldNeverHappenError(e);//already guarded
+			}
+		}
+		
+		for(Chunk chunk : chunks){
+			if(!chunk.dirty()) continue;
+			byte[] d=new byte[chunk.getHeaderSize()];
+			try(var out=new ContentOutputStream.BA(d)){
+				chunk.writeHeader(out);
+			}
+			UtilL.addRemainSorted(mappedChunks, new WriteChunk(chunk.getPtr().getValue(), d));
+		}
+		
+		source.writeAtOffsets(mappedChunks);
+	}
+	
+	private int findIndex(long[] localRanges, long writeStart){
+		for(int i=0;i<localRanges.length/2;i++){
+			var start=localRanges[i*2];
+			if(writeStart>=start){
+				var end        =localRanges[i*2+1];
+				var size       =end-start;
+				var chunkOffset=writeStart-start;
+				if(chunkOffset>=size){
+					continue;
+				}
+				return i;
+			}
+		}
+		throw new ShouldNeverHappenError();
 	}
 	
 	@Override
