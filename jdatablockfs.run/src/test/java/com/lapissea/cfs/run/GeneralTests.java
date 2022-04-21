@@ -179,6 +179,15 @@ public class GeneralTests{
 	
 	@ParameterizedTest
 	@ValueSource(classes={ContiguousIOList.class, LinkedIOList.class})
+	<L extends IOInstance.Unmanaged<L>&IOList<Integer>> void listTestIntAdd(Class<L> listType, TestInfo info) throws IOException{
+		listEqualityTest(info, listType, Integer.class, list->{
+			list.add(69);
+			list.add(420);
+		}, true);
+	}
+	
+	@ParameterizedTest
+	@ValueSource(classes={ContiguousIOList.class, LinkedIOList.class})
 	<L extends IOInstance.Unmanaged<L>&IOList<Dummy>> void listTestSimpleAdd(Class<L> listType, TestInfo info) throws IOException{
 		listEqualityTest(info, listType, Dummy.class, list->{
 			list.add(new Dummy(69));
