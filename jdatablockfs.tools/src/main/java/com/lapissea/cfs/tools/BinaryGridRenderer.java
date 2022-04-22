@@ -1278,11 +1278,11 @@ public class BinaryGridRenderer{
 						}
 						if(field instanceof BitFieldMerger<T> merger){
 							int bitOffset=0;
-							drawByteRanges(rctx, List.of(Range.fromSize(trueOffset, size)), chunkBaseColor(), false, true);
+							drawByteRanges(rctx, List.of(Range.fromSize(trueOffset, size)), col, false, true);
 							for(IOField.Bit<T, ?> bit : merger.fieldGroup()){
 								
 								var bCol=ColorUtils.makeCol(rand, typeHash, bit);
-								var siz =bit.getSizeDescriptor().calcUnknown(ioPool, ctx.provider, instance, WordSpace.BYTE);
+								var siz =bit.getSizeDescriptor().calcUnknown(ioPool, ctx.provider, instance, WordSpace.BIT);
 								
 								if(annotate) annotateBitField(ctx, ioPool, instance, bit, bCol, bitOffset, siz, reference, fieldOffset);
 								bitOffset+=siz;
