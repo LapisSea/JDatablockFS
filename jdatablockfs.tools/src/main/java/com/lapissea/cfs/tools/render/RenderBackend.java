@@ -10,6 +10,8 @@ import java.util.function.Consumer;
 
 public abstract class RenderBackend{
 	
+	public static final boolean DRAW_DEBUG=Boolean.parseBoolean(System.getProperty("drawDebug"));
+	
 	public static class Buffered extends RenderBackend{
 		
 		private sealed interface Command{

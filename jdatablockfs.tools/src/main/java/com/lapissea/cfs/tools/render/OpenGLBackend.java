@@ -68,6 +68,7 @@ public class OpenGLBackend extends RenderBackend{
 			if(inactive) return;
 			
 			glEnd();
+			debSwap();
 			glErrorPrint();
 		}
 	}
@@ -306,15 +307,18 @@ public class OpenGLBackend extends RenderBackend{
 		
 		window.swapBuffers();
 	}
+	
 	@Override
 	public DrawFont getFont(){
 		return font;
 	}
+	
 	@Override
 	public void preRender(){
 		flushTasks();
 		glDisable(GL_TEXTURE_2D);
 		glUseProgram(0);
+		debSwap();
 	}
 	
 	private void flushTasks(){
@@ -329,6 +333,7 @@ public class OpenGLBackend extends RenderBackend{
 	public void clearFrame(){
 		glViewport(0, 0, getDisplay().getWidth(), getDisplay().getHeight());
 		glClear(GL_COLOR_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
+		debSwap();
 	}
 	
 	
@@ -341,6 +346,7 @@ public class OpenGLBackend extends RenderBackend{
 		glLoadIdentity();
 		translate(-1, 1);
 		scale(2F/getDisplay().getWidth(), -2F/getDisplay().getHeight());
+		debSwap();
 	}
 	
 	@Override
@@ -401,7 +407,10 @@ public class OpenGLBackend extends RenderBackend{
 		vertex2dCpuTrans(p, t, x+width, length);
 		vertex2dCpuTrans(p, t, x, length);
 		
-		if(!isBulkDrawing()) glEnd();
+		if(!isBulkDrawing()){
+			glEnd();
+			debSwap();
+		}
 	}
 	private void vertex2dCpuTrans(Point2D.Double p, AffineTransform t, double x, double y){
 		p.setLocation(x, y);
@@ -425,6 +434,14 @@ public class OpenGLBackend extends RenderBackend{
 		glVertex3d(x+width, y, 0);
 		glVertex3d(x+width, y+height, 0);
 		glVertex3d(x, y+height, 0);
-		if(!isBulkDrawing()) glEnd();
+		if(!isBulkDrawing()){
+			glEnd();
+			debSwap();
+		}
+	}
+	private void debSwap(){
+		if(!DRAW_DEBUG) return;
+		window.swapBuffers();
+		window.pollEvents();
 	}
 }

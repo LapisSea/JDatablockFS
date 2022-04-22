@@ -49,7 +49,7 @@ public class DisplayManager implements DataLogger{
 		renderer=createBackend();
 		gridBuff=renderer.buffer();
 		
-		gridRenderer=new BinaryGridRenderer(gridBuff);
+		gridRenderer=new BinaryGridRenderer(RenderBackend.DRAW_DEBUG?renderer:gridBuff);
 		
 		Runnable updateTitle=()->{
 			var f=sessionHost.activeFrame.get();
@@ -245,7 +245,7 @@ public class DisplayManager implements DataLogger{
 		
 		renderer.preRender();
 		
-		if(!ImGui.getIO().getWantCaptureMouse()||gridRenderer.isDirty()){
+		if(RenderBackend.DRAW_DEBUG||!ImGui.getIO().getWantCaptureMouse()||gridRenderer.isDirty()){
 			gridBuff.clear();
 			hover=gridRenderer.render();
 		}
