@@ -45,6 +45,20 @@ public final class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends Abstra
 	
 	public VirtualAccessor(Struct<CTyp> struct, VirtualFieldDefinition<CTyp, Object> type, int ptrIndex, int primitiveOffset, int primitiveSize){
 		super(struct, type.getName(), type.getType());
+		
+		boolean noPtr=ptrIndex<0;
+		boolean noOff=primitiveOffset<0;
+		if(noPtr){
+			if(ptrIndex!=-1) throw new IllegalArgumentException("ptrIndex = "+ptrIndex);
+		}
+		if(noOff){
+			if(primitiveOffset!=-1) throw new IllegalArgumentException("primitiveOffset = "+primitiveOffset);
+		}
+		
+		if(noPtr==noOff){
+			throw new IllegalStateException("Must provide ptr index or primitive offset");
+		}
+		
 		this.type=type;
 		this.ptrIndex=ptrIndex;
 		this.primitiveOffset=primitiveOffset;
@@ -86,7 +100,7 @@ public final class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends Abstra
 			deps=getDeclaringStruct()
 				     .getFields()
 				     .stream()
-				     .filter(f->f.getDependencies().contains(field))
+				     .filter(f->f.isDependency(field))
 				     .map(IOField::getAccessor)
 				     .collect(Collectors.toList());
 		}
@@ -112,9 +126,7 @@ public final class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends Abstra
 		return ((GetterFilter.I<CTyp>)(Object)filter).filterPrimitive(ioPool, instance, deps, rawVal);
 	}
 	@Override
-	protected void setExactInt(Struct.Pool<CTyp> ioPool, CTyp instance, int value){
-		getTargetPool(ioPool, instance).setInt(this, value);
-	}
+	protected void setExactInt(Struct.Pool<CTyp> ioPool, CTyp instance, int value){getTargetPool(ioPool, instance).setInt(this, value);}
 	
 	@Override
 	protected short getExactShort(Struct.Pool<CTyp> ioPool, CTyp instance){return (short)getExactObject(ioPool, instance);}
@@ -122,9 +134,9 @@ public final class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends Abstra
 	protected void setExactShort(Struct.Pool<CTyp> ioPool, CTyp instance, short value){setExactObject(ioPool, instance, value);}
 	
 	@Override
-	protected byte getExactByte(Struct.Pool<CTyp> ioPool, CTyp instance){return (byte)getExactObject(ioPool, instance);}
+	protected byte getExactByte(Struct.Pool<CTyp> ioPool, CTyp instance){return getTargetPool(ioPool, instance).getByte(this);}
 	@Override
-	protected void setExactByte(Struct.Pool<CTyp> ioPool, CTyp instance, byte value){setExactObject(ioPool, instance, value);}
+	protected void setExactByte(Struct.Pool<CTyp> ioPool, CTyp instance, byte value){getTargetPool(ioPool, instance).setByte(this, value);}
 	
 	@Override
 	protected double getExactDouble(Struct.Pool<CTyp> ioPool, CTyp instance){return (double)getExactObject(ioPool, instance);}
@@ -137,9 +149,9 @@ public final class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends Abstra
 	protected void setExactFloat(Struct.Pool<CTyp> ioPool, CTyp instance, float value){setExactObject(ioPool, instance, value);}
 	
 	@Override
-	protected boolean getExactBoolean(Struct.Pool<CTyp> ioPool, CTyp instance){return (boolean)getExactObject(ioPool, instance);}
+	protected boolean getExactBoolean(Struct.Pool<CTyp> ioPool, CTyp instance){return getTargetPool(ioPool, instance).getBoolean(this);}
 	@Override
-	protected void setExactBoolean(Struct.Pool<CTyp> ioPool, CTyp instance, boolean value){setExactObject(ioPool, instance, value);}
+	protected void setExactBoolean(Struct.Pool<CTyp> ioPool, CTyp instance, boolean value){getTargetPool(ioPool, instance).setBoolean(this, value);}
 	
 	@Override
 	protected Object getExactObject(Struct.Pool<CTyp> ioPool, CTyp instance){

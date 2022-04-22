@@ -46,7 +46,7 @@ public final class Reference extends IOInstance<Reference>{
 					throw new ShouldNeverHappenError(f.toString());
 				}
 				@Override
-				protected void doWrite(DataProvider provider, ContentWriter dest, Reference instance) throws IOException{
+				protected void doWrite(DataProvider provider, ContentWriter dest, Struct.Pool<Reference> ioPool, Reference instance) throws IOException{
 					
 					var off=instance.getOffset();
 					var ptr=instance.getPtr();
@@ -91,7 +91,7 @@ public final class Reference extends IOInstance<Reference>{
 					throw new ShouldNeverHappenError(f.toString());
 				}
 				@Override
-				protected void doWrite(DataProvider provider, ContentWriter dest, Reference instance) throws IOException{
+				protected void doWrite(DataProvider provider, ContentWriter dest, Struct.Pool<Reference> ioPool, Reference instance) throws IOException{
 					
 					var off=instance.getOffset();
 					var ptr=instance.getPtr();

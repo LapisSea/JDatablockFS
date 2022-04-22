@@ -11,7 +11,7 @@
     <option name="MAIN_CLASS_NAME" value="com.lapissea.cfs.run.SlowTests" />
     <option name="METHOD_NAME" value="ioTransaction" />
     <option name="TEST_OBJECT" value="method" />
-    <option name="WORKING_DIRECTORY" value="$MODULE_DIR$" />
+    <option name="WORKING_DIRECTORY" value="$ProjectFileDir$/run/test" />
     <method v="2">
       <option name="Make" enabled="true" />
     </method>

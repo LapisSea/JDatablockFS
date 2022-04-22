@@ -1,24 +1,18 @@
 package com.lapissea.cfs.objects.collections;
 
-import com.lapissea.cfs.Utils;
-import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.DataProvider;
-import com.lapissea.cfs.exceptions.MalformedStructLayout;
-import com.lapissea.cfs.io.content.ContentReader;
-import com.lapissea.cfs.io.content.ContentWriter;
+import com.lapissea.cfs.io.RandomIO;
+import com.lapissea.cfs.io.ValueStorage;
 import com.lapissea.cfs.io.impl.MemoryData;
-import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
-import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.AbstractFieldAccessor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IOValue;
-import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeLongConsumer;
@@ -28,19 +22,11 @@ import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Type;
 import java.util.*;
-import java.util.function.LongFunction;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
 @SuppressWarnings("unchecked")
 public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIOList<T>>{
-	
-	private enum ElementForm{
-		INLINE_DIRECT,
-		INDIRECT,
-		UNMANAGED,
-		PRIMITIVE;
-	}
 	
 	private static final TypeLink.Check TYPE_CHECK=new TypeLink.Check(
 		ContiguousIOList.class,
@@ -51,17 +37,10 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 		})
 	);
 	
-	private static final FixedContiguousStructPipe<Reference> REF_PIPE=FixedContiguousStructPipe.of(Reference.STRUCT);
-	
 	@IOValue
 	private long size;
 	
-	private final StructPipe<?> elementPipe;
-	private final long          elementSize;
-	
-	private final RuntimeType<T>     type;
-	private final ElementForm        form;
-	private final SupportedPrimitive primitive;
+	private final ValueStorage<T> storage;
 	
 	private final Map<Long, T> cache;
 	
@@ -70,38 +49,7 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 		TYPE_CHECK.ensureValid(typeDef);
 		cache=readOnly?new HashMap<>():null;
 		
-		var clazz=typeDef.arg(0).getTypeClass(provider.getTypeDb());
-		type=RuntimeType.of((Class<T>)clazz);
-		
-		if(SupportedPrimitive.isAny(clazz)){
-			form=ElementForm.PRIMITIVE;
-			primitive=SupportedPrimitive.get(getTypeDef().arg(0).getTypeClass(getDataProvider().getTypeDb())).orElseThrow();
-		}else if(!IOInstance.isManaged(clazz)){
-			form=ElementForm.UNMANAGED;
-			primitive=null;
-		}else{
-			var canBeFixed=true;
-			try{
-				FixedContiguousStructPipe.of(Struct.ofUnknown(clazz));
-			}catch(MalformedStructLayout e){
-				canBeFixed=false;
-			}
-			form=canBeFixed?ElementForm.INLINE_DIRECT:ElementForm.INDIRECT;
-			primitive=null;
-		}
-		
-		elementPipe=switch(form){
-			case INLINE_DIRECT -> FixedContiguousStructPipe.of(Struct.ofUnknown(clazz));
-			case INDIRECT -> ContiguousStructPipe.of(Struct.ofUnknown(clazz));
-			case PRIMITIVE, UNMANAGED -> null;
-		};
-		
-		elementSize=switch(form){
-			case INLINE_DIRECT -> elementPipe.getSizeDescriptor().requireFixed(WordSpace.BYTE);
-			case INDIRECT -> -1;
-			case UNMANAGED -> REF_PIPE.getFixedDescriptor().get(WordSpace.BYTE);
-			case PRIMITIVE -> primitive.maxSize.get(WordSpace.BYTE);
-		};
+		this.storage=(ValueStorage<T>)ValueStorage.makeStorage(provider, typeDef.arg(0), getGenerics(), true);
 		
 		if(!readOnly&&isSelfDataEmpty()){
 			writeManagedFields();
@@ -117,7 +65,7 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 	}
 	
 	
-	private static <T extends IOInstance<T>> FieldAccessor<ContiguousIOList<T>> fieldAccessor(Type elementType, long index){
+	private static <T> FieldAccessor<ContiguousIOList<T>> fieldAccessor(Type elementType, long index){
 		return new AbstractFieldAccessor<>(null, elementName(index)){
 			@NotNull
 			@Override
@@ -146,52 +94,10 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 	private static String elementName(long index){
 		return "Element["+index+"]";
 	}
-	private static <T extends IOInstance<T>> IOField<ContiguousIOList<T>, ?> eFieldRefInst(Type elementType, long index){
-		var instPipe=ContiguousStructPipe.of((Class<T>)Utils.typeToRaw(elementType));
-		return new IOField.Ref.NoIO<ContiguousIOList<T>, T>(fieldAccessor(elementType, index), REF_PIPE.getFixedDescriptor()){
-			@Override
-			public void setReference(ContiguousIOList<T> instance, Reference newRef){
-				try{
-					instance.writeReferenceAt(index, newRef);
-				}catch(IOException e){
-					throw new RuntimeException(e);
-				}
-			}
-			@Override
-			public Reference getReference(ContiguousIOList<T> instance){
-				try{
-					return instance.readReferenceAt(index);
-				}catch(IOException e){
-					throw new RuntimeException(e);
-				}
-			}
-			@Override
-			public StructPipe<T> getReferencedPipe(ContiguousIOList<T> instance){
-				return instPipe;
-			}
-		};
-	}
 	
+	private static final FixedContiguousStructPipe<Reference> REF_PIPE=FixedContiguousStructPipe.of(Reference.STRUCT);
 	private static <T extends IOInstance.Unmanaged<T>> IOField<ContiguousIOList<T>, ?> eFieldUnmanagedInst(Type elementType, long index){
 		return new IOField.Ref.NoIO<ContiguousIOList<T>, T>(fieldAccessor(elementType, index), REF_PIPE.getFixedDescriptor()){
-			@Override
-			public void setReference(ContiguousIOList<T> instance, Reference newRef){
-				try{
-					instance.get(index).notifyReferenceMovement(newRef);
-					instance.writeReferenceAt(index, newRef);
-				}catch(IOException e){
-					throw new RuntimeException(e);
-				}
-			}
-			@Override
-			public Reference getReference(ContiguousIOList<T> instance){
-				try{
-					return instance.readReferenceAt(index);
-				}catch(IOException e){
-					throw new RuntimeException(e);
-				}
-			}
-			
 			@Override
 			public StructPipe<T> getReferencedPipe(ContiguousIOList<T> instance){
 				try{
@@ -200,11 +106,29 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 					throw new RuntimeException(e);
 				}
 			}
+			
+			@Override
+			public void setReference(ContiguousIOList<T> instance, Reference newRef){
+				try{
+					try(var io=instance.ioAtElement(index)){
+						REF_PIPE.write(instance.getDataProvider(), io, newRef);
+					}
+				}catch(IOException e){
+					throw new RuntimeException(e);
+				}
+			}
+			
+			@Override
+			public Reference getReference(ContiguousIOList<T> instance){
+				try{
+					try(var io=instance.ioAtElement(index)){
+						return REF_PIPE.readNew(instance.getDataProvider(), io, instance.getGenerics());
+					}
+				}catch(IOException e){
+					throw new RuntimeException(e);
+				}
+			}
 		};
-	}
-	
-	private static <T extends IOInstance<T>> IOField<ContiguousIOList<T>, ?> eFieldInst(Type elementType, SizeDescriptor.Fixed<T> desc, long index){
-		return new IOField.NoIO<ContiguousIOList<T>, T>(fieldAccessor(elementType, index), SizeDescriptor.Fixed.of(desc));
 	}
 	
 	@NotNull
@@ -212,14 +136,12 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 	public Stream<IOField<ContiguousIOList<T>, ?>> listDynamicUnmanagedFields(){
 		var typ=getTypeDef().arg(0).generic(getDataProvider().getTypeDb());
 		
-		LongFunction<IOField<ContiguousIOList<T>, ?>> mapper=switch(form){
-			case INLINE_DIRECT -> index->eFieldInst(typ, (SizeDescriptor.Fixed)elementPipe.getSizeDescriptor(), index);
-			case INDIRECT -> index->(IOField<ContiguousIOList<T>, ?>)(Object)eFieldRefInst(typ, index);
-			case UNMANAGED -> index->(IOField<ContiguousIOList<T>, ?>)(Object)eFieldUnmanagedInst(typ, index);
-			case PRIMITIVE -> index->(IOField<ContiguousIOList<T>, ?>)(Object)IOFieldPrimitive.make(fieldAccessor(typ, index));
-		};
-		
-		return LongStream.range(0, size()).mapToObj(mapper);
+		return LongStream.range(0, size()).mapToObj(index->{
+			if(storage instanceof ValueStorage.UnmanagedInstance){
+				return (IOField<ContiguousIOList<T>, ?>)(Object)eFieldUnmanagedInst(typ, index);
+			}
+			return storage.field(fieldAccessor(typ, index), ()->ioAtElement(index));
+		});
 	}
 	
 	private long calcElementOffset(long index, long siz){
@@ -227,131 +149,31 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 		return headSiz+siz*index;
 	}
 	private long getElementSize(){
-		return elementSize;
+		return storage.inlineSize();
 	}
 	
 	
-	private <I extends IOInstance<I>> void writeEl(ContentWriter io, I value) throws IOException{
-		((FixedContiguousStructPipe<I>)elementPipe).write(this, io, value);
-	}
-	private <I extends IOInstance<I>> I readEl(ContentReader io) throws IOException{
-		return ((FixedContiguousStructPipe<I>)elementPipe).readNew(getDataProvider(), io, getGenerics());
+	protected RandomIO ioAtElement(long index) throws IOException{
+		var io=selfIO();
+		try{
+			var pos=calcElementOffset(index, getElementSize());
+			io.skipExact(pos);
+		}catch(Throwable e){
+			io.close();
+			throw e;
+		}
+		return io;
 	}
 	
 	private void writeAt(long index, T value) throws IOException{
-		switch(form){
-			case INLINE_DIRECT -> {
-				var inst=(IOInstance)value;
-				try(var io=selfIO()){
-					var pos=calcElementOffset(index, getElementSize());
-					io.skipExact(pos);
-					
-					writeEl(io, inst);
-				}
-			}
-			case INDIRECT -> {
-				var inst=(IOInstance)value;
-				var ref =readReferenceAt(index);
-				if(ref.isNull()){
-					var c=AllocateTicket.withData((StructPipe)elementPipe, getDataProvider(), inst).submit(getDataProvider());
-					writeReferenceAt(index, c.getPtr().makeReference());
-					return;
-				}
-				try(var io=ref.io(this)){
-					writeEl(io, inst);
-				}
-			}
-			case UNMANAGED -> {
-				var inst=(IOInstance.Unmanaged)value;
-				var ref =readReferenceAt(index);
-				if(!ref.equals(inst.getReference())){
-					writeReferenceAt(index, inst.getReference());
-				}
-			}
-			case PRIMITIVE -> {
-				try(var io=selfIO()){
-					var pos=calcElementOffset(index, getElementSize());
-					io.skipExact(pos);
-					
-					writePrimitive(io, value);
-				}
-			}
-		}
-	}
-	
-	private void writePrimitive(ContentWriter io, T value) throws IOException{
-		switch(primitive){
-			case DOUBLE -> io.writeFloat8((Double)value);
-			case FLOAT -> io.writeFloat4((Float)value);
-			case LONG -> io.writeInt8((Long)value);
-			case INT -> io.writeInt4((Short)value);
-			case SHORT -> io.writeInt2((Integer)value);
-			case BYTE -> io.writeInt1((Integer)value);
-			case BOOLEAN -> io.writeBoolean((Boolean)value);
+		try(var io=ioAtElement(index)){
+			storage.write(io, value);
 		}
 	}
 	
 	private T readAt(long index) throws IOException{
-		return switch(form){
-			case INLINE_DIRECT -> {
-				try(var io=selfIO()){
-					var pos=calcElementOffset(index, getElementSize());
-					io.skipExact(pos);
-					
-					yield (T)readEl(io);
-				}
-			}
-			case INDIRECT -> {
-				var ref=readReferenceAt(index);
-				try(var io=ref.io(this)){
-					yield (T)readEl(io);
-				}
-			}
-			case UNMANAGED -> {
-				var typ   =getTypeDef().arg(0);
-				var struct=Struct.Unmanaged.ofUnknown(typ.getTypeClass(getDataProvider().getTypeDb()));
-				
-				var ref=readReferenceAt(index);
-				
-				yield (T)struct.requireUnmanagedConstructor().create(getDataProvider(), ref, typ);
-			}
-			case PRIMITIVE -> {
-				try(var io=selfIO()){
-					var pos=calcElementOffset(index, getElementSize());
-					io.skipExact(pos);
-					
-					yield readPrimitive(io);
-				}
-			}
-		};
-	}
-	
-	private T readPrimitive(ContentReader io) throws IOException{
-		return switch(primitive){
-			case DOUBLE -> (T)(Double)io.readFloat8();
-			case FLOAT -> (T)(Float)io.readFloat4();
-			case LONG -> (T)(Long)io.readInt8();
-			case INT -> (T)(Integer)io.readInt4();
-			case SHORT -> (T)(Short)io.readInt2();
-			case BYTE -> (T)(Byte)io.readInt1();
-			case BOOLEAN -> (T)(Boolean)io.readBoolean();
-		};
-	}
-	
-	private Reference readReferenceAt(long index) throws IOException{
-		try(var io=selfIO()){
-			var pos=calcElementOffset(index, REF_PIPE.getFixedDescriptor().requireFixed(WordSpace.BYTE));
-			io.skipExact(pos);
-			
-			return REF_PIPE.readNew(getDataProvider(), io, getGenerics());
-		}
-	}
-	private void writeReferenceAt(long index, Reference ref) throws IOException{
-		try(var io=selfIO()){
-			var pos=calcElementOffset(index, REF_PIPE.getFixedDescriptor().requireFixed(WordSpace.BYTE));
-			io.skipExact(pos);
-			
-			REF_PIPE.write(getDataProvider(), io, ref);
+		try(var io=ioAtElement(index)){
+			return storage.readNew(io);
 		}
 	}
 	
@@ -359,6 +181,7 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 	public long size(){
 		return size;
 	}
+	
 	@Override
 	protected void setSize(long size){
 		this.size=size;
@@ -411,7 +234,7 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 	}
 	
 	private void addMany(long count, UnsafeSupplier<T, IOException> source) throws IOException{
-		if(form==ElementForm.INDIRECT||form==ElementForm.UNMANAGED){//TODO
+		if(storage instanceof ValueStorage.FixedReferencedInstance||storage instanceof ValueStorage.UnmanagedInstance){//TODO
 			for(long i=0;i<count;i++){
 				add(source.get());
 			}
@@ -446,10 +269,7 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 				for(long c=0;c<count;c++){
 					T value=source.get();
 					
-					switch(form){
-						case INLINE_DIRECT -> writeEl(buffIo, (IOInstance)value);
-						case PRIMITIVE -> writePrimitive(buffIo, value);
-					}
+					storage.write(buffIo, value);
 					
 					i++;
 					var s=buffIo.getPos();
@@ -555,7 +375,7 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 	
 	@Override
 	public RuntimeType<T> getElementType(){
-		return type;
+		return storage.getType();
 	}
 	
 	@Override

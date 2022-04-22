@@ -1,6 +1,7 @@
 package com.lapissea.cfs.io;
 
 import java.io.IOException;
+import java.util.Collection;
 
 public class RandomIOReadOnly implements RandomIO{
 	private final RandomIO io;
@@ -108,9 +109,14 @@ public class RandomIOReadOnly implements RandomIO{
 	public void write(byte[] b, int off, int len) throws IOException{
 		throw new UnsupportedOperationException();
 	}
+	@Override
+	public void writeAtOffsets(Collection<WriteChunk> data) throws IOException{
+		throw new UnsupportedOperationException();
+	}
 	
 	@Override
 	public boolean isReadOnly(){
 		return true;
 	}
+	
 }

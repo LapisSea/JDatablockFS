@@ -8,13 +8,14 @@ import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.ArrayViewList;
 import com.lapissea.util.NotNull;
-import com.lapissea.util.UtilL;
 
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
+
+import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NULLABLE;
 
 public class TypeDef extends IOInstance<TypeDef>{
 	
@@ -26,7 +27,7 @@ public class TypeDef extends IOInstance<TypeDef>{
 		private String name;
 		
 		@IOValue
-		@IONullability(IONullability.Mode.NULLABLE)
+		@IONullability(NULLABLE)
 		private IONullability.Mode nullability;
 		
 		@IOValue
@@ -42,7 +43,7 @@ public class TypeDef extends IOInstance<TypeDef>{
 			name=field.getName();
 			nullability=field.getAccessor().getAnnotation(IONullability.class).map(IONullability::value).orElse(null);
 			isDynamic=field.getAccessor().hasAnnotation(IOType.Dynamic.class);
-			var deps=field.getDependencies().stream().map(IOField::getName).collect(Collectors.toSet());
+			var deps=field.dependencyStream().map(IOField::getName).collect(Collectors.toSet());
 			if(field.getAccessor().getType().isArray()) deps.remove(IOFieldTools.makeArrayLenName(field.getAccessor()));
 			if(isDynamic) deps.remove(IOFieldTools.makeGenericIDFieldName(field.getAccessor()));
 			dependencies=deps.toArray(String[]::new);
@@ -86,8 +87,8 @@ public class TypeDef extends IOInstance<TypeDef>{
 	
 	public TypeDef(@NotNull Class<?> type){
 		Objects.requireNonNull(type);
-		ioInstance=UtilL.instanceOf(type, IOInstance.class);
-		unmanaged=UtilL.instanceOf(type, IOInstance.Unmanaged.class);
+		ioInstance=IOInstance.isInstance(type);
+		unmanaged=IOInstance.isUnmanaged(type);
 		if(ioInstance){
 			if(!Modifier.isAbstract(type.getModifiers())){
 				fields=Struct.ofUnknown(type).getFields().stream().map(FieldDef::new).toArray(FieldDef[]::new);

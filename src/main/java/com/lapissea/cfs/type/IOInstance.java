@@ -158,14 +158,11 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>> implements Clone
 		}
 	}
 	
-	private final Struct<SELF>      thisStruct;
-	private final Struct.Pool<SELF> virtualFields;
+	private Struct<SELF>      thisStruct;
+	private Struct.Pool<SELF> virtualFields;
 	
-	@SuppressWarnings("unchecked")
-	public IOInstance(){
-		this.thisStruct=Struct.of((Class<SELF>)getClass());
-		virtualFields=getThisStruct().allocVirtualVarPool(INSTANCE);
-	}
+	public IOInstance(){}
+	
 	public IOInstance(Struct<SELF> thisStruct){
 		if(DEBUG_VALIDATION){
 			if(!thisStruct.getType().equals(getClass())){
@@ -176,12 +173,23 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>> implements Clone
 		virtualFields=getThisStruct().allocVirtualVarPool(INSTANCE);
 	}
 	
+	@SuppressWarnings("unchecked")
+	private void init(){
+		if(thisStruct!=null) return;
+		
+		thisStruct=Struct.of((Class<SELF>)getClass());
+		virtualFields=getThisStruct().allocVirtualVarPool(INSTANCE);
+	}
 	
 	public Struct<SELF> getThisStruct(){
+		init();
 		return thisStruct;
 	}
 	
-	private Struct.Pool<SELF> getVirtualPool(){return virtualFields;}
+	private Struct.Pool<SELF> getVirtualPool(){
+		init();
+		return virtualFields;
+	}
 	
 	@SuppressWarnings("unchecked")
 	protected final SELF self(){return (SELF)this;}
@@ -218,7 +226,7 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>> implements Clone
 	public int hashCode(){
 		int result=1;
 		var ioPool=getThisStruct().allocVirtualVarPool(IO);
-		for(var field : thisStruct.getFields()){
+		for(var field : getThisStruct().getFields()){
 			result=31*result+field.instanceHashCode(ioPool, self());
 		}
 		return result;
@@ -250,6 +258,9 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>> implements Clone
 		return isManaged(type.getTypeClass(null));
 	}
 	
+	public static boolean isUnmanaged(Class<?> type){
+		return UtilL.instanceOf(type, IOInstance.Unmanaged.class);
+	}
 	public static boolean isManaged(Class<?> type){
 		var isInstance =isInstance(type);
 		var isUnmanaged=UtilL.instanceOf(type, IOInstance.Unmanaged.class);
@@ -283,7 +294,7 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>> implements Clone
 				
 				arr=arr.clone();
 				
-				if(UtilL.instanceOf(typ.componentType(), IOInstance.class)){
+				if(IOInstance.isInstance(typ.componentType())){
 					var iArr=(IOInstance<?>[])arr;
 					for(int i=0;i<iArr.length;i++){
 						var el=iArr[i];
@@ -295,8 +306,8 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>> implements Clone
 				continue;
 			}
 			
-			if(!UtilL.instanceOf(typ, IOInstance.class)) continue;
-			if(UtilL.instanceOf(typ, IOInstance.Unmanaged.class)) continue;
+			if(!IOInstance.isInstance(typ)) continue;
+			if(IOInstance.isUnmanaged(typ)) continue;
 			var instField=(IOField<SELF, IOInstance<?>>)field;
 			
 			var val=instField.get(null, (SELF)this);

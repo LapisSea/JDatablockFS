@@ -546,11 +546,11 @@ public class BinaryGridRenderer{
 			}
 		}
 		
-		if(renderStatic){
+		if(renderStatic||RenderBackend.DRAW_DEBUG){
 			renderStatic=false;
 			buff.clear();
 			
-			var rCtx=new RenderContext(buff, bytes, getPixelsPerByte(), dis, new ArrayList<>());
+			var rCtx=new RenderContext(RenderBackend.DRAW_DEBUG?direct:buff, bytes, getPixelsPerByte(), dis, new ArrayList<>());
 			drawStatic(frame, rCtx, parsed);
 			this.lastHoverMessages=List.copyOf(rCtx.hoverMessages);
 		}
@@ -633,8 +633,30 @@ public class BinaryGridRenderer{
 				var          cl      =cluster;
 				var          root    =cluster.rootWalker().getRoot();
 				
+				
+				List<DrawFont.StringDraw> strings, stringOutlines;
+				if(RenderBackend.DRAW_DEBUG){
+					strings=new ArrayList<>(){
+						@Override
+						public boolean add(DrawFont.StringDraw stringDraw){
+							ctx.renderer.getFont().fillStrings(List.of(stringDraw));
+							return true;
+						}
+					};
+					stringOutlines=new ArrayList<>(){
+						@Override
+						public boolean add(DrawFont.StringDraw stringDraw){
+							ctx.renderer.getFont().outlineStrings(List.of(stringDraw));
+							return true;
+						}
+					};
+				}else{
+					strings=new ArrayList<>();
+					stringOutlines=new ArrayList<>();
+				}
+				
 				Throwable e1    =null;
-				var       annCtx=new AnnotateCtx(ctx, provider, new LinkedList<>(), ptrs::add, new ArrayList<>(), new ArrayList<>());
+				var       annCtx=new AnnotateCtx(ctx, provider, new LinkedList<>(), ptrs::add, strings, stringOutlines);
 				
 				try{
 					
@@ -1204,7 +1226,7 @@ public class BinaryGridRenderer{
 					
 					long trueOffset=offsetStart+fieldOffset;
 					var  sizeDesc  =field.getSizeDescriptor();
-					size=sizeDesc.calcUnknown(ioPool, ctx.provider, instance);
+					size=sizeDesc.calcUnknown(ioPool, ctx.provider, instance, sizeDesc.getWordSpace());
 					
 					try{
 						if(acc!=null&&acc.hasAnnotation(IOType.Dynamic.class)){
@@ -1256,11 +1278,11 @@ public class BinaryGridRenderer{
 						}
 						if(field instanceof BitFieldMerger<T> merger){
 							int bitOffset=0;
-							drawByteRanges(rctx, List.of(Range.fromSize(trueOffset, size)), chunkBaseColor(), false, true);
+							drawByteRanges(rctx, List.of(Range.fromSize(trueOffset, size)), col, false, true);
 							for(IOField.Bit<T, ?> bit : merger.fieldGroup()){
 								
 								var bCol=ColorUtils.makeCol(rand, typeHash, bit);
-								var siz =bit.getSizeDescriptor().calcUnknown(ioPool, ctx.provider, instance);
+								var siz =bit.getSizeDescriptor().calcUnknown(ioPool, ctx.provider, instance, WordSpace.BIT);
 								
 								if(annotate) annotateBitField(ctx, ioPool, instance, bit, bCol, bitOffset, siz, reference, fieldOffset);
 								bitOffset+=siz;
@@ -1307,7 +1329,7 @@ public class BinaryGridRenderer{
 									typ=inst.getClass();
 								}
 							}
-							if(UtilL.instanceOf(typ, IOInstance.class)){
+							if(IOInstance.isInstance(typ)){
 								var inst=(IOInstance<?>)field.get(ioPool, instance);
 								if(inst!=null){
 									annotateStruct(ctx, (T)inst, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), inst.getThisStruct()), generics(instance, parentGenerics), annotate);
@@ -1443,7 +1465,7 @@ public class BinaryGridRenderer{
 						fieldErr.addSuppressed(err);
 					}
 					var sizeDesc=field.getSizeDescriptor();
-					var size    =sizeDesc.calcUnknown(ioPool, ctx.provider, instance);
+					var size    =sizeDesc.calcUnknown(ioPool, ctx.provider, instance, WordSpace.BYTE);
 					outlineByteRange(Color.RED, ctx.renderCtx, Range.fromSize(offsetStart+fieldOffset-size, size));
 				}
 			}

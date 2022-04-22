@@ -24,8 +24,8 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -81,33 +81,46 @@ public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 				}
 			}
 			
-			private int getPtrIndex(VirtualAccessor<T> accessor){
-				if(DEBUG_VALIDATION) protectAccessor(accessor);
-				
+			@Override
+			public void set(VirtualAccessor<T> accessor, Object value){
 				int index=accessor.getPtrIndex();
 				if(index==-1){
-					if(accessor.getPrimitiveOffset()==-1) throw new IllegalStateException(TextUtil.toNamedJson(accessor));
-					throw new ClassCastException(accessor+" is not of an object type!");
+					Objects.requireNonNull(value);
+					var typ=accessor.getType();
+					if(typ==long.class) setLong(accessor, switch(value){
+						case Long n -> n;
+						case Integer n -> n;
+						case Short n -> n;
+						case Byte n -> n;
+						default -> throw new ClassCastException(value.getClass().getName()+" can not be converted to long");
+					});
+					else if(typ==int.class) setInt(accessor, switch(value){
+						case Integer n -> n;
+						case Short n -> n;
+						case Byte n -> n;
+						default -> throw new ClassCastException(value.getClass().getName()+" can not be converted to int");
+					});
+					else if(typ==byte.class) setByte(accessor, (Byte)value);
+					else if(typ==boolean.class) setBoolean(accessor, (Boolean)value);
+					else throw new NotImplementedException(typ.getName());
 				}
-				return index;
+				if(DEBUG_VALIDATION) protectAccessor(accessor);
+				if(pool==null) pool=new Object[poolSize];
+				pool[index]=value;
 			}
 			
 			@Override
-			public void set(VirtualAccessor<T> accessor, Object value){
-				int index=getPtrIndex(accessor);
-				if(pool==null) pool=new Object[poolSize];
-				pool[index]=value;
-				
-			}
-			@Override
 			public Object get(VirtualAccessor<T> accessor){
-				if(accessor.getPtrIndex()==-1){
+				int index=accessor.getPtrIndex();
+				if(index==-1){
 					var typ=accessor.getType();
 					if(typ==long.class) return getLong(accessor);
 					if(typ==int.class) return getInt(accessor);
+					if(typ==boolean.class) return getBoolean(accessor);
+					if(typ==byte.class) return getByte(accessor);
 					throw new NotImplementedException(typ.getName());
 				}
-				int index=getPtrIndex(accessor);
+				if(DEBUG_VALIDATION) protectAccessor(accessor);
 				if(pool==null) return null;
 				return pool[index];
 			}
@@ -160,7 +173,42 @@ public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 					default -> throw new IllegalStateException();
 				}
 			}
+			@Override
+			public boolean getBoolean(VirtualAccessor<T> accessor){
+				if(DEBUG_VALIDATION) protectAccessor(accessor, List.of(boolean.class));
+				return getByte0(accessor)==1;
+			}
 			
+			@Override
+			public void setBoolean(VirtualAccessor<T> accessor, boolean value){
+				if(DEBUG_VALIDATION) protectAccessor(accessor, List.of(boolean.class));
+				setByte0(accessor, (byte)(value?1:0));
+			}
+			
+			@Override
+			public byte getByte(VirtualAccessor<T> accessor){
+				if(DEBUG_VALIDATION) protectAccessor(accessor, List.of(byte.class));
+				return getByte0(accessor);
+			}
+			
+			@Override
+			public void setByte(VirtualAccessor<T> accessor, byte value){
+				if(DEBUG_VALIDATION) protectAccessor(accessor, List.of(byte.class));
+				setByte0(accessor, value);
+			}
+			
+			private byte getByte0(VirtualAccessor<T> accessor){
+				if(primitives==null) return 0;
+				return MemPrimitive.getByte(primitives, accessor.getPrimitiveOffset());
+			}
+			
+			private void setByte0(VirtualAccessor<T> accessor, byte value){
+				if(primitives==null){
+					if(value==0) return;
+					primitives=new byte[primitiveMemorySize];
+				}
+				MemPrimitive.setByte(primitives, accessor.getPrimitiveOffset(), value);
+			}
 			
 			@Override
 			public String toString(){
@@ -183,6 +231,12 @@ public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 		
 		int getInt(VirtualAccessor<T> accessor);
 		void setInt(VirtualAccessor<T> accessor, int value);
+		
+		boolean getBoolean(VirtualAccessor<T> accessor);
+		void setBoolean(VirtualAccessor<T> accessor, boolean value);
+		
+		byte getByte(VirtualAccessor<T> accessor);
+		void setByte(VirtualAccessor<T> accessor, byte value);
 	}
 	
 	public static final class Unmanaged<T extends IOInstance.Unmanaged<T>> extends Struct<T>{
@@ -203,7 +257,7 @@ public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 		public static Unmanaged<?> ofUnknown(@NotNull Class<?> instanceClass){
 			Objects.requireNonNull(instanceClass);
 			
-			if(!UtilL.instanceOf(instanceClass, IOInstance.class)){
+			if(!IOInstance.isInstance(instanceClass)){
 				throw new IllegalArgumentException(instanceClass.getName()+" is not an "+IOInstance.class.getSimpleName());
 			}
 			
@@ -274,7 +328,7 @@ public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 		}
 	}
 	
-	private static final Lock STRUCT_CACHE_LOCK=new ReentrantLock();
+	private static final ReadWriteLock STRUCT_CACHE_LOCK=new ReentrantReadWriteLock();
 	
 	private static final Map<Class<?>, Struct<?>> STRUCT_CACHE  =new WeakValueHashMap<>();
 	private static final Map<Class<?>, Thread>    STRUCT_COMPILE=new ConcurrentHashMap<>();
@@ -297,7 +351,7 @@ public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 	public static Struct<?> ofUnknown(@NotNull Class<?> instanceClass){
 		Objects.requireNonNull(instanceClass);
 		
-		if(!UtilL.instanceOf(instanceClass, IOInstance.class)){
+		if(!IOInstance.isInstance(instanceClass)){
 			throw new IllegalArgumentException(instanceClass.getName()+" is not an "+IOInstance.class.getSimpleName());
 		}
 		
@@ -311,12 +365,12 @@ public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 		Struct<T> cached=getCached(instanceClass);
 		if(cached!=null) return cached;
 		
-		if(UtilL.instanceOf(instanceClass, IOInstance.Unmanaged.class)){
+		if(IOInstance.isUnmanaged(instanceClass)){
 			return (Struct<T>)Unmanaged.ofUnknown(instanceClass);
 		}
 		return compile(instanceClass, t->{
-			if(!UtilL.instanceOf(t, IOInstance.class)) throw new ClassCastException(t.getName()+" is not an "+IOInstance.class.getSimpleName());
-			if(UtilL.instanceOf(t, IOInstance.Unmanaged.class)) throw new ClassCastException(t.getName()+" is unmanaged!");
+			if(!IOInstance.isInstance(t)) throw new ClassCastException(t.getName()+" is not an "+IOInstance.class.getSimpleName());
+			if(IOInstance.isUnmanaged(t)) throw new ClassCastException(t.getName()+" is unmanaged!");
 			return new Struct<>(t);
 		});
 	}
@@ -331,23 +385,33 @@ public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 		if(thread!=null&&thread==Thread.currentThread()){
 			throw new MalformedStructLayout("Recursive struct compilation");
 		}
+		{
+			var lock=STRUCT_CACHE_LOCK.readLock();
+			try{
+				lock.lock();
+				//If class was compiled in another thread this should early exit
+				var existing=STRUCT_CACHE.get(instanceClass);
+				if(existing!=null) return (S)existing;
+			}finally{
+				lock.unlock();
+			}
+		}
 		
-		S struct;
+		var lock=STRUCT_CACHE_LOCK.writeLock();
+		S   struct;
 		try{
-			STRUCT_CACHE_LOCK.lock();
-			//If class was compiled in another thread this should early exit
-			var existing=STRUCT_CACHE.get(instanceClass);
-			if(existing!=null) return (S)existing;
+			lock.lock();
 			STRUCT_COMPILE.put(instanceClass, Thread.currentThread());
 			
 			struct=newStruct.apply(instanceClass);
 			
 			STRUCT_CACHE.put(instanceClass, struct);
 		}catch(Throwable e){
+			e.printStackTrace();
 			throw new MalformedStructLayout("Failed to compile "+instanceClass.getName(), e);
 		}finally{
 			STRUCT_COMPILE.remove(instanceClass);
-			STRUCT_CACHE_LOCK.unlock();
+			lock.unlock();
 		}
 		
 		if(GlobalConfig.PRINT_COMPILATION){
@@ -358,11 +422,12 @@ public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 	
 	@SuppressWarnings("unchecked")
 	private static <T extends IOInstance<T>> Struct<T> getCached(Class<T> instanceClass){
+		var lock=STRUCT_CACHE_LOCK.readLock();
 		try{
-			STRUCT_CACHE_LOCK.lock();
+			lock.lock();
 			return (Struct<T>)STRUCT_CACHE.get(instanceClass);
 		}finally{
-			STRUCT_CACHE_LOCK.unlock();
+			lock.unlock();
 		}
 	}
 	

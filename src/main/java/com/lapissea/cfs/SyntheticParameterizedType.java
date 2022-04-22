@@ -11,6 +11,16 @@ import static com.lapissea.cfs.Utils.extractFromVarType;
 
 public final class SyntheticParameterizedType implements ParameterizedType{
 	
+	public static Type of(Type ownerType, Class<?> rawType, Type[] actualTypeArguments){
+		if(actualTypeArguments.length==0) return rawType;
+		return new SyntheticParameterizedType(ownerType, rawType, actualTypeArguments);
+	}
+	
+	public static Type of(Class<?> rawType, Type[] actualTypeArguments){
+		if(actualTypeArguments.length==0) return rawType;
+		return new SyntheticParameterizedType(rawType, actualTypeArguments);
+	}
+	
 	public static SyntheticParameterizedType generalize(Type type){
 		return switch(type){
 			case ParameterizedType t -> new SyntheticParameterizedType((Class<?>)t.getRawType(), t.getActualTypeArguments());
@@ -23,13 +33,13 @@ public final class SyntheticParameterizedType implements ParameterizedType{
 	private final Type     ownerType;
 	private final Class<?> rawType;
 	
-	public SyntheticParameterizedType(Type ownerType, Class<?> rawType, Type... actualTypeArguments){
+	private SyntheticParameterizedType(Type ownerType, Class<?> rawType, Type... actualTypeArguments){
 		this.ownerType=ownerType;
 		this.actualTypeArguments=actualTypeArguments.clone();
 		this.rawType=rawType;
 	}
 	
-	public SyntheticParameterizedType(Class<?> rawType, Type... actualTypeArguments){
+	private SyntheticParameterizedType(Class<?> rawType, Type... actualTypeArguments){
 		this(null, rawType, actualTypeArguments);
 	}
 	

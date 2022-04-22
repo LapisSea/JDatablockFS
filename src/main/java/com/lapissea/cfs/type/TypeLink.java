@@ -72,7 +72,7 @@ public final class TypeLink extends IOInstance<TypeLink>{
 		for(int i=0;i<parms.length;i++){
 			args[i]=readType(iter);
 		}
-		return new SyntheticParameterizedType(cls, args);
+		return SyntheticParameterizedType.of(cls, args);
 	}
 	
 	public static TypeLink ofFlat(Class<?>... args){
@@ -80,7 +80,7 @@ public final class TypeLink extends IOInstance<TypeLink>{
 	}
 	
 	public static TypeLink of(Class<?> raw, Type... args){
-		return of(new SyntheticParameterizedType(raw, args));
+		return of(SyntheticParameterizedType.of(raw, args));
 	}
 	
 	public static TypeLink of(Type genericType){
@@ -196,7 +196,7 @@ public final class TypeLink extends IOInstance<TypeLink>{
 		return nam;
 	}
 	public Type generic(IOTypeDB db){
-		if(generic==null) generic=new SyntheticParameterizedType(null, getTypeClass(db), Arrays.stream(args).map(t->t.getTypeClass(db)).toArray(Type[]::new));
+		if(generic==null) generic=SyntheticParameterizedType.of(getTypeClass(db), Arrays.stream(args).map(t->t.getTypeClass(db)).toArray(Type[]::new));
 		return generic;
 	}
 	

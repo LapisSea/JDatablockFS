@@ -34,7 +34,7 @@ public class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends IOField.
 					if(nullable()) return 0;
 					throw new NullPointerException();
 				}
-				return desc.calcUnknown(AutoText.PIPE.makeIOPool(), prov, val);
+				return desc.calcUnknown(AutoText.PIPE.makeIOPool(), prov, val, desc.getWordSpace());
 			}
 		);
 	}

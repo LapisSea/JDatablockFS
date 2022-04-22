@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.OptionalLong;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
@@ -332,28 +333,17 @@ public class IOTransactionBuffer{
 		return new IOEvent.Write(offset, data);
 	}
 	
-	public void merge(IOInterface dest) throws IOException{
-		if(writeEvents.isEmpty()) return;
-		try(var io=dest.io()){
-			
-			if(modifiedCapacity!=-1){
-				io.setCapacity(modifiedCapacity);
-			}
-			
-			while(writeEvents.size()>1){
-				var e1=writeEvents.get(0);
-				var e2=writeEvents.get(1);
-				
-				var start=e1.end();
-				var end  =e2.start();
-				var size =Math.toIntExact(end-start);
-				write(start, io.setPos(start).readInts1(size), 0, size);
-			}
-			var event=writeEvents.get(0);
-			io.setPos(event.offset).write(event.data);
-			
+	public record TransactionExport(OptionalLong setCapacity, List<RandomIO.WriteChunk> writes){}
+	
+	public TransactionExport export(){
+		var writes     =writeEvents.stream().map(e->new RandomIO.WriteChunk(e.offset, e.data)).toList();
+		var setCapacity=OptionalLong.empty();
+		if(modifiedCapacity!=-1){
+			setCapacity=OptionalLong.of(modifiedCapacity);
 		}
 		reset();
+		
+		return new TransactionExport(setCapacity, writes);
 	}
 	
 	private void reset(){

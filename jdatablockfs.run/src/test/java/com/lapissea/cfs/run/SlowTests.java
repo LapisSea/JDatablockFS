@@ -1,23 +1,139 @@
 package com.lapissea.cfs.run;
 
+import com.lapissea.cfs.chunk.AllocateTicket;
+import com.lapissea.cfs.chunk.Chunk;
+import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.io.IOInterface;
+import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.impl.MemoryData;
+import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.ObjectID;
 import com.lapissea.cfs.objects.collections.HashIOMap;
 import com.lapissea.cfs.objects.collections.IOMap;
+import com.lapissea.cfs.tools.logging.DataLogger;
+import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.cfs.type.TypeLink;
+import com.lapissea.util.LateInit;
 import com.lapissea.util.LogUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
+import org.opentest4j.AssertionFailedError;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.HexFormat;
-import java.util.Random;
+import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 public class SlowTests{
+	
+	@Test
+	void ioMultiWrite() throws IOException{
+		LateInit<DataLogger> logger;
+		logger=new LateInit<>(()->DataLogger.Blank.INSTANCE);
+//		logger=LoggedMemoryUtils.createLoggerFromConfig();
+		
+		byte[] baked;
+		{
+			var d=MemoryData.build().build();
+			Cluster.init(d);
+			baked=d.readAll();
+		}
+		
+		long   lastTim=0;
+		Random r      =new Random(1);
+		for(int iter=0;iter<500000;iter++){
+			if(System.currentTimeMillis()-lastTim>1000){
+				lastTim=System.currentTimeMillis();
+				LogUtil.println(iter);
+			}
+			try{
+				List<RandomIO.WriteChunk> allWrites;
+				if(iter==0){
+					var b=new byte[10];
+					Arrays.fill(b, (byte)(1));
+					allWrites=List.of(new RandomIO.WriteChunk(1, b));
+				}else allWrites=IntStream.range(0, r.nextInt(10)+1).mapToObj(i->{
+					var bytes=new byte[15];
+					Arrays.fill(bytes, (byte)(i+1));
+					return new RandomIO.WriteChunk(r.nextInt(20), bytes);
+				}).toList();
+				
+				Chunk head;
+				
+				IOInterface mem=LoggedMemoryUtils.newLoggedMemory("default", logger);
+				try(var ignored=mem.openIOTransaction()){
+					var chunks=new ArrayList<Chunk>();
+					
+					mem.write(true, baked);
+					Cluster c=new Cluster(mem);
+					
+					var chunkCount=r.nextInt(5)+1;
+					for(int i=0;i<chunkCount;i++){
+						chunks.add(AllocateTicket.bytes(r.nextInt(10)+1).withNext(ChunkPointer.of(1000)).submit(c));
+					}
+					
+					for(int i=0;i<100;i++){
+						var ai=r.nextInt(chunks.size());
+						var bi=r.nextInt(chunks.size());
+						
+						var a=chunks.get(ai);
+						var b=chunks.get(bi);
+						
+						chunks.set(ai, b);
+						chunks.set(bi, a);
+					}
+					
+					head=chunks.get(0);
+					var last=head;
+					for(int i=1;i<chunks.size();i++){
+						var next=chunks.get(i);
+						last.setNextPtr(next.getPtr());
+						last.syncStruct();
+						last=next;
+					}
+					last.setNextPtr(ChunkPointer.NULL);
+					last.syncStruct();
+				}
+				
+				for(int i=0;i<allWrites.size();i++){
+					var writes=allWrites.subList(0, i+1);
+
+//					for(RandomIO.WriteChunk write : writes){
+//						LogUtil.println(write);
+//					}
+					
+					try(var io=head.io()){
+						io.writeAtOffsets(writes);
+					}
+					
+					var read=head.readAll();
+					
+					var valid=new byte[Math.toIntExact(writes.stream().mapToLong(RandomIO.WriteChunk::ioEnd).max().orElseThrow())];
+					for(RandomIO.WriteChunk write : writes){
+						System.arraycopy(write.data(), 0, valid, Math.toIntExact(write.ioOffset()), write.dataLength());
+					}
+
+//					LogUtil.println(IntStream.range(0, valid.length).mapToObj(a->(valid[a]+"")).collect(Collectors.joining()));
+//					LogUtil.println(IntStream.range(0, read.length).mapToObj(a->(read[a]+"")).collect(Collectors.joining()));
+					
+					int finalIter=iter;
+					Assertions.assertArrayEquals(read, valid, ()->{
+						return finalIter+"\n"+
+						       IntStream.range(0, valid.length).mapToObj(a->(valid[a]+"")).collect(Collectors.joining())+"\n"+
+						       IntStream.range(0, read.length).mapToObj(a->(read[a]+"")).collect(Collectors.joining());
+					});
+					
+				}
+			}catch(AssertionFailedError e){
+				throw e;
+			}catch(Throwable e){
+				throw new RuntimeException(iter+"", e);
+			}
+		}
+		
+	}
 	
 	@Test
 	void ioTransaction() throws IOException{

@@ -89,6 +89,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 					}catch(FieldIsNullException e){
 //						LogUtil.println("warning, "+struct+" is non conforming");
 					}catch(IOException e){
+						e.printStackTrace();
 						throw new RuntimeException(e);
 					}
 				}
@@ -131,7 +132,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		sizeDescription=createSizeDescriptor();
 		ioPoolAccessors=Utils.nullIfEmpty(calcIOPoolAccessors());
 		earlyNullChecks=Utils.nullIfEmpty(getNonNulls());
-		generators=Utils.nullIfEmpty(ioFields.stream().map(IOField::getGenerators).flatMap(Collection::stream).toList());
+		generators=Utils.nullIfEmpty(ioFields.stream().flatMap(IOField::generatorStream).toList());
 	}
 	
 	private List<IOField<T, ?>> getNonNulls(){
@@ -251,27 +252,27 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		var ioPool=makeIOPool();
 		earlyCheckNulls(ioPool, instance);
 		try(var io=dest.io()){
-			doWrite(provider, io, instance);
+			doWrite(provider, io, ioPool, instance);
 		}
 	}
 	public final void write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		var ioPool=makeIOPool();
 		earlyCheckNulls(ioPool, instance);
-		doWrite(provider, dest, instance);
+		doWrite(provider, dest, ioPool, instance);
 	}
 	public final void write(DataProvider.Holder holder, ContentWriter dest, T instance) throws IOException{
 		var ioPool=makeIOPool();
 		earlyCheckNulls(ioPool, instance);
-		doWrite(holder.getDataProvider(), dest, instance);
+		doWrite(holder.getDataProvider(), dest, ioPool, instance);
 	}
 	public final <Prov extends DataProvider.Holder&RandomIO.Creator> void write(Prov dest, T instance) throws IOException{
 		var ioPool=makeIOPool();
 		earlyCheckNulls(ioPool, instance);
 		try(var io=dest.io()){
-			doWrite(dest.getDataProvider(), io, instance);
+			doWrite(dest.getDataProvider(), io, ioPool, instance);
 		}
 	}
-	protected abstract void doWrite(DataProvider provider, ContentWriter dest, T instance) throws IOException;
+	protected abstract void doWrite(DataProvider provider, ContentWriter dest, Struct.Pool<T> ioPool, T instance) throws IOException;
 	
 	
 	public <Prov extends DataProvider.Holder&RandomIO.Creator> void modify(Prov src, UnsafeConsumer<T, IOException> modifier, GenericContext genericContext) throws IOException{
@@ -434,19 +435,19 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 			shouldRun=false;
 			
 			for(IOField<T, ?> field : new HashSet<>(selectedWriteFieldsSet)){
-				var deps=field.getDependencies();
-				if(!deps.isEmpty()){
-					if(selectedWriteFieldsSet.addAll(deps)) shouldRun=true;
+				if(field.hasDependencies()){
+					if(selectedWriteFieldsSet.addAll(field.getDependencies())) shouldRun=true;
 				}
 				var gens=field.getGenerators();
-				for(var gen : gens){
-					if(selectedWriteFieldsSet.add(gen.field())) shouldRun=true;
+				if(gens!=null){
+					for(var gen : gens){
+						if(selectedWriteFieldsSet.add(gen.field())) shouldRun=true;
+					}
 				}
 			}
 			for(IOField<T, ?> field : new HashSet<>(selectedReadFieldsSet)){
-				var deps=field.getDependencies();
-				if(!deps.isEmpty()){
-					if(selectedReadFieldsSet.addAll(deps)) shouldRun=true;
+				if(field.hasDependencies()){
+					if(selectedReadFieldsSet.addAll(field.getDependencies())) shouldRun=true;
 				}
 			}
 			
@@ -466,7 +467,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		
 		var writeFields=fieldSetToOrderedList(selectedWriteFieldsSet);
 		var readFields =fieldSetToOrderedList(selectedReadFieldsSet);
-		var generators =writeFields.stream().flatMap(e->e.getGenerators().stream()).toList();
+		var generators =writeFields.stream().flatMap(IOField::generatorStream).toList();
 		
 		return new IODependency<>(
 			writeFields,

@@ -21,10 +21,10 @@ public class ContiguousStructPipe<T extends IOInstance<T>> extends StructPipe<T>
 		return pip.calcUnknownSize(provider, instance, wordSpace);
 	}
 	
-	public static <T extends IOInstance<T>> StructPipe<T> of(Class<T> type){
+	public static <T extends IOInstance<T>> ContiguousStructPipe<T> of(Class<T> type){
 		return of(Struct.of(type));
 	}
-	public static <T extends IOInstance<T>> StructPipe<T> of(Struct<T> struct){
+	public static <T extends IOInstance<T>> ContiguousStructPipe<T> of(Struct<T> struct){
 		return of(ContiguousStructPipe.class, struct);
 	}
 	
@@ -46,8 +46,7 @@ public class ContiguousStructPipe<T extends IOInstance<T>> extends StructPipe<T>
 	}
 	
 	@Override
-	protected void doWrite(DataProvider provider, ContentWriter dest, T instance) throws IOException{
-		var ioPool=makeIOPool();
+	protected void doWrite(DataProvider provider, ContentWriter dest, Struct.Pool<T> ioPool, T instance) throws IOException{
 		writeIOFields(getSpecificFields(), ioPool, provider, dest, instance);
 	}
 	

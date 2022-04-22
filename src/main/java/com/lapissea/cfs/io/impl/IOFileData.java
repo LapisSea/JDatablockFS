@@ -11,6 +11,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.util.Collection;
 import java.util.stream.LongStream;
 
 import static com.lapissea.util.UtilL.Assert;
@@ -99,6 +100,10 @@ public class IOFileData implements IOInterface, AutoCloseable{
 		@Override
 		public void write(byte[] b, int off, int len) throws IOException{
 			write(b, off, len, true);
+		}
+		@Override
+		public void writeAtOffsets(Collection<WriteChunk> data) throws IOException{
+			throw NotImplementedException.infer();//TODO: implement FIleRandomIO.writeAtOffsets()
 		}
 		
 		public void write(byte[] b, int off, int len, boolean pushPos) throws IOException{

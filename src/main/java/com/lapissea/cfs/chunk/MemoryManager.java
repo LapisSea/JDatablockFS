@@ -3,7 +3,6 @@ package com.lapissea.cfs.chunk;
 import com.lapissea.cfs.exceptions.UnknownAllocationMethodException;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.collections.IOList;
-import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotNull;
 
 import java.io.IOException;
@@ -80,8 +79,6 @@ public interface MemoryManager extends DataProvider.Holder{
 			if(toAllocate<0){
 				throw new IllegalArgumentException();
 			}
-			
-			LogUtil.println(toAllocate);
 			
 			MemoryOperations.checkValidityOfChainAlloc(context, firstChunk, target);
 			

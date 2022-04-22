@@ -77,10 +77,10 @@ public @interface IOValue{
 		AnnotationLogic<Reference> LOGIC=new AnnotationLogic<>(){
 			@Override
 			public void validate(FieldAccessor<?> field, Reference annotation){
-				if(!UtilL.instanceOf(field.getType(), IOInstance.class)){
+				if(!IOInstance.isInstance(field.getType())){
 					throw new MalformedStructLayout("Reference annotation can be used only in IOInstance types but "+field+" is not");
 				}
-				if(UtilL.instanceOf(field.getType(), IOInstance.Unmanaged.class)){
+				if(IOInstance.isUnmanaged(field.getType())){
 					throw new MalformedStructLayout("Reference annotation can be used only in IOInstance regular types but "+field+" is unmanaged");
 				}
 			}

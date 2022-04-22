@@ -4,6 +4,7 @@ import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 
 import java.io.IOException;
+import java.util.Collection;
 
 public final class OffsetIO implements RandomIO{
 	private final RandomIO parent;
@@ -79,13 +80,17 @@ public final class OffsetIO implements RandomIO{
 	}
 	
 	@Override
-	public long read8(int len) throws IOException{
-		return parent.read8(len);
+	public long readWord(int len) throws IOException{
+		return parent.readWord(len);
 	}
 	
 	@Override
 	public void write(byte[] b, int off, int len) throws IOException{
 		parent.write(b, off, len);
+	}
+	@Override
+	public void writeAtOffsets(Collection<WriteChunk> data) throws IOException{
+		parent.writeAtOffsets(data.stream().map(d->d.withOffset(d.ioOffset()+offset)).toList());
 	}
 	
 	@Override

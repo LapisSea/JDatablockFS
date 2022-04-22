@@ -52,7 +52,7 @@ public interface RuntimeType<T>{
 			return (RuntimeType<T>)Struct.ofUnknown(type);
 		}
 		
-		return SupportedPrimitive.get(type).map(t->(RuntimeType<T>)t.runtimeType).orElseGet(()->new Abstract<>(type){
+		return SupportedPrimitive.get(type).map(t->(RuntimeType<T>)t).orElseGet(()->new Abstract<>(type){
 			private Supplier<T> sup;
 			
 			@Override

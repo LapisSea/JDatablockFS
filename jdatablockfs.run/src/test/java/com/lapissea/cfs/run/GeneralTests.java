@@ -46,11 +46,11 @@ public class GeneralTests{
 	
 	@BeforeAll
 	static void init() throws IOException{
-		if(Boolean.parseBoolean(UtilL.sysPropertyByClass(GeneralTests.class, "tabPrint").orElse("false"))){
+		if(UtilL.sysPropertyByClass(GeneralTests.class, "tabPrint", false, Boolean::parseBoolean)){
 			LogUtil.Init.attach(USE_CALL_POS|USE_TABULATED_HEADER);
 		}
 		
-		if(Boolean.parseBoolean(UtilL.sysPropertyByClass(GeneralTests.class, "standardInit").orElse("false"))){
+		if(UtilL.sysPropertyByClass(GeneralTests.class, "standardInit", false, Boolean::parseBoolean)){
 			for(var c : Arrays.asList(Chunk.class, Reference.class, AutoText.class, Cluster.RootRef.class, ContiguousIOList.class, LinkedIOList.class, HashIOMap.class)){
 				try{
 					Struct.ofUnknown(c);
@@ -175,6 +175,15 @@ public class GeneralTests{
 			var read=ls.get(0).value;
 			assertEquals(obj, read);
 		});
+	}
+	
+	@ParameterizedTest
+	@ValueSource(classes={ContiguousIOList.class, LinkedIOList.class})
+	<L extends IOInstance.Unmanaged<L>&IOList<Integer>> void listTestIntAdd(Class<L> listType, TestInfo info) throws IOException{
+		listEqualityTest(info, listType, Integer.class, list->{
+			list.add(69);
+			list.add(420);
+		}, true);
 	}
 	
 	@ParameterizedTest
@@ -345,7 +354,7 @@ public class GeneralTests{
 		listEqualityTest(info, ContiguousIOList.class, typ, session, useCluster);
 	}
 	
-	static <T extends IOInstance<T>, L extends IOInstance.Unmanaged<L>&IOList<T>> void listEqualityTest(TestInfo info, Class<L> listType, Class<T> typ, UnsafeConsumer<IOList<T>, IOException> session, boolean useCluster) throws IOException{
+	static <T, L extends IOInstance.Unmanaged<L>&IOList<T>> void listEqualityTest(TestInfo info, Class<L> listType, Class<T> typ, UnsafeConsumer<IOList<T>, IOException> session, boolean useCluster) throws IOException{
 		TestUtils.ioListComplianceSequence(
 			info, 64,
 			(provider, reference, typeDef)->{
@@ -382,19 +391,19 @@ public class GeneralTests{
 	@SuppressWarnings("unchecked")
 	private static <T extends IOInstance<T>> Stream<Struct<T>> types(){
 		return (Stream<Struct<T>>)(Object)Stream
-			.of(
-				Reference.class,
-				AutoText.class,
-				Cluster.class,
-				ContiguousIOList.class,
-				LinkedIOList.class,
-				HashIOMap.class,
-				BooleanContainer.class,
-				IntContainer.class,
-				LongContainer.class,
-				Dummy.class
-			).flatMap(p->Stream.concat(Stream.of(p), Arrays.stream(p.getDeclaredClasses())))
-			.filter(c->UtilL.instanceOf(c, IOInstance.class))
-			.map(Struct::ofUnknown);
+			                                  .of(
+				                                  Reference.class,
+				                                  AutoText.class,
+				                                  Cluster.class,
+				                                  ContiguousIOList.class,
+				                                  LinkedIOList.class,
+				                                  HashIOMap.class,
+				                                  BooleanContainer.class,
+				                                  IntContainer.class,
+				                                  LongContainer.class,
+				                                  Dummy.class
+			                                  ).flatMap(p->Stream.concat(Stream.of(p), Arrays.stream(p.getDeclaredClasses())))
+			                                  .filter(IOInstance::isInstance)
+			                                  .map(Struct::ofUnknown);
 	}
 }

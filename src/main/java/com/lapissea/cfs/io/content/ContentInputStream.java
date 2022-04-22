@@ -88,7 +88,7 @@ public abstract class ContentInputStream extends InputStream implements ContentR
 			return read;
 		}
 		@Override
-		public long read8(int len) throws IOException{
+		public long readWord(int len) throws IOException{
 			int rem=available();
 			if(rem<len) throw new EOFException();
 			var val=Utils.read8(ba, pos, len);

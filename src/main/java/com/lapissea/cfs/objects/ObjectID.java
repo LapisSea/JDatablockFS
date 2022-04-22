@@ -12,4 +12,13 @@ public class ObjectID extends IOInstance<ObjectID>{
 	public ObjectID(String id){
 		this.id=id;
 	}
+	
+	@Override
+	public String toString(){
+		return id;
+	}
+	@Override
+	public String toShortString(){
+		return id;
+	}
 }

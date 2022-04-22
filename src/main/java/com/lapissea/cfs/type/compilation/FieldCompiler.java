@@ -204,6 +204,8 @@ public class FieldCompiler{
 						}else{
 							if(List.of(long.class, double.class).contains(s.getType())){
 								primitiveSize=8;
+							}else if(List.of(byte.class, boolean.class).contains(s.getType())){
+								primitiveSize=1;
 							}else{
 								primitiveSize=4;
 							}
@@ -393,7 +395,7 @@ public class FieldCompiler{
 			if(typeOverride.value()!=Object.class) raw=typeOverride.value();
 			if(typeOverride.genericArgs().length!=0) parms=typeOverride.genericArgs();
 			
-			type=new SyntheticParameterizedType(raw, parms);
+			type=SyntheticParameterizedType.of(raw, parms);
 		}
 		return type;
 	}

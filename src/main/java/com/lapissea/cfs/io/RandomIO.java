@@ -17,6 +17,7 @@ import java.io.Flushable;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.util.Collection;
 import java.util.Objects;
 
 /**
@@ -350,6 +351,11 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 	}
 	
 	/**
+	 * Writes data from all elements. Does not change cursor position
+	 */
+	void writeAtOffsets(Collection<WriteChunk> data) throws IOException;
+	
+	/**
 	 * Simiar to the write methods except it writes some number of 0 bytes but does not modify things such as the size of the data. (useful for clearing garbage data after some data has ben shrunk)
 	 */
 	void fillZero(long requestedMemory) throws IOException;
@@ -386,5 +392,50 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 		}
 		
 		return transferTo(out, buffSize);
+	}
+	
+	record WriteChunk(long ioOffset, int dataOffset, int dataLength, byte[] data) implements Comparable<WriteChunk>{
+		public WriteChunk(long ioOffset, byte[] data){
+			this(ioOffset, 0, data.length, data);
+		}
+		public WriteChunk(long ioOffset, byte[] data, int dataLength){
+			this(ioOffset, 0, dataLength, data);
+		}
+		public WriteChunk{
+			Objects.requireNonNull(data);
+			if(ioOffset<0) throw new IllegalArgumentException("ioOffset ("+ioOffset+") can't be negative");
+			if(dataOffset<0) throw new IllegalArgumentException("dataOffset ("+dataOffset+") can't be negative");
+			if(dataLength<0) throw new IllegalArgumentException("dataLength ("+dataLength+") can't be negative");
+			if(dataOffset+dataLength>data.length) throw new IndexOutOfBoundsException(
+				"dataOffset ("+dataOffset+") + dataLength ("+dataLength+") must be less or equal to data.length ("+data.length+")");
+		}
+		
+		public long ioEnd(){
+			return ioOffset+dataLength;
+		}
+		
+		public WriteChunk withOffset(long ioOffset){
+			return new WriteChunk(ioOffset, dataOffset, dataLength, data);
+		}
+		
+		public record Split(WriteChunk before, WriteChunk after){}
+		
+		public Split split(int pos){
+			if(pos==0) throw new IllegalArgumentException();
+			Objects.checkIndex(pos, data.length);
+			
+			var before=new WriteChunk(ioOffset, dataOffset, pos, data);
+			var after =new WriteChunk(ioOffset+pos, dataOffset+pos, dataLength-pos, data);
+			
+			return new Split(before, after);
+		}
+		
+		@Override
+		public int compareTo(WriteChunk o){
+			var c=Long.compare(ioOffset, o.ioOffset);
+			if(c==0) c=Integer.compare(dataOffset, o.dataOffset);
+			if(c==0) c=Integer.compare(dataLength, o.dataLength);
+			return c;
+		}
 	}
 }

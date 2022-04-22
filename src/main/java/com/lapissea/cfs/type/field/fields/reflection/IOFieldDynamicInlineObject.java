@@ -148,13 +148,13 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 			var len=(int)num.read(src);
 			return src.readInts1(len);
 		}
-		if(UtilL.instanceOf(typ, IOInstance.Unmanaged.class)){
+		if(IOInstance.isUnmanaged(typ)){
 			var uStruct=Struct.Unmanaged.ofUnknown(typ);
 			var ref    =REF_PIPE.readNew(provider, src, genericContext);
 			var inst   =uStruct.requireUnmanagedConstructor().create(provider, ref, typDef);
 			return inst;
 		}
-		if(UtilL.instanceOf(typ, IOInstance.class)){
+		if(IOInstance.isInstance(typ)){
 			var struct=Struct.ofUnknown(typ);
 			return readStruct(provider, src, genericContext, struct);
 		}
@@ -179,8 +179,8 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 			AutoText.PIPE.readNew(provider, src, genericContext);
 			return;
 		}
-		if(UtilL.instanceOf(typ, IOInstance.class)){
-			if(UtilL.instanceOf(typ, IOInstance.Unmanaged.class)){
+		if(IOInstance.isInstance(typ)){
+			if(IOInstance.isUnmanaged(typ)){
 				REF_PIPE.readNew(provider, src, genericContext);
 			}else{
 				skipReadStruct(provider, src, genericContext, Struct.ofUnknown(typ));
@@ -249,7 +249,9 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 			}
 		});
 		
-		return Stream.concat(super.getGenerators().stream(), Stream.of(idGenerator)).toList();
+		var gens=super.getGenerators();
+		if(gens==null) return List.of(idGenerator);
+		return Stream.concat(gens.stream(), Stream.of(idGenerator)).toList();
 	}
 	@Override
 	public void write(Struct.Pool<CTyp> ioPool, DataProvider provider, ContentWriter dest, CTyp instance) throws IOException{

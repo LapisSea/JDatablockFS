@@ -73,29 +73,29 @@ public class FixedContiguousStructPipe<T extends IOInstance<T>> extends StructPi
 	}
 	private Map<IOField<T, NumberSize>, NumberSize> computeMaxValues(){
 		//TODO: see how to properly handle max values with dependencies
-		var badFields=sizeFieldStream().filter(f->!f.getDependencies().isEmpty()).map(IOField::toString).collect(Collectors.joining(", "));
+		var badFields=sizeFieldStream().filter(IOField::hasDependencies).map(IOField::toString).collect(Collectors.joining(", "));
 		if(!badFields.isEmpty()){
 			throw new NotImplementedException(badFields+" should not have dependencies");
 		}
 		
 		return sizeFieldStream()
-			.map(sizingField->{
-				var size=getType().getFields().streamDependentOn(sizingField)
-				                  .mapToLong(v->v.getSizeDescriptor().requireMax(WordSpace.BYTE))
-				                  .distinct()
-				                  .mapToObj(l->NumberSize.FLAG_INFO.stream()
-				                                                   .filter(s->s.bytes==l)
-				                                                   .findAny().orElseThrow())
-				                  .reduce((a, b)->{
-					                  if(a!=b){
-						                  throw new MalformedStructLayout("inconsistent dependency sizes"+sizingField);
-					                  }
-					                  return a;
-				                  })
-				                  .orElse(NumberSize.LARGEST);
-				return new AbstractMap.SimpleEntry<>(sizingField, size);
-			})
-			.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+			       .map(sizingField->{
+				       var size=getType().getFields().streamDependentOn(sizingField)
+				                         .mapToLong(v->v.getSizeDescriptor().requireMax(WordSpace.BYTE))
+				                         .distinct()
+				                         .mapToObj(l->NumberSize.FLAG_INFO.stream()
+				                                                          .filter(s->s.bytes==l)
+				                                                          .findAny().orElseThrow())
+				                         .reduce((a, b)->{
+					                         if(a!=b){
+						                         throw new MalformedStructLayout("inconsistent dependency sizes"+sizingField);
+					                         }
+					                         return a;
+				                         })
+				                         .orElse(NumberSize.LARGEST);
+				       return new AbstractMap.SimpleEntry<>(sizingField, size);
+			       })
+			       .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 	}
 	
 	private Stream<IOField<T, NumberSize>> sizeFieldStream(){
@@ -112,8 +112,7 @@ public class FixedContiguousStructPipe<T extends IOInstance<T>> extends StructPi
 	}
 	
 	@Override
-	protected void doWrite(DataProvider provider, ContentWriter dest, T instance) throws IOException{
-		var ioPool=makeIOPool();
+	protected void doWrite(DataProvider provider, ContentWriter dest, Struct.Pool<T> ioPool, T instance) throws IOException{
 		setMax(instance, ioPool);
 		writeIOFields(getSpecificFields(), ioPool, provider, dest, instance);
 	}

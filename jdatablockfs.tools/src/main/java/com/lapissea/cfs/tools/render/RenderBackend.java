@@ -10,6 +10,8 @@ import java.util.function.Consumer;
 
 public abstract class RenderBackend{
 	
+	public static final boolean DRAW_DEBUG=Boolean.parseBoolean(System.getProperty("drawDebug"));
+	
 	public static class Buffered extends RenderBackend{
 		
 		private sealed interface Command{
@@ -40,8 +42,8 @@ public abstract class RenderBackend{
 			final class FillQuads extends ArgBuff4<FillQuads>{
 				@Override
 				public void draw(RenderBackend backend){
-					for(int i=0;i<len;i++){
-						try(var ignored=backend.bulkDraw(DrawMode.QUADS)){
+					try(var ignored=backend.bulkDraw(DrawMode.QUADS)){
+						for(int i=0;i<len;i++){
 							backend.outlineQuad(data[i*4], data[i*4+1], data[i*4+2], data[i*4+3]);
 						}
 					}
@@ -65,8 +67,8 @@ public abstract class RenderBackend{
 			final class DrawLines extends ArgBuff4<DrawLines>{
 				@Override
 				public void draw(RenderBackend backend){
-					for(int i=0;i<len;i++){
-						try(var ignored=backend.bulkDraw(DrawMode.QUADS)){
+					try(var ignored=backend.bulkDraw(DrawMode.QUADS)){
+						for(int i=0;i<len;i++){
 							backend.drawLine(data[i*4], data[i*4+1], data[i*4+2], data[i*4+3]);
 						}
 					}
