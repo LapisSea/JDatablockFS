@@ -24,8 +24,8 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -328,7 +328,7 @@ public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 		}
 	}
 	
-	private static final Lock STRUCT_CACHE_LOCK=new ReentrantLock();
+	private static final ReadWriteLock STRUCT_CACHE_LOCK=new ReentrantReadWriteLock();
 	
 	private static final Map<Class<?>, Struct<?>> STRUCT_CACHE  =new WeakValueHashMap<>();
 	private static final Map<Class<?>, Thread>    STRUCT_COMPILE=new ConcurrentHashMap<>();
@@ -385,13 +385,22 @@ public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 		if(thread!=null&&thread==Thread.currentThread()){
 			throw new MalformedStructLayout("Recursive struct compilation");
 		}
+		{
+			var lock=STRUCT_CACHE_LOCK.readLock();
+			try{
+				lock.lock();
+				//If class was compiled in another thread this should early exit
+				var existing=STRUCT_CACHE.get(instanceClass);
+				if(existing!=null) return (S)existing;
+			}finally{
+				lock.unlock();
+			}
+		}
 		
-		S struct;
+		var lock=STRUCT_CACHE_LOCK.writeLock();
+		S   struct;
 		try{
-			STRUCT_CACHE_LOCK.lock();
-			//If class was compiled in another thread this should early exit
-			var existing=STRUCT_CACHE.get(instanceClass);
-			if(existing!=null) return (S)existing;
+			lock.lock();
 			STRUCT_COMPILE.put(instanceClass, Thread.currentThread());
 			
 			struct=newStruct.apply(instanceClass);
@@ -402,7 +411,7 @@ public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 			throw new MalformedStructLayout("Failed to compile "+instanceClass.getName(), e);
 		}finally{
 			STRUCT_COMPILE.remove(instanceClass);
-			STRUCT_CACHE_LOCK.unlock();
+			lock.unlock();
 		}
 		
 		if(GlobalConfig.PRINT_COMPILATION){
@@ -413,11 +422,12 @@ public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 	
 	@SuppressWarnings("unchecked")
 	private static <T extends IOInstance<T>> Struct<T> getCached(Class<T> instanceClass){
+		var lock=STRUCT_CACHE_LOCK.readLock();
 		try{
-			STRUCT_CACHE_LOCK.lock();
+			lock.lock();
 			return (Struct<T>)STRUCT_CACHE.get(instanceClass);
 		}finally{
-			STRUCT_CACHE_LOCK.unlock();
+			lock.unlock();
 		}
 	}
 	
