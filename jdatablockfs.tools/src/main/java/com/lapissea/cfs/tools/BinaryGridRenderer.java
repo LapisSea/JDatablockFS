@@ -1226,7 +1226,7 @@ public class BinaryGridRenderer{
 					
 					long trueOffset=offsetStart+fieldOffset;
 					var  sizeDesc  =field.getSizeDescriptor();
-					size=sizeDesc.calcUnknown(ioPool, ctx.provider, instance, WordSpace.BYTE);
+					size=sizeDesc.calcUnknown(ioPool, ctx.provider, instance, sizeDesc.getWordSpace());
 					
 					try{
 						if(acc!=null&&acc.hasAnnotation(IOType.Dynamic.class)){
