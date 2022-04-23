@@ -1,6 +1,8 @@
 package com.lapissea.cfs.io;
 
 import com.lapissea.cfs.Utils;
+import com.lapissea.util.function.UnsafeRunnable;
+import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -34,6 +36,17 @@ public interface IOInterface extends RandomIO.Creator{
 	boolean isReadOnly();
 	
 	Trans openIOTransaction();
+	
+	default <E extends Throwable> void openIOTransaction(UnsafeRunnable<E> session) throws E, IOException{
+		try(var ignored=openIOTransaction()){
+			session.run();
+		}
+	}
+	default <T, E extends Throwable> T openIOTransaction(UnsafeSupplier<T, E> session) throws E, IOException{
+		try(var ignored=openIOTransaction()){
+			return session.get();
+		}
+	}
 	
 	default IOInterface asReadOnly(){
 		if(isReadOnly()) return this;

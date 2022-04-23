@@ -3,7 +3,6 @@ package com.lapissea.cfs.objects.collections;
 import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
-import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.IOInstance;
@@ -340,26 +339,25 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 			sorted.computeIfAbsent(toSmallHash(kvEntry.getKey(), bucketPO2), i->new ArrayList<>()).add(kvEntry);
 		}
 		
-		var  shouldReflow=false;
-		long deltaSize   =0;
-		for(var group : sorted.values()){
-			IOInterface.Trans ignored=null;
-			for(int i=0;i<group.size();i++){
-				if(i==1) ignored=getDataProvider().getSource().openIOTransaction();
-				var e    =group.get(i);
-				var key  =e.getKey();
-				var value=e.getValue();
-				
-				long sizeFlag;
-				sizeFlag=putEntry(buckets, bucketPO2, key, value);
-				if(sizeFlag==OVERWRITE) continue;
-				deltaSize++;
-				if(sizeFlag>RESIZE_TRIGGER) shouldReflow=true;
+		var shouldReflow=getDataProvider().getSource().openIOTransaction(()->{
+			boolean reflow   =false;
+			long    deltaSize=0;
+			for(var group : sorted.values()){
+				for(Map.Entry<K, V> e : group){
+					var key  =e.getKey();
+					var value=e.getValue();
+					
+					long sizeFlag;
+					sizeFlag=putEntry(buckets, bucketPO2, key, value);
+					if(sizeFlag==OVERWRITE) continue;
+					deltaSize++;
+					if(sizeFlag>RESIZE_TRIGGER) reflow=true;
+				}
 			}
-			if(ignored!=null) ignored.close();
-		}
-		
-		deltaSize(deltaSize);
+			
+			deltaSize(deltaSize);
+			return reflow;
+		});
 		if(shouldReflow){
 			reflow();
 		}
