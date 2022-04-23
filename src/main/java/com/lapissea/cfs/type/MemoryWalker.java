@@ -229,9 +229,16 @@ public class MemoryWalker{
 							if(res.shouldSave&&res.shouldContinue&&inlinedParent){
 								inlineDirtyButContinue=true;
 							}else{
-								var fval  =res.shouldSave?refField.get(ioPool, instance):null;
-								var result=handleResult(ioPool, instance, pipe, inlinedParent, reference, refField, fval, res);
-								if(result!=null) return result;
+								if(res.shouldSave){
+									if(inlinedParent){
+										return IterationOptions.SAVE_AND_END;
+									}
+									
+									try(var io=reference.io(provider)){
+										pipe.write(provider, io, instance);
+									}
+								}
+								if(!res.shouldContinue) return IterationOptions.END;
 							}
 						}
 						{
