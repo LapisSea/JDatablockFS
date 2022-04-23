@@ -181,10 +181,10 @@ public class MemoryWalker{
 						continue;
 					}
 					
-					if(UtilL.checkFlag(field.typeFlags(), IOField.PRIMITIVE_OR_ENUM_FLAG)){
+					if(field.typeFlag(IOField.PRIMITIVE_OR_ENUM_FLAG)){
 						continue;
 					}
-					if(UtilL.checkFlag(field.typeFlags(), IOField.HAS_NO_POINTERS_FLAG)){
+					if(field.typeFlag(IOField.HAS_NO_POINTERS_FLAG)){
 						continue;
 					}
 					

@@ -228,9 +228,9 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 			
 			if(unkownNumAcc!=null){
 				for(int i=0;i<unkownNumAcc.length;i++){
-					var acc=unkownNumAcc[i];
-					var num=(NumberSize)acc.get(ioPool, inst);
-					var mul=unkownNumAccMul[i];
+					var  acc=unkownNumAcc[i];
+					var  num=(NumberSize)acc.get(ioPool, inst);
+					long mul=unkownNumAccMul[i];
 					unkownSum+=num.bytes*mul;
 				}
 			}

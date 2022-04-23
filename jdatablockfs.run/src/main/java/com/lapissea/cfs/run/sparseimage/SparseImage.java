@@ -21,7 +21,7 @@ import static com.lapissea.util.LogUtil.Init.USE_TABULATED_HEADER;
 public class SparseImage{
 	
 	public static void main(String[] args) throws IOException{
-		Configuration config=new Configuration();
+		var config=new Configuration();
 		config.load(new Configuration.Loader.JsonArgs(new File("SparseImage.json"), true));
 		config.load(new Configuration.Loader.DashedNameValueArgs(args));
 		main(config.getView());
@@ -60,12 +60,13 @@ public class SparseImage{
 			logger.get().destroy();
 		}
 	}
+	
 	public static void run(Cluster cluster, Configuration.View args) throws IOException{
 		
 		int radius    =args.getInt("radius", 10);
 		int iterations=args.getInt("iterations", 100);
 		
-		Image image=cluster.getRootProvider().request(Image.class, new ObjectID("my image"));
+		var image=cluster.getRootProvider().request(Image.class, new ObjectID("my image"));
 		
 		Random r=new Random(1);
 		for(int i=0;i<iterations;i++){

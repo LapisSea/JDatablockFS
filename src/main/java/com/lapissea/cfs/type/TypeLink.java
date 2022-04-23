@@ -13,6 +13,8 @@ import java.util.*;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NULLABLE;
+
 public final class TypeLink extends IOInstance<TypeLink>{
 	
 	public static class Check{
@@ -105,32 +107,40 @@ public final class TypeLink extends IOInstance<TypeLink>{
 				genLinks
 			);
 		}
-		return new TypeLink((Class<?>)cleanGenericType, NO_ARGS);
+		return of((Class<?>)cleanGenericType);
+	}
+	
+	public static TypeLink of(Class<?> raw){
+		return new TypeLink(raw, NO_ARGS);
 	}
 	
 	private Class<?> typeClass;
 	
 	@IOValue
-	private String     typeName="";
+	private String     typeName;
 	@IOValue
-	@IONullability.Elements(IONullability.Mode.NULLABLE)
-	private TypeLink[] args    =new TypeLink[0];
+	@IONullability.Elements(NULLABLE)
+	private TypeLink[] args;
 	
 	private Type generic;
 	
-	public TypeLink(){}
-	
+	public TypeLink(){
+		typeName="";
+		args=NO_ARGS;
+	}
 	
 	public TypeLink(Class<?> type, TypeLink... args){
-		this.typeName=type.getName();
-		this.args=args.length==0?args:args.clone();
-		
+		this(type.getName(), args);
 		this.typeClass=type;
 	}
 	
 	public TypeLink(String typeName, TypeLink... args){
-		this.typeName=typeName;
-		this.args=args.length==0?args:args.clone();
+		this.typeName=switch(typeName){
+			case null -> throw new NullPointerException("Name can not be null");
+			case String s && s.length()==0 -> throw new IllegalArgumentException("Name can not be empty!");
+			default -> typeName;
+		};
+		this.args=(args==null||args.length==0)?NO_ARGS:args.clone();
 	}
 	
 	public String getTypeName(){
