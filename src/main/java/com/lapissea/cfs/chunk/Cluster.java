@@ -51,8 +51,7 @@ public class Cluster implements DataProvider{
 	}
 	
 	public static void init(IOInterface data) throws IOException{
-		try(var ignored=data.openIOTransaction()){
-			
+		data.openIOTransaction(()->{
 			var provider=DataProvider.newVerySimpleProvider(data);
 			
 			try(var io=data.write(true)){
@@ -71,13 +70,13 @@ public class Cluster implements DataProvider{
 				metadata.db=db;
 				metadata.allocateNulls(provider);
 			}, null);
-		}
+		});
 	}
 	
 	
 	public static class RootRef extends IOInstance<RootRef>{
 		@IOValue
-		@IOValue.Reference(dataPipeType = FIXED)
+		@IOValue.Reference(dataPipeType=FIXED)
 		@IONullability(DEFAULT_IF_NULL)
 		private Metadata metadata;
 	}
@@ -87,7 +86,7 @@ public class Cluster implements DataProvider{
 		
 		@IOValue
 		@IONullability(NULLABLE)
-		@IOValue.OverrideType(value = HashIOMap.class)
+		@IOValue.OverrideType(value=HashIOMap.class)
 		private AbstractUnmanagedIOMap<ObjectID, IOInstance<?>> rootObjects;
 		
 		@IOValue

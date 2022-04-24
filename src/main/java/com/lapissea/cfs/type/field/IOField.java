@@ -279,14 +279,15 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		int typeFlags=0;
 		
 		if(accessor!=null){
-			if(accessor.hasAnnotation(IOType.Dynamic.class)){
+			boolean isDynamic=accessor.hasAnnotation(IOType.Dynamic.class);
+			if(isDynamic){
 				typeFlags|=DYNAMIC_FLAG;
 			}
 			var type=accessor.getType();
 			if(IOInstance.isInstance(type)){
 				typeFlags|=IOINSTANCE_FLAG;
 				
-				if(!(this instanceof IOField.Ref)&&!Struct.ofUnknown(type).getCanHavePointers()){
+				if(!isDynamic&&!(this instanceof IOField.Ref)&&!Struct.ofUnknown(type).getCanHavePointers()){
 					typeFlags|=HAS_NO_POINTERS_FLAG;
 				}
 			}

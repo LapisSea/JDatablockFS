@@ -9,6 +9,10 @@ import java.lang.reflect.Type;
 
 public interface RootProvider{
 	
+	default <T extends IOInstance<T>> T request(Class<T> type, ObjectID id) throws IOException{
+		return request(TypeLink.of(type), id);
+	}
+	
 	default <T extends IOInstance<T>> T request(Type genericType, ObjectID id) throws IOException{
 		return request(TypeLink.of(genericType), id);
 	}

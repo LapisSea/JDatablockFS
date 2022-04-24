@@ -91,7 +91,9 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>> implements Clone
 				}catch(IOException e){
 					throw new RuntimeException(e);
 				}
-				assert Arrays.equals(oldData, newData):"Data changed when moving reference! This is invalid behaviour";
+				assert Arrays.equals(oldData, newData):"Data changed when moving reference! This is invalid behaviour\n"+
+				                                       Arrays.toString(oldData)+"\n"+
+				                                       Arrays.toString(newData);
 			}
 			
 			reference=newRef;
