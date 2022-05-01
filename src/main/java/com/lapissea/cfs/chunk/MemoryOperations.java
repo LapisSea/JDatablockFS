@@ -404,14 +404,15 @@ public class MemoryOperations{
 		
 		assert reallocate.dataEnd()==ch.dataEnd();
 		
-		if(ticket.approve(reallocate)){
-			reallocate.writeHeader();
-			
-			ch.setCapacityAndModifyNumSize(ch.getCapacity()-reallocate.totalSize());
-			ch.writeHeader();
-			return reallocate;
+		if(!ticket.approve(reallocate)){
+			return null;
 		}
-		return null;
+		
+		reallocate.writeHeader();
+		
+		ch.setCapacityAndModifyNumSize(ch.getCapacity()-reallocate.totalSize());
+		ch.writeHeader();
+		return reallocate;
 	}
 	
 	public static Chunk allocateAppendToFile(DataProvider context, AllocateTicket ticket) throws IOException{
