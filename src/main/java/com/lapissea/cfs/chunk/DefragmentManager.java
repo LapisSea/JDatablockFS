@@ -18,6 +18,9 @@ import java.util.*;
 import java.util.function.Predicate;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.type.MemoryWalker.CONTINUE;
+import static com.lapissea.cfs.type.MemoryWalker.END;
+import static com.lapissea.cfs.type.MemoryWalker.SAVE;
 
 public class DefragmentManager{
 	
@@ -48,51 +51,43 @@ public class DefragmentManager{
 			
 			cluster.rootWalker().walk(new MemoryWalker.PointerRecord(){
 				@Override
-				public <T extends IOInstance<T>> MemoryWalker.IterationOptions log(StructPipe<T> pipe, Reference instanceReference, IOField.Ref<T, ?> field, T instance, Reference value) throws IOException{
+				public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, IOField.Ref<T, ?> field, Reference valueReference) throws IOException{
 					if(instance instanceof IOInstance.Unmanaged u){
 						var p   =u.getReference().getPtr();
 						var user=findReferenceUser(cluster, u.getReference());
 						if(user.getPtr().compareTo(p)>0){
 							reallocateUnmanaged(cluster, u, c->c.getPtr().compareTo(user.getPtr())>0);
 							run[0]=true;
-							return MemoryWalker.IterationOptions.CONTINUE_NO_SAVE;
+							return CONTINUE;
 						}
+					}else{
+						boolean after=instanceReference.getPtr().compareTo(valueReference.getPtr())<0;
+						if(after) return CONTINUE;
+						run[0]=true;
+						
+						var type=field.getAccessor().getType();
+						
+						if(IOInstance.isUnmanaged(type)){
+							reallocateUnmanaged(cluster, (IOInstance.Unmanaged)field.get(null, instance));
+							return END;
+						}
+						
+						
+						var newCh=AllocateTicket.withData((StructPipe)field.getReferencedPipe(instance), cluster, (IOInstance)field.get(null, instance))
+						                        .withApproval(c->c.getPtr().getValue()>instanceReference.getPtr().getValue())
+						                        .submit(cluster);
+						
+						field.setReference(instance, newCh.getPtr().makeReference());
+						return CONTINUE|SAVE;
 					}
-					return MemoryWalker.IterationOptions.CONTINUE_NO_SAVE;
+					return CONTINUE;
 				}
 				@Override
-				public <T extends IOInstance<T>> MemoryWalker.IterationOptions logChunkPointer(StructPipe<T> pipe, Reference instanceReference, IOField<T, ChunkPointer> field, T instance, ChunkPointer value) throws IOException{
-					return MemoryWalker.IterationOptions.CONTINUE_NO_SAVE;
+				public <T extends IOInstance<T>> int logChunkPointer(Reference instanceReference, T instance, IOField<T, ChunkPointer> field, ChunkPointer value) throws IOException{
+					return CONTINUE;
 				}
 			});
 		}
-//		run[0]=true;
-//		while(run[0]){
-//			run[0]=false;
-//
-//			new MemoryWalker((HashIOMap<?, ?>)cluster.getTemp()).walk(new MemoryWalker.PointerRecord(){
-//				@Override
-//				public <T extends IOInstance<T>> MemoryWalker.IterationOptions log(StructPipe<T> pipe, Reference instanceReference, IOField.Ref<T, ?> field, T instance, Reference value) throws IOException{
-//					if(instance instanceof IOInstance.Unmanaged u){
-//						var p   =u.getReference().getPtr();
-//						for(ChunkPointer freeChunk : cluster.getMemoryManager().getFreeChunks()){
-//							if(freeChunk.compareTo(p)>0) continue;
-//							var c=freeChunk.dereference(cluster);
-//							if(c.getCapacity()-Chunk.PIPE.getSizeDescriptor().requireMax(WordSpace.BYTE)>p.dereference(cluster).getSize()){
-//								reallocateUnmanaged(cluster, u, ch->ch.getPtr().compareTo(p)<0);
-//								run[0]=true;
-//								return MemoryWalker.IterationOptions.CONTINUE_NO_SAVE;
-//							}
-//						}
-//					}
-//					return MemoryWalker.IterationOptions.CONTINUE_NO_SAVE;
-//				}
-//				@Override
-//				public <T extends IOInstance<T>> MemoryWalker.IterationOptions logChunkPointer(StructPipe<T> pipe, Reference instanceReference, IOField<T, ChunkPointer> field, T instance, ChunkPointer value) throws IOException{
-//					return MemoryWalker.IterationOptions.CONTINUE_NO_SAVE;
-//				}
-//			});
-//		}
 	}
 	
 	private void mergeChains(Cluster cluster) throws IOException{
@@ -107,28 +102,19 @@ public class DefragmentManager{
 			long requiredSize=fragmentedChunk.chainSize();
 			
 			reallocateAndMove(cluster, fragmentedChunk, requiredSize);
-			
-			
-			//TODO: moveNextAndMerge is not stable. Figure out what's wrong before enabling
-//			if(fragmentedChunk.getBodyNumSize().canFit(requiredSize)){
-//				TODO: make better logic for deciding if moving next is good
-//				moveNextAndMerge(cluster, fragmentedChunk, requiredSize);
-//			}else{
-//				reallocateAndMove(cluster, fragmentedChunk, requiredSize);
-//			}
 		}
 	}
 	
 	private void reallocateAndMove(Cluster cluster, Chunk fragmentedChunk, long requiredSize) throws IOException{
 		var newChunk=AllocateTicket
-			.bytes(requiredSize)
-			.shouldDisableResizing(fragmentedChunk.getNextSize()==NumberSize.VOID)
-			.withDataPopulated((p, io)->{
-				try(var old=fragmentedChunk.io()){
-					old.transferTo(io);
-				}
-			})
-			.submit(cluster);
+			             .bytes(requiredSize)
+			             .shouldDisableResizing(fragmentedChunk.getNextSize()==NumberSize.VOID)
+			             .withDataPopulated((p, io)->{
+				             try(var old=fragmentedChunk.io()){
+					             old.transferTo(io);
+				             }
+			             })
+			             .submit(cluster);
 		
 		moveChunkExact(cluster, fragmentedChunk.getPtr(), newChunk.getPtr());
 		fragmentedChunk.freeChaining();
@@ -157,14 +143,14 @@ public class DefragmentManager{
 						
 						Chunk c=next;
 						var newChunk=AllocateTicket
-							.bytes(next.getSize())
-							.shouldDisableResizing(next.getNextSize()==NumberSize.VOID)
-							.withNext(next.getNextPtr())
-							.withDataPopulated((p, io)->{
-								byte[] data=p.getSource().read(c.dataStart(), Math.toIntExact(c.getSize()));
-								io.write(data);
-							})
-							.submit(cluster);
+							             .bytes(next.getSize())
+							             .shouldDisableResizing(next.getNextSize()==NumberSize.VOID)
+							             .withNext(next.getNextPtr())
+							             .withDataPopulated((p, io)->{
+								             byte[] data=p.getSource().read(c.dataStart(), Math.toIntExact(c.getSize()));
+								             io.write(data);
+							             })
+							             .submit(cluster);
 						
 						moveChunkExact(cluster, next.getPtr(), newChunk.getPtr());
 					}
@@ -288,20 +274,20 @@ public class DefragmentManager{
 		
 		cluster.rootWalker().walk(new MemoryWalker.PointerRecord(){
 			@Override
-			public <T extends IOInstance<T>> MemoryWalker.IterationOptions log(StructPipe<T> pipe, Reference instanceReference, IOField.Ref<T, ?> field, T instance, Reference value){
-				if(value.getPtr().equals(oldChunk)){
-					field.setReference(instance, new Reference(newChunk, value.getOffset()));
-					return MemoryWalker.IterationOptions.CONTINUE_AND_SAVE;
+			public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, IOField.Ref<T, ?> field, Reference valueReference){
+				if(valueReference.getPtr().equals(oldChunk)){
+					field.setReference(instance, new Reference(newChunk, valueReference.getOffset()));
+					return CONTINUE|SAVE;
 				}
-				return MemoryWalker.IterationOptions.CONTINUE_NO_SAVE;
+				return CONTINUE;
 			}
 			@Override
-			public <T extends IOInstance<T>> MemoryWalker.IterationOptions logChunkPointer(StructPipe<T> pipe, Reference instanceReference, IOField<T, ChunkPointer> field, T instance, ChunkPointer value){
+			public <T extends IOInstance<T>> int logChunkPointer(Reference instanceReference, T instance, IOField<T, ChunkPointer> field, ChunkPointer value){
 				if(value.equals(oldChunk)){
 					field.set(null, instance, newChunk);
-					return MemoryWalker.IterationOptions.CONTINUE_AND_SAVE;
+					return CONTINUE|SAVE;
 				}
-				return MemoryWalker.IterationOptions.CONTINUE_NO_SAVE;
+				return CONTINUE;
 			}
 		});
 		
@@ -334,9 +320,9 @@ public class DefragmentManager{
 		cluster.rootWalker().walk(new MemoryWalker.PointerRecord(){
 			boolean foundCh;
 			@Override
-			public <T extends IOInstance<T>> MemoryWalker.IterationOptions log(StructPipe<T> pipe, Reference instanceReference, IOField.Ref<T, ?> field, T instance, Reference value){
+			public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, IOField.Ref<T, ?> field, Reference valueReference){
 				var ptr=oldRef.getPtr();
-				if(value.getPtr().equals(ptr)){
+				if(valueReference.getPtr().equals(ptr)){
 					
 					if(toFree.contains(ptr)){
 						toFree.remove(ptr);
@@ -346,16 +332,16 @@ public class DefragmentManager{
 					}
 				}
 				
-				if(value.equals(oldRef)){
+				if(valueReference.equals(oldRef)){
 					field.setReference(instance, newRef);
 					found[0]=true;
-					return MemoryWalker.IterationOptions.SAVE_AND_END;
+					return SAVE|END;
 				}
-				return MemoryWalker.IterationOptions.CONTINUE_NO_SAVE;
+				return CONTINUE;
 			}
 			@Override
-			public <T extends IOInstance<T>> MemoryWalker.IterationOptions logChunkPointer(StructPipe<T> pipe, Reference instanceReference, IOField<T, ChunkPointer> field, T instance, ChunkPointer value){
-				return MemoryWalker.IterationOptions.CONTINUE_NO_SAVE;
+			public <T extends IOInstance<T>> int logChunkPointer(Reference instanceReference, T instance, IOField<T, ChunkPointer> field, ChunkPointer value){
+				return CONTINUE;
 			}
 		});
 		if(!found[0]){
@@ -368,16 +354,16 @@ public class DefragmentManager{
 		Reference[] found={null};
 		cluster.rootWalker().walk(new MemoryWalker.PointerRecord(){
 			@Override
-			public <T extends IOInstance<T>> MemoryWalker.IterationOptions log(StructPipe<T> pipe, Reference instanceReference, IOField.Ref<T, ?> field, T instance, Reference value){
-				if(value.equals(ref)){
+			public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, IOField.Ref<T, ?> field, Reference valueReference){
+				if(valueReference.equals(ref)){
 					found[0]=instanceReference;
-					return MemoryWalker.IterationOptions.END;
+					return END;
 				}
-				return MemoryWalker.IterationOptions.CONTINUE_NO_SAVE;
+				return CONTINUE;
 			}
 			@Override
-			public <T extends IOInstance<T>> MemoryWalker.IterationOptions logChunkPointer(StructPipe<T> pipe, Reference instanceReference, IOField<T, ChunkPointer> field, T instance, ChunkPointer value){
-				return MemoryWalker.IterationOptions.CONTINUE_NO_SAVE;
+			public <T extends IOInstance<T>> int logChunkPointer(Reference instanceReference, T instance, IOField<T, ChunkPointer> field, ChunkPointer value){
+				return CONTINUE;
 			}
 		});
 		if(found[0]==null){

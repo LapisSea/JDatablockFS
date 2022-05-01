@@ -2,6 +2,7 @@
   <configuration default="false" name="SparseImage" type="Application" factoryName="Application">
     <option name="MAIN_CLASS_NAME" value="com.lapissea.cfs.run.sparseimage.SparseImage" />
     <module name="jdatablockfs.run" />
+    <option name="PROGRAM_PARAMETERS" value="-iterations 10" />
     <option name="VM_PARAMETERS" value="-ea --finalization=disabled -Dcom.lapissea.cfs.GlobalConfig.printCompilation=true" />
     <option name="WORKING_DIRECTORY" value="$ProjectFileDir$/run/main" />
     <extension name="coverage">
