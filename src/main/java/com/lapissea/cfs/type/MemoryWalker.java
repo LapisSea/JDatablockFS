@@ -23,23 +23,32 @@ import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 
 public class MemoryWalker{
 	
-	public record IterationOptions(boolean shouldContinue, boolean shouldSave){
-		public static final IterationOptions CONTINUE_NO_SAVE =new IterationOptions(true, false);
-		public static final IterationOptions CONTINUE_AND_SAVE=new IterationOptions(true, true);
-		public static final IterationOptions END              =new IterationOptions(false, false);
-		public static final IterationOptions SAVE_AND_END     =new IterationOptions(false, true);
-		
-	}
+	
+	private static final int DATA_MASK=0b00001;
+	public static final  int SAVE     =0b00001;
+	/**/
+	private static final int FLOW_MASK=0b00110;
+	public static final  int CONTINUE =0b00010;
+	public static final  int END      =0b00100;
+	public static final  int REPEAT   =0b00110;
+	
+	private static final int INTERNAL_MASK=0b1000000000000000000000000000000;
+	private static final int NO_RESULT    =0b1000000000000000000000000000000;
+	
+	
+	private static int data(int flags)          {return flags&FLOW_MASK;}
+	private static boolean fSave(int flags)     {return UtilL.checkFlag(flags&DATA_MASK, SAVE);}
+	private static boolean hasResult(int result){return !UtilL.checkFlag(result, NO_RESULT);}
 	
 	public interface PointerRecord{
 		/**
 		 * @return if walking should continue
 		 */
-		<T extends IOInstance<T>> IterationOptions log(StructPipe<T> pipe, Reference instanceReference, IOField.Ref<T, ?> field, T instance, Reference value) throws IOException;
+		<T extends IOInstance<T>> int log(Reference instanceReference, T instance, IOField.Ref<T, ?> field, Reference valueReference) throws IOException;
 		/**
 		 * @return if walking should continue
 		 */
-		<T extends IOInstance<T>> IterationOptions logChunkPointer(StructPipe<T> pipe, Reference instanceReference, IOField<T, ChunkPointer> field, T instance, ChunkPointer value) throws IOException;
+		<T extends IOInstance<T>> int logChunkPointer(Reference instanceReference, T instance, IOField<T, ChunkPointer> field, ChunkPointer value) throws IOException;
 	}
 	
 	private final DataProvider provider;
@@ -61,14 +70,14 @@ public class MemoryWalker{
 		if(self) consumer.accept(rootReference);
 		walkStructFull((T)root, rootReference, (StructPipe<T>)pipe, new PointerRecord(){
 			@Override
-			public <I extends IOInstance<I>> IterationOptions log(StructPipe<I> pipe, Reference instanceReference, IOField.Ref<I, ?> field, I instance, Reference value) throws IOException{
-				consumer.accept(value);
-				return IterationOptions.CONTINUE_NO_SAVE;
+			public <I extends IOInstance<I>> int log(Reference instanceReference, I instance, IOField.Ref<I, ?> field, Reference valueReference) throws IOException{
+				consumer.accept(valueReference);
+				return CONTINUE;
 			}
 			@Override
-			public <I extends IOInstance<I>> IterationOptions logChunkPointer(StructPipe<I> pipe, Reference instanceReference, IOField<I, ChunkPointer> field, I instance, ChunkPointer value) throws IOException{
+			public <I extends IOInstance<I>> int logChunkPointer(Reference instanceReference, I instance, IOField<I, ChunkPointer> field, ChunkPointer value) throws IOException{
 				consumer.accept(value.makeReference());
-				return IterationOptions.CONTINUE_NO_SAVE;
+				return CONTINUE;
 			}
 		});
 	}
@@ -127,7 +136,7 @@ public class MemoryWalker{
 		}
 	}
 	
-	private <T extends IOInstance<T>> IterationOptions walkStructFull(
+	private <T extends IOInstance<T>> int walkStructFull(
 		T instance, Reference instanceReference, StructPipe<T> pipe,
 		PointerRecord pointerRecord
 	) throws IOException{
@@ -135,16 +144,16 @@ public class MemoryWalker{
 	}
 	
 	@SuppressWarnings("unchecked")
-	private <T extends IOInstance<T>> IterationOptions walkStructFull(
+	private <T extends IOInstance<T>> int walkStructFull(
 		RefStack stack,
 		T instance, Reference instanceReference, StructPipe<T> pipe,
 		PointerRecord pointerRecord, boolean inlinedParent
 	) throws IOException{
 		if(instance==null){
-			return IterationOptions.CONTINUE_NO_SAVE;
+			return CONTINUE;
 		}
 		if(!instance.getThisStruct().getCanHavePointers()){
-			return IterationOptions.CONTINUE_NO_SAVE;
+			return CONTINUE;
 		}
 		
 		var reference=instanceReference;
@@ -152,10 +161,10 @@ public class MemoryWalker{
 			var off=provider.getFirstChunk().getPtr();
 			reference=new Reference(off, c.getPtr().getValue()-off.getValue());
 		}
-		if(reference==null||reference.isNull()) return IterationOptions.CONTINUE_NO_SAVE;
+		if(reference==null||reference.isNull()) return CONTINUE;
 		boolean inlineDirtyButContinue=false;
 		if(stack.contains(reference, instance)){
-			return IterationOptions.CONTINUE_NO_SAVE;
+			return CONTINUE;
 		}
 		stack.push(reference, instance);
 		try{
@@ -211,11 +220,17 @@ public class MemoryWalker{
 						
 						if(isInstance&&inst instanceof IOInstance.Unmanaged valueInstance){
 							var res=walkStructFull(stack, valueInstance, valueInstance.getReference(), valueInstance.getPipe(), pointerRecord, false);
-							if(res.shouldSave){
+							if(fSave(res)){
 								throw new NotImplementedException();//TODO
 							}
-							if(!res.shouldContinue) return IterationOptions.END;
-							continue;
+							switch(res&FLOW_MASK){
+								case CONTINUE -> {
+									continue;
+								}
+								case END -> {return END;}
+								case REPEAT -> throw new NotImplementedException();
+								default -> throw new NotImplementedException((res&FLOW_MASK)+"");
+							}
 						}
 					}
 					
@@ -223,22 +238,29 @@ public class MemoryWalker{
 						IOField.Ref<T, T> refField=(IOField.Ref<T, T>)refO;
 						var               ref     =refField.getReference(instance);
 						
+						if(ref.isNull()) continue;
+						
 						{
-							var res=pointerRecord.log(pipe, reference, refField, instance, ref);
+							var res=pointerRecord.log(reference, instance, refField, ref);
 							checkResult(res);
-							if(res.shouldSave&&res.shouldContinue&&inlinedParent){
+							if(fSave(res)&&data(res)==CONTINUE&&inlinedParent&&field.getSizeDescriptor().hasFixed()){
 								inlineDirtyButContinue=true;
 							}else{
-								if(res.shouldSave){
+								if(fSave(res)){
 									if(inlinedParent){
-										return IterationOptions.SAVE_AND_END;
+										return SAVE|END;
 									}
 									
 									try(var io=reference.io(provider)){
 										pipe.write(provider, io, instance);
 									}
 								}
-								if(!res.shouldContinue) return IterationOptions.END;
+								switch(data(res)){
+									case CONTINUE -> {}
+									case END -> {return END;}
+									case REPEAT -> throw new NotImplementedException();
+									default -> throw new NotImplementedException(data(res)+"");
+								}
 							}
 						}
 						{
@@ -251,14 +273,19 @@ public class MemoryWalker{
 								}
 							}
 							var res=walkStructFull(stack, refField.get(ioPool, instance), ref, refField.getReferencedPipe(instance), pointerRecord, false);
-							if(res.shouldSave){
+							if(fSave(res)){
 								throw new NotImplementedException();//TODO
 							}
-							if(!res.shouldContinue) return IterationOptions.END;
+							switch(data(res)){
+								case CONTINUE -> {}
+								case END -> {return END;}
+								case REPEAT -> throw new NotImplementedException();
+								default -> throw new NotImplementedException(data(res)+"");
+							}
 						}
 					}else if(UtilL.instanceOf(type, ChunkPointer.class)){
 						var result=handlePtr(stack, instance, pipe, pointerRecord, reference, ioPool, (IOField<T, ChunkPointer>)field);
-						if(result!=null) return result;
+						if(hasResult(result)) return result;
 					}else{
 						if(type.isArray()){
 							var component=type.componentType();
@@ -272,10 +299,15 @@ public class MemoryWalker{
 								for(IOInstance<?> inst : array){
 									{
 										var res=walkStructFull(stack, (T)inst, reference.addOffset(fieldOffset), pip, pointerRecord, true);
-										if(res.shouldSave){
+										if(fSave(res)){
 											throw new NotImplementedException();//TODO
 										}
-										if(!res.shouldContinue) return IterationOptions.END;
+										switch(data(res)){
+											case CONTINUE -> {}
+											case END -> {return END;}
+											case REPEAT -> throw new NotImplementedException();
+											default -> throw new NotImplementedException(data(res)+"");
+										}
 									}
 									fieldOffset+=pip.calcUnknownSize(provider, inst, WordSpace.BYTE);
 								}
@@ -293,11 +325,11 @@ public class MemoryWalker{
 							if(fieldValue!=null){
 								{
 									var res=walkStructFull(stack, (T)fieldValue, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), fieldValue.getThisStruct()), pointerRecord, true);
-									if(res.shouldSave&&res.shouldContinue&&inlinedParent){
+									if(fSave(res)&&data(res)==CONTINUE&&inlinedParent){
 										inlineDirtyButContinue=true;
 									}else{
 										var result=handleResult(ioPool, instance, pipe, inlinedParent, reference, (IOField<T, IOInstance<?>>)field, fieldValue, res);
-										if(result!=null) return result;
+										if(hasResult(result)) return result;
 									}
 								}
 							}
@@ -316,7 +348,7 @@ public class MemoryWalker{
 									var res=walkStructFull(stack, fieldValueInstance, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), fieldValueInstance.getThisStruct()), pointerRecord, true);
 									
 									var result=handleResult(ioPool, instance, pipe, inlinedParent, reference, (IOField<T, Object>)field, fieldValue, res);
-									if(result!=null) return result;
+									if(hasResult(result)) return result;
 									
 								}
 								continue;
@@ -338,43 +370,53 @@ public class MemoryWalker{
 			stack.pop();
 		}
 		if(inlineDirtyButContinue){
-			return IterationOptions.CONTINUE_AND_SAVE;
+			return CONTINUE|SAVE;
 		}
-		return IterationOptions.CONTINUE_NO_SAVE;
+		return CONTINUE;
 	}
 	
-	private <T extends IOInstance<T>> IterationOptions handlePtr(RefStack stack, T instance, StructPipe<T> pipe, PointerRecord pointerRecord, Reference reference, Struct.Pool<T> ioPool, IOField<T, ChunkPointer> ptrField) throws IOException{
+	private <T extends IOInstance<T>> int handlePtr(RefStack stack, T instance, StructPipe<T> pipe, PointerRecord pointerRecord, Reference reference, Struct.Pool<T> ioPool, IOField<T, ChunkPointer> ptrField) throws IOException{
 		var ch=ptrField.get(ioPool, instance);
 		
 		if(!ch.isNull()){
 			{
-				var res=pointerRecord.logChunkPointer(pipe, reference, ptrField, instance, ch);
+				var res=pointerRecord.logChunkPointer(reference, instance, ptrField, ch);
 				checkResult(res);
-				if(res.shouldSave){
+				if(fSave(res)){
 					throw new NotImplementedException();//TODO
 				}
-				if(!res.shouldContinue) return IterationOptions.END;
+				switch(data(res)){
+					case CONTINUE -> {}
+					case END -> {return END;}
+					case REPEAT -> throw new NotImplementedException();
+					default -> throw new NotImplementedException(data(res)+"");
+				}
 			}
 			{
 				var res=walkStructFull(stack, ch.dereference(provider), null, Chunk.PIPE, pointerRecord, false);
-				if(res.shouldSave){
+				if(fSave(res)){
 					throw new NotImplementedException();//TODO
 				}
-				if(!res.shouldContinue) return IterationOptions.END;
+				switch(data(res)){
+					case CONTINUE -> {}
+					case END -> {return END;}
+					case REPEAT -> throw new NotImplementedException();
+					default -> throw new NotImplementedException(data(res)+"");
+				}
 			}
 		}
-		return null;
+		return NO_RESULT;
 	}
 	
-	private <T extends IOInstance<T>, FT> IterationOptions handleResult(
+	private <T extends IOInstance<T>, FT> int handleResult(
 		Struct.Pool<T> ioPool, T instance, StructPipe<T> pipe,
 		boolean inlinedParent, Reference instanceReference,
 		IOField<T, FT> field, FT fieldValue,
-		IterationOptions res
+		int res
 	) throws IOException{
-		if(res.shouldSave){
+		if(fSave(res)){
 			if(inlinedParent){
-				return IterationOptions.SAVE_AND_END;
+				return SAVE|END;
 			}
 			if(instance instanceof IOInstance.Unmanaged<?>){
 				field.set(ioPool, instance, fieldValue);
@@ -385,16 +427,25 @@ public class MemoryWalker{
 			}
 		}
 		
-		if(!res.shouldContinue){
-			return IterationOptions.END;
+		switch(data(res)){
+			case CONTINUE -> {return NO_RESULT;}
+			case END -> {return END;}
+			case REPEAT -> throw new NotImplementedException();
+			default -> throw new NotImplementedException(data(res)+"");
 		}
-		return null;
 	}
 	
-	private void checkResult(IterationOptions res){
+	private void checkResult(int res){
 		if(provider.isReadOnly()){
-			if(res.shouldSave()){
+			if(fSave(res)){
 				throw new IllegalStateException("Tried to save on read only walk");
+			}
+		}
+		
+		if(DEBUG_VALIDATION){
+			var data=res&FLOW_MASK;
+			if(!UtilL.contains(new int[]{CONTINUE, END, REPEAT}, data)){
+				throw new IllegalStateException("no flow flag provided");
 			}
 		}
 	}

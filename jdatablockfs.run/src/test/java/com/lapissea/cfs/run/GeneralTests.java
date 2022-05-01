@@ -406,4 +406,15 @@ public class GeneralTests{
 			                                  .filter(IOInstance::isInstance)
 			                                  .map(Struct::ofUnknown);
 	}
+	
+	@Test
+	void checkMemoryWalk(TestInfo info) throws IOException{
+		TestUtils.testCluster(info, cluster->{
+			
+			var prov=cluster.getRootProvider();
+			
+			var dummies=prov.request(TypeLink.of(GenericContainer.class, Dummy[].class), "dummy_array");
+			
+		});
+	}
 }
