@@ -257,8 +257,8 @@ public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 		public static Unmanaged<?> ofUnknown(@NotNull Class<?> instanceClass){
 			Objects.requireNonNull(instanceClass);
 			
-			if(!IOInstance.isInstance(instanceClass)){
-				throw new IllegalArgumentException(instanceClass.getName()+" is not an "+IOInstance.class.getSimpleName());
+			if(!IOInstance.isUnmanaged(instanceClass)){
+				throw new IllegalArgumentException(instanceClass.getName()+" is not an "+IOInstance.Unmanaged.class.getName());
 			}
 			
 			return ofUnmanaged((Class<? extends IOInstance.Unmanaged>)instanceClass);

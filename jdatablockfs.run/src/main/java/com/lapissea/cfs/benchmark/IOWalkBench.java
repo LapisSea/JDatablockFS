@@ -3,7 +3,6 @@ package com.lapissea.cfs.benchmark;
 import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.impl.MemoryData;
-import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.run.Configuration;
@@ -31,12 +30,12 @@ public class IOWalkBench{
 	private final Cluster                    cluster;
 	private       MemoryWalker.PointerRecord rec=new MemoryWalker.PointerRecord(){
 		@Override
-		public <T extends IOInstance<T>> MemoryWalker.IterationOptions log(StructPipe<T> pipe, Reference instanceReference, IOField.Ref<T, ?> field, T instance, Reference value) throws IOException{
-			return MemoryWalker.IterationOptions.CONTINUE_NO_SAVE;
+		public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, IOField.Ref<T, ?> field, Reference valueReference) throws IOException{
+			return MemoryWalker.CONTINUE;
 		}
 		@Override
-		public <T extends IOInstance<T>> MemoryWalker.IterationOptions logChunkPointer(StructPipe<T> pipe, Reference instanceReference, IOField<T, ChunkPointer> field, T instance, ChunkPointer value) throws IOException{
-			return MemoryWalker.IterationOptions.CONTINUE_NO_SAVE;
+		public <T extends IOInstance<T>> int logChunkPointer(Reference instanceReference, T instance, IOField<T, ChunkPointer> field, ChunkPointer value) throws IOException{
+			return MemoryWalker.CONTINUE;
 		}
 	};
 	
