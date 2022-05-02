@@ -43,12 +43,14 @@ public class JorthWriter implements AutoCloseable{
 	}
 	
 	private final UnsafeBiConsumer<JorthWriter, Token, MalformedJorthException> rawTokens;
-	private final Map<String, String>                                           overrides=new HashMap<>();
+	final         Map<String, String>                                           overrides=new HashMap<>();
+	private final JorthCompiler                                                 compiler;
 	
 	private int line;
-	JorthWriter(int startingLine, UnsafeBiConsumer<JorthWriter, Token, MalformedJorthException> rawTokens){
+	JorthWriter(int startingLine, UnsafeBiConsumer<JorthWriter, Token, MalformedJorthException> rawTokens, JorthCompiler compiler){
 		this.line=startingLine;
 		this.rawTokens=rawTokens;
+		this.compiler=compiler;
 	}
 	
 	private CharSequence inlineCodeValues(CharIterator data, String[] values) throws MalformedJorthException{
@@ -228,8 +230,8 @@ public class JorthWriter implements AutoCloseable{
 			}
 			
 			char c=codeChunk.next();
-			
-			if(c=='\n') line++;
+
+//			if(c=='\n') line++;
 			
 			if(c=='\\'){
 				var ch=readOrUnexpected(codeChunk);
@@ -293,6 +295,7 @@ public class JorthWriter implements AutoCloseable{
 		}else{
 			rawTokens.accept(this, new Token(line, tokenStr));
 		}
+		if(!compiler.hasRawTokens()) line++;
 	}
 	
 	private CharIterator.Sequence seq(CharSequence codeChunk){

@@ -132,6 +132,9 @@ public class JorthCompiler{
 	private       boolean       addedClinit;
 	private       Visibility    visibility     =Visibility.PUBLIC;
 	
+	public final StringJoiner src =new StringJoiner(" ");
+	private      int          line=-1, tab;
+	
 	public JorthCompiler(ClassLoader classLoader){
 		this.classLoader=classLoader;
 	}
@@ -141,6 +144,10 @@ public class JorthCompiler{
 	}
 	private Token pop() throws MalformedJorthException{
 		return rawTokens.pop();
+	}
+	
+	boolean hasRawTokens(){
+		return !rawTokens.isEmpty();
 	}
 	
 	private void consumeRawToken(JorthWriter writer, Token token) throws MalformedJorthException{
@@ -175,6 +182,24 @@ public class JorthCompiler{
 	
 	private boolean consume(JorthWriter writer, Token token) throws MalformedJorthException{
 //		LogUtil.println(currentMethod,token.source);
+		
+		switch(token.source.toLowerCase()){
+			case "start" -> tab++;
+			case "end" -> tab--;
+		}
+		
+		if(line==-1) line=token.line;
+		if(line!=token.line){
+			line=token.line;
+			src.add("\n"+("\t".repeat(tab)));
+		}
+		
+		src.add(writer.overrides.entrySet().stream().filter(s->s.getValue().equals(token.source)).map(e->e.getKey()).findAny().orElse(token.source));
+		switch(token.source.toLowerCase()){
+			case "end" -> {
+				src.add("\n"+("\t".repeat(tab)));
+			}
+		}
 		
 		if(currentMethod!=null){
 			
@@ -568,6 +593,8 @@ public class JorthCompiler{
 					visibility=Visibility.PUBLIC;
 					isStatic=false;
 					isFinal=false;
+					
+					src.add("\n"+("\t".repeat(tab)));
 					return true;
 				}
 				case "@" -> {
@@ -692,7 +719,7 @@ public class JorthCompiler{
 							
 							if(raw.isStringLiteral()){
 								var w=new Token.Sequence.Writable();
-								try(var writ=new JorthWriter(raw.line, (__, t)->w.write(t))){
+								try(var writ=new JorthWriter(raw.line, (__, t)->w.write(t), this)){
 									writ.write(raw.getStringLiteralValue());
 								}
 								return w;
@@ -902,6 +929,8 @@ public class JorthCompiler{
 						}catch(Throwable e){
 							throw new MalformedJorthException("Failed to end function ", e);
 						}
+						
+						src.add("\n"+("\t".repeat(tab)));
 					}
 					case "if" -> {
 						var lastEnd=ifStack.remove(ifStack.size()-1);
@@ -1145,7 +1174,7 @@ public class JorthCompiler{
 	}
 	
 	public JorthWriter writeCode(){
-		return new JorthWriter(lastLine, this::consumeRawToken);
+		return new JorthWriter(lastLine, this::consumeRawToken, this);
 	}
 	
 	

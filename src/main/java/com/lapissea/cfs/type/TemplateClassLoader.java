@@ -118,6 +118,8 @@ public class TemplateClassLoader extends ClassLoader{
 		try{
 			byt=jorth.classBytecode(PRINT_BYTECODE);
 			
+			LogUtil.println(jorth.src);
+			
 		}catch(MalformedJorthException e){
 			throw new RuntimeException(e);
 		}
