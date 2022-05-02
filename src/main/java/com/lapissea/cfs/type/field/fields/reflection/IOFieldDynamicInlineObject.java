@@ -3,8 +3,12 @@ package com.lapissea.cfs.type.field.fields.reflection;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
+import com.lapissea.cfs.io.bit.BitInputStream;
+import com.lapissea.cfs.io.bit.BitOutputStream;
 import com.lapissea.cfs.io.bit.FlagReader;
 import com.lapissea.cfs.io.bit.FlagWriter;
+import com.lapissea.cfs.io.content.ContentOutputBuilder;
+import com.lapissea.cfs.io.content.ContentOutputStream;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
@@ -19,13 +23,17 @@ import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Objects;
 import java.util.OptionalLong;
+import java.util.stream.IntStream;
+import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
 public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType> extends IOField.NullFlagCompany<CTyp, ValueType>{
@@ -52,7 +60,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 			minKnownTypeSize=typDesc.getMin(WordSpace.BYTE);
 		}catch(IllegalArgumentException ignored){}
 		
-		var refDesc=ContiguousStructPipe.of(Reference.class).getSizeDescriptor();
+		var refDesc=REF_PIPE.getSizeDescriptor();
 		
 		long minSize=Math.min(refDesc.getMin(WordSpace.BYTE), minKnownTypeSize);
 		
@@ -88,7 +96,42 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 					yield ContiguousStructPipe.sizeOfUnknown(prov, inst, WordSpace.BYTE);
 				}
 			}
-			default -> throw new NotImplementedException(val.getClass()+"");
+			default -> {
+				var type=val.getClass();
+				if(type.isArray()){
+					var e  =type.getComponentType();
+					var len=Array.getLength(val);
+					
+					var lenSize=NumberSize.bySize(len).bytes+1;
+					
+					var psiz=SupportedPrimitive.get(e).map(pTyp->(switch(pTyp){
+						case DOUBLE, FLOAT -> pTyp.maxSize.get();
+						case BOOLEAN -> Utils.bitToByte(len);
+						case LONG -> NumberSize.bySize(LongStream.of((long[])val).max().orElse(0)).bytes;
+						case INT -> NumberSize.bySize(IntStream.of((int[])val).max().orElse(0)).bytes;
+						case SHORT -> 2;
+						case BYTE -> 1;
+					})*len);
+					if(psiz.isPresent()) yield psiz.get()+lenSize;
+					
+					if(IOInstance.isInstance(e)){
+						var struct=Struct.ofUnknown(e);
+						if(struct instanceof Struct.Unmanaged){
+							yield Stream.of((IOInstance.Unmanaged<?>[])val).mapToLong(i->REF_PIPE.calcUnknownSize(prov, i.getReference(), WordSpace.BYTE)).sum();
+						}
+						
+						StructPipe pip=ContiguousStructPipe.of(struct);
+						
+						if(pip.getSizeDescriptor().hasFixed()){
+							yield pip.getSizeDescriptor().requireFixed(WordSpace.BYTE)*len+lenSize;
+						}
+						
+						yield Stream.of((IOInstance<?>[])val).mapToLong(i->pip.calcUnknownSize(prov, i, WordSpace.BYTE)).sum()+lenSize;
+					}
+				}
+				
+				throw new NotImplementedException(val.getClass()+"");
+			}
 		};
 	}
 	@SuppressWarnings("unchecked")
@@ -113,9 +156,130 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 			case IOInstance.Unmanaged inst -> REF_PIPE.write(provider, dest, inst.getReference());
 			case IOInstance inst -> ContiguousStructPipe.of(inst.getThisStruct()).write(provider, dest, inst);
 			
-			default -> throw new NotImplementedException(val.getClass()+"");
+			default -> {
+				var type=val.getClass();
+				if(type.isArray()){
+					var len=Array.getLength(val);
+					{
+						var num=NumberSize.bySize(len);
+						FlagWriter.writeSingle(dest, NumberSize.BYTE, NumberSize.FLAG_INFO, false, num);
+						num.write(dest, len);
+					}
+					
+					var e=type.getComponentType();
+					
+					var pTypO=SupportedPrimitive.get(e);
+					if(pTypO.isPresent()){
+						var pTyp=pTypO.get();
+						writePrimitiveArray(dest, val, len, pTyp);
+						break;
+					}
+					
+					if(IOInstance.isInstance(e)){
+						var struct=Struct.ofUnknown(e);
+						if(struct instanceof Struct.Unmanaged){
+							var b=new ContentOutputBuilder();
+							for(var i : (IOInstance.Unmanaged<?>[])val){
+								REF_PIPE.write(provider, b, i.getReference());
+							}
+							b.writeTo(dest);
+							break;
+						}
+						
+						StructPipe pip=ContiguousStructPipe.of(struct);
+						
+						ContentOutputBuilder b=new ContentOutputBuilder(Math.toIntExact(pip.getSizeDescriptor().getFixed(WordSpace.BYTE).orElse(128)));
+						for(var i : (IOInstance<?>[])val){
+							pip.write(provider, b, i);
+						}
+						b.writeTo(dest);
+						break;
+					}
+				}
+				
+				throw new NotImplementedException(val.getClass()+"");
+			}
 		}
 	}
+	
+	private void writePrimitiveArray(ContentWriter dest, Object array, int len, SupportedPrimitive pTyp) throws IOException{
+		switch(pTyp){
+			case DOUBLE -> dest.writeFloats8((double[])array);
+			case FLOAT -> dest.writeFloats4((float[])array);
+			case BOOLEAN -> {
+				try(var bitOut=new BitOutputStream(dest)){
+					bitOut.writeBits((boolean[])array);
+				}
+			}
+			case LONG -> {
+				var siz=NumberSize.bySize(LongStream.of((long[])array).max().orElse(0));
+				FlagWriter.writeSingle(dest, NumberSize.BYTE, NumberSize.FLAG_INFO, false, siz);
+				
+				byte[] bb=new byte[siz.bytes*len];
+				try(var io=new ContentOutputStream.BA(bb)){
+					for(long l : (long[])array){
+						siz.write(io, l);
+					}
+				}
+				dest.write(bb);
+			}
+			case INT -> {
+				var siz=NumberSize.bySize(IntStream.of((int[])array).max().orElse(0));
+				FlagWriter.writeSingle(dest, NumberSize.BYTE, NumberSize.FLAG_INFO, false, siz);
+				
+				byte[] bb=new byte[siz.bytes*len];
+				try(var io=new ContentOutputStream.BA(bb)){
+					for(var l : (int[])array){
+						siz.write(io, l);
+					}
+				}
+				dest.write(bb);
+			}
+			case SHORT -> {
+				byte[] bb=new byte[len*2];
+				try(var io=new ContentOutputStream.BA(bb)){
+					for(var l : (short[])array){
+						io.writeInt2(l&0xFFFF);
+					}
+				}
+				dest.write(bb);
+			}
+			case BYTE -> throw new ShouldNeverHappenError();
+		}
+	}
+	
+	private Object readPrimitiveArray(ContentReader src, int len, SupportedPrimitive pTyp) throws IOException{
+		return switch(pTyp){
+			case DOUBLE -> src.readFloats8(len);
+			case FLOAT -> src.readFloats4(len);
+			case BOOLEAN -> {
+				try(var bitIn=new BitInputStream(src, len)){
+					var bools=new boolean[len];
+					bitIn.readBits(bools);
+					yield bools;
+				}
+			}
+			case LONG -> {
+				var siz=FlagReader.readSingle(src, NumberSize.FLAG_INFO, false);
+				var arr=new long[len];
+				for(int i=0;i<arr.length;i++){
+					arr[i]=siz.read(src);
+				}
+				yield arr;
+			}
+			case INT -> {
+				var siz=FlagReader.readSingle(src, NumberSize.FLAG_INFO, false);
+				var arr=new int[len];
+				for(int i=0;i<arr.length;i++){
+					arr[i]=(int)siz.read(src);
+				}
+				yield arr;
+			}
+			case SHORT -> src.readInts2(len);
+			case BYTE -> throw new ShouldNeverHappenError();
+		};
+	}
+	
 	private static long numToLong(Number integer){
 		ensureInt(integer.getClass());
 		return switch(integer){
@@ -158,6 +322,40 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 			var struct=Struct.ofUnknown(typ);
 			return readStruct(provider, src, genericContext, struct);
 		}
+		
+		if(typ.isArray()){
+			int len=Math.toIntExact(FlagReader.readSingle(src, NumberSize.FLAG_INFO, false).read(src));
+			
+			var e=typ.getComponentType();
+			
+			var pTypO=SupportedPrimitive.get(e);
+			if(pTypO.isPresent()){
+				var pTyp=pTypO.get();
+				return readPrimitiveArray(src, len, pTyp);
+			}
+			
+			if(IOInstance.isInstance(e)){
+				var struct=Struct.ofUnknown(e);
+				if(struct instanceof Struct.Unmanaged<?> u){
+					var arr    =(IOInstance.Unmanaged<?>[])Array.newInstance(e, len);
+					var creator=u.requireUnmanagedConstructor();
+					for(int i=0;i<arr.length;i++){
+						var ref=REF_PIPE.readNew(provider, src, null);
+						arr[i]=creator.create(provider, ref, typDef);
+					}
+					return arr;
+				}
+				
+				var pip=ContiguousStructPipe.of(struct);
+				
+				var arr=(IOInstance<?>[])Array.newInstance(e, len);
+				for(int i=0;i<arr.length;i++){
+					arr[i]=pip.readNew(provider, src, genericContext);
+				}
+				return arr;
+			}
+		}
+		
 		throw new NotImplementedException(typ+"");
 	}
 	private void skipReadTyp(TypeLink typDef, DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
@@ -253,6 +451,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		if(gens==null) return List.of(idGenerator);
 		return Stream.concat(gens.stream(), Stream.of(idGenerator)).toList();
 	}
+	
 	@Override
 	public void write(Struct.Pool<CTyp> ioPool, DataProvider provider, ContentWriter dest, CTyp instance) throws IOException{
 		if(nullable()&&getIsNull(ioPool, instance)) return;
