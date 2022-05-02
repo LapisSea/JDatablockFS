@@ -30,6 +30,15 @@ public class DisplayManager implements DataLogger{
 		try{
 			System.setProperty("imgui.library.path", "./lib");
 			ImGui.createContext();
+			
+			var    io=ImGui.getIO();
+			var    f =io.getFonts();
+			byte[] bb;
+			try(var t=Objects.requireNonNull(DisplayManager.class.getResourceAsStream("/CourierPrime/Regular/font.ttf"))){
+				bb=t.readAllBytes();
+			}
+			f.clearFonts();
+			f.addFontFromMemoryTTF(bb, 16);
 		}catch(Throwable e){
 			e.printStackTrace();
 			System.exit(1);
@@ -519,6 +528,7 @@ public class DisplayManager implements DataLogger{
 	
 	private double  time=0.0;
 	private IVec2iR lastSiz;
+	
 	private void updateImgui(){
 		int w=renderer.getDisplay().getWidth(), h=renderer.getDisplay().getHeight();
 		if(lastSiz==null) lastSiz=new Vec2iFinal(w, h);
