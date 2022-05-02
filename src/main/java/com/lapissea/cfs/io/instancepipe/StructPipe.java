@@ -639,7 +639,11 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	}
 	
 	public long calcUnknownSize(DataProvider provider, T instance, WordSpace wordSpace){
-		return getSizeDescriptor().calcUnknown(makeIOPool(), provider, instance, wordSpace);
+		var pool=makeIOPool();
+		if(DEBUG_VALIDATION){
+			earlyCheckNulls(pool, instance);
+		}
+		return getSizeDescriptor().calcUnknown(pool, provider, instance, wordSpace);
 	}
 	
 	

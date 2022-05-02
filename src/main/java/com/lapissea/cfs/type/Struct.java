@@ -315,7 +315,7 @@ public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 		public String instanceToString(Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
 			return instanceToString0(
 				ioPool, instance, doShort, start, end, fieldValueSeparator, fieldSeparator,
-				Stream.concat(getFields().stream().filter(f->f.getName().indexOf(IOFieldTools.GENERATED_FIELD_SEPARATOR)!=-1), instance.listUnmanagedFields())
+				Stream.concat(getFields().stream().filter(f->f.getName().indexOf(IOFieldTools.GENERATED_FIELD_SEPARATOR)==-1), instance.listUnmanagedFields())
 			);
 		}
 		
@@ -442,7 +442,7 @@ public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 	
 	private Supplier<T> emptyConstructor;
 	
-	private int invalidInitialNulls=-1;
+	private byte invalidInitialNulls=-1;
 	
 	public Struct(Class<T> type){
 		this.type=type;
@@ -545,7 +545,7 @@ public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 	public String instanceToString(Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
 		return instanceToString0(
 			ioPool, instance, doShort, start, end, fieldValueSeparator, fieldSeparator,
-			fields.stream().filter(f->f.getName().indexOf(IOFieldTools.GENERATED_FIELD_SEPARATOR)!=-1)
+			fields.stream().filter(f->f.getName().indexOf(IOFieldTools.GENERATED_FIELD_SEPARATOR)==-1)
 		);
 	}
 	
@@ -590,6 +590,11 @@ public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 	
 	public boolean hasInvalidInitialNulls(){
 		if(invalidInitialNulls==-1){
+			if(this instanceof Unmanaged){
+				invalidInitialNulls=(byte)0;
+				return false;
+			}
+			
 			boolean inv=false;
 			if(fields.unpackedStream().anyMatch(f->f.getNullability()==NOT_NULL)){
 				var obj =requireEmptyConstructor().get();
@@ -598,7 +603,7 @@ public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 				          .filter(f->f.getNullability()==NOT_NULL)
 				          .anyMatch(f->f.isNull(pool, obj));
 			}
-			invalidInitialNulls=inv?1:0;
+			invalidInitialNulls=(byte)(inv?1:0);
 			return inv;
 		}
 		return invalidInitialNulls==1;

@@ -3,6 +3,8 @@ package com.lapissea.cfs.objects.collections;
 import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
+import com.lapissea.cfs.io.ValueStorage;
+import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.IOInstance;
@@ -319,6 +321,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	
 	@Override
 	public void put(K key, V value) throws IOException{
+		if(DEBUG_VALIDATION) checkValue(value);
 		long sizeFlag=putEntry(buckets, bucketPO2, key, value);
 		if(sizeFlag==OVERWRITE) return;
 		
@@ -329,9 +332,33 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		}
 	}
 	
+	private void checkValue(V value){
+		if(!(value instanceof IOInstance.Unmanaged)){
+			try{
+				var d=MemoryData.build().build();
+				var v=ValueStorage.makeStorage(DataProvider.newVerySimpleProvider(d), TypeLink.of(value.getClass()), getGenerics(), false);
+				((ValueStorage<V>)v).write(d.io(), value);
+			}catch(Throwable e){
+				String valStr;
+				try{
+					valStr=value.toString();
+				}catch(Throwable e1){
+					valStr="<"+value.getClass().getSimpleName()+" failed toString: "+e1.getMessage()+">";
+				}
+				throw new IllegalArgumentException(valStr+" is not a valid value!", e);
+			}
+		}
+	}
+	
 	@Override
 	public void putAll(Map<K, V> values) throws IOException{
 		if(values.isEmpty()) return;
+		
+		if(DEBUG_VALIDATION){
+			for(V value : values.values()){
+				checkValue(value);
+			}
+		}
 		
 		Map<Integer, List<Map.Entry<K, V>>> sorted=new HashMap<>();
 		

@@ -25,14 +25,8 @@ public class BitOutputStream implements BitWriter<BitOutputStream>, AutoCloseabl
 	private final byte[]     byteBuf=new byte[Long.BYTES];
 	private final LongBuffer lb     =ByteBuffer.wrap(byteBuf).order(ByteOrder.LITTLE_ENDIAN).asLongBuffer();
 	
-	private final boolean test;
-	
 	public BitOutputStream(ContentWriter dest){
-		this(dest, true);
-	}
-	public BitOutputStream(ContentWriter dest, boolean test){
 		this.dest=dest;
-		this.test=test;
 	}
 	
 	@Override

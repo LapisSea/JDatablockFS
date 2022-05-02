@@ -199,7 +199,8 @@ public class SlowTests{
 			check(mirror, data, "failed after cycle "+run);
 		}
 	}
-	private void check(IOInterface expected, IOInterface data, String s) throws IOException{
+	
+	private void check(IOInterface expected, IOInterface data, String s){
 		byte[] m, d;
 		try{
 			m=expected.readAll();

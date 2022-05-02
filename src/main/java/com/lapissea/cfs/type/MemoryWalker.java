@@ -290,7 +290,7 @@ public class MemoryWalker{
 						if(type.isArray()){
 							var component=type.componentType();
 							if(IOInstance.isInstance(component)){
-								if(!Struct.ofUnknown(type).getCanHavePointers()){
+								if(!Struct.ofUnknown(component).getCanHavePointers()){
 									continue;
 								}
 								var array=(IOInstance<?>[])field.get(ioPool, instance);
