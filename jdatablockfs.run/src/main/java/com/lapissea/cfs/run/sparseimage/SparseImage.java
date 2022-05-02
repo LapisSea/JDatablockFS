@@ -2,7 +2,6 @@ package com.lapissea.cfs.run.sparseimage;
 
 import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.io.impl.MemoryData;
-import com.lapissea.cfs.objects.ObjectID;
 import com.lapissea.cfs.run.Configuration;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
@@ -66,7 +65,7 @@ public class SparseImage{
 		int radius    =args.getInt("radius", 10);
 		int iterations=args.getInt("iterations", 100);
 		
-		var image=cluster.getRootProvider().request(Image.class, new ObjectID("my image"));
+		var image=cluster.getRootProvider().request(Image.class, "my image");
 		
 		Random r=new Random(1);
 		for(int i=0;i<iterations;i++){

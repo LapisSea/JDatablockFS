@@ -4,17 +4,20 @@ import com.lapissea.cfs.exceptions.InvalidMagicIDException;
 import com.lapissea.cfs.exceptions.MalformedPointerException;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.content.ContentReader;
-import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.ObjectID;
 import com.lapissea.cfs.objects.collections.AbstractUnmanagedIOMap;
 import com.lapissea.cfs.objects.collections.HashIOMap;
-import com.lapissea.cfs.type.*;
+import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.IOTypeDB;
+import com.lapissea.cfs.type.MemoryWalker;
+import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.UtilL;
+import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -87,7 +90,7 @@ public class Cluster implements DataProvider{
 		@IOValue
 		@IONullability(NULLABLE)
 		@IOValue.OverrideType(value=HashIOMap.class)
-		private AbstractUnmanagedIOMap<ObjectID, IOInstance<?>> rootObjects;
+		private AbstractUnmanagedIOMap<ObjectID, Object> rootObjects;
 		
 		@IOValue
 		@IONullability(NULLABLE)
@@ -106,9 +109,9 @@ public class Cluster implements DataProvider{
 	private final RootProvider rootProvider=new RootProvider(){
 		@SuppressWarnings("unchecked")
 		@Override
-		public <T extends IOInstance<T>> T request(TypeLink genericType, ObjectID id) throws IOException{
-			Objects.requireNonNull(genericType);
+		public <T> T request(ObjectID id, UnsafeSupplier<T, IOException> objectGenerator) throws IOException{
 			Objects.requireNonNull(id);
+			Objects.requireNonNull(objectGenerator);
 			
 			var meta=meta();
 			
@@ -117,36 +120,22 @@ public class Cluster implements DataProvider{
 				return (T)existing;
 			}
 			
-			var provider=Cluster.this;
-			var rawType =genericType.getTypeClass(provider.getTypeDb());
-			var struct  =Struct.ofUnknown(rawType);
+			var inst=objectGenerator.get();
 			
-			if(struct instanceof Struct.Unmanaged<?> uStruct){
-				var pipe=ContiguousStructPipe.of(struct);
-				
-				var siz=pipe.getSizeDescriptor().calcAllocSize(WordSpace.BYTE);
-				
-				var mem=AllocateTicket.bytes(siz).submit(provider);
-				
-				var inst=uStruct.requireUnmanagedConstructor().create(provider, mem.getPtr().makeReference(), genericType);
-				
-				meta.rootObjects.put(id, inst);
-				return (T)inst;
-			}else{
-				var inst=struct.requireEmptyConstructor().get();
-				if(struct.hasInvalidInitialNulls()){
-					inst.allocateNulls(provider);
-				}
-				
-				meta.rootObjects.put(id, inst);
-				return (T)inst;
-			}
+			meta.rootObjects.put(id, inst);
+			return inst;
 		}
+		
 		@Override
-		public <T extends IOInstance<T>> void provide(T obj, ObjectID id) throws IOException{
+		public <T> void provide(T obj, ObjectID id) throws IOException{
 			Objects.requireNonNull(obj);
 			var meta=meta();
 			meta.rootObjects.put(id, obj);
+		}
+		
+		@Override
+		public DataProvider getDataProvider(){
+			return Cluster.this;
 		}
 	};
 	

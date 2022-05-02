@@ -8,7 +8,6 @@ import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
-import com.lapissea.cfs.objects.ObjectID;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.objects.collections.ContiguousIOList;
 import com.lapissea.cfs.objects.collections.HashIOMap;
@@ -164,10 +163,10 @@ public class GeneralTests{
 	@MethodSource({"genericObjects"})
 	<T extends IOInstance<T>> void genericStorage(T obj, TestInfo info) throws IOException{
 		TestUtils.testCluster(info, ses->{
-			IOList<GenericContainer<?>> ls=ses.getRootProvider().request(TypeLink.ofFlat(
+			var ls=ses.getRootProvider().<IOList<GenericContainer<?>>>builder().withType(TypeLink.ofFlat(
 				LinkedIOList.class,
 				GenericContainer.class, Object.class
-			), new ObjectID("list"));
+			)).withId("list").request();
 			
 			var c=new GenericContainer<>(obj);
 			ls.clear();
@@ -413,7 +412,12 @@ public class GeneralTests{
 			
 			var prov=cluster.getRootProvider();
 			
-			var dummies=prov.request(TypeLink.of(GenericContainer.class, Dummy[].class), "dummy_array");
+			var dummies=prov.builder()
+			                .withGenerator(()->new GenericContainer<>(IntStream.range(0, 3).mapToObj(Dummy::new).toArray(Dummy[]::new)))
+			                .withId("dummy_array")
+			                .request();
+			
+			LogUtil.println(dummies.toString());
 			
 		});
 	}
