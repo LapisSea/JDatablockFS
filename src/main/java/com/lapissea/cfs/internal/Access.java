@@ -15,14 +15,11 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.nio.ByteBuffer;
 import java.security.ProtectionDomain;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
-import java.util.Random;
 import java.util.function.Supplier;
-import java.util.stream.IntStream;
 
 import static com.lapissea.cfs.internal.MyUnsafe.UNSAFE;
 import static java.lang.invoke.MethodHandles.Lookup.*;
@@ -32,7 +29,7 @@ public class Access{
 	
 	private static final boolean USE_UNSAFE_LOOKUP=true;
 	
-	private static int calcModesOffset(){
+	private static long calcModesOffset(){
 		@SuppressWarnings("all")
 		final class Mirror{
 			Class<?> lookupClass;
@@ -48,22 +45,11 @@ public class Access{
 			}
 		}
 		
-		int offset=0;
-		var mirror=new Mirror(null, null, Integer.MAX_VALUE);
-		while(true){
-			int off=offset;
-			
-			var ok=IntStream.range(0, 100).map(i->i+1234).allMatch(i->{
-				ByteBuffer bb=ByteBuffer.allocate(4);
-				new Random(i).nextBytes(bb.array());
-				mirror.allowedModes=bb.getInt(0);
-				var val=UNSAFE.getInt(mirror, off);
-				return mirror.allowedModes==val;
-			});
-			
-			if(ok) break;
-			
-			offset++;
+		long offset;
+		try{
+			offset=UNSAFE.objectFieldOffset(Mirror.class.getDeclaredField("allowedModes"));
+		}catch(NoSuchFieldException e){
+			throw new RuntimeException(e);
 		}
 		return offset;
 	}
@@ -180,7 +166,7 @@ public class Access{
 		}
 		
 		//calculate objectFieldOffset every time as JVM may not keep a constant for a field
-		int offset=calcModesOffset();
+		long offset=calcModesOffset();
 		
 		UNSAFE.getAndSetInt(lookup, offset, allModes);
 		if(lookup.lookupModes()!=allModes){
