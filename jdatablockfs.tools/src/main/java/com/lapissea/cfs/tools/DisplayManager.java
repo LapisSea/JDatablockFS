@@ -4,7 +4,10 @@ import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.MemFrame;
 import com.lapissea.cfs.tools.render.RenderBackend;
 import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.util.*;
+import com.lapissea.util.LogUtil;
+import com.lapissea.util.MathUtil;
+import com.lapissea.util.Rand;
+import com.lapissea.util.UtilL;
 import com.lapissea.vec.Vec2iFinal;
 import com.lapissea.vec.interf.IVec2iR;
 import imgui.ImGui;
@@ -244,8 +247,6 @@ public class DisplayManager implements DataLogger{
 			display.destroy();
 		}
 	}
-	
-	private final NanoTimer timer=LOG_FRAME_TIME?new NanoTimer():null;
 	
 	private List<BinaryGridRenderer.HoverMessage> hover=List.of();
 	

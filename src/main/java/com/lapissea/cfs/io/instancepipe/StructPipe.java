@@ -1,6 +1,5 @@
 package com.lapissea.cfs.io.instancepipe;
 
-import com.lapissea.cfs.ConsoleColors;
 import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
@@ -36,6 +35,9 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.lapissea.cfs.ConsoleColors.BLUE_BRIGHT;
+import static com.lapissea.cfs.ConsoleColors.CYAN_BRIGHT;
+import static com.lapissea.cfs.ConsoleColors.RESET;
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
 public abstract class StructPipe<T extends IOInstance<T>>{
@@ -67,9 +69,18 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 			}
 			
 			if(GlobalConfig.PRINT_COMPILATION){
-				LogUtil.println(ConsoleColors.CYAN_BRIGHT+
-				                "Compiled "+struct.getType().getSimpleName()+" with "+TextUtil.toNamedPrettyJson(created, true)+"\n"+
-				                TextUtil.toTable(created.getSpecificFields())+ConsoleColors.RESET);
+				String s=CYAN_BRIGHT+
+				         "Compiled: "+struct.getType().getName()+"\n"+
+				         "\tPipe type: "+BLUE_BRIGHT+created.getClass().getName()+CYAN_BRIGHT+"\n"+
+				         "\tSize: "+BLUE_BRIGHT+created.getSizeDescriptor()+CYAN_BRIGHT;
+				
+				var sFields=created.getSpecificFields();
+				
+				if(!sFields.equals(struct.getFields())){
+					s+="\n"+TextUtil.toTable(created.getSpecificFields());
+				}
+				
+				LogUtil.println(s+RESET);
 			}
 			
 			put(struct, created);

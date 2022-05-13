@@ -1,7 +1,6 @@
 package com.lapissea.cfs.run.sparseimage;
 
 import com.lapissea.cfs.chunk.Cluster;
-import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.run.Configuration;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
@@ -41,7 +40,7 @@ public class SparseImage{
 		LateInit<DataLogger> logger     =LoggedMemoryUtils.createLoggerFromConfig();
 		
 		try{
-			MemoryData<?> mem=LoggedMemoryUtils.newLoggedMemory(sessionName, logger);
+			var mem=LoggedMemoryUtils.newLoggedMemory(sessionName, logger);
 			logger.ifInited(l->l.getSession(sessionName).reset());
 			
 			try{
