@@ -91,6 +91,21 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		
 	}
 	
+	private final class FieldSetIterator implements Iterator<IOField<T, ?>>{
+		
+		private int cursor;
+		
+		@Override
+		public boolean hasNext(){
+			return cursor<data.length;
+		}
+		
+		@Override
+		public IOField<T, ?> next(){
+			return data[cursor++];
+		}
+	}
+	
 	private static final FieldSet<?> EMPTY=new FieldSet<>();
 	
 	@SuppressWarnings("unchecked")
@@ -100,7 +115,7 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	
 	@SuppressWarnings("unchecked")
 	public static <T extends IOInstance<T>> FieldSet<T> of(Stream<IOField<T, ?>> stream){
-		var data=stream.filter(Objects::nonNull).distinct().toArray(IOField[]::new);
+		var data=stream.map(Objects::requireNonNull).distinct().toArray(IOField[]::new);
 		if(data.length==0) return of();
 		return new FieldSet<>((IOField<T, ?>[])data);
 	}
@@ -115,6 +130,7 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	
 	
 	private final IOField<T, ?>[] data;
+	private       int             hash=-1;
 	
 	@SuppressWarnings("unchecked")
 	private FieldSet(){
@@ -156,17 +172,53 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 			sb.append(',').append(' ');
 		}
 	}
+	
+	@Override
+	public boolean equals(Object o){
+		return this==o||
+		       o instanceof FieldSet<?> that&&
+		       equals(that);
+	}
+	public boolean equals(FieldSet<?> that){
+		if(that==null) return false;
+		if(this==that) return true;
+		
+		var len=this.data.length;
+		if(that.data.length!=len) return false;
+		for(int i=0;i<len;i++){
+			var thisEl=this.data[i];
+			var thatEl=that.data[i];
+			if(!thisEl.equals(thatEl)){
+				return false;
+			}
+		}
+		return true;
+	}
+	
+	@Override
+	public int hashCode(){
+		if(hash==-1){
+			int hashCode=1;
+			for(var e : data){
+				hashCode=31*hashCode+e.hashCode();
+			}
+			hash=hashCode==-1?-2:hashCode;
+		}
+		return hash;
+	}
+	
 	@Override
 	public Spliterator<IOField<T, ?>> spliterator(){
 		return new FieldSetSpliterator<>(this);
 	}
 	@Override
-	public IOField<T, ?> get(int index){
-		return data[index];
+	public Iterator<IOField<T, ?>> iterator(){
+		return new FieldSetIterator();
 	}
 	
-	public IOField<T, ?> getLast(){
-		return data[data.length-1];
+	@Override
+	public IOField<T, ?> get(int index){
+		return data[index];
 	}
 	
 	@Override
