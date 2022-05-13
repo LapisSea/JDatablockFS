@@ -24,6 +24,9 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
@@ -328,10 +331,52 @@ public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 		}
 	}
 	
-	private static final ReadWriteLock STRUCT_CACHE_LOCK=new ReentrantReadWriteLock();
+	private static final ReadWriteLock STRUCT_CACHE_LOCK;
 	
-	private static final Map<Class<?>, Struct<?>> STRUCT_CACHE  =new WeakValueHashMap<>();
+	private static final Map<Class<?>, Struct<?>> STRUCT_CACHE;
 	private static final Map<Class<?>, Thread>    STRUCT_COMPILE=new ConcurrentHashMap<>();
+	
+	static{
+		if(Access.NO_CACHE){
+			STRUCT_CACHE=new AbstractMap<>(){
+				@Override
+				public Set<Entry<Class<?>, Struct<?>>> entrySet(){
+					return Set.of();
+				}
+				@Override
+				public Struct<?> put(Class<?> key, Struct<?> value){
+					return null;
+				}
+			};
+			STRUCT_CACHE_LOCK=new ReadWriteLock(){
+				private final Lock lock=new Lock(){
+					@Override
+					public void lock(){}
+					@Override
+					public void lockInterruptibly(){}
+					@Override
+					public boolean tryLock(){return true;}
+					@Override
+					public boolean tryLock(long time, TimeUnit unit){return true;}
+					@Override
+					public void unlock(){}
+					@Override
+					public Condition newCondition(){throw new RuntimeException();}
+				};
+				@Override
+				public Lock readLock(){
+					return lock;
+				}
+				@Override
+				public Lock writeLock(){
+					return lock;
+				}
+			};
+		}else{
+			STRUCT_CACHE=new WeakValueHashMap<>();
+			STRUCT_CACHE_LOCK=new ReentrantReadWriteLock();
+		}
+	}
 	
 	
 	private static Class<?> getStack(Function<Stream<StackWalker.StackFrame>, Stream<StackWalker.StackFrame>> stream){
@@ -414,7 +459,7 @@ public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 			lock.unlock();
 		}
 		
-		if(GlobalConfig.PRINT_COMPILATION){
+		if(GlobalConfig.PRINT_COMPILATION&&!Access.NO_CACHE){
 			LogUtil.println(ConsoleColors.GREEN_BRIGHT+TextUtil.toTable("Compiled: "+struct.getType().getName(), struct.getFields())+ConsoleColors.RESET);
 		}
 		return struct;

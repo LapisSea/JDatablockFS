@@ -56,7 +56,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		}
 		
 		P make(Struct<T> struct){
-			var cached=get(struct);
+			var cached=Access.NO_CACHE?null:get(struct);
 			if(cached!=null) return cached;
 			
 			P created;
@@ -68,7 +68,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 				created=lConstructor.apply(struct);
 			}
 			
-			if(GlobalConfig.PRINT_COMPILATION){
+			if(GlobalConfig.PRINT_COMPILATION&&!Access.NO_CACHE){
 				String s=CYAN_BRIGHT+
 				         "Compiled: "+struct.getType().getName()+"\n"+
 				         "\tPipe type: "+BLUE_BRIGHT+created.getClass().getName()+CYAN_BRIGHT+"\n"+
@@ -83,7 +83,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 				LogUtil.println(s+RESET);
 			}
 			
-			put(struct, created);
+			if(!Access.NO_CACHE) put(struct, created);
 			
 			
 			if(DEBUG_VALIDATION){
@@ -352,6 +352,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	}
 	
 	protected void writeIOFields(FieldSet<T> fields, Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+		if(Access.NO_CACHE) throw new RuntimeException();
 		
 		ContentOutputBuilder destBuff=null;
 		ContentWriter        target;
