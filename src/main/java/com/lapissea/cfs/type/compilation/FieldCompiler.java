@@ -21,11 +21,9 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
 import java.util.*;
 import java.util.function.Function;
-import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static java.util.function.Function.identity;
@@ -35,8 +33,10 @@ public class FieldCompiler{
 	
 	protected record LogicalAnnotation<T extends Annotation>(T annotation, AnnotationLogic<T> logic){}
 	
+	private static final FieldCompiler INST=new FieldCompiler();
+	
 	public static FieldCompiler create(){
-		return new FieldCompiler();
+		return INST;
 	}
 	
 	private record AnnotatedField<T extends IOInstance<T>>(
@@ -117,23 +117,7 @@ public class FieldCompiler{
 		
 		validate(fields);
 		
-		for(var pair : fields){
-			var depAn=pair.annotations;
-			var field=pair.field;
-			
-			field.initLateData(FieldSet.of(generateDependencies(fields, depAn, field)),
-			                   fields.stream()
-			                         .flatMap(f->f.annotations.stream()
-			                                                  .flatMap(an->an.logic.getHints(f.field.getAccessor(), an.annotation)
-			                                                                       .map(h->h.target()==null?
-			                                                                               new IOField.UsageHintDefinition(h.type(), f.field.getName()):
-			                                                                               h)
-			                                                  )
-			                         )
-			                         .filter(t->t.target().equals(field.getName()))
-			                         .map(IOField.UsageHintDefinition::type)
-			);
-		}
+		initLateData(fields);
 		
 		return FieldSet.of(fields.stream().map(AnnotatedField::field));
 	}
@@ -163,14 +147,38 @@ public class FieldCompiler{
 	private <T extends IOInstance<T>> void validate(List<AnnotatedField<T>> parsed){
 		for(var pair : parsed){
 			var nam=pair.field.getName();
-			var err=IntStream.of('.', '/', '\\', ' ')
-			                 .filter(c->nam.indexOf((char)c)!=-1)
-			                 .mapToObj(c->"Character "+((char)c)+" is not allowed in field name \""+nam+"\"! ")
-			                 .findAny();
-			if(err.isPresent()) throw new MalformedStructLayout(err.get());
+			for(char c : new char[]{'.', '/', '\\', ' '}){
+				if(nam.indexOf(c)!=-1){
+					throw new MalformedStructLayout("Character '"+c+"' is not allowed in field name \""+nam+"\"! ");
+				}
+			}
 			
 			var field=pair.field.getAccessor();
-			pair.annotations.forEach(ann->ann.logic().validate(field, ann.annotation()));
+			for(var ann : pair.annotations){
+				ann.logic().validate(field, ann.annotation());
+			}
+		}
+	}
+	
+	private <T extends IOInstance<T>> void initLateData(List<AnnotatedField<T>> fields){
+		for(var pair : fields){
+			var depAn=pair.annotations;
+			var field=pair.field;
+			
+			field.initLateData(
+				FieldSet.of(generateDependencies(fields, depAn, field)),
+				fields.stream()
+				      .flatMap(f->f.annotations.stream()
+				                               .flatMap(an->an.logic.getHints(f.field.getAccessor(), an.annotation)
+				                                                    .map(h->h.target()==null?
+				                                                            new IOField.UsageHintDefinition(h.type(), f.field.getName()):
+				                                                            h
+				                                                    )
+				                               )
+				      )
+				      .filter(t->t.target().equals(field.getName()))
+				      .map(IOField.UsageHintDefinition::type)
+			);
 		}
 	}
 	
@@ -184,9 +192,9 @@ public class FieldCompiler{
 		List<AnnotatedField<T>> toRun=new ArrayList<>(parsed);
 		
 		do{
-			for(var pair : toRun){
-				for(var logicalAnn : pair.annotations){
-					for(var s : logicalAnn.logic().injectPerInstanceValue(pair.field.getAccessor(), logicalAnn.annotation())){
+			for(var runAnn : toRun){
+				for(var logicalAnn : runAnn.annotations){
+					for(var s : logicalAnn.logic().injectPerInstanceValue(runAnn.field.getAccessor(), logicalAnn.annotation())){
 						var existing=virtualData.get(s.getName());
 						if(existing!=null){
 							var gTyp=existing.getGenericType(null);
@@ -243,6 +251,9 @@ public class FieldCompiler{
 					       if(c==null) return null;
 					       var tmp=c;
 					       var cp =c.getSuperclass();
+					       if(cp!=null&&(cp==IOInstance.class||!IOInstance.isInstance(cp))){
+						       cp=null;
+					       }
 					       c=cp==c?null:cp;
 					
 					       return tmp;
@@ -256,7 +267,9 @@ public class FieldCompiler{
 		var cl=struct.getType();
 		
 		List<FieldAccessor<T>> fields    =new ArrayList<>();
-		List<Method>           usedFields=new ArrayList<>();
+		Set<Method>            usedFields=new HashSet<>();
+		
+		var ioMethods=allMethods(cl).filter(m->m.isAnnotationPresent(IOValue.class)).toList();
 		
 		for(Field field : deepFieldsByAnnotation(cl, IOValue.class)){
 			try{
@@ -267,7 +280,12 @@ public class FieldCompiler{
 				
 				String fieldName=getFieldName(field);
 				
-				Function<String, Optional<Method>> getMethod=prefix->scanMethod(cl, m->checkMethod(fieldName, prefix, m));
+				Function<String, Optional<Method>> getMethod=prefix->{
+					for(Method m : ioMethods){
+						if(checkMethod(fieldName, prefix, m)) return Optional.of(m);
+					}
+					return Optional.empty();
+				};
 				
 				var getter=calcGetPrefixes(field).map(getMethod).filter(Optional::isPresent).map(Optional::get).findAny();
 				var setter=getMethod.apply("set");
@@ -286,7 +304,7 @@ public class FieldCompiler{
 			}
 		}
 		
-		var hangingMethods=scanMethods(cl, method->method.isAnnotationPresent(IOValue.class)&&!usedFields.contains(method)).toList();
+		var hangingMethods=ioMethods.stream().filter(method->!usedFields.contains(method)).toList();
 		
 		Map<String, PairM<Method, Method>> transientFieldsMap=new HashMap<>();
 		
@@ -296,16 +314,13 @@ public class FieldCompiler{
 			getMethodFieldName("set", hangingMethod).ifPresent(s->transientFieldsMap.computeIfAbsent(s, n->new PairM<>()).obj2=hangingMethod);
 		}
 		
-		record Err(String fieldName, boolean getter, boolean setter){}
-		
-		
 		var errors=transientFieldsMap.entrySet()
 		                             .stream()
 		                             .filter(e->e.getValue().obj1==null||e.getValue().obj2==null)
-		                             .map(e->new Err(e.getKey(), e.getValue().obj1!=null, e.getValue().obj2!=null))
+		                             .map(e->Map.of("fieldName", e.getKey(), "getter", e.getValue().obj1!=null, "setter", e.getValue().obj2!=null))
 		                             .toList();
 		if(!errors.isEmpty()){
-			throw new MalformedStructLayout("Invalid transient IO field for "+cl.getName()+":\n"+TextUtil.toTable(errors));
+			throw new MalformedStructLayout("Invalid transient (getter+setter, no value) IO field for "+cl.getName()+":\n"+TextUtil.toTable(errors));
 		}
 		
 		var unusedWaning=hangingMethods.stream()
@@ -359,9 +374,11 @@ public class FieldCompiler{
 		if(!mName.startsWith(prefix)) return Optional.empty();
 		
 		if(ann.name().isEmpty()){
-			var n=mName.substring(prefix.length());
-			if(n.isEmpty()||Character.isLowerCase(n.charAt(0))) return Optional.empty();
-			return Optional.of(TextUtil.firstToLowerCase(mName.substring(prefix.length())));
+			if(mName.length()<=prefix.length()||Character.isLowerCase(mName.charAt(prefix.length()))) return Optional.empty();
+			StringBuilder name=new StringBuilder(mName.length()-prefix.length());
+			name.append(mName, prefix.length(), mName.length());
+			name.setCharAt(0, Character.toLowerCase(name.charAt(0)));
+			return Optional.of(name.toString());
 		}else{
 			return Optional.of(ann.name());
 		}
@@ -400,41 +417,59 @@ public class FieldCompiler{
 		return type;
 	}
 	
-	private Stream<Method> scanMethods(Class<?> clazz, Predicate<Method> check){
+	private Stream<Method> allMethods(Class<?> clazz){
 		return Stream.iterate(clazz, Objects::nonNull, (UnaryOperator<Class<?>>)Class::getSuperclass)
-		             .flatMap(c->Arrays.stream(c.getDeclaredMethods()))
-		             .filter(check);
+		             .flatMap(c->Arrays.stream(c.getDeclaredMethods()));
 	}
-	private Optional<Method> scanMethod(Class<?> clazz, Predicate<Method> check){
-		return scanMethods(clazz, check).findAny();
+	
+	private static final class LogicalAnnType{
+		private final Class<Annotation>           type;
+		private       AnnotationLogic<Annotation> logic;
+		
+		@SuppressWarnings("unchecked")
+		private LogicalAnnType(Class<?> type){
+			this.type=(Class<Annotation>)type;
+		}
+		
+		public AnnotationLogic<Annotation> logic(){
+			if(logic==null) logic=getAnnotationLogic(type);
+			return logic;
+		}
+		
+		@SuppressWarnings("unchecked")
+		private AnnotationLogic<Annotation> getAnnotationLogic(Class<?> t){
+			try{
+				Field logic=t.getField("LOGIC");
+				
+				if(!(logic.getGenericType() instanceof ParameterizedType parmType&&
+				     AnnotationLogic.class.equals(parmType.getRawType())&&
+				     Arrays.equals(parmType.getActualTypeArguments(), new Type[]{t}))){
+					
+					throw new ClassCastException(logic+" is not a type of "+AnnotationLogic.class.getName()+"<"+t.getName()+">");
+				}
+				
+				return (AnnotationLogic<Annotation>)logic.get(null);
+			}catch(NoSuchFieldException|IllegalAccessException e){
+				throw new RuntimeException("Class "+t.getName()+" does not contain an AnnotationLogic LOGIC field", e);
+			}
+		}
 	}
+	
+	private final List<LogicalAnnType> annotationScan=
+		activeAnnotations()
+			.stream()
+			.flatMap(ann->Stream.concat(Stream.of(ann), Arrays.stream(ann.getClasses())))
+			.map(LogicalAnnType::new)
+			.toList();
 	
 	protected <T extends IOInstance<T>> List<LogicalAnnotation<Annotation>> scanAnnotations(IOField<T, ?> field){
-		return activeAnnotations()
-			       .stream()
-			       .flatMap(ann->Stream.concat(Stream.of(ann), Arrays.stream(ann.getClasses())))
-			       .map(t->field.getAccessor().getAnnotation((Class<Annotation>)t).map(ann->new LogicalAnnotation<>(ann, getAnnotation(t))))
-			       .filter(Optional::isPresent)
-			       .map(Optional::get)
-			       .toList();
-	}
-	
-	@SuppressWarnings("unchecked")
-	private AnnotationLogic<Annotation> getAnnotation(Class<?> t){
-		try{
-			Field logic=t.getField("LOGIC");
-			
-			if(!(logic.getGenericType() instanceof ParameterizedType parmType&&
-			     AnnotationLogic.class.equals(parmType.getRawType())&&
-			     Arrays.equals(parmType.getActualTypeArguments(), new Type[]{t}))){
-				
-				throw new ClassCastException(logic+" is not a type of "+AnnotationLogic.class.getName()+"<"+t.getName()+">");
-			}
-			
-			return (AnnotationLogic<Annotation>)logic.get(null);
-		}catch(NoSuchFieldException|IllegalAccessException e){
-			throw new RuntimeException("Class "+t.getName()+" does not contain an AnnotationLogic LOGIC field", e);
-		}
+		return annotationScan.stream()
+		                     .map(logTyp->field.getAccessor()
+		                                       .getAnnotation(logTyp.type)
+		                                       .map(ann->new LogicalAnnotation<>(ann, logTyp.logic())))
+		                     .filter(Optional::isPresent)
+		                     .map(Optional::get)
+		                     .toList();
 	}
 	
 	

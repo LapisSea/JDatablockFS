@@ -84,7 +84,7 @@
       <option value="org.jetbrains.annotations.NotNull" />
     </instrumentedNotNulls>
   </component>
-  <component name="ProjectRootManager" version="2" languageLevel="JDK_18_PREVIEW" project-jdk-name="openjdk-18" project-jdk-type="JavaSDK">
+  <component name="ProjectRootManager" version="2" languageLevel="JDK_18_PREVIEW" project-jdk-name="temurin-18" project-jdk-type="JavaSDK">
     <output url="file://$PROJECT_DIR$/run/target" />
   </component>
   <component name="SwUserDefinedSpecifications">

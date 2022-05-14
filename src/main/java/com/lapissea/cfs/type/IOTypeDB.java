@@ -207,36 +207,38 @@ public sealed interface IOTypeDB{
 		}
 		
 		private void checkNewTypeValidity(Map<TypeName, TypeDef> newDefs){
-			if(!newDefs.isEmpty()){
-				var names=newDefs.entrySet().stream().filter(e->!e.getValue().isUnmanaged()).map(e->e.getKey().typeName).collect(Collectors.toSet());
-				var classLoader=new TemplateClassLoader(this, this.getClass().getClassLoader()){
-					@Override
-					protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException{
-						if(names.contains(name)){
-							synchronized(getClassLoadingLock(name)){
-								Class<?> c=findLoadedClass(name);
-								if(c==null){
-									c=findClass(name);
-								}
-								if(resolve){
-									resolveClass(c);
-								}
-								return c;
+			if(newDefs.isEmpty()) return;
+			
+			var names=newDefs.entrySet().stream().filter(e->!e.getValue().isUnmanaged()).map(e->e.getKey().typeName).collect(Collectors.toSet());
+			var classLoader=new TemplateClassLoader(this, this.getClass().getClassLoader()){
+				@Override
+				protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException{
+					if(names.contains(name)){
+						synchronized(getClassLoadingLock(name)){
+							Class<?> c=findLoadedClass(name);
+							if(c==null){
+								c=findClass(name);
 							}
+							if(resolve){
+								resolveClass(c);
+							}
+							return c;
 						}
-						return super.loadClass(name, resolve);
 					}
-				};
-				
-				for(var name : names){
-					try{
-						var cls=Class.forName(name, true, classLoader);
-						Struct.ofUnknown(cls);
-					}catch(Throwable ex){
-						throw new RuntimeException("Invalid stored class "+name+"\n"+TextUtil.toNamedPrettyJson(newDefs.get(new TypeName(name))), ex);
-					}
+					return super.loadClass(name, resolve);
+				}
+			};
+			
+			for(var name : names){
+				try{
+					var cls=Class.forName(name, true, classLoader);
+					Struct.ofUnknown(cls);
+				}catch(Throwable ex){
+					throw new RuntimeException("Invalid stored class "+name+"\n"+TextUtil.toNamedPrettyJson(newDefs.get(new TypeName(name))), ex);
 				}
 			}
+			
+			System.gc();
 		}
 		
 		private void recordType(TypeLink type, Map<TypeName, TypeDef> newDefs) throws IOException{
