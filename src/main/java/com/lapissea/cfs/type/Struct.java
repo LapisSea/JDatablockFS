@@ -281,7 +281,7 @@ public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 		private final boolean     overridingDynamicUnmanaged;
 		private       FieldSet<T> unmanagedStaticFields;
 		
-		public Unmanaged(Class<T> type){
+		private Unmanaged(Class<T> type){
 			super(type);
 			overridingDynamicUnmanaged=checkOverridingUnmanaged();
 		}
@@ -479,17 +479,18 @@ public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 	private final Class<T> type;
 	
 	private final FieldSet<T> fields;
-	private final boolean[]   hasPools;
-	private final int[]       poolSizes;
-	private final int[]       poolPrimitiveSizes;
+	
+	private final int[]     poolSizes;
+	private final int[]     poolPrimitiveSizes;
+	private final boolean[] hasPools;
 	
 	private final boolean canHavePointers;
+	private       byte    invalidInitialNulls=-1;
 	
 	private Supplier<T> emptyConstructor;
 	
-	private byte invalidInitialNulls=-1;
 	
-	public Struct(Class<T> type){
+	private Struct(Class<T> type){
 		this.type=type;
 		this.fields=FieldCompiler.create().compile(this);
 		this.fields.forEach(IOField::init);
@@ -575,10 +576,12 @@ public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 	public FieldSet<T> getFields(){
 		return fields;
 	}
+	
 	public IOField<T, ?> toIOField(Field field){
 		if(field.getDeclaringClass()!=getType()) throw new IllegalArgumentException();
 		return getFields().byName(field.getName()).orElseThrow();
 	}
+	
 	@Override
 	public boolean getCanHavePointers(){
 		return canHavePointers;

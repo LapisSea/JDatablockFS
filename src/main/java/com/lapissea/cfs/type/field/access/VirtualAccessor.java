@@ -31,7 +31,9 @@ public final class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends Abstra
 	@SuppressWarnings("unchecked")
 	private static <T extends IOInstance<T>> Struct.Pool<T> getVirtualPool(T instance){
 		var pool=(Struct.Pool<T>)GETTER.apply(instance);
-		if(pool==null) throw new NullPointerException("Tried to access instance pool where there is none");
+		if(pool==null){
+			throw new NullPointerException("Tried to access instance pool where there is none");
+		}
 		return pool;
 	}
 	
