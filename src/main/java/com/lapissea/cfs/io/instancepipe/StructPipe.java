@@ -5,6 +5,7 @@ import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.FieldIsNullException;
 import com.lapissea.cfs.exceptions.MalformedObjectException;
+import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.exceptions.UnknownSizePredictionException;
 import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.io.RandomIO;
@@ -46,6 +47,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		
 		private final Map<Struct<T>, Supplier<P>> specials=new HashMap<>();
 		private final Function<Struct<?>, P>      lConstructor;
+		private final Class<?>                    type;
 		
 		private StructGroup(Class<? extends StructPipe<?>> type){
 			try{
@@ -53,6 +55,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 			}catch(ReflectiveOperationException e){
 				throw new RuntimeException("Failed to get pipe constructor", e);
 			}
+			this.type=type;
 		}
 		
 		P make(Struct<T> struct){
@@ -61,11 +64,15 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 			
 			P created;
 			
-			var special=specials.get(struct);
-			if(special!=null){
-				created=special.get();
-			}else{
-				created=lConstructor.apply(struct);
+			try{
+				var special=specials.get(struct);
+				if(special!=null){
+					created=special.get();
+				}else{
+					created=lConstructor.apply(struct);
+				}
+			}catch(Throwable e){
+				throw new MalformedStructLayout("Failed to compile "+type.getSimpleName()+" for "+struct.getType().getName(), e);
 			}
 			
 			if(GlobalConfig.PRINT_COMPILATION&&!Access.NO_CACHE){
