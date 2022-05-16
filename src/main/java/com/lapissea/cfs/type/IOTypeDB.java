@@ -9,11 +9,10 @@ import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
 import java.lang.ref.WeakReference;
-import java.util.Arrays;
+import java.lang.reflect.Modifier;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
@@ -33,6 +32,11 @@ public sealed interface IOTypeDB{
 		private final Map<TypeLink, Integer> typToID=new HashMap<>();
 		
 		private WeakReference<ClassLoader> templateLoader=new WeakReference<>(null);
+		
+		@Override
+		public TypeID toID(Class<?> type, boolean recordNew){
+			return toID(TypeLink.of(type), recordNew);
+		}
 		
 		@Override
 		public TypeID toID(TypeLink type, boolean recordNew){
@@ -138,25 +142,33 @@ public sealed interface IOTypeDB{
 		private static final MemoryOnlyDB BUILT_IN=new MemoryOnlyDB();
 		private static final int          FIRST_ID;
 		
+		private static void registerBuiltIn(Class<?> c){
+			BUILT_IN.toID(c, true);
+			
+			for(var dc : c.getDeclaredClasses()){
+				if(Modifier.isAbstract(dc.getModifiers())||!IOInstance.isInstance(dc)) continue;
+				registerBuiltIn(dc);
+			}
+		}
+		
 		static{
 			try{
-				Stream.of(
-					      int.class,
-					      float.class,
-					      Integer.class,
-					      String.class,
-					      TypeLink.class,
-					      TypeDef.class,
-					      PersistentDB.class,
-					      IOInstance.class
-				      ).flatMap(csrc->Stream.concat(Stream.of(csrc), Arrays.stream(csrc.getDeclaredClasses()).filter(IOInstance::isInstance)))
-				      .forEach(c->{
-					      try{
-						      BUILT_IN.toID(c, true);
-					      }catch(IOException e){
-						      throw new RuntimeException(e);
-					      }
-				      });
+				for(var c : new Class<?>[]{
+					int.class,
+					float.class,
+					Integer.class,
+					String.class,
+					TypeLink.class
+				}){
+					BUILT_IN.newID(TypeLink.of(c), true);
+				}
+				for(var c : new Class<?>[]{
+					TypeDef.class,
+					PersistentDB.class,
+					IOInstance.class
+				}){
+					registerBuiltIn(c);
+				}
 			}catch(Throwable e){
 				e.printStackTrace();
 				throw new RuntimeException(e);
@@ -237,8 +249,6 @@ public sealed interface IOTypeDB{
 					throw new RuntimeException("Invalid stored class "+name+"\n"+TextUtil.toNamedPrettyJson(newDefs.get(new TypeName(name))), ex);
 				}
 			}
-			
-			System.gc();
 		}
 		
 		private void recordType(TypeLink type, Map<TypeName, TypeDef> newDefs) throws IOException{

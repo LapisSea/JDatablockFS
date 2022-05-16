@@ -108,10 +108,13 @@ public class FieldCompiler{
 	}
 	
 	public <T extends IOInstance<T>> FieldSet<T> compile(Struct<T> struct){
-		var fields=scanFields(struct)
-			           .map(f->registry().create(f, null))
-			           .map(f->new AnnotatedField<>(f, scanAnnotations(f)))
-			           .collect(Collectors.toList());
+		List<FieldAccessor<T>> accessor=scanFields(struct);
+		
+		List<AnnotatedField<T>> fields=new ArrayList<>(accessor.size()+4);
+		for(var a : accessor){
+			var f=registry().create(a, null);
+			fields.add(new AnnotatedField<>(f, scanAnnotations(f)));
+		}
 		
 		generateVirtualFields(fields, struct);
 		
@@ -263,7 +266,7 @@ public class FieldCompiler{
 			       .filtered(f->f.isAnnotationPresent(type));
 	}
 	
-	protected <T extends IOInstance<T>> Stream<FieldAccessor<T>> scanFields(Struct<T> struct){
+	protected <T extends IOInstance<T>> List<FieldAccessor<T>> scanFields(Struct<T> struct){
 		var cl=struct.getType();
 		
 		List<FieldAccessor<T>> fields    =new ArrayList<>();
@@ -336,28 +339,29 @@ public class FieldCompiler{
 			throw new MalformedStructLayout("There are unused or invalid methods marked with "+IOValue.class.getSimpleName()+"\n"+unusedWaning);
 		}
 		
-		return Stream.concat(
-			fields.stream(),
-			transientFieldsMap.entrySet().stream().<FieldAccessor<T>>map(e->{
-				String name=e.getKey();
-				var    p   =e.getValue();
-				
-				Method getter=p.obj1, setter=p.obj2;
-				
-				var annotations=GetAnnotation.from(Stream.of(getter.getAnnotations(), setter.getAnnotations())
-				                                         .flatMap(Arrays::stream)
-				                                         .distinct()
-				                                         .collect(Collectors.toMap(Annotation::annotationType, identity())));
-				Type type=getType(getter.getGenericReturnType(), annotations);
-				
-				Type setType=setter.getGenericParameterTypes()[0];
-				if(!Utils.genericInstanceOf(type, setType)){
-					throw new MalformedStructLayout(setType+" is not a valid argument in\n"+setter);
-				}
-				
-				return FunctionalReflectionAccessor.make(struct, name, getter, setter, annotations, type);
-			})
-		).sorted();
+		fields.sort(Comparator.naturalOrder());
+		
+		for(var e : transientFieldsMap.entrySet()){
+			String name=e.getKey();
+			var    p   =e.getValue();
+			
+			Method getter=p.obj1, setter=p.obj2;
+			
+			var annotations=GetAnnotation.from(Stream.of(getter.getAnnotations(), setter.getAnnotations())
+			                                         .flatMap(Arrays::stream)
+			                                         .distinct()
+			                                         .collect(Collectors.toMap(Annotation::annotationType, identity())));
+			Type type=getType(getter.getGenericReturnType(), annotations);
+			
+			Type setType=setter.getGenericParameterTypes()[0];
+			if(!Utils.genericInstanceOf(type, setType)){
+				throw new MalformedStructLayout(setType+" is not a valid argument in\n"+setter);
+			}
+			
+			UtilL.addRemainSorted(fields, FunctionalReflectionAccessor.make(struct, name, getter, setter, annotations, type));
+		}
+		
+		return fields;
 	}
 	
 	private Stream<String> calcGetPrefixes(Field field)  {return calcGetPrefixes(field.getType());}
