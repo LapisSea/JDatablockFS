@@ -41,7 +41,7 @@ import static com.lapissea.cfs.ConsoleColors.CYAN_BRIGHT;
 import static com.lapissea.cfs.ConsoleColors.RESET;
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
-public abstract class StructPipe<T extends IOInstance<T>>{
+public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit{
 	
 	private static class StructGroup<T extends IOInstance<T>, P extends StructPipe<T>> extends ConcurrentHashMap<Struct<T>, P>{
 		
@@ -59,7 +59,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 		}
 		
 		P make(Struct<T> struct){
-			var cached=Access.NO_CACHE?null:get(struct);
+			var cached=get(struct);
 			if(cached!=null) return cached;
 			
 			P created;
@@ -90,25 +90,28 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 				LogUtil.println(s+RESET);
 			}
 			
-			if(!Access.NO_CACHE) put(struct, created);
+			put(struct, created);
 			
 			
-			if(DEBUG_VALIDATION){
-				
-				T inst;
-				try{
-					inst=created.getType().requireEmptyConstructor().get();
-				}catch(Throwable e){
-					inst=null;
-				}
-				if(inst!=null){
+			if(DEBUG_VALIDATION&&!(struct instanceof Struct.Unmanaged)){
+				if(Access.NO_CACHE){
+					created.getType().requireEmptyConstructor();
+				}else{
+					T inst;
 					try{
-						created.checkTypeIntegrity(inst);
-					}catch(FieldIsNullException e){
+						inst=created.getType().requireEmptyConstructor().get();
+					}catch(Throwable e){
+						inst=null;
+					}
+					if(inst!=null){
+						try{
+							created.checkTypeIntegrity(inst);
+						}catch(FieldIsNullException e){
 //						LogUtil.println("warning, "+struct+" is non conforming");
-					}catch(IOException e){
-						e.printStackTrace();
-						throw new RuntimeException(e);
+						}catch(IOException e){
+							e.printStackTrace();
+							throw new RuntimeException(e);
+						}
 					}
 				}
 			}
@@ -123,6 +126,11 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	
 	private static final ConcurrentHashMap<Class<? extends StructPipe<?>>, StructGroup<?, ?>> CACHE=new ConcurrentHashMap<>();
 	
+	public static void clear(){
+		if(!Access.NO_CACHE) throw new RuntimeException();
+		CACHE.clear();
+	}
+	
 	@SuppressWarnings("unchecked")
 	public static <T extends IOInstance<T>, P extends StructPipe<T>> P of(Class<P> type, Struct<T> struct){
 		var group=(StructGroup<T, P>)CACHE.computeIfAbsent(type, StructGroup::new);
@@ -136,23 +144,35 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	}
 	
 	
-	private final Struct<T>                type;
-	private final SizeDescriptor<T>        sizeDescription;
-	private final FieldSet<T>              ioFields;
-	private final List<VirtualAccessor<T>> ioPoolAccessors;
-	private final List<IOField<T, ?>>      earlyNullChecks;
+	private final Struct<T>           type;
+	private       SizeDescriptor<T>   sizeDescription;
+	private       FieldSet<T>         ioFields;
+	private       List<IOField<T, ?>> earlyNullChecks;
 	
-	protected final List<IOField.ValueGeneratorInfo<T, ?>> generators;
+	private List<IOField.ValueGeneratorInfo<T, ?>> generators;
+	
+	public static final int STATE_IO_FIELD=1;
 	
 	public StructPipe(Struct<T> type){
 		this.type=type;
-		this.ioFields=FieldSet.of(initFields());
-		sizeDescription=createSizeDescriptor();
-		ioPoolAccessors=Utils.nullIfEmpty(calcIOPoolAccessors());
-		earlyNullChecks=Utils.nullIfEmpty(getNonNulls());
-		generators=Utils.nullIfEmpty(ioFields.stream().flatMap(IOField::generatorStream).toList());
+		init(()->{
+			this.ioFields=FieldSet.of(initFields());
+			setInitState(STATE_IO_FIELD);
+			earlyNullChecks=Utils.nullIfEmpty(getNonNulls());
+			
+			type.waitForState(STATE_DONE);
+			sizeDescription=createSizeDescriptor();
+			generators=Utils.nullIfEmpty(ioFields.stream().flatMap(IOField::generatorStream).toList());
+		});
 	}
 	
+	@Override
+	protected String stateToStr(int state){
+		return switch(state){
+			case STATE_IO_FIELD -> "IO_FIELD";
+			default -> super.stateToStr(state);
+		};
+	}
 	private List<IOField<T, ?>> getNonNulls(){
 		return ioFields.unpackedStream().filter(f->f.getNullability()==IONullability.Mode.NOT_NULL&&f.getAccessor().canBeNull()).toList();
 	}
@@ -334,6 +354,13 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	protected abstract T doRead(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException;
 	
 	public final SizeDescriptor<T> getSizeDescriptor(){
+		if(sizeDescription==null){
+			waitForState(STATE_DONE);
+			if(sizeDescription==null){
+				waitForState(STATE_DONE);
+			}
+			assert sizeDescription!=null;
+		}
 		return sizeDescription;
 	}
 	
@@ -342,14 +369,12 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	}
 	
 	public FieldSet<T> getSpecificFields(){
+		waitForState(STATE_IO_FIELD);
 		return ioFields;
 	}
 	
-	protected final List<VirtualAccessor<T>> getIoPoolAccessors(){
-		return ioPoolAccessors;
-	}
-	
 	public void earlyCheckNulls(Struct.Pool<T> ioPool, T instance){
+		waitForState(STATE_DONE);
 		if(earlyNullChecks==null) return;
 		for(var field : earlyNullChecks){
 			if(field.isNull(ioPool, instance)){
@@ -396,6 +421,7 @@ public abstract class StructPipe<T extends IOInstance<T>>{
 	}
 	
 	private void generateAll(Struct.Pool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException{
+		waitForState(STATE_DONE);
 		if(generators==null) return;
 		for(var generator : generators){
 			generator.generate(ioPool, provider, instance, allowExternalMod);

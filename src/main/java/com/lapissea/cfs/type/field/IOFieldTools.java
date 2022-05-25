@@ -6,6 +6,7 @@ import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.DepSort;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
@@ -86,6 +87,7 @@ public class IOFieldTools{
 			                                                       .findAny()
 			                                                       .orElseThrow())
 			).sort(Comparator.comparingInt((IOField<T, ?> f)->{//Pull fixed fields back and enforce word space sort order
+				                 f.declaringStruct().waitForState(Struct.STATE_INIT_FIELDS);
 				                 var order=f.getSizeDescriptor().getWordSpace().sortOrder;
 				                 if(!f.getSizeDescriptor().hasFixed()){
 					                 order+=100000;

@@ -1,6 +1,7 @@
 package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.Index;
+import com.lapissea.util.NotNull;
 import com.lapissea.util.ZeroArrays;
 
 import java.util.*;
@@ -106,9 +107,9 @@ public class DepSort<T>{
 	private final List<T>                data;
 	private final Function<T, IntStream> getDependencies;
 	
-	public DepSort(List<T> data, Function<T, IntStream> getDependencies){
-		this.getDependencies=getDependencies;
-		this.data=data;
+	public DepSort(@NotNull List<T> data, @NotNull Function<T, IntStream> getDependencies){
+		this.getDependencies=Objects.requireNonNull(getDependencies);
+		this.data=Objects.requireNonNull(data);
 	}
 	
 	public Index sort(){

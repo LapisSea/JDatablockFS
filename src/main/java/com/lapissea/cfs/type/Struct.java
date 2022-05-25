@@ -8,6 +8,7 @@ import com.lapissea.cfs.exceptions.FieldIsNullException;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.internal.MemPrimitive;
+import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.compilation.FieldCompiler;
@@ -24,9 +25,6 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
@@ -39,7 +37,7 @@ import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NOT_NULL;
 
-public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
+public sealed class Struct<T extends IOInstance<T>> extends StagedInit implements RuntimeType<T>{
 	
 	public interface Pool<T extends IOInstance<T>>{
 		
@@ -331,51 +329,19 @@ public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 		}
 	}
 	
-	private static final ReadWriteLock STRUCT_CACHE_LOCK;
+	private static final ReadWriteLock STRUCT_CACHE_LOCK=new ReentrantReadWriteLock();
 	
-	private static final Map<Class<?>, Struct<?>> STRUCT_CACHE;
+	private static final Map<Class<?>, Struct<?>> STRUCT_CACHE  =new WeakValueHashMap<>();
 	private static final Map<Class<?>, Thread>    STRUCT_COMPILE=new ConcurrentHashMap<>();
 	
-	static{
-		if(Access.NO_CACHE){
-			STRUCT_CACHE=new AbstractMap<>(){
-				@Override
-				public Set<Entry<Class<?>, Struct<?>>> entrySet(){
-					return Set.of();
-				}
-				@Override
-				public Struct<?> put(Class<?> key, Struct<?> value){
-					return null;
-				}
-			};
-			STRUCT_CACHE_LOCK=new ReadWriteLock(){
-				private final Lock lock=new Lock(){
-					@Override
-					public void lock(){}
-					@Override
-					public void lockInterruptibly(){}
-					@Override
-					public boolean tryLock(){return true;}
-					@Override
-					public boolean tryLock(long time, TimeUnit unit){return true;}
-					@Override
-					public void unlock(){}
-					@Override
-					public Condition newCondition(){throw new RuntimeException();}
-				};
-				@Override
-				public Lock readLock(){
-					return lock;
-				}
-				@Override
-				public Lock writeLock(){
-					return lock;
-				}
-			};
-		}else{
-			STRUCT_CACHE=new WeakValueHashMap<>();
-			STRUCT_CACHE_LOCK=new ReentrantReadWriteLock();
-		}
+	public static void clear(){
+		if(!Access.NO_CACHE) throw new RuntimeException();
+		var lock=STRUCT_CACHE_LOCK.writeLock();
+		lock.lock();
+		if(!STRUCT_COMPILE.isEmpty()) throw new RuntimeException();
+		STRUCT_CACHE.clear();
+		lock.unlock();
+		StructPipe.clear();
 	}
 	
 	
@@ -447,9 +413,11 @@ public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 		try{
 			lock.lock();
 			STRUCT_COMPILE.put(instanceClass, Thread.currentThread());
+			lock.unlock();
 			
 			struct=newStruct.apply(instanceClass);
 			
+			lock.lock();
 			STRUCT_CACHE.put(instanceClass, struct);
 		}catch(Throwable e){
 			e.printStackTrace();
@@ -478,33 +446,47 @@ public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 	
 	private final Class<T> type;
 	
-	private final FieldSet<T> fields;
+	private FieldSet<T> fields;
 	
-	private final int[]     poolSizes;
-	private final int[]     poolPrimitiveSizes;
-	private final boolean[] hasPools;
+	private int[]     poolSizes;
+	private int[]     poolPrimitiveSizes;
+	private boolean[] hasPools;
 	
-	private final boolean canHavePointers;
-	private       byte    invalidInitialNulls=-1;
+	private boolean canHavePointers;
+	private byte    invalidInitialNulls=-1;
 	
 	private Supplier<T> emptyConstructor;
 	
+	public static final int STATE_FIELD_MAKE=1, STATE_INIT_FIELDS=2;
 	
 	private Struct(Class<T> type){
 		this.type=type;
-		this.fields=FieldCompiler.create().compile(this);
-		this.fields.forEach(IOField::init);
-		poolSizes=calcPoolSizes();
-		poolPrimitiveSizes=calcPoolPrimitiveSizes();
-		hasPools=calcHasPools();
-		canHavePointers=calcCanHavePointers();
+		init(()->{
+			this.fields=FieldCompiler.create().compile(this);
+			setInitState(STATE_FIELD_MAKE);
+			this.fields.forEach(IOField::init);
+			setInitState(STATE_INIT_FIELDS);
+			poolSizes=calcPoolSizes();
+			poolPrimitiveSizes=calcPoolPrimitiveSizes();
+			hasPools=calcHasPools();
+			canHavePointers=calcCanHavePointers();
+		});
+	}
+	
+	@Override
+	protected String stateToStr(int state){
+		return switch(state){
+			case STATE_FIELD_MAKE -> "FIELD_MAKE";
+			case STATE_INIT_FIELDS -> "INIT_FIELDS";
+			default -> super.stateToStr(state);
+		};
 	}
 	
 	private Stream<VirtualAccessor<T>> virtualAccessorStream(){
-		return fields.stream()
-		             .map(IOField::getAccessor)
-		             .filter(f->f instanceof VirtualAccessor)
-		             .map(c->((VirtualAccessor<T>)c));
+		return getFields().stream()
+		                  .map(IOField::getAccessor)
+		                  .filter(f->f instanceof VirtualAccessor)
+		                  .map(c->((VirtualAccessor<T>)c));
 	}
 	
 	private int[] calcPoolSizes(){
@@ -548,13 +530,16 @@ public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 	
 	private boolean calcCanHavePointers(){
 		if(this instanceof Struct.Unmanaged) return true;
-		return fields.stream().anyMatch(f->{
+		return getFields().stream().anyMatch(f->{
 			var acc=f.getAccessor();
 			if(acc==null) return true;
+			
 			if(acc.hasAnnotation(IOType.Dynamic.class)) return true;
 			if(f instanceof IOField.Ref) return true;
+			
 			if(acc.getType()==ChunkPointer.class) return true;
 			if(acc.getType()==Reference.class) return true;
+			
 			if(IOInstance.isInstance(acc.getType())){
 				if(!IOInstance.isManaged(acc.getType())) return true;
 				var s=Struct.ofUnknown(acc.getType());
@@ -574,7 +559,13 @@ public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 	}
 	
 	public FieldSet<T> getFields(){
-		return fields;
+		if(fields==null){
+			waitForState(STATE_FIELD_MAKE);
+			if(fields==null){
+				waitForState(STATE_FIELD_MAKE);
+			}
+		}
+		return Objects.requireNonNull(fields);
 	}
 	
 	public IOField<T, ?> toIOField(Field field){
@@ -584,6 +575,7 @@ public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 	
 	@Override
 	public boolean getCanHavePointers(){
+		waitForState(STATE_DONE);
 		return canHavePointers;
 	}
 	
@@ -643,6 +635,8 @@ public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 				return false;
 			}
 			
+			waitForState(STATE_DONE);
+			
 			boolean inv=false;
 			if(fields.unpackedStream().anyMatch(f->f.getNullability()==NOT_NULL)){
 				var obj =requireEmptyConstructor().get();
@@ -659,6 +653,7 @@ public sealed class Struct<T extends IOInstance<T>> implements RuntimeType<T>{
 	
 	@Nullable
 	public Pool<T> allocVirtualVarPool(VirtualFieldDefinition.StoragePool pool){
+		waitForState(STATE_DONE);
 		if(hasPools==null||!hasPools[pool.ordinal()]) return null;
 		return new Pool.GeneralStructArray<>(this, pool);
 	}
