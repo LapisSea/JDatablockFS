@@ -567,27 +567,31 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		return Stream.of(this);
 	}
 	
+	protected void throwInformativeFixedSizeError(){}
+	private FixedFormatNotSupportedException unsupportedFixed(){
+		try{
+			throwInformativeFixedSizeError();
+		}catch(Throwable e){
+			return new FixedFormatNotSupportedException(this, e);
+		}
+		return new FixedFormatNotSupportedException(this);
+	}
+	
 	public IOField<T, ValueType> forceMaxAsFixedSize(){
 		if(getSizeDescriptor().hasFixed()) return this;
 		if(!getSizeDescriptor().hasMax()){
-			try{
-				throwInformativeFixedSizeError();
-			}catch(Throwable e){
-				throw new FixedFormatNotSupportedException(this, e);
-			}
-			throw new FixedFormatNotSupportedException(this);
+			throw unsupportedFixed();
 		}
 		var f=implMaxAsFixedSize();
 		f.initLateData(getDependencies(), usageHintsStream());
 		f.init();
-		if(!f.getSizeDescriptor().hasFixed()) throw new RuntimeException(this+" failed to make itslef fixed");
+		if(!f.getSizeDescriptor().hasFixed()) throw new RuntimeException(this+" failed to make itself fixed");
 		return f;
 	}
 	
-	protected void throwInformativeFixedSizeError(){}
 	
 	protected IOField<T, ValueType> implMaxAsFixedSize(){
-		throw new NotImplementedException();
+		throw unsupportedFixed();
 	}
 	
 	public IONullability.Mode getNullability(){

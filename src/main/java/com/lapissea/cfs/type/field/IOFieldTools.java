@@ -166,6 +166,10 @@ public class IOFieldTools{
 		return baseName+GENERATED_FIELD_SEPARATOR+"ref";
 	}
 	
+	public static <E extends Annotation> E makeAnnotation(Class<E> annotationType){
+		return makeAnnotation(annotationType, Map.of());
+	}
+	
 	public static <E extends Annotation> E makeAnnotation(Class<E> annotationType, @NotNull Map<String, Object> values){
 		Objects.requireNonNull(values);
 		Class<?>[] interfaces=annotationType.getInterfaces();

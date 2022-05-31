@@ -161,7 +161,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit{
 			earlyNullChecks=Utils.nullIfEmpty(getNonNulls());
 			
 			type.waitForState(STATE_DONE);
-			sizeDescription=createSizeDescriptor();
+			sizeDescription=Objects.requireNonNull(createSizeDescriptor());
 			generators=Utils.nullIfEmpty(ioFields.stream().flatMap(IOField::generatorStream).toList());
 		});
 	}

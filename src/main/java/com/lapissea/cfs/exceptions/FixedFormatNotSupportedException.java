@@ -4,12 +4,17 @@ import com.lapissea.cfs.type.field.IOField;
 
 public class FixedFormatNotSupportedException extends UnsupportedOperationException{
 	private final IOField<?, ?> field;
+	
+	private static String makeMsg(IOField<?, ?> field){
+		return field+" ("+field.getClass().getSimpleName()+") can not create a fixed form of itself";
+	}
+	
 	public FixedFormatNotSupportedException(IOField<?, ?> field){
-		super(field+" can not create a fixed form of itself");
+		super(makeMsg(field));
 		this.field=field;
 	}
 	public FixedFormatNotSupportedException(IOField<?, ?> field, Throwable cause){
-		super(field+" can not create a fixed form of itself", cause);
+		super(makeMsg(field), cause);
 		this.field=field;
 	}
 	public IOField<?, ?> getField(){
