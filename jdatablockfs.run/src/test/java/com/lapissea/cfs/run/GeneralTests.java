@@ -15,6 +15,7 @@ import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.collections.LinkedIOList;
 import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.StagedInit;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.field.annotations.IODependency;
@@ -372,16 +373,22 @@ public class GeneralTests{
 			return;
 		}
 		
-		StructPipe<T> pipe=null;
+		StructPipe<T> pipe;
 		try{
 			pipe=ContiguousStructPipe.of(struct);
-		}catch(MalformedStructLayout ignored){}
+			pipe.waitForState(StagedInit.STATE_DONE);
+		}catch(MalformedStructLayout ignored){
+			pipe=null;
+		}
 		if(pipe!=null){
 			pipe.checkTypeIntegrity(struct.requireEmptyConstructor().get());
 		}
 		try{
 			pipe=FixedContiguousStructPipe.of(struct);
-		}catch(MalformedStructLayout ignored){}
+			pipe.waitForState(StagedInit.STATE_DONE);
+		}catch(MalformedStructLayout ignored){
+			pipe=null;
+		}
 		if(pipe!=null){
 			pipe.checkTypeIntegrity(struct.requireEmptyConstructor().get());
 		}
