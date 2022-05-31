@@ -14,12 +14,12 @@ public abstract class StagedInit{
 //		LogUtil.printTable("ms pass", "", "action", "", "current", " ".repeat(11), "target state", " ".repeat(11), "done", " ".repeat(11), "thread", "", "actor", " ");
 //	}
 	
-	private static final boolean DO_ASYNC=true;//UtilL.sysPropertyByClass(StagedInit.class, "DO_ASYNC", true, Boolean::valueOf);
+	private static final boolean DO_ASYNC=UtilL.sysPropertyByClass(StagedInit.class, "DO_ASYNC", true, Boolean::valueOf);
 	
 	public static final int STATE_START=0, STATE_DONE=Integer.MAX_VALUE;
 	
-	private int       state=STATE_START;
-	private Throwable e;
+	private transient int       state=STATE_START;
+	private           Throwable e;
 	
 	private static long last;
 	
@@ -29,7 +29,6 @@ public abstract class StagedInit{
 			try{
 				init.run();
 			}catch(Throwable e){
-				e.printStackTrace();
 				this.e=e;
 			}finally{
 				setInitState(STATE_DONE);
@@ -64,14 +63,16 @@ public abstract class StagedInit{
 	}
 	
 	public final void waitForState(int state){
-		if(this.state>=state) return;
-		waitForState0(state);
-		assert this.state>=state;
+		if(this.state<state){
+			waitForState0(state);
+			assert this.state>=state;
+//			LogUtil.printTable("ms pass", tim(), "actor", this, "thread", Thread.currentThread().getName(), "done", stateToStrCol(state));
+		}
+		
 		var e=this.e;
-//		LogUtil.printTable("ms pass", tim(), "actor", this, "thread", Thread.currentThread().getName(), "done", stateToStrCol(state));
 		if(e!=null){
 			this.e=null;
-			throw UtilL.uncheckedThrow(e);
+			throw new RuntimeException("Exception occurred while initializing", e);
 		}
 	}
 	
