@@ -114,6 +114,19 @@ public final class TypeLink extends IOInstance<TypeLink>{
 		return new TypeLink(raw, NO_ARGS);
 	}
 	
+	private static final char                  PRIMITIVE_MARKER=';';
+	private static final Map<String, Class<?>> PRIMITIVE_NAMES =Map.of(
+		PRIMITIVE_MARKER+"B", byte.class,
+		PRIMITIVE_MARKER+"S", short.class,
+		PRIMITIVE_MARKER+"I", int.class,
+		PRIMITIVE_MARKER+"J", long.class,
+		PRIMITIVE_MARKER+"F", float.class,
+		PRIMITIVE_MARKER+"D", double.class,
+		PRIMITIVE_MARKER+"C", char.class,
+		PRIMITIVE_MARKER+"Z", boolean.class,
+		PRIMITIVE_MARKER+"V", void.class
+	);
+	
 	private Class<?> typeClass;
 	
 	@IOValue
@@ -130,31 +143,35 @@ public final class TypeLink extends IOInstance<TypeLink>{
 	}
 	
 	public TypeLink(Class<?> type, TypeLink... args){
-		this(type.getName(), args);
+		setTypeName(type.getName());
+		this.args=(args==null||args.length==0)?NO_ARGS:args.clone();
 		this.typeClass=type;
 	}
 	
-	public TypeLink(String typeName, TypeLink... args){
-		this.typeName=switch(typeName){
-			case null -> throw new NullPointerException("Name can not be null");
-			case String s && s.length()==0 -> throw new IllegalArgumentException("Name can not be empty!");
-			default -> typeName;
-		};
-		this.args=(args==null||args.length==0)?NO_ARGS:args.clone();
+	private void setTypeName(String typeName){
+		this.typeName=PRIMITIVE_NAMES.entrySet().stream().filter(e->e.getValue().getName().equals(typeName)).map(Map.Entry::getKey).findAny().orElse(typeName);
 	}
 	
 	public String getTypeName(){
+		if(isPrimitive()){
+			return PRIMITIVE_NAMES.get(typeName).getName();
+		}
 		return typeName;
 	}
 	
 	public Class<?> getTypeClass(IOTypeDB db){
-		if(typeClass==null){
-			typeClass=loadClass(db);
-		}
-		return typeClass;
+		var c=typeClass;
+		if(c!=null) return c;
+		
+		var loaded=Objects.requireNonNull(loadClass(db));
+		typeClass=loaded;
+		return loaded;
 	}
 	
 	private Class<?> loadClass(IOTypeDB db){
+		if(isPrimitive()){
+			return PRIMITIVE_NAMES.get(typeName);
+		}
 		var name=getTypeName();
 		try{
 			return Class.forName(name);
@@ -166,7 +183,10 @@ public final class TypeLink extends IOInstance<TypeLink>{
 				throw new RuntimeException(ex);
 			}
 		}
-		
+	}
+	
+	public boolean isPrimitive(){
+		return typeName.length()==2&&typeName.charAt(0)==PRIMITIVE_MARKER;
 	}
 	
 	public int argCount(){
