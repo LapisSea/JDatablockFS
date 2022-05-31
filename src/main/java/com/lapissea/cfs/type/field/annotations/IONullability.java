@@ -5,6 +5,7 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.compilation.AnnotationLogic;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
+import com.lapissea.cfs.type.field.access.AnnotatedType;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
@@ -75,13 +76,18 @@ public @interface IONullability{
 		Mode value() default Mode.NOT_NULL;
 	}
 	
-	AnnotationLogic<IONullability> LOGIC=new AnnotationLogic<>(){
+	final class NullLogic implements AnnotationLogic<IONullability>{
 		@Override
 		public void validate(FieldAccessor<?> field, IONullability annotation){
-			var typ=field.getType();
-			if(Stream.of(IOInstance.class, Enum.class, String.class).noneMatch(c->UtilL.instanceOf(typ, c))&&!field.hasAnnotation(IOType.Dynamic.class)){
+			if(!canHave(field)){
 				throw new MalformedStructLayout(field+" is not a supported field");
 			}
+		}
+		
+		public static boolean canHave(AnnotatedType field){
+			var typ=field.getType();
+			if(typ.isPrimitive()) return false;
+			return field.hasAnnotation(IOType.Dynamic.class)||Stream.of(IOInstance.class, Enum.class, String.class).anyMatch(c->UtilL.instanceOf(typ, c));
 		}
 		
 		
@@ -118,7 +124,9 @@ public @interface IONullability{
 			
 			return Set.of(IOFieldTools.makeNullFlagName(field));
 		}
-	};
+	}
+	
+	AnnotationLogic<IONullability> LOGIC=new NullLogic();
 	
 	enum Mode{
 		NOT_NULL("NN"),

@@ -15,8 +15,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NULLABLE;
-
 public class TypeDef extends IOInstance<TypeDef>{
 	
 	public static class FieldDef extends IOInstance<FieldDef>{
@@ -27,7 +25,6 @@ public class TypeDef extends IOInstance<TypeDef>{
 		private String name;
 		
 		@IOValue
-		@IONullability(NULLABLE)
 		private IONullability.Mode nullability;
 		
 		@IOValue
@@ -41,7 +38,7 @@ public class TypeDef extends IOInstance<TypeDef>{
 		public FieldDef(IOField<?, ?> field){
 			type=TypeLink.of(field.getAccessor().getGenericType(null));
 			name=field.getName();
-			nullability=field.getAccessor().getAnnotation(IONullability.class).map(IONullability::value).orElse(null);
+			nullability=field.getAccessor().getAnnotation(IONullability.class).map(IONullability::value).orElse(IONullability.Mode.NOT_NULL);
 			isDynamic=field.getAccessor().hasAnnotation(IOType.Dynamic.class);
 			var deps=field.dependencyStream().map(IOField::getName).collect(Collectors.toSet());
 			if(field.getAccessor().getType().isArray()) deps.remove(IOFieldTools.makeArrayLenName(field.getAccessor()));

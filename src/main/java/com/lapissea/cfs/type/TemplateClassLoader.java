@@ -1,5 +1,7 @@
 package com.lapissea.cfs.type;
 
+import com.lapissea.cfs.type.field.IOFieldTools;
+import com.lapissea.cfs.type.field.access.AnnotatedType;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOType;
@@ -11,6 +13,7 @@ import com.lapissea.util.*;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -75,7 +78,10 @@ public class TemplateClassLoader extends ClassLoader{
 			for(var field : classType.def.getFields()){
 				var type=toJorthGeneric(field.getType());
 				
-				if(field.getNullability()!=null){
+				if(IONullability.NullLogic.canHave(new AnnotatedType.Simple(
+					field.isDynamic()?List.of(IOFieldTools.makeAnnotation(IOType.Dynamic.class)):List.of(),
+					field.getType().getTypeClass(db)
+				))){
 					writer.write("{#TOKEN(0)} IONullability @", field.getNullability().toString());
 				}
 				if(field.isDynamic()){
