@@ -1,35 +1,16 @@
 package com.lapissea.cfs.type.field.access;
 
-import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.util.NotNull;
 
-import java.lang.annotation.Annotation;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
-import java.util.Optional;
-
-public interface FieldAccessor<CTyp extends IOInstance<CTyp>> extends Comparable<FieldAccessor<CTyp>>{
-	
-	@NotNull
-	<T extends Annotation> Optional<T> getAnnotation(Class<T> annotationClass);
-	default boolean hasAnnotation(Class<? extends Annotation> annotationClass){
-		return getAnnotation(annotationClass).isPresent();
-	}
+public interface FieldAccessor<CTyp extends IOInstance<CTyp>> extends AnnotatedType, Comparable<FieldAccessor<CTyp>>{
 	
 	Struct<CTyp> getDeclaringStruct();
 	
 	@NotNull
 	String getName();
-	
-	Type getGenericType(GenericContext genericContext);
-	
-	default Class<?> getType(){
-		var generic=getGenericType(null);
-		return (Class<?>)(generic instanceof ParameterizedType p?p.getRawType():generic);
-	}
 	
 	Object get(Struct.Pool<CTyp> ioPool, CTyp instance);
 	void set(Struct.Pool<CTyp> ioPool, CTyp instance, Object value);
