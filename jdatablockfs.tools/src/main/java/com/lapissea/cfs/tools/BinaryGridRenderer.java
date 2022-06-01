@@ -539,6 +539,8 @@ public class BinaryGridRenderer{
 			return List.of();
 		}
 		
+		if(errorMode) renderStatic=true;
+		
 		CachedFrame cFrame=getFrame(frameIndex);
 		MemFrame    frame =cFrame.memData();
 		var         bytes =frame.bytes();
