@@ -230,7 +230,10 @@ public class Access{
 				
 				return makeLambda(of, functionalInterface);
 			}catch(ReflectiveOperationException ofe){
-				throw new MalformedStructLayout(clazz.getName()+" does not have a valid constructor or of static method with arguments of "+Arrays.toString(parameterTypes));
+				var e=new MalformedStructLayout(clazz.getName()+" does not have a valid constructor or of static method with arguments of "+Arrays.toString(parameterTypes));
+				e.addSuppressed(ce);
+				e.addSuppressed(ofe);
+				throw e;
 			}
 		}
 	}
