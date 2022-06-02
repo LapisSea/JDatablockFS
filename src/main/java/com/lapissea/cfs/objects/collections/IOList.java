@@ -153,6 +153,36 @@ public interface IOList<T> extends IterablePP<T>{
 		}
 		
 		@Override
+		public Optional<To> peekFirst() throws IOException{
+			return data.peekFirst().map(this::map);
+		}
+		
+		@Override
+		public Optional<To> popFirst() throws IOException{
+			return data.popFirst().map(this::map);
+		}
+		
+		@Override
+		public Optional<To> peekLast() throws IOException{
+			return data.peekLast().map(this::map);
+		}
+		
+		@Override
+		public Optional<To> popLast() throws IOException{
+			return data.popLast().map(this::map);
+		}
+		
+		@Override
+		public void pushFirst(To newFirst) throws IOException{
+			data.pushFirst(unmap(newFirst));
+		}
+		
+		@Override
+		public void pushLast(To newLast) throws IOException{
+			data.pushLast(unmap(newLast));
+		}
+		
+		@Override
 		public int hashCode(){
 			return data.hashCode();
 		}
@@ -297,7 +327,7 @@ public interface IOList<T> extends IterablePP<T>{
 		Objects.requireNonNull(data);
 		Objects.requireNonNull(map);
 		Objects.requireNonNull(unmap);
-		return new MappedIOList<From, To>(data){
+		return new MappedIOList<>(data){
 			protected To map(From v){return map.apply(v);}
 			protected From unmap(To v){return unmap.apply(v);}
 		};
@@ -310,11 +340,11 @@ public interface IOList<T> extends IterablePP<T>{
 			return 0;
 		}
 		
-		if(value.compareTo(list.get(0))<0){
-			list.add(0, value);
+		if(value.compareTo(list.peekLast().orElseThrow())<0){
+			list.pushFirst(value);
 			return 0;
 		}
-		if(value.compareTo(list.get(list.size()-1))>0){
+		if(value.compareTo(list.peekLast().orElseThrow())>0){
 			var index=list.size();
 			list.add(value);
 			return index;
@@ -647,5 +677,46 @@ public interface IOList<T> extends IterablePP<T>{
 			index++;
 		}
 		return -1;
+	}
+	
+	@Override
+	default Optional<T> first(){
+		if(isEmpty()) return Optional.empty();
+		return Optional.of(getUnsafe(0));
+	}
+	
+	default Optional<T> peekFirst() throws IOException{
+		if(isEmpty()) return Optional.empty();
+		return Optional.of(get(0));
+	}
+	default Optional<T> popFirst() throws IOException{
+		if(isEmpty()) return Optional.empty();
+		var first=get(0);
+		remove(0);
+		return Optional.of(first);
+	}
+	
+	default void pushFirst(T newFirst) throws IOException{
+		if(isEmpty()){
+			add(newFirst);
+		}else{
+			add(0, newFirst);
+		}
+	}
+	
+	default Optional<T> peekLast() throws IOException{
+		if(isEmpty()) return Optional.empty();
+		return Optional.of(get(0));
+	}
+	default Optional<T> popLast() throws IOException{
+		if(isEmpty()) return Optional.empty();
+		var index=size()-1;
+		var first=get(index);
+		remove(index);
+		return Optional.of(first);
+	}
+	
+	default void pushLast(T newLast) throws IOException{
+		add(newLast);
 	}
 }
