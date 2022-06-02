@@ -215,17 +215,20 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 			return;
 		}
 		
-		shift(index, ShiftAction.FORWARD_DUP);
-		writeAt(index, value);
-		deltaSize(1);
+		try(var ignored=getDataProvider().getSource().openIOTransaction()){
+			forwardDup(index);
+			writeAt(index, value);
+			deltaSize(1);
+		}
 	}
 	
 	@Override
 	public void add(T value) throws IOException{
 		Objects.requireNonNull(value);
-		
-		writeAt(size(), value);
-		deltaSize(1);
+		try(var ignored=getDataProvider().getSource().openIOTransaction()){
+			writeAt(size(), value);
+			deltaSize(1);
+		}
 	}
 	
 	@Override
@@ -292,9 +295,10 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 	public void remove(long index) throws IOException{
 		checkSize(index);
 		
-		shift(index, ShiftAction.SQUASH);
-		
-		deltaSize(-1);
+		try(var ignored=getDataProvider().getSource().openIOTransaction()){
+			squash(index);
+			deltaSize(-1);
+		}
 	}
 	
 	@Override
@@ -320,48 +324,44 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 		}
 	}
 	
-	private enum ShiftAction{
-		SQUASH, FORWARD_DUP
-	}
-	
-	private void shift(long index, ShiftAction action) throws IOException{
+	private void forwardDup(long index) throws IOException{
 		try(var io=selfIO()){
 			var    siz =getElementSize();
 			byte[] buff=new byte[Math.toIntExact(siz)];
 			
-			int dummy=switch(action){
-				case SQUASH -> {
-					for(long i=index;i<size()-1;i++){
-						var nextPos=calcElementOffset(i+1, getElementSize());
-						io.setPos(nextPos);
-						io.readFully(buff);
-						
-						var pos=calcElementOffset(i, getElementSize());
-						io.setPos(pos);
-						io.write(buff);
-					}
-					
-					var lastOff=calcElementOffset(size()-1, getElementSize());
-					io.setCapacity(lastOff);
-					yield 0;
-				}
-				case FORWARD_DUP -> {
-					var lastOff=calcElementOffset(size()+1, getElementSize());
-					io.setCapacity(lastOff);
-					
-					for(long i=index;i<size();i++){
-						
-						var pos=calcElementOffset(i, getElementSize());
-						io.setPos(pos);
-						io.readFully(buff);
-						
-						var nextPos=calcElementOffset(i+1, getElementSize());
-						io.setPos(nextPos);
-						io.write(buff);
-					}
-					yield 0;
-				}
-			};
+			var lastOff=calcElementOffset(size()+1, getElementSize());
+			io.setCapacity(lastOff);
+			
+			for(long i=size()-1;i>=index;i--){
+				
+				var pos=calcElementOffset(i, getElementSize());
+				io.setPos(pos);
+				io.readFully(buff);
+				
+				var nextPos=calcElementOffset(i+1, getElementSize());
+				io.setPos(nextPos);
+				io.write(buff);
+			}
+		}
+	}
+	
+	private void squash(long index) throws IOException{
+		try(var io=selfIO()){
+			var    siz =getElementSize();
+			byte[] buff=new byte[Math.toIntExact(siz)];
+			
+			for(long i=index;i<size()-1;i++){
+				var nextPos=calcElementOffset(i+1, getElementSize());
+				io.setPos(nextPos);
+				io.readFully(buff);
+				
+				var pos=calcElementOffset(i, getElementSize());
+				io.setPos(pos);
+				io.write(buff);
+			}
+			
+			var lastOff=calcElementOffset(size()-1, getElementSize());
+			io.setCapacity(lastOff);
 		}
 	}
 	

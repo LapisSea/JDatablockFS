@@ -219,10 +219,12 @@ public class GeneralTests{
 	@ValueSource(classes={ContiguousIOList.class, LinkedIOList.class})
 	<L extends IOInstance.Unmanaged<L>&IOList<Dummy>> void listInsert(Class<L> listType, TestInfo info) throws IOException{
 		listEqualityTest(info, listType, Dummy.class, list->{
-			list.add(new Dummy(69));
-			list.add(new Dummy(420));
+			list.add(new Dummy('1'));
+			list.add(new Dummy('2'));
+			list.add(new Dummy('3'));
+			list.add(new Dummy('4'));
 			
-			list.add(1, new Dummy(360));
+			list.add(1, new Dummy('5'));
 		}, false);
 	}
 	
