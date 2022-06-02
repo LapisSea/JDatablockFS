@@ -96,6 +96,8 @@ public interface MemoryManager extends DataProvider.Holder{
 					long allocated=allocTo.allocTo(firstChunk, last, remaining);
 					
 					if(DEBUG_VALIDATION){
+						checkChainData(firstChunk);
+						
 						assert !last.dirty();
 						if(allocated<0){
 							throw new IllegalStateException();
@@ -111,6 +113,19 @@ public interface MemoryManager extends DataProvider.Holder{
 				throw new UnknownAllocationMethodException("Tried to allocate "+toAllocate+" bytes to "+last.getPtr()+" but there is no known way to do that");
 			}
 			
+		}
+		
+		private void checkChainData(Chunk firstChunk) throws IOException{
+			var ch=firstChunk;
+			while(ch!=null){
+				var n=ch.next();
+				if(n!=null&&n.getSize()>0){
+					if(ch.getCapacity()!=ch.getSize()){
+						throw new IllegalStateException(ch+" is not full but has next with data");
+					}
+				}
+				ch=n;
+			}
 		}
 		
 		@Override
