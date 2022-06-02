@@ -9,7 +9,9 @@ import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.ObjectID;
 import com.lapissea.cfs.objects.collections.AbstractUnmanagedIOMap;
+import com.lapissea.cfs.objects.collections.ContiguousIOList;
 import com.lapissea.cfs.objects.collections.HashIOMap;
+import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.IOTypeDB;
 import com.lapissea.cfs.type.MemoryWalker;
@@ -84,6 +86,20 @@ public class Cluster implements DataProvider{
 		private Metadata metadata;
 	}
 	
+	private static class IOChunkPointer extends IOInstance<IOChunkPointer>{
+		
+		@IOValue
+		private ChunkPointer val=ChunkPointer.NULL;
+		
+		private IOChunkPointer(){}
+		private IOChunkPointer(ChunkPointer val){
+			this.val=val;
+		}
+		
+		private ChunkPointer getVal(){
+			return val;
+		}
+	}
 	
 	private static class Metadata extends IOInstance<Metadata>{
 		
@@ -95,12 +111,17 @@ public class Cluster implements DataProvider{
 		@IOValue
 		@IONullability(NULLABLE)
 		private IOTypeDB.PersistentDB db;
+		
+		@IOValue
+		@IONullability(NULLABLE)
+		@IOValue.OverrideType(value=ContiguousIOList.class)
+		private IOList<IOChunkPointer> freeChunks;
 	}
 	
 	private final ChunkCache chunkCache=ChunkCache.strong();
 	
 	private final IOInterface       source;
-	private final MemoryManager     memoryManager    =new VerySimpleMemoryManager(this);
+	private final MemoryManager     memoryManager;
 	private final DefragmentManager defragmentManager=new DefragmentManager(this);
 	
 	private final RootRef root;
@@ -152,6 +173,7 @@ public class Cluster implements DataProvider{
 			throw new IOException("no valid cluster data "+s+" "+ch.getSize()+" "+ch.io().getSize());
 		}
 		root=readRootRef();
+		memoryManager=new PersistentMemoryManager(this, IOList.map(meta().freeChunks, IOChunkPointer::getVal, IOChunkPointer::new));
 	}
 	
 	private RootRef readRootRef() throws IOException{
