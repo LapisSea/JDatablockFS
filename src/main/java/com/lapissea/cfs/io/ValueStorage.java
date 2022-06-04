@@ -8,11 +8,13 @@ import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
+import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.BasicSizeDescriptor;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.IOException;
@@ -305,12 +307,60 @@ public sealed interface ValueStorage<T>{
 		}
 	}
 	
+	final class InlineString implements ValueStorage<String>{
+		
+		private static final RuntimeType<String> TYPE=RuntimeType.of(String.class);
+		
+		private final DataProvider provider;
+		
+		public InlineString(DataProvider provider){
+			this.provider=provider;
+		}
+		
+		@Override
+		public String readNew(ContentReader src) throws IOException{
+			return AutoText.PIPE.readNew(provider, src, null).getData();
+		}
+		@Override
+		public void write(RandomIO dest, String src) throws IOException{
+			AutoText.PIPE.write(provider, dest, new AutoText(src));
+		}
+		
+		@Override
+		public long inlineSize(){
+			return -1;
+		}
+		
+		@Override
+		public <I extends IOInstance<I>> IOField<I, String> field(FieldAccessor<I> accessor, UnsafeSupplier<RandomIO, IOException> ioAt){
+			var d=AutoText.PIPE.getSizeDescriptor();
+			return new IOField.NoIO<>(accessor, SizeDescriptor.Unknown.of(d.getWordSpace(), d.getMin(), d.getMax(), (ioPool, prov, value)->{
+				var str=(String)accessor.get(ioPool, value);
+				if(str==null) return 0;
+				return AutoText.PIPE.getSizeDescriptor().calcUnknown(null, prov, new AutoText(str), d.getWordSpace());
+			}));
+		}
+		@Override
+		public RuntimeType<String> getType(){
+			return TYPE;
+		}
+	}
+	
 	static ValueStorage<?> makeStorage(DataProvider provider, TypeLink typeDef, GenericContext generics, boolean fixedOnly){
-		Class<?> clazz    =typeDef.getTypeClass(provider.getTypeDb());
-		var      primitive=SupportedPrimitive.get(clazz);
-		if(primitive.isPresent()){
-			return new Primitive<>(primitive.get());
-		}else if(!IOInstance.isManaged(clazz)){
+		Class<?> clazz=typeDef.getTypeClass(provider.getTypeDb());
+		{
+			var primitive=SupportedPrimitive.get(clazz);
+			if(primitive.isPresent()){
+				return new Primitive<>(primitive.get());
+			}
+		}
+		
+		if(clazz==String.class){
+			if(fixedOnly) throw new NotImplementedException();//TODO: implement fixed reference string
+			return new InlineString(provider);
+		}
+		
+		if(!IOInstance.isManaged(clazz)){
 			return new UnmanagedInstance<>(typeDef, provider);
 		}else{
 			var struct=Struct.ofUnknown(clazz);
