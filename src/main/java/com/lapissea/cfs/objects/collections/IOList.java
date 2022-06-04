@@ -243,6 +243,18 @@ public interface IOList<T> extends IterablePP<T>{
 				public To ioNext() throws IOException{
 					return map(src.ioNext());
 				}
+				@Override
+				public To next(){
+					return map(src.next());
+				}
+				@Override
+				public void remove(){
+					src.remove();
+				}
+				@Override
+				public void ioRemove() throws IOException{
+					src.ioRemove();
+				}
 			};
 		}
 		
