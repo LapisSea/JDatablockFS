@@ -23,6 +23,7 @@ import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
 import java.lang.reflect.Array;
+import java.lang.reflect.Method;
 import java.util.*;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -437,6 +438,29 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		if(val==null) return Optional.empty();
 		
 		if(val instanceof IOInstance inst){
+			if("{".equals(start)&&"}".equals(end)&&"=".equals(fieldValueSeparator)&&", ".equals(fieldSeparator)){
+				defaultStr:
+				try{
+					var    t=inst.getClass();
+					Method strMethod;
+					if(doShort){
+						try{
+							strMethod=t.getMethod("toShortString");
+						}catch(ReflectiveOperationException e){
+							strMethod=t.getMethod("toString");
+						}
+					}else{
+						strMethod=t.getMethod("toString");
+					}
+					var declaring=strMethod.getDeclaringClass();
+					if(declaring==IOInstance.class){
+						break defaultStr;
+					}
+					
+					return Optional.ofNullable((String)strMethod.invoke(inst));
+				}catch(ReflectiveOperationException ignored){}
+			}
+			
 			var struct=inst.getThisStruct();
 			return Optional.of(struct.instanceToString(struct.allocVirtualVarPool(IO), inst, doShort, start, end, fieldValueSeparator, fieldSeparator));
 		}

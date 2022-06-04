@@ -112,6 +112,11 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 			if(node==null) return Collections.emptyIterator();
 			return node.valueIterator();
 		}
+		
+		@Override
+		public String toString(){
+			return "Bucket{"+node+"}";
+		}
 	}
 	
 	private static final int RESIZE_TRIGGER=4;
