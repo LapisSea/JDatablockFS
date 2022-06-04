@@ -111,7 +111,11 @@ public class DefragmentManager{
 			             .shouldDisableResizing(fragmentedChunk.getNextSize()==NumberSize.VOID)
 			             .withDataPopulated((p, io)->{
 				             try(var old=fragmentedChunk.io()){
+					             io.setSize(old.getSize());
 					             old.transferTo(io);
+					             if(io.getSize()!=io.getPos()){
+						             throw new IllegalStateException();
+					             }
 				             }
 			             })
 			             .submit(cluster);
