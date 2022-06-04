@@ -296,8 +296,9 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 		checkSize(index);
 		
 		try(var ignored=getDataProvider().getSource().openIOTransaction()){
-			squash(index);
+			var size=size();
 			deltaSize(-1);
+			squash(index, size);
 		}
 	}
 	
@@ -345,12 +346,12 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 		}
 	}
 	
-	private void squash(long index) throws IOException{
+	private void squash(long index, long size) throws IOException{
 		try(var io=selfIO()){
 			var    siz =getElementSize();
 			byte[] buff=new byte[Math.toIntExact(siz)];
 			
-			for(long i=index;i<size()-1;i++){
+			for(long i=index;i<size-1;i++){
 				var nextPos=calcElementOffset(i+1, getElementSize());
 				io.setPos(nextPos);
 				io.readFully(buff);
@@ -360,7 +361,7 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 				io.write(buff);
 			}
 			
-			var lastOff=calcElementOffset(size()-1, getElementSize());
+			var lastOff=calcElementOffset(size-1, getElementSize());
 			io.setCapacity(lastOff);
 		}
 	}
