@@ -69,7 +69,11 @@ public class TestUtils{
 		testRawMem(info, mem->{
 			Cluster.init(mem);
 			var c=new Cluster(mem);
-			session.accept(c);
+			try{
+				session.accept(c);
+			}catch(Throwable e){
+				throw new RuntimeException("Failed cluster session", e);
+			}
 			c.rootWalker().walk(true, r->{});
 		});
 	}

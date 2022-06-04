@@ -89,7 +89,7 @@ public abstract class StagedInit{
 	
 	private void waitForState0(int state){
 		if(DEBUG_VALIDATION){
-			var limit=500;
+			var limit=1000;
 			while(true){
 				synchronized(this){
 					if(this.state>=state) return;

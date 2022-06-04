@@ -62,25 +62,26 @@ public class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 		
 		var popped=popFile(toFree);
 		if(popped.isEmpty()) return;
-
-//		try(var ignored=context.getSource().openIOTransaction()){
+		
 		List<Chunk> toAdd=MemoryOperations.mergeChunks(popped, PURGE_ACCIDENTAL);
+		
 		if(adding){
 			toAdd.stream().sorted(Comparator.comparingLong(Chunk::getCapacity)).map(Chunk::getPtr).forEach(queuedFreeChunks::add);
 			return;
 		}
+		
 		adding=true;
 		try{
 			MemoryOperations.mergeFreeChunksSorted(context, freeChunks, toAdd);
 		}finally{
 			adding=false;
 		}
+		
 		while(!queuedFreeChunks.isEmpty()){
 			var ptr=queuedFreeChunks.remove(queuedFreeChunks.size()-1);
 			var ch =context.getChunk(ptr);
 			free(ch);
 		}
-//		}
 	}
 	
 	private Collection<Chunk> popFile(Collection<Chunk> toFree) throws IOException{
