@@ -59,8 +59,10 @@ public class FixedContiguousStructPipe<T extends IOInstance<T>> extends StructPi
 	protected List<IOField<T, ?>> initFields(){
 		var sizeFields=sizeFieldStream().collect(Collectors.toSet());
 		try{
+			var type=getType();
+			type.waitForState(Struct.STATE_INIT_FIELDS);
 			return IOFieldTools.stepFinal(
-				getType().getFields(),
+				type.getFields(),
 				List.of(
 					IOFieldTools.streamStep(s->s.map(f->sizeFields.contains(f)?f:f.forceMaxAsFixedSize())),
 					IOFieldTools::dependencyReorder,

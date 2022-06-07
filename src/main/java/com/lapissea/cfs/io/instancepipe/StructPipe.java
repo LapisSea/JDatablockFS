@@ -359,7 +359,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit{
 			if(sizeDescription==null){
 				waitForState(STATE_DONE);
 			}
-			assert sizeDescription!=null;
+			if(sizeDescription==null) throw new IllegalStateException();
 		}
 		return sizeDescription;
 	}

@@ -79,6 +79,7 @@ public class IOFieldNumber<T extends IOInstance<T>, E extends INumber> extends I
 	
 	@Override
 	public SizeDescriptor<T> getSizeDescriptor(){
+		if(sizeDescriptor==null) throw new IllegalStateException(this+" not initialized");
 		return sizeDescriptor;
 	}
 }

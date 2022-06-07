@@ -379,7 +379,7 @@ public class GeneralTests{
 		try{
 			pipe=ContiguousStructPipe.of(struct);
 			pipe.waitForState(StagedInit.STATE_DONE);
-		}catch(MalformedStructLayout ignored){
+		}catch(MalformedStructLayout|StagedInit.WaitException ignored){
 			pipe=null;
 		}
 		if(pipe!=null){
@@ -388,7 +388,7 @@ public class GeneralTests{
 		try{
 			pipe=FixedContiguousStructPipe.of(struct);
 			pipe.waitForState(StagedInit.STATE_DONE);
-		}catch(MalformedStructLayout ignored){
+		}catch(MalformedStructLayout|StagedInit.WaitException ignored){
 			pipe=null;
 		}
 		if(pipe!=null){

@@ -28,10 +28,12 @@ public abstract class StagedInit{
 		Runnable managedInit=()->{
 			try{
 				init.run();
+				setInitState(STATE_DONE);
 			}catch(Throwable e){
 				this.e=e;
-			}finally{
-				setInitState(STATE_DONE);
+				synchronized(this){
+					this.notifyAll();
+				}
 			}
 		};
 		if(DO_ASYNC){
@@ -69,11 +71,19 @@ public abstract class StagedInit{
 //			LogUtil.printTable("ms pass", tim(), "actor", this, "thread", Thread.currentThread().getName(), "done", stateToStrCol(state));
 		}
 		
-		var e=this.e;
-		if(e!=null){
-			this.e=null;
-			throw new RuntimeException("Exception occurred while initializing", e);
+		checkErr();
+	}
+	
+	public static class WaitException extends RuntimeException{
+		public WaitException(String message, Throwable cause){
+			super(message, cause);
 		}
+	}
+	
+	private void checkErr(){
+		if(e==null) return;
+		
+		throw new WaitException("Exception occurred while initializing", e);
 	}
 	
 	protected String stateToStrCol(int state){
@@ -92,6 +102,7 @@ public abstract class StagedInit{
 			var limit=1000;
 			while(true){
 				synchronized(this){
+					checkErr();
 					if(this.state>=state) return;
 					try{
 //						LogUtil.printTable("ms pass", tim(), "actor", this, "thread", Thread.currentThread().getName(), "action", "wait", "target state", stateToStrCol(state), "current", stateToStrCol(this.state));
@@ -109,6 +120,7 @@ public abstract class StagedInit{
 		}else{
 			while(true){
 				synchronized(this){
+					checkErr();
 					if(this.state>=state) return;
 					try{
 						this.wait();
