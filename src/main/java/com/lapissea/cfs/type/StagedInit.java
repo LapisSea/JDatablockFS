@@ -4,8 +4,6 @@ import com.lapissea.cfs.internal.Runner;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
 
-import java.text.DecimalFormat;
-
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
 public abstract class StagedInit{
@@ -20,11 +18,11 @@ public abstract class StagedInit{
 	
 	private transient int       state=STATE_START;
 	private           Throwable e;
-	
-	private static long last;
+
+//	private static long last;
 	
 	protected void init(Runnable init){
-		if(last==0) last=System.nanoTime();
+//		if(last==0) last=System.nanoTime();
 		Runnable managedInit=()->{
 			try{
 				init.run();
@@ -51,18 +49,18 @@ public abstract class StagedInit{
 			this.notifyAll();
 		}
 	}
-	private String tim(){
-		var t=System.nanoTime();
-		if(last==0) last=t;
-		var dif=t-last;
-		last=t;
-		var           ddif=dif/1000000D;
-		DecimalFormat f   =new DecimalFormat();
-//		f.setMinimumIntegerDigits(3);
-		f.setMinimumFractionDigits(3);
-		f.setMaximumFractionDigits(3);
-		return f.format(ddif);
-	}
+//	private String tim(){
+//		var t=System.nanoTime();
+//		if(last==0) last=t;
+//		var dif=t-last;
+//		last=t;
+//		var           ddif=dif/1000000D;
+//		DecimalFormat f   =new DecimalFormat();
+////		f.setMinimumIntegerDigits(3);
+//		f.setMinimumFractionDigits(3);
+//		f.setMaximumFractionDigits(3);
+//		return f.format(ddif);
+//	}
 	
 	public final void waitForState(int state){
 		if(this.state<state){
