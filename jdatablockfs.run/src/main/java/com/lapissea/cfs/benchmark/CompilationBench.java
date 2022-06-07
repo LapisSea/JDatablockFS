@@ -11,7 +11,7 @@ import java.util.concurrent.TimeUnit;
 public class CompilationBench{
 	
 	@Benchmark
-//	@Fork(jvmArgsAppend="-Dcom.lapissea.cfs.internal.Access.NO_CACHE=true")
+//	@Fork(jvmArgsAppend="-Dcom.lapissea.cfs.internal.Access.DEV_CACHE=true")
 	@Warmup(iterations=6, time=2000, timeUnit=TimeUnit.MILLISECONDS)
 	@Measurement(iterations=3, time=2000, timeUnit=TimeUnit.MILLISECONDS)
 	@BenchmarkMode(Mode.Throughput)

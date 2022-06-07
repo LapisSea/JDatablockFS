@@ -27,7 +27,7 @@ import static java.lang.invoke.MethodHandles.Lookup.*;
 @SuppressWarnings("unchecked")
 public class Access{
 	
-	public static final boolean NO_CACHE=UtilL.sysPropertyByClass(Access.class, "NO_CACHE", false, Boolean::parseBoolean);
+	public static final boolean DEV_CACHE=UtilL.sysPropertyByClass(Access.class, "DEV_CACHE", false, Boolean::parseBoolean);
 	
 	
 	private static final boolean USE_UNSAFE_LOOKUP=true;

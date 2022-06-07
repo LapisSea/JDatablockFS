@@ -75,7 +75,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit{
 				throw new MalformedStructLayout("Failed to compile "+type.getSimpleName()+" for "+struct.getType().getName(), e);
 			}
 			
-			if(GlobalConfig.PRINT_COMPILATION&&!Access.NO_CACHE){
+			if(GlobalConfig.PRINT_COMPILATION&&!Access.DEV_CACHE){
 				String s=CYAN_BRIGHT+
 				         "Compiled: "+struct.getType().getName()+"\n"+
 				         "\tPipe type: "+BLUE_BRIGHT+created.getClass().getName()+CYAN_BRIGHT+"\n"+
@@ -94,7 +94,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit{
 			
 			
 			if(DEBUG_VALIDATION&&!(struct instanceof Struct.Unmanaged)){
-				if(Access.NO_CACHE){
+				if(Access.DEV_CACHE){
 					created.getType().requireEmptyConstructor();
 				}else{
 					T inst;
@@ -127,7 +127,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit{
 	private static final ConcurrentHashMap<Class<? extends StructPipe<?>>, StructGroup<?, ?>> CACHE=new ConcurrentHashMap<>();
 	
 	public static void clear(){
-		if(!Access.NO_CACHE) throw new RuntimeException();
+		if(!Access.DEV_CACHE) throw new RuntimeException();
 		CACHE.clear();
 	}
 	
@@ -384,7 +384,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit{
 	}
 	
 	protected void writeIOFields(FieldSet<T> fields, Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
-		if(Access.NO_CACHE) throw new RuntimeException();
+		if(Access.DEV_CACHE) throw new RuntimeException();
 		
 		ContentOutputBuilder destBuff=null;
 		ContentWriter        target;

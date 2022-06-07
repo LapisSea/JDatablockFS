@@ -335,7 +335,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	private static final Map<Class<?>, Thread>    STRUCT_COMPILE=new ConcurrentHashMap<>();
 	
 	public static void clear(){
-		if(!Access.NO_CACHE) throw new RuntimeException();
+		if(!Access.DEV_CACHE) throw new RuntimeException();
 		var lock=STRUCT_CACHE_LOCK.writeLock();
 		lock.lock();
 		if(!STRUCT_COMPILE.isEmpty()) throw new RuntimeException();
@@ -427,7 +427,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			lock.unlock();
 		}
 		
-		if(GlobalConfig.PRINT_COMPILATION&&!Access.NO_CACHE){
+		if(GlobalConfig.PRINT_COMPILATION&&!Access.DEV_CACHE){
 			LogUtil.println(ConsoleColors.GREEN_BRIGHT+TextUtil.toTable("Compiled: "+struct.getType().getName(), struct.getFields())+ConsoleColors.RESET);
 		}
 		return struct;
