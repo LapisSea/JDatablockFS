@@ -165,13 +165,13 @@ public class IOTransactionBuffer{
 		
 		for(int i=writeEvents.size()-1;i>=0;i--){
 			var e=writeEvents.get(i);
-			if(e.start()>newCapacity){
+			if(e.start()>=newCapacity){
 				writeEvents.remove(i);
 				continue;
 			}
 			if(e.end()>newCapacity){
 				int shrink=(int)(e.end()-newCapacity);
-				assert shrink<e.data.length;
+				assert shrink<e.data.length:newCapacity;
 				assert shrink>0;
 				writeEvents.set(i, makeEvent(e.offset, e.data, 0, e.data.length-shrink));
 				continue;
