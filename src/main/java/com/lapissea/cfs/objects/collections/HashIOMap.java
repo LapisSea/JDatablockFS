@@ -6,10 +6,12 @@ import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.ValueStorage;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
+import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.cfs.type.field.annotations.IOValue;
@@ -27,6 +29,8 @@ import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NULLABL
 public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	
 	private static class BucketEntry<K, V> extends IOInstance<BucketEntry<K, V>>{
+		
+		private static final StructPipe<BucketEntry<Object, Object>> PIPE=ContiguousStructPipe.of((Class<BucketEntry<Object, Object>>)(Object)BucketEntry.class);
 		
 		@IOValue
 		@IONullability(NULLABLE)
@@ -441,15 +445,18 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		
 		return count;
 	}
+	
+	private static final TypeLink BUCKET_NODE_TYPE=new TypeLink(
+		LinkedIOList.Node.class,
+		TypeLink.of(BucketEntry.class)
+	);
+	
 	private LinkedIOList.Node<BucketEntry<K, V>> allocNewNode(BucketEntry<K, V> newEntry) throws IOException{
 		return LinkedIOList.Node.allocValNode(
 			newEntry,
 			null,
-			ContiguousStructPipe.of((Class<BucketEntry<K, V>>)(Object)BucketEntry.class).getSizeDescriptor(),
-			new TypeLink(
-				LinkedIOList.Node.class,
-				TypeLink.of(BucketEntry.class)
-			),
+			(SizeDescriptor<BucketEntry<K, V>>)(Object)BucketEntry.PIPE.getSizeDescriptor(),
+			BUCKET_NODE_TYPE,
 			getDataProvider()
 		);
 	}
