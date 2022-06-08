@@ -12,6 +12,8 @@ import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.EOFException;
 import java.io.IOException;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Collection;
@@ -32,7 +34,7 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		}
 		
 		@Override
-		public RandomIO setPos(long pos){
+		public MemRandomIO setPos(long pos){
 			if(pos<0) throw new IndexOutOfBoundsException();
 			this.pos=Math.toIntExact(pos);
 			return this;
@@ -56,13 +58,13 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		@Override
 		public long getCapacity(){
 			if(transactionOpen){
-				return transactions.getCapacity(used);
+				return transactionBuff.getCapacity(used);
 			}
 			return used;
 		}
 		
 		@Override
-		public RandomIO setCapacity(long newCapacity){
+		public MemRandomIO setCapacity(long newCapacity){
 			if(readOnly) throw new UnsupportedOperationException();
 			
 			MemoryData.this.setCapacity(newCapacity);
@@ -79,7 +81,7 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		@Override
 		public int read() throws IOException{
 			if(transactionOpen){
-				int b=transactions.readByte(this::readAt, pos);
+				int b=transactionBuff.readByte(this::readAt, pos);
 				if(b>=0){
 					this.pos++;
 				}
@@ -94,7 +96,7 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		@Override
 		public int read(byte[] b, int off, int len) throws IOException{
 			if(transactionOpen){
-				int read=transactions.read(this::readAt, pos, b, off, len);
+				int read=transactionBuff.read(this::readAt, pos, b, off, len);
 				pos+=read;
 				return read;
 			}
@@ -136,7 +138,7 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		public void write(int b){
 			if(readOnly) throw new UnsupportedOperationException();
 			if(transactionOpen){
-				transactions.writeByte(pos, b);
+				transactionBuff.writeByte(pos, b);
 				pos++;
 				return;
 			}
@@ -157,7 +159,7 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		private void write(byte[] b, int off, int len, boolean pushPos){
 			if(readOnly) throw new UnsupportedOperationException();
 			if(transactionOpen){
-				transactions.write(pos, b, off, len);
+				transactionBuff.write(pos, b, off, len);
 				if(pushPos) pos+=len;
 				return;
 			}
@@ -178,7 +180,7 @@ public abstract class MemoryData<DataType> implements IOInterface{
 			if(writeData.isEmpty()) return;
 			if(transactionOpen){
 				for(var e : writeData){
-					transactions.write(e.ioOffset(), e.data(), e.dataOffset(), e.dataLength());
+					transactionBuff.write(e.ioOffset(), e.data(), e.dataOffset(), e.dataLength());
 				}
 				return;
 			}
@@ -250,7 +252,7 @@ public abstract class MemoryData<DataType> implements IOInterface{
 				end=used;
 			}
 			
-			String transactionStr=transactionOpen?", transaction: {"+transactions.infoString()+"}":"";
+			String transactionStr=transactionOpen?", transaction: {"+transactionBuff.infoString()+"}":"";
 			
 			String name=getClass().getSimpleName();
 			String pre ="{pos="+pos+transactionStr+", data=";
@@ -296,7 +298,7 @@ public abstract class MemoryData<DataType> implements IOInterface{
 	private final boolean readOnly;
 	
 	private       boolean             transactionOpen;
-	private final IOTransactionBuffer transactions=new IOTransactionBuffer();
+	private final IOTransactionBuffer transactionBuff=new IOTransactionBuffer();
 	
 	public MemoryData(DataType data, Builder info){
 		
@@ -341,7 +343,7 @@ public abstract class MemoryData<DataType> implements IOInterface{
 	@Override
 	public long getIOSize(){
 		if(transactionOpen){
-			return transactions.getCapacity(used);
+			return transactionBuff.getCapacity(used);
 		}
 		return used;
 	}
@@ -352,8 +354,8 @@ public abstract class MemoryData<DataType> implements IOInterface{
 	private void setCapacity(int newCapacity){
 		if(readOnly) throw new UnsupportedOperationException();
 		if(transactionOpen){
-			var siz=transactions.getCapacity(used);
-			transactions.capacityChange(Math.min(siz, newCapacity));
+			var siz=transactionBuff.getCapacity(used);
+			transactionBuff.capacityChange(Math.min(siz, newCapacity));
 			return;
 		}
 		
@@ -371,23 +373,19 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		return readOnly;
 	}
 	
+	private static final VarHandle TRANSACTION_OPEN;
+	
+	static{
+		try{
+			TRANSACTION_OPEN=MethodHandles.lookup().findVarHandle(MemoryData.class, "transactionOpen", boolean.class);
+		}catch(ReflectiveOperationException e){
+			throw new Error(e);
+		}
+	}
+	
 	@Override
-	public Trans openIOTransaction(){
-		var oldTransactionOpen=transactionOpen;
-		transactionOpen=true;
-		return ()->{
-			transactionOpen=oldTransactionOpen;
-			if(!oldTransactionOpen){
-				var data=transactions.export();
-				try(var io=io()){
-					var cap=data.setCapacity();
-					if(cap.isPresent()){
-						io.setCapacity(cap.getAsLong());
-					}
-					io.writeAtOffsets(data.writes());
-				}
-			}
-		};
+	public IOTransaction openIOTransaction(){
+		return transactionBuff.open(this, TRANSACTION_OPEN);
 	}
 	
 	@Override

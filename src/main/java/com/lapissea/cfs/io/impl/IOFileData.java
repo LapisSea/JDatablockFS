@@ -180,7 +180,7 @@ public class IOFileData implements IOInterface, AutoCloseable{
 	}
 	
 	@Override
-	public Trans openIOTransaction(){
+	public IOTransaction openIOTransaction(){
 		throw new NotImplementedException();//TODO: implement transaction handling for IOFile
 	}
 	

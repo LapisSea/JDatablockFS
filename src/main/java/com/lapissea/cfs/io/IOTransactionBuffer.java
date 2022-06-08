@@ -3,6 +3,7 @@ package com.lapissea.cfs.io;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
+import java.lang.invoke.VarHandle;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -356,6 +357,71 @@ public class IOTransactionBuffer{
 	
 	public String infoString(){
 		if(writeEvents.isEmpty()) return "no data";
-		return writeEvents.stream().mapToInt(e->e.data.length).sum()+" bytes overridden in range "+writeEvents.get(0).start()+" - "+writeEvents.get(writeEvents.size()-1).end();
+		return getTotalBytes()+" bytes overridden in range "+writeEvents.get(0).start()+" - "+writeEvents.get(writeEvents.size()-1).end();
+	}
+	
+	public int getChunkCount(){
+		return writeEvents.size();
+	}
+	
+	public long getTotalBytes(){
+		int sum=0;
+		for(int i=0;i<writeEvents.size();i++){
+			sum+=writeEvents.get(i).data.length;
+		}
+		return sum;
+	}
+	
+	public IOInterface.IOTransaction open(RandomIO.Creator target, VarHandle transactionOpenVar){
+		var oldTransactionOpen=(boolean)transactionOpenVar.get(target);
+		transactionOpenVar.set(target, true);
+		
+		return new IOInterface.IOTransaction(){
+			private final int startingChunkCount=DEBUG_VALIDATION&&oldTransactionOpen?getChunkCount():0;
+			private final long startingTotalBytes=DEBUG_VALIDATION&&oldTransactionOpen?getTotalBytes():0;
+			
+			@Override
+			public int getChunkCount(){
+				return IOTransactionBuffer.this.getChunkCount();
+			}
+			@Override
+			public long getTotalBytes(){
+				return IOTransactionBuffer.this.getTotalBytes();
+			}
+			
+			@Override
+			public void close() throws IOException{
+				transactionOpenVar.set(target, oldTransactionOpen);
+				if(!oldTransactionOpen){
+					var data=export();
+					try(var io=target.io()){
+						var cap=data.setCapacity();
+						if(cap.isPresent()){
+							io.setCapacity(cap.getAsLong());
+						}
+						var w=data.writes();
+						switch(w.size()){
+							case 0 -> {}
+							case 1 -> {
+								var e=w.get(0);
+								io.setPos(e.ioOffset()).write(e.data(), e.dataOffset(), e.dataLength());
+							}
+							default -> io.writeAtOffsets(w);
+						}
+					}
+				}
+			}
+			
+			@Override
+			public String toString(){
+				if(oldTransactionOpen){
+					if(!DEBUG_VALIDATION){
+						return "Transaction{child}";
+					}
+					return "Transaction{Δ count: "+(startingChunkCount-getChunkCount())+", Δ bytes: "+(startingTotalBytes-getTotalBytes())+"}";
+				}
+				return "Transaction{count: "+getChunkCount()+", bytes: "+getTotalBytes()+"}";
+			}
+		};
 	}
 }

@@ -13,7 +13,10 @@ import java.io.IOException;
  */
 public interface IOInterface extends RandomIO.Creator{
 	
-	interface Trans extends Closeable{}
+	interface IOTransaction extends Closeable{
+		int getChunkCount();
+		long getTotalBytes();
+	}
 	
 	default void setIOSize(long requestedSize) throws IOException{
 		try(var io=io()){
@@ -35,7 +38,7 @@ public interface IOInterface extends RandomIO.Creator{
 	
 	boolean isReadOnly();
 	
-	Trans openIOTransaction();
+	IOTransaction openIOTransaction();
 	
 	default <E extends Throwable> void openIOTransaction(UnsafeRunnable<E> session) throws E, IOException{
 		try(var ignored=openIOTransaction()){
@@ -57,7 +60,7 @@ public interface IOInterface extends RandomIO.Creator{
 				return true;
 			}
 			@Override
-			public Trans openIOTransaction(){
+			public IOTransaction openIOTransaction(){
 				return that.openIOTransaction();
 			}
 			@Override
