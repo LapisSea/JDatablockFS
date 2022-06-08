@@ -76,18 +76,21 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit{
 			}
 			
 			if(GlobalConfig.PRINT_COMPILATION&&!Access.DEV_CACHE){
-				String s=CYAN_BRIGHT+
-				         "Compiled: "+struct.getType().getName()+"\n"+
-				         "\tPipe type: "+BLUE_BRIGHT+created.getClass().getName()+CYAN_BRIGHT+"\n"+
-				         "\tSize: "+BLUE_BRIGHT+created.getSizeDescriptor()+CYAN_BRIGHT;
-				
-				var sFields=created.getSpecificFields();
-				
-				if(!sFields.equals(struct.getFields())){
-					s+="\n"+TextUtil.toTable(created.getSpecificFields());
-				}
-				
-				LogUtil.println(s+RESET);
+				LogUtil.println(CYAN_BRIGHT+"Requested pipe: "+struct.getType().getName()+RESET);
+				StagedInit.runBaseStageTask(()->{
+					String s=CYAN_BRIGHT+
+					         "Compiled: "+struct.getType().getName()+"\n"+
+					         "\tPipe type: "+BLUE_BRIGHT+created.getClass().getName()+CYAN_BRIGHT+"\n"+
+					         "\tSize: "+BLUE_BRIGHT+created.getSizeDescriptor()+CYAN_BRIGHT;
+					
+					var sFields=created.getSpecificFields();
+					
+					if(!sFields.equals(struct.getFields())){
+						s+="\n"+TextUtil.toTable(created.getSpecificFields());
+					}
+					
+					LogUtil.println(s+RESET);
+				});
 			}
 			
 			put(struct, created);

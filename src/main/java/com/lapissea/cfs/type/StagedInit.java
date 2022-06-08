@@ -14,6 +14,14 @@ public abstract class StagedInit{
 	
 	private static final boolean DO_ASYNC=UtilL.sysPropertyByClass(StagedInit.class, "DO_ASYNC", true, Boolean::valueOf);
 	
+	public static void runBaseStageTask(Runnable task){
+		if(DO_ASYNC){
+			Runner.compileTask(task);
+		}else{
+			task.run();
+		}
+	}
+	
 	public static final int STATE_START=0, STATE_DONE=Integer.MAX_VALUE;
 	
 	private transient int       state=STATE_START;
@@ -23,7 +31,7 @@ public abstract class StagedInit{
 	
 	protected void init(Runnable init){
 //		if(last==0) last=System.nanoTime();
-		Runnable managedInit=()->{
+		runBaseStageTask(()->{
 			try{
 				init.run();
 				setInitState(STATE_DONE);
@@ -33,13 +41,7 @@ public abstract class StagedInit{
 					this.notifyAll();
 				}
 			}
-		};
-		if(DO_ASYNC){
-			Runner.compileTask(managedInit);
-		}else{
-			managedInit.run();
-		}
-		
+		});
 	}
 	
 	protected final void setInitState(int state){

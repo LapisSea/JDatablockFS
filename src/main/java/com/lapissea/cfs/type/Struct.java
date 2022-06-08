@@ -428,7 +428,11 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		}
 		
 		if(GlobalConfig.PRINT_COMPILATION&&!Access.DEV_CACHE){
-			LogUtil.println(ConsoleColors.GREEN_BRIGHT+TextUtil.toTable("Compiled: "+struct.getType().getName(), struct.getFields())+ConsoleColors.RESET);
+			LogUtil.println(ConsoleColors.GREEN_BRIGHT+"Requested struct: "+struct.getType().getName()+ConsoleColors.RESET);
+			StagedInit.runBaseStageTask(()->{
+				var tableStr=TextUtil.toTable(struct.getType().getName(), struct.getFields());
+				LogUtil.println(ConsoleColors.GREEN_BRIGHT+tableStr+ConsoleColors.RESET);
+			});
 		}
 		return struct;
 	}
