@@ -21,6 +21,10 @@ import java.io.IOException;
 
 public sealed interface ValueStorage<T>{
 	
+	sealed interface InstanceBased<T extends IOInstance<T>> extends ValueStorage<T>{
+		void readSingle(ContentReader src, T dest, IOField<T, ?> field) throws IOException;
+	}
+	
 	private static <I extends IOInstance<I>, T extends IOInstance<T>> SizeDescriptor<I> makeSizeDescriptor(DataProvider provider, FieldAccessor<I> accessor, StructPipe<T> pipe){
 		SizeDescriptor<I> desc;
 		
@@ -39,7 +43,7 @@ public sealed interface ValueStorage<T>{
 		return desc;
 	}
 	
-	final class Instance<T extends IOInstance<T>> implements ValueStorage<T>{
+	final class Instance<T extends IOInstance<T>> implements ValueStorage.InstanceBased<T>{
 		
 		private final GenericContext          ctx;
 		private final DataProvider            provider;
@@ -83,9 +87,14 @@ public sealed interface ValueStorage<T>{
 		public RuntimeType<T> getType(){
 			return pipe.getType();
 		}
+		
+		@Override
+		public void readSingle(ContentReader src, T dest, IOField<T, ?> field) throws IOException{
+			pipe.readSingleField(pipe.makeIOPool(), provider, src, field, dest, ctx);
+		}
 	}
 	
-	final class FixedInstance<T extends IOInstance<T>> implements ValueStorage<T>{
+	final class FixedInstance<T extends IOInstance<T>> implements ValueStorage.InstanceBased<T>{
 		
 		private final GenericContext               ctx;
 		private final DataProvider                 provider;
@@ -127,9 +136,14 @@ public sealed interface ValueStorage<T>{
 		public RuntimeType<T> getType(){
 			return pipe.getType();
 		}
+		
+		@Override
+		public void readSingle(ContentReader src, T dest, IOField<T, ?> field) throws IOException{
+			pipe.readSingleField(pipe.makeIOPool(), provider, src, field, dest, ctx);
+		}
 	}
 	
-	final class FixedReferencedInstance<T extends IOInstance<T>> implements ValueStorage<T>{
+	final class FixedReferencedInstance<T extends IOInstance<T>> implements ValueStorage.InstanceBased<T>{
 		
 		private static final FixedContiguousStructPipe<Reference> REF_PIPE=FixedContiguousStructPipe.of(Reference.STRUCT);
 		private static final long                                 SIZE    =REF_PIPE.getFixedDescriptor().get(WordSpace.BYTE);
@@ -205,6 +219,15 @@ public sealed interface ValueStorage<T>{
 		@Override
 		public RuntimeType<T> getType(){
 			return pipe.getType();
+		}
+		
+		@Override
+		public void readSingle(ContentReader src, T dest, IOField<T, ?> field) throws IOException{
+			var ref=REF_PIPE.readNew(provider, src, null);
+			ref.requireNonNull();
+			try(var io=ref.io(provider)){
+				pipe.readSingleField(pipe.makeIOPool(), provider, io, field, dest, ctx);
+			}
 		}
 	}
 	
