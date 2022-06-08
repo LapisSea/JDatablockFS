@@ -396,6 +396,10 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 			return readNext();
 		}
 		
+		public boolean hasNext() throws IOException{
+			return !getNextPtr().isNull();
+		}
+		
 		private Node<T> readNext() throws IOException{
 			
 			var ptr=getNextPtr();
@@ -428,6 +432,10 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 			setNextRaw(ptr);
 		}
 		private void setNextRaw(ChunkPointer ptr) throws IOException{
+			var oldPtr=getNextPtr();
+			if(oldPtr.equals(ptr)){
+				return;
+			}
 			
 			var newSiz=NumberSize.bySize(ptr);
 			if(newSiz.greaterThan(nextSize)){
@@ -435,8 +443,10 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 				var grow=newSiz.bytes-nextSize.bytes;
 				nextSize=newSiz;
 				getReference().withContext(this).io(io->io.ensureCapacity(io.getCapacity()+grow));
-				writeManagedFields();
-				setValue(val);
+				try(var ignored=getDataProvider().getSource().openIOTransaction()){
+					writeManagedFields();
+					setValue(val);
+				}
 			}
 			
 			try(var io=getReference().io(this)){
