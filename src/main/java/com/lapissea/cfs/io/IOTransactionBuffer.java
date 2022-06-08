@@ -129,10 +129,13 @@ public class IOTransactionBuffer{
 			}
 			var toRead=Math.min(tillNext, rem);
 			var read  =base.read(cursor, b, localOff, toRead);
-			cursor+=read;
-			localOff+=read;
-			rem-=read;
+			if(read>0){
+				cursor+=read;
+				localOff+=read;
+				rem-=read;
+			}
 			if(read!=toRead){
+				if(len==rem) return -1;
 				return len-rem;
 			}
 		}
