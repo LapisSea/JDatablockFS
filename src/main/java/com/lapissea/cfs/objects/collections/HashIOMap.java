@@ -204,45 +204,96 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		fillBuckets();
 		
 		datasetID++;
-		transfer(oldBuckets, buckets, bucketPO2, size()<256);
-		writeManagedFields();
 		
-		((Unmanaged<?>)oldBuckets).free();
-		
-	}
-	
-	private void transfer(IOList<Bucket<K, V>> oldBuckets, IOList<Bucket<K, V>> newBuckets, short newPO2, boolean optimizedOrder) throws IOException{
-		if(optimizedOrder){
-			Map<Integer, List<BucketEntry<K, V>>> hashGroupings=new TreeMap<>();
-			
-			for(var e : rawEntries(oldBuckets)){
-				hashGroupings.computeIfAbsent(toSmallHash(e.key, newPO2), i->new ArrayList<>()).add(e);
+		if(size()<128){
+			try(var ignored=getDataProvider().getSource().openIOTransaction()){
+				transferRewire(oldBuckets, buckets, bucketPO2);
+				writeManagedFields();
 			}
-			for(var group : hashGroupings.values()){
-				var key=group.get(0).key;
-				
-				Bucket<K, V> bucket=getBucket(newBuckets, key, newPO2);
-				assert bucket.node==null;
-				bucket.allocateNulls(getDataProvider());
-				setBucket(newBuckets, key, newPO2, bucket);
-				
-				Iterator<BucketEntry<K, V>> iter=group.iterator();
-				assert iter.hasNext();
-				
-				var node=bucket.node;
-				node.setValue(iter.next());
-				
-				while(iter.hasNext()){
-					var newNode=allocNewNode(iter.next());
-					
-					node.setNext(newNode);
-					node=newNode;
+			oldBuckets.clear();
+			((Unmanaged<?>)oldBuckets).free();
+		}else{
+			try(var ignored=getDataProvider().getSource().openIOTransaction()){
+				if(size()<256){
+					optimizedOrderTransfer(oldBuckets, buckets, bucketPO2);
+				}else{
+					linearCopyTransfer(oldBuckets, buckets, bucketPO2);
 				}
 			}
-		}else{
-			for(var e : rawEntries(oldBuckets)){
-				putEntry(newBuckets, newPO2, e.key, e.value);
+			writeManagedFields();
+			((Unmanaged<?>)oldBuckets).free();
+		}
+	}
+	
+	private void linearCopyTransfer(IOList<Bucket<K, V>> oldBuckets, IOList<Bucket<K, V>> newBuckets, short newPO2) throws IOException{
+		for(var e : rawEntries(oldBuckets)){
+			putEntry(newBuckets, newPO2, e.key, e.value);
+		}
+	}
+	
+	private void optimizedOrderTransfer(IOList<Bucket<K, V>> oldBuckets, IOList<Bucket<K, V>> newBuckets, short newPO2) throws IOException{
+		
+		
+		Map<Integer, List<BucketEntry<K, V>>> hashGroupings=new TreeMap<>();
+		
+		for(var e : rawEntries(oldBuckets)){
+			hashGroupings.computeIfAbsent(toSmallHash(e.key, newPO2), i->new ArrayList<>()).add(e);
+		}
+		for(var group : hashGroupings.values()){
+			var key=group.get(0).key;
+			
+			Bucket<K, V> bucket=getBucket(newBuckets, key, newPO2);
+			assert bucket.node==null;
+			bucket.allocateNulls(getDataProvider());
+			setBucket(newBuckets, key, newPO2, bucket);
+			
+			Iterator<BucketEntry<K, V>> iter=group.iterator();
+			assert iter.hasNext();
+			
+			var node=bucket.node;
+			node.setValue(iter.next());
+			
+			while(iter.hasNext()){
+				var newNode=allocNewNode(iter.next());
+				
+				node.setNext(newNode);
+				node=newNode;
 			}
+		}
+	}
+	
+	private void transferRewire(IOList<Bucket<K, V>> oldBuckets, IOList<Bucket<K, V>> newBuckets, short newPO2) throws IOException{
+		for(Bucket<K, V> oldBucket : oldBuckets){
+			var oldNodes=oldBucket.node.stream().toList();
+			for(var node : oldNodes){
+				if(node.hasNext()) node.setNext(null);
+				
+				if(!node.hasValue()){
+					node.free();
+					continue;
+				}
+				
+				var key=node.getValue().key;
+				
+				Bucket<K, V> bucket=getBucket(newBuckets, key, newPO2);
+				if(bucket.node==null){
+					bucket.node=node;
+					setBucket(newBuckets, key, newPO2, bucket);
+					continue;
+				}
+				
+				var last=bucket.node;
+				while(true){
+					if(!last.hasValue()){
+						throw new RuntimeException();
+					}
+					var next=last.getNext();
+					if(next==null) break;
+					last=next;
+				}
+				last.setNext(node);
+			}
+			
 		}
 	}
 	
