@@ -1,5 +1,6 @@
 package com.lapissea.cfs.chunk;
 
+import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.BitDepthOutOfSpaceException;
 import com.lapissea.cfs.objects.ChunkPointer;
@@ -8,6 +9,7 @@ import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
+import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -228,7 +230,10 @@ public class MemoryOperations{
 		assert prev.dataEnd()==next.dataEnd();
 	}
 	
-	public static List<Chunk> mergeChunks(Collection<Chunk> data, boolean purgeAccidental) throws IOException{
+	
+	private static final boolean PURGE_ACCIDENTAL=UtilL.sysPropertyByClass(MemoryOperations.class, "PURGE_ACCIDENTAL", GlobalConfig.DEBUG_VALIDATION, Boolean::valueOf);
+	
+	public static List<Chunk> mergeChunks(Collection<Chunk> data) throws IOException{
 		List<Chunk> chunks=new ArrayList<>(data);
 		chunks.sort(Chunk::compareTo);
 		List<Chunk> toDestroy=new ArrayList<>();
@@ -255,12 +260,12 @@ public class MemoryOperations{
 		for(Chunk chunk : chunks){
 			clearFree(chunk);
 			
-			if(purgeAccidental){
+			if(PURGE_ACCIDENTAL){
 				purgePossibleChunkHeaders(chunk.getDataProvider(), chunk.dataStart(), chunk.getCapacity());
 			}
 		}
 		
-		if(!purgeAccidental){
+		if(!PURGE_ACCIDENTAL){
 			for(Chunk chunk : toDestroy){
 				chunk.destroy(false);
 			}

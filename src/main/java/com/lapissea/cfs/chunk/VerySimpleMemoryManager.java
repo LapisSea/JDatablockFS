@@ -10,8 +10,6 @@ import java.util.List;
 
 public class VerySimpleMemoryManager extends MemoryManager.StrategyImpl{
 	
-	private static final boolean PURGE_ACCIDENTAL=true;
-	
 	private final IOList<ChunkPointer> freeChunks=IOList.wrap(new ArrayList<>(), ()->null);
 	private       boolean              defragmentMode;
 	
@@ -53,7 +51,7 @@ public class VerySimpleMemoryManager extends MemoryManager.StrategyImpl{
 	@Override
 	public void free(Collection<Chunk> toFree) throws IOException{
 		if(toFree.isEmpty()) return;
-		List<Chunk> toAdd=MemoryOperations.mergeChunks(toFree, PURGE_ACCIDENTAL);
+		List<Chunk> toAdd=MemoryOperations.mergeChunks(toFree);
 		MemoryOperations.mergeFreeChunksSorted(context, freeChunks, toAdd);
 	}
 }

@@ -11,8 +11,6 @@ import java.util.List;
 
 public class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 	
-	private static final boolean PURGE_ACCIDENTAL=true;
-	
 	private final List<ChunkPointer> queuedFreeChunks=new ArrayList<>();
 	
 	private final IOList<ChunkPointer> freeChunks;
@@ -63,7 +61,7 @@ public class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 		var popped=popFile(toFree);
 		if(popped.isEmpty()) return;
 		
-		List<Chunk> toAdd=MemoryOperations.mergeChunks(popped, PURGE_ACCIDENTAL);
+		List<Chunk> toAdd=MemoryOperations.mergeChunks(popped);
 		
 		if(adding){
 			toAdd.stream().sorted(Comparator.comparingLong(Chunk::getCapacity)).map(Chunk::getPtr).forEach(queuedFreeChunks::add);
