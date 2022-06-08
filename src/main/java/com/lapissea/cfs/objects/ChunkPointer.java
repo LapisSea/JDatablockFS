@@ -97,7 +97,7 @@ public final class ChunkPointer implements INumber, Comparable<ChunkPointer>{
 	}
 	
 	public void requireNonNull(){
-		if(isNull()) throw new NullPointerException();
+		if(isNull()) throw new NullPointerException("Pointer is null");
 	}
 	public boolean isNull(){
 		return getValue()==0;

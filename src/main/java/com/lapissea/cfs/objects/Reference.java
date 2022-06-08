@@ -195,7 +195,7 @@ public final class Reference extends IOInstance<Reference>{
 	}
 	
 	public Reference requireNonNull(){
-		ptr.requireNonNull();
+		if(isNull()) throw new NullPointerException("Reference is null");
 		return this;
 	}
 	
