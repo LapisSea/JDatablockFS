@@ -9,6 +9,7 @@ import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
@@ -20,6 +21,7 @@ import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
@@ -205,7 +207,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		
 		datasetID++;
 		
-		if(size()<128){
+		if(size()<256){
 			try(var ignored=getDataProvider().getSource().openIOTransaction()){
 				transferRewire(oldBuckets, buckets, bucketPO2);
 				writeManagedFields();
@@ -213,12 +215,10 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 			oldBuckets.clear();
 			((Unmanaged<?>)oldBuckets).free();
 		}else{
-			try(var ignored=getDataProvider().getSource().openIOTransaction()){
-				if(size()<256){
-					optimizedOrderTransfer(oldBuckets, buckets, bucketPO2);
-				}else{
-					linearCopyTransfer(oldBuckets, buckets, bucketPO2);
-				}
+			if(size()<512){
+				optimizedOrderTransfer(oldBuckets, buckets, bucketPO2);
+			}else{
+				linearCopyTransfer(oldBuckets, buckets, bucketPO2);
 			}
 			writeManagedFields();
 			((Unmanaged<?>)oldBuckets).free();
@@ -232,29 +232,42 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	}
 	
 	private void optimizedOrderTransfer(IOList<Bucket<K, V>> oldBuckets, IOList<Bucket<K, V>> newBuckets, short newPO2) throws IOException{
+		var hashGroupings=IntStream.range(0, 1<<newPO2)
+		                           .mapToObj(i->new ArrayList<LinkedIOList.Node<BucketEntry<K, V>>>())
+		                           .toList();
 		
+		@SuppressWarnings("unchecked")
+		var keyVar=Struct.of((Class<BucketEntry<K, V>>)(Object)BucketEntry.class)
+		                 .getFields()
+		                 .byName("key")
+		                 .orElseThrow();
 		
-		Map<Integer, List<BucketEntry<K, V>>> hashGroupings=new TreeMap<>();
-		
-		for(var e : rawEntries(oldBuckets)){
-			hashGroupings.computeIfAbsent(toSmallHash(e.key, newPO2), i->new ArrayList<>()).add(e);
+		for(var bucket : oldBuckets){
+			for(var n : bucket.node){
+				BucketEntry<K, V> be=new BucketEntry<>();
+				n.readValueField(be, keyVar);
+				var hash=toSmallHash(be.key, newPO2);
+				hashGroupings.get(hash).add(n);
+			}
 		}
-		for(var group : hashGroupings.values()){
-			var key=group.get(0).key;
+		
+		for(var group : hashGroupings){
+			if(group.isEmpty()) continue;
+			var key=group.get(0).getValue().key;
 			
 			Bucket<K, V> bucket=getBucket(newBuckets, key, newPO2);
 			assert bucket.node==null;
 			bucket.allocateNulls(getDataProvider());
 			setBucket(newBuckets, key, newPO2, bucket);
 			
-			Iterator<BucketEntry<K, V>> iter=group.iterator();
+			Iterator<LinkedIOList.Node<BucketEntry<K, V>>> iter=group.iterator();
 			assert iter.hasNext();
 			
 			var node=bucket.node;
-			node.setValue(iter.next());
+			node.setValue(iter.next().getValue());
 			
 			while(iter.hasNext()){
-				var newNode=allocNewNode(iter.next());
+				var newNode=allocNewNode(iter.next().getValue());
 				
 				node.setNext(newNode);
 				node=newNode;
