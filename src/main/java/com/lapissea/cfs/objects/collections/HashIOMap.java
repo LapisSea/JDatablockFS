@@ -97,9 +97,9 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 			throw new RuntimeException("bucket entry not found");
 		}
 		
-		private Stream<BucketEntry<K, V>> stream(){
+		private Stream<LinkedIOList.Node<BucketEntry<K, V>>> nodeStream(){
 			if(node==null) return Stream.of();
-			return UtilL.stream(node.valueIterator());
+			return UtilL.stream(node.iterator());
 		}
 		public BucketEntry<K, V> getEntryByKey(K key) throws IOException{
 			if(node==null) return null;
@@ -156,7 +156,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		
 		short newBucketPO2=bucketPO2;
 		
-		int[] hashes=rawEntryStream(buckets).map(e->e.key).mapToInt(this::toHash).toArray();
+		int[] hashes=rawKeyStream(buckets).mapToInt(this::toHash).toArray();
 		
 		boolean overflow=true;
 		while(overflow){
@@ -238,9 +238,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		
 		for(var bucket : oldBuckets){
 			for(var n : bucket.node){
-				K key=readKey(n);
-				
-				var smallHash=toSmallHash(key, newPO2);
+				var smallHash=toSmallHash(n, newPO2);
 				hashGroupings.get(smallHash).add(n);
 			}
 		}
@@ -294,12 +292,12 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 					continue;
 				}
 				
-				var key=node.getValue().key;
+				var smallHash=toSmallHash(node, newPO2);
 				
-				Bucket<K, V> bucket=getBucket(newBuckets, key, newPO2);
+				Bucket<K, V> bucket=getBucket(newBuckets, smallHash);
 				if(bucket.node==null){
 					bucket.node=node;
-					setBucket(newBuckets, key, newPO2, bucket);
+					setBucket(newBuckets, smallHash, bucket);
 					continue;
 				}
 				
@@ -397,7 +395,37 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		return ()->rawEntryStream(buckets).iterator();
 	}
 	private Stream<BucketEntry<K, V>> rawEntryStream(IOList<Bucket<K, V>> buckets){
-		return buckets.stream().flatMap(e->e.stream().filter(Objects::nonNull));
+		return rawNodeStreamWithValues(buckets).map(e->{
+			try{
+				return e.getValue();
+			}catch(IOException ex){
+				throw UtilL.uncheckedThrow(ex);
+			}
+		});
+	}
+	
+	private Stream<K> rawKeyStream(IOList<Bucket<K, V>> buckets){
+		return rawNodeStreamWithValues(buckets).map(e->{
+			try{
+				return readKey(e);
+			}catch(IOException ex){
+				throw UtilL.uncheckedThrow(ex);
+			}
+		});
+	}
+	
+	private Stream<LinkedIOList.Node<BucketEntry<K, V>>> rawNodeStream(IOList<Bucket<K, V>> buckets){
+		return buckets.stream().flatMap(Bucket::nodeStream);
+	}
+	
+	private Stream<LinkedIOList.Node<BucketEntry<K, V>>> rawNodeStreamWithValues(IOList<Bucket<K, V>> buckets){
+		return rawNodeStream(buckets).filter(e->{
+			try{
+				return e.hasValue();
+			}catch(IOException ex){
+				throw UtilL.uncheckedThrow(ex);
+			}
+		});
 	}
 	
 	@Override
@@ -551,6 +579,11 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 			var read=buckets.get(smallHash);
 			assert read.equals(bucket);
 		}
+	}
+	
+	private int toSmallHash(LinkedIOList.Node<BucketEntry<K, V>> entry, short bucketPO2) throws IOException{
+		int hash=toHash(readKey(entry));
+		return hashToSmall(hash, bucketPO2);
 	}
 	
 	private int toSmallHash(K key, short bucketPO2){
