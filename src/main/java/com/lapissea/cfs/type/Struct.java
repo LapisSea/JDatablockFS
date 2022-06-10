@@ -369,6 +369,12 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		return of((Class<? extends IOInstance>)instanceClass);
 	}
 	
+	public static <T extends IOInstance<T>> Struct<T> of(Class<T> instanceClass, int minRequestedStage){
+		var s=of(instanceClass);
+		s.waitForState(minRequestedStage);
+		return s;
+	}
+	
 	@SuppressWarnings("unchecked")
 	public static <T extends IOInstance<T>> Struct<T> of(Class<T> instanceClass){
 		Objects.requireNonNull(instanceClass);

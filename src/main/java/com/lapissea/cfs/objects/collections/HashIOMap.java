@@ -236,29 +236,22 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		                           .mapToObj(i->new ArrayList<LinkedIOList.Node<BucketEntry<K, V>>>())
 		                           .toList();
 		
-		@SuppressWarnings("unchecked")
-		var keyVar=Struct.of((Class<BucketEntry<K, V>>)(Object)BucketEntry.class)
-		                 .getFields()
-		                 .byName("key")
-		                 .orElseThrow();
-		
 		for(var bucket : oldBuckets){
 			for(var n : bucket.node){
-				BucketEntry<K, V> be=new BucketEntry<>();
-				n.readValueField(be, keyVar);
-				var hash=toSmallHash(be.key, newPO2);
-				hashGroupings.get(hash).add(n);
+				K key=readKey(n);
+				
+				var smallHash=toSmallHash(key, newPO2);
+				hashGroupings.get(smallHash).add(n);
 			}
 		}
-		
-		for(var group : hashGroupings){
+		for(int smallHash=0;smallHash<hashGroupings.size();smallHash++){
+			var group=hashGroupings.get(smallHash);
 			if(group.isEmpty()) continue;
-			var key=group.get(0).getValue().key;
 			
-			Bucket<K, V> bucket=getBucket(newBuckets, key, newPO2);
+			Bucket<K, V> bucket=getBucket(newBuckets, smallHash);
 			assert bucket.node==null;
 			bucket.allocateNulls(getDataProvider());
-			setBucket(newBuckets, key, newPO2, bucket);
+			setBucket(newBuckets, smallHash, bucket);
 			
 			Iterator<LinkedIOList.Node<BucketEntry<K, V>>> iter=group.iterator();
 			assert iter.hasNext();
@@ -273,6 +266,21 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 				node=newNode;
 			}
 		}
+	}
+	
+	private IOField<BucketEntry<K, V>, ?> keyVar;
+	
+	private K readKey(LinkedIOList.Node<BucketEntry<K, V>> n) throws IOException{
+		if(keyVar==null){
+			keyVar=Struct.of((Class<BucketEntry<K, V>>)(Object)BucketEntry.class, Struct.STATE_DONE)
+			             .getFields()
+			             .byName("key")
+			             .orElseThrow();
+		}
+		
+		BucketEntry<K, V> be=new BucketEntry<>();
+		n.readValueField(be, keyVar);
+		return be.key;
 	}
 	
 	private void transferRewire(IOList<Bucket<K, V>> oldBuckets, IOList<Bucket<K, V>> newBuckets, short newPO2) throws IOException{
@@ -528,10 +536,16 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	
 	private Bucket<K, V> getBucket(IOList<Bucket<K, V>> buckets, K key, short bucketPO2) throws IOException{
 		int smallHash=toSmallHash(key, bucketPO2);
+		return getBucket(buckets, smallHash);
+	}
+	private Bucket<K, V> getBucket(IOList<Bucket<K, V>> buckets, int smallHash) throws IOException{
 		return buckets.get(smallHash);
 	}
 	private void setBucket(IOList<Bucket<K, V>> buckets, K key, short bucketPO2, Bucket<K, V> bucket) throws IOException{
 		int smallHash=toSmallHash(key, bucketPO2);
+		setBucket(buckets, smallHash, bucket);
+	}
+	private void setBucket(IOList<Bucket<K, V>> buckets, int smallHash, Bucket<K, V> bucket) throws IOException{
 		buckets.set(smallHash, bucket);
 		if(DEBUG_VALIDATION){
 			var read=buckets.get(smallHash);
