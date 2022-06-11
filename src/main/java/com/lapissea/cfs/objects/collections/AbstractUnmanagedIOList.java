@@ -12,7 +12,8 @@ import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
 import java.util.Objects;
-import java.util.stream.Collectors;
+import java.util.StringJoiner;
+import java.util.function.Consumer;
 
 public abstract class AbstractUnmanagedIOList<T, SELF extends AbstractUnmanagedIOList<T, SELF>> extends IOInstance.Unmanaged<SELF> implements IOList<T>{
 	
@@ -68,13 +69,86 @@ public abstract class AbstractUnmanagedIOList<T, SELF extends AbstractUnmanagedI
 	@NotNull
 	protected String getStringPrefix(){return "";}
 	
+	
+	private void elementsStr(StringJoiner sb) throws IOException{
+		var iter=iterator();
+		
+		var push=new Consumer<String>(){
+			private String repeatBuff=null;
+			private int repeatCount=0;
+			private long repeatIndexStart;
+			private long count=0;
+			
+			@Override
+			public void accept(String str){
+				if(repeatBuff==null){
+					repeatBuff=str;
+					repeatCount=1;
+					repeatIndexStart=count;
+					return;
+				}
+				if(repeatBuff.equals(str)){
+					repeatCount++;
+					return;
+				}
+				
+				if(repeatCount!=0){
+					flush();
+				}
+				
+				accept(str);
+			}
+			private void flush(){
+				if(repeatCount>4){
+					if(repeatIndexStart==0) sb.add(repeatBuff+" ("+repeatCount+" times)");
+					else sb.add(repeatBuff+" ("+repeatCount+" times @"+repeatIndexStart+")");
+				}else{
+					for(int i=0;i<repeatCount;i++){
+						sb.add(repeatBuff);
+					}
+				}
+				repeatBuff=null;
+				repeatCount=0;
+				repeatIndexStart=0;
+			}
+		};
+		
+		while(true){
+			if(!iter.hasNext()){
+				push.flush();
+				return;
+			}
+			if(sb.length()+(push.repeatCount==0?0:(push.repeatCount*(push.repeatBuff.length()+2)+8))>300){
+				push.flush();
+				sb.add("... "+(size()-push.count)+" more");
+				return;
+			}
+			var e=iter.ioNext();
+			push.count++;
+			
+			push.accept(Utils.toShortString(e));
+		}
+	}
+	
 	@Override
 	public String toString(){
-		return stream().map(Utils::toShortString).collect(Collectors.joining(", ", getStringPrefix()+"[", "]"));
+		StringJoiner sj=new StringJoiner(", ", getStringPrefix()+"{size: "+size()+"}"+"[", "]");
+		try{
+			elementsStr(sj);
+		}catch(IOException e){
+			throw new RuntimeException("Failed to create toString of IOList elements", e);
+		}
+		return sj.toString();
 	}
 	@Override
 	public String toShortString(){
-		return stream().map(Utils::toShortString).collect(Collectors.joining(", ", "[", "]"));
+		StringJoiner sj=new StringJoiner(", ", "[", "]");
+		try{
+			elementsStr(sj);
+		}catch(IOException e){
+			throw new RuntimeException("Failed to create toString of IOList elements", e);
+		}
+		return sj.toString();
 	}
 	
 	@Override

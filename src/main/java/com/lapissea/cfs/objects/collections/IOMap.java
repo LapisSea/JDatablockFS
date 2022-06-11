@@ -112,8 +112,10 @@ public interface IOMap<K, V>{
 		
 		StringBuilder sb=new StringBuilder();
 		sb.append('{');
+		long count=0;
 		while(true){
 			var e=i.next();
+			count++;
 			
 			K key  =e.getKey();
 			V value=e.getValue();
@@ -122,6 +124,9 @@ public interface IOMap<K, V>{
 			sb.append('=');
 			sb.append(Utils.toShortString(value));
 			if(!i.hasNext()) return sb.append('}').toString();
+			if(sb.length()>300){
+				return sb.append(" ... ").append(map.size()-count).append("more }").toString();
+			}
 			sb.append(',').append(' ');
 		}
 	}
