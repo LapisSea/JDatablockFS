@@ -4,10 +4,7 @@ import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.lang.invoke.VarHandle;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.OptionalLong;
+import java.util.*;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
@@ -52,8 +49,62 @@ public class IOTransactionBuffer{
 		return read!=1?-1:b[0]&0xFF;
 	}
 	
+	private class LocalOffIndexIter implements PrimitiveIterator.OfInt{
+		private final long    offset;
+		private final boolean eventStart;
+		
+		private int i;
+		private int next;
+		private int high=writeEvents.size();
+		
+		public LocalOffIndexIter(long offset, int start, boolean eventStart){
+			this.offset=offset;
+			this.i=start-1;
+			this.eventStart=eventStart;
+			computeNext();
+		}
+		
+		private void computeNext(){
+			next=-1;
+			while(++i<writeEvents.size()){
+				binSearch:
+				{
+					int low=i;
+					if(high-low<2) break binSearch;
+					var mid=(low+high)/2;
+					
+					var eventTmp       =writeEvents.get(mid);
+					var eStartTmp      =eventStart?eventTmp.start():eventTmp.end();
+					var localOffsetLTmp=offset-eStartTmp;
+					if(localOffsetLTmp>=0){
+						i=mid-1;
+						continue;
+					}
+					high=mid;
+				}
+				next=i;
+				break;
+			}
+		}
+		
+		@Override
+		public int nextInt(){
+			var n=next;
+			computeNext();
+			return n;
+		}
+		
+		@Override
+		public boolean hasNext(){
+			return next!=-1;
+		}
+	}
+	
 	private int readSingle(long offset){
-		for(IOEvent.Write event : writeEvents){
+		for(var iter=new LocalOffIndexIter(offset, 0, true);iter.hasNext();){
+			int i=iter.nextInt();
+			
+			var event =writeEvents.get(i);
 			var eStart=event.start();
 			
 			var localOffsetL=offset-eStart;
@@ -90,7 +141,9 @@ public class IOTransactionBuffer{
 		while(rem>0){
 			next=null;
 			
-			for(int i=eventsStart;i<writeEvents.size();i++){
+			for(var iter=new LocalOffIndexIter(cursor, eventsStart, true);iter.hasNext();){
+				int i=iter.nextInt();
+				
 				var event =writeEvents.get(i);
 				var eStart=event.start();
 				
@@ -205,7 +258,9 @@ public class IOTransactionBuffer{
 				return;
 			}
 			
-			for(int i=0;i<writeEvents.size();i++){
+			for(var iter=new LocalOffIndexIter(newStart, 0, false);iter.hasNext();){
+				int i=iter.nextInt();
+				
 				var event=writeEvents.get(i);
 				
 				var eStart=event.start();
