@@ -215,6 +215,13 @@ public final class ChunkChainIO implements RandomIO{
 		
 		chunk.growBy(head, toGrow);
 		
+		//If grow has changed the header of cursor in a way that causes
+		//an out of bounds for the cursor offset, then revalidate
+		var offset=calcCursorOffset();
+		if(offset<0||offset>=cursor.getSize()){
+			revalidate();
+		}
+		
 		var cap=getCapacity();
 		if(cap<newCapacity) throw new IOException(cap+" < "+newCapacity);
 		return this;
