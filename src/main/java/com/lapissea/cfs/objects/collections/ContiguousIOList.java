@@ -69,7 +69,7 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 		return new AbstractFieldAccessor<>(null, elementName(index)){
 			@NotNull
 			@Override
-			public <T extends Annotation> Optional<T> getAnnotation(Class<T> annotationClass){
+			public <F extends Annotation> Optional<F> getAnnotation(Class<F> annotationClass){
 				return Optional.empty();
 			}
 			@Override
@@ -252,7 +252,7 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 			io.ensureCapacity(totalPos);
 			io.setSize(totalPos);
 			
-			long targetBytes=512;
+			long targetBytes=Math.min(1024, elSiz*count);
 			long targetCount=Math.min(count, Math.max(1, targetBytes/elSiz));
 			
 			var targetCap=targetCount*elSiz;

@@ -25,7 +25,7 @@ import java.util.Objects;
  * an instance with this interface is created, it should always be closed as the underlying
  * providers may be locking resources.
  */
-@SuppressWarnings("unused")
+@SuppressWarnings({"unused", "resource"})
 public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 	
 	/**
@@ -254,7 +254,7 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 			}
 		}
 		default void transferTo(ContentWriter dest) throws IOException{
-			try(var in=read()){
+			try(var in=io()){
 				in.transferTo(dest);
 			}
 		}
