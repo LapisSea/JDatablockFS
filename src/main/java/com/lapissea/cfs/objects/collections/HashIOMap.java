@@ -16,6 +16,8 @@ import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.util.LogUtil;
+import com.lapissea.util.NanoTimer;
 import com.lapissea.util.ObjectHolder;
 import com.lapissea.util.UtilL;
 
@@ -104,9 +106,10 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		public BucketEntry<K, V> getEntryByKey(K key) throws IOException{
 			if(node==null) return null;
 			for(var entry : node){
-				var value=entry.getValue();
-				if(value!=null&&Objects.equals(value.key, key)){
-					return value;
+				var k=readKey(entry);
+				if(!k.hasValue) continue;
+				if(Objects.equals(k.key, key)){
+					return entry.getValue();
 				}
 			}
 			
@@ -266,19 +269,20 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		}
 	}
 	
-	private IOField<BucketEntry<K, V>, ?> keyVar;
+	private static IOField<BucketEntry<Object, Object>, ?> keyVar;
 	
-	private K readKey(LinkedIOList.Node<BucketEntry<K, V>> n) throws IOException{
+	private record KeyResult<K>(K key, boolean hasValue){}
+	private static <K, V> KeyResult<K> readKey(LinkedIOList.Node<BucketEntry<K, V>> n) throws IOException{
 		if(keyVar==null){
-			keyVar=Struct.of((Class<BucketEntry<K, V>>)(Object)BucketEntry.class, Struct.STATE_DONE)
+			keyVar=Struct.of((Class<BucketEntry<Object, Object>>)(Object)BucketEntry.class, Struct.STATE_DONE)
 			             .getFields()
 			             .byName("key")
 			             .orElseThrow();
 		}
 		
 		BucketEntry<K, V> be=new BucketEntry<>();
-		n.readValueField(be, keyVar);
-		return be.key;
+		if(!n.readValueField(be, keyVar)) return new KeyResult<>(null, false);
+		return new KeyResult<>(be.key, true);
 	}
 	
 	private void transferRewire(IOList<Bucket<K, V>> oldBuckets, IOList<Bucket<K, V>> newBuckets, short newPO2) throws IOException{
@@ -405,13 +409,16 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	}
 	
 	private Stream<K> rawKeyStream(IOList<Bucket<K, V>> buckets){
-		return rawNodeStreamWithValues(buckets).map(e->{
-			try{
-				return readKey(e);
-			}catch(IOException ex){
-				throw UtilL.uncheckedThrow(ex);
-			}
-		});
+		return rawNodeStream(buckets)
+			       .map(e->{
+				       try{
+					       return readKey(e);
+				       }catch(IOException ex){
+					       throw UtilL.uncheckedThrow(ex);
+				       }
+			       })
+			       .filter(KeyResult::hasValue)
+			       .map(KeyResult::key);
 	}
 	
 	private Stream<LinkedIOList.Node<BucketEntry<K, V>>> rawNodeStream(IOList<Bucket<K, V>> buckets){
@@ -582,7 +589,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	}
 	
 	private int toSmallHash(LinkedIOList.Node<BucketEntry<K, V>> entry, short bucketPO2) throws IOException{
-		int hash=toHash(readKey(entry));
+		int hash=toHash(readKey(entry).key);
 		return hashToSmall(hash, bucketPO2);
 	}
 	

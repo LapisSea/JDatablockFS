@@ -517,7 +517,7 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 			return new LinkedValueIterator<>(this);
 		}
 		
-		public void readValueField(T dest, IOField<?, ?> field) throws IOException{
+		public boolean readValueField(T dest, IOField<?, ?> field) throws IOException{
 			if(DEBUG_VALIDATION){
 				var struct=field.getAccessor().getDeclaringStruct();
 				if(!UtilL.instanceOf(dest.getClass(), struct.getType())){
@@ -527,11 +527,13 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 					throw new UnsupportedOperationException("Node with type of "+valueStorage.getType().getType()+" is not a valid instance");
 				}
 			}
+			if(!hasValue()) return false;
 			var based=(ValueStorage.InstanceBased)valueStorage;
 			try(var io=this.getReference().io(this)){
 				io.skipExact(valueStart());
 				based.readSingle(io, (IOInstance)dest, field);
 			}
+			return true;
 		}
 	}
 	
