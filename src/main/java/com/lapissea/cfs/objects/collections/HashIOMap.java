@@ -150,7 +150,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		if(isSelfDataEmpty()&&!readOnly){
 			newBuckets();
 			writeManagedFields();
-			fillBuckets();
+			fillBuckets(buckets, bucketPO2);
 		}
 		readManagedFields();
 	}
@@ -160,7 +160,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		
 		short newBucketPO2=bucketPO2;
 		
-		int[] hashes=rawKeyStream(buckets).mapToInt(this::toHash).toArray();
+		int[] hashes=rawKeyStream(buckets).mapToInt(this::toHash).parallel().toArray();
 		
 		boolean overflow=true;
 		while(overflow){
@@ -188,7 +188,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	}
 	
 	
-	private void fillBuckets() throws IOException{
+	private void fillBuckets(IOList<Bucket<K, V>> buckets, short bucketPO2) throws IOException{
 		var siz=1L<<bucketPO2;
 		buckets.addAll(LongStream.range(0, siz-buckets.size()).mapToObj(i->new Bucket<K, V>()).toList());
 	}
@@ -205,17 +205,21 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		var oldBucketPO2=bucketPO2;
 		
 		bucketPO2=calcNewSize(oldBuckets, oldBucketPO2);
-		
-		newBuckets();
-		fillBuckets();
-		
 		datasetID++;
 		
+		newBuckets();
+		fillBuckets(buckets, bucketPO2);
+		
 		if(size()<256){
+			NanoTimer t=new NanoTimer();
+			t.start();
 			try(var ignored=getDataProvider().getSource().openIOTransaction()){
 				transferRewire(oldBuckets, buckets, bucketPO2);
 				writeManagedFields();
 			}
+			t.end();
+			LogUtil.println(t.ms());
+			
 			oldBuckets.clear();
 			((Unmanaged<?>)oldBuckets).free();
 		}else{
