@@ -18,9 +18,13 @@ import com.lapissea.util.LogUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.opentest4j.AssertionFailedError;
 
 import java.io.IOException;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -213,20 +217,73 @@ public class SlowTests{
 		);
 	}
 	
-	@Test
-	void bigMap(TestInfo info) throws IOException{
+	@ParameterizedTest
+	@ValueSource(booleans={false, true})
+	void bigMap(boolean compliantCheck, TestInfo info) throws IOException{
 		TestUtils.testCluster(info, provider->{
+//			provider.getSource().write(true, Files.readAllBytes(new File("bigmap.bin").toPath()));
+//			provider.getSource().write(false, new byte[]{'B'});
+//			provider=new Cluster(provider.getSource());
+			
 			var map=provider.getRootProvider().<IOMap<Object, Object>>builder().withType(TypeLink.of(HashIOMap.class, Object.class, Object.class)).withId("map").request();
 			
-			var splitter=Splitter.map(map, new ReferenceMemoryIOMap<>(), TestUtils::checkCompliance);
 			
-			int i=0;
-			while(provider.getSource().getIOSize()<NumberSize.SHORT.maxSize){
-				splitter.put(i, "int("+i+")");
-				if(i%100==0) LogUtil.println(i, provider.getSource().getIOSize()/(float)NumberSize.SHORT.maxSize);
-				i++;
+			var splitter=compliantCheck?Splitter.map(map, new ReferenceMemoryIOMap<>(), TestUtils::checkCompliance):map;
+			
+			record Deb(long time, long size){}
+			
+			var debs=new ArrayList<Deb>();
+			Runnable printTable=()->{
+				if(debs.isEmpty()) return;
+				List<Deb> l=debs;
+				
+				var w=150;
+				if(l.size()>w){
+					l=IntStream.range(0, w).mapToObj(i->{
+						var d    =(double)i;
+						var start=(int)(debs.size()*(d/w));
+						var end  =(int)(debs.size()*((d+1)/w));
+						
+						var t=IntStream.range(start, end).mapToLong(j->debs.get(j).time).average().orElse(0);
+						return new Deb((long)t, debs.get(start).size);
+					}).toList();
+				}
+				LogUtil.printGraph(l, 15, w, false,
+				                   new LogUtil.Val<>("size", '.', Deb::size),
+				                   new LogUtil.Val<>("time", '*', deb->deb.time()/1000000d)
+				);
+			};
+			var size=NumberSize.SHORT;
+			
+			var  inst=Instant.now();
+			long i   =splitter.size();
+			while(provider.getSource().getIOSize()<size.maxSize){
+				long t=System.nanoTime();
+				for(int j=0;j<5;j++){
+					if(i==5120){
+						int a=0;
+//						Files.write(new File("bigmap.bin").toPath(), provider.getSource().readAll());
+					}
+					
+					try{
+						splitter.put(i, "int("+i+")");
+					}catch(IOException e){
+						throw new IOException("failed to put element: "+i, e);
+					}
+					i++;
+				}
+				var dt=System.nanoTime()-t;
+//				if(dt/10D<debs.stream().mapToLong(Deb::time).average().orElse(Double.MAX_VALUE)) debs.add(new Deb(dt, splitter.size()));
+//				else LogUtil.println("nope", i);
+				
+				if(Duration.between(inst, Instant.now()).toMillis()>1000){
+					inst=Instant.now();
+					LogUtil.println(i, provider.getSource().getIOSize()/(float)size.maxSize);
+					printTable.run();
+				}
 			}
-			LogUtil.println(i, provider.getSource().getIOSize()/(float)NumberSize.SHORT.maxSize);
+			LogUtil.println(i, provider.getSource().getIOSize()/(float)size.maxSize);
+			printTable.run();
 		});
 	}
 	
