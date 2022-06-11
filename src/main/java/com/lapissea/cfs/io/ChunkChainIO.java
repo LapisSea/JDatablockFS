@@ -239,7 +239,14 @@ public final class ChunkChainIO implements RandomIO{
 	
 	@Override
 	public int read() throws IOException{
-		if(remaining()<=0) return -1;
+		long cOff     =calcCursorOffset();
+		long remaining=cursor.getSize()-cOff;
+		if(remaining==0){
+			if(tryAdvanceCursor()){
+				return read();
+			}
+			return -1;
+		}
 		int b=syncedSource().read();
 		advanceCursorBy(1);
 		return b;
@@ -251,7 +258,12 @@ public final class ChunkChainIO implements RandomIO{
 		
 		long cOff     =calcCursorOffset();
 		long remaining=cursor.getSize()-cOff;
-		if(remaining==0) return -1;
+		if(remaining==0){
+			if(tryAdvanceCursor()){
+				return read(b, off, len);
+			}
+			return -1;
+		}
 		
 		int toRead=(int)Math.min(len, remaining);
 		
