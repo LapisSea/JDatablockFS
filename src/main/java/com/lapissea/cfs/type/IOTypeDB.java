@@ -219,6 +219,7 @@ public sealed interface IOTypeDB{
 			defs.putAll(newDefs);
 			
 			if(DEBUG_VALIDATION){
+				newDefs.entrySet().removeIf(e->!e.getValue().isIoInstance());
 				checkNewTypeValidity(newDefs);
 			}
 			return new TypeID(newID, true);

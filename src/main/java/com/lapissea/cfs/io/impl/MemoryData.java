@@ -362,7 +362,10 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		long lastCapacity=getLength(data);
 		if(lastCapacity==newCapacity) return;
 		
-		data=resize(data, newCapacity);
+		if(lastCapacity<newCapacity||lastCapacity>newCapacity*3L/2){
+			var newc=lastCapacity<newCapacity?(int)Math.max(newCapacity, lastCapacity*3/2):newCapacity;
+			data=resize(data, newc);
+		}
 		used=Math.min(used, newCapacity);
 		
 		logWriteEvent(lastCapacity, newCapacity);

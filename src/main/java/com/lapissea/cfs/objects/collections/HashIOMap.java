@@ -34,6 +34,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	
 	private static class BucketEntry<K, V> extends IOInstance<BucketEntry<K, V>>{
 		
+		@SuppressWarnings("unchecked")
 		private static final StructPipe<BucketEntry<Object, Object>> PIPE=ContiguousStructPipe.of((Class<BucketEntry<Object, Object>>)(Object)BucketEntry.class);
 		
 		@IOValue
@@ -274,6 +275,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	private record KeyResult<K>(K key, boolean hasValue){}
 	private static <K, V> KeyResult<K> readKey(LinkedIOList.Node<BucketEntry<K, V>> n) throws IOException{
 		if(keyVar==null){
+			//noinspection unchecked
 			keyVar=Struct.of((Class<BucketEntry<Object, Object>>)(Object)BucketEntry.class, Struct.STATE_DONE)
 			             .getFields()
 			             .byName("key")
@@ -453,6 +455,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 			try{
 				var d=MemoryData.build().build();
 				var v=ValueStorage.makeStorage(DataProvider.newVerySimpleProvider(d), TypeLink.of(value.getClass()), getGenerics(), false);
+				//noinspection unchecked
 				((ValueStorage<V>)v).write(d.io(), value);
 			}catch(Throwable e){
 				String valStr;
@@ -525,6 +528,10 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		if(bucket.node==null){
 			bucket.allocateNulls(getDataProvider());
 			setBucket(buckets, key, bucketPO2, bucket);
+			
+			assert !bucket.node.hasValue();
+			bucket.node.setValue(newEntry);
+			return OVERWRITE_EMPTY;
 		}
 		
 		long count=0;
@@ -558,6 +565,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		TypeLink.of(BucketEntry.class)
 	);
 	
+	@SuppressWarnings("unchecked")
 	private LinkedIOList.Node<BucketEntry<K, V>> allocNewNode(BucketEntry<K, V> newEntry) throws IOException{
 		return LinkedIOList.Node.allocValNode(
 			newEntry,
