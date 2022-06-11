@@ -155,8 +155,14 @@ public sealed interface IOTypeDB{
 			try{
 				for(var c : new Class<?>[]{
 					int.class,
+					long.class,
 					float.class,
+					double.class,
 					Integer.class,
+					Long.class,
+					Float.class,
+					Double.class,
+					
 					String.class,
 					TypeLink.class
 				}){
