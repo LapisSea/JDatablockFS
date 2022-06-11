@@ -556,10 +556,80 @@ public interface IOList<T> extends IterablePP<T>{
 	
 	@Override
 	default Spliterator<T> spliterator(){
+		
+		final class RandomAccessIteratorSpliterator implements Spliterator<T>{
+			private       long index; // current index, modified on advance/split
+			private final long size;
+			
+			private IOListIterator<T> iterator;
+			
+			private RandomAccessIteratorSpliterator(){
+				this(0, size());
+			}
+			
+			private RandomAccessIteratorSpliterator(long origin, long size){
+				this.index=origin;
+				this.size=size;
+			}
+			
+			public Spliterator<T> trySplit(){
+				long lo=index, mid=(lo+size) >>> 1;
+				return (lo>=mid)?null: // divide range in half unless too small
+				       new RandomAccessIteratorSpliterator(lo, index=mid);
+			}
+			
+			public boolean tryAdvance(Consumer<? super T> action){
+				if(action==null) throw new NullPointerException();
+				long i=index;
+				if(i<size){
+					index=i+1;
+					action.accept(get(getIterator(i), i));
+					return true;
+				}
+				return false;
+			}
+			
+			public void forEachRemaining(Consumer<? super T> action){
+				Objects.requireNonNull(action);
+				long i   =index;
+				var  iter=getIterator(i);
+				index=size;
+				for(;i<size;i++){
+					action.accept(get(iter, i));
+				}
+			}
+			
+			public long estimateSize(){
+				return size-index;
+			}
+			
+			public int characteristics(){
+				return Spliterator.ORDERED|Spliterator.SIZED|Spliterator.SUBSIZED;
+			}
+			
+			private IOListIterator<T> getIterator(long i){
+				var iter=iterator;
+				if(iter==null) iterator=iter=listIterator(i);
+				return iter;
+			}
+			
+			private static <E> E get(IOListIterator<E> list, long i){
+				if(i!=list.nextIndex()) throw new AssertionError(i+" "+(list.nextIndex()));
+				try{
+					return list.ioNext();
+				}catch(IndexOutOfBoundsException ex){
+					throw new ConcurrentModificationException();
+				}catch(IOException e){
+					throw new RuntimeException(e);
+				}
+			}
+		}
+		
 		final class IteratorSpliterator implements Spliterator<T>{
 			
 			private final Iterator<T> it  =iterator();
 			private final long        size=size();
+			private       long        index;
 			
 			@Override
 			public boolean tryAdvance(Consumer<? super T> action){
@@ -567,6 +637,7 @@ public interface IOList<T> extends IterablePP<T>{
 					return false;
 				}
 				var val=it.next();
+				index++;
 				action.accept(val);
 				return true;
 			}
@@ -576,7 +647,7 @@ public interface IOList<T> extends IterablePP<T>{
 			}
 			@Override
 			public long estimateSize(){
-				return size;
+				return size-index;
 			}
 			@Override
 			public int characteristics(){
@@ -584,7 +655,8 @@ public interface IOList<T> extends IterablePP<T>{
 			}
 		}
 		
-		return new IteratorSpliterator();
+		if(this instanceof RandomAccess) return new RandomAccessIteratorSpliterator();
+		else return new IteratorSpliterator();
 	}
 	
 	@Override

@@ -26,7 +26,7 @@ import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
 @SuppressWarnings("unchecked")
-public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIOList<T>>{
+public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIOList<T>> implements RandomAccess{
 	
 	private static final TypeLink.Check TYPE_CHECK=new TypeLink.Check(
 		ContiguousIOList.class,
