@@ -237,24 +237,28 @@ public class MemoryOperations{
 		List<Chunk> chunks=new ArrayList<>(data);
 		chunks.sort(Chunk::compareTo);
 		List<Chunk> toDestroy=new ArrayList<>();
-		iter:
+		
 		while(chunks.size()>1){
-			for(var iter=chunks.iterator();iter.hasNext();){
+			Chunk   prev    =null;
+			var     iter    =chunks.listIterator();
+			boolean noChange=true;
+			while(iter.hasNext()){
 				var chunk=iter.next();
-				
-				var optPrev=chunks.stream().filter(c->c.isNextPhysical(chunk)).findAny();
-				if(optPrev.isPresent()){
-					var prev=optPrev.get();
+				if(prev==null){
+					prev=chunk;
+					continue;
+				}
+				if(prev.isNextPhysical(chunk)){
 					prepareFreeChunkMerge(prev, chunk);
 					toDestroy.add(chunk);
 					iter.remove();
-					continue iter;
+					noChange=false;
 				}
-				
-				chunk.sizeSetZero();
+				prev=chunk;
 			}
-			
-			break;
+			if(noChange){
+				break;
+			}
 		}
 		
 		for(Chunk chunk : chunks){
@@ -266,8 +270,11 @@ public class MemoryOperations{
 		}
 		
 		if(!PURGE_ACCIDENTAL){
-			for(Chunk chunk : toDestroy){
-				chunk.destroy(false);
+			if(!toDestroy.isEmpty()){
+				toDestroy.sort(Comparator.naturalOrder());
+				for(Chunk chunk : toDestroy){
+					chunk.destroy(false);
+				}
 			}
 		}
 		return chunks;
