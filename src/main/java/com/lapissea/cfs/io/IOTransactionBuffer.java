@@ -122,6 +122,7 @@ public class IOTransactionBuffer{
 	}
 	
 	public int read(BaseAccess base, long offset, byte[] b, int off, int len) throws IOException{
+		doMerge(base, offset+len);
 		if(len==0) return 0;
 		if(len==1){
 			var byt=readSingle(offset);
@@ -247,10 +248,12 @@ public class IOTransactionBuffer{
 			if(!writeEvents.isEmpty()){
 				if(writeEvents.get(0).start()>newEnd){
 					writeEvents.add(0, makeEvent(offset, b, off, len));
+					markIndexDirty(0);
 					return;
 				}
 				if(writeEvents.get(writeEvents.size()-1).end()<newStart){
 					writeEvents.add(makeEvent(offset, b, off, len));
+					markIndexDirty(writeEvents.size()-1);
 					return;
 				}
 			}else{
@@ -272,6 +275,7 @@ public class IOTransactionBuffer{
 					byte[] data=Arrays.copyOf(event.data, event.data.length+len);
 					System.arraycopy(b, off, data, event.data.length, len);
 					writeEvents.set(i, new IOEvent.Write(event.offset, data));
+					markIndexDirty(i);
 					return;
 				}
 				if(newEnd==eStart){
@@ -316,6 +320,7 @@ public class IOTransactionBuffer{
 				}
 			}
 			UtilL.addRemainSorted(writeEvents, makeEvent(offset, b, off, len));
+			askOptimize();
 		}finally{
 			if(modifiedCapacity!=-1){
 				var last=writeEvents.get(writeEvents.size()-1);
@@ -341,13 +346,55 @@ public class IOTransactionBuffer{
 			}
 		}
 	}
+	
+	private       boolean      optimize;
+	private final Set<Integer> dirty=new HashSet<>();
+	
+	private void markIndexDirty(int i){
+		if(i>0) dirty.add(i-1);
+		dirty.add(i);
+//		if(i+2<writeEvents.size()) dirty.add(i+1);
+		askOptimize();
+	}
+	
+	private void askOptimize(){
+		if(writeEvents.size()<64) return;
+		optimize=true;
+	}
+	
+	private void doMerge(BaseAccess base, long jitter) throws IOException{
+		if(!optimize) return;
+		optimize=false;
+		
+		for(int i=0;i<writeEvents.size()-1;i+=40){
+			dirty.add((int)((jitter+i)%(writeEvents.size()-1)));
+		}
+		
+		var jumpSize=writeEvents.size()/4;
+		for(int i : dirty){
+			if(i+1>=writeEvents.size()) continue;
+			var e1End  =writeEvents.get(i).end();
+			var e2Start=writeEvents.get(i+1).start();
+			var dist   =(int)(e2Start-e1End);
+			if(dist<=jumpSize){
+				var bb  =new byte[dist];
+				var read=read(base, e1End, bb, 0, bb.length);
+				write(e1End, bb, 0, read);
+				break;
+			}
+		}
+		dirty.clear();
+	}
+	
 	private void setEventSorted(int i, IOEvent.Write m){
 		var old=writeEvents.set(i, m);
+		markIndexDirty(i);
 		if(old.offset==m.offset) return;
 		if(i>0){
 			var prev=writeEvents.get(i-1);
 			if(prev.compareTo(m)>0){
 				writeEvents.sort(IOEvent.Write::compareTo);
+				markIndexDirty(i-1);
 				return;
 			}
 		}
@@ -355,6 +402,7 @@ public class IOTransactionBuffer{
 			var next=writeEvents.get(i+1);
 			if(m.compareTo(next)>0){
 				writeEvents.sort(IOEvent.Write::compareTo);
+				markIndexDirty(i+1);
 				return;
 			}
 		}
