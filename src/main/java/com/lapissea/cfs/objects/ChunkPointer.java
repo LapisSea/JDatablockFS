@@ -53,7 +53,13 @@ public final class ChunkPointer implements INumber, Comparable<ChunkPointer>{
 	
 	@Override
 	public String toString(){
-		return isNull()?"NULL":"*"+getValue();
+		if(isNull()) return "NULL";
+		
+		if(getValue()>9999){
+			var h=Long.toHexString(getValue()).toUpperCase();
+			return "x"+h;
+		}
+		return "*"+getValue();
 	}
 	
 	public ChunkPointer addPtr(INumber value){

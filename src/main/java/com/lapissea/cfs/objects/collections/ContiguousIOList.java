@@ -389,7 +389,7 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 			ref.getPtr().dereference(prov).streamNext().forEach(chunks::add);
 		});
 		
-		prov.getMemoryManager().free(new ArrayList<>(chunks));
+		prov.getMemoryManager().free(chunks);
 	}
 	@NotNull
 	@Override

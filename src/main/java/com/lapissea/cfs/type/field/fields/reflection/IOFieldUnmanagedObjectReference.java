@@ -113,7 +113,9 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 			if(nullable()) return null;
 			throw new NullPointerException();
 		}
-		return struct.requireUnmanagedConstructor().create(provider, readNew, TypeLink.of(getAccessor().getGenericType(genericContext)));
+		var ctr =struct.requireUnmanagedConstructor();
+		var type=TypeLink.of(getAccessor().getGenericType(genericContext));
+		return ctr.create(provider, readNew, type);
 	}
 	
 	@Override

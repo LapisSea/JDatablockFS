@@ -334,6 +334,10 @@ public class MemoryOperations{
 			siz=siz.next();
 			growth=siz.bytes-target.getNextSize().bytes;
 			
+			if(target.getCapacity()<growth){
+				return 0;
+			}
+			
 			//TODO: replace max of 8 bytes with a configurable value, not a magic constant
 			toPin=AllocateTicket.bytes(Math.max(toAllocate+growth, 8)).withApproval(Chunk.sizeFitsPointer(siz)).submit(manager);
 		}while(toPin==null);
@@ -342,9 +346,6 @@ public class MemoryOperations{
 		
 		int shiftSize=Math.toIntExact(Math.min(target.getCapacity()-growth, target.getSize()));
 		if(shiftSize<0){
-			if(target.getCapacity()<growth){
-				return 0;
-			}
 			shiftSize=0;
 		}
 		byte[] toShift;

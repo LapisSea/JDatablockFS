@@ -68,7 +68,8 @@ public class LoggedMemoryUtils{
 				logger=(d, i)->{};
 			}else{
 				var ses=disp.getSession(sessionName);
-				logger=(data, ids)->ses.log(new MemFrame(data.readAll(), ids.toArray(), new Throwable()));
+				if(ses==DataLogger.Session.Blank.INSTANCE) logger=(d, i)->{};
+				else logger=(data, ids)->ses.log(new MemFrame(data.readAll(), ids.toArray(), new Throwable()));
 			}
 		}else{
 			var preBuf=new LinkedList<MemFrame>();
