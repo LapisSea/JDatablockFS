@@ -22,7 +22,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.opentest4j.AssertionFailedError;
 
+import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
@@ -218,17 +220,40 @@ public class SlowTests{
 	}
 	
 	@ParameterizedTest
-	@ValueSource(booleans={false, true})
+	@ValueSource(booleans={
+		false
+//		, true
+	})
 	void bigMap(boolean compliantCheck, TestInfo info) throws IOException{
 		TestUtils.testCluster(info, provider->{
-//			provider.getSource().write(true, Files.readAllBytes(new File("bigmap.bin").toPath()));
-//			provider.getSource().write(false, new byte[]{'B'});
-//			provider=new Cluster(provider.getSource());
+			enum Mode{
+				DEFAULT, CHECKPOINT, MAKE_CHECKPOINT
+			}
+			var mode          =Mode.DEFAULT;
+			var checkpointFile=new File("bigmap.bin");
+			
+			if(mode==Mode.CHECKPOINT){
+				LogUtil.println("loading checkpoint from:", checkpointFile.getAbsoluteFile());
+				provider.getSource().write(true, Files.readAllBytes(checkpointFile.toPath()));
+				provider.getSource().write(false, provider.getSource().read(0, 1));
+				provider=new Cluster(provider.getSource());
+			}
 			
 			var map=provider.getRootProvider().<IOMap<Object, Object>>builder().withType(TypeLink.of(HashIOMap.class, Object.class, Object.class)).withId("map").request();
+			if(mode==Mode.CHECKPOINT){
+				LogUtil.println("Starting on step", map.size());
+			}
 			
-			
-			var splitter=compliantCheck?Splitter.map(map, new ReferenceMemoryIOMap<>(), TestUtils::checkCompliance):map;
+			IOMap<Object, Object> splitter;
+			if(compliantCheck){
+				var ref=new ReferenceMemoryIOMap<>();
+				for(IOMap.Entry<Object, Object> entry : map.entries()){
+					ref.put(entry.getKey(), entry.getValue());
+				}
+				splitter=Splitter.map(map, ref, TestUtils::checkCompliance);
+			}else{
+				splitter=map;
+			}
 			
 			record Deb(long time, long size){}
 			
@@ -253,20 +278,23 @@ public class SlowTests{
 				                   new LogUtil.Val<>("time", '*', deb->deb.time()/1000000d)
 				);
 			};
-			var size=NumberSize.SHORT;
+			var size=NumberSize.INT;
 			
 			var  inst=Instant.now();
 			long i   =splitter.size();
 			while(provider.getSource().getIOSize()<size.maxSize){
 				long t=System.nanoTime();
 				for(int j=0;j<5;j++){
-					if(i==5120){
-						int a=0;
-//						Files.write(new File("bigmap.bin").toPath(), provider.getSource().readAll());
+					if(i==81920){
+						if(mode==Mode.MAKE_CHECKPOINT){
+							Files.write(checkpointFile.toPath(), provider.getSource().readAll());
+							LogUtil.println("Saved checkpoint to", checkpointFile.getAbsoluteFile());
+							System.exit(0);
+						}
 					}
 					
 					try{
-						splitter.put(i, "int("+i+")");
+						splitter.put(i, ("int("+i+")").repeat(10));
 					}catch(IOException e){
 						throw new IOException("failed to put element: "+i, e);
 					}
