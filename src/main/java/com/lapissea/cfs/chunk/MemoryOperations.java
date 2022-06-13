@@ -314,7 +314,7 @@ public class MemoryOperations{
 	}
 	
 	public static long allocateBySimpleNextAssign(MemoryManager manager, Chunk target, long toAllocate) throws IOException{
-		var toPin=AllocateTicket.bytes(Math.max(toAllocate, 8)).withApproval(Chunk.sizeFitsPointer(target.getNextSize())).submit(manager);
+		var toPin=AllocateTicket.bytes(toAllocate).withApproval(Chunk.sizeFitsPointer(target.getNextSize())).submit(manager);
 		if(toPin==null) return 0;
 		target.modifyAndSave(c->{
 			try{

@@ -131,6 +131,10 @@ public interface MemoryManager extends DataProvider.Holder{
 		
 		@Override
 		public Chunk alloc(AllocateTicket ticket) throws IOException{
+			long minSize=minAllocationCapacity();
+			if(ticket.bytes()<minSize){
+				ticket=ticket.withBytes(minSize);
+			}
 			
 			Chunk chunk;
 			
@@ -211,4 +215,8 @@ public interface MemoryManager extends DataProvider.Holder{
 	 * Allocates a new independent chunk, unreferenced by anything. All instructions on what and how to allocate it are provided in the ticket.
 	 */
 	Chunk alloc(AllocateTicket ticket) throws IOException;
+	
+	default long minAllocationCapacity(){
+		return 8;
+	}
 }
