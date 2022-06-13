@@ -103,6 +103,7 @@ public interface MemoryManager extends DataProvider.Holder{
 							throw new IllegalStateException();
 						}
 					}
+					if(allocated==0) continue;
 					
 					remaining-=allocated;
 					if(allocated>0){

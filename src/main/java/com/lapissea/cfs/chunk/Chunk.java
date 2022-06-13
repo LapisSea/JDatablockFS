@@ -470,6 +470,7 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		forbidReadOnly();
 		Objects.requireNonNull(nextPtr);
 		if(this.nextPtr.equals(nextPtr)) return;
+		if(nextPtr.equals(getPtr())) throw new IllegalArgumentException();
 		getNextSize().ensureCanFit(nextPtr);
 		this.nextPtr=nextPtr;
 		nextCache=null;

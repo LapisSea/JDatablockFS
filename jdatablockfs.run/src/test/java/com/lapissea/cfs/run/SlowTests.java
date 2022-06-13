@@ -295,7 +295,7 @@ public class SlowTests{
 					
 					try{
 						splitter.put(i, ("int("+i+")").repeat(10));
-					}catch(IOException e){
+					}catch(Throwable e){
 						throw new IOException("failed to put element: "+i, e);
 					}
 					i++;
