@@ -74,13 +74,21 @@ public abstract class StagedInit{
 		checkErr();
 	}
 	
+	protected int getState(){
+		return state;
+	}
+	
 	public static class WaitException extends RuntimeException{
 		public WaitException(String message, Throwable cause){
 			super(message, cause);
 		}
 	}
 	
-	private void checkErr(){
+	protected synchronized Throwable getErr(){
+		return e;
+	}
+	
+	private synchronized void checkErr(){
 		if(e==null) return;
 		
 		throw new WaitException("Exception occurred while initializing", e);

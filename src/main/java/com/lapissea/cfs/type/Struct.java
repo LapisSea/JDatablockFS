@@ -561,7 +561,24 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	
 	@Override
 	public String toString(){
-		return getType().getSimpleName()+"{}";
+		var sj=new StringJoiner(", ", getType().getSimpleName()+"{", "}");
+		if(this instanceof Struct.Unmanaged){
+			sj.add("Unmanaged");
+		}
+		var e=getErr();
+		if(e!=null){
+			sj.add("INVALID: "+(e.getMessage()==null?e.getClass().getName():e.getMessage()));
+		}
+		var state=getState();
+		if(state!=STATE_DONE){
+			if(e==null) sj.add("init-state: "+stateToStr(state));
+		}
+		if(state>=STATE_FIELD_MAKE){
+			var fields=getFields();
+			sj.add(fields.size()+" "+TextUtil.plural("field", fields.size()));
+		}
+		
+		return sj.toString();
 	}
 	@Override
 	public Class<T> getType(){
