@@ -16,19 +16,22 @@ import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.cfs.type.field.annotations.IOValue;
-import com.lapissea.util.LogUtil;
-import com.lapissea.util.NanoTimer;
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ObjectHolder;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NULLABLE;
+import static com.lapissea.util.PoolOwnThread.async;
 
 public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	
@@ -210,66 +213,151 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		newBuckets();
 		fillBuckets(buckets, bucketPO2);
 		
-		if(size()<256){
-			NanoTimer t=new NanoTimer();
-			t.start();
+		if(size()<512){
 			try(var ignored=getDataProvider().getSource().openIOTransaction()){
 				transferRewire(oldBuckets, buckets, bucketPO2);
 				writeManagedFields();
 			}
-			t.end();
-			LogUtil.println(t.ms());
-			
 			oldBuckets.clear();
 			((Unmanaged<?>)oldBuckets).free();
 		}else{
-			if(size()<512){
-				optimizedOrderTransfer(oldBuckets, buckets, bucketPO2);
-			}else{
-				linearCopyTransfer(oldBuckets, buckets, bucketPO2);
+			long pos=0;
+			
+			List<Iterable<LinkedIOList.Node<BucketEntry<K, V>>>> sources=new ArrayList<>();
+			ExecutorService                                      service=Executors.newSingleThreadExecutor();
+			while(pos<oldBuckets.size()){
+				long from=pos;
+				long to  =Math.min(oldBuckets.size(), from+256/RESIZE_TRIGGER);
+				pos=to;
+				
+				var view=oldBuckets.subListView(from, to);
+				if(false){
+					sources.add(asyncNodeSource(service, view));
+				}else{
+					sources.add(nodeSource(view));
+				}
 			}
+			
+			for(int i=0;i<sources.size();i++){
+				var source=sources.get(i);
+				try{
+					optimizedOrderTransfer(source, buckets, bucketPO2);
+				}catch(Throwable e){
+					throw new RuntimeException("failed to copy on chunk "+i, e);
+				}
+			}
+			service.shutdown();
 			writeManagedFields();
 			((Unmanaged<?>)oldBuckets).free();
 		}
 	}
 	
-	private void linearCopyTransfer(IOList<Bucket<K, V>> oldBuckets, IOList<Bucket<K, V>> newBuckets, short newPO2) throws IOException{
-		for(var e : rawEntries(oldBuckets)){
-			putEntry(newBuckets, newPO2, e.key, e.value);
-		}
+	private Iterable<LinkedIOList.Node<BucketEntry<K, V>>> nodeSource(IOList<Bucket<K, V>> view){
+		return ()->view.stream().filter(b->b.node!=null).flatMap(b->b.node.stream()).iterator();
+	}
+	private Iterable<LinkedIOList.Node<BucketEntry<K, V>>> asyncNodeSource(ExecutorService service, IOList<Bucket<K, V>> view){
+		LinkedList<LinkedIOList.Node<BucketEntry<K, V>>> nodeBuffer=new LinkedList<>();
+		var task=async(()->{
+			for(var bucket : view){
+				if(bucket.node==null) continue;
+				for(var node : bucket.node){
+					synchronized(nodeBuffer){
+						nodeBuffer.add(node);
+					}
+				}
+			}
+		}, service);
+		
+		return ()->new Iterator<>(){
+			private LinkedIOList.Node<BucketEntry<K, V>> next;
+			@Override
+			public boolean hasNext(){
+				if(next==null){
+					if(task.isDone()){
+						if(task.isCompletedExceptionally()){
+							task.join();
+						}
+						if(nodeBuffer.isEmpty()) return false;
+						else{
+							next=nodeBuffer.remove(0);
+							return true;
+						}
+					}
+					getNext();
+				}
+				return next!=null;
+			}
+			private void getNext(){
+				while(true){
+					if(task.isDone()){
+						if(task.isCompletedExceptionally()){
+							task.join();
+						}
+						break;
+					}
+					if(!nodeBuffer.isEmpty()) break;
+					UtilL.sleep(1);
+				}
+				synchronized(nodeBuffer){
+					if(!nodeBuffer.isEmpty()){
+						next=nodeBuffer.remove(0);
+					}
+				}
+			}
+			
+			@Override
+			public LinkedIOList.Node<BucketEntry<K, V>> next(){
+				if(next==null) getNext();
+				if(next==null) throw new NotImplementedException();
+				var n=next;
+				next=null;
+				return n;
+			}
+		};
 	}
 	
-	private void optimizedOrderTransfer(IOList<Bucket<K, V>> oldBuckets, IOList<Bucket<K, V>> newBuckets, short newPO2) throws IOException{
+	private void optimizedOrderTransfer(Iterable<LinkedIOList.Node<BucketEntry<K, V>>> oldData, IOList<Bucket<K, V>> newBuckets, short newPO2) throws IOException{
 		var hashGroupings=IntStream.range(0, 1<<newPO2)
-		                           .mapToObj(i->new ArrayList<LinkedIOList.Node<BucketEntry<K, V>>>())
-		                           .toList();
+		                           .mapToObj(i->(ArrayList<LinkedIOList.Node<BucketEntry<K, V>>>)null)
+		                           .collect(Collectors.toList());
 		
-		for(var bucket : oldBuckets){
-			for(var n : bucket.node){
-				var smallHash=toSmallHash(n, newPO2);
-				hashGroupings.get(smallHash).add(n);
-			}
+		int min=hashGroupings.size(), max=0;
+		for(var n : oldData){
+			var smallHash=toSmallHash(n, newPO2);
+			var l        =hashGroupings.get(smallHash);
+			if(l==null) hashGroupings.set(smallHash, l=new ArrayList<>(RESIZE_TRIGGER));
+			l.add(n);
+			min=Math.min(min, smallHash);
+			max=Math.max(max, smallHash+1);
 		}
+		if(max<min) return;
+		hashGroupings=hashGroupings.subList(min, max);
+		
 		for(int smallHash=0;smallHash<hashGroupings.size();smallHash++){
 			var group=hashGroupings.get(smallHash);
-			if(group.isEmpty()) continue;
+			if(group==null) continue;
 			
-			Bucket<K, V> bucket=getBucket(newBuckets, smallHash);
-			assert bucket.node==null;
-			bucket.allocateNulls(getDataProvider());
-			setBucket(newBuckets, smallHash, bucket);
-			
-			Iterator<LinkedIOList.Node<BucketEntry<K, V>>> iter=group.iterator();
-			assert iter.hasNext();
-			
-			var node=bucket.node;
-			node.setValue(iter.next().getValue());
-			
-			while(iter.hasNext()){
-				var newNode=allocNewNode(iter.next().getValue());
+			try{
+				Bucket<K, V> bucket=getBucket(newBuckets, smallHash);
+				if(bucket.node==null){
+					bucket.allocateNulls(getDataProvider());
+					setBucket(newBuckets, smallHash, bucket);
+				}
 				
-				node.setNext(newNode);
-				node=newNode;
+				Iterator<LinkedIOList.Node<BucketEntry<K, V>>> iter=group.iterator();
+				assert iter.hasNext();
+				
+				var node=bucket.node;
+				node.setValue(iter.next().getValue());
+				
+				while(iter.hasNext()){
+					var newNode=allocNewNode(iter.next().getValue());
+					
+					node.setNext(newNode);
+					node=newNode;
+				}
+			}catch(Throwable e){
+				throw new RuntimeException("failed to run copy on "+smallHash, e);
 			}
 		}
 	}
