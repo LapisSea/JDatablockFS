@@ -229,7 +229,14 @@ public class SlowTests{
 			enum Mode{
 				DEFAULT, CHECKPOINT, MAKE_CHECKPOINT
 			}
-			var mode          =Mode.DEFAULT;
+			
+			Mode mode;
+			{
+				var prop=System.getProperty("chmode");
+				if(prop!=null) mode=Mode.valueOf(prop);
+				else mode=Mode.DEFAULT;
+			}
+			
 			var checkpointFile=new File("bigmap.bin");
 			
 			long checkpointStep=-1;
