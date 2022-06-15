@@ -286,7 +286,7 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		}
 		@Override
 		public boolean isDirect(){
-			return true;
+			return !transactionOpen;
 		}
 	}
 	

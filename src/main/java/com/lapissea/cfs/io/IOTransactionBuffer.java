@@ -8,7 +8,7 @@ import java.util.*;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
-public class IOTransactionBuffer{
+public final class IOTransactionBuffer{
 	
 	private interface IOEvent{
 		record Write(long offset, byte[] data) implements IOEvent, Comparable<Write>{
@@ -31,7 +31,7 @@ public class IOTransactionBuffer{
 	
 	private final List<IOEvent.Write> writeEvents=new ArrayList<>();
 	
-	private boolean rangeOverlaps(long x1, long x2, long y1, long y2){
+	private static boolean rangeOverlaps(long x1, long x2, long y1, long y2){
 		return x1<=(y2-1)&&y1<=(x2-1);
 	}
 	

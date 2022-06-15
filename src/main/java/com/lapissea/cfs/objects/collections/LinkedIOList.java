@@ -298,8 +298,10 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 			var ch   =this.getReference().getPtr();
 			var frees=getDataProvider().getMemoryManager().getFreeChunks();
 			
-			if(frees.contains(ch)){
-				throw new RuntimeException(frees+" "+ch);
+			if(DEBUG_VALIDATION){
+				if(frees.contains(ch)){
+					throw new RuntimeException(frees+" "+ch);
+				}
 			}
 			try(var io=this.getReference().io(this)){
 				if(io.getSize()<start){
