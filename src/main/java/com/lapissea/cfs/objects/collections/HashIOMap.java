@@ -138,7 +138,6 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	private short bucketPO2=1;
 	
 	@IOValue
-	@IOValue.OverrideType(ContiguousIOList.class)
 	private IOList<Bucket<K, V>> buckets;
 	
 	private int datasetID;

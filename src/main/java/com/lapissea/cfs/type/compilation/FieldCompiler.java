@@ -418,6 +418,17 @@ public class FieldCompiler{
 			
 			type=SyntheticParameterizedType.of(raw, parms);
 		}
+		var rt=Utils.typeToRaw(type);
+		if(rt.isInterface()){
+			var impl=rt.getAnnotation(IOValue.OverrideType.DefaultImpl.class);
+			if(impl!=null){
+				var      rawType=SyntheticParameterizedType.generalize(type);
+				Class<?> raw    =impl.value();
+				Type[]   parms  =rawType.getActualTypeArguments();
+				type=SyntheticParameterizedType.of(raw, parms);
+			}
+		}
+		
 		return type;
 	}
 	

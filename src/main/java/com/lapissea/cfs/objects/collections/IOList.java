@@ -2,6 +2,7 @@ package com.lapissea.cfs.objects.collections;
 
 import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;
@@ -15,6 +16,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @SuppressWarnings("unused")
+@IOValue.OverrideType.DefaultImpl(ContiguousIOList.class)
 public interface IOList<T> extends IterablePP<T>{
 	
 	class MemoryWrappedIOList<T> implements IOList<T>{

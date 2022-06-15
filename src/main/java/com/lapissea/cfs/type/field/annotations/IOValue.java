@@ -112,6 +112,11 @@ public @interface IOValue{
 	@Retention(RetentionPolicy.RUNTIME)
 	@interface OverrideType{
 		
+		@Retention(RetentionPolicy.RUNTIME)
+		@interface DefaultImpl{
+			Class<? extends IOInstance> value();
+		}
+		
 		AnnotationLogic<OverrideType> LOGIC=new AnnotationLogic<>(){
 			@Override
 			public void validate(FieldAccessor<?> field, OverrideType typeOverride){

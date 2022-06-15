@@ -114,7 +114,6 @@ public class Cluster implements DataProvider{
 		
 		@IOValue
 		@IONullability(NULLABLE)
-		@IOValue.OverrideType(value=ContiguousIOList.class)
 		private IOList<IOChunkPointer> freeChunks;
 	}
 	
