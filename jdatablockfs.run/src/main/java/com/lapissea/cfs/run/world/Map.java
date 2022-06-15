@@ -7,7 +7,7 @@ import com.lapissea.cfs.type.field.annotations.IOValue;
 public class Map extends IOInstance<Map>{
 	
 	@IOValue
-	private IOList<Entity> entities;
+	public IOList<Entity> entities;
 	
 	
 	

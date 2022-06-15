@@ -94,7 +94,8 @@ public interface RootProvider extends DataProvider.Holder{
 		return new Builder<>(this);
 	}
 	
-	default <T> T request(Class<T> type, String id) throws IOException{return this.builder().withId(id).withType(type).request();}
+	default <T extends IOInstance<T>> T request(Struct<T> type, String id) throws IOException{return this.builder().withId(id).withType(type.getType()).request();}
+	default <T> T request(Class<T> type, String id) throws IOException                       {return this.builder().withId(id).withType(type).request();}
 	
 	<T> T request(ObjectID id, UnsafeSupplier<T, IOException> objectGenerator) throws IOException;
 	<T> void provide(T obj, ObjectID id) throws IOException;

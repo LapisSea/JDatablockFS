@@ -6,6 +6,6 @@ import com.lapissea.cfs.type.field.annotations.IOValue;
 public class Entity extends IOInstance<Entity>{
 	
 	@IOValue
-	private Vec2d pos;
+	public Vec2d pos=new Vec2d();
 	
 }
