@@ -7,13 +7,12 @@ import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.type.WordSpace;
-import com.lapissea.util.ShouldNeverHappenError;
-import com.lapissea.util.TextUtil;
-import com.lapissea.util.UtilL;
+import com.lapissea.util.*;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.LongStream;
 
@@ -239,22 +238,18 @@ public class MemoryOperations{
 		List<Chunk> toDestroy=new ArrayList<>();
 		
 		while(chunks.size()>1){
-			Chunk   prev    =null;
-			var     iter    =chunks.listIterator();
 			boolean noChange=true;
-			while(iter.hasNext()){
-				var chunk=iter.next();
-				if(prev==null){
-					prev=chunk;
-					continue;
-				}
+			
+			var chunk=chunks.get(chunks.size()-1);
+			for(int i=chunks.size()-2;i>=0;i--){
+				var prev=chunks.get(i);
 				if(prev.isNextPhysical(chunk)){
 					prepareFreeChunkMerge(prev, chunk);
 					toDestroy.add(chunk);
-					iter.remove();
+					chunks.remove(i+1);
 					noChange=false;
 				}
-				prev=chunk;
+				chunk=prev;
 			}
 			if(noChange){
 				break;

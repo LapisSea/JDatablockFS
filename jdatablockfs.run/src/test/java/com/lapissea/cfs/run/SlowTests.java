@@ -232,6 +232,12 @@ public class SlowTests{
 			var mode          =Mode.DEFAULT;
 			var checkpointFile=new File("bigmap.bin");
 			
+			long checkpointStep=-1;
+			if(mode==Mode.MAKE_CHECKPOINT){
+				var prop=System.getProperty("checkpointStep");
+				if(prop!=null) checkpointStep=Integer.parseInt(prop);
+			}
+			
 			if(mode==Mode.CHECKPOINT){
 				LogUtil.println("loading checkpoint from:", checkpointFile.getAbsoluteFile());
 				provider.getSource().write(true, Files.readAllBytes(checkpointFile.toPath()));
@@ -278,14 +284,15 @@ public class SlowTests{
 				                   new LogUtil.Val<>("time", '*', deb->deb.time()/1000000d)
 				);
 			};
-			var size=NumberSize.INT;
+			
+			NumberSize size=NumberSize.SMALL_INT;
 			
 			var  inst=Instant.now();
 			long i   =splitter.size();
 			while(provider.getSource().getIOSize()<size.maxSize){
 				long t=System.nanoTime();
 				for(int j=0;j<5;j++){
-					if(i==81920){
+					if(i==checkpointStep){
 						if(mode==Mode.MAKE_CHECKPOINT){
 							Files.write(checkpointFile.toPath(), provider.getSource().readAll());
 							LogUtil.println("Saved checkpoint to", checkpointFile.getAbsoluteFile());
