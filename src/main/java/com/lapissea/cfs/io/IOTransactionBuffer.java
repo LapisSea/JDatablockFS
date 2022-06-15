@@ -5,6 +5,8 @@ import com.lapissea.util.UtilL;
 import java.io.IOException;
 import java.lang.invoke.VarHandle;
 import java.util.*;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
@@ -30,6 +32,7 @@ public final class IOTransactionBuffer{
 	}
 	
 	private final List<IOEvent.Write> writeEvents=new ArrayList<>();
+	private final ReadWriteLock       lock       =new ReentrantReadWriteLock();
 	
 	private static boolean rangeOverlaps(long x1, long x2, long y1, long y2){
 		return x1<=(y2-1)&&y1<=(x2-1);
@@ -41,7 +44,15 @@ public final class IOTransactionBuffer{
 	
 	public int readByte(BaseAccess base, long offset) throws IOException{
 		
-		int data=readSingle(offset);
+		int data;
+		
+		var l=lock.readLock();
+		l.lock();
+		try{
+			data=readSingle(offset);
+		}finally{
+			l.unlock();
+		}
 		if(data!=-1) return data;
 		
 		byte[] b   ={0};
@@ -124,13 +135,22 @@ public final class IOTransactionBuffer{
 	public int read(BaseAccess base, long offset, byte[] b, int off, int len) throws IOException{
 		doMerge(base, offset+len);
 		if(len==0) return 0;
-		if(len==1){
-			var byt=readSingle(offset);
-			if(byt!=-1){
-				b[off]=(byte)byt;
-				return 1;
+		var l=lock.readLock();
+		l.lock();
+		try{
+			if(len==1){
+				int byt=readSingle(offset);
+				if(byt!=-1){
+					b[off]=(byte)byt;
+					return 1;
+				}
 			}
+			return read0(base, offset, b, off, len);
+		}finally{
+			l.unlock();
 		}
+	}
+	private int read0(BaseAccess base, long offset, byte[] b, int off, int len) throws IOException{
 		
 		IOEvent.Write next;
 		
@@ -201,6 +221,15 @@ public final class IOTransactionBuffer{
 	private long modifiedCapacity=-1;
 	
 	public long getCapacity(long fallback){
+		var l=lock.readLock();
+		l.lock();
+		try{
+			return getCapacity0(fallback);
+		}finally{
+			l.unlock();
+		}
+	}
+	private long getCapacity0(long fallback){
 		if(modifiedCapacity==-1){
 			if(!writeEvents.isEmpty()){
 				var last=writeEvents.get(writeEvents.size()-1);
@@ -215,6 +244,15 @@ public final class IOTransactionBuffer{
 	}
 	
 	public void capacityChange(long newCapacity){
+		var l=lock.writeLock();
+		l.lock();
+		try{
+			capacityChange0(newCapacity);
+		}finally{
+			l.unlock();
+		}
+	}
+	private void capacityChange0(long newCapacity){
 		if(newCapacity<0) throw new IllegalArgumentException();
 		modifiedCapacity=newCapacity;
 		
@@ -241,6 +279,15 @@ public final class IOTransactionBuffer{
 	}
 	
 	public void write(long offset, byte[] b, int off, int len){
+		var l=lock.writeLock();
+		l.lock();
+		try{
+			write0(offset, b, off, len);
+		}finally{
+			l.unlock();
+		}
+	}
+	private void write0(long offset, byte[] b, int off, int len){
 		if(len==0) return;
 		var newStart=offset;
 		var newEnd  =offset+len;
@@ -366,24 +413,30 @@ public final class IOTransactionBuffer{
 		if(!optimize) return;
 		optimize=false;
 		
-		for(int i=0;i<writeEvents.size()-1;i+=40){
-			dirty.add((int)((jitter+i)%(writeEvents.size()-1)));
-		}
-		
-		var jumpSize=writeEvents.size()/4;
-		for(int i : dirty){
-			if(i+1>=writeEvents.size()) continue;
-			var e1End  =writeEvents.get(i).end();
-			var e2Start=writeEvents.get(i+1).start();
-			var dist   =(int)(e2Start-e1End);
-			if(dist<=jumpSize){
-				var bb  =new byte[dist];
-				var read=read(base, e1End, bb, 0, bb.length);
-				write(e1End, bb, 0, read);
-				break;
+		var l=lock.writeLock();
+		l.lock();
+		try{
+			for(int i=0;i<writeEvents.size()-1;i+=40){
+				dirty.add((int)((jitter+i)%(writeEvents.size()-1)));
 			}
+			
+			var jumpSize=writeEvents.size()/4;
+			for(int i : dirty){
+				if(i+1>=writeEvents.size()) continue;
+				var e1End  =writeEvents.get(i).end();
+				var e2Start=writeEvents.get(i+1).start();
+				var dist   =(int)(e2Start-e1End);
+				if(dist<=jumpSize){
+					var bb  =new byte[dist];
+					var read=read0(base, e1End, bb, 0, bb.length);
+					write(e1End, bb, 0, read);
+					break;
+				}
+			}
+			dirty.clear();
+		}finally{
+			l.unlock();
 		}
-		dirty.clear();
 	}
 	
 	private void setEventSorted(int i, IOEvent.Write m){
@@ -443,6 +496,15 @@ public final class IOTransactionBuffer{
 	public record TransactionExport(OptionalLong setCapacity, List<RandomIO.WriteChunk> writes){}
 	
 	public TransactionExport export(){
+		var l=lock.writeLock();
+		l.lock();
+		try{
+			return export0();
+		}finally{
+			l.unlock();
+		}
+	}
+	private TransactionExport export0(){
 		var writes     =writeEvents.stream().map(e->new RandomIO.WriteChunk(e.offset, e.data)).toList();
 		var setCapacity=OptionalLong.empty();
 		if(modifiedCapacity!=-1){
@@ -459,20 +521,38 @@ public final class IOTransactionBuffer{
 	}
 	
 	public String infoString(){
-		if(writeEvents.isEmpty()) return "no data";
-		return getTotalBytes()+" bytes overridden in range "+writeEvents.get(0).start()+" - "+writeEvents.get(writeEvents.size()-1).end();
+		var l=lock.readLock();
+		l.lock();
+		try{
+			if(writeEvents.isEmpty()) return "no data";
+			return getTotalBytes()+" bytes overridden in range "+writeEvents.get(0).start()+" - "+writeEvents.get(writeEvents.size()-1).end();
+		}finally{
+			l.unlock();
+		}
 	}
 	
 	public int getChunkCount(){
-		return writeEvents.size();
+		var l=lock.readLock();
+		l.lock();
+		try{
+			return writeEvents.size();
+		}finally{
+			l.unlock();
+		}
 	}
 	
 	public long getTotalBytes(){
-		int sum=0;
-		for(int i=0;i<writeEvents.size();i++){
-			sum+=writeEvents.get(i).data.length;
+		var l=lock.readLock();
+		l.lock();
+		try{
+			int sum=0;
+			for(IOEvent.Write writeEvent : writeEvents){
+				sum+=writeEvent.data.length;
+			}
+			return sum;
+		}finally{
+			l.unlock();
 		}
-		return sum;
 	}
 	
 	public IOInterface.IOTransaction open(RandomIO.Creator target, VarHandle transactionOpenVar){
