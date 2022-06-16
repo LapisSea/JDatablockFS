@@ -235,7 +235,21 @@ public final class TypeLink extends IOInstance<TypeLink>{
 		return this==o||
 		       o instanceof TypeLink that&&
 		       getTypeName().equals(that.getTypeName())&&
-		       Arrays.equals(args, that.args);
+		       argsEqual(args, that.args);
+	}
+	
+	private static boolean argsEqual(TypeLink[] a, TypeLink[] b){
+		if(a.length!=b.length){
+			if(a.length!=0&&b.length!=0) return false;
+			var obj=TypeLink.of(Object.class);
+			for(var arg : a.length!=0?a:b){
+				if(!arg.equals(obj)){
+					return false;
+				}
+			}
+			return true;
+		}
+		return Arrays.equals(a, b);
 	}
 	
 	@Override

@@ -489,7 +489,12 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 			}
 		}
 		
-		if(getAccessor().getType().isArray()){
+		var isArray=getAccessor().getType().isArray();
+		if(!isArray&&typeFlag(DYNAMIC_FLAG)){
+			var obj=o1!=null?o1:o2;
+			isArray=obj!=null&&obj.getClass().isArray();
+		}
+		if(isArray){
 			if(o1==o2) return true;
 			if(o1==null||o2==null) return false;
 			int l1=Array.getLength(o1);
