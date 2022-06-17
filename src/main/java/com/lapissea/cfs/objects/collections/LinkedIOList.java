@@ -907,9 +907,16 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 			.free(chunks);
 	}
 	
+	private boolean freed;
+	
 	@Override
 	public void free() throws IOException{
 		freeUnmanaged(this);
+		freed=true;
+	}
+	@Override
+	public boolean isFreed(){
+		return freed;
 	}
 	
 	@NotNull

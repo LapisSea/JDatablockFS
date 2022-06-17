@@ -379,6 +379,8 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 		return storage.getType();
 	}
 	
+	private boolean freed;
+	
 	@Override
 	public void free() throws IOException{
 		Set<Chunk> chunks=new HashSet<>();
@@ -390,7 +392,13 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 		});
 		
 		prov.getMemoryManager().free(chunks);
+		freed=true;
 	}
+	@Override
+	public boolean isFreed(){
+		return freed;
+	}
+	
 	@NotNull
 	@Override
 	protected String getStringPrefix(){

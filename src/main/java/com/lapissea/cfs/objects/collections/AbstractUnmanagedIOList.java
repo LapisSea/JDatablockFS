@@ -61,7 +61,7 @@ public abstract class AbstractUnmanagedIOList<T, SELF extends AbstractUnmanagedI
 	@Override
 	public int hashCode(){
 		int result=1;
-		result=31*result+Long.hashCode(size());
+		result=31*result+getReference().hashCode();
 		result=31*result+getElementType().hashCode();
 		return result;
 	}
@@ -132,6 +132,10 @@ public abstract class AbstractUnmanagedIOList<T, SELF extends AbstractUnmanagedI
 	
 	@Override
 	public String toString(){
+		if(isFreed()){
+			return getStringPrefix()+"{size: "+size()+", at: "+getReference()+" deallocated}";
+		}
+		
 		StringJoiner sj=new StringJoiner(", ", getStringPrefix()+"{size: "+size()+"}"+"[", "]");
 		try{
 			elementsStr(sj);
@@ -142,6 +146,10 @@ public abstract class AbstractUnmanagedIOList<T, SELF extends AbstractUnmanagedI
 	}
 	@Override
 	public String toShortString(){
+		if(isFreed()){
+			return getStringPrefix()+"{size: "+size()+", at: "+getReference()+" deallocated}";
+		}
+		
 		StringJoiner sj=new StringJoiner(", ", "[", "]");
 		try{
 			elementsStr(sj);
@@ -149,6 +157,14 @@ public abstract class AbstractUnmanagedIOList<T, SELF extends AbstractUnmanagedI
 			throw new RuntimeException("Failed to create toString of IOList elements", e);
 		}
 		return sj.toString();
+	}
+	
+	protected boolean isFreed(){
+		try{
+			return getDataProvider().getMemoryManager().getFreeChunks().contains(getReference().getPtr());
+		}catch(IOException e){
+			throw new RuntimeException(e);
+		}
 	}
 	
 	@Override
