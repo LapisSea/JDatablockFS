@@ -891,6 +891,10 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 		
 		freeUnmanaged(head);
 	}
+	@Override
+	public long getCapacity() throws IOException{
+		return Long.MAX_VALUE;
+	}
 	
 	private <U extends IOInstance.Unmanaged<U>> void freeUnmanaged(U val) throws IOException{
 		Set<Chunk> chunks=new HashSet<>();

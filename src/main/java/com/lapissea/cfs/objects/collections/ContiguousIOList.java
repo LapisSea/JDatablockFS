@@ -373,6 +373,16 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 			io.ensureCapacity(cap);
 		}
 	}
+	@Override
+	public long getCapacity() throws IOException{
+		long size;
+		try(var io=selfIO()){
+			size=io.getCapacity();
+		}
+		var headSiz=calcInstanceSize(WordSpace.BYTE);
+		var eSiz   =getElementSize();
+		return (size-headSiz)/eSiz;
+	}
 	
 	@Override
 	public RuntimeType<T> getElementType(){

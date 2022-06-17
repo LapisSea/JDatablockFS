@@ -128,6 +128,10 @@ public class Splitter{
 				b.clear();
 			}
 			@Override
+			public long getCapacity() throws IOException{
+				return a.getCapacity();
+			}
+			@Override
 			public String toString(){
 				return a.toString();
 			}

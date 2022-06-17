@@ -80,6 +80,10 @@ public interface IOList<T> extends IterablePP<T>{
 				al.ensureCapacity(Math.toIntExact(capacity));
 			}
 		}
+		@Override
+		public long getCapacity() throws IOException{
+			return Integer.MAX_VALUE;
+		}
 		
 		@Override
 		public String toString(){
@@ -322,6 +326,10 @@ public interface IOList<T> extends IterablePP<T>{
 		@Override
 		public void requestCapacity(long capacity) throws IOException{
 			data.requestCapacity(capacity);
+		}
+		@Override
+		public long getCapacity() throws IOException{
+			return data.getCapacity();
 		}
 		@Override
 		public boolean contains(To value) throws IOException{
@@ -759,6 +767,7 @@ public interface IOList<T> extends IterablePP<T>{
 	 * It is not required to do so but is desirable. No exact capacity allocation is required.
 	 */
 	default void requestCapacity(long capacity) throws IOException{}
+	long getCapacity() throws IOException;
 	
 	default boolean contains(T value) throws IOException{
 		return indexOf(value)!=-1;
@@ -997,6 +1006,10 @@ public interface IOList<T> extends IterablePP<T>{
 		@Override
 		public void requestCapacity(long capacity) throws IOException{
 			data.requestCapacity(capacity+from);
+		}
+		@Override
+		public long getCapacity() throws IOException{
+			return data.getCapacity();
 		}
 		@Override
 		public boolean contains(T value) throws IOException{
