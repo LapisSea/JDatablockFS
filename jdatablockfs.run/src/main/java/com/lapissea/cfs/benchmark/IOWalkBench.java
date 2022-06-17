@@ -41,10 +41,9 @@ public class IOWalkBench{
 	
 	public IOWalkBench(){
 		try{
-			IOInterface mem=MemoryData.builder().build();
-			Cluster.init(mem);
-			var c   =new Cluster(mem);
-			var conf=new Configuration();
+			IOInterface mem =MemoryData.builder().build();
+			var         c   =Cluster.init(mem);
+			var         conf=new Configuration();
 			
 			Map<String, Object> vals=new HashMap<>();
 			if(System.getProperty("radius")!=null){

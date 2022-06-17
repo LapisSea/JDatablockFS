@@ -36,8 +36,7 @@ public class SparseImage{
 			
 			try{
 				LogUtil.println("init");
-				Cluster.init(mem);
-				Cluster cluster=new Cluster(mem);
+				var cluster=Cluster.init(mem);
 				
 				LogUtil.println("run");
 				run(cluster, args);

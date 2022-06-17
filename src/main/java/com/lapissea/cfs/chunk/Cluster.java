@@ -9,7 +9,6 @@ import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.ObjectID;
 import com.lapissea.cfs.objects.collections.AbstractUnmanagedIOMap;
-import com.lapissea.cfs.objects.collections.ContiguousIOList;
 import com.lapissea.cfs.objects.collections.HashIOMap;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.type.IOInstance;
@@ -47,15 +46,15 @@ public class Cluster implements DataProvider{
 		ByteBuffer magicId;
 		try{
 			magicId=ByteBuffer.wrap(src.readInts1(MAGIC_ID.limit()));
+			if(!magicId.equals(MAGIC_ID)){
+				throw new InvalidMagicIDException("ID: "+UTF_8.decode(magicId));
+			}
 		}catch(IOException e){
-			throw new InvalidMagicIDException("There is no magic id, was data initialized?");
-		}
-		if(!magicId.equals(MAGIC_ID)){
-			throw new InvalidMagicIDException(UTF_8.decode(magicId)+" is not a valid magic id");
+			throw new InvalidMagicIDException("There is no valid magic id, was Cluster.init called?", e);
 		}
 	}
 	
-	public static void init(IOInterface data) throws IOException{
+	public static Cluster init(IOInterface data) throws IOException{
 		data.openIOTransaction(()->{
 			var provider=DataProvider.newVerySimpleProvider(data);
 			
@@ -76,6 +75,8 @@ public class Cluster implements DataProvider{
 				metadata.allocateNulls(provider);
 			}, null);
 		});
+		
+		return new Cluster(data);
 	}
 	
 	

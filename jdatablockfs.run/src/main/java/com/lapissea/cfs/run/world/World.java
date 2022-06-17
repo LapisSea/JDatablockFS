@@ -14,9 +14,8 @@ public class World{
 	public static void main(String[] args) throws IOException{
 		var smap=Struct.of(Map.class);
 		
-		var data=MemoryData.builder().build();
-		Cluster.init(data);
-		var cluster=new Cluster(data);
+		var data   =MemoryData.builder().build();
+		var cluster=Cluster.init(data);
 		
 		var map=cluster.getRootProvider().request(smap, "map");
 		
