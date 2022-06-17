@@ -41,7 +41,7 @@ public class SlowTests{
 		
 		byte[] baked;
 		{
-			var d=MemoryData.build().build();
+			var d=MemoryData.builder().build();
 			Cluster.init(d);
 			baked=d.readAll();
 		}
@@ -144,8 +144,8 @@ public class SlowTests{
 	void ioTransaction() throws IOException{
 		int cap=50;
 		
-		IOInterface data  =MemoryData.build().withCapacity(cap+10).build();
-		IOInterface mirror=MemoryData.build().withCapacity(cap+10).build();
+		IOInterface data  =MemoryData.builder().withCapacity(cap+10).build();
+		IOInterface mirror=MemoryData.builder().withCapacity(cap+10).build();
 		
 		
 		int runIndex=0;

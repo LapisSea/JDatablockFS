@@ -24,7 +24,7 @@ public class TestRun{
 		
 		Stream.of(Chunk.class, Reference.class, AutoText.class, ContiguousIOList.class).forEach(Struct::ofUnknown);
 		
-		IOInterface data=MemoryData.build().build();
+		IOInterface data=MemoryData.builder().build();
 		Cluster.init(data);
 		
 		var cluster=new Cluster(data);

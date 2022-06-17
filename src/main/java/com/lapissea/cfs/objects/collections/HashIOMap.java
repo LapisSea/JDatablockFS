@@ -544,7 +544,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	private void checkValue(V value){
 		if(!(value instanceof IOInstance.Unmanaged)){
 			try{
-				var d=MemoryData.build().build();
+				var d=MemoryData.builder().build();
 				var v=ValueStorage.makeStorage(DataProvider.newVerySimpleProvider(d), TypeLink.of(value.getClass()), getGenerics(), false);
 				//noinspection unchecked
 				((ValueStorage<V>)v).write(d.io(), value);

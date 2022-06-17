@@ -343,7 +343,7 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 				if(value!=null){
 					if(DEBUG_VALIDATION){
 						var size=calcUnknownSize(valueStorage, getDataProvider(), value);
-						var tmp =MemoryData.build().withCapacity(Math.toIntExact(size+1)).withUsedLength(0).build();
+						var tmp =MemoryData.builder().withCapacity(Math.toIntExact(size+1)).withUsedLength(0).build();
 						try(var tio=tmp.io()){
 							valueStorage.write(tio, value);
 						}

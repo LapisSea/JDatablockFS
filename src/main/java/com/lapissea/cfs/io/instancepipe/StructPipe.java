@@ -696,7 +696,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit{
 	
 	
 	public void checkTypeIntegrity(T inst) throws IOException{
-		var tmp=MemoryData.build().build();
+		var tmp=MemoryData.builder().build();
 		var man=DataProvider.newVerySimpleProvider(tmp);
 		
 		T instRead;

@@ -419,7 +419,7 @@ public abstract class MemoryData<DataType> implements IOInterface{
 	protected abstract long read8(DataType data, int index, int len);
 	protected abstract void write8(long src, DataType dest, int off, int len);
 	
-	public static Builder build(){
+	public static Builder builder(){
 		return new Builder();
 	}
 	

@@ -571,7 +571,7 @@ public class BinaryGridRenderer{
 		buff.draw();
 		
 		try{
-			findHoverChunk(ctx, parsed, DataProvider.newVerySimpleProvider(MemoryData.build().withRaw(bytes).asReadOnly().build()));
+			findHoverChunk(ctx, parsed, DataProvider.newVerySimpleProvider(MemoryData.builder().withRaw(bytes).asReadOnly().build()));
 		}catch(IOException e1){
 			handleError(e1, parsed);
 		}
@@ -630,7 +630,7 @@ public class BinaryGridRenderer{
 		try{
 			Cluster cluster=parsed.getCluster().orElseGet(()->{
 				try{
-					var c=new Cluster(MemoryData.build().withRaw(bytes).asReadOnly().build());
+					var c=new Cluster(MemoryData.builder().withRaw(bytes).asReadOnly().build());
 //					LogUtil.println("parsed cluster at frame", frameIndex);
 					parsed.cluster=new WeakReference<>(c);
 					return c;
@@ -720,7 +720,7 @@ public class BinaryGridRenderer{
 				
 				if(e1!=null) throw e1;
 			}else{
-				var         provider=DataProvider.newVerySimpleProvider(MemoryData.build().withRaw(bytes).build());
+				var         provider=DataProvider.newVerySimpleProvider(MemoryData.builder().withRaw(bytes).build());
 				AnnotateCtx annCtx  =new AnnotateCtx(ctx, provider, new LinkedList<>(), ptrs::add, new ArrayList<>(), new ArrayList<>());
 				annCtx.stack.add(null);
 				long pos;

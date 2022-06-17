@@ -50,7 +50,7 @@ public class BakedData{
 	}
 	
 	public static void genData() throws IOException{
-		var mem=MemoryData.build().build();
+		var mem=MemoryData.builder().build();
 		Cluster.init(mem);
 		var data=mem.readAll();
 		var def =new Deflater(Deflater.BEST_COMPRESSION, true);

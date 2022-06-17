@@ -257,7 +257,7 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 			
 			var targetCap=targetCount*elSiz;
 			
-			var mem=MemoryData.build().withCapacity((int)targetCap).build();
+			var mem=MemoryData.builder().withCapacity((int)targetCap).build();
 			try(var buffIo=mem.io()){
 				UnsafeLongConsumer<IOException> flush=change->{
 					buffIo.setCapacity(buffIo.getPos());
