@@ -66,7 +66,16 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 	
 	
 	private static <T> FieldAccessor<ContiguousIOList<T>> fieldAccessor(Type elementType, long index){
-		return new AbstractFieldAccessor<>(null, elementName(index)){
+		return new AbstractFieldAccessor<>(null, ""){
+			private String lazyName;
+			@NotNull
+			@Override
+			public String getName(){
+				if(lazyName==null){
+					lazyName=elementName(index);
+				}
+				return lazyName;
+			}
 			@NotNull
 			@Override
 			public <F extends Annotation> Optional<F> getAnnotation(Class<F> annotationClass){
@@ -134,10 +143,10 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 	@NotNull
 	@Override
 	public Stream<IOField<ContiguousIOList<T>, ?>> listDynamicUnmanagedFields(){
-		var typ=getTypeDef().arg(0).generic(getDataProvider().getTypeDb());
-		
+		var typ      =getTypeDef().arg(0).generic(getDataProvider().getTypeDb());
+		var unmanaged=storage instanceof ValueStorage.UnmanagedInstance;
 		return LongStream.range(0, size()).mapToObj(index->{
-			if(storage instanceof ValueStorage.UnmanagedInstance){
+			if(unmanaged){
 				return (IOField<ContiguousIOList<T>, ?>)(Object)eFieldUnmanagedInst(typ, index);
 			}
 			return storage.field(fieldAccessor(typ, index), ()->ioAtElement(index));

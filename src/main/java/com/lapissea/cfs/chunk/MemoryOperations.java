@@ -3,17 +3,23 @@ package com.lapissea.cfs.chunk;
 import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.BitDepthOutOfSpaceException;
+import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.type.WordSpace;
-import com.lapissea.util.*;
+import com.lapissea.util.ShouldNeverHappenError;
+import com.lapissea.util.TextUtil;
+import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.LongStream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
@@ -34,10 +40,14 @@ public class MemoryOperations{
 		
 		boolean noTrim=false;
 		
+		List<RandomIO.WriteChunk> writes=new ArrayList<>();
+		byte[]                    b1    ={0};
+		
 		while(!possibleHeaders.isEmpty()){
 			
 			long lastUnknown=-1;
 			int  removeCount=0;
+			
 			
 			//test unknowns
 			var iter=(noTrim?LongStream.of(possibleHeaders.last().getValue()):possibleHeaders.longStream()).iterator();
@@ -55,13 +65,17 @@ public class MemoryOperations{
 				}
 				
 				//known invalid - destroyed
-				
-				try(var io=provider.getSource().write(pos, false)){
-					io.writeInt1(0);
-				}
+				writes.add(new RandomIO.WriteChunk(pos, b1));
 				possibleHeaders.remove(headIndex);
 				removeCount++;
 			}
+			if(!writes.isEmpty()){
+				try(var io=provider.getSource().io()){
+					io.writeAtOffsets(writes);
+				}
+				writes.clear();
+			}
+			
 			if(lastUnknown!=-1){
 				possibleHeaders.remove(lastUnknown);
 			}
@@ -256,11 +270,32 @@ public class MemoryOperations{
 			}
 		}
 		
+		ExecutorService service=null;
+		
 		for(Chunk chunk : chunks){
 			clearFree(chunk);
 			
 			if(PURGE_ACCIDENTAL){
-				purgePossibleChunkHeaders(chunk.getDataProvider(), chunk.dataStart(), chunk.getCapacity());
+				if(chunk.getCapacity()>3000){
+					if(service==null) service=Executors.newWorkStealingPool();
+					service.execute(()->{
+						try{
+							purgePossibleChunkHeaders(chunk.getDataProvider(), chunk.dataStart(), chunk.getCapacity());
+						}catch(IOException e){
+							throw new RuntimeException(e);
+						}
+					});
+				}else{
+					purgePossibleChunkHeaders(chunk.getDataProvider(), chunk.dataStart(), chunk.getCapacity());
+				}
+			}
+		}
+		if(service!=null){
+			service.shutdown();
+			try{
+				while(!service.awaitTermination(Long.MAX_VALUE, TimeUnit.MILLISECONDS)) ;
+			}catch(InterruptedException e){
+				throw new RuntimeException(e);
 			}
 		}
 		

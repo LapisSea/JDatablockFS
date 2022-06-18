@@ -579,10 +579,7 @@ public final class IOTransactionBuffer{
 					var data=export();
 					try(var io=target.io()){
 						var cap=data.setCapacity();
-						if(cap.isPresent()){
-							io.setCapacity(cap.getAsLong());
-						}
-						var w=data.writes();
+						var w  =data.writes();
 						switch(w.size()){
 							case 0 -> {}
 							case 1 -> {
@@ -590,6 +587,9 @@ public final class IOTransactionBuffer{
 								io.setPos(e.ioOffset()).write(e.data(), e.dataOffset(), e.dataLength());
 							}
 							default -> io.writeAtOffsets(w);
+						}
+						if(cap.isPresent()){
+							io.setCapacity(cap.getAsLong());
 						}
 					}
 				}

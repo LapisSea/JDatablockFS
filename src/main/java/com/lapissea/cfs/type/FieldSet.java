@@ -280,4 +280,16 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	public Stream<IOField<T, ?>> streamDependentOn(IOField<T, ?> field){
 		return stream().filter(f->f.isDependency(field));
 	}
+	
+	@Override
+	public Stream<IOField<T, ?>> stream(){
+		if(isEmpty()){
+			return Stream.of();
+		}
+		return Stream.of(data);
+	}
+	@Override
+	public Stream<IOField<T, ?>> parallelStream(){
+		return stream().parallel();
+	}
 }

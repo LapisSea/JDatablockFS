@@ -23,7 +23,7 @@ public abstract class AbstractFieldAccessor<CTyp extends IOInstance<CTyp>> imple
 	
 	@NotNull
 	@Override
-	public final String getName(){
+	public String getName(){
 		return name;
 	}
 	

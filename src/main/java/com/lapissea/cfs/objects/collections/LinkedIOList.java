@@ -7,6 +7,8 @@ import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.ValueStorage;
+import com.lapissea.cfs.io.bit.FlagReader;
+import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
@@ -175,11 +177,11 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 			})
 		);
 		
-		private static final IOField<?, NumberSize> NEXT_SIZE_FIELD=Struct.thisClass().getFields().requireExact(NumberSize.class, "nextSize");
-		
+		private static final IOField<?, NumberSize> NEXT_SIZE_FIELD         =Struct.thisClass().getFields().requireExact(NumberSize.class, "nextSize");
+		private static final int                    NEXT_SIZE_FIELD_MIN_SIZE=Math.toIntExact(getNextSizeField().getSizeDescriptor().getMin(WordSpace.BYTE));
 		
 		private static NumberSize calcOptimalNextSize(DataProvider provider) throws IOException{
-			return NumberSize.bySize(provider.getSource().getIOSize());
+			return NumberSize.bySize(provider.getSource().getIOSize()).next();
 		}
 		public static <T> Node<T> allocValNode(T value, Node<T> next, BasicSizeDescriptor<T, ?> sizeDescriptor, TypeLink nodeType, DataProvider provider) throws IOException{
 			int nextBytes;
@@ -288,32 +290,40 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 			try(var io=selfIO()){
 				var s=io.getSize();
 				if(s==0) return null;
-				var min=getNextSizeField().getSizeDescriptor().getMin(WordSpace.BYTE);
-				if(s<min) return null;
-				getPipe().readSingleField(null, getDataProvider(), io, getNextSizeField(), self(), getGenerics());
-			}
-			
-			var start=valueStart();
-			
-			var ch   =this.getReference().getPtr();
-			var frees=getDataProvider().getMemoryManager().getFreeChunks();
-			
-			if(DEBUG_VALIDATION){
-				if(frees.contains(ch)){
-					throw new RuntimeException(frees+" "+ch);
+				if(s<NEXT_SIZE_FIELD_MIN_SIZE) return null;
+				if(DEBUG_VALIDATION){
+					assert getPipe().getSpecificFields().get(0).equals(getNextSizeField());
 				}
-			}
-			try(var io=this.getReference().io(this)){
-				if(io.getSize()<start){
-					return null;
+				nextSize=FlagReader.readSingle(io, NumberSize.FLAG_INFO, false);
+
+//				if(DEBUG_VALIDATION){
+//					requireNonFreed();
+//				}
+				
+				long toSkip =nextSize.bytes;
+				long skipped=0;
+				while(skipped<toSkip){
+					long remaining   =toSkip-skipped;
+					var  skippedChunk=io.skip(remaining);
+					if(skippedChunk==0){
+						return null;
+					}
+					skipped+=skippedChunk;
 				}
-				io.skipExact(start);
 				if(io.remaining()==0){
 					return null;
 				}
 				return valueStorage.readNew(io);
 			}catch(Throwable e){
-				throw new IOException("failed to get value on "+this.getReference().addOffset(start).infoString(getDataProvider()), e);
+				throw new IOException("failed to get value on "+this.getReference().addOffset(valueStart()).infoString(getDataProvider()), e);
+			}
+		}
+		
+		private void requireNonFreed() throws IOException{
+			var ch   =this.getReference().getPtr();
+			var frees=getDataProvider().getMemoryManager().getFreeChunks();
+			if(frees.contains(ch)){
+				throw new RuntimeException(frees+" "+ch);
 			}
 		}
 		
