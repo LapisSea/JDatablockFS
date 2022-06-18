@@ -22,9 +22,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.opentest4j.AssertionFailedError;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
+import java.io.*;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
@@ -222,7 +220,8 @@ public class SlowTests{
 	@ParameterizedTest
 	@ValueSource(booleans={
 		false
-//		, true
+		,
+		true
 	})
 	void bigMap(boolean compliantCheck, TestInfo info) throws IOException{
 		TestUtils.testCluster(info, provider->{
@@ -239,15 +238,35 @@ public class SlowTests{
 			
 			var checkpointFile=new File("bigmap.bin");
 			
-			long checkpointStep=-1;
-			if(mode==Mode.MAKE_CHECKPOINT){
+			long checkpointStep;
+			{
 				var prop=System.getProperty("checkpointStep");
-				if(prop!=null) checkpointStep=Integer.parseInt(prop);
+				if(prop!=null){
+					checkpointStep=Integer.parseInt(prop);
+					if(checkpointStep<0) throw new IllegalArgumentException();
+				}else checkpointStep=-1;
 			}
 			
+			read:
 			if(mode==Mode.CHECKPOINT){
 				LogUtil.println("loading checkpoint from:", checkpointFile.getAbsoluteFile());
-				provider.getSource().write(true, Files.readAllBytes(checkpointFile.toPath()));
+				if(!checkpointFile.exists()){
+					if(checkpointStep==-1) throw new IllegalStateException("No checkpointStep defined");
+					LogUtil.println("No checkpoint, making checkpoint...");
+					mode=Mode.MAKE_CHECKPOINT;
+					break read;
+				}
+				try(var f=new DataInputStream(new FileInputStream(checkpointFile))){
+					var step=f.readLong();
+					if(checkpointStep!=-1&&step!=checkpointStep){
+						LogUtil.println("Outdated checkpoint, making checkpoint...");
+						mode=Mode.MAKE_CHECKPOINT;
+						break read;
+					}
+					
+					provider.getSource().write(true, f.readAllBytes());
+				}
+				
 				provider.getSource().write(false, provider.getSource().read(0, 1));
 				provider=new Cluster(provider.getSource());
 			}
@@ -292,7 +311,7 @@ public class SlowTests{
 				);
 			};
 			
-			NumberSize size=NumberSize.SMALL_INT;
+			NumberSize size=compliantCheck?NumberSize.SHORT:NumberSize.SMALL_INT;
 			
 			var  inst=Instant.now();
 			long i   =splitter.size();
@@ -301,7 +320,10 @@ public class SlowTests{
 				for(int j=0;j<5;j++){
 					if(i==checkpointStep){
 						if(mode==Mode.MAKE_CHECKPOINT){
-							Files.write(checkpointFile.toPath(), provider.getSource().readAll());
+							try(var f=new DataOutputStream(new FileOutputStream(checkpointFile))){
+								f.writeLong(checkpointStep);
+								provider.getSource().transferTo(f);
+							}
 							LogUtil.println("Saved checkpoint to", checkpointFile.getAbsoluteFile());
 							System.exit(0);
 						}
