@@ -16,14 +16,11 @@ import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.cfs.type.field.annotations.IOValue;
-import com.lapissea.util.NotImplementedException;
-import com.lapissea.util.ObjectHolder;
-import com.lapissea.util.UtilL;
+import com.lapissea.util.*;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
@@ -105,7 +102,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		
 		private Stream<LinkedIOList.Node<BucketEntry<K, V>>> nodeStream(){
 			if(node==null) return Stream.of();
-			return UtilL.stream(node.iterator());
+			return node.stream();
 		}
 		public BucketEntry<K, V> getEntryByKey(K key) throws IOException{
 			if(node==null) return null;
@@ -206,8 +203,10 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		var oldBuckets  =buckets;
 		var oldBucketPO2=bucketPO2;
 		
-		bucketPO2=calcNewSize(oldBuckets, oldBucketPO2);
+		bucketPO2=(short)(oldBucketPO2+1);//calcNewSize(oldBuckets, oldBucketPO2);
 		datasetID++;
+		
+		if(bucketPO2<0) throw new IllegalStateException();
 		
 		newBuckets();
 		fillBuckets(buckets, bucketPO2);
@@ -222,37 +221,81 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		}else{
 			long pos=0;
 			
-			List<Iterable<LinkedIOList.Node<BucketEntry<K, V>>>> sources=new ArrayList<>();
-			ExecutorService                                      service=Executors.newSingleThreadExecutor();
+			boolean disableAsync=size()<=512*RESIZE_TRIGGER*3;
+			
+			var semaphore =new Semaphore(3);
+			var writeTasks=Collections.synchronizedList(new LinkedList<Runnable>());
+			
+			ExecutorService readService=new ThreadPoolExecutor(
+				2, 2,
+				0L, TimeUnit.MILLISECONDS,
+				new LinkedBlockingQueue<>()
+			);
+			
+			Executor readExecutor=task->{
+				if(disableAsync){
+					task.run();
+					return;
+				}
+				readService.execute(()->{
+					try{
+						semaphore.acquire();
+						task.run();
+					}catch(InterruptedException e){
+						throw new RuntimeException(e);
+					}
+				});
+			}, writeExecutor=task->{
+				if(disableAsync){
+					task.run();
+					return;
+				}
+				writeTasks.add(task);
+			};
+			
+			Runnable doWrites=()->{
+				while(!writeTasks.isEmpty()){
+					writeTasks.remove(0).run();
+					semaphore.release();
+				}
+			};
+			
 			while(pos<oldBuckets.size()){
 				long from=pos;
-				long to  =Math.min(oldBuckets.size(), from+256/RESIZE_TRIGGER);
+				long to  =Math.min(oldBuckets.size(), from+512/RESIZE_TRIGGER);
 				pos=to;
 				
 				var view=oldBuckets.subListView(from, to);
-				if(false){
-					sources.add(asyncNodeSource(service, view));
-				}else{
-					sources.add(nodeSource(view));
+				
+				doWrites.run();
+				optimizedOrderTransfer(view, buckets, bucketPO2, readExecutor, writeExecutor);
+			}
+			readService.shutdown();
+			while(!readService.isTerminated()){
+				UtilL.sleep(1);
+				doWrites.run();
+			}
+			doWrites.run();
+			
+			var nCount=rawNodeStreamWithValues(buckets).count();
+			if(nCount!=size()){
+				var oldKeys=rawKeyStream(oldBuckets).collect(Collectors.toSet());
+				var newKeys=rawKeyStream(buckets).collect(Collectors.toSet());
+				if(oldKeys.size()>newKeys.size()){
+					oldKeys.removeAll(newKeys);
+					throw new IllegalStateException("Failed to transfer keys: "+TextUtil.toShortString(oldKeys));
 				}
+				LogUtil.println(oldKeys.size(), newKeys.size());
+				throw new IllegalStateException(nCount+" "+size());
 			}
 			
-			for(int i=0;i<sources.size();i++){
-				var source=sources.get(i);
-				try{
-					optimizedOrderTransfer(source, buckets, bucketPO2);
-				}catch(Throwable e){
-					throw new RuntimeException("failed to copy on chunk "+i, e);
-				}
-			}
-			service.shutdown();
 			writeManagedFields();
 			((Unmanaged<?>)oldBuckets).free();
 		}
 	}
 	
 	private Iterable<LinkedIOList.Node<BucketEntry<K, V>>> nodeSource(IOList<Bucket<K, V>> view){
-		return ()->view.stream().filter(b->b.node!=null).flatMap(b->b.node.stream()).iterator();
+		return ()->view.stream().flatMap(Bucket::nodeStream).iterator();
 	}
 	private Iterable<LinkedIOList.Node<BucketEntry<K, V>>> asyncNodeSource(ExecutorService service, IOList<Bucket<K, V>> view){
 		LinkedList<LinkedIOList.Node<BucketEntry<K, V>>> nodeBuffer=new LinkedList<>();
@@ -315,50 +358,61 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		};
 	}
 	
-	private void optimizedOrderTransfer(Iterable<LinkedIOList.Node<BucketEntry<K, V>>> oldData, IOList<Bucket<K, V>> newBuckets, short newPO2) throws IOException{
-		var hashGroupings=IntStream.range(0, 1<<newPO2)
-		                           .mapToObj(i->(ArrayList<LinkedIOList.Node<BucketEntry<K, V>>>)null)
-		                           .collect(Collectors.toList());
-		
-		int min=hashGroupings.size(), max=0;
-		for(var n : oldData){
-			var smallHash=toSmallHash(n, newPO2);
-			var l        =hashGroupings.get(smallHash);
-			if(l==null) hashGroupings.set(smallHash, l=new ArrayList<>(RESIZE_TRIGGER));
-			l.add(n);
-			min=Math.min(min, smallHash);
-			max=Math.max(max, smallHash+1);
-		}
-		if(max<min) return;
-		hashGroupings=hashGroupings.subList(min, max);
-		
-		for(int smallHash=0;smallHash<hashGroupings.size();smallHash++){
-			var group=hashGroupings.get(smallHash);
-			if(group==null) continue;
+	private void optimizedOrderTransfer(IOList<Bucket<K, V>> oldData, IOList<Bucket<K, V>> newBuckets, short newPO2, Executor readExecutor, Executor writeExecutor) throws IOException{
+		async(()->{
+			var hashGroupings=IntStream.range(0, 1<<newPO2)
+			                           .mapToObj(i->(ArrayList<LinkedIOList.Node<BucketEntry<K, V>>>)null)
+			                           .collect(Collectors.toList());
 			
-			try{
-				Bucket<K, V> bucket=getBucket(newBuckets, smallHash);
-				if(bucket.node==null){
-					bucket.allocateNulls(getDataProvider());
-					setBucket(newBuckets, smallHash, bucket);
+			for(var bucket : oldData){
+				if(bucket.node==null) continue;
+				for(var n : bucket.node){
+					int smallHash;
+					try{
+						smallHash=toSmallHash(n, newPO2);
+					}catch(IOException e){
+						throw new RuntimeException("failed to run read on "+n.getReference(), e);
+					}
+					var l=hashGroupings.get(smallHash);
+					if(l==null) hashGroupings.set(smallHash, l=new ArrayList<>(RESIZE_TRIGGER));
+					l.add(n);
 				}
-				
-				Iterator<LinkedIOList.Node<BucketEntry<K, V>>> iter=group.iterator();
-				assert iter.hasNext();
-				
-				var node=bucket.node;
-				node.setValue(iter.next().getValue());
-				
-				while(iter.hasNext()){
-					var newNode=allocNewNode(iter.next().getValue());
-					
-					node.setNext(newNode);
-					node=newNode;
-				}
-			}catch(Throwable e){
-				throw new RuntimeException("failed to run copy on "+smallHash, e);
 			}
-		}
+			return hashGroupings;
+		}, readExecutor).thenAcceptAsync(hashGroupings->{
+			if(hashGroupings.isEmpty()) return;
+			
+			for(int smallHash=0;smallHash<hashGroupings.size();smallHash++){
+				var group=hashGroupings.get(smallHash);
+				if(group==null) continue;
+				
+				try{
+					Bucket<K, V> bucket=getBucket(newBuckets, smallHash);
+					
+					Iterator<LinkedIOList.Node<BucketEntry<K, V>>> iter=group.iterator();
+					assert iter.hasNext();
+					
+					var node=bucket.node;
+					if(node==null){
+						var entry=iter.next().getValue();
+						node=allocNewNode(entry);
+						bucket.node=node;
+						setBucket(newBuckets, smallHash, bucket);
+					}else{
+						node.setValue(iter.next().getValue());
+					}
+					
+					while(iter.hasNext()){
+						var newNode=allocNewNode(iter.next().getValue());
+						
+						node.setNext(newNode);
+						node=newNode;
+					}
+				}catch(Throwable e){
+					throw new RuntimeException("failed to run copy on "+smallHash, e);
+				}
+			}
+		}, writeExecutor);
 	}
 	
 	private static IOField<BucketEntry<Object, Object>, ?> keyVar;
@@ -380,7 +434,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	
 	private void transferRewire(IOList<Bucket<K, V>> oldBuckets, IOList<Bucket<K, V>> newBuckets, short newPO2) throws IOException{
 		for(Bucket<K, V> oldBucket : oldBuckets){
-			var oldNodes=oldBucket.node.stream().toList();
+			var oldNodes=oldBucket.nodeStream().toList();
 			for(var node : oldNodes){
 				if(node.hasNext()) node.setNext(null);
 				
@@ -536,7 +590,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		
 		deltaSize(1);
 		if(sizeFlag==OVERWRITE_EMPTY) return;
-		if(sizeFlag>RESIZE_TRIGGER){
+		if(size()>=buckets.size()*RESIZE_TRIGGER){
 			reflow();
 		}
 	}
@@ -576,7 +630,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 			sorted.computeIfAbsent(toSmallHash(kvEntry.getKey(), bucketPO2), i->new ArrayList<>()).add(kvEntry);
 		}
 		
-		var shouldReflow=getDataProvider().getSource().openIOTransaction(()->{
+		getDataProvider().getSource().openIOTransaction(()->{
 			boolean reflow   =false;
 			long    deltaSize=0;
 			for(var group : sorted.values()){
@@ -588,14 +642,13 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 					sizeFlag=putEntry(buckets, bucketPO2, key, value);
 					if(sizeFlag==OVERWRITE) continue;
 					deltaSize++;
-					if(sizeFlag>RESIZE_TRIGGER) reflow=true;
 				}
 			}
 			
 			deltaSize(deltaSize);
 			return reflow;
 		});
-		if(shouldReflow){
+		if(size()>=buckets.size()*RESIZE_TRIGGER){
 			reflow();
 		}
 	}
@@ -604,8 +657,9 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	private static final long OVERWRITE_EMPTY=-2;
 	
 	private long putEntry(IOList<Bucket<K, V>> buckets, short bucketPO2, K key, V value) throws IOException{
+		var smallHash=toSmallHash(key, bucketPO2);
 		
-		Bucket<K, V> bucket=getBucket(buckets, key, bucketPO2);
+		Bucket<K, V> bucket=getBucket(buckets, smallHash);
 		
 		var entry=bucket.getEntryByKey(key);
 		if(entry!=null){
@@ -617,11 +671,8 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		BucketEntry<K, V> newEntry=new BucketEntry<>(key, value);
 		
 		if(bucket.node==null){
-			bucket.allocateNulls(getDataProvider());
-			setBucket(buckets, key, bucketPO2, bucket);
-			
-			assert !bucket.node.hasValue();
-			bucket.node.setValue(newEntry);
+			bucket.node=allocNewNode(newEntry);
+			setBucket(buckets, smallHash, bucket);
 			return OVERWRITE_EMPTY;
 		}
 		
@@ -683,7 +734,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		buckets.set(smallHash, bucket);
 		if(DEBUG_VALIDATION){
 			var read=buckets.get(smallHash);
-			assert read.equals(bucket);
+			assert read.equals(bucket):"Bucket integrity failed:\n"+bucket+"\n"+read;
 		}
 	}
 	
@@ -705,6 +756,11 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		if(key==null){
 			return 0;
 		}
-		return key.hashCode();
+		var h=key.hashCode();
+		return h2h(h);
+	}
+	private static int h2h(int x){
+		long mul=0x5DEECE66DL, mask=0xFFFFFFFFFFFFL;
+		return (int)(((((x^mul)&mask)*mul+0xBL)&mask) >>> 17);
 	}
 }
