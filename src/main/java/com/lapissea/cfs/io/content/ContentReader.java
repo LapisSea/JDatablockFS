@@ -6,6 +6,7 @@ import com.lapissea.util.ZeroArrays;
 
 import java.io.EOFException;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.util.Objects;
 import java.util.OptionalInt;
@@ -445,6 +446,21 @@ public interface ContentReader extends AutoCloseable{
 		return transferTo(out, 8192);
 	}
 	default long transferTo(ContentWriter out, int buffSize) throws IOException{
+		Objects.requireNonNull(out);
+		long transferred=0;
+		
+		byte[] buffer=new byte[buffSize];
+		int    read;
+		while((read=this.read(buffer))>=0){
+			out.write(buffer, 0, read);
+			transferred+=read;
+		}
+		return transferred;
+	}
+	default long transferTo(OutputStream out) throws IOException{
+		return transferTo(out, 8192);
+	}
+	default long transferTo(OutputStream out, int buffSize) throws IOException{
 		Objects.requireNonNull(out);
 		long transferred=0;
 		

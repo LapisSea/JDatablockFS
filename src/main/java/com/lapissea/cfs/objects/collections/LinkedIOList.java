@@ -358,7 +358,7 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 							valueStorage.write(tio, value);
 						}
 						try(var buff=io.writeTicket(size).requireExact().submit()){
-							tmp.transferTo(buff);
+							tmp.transferTo((ContentWriter)buff);
 						}
 					}else{
 						valueStorage.write(io, value);

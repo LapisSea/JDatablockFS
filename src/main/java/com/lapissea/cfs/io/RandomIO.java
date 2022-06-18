@@ -258,6 +258,11 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 				in.transferTo(dest);
 			}
 		}
+		default void transferTo(OutputStream dest) throws IOException{
+			try(var in=io()){
+				in.transferTo(dest);
+			}
+		}
 	}
 	
 	
@@ -384,6 +389,16 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 	
 	@Override
 	default long transferTo(ContentWriter out) throws IOException{
+		int buffSize=8192;
+		
+		var remaining=remaining();
+		if(remaining<buffSize){
+			buffSize=Math.max((int)remaining, 8);
+		}
+		
+		return transferTo(out, buffSize);
+	}
+	default long transferTo(OutputStream out) throws IOException{
 		int buffSize=8192;
 		
 		var remaining=remaining();
