@@ -64,21 +64,44 @@ public class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 		List<Chunk> toAdd=MemoryOperations.mergeChunks(popped);
 		
 		if(adding){
-			toAdd.stream().sorted(Comparator.comparingLong(Chunk::getCapacity)).map(Chunk::getPtr).forEach(queuedFreeChunks::add);
+			synchronized(queuedFreeChunks){
+				toAdd.stream().sorted(Comparator.comparingLong(Chunk::getCapacity)).map(Chunk::getPtr).forEach(queuedFreeChunks::add);
+			}
 			return;
 		}
 		
 		adding=true;
 		try{
-			MemoryOperations.mergeFreeChunksSorted(context, freeChunks, toAdd);
+			synchronized(queuedFreeChunks){
+				for(Chunk chunk : toAdd){
+					queuedFreeChunks.add(chunk.getPtr());
+				}
+			}
+			do{
+				synchronized(queuedFreeChunks){
+					var capacity       =freeChunks.getCapacity();
+					var optimalCapacity=freeChunks.size()+queuedFreeChunks.size();
+					if(capacity<optimalCapacity){
+						var cap=optimalCapacity+1;
+						freeChunks.requestCapacity(cap);
+						assert freeChunks.getCapacity()==cap:freeChunks.getCapacity()+" "+cap;
+					}
+					var chs=new ArrayList<Chunk>(queuedFreeChunks.size());
+					while(!queuedFreeChunks.isEmpty()){
+						synchronized(queuedFreeChunks){
+							if(queuedFreeChunks.isEmpty()) break;
+							var ptr=queuedFreeChunks.remove(queuedFreeChunks.size()-1);
+							var ch =context.getChunk(ptr);
+							chs.add(ch);
+						}
+					}
+					chs.sort(Comparator.naturalOrder());
+					
+					MemoryOperations.mergeFreeChunksSorted(context, freeChunks, chs);
+				}
+			}while(!queuedFreeChunks.isEmpty());
 		}finally{
 			adding=false;
-		}
-		
-		while(!queuedFreeChunks.isEmpty()){
-			var ptr=queuedFreeChunks.remove(queuedFreeChunks.size()-1);
-			var ch =context.getChunk(ptr);
-			free(ch);
 		}
 	}
 	
