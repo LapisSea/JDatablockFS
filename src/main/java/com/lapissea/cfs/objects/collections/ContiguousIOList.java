@@ -316,9 +316,10 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 		if(count==0) return;
 		if(count<0) throw new IllegalArgumentException("Count must be positive!");
 		
-		T val=getElementType().requireEmptyConstructor().get();
+		var ctr=getElementType().requireEmptyConstructor();
 		
 		addMany(count, ()->{
+			T val=ctr.get();
 			if(initializer!=null){
 				initializer.accept(val);
 			}

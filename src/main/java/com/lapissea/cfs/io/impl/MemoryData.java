@@ -242,7 +242,7 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		public String toString(){
 			int count=64;
 			
-			int start=pos, end=start+count;
+			int start=(int)getPos(), end=start+count;
 			
 			var used=(int)getSize();
 			
@@ -255,7 +255,10 @@ public abstract class MemoryData<DataType> implements IOInterface{
 			String transactionStr=transactionOpen?", transaction: {"+transactionBuff.infoString()+"}":"";
 			
 			String name=getClass().getSimpleName();
-			String pre ="{pos="+pos+transactionStr+", data=";
+			String pre ="{pos="+getPos()+transactionStr;
+			if(start!=0||start!=end){
+				pre+=", data=";
+			}
 			if(start!=0) pre+=start+" ... ";
 			
 			var more=used-end;

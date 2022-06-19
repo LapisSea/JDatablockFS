@@ -6,10 +6,7 @@ import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
-import com.lapissea.cfs.type.GenericContext;
-import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.Struct;
-import com.lapissea.cfs.type.WordSpace;
+import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
@@ -56,7 +53,11 @@ public class IOFieldInstanceArray<T extends IOInstance<T>, ValType extends IOIns
 	}
 	
 	private StructPipe<ValType> getValPipe(){
-		if(valPipe==null) valPipe=ContiguousStructPipe.of(component);
+		if(valPipe==null){
+			var p=ContiguousStructPipe.of(component);
+			p.waitForState(StagedInit.STATE_DONE);
+			valPipe=p;
+		}
 		return valPipe;
 	}
 	
@@ -107,7 +108,12 @@ public class IOFieldInstanceArray<T extends IOInstance<T>, ValType extends IOIns
 	public void skipRead(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		var pip=getValPipe();
 		
-		int     size=getArraySize(ioPool, instance);
+		int size            =getArraySize(ioPool, instance);
+		var fixedElementSize=pip.getSizeDescriptor().getFixed(WordSpace.BYTE);
+		if(fixedElementSize.isPresent()){
+			src.skipExact(size*fixedElementSize.getAsLong());
+			return;
+		}
 		ValType inst=pip.getType().requireEmptyConstructor().get();
 		for(int i=0;i<size;i++){
 			pip.read(provider, src, inst, genericContext);

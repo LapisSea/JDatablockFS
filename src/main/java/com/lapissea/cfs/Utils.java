@@ -140,7 +140,6 @@ public class Utils{
 		return (int)Math.ceil(bits/(double)Byte.SIZE);
 	}
 	public static long bitToByte(long bits){
-		if(bits<=Byte.SIZE) return 1;
 		return (long)Math.ceil(bits/(double)Byte.SIZE);
 	}
 	public static OptionalLong bitToByte(OptionalLong bits){

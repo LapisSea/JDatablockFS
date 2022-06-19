@@ -3,6 +3,7 @@ package com.lapissea.cfs.chunk;
 import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.BitDepthOutOfSpaceException;
+import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
@@ -344,6 +345,9 @@ public class MemoryOperations{
 	}
 	
 	public static long allocateBySimpleNextAssign(MemoryManager manager, Chunk target, long toAllocate) throws IOException{
+		if(target.getNextSize()==NumberSize.VOID){
+			return 0;
+		}
 		var toPin=AllocateTicket.bytes(toAllocate).withApproval(Chunk.sizeFitsPointer(target.getNextSize())).submit(manager);
 		if(toPin==null) return 0;
 		target.modifyAndSave(c->{
@@ -379,7 +383,7 @@ public class MemoryOperations{
 			toPin=AllocateTicket.bytes(Math.max(toAllocate+growth, 8)).withApproval(Chunk.sizeFitsPointer(siz)).submit(manager);
 		}while(toPin==null);
 		
-		var source=target.getDataProvider().getSource();
+		IOInterface source=target.getDataProvider().getSource();
 		
 		int shiftSize=Math.toIntExact(Math.min(target.getCapacity()-growth, target.getSize()));
 		if(shiftSize<0){

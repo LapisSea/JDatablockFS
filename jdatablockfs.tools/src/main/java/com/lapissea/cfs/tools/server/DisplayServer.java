@@ -37,11 +37,14 @@ public class DisplayServer implements DataLogger{
 			var io=ServerCommons.makeIO();
 			
 			UnsafeBiConsumer<Action, UnsafeConsumer<DataOutputStream, IOException>, IOException> sendAction=(a, data)->{
-				writer.writeByte(a.ordinal());
-				ServerCommons.writeSafe(writer, data);
+				synchronized(writer){
+					writer.writeByte(a.ordinal());
+					ServerCommons.writeSafe(writer, data);
+					
+					if(threadedOutput) return;
+					writer.flush();
+				}
 				
-				if(threadedOutput) return;
-				writer.flush();
 			};
 			
 			
