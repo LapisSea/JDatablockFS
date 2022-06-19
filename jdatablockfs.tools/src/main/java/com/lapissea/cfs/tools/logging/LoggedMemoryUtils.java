@@ -1,12 +1,14 @@
 package com.lapissea.cfs.tools.logging;
 
 import com.google.gson.GsonBuilder;
+import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.tools.DisplayManager;
 import com.lapissea.cfs.tools.server.DisplayServer;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.UtilL;
+import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.FileReader;
 import java.io.IOException;
@@ -38,6 +40,28 @@ public class LoggedMemoryUtils{
 		
 		CONFIG=new WeakReference<>(Collections.unmodifiableMap(newConf));
 		return newConf;
+	}
+	
+	public static void simpleLoggedMemorySession(UnsafeConsumer<IOInterface, IOException> session) throws IOException{
+		simpleLoggedMemorySession("default", session);
+	}
+	public static void simpleLoggedMemorySession(String sessionName, UnsafeConsumer<IOInterface, IOException> session) throws IOException{
+		
+		LateInit<DataLogger> logger=LoggedMemoryUtils.createLoggerFromConfig();
+		
+		try{
+			var mem=LoggedMemoryUtils.newLoggedMemory(sessionName, logger);
+			logger.ifInited(l->l.getSession(sessionName).reset());
+			
+			try{
+				session.accept(mem);
+			}finally{
+				logger.block();
+				mem.onWrite.log(mem, LongStream.of());
+			}
+		}finally{
+			logger.get().destroy();
+		}
 	}
 	
 	public static LateInit<DataLogger> createLoggerFromConfig(){
