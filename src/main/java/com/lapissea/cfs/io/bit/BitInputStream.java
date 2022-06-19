@@ -5,9 +5,6 @@ import com.lapissea.cfs.io.content.ContentReader;
 
 import java.io.EOFException;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.LongBuffer;
 
 import static com.lapissea.cfs.io.bit.BitUtils.bitsToBytes;
 import static com.lapissea.cfs.io.bit.BitUtils.makeMask;
@@ -21,9 +18,6 @@ public class BitInputStream implements BitReader, AutoCloseable{
 	private long totalBits;
 	
 	private final long expectedBits;
-	
-	private final byte[]     byteBuf=new byte[Long.BYTES];
-	private final LongBuffer lb     =ByteBuffer.wrap(byteBuf).order(ByteOrder.LITTLE_ENDIAN).asLongBuffer();
 	
 	public BitInputStream(ContentReader source, long expectedBits){
 		this.source=source;
@@ -52,9 +46,7 @@ public class BitInputStream implements BitReader, AutoCloseable{
 				buffer|=(long)byt<<bufferedBits;
 				bufferedBits+=Byte.SIZE;
 			}else{
-				lb.put(0, 0);
-				source.readFully(byteBuf, 0, toRead);
-				buffer|=lb.get(0)<<bufferedBits;
+				buffer|=Long.reverseBytes(source.readWord(toRead)<<((8-toRead)*8))<<bufferedBits;
 				bufferedBits+=toRead*Byte.SIZE;
 			}
 		}

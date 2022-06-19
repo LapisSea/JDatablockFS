@@ -4,16 +4,13 @@ package com.lapissea.cfs.io.bit;
 import com.lapissea.cfs.io.content.ContentWriter;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.LongBuffer;
 
 import static com.lapissea.cfs.io.bit.BitUtils.bitsToBytes;
 import static com.lapissea.cfs.io.bit.BitUtils.makeMask;
 
 public class BitOutputStream implements BitWriter<BitOutputStream>, AutoCloseable{
 	
-	private static final long BYTE_MASK=makeMask(8);
+	private static final long BYTE_MASK=0xFF;
 	private static final int  MAX_BITS =63;
 	
 	private final ContentWriter dest;
@@ -21,9 +18,6 @@ public class BitOutputStream implements BitWriter<BitOutputStream>, AutoCloseabl
 	private long buffer;
 	private int  written;
 	private long totalBits;
-	
-	private final byte[]     byteBuf=new byte[Long.BYTES];
-	private final LongBuffer lb     =ByteBuffer.wrap(byteBuf).order(ByteOrder.LITTLE_ENDIAN).asLongBuffer();
 	
 	public BitOutputStream(ContentWriter dest){
 		this.dest=dest;
@@ -71,10 +65,7 @@ public class BitOutputStream implements BitWriter<BitOutputStream>, AutoCloseabl
 		switch(bytesToWrite){
 			case 0 -> {return;}
 			case 1 -> dest.write((int)(buffer&BYTE_MASK));
-			default -> {
-				lb.put(0, buffer);
-				dest.write(byteBuf, 0, bytesToWrite);
-			}
+			default -> dest.write8(Long.reverseBytes(buffer) >>> ((8-bytesToWrite)*8), bytesToWrite);
 		}
 		written-=bytesToWrite*8;
 		buffer >>>= bytesToWrite*8;
