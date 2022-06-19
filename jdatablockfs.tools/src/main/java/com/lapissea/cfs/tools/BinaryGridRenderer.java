@@ -1282,16 +1282,29 @@ public class BinaryGridRenderer{
 							IOField.Ref<T, T> refField=(IOField.Ref<T, T>)refO;
 							var               ref     =refField.getReference(instance);
 							boolean           diffPos =true;
+							Pointer           ptr     =null;
 							if(!ref.isNull()){
 								var from=trueOffset;
 								var to  =ref.calcGlobalOffset(ctx.provider);
 								diffPos=from!=to;
 								if(diffPos){
-									ctx.recordPointer(new Pointer(from, to, (int)size, col, refField.toString(), 1));
+									ptr=new Pointer(from, to, (int)size, col, refField.toString(), 0.8F);
 								}
 							}
-							
-							if(annotate) annotateByteField(ctx, ioPool, instance, field, col, reference, Range.fromSize(fieldOffset, size));
+							try{
+								if(annotate){
+									annotateByteField(ctx, ioPool, instance, field, col, reference, Range.fromSize(fieldOffset, size));
+								}
+							}catch(Throwable e){
+								if(ptr!=null){
+									ptr=new Pointer(ptr.from, ptr.to, ptr.size, Color.RED, ptr.message, 1);
+								}
+								throw e;
+							}finally{
+								if(ptr!=null){
+									ctx.recordPointer(ptr);
+								}
+							}
 							if(!diffPos){
 								int xByte    =(int)(renderer.getDisplay().getMouseX()/rctx.pixelsPerByte());
 								int yByte    =(int)(renderer.getDisplay().getMouseY()/rctx.pixelsPerByte());
