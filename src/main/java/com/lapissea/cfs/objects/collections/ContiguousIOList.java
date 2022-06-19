@@ -246,7 +246,8 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 	}
 	
 	private void addMany(long count, UnsafeSupplier<T, IOException> source) throws IOException{
-		if(storage instanceof ValueStorage.FixedReferencedInstance||storage instanceof ValueStorage.UnmanagedInstance){//TODO
+		if(storage instanceof ValueStorage.UnmanagedInstance){//TODO is this necessary? Test and maybe remove
+			requestCapacity(size()+count);
 			for(long i=0;i<count;i++){
 				add(source.get());
 			}

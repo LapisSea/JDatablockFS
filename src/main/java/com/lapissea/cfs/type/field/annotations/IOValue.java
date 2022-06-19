@@ -15,6 +15,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Array;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -30,8 +31,9 @@ public @interface IOValue{
 		@NotNull
 		@Override
 		public <T extends IOInstance<T>> List<VirtualFieldDefinition<T, ?>> injectPerInstanceValue(FieldAccessor<T> field, IOValue annotation){
-			var type=field.getType();
-			if(!type.isArray()) return List.of();
+			var type  =field.getType();
+			var isList=type==List.class||type==ArrayList.class;
+			if(!type.isArray()&&!isList) return List.of();
 			
 			var arrayLengthSizeName=field.getAnnotation(IODependency.ArrayLenSize.class)
 			                             .map(IODependency.ArrayLenSize::name)
@@ -42,7 +44,10 @@ public @interface IOValue{
 				(VirtualFieldDefinition.GetterFilter.I<T>)(ioPool, instance, dependencies, value)->{
 					if(value>0) return value;
 					var arr=field.get(ioPool, instance);
-					if(arr!=null) return Array.getLength(arr);
+					if(arr!=null){
+						if(isList) return ((List<?>)arr).size();
+						return Array.getLength(arr);
+					}
 					return 0;
 				},
 				List.of(IOFieldTools.makeAnnotation(IODependency.VirtualNumSize.class, Map.of("name", arrayLengthSizeName)))));

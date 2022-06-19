@@ -556,6 +556,19 @@ public class FieldCompiler{
 				return new IOFieldInstanceArray<>(field);
 			}
 		});
+		REGISTRY.register(new RegistryNode(){
+			@Override
+			public boolean canCreate(Type type, GetAnnotation annotations){
+				if(!(type instanceof ParameterizedType parmType)) return false;
+				if(parmType.getRawType()!=List.class&&parmType.getRawType()!=ArrayList.class) return false;
+				var args=parmType.getActualTypeArguments();
+				return IOInstance.isManaged(Objects.requireNonNull(TypeLink.of(args[0])));
+			}
+			@Override
+			public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
+				return new IOFieldInstanceList<>(field);
+			}
+		});
 		REGISTRY.register(new RegistryNode.InstanceOf<>(String.class){
 			@Override
 			public <T extends IOInstance<T>> IOField<T, String> create(FieldAccessor<T> field, GenericContext genericContext){

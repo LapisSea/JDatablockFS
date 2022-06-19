@@ -1,6 +1,7 @@
 package com.lapissea.cfs.tools;
 
 
+import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.*;
 import com.lapissea.cfs.io.ChunkChainIO;
 import com.lapissea.cfs.io.bit.FlagReader;
@@ -36,7 +37,7 @@ import java.awt.Color;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.ref.WeakReference;
-import java.lang.reflect.Array;
+import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.nio.ByteBuffer;
 import java.util.*;
@@ -1381,17 +1382,29 @@ public class BinaryGridRenderer{
 								}
 								continue;
 							}
-							if(typ.isArray()){
+							boolean isList=typ==List.class||typ==ArrayList.class;
+							if(typ.isArray()||isList){
 								
-								var comp=typ.componentType();
+								Class<?> comp;
+								if(isList){
+									var gTyp=acc.getGenericType(parentGenerics);
+									comp=switch(gTyp){
+										case ParameterizedType p -> Utils.typeToRaw(p.getActualTypeArguments()[0]);
+										case Class<?> c -> Object.class;
+										default -> throw new NotImplementedException(gTyp.getClass().getName());
+									};
+								}else{
+									comp=typ.componentType();
+								}
+								
 								if(IOInstance.isManaged(comp)){
-									var inst  =(IOInstance<?>[])field.get(ioPool, instance);
-									var arrSiz=Array.getLength(inst);
+									Object              instTmp=field.get(ioPool, instance);
+									List<IOInstance<?>> inst   =(List<IOInstance<?>>)(isList?instTmp:ArrayViewList.create((Object[])instTmp, null));
+									if(inst.isEmpty()) continue;
 									
-									StructPipe elementPipe=ContiguousStructPipe.of(Struct.ofUnknown(typ.componentType()));
+									StructPipe elementPipe=ContiguousStructPipe.of(Struct.ofUnknown(inst.get(0).getClass()));
 									long       arrOffset  =0;
-									for(int i=0;i<arrSiz;i++){
-										var val=(IOInstance)Array.get(inst, i);
+									for(IOInstance val : inst){
 										annotateStruct(ctx, val, reference.addOffset(fieldOffset+arrOffset), elementPipe, generics(instance, parentGenerics), annotate);
 										arrOffset+=elementPipe.getSizeDescriptor().calcUnknown(elementPipe.makeIOPool(), ctx.provider, val, WordSpace.BYTE);
 									}
