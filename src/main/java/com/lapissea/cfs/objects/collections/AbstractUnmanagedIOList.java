@@ -123,7 +123,12 @@ public abstract class AbstractUnmanagedIOList<T, SELF extends AbstractUnmanagedI
 				sb.add("... "+(size()-push.count)+" more");
 				return;
 			}
-			var e=iter.ioNext();
+			Object e;
+			try{
+				e=iter.ioNext();
+			}catch(Throwable ex){
+				e="CORRUPT: "+ex.getClass().getSimpleName();
+			}
 			push.count++;
 			
 			push.accept(Utils.toShortString(e));

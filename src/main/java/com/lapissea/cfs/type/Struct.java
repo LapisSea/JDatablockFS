@@ -638,6 +638,8 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 				str=field.instanceToString(ioPool, instance, doShort||TextUtil.USE_SHORT_IN_COLLECTIONS);
 			}catch(FieldIsNullException e){
 				str=Optional.of("<UNINITIALIZED>");
+			}catch(Throwable e){
+				str=Optional.of("CORRUPTED: "+e.getMessage());
 			}
 			
 			if(str.isEmpty()) continue;
