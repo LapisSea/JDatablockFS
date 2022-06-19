@@ -7,6 +7,14 @@ import java.io.IOException;
 import java.util.Collection;
 
 public final class OffsetIO implements RandomIO{
+	
+	public static RandomIO of(RandomIO.Creator parent, long offset) throws IOException{
+		return offset==0?parent.io():new OffsetIO(parent, offset);
+	}
+	public static RandomIO of(RandomIO parent, long offset) throws IOException{
+		return offset==0?parent:new OffsetIO(parent, offset);
+	}
+	
 	private final RandomIO parent;
 	private final long     offset;
 	

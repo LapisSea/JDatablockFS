@@ -162,7 +162,7 @@ public final class Reference extends IOInstance<Reference>{
 		return io(holder.getDataProvider());
 	}
 	public RandomIO io(DataProvider provider) throws IOException{
-		return new OffsetIO(ptr.dereference(provider), offset);
+		return OffsetIO.of(ptr.dereference(provider), offset);
 	}
 	
 	public ChunkPointer getPtr(){return ptr;}
