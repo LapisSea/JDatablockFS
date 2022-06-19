@@ -397,12 +397,14 @@ public class MemoryOperations{
 			}
 		}
 		
+		var oldCapacity=target.getCapacity();
+		
 		target.requireReal();
 		try{
 			target.setNextSize(siz);
 			target.setNextPtr(toPin.getPtr());
 			target.setSize(shiftSize);
-			target.setCapacity(target.getCapacity()-growth);
+			target.setCapacity(oldCapacity-growth);
 		}catch(BitDepthOutOfSpaceException e){
 			throw new ShouldNeverHappenError(e);
 		}
@@ -411,7 +413,7 @@ public class MemoryOperations{
 			source.write(target.dataStart(), false, toShift);
 		}
 		
-		return toPin.getCapacity()-growth;
+		return (target.getCapacity()+toPin.getCapacity())-oldCapacity;
 	}
 	
 	

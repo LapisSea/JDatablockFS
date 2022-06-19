@@ -111,7 +111,9 @@ public class IOFieldTools{
 	public static <T extends IOInstance<T>> Optional<IOField<T, NumberSize>> getDynamicSize(FieldAccessor<T> field){
 		Optional<String> dynSiz=Stream.of(
 			field.getAnnotation(IODependency.NumSize.class).map(IODependency.NumSize::value),
-			field.getAnnotation(IODependency.VirtualNumSize.class).map(e->IODependency.VirtualNumSize.Logic.getName(field, e))
+			field.getAnnotation(IODependency.VirtualNumSize.class).map(e->IODependency.VirtualNumSize.Logic.getName(field, e)),
+			//TODO: This is a bandage for template loaded classes, make annotation serialization more precise.
+			field.getAnnotation(IODependency.class).stream().flatMap(e->Arrays.stream(e.value())).filter(name->name.equals(makeNumberSizeName(field.getName()))).findAny()
 		).filter(Optional::isPresent).map(Optional::get).findAny();
 		
 		if(dynSiz.isEmpty()) return Optional.empty();

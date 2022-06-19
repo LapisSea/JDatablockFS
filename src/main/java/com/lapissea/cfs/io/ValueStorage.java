@@ -171,7 +171,7 @@ public sealed interface ValueStorage<T>{
 		
 		@Override
 		public void write(RandomIO dest, T src) throws IOException{
-			var ref=REF_PIPE.readNew(provider, dest, null);
+			var ref=dest.remaining()==0?new Reference():REF_PIPE.readNew(provider, dest, null);
 			if(ref.isNull()){
 				var ch=AllocateTicket.withData(pipe, provider, src).submit(provider);
 				REF_PIPE.write(provider, dest, ch.getPtr().makeReference());
@@ -180,6 +180,7 @@ public sealed interface ValueStorage<T>{
 			
 			try(var io=ref.io(provider)){
 				pipe.write(provider, io, src);
+				io.trim();
 			}
 		}
 		
