@@ -223,10 +223,10 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 			
 			boolean disableAsync=size()<=512*RESIZE_TRIGGER*3;
 			
-			var semaphore =new Semaphore(3);
-			var writeTasks=Collections.synchronizedList(new LinkedList<Runnable>());
+			var semaphore =disableAsync?null:new Semaphore(3);
+			var writeTasks=disableAsync?null:Collections.synchronizedList(new LinkedList<Runnable>());
 			
-			ExecutorService readService=new ThreadPoolExecutor(
+			ExecutorService readService=disableAsync?null:new ThreadPoolExecutor(
 				2, 2,
 				0L, TimeUnit.MILLISECONDS,
 				new LinkedBlockingQueue<>()
@@ -253,7 +253,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 				writeTasks.add(task);
 			};
 			
-			Runnable doWrites=()->{
+			Runnable doWrites=disableAsync?()->{}:()->{
 				while(!writeTasks.isEmpty()){
 					writeTasks.remove(0).run();
 					semaphore.release();
@@ -270,12 +270,14 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 				doWrites.run();
 				optimizedOrderTransfer(view, buckets, bucketPO2, readExecutor, writeExecutor);
 			}
-			readService.shutdown();
-			while(!readService.isTerminated()){
-				UtilL.sleep(1);
+			if(!disableAsync){
+				readService.shutdown();
+				while(!readService.isTerminated()){
+					UtilL.sleep(1);
+					doWrites.run();
+				}
 				doWrites.run();
 			}
-			doWrites.run();
 			
 			var nCount=rawNodeStreamWithValues(buckets).count();
 			if(nCount!=size()){
