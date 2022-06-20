@@ -1285,7 +1285,7 @@ public class BinaryGridRenderer{
 							boolean           diffPos =true;
 							Pointer           ptr     =null;
 							if(!ref.isNull()){
-								var from=trueOffset;
+								var from=reference.addOffset(fieldOffset).calcGlobalOffset(ctx.provider);
 								var to  =ref.calcGlobalOffset(ctx.provider);
 								diffPos=from!=to;
 								if(diffPos){
