@@ -43,7 +43,7 @@ public interface ContentWriter extends AutoCloseable{
 	
 	void write(byte[] b, int off, int len) throws IOException;
 	
-	default void write8(long v, int len) throws IOException{
+	default void writeWord(long v, int len) throws IOException{
 		byte[]    writeBuffer=new byte[8];
 		final var lm1        =len-1;
 		
@@ -77,7 +77,7 @@ public interface ContentWriter extends AutoCloseable{
 	}
 	
 	default void writeInt2(int v) throws IOException{
-		write8(Integer.toUnsignedLong(v), 2);
+		writeWord(Integer.toUnsignedLong(v), 2);
 	}
 	
 	private void writeInt2(byte[] writeBuffer, int off, int v){
@@ -95,7 +95,7 @@ public interface ContentWriter extends AutoCloseable{
 	}
 	
 	default void writeInt3(int v) throws IOException{
-		write8(v, 3);
+		writeWord(v, 3);
 	}
 	
 	private void writeInt3(byte[] writeBuffer, int off, int v){
@@ -114,7 +114,7 @@ public interface ContentWriter extends AutoCloseable{
 	}
 	
 	default void writeInt4(int v) throws IOException{
-		write8(Integer.toUnsignedLong(v), 4);
+		writeWord(Integer.toUnsignedLong(v), 4);
 	}
 	
 	private void writeInt4(byte[] writeBuffer, int off, int v){
@@ -134,7 +134,7 @@ public interface ContentWriter extends AutoCloseable{
 	}
 	
 	default void writeInt5(long v) throws IOException{
-		write8(v, 5);
+		writeWord(v, 5);
 	}
 	
 	private void writeInt5(byte[] writeBuffer, int off, long v){
@@ -155,7 +155,7 @@ public interface ContentWriter extends AutoCloseable{
 	}
 	
 	default void writeInt6(long v) throws IOException{
-		write8(v, 6);
+		writeWord(v, 6);
 	}
 	
 	private void writeInt6(byte[] writeBuffer, int off, long v){
@@ -177,7 +177,7 @@ public interface ContentWriter extends AutoCloseable{
 	}
 	
 	default void writeInt8(long v) throws IOException{
-		write8(v, 8);
+		writeWord(v, 8);
 	}
 	
 	private void writeInt8(byte[] writeBuffer, int off, long v){
@@ -244,7 +244,7 @@ public interface ContentWriter extends AutoCloseable{
 	}
 	
 	default void writeChar2(char v) throws IOException{
-		write8(v, 2);
+		writeWord(v, 2);
 	}
 	
 	private void writeChar2(byte[] writeBuffer, int off, int v){
@@ -291,7 +291,7 @@ public interface ContentWriter extends AutoCloseable{
 				earlyCheck();
 			}
 			@Override
-			public void write8(long v, int len) throws IOException{
+			public void writeWord(long v, int len) throws IOException{
 				if(count+len<=buf.length){
 					Utils.write8(v, buf, count, len);
 				}

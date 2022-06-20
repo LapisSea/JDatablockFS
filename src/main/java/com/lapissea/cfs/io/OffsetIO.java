@@ -102,8 +102,8 @@ public final class OffsetIO implements RandomIO{
 	}
 	
 	@Override
-	public void write8(long v, int len) throws IOException{
-		parent.write8(v, len);
+	public void writeWord(long v, int len) throws IOException{
+		parent.writeWord(v, len);
 	}
 	
 	@Override

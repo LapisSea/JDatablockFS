@@ -19,8 +19,8 @@ public class ContentReaderOutputStream extends ContentOutputStream{
 	}
 	
 	@Override
-	public void write8(long v, int len) throws IOException{
-		writer.write8(v, len);
+	public void writeWord(long v, int len) throws IOException{
+		writer.writeWord(v, len);
 	}
 	
 	@Override

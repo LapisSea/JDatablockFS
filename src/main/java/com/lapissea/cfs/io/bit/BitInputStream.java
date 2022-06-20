@@ -3,7 +3,6 @@ package com.lapissea.cfs.io.bit;
 import com.lapissea.cfs.exceptions.IllegalBitValueException;
 import com.lapissea.cfs.io.content.ContentReader;
 
-import java.io.EOFException;
 import java.io.IOException;
 
 import static com.lapissea.cfs.io.bit.BitUtils.bitsToBytes;
@@ -40,10 +39,7 @@ public class BitInputStream implements BitReader, AutoCloseable{
 			}
 			
 			if(toRead==1){
-				int byt=source.read();
-				if(byt==-1) throw new EOFException();
-				
-				buffer|=(long)byt<<bufferedBits;
+				buffer|=(long)source.tryRead()<<bufferedBits;
 				bufferedBits+=Byte.SIZE;
 			}else{
 				buffer|=Long.reverseBytes(source.readWord(toRead)<<((8-toRead)*8))<<bufferedBits;

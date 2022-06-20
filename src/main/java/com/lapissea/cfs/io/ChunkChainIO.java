@@ -370,16 +370,16 @@ public final class ChunkChainIO implements RandomIO{
 	}
 	
 	@Override
-	public void write8(long v, int len) throws IOException{
+	public void writeWord(long v, int len) throws IOException{
 		long offset=calcCursorOffset();
 		long cRem  =cursor.getCapacity()-offset;
 		
 		if(cRem<len){
-			RandomIO.super.write8(v, len);
+			RandomIO.super.writeWord(v, len);
 			return;
 		}
 		
-		syncedSource().write8(v, len);
+		syncedSource().writeWord(v, len);
 		cursor.modifyAndSave(c->{
 			try{
 				c.pushSize(offset+len);

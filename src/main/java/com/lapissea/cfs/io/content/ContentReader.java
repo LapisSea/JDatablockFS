@@ -16,9 +16,7 @@ import java.util.OptionalLong;
 public interface ContentReader extends AutoCloseable{
 	
 	default void read(ByteBuffer buff) throws IOException{
-		int b=read();
-		if(b<0) throw new EOFException();
-		buff.put((byte)b);
+		buff.put((byte)tryRead());
 	}
 	default int read(ByteBuffer buff, int length) throws IOException{
 		if(length>buff.remaining()) throw new IndexOutOfBoundsException("reading "+length+" remaining "+buff.remaining());
@@ -32,6 +30,12 @@ public interface ContentReader extends AutoCloseable{
 			buff.put(bb, 0, read);
 		}
 		return read;
+	}
+	
+	default int tryRead() throws IOException{
+		var b=read();
+		if(b<0) throw new EOFException();
+		return b;
 	}
 	
 	int read() throws IOException;
@@ -136,11 +140,7 @@ public interface ContentReader extends AutoCloseable{
 	
 	
 	default int readUnsignedInt1() throws IOException{
-		int ch=read();
-		if(ch<0){
-			throw new EOFException();
-		}
-		return ch;
+		return tryRead();
 	}
 	
 	default int[] readUnsignedInts1(int elementsToRead) throws IOException{

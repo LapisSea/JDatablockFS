@@ -214,9 +214,9 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		}
 		
 		@Override
-		public void write8(long v, int len) throws IOException{
+		public void writeWord(long v, int len) throws IOException{
 			if(transactionOpen){//TODO: Implement transaction read8
-				RandomIO.super.write8(v, len);
+				RandomIO.super.writeWord(v, len);
 				return;
 			}
 			

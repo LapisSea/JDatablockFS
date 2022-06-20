@@ -22,8 +22,8 @@ public class RandomOutputStream extends ContentOutputStream{
 		io.write(b, off, len);
 	}
 	@Override
-	public void write8(long v, int len) throws IOException{
-		io.write8(v, len);
+	public void writeWord(long v, int len) throws IOException{
+		io.writeWord(v, len);
 	}
 	
 	@Override

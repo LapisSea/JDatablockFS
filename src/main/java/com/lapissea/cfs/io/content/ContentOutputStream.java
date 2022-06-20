@@ -27,7 +27,7 @@ public abstract class ContentOutputStream extends OutputStream implements Conten
 			pos+=len;
 		}
 		@Override
-		public void write8(long v, int len) throws IOException{
+		public void writeWord(long v, int len) throws IOException{
 			Utils.write8(v, ba, pos, len);
 			pos+=len;
 		}
