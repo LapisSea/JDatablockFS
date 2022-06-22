@@ -1,7 +1,5 @@
 package com.lapissea.cfs.io.bit;
 
-import com.lapissea.util.NotNull;
-
 import java.io.IOException;
 
 public interface BitWriter<SELF extends BitWriter<SELF>>{
@@ -18,12 +16,13 @@ public interface BitWriter<SELF extends BitWriter<SELF>>{
 		return self();
 	}
 	
-	default <T extends Enum<T>> SELF writeEnum(@NotNull T val, boolean nullable) throws IOException{
-		return writeEnum(EnumUniverse.getUnknown(val.getClass()), val, nullable);
-	}
-	
 	default <T extends Enum<T>> SELF writeEnum(EnumUniverse<T> info, T val, boolean nullable) throws IOException{
 		info.write(val, this, nullable);
+		return self();
+	}
+	
+	default <T extends Enum<T>> SELF writeEnum(EnumUniverse<T> info, T val) throws IOException{
+		info.write(val, this);
 		return self();
 	}
 	

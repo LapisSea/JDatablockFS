@@ -6,7 +6,6 @@ import com.lapissea.cfs.objects.NumberSize;
 
 import java.io.IOException;
 
-import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.io.bit.BitUtils.makeMask;
 
 public class FlagWriter implements BitWriter<FlagWriter>{
@@ -25,54 +24,69 @@ public class FlagWriter implements BitWriter<FlagWriter>{
 		}
 	}
 	
-	public static <T extends Enum<T>> void writeSingle(ContentWriter target, EnumUniverse<T> enumInfo, boolean nullable, T value) throws IOException{
-		writeSingle(target, enumInfo.numSize(nullable), enumInfo, nullable, value);
-	}
-	
-	public static <T extends Enum<T>> void writeSingle(ContentWriter target, NumberSize size, EnumUniverse<T> enumInfo, boolean nullable, T value) throws IOException{
-		if(DEBUG_VALIDATION){
-			var nums=enumInfo.numSize(nullable);
-			if(nums.lesserThan(size)) throw new IllegalArgumentException(nums+" <= "+size);
+	public static <T extends Enum<T>> void writeSingle(ContentWriter target, EnumUniverse<T> enumInfo, T value) throws IOException{
+		var size=enumInfo.numSize(false);
+		
+		if(size==NumberSize.BYTE){
+			var eSiz         =enumInfo.bitSize;
+			int integrityBits=((1<<eSiz)-1)<<eSiz;
+			
+			target.writeInt1(value.ordinal()|integrityBits);
+			return;
 		}
 		
 		var flags=new FlagWriter(size);
 		
-		flags.writeEnum(enumInfo, value, nullable);
+		flags.writeEnum(enumInfo, value);
 		
 		flags.fillRestAllOne().export(target);
 	}
 	
-	private NumberSize numberSize;
-	private long       buffer;
-	private int        written;
+	private final NumberSize numberSize;
+	private       long       buffer;
+	private       int        written;
 	
 	public FlagWriter(NumberSize numberSize){
-		reset(numberSize);
-	}
-	
-	private void reset(NumberSize numberSize){
 		this.numberSize=numberSize;
 		written=0;
 		buffer=0;
 	}
 	
+	
 	@Override
 	public FlagWriter writeBits(long data, int bitCount){
 		assert (data&makeMask(bitCount))==data;
-		if(written+bitCount>numberSize.bits()) throw new RuntimeException("ran out of bits "+(written+bitCount)+" > "+numberSize.bits());
-		
-		buffer|=data<<written;
-		written+=bitCount;
-		
+		checkBuffer(bitCount);
+		write(data, bitCount);
 		return this;
 	}
 	
-	public FlagWriter fillRestAllOne() throws IOException{
+	public FlagWriter fillRestAllOne(){
 		return fillNOne(remainingCount());
 	}
 	
 	public int remainingCount(){
 		return numberSize.bytes*Byte.SIZE-written;
+	}
+	
+	public FlagWriter fillNOne(int n){
+		checkBuffer(n);
+		
+		int maxBatch=63;
+		if(n>maxBatch){
+			write(1L, 1);
+			n--;
+		}
+		write((1L<<n)-1L, n);
+		return this;
+	}
+	
+	private void checkBuffer(int n){
+		if(written+n>numberSize.bits()) throw new RuntimeException("ran out of bits "+(written+n)+" > "+numberSize.bits());
+	}
+	private void write(long data, int bitCount){
+		buffer|=data<<written;
+		written+=bitCount;
 	}
 	
 	public void export(ContentWriter dest) throws IOException{

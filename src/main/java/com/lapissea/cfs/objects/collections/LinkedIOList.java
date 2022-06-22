@@ -294,7 +294,7 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 				if(DEBUG_VALIDATION){
 					assert getPipe().getSpecificFields().get(0).equals(getNextSizeField());
 				}
-				nextSize=FlagReader.readSingle(io, NumberSize.FLAG_INFO, false);
+				nextSize=FlagReader.readSingle(io, NumberSize.FLAG_INFO);
 
 //				if(DEBUG_VALIDATION){
 //					requireNonFreed();

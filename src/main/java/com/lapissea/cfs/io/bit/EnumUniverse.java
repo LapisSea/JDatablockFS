@@ -127,6 +127,8 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
 	public final  int      bitSize;
 	public final  int      nullableBitSize;
 	
+	private final NumberSize numberSize;
+	private final NumberSize nullableNumberSize;
 	
 	private EnumUniverse(Class<T> type){
 		this.type=type;
@@ -134,6 +136,9 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
 		
 		bitSize=calcBits(size());
 		nullableBitSize=calcBits(size()+1);
+		
+		numberSize=NumberSize.byBits(bitSize);
+		nullableNumberSize=NumberSize.byBits(nullableBitSize);
 	}
 	
 	private int calcBits(int size){
@@ -145,30 +150,32 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
 		source.skip(getBitSize(nullable));
 	}
 	
-	public T read(BitReader source) throws IOException{return read(source, false);}
+	public T read(BitReader source) throws IOException{
+		return get((int)source.readBits(bitSize));
+	}
 	public T read(BitReader source, boolean nullable) throws IOException{
-		int ordinal=(int)source.readBits(getBitSize(nullable));
-		if(nullable){
-			if(ordinal==0) return null;
-			return get(ordinal-1);
-		}
-		return get(ordinal);
+		if(!nullable) return read(source);
+		
+		int ordinal=(int)source.readBits(nullableBitSize);
+		if(ordinal==0) return null;
+		return get(ordinal-1);
 	}
 	
-	public void write(T source, BitWriter<?> dest) throws IOException{write(source, dest, false);}
+	public void write(T source, BitWriter<?> dest) throws IOException{
+		dest.writeBits(source.ordinal(), bitSize);
+	}
+	
 	public void write(T source, BitWriter<?> dest, boolean nullable) throws IOException{
-		int index;
-		if(nullable){
-			index=source==null?0:source.ordinal()+1;
-		}else{
+		if(!nullable){
 			Objects.requireNonNull(source);
-			index=source.ordinal();
+			write(source, dest);
+			return;
 		}
-		dest.writeBits(index, getBitSize(nullable));
+		dest.writeBits(source==null?0:source.ordinal()+1, nullableBitSize);
 	}
 	
 	public NumberSize numSize(boolean nullable){
-		return NumberSize.byBits(getBitSize(nullable));
+		return nullable?nullableNumberSize:numberSize;
 	}
 	
 	public int getBitSize(boolean nullable){

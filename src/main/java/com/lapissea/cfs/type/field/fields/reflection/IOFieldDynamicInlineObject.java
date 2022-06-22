@@ -143,13 +143,13 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 			case Number integer -> {
 				long value=numToLong(integer);
 				var  num  =NumberSize.bySize(value);
-				FlagWriter.writeSingle(dest, NumberSize.FLAG_INFO, false, num);
+				FlagWriter.writeSingle(dest, NumberSize.FLAG_INFO, num);
 				num.write(dest, value);
 			}
 			case String str -> AutoText.PIPE.write(provider, dest, new AutoText(str));
 			case byte[] array -> {
 				var num=NumberSize.bySize(array.length);
-				FlagWriter.writeSingle(dest, NumberSize.BYTE, NumberSize.FLAG_INFO, false, num);
+				FlagWriter.writeSingle(dest, NumberSize.FLAG_INFO, num);
 				num.write(dest, array.length);
 				dest.writeInts1(array);
 			}
@@ -162,7 +162,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 					var len=Array.getLength(val);
 					{
 						var num=NumberSize.bySize(len);
-						FlagWriter.writeSingle(dest, NumberSize.BYTE, NumberSize.FLAG_INFO, false, num);
+						FlagWriter.writeSingle(dest, NumberSize.FLAG_INFO, num);
 						num.write(dest, len);
 					}
 					
@@ -213,7 +213,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 			}
 			case LONG -> {
 				var siz=NumberSize.bySize(LongStream.of((long[])array).max().orElse(0));
-				FlagWriter.writeSingle(dest, NumberSize.BYTE, NumberSize.FLAG_INFO, false, siz);
+				FlagWriter.writeSingle(dest, NumberSize.FLAG_INFO, siz);
 				
 				byte[] bb=new byte[siz.bytes*len];
 				try(var io=new ContentOutputStream.BA(bb)){
@@ -225,7 +225,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 			}
 			case INT -> {
 				var siz=NumberSize.bySize(IntStream.of((int[])array).max().orElse(0));
-				FlagWriter.writeSingle(dest, NumberSize.BYTE, NumberSize.FLAG_INFO, false, siz);
+				FlagWriter.writeSingle(dest, NumberSize.FLAG_INFO, siz);
 				
 				byte[] bb=new byte[siz.bytes*len];
 				try(var io=new ContentOutputStream.BA(bb)){
@@ -260,7 +260,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 				}
 			}
 			case LONG -> {
-				var siz=FlagReader.readSingle(src, NumberSize.FLAG_INFO, false);
+				var siz=FlagReader.readSingle(src, NumberSize.FLAG_INFO);
 				var arr=new long[len];
 				for(int i=0;i<arr.length;i++){
 					arr[i]=siz.read(src);
@@ -268,7 +268,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 				yield arr;
 			}
 			case INT -> {
-				var siz=FlagReader.readSingle(src, NumberSize.FLAG_INFO, false);
+				var siz=FlagReader.readSingle(src, NumberSize.FLAG_INFO);
 				var arr=new int[len];
 				for(int i=0;i<arr.length;i++){
 					arr[i]=(int)siz.read(src);
@@ -298,7 +298,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		if(typ==Double.class) return NumberSize.LONG.readFloating(src);
 		if(UtilL.instanceOf(typ, Number.class)){
 			ensureInt(typ);
-			var num    =FlagReader.readSingle(src, NumberSize.FLAG_INFO, false);
+			var num    =FlagReader.readSingle(src, NumberSize.FLAG_INFO);
 			var longNum=num.read(src);
 			if(typ==Byte.class) return (byte)longNum;
 			if(typ==Short.class) return (short)longNum;
@@ -308,7 +308,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		}
 		if(typ==String.class) return AutoText.PIPE.readNew(provider, src, genericContext).getData();
 		if(typ==byte[].class){
-			var num=FlagReader.readSingle(src, NumberSize.BYTE, NumberSize.FLAG_INFO, false);
+			var num=FlagReader.readSingle(src, NumberSize.FLAG_INFO);
 			var len=(int)num.read(src);
 			return src.readInts1(len);
 		}
@@ -324,7 +324,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		}
 		
 		if(typ.isArray()){
-			int len=Math.toIntExact(FlagReader.readSingle(src, NumberSize.FLAG_INFO, false).read(src));
+			int len=Math.toIntExact(FlagReader.readSingle(src, NumberSize.FLAG_INFO).read(src));
 			
 			var e=typ.getComponentType();
 			
@@ -366,7 +366,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		else if(typ==Double.class) siz=NumberSize.LONG;
 		else if(UtilL.instanceOf(typ, Number.class)){
 			ensureInt(typ);
-			siz=FlagReader.readSingle(src, NumberSize.FLAG_INFO, false);
+			siz=FlagReader.readSingle(src, NumberSize.FLAG_INFO);
 		}
 		if(siz!=null){
 			src.skipExact(siz);

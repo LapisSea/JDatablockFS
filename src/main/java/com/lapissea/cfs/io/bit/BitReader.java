@@ -16,6 +16,12 @@ public interface BitReader{
 	default void skipEnum(EnumUniverse<?> info, boolean nullable) throws IOException{
 		info.readSkip(this, nullable);
 	}
+	default <T extends Enum<T>> T readEnum(EnumUniverse<T> info) throws IOException{
+		return info.read(this);
+	}
+	default void skipEnum(EnumUniverse<?> info) throws IOException{
+		info.readSkip(this);
+	}
 	
 	default boolean readBoolBit() throws IOException{
 		return readBits(1)==1;

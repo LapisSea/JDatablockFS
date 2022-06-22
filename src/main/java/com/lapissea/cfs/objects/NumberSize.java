@@ -12,6 +12,7 @@ import com.lapissea.util.ShouldNeverHappenError;
 
 import java.io.IOException;
 import java.math.BigInteger;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
@@ -67,7 +68,7 @@ public enum NumberSize{
 	private static <T> NumberSize searchSizeByVal(ToLongFunction<NumberSize> mapper, long key){
 		//TODO: maybe something more intelligent?
 		//nah, premature optimization for now
-		for(var value : FLAG_INFO){
+		for(var value : FLAG_INFO==null?Arrays.asList(values()):FLAG_INFO){
 			if(mapper.applyAsLong(value)>=key) return value;
 		}
 		return null;

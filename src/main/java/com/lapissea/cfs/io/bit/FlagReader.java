@@ -1,31 +1,37 @@
 package com.lapissea.cfs.io.bit;
 
 
+import com.lapissea.cfs.exceptions.IllegalBitValueException;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.objects.NumberSize;
+import com.lapissea.util.NotNull;
 
 import java.io.IOException;
 
-import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.io.bit.BitUtils.makeMask;
 
 public class FlagReader implements BitReader, AutoCloseable{
 	
-	
-	private static final ThreadLocal<FlagReader> INTERNAL_READERS=ThreadLocal.withInitial(()->new FlagReader(0, -1));
-	
-	public static <T extends Enum<T>> T readSingle(ContentReader in, EnumUniverse<T> enumInfo, boolean nullable) throws IOException{
-		return readSingle(in, enumInfo.numSize(nullable), enumInfo, nullable);
-	}
-	
-	public static <T extends Enum<T>> T readSingle(ContentReader in, NumberSize size, EnumUniverse<T> enumInfo, boolean nullable) throws IOException{
-		if(DEBUG_VALIDATION){
-			var nums=enumInfo.numSize(nullable);
-			if(nums.lesserThan(size)) throw new IllegalArgumentException(nums+" <= "+size);
+	@NotNull
+	public static <T extends Enum<T>> T readSingle(ContentReader in, EnumUniverse<T> enumInfo) throws IOException{
+		var size=enumInfo.numSize(false);
+		
+		if(size==NumberSize.BYTE){
+			int data=in.readUnsignedInt1();
+			
+			var eSiz         =enumInfo.bitSize;
+			int integrityBits=((1<<eSiz)-1)<<eSiz;
+			
+			if((data&integrityBits)!=integrityBits){
+				throw new IllegalBitValueException(BitUtils.binaryRangeFindZero(data, 8, 0));
+			}
+			
+			return enumInfo.get((int)(data&((1L<<eSiz)-1L)));
 		}
 		
-		try(var flags=INTERNAL_READERS.get().start(size.read(in), size.bits())){
-			return flags.readEnum(enumInfo, nullable);
+		
+		try(var flags=new FlagReader(size.read(in), size.bits())){
+			return flags.readEnum(enumInfo);
 		}
 	}
 	
@@ -43,13 +49,8 @@ public class FlagReader implements BitReader, AutoCloseable{
 	
 	public FlagReader(long data, int bitCount){
 		totalBitCount=bitCount;
-		start(data, bitCount);
-	}
-	
-	private FlagReader start(long data, int bitCount){
 		this.data=data;
 		this.bitCount=bitCount;
-		return this;
 	}
 	
 	public int remainingCount(){
