@@ -1,10 +1,7 @@
 package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.internal.Runner;
-import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
-
-import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
 public abstract class StagedInit{
 //	static{
@@ -106,35 +103,35 @@ public abstract class StagedInit{
 	}
 	
 	private void waitForState0(int state){
-		if(DEBUG_VALIDATION){
-			var limit=1000;
-			while(true){
-				synchronized(this){
-					checkErr();
-					if(this.state>=state) return;
-					try{
-//						LogUtil.printTable("ms pass", tim(), "actor", this, "thread", Thread.currentThread().getName(), "action", "wait", "target state", stateToStrCol(state), "current", stateToStrCol(this.state));
-						long tim=System.nanoTime();
-						this.wait(limit);
-						long dif=(System.nanoTime()-tim);
-						
-						if(dif>(limit-2)*1000_000L){
-							if(state>=this.state) throw new ShouldNeverHappenError(this+" didn't wake");
-							throw new RuntimeException(this+" "+stateToStrCol(state)+" "+stateToStrCol(this.state)+" took too long");
-						}
-					}catch(InterruptedException ignored){}
-				}
-			}
-		}else{
-			while(true){
-				synchronized(this){
-					checkErr();
-					if(this.state>=state) return;
-					try{
-						this.wait();
-					}catch(InterruptedException ignored){}
-				}
+//		if(DEBUG_VALIDATION){
+//			var limit=1000;
+//			while(true){
+//				synchronized(this){
+//					checkErr();
+//					if(this.state>=state) return;
+//					try{
+////						LogUtil.printTable("ms pass", tim(), "actor", this, "thread", Thread.currentThread().getName(), "action", "wait", "target state", stateToStrCol(state), "current", stateToStrCol(this.state));
+//						long tim=System.nanoTime();
+//						this.wait(limit);
+//						long dif=(System.nanoTime()-tim);
+//
+//						if(dif>(limit-2)*1000_000L){
+//							if(state>=this.state) throw new ShouldNeverHappenError(this+" didn't wake");
+//							throw new RuntimeException(this+" "+stateToStrCol(state)+" "+stateToStrCol(this.state)+" took too long");
+//						}
+//					}catch(InterruptedException ignored){}
+//				}
+//			}
+//		}else{
+		while(true){
+			synchronized(this){
+				checkErr();
+				if(this.state>=state) return;
+				try{
+					this.wait();
+				}catch(InterruptedException ignored){}
 			}
 		}
+//		}
 	}
 }
