@@ -8,6 +8,7 @@ import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
+import com.lapissea.util.ShouldNeverHappenError;
 
 import java.io.IOException;
 import java.math.BigInteger;
@@ -20,34 +21,15 @@ import java.util.function.ToLongFunction;
 public enum NumberSize{
 	
 	// @formatter:off
-	VOID      ('V', 0, in->0,                           (out, num)->{},                      in->0,                                      (out, num)->{}),
-	BYTE      ('B', 1, ContentReader::readUnsignedInt1, (out, num)->out.writeInt1((int)num), NumberSize::RNS,                            NumberSize::WNS),
-	SHORT     ('s', 2, ContentReader::readUnsignedInt2, (out, num)->out.writeInt2((int)num), in->Utils.shortBitsToFloat(in.readInt2()),  (out, num)->out.writeInt2(Utils.floatToShortBits((float)num))),
-	SMALL_INT ('S', 3, ContentReader::readUnsignedInt3, (out, num)->out.writeInt3((int)num), NumberSize::RNS,                            NumberSize::WNS),
-	INT       ('i', 4, ContentReader::readUnsignedInt4, (out, num)->out.writeInt4((int)num), in->Float.intBitsToFloat(in.readInt4()),    (out, num)->out.writeInt4(Float.floatToIntBits((float)num))),
-	BIG_INT   ('I', 5, ContentReader::readUnsignedInt5, ContentWriter::writeInt5,            NumberSize::RNS,                            NumberSize::WNS),
-	SMALL_LONG('l', 6, ContentReader::readUnsignedInt6, ContentWriter::writeInt6,            NumberSize::RNS,                            NumberSize::WNS),
-	LONG      ('L', 8, ContentReader::readInt8,         ContentWriter::writeInt8,            in->Double.longBitsToDouble(in.readInt8()), (out, num)->out.writeInt8(Double.doubleToLongBits(num)));
+	VOID      ('V', 0),
+	BYTE      ('B', 1),
+	SHORT     ('s', 2),
+	SMALL_INT ('S', 3),
+	INT       ('i', 4),
+	BIG_INT   ('I', 5),
+	SMALL_LONG('l', 6),
+	LONG      ('L', 8);
 	// @formatter:on
-	
-	private static double RNS(ContentReader src)             {throw new UnsupportedOperationException();}
-	private static void WNS(ContentWriter dest, double value){throw new UnsupportedOperationException();}
-	
-	private interface WriterI{
-		void write(ContentWriter dest, long value) throws IOException;
-	}
-	
-	private interface ReaderI{
-		long read(ContentReader src) throws IOException;
-	}
-	
-	private interface WriterF{
-		void write(ContentWriter dest, double value) throws IOException;
-	}
-	
-	private interface ReaderF{
-		double read(ContentReader src) throws IOException;
-	}
 	
 	public static final EnumUniverse<NumberSize> FLAG_INFO=EnumUniverse.get(NumberSize.class);
 	
@@ -98,38 +80,50 @@ public enum NumberSize{
 	public final long maxSize;
 	public final char shortName;
 	
-	private final ReaderI reader;
-	private final WriterI writer;
-	private final ReaderF readerFloating;
-	private final WriterF writerFloating;
-	
 	public final OptionalInt  optionalBytes;
 	public final OptionalLong optionalBytesLong;
 	
-	NumberSize(char shortName, int bytes, ReaderI reader, WriterI writer, ReaderF readerFloating, WriterF writerFloating){
+	NumberSize(char shortName, int bytes){
 		this.shortName=shortName;
 		this.bytes=bytes;
 		this.maxSize=BigInteger.ONE.shiftLeft(bytes*8).subtract(BigInteger.ONE).min(BigInteger.valueOf(Long.MAX_VALUE)).longValueExact();
-		
-		this.reader=reader;
-		this.writer=writer;
-		this.readerFloating=readerFloating;
-		this.writerFloating=writerFloating;
 		
 		optionalBytes=OptionalInt.of(bytes);
 		optionalBytesLong=OptionalLong.of(bytes);
 	}
 	
 	public double readFloating(ContentReader in) throws IOException{
-		return readerFloating.read(in);
+		return switch(this){
+			case INT -> Float.intBitsToFloat(in.readInt4());
+			case LONG -> Double.longBitsToDouble(in.readInt8());
+			case SHORT -> Utils.shortBitsToFloat(in.readInt2());
+			case VOID -> 0;
+			case BYTE, SMALL_INT, BIG_INT, SMALL_LONG -> throw new UnsupportedOperationException();
+		};
 	}
 	
 	public void writeFloating(ContentWriter out, double value) throws IOException{
-		writerFloating.write(out, value);
+		switch(this){
+			case INT -> out.writeInt4(Float.floatToIntBits((float)value));
+			case LONG -> out.writeInt8(Double.doubleToLongBits(value));
+			case SHORT -> out.writeInt2(Utils.floatToShortBits((float)value));
+			case VOID -> {}
+			case BYTE, SMALL_INT, BIG_INT, SMALL_LONG -> throw new UnsupportedOperationException();
+			case null -> throw new ShouldNeverHappenError();
+		}
 	}
 	
 	public long read(ContentReader in) throws IOException{
-		return reader.read(in);
+		return switch(this){
+			case VOID -> 0;
+			case BYTE -> in.readUnsignedInt1();
+			case SHORT -> in.readUnsignedInt2();
+			case SMALL_INT -> in.readUnsignedInt3();
+			case INT -> in.readUnsignedInt4();
+			case BIG_INT -> in.readUnsignedInt5();
+			case SMALL_LONG -> in.readUnsignedInt6();
+			case LONG -> in.readInt8();
+		};
 	}
 	
 	public void write(ContentWriter out, INumber value) throws IOException{
@@ -137,7 +131,17 @@ public enum NumberSize{
 	}
 	
 	public void write(ContentWriter out, long value) throws IOException{
-		writer.write(out, value);
+		switch(this){
+			case VOID -> {}
+			case BYTE -> out.writeInt1((int)value);
+			case SHORT -> out.writeInt2((int)value);
+			case SMALL_INT -> out.writeInt3((int)value);
+			case INT -> out.writeInt4((int)value);
+			case BIG_INT -> out.writeInt5(value);
+			case SMALL_LONG -> out.writeInt6(value);
+			case LONG -> out.writeInt8(value);
+			case null -> throw new ShouldNeverHappenError();
+		}
 	}
 	
 	public NumberSize prev(){
