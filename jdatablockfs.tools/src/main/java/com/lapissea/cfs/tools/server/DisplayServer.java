@@ -153,7 +153,7 @@ public class DisplayServer implements DataLogger{
 		public record Info(InetAddress addr, int timeout){}
 		
 		private static Socket sessionConnection(Info con, String sessionName, Map<String, Object> config) throws IOException{
-			int port=((Number)config.getOrDefault("port", 666)).intValue();
+			int port=((Number)config.getOrDefault("port", 6666)).intValue();
 			
 			var socketMake=new Socket();
 			socketMake.connect(new InetSocketAddress(con.addr, port), con.timeout);

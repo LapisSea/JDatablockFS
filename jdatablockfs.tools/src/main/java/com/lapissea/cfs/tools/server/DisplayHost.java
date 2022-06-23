@@ -206,7 +206,7 @@ public class DisplayHost{
 	
 	public void start(boolean lazyStart) throws IOException{
 		var config=LoggedMemoryUtils.readConfig();
-		int port  =((Number)config.getOrDefault("port", 666)).intValue();
+		int port  =((Number)config.getOrDefault("port", 6666)).intValue();
 		
 		ServerSocket server=new ServerSocket(port);
 		LogUtil.println("Started on port", port);
