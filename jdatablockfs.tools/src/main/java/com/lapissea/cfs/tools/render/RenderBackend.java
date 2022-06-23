@@ -44,7 +44,7 @@ public abstract class RenderBackend{
 				public void draw(RenderBackend backend){
 					try(var ignored=backend.bulkDraw(DrawMode.QUADS)){
 						for(int i=0;i<len;i++){
-							backend.outlineQuad(data[i*4], data[i*4+1], data[i*4+2], data[i*4+3]);
+							backend.fillQuad(data[i*4], data[i*4+1], data[i*4+2], data[i*4+3]);
 						}
 					}
 				}

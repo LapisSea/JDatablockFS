@@ -18,15 +18,13 @@ import java.util.EnumSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 import static java.awt.event.MouseEvent.BUTTON1;
 import static java.awt.event.MouseEvent.BUTTON2;
 import static org.joml.Math.clamp;
 
 public class G2DBackend extends RenderBackend{
-	static{
-		System.setProperty("sun.java2d.opengl", "true");
-	}
 	
 	private BufferedImage displayBuffer, activeBuffer;
 	private BufferedImage b1, b2;
@@ -50,14 +48,41 @@ public class G2DBackend extends RenderBackend{
 	private final DrawFont font=new DrawFont(){
 		@Override
 		public void fillStrings(List<StringDraw> strings){
-			for(StringDraw string : strings){
-				fillString(string.color(), string.string(), string.x(), string.y(), string.pixelHeight());
+			for(List<StringDraw> batch : strings.size()<=1?List.of(strings):strings.stream().collect(Collectors.groupingBy(StringDraw::pixelHeight)).values()){
+				var pixelHeight=batch.get(0).pixelHeight();
+				currentGraphics.setFont(currentGraphics.getFont().deriveFont(pixelHeight*0.8F));
+				for(StringDraw sd : batch){
+					var col=alphaScale(sd.color(), pixelHeight, false);
+					if(col.getAlpha()<2) continue;
+					
+					var t=currentGraphics.getTransform();
+					currentGraphics.translate(sd.x(), sd.y());
+					currentGraphics.scale(sd.xScale(), 1);
+					
+					currentGraphics.setColor(col);
+					currentGraphics.drawString(sd.string(), 0, 0);
+					
+					currentGraphics.setTransform(t);
+				}
 			}
 		}
 		@Override
 		public void outlineStrings(List<StringDraw> strings){
-			for(StringDraw string : strings){
-				outlineString(string.color(), string.string(), string.x(), string.y());
+			
+			for(List<StringDraw> batch : strings.size()<=1?List.of(strings):strings.stream().collect(Collectors.groupingBy(StringDraw::pixelHeight)).values()){
+				var pixelHeight=batch.get(0).pixelHeight();
+				currentGraphics.setFont(currentGraphics.getFont().deriveFont(pixelHeight*0.8F));
+				
+				setStrokeWidth(1);
+				for(StringDraw sd : batch){
+					var col=alphaScale(sd.color(), pixelHeight, true);
+					if(col.getAlpha()<2) continue;
+					currentGraphics.setColor(col);
+					var transform=new AffineTransform();
+					transform.translate(sd.x(), sd.y());
+					transform.scale(sd.xScale(), 1);
+					currentGraphics.draw(new TextLayout(sd.string(), currentGraphics.getFont(), currentGraphics.getFontRenderContext()).getOutline(transform));
+				}
 			}
 		}
 		@Override
@@ -71,27 +96,11 @@ public class G2DBackend extends RenderBackend{
 			return currentGraphics.getFont().canDisplay(c);
 		}
 		
-		public void fillString(Color color, String str, float x, float y, float pixelHeight){
-			var   outline=false;
-			Color newCol =alphaScale(color, pixelHeight, outline);
-			currentGraphics.setColor(newCol);
-			currentGraphics.setFont(currentGraphics.getFont().deriveFont(getFontScale()/2));
-			currentGraphics.drawString(str, x, y);
-		}
 		private Color alphaScale(Color color, float pixelHeight, boolean outline){
 			var   minSpace=outline?20:5;
 			float alphaMul=clamp(0, 1, (pixelHeight-minSpace)/3);
 			var   newCol  =new Color(color.getRed(), color.getGreen(), color.getBlue(), (int)(color.getAlpha()*alphaMul));
 			return newCol;
-		}
-		public void outlineString(Color color, String str, float x, float y){
-			currentGraphics.setColor(color);
-			setStrokeWidth(1);
-			currentGraphics.setFont(currentGraphics.getFont().deriveFont(getFontScale()/2));
-			var transform=new AffineTransform();
-			transform.translate(x, y);
-			Shape shape=new TextLayout(str, currentGraphics.getFont(), currentGraphics.getFontRenderContext()).getOutline(transform);
-			currentGraphics.draw(shape);
 		}
 	};
 	
