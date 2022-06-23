@@ -306,19 +306,12 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 	}
 	
 	
-	public void pushSize(long newSize) throws BitDepthOutOfSpaceException{
+	public void pushSize(long newSize){
 		if(newSize>getSize()) setSize(newSize);
 	}
 	public void clampSize(long newSize){
 		if(newSize<getSize()){
-			try{
-				setSize(newSize);
-			}catch(BitDepthOutOfSpaceException e){
-				/*
-				 * The size only gets smaller. This can theoretically happen if the chunk is in a corrupt state.
-				 * */
-				throw new ShouldNeverHappenError(e);
-			}
+			setSize(newSize);
 		}
 	}
 	public void growSizeAndZeroOut(long newSize) throws IOException{
@@ -332,24 +325,17 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		
 	}
 	
-	public void sizeSetZero(){
-		try{
-			setSize(0);
-		}catch(BitDepthOutOfSpaceException e){
-			throw new ShouldNeverHappenError(e);
-		}
-	}
-	
 	@IOValue
 	public long getSize(){
 		return size;
 	}
 	@IOValue
-	public void setSize(long newSize) throws BitDepthOutOfSpaceException{
+	public void setSize(long newSize){
 		forbidReadOnly();
 		if(this.size==newSize) return;
-		assert newSize<=getCapacity():newSize+" > "+getCapacity();
-		getBodyNumSize().ensureCanFit(newSize);
+		if(newSize>capacity){
+			throw new IllegalArgumentException("New size "+newSize+" is bigger than capacity "+capacity);
+		}
 		
 		setSizeUnsafe(newSize);
 	}

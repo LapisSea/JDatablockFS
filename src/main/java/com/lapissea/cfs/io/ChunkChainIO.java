@@ -2,7 +2,6 @@ package com.lapissea.cfs.io;
 
 import com.lapissea.cfs.chunk.ChainWalker;
 import com.lapissea.cfs.chunk.Chunk;
-import com.lapissea.cfs.exceptions.BitDepthOutOfSpaceException;
 import com.lapissea.cfs.io.content.ContentOutputStream;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
@@ -340,17 +339,7 @@ public final class ChunkChainIO implements RandomIO{
 			long cRem  =cursor.getCapacity()-offset;
 			if(cRem>=len){
 				syncedSource().write(b, off, len);
-				cursor.modifyAndSave(c->{
-					try{
-						c.pushSize(offset+len);
-					}catch(BitDepthOutOfSpaceException e){
-						/*
-						 * size can not exceed capacity. If it somehow does and capacity
-						 * did not throw bitdepth then this should not be the biggest concern.
-						 * */
-						throw new ShouldNeverHappenError(e);
-					}
-				});
+				cursor.modifyAndSave(c->c.pushSize(offset+len));
 				advanceCursorBy(len);
 				return;
 			}
@@ -403,11 +392,7 @@ public final class ChunkChainIO implements RandomIO{
 			remaining-=toWrite;
 			dataOffset+=toWrite;
 			
-			try{
-				cursor.pushSize(offset+toWrite);
-			}catch(BitDepthOutOfSpaceException e){
-				throw new ShouldNeverHappenError(e);
-			}
+			cursor.pushSize(offset+toWrite);
 		}
 		
 		if(cursor.dirty()) chunks.add(writeHeadToBuf(cursor));
@@ -422,11 +407,7 @@ public final class ChunkChainIO implements RandomIO{
 			remaining-=toWrite;
 			dataOffset+=toWrite;
 			
-			try{
-				ch.pushSize(toWrite);
-			}catch(BitDepthOutOfSpaceException e){
-				throw new ShouldNeverHappenError(e);
-			}
+			ch.pushSize(toWrite);
 			if(ch.dirty()) chunks.add(writeHeadToBuf(ch));
 			chunks.add(event);
 		}
@@ -455,17 +436,7 @@ public final class ChunkChainIO implements RandomIO{
 		}
 		
 		syncedSource().writeWord(v, len);
-		cursor.modifyAndSave(c->{
-			try{
-				c.pushSize(offset+len);
-			}catch(BitDepthOutOfSpaceException e){
-				/*
-				 * size can not exceed capacity. If it somehow does and capacity
-				 * did not throw bitdepth then this should not be the biggest concern.
-				 * */
-				throw new ShouldNeverHappenError(e);
-			}
-		});
+		cursor.modifyAndSave(c->c.pushSize(offset+len));
 		advanceCursorBy(len);
 	}
 	
@@ -557,18 +528,14 @@ public final class ChunkChainIO implements RandomIO{
 			var w=unmapped.withOffset(chunk.dataStart()+chunkOffset);
 			
 			mappedChunks.add(w);
-			try{
-				if(pushIndex<index){
-					for(int j=pushIndex;j<index;j++){
-						var c=chunks.get(j);
-						c.setSize(c.getCapacity());
-					}
-					pushIndex=index;
+			if(pushIndex<index){
+				for(int j=pushIndex;j<index;j++){
+					var c=chunks.get(j);
+					c.setSize(c.getCapacity());
 				}
-				chunk.pushSize(chunkOffset+unmapped.dataLength());
-			}catch(BitDepthOutOfSpaceException e){
-				throw new ShouldNeverHappenError(e);//already guarded
+				pushIndex=index;
 			}
+			chunk.pushSize(chunkOffset+unmapped.dataLength());
 		}
 		
 		for(Chunk chunk : chunks){
@@ -630,13 +597,7 @@ public final class ChunkChainIO implements RandomIO{
 			var newSiz=siz+remaining;
 			if(cap<newSiz) throw new IOException("size too big! "+cap+" "+newSiz);
 			
-			try{
-				chunk.setSize(newSiz);
-			}catch(BitDepthOutOfSpaceException e){
-				//capacity ensures bitspace is large enough
-				throw new ShouldNeverHappenError();
-			}
-			chunk.syncStruct();
+			chunk.modifyAndSave(c->c.setSize(newSiz));
 		}
 		
 		assert targetSize==getSize():targetSize+"!="+getSize();

@@ -226,7 +226,7 @@ public class MemoryOperations{
 		}
 	}
 	private static void clearFree(Chunk newCh) throws IOException{
-		newCh.sizeSetZero();
+		newCh.setSize(0);
 		newCh.clearNextPtr();
 		newCh.syncStruct();
 	}
