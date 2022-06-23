@@ -35,8 +35,18 @@ public class Cluster implements DataProvider{
 	
 	private static final ByteBuffer MAGIC_ID=ByteBuffer.wrap("BYT-BAE".getBytes(UTF_8)).asReadOnlyBuffer();
 	
-	public static final  StructPipe<RootRef> ROOT_PIPE      =FixedContiguousStructPipe.of(RootRef.class);
-	private static final ChunkPointer        FIRST_CHUNK_PTR=ChunkPointer.of(MAGIC_ID.limit());
+	public static final  StructPipe<RootRef> ROOT_PIPE;
+	private static final ChunkPointer        FIRST_CHUNK_PTR;
+	
+	static{
+		try{
+			ROOT_PIPE=FixedContiguousStructPipe.of(RootRef.class);
+			FIRST_CHUNK_PTR=ChunkPointer.of(MAGIC_ID.limit());
+		}catch(Throwable e){
+			e.printStackTrace();
+			throw e;
+		}
+	}
 	
 	public static ByteBuffer getMagicId(){
 		return MAGIC_ID.asReadOnlyBuffer();
