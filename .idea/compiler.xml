@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CompilerConfiguration">
+    <wildcardResourcePatterns>
+      <entry name="*" />
+    </wildcardResourcePatterns>
+    <annotationProcessing>
+      <profile default="true" name="Default" enabled="true" />
+      <profile name="Maven default annotation processors profile" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <module name="jdatablockfs.run" />
+        <module name="jdatablockfs.tools" />
+        <module name="Jorth" />
+      </profile>
+    </annotationProcessing>
+    <bytecodeTargetLevel target="17">
+      <module name="JDatablockFS" target="18" />
+      <module name="jdatablockfs.run" target="18" />
+      <module name="jdatablockfs.tools" target="18" />
+      <module name="Jorth" target="18" />
+    </bytecodeTargetLevel>
+  </component>
+  <component name="JavacSettings">
+    <option name="ADDITIONAL_OPTIONS_OVERRIDE">
+      <module name="JDatablockFS" options="" />
+      <module name="Jorth" options="" />
+      <module name="jdatablockfs.run" options="" />
+      <module name="jdatablockfs.tools" options="" />
+    </option>
+  </component>
+</project>
