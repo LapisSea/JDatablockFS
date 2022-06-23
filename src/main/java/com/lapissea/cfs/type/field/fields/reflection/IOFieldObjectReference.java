@@ -11,6 +11,7 @@ import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.StagedInit;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
@@ -44,7 +45,11 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 		struct=(Struct<ValueType>)Struct.ofUnknown(getAccessor().getType());
 		var typ=accessor.getAnnotation(IOValue.Reference.class).map(IOValue.Reference::dataPipeType).orElseThrow();
 		instancePipe=switch(typ){
-			case FIXED -> FixedContiguousStructPipe.of(struct);
+			case FIXED -> {
+				var pip=FixedContiguousStructPipe.of(struct);
+				pip.waitForState(StagedInit.STATE_DONE);
+				yield pip;
+			}
 			case FLEXIBLE -> ContiguousStructPipe.of(struct);
 		};
 		

@@ -15,6 +15,7 @@ import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.IOException;
@@ -390,7 +391,13 @@ public sealed interface ValueStorage<T>{
 			var struct=Struct.ofUnknown(clazz);
 			if(fixedOnly){
 				try{
-					return new FixedInstance<>(generics, provider, FixedContiguousStructPipe.of(struct));
+					var pipe=FixedContiguousStructPipe.of(struct);
+					try{
+						pipe.waitForState(StagedInit.STATE_DONE);
+					}catch(StagedInit.WaitException e){
+						throw UtilL.uncheckedThrow(e.getCause());
+					}
+					return new FixedInstance<>(generics, provider, pipe);
 				}catch(MalformedStructLayout ignored){
 					return new FixedReferencedInstance<>(generics, provider, ContiguousStructPipe.of(struct));
 				}
