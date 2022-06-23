@@ -10,10 +10,7 @@ import com.lapissea.util.function.FunctionOL;
 
 import java.io.EOFException;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.LinkedList;
-import java.util.Objects;
+import java.util.*;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
@@ -338,35 +335,113 @@ public final class ChunkChainIO implements RandomIO{
 			checkCursorInChain();
 		}
 		
-		int remaining=len;
-		int offAdd   =off;
-		
-		while(remaining>0){
+		while(true){
 			long offset=calcCursorOffset();
 			long cRem  =cursor.getCapacity()-offset;
-			if(cRem<remaining&&!cursor.hasNextPtr()){
-				ensureForwardCapacity(remaining);
-				continue;
+			if(cRem>=len){
+				syncedSource().write(b, off, len);
+				cursor.modifyAndSave(c->{
+					try{
+						c.pushSize(offset+len);
+					}catch(BitDepthOutOfSpaceException e){
+						/*
+						 * size can not exceed capacity. If it somehow does and capacity
+						 * did not throw bitdepth then this should not be the biggest concern.
+						 * */
+						throw new ShouldNeverHappenError(e);
+					}
+				});
+				advanceCursorBy(len);
+				return;
 			}
-			int toWrite=(int)Math.min(remaining, cRem);
-			
-			syncedSource().write(b, offAdd, toWrite);
-			cursor.modifyAndSave(c->{
-				try{
-					c.pushSize(offset+toWrite);
-				}catch(BitDepthOutOfSpaceException e){
-					/*
-					 * size can not exceed capacity. If it somehow does and capacity
-					 * did not throw bitdepth then this should not be the biggest concern.
-					 * */
-					throw new ShouldNeverHappenError(e);
+			if(!cursor.hasNextPtr()){
+				ensureForwardCapacity(len);
+				if(!cursor.hasNextPtr()){
+					continue;
 				}
-			});
-			advanceCursorBy(toWrite);
-			
-			offAdd+=toWrite;
-			remaining-=toWrite;
+			}
+			break;
 		}
+		var request=multiMappedWrite(b, off, len);
+		if(request>0){
+			ensureForwardCapacity(len);
+			request=multiMappedWrite(b, off, len);
+			if(request!=0) throw new IllegalStateException();
+		}
+	}
+	
+	private int multiMappedWrite(byte[] data, int off, int len) throws IOException{
+		
+		var offset         =calcCursorOffset();
+		var cursorRemaining=cursor.getCapacity()-offset;
+		int eventSize      =2;
+		{
+			int remaining=len;
+			remaining-=cursorRemaining;
+			
+			var ch=cursor;
+			while(remaining>0){
+				var next=ch.next();
+				if(next==null){
+					return remaining;
+				}
+				ch=next;
+				remaining-=ch.getCapacity();
+				eventSize+=2;
+			}
+		}
+		
+		List<WriteChunk> chunks=new ArrayList<>(eventSize);
+		
+		int dataOffset=off;
+		int remaining =len;
+		
+		WriteChunk cursorWrite;
+		{
+			var toWrite=(int)Math.min(remaining, cursorRemaining);
+			cursorWrite=new WriteChunk(calcGlobalPos(), dataOffset, toWrite, data);
+			remaining-=toWrite;
+			dataOffset+=toWrite;
+			
+			try{
+				cursor.pushSize(offset+toWrite);
+			}catch(BitDepthOutOfSpaceException e){
+				throw new ShouldNeverHappenError(e);
+			}
+		}
+		
+		if(cursor.dirty()) chunks.add(writeHeadToBuf(cursor));
+		chunks.add(cursorWrite);
+		
+		var ch=cursor;
+		while(remaining>0){
+			ch=Objects.requireNonNull(ch.next());
+			
+			var toWrite=(int)Math.min(remaining, ch.getCapacity());
+			var event  =new WriteChunk(ch.dataStart(), dataOffset, toWrite, data);
+			remaining-=toWrite;
+			dataOffset+=toWrite;
+			
+			try{
+				ch.pushSize(toWrite);
+			}catch(BitDepthOutOfSpaceException e){
+				throw new ShouldNeverHappenError(e);
+			}
+			if(ch.dirty()) chunks.add(writeHeadToBuf(ch));
+			chunks.add(event);
+		}
+		
+		chunks.sort(Comparator.naturalOrder());
+		
+		source.writeAtOffsets(chunks);
+		advanceCursorBy(len);
+		
+		return 0;
+	}
+	private WriteChunk writeHeadToBuf(Chunk chunk) throws IOException{
+		byte[] headBuf=new byte[chunk.getHeaderSize()];
+		chunk.writeHeader(new ContentOutputStream.BA(headBuf));
+		return new WriteChunk(chunk.getPtr().getValue(), headBuf);
 	}
 	
 	@Override
