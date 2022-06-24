@@ -183,7 +183,7 @@ public class Cluster implements DataProvider{
 			throw new IOException("no valid cluster data "+s+" "+ch.getSize()+" "+ch.io().getSize());
 		}
 		root=readRootRef();
-		memoryManager=new PersistentMemoryManager(this, IOList.map(meta().freeChunks, IOChunkPointer::getVal, IOChunkPointer::new));
+		memoryManager=new PersistentMemoryManager(this, meta().freeChunks.map(IOChunkPointer::getVal, IOChunkPointer::new));
 	}
 	
 	private RootRef readRootRef() throws IOException{
