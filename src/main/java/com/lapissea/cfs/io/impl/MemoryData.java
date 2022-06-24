@@ -115,7 +115,9 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		@Override
 		public long readWord(int len) throws IOException{
 			if(transactionOpen){
-				return transactionBuff.readWord(this::readAt, pos, len);
+				var word=transactionBuff.readWord(this::readAt, pos, len);
+				pos+=len;
+				return word;
 			}
 			
 			int remaining=used-pos;
@@ -218,6 +220,7 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		public void writeWord(long v, int len) throws IOException{
 			if(transactionOpen){
 				transactionBuff.writeWord(pos, v, len);
+				pos+=len;
 				return;
 			}
 			

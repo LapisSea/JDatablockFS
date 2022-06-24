@@ -170,12 +170,13 @@ public final class IOTransactionBuffer{
 				var i=iter.nextInt();
 				
 				var event=writeEvents.get(i);
-				if(offset<event.start()) continue;
+				
+				var eStart=event.start();
+				if(offset<eStart) continue;
 				
 				var end=event.end();
 				if(end>=newEnd){
-					var start      =event.start();
-					var eventOffset=(int)(offset-start);
+					var eventOffset=(int)(offset-eStart);
 					return Utils.read8(event.data, eventOffset, len);
 				}
 				break;
