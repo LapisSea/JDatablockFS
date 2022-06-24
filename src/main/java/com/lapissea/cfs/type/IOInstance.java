@@ -1,5 +1,6 @@
 package com.lapissea.cfs.type;
 
+import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
@@ -12,7 +13,9 @@ import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
@@ -103,7 +106,20 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>> implements Clone
 			return (Struct.Unmanaged<SELF>)super.getThisStruct();
 		}
 		
-		public void free() throws IOException{}
+		public void free() throws IOException{
+			Set<Chunk> chunks=new HashSet<>();
+			
+			new MemoryWalker(self()).walk(true, ref->{
+				if(ref.isNull()){
+					return;
+				}
+				ref.getPtr().dereference(getDataProvider()).streamNext().forEach(chunks::add);
+			});
+			
+			getDataProvider()
+				.getMemoryManager()
+				.free(chunks);
+		}
 		
 		protected RandomIO selfIO() throws IOException{
 			return reference.io(provider);
