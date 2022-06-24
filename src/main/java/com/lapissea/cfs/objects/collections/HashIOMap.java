@@ -75,11 +75,11 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	private static class Bucket<K, V> extends IOInstance<Bucket<K, V>> implements Iterable<BucketEntry<K, V>>{
 		@IOValue
 		@IONullability(NULLABLE)
-		private LinkedIOList.Node<BucketEntry<K, V>> node;
+		private IONode<BucketEntry<K, V>> node;
 		
 		public BucketEntry<K, V> entry(K key) throws IOException{
 			if(node==null) return null;
-			for(LinkedIOList.Node<BucketEntry<K, V>> entry : node){
+			for(IONode<BucketEntry<K, V>> entry : node){
 				var value=entry.getValue();
 				if(value!=null&&Objects.equals(value.key, key)){
 					return value;
@@ -100,7 +100,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 			throw new RuntimeException("bucket entry not found");
 		}
 		
-		private Stream<LinkedIOList.Node<BucketEntry<K, V>>> nodeStream(){
+		private Stream<IONode<BucketEntry<K, V>>> nodeStream(){
 			if(node==null) return Stream.of();
 			return node.stream();
 		}
@@ -296,11 +296,11 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		}
 	}
 	
-	private Iterable<LinkedIOList.Node<BucketEntry<K, V>>> nodeSource(IOList<Bucket<K, V>> view){
+	private Iterable<IONode<BucketEntry<K, V>>> nodeSource(IOList<Bucket<K, V>> view){
 		return ()->view.stream().flatMap(Bucket::nodeStream).iterator();
 	}
-	private Iterable<LinkedIOList.Node<BucketEntry<K, V>>> asyncNodeSource(ExecutorService service, IOList<Bucket<K, V>> view){
-		LinkedList<LinkedIOList.Node<BucketEntry<K, V>>> nodeBuffer=new LinkedList<>();
+	private Iterable<IONode<BucketEntry<K, V>>> asyncNodeSource(ExecutorService service, IOList<Bucket<K, V>> view){
+		LinkedList<IONode<BucketEntry<K, V>>> nodeBuffer=new LinkedList<>();
 		var task=async(()->{
 			for(var bucket : view){
 				if(bucket.node==null) continue;
@@ -313,7 +313,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		}, service);
 		
 		return ()->new Iterator<>(){
-			private LinkedIOList.Node<BucketEntry<K, V>> next;
+			private IONode<BucketEntry<K, V>> next;
 			@Override
 			public boolean hasNext(){
 				if(next==null){
@@ -350,7 +350,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 			}
 			
 			@Override
-			public LinkedIOList.Node<BucketEntry<K, V>> next(){
+			public IONode<BucketEntry<K, V>> next(){
 				if(next==null) getNext();
 				if(next==null) throw new NotImplementedException();
 				var n=next;
@@ -363,7 +363,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	private void optimizedOrderTransfer(IOList<Bucket<K, V>> oldData, IOList<Bucket<K, V>> newBuckets, short newPO2, Executor readExecutor, Executor writeExecutor) throws IOException{
 		async(()->{
 			var hashGroupings=IntStream.range(0, 1<<newPO2)
-			                           .mapToObj(i->(ArrayList<LinkedIOList.Node<BucketEntry<K, V>>>)null)
+			                           .mapToObj(i->(ArrayList<IONode<BucketEntry<K, V>>>)null)
 			                           .collect(Collectors.toList());
 			
 			for(var bucket : oldData){
@@ -391,7 +391,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 				try{
 					Bucket<K, V> bucket=getBucket(newBuckets, smallHash);
 					
-					Iterator<LinkedIOList.Node<BucketEntry<K, V>>> iter=group.iterator();
+					Iterator<IONode<BucketEntry<K, V>>> iter=group.iterator();
 					assert iter.hasNext();
 					
 					var node=bucket.node;
@@ -420,7 +420,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	private static IOField<BucketEntry<Object, Object>, ?> keyVar;
 	
 	private record KeyResult<K>(K key, boolean hasValue){}
-	private static <K, V> KeyResult<K> readKey(LinkedIOList.Node<BucketEntry<K, V>> n) throws IOException{
+	private static <K, V> KeyResult<K> readKey(IONode<BucketEntry<K, V>> n) throws IOException{
 		if(keyVar==null){
 			//noinspection unchecked
 			keyVar=Struct.of((Class<BucketEntry<Object, Object>>)(Object)BucketEntry.class, Struct.STATE_DONE)
@@ -570,11 +570,11 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 			       .map(KeyResult::key);
 	}
 	
-	private Stream<LinkedIOList.Node<BucketEntry<K, V>>> rawNodeStream(IOList<Bucket<K, V>> buckets){
+	private Stream<IONode<BucketEntry<K, V>>> rawNodeStream(IOList<Bucket<K, V>> buckets){
 		return buckets.stream().flatMap(Bucket::nodeStream);
 	}
 	
-	private Stream<LinkedIOList.Node<BucketEntry<K, V>>> rawNodeStreamWithValues(IOList<Bucket<K, V>> buckets){
+	private Stream<IONode<BucketEntry<K, V>>> rawNodeStreamWithValues(IOList<Bucket<K, V>> buckets){
 		return rawNodeStream(buckets).filter(e->{
 			try{
 				return e.hasValue();
@@ -680,7 +680,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		
 		long count=0;
 		
-		LinkedIOList.Node<BucketEntry<K, V>> last=bucket.node;
+		IONode<BucketEntry<K, V>> last=bucket.node;
 		for(var node : bucket.node){
 			if(!node.hasValue()){
 				if(DEBUG_VALIDATION){
@@ -697,7 +697,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		}
 		
 		
-		LinkedIOList.Node<BucketEntry<K, V>> newNode=allocNewNode(newEntry);
+		IONode<BucketEntry<K, V>> newNode=allocNewNode(newEntry);
 		
 		last.setNext(newNode);
 		
@@ -705,13 +705,13 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	}
 	
 	private static final TypeLink BUCKET_NODE_TYPE=new TypeLink(
-		LinkedIOList.Node.class,
+		IONode.class,
 		TypeLink.of(BucketEntry.class)
 	);
 	
 	@SuppressWarnings("unchecked")
-	private LinkedIOList.Node<BucketEntry<K, V>> allocNewNode(BucketEntry<K, V> newEntry) throws IOException{
-		return LinkedIOList.Node.allocValNode(
+	private IONode<BucketEntry<K, V>> allocNewNode(BucketEntry<K, V> newEntry) throws IOException{
+		return IONode.allocValNode(
 			newEntry,
 			null,
 			(SizeDescriptor<BucketEntry<K, V>>)(Object)BucketEntry.PIPE.getSizeDescriptor(),
@@ -740,7 +740,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		}
 	}
 	
-	private int toSmallHash(LinkedIOList.Node<BucketEntry<K, V>> entry, short bucketPO2) throws IOException{
+	private int toSmallHash(IONode<BucketEntry<K, V>> entry, short bucketPO2) throws IOException{
 		int hash=toHash(readKey(entry).key);
 		return hashToSmall(hash, bucketPO2);
 	}
