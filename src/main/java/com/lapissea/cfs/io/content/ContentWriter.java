@@ -44,7 +44,7 @@ public interface ContentWriter extends AutoCloseable{
 	void write(byte[] b, int off, int len) throws IOException;
 	
 	default void writeWord(long v, int len) throws IOException{
-		byte[]    writeBuffer=new byte[8];
+		byte[]    writeBuffer=new byte[len];
 		final var lm1        =len-1;
 		
 		for(int i=0;i<len;i++){

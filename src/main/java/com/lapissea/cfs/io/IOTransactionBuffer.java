@@ -1,5 +1,6 @@
 package com.lapissea.cfs.io;
 
+import com.lapissea.cfs.Utils;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
@@ -150,6 +151,44 @@ public final class IOTransactionBuffer{
 			l.unlock();
 		}
 	}
+	
+	public long readWord(BaseAccess base, long offset, int len) throws IOException{
+		doMerge(base, offset+len);
+		if(len==0) return 0;
+		var l=lock.readLock();
+		l.lock();
+		try{
+			if(writeEvents.isEmpty()){
+				byte[] buf=new byte[len];
+				base.read(offset, buf, 0, len);
+				return Utils.read8(buf, 0, len);
+			}
+			
+			
+			var newEnd=offset+len;
+			for(var iter=new LocalOffIndexIter(offset, 0, true);iter.hasNext();){
+				var i=iter.nextInt();
+				
+				var event=writeEvents.get(i);
+				if(offset<event.start()) continue;
+				
+				var end=event.end();
+				if(end>=newEnd){
+					var start      =event.start();
+					var eventOffset=(int)(offset-start);
+					return Utils.read8(event.data, eventOffset, len);
+				}
+				break;
+			}
+			
+			byte[] buf=new byte[len];
+			read0(base, offset, buf, 0, len);
+			return Utils.read8(buf, 0, len);
+		}finally{
+			l.unlock();
+		}
+	}
+	
 	private int read0(BaseAccess base, long offset, byte[] b, int off, int len) throws IOException{
 		
 		IOEvent.Write next;
@@ -274,6 +313,18 @@ public final class IOTransactionBuffer{
 		
 	}
 	
+	
+	private static IOEvent.Write makeEvent(long offset, byte[] b, int off, int len){
+		byte[] data=new byte[len];
+		System.arraycopy(b, off, data, 0, len);
+		return new IOEvent.Write(offset, data);
+	}
+	private static IOEvent.Write makeWordEvent(long offset, long v, int len){
+		byte[] arr=new byte[len];
+		Utils.write8(v, arr, 0, len);
+		return new IOEvent.Write(offset, arr);
+	}
+	
 	public void writeByte(long offset, int b){
 		write(offset, new byte[]{(byte)b}, 0, 1);
 	}
@@ -287,6 +338,55 @@ public final class IOTransactionBuffer{
 			l.unlock();
 		}
 	}
+	
+	public void writeWord(long offset, long v, int len){
+		var l=lock.writeLock();
+		l.lock();
+		
+		var newEnd=offset+len;
+		try{
+			if(!writeEvents.isEmpty()){
+				if(writeEvents.get(0).start()>newEnd){
+					writeEvents.add(0, makeWordEvent(offset, v, len));
+					markIndexDirty(0);
+					return;
+				}
+				if(writeEvents.get(writeEvents.size()-1).end()<offset){
+					writeEvents.add(makeWordEvent(offset, v, len));
+					markIndexDirty(writeEvents.size()-1);
+					return;
+				}
+			}else{
+				writeEvents.add(makeWordEvent(offset, v, len));
+				return;
+			}
+			
+			for(var iter=new LocalOffIndexIter(offset, 0, true);iter.hasNext();){
+				var i=iter.nextInt();
+				
+				var event=writeEvents.get(i);
+				if(offset<event.start()) continue;
+				
+				var end=event.end();
+				if(end>=newEnd){
+					var start      =event.start();
+					var eventOffset=(int)(offset-start);
+					Utils.write8(v, event.data, eventOffset, len);
+					return;
+				}
+				break;
+			}
+			
+			byte[] arr=new byte[len];
+			Utils.write8(v, arr, 0, len);
+			write0(offset, arr, 0, len);
+			
+			
+		}finally{
+			l.unlock();
+		}
+	}
+	
 	private void write0(long offset, byte[] b, int off, int len){
 		if(len==0) return;
 		var newStart=offset;
@@ -485,12 +585,6 @@ public final class IOTransactionBuffer{
 			break;
 		}
 		return false;
-	}
-	
-	private IOEvent.Write makeEvent(long offset, byte[] b, int off, int len){
-		byte[] data=new byte[len];
-		System.arraycopy(b, off, data, 0, len);
-		return new IOEvent.Write(offset, data);
 	}
 	
 	public record TransactionExport(OptionalLong setCapacity, List<RandomIO.WriteChunk> writes){}

@@ -379,8 +379,7 @@ public class MemoryOperations{
 				return 0;
 			}
 			
-			//TODO: replace max of 8 bytes with a configurable value, not a magic constant
-			toPin=AllocateTicket.bytes(Math.max(toAllocate+growth, 8)).withApproval(Chunk.sizeFitsPointer(siz)).submit(manager);
+			toPin=AllocateTicket.bytes(toAllocate+growth).withApproval(Chunk.sizeFitsPointer(siz)).submit(manager);
 		}while(toPin==null);
 		
 		IOInterface source=target.getDataProvider().getSource();

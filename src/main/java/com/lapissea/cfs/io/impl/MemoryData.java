@@ -23,6 +23,7 @@ import java.util.stream.LongStream;
 
 public abstract class MemoryData<DataType> implements IOInterface{
 	
+	@SuppressWarnings("resource")
 	public class MemRandomIO implements RandomIO{
 		
 		private int pos;
@@ -113,8 +114,8 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		
 		@Override
 		public long readWord(int len) throws IOException{
-			if(transactionOpen){//TODO: Implement transaction read8
-				return RandomIO.super.readWord(len);
+			if(transactionOpen){
+				return transactionBuff.readWord(this::readAt, pos, len);
 			}
 			
 			int remaining=used-pos;
@@ -215,8 +216,8 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		
 		@Override
 		public void writeWord(long v, int len) throws IOException{
-			if(transactionOpen){//TODO: Implement transaction read8
-				RandomIO.super.writeWord(v, len);
+			if(transactionOpen){
+				transactionBuff.writeWord(pos, v, len);
 				return;
 			}
 			
@@ -305,6 +306,7 @@ public abstract class MemoryData<DataType> implements IOInterface{
 	
 	private final boolean readOnly;
 	
+	@SuppressWarnings("unused")
 	private       boolean             transactionOpen;
 	private final IOTransactionBuffer transactionBuff=new IOTransactionBuffer();
 	
@@ -439,6 +441,7 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		void init(ContentWriter dest) throws IOException;
 	}
 	
+	@SuppressWarnings("unused")
 	public static class Builder{
 		private UnsafeSupplier<Object, IOException> dataProducer;
 		private boolean                             readOnly=false;
