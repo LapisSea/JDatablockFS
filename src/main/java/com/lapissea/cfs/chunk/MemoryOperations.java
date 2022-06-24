@@ -510,4 +510,55 @@ public class MemoryOperations{
 		}
 	}
 	
+	public static long growFreeAlloc(MemoryManager manager, Chunk target, long toAllocate) throws IOException{
+		var end=target.dataEnd();
+		for(var iter=manager.getFreeChunks().iterator();iter.hasNext();){
+			ChunkPointer freePtr=iter.next();
+			
+			if(freePtr.equals(end)){
+				var provider =manager.getDataProvider();
+				var freeChunk=freePtr.dereference(provider);
+				var size     =freeChunk.totalSize();
+				
+				var remaining=size-toAllocate;
+				if(remaining<16){
+					var newCapacity=target.getCapacity()+size;
+					
+					if(!target.getBodyNumSize().canFit(newCapacity)){
+						return 0;
+					}
+					
+					iter.remove();
+					try{
+						target.setCapacity(newCapacity);
+					}catch(BitDepthOutOfSpaceException e){
+						throw new ShouldNeverHappenError(e);
+					}
+					target.syncStruct();
+					return size;
+				}
+				
+				iter.remove();
+				
+				var ch=new ChunkBuilder(provider, freePtr.addPtr(toAllocate)).create();
+				ch.setCapacityAndModifyNumSize(size-ch.getHeaderSize()-toAllocate);
+				ch.writeHeader();
+				
+				
+				var newCapacity=target.getCapacity()+toAllocate;
+				try{
+					target.setCapacity(newCapacity);
+				}catch(BitDepthOutOfSpaceException e){
+					throw new ShouldNeverHappenError(e);
+				}
+				target.syncStruct();
+				freeChunk.destroy(false);
+				
+				provider.getChunkCache().add(ch);
+				provider.getMemoryManager().free(ch);
+				return toAllocate;
+			}
+		}
+		return 0;
+	}
 }
