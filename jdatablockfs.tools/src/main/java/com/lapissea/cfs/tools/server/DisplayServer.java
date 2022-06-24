@@ -3,6 +3,7 @@ package com.lapissea.cfs.tools.server;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.MemFrame;
 import com.lapissea.util.LogUtil;
+import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeBiConsumer;
 import com.lapissea.util.function.UnsafeConsumer;
 
@@ -11,10 +12,8 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.*;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
 import static com.lapissea.cfs.tools.server.ServerCommons.Action;
@@ -96,7 +95,41 @@ public class DisplayServer implements DataLogger{
 			};
 			
 			if(threadedOutput){
-				ExecutorService    exec  =Executors.newSingleThreadExecutor();
+				var queue=new LinkedList<Runnable>();
+				var worker=new Thread(){
+					private boolean run=true;
+					private boolean running=true;
+					@Override
+					public void run(){
+						while(run){
+							if(queue.isEmpty()){
+								synchronized(this){
+									try{
+										if(queue.isEmpty()) this.wait();
+									}catch(InterruptedException e){
+										throw new RuntimeException(e);
+									}
+								}
+								continue;
+							}
+							synchronized(queue){
+								queue.remove(0).run();
+							}
+						}
+						while(!queue.isEmpty()){
+							queue.remove(0).run();
+						}
+						running=false;
+					}
+					
+					private void end(){
+						run=false;
+						UtilL.sleepWhile(()->running);
+					}
+				};
+				worker.setDaemon(false);
+				worker.start();
+				
 				DataLogger.Session logger=proxy;
 				proxy=new Session(){
 					
@@ -106,16 +139,23 @@ public class DisplayServer implements DataLogger{
 						return logger.getName();
 					}
 					
+					private void exec(Runnable e){
+						if(!worker.run) throw new IllegalStateException();
+						UtilL.sleepWhile(()->queue.size()>8);
+						synchronized(queue){
+							queue.add(e);
+						}
+						synchronized(worker){
+							worker.notifyAll();
+						}
+					}
 					private void stop(){
-						exec.shutdown();
-						try{
-							exec.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
-						}catch(InterruptedException ignored){}
+						worker.end();
 					}
 					
 					@Override
 					public void log(MemFrame frame){
-						exec.execute(()->{
+						exec(()->{
 							if(deleting) return;
 							logger.log(frame);
 						});
@@ -123,7 +163,7 @@ public class DisplayServer implements DataLogger{
 					
 					@Override
 					public void reset(){
-						exec.execute(()->{
+						exec(()->{
 							if(deleting) return;
 							logger.reset();
 						});
@@ -131,13 +171,13 @@ public class DisplayServer implements DataLogger{
 					@Override
 					public void delete(){
 						deleting=true;
-						exec.execute(logger::delete);
+						exec(logger::delete);
 						stop();
 					}
 					
 					@Override
 					public void finish(){
-						exec.execute(()->{
+						exec(()->{
 							if(deleting) return;
 							logger.finish();
 						});
