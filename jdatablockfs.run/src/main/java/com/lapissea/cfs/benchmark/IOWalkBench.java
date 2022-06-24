@@ -17,7 +17,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-@Warmup(iterations=6, time=800, timeUnit=TimeUnit.MILLISECONDS)
+@Warmup(iterations=6, time=1000, timeUnit=TimeUnit.MILLISECONDS)
 @Measurement(iterations=16, time=500, timeUnit=TimeUnit.MILLISECONDS)
 @State(Scope.Thread)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)

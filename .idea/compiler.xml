@@ -15,7 +15,7 @@
         <module name="Jorth" />
       </profile>
     </annotationProcessing>
-    <bytecodeTargetLevel target="17">
+    <bytecodeTargetLevel target="18">
       <module name="JDatablockFS" target="18" />
       <module name="jdatablockfs.run" target="18" />
       <module name="jdatablockfs.tools" target="18" />

@@ -16,7 +16,6 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
-import java.util.function.ToLongFunction;
 
 @SuppressWarnings("unused")
 public enum NumberSize{
@@ -31,6 +30,9 @@ public enum NumberSize{
 	SMALL_LONG('l', 6),
 	LONG      ('L', 8);
 	// @formatter:on
+	
+	private static final long[] MAX_SIZES=Arrays.stream(values()).mapToLong(NumberSize::maxSize).toArray();
+	private static final int[]  BYTES    =Arrays.stream(values()).mapToInt(NumberSize::bytes).toArray();
 	
 	public static final EnumUniverse<NumberSize> FLAG_INFO=EnumUniverse.get(NumberSize.class);
 	
@@ -50,8 +52,9 @@ public enum NumberSize{
 	}
 	
 	public static NumberSize bySize(long size){
-		var value=searchSizeByVal(NumberSize::maxSize, size);
-		if(value!=null) return value;
+		for(int i=0;i<MAX_SIZES.length;i++){
+			if(MAX_SIZES[i]>=size) return FLAG_INFO.get(i);
+		}
 		throw new RuntimeException("Extremely large value: "+size);
 	}
 	
@@ -59,19 +62,14 @@ public enum NumberSize{
 		return byBytes(Utils.bitToByte(bits));
 	}
 	
-	public static NumberSize byBytes(long bytes){
-		var value=searchSizeByVal(NumberSize::bytes, bytes);
-		if(value!=null) return value;
-		throw new RuntimeException("Extremely large byte length: "+bytes);
-	}
-	
-	private static <T> NumberSize searchSizeByVal(ToLongFunction<NumberSize> mapper, long key){
-		//TODO: maybe something more intelligent?
-		//nah, premature optimization for now
-		for(var value : FLAG_INFO==null?Arrays.asList(values()):FLAG_INFO){
-			if(mapper.applyAsLong(value)>=key) return value;
+	public static NumberSize byBytes(int bytes){
+		for(int i=0;i<BYTES.length;i++){
+			if(BYTES[i]>=bytes){
+				if(FLAG_INFO==null) return values()[i];
+				return FLAG_INFO.get(i);
+			}
 		}
-		return null;
+		throw new RuntimeException("Extremely large byte length: "+bytes);
 	}
 	
 	private int nextId=-2;

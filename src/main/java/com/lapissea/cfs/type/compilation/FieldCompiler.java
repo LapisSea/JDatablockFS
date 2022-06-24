@@ -52,7 +52,7 @@ public class FieldCompiler{
 	protected FieldCompiler(){
 	}
 	
-	public <T extends IOInstance.Unmanaged<T>> FieldSet<T> compileStaticUnmanaged(Struct.Unmanaged<T> struct){//TODO: implement static unmanaged fields
+	public <T extends IOInstance.Unmanaged<T>> FieldSet<T> compileStaticUnmanaged(Struct.Unmanaged<T> struct){
 		var type=struct.getType();
 		
 		var methods=type.getDeclaredMethods();

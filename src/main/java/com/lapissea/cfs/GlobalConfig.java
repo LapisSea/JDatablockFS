@@ -9,21 +9,12 @@ public class GlobalConfig{
 	public static       boolean PRINT_COMPILATION;
 	
 	static{
-		DEBUG_VALIDATION=testAssertion();
+		DEBUG_VALIDATION=GlobalConfig.class.desiredAssertionStatus();
 		
 		PRINT_COMPILATION=UtilL.sysPropertyByClass(GlobalConfig.class, "printCompilation", false, Boolean::valueOf);
 		
 		if(DEBUG_VALIDATION){
 			LogUtil.println("Running with debugging");
-		}
-	}
-	
-	private static boolean testAssertion(){
-		try{
-			assert false;
-			return false;
-		}catch(AssertionError e){
-			return true;
 		}
 	}
 	
