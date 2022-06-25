@@ -61,7 +61,7 @@ public final class ChunkBuilder{
 		if(bodyNumSize==null) bodyNumSize=NumberSize.bySize(capacity);
 		
 		var nextSize=this.nextSize;
-		if(nextSize==null) nextSize=NumberSize.bySize(nextPtr).max(NumberSize.BYTE);
+		if(nextSize==null) nextSize=NumberSize.bySize(nextPtr);
 		
 		return new Chunk(provider, ptr, bodyNumSize, capacity, size, nextSize, nextPtr);
 	}
