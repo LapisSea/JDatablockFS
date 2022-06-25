@@ -58,7 +58,7 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 		var desc =instancePipe.getSizeDescriptor();
 		var fixed=desc.getFixed(WordSpace.BYTE);
 		if(fixed.isPresent()){
-			t=AllocateTicket.bytes(fixed.getAsLong()).withDisabledResizing();
+			t=AllocateTicket.bytes(fixed.getAsLong());
 		}else{
 			var min=desc.getMin(WordSpace.BYTE);
 			var max=desc.getMax(WordSpace.BYTE).orElse(min+8);

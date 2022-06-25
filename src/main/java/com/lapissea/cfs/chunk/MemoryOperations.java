@@ -427,7 +427,7 @@ public class MemoryOperations{
 				if(reallocate!=null) return reallocate;
 			}
 			
-			if(!ticket.disableResizing()&&freeSpace<8){
+			if(freeSpace<8){
 				if(ticket.approve(c)){
 					iterator.remove();
 					return c;
@@ -440,8 +440,7 @@ public class MemoryOperations{
 	private static Chunk chipEndProbe(DataProvider context, AllocateTicket ticket, Chunk ch) throws IOException{
 		var builder=new ChunkBuilder(context, ch.getPtr())
 			            .withCapacity(ticket.bytes())
-			            .withNext(ticket.next())
-			            .withExplicitNextSize(ticket.disableResizing()?NumberSize.VOID:NumberSize.bySize(ticket.next()));
+			            .withNext(ticket.next());
 		
 		var reallocate=builder.create();
 		
@@ -469,8 +468,7 @@ public class MemoryOperations{
 		
 		var builder=new ChunkBuilder(context, ChunkPointer.of(src.getIOSize()))
 			            .withCapacity(ticket.bytes())
-			            .withNext(ticket.next())
-			            .withExplicitNextSize(ticket.disableResizing()?NumberSize.VOID:NumberSize.bySize(ticket.next()));
+			            .withNext(ticket.next());
 		
 		var chunk=builder.create();
 		if(!ticket.approve(chunk)) return null;

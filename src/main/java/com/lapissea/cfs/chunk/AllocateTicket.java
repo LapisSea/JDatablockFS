@@ -15,9 +15,12 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Predicate;
 
-public record AllocateTicket(long bytes, boolean disableResizing, ChunkPointer next, Optional<Predicate<Chunk>> approve, @Nullable UnsafeConsumer<Chunk, IOException> dataPopulator){
+public record AllocateTicket(
+	long bytes, ChunkPointer next,
+	Optional<Predicate<Chunk>> approve, @Nullable UnsafeConsumer<Chunk, IOException> dataPopulator
+){
 	
-	public static final AllocateTicket DEFAULT=new AllocateTicket(0, false, ChunkPointer.NULL, Optional.empty(), null);
+	public static final AllocateTicket DEFAULT=new AllocateTicket(0, ChunkPointer.NULL, Optional.empty(), null);
 	
 	public AllocateTicket{
 		assert bytes>=0;
@@ -34,8 +37,7 @@ public record AllocateTicket(long bytes, boolean disableResizing, ChunkPointer n
 		return bytes(switch(size){
 			case SizeDescriptor.Fixed<IO> f -> f.get(WordSpace.BYTE);
 			case SizeDescriptor.Unknown<IO> u -> Math.max(8, u.calcUnknown(pipe.makeIOPool(), provider, data, WordSpace.BYTE));
-		}).shouldDisableResizing(size.hasFixed())
-		  .withDataPopulated((prov, io)->pipe.write(prov, io, data));
+		}).withDataPopulated((prov, io)->pipe.write(prov, io, data));
 	}
 	
 	public static AllocateTicket bytes(long requestedBytes){
@@ -46,17 +48,9 @@ public record AllocateTicket(long bytes, boolean disableResizing, ChunkPointer n
 		return DEFAULT.withApproval(approve);
 	}
 	
-	public AllocateTicket withDisabledResizing(){
-		return shouldDisableResizing(true);
-	}
-	
-	public AllocateTicket shouldDisableResizing(boolean disableResizing){
-		if(this.disableResizing==disableResizing) return this;
-		return new AllocateTicket(bytes, disableResizing, next, approve, dataPopulator);
-	}
 	
 	public AllocateTicket withApproval(Predicate<Chunk> approve){
-		return new AllocateTicket(bytes, disableResizing, next, Optional.of(this.approve.map(p->p.and(approve)).orElse(approve)), dataPopulator);
+		return new AllocateTicket(bytes, next, Optional.of(this.approve.map(p->p.and(approve)).orElse(approve)), dataPopulator);
 	}
 	
 	public <IO extends IOInstance<IO>> AllocateTicket withDataPopulated(Class<? extends StructPipe> pipeType, IO data){
@@ -78,19 +72,19 @@ public record AllocateTicket(long bytes, boolean disableResizing, ChunkPointer n
 	}
 	
 	public AllocateTicket withDataPopulated(UnsafeConsumer<Chunk, IOException> dataPopulator){
-		return new AllocateTicket(bytes, disableResizing, next, approve, dataPopulator);
+		return new AllocateTicket(bytes, next, approve, dataPopulator);
 	}
 	
 	public AllocateTicket withBytes(long bytes){
 		if(this.bytes==bytes) return this;
-		return new AllocateTicket(bytes, disableResizing, next, approve, dataPopulator);
+		return new AllocateTicket(bytes, next, approve, dataPopulator);
 	}
 	public AllocateTicket withNext(Chunk next){
 		return withNext(Chunk.getPtrNullable(next));
 	}
 	public AllocateTicket withNext(ChunkPointer next){
 		if(Objects.equals(this.next, next)) return this;
-		return new AllocateTicket(bytes, disableResizing, next, approve, dataPopulator);
+		return new AllocateTicket(bytes, next, approve, dataPopulator);
 	}
 	
 	public Chunk submit(DataProvider provider) throws IOException{

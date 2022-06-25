@@ -108,7 +108,6 @@ public class DefragmentManager{
 	private void reallocateAndMove(Cluster cluster, Chunk fragmentedChunk, long requiredSize) throws IOException{
 		var newChunk=AllocateTicket
 			             .bytes(requiredSize)
-			             .shouldDisableResizing(fragmentedChunk.getNextSize()==NumberSize.VOID)
 			             .withDataPopulated((p, io)->{
 				             try(var old=fragmentedChunk.io()){
 					             io.setSize(old.getSize());
@@ -148,7 +147,6 @@ public class DefragmentManager{
 						Chunk c=next;
 						var newChunk=AllocateTicket
 							             .bytes(next.getSize())
-							             .shouldDisableResizing(next.getNextSize()==NumberSize.VOID)
 							             .withNext(next.getNextPtr())
 							             .withDataPopulated((p, io)->{
 								             byte[] data=p.getSource().read(c.dataStart(), Math.toIntExact(c.getSize()));
