@@ -235,7 +235,6 @@ public class MemoryOperations{
 		prepareFreeChunkMerge(prev, next);
 		prev.syncStruct();
 		next.destroy(true);
-		next.getDataProvider().getChunkCache().notifyDestroyed(next);
 	}
 	
 	private static void prepareFreeChunkMerge(Chunk prev, Chunk next){
@@ -516,7 +515,6 @@ public class MemoryOperations{
 			if(!freePtr.equals(end)) continue;
 			
 			var provider =manager.getDataProvider();
-			var cc       =provider.getChunkCache();
 			var freeChunk=freePtr.dereference(provider);
 			var size     =freeChunk.totalSize();
 			
@@ -537,7 +535,6 @@ public class MemoryOperations{
 				target.syncStruct();
 				
 				freeChunk.destroy(false);
-				cc.notifyDestroyed(freeChunk);
 				return size;
 			}
 			
@@ -560,7 +557,6 @@ public class MemoryOperations{
 			target.syncStruct();
 			
 			freeChunk.destroy(false);
-			cc.notifyDestroyed(freeChunk);
 			return toAllocate;
 		}
 		return 0;

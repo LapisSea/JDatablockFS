@@ -542,6 +542,7 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 	
 	public void destroy(boolean zeroSize) throws IOException{
 		getSource().ioAt(getPtr().getValue(), io->io.fillZero(getHeaderSize()+(zeroSize?getSize():0)));
+		getDataProvider().getChunkCache().notifyDestroyed(this);
 	}
 	
 	public void freeChaining() throws IOException{
