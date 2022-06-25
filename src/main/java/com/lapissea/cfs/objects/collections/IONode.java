@@ -7,8 +7,6 @@ import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.ValueStorage;
 import com.lapissea.cfs.io.bit.FlagReader;
-import com.lapissea.cfs.io.content.ContentWriter;
-import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
@@ -68,6 +66,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		IOFieldTools.makeAnnotation(IONullability.class, Map.of("value", IONullability.Mode.NULLABLE))
 	);
 	
+	@SuppressWarnings({"unchecked", "rawtypes"})
 	@IOValueUnmanaged(index=0)
 	private static <T> IOField<IONode<T>, Object> makeValField(){
 		var valueAccessor=new AbstractFieldAccessor<IONode<T>>(null, "value"){
@@ -121,6 +120,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	}
 	
 	@IOValueUnmanaged(index=1)
+	@SuppressWarnings("unchecked")
 	private static <T extends IOInstance<T>> IOField<IONode<T>, IONode<T>> makeNextField(){
 		var nextAccessor=new AbstractFieldAccessor<IONode<T>>(null, "next"){
 			@NotNull
@@ -198,13 +198,15 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	private static NumberSize calcOptimalNextSize(DataProvider provider) throws IOException{
 		return NumberSize.bySize(provider.getSource().getIOSize()).next();
 	}
+	
+	@SuppressWarnings({"rawtypes", "unchecked"})
 	public static <T> IONode<T> allocValNode(T value, IONode<T> next, BasicSizeDescriptor<T, ?> sizeDescriptor, TypeLink nodeType, DataProvider provider) throws IOException{
 		int nextBytes;
 		if(next!=null) nextBytes=NumberSize.bySize(next.getReference().getPtr()).bytes;
 		else nextBytes=calcOptimalNextSize(provider).bytes;
 		
 		var bytes=1+nextBytes+switch(sizeDescriptor){
-			case SizeDescriptor.Fixed f -> f.get(WordSpace.BYTE);
+			case SizeDescriptor.Fixed<?> f -> f.get(WordSpace.BYTE);
 			case SizeDescriptor.Unknown f -> f.calcUnknown(((IOInstance<?>)value).getThisStruct().allocVirtualVarPool(IO), provider, value, WordSpace.BYTE);
 			case BasicSizeDescriptor<T, ?> b -> b.calcUnknown(null, provider, value, WordSpace.BYTE);
 		};
@@ -236,6 +238,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	public IONode(DataProvider provider, Reference reference, TypeLink typeDef) throws IOException{
 		super(provider, reference, typeDef, NODE_TYPE_CHECK);
 		
+		//noinspection unchecked
 		valueStorage=(ValueStorage<T>)ValueStorage.makeStorage(provider, typeDef.arg(0), getGenerics(), false);
 		
 		if(isSelfDataEmpty()){
@@ -366,18 +369,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 			ensureNextSpace(io);
 			io.skipExact(valueStart());
 			if(value!=null){
-				if(DEBUG_VALIDATION){
-					var size=calcUnknownSize(valueStorage, getDataProvider(), value);
-					var tmp =MemoryData.builder().withCapacity(Math.toIntExact(size+1)).withUsedLength(0).build();
-					try(var tio=tmp.io()){
-						valueStorage.write(tio, value);
-					}
-					try(var buff=io.writeTicket(size).requireExact().submit()){
-						tmp.transferTo((ContentWriter)buff);
-					}
-				}else{
-					valueStorage.write(io, value);
-				}
+				valueStorage.write(io, value);
 			}
 			io.trim();
 		}
@@ -443,13 +435,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		};
 	}
 	
-	private static <T> long calcUnknownSize(ValueStorage<T> storage, DataProvider prov, T value){
-		if(storage instanceof ValueStorage.Instance iStor){
-			return iStor.getPipe().calcUnknownSize(prov, (IOInstance)value, WordSpace.BYTE);
-		}
-		return storage.inlineSize();
-	}
-	
+	@SuppressWarnings("unchecked")
 	private static <T> IOField<IONode<T>, NumberSize> getNextSizeField(){
 		return (IOField<IONode<T>, NumberSize>)NEXT_SIZE_FIELD;
 	}
@@ -551,6 +537,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		return new LinkedValueIterator<>(this);
 	}
 	
+	@SuppressWarnings({"rawtypes", "unchecked"})
 	public boolean readValueField(T dest, IOField<?, ?> field) throws IOException{
 		if(DEBUG_VALIDATION){
 			var struct=field.getAccessor().getDeclaringStruct();
