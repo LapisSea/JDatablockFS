@@ -85,6 +85,9 @@ public interface IOList<T> extends IterablePP<T>{
 		}
 	}
 	
+	static <T> IOList<T> wrap(List<T> data){
+		return new MemoryWrappedIOList<>(data, null);
+	}
 	static <T> IOList<T> wrap(List<T> data, Supplier<T> typeConstructor){
 		return new MemoryWrappedIOList<>(data, typeConstructor);
 	}

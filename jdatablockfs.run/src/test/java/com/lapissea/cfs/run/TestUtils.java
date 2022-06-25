@@ -143,7 +143,7 @@ public class TestUtils{
 		UnsafeConsumer<IOList<E>, IOException> session, boolean useCluster
 	) throws IOException{
 		complexObjectIntegrityTest(info, initalCapacity, constr, typeDef, list->{
-			var splitter=Splitter.list(list, IOList.wrap(new ArrayList<>(), ()->{throw new UnsupportedOperationException();}), TestUtils::checkCompliance);
+			var splitter=Splitter.list(list, IOList.wrap(new ArrayList<>()), TestUtils::checkCompliance);
 			session.accept(splitter);
 		}, useCluster);
 	}

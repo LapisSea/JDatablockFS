@@ -10,7 +10,7 @@ import java.util.List;
 
 public class VerySimpleMemoryManager extends MemoryManager.StrategyImpl{
 	
-	private final IOList<ChunkPointer> freeChunks=IOList.wrap(new ArrayList<>(), ()->null);
+	private final IOList<ChunkPointer> freeChunks=IOList.wrap(new ArrayList<>());
 	private       boolean              defragmentMode;
 	
 	public VerySimpleMemoryManager(DataProvider context){
