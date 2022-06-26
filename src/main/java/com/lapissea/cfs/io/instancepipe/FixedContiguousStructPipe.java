@@ -83,7 +83,10 @@ public class FixedContiguousStructPipe<T extends IOInstance<T>> extends StructPi
 		return sizeFieldStream()
 			       .map(sizingField->{
 				       var size=getType().getFields().streamDependentOn(sizingField)
-				                         .mapToLong(v->v.getSizeDescriptor().requireMax(WordSpace.BYTE))
+				                         .mapToLong(v->{
+					                         v.declaringStruct().waitForState(Struct.STATE_INIT_FIELDS);
+					                         return v.getSizeDescriptor().requireMax(WordSpace.BYTE);
+				                         })
 				                         .distinct()
 				                         .mapToObj(l->NumberSize.FLAG_INFO.stream()
 				                                                          .filter(s->s.bytes==l)
