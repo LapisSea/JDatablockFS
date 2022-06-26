@@ -146,8 +146,7 @@ public sealed interface ValueStorage<T>{
 	
 	final class FixedReferencedInstance<T extends IOInstance<T>> implements ValueStorage.InstanceBased<T>{
 		
-		private static final FixedContiguousStructPipe<Reference> REF_PIPE=FixedContiguousStructPipe.of(Reference.STRUCT);
-		private static final long                                 SIZE    =REF_PIPE.getFixedDescriptor().get(WordSpace.BYTE);
+		private static final long SIZE=Reference.FIXED_PIPE.getFixedDescriptor().get(WordSpace.BYTE);
 		
 		private final GenericContext ctx;
 		private final DataProvider   provider;
@@ -161,7 +160,7 @@ public sealed interface ValueStorage<T>{
 		
 		@Override
 		public T readNew(ContentReader src) throws IOException{
-			var ref=REF_PIPE.readNew(provider, src, null);
+			var ref=Reference.FIXED_PIPE.readNew(provider, src, null);
 			if(ref.isNull()){
 				return null;
 			}
@@ -172,10 +171,10 @@ public sealed interface ValueStorage<T>{
 		
 		@Override
 		public void write(RandomIO dest, T src) throws IOException{
-			var ref=dest.remaining()==0?new Reference():REF_PIPE.readNew(provider, dest, null);
+			var ref=dest.remaining()==0?new Reference():Reference.FIXED_PIPE.readNew(provider, dest, null);
 			if(ref.isNull()){
 				var ch=AllocateTicket.withData(pipe, provider, src).submit(provider);
-				REF_PIPE.write(provider, dest, ch.getPtr().makeReference());
+				Reference.FIXED_PIPE.write(provider, dest, ch.getPtr().makeReference());
 				return;
 			}
 			
@@ -192,11 +191,11 @@ public sealed interface ValueStorage<T>{
 		
 		@Override
 		public <I extends IOInstance<I>> IOField<I, T> field(FieldAccessor<I> accessor, UnsafeSupplier<RandomIO, IOException> ioAt){
-			return new IOField.Ref.NoIO<>(accessor, REF_PIPE.getFixedDescriptor()){
+			return new IOField.Ref.NoIO<>(accessor, Reference.FIXED_PIPE.getFixedDescriptor()){
 				@Override
 				public void setReference(I instance, Reference newRef){
 					try(var io=ioAt.get()){
-						REF_PIPE.write(provider, io, newRef);
+						Reference.FIXED_PIPE.write(provider, io, newRef);
 					}catch(IOException e){
 						throw new RuntimeException(e);
 					}
@@ -205,7 +204,7 @@ public sealed interface ValueStorage<T>{
 				@Override
 				public Reference getReference(I instance){
 					try(var io=ioAt.get()){
-						return REF_PIPE.readNew(provider, io, null);
+						return Reference.FIXED_PIPE.readNew(provider, io, null);
 					}catch(IOException e){
 						throw new RuntimeException(e);
 					}
@@ -225,7 +224,7 @@ public sealed interface ValueStorage<T>{
 		
 		@Override
 		public void readSingle(ContentReader src, T dest, IOField<T, ?> field) throws IOException{
-			var ref=REF_PIPE.readNew(provider, src, null);
+			var ref=Reference.FIXED_PIPE.readNew(provider, src, null);
 			ref.requireNonNull();
 			try(var io=ref.io(provider)){
 				pipe.readSingleField(pipe.makeIOPool(), provider, io, field, dest, ctx);
@@ -235,8 +234,7 @@ public sealed interface ValueStorage<T>{
 	
 	final class UnmanagedInstance<T extends IOInstance.Unmanaged<T>> implements ValueStorage<T>{
 		
-		private static final FixedContiguousStructPipe<Reference> REF_PIPE=FixedContiguousStructPipe.of(Reference.STRUCT);
-		private static final long                                 SIZE    =REF_PIPE.getFixedDescriptor().get(WordSpace.BYTE);
+		private static final long SIZE=Reference.FIXED_PIPE.getFixedDescriptor().get(WordSpace.BYTE);
 		
 		private final TypeLink            type;
 		private final DataProvider        provider;
@@ -251,7 +249,7 @@ public sealed interface ValueStorage<T>{
 		
 		@Override
 		public T readNew(ContentReader src) throws IOException{
-			var ref=REF_PIPE.readNew(provider, src, null);
+			var ref=Reference.FIXED_PIPE.readNew(provider, src, null);
 			if(ref.isNull()){
 				return null;
 			}
@@ -261,7 +259,7 @@ public sealed interface ValueStorage<T>{
 		
 		@Override
 		public void write(RandomIO dest, T src) throws IOException{
-			REF_PIPE.write(provider, dest, src.getReference());
+			Reference.FIXED_PIPE.write(provider, dest, src.getReference());
 		}
 		
 		@Override
@@ -371,6 +369,61 @@ public sealed interface ValueStorage<T>{
 		}
 	}
 	
+	final class FixedReferenceString implements ValueStorage<String>{
+		
+		private static final long SIZE=Reference.FIXED_PIPE.getFixedDescriptor().get(WordSpace.BYTE);
+		
+		private static final RuntimeType<String> TYPE=RuntimeType.of(String.class);
+		
+		private final DataProvider provider;
+		
+		public FixedReferenceString(DataProvider provider){
+			this.provider=provider;
+		}
+		
+		@Override
+		public String readNew(ContentReader src) throws IOException{
+			var ref=Reference.FIXED_PIPE.readNew(provider, src, null);
+			if(ref.isNull()){
+				return null;
+			}
+			try(var io=ref.io(provider)){
+				return AutoText.PIPE.readNew(provider, io, null).getData();
+			}
+		}
+		
+		@Override
+		public void write(RandomIO dest, String src) throws IOException{
+			var ref=dest.remaining()==0?new Reference():Reference.FIXED_PIPE.readNew(provider, dest, null);
+			if(ref.isNull()){
+				var ch=AllocateTicket.withData(AutoText.PIPE, provider, new AutoText(src)).submit(provider);
+				Reference.FIXED_PIPE.write(provider, dest, ch.getPtr().makeReference());
+				return;
+			}
+			
+			try(var io=ref.io(provider)){
+				AutoText.PIPE.write(provider, io, new AutoText(src));
+				io.trim();
+			}
+		}
+		
+		@Override
+		public long inlineSize(){
+			return SIZE;
+		}
+		
+		@Override
+		public <I extends IOInstance<I>> IOField<I, String> field(FieldAccessor<I> accessor, UnsafeSupplier<RandomIO, IOException> ioAt){
+			//TODO: Make IOField.Ref non IOInstance only
+			throw new NotImplementedException();
+		}
+		
+		@Override
+		public RuntimeType<String> getType(){
+			return TYPE;
+		}
+	}
+	
 	static ValueStorage<?> makeStorage(DataProvider provider, TypeLink typeDef, GenericContext generics, boolean fixedOnly){
 		Class<?> clazz=typeDef.getTypeClass(provider.getTypeDb());
 		{
@@ -381,7 +434,7 @@ public sealed interface ValueStorage<T>{
 		}
 		
 		if(clazz==String.class){
-			if(fixedOnly) throw new NotImplementedException();//TODO: implement fixed reference string
+			if(fixedOnly) return new FixedReferenceString(provider);
 			return new InlineString(provider);
 		}
 		

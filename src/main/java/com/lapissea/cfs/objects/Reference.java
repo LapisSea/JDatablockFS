@@ -28,6 +28,8 @@ public final class Reference extends IOInstance<Reference>{
 	@SuppressWarnings("unchecked")
 	public static final Struct<Reference> STRUCT=(Struct<Reference>)Struct.thisClass();
 	
+	public static final FixedContiguousStructPipe<Reference> FIXED_PIPE=FixedContiguousStructPipe.of(STRUCT);
+	
 	static{
 		boolean useOptimized=!UtilL.sysPropertyByClass(Chunk.class, "DO_NOT_USE_OPTIMIZED_PIPE", false, Boolean::parseBoolean);
 		if(useOptimized){
