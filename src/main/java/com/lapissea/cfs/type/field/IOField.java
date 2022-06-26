@@ -37,14 +37,6 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		TextUtil.SHORT_TO_STRINGS.register(OptionalLong.class, l->l.isEmpty()?"()L":"("+l.getAsLong()+")L");
 	}
 	
-	
-	public enum UsageHintType{
-		SIZE_DATA
-	}
-	
-	public record UsageHintDefinition(UsageHintType type, String target){}
-	
-	
 	public abstract static class FixedSizeDescriptor<Inst extends IOInstance<Inst>, ValueType> extends IOField<Inst, ValueType>{
 		
 		private final SizeDescriptor<Inst> sizeDescriptor;
@@ -242,9 +234,8 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	
 	private final FieldAccessor<T> accessor;
 	
-	private boolean                lateDataInitialized;
-	private FieldSet<T>            dependencies;
-	private EnumSet<UsageHintType> usageHints;
+	private boolean     lateDataInitialized;
+	private FieldSet<T> dependencies;
 	
 	private IONullability.Mode nullability;
 	
@@ -259,13 +250,10 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		this.accessor=accessor;
 	}
 	
-	public void initLateData(FieldSet<T> dependencies, Stream<UsageHintType> usageHints){
+	public void initLateData(FieldSet<T> dependencies){
 		if(lateDataInitialized) throw new IllegalStateException("already initialized");
 		
 		this.dependencies=dependencies==null?null:Utils.nullIfEmpty(dependencies);
-		var h=EnumSet.noneOf(UsageHintType.class);
-		usageHints.forEach(h::add);
-		this.usageHints=Utils.nullIfEmpty(h);
 		lateDataInitialized=true;
 	}
 	
@@ -563,22 +551,6 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		return dependencies!=null&&!dependencies.isEmpty();
 	}
 	
-	public boolean hasUsageHint(UsageHintType hint){
-		var hints=getUsageHints();
-		if(hints==null) return false;
-		return hints.contains(hint);
-	}
-	public Stream<UsageHintType> usageHintsStream(){
-		var hints=getUsageHints();
-		if(hints==null) return Stream.of();
-		return hints.stream();
-	}
-	@Nullable
-	public EnumSet<UsageHintType> getUsageHints(){
-		requireLateData();
-		return usageHints;
-	}
-	
 	public String toShortString(){
 		return Objects.requireNonNull(getName());
 	}
@@ -612,7 +584,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 			throw unsupportedFixed();
 		}
 		var f=implMaxAsFixedSize();
-		f.initLateData(getDependencies(), usageHintsStream());
+		f.initLateData(getDependencies());
 		f.init();
 		if(!f.getSizeDescriptor().hasFixed()) throw new RuntimeException(this+" failed to make itself fixed");
 		return f;

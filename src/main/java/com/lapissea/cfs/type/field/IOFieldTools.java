@@ -118,7 +118,7 @@ public class IOFieldTools{
 		
 		if(dynSiz.isEmpty()) return Optional.empty();
 		var opt=field.getDeclaringStruct().getFields().exact(NumberSize.class, dynSiz.get());
-		if(opt.isEmpty()) throw new ShouldNeverHappenError("This should have been checked in annotation logic");
+		if(opt.isEmpty()) throw new ShouldNeverHappenError("Missing or invalid field should have been checked in annotation logic");
 		return opt;
 	}
 	

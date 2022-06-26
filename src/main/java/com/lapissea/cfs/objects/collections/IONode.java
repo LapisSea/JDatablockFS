@@ -30,7 +30,6 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.*;
-import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
@@ -177,7 +176,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 				return instance.getPipe();
 			}
 		};
-		next.initLateData(FieldSet.of(List.of(getNextSizeField())), Stream.of());
+		next.initLateData(FieldSet.of(List.of(getNextSizeField())));
 		
 		return next;
 	}

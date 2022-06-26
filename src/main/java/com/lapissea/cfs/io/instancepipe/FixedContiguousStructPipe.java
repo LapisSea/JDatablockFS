@@ -20,12 +20,12 @@ import java.io.IOException;
 import java.util.AbstractMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
-import static com.lapissea.cfs.type.field.IOField.UsageHintType.SIZE_DATA;
 import static java.util.function.Predicate.not;
 
 public class FixedContiguousStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
@@ -104,7 +104,7 @@ public class FixedContiguousStructPipe<T extends IOInstance<T>> extends StructPi
 	}
 	
 	private Stream<IOField<T, NumberSize>> sizeFieldStream(){
-		return getType().getFields().byType(NumberSize.class).filter(f->f.hasUsageHint(SIZE_DATA));
+		return getType().getFields().stream().map(f->IOFieldTools.getDynamicSize(f.getAccessor())).filter(Optional::isPresent).map(Optional::get);
 	}
 	
 	public <E extends IOInstance<E>> SizeDescriptor.Fixed<E> getFixedDescriptor(){

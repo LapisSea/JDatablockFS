@@ -168,20 +168,7 @@ public class FieldCompiler{
 			var depAn=pair.annotations;
 			var field=pair.field;
 			
-			field.initLateData(
-				FieldSet.of(generateDependencies(fields, depAn, field)),
-				fields.stream()
-				      .flatMap(f->f.annotations.stream()
-				                               .flatMap(an->an.logic.getHints(f.field.getAccessor(), an.annotation)
-				                                                    .map(h->h.target()==null?
-				                                                            new IOField.UsageHintDefinition(h.type(), f.field.getName()):
-				                                                            h
-				                                                    )
-				                               )
-				      )
-				      .filter(t->t.target().equals(field.getName()))
-				      .map(IOField.UsageHintDefinition::type)
-			);
+			field.initLateData(FieldSet.of(generateDependencies(fields, depAn, field)));
 		}
 	}
 	
