@@ -200,7 +200,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	}
 	
 	@SuppressWarnings({"rawtypes", "unchecked"})
-	public static <T> IONode<T> allocValNode(T value, IONode<T> next, BasicSizeDescriptor<T, ?> sizeDescriptor, TypeLink nodeType, DataProvider provider) throws IOException{
+	public static <T> IONode<T> allocValNode(T value, IONode<T> next, BasicSizeDescriptor<T, ?> sizeDescriptor, TypeLink nodeType, DataProvider provider, OptionalLong positionMagnet) throws IOException{
 		int nextBytes;
 		if(next!=null) nextBytes=NumberSize.bySize(next.getReference().getPtr()).bytes;
 		else nextBytes=calcOptimalNextSize(provider).bytes;
@@ -212,7 +212,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		};
 		
 		try(var ignored=provider.getSource().openIOTransaction()){
-			var chunk=AllocateTicket.bytes(bytes).submit(provider);
+			var chunk=AllocateTicket.bytes(bytes).withPositionMagnet(positionMagnet).submit(provider);
 			return new IONode<>(provider, chunk.getPtr().makeReference(), nodeType, value, next);
 		}
 	}
@@ -238,8 +238,10 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	public IONode(DataProvider provider, Reference reference, TypeLink typeDef) throws IOException{
 		super(provider, reference, typeDef, NODE_TYPE_CHECK);
 		
+		var magnetProvider=provider.withRouter(t->t.withPositionMagnet(t.positionMagnet().orElse(getReference().getPtr().getValue())));
+		
 		//noinspection unchecked
-		valueStorage=(ValueStorage<T>)ValueStorage.makeStorage(provider, typeDef.arg(0), getGenerics(), false);
+		valueStorage=(ValueStorage<T>)ValueStorage.makeStorage(magnetProvider, typeDef.arg(0), getGenerics(), false);
 		
 		if(isSelfDataEmpty()){
 			nextSize=calcOptimalNextSize(provider);

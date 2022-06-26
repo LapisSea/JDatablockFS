@@ -8,16 +8,14 @@ import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.collections.IOList;
+import com.lapissea.cfs.objects.collections.IOList.IOIterator;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -347,7 +345,10 @@ public class MemoryOperations{
 		if(target.getNextSize()==NumberSize.VOID){
 			return 0;
 		}
-		var toPin=AllocateTicket.bytes(toAllocate).withApproval(Chunk.sizeFitsPointer(target.getNextSize())).submit(manager);
+		var toPin=AllocateTicket.bytes(toAllocate)
+		                        .withApproval(Chunk.sizeFitsPointer(target.getNextSize()))
+		                        .withPositionMagnet(target)
+		                        .submit(manager);
 		if(toPin==null) return 0;
 		target.modifyAndSave(c->{
 			try{
@@ -378,7 +379,10 @@ public class MemoryOperations{
 				return 0;
 			}
 			
-			toPin=AllocateTicket.bytes(toAllocate+growth).withApproval(Chunk.sizeFitsPointer(siz)).submit(manager);
+			toPin=AllocateTicket.bytes(toAllocate+growth)
+			                    .withApproval(Chunk.sizeFitsPointer(siz))
+			                    .withPositionMagnet(target)
+			                    .submit(manager);
 		}while(toPin==null);
 		
 		IOInterface source=target.getDataProvider().getSource();
@@ -415,9 +419,56 @@ public class MemoryOperations{
 	}
 	
 	
+	private static IOIterator<ChunkPointer> magnetisedFreeChunkIterator(DataProvider context, OptionalLong magnet) throws IOException{
+		var freeChunks=context.getMemoryManager().getFreeChunks();
+		if(magnet.isEmpty()||freeChunks.size()<=1){
+			return freeChunks.iterator();
+		}
+		
+		var pos=magnet.getAsLong();
+		
+		long index=IOList.findSortedClosest(freeChunks, ch->Math.abs(ch.getValue()-pos));
+		
+		var after =freeChunks.listIterator(index);
+		var before=freeChunks.listIterator(index);
+		
+		return new IOIterator<>(){
+			private boolean toggle;
+			private IOList.IOListIterator<ChunkPointer> lastRet;
+			@Override
+			public boolean hasNext(){
+				return after.hasNext()||before.hasPrevious();
+			}
+			@Override
+			public ChunkPointer ioNext() throws IOException{
+				toggle=!toggle;
+				
+				if(toggle){
+					if(after.hasNext()){
+						lastRet=after;
+						return after.ioNext();
+					}
+					lastRet=before;
+					return before.ioPrevious();
+				}else{
+					if(before.hasPrevious()){
+						lastRet=before;
+						return before.ioPrevious();
+					}
+					lastRet=after;
+					return after.ioNext();
+				}
+			}
+			@Override
+			public void ioRemove() throws IOException{
+				lastRet.ioRemove();
+			}
+		};
+	}
+	
 	public static Chunk allocateReuseFreeChunk(DataProvider context, AllocateTicket ticket) throws IOException{
-		for(var iterator=context.getMemoryManager().getFreeChunks().iterator();iterator.hasNext();){
-			Chunk c=iterator.next().dereference(context);
+		for(var iterator=magnetisedFreeChunkIterator(context, ticket.positionMagnet());iterator.hasNext();){
+			Chunk c=iterator.ioNext().dereference(context);
 			if(c.getCapacity()<ticket.bytes()) continue;
 			
 			var freeSpace=c.getCapacity()-ticket.bytes();
@@ -429,7 +480,7 @@ public class MemoryOperations{
 			
 			if(freeSpace<8){
 				if(ticket.approve(c)){
-					iterator.remove();
+					iterator.ioRemove();
 					return c;
 				}
 			}

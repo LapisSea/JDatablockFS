@@ -49,7 +49,9 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 		TYPE_CHECK.ensureValid(typeDef);
 		cache=readOnly?new HashMap<>():null;
 		
-		this.storage=(ValueStorage<T>)ValueStorage.makeStorage(provider, typeDef.arg(0), getGenerics(), true);
+		var magnetProvider=provider.withRouter(t->t.withPositionMagnet(t.positionMagnet().orElse(getReference().getPtr().getValue())));
+		
+		this.storage=(ValueStorage<T>)ValueStorage.makeStorage(magnetProvider, typeDef.arg(0), getGenerics(), true);
 		
 		if(!readOnly&&isSelfDataEmpty()){
 			writeManagedFields();

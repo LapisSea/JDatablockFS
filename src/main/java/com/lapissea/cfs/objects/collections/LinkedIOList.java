@@ -105,6 +105,7 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 	private long size;
 	
 	private final ValueStorage<T> valueStorage;
+	private final TypeLink        nodeType;
 	
 	private final boolean      readOnly;
 	private final Map<Long, T> cache;
@@ -115,6 +116,11 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 		super(provider, reference, typeDef, LIST_TYPE_CHECK);
 		readOnly=getDataProvider().isReadOnly();
 		cache=readOnly?new HashMap<>():null;
+		
+		nodeType=new TypeLink(
+			IONode.class,
+			getTypeDef().arg(0)
+		);
 		
 		valueStorage=(ValueStorage<T>)ValueStorage.makeStorage(provider, typeDef.arg(0), getGenerics(), false);
 		
@@ -171,11 +177,9 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 		getNode(index).setValue(value);
 	}
 	
-	private TypeLink nodeType(){
-		return new TypeLink(
-			IONode.class,
-			getTypeDef().arg(0)
-		);
+	private IONode<T> allocNode(T value, IONode<T> next) throws IOException{
+		var mag=OptionalLong.of((next==null?this:next).getReference().getPtr().getValue());
+		return IONode.allocValNode(value, next, valueStorage.getSizeDescriptor(), nodeType, getDataProvider(), mag);
 	}
 	
 	@Override
@@ -190,7 +194,7 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 		if(index==0){
 			var head=getHead();
 			
-			setHead(IONode.allocValNode(value, head, valueStorage.getSizeDescriptor(), nodeType(), getDataProvider()));
+			setHead(allocNode(value, head));
 			deltaSize(1);
 			return;
 		}
@@ -201,14 +205,14 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 	}
 	private void insertNodeInFrontOf(IONode<T> prevNode, T value) throws IOException{
 		var       node   =prevNode.getNext();
-		IONode<T> newNode=IONode.allocValNode(value, node, valueStorage.getSizeDescriptor(), nodeType(), getDataProvider());
+		IONode<T> newNode=allocNode(value, node);
 		prevNode.setNext(newNode);
 		deltaSize(1);
 	}
 	
 	@Override
 	public void add(T value) throws IOException{
-		IONode<T> newNode=IONode.allocValNode(value, null, valueStorage.getSizeDescriptor(), nodeType(), getDataProvider());
+		IONode<T> newNode=allocNode(value, null);
 		
 		if(isEmpty()){
 			setHead(newNode);
@@ -314,8 +318,7 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 		if(count==0) return;
 		if(count<0) throw new IllegalArgumentException("Count must be positive!");
 		
-		T   val=getElementType().requireEmptyConstructor().get();
-		var typ=nodeType();
+		T val=getElementType().requireEmptyConstructor().get();
 		
 		
 		IONode<T> chainStart=null;
@@ -326,7 +329,7 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 			}
 			//inverse order add, reduce chance for fragmentation by providing next node immediately
 			var nextNode=chainStart;
-			chainStart=IONode.allocValNode(val, nextNode, valueStorage.getSizeDescriptor(), typ, getDataProvider());
+			chainStart=allocNode(val, nextNode);
 		}
 		
 		var last=getLastNode();

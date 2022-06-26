@@ -2,6 +2,7 @@ package com.lapissea.cfs.chunk;
 
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.collections.IOList;
+import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -11,7 +12,8 @@ import java.util.List;
 
 public class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 	
-	private final List<ChunkPointer> queuedFreeChunks=new ArrayList<>();
+	private final List<ChunkPointer>   queuedFreeChunks  =new ArrayList<>();
+	private final IOList<ChunkPointer> queuedFreeChunksIO=IOList.wrap(queuedFreeChunks);
 	
 	private final IOList<ChunkPointer> freeChunks;
 	private       boolean              defragmentMode;
@@ -52,7 +54,33 @@ public class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 	}
 	@Override
 	public IOList<ChunkPointer> getFreeChunks(){
-		return adding?IOList.wrap(queuedFreeChunks, ()->null):freeChunks;
+		return adding?queuedFreeChunksIO:freeChunks;
+	}
+	
+	private void addQueue(Collection<Chunk> ptrs){
+		synchronized(queuedFreeChunksIO){
+			if(ptrs.size()<=2){
+				for(Chunk ptr : ptrs){
+					UtilL.addRemainSorted(queuedFreeChunks, ptr.getPtr());
+				}
+			}else{
+				for(Chunk ptr : ptrs){
+					queuedFreeChunks.add(ptr.getPtr());
+				}
+				queuedFreeChunks.sort(Comparator.naturalOrder());
+			}
+		}
+	}
+	private List<Chunk> popQueue() throws IOException{
+		synchronized(queuedFreeChunksIO){
+			var chs=new ArrayList<Chunk>(queuedFreeChunks.size());
+			while(!queuedFreeChunks.isEmpty()){
+				var ptr=queuedFreeChunks.remove(queuedFreeChunks.size()-1);
+				var ch =context.getChunk(ptr);
+				chs.add(ch);
+			}
+			return chs;
+		}
 	}
 	
 	@Override
@@ -65,39 +93,26 @@ public class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 		List<Chunk> toAdd=MemoryOperations.mergeChunks(popped);
 		
 		if(adding){
-			synchronized(queuedFreeChunks){
-				toAdd.stream().sorted(Comparator.comparingLong(Chunk::getCapacity)).map(Chunk::getPtr).forEach(queuedFreeChunks::add);
-			}
+			addQueue(toAdd);
 			return;
 		}
 		
 		adding=true;
 		try{
-			synchronized(queuedFreeChunks){
-				for(Chunk chunk : toAdd){
-					queuedFreeChunks.add(chunk.getPtr());
-				}
-			}
+			addQueue(toAdd);
 			do{
-				synchronized(queuedFreeChunks){
-					var capacity       =freeChunks.getCapacity();
-					var optimalCapacity=freeChunks.size()+queuedFreeChunks.size();
-					if(capacity<optimalCapacity){
-						var cap=optimalCapacity+1;
+				var capacity       =freeChunks.getCapacity();
+				var optimalCapacity=freeChunks.size()+queuedFreeChunks.size();
+				if(capacity<optimalCapacity){
+					var cap=optimalCapacity+1;
+					synchronized(freeChunks){
 						freeChunks.requestCapacity(cap);
-						assert freeChunks.getCapacity()==cap:freeChunks.getCapacity()+" "+cap;
 					}
-					var chs=new ArrayList<Chunk>(queuedFreeChunks.size());
-					while(!queuedFreeChunks.isEmpty()){
-						synchronized(queuedFreeChunks){
-							if(queuedFreeChunks.isEmpty()) break;
-							var ptr=queuedFreeChunks.remove(queuedFreeChunks.size()-1);
-							var ch =context.getChunk(ptr);
-							chs.add(ch);
-						}
-					}
-					chs.sort(Comparator.naturalOrder());
-					
+					assert freeChunks.getCapacity()==cap:freeChunks.getCapacity()+" "+cap;
+				}
+				
+				var chs=popQueue();
+				synchronized(freeChunks){
 					MemoryOperations.mergeFreeChunksSorted(context, freeChunks, chs);
 				}
 			}while(!queuedFreeChunks.isEmpty());

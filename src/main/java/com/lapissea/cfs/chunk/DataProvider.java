@@ -4,10 +4,13 @@ import com.lapissea.cfs.exceptions.DesyncedCacheException;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.objects.ChunkPointer;
+import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.type.IOTypeDB;
 
 import java.io.IOException;
+import java.util.Collection;
 import java.util.Objects;
+import java.util.function.Function;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
@@ -59,9 +62,9 @@ public interface DataProvider{
 	
 	static DataProvider newVerySimpleProvider(MemoryData.EventLogger onWrite) throws IOException{
 		var data=new MemoryData.Builder()
-			.withOnWrite(onWrite)
-			.withInitial(dest->dest.write(Cluster.getMagicId()))
-			.build();
+			         .withOnWrite(onWrite)
+			         .withInitial(dest->dest.write(Cluster.getMagicId()))
+			         .build();
 		return newVerySimpleProvider(data);
 	}
 	
@@ -113,5 +116,36 @@ public interface DataProvider{
 		if(DEBUG_VALIDATION) return;
 		Chunk cached=getChunkCached(chunk.getPtr());
 		assert cached==chunk:"Fake "+chunk;
+	}
+	
+	default DataProvider withRouter(Function<AllocateTicket, AllocateTicket> router){
+		MemoryManager src=getMemoryManager();
+		class Routed implements DataProvider, MemoryManager{
+			@Override public IOTypeDB getTypeDb()                    {return DataProvider.this.getTypeDb();}
+			@Override public IOInterface getSource()                 {return DataProvider.this.getSource();}
+			@Override public MemoryManager getMemoryManager()        {return this;}
+			@Override public ChunkCache getChunkCache()              {return DataProvider.this.getChunkCache();}
+			@Override public Chunk getFirstChunk() throws IOException{return DataProvider.this.getFirstChunk();}
+			
+			
+			@Override public DefragSes openDefragmentMode()          {return src.openDefragmentMode();}
+			@Override public IOList<ChunkPointer> getFreeChunks()    {return src.getFreeChunks();}
+			@Override public DataProvider getDataProvider()          {return this;}
+			@Override
+			public void free(Collection<Chunk> toFree) throws IOException{
+				src.free(toFree);
+			}
+			@Override
+			public void allocTo(Chunk firstChunk, Chunk target, long toAllocate) throws IOException{
+				src.allocTo(firstChunk, target, toAllocate);
+			}
+			
+			@Override
+			public Chunk alloc(AllocateTicket ticket) throws IOException{
+				return src.alloc(router.apply(ticket));
+			}
+		}
+		
+		return new Routed();
 	}
 }

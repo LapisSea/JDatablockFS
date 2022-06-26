@@ -397,7 +397,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 					var node=bucket.node;
 					if(node==null){
 						var entry=iter.next().getValue();
-						node=allocNewNode(entry);
+						node=allocNewNode(entry, (Unmanaged<?>)newBuckets);
 						bucket.node=node;
 						setBucket(newBuckets, smallHash, bucket);
 					}else{
@@ -405,7 +405,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 					}
 					
 					while(iter.hasNext()){
-						var newNode=allocNewNode(iter.next().getValue());
+						var newNode=allocNewNode(iter.next().getValue(), node);
 						
 						node.setNext(newNode);
 						node=newNode;
@@ -673,7 +673,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		BucketEntry<K, V> newEntry=new BucketEntry<>(key, value);
 		
 		if(bucket.node==null){
-			bucket.node=allocNewNode(newEntry);
+			bucket.node=allocNewNode(newEntry, (Unmanaged<?>)buckets);
 			setBucket(buckets, smallHash, bucket);
 			return OVERWRITE_EMPTY;
 		}
@@ -697,7 +697,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		}
 		
 		
-		IONode<BucketEntry<K, V>> newNode=allocNewNode(newEntry);
+		IONode<BucketEntry<K, V>> newNode=allocNewNode(newEntry, last);
 		
 		last.setNext(newNode);
 		
@@ -710,13 +710,14 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	);
 	
 	@SuppressWarnings("unchecked")
-	private IONode<BucketEntry<K, V>> allocNewNode(BucketEntry<K, V> newEntry) throws IOException{
+	private IONode<BucketEntry<K, V>> allocNewNode(BucketEntry<K, V> newEntry, IOInstance.Unmanaged<?> magnet) throws IOException{
 		return IONode.allocValNode(
 			newEntry,
 			null,
 			(SizeDescriptor<BucketEntry<K, V>>)(Object)BucketEntry.PIPE.getSizeDescriptor(),
 			BUCKET_NODE_TYPE,
-			getDataProvider()
+			getDataProvider(),
+			OptionalLong.of(magnet.getReference().getPtr().getValue())
 		);
 	}
 	

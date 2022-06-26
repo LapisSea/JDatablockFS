@@ -7,6 +7,7 @@ import com.lapissea.cfs.objects.collections.listtools.MappedIOList;
 import com.lapissea.cfs.objects.collections.listtools.MemoryWrappedIOList;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.Nullable;
+import com.lapissea.util.function.FunctionOL;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;
 
@@ -90,6 +91,35 @@ public interface IOList<T> extends IterablePP<T>{
 	}
 	static <T> IOList<T> wrap(List<T> data, Supplier<T> typeConstructor){
 		return new MemoryWrappedIOList<>(data, typeConstructor);
+	}
+	
+	static <T> long findSortedClosest(IOList<T> freeChunks, FunctionOL<T> distanceMapping) throws IOException{
+		switch((int)freeChunks.size()){
+			case 0 -> {return -1;}
+			case 1 -> {return 0;}
+		}
+		
+		long min=0, max=freeChunks.size()-1;
+		
+		long minDist=distanceMapping.apply(freeChunks.get(min));
+		long maxDist=distanceMapping.apply(freeChunks.get(max));
+		
+		while(max-min>1){
+			var mid    =(min+max)/2;
+			var midDist=distanceMapping.apply(freeChunks.get(mid));
+			
+			if(midDist<minDist){
+				minDist=midDist;
+				min=mid;
+				continue;
+			}
+			if(midDist<maxDist){
+				maxDist=midDist;
+				max=mid;
+			}
+		}
+		
+		return minDist<maxDist?min:max;
 	}
 	
 	static <T extends Comparable<T>> long addRemainSorted(IOList<T> list, T value) throws IOException{
@@ -184,7 +214,6 @@ public interface IOList<T> extends IterablePP<T>{
 			throw new UnsupportedOperationException(getClass().toString());
 		}
 	}
-	
 	
 	interface IOListIterator<T> extends IOIterator<T>{
 		

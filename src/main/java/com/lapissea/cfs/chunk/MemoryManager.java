@@ -161,7 +161,7 @@ public interface MemoryManager extends DataProvider.Holder{
 	DefragSes openDefragmentMode();
 	
 	/**
-	 * Lists locations of all KNOWN chunks. This may not be a complete list of unused chunks.
+	 * Lists locations of all KNOWN chunks in a sorted order from smallest to biggest. This may not be a complete list of unused chunks.
 	 */
 	IOList<ChunkPointer> getFreeChunks();
 	
