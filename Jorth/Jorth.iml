@@ -12,10 +12,10 @@
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="Maven: com.github.lapissea:jlapisutil:1.0.11" level="project" />
-    <orderEntry type="library" name="Maven: org.ow2.asm:asm:9.2" level="project" />
-    <orderEntry type="library" name="Maven: org.ow2.asm:asm-tree:9.2" level="project" />
-    <orderEntry type="library" name="Maven: org.ow2.asm:asm-util:9.2" level="project" />
-    <orderEntry type="library" name="Maven: org.ow2.asm:asm-analysis:9.2" level="project" />
+    <orderEntry type="library" name="Maven: org.ow2.asm:asm:9.3" level="project" />
+    <orderEntry type="library" name="Maven: org.ow2.asm:asm-tree:9.3" level="project" />
+    <orderEntry type="library" name="Maven: org.ow2.asm:asm-util:9.3" level="project" />
+    <orderEntry type="library" name="Maven: org.ow2.asm:asm-analysis:9.3" level="project" />
     <orderEntry type="library" scope="TEST" name="Maven: org.junit.jupiter:junit-jupiter-api:5.8.2" level="project" />
     <orderEntry type="library" scope="TEST" name="Maven: org.opentest4j:opentest4j:1.2.0" level="project" />
     <orderEntry type="library" scope="TEST" name="Maven: org.junit.platform:junit-platform-commons:1.8.2" level="project" />

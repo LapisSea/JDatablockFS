@@ -15,28 +15,36 @@
 		<cfsVersion>1.0</cfsVersion>
 	</properties>
 
-	<groupId>com.github.lapissea</groupId>
-	<artifactId>JDatablockFS</artifactId>
-	<packaging>pom</packaging>
+	<parent>
+		<groupId>com.github.lapissea</groupId>
+		<artifactId>JDatablockFS</artifactId>
+		<version>1.0</version>
+	</parent>
 
+	<artifactId>jdatablockfs.core</artifactId>
 	<version>1.0</version>
 
-	<modules>
-		<module>jdatablockfs.core</module>
-		<module>jdatablockfs.run</module>
-		<module>jdatablockfs.tools</module>
-		<module>Jorth</module>
-	</modules>
-
-	<dependencyManagement>
-		<dependencies>
-			<dependency>
-				<groupId>com.github.lapissea</groupId>
-				<artifactId>jlapisutil</artifactId>
-				<version>1.0.11</version>
-			</dependency>
-		</dependencies>
-	</dependencyManagement>
+	<dependencies>
+		<dependency>
+			<groupId>com.github.lapissea</groupId>
+			<artifactId>jlapisutil</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.github.lapissea</groupId>
+			<artifactId>Jorth</artifactId>
+			<version>0.0.1</version>
+		</dependency>
+		<dependency>
+			<groupId>org.roaringbitmap</groupId>
+			<artifactId>RoaringBitmap</artifactId>
+			<version>0.9.28</version>
+		</dependency>
+		<dependency>
+			<groupId>ru.vyarus</groupId>
+			<artifactId>generics-resolver</artifactId>
+			<version>3.0.3</version>
+		</dependency>
+	</dependencies>
 
 	<build>
 		<plugins>

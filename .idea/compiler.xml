@@ -11,23 +11,17 @@
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <module name="jdatablockfs.run" />
-        <module name="jdatablockfs.tools" />
+        <module name="jdatablockfs.core" />
         <module name="Jorth" />
+        <module name="jdatablockfs.tools" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel target="18">
       <module name="JDatablockFS" target="18" />
+      <module name="jdatablockfs.core" target="18" />
       <module name="jdatablockfs.run" target="18" />
       <module name="jdatablockfs.tools" target="18" />
       <module name="Jorth" target="18" />
     </bytecodeTargetLevel>
-  </component>
-  <component name="JavacSettings">
-    <option name="ADDITIONAL_OPTIONS_OVERRIDE">
-      <module name="JDatablockFS" options="" />
-      <module name="Jorth" options="" />
-      <module name="jdatablockfs.run" options="" />
-      <module name="jdatablockfs.tools" options="" />
-    </option>
   </component>
 </project>

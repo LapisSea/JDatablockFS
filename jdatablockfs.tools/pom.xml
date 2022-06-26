@@ -13,6 +13,7 @@
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
 		<cfsVersion>1.0</cfsVersion>
+		<github.spair.version>1.86.4</github.spair.version>
 		<lwjgl.version>3.3.1</lwjgl.version>
 		<joml.version>1.10.4</joml.version>
 		<lwjgl.natives>natives-windows</lwjgl.natives>
@@ -20,7 +21,7 @@
 
 	<parent>
 		<groupId>com.github.lapissea</groupId>
-		<artifactId>jdatablockfs</artifactId>
+		<artifactId>JDatablockFS</artifactId>
 		<version>1.0</version>
 	</parent>
 
@@ -30,7 +31,7 @@
 	<dependencies>
 		<dependency>
 			<groupId>com.github.lapissea</groupId>
-			<artifactId>jdatablockfs</artifactId>
+			<artifactId>jdatablockfs.core</artifactId>
 			<version>${cfsVersion}</version>
 		</dependency>
 		<dependency>
@@ -90,13 +91,13 @@
 		<dependency>
 			<groupId>io.github.spair</groupId>
 			<artifactId>imgui-java-binding</artifactId>
-			<version>1.86.3</version>
+			<version>${github.spair.version}</version>
 			<scope>compile</scope>
 		</dependency>
 		<dependency>
 			<groupId>io.github.spair</groupId>
 			<artifactId>imgui-java-lwjgl3</artifactId>
-			<version>1.86.3</version>
+			<version>${github.spair.version}</version>
 			<scope>compile</scope>
 		</dependency>
 

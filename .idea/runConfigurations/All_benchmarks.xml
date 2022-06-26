@@ -1,0 +1,8 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="All benchmarks" type="jmh-id" vm-parameters="" program-parameters="com.lapissea.cfs.benchmark.*" working-dir="$ProjectFileDir$\run\main" benchmark-type="CLASS" benchmark-class="com.lapissea.cfs.objects.text.TextBench" isAlternativeJrePathEnabled="false">
+    <module name="JDatablockFS" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

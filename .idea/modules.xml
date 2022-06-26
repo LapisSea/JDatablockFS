@@ -4,6 +4,7 @@
     <modules>
       <module fileurl="file://$PROJECT_DIR$/JDatablockFS.iml" filepath="$PROJECT_DIR$/JDatablockFS.iml" />
       <module fileurl="file://$PROJECT_DIR$/Jorth/Jorth.iml" filepath="$PROJECT_DIR$/Jorth/Jorth.iml" />
+      <module fileurl="file://$PROJECT_DIR$/jdatablockfs.core/jdatablockfs.core.iml" filepath="$PROJECT_DIR$/jdatablockfs.core/jdatablockfs.core.iml" />
       <module fileurl="file://$PROJECT_DIR$/jdatablockfs.run/jdatablockfs.run.iml" filepath="$PROJECT_DIR$/jdatablockfs.run/jdatablockfs.run.iml" />
       <module fileurl="file://$PROJECT_DIR$/jdatablockfs.tools/jdatablockfs.tools.iml" filepath="$PROJECT_DIR$/jdatablockfs.tools/jdatablockfs.tools.iml" />
     </modules>

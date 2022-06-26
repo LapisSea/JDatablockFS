@@ -1,4 +1,4 @@
-module JDatablockFS {
+module JDatablockFS.core {
 	requires jdk.unsupported;
 	
 	requires jlapisutil;

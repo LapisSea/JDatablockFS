@@ -31,7 +31,6 @@
     <option name="originalFiles">
       <list>
         <option value="$PROJECT_DIR$/pom.xml" />
-        <option value="$PROJECT_DIR$/jdatablockfs.tools/pom.xml" />
       </list>
     </option>
   </component>
@@ -85,6 +84,6 @@
     </instrumentedNotNulls>
   </component>
   <component name="ProjectRootManager" version="2" languageLevel="JDK_18_PREVIEW" project-jdk-name="temurin-18" project-jdk-type="JavaSDK">
-    <output url="file://$PROJECT_DIR$/run/target" />
+    <output url="file://$PROJECT_DIR$/target" />
   </component>
 </project>

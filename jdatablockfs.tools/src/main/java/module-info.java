@@ -1,7 +1,7 @@
 module JDatablockFS.tools {
 	requires java.desktop;
 	requires org.joml;
-	requires transitive JDatablockFS;
+	requires JDatablockFS.core;
 	requires jlapisutil;
 	requires glfw.window;
 	requires jlapisvector;

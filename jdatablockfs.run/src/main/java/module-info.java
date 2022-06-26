@@ -1,4 +1,5 @@
 module JDatablockFS.run {
+	requires JDatablockFS.core;
 	requires JDatablockFS.tools;
 	requires jlapisutil;
 	requires Jorth;

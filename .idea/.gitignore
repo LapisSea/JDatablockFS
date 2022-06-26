@@ -6,3 +6,9 @@
 /dataSources.local.xml
 # Editor-based HTTP Client requests
 /httpRequests/
+
+saveactions_settings.xml
+/dictionaries/
+jarRepositories.xml
+JPAMappingSettings.xml
+uiDesigner.xml
