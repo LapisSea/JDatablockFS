@@ -68,7 +68,11 @@ public class BinaryGridRenderer{
 		NAMED_STACK
 	}
 	
-	record HoverMessage(Range range, Color color, Object[] data){}
+	record HoverMessage(List<Range> ranges, Color color, Object[] data){
+		boolean isRangeEmpty(){
+			return ranges.isEmpty()||ranges.stream().allMatch(r->r.size()==0);
+		}
+	}
 	
 	record RenderContext(
 		RenderBackend renderer,
@@ -226,7 +230,7 @@ public class BinaryGridRenderer{
 				var bitRect=DrawUtils.makeBitRect(ctx.renderCtx, trueOffset, bitOff, remaining);
 				var range  =Range.fromSize(trueOffset, 1);
 				if(ctx.renderCtx.isRangeHovered(range)){
-					ctx.renderCtx.hoverMessages.add(new HoverMessage(range, null, new Object[]{field+": ", new FieldVal<>(ioPool, instance, field)}));
+					ctx.renderCtx.hoverMessages.add(new HoverMessage(List.of(range), null, new Object[]{field+": ", new FieldVal<>(ioPool, instance, field)}));
 				}
 				doSegment.accept(bitRect);
 				remaining-=Math.min(8, remaining);
@@ -245,7 +249,7 @@ public class BinaryGridRenderer{
 					var bitRect=DrawUtils.makeBitRect(ctx.renderCtx, trueOffset, bitOff, remaining);
 					var range  =Range.fromSize(trueOffset, 1);
 					if(ctx.renderCtx.isRangeHovered(range)){
-						ctx.renderCtx.hoverMessages.add(new HoverMessage(range, null, new Object[]{field+": ", new FieldVal<>(ioPool, instance, field)}));
+						ctx.renderCtx.hoverMessages.add(new HoverMessage(List.of(range), null, new Object[]{field+": ", new FieldVal<>(ioPool, instance, field)}));
 					}
 					doSegment.accept(bitRect);
 					remaining-=Math.min(8, remaining);
@@ -268,9 +272,10 @@ public class BinaryGridRenderer{
 		Range hover    =null;
 		Range bestRange=new Range(0, 0);
 		Range lastRange=null;
-		for(Range range : instance instanceof Chunk ch?
-		                  List.of(Range.fromSize(ch.getPtr().getValue()+fieldRange.from(), fieldRange.size())):
-		                  DrawUtils.chainRangeResolve(ctx.provider, reference, fieldRange.from(), fieldRange.size())){
+		var ranges=instance instanceof Chunk ch?
+		           List.of(Range.fromSize(ch.getPtr().getValue()+fieldRange.from(), fieldRange.size())):
+		           DrawUtils.chainRangeResolve(ctx.provider, reference, fieldRange.from(), fieldRange.size());
+		for(Range range : ranges){
 			if(bestRange.size()<ctx.renderCtx.width()){
 				var contiguousRange=DrawUtils.findBestContiguousRange(ctx.renderCtx.width, range);
 				if(bestRange.size()<contiguousRange.size()) bestRange=contiguousRange;
@@ -308,7 +313,7 @@ public class BinaryGridRenderer{
 		}
 		
 		if(hover!=null){
-			ctx.renderCtx.hoverMessages.add(new HoverMessage(hover, color, new Object[]{field+": ", new FieldVal<>(ioPool, instance, field)}));
+			ctx.renderCtx.hoverMessages.add(new HoverMessage(UtilL.stream(ranges).toList(), color, new Object[]{field+": ", new FieldVal<>(ioPool, instance, field)}));
 		}
 		
 		
@@ -553,7 +558,7 @@ public class BinaryGridRenderer{
 		ParsedFrame parsed=cFrame.parsed();
 		if(!renderStatic){
 			var ctx=new RenderContext(null, bytes, getPixelsPerByte(), dis, null);
-			if(lastHoverMessages.stream().anyMatch(m->!ctx.isRangeHovered(m.range))){
+			if(lastHoverMessages.stream().flatMap(m->m.ranges.stream()).anyMatch(r->!ctx.isRangeHovered(r))){
 				renderStatic=true;
 			}
 		}
@@ -1051,14 +1056,9 @@ public class BinaryGridRenderer{
 	}
 	
 	private void drawMouse(RenderContext ctx, CachedFrame frame){
-		
-		var screenWidth=ctx.renderer.getDisplay().getWidth();
-		
 		var bytes =frame.memData().bytes();
 		var parsed=frame.parsed();
 		
-		int xByte    =ctx.hoverByteX;
-		int yByte    =ctx.hoverByteY;
 		int byteIndex=ctx.hoverByteIndex;
 		if(byteIndex==-1) return;
 		
@@ -1069,10 +1069,10 @@ public class BinaryGridRenderer{
 		
 		for(int i=ctx.hoverMessages.size()-1;i>=0;i--){
 			HoverMessage hoverMessage=ctx.hoverMessages.get(i);
-			if(hoverMessage.color==null||hoverMessage.range.size()==0){
+			if(hoverMessage.color==null||hoverMessage.isRangeEmpty()){
 				continue;
 			}
-			hoverMessage.range.longs().forEach(l->colorMap.put(l, hoverMessage.color));
+			hoverMessage.ranges.stream().flatMapToLong(Range::longs).forEach(l->colorMap.put(l, hoverMessage.color));
 		}
 		
 		colorMap.entrySet().stream().sorted(Comparator.comparingLong(Map.Entry::getKey)).forEach(e->{
@@ -1095,12 +1095,13 @@ public class BinaryGridRenderer{
 		
 		for(int i=ctx.hoverMessages.size()-1;i>=0;i--){
 			HoverMessage hoverMessage=ctx.hoverMessages.get(i);
-			if(hoverMessage.color==null||hoverMessage.range.size()==0){
+			if(hoverMessage.color==null||hoverMessage.isRangeEmpty()){
 				continue;
 			}
 			ctx.renderer.setLineWidth(i+1);
-			outlineByteRange(hoverMessage.color, ctx, hoverMessage.range);
-			
+			for(Range range : hoverMessage.ranges){
+				outlineByteRange(hoverMessage.color, ctx, range);
+			}
 		}
 		
 		ctx.renderer.translate(0.5, 0.5);
@@ -1119,7 +1120,7 @@ public class BinaryGridRenderer{
 		var bStr=b+"";
 		while(bStr.length()<3) bStr+=" ";
 		bStr=bStr+(ctx.renderer.getFont().canFontDisplay(bytes[byteIndex])?" = "+(char)b:"");
-		ctx.hoverMessages().addAll(0, List.of(new HoverMessage(new Range(0, 0), null, new Object[]{"@"+byteIndex}), new HoverMessage(new Range(0, 0), null, new Object[]{bStr})));
+		ctx.hoverMessages().addAll(0, List.of(new HoverMessage(List.of(new Range(0, 0)), null, new Object[]{"@"+byteIndex}), new HoverMessage(List.of(new Range(0, 0)), null, new Object[]{bStr})));
 		
 		ctx.renderer.setLineWidth(3);
 		outlineByteRange(Color.BLACK, ctx, Range.fromSize(byteIndex, 1));
@@ -1156,7 +1157,7 @@ public class BinaryGridRenderer{
 		}catch(IOException e){
 			if(parsed.lastHoverChunk!=null) renderStatic=true;
 			parsed.lastHoverChunk=null;
-			ctx.hoverMessages.add(new HoverMessage(new Range(0, 0), null, new Object[]{"Unable to find hover chunk"}));
+			ctx.hoverMessages.add(new HoverMessage(List.of(new Range(0, 0)), null, new Object[]{"Unable to find hover chunk"}));
 		}
 	}
 	
@@ -1530,9 +1531,13 @@ public class BinaryGridRenderer{
 			if(fieldErr!=null){
 				throw fieldErr;
 			}
-			var rang=Range.fromSize(offsetStart, fieldOffset);
-			if(rctx.isRangeHovered(rang)){
-				rctx.hoverMessages.add(new HoverMessage(rang, ColorUtils.makeCol(rand, typeHash, offsetStart+""), new Object[]{"Inst: ", instance}));
+			
+			var ranges=instance instanceof Chunk?List.of(Range.fromSize(offsetStart, fieldOffset)):DrawUtils.chainRangeResolve(ctx.provider, reference, 0, fieldOffset);
+			for(Range range : ranges){
+				if(rctx.isRangeHovered(range)){
+					rctx.hoverMessages.add(new HoverMessage(UtilL.stream(ranges).toList(), ColorUtils.makeCol(rand, typeHash, offsetStart+""), new Object[]{"Inst: ", instance}));
+					break;
+				}
 			}
 		}finally{
 			ctx.stack.remove(frame);
