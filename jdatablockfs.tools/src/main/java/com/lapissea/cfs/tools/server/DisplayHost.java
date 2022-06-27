@@ -11,6 +11,8 @@ import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -211,7 +213,21 @@ public class DisplayHost{
 		ServerSocket server=new ServerSocket(port);
 		LogUtil.println("Started on port", port);
 		
-		if(!lazyStart) getDisplay();
+		var initialData=System.getProperty("initialData");
+		if(!lazyStart||initialData!=null) getDisplay();
+		
+		if(initialData!=null){
+			LogUtil.println("Loading initialData...");
+			try{
+				var data=Files.readAllBytes(Path.of(initialData));
+				var d=getDisplay().join();
+				var ses=d.getSession("default");
+				ses.log(new MemFrame(data, new long[0], ""));
+				LogUtil.println("Loaded initialData.");
+			}catch(Throwable e){
+				new RuntimeException("Failed to load initialData", e).printStackTrace();
+			}
+		}
 		
 		int sesCounter=1;
 		while(true){
