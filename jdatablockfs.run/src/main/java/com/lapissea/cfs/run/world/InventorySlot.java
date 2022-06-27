@@ -14,4 +14,9 @@ public class InventorySlot extends IOInstance<InventorySlot>{
 	@IODependency.VirtualNumSize
 	public int count=420;
 	
+	public InventorySlot(){}
+	public InventorySlot(int id, int count){
+		this.id=id;
+		this.count=count;
+	}
 }
