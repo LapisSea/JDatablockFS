@@ -5,7 +5,7 @@ module JDatablockFS.run {
 	requires Jorth;
 	requires jmh.core;
 	requires jmh.generator.annprocess;
-	requires gson;
+	requires com.google.gson;
 	
 	opens com.lapissea.cfs.run;
 	opens com.lapissea.cfs.run.sparseimage;
