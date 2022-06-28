@@ -86,7 +86,7 @@ public class OpenGLBackend extends RenderBackend{
 	private CompletableFuture<?> glInit;
 	private Runnable             start;
 	
-	private final ImGuiImplGl3 imGuiGl3=new ImGuiImplGl3();
+	private ImGuiImplGl3 imGuiGl3;
 	
 	public OpenGLBackend(){
 		Thread glThread=new Thread(this::displayLifecycle, "display");
@@ -258,7 +258,7 @@ public class OpenGLBackend extends RenderBackend{
 		glDepthMask(false);
 		glfwSwapInterval(0);
 		
-		imGuiGl3.init("#version 330 core");
+		imGuiGl3=ImGuiUtils.makeGL3Impl();
 	}
 	
 	private void displayLifecycle(){

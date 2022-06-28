@@ -1,6 +1,7 @@
 package com.lapissea.cfs.tools.render;
 
 import com.lapissea.cfs.tools.DrawFont;
+import imgui.ImGui;
 
 import javax.swing.*;
 import java.awt.*;
@@ -44,6 +45,8 @@ public class G2DBackend extends RenderBackend{
 	
 	private       Thread          renderThread;
 	private final Deque<Runnable> tasks=new LinkedList<>();
+	
+	private ImGuiImplG2D imguiImpl;
 	
 	private final DrawFont font=new DrawFont(){
 		@Override
@@ -116,6 +119,7 @@ public class G2DBackend extends RenderBackend{
 	
 	public G2DBackend(){
 		frame=new JFrame();
+		imguiImpl=ImGuiUtils.makeG2DImpl();
 		
 		File f=new File("wind");
 		try(var in=new BufferedReader(new FileReader(f))){
@@ -419,6 +423,8 @@ public class G2DBackend extends RenderBackend{
 	
 	@Override
 	public void postRender(){
+		imguiImpl.renderDrawData(currentGraphics, ImGui.getDrawData());
+		
 		currentGraphics.dispose();
 		currentGraphics=null;
 		
