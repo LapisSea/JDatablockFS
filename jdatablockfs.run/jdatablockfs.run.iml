@@ -14,7 +14,7 @@
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="module" module-name="jdatablockfs.tools" />
     <orderEntry type="module" module-name="jdatablockfs.core" />
-    <orderEntry type="library" name="Maven: com.github.lapissea:jlapisutil:1.0.11" level="project" />
+    <orderEntry type="library" name="Maven: com.github.lapissea:jlapisutil:1.1.0" level="project" />
     <orderEntry type="module" module-name="Jorth" />
     <orderEntry type="library" name="Maven: org.ow2.asm:asm:9.3" level="project" />
     <orderEntry type="library" name="Maven: org.ow2.asm:asm-tree:9.3" level="project" />
@@ -23,10 +23,10 @@
     <orderEntry type="library" name="Maven: org.roaringbitmap:RoaringBitmap:0.9.28" level="project" />
     <orderEntry type="library" scope="RUNTIME" name="Maven: org.roaringbitmap:shims:0.9.28" level="project" />
     <orderEntry type="library" name="Maven: ru.vyarus:generics-resolver:3.0.3" level="project" />
-    <orderEntry type="library" name="Maven: com.github.lapissea:glfw-window:1.0.0" level="project" />
-    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-assimp:3.2.3" level="project" />
-    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-vulkan:3.2.3" level="project" />
-    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-assimp:natives-windows:3.2.3" level="project" />
+    <orderEntry type="library" name="Maven: com.github.lapissea:glfw-window:1.0.3" level="project" />
+    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-assimp:3.3.1" level="project" />
+    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-vulkan:3.3.1" level="project" />
+    <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-assimp:natives-windows:3.3.1" level="project" />
     <orderEntry type="library" name="Maven: com.github.lapissea:jlapisvector:1.0.7" level="project" />
     <orderEntry type="library" name="Maven: net.sf.trove4j:trove4j:3.0.3" level="project" />
     <orderEntry type="library" name="Maven: org.lwjgl:lwjgl:3.3.1" level="project" />
