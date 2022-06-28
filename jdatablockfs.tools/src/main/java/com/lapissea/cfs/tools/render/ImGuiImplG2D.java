@@ -97,6 +97,11 @@ public final class ImGuiImplG2D{
 					
 					vb.position(i1*ImDrawData.SIZEOF_IM_DRAW_VERT+vtxBufferOffset);
 					float x1=vb.getFloat(), y1=vb.getFloat(), u1=vb.getFloat(), v1=vb.getFloat();
+					vb.position(i2*ImDrawData.SIZEOF_IM_DRAW_VERT+vtxBufferOffset);
+					float x2=vb.getFloat(), y2=vb.getFloat(), u2=vb.getFloat(), v2=vb.getFloat();
+					vb.position(i3*ImDrawData.SIZEOF_IM_DRAW_VERT+vtxBufferOffset);
+					float x3=vb.getFloat(), y3=vb.getFloat(), u3=vb.getFloat(), v3=vb.getFloat();
+					float x4=x3, y4=y3, u4=u3, v4=v3;
 					
 					var pixel32=vb.getInt();
 					
@@ -105,30 +110,56 @@ public final class ImGuiImplG2D{
 					var b=(pixel32>>16)&0xFF;
 					var a=(pixel32>>24)&0xFF;
 					
-					vb.position(i2*ImDrawData.SIZEOF_IM_DRAW_VERT+vtxBufferOffset);
-					float x2=vb.getFloat(), y2=vb.getFloat(), u2=vb.getFloat(), v2=vb.getFloat();
-					vb.position(i3*ImDrawData.SIZEOF_IM_DRAW_VERT+vtxBufferOffset);
-					float x3=vb.getFloat(), y3=vb.getFloat(), u3=vb.getFloat(), v3=vb.getFloat();
+					if(i+1<elemCount/3){
+						ib.mark();
+						int ni1=ib.get();
+						int ni2=ib.get();
+						int ni3=ib.get();
+						
+						boolean ni1in=ni1==i1||ni1==i2||ni1==i3;
+						boolean ni2in=ni2==i1||ni2==i2||ni2==i3;
+						boolean ni3in=ni3==i1||ni3==i2||ni3==i3;
+						
+						int c=0;
+						if(ni1in) c++;
+						if(ni2in) c++;
+						if(ni3in) c++;
+						if(c==2){
+							int i4;
+							if(!ni1in) i4=ni1;
+							else if(!ni2in) i4=ni2;
+							else i4=ni3;
+							
+							vb.position(i4*ImDrawData.SIZEOF_IM_DRAW_VERT+vtxBufferOffset);
+							x4=vb.getFloat();
+							y4=vb.getFloat();
+							u4=vb.getFloat();
+							v4=vb.getFloat();
+							i++;
+						}else{
+							ib.reset();
+						}
+					}
 					
 					if(textureId==69){
 						
-						float ul=MathUtil.min(u1, u2, u3);
-						float ur=MathUtil.max(u1, u2, u3);
-						float vl=MathUtil.min(v1, v2, v3);
-						float vr=MathUtil.max(v1, v2, v3);
+						float ul=MathUtil.min(u1, u2, u3, u4);
+						float ur=MathUtil.max(u1, u2, u3, u4);
+						float vl=MathUtil.min(v1, v2, v3, v4);
+						float vr=MathUtil.max(v1, v2, v3, v4);
 						float us=ur-ul, vs=vr-vl;
 						
 						if(Math.min(us, vs)<0.00001){
 							graphics.setPaintMode();
 							graphics.setColor(new Color(r, g, b, a));
 						}else{
-							float xl=MathUtil.min(x1, x2, x3);
-							float xr=MathUtil.max(x1, x2, x3);
-							float yl=MathUtil.min(y1, y2, y3);
-							float yr=MathUtil.max(y1, y2, y3);
+							float xl=MathUtil.min(x1, x2, x3, x4);
+							float xr=MathUtil.max(x1, x2, x3, x4);
+							float yl=MathUtil.min(y1, y2, y3, y4);
+							float yr=MathUtil.max(y1, y2, y3, y4);
 							float w =xr-xl, h=yr-yl;
 							
-							float iw=fontImage.getHeight();
+							float iw=fontImage.getWidth();
 							float ih=fontImage.getHeight();
 							
 							iw*=w/(us*iw);
@@ -179,6 +210,7 @@ public final class ImGuiImplG2D{
 					tri.moveTo(x1, y1);
 					tri.lineTo(x2, y2);
 					tri.lineTo(x3, y3);
+					if(x3!=x4||y3!=y4) tri.lineTo(x4, y4);
 					tri.closePath();
 					
 					graphics.fill(tri);
