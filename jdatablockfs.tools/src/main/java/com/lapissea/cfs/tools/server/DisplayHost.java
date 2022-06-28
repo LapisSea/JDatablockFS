@@ -1,5 +1,7 @@
 package com.lapissea.cfs.tools.server;
 
+import com.lapissea.cfs.chunk.Cluster;
+import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.cfs.tools.logging.MemFrame;
@@ -213,15 +215,22 @@ public class DisplayHost{
 		ServerSocket server=new ServerSocket(port);
 		LogUtil.println("Started on port", port);
 		
-		var initialData=System.getProperty("initialData");
-		if(!lazyStart||initialData!=null) getDisplay();
+		if(!lazyStart) getDisplay();
 		
+		var initialData=System.getProperty("initialData");
 		if(initialData!=null){
 			LogUtil.println("Loading initialData...");
 			try{
 				var data=Files.readAllBytes(Path.of(initialData));
-				var d=getDisplay().join();
-				var ses=d.getSession("default");
+				async(()->{//dry run cluster to load and compile classes while display is loading
+					try{
+						var cl=new Cluster(MemoryData.builder().withRaw(data).asReadOnly().build());
+						cl.rootWalker().walk(true, r->{});
+					}catch(IOException e){
+						e.printStackTrace();
+					}
+				});
+				var ses=getDisplay().join().getSession("default");
 				ses.log(new MemFrame(data, new long[0], ""));
 				LogUtil.println("Loaded initialData.");
 			}catch(Throwable e){
