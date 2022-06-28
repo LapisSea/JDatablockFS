@@ -1080,8 +1080,9 @@ public class BinaryGridRenderer{
 				flatRanges.add(new CRange(e.getValue(), Range.fromSize(e.getKey(), 1)));
 				return;
 			}
-			var last=flatRanges.get(flatRanges.size()-1);
-			if(last.col.equals(e.getValue())){
+			var  last=flatRanges.get(flatRanges.size()-1);
+			long pos =e.getKey();
+			if(last.col.equals(e.getValue())&&pos==last.rang.to()){
 				flatRanges.set(flatRanges.size()-1, new CRange(e.getValue(), new Range(last.rang.from(), e.getKey()+1)));
 				return;
 			}
@@ -1090,7 +1091,7 @@ public class BinaryGridRenderer{
 		});
 		
 		for(CRange flatRange : flatRanges){
-			DrawUtils.fillByteRange(alpha(flatRange.col, 0.3F), ctx, flatRange.rang);
+			DrawUtils.fillByteRange(alpha(flatRange.col, 0.15F), ctx, flatRange.rang);
 		}
 		
 		for(int i=ctx.hoverMessages.size()-1;i>=0;i--){
