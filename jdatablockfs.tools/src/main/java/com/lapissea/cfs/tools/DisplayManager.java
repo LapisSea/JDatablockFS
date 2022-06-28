@@ -2,6 +2,7 @@ package com.lapissea.cfs.tools;
 
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.MemFrame;
+import com.lapissea.cfs.tools.render.ImGuiUtils;
 import com.lapissea.cfs.tools.render.RenderBackend;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.util.LogUtil;
@@ -30,22 +31,7 @@ public class DisplayManager implements DataLogger{
 	private static final boolean LOG_FRAME_TIME=UtilL.sysPropertyByClass(DisplayManager.class, "LOG_FRAME_TIME", false, Boolean::parseBoolean);
 	
 	static{
-		try{
-			System.setProperty("imgui.library.path", "./lib");
-			ImGui.createContext();
-			
-			var    io=ImGui.getIO();
-			var    f =io.getFonts();
-			byte[] bb;
-			try(var t=Objects.requireNonNull(DisplayManager.class.getResourceAsStream("/CourierPrime/Regular/font.ttf"))){
-				bb=t.readAllBytes();
-			}
-			f.clearFonts();
-			f.addFontFromMemoryTTF(bb, 16);
-		}catch(Throwable e){
-			e.printStackTrace();
-			System.exit(1);
-		}
+		ImGuiUtils.load();
 	}
 	
 	private boolean destroyRequested=false;

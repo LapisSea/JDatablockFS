@@ -26,6 +26,9 @@ public final class ChunkChainIO implements RandomIO{
 	
 	public ChunkChainIO(Chunk head) throws IOException{
 		this.head=head;
+		if(DEBUG_VALIDATION){
+			head.requireReal();
+		}
 		restartCursor();
 		source=head.getDataProvider().getSource().io();
 	}

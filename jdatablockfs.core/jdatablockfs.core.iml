@@ -12,7 +12,7 @@
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
-    <orderEntry type="library" name="Maven: com.github.lapissea:jlapisutil:1.0.11" level="project" />
+    <orderEntry type="library" name="Maven: com.github.lapissea:jlapisutil:1.1.0" level="project" />
     <orderEntry type="module" module-name="Jorth" />
     <orderEntry type="library" name="Maven: org.ow2.asm:asm:9.3" level="project" />
     <orderEntry type="library" name="Maven: org.ow2.asm:asm-tree:9.3" level="project" />

@@ -33,7 +33,7 @@ public class ChunkCache{
 	}
 	public static ChunkCache weak(){
 		return new ChunkCache(()->Collections.synchronizedMap(new WeakValueHashMap<>()));
-//		return new ChunkCache(()->Collections.synchronizedMap(new WeakValueHashMap<ChunkPointer, Chunk>().defineStayAlivePolicy(1))); TODO: fix define policy
+//		return new ChunkCache(()->Collections.synchronizedMap(new WeakValueHashMap<ChunkPointer, Chunk>().defineStayAlivePolicy(1)));
 	}
 	
 	private final Map<ChunkPointer, Chunk> data;

@@ -72,7 +72,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 			@NotNull
 			@Override
 			public <T1 extends Annotation> Optional<T1> getAnnotation(Class<T1> annotationClass){
-				return ANNOTATIONS.stream().filter(a->UtilL.instanceOf(a, annotationClass)).map(a->(T1)a).findAny();
+				return ANNOTATIONS.stream().filter(a->UtilL.instanceOfObj(a, annotationClass)).map(a->(T1)a).findAny();
 			}
 			@Override
 			public Type getGenericType(GenericContext genericContext){
@@ -91,7 +91,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 				try{
 					if(value!=null){
 						var arg=instance.getTypeDef().arg(0);
-						if(!UtilL.instanceOf(value, arg.getTypeClass(instance.getDataProvider().getTypeDb()))) throw new ClassCastException(arg+" not compatible with "+value);
+						if(!UtilL.instanceOfObj(value, arg.getTypeClass(instance.getDataProvider().getTypeDb()))) throw new ClassCastException(arg+" not compatible with "+value);
 					}
 					
 					instance.setValue((T)value);
