@@ -501,8 +501,7 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 	}
 	
 	public void requireReal() throws DesyncedCacheException{
-		var cached=provider.getChunkCache().get(getPtr());
-		if(this!=cached) throw new DesyncedCacheException(this, cached);
+		provider.getChunkCache().requireReal(this);
 	}
 	
 	public boolean hasNextPtr(){
