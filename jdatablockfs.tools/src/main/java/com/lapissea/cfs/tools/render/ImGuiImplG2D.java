@@ -34,7 +34,7 @@ public final class ImGuiImplG2D{
 	}
 	
 	
-	public void renderDrawData(Graphics2D g, final ImDrawData drawData){
+	public void renderDrawData(Graphics2D graphics, final ImDrawData drawData){
 		if(drawData.getCmdListsCount()<=0){
 			return;
 		}
@@ -81,7 +81,7 @@ public final class ImGuiImplG2D{
 					continue;
 				}
 				
-				g.setClip((int)clipMinX, (int)(clipMinY), (int)(clipMaxX-clipMinX), (int)(clipMaxY-clipMinY));
+				graphics.setClip((int)clipMinX, (int)(clipMinY), (int)(clipMaxX-clipMinX), (int)(clipMaxY-clipMinY));
 				
 				// Bind texture, Draw
 				final int textureId      =drawData.getCmdListCmdBufferTextureId(cmdListIdx, cmdBufferIdx);
@@ -98,7 +98,12 @@ public final class ImGuiImplG2D{
 					vb.position(i1*ImDrawData.SIZEOF_IM_DRAW_VERT+vtxBufferOffset);
 					float x1=vb.getFloat(), y1=vb.getFloat(), u1=vb.getFloat(), v1=vb.getFloat();
 					
-					Color color=new Color(vb.getInt(), true);
+					var pixel32=vb.getInt();
+					
+					var r=(pixel32>>0)&0xFF;
+					var g=(pixel32>>8)&0xFF;
+					var b=(pixel32>>16)&0xFF;
+					var a=(pixel32>>24)&0xFF;
 					
 					vb.position(i2*ImDrawData.SIZEOF_IM_DRAW_VERT+vtxBufferOffset);
 					float x2=vb.getFloat(), y2=vb.getFloat(), u2=vb.getFloat(), v2=vb.getFloat();
@@ -114,8 +119,8 @@ public final class ImGuiImplG2D{
 						float us=ur-ul, vs=vr-vl;
 						
 						if(Math.min(us, vs)<0.00001){
-							g.setPaintMode();
-							g.setColor(color);
+							graphics.setPaintMode();
+							graphics.setColor(new Color(r, g, b, a));
 						}else{
 							float xl=MathUtil.min(x1, x2, x3);
 							float xr=MathUtil.max(x1, x2, x3);
@@ -135,7 +140,7 @@ public final class ImGuiImplG2D{
 							);
 							
 							
-							g.setComposite((srcCM, dstCM, hints)->new CompositeContext(){
+							graphics.setComposite((srcCM, dstCM, hints)->new CompositeContext(){
 								@Override
 								public void dispose(){}
 								
@@ -148,10 +153,10 @@ public final class ImGuiImplG2D{
 											p1=src1.getPixel(x, y, p1);
 											p2=src2.getPixel(x, y, p2);
 											
-											p1[0]*=color.getRed()/255F;
-											p1[1]*=color.getGreen()/255F;
-											p1[2]*=color.getBlue()/255F;
-											p1[3]*=color.getAlpha()/255F;
+											p1[0]*=r/255F;
+											p1[1]*=g/255F;
+											p1[2]*=b/255F;
+											p1[3]*=a/255F;
 											
 											var a=p1[3]/255F;
 											for(int j=0;j<3;j++){
@@ -163,11 +168,11 @@ public final class ImGuiImplG2D{
 									}
 								}
 							});
-							g.setPaint(paint);
+							graphics.setPaint(paint);
 						}
 					}else{
-						g.setPaintMode();
-						g.setColor(color);
+						graphics.setPaintMode();
+						graphics.setColor(new Color(r, g, b, a));
 					}
 					
 					tri.reset();
@@ -176,16 +181,16 @@ public final class ImGuiImplG2D{
 					tri.lineTo(x3, y3);
 					tri.closePath();
 					
-					g.fill(tri);
+					graphics.fill(tri);
 					
 				}
 			}
 		}
 		
-		g.setClip(null);
-		g.setColor(Color.WHITE);
-		g.setPaintMode();
-		g.setPaint(Color.WHITE);
+		graphics.setClip(null);
+		graphics.setColor(Color.WHITE);
+		graphics.setPaintMode();
+		graphics.setPaint(Color.WHITE);
 	}
 	
 	/**
