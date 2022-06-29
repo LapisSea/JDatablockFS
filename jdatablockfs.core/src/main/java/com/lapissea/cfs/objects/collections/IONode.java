@@ -333,7 +333,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 				return null;
 			}
 			return valueStorage.readNew(io);
-		}catch(Throwable e){
+		}catch(IOException e){
 			throw new IOException("failed to get value on "+this.getReference().addOffset(valueStart()).infoString(getDataProvider()), e);
 		}
 	}
@@ -478,22 +478,31 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	
 	@Override
 	public String toShortString(){
+		String  val;
+		boolean valCorrupted=false;
 		try{
-			var val   =getValue();
-			var result=new StringBuilder().append("{").append(Utils.toShortString(val));
-			
+			val=Utils.toShortString(getValue());
+		}catch(Throwable e){
+			val="CORRUPTED: "+e;
+			valCorrupted=true;
+		}
+		var result=new StringBuilder().append("{").append(Utils.toShortString(val));
+		try{
 			var next=getNextPtr();
 			if(!next.isNull()){
 				result.append(" -> ").append(next);
 			}
-			return result.append("}").toString();
-		}catch(IOException e){
-			throw new RuntimeException(e);
+		}catch(Throwable e){
+			if(!valCorrupted){
+				result.append(" -> ").append("CORRUPTED: ").append(e);
+			}
 		}
+		
+		return result.append("}").toString();
 	}
 	@Override
 	public String toString(){
-		return "Node"+toShortString();
+		return this.getClass().getSimpleName()+toShortString();
 	}
 	
 	private static class NodeIterator<T> implements IOList.IOIterator.Iter<IONode<T>>{
