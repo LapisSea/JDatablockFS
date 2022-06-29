@@ -158,7 +158,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit{
 	
 	public StructPipe(Struct<T> type){
 		this.type=type;
-		init(()->{
+		init(false, ()->{
 			this.ioFields=FieldSet.of(initFields());
 			setInitState(STATE_IO_FIELD);
 			earlyNullChecks=Utils.nullIfEmpty(getNonNulls());

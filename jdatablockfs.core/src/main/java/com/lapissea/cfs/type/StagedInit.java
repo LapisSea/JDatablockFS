@@ -26,8 +26,12 @@ public abstract class StagedInit{
 
 //	private static long last;
 	
-	protected void init(Runnable init){
+	protected void init(boolean runNow, Runnable init){
 //		if(last==0) last=System.nanoTime();
+		if(runNow){
+			init.run();
+			setInitState(STATE_DONE);
+		}
 		runBaseStageTask(()->{
 			try{
 				init.run();

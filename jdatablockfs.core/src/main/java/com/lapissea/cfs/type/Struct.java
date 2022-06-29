@@ -280,7 +280,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		private       FieldSet<T> unmanagedStaticFields;
 		
 		private Unmanaged(Class<T> type){
-			super(type);
+			super(type, false);
 			overridingDynamicUnmanaged=checkOverridingUnmanaged();
 		}
 		
@@ -370,13 +370,17 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	public static <T extends IOInstance<T>> Struct<T> of(Class<T> instanceClass, int minRequestedStage){
-		var s=of(instanceClass);
+		var s=of0(instanceClass, minRequestedStage==STATE_DONE);
 		s.waitForState(minRequestedStage);
 		return s;
 	}
 	
-	@SuppressWarnings("unchecked")
 	public static <T extends IOInstance<T>> Struct<T> of(Class<T> instanceClass){
+		return of0(instanceClass, false);
+	}
+	
+	@SuppressWarnings("unchecked")
+	private static <T extends IOInstance<T>> Struct<T> of0(Class<T> instanceClass, boolean runNow){
 		Objects.requireNonNull(instanceClass);
 		
 		Struct<T> cached=getCached(instanceClass);
@@ -388,7 +392,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		return compile(instanceClass, t->{
 			if(!IOInstance.isInstance(t)) throw new ClassCastException(t.getName()+" is not an "+IOInstance.class.getSimpleName());
 			if(IOInstance.isUnmanaged(t)) throw new ClassCastException(t.getName()+" is unmanaged!");
-			return new Struct<>(t);
+			return new Struct<>(t, runNow);
 		});
 	}
 	
@@ -420,13 +424,14 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			lock.lock();
 			STRUCT_COMPILE.put(instanceClass, Thread.currentThread());
 			lock.unlock();
+			try{
+				struct=newStruct.apply(instanceClass);
+			}finally{
+				lock.lock();
+			}
 			
-			struct=newStruct.apply(instanceClass);
-			
-			lock.lock();
 			STRUCT_CACHE.put(instanceClass, struct);
 		}catch(Throwable e){
-			e.printStackTrace();
 			throw new MalformedStructLayout("Failed to compile "+instanceClass.getName(), e);
 		}finally{
 			STRUCT_COMPILE.remove(instanceClass);
@@ -469,9 +474,9 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	
 	public static final int STATE_FIELD_MAKE=1, STATE_INIT_FIELDS=2;
 	
-	private Struct(Class<T> type){
+	private Struct(Class<T> type, boolean runNow){
 		this.type=type;
-		init(()->{
+		init(runNow, ()->{
 			this.fields=FieldCompiler.create().compile(this);
 			setInitState(STATE_FIELD_MAKE);
 			this.fields.forEach(IOField::init);
