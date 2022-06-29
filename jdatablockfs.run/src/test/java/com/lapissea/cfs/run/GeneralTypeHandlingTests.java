@@ -13,6 +13,7 @@ import com.lapissea.cfs.objects.collections.HashIOMap;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.collections.LinkedIOList;
 import com.lapissea.cfs.objects.text.AutoText;
+import com.lapissea.cfs.tools.utils.ToolUtils;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.StagedInit;
 import com.lapissea.cfs.type.Struct;
@@ -26,6 +27,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.List;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -175,6 +177,15 @@ public class GeneralTypeHandlingTests{
 		var r        =cluster.getRootProvider().builder().withId("hello!").withGenerator(()->{throw new RuntimeException();});
 		var container=r.request();
 		assertEquals(((EnumContainer)container).r, RandomEnum.A);
+	}
+	
+	@Test
+	void enumSerialization() throws NoSuchMethodException{
+		ToolUtils.simulateMissingClasses(
+			List.of(n->List.of(RandomEnum.class.getName(), EnumContainer.class.getName()).contains(n)),
+			GeneralTypeHandlingTests.class.getMethod("make"),
+			GeneralTypeHandlingTests.class.getMethod("use", byte[].class)
+		);
 	}
 	
 }
