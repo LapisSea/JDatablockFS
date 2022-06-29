@@ -2,6 +2,7 @@ package com.lapissea.cfs.type.field.annotations;
 
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.SupportedPrimitive;
 import com.lapissea.cfs.type.compilation.AnnotationLogic;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
@@ -12,6 +13,7 @@ import com.lapissea.util.UtilL;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -82,12 +84,19 @@ public @interface IONullability{
 			if(!canHave(field)){
 				throw new MalformedStructLayout(field+" is not a supported field");
 			}
+			if(SupportedPrimitive.get(field.getType()).isPresent()&&annotation.value()==Mode.DEFAULT_IF_NULL){
+				throw new MalformedStructLayout("Wrapper type on "+field+" does not support "+Mode.DEFAULT_IF_NULL+" mode");
+			}
 		}
 		
 		public static boolean canHave(AnnotatedType field){
 			var typ=field.getType();
 			if(typ.isPrimitive()) return false;
-			return field.hasAnnotation(IOType.Dynamic.class)||Stream.of(IOInstance.class, Enum.class, String.class).anyMatch(c->UtilL.instanceOf(typ, c));
+			return field.hasAnnotation(IOType.Dynamic.class)||
+			       Stream.concat(
+				       Stream.of(IOInstance.class, Enum.class, String.class),
+				       Arrays.stream(SupportedPrimitive.values()).map(p->p.wrapper)
+			       ).anyMatch(c->UtilL.instanceOf(typ, c));
 		}
 		
 		

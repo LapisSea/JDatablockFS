@@ -234,6 +234,15 @@ public sealed class VarHandleAccessor<CTyp extends IOInstance<CTyp>> extends Abs
 	}
 	
 	@Override
+	protected char getExactChar(Struct.Pool<CTyp> ioPool, CTyp instance){
+		return (char)handle.get(instance);
+	}
+	@Override
+	protected void setExactChar(Struct.Pool<CTyp> ioPool, CTyp instance, char value){
+		handle.set(instance, value);
+	}
+	
+	@Override
 	protected long getExactLong(Struct.Pool<CTyp> ioPool, CTyp instance){
 		return (long)handle.get(instance);
 	}

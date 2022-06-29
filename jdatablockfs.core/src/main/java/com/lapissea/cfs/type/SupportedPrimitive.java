@@ -9,6 +9,7 @@ import java.util.function.Supplier;
 
 public enum SupportedPrimitive implements RuntimeType<Object>{
 	DOUBLE(double.class, Double.class, SizeDescriptor.Fixed.of(8)),
+	CHAR(char.class, Character.class, SizeDescriptor.Fixed.of(2)),
 	FLOAT(float.class, Float.class, SizeDescriptor.Fixed.of(4)),
 	LONG(long.class, Long.class, SizeDescriptor.Fixed.of(8)),
 	INT(int.class, Integer.class, SizeDescriptor.Fixed.of(4)),

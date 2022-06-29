@@ -298,6 +298,7 @@ public sealed interface ValueStorage<T>{
 				case SHORT -> src.readInt2();
 				case BYTE -> src.readInt1();
 				case BOOLEAN -> src.readBoolean();
+				case CHAR -> src.readChar2();
 			};
 		}
 		

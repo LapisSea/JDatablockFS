@@ -109,7 +109,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 						case BOOLEAN -> Utils.bitToByte(len);
 						case LONG -> NumberSize.bySize(LongStream.of((long[])val).max().orElse(0)).bytes;
 						case INT -> NumberSize.bySize(IntStream.of((int[])val).max().orElse(0)).bytes;
-						case SHORT -> 2;
+						case SHORT, CHAR -> 2;
 						case BYTE -> 1;
 					})*len);
 					if(psiz.isPresent()) yield psiz.get()+lenSize;
@@ -276,6 +276,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 				yield arr;
 			}
 			case SHORT -> src.readInts2(len);
+			case CHAR -> src.readChars2(len);
 			case BYTE -> throw new ShouldNeverHappenError();
 		};
 	}

@@ -134,6 +134,10 @@ public final class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends Abstra
 	protected short getExactShort(Struct.Pool<CTyp> ioPool, CTyp instance){return (short)getExactObject(ioPool, instance);}
 	@Override
 	protected void setExactShort(Struct.Pool<CTyp> ioPool, CTyp instance, short value){setExactObject(ioPool, instance, value);}
+	@Override
+	protected char getExactChar(Struct.Pool<CTyp> ioPool, CTyp instance){return (char)getExactObject(ioPool, instance);}
+	@Override
+	protected void setExactChar(Struct.Pool<CTyp> ioPool, CTyp instance, char value){setExactObject(ioPool, instance, value);}
 	
 	@Override
 	protected byte getExactByte(Struct.Pool<CTyp> ioPool, CTyp instance){return getTargetPool(ioPool, instance).getByte(this);}

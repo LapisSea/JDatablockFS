@@ -36,6 +36,9 @@ public interface FieldAccessor<CTyp extends IOInstance<CTyp>> extends AnnotatedT
 	default short getShort(Struct.Pool<CTyp> ioPool, CTyp instance)                {return (short)get(ioPool, instance);}
 	default void setShort(Struct.Pool<CTyp> ioPool, CTyp instance, short value)    {set(ioPool, instance, value);}
 	
+	default char getChar(Struct.Pool<CTyp> ioPool, CTyp instance)                  {return (Character)get(ioPool, instance);}
+	default void setChar(Struct.Pool<CTyp> ioPool, CTyp instance, char value)      {set(ioPool, instance, value);}
+	
 	@Override
 	default int compareTo(FieldAccessor<CTyp> o){
 		return getName().compareTo(o.getName());

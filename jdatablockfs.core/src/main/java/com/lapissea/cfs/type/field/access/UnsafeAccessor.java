@@ -235,6 +235,15 @@ public sealed class UnsafeAccessor<CTyp extends IOInstance<CTyp>> extends Abstra
 	}
 	
 	@Override
+	protected void setExactChar(Struct.Pool<CTyp> ioPool, CTyp instance, char value){
+		UNSAFE.putChar(instance, fieldOffset, value);
+	}
+	@Override
+	protected char getExactChar(Struct.Pool<CTyp> ioPool, CTyp instance){
+		return UNSAFE.getChar(instance, fieldOffset);
+	}
+	
+	@Override
 	protected long getExactLong(Struct.Pool<CTyp> ioPool, CTyp instance){
 		return UNSAFE.getLong(instance, fieldOffset);
 	}

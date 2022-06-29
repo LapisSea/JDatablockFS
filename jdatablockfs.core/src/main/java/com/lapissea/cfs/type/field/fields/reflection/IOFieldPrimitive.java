@@ -29,6 +29,7 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 	public static <T extends IOInstance<T>> IOField<T, ?> make(FieldAccessor<T> field){
 		return SupportedPrimitive.get(field.getType()).map(t->switch(t){
 			case DOUBLE -> new FDouble<>(field);
+			case CHAR -> new FChar<>(field);
 			case FLOAT -> new FFloat<>(field);
 			case LONG -> new FLong<>(field);
 			case INT -> new FInt<>(field);
@@ -95,6 +96,66 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		@Override
 		public int instanceHashCode(Struct.Pool<T> ioPool, T instance){
 			return Double.hashCode(getValue(ioPool, instance));
+		}
+	}
+	
+	public static class FChar<T extends IOInstance<T>> extends IOFieldPrimitive<T, Character>{
+		
+		
+		public FChar(FieldAccessor<T> field){
+			this(field, false);
+		}
+		public FChar(FieldAccessor<T> field, boolean forceFixed){
+			super(field, forceFixed, SHORT);
+		}
+		@Override
+		protected EnumSet<NumberSize> allowedSizes(){
+			return EnumSet.of(VOID, BYTE, SHORT);
+		}
+		
+		private char getValue(Struct.Pool<T> ioPool, T instance){
+			return getAccessor().getChar(ioPool, instance);
+		}
+		
+		public void setValue(Struct.Pool<T> ioPool, T instance, char value){
+			getAccessor().setChar(ioPool, instance, value);
+		}
+		
+		@Deprecated
+		@Override
+		public Character get(Struct.Pool<T> ioPool, T instance){
+			return getValue(ioPool, instance);
+		}
+		@Deprecated
+		@Override
+		public void set(Struct.Pool<T> ioPool, T instance, Character value){
+			setValue(ioPool, instance, value);
+		}
+		
+		@Override
+		public void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+			var size=getSize(ioPool, instance);
+			size.writeFloating(dest, getValue(ioPool, instance));
+		}
+		
+		@Override
+		public void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+			var size=getSize(ioPool, instance);
+			setValue(ioPool, instance, (char)size.read(src));
+		}
+		
+		@Override
+		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+			return Optional.of(String.valueOf(getValue(ioPool, instance)));
+		}
+		
+		@Override
+		public boolean instancesEqual(Struct.Pool<T> ioPool1, T inst1, Struct.Pool<T> ioPool2, T inst2){
+			return getValue(ioPool1, inst1)==getValue(ioPool2, inst2);
+		}
+		@Override
+		public int instanceHashCode(Struct.Pool<T> ioPool, T instance){
+			return Character.hashCode(getValue(ioPool, instance));
 		}
 	}
 	
