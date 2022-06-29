@@ -334,7 +334,19 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 			}
 			return valueStorage.readNew(io);
 		}catch(IOException e){
-			throw new IOException("failed to get value on "+this.getReference().addOffset(valueStart()).infoString(getDataProvider()), e);
+			StringBuilder sb=new StringBuilder();
+			sb.append("@ ").append(this.getReference().addOffset(valueStart()).infoString(getDataProvider())).append(": ");
+			var cause=e.getCause();
+			while(cause!=null&&cause.getClass()==IOException.class&&cause.getLocalizedMessage()!=null){
+				sb.append(e.getLocalizedMessage()).append(": ");
+				cause=cause.getCause();
+			}
+			if(cause!=null){
+				sb.append(cause.getClass().getSimpleName());
+				var msg=cause.getLocalizedMessage();
+				if(msg!=null) sb.append(": ").append(msg);
+			}
+			throw new IOException(sb.toString(), e);
 		}
 	}
 	
