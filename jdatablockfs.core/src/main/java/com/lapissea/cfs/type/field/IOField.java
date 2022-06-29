@@ -423,7 +423,12 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	 */
 	public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
 		var val=get(ioPool, instance);
-		if(val==null) return Optional.empty();
+		if(val==null){
+			if(getNullability()==IONullability.Mode.NOT_NULL){
+				throw new FieldIsNullException(this);
+			}
+			return Optional.empty();
+		}
 		
 		if(val instanceof IOInstance inst){
 			if("{".equals(start)&&"}".equals(end)&&"=".equals(fieldValueSeparator)&&", ".equals(fieldSeparator)){
