@@ -4,9 +4,7 @@ import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.chunk.DataProvider;
-import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
-import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.objects.collections.ContiguousIOList;
@@ -15,11 +13,8 @@ import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.collections.LinkedIOList;
 import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.StagedInit;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.TypeLink;
-import com.lapissea.cfs.type.field.annotations.IODependency;
-import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeConsumer;
@@ -27,7 +22,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
@@ -35,7 +29,6 @@ import java.util.Arrays;
 import java.util.Random;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 import static com.lapissea.util.LogUtil.Init.USE_CALL_POS;
 import static com.lapissea.util.LogUtil.Init.USE_TABULATED_HEADER;
@@ -124,57 +117,6 @@ public class GeneralTests{
 	@Test
 	void blankCluster(TestInfo info) throws IOException{
 		TestUtils.testCluster(info, ses->{});
-	}
-	
-	public static class Deps extends IOInstance<Deps>{
-		
-		@IOValue
-		@IODependency("b")
-		public int a;
-		
-		@IOValue
-		@IODependency("c")
-		public int b;
-		
-		@IOValue
-		public int c;
-		
-		@IOValue
-		@IODependency({"c", "b"})
-		public int d;
-	}
-	
-	public static class Arr extends IOInstance<Arr>{
-		@IOValue
-		public float[] arr;
-	}
-	
-	static Stream<IOInstance<?>> genericObjects(){
-		var deps=new Deps();
-		deps.a=1;
-		deps.b=2;
-		deps.c=3;
-		deps.d=4;
-		var arr=new Arr();
-		arr.arr=new float[]{1, 2, 3, 4, 5};
-		return Stream.of(Dummy.first(), deps, arr);
-	}
-	
-	@ParameterizedTest
-	@MethodSource({"genericObjects"})
-	<T extends IOInstance<T>> void genericStorage(T obj, TestInfo info) throws IOException{
-		TestUtils.testCluster(info, ses->{
-			var ls=ses.getRootProvider().<IOList<GenericContainer<?>>>builder().withType(TypeLink.ofFlat(
-				LinkedIOList.class,
-				GenericContainer.class, Object.class
-			)).withId("list").request();
-			
-			var c=new GenericContainer<>(obj);
-			ls.clear();
-			ls.add(c);
-			var read=ls.get(0).value;
-			assertEquals(obj, read);
-		});
 	}
 	
 	@ParameterizedTest
@@ -279,32 +221,6 @@ public class GeneralTests{
 	}
 	
 	@Test
-	void genericTest(TestInfo info) throws IOException{
-		TestUtils.testChunkProvider(info, provider->{
-			var pipe=ContiguousStructPipe.of(GenericContainer.class);
-			
-			var chunk=AllocateTicket.bytes(64).submit(provider);
-			
-			var container=new GenericContainer<>();
-			
-			container.value=new Dummy(123);
-			
-			pipe.write(chunk, container);
-			var read=pipe.readNew(chunk, null);
-			
-			assertEquals(container, read);
-			
-			
-			container.value="This is a test.";
-			
-			pipe.write(chunk, container);
-			read=pipe.readNew(chunk, null);
-			
-			assertEquals(container, read);
-		});
-	}
-	
-	@Test
 	void stringTest(TestInfo info) throws IOException{
 		TestUtils.testChunkProvider(info, provider->{
 			String data="this is a test!";
@@ -366,53 +282,6 @@ public class GeneralTests{
 			TypeLink.of(listType, typ),
 			session, useCluster
 		);
-	}
-	
-	@ParameterizedTest
-	@MethodSource("types")
-	<T extends IOInstance<T>> void checkIntegrity(Struct<T> struct) throws IOException{
-		if(struct instanceof Struct.Unmanaged){
-			return;
-		}
-		
-		StructPipe<T> pipe;
-		try{
-			pipe=ContiguousStructPipe.of(struct);
-			pipe.waitForState(StagedInit.STATE_DONE);
-		}catch(MalformedStructLayout|StagedInit.WaitException ignored){
-			pipe=null;
-		}
-		if(pipe!=null){
-			pipe.checkTypeIntegrity(struct.requireEmptyConstructor().get());
-		}
-		try{
-			pipe=FixedContiguousStructPipe.of(struct);
-			pipe.waitForState(StagedInit.STATE_DONE);
-		}catch(MalformedStructLayout|StagedInit.WaitException ignored){
-			pipe=null;
-		}
-		if(pipe!=null){
-			pipe.checkTypeIntegrity(struct.requireEmptyConstructor().get());
-		}
-	}
-	
-	@SuppressWarnings("unchecked")
-	private static <T extends IOInstance<T>> Stream<Struct<T>> types(){
-		return (Stream<Struct<T>>)(Object)Stream
-			                                  .of(
-				                                  Reference.class,
-				                                  AutoText.class,
-				                                  Cluster.class,
-				                                  ContiguousIOList.class,
-				                                  LinkedIOList.class,
-				                                  HashIOMap.class,
-				                                  BooleanContainer.class,
-				                                  IntContainer.class,
-				                                  LongContainer.class,
-				                                  Dummy.class
-			                                  ).flatMap(p->Stream.concat(Stream.of(p), Arrays.stream(p.getDeclaredClasses())))
-			                                  .filter(IOInstance::isInstance)
-			                                  .map(Struct::ofUnknown);
 	}
 	
 	@Test
