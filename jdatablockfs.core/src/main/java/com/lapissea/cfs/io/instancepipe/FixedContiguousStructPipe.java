@@ -14,7 +14,6 @@ import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
-import com.lapissea.util.NotImplementedException;
 
 import java.io.IOException;
 import java.util.AbstractMap;
@@ -74,10 +73,9 @@ public class FixedContiguousStructPipe<T extends IOInstance<T>> extends StructPi
 		}
 	}
 	private Map<IOField<T, NumberSize>, NumberSize> computeMaxValues(){
-		//TODO: see how to properly handle max values with dependencies
 		var badFields=sizeFieldStream().filter(IOField::hasDependencies).map(IOField::toString).collect(Collectors.joining(", "));
 		if(!badFields.isEmpty()){
-			throw new NotImplementedException(badFields+" should not have dependencies");
+			throw new MalformedStructLayout(badFields+" should not have dependencies");
 		}
 		
 		return sizeFieldStream()

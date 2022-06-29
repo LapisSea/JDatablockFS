@@ -6,7 +6,6 @@ import com.lapissea.cfs.io.IOTransactionBuffer;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.content.ContentOutputBuilder;
 import com.lapissea.cfs.io.content.ContentWriter;
-import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.function.UnsafeSupplier;
@@ -55,7 +54,7 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		@Override
 		public void setSize(long targetSize){
 			if(targetSize<0) throw new IllegalArgumentException();
-			if(transactionOpen) throw new NotImplementedException();//TODO
+			if(transactionOpen) throw new UnsupportedOperationException();
 			var cap=getCapacity();
 			if(targetSize>cap) targetSize=cap;
 			MemoryData.this.used=Math.toIntExact(targetSize);
