@@ -417,6 +417,9 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 				lock.unlock();
 			}
 		}
+		if(GlobalConfig.PRINT_COMPILATION&&!Access.DEV_CACHE){
+			LogUtil.println(ConsoleColors.GREEN_BRIGHT+"Requested struct: "+instanceClass.getName()+ConsoleColors.RESET);
+		}
 		
 		var lock=STRUCT_CACHE_LOCK.writeLock();
 		S   struct;
@@ -439,7 +442,6 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		}
 		
 		if(GlobalConfig.PRINT_COMPILATION&&!Access.DEV_CACHE){
-			LogUtil.println(ConsoleColors.GREEN_BRIGHT+"Requested struct: "+struct.getType().getName()+ConsoleColors.RESET);
 			StagedInit.runBaseStageTask(()->{
 				var tableStr=TextUtil.toTable(struct.getType().getName(), struct.getFields());
 				LogUtil.println(ConsoleColors.GREEN_BRIGHT+tableStr+ConsoleColors.RESET);
@@ -479,6 +481,13 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		init(runNow, ()->{
 			this.fields=FieldCompiler.create().compile(this);
 			setInitState(STATE_FIELD_MAKE);
+			for(IOField<T, ?> field : this.fields){
+				try{
+					field.init();
+				}catch(Throwable e){
+					throw new RuntimeException("Failed to init "+field, e);
+				}
+			}
 			this.fields.forEach(IOField::init);
 			setInitState(STATE_INIT_FIELDS);
 			poolSizes=calcPoolSizes();

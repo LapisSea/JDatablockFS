@@ -168,7 +168,7 @@ public class GeneralTypeHandlingTests{
 	
 	public static byte[] make() throws IOException{
 		var data=MemoryData.builder().build();
-		Cluster.init(data).getRootProvider().builder().withId("hello!").withType(EnumContainer.class).request();
+		Cluster.init(data).getRootProvider().request(EnumContainer.class, "hello!");
 		return data.readAll();
 	}
 	public static void use(byte[] data) throws IOException{

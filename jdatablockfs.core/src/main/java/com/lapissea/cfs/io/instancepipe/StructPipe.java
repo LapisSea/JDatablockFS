@@ -63,7 +63,9 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit{
 			if(cached!=null) return cached;
 			
 			P created;
-			
+			if(GlobalConfig.PRINT_COMPILATION&&!Access.DEV_CACHE){
+				LogUtil.println(CYAN_BRIGHT+"Requested pipe: "+struct.getType().getName()+RESET);
+			}
 			try{
 				var special=specials.get(struct);
 				if(special!=null){
@@ -76,7 +78,6 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit{
 			}
 			
 			if(GlobalConfig.PRINT_COMPILATION&&!Access.DEV_CACHE){
-				LogUtil.println(CYAN_BRIGHT+"Requested pipe: "+struct.getType().getName()+RESET);
 				StagedInit.runBaseStageTask(()->{
 					String s=CYAN_BRIGHT+
 					         "Compiled: "+struct.getType().getName()+"\n"+

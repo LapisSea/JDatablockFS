@@ -4,6 +4,7 @@ import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.chunk.DataProvider;
+import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
@@ -12,9 +13,7 @@ import com.lapissea.cfs.objects.collections.HashIOMap;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.collections.LinkedIOList;
 import com.lapissea.cfs.objects.text.AutoText;
-import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.Struct;
-import com.lapissea.cfs.type.TypeLink;
+import com.lapissea.cfs.type.*;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeConsumer;
@@ -25,10 +24,11 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
-import java.util.Arrays;
+import java.util.Objects;
 import java.util.Random;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static com.lapissea.util.LogUtil.Init.USE_CALL_POS;
 import static com.lapissea.util.LogUtil.Init.USE_TABULATED_HEADER;
@@ -44,19 +44,25 @@ public class GeneralTests{
 		}
 		
 		if(UtilL.sysPropertyByClass(GeneralTests.class, "standardInit", false, Boolean::parseBoolean)){
-			for(var c : Arrays.asList(Chunk.class, Reference.class, AutoText.class, Cluster.RootRef.class, ContiguousIOList.class, LinkedIOList.class, HashIOMap.class)){
-				try{
-					Struct.ofUnknown(c);
-				}catch(Throwable e){
-					LogUtil.printlnEr(e);
-				}
-			}
+			Stream.of(Chunk.class, Reference.class, AutoText.class, Cluster.RootRef.class, ContiguousIOList.class, LinkedIOList.class, HashIOMap.class, TypeDef.class)
+			      .map(c->{
+				      try{
+					      return Struct.ofUnknown(c);
+				      }catch(Throwable e){
+					      LogUtil.printlnEr(e);
+					      return null;
+				      }
+			      })
+			      .filter(Objects::nonNull)
+			      .toList()
+			      .forEach(c->c.waitForState(StagedInit.STATE_DONE));
 		}
 		
 		if(Boolean.parseBoolean(UtilL.sysPropertyByClass(GeneralTests.class, "earlyRunCode").orElse("true"))){
 			try(var dummy=AllocateTicket.bytes(1).submit(DataProvider.newVerySimpleProvider()).io()){
 				dummy.write(1);
 			}
+			AllocateTicket.bytes(10).submit(Cluster.init(MemoryData.builder().build()));
 		}
 	}
 	
