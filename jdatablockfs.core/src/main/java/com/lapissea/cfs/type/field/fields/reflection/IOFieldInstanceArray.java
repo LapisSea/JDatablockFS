@@ -2,6 +2,7 @@ package com.lapissea.cfs.type.field.fields.reflection;
 
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
+import com.lapissea.cfs.internal.Runner;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
@@ -20,7 +21,7 @@ import java.util.OptionalLong;
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 
-public class IOFieldInstanceArray<T extends IOInstance<T>, ValType extends IOInstance<ValType>> extends IOField<T, ValType[]>{
+public class IOFieldInstanceArray<T extends IOInstance<T>, ValType extends IOInstance<ValType>> extends IOField.NullFlagCompany<T, ValType[]>{
 	
 	private final SizeDescriptor<T>   descriptor;
 	private final Class<ValType>      component;
@@ -35,9 +36,12 @@ public class IOFieldInstanceArray<T extends IOInstance<T>, ValType extends IOIns
 		component=(Class<ValType>)type.getComponentType();
 		if(component.isArray()) throw new MalformedStructLayout("Multi dimension arrays are not supported (yet)");
 		
+		//preload pipe
+		Runner.compileTask(()->ContiguousStructPipe.of(component));
+		
 		descriptor=SizeDescriptor.Unknown.of(WordSpace.BYTE, 0, OptionalLong.empty(), (ioPool, prov, inst)->{
 			var arr=get(null, inst);
-			if(arr.length==0) return 0;
+			if(arr==null||arr.length==0) return 0;
 			
 			var desc=getValPipe().getSizeDescriptor();
 			if(desc.hasFixed()){
@@ -75,8 +79,15 @@ public class IOFieldInstanceArray<T extends IOInstance<T>, ValType extends IOIns
 	public SizeDescriptor<T> getSizeDescriptor(){
 		return descriptor;
 	}
+	
 	@Override
 	public void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+		if(nullable()){
+			if(getIsNull(ioPool, instance)){
+				return;
+			}
+		}
+		
 		var pip=getValPipe();
 		
 		var arr=get(ioPool, instance);
@@ -94,6 +105,13 @@ public class IOFieldInstanceArray<T extends IOInstance<T>, ValType extends IOIns
 	}
 	@Override
 	public void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		if(nullable()){
+			if(getIsNull(ioPool, instance)){
+				set(ioPool, instance, null);
+				return;
+			}
+		}
+		
 		var pip=getValPipe();
 		
 		int       size=getArraySize(ioPool, instance);
@@ -106,6 +124,12 @@ public class IOFieldInstanceArray<T extends IOInstance<T>, ValType extends IOIns
 	
 	@Override
 	public void skipRead(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		if(nullable()){
+			if(getIsNull(ioPool, instance)){
+				return;
+			}
+		}
+		
 		var pip=getValPipe();
 		
 		int size            =getArraySize(ioPool, instance);

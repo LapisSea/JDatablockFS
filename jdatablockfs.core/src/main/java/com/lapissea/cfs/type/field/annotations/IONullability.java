@@ -92,7 +92,7 @@ public @interface IONullability{
 		public static boolean canHave(AnnotatedType field){
 			var typ=field.getType();
 			if(typ.isPrimitive()) return false;
-			return field.hasAnnotation(IOType.Dynamic.class)||
+			return field.hasAnnotation(IOType.Dynamic.class)||typ.isArray()||
 			       Stream.concat(
 				       Stream.of(IOInstance.class, Enum.class, String.class),
 				       Arrays.stream(SupportedPrimitive.values()).map(p->p.wrapper)
@@ -106,6 +106,7 @@ public @interface IONullability{
 		
 		private <T extends IOInstance<T>> boolean canHaveNullabilityField(FieldAccessor<T> field){
 			if(field.hasAnnotation(IOValue.Reference.class)) return false;
+			if(field.getType().isArray()) return true;
 			if(IOInstance.isInstance(field.getType())){
 				return IOInstance.isManaged(field.getType());
 			}
