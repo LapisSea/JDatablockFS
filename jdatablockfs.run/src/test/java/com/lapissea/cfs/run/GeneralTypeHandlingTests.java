@@ -18,6 +18,7 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.StagedInit;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.TypeLink;
+import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import org.junit.jupiter.api.Test;
@@ -175,8 +176,10 @@ public class GeneralTypeHandlingTests{
 		var cluster=new Cluster(MemoryData.builder().withRaw(data).build());
 		
 		var r        =cluster.getRootProvider().builder().withId("hello!").withGenerator(()->{throw new RuntimeException();});
-		var container=r.request();
-		assertEquals(((EnumContainer)container).r, RandomEnum.A);
+		var container=(IOInstance<?>)r.request();
+		
+		IOField f=container.getThisStruct().getFields().byName("r").orElseThrow();
+		assertEquals(f.instanceToString(null, container, false).orElse(null), "A");
 	}
 	
 	@Test
