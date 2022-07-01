@@ -7,8 +7,10 @@ import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.jorth.JorthCompiler;
+import com.lapissea.jorth.JorthWriter;
 import com.lapissea.jorth.MalformedJorthException;
 import com.lapissea.util.*;
+import com.lapissea.util.function.UnsafeBiConsumer;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -39,83 +41,28 @@ public class TemplateClassLoader extends ClassLoader{
 		if(def.isUnmanaged()){
 			throw new UnsupportedOperationException(className+" is unmanaged! All unmanaged types must be present! Unmanaged types may contain mechanism not understood by the base IO engine.");
 		}
-		if(!def.isIoInstance()){
-			throw new UnsupportedOperationException("Can not generate: "+className+". It is not an "+IOInstance.class.getSimpleName());
+		
+		if(!def.isIoInstance()&&!def.isEnum()){
+			throw new UnsupportedOperationException("Can not generate: "+className+". It is not an "+IOInstance.class.getSimpleName()+" or Enum");
 		}
 		
 		var classData=CLASS_DATA_CACHE.get(new TypeNamed(className, def));
 		if(classData==null){
 			var typ=new TypeNamed(className, def.clone());
-			classData=generateBytecode(typ);
+			classData=jorthGenerate(typ, def.isIoInstance()?this::generateIOInstance:this::generateEnum);
 			CLASS_DATA_CACHE.put(typ, classData);
 		}
 		
 		return defineClass(className, ByteBuffer.wrap(classData), null);
 	}
 	
-	private byte[] generateBytecode(TypeNamed classType){
+	private byte[] jorthGenerate(TypeNamed classType, UnsafeBiConsumer<TypeNamed, JorthWriter, MalformedJorthException> generator){
 		if(PRINT_GENERATING_INFO) LogUtil.println("generating", "\n"+TextUtil.toTable(classType.name, classType.def.getFields()));
 		
 		var jorth=new JorthCompiler(this);
 		
 		try(var writer=jorth.writeCode()){
-			
-			writer.write("#TOKEN(0) genClassName define", classType.name);
-			writer.write("#TOKEN(0) IOInstance define", IOInstance.class.getName());
-			writer.write("#TOKEN(0) IOValue define", IOValue.class.getName());
-			writer.write("#TOKEN(0) IONullability define", IONullability.class.getName());
-			writer.write("#TOKEN(0) IOType.Dynamic define", IOType.Dynamic.class.getName());
-			writer.write("#TOKEN(0) IODependency define", IODependency.class.getName());
-			
-			writer.write(
-				"""
-					[genClassName] IOInstance extends
-					public visibility
-					genClassName class start
-					"""
-			);
-			
-			for(var field : classType.def.getFields()){
-				var type=toJorthGeneric(field.getType());
-				
-				if(IONullability.NullLogic.canHave(new AnnotatedType.Simple(
-					field.isDynamic()?List.of(IOFieldTools.makeAnnotation(IOType.Dynamic.class)):List.of(),
-					field.getType().getTypeClass(db)
-				))){
-					writer.write("{#TOKEN(0)} IONullability @", field.getNullability().toString());
-				}
-				if(field.isDynamic()){
-					writer.write("IOType.Dynamic @");
-				}
-				if(!field.getDependencies().isEmpty()){
-					writer.write("{#RAW(0)} IODependency @", field.getDependencies().stream().collect(Collectors.joining(" ", "[", "]")));
-				}
-				
-				writer.write(
-					"""
-						private visibility
-						IOValue @
-						#RAW(0) #TOKEN(1) field
-						""",
-					type,
-					field.getName());
-			}
-			for(var field : classType.def.getFields()){
-				var type=toJorthGeneric(field.getType());
-				
-				writer.write(
-					"""
-						public visibility
-						#RAW(0) returns
-						#TOKEN(1) function start
-							this #TOKEN(2) get
-						end
-						""",
-					type,
-					"get"+TextUtil.firstToUpperCase(field.getName()),
-					field.getName());
-			}
-			
+			generator.accept(classType, writer);
 		}catch(MalformedJorthException e){
 			throw new RuntimeException("Failed to generate class "+classType.name, e);
 		}
@@ -128,6 +75,78 @@ public class TemplateClassLoader extends ClassLoader{
 			throw new RuntimeException(e);
 		}
 		return byt;
+	}
+	
+	private void generateEnum(TypeNamed classType, JorthWriter writer) throws MalformedJorthException{
+		writer.write("#TOKEN(0) className define", classType.name);
+		writer.write(
+			"""
+				public visibility
+				className enum start
+				"""
+		);
+		for(var constant : classType.def.getEnumConstants()){
+			writer.write(constant.getName()).write("enum constant");
+		}
+	}
+	
+	private void generateIOInstance(TypeNamed classType, JorthWriter writer) throws MalformedJorthException{
+		
+		writer.write("#TOKEN(0) genClassName define", classType.name);
+		writer.write("#TOKEN(0) IOInstance define", IOInstance.class.getName());
+		writer.write("#TOKEN(0) IOValue define", IOValue.class.getName());
+		writer.write("#TOKEN(0) IONullability define", IONullability.class.getName());
+		writer.write("#TOKEN(0) IOType.Dynamic define", IOType.Dynamic.class.getName());
+		writer.write("#TOKEN(0) IODependency define", IODependency.class.getName());
+		
+		writer.write(
+			"""
+				[genClassName] IOInstance extends
+				public visibility
+				genClassName class start
+				"""
+		);
+		
+		for(var field : classType.def.getFields()){
+			var type=toJorthGeneric(field.getType());
+			
+			if(IONullability.NullLogic.canHave(new AnnotatedType.Simple(
+				field.isDynamic()?List.of(IOFieldTools.makeAnnotation(IOType.Dynamic.class)):List.of(),
+				field.getType().getTypeClass(db)
+			))){
+				writer.write("{#TOKEN(0)} IONullability @", field.getNullability().toString());
+			}
+			if(field.isDynamic()){
+				writer.write("IOType.Dynamic @");
+			}
+			if(!field.getDependencies().isEmpty()){
+				writer.write("{#RAW(0)} IODependency @", field.getDependencies().stream().collect(Collectors.joining(" ", "[", "]")));
+			}
+			
+			writer.write(
+				"""
+					private visibility
+					IOValue @
+					#RAW(0) #TOKEN(1) field
+					""",
+				type,
+				field.getName());
+		}
+		for(var field : classType.def.getFields()){
+			var type=toJorthGeneric(field.getType());
+			
+			writer.write(
+				"""
+					public visibility
+					#RAW(0) returns
+					#TOKEN(1) function start
+						this #TOKEN(2) get
+					end
+					""",
+				type,
+				"get"+TextUtil.firstToUpperCase(field.getName()),
+				field.getName());
+		}
 	}
 	
 	private String toJorthGeneric(TypeLink typ){

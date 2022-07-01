@@ -15,9 +15,11 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-public class TypeDef extends IOInstance<TypeDef>{
+import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NULLABLE;
+
+public final class TypeDef extends IOInstance<TypeDef>{
 	
-	public static class FieldDef extends IOInstance<FieldDef>{
+	public static final class FieldDef extends IOInstance<FieldDef>{
 		@IOValue
 		private TypeLink type;
 		
@@ -72,6 +74,22 @@ public class TypeDef extends IOInstance<TypeDef>{
 		}
 	}
 	
+	public static final class EnumConstant extends IOInstance<EnumConstant>{
+		
+		@IOValue
+		private String name;
+		
+		public EnumConstant(){}
+		public <T extends Enum<T>> EnumConstant(T constant){
+			name=constant.name();
+		}
+		
+		public String getName(){
+			return name;
+		}
+	}
+	
+	
 	@IOValue
 	private boolean ioInstance;
 	@IOValue
@@ -79,6 +97,10 @@ public class TypeDef extends IOInstance<TypeDef>{
 	
 	@IOValue
 	private FieldDef[] fields=new FieldDef[0];
+	
+	@IOValue
+	@IONullability(NULLABLE)
+	private EnumConstant[] enumConstants;
 	
 	public TypeDef(){}
 	
@@ -91,16 +113,27 @@ public class TypeDef extends IOInstance<TypeDef>{
 				fields=Struct.ofUnknown(type).getFields().stream().map(FieldDef::new).toArray(FieldDef[]::new);
 			}
 		}
+		if(type.isEnum()){
+			//noinspection unchecked,rawtypes
+			enumConstants=Arrays.stream(((Class<Enum>)type).getEnumConstants())
+			                    .map(EnumConstant::new)
+			                    .toArray(EnumConstant[]::new);
+		}
 	}
 	
 	public boolean isUnmanaged() {return unmanaged;}
 	public boolean isIoInstance(){return ioInstance;}
+	public boolean isEnum()      {return enumConstants!=null;}
 	
 	public List<FieldDef> getFields(){
 		if(fields==null) return List.of();
 		return ArrayViewList.create(fields, null);
 	}
 	
+	public List<EnumConstant> getEnumConstants(){
+		if(!isEnum()) return List.of();
+		return ArrayViewList.create(enumConstants, null);
+	}
 	@Override
 	public String toShortString(){
 		return Arrays.stream(fields).map(FieldDef::toShortString).collect(Collectors.joining(", ", (ioInstance?"IO":"")+(unmanaged?"U":"")+"{", "}"));
