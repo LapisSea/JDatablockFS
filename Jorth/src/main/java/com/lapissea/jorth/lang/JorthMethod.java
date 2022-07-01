@@ -559,8 +559,7 @@ public class JorthMethod{
 			throw new MalformedJorthException("cannot cast "+type+" to "+castType);
 		}
 		
-		if(castType.arrayDimensions()!=0) throw new NotImplementedException();
-		mv.visitTypeInsn(CHECKCAST, Utils.undotify(castType.typeName()));
+		mv.visitTypeInsn(CHECKCAST, Utils.genericSignature(castType.rawType()));
 		
 		pushTypeStack(castType);
 	}
@@ -571,4 +570,37 @@ public class JorthMethod{
 		pushTypeStack(new GenType(Class.class.getName(), 0, List.of(cType)));
 	}
 	
+	public void allocateNewArray(GenType type) throws MalformedJorthException{
+		var arraySize=popTypeStack();
+		if(!List.of(Types.INT, Types.SHORT, Types.BYTE).contains(arraySize.type())){
+			throw new MalformedJorthException("Array size is not an integer");
+		}
+		if(type.arrayDimensions()>0){
+			throw new NotImplementedException("multi array dims not implemented");//TODO
+		}
+		if(type.type()!=Types.OBJECT){
+			throw new NotImplementedException("allocation of primitive array not implemented");//TODO
+		}
+		
+		mv.visitTypeInsn(ANEWARRAY, Utils.undotify(type.typeName()));
+		pushTypeStack(new GenType(type.typeName(), 1, List.of()));
+	}
+	
+	public void arrayStore() throws MalformedJorthException{
+		var value=popTypeStack();
+		var index=popTypeStack();
+		if(!List.of(Types.INT, Types.SHORT, Types.BYTE).contains(index.type())){
+			throw new MalformedJorthException("Index is not an integer");
+		}
+		var arrayref=popTypeStack();
+		if(arrayref.arrayDimensions()==0){
+			throw new MalformedJorthException(arrayref+" is not an array");
+		}
+		var el=arrayref.elementType();
+		if(!el.instanceOf(context, value)){
+			throw new MalformedJorthException("Can not store "+value+" in to "+arrayref);
+		}
+		
+		mv.visitInsn(AASTORE);
+	}
 }

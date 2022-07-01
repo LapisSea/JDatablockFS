@@ -41,7 +41,23 @@ public record GenType(String typeName, int arrayDimensions, List<GenType> args, 
 		this(fromTyp(type));
 	}
 	public GenType(Class<?> type){
-		this(type.getName());
+		this(getName(type), getDims(type), List.of());
+	}
+	private static int getDims(Class<?> type){
+		var t              =type;
+		int arrayDimensions=0;
+		while(t.isArray()){
+			arrayDimensions++;
+			t=t.getComponentType();
+		}
+		return arrayDimensions;
+	}
+	private static String getName(Class<?> type){
+		var t=type;
+		while(t.isArray()){
+			t=t.getComponentType();
+		}
+		return t.getName();
 	}
 	
 	public GenType(String typeName){
@@ -58,15 +74,14 @@ public record GenType(String typeName, int arrayDimensions, List<GenType> args, 
 	public boolean instanceOf(JorthCompiler context, GenType popped) throws MalformedJorthException{
 		if(popped.equals(this)) return true;
 		if(popped.type()!=this.type()) return false;
+		var isObj=popped.typeName().equals("java.lang.Object");
+		if(!isObj&&popped.arrayDimensions()!=this.arrayDimensions()) return false;
 		
 		if(popped.type()==Types.OBJECT){
 			if(typeName().equals("java.lang.Object")) return true;
-			if(popped.typeName.equals("java.lang.Object")) return true;
+			if(popped.typeName().equals("java.lang.Object")) return true;
 			
 			var clazz=context.getClassInfo(typeName);
-			if(type==Types.OBJECT&&clazz.parents().isEmpty()&&popped.typeName().equals("java.lang.Object")){
-				return true;
-			}
 			return clazz.instanceOf(popped.typeName);
 		}
 		return false;
@@ -97,4 +112,8 @@ public record GenType(String typeName, int arrayDimensions, List<GenType> args, 
 		return sb.toString();
 	}
 	
+	public GenType elementType(){
+		if(arrayDimensions==0) throw new RuntimeException("Not an array: "+this);
+		return new GenType(typeName, arrayDimensions-1, args, type);
+	}
 }

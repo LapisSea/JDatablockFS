@@ -15,7 +15,7 @@ public class Utils{
 			case LONG -> "J";
 			case FLOAT -> "F";
 			case DOUBLE -> "D";
-			default -> {
+			case OBJECT -> {
 				String argStr;
 				if(sig.args().isEmpty()) argStr="";
 				else{
@@ -30,4 +30,9 @@ public class Utils{
 	public static String undotify(String className){
 		return className.replace('.', '/');
 	}
+	
+	public static String makeArrayName(String elementName, int dimensions){
+		return "[".repeat(dimensions)+"L"+elementName+";";
+	}
+	
 }

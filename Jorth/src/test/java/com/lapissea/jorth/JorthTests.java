@@ -6,6 +6,8 @@ import org.junit.jupiter.api.Test;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Field;
+import java.util.EnumSet;
+import java.util.List;
 import java.util.function.Function;
 
 import static com.lapissea.jorth.TestUtils.generateAndLoadInstance;
@@ -18,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class JorthTests{
 	
 	public static void main(String[] args) throws Throwable{
-		new JorthTests().fieldArrayClass();
+		new JorthTests().simpleEnum();
 	}
 	
 	
@@ -519,4 +521,23 @@ public class JorthTests{
 		assertEquals(msg, str);
 	}
 	
+	@SuppressWarnings("unchecked")
+	@Test
+	<T extends Enum<T>> void simpleEnum() throws ReflectiveOperationException{
+		
+		var className="jorth.SimpleEnum$$";
+		var cls=generateAndLoadInstance(className, writer->{
+			writer.write(
+				"""
+					public visibility
+					#TOKEN(0) enum start
+					
+					FOO enum constant
+					BAR enum constant
+					""",
+				className);
+		});
+		
+		assertEquals(List.of("FOO", "BAR"), EnumSet.allOf((Class<T>)cls).stream().map(Enum::name).toList());
+	}
 }
