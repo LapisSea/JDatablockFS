@@ -1400,8 +1400,9 @@ public class BinaryGridRenderer{
 								}
 								
 								if(IOInstance.isManaged(comp)){
-									Object              instTmp=field.get(ioPool, instance);
-									List<IOInstance<?>> inst   =(List<IOInstance<?>>)(isList?instTmp:ArrayViewList.create((Object[])instTmp, null));
+									Object instTmp=field.get(ioPool, instance);
+									if(instTmp==null) continue;
+									List<IOInstance<?>> inst=(List<IOInstance<?>>)(isList?instTmp:ArrayViewList.create((Object[])instTmp, null));
 									if(inst.isEmpty()) continue;
 									
 									StructPipe elementPipe=ContiguousStructPipe.of(Struct.ofUnknown(inst.get(0).getClass()));
