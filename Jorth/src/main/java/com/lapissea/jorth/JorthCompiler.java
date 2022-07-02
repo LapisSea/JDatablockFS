@@ -1278,8 +1278,6 @@ public class JorthCompiler{
 		}
 		
 		if(isClassEnum){
-			LogUtil.println(enumConstants);
-			
 			try(var writer=writeCode()){
 				writer.write("#TOKEN(0) thisClass define", classInfo.name);
 				writer.write(
