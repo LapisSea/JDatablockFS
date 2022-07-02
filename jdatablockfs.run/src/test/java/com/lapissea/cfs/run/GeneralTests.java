@@ -283,7 +283,7 @@ public class GeneralTests{
 			info, 64,
 			(provider, reference, typeDef)->{
 				var lTyp=Struct.Unmanaged.ofUnmanaged(listType);
-				return lTyp.requireUnmanagedConstructor().create(provider, reference, typeDef);
+				return lTyp.getUnmanagedConstructor().create(provider, reference, typeDef);
 			},
 			TypeLink.of(listType, typ),
 			session, useCluster

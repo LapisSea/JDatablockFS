@@ -316,7 +316,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		if(IOInstance.isUnmanaged(typ)){
 			var uStruct=Struct.Unmanaged.ofUnknown(typ);
 			var ref    =REF_PIPE.readNew(provider, src, genericContext);
-			var inst   =uStruct.requireUnmanagedConstructor().create(provider, ref, typDef);
+			var inst   =uStruct.getUnmanagedConstructor().create(provider, ref, typDef);
 			return inst;
 		}
 		if(IOInstance.isInstance(typ)){
@@ -339,7 +339,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 				var struct=Struct.ofUnknown(e);
 				if(struct instanceof Struct.Unmanaged<?> u){
 					var arr    =(IOInstance.Unmanaged<?>[])Array.newInstance(e, len);
-					var creator=u.requireUnmanagedConstructor();
+					var creator=u.getUnmanagedConstructor();
 					for(int i=0;i<arr.length;i++){
 						var ref=REF_PIPE.readNew(provider, src, null);
 						arr[i]=creator.create(provider, ref, typDef);
@@ -390,7 +390,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 	}
 	private <T extends IOInstance<T>> T readStruct(DataProvider provider, ContentReader src, GenericContext genericContext, Struct<T> struct) throws IOException{
 		var pipe=ContiguousStructPipe.of(struct);
-		var inst=struct.requireEmptyConstructor().get();
+		var inst=struct.emptyConstructor().get();
 		pipe.read(provider, src, inst, genericContext);
 		return inst;
 	}

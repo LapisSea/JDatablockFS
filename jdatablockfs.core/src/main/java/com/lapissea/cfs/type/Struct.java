@@ -20,6 +20,10 @@ import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.util.*;
 
 import java.io.IOException;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
@@ -38,6 +42,10 @@ import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NOT_NULL;
 
 public sealed class Struct<T extends IOInstance<T>> extends StagedInit implements RuntimeType<T>{
+	
+	@Retention(RetentionPolicy.RUNTIME)
+	@Target(ElementType.TYPE)
+	public @interface NoDefaultConstructor{}
 	
 	public interface Pool<T extends IOInstance<T>>{
 		
@@ -275,13 +283,14 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			return compile(instanceClass, Unmanaged::new);
 		}
 		
-		private       Constr<T>   unmanagedConstructor;
+		private final Constr<T>   unmanagedConstructor;
 		private final boolean     overridingDynamicUnmanaged;
 		private       FieldSet<T> unmanagedStaticFields;
 		
 		private Unmanaged(Class<T> type){
 			super(type, false);
 			overridingDynamicUnmanaged=checkOverridingUnmanaged();
+			unmanagedConstructor=Access.findConstructor(getType(), Constr.class, Access.getFunctionalMethod(Constr.class).getParameterTypes());
 		}
 		
 		private boolean checkOverridingUnmanaged(){
@@ -299,16 +308,13 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			return overridingDynamicUnmanaged;
 		}
 		
-		public Constr<T> requireUnmanagedConstructor(){
-			if(unmanagedConstructor==null){
-				unmanagedConstructor=Access.findConstructor(getType(), Constr.class, Access.getFunctionalMethod(Constr.class).getParameterTypes());
-			}
+		public Constr<T> getUnmanagedConstructor(){
 			return unmanagedConstructor;
 		}
 		
 		@Deprecated
 		@Override
-		public Supplier<T> requireEmptyConstructor(){
+		public Supplier<T> emptyConstructor(){
 			throw new UnsupportedOperationException();
 		}
 		
@@ -479,6 +485,12 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	private Struct(Class<T> type, boolean runNow){
 		this.type=type;
 		init(runNow, ()->{
+			if(!(this instanceof Struct.Unmanaged)){
+				if(!getType().isAnnotationPresent(NoDefaultConstructor.class)){
+					emptyConstructor=Access.findConstructor(getType(), Supplier.class);
+				}
+			}
+			
 			this.fields=FieldCompiler.create().compile(this);
 			setInitState(STATE_FIELD_MAKE);
 			for(IOField<T, ?> field : this.fields){
@@ -666,9 +678,14 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	@Override
-	public Supplier<T> requireEmptyConstructor(){
-		if(emptyConstructor==null) emptyConstructor=Access.findConstructor(getType(), Supplier.class);
-		return emptyConstructor;
+	public Supplier<T> emptyConstructor(){
+		if(emptyConstructor==null){
+			waitForState(STATE_FIELD_MAKE);
+			if(emptyConstructor==null&&getType().isAnnotationPresent(NoDefaultConstructor.class)){
+				throw new UnsupportedOperationException();
+			}
+		}
+		return Objects.requireNonNull(emptyConstructor);
 	}
 	
 	public boolean hasInvalidInitialNulls(){
@@ -682,7 +699,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			
 			boolean inv=false;
 			if(fields.unpackedStream().anyMatch(f->f.getNullability()==NOT_NULL)){
-				var obj =requireEmptyConstructor().get();
+				var obj =emptyConstructor().get();
 				var pool=allocVirtualVarPool(IO);
 				inv=fields.unpackedStream()
 				          .filter(f->f.getNullability()==NOT_NULL)

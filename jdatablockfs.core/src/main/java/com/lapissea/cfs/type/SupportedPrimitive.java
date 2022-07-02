@@ -82,7 +82,7 @@ public enum SupportedPrimitive implements RuntimeType<Object>{
 		return false;
 	}
 	@Override
-	public Supplier<Object> requireEmptyConstructor(){
+	public Supplier<Object> emptyConstructor(){
 		return this::getDefaultValue;
 	}
 	public Object getDefaultValue(){

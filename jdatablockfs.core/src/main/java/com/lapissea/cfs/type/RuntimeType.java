@@ -41,7 +41,7 @@ public interface RuntimeType<T>{
 			return false;
 		}
 		@Override
-		public Supplier<L> requireEmptyConstructor(){
+		public Supplier<L> emptyConstructor(){
 			return sup;
 		}
 	}
@@ -60,7 +60,7 @@ public interface RuntimeType<T>{
 				return false;
 			}
 			@Override
-			public Supplier<T> requireEmptyConstructor(){
+			public Supplier<T> emptyConstructor(){
 				if(sup==null){
 					try{
 						var constr=getType().getConstructor();
@@ -82,6 +82,6 @@ public interface RuntimeType<T>{
 	
 	
 	boolean getCanHavePointers();
-	Supplier<T> requireEmptyConstructor();
+	Supplier<T> emptyConstructor();
 	Class<T> getType();
 }

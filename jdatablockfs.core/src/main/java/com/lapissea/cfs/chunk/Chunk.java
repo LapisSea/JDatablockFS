@@ -45,6 +45,7 @@ import java.util.stream.Stream;
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
 @SuppressWarnings("unused")
+@Struct.NoDefaultConstructor
 public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, DataProvider.Holder, Comparable<Chunk>{
 	
 	private static class OptimizedChunkPipe extends ContiguousStructPipe<Chunk>{

@@ -58,7 +58,7 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 	
 	@Override
 	public ValueType get(Struct.Pool<CTyp> ioPool, CTyp instance){
-		return getNullable(ioPool, instance, ()->instancePipe.getType().requireEmptyConstructor().get());
+		return getNullable(ioPool, instance, ()->instancePipe.getType().emptyConstructor().get());
 	}
 	
 	@Override

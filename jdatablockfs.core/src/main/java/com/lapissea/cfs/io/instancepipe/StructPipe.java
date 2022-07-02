@@ -99,19 +99,18 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit{
 			
 			if(DEBUG_VALIDATION&&!(struct instanceof Struct.Unmanaged)){
 				if(Access.DEV_CACHE){
-					created.getType().requireEmptyConstructor();
+					created.getType().emptyConstructor();
 				}else{
 					T inst;
 					try{
-						inst=created.getType().requireEmptyConstructor().get();
+						inst=created.getType().emptyConstructor().get();
 					}catch(Throwable e){
 						inst=null;
 					}
 					if(inst!=null){
 						try{
 							created.checkTypeIntegrity(inst);
-						}catch(FieldIsNullException e){
-//						LogUtil.println("warning, "+struct+" is non conforming");
+						}catch(FieldIsNullException ignored){
 						}catch(IOException e){
 							e.printStackTrace();
 							throw new RuntimeException(e);
@@ -333,7 +332,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit{
 		}
 	}
 	public T readNew(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
-		T instance=type.requireEmptyConstructor().get();
+		T instance=type.emptyConstructor().get();
 		return doRead(makeIOPool(), provider, src, instance, genericContext);
 	}
 	

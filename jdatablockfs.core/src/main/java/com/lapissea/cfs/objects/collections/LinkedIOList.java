@@ -318,7 +318,7 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 		if(count==0) return;
 		if(count<0) throw new IllegalArgumentException("Count must be positive!");
 		
-		T val=getElementType().requireEmptyConstructor().get();
+		T val=getElementType().emptyConstructor().get();
 		
 		
 		IONode<T> chainStart=null;

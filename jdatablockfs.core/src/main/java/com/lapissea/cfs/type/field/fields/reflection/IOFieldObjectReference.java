@@ -62,7 +62,7 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	
 	@Override
 	public void allocate(T instance, DataProvider provider, GenericContext genericContext) throws IOException{
-		ValueType val=struct.requireEmptyConstructor().get();
+		ValueType val=struct.emptyConstructor().get();
 		allocAndSet(instance, provider, val);
 		set(null, instance, val);
 	}
@@ -117,10 +117,10 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 			return switch(getNullability()){
 				case NULLABLE -> null;
 				case NOT_NULL -> throw new NullPointerException();
-				case DEFAULT_IF_NULL -> struct.requireEmptyConstructor().get();
+				case DEFAULT_IF_NULL -> struct.emptyConstructor().get();
 			};
 		}
-		ValueType val=struct.requireEmptyConstructor().get();
+		ValueType val=struct.emptyConstructor().get();
 		try(var io=readNew.io(provider)){
 			instancePipe.read(provider, io, val, genericContext);
 		}
@@ -154,7 +154,7 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 			public Reference generate(Struct.Pool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException{
 				var val=get(ioPool, instance);
 				if(val==null&&getNullability()==IONullability.Mode.DEFAULT_IF_NULL){
-					val=struct.requireEmptyConstructor().get();
+					val=struct.emptyConstructor().get();
 				}
 				
 				if(val==null){
@@ -174,7 +174,7 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	public void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		var val=get(ioPool, instance);
 		if(val==null&&getNullability()==IONullability.Mode.DEFAULT_IF_NULL){
-			val=struct.requireEmptyConstructor().get();
+			val=struct.emptyConstructor().get();
 		}
 		var ref=getReference(instance);
 		if(val!=null&&(ref==null||ref.isNull())){

@@ -121,7 +121,7 @@ public class IOFieldInstanceList<T extends IOInstance<T>, ValType extends IOInst
 			src.skipExact(size*fixedElementSize.getAsLong());
 			return;
 		}
-		ValType inst=pip.getType().requireEmptyConstructor().get();
+		ValType inst=pip.getType().emptyConstructor().get();
 		for(int i=0;i<size;i++){
 			pip.read(provider, src, inst, genericContext);
 		}
