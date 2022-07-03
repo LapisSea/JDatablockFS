@@ -10,8 +10,10 @@ import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
 
+import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import java.lang.reflect.Array;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
@@ -25,6 +27,7 @@ import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 
 @SuppressWarnings("unused")
 @Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.FIELD, ElementType.METHOD})
 public @interface IOValue{
 	
 	AnnotationLogic<IOValue> LOGIC=new AnnotationLogic<>(){
@@ -78,6 +81,7 @@ public @interface IOValue{
 	String name() default "";
 	
 	@Retention(RetentionPolicy.RUNTIME)
+	@Target({ElementType.FIELD, ElementType.METHOD})
 	@interface Reference{
 		AnnotationLogic<Reference> LOGIC=new AnnotationLogic<>(){
 			@Override
@@ -115,6 +119,7 @@ public @interface IOValue{
 	}
 	
 	@Retention(RetentionPolicy.RUNTIME)
+	@Target({ElementType.FIELD, ElementType.METHOD})
 	@interface OverrideType{
 		
 		@Retention(RetentionPolicy.RUNTIME)

@@ -10,8 +10,10 @@ import com.lapissea.cfs.type.field.VirtualFieldDefinition;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.util.NotNull;
 
+import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import java.util.List;
 import java.util.Set;
 
@@ -20,6 +22,7 @@ import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 import static com.lapissea.cfs.type.field.annotations.IODependency.VirtualNumSize.RetentionPolicy.GHOST;
 
 @Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.FIELD, ElementType.METHOD})
 public @interface IODependency{
 	
 	AnnotationLogic<IODependency> LOGIC=new AnnotationLogic<>(){
@@ -32,6 +35,7 @@ public @interface IODependency{
 	String[] value();
 	
 	@Retention(RetentionPolicy.RUNTIME)
+	@Target({ElementType.FIELD, ElementType.METHOD})
 	@interface NumSize{
 		
 		AnnotationLogic<NumSize> LOGIC=new AnnotationLogic<>(){
@@ -46,6 +50,7 @@ public @interface IODependency{
 	}
 	
 	@Retention(RetentionPolicy.RUNTIME)
+	@Target({ElementType.FIELD, ElementType.METHOD})
 	@interface ArrayLenSize{
 		
 		AnnotationLogic<ArrayLenSize> LOGIC=new AnnotationLogic<>(){
@@ -61,6 +66,7 @@ public @interface IODependency{
 	}
 	
 	@Retention(RetentionPolicy.RUNTIME)
+	@Target({ElementType.FIELD, ElementType.METHOD})
 	@interface VirtualNumSize{
 		
 		enum RetentionPolicy{

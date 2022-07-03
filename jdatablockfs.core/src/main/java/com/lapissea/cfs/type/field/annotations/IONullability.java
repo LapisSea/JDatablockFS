@@ -11,8 +11,10 @@ import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
 
+import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -20,8 +22,10 @@ import java.util.Set;
 import java.util.stream.Stream;
 
 @Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.FIELD, ElementType.METHOD})
 public @interface IONullability{
 	
+	@Target({ElementType.FIELD, ElementType.METHOD})
 	@interface Elements{
 		
 		
