@@ -1242,108 +1242,10 @@ public class JorthCompiler{
 	public byte[] classBytecode(boolean printBytecode) throws MalformedJorthException{
 		
 		if(!addedInit){
-			try(var writer=writeCode()){
-				var parent=getClassInfo(classExtension);
-				
-				writer.write(isClassEnum?"private":classVisibility.lower).write("visibility");
-				if(parent.constructors.size()==1){
-					var ay=parent.constructors.get(0);
-					
-					for(var argument : ay.arguments){
-						writer.write(argument.type.asJorthString()).write(argument.name).write("arg");
-					}
-					
-					writer.write(
-						"""
-							<init> function start
-								this this get
-							""");
-					
-					for(var argument : ay.arguments){
-						writer.write("<arg>").write(argument.name).write("get");
-					}
-					writer.write("super end");
-				}else{
-					writer.write(
-						"""
-							<init> function start
-								this this get
-								super
-							end
-							""");
-				}
-			}catch(MalformedJorthException e){
-				throw new RuntimeException(e);
-			}
+			generateDefaultConstructors();
 		}
-		
 		if(isClassEnum){
-			try(var writer=writeCode()){
-				writer.write("#TOKEN(0) thisClass define", classInfo.name);
-				writer.write(
-					"""
-						public visibility static
-						array thisClass returns
-						values function start
-							thisClass $VALUES get
-							clone (0) call
-							array thisClass cast
-						end
-						""", enumConstants.size()+"");
-				
-				
-				writer.write(
-					"""
-						private visibility static
-						array thisClass returns
-						$values function start
-							#TOKEN(0)
-							thisClass new_array
-						""", enumConstants.size()+"");
-				
-				for(int ordinal=0;ordinal<enumConstants.size();ordinal++){
-					var constant=enumConstants.get(ordinal);
-					writer.write(
-						"""
-								dup
-								#TOKEN(0)
-								thisClass #TOKEN(1) get
-								array_set
-							""", ordinal+"", constant.name);
-				}
-				writer.write("end");
-				
-				writer.write(
-					"""
-						private visibility
-						static
-						<clinit> function start
-						""");
-				
-				for(int ordinal=0;ordinal<enumConstants.size();ordinal++){
-					EnumDef constant=enumConstants.get(ordinal);
-					writer.write(
-						"""
-								thisClass new
-								dup
-								'#TOKEN(0)'
-								#TOKEN(1)
-								<init> (2) call
-								thisClass #TOKEN(0) set
-							""", constant.name, ordinal+"");
-				}
-				writer.write(
-					"""
-						
-						thisClass $values (0) static call
-						thisClass $VALUES set
-						
-						end
-						"""
-				);
-			}
-			
-			isClassEnum=false;
+			writeEnumBoilerplate();
 		}
 		
 		currentClass.visitEnd();
@@ -1355,6 +1257,106 @@ public class JorthCompiler{
 			BytecodeUtils.printClass(ba);
 		}
 		return ba;
+	}
+	
+	private void writeEnumBoilerplate() throws MalformedJorthException{
+		try(var writer=writeCode()){
+			writer.write("#TOKEN(0) thisClass define", classInfo.name);
+			writer.write(
+				"""
+					public visibility static
+					array thisClass returns
+					values function start
+						thisClass $VALUES get
+						clone (0) call
+						array thisClass cast
+					end
+					""", enumConstants.size()+"");
+			
+			
+			writer.write(
+				"""
+					private visibility static
+					array thisClass returns
+					$values function start
+						#TOKEN(0)
+						thisClass new_array
+					""", enumConstants.size()+"");
+			
+			for(int ordinal=0;ordinal<enumConstants.size();ordinal++){
+				var constant=enumConstants.get(ordinal);
+				writer.write(
+					"""
+							dup
+							#TOKEN(0)
+							thisClass #TOKEN(1) get
+							array_set
+						""", ordinal+"", constant.name);
+			}
+			writer.write("end");
+			
+			writer.write(
+				"""
+					private visibility
+					static
+					<clinit> function start
+					""");
+			
+			for(int ordinal=0;ordinal<enumConstants.size();ordinal++){
+				EnumDef constant=enumConstants.get(ordinal);
+				writer.write(
+					"""
+							thisClass new
+							dup
+							'#TOKEN(0)'
+							#TOKEN(1)
+							<init> (2) call
+							thisClass #TOKEN(0) set
+						""", constant.name, ordinal+"");
+			}
+			writer.write(
+				"""
+						thisClass $values (0) static call
+						thisClass $VALUES set
+					end
+					"""
+			);
+		}
+	}
+	private void generateDefaultConstructors(){
+		try(var writer=writeCode()){
+			var parent=getClassInfo(classExtension);
+			
+			writer.write(isClassEnum?"private":classVisibility.lower).write("visibility");
+			if(parent.constructors.size()==1){
+				var ay=parent.constructors.get(0);
+				
+				for(var argument : ay.arguments){
+					writer.write(argument.type.asJorthString()).write(argument.name).write("arg");
+				}
+				
+				writer.write(
+					"""
+						<init> function start
+							this this get
+						""");
+				
+				for(var argument : ay.arguments){
+					writer.write("<arg>").write(argument.name).write("get");
+				}
+				writer.write("super end");
+			}else{
+				writer.write(
+					"""
+						<init> function start
+							this this get
+							super
+						end
+						""");
+			}
+		}catch(MalformedJorthException e){
+			throw new RuntimeException(e);
+		}
 	}
 	
 	private void requireEmptyWords() throws MalformedJorthException{
