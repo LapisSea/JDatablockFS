@@ -28,7 +28,6 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
@@ -338,16 +337,19 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	private static final ReadWriteLock STRUCT_CACHE_LOCK=new ReentrantReadWriteLock();
 	
 	private static final Map<Class<?>, Struct<?>> STRUCT_CACHE  =new WeakValueHashMap<>();
-	private static final Map<Class<?>, Thread>    STRUCT_COMPILE=new ConcurrentHashMap<>();
+	private static final Map<Class<?>, Thread>    STRUCT_COMPILE=new HashMap<>();
 	
 	public static void clear(){
 		if(!Access.DEV_CACHE) throw new RuntimeException();
 		var lock=STRUCT_CACHE_LOCK.writeLock();
 		lock.lock();
-		if(!STRUCT_COMPILE.isEmpty()) throw new RuntimeException();
-		STRUCT_CACHE.clear();
-		lock.unlock();
-		StructPipe.clear();
+		try{
+			if(!STRUCT_COMPILE.isEmpty()) throw new RuntimeException();
+			STRUCT_CACHE.clear();
+			StructPipe.clear();
+		}finally{
+			lock.unlock();
+		}
 	}
 	
 	
@@ -408,42 +410,36 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			throw new IllegalArgumentException("Can not compile "+instanceClass.getName()+" because it is abstract");
 		}
 		
-		Thread thread=STRUCT_COMPILE.get(instanceClass);
-		if(thread!=null&&thread==Thread.currentThread()){
-			throw new MalformedStructLayout("Recursive struct compilation");
-		}
-		{
-			var lock=STRUCT_CACHE_LOCK.readLock();
-			try{
-				lock.lock();
-				//If class was compiled in another thread this should early exit
-				var existing=STRUCT_CACHE.get(instanceClass);
-				if(existing!=null) return (S)existing;
-			}finally{
-				lock.unlock();
-			}
-		}
-		if(GlobalConfig.PRINT_COMPILATION&&!Access.DEV_CACHE){
-			LogUtil.println(ConsoleColors.GREEN_BRIGHT+"Requested struct: "+instanceClass.getName()+ConsoleColors.RESET);
-		}
+		S struct;
 		
 		var lock=STRUCT_CACHE_LOCK.writeLock();
-		S   struct;
+		lock.lock();
 		try{
-			lock.lock();
-			STRUCT_COMPILE.put(instanceClass, Thread.currentThread());
-			lock.unlock();
-			try{
-				struct=newStruct.apply(instanceClass);
-			}finally{
-				lock.lock();
+			Thread thread=STRUCT_COMPILE.get(instanceClass);
+			if(thread!=null&&thread==Thread.currentThread()){
+				throw new MalformedStructLayout("Recursive struct compilation");
 			}
 			
-			STRUCT_CACHE.put(instanceClass, struct);
-		}catch(Throwable e){
-			throw new MalformedStructLayout("Failed to compile "+instanceClass.getName(), e);
+			//If class was compiled in another thread this should early exit
+			var existing=STRUCT_CACHE.get(instanceClass);
+			if(existing!=null) return (S)existing;
+			
+			if(GlobalConfig.PRINT_COMPILATION&&!Access.DEV_CACHE){
+				LogUtil.println(ConsoleColors.GREEN_BRIGHT+"Requested struct: "+instanceClass.getName()+ConsoleColors.RESET);
+			}
+			
+			try{
+				STRUCT_COMPILE.put(instanceClass, Thread.currentThread());
+				
+				struct=newStruct.apply(instanceClass);
+				
+				STRUCT_CACHE.put(instanceClass, struct);
+			}catch(Throwable e){
+				throw new MalformedStructLayout("Failed to compile "+instanceClass.getName(), e);
+			}finally{
+				STRUCT_COMPILE.remove(instanceClass);
+			}
 		}finally{
-			STRUCT_COMPILE.remove(instanceClass);
 			lock.unlock();
 		}
 		
@@ -593,7 +589,8 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		}
 		var e=getErr();
 		if(e!=null){
-			sj.add("INVALID: "+(e.getMessage()==null?e.getClass().getName():e.getMessage()));
+			var msg=e.getLocalizedMessage();
+			sj.add("INVALID: "+(msg==null?e.getClass().getSimpleName():msg));
 		}
 		var state=getState();
 		if(state!=STATE_DONE){
