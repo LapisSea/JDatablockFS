@@ -11,6 +11,12 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
+/**
+ * This class implements the logic necessary for {@link IOInterface.IOTransaction}. The changes are
+ * stored in memory as a sorted list of {@link WriteEvent}. If the transaction corsses a threshold
+ * where it has too many events. It will attempt to merge them as to minimise overhead of writing new
+ * changes but at the cost of total data that needs to be written once it has been exported on close.
+ */
 public final class IOTransactionBuffer{
 	
 	private record WriteEvent(long offset, byte[] data) implements Comparable<WriteEvent>{

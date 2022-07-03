@@ -52,6 +52,9 @@ public class FieldCompiler{
 	protected FieldCompiler(){
 	}
 	
+	/**
+	 * Scans an unmanaged struct for
+	 */
 	public <T extends IOInstance.Unmanaged<T>> FieldSet<T> compileStaticUnmanaged(Struct.Unmanaged<T> struct){
 		var type=struct.getType();
 		
@@ -107,6 +110,11 @@ public class FieldCompiler{
 		}));
 	}
 	
+	/**
+	 * Detects and generates fields from {@link Struct} type class data and all its super types.
+	 *
+	 * @return a {@link FieldSet} containing all {@link IOValue} fields
+	 */
 	public <T extends IOInstance<T>> FieldSet<T> compile(Struct<T> struct){
 		List<FieldAccessor<T>> accessor=scanFields(struct);
 		

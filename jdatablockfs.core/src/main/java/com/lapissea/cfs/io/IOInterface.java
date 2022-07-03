@@ -14,7 +14,17 @@ import java.io.IOException;
 public interface IOInterface extends RandomIO.Creator{
 	
 	interface IOTransaction extends Closeable{
+		/**
+		 * Optional information used for profiling or debugging.
+		 *
+		 * @return number of separate ranges of bytes that may contain data that has changed
+		 */
 		int getChunkCount();
+		/**
+		 * Optional information used for profiling or debugging.
+		 *
+		 * @return number of bytes that may have been overwritten
+		 */
 		long getTotalBytes();
 	}
 	
@@ -36,8 +46,23 @@ public interface IOInterface extends RandomIO.Creator{
 		return read(0, Math.toIntExact(getIOSize()));
 	}
 	
+	/**
+	 * @return if this {@link IOInterface} allows for modification of data
+	 */
 	boolean isReadOnly();
 	
+	/**
+	 * Call to this function signifies that future write events need to be treated as an atomic
+	 * operation. (atomic meaning, partial execution is not acceptable) This stands true until
+	 * {@link IOTransaction#close()} has been called. This function may be called multiple times
+	 * before any close has been called. The transaction ends only when all {@link IOTransaction}s
+	 * have been closed.
+	 * The changes of data must be visible to while the transaction is ongoing, although they do not
+	 * need to be stored.
+	 *
+	 * @return a transaction object that is active until closed
+	 * @see IOTransactionBuffer
+	 */
 	IOTransaction openIOTransaction();
 	
 	default <E extends Throwable> void openIOTransaction(UnsafeRunnable<E> session) throws E, IOException{
