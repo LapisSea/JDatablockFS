@@ -13,27 +13,25 @@ import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
 public final class IOTransactionBuffer{
 	
-	private interface IOEvent{
-		record Write(long offset, byte[] data) implements IOEvent, Comparable<Write>{
-			long start(){
-				return offset;
-			}
-			long end(){
-				return offset+data.length;
-			}
-			@Override
-			public String toString(){
-				return start()+" - "+end();
-			}
-			@Override
-			public int compareTo(Write o){
-				return Long.compare(offset, o.offset);
-			}
+	private record WriteEvent(long offset, byte[] data) implements Comparable<WriteEvent>{
+		long start(){
+			return offset;
+		}
+		long end(){
+			return offset+data.length;
+		}
+		@Override
+		public String toString(){
+			return start()+" - "+end();
+		}
+		@Override
+		public int compareTo(WriteEvent o){
+			return Long.compare(offset, o.offset);
 		}
 	}
 	
-	private final List<IOEvent.Write> writeEvents=new ArrayList<>();
-	private final ReadWriteLock       lock       =new ReentrantReadWriteLock();
+	private final List<WriteEvent> writeEvents=new ArrayList<>();
+	private final ReadWriteLock    lock       =new ReentrantReadWriteLock();
 	
 	private static boolean rangeOverlaps(long x1, long x2, long y1, long y2){
 		return x1<=(y2-1)&&y1<=(x2-1);
@@ -192,7 +190,7 @@ public final class IOTransactionBuffer{
 	
 	private int read0(BaseAccess base, long offset, byte[] b, int off, int len) throws IOException{
 		
-		IOEvent.Write next;
+		WriteEvent next;
 		
 		long cursor=offset;
 		
@@ -315,15 +313,15 @@ public final class IOTransactionBuffer{
 	}
 	
 	
-	private static IOEvent.Write makeEvent(long offset, byte[] b, int off, int len){
+	private static WriteEvent makeEvent(long offset, byte[] b, int off, int len){
 		byte[] data=new byte[len];
 		System.arraycopy(b, off, data, 0, len);
-		return new IOEvent.Write(offset, data);
+		return new WriteEvent(offset, data);
 	}
-	private static IOEvent.Write makeWordEvent(long offset, long v, int len){
+	private static WriteEvent makeWordEvent(long offset, long v, int len){
 		byte[] arr=new byte[len];
 		Utils.write8(v, arr, 0, len);
-		return new IOEvent.Write(offset, arr);
+		return new WriteEvent(offset, arr);
 	}
 	
 	public void writeByte(long offset, int b){
@@ -422,7 +420,7 @@ public final class IOTransactionBuffer{
 					
 					byte[] data=Arrays.copyOf(event.data, event.data.length+len);
 					System.arraycopy(b, off, data, event.data.length, len);
-					writeEvents.set(i, new IOEvent.Write(event.offset, data));
+					writeEvents.set(i, new WriteEvent(event.offset, data));
 					markIndexDirty(i);
 					return;
 				}
@@ -431,7 +429,7 @@ public final class IOTransactionBuffer{
 					byte[] data=new byte[event.data.length+len];
 					System.arraycopy(b, off, data, 0, len);
 					System.arraycopy(event.data, 0, data, len, event.data.length);
-					setEventSorted(i, new IOEvent.Write(offset, data));
+					setEventSorted(i, new WriteEvent(offset, data));
 					return;
 				}
 				if(rangeOverlaps(newStart, newEnd, eStart, eEnd)){
@@ -445,7 +443,7 @@ public final class IOTransactionBuffer{
 					if(newStart<eStart&&newEnd>eEnd){
 						byte[] data=new byte[len];
 						System.arraycopy(b, off, data, 0, len);
-						setEventSorted(i, new IOEvent.Write(offset, data));
+						setEventSorted(i, new WriteEvent(offset, data));
 						return;
 					}
 					
@@ -463,7 +461,7 @@ public final class IOTransactionBuffer{
 					byte[] data=new byte[size];
 					System.arraycopy(event.data, 0, data, eOff, event.data.length);
 					System.arraycopy(b, off, data, newOff, len);
-					setEventSorted(i, new IOEvent.Write(start, data));
+					setEventSorted(i, new WriteEvent(start, data));
 					return;
 				}
 			}
@@ -478,7 +476,7 @@ public final class IOTransactionBuffer{
 			}
 			if(DEBUG_VALIDATION){
 				var copy=new ArrayList<>(writeEvents);
-				copy.sort(IOEvent.Write::compareTo);
+				copy.sort(WriteEvent::compareTo);
 				assert copy.equals(writeEvents):"\n"+copy+"\n"+writeEvents;
 				
 				for(var event1 : writeEvents){
@@ -540,14 +538,14 @@ public final class IOTransactionBuffer{
 		}
 	}
 	
-	private void setEventSorted(int i, IOEvent.Write m){
+	private void setEventSorted(int i, WriteEvent m){
 		var old=writeEvents.set(i, m);
 		markIndexDirty(i);
 		if(old.offset==m.offset) return;
 		if(i>0){
 			var prev=writeEvents.get(i-1);
 			if(prev.compareTo(m)>0){
-				writeEvents.sort(IOEvent.Write::compareTo);
+				writeEvents.sort(WriteEvent::compareTo);
 				markIndexDirty(i-1);
 				return;
 			}
@@ -555,7 +553,7 @@ public final class IOTransactionBuffer{
 		if(i+1<writeEvents.size()){
 			var next=writeEvents.get(i+1);
 			if(m.compareTo(next)>0){
-				writeEvents.sort(IOEvent.Write::compareTo);
+				writeEvents.sort(WriteEvent::compareTo);
 				markIndexDirty(i+1);
 				return;
 			}
@@ -641,7 +639,7 @@ public final class IOTransactionBuffer{
 		l.lock();
 		try{
 			int sum=0;
-			for(IOEvent.Write writeEvent : writeEvents){
+			for(WriteEvent writeEvent : writeEvents){
 				sum+=writeEvent.data.length;
 			}
 			return sum;

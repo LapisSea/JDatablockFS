@@ -139,6 +139,12 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 		 */
 		RandomIO io() throws IOException;
 		
+		default RandomIO readOnlyIO() throws IOException{
+			var io=io();
+			if(io.isReadOnly()) return io;
+			return new RandomIOReadOnly(io);
+		}
+		
 		default void write(boolean trimOnClose, ByteBuffer data) throws IOException         {write(0, trimOnClose, data);}
 		
 		default void write(boolean trimOnClose, byte[] data) throws IOException             {write(0, trimOnClose, data);}
@@ -364,13 +370,6 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 	 * Simiar to the write methods except it writes some number of 0 bytes but does not modify things such as the size of the data. (useful for clearing garbage data after some data has ben shrunk)
 	 */
 	void fillZero(long requestedMemory) throws IOException;
-	
-	default RandomIO readOnly(){
-		if(isReadOnly()){
-			return this;
-		}
-		return new RandomIOReadOnly(this);
-	}
 	
 	boolean isReadOnly();
 	

@@ -110,7 +110,7 @@ public class FieldCompiler{
 	public <T extends IOInstance<T>> FieldSet<T> compile(Struct<T> struct){
 		List<FieldAccessor<T>> accessor=scanFields(struct);
 		
-		List<AnnotatedField<T>> fields=new ArrayList<>(accessor.size()+4);
+		List<AnnotatedField<T>> fields=new ArrayList<>(Math.max(accessor.size()*2, accessor.size()+5));//Give extra capacity for virtual fields
 		for(var a : accessor){
 			var f=registry().create(a, null);
 			fields.add(new AnnotatedField<>(f, scanAnnotations(f)));

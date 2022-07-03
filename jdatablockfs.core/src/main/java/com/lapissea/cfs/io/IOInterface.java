@@ -65,7 +65,11 @@ public interface IOInterface extends RandomIO.Creator{
 			}
 			@Override
 			public RandomIO io() throws IOException{
-				return that.io().readOnly();
+				var io=that.readOnlyIO();
+				if(!io.isReadOnly()){
+					throw new IllegalStateException();
+				}
+				return io;
 			}
 			@Override
 			public String toString(){
