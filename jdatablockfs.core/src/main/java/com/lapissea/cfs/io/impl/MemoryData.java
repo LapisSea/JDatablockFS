@@ -404,6 +404,14 @@ public abstract class MemoryData<DataType> implements IOInterface{
 	}
 	
 	@Override
+	public byte[] readAll() throws IOException{
+		if(transactionOpen) return IOInterface.super.readAll();
+		var copy=new byte[used];
+		readN(data, 0, copy, 0, used);
+		return copy;
+	}
+	
+	@Override
 	public String toString(){
 		return MemoryData.class.getSimpleName()+"."+getClass().getSimpleName()+"#"+Integer.toHexString(hashCode());
 	}

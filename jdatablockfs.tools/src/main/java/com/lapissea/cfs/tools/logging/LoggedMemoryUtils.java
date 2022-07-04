@@ -129,7 +129,7 @@ public class LoggedMemoryUtils{
 			};
 		}
 		
-		MemoryData<?> mem=MemoryData.builder().withOnWrite(logger).build();
+		MemoryData<?> mem=MemoryData.builder().withCapacity(0).withOnWrite(logger).build();
 		
 		mem.onWrite.log(mem, LongStream.of());
 		
