@@ -12,6 +12,7 @@ import java.lang.ref.WeakReference;
 import java.lang.reflect.Modifier;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
@@ -23,7 +24,6 @@ import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
  * interacting with a value of unknown implicit type.
  */
 public sealed interface IOTypeDB{
-	
 	final class MemoryOnlyDB implements IOTypeDB{
 		
 		private final Map<String, TypeDef> defs=new HashMap<>();
@@ -139,19 +139,10 @@ public sealed interface IOTypeDB{
 			}
 		}
 		
-		private static final MemoryOnlyDB BUILT_IN=new MemoryOnlyDB();
-		private static final int          FIRST_ID;
-		
-		private static void registerBuiltIn(Class<?> c){
-			BUILT_IN.toID(c, true);
-			
-			for(var dc : c.getDeclaredClasses()){
-				if(Modifier.isAbstract(dc.getModifiers())||!IOInstance.isInstance(dc)) continue;
-				registerBuiltIn(dc);
-			}
-		}
-		
-		static{
+		//Init async, improves first run time, does not load a bunch of classes in static initializer
+		private static       int                             FIRST_ID=-1;
+		private static final CompletableFuture<MemoryOnlyDB> BUILT_IN=CompletableFuture.supplyAsync(()->{
+			var db=new MemoryOnlyDB();
 			try{
 				for(var c : new Class<?>[]{
 					int.class,
@@ -164,23 +155,33 @@ public sealed interface IOTypeDB{
 					Double.class,
 					
 					String.class,
-					TypeLink.class
+					TypeLink.class,
+					TypeDef.class
 				}){
-					BUILT_IN.newID(TypeLink.of(c), true);
+					db.newID(TypeLink.of(c), true);
 				}
 				for(var c : new Class<?>[]{
 					TypeDef.class,
 					PersistentDB.class,
 					IOInstance.class
 				}){
-					registerBuiltIn(c);
+					registerBuiltIn(db, c);
 				}
 			}catch(Throwable e){
 				e.printStackTrace();
 				throw new RuntimeException(e);
 			}
+			FIRST_ID=db.maxID();
+			return db;
+		});
+		
+		private static void registerBuiltIn(MemoryOnlyDB builtIn, Class<?> c){
+			builtIn.toID(c, true);
 			
-			FIRST_ID=BUILT_IN.maxID();
+			for(var dc : c.getDeclaredClasses()){
+				if(Modifier.isAbstract(dc.getModifiers())||!IOInstance.isInstance(dc)) continue;
+				registerBuiltIn(builtIn, dc);
+			}
 		}
 		
 		@IOValue
@@ -195,7 +196,8 @@ public sealed interface IOTypeDB{
 		
 		@Override
 		public TypeID toID(TypeLink type, boolean recordNew) throws IOException{
-			var id=BUILT_IN.toID(type, false);
+			var builtIn=BUILT_IN.join();
+			var id     =builtIn.toID(type, false);
 			if(id.stored()) return id;
 			
 			int max=0;
@@ -214,7 +216,7 @@ public sealed interface IOTypeDB{
 			
 			data.put(newID, type);
 			var newDefs=new HashMap<TypeName, TypeDef>();
-			recordType(type, newDefs);
+			recordType(builtIn, type, newDefs);
 			
 			defs.putAll(newDefs);
 			
@@ -258,8 +260,8 @@ public sealed interface IOTypeDB{
 			}
 		}
 		
-		private void recordType(TypeLink type, Map<TypeName, TypeDef> newDefs) throws IOException{
-			var isBuiltIn=BUILT_IN.getDefinitionFromClassName(type.getTypeName())!=null;
+		private void recordType(MemoryOnlyDB builtIn, TypeLink type, Map<TypeName, TypeDef> newDefs) throws IOException{
+			var isBuiltIn=builtIn.getDefinitionFromClassName(type.getTypeName())!=null;
 			if(isBuiltIn) return;
 			
 			var typeName=new TypeName(type.getTypeName());
@@ -275,7 +277,7 @@ public sealed interface IOTypeDB{
 				while(base.isArray()){
 					base=base.componentType();
 				}
-				recordType(new TypeLink(base), newDefs);
+				recordType(builtIn, new TypeLink(base), newDefs);
 				return;
 			}
 			
@@ -285,7 +287,7 @@ public sealed interface IOTypeDB{
 			}
 			
 			for(int i=0;i<type.argCount();i++){
-				recordType(type.arg(i), newDefs);
+				recordType(builtIn, type.arg(i), newDefs);
 			}
 			
 			if(def.isUnmanaged()) return;
@@ -296,14 +298,15 @@ public sealed interface IOTypeDB{
 			
 			
 			for(TypeDef.FieldDef field : def.getFields()){
-				recordType(field.getType(), newDefs);
+				recordType(builtIn, field.getType(), newDefs);
 			}
 		}
 		
 		@Override
 		public TypeLink fromID(int id) throws IOException{
-			if(BUILT_IN.hasID(id)){
-				return BUILT_IN.fromID(id);
+			var builtIn=BUILT_IN.join();
+			if(builtIn.hasID(id)){
+				return builtIn.fromID(id);
 			}
 			
 			var type=data.get(id);
@@ -316,9 +319,10 @@ public sealed interface IOTypeDB{
 		
 		@Override
 		public TypeDef getDefinitionFromClassName(String className) throws IOException{
+			var builtIn=BUILT_IN.join();
 			if(className==null||className.isEmpty()) return null;
 			{
-				var def=BUILT_IN.getDefinitionFromClassName(className);
+				var def=builtIn.getDefinitionFromClassName(className);
 				if(def!=null) return def;
 			}
 			
