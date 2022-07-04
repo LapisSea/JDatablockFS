@@ -109,7 +109,8 @@ public class LoggedMemoryUtils{
 			
 			logger=(data, ids)->{
 				if(display.isInited()){
-					if(display.get() instanceof DataLogger.Blank){
+					var d=display.get();
+					if(!d.isActive()){
 						return;
 					}
 				}

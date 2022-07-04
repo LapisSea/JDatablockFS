@@ -45,9 +45,15 @@ public interface DataLogger{
 		
 		@Override
 		public void destroy(){}
+		@Override
+		public boolean isActive(){
+			return false;
+		}
 	}
 	
 	Session getSession(String name);
 	
 	void destroy();
+	
+	boolean isActive();
 }

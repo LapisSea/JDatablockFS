@@ -590,4 +590,8 @@ public class DisplayManager implements DataLogger{
 		gridRenderer.setDisplayedSession(Optional.empty());
 		renderer.markFrameDirty();
 	}
+	@Override
+	public boolean isActive(){
+		return sessionHost.isActive();
+	}
 }

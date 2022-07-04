@@ -119,6 +119,12 @@ public class SessionHost implements DataLogger{
 		}
 		activeSession.set(Optional.empty());
 	}
+	@Override
+	public boolean isActive(){
+		if(destroyed) return false;
+		
+		return true;
+	}
 	
 	public void prevSession(){
 		

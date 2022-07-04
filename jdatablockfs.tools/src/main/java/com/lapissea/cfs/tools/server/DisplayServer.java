@@ -234,6 +234,7 @@ public class DisplayServer implements DataLogger{
 	
 	
 	private Function<String, Session> sessionCreator;
+	private boolean                   active=true;
 	
 	private final Map<String, Object>  config;
 	private final Map<String, Session> sessions=new HashMap<>();
@@ -262,10 +263,12 @@ public class DisplayServer implements DataLogger{
 					yield getLocalLoggerImpl()::getSession;
 				}
 				case "none" -> {
+					active=false;
 					LogUtil.printlnEr("Switching to no output.");
 					yield s->Session.Blank.INSTANCE;
 				}
 				default -> {
+					active=false;
 					LogUtil.printlnEr("Unknown type \""+type+"\", defaulting to no output.");
 					yield s->Session.Blank.INSTANCE;
 				}
@@ -286,5 +289,9 @@ public class DisplayServer implements DataLogger{
 		sessionCreator=null;
 		sessions.values().forEach(Session::finish);
 		sessions.clear();
+	}
+	@Override
+	public boolean isActive(){
+		return active;
 	}
 }
