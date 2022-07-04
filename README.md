@@ -19,7 +19,7 @@ This library has at its core 2 tasks.
 
 If you need to store data but do not want to deal with complicated SQL servers or are annoyed with writing queries then this is a perfect alternative.
 
-This library acts like a database but it writes like regular objects/collections and there is no server at all. Everything can be simply stored in a single efficient self-contained file.
+This library acts like a database, but it writes like regular objects/collections and there is no server at all. Everything can be simply stored in a single efficient self-contained file.
 
 You don't need to write SQL files to set up tables. You just write a class with values that you wish to store. I'll do
 the rest for you.
@@ -33,7 +33,55 @@ This is no SQL killer. This is just a "I want it dummy simple" database.
 
 ### (Super simple) Examples:
 
-`//TODO: I'll do this soon I promise, I've just written basically everything you see and I'm tired.`
+### IPSet example:
+
+This shows very simple list of ipv6 and their cordinates on earth. (made up data)
+
+```java
+//Setting up classes
+public static class IP extends IOInstance<IP>{
+	@IOValue
+	double latitude, longitude;
+	
+	@IOValue
+	String v6;
+	
+	//Every IOInstance needs an empty constructor
+	public IP(){}
+	public IP(double latitude, double longitude, String v6){
+		this.latitude=latitude;
+		this.longitude=longitude;
+		this.v6=v6;
+	}
+}
+
+public static class IPSet extends IOInstance<IPSet>{
+	@IOValue
+	IOList<IP> ips;
+}
+```
+
+Create database and add sample data:
+
+```java
+//init and create new Cluster with in memory (byte[]) data
+Cluster cluster=Cluster.init(MemoryData.builder().build());
+
+//Ask root provider for an IPSet with the id of my ips
+IPSet set=cluster.getRootProvider().request(IPSet.class,"my ips");
+
+//Adding sample data to database:
+set.ips.add(new IP(0.2213415,0.71346,"2001:0db8:85a3:0000:0000:8a2e:0370:7334"));
+set.ips.add(new IP(0.6234,0.51341123,"2001:0db8:0:1:1:1:1:1"));
+```
+
+Details:
+
+`cluster.getRootProvider().request` creates and initializes an object if it does not exist under the provided id within the database or returns an existing value. So referencing "my ips" in the future would return the same data that has been added in this example.
+
+`IPSet.ips` is an IOList (that defaults to an implementation called `ContiguousIOList`) and is automatically allocated by the rootProvider.
+
+`set.ips.add` writes to the database immediately. This only happens with unmanaged instances. Setting a values on a regular instance changes no data on the actual database.
 
 ---
 
@@ -56,7 +104,7 @@ This is no SQL killer. This is just a "I want it dummy simple" database.
 
 ### Note: Documentation is unfinished!!
 
-**Please create an issue and ask a question about anything that is not clear! I'm just 1 guy and it's hard to know what may be complicated or unclear when I've designed it. Thanks ☺️**
+**Please create an issue and ask a question about anything that is not clear! I'm just 1 guy, and it's hard to know what may be complicated or unclear when I've designed it. Thanks ☺️**
 
 ---
 
@@ -78,12 +126,12 @@ This is no SQL killer. This is just a "I want it dummy simple" database.
 
 - `@IOValue`: This is the most basic annotation. It signifies that a value should be serialized.
 - `@IONullability`: This annotation specified what kinda of nullability is accepted. Every `IOValue` without this annotation is `NOT_NULL`. When this annotation has `NULLABLE`, a new virtual field of type boolean will be added. Its value is automatically managed by the library. When this annotation has `DEFAULT_IF_NULL` then a value will be stored as its default value. (0, false, empty constructor, empty array, etc...)
-- `@IOValue.Reference`: This annotation suggests to the library that this field should not be inlined and should be stored as a reference. (This is useful if an object is going to be stored in a list. When an object is in a list, the list greatly benefits from an object whos size can be fixed and can be stored inline with the list data)
-- `@IOValue.OverrideType`: This annotation specifies that the type of a field should be replaced with a compatible type. For example if there is an IOList and a spesific implementation is desired then `@IOValue.OverrideType(FooList.class)` can be used
+- `@IOValue.Reference`: This annotation suggests to the library that this field should not be inlined and should be stored as a reference. (This is useful if an object is going to be stored in a list. When an object is in a list, the list greatly benefits from an object whose size can be fixed and can be stored inline with the list data)
+- `@IOValue.OverrideType`: This annotation specifies that the type of field should be replaced with a compatible type. For example if there is an IOList and a specific implementation is desired then `@IOValue.OverrideType(FooList.class)` can be used
 - `@IODependency`: This annotation specifies that this field requires another `IOField` to be read/written correctly. This will change the way the memory of an IOInstance is organised. If used incorrectly this annotation can create dependency loops what will make the instance of an invalid format. This annotation should probably not be used unless there is a specific need for it.
 - `@IODependency.VirtualNumSize`: This annotation can be used on a field of a numeric type. It creates a virtual field of `NumberSize` what enables the number to be stored in less bytes than its max value requires. A name can be specified for the `NumberSize` field. If 2 fields share the same name, their `NumberSize` field will be shared.
 - `@IODependency.NumSize`: This annotation has the same effect as `IODependency.VirtualNumSize` except it does not create a virtual field but references the name of another field.
-- `@IOType.Dynamic`: This annotation enables the field to have a value whos class does not match the field exactly. This freedom comes at the cost of needing an extra typeID virtual field and any stored value will need to have its class layout stored on file what can create a lot of non-useful data. Use this annotation only when needed.
+- `@IOType.Dynamic`: This annotation enables the field to have a value whose class does not match the field exactly. This freedom comes at the cost of needing an extra typeID virtual field and any stored value will need to have its class layout stored on file what can create a lot of non-useful data. Use this annotation only when needed.
 - `@IOValueUnmanaged`: This annotation can be used on static methods inside an `IOInstance.Unmanaged` to mark that function as a static unmanaged field factory.
 
 ---
