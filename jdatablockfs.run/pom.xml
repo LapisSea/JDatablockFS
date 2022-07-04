@@ -5,14 +5,6 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<properties>
-		<java.version>18</java.version>
-		<maven.compiler.release>${java.version}</maven.compiler.release>
-		<maven.compiler.target>${java.version}</maven.compiler.target>
-		<maven.compiler.source>${java.version}</maven.compiler.source>
-
-		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-
-		<cfsVersion>1.0</cfsVersion>
 		<jmh.version>1.35</jmh.version>
 	</properties>
 
@@ -29,31 +21,27 @@
 		<dependency>
 			<groupId>com.github.lapissea</groupId>
 			<artifactId>jdatablockfs.tools</artifactId>
-			<version>${cfsVersion}</version>
+			<version>${project.version}</version>
 		</dependency>
 
 		<dependency>
 			<groupId>org.junit.jupiter</groupId>
 			<artifactId>junit-jupiter-api</artifactId>
-			<version>5.8.2</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.junit.jupiter</groupId>
 			<artifactId>junit-jupiter-params</artifactId>
-			<version>5.8.2</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.junit.jupiter</groupId>
 			<artifactId>junit-jupiter-engine</artifactId>
-			<version>5.8.2</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.junit.platform</groupId>
 			<artifactId>junit-platform-launcher</artifactId>
-			<version>1.8.2</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
@@ -80,7 +68,7 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
-				<version>3.8.0</version>
+				<version>${maven-compiler-plugin-version}</version>
 				<configuration>
 					<compilerArgs>--enable-preview</compilerArgs>
 					<release>${java.version}</release>

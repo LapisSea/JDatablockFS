@@ -4,16 +4,16 @@
 		 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 
-	<groupId>com.github.lapissea</groupId>
 	<artifactId>Jorth</artifactId>
 	<version>0.0.1</version>
 
-	<properties>
-		<java.version>18</java.version>
-		<maven.compiler.release>${java.version}</maven.compiler.release>
-		<maven.compiler.target>${java.version}</maven.compiler.target>
-		<maven.compiler.source>${java.version}</maven.compiler.source>
+	<parent>
+		<groupId>com.github.lapissea</groupId>
+		<artifactId>JDatablockFS</artifactId>
+		<version>1.0</version>
+	</parent>
 
+	<properties>
 		<asmVersion>9.3</asmVersion>
 	</properties>
 
@@ -21,18 +21,11 @@
 		<dependency>
 			<groupId>com.github.lapissea</groupId>
 			<artifactId>jlapisutil</artifactId>
-			<version>1.0.11</version>
 		</dependency>
 
 		<dependency>
 			<groupId>org.ow2.asm</groupId>
 			<artifactId>asm</artifactId>
-			<version>${asmVersion}</version>
-		</dependency>
-
-		<dependency>
-			<groupId>org.ow2.asm</groupId>
-			<artifactId>asm-tree</artifactId>
 			<version>${asmVersion}</version>
 		</dependency>
 		<dependency>
@@ -45,26 +38,18 @@
 		<dependency>
 			<groupId>org.junit.jupiter</groupId>
 			<artifactId>junit-jupiter-api</artifactId>
-			<version>5.8.2</version>
-			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.junit.jupiter</groupId>
 			<artifactId>junit-jupiter-params</artifactId>
-			<version>5.8.2</version>
-			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.junit.jupiter</groupId>
 			<artifactId>junit-jupiter-engine</artifactId>
-			<version>5.8.2</version>
-			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.junit.platform</groupId>
 			<artifactId>junit-platform-launcher</artifactId>
-			<version>1.8.2</version>
-			<scope>test</scope>
 		</dependency>
 	</dependencies>
 
@@ -80,7 +65,7 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
-				<version>3.8.1</version>
+				<version>3.10.1</version>
 				<configuration>
 					<compilerArgs>--enable-preview</compilerArgs>
 					<release>${java.version}</release>

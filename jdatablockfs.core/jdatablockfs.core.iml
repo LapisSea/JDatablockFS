@@ -15,8 +15,8 @@
     <orderEntry type="library" name="Maven: com.github.lapissea:jlapisutil:1.1.0" level="project" />
     <orderEntry type="module" module-name="Jorth" />
     <orderEntry type="library" name="Maven: org.ow2.asm:asm:9.3" level="project" />
-    <orderEntry type="library" name="Maven: org.ow2.asm:asm-tree:9.3" level="project" />
     <orderEntry type="library" name="Maven: org.ow2.asm:asm-util:9.3" level="project" />
+    <orderEntry type="library" name="Maven: org.ow2.asm:asm-tree:9.3" level="project" />
     <orderEntry type="library" name="Maven: org.ow2.asm:asm-analysis:9.3" level="project" />
     <orderEntry type="library" name="Maven: org.roaringbitmap:RoaringBitmap:0.9.28" level="project" />
     <orderEntry type="library" scope="RUNTIME" name="Maven: org.roaringbitmap:shims:0.9.28" level="project" />
