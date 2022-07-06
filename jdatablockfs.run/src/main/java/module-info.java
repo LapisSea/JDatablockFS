@@ -10,4 +10,5 @@ module JDatablockFS.run {
 	opens com.lapissea.cfs.run;
 	opens com.lapissea.cfs.run.sparseimage;
 	opens com.lapissea.cfs.run.world;
+	opens com.lapissea.cfs.run.examples;
 }

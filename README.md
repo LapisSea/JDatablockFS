@@ -37,6 +37,8 @@ This is no SQL killer. This is just a "I want it dummy simple" database.
 
 This shows very simple list of ipv6 and their cordinates on earth. (made up data)
 
+_You can find the complete code of the example in `/jdatablockfs.run/src/main/java/com/lapissea/cfs/run/examples/IPs.java`_
+
 ```java
 //Setting up classes
 public static class IP extends IOInstance<IP>{
