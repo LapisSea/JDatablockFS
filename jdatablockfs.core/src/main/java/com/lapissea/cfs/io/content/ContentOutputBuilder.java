@@ -12,9 +12,10 @@ public class ContentOutputBuilder extends ByteArrayOutputStream implements Conte
 		super(size);
 	}
 	
-	public synchronized void writeTo(ContentWriter out) throws IOException{
+	public void writeTo(ContentWriter out) throws IOException{
 		out.write(buf, 0, count);
 	}
+	
 	@Override
 	public void writeWord(long v, int len) throws IOException{
 		

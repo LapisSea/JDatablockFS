@@ -14,6 +14,8 @@ import java.lang.reflect.Modifier;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
@@ -26,6 +28,8 @@ import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
  */
 public sealed interface IOTypeDB{
 	final class MemoryOnlyDB implements IOTypeDB{
+		
+		private final ReadWriteLock rwLock=new ReentrantReadWriteLock();
 		
 		private final Map<String, TypeDef> defs=new HashMap<>();
 		
@@ -41,21 +45,31 @@ public sealed interface IOTypeDB{
 		
 		@Override
 		public TypeID toID(TypeLink type, boolean recordNew){
-			synchronized(typToID){
+			var lock=rwLock.readLock();
+			lock.lock();
+			try{
 				var id=typToID.get(type);
 				if(id!=null) return new TypeID(id, true);
-				return newID(type, recordNew);
+			}finally{
+				lock.unlock();
 			}
+			return newID(type, recordNew);
 		}
 		
 		private TypeID newID(TypeLink type, boolean recordNew){
-			var newID=maxID()+1;
-			if(!recordNew) return new TypeID(newID, false);
-			idToTyp.put(newID, type);
-			typToID.put(type, newID);
-			
-			recordType(type);
-			return new TypeID(newID, true);
+			var lock=rwLock.writeLock();
+			lock.lock();
+			try{
+				var newID=maxID()+1;
+				if(!recordNew) return new TypeID(newID, false);
+				idToTyp.put(newID, type);
+				typToID.put(type, newID);
+				
+				recordType(type);
+				return new TypeID(newID, true);
+			}finally{
+				lock.unlock();
+			}
 		}
 		
 		private void recordType(TypeLink type){
@@ -78,20 +92,36 @@ public sealed interface IOTypeDB{
 		
 		@Override
 		public TypeLink fromID(int id){
-			synchronized(typToID){
+			var lock=rwLock.readLock();
+			lock.lock();
+			try{
 				var type=idToTyp.get(id);
 				if(type==null){
 					throw new RuntimeException("Unknown type from ID of "+id);
 				}
 				return type;
+			}finally{
+				lock.unlock();
 			}
 		}
 		
 		public boolean hasType(TypeLink type){
-			return typToID.containsKey(type);
+			var lock=rwLock.readLock();
+			lock.lock();
+			try{
+				return typToID.containsKey(type);
+			}finally{
+				lock.unlock();
+			}
 		}
 		public boolean hasID(int id){
-			return idToTyp.containsKey(id);
+			var lock=rwLock.readLock();
+			lock.lock();
+			try{
+				return idToTyp.containsKey(id);
+			}finally{
+				lock.unlock();
+			}
 		}
 		
 		private int maxID(){
@@ -99,13 +129,11 @@ public sealed interface IOTypeDB{
 		}
 		@Override
 		public ClassLoader getTemplateLoader(){
-			synchronized(this){
-				var l=templateLoader.get();
-				if(l==null){
-					templateLoader=new WeakReference<>(l=new TemplateClassLoader(this, getClass().getClassLoader()));
-				}
-				return l;
+			var l=templateLoader.get();
+			if(l==null){
+				templateLoader=new WeakReference<>(l=new TemplateClassLoader(this, getClass().getClassLoader()));
 			}
+			return l;
 		}
 		
 		@Override
@@ -346,14 +374,13 @@ public sealed interface IOTypeDB{
 		}
 		@Override
 		public ClassLoader getTemplateLoader(){
-			synchronized(this){
-				var l=templateLoader.get();
-				if(l==null){
-					templateLoader=new WeakReference<>(l=new TemplateClassLoader(this, getClass().getClassLoader()));
-				}
-				return l;
+			var l=templateLoader.get();
+			if(l==null){
+				templateLoader=new WeakReference<>(l=new TemplateClassLoader(this, getClass().getClassLoader()));
 			}
+			return l;
 		}
+		
 		@Override
 		public String toString(){
 			return getClass().getSimpleName()+toShortString();

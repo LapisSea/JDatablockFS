@@ -14,6 +14,8 @@ import java.net.*;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 
 import static com.lapissea.cfs.tools.server.ServerCommons.Action;
@@ -35,15 +37,18 @@ public class DisplayServer implements DataLogger{
 			
 			var io=ServerCommons.makeIO();
 			
+			Lock sendActionLock=new ReentrantLock();
 			UnsafeBiConsumer<Action, UnsafeConsumer<DataOutputStream, IOException>, IOException> sendAction=(a, data)->{
-				synchronized(writer){
+				sendActionLock.lock();
+				try{
 					writer.writeByte(a.ordinal());
 					ServerCommons.writeSafe(writer, data);
 					
 					if(threadedOutput) return;
 					writer.flush();
+				}finally{
+					sendActionLock.unlock();
 				}
-				
 			};
 			
 			
@@ -95,25 +100,29 @@ public class DisplayServer implements DataLogger{
 			};
 			
 			if(threadedOutput){
-				var queue=new LinkedList<Runnable>();
+				var queue    =new LinkedList<Runnable>();
+				var queueLock=new ReentrantLock();
+				var hasTasks =queueLock.newCondition();
 				var worker=new Thread(){
 					private boolean run=true;
 					private boolean running=true;
 					@Override
 					public void run(){
 						while(run){
-							if(queue.isEmpty()){
-								synchronized(this){
+							queueLock.lock();
+							try{
+								if(queue.isEmpty()){
 									try{
-										if(queue.isEmpty()) this.wait();
+										hasTasks.await();
 									}catch(InterruptedException e){
 										throw new RuntimeException(e);
 									}
+									continue;
 								}
-								continue;
-							}
-							synchronized(queue){
+								
 								queue.remove(0).run();
+							}finally{
+								queueLock.unlock();
 							}
 						}
 						while(!queue.isEmpty()){
@@ -142,11 +151,12 @@ public class DisplayServer implements DataLogger{
 					private void exec(Runnable e){
 						if(!worker.run) throw new IllegalStateException();
 						UtilL.sleepWhile(()->queue.size()>8);
-						synchronized(queue){
+						queueLock.lock();
+						try{
 							queue.add(e);
-						}
-						synchronized(worker){
-							worker.notifyAll();
+							hasTasks.notifyAll();
+						}finally{
+							queueLock.unlock();
 						}
 					}
 					private void stop(){

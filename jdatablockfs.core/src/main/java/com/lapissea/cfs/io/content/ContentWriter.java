@@ -275,7 +275,7 @@ public interface ContentWriter extends AutoCloseable{
 			}
 			
 			@Override
-			public synchronized void close() throws IOException{
+			public void close() throws IOException{
 				if(errorOnMismatch!=null){
 					if(count!=amount) throw errorOnMismatch.apply(this.size(), amount);
 				}
@@ -286,7 +286,7 @@ public interface ContentWriter extends AutoCloseable{
 			}
 			
 			@Override
-			public synchronized void write(byte[] b, int off, int len){
+			public void write(byte[] b, int off, int len){
 				super.write(b, off, len);
 				earlyCheck();
 			}
@@ -300,7 +300,7 @@ public interface ContentWriter extends AutoCloseable{
 			}
 			
 			@Override
-			public synchronized void write(int b){
+			public void write(int b){
 				super.write(b);
 				earlyCheck();
 			}

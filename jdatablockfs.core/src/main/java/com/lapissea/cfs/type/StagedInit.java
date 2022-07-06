@@ -3,6 +3,10 @@ package com.lapissea.cfs.type;
 import com.lapissea.cfs.internal.Runner;
 import com.lapissea.util.UtilL;
 
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+
 public abstract class StagedInit{
 	
 	private static final boolean DO_ASYNC=UtilL.sysPropertyByClass(StagedInit.class, "DO_ASYNC", true, Boolean::valueOf);
@@ -17,8 +21,10 @@ public abstract class StagedInit{
 	
 	public static final int STATE_NOT_STARTED=-1, STATE_START=0, STATE_DONE=Integer.MAX_VALUE;
 	
-	private transient int       state=STATE_NOT_STARTED;
-	private           Throwable e;
+	private final Lock      lock     =new ReentrantLock();
+	private final Condition condition=lock.newCondition();
+	private       int       state    =STATE_NOT_STARTED;
+	private       Throwable e;
 	
 	
 	protected void init(boolean runNow, Runnable init){
@@ -35,18 +41,23 @@ public abstract class StagedInit{
 				setInitState(STATE_DONE);
 			}catch(Throwable e){
 				this.e=e;
-				synchronized(this){
-					this.notifyAll();
+				try{
+					lock.lock();
+					condition.signalAll();
+				}finally{
+					lock.unlock();
 				}
 			}
 		});
 	}
 	
 	protected final void setInitState(int state){
-		synchronized(this){
+		try{
+			lock.lock();
 			this.state=state;
-			this.notifyAll();
-//			LogUtil.println(this, stateToStr(state));
+			condition.signalAll();
+		}finally{
+			lock.unlock();
 		}
 	}
 	
@@ -69,14 +80,24 @@ public abstract class StagedInit{
 		}
 	}
 	
-	protected synchronized Throwable getErr(){
-		return e;
+	protected Throwable getErr(){
+		try{
+			lock.lock();
+			return e;
+		}finally{
+			lock.unlock();
+		}
 	}
 	
-	private synchronized void checkErr(){
-		if(e==null) return;
-		
-		throw new WaitException("Exception occurred while initializing for "+this, e);
+	private void checkErr(){
+		try{
+			lock.lock();
+			
+			if(e==null) return;
+			throw new WaitException("Exception occurred while initializing for "+this, e);
+		}finally{
+			lock.unlock();
+		}
 	}
 	
 	protected String stateToStr(int state){
@@ -90,12 +111,15 @@ public abstract class StagedInit{
 	
 	private void waitForState0(int state){
 		while(true){
-			synchronized(this){
+			try{
+				lock.lock();
 				checkErr();
 				if(this.state>=state) return;
 				try{
-					this.wait();
+					condition.await();
 				}catch(InterruptedException ignored){}
+			}finally{
+				lock.unlock();
 			}
 		}
 	}

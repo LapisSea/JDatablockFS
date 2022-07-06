@@ -17,6 +17,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.LongStream;
 
 import static com.lapissea.util.LogUtil.Init.USE_CALL_POS;
@@ -96,14 +98,18 @@ public class LoggedMemoryUtils{
 				else proxyLogger=(data, ids)->ses.log(new MemFrame(data.readAll(), ids.toArray(), new Throwable()));
 			}
 		}else{
-			var preBuf=new LinkedList<MemFrame>();
+			var  preBuf=new LinkedList<MemFrame>();
+			Lock lock  =new ReentrantLock();
 			new Thread(()->{
 				UtilL.sleepUntil(logger::isInited, 20);
-				synchronized(preBuf){
+				lock.lock();
+				try{
 					var ses=logger.get().getSession(sessionName);
 					while(!preBuf.isEmpty()){
 						ses.log(preBuf.remove(0));
 					}
+				}finally{
+					lock.unlock();
 				}
 			}).start();
 			
@@ -115,7 +121,8 @@ public class LoggedMemoryUtils{
 					}
 				}
 				var memFrame=new MemFrame(data.readAll(), ids.toArray(), new Throwable());
-				synchronized(preBuf){
+				lock.lock();
+				try{
 					if(logger.isInited()){
 						var ses=logger.get().getSession(sessionName);
 						while(!preBuf.isEmpty()){
@@ -125,6 +132,8 @@ public class LoggedMemoryUtils{
 					}else{
 						preBuf.add(memFrame);
 					}
+				}finally{
+					lock.unlock();
 				}
 			};
 		}
