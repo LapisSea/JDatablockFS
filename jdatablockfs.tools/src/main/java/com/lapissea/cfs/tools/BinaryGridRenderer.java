@@ -41,6 +41,7 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.nio.ByteBuffer;
 import java.util.*;
+import java.util.concurrent.ForkJoinPool;
 import java.util.function.Consumer;
 import java.util.function.IntPredicate;
 import java.util.function.Supplier;
@@ -54,6 +55,14 @@ import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 
 @SuppressWarnings({"UnnecessaryLocalVariable", "SameParameterValue"})
 public class BinaryGridRenderer{
+	
+	static{
+		ForkJoinPool.commonPool().execute(()->{
+			try{
+				Cluster.init(MemoryData.builder().build()).rootWalker().walk(true, e->{});
+			}catch(IOException ignored){}
+		});
+	}
 	
 	public record FieldVal<T extends IOInstance<T>>(Struct.Pool<T> ioPool, T instance, IOField<T, ?> field){
 		Optional<String> instanceToString(boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
@@ -612,7 +621,7 @@ public class BinaryGridRenderer{
 		byte[] bytes=ctx.bytes;
 		var    magic=Cluster.getMagicId();
 		
-		var hasMagic=magic.mismatch(ByteBuffer.wrap(bytes).limit(magic.limit()))==-1;
+		var hasMagic=bytes.length>=magic.limit()&&magic.mismatch(ByteBuffer.wrap(bytes).limit(magic.limit()))==-1;
 		if(!hasMagic&&!errorMode){
 			throw new RuntimeException("No magic bytes");
 		}
@@ -626,7 +635,7 @@ public class BinaryGridRenderer{
 		}
 		ctx.renderer.setLineWidth(2F);
 		outlineByteRange(Color.WHITE, ctx, new Range(0, magic.limit()));
-		drawStringIn(ctx.renderer, Color.WHITE, new String(bytes, 0, magic.limit()), new DrawUtils.Rect(0, 0, ctx.pixelsPerByte()*Math.min(magic.limit(), ctx.width()), ctx.pixelsPerByte()), false);
+		drawStringIn(ctx.renderer, Color.WHITE, new String(bytes, 0, Math.min(bytes.length, magic.limit())), new DrawUtils.Rect(0, 0, ctx.pixelsPerByte()*Math.min(magic.limit(), ctx.width()), ctx.pixelsPerByte()), false);
 		
 		ctx.renderer.setColor(alpha(Color.WHITE, 0.5F));
 		

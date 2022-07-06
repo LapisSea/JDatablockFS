@@ -70,7 +70,7 @@ public abstract class StagedInit{
 		checkErr();
 	}
 	
-	protected int getState(){
+	protected int getEstimatedState(){
 		return state;
 	}
 	

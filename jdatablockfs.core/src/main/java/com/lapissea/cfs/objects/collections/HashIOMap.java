@@ -16,7 +16,10 @@ import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.cfs.type.field.annotations.IOValue;
-import com.lapissea.util.*;
+import com.lapissea.util.LogUtil;
+import com.lapissea.util.ObjectHolder;
+import com.lapissea.util.TextUtil;
+import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.util.*;
@@ -294,70 +297,6 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 			writeManagedFields();
 			((Unmanaged<?>)oldBuckets).free();
 		}
-	}
-	
-	private Iterable<IONode<BucketEntry<K, V>>> nodeSource(IOList<Bucket<K, V>> view){
-		return ()->view.stream().flatMap(Bucket::nodeStream).iterator();
-	}
-	private Iterable<IONode<BucketEntry<K, V>>> asyncNodeSource(ExecutorService service, IOList<Bucket<K, V>> view){
-		LinkedList<IONode<BucketEntry<K, V>>> nodeBuffer=new LinkedList<>();
-		var task=async(()->{
-			for(var bucket : view){
-				if(bucket.node==null) continue;
-				for(var node : bucket.node){
-					synchronized(nodeBuffer){
-						nodeBuffer.add(node);
-					}
-				}
-			}
-		}, service);
-		
-		return ()->new Iterator<>(){
-			private IONode<BucketEntry<K, V>> next;
-			@Override
-			public boolean hasNext(){
-				if(next==null){
-					if(task.isDone()){
-						if(task.isCompletedExceptionally()){
-							task.join();
-						}
-						if(nodeBuffer.isEmpty()) return false;
-						else{
-							next=nodeBuffer.remove(0);
-							return true;
-						}
-					}
-					getNext();
-				}
-				return next!=null;
-			}
-			private void getNext(){
-				while(true){
-					if(task.isDone()){
-						if(task.isCompletedExceptionally()){
-							task.join();
-						}
-						break;
-					}
-					if(!nodeBuffer.isEmpty()) break;
-					UtilL.sleep(1);
-				}
-				synchronized(nodeBuffer){
-					if(!nodeBuffer.isEmpty()){
-						next=nodeBuffer.remove(0);
-					}
-				}
-			}
-			
-			@Override
-			public IONode<BucketEntry<K, V>> next(){
-				if(next==null) getNext();
-				if(next==null) throw new NotImplementedException();
-				var n=next;
-				next=null;
-				return n;
-			}
-		};
 	}
 	
 	private void optimizedOrderTransfer(IOList<Bucket<K, V>> oldData, IOList<Bucket<K, V>> newBuckets, short newPO2, Executor readExecutor, Executor writeExecutor) throws IOException{
