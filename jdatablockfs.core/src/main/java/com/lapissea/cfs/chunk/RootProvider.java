@@ -2,6 +2,7 @@ package com.lapissea.cfs.chunk;
 
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.objects.ObjectID;
+import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.cfs.type.*;
 import com.lapissea.util.function.UnsafeSupplier;
@@ -99,5 +100,8 @@ public interface RootProvider extends DataProvider.Holder{
 	
 	<T> T request(ObjectID id, UnsafeSupplier<T, IOException> objectGenerator) throws IOException;
 	<T> void provide(T obj, ObjectID id) throws IOException;
+	
+	
+	Iterable<IOMap.Entry<ObjectID, Object>> listAll();
 	
 }

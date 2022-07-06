@@ -11,6 +11,7 @@ import com.lapissea.cfs.objects.ObjectID;
 import com.lapissea.cfs.objects.collections.AbstractUnmanagedIOMap;
 import com.lapissea.cfs.objects.collections.HashIOMap;
 import com.lapissea.cfs.objects.collections.IOList;
+import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.IOTypeDB;
 import com.lapissea.cfs.type.MemoryWalker;
@@ -167,6 +168,11 @@ public class Cluster implements DataProvider{
 		@Override
 		public DataProvider getDataProvider(){
 			return Cluster.this;
+		}
+		
+		@Override
+		public Iterable<IOMap.Entry<ObjectID, Object>> listAll(){
+			return ()->meta().rootObjects.iterator();
 		}
 	};
 	

@@ -4,11 +4,12 @@ import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.Utils;
 
 import java.io.IOException;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Stream;
 
-public interface IOMap<K, V>{
+public interface IOMap<K, V> extends Iterable<IOMap.Entry<K, V>>{
 	
 	interface Entry<K, V>{
 		
@@ -91,6 +92,11 @@ public interface IOMap<K, V>{
 	}
 	
 	Stream<Entry<K, V>> stream();
+	
+	@Override
+	default Iterator<Entry<K, V>> iterator(){
+		return stream().iterator();
+	}
 	
 	default IterablePP<Entry<K, V>> entries(){
 		return ()->stream().iterator();
