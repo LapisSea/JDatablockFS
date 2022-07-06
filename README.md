@@ -127,7 +127,10 @@ Details:
 
 
 - `@IOValue`: This is the most basic annotation. It signifies that a value should be serialized.
-- `@IONullability`: This annotation specified what kinda of nullability is accepted. Every `IOValue` without this annotation is `NOT_NULL`. When this annotation has `NULLABLE`, a new virtual field of type boolean will be added. Its value is automatically managed by the library. When this annotation has `DEFAULT_IF_NULL` then a value will be stored as its default value. (0, false, empty constructor, empty array, etc...)
+- `@IONullability`: This annotation specified what kind of nullability is accepted. Every `IOValue` without this annotation is `NOT_NULL`.
+	- When a field is `NOT_NULL` and is null, then the object it is in will be considered invalid and the library will refuse to store it.
+	- When this annotation has `NULLABLE`, a new field of type boolean will be added to the instance under the hood. Its value represents if the relevant field is null or not. It is automatically managed by the library.
+	- When this annotation has `DEFAULT_IF_NULL` then a value will be stored as its default value. (0, false, empty constructor, empty array, etc...)
 - `@IOValue.Reference`: This annotation suggests to the library that this field should not be inlined and should be stored as a reference. (This is useful if an object is going to be stored in a list. When an object is in a list, the list greatly benefits from an object whose size can be fixed and can be stored inline with the list data)
 - `@IOValue.OverrideType`: This annotation specifies that the type of field should be replaced with a compatible type. For example if there is an IOList and a specific implementation is desired then `@IOValue.OverrideType(FooList.class)` can be used
 - `@IODependency`: This annotation specifies that this field requires another `IOField` to be read/written correctly. This will change the way the memory of an IOInstance is organised. If used incorrectly this annotation can create dependency loops what will make the instance of an invalid format. This annotation should probably not be used unless there is a specific need for it.
