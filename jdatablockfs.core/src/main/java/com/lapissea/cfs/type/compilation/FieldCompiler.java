@@ -20,6 +20,7 @@ import ru.vyarus.java.generics.resolver.GenericsResolver;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
@@ -483,10 +484,9 @@ public class FieldCompiler{
 	}
 	
 	
-	private static final RegistryNode.Registry REGISTRY=new RegistryNode.Registry();
-	
-	static{
-		REGISTRY.register(new RegistryNode(){
+	private static final CompletableFuture<RegistryNode.Registry> REGISTRY=CompletableFuture.supplyAsync(()->{
+		var reg=new RegistryNode.Registry();
+		reg.register(new RegistryNode(){
 			@Override
 			public boolean canCreate(Type type, GetAnnotation annotations){
 				return annotations.isPresent(IOType.Dynamic.class);
@@ -499,7 +499,7 @@ public class FieldCompiler{
 				return new IOFieldDynamicInlineObject<>(field);
 			}
 		});
-		REGISTRY.register(new RegistryNode(){
+		reg.register(new RegistryNode(){
 			@Override
 			public boolean canCreate(Type type, GetAnnotation annotations){
 				return SupportedPrimitive.isAny(type);
@@ -509,37 +509,37 @@ public class FieldCompiler{
 				return IOFieldPrimitive.make(field);
 			}
 		});
-		REGISTRY.register(new RegistryNode.InstanceOf<>(Enum.class){
+		reg.register(new RegistryNode.InstanceOf<>(Enum.class){
 			@Override
 			public <T extends IOInstance<T>> IOField<T, Enum> create(FieldAccessor<T> field, GenericContext genericContext){
 				return new IOFieldEnum<>(field);
 			}
 		});
-		REGISTRY.register(new RegistryNode.InstanceOf<>(INumber.class){
+		reg.register(new RegistryNode.InstanceOf<>(INumber.class){
 			@Override
 			public <T extends IOInstance<T>> IOField<T, INumber> create(FieldAccessor<T> field, GenericContext genericContext){
 				return new IOFieldNumber<>(field);
 			}
 		});
-		REGISTRY.register(new RegistryNode.InstanceOf<>(byte[].class){
+		reg.register(new RegistryNode.InstanceOf<>(byte[].class){
 			@Override
 			public <T extends IOInstance<T>> IOField<T, byte[]> create(FieldAccessor<T> field, GenericContext genericContext){
 				return new IOFieldByteArray<>(field);
 			}
 		});
-		REGISTRY.register(new RegistryNode.InstanceOf<>(boolean[].class){
+		reg.register(new RegistryNode.InstanceOf<>(boolean[].class){
 			@Override
 			public <T extends IOInstance<T>> IOField<T, boolean[]> create(FieldAccessor<T> field, GenericContext genericContext){
 				return new IOFieldBooleanArray<>(field);
 			}
 		});
-		REGISTRY.register(new RegistryNode.InstanceOf<>(float[].class){
+		reg.register(new RegistryNode.InstanceOf<>(float[].class){
 			@Override
 			public <T extends IOInstance<T>> IOField<T, float[]> create(FieldAccessor<T> field, GenericContext genericContext){
 				return new IOFieldFloatArray<>(field);
 			}
 		});
-		REGISTRY.register(new RegistryNode(){
+		reg.register(new RegistryNode(){
 			@Override
 			public boolean canCreate(Type type, GetAnnotation annotations){
 				var raw=Utils.typeToRaw(type);
@@ -551,7 +551,7 @@ public class FieldCompiler{
 				return new IOFieldInstanceArray<>(field);
 			}
 		});
-		REGISTRY.register(new RegistryNode(){
+		reg.register(new RegistryNode(){
 			@Override
 			public boolean canCreate(Type type, GetAnnotation annotations){
 				if(!(type instanceof ParameterizedType parmType)) return false;
@@ -564,19 +564,19 @@ public class FieldCompiler{
 				return new IOFieldInstanceList<>(field);
 			}
 		});
-		REGISTRY.register(new RegistryNode.InstanceOf<>(String.class){
+		reg.register(new RegistryNode.InstanceOf<>(String.class){
 			@Override
 			public <T extends IOInstance<T>> IOField<T, String> create(FieldAccessor<T> field, GenericContext genericContext){
 				return new IOFieldInlineString<>(field);
 			}
 		});
-		REGISTRY.register(new RegistryNode.InstanceOf<>(String[].class){
+		reg.register(new RegistryNode.InstanceOf<>(String[].class){
 			@Override
 			public <T extends IOInstance<T>> IOField<T, String[]> create(FieldAccessor<T> field, GenericContext genericContext){
 				return new IOFieldStringArray<>(field);
 			}
 		});
-		REGISTRY.register(new RegistryNode.InstanceOf<>(IOInstance.class){
+		reg.register(new RegistryNode.InstanceOf<>(IOInstance.class){
 			@Override
 			public <T extends IOInstance<T>> IOField<T, ? extends IOInstance> create(FieldAccessor<T> field, GenericContext genericContext){
 				Class<?> raw      =field.getType();
@@ -591,11 +591,11 @@ public class FieldCompiler{
 				return new IOFieldInlineObject<>(field);
 			}
 		});
-	}
+		return reg;
+	});
 	
-	protected RegistryNode.Registry registry(){
-		return REGISTRY;
-	}
+	protected RegistryNode.Registry registry(){return REGISTRY.join();}
+	
 	protected Set<Class<? extends Annotation>> activeAnnotations(){
 		return Set.of(
 			IOValue.class,
