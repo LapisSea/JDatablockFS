@@ -2,6 +2,7 @@ package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
+import com.lapissea.cfs.objects.ObjectID;
 import com.lapissea.cfs.objects.collections.HashIOMap;
 import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.type.field.annotations.IOValue;
@@ -154,16 +155,16 @@ public sealed interface IOTypeDB{
 					Float.class,
 					Double.class,
 					
-					String.class,
-					TypeLink.class,
-					TypeDef.class
+					String.class
 				}){
 					db.newID(TypeLink.of(c), true);
 				}
 				for(var c : new Class<?>[]{
 					TypeDef.class,
 					PersistentDB.class,
-					IOInstance.class
+					IOInstance.class,
+					TypeDef.class,
+					ObjectID.class
 				}){
 					registerBuiltIn(db, c);
 				}
@@ -181,6 +182,17 @@ public sealed interface IOTypeDB{
 			for(var dc : c.getDeclaredClasses()){
 				if(Modifier.isAbstract(dc.getModifiers())||!IOInstance.isInstance(dc)) continue;
 				registerBuiltIn(builtIn, dc);
+			}
+			var cl=c;
+			while(cl!=null&&cl!=Object.class){
+				
+				for(var field : cl.getDeclaredFields()){
+					if(field.isAnnotationPresent(IOValue.class)&&IOInstance.isInstance(field.getType())){
+						registerBuiltIn(builtIn, field.getType());
+					}
+				}
+				
+				cl=cl.getSuperclass();
 			}
 		}
 		

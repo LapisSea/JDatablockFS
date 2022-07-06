@@ -84,40 +84,40 @@ public class LoggedMemoryUtils{
 		});
 	}
 	
-	public static MemoryData<?> newLoggedMemory(String sessionName, LateInit<DataLogger> display) throws IOException{
-		MemoryData.EventLogger logger;
-		if(display.isInited()){
-			DataLogger disp=display.get();
+	public static MemoryData<?> newLoggedMemory(String sessionName, LateInit<DataLogger> logger) throws IOException{
+		MemoryData.EventLogger proxyLogger;
+		if(logger.isInited()){
+			DataLogger disp=logger.get();
 			if(disp instanceof DataLogger.Blank){
-				logger=(d, i)->{};
+				proxyLogger=(d, i)->{};
 			}else{
 				var ses=disp.getSession(sessionName);
-				if(ses==DataLogger.Session.Blank.INSTANCE) logger=(d, i)->{};
-				else logger=(data, ids)->ses.log(new MemFrame(data.readAll(), ids.toArray(), new Throwable()));
+				if(ses==DataLogger.Session.Blank.INSTANCE) proxyLogger=(d, i)->{};
+				else proxyLogger=(data, ids)->ses.log(new MemFrame(data.readAll(), ids.toArray(), new Throwable()));
 			}
 		}else{
 			var preBuf=new LinkedList<MemFrame>();
 			new Thread(()->{
-				UtilL.sleepUntil(display::isInited, 20);
+				UtilL.sleepUntil(logger::isInited, 20);
 				synchronized(preBuf){
-					var ses=display.get().getSession(sessionName);
+					var ses=logger.get().getSession(sessionName);
 					while(!preBuf.isEmpty()){
 						ses.log(preBuf.remove(0));
 					}
 				}
 			}).start();
 			
-			logger=(data, ids)->{
-				if(display.isInited()){
-					var d=display.get();
+			proxyLogger=(data, ids)->{
+				if(logger.isInited()){
+					var d=logger.get();
 					if(!d.isActive()){
 						return;
 					}
 				}
 				var memFrame=new MemFrame(data.readAll(), ids.toArray(), new Throwable());
 				synchronized(preBuf){
-					if(display.isInited()){
-						var ses=display.get().getSession(sessionName);
+					if(logger.isInited()){
+						var ses=logger.get().getSession(sessionName);
 						while(!preBuf.isEmpty()){
 							ses.log(preBuf.remove(0));
 						}
@@ -129,7 +129,7 @@ public class LoggedMemoryUtils{
 			};
 		}
 		
-		MemoryData<?> mem=MemoryData.builder().withCapacity(0).withOnWrite(logger).build();
+		MemoryData<?> mem=MemoryData.builder().withCapacity(0).withOnWrite(proxyLogger).build();
 		
 		mem.onWrite.log(mem, LongStream.of());
 		

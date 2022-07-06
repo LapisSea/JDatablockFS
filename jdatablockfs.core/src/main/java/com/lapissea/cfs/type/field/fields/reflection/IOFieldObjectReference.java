@@ -153,12 +153,13 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 			@Override
 			public Reference generate(Struct.Pool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException{
 				var val=get(ioPool, instance);
-				if(val==null&&getNullability()==IONullability.Mode.DEFAULT_IF_NULL){
-					val=struct.emptyConstructor().get();
-				}
 				
 				if(val==null){
-					return new Reference();
+					if(allowExternalMod&&getNullability()==IONullability.Mode.DEFAULT_IF_NULL){
+						val=struct.emptyConstructor().get();
+					}else{
+						return new Reference();
+					}
 				}
 				
 				if(DEBUG_VALIDATION){

@@ -204,7 +204,13 @@ public interface BasicSizeDescriptor<T, PoolType>{
 	
 	default long calcAllocSize(WordSpace wordSpace){
 		var val=getFixed();
-		if(val.isEmpty()) val=getMax();
+		if(val.isEmpty()){
+			var max=getMax();
+			if(max.isPresent()){
+				var min=getMin();
+				val=OptionalLong.of((min+max.getAsLong())/2);
+			}
+		}
 		if(val.isEmpty()){
 			var min=getMin();
 			var siz=Math.max(min, 32);

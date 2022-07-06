@@ -236,10 +236,8 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 	@Override
 	public void add(T value) throws IOException{
 		Objects.requireNonNull(value);
-		try(var ignored=getDataProvider().getSource().openIOTransaction()){
-			writeAt(size(), value);
-			deltaSize(1);
-		}
+		writeAt(size(), value);
+		deltaSize(1);
 	}
 	
 	@Override

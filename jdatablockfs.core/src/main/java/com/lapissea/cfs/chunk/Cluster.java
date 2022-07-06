@@ -28,7 +28,7 @@ import java.util.Set;
 
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NULLABLE;
-import static com.lapissea.cfs.type.field.annotations.IOValue.Reference.PipeType.FIXED;
+import static com.lapissea.cfs.type.field.annotations.IOValue.Reference.PipeType.FLEXIBLE;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 public class Cluster implements DataProvider{
@@ -92,7 +92,7 @@ public class Cluster implements DataProvider{
 	
 	public static class RootRef extends IOInstance<RootRef>{
 		@IOValue
-		@IOValue.Reference(dataPipeType=FIXED)
+		@IOValue.Reference(dataPipeType=FLEXIBLE)
 		@IONullability(DEFAULT_IF_NULL)
 		private Metadata metadata;
 	}
