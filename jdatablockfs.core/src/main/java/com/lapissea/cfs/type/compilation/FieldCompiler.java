@@ -4,14 +4,14 @@ import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.SyntheticParameterizedType;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
-import com.lapissea.cfs.objects.INumber;
-import com.lapissea.cfs.type.*;
+import com.lapissea.cfs.type.FieldSet;
+import com.lapissea.cfs.type.GetAnnotation;
+import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
 import com.lapissea.cfs.type.field.access.*;
 import com.lapissea.cfs.type.field.annotations.*;
-import com.lapissea.cfs.type.field.fields.reflection.*;
-import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.PairM;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
@@ -484,115 +484,7 @@ public class FieldCompiler{
 	}
 	
 	
-	private static final CompletableFuture<RegistryNode.Registry> REGISTRY=CompletableFuture.supplyAsync(()->{
-		var reg=new RegistryNode.Registry();
-		reg.register(new RegistryNode(){
-			@Override
-			public boolean canCreate(Type type, GetAnnotation annotations){
-				return annotations.isPresent(IOType.Dynamic.class);
-			}
-			@Override
-			public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
-				if(field.hasAnnotation(IOValue.Reference.class)){
-					throw new NotImplementedException();
-				}
-				return new IOFieldDynamicInlineObject<>(field);
-			}
-		});
-		reg.register(new RegistryNode(){
-			@Override
-			public boolean canCreate(Type type, GetAnnotation annotations){
-				return SupportedPrimitive.isAny(type);
-			}
-			@Override
-			public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
-				return IOFieldPrimitive.make(field);
-			}
-		});
-		reg.register(new RegistryNode.InstanceOf<>(Enum.class){
-			@Override
-			public <T extends IOInstance<T>> IOField<T, Enum> create(FieldAccessor<T> field, GenericContext genericContext){
-				return new IOFieldEnum<>(field);
-			}
-		});
-		reg.register(new RegistryNode.InstanceOf<>(INumber.class){
-			@Override
-			public <T extends IOInstance<T>> IOField<T, INumber> create(FieldAccessor<T> field, GenericContext genericContext){
-				return new IOFieldNumber<>(field);
-			}
-		});
-		reg.register(new RegistryNode.InstanceOf<>(byte[].class){
-			@Override
-			public <T extends IOInstance<T>> IOField<T, byte[]> create(FieldAccessor<T> field, GenericContext genericContext){
-				return new IOFieldByteArray<>(field);
-			}
-		});
-		reg.register(new RegistryNode.InstanceOf<>(boolean[].class){
-			@Override
-			public <T extends IOInstance<T>> IOField<T, boolean[]> create(FieldAccessor<T> field, GenericContext genericContext){
-				return new IOFieldBooleanArray<>(field);
-			}
-		});
-		reg.register(new RegistryNode.InstanceOf<>(float[].class){
-			@Override
-			public <T extends IOInstance<T>> IOField<T, float[]> create(FieldAccessor<T> field, GenericContext genericContext){
-				return new IOFieldFloatArray<>(field);
-			}
-		});
-		reg.register(new RegistryNode(){
-			@Override
-			public boolean canCreate(Type type, GetAnnotation annotations){
-				var raw=Utils.typeToRaw(type);
-				if(!raw.isArray()) return false;
-				return IOInstance.isManaged(raw.componentType());
-			}
-			@Override
-			public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
-				return new IOFieldInstanceArray<>(field);
-			}
-		});
-		reg.register(new RegistryNode(){
-			@Override
-			public boolean canCreate(Type type, GetAnnotation annotations){
-				if(!(type instanceof ParameterizedType parmType)) return false;
-				if(parmType.getRawType()!=List.class&&parmType.getRawType()!=ArrayList.class) return false;
-				var args=parmType.getActualTypeArguments();
-				return IOInstance.isManaged(Objects.requireNonNull(TypeLink.of(args[0])));
-			}
-			@Override
-			public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
-				return new IOFieldInstanceList<>(field);
-			}
-		});
-		reg.register(new RegistryNode.InstanceOf<>(String.class){
-			@Override
-			public <T extends IOInstance<T>> IOField<T, String> create(FieldAccessor<T> field, GenericContext genericContext){
-				return new IOFieldInlineString<>(field);
-			}
-		});
-		reg.register(new RegistryNode.InstanceOf<>(String[].class){
-			@Override
-			public <T extends IOInstance<T>> IOField<T, String[]> create(FieldAccessor<T> field, GenericContext genericContext){
-				return new IOFieldStringArray<>(field);
-			}
-		});
-		reg.register(new RegistryNode.InstanceOf<>(IOInstance.class){
-			@Override
-			public <T extends IOInstance<T>> IOField<T, ? extends IOInstance> create(FieldAccessor<T> field, GenericContext genericContext){
-				Class<?> raw      =field.getType();
-				var      unmanaged=!IOInstance.isManaged(raw);
-				
-				if(unmanaged){
-					return new IOFieldUnmanagedObjectReference<>(field);
-				}
-				if(field.hasAnnotation(IOValue.Reference.class)){
-					return new IOFieldObjectReference<>(field);
-				}
-				return new IOFieldInlineObject<>(field);
-			}
-		});
-		return reg;
-	});
+	private static final CompletableFuture<RegistryNode.Registry> REGISTRY=FieldRegistry.make();
 	
 	protected RegistryNode.Registry registry(){return REGISTRY.join();}
 	
