@@ -14,7 +14,6 @@ import com.lapissea.cfs.type.field.BasicSizeDescriptor;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
-import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeSupplier;
 
@@ -415,8 +414,7 @@ public sealed interface ValueStorage<T>{
 		
 		@Override
 		public <I extends IOInstance<I>> IOField<I, String> field(FieldAccessor<I> accessor, UnsafeSupplier<RandomIO, IOException> ioAt){
-			//TODO: Make IOField.Ref non IOInstance only
-			throw new NotImplementedException();
+			return new IOField.NoIO<>(accessor, Reference.FIXED_PIPE.getFixedDescriptor());
 		}
 		
 		@Override

@@ -12,6 +12,7 @@ public class Entity extends IOInstance<Entity>{
 	public Vec2d pos=new Vec2d();
 	
 	@IOValue
+	@IOValue.Reference
 	public List<InventorySlot> inventory=new ArrayList<>();
 	
 }

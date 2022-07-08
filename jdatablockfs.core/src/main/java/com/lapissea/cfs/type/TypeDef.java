@@ -27,13 +27,18 @@ public final class TypeDef extends IOInstance<TypeDef>{
 		private String name;
 		
 		@IOValue
-		private IONullability.Mode nullability;
-		
-		@IOValue
 		private boolean isDynamic;
 		
 		@IOValue
 		private String[] dependencies;
+		
+		@IOValue
+		private IONullability.Mode nullability;
+		
+		@IOValue
+		@IONullability(NULLABLE)
+		private IOValue.Reference.PipeType referenceType;
+		
 		
 		public FieldDef(){}
 		
@@ -42,27 +47,23 @@ public final class TypeDef extends IOInstance<TypeDef>{
 			name=field.getName();
 			nullability=field.getAccessor().getAnnotation(IONullability.class).map(IONullability::value).orElse(IONullability.Mode.NOT_NULL);
 			isDynamic=field.getAccessor().hasAnnotation(IOType.Dynamic.class);
+			referenceType=field.getAccessor().getAnnotation(IOValue.Reference.class).map(IOValue.Reference::dataPipeType).orElse(null);
 			var deps=field.dependencyStream().map(IOField::getName).collect(Collectors.toSet());
 			if(field.getAccessor().getType().isArray()) deps.remove(IOFieldTools.makeArrayLenName(field.getAccessor()));
 			if(isDynamic) deps.remove(IOFieldTools.makeGenericIDFieldName(field.getAccessor()));
 			dependencies=deps.toArray(String[]::new);
 		}
 		
-		public TypeLink getType(){
-			return type;
-		}
-		public String getName(){
-			return name;
-		}
-		public IONullability.Mode getNullability(){
-			return nullability;
-		}
-		public boolean isDynamic(){
-			return isDynamic;
-		}
+		public TypeLink getType() {return type;}
+		public String getName()   {return name;}
+		public boolean isDynamic(){return isDynamic;}
+		
 		public List<String> getDependencies(){
 			return dependencies==null?List.of():ArrayViewList.create(dependencies, null);
 		}
+		
+		public IONullability.Mode getNullability()          {return nullability;}
+		public IOValue.Reference.PipeType getReferenceType(){return referenceType;}
 		
 		@Override
 		public String toString(){

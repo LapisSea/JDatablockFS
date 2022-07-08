@@ -329,16 +329,20 @@ public class MemoryWalker{
 							}
 						}
 						{
+							if(!isInstance){
+								continue;
+							}
 							if(!dynamic){
-								if(isInstance){
-									var typ=refField.getAccessor().getType();
-									if(!Struct.ofUnknown(typ).getCanHavePointers()){
-										continue;
-									}
+								var typ=refField.getAccessor().getType();
+								if(!Struct.ofUnknown(typ).getCanHavePointers()){
+									continue;
 								}
 							}
+							
+							var instRefField=(IOField.Ref<T, T> & IOField.Ref.Inst<T, T>)refField;
+							
 							long t0v=record?System.nanoTime():0;
-							var  res=walkStructFull(stack, refField.get(ioPool, instance), ref, refField.getReferencedPipe(instance), pointerRecord, false);
+							var  res=walkStructFull(stack, instRefField.get(ioPool, instance), ref, instRefField.getReferencedPipe(instance), pointerRecord, false);
 							if(record){
 								var t1v =System.nanoTime();
 								var diff=t1v-t0v;

@@ -10,6 +10,7 @@ import com.lapissea.cfs.io.bit.BitReader;
 import com.lapissea.cfs.io.bit.BitWriter;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
+import com.lapissea.cfs.io.instancepipe.ObjectPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.*;
@@ -80,9 +81,19 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		}
 	}
 	
-	public abstract static class Ref<T extends IOInstance<T>, Type extends IOInstance<Type>> extends IOField<T, Type>{
+	public abstract static class Ref<T extends IOInstance<T>, Type> extends IOField<T, Type>{
 		
-		public abstract static class NoIO<T extends IOInstance<T>, ValueType extends IOInstance<ValueType>> extends IOField.Ref<T, ValueType>{
+		public abstract static class InstRef<T extends IOInstance<T>, Type extends IOInstance<Type>> extends Ref<T, Type> implements Inst<T, Type>{
+			public InstRef(FieldAccessor<T> accessor){
+				super(accessor);
+			}
+		}
+		
+		public interface Inst<T extends IOInstance<T>, Type extends IOInstance<Type>>{
+			StructPipe<Type> getReferencedPipe(T instance);
+		}
+		
+		public abstract static class NoIO<T extends IOInstance<T>, ValueType extends IOInstance<ValueType>> extends InstRef<T, ValueType>{
 			
 			private final SizeDescriptor<T> sizeDescriptor;
 			
@@ -114,6 +125,85 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 			}
 		}
 		
+		public abstract static class ReferenceCompanion<T extends IOInstance<T>, ValueType> extends IOField.Ref<T, ValueType>{
+			
+			private IOField<T, Reference> referenceField;
+			
+			public ReferenceCompanion(FieldAccessor<T> accessor){
+				super(accessor);
+			}
+			
+			@Override
+			public void init(){
+				super.init();
+				referenceField=getDependencies().requireExact(Reference.class, IOFieldTools.makeRefName(getAccessor()));
+			}
+			
+			protected void setRef(T instance, Reference newRef){
+				referenceField.set(null, instance, newRef);
+			}
+			protected Reference getRef(T instance){
+				return referenceField.get(null, instance);
+			}
+			
+			@Override
+			public Reference getReference(T instance){
+				var ref=getRef(instance);
+				if(ref.isNull()){
+					return switch(getNullability()){
+						case NOT_NULL -> throw new NullPointerException();
+						case NULLABLE -> get(null, instance)!=null?null:ref;
+						case DEFAULT_IF_NULL -> null;
+					};
+					
+				}
+				return ref;
+			}
+			
+			@Override
+			public List<ValueGeneratorInfo<T, ?>> getGenerators(){
+				return List.of(new ValueGeneratorInfo<>(referenceField, new ValueGenerator<>(){
+					@Override
+					public boolean shouldGenerate(Struct.Pool<T> ioPool, DataProvider provider, T instance){
+						boolean refNull=switch(getNullability()){
+							case NOT_NULL, DEFAULT_IF_NULL -> false;
+							case NULLABLE -> {
+								var val=get(ioPool, instance);
+								yield val==null;
+							}
+						};
+						
+						var     ref      =getRef(instance);
+						boolean isRefNull=ref==null||ref.isNull();
+						
+						return refNull!=isRefNull;
+					}
+					@Override
+					public Reference generate(Struct.Pool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException{
+						var val=get(ioPool, instance);
+						
+						if(val==null){
+							if(allowExternalMod&&getNullability()==IONullability.Mode.DEFAULT_IF_NULL){
+								val=newDefault();
+							}else{
+								return new Reference();
+							}
+						}
+						
+						if(DEBUG_VALIDATION){
+							var ref=getRef(instance);
+							assert ref==null||ref.isNull();
+						}
+						if(!allowExternalMod) throw new RuntimeException("data modification should not be done here");
+						return allocNew(provider, val);
+					}
+				}));
+			}
+			
+			protected abstract ValueType newDefault();
+			protected abstract Reference allocNew(DataProvider provider, ValueType val) throws IOException;
+		}
+		
 		public Ref(FieldAccessor<T> accessor){
 			super(accessor);
 		}
@@ -126,7 +216,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		public abstract void allocate(T instance, DataProvider provider, GenericContext genericContext) throws IOException;
 		public abstract void setReference(T instance, Reference newRef);
 		public abstract Reference getReference(T instance);
-		public abstract StructPipe<Type> getReferencedPipe(T instance);
+		public abstract ObjectPipe<Type, ?> getReferencedPipe(T instance);
 		
 		@Override
 		public IOField.Ref<T, Type> implMaxAsFixedSize(){

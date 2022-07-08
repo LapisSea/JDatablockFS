@@ -8,6 +8,7 @@ import com.lapissea.cfs.io.bit.FlagReader;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
+import com.lapissea.cfs.io.instancepipe.ObjectPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.INumber;
@@ -1291,7 +1292,7 @@ public class BinaryGridRenderer{
 						}
 						
 						if(field instanceof IOField.Ref refO){
-							IOField.Ref<T, T> refField=(IOField.Ref<T, T>)refO;
+							IOField.Ref<T, ?> refField=(IOField.Ref<T, ?>)refO;
 							var               ref     =refField.getReference(instance);
 							boolean           diffPos =true;
 							Pointer           ptr     =null;
@@ -1329,7 +1330,15 @@ public class BinaryGridRenderer{
 								}
 							}
 							if(!diffPos) ctx.popStrings(renderer);
-							annotateStruct(ctx, refField.get(ioPool, instance), ref, refField.getReferencedPipe(instance), generics(instance, parentGenerics), diffPos);
+							
+							if(refField instanceof IOField.Ref.Inst instRef){
+								annotateStruct(ctx, (T)refField.get(ioPool, instance), ref, instRef.getReferencedPipe(instance), generics(instance, parentGenerics), diffPos);
+							}else{
+								ObjectPipe pip     =refField.getReferencedPipe(instance);
+								var        refVal  =refField.get(null, instance);
+								var        dataSize=pip.calcUnknownSize(ctx.provider, refVal, WordSpace.BYTE);
+								annotateByteField(ctx, ioPool, instance, refField, col, ref, Range.fromSize(0, dataSize));
+							}
 							
 							continue;
 						}

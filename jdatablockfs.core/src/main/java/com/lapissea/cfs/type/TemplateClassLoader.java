@@ -98,6 +98,8 @@ public class TemplateClassLoader extends ClassLoader{
 		writer.write("#TOKEN(0) IONullability define", IONullability.class.getName());
 		writer.write("#TOKEN(0) IOType.Dynamic define", IOType.Dynamic.class.getName());
 		writer.write("#TOKEN(0) IODependency define", IODependency.class.getName());
+		writer.write("#TOKEN(0) IODependency define", IODependency.class.getName());
+		writer.write("#TOKEN(0) IOValue.Reference define", IOValue.Reference.class.getName());
 		
 		writer.write(
 			"""
@@ -118,6 +120,9 @@ public class TemplateClassLoader extends ClassLoader{
 			}
 			if(field.isDynamic()){
 				writer.write("IOType.Dynamic @");
+			}
+			if(field.getReferenceType()!=null){
+				writer.write("{#TOKEN(0) dataPipeType} IOValue.Reference @", field.getReferenceType().toString());
 			}
 			if(!field.getDependencies().isEmpty()){
 				writer.write("{#RAW(0)} IODependency @", field.getDependencies().stream().collect(Collectors.joining(" ", "[", "]")));

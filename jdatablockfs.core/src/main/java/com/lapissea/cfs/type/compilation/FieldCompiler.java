@@ -150,7 +150,10 @@ public class FieldCompiler{
 			
 			for(String nam : depNames){
 				IOField<T, ?> e=fields.stream().filter(f->f.field.getName().equals(nam)).findAny().orElseThrow().field;
-				if(!dependencies.add(e)) throw new MalformedStructLayout("Duplicate dependency "+e.getAccessor());
+				if(!dependencies.add(e)){
+					//TODO: decide if duplicated dependencies should be tolerated
+//					throw new MalformedStructLayout("Duplicate dependency "+e.getAccessor());
+				}
 			}
 		}
 		return dependencies;

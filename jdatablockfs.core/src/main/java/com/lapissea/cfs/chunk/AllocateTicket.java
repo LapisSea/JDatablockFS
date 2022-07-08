@@ -1,6 +1,7 @@
 package com.lapissea.cfs.chunk;
 
 import com.lapissea.cfs.io.RandomIO;
+import com.lapissea.cfs.io.instancepipe.ObjectPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
@@ -36,7 +37,7 @@ public record AllocateTicket(
 		return withData(StructPipe.of(pipeType, data.getThisStruct()), provider, data);
 	}
 	
-	public static <IO extends IOInstance<IO>> AllocateTicket withData(StructPipe<IO> pipe, DataProvider provider, IO data){
+	public static <IO, PoolType> AllocateTicket withData(ObjectPipe<IO, PoolType> pipe, DataProvider provider, IO data){
 		var desc =pipe.getSizeDescriptor();
 		var bytes=desc.getFixed(WordSpace.BYTE).orElseGet(()->Math.max(desc.calcAllocSize(WordSpace.BYTE), desc.calcUnknown(pipe.makeIOPool(), provider, data, WordSpace.BYTE)));
 		return bytes(bytes).withDataPopulated((prov, io)->pipe.write(prov, io, data));

@@ -21,7 +21,7 @@ import java.io.IOException;
 
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 
-public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType extends IOInstance.Unmanaged<ValueType>> extends IOField.Ref<T, ValueType>{
+public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType extends IOInstance.Unmanaged<ValueType>> extends IOField.Ref.InstRef<T, ValueType>{
 	
 	
 	private final SizeDescriptor<T>           descriptor;

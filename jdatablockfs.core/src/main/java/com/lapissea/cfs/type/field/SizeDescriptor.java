@@ -41,6 +41,10 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>> extends Ba
 			return bytes>=BIT_CACHE.length?new Fixed<>(BIT, bytes):(Fixed<T>)BIT_CACHE[(int)bytes];
 		}
 		
+		public static <T extends IOInstance<T>> SizeDescriptor.Fixed<T> empty(){
+			return (Fixed<T>)BYTE_CACHE[0];
+		}
+		
 		public static <T extends IOInstance<T>> SizeDescriptor.Fixed<T> of(long bytes){
 			return ofByte(bytes);
 		}
@@ -68,6 +72,7 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>> extends Ba
 		@Override
 		public WordSpace getWordSpace(){return wordSpace;}
 		
+		@Override
 		public long get(){return size;}
 		
 		@Override
@@ -161,7 +166,8 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>> extends Ba
 		
 		@Override
 		public long calcUnknown(Struct.Pool<Inst> ioPool, DataProvider provider, Inst instance, WordSpace wordSpace){
-			return mapSize(wordSpace, unknownSize.calc(ioPool, provider, instance));
+			var unmapped=unknownSize.calc(ioPool, provider, instance);
+			return mapSize(wordSpace, unmapped);
 		}
 		
 		@Override
@@ -194,7 +200,10 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>> extends Ba
 		@Override
 		public long calcUnknown(Struct.Pool<Inst> ioPool, DataProvider provider, Inst instance, WordSpace wordSpace){
 			var num=(NumberSize)accessor.get(ioPool, instance);
-			return num.bytes;
+			return switch(wordSpace){
+				case BYTE -> num.bytes;
+				case BIT -> num.bits();
+			};
 		}
 		
 		

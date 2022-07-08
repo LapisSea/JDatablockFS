@@ -1,7 +1,7 @@
 package com.lapissea.cfs.chunk;
 
 import com.lapissea.cfs.exceptions.BitDepthOutOfSpaceException;
-import com.lapissea.cfs.io.instancepipe.StructPipe;
+import com.lapissea.cfs.io.instancepipe.ObjectPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Reference;
@@ -73,7 +73,7 @@ public class DefragmentManager{
 						}
 						
 						
-						var newCh=AllocateTicket.withData((StructPipe)field.getReferencedPipe(instance), cluster, (IOInstance)field.get(null, instance))
+						var newCh=AllocateTicket.withData((ObjectPipe)field.getReferencedPipe(instance), cluster, field.get(null, instance))
 						                        .withApproval(c->c.getPtr().getValue()>instanceReference.getPtr().getValue())
 						                        .submit(cluster);
 						

@@ -6,7 +6,6 @@ import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.FieldIsNullException;
 import com.lapissea.cfs.exceptions.MalformedObjectException;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
-import com.lapissea.cfs.exceptions.UnknownSizePredictionException;
 import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.content.ContentOutputBuilder;
@@ -24,7 +23,6 @@ import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
-import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
 import java.util.*;
@@ -41,7 +39,7 @@ import static com.lapissea.cfs.ConsoleColors.CYAN_BRIGHT;
 import static com.lapissea.cfs.ConsoleColors.RESET;
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
-public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit{
+public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit implements ObjectPipe<T, Struct.Pool<T>>{
 	
 	private static class StructGroup<T extends IOInstance<T>, P extends StructPipe<T>> extends ConcurrentHashMap<Struct<T>, P>{
 		
@@ -272,7 +270,10 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit{
 					var  acc=unkownNumAcc[i];
 					var  num=(NumberSize)acc.get(ioPool, inst);
 					long mul=unkownNumAccMul[i];
-					unkownSum+=num.bytes*mul;
+					unkownSum+=switch(wordSpace){
+						case BIT -> num.bits();
+						case BYTE -> num.bytes;
+					}*mul;
 				}
 			}
 			return knownFixed+unkownSum;
@@ -296,41 +297,17 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit{
 			doWrite(provider, io, ioPool, instance);
 		}
 	}
+	@Override
 	public final void write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		var ioPool=makeIOPool();
 		earlyCheckNulls(ioPool, instance);
 		doWrite(provider, dest, ioPool, instance);
 	}
-	public final void write(DataProvider.Holder holder, ContentWriter dest, T instance) throws IOException{
-		var ioPool=makeIOPool();
-		earlyCheckNulls(ioPool, instance);
-		doWrite(holder.getDataProvider(), dest, ioPool, instance);
-	}
-	public final <Prov extends DataProvider.Holder&RandomIO.Creator> void write(Prov dest, T instance) throws IOException{
-		var ioPool=makeIOPool();
-		earlyCheckNulls(ioPool, instance);
-		try(var io=dest.io()){
-			doWrite(dest.getDataProvider(), io, ioPool, instance);
-		}
-	}
+	
 	protected abstract void doWrite(DataProvider provider, ContentWriter dest, Struct.Pool<T> ioPool, T instance) throws IOException;
 	
 	
-	public <Prov extends DataProvider.Holder&RandomIO.Creator> void modify(Prov src, UnsafeConsumer<T, IOException> modifier, GenericContext genericContext) throws IOException{
-		T val=readNew(src, genericContext);
-		modifier.accept(val);
-		write(src, val);
-	}
-	public <Prov extends DataProvider.Holder&RandomIO.Creator> T readNew(Prov src, GenericContext genericContext) throws IOException{
-		try(var io=src.io()){
-			return readNew(src.getDataProvider(), io, genericContext);
-		}
-	}
-	public T readNew(DataProvider provider, RandomIO.Creator src, GenericContext genericContext) throws IOException{
-		try(var io=src.io()){
-			return readNew(provider, io, genericContext);
-		}
-	}
+	@Override
 	public T readNew(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
 		T instance=type.emptyConstructor().get();
 		return doRead(makeIOPool(), provider, src, instance, genericContext);
@@ -341,21 +318,15 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit{
 			return doRead(makeIOPool(), provider, io, instance, genericContext);
 		}
 	}
-	public <Prov extends DataProvider.Holder&RandomIO.Creator> T read(Prov src, T instance, GenericContext genericContext) throws IOException{
-		try(var io=src.io()){
-			return doRead(makeIOPool(), src.getDataProvider(), io, instance, genericContext);
-		}
-	}
 	
+	@Override
 	public T read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		return doRead(makeIOPool(), provider, src, instance, genericContext);
-	}
-	public T read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		return doRead(ioPool, provider, src, instance, genericContext);
 	}
 	
 	protected abstract T doRead(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException;
 	
+	@Override
 	public final SizeDescriptor<T> getSizeDescriptor(){
 		if(sizeDescription==null){
 			waitForState(STATE_DONE);
@@ -392,6 +363,32 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit{
 		ContentOutputBuilder destBuff=null;
 		ContentWriter        target;
 		
+		if(DEBUG_VALIDATION&&!(instance instanceof IOInstance.Unmanaged<?>)){
+			var siz=getSizeDescriptor().calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
+			
+			var sum=0L;
+			for(IOField<T, ?> field : fields){
+				var desc =field.getSizeDescriptor();
+				var bytes=desc.calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
+				sum+=bytes;
+			}
+			
+			if(sum!=siz){
+				StringJoiner sj=new StringJoiner("\n");
+				sj.add("total"+siz);
+				for(IOField<T, ?> field : fields){
+					var desc =field.getSizeDescriptor();
+					var bytes=desc.calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
+					sj.add(field+" "+bytes+" "+desc.hasFixed()+" "+desc.getWordSpace());
+				}
+				throw new RuntimeException(sj.toString());
+			}
+			
+			dest=dest.writeTicket(siz).requireExact((written, expected)->{
+				return new IOException(written+" "+expected+" on "+instance);
+			}).submit();
+		}
+		
 		if(dest.isDirect()){
 			var siz=getSizeDescriptor().calcAllocSize(WordSpace.BYTE);
 			destBuff=new ContentOutputBuilder((int)siz);
@@ -415,13 +412,20 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit{
 		if(destBuff!=null){
 			destBuff.writeTo(dest);
 		}
+		if(DEBUG_VALIDATION){
+			dest.close();
+		}
 	}
 	
 	private void generateAll(Struct.Pool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException{
 		waitForState(STATE_DONE);
 		if(generators==null) return;
 		for(var generator : generators){
-			generator.generate(ioPool, provider, instance, allowExternalMod);
+			try{
+				generator.generate(ioPool, provider, instance, allowExternalMod);
+			}catch(Throwable e){
+				throw new IOException("Failed to generate fields. Problem on "+generator, e);
+			}
 		}
 	}
 	
@@ -432,7 +436,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit{
 		try{
 			safeBuff.close();
 		}catch(Exception e){
-			throw new IOException(TextUtil.toString(field)+" ("+field.get(ioPool, instance)+") did not write correctly", e);
+			throw new IOException(TextUtil.toString(field)+" ("+Utils.toShortString(field.get(ioPool, instance))+") did not write correctly", e);
 		}
 	}
 	
@@ -670,18 +674,10 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit{
 		}
 	}
 	
+	@Override
 	public Struct.Pool<T> makeIOPool(){
 		return getType().allocVirtualVarPool(VirtualFieldDefinition.StoragePool.IO);
 	}
-	
-	public long calcUnknownSize(DataProvider provider, T instance, WordSpace wordSpace){
-		var pool=makeIOPool();
-		if(DEBUG_VALIDATION){
-			earlyCheckNulls(pool, instance);
-		}
-		return getSizeDescriptor().calcUnknown(pool, provider, instance, wordSpace);
-	}
-	
 	
 	public void checkTypeIntegrity(T inst) throws IOException{
 		var tmp=MemoryData.builder().build();

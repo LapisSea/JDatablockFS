@@ -37,6 +37,7 @@ public @interface IOValue{
 			var type  =field.getType();
 			var isList=type==List.class||type==ArrayList.class;
 			if(!type.isArray()&&!isList) return List.of();
+			if(field.hasAnnotation(Reference.class)) return List.of();
 			
 			var arrayLengthSizeName=field.getAnnotation(IODependency.ArrayLenSize.class)
 			                             .map(IODependency.ArrayLenSize::name)
@@ -86,8 +87,11 @@ public @interface IOValue{
 		AnnotationLogic<Reference> LOGIC=new AnnotationLogic<>(){
 			@Override
 			public void validate(FieldAccessor<?> field, Reference annotation){
+				if(field.getType().isArray()||UtilL.instanceOf(field.getType(), List.class)){
+					return;
+				}
 				if(!IOInstance.isInstance(field.getType())){
-					throw new MalformedStructLayout("Reference annotation can be used only in IOInstance types but "+field+" is not");
+					throw new MalformedStructLayout("Reference annotation can be used only in IOInstance types or collections but "+field+" is not");
 				}
 				if(IOInstance.isUnmanaged(field.getType())){
 					throw new MalformedStructLayout("Reference annotation can be used only in IOInstance regular types but "+field+" is unmanaged");

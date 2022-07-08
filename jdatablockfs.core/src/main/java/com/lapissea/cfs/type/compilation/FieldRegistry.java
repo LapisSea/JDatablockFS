@@ -83,7 +83,10 @@ class FieldRegistry{
 				}
 				@Override
 				public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
-					return new IOFieldInstanceArray<>(field);
+					if(field.hasAnnotation(IOValue.Reference.class)){
+						return new InstanceCollection.ReferenceField<>(field, InstanceCollection.DataAdapter.ArrayAdapter.class);
+					}
+					return new InstanceCollection.InlineField<>(field, InstanceCollection.DataAdapter.ArrayAdapter.class);
 				}
 			});
 			reg.register(new RegistryNode(){
@@ -96,7 +99,10 @@ class FieldRegistry{
 				}
 				@Override
 				public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
-					return new IOFieldInstanceList<>(field);
+					if(field.hasAnnotation(IOValue.Reference.class)){
+						return new InstanceCollection.ReferenceField<>(field, InstanceCollection.DataAdapter.ListAdapter.class);
+					}
+					return new InstanceCollection.InlineField<>(field, InstanceCollection.DataAdapter.ListAdapter.class);
 				}
 			});
 			reg.register(new RegistryNode.InstanceOf<>(String.class){
