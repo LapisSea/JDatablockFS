@@ -103,6 +103,7 @@ public class MemoryWalker{
 		return stats;
 	}
 	
+	@SuppressWarnings({"RedundantCast", "unchecked"})
 	public <T extends IOInstance<T>> void walk(boolean self, UnsafeConsumer<Reference, IOException> consumer) throws IOException{
 		if(self) consumer.accept(rootReference);
 		walkStructFull((T)root, rootReference, (StructPipe<T>)pipe, new PointerRecord(){
@@ -119,6 +120,7 @@ public class MemoryWalker{
 		});
 	}
 	
+	@SuppressWarnings({"RedundantCast", "unchecked"})
 	public <T extends IOInstance<T>> void walk(PointerRecord consumer) throws IOException{
 		walkStructFull((T)root, rootReference, (StructPipe<T>)pipe, consumer);
 	}

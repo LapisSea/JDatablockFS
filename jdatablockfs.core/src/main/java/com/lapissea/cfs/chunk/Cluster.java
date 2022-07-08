@@ -221,7 +221,7 @@ public class Cluster implements DataProvider{
 	}
 	@Override
 	public MemoryManager getMemoryManager(){
-		return memoryManager;
+		return Objects.requireNonNull(memoryManager);
 	}
 	public RootProvider getRootProvider(){
 		return rootProvider;

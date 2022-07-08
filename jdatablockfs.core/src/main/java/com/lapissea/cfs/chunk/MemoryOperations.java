@@ -558,8 +558,9 @@ public class MemoryOperations{
 	public static void checkValidityOfChainAlloc(DataProvider context, Chunk firstChunk, Chunk target) throws IOException{
 		if(!DEBUG_VALIDATION) return;
 		
-		assert firstChunk.getDataProvider()==context;
-		assert target.getDataProvider()==context;
+		//TODO: re-enable this once DataProvider.withRouter is replaced with proper router
+//		assert firstChunk.getDataProvider()==context;
+//		assert target.getDataProvider()==context;
 		
 		var ptr=firstChunk.getPtr();
 		

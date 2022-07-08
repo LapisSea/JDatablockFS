@@ -106,6 +106,7 @@ public class DefragmentManager{
 	}
 	
 	private void reallocateAndMove(Cluster cluster, Chunk fragmentedChunk, long requiredSize) throws IOException{
+		var likelyChain=fragmentedChunk.streamNext().limit(3).count()>2;
 		var newChunk=AllocateTicket
 			             .bytes(requiredSize)
 			             .withDataPopulated((p, io)->{
@@ -117,6 +118,7 @@ public class DefragmentManager{
 					             }
 				             }
 			             })
+			             .withExplicitNextSize(likelyChain?Optional.empty():Optional.of(NumberSize.bySize(cluster.getSource().getIOSize())))
 			             .submit(cluster);
 		
 		moveChunkExact(cluster, fragmentedChunk.getPtr(), newChunk.getPtr());

@@ -13,6 +13,8 @@ import java.io.IOException;
 import java.util.Objects;
 import java.util.StringJoiner;
 
+import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+
 public abstract class AbstractUnmanagedIOList<T, SELF extends AbstractUnmanagedIOList<T, SELF>> extends IOInstance.Unmanaged<SELF> implements IOList<T>{
 	
 	private IOField<SELF, ?> sizeField;
@@ -120,6 +122,9 @@ public abstract class AbstractUnmanagedIOList<T, SELF extends AbstractUnmanagedI
 			initializer.accept(val);
 		}
 		add(val);
+		if(DEBUG_VALIDATION){
+			get(size()-1);
+		}
 		return val;
 	}
 	

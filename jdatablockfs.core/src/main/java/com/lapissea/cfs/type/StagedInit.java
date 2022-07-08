@@ -94,7 +94,7 @@ public abstract class StagedInit{
 			lock.lock();
 			
 			if(e==null) return;
-			throw new WaitException("Exception occurred while initializing for "+this, e);
+			throw new WaitException("Exception occurred while initializing: "+this, e);
 		}finally{
 			lock.unlock();
 		}

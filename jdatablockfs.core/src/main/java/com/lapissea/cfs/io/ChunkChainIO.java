@@ -341,8 +341,15 @@ public final class ChunkChainIO implements RandomIO{
 			long offset=calcCursorOffset();
 			long cRem  =cursor.getCapacity()-offset;
 			if(cRem>=len){
-				syncedSource().write(b, off, len);
-				cursor.modifyAndSave(c->c.pushSize(offset+len));
+				cursor.pushSize(offset+len);
+				if(cursor.dirty()){
+					var chunks=new ArrayList<WriteChunk>(2);
+					writeHeadToBuf(chunks, cursor);
+					chunks.add(new WriteChunk(calcGlobalPos(), off, len, b));
+					source.writeAtOffsets(chunks);
+				}else{
+					syncedSource().write(b, off, len);
+				}
 				advanceCursorBy(len);
 				return;
 			}
@@ -398,7 +405,7 @@ public final class ChunkChainIO implements RandomIO{
 			cursor.pushSize(offset+toWrite);
 		}
 		
-		if(cursor.dirty()) chunks.add(writeHeadToBuf(cursor));
+		writeHeadToBuf(chunks, cursor);
 		chunks.add(cursorWrite);
 		
 		var ch=cursor;
@@ -411,7 +418,7 @@ public final class ChunkChainIO implements RandomIO{
 			dataOffset+=toWrite;
 			
 			ch.pushSize(toWrite);
-			if(ch.dirty()) chunks.add(writeHeadToBuf(ch));
+			writeHeadToBuf(chunks, ch);
 			chunks.add(event);
 		}
 		
@@ -421,6 +428,11 @@ public final class ChunkChainIO implements RandomIO{
 		advanceCursorBy(len);
 		
 		return 0;
+	}
+	
+	private void writeHeadToBuf(List<WriteChunk> dest, Chunk chunk) throws IOException{
+		if(!chunk.dirty()) return;
+		dest.add(writeHeadToBuf(chunk));
 	}
 	private WriteChunk writeHeadToBuf(Chunk chunk) throws IOException{
 		byte[] headBuf=new byte[chunk.getHeaderSize()];

@@ -2,6 +2,7 @@ package com.lapissea.cfs.io.bit;
 
 import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.objects.NumberSize;
+import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
 import sun.misc.Unsafe;
 
@@ -188,6 +189,7 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
 	}
 	
 	@Override
+	@NotNull
 	public T get(int index){
 		return universe[index];
 	}

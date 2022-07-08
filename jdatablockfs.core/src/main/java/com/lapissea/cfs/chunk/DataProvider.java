@@ -119,30 +119,32 @@ public interface DataProvider{
 	}
 	
 	default DataProvider withRouter(Function<AllocateTicket, AllocateTicket> router){
-		MemoryManager src=getMemoryManager();
 		class Routed implements DataProvider, MemoryManager{
+			private MemoryManager src(){
+				return DataProvider.this.getMemoryManager();
+			}
+			
 			@Override public IOTypeDB getTypeDb()                    {return DataProvider.this.getTypeDb();}
 			@Override public IOInterface getSource()                 {return DataProvider.this.getSource();}
 			@Override public MemoryManager getMemoryManager()        {return this;}
 			@Override public ChunkCache getChunkCache()              {return DataProvider.this.getChunkCache();}
 			@Override public Chunk getFirstChunk() throws IOException{return DataProvider.this.getFirstChunk();}
 			
-			
-			@Override public DefragSes openDefragmentMode()          {return src.openDefragmentMode();}
-			@Override public IOList<ChunkPointer> getFreeChunks()    {return src.getFreeChunks();}
+			@Override public DefragSes openDefragmentMode()          {return src().openDefragmentMode();}
+			@Override public IOList<ChunkPointer> getFreeChunks()    {return src().getFreeChunks();}
 			@Override public DataProvider getDataProvider()          {return this;}
 			@Override
 			public void free(Collection<Chunk> toFree) throws IOException{
-				src.free(toFree);
+				src().free(toFree);
 			}
 			@Override
 			public void allocTo(Chunk firstChunk, Chunk target, long toAllocate) throws IOException{
-				src.allocTo(firstChunk, target, toAllocate);
+				src().allocTo(firstChunk, target, toAllocate);
 			}
 			
 			@Override
 			public Chunk alloc(AllocateTicket ticket) throws IOException{
-				return src.alloc(router.apply(ticket));
+				return src().alloc(router.apply(ticket));
 			}
 		}
 		

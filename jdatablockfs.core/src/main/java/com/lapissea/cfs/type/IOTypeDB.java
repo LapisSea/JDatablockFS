@@ -3,8 +3,11 @@ package com.lapissea.cfs.type;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.objects.ObjectID;
+import com.lapissea.cfs.objects.Reference;
+import com.lapissea.cfs.objects.collections.ContiguousIOList;
 import com.lapissea.cfs.objects.collections.HashIOMap;
 import com.lapissea.cfs.objects.collections.IOMap;
+import com.lapissea.cfs.objects.collections.LinkedIOList;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.TextUtil;
 
@@ -35,6 +38,7 @@ public sealed interface IOTypeDB{
 		
 		private final Map<Integer, TypeLink> idToTyp=new HashMap<>();
 		private final Map<TypeLink, Integer> typToID=new HashMap<>();
+		private       int                    maxID  =0;
 		
 		private WeakReference<ClassLoader> templateLoader=new WeakReference<>(null);
 		
@@ -64,6 +68,7 @@ public sealed interface IOTypeDB{
 				if(!recordNew) return new TypeID(newID, false);
 				idToTyp.put(newID, type);
 				typToID.put(type, newID);
+				maxID=newID;
 				
 				recordType(type);
 				return new TypeID(newID, true);
@@ -125,8 +130,9 @@ public sealed interface IOTypeDB{
 		}
 		
 		private int maxID(){
-			return idToTyp.keySet().stream().mapToInt(i->i).max().orElse(0);
+			return maxID;
 		}
+		
 		@Override
 		public ClassLoader getTemplateLoader(){
 			var l=templateLoader.get();
@@ -183,8 +189,9 @@ public sealed interface IOTypeDB{
 					Float.class,
 					Double.class,
 					
-					String.class
-				}){
+					String.class,
+					Reference.class,
+					}){
 					db.newID(TypeLink.of(c), true);
 				}
 				for(var c : new Class<?>[]{
@@ -192,8 +199,11 @@ public sealed interface IOTypeDB{
 					PersistentDB.class,
 					IOInstance.class,
 					TypeDef.class,
-					ObjectID.class
-				}){
+					ObjectID.class,
+					ContiguousIOList.class,
+					LinkedIOList.class,
+					HashIOMap.class,
+					}){
 					registerBuiltIn(db, c);
 				}
 			}catch(Throwable e){

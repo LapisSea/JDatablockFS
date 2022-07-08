@@ -160,11 +160,11 @@ public enum NumberSize{
 	}
 	
 	public boolean greaterThanOrEqual(NumberSize other){
-		if(other==this) return false;
+		if(other==this) return true;
 		return bytes>=other.bytes;
 	}
 	public boolean lesserThanOrEqual(NumberSize other){
-		if(other==this) return false;
+		if(other==this) return true;
 		return bytes<=other.bytes;
 	}
 	
