@@ -142,7 +142,19 @@ public interface MemoryManager extends DataProvider.Holder{
 			{
 				for(var alloc : allocs){
 					chunk=alloc.alloc(context, ticket);
-					if(chunk!=null) break tryStrategies;
+					if(chunk!=null){
+						if(DEBUG_VALIDATION){
+							var nsizO=ticket.explicitNextSize();
+							if(nsizO.isPresent()){
+								var nsiz =nsizO.get();
+								var chSiz=chunk.getNextSize();
+								if(nsiz.greaterThan(chSiz)){
+									throw new IllegalStateException("Allocation did not respect explicit next size since "+nsiz+" > "+chSiz);
+								}
+							}
+						}
+						break tryStrategies;
+					}
 				}
 				return null;
 			}

@@ -39,10 +39,10 @@ public class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 	@Override
 	protected List<AllocToStrategy> createAllocTos(){
 		return List.of(
-			(f, target, toAllocate)->MemoryOperations.growFileAlloc(target, toAllocate),
-			(f, target, toAllocate)->MemoryOperations.growFreeAlloc(this, target, toAllocate),
-			(f, target, toAllocate)->MemoryOperations.allocateBySimpleNextAssign(this, target, toAllocate),
-			(f, target, toAllocate)->MemoryOperations.allocateByGrowingHeaderNextAssign(this, target, toAllocate)
+			(first, target, toAllocate)->MemoryOperations.growFileAlloc(target, toAllocate),
+			(first, target, toAllocate)->MemoryOperations.growFreeAlloc(this, target, toAllocate),
+			(first, target, toAllocate)->MemoryOperations.allocateBySimpleNextAssign(this, first, target, toAllocate),
+			(first, target, toAllocate)->MemoryOperations.allocateByGrowingHeaderNextAssign(this, first, target, toAllocate)
 		);
 	}
 	

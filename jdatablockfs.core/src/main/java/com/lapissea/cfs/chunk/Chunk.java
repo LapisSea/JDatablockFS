@@ -477,6 +477,18 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		return nextCache;
 	}
 	
+	public void clearNextPtrAndSize(){
+		try{
+			setNextPtr(ChunkPointer.NULL);
+			var oldSiz=getHeaderSize();
+			setNextSize(NumberSize.VOID);
+			var newSiz=getHeaderSize();
+			setCapacity(getCapacity()+oldSiz-newSiz);
+		}catch(BitDepthOutOfSpaceException e){
+			throw new ShouldNeverHappenError(e);
+		}
+	}
+	
 	public void clearNextPtr(){
 		try{
 			setNextPtr(ChunkPointer.NULL);

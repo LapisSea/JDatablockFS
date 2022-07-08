@@ -3,6 +3,7 @@ package com.lapissea.cfs.chunk;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
+import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.util.Nullable;
@@ -16,16 +17,18 @@ import java.util.OptionalLong;
 import java.util.function.Predicate;
 
 public record AllocateTicket(
-	long bytes, ChunkPointer next,
+	long bytes, ChunkPointer next, Optional<NumberSize> explicitNextSize,
 	OptionalLong positionMagnet,
 	Optional<Predicate<Chunk>> approve, @Nullable UnsafeConsumer<Chunk, IOException> dataPopulator
 ){
 	
-	public static final AllocateTicket DEFAULT=new AllocateTicket(0, ChunkPointer.NULL, OptionalLong.empty(), Optional.empty(), null);
+	public static final AllocateTicket DEFAULT=new AllocateTicket(0, ChunkPointer.NULL, Optional.empty(), OptionalLong.empty(), Optional.empty(), null);
 	
 	public AllocateTicket{
-		assert bytes>=0;
+		if(bytes<0) throw new IllegalArgumentException("bytes must be positive");
 		Objects.requireNonNull(next);
+		Objects.requireNonNull(explicitNextSize);
+		Objects.requireNonNull(positionMagnet);
 		Objects.requireNonNull(approve);
 	}
 	
@@ -49,7 +52,7 @@ public record AllocateTicket(
 	
 	
 	public AllocateTicket withApproval(Predicate<Chunk> approve){
-		return new AllocateTicket(bytes, next, positionMagnet, Optional.of(this.approve.map(p->p.and(approve)).orElse(approve)), dataPopulator);
+		return new AllocateTicket(bytes, next, explicitNextSize, positionMagnet, Optional.of(this.approve.map(p->p.and(approve)).orElse(approve)), dataPopulator);
 	}
 	
 	public <IO extends IOInstance<IO>> AllocateTicket withDataPopulated(Class<? extends StructPipe> pipeType, IO data){
@@ -71,29 +74,29 @@ public record AllocateTicket(
 	}
 	
 	public AllocateTicket withDataPopulated(UnsafeConsumer<Chunk, IOException> dataPopulator){
-		return new AllocateTicket(bytes, next, positionMagnet, approve, dataPopulator);
+		return new AllocateTicket(bytes, next, explicitNextSize, positionMagnet, approve, dataPopulator);
 	}
 	
 	public AllocateTicket withBytes(long bytes){
 		if(this.bytes==bytes) return this;
-		return new AllocateTicket(bytes, next, positionMagnet, approve, dataPopulator);
-	}
-	public AllocateTicket withNext(Chunk next){
-		return withNext(Chunk.getPtrNullable(next));
-	}
-	public AllocateTicket withNext(ChunkPointer next){
-		if(Objects.equals(this.next, next)) return this;
-		return new AllocateTicket(bytes, next, positionMagnet, approve, dataPopulator);
+		return new AllocateTicket(bytes, next, explicitNextSize, positionMagnet, approve, dataPopulator);
 	}
 	
-	public AllocateTicket withPositionMagnet(Chunk magnetChunk){
-		return withPositionMagnet(magnetChunk.getPtr().getValue());
+	public AllocateTicket withNext(Chunk next){return withNext(Chunk.getPtrNullable(next));}
+	public AllocateTicket withNext(ChunkPointer next){
+		if(Objects.equals(this.next, next)) return this;
+		return new AllocateTicket(bytes, next, explicitNextSize, positionMagnet, approve, dataPopulator);
 	}
-	public AllocateTicket withPositionMagnet(long positionMagnet){
-		return withPositionMagnet(OptionalLong.of(positionMagnet));
+	
+	public AllocateTicket withExplicitNextSize(Optional<NumberSize> explicitNextSize){
+		if(Objects.equals(this.explicitNextSize, explicitNextSize)) return this;
+		return new AllocateTicket(bytes, next, explicitNextSize, positionMagnet, approve, dataPopulator);
 	}
+	
+	public AllocateTicket withPositionMagnet(Chunk magnetChunk)  {return withPositionMagnet(magnetChunk.getPtr().getValue());}
+	public AllocateTicket withPositionMagnet(long positionMagnet){return withPositionMagnet(OptionalLong.of(positionMagnet));}
 	public AllocateTicket withPositionMagnet(OptionalLong positionMagnet){
-		return new AllocateTicket(bytes, next, positionMagnet, approve, dataPopulator);
+		return new AllocateTicket(bytes, next, explicitNextSize, positionMagnet, approve, dataPopulator);
 	}
 	
 	public Chunk submit(DataProvider provider) throws IOException{
@@ -113,6 +116,10 @@ public record AllocateTicket(
 	public void populate(Chunk chunk) throws IOException{
 		if(dataPopulator==null) return;
 		dataPopulator.accept(chunk);
+	}
+	
+	public NumberSize calcNextSize(){
+		return NumberSize.bySize(next).max(explicitNextSize.orElse(NumberSize.VOID));
 	}
 	
 }

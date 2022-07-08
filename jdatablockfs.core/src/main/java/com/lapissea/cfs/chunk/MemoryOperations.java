@@ -225,7 +225,7 @@ public class MemoryOperations{
 	}
 	private static void clearFree(Chunk newCh) throws IOException{
 		newCh.setSize(0);
-		newCh.clearNextPtr();
+		newCh.clearNextPtrAndSize();
 		newCh.syncStruct();
 	}
 	
@@ -341,13 +341,17 @@ public class MemoryOperations{
 		return 0;
 	}
 	
-	public static long allocateBySimpleNextAssign(MemoryManager manager, Chunk target, long toAllocate) throws IOException{
+	public static long allocateBySimpleNextAssign(MemoryManager manager, Chunk first, Chunk target, long toAllocate) throws IOException{
 		if(target.getNextSize()==NumberSize.VOID){
 			return 0;
 		}
+		
+		boolean isChain=first!=target;
+		
 		var toPin=AllocateTicket.bytes(toAllocate)
 		                        .withApproval(Chunk.sizeFitsPointer(target.getNextSize()))
 		                        .withPositionMagnet(target)
+		                        .withExplicitNextSize(explicitNextSize(manager, isChain))
 		                        .submit(manager);
 		if(toPin==null) return 0;
 		target.modifyAndSave(c->{
@@ -360,10 +364,15 @@ public class MemoryOperations{
 		return toPin.getCapacity();
 	}
 	
-	public static long allocateByGrowingHeaderNextAssign(MemoryManager manager, Chunk target, long toAllocate) throws IOException{
+	public static long allocateByGrowingHeaderNextAssign(MemoryManager manager, Chunk first, Chunk target, long toAllocate) throws IOException{
 		if(target.hasNextPtr()) throw new IllegalArgumentException();
 		
+		boolean isChain=first!=target;
+		
 		var siz=target.getNextSize();
+		
+		var ticket=AllocateTicket.DEFAULT.withExplicitNextSize(explicitNextSize(manager, isChain))
+		                                 .withPositionMagnet(target);
 		
 		Chunk toPin;
 		int   growth;
@@ -379,10 +388,9 @@ public class MemoryOperations{
 				return 0;
 			}
 			
-			toPin=AllocateTicket.bytes(toAllocate+growth)
-			                    .withApproval(Chunk.sizeFitsPointer(siz))
-			                    .withPositionMagnet(target)
-			                    .submit(manager);
+			toPin=ticket.withBytes(toAllocate+growth)
+			            .withApproval(Chunk.sizeFitsPointer(siz))
+			            .submit(manager);
 		}while(toPin==null);
 		
 		IOInterface source=target.getDataProvider().getSource();
@@ -469,11 +477,14 @@ public class MemoryOperations{
 	public static Chunk allocateReuseFreeChunk(DataProvider context, AllocateTicket ticket) throws IOException{
 		for(var iterator=magnetisedFreeChunkIterator(context, ticket.positionMagnet());iterator.hasNext();){
 			Chunk c=iterator.ioNext().dereference(context);
-			if(c.getCapacity()<ticket.bytes()) continue;
+			assert c.getNextSize()==NumberSize.VOID;
+			NumberSize neededNextSize   =ticket.calcNextSize();
+			var        effectiveCapacity=c.getCapacity()-neededNextSize.bytes;
+			if(effectiveCapacity<ticket.bytes()) continue;
 			
-			var freeSpace=c.getCapacity()-ticket.bytes();
+			var freeSpace=effectiveCapacity-ticket.bytes();
 			
-			if(freeSpace>c.getHeaderSize()*2L){
+			if(freeSpace>effectiveCapacity*2L){
 				Chunk reallocate=chipEndProbe(context, ticket, c);
 				if(reallocate!=null) return reallocate;
 			}
@@ -481,6 +492,16 @@ public class MemoryOperations{
 			if(freeSpace<8){
 				if(ticket.approve(c)){
 					iterator.ioRemove();
+					try{
+						var oldHSiz=c.getHeaderSize();
+						c.setNextSize(neededNextSize);
+						c.setNextPtr(ticket.next());
+						var newHSiz=c.getHeaderSize();
+						c.setCapacity(c.getCapacity()+oldHSiz-newHSiz);
+						c.syncStruct();
+					}catch(BitDepthOutOfSpaceException e){
+						throw new ShouldNeverHappenError(e);
+					}
 					return c;
 				}
 			}
@@ -491,6 +512,7 @@ public class MemoryOperations{
 	private static Chunk chipEndProbe(DataProvider context, AllocateTicket ticket, Chunk ch) throws IOException{
 		var builder=new ChunkBuilder(context, ch.getPtr())
 			            .withCapacity(ticket.bytes())
+			            .withExplicitNextSize(ticket.calcNextSize())
 			            .withNext(ticket.next());
 		
 		var reallocate=builder.create();
@@ -519,6 +541,7 @@ public class MemoryOperations{
 		
 		var builder=new ChunkBuilder(context, ChunkPointer.of(src.getIOSize()))
 			            .withCapacity(ticket.bytes())
+			            .withExplicitNextSize(ticket.calcNextSize())
 			            .withNext(ticket.next());
 		
 		var chunk=builder.create();
@@ -609,5 +632,12 @@ public class MemoryOperations{
 			return toAllocate;
 		}
 		return 0;
+	}
+	
+	private static Optional<NumberSize> explicitNextSize(MemoryManager manager, boolean isChain) throws IOException{
+		if(!isChain){
+			return Optional.empty();
+		}
+		return Optional.of(NumberSize.bySize(manager.getDataProvider().getSource().getIOSize()));
 	}
 }
