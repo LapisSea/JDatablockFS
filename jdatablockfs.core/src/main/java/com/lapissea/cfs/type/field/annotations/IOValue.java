@@ -41,10 +41,10 @@ public @interface IOValue{
 			
 			var arrayLengthSizeName=field.getAnnotation(IODependency.ArrayLenSize.class)
 			                             .map(IODependency.ArrayLenSize::name)
-			                             .orElseGet(()->IOFieldTools.makeNumberSizeName(IOFieldTools.makeArrayLenName(field)));
+			                             .orElseGet(()->IOFieldTools.makeNumberSizeName(IOFieldTools.makeCollectionLenName(field)));
 			
 			return List.of(new VirtualFieldDefinition<>(
-				IO, IOFieldTools.makeArrayLenName(field), int.class,
+				IO, IOFieldTools.makeCollectionLenName(field), int.class,
 				(VirtualFieldDefinition.GetterFilter.I<T>)(ioPool, instance, dependencies, value)->{
 					if(value>0) return value;
 					var arr=field.get(ioPool, instance);
@@ -62,7 +62,7 @@ public @interface IOValue{
 			var type=field.getType();
 			if(!type.isArray()) return Set.of();
 			
-			return Set.of(IOFieldTools.makeArrayLenName(field));
+			return Set.of(IOFieldTools.makeCollectionLenName(field));
 		}
 		@Override
 		public void validate(FieldAccessor<?> field, IOValue annotation){

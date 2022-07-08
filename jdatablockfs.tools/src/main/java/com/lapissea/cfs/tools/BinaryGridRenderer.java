@@ -1569,7 +1569,7 @@ public class BinaryGridRenderer{
 	private <T extends IOInstance<T>> void annotateDynamicArrayValueLength(AnnotateCtx ctx, T instance, Reference reference, long fieldOffset, Struct.Pool<T> ioPool, IOField<T, Object> field, Color col, Object[] arr){
 		var arrayLenSiz=NumberSize.bySize(arr.length);
 		
-		var arrayLenName    =IOFieldTools.makeArrayLenName(field.getAccessor());
+		var arrayLenName    =IOFieldTools.makeCollectionLenName(field.getAccessor());
 		var arrayLenSizeName=IOFieldTools.makeNumberSizeName(arrayLenName);
 		
 		annotateByteField(ctx, ioPool, instance, new IOField.NoIO<>(new AbstractFieldAccessor<T>(null, arrayLenSizeName){

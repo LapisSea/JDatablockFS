@@ -35,7 +35,7 @@ public class IOFieldStringArray<T extends IOInstance<T>> extends IOField<T, Stri
 	@Override
 	public void init(){
 		super.init();
-		arraySize=declaringStruct().getFields().requireExactInt(IOFieldTools.makeArrayLenName(getAccessor()));
+		arraySize=declaringStruct().getFields().requireExactInt(IOFieldTools.makeCollectionLenName(getAccessor()));
 	}
 	
 	@Override

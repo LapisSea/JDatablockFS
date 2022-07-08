@@ -74,7 +74,7 @@ public class InstanceCollection{
 		@Override
 		public void init(){
 			super.init();
-			collectionSize=declaringStruct().getFields().requireExact(int.class, IOFieldTools.makeArrayLenName(getAccessor()));
+			collectionSize=declaringStruct().getFields().requireExact(int.class, IOFieldTools.makeCollectionLenName(getAccessor()));
 		}
 		
 		@Override

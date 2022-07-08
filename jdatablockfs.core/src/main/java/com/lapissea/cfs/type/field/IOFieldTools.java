@@ -138,7 +138,7 @@ public class IOFieldTools{
 		return fields.stream().map(IOField::getSizeDescriptor).map(SizeDescriptor::getWordSpace).reduce(WordSpace::min).orElse(WordSpace.MIN);
 	}
 	
-	public static <T extends IOInstance<T>> String makeArrayLenName(FieldAccessor<T> field){
+	public static <T extends IOInstance<T>> String makeCollectionLenName(FieldAccessor<T> field){
 		return field.getName()+GENERATED_FIELD_SEPARATOR+"len";
 	}
 	public static <T extends IOInstance<T>> String makeNumberSizeName(String name){
