@@ -404,14 +404,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit{
 		
 		for(IOField<T, ?> field : fields){
 			if(DEBUG_VALIDATION){
-				long bytes;
-				try{
-					var desc=field.getSizeDescriptor();
-					bytes=desc.calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
-				}catch(UnknownSizePredictionException e){
-					field.writeReported(ioPool, provider, target, instance);
-					continue;
-				}
+				var desc =field.getSizeDescriptor();
+				var bytes=desc.calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
 				writeFieldKnownSize(ioPool, provider, instance, field, target.writeTicket(bytes));
 			}else{
 				field.writeReported(ioPool, provider, target, instance);
@@ -563,14 +557,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit{
 		int checkIndex=0;
 		
 		for(IOField<T, ?> field : getSpecificFields()){
-			
-			long bytes;
-			try{
-				var desc=field.getSizeDescriptor();
-				bytes=desc.calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
-			}catch(UnknownSizePredictionException e){
-				throw new RuntimeException("Write of "+deps+" is not currently supported!");
-			}
+			var desc =field.getSizeDescriptor();
+			var bytes=desc.calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
 			
 			if(fields.get(checkIndex)==field){
 				checkIndex++;
