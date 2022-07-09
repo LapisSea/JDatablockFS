@@ -490,6 +490,10 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	
 	@Override
 	public String toShortString(){
+		if(isFreed()){
+			return "{FREED}";
+		}
+		
 		String  val;
 		boolean valCorrupted=false;
 		try{

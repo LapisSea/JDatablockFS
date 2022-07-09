@@ -94,7 +94,9 @@ public abstract class AbstractUnmanagedIOList<T, SELF extends AbstractUnmanagedI
 		return sj.toString();
 	}
 	
-	protected boolean isFreed(){
+	@Override
+	public boolean isFreed(){
+		if(super.isFreed()) return true;
 		try{
 			return getDataProvider().getMemoryManager().getFreeChunks().contains(getReference().getPtr());
 		}catch(IOException e){

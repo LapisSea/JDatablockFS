@@ -9,6 +9,8 @@ import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.collections.IOList.IOIterator;
+import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.MemoryWalker;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
@@ -640,5 +642,19 @@ public class MemoryOperations{
 			return Optional.empty();
 		}
 		return Optional.of(NumberSize.bySize(manager.getDataProvider().getSource().getIOSize()));
+	}
+	
+	public static <U extends IOInstance.Unmanaged<U>> void freeSelfAndReferenced(U val) throws IOException{
+		Set<Chunk> chunks=new HashSet<>();
+		var        prov  =val.getDataProvider();
+		
+		new MemoryWalker(val).walk(true, ref->{
+			if(ref.isNull()){
+				return;
+			}
+			ref.getPtr().dereference(prov).streamNext().forEach(chunks::add);
+		});
+		
+		prov.getMemoryManager().free(chunks);
 	}
 }

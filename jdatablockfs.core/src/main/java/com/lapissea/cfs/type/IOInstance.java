@@ -1,7 +1,7 @@
 package com.lapissea.cfs.type;
 
-import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.DataProvider;
+import com.lapissea.cfs.chunk.MemoryOperations;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
@@ -13,9 +13,7 @@ import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.Objects;
-import java.util.Set;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
@@ -102,23 +100,23 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>> implements Clone
 			reference=newRef;
 		}
 		
+		@Override
 		public Struct.Unmanaged<SELF> getThisStruct(){
 			return (Struct.Unmanaged<SELF>)super.getThisStruct();
 		}
 		
+		private boolean freed;
+		
+		public boolean isFreed(){
+			return freed;
+		}
+		protected void notifyFreed(){
+			freed=true;
+		}
+		
 		public void free() throws IOException{
-			Set<Chunk> chunks=new HashSet<>();
-			
-			new MemoryWalker(self()).walk(true, ref->{
-				if(ref.isNull()){
-					return;
-				}
-				ref.getPtr().dereference(getDataProvider()).streamNext().forEach(chunks::add);
-			});
-			
-			getDataProvider()
-				.getMemoryManager()
-				.free(chunks);
+			MemoryOperations.freeSelfAndReferenced(self());
+			notifyFreed();
 		}
 		
 		protected RandomIO selfIO() throws IOException{

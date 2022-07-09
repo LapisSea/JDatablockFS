@@ -1,6 +1,5 @@
 package com.lapissea.cfs.objects.collections;
 
-import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.ValueStorage;
@@ -396,26 +395,6 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 	@Override
 	public RuntimeType<T> getElementType(){
 		return storage.getType();
-	}
-	
-	private boolean freed;
-	
-	@Override
-	public void free() throws IOException{
-		Set<Chunk> chunks=new HashSet<>();
-		var        prov  =getDataProvider();
-		
-		new MemoryWalker(this).walk(true, ref->{
-			if(ref.isNull()) return;
-			ref.getPtr().dereference(prov).streamNext().forEach(chunks::add);
-		});
-		
-		prov.getMemoryManager().free(chunks);
-		freed=true;
-	}
-	@Override
-	public boolean isFreed(){
-		return freed;
 	}
 	
 	@NotNull

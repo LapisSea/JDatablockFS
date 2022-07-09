@@ -1,7 +1,6 @@
 package com.lapissea.cfs.objects.collections;
 
 import com.lapissea.cfs.Utils;
-import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.ValueStorage;
 import com.lapissea.cfs.objects.Reference;
@@ -14,7 +13,10 @@ import com.lapissea.util.NotNull;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.OptionalLong;
 
 @SuppressWarnings("unchecked")
 public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>{
@@ -231,13 +233,13 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 			if(isLast(index)){
 				var oldHead=getHead();
 				setHead(null);
-				freeUnmanaged(oldHead);
+				oldHead.free();
 			}else{
 				var oldHead=getHead();
 				var newHead=getNode(1);
 				setHead(newHead);
 				oldHead.setNext(null);
-				freeUnmanaged(oldHead);
+				oldHead.free();
 			}
 			deltaSize(-1);
 		}else{
@@ -252,7 +254,7 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 		prevNode.setNext(nextNode);
 		deltaSize(-1);
 		toPop.setNext(null);
-		freeUnmanaged(toPop);
+		toPop.free();
 	}
 	
 	private boolean isLast(long index){
@@ -347,38 +349,11 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 		setHead(null);
 		deltaSize(-size());
 		
-		freeUnmanaged(head);
+		head.free();
 	}
 	@Override
 	public long getCapacity() throws IOException{
 		return Long.MAX_VALUE;
-	}
-	
-	private <U extends IOInstance.Unmanaged<U>> void freeUnmanaged(U val) throws IOException{
-		Set<Chunk> chunks=new HashSet<>();
-		
-		new MemoryWalker(val).walk(true, ref->{
-			if(ref.isNull()){
-				return;
-			}
-			ref.getPtr().dereference(getDataProvider()).streamNext().forEach(chunks::add);
-		});
-		
-		getDataProvider()
-			.getMemoryManager()
-			.free(chunks);
-	}
-	
-	private boolean freed;
-	
-	@Override
-	public void free() throws IOException{
-		freeUnmanaged(this);
-		freed=true;
-	}
-	@Override
-	public boolean isFreed(){
-		return freed;
 	}
 	
 	@NotNull
