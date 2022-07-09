@@ -75,6 +75,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				throw new MalformedStructLayout("Failed to compile "+type.getSimpleName()+" for "+struct.getType().getName(), e);
 			}
 			
+			put(struct, created);
+			
 			if(GlobalConfig.PRINT_COMPILATION&&!Access.DEV_CACHE){
 				StagedInit.runBaseStageTask(()->{
 					String s=CYAN_BRIGHT+
@@ -91,9 +93,6 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 					LogUtil.println(s+RESET);
 				});
 			}
-			
-			put(struct, created);
-			
 			
 			if(DEBUG_VALIDATION&&!(struct instanceof Struct.Unmanaged)){
 				if(Access.DEV_CACHE){
@@ -364,6 +363,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		ContentWriter        target;
 		
 		if(DEBUG_VALIDATION&&!(instance instanceof IOInstance.Unmanaged<?>)){
+			generateAll(ioPool, provider, instance, true);
 			var siz=getSizeDescriptor().calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
 			
 			var sum=0L;

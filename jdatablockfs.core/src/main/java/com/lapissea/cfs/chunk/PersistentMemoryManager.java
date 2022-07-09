@@ -124,19 +124,23 @@ public class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 	private Collection<Chunk> popFile(Collection<Chunk> toFree) throws IOException{
 		Collection<Chunk> result=toFree;
 		boolean           dirty =true;
+		
+		if(toFree.isEmpty()) return toFree;
+		var end=toFree.iterator().next().getDataProvider().getSource().getIOSize();
+		
 		wh:
 		while(true){
 			for(var i=result.iterator();i.hasNext();){
 				Chunk chunk=i.next();
-				if(!chunk.checkLastPhysical()) continue;
+				if(chunk.dataEnd()<end) continue;
 				
 				if(dirty){
 					dirty=false;
 					result=new ArrayList<>(result);
 					continue wh;
 				}
-				var popCapacity=chunk.getPtr().getValue();
-				var ptr        =chunk.getPtr();
+				end=chunk.getPtr().getValue();
+				var ptr=chunk.getPtr();
 				
 				i.remove();
 				
@@ -145,10 +149,12 @@ public class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 						c.modifyAndSave(Chunk::clearNextPtr);
 					}
 				}
-				try(var io=context.getSource().io()){
-					io.setCapacity(popCapacity);
-				}
 				continue wh;
+			}
+			if(!dirty){
+				try(var io=context.getSource().io()){
+					io.setCapacity(end);
+				}
 			}
 			return result;
 		}
