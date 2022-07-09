@@ -594,6 +594,34 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		}
 	}
 	
+	@Override
+	public boolean remove(K key) throws IOException{
+		var smallHash=toSmallHash(key, bucketPO2);
+		var bucket   =getBucket(buckets, smallHash);
+		
+		if(bucket.node==null){
+			return false;
+		}
+		
+		var prevNode=bucket.node;
+		for(var node : bucket.node){
+			var keyResult=readKey(node);
+			if(!keyResult.hasValue) continue;
+			if(Objects.equals(keyResult.key, key)){
+				if(prevNode==node){
+					bucket.node=node.getNext();
+					setBucket(buckets, smallHash, bucket);
+				}else{
+					prevNode.setNext(node.getNext());
+				}
+				node.free();
+				return true;
+			}
+			prevNode=node;
+		}
+		return false;
+	}
+	
 	private static final long OVERWRITE      =-1;
 	private static final long OVERWRITE_EMPTY=-2;
 	

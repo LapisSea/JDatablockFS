@@ -111,6 +111,7 @@ public interface IOMap<K, V> extends Iterable<IOMap.Entry<K, V>>{
 	void put(K key, V value) throws IOException;
 	void putAll(Map<K, V> values) throws IOException;
 	
+	boolean remove(K key) throws IOException;
 	
 	static <K, V> String toString(IOMap<K, V> map){
 		if(map.isEmpty()) return "{}";

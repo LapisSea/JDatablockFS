@@ -49,6 +49,13 @@ public class Splitter{
 				test();
 			}
 			@Override
+			public boolean remove(K key) throws IOException{
+				var removed=a.remove(key);
+				b.remove(key);
+				test();
+				return removed;
+			}
+			@Override
 			public boolean containsKey(K key) throws IOException{
 				return a.containsKey(key);
 			}

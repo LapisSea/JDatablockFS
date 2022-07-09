@@ -50,6 +50,12 @@ public class ReferenceMemoryIOMap<K, V> implements IOMap<K, V>{
 	public void putAll(Map<K, V> values) throws IOException{
 		data.putAll(values);
 	}
+	@Override
+	public boolean remove(K key) throws IOException{
+		var had=data.containsKey(key);
+		data.remove(key);
+		return had;
+	}
 	
 	@Override
 	public String toString(){
