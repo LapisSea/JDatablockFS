@@ -104,4 +104,8 @@ public interface RootProvider extends DataProvider.Holder{
 	
 	Iterable<IOMap.Entry<ObjectID, Object>> listAll();
 	
+	default void drop(String id) throws IOException{
+		drop(new ObjectID(id));
+	}
+	void drop(ObjectID id) throws IOException;
 }

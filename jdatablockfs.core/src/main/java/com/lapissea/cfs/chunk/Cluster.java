@@ -174,6 +174,11 @@ public class Cluster implements DataProvider{
 		public Iterable<IOMap.Entry<ObjectID, Object>> listAll(){
 			return ()->meta().rootObjects.iterator();
 		}
+		
+		@Override
+		public void drop(ObjectID id) throws IOException{
+			meta().rootObjects.remove(id);
+		}
 	};
 	
 	public Cluster(IOInterface source) throws IOException{
