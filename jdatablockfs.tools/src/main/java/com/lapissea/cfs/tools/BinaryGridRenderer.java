@@ -937,8 +937,9 @@ public class BinaryGridRenderer{
 		var                       renderer=ctx.renderer;
 		List<DrawFont.StringDraw> strings =new ArrayList<>(ptrs.size());
 		for(Pointer ptr : ptrs){
+			boolean drawMsg=false;
 			
-			var siz  =Math.max(1, ctx.pixelsPerByte()/8F);
+			var siz  =Math.max(1, ctx.pixelsPerByte()/12F);
 			var sFul =siz;
 			var sHalf=siz/2;
 			renderer.setLineWidth(sFul*ptr.widthFactor());
@@ -951,6 +952,9 @@ public class BinaryGridRenderer{
 			Color col;
 			if(parsed.lastHoverChunk!=null&&new ChainWalker(parsed.lastHoverChunk).stream().anyMatch(ch->ch.rangeIntersects(ptr.from()))){
 				col=ColorUtils.mix(chunkBaseColor(), ptr.color(), 0.5F);
+				drawMsg=true;
+				renderer.setLineWidth(sFul*ptr.widthFactor()*2);
+				
 			}else{
 				col=ptr.color();
 			}
@@ -1006,7 +1010,7 @@ public class BinaryGridRenderer{
 				{xToOrg, yToOrg}
 			}, true);
 			
-			if(!ptr.message().isEmpty()){
+			if(drawMsg&&!ptr.message().isEmpty()){
 				float
 					x=(float)(xFrom+xTo)/2*ctx.pixelsPerByte(),
 					y=(float)(yFrom+yTo)/2*ctx.pixelsPerByte();
