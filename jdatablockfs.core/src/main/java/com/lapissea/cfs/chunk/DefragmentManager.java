@@ -49,6 +49,8 @@ public class DefragmentManager{
 		while(run[0]){
 			run[0]=false;
 			
+			List<Chunk> toFree=new ArrayList<>();
+			
 			cluster.rootWalker().walk(new MemoryWalker.PointerRecord(){
 				@Override
 				public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, IOField.Ref<T, ?> field, Reference valueReference) throws IOException{
@@ -72,12 +74,18 @@ public class DefragmentManager{
 							return END;
 						}
 						
+						var ch=valueReference.getPtr().dereference(cluster);
+						ch.streamNext().forEach(toFree::add);
 						
 						var newCh=AllocateTicket.withData((ObjectPipe)field.getReferencedPipe(instance), cluster, field.get(null, instance))
+						                        .withBytes(ch.getSize())
 						                        .withApproval(c->c.getPtr().getValue()>instanceReference.getPtr().getValue())
 						                        .submit(cluster);
 						
 						field.setReference(instance, newCh.getPtr().makeReference());
+						if(toFree.size()>8){
+							return END|SAVE;
+						}
 						return CONTINUE|SAVE;
 					}
 					return CONTINUE;
@@ -87,6 +95,8 @@ public class DefragmentManager{
 					return CONTINUE;
 				}
 			});
+			
+			cluster.getMemoryManager().free(toFree);
 		}
 	}
 	
