@@ -251,7 +251,7 @@ public sealed interface IOTypeDB{
 			if(id.stored()) return id;
 			
 			int max=0;
-			for(var entry : data.entries()){
+			for(var entry : data){
 				var key=entry.getKey();
 				if(entry.getValue().equals(type)){
 					return new TypeID(key, true);

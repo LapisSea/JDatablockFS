@@ -1,6 +1,5 @@
 package com.lapissea.cfs.run;
 
-import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.util.function.UnsafeBiConsumer;
@@ -27,10 +26,6 @@ public class Splitter{
 			@Override
 			public Entry<K, V> getEntry(K key) throws IOException{
 				return a.getEntry(key);
-			}
-			@Override
-			public IterablePP<Entry<K, V>> entries(){
-				return a.entries();
 			}
 			@Override
 			public Stream<Entry<K, V>> stream(){

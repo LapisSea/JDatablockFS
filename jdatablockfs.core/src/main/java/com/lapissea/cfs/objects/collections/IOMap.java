@@ -2,6 +2,7 @@ package com.lapissea.cfs.objects.collections;
 
 import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.Utils;
+import com.lapissea.util.Nullable;
 
 import java.io.IOException;
 import java.util.Iterator;
@@ -9,7 +10,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Stream;
 
-public interface IOMap<K, V> extends Iterable<IOMap.Entry<K, V>>{
+public interface IOMap<K, V> extends IterablePP<IOMap.Entry<K, V>>{
 	
 	interface Entry<K, V>{
 		
@@ -85,37 +86,68 @@ public interface IOMap<K, V> extends Iterable<IOMap.Entry<K, V>>{
 		return size()==0;
 	}
 	
+	/**
+	 * Provides an entry that provides the key and value in this map. The entry may be modifiable. If it is its modification will reflect in the contents of the map.
+	 *
+	 * @return null if the entry with specified key does not exist.
+	 */
+	@Nullable
 	Entry<K, V> getEntry(K key) throws IOException;
 	
+	/**
+	 * @param key key whose existance should be checked
+	 * @return true if map contains the key
+	 */
 	default boolean containsKey(K key) throws IOException{
 		return getEntry(key)!=null;
 	}
 	
+	/**
+	 * Provides a stream of read only entries
+	 */
+	@Override
 	Stream<Entry<K, V>> stream();
 	
+	/**
+	 * Provides an iterator of read only entries
+	 */
 	@Override
 	default Iterator<Entry<K, V>> iterator(){
 		return stream().iterator();
 	}
 	
-	default IterablePP<Entry<K, V>> entries(){
-		return ()->stream().iterator();
-	}
-	
+	/**
+	 * Retrieves a value that matches the provided key
+	 */
 	default V get(K key) throws IOException{
 		var e=getEntry(key);
 		if(e==null) return null;
 		return e.getValue();
 	}
 	
+	/**
+	 * Adds a new entry to the map or overrides a value of an existing entry of the same key if it exists
+	 *
+	 * @param key   the key of the entry
+	 * @param value the value of the entry
+	 */
 	void put(K key, V value) throws IOException;
+	/**
+	 * Puts all entries from the provided map
+	 *
+	 * @param values the map to put the entries from
+	 */
 	void putAll(Map<K, V> values) throws IOException;
 	
+	/**
+	 * @param key the key of the entry to be removed
+	 * @return true if the entry existed and was removed
+	 */
 	boolean remove(K key) throws IOException;
 	
 	static <K, V> String toString(IOMap<K, V> map){
 		if(map.isEmpty()) return "{}";
-		var i=map.entries().iterator();
+		var i=map.iterator();
 		
 		StringBuilder sb=new StringBuilder();
 		sb.append('{');
