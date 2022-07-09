@@ -24,11 +24,11 @@ public class Splitter{
 				return a.size();
 			}
 			@Override
-			public Entry<K, V> getEntry(K key) throws IOException{
+			public IOEntry.Modifiable<K, V> getEntry(K key) throws IOException{
 				return a.getEntry(key);
 			}
 			@Override
-			public Stream<Entry<K, V>> stream(){
+			public Stream<IOEntry<K, V>> stream(){
 				return a.stream();
 			}
 			@Override

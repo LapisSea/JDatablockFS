@@ -17,11 +17,11 @@ public class ReferenceMemoryIOMap<K, V> implements IOMap<K, V>{
 	}
 	
 	@Override
-	public Entry<K, V> getEntry(K key){
+	public IOEntry.Modifiable<K, V> getEntry(K key){
 		if(!data.containsKey(key)) return null;
 		
 		var k=data.get(key);
-		return new Entry.Abstract<>(){
+		return new IOEntry.Modifiable.Abstract<>(){
 			@Override
 			public K getKey(){
 				return key;
@@ -38,8 +38,8 @@ public class ReferenceMemoryIOMap<K, V> implements IOMap<K, V>{
 	}
 	
 	@Override
-	public Stream<Entry<K, V>> stream(){
-		return data.entrySet().stream().map(Entry::viewOf);
+	public Stream<IOEntry<K, V>> stream(){
+		return data.entrySet().stream().map(IOEntry::viewOf);
 	}
 	
 	@Override

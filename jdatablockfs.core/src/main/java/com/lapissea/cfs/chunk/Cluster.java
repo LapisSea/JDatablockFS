@@ -171,7 +171,7 @@ public class Cluster implements DataProvider{
 		}
 		
 		@Override
-		public Iterable<IOMap.Entry<ObjectID, Object>> listAll(){
+		public Iterable<IOMap.IOEntry<ObjectID, Object>> listAll(){
 			return ()->meta().rootObjects.iterator();
 		}
 		

@@ -10,11 +10,42 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Stream;
 
-public interface IOMap<K, V> extends IterablePP<IOMap.Entry<K, V>>{
+public interface IOMap<K, V> extends IterablePP<IOMap.IOEntry<K, V>>{
 	
-	interface Entry<K, V>{
+	interface IOEntry<K, V>{
 		
-		abstract class Abstract<K, V> implements Entry<K, V>{
+		interface Modifiable<K, V> extends IOEntry<K, V>{
+			abstract class Abstract<K, V> extends IOEntry.Abstract<K, V> implements Modifiable<K, V>{}
+			
+			class Unsupported<K, V> extends Abstract<K, V>{
+				
+				private final K key;
+				private final V value;
+				
+				public Unsupported(K key, V value){
+					this.key=key;
+					this.value=value;
+				}
+				
+				@Override
+				public void set(V value) throws IOException{
+					throw new UnsupportedOperationException();
+				}
+				
+				@Override
+				public K getKey(){
+					return key;
+				}
+				@Override
+				public V getValue(){
+					return value;
+				}
+			}
+			
+			void set(V value) throws IOException;
+		}
+		
+		abstract class Abstract<K, V> implements IOEntry<K, V>{
 			@Override
 			public String toString(){
 				return this.getClass().getSimpleName()+"{"+Utils.toShortString(getKey())+" = "+Utils.toShortString(getValue())+"}";
@@ -25,7 +56,7 @@ public interface IOMap<K, V> extends IterablePP<IOMap.Entry<K, V>>{
 			@Override
 			public boolean equals(Object obj){
 				return obj==this||
-				       obj instanceof Entry<?, ?> e&&
+				       obj instanceof IOEntry<?, ?> e&&
 				       Objects.equals(getKey(), e.getKey())&&
 				       Objects.equals(getValue(), e.getValue());
 			}
@@ -41,24 +72,32 @@ public interface IOMap<K, V> extends IterablePP<IOMap.Entry<K, V>>{
 			}
 		}
 		
-		static <K, V> Entry<K, V> of(K key, V value){
-			return new Entry.Abstract<>(){
-				@Override
-				public K getKey(){
-					return key;
-				}
-				@Override
-				public V getValue(){
-					return value;
-				}
-				@Override
-				public void set(V value){
-					throw new UnsupportedOperationException();
-				}
-			};
+		final class Simple<K, V> extends Abstract<K, V>{
+			private final K key;
+			private final V value;
+			
+			public Simple(K key, V value){
+				this.key=key;
+				this.value=value;
+			}
+			
+			@Override
+			public K getKey(){
+				return key;
+			}
+			@Override
+			public V getValue(){
+				return value;
+			}
 		}
-		static <K, V> Entry<K, V> viewOf(Map.Entry<K, V> entry){
-			return new Entry.Abstract<>(){
+		
+		
+		static <K, V> IOEntry<K, V> of(K key, V value){
+			return new Simple<>(key, value);
+		}
+		
+		static <K, V> IOEntry.Modifiable<K, V> viewOf(Map.Entry<K, V> entry){
+			class View extends Modifiable.Abstract<K, V>{
 				@Override
 				public K getKey(){
 					return entry.getKey();
@@ -71,13 +110,12 @@ public interface IOMap<K, V> extends IterablePP<IOMap.Entry<K, V>>{
 				public void set(V value){
 					entry.setValue(value);
 				}
-			};
+			}
+			return new View();
 		}
 		
 		K getKey();
-		
 		V getValue();
-		void set(V value) throws IOException;
 	}
 	
 	long size();
@@ -92,10 +130,10 @@ public interface IOMap<K, V> extends IterablePP<IOMap.Entry<K, V>>{
 	 * @return null if the entry with specified key does not exist.
 	 */
 	@Nullable
-	Entry<K, V> getEntry(K key) throws IOException;
+	IOEntry.Modifiable<K, V> getEntry(K key) throws IOException;
 	
 	/**
-	 * @param key key whose existance should be checked
+	 * @param key key whose existence should be checked
 	 * @return true if map contains the key
 	 */
 	default boolean containsKey(K key) throws IOException{
@@ -106,13 +144,13 @@ public interface IOMap<K, V> extends IterablePP<IOMap.Entry<K, V>>{
 	 * Provides a stream of read only entries
 	 */
 	@Override
-	Stream<Entry<K, V>> stream();
+	Stream<IOEntry<K, V>> stream();
 	
 	/**
 	 * Provides an iterator of read only entries
 	 */
 	@Override
-	default Iterator<Entry<K, V>> iterator(){
+	default Iterator<IOEntry<K, V>> iterator(){
 		return stream().iterator();
 	}
 	

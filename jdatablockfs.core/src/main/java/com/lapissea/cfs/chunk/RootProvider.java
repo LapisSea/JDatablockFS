@@ -102,7 +102,7 @@ public interface RootProvider extends DataProvider.Holder{
 	<T> void provide(T obj, ObjectID id) throws IOException;
 	
 	
-	Iterable<IOMap.Entry<ObjectID, Object>> listAll();
+	Iterable<IOMap.IOEntry<ObjectID, Object>> listAll();
 	
 	default void drop(String id) throws IOException{
 		drop(new ObjectID(id));

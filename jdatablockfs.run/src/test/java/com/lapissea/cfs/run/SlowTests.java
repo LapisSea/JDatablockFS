@@ -279,7 +279,7 @@ public class SlowTests{
 			IOMap<Object, Object> splitter;
 			if(compliantCheck){
 				var ref=new ReferenceMemoryIOMap<>();
-				for(IOMap.Entry<Object, Object> entry : map){
+				for(var entry : map){
 					ref.put(entry.getKey(), entry.getValue());
 				}
 				splitter=Splitter.map(map, ref, TestUtils::checkCompliance);

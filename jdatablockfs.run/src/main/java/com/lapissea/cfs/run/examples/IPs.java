@@ -3,9 +3,7 @@ package com.lapissea.cfs.run.examples;
 import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.impl.MemoryData;
-import com.lapissea.cfs.objects.ObjectID;
 import com.lapissea.cfs.objects.collections.IOList;
-import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 
@@ -75,7 +73,7 @@ public class IPs{
 		System.out.println();
 		System.out.println("Data in memory:");
 		
-		for(IOMap.Entry<ObjectID, Object> e : new Cluster(memory).getRootProvider().listAll()){
+		for(var e : new Cluster(memory).getRootProvider().listAll()){
 			System.out.println(e.getKey()+": "+switch(e.getValue()){
 				//Just a fancy toString that every IOInstance has that allows for printing the data in a more appealing way
 				case IOInstance<?> inst -> inst.toString(false, "{\n\t", "\n}", ": ", ",\n\t");

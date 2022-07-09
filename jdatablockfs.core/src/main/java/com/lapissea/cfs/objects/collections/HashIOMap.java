@@ -59,19 +59,18 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 			return "{"+Utils.toShortString(key)+" = "+Utils.toShortString(value)+"}";
 		}
 		
-		private Entry<K, V> unmodifiable;
-		
 		public BucketEntry(){}
 		public BucketEntry(K key, V value){
 			this.key=key;
 			this.value=value;
 		}
 		
-		public Entry<K, V> unmodifiable(){
-			if(unmodifiable==null){
-				unmodifiable=Entry.of(key, value);
-			}
-			return unmodifiable;
+		public IOEntry.Modifiable<K, V> unsupported(){
+			return new IOEntry.Modifiable.Unsupported<>(key, value);
+		}
+		
+		public IOEntry<K, V> unmodifiable(){
+			return IOEntry.of(key, value);
 		}
 	}
 	
@@ -142,7 +141,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	
 	private int datasetID;
 	
-	private final Map<K, Entry<K, V>> cache;
+	private final Map<K, IOEntry.Modifiable<K, V>> cache;
 	
 	
 	public HashIOMap(DataProvider provider, Reference reference, TypeLink typeDef) throws IOException{
@@ -408,13 +407,13 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		}
 	}
 	
-	private class ModifiableEntry extends Entry.Abstract<K, V>{
+	private class ModifiableIOEntry extends IOEntry.Modifiable.Abstract<K, V>{
 		
 		private       int               currentDatasetID=datasetID;
 		private       Bucket<K, V>      currentBucket;
 		private final BucketEntry<K, V> data;
 		
-		public ModifiableEntry(Bucket<K, V> bucket, BucketEntry<K, V> entry){
+		public ModifiableIOEntry(Bucket<K, V> bucket, BucketEntry<K, V> entry){
 			currentBucket=bucket;
 			this.data=entry;
 		}
@@ -453,7 +452,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	}
 	
 	@Override
-	public Entry<K, V> getEntry(K key) throws IOException{
+	public IOEntry.Modifiable<K, V> getEntry(K key) throws IOException{
 		if(readOnly){
 			if(cache.containsKey(key)){
 				return cache.get(key);
@@ -472,15 +471,15 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		}
 		
 		if(readOnly){
-			var e=entry.unmodifiable();
+			var e=entry.unsupported();
 			cache.put(key, e);
 			return e;
 		}
-		return new ModifiableEntry(bucket, entry);
+		return new ModifiableIOEntry(bucket, entry);
 	}
 	
 	@Override
-	public Stream<Entry<K, V>> stream(){
+	public Stream<IOEntry<K, V>> stream(){
 		return rawEntryStream(buckets).map(BucketEntry::unmodifiable);
 	}
 	private IterablePP<BucketEntry<K, V>> rawEntries(IOList<Bucket<K, V>> buckets){

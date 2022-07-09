@@ -51,7 +51,7 @@ public abstract class AbstractUnmanagedIOMap<K, V> extends IOInstance.Unmanaged<
 		}
 		
 		try{
-			for(Entry<K, V> e : this){
+			for(IOEntry<K, V> e : this){
 				K key  =e.getKey();
 				V value=e.getValue();
 				if(value==null){
