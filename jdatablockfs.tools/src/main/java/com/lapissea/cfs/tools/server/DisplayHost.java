@@ -70,7 +70,7 @@ public class DisplayHost{
 		}
 		
 		private void run() throws IOException{
-			LogUtil.println("connected", client);
+			LogUtil.println("connected", name, client);
 			
 			var objInput=new DataInputStream(new BufferedInputStream(client.getInputStream()));
 			var io      =ServerCommons.makeIO();
@@ -148,6 +148,8 @@ public class DisplayHost{
 								System.gc();
 							};
 							case FINISH -> ()->{
+								out.write(2);
+								out.flush();
 								getSession().finish();
 								LogUtil.println("finishing");
 								running=false;
