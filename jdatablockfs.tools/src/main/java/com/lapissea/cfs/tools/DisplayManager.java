@@ -39,22 +39,21 @@ public class DisplayManager implements DataLogger{
 	private final RenderBackend          renderer;
 	private final RenderBackend.Buffered gridBuff;
 	
-	private final SessionHost        sessionHost=new SessionHost();
-	private final BinaryGridRenderer gridRenderer;
+	private final SessionHost  sessionHost=new SessionHost();
+	private final DataRenderer gridRenderer;
+	
+	private boolean titleDirty=true;
 	
 	public DisplayManager(){
 		
 		renderer=createBackend();
 		gridBuff=renderer.buffer();
 		
-		gridRenderer=new BinaryGridRenderer(RenderBackend.DRAW_DEBUG?renderer:gridBuff);
+		gridRenderer=new GraphRenderer(renderer);
+//		gridRenderer=new BinaryGridRenderer(RenderBackend.DRAW_DEBUG?renderer:gridBuff);
 		
 		Runnable updateTitle=()->{
-			var f=sessionHost.activeFrame.get();
-			renderer.getDisplay().setTitle(
-				"Binary display - frame: "+(f==-1?"NaN":f)+
-				sessionHost.activeSession.get().map(s->" - Session: "+s.getName()).orElse("")
-			);
+			titleDirty=true;
 			gridRenderer.markDirty();
 			renderer.markFrameDirty();
 		};
@@ -147,7 +146,7 @@ public class DisplayManager implements DataLogger{
 		
 		display.registerDisplayResize(()->{
 			sessionHost.cleanUpSessions();
-			ifFrame(frame->gridRenderer.calcSize(display, frame.bytes().length, true));
+			gridRenderer.notifyResize();
 			renderer.markFrameDirty();
 			gridRenderer.markDirty();
 			renderer.runLater(()->{
@@ -208,7 +207,7 @@ public class DisplayManager implements DataLogger{
 					
 					if(!gridRenderer.getDisplayedSession().equals(activeSession)){
 						gridRenderer.setDisplayedSession(activeSession);
-						ifFrame(frame->gridRenderer.calcSize(display, frame.bytes().length, true));
+						ifFrame(frame->gridRenderer.notifyResize());
 					}
 					if(destroyRequested){
 						destroyRequested=false;
@@ -219,6 +218,16 @@ public class DisplayManager implements DataLogger{
 //						lastFrameTime=tim;
 //						renderer.markFrameDirty();
 //					}
+					
+					if(titleDirty){
+						titleDirty=false;
+						
+						var f=sessionHost.activeFrame.get();
+						renderer.getDisplay().setTitle(
+							"Binary display - frame: "+(f==-1?"NaN":f)+
+							sessionHost.activeSession.get().map(s->" - Session: "+s.getName()).orElse("")
+						);
+					}
 					
 					if(renderer.notifyDirtyFrame()||gridRenderer.isDirty()){
 						doRender();
@@ -234,14 +243,15 @@ public class DisplayManager implements DataLogger{
 		}
 	}
 	
-	private List<BinaryGridRenderer.HoverMessage> hover=List.of();
+	private List<DataRenderer.HoverMessage> hover=List.of();
 	
 	private void doRender(){
 		updateImgui();
 		
 		renderer.preRender();
 		
-		if(RenderBackend.DRAW_DEBUG||!ImGui.getIO().getWantCaptureMouse()||gridRenderer.isDirty()){
+		var m=ImGui.getIO().getWantCaptureMouse();
+		if(RenderBackend.DRAW_DEBUG||!m||gridRenderer.isDirty()){
 			gridBuff.clear();
 			hover=gridRenderer.render();
 		}
@@ -334,7 +344,7 @@ public class DisplayManager implements DataLogger{
 								if(col==null) col=new Color(100, 100, 255);
 								ImGui.textColored(col.getRed(), col.getGreen(), col.getBlue(), 255, str);
 							}
-							case BinaryGridRenderer.FieldVal<?> inst -> {
+							case DataRenderer.FieldVal<?> inst -> {
 								String str=inst.instanceToString(false, "{\n\t", "\n}", ": ", ",\n\t").orElse("");
 								
 								var col=msg.color();

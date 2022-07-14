@@ -19,7 +19,7 @@ import java.util.stream.LongStream;
 
 class DrawUtils{
 	
-	public static record Range(long from, long to){
+	public record Range(long from, long to){
 		
 		static class Builder{
 			long start;
@@ -318,6 +318,9 @@ class DrawUtils{
 	}
 	
 	public static void drawArrow(BinaryGridRenderer.RenderContext ctx, double xFrom, double yFrom, double xTo, double yTo){
+		drawArrow(ctx.renderer(), ctx.pixelsPerByte(), xFrom, yFrom, xTo, yTo);
+	}
+	public static void drawArrow(RenderBackend renderer, float scale, double xFrom, double yFrom, double xTo, double yTo){
 		double xMid=(xFrom+xTo)/2, yMid=(yFrom+yTo)/2;
 		
 		double angle=Math.atan2(xTo-xFrom, yTo-yFrom);
@@ -327,13 +330,16 @@ class DrawUtils{
 		double sin=Math.sin(angle)*arrowSize/2;
 		double cos=Math.cos(angle)*arrowSize/2;
 		
-		drawPixelLine(ctx, xMid+sin, yMid+cos, xMid-sin-cos, yMid-cos+sin);
-		drawPixelLine(ctx, xMid+sin, yMid+cos, xMid-sin+cos, yMid-cos-sin);
-		drawPixelLine(ctx, xFrom, yFrom, xTo, yTo);
+		drawPixelLine(renderer, scale, xMid+sin, yMid+cos, xMid-sin-cos, yMid-cos+sin);
+		drawPixelLine(renderer, scale, xMid+sin, yMid+cos, xMid-sin+cos, yMid-cos-sin);
+		drawPixelLine(renderer, scale, xFrom, yFrom, xTo, yTo);
 	}
 	
 	public static void drawPixelLine(BinaryGridRenderer.RenderContext ctx, double xFrom, double yFrom, double xTo, double yTo){
-		ctx.renderer().drawLine(xFrom*ctx.pixelsPerByte(), yFrom*ctx.pixelsPerByte(), xTo*ctx.pixelsPerByte(), yTo*ctx.pixelsPerByte());
+		drawPixelLine(ctx.renderer(), ctx.pixelsPerByte(), xFrom, yFrom, xTo, yTo);
+	}
+	public static void drawPixelLine(RenderBackend renderer, float scale, double xFrom, double yFrom, double xTo, double yTo){
+		renderer.drawLine(xFrom*scale, yFrom*scale, xTo*scale, yTo*scale);
 	}
 	static IterablePP<Range> chainRangeResolve(DataProvider cluster, Reference ref, long fieldOffset, long size){
 		return IterablePP.nullTerminated(()->new Supplier<>(){

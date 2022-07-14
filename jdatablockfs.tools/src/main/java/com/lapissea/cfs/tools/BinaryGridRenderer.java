@@ -4,7 +4,6 @@ package com.lapissea.cfs.tools;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.*;
 import com.lapissea.cfs.io.ChunkChainIO;
-import com.lapissea.cfs.io.bit.FlagReader;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
@@ -55,7 +54,7 @@ import static com.lapissea.cfs.tools.render.RenderBackend.DrawMode;
 import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 
 @SuppressWarnings({"UnnecessaryLocalVariable", "SameParameterValue"})
-public class BinaryGridRenderer{
+public class BinaryGridRenderer implements DataRenderer{
 	
 	static{
 		ForkJoinPool.commonPool().execute(()->{
@@ -65,23 +64,11 @@ public class BinaryGridRenderer{
 		});
 	}
 	
-	public record FieldVal<T extends IOInstance<T>>(Struct.Pool<T> ioPool, T instance, IOField<T, ?> field){
-		Optional<String> instanceToString(boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
-			return field.instanceToString(ioPool, instance, doShort, start, end, fieldValueSeparator, fieldSeparator);
-		}
-	}
-	
 	enum ErrorLogLevel{
 		NONE,
 		NAME,
 		STACK,
 		NAMED_STACK
-	}
-	
-	record HoverMessage(List<Range> ranges, Color color, Object[] data){
-		boolean isRangeEmpty(){
-			return ranges.isEmpty()||ranges.stream().allMatch(r->r.size()==0);
-		}
 	}
 	
 	record RenderContext(
@@ -163,11 +150,20 @@ public class BinaryGridRenderer{
 			return s.frames.get(index);
 		}).orElse(null);
 	}
+	@Override
 	public int getFramePos(){
 		return getDisplayedSession().map(ses->{
 			if(ses.framePos.get()==-1) ses.setFrame(ses.frames.size()-1);
 			return ses.framePos.get();
 		}).orElse(0);
+	}
+	
+	@Override
+	public void notifyResize(){
+		var frame=getFrame(getFramePos());
+		if(frame==null) return;
+		calcSize(direct.getDisplay(), frame.memData().bytes().length, true);
+		markDirty();
 	}
 	
 	
@@ -519,7 +515,8 @@ public class BinaryGridRenderer{
 		}else throw UtilL.uncheckedThrow(e);
 	}
 	
-	protected List<HoverMessage> render(){
+	@Override
+	public List<HoverMessage> render(){
 		frameTimer.start();
 		
 		renderCount++;
@@ -566,9 +563,12 @@ public class BinaryGridRenderer{
 		calcSize(dis, bytes.length, false);
 		
 		ParsedFrame parsed=cFrame.parsed();
+		if(!errorMode){
+			parsed.displayError=null;
+		}
 		if(!renderStatic){
 			var ctx=new RenderContext(null, bytes, getPixelsPerByte(), dis, null);
-			if(lastHoverMessages.stream().flatMap(m->m.ranges.stream()).anyMatch(r->!ctx.isRangeHovered(r))){
+			if(lastHoverMessages.stream().flatMap(m->m.ranges().stream()).anyMatch(r->!ctx.isRangeHovered(r))){
 				renderStatic=true;
 			}
 		}
@@ -609,9 +609,11 @@ public class BinaryGridRenderer{
 		renderer.setFontScale(Math.min(h, w/(str.length()*0.8F)));
 		drawStringIn(renderer, Color.LIGHT_GRAY, str, new DrawUtils.Rect(0, 0, w, h), true);
 	}
+	@Override
 	public void markDirty(){
 		renderStatic=true;
 	}
+	@Override
 	public boolean isDirty(){
 		return renderStatic;
 	}
@@ -642,7 +644,7 @@ public class BinaryGridRenderer{
 		
 		List<Pointer> ptrs=new ArrayList<>();
 		
-		Set<Chunk> referenced=new HashSet<>();
+		ChunkSet referenced=new ChunkSet();
 		try{
 			Cluster cluster=parsed.getCluster().orElseGet(()->{
 				try{
@@ -686,18 +688,22 @@ public class BinaryGridRenderer{
 				var       annCtx=new AnnotateCtx(ctx, provider, new LinkedList<>(), ptrs::add, strings, stringOutlines);
 				
 				try{
-					
-					cluster.rootWalker().walk(true, ref->{
-						if(!ref.isNull()){
-							try{
-								for(Chunk chunk : new ChainWalker(ref.getPtr().dereference(cl))){
-									referenced.add(chunk);
+					try{
+						cluster.rootWalker().walk(true, ref->{
+							if(!ref.isNull()){
+								try{
+									for(Chunk chunk : new ChainWalker(ref.getPtr().dereference(cl))){
+										referenced.add(chunk.getPtr());
+									}
+								}catch(IOException e){
+									throw UtilL.uncheckedThrow(e);
 								}
-							}catch(IOException e){
-								throw UtilL.uncheckedThrow(e);
 							}
-						}
-					});
+						});
+					}catch(IOException e){
+						throw new RuntimeException(e);
+					}
+					
 					annotateStruct(annCtx, root,
 					               cluster.getFirstChunk().getPtr().makeReference(),
 					               FixedContiguousStructPipe.of(root.getThisStruct()),
@@ -713,14 +719,18 @@ public class BinaryGridRenderer{
 					long pos=cluster.getFirstChunk().getPtr().getValue();
 					while(pos<bytes.length){
 						try{
+							ChunkSet done=new ChunkSet();
 							for(Chunk chunk : new PhysicalChunkWalker(cluster.getChunk(ChunkPointer.of(pos)))){
 								pos=chunk.dataEnd();
-								if(referenced.contains(chunk)){
+								if(referenced.contains(chunk.getPtr())){
 									fillChunk(ctx, chunk, true, false);
 								}else{
-									drawByteRanges(ctx, List.of(Range.fromSize(chunk.dataStart(), chunk.getCapacity())), alpha(Color.BLUE, 0.1F), false, false);
+									drawByteRanges(ctx, List.of(new Range(chunk.dataStart(), Math.min(cluster.getSource().getIOSize(), chunk.dataEnd()))), alpha(Color.BLUE, 0.1F), false, false);
 								}
-								annotateChunk(annCtx, chunk);
+								if(done.add(chunk.getPtr())){
+									chunk.streamNext().map(Chunk::getPtr).forEach(done::add);
+									annotateChunk(annCtx, chunk);
+								}
 							}
 						}catch(IOException e){
 							var p=(int)pos;
@@ -831,14 +841,17 @@ public class BinaryGridRenderer{
 				if(b==0) return;
 				int   xi=i%ctx.width(), yi=i/ctx.width();
 				float xF=ctx.pixelsPerByte()*xi, yF=ctx.pixelsPerByte()*yi;
-				
-				for(FlagReader flags=new FlagReader(b, 8);flags.remainingCount()>0;){
-					try{
-						if(flags.readBoolBit()){
-							fillBit(ctx.renderer, xF, yF, flags.readCount()-1, 0, 0);
+				if(ctx.pixelsPerByte()<6){
+					var ones=0;
+					for(int bi=0;bi<8;bi++){
+						if(((b>>bi)&1)==1) ones++;
+					}
+					ctx.renderer.fillQuad(xF, yF, ctx.pixelsPerByte(), ctx.pixelsPerByte()/8F*ones);
+				}else{
+					for(int bi=0;bi<8;bi++){
+						if(((b>>bi)&1)==1){
+							fillBit(ctx.renderer, xF, yF, bi, 0, 0);
 						}
-					}catch(IOException e){
-						throw new RuntimeException(e);
 					}
 				}
 				
@@ -1083,10 +1096,10 @@ public class BinaryGridRenderer{
 		
 		for(int i=ctx.hoverMessages.size()-1;i>=0;i--){
 			HoverMessage hoverMessage=ctx.hoverMessages.get(i);
-			if(hoverMessage.color==null||hoverMessage.isRangeEmpty()){
+			if(hoverMessage.color()==null||hoverMessage.isRangeEmpty()){
 				continue;
 			}
-			hoverMessage.ranges.stream().flatMapToLong(Range::longs).forEach(l->colorMap.put(l, hoverMessage.color));
+			hoverMessage.ranges().stream().flatMapToLong(Range::longs).forEach(l->colorMap.put(l, hoverMessage.color()));
 		}
 		
 		colorMap.entrySet().stream().sorted(Comparator.comparingLong(Map.Entry::getKey)).forEach(e->{
@@ -1110,12 +1123,12 @@ public class BinaryGridRenderer{
 		
 		for(int i=ctx.hoverMessages.size()-1;i>=0;i--){
 			HoverMessage hoverMessage=ctx.hoverMessages.get(i);
-			if(hoverMessage.color==null||hoverMessage.isRangeEmpty()){
+			if(hoverMessage.color()==null||hoverMessage.isRangeEmpty()){
 				continue;
 			}
 			ctx.renderer.setLineWidth(i+1);
-			for(Range range : hoverMessage.ranges){
-				outlineByteRange(hoverMessage.color, ctx, range);
+			for(Range range : hoverMessage.ranges()){
+				outlineByteRange(hoverMessage.color(), ctx, range);
 			}
 		}
 		
@@ -1641,9 +1654,11 @@ public class BinaryGridRenderer{
 		}
 	}
 	
+	@Override
 	public Optional<SessionHost.HostedSession> getDisplayedSession(){
 		return displayedSession;
 	}
+	@Override
 	public void setDisplayedSession(Optional<SessionHost.HostedSession> displayedSession){
 		this.displayedSession=displayedSession;
 		renderStatic=true;

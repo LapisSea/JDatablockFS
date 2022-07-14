@@ -226,6 +226,7 @@ public class OpenGLBackend extends RenderBackend{
 		
 		var stateFile=new File("glfw-win.json");
 		window.autoHandleStateSaving(stateFile);
+		window.autoF11Toggle();
 		
 		window.onDestroy(()->{
 			window.saveState(stateFile);
