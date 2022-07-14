@@ -95,7 +95,18 @@ public class LoggedMemoryUtils{
 			}else{
 				var ses=disp.getSession(sessionName);
 				if(ses==DataLogger.Session.Blank.INSTANCE) proxyLogger=(d, i)->{};
-				else proxyLogger=(data, ids)->ses.log(new MemFrame(data.readAll(), ids.toArray(), new Throwable()));
+				else proxyLogger=new MemoryData.EventLogger(){
+					private long frameId=0;
+					@Override
+					public void log(MemoryData<?> data, LongStream ids) throws IOException{
+						long id;
+						synchronized(this){
+							id=frameId;
+							frameId++;
+						}
+						ses.log(new MemFrame(id, data.readAll(), ids.toArray(), new Throwable()));
+					}
+				};
 			}
 		}else{
 			var  preBuf=new LinkedList<MemFrame>();
@@ -113,6 +124,7 @@ public class LoggedMemoryUtils{
 				}
 			}).start();
 			
+			long[] frameId={0};
 			proxyLogger=(data, ids)->{
 				if(logger.isInited()){
 					var d=logger.get();
@@ -120,7 +132,12 @@ public class LoggedMemoryUtils{
 						return;
 					}
 				}
-				var memFrame=new MemFrame(data.readAll(), ids.toArray(), new Throwable());
+				long id;
+				synchronized(frameId){
+					id=frameId[0];
+					frameId[0]++;
+				}
+				var memFrame=new MemFrame(id, data.readAll(), ids.toArray(), new Throwable());
 				lock.lock();
 				try{
 					if(logger.isInited()){

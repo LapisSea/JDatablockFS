@@ -37,13 +37,19 @@ class ServerCommons{
 		var siz=in.readInt();
 		return in.readNBytes(siz);
 	}
-	static void writeSafe(DataOutputStream dest, UnsafeConsumer<DataOutputStream, IOException> ses) throws IOException{
+	static void writeSafe(OutputStream dest, UnsafeConsumer<DataOutputStream, IOException> ses) throws IOException{
 		ByteArrayOutputStream buff=new ByteArrayOutputStream();
 		
 		ses.accept(new DataOutputStream(buff));
 		
+		int    v          =buff.size();
+		byte[] writeBuffer=new byte[4];
+		writeBuffer[0]=(byte)(v >>> 24);
+		writeBuffer[1]=(byte)(v >>> 16);
+		writeBuffer[2]=(byte)(v >>> 8);
+		writeBuffer[3]=(byte)(v >>> 0);
+		dest.write(writeBuffer, 0, 4);
 		
-		dest.writeInt(buff.size());
 		buff.writeTo(dest);
 	}
 	
@@ -99,17 +105,19 @@ class ServerCommons{
 		return new ObjectIO(){
 			@Override
 			public MemFrame readFrame(DataInputStream stream) throws IOException{
-				var bytes   =readSafe(stream);
-				var idBuffer=ByteBuffer.wrap(readSafe(stream)).asLongBuffer();
-				var ids     =new long[idBuffer.limit()];
+				long frameId =stream.readLong();
+				var  bytes   =readSafe(stream);
+				var  idBuffer=ByteBuffer.wrap(readSafe(stream)).asLongBuffer();
+				var  ids     =new long[idBuffer.limit()];
 				idBuffer.get(ids);
 				var e=new String(readSafe(stream), StandardCharsets.UTF_8);
 				
-				return new MemFrame(bytes, ids, e);
+				return new MemFrame(frameId, bytes, ids, e);
 			}
 			
 			@Override
 			public void writeFrame(DataOutputStream stream, MemFrame frame) throws IOException{
+				stream.writeLong(frame.frameId());
 				writeSafe(stream, b->b.write(frame.bytes()));
 				writeSafe(stream, b->{
 					var data=new byte[frame.ids().length*Long.BYTES];
@@ -128,7 +136,7 @@ class ServerCommons{
 			@Override
 			public MemFrame readFrame(DataInputStream stream) throws IOException{
 				readSafe(stream);
-				return new MemFrame(new byte[8], new long[0], new Throwable());
+				return new MemFrame(-1, new byte[8], new long[0], new Throwable());
 			}
 			@Override
 			public void writeFrame(DataOutputStream stream, MemFrame frame) throws IOException{
@@ -144,17 +152,17 @@ class ServerCommons{
 			
 			@Override
 			public MemFrame readFrame(DataInputStream stream) throws IOException{
-				var big=stream.readBoolean();
+				var compressFlag=stream.readBoolean();
 				
 				InputStream uncompressed=stream;
-				if(big){
+				if(compressFlag){
 					uncompressed=new GZIPInputStream(uncompressed, 2048);
 				}
 				return io.readFrame(new DataInputStream(uncompressed));
 			}
 			@Override
 			public void writeFrame(DataOutputStream stream, MemFrame frame) throws IOException{
-				boolean big=(frame.ids().length*8+frame.bytes().length)>8192;
+				boolean big=frame.askForCompress;
 				stream.writeBoolean(big);
 				if(big){
 					try(var z=new GZIPOutputStream(stream, 2048)){

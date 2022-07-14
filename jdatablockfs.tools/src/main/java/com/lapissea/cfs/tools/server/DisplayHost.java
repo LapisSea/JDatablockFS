@@ -103,6 +103,7 @@ public class DisplayHost{
 			
 			var workerPool=Executors.newFixedThreadPool(ForkJoinPool.getCommonPoolParallelism());
 			
+			MemFrame[] lastFrame={null};
 			while(running){
 				try{
 					
@@ -133,7 +134,13 @@ public class DisplayHost{
 								}
 								var s=getSession();
 								yield ()->{
-									s.log(frame);
+									var l   =lastFrame[0];
+									var diff=MemFrame.diff(l, frame);
+									if(diff!=null) s.log(diff);
+									else{
+										lastFrame[0]=frame;
+										s.log(frame);
+									}
 								};
 							}
 							case RESET -> ()->{
@@ -231,7 +238,7 @@ public class DisplayHost{
 					}
 				});
 				var ses=getDisplay().join().getSession("default");
-				ses.log(new MemFrame(data, new long[0], ""));
+				ses.log(new MemFrame(0, data, new long[0], ""));
 				LogUtil.println("Loaded initialData.");
 			}catch(Throwable e){
 				new RuntimeException("Failed to load initialData", e).printStackTrace();
