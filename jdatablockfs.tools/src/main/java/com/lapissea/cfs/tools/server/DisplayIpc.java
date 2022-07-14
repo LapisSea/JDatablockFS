@@ -27,7 +27,7 @@ import java.util.function.Supplier;
 import static com.lapissea.cfs.tools.server.ServerCommons.Action;
 import static com.lapissea.cfs.tools.server.ServerCommons.getLocalLoggerImpl;
 
-public class DisplayServer implements DataLogger{
+public class DisplayIpc implements DataLogger{
 	
 	private static class IpcSession implements DataLogger.Session{
 		
@@ -395,7 +395,7 @@ public class DisplayServer implements DataLogger{
 	private final Map<String, Object>  config;
 	private final Map<String, Session> sessions=new HashMap<>();
 	
-	public DisplayServer(Map<String, Object> config){
+	public DisplayIpc(Map<String, Object> config){
 		this.config=config;
 		
 		initSession();

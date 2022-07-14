@@ -4,7 +4,7 @@ import com.google.gson.GsonBuilder;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.tools.DisplayManager;
-import com.lapissea.cfs.tools.server.DisplayServer;
+import com.lapissea.cfs.tools.server.DisplayIpc;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.UtilL;
@@ -81,7 +81,7 @@ public class LoggedMemoryUtils{
 		return new LateInit<>(()->switch(type){
 			case "none" -> DataLogger.Blank.INSTANCE;
 			case "direct" -> new DisplayManager();
-			case "server" -> new DisplayServer(loggerConfig);
+			case "server" -> new DisplayIpc(loggerConfig);
 			default -> throw new IllegalArgumentException("logger.type unknown value \""+type+"\"");
 		});
 	}
