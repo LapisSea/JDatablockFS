@@ -4,16 +4,18 @@ import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.MemFrame;
+import com.lapissea.util.UtilL;
 import com.lapissea.util.event.change.ChangeRegistry;
 import com.lapissea.util.event.change.ChangeRegistryInt;
 
 import java.lang.ref.WeakReference;
 import java.util.*;
+import java.util.stream.IntStream;
 
 public class SessionHost implements DataLogger{
 	
 	public static final class ParsedFrame{
-		final int index;
+		int                    index;
 		WeakReference<Cluster> cluster=new WeakReference<>(null);
 		Throwable              displayError;
 		Chunk                  lastHoverChunk;
@@ -47,8 +49,34 @@ public class SessionHost implements DataLogger{
 		}
 		
 		@Override
-		public synchronized void log(MemFrame frame){
-			frames.add(new CachedFrame(frame, new ParsedFrame(frames.size())));
+		public void log(MemFrame frame){
+			if(frames.size()>10000){
+				synchronized(frames){
+					var               ints     =new Random().ints(0, frames.size()).distinct().limit(1000).toArray();
+					List<CachedFrame> tmpFrames=new LinkedList<>();
+					IntStream.range(0, (int)(frames.size()*0.7)).filter(i->!UtilL.contains(ints, i)).mapToObj(frames::get).forEach(tmpFrames::add);
+					frames.clear();
+					MemFrame lastFull;
+					{
+						var f=tmpFrames.remove(0);
+						lastFull=new MemFrame(f.memData.frameId(), f.memData.bytes(), f.memData.ids(), f.memData.e());
+						frames.add(new CachedFrame(lastFull, f.parsed));
+					}
+					while(!tmpFrames.isEmpty()){
+						var fr  =tmpFrames.remove(0);
+						var diff=MemFrame.diff(lastFull, fr.memData);
+						frames.add(new CachedFrame(diff==null?fr.memData:diff, fr.parsed));
+						if(diff==null){
+							lastFull=new MemFrame(fr.memData.frameId(), fr.memData.bytes(), fr.memData.ids(), fr.memData.e());
+						}
+					}
+					System.gc();
+				}
+			}
+			
+			synchronized(frames){
+				frames.add(new CachedFrame(frame, new ParsedFrame(frames.isEmpty()?0:frames.get(frames.size()-1).parsed.index+1)));
+			}
 			synchronized(framePos){
 				framePos.set(-1);
 			}

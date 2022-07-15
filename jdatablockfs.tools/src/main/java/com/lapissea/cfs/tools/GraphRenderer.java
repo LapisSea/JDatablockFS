@@ -1,11 +1,14 @@
 package com.lapissea.cfs.tools;
 
 import com.lapissea.cfs.chunk.Cluster;
+import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.impl.MemoryData;
+import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.tools.render.RenderBackend;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
 import com.lapissea.util.Rand;
@@ -176,6 +179,7 @@ public class GraphRenderer implements DataRenderer{
 		private final Bubble       parent;
 		
 		private       long    pos;
+		private       long    size;
 		private       Color   color;
 		private       String  debStr ="";
 		private final String  refName;
@@ -199,22 +203,36 @@ public class GraphRenderer implements DataRenderer{
 			yNew=this.y=y;
 		}
 		
-		public void setVal(long pos, Object val){
-			if(val instanceof IOInstance<?> i) setVal(pos, i);
+		public void setVal(long pos, DataProvider provider, Object val){
+			if(val instanceof IOInstance<?> i) setVal(pos, provider, i);
 			else{
 				this.val=TextUtil.toString(val);
 				pos(pos);
+				size=16;
 			}
 		}
 		private void pos(long pos){
 			this.pos=pos;
-			var r=nodeRand(this);
+			var r=bubbleRand(this);
 			this.color=new Color(Color.HSBtoRGB(r.nextFloat(), (r.nextFloat()*0.2F)+0.8F, 0.8F));
 		}
 		
-		public void setVal(long pos, IOInstance<?> val){
+		@SuppressWarnings({"rawtypes", "unchecked"})
+		public void setVal(long pos, DataProvider provider, IOInstance<?> val){
 			this.val=val==null?"null":val.toString(false, "{\n\t", "\n}", ": ", ",\n\t");
 			pos(pos);
+			try{
+				if(val instanceof IOInstance.Unmanaged u){
+					try(var io=u.getReference().io(provider)){
+						size=io.remaining();
+					}
+				}else if(val==null) size=0;
+				else{
+					size=ContiguousStructPipe.sizeOfUnknown(provider, (IOInstance)val, WordSpace.BYTE);
+				}
+			}catch(Throwable e){
+				size=16;
+			}
 		}
 		public Bubble child(List<Bubble> undead, String name){
 			var opt=children.stream().filter(n->n.refName.equals(name)).findAny().map(n->{
@@ -293,15 +311,9 @@ public class GraphRenderer implements DataRenderer{
 		}
 		
 		for(Bubble bubble : undead){
-			renderBubble(bubble);
-			var l1=lerp(bubble.age, 0.3, 0.1)*lerp(bubble.age, 0, 0.1);
-			if(l1>0.001){
-				renderer.setColor(ColorUtils.alpha(bubble.color, 0.2F));
-				var siz=20*Math.pow(l1, 2);
-				renderer.fillQuad(bubble.x-siz/2, bubble.y-siz/2, siz, siz);
-			}
+			renderBubble(bubble, true);
 		}
-		renderBubble(root);
+		renderBubble(root, false);
 		
 		return maxDist;
 	}
@@ -326,7 +338,7 @@ public class GraphRenderer implements DataRenderer{
 		zoomSpeed+=0.05;
 	}
 	
-	private void renderBubble(Bubble bubble){
+	private void renderBubble(Bubble bubble, boolean undead){
 		var dist      =distFrom(bubble, renderer.getDisplay().getMouseX(), renderer.getDisplay().getMouseY());
 		var close     =dist<150*zoom;
 		var quiteClose=dist<20;
@@ -334,11 +346,13 @@ public class GraphRenderer implements DataRenderer{
 		float fontSize  =(float)(20*lerpPow(dist, 150, 30, 2));
 		int   maxLineLen=100;
 		
+		Color color=undead?ColorUtils.alpha(bubble.color, bubble.age):bubble.color;
+		
 		if(!bubble.debStr.isEmpty()){
-			renderer.getFont().fillStrings(List.of(new DrawFont.StringDraw(25, bubble.color, bubble.debStr, (float)bubble.x, (float)bubble.y)));
+			renderer.getFont().fillStrings(List.of(new DrawFont.StringDraw(25, color, bubble.debStr, (float)bubble.x, (float)bubble.y)));
 		}
 		
-		boolean drawText=false;
+		boolean drawText=!undead;
 		
 		if(drawText&&(close||bubble==root)){
 			var str=bubble.refName;
@@ -350,13 +364,13 @@ public class GraphRenderer implements DataRenderer{
 			for(int i=0;i<split.length;i++){
 				String s=split[i].replace("\t", "    ");
 				if(s.length()>maxLineLen) s=s.substring(0, maxLineLen-3)+"...";
-				renderer.getFont().fillStrings(List.of(new DrawFont.StringDraw(fontSize, bubble.color, s, (float)bubble.x, (float)bubble.y+i*fontSize)));
+				renderer.getFont().fillStrings(List.of(new DrawFont.StringDraw(fontSize, color, s, (float)bubble.x, (float)bubble.y+i*fontSize)));
 			}
 		}
 		var lineW=(float)(6/Math.max(Math.sqrt(bubble.children.size())/3F, 1))*bubble.age*zoom;
 		
-		double nodeSize=(10+Math.sqrt(bubble.val==null?0:bubble.val.length())/3)*bubble.age*zoom;
-		renderer.setColor(bubble.color);
+		double nodeSize=(10+Math.sqrt(1+bubble.size)+Math.sqrt(bubble.val==null?0:bubble.val.length())/3)*bubble.age*zoom;
+		renderer.setColor(color);
 		renderer.fillQuad(bubble.x-nodeSize/2, bubble.y-nodeSize/2, nodeSize, nodeSize);
 		for(Bubble ref : bubble.children){
 			var distXB=bubble.x-ref.x;
@@ -367,40 +381,40 @@ public class GraphRenderer implements DataRenderer{
 			var midXOff=(bubble.x+ref.x*2)/3;
 			var midYOff=(bubble.y+ref.y*2)/3;
 			
-			renderer.setColor(ColorUtils.alpha(bubble.color, 0.4F));
+			renderer.setColor(ColorUtils.alpha(color, 0.4F));
 			
 			var a=Math.min(lineW*8, distB*0.7F);
 			DrawUtils.drawArrow(renderer, a, bubble.x/a, bubble.y/a, ref.x/a, ref.y/a);
 			
-			renderer.setColor(bubble.color);
+			renderer.setColor(color);
 			
 			renderer.drawLine(bubble.x, bubble.y, midXOff, midYOff);
 			
-			renderer.setColor(ref.color);
+			renderer.setColor(undead?ColorUtils.alpha(ref.color, bubble.age):ref.color);
 			renderer.drawLine(ref.x, ref.y, midXOff, midYOff);
 			
-			renderBubble(ref);
+			renderBubble(ref, undead);
 		}
 		
 		
 		var ch=bubble.children;
 		if(drawText&&(close&&!ch.isEmpty())){
 			renderer.getFont().fillStrings(
-				nodeRand(bubble).ints(0, ch.size())
-				                .distinct()
-				                .limit(10)
-				                .mapToObj(ch::get)
-				                .map(ref->{
-					                var midX=(bubble.x+ref.x*2)/3;
-					                var midY=(bubble.y+ref.y*2)/3;
-					                return new DrawFont.StringDraw(fontSize, ref.color, ref.refName, (float)midX, (float)midY);
-				                })
-				                .toList());
+				bubbleRand(bubble).ints(0, ch.size())
+				                  .distinct()
+				                  .limit(Math.min(ch.size(), 10))
+				                  .mapToObj(ch::get)
+				                  .map(ref->{
+					                  var midX=(bubble.x+ref.x*2)/3;
+					                  var midY=(bubble.y+ref.y*2)/3;
+					                  return new DrawFont.StringDraw(fontSize, ref.color, ref.refName, (float)midX, (float)midY);
+				                  })
+				                  .toList());
 		}
 		
 	}
 	
-	private static Random nodeRand(Bubble bubble){
+	private static Random bubbleRand(Bubble bubble){
 		return new Random(bubble.pos<<5);
 	}
 	
@@ -432,7 +446,7 @@ public class GraphRenderer implements DataRenderer{
 			var max   =0.04;
 			var pow   =1.5;
 			
-			double attractStrength=1000*Math.min(1, zoom*zoom);
+			double attractStrength=2000*Math.min(1, zoom);
 			
 			for(var b : flatBubbles){
 				var xstr=attractStrength/Math.max(max, Math.max(lerpPow(b.xNew, margin, 0, pow), lerpPow(b.xNew, width-margin, width, pow)));
@@ -450,7 +464,7 @@ public class GraphRenderer implements DataRenderer{
 		
 		if(undead){
 			for(Bubble b : flatBubbles){
-				var rand=nodeRand(b);
+				var rand=bubbleRand(b);
 				var t   =rand.nextDouble()*10+b.age*10;
 				t*=Math.pow(rand.nextDouble(), 2)*2;
 				var speed=b.children.isEmpty()&&b.parent!=null&&b.parent.children.isEmpty()?2:1;
@@ -743,7 +757,7 @@ public class GraphRenderer implements DataRenderer{
 				n.debStr="";
 			});
 			
-			scan(root, 8, cluster.rootWalker().getRoot());
+			scan(root, cluster, 8, cluster.rootWalker().getRoot());
 		}finally{
 			bubbleDeep(root, n->n.children.removeIf(ref->{
 				if(!ref.touched){
@@ -755,7 +769,7 @@ public class GraphRenderer implements DataRenderer{
 	}
 	
 	@SuppressWarnings({"rawtypes", "unchecked"})
-	private <T extends IOInstance<T>> void scanInline(Bubble parent, T inst, String path){
+	private <T extends IOInstance<T>> void scanInline(Bubble parent, DataProvider provider, T inst, String path){
 		var struct=inst.getThisStruct();
 		var iter  =makeFieldIterator(inst, struct);
 		
@@ -767,7 +781,7 @@ public class GraphRenderer implements DataRenderer{
 				if(field.getAccessor().getType()==ChunkPointer.class){
 					var    val  =field.get(pool, inst);
 					Bubble child=parent.child(undead, path+"."+field.getName());
-					child.setVal(val==null?0:((ChunkPointer)val).getValue(), val);
+					child.setVal(val==null?0:((ChunkPointer)val).getValue(), provider, val);
 					continue;
 				}
 				if(field.typeFlag(IOField.PRIMITIVE_OR_ENUM_FLAG)){
@@ -777,7 +791,7 @@ public class GraphRenderer implements DataRenderer{
 					continue;
 				}
 				var val=field.get(pool, inst);
-				if(val instanceof IOInstance i) scanInline(parent, i, path+"."+field.getName());
+				if(val instanceof IOInstance i) scanInline(parent, provider, i, path+"."+field.getName());
 				continue;
 			}
 			
@@ -785,17 +799,17 @@ public class GraphRenderer implements DataRenderer{
 			if(val!=null){
 				var    ref  =refField.getReference(inst).getPtr().getValue();
 				Bubble child=parent.child(undead, path+"."+refField.getName());
-				if(val instanceof IOInstance i) scan(child, ref, i);
+				if(val instanceof IOInstance i) scan(child, provider, ref, i);
 				else{
-					child.setVal(ref, val);
+					child.setVal(ref, provider, val);
 				}
 			}
 		}
 	}
 	
 	@SuppressWarnings({"rawtypes", "unchecked"})
-	private <T extends IOInstance<T>> void scan(Bubble bubble, long pos, T inst){
-		bubble.setVal(pos, inst);
+	private <T extends IOInstance<T>> void scan(Bubble bubble, DataProvider provider, long pos, T inst){
+		bubble.setVal(pos, provider, inst);
 		if(inst==null) return;
 		
 		var struct=inst.getThisStruct();
@@ -809,7 +823,7 @@ public class GraphRenderer implements DataRenderer{
 				if(field.getAccessor().getType()==ChunkPointer.class){
 					var    val  =field.get(pool, inst);
 					Bubble child=bubble.child(undead, field.getName());
-					child.setVal(val==null?0:((ChunkPointer)val).getValue(), val);
+					child.setVal(val==null?0:((ChunkPointer)val).getValue(), provider, val);
 					continue;
 				}
 				
@@ -820,7 +834,7 @@ public class GraphRenderer implements DataRenderer{
 					continue;
 				}
 				var val=field.get(pool, inst);
-				if(val instanceof IOInstance i) scanInline(bubble, i, field.getName());
+				if(val instanceof IOInstance i) scanInline(bubble, provider, i, field.getName());
 				continue;
 			}
 			
@@ -828,9 +842,9 @@ public class GraphRenderer implements DataRenderer{
 			if(val!=null){
 				var    ref  =refField.getReference(inst).getPtr().getValue();
 				Bubble child=bubble.child(undead, refField.getName());
-				if(val instanceof IOInstance i) scan(child, ref, i);
+				if(val instanceof IOInstance i) scan(child, provider, ref, i);
 				else{
-					child.setVal(ref, val);
+					child.setVal(ref, provider, val);
 				}
 			}
 		}

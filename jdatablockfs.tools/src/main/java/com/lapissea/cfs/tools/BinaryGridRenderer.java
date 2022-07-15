@@ -139,21 +139,31 @@ public class BinaryGridRenderer implements DataRenderer{
 	}
 	
 	private int getFrameCount(){
-		return getDisplayedSession().map(s->s.frames.size()).orElse(0);
+		return getDisplayedSession().map(s->{
+			synchronized(s.frames){
+				return s.frames.size();
+			}
+		}).orElse(0);
 	}
 	public SessionHost.CachedFrame getFrame(int index){
 		return getDisplayedSession().map(s->{
-			if(index==-1){
-				if(s.frames.isEmpty()) return null;
-				return s.frames.get(s.frames.size()-1);
+			synchronized(s.frames){
+				if(index==-1){
+					if(s.frames.isEmpty()) return null;
+					return s.frames.get(s.frames.size()-1);
+				}
+				return s.frames.get(index);
 			}
-			return s.frames.get(index);
 		}).orElse(null);
 	}
 	@Override
 	public int getFramePos(){
 		return getDisplayedSession().map(ses->{
-			if(ses.framePos.get()==-1) ses.setFrame(ses.frames.size()-1);
+			if(ses.framePos.get()==-1){
+				synchronized(ses.frames){
+					ses.setFrame(ses.frames.size()-1);
+				}
+			}
 			return ses.framePos.get();
 		}).orElse(0);
 	}
@@ -578,7 +588,22 @@ public class BinaryGridRenderer implements DataRenderer{
 			buff.clear();
 			
 			var rCtx=new RenderContext(RenderBackend.DRAW_DEBUG?direct:buff, bytes, getPixelsPerByte(), dis, new ArrayList<>());
+			try{
+				findHoverChunk(rCtx, parsed, DataProvider.newVerySimpleProvider(MemoryData.builder().withRaw(bytes).asReadOnly().build()));
+			}catch(IOException e1){
+				handleError(e1, parsed);
+			}
+			
 			drawStatic(frame, rCtx, parsed);
+			
+			if(parsed.lastHoverChunk!=null){
+				Random r=new Random(parsed.lastHoverChunk.getPtr().getValue());
+				rCtx.hoverMessages.add(new HoverMessage(
+					List.of(new Range(parsed.lastHoverChunk.getPtr().getValue(), parsed.lastHoverChunk.dataEnd())),
+					new Color(r.nextInt(256), r.nextInt(256), r.nextInt(256), 100),
+					new Object[]{parsed.lastHoverChunk}
+				));
+			}
 			this.lastHoverMessages=List.copyOf(rCtx.hoverMessages);
 		}
 		
@@ -952,7 +977,9 @@ public class BinaryGridRenderer implements DataRenderer{
 		for(Pointer ptr : ptrs){
 			boolean drawMsg=false;
 			
-			var siz  =Math.max(1, ctx.pixelsPerByte()/12F);
+			var siz  =ctx.pixelsPerByte()/16F;
+			var alpha=Math.min(1, siz);
+			siz=Math.max(1, siz);
 			var sFul =siz;
 			var sHalf=siz/2;
 			renderer.setLineWidth(sFul*ptr.widthFactor());
@@ -972,14 +999,14 @@ public class BinaryGridRenderer implements DataRenderer{
 				col=ptr.color();
 			}
 			
-			renderer.setColor(alpha(col, 0.5F));
+			renderer.setColor(alpha(col, 0.7F*alpha));
 			
 			if(pSiz>1&&LongStream.range(start, start+pSiz).noneMatch(i->i%ctx.width()==0)){
-				renderer.setColor(alpha(col, 0.1F));
+				renderer.setColor(alpha(col, 0.2F*alpha));
 				renderer.setLineWidth(sHalf*ptr.widthFactor());
 				drawLine(ctx, start, start+pSiz-1);
 				renderer.setLineWidth(sFul*ptr.widthFactor());
-				renderer.setColor(alpha(col, 0.5F));
+				renderer.setColor(alpha(col, 0.7F*alpha));
 			}
 			
 			start+=pSiz/2;

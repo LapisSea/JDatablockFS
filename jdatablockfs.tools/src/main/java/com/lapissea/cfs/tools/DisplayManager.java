@@ -39,8 +39,8 @@ public class DisplayManager implements DataLogger{
 	private final RenderBackend          renderer;
 	private final RenderBackend.Buffered gridBuff;
 	
-	private final SessionHost  sessionHost=new SessionHost();
-	private final DataRenderer gridRenderer;
+	private final SessionHost        sessionHost=new SessionHost();
+	private final DataRenderer.Split splitRenderer;
 	
 	private boolean titleDirty=true;
 	
@@ -49,8 +49,10 @@ public class DisplayManager implements DataLogger{
 		renderer=createBackend();
 		gridBuff=renderer.buffer();
 		
-		gridRenderer=new GraphRenderer(renderer);
-//		gridRenderer=new BinaryGridRenderer(RenderBackend.DRAW_DEBUG?renderer:gridBuff);
+		var graphRenderer=new GraphRenderer(renderer);
+		var gridRenderer =new BinaryGridRenderer(RenderBackend.DRAW_DEBUG?renderer:gridBuff);
+		
+		splitRenderer=new DataRenderer.Split(List.of(gridRenderer, graphRenderer));
 		
 		Runnable updateTitle=()->{
 			titleDirty=true;
@@ -125,9 +127,9 @@ public class DisplayManager implements DataLogger{
 				return;
 			}
 			
-			gridRenderer.getDisplayedSession().ifPresent(ses->{
-				ses.setFrame(Math.max(0, gridRenderer.getFramePos()-delta));
-				gridRenderer.markDirty();
+			splitRenderer.getDisplayedSession().ifPresent(ses->{
+				ses.setFrame(Math.max(0, splitRenderer.getFramePos()-delta));
+				splitRenderer.markDirty();
 			});
 		});
 		
@@ -137,18 +139,18 @@ public class DisplayManager implements DataLogger{
 			if(!display.isMouseKeyDown(RenderBackend.DisplayInterface.MouseKey.LEFT)) return;
 			if(ImGui.getIO().getWantCaptureMouse()) return;
 			
-			gridRenderer.getDisplayedSession().ifPresent(ses->{
+			splitRenderer.getDisplayedSession().ifPresent(ses->{
 				float percent=MathUtil.snap((display.getMouseX()-10F)/(display.getWidth()-20F), 0, 1);
 				ses.setFrame(Math.round((ses.frames.size()-1)*percent));
-				gridRenderer.markDirty();
+				splitRenderer.markDirty();
 			});
 		});
 		
 		display.registerDisplayResize(()->{
 			sessionHost.cleanUpSessions();
-			gridRenderer.notifyResize();
+			splitRenderer.notifyResize();
 			renderer.markFrameDirty();
-			gridRenderer.markDirty();
+			splitRenderer.markDirty();
 			renderer.runLater(()->{
 				if(renderer.notifyDirtyFrame()){
 					doRender();
@@ -158,7 +160,10 @@ public class DisplayManager implements DataLogger{
 		
 		display.registerKeyboardButton(e->{
 			sessionHost.cleanUpSessions();
-			if(e.type()!=DOWN&&gridRenderer.getDisplayedSession().isPresent()){
+			if(e.type()!=DOWN&&e.key()==GLFW_KEY_LEFT_ALT){
+				splitRenderer.next();
+			}
+			if(e.type()!=DOWN&&splitRenderer.getDisplayedSession().isPresent()){
 				switch(e.key()){
 					case GLFW_KEY_UP -> {
 						sessionHost.nextSession();
@@ -176,8 +181,8 @@ public class DisplayManager implements DataLogger{
 			else if(e.key()==GLFW_KEY_RIGHT||e.key()==GLFW_KEY_D) delta=1;
 			else return;
 			if(e.type()==UP) return;
-			gridRenderer.markDirty();
-			gridRenderer.getDisplayedSession().ifPresent(ses->ses.setFrame(gridRenderer.getFramePos()+delta));
+			splitRenderer.markDirty();
+			splitRenderer.getDisplayedSession().ifPresent(ses->ses.setFrame(splitRenderer.getFramePos()+delta));
 		});
 		
 		try{
@@ -205,9 +210,9 @@ public class DisplayManager implements DataLogger{
 						}
 					}
 					
-					if(!gridRenderer.getDisplayedSession().equals(activeSession)){
-						gridRenderer.setDisplayedSession(activeSession);
-						ifFrame(frame->gridRenderer.notifyResize());
+					if(!splitRenderer.getDisplayedSession().equals(activeSession)){
+						splitRenderer.setDisplayedSession(activeSession);
+						ifFrame(frame->splitRenderer.notifyResize());
 					}
 					if(destroyRequested){
 						destroyRequested=false;
@@ -229,7 +234,7 @@ public class DisplayManager implements DataLogger{
 						);
 					}
 					
-					if(renderer.notifyDirtyFrame()||gridRenderer.isDirty()){
+					if(renderer.notifyDirtyFrame()||splitRenderer.isDirty()){
 						doRender();
 					}else UtilL.sleep(16);
 					if(jitWarmup>=150) UtilL.sleep(0, 1000);
@@ -251,9 +256,9 @@ public class DisplayManager implements DataLogger{
 		renderer.preRender();
 		
 		var m=ImGui.getIO().getWantCaptureMouse();
-		if(RenderBackend.DRAW_DEBUG||!m||gridRenderer.isDirty()){
+		if(RenderBackend.DRAW_DEBUG||!m||splitRenderer.isDirty()){
 			gridBuff.clear();
-			hover=gridRenderer.render();
+			hover=splitRenderer.render();
 		}
 		
 		gridBuff.draw();
@@ -295,11 +300,11 @@ public class DisplayManager implements DataLogger{
 			
 			ImGui.end();
 		});
-		gridRenderer.getDisplayedSession().map(s->s.frames).ifPresent(frames->{
+		splitRenderer.getDisplayedSession().map(s->s.frames).ifPresent(frames->{
 			if(frames.isEmpty()) return;
 			SessionHost.ParsedFrame f;
 			try{
-				f=frames.get(gridRenderer.getFramePos()).parsed();
+				f=frames.get(splitRenderer.getFramePos()).parsed();
 			}catch(IndexOutOfBoundsException ignored){
 				return;
 			}
@@ -580,11 +585,13 @@ public class DisplayManager implements DataLogger{
 	}
 	
 	private void ifFrame(Consumer<MemFrame> o){
-		gridRenderer.getDisplayedSession().map(s->s.frames).ifPresent(frames->{
-			if(frames.isEmpty()) return;
-			try{
-				o.accept(frames.get(gridRenderer.getFramePos()).memData());
-			}catch(IndexOutOfBoundsException ignored){}
+		splitRenderer.getDisplayedSession().map(s->s.frames).ifPresent(frames->{
+			synchronized(frames){
+				if(frames.isEmpty()) return;
+				try{
+					o.accept(frames.get(splitRenderer.getFramePos()).memData());
+				}catch(IndexOutOfBoundsException ignored){}
+			}
 		});
 	}
 	
@@ -597,7 +604,7 @@ public class DisplayManager implements DataLogger{
 	public void destroy(){
 		destroyRequested=true;
 		sessionHost.destroy();
-		gridRenderer.setDisplayedSession(Optional.empty());
+		splitRenderer.setDisplayedSession(Optional.empty());
 		renderer.markFrameDirty();
 	}
 	@Override
