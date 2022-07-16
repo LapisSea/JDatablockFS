@@ -1,11 +1,15 @@
 package com.lapissea.cfs.objects.collections;
 
+import com.lapissea.cfs.chunk.AllocateTicket;
+import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.DataProvider;
+import com.lapissea.cfs.exceptions.BitDepthOutOfSpaceException;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.ValueStorage;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
+import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
@@ -235,6 +239,7 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 	@Override
 	public void add(T value) throws IOException{
 		Objects.requireNonNull(value);
+		defragData(1);
 		writeAt(size(), value);
 		deltaSize(1);
 	}
@@ -252,6 +257,7 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 			}
 			return;
 		}
+		defragData(count);
 		
 		try(var io=selfIO()){
 			var pos=calcElementOffset(size(), getElementSize());
@@ -334,6 +340,8 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 	}
 	
 	private void forwardDup(long index) throws IOException{
+		defragData(1);
+		
 		try(var io=selfIO()){
 			var    siz =getElementSize();
 			byte[] buff=new byte[Math.toIntExact(siz)];
@@ -351,6 +359,42 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 				io.setPos(nextPos);
 				io.write(buff);
 			}
+		}
+	}
+	
+	private void defragData(long extraSlots) throws IOException{
+		defragData(getReference().getPtr().dereference(getDataProvider()), extraSlots, Math.max(5, size()/8));
+	}
+	private void defragData(Chunk ch, long extraSlots, long max) throws IOException{
+		if(max<=2) return;
+		if(ch.streamNext().limit(max).count()==max){
+			var next    =ch.requireNext();
+			var existing=next.streamNext().mapToLong(Chunk::getCapacity).sum();
+			var extra   =extraSlots*getElementSize();
+			
+			var newNext=AllocateTicket.bytes(existing+extra)
+			                          .withPositionMagnet(ch)
+			                          .withDataPopulated((prov, io)->{
+				                          try(var ioSrc=next.io()){
+					                          ioSrc.transferTo(io);
+				                          }
+			                          })
+			                          .withApproval(Chunk.sizeFitsPointer(ch.getNextSize()))
+			                          .withExplicitNextSize(Optional.of(NumberSize.bySize(getDataProvider().getSource().getIOSize())))
+			                          .submit(getDataProvider());
+			if(newNext==null){
+				defragData(next, extraSlots, max-1);
+				return;
+			}
+			
+			try{
+				ch.setNextPtr(newNext.getPtr());
+			}catch(BitDepthOutOfSpaceException e){
+				throw new RuntimeException(e);
+			}
+			ch.syncStruct();
+			
+			getDataProvider().getMemoryManager().free(next.collectNext());
 		}
 	}
 	
