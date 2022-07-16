@@ -92,6 +92,15 @@ public class Configuration{
 				default -> throw new IllegalStateException(val+" can not be converted to int");
 			};
 		}
+		public boolean getBoolean(String name, boolean defaultValue){
+			var val=arguments.get(name);
+			return switch(val){
+				case null -> defaultValue;
+				case Boolean b -> b;
+				case String s -> Boolean.parseBoolean(s);
+				default -> throw new IllegalStateException(val+" can not be converted to boolean");
+			};
+		}
 	}
 	
 	private final Map<String, Object> arguments=new HashMap<>();

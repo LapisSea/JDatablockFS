@@ -316,6 +316,8 @@ public class SlowTests{
 			var  inst=Instant.now();
 			long i   =splitter.size();
 			while(provider.getSource().getIOSize()<size.maxSize){
+				IOException e1=null;
+				
 				long t=System.nanoTime();
 				for(int j=0;j<5;j++){
 					if(i==checkpointStep){
@@ -330,20 +332,23 @@ public class SlowTests{
 					}
 					
 					try{
-						splitter.put(i, ("int("+i+")").repeat(10));
+						splitter.put(i, ("int("+i+")").repeat(new Random(provider.getSource().getIOSize()+i).nextInt(20)));
+						i++;
 					}catch(Throwable e){
-						throw new IOException("failed to put element: "+i, e);
+						e1=new IOException("failed to put element: "+i, e);
 					}
-					i++;
 				}
 				var dt=System.nanoTime()-t;
 //				if(dt/10D<debs.stream().mapToLong(Deb::time).average().orElse(Double.MAX_VALUE)) debs.add(new Deb(dt, splitter.size()));
 //				else LogUtil.println("nope", i);
 				
-				if(Duration.between(inst, Instant.now()).toMillis()>1000){
+				if(Duration.between(inst, Instant.now()).toMillis()>1000||e1!=null){
 					inst=Instant.now();
 					LogUtil.println(i, provider.getSource().getIOSize()/(float)size.maxSize);
 					printTable.run();
+				}
+				if(e1!=null){
+					throw e1;
 				}
 			}
 			LogUtil.println(i, provider.getSource().getIOSize()/(float)size.maxSize);
