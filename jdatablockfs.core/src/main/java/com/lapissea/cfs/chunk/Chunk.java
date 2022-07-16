@@ -412,6 +412,14 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 	public NumberSize getBodyNumSize(){
 		return bodyNumSize;
 	}
+	public void setBodyNumSize(NumberSize bodyNumSize) throws BitDepthOutOfSpaceException{
+		forbidReadOnly();
+		if(this.bodyNumSize==bodyNumSize) return;
+		bodyNumSize.ensureCanFit(getCapacity());
+		this.bodyNumSize=bodyNumSize;
+		markDirty();
+		calcHeaderSize();
+	}
 	
 	public NumberSize getNextSize(){
 		return nextSize;
@@ -468,6 +476,10 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		return Optional.ofNullable(next());
 	}
 	
+	public Chunk requireNext() throws IOException{
+		return Objects.requireNonNull(next());
+	}
+	
 	@Nullable
 	public Chunk next() throws IOException{
 		if(nextCache==null){
@@ -477,13 +489,20 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		return nextCache;
 	}
 	
-	public void clearNextPtrAndSize(){
+	public void clearAndCompressHeader(){
 		try{
 			setNextPtr(ChunkPointer.NULL);
 			var oldSiz=getHeaderSize();
 			setNextSize(NumberSize.VOID);
 			var newSiz=getHeaderSize();
-			setCapacity(getCapacity()+oldSiz-newSiz);
+			setSize(0);
+			try{
+				setCapacity(getCapacity()+oldSiz-newSiz);
+			}catch(BitDepthOutOfSpaceException e){
+				setBodyNumSize(NumberSize.bySize(getCapacity()+oldSiz-newSiz));
+				newSiz=getHeaderSize();
+				setCapacity(getCapacity()+oldSiz-newSiz);
+			}
 		}catch(BitDepthOutOfSpaceException e){
 			throw new ShouldNeverHappenError(e);
 		}

@@ -1,5 +1,6 @@
 package com.lapissea.cfs.chunk;
 
+import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.objects.ObjectID;
 import com.lapissea.cfs.objects.collections.IOMap;
@@ -102,7 +103,7 @@ public interface RootProvider extends DataProvider.Holder{
 	<T> void provide(T obj, ObjectID id) throws IOException;
 	
 	
-	Iterable<IOMap.IOEntry<ObjectID, Object>> listAll();
+	IterablePP<IOMap.IOEntry<ObjectID, Object>> listAll();
 	
 	default void drop(String id) throws IOException{
 		drop(new ObjectID(id));

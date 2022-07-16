@@ -108,7 +108,6 @@ public class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 					synchronized(freeChunks){
 						freeChunks.requestCapacity(cap);
 					}
-					assert freeChunks.getCapacity()==cap:freeChunks.getCapacity()+" "+cap;
 				}
 				
 				var chs=popQueue();
@@ -128,6 +127,8 @@ public class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 		if(toFree.isEmpty()) return toFree;
 		var end=toFree.iterator().next().getDataProvider().getSource().getIOSize();
 		
+		List<Chunk> toNotify=new ArrayList<>();
+		
 		wh:
 		while(true){
 			for(var i=result.iterator();i.hasNext();){
@@ -143,6 +144,7 @@ public class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 				var ptr=chunk.getPtr();
 				
 				i.remove();
+				toNotify.add(chunk);
 				
 				for(Chunk c : result){
 					if(c.getNextPtr().equals(ptr)){
@@ -154,6 +156,9 @@ public class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 			if(!dirty){
 				try(var io=context.getSource().io()){
 					io.setCapacity(end);
+				}
+				for(Chunk chunk : toNotify){
+					context.getChunkCache().notifyDestroyed(chunk);
 				}
 			}
 			return result;

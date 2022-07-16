@@ -1,5 +1,6 @@
 package com.lapissea.cfs.chunk;
 
+import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.exceptions.InvalidMagicIDException;
 import com.lapissea.cfs.exceptions.MalformedPointerException;
 import com.lapissea.cfs.io.IOInterface;
@@ -171,7 +172,7 @@ public class Cluster implements DataProvider{
 		}
 		
 		@Override
-		public Iterable<IOMap.IOEntry<ObjectID, Object>> listAll(){
+		public IterablePP<IOMap.IOEntry<ObjectID, Object>> listAll(){
 			return ()->meta().rootObjects.iterator();
 		}
 		

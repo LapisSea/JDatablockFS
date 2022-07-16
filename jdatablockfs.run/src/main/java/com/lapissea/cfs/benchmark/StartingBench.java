@@ -11,7 +11,7 @@ import java.util.concurrent.TimeUnit;
 public class StartingBench{
 	
 	@Benchmark
-	@Fork(value=200)
+	@Fork(value=200, warmups=1)
 	@Warmup(iterations=0)
 	@Measurement(iterations=1)
 	@BenchmarkMode(Mode.SingleShotTime)

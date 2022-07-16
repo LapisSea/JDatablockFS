@@ -101,10 +101,20 @@ public record AllocateTicket(
 	}
 	
 	public Chunk submit(DataProvider provider) throws IOException{
-		return provider.getMemoryManager().alloc(this);
+		var mngr=provider.getMemoryManager();
+		try{
+			return mngr.alloc(this);
+		}catch(Throwable e){
+			throw new IOException("Failed to submit "+this, e);
+		}
 	}
 	public Chunk submit(DataProvider.Holder provider) throws IOException{
-		return provider.getDataProvider().getMemoryManager().alloc(this);
+		var mngr=provider.getDataProvider().getMemoryManager();
+		try{
+			return mngr.alloc(this);
+		}catch(Throwable e){
+			throw new IOException("Failed to submit "+this, e);
+		}
 	}
 	public Chunk submit(MemoryManager manager) throws IOException{
 		return manager.alloc(this);
