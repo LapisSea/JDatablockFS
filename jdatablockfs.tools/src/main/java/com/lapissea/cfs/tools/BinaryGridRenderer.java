@@ -867,11 +867,7 @@ public class BinaryGridRenderer implements DataRenderer{
 				int   xi=i%ctx.width(), yi=i/ctx.width();
 				float xF=ctx.pixelsPerByte()*xi, yF=ctx.pixelsPerByte()*yi;
 				if(ctx.pixelsPerByte()<6){
-					var ones=0;
-					for(int bi=0;bi<8;bi++){
-						if(((b>>bi)&1)==1) ones++;
-					}
-					ctx.renderer.fillQuad(xF, yF, ctx.pixelsPerByte(), ctx.pixelsPerByte()/8F*ones);
+					ctx.renderer.fillQuad(xF, yF, ctx.pixelsPerByte(), ctx.pixelsPerByte()/8F*Integer.bitCount(b));
 				}else{
 					for(int bi=0;bi<8;bi++){
 						if(((b>>bi)&1)==1){

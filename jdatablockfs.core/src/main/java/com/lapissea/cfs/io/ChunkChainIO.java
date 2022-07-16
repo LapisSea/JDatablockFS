@@ -199,7 +199,7 @@ public final class ChunkChainIO implements RandomIO{
 				
 				var cap=getCapacity();
 				if(cap<newCapacity){
-					throw new IOException("Capacity not allocated for: "+head+(head==cursor?"":" (at "+cursor+")")+" "+cap+" < "+newCapacity);
+					throw new IOException("Capacity not allocated for: "+head.collectNext()+" "+cap+" < "+newCapacity);
 				}
 				
 				return this;

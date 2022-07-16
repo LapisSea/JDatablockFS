@@ -349,7 +349,9 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 						node=newNode;
 					}
 				}catch(Throwable e){
-					throw new RuntimeException("failed to run copy on "+smallHash, e);
+					var e1=new RuntimeException("failed to run copy on "+smallHash, e);
+					e1.printStackTrace();
+					throw e1;
 				}
 			}
 		}, writeExecutor);
@@ -733,3 +735,4 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		return (int)(((((x^mul)&mask)*mul+0xBL)&mask) >>> 17);
 	}
 }
+
