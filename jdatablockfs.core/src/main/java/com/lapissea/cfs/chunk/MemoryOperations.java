@@ -247,33 +247,47 @@ public class MemoryOperations{
 	private static final boolean PURGE_ACCIDENTAL=UtilL.sysPropertyByClass(MemoryOperations.class, "PURGE_ACCIDENTAL", GlobalConfig.DEBUG_VALIDATION, Boolean::valueOf);
 	
 	public static List<Chunk> mergeChunks(Collection<Chunk> data) throws IOException{
-		List<Chunk> chunks=new ArrayList<>(data);
-		chunks.sort(Chunk::compareTo);
 		List<Chunk> toDestroy=new ArrayList<>();
+		List<Chunk> oks      =new ArrayList<>();
 		
-		while(chunks.size()>1){
-			boolean noChange=true;
-			
-			var chunk=chunks.get(chunks.size()-1);
-			for(int i=chunks.size()-2;i>=0;i--){
-				var prev=chunks.get(i);
+		{
+			List<Chunk> chunks=new ArrayList<>(data);
+			chunks.sort(Chunk::compareTo);
+			while(chunks.size()>1){
+				var prev =chunks.get(chunks.size()-2);
+				var chunk=chunks.remove(chunks.size()-1);
+				assert prev.getPtr().getValue()<chunk.getPtr().getValue():prev.getPtr()+" "+chunk.getPtr();
 				if(prev.isNextPhysical(chunk)){
 					prepareFreeChunkMerge(prev, chunk);
+					
 					toDestroy.add(chunk);
-					chunks.remove(i+1);
-					noChange=false;
+				}else{
+					oks.add(chunk);
 				}
-				chunk=prev;
 			}
-			if(noChange){
-				break;
+			var chunk=chunks.remove(chunks.size()-1);
+			oks.add(chunk);
+		}
+		
+		for(Chunk chunk : oks){
+			clearFree(chunk);
+		}
+		
+		if(!toDestroy.isEmpty()){
+			toDestroy.sort(Comparator.naturalOrder());
+			byte[] empty   =new byte[(int)Chunk.PIPE.getSizeDescriptor().requireMax(WordSpace.BYTE)];
+			var    provider=toDestroy.get(0).getDataProvider();
+			try(var io=provider.getSource().io()){
+				io.writeAtOffsets(toDestroy.stream().map(c->new RandomIO.WriteChunk(c.getPtr().getValue(), empty, c.getHeaderSize())).toList());
+			}
+			for(Chunk chunk : toDestroy){
+				provider.getChunkCache().notifyDestroyed(chunk);
 			}
 		}
 		
 		ExecutorService service=null;
 		
-		for(Chunk chunk : chunks){
-			clearFree(chunk);
+		for(Chunk chunk : oks){
 			
 			if(PURGE_ACCIDENTAL){
 				if(chunk.getCapacity()>3000){
@@ -299,15 +313,7 @@ public class MemoryOperations{
 			}
 		}
 		
-		if(!PURGE_ACCIDENTAL){
-			if(!toDestroy.isEmpty()){
-				toDestroy.sort(Comparator.naturalOrder());
-				for(Chunk chunk : toDestroy){
-					chunk.destroy(false);
-				}
-			}
-		}
-		return chunks;
+		return oks;
 	}
 	
 	
@@ -486,7 +492,8 @@ public class MemoryOperations{
 			
 			var freeSpace=effectiveCapacity-ticket.bytes();
 			
-			if(freeSpace>effectiveCapacity*2L){
+			var potentialChunk=chBuilderFromTicket(context, c.getPtr(), ticket).create();
+			if(freeSpace>c.getHeaderSize()+potentialChunk.getHeaderSize()){
 				Chunk reallocate=chipEndProbe(context, ticket, c);
 				if(reallocate!=null) return reallocate;
 			}
@@ -512,10 +519,8 @@ public class MemoryOperations{
 	}
 	
 	private static Chunk chipEndProbe(DataProvider context, AllocateTicket ticket, Chunk ch) throws IOException{
-		var builder=new ChunkBuilder(context, ch.getPtr())
-			            .withCapacity(ticket.bytes())
-			            .withExplicitNextSize(ticket.calcNextSize())
-			            .withNext(ticket.next());
+		var ptr    =ch.getPtr();
+		var builder=chBuilderFromTicket(context, ptr, ticket);
 		
 		var reallocate=builder.create();
 		
@@ -534,17 +539,22 @@ public class MemoryOperations{
 		
 		ch.setCapacityAndModifyNumSize(ch.getCapacity()-reallocate.totalSize());
 		ch.writeHeader();
+		context.getChunkCache().add(reallocate);
 		return reallocate;
+	}
+	private static ChunkBuilder chBuilderFromTicket(DataProvider context, ChunkPointer ptr, AllocateTicket ticket){
+		return new ChunkBuilder(context, ptr)
+			       .withCapacity(ticket.bytes())
+			       .withExplicitNextSize(ticket.calcNextSize())
+			       .withNext(ticket.next());
 	}
 	
 	public static Chunk allocateAppendToFile(DataProvider context, AllocateTicket ticket) throws IOException{
 		
-		var src=context.getSource();
+		var src  =context.getSource();
+		var ioSiz=src.getIOSize();
 		
-		var builder=new ChunkBuilder(context, ChunkPointer.of(src.getIOSize()))
-			            .withCapacity(ticket.bytes())
-			            .withExplicitNextSize(ticket.calcNextSize())
-			            .withNext(ticket.next());
+		ChunkBuilder builder=chBuilderFromTicket(context, ChunkPointer.of(ioSiz), ticket);
 		
 		var chunk=builder.create();
 		if(!ticket.approve(chunk)) return null;
@@ -553,7 +563,7 @@ public class MemoryOperations{
 			chunk.writeHeader(io);
 			Utils.zeroFill(io::write, chunk.getCapacity());
 		}
-		
+		context.getChunkCache().add(chunk);
 		return chunk;
 	}
 	
@@ -613,26 +623,46 @@ public class MemoryOperations{
 				return size;
 			}
 			
+			long safeToAllocate=toAllocate;
 			
-			var ch=new ChunkBuilder(provider, freePtr.addPtr(toAllocate)).create();
-			ch.setCapacityAndModifyNumSize(size-ch.getHeaderSize()-toAllocate);
-			ch.writeHeader();
-			
-			ch=ch.getPtr().dereference(provider);
-			
-			iter.ioSet(ch.getPtr());
-			
-			
-			var newCapacity=target.getCapacity()+toAllocate;
-			try{
-				target.setCapacity(newCapacity);
-			}catch(BitDepthOutOfSpaceException e){
-				throw new ShouldNeverHappenError(e);
+			Chunk ch;
+			long  newCapacity;
+			while(true){
+				ch=new ChunkBuilder(provider, freePtr.addPtr(safeToAllocate)).create();
+				ch.setCapacityAndModifyNumSize(size-ch.getHeaderSize()-safeToAllocate);
+				
+				newCapacity=target.getCapacity()+safeToAllocate;
+				if(!target.getBodyNumSize().canFit(newCapacity)){
+					safeToAllocate=target.getBodyNumSize().maxSize()-target.getCapacity();
+					continue;
+				}
+				break;
 			}
-			target.syncStruct();
+			if(safeToAllocate==0) continue;
 			
-			freeChunk.destroy(false);
-			return toAllocate;
+			try(var ignored=provider.getSource().openIOTransaction()){
+				ch.writeHeader();
+				ch=ch.getPtr().dereference(provider);
+				
+				iter.ioSet(ch.getPtr());
+				
+				
+				try{
+					target.setCapacity(newCapacity);
+				}catch(BitDepthOutOfSpaceException e){
+					throw new ShouldNeverHappenError(e);
+				}
+				target.syncStruct();
+			}
+			if(safeToAllocate<freeChunk.getHeaderSize()){
+				try(var io=provider.getSource().ioAt(freeChunk.getPtr().getValue())){
+					Utils.zeroFill(io::write, safeToAllocate);
+				}
+				provider.getChunkCache().notifyDestroyed(freeChunk);
+			}else{
+				freeChunk.destroy(false);
+			}
+			return safeToAllocate;
 		}
 		return 0;
 	}

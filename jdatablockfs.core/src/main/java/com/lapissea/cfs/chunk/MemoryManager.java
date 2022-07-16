@@ -136,6 +136,7 @@ public interface MemoryManager extends DataProvider.Holder{
 				ticket=ticket.withBytes(minSize);
 			}
 			
+			
 			Chunk chunk;
 			
 			tryStrategies:
@@ -144,6 +145,7 @@ public interface MemoryManager extends DataProvider.Holder{
 					chunk=alloc.alloc(context, ticket);
 					if(chunk!=null){
 						if(DEBUG_VALIDATION){
+							chunk.requireReal();
 							var nsizO=ticket.explicitNextSize();
 							if(nsizO.isPresent()){
 								var nsiz =nsizO.get();
@@ -159,7 +161,6 @@ public interface MemoryManager extends DataProvider.Holder{
 				return null;
 			}
 			
-			context.getChunkCache().add(chunk);
 			
 			var initial=ticket.dataPopulator();
 			if(initial!=null){

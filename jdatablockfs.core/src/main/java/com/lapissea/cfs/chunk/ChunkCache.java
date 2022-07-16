@@ -8,12 +8,13 @@ import com.lapissea.util.WeakValueHashMap;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.function.Supplier;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
-public class ChunkCache{
+public final class ChunkCache{
 	
 	public static ChunkCache none(){
 		return new ChunkCache(()->new AbstractMap<>(){
@@ -29,10 +30,10 @@ public class ChunkCache{
 	}
 	
 	public static ChunkCache strong(){
-		return new ChunkCache(()->Collections.synchronizedMap(new HashMap<>()));
+		return new ChunkCache(HashMap::new);
 	}
 	public static ChunkCache weak(){
-		return new ChunkCache(()->Collections.synchronizedMap(new WeakValueHashMap<>()));
+		return new ChunkCache(WeakValueHashMap::new);
 //		return new ChunkCache(()->Collections.synchronizedMap(new WeakValueHashMap<ChunkPointer, Chunk>().defineStayAlivePolicy(1)));
 	}
 	
@@ -42,16 +43,21 @@ public class ChunkCache{
 		data=Objects.requireNonNull(dataInitializer.get());
 	}
 	
-	public void add(Chunk chunk){
+	public synchronized void add(Chunk chunk){
+		if(DEBUG_VALIDATION){
+			if(data.containsKey(chunk.getPtr())){
+				throw new IllegalStateException(chunk.getPtr()+" already exists");
+			}
+		}
 		data.put(chunk.getPtr(), chunk);
 	}
 	
 	@Nullable
-	public Chunk get(ChunkPointer pointer){
+	public synchronized Chunk get(ChunkPointer pointer){
 		return data.get(pointer);
 	}
 	
-	public void notifyDestroyed(Chunk chunk){
+	public synchronized void notifyDestroyed(Chunk chunk){
 		if(DEBUG_VALIDATION){
 			var fail=false;
 			try{
@@ -62,37 +68,74 @@ public class ChunkCache{
 			if(!fail){
 				throw new IllegalStateException("Chunk at "+chunk.getPtr()+" is still valid!");
 			}
+			
+			if(!data.containsKey(chunk.getPtr())){
+				throw new IllegalStateException(chunk.getPtr()+" is not cached");
+			}
 		}
 		data.remove(chunk.getPtr());
 	}
 	
-	public <T extends Throwable> void ifCached(ChunkPointer pointer, UnsafeConsumer<Chunk, T> onPresent) throws T{
-		var chunk=get(pointer);
+	public synchronized <T extends Throwable> void ifCached(ChunkPointer pointer, UnsafeConsumer<Chunk, T> onPresent) throws T{
+		var chunk=data.get(pointer);
 		if(chunk!=null){
 			onPresent.accept(chunk);
 		}
 	}
 	
 	@NotNull
-	public <T extends Throwable> Chunk getOr(ChunkPointer pointer, UnsafeFunction<ChunkPointer, Chunk, T> orGet) throws T{
-		var chunk=get(pointer);
+	public synchronized <T extends Throwable> Chunk getOr(ChunkPointer pointer, UnsafeFunction<ChunkPointer, Chunk, T> orGet) throws T{
+		var chunk=data.get(pointer);
 		if(chunk!=null){
 			return chunk;
 		}
 		
 		var generated=orGet.apply(pointer);
 		Objects.requireNonNull(generated);
-		add(generated);
+		data.put(generated.getPtr(), generated);
 		return generated;
 	}
 	
-	public boolean isReal(Chunk chunk){
-		var cached=get(chunk.getPtr());
+	public synchronized boolean isReal(Chunk chunk){
+		var cached=data.get(chunk.getPtr());
 		return chunk==cached;
 	}
 	
-	public void requireReal(Chunk chunk) throws DesyncedCacheException{
-		var cached=get(chunk.getPtr());
+	public synchronized void requireReal(Chunk chunk) throws DesyncedCacheException{
+		var cached=data.get(chunk.getPtr());
 		if(chunk!=cached) throw new DesyncedCacheException(this, cached);
+	}
+	
+	public synchronized void validate(DataProvider provider) throws IOException{
+		Chunk f;
+		try{
+			f=provider.getFirstChunk();
+		}catch(Throwable e){
+			return;
+		}
+		var vals=List.copyOf(data.values());
+		
+		for(Chunk cached : vals){
+			try{
+				var read=Chunk.readChunk(provider, cached.getPtr());
+				if(!read.equals(cached)){
+					throw new DesyncedCacheException(read, cached);
+				}
+			}catch(Throwable e){
+				throw e;
+			}
+			
+		}
+		
+		outer:
+		for(Chunk value : vals){
+			for(Chunk chunk : new PhysicalChunkWalker(f)){
+				if(chunk.getPtr().getValue()>value.getPtr().getValue()) break;
+				if(chunk==value){
+					continue outer;
+				}
+			}
+			throw new DesyncedCacheException("Unreachable chunk: "+value);
+		}
 	}
 }
