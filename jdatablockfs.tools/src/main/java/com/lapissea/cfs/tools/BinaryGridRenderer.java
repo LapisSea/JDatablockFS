@@ -52,6 +52,8 @@ import java.util.stream.Stream;
 import static com.lapissea.cfs.tools.ColorUtils.alpha;
 import static com.lapissea.cfs.tools.render.RenderBackend.DrawMode;
 import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
+import static org.lwjgl.glfw.GLFW.GLFW_KEY_KP_ADD;
+import static org.lwjgl.glfw.GLFW.GLFW_KEY_KP_SUBTRACT;
 
 @SuppressWarnings({"UnnecessaryLocalVariable", "SameParameterValue"})
 public class BinaryGridRenderer implements DataRenderer{
@@ -77,10 +79,10 @@ public class BinaryGridRenderer implements DataRenderer{
 		int width, float pixelsPerByte, int hoverByteX, int hoverByteY, int hoverByteIndex,
 		List<HoverMessage> hoverMessages){
 		
-		private static int calcIndex(byte[] bytes, RenderBackend.DisplayInterface dis, float pixelsPerByte){
+		private static int calcIndex(byte[] bytes, RenderBackend.DisplayInterface dis, float pixelsPerByte, float zoom){
 			int width    =(int)Math.max(1, dis.getWidth()/pixelsPerByte);
-			int xByte    =(int)(dis.getMouseX()/pixelsPerByte);
-			int yByte    =(int)(dis.getMouseY()/pixelsPerByte);
+			int xByte    =(int)(dis.getMouseX()/(pixelsPerByte*zoom));
+			int yByte    =(int)(dis.getMouseY()/(pixelsPerByte*zoom));
 			int byteIndex=yByte*width+xByte;
 			if(xByte>=width||byteIndex>=bytes.length) return -1;
 			else return byteIndex;
@@ -88,13 +90,13 @@ public class BinaryGridRenderer implements DataRenderer{
 		
 		RenderContext(RenderBackend renderer,
 		              byte[] bytes,
-		              float pixelsPerByte, RenderBackend.DisplayInterface dis,
+		              float pixelsPerByte, float zoom, RenderBackend.DisplayInterface dis,
 		              List<HoverMessage> hoverMessages){
 			this(renderer, bytes, new RoaringBitmap(),
-			     (int)Math.max(1, dis.getWidth()/pixelsPerByte), pixelsPerByte,
-			     (int)(dis.getMouseX()/pixelsPerByte),
-			     (int)(dis.getMouseY()/pixelsPerByte),
-			     calcIndex(bytes, dis, pixelsPerByte),
+			     (int)Math.max(1, dis.getWidth()/pixelsPerByte), pixelsPerByte*zoom,
+			     (int)(dis.getMouseX()/(pixelsPerByte*zoom)),
+			     (int)(dis.getMouseY()/(pixelsPerByte*zoom)),
+			     calcIndex(bytes, dis, pixelsPerByte, zoom),
 			     hoverMessages);
 		}
 		
@@ -133,9 +135,22 @@ public class BinaryGridRenderer implements DataRenderer{
 		}
 	}).orElse(ErrorLogLevel.NAMED_STACK);
 	
+	
+	private float zoom=1;
+	
 	public BinaryGridRenderer(RenderBackend renderer){
 		this.direct=renderer;
 		buff=renderer.buffer();
+		
+		renderer.getDisplay().registerKeyboardButton(e->{
+			if(e.type()==RenderBackend.DisplayInterface.ActionType.UP) return;
+			switch(e.key()){
+				case GLFW_KEY_KP_ADD -> zoom+=0.02;
+				case GLFW_KEY_KP_SUBTRACT -> zoom-=0.02;
+			}
+			renderStatic=true;
+			markDirty();
+		});
 	}
 	
 	private int getFrameCount(){
@@ -380,17 +395,17 @@ public class BinaryGridRenderer implements DataRenderer{
 		drawByteRanges(ctx, List.of(new DrawUtils.Range(start, start+siz)), dataColor, withChar, force);
 	}
 	
-	private void fillBit(RenderBackend renderer, float x, float y, int index, float xOff, float yOff){
+	private void fillBit(RenderContext ctx, float x, float y, int index, float xOff, float yOff){
 		int   xi =index%3;
 		int   yi =index/3;
-		float pxS=getPixelsPerByte()/3F;
+		float pxS=ctx.pixelsPerByte()/3F;
 		
 		float x1=xi*pxS;
 		float y1=yi*pxS;
 		float x2=(xi+1)*pxS;
 		float y2=(yi+1)*pxS;
 		
-		renderer.fillQuad(x+xOff+x1, y+yOff+y1, x2-x1, y2-y1);
+		ctx.renderer.fillQuad(x+xOff+x1, y+yOff+y1, x2-x1, y2-y1);
 	}
 	
 	private void initFont(RenderContext ctx){
@@ -552,6 +567,18 @@ public class BinaryGridRenderer implements DataRenderer{
 		ctx.renderer.initRenderState();
 		initFont(ctx);
 		
+		
+		var d=ctx.renderer.getDisplay();
+		if(zoom>1.0001) renderStatic=true;
+		var zoom=this.zoom*this.zoom;
+		
+		var w   =d.getWidth();
+		var h   =d.getHeight();
+		var offX=(w-w*zoom)*(d.getMouseX()/(float)w);
+		var offY=(h-h*zoom)*(d.getMouseY()/(float)h);
+		
+		ctx.renderer.translate(--offX, offY);
+		
 		drawBackgroundDots(ctx.renderer);
 	}
 	
@@ -561,6 +588,8 @@ public class BinaryGridRenderer implements DataRenderer{
 			renderStatic=false;
 			return List.of();
 		}
+		
+		var zoom=this.zoom*this.zoom;
 		
 		if(errorMode) renderStatic=true;
 		
@@ -577,7 +606,7 @@ public class BinaryGridRenderer implements DataRenderer{
 			parsed.displayError=null;
 		}
 		if(!renderStatic){
-			var ctx=new RenderContext(null, bytes, getPixelsPerByte(), dis, null);
+			var ctx=new RenderContext(null, bytes, getPixelsPerByte(), zoom, dis, null);
 			if(lastHoverMessages.stream().flatMap(m->m.ranges().stream()).anyMatch(r->!ctx.isRangeHovered(r))){
 				renderStatic=true;
 			}
@@ -587,7 +616,7 @@ public class BinaryGridRenderer implements DataRenderer{
 			renderStatic=false;
 			buff.clear();
 			
-			var rCtx=new RenderContext(RenderBackend.DRAW_DEBUG?direct:buff, bytes, getPixelsPerByte(), dis, new ArrayList<>());
+			var rCtx=new RenderContext(RenderBackend.DRAW_DEBUG?direct:buff, bytes, getPixelsPerByte(), zoom, dis, new ArrayList<>());
 			try{
 				findHoverChunk(rCtx, parsed, DataProvider.newVerySimpleProvider(MemoryData.builder().withRaw(bytes).asReadOnly().build()));
 			}catch(IOException e1){
@@ -607,7 +636,7 @@ public class BinaryGridRenderer implements DataRenderer{
 			this.lastHoverMessages=List.copyOf(rCtx.hoverMessages);
 		}
 		
-		var ctx=new RenderContext(direct, bytes, getPixelsPerByte(), dis, new ArrayList<>(lastHoverMessages));
+		var ctx=new RenderContext(direct, bytes, getPixelsPerByte(), zoom, dis, new ArrayList<>(lastHoverMessages));
 		
 		buff.draw();
 		
@@ -617,7 +646,9 @@ public class BinaryGridRenderer implements DataRenderer{
 			handleError(e1, parsed);
 		}
 		
-		drawMouse(ctx, cFrame);
+		if(!ctx.renderer.getDisplay().isMouseKeyDown(RenderBackend.DisplayInterface.MouseKey.LEFT)){
+			drawMouse(ctx, cFrame);
+		}
 		
 		return ctx.hoverMessages;
 	}
@@ -741,16 +772,25 @@ public class BinaryGridRenderer implements DataRenderer{
 					assert annCtx.stack.isEmpty();
 					annCtx.stack.add(null);
 					
-					long pos=cluster.getFirstChunk().getPtr().getValue();
+					var  done =new ChunkSet();
+					var  frees=new ChunkSet(provider.getMemoryManager().getFreeChunks());
+					long pos  =cluster.getFirstChunk().getPtr().getValue();
 					while(pos<bytes.length){
 						try{
-							ChunkSet done=new ChunkSet();
 							for(Chunk chunk : new PhysicalChunkWalker(cluster.getChunk(ChunkPointer.of(pos)))){
 								pos=chunk.dataEnd();
 								if(referenced.contains(chunk.getPtr())){
-									fillChunk(ctx, chunk, true, false);
+									if(frees.contains(chunk.getPtr())){
+										drawByteRanges(ctx,
+										               List.of(new Range(chunk.dataStart(), Math.min(cluster.getSource().getIOSize(), chunk.dataEnd()))),
+										               alpha(Color.YELLOW, 0.15F), false, false);
+									}else{
+										fillChunk(ctx, chunk, true, false);
+									}
 								}else{
-									drawByteRanges(ctx, List.of(new Range(chunk.dataStart(), Math.min(cluster.getSource().getIOSize(), chunk.dataEnd()))), alpha(Color.BLUE, 0.1F), false, false);
+									drawByteRanges(ctx,
+									               List.of(new Range(chunk.dataStart(), Math.min(cluster.getSource().getIOSize(), chunk.dataEnd()))),
+									               alpha(Color.BLUE, 0.1F), false, false);
 								}
 								if(done.add(chunk.getPtr())){
 									chunk.streamNext().map(Chunk::getPtr).forEach(done::add);
@@ -871,7 +911,7 @@ public class BinaryGridRenderer implements DataRenderer{
 				}else{
 					for(int bi=0;bi<8;bi++){
 						if(((b>>bi)&1)==1){
-							fillBit(ctx.renderer, xF, yF, bi, 0, 0);
+							fillBit(ctx, xF, yF, bi, 0, 0);
 						}
 					}
 				}
@@ -963,7 +1003,7 @@ public class BinaryGridRenderer implements DataRenderer{
 			int xi=i%ctx.width();
 			int yi=i/ctx.width();
 			
-			fillBit(ctx.renderer, 0, 0, 8, xi*ctx.pixelsPerByte(), yi*ctx.pixelsPerByte());
+			fillBit(ctx, 0, 0, 8, xi*ctx.pixelsPerByte(), yi*ctx.pixelsPerByte());
 		}
 	}
 	
@@ -1140,6 +1180,16 @@ public class BinaryGridRenderer implements DataRenderer{
 			flatRanges.add(new CRange(e.getValue(), Range.fromSize(e.getKey(), 1)));
 		});
 		
+		if(parsed.lastHoverChunk!=null){
+			var chunk=parsed.lastHoverChunk;
+			ctx.renderer.setLineWidth(1);
+			try{
+				outlineChunk(ctx, chunk, ColorUtils.mix(chunkBaseColor(), Color.WHITE, 0.4F));
+			}catch(IOException e){
+				handleError(e, parsed);
+			}
+		}
+		
 		for(CRange flatRange : flatRanges){
 			DrawUtils.fillByteRange(alpha(flatRange.col, 0.15F), ctx, flatRange.rang);
 		}
@@ -1152,18 +1202,6 @@ public class BinaryGridRenderer implements DataRenderer{
 			ctx.renderer.setLineWidth(i+1);
 			for(Range range : hoverMessage.ranges()){
 				outlineByteRange(hoverMessage.color(), ctx, range);
-			}
-		}
-		
-		ctx.renderer.translate(0.5, 0.5);
-		
-		if(parsed.lastHoverChunk!=null){
-			var chunk=parsed.lastHoverChunk;
-			ctx.renderer.setLineWidth(1);
-			try{
-				outlineChunk(ctx, chunk, ColorUtils.mix(chunkBaseColor(), Color.WHITE, 0.4F));
-			}catch(IOException e){
-				handleError(e, parsed);
 			}
 		}
 		
