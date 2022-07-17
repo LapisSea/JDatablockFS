@@ -88,7 +88,10 @@ public class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 		if(toFree.isEmpty()) return;
 		
 		var popped=popFile(toFree);
-		if(popped.isEmpty()) return;
+		if(popped.isEmpty()){
+			popLast();
+			return;
+		}
 		
 		List<Chunk> toAdd=MemoryOperations.mergeChunks(popped);
 		
@@ -117,6 +120,26 @@ public class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 			}while(!queuedFreeChunks.isEmpty());
 		}finally{
 			adding=false;
+		}
+		
+		popLast();
+	}
+	
+	private void popLast() throws IOException{
+		if(adding) return;
+		while(true){
+			var last=freeChunks.peekLast();
+			if(last.isEmpty()) break;
+			var lastCh=last.orElseThrow().dereference(context);
+			if(lastCh.checkLastPhysical()){
+				freeChunks.popLast();
+				try(var io=context.getSource().io()){
+					io.setCapacity(lastCh.getPtr().getValue());
+				}
+				context.getChunkCache().notifyDestroyed(lastCh);
+			}else{
+				break;
+			}
 		}
 	}
 	

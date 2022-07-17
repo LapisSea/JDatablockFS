@@ -121,8 +121,8 @@ public class MemoryWalker{
 	}
 	
 	@SuppressWarnings({"RedundantCast", "unchecked"})
-	public <T extends IOInstance<T>> void walk(PointerRecord consumer) throws IOException{
-		walkStructFull((T)root, rootReference, (StructPipe<T>)pipe, consumer);
+	public <T extends IOInstance<T>> int walk(PointerRecord consumer) throws IOException{
+		return walkStructFull((T)root, rootReference, (StructPipe<T>)pipe, consumer);
 	}
 	
 	private static class RefStack{
@@ -175,12 +175,12 @@ public class MemoryWalker{
 		}
 	}
 	
-	private <T extends IOInstance<T>> void walkStructFull(
+	private <T extends IOInstance<T>> int walkStructFull(
 		T instance, Reference instanceReference, StructPipe<T> pipe,
 		PointerRecord pointerRecord
 	) throws IOException{
 		var stack=new RefStack();
-		walkStructFull(stack, instance, instanceReference, pipe, pointerRecord, false);
+		return walkStructFull(stack, instance, instanceReference, pipe, pointerRecord, false);
 	}
 	
 	@SuppressWarnings({"unchecked", "rawtypes"})
@@ -207,6 +207,8 @@ public class MemoryWalker{
 		if(stack.contains(reference, instance)){
 			return CONTINUE;
 		}
+		
+		
 		stack.push(reference, instance);
 		long t0=0, iterNextSum=0;
 		try{

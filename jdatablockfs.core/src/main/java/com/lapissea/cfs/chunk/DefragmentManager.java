@@ -36,12 +36,119 @@ public class DefragmentManager{
 		scanFreeChunks(parent);
 		
 		mergeChains(parent);
-		
-		scanFreeChunks(parent);
-		
-		reorder(parent);
+		optimizeFreeChunks(parent);
 		
 		mergeChains(parent);
+		optimizeFreeChunks(parent);
+		
+		pack(parent);
+		int a=0;
+	}
+	
+	private void pack(final Cluster cluster) throws IOException{
+		var freeChunks=cluster.getMemoryManager().getFreeChunks();
+		while(!freeChunks.isEmpty()){
+			Chunk last=freeChunks.peekLast().orElseThrow().dereference(cluster);
+			while(!last.checkLastPhysical()){
+				last=last.nextPhysical();
+			}
+			
+			var     siz  =cluster.getSource().getIOSize();
+			boolean found=moveReference(cluster, last.getPtr(), 0, c->c.getPtr().getValue()<siz);
+			if(!found) break;
+		}
+	}
+	private void optimizeFreeChunks(final Cluster cluster) throws IOException{
+		wh:
+		while(true){
+			
+			var frees=cluster.getMemoryManager().getFreeChunks();
+			iter:
+			for(var iter=frees.listIterator();iter.hasNext();){
+				var freeFirst=iter.ioNext().dereference(cluster);
+				if(!iter.hasNext()) break;
+				var freeNext=iter.ioNext().dereference(cluster);
+				iter.ioPrevious();
+				
+				boolean soround=false;
+				
+				long sumMove=0;
+				var  ch     =freeFirst;
+				for(int i=0;i<16;i++){
+					ch=ch.nextPhysical();
+					if(ch==null) continue iter;
+					
+					sumMove+=ch.totalSize();
+					if(sumMove>=256) break;
+					if(freeNext.getPtr().equals(ch.dataEnd())){
+						soround=true;
+						break;
+					}
+				}
+				if(!soround) continue;
+				
+				var last=ch.dataEnd();
+				
+				var firstNext=freeFirst.nextPhysical();
+				
+				var user=findReferenceUser(cluster, firstNext.getPtr().makeReference());
+				
+				boolean found=moveReference(cluster, firstNext.getPtr(), user==null?cluster.getSource().getIOSize():user.calcGlobalOffset(cluster), c->c.getPtr().getValue()>last);
+				
+				if(found){
+					continue wh;
+				}
+			}
+			
+			break;
+		}
+	}
+	
+	private boolean moveReference(Cluster cluster, ChunkPointer target, long magnet, Predicate<Chunk> approve) throws IOException{
+		List<Chunk> toFree=new ArrayList<>();
+		var record=new MemoryWalker.PointerRecord(){
+			boolean moved=false;
+			@Override
+			public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, IOField.Ref<T, ?> field, Reference valueReference) throws IOException{
+				if(!valueReference.getPtr().equals(target)){
+					return CONTINUE;
+				}
+				
+				
+				var type=field.getAccessor().getType();
+				
+				if(IOInstance.isUnmanaged(type)){
+					var moved=reallocateUnmanaged(cluster, (IOInstance.Unmanaged)field.get(null, instance), approve);
+					if(moved) this.moved=true;
+					return END;
+				}
+				
+				var ch=valueReference.getPtr().dereference(cluster);
+				
+				var newCh=AllocateTicket.withData((ObjectPipe)field.getReferencedPipe(instance), cluster, field.get(null, instance))
+				                        .withBytes(ch.chainSize())
+				                        .withApproval(approve)
+				                        .withPositionMagnet(magnet)
+				                        .submit(cluster);
+				if(newCh==null){
+					return END;
+				}
+				ch.streamNext().forEach(toFree::add);
+				
+				field.setReference(instance, newCh.getPtr().makeReference());
+				moved=true;
+				return END|SAVE;
+			}
+			@Override
+			public <T extends IOInstance<T>> int logChunkPointer(Reference instanceReference, T instance, IOField<T, ChunkPointer> field, ChunkPointer value) throws IOException{
+				return CONTINUE;
+			}
+		};
+		
+		cluster.rootWalker().walk(record);
+		
+		cluster.getMemoryManager().free(toFree);
+		return record.moved;
 	}
 	
 	private void reorder(final Cluster cluster) throws IOException{
@@ -58,21 +165,23 @@ public class DefragmentManager{
 						var p   =u.getReference().getPtr();
 						var user=findReferenceUser(cluster, u.getReference());
 						if(user.getPtr().compareTo(p)>0){
-							reallocateUnmanaged(cluster, u, c->c.getPtr().compareTo(user.getPtr())>0);
-							run[0]=true;
+							var moved=reallocateUnmanaged(cluster, u, c->c.getPtr().compareTo(user.getPtr())>0);
+							if(moved) run[0]=true;
 							return CONTINUE;
 						}
 					}else{
 						boolean after=instanceReference.getPtr().compareTo(valueReference.getPtr())<0;
 						if(after) return CONTINUE;
-						run[0]=true;
 						
 						var type=field.getAccessor().getType();
 						
 						if(IOInstance.isUnmanaged(type)){
-							reallocateUnmanaged(cluster, (IOInstance.Unmanaged)field.get(null, instance));
+							var moved=reallocateUnmanaged(cluster, (IOInstance.Unmanaged)field.get(null, instance));
+							if(moved) run[0]=true;
 							return END;
 						}
+						
+						run[0]=true;
 						
 						var ch=valueReference.getPtr().dereference(cluster);
 						ch.streamNext().forEach(toFree::add);
@@ -107,9 +216,16 @@ public class DefragmentManager{
 				var fragmentedChunkOpt=cluster.getFirstChunk().chunksAhead().stream().skip(1).filter(Chunk::hasNextPtr).findFirst();
 				if(fragmentedChunkOpt.isEmpty()) break;
 				fragmentedChunk=fragmentedChunkOpt.get();
+				
+				while(true){
+					var fptr =fragmentedChunk.getPtr();
+					var chRef=cluster.getFirstChunk().chunksAhead().stream().skip(1).filter(Chunk::hasNextPtr).filter(c->c.getNextPtr().equals(fptr)).findAny();
+					if(chRef.isEmpty()) break;
+					fragmentedChunk=chRef.get();
+				}
 			}
 			
-			long requiredSize=fragmentedChunk.chainSize();
+			long requiredSize=fragmentedChunk.chainCapacity();
 			
 			reallocateAndMove(cluster, fragmentedChunk, requiredSize);
 		}
@@ -131,8 +247,12 @@ public class DefragmentManager{
 			             .withExplicitNextSize(likelyChain?Optional.empty():Optional.of(NumberSize.bySize(cluster.getSource().getIOSize())))
 			             .submit(cluster);
 		
-		moveChunkExact(cluster, fragmentedChunk.getPtr(), newChunk.getPtr());
-		fragmentedChunk.freeChaining();
+		var moved=moveChunkExact(cluster, fragmentedChunk.getPtr(), newChunk.getPtr());
+		if(moved){
+			fragmentedChunk.freeChaining();
+		}else{
+			throw new RuntimeException();
+		}
 	}
 	private void moveNextAndMerge(Cluster cluster, Chunk fragmentedChunk, long requiredSize) throws IOException{
 		try(var ignored1=cluster.getMemoryManager().openDefragmentMode()){
@@ -166,7 +286,8 @@ public class DefragmentManager{
 							             })
 							             .submit(cluster);
 						
-						moveChunkExact(cluster, next.getPtr(), newChunk.getPtr());
+						var moved=moveChunkExact(cluster, next.getPtr(), newChunk.getPtr());
+						if(!moved) throw new NotImplementedException();
 					}
 					
 					createdCapacity+=next.totalSize();
@@ -284,14 +405,14 @@ public class DefragmentManager{
 		}
 	}
 	
-	private void moveChunkExact(final Cluster cluster, ChunkPointer oldChunk, ChunkPointer newChunk) throws IOException{
+	private boolean moveChunkExact(final Cluster cluster, ChunkPointer oldChunk, ChunkPointer newChunk) throws IOException{
 		
-		cluster.rootWalker().walk(new MemoryWalker.PointerRecord(){
+		var fin=cluster.rootWalker().walk(new MemoryWalker.PointerRecord(){
 			@Override
 			public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, IOField.Ref<T, ?> field, Reference valueReference){
 				if(valueReference.getPtr().equals(oldChunk)){
 					field.setReference(instance, new Reference(newChunk, valueReference.getOffset()));
-					return CONTINUE|SAVE;
+					return END|SAVE;
 				}
 				return CONTINUE;
 			}
@@ -299,18 +420,19 @@ public class DefragmentManager{
 			public <T extends IOInstance<T>> int logChunkPointer(Reference instanceReference, T instance, IOField<T, ChunkPointer> field, ChunkPointer value){
 				if(value.equals(oldChunk)){
 					field.set(null, instance, newChunk);
-					return CONTINUE|SAVE;
+					return END|SAVE;
 				}
 				return CONTINUE;
 			}
 		});
 		
+		return fin==END;
 	}
 	
-	private <T extends IOInstance.Unmanaged<T>> void reallocateUnmanaged(Cluster cluster, T instance) throws IOException{
-		reallocateUnmanaged(cluster, instance, c->c.getPtr().compareTo(instance.getReference().getPtr())>0);
+	private <T extends IOInstance.Unmanaged<T>> boolean reallocateUnmanaged(Cluster cluster, T instance) throws IOException{
+		return reallocateUnmanaged(cluster, instance, c->c.getPtr().compareTo(instance.getReference().getPtr())>0);
 	}
-	private <T extends IOInstance.Unmanaged<T>> void reallocateUnmanaged(Cluster cluster, T instance, Predicate<Chunk> approve) throws IOException{
+	private <T extends IOInstance.Unmanaged<T>> boolean reallocateUnmanaged(Cluster cluster, T instance, Predicate<Chunk> approve) throws IOException{
 		var oldRef=instance.getReference();
 		
 		var siz=instance.getReference().getPtr().dereference(cluster).chainSize();
@@ -320,11 +442,13 @@ public class DefragmentManager{
 		                        .withDataPopulated((p, io)->{
 			                        oldRef.withContext(p).io(src->src.transferTo(io));
 		                        }).submit(cluster);
+		if(newCh==null) return false;
 		var newRef=newCh.getPtr().makeReference();
 		
 		var ptrsToFree=moveReference(cluster, oldRef, newRef);
 		instance.notifyReferenceMovement(newRef);
 		cluster.getMemoryManager().freeChains(ptrsToFree);
+		return true;
 	}
 	
 	private Set<ChunkPointer> moveReference(final Cluster cluster, Reference oldRef, Reference newRef) throws IOException{

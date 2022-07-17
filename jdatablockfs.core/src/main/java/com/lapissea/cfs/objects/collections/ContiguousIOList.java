@@ -370,7 +370,17 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 		if(ch.streamNext().limit(max).count()==max){
 			var next    =ch.requireNext();
 			var existing=next.streamNext().mapToLong(Chunk::getCapacity).sum();
-			var extra   =extraSlots*getElementSize();
+			
+			var nextNext=next.next();
+			if(nextNext!=null){
+				var nnExisting=nextNext.streamNext().mapToLong(Chunk::getCapacity).sum();
+				if(nnExisting*10<=existing){
+					defragData(next, extraSlots, max-1);
+					return;
+				}
+			}
+			
+			var extra=extraSlots*getElementSize();
 			
 			var newNext=AllocateTicket.bytes(existing+extra)
 			                          .withPositionMagnet(ch)

@@ -172,7 +172,11 @@ public sealed interface ValueStorage<T>{
 		public void write(RandomIO dest, T src) throws IOException{
 			var ref=dest.remaining()==0?new Reference():Reference.FIXED_PIPE.readNew(provider, dest, null);
 			if(ref.isNull()){
-				var ch=AllocateTicket.withData(pipe, provider, src).submit(provider);
+				var ticket=AllocateTicket.withData(pipe, provider, src);
+				if(dest instanceof ChunkChainIO io){
+					ticket=ticket.withPositionMagnet(io.calcGlobalPos());
+				}
+				var ch=ticket.submit(provider);
 				Reference.FIXED_PIPE.write(provider, dest, ch.getPtr().makeReference());
 				return;
 			}
@@ -396,7 +400,11 @@ public sealed interface ValueStorage<T>{
 		public void write(RandomIO dest, String src) throws IOException{
 			var ref=dest.remaining()==0?new Reference():Reference.FIXED_PIPE.readNew(provider, dest, null);
 			if(ref.isNull()){
-				var ch=AllocateTicket.withData(AutoText.PIPE, provider, new AutoText(src)).submit(provider);
+				var ticket=AllocateTicket.withData(AutoText.PIPE, provider, new AutoText(src));
+				if(dest instanceof ChunkChainIO io){
+					ticket=ticket.withPositionMagnet(io.calcGlobalPos());
+				}
+				var ch=ticket.submit(provider);
 				Reference.FIXED_PIPE.write(provider, dest, ch.getPtr().makeReference());
 				return;
 			}
