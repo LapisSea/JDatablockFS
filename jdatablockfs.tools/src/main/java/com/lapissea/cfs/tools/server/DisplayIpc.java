@@ -101,6 +101,7 @@ public class DisplayIpc implements DataLogger{
 					public void terminating(Action action){
 						try{
 							sendAction.accept(action, buff->{});
+							LogUtil.println("Closing connection to:", name);
 							socketOut.flush();
 							socket.close();
 						}catch(SocketException ignored){
@@ -403,29 +404,30 @@ public class DisplayIpc implements DataLogger{
 	
 	private void initSession(){
 		sessionCreator=name->{
+			String msg;
 			try{
 				return new IpcSession(new IpcSession.Info(InetAddress.getLocalHost(), 20), name, config);
 			}catch(SocketTimeoutException e){
-				LogUtil.printlnEr("Could not contact the server!");
+				msg="Could not contact the server for \""+name+"\", ";
 			}catch(Throwable e){
-				e.printStackTrace();
+				msg="Unexpected error: "+e+", ";
 			}
 			
 			var type=config.getOrDefault("server-fallback", "local").toString();
 			
 			sessionCreator=switch(type){
 				case "local" -> {
-					LogUtil.printlnEr("Switching to local server session.");
+					LogUtil.printlnEr(msg+"switching to local server session.");
 					yield getLocalLoggerImpl()::getSession;
 				}
 				case "none" -> {
 					active=false;
-					LogUtil.printlnEr("Switching to no output.");
+					LogUtil.printlnEr(msg+"switching to no output.");
 					yield s->Session.Blank.INSTANCE;
 				}
 				default -> {
 					active=false;
-					LogUtil.printlnEr("Unknown type \""+type+"\", defaulting to no output.");
+					LogUtil.printlnEr(msg+"unknown type \""+type+"\", defaulting to no output.");
 					yield s->Session.Blank.INSTANCE;
 				}
 			};

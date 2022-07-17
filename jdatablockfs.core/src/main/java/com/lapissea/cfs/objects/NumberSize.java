@@ -17,6 +17,8 @@ import java.util.Comparator;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
 
+import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+
 @SuppressWarnings("unused")
 public enum NumberSize{
 	
@@ -130,6 +132,12 @@ public enum NumberSize{
 	}
 	
 	public void write(ContentWriter out, long value) throws IOException{
+		if(DEBUG_VALIDATION){
+			var max=this.maxSize;
+			if(value>max){
+				throw new IllegalArgumentException(value+" can not fit in to "+this);
+			}
+		}
 		switch(this){
 			case VOID -> {}
 			case BYTE -> out.writeInt1((int)value);

@@ -683,4 +683,9 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 			return io.getSize();
 		}
 	}
+	public long chainCapacity() throws IOException{
+		try(var io=io()){
+			return io.getCapacity();
+		}
+	}
 }

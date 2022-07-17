@@ -190,6 +190,7 @@ public interface IOList<T> extends IterablePP<T>{
 	
 	interface IOIterator<T>{
 		interface Iter<T> extends IOIterator<T>, Iterator<T>{
+			@Deprecated
 			@Override
 			default T next(){
 				try{
@@ -199,6 +200,7 @@ public interface IOList<T> extends IterablePP<T>{
 				}
 			}
 			@Override
+			@Deprecated
 			default void remove(){
 				try{
 					ioRemove();
@@ -578,7 +580,7 @@ public interface IOList<T> extends IterablePP<T>{
 	
 	default Optional<T> peekLast() throws IOException{
 		if(isEmpty()) return Optional.empty();
-		return Optional.of(get(0));
+		return Optional.of(get(size()-1));
 	}
 	default Optional<T> popLast() throws IOException{
 		if(isEmpty()) return Optional.empty();

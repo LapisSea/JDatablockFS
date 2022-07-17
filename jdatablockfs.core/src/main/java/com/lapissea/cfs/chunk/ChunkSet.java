@@ -2,10 +2,12 @@ package com.lapissea.cfs.chunk;
 
 import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.objects.ChunkPointer;
+import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.util.NotNull;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.longlong.Roaring64Bitmap;
 
+import java.io.IOException;
 import java.lang.reflect.Array;
 import java.util.*;
 import java.util.function.Supplier;
@@ -14,7 +16,7 @@ import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
 @SuppressWarnings({"SimplifyStreamApiCallChains", "unused"})
-public class ChunkSet implements Set<ChunkPointer>{
+public final class ChunkSet implements Set<ChunkPointer>{
 	
 	
 	private sealed interface Index{
@@ -160,6 +162,12 @@ public class ChunkSet implements Set<ChunkPointer>{
 	}
 	public ChunkSet(Collection<ChunkPointer> data){
 		addAll(data);
+	}
+	public ChunkSet(IOList<ChunkPointer> data) throws IOException{
+		var iter=data.iterator();
+		while(iter.hasNext()){
+			add(iter.ioNext());
+		}
 	}
 	public ChunkSet(Iterable<ChunkPointer> data){
 		data.forEach(this::add);

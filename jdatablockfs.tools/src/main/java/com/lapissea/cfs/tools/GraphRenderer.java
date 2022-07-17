@@ -544,8 +544,6 @@ public class GraphRenderer implements DataRenderer{
 		var margin  =300*midDistFac*zoom;
 		var maxDst  =nearDist+margin;
 		
-		var bIndex  =new PosIndex(bubble, posIndexSize);
-		var indexRad=(int)Math.ceil(maxDst/posIndexSize)+1;
 		Consumer<Bubble> c=ref->{
 			if(ref==bubble) return;
 			
@@ -571,19 +569,26 @@ public class GraphRenderer implements DataRenderer{
 				push(bubble, ref, xOff*ageFac, yOff*ageFac);
 			}
 		};
+		fromRadius(spatialMap, posIndexSize, bubble.x, bubble.y, maxDst).forEach(c);
+	}
+	
+	private Stream<Bubble> fromRadius(Map<PosIndex, List<Bubble>> spatialMap, float posIndexSize, double xOrigin, double yOrigin, double rad){
+		var bIndex  =new PosIndex((int)(xOrigin/posIndexSize), (int)(yOrigin/posIndexSize));
+		var indexRad=(int)Math.ceil(rad/posIndexSize)+1;
 		
-		IntStream.range(bIndex.x-indexRad, bIndex.x+indexRad)
-		         .mapToObj(x->IntStream.range(bIndex.y-indexRad, bIndex.y+indexRad)
-		                               .mapToObj(y->new PosIndex(x, y)))
-		         .flatMap(s->s)
-		         .filter(i->{
-			         var x   =i.x*posIndexSize;
-			         var y   =i.y*posIndexSize;
-			         var dist=distFrom(bubble, x, y)-posIndexSize*UtilL.SQRT2D*2;
-			         return !(dist>maxDst);
-		         })
-		         .flatMap(index->spatialMap.getOrDefault(index, List.of()).stream())
-		         .forEach(c);
+		return IntStream.range(bIndex.x-indexRad, bIndex.x+indexRad)
+		                .mapToObj(x->IntStream.range(bIndex.y-indexRad, bIndex.y+indexRad)
+		                                      .mapToObj(y->new PosIndex(x, y)))
+		                .flatMap(s->s)
+		                .filter(i->{
+			                var x   =i.x*posIndexSize;
+			                var y   =i.y*posIndexSize;
+			                var dx  =xOrigin-x;
+			                var dy  =yOrigin-y;
+			                var dist=Math.sqrt(dx*dx+dy*dy)-posIndexSize*UtilL.SQRT2D*2;
+			                return !(dist>rad);
+		                })
+		                .flatMap(index->spatialMap.getOrDefault(index, List.of()).stream());
 	}
 	
 	private void attractConnections(Bubble bubble){

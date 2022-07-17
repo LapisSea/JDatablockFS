@@ -103,7 +103,9 @@ public final class ChunkCache{
 	
 	public synchronized void requireReal(Chunk chunk) throws DesyncedCacheException{
 		var cached=data.get(chunk.getPtr());
-		if(chunk!=cached) throw new DesyncedCacheException(this, cached);
+		if(chunk!=cached){
+			throw new DesyncedCacheException(chunk, cached);
+		}
 	}
 	
 	public synchronized void validate(DataProvider provider) throws IOException{

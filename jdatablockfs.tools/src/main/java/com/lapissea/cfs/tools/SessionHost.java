@@ -113,6 +113,8 @@ public class SessionHost implements DataLogger{
 	public final ChangeRegistryInt                       activeFrame  =new ChangeRegistryInt(-1);
 	
 	
+	private long lastSessionSet;
+	
 	@Override
 	public Session getSession(String name){
 		if(destroyed) throw new IllegalStateException();
@@ -121,7 +123,12 @@ public class SessionHost implements DataLogger{
 		synchronized(sessions){
 			ses=sessions.computeIfAbsent(name, HostedSession::new);
 		}
-		setActiveSession(ses);
+		var tim=System.nanoTime();
+		if(tim-lastSessionSet>4000_000_000L||activeSession.get().isEmpty()){
+			lastSessionSet=tim;
+			setActiveSession(ses);
+		}
+		
 		return ses;
 	}
 	private void setActiveSession(HostedSession session){
