@@ -124,7 +124,7 @@ public class SessionHost implements DataLogger{
 			ses=sessions.computeIfAbsent(name, HostedSession::new);
 		}
 		var tim=System.nanoTime();
-		if(tim-lastSessionSet>4000_000_000L||activeSession.get().isEmpty()){
+		if(tim-lastSessionSet>4000_000_000L&&activeSession.get().orElse(null)!=ses){
 			lastSessionSet=tim;
 			setActiveSession(ses);
 		}

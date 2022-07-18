@@ -169,10 +169,12 @@ public abstract class MappedIOList<From, To> implements IOList<To>{
 				return map(src.ioNext());
 			}
 			@Override
+			@Deprecated
 			public To next(){
 				return map(src.next());
 			}
 			@Override
+			@Deprecated
 			public void remove(){
 				src.remove();
 			}

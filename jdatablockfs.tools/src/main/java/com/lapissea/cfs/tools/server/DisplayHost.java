@@ -151,7 +151,6 @@ public class DisplayHost{
 								out.write(2);
 								out.flush();
 								getSession().finish();
-								LogUtil.println("finishing");
 								running=false;
 							};
 							case PING -> ()->{

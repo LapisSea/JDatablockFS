@@ -351,12 +351,14 @@ public interface IOList<T> extends IterablePP<T>{
 				this.size=size;
 			}
 			
+			@Override
 			public Spliterator<T> trySplit(){
 				long lo=index, mid=(lo+size) >>> 1;
 				return (lo>=mid)?null: // divide range in half unless too small
 				       new RandomAccessIteratorSpliterator(lo, index=mid);
 			}
 			
+			@Override
 			public boolean tryAdvance(Consumer<? super T> action){
 				if(action==null) throw new NullPointerException();
 				long i=index;
@@ -368,6 +370,7 @@ public interface IOList<T> extends IterablePP<T>{
 				return false;
 			}
 			
+			@Override
 			public void forEachRemaining(Consumer<? super T> action){
 				Objects.requireNonNull(action);
 				long i   =index;
@@ -378,10 +381,12 @@ public interface IOList<T> extends IterablePP<T>{
 				}
 			}
 			
+			@Override
 			public long estimateSize(){
 				return size-index;
 			}
 			
+			@Override
 			public int characteristics(){
 				return Spliterator.ORDERED|Spliterator.SIZED|Spliterator.SUBSIZED;
 			}
@@ -602,7 +607,9 @@ public interface IOList<T> extends IterablePP<T>{
 		Objects.requireNonNull(map);
 		Objects.requireNonNull(unmap);
 		return new MappedIOList<>(this){
+			@Override
 			protected To map(T v){return map.apply(v);}
+			@Override
 			protected T unmap(To v){return unmap.apply(v);}
 		};
 	}

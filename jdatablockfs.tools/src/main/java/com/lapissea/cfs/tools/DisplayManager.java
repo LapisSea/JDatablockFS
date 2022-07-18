@@ -142,8 +142,9 @@ public class DisplayManager implements DataLogger{
 			splitRenderer.getDisplayedSession().ifPresent(ses->{
 				float percent=MathUtil.snap((display.getMouseX()-10F)/(display.getWidth()-20F), 0, 1);
 				ses.setFrame(Math.round((ses.frames.size()-1)*percent));
-				splitRenderer.markDirty();
 			});
+			renderer.markFrameDirty();
+			splitRenderer.markDirty();
 		});
 		
 		display.registerDisplayResize(()->{

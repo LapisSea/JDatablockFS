@@ -158,6 +158,9 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 		});
 	}
 	
+	private long calcElementOffset(long index){
+		return calcElementOffset(index, getElementSize());
+	}
 	private long calcElementOffset(long index, long siz){
 		var headSiz=calcInstanceSize(WordSpace.BYTE);
 		return headSiz+siz*index;
@@ -170,7 +173,7 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 	protected RandomIO ioAtElement(long index) throws IOException{
 		var io=selfIO();
 		try{
-			var pos=calcElementOffset(index, getElementSize());
+			var pos=calcElementOffset(index);
 			io.skipExact(pos);
 		}catch(Throwable e){
 			io.close();
@@ -260,7 +263,7 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 		defragData(count);
 		
 		try(var io=selfIO()){
-			var pos=calcElementOffset(size(), getElementSize());
+			var pos=calcElementOffset(size());
 			io.skipExact(pos);
 			var elSiz   =getElementSize();
 			var totalPos=pos+count*elSiz;
@@ -335,7 +338,7 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 		if(isEmpty()) return;
 		deltaSize(-size());
 		try(var io=selfIO()){
-			io.setCapacity(calcElementOffset(0, getElementSize()));
+			io.setCapacity(calcElementOffset(0));
 		}
 	}
 	
@@ -346,16 +349,16 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 			var    siz =getElementSize();
 			byte[] buff=new byte[Math.toIntExact(siz)];
 			
-			var lastOff=calcElementOffset(size()+1, getElementSize());
+			var lastOff=calcElementOffset(size()+1);
 			io.setCapacity(lastOff);
 			
 			for(long i=size()-1;i>=index;i--){
 				
-				var pos=calcElementOffset(i, getElementSize());
+				var pos=calcElementOffset(i);
 				io.setPos(pos);
 				io.readFully(buff);
 				
-				var nextPos=calcElementOffset(i+1, getElementSize());
+				var nextPos=calcElementOffset(i+1);
 				io.setPos(nextPos);
 				io.write(buff);
 			}
@@ -414,24 +417,24 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 			byte[] buff=new byte[Math.toIntExact(siz)];
 			
 			for(long i=index;i<size-1;i++){
-				var nextPos=calcElementOffset(i+1, getElementSize());
+				var nextPos=calcElementOffset(i+1);
 				io.setPos(nextPos);
 				io.readFully(buff);
 				
-				var pos=calcElementOffset(i, getElementSize());
+				var pos=calcElementOffset(i);
 				io.setPos(pos);
 				io.write(buff);
 			}
 			
-			var lastOff=calcElementOffset(size-1, getElementSize());
+			var lastOff=calcElementOffset(size-1);
 			io.setCapacity(lastOff);
 		}
 	}
 	
 	@Override
 	public void requestCapacity(long capacity) throws IOException{
+		var cap=calcElementOffset(capacity);
 		try(var io=selfIO()){
-			var cap=calcElementOffset(capacity, getElementSize());
 			io.ensureCapacity(cap);
 		}
 	}
