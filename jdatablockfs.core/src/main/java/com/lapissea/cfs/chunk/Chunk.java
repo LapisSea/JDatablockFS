@@ -524,6 +524,13 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		}
 	}
 	
+	public Chunk last() throws IOException{
+		Chunk ch=this;
+		while(ch.hasNextPtr()){
+			ch=ch.requireNext();
+		}
+		return ch;
+	}
 	
 	public List<Chunk> collectNext(){
 		return streamNext().collect(Collectors.toList());

@@ -87,10 +87,7 @@ public interface MemoryManager extends DataProvider.Holder{
 			long remaining=toAllocate;
 			strategyLoop:
 			while(remaining>0){
-				Chunk next;
-				while((next=last.next())!=null){
-					last=next;
-				}
+				last=last.last();
 				
 				for(AllocToStrategy allocTo : allocTos){
 					long allocated=allocTo.allocTo(firstChunk, last, remaining);
