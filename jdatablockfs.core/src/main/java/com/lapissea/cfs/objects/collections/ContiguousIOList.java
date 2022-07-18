@@ -2,6 +2,7 @@ package com.lapissea.cfs.objects.collections;
 
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.Chunk;
+import com.lapissea.cfs.chunk.ChunkBuilder;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.BitDepthOutOfSpaceException;
 import com.lapissea.cfs.io.RandomIO;
@@ -9,6 +10,7 @@ import com.lapissea.cfs.io.ValueStorage;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
+import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.*;
@@ -17,6 +19,7 @@ import com.lapissea.cfs.type.field.access.AbstractFieldAccessor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.NotNull;
+import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeLongConsumer;
 import com.lapissea.util.function.UnsafeSupplier;
@@ -438,6 +441,52 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 			io.ensureCapacity(cap);
 		}
 	}
+	@Override
+	public void trim() throws IOException{
+		try(var io=selfIO()){
+			io.setCapacity(calcElementOffset(size()));
+		}
+		
+		long siz, cap;
+		try(var io=selfIO()){
+			cap=io.getCapacity();
+			siz=io.getSize();
+		}
+		
+		var totalFree=cap-siz;
+		
+		var prov=getDataProvider();
+		
+		var endRef =getReference().addOffset(siz);
+		var ptr    =ChunkPointer.of(endRef.calcGlobalOffset(prov));
+		var builder=new ChunkBuilder(prov, ptr).withCapacity(totalFree);
+		
+		var ch        =builder.create();
+		var headerSize=ch.getHeaderSize();
+		if(headerSize>=totalFree) return;
+		
+		Chunk chRem  =getReference().getPtr().dereference(prov);
+		var   sizeRem=siz;
+		while(chRem.hasNextPtr()){
+			sizeRem-=chRem.getSize();
+			chRem=chRem.requireNext();
+		}
+		if(chRem.dataStart()+sizeRem!=ptr.getValue()){
+			throw new AssertionError(chRem.dataStart()+sizeRem+" "+ptr.getValue());
+		}
+		
+		try{
+			chRem.setCapacity(sizeRem);
+			ch.setCapacity(totalFree-headerSize);
+		}catch(BitDepthOutOfSpaceException e){
+			throw new ShouldNeverHappenError(e);
+		}
+		ch.writeHeader();
+		chRem.writeHeader();
+		
+		prov.getMemoryManager().free(prov.getChunk(ptr));
+	}
+	
 	@Override
 	public long getCapacity() throws IOException{
 		long size;

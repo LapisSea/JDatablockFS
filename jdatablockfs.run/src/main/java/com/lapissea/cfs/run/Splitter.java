@@ -130,6 +130,18 @@ public class Splitter{
 				b.clear();
 			}
 			@Override
+			public void requestCapacity(long capacity) throws IOException{
+				a.requestCapacity(capacity);
+				b.requestCapacity(capacity);
+				test();
+			}
+			@Override
+			public void trim() throws IOException{
+				a.trim();
+				b.trim();
+				test();
+			}
+			@Override
 			public long getCapacity() throws IOException{
 				return a.getCapacity();
 			}

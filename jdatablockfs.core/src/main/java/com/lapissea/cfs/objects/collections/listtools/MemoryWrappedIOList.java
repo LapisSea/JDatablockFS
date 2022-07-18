@@ -82,6 +82,13 @@ public class MemoryWrappedIOList<T> implements IOList<T>{
 	}
 	
 	@Override
+	public void trim() throws IOException{
+		if(data instanceof ArrayList<T> al){
+			al.trimToSize();
+		}
+	}
+	
+	@Override
 	public long getCapacity() throws IOException{
 		return Integer.MAX_VALUE;
 	}

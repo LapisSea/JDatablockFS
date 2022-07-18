@@ -249,6 +249,11 @@ public abstract class MappedIOList<From, To> implements IOList<To>{
 		data.requestCapacity(capacity);
 	}
 	@Override
+	public void trim() throws IOException{
+		data.trim();
+	}
+	
+	@Override
 	public long getCapacity() throws IOException{
 		return data.getCapacity();
 	}

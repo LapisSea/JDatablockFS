@@ -538,7 +538,8 @@ public interface IOList<T> extends IterablePP<T>{
 	 * The list can allocate space for data that may come later here.
 	 * It is not required to do so but is desirable. No exact capacity allocation is required.
 	 */
-	default void requestCapacity(long capacity) throws IOException{}
+	void requestCapacity(long capacity) throws IOException;
+	void trim() throws IOException;
 	long getCapacity() throws IOException;
 	
 	default boolean contains(T value) throws IOException{

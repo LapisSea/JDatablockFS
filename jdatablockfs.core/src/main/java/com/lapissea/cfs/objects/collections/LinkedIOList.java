@@ -352,6 +352,11 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 		head.free();
 	}
 	@Override
+	public void requestCapacity(long capacity){}
+	@Override
+	public void trim() throws IOException{}
+	
+	@Override
 	public long getCapacity() throws IOException{
 		return Long.MAX_VALUE;
 	}

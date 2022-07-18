@@ -189,6 +189,11 @@ public class IOListRangeView<T> implements IOList<T>{
 		data.requestCapacity(capacity+from);
 	}
 	@Override
+	public void trim() throws IOException{
+		data.trim();
+	}
+	
+	@Override
 	public long getCapacity() throws IOException{
 		return data.getCapacity();
 	}
