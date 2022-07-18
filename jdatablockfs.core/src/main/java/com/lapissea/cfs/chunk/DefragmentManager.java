@@ -64,11 +64,11 @@ public class DefragmentManager{
 			
 			var frees=cluster.getMemoryManager().getFreeChunks();
 			iter:
-			for(var iter=frees.listIterator();iter.hasNext();){
-				var freeFirst=iter.ioNext().dereference(cluster);
-				if(!iter.hasNext()) break;
-				var freeNext=iter.ioNext().dereference(cluster);
-				iter.ioPrevious();
+			for(var iter=frees.listIterator(frees.size());iter.hasPrevious();){
+				var freeNext=iter.ioPrevious().dereference(cluster);
+				if(!iter.hasPrevious()) break;
+				var freeFirst=iter.ioPrevious().dereference(cluster);
+				iter.ioNext();
 				
 				boolean soround=false;
 				
@@ -87,13 +87,10 @@ public class DefragmentManager{
 				}
 				if(!soround) continue;
 				
-				var last=ch.dataEnd();
-				
 				var firstNext=freeFirst.nextPhysical();
+				var limit    =firstNext.getPtr().getValue();
 				
-				var user=findReferenceUser(cluster, firstNext.getPtr().makeReference());
-				
-				boolean found=moveReference(cluster, firstNext.getPtr(), user==null?cluster.getSource().getIOSize():user.calcGlobalOffset(cluster), c->c.getPtr().getValue()>last);
+				boolean found=moveReference(cluster, firstNext.getPtr(), 0, c->c.getPtr().getValue()<limit);
 				
 				if(found){
 					continue wh;
@@ -102,12 +99,15 @@ public class DefragmentManager{
 			
 			break;
 		}
+		
+		cluster.getMemoryManager().getFreeChunks().trim();
 	}
 	
 	private boolean moveReference(Cluster cluster, ChunkPointer target, long magnet, Predicate<Chunk> approve) throws IOException{
 		List<Chunk> toFree=new ArrayList<>();
 		var record=new MemoryWalker.PointerRecord(){
 			boolean moved=false;
+			@SuppressWarnings({"unchecked", "rawtypes"})
 			@Override
 			public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, IOField.Ref<T, ?> field, Reference valueReference) throws IOException{
 				if(!valueReference.getPtr().equals(target)){
@@ -159,6 +159,7 @@ public class DefragmentManager{
 			List<Chunk> toFree=new ArrayList<>();
 			
 			cluster.rootWalker().walk(new MemoryWalker.PointerRecord(){
+				@SuppressWarnings({"rawtypes", "unchecked"})
 				@Override
 				public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, IOField.Ref<T, ?> field, Reference valueReference) throws IOException{
 					if(instance instanceof IOInstance.Unmanaged u){
