@@ -673,7 +673,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		return new FixedFormatNotSupportedException(this);
 	}
 	
-	public IOField<T, ValueType> forceMaxAsFixedSize(){
+	public final IOField<T, ValueType> forceMaxAsFixedSize(){
 		if(getSizeDescriptor().hasFixed()) return this;
 		if(!getSizeDescriptor().hasMax()){
 			throw unsupportedFixed();

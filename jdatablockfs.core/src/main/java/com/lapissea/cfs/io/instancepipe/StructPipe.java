@@ -710,7 +710,13 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	
 	@Override
 	public String toString(){
-		return getClass().getSimpleName()+"{"+type.getType().getSimpleName()+"}";
+		var pipName=getClass().getSimpleName();
+		var end    ="StructPipe";
+		if(pipName.endsWith(end)){
+			pipName="~~"+pipName.substring(0, pipName.length()-end.length());
+		}
+		
+		return pipName+"("+type.getType().getSimpleName()+")";
 	}
 	
 	@Override
