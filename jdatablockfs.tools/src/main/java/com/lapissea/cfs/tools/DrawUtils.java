@@ -278,6 +278,7 @@ class DrawUtils{
 			double[] lastPoint=null;
 			double   lastAngle=0;
 			double   delta    =1/64.0;
+			double   lastArrow=0;
 			for(double t=tPoints[2];t<tPoints[5];t+=delta){
 				double[] newPoint=DeBoor(_k, tPoints, handles, t);
 				if(lastPoint!=null){
@@ -298,8 +299,9 @@ class DrawUtils{
 					boolean didArrow=false;
 					if(arrow){
 						var mid=(tPoints[5]+tPoints[2])/2;
-						if(t<mid&&(t+delta)>mid){
+						if(t<mid&&(t+delta)>mid||t-lastArrow>0.1){
 							drawArrow(ctx, lastPoint[0], lastPoint[1], newPoint[0], newPoint[1]);
+							lastArrow=t;
 							didArrow=true;
 						}
 					}

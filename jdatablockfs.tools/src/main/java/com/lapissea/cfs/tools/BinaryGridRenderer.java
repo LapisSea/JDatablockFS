@@ -53,6 +53,7 @@ import static com.lapissea.cfs.tools.ColorUtils.alpha;
 import static com.lapissea.cfs.tools.render.RenderBackend.DrawMode;
 import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 import static com.lapissea.util.PoolOwnThread.async;
+import static com.lapissea.util.UtilL.TRUE;
 import static org.lwjgl.glfw.GLFW.*;
 
 @SuppressWarnings({"UnnecessaryLocalVariable", "SameParameterValue"})
@@ -739,7 +740,8 @@ public class BinaryGridRenderer implements DataRenderer{
 		
 		ctx.renderer.setColor(alpha(Color.WHITE, 0.5F));
 		
-		List<Pointer> ptrs=new ArrayList<>();
+		List<Pointer>     ptrs         =new ArrayList<>();
+		Consumer<Pointer> pointerRecord=!TRUE()?p->{}:ptrs::add;
 		
 		ChunkSet referenced=new ChunkSet();
 		try{
@@ -782,7 +784,7 @@ public class BinaryGridRenderer implements DataRenderer{
 				}
 				
 				Throwable e1    =null;
-				var       annCtx=new AnnotateCtx(ctx, provider, new LinkedList<>(), ptrs::add, strings, stringOutlines);
+				var       annCtx=new AnnotateCtx(ctx, provider, new LinkedList<>(), pointerRecord, strings, stringOutlines);
 				
 				try{
 					try{
@@ -853,7 +855,7 @@ public class BinaryGridRenderer implements DataRenderer{
 				if(e1!=null) throw e1;
 			}else{
 				var         provider=DataProvider.newVerySimpleProvider(MemoryData.builder().withRaw(bytes).build());
-				AnnotateCtx annCtx  =new AnnotateCtx(ctx, provider, new LinkedList<>(), ptrs::add, new ArrayList<>(), new ArrayList<>());
+				AnnotateCtx annCtx  =new AnnotateCtx(ctx, provider, new LinkedList<>(), pointerRecord, new ArrayList<>(), new ArrayList<>());
 				annCtx.stack.add(null);
 				long pos;
 				try{
@@ -1094,13 +1096,17 @@ public class BinaryGridRenderer implements DataRenderer{
 				xPosTo=end%ctx.width(),
 				yPosTo=end/ctx.width();
 			
-			var rand=new Random((start<<32)+end);
+			var direction=start<end;
+			var ySmall   =Math.abs(yPosFrom-yPosTo)>1;
+			var dirY     =direction?1:-1;
+			var dirX     =0;
+			
 			double
-				offScale=Math.sqrt(MathUtil.sq(xPosFrom-xPosTo)+MathUtil.sq(yPosFrom-yPosTo))/5,
-				xFromOff=(rand.nextDouble()-0.5)*offScale,
-				yFromOff=(rand.nextDouble()-0.5)*offScale,
-				xToOff=(rand.nextDouble()-0.5)*offScale,
-				yToOff=(rand.nextDouble()-0.5)*offScale,
+				offScale=ySmall?Math.abs(yPosFrom-yPosTo)/6D:2,
+				xFromOff=(dirX)*offScale,
+				yFromOff=(dirY)*offScale,
+				xToOff=(-dirX)*offScale,
+				yToOff=((ySmall?-1:1)*dirY)*offScale,
 				
 				xFromOrg=xPosFrom+(pSiz==0?0:0.5),
 				yFromOrg=yPosFrom+0.5,

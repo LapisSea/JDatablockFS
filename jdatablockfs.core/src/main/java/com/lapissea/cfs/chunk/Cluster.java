@@ -112,6 +112,11 @@ public class Cluster implements DataProvider{
 		private ChunkPointer getVal(){
 			return val;
 		}
+		
+		@Override
+		public String toString(){
+			return val.toString();
+		}
 	}
 	
 	private static class Metadata extends IOInstance<Metadata>{
