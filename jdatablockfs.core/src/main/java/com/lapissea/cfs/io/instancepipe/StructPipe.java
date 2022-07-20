@@ -38,6 +38,7 @@ import static com.lapissea.cfs.ConsoleColors.BLUE_BRIGHT;
 import static com.lapissea.cfs.ConsoleColors.CYAN_BRIGHT;
 import static com.lapissea.cfs.ConsoleColors.RESET;
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.GlobalConfig.TYPE_VALIDATION;
 
 public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit implements ObjectPipe<T, Struct.Pool<T>>{
 	
@@ -94,7 +95,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				});
 			}
 			
-			if(DEBUG_VALIDATION&&!(struct instanceof Struct.Unmanaged)){
+			if(TYPE_VALIDATION&&!(struct instanceof Struct.Unmanaged)){
 				if(Access.DEV_CACHE){
 					created.getType().emptyConstructor();
 				}else{

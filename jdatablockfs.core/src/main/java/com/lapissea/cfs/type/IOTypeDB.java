@@ -22,6 +22,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.GlobalConfig.TYPE_VALIDATION;
 
 
 /**
@@ -342,7 +343,7 @@ public sealed interface IOTypeDB{
 			
 			if(def.isUnmanaged()) return;
 			
-			if(DEBUG_VALIDATION){
+			if(TYPE_VALIDATION){
 				ContiguousStructPipe.of(type.getThisStruct()).checkTypeIntegrity(type);
 			}
 			

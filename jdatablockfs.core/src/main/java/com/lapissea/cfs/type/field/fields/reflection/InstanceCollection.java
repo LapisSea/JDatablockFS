@@ -31,6 +31,7 @@ import java.util.*;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.GlobalConfig.TYPE_VALIDATION;
 import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 
 public class InstanceCollection{
@@ -386,7 +387,11 @@ public class InstanceCollection{
 			if(IOInstance.isUnmanaged(component)) throw new MalformedStructLayout(this+" element type is unmanaged: "+type);
 			
 			//preload pipe
-			Runner.compileTask(this::getValPipe);
+			if(TYPE_VALIDATION){
+				Runner.compileTask(this::getValPipe);
+			}else{
+				ContiguousStructPipe.of(component);
+			}
 			
 		}
 		

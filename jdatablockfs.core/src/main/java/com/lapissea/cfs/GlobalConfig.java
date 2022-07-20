@@ -6,11 +6,13 @@ import com.lapissea.util.UtilL;
 public class GlobalConfig{
 	
 	public static final boolean DEBUG_VALIDATION;
+	public static final boolean TYPE_VALIDATION;
 	public static       boolean PRINT_COMPILATION;
 	
 	static{
 		DEBUG_VALIDATION=GlobalConfig.class.desiredAssertionStatus();
 		
+		TYPE_VALIDATION=UtilL.sysPropertyByClass(GlobalConfig.class, "TYPE_VALIDATION", DEBUG_VALIDATION, Boolean::valueOf);
 		PRINT_COMPILATION=UtilL.sysPropertyByClass(GlobalConfig.class, "printCompilation", false, Boolean::valueOf);
 		
 		if(DEBUG_VALIDATION){
