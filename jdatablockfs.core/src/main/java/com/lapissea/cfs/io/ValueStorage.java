@@ -14,10 +14,11 @@ import com.lapissea.cfs.type.field.BasicSizeDescriptor;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
-import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.IOException;
+
+import static com.lapissea.cfs.type.StagedInit.STATE_DONE;
 
 public sealed interface ValueStorage<T>{
 	
@@ -451,13 +452,7 @@ public sealed interface ValueStorage<T>{
 			var struct=Struct.ofUnknown(clazz);
 			if(fixedOnly){
 				try{
-					var pipe=FixedContiguousStructPipe.of(struct);
-					try{
-						pipe.waitForState(StagedInit.STATE_DONE);
-					}catch(StagedInit.WaitException e){
-						throw UtilL.uncheckedThrow(e.getCause());
-					}
-					return new FixedInstance<>(generics, provider, pipe);
+					return new FixedInstance<>(generics, provider, FixedContiguousStructPipe.of(struct, STATE_DONE));
 				}catch(MalformedStructLayout ignored){
 					return new FixedReferencedInstance<>(generics, provider, ContiguousStructPipe.of(struct));
 				}

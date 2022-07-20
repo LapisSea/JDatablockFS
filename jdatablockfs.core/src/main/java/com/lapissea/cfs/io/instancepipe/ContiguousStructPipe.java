@@ -24,8 +24,14 @@ public class ContiguousStructPipe<T extends IOInstance<T>> extends StructPipe<T>
 	public static <T extends IOInstance<T>> ContiguousStructPipe<T> of(Class<T> type){
 		return of(Struct.of(type));
 	}
+	public static <T extends IOInstance<T>> ContiguousStructPipe<T> of(Class<T> type, int minRequestedStage){
+		return of(Struct.of(type), minRequestedStage);
+	}
 	public static <T extends IOInstance<T>> ContiguousStructPipe<T> of(Struct<T> struct){
 		return of(ContiguousStructPipe.class, struct);
+	}
+	public static <T extends IOInstance<T>> ContiguousStructPipe<T> of(Struct<T> struct, int minRequestedStage){
+		return of(ContiguousStructPipe.class, struct, minRequestedStage);
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -33,8 +39,8 @@ public class ContiguousStructPipe<T extends IOInstance<T>> extends StructPipe<T>
 		StructPipe.registerSpecialImpl(struct, (Class<P>)(Object)ContiguousStructPipe.class, newType);
 	}
 	
-	public ContiguousStructPipe(Struct<T> type){
-		super(type);
+	public ContiguousStructPipe(Struct<T> type, boolean runNow){
+		super(type, runNow);
 	}
 	
 	@Override

@@ -11,7 +11,6 @@ import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.StagedInit;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
@@ -22,6 +21,8 @@ import com.lapissea.util.ShouldNeverHappenError;
 
 import java.io.IOException;
 import java.util.Objects;
+
+import static com.lapissea.cfs.type.StagedInit.STATE_DONE;
 
 public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends IOInstance<ValueType>> extends IOField.Ref.ReferenceCompanion<T, ValueType> implements IOField.Ref.Inst<T, ValueType>{
 	
@@ -39,11 +40,7 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 		struct=(Struct<ValueType>)Struct.ofUnknown(getAccessor().getType());
 		var typ=accessor.getAnnotation(IOValue.Reference.class).map(IOValue.Reference::dataPipeType).orElseThrow();
 		instancePipe=switch(typ){
-			case FIXED -> {
-				var pip=FixedContiguousStructPipe.of(struct);
-				pip.waitForState(StagedInit.STATE_DONE);
-				yield pip;
-			}
+			case FIXED -> FixedContiguousStructPipe.of(struct, STATE_DONE);
 			case FLEXIBLE -> ContiguousStructPipe.of(struct);
 		};
 		

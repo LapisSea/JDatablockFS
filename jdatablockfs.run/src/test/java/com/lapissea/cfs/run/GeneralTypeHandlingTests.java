@@ -31,6 +31,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Stream;
 
+import static com.lapissea.cfs.type.StagedInit.STATE_DONE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class GeneralTypeHandlingTests{
@@ -121,8 +122,7 @@ public class GeneralTypeHandlingTests{
 		
 		StructPipe<T> pipe;
 		try{
-			pipe=ContiguousStructPipe.of(struct);
-			pipe.waitForState(StagedInit.STATE_DONE);
+			pipe=ContiguousStructPipe.of(struct, STATE_DONE);
 		}catch(MalformedStructLayout|StagedInit.WaitException ignored){
 			pipe=null;
 		}
@@ -130,8 +130,7 @@ public class GeneralTypeHandlingTests{
 			pipe.checkTypeIntegrity(struct.emptyConstructor().get());
 		}
 		try{
-			pipe=FixedContiguousStructPipe.of(struct);
-			pipe.waitForState(StagedInit.STATE_DONE);
+			pipe=FixedContiguousStructPipe.of(struct, STATE_DONE);
 		}catch(MalformedStructLayout|StagedInit.WaitException ignored){
 			pipe=null;
 		}

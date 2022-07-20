@@ -32,8 +32,14 @@ public class FixedContiguousStructPipe<T extends IOInstance<T>> extends StructPi
 	public static <T extends IOInstance<T>> FixedContiguousStructPipe<T> of(Class<T> type){
 		return of(Struct.of(type));
 	}
+	public static <T extends IOInstance<T>> FixedContiguousStructPipe<T> of(Class<T> type, int minRequestedStage){
+		return of(Struct.of(type), minRequestedStage);
+	}
 	public static <T extends IOInstance<T>> FixedContiguousStructPipe<T> of(Struct<T> struct){
 		return of(FixedContiguousStructPipe.class, struct);
+	}
+	public static <T extends IOInstance<T>> FixedContiguousStructPipe<T> of(Struct<T> struct, int minRequestedStage){
+		return of(FixedContiguousStructPipe.class, struct, minRequestedStage);
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -43,8 +49,8 @@ public class FixedContiguousStructPipe<T extends IOInstance<T>> extends StructPi
 	
 	private final Map<IOField<T, NumberSize>, NumberSize> maxValues;
 	
-	public FixedContiguousStructPipe(Struct<T> type){
-		super(type);
+	public FixedContiguousStructPipe(Struct<T> type, boolean runNow){
+		super(type, runNow);
 		
 		maxValues=Utils.nullIfEmpty(computeMaxValues());
 		

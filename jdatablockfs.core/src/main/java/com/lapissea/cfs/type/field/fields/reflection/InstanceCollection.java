@@ -14,7 +14,10 @@ import com.lapissea.cfs.io.instancepipe.ObjectPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Reference;
-import com.lapissea.cfs.type.*;
+import com.lapissea.cfs.type.GenericContext;
+import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.BasicSizeDescriptor;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
@@ -32,6 +35,7 @@ import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.GlobalConfig.TYPE_VALIDATION;
+import static com.lapissea.cfs.type.StagedInit.STATE_DONE;
 import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 
 public class InstanceCollection{
@@ -397,9 +401,7 @@ public class InstanceCollection{
 		
 		private StructPipe<ElementType> getValPipe(){
 			if(valPipe==null){
-				var p=ContiguousStructPipe.of(component);
-				p.waitForState(StagedInit.STATE_DONE);
-				valPipe=p;
+				valPipe=ContiguousStructPipe.of(component, STATE_DONE);
 			}
 			return valPipe;
 		}

@@ -36,6 +36,8 @@ import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
+import static com.lapissea.cfs.type.StagedInit.STATE_DONE;
+
 public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType> extends IOField.NullFlagCompany<CTyp, ValueType>{
 	
 	private static final StructPipe<Reference> REF_PIPE=ContiguousStructPipe.of(Reference.class);
@@ -56,7 +58,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		long minKnownTypeSize=Long.MAX_VALUE;
 		try{
 			Struct<?>         struct =Struct.ofUnknown(Utils.typeToRaw(type));
-			SizeDescriptor<?> typDesc=ContiguousStructPipe.of(struct).getSizeDescriptor();
+			SizeDescriptor<?> typDesc=ContiguousStructPipe.of(struct, STATE_DONE).getSizeDescriptor();
 			minKnownTypeSize=typDesc.getMin(WordSpace.BYTE);
 		}catch(IllegalArgumentException ignored){}
 		

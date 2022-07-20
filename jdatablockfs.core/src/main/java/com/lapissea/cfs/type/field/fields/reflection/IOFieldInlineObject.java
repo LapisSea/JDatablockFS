@@ -7,13 +7,18 @@ import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
-import com.lapissea.cfs.type.*;
+import com.lapissea.cfs.type.GenericContext;
+import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 
 import java.io.IOException;
 import java.util.Objects;
+
+import static com.lapissea.cfs.type.StagedInit.STATE_DONE;
 
 public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extends IOInstance<ValueType>> extends IOField.NullFlagCompany<CTyp, ValueType>{
 	
@@ -30,8 +35,7 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 		
 		var struct=(Struct<ValueType>)Struct.ofUnknown(getAccessor().getType());
 		if(fixed){
-			instancePipe=FixedContiguousStructPipe.of(struct);
-			instancePipe.waitForState(StagedInit.STATE_DONE);
+			instancePipe=FixedContiguousStructPipe.of(struct, STATE_DONE);
 		}else instancePipe=ContiguousStructPipe.of(struct);
 		
 		var desc=instancePipe.getSizeDescriptor();

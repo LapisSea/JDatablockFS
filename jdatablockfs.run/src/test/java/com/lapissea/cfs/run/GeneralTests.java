@@ -13,7 +13,10 @@ import com.lapissea.cfs.objects.collections.HashIOMap;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.collections.LinkedIOList;
 import com.lapissea.cfs.objects.text.AutoText;
-import com.lapissea.cfs.type.*;
+import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.TypeDef;
+import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeConsumer;
@@ -30,6 +33,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+import static com.lapissea.cfs.type.StagedInit.STATE_DONE;
 import static com.lapissea.util.LogUtil.Init.USE_CALL_POS;
 import static com.lapissea.util.LogUtil.Init.USE_TABULATED_HEADER;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -55,7 +59,7 @@ public class GeneralTests{
 			      })
 			      .filter(Objects::nonNull)
 			      .toList()
-			      .forEach(c->c.waitForState(StagedInit.STATE_DONE));
+			      .forEach(c->c.waitForState(STATE_DONE));
 		}
 		
 		if(Boolean.parseBoolean(UtilL.sysPropertyByClass(GeneralTests.class, "earlyRunCode").orElse("true"))){

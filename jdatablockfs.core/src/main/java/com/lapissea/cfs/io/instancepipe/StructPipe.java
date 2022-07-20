@@ -29,7 +29,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -44,20 +43,24 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	
 	private static class StructGroup<T extends IOInstance<T>, P extends StructPipe<T>> extends ConcurrentHashMap<Struct<T>, P>{
 		
+		interface PipeConstructor<T extends IOInstance<T>, P extends StructPipe<T>>{
+			P make(Struct<T> type, boolean runNow);
+		}
+		
 		private final Map<Struct<T>, Supplier<P>> specials=new HashMap<>();
-		private final Function<Struct<?>, P>      lConstructor;
+		private final PipeConstructor<T, P>       lConstructor;
 		private final Class<?>                    type;
 		
 		private StructGroup(Class<? extends StructPipe<?>> type){
 			try{
-				lConstructor=Access.makeLambda(type.getConstructor(Struct.class), Function.class);
+				lConstructor=Access.makeLambda(type.getConstructor(Struct.class, boolean.class), PipeConstructor.class);
 			}catch(ReflectiveOperationException e){
 				throw new RuntimeException("Failed to get pipe constructor", e);
 			}
 			this.type=type;
 		}
 		
-		P make(Struct<T> struct){
+		P make(Struct<T> struct, boolean runNow){
 			var cached=get(struct);
 			if(cached!=null) return cached;
 			
@@ -70,7 +73,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				if(special!=null){
 					created=special.get();
 				}else{
-					created=lConstructor.apply(struct);
+					created=lConstructor.make(struct, runNow);
 				}
 			}catch(Throwable e){
 				throw new MalformedStructLayout("Failed to compile "+type.getSimpleName()+" for "+struct.getType().getName(), e);
@@ -133,9 +136,17 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	}
 	
 	@SuppressWarnings("unchecked")
+	public static <T extends IOInstance<T>, P extends StructPipe<T>> P of(Class<P> type, Struct<T> struct, int minRequestedStage){
+		var group=(StructGroup<T, P>)CACHE.computeIfAbsent(type, StructGroup::new);
+		var pipe =group.make(struct, minRequestedStage==STATE_DONE);
+		pipe.waitForState(minRequestedStage);
+		return pipe;
+	}
+	
+	@SuppressWarnings("unchecked")
 	public static <T extends IOInstance<T>, P extends StructPipe<T>> P of(Class<P> type, Struct<T> struct){
 		var group=(StructGroup<T, P>)CACHE.computeIfAbsent(type, StructGroup::new);
-		return group.make(struct);
+		return group.make(struct, false);
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -154,9 +165,9 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	
 	public static final int STATE_IO_FIELD=1;
 	
-	public StructPipe(Struct<T> type){
+	public StructPipe(Struct<T> type, boolean runNow){
 		this.type=type;
-		init(false, ()->{
+		init(runNow, ()->{
 			this.ioFields=FieldSet.of(initFields());
 			setInitState(STATE_IO_FIELD);
 			earlyNullChecks=Utils.nullIfEmpty(getNonNulls());

@@ -28,12 +28,10 @@ public final class Reference extends IOInstance<Reference>{
 	@SuppressWarnings("unchecked")
 	public static final Struct<Reference> STRUCT=(Struct<Reference>)Struct.thisClass();
 	
-	public static final FixedContiguousStructPipe<Reference> FIXED_PIPE=FixedContiguousStructPipe.of(STRUCT);
-	
 	static{
 		boolean useOptimized=!UtilL.sysPropertyByClass(Chunk.class, "DO_NOT_USE_OPTIMIZED_PIPE", false, Boolean::parseBoolean);
 		if(useOptimized){
-			ContiguousStructPipe.registerSpecialImpl(STRUCT, ()->new ContiguousStructPipe<>(STRUCT){
+			ContiguousStructPipe.registerSpecialImpl(STRUCT, ()->new ContiguousStructPipe<>(STRUCT, true){
 				@Override
 				protected List<IOField<Reference, ?>> initFields(){
 					var f=super.initFields();
@@ -79,7 +77,7 @@ public final class Reference extends IOInstance<Reference>{
 					return instance;
 				}
 			});
-			FixedContiguousStructPipe.registerSpecialImpl(STRUCT, ()->new FixedContiguousStructPipe<>(STRUCT){
+			FixedContiguousStructPipe.registerSpecialImpl(STRUCT, ()->new FixedContiguousStructPipe<>(STRUCT, true){
 				@Override
 				protected List<IOField<Reference, ?>> initFields(){
 					var f=super.initFields();
@@ -114,6 +112,8 @@ public final class Reference extends IOInstance<Reference>{
 			});
 		}
 	}
+	
+	public static final FixedContiguousStructPipe<Reference> FIXED_PIPE=FixedContiguousStructPipe.of(STRUCT);
 	
 	private static final class IOContext implements RandomIO.Creator{
 		private final Reference    ref;
