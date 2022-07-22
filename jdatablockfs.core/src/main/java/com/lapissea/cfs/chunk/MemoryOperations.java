@@ -1,8 +1,8 @@
 package com.lapissea.cfs.chunk;
 
 import com.lapissea.cfs.GlobalConfig;
-import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.BitDepthOutOfSpaceException;
+import com.lapissea.cfs.internal.IUtils;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.objects.ChunkPointer;
@@ -331,7 +331,7 @@ public class MemoryOperations{
 					var old=io.getCapacity();
 					io.setCapacity(old+toGrow);
 					io.setPos(old);
-					Utils.zeroFill(io::write, toGrow);
+					IUtils.zeroFill(io::write, toGrow);
 				}
 				target.modifyAndSave(ch->{
 					try{
@@ -562,7 +562,7 @@ public class MemoryOperations{
 		
 		try(var io=src.ioAt(chunk.getPtr().getValue())){
 			chunk.writeHeader(io);
-			Utils.zeroFill(io::write, chunk.getCapacity());
+			IUtils.zeroFill(io::write, chunk.getCapacity());
 		}
 		context.getChunkCache().add(chunk);
 		return chunk;
@@ -657,7 +657,7 @@ public class MemoryOperations{
 			}
 			if(safeToAllocate<freeChunk.getHeaderSize()){
 				try(var io=provider.getSource().ioAt(freeChunk.getPtr().getValue())){
-					Utils.zeroFill(io::write, safeToAllocate);
+					IUtils.zeroFill(io::write, safeToAllocate);
 				}
 				provider.getChunkCache().notifyDestroyed(freeChunk);
 			}else{

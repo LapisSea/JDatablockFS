@@ -1,7 +1,7 @@
 package com.lapissea.cfs.type.field.fields.reflection;
 
-import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
+import com.lapissea.cfs.internal.IUtils;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
@@ -89,7 +89,7 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 		if(nullable()){
 			if(val==null){
 				if(fixed){
-					Utils.zeroFill(dest::write, (int)getSizeDescriptor().requireFixed(WordSpace.BYTE));
+					IUtils.zeroFill(dest::write, (int)getSizeDescriptor().requireFixed(WordSpace.BYTE));
 				}
 				return;
 			}

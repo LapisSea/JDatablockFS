@@ -1,6 +1,6 @@
 package com.lapissea.cfs.io.impl;
 
-import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.internal.IUtils;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.util.NotImplementedException;
@@ -125,7 +125,7 @@ public class IOFileData implements IOInterface, AutoCloseable{
 		
 		@Override
 		public void fillZero(long requestedMemory) throws IOException{
-			Utils.zeroFill((b, off, len)->write(b, off, len, false), requestedMemory);
+			IUtils.zeroFill((b, off, len)->write(b, off, len, false), requestedMemory);
 		}
 		@Override
 		public boolean isReadOnly(){

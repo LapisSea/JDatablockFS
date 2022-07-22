@@ -1,6 +1,7 @@
 package com.lapissea.cfs.io.impl;
 
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.internal.IUtils;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.IOTransactionBuffer;
 import com.lapissea.cfs.io.RandomIO;
@@ -239,7 +240,7 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		public void fillZero(long requestedMemory) throws IOException{
 			if(readOnly) throw new UnsupportedOperationException();
 			
-			Utils.zeroFill((b, off, len)->write(b, off, len, false), requestedMemory);
+			IUtils.zeroFill((b, off, len)->write(b, off, len, false), requestedMemory);
 		}
 		@Override
 		public boolean isReadOnly(){

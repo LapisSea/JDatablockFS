@@ -18,12 +18,14 @@ public class Log{
 	private static final int INFO =2;
 	private static final int DEBUG=3;
 	private static final int TRACE=4;
+	private static final int ALL  =Integer.MAX_VALUE;
 	
 	private static final int LOG_LEVEL=switch(UtilL.sysPropertyByClass(Log.class, "level").orElse("").toUpperCase()){
 		case "WARN" -> WARN;
 		case "DEBUG" -> DEBUG;
 		case "TRACE" -> TRACE;
 		case "MIN" -> MIN;
+		case "ALL" -> ALL;
 		default -> INFO;
 	};
 	

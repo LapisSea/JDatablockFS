@@ -37,6 +37,7 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.internal.IUtils.getCallee;
 import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NOT_NULL;
 
@@ -254,7 +255,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		}
 		
 		public static Unmanaged<?> thisClass(){
-			return ofUnknown(getStack(s->s.skip(2)));
+			return ofUnknown(getCallee(1));
 		}
 		
 		public static Unmanaged<?> ofUnknown(@NotNull Type instanceType){
@@ -352,14 +353,8 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		}
 	}
 	
-	
-	private static Class<?> getStack(Function<Stream<StackWalker.StackFrame>, Stream<StackWalker.StackFrame>> stream){
-		return StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE)
-		                  .walk(s->stream.apply(s).findFirst().orElseThrow().getDeclaringClass());
-	}
-	
 	public static Struct<?> thisClass(){
-		return ofUnknown(getStack(s->s.skip(2)));
+		return ofUnknown(getCallee(1));
 	}
 	
 	public static Struct<?> ofUnknown(@NotNull Type instanceType){

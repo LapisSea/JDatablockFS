@@ -2,6 +2,7 @@ package com.lapissea.cfs.objects;
 
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.BitDepthOutOfSpaceException;
+import com.lapissea.cfs.internal.IUtils;
 import com.lapissea.cfs.io.bit.BitUtils;
 import com.lapissea.cfs.io.bit.EnumUniverse;
 import com.lapissea.cfs.io.content.ContentReader;
@@ -102,7 +103,7 @@ public enum NumberSize{
 		return switch(this){
 			case INT -> Float.intBitsToFloat(in.readInt4());
 			case LONG -> Double.longBitsToDouble(in.readInt8());
-			case SHORT -> Utils.shortBitsToFloat(in.readInt2());
+			case SHORT -> IUtils.shortBitsToFloat(in.readInt2());
 			case VOID -> 0;
 			case BYTE, SMALL_INT, BIG_INT, SMALL_LONG -> throw new UnsupportedOperationException();
 		};
@@ -112,7 +113,7 @@ public enum NumberSize{
 		switch(this){
 			case INT -> out.writeInt4(Float.floatToIntBits((float)value));
 			case LONG -> out.writeInt8(Double.doubleToLongBits(value));
-			case SHORT -> out.writeInt2(Utils.floatToShortBits((float)value));
+			case SHORT -> out.writeInt2(IUtils.floatToShortBits((float)value));
 			case VOID -> {}
 			case BYTE, SMALL_INT, BIG_INT, SMALL_LONG -> throw new UnsupportedOperationException();
 			case null -> throw new ShouldNeverHappenError();
