@@ -30,6 +30,10 @@ import static org.lwjgl.opengl.GL30.GL_INVALID_FRAMEBUFFER_OPERATION;
 
 public class OpenGLBackend extends RenderBackend{
 	
+	static{
+		ImGuiUtils.load();
+	}
+	
 	public static void glErrorPrint(){
 		int errorCode=glGetError();
 		if(errorCode==GL_NO_ERROR) return;
@@ -303,7 +307,8 @@ public class OpenGLBackend extends RenderBackend{
 	
 	@Override
 	public void postRender(){
-		imGuiGl3.renderDrawData(ImGui.getDrawData());
+		var data=ImGui.getDrawData();
+		if(data.ptr!=0) imGuiGl3.renderDrawData(data);
 		
 		window.swapBuffers();
 	}

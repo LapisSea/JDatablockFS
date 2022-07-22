@@ -35,6 +35,7 @@ public class IOFileData implements IOInterface, AutoCloseable{
 		
 		@Override
 		public long getSize() throws IOException{
+			var source=getSource();
 			return source.length();
 		}
 		
@@ -45,11 +46,13 @@ public class IOFileData implements IOInterface, AutoCloseable{
 		
 		@Override
 		public long getCapacity() throws IOException{
+			var source=getSource();
 			return source.length();
 		}
 		
 		@Override
 		public RandomIO setCapacity(long newCapacity) throws IOException{
+			var source=getSource();
 			source.setLength(newCapacity);
 			return this;
 		}
@@ -63,8 +66,9 @@ public class IOFileData implements IOInterface, AutoCloseable{
 		public void flush(){}
 		
 		private void snapPos() throws IOException{
-			var pos=getPos();
-			var p0 =source.getFilePointer();
+			var source=getSource();
+			var pos   =getPos();
+			var p0    =source.getFilePointer();
 			if(p0!=pos) source.seek(pos);
 			var p1=source.getFilePointer();
 			Assert(pos==p1);
@@ -72,6 +76,7 @@ public class IOFileData implements IOInterface, AutoCloseable{
 		
 		@Override
 		public int read() throws IOException{
+			var source=getSource();
 			snapPos();
 			var i=source.read();
 			if(i!=-1) pos++;
@@ -81,6 +86,7 @@ public class IOFileData implements IOInterface, AutoCloseable{
 		
 		@Override
 		public int read(byte[] b, int off, int len) throws IOException{
+			var source=getSource();
 			snapPos();
 			var read=source.read(b, off, len);
 			if(read>0) pos+=read;
@@ -89,6 +95,7 @@ public class IOFileData implements IOInterface, AutoCloseable{
 		
 		@Override
 		public void write(int b) throws IOException{
+			var source=getSource();
 			snapPos();
 			source.write(b);
 			if(onWrite!=null){
@@ -107,6 +114,7 @@ public class IOFileData implements IOInterface, AutoCloseable{
 		}
 		
 		public void write(byte[] b, int off, int len, boolean pushPos) throws IOException{
+			var source=getSource();
 			snapPos();
 			source.write(b, off, len);
 			if(onWrite!=null){
