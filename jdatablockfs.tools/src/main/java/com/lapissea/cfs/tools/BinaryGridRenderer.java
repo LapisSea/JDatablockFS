@@ -49,6 +49,8 @@ import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
+import static com.lapissea.cfs.logging.Log.trace;
+import static com.lapissea.cfs.logging.Log.warn;
 import static com.lapissea.cfs.tools.ColorUtils.alpha;
 import static com.lapissea.cfs.tools.render.RenderBackend.DrawMode;
 import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
@@ -142,7 +144,7 @@ public class BinaryGridRenderer implements DataRenderer{
 		try{
 			return ErrorLogLevel.valueOf(v);
 		}catch(IllegalArgumentException e){
-			LogUtil.printlnEr("Unknown value", v, "for errorLogLevel");
+			warn("Unknown value {} for errorLogLevel", v);
 			return ErrorLogLevel.NAMED_STACK;
 		}
 	}).orElse(ErrorLogLevel.NAMED_STACK);
@@ -570,7 +572,7 @@ public class BinaryGridRenderer implements DataRenderer{
 		if(errorMode){
 			if(parsed.displayError==null) parsed.displayError=e;
 			switch(errorLogLevel){
-				case NAME -> LogUtil.printlnEr(e);
+				case NAME -> warn("{}", e);
 				case STACK -> e.printStackTrace();
 				case NAMED_STACK -> new RuntimeException("Failed to process frame "+getFramePos(), e).printStackTrace();
 			}
@@ -590,13 +592,12 @@ public class BinaryGridRenderer implements DataRenderer{
 			try{
 				return render(getFramePos());
 			}catch(Throwable e1){
-//				LogUtil.println(e1);
 				e1.printStackTrace();
 			}
 		}
 		
 		frameTimer.end();
-//		LogUtil.println("Frame time:", frameTimer.msAvrg100());
+		trace("Frame time: {}", (Supplier<Double>)frameTimer::msAvrg100);
 		return List.of();
 	}
 	private void startFrame(RenderContext ctx){
@@ -750,7 +751,7 @@ public class BinaryGridRenderer implements DataRenderer{
 			Cluster cluster=parsed.getCluster().orElseGet(()->{
 				try{
 					var c=new Cluster(MemoryData.builder().withRaw(bytes).asReadOnly().build());
-//					LogUtil.println("parsed cluster at frame", frameIndex);
+					trace("parsed cluster at frame {}", frameIndex);
 					parsed.cluster=new WeakReference<>(c);
 					return c;
 				}catch(Exception e){
@@ -1415,8 +1416,7 @@ public class BinaryGridRenderer implements DataRenderer{
 								if(annotate) annotateByteField(ctx, ioPool, instance, field, col, reference, Range.fromSize(arrayOffset, size-ahead));
 								continue;
 							}
-							LogUtil.printlnEr("unmanaged dynamic type", inst);
-							
+							warn("unmanaged dynamic type {}", inst);
 							continue;
 						}
 						
@@ -1658,7 +1658,7 @@ public class BinaryGridRenderer implements DataRenderer{
 								if(annotate) annotateByteField(ctx, ioPool, instance, field, col, reference, Range.fromSize(fieldOffset, size));
 								continue;
 							}
-							LogUtil.printlnEr("unmanaged draw type:", typ.toString(), acc);
+							warn("unmanaged draw type: {} accessor: {}", typ, acc);
 						}
 					}finally{
 						fieldOffset+=sizeDesc.mapSize(WordSpace.BYTE, size);

@@ -2,7 +2,6 @@ package com.lapissea.cfs.tools.server;
 
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.MemFrame;
-import com.lapissea.util.LogUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeBiConsumer;
 import com.lapissea.util.function.UnsafeConsumer;
@@ -24,6 +23,9 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+import static com.lapissea.cfs.logging.Log.info;
+import static com.lapissea.cfs.logging.Log.trace;
+import static com.lapissea.cfs.logging.Log.warn;
 import static com.lapissea.cfs.tools.server.ServerCommons.Action;
 import static com.lapissea.cfs.tools.server.ServerCommons.getLocalLoggerImpl;
 
@@ -35,7 +37,7 @@ public class DisplayIpc implements DataLogger{
 		
 		public IpcSession(Info conn, String name, Map<String, Object> config) throws IOException{
 			var socket=sessionConnection(conn, name, config);
-			LogUtil.println("Server session("+name+") established");
+			info("Server session({}) established", name);
 			
 			boolean threadedOutput=Boolean.parseBoolean(config.getOrDefault("threadedOutput", "false").toString());
 			
@@ -101,7 +103,7 @@ public class DisplayIpc implements DataLogger{
 					public void terminating(Action action){
 						try{
 							sendAction.accept(action, buff->{});
-							LogUtil.println("Closing connection to:", name);
+							trace("Closing connection to: {}", name);
 							socketOut.flush();
 							socket.close();
 						}catch(SocketException ignored){
@@ -148,12 +150,12 @@ public class DisplayIpc implements DataLogger{
 //									lastTimeMs=timeMs;
 //									var mb       =writtenBytes/(1024*1024D);
 //									var secPassed=passed/1000D;
-//									LogUtil.println(queue.size()+"\t", (mb/secPassed)+" Mb/s");
+//									Log.trace(queue.size()+"\t", (mb/secPassed)+" Mb/s");
 //									writtenBytes=0;
 //								}
 								
 							}
-							LogUtil.println("Closing async connection to:", name);
+							trace("Closing async connection to: {}", name);
 							try{
 								socketOut.flush();
 								socket.close();
@@ -408,26 +410,26 @@ public class DisplayIpc implements DataLogger{
 			try{
 				return new IpcSession(new IpcSession.Info(InetAddress.getLocalHost(), 20), name, config);
 			}catch(SocketTimeoutException e){
-				msg="Could not contact the server for \""+name+"\", ";
+				msg="Could not contact the server for \""+name+"\"";
 			}catch(Throwable e){
-				msg="Unexpected error: "+e+", ";
+				msg="Unexpected error: "+e;
 			}
 			
 			var type=config.getOrDefault("server-fallback", "local").toString();
 			
 			sessionCreator=switch(type){
 				case "local" -> {
-					LogUtil.printlnEr(msg+"switching to local server session.");
+					warn("{}, switching to local server session.", msg);
 					yield getLocalLoggerImpl()::getSession;
 				}
 				case "none" -> {
 					active=false;
-					LogUtil.printlnEr(msg+"switching to no output.");
+					warn("{} switching to no output.", msg);
 					yield s->Session.Blank.INSTANCE;
 				}
 				default -> {
 					active=false;
-					LogUtil.printlnEr(msg+"unknown type \""+type+"\", defaulting to no output.");
+					warn("{}, unknown type \"{}\", defaulting to no output.", msg, type);
 					yield s->Session.Blank.INSTANCE;
 				}
 			};

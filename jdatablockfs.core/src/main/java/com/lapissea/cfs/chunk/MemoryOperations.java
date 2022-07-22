@@ -24,6 +24,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.LongStream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.logging.Log.trace;
 
 public class MemoryOperations{
 	
@@ -318,7 +319,7 @@ public class MemoryOperations{
 	
 	
 	public static long growFileAlloc(Chunk target, long toAllocate) throws IOException{
-//		LogUtil.println("growing file by:", toAllocate);
+		trace("growing {} by {} by growing file", target, toAllocate);
 		
 		DataProvider context=target.getDataProvider();
 		

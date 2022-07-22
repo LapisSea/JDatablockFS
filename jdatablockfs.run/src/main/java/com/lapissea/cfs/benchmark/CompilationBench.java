@@ -20,7 +20,6 @@ public class CompilationBench{
 		StructPipe.clear();
 		var s=Struct.of(HashIOMap.class);
 		s.waitForState(Struct.STATE_DONE);
-//		LogUtil.println(System.identityHashCode(s));
 	}
 	
 	@Benchmark
@@ -31,7 +30,6 @@ public class CompilationBench{
 	public void hashmapDryRun(){
 		var s=Struct.of(HashIOMap.class);
 		s.waitForState(Struct.STATE_DONE);
-//		LogUtil.println(System.identityHashCode(s));
 	}
 	
 }

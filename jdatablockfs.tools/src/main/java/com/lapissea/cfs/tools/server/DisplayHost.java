@@ -24,6 +24,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 
+import static com.lapissea.cfs.logging.Log.info;
+import static com.lapissea.cfs.logging.Log.nonFatal;
 import static com.lapissea.cfs.tools.server.ServerCommons.Action;
 import static com.lapissea.util.LogUtil.Init.USE_CALL_POS;
 import static com.lapissea.util.LogUtil.Init.USE_TABULATED_HEADER;
@@ -70,7 +72,7 @@ public class DisplayHost{
 		}
 		
 		private void run() throws IOException{
-			LogUtil.println("connected", name, client);
+			info("connected {} {}", name, client);
 			
 			var objInput=new DataInputStream(new BufferedInputStream(client.getInputStream()));
 			var io      =ServerCommons.makeIO();
@@ -89,7 +91,7 @@ public class DisplayHost{
 					}
 					
 					while(doneCounter!=taskCounter){
-						LogUtil.println("finishing up", doneCounter, "/", taskCounter);
+						info("finishing up {} / {}", doneCounter, taskCounter);
 						while(!hasNext()) UtilL.sleep(1);
 						doTasks();
 					}
@@ -158,7 +160,7 @@ public class DisplayHost{
 								out.flush();
 							};
 							case DELETE -> ()->{
-//								LogUtil.println("DELETE ORDER", name);
+//								Log.debug("DELETE ORDER {}", name);
 								getSession().delete();
 								running=false;
 							};
@@ -187,7 +189,7 @@ public class DisplayHost{
 			runner.join();
 			
 			
-			LogUtil.println("disconnected", client);
+			info("disconnected {}", client);
 		}
 	}
 	
@@ -221,13 +223,13 @@ public class DisplayHost{
 		int port  =((Number)config.getOrDefault("port", 6666)).intValue();
 		
 		ServerSocket server=new ServerSocket(port);
-		LogUtil.println("Started on port", port);
+		info("Started on port {}", port);
 		
 		if(!lazyStart) getDisplay();
 		
 		var initialData=System.getProperty("initialData");
 		if(initialData!=null){
-			LogUtil.println("Loading initialData...");
+			info("Loading initialData...");
 			try{
 				var data=Files.readAllBytes(Path.of(initialData));
 				async(()->{//dry run cluster to load and compile classes while display is loading
@@ -240,9 +242,9 @@ public class DisplayHost{
 				});
 				var ses=getDisplay().join().getSession("default");
 				ses.log(new MemFrame(0, data, new long[0], ""));
-				LogUtil.println("Loaded initialData.");
+				info("Loaded initialData.");
 			}catch(Throwable e){
-				new RuntimeException("Failed to load initialData", e).printStackTrace();
+				nonFatal(e, "Failed to load initialData");
 			}
 		}
 		

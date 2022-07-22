@@ -14,7 +14,6 @@ import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.util.LateInit;
-import com.lapissea.util.LogUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
@@ -28,6 +27,8 @@ import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+
+import static com.lapissea.cfs.logging.Log.info;
 
 public class SlowTests{
 	
@@ -49,7 +50,7 @@ public class SlowTests{
 		for(int iter=0;iter<500000;iter++){
 			if(System.currentTimeMillis()-lastTim>1000){
 				lastTim=System.currentTimeMillis();
-				LogUtil.println(iter);
+				info("iteration: {}", iter);
 			}
 			try{
 				List<RandomIO.WriteChunk> allWrites;
@@ -102,10 +103,6 @@ public class SlowTests{
 				
 				for(int i=0;i<allWrites.size();i++){
 					var writes=allWrites.subList(0, i+1);
-
-//					for(RandomIO.WriteChunk write : writes){
-//						LogUtil.println(write);
-//					}
 					
 					try(var io=head.io()){
 						io.writeAtOffsets(writes);
@@ -117,9 +114,6 @@ public class SlowTests{
 					for(RandomIO.WriteChunk write : writes){
 						System.arraycopy(write.data(), 0, valid, Math.toIntExact(write.ioOffset()), write.dataLength());
 					}
-
-//					LogUtil.println(IntStream.range(0, valid.length).mapToObj(a->(valid[a]+"")).collect(Collectors.joining()));
-//					LogUtil.println(IntStream.range(0, read.length).mapToObj(a->(read[a]+"")).collect(Collectors.joining()));
 					
 					int finalIter=iter;
 					Assertions.assertArrayEquals(read, valid, ()->{
@@ -151,7 +145,7 @@ public class SlowTests{
 		var rand=new Random(1);
 		//Dumb brute force all possible edge cases
 		for(int run=0;run<50000;run++){
-			if(run%10000==0) LogUtil.println(run);
+			if(run%10000==0) info("{}", run);
 			
 			try(var ignored=data.openIOTransaction()){
 				var runSize=rand.nextInt(40);
@@ -249,17 +243,17 @@ public class SlowTests{
 			
 			read:
 			if(mode==Mode.CHECKPOINT){
-				LogUtil.println("loading checkpoint from:", checkpointFile.getAbsoluteFile());
+				info("loading checkpoint from:", checkpointFile.getAbsoluteFile());
 				if(!checkpointFile.exists()){
 					if(checkpointStep==-1) throw new IllegalStateException("No checkpointStep defined");
-					LogUtil.println("No checkpoint, making checkpoint...");
+					info("No checkpoint, making checkpoint...");
 					mode=Mode.MAKE_CHECKPOINT;
 					break read;
 				}
 				try(var f=new DataInputStream(new FileInputStream(checkpointFile))){
 					var step=f.readLong();
 					if(checkpointStep!=-1&&step!=checkpointStep){
-						LogUtil.println("Outdated checkpoint, making checkpoint...");
+						info("Outdated checkpoint, making checkpoint...");
 						mode=Mode.MAKE_CHECKPOINT;
 						break read;
 					}
@@ -273,7 +267,7 @@ public class SlowTests{
 			
 			var map=provider.getRootProvider().<IOMap<Object, Object>>builder().withType(TypeLink.of(HashIOMap.class, Object.class, Object.class)).withId("map").request();
 			if(mode==Mode.CHECKPOINT){
-				LogUtil.println("Starting on step", map.size());
+				info("Starting on step", map.size());
 			}
 			
 			IOMap<Object, Object> splitter;
@@ -286,30 +280,6 @@ public class SlowTests{
 			}else{
 				splitter=map;
 			}
-			
-			record Deb(long time, long size){}
-			
-			var debs=new ArrayList<Deb>();
-			Runnable printTable=()->{
-				if(debs.isEmpty()) return;
-				List<Deb> l=debs;
-				
-				var w=150;
-				if(l.size()>w){
-					l=IntStream.range(0, w).mapToObj(i->{
-						var d    =(double)i;
-						var start=(int)(debs.size()*(d/w));
-						var end  =(int)(debs.size()*((d+1)/w));
-						
-						var t=IntStream.range(start, end).mapToLong(j->debs.get(j).time).average().orElse(0);
-						return new Deb((long)t, debs.get(start).size);
-					}).toList();
-				}
-				LogUtil.printGraph(l, 15, w, false,
-				                   new LogUtil.Val<>("size", '.', Deb::size),
-				                   new LogUtil.Val<>("time", '*', deb->deb.time()/1000000d)
-				);
-			};
 			
 			NumberSize size=compliantCheck?NumberSize.SHORT:NumberSize.SMALL_INT;
 			
@@ -326,7 +296,7 @@ public class SlowTests{
 								f.writeLong(checkpointStep);
 								provider.getSource().transferTo(f);
 							}
-							LogUtil.println("Saved checkpoint to", checkpointFile.getAbsoluteFile());
+							info("Saved checkpoint to", checkpointFile.getAbsoluteFile());
 							System.exit(0);
 						}
 					}
@@ -338,21 +308,15 @@ public class SlowTests{
 						e1=new IOException("failed to put element: "+i, e);
 					}
 				}
-				var dt=System.nanoTime()-t;
-//				if(dt/10D<debs.stream().mapToLong(Deb::time).average().orElse(Double.MAX_VALUE)) debs.add(new Deb(dt, splitter.size()));
-//				else LogUtil.println("nope", i);
-				
 				if(Duration.between(inst, Instant.now()).toMillis()>1000||e1!=null){
 					inst=Instant.now();
-					LogUtil.println(i, provider.getSource().getIOSize()/(float)size.maxSize);
-					printTable.run();
+					info("iter {}, {}%", i, (provider.getSource().getIOSize()/(float)size.maxSize)*100);
 				}
 				if(e1!=null){
 					throw e1;
 				}
 			}
-			LogUtil.println(i, provider.getSource().getIOSize()/(float)size.maxSize);
-			printTable.run();
+			info("iter {}, {}%", i, (provider.getSource().getIOSize()/(float)size.maxSize)*100);
 		});
 	}
 	

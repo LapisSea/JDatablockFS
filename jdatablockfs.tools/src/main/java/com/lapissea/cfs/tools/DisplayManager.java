@@ -5,7 +5,6 @@ import com.lapissea.cfs.tools.logging.MemFrame;
 import com.lapissea.cfs.tools.render.ImGuiUtils;
 import com.lapissea.cfs.tools.render.RenderBackend;
 import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.util.LogUtil;
 import com.lapissea.util.MathUtil;
 import com.lapissea.util.Rand;
 import com.lapissea.util.UtilL;
@@ -21,6 +20,7 @@ import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static com.lapissea.cfs.logging.Log.log;
 import static com.lapissea.cfs.tools.render.RenderBackend.DisplayInterface.ActionType.DOWN;
 import static com.lapissea.cfs.tools.render.RenderBackend.DisplayInterface.ActionType.UP;
 import static org.lwjgl.glfw.GLFW.*;
@@ -426,7 +426,7 @@ public class DisplayManager implements DataLogger{
 		ImGui.text(skipImpl[0]?"Y":"N");
 		
 		if(ImGui.button("Print to console")){
-			LogUtil.println(trace);
+			log(trace);
 		}
 		
 		var style  =ImGui.getStyle();

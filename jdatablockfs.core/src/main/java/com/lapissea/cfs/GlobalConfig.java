@@ -1,7 +1,8 @@
 package com.lapissea.cfs;
 
-import com.lapissea.util.LogUtil;
 import com.lapissea.util.UtilL;
+
+import static com.lapissea.cfs.logging.Log.info;
 
 public class GlobalConfig{
 	
@@ -16,9 +17,14 @@ public class GlobalConfig{
 		PRINT_COMPILATION=UtilL.sysPropertyByClass(GlobalConfig.class, "printCompilation", false, Boolean::valueOf);
 		
 		if(DEBUG_VALIDATION){
-			LogUtil.println("Running with debugging");
-			LogUtil.println("TYPE_VALIDATION:", TYPE_VALIDATION);
-			LogUtil.println("PRINT_COMPILATION:", PRINT_COMPILATION);
+			info(
+				"""
+					Running with debugging
+					TYPE_VALIDATION: {}
+					PRINT_COMPILATION: {}
+					""",
+				TYPE_VALIDATION, PRINT_COMPILATION
+			);
 		}
 	}
 	

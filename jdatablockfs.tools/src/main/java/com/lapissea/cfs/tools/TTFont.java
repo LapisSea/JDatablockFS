@@ -2,7 +2,6 @@ package com.lapissea.cfs.tools;
 
 import com.lapissea.cfs.tools.render.GlUtils;
 import com.lapissea.cfs.tools.render.RenderBackend;
-import com.lapissea.util.LogUtil;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.stb.STBTTAlignedQuad;
@@ -27,6 +26,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.IntStream;
 
+import static com.lapissea.cfs.logging.Log.nonFatal;
 import static com.lapissea.util.PoolOwnThread.async;
 import static org.lwjgl.opengl.GL11.glColor4f;
 import static org.lwjgl.system.MemoryStack.stackPush;
@@ -82,8 +82,6 @@ public class TTFont extends DrawFont{
 			}
 			this.bitmapWidth=bitmapWidth;
 			this.bitmapHeight=bitmapHeight;
-			
-			//LogUtil.println("Font map compiled:", pixelHeight, min, "->", max, "Size:", bitmapWidth+"x"+bitmapHeight);
 			
 			ByteBuffer fillBitmap   =bitmap;
 			ByteBuffer outlineBitmap=BufferUtils.createByteBuffer(fillBitmap.capacity());
@@ -297,7 +295,7 @@ public class TTFont extends DrawFont{
 					maxY=Math.max(q.y0(), maxY);
 					maxY=Math.max(q.y1(), maxY);
 				}catch(IllegalArgumentException e){
-					LogUtil.printlnEr(e, cp);
+					nonFatal(e, cp+"");
 				}
 			}
 		}

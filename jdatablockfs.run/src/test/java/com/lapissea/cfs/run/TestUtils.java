@@ -15,7 +15,6 @@ import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.util.LateInit;
-import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeConsumer;
 import org.junit.jupiter.api.TestInfo;
 
@@ -23,6 +22,8 @@ import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 
+import static com.lapissea.cfs.logging.Log.trace;
+import static com.lapissea.cfs.logging.Log.warn;
 import static com.lapissea.cfs.type.StagedInit.STATE_DONE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -51,7 +52,7 @@ public class TestUtils{
 		}finally{
 			var ses=LOGGER.get().getSession(sessionName);
 			if(deleting){
-				LogUtil.println("deleting ok session", sessionName);
+				trace("deleting ok session {}", sessionName);
 				ses.delete();
 			}else{
 				ses.finish();
@@ -103,7 +104,7 @@ public class TestUtils{
 			var actualSize=ContiguousStructPipe.sizeOfUnknown(provider, obj, WordSpace.BYTE);
 			
 			if(actualSize>initalCapacity){
-				LogUtil.printlnEr("WARNING: initial capacity is", initalCapacity, "but object has allocated", actualSize);
+				warn("Initial capacity is {} but object has allocated {}", initalCapacity, actualSize);
 			}
 			
 			if(provider instanceof Cluster c){

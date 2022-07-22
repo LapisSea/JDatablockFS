@@ -8,7 +8,6 @@ import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.MemoryWalker;
 import com.lapissea.cfs.type.field.IOField;
-import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.function.UnsafeConsumer;
@@ -18,6 +17,8 @@ import java.util.*;
 import java.util.function.Predicate;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.logging.Log.trace;
+import static com.lapissea.cfs.logging.Log.warn;
 import static com.lapissea.cfs.type.MemoryWalker.CONTINUE;
 import static com.lapissea.cfs.type.MemoryWalker.END;
 import static com.lapissea.cfs.type.MemoryWalker.SAVE;
@@ -31,7 +32,7 @@ public class DefragmentManager{
 	}
 	
 	public void defragment() throws IOException{
-		LogUtil.println("Defragmenting...");
+		trace("Defragmenting...");
 		
 		scanFreeChunks(parent);
 		
@@ -400,7 +401,7 @@ public class DefragmentManager{
 				unreferenced.add(ptr.dereference(cluster));
 			}
 			
-			LogUtil.println("found unknown free chunks:", unreferenced);
+			warn("found unknown free chunks: {}", unreferenced);
 			
 			cluster.getMemoryManager().free(unreferenced);
 		}
@@ -453,7 +454,8 @@ public class DefragmentManager{
 	}
 	
 	private Set<ChunkPointer> moveReference(final Cluster cluster, Reference oldRef, Reference newRef) throws IOException{
-//		LogUtil.println("moving", oldRef, "to", newRef);
+		trace("moving {} to {}", oldRef, newRef);
+		
 		boolean[]         found ={false};
 		Set<ChunkPointer> toFree=new HashSet<>();
 		cluster.rootWalker().walk(new MemoryWalker.PointerRecord(){

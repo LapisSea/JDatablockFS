@@ -1,6 +1,5 @@
 package com.lapissea.cfs.io.instancepipe;
 
-import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.FieldIsNullException;
@@ -12,6 +11,7 @@ import com.lapissea.cfs.io.content.ContentOutputBuilder;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.impl.MemoryData;
+import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
@@ -21,7 +21,6 @@ import com.lapissea.cfs.type.field.VirtualFieldDefinition;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
-import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
@@ -35,11 +34,17 @@ import java.util.stream.Stream;
 
 import static com.lapissea.cfs.ConsoleColors.BLUE_BRIGHT;
 import static com.lapissea.cfs.ConsoleColors.CYAN_BRIGHT;
-import static com.lapissea.cfs.ConsoleColors.RESET;
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.GlobalConfig.PRINT_COMPILATION;
 import static com.lapissea.cfs.GlobalConfig.TYPE_VALIDATION;
+import static com.lapissea.cfs.logging.Log.log;
 
 public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit implements ObjectPipe<T, Struct.Pool<T>>{
+	
+	private static final Log.Channel COMPILATION=Log.channel(
+		PRINT_COMPILATION&&!Access.DEV_CACHE,
+		Log.Channel.colored(CYAN_BRIGHT, s->log(s.toString()))
+	);
 	
 	private static class StructGroup<T extends IOInstance<T>, P extends StructPipe<T>> extends ConcurrentHashMap<Struct<T>, P>{
 		
@@ -64,10 +69,9 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			var cached=get(struct);
 			if(cached!=null) return cached;
 			
+			log(COMPILATION, "Requested pipe: {}", struct.getType().getName());
+			
 			P created;
-			if(GlobalConfig.PRINT_COMPILATION&&!Access.DEV_CACHE){
-				LogUtil.println(CYAN_BRIGHT+"Requested pipe: "+struct.getType().getName()+RESET);
-			}
 			try{
 				var special=specials.get(struct);
 				if(special!=null){
@@ -81,22 +85,19 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			
 			put(struct, created);
 			
-			if(GlobalConfig.PRINT_COMPILATION&&!Access.DEV_CACHE){
-				StagedInit.runBaseStageTask(()->{
-					String s=CYAN_BRIGHT+
-					         "Compiled: "+struct.getType().getName()+"\n"+
-					         "\tPipe type: "+BLUE_BRIGHT+created.getClass().getName()+CYAN_BRIGHT+"\n"+
-					         "\tSize: "+BLUE_BRIGHT+created.getSizeDescriptor()+CYAN_BRIGHT;
-					
-					var sFields=created.getSpecificFields();
-					
-					if(!sFields.equals(struct.getFields())){
-						s+="\n"+TextUtil.toTable(created.getSpecificFields());
-					}
-					
-					LogUtil.println(s+RESET);
-				});
-			}
+			COMPILATION.on(()->StagedInit.runBaseStageTask(()->{
+				String s="Compiled: "+struct.getType().getName()+"\n"+
+				         "\tPipe type: "+BLUE_BRIGHT+created.getClass().getName()+CYAN_BRIGHT+"\n"+
+				         "\tSize: "+BLUE_BRIGHT+created.getSizeDescriptor()+CYAN_BRIGHT;
+				
+				var sFields=created.getSpecificFields();
+				
+				if(!sFields.equals(struct.getFields())){
+					s+="\n"+TextUtil.toTable(created.getSpecificFields());
+				}
+				
+				log(COMPILATION, s);
+			}));
 			
 			if(TYPE_VALIDATION&&!(struct instanceof Struct.Unmanaged)){
 				if(Access.DEV_CACHE){
