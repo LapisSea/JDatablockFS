@@ -53,7 +53,7 @@ public class GeneralTests{
 				      try{
 					      return Struct.ofUnknown(c);
 				      }catch(Throwable e){
-					      LogUtil.printlnEr(e);
+					      e.printStackTrace();
 					      return null;
 				      }
 			      })

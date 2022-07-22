@@ -17,6 +17,8 @@ public class GlobalConfig{
 		
 		if(DEBUG_VALIDATION){
 			LogUtil.println("Running with debugging");
+			LogUtil.println("TYPE_VALIDATION:", TYPE_VALIDATION);
+			LogUtil.println("PRINT_COMPILATION:", PRINT_COMPILATION);
 		}
 	}
 	

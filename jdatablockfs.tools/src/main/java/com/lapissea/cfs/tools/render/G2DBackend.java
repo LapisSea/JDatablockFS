@@ -27,6 +27,10 @@ import static org.joml.Math.clamp;
 
 public class G2DBackend extends RenderBackend{
 	
+	static{
+		ImGuiUtils.load();
+	}
+	
 	private BufferedImage displayBuffer, activeBuffer;
 	private BufferedImage b1, b2;
 	private Graphics2D currentGraphics;
@@ -423,7 +427,8 @@ public class G2DBackend extends RenderBackend{
 	
 	@Override
 	public void postRender(){
-		imguiImpl.renderDrawData(currentGraphics, ImGui.getDrawData());
+		var data=ImGui.getDrawData();
+		if(data.ptr!=0) imguiImpl.renderDrawData(currentGraphics, data);
 		
 		currentGraphics.dispose();
 		currentGraphics=null;

@@ -534,6 +534,16 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		}
 	}
 	
+	@Override
+	public MemoryData<?> asReadOnly(){
+		if(isReadOnly()) return this;
+		try{
+			return new Builder().withRaw0(data).withUsedLength(used).asReadOnly().build();
+		}catch(IOException e){
+			throw new RuntimeException(e);
+		}
+	}
+	
 	private static final class Arr extends MemoryData<byte[]>{
 		
 		public Arr(byte[] data, Builder info){

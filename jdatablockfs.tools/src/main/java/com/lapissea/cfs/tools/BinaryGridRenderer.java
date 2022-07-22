@@ -181,7 +181,7 @@ public class BinaryGridRenderer implements DataRenderer{
 					}
 				}
 			}
-			renderStatic=true;
+			markDirty();
 			markDirty();
 		});
 	}
@@ -232,7 +232,7 @@ public class BinaryGridRenderer implements DataRenderer{
 		if(Math.abs(pixelsPerByte-newPixelsPerByte)<0.0001) return;
 		pixelsPerByte=newPixelsPerByte;
 		direct.markFrameDirty();
-		renderStatic=true;
+		markDirty();
 	}
 	
 	private void outlineChunk(RenderContext ctx, Chunk chunk, Color color) throws IOException{
@@ -606,7 +606,9 @@ public class BinaryGridRenderer implements DataRenderer{
 		
 		
 		var d=ctx.renderer.getDisplay();
-		if(zoom>1.0001) renderStatic=true;
+		if(zoom>1.0001){
+			markDirty();
+		}
 		var zoom=this.zoom*this.zoom;
 		
 		var w   =d.getWidth();
@@ -628,7 +630,7 @@ public class BinaryGridRenderer implements DataRenderer{
 		
 		var zoom=this.zoom*this.zoom;
 		
-		if(errorMode) renderStatic=true;
+		if(errorMode) markDirty();
 		
 		CachedFrame cFrame=getFrame(frameIndex);
 		MemFrame    frame =cFrame.memData();
@@ -649,8 +651,8 @@ public class BinaryGridRenderer implements DataRenderer{
 		}
 		if(!renderStatic){
 			var ctx=new RenderContext(null, bytes, getPixelsPerByte(), zoom, dis, null);
-			if(lastHoverMessages.stream().flatMap(m->m.ranges().stream()).anyMatch(r->!ctx.isRangeHovered(r))){
-				renderStatic=true;
+			if(lastHoverMessages.stream().anyMatch(m->m.ranges().stream().noneMatch(ctx::isRangeHovered))){
+				markDirty();
 			}
 		}
 		
@@ -1018,6 +1020,8 @@ public class BinaryGridRenderer implements DataRenderer{
 	}
 	
 	private void drawTimeline(RenderBackend renderer, int frameIndex){
+		if(getFrameCount()<2) return;
+		
 		var screenHeight=renderer.getDisplay().getHeight();
 		var screenWidth =renderer.getDisplay().getWidth();
 		
@@ -1274,7 +1278,7 @@ public class BinaryGridRenderer implements DataRenderer{
 	private void findHoverChunk(RenderContext ctx, ParsedFrame parsed, DataProvider provider){
 		int byteIndex=ctx.hoverByteIndex;
 		if(byteIndex==-1){
-			if(parsed.lastHoverChunk!=null) renderStatic=true;
+			if(parsed.lastHoverChunk!=null) markDirty();
 			parsed.lastHoverChunk=null;
 			return;
 		}
@@ -1284,14 +1288,14 @@ public class BinaryGridRenderer implements DataRenderer{
 				parsed.lastHoverChunk=null;
 				for(Chunk chunk : new PhysicalChunkWalker(provider.getFirstChunk())){
 					if(chunk.rangeIntersects(byteIndex)){
-						renderStatic=true;
+						markDirty();
 						parsed.lastHoverChunk=chunk;
 						break;
 					}
 				}
 			}
 		}catch(IOException e){
-			if(parsed.lastHoverChunk!=null) renderStatic=true;
+			if(parsed.lastHoverChunk!=null) markDirty();
 			parsed.lastHoverChunk=null;
 			ctx.hoverMessages.add(new HoverMessage(List.of(new Range(0, 0)), null, new Object[]{"Unable to find hover chunk"}));
 		}
@@ -1769,6 +1773,6 @@ public class BinaryGridRenderer implements DataRenderer{
 	@Override
 	public void setDisplayedSession(Optional<SessionHost.HostedSession> displayedSession){
 		this.displayedSession=displayedSession;
-		renderStatic=true;
+		markDirty();
 	}
 }
