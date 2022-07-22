@@ -137,7 +137,11 @@ public enum NumberSize{
 			if(value>max){
 				throw new IllegalArgumentException(value+" can not fit in to "+this);
 			}
+			if(value<0&&this!=LONG&&this!=VOID){
+				throw new IllegalArgumentException(value+" is signed! "+this);
+			}
 		}
+		
 		switch(this){
 			case VOID -> {}
 			case BYTE -> out.writeInt1((int)value);

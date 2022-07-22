@@ -4,7 +4,6 @@ import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
-import com.lapissea.cfs.internal.Runner;
 import com.lapissea.cfs.io.bit.FlagReader;
 import com.lapissea.cfs.io.bit.FlagWriter;
 import com.lapissea.cfs.io.content.ContentReader;
@@ -36,6 +35,7 @@ import java.util.stream.Stream;
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.GlobalConfig.TYPE_VALIDATION;
 import static com.lapissea.cfs.type.StagedInit.STATE_DONE;
+import static com.lapissea.cfs.type.StagedInit.runBaseStageTask;
 import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 
 public class InstanceCollection{
@@ -392,7 +392,7 @@ public class InstanceCollection{
 			
 			//preload pipe
 			if(TYPE_VALIDATION){
-				Runner.compileTask(this::getValPipe);
+				runBaseStageTask(this::getValPipe);
 			}else{
 				ContiguousStructPipe.of(component);
 			}
