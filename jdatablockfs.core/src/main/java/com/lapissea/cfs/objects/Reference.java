@@ -140,6 +140,7 @@ public final class Reference extends IOInstance<Reference>{
 	private ChunkPointer ptr;
 	@IOValue
 	@IODependency.VirtualNumSize(name="offsetSize")
+	@IOValue.Unsigned
 	private long         offset;
 	
 	public Reference(){

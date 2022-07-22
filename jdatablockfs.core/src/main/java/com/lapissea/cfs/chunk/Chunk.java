@@ -196,12 +196,14 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 	@IOValue
 	private NumberSize bodyNumSize;
 	
-	@IODependency.NumSize("bodyNumSize")
 	@IOValue
+	@IOValue.Unsigned
+	@IODependency.NumSize("bodyNumSize")
 	private long capacity;
 	
-	@IODependency.NumSize("bodyNumSize")
 	@IOValue
+	@IOValue.Unsigned
+	@IODependency.NumSize("bodyNumSize")
 	private long size;
 	
 	@IOValue

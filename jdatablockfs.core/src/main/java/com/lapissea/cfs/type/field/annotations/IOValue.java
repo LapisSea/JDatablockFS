@@ -3,6 +3,7 @@ package com.lapissea.cfs.type.field.annotations;
 import com.lapissea.cfs.SyntheticParameterizedType;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.SupportedPrimitive;
 import com.lapissea.cfs.type.compilation.AnnotationLogic;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
@@ -54,7 +55,10 @@ public @interface IOValue{
 					}
 					return 0;
 				},
-				List.of(IOFieldTools.makeAnnotation(IODependency.VirtualNumSize.class, Map.of("name", arrayLengthSizeName)))));
+				List.of(
+					IOFieldTools.makeAnnotation(IODependency.VirtualNumSize.class, Map.of("name", arrayLengthSizeName)),
+					Unsigned.INSTANCE
+				)));
 		}
 		@NotNull
 		@Override
@@ -163,5 +167,24 @@ public @interface IOValue{
 		
 		Class<?> value() default Object.class;
 		Class<?>[] genericArgs() default {};
+	}
+	
+	@Retention(RetentionPolicy.RUNTIME)
+	@Target({ElementType.FIELD, ElementType.METHOD})
+	@interface Unsigned{
+		
+		Unsigned INSTANCE=IOFieldTools.makeAnnotation(Unsigned.class);
+		
+		AnnotationLogic<Unsigned> LOGIC=new AnnotationLogic<>(){
+			@Override
+			public void validate(FieldAccessor<?> field, Unsigned typeOverride){
+				switch(SupportedPrimitive.get(field.getType()).orElse(null)){
+					case null, BOOLEAN, FLOAT, DOUBLE, CHAR -> throw new MalformedStructLayout(field+" can not be unsigned");
+					case BYTE, SHORT, INT, LONG -> {}
+				}
+			}
+		};
+		
+		
 	}
 }

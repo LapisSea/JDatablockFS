@@ -103,6 +103,7 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 	private IONode<T> head;
 	
 	@IOValue
+	@IOValue.Unsigned
 	@IODependency.VirtualNumSize
 	private long size;
 	

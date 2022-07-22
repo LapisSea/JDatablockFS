@@ -79,6 +79,8 @@ public enum NumberSize{
 	
 	public final int  bytes;
 	public final long maxSize;
+	public final long signedMaxValue;
+	public final long signedMinValue;
 	public final char shortName;
 	
 	public final OptionalInt  optionalBytes;
@@ -88,6 +90,9 @@ public enum NumberSize{
 		this.shortName=shortName;
 		this.bytes=bytes;
 		this.maxSize=BigInteger.ONE.shiftLeft(bytes*8).subtract(BigInteger.ONE).min(BigInteger.valueOf(Long.MAX_VALUE)).longValueExact();
+		var signBase=BigInteger.ONE.shiftLeft(bytes*8-1);
+		this.signedMaxValue=signBase.subtract(BigInteger.ONE).max(BigInteger.ZERO).longValueExact();
+		this.signedMinValue=signBase.multiply(BigInteger.valueOf(-1)).longValueExact();
 		
 		optionalBytes=OptionalInt.of(bytes);
 		optionalBytesLong=OptionalLong.of(bytes);
@@ -127,18 +132,23 @@ public enum NumberSize{
 		};
 	}
 	
+	public long readSigned(ContentReader in) throws IOException{
+		return toSigned(read(in));
+	}
+	
 	public void write(ContentWriter out, INumber value) throws IOException{
 		write(out, value==null?0:value.getValue());
 	}
 	
 	public void write(ContentWriter out, long value) throws IOException{
 		if(DEBUG_VALIDATION){
-			var max=this.maxSize;
-			if(value>max){
-				throw new IllegalArgumentException(value+" can not fit in to "+this);
+			try{
+				ensureCanFit(value);
+			}catch(BitDepthOutOfSpaceException e){
+				throw new RuntimeException(e);
 			}
 			if(value<0&&this!=LONG&&this!=VOID){
-				throw new IllegalArgumentException(value+" is signed! "+this);
+				throw new IllegalStateException(value+" is signed! "+this);
 			}
 		}
 		
@@ -153,6 +163,26 @@ public enum NumberSize{
 			case LONG -> out.writeInt8(value);
 			case null -> throw new ShouldNeverHappenError();
 		}
+	}
+	public void writeSigned(ContentWriter out, long value) throws IOException{
+		if(DEBUG_VALIDATION){
+			try{
+				ensureCanFitSigned(value);
+			}catch(BitDepthOutOfSpaceException e){
+				throw new RuntimeException(e);
+			}
+		}
+		write(out, toUnsigned(value));
+	}
+	
+	private long toUnsigned(long value){
+		if(this==LONG) return value;
+		return value&this.maxSize;
+	}
+	private long toSigned(long value){
+		if(this==LONG||this==VOID) return value;
+		if(value<=signedMaxValue) return value;
+		return value-maxSize-1;
 	}
 	
 	public NumberSize prev(){
@@ -206,6 +236,10 @@ public enum NumberSize{
 		return num<=maxSize;
 	}
 	
+	public boolean canFitSigned(long num){
+		return signedMinValue<=num&&num<=signedMaxValue;
+	}
+	
 	public long remaining(long num){
 		return maxSize-num;
 	}
@@ -220,6 +254,10 @@ public enum NumberSize{
 	
 	public void ensureCanFit(long num) throws BitDepthOutOfSpaceException{
 		if(!canFit(num)) throw new BitDepthOutOfSpaceException(this, num);
+	}
+	
+	public void ensureCanFitSigned(long num) throws BitDepthOutOfSpaceException{
+		if(!canFitSigned(num)) throw new BitDepthOutOfSpaceException(this, num);
 	}
 	
 	public void write(ContentWriter stream, long[] data) throws IOException{
@@ -251,6 +289,13 @@ public enum NumberSize{
 	public long maxSize(){
 		return maxSize;
 	}
+	public long signedMinValue(){
+		return signedMinValue;
+	}
+	public long signedMaxValue(){
+		return signedMaxValue;
+	}
+	
 	public char shortName(){
 		return shortName;
 	}

@@ -14,6 +14,7 @@ import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
+import com.lapissea.cfs.type.field.annotations.IOValue;
 
 import java.io.IOException;
 import java.util.Comparator;
@@ -221,11 +222,14 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 	
 	public static class FLong<T extends IOInstance<T>> extends IOFieldPrimitive<T, Long>{
 		
+		private final boolean unsigned;
+		
 		public FLong(FieldAccessor<T> field){
 			this(field, false);
 		}
 		public FLong(FieldAccessor<T> field, boolean forceFixed){
 			super(field, forceFixed, LONG);
+			unsigned=field.hasAnnotation(IOValue.Unsigned.class);
 		}
 		
 		public long getValue(Struct.Pool<T> ioPool, T instance){
@@ -250,13 +254,24 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		@Override
 		public void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 			var size=getSize(ioPool, instance);
-			size.write(dest, getValue(ioPool, instance));
+			var val =getValue(ioPool, instance);
+			if(unsigned){
+				size.write(dest, val);
+			}else{
+				size.writeSigned(dest, val);
+			}
 		}
 		
 		@Override
 		public void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-			var size=getSize(ioPool, instance);
-			setValue(ioPool, instance, size.read(src));
+			var  size=getSize(ioPool, instance);
+			long val;
+			if(unsigned){
+				val=size.read(src);
+			}else{
+				val=size.readSigned(src);
+			}
+			setValue(ioPool, instance, val);
 		}
 		
 		@Override
@@ -276,12 +291,14 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 	
 	public static class FInt<T extends IOInstance<T>> extends IOFieldPrimitive<T, Integer>{
 		
+		private final boolean unsigned;
 		
 		public FInt(FieldAccessor<T> field){
 			this(field, false);
 		}
 		public FInt(FieldAccessor<T> field, boolean forceFixed){
 			super(field, forceFixed, INT);
+			unsigned=field.hasAnnotation(IOValue.Unsigned.class);
 		}
 		@Override
 		protected EnumSet<NumberSize> allowedSizes(){
@@ -312,13 +329,24 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		@Override
 		public void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 			var size=getSize(ioPool, instance);
-			size.write(dest, getValue(ioPool, instance));
+			var val =getValue(ioPool, instance);
+			if(unsigned){
+				size.write(dest, val);
+			}else{
+				size.writeSigned(dest, val);
+			}
 		}
 		
 		@Override
 		public void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			var size=getSize(ioPool, instance);
-			setValue(ioPool, instance, (int)size.read(src));
+			int val;
+			if(unsigned){
+				val=(int)size.read(src);
+			}else{
+				val=(int)size.readSigned(src);
+			}
+			setValue(ioPool, instance, val);
 		}
 		
 		@Override
@@ -338,12 +366,14 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 	
 	public static class FShort<T extends IOInstance<T>> extends IOFieldPrimitive<T, Short>{
 		
+		private final boolean unsigned;
 		
 		public FShort(FieldAccessor<T> field){
 			this(field, false);
 		}
 		public FShort(FieldAccessor<T> field, boolean forceFixed){
 			super(field, forceFixed, SHORT);
+			unsigned=field.hasAnnotation(IOValue.Unsigned.class);
 		}
 		@Override
 		protected EnumSet<NumberSize> allowedSizes(){
@@ -374,13 +404,24 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		@Override
 		public void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 			var size=getSize(ioPool, instance);
-			size.write(dest, getValue(ioPool, instance));
+			var val =getValue(ioPool, instance);
+			if(unsigned){
+				size.write(dest, val);
+			}else{
+				size.writeSigned(dest, val);
+			}
 		}
 		
 		@Override
 		public void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-			var size=getSize(ioPool, instance);
-			setValue(ioPool, instance, (short)size.read(src));
+			var   size=getSize(ioPool, instance);
+			short val;
+			if(unsigned){
+				val=(short)size.read(src);
+			}else{
+				val=(short)size.readSigned(src);
+			}
+			setValue(ioPool, instance, val);
 		}
 		
 		@Override
@@ -400,18 +441,19 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 	
 	public static class FByte<T extends IOInstance<T>> extends IOFieldPrimitive<T, Byte>{
 		
+		private final boolean unsigned;
+		
 		public FByte(FieldAccessor<T> field){
 			this(field, false);
 		}
 		
 		public FByte(FieldAccessor<T> field, boolean forceFixed){
-			super(field, forceFixed, BYTE);
+			super(field, true, BYTE);
+			unsigned=field.hasAnnotation(IOValue.Unsigned.class);
 		}
 		@Override
 		protected EnumSet<NumberSize> allowedSizes(){
-			var all=EnumSet.allOf(NumberSize.class);
-			all.removeIf(s->s.greaterThan(BYTE));
-			return all;
+			return EnumSet.of(BYTE);
 		}
 		
 		public byte getValue(Struct.Pool<T> ioPool, T instance){
@@ -436,7 +478,6 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		@Override
 		public void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 			dest.writeInt1(getValue(ioPool, instance));
-			
 		}
 		
 		@Override

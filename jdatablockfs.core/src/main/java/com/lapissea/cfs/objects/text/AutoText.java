@@ -25,7 +25,8 @@ public final class AutoText extends IOInstance<AutoText> implements CharSequence
 	@IOValue
 	private CharEncoding encoding;
 	@IOValue
-	@IODependency.VirtualNumSize(name = "numSize")
+	@IOValue.Unsigned
+	@IODependency.VirtualNumSize(name="numSize")
 	private int          charCount;
 	
 	
@@ -62,7 +63,7 @@ public final class AutoText extends IOInstance<AutoText> implements CharSequence
 	
 	@IOValue
 	@IODependency({"charCount", "encoding"})
-	@IODependency.ArrayLenSize(name = "numSize")
+	@IODependency.ArrayLenSize(name="numSize")
 	private byte[] getTextBytes() throws IOException{
 		if(dataSrc==null){
 			dataSrc=generateBytes();

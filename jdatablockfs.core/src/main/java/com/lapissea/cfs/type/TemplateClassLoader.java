@@ -92,14 +92,15 @@ public class TemplateClassLoader extends ClassLoader{
 	
 	private void generateIOInstance(TypeNamed classType, JorthWriter writer) throws MalformedJorthException{
 		
-		writer.write("#TOKEN(0) genClassName define", classType.name);
-		writer.write("#TOKEN(0) IOInstance define", IOInstance.class.getName());
-		writer.write("#TOKEN(0) IOValue define", IOValue.class.getName());
-		writer.write("#TOKEN(0) IONullability define", IONullability.class.getName());
-		writer.write("#TOKEN(0) IOType.Dynamic define", IOType.Dynamic.class.getName());
-		writer.write("#TOKEN(0) IODependency define", IODependency.class.getName());
-		writer.write("#TOKEN(0) IODependency define", IODependency.class.getName());
+		writer.write("#TOKEN(0) genClassName      define", classType.name);
+		writer.write("#TOKEN(0) IOInstance        define", IOInstance.class.getName());
+		writer.write("#TOKEN(0) IOValue           define", IOValue.class.getName());
+		writer.write("#TOKEN(0) IONullability     define", IONullability.class.getName());
+		writer.write("#TOKEN(0) IOType.Dynamic    define", IOType.Dynamic.class.getName());
+		writer.write("#TOKEN(0) IODependency      define", IODependency.class.getName());
+		writer.write("#TOKEN(0) IODependency      define", IODependency.class.getName());
 		writer.write("#TOKEN(0) IOValue.Reference define", IOValue.Reference.class.getName());
+		writer.write("#TOKEN(0) IOValue.Unsigned  define", IOValue.Unsigned.class.getName());
 		
 		writer.write(
 			"""
@@ -120,6 +121,9 @@ public class TemplateClassLoader extends ClassLoader{
 			}
 			if(field.isDynamic()){
 				writer.write("IOType.Dynamic @");
+			}
+			if(field.isUnsigned()){
+				writer.write("IOValue.Unsigned @");
 			}
 			if(field.getReferenceType()!=null){
 				writer.write("{#TOKEN(0) dataPipeType} IOValue.Reference @", field.getReferenceType().toString());

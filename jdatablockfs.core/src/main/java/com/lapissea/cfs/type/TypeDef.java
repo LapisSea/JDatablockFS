@@ -30,6 +30,9 @@ public final class TypeDef extends IOInstance<TypeDef>{
 		private boolean isDynamic;
 		
 		@IOValue
+		private boolean unsigned;
+		
+		@IOValue
 		private String[] dependencies;
 		
 		@IOValue
@@ -38,7 +41,6 @@ public final class TypeDef extends IOInstance<TypeDef>{
 		@IOValue
 		@IONullability(NULLABLE)
 		private IOValue.Reference.PipeType referenceType;
-		
 		
 		public FieldDef(){}
 		
@@ -52,11 +54,13 @@ public final class TypeDef extends IOInstance<TypeDef>{
 			if(field.getAccessor().getType().isArray()) deps.remove(IOFieldTools.makeCollectionLenName(field.getAccessor()));
 			if(isDynamic) deps.remove(IOFieldTools.makeGenericIDFieldName(field.getAccessor()));
 			dependencies=deps.toArray(String[]::new);
+			unsigned=field.getAccessor().hasAnnotation(IOValue.Unsigned.class);
 		}
 		
-		public TypeLink getType() {return type;}
-		public String getName()   {return name;}
-		public boolean isDynamic(){return isDynamic;}
+		public TypeLink getType()  {return type;}
+		public String getName()    {return name;}
+		public boolean isDynamic() {return isDynamic;}
+		public boolean isUnsigned(){return unsigned;}
 		
 		public List<String> getDependencies(){
 			return dependencies==null?List.of():ArrayViewList.create(dependencies, null);

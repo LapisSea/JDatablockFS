@@ -32,7 +32,7 @@ public @interface IOType{
 					VirtualFieldDefinition.StoragePool.IO,
 					IOFieldTools.makeGenericIDFieldName(field),
 					int.class,
-					List.of(IOFieldTools.makeAnnotation(IODependency.VirtualNumSize.class, Map.of()))
+					List.of(IOFieldTools.makeAnnotation(IODependency.VirtualNumSize.class, Map.of()), IOValue.Unsigned.INSTANCE)
 				));
 			}
 			@NotNull

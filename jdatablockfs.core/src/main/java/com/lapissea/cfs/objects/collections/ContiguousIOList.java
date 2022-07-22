@@ -44,6 +44,7 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 	);
 	
 	@IOValue
+	@IOValue.Unsigned
 	private long size;
 	
 	private final ValueStorage<T> storage;

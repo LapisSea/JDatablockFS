@@ -13,6 +13,7 @@ import java.io.IOException;
 public abstract class AbstractUnmanagedIOMap<K, V> extends IOInstance.Unmanaged<AbstractUnmanagedIOMap<K, V>> implements IOMap<K, V>{
 	
 	@IOValue
+	@IOValue.Unsigned
 	@IODependency.VirtualNumSize
 	private long size;
 	

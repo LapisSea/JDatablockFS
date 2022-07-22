@@ -134,6 +134,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	private static final int RESIZE_TRIGGER=4;
 	
 	@IOValue
+	@IOValue.Unsigned
 	private short bucketPO2=1;
 	
 	@IOValue

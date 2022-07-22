@@ -12,7 +12,7 @@ public class BitDepthOutOfSpaceException extends Exception{
 	public final         long       num;
 	
 	public BitDepthOutOfSpaceException(NumberSize numberSize, long num){
-		super(num+" can not fit inside "+numberSize+"("+numberSize.maxSize+")");
+		super(num+" can not fit inside "+numberSize+" unsigned: "+numberSize.maxSize+" signed: "+numberSize.signedMinValue+" - "+numberSize.signedMaxValue);
 		this.numberSize=numberSize;
 		this.num=num;
 		

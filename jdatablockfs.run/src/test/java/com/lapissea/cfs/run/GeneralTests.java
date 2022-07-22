@@ -4,9 +4,12 @@ import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.chunk.DataProvider;
+import com.lapissea.cfs.io.content.ContentInputStream;
+import com.lapissea.cfs.io.content.ContentOutputStream;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
+import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.objects.collections.ContiguousIOList;
 import com.lapissea.cfs.objects.collections.HashIOMap;
@@ -68,6 +71,29 @@ public class GeneralTests{
 			}
 			AllocateTicket.bytes(10).submit(Cluster.init(MemoryData.builder().build()));
 		}
+	}
+	
+	@Test
+	void signedIO() throws IOException{
+		for(NumberSize numberSize : NumberSize.FLAG_INFO){
+			signedIO(numberSize, 0);
+			signedIO(numberSize, numberSize.signedMaxValue);
+			signedIO(numberSize, numberSize.signedMinValue);
+			if(numberSize!=NumberSize.VOID){
+				var iter=new Random(10).longs(numberSize.signedMinValue, numberSize.signedMaxValue).limit(1000).iterator();
+				while(iter.hasNext()){
+					signedIO(numberSize, iter.nextLong());
+				}
+			}
+		}
+	}
+	
+	void signedIO(NumberSize numberSize, long value) throws IOException{
+		byte[] buf=new byte[8];
+		numberSize.writeSigned(new ContentOutputStream.BA(buf), value);
+		var read=numberSize.readSigned(new ContentInputStream.BA(buf));
+		
+		assertEquals(value, read, ()->value+" was not read or written correctly with "+numberSize);
 	}
 	
 	@ParameterizedTest
