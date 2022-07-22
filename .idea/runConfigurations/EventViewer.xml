@@ -1,0 +1,17 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="EventViewer" type="Application" factoryName="Application">
+    <option name="MAIN_CLASS_NAME" value="com.lapissea.cfs.tools.EventViewer" />
+    <module name="jdatablockfs.tools" />
+    <option name="VM_PARAMETERS" value="-ea --finalization=disabled" />
+    <option name="WORKING_DIRECTORY" value="$ProjectFileDir$/run/main" />
+    <extension name="coverage">
+      <pattern>
+        <option name="PATTERN" value="com.lapissea.cfs.tools.logging.*" />
+        <option name="ENABLED" value="true" />
+      </pattern>
+    </extension>
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>
