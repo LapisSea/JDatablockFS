@@ -36,7 +36,6 @@ import com.lapissea.util.function.UnsafeConsumer;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -44,10 +43,73 @@ import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
-@SuppressWarnings("unused")
+
+/**
+ * Chunk structure:
+ *
+ * <pre>
+ * . 1            2
+ * 3   4                     5
+ * |---|---------------------|
+ * </pre>
+ * <table>
+ *   <tr>
+ *     <th>No.</th>
+ *     <th>Section</th>
+ *     <th>Description</th>
+ *   </tr>
+ *   <tr>
+ *     <td>1.</td>
+ *     <td>Header</td>
+ *     <td>
+ *         Area for the header that contains information about<br/>
+ *         the chunk and its body. (next chunk, size, etc...)
+ *     </td>
+ *   </tr>
+ *   <tr>
+ *     <td>2.</td>
+ *     <td>Body</td>
+ *     <td>
+ *         Area that holds arbitrary binary data. Typically<br/>
+ *         object(s) that are referenced by something else
+ *     </td>
+ *   </tr>
+ *   <tr>
+ *     <td>3.</td>
+ *     <td>Pointer</td>
+ *     <td>
+ *         At this point (start of header) is the crucial offset (pointer) <br/>
+ *         based on the start of the file. If the header data starts at<br/>
+ *         byte 100 then the pointer of a 100 will be able to fetch the<br/>
+ *         header and it's data.<br/>
+ *     </td>
+ *   </tr>
+ *   <tr>
+ *     <td>4.</td>
+ *     <td>Data start</td>
+ *     <td>
+ *         At this point the header ends and the body of the chunk starts.<br/>
+ *         The header itself determines its own size and by effect the data<br/>
+ *         start. This size is calculated trough the data within the header.
+ *     </td>
+ *   </tr>
+ *   <tr>
+ *     <td>5.</td>
+ *     <td>Data end</td>
+ *     <td>
+ *         At this point the body data ends. This point is does not mean actual <br/>
+ *         data ends there. There can be extra unused space between the end of <br/>
+ *         data (body size) and the actual chunk end. (capacity + header size)
+ *     </td>
+ *   </tr>
+ * </table>
+ */
 @Struct.NoDefaultConstructor
 public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, DataProvider.Holder, Comparable<Chunk>{
 	
+	/**
+	 * Internal implementation of the {@link ContiguousStructPipe}. This may be removed in the future as the generated/generic pipes get further optimized
+	 */
 	private static class OptimizedChunkPipe extends ContiguousStructPipe<Chunk>{
 		
 		static{
@@ -167,9 +229,13 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 	
 	
 	public static ChunkPointer getPtrNullable(Chunk chunk){
-		return chunk==null?null:chunk.getPtr();
+		return chunk==null?ChunkPointer.NULL:chunk.getPtr();
 	}
 	
+	/**
+	 * Created a new chunk at the specified pointer within the data of the provider. This chunk object is stray and if it will be
+	 * referenced outside a controlled context, then it should be reported to the chunk cache as it is not a "real" chunk until that happens.
+	 */
 	public static Chunk readChunk(@NotNull DataProvider provider, @NotNull ChunkPointer pointer) throws IOException{
 		if(!earlyCheckChunkAt(provider, pointer)) throw new IOException("Invalid chunk at "+pointer);
 		if(provider.getSource().getIOSize()<pointer.add(PIPE.getSizeDescriptor().getMin(WordSpace.BYTE))) throw new MalformedPointerException(pointer+" points outside of available data");
@@ -182,6 +248,9 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		return chunk;
 	}
 	
+	/**
+	 * Quickly checks of a chunk start is possible at all at a certain pointer.
+	 */
 	public static boolean earlyCheckChunkAt(DataProvider provider, ChunkPointer pointer) throws IOException{
 		try(var io=provider.getSource().ioAt(pointer.add(CHECK_BYTE_OFF))){
 			return earlyCheckChunkAt(io);
@@ -257,21 +326,34 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		headerSize=(int)PIPE.calcUnknownSize(provider, this, WordSpace.BYTE);
 	}
 	
+	/**
+	 * Writes the current Chunk header data at header area.
+	 */
 	public void writeHeader() throws IOException{
 		try(var io=clusterIoAtHead()){
 			writeHeader(io);
 		}
 	}
+	/**
+	 * Writes the current Chunk header data in to the {@link ContentWriter}.
+	 */
 	public void writeHeader(ContentWriter dest) throws IOException{
 		dirty=false;
 		PIPE.write(provider, dest, this);
 	}
 	
+	/**
+	 * Reads the data from the file in to this chunk.
+	 */
 	public void readHeader() throws IOException{
 		try(var io=clusterIoAtHead()){
 			readHeader(io);
 		}
 	}
+	
+	/**
+	 * Reads the data from the provided {@link ContentReader} in to this chunk.
+	 */
 	public void readHeader(ContentReader src) throws IOException{
 		reading=true;
 		try{
@@ -281,18 +363,10 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		}
 		calcHeaderSize();
 	}
+	
 	public int getHeaderSize(){
 		return headerSize;
 	}
-	private RandomIO clusterIoAtHead() throws IOException{
-		return getSource().ioAt(getPtr().getValue());
-	}
-	
-	@Override
-	public RandomIO io() throws IOException{
-		return new ChunkChainIO(this);
-	}
-	
 	public long dataStart(){
 		return ptr.add(getHeaderSize());
 	}
@@ -302,11 +376,22 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		return start+cap;
 	}
 	
+	private RandomIO clusterIoAtHead() throws IOException{
+		return getSource().ioAt(getPtr().getValue());
+	}
+	
+	/**
+	 * Creates a new {@link RandomIO} who's available data is provided from this and next chunks (if any).
+	 */
+	@Override
+	public RandomIO io() throws IOException{
+		return new ChunkChainIO(this);
+	}
+	
 	@NotNull
 	public ChunkPointer getPtr(){
 		return ptr;
 	}
-	
 	
 	public void pushSize(long newSize){
 		if(newSize>getSize()) setSize(newSize);
@@ -473,10 +558,6 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		markDirty();
 	}
 	
-	public Optional<Chunk> nextOpt() throws IOException{
-		return Optional.ofNullable(next());
-	}
-	
 	public Chunk requireNext() throws IOException{
 		return Objects.requireNonNull(next());
 	}
@@ -517,14 +598,6 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		}
 	}
 	
-	public Chunk nextUnsafe(){
-		try{
-			return next();
-		}catch(IOException e){
-			throw new RuntimeException(e);
-		}
-	}
-	
 	public Chunk last() throws IOException{
 		Chunk ch=this;
 		while(ch.hasNextPtr()){
@@ -562,9 +635,6 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 		}
 		if(!dirty) return;
 		writeHeader();
-	}
-	public void zeroOutCapacity() throws IOException{
-		zeroOutFromTo(0, getCapacity());
 	}
 	
 	public void zeroOutFromTo(long from, long to) throws IOException{
