@@ -1,5 +1,6 @@
 package com.lapissea.cfs.chunk;
 
+import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.BitDepthOutOfSpaceException;
@@ -30,7 +31,6 @@ import com.lapissea.cfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.ShouldNeverHappenError;
-import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
@@ -202,7 +202,7 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 	
 	static{
 		STRUCT=Struct.of(Chunk.class);
-		if(!UtilL.sysPropertyByClass(Chunk.class, "DO_NOT_USE_OPTIMIZED_PIPE", false, Boolean::parseBoolean)){
+		if(GlobalConfig.configFlag("abBenchmark.chunkOptimizedPipe", true)){
 			ContiguousStructPipe.registerSpecialImpl(STRUCT, OptimizedChunkPipe::new);
 		}
 		PIPE=ContiguousStructPipe.of(STRUCT);

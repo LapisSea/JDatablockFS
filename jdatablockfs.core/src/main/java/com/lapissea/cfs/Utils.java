@@ -213,4 +213,8 @@ public class Utils{
 			writeBuffer[off+i]=(byte)(v >>> ((lm1-i)*8));
 		}
 	}
+	
+	public static Optional<String> optionalProperty(String name){
+		return Optional.ofNullable(System.getProperty(name));
+	}
 }

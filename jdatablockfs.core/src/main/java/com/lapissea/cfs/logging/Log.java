@@ -4,7 +4,6 @@ import com.lapissea.cfs.ConsoleColors;
 import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
-import com.lapissea.util.UtilL;
 
 import java.util.Objects;
 import java.util.function.Function;
@@ -23,7 +22,7 @@ public class Log{
 	private static final int SMALL_TRACE=5;
 	private static final int ALL        =Integer.MAX_VALUE;
 	
-	private static final int LOG_LEVEL=switch(UtilL.sysPropertyByClass(Log.class, "level").orElse("").toUpperCase()){
+	private static final int LOG_LEVEL=GlobalConfig.configProp("log.level").map(String::toUpperCase).map(level->switch(level){
 		case "NONE" -> NONE;
 		case "MIN" -> MIN;
 		case "WARN" -> WARN;
@@ -32,8 +31,8 @@ public class Log{
 		case "TRACE" -> TRACE;
 		case "SMALL_TRACE" -> SMALL_TRACE;
 		case "ALL" -> ALL;
-		default -> GlobalConfig.RELEASE_MODE?WARN:INFO;
-	};
+		default -> throw new IllegalStateException(level+" is not a recognised logging level");
+	}).orElse(GlobalConfig.RELEASE_MODE?WARN:INFO);
 	
 	
 	public static final class Channel{

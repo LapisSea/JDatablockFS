@@ -1,10 +1,10 @@
 package com.lapissea.cfs.run.sparseimage;
 
+import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.collections.LinkedIOList;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.annotations.IOValue;
-import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 
@@ -27,7 +27,7 @@ public class Image extends IOInstance<Image>{
 		}
 	}
 	
-	private static final int CHUNK_SIZE=UtilL.sysPropertyByClass(Image.class, "CHUNK_SIZE", 2, Integer::parseInt);
+	private static final int CHUNK_SIZE=Utils.optionalProperty("chunkSize").map(Integer::valueOf).orElse(4);
 	
 	@IOValue
 	@IOValue.OverrideType(LinkedIOList.class)

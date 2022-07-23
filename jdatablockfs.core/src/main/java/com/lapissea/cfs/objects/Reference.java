@@ -1,6 +1,6 @@
 package com.lapissea.cfs.objects;
 
-import com.lapissea.cfs.chunk.Chunk;
+import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.ChunkChainIO;
 import com.lapissea.cfs.io.OffsetIO;
@@ -17,7 +17,6 @@ import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.util.ShouldNeverHappenError;
-import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.util.List;
@@ -29,7 +28,7 @@ public final class Reference extends IOInstance<Reference>{
 	public static final Struct<Reference> STRUCT=(Struct<Reference>)Struct.thisClass();
 	
 	static{
-		boolean useOptimized=!UtilL.sysPropertyByClass(Chunk.class, "DO_NOT_USE_OPTIMIZED_PIPE", false, Boolean::parseBoolean);
+		boolean useOptimized=GlobalConfig.configFlag("abBenchmark.referenceOptimizedPipe", true);
 		if(useOptimized){
 			ContiguousStructPipe.registerSpecialImpl(STRUCT, ()->new ContiguousStructPipe<>(STRUCT, true){
 				@Override

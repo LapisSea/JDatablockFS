@@ -14,7 +14,7 @@
     <option name="MAIN_CLASS_NAME" value="com.lapissea.cfs.run.GeneralTests" />
     <option name="METHOD_NAME" value="" />
     <option name="TEST_OBJECT" value="class" />
-    <option name="VM_PARAMETERS" value="-ea -DdeleteOk=true -Dcom.lapissea.cfs.GlobalConfig.printCompilation=true -Dcom.lapissea.cfs.run.GeneralTests.standardInit=true -Dcom.lapissea.cfs.run.GeneralTests.tabPrint=false -Dcom.lapissea.cfs.type.TemplateClassLoader.PRINT_BYTECODE=true" />
+    <option name="VM_PARAMETERS" value="-ea -DdeleteOk=true -Ddfs.printCompilation=true -Ddfs.test.standardInit=true -Ddfs.test.tabPrint=false -Ddfs.classGen.printBytecode=true -Ddfs.log.level=TRACE" />
     <option name="WORKING_DIRECTORY" value="$ProjectFileDir$/run/test" />
     <method v="2">
       <option name="Make" enabled="true" />

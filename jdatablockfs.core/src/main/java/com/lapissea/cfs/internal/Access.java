@@ -1,5 +1,6 @@
 package com.lapissea.cfs.internal;
 
+import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
@@ -27,8 +28,7 @@ import static java.lang.invoke.MethodHandles.Lookup.*;
 @SuppressWarnings("unchecked")
 public class Access{
 	
-	public static final boolean DEV_CACHE=UtilL.sysPropertyByClass(Access.class, "DEV_CACHE", false, Boolean::parseBoolean);
-	
+	public static final boolean DEV_CACHE=GlobalConfig.configFlag("abBenchmark.devCache", false);
 	
 	private static final boolean USE_UNSAFE_LOOKUP=true;
 	

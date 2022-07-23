@@ -1,5 +1,6 @@
 package com.lapissea.cfs.type.compilation;
 
+import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.SyntheticParameterizedType;
 import com.lapissea.cfs.Utils;
@@ -31,6 +32,14 @@ import static java.util.function.Function.identity;
 
 @SuppressWarnings("rawtypes")
 public class FieldCompiler{
+	
+	private enum FieldAccess{
+		UNSAFE,
+		VAR_HANDLE,
+		REFLECTION
+	}
+	
+	private static final FieldAccess FIELD_ACCESS=GlobalConfig.configEnum("fieldAccess", Runtime.version().feature()<=18?FieldAccess.UNSAFE:FieldAccess.VAR_HANDLE);
 	
 	protected record LogicalAnnotation<T extends Annotation>(T annotation, AnnotationLogic<T> logic){}
 	
@@ -295,11 +304,10 @@ public class FieldCompiler{
 				getter.ifPresent(usedFields::add);
 				setter.ifPresent(usedFields::add);
 				
-				var def=Runtime.version().feature()<=18?"unsafe":"varhandle";
-				fields.add(switch(UtilL.sysPropertyByClass(FieldCompiler.class, "UNSAFE_ACCESS").orElse(def).toLowerCase()){
-					case "unsafe" -> UnsafeAccessor.make(struct, field, getter, setter, fieldName, type);
-					case "varhandle" -> VarHandleAccessor.make(struct, field, getter, setter, fieldName, type);
-					default -> ReflectionAccessor.make(struct, field, getter, setter, fieldName, type);
+				fields.add(switch(FIELD_ACCESS){
+					case UNSAFE -> UnsafeAccessor.make(struct, field, getter, setter, fieldName, type);
+					case VAR_HANDLE -> VarHandleAccessor.make(struct, field, getter, setter, fieldName, type);
+					case REFLECTION -> ReflectionAccessor.make(struct, field, getter, setter, fieldName, type);
 				});
 			}catch(Throwable e){
 				throw new MalformedStructLayout("Failed to scan field #"+field.getName(), e);

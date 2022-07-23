@@ -1,5 +1,6 @@
 package com.lapissea.cfs.type;
 
+import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.access.AnnotatedType;
 import com.lapissea.cfs.type.field.annotations.IODependency;
@@ -9,7 +10,10 @@ import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.jorth.JorthCompiler;
 import com.lapissea.jorth.JorthWriter;
 import com.lapissea.jorth.MalformedJorthException;
-import com.lapissea.util.*;
+import com.lapissea.util.LogUtil;
+import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.TextUtil;
+import com.lapissea.util.WeakValueHashMap;
 import com.lapissea.util.function.UnsafeBiConsumer;
 
 import java.io.IOException;
@@ -25,8 +29,8 @@ public class TemplateClassLoader extends ClassLoader{
 	
 	private static final Map<TypeNamed, byte[]> CLASS_DATA_CACHE=Collections.synchronizedMap(new WeakValueHashMap<>());
 	
-	private static final boolean PRINT_GENERATING_INFO=UtilL.sysPropertyByClass(TemplateClassLoader.class, "PRINT_GENERATING_INFO", false, Boolean::parseBoolean);
-	private static final boolean PRINT_BYTECODE       =UtilL.sysPropertyByClass(TemplateClassLoader.class, "PRINT_BYTECODE", false, Boolean::parseBoolean);
+	private static final boolean PRINT_GENERATING_INFO=GlobalConfig.configFlag("classGen.printGeneratingInfo", false);
+	private static final boolean PRINT_BYTECODE       =GlobalConfig.configFlag("classGen.printBytecode", false);
 	
 	private final IOTypeDB db;
 	

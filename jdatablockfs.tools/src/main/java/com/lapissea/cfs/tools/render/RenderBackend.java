@@ -1,5 +1,6 @@
 package com.lapissea.cfs.tools.render;
 
+import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.tools.DrawFont;
 
 import java.awt.Color;
@@ -10,7 +11,7 @@ import java.util.function.Consumer;
 
 public abstract class RenderBackend{
 	
-	public static final boolean DRAW_DEBUG=Boolean.parseBoolean(System.getProperty("drawDebug"));
+	public static final boolean DRAW_DEBUG=GlobalConfig.configFlag("tools.drawDebug", false);
 	
 	public static class Buffered extends RenderBackend{
 		

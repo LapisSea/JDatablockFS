@@ -10,8 +10,8 @@ import org.openjdk.jmh.annotations.*;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
-@Warmup(iterations = 6, time = 200, timeUnit = TimeUnit.MILLISECONDS)
-@Measurement(iterations = 6, time = 500, timeUnit = TimeUnit.MILLISECONDS)
+@Warmup(iterations=6, time=200, timeUnit=TimeUnit.MILLISECONDS)
+@Measurement(iterations=6, time=500, timeUnit=TimeUnit.MILLISECONDS)
 @State(Scope.Thread)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 public class ChunkBenchmark{
@@ -51,7 +51,7 @@ public class ChunkBenchmark{
 	}
 	
 	@Benchmark
-	@Fork(jvmArgsAppend = "-Dcom.lapissea.cfs.chunk.Chunk.DO_NOT_USE_OPTIMIZED_PIPE=true")
+	@Fork(jvmArgsAppend="-Ddfs.abBenchmark.chunkOptimizedPipe=true")
 	public void readGenerated(){
 		try{
 			chunk.readHeader();
@@ -61,7 +61,7 @@ public class ChunkBenchmark{
 	}
 	
 	@Benchmark
-	@Fork(jvmArgsAppend = "-Dcom.lapissea.cfs.chunk.Chunk.DO_NOT_USE_OPTIMIZED_PIPE=true")
+	@Fork(jvmArgsAppend="-Ddfs.abBenchmark.chunkOptimizedPipe=true")
 	public void writeGenerated(){
 		try{
 			chunk.writeHeader();

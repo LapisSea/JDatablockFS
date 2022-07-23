@@ -14,7 +14,6 @@ import com.lapissea.cfs.type.MemoryWalker;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
-import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.util.*;
@@ -245,7 +244,7 @@ public class MemoryOperations{
 	}
 	
 	
-	private static final boolean PURGE_ACCIDENTAL=UtilL.sysPropertyByClass(MemoryOperations.class, "PURGE_ACCIDENTAL", GlobalConfig.DEBUG_VALIDATION, Boolean::valueOf);
+	private static final boolean PURGE_ACCIDENTAL=GlobalConfig.configFlag("purgeAccidentalChunkHeaders", GlobalConfig.DEBUG_VALIDATION);
 	
 	public static List<Chunk> mergeChunks(Collection<Chunk> data) throws IOException{
 		List<Chunk> toDestroy=new ArrayList<>();
@@ -545,9 +544,9 @@ public class MemoryOperations{
 	}
 	private static ChunkBuilder chBuilderFromTicket(DataProvider context, ChunkPointer ptr, AllocateTicket ticket){
 		return new ChunkBuilder(context, ptr)
-				       .withCapacity(ticket.bytes())
-				       .withExplicitNextSize(ticket.calcNextSize())
-				       .withNext(ticket.next());
+			       .withCapacity(ticket.bytes())
+			       .withExplicitNextSize(ticket.calcNextSize())
+			       .withNext(ticket.next());
 	}
 	
 	public static Chunk allocateAppendToFile(DataProvider context, AllocateTicket ticket) throws IOException{
@@ -578,11 +577,11 @@ public class MemoryOperations{
 		var ptr=firstChunk.getPtr();
 		
 		var prev=new PhysicalChunkWalker(context.getFirstChunk())
-				         .stream()
-				         .filter(Chunk::hasNextPtr)
-				         .map(Chunk::getNextPtr)
-				         .filter(p->p.equals(ptr))
-				         .findAny();
+			         .stream()
+			         .filter(Chunk::hasNextPtr)
+			         .map(Chunk::getNextPtr)
+			         .filter(p->p.equals(ptr))
+			         .findAny();
 		
 		if(prev.isPresent()){
 			var ch=context.getChunk(prev.get());

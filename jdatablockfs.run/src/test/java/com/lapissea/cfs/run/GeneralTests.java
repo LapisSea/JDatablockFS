@@ -1,5 +1,6 @@
 package com.lapissea.cfs.run;
 
+import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.Cluster;
@@ -21,7 +22,6 @@ import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.TypeDef;
 import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.util.LogUtil;
-import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeConsumer;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -46,11 +46,11 @@ public class GeneralTests{
 	
 	@BeforeAll
 	static void init() throws IOException{
-		if(UtilL.sysPropertyByClass(GeneralTests.class, "tabPrint", false, Boolean::parseBoolean)){
+		if(GlobalConfig.configFlag("test.tabPrint", false)){
 			LogUtil.Init.attach(USE_CALL_POS|USE_TABULATED_HEADER);
 		}
 		
-		if(UtilL.sysPropertyByClass(GeneralTests.class, "standardInit", false, Boolean::parseBoolean)){
+		if(GlobalConfig.configFlag("test.standardInit", false)){
 			Stream.of(Chunk.class, Reference.class, AutoText.class, Cluster.RootRef.class, ContiguousIOList.class, LinkedIOList.class, HashIOMap.class, TypeDef.class)
 			      .map(c->{
 				      try{
@@ -65,7 +65,7 @@ public class GeneralTests{
 			      .forEach(c->c.waitForState(STATE_DONE));
 		}
 		
-		if(Boolean.parseBoolean(UtilL.sysPropertyByClass(GeneralTests.class, "earlyRunCode").orElse("true"))){
+		if(GlobalConfig.configFlag("test.earlyRunCode", true)){
 			try(var dummy=AllocateTicket.bytes(1).submit(DataProvider.newVerySimpleProvider()).io()){
 				dummy.write(1);
 			}

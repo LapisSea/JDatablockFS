@@ -2,7 +2,7 @@
   <configuration default="false" name="RandomLists" type="Application" factoryName="Application">
     <option name="MAIN_CLASS_NAME" value="com.lapissea.cfs.run.world.RandomLists" />
     <module name="jdatablockfs.run" />
-    <option name="VM_PARAMETERS" value="-ea -Dcom.lapissea.cfs.GlobalConfig.printCompilation=false" />
+    <option name="VM_PARAMETERS" value="-ea -Ddfs.printCompilation=false" />
     <option name="WORKING_DIRECTORY" value="$ProjectFileDir$/run/main" />
     <extension name="coverage">
       <pattern>

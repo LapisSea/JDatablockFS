@@ -1,5 +1,6 @@
 package com.lapissea.cfs.objects.text;
 
+import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.io.bit.BitInputStream;
 import com.lapissea.cfs.io.bit.BitOutputStream;
 import com.lapissea.cfs.io.bit.BitUtils;
@@ -7,7 +8,6 @@ import com.lapissea.cfs.io.content.ContentInputStream;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.util.PairM;
-import com.lapissea.util.UtilL;
 import com.lapissea.util.function.FunctionOI;
 import com.lapissea.util.function.UnsafeBiConsumer;
 
@@ -69,7 +69,7 @@ class Encoding{
 			
 			
 			int optimizedBlockCount;
-			if(UtilL.sysPropertyByClass(Encoding.class, "DISABLE_BLOCK_CODING", false, Boolean::parseBoolean)){
+			if(GlobalConfig.configFlag("abBenchmark.disableBlockCoding", false)){
 				optimizedBlockCount=-1;
 			}else{
 				optimizedBlockCount=1;

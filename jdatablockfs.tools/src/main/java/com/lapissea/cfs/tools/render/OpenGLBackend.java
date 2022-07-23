@@ -1,5 +1,6 @@
 package com.lapissea.cfs.tools.render;
 
+import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.tools.AtlasFont;
 import com.lapissea.cfs.tools.DrawFont;
 import com.lapissea.cfs.tools.MSDFAtlas;
@@ -218,7 +219,7 @@ public class OpenGLBackend extends RenderBackend{
 	
 	
 	private synchronized void initWindow(){
-		if(UtilL.sysPropertyByClass(OpenGLBackend.class, "emulateNoGLSupport").map(Boolean::parseBoolean).orElse(false)){
+		if(GlobalConfig.configFlag("tools.emulateNoGL", false)){
 			throw new RuntimeException("gl disabled");
 		}
 		

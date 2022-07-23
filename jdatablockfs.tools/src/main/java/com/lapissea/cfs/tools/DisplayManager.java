@@ -1,5 +1,6 @@
 package com.lapissea.cfs.tools;
 
+import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.MemFrame;
 import com.lapissea.cfs.tools.render.ImGuiUtils;
@@ -27,8 +28,7 @@ import static org.lwjgl.glfw.GLFW.*;
 
 public class DisplayManager implements DataLogger{
 	
-	private static final boolean DO_JIT_WARMUP =UtilL.sysPropertyByClass(DisplayManager.class, "DO_JIT_WARMUP", true, Boolean::parseBoolean);
-	private static final boolean LOG_FRAME_TIME=UtilL.sysPropertyByClass(DisplayManager.class, "LOG_FRAME_TIME", false, Boolean::parseBoolean);
+	private static final boolean DO_JIT_WARMUP=GlobalConfig.configFlag("tools.jitWarmup", true);
 	
 	static{
 		ImGuiUtils.load();

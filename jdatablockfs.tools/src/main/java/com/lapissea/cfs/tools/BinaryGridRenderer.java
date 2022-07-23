@@ -1,6 +1,7 @@
 package com.lapissea.cfs.tools;
 
 
+import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.*;
 import com.lapissea.cfs.io.ChunkChainIO;
@@ -139,15 +140,7 @@ public class BinaryGridRenderer implements DataRenderer{
 	private boolean            renderStatic     =false;
 	private List<HoverMessage> lastHoverMessages=List.of();
 	
-	
-	private final ErrorLogLevel errorLogLevel=UtilL.sysPropertyByClass(BinaryGridRenderer.class, "errorLogLevel").map(String::toUpperCase).map(v->{
-		try{
-			return ErrorLogLevel.valueOf(v);
-		}catch(IllegalArgumentException e){
-			warn("Unknown value {} for errorLogLevel", v);
-			return ErrorLogLevel.NAMED_STACK;
-		}
-	}).orElse(ErrorLogLevel.NAMED_STACK);
+	private final ErrorLogLevel errorLogLevel=GlobalConfig.configEnum("tools.renderer.errorLogLevel", ErrorLogLevel.NAMED_STACK);
 	
 	
 	private float   zoom=1;

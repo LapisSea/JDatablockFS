@@ -1,7 +1,7 @@
 package com.lapissea.cfs.type;
 
+import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.internal.Runner;
-import com.lapissea.util.UtilL;
 
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
@@ -9,7 +9,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public abstract class StagedInit{
 	
-	private static final boolean DO_ASYNC=UtilL.sysPropertyByClass(StagedInit.class, "DO_ASYNC", true, Boolean::valueOf);
+	private static final boolean DO_ASYNC=GlobalConfig.configFlag("asyncLoad", true);
 	
 	public static void runBaseStageTask(Runnable task){
 		if(DO_ASYNC){
