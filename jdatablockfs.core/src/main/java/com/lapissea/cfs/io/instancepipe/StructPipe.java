@@ -37,14 +37,10 @@ import static com.lapissea.cfs.ConsoleColors.CYAN_BRIGHT;
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.GlobalConfig.PRINT_COMPILATION;
 import static com.lapissea.cfs.GlobalConfig.TYPE_VALIDATION;
-import static com.lapissea.cfs.logging.Log.log;
 
 public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit implements ObjectPipe<T, Struct.Pool<T>>{
 	
-	private static final Log.Channel COMPILATION=Log.channel(
-		PRINT_COMPILATION&&!Access.DEV_CACHE,
-		Log.Channel.colored(CYAN_BRIGHT, s->log(s.toString()))
-	);
+	private static final Log.Channel COMPILATION=Log.channel(PRINT_COMPILATION&&!Access.DEV_CACHE, Log.Channel.colored(CYAN_BRIGHT));
 	
 	private static class StructGroup<T extends IOInstance<T>, P extends StructPipe<T>> extends ConcurrentHashMap<Struct<T>, P>{
 		
@@ -69,7 +65,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			var cached=get(struct);
 			if(cached!=null) return cached;
 			
-			log(COMPILATION, "Requested pipe: {}", struct.getType().getName());
+			COMPILATION.log("Requested pipe: {}", struct.getType().getName());
 			
 			P created;
 			try{
@@ -96,7 +92,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 					s+="\n"+TextUtil.toTable(created.getSpecificFields());
 				}
 				
-				log(COMPILATION, s);
+				COMPILATION.log(s);
 			}));
 			
 			if(TYPE_VALIDATION&&!(struct instanceof Struct.Unmanaged)){

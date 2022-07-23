@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.LongStream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
-import static com.lapissea.cfs.logging.Log.trace;
+import static com.lapissea.cfs.logging.Log.smallTrace;
 
 public class MemoryOperations{
 	
@@ -319,7 +319,7 @@ public class MemoryOperations{
 	
 	
 	public static long growFileAlloc(Chunk target, long toAllocate) throws IOException{
-		trace("growing {} by {} by growing file", target, toAllocate);
+		smallTrace("growing {} by {} by growing file", target, toAllocate);
 		
 		DataProvider context=target.getDataProvider();
 		
@@ -545,9 +545,9 @@ public class MemoryOperations{
 	}
 	private static ChunkBuilder chBuilderFromTicket(DataProvider context, ChunkPointer ptr, AllocateTicket ticket){
 		return new ChunkBuilder(context, ptr)
-			       .withCapacity(ticket.bytes())
-			       .withExplicitNextSize(ticket.calcNextSize())
-			       .withNext(ticket.next());
+				       .withCapacity(ticket.bytes())
+				       .withExplicitNextSize(ticket.calcNextSize())
+				       .withNext(ticket.next());
 	}
 	
 	public static Chunk allocateAppendToFile(DataProvider context, AllocateTicket ticket) throws IOException{
@@ -578,11 +578,11 @@ public class MemoryOperations{
 		var ptr=firstChunk.getPtr();
 		
 		var prev=new PhysicalChunkWalker(context.getFirstChunk())
-			         .stream()
-			         .filter(Chunk::hasNextPtr)
-			         .map(Chunk::getNextPtr)
-			         .filter(p->p.equals(ptr))
-			         .findAny();
+				         .stream()
+				         .filter(Chunk::hasNextPtr)
+				         .map(Chunk::getNextPtr)
+				         .filter(p->p.equals(ptr))
+				         .findAny();
 		
 		if(prev.isPresent()){
 			var ch=context.getChunk(prev.get());

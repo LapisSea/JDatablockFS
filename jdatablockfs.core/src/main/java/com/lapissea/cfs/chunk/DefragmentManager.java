@@ -17,7 +17,9 @@ import java.util.*;
 import java.util.function.Predicate;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
-import static com.lapissea.cfs.logging.Log.trace;
+import static com.lapissea.cfs.logging.Log.debug;
+import static com.lapissea.cfs.logging.Log.smallTrace;
+import static com.lapissea.cfs.logging.Log.traceCall;
 import static com.lapissea.cfs.logging.Log.warn;
 import static com.lapissea.cfs.type.MemoryWalker.CONTINUE;
 import static com.lapissea.cfs.type.MemoryWalker.END;
@@ -32,7 +34,7 @@ public class DefragmentManager{
 	}
 	
 	public void defragment() throws IOException{
-		trace("Defragmenting...");
+		debug("Defragmenting...");
 		
 		scanFreeChunks(parent);
 		
@@ -47,6 +49,8 @@ public class DefragmentManager{
 	}
 	
 	private void pack(final Cluster cluster) throws IOException{
+		traceCall();
+		
 		var freeChunks=cluster.getMemoryManager().getFreeChunks();
 		while(!freeChunks.isEmpty()){
 			Chunk last=freeChunks.peekLast().orElseThrow().dereference(cluster);
@@ -60,6 +64,7 @@ public class DefragmentManager{
 		}
 	}
 	private void optimizeFreeChunks(final Cluster cluster) throws IOException{
+		traceCall();
 		wh:
 		while(true){
 			
@@ -212,6 +217,8 @@ public class DefragmentManager{
 	}
 	
 	private void mergeChains(Cluster cluster) throws IOException{
+		traceCall();
+		
 		while(true){
 			Chunk fragmentedChunk;
 			{
@@ -338,6 +345,7 @@ public class DefragmentManager{
 	}
 	
 	private void scanFreeChunks(Cluster cluster) throws IOException{
+		traceCall();
 		
 		var activeChunks      =new ChunkSet();
 		var unreferencedChunks=new ChunkSet();
@@ -454,7 +462,7 @@ public class DefragmentManager{
 	}
 	
 	private Set<ChunkPointer> moveReference(final Cluster cluster, Reference oldRef, Reference newRef) throws IOException{
-		trace("moving {} to {}", oldRef, newRef);
+		smallTrace("moving {} to {}", oldRef, newRef);
 		
 		boolean[]         found ={false};
 		Set<ChunkPointer> toFree=new HashSet<>();

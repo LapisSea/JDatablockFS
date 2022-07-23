@@ -1,7 +1,5 @@
 package com.lapissea.cfs.type;
 
-import com.lapissea.cfs.ConsoleColors;
-import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.FieldIsNullException;
@@ -9,6 +7,7 @@ import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.internal.MemPrimitive;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
+import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.compilation.FieldCompiler;
@@ -36,12 +35,17 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+import static com.lapissea.cfs.ConsoleColors.GREEN_BRIGHT;
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.GlobalConfig.PRINT_COMPILATION;
 import static com.lapissea.cfs.internal.IUtils.getCallee;
 import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NOT_NULL;
 
 public sealed class Struct<T extends IOInstance<T>> extends StagedInit implements RuntimeType<T>{
+	
+	private static final Log.Channel COMPILATION=Log.channel(PRINT_COMPILATION&&!Access.DEV_CACHE, Log.Channel.colored(GREEN_BRIGHT));
+	
 	
 	@Retention(RetentionPolicy.RUNTIME)
 	@Target(ElementType.TYPE)
@@ -419,9 +423,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			var existing=STRUCT_CACHE.get(instanceClass);
 			if(existing!=null) return (S)existing;
 			
-			if(GlobalConfig.PRINT_COMPILATION&&!Access.DEV_CACHE){
-				LogUtil.println(ConsoleColors.GREEN_BRIGHT+"Requested struct: "+instanceClass.getName()+ConsoleColors.RESET);
-			}
+			COMPILATION.log("Requested struct: {}", instanceClass.getName());
 			
 			try{
 				STRUCT_COMPILE.put(instanceClass, Thread.currentThread());
@@ -438,12 +440,8 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			lock.unlock();
 		}
 		
-		if(GlobalConfig.PRINT_COMPILATION&&!Access.DEV_CACHE){
-			StagedInit.runBaseStageTask(()->{
-				var tableStr=TextUtil.toTable(struct.getType().getName(), struct.getFields());
-				LogUtil.println(ConsoleColors.GREEN_BRIGHT+tableStr+ConsoleColors.RESET);
-			});
-		}
+		COMPILATION.on(()->StagedInit.runBaseStageTask(()->COMPILATION.log(TextUtil.toTable(struct.getType().getName(), struct.getFields()))));
+		
 		return struct;
 	}
 	
