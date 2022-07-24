@@ -1,6 +1,5 @@
 package com.lapissea.cfs.chunk;
 
-import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.util.NotNull;
@@ -14,6 +13,8 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
+
+import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
 @SuppressWarnings({"SimplifyStreamApiCallChains", "unused"})
 public final class ChunkSet implements Set<ChunkPointer>{
@@ -315,22 +316,20 @@ public final class ChunkSet implements Set<ChunkPointer>{
 		size++;
 		index.add(Math.toIntExact(ptr));
 		
-		checkData();
+		if(DEBUG_VALIDATION) checkData();
 		return true;
 	}
 	
 	@SuppressWarnings({"ReplaceInefficientStreamCount", "UnnecessaryToStringCall"})
 	private void checkData(){
-		if(!GlobalConfig.DEBUG_VALIDATION) return;
-		assert size()==longStream().count():
-			size()+" "+stream().count();
+		if(size()!=longStream().count()){
+			throw new IllegalStateException(size()+" "+stream().count());
+		}
 		if(!isEmpty()){
-			var s=calcStart(index);
-			var e=calcEnd(index);
-			assert s==start:
-				start+" "+index.toString();
-			assert e==end:
-				lastIndex()+" "+index;
+			var start=calcStart(index);
+			var end  =calcEnd(index);
+			if(start!=this.start) throw new IllegalStateException("corrupt start: "+this.start+" "+index.toString());
+			if(end!=this.end) throw new IllegalStateException("corrupt end: "+lastIndex()+" "+index);
 		}
 	}
 	
@@ -345,14 +344,14 @@ public final class ChunkSet implements Set<ChunkPointer>{
 		if(rageSize()==1){
 			clear();
 		}else{
-			assert index.contains(ptr);
+			if(!index.contains(ptr)) throw new IllegalStateException("contains() invalid");
 			size--;
 			index.remove(ptr);
 			
 			if(ptr==start) calcStart();
 			if(ptr==lastIndex()) calcEnd();
 		}
-		checkData();
+		if(DEBUG_VALIDATION) checkData();
 		return true;
 	}
 	
@@ -368,12 +367,12 @@ public final class ChunkSet implements Set<ChunkPointer>{
 		if(rageSize()==1){
 			clear();
 		}else{
-			assert index.contains(Math.toIntExact(start));
+			if(!index.contains(Math.toIntExact(start))) throw new IllegalStateException("First element must exist");
 			index.remove(Math.toIntExact(start));
 			size--;
 			calcStart();
 		}
-		checkData();
+		if(DEBUG_VALIDATION) checkData();
 	}
 	
 	public void removeLast(){
@@ -381,12 +380,12 @@ public final class ChunkSet implements Set<ChunkPointer>{
 		if(rageSize()==1){
 			clear();
 		}else{
-			assert index.contains(Math.toIntExact(lastIndex()));
+			if(!index.contains(Math.toIntExact(lastIndex()))) throw new IllegalStateException("Last element must exist");
 			index.remove((int)lastIndex());
 			size--;
 			calcEnd();
 		}
-		checkData();
+		if(DEBUG_VALIDATION) checkData();
 	}
 	
 	@Override

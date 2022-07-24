@@ -24,6 +24,7 @@ import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.annotations.IOValueUnmanaged;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
+import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
@@ -312,7 +313,9 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 			if(s==0) return null;
 			if(s<NEXT_SIZE_FIELD_MIN_SIZE) return null;
 			if(DEBUG_VALIDATION){
-				assert getPipe().getSpecificFields().get(0).equals(getNextSizeField());
+				if(!getPipe().getSpecificFields().get(0).equals(getNextSizeField())){
+					throw new ShouldNeverHappenError();
+				}
 			}
 			nextSize=FlagReader.readSingle(io, NumberSize.FLAG_INFO);
 
@@ -370,7 +373,9 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 				return false;
 			}
 			io.skipExact(nextSize.bytes);
-			assert valueStart()==io.getPos();
+			if(DEBUG_VALIDATION){
+				if(valueStart()!=io.getPos()) throw new AssertionError();
+			}
 			return io.remaining()!=0;
 		}
 	}
@@ -566,15 +571,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	
 	@SuppressWarnings({"rawtypes", "unchecked"})
 	public boolean readValueField(T dest, IOField<?, ?> field) throws IOException{
-		if(DEBUG_VALIDATION){
-			var struct=field.getAccessor().getDeclaringStruct();
-			if(!UtilL.instanceOf(dest.getClass(), struct.getType())){
-				throw new ClassCastException(dest.getClass()+" is not compatible with "+field);
-			}
-			if(!(valueStorage instanceof ValueStorage.InstanceBased)){
-				throw new UnsupportedOperationException("Node with type of "+valueStorage.getType().getType()+" is not a valid instance");
-			}
-		}
+		if(DEBUG_VALIDATION) validateField(dest, field);
 		if(!hasValue()) return false;
 		var based=(ValueStorage.InstanceBased)valueStorage;
 		try(var io=this.getReference().io(this)){
@@ -582,5 +579,15 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 			based.readSingle(io, (IOInstance)dest, field);
 		}
 		return true;
+	}
+	
+	private void validateField(T dest, IOField<?, ?> field){
+		var struct=field.getAccessor().getDeclaringStruct();
+		if(!UtilL.instanceOf(dest.getClass(), struct.getType())){
+			throw new ClassCastException(dest.getClass()+" is not compatible with "+field);
+		}
+		if(!(valueStorage instanceof ValueStorage.InstanceBased)){
+			throw new UnsupportedOperationException("Node with type of "+valueStorage.getType().getType()+" is not a valid instance");
+		}
 	}
 }

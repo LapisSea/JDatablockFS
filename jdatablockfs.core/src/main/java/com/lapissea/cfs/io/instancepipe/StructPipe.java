@@ -362,7 +362,40 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		ContentOutputBuilder destBuff=null;
 		ContentWriter        target;
 		
-		if(DEBUG_VALIDATION&&!(instance instanceof IOInstance.Unmanaged<?>)){
+		if(DEBUG_VALIDATION){
+			var safe=validateAndSafeDestination(fields, ioPool, provider, dest, instance);
+			if(safe!=null) dest=safe;
+		}
+		
+		if(dest.isDirect()){
+			var siz=getSizeDescriptor().calcAllocSize(WordSpace.BYTE);
+			destBuff=new ContentOutputBuilder((int)siz);
+			target=destBuff;
+		}else{
+			target=dest;
+		}
+		
+		generateAll(ioPool, provider, instance, true);
+		
+		for(IOField<T, ?> field : fields){
+			if(DEBUG_VALIDATION){
+				writeFieldKnownSize(ioPool, provider, target, instance, field);
+			}else{
+				field.writeReported(ioPool, provider, target, instance);
+			}
+		}
+		
+		if(destBuff!=null){
+			destBuff.writeTo(dest);
+		}
+		if(DEBUG_VALIDATION){
+			dest.close();
+		}
+	}
+	
+	private ContentWriter validateAndSafeDestination(FieldSet<T> fields, Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+		ContentWriter safe=null;
+		if(!(instance instanceof IOInstance.Unmanaged<?>)){
 			generateAll(ioPool, provider, instance, true);
 			var siz=getSizeDescriptor().calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
 			
@@ -384,37 +417,11 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				throw new RuntimeException(sj.toString());
 			}
 			
-			dest=dest.writeTicket(siz).requireExact((written, expected)->{
+			safe=dest.writeTicket(siz).requireExact((written, expected)->{
 				return new IOException(written+" "+expected+" on "+instance);
 			}).submit();
 		}
-		
-		if(dest.isDirect()){
-			var siz=getSizeDescriptor().calcAllocSize(WordSpace.BYTE);
-			destBuff=new ContentOutputBuilder((int)siz);
-			target=destBuff;
-		}else{
-			target=dest;
-		}
-		
-		generateAll(ioPool, provider, instance, true);
-		
-		for(IOField<T, ?> field : fields){
-			if(DEBUG_VALIDATION){
-				var desc =field.getSizeDescriptor();
-				var bytes=desc.calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
-				writeFieldKnownSize(ioPool, provider, instance, field, target.writeTicket(bytes));
-			}else{
-				field.writeReported(ioPool, provider, target, instance);
-			}
-		}
-		
-		if(destBuff!=null){
-			destBuff.writeTo(dest);
-		}
-		if(DEBUG_VALIDATION){
-			dest.close();
-		}
+		return safe;
 	}
 	
 	private void generateAll(Struct.Pool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException{
@@ -429,8 +436,10 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		}
 	}
 	
-	private void writeFieldKnownSize(Struct.Pool<T> ioPool, DataProvider provider, T instance, IOField<T, ?> field, ContentWriter.BufferTicket ticket) throws IOException{
-		var safeBuff=ticket.requireExact().submit();
+	private void writeFieldKnownSize(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter target, T instance, IOField<T, ?> field) throws IOException{
+		var desc    =field.getSizeDescriptor();
+		var bytes   =desc.calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
+		var safeBuff=target.writeTicket(bytes).requireExact().submit();
 		field.writeReported(ioPool, provider, safeBuff, instance);
 		
 		try{
@@ -566,7 +575,11 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			
 			if(fields.get(checkIndex)==field){
 				checkIndex++;
-				writeFieldKnownSize(ioPool, provider, instance, field, dest.writeTicket(bytes));
+				if(DEBUG_VALIDATION){
+					writeFieldKnownSize(ioPool, provider, dest, instance, field);
+				}else{
+					field.writeReported(ioPool, provider, dest, instance);
+				}
 				
 				if(checkIndex==fields.size()){
 					return;
@@ -581,12 +594,10 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	}
 	
 	protected void readIOFields(FieldSet<T> fields, Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		if(DEBUG_VALIDATION){
-			for(IOField<T, ?> field : fields){
-				readFieldSafe(ioPool, provider, src, instance, field, genericContext);
-			}
-		}else{
-			for(IOField<T, ?> field : fields){
+		for(IOField<T, ?> field : fields){
+			if(DEBUG_VALIDATION){
+				readFieldSafe(ioPool, provider, src, instance, genericContext, field);
+			}else{
 				field.readReported(ioPool, provider, src, instance, genericContext);
 			}
 		}
@@ -601,39 +612,26 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		var fields    =deps.readFields;
 		int checkIndex=0;
 		
-		if(DEBUG_VALIDATION){
-			for(IOField<T, ?> field : getSpecificFields()){
-				if(fields.get(checkIndex)==field){
-					checkIndex++;
-					readFieldSafe(ioPool, provider, src, instance, field, genericContext);
-					
-					if(checkIndex==fields.size()){
-						return;
-					}
-					
-					continue;
-				}
+		for(IOField<T, ?> field : getSpecificFields()){
+			if(fields.get(checkIndex)==field){
+				checkIndex++;
 				
-				field.skipReadReported(ioPool, provider, src, instance, genericContext);
-			}
-		}else{
-			for(IOField<T, ?> field : getSpecificFields()){
-				if(fields.get(checkIndex)==field){
-					checkIndex++;
+				if(DEBUG_VALIDATION){
+					readFieldSafe(ioPool, provider, src, instance, genericContext, field);
+				}else{
 					field.readReported(ioPool, provider, src, instance, genericContext);
-					
-					if(checkIndex==fields.size()){
-						return;
-					}
-					
-					continue;
 				}
 				
-				field.skipReadReported(ioPool, provider, src, instance, genericContext);
+				if(checkIndex==fields.size()){
+					return;
+				}
+				
+				continue;
 			}
-			throw new IllegalArgumentException(selectedField+" is not listed!");
+			
+			field.skipReadReported(ioPool, provider, src, instance, genericContext);
 		}
-		
+		throw new IllegalArgumentException(selectedField+" is not listed!");
 	}
 	
 	private void checkExistenceOfField(IOField<T, ?> selectedField){
@@ -645,13 +643,13 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		throw new IllegalArgumentException(selectedField+" is not listed!");
 	}
 	
-	private void readFieldSafe(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, IOField<T, ?> field, GenericContext genericContext) throws IOException{
+	private void readFieldSafe(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext, IOField<T, ?> field) throws IOException{
 		var desc =field.getSizeDescriptor();
 		var fixed=desc.getFixed(WordSpace.BYTE);
 		if(fixed.isPresent()){
 			long bytes=fixed.getAsLong();
 			
-			String extra="";
+			String extra=null;
 			if(DEBUG_VALIDATION){
 				extra=" started on: "+src;
 			}
@@ -661,7 +659,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			try{
 				field.readReported(ioPool, provider, buf, instance, genericContext);
 			}catch(Exception e){
-				throw new IOException(TextUtil.toString(field)+" failed to read!"+extra, e);
+				throw new IOException(TextUtil.toString(field)+" failed to read!"+(DEBUG_VALIDATION?extra:""), e);
 			}
 			
 			try{

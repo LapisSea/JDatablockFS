@@ -55,7 +55,7 @@ public class TestUtils{
 		};
 		
 		var cls=Class.forName(className, true, loader);
-		assert cls.getName().equals(className);
+		if(!cls.getName().equals(className)) throw new AssertionError(cls.getName()+" "+className);
 		
 		LogUtil.println("Compiled:", cls);
 		LogUtil.println("========================================================================");

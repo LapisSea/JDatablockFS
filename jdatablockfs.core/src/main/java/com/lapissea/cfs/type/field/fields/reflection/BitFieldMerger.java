@@ -43,7 +43,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 	
 	public BitFieldMerger(List<IOField.Bit<T, ?>> group){
 		super(null);
-		assert !group.isEmpty();
+		if(group.isEmpty()) throw new IllegalArgumentException("group is empty");
 		
 		if(group.stream().anyMatch(g->g.getSizeDescriptor().getWordSpace()!=WordSpace.BIT)){
 			throw new IllegalArgumentException(group+"");
@@ -77,26 +77,27 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 	public void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		try(var stream=new BitOutputStream(dest)){
 			for(var fi : group){
-				if(DEBUG_VALIDATION){
-					long size=fi.getSizeDescriptor().calcUnknown(ioPool, provider, instance, WordSpace.BIT);
-					var  oldW=stream.getTotalBits();
-					
-					try{
+				try{
+					if(DEBUG_VALIDATION){
+						writeBitsCheckedSize(ioPool, stream, instance, provider, fi);
+					}else{
 						fi.writeBits(ioPool, stream, instance);
-					}catch(Exception e){
-						throw new IOException("Failed to write "+fi, e);
 					}
-					var written=stream.getTotalBits()-oldW;
-					if(written!=size) throw new RuntimeException("Written bits "+written+" but "+size+" expected on "+fi);
-				}else{
-					try{
-						fi.writeBits(ioPool, stream, instance);
-					}catch(Exception e){
-						throw new IOException("Failed to write "+fi, e);
-					}
+				}catch(Exception e){
+					throw new IOException("Failed to write "+fi, e);
 				}
 			}
 		}
+	}
+	
+	private void writeBitsCheckedSize(Struct.Pool<T> ioPool, BitOutputStream stream, T instance, DataProvider provider, Bit<T, ?> fi) throws IOException{
+		long size=fi.getSizeDescriptor().calcUnknown(ioPool, provider, instance, WordSpace.BIT);
+		var  oldW=stream.getTotalBits();
+		
+		fi.writeBits(ioPool, stream, instance);
+		
+		var written=stream.getTotalBits()-oldW;
+		if(written!=size) throw new RuntimeException("Written bits "+written+" but "+size+" expected on "+fi);
 	}
 	
 	@Override
@@ -104,17 +105,22 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 		try(var stream=new BitInputStream(src, safetyBits.isPresent()?getSizeDescriptor().requireFixed(WordSpace.BIT):-1)){
 			for(var fi : group){
 				if(DEBUG_VALIDATION){
-					long size=fi.getSizeDescriptor().calcUnknown(ioPool, provider, instance, WordSpace.BIT);
-					var  oldW=stream.getTotalBits();
-					
-					fi.readBits(ioPool, stream, instance);
-					var read=stream.getTotalBits()-oldW;
-					if(read!=size) throw new RuntimeException("Read bits "+read+" but "+size+" expected on "+fi);
+					readBitsCheckedSize(ioPool, stream, instance, provider, fi);
 				}else{
 					fi.readBits(ioPool, stream, instance);
 				}
 			}
 		}
+	}
+	
+	private void readBitsCheckedSize(Struct.Pool<T> ioPool, BitInputStream stream, T instance, DataProvider provider, Bit<T, ?> fi) throws IOException{
+		long size=fi.getSizeDescriptor().calcUnknown(ioPool, provider, instance, WordSpace.BIT);
+		var  oldW=stream.getTotalBits();
+		
+		fi.readBits(ioPool, stream, instance);
+		
+		var read=stream.getTotalBits()-oldW;
+		if(read!=size) throw new RuntimeException("Read bits "+read+" but "+size+" expected on "+fi);
 	}
 	
 	@Override
@@ -126,17 +132,22 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 		try(var stream=new BitInputStream(src, getSizeDescriptor().getMin(WordSpace.BIT))){
 			for(var fi : group){
 				if(DEBUG_VALIDATION){
-					long size=fi.getSizeDescriptor().calcUnknown(ioPool, provider, instance, WordSpace.BIT);
-					var  oldW=stream.getTotalBits();
-					
-					fi.skipReadBits(stream, instance);
-					var read=stream.getTotalBits()-oldW;
-					if(read!=size) throw new RuntimeException("Read bits "+read+" but "+size+" expected on "+fi);
+					skipBitsCheckedSize(ioPool, provider, instance, stream, fi);
 				}else{
 					fi.skipReadBits(stream, instance);
 				}
 			}
 		}
+	}
+	
+	private void skipBitsCheckedSize(Struct.Pool<T> ioPool, DataProvider provider, T instance, BitInputStream stream, Bit<T, ?> fi) throws IOException{
+		long size=fi.getSizeDescriptor().calcUnknown(ioPool, provider, instance, WordSpace.BIT);
+		var  oldW=stream.getTotalBits();
+		
+		fi.skipReadBits(stream, instance);
+		
+		var read=stream.getTotalBits()-oldW;
+		if(read!=size) throw new RuntimeException("Read bits "+read+" but "+size+" expected on "+fi);
 	}
 	
 	@Override

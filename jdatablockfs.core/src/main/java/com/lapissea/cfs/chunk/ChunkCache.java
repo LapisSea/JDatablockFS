@@ -5,7 +5,6 @@ import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.WeakValueHashMap;
-import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;
 
 import java.io.IOException;
@@ -58,28 +57,23 @@ public final class ChunkCache{
 	}
 	
 	public synchronized void notifyDestroyed(Chunk chunk){
-		if(DEBUG_VALIDATION){
-			var fail=false;
-			try{
-				Chunk.readChunk(chunk.getDataProvider(), chunk.getPtr());
-			}catch(Throwable e){
-				fail=true;
-			}
-			if(!fail){
-				throw new IllegalStateException("Chunk at "+chunk.getPtr()+" is still valid!");
-			}
-			
-			if(!data.containsKey(chunk.getPtr())){
-				throw new IllegalStateException(chunk.getPtr()+" is not cached");
-			}
-		}
+		if(DEBUG_VALIDATION) validateDestroyed(chunk);
 		data.remove(chunk.getPtr());
 	}
 	
-	public synchronized <T extends Throwable> void ifCached(ChunkPointer pointer, UnsafeConsumer<Chunk, T> onPresent) throws T{
-		var chunk=data.get(pointer);
-		if(chunk!=null){
-			onPresent.accept(chunk);
+	private void validateDestroyed(Chunk chunk){
+		var fail=false;
+		try{
+			Chunk.readChunk(chunk.getDataProvider(), chunk.getPtr());
+		}catch(Throwable e){
+			fail=true;
+		}
+		if(!fail){
+			throw new IllegalStateException("Chunk at "+chunk.getPtr()+" is still valid!");
+		}
+		
+		if(!data.containsKey(chunk.getPtr())){
+			throw new IllegalStateException(chunk.getPtr()+" is not cached");
 		}
 	}
 	
@@ -94,11 +88,6 @@ public final class ChunkCache{
 		Objects.requireNonNull(generated);
 		data.put(generated.getPtr(), generated);
 		return generated;
-	}
-	
-	public synchronized boolean isReal(Chunk chunk){
-		var cached=data.get(chunk.getPtr());
-		return chunk==cached;
 	}
 	
 	public synchronized void requireReal(Chunk chunk) throws DesyncedCacheException{
@@ -124,7 +113,7 @@ public final class ChunkCache{
 					throw new DesyncedCacheException(read, cached);
 				}
 			}catch(Throwable e){
-				throw e;
+				throw new RuntimeException(cached+"", e);
 			}
 			
 		}

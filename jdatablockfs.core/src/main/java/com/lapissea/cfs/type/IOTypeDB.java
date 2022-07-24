@@ -21,7 +21,6 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 
-import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.GlobalConfig.TYPE_VALIDATION;
 
 
@@ -271,7 +270,7 @@ public sealed interface IOTypeDB{
 			
 			defs.putAll(newDefs);
 			
-			if(DEBUG_VALIDATION){
+			if(TYPE_VALIDATION){
 				newDefs.entrySet().removeIf(e->!e.getValue().isIoInstance());
 				checkNewTypeValidity(newDefs);
 			}

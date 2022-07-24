@@ -65,16 +65,7 @@ public abstract class StagedInit{
 	protected final void setInitState(int state){
 		try{
 			lock.lock();
-			
-			if(DEBUG_VALIDATION){
-				if(state<=this.state){
-					throw new IllegalArgumentException("State must advance");
-				}
-				if(listStates().mapToInt(StateInfo::id).noneMatch(id->id==state)){
-					throw new IllegalArgumentException("Unknown state: "+state);
-				}
-			}
-			
+			if(DEBUG_VALIDATION) validateNewState(state);
 			this.state=state;
 			condition.signalAll();
 		}finally{
@@ -82,10 +73,21 @@ public abstract class StagedInit{
 		}
 	}
 	
+	private void validateNewState(int state){
+		if(state<=this.state){
+			throw new IllegalArgumentException("State must advance");
+		}
+		if(listStates().mapToInt(StateInfo::id).noneMatch(id->id==state)){
+			throw new IllegalArgumentException("Unknown state: "+state);
+		}
+	}
+	
 	public final void waitForState(int state){
 		if(this.state<state){
 			waitForState0(state);
-			assert this.state>=state;
+			if(this.state<state){
+				throw new IllegalStateException();
+			}
 		}
 		
 		checkErr();

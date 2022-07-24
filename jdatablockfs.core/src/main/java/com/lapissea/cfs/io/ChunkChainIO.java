@@ -2,6 +2,7 @@ package com.lapissea.cfs.io;
 
 import com.lapissea.cfs.chunk.ChainWalker;
 import com.lapissea.cfs.chunk.Chunk;
+import com.lapissea.cfs.exceptions.MalformedClusterDataException;
 import com.lapissea.cfs.io.content.ContentOutputStream;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
@@ -46,12 +47,12 @@ public final class ChunkChainIO implements RandomIO{
 	}
 	
 	private void checkCursorInChain() throws IOException{
-		if(DEBUG_VALIDATION){
-			head.requireReal();
-			cursor.requireReal();
-		}
+		if(!DEBUG_VALIDATION) return;
+		head.requireReal();
+		cursor.requireReal();
+		
 		if(head==cursor) return;
-		assert head.streamNext().anyMatch(c->c==cursor):cursor+" not in "+head.collectNext();
+		if(head.streamNext().noneMatch(c->c==cursor)) throw new MalformedClusterDataException(cursor+" not in "+head.collectNext());
 	}
 	
 	private long calcCursorEnd(){
@@ -128,9 +129,11 @@ public final class ChunkChainIO implements RandomIO{
 				}
 			}
 		}finally{
-			assert calcCursorOffset()>=0:"cursorOffset "+calcCursorOffset()+" < 0";
-			assert calcCursorOffset()<=cursor.getSize():"cursorOffset "+calcCursorOffset()+" > "+cursor.getSize();
-			checkCursorInChain();
+			if(DEBUG_VALIDATION){
+				if(calcCursorOffset()<0) throw new AssertionError("cursorOffset "+calcCursorOffset()+" < 0");
+				if(calcCursorOffset()>cursor.getSize()) throw new AssertionError("cursorOffset "+calcCursorOffset()+" > "+cursor.getSize());
+				checkCursorInChain();
+			}
 		}
 		
 	}
@@ -585,7 +588,9 @@ public final class ChunkChainIO implements RandomIO{
 	public void setSize(long targetSize) throws IOException{
 		long remaining=targetSize;
 		
-		assert getCapacity()>=targetSize:getCapacity()+">="+targetSize;
+		if(DEBUG_VALIDATION){
+			if(getCapacity()<targetSize) throw new IllegalArgumentException(getCapacity()+">="+targetSize);
+		}
 		
 		Chunk chunk=head;
 		while(true){
@@ -615,7 +620,9 @@ public final class ChunkChainIO implements RandomIO{
 			chunk.modifyAndSave(c->c.setSize(newSiz));
 		}
 		
-		assert targetSize==getSize():targetSize+"!="+getSize();
+		if(DEBUG_VALIDATION){
+			if(targetSize!=getSize()) throw new IllegalStateException(targetSize+"!="+getSize());
+		}
 	}
 	
 	@Override

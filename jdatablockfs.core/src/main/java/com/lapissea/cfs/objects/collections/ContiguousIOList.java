@@ -473,7 +473,7 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 			chRem=chRem.requireNext();
 		}
 		if(chRem.dataStart()+sizeRem!=ptr.getValue()){
-			throw new AssertionError(chRem.dataStart()+sizeRem+" "+ptr.getValue());
+			throw new IllegalStateException(chRem.dataStart()+sizeRem+" "+ptr.getValue());
 		}
 		
 		try{

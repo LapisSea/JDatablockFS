@@ -706,7 +706,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		buckets.set(smallHash, bucket);
 		if(DEBUG_VALIDATION){
 			var read=buckets.get(smallHash);
-			assert read.equals(bucket):"Bucket integrity failed:\n"+bucket+"\n"+read;
+			if(!read.equals(bucket)) throw new IllegalStateException("Bucket integrity failed:\n"+bucket+"\n"+read);
 		}
 	}
 	

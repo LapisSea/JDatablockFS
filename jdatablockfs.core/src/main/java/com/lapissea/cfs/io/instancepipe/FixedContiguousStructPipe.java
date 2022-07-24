@@ -56,7 +56,7 @@ public class FixedContiguousStructPipe<T extends IOInstance<T>> extends StructPi
 		
 		if(DEBUG_VALIDATION){
 			if(!(type instanceof Struct.Unmanaged)){
-				getSizeDescriptor().requireFixed(WordSpace.BYTE);
+				if(!getSizeDescriptor().hasFixed()) throw new RuntimeException();
 			}
 		}
 	}

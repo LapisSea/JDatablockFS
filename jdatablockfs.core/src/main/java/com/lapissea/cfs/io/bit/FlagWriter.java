@@ -6,6 +6,7 @@ import com.lapissea.cfs.objects.NumberSize;
 
 import java.io.IOException;
 
+import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.io.bit.BitUtils.makeMask;
 
 public class FlagWriter implements BitWriter<FlagWriter>{
@@ -55,7 +56,9 @@ public class FlagWriter implements BitWriter<FlagWriter>{
 	
 	@Override
 	public FlagWriter writeBits(long data, int bitCount){
-		assert (data&makeMask(bitCount))==data;
+		if(DEBUG_VALIDATION){
+			if((data&makeMask(bitCount))!=data) throw new IllegalArgumentException();
+		}
 		checkBuffer(bitCount);
 		write(data, bitCount);
 		return this;

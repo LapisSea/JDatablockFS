@@ -221,7 +221,7 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 			int offset=(int)(layout.usedBits()-CHECK_BYTE_OFF*Byte.SIZE);
 			CHECK_BIT_MASK=(byte)(BitUtils.makeMask(layout.safetyBits())<<offset);
 			
-			assert offset+layout.safetyBits()==8;
+			if(offset+layout.safetyBits()!=8) throw new AssertionError("not 1 byte");
 		}else{
 			throw new ShouldNeverHappenError("Update the early check logic!");
 		}
@@ -312,7 +312,10 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 			throw new RuntimeException(e);
 		}
 		
-		assert capacity>=size;
+		if(size>capacity){
+			throw new IllegalArgumentException(size+" > "+capacity);
+		}
+		
 		try{
 			bodyNumSize.ensureCanFit(capacity);
 		}catch(BitDepthOutOfSpaceException e){

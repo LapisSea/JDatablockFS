@@ -192,7 +192,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 						
 						if(DEBUG_VALIDATION){
 							var ref=getRef(instance);
-							assert ref==null||ref.isNull();
+							if(ref!=null&&!ref.isNull()) throw new IllegalStateException();
 						}
 						if(!allowExternalMod) throw new RuntimeException("data modification should not be done here");
 						return allocNew(provider, val);
@@ -477,14 +477,14 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	
 	public abstract void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException;
 	public final void readReported(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		String extra="";
+		String extra=null;
 		if(DEBUG_VALIDATION){
 			extra=" started on: "+src;
 		}
 		try{
 			read(ioPool, provider, src, instance, genericContext);
 		}catch(Exception e){
-			throw new IOException("Failed to read "+this+extra, e);
+			throw new IOException("Failed to read "+this+(DEBUG_VALIDATION?extra:""), e);
 		}
 	}
 	

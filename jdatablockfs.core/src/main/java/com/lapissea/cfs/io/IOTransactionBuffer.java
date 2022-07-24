@@ -258,7 +258,7 @@ public final class IOTransactionBuffer{
 				return len-rem;
 			}
 		}
-		assert rem==0;
+		if(rem!=0) throw new AssertionError();
 		return len;
 	}
 	
@@ -483,7 +483,7 @@ public final class IOTransactionBuffer{
 			if(DEBUG_VALIDATION){
 				var copy=new ArrayList<>(writeEvents);
 				copy.sort(WriteEvent::compareTo);
-				assert copy.equals(writeEvents):"\n"+copy+"\n"+writeEvents;
+				if(!copy.equals(writeEvents)) throw new AssertionError("\n"+copy+"\n"+writeEvents);
 				
 				for(var event1 : writeEvents){
 					for(var event2 : writeEvents){

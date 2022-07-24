@@ -86,17 +86,19 @@ public interface DataProvider{
 	}
 	default Chunk getChunk(ChunkPointer ptr) throws IOException{
 		Objects.requireNonNull(ptr);
-		
 		if(DEBUG_VALIDATION){
-			getChunkCache().ifCached(ptr, cached->{
-				var read=readChunk(ptr);
-				if(!read.equals(cached)){
-					throw new DesyncedCacheException(read, cached);
-				}
-			});
+			ensureChunkValid(ptr);
 		}
-		
 		return getChunkCache().getOr(ptr, this::readChunk);
+	}
+	
+	private void ensureChunkValid(ChunkPointer ptr) throws IOException{
+		var cached=getChunkCache().get(ptr);
+		if(cached==null) return;
+		var read=readChunk(ptr);
+		if(!read.equals(cached)){
+			throw new DesyncedCacheException(read, cached);
+		}
 	}
 	
 	private Chunk readChunk(ChunkPointer ptr) throws IOException{
@@ -113,9 +115,10 @@ public interface DataProvider{
 	default void validate(){}
 	
 	default void checkCached(Chunk chunk){
-		if(DEBUG_VALIDATION) return;
 		Chunk cached=getChunkCached(chunk.getPtr());
-		assert cached==chunk:"Fake "+chunk;
+		if(cached!=chunk){
+			throw new IllegalStateException("Fake "+chunk);
+		}
 	}
 	
 	default DataProvider withRouter(Function<AllocateTicket, AllocateTicket> router){
@@ -124,15 +127,23 @@ public interface DataProvider{
 				return DataProvider.this.getMemoryManager();
 			}
 			
-			@Override public IOTypeDB getTypeDb()                    {return DataProvider.this.getTypeDb();}
-			@Override public IOInterface getSource()                 {return DataProvider.this.getSource();}
-			@Override public MemoryManager getMemoryManager()        {return this;}
-			@Override public ChunkCache getChunkCache()              {return DataProvider.this.getChunkCache();}
-			@Override public Chunk getFirstChunk() throws IOException{return DataProvider.this.getFirstChunk();}
+			@Override
+			public IOTypeDB getTypeDb(){return DataProvider.this.getTypeDb();}
+			@Override
+			public IOInterface getSource(){return DataProvider.this.getSource();}
+			@Override
+			public MemoryManager getMemoryManager(){return this;}
+			@Override
+			public ChunkCache getChunkCache(){return DataProvider.this.getChunkCache();}
+			@Override
+			public Chunk getFirstChunk() throws IOException{return DataProvider.this.getFirstChunk();}
 			
-			@Override public DefragSes openDefragmentMode()          {return src().openDefragmentMode();}
-			@Override public IOList<ChunkPointer> getFreeChunks()    {return src().getFreeChunks();}
-			@Override public DataProvider getDataProvider()          {return this;}
+			@Override
+			public DefragSes openDefragmentMode(){return src().openDefragmentMode();}
+			@Override
+			public IOList<ChunkPointer> getFreeChunks(){return src().getFreeChunks();}
+			@Override
+			public DataProvider getDataProvider(){return this;}
 			@Override
 			public void free(Collection<Chunk> toFree) throws IOException{
 				src().free(toFree);

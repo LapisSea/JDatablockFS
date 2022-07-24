@@ -140,7 +140,7 @@ public class MemoryOperations{
 	
 	public static void mergeFreeChunksSorted(DataProvider provider, IOList<ChunkPointer> data, List<Chunk> newData) throws IOException{
 		for(Chunk newCh : newData){
-			checkOptimal(provider, data);
+			if(DEBUG_VALIDATION) checkOptimal(provider, data);
 			
 			var newPtr=newCh.getPtr();
 			if(data.isEmpty()){
@@ -199,7 +199,7 @@ public class MemoryOperations{
 				freeListAdd(data, insertIndex, newCh);
 			}
 		}
-		checkOptimal(provider, data);
+		if(DEBUG_VALIDATION) checkOptimal(provider, data);
 	}
 	
 	private static void freeListReplace(IOList<ChunkPointer> data, long replaceIndex, Chunk newCh) throws IOException{
@@ -212,15 +212,13 @@ public class MemoryOperations{
 	}
 	
 	private static void checkOptimal(DataProvider provider, IOList<ChunkPointer> data) throws IOException{
-		if(!DEBUG_VALIDATION) return;
-		
 		ChunkPointer last=null;
 		for(ChunkPointer val : data){
 			if(last!=null){
-				assert last.compareTo(val)<0:last+" "+val+" "+data;
+				if(last.compareTo(val)>=0) throw new IllegalStateException(last+" >= "+val+" in "+data);
 				var prev=last.dereference(provider);
 				var c   =val.dereference(provider);
-				assert !prev.isNextPhysical(c):prev+" "+c+" "+data;
+				if(prev.isNextPhysical(c)) throw new IllegalStateException(prev+" connected to "+c+" in "+data);
 			}
 			last=val;
 		}
@@ -240,7 +238,7 @@ public class MemoryOperations{
 	private static void prepareFreeChunkMerge(Chunk prev, Chunk next){
 		var wholeSize=next.getHeaderSize()+next.getCapacity();
 		prev.setCapacityAndModifyNumSize(prev.getCapacity()+wholeSize);
-		assert prev.dataEnd()==next.dataEnd();
+		if(prev.dataEnd()!=next.dataEnd()) throw new IllegalStateException(prev+" and "+next+" are not connected");
 	}
 	
 	
@@ -529,7 +527,7 @@ public class MemoryOperations{
 		builder.withPtr(ChunkPointer.of(end-siz));
 		reallocate=builder.create();
 		
-		assert reallocate.dataEnd()==ch.dataEnd();
+		if(reallocate.dataEnd()!=ch.dataEnd()) throw new IllegalStateException();
 		
 		if(!ticket.approve(reallocate)){
 			return null;
@@ -568,8 +566,6 @@ public class MemoryOperations{
 	}
 	
 	public static void checkValidityOfChainAlloc(DataProvider context, Chunk firstChunk, Chunk target) throws IOException{
-		if(!DEBUG_VALIDATION) return;
-		
 		//TODO: re-enable this once DataProvider.withRouter is replaced with proper router
 //		assert firstChunk.getDataProvider()==context;
 //		assert target.getDataProvider()==context;

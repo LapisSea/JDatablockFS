@@ -36,6 +36,7 @@ import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
+import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.type.StagedInit.STATE_DONE;
 
 public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType> extends IOField.NullFlagCompany<CTyp, ValueType>{
@@ -284,14 +285,16 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 	}
 	
 	private static long numToLong(Number integer){
-		ensureInt(integer.getClass());
+		if(DEBUG_VALIDATION){
+			ensureInt(integer.getClass());
+		}
 		return switch(integer){
 			case Byte b -> b&0xFF;
 			default -> integer.longValue();
 		};
 	}
 	private static void ensureInt(Class<?> tyo){
-		assert List.<Class<? extends Number>>of(Byte.class, Short.class, Integer.class, Long.class).contains(tyo);
+		if(!List.<Class<? extends Number>>of(Byte.class, Short.class, Integer.class, Long.class).contains(tyo)) throw new AssertionError(tyo+" is not an integer");
 	}
 	
 	private Object readTyp(TypeLink typDef, DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{

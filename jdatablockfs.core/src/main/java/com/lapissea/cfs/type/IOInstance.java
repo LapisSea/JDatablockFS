@@ -82,22 +82,28 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>> implements Clone
 		public void notifyReferenceMovement(Reference newRef){
 			newRef.requireNonNull();
 			
-			if(DEBUG_VALIDATION){
-				byte[] oldData, newData;
-				try(var oldIo=reference.io(this);
-				    var newIo=newRef.io(this)
-				){
-					oldData=oldIo.readRemaining();
-					newData=newIo.readRemaining();
-				}catch(IOException e){
-					throw new RuntimeException(e);
-				}
-				assert Arrays.equals(oldData, newData):"Data changed when moving reference! This is invalid behaviour\n"+
-				                                       Arrays.toString(oldData)+"\n"+
-				                                       Arrays.toString(newData);
-			}
+			if(DEBUG_VALIDATION) ensureDataIntegrity(newRef);
 			
 			reference=newRef;
+		}
+		
+		private void ensureDataIntegrity(Reference newRef){
+			byte[] oldData, newData;
+			try(var oldIo=reference.io(this);
+			    var newIo=newRef.io(this)
+			){
+				oldData=oldIo.readRemaining();
+				newData=newIo.readRemaining();
+			}catch(IOException e){
+				throw new RuntimeException(e);
+			}
+			if(!Arrays.equals(oldData, newData)){
+				throw new IllegalStateException(
+					"Data changed when moving reference! This is invalid behaviour\n"+
+					Arrays.toString(oldData)+"\n"+
+					Arrays.toString(newData)
+				);
+			}
 		}
 		
 		@Override

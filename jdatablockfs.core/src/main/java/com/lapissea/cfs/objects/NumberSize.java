@@ -142,16 +142,7 @@ public enum NumberSize{
 	}
 	
 	public void write(ContentWriter out, long value) throws IOException{
-		if(DEBUG_VALIDATION){
-			try{
-				ensureCanFit(value);
-			}catch(BitDepthOutOfSpaceException e){
-				throw new RuntimeException(e);
-			}
-			if(value<0&&this!=LONG&&this!=VOID){
-				throw new IllegalStateException(value+" is signed! "+this);
-			}
-		}
+		if(DEBUG_VALIDATION) validateUnsigned(value);
 		
 		switch(this){
 			case VOID -> {}
@@ -165,14 +156,27 @@ public enum NumberSize{
 			case null -> throw new ShouldNeverHappenError();
 		}
 	}
-	public void writeSigned(ContentWriter out, long value) throws IOException{
-		if(DEBUG_VALIDATION){
-			try{
-				ensureCanFitSigned(value);
-			}catch(BitDepthOutOfSpaceException e){
-				throw new RuntimeException(e);
-			}
+	
+	private void validateUnsigned(long value){
+		try{
+			ensureCanFit(value);
+		}catch(BitDepthOutOfSpaceException e){
+			throw new RuntimeException(e);
 		}
+		if(value<0&&this!=LONG&&this!=VOID){
+			throw new IllegalStateException(value+" is signed! "+this);
+		}
+	}
+	private void validateSigned(long value){
+		try{
+			ensureCanFitSigned(value);
+		}catch(BitDepthOutOfSpaceException e){
+			throw new RuntimeException(e);
+		}
+	}
+	
+	public void writeSigned(ContentWriter out, long value) throws IOException{
+		if(DEBUG_VALIDATION) validateSigned(value);
 		write(out, toUnsigned(value));
 	}
 	

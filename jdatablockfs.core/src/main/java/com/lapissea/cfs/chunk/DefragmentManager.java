@@ -318,7 +318,7 @@ public class DefragmentManager{
 			try(var ignored=cluster.getSource().openIOTransaction()){
 				
 				remainingData.setCapacityAndModifyNumSize(remainingSpace-remainingData.getHeaderSize());
-				assert remainingData.getCapacity()>0:remainingData;
+				if(remainingData.getCapacity()<=0) throw new AssertionError(remainingData);
 				
 				remainingData.writeHeader();
 				remainingData=cluster.getChunk(remainingData.getPtr());

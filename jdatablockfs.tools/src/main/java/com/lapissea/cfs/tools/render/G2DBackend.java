@@ -395,8 +395,8 @@ public class G2DBackend extends RenderBackend{
 	}
 	@Override
 	public void preRender(){
-		assert Thread.currentThread()==renderThread;
-		assert currentGraphics==null;
+		if(Thread.currentThread()!=renderThread) throw new IllegalStateException();
+		if(currentGraphics!=null) throw new IllegalStateException();
 		
 		flushTasks();
 		

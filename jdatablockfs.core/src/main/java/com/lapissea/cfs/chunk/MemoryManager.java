@@ -80,7 +80,7 @@ public interface MemoryManager extends DataProvider.Holder{
 				throw new IllegalArgumentException();
 			}
 			
-			MemoryOperations.checkValidityOfChainAlloc(context, firstChunk, target);
+			if(DEBUG_VALIDATION) MemoryOperations.checkValidityOfChainAlloc(context, firstChunk, target);
 			
 			var last=target;
 			
@@ -95,7 +95,7 @@ public interface MemoryManager extends DataProvider.Holder{
 					if(DEBUG_VALIDATION){
 						checkChainData(firstChunk);
 						
-						assert !last.dirty();
+						if(last.dirty()) throw new RuntimeException(last+" is dirty");
 						if(allocated<0){
 							throw new IllegalStateException();
 						}
@@ -133,7 +133,6 @@ public interface MemoryManager extends DataProvider.Holder{
 				ticket=ticket.withBytes(minSize);
 			}
 			
-			
 			Chunk chunk;
 			
 			tryStrategies:
@@ -141,17 +140,7 @@ public interface MemoryManager extends DataProvider.Holder{
 				for(var alloc : allocs){
 					chunk=alloc.alloc(context, ticket);
 					if(chunk!=null){
-						if(DEBUG_VALIDATION){
-							chunk.requireReal();
-							var nsizO=ticket.explicitNextSize();
-							if(nsizO.isPresent()){
-								var nsiz =nsizO.get();
-								var chSiz=chunk.getNextSize();
-								if(nsiz.greaterThan(chSiz)){
-									throw new IllegalStateException("Allocation did not respect explicit next size since "+nsiz+" > "+chSiz);
-								}
-							}
-						}
+						if(DEBUG_VALIDATION) postAllocValidate(ticket, chunk);
 						break tryStrategies;
 					}
 				}
@@ -165,6 +154,18 @@ public interface MemoryManager extends DataProvider.Holder{
 			}
 			
 			return chunk;
+		}
+		
+		private static void postAllocValidate(AllocateTicket ticket, Chunk chunk) throws IOException{
+			chunk.requireReal();
+			var nsizO=ticket.explicitNextSize();
+			if(nsizO.isPresent()){
+				var nsiz =nsizO.get();
+				var chSiz=chunk.getNextSize();
+				if(nsiz.greaterThan(chSiz)){
+					throw new IllegalStateException("Allocation did not respect explicit next size since "+nsiz+" > "+chSiz);
+				}
+			}
 		}
 	}
 	
