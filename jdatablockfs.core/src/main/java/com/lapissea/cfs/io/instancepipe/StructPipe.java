@@ -19,7 +19,6 @@ import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
-import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.util.TextUtil;
 
@@ -176,26 +175,18 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	}
 	
 	@Override
-	protected String stateToStr(int state){
-		return switch(state){
-			case STATE_IO_FIELD -> "IO_FIELD";
-			default -> super.stateToStr(state);
-		};
+	protected Stream<StateInfo> listStates(){
+		return Stream.concat(
+			super.listStates(),
+			Stream.of(new StateInfo(STATE_IO_FIELD, "IO_FIELD"))
+		);
 	}
+	
 	private List<IOField<T, ?>> getNonNulls(){
 		return ioFields.unpackedStream().filter(f->f.getNullability()==IONullability.Mode.NOT_NULL&&f.getAccessor().canBeNull()).toList();
 	}
 	
 	protected abstract List<IOField<T, ?>> initFields();
-	
-	private List<VirtualAccessor<T>> calcIOPoolAccessors(){
-		return type.getFields().unpackedStream()
-		           .map(IOField::getAccessor)
-		           .filter(a->a instanceof VirtualAccessor)
-		           .map(a->(VirtualAccessor<T>)a)
-		           .filter(a->a.getStoragePool()==VirtualFieldDefinition.StoragePool.IO)
-		           .toList();
-	}
 	
 	protected SizeDescriptor<T> createSizeDescriptor(){
 		FieldSet<T> fields=getSpecificFields();

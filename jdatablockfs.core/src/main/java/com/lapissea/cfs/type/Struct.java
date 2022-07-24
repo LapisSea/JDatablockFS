@@ -499,12 +499,14 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	@Override
-	protected String stateToStr(int state){
-		return switch(state){
-			case STATE_FIELD_MAKE -> "FIELD_MAKE";
-			case STATE_INIT_FIELDS -> "INIT_FIELDS";
-			default -> super.stateToStr(state);
-		};
+	protected Stream<StateInfo> listStates(){
+		return Stream.concat(
+			super.listStates(),
+			Stream.of(
+				new StateInfo(STATE_FIELD_MAKE, "FIELD_MAKE"),
+				new StateInfo(STATE_INIT_FIELDS, "INIT_FIELDS")
+			)
+		);
 	}
 	
 	private Stream<VirtualAccessor<T>> virtualAccessorStream(){
@@ -587,7 +589,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		}
 		var state=getEstimatedState();
 		if(state!=STATE_DONE){
-			if(e==null) sj.add("init-state: "+stateToStr(state));
+			if(e==null) sj.add("init-state: "+stateToString(state));
 		}
 		if(state>=STATE_FIELD_MAKE){
 			var fields=getFields();
