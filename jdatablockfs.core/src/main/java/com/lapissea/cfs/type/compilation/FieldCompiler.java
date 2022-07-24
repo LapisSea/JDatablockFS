@@ -30,7 +30,6 @@ import java.util.stream.Stream;
 
 import static java.util.function.Function.identity;
 
-@SuppressWarnings("rawtypes")
 public class FieldCompiler{
 	
 	private enum FieldAccess{

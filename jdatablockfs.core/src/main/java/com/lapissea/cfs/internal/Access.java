@@ -1,7 +1,6 @@
 package com.lapissea.cfs.internal;
 
 import com.lapissea.cfs.GlobalConfig;
-import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
@@ -20,7 +19,6 @@ import java.security.ProtectionDomain;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
-import java.util.function.Supplier;
 
 import static com.lapissea.cfs.internal.MyUnsafe.UNSAFE;
 import static java.lang.invoke.MethodHandles.Lookup.*;
@@ -30,7 +28,7 @@ public class Access{
 	
 	public static final boolean DEV_CACHE=GlobalConfig.configFlag("abBenchmark.devCache", false);
 	
-	private static final boolean USE_UNSAFE_LOOKUP=true;
+	private static final boolean USE_UNSAFE_LOOKUP=GlobalConfig.configFlag("corruptAccess", true);
 	
 	private static long calcModesOffset(){
 		@SuppressWarnings("all")
@@ -57,29 +55,50 @@ public class Access{
 		return offset;
 	}
 	
+	public static <FInter, T extends FInter> T makeLambda(Class<?> type, String name, Class<FInter> functionalInterface){
+		var match=Arrays.stream(type.getMethods()).filter(m->m.getName().equals(name)).limit(2).toList();
+		if(match.isEmpty()){
+			match=Arrays.stream(type.getDeclaredMethods()).filter(m->m.getName().equals(name)).limit(2).toList();
+		}
+		if(match.size()>1) throw new IllegalArgumentException("Ambitious method name");
+		return makeLambda(match.get(0), functionalInterface);
+	}
+	
 	public static <FInter, T extends FInter> T makeLambda(Method method, Class<FInter> functionalInterface){
-		Method functionalInterfaceFunction=null;
 		try{
-			var lookup=getLookup(method.getDeclaringClass(), method.getModifiers());
 			method.setAccessible(true);
-			var handle=lookup.unreflect(method);
-			
-			functionalInterfaceFunction=getFunctionalMethod(functionalInterface);
-			
-			MethodType signature=MethodType.methodType(functionalInterfaceFunction.getReturnType(), functionalInterfaceFunction.getParameterTypes());
-			
-			CallSite site=LambdaMetafactory.metafactory(lookup,
-			                                            functionalInterfaceFunction.getName(),
-			                                            MethodType.methodType(functionalInterface),
-			                                            signature,
-			                                            handle,
-			                                            handle.type());
-			
-			return (T)site.getTarget().invoke();
+			var lookup=getLookup(method.getDeclaringClass());
+			return createFromCallSite(functionalInterface, lookup, lookup.unreflect(method));
 		}catch(Throwable e){
-			throw new RuntimeException("failed to create lambda\n"+method+"\n"+functionalInterface+(functionalInterfaceFunction!=null?" ("+functionalInterfaceFunction.getName()+")":""), e);
+			throw new RuntimeException("failed to create lambda for "+method+" with "+functionalInterface, e);
 		}
 	}
+	public static synchronized <FInter, T extends FInter> T makeLambda(Constructor<?> constructor, Class<FInter> functionalInterface){
+		try{
+			constructor.setAccessible(true);
+			var lookup=getLookup(constructor.getDeclaringClass());
+			return createFromCallSite(functionalInterface, lookup, lookup.unreflectConstructor(constructor));
+		}catch(Throwable e){
+			throw new RuntimeException("failed to create lambda for "+constructor+" with "+functionalInterface, e);
+		}
+	}
+	
+	private static <FInter, T extends FInter> T createFromCallSite(Class<FInter> functionalInterface, MethodHandles.Lookup lookup, MethodHandle handle) throws Throwable{
+		var site=createCallSite(functionalInterface, lookup, handle);
+		return Objects.requireNonNull((T)site.getTarget().invoke());
+	}
+	
+	private static <FInter> CallSite createCallSite(Class<FInter> functionalInterface, MethodHandles.Lookup lookup, MethodHandle handle) throws LambdaConversionException{
+		Method     functionalInterfaceFunction=getFunctionalMethod(functionalInterface);
+		MethodType signature                  =MethodType.methodType(functionalInterfaceFunction.getReturnType(), functionalInterfaceFunction.getParameterTypes());
+		
+		var funName   =functionalInterfaceFunction.getName();
+		var funType   =MethodType.methodType(functionalInterface);
+		var handleType=handle.type();
+		
+		return LambdaMetafactory.metafactory(lookup, funName, funType, signature, handle, handleType);
+	}
+	
 	
 	public static <FInter> Method getFunctionalMethod(Class<FInter> functionalInterface){
 		var methods=Arrays.stream(functionalInterface.getMethods()).filter(m->!Modifier.isStatic(m.getModifiers())&&Modifier.isAbstract(m.getModifiers())).toList();
@@ -89,61 +108,33 @@ public class Access{
 		return methods.get(0);
 	}
 	
-	public static <FInter, T extends FInter> T makeLambda(Constructor<?> constructor, Class<FInter> functionalInterface){
+	public static MethodHandles.Lookup privateLookupIn(Class<?> clazz) throws IllegalAccessException{
 		try{
-			var lookup=getLookup(constructor.getDeclaringClass(), constructor.getModifiers());
-			constructor.setAccessible(true);
-			var handle=lookup.unreflectConstructor(constructor);
-			
-			Method functionalInterfaceFunction=getFunctionalMethod(functionalInterface);
-			
-			MethodType signature=MethodType.methodType(functionalInterfaceFunction.getReturnType(), functionalInterfaceFunction.getParameterTypes());
-			
-			CallSite site;
-			try{
-				site=LambdaMetafactory.metafactory(lookup,
-				                                   functionalInterfaceFunction.getName(),
-				                                   MethodType.methodType(functionalInterface),
-				                                   signature,
-				                                   handle,
-				                                   handle.type());
-			}catch(LambdaConversionException e){
-				if(USE_UNSAFE_LOOKUP) throw new ShouldNeverHappenError("Unsafe lookup should solve this", e);
-				
-				T val=tryRecoverWithOld(constructor, functionalInterface);
-				if(val!=null) return val;
-				throw new NotImplementedException("java modules cause this not to be supported", e);
+			return MethodHandles.privateLookupIn(clazz, MethodHandles.lookup());
+		}catch(IllegalAccessException e){
+			var tc        =IUtils.getCallee(0);
+			var thisModule=tc.getModule().getName();
+			if(!e.getMessage().contains(thisModule+" does not read ")){
+				throw e;
 			}
-			
-			return Objects.requireNonNull((T)site.getTarget().invoke());
-		}catch(Throwable e){
-			throw new RuntimeException("failed to create lambda\n"+constructor+"\n"+functionalInterface, e);
+			allowModule(clazz);
+			return MethodHandles.privateLookupIn(clazz, MethodHandles.lookup());
 		}
 	}
 	
-	private static <FInter, T extends FInter> T tryRecoverWithOld(Constructor<?> constructor, Class<FInter> functionalInterface){
-		if(functionalInterface==Supplier.class){
-			return (T)(Supplier<Object>)()->{
-				try{
-					return constructor.newInstance();
-				}catch(ReflectiveOperationException ex){
-					throw new RuntimeException(ex);
-				}
-			};
+	private static MethodHandles.Lookup getLookup(Class<?> clazz) throws IllegalAccessException{
+		var lookup=privateLookupIn(clazz);
+		if(lookup.hasFullPrivilegeAccess()){
+			return lookup;
 		}
-		return null;
-	}
-	
-	private static MethodHandles.Lookup getLookup(Class<?> clazz, int modifiers) throws IllegalAccessException{
-		allowModule(clazz);
+		
 		var local=MethodHandles.lookup();
 		if(USE_UNSAFE_LOOKUP){
 			local=MethodHandles.privateLookupIn(clazz, local);
 			corruptPermissions(local);
 			return local;
 		}else{
-			if(Modifier.isPublic(clazz.getModifiers())&&Modifier.isPublic(modifiers)) return local;
-			return MethodHandles.privateLookupIn(clazz, local);
+			throw new NotImplementedException("Ask for consent not implemented");
 		}
 	}
 	
@@ -182,16 +173,17 @@ public class Access{
 	
 	private static void allowModule(Class<?> clazz){
 		var classModule=clazz.getModule();
-		var thisModule =Utils.class.getModule();
+		var tc         =IUtils.getCallee(0);
+		var thisModule =tc.getModule();
 		if(!thisModule.canRead(classModule)){
 			thisModule.addReads(classModule);
-			thisModule.addOpens(Utils.class.getPackageName(), classModule);
+			thisModule.addOpens(tc.getPackageName(), classModule);
 		}
 	}
 	
 	public static VarHandle makeVarHandle(Field field){
 		try{
-			var lookup=getLookup(field.getDeclaringClass(), field.getModifiers());
+			var lookup=getLookup(field.getDeclaringClass());
 			field.setAccessible(true);
 			return lookup.unreflectVarHandle(field);
 		}catch(Throwable e){
@@ -201,7 +193,7 @@ public class Access{
 	
 	public static MethodHandle makeMethodHandle(@NotNull Method method){
 		try{
-			var lookup=getLookup(method.getDeclaringClass(), method.getModifiers());
+			var lookup=getLookup(method.getDeclaringClass());
 			method.setAccessible(true);
 			return lookup.unreflect(method);
 		}catch(Throwable e){

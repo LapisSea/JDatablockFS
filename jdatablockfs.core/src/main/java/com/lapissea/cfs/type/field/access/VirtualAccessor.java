@@ -17,16 +17,7 @@ import java.util.stream.Collectors;
 
 public final class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends AbstractPrimitiveAccessor<CTyp>{
 	
-	private static final Function<IOInstance<?>, Struct.Pool<?>> GETTER;
-	
-	static{
-		try{
-			var fun=IOInstance.class.getDeclaredMethod("getVirtualPool");
-			GETTER=Access.makeLambda(fun, Function.class);
-		}catch(ReflectiveOperationException e){
-			throw new RuntimeException(e);
-		}
-	}
+	private static final Function<IOInstance<?>, Struct.Pool<?>> GETTER=Access.makeLambda(IOInstance.class, "getVirtualPool", Function.class);
 	
 	@SuppressWarnings("unchecked")
 	private static <T extends IOInstance<T>> Struct.Pool<T> getVirtualPool(T instance){

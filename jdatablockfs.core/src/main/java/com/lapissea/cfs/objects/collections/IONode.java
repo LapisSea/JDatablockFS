@@ -206,9 +206,9 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		else nextBytes=calcOptimalNextSize(provider).bytes;
 		
 		var bytes=1+nextBytes+switch(sizeDescriptor){
-			case SizeDescriptor.Fixed<?> f -> f.get(WordSpace.BYTE);
-			case SizeDescriptor.Unknown f -> f.calcUnknown(((IOInstance<?>)value).getThisStruct().allocVirtualVarPool(IO), provider, value, WordSpace.BYTE);
-			case BasicSizeDescriptor<T, ?> b -> b.calcUnknown(null, provider, value, WordSpace.BYTE);
+			case SizeDescriptor.Fixed<?> fixed -> fixed.get(WordSpace.BYTE);
+			case SizeDescriptor.Unknown unknown -> unknown.calcUnknown(((IOInstance<?>)value).getThisStruct().allocVirtualVarPool(IO), provider, value, WordSpace.BYTE);
+			case BasicSizeDescriptor<T, ?> basic -> basic.calcUnknown(null, provider, value, WordSpace.BYTE);
 		};
 		
 		try(var ignored=provider.getSource().openIOTransaction()){
