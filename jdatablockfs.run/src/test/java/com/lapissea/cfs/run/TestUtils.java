@@ -16,16 +16,14 @@ import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.function.UnsafeConsumer;
-import org.junit.jupiter.api.TestInfo;
 
 import java.io.IOException;
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 
 import static com.lapissea.cfs.logging.Log.trace;
 import static com.lapissea.cfs.logging.Log.warn;
 import static com.lapissea.cfs.type.StagedInit.STATE_DONE;
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.testng.Assert.assertEquals;
 
 public class TestUtils{
 	
@@ -80,12 +78,7 @@ public class TestUtils{
 	}
 	
 	private static String getSessionName(TestInfo info){
-		var    mn         =info.getTestMethod().map(Method::getName).orElse(null);
-		String sessionName=info.getDisplayName();
-		if(mn!=null&&!sessionName.contains(mn)){
-			return mn+": "+sessionName;
-		}
-		return sessionName;
+		return info.getName();
 	}
 	
 	static <T extends IOInstance.Unmanaged<T>> void complexObjectIntegrityTest(
@@ -120,7 +113,7 @@ public class TestUtils{
 				throw new RuntimeException("Failed to read object with data", e);
 			}
 			
-			assertEquals(obj, read);
+			assertEquals(read, obj);
 		};
 		
 		if(useCluster){

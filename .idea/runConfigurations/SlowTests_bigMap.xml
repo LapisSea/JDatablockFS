@@ -1,17 +1,20 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="All tests" type="TestNG">
+  <configuration default="false" name="SlowTests.bigMap" type="TestNG" nameIsGenerated="true">
     <module name="jdatablockfs.run" />
     <shortenClasspath name="NONE" />
     <option name="SUITE_NAME" value="" />
-    <option name="PACKAGE_NAME" value="com.lapissea.cfs" />
-    <option name="MAIN_CLASS_NAME" value="" />
-    <option name="METHOD_NAME" value="" />
+    <option name="PACKAGE_NAME" value="com.lapissea.cfs.run" />
+    <option name="MAIN_CLASS_NAME" value="com.lapissea.cfs.run.SlowTests" />
+    <option name="METHOD_NAME" value="bigMap" />
     <option name="GROUP_NAME" value="" />
-    <option name="TEST_OBJECT" value="PACKAGE" />
-    <option name="VM_PARAMETERS" value="-ea -DdeleteOk=true -Ddfs.test.standardInit=true -Ddfs.printCompilation=false -Ddfs.log.level=TRACE" />
+    <option name="TEST_OBJECT" value="METHOD" />
+    <option name="VM_PARAMETERS" value="-ea -DcheckpointStep=513 -Dchmode=DEFAULT" />
     <option name="PARAMETERS" value="" />
     <option name="WORKING_DIRECTORY" value="$ProjectFileDir$/run/test" />
     <option name="OUTPUT_DIRECTORY" value="" />
+    <option name="TEST_SEARCH_SCOPE">
+      <value defaultName="moduleWithDependencies" />
+    </option>
     <option name="PROPERTIES_FILE" value="" />
     <properties />
     <listeners />

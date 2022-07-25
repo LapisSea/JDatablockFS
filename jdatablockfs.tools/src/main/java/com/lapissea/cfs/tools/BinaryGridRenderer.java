@@ -655,11 +655,8 @@ public class BinaryGridRenderer implements DataRenderer{
 			buff.clear();
 			
 			var rCtx=new RenderContext(RenderBackend.DRAW_DEBUG?direct:buff, bytes, getPixelsPerByte(), zoom, dis, new ArrayList<>());
-			try{
-				findHoverChunk(rCtx, parsed, DataProvider.newVerySimpleProvider(MemoryData.builder().withRaw(bytes).asReadOnly().build()));
-			}catch(IOException e1){
-				handleError(e1, parsed);
-			}
+			
+			findHoverChunk(rCtx, parsed, DataProvider.newVerySimpleProvider(MemoryData.builder().withRaw(bytes).asReadOnly().build()));
 			
 			drawStatic(frame, rCtx, parsed);
 			
@@ -678,11 +675,7 @@ public class BinaryGridRenderer implements DataRenderer{
 		
 		buff.draw();
 		
-		try{
-			findHoverChunk(ctx, parsed, DataProvider.newVerySimpleProvider(MemoryData.builder().withRaw(bytes).asReadOnly().build()));
-		}catch(IOException e1){
-			handleError(e1, parsed);
-		}
+		findHoverChunk(ctx, parsed, DataProvider.newVerySimpleProvider(MemoryData.builder().withRaw(bytes).asReadOnly().build()));
 		
 		if(!ctx.renderer.getDisplay().isMouseKeyDown(RenderBackend.DisplayInterface.MouseKey.LEFT)){
 			drawMouse(ctx, cFrame);

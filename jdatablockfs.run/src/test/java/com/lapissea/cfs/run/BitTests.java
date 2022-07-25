@@ -7,12 +7,13 @@ import com.lapissea.cfs.io.bit.FlagWriter;
 import com.lapissea.cfs.io.content.ContentInputStream;
 import com.lapissea.cfs.io.content.ContentOutputStream;
 import com.lapissea.cfs.objects.NumberSize;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Random;
+
+import static org.testng.Assert.assertEquals;
 
 public class BitTests{
 	
@@ -42,7 +43,7 @@ public class BitTests{
 				throw new RuntimeException("failed iter "+i, e);
 			}
 			
-			Assertions.assertArrayEquals(bs, rbs, ""+i);
+			assertEquals(rbs, bs, ""+i);
 		}
 	}
 	
@@ -67,7 +68,7 @@ public class BitTests{
 					in.readBits(rbs);
 				}
 				
-				Assertions.assertArrayEquals(bs, rbs, siz+" "+i);
+				assertEquals(rbs, bs, siz+" "+i);
 			}
 		}
 	}

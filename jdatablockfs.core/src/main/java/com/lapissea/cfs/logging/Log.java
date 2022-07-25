@@ -2,6 +2,7 @@ package com.lapissea.cfs.logging;
 
 import com.lapissea.cfs.ConsoleColors;
 import com.lapissea.cfs.GlobalConfig;
+import com.lapissea.cfs.Utils;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
 
@@ -9,7 +10,7 @@ import java.util.Objects;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-import static com.lapissea.cfs.internal.IUtils.getFrame;
+import static com.lapissea.cfs.Utils.getFrame;
 
 public class Log{
 	
@@ -125,7 +126,7 @@ public class Log{
 	public static void traceCall(String message, Object... args)          {if(LOG_LEVEL>=TRACE) traceCall0(resolveArgs(message, args), getFrame(1));}
 	private static void traceCall0(CharSequence message, StackWalker.StackFrame frame){
 		var sb=new StringBuilder();
-		frameToStr(sb, frame);
+		Utils.frameToStr(sb, frame);
 		if(!message.isEmpty()) sb.append(" ->\t").append(message);
 		trace(sb.toString());
 	}
@@ -187,14 +188,14 @@ public class Log{
 	public static void nonFatal0(Throwable error, CharSequence message){
 		var sb=new StringBuilder();
 		
-		frameToStr(sb, getFrame(1));
+		Utils.frameToStr(sb, getFrame(1));
 		if(message!=null) sb.append('\n').append("\nMessage: ").append(message);
 		
 		Throwable e=error;
 		while(e!=null){
 			
 			sb.append('\n');
-			classToStr(sb, e.getClass());
+			Utils.classToStr(sb, e.getClass());
 			var msg=e.getLocalizedMessage();
 			if(msg!=null) sb.append(": ").append(msg);
 			
@@ -204,27 +205,4 @@ public class Log{
 		warn(sb.toString());
 	}
 	
-	private static void frameToStr(StringBuilder sb, StackWalker.StackFrame f){
-		classToStr(sb, f.getDeclaringClass());
-		sb.append('.').append(f.getMethodName()).append('(').append(f.getLineNumber()).append(')');
-	}
-	
-	private static void classToStr(StringBuilder sb, Class<?> clazz){
-		var enclosing=clazz.getEnclosingClass();
-		if(enclosing!=null){
-			classToStr(sb, enclosing);
-			sb.append('.').append(clazz.getSimpleName());
-			return;
-		}
-		
-		var p=clazz.getPackageName();
-		for(int i=0;i<p.length();i++){
-			if(i==0){
-				sb.append(p.charAt(i));
-			}else if(p.charAt(i-1)=='.'){
-				sb.append(p, i-1, i+1);
-			}
-		}
-		sb.append('.').append(clazz.getSimpleName());
-	}
 }

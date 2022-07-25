@@ -49,7 +49,7 @@ public class RandomLists{
 						logger.get().destroy();
 					}
 				});
-				if(conf.getBoolean("async", true)) UtilL.sleep(50);
+				if(conf.getBoolean("async", true)) UtilL.sleep(10);
 				else task.join();
 				return task;
 				

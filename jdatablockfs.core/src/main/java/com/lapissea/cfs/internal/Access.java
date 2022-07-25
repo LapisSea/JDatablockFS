@@ -1,6 +1,7 @@
 package com.lapissea.cfs.internal;
 
 import com.lapissea.cfs.GlobalConfig;
+import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
@@ -112,7 +113,7 @@ public class Access{
 		try{
 			return MethodHandles.privateLookupIn(clazz, MethodHandles.lookup());
 		}catch(IllegalAccessException e){
-			var tc        =IUtils.getCallee(0);
+			var tc        =Utils.getCallee(0);
 			var thisModule=tc.getModule().getName();
 			if(!e.getMessage().contains(thisModule+" does not read ")){
 				throw e;
@@ -173,7 +174,7 @@ public class Access{
 	
 	private static void allowModule(Class<?> clazz){
 		var classModule=clazz.getModule();
-		var tc         =IUtils.getCallee(0);
+		var tc         =Utils.getCallee(0);
 		var thisModule =tc.getModule();
 		if(!thisModule.canRead(classModule)){
 			thisModule.addReads(classModule);

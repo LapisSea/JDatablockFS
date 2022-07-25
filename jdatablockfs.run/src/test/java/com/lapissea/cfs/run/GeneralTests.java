@@ -23,11 +23,8 @@ import com.lapissea.cfs.type.TypeDef;
 import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeConsumer;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInfo;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.testng.annotations.BeforeSuite;
+import org.testng.annotations.Test;
 
 import java.io.IOException;
 import java.util.Objects;
@@ -39,12 +36,11 @@ import java.util.stream.Stream;
 import static com.lapissea.cfs.type.StagedInit.STATE_DONE;
 import static com.lapissea.util.LogUtil.Init.USE_CALL_POS;
 import static com.lapissea.util.LogUtil.Init.USE_TABULATED_HEADER;
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.testng.Assert.assertEquals;
 
 public class GeneralTests{
 	
-	@BeforeAll
+	@BeforeSuite
 	static void init() throws IOException{
 		if(GlobalConfig.configFlag("test.tabPrint", false)){
 			LogUtil.Init.attach(USE_CALL_POS|USE_TABULATED_HEADER);
@@ -93,26 +89,29 @@ public class GeneralTests{
 		numberSize.writeSigned(new ContentOutputStream.BA(buf), value);
 		var read=numberSize.readSigned(new ContentInputStream.BA(buf));
 		
-		assertEquals(value, read, ()->value+" was not read or written correctly with "+numberSize);
+		assertEquals(read, value, value+" was not read or written correctly with "+numberSize);
 	}
 	
-	@ParameterizedTest
-	@ValueSource(longs={0, 10, 255, 256, 1000, 10000})
-	void chunkHeadIntegrity(long capacity, TestInfo info) throws IOException{
-		TestUtils.testChunkProvider(info, provider->{
+	@org.testng.annotations.DataProvider(name="chunkSizeNumbers")
+	public static Object[][] chunkSizeNumbers(){
+		return new Object[][]{{0}, {10}, {255}, {256}, {1000}, {10000}};
+	}
+	
+	@Test(dataProvider="chunkSizeNumbers")
+	void chunkHeadIntegrity(long capacity) throws IOException{
+		TestUtils.testChunkProvider(TestInfo.of(capacity), provider->{
 			var chunk=AllocateTicket.bytes(capacity).submit(provider);
 			
 			var providerRead=DataProvider.newVerySimpleProvider(provider.getSource());
 			var readChunk   =providerRead.getChunk(chunk.getPtr());
 			
-			assertEquals(chunk, readChunk);
+			assertEquals(readChunk, chunk);
 		});
 	}
 	
-	@ParameterizedTest
-	@ValueSource(longs={0, 10, 255, 256, 1000, 10000})
-	void chunkBodyIntegrity(long capacity, TestInfo info) throws IOException{
-		TestUtils.testChunkProvider(info, provider->{
+	@Test(dataProvider="chunkSizeNumbers")
+	void chunkBodyIntegrity(long capacity) throws IOException{
+		TestUtils.testChunkProvider(TestInfo.of(capacity), provider->{
 			var chunkSecond=AllocateTicket.bytes(1).submit(provider);
 			var chunk      =AllocateTicket.bytes(capacity).withNext(chunkSecond).submit(provider);
 //			var chunk      =AllocateTicket.bytes(capacity).submit(provider);
@@ -125,14 +124,13 @@ public class GeneralTests{
 			chunk.write(true, bodyData);
 			
 			var readBody=chunk.readAll();
-			assertArrayEquals(bodyData, readBody);
+			assertEquals(readBody, bodyData);
 		});
 	}
 	
-	@ParameterizedTest
-	@ValueSource(longs={10, 256, 1000, 10000})
-	void chunkBodyChainedIntegrity(long capacity, TestInfo info) throws IOException{
-		TestUtils.testChunkProvider(info, provider->{
+	@Test(dataProvider="chunkSizeNumbers")
+	void chunkBodyChainedIntegrity(long capacity) throws IOException{
+		TestUtils.testChunkProvider(TestInfo.of(capacity), provider->{
 			
 			var ticket     =AllocateTicket.bytes(capacity/2);
 			var chunkSecond=ticket.submit(provider);
@@ -146,45 +144,46 @@ public class GeneralTests{
 			chunk.write(true, bodyData);
 			
 			var readBody=chunk.readAll();
-			assertArrayEquals(bodyData, readBody);
+			assertEquals(readBody, bodyData);
 		});
 	}
 	
 	@Test
-	void blankCluster(TestInfo info) throws IOException{
-		TestUtils.testCluster(info, ses->{});
+	void blankCluster() throws IOException{
+		TestUtils.testCluster(TestInfo.of(), ses->{});
 	}
 	
-	@ParameterizedTest
-	@ValueSource(classes={ContiguousIOList.class, LinkedIOList.class})
-	<L extends IOInstance.Unmanaged<L>&IOList<Integer>> void listTestIntAdd(Class<L> listType, TestInfo info) throws IOException{
-		listEqualityTest(info, listType, Integer.class, list->{
+	@org.testng.annotations.DataProvider(name="lists")
+	public static Object[][] lists(){
+		return new Object[][]{{ContiguousIOList.class}, {LinkedIOList.class}};
+	}
+	
+	@Test(dataProvider="lists")
+	<L extends IOInstance.Unmanaged<L>&IOList<Integer>> void listTestIntAdd(Class<L> listType) throws IOException{
+		listEqualityTest(TestInfo.of(listType), listType, Integer.class, list->{
 			list.add(69);
 			list.add(420);
 		}, true);
 	}
 	
-	@ParameterizedTest
-	@ValueSource(classes={ContiguousIOList.class, LinkedIOList.class})
-	<L extends IOInstance.Unmanaged<L>&IOList<Dummy>> void listTestSimpleAdd(Class<L> listType, TestInfo info) throws IOException{
-		listEqualityTest(info, listType, Dummy.class, list->{
+	@Test(dataProvider="lists")
+	<L extends IOInstance.Unmanaged<L>&IOList<Dummy>> void listTestSimpleAdd(Class<L> listType) throws IOException{
+		listEqualityTest(TestInfo.of(listType), listType, Dummy.class, list->{
 			list.add(new Dummy(69));
 			list.add(new Dummy(420));
 		}, false);
 	}
 	
-	@ParameterizedTest
-	@ValueSource(classes={ContiguousIOList.class, LinkedIOList.class})
-	<L extends IOInstance.Unmanaged<L>&IOList<Dummy>> void listSingleAdd(Class<L> listType, TestInfo info) throws IOException{
-		listEqualityTest(info, listType, Dummy.class, list->{
+	@Test(dataProvider="lists")
+	<L extends IOInstance.Unmanaged<L>&IOList<Dummy>> void listSingleAdd(Class<L> listType) throws IOException{
+		listEqualityTest(TestInfo.of(listType), listType, Dummy.class, list->{
 			list.add(Dummy.first());
 		}, false);
 	}
 	
-	@ParameterizedTest
-	@ValueSource(classes={ContiguousIOList.class, LinkedIOList.class})
-	<L extends IOInstance.Unmanaged<L>&IOList<BooleanContainer>> void listBitValue(Class<L> listType, TestInfo info) throws IOException{
-		listEqualityTest(info, listType, BooleanContainer.class, list->{
+	@Test(dataProvider="lists")
+	<L extends IOInstance.Unmanaged<L>&IOList<BooleanContainer>> void listBitValue(Class<L> listType) throws IOException{
+		listEqualityTest(TestInfo.of(listType), listType, BooleanContainer.class, list->{
 			var rand=new Random(1);
 			var vals=IntStream.range(0, 100)
 			                  .mapToObj(i->new BooleanContainer(rand.nextBoolean()))
@@ -193,10 +192,9 @@ public class GeneralTests{
 		}, true);
 	}
 	
-	@ParameterizedTest
-	@ValueSource(classes={ContiguousIOList.class, LinkedIOList.class})
-	<L extends IOInstance.Unmanaged<L>&IOList<Dummy>> void listInsert(Class<L> listType, TestInfo info) throws IOException{
-		listEqualityTest(info, listType, Dummy.class, list->{
+	@Test(dataProvider="lists")
+	<L extends IOInstance.Unmanaged<L>&IOList<Dummy>> void listInsert(Class<L> listType) throws IOException{
+		listEqualityTest(TestInfo.of(listType), listType, Dummy.class, list->{
 			list.add(new Dummy('1'));
 			list.add(new Dummy('2'));
 			list.add(new Dummy('3'));
@@ -206,10 +204,9 @@ public class GeneralTests{
 		}, false);
 	}
 	
-	@ParameterizedTest
-	@ValueSource(classes={ContiguousIOList.class, LinkedIOList.class})
-	<L extends IOInstance.Unmanaged<L>&IOList<Dummy>> void listIndexRemove(Class<L> listType, TestInfo info) throws IOException{
-		listEqualityTest(info, listType, Dummy.class, list->{
+	@Test(dataProvider="lists")
+	<L extends IOInstance.Unmanaged<L>&IOList<Dummy>> void listIndexRemove(Class<L> listType) throws IOException{
+		listEqualityTest(TestInfo.of(listType), listType, Dummy.class, list->{
 			list.add(new Dummy(69));
 			list.add(new Dummy(360));
 			list.add(new Dummy(420));
@@ -217,10 +214,10 @@ public class GeneralTests{
 			list.remove(1);
 		}, false);
 	}
-	@ParameterizedTest
-	@ValueSource(classes={ContiguousIOList.class, LinkedIOList.class})
-	<L extends IOInstance.Unmanaged<L>&IOList<Dummy>> void listComplexIndexRemove(Class<L> listType, TestInfo info) throws IOException{
-		listEqualityTest(info, listType, Dummy.class, list->{
+	
+	@Test(dataProvider="lists")
+	<L extends IOInstance.Unmanaged<L>&IOList<Dummy>> void listComplexIndexRemove(Class<L> listType) throws IOException{
+		listEqualityTest(TestInfo.of(listType), listType, Dummy.class, list->{
 			list.add(Dummy.first());
 			list.add(Dummy.auto());
 			list.add(Dummy.auto());
@@ -236,9 +233,9 @@ public class GeneralTests{
 	}
 	
 	@Test
-	void testHashIOMap(TestInfo info) throws IOException{
+	void testHashIOMap() throws IOException{
 		TestUtils.ioMapComplianceSequence(
-			info,
+			TestInfo.of(),
 			HashIOMap<Integer, Integer>::new,
 			TypeLink.of(HashIOMap.class, Integer.class, Integer.class),
 			map->{
@@ -257,8 +254,8 @@ public class GeneralTests{
 	}
 	
 	@Test
-	void stringTest(TestInfo info) throws IOException{
-		TestUtils.testChunkProvider(info, provider->{
+	void stringTest() throws IOException{
+		TestUtils.testChunkProvider(TestInfo.of(), provider->{
 			String data="this is a test!";
 			
 			StructPipe<StringContainer> pipe=ContiguousStructPipe.of(StringContainer.class);
@@ -274,18 +271,24 @@ public class GeneralTests{
 		});
 	}
 	
-	@ParameterizedTest
-	@ValueSource(strings={
-		"",
-		"ABC123",
-		"this works",
-		"hey does this work?",
-		"dgasf_gfao124581z523tg eagdgisndgim315   qTGE254ghaerza573q6 wr gewr2$afas -.,/7-+41561552030,15.ds",
-		"I ❤️ you",
-		"\u00ff"
-	})
-	void autoTextTest(String data, TestInfo info) throws IOException{
-		TestUtils.testChunkProvider(info, provider->{
+	
+	@org.testng.annotations.DataProvider(name="strings")
+	public static Object[][] strings(){
+		return new Object[][]{
+			{""},
+			{"ABC123"},
+			{"this works"},
+			{"hey does this work"},
+			{"dgasf_gfao124581z523tg eagdgisndgim315   qTGE254ghaerza573q6 wr gewr2$afas -.,/7-+41561552030,15.ds"},
+			{"I ❤️ you"},
+			{"\u00ff"},
+			{IntStream.range(0, 1000).mapToObj(i->"loong string!? ("+i+")").collect(Collectors.joining(", "))},
+			};
+	}
+	
+	@Test(dataProvider="strings")
+	void autoTextTest(String data) throws IOException{
+		TestUtils.testChunkProvider(TestInfo.of(data), provider->{
 			StructPipe<AutoText> pipe=ContiguousStructPipe.of(AutoText.class);
 			
 			var chunk=AllocateTicket.bytes(64).submit(provider);
@@ -321,8 +324,8 @@ public class GeneralTests{
 	}
 	
 	@Test
-	void checkMemoryWalk(TestInfo info) throws IOException{
-		TestUtils.testCluster(info, cluster->{
+	void checkMemoryWalk() throws IOException{
+		TestUtils.testCluster(TestInfo.of(), cluster->{
 			
 			var prov=cluster.getRootProvider();
 			

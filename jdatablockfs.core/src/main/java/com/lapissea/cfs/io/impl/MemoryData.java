@@ -523,8 +523,13 @@ public abstract class MemoryData<DataType> implements IOInterface{
 			return readOnly;
 		}
 		
-		public MemoryData<?> build() throws IOException{
-			var actualData=readData();
+		public MemoryData<?> build(){
+			Object actualData;
+			try{
+				actualData=readData();
+			}catch(IOException e){
+				throw new RuntimeException(e);
+			}
 			dataProducer=null;
 			
 			return switch(actualData){
@@ -538,11 +543,7 @@ public abstract class MemoryData<DataType> implements IOInterface{
 	@Override
 	public MemoryData<?> asReadOnly(){
 		if(isReadOnly()) return this;
-		try{
-			return new Builder().withRaw0(data).withUsedLength(used).asReadOnly().build();
-		}catch(IOException e){
-			throw new RuntimeException(e);
-		}
+		return new Builder().withRaw0(data).withUsedLength(used).asReadOnly().build();
 	}
 	
 	private static final class Arr extends MemoryData<byte[]>{

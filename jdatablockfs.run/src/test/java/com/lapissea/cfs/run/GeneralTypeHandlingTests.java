@@ -21,10 +21,8 @@ import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IOValue;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInfo;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
+import org.testng.annotations.DataProvider;
+import org.testng.annotations.Test;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -32,7 +30,7 @@ import java.util.List;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.type.StagedInit.STATE_DONE;
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.testng.AssertJUnit.assertEquals;
 
 public class GeneralTypeHandlingTests{
 	
@@ -59,7 +57,8 @@ public class GeneralTypeHandlingTests{
 		public float[] arr;
 	}
 	
-	static Stream<IOInstance<?>> genericObjects(){
+	@DataProvider(name="genericObjects")
+	static Object[][] genericObjects(){
 		var deps=new Deps();
 		deps.a=1;
 		deps.b=2;
@@ -67,13 +66,12 @@ public class GeneralTypeHandlingTests{
 		deps.d=4;
 		var arr=new Arr();
 		arr.arr=new float[]{1, 2, 3, 4, 5};
-		return Stream.of(Dummy.first(), deps, arr);
+		return new Object[][]{{Dummy.first()}, {deps}, {arr}};
 	}
 	
-	@ParameterizedTest
-	@MethodSource({"genericObjects"})
-	<T extends IOInstance<T>> void genericStorage(T obj, TestInfo info) throws IOException{
-		TestUtils.testCluster(info, ses->{
+	@Test(dataProvider="genericObjects")
+	<T extends IOInstance<T>> void genericStorage(T obj) throws IOException{
+		TestUtils.testCluster(TestInfo.of(obj), ses->{
 			var ls=ses.getRootProvider().<IOList<GenericContainer<?>>>builder().withType(TypeLink.ofFlat(
 				LinkedIOList.class,
 				GenericContainer.class, Object.class
@@ -88,8 +86,8 @@ public class GeneralTypeHandlingTests{
 	}
 	
 	@Test
-	void genericTest(TestInfo info) throws IOException{
-		TestUtils.testChunkProvider(info, provider->{
+	void genericTest() throws IOException{
+		TestUtils.testChunkProvider(TestInfo.of(), provider->{
 			var pipe=ContiguousStructPipe.of(GenericContainer.class);
 			
 			var chunk=AllocateTicket.bytes(64).submit(provider);
@@ -113,8 +111,7 @@ public class GeneralTypeHandlingTests{
 		});
 	}
 	
-	@ParameterizedTest
-	@MethodSource("types")
+	@Test(dataProvider="types")
 	<T extends IOInstance<T>> void checkIntegrity(Struct<T> struct) throws IOException{
 		if(struct instanceof Struct.Unmanaged){
 			return;
@@ -139,23 +136,24 @@ public class GeneralTypeHandlingTests{
 		}
 	}
 	
-	@SuppressWarnings("unchecked")
-	private static <T extends IOInstance<T>> Stream<Struct<T>> types(){
-		return (Stream<Struct<T>>)(Object)Stream
-			                                  .of(
-				                                  Reference.class,
-				                                  AutoText.class,
-				                                  Cluster.class,
-				                                  ContiguousIOList.class,
-				                                  LinkedIOList.class,
-				                                  HashIOMap.class,
-				                                  BooleanContainer.class,
-				                                  IntContainer.class,
-				                                  LongContainer.class,
-				                                  Dummy.class
-			                                  ).flatMap(p->Stream.concat(Stream.of(p), Arrays.stream(p.getDeclaredClasses())))
-			                                  .filter(IOInstance::isInstance)
-			                                  .map(Struct::ofUnknown);
+	@DataProvider(name="types")
+	private static Object[][] types(){
+		return Stream.of(
+			             Reference.class,
+			             AutoText.class,
+			             Cluster.class,
+			             ContiguousIOList.class,
+			             LinkedIOList.class,
+			             HashIOMap.class,
+			             BooleanContainer.class,
+			             IntContainer.class,
+			             LongContainer.class,
+			             Dummy.class
+		             ).flatMap(p->Stream.concat(Stream.of(p), Arrays.stream(p.getDeclaredClasses())))
+		             .filter(IOInstance::isInstance)
+		             .map(Struct::ofUnknown)
+		             .map(o->new Object[]{o})
+		             .toArray(Object[][]::new);
 	}
 	
 	

@@ -7,6 +7,7 @@ import com.lapissea.cfs.io.ValueStorage;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
+import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
@@ -215,6 +216,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		fillBuckets(buckets, bucketPO2);
 		
 		if(size()<512){
+			Log.traceCall("method: rewire, size: {}", size());
 			try(var ignored=getDataProvider().getSource().openIOTransaction()){
 				transferRewire(oldBuckets, buckets, bucketPO2);
 				writeManagedFields();
@@ -224,7 +226,9 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		}else{
 			long pos=0;
 			
-			boolean disableAsync=size()<=512*RESIZE_TRIGGER*3;
+			boolean disableAsync=size()>=512*RESIZE_TRIGGER*3;
+			
+			Log.traceCall("method: reallocate and transfer, size: {}, async: {}", size(), disableAsync);
 			
 			var semaphore =disableAsync?null:new Semaphore(3);
 			var writeTasks=disableAsync?null:Collections.synchronizedList(new LinkedList<Runnable>());

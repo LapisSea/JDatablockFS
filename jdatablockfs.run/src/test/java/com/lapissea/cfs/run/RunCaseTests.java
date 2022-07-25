@@ -4,7 +4,7 @@ import com.lapissea.cfs.run.sparseimage.SparseImage;
 import com.lapissea.cfs.run.world.RandomLists;
 import com.lapissea.cfs.run.world.World;
 import com.lapissea.util.ZeroArrays;
-import org.junit.jupiter.api.Test;
+import org.testng.annotations.Test;
 
 import java.io.IOException;
 

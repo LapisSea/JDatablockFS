@@ -14,23 +14,52 @@ import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.util.LateInit;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInfo;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
-import org.opentest4j.AssertionFailedError;
+import org.testng.annotations.Test;
 
 import java.io.*;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
+import java.util.function.IntConsumer;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static com.lapissea.cfs.logging.Log.info;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.fail;
+
 
 public class SlowTests{
+	
+	private interface Task{
+		void run(Random r, int iter, boolean tick);
+	}
+	
+	private void randomBatch(int totalTasks, Task task){
+		var cores=Runtime.getRuntime().availableProcessors();
+		IntStream.range(0, cores).parallel().map(i->i*10000).forEach(new IntConsumer(){
+			int index;
+			long lastTime=0;
+			@Override
+			public void accept(int seed){
+				Random r    =new Random(seed);
+				var    batch=totalTasks/cores;
+				for(int i=0;i<batch;i++){
+					int     iter;
+					boolean tick=false;
+					synchronized(this){
+						iter=index;
+						index++;
+						if(System.currentTimeMillis()-lastTime>1000){
+							lastTime=System.currentTimeMillis();
+							tick=true;
+						}
+					}
+					task.run(r, iter, tick);
+				}
+			}
+		});
+	}
 	
 	@Test
 	void ioMultiWrite() throws IOException{
@@ -45,11 +74,8 @@ public class SlowTests{
 			baked=d.readAll();
 		}
 		
-		long   lastTim=0;
-		Random r      =new Random(1);
-		for(int iter=0;iter<500000;iter++){
-			if(System.currentTimeMillis()-lastTim>1000){
-				lastTim=System.currentTimeMillis();
+		randomBatch(500000, (r, iter, tick)->{
+			if(tick){
 				info("iteration: {}", iter);
 			}
 			try{
@@ -114,21 +140,19 @@ public class SlowTests{
 					for(RandomIO.WriteChunk write : writes){
 						System.arraycopy(write.data(), 0, valid, Math.toIntExact(write.ioOffset()), write.dataLength());
 					}
-					
-					int finalIter=iter;
-					Assertions.assertArrayEquals(read, valid, ()->{
-						return finalIter+"\n"+
-						       IntStream.range(0, valid.length).mapToObj(a->(valid[a]+"")).collect(Collectors.joining())+"\n"+
-						       IntStream.range(0, read.length).mapToObj(a->(read[a]+"")).collect(Collectors.joining());
-					});
+					if(!Arrays.equals(read, valid)){
+						fail(iter+"\n"+
+						     IntStream.range(0, valid.length).mapToObj(a->(valid[a]+"")).collect(Collectors.joining())+"\n"+
+						     IntStream.range(0, read.length).mapToObj(a->(read[a]+"")).collect(Collectors.joining()));
+					}
 					
 				}
-			}catch(AssertionFailedError e){
+			}catch(AssertionError e){
 				throw e;
 			}catch(Throwable e){
 				throw new RuntimeException(iter+"", e);
 			}
-		}
+		});
 		
 	}
 	
@@ -136,22 +160,24 @@ public class SlowTests{
 	void ioTransaction() throws IOException{
 		int cap=50;
 		
-		IOInterface data  =MemoryData.builder().withCapacity(cap+10).build();
-		IOInterface mirror=MemoryData.builder().withCapacity(cap+10).build();
+		ThreadLocal<IOInterface> dataLocal  =ThreadLocal.withInitial(()->MemoryData.builder().withCapacity(cap+10).build());
+		ThreadLocal<IOInterface> mirrorLocal=ThreadLocal.withInitial(()->MemoryData.builder().withCapacity(cap+10).build());
 		
 		
-		int runIndex=0;
 		
-		var rand=new Random(1);
 		//Dumb brute force all possible edge cases
-		for(int run=0;run<50000;run++){
-			if(run%10000==0) info("{}", run);
+		randomBatch(50000, (rand, run, tick)->{
+			if(tick) info("{}", run);
+			int runIndex=0;
+			
+			IOInterface data  =dataLocal.get();
+			IOInterface mirror=mirrorLocal.get();
 			
 			try(var ignored=data.openIOTransaction()){
 				var runSize=rand.nextInt(40);
 				for(int j=1;j<runSize+1;j++){
 					runIndex++;
-					var failS="failed on run "+runIndex;
+					var failS="failed on run "+run+" "+runIndex;
 					
 					if(rand.nextFloat()<0.1){
 						var newSiz=rand.nextInt(cap*2)+21;
@@ -173,28 +199,30 @@ public class SlowTests{
 						mirror.write(off, false, buf);
 						data.write(off, false, buf);
 						
-						Assertions.assertArrayEquals(mirror.read(off+1, 9),
-						                             data.read(off+1, 9),
-						                             failS);
+						assertEquals(
+							data.read(off+1, 9),
+							mirror.read(off+1, 9),
+							failS
+						);
 					}
 					
-					Assertions.assertEquals(mirror.getIOSize(), data.getIOSize(), failS);
+					assertEquals(data.getIOSize(), mirror.getIOSize(), failS);
 					
 					for(int i=0;i<100;i++){
-						var rSiz  =rand.nextInt(20);
-						var rOff  =rand.nextInt((int)(data.getIOSize()-rSiz));
-						int finalI=i;
-						Assertions.assertArrayEquals(mirror.read(rOff, rSiz),
-						                             data.read(rOff, rSiz), ()->failS+" "+finalI);
+						var rSiz=rand.nextInt(20);
+						var rOff=rand.nextInt((int)(data.getIOSize()-rSiz));
+						if(!Arrays.equals(data.read(rOff, rSiz), mirror.read(rOff, rSiz))){
+							fail(failS+" "+i);
+						}
 					}
 					
 					check(mirror, data, failS);
 				}
 			}catch(Throwable e){
-				throw new RuntimeException("failed on run "+runIndex, e);
+				throw new RuntimeException("failed on run "+run+" "+runIndex, e);
 			}
 			check(mirror, data, "failed after cycle "+run);
-		}
+		});
 	}
 	
 	private void check(IOInterface expected, IOInterface data, String s){
@@ -205,20 +233,24 @@ public class SlowTests{
 		}catch(Throwable e){
 			throw new RuntimeException(s, e);
 		}
-		Assertions.assertArrayEquals(m, d, ()->s+"\n"+
-		                                       HexFormat.of().formatHex(m)+"\n"+
-		                                       HexFormat.of().formatHex(d)+"\n"
-		);
+		if(!Arrays.equals(m, d)){
+			fail(s+"\n"+
+			     HexFormat.of().formatHex(m)+"\n"+
+			     HexFormat.of().formatHex(d)+"\n");
+		}
 	}
 	
-	@ParameterizedTest
-	@ValueSource(booleans={
-		false
-		,
-		true
-	})
-	void bigMap(boolean compliantCheck, TestInfo info) throws IOException{
-		TestUtils.testCluster(info, provider->{
+	@Test
+	void bigMapCompliant() throws IOException{
+		bigMapRun(true);
+	}
+	@Test
+	void bigMap() throws IOException{
+		bigMapRun(false);
+	}
+	
+	void bigMapRun(boolean compliantCheck) throws IOException{
+		TestUtils.testCluster(TestInfo.of(compliantCheck), provider->{
 			enum Mode{
 				DEFAULT, CHECKPOINT, MAKE_CHECKPOINT
 			}
@@ -281,42 +313,39 @@ public class SlowTests{
 				splitter=map;
 			}
 			
-			NumberSize size=compliantCheck?NumberSize.SHORT:NumberSize.SMALL_INT;
+			var size=(compliantCheck?NumberSize.SHORT.maxSize:NumberSize.SMALL_INT.maxSize/2);
 			
 			var  inst=Instant.now();
 			long i   =splitter.size();
-			while(provider.getSource().getIOSize()<size.maxSize){
+			while(provider.getSource().getIOSize()<size){
 				IOException e1=null;
 				
-				long t=System.nanoTime();
-				for(int j=0;j<5;j++){
-					if(i==checkpointStep){
-						if(mode==Mode.MAKE_CHECKPOINT){
-							try(var f=new DataOutputStream(new FileOutputStream(checkpointFile))){
-								f.writeLong(checkpointStep);
-								provider.getSource().transferTo(f);
-							}
-							info("Saved checkpoint to", checkpointFile.getAbsoluteFile());
-							System.exit(0);
+				if(i==checkpointStep){
+					if(mode==Mode.MAKE_CHECKPOINT){
+						try(var f=new DataOutputStream(new FileOutputStream(checkpointFile))){
+							f.writeLong(checkpointStep);
+							provider.getSource().transferTo(f);
 						}
-					}
-					
-					try{
-						splitter.put(i, ("int("+i+")").repeat(new Random(provider.getSource().getIOSize()+i).nextInt(20)));
-						i++;
-					}catch(Throwable e){
-						e1=new IOException("failed to put element: "+i, e);
+						info("Saved checkpoint to", checkpointFile.getAbsoluteFile());
+						System.exit(0);
 					}
 				}
+				try{
+					splitter.put(i, ("int("+i+")").repeat(new Random(provider.getSource().getIOSize()+i).nextInt(20)));
+					i++;
+				}catch(Throwable e){
+					e1=new IOException("failed to put element: "+i, e);
+				}
+				
 				if(Duration.between(inst, Instant.now()).toMillis()>1000||e1!=null){
 					inst=Instant.now();
-					info("iter {}, {}%", i, (provider.getSource().getIOSize()/(float)size.maxSize)*100);
+					info("iter {}, {}%", i, (provider.getSource().getIOSize()/(float)size)*100);
 				}
 				if(e1!=null){
 					throw e1;
 				}
 			}
-			info("iter {}, {}%", i, (provider.getSource().getIOSize()/(float)size.maxSize)*100);
+			info("iter {}, {}%", i, (provider.getSource().getIOSize()/(float)size)*100);
 		});
 	}
 	

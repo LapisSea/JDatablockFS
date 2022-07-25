@@ -1,5 +1,6 @@
 package com.lapissea.cfs.tools.server;
 
+import com.lapissea.cfs.ConsoleColors;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.MemFrame;
 import com.lapissea.util.UtilL;
@@ -17,6 +18,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BiFunction;
@@ -37,7 +39,7 @@ public class DisplayIpc implements DataLogger{
 		
 		public IpcSession(Info conn, String name, Map<String, Object> config) throws IOException{
 			var socket=sessionConnection(conn, name, config);
-			info("Server session({}) established", name);
+			info(ConsoleColors.YELLOW_BRIGHT+"Server session({}) established"+ConsoleColors.RESET, name);
 			
 			boolean threadedOutput=Boolean.parseBoolean(config.getOrDefault("threadedOutput", "false").toString());
 			
@@ -398,6 +400,8 @@ public class DisplayIpc implements DataLogger{
 	private final Map<String, Object>  config;
 	private final Map<String, Session> sessions=new HashMap<>();
 	
+	private static final Map<InetAddress, Long> FAILS=new ConcurrentHashMap<>();
+	
 	public DisplayIpc(Map<String, Object> config){
 		this.config=config;
 		
@@ -406,30 +410,53 @@ public class DisplayIpc implements DataLogger{
 	
 	private void initSession(){
 		sessionCreator=name->{
-			String msg;
+			InetAddress address;
 			try{
-				return new IpcSession(new IpcSession.Info(InetAddress.getLocalHost(), 20), name, config);
+				address=InetAddress.getLocalHost();
+			}catch(UnknownHostException e){
+				throw new RuntimeException(e);
+			}
+			
+			String  msg;
+			boolean tryConnect=true;
+			try{
+				var t=FAILS.get(address);
+				if(t!=null){
+					if(System.currentTimeMillis()>t+1000){
+						FAILS.remove(address);
+					}else{
+						tryConnect=false;
+					}
+				}
+				
+				if(tryConnect){
+					return new IpcSession(new IpcSession.Info(address, 20), name, config);
+				}else msg=null;
 			}catch(SocketTimeoutException e){
 				msg="Could not contact the server for \""+name+"\"";
 			}catch(Throwable e){
 				msg="Unexpected error: "+e;
 			}
+			FAILS.computeIfAbsent(address, c->{
+				warn("Giving up on connecting to {} for 1s", address);
+				return System.currentTimeMillis();
+			});
 			
 			var type=config.getOrDefault("server-fallback", "local").toString();
 			
 			sessionCreator=switch(type){
 				case "local" -> {
-					warn("{}, switching to local server session.", msg);
+					if(tryConnect) warn("{}, switching to local server session.", msg);
 					yield getLocalLoggerImpl()::getSession;
 				}
 				case "none" -> {
 					active=false;
-					warn("{} switching to no output.", msg);
+					if(tryConnect) warn("{}, switching to no output.", msg);
 					yield s->Session.Blank.INSTANCE;
 				}
 				default -> {
 					active=false;
-					warn("{}, unknown type \"{}\", defaulting to no output.", msg, type);
+					if(tryConnect) warn("{}, unknown type \"{}\", defaulting to no output.", msg, type);
 					yield s->Session.Blank.INSTANCE;
 				}
 			};

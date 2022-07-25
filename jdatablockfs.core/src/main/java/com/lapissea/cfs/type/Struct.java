@@ -38,7 +38,7 @@ import java.util.stream.Stream;
 import static com.lapissea.cfs.ConsoleColors.GREEN_BRIGHT;
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.GlobalConfig.PRINT_COMPILATION;
-import static com.lapissea.cfs.internal.IUtils.getCallee;
+import static com.lapissea.cfs.Utils.getCallee;
 import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NOT_NULL;
 

@@ -11,8 +11,10 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static com.lapissea.util.UtilL.Assert;
 
@@ -216,5 +218,46 @@ public class Utils{
 	
 	public static Optional<String> optionalProperty(String name){
 		return Optional.ofNullable(System.getProperty(name));
+	}
+	
+	public static void frameToStr(StringBuilder sb, StackWalker.StackFrame frame){
+		frameToStr(sb, frame, true);
+	}
+	public static void frameToStr(StringBuilder sb, StackWalker.StackFrame frame, boolean addLine){
+		classToStr(sb, frame.getDeclaringClass());
+		sb.append('.').append(frame.getMethodName());
+		if(addLine) sb.append('(').append(frame.getLineNumber()).append(')');
+	}
+	public static void classToStr(StringBuilder sb, Class<?> clazz){
+		var enclosing=clazz.getEnclosingClass();
+		if(enclosing!=null){
+			classToStr(sb, enclosing);
+			sb.append('.').append(clazz.getSimpleName());
+			return;
+		}
+		
+		var p=clazz.getPackageName();
+		for(int i=0;i<p.length();i++){
+			if(i==0){
+				sb.append(p.charAt(i));
+			}else if(p.charAt(i-1)=='.'){
+				sb.append(p, i-1, i+1);
+			}
+		}
+		sb.append('.').append(clazz.getSimpleName());
+	}
+	public static Class<?> getCallee(int depth){
+		return getCallee(s->s.skip(depth+2));
+	}
+	public static Class<?> getCallee(Function<Stream<StackWalker.StackFrame>, Stream<StackWalker.StackFrame>> stream){
+		return StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE)
+		                  .walk(s->stream.apply(s).findFirst().orElseThrow().getDeclaringClass());
+	}
+	public static StackWalker.StackFrame getFrame(int depth){
+		return getFrame(s->s.skip(depth+2));
+	}
+	public static StackWalker.StackFrame getFrame(Function<Stream<StackWalker.StackFrame>, Stream<StackWalker.StackFrame>> stream){
+		return StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE)
+		                  .walk(s->stream.apply(s).findFirst().orElseThrow());
 	}
 }
