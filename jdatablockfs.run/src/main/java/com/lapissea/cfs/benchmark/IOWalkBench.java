@@ -18,7 +18,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 @Warmup(iterations=6, time=1000, timeUnit=TimeUnit.MILLISECONDS)
-@Measurement(iterations=16, time=500, timeUnit=TimeUnit.MILLISECONDS)
+@Measurement(iterations=30, time=1500, timeUnit=TimeUnit.MILLISECONDS)
 @State(Scope.Thread)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 public class IOWalkBench{
@@ -101,7 +101,7 @@ public class IOWalkBench{
 		doWalk();
 	}
 	@Benchmark
-	@Fork(jvmArgsAppend="-Dradius=30")
+	@Fork(jvmArgsAppend="-Dradius=80")
 	public void walk30(){
 		doWalk();
 	}

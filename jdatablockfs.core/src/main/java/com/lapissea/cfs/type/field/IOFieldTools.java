@@ -4,10 +4,7 @@ import com.lapissea.cfs.Index;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.objects.NumberSize;
-import com.lapissea.cfs.type.DepSort;
-import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.Struct;
-import com.lapissea.cfs.type.WordSpace;
+import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.cfs.type.field.annotations.IODependency;
@@ -97,7 +94,7 @@ public class IOFieldTools{
 			                 //Pull any temporary fields back to reduce unessecary field skipping when re-reading them
 			                 .thenComparingInt(f->f.getAccessor() instanceof VirtualAccessor<T> a&&a.getStoragePool()!=VirtualFieldDefinition.StoragePool.INSTANCE?0:1)
 			                 //pull any cheap to read/write fields back
-			                 .thenComparingInt(f->f.getAccessor().getType().isEnum()||f.getAccessor().getType().isPrimitive()?0:1)
+			                 .thenComparingInt(f->f.getAccessor().getType().isEnum()||SupportedPrimitive.isAny(f.getAccessor().getType())?0:1)
 			                 //Encourage fields with similar dependencies to be next to each other
 			                 .thenComparing(f->f.dependencyStream().map(IOField::getName).collect(Collectors.joining(" / ")))
 			                 //Eliminate JVM entropy. Make initial field order irrelevant
