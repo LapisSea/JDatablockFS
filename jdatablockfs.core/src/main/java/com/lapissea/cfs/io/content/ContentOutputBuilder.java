@@ -28,4 +28,8 @@ public class ContentOutputBuilder extends ByteArrayOutputStream implements Conte
 		Utils.write8(v, buf, count, len);
 		count+=len;
 	}
+	@Override
+	public void write(byte[] b){
+		write(b, 0, b.length);
+	}
 }

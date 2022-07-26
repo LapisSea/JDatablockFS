@@ -229,11 +229,43 @@ public class MemoryWalker{
 			if(record){
 				iterNextSum+=(System.nanoTime()-in0);
 			}
+			var cmds  =pipe.getWalkCommands().reader();
 			var ioPool=instanceStruct.allocVirtualVarPool(IO);
+			wh:
 			while(true){
 				if(record) in0=System.nanoTime();
 				if(!iterator.hasNext()) break;
 				IOField<T, ?> field=iterator.next();
+				switch(cmds.cmd()){
+					case CommandSet.ENDF -> {break wh;}
+					case CommandSet.SKIPB_B -> {
+						var siz=cmds.read8();
+						fieldOffset+=siz;
+						continue;
+					}
+					case CommandSet.SKIPB_I -> {
+						var siz=cmds.read32();
+						fieldOffset+=siz;
+						continue;
+					}
+					case CommandSet.SKIPB_L -> {
+						var siz=cmds.read64();
+						fieldOffset+=siz;
+						continue;
+					}
+					case CommandSet.SKIPB_UNKOWN -> {
+						var  sizeDesc=field.getSizeDescriptor();
+						long size    =sizeDesc.calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
+						fieldOffset+=field.getSizeDescriptor().mapSize(WordSpace.BYTE, size);
+						continue;
+					}
+					case CommandSet.SKIPF_N_IF_NULL -> {
+						var len=cmds.read8();
+						fieldOffset+=siz;
+						continue;
+					}
+					default -> throw new NotImplementedException();
+				}
 				if(record){
 					iterNextSum+=(System.nanoTime()-in0);
 				}

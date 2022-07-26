@@ -719,4 +719,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		result=31*result+ioFields.hashCode();
 		return result;
 	}
+	
+	public CommandSet getWalkCommands(){
+		return null;
+	}
 }
