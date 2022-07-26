@@ -21,10 +21,12 @@ import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.TextUtil;
+import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.lang.reflect.Array;
 import java.lang.reflect.Method;
+import java.lang.reflect.ParameterizedType;
 import java.util.*;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -362,7 +364,28 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 			if(isDynamic){
 				typeFlags|=DYNAMIC_FLAG;
 			}
-			var type=accessor.getType();
+			
+			var typeGen=accessor.getGenericType(null);
+			while(true){
+				if(typeGen instanceof Class<?> c){
+					if(c.isArray()){
+						typeGen=c.componentType();
+						continue;
+					}
+				}
+				if(UtilL.instanceOf(Utils.typeToRaw(typeGen), List.class)){
+					typeGen=switch(typeGen){
+						case Class<?> c -> typeGen=Object.class;
+						case ParameterizedType t -> t.getActualTypeArguments()[0];
+						default -> throw new NotImplementedException(typeGen.getClass()+"");
+					};
+					continue;
+				}
+				break;
+			}
+			
+			var type=Utils.typeToRaw(typeGen);
+			
 			if(IOInstance.isInstance(type)){
 				typeFlags|=IOINSTANCE_FLAG;
 				

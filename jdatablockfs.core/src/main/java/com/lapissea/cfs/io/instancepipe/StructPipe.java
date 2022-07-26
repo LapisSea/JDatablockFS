@@ -12,6 +12,7 @@ import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.logging.Log;
+import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
@@ -20,6 +21,7 @@ import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
@@ -155,6 +157,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	private final Struct<T>           type;
 	private       SizeDescriptor<T>   sizeDescription;
 	private       FieldSet<T>         ioFields;
+	private       CommandSet          referenceWalkCommands;
 	private       List<IOField<T, ?>> earlyNullChecks;
 	
 	private List<IOField.ValueGeneratorInfo<T, ?>> generators;
@@ -171,7 +174,77 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			type.waitForState(STATE_DONE);
 			sizeDescription=Objects.requireNonNull(createSizeDescriptor());
 			generators=Utils.nullIfEmpty(ioFields.stream().flatMap(IOField::generatorStream).toList());
+			referenceWalkCommands=generateReferenceWalkCommands();
 		});
+	}
+	
+	
+	private CommandSet generateReferenceWalkCommands(){
+		var builder=new CommandSet.Builder();
+		var fields =getSpecificFields();
+		
+		for(var field : fields){
+			if(field.typeFlag(IOField.PRIMITIVE_OR_ENUM_FLAG)||field.typeFlag(IOField.HAS_NO_POINTERS_FLAG)){
+				builder.skipField(field);
+				continue;
+			}
+			
+			if(field.typeFlag(IOField.DYNAMIC_FLAG)){
+				builder.potentialReference();
+				continue;
+			}
+			
+			var accessor=field.getAccessor();
+			if(accessor==null){
+				builder.skipField(field);
+				continue;
+			}
+			Class<?> type=accessor.getType();
+			
+			if(field.typeFlag(IOField.IOINSTANCE_FLAG)){
+				Struct<?> struct=Struct.ofUnknown(type);
+				if(struct.getCanHavePointers()){
+					builder.potentialReference();
+				}else{
+					builder.skipField(field);
+				}
+				continue;
+			}
+			
+			if(type==ChunkPointer.class){
+				builder.potentialReference();
+				continue;
+			}
+			if(type==String.class){
+				builder.skipField(field);
+				continue;
+			}
+			
+			if(type.isArray()){
+				var pType=type;
+				while(pType.isArray()){
+					pType=pType.componentType();
+				}
+				
+				if(SupportedPrimitive.isAny(pType)||pType.isEnum()||pType==String.class){
+					builder.skipField(field);
+					continue;
+				}
+			}
+			
+			throw new NotImplementedException(field+" not handled");
+			
+		}
+		if(getType() instanceof Struct.Unmanaged) builder.unmanagedRest();
+		else builder.endFlow();
+		
+		return builder.build();
+	}
+	
+	
+	public CommandSet getReferenceWalkCommands(){
+		waitForState(STATE_DONE);
+		return referenceWalkCommands;
 	}
 	
 	@Override
@@ -718,9 +791,5 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		int result=type.hashCode();
 		result=31*result+ioFields.hashCode();
 		return result;
-	}
-	
-	public CommandSet getWalkCommands(){
-		return null;
 	}
 }

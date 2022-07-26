@@ -18,6 +18,7 @@ import java.util.function.DoubleConsumer;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.type.CommandSet.*;
 import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 
 public class MemoryWalker{
@@ -229,45 +230,51 @@ public class MemoryWalker{
 			if(record){
 				iterNextSum+=(System.nanoTime()-in0);
 			}
-			var cmds  =pipe.getWalkCommands().reader();
-			var ioPool=instanceStruct.allocVirtualVarPool(IO);
+			var cmds         =pipe.getReferenceWalkCommands().reader();
+			var unmanagedCmds=false;
+			var ioPool       =instanceStruct.allocVirtualVarPool(IO);
 			wh:
 			while(true){
 				if(record) in0=System.nanoTime();
 				if(!iterator.hasNext()) break;
+				
 				IOField<T, ?> field=iterator.next();
-				switch(cmds.cmd()){
-					case CommandSet.ENDF -> {break wh;}
-					case CommandSet.SKIPB_B -> {
-						var siz=cmds.read8();
-						fieldOffset+=siz;
-						continue;
-					}
-					case CommandSet.SKIPB_I -> {
-						var siz=cmds.read32();
-						fieldOffset+=siz;
-						continue;
-					}
-					case CommandSet.SKIPB_L -> {
-						var siz=cmds.read64();
-						fieldOffset+=siz;
-						continue;
-					}
-					case CommandSet.SKIPB_UNKOWN -> {
-						var  sizeDesc=field.getSizeDescriptor();
-						long size    =sizeDesc.calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
-						fieldOffset+=field.getSizeDescriptor().mapSize(WordSpace.BYTE, size);
-						continue;
-					}
-					case CommandSet.SKIPF_N_IF_NULL -> {
-						var len=cmds.read8();
-						fieldOffset+=siz;
-						continue;
-					}
-					default -> throw new NotImplementedException();
-				}
+				
 				if(record){
 					iterNextSum+=(System.nanoTime()-in0);
+				}
+				if(!unmanagedCmds){
+					switch(cmds.cmd()){
+						case ENDF -> {break wh;}
+						case UNMANAGED_REST -> unmanagedCmds=true;
+						case SKIPB_B -> {
+							var siz=cmds.read8();
+							fieldOffset+=siz;
+							continue;
+						}
+						case SKIPB_I -> {
+							var siz=cmds.read32();
+							fieldOffset+=siz;
+							continue;
+						}
+						case SKIPB_L -> {
+							var siz=cmds.read64();
+							fieldOffset+=siz;
+							continue;
+						}
+						case SKIPB_UNKOWN -> {
+							var  sizeDesc=field.getSizeDescriptor();
+							long size    =sizeDesc.calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
+							fieldOffset+=field.getSizeDescriptor().mapSize(WordSpace.BYTE, size);
+							continue;
+						}
+						case SKIPF_N_IF_NULL -> {
+							LogUtil.println("SKIPF_N_IF_NULL");
+							throw new NotImplementedException();
+						}
+						case POTENTIAL_REF -> {}
+						default -> throw new NotImplementedException();
+					}
 				}
 				
 				var  sizeDesc=field.getSizeDescriptor();
@@ -277,25 +284,7 @@ public class MemoryWalker{
 					var accessor=field.getAccessor();
 					if(accessor==null) continue;
 					
-					if(field.typeFlag(IOField.PRIMITIVE_OR_ENUM_FLAG)){
-						continue;
-					}
-					if(field.typeFlag(IOField.HAS_NO_POINTERS_FLAG)){
-						continue;
-					}
-					
 					Class<?> type=accessor.getType();
-					
-					if(type.isArray()){
-						var pType=type;
-						while(pType.isArray()){
-							pType=pType.componentType();
-						}
-						
-						if(SupportedPrimitive.isAny(pType)||pType.isEnum()||pType==String.class){
-							continue;
-						}
-					}
 					
 					var dynamic   =field.typeFlag(IOField.DYNAMIC_FLAG);
 					var isInstance=field.typeFlag(IOField.IOINSTANCE_FLAG);
@@ -454,6 +443,9 @@ public class MemoryWalker{
 									}
 								}
 							}
+							continue;
+						}
+						if(SupportedPrimitive.isAny(type)){
 							continue;
 						}
 						if(type==String.class){

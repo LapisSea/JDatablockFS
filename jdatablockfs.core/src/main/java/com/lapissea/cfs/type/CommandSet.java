@@ -2,8 +2,10 @@ package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.internal.MemPrimitive;
 import com.lapissea.cfs.io.content.ContentOutputBuilder;
+import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.SizeDescriptor;
 
-public class CommandSet{
+public final class CommandSet{
 	
 	public static class Builder{
 		private final ContentOutputBuilder data=new ContentOutputBuilder();
@@ -11,6 +13,10 @@ public class CommandSet{
 		
 		public void endFlow(){
 			cmdId(ENDF);
+			done=true;
+		}
+		public void unmanagedRest(){
+			cmdId(UNMANAGED_REST);
 			done=true;
 		}
 		
@@ -44,8 +50,8 @@ public class CommandSet{
 			}
 		}
 		
-		public void reference(){
-			cmdId(REF);
+		public void potentialReference(){
+			cmdId(POTENTIAL_REF);
 		}
 		
 		private void write8(int value){
@@ -70,9 +76,25 @@ public class CommandSet{
 			return new CommandSet(data.toByteArray());
 		}
 		
+		public void skipField(IOField<?, ?> field){
+			skipSize(field.getSizeDescriptor());
+		}
+		public void skipSize(SizeDescriptor<?> descriptor){
+			var sizO=descriptor.getFixed(WordSpace.BYTE);
+			if(sizO.isPresent()){
+				var siz=sizO.getAsLong();
+				
+				if(siz<=255) skipBytes8((int)siz);
+				else if(siz<=Integer.MAX_VALUE) skipBytes32((int)siz);
+				else skipBytes64(siz);
+				
+			}else{
+				skipBytesUnkown();
+			}
+		}
 	}
 	
-	public static class CmdReader{
+	public static final class CmdReader{
 		private final byte[] code;
 		private       int    pos;
 		
@@ -100,12 +122,14 @@ public class CommandSet{
 	}
 	
 	public static final byte ENDF           =0;
-	public static final byte SKIPB_B        =1;
-	public static final byte SKIPB_I        =2;
-	public static final byte SKIPB_L        =3;
-	public static final byte SKIPB_UNKOWN   =4;
-	public static final byte SKIPF_N_IF_NULL=5;
-	public static final byte REF            =6;
+	public static final byte UNMANAGED_REST =1;
+	public static final byte SKIPB_B        =2;
+	public static final byte SKIPB_I        =3;
+	public static final byte SKIPB_L        =4;
+	public static final byte SKIPB_UNKOWN   =5;
+	public static final byte SKIPF_N_IF_NULL=6;
+	public static final byte POTENTIAL_REF  =7;
+	
 	
 	private final byte[] code;
 	
