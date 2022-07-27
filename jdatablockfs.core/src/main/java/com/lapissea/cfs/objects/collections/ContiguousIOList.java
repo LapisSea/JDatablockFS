@@ -18,7 +18,6 @@ import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.access.AbstractFieldAccessor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IOValue;
-import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.function.UnsafeConsumer;
@@ -163,27 +162,34 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 		});
 	}
 	
-	private static final CommandSet END_SET=CommandSet.builder(CommandSet.Builder::endFlow);
+	private static final CommandSet END_SET =CommandSet.builder(CommandSet.Builder::endFlow);
+	private static final CommandSet PREF_SET=CommandSet.builder(b->{
+		b.potentialReference();
+		b.endFlow();
+	});
 	
 	@Override
 	public CommandSet.CmdReader getUnmanagedReferenceWalkCommands(){
 		if(isEmpty()) return END_SET.reader();
-		var typ=getTypeDef().arg(0).generic(getDataProvider().getTypeDb());
-		switch(storage){
-			case ValueStorage.FixedInstance<?> inst -> {
-				var struct=Struct.ofUnknown(typ);
-				if(!struct.getCanHavePointers()) return END_SET.reader();
-				var set=CommandSet.builder(b->{
-					b.potentialReference();
-					b.endFlow();
-				});
-				return new CommandSet.RepeaterEnd(set, size());
+		return switch(storage){
+			case ValueStorage.Primitive<?> __ -> END_SET.reader();
+			case ValueStorage.FixedInstance<?> stor -> {
+				var struct=stor.getPipe().getType();
+				if(!struct.getCanHavePointers()) yield END_SET.reader();
+				yield new CommandSet.RepeaterEnd(PREF_SET, size());
 			}
-			default -> {
-				throw new NotImplementedException(storage.getClass()+"");
+			case ValueStorage.UnmanagedInstance<?> __ -> new CommandSet.RepeaterEnd(PREF_SET, size());
+			case ValueStorage.FixedReferencedInstance<?> __ -> new CommandSet.RepeaterEnd(PREF_SET, size());
+			case ValueStorage.InlineString __ -> END_SET.reader();
+			case ValueStorage.Instance<?> stor -> {
+				var struct=stor.getPipe().getType();
+				if(!struct.getCanHavePointers()) yield END_SET.reader();
+				yield new CommandSet.RepeaterEnd(PREF_SET, size());
 			}
-		}
+			case ValueStorage.FixedReferenceString __ -> new CommandSet.RepeaterEnd(PREF_SET, size());
+		};
 	}
+	
 	private long calcElementOffset(long index){
 		return calcElementOffset(index, getElementSize());
 	}
