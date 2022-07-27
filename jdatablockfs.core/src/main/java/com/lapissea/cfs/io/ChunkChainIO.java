@@ -47,12 +47,16 @@ public final class ChunkChainIO implements RandomIO{
 	}
 	
 	private void checkCursorInChain() throws IOException{
-		if(!DEBUG_VALIDATION) return;
 		head.requireReal();
-		cursor.requireReal();
 		
 		if(head==cursor) return;
-		if(head.streamNext().noneMatch(c->c==cursor)) throw new MalformedClusterDataException(cursor+" not in "+head.collectNext());
+		
+		cursor.requireReal();
+		
+		for(Chunk chunk : new ChainWalker(head)){
+			if(chunk==cursor) return;
+		}
+		throw new MalformedClusterDataException(cursor+" not in "+head.collectNext());
 	}
 	
 	private long calcCursorEnd(){
