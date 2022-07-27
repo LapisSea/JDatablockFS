@@ -296,9 +296,9 @@ public final class CommandSet{
 			str.add(switch(cmd){
 				case ENDF -> "ENDF";
 				case UNMANAGED_REST -> "UNMANAGED_REST";
-				case SKIPB_B -> "SKIPB_B("+reader.read8()+" fields, "+reader.read8()+" bytes)";
-				case SKIPB_I -> "SKIPB_I("+reader.read8()+" fields, "+reader.read32()+" bytes)";
-				case SKIPB_L -> "SKIPB_L("+reader.read8()+" fields, "+reader.read64()+" bytes)";
+				case SKIPB_B -> "SKIPB_B("+reader.read8()+" jump, "+reader.read8()+" bytes)";
+				case SKIPB_I -> "SKIPB_I("+reader.read8()+" jump, "+reader.read32()+" bytes)";
+				case SKIPB_L -> "SKIPB_L("+reader.read8()+" jump, "+reader.read64()+" bytes)";
 				case SKIPB_UNKOWN -> "SKIPB_UNKOWN("+reader.read8()+" fields)";
 				case SKIPF_IF_NULL -> "SKIPF_IF_NULL("+reader.read8()+" offset)";
 				case POTENTIAL_REF -> "POTENTIAL_REF";

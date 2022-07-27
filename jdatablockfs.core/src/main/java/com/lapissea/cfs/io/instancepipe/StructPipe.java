@@ -85,7 +85,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			COMPILATION.on(()->StagedInit.runBaseStageTask(()->{
 				String s="Compiled: "+struct.getType().getName()+"\n"+
 				         "\tPipe type: "+BLUE_BRIGHT+created.getClass().getName()+CYAN_BRIGHT+"\n"+
-				         "\tSize: "+BLUE_BRIGHT+created.getSizeDescriptor()+CYAN_BRIGHT;
+				         "\tSize: "+BLUE_BRIGHT+created.getSizeDescriptor()+CYAN_BRIGHT+"\n"+
+				         "\tReference commands: "+created.getReferenceWalkCommands();
 				
 				var sFields=created.getSpecificFields();
 				
