@@ -180,17 +180,40 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	
 	
 	private CommandSet generateReferenceWalkCommands(){
-		var builder=new CommandSet.Builder();
-		var fields =getSpecificFields();
+		var         builder  =CommandSet.builder();
+		var         hasDynmic=getType() instanceof Struct.Unmanaged<?> u&&u.isOverridingDynamicUnmanaged();
+		FieldSet<T> fields;
+		
+		if(hasDynmic){
+			fields=FieldSet.of(Stream.concat(getSpecificFields().stream(), ((Struct.Unmanaged<?>)getType()).getUnmanagedStaticFields().stream().map(f->(IOField<T, ?>)f)).toList());
+		}else{
+			fields=getSpecificFields();
+		}
+		var refs=fields.stream()
+		               .map(f->f instanceof IOField.Ref<?, ?> ref?ref:null)
+		               .filter(Objects::nonNull)
+		               .map(ref->fields.byName(IOFieldTools.makeRefName(ref.getAccessor())).map(f->Map.entry(f, ref)))
+		               .filter(Optional::isPresent)
+		               .map(Optional::get)
+		               .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 		
 		for(var field : fields){
+			var refVal=refs.get(field);
+			
+			if(refVal!=null){
+				var refi=fields.indexOf(field);
+				var vali=fields.indexOf(refVal);
+				if(refi==-1||vali==-1) throw new IllegalStateException();
+				builder.skipFlowIfNull(vali-refi);
+			}
+			
 			if(field.typeFlag(IOField.PRIMITIVE_OR_ENUM_FLAG)||field.typeFlag(IOField.HAS_NO_POINTERS_FLAG)){
 				builder.skipField(field);
 				continue;
 			}
 			
 			if(field.typeFlag(IOField.DYNAMIC_FLAG)){
-				builder.potentialReference();
+				builder.dynamic();
 				continue;
 			}
 			
@@ -212,7 +235,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			}
 			
 			if(type==ChunkPointer.class){
-				builder.potentialReference();
+				builder.chptr();
 				continue;
 			}
 			if(type==String.class){
@@ -235,7 +258,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			throw new NotImplementedException(field+" not handled");
 			
 		}
-		if(getType() instanceof Struct.Unmanaged) builder.unmanagedRest();
+		
+		if(hasDynmic) builder.unmanagedRest();
 		else builder.endFlow();
 		
 		return builder.build();

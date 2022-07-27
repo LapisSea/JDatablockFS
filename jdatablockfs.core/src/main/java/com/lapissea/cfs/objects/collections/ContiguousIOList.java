@@ -18,6 +18,7 @@ import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.access.AbstractFieldAccessor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.function.UnsafeConsumer;
@@ -162,6 +163,27 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 		});
 	}
 	
+	private static final CommandSet END_SET=CommandSet.builder(CommandSet.Builder::endFlow);
+	
+	@Override
+	public CommandSet.CmdReader getUnmanagedReferenceWalkCommands(){
+		if(isEmpty()) return END_SET.reader();
+		var typ=getTypeDef().arg(0).generic(getDataProvider().getTypeDb());
+		switch(storage){
+			case ValueStorage.FixedInstance<?> inst -> {
+				var struct=Struct.ofUnknown(typ);
+				if(!struct.getCanHavePointers()) return END_SET.reader();
+				var set=CommandSet.builder(b->{
+					b.potentialReference();
+					b.endFlow();
+				});
+				return new CommandSet.RepeaterEnd(set, size());
+			}
+			default -> {
+				throw new NotImplementedException(storage.getClass()+"");
+			}
+		}
+	}
 	private long calcElementOffset(long index){
 		return calcElementOffset(index, getElementSize());
 	}

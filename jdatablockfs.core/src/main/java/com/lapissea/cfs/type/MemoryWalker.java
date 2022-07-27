@@ -6,16 +6,12 @@ import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.field.IOField;
-import com.lapissea.util.LogUtil;
-import com.lapissea.util.NotImplementedException;
-import com.lapissea.util.TextUtil;
-import com.lapissea.util.UtilL;
+import com.lapissea.util.*;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
 import java.util.*;
 import java.util.function.DoubleConsumer;
-import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.type.CommandSet.*;
@@ -205,10 +201,10 @@ public class MemoryWalker{
 		}
 		if(reference==null||reference.isNull()) return CONTINUE;
 		boolean inlineDirtyButContinue=false;
+		
 		if(stack.contains(reference, instance)){
 			return CONTINUE;
 		}
-		
 		
 		stack.push(reference, instance);
 		long t0=0, iterNextSum=0;
@@ -221,59 +217,174 @@ public class MemoryWalker{
 			
 			long in0=0;
 			if(record) in0=System.nanoTime();
-			Iterator<IOField<T, ?>> iterator;
-			if(instance instanceof IOInstance.Unmanaged unmanaged){
-				iterator=Stream.concat(pipe.getSpecificFields().stream(), unmanaged.listUnmanagedFields()).iterator();
-			}else{
-				iterator=pipe.getSpecificFields().iterator();
-			}
+			
+			Iterator<IOField<T, ?>> iterator=pipe.getSpecificFields().iterator();
+			
 			if(record){
 				iterNextSum+=(System.nanoTime()-in0);
 			}
-			var cmds         =pipe.getReferenceWalkCommands().reader();
-			var unmanagedCmds=false;
-			var ioPool       =instanceStruct.allocVirtualVarPool(IO);
+			
+			CmdReader cmds  =pipe.getReferenceWalkCommands().reader();
+			var       ioPool=instanceStruct.allocVirtualVarPool(IO);
+			
+			long    skipBits     =0;
+			boolean dynamicFields=false;
 			wh:
 			while(true){
 				if(record) in0=System.nanoTime();
-				if(!iterator.hasNext()) break;
+				if(!iterator.hasNext()){
+					if(!dynamicFields&&instance instanceof IOInstance.Unmanaged unmanaged){
+						dynamicFields=true;
+						iterator=unmanaged.listUnmanagedFields().iterator();
+						continue;
+					}
+					break;
+				}
 				
 				IOField<T, ?> field=iterator.next();
+				
+				if(skipBits>0) skipBits >>>= 1;
+				boolean skipBit=(skipBits&1)==1;
+				if(skipBit) continue;
 				
 				if(record){
 					iterNextSum+=(System.nanoTime()-in0);
 				}
-				if(!unmanagedCmds){
-					switch(cmds.cmd()){
-						case ENDF -> {break wh;}
-						case UNMANAGED_REST -> unmanagedCmds=true;
-						case SKIPB_B -> {
-							var siz=cmds.read8();
-							fieldOffset+=siz;
-							continue;
+				cmd:
+				{
+					int cmd;
+					
+					while(true){
+						cmd=cmds.cmd();
+						if(cmd==UNMANAGED_REST){
+							cmds=((IOInstance.Unmanaged<?>)instance).getUnmanagedReferenceWalkCommands();
+							cmd=cmds.cmd();
 						}
-						case SKIPB_I -> {
-							var siz=cmds.read32();
-							fieldOffset+=siz;
-							continue;
+						
+						//repeat cmd cases
+						switch(cmd){
+							case SKIPF_IF_NULL -> {
+								var offset=cmds.read8();
+								
+								var inst=field.get(ioPool, instance);
+								if(inst!=null){
+									if(inst instanceof Reference ref&&!ref.isNull()) continue;
+									if(inst instanceof ChunkPointer ptr&&!ptr.isNull()) continue;
+								}
+								skipBits|=1L<<offset;
+								continue;
+							}
 						}
-						case SKIPB_L -> {
-							var siz=cmds.read64();
+						break;
+					}
+					
+					//no value cases
+					switch(cmd){
+						case ENDF -> {
+							if(iterator.hasNext()){
+								List<Object> iter=new ArrayList<>();
+								iterator.forEachRemaining(iter::add);
+								LogUtil.println(iter);
+							}
+							break wh;
+						}
+						case SKIPB_B, SKIPB_I, SKIPB_L -> {
+							var extra=cmds.read8();
+							var siz=switch(cmd){
+								case SKIPB_B -> cmds.read8();
+								case SKIPB_I -> cmds.read32();
+								case SKIPB_L -> cmds.read64();
+								default -> throw new ShouldNeverHappenError();
+							};
+							for(int i=0;i<extra;i++){
+								iterator.next();
+							}
 							fieldOffset+=siz;
 							continue;
 						}
 						case SKIPB_UNKOWN -> {
+							var  extra   =cmds.read8();
 							var  sizeDesc=field.getSizeDescriptor();
 							long size    =sizeDesc.calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
-							fieldOffset+=field.getSizeDescriptor().mapSize(WordSpace.BYTE, size);
+							
+							for(int i=0;i<extra;i++){
+								iterator.next();
+							}
+							fieldOffset+=size;
 							continue;
 						}
-						case SKIPF_N_IF_NULL -> {
-							LogUtil.println("SKIPF_N_IF_NULL");
-							throw new NotImplementedException();
+					}
+					
+					//legacy fallback
+					if(cmd==POTENTIAL_REF) break cmd;
+					
+					var  sizeDesc=field.getSizeDescriptor();
+					long size    =sizeDesc.calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
+					
+					try{
+						var accessor=field.getAccessor();
+						if(accessor==null) continue;
+						
+						//auto size advance
+						switch(cmd){
+							case DYNAMIC -> {
+								
+								var inst=field.get(ioPool, instance);
+								if(inst==null) continue;
+								
+								if(inst instanceof IOInstance.Unmanaged valueInstance){
+									long t0v=record?System.nanoTime():0;
+									var  res=walkStructFull(stack, valueInstance, valueInstance.getReference(), valueInstance.getPipe(), pointerRecord, false);
+									if(record){
+										var t1v =System.nanoTime();
+										var diff=t1v-t0v;
+										t0+=diff;
+									}
+									if(fSave(res)){
+										throw new NotImplementedException();//TODO
+									}
+									switch(res&FLOW_MASK){
+										case CONTINUE -> {
+											continue;
+										}
+										case END -> {return END;}
+										case REPEAT -> throw new NotImplementedException();
+										default -> throw new NotImplementedException((res&FLOW_MASK)+"");
+									}
+								}
+								
+								
+								if(inst instanceof IOInstance fieldValueInstance){
+									if(!fieldValueInstance.getThisStruct().getCanHavePointers()) continue;
+									{
+										long t0v=record?System.nanoTime():0;
+										var  res=walkStructFull(stack, fieldValueInstance, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), fieldValueInstance.getThisStruct()), pointerRecord, true);
+										if(record){
+											var t1v =System.nanoTime();
+											var diff=t1v-t0v;
+											t0+=diff;
+										}
+										
+										var result=handleResult(ioPool, instance, pipe, inlinedParent, reference, (IOField<T, Object>)field, inst, res);
+										if(hasResult(result)) return result;
+									}
+									continue;
+								}
+								
+								continue;
+							}
+							case CHPTR -> {
+								var result=handlePtr(stack, instance, pipe, pointerRecord, reference, ioPool, (IOField<T, ChunkPointer>)field);
+								if(hasResult(result)) return result;
+								continue;
+							}
+							default -> throw new NotImplementedException(cmd+"");
 						}
-						case POTENTIAL_REF -> {}
-						default -> throw new NotImplementedException();
+					}catch(Throwable e){
+						String instStr=instanceErrStr(instance);
+						throw new RuntimeException("failed to walk on "+field+" in "+instStr, e);
+					}finally{
+						fieldOffset+=size;
 					}
 				}
 				
@@ -288,33 +399,6 @@ public class MemoryWalker{
 					
 					var dynamic   =field.typeFlag(IOField.DYNAMIC_FLAG);
 					var isInstance=field.typeFlag(IOField.IOINSTANCE_FLAG);
-					
-					if(dynamic){
-						var inst=field.get(ioPool, instance);
-						if(inst==null) continue;
-						type=inst.getClass();
-						
-						if(isInstance&&inst instanceof IOInstance.Unmanaged valueInstance){
-							long t0v=record?System.nanoTime():0;
-							var  res=walkStructFull(stack, valueInstance, valueInstance.getReference(), valueInstance.getPipe(), pointerRecord, false);
-							if(record){
-								var t1v =System.nanoTime();
-								var diff=t1v-t0v;
-								t0+=diff;
-							}
-							if(fSave(res)){
-								throw new NotImplementedException();//TODO
-							}
-							switch(res&FLOW_MASK){
-								case CONTINUE -> {
-									continue;
-								}
-								case END -> {return END;}
-								case REPEAT -> throw new NotImplementedException();
-								default -> throw new NotImplementedException((res&FLOW_MASK)+"");
-							}
-						}
-					}
 					
 					if(field instanceof IOField.Ref<?, ?> refO){
 						IOField.Ref<T, T> refField=(IOField.Ref<T, T>)refO;
@@ -381,9 +465,6 @@ public class MemoryWalker{
 								default -> throw new NotImplementedException(data(res)+"");
 							}
 						}
-					}else if(UtilL.instanceOf(type, ChunkPointer.class)){
-						var result=handlePtr(stack, instance, pipe, pointerRecord, reference, ioPool, (IOField<T, ChunkPointer>)field);
-						if(hasResult(result)) return result;
 					}else{
 						if(type.isArray()){
 							var component=type.componentType();
@@ -449,30 +530,6 @@ public class MemoryWalker{
 							continue;
 						}
 						if(type==String.class){
-							continue;
-						}
-						if(dynamic){
-							var fieldValue=field.get(ioPool, instance);
-							if(fieldValue==null) continue;
-							
-							if(fieldValue instanceof IOInstance fieldValueInstance){
-								if(!fieldValueInstance.getThisStruct().getCanHavePointers()) continue;
-								{
-									long t0v=record?System.nanoTime():0;
-									var  res=walkStructFull(stack, fieldValueInstance, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), fieldValueInstance.getThisStruct()), pointerRecord, true);
-									if(record){
-										var t1v =System.nanoTime();
-										var diff=t1v-t0v;
-										t0+=diff;
-									}
-									
-									var result=handleResult(ioPool, instance, pipe, inlinedParent, reference, (IOField<T, Object>)field, fieldValue, res);
-									if(hasResult(result)) return result;
-									
-								}
-								continue;
-							}
-							
 							continue;
 						}
 						

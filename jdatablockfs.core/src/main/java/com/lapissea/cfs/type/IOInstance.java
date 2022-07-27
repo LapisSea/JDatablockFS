@@ -8,6 +8,7 @@ import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
 
@@ -58,6 +59,14 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>> implements Clone
 				return fs;
 			}
 			return Stream.concat(listDynamicUnmanagedFields(), fs);
+		}
+		
+		public CommandSet.CmdReader getUnmanagedReferenceWalkCommands(){
+			if(getThisStruct().isOverridingDynamicUnmanaged()){
+				throw new NotImplementedException(getThisStruct()+" has dynamic fields! Please implement walk commands!");
+			}else{
+				throw new UnsupportedOperationException();
+			}
 		}
 		
 		public TypeLink getTypeDef(){
