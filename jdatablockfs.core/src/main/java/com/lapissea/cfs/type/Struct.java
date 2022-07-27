@@ -592,8 +592,9 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			if(e==null) sj.add("init-state: "+stateToString(state));
 		}
 		if(state>=STATE_FIELD_MAKE){
-			var fields=getFields();
-			sj.add(fields.size()+" "+TextUtil.plural("field", fields.size()));
+			var fields =getFields();
+			var dynamic=this instanceof Struct.Unmanaged<?> u&&u.isOverridingDynamicUnmanaged();
+			sj.add((dynamic?"+":"")+fields.size()+" "+TextUtil.plural("field", fields.size()+(dynamic?10:0)));
 		}
 		
 		return sj.toString();
