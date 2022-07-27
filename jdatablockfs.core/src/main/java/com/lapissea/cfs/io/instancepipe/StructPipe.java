@@ -184,8 +184,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		var         hasDynmic=getType() instanceof Struct.Unmanaged<?> u&&u.isOverridingDynamicUnmanaged();
 		FieldSet<T> fields;
 		
-		if(hasDynmic){
-			fields=FieldSet.of(Stream.concat(getSpecificFields().stream(), ((Struct.Unmanaged<?>)getType()).getUnmanagedStaticFields().stream().map(f->(IOField<T, ?>)f)).toList());
+		if(getType() instanceof Struct.Unmanaged<?> unmanaged){
+			fields=FieldSet.of(Stream.concat(getSpecificFields().stream(), unmanaged.getUnmanagedStaticFields().stream().map(f->(IOField<T, ?>)f)).toList());
 		}else{
 			fields=getSpecificFields();
 		}
