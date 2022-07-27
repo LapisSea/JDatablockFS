@@ -190,6 +190,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		}else{
 			fields=getSpecificFields();
 		}
+		
 		var refs=fields.stream()
 		               .map(f->f instanceof IOField.Ref<?, ?> ref?ref:null)
 		               .filter(Objects::nonNull)
@@ -201,7 +202,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		for(var field : fields){
 			var refVal=refs.get(field);
 			
-			if(refVal!=null){
+			if(refVal!=null&&refVal.nullable()){
 				var refi=fields.indexOf(field);
 				var vali=fields.indexOf(refVal);
 				if(refi==-1||vali==-1) throw new IllegalStateException();
@@ -257,7 +258,6 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			}
 			
 			throw new NotImplementedException(field+" not handled");
-			
 		}
 		
 		if(hasDynmic) builder.unmanagedRest();

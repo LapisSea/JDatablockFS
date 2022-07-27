@@ -14,27 +14,40 @@ import java.util.function.Consumer;
 public final class CommandSet{
 	
 	public static class Builder{
-		private interface Cmd{
-			void push(Builder builder);
+		private sealed interface Cmd{
+			void push(ContentOutputBuilder dest);
 		}
 		
 		private record Skip(byte cmd, long bytes, int fields) implements Cmd{
+			public Skip{
+				if(cmd!=SKIPB_UNKOWN){
+					var max=switch(cmd){
+						case SKIPB_B -> 255;
+						case SKIPB_I -> Integer.MAX_VALUE;
+						case SKIPB_L -> Long.MAX_VALUE;
+						default -> throw new IllegalStateException("Unexpected value: "+cmd);
+					};
+					checkRange(max, bytes);
+				}
+				checkRange(255, fields);
+			}
+			
 			@Override
-			public void push(Builder builder){
-				builder.cmdId(cmd);
-				builder.write8(fields-1);
+			public void push(ContentOutputBuilder dest){
+				dest.write(cmd);
+				dest.write(fields-1);
 				switch(cmd){
 					case SKIPB_UNKOWN -> {}
-					case SKIPB_B -> builder.write8((int)bytes);
+					case SKIPB_B -> dest.write((int)bytes);
 					case SKIPB_I -> {
 						byte[] bb=new byte[4];
 						MemPrimitive.setInt(bb, 0, (int)bytes);
-						builder.data.write(bb);
+						dest.write(bb);
 					}
 					case SKIPB_L -> {
 						byte[] bb=new byte[8];
 						MemPrimitive.setLong(bb, 0, bytes);
-						builder.data.write(bb);
+						dest.write(bb);
 					}
 					default -> throw new IllegalStateException("Unexpected value: "+cmd);
 				}
@@ -42,39 +55,78 @@ public final class CommandSet{
 			}
 		}
 		
-		private final ContentOutputBuilder data     =new ContentOutputBuilder();
-		private final List<Cmd>            optionals=new ArrayList<>();
-		private       boolean              done;
+		private record Obj(byte cmd, boolean calcSize) implements Cmd{
+			public Obj{
+				if(!List.of(
+					POTENTIAL_REF,
+					DYNAMIC,
+					CHPTR
+				).contains(cmd)) throw new IllegalArgumentException(cmd+"");
+			}
+			@Override
+			public void push(ContentOutputBuilder dest){
+				dest.write(cmd);
+				dest.writeBoolean(calcSize);
+			}
+		}
+		
+		private record SkipFlow(int fieldOffset) implements Cmd{
+			public SkipFlow{
+				checkRange(63, fieldOffset);
+			}
+			@Override
+			public void push(ContentOutputBuilder dest){
+				dest.write(SKIPF_IF_NULL);
+				dest.write(fieldOffset);
+			}
+		}
+		
+		private record EndFlow(byte cmd) implements Cmd{
+			private EndFlow{
+				if(!List.of(ENDF, UNMANAGED_REST).contains(cmd)) throw new IllegalArgumentException();
+			}
+			@Override
+			public void push(ContentOutputBuilder dest){
+				dest.write(cmd);
+			}
+		}
+		
+		private final List<Cmd> commands =new ArrayList<>();
+		private final List<Cmd> optionals=new ArrayList<>();
+		private       boolean   done;
 		
 		public void endFlow(){
 			requireNotDone();
 			optionals.clear();
-			cmdId(ENDF);
+			
+			if(!commands.isEmpty()){
+				var last=commands.get(commands.size()-1);
+				switch(last){
+					case Obj o -> commands.set(commands.size()-1, new Obj(o.cmd, false));
+					default -> {}
+				}
+			}
+			
+			addRequired(new EndFlow(ENDF));
 			done=true;
 		}
 		public void unmanagedRest(){
-			requireNotDone();
-			flushOptional();
-			cmdId(UNMANAGED_REST);
+			addRequired(new EndFlow(UNMANAGED_REST));
 			done=true;
 		}
 		
 		public void skipBytes8(int bytes){
-			requireNotDone();
-			optionals.add(new Skip(SKIPB_B, bytes, 1));
+			addOptional(new Skip(SKIPB_B, bytes, 1));
 		}
 		public void skipBytes32(int bytes){
-			requireNotDone();
-			optionals.add(new Skip(SKIPB_I, bytes, 1));
+			addOptional(new Skip(SKIPB_I, bytes, 1));
 		}
 		public void skipBytes64(long bytes){
-			requireNotDone();
-			optionals.add(new Skip(SKIPB_L, bytes, 1));
+			addOptional(new Skip(SKIPB_L, bytes, 1));
 		}
 		
 		public void skipBytesUnknown(){
-			requireNotDone();
-			optionals.add(new Skip(SKIPB_UNKOWN, -1, 1));
+			addOptional(new Skip(SKIPB_UNKOWN, -1, 1));
 		}
 		
 		public void skipField(IOField<?, ?> field){
@@ -97,29 +149,18 @@ public final class CommandSet{
 		}
 		
 		public void skipFlowIfNull(int offset){
-			flushOptional();
-			cmdId(SKIPF_IF_NULL);
-			checkRange(63, offset);
-			data.write(offset);
+			addRequired(new SkipFlow(offset));
 		}
 		
 		public void potentialReference(){
-			flushOptional();
-			cmdId(POTENTIAL_REF);
+			addRequired(new Obj(POTENTIAL_REF, true));
 		}
 		
 		public void dynamic(){
-			flushOptional();
-			cmdId(DYNAMIC);
+			addRequired(new Obj(DYNAMIC, true));
 		}
 		public void chptr(){
-			flushOptional();
-			cmdId(CHPTR);
-		}
-		
-		private void write8(int value){
-			checkRange(255, value);
-			data.write(value);
+			addRequired(new Obj(CHPTR, true));
 		}
 		
 		private void flushOptional(){
@@ -150,18 +191,22 @@ public final class CommandSet{
 				}
 			}
 			
-			for(Cmd cmd : optionals){
-				cmd.push(this);
-			}
+			commands.addAll(optionals);
 			optionals.clear();
 		}
 		
-		private void cmdId(byte id){
+		private void addOptional(Cmd cmd){
 			requireNotDone();
-			data.write(id);
+			optionals.add(cmd);
 		}
 		
-		private void checkRange(long max, long value){
+		private void addRequired(Cmd cmd){
+			requireNotDone();
+			flushOptional();
+			commands.add(cmd);
+		}
+		
+		private static void checkRange(long max, long value){
 			if(value<0) throw new IllegalArgumentException("value must be positive");
 			if(value>max) throw new IllegalArgumentException("value can not be larger than "+max);
 		}
@@ -171,7 +216,12 @@ public final class CommandSet{
 		
 		public CommandSet build(){
 			if(!done) throw new IllegalStateException("not done");
-			return new CommandSet(data.toByteArray());
+			
+			var buff=new ContentOutputBuilder();
+			for(Cmd command : commands){
+				command.push(buff);
+			}
+			return new CommandSet(buff.toByteArray());
 		}
 	}
 	
@@ -189,15 +239,14 @@ public final class CommandSet{
 		int read8();
 		int read32();
 		long read64();
+		boolean readBool();
 	}
 	
-	public static final class RepeaterEnd implements CmdReader{
-		private final byte[] code;
-		private       int    pos;
-		private       long   remainingRepeats;
+	public static final class RepeaterEnd extends BakedCmdReader{
+		private long remainingRepeats;
 		
 		public RepeaterEnd(CommandSet repeatedSet, long repeats){
-			code=repeatedSet.code;
+			super(repeatedSet.code);
 			this.remainingRepeats=repeats;
 		}
 		
@@ -212,28 +261,11 @@ public final class CommandSet{
 			
 			return code[pos++];
 		}
-		
-		@Override
-		public int read8(){
-			return code[pos++]&0xFF;
-		}
-		@Override
-		public int read32(){
-			var p=pos;
-			pos+=4;
-			return MemPrimitive.getInt(code, p);
-		}
-		@Override
-		public long read64(){
-			var p=pos;
-			pos+=8;
-			return MemPrimitive.getLong(code, p);
-		}
 	}
 	
-	public static final class BakedCmdReader implements CmdReader{
-		private final byte[] code;
-		private       int    pos;
+	public static class BakedCmdReader implements CmdReader{
+		protected final byte[] code;
+		protected       int    pos;
 		
 		private BakedCmdReader(byte[] code){
 			this.code=code;
@@ -259,6 +291,10 @@ public final class CommandSet{
 			var p=pos;
 			pos+=8;
 			return MemPrimitive.getLong(code, p);
+		}
+		@Override
+		public boolean readBool(){
+			return code[pos++]==1;
 		}
 	}
 	

@@ -240,7 +240,8 @@ public class MemoryWalker{
 					}
 					break;
 				}
-				
+				final boolean sized;
+				final long    size;
 				IOField<T, ?> field=iterator.next();
 				
 				if(skipBits>0) skipBits >>>= 1;
@@ -305,21 +306,28 @@ public class MemoryWalker{
 						case SKIPB_UNKOWN -> {
 							var  extra   =cmds.read8();
 							var  sizeDesc=field.getSizeDescriptor();
-							long size    =sizeDesc.calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
+							long skipSize=sizeDesc.calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
 							
 							for(int i=0;i<extra;i++){
 								iterator.next();
 							}
-							fieldOffset+=size;
+							fieldOffset+=skipSize;
 							continue;
 						}
+					}
+					
+					sized=cmds.readBool();
+					
+					if(sized){
+						var sizeDesc=field.getSizeDescriptor();
+						size=sizeDesc.calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
+					}else{
+						size=-1;
 					}
 					
 					//legacy fallback
 					if(cmd==POTENTIAL_REF) break cmd;
 					
-					var  sizeDesc=field.getSizeDescriptor();
-					long size    =sizeDesc.calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
 					
 					try{
 						var accessor=field.getAccessor();
@@ -384,12 +392,11 @@ public class MemoryWalker{
 						String instStr=instanceErrStr(instance);
 						throw new RuntimeException("failed to walk on "+field+" in "+instStr, e);
 					}finally{
-						fieldOffset+=size;
+						if(sized){
+							fieldOffset+=size;
+						}
 					}
 				}
-				
-				var  sizeDesc=field.getSizeDescriptor();
-				long size    =sizeDesc.calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
 				
 				try{
 					var accessor=field.getAccessor();
@@ -539,7 +546,9 @@ public class MemoryWalker{
 					String instStr=instanceErrStr(instance);
 					throw new RuntimeException("failed to walk on "+field+" in "+instStr, e);
 				}finally{
-					fieldOffset+=field.getSizeDescriptor().mapSize(WordSpace.BYTE, size);
+					if(sized){
+						fieldOffset+=field.getSizeDescriptor().mapSize(WordSpace.BYTE, size);
+					}
 				}
 			}
 		}finally{
