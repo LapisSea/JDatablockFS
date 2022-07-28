@@ -218,6 +218,10 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>> extends Ba
 			       equalsVals(that)&&
 			       accessor==that.accessor;
 		}
+		@Override
+		public String toString(){
+			return "NS("+accessor.getName()+"): "+BasicSizeDescriptor.toString(this);
+		}
 	}
 	
 	<T extends IOInstance<T>> SizeDescriptor<T> map(Function<T, Inst> mapping);
