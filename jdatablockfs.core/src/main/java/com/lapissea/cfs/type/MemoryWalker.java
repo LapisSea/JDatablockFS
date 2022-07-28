@@ -240,8 +240,6 @@ public class MemoryWalker{
 					}
 					break;
 				}
-				final boolean sized;
-				final long    size;
 				IOField<T, ?> field=iterator.next();
 				
 				if(skipBits>0) skipBits >>>= 1;
@@ -282,11 +280,6 @@ public class MemoryWalker{
 					//no value cases
 					switch(cmd){
 						case ENDF -> {
-							if(iterator.hasNext()){
-								List<Object> iter=new ArrayList<>();
-								iterator.forEachRemaining(iter::add);
-								LogUtil.println(iter);
-							}
 							break wh;
 						}
 						case SKIPB_B, SKIPB_I, SKIPB_L -> {
@@ -316,17 +309,22 @@ public class MemoryWalker{
 						}
 					}
 					
-					sized=cmds.readBool();
+					var  sized=cmds.readBool();
+					long size;
 					
 					if(sized){
 						var sizeDesc=field.getSizeDescriptor();
 						size=sizeDesc.calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
 					}else{
-						size=-1;
+						size=0;
 					}
 					
 					//legacy fallback
-					if(cmd==POTENTIAL_REF) break cmd;
+					if(cmd==POTENTIAL_REF){
+						if(field instanceof IOField.Ref){
+							cmd=REF_FIELD;
+						}
+					}
 					
 					
 					try{
@@ -335,8 +333,76 @@ public class MemoryWalker{
 						
 						//auto size advance
 						switch(cmd){
-							case DYNAMIC -> {
+							case REF_FIELD -> {
+								var dynamic   =field.typeFlag(IOField.DYNAMIC_FLAG);
+								var isInstance=field.typeFlag(IOField.IOINSTANCE_FLAG);
 								
+								IOField.Ref<T, T> refField=(IOField.Ref<T, T>)field;
+								var               ref     =refField.getReference(instance);
+								
+								if(ref.isNull()) continue;
+								
+								{
+									long t0v=record?System.nanoTime():0;
+									var  res=pointerRecord.log(reference, instance, refField, ref);
+									if(record){
+										var t1v =System.nanoTime();
+										var diff=t1v-t0v;
+										t0+=diff;
+									}
+									checkResult(res);
+									if(fSave(res)&&data(res)==CONTINUE&&inlinedParent&&field.getSizeDescriptor().hasFixed()){
+										inlineDirtyButContinue=true;
+									}else{
+										if(fSave(res)){
+											if(inlinedParent){
+												return SAVE|END;
+											}
+											
+											try(var io=reference.io(provider)){
+												pipe.write(provider, io, instance);
+											}
+										}
+										switch(data(res)){
+											case CONTINUE -> {}
+											case END -> {return END;}
+											case REPEAT -> throw new NotImplementedException();
+											default -> throw new NotImplementedException(data(res)+"");
+										}
+									}
+								}
+								{
+									if(!isInstance){
+										continue;
+									}
+									if(!dynamic){
+										var typ=refField.getAccessor().getType();
+										if(!Struct.ofUnknown(typ).getCanHavePointers()){
+											continue;
+										}
+									}
+									
+									var instRefField=(IOField.Ref<T, T> & IOField.Ref.Inst<T, T>)refField;
+									
+									long t0v=record?System.nanoTime():0;
+									var  res=walkStructFull(stack, instRefField.get(ioPool, instance), ref, instRefField.getReferencedPipe(instance), pointerRecord, false);
+									if(record){
+										var t1v =System.nanoTime();
+										var diff=t1v-t0v;
+										t0+=diff;
+									}
+									if(fSave(res)){
+										throw new NotImplementedException();//TODO
+									}
+									switch(data(res)){
+										case CONTINUE -> {}
+										case END -> {return END;}
+										case REPEAT -> throw new NotImplementedException();
+										default -> throw new NotImplementedException(data(res)+"");
+									}
+								}
+							}
+							case DYNAMIC -> {
 								var inst=field.get(ioPool, instance);
 								if(inst==null) continue;
 								
@@ -376,15 +442,88 @@ public class MemoryWalker{
 										var result=handleResult(ioPool, instance, pipe, inlinedParent, reference, (IOField<T, Object>)field, inst, res);
 										if(hasResult(result)) return result;
 									}
-									continue;
 								}
-								
-								continue;
 							}
 							case CHPTR -> {
 								var result=handlePtr(stack, instance, pipe, pointerRecord, reference, ioPool, (IOField<T, ChunkPointer>)field);
 								if(hasResult(result)) return result;
-								continue;
+							}
+							case POTENTIAL_REF -> {
+								
+								Class<?> type=accessor.getType();
+								
+								var isInstance=field.typeFlag(IOField.IOINSTANCE_FLAG);
+								
+								{
+									if(type.isArray()){
+										var component=type.componentType();
+										if(IOInstance.isInstance(component)){
+											if(!Struct.ofUnknown(component).getCanHavePointers()){
+												continue;
+											}
+											var array=(IOInstance<?>[])field.get(ioPool, instance);
+											if(array==null||array.length==0) continue;
+											var pip=StructPipe.of(pipe.getClass(), array[0].getThisStruct());
+											for(IOInstance<?> inst : array){
+												{
+													long t0v=record?System.nanoTime():0;
+													var  res=walkStructFull(stack, (T)inst, reference.addOffset(fieldOffset), pip, pointerRecord, true);
+													if(record){
+														var t1v =System.nanoTime();
+														var diff=t1v-t0v;
+														t0+=diff;
+													}
+													if(fSave(res)){
+														throw new NotImplementedException();//TODO
+													}
+													switch(data(res)){
+														case CONTINUE -> {}
+														case END -> {return END;}
+														case REPEAT -> throw new NotImplementedException();
+														default -> throw new NotImplementedException(data(res)+"");
+													}
+												}
+												fieldOffset+=pip.calcUnknownSize(provider, inst, WordSpace.BYTE);
+											}
+											continue;
+										}
+										if(SupportedPrimitive.isAny(component)){
+											continue;
+										}
+										if(component==String.class){
+											continue;
+										}
+									}
+									if(isInstance){
+										var fieldValue=(IOInstance<?>)field.get(ioPool, instance);
+										if(fieldValue!=null){
+											{
+												long t0v=record?System.nanoTime():0;
+												var  res=walkStructFull(stack, (T)fieldValue, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), fieldValue.getThisStruct()), pointerRecord, true);
+												if(record){
+													var t1v =System.nanoTime();
+													var diff=t1v-t0v;
+													t0+=diff;
+												}
+												if(fSave(res)&&data(res)==CONTINUE&&inlinedParent){
+													inlineDirtyButContinue=true;
+												}else{
+													var result=handleResult(ioPool, instance, pipe, inlinedParent, reference, (IOField<T, IOInstance<?>>)field, fieldValue, res);
+													if(hasResult(result)) return result;
+												}
+											}
+										}
+										continue;
+									}
+									if(SupportedPrimitive.isAny(type)){
+										continue;
+									}
+									if(type==String.class){
+										continue;
+									}
+									
+									throw new RuntimeException(TextUtil.toString("unmanaged walk type:", type.toString(), field.getAccessor()));
+								}
 							}
 							default -> throw new NotImplementedException(cmd+"");
 						}
@@ -395,159 +534,6 @@ public class MemoryWalker{
 						if(sized){
 							fieldOffset+=size;
 						}
-					}
-				}
-				
-				try{
-					var accessor=field.getAccessor();
-					if(accessor==null) continue;
-					
-					Class<?> type=accessor.getType();
-					
-					var dynamic   =field.typeFlag(IOField.DYNAMIC_FLAG);
-					var isInstance=field.typeFlag(IOField.IOINSTANCE_FLAG);
-					
-					if(field instanceof IOField.Ref<?, ?> refO){
-						IOField.Ref<T, T> refField=(IOField.Ref<T, T>)refO;
-						var               ref     =refField.getReference(instance);
-						
-						if(ref.isNull()) continue;
-						
-						{
-							long t0v=record?System.nanoTime():0;
-							var  res=pointerRecord.log(reference, instance, refField, ref);
-							if(record){
-								var t1v =System.nanoTime();
-								var diff=t1v-t0v;
-								t0+=diff;
-							}
-							checkResult(res);
-							if(fSave(res)&&data(res)==CONTINUE&&inlinedParent&&field.getSizeDescriptor().hasFixed()){
-								inlineDirtyButContinue=true;
-							}else{
-								if(fSave(res)){
-									if(inlinedParent){
-										return SAVE|END;
-									}
-									
-									try(var io=reference.io(provider)){
-										pipe.write(provider, io, instance);
-									}
-								}
-								switch(data(res)){
-									case CONTINUE -> {}
-									case END -> {return END;}
-									case REPEAT -> throw new NotImplementedException();
-									default -> throw new NotImplementedException(data(res)+"");
-								}
-							}
-						}
-						{
-							if(!isInstance){
-								continue;
-							}
-							if(!dynamic){
-								var typ=refField.getAccessor().getType();
-								if(!Struct.ofUnknown(typ).getCanHavePointers()){
-									continue;
-								}
-							}
-							
-							var instRefField=(IOField.Ref<T, T> & IOField.Ref.Inst<T, T>)refField;
-							
-							long t0v=record?System.nanoTime():0;
-							var  res=walkStructFull(stack, instRefField.get(ioPool, instance), ref, instRefField.getReferencedPipe(instance), pointerRecord, false);
-							if(record){
-								var t1v =System.nanoTime();
-								var diff=t1v-t0v;
-								t0+=diff;
-							}
-							if(fSave(res)){
-								throw new NotImplementedException();//TODO
-							}
-							switch(data(res)){
-								case CONTINUE -> {}
-								case END -> {return END;}
-								case REPEAT -> throw new NotImplementedException();
-								default -> throw new NotImplementedException(data(res)+"");
-							}
-						}
-					}else{
-						if(type.isArray()){
-							var component=type.componentType();
-							if(IOInstance.isInstance(component)){
-								if(!Struct.ofUnknown(component).getCanHavePointers()){
-									continue;
-								}
-								var array=(IOInstance<?>[])field.get(ioPool, instance);
-								if(array==null||array.length==0) continue;
-								var pip=StructPipe.of(pipe.getClass(), array[0].getThisStruct());
-								for(IOInstance<?> inst : array){
-									{
-										long t0v=record?System.nanoTime():0;
-										var  res=walkStructFull(stack, (T)inst, reference.addOffset(fieldOffset), pip, pointerRecord, true);
-										if(record){
-											var t1v =System.nanoTime();
-											var diff=t1v-t0v;
-											t0+=diff;
-										}
-										if(fSave(res)){
-											throw new NotImplementedException();//TODO
-										}
-										switch(data(res)){
-											case CONTINUE -> {}
-											case END -> {return END;}
-											case REPEAT -> throw new NotImplementedException();
-											default -> throw new NotImplementedException(data(res)+"");
-										}
-									}
-									fieldOffset+=pip.calcUnknownSize(provider, inst, WordSpace.BYTE);
-								}
-								continue;
-							}
-							if(SupportedPrimitive.isAny(component)){
-								continue;
-							}
-							if(component==String.class){
-								continue;
-							}
-						}
-						if(isInstance){
-							var fieldValue=(IOInstance<?>)field.get(ioPool, instance);
-							if(fieldValue!=null){
-								{
-									long t0v=record?System.nanoTime():0;
-									var  res=walkStructFull(stack, (T)fieldValue, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), fieldValue.getThisStruct()), pointerRecord, true);
-									if(record){
-										var t1v =System.nanoTime();
-										var diff=t1v-t0v;
-										t0+=diff;
-									}
-									if(fSave(res)&&data(res)==CONTINUE&&inlinedParent){
-										inlineDirtyButContinue=true;
-									}else{
-										var result=handleResult(ioPool, instance, pipe, inlinedParent, reference, (IOField<T, IOInstance<?>>)field, fieldValue, res);
-										if(hasResult(result)) return result;
-									}
-								}
-							}
-							continue;
-						}
-						if(SupportedPrimitive.isAny(type)){
-							continue;
-						}
-						if(type==String.class){
-							continue;
-						}
-						
-						throw new RuntimeException(TextUtil.toString("unmanaged walk type:", type.toString(), field.getAccessor()));
-					}
-				}catch(Throwable e){
-					String instStr=instanceErrStr(instance);
-					throw new RuntimeException("failed to walk on "+field+" in "+instStr, e);
-				}finally{
-					if(sized){
-						fieldOffset+=field.getSizeDescriptor().mapSize(WordSpace.BYTE, size);
 					}
 				}
 			}

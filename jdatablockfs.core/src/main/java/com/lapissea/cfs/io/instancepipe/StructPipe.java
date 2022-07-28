@@ -219,6 +219,11 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				continue;
 			}
 			
+			if(field instanceof IOField.Ref){
+				builder.referenceField();
+				continue;
+			}
+			
 			var accessor=field.getAccessor();
 			if(accessor==null){
 				builder.skipField(field);

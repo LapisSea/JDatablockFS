@@ -167,6 +167,10 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 		b.potentialReference();
 		b.endFlow();
 	});
+	private static final CommandSet REFF_SET=CommandSet.builder(b->{
+		b.referenceField();
+		b.endFlow();
+	});
 	
 	@Override
 	public CommandSet.CmdReader getUnmanagedReferenceWalkCommands(){
@@ -178,8 +182,8 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 				if(!struct.getCanHavePointers()) yield END_SET.reader();
 				yield new CommandSet.RepeaterEnd(PREF_SET, size());
 			}
-			case ValueStorage.UnmanagedInstance<?> __ -> new CommandSet.RepeaterEnd(PREF_SET, size());
-			case ValueStorage.FixedReferencedInstance<?> __ -> new CommandSet.RepeaterEnd(PREF_SET, size());
+			case ValueStorage.UnmanagedInstance<?> __ -> new CommandSet.RepeaterEnd(REFF_SET, size());
+			case ValueStorage.FixedReferencedInstance<?> __ -> new CommandSet.RepeaterEnd(REFF_SET, size());
 			case ValueStorage.InlineString __ -> END_SET.reader();
 			case ValueStorage.Instance<?> stor -> {
 				var struct=stor.getPipe().getType();

@@ -60,7 +60,8 @@ public final class CommandSet{
 				if(!List.of(
 					POTENTIAL_REF,
 					DYNAMIC,
-					CHPTR
+					CHPTR,
+					REF_FIELD
 				).contains(cmd)) throw new IllegalArgumentException(cmd+"");
 			}
 			@Override
@@ -154,6 +155,9 @@ public final class CommandSet{
 		
 		public void potentialReference(){
 			addRequired(new Obj(POTENTIAL_REF, true));
+		}
+		public void referenceField(){
+			addRequired(new Obj(REF_FIELD, true));
 		}
 		
 		public void dynamic(){
@@ -308,6 +312,7 @@ public final class CommandSet{
 	public static final byte POTENTIAL_REF =7;
 	public static final byte DYNAMIC       =8;
 	public static final byte CHPTR         =9;
+	public static final byte REF_FIELD     =10;
 	
 	
 	private final byte[] code;
@@ -340,6 +345,7 @@ public final class CommandSet{
 				case POTENTIAL_REF -> "POTENTIAL_REF";
 				case DYNAMIC -> "DYNAMIC";
 				case CHPTR -> "CHPTR";
+				case REF_FIELD -> "REF_FIELD";
 				default -> throw new IllegalStateException("Unexpected value: "+cmd);
 			});
 			
