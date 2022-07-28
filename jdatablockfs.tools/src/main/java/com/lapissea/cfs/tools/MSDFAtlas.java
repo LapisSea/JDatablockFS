@@ -19,7 +19,7 @@ public class MSDFAtlas{
 	public static final class Info{
 		private final String type;
 		private final int    distanceRange;
-		private final int    size;
+		private final double size;
 		private final int    width;
 		private final int    height;
 		private final String yOrigin;
@@ -37,7 +37,7 @@ public class MSDFAtlas{
 		public int getDistanceRange(){
 			return distanceRange;
 		}
-		public int getSize(){
+		public double getSize(){
 			return size;
 		}
 		public int getWidth(){

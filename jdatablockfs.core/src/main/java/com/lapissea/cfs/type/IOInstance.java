@@ -26,9 +26,10 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>> implements Clone
 	
 	public abstract static class Unmanaged<SELF extends Unmanaged<SELF>> extends IOInstance<SELF> implements DataProvider.Holder{
 		
-		private final DataProvider provider;
-		private       Reference    reference;
-		private final TypeLink     typeDef;
+		private final DataProvider   provider;
+		private       Reference      reference;
+		private final TypeLink       typeDef;
+		private       GenericContext genericCtx;
 		
 		private StructPipe<SELF> pipe;
 		
@@ -69,26 +70,28 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>> implements Clone
 			}
 		}
 		
-		public TypeLink getTypeDef(){
+		public final TypeLink getTypeDef(){
 			return typeDef;
 		}
 		
-		public GenericContext getGenerics(){
-			return getThisStruct().describeGenerics(typeDef);
+		
+		public final GenericContext getGenerics(){
+			if(genericCtx==null) genericCtx=getThisStruct().describeGenerics(typeDef);
+			return genericCtx;
 		}
 		
 		@Override
-		public DataProvider getDataProvider(){
+		public final DataProvider getDataProvider(){
 			return provider;
 		}
 		
-		protected boolean isSelfDataEmpty() throws IOException{
+		protected final boolean isSelfDataEmpty() throws IOException{
 			try(var io=selfIO()){
 				return io.getSize()==0;
 			}
 		}
 		
-		public void notifyReferenceMovement(Reference newRef){
+		public final void notifyReferenceMovement(Reference newRef){
 			newRef.requireNonNull();
 			
 			if(DEBUG_VALIDATION) ensureDataIntegrity(newRef);
@@ -134,7 +137,7 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>> implements Clone
 			notifyFreed();
 		}
 		
-		protected RandomIO selfIO() throws IOException{
+		protected final RandomIO selfIO() throws IOException{
 			return reference.io(provider);
 		}
 		
@@ -142,12 +145,12 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>> implements Clone
 			return ContiguousStructPipe.of(getThisStruct());
 		}
 		
-		public StructPipe<SELF> getPipe(){
+		public final StructPipe<SELF> getPipe(){
 			if(pipe==null) pipe=newPipe();
 			return pipe;
 		}
 		
-		protected void writeManagedFields() throws IOException{
+		protected final void writeManagedFields() throws IOException{
 			if(readOnly){
 				throw new UnsupportedOperationException();
 			}
@@ -155,36 +158,36 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>> implements Clone
 				getPipe().write(provider, io, self());
 			}
 		}
-		protected void readManagedFields() throws IOException{
+		protected final void readManagedFields() throws IOException{
 			try(var io=selfIO()){
 				getPipe().read(provider, io, self(), getGenerics());
 			}
 		}
 		
-		protected void readManagedField(IOField<SELF, ?> field) throws IOException{
+		protected final void readManagedField(IOField<SELF, ?> field) throws IOException{
 			try(var io=getReference().io(this)){
 				getPipe().readSingleField(getPipe().makeIOPool(), provider, io, field, self(), getGenerics());
 			}
 		}
 		
-		protected void writeManagedField(IOField<SELF, ?> field) throws IOException{
+		protected final void writeManagedField(IOField<SELF, ?> field) throws IOException{
 			try(var io=getReference().io(this)){
 				getPipe().writeSingleField(provider, io, field, self());
 			}
 		}
 		
-		protected long calcInstanceSize(WordSpace wordSpace){
+		protected final long calcInstanceSize(WordSpace wordSpace){
 			var siz=getPipe().getSizeDescriptor();
 			var f  =siz.getFixed(wordSpace);
 			if(f.isPresent()) return f.getAsLong();
 			return siz.calcUnknown(getPipe().makeIOPool(), getDataProvider(), self(), wordSpace);
 		}
 		
-		public Reference getReference(){
+		public final Reference getReference(){
 			return reference;
 		}
 		
-		protected void allocateNulls() throws IOException{
+		protected final void allocateNulls() throws IOException{
 			allocateNulls(getDataProvider());
 		}
 	}

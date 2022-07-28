@@ -17,7 +17,6 @@ import java.awt.Color;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.Point2D;
 import java.io.File;
-import java.io.IOException;
 import java.util.Deque;
 import java.util.LinkedList;
 import java.util.concurrent.CompletableFuture;
@@ -108,7 +107,7 @@ public class OpenGLBackend extends RenderBackend{
 			var atlas=new MSDFAtlas(path);
 			
 			font=new AtlasFont(atlas, this, this::markFrameDirty, this::runLater);
-		}catch(IOException e){
+		}catch(Throwable e){
 			throw new RuntimeException("failed to load font", e);
 		}
 		
