@@ -113,15 +113,17 @@ public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, 
 	private static class OptimizedChunkPipe extends ContiguousStructPipe<Chunk>{
 		
 		static{
-			var check="bodyNumSize + nextSize 1 byte capacity 0-8 bytes size 0-8 bytes nextPtr 0-8 bytes ";
-			var sb   =new StringBuilder(check.length());
-			var p    =ContiguousStructPipe.of(STRUCT, STATE_DONE);
-			for(IOField<Chunk, ?> specificField : p.getSpecificFields()){
-				sb.append(specificField.getName()).append(' ').append(specificField.getSizeDescriptor()).append(' ');
-			}
-			var res=sb.toString();
-			if(!check.equals(res)){
-				throw new ShouldNeverHappenError("\n"+check+"\n"+res);
+			if(DEBUG_VALIDATION){
+				var check="bodyNumSize + nextSize 1 byte capacity NS(bodyNumSize): 0-8 bytes size NS(bodyNumSize): 0-8 bytes nextPtr NS(nextSize): 0-8 bytes ";
+				var sb   =new StringBuilder(check.length());
+				var p    =ContiguousStructPipe.of(STRUCT, STATE_DONE);
+				for(IOField<Chunk, ?> specificField : p.getSpecificFields()){
+					sb.append(specificField.getName()).append(' ').append(specificField.getSizeDescriptor()).append(' ');
+				}
+				var res=sb.toString();
+				if(!check.equals(res)){
+					throw new ShouldNeverHappenError("\n"+check+"\n"+res);
+				}
 			}
 		}
 		

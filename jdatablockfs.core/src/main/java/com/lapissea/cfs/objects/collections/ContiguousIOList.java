@@ -152,13 +152,14 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 	@NotNull
 	@Override
 	public Stream<IOField<ContiguousIOList<T>, ?>> listDynamicUnmanagedFields(){
-		var typ      =getTypeDef().arg(0).generic(getDataProvider().getTypeDb());
-		var unmanaged=storage instanceof ValueStorage.UnmanagedInstance;
+		var typeDatabase=getDataProvider().getTypeDb();
+		var genericType =getTypeDef().arg(0).generic(typeDatabase);
+		var unmanaged   =storage instanceof ValueStorage.UnmanagedInstance;
 		return LongStream.range(0, size()).mapToObj(index->{
 			if(unmanaged){
-				return (IOField<ContiguousIOList<T>, ?>)(Object)eFieldUnmanagedInst(typ, index);
+				return (IOField<ContiguousIOList<T>, ?>)(Object)eFieldUnmanagedInst(genericType, index);
 			}
-			return storage.field(fieldAccessor(typ, index), ()->ioAtElement(index));
+			return storage.field(fieldAccessor(genericType, index), ()->ioAtElement(index));
 		});
 	}
 	
