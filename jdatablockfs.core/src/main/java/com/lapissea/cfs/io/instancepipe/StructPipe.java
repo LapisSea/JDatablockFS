@@ -47,9 +47,10 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			P make(Struct<T> type, boolean runNow);
 		}
 		
-		private final Map<Struct<T>, Supplier<P>> specials=new HashMap<>();
-		private final PipeConstructor<T, P>       lConstructor;
-		private final Class<?>                    type;
+		private final Map<Struct<T>, Supplier<P>>           specials=new HashMap<>();
+		private final PipeConstructor<T, P>                 lConstructor;
+		private final Class<?>                              type;
+		private final Map<Struct<T>, MalformedStructLayout> errors  =new ConcurrentHashMap<>();
 		
 		private StructGroup(Class<? extends StructPipe<?>> type){
 			try{
@@ -63,8 +64,10 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		P make(Struct<T> struct, boolean runNow){
 			var cached=get(struct);
 			if(cached!=null) return cached;
+			var err=errors.get(struct);
+			if(err!=null) throw err;
 			
-			COMPILATION.log("Requested pipe: {}", struct.getType().getName());
+			COMPILATION.log("Requested pipe({}): {}", shortPipeName(type), struct.getType().getName());
 			
 			P created;
 			try{
@@ -75,7 +78,9 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 					created=lConstructor.make(struct, runNow);
 				}
 			}catch(Throwable e){
-				throw new MalformedStructLayout("Failed to compile "+type.getSimpleName()+" for "+struct.getType().getName(), e);
+				var me=new MalformedStructLayout("Failed to compile "+type.getSimpleName()+" for "+struct.getType().getName(), e);
+				errors.put(struct, me);
+				throw me;
 			}
 			
 			put(struct, created);
@@ -696,13 +701,16 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	
 	@Override
 	public String toString(){
-		var pipName=getClass().getSimpleName();
+		return shortPipeName(getClass())+"("+type.getType().getSimpleName()+")";
+	}
+	
+	private static String shortPipeName(Class<?> cls){
+		var pipName=cls.getSimpleName();
 		var end    ="StructPipe";
 		if(pipName.endsWith(end)){
 			pipName="~~"+pipName.substring(0, pipName.length()-end.length());
 		}
-		
-		return pipName+"("+type.getType().getSimpleName()+")";
+		return pipName;
 	}
 	
 	@Override
