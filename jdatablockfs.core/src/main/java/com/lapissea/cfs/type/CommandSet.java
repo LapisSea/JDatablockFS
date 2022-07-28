@@ -84,7 +84,10 @@ public final class CommandSet{
 		
 		private record EndFlow(byte cmd) implements Cmd{
 			private EndFlow{
-				if(!List.of(ENDF, UNMANAGED_REST).contains(cmd)) throw new IllegalArgumentException();
+				if(!List.of(
+					ENDF,
+					UNMANAGED_REST
+				).contains(cmd)) throw new IllegalArgumentException();
 			}
 			@Override
 			public void push(ContentOutputBuilder dest){
@@ -102,9 +105,8 @@ public final class CommandSet{
 			
 			if(!commands.isEmpty()){
 				var last=commands.get(commands.size()-1);
-				switch(last){
-					case Obj o -> commands.set(commands.size()-1, new Obj(o.cmd, false));
-					default -> {}
+				if(last instanceof Obj o){
+					commands.set(commands.size()-1, new Obj(o.cmd, false));
 				}
 			}
 			

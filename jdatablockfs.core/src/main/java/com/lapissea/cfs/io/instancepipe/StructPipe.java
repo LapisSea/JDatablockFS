@@ -265,8 +265,11 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			throw new NotImplementedException(field+" not handled");
 		}
 		
-		if(hasDynmic) builder.unmanagedRest();
-		else builder.endFlow();
+		if(hasDynmic){
+			builder.unmanagedRest();
+		}else{
+			builder.endFlow();
+		}
 		
 		return builder.build();
 	}
