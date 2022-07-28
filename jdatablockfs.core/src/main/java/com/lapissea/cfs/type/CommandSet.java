@@ -342,14 +342,19 @@ public final class CommandSet{
 				case SKIPB_L -> "SKIPB_L("+reader.read8()+" jump, "+reader.read64()+" bytes)";
 				case SKIPB_UNKOWN -> "SKIPB_UNKOWN("+reader.read8()+" fields)";
 				case SKIPF_IF_NULL -> "SKIPF_IF_NULL("+reader.read8()+" offset)";
-				case POTENTIAL_REF -> "POTENTIAL_REF";
-				case DYNAMIC -> "DYNAMIC";
-				case CHPTR -> "CHPTR";
-				case REF_FIELD -> "REF_FIELD";
+				case POTENTIAL_REF -> obj(reader, "POTENTIAL_REF");
+				case DYNAMIC -> obj(reader, "DYNAMIC");
+				case CHPTR -> obj(reader, "CHPTR");
+				case REF_FIELD -> obj(reader, "REF_FIELD");
 				default -> throw new IllegalStateException("Unexpected value: "+cmd);
 			});
 			
 			if(cmd==ENDF||cmd==UNMANAGED_REST) return str.toString();
 		}
+	}
+	
+	private String obj(CmdReader reader, String name){
+		if(reader.readBool()) return name;
+		return name+"(No advance)";
 	}
 }
