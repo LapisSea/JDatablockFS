@@ -108,6 +108,8 @@ public abstract class StagedInit{
 			new StateInfo(STATE_START, "START"),
 			new StateInfo(STATE_DONE, "DONE")
 		);
+		
+		private static final int MIN_ID=BASE_STATES.stream().mapToInt(StateInfo::id).min().orElseThrow();
 	}
 	
 	protected String stateToString(int state){
@@ -129,7 +131,7 @@ public abstract class StagedInit{
 		Set<StateInfo> base    =new HashSet<>(StateInfo.BASE_STATES);
 		
 		listStates().forEach(state->{
-			if(state.id<STATE_NOT_STARTED) problems.add("\t"+state+": id is too small!");
+			if(state.id<StateInfo.MIN_ID) problems.add("\t"+state+": id is too small!");
 			if(!ids.add(state.id)) problems.add("\t"+state+": has a duplicate id");
 			if(!names.add(state.name)) problems.add("\t"+state+": has a duplicate name");
 			base.remove(state);
