@@ -200,19 +200,17 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>> implements Clone
 	
 	@SuppressWarnings("unchecked")
 	private void init(){
-		if(thisStruct!=null) return;
-		
 		thisStruct=Struct.of((Class<SELF>)getClass());
 		virtualFields=getThisStruct().allocVirtualVarPool(INSTANCE);
 	}
 	
 	public Struct<SELF> getThisStruct(){
-		init();
+		if(thisStruct==null) init();
 		return thisStruct;
 	}
 	
 	private Struct.Pool<SELF> getVirtualPool(){
-		init();
+		if(thisStruct==null) init();
 		return virtualFields;
 	}
 	

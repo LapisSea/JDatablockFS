@@ -6,9 +6,6 @@ import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 
 import java.util.*;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
@@ -25,12 +22,11 @@ public abstract class StagedInit{
 		}
 	}
 	
-	public static final int STATE_NOT_STARTED=-1, STATE_START=0, STATE_DONE=Integer.MAX_VALUE;
+	public static final int ERROR=-2, STATE_NOT_STARTED=-1, STATE_START=0, STATE_DONE=Integer.MAX_VALUE;
 	
-	private final Lock      lock     =new ReentrantLock();
-	private final Condition condition=lock.newCondition();
-	private       int       state    =STATE_NOT_STARTED;
+	private       int       state=STATE_NOT_STARTED;
 	private       Throwable e;
+	private final Object    lock =new Object();
 	
 	public StagedInit(){
 		if(DEBUG_VALIDATION){
@@ -51,25 +47,20 @@ public abstract class StagedInit{
 				init.run();
 				setInitState(STATE_DONE);
 			}catch(Throwable e){
+				state=ERROR;
 				this.e=e;
-				try{
-					lock.lock();
-					condition.signalAll();
-				}finally{
-					lock.unlock();
+				synchronized(lock){
+					lock.notifyAll();
 				}
 			}
 		});
 	}
 	
 	protected final void setInitState(int state){
-		try{
-			lock.lock();
+		synchronized(lock){
 			if(DEBUG_VALIDATION) validateNewState(state);
 			this.state=state;
-			condition.signalAll();
-		}finally{
-			lock.unlock();
+			lock.notifyAll();
 		}
 	}
 	
@@ -83,14 +74,8 @@ public abstract class StagedInit{
 	}
 	
 	public final void waitForState(int state){
-		if(this.state<state){
-			waitForState0(state);
-			if(this.state<state){
-				throw new IllegalStateException();
-			}
-		}
-		
-		checkErr();
+		if(this.state>=state) return;
+		waitForState0(state);
 	}
 	
 	protected int getEstimatedState(){
@@ -104,27 +89,21 @@ public abstract class StagedInit{
 	}
 	
 	protected Throwable getErr(){
-		try{
-			lock.lock();
+		synchronized(lock){
 			return e;
-		}finally{
-			lock.unlock();
 		}
 	}
 	
 	private void checkErr(){
-		try{
-			lock.lock();
-			
+		synchronized(lock){
 			if(e==null) return;
 			throw new WaitException("Exception occurred while initializing: "+this, e);
-		}finally{
-			lock.unlock();
 		}
 	}
 	
 	public record StateInfo(int id, String name){
 		private static final List<StateInfo> BASE_STATES=List.of(
+			new StateInfo(ERROR, "ERROR"),
 			new StateInfo(STATE_NOT_STARTED, "NOT_STARTED"),
 			new StateInfo(STATE_START, "START"),
 			new StateInfo(STATE_DONE, "DONE")
@@ -171,15 +150,15 @@ public abstract class StagedInit{
 	
 	private void waitForState0(int state){
 		while(true){
-			try{
-				lock.lock();
+			synchronized(lock){
 				checkErr();
-				if(this.state>=state) return;
+				if(this.state>=state){
+					checkErr();
+					return;
+				}
 				try{
-					condition.await();
+					lock.wait();
 				}catch(InterruptedException ignored){}
-			}finally{
-				lock.unlock();
 			}
 		}
 	}

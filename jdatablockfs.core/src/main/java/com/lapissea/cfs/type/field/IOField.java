@@ -350,11 +350,13 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	public boolean typeFlag(int flag){
 		return (typeFlags()&flag)==flag;
 	}
+	
 	public int typeFlags(){
-		if(typeFlags!=-1){
-			return typeFlags;
-		}
-		
+		if(typeFlags==-1) typeFlags=calcTypeFlags();
+		return typeFlags;
+	}
+	
+	private int calcTypeFlags(){
 		int typeFlags=0;
 		
 		if(accessor!=null){
@@ -374,7 +376,6 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 				typeFlags|=PRIMITIVE_OR_ENUM_FLAG;
 			}
 		}
-		this.typeFlags=typeFlags;
 		return typeFlags;
 	}
 	
