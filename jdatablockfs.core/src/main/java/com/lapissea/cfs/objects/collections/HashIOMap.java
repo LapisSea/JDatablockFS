@@ -226,9 +226,9 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		}else{
 			long pos=0;
 			
-			boolean disableAsync=size()>=512*RESIZE_TRIGGER*3;
+			boolean disableAsync=size()<=512*RESIZE_TRIGGER*3;
 			
-			Log.traceCall("method: reallocate and transfer, size: {}, async: {}", size(), disableAsync);
+			Log.traceCall("method: reallocate and transfer, size: {}, async: {}", size(), !disableAsync);
 			
 			var semaphore =disableAsync?null:new Semaphore(3);
 			var writeTasks=disableAsync?null:Collections.synchronizedList(new LinkedList<Runnable>());
