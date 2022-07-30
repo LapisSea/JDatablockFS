@@ -171,38 +171,32 @@ public final class CommandSet{
 		
 		private void flushOptional(){
 			if(optionals.isEmpty()) return;
-			
-			//merge skips
-			for(int i=0;i<optionals.size()-1;i++){
-				var c1=optionals.get(i);
-				var c2=optionals.get(i+1);
-				
-				if(!(c1 instanceof Skip s1)||!(c2 instanceof Skip s2)) continue;
-				if(s1.cmd==SKIPB_UNKOWN||s2.cmd==SKIPB_UNKOWN) continue;
-				
-				var fields=s1.fields+s2.fields;
-				if(fields>255) continue;
-				
-				var sum=BigInteger.valueOf(s1.bytes).add(BigInteger.valueOf(s2.bytes));
-				
-				var ok=true;
-				if(sum.compareTo(BigInteger.valueOf(255))<=0) optionals.set(i, new Skip(SKIPB_B, (int)sum.longValue(), fields));
-				else if(sum.compareTo(BigInteger.valueOf(Integer.MAX_VALUE))<=0) optionals.set(i, new Skip(SKIPB_I, (int)sum.longValue(), fields));
-				else if(sum.compareTo(BigInteger.valueOf(Long.MAX_VALUE))<=0) optionals.set(i, new Skip(SKIPB_L, sum.longValue(), fields));
-				else ok=false;
-				
-				if(ok){
-					optionals.remove(i+1);
-					i--;
-				}
-			}
-			
 			commands.addAll(optionals);
 			optionals.clear();
 		}
 		
 		private void addOptional(Cmd cmd){
 			requireNotDone();
+			
+			//merge skips
+			int        fields;
+			BigInteger bigSum;
+			int        lastIndex=optionals.size()-1;
+			
+			if(lastIndex>=0&&
+			   optionals.get(lastIndex) instanceof Skip s1&&cmd instanceof Skip s2&&
+			   s1.cmd!=SKIPB_UNKOWN&&s2.cmd!=SKIPB_UNKOWN&&
+			   (fields=s1.fields+s2.fields)<=255&&
+			   (bigSum=BigInteger.valueOf(s1.bytes).add(BigInteger.valueOf(s2.bytes))).compareTo(BigInteger.valueOf(Long.MAX_VALUE))<=0
+			){
+				var sum=bigSum.longValue();
+				
+				if(sum<=255) optionals.set(lastIndex, new Skip(SKIPB_B, (int)bigSum.longValue(), fields));
+				else if(sum<=Integer.MAX_VALUE) optionals.set(lastIndex, new Skip(SKIPB_I, (int)bigSum.longValue(), fields));
+				else optionals.set(lastIndex, new Skip(SKIPB_L, sum, fields));
+				return;
+			}
+			
 			optionals.add(cmd);
 		}
 		
