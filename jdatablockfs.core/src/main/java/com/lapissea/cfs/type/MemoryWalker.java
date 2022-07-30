@@ -6,11 +6,16 @@ import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.field.IOField;
-import com.lapissea.util.*;
+import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.ShouldNeverHappenError;
+import com.lapissea.util.TextUtil;
+import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
 import java.util.function.DoubleConsumer;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
@@ -122,67 +127,15 @@ public class MemoryWalker{
 		return walkStructFull((T)root, rootReference, (StructPipe<T>)pipe, consumer);
 	}
 	
-	private static class RefStack{
-		
-		private IOInstance<?>[] oBuff=new IOInstance[16];
-		private long[]          buff =new long[32];
-		private int             siz;
-		
-		<T extends IOInstance<T>> boolean contains(Reference ref, T inst){
-			if(siz==0) return false;
-			var ptr=ref.getPtr().getValue();
-			var off=ref.getOffset();
-			for(int i=0;i<siz;i++){
-				if(buff[i*2]==ptr&&buff[i*2+1]==off){
-					var o=oBuff[siz];
-					if(!Objects.equals(inst, o)) continue;
-					
-					if(DEBUG_VALIDATION){
-						if(
-							o instanceof IOInstance.Unmanaged<?> u1&&inst instanceof IOInstance.Unmanaged<?> u2&&(
-								!u1.getReference().equals(u2.getReference())||
-								!u1.getTypeDef().equals(u2.getTypeDef())
-							)||
-							!inst.toString().equals(o.toString())
-						){
-							LogUtil.printlnEr("Possible equality problem?\n"+inst+"\n"+o);
-						}
-					}
-					
-					return true;
-				}
-			}
-			return false;
-		}
-		
-		<T extends IOInstance<T>> void push(Reference ref, T inst){
-			if(siz==oBuff.length){
-				buff=Arrays.copyOf(buff, buff.length*2);
-				oBuff=Arrays.copyOf(oBuff, oBuff.length*2);
-			}
-			buff[siz*2]=ref.getPtr().getValue();
-			buff[siz*2+1]=ref.getOffset();
-			oBuff[siz]=inst;
-			siz++;
-		}
-		void pop(){
-			if(siz==0) throw new IllegalStateException();
-			siz--;
-			oBuff[siz]=null;
-		}
-	}
-	
 	private <T extends IOInstance<T>> int walkStructFull(
 		T instance, Reference instanceReference, StructPipe<T> pipe,
 		PointerRecord pointerRecord
 	) throws IOException{
-		var stack=new RefStack();
-		return walkStructFull(stack, instance, instanceReference, pipe, pointerRecord, false);
+		return walkStructFull(instance, instanceReference, pipe, pointerRecord, false);
 	}
 	
 	@SuppressWarnings({"unchecked", "rawtypes"})
 	private <T extends IOInstance<T>> int walkStructFull(
-		RefStack stack,
 		T instance, Reference instanceReference, StructPipe<T> pipe,
 		PointerRecord pointerRecord, boolean inlinedParent
 	) throws IOException{
@@ -202,11 +155,6 @@ public class MemoryWalker{
 		if(reference==null||reference.isNull()) return CONTINUE;
 		boolean inlineDirtyButContinue=false;
 		
-		if(stack.contains(reference, instance)){
-			return CONTINUE;
-		}
-		
-		stack.push(reference, instance);
 		long t0=0;
 		try{
 			if(record){
@@ -231,7 +179,7 @@ public class MemoryWalker{
 					while(true){
 						cmd=cmds.cmd();
 						if(cmd==UNMANAGED_REST){
-							cmds=((IOInstance.Unmanaged<?>)instance).getUnmanagedReferenceWalkCommands();
+							cmds=unmanagedCmd(instance);
 							cmd=cmds.cmd();
 						}
 						
@@ -374,7 +322,7 @@ public class MemoryWalker{
 									var instRefField=(IOField.Ref<T, T> & IOField.Ref.Inst<T, T>)refField;
 									
 									long t0v=record?System.nanoTime():0;
-									var  res=walkStructFull(stack, instRefField.get(ioPool, instance), ref, instRefField.getReferencedPipe(instance), pointerRecord, false);
+									var  res=walkStructFull(instRefField.get(ioPool, instance), ref, instRefField.getReferencedPipe(instance), pointerRecord, false);
 									if(record){
 										var t1v =System.nanoTime();
 										var diff=t1v-t0v;
@@ -397,7 +345,7 @@ public class MemoryWalker{
 								
 								if(inst instanceof IOInstance.Unmanaged valueInstance){
 									long t0v=record?System.nanoTime():0;
-									var  res=walkStructFull(stack, valueInstance, valueInstance.getReference(), valueInstance.getPipe(), pointerRecord, false);
+									var  res=walkStructFull(valueInstance, valueInstance.getReference(), valueInstance.getPipe(), pointerRecord, false);
 									if(record){
 										var t1v =System.nanoTime();
 										var diff=t1v-t0v;
@@ -421,7 +369,7 @@ public class MemoryWalker{
 									if(!fieldValueInstance.getThisStruct().getCanHavePointers()) continue;
 									{
 										long t0v=record?System.nanoTime():0;
-										var  res=walkStructFull(stack, fieldValueInstance, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), fieldValueInstance.getThisStruct()), pointerRecord, true);
+										var  res=walkStructFull(fieldValueInstance, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), fieldValueInstance.getThisStruct()), pointerRecord, true);
 										if(record){
 											var t1v =System.nanoTime();
 											var diff=t1v-t0v;
@@ -434,7 +382,7 @@ public class MemoryWalker{
 								}
 							}
 							case CHPTR -> {
-								var result=handlePtr(stack, instance, pipe, pointerRecord, reference, ioPool, (IOField<T, ChunkPointer>)field);
+								var result=handlePtr(instance, pipe, pointerRecord, reference, ioPool, (IOField<T, ChunkPointer>)field);
 								if(hasResult(result)) return result;
 							}
 							case POTENTIAL_REF -> {
@@ -456,7 +404,7 @@ public class MemoryWalker{
 											for(IOInstance<?> inst : array){
 												{
 													long t0v=record?System.nanoTime():0;
-													var  res=walkStructFull(stack, (T)inst, reference.addOffset(fieldOffset), pip, pointerRecord, true);
+													var  res=walkStructFull((T)inst, reference.addOffset(fieldOffset), pip, pointerRecord, true);
 													if(record){
 														var t1v =System.nanoTime();
 														var diff=t1v-t0v;
@@ -488,7 +436,7 @@ public class MemoryWalker{
 										if(fieldValue!=null){
 											{
 												long t0v=record?System.nanoTime():0;
-												var  res=walkStructFull(stack, (T)fieldValue, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), fieldValue.getThisStruct()), pointerRecord, true);
+												var  res=walkStructFull((T)fieldValue, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), fieldValue.getThisStruct()), pointerRecord, true);
 												if(record){
 													var t1v =System.nanoTime();
 													var diff=t1v-t0v;
@@ -533,7 +481,6 @@ public class MemoryWalker{
 				var info=stats.computeIfAbsent(instance.getClass(), c->new Stat());
 				info.localTime().accept(diff);
 			}
-			stack.pop();
 		}
 		if(inlineDirtyButContinue){
 			return CONTINUE|SAVE;
@@ -541,7 +488,11 @@ public class MemoryWalker{
 		return CONTINUE;
 	}
 	
-	private <T extends IOInstance<T>> int handlePtr(RefStack stack, T instance, StructPipe<T> pipe, PointerRecord pointerRecord, Reference reference, Struct.Pool<T> ioPool, IOField<T, ChunkPointer> ptrField) throws IOException{
+	private static <T extends IOInstance<T>> CmdReader unmanagedCmd(IOInstance<T> instance){
+		return ((IOInstance.Unmanaged<?>)instance).getUnmanagedReferenceWalkCommands();
+	}
+	
+	private <T extends IOInstance<T>> int handlePtr(T instance, StructPipe<T> pipe, PointerRecord pointerRecord, Reference reference, Struct.Pool<T> ioPool, IOField<T, ChunkPointer> ptrField) throws IOException{
 		var ch=ptrField.get(ioPool, instance);
 		
 		if(!ch.isNull()){
@@ -559,7 +510,7 @@ public class MemoryWalker{
 				}
 			}
 			{
-				var res=walkStructFull(stack, ch.dereference(provider), null, Chunk.PIPE, pointerRecord, false);
+				var res=walkStructFull(ch.dereference(provider), null, Chunk.PIPE, pointerRecord, false);
 				if(fSave(res)){
 					throw new NotImplementedException();//TODO
 				}
