@@ -40,9 +40,9 @@ public class MemoryWalker{
 		}
 	}
 	
-	public record Stat(AverageDouble localTime, AverageDouble iterNext){
+	public record Stat(AverageDouble localTime){
 		public Stat(){
-			this(new AverageDouble(), new AverageDouble());
+			this(new AverageDouble());
 		}
 	}
 	
@@ -207,7 +207,7 @@ public class MemoryWalker{
 		}
 		
 		stack.push(reference, instance);
-		long t0=0, iterNextSum=0;
+		long t0=0;
 		try{
 			if(record){
 				t0=System.nanoTime();
@@ -215,41 +215,16 @@ public class MemoryWalker{
 			
 			var fieldOffset=0L;
 			
-			long in0=0;
-			if(record) in0=System.nanoTime();
-			
 			Iterator<IOField<T, ?>> iterator=pipe.getSpecificFields().iterator();
-			
-			if(record){
-				iterNextSum+=(System.nanoTime()-in0);
-			}
 			
 			CmdReader cmds  =pipe.getReferenceWalkCommands().reader();
 			var       ioPool=instanceStruct.allocVirtualVarPool(IO);
 			
-			long    skipBits     =0;
-			boolean dynamicFields=false;
+			long    skipBits    =0;
+			boolean dynamicPhase=false;
 			wh:
 			while(true){
-				if(record) in0=System.nanoTime();
-				if(!iterator.hasNext()){
-					if(!dynamicFields&&instance instanceof IOInstance.Unmanaged unmanaged){
-						dynamicFields=true;
-						iterator=unmanaged.listUnmanagedFields().iterator();
-						continue;
-					}
-					break;
-				}
-				IOField<T, ?> field=iterator.next();
-				
-				if(skipBits>0) skipBits >>>= 1;
-				boolean skipBit=(skipBits&1)==1;
-				if(skipBit) continue;
-				
-				if(record){
-					iterNextSum+=(System.nanoTime()-in0);
-				}
-				cmd:
+				IOField<T, ?> field;
 				{
 					int cmd;
 					
@@ -259,6 +234,23 @@ public class MemoryWalker{
 							cmds=((IOInstance.Unmanaged<?>)instance).getUnmanagedReferenceWalkCommands();
 							cmd=cmds.cmd();
 						}
+						
+						if(cmd==ENDF) break wh;
+						
+						if(!iterator.hasNext()){
+							if(dynamicPhase||!(instance instanceof IOInstance.Unmanaged unmanaged)) break wh;
+							dynamicPhase=true;
+							iterator=unmanaged.listUnmanagedFields().iterator();
+							if(!iterator.hasNext()){
+								break wh;
+							}
+						}
+						
+						field=iterator.next();
+						
+						if(skipBits>0) skipBits >>>= 1;
+						boolean skipBit=(skipBits&1)==1;
+						if(skipBit) continue wh;
 						
 						//repeat cmd cases
 						switch(cmd){
@@ -279,9 +271,6 @@ public class MemoryWalker{
 					
 					//no value cases
 					switch(cmd){
-						case ENDF -> {
-							break wh;
-						}
 						case SKIPB_B, SKIPB_I, SKIPB_L -> {
 							var extra=cmds.read8();
 							var siz=switch(cmd){
@@ -543,7 +532,6 @@ public class MemoryWalker{
 				var diff=(t1-t0)/1000_000D;
 				var info=stats.computeIfAbsent(instance.getClass(), c->new Stat());
 				info.localTime().accept(diff);
-				info.iterNext().accept(iterNextSum/1000_000D);
 			}
 			stack.pop();
 		}
