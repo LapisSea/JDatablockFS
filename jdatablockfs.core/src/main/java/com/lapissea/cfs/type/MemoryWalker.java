@@ -3,6 +3,7 @@ package com.lapissea.cfs.type;
 import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
+import com.lapissea.cfs.logging.AverageDouble;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.field.IOField;
@@ -16,7 +17,6 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.function.DoubleConsumer;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.type.CommandSet.*;
@@ -24,33 +24,11 @@ import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 
 public class MemoryWalker{
 	
-	public static class AverageDouble implements DoubleConsumer{
-		private int    n     =1;
-		private double curAvg=0;
-		
-		@Override
-		public void accept(double newNum){
-			curAvg=curAvg+(newNum-curAvg)/n;
-			n++;
-		}
-		
-		public double getAvg(){
-			return curAvg;
-		}
-		public double getTotal(){
-			return curAvg*n;
-		}
-		public int getCount(){
-			return n;
-		}
-	}
-	
 	public record Stat(AverageDouble localTime){
 		public Stat(){
 			this(new AverageDouble());
 		}
 	}
-	
 	
 	private static final int DATA_MASK=0b00001;
 	public static final  int SAVE     =0b00001;
