@@ -105,6 +105,7 @@ import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
  * </table>
  */
 @Struct.NoDefaultConstructor
+@StructPipe.Special
 public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, DataProvider.Holder, Comparable<Chunk>{
 	
 	/**

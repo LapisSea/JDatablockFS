@@ -9,6 +9,7 @@ import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
+import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
@@ -22,6 +23,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 
+@StructPipe.Special
 public final class Reference extends IOInstance<Reference>{
 	
 	@SuppressWarnings("unchecked")
@@ -63,7 +65,7 @@ public final class Reference extends IOInstance<Reference>{
 				protected Reference doRead(Struct.Pool<Reference> ioPool, DataProvider provider, ContentReader src, Reference instance, GenericContext genericContext) throws IOException{
 					int flags     =src.readInt1()&0xFF;
 					var offsetSize=NumberSize.ordinal(flags&0b111);
-					var ptrSize   =NumberSize.ordinal(flags&(0b111<<3));
+					var ptrSize   =NumberSize.ordinal((flags >>> 3)&0b111);
 					if((flags&(0b11<<6))!=(0b11<<6)){
 						throw new IOException();
 					}

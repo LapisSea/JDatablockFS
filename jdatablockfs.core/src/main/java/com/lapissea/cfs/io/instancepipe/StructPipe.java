@@ -25,6 +25,10 @@ import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -42,6 +46,10 @@ import static com.lapissea.cfs.GlobalConfig.TYPE_VALIDATION;
 public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit implements ObjectPipe<T, Struct.Pool<T>>{
 	
 	private static final Log.Channel COMPILATION=Log.channel(PRINT_COMPILATION&&!Access.DEV_CACHE, Log.Channel.colored(CYAN_BRIGHT));
+	
+	@Retention(RetentionPolicy.RUNTIME)
+	@Target({ElementType.TYPE})
+	public @interface Special{}
 	
 	private static class StructGroup<T extends IOInstance<T>, P extends StructPipe<T>> extends ConcurrentHashMap<Struct<T>, P>{
 		
@@ -73,6 +81,15 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			
 			P created;
 			try{
+				var typ=struct.getType();
+				if(typ.isAnnotationPresent(Special.class)){
+					try{
+						Class.forName(typ.getName(), true, typ.getClassLoader());
+					}catch(ClassNotFoundException e){
+						throw new AssertionError(e);  // Can't happen
+					}
+				}
+				
 				var special=specials.get(struct);
 				if(special!=null){
 					created=special.get();
