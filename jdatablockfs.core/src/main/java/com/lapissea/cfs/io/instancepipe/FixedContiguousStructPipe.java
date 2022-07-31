@@ -116,19 +116,18 @@ public class FixedContiguousStructPipe<T extends IOInstance<T>> extends StructPi
 	}
 	
 	private void setMax(T instance, Struct.Pool<T> ioPool){
-		if(maxValues==null) return;
 		maxValues.forEach((k, v)->k.set(ioPool, instance, v));
 	}
 	
 	@Override
 	protected void doWrite(DataProvider provider, ContentWriter dest, Struct.Pool<T> ioPool, T instance) throws IOException{
-		setMax(instance, ioPool);
+		if(maxValues!=null) setMax(instance, ioPool);
 		writeIOFields(getSpecificFields(), ioPool, provider, dest, instance);
 	}
 	
 	@Override
 	protected T doRead(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		setMax(instance, ioPool);
+		if(maxValues!=null) setMax(instance, ioPool);
 		readIOFields(getSpecificFields(), ioPool, provider, src, instance, genericContext);
 		return instance;
 	}

@@ -384,7 +384,10 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			checkNull(inst);
 			
 			try{
-				generateAll(ioPool, prov, inst, false);
+				waitForState(STATE_DONE);
+				if(generators!=null){
+					generateAll(ioPool, prov, inst, false);
+				}
 			}catch(IOException e){
 				throw new RuntimeException(e);
 			}
@@ -503,7 +506,10 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			target=dest;
 		}
 		
-		generateAll(ioPool, provider, instance, true);
+		waitForState(STATE_DONE);
+		if(generators!=null){
+			generateAll(ioPool, provider, instance, true);
+		}
 		
 		for(IOField<T, ?> field : fields){
 			if(DEBUG_VALIDATION){
@@ -524,7 +530,10 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	private ContentWriter validateAndSafeDestination(FieldSet<T> fields, Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		ContentWriter safe=null;
 		if(!(instance instanceof IOInstance.Unmanaged<?>)){
-			generateAll(ioPool, provider, instance, true);
+			waitForState(STATE_DONE);
+			if(generators!=null){
+				generateAll(ioPool, provider, instance, true);
+			}
 			var siz=getSizeDescriptor().calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
 			
 			var sum=0L;
@@ -553,8 +562,6 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	}
 	
 	private void generateAll(Struct.Pool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException{
-		waitForState(STATE_DONE);
-		if(generators==null) return;
 		for(var generator : generators){
 			try{
 				generator.generate(ioPool, provider, instance, allowExternalMod);
