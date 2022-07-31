@@ -1,5 +1,6 @@
 package com.lapissea.cfs.type.field;
 
+import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.FieldIsNullException;
@@ -28,13 +29,17 @@ import java.lang.reflect.Array;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.internal.StatIOField.*;
 import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 
 public abstract class IOField<T extends IOInstance<T>, ValueType>{
+	
+	private static final boolean STAT_LOGGING=GlobalConfig.configFlag("logging.fieldTimes", false);
 	
 	static{
 		TextUtil.SHORT_TO_STRINGS.register(OptionalLong.class, l->l.isEmpty()?"()L":"("+l.getAsLong()+")L");
@@ -324,6 +329,11 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		
 	}
 	
+	private static final AtomicLong UID_COUNT=new AtomicLong();
+	private static long nextUID(){
+		return UID_COUNT.incrementAndGet();
+	}
+	
 	private final FieldAccessor<T> accessor;
 	
 	private boolean     lateDataInitialized;
@@ -337,6 +347,8 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	public static final int HAS_NO_POINTERS_FLAG  =1<<3;
 	
 	private int typeFlags=-1;
+	
+	private volatile long uid=-1;
 	
 	public IOField(FieldAccessor<T> accessor){
 		this.accessor=accessor;
@@ -493,7 +505,9 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	@Nullable
 	public final void writeReported(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		try{
+			if(STAT_LOGGING) logStart(WRITE_ACTION, uid());
 			write(ioPool, provider, dest, instance);
+			if(STAT_LOGGING) logEnd(WRITE_ACTION, uid());
 		}catch(Exception e){
 			throw new IOException("Failed to write "+this, e);
 		}
@@ -506,7 +520,9 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 			extra=" started on: "+src;
 		}
 		try{
+			if(STAT_LOGGING) logStart(READ_ACTION, uid());
 			read(ioPool, provider, src, instance, genericContext);
+			if(STAT_LOGGING) logEnd(READ_ACTION, uid());
 		}catch(Exception e){
 			throw new IOException("Failed to read "+this+(DEBUG_VALIDATION?extra:""), e);
 		}
@@ -515,11 +531,14 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	public abstract void skipRead(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException;
 	public final void skipReadReported(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		try{
+			if(STAT_LOGGING) logStart(SKIP_READ_ACTION, uid());
 			skipRead(ioPool, provider, src, instance, genericContext);
+			if(STAT_LOGGING) logEnd(SKIP_READ_ACTION, uid());
 		}catch(Exception e){
 			throw reportSkipReadFail(this, e);
 		}
 	}
+	
 	protected IOException reportSkipReadFail(IOField<T, ?> fi, Exception e) throws IOException{
 		throw new IOException("Failed to skip read "+fi, e);
 	}
@@ -632,6 +651,17 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		getAccessor().init(this);
 	}
 	
+	public long uid(){
+		if(uid==-1){
+			synchronized(this){
+				if(uid==-1){
+					uid=nextUID();
+					if(STAT_LOGGING) logRegister(uid, this.toString());
+				}
+			}
+		}
+		return uid;
+	}
 	
 	public String getName()              {return getAccessor().getName();}
 	public FieldAccessor<T> getAccessor(){return accessor;}
