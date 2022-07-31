@@ -21,7 +21,7 @@ import java.util.Collection;
 import java.util.Objects;
 import java.util.stream.LongStream;
 
-public abstract class MemoryData<DataType> implements IOInterface{
+public abstract sealed class MemoryData<DataType> implements IOInterface{
 	
 	@SuppressWarnings("resource")
 	public class MemRandomIO implements RandomIO{
@@ -304,8 +304,8 @@ public abstract class MemoryData<DataType> implements IOInterface{
 	
 	public transient EventLogger onWrite;
 	
-	private DataType data;
-	private int      used;
+	protected DataType data;
+	protected int      used;
 	
 	private final boolean readOnly;
 	
@@ -478,10 +478,16 @@ public abstract class MemoryData<DataType> implements IOInterface{
 		}
 		
 		public Builder withRaw(byte[] data){
-			return withRaw0(data);
+			var clone=data.clone();
+			this.dataProducer=()->clone;
+			return this;
 		}
+		
 		public Builder withRaw(ByteBuffer data){
-			return withRaw0(data);
+			var d=ByteBuffer.allocate(data.limit());
+			d.put(data.position(0));
+			d.position(0);
+			return withRaw0(d);
 		}
 		
 		private Builder withRaw0(Object data){
@@ -543,7 +549,10 @@ public abstract class MemoryData<DataType> implements IOInterface{
 	@Override
 	public MemoryData<?> asReadOnly(){
 		if(isReadOnly()) return this;
-		return new Builder().withRaw0(data).withUsedLength(used).asReadOnly().build();
+		return (switch(this){
+			case Arr d -> builder().withRaw(d.data).withUsedLength(used);
+			case Buff d -> builder().withRaw(d.data).withUsedLength(used);
+		}).asReadOnly().build();
 	}
 	
 	private static final class Arr extends MemoryData<byte[]>{

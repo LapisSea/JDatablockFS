@@ -4,6 +4,7 @@ import com.lapissea.cfs.internal.MemPrimitive;
 import com.lapissea.cfs.io.content.ContentOutputBuilder;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
+import com.lapissea.util.TextUtil;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -333,10 +334,10 @@ public final class CommandSet{
 			str.add(switch(cmd){
 				case ENDF -> "ENDF";
 				case UNMANAGED_REST -> "UNMANAGED_REST";
-				case SKIPB_B -> "SKIPB_B("+reader.read8()+" jump, "+reader.read8()+" bytes)";
-				case SKIPB_I -> "SKIPB_I("+reader.read8()+" jump, "+reader.read32()+" bytes)";
-				case SKIPB_L -> "SKIPB_L("+reader.read8()+" jump, "+reader.read64()+" bytes)";
-				case SKIPB_UNKOWN -> "SKIPB_UNKOWN("+reader.read8()+" fields)";
+				case SKIPB_B -> props("SKIPB_B", reader.read8(), "jump", reader.read8(), "byte");
+				case SKIPB_I -> props("SKIPB_B", reader.read8(), "jump", reader.read32(), "byte");
+				case SKIPB_L -> props("SKIPB_B", reader.read8(), "jump", reader.read64(), "byte");
+				case SKIPB_UNKOWN -> props("SKIPB_UNKOWN", reader.read8(), "field");
 				case SKIPF_IF_NULL -> "SKIPF_IF_NULL("+reader.read8()+" offset)";
 				case POTENTIAL_REF -> obj(reader, "POTENTIAL_REF");
 				case DYNAMIC -> obj(reader, "DYNAMIC");
@@ -349,6 +350,25 @@ public final class CommandSet{
 		}
 	}
 	
+	private String props(String name, Object... props){
+		StringBuilder b=new StringBuilder();
+		b.append(name);
+		boolean any=false;
+		for(int i=0;i<props.length;i+=2){
+			long val=((Number)props[i]).longValue();
+			if(val==0) continue;
+			if(!any){
+				any=true;
+				b.append('(');
+			}else b.append(", ");
+			b.append(val).append(' ').append(TextUtil.plural((String)props[i+1], (int)Math.min(100, val)));
+		}
+		if(any) b.append(')');
+		return b.toString();
+	}
+	private String iprop(long val, String name){
+		return val==0?name:val+" "+name;
+	}
 	private String obj(CmdReader reader, String name){
 		if(reader.readBool()) return name;
 		return name+"(No advance)";

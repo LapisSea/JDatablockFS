@@ -68,6 +68,6 @@ public class IOFieldStringArray<T extends IOInstance<T>> extends IOField<T, Stri
 	
 	@Override
 	public void skipRead(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		read(ioPool, provider, src, instance, genericContext);
+		readReported(ioPool, provider, src, instance, genericContext);
 	}
 }

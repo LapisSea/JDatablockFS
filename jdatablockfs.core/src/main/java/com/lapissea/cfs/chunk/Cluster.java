@@ -6,7 +6,6 @@ import com.lapissea.cfs.exceptions.MalformedPointerException;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
-import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.ObjectID;
 import com.lapissea.cfs.objects.collections.AbstractUnmanagedIOMap;
@@ -37,8 +36,8 @@ public class Cluster implements DataProvider{
 	
 	private static final ByteBuffer MAGIC_ID=ByteBuffer.wrap("BYT-BAE".getBytes(UTF_8)).asReadOnlyBuffer();
 	
-	public static final  StructPipe<RootRef> ROOT_PIPE;
-	private static final ChunkPointer        FIRST_CHUNK_PTR;
+	public static final  FixedContiguousStructPipe<RootRef> ROOT_PIPE;
+	private static final ChunkPointer                       FIRST_CHUNK_PTR;
 	
 	static{
 		try{
@@ -195,16 +194,14 @@ public class Cluster implements DataProvider{
 		}
 		
 		Chunk ch=getFirstChunk();
-		var   s =ROOT_PIPE.getSizeDescriptor().fixedOrMin(WordSpace.BYTE);
+		
+		var s=ROOT_PIPE.getFixedDescriptor().get(WordSpace.BYTE);
 		if(s>ch.getSize()){
-			throw new IOException("no valid cluster data "+s+" "+ch.getSize()+" "+ch.io().getSize());
+			throw new IOException("no valid cluster data "+s+" "+ch.getSize());
 		}
-		root=readRootRef();
+		
+		root=ROOT_PIPE.readNew(this, ch, null);
 		memoryManager=new PersistentMemoryManager(this, meta().freeChunks.map(IOChunkPointer::getVal, IOChunkPointer::new));
-	}
-	
-	private RootRef readRootRef() throws IOException{
-		return ROOT_PIPE.readNew(this, getFirstChunk(), null);
 	}
 	
 	@Override
