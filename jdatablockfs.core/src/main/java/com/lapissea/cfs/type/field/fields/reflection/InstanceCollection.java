@@ -447,7 +447,7 @@ public class InstanceCollection{
 				src.skipExact(size*fixedElementSize.getAsLong());
 				return;
 			}
-			ElementType inst=pip.getType().emptyConstructor().get();
+			ElementType inst=pip.getType().make();
 			for(int i=0;i<size;i++){
 				pip.read(provider, src, inst, genericContext);
 			}

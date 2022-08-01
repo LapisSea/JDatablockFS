@@ -604,8 +604,8 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 			if(IOInstance.isInstance(acc.getType())){
 				var typ=Struct.ofUnknown(acc.getType());
 				
-				if(o1==null) o1=(ValueType)typ.emptyConstructor().get();
-				if(o2==null) o2=(ValueType)typ.emptyConstructor().get();
+				if(o1==null) o1=(ValueType)typ.make();
+				if(o2==null) o2=(ValueType)typ.make();
 			}else{
 				throw new NotImplementedException(acc.getType()+"");//TODO implement equals of numbers?
 			}

@@ -125,7 +125,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				}else{
 					T inst;
 					try{
-						inst=created.getType().emptyConstructor().get();
+						inst=created.getType().make();
 					}catch(Throwable e){
 						inst=null;
 					}
@@ -439,7 +439,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	
 	@Override
 	public T readNew(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
-		T instance=type.emptyConstructor().get();
+		T instance=type.make();
 		return doRead(makeIOPool(), provider, src, instance, genericContext);
 	}
 	

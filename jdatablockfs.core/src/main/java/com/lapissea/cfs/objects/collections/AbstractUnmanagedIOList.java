@@ -126,7 +126,7 @@ public abstract class AbstractUnmanagedIOList<T, SELF extends AbstractUnmanagedI
 	
 	@Override
 	public T addNew(UnsafeConsumer<T, IOException> initializer) throws IOException{
-		T val=getElementType().emptyConstructor().get();
+		T val=getElementType().make();
 		if(initializer!=null){
 			initializer.accept(val);
 		}

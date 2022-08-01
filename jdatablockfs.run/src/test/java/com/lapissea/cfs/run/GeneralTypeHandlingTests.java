@@ -124,7 +124,7 @@ public class GeneralTypeHandlingTests{
 			pipe=null;
 		}
 		if(pipe!=null){
-			pipe.checkTypeIntegrity(struct.emptyConstructor().get());
+			pipe.checkTypeIntegrity(struct.make());
 		}
 		try{
 			pipe=FixedContiguousStructPipe.of(struct, STATE_DONE);
@@ -132,7 +132,7 @@ public class GeneralTypeHandlingTests{
 			pipe=null;
 		}
 		if(pipe!=null){
-			pipe.checkTypeIntegrity(struct.emptyConstructor().get());
+			pipe.checkTypeIntegrity(struct.make());
 		}
 	}
 	

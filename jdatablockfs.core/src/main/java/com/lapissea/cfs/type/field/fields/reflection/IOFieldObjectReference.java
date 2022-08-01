@@ -76,7 +76,7 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	
 	@Override
 	protected ValueType newDefault(){
-		return struct.emptyConstructor().get();
+		return struct.make();
 	}
 	
 	@Override
@@ -94,10 +94,10 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 			return switch(getNullability()){
 				case NULLABLE -> null;
 				case NOT_NULL -> throw new NullPointerException();
-				case DEFAULT_IF_NULL -> struct.emptyConstructor().get();
+				case DEFAULT_IF_NULL -> struct.make();
 			};
 		}
-		ValueType val=struct.emptyConstructor().get();
+		ValueType val=struct.make();
 		try(var io=readNew.io(provider)){
 			instancePipe.read(provider, io, val, genericContext);
 		}
@@ -113,7 +113,7 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	public void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		var val=get(ioPool, instance);
 		if(val==null&&getNullability()==IONullability.Mode.DEFAULT_IF_NULL){
-			val=struct.emptyConstructor().get();
+			val=struct.make();
 		}
 		var ref=getReference(instance);
 		if(val!=null&&(ref==null||ref.isNull())){

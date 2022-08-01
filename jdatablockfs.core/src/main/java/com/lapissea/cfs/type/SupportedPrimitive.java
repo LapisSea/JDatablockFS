@@ -5,7 +5,6 @@ import com.lapissea.cfs.type.field.SizeDescriptor;
 import java.lang.reflect.Array;
 import java.lang.reflect.Type;
 import java.util.Optional;
-import java.util.function.Supplier;
 
 public enum SupportedPrimitive implements RuntimeType<Object>{
 	DOUBLE(double.class, Double.class, SizeDescriptor.Fixed.of(8)),
@@ -82,7 +81,7 @@ public enum SupportedPrimitive implements RuntimeType<Object>{
 		return false;
 	}
 	@Override
-	public Supplier<Object> emptyConstructor(){
+	public NewObj<Object> emptyConstructor(){
 		return this::getDefaultValue;
 	}
 	public Object getDefaultValue(){

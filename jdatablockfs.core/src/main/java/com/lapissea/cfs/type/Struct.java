@@ -23,14 +23,12 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.*;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -44,7 +42,6 @@ import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NOT_NUL
 public sealed class Struct<T extends IOInstance<T>> extends StagedInit implements RuntimeType<T>{
 	
 	private static final Log.Channel COMPILATION=Log.channel(PRINT_COMPILATION&&!Access.DEV_CACHE, Log.Channel.colored(GREEN_BRIGHT));
-	
 	
 	@Retention(RetentionPolicy.RUNTIME)
 	@Target(ElementType.TYPE)
@@ -228,7 +225,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 				       typ.getFields()
 				          .stream()
 				          .map(IOField::getAccessor)
-				          .filter(f->f instanceof VirtualAccessor acc&&acc.getStoragePool()==poolType)
+				          .filter(f->f instanceof VirtualAccessor<T> acc&&acc.getStoragePool()==poolType)
 				          .map(f->(VirtualAccessor<T>)f)
 				          .map(c->c.getName()+": "+Utils.toShortString(get(c)))
 				          .collect(Collectors.joining(", ", "{", "}"));
@@ -252,10 +249,6 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	public static final class Unmanaged<T extends IOInstance.Unmanaged<T>> extends Struct<T>{
-		
-		public interface Constr<T>{
-			T create(DataProvider provider, Reference reference, TypeLink type) throws IOException;
-		}
 		
 		public static Unmanaged<?> thisClass(){
 			return ofUnknown(getCallee(1));
@@ -286,14 +279,14 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			return compile(instanceClass, Unmanaged::new);
 		}
 		
-		private final Constr<T>   unmanagedConstructor;
-		private final boolean     overridingDynamicUnmanaged;
-		private       FieldSet<T> unmanagedStaticFields;
+		private final NewUnmanaged<T> unmanagedConstructor;
+		private final boolean         overridingDynamicUnmanaged;
+		private       FieldSet<T>     unmanagedStaticFields;
 		
 		private Unmanaged(Class<T> type){
 			super(type, false);
 			overridingDynamicUnmanaged=checkOverridingUnmanaged();
-			unmanagedConstructor=Access.findConstructor(getType(), Constr.class, Access.getFunctionalMethod(Constr.class).getParameterTypes());
+			unmanagedConstructor=Access.findConstructor(getType(), NewUnmanaged.class, Access.getFunctionalMethod(NewUnmanaged.class).getParameterTypes());
 		}
 		
 		private boolean checkOverridingUnmanaged(){
@@ -311,13 +304,18 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			return overridingDynamicUnmanaged;
 		}
 		
-		public Constr<T> getUnmanagedConstructor(){
-			return unmanagedConstructor;
+		public T make(DataProvider provider, Reference reference, TypeLink type) throws IOException{
+			return unmanagedConstructor.make(provider, reference, type);
 		}
 		
 		@Deprecated
 		@Override
-		public Supplier<T> emptyConstructor(){
+		public NewObj.Instance<T> emptyConstructor(){
+			throw new UnsupportedOperationException();
+		}
+		@Override
+		@Deprecated
+		public T make(){
 			throw new UnsupportedOperationException();
 		}
 		
@@ -466,7 +464,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	private boolean canHavePointers;
 	private byte    invalidInitialNulls=-1;
 	
-	private Supplier<T> emptyConstructor;
+	private NewObj.Instance<T> emptyConstructor;
 	
 	public static final int STATE_FIELD_MAKE=1, STATE_INIT_FIELDS=2;
 	
@@ -475,7 +473,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		init(runNow, ()->{
 			if(!(this instanceof Struct.Unmanaged)){
 				if(!getType().isAnnotationPresent(NoDefaultConstructor.class)){
-					emptyConstructor=Access.findConstructor(getType(), Supplier.class);
+					emptyConstructor=Access.findConstructor(getType(), NewObj.Instance.class);
 				}
 			}
 			
@@ -670,7 +668,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	@Override
-	public Supplier<T> emptyConstructor(){
+	public NewObj.Instance<T> emptyConstructor(){
 		if(emptyConstructor==null){
 			waitForState(STATE_FIELD_MAKE);
 			if(emptyConstructor==null&&getType().isAnnotationPresent(NoDefaultConstructor.class)){
@@ -691,7 +689,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			
 			boolean inv=false;
 			if(fields.unpackedStream().anyMatch(f->f.getNullability()==NOT_NULL)){
-				var obj =emptyConstructor().get();
+				var obj =make();
 				var pool=allocVirtualVarPool(IO);
 				inv=fields.unpackedStream()
 				          .filter(f->f.getNullability()==NOT_NULL)

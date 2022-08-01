@@ -10,10 +10,7 @@ import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
-import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.Struct;
-import com.lapissea.cfs.type.TypeLink;
-import com.lapissea.cfs.type.WordSpace;
+import com.lapissea.cfs.type.*;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.function.UnsafeConsumer;
 
@@ -83,7 +80,7 @@ public class TestUtils{
 	
 	static <T extends IOInstance.Unmanaged<T>> void complexObjectIntegrityTest(
 		TestInfo info, int initalCapacity,
-		Struct.Unmanaged.Constr<T> constr,
+		NewUnmanaged<T> constr,
 		TypeLink typeDef,
 		UnsafeConsumer<T, IOException> session,
 		boolean useCluster
@@ -92,7 +89,7 @@ public class TestUtils{
 			var chunk=AllocateTicket.bytes(initalCapacity).submit(provider);
 			var ref  =chunk.getPtr().makeReference(0);
 			
-			T obj=constr.create(provider, ref, typeDef);
+			T obj=constr.make(provider, ref, typeDef);
 			
 			var actualSize=ContiguousStructPipe.sizeOfUnknown(provider, obj, WordSpace.BYTE);
 			
@@ -108,7 +105,7 @@ public class TestUtils{
 			
 			T read;
 			try{
-				read=constr.create(provider, ref, typeDef);
+				read=constr.make(provider, ref, typeDef);
 			}catch(Throwable e){
 				throw new RuntimeException("Failed to read object with data", e);
 			}
@@ -133,7 +130,7 @@ public class TestUtils{
 	
 	static <E, T extends IOInstance.Unmanaged<T>&IOList<E>> void ioListComplianceSequence(
 		TestInfo info, int initalCapacity,
-		Struct.Unmanaged.Constr<T> constr,
+		NewUnmanaged<T> constr,
 		TypeLink typeDef,
 		UnsafeConsumer<IOList<E>, IOException> session, boolean useCluster
 	) throws IOException{
@@ -146,7 +143,7 @@ public class TestUtils{
 	
 	static <K, V, T extends IOInstance.Unmanaged<T>&IOMap<K, V>> void ioMapComplianceSequence(
 		TestInfo info,
-		Struct.Unmanaged.Constr<T> constr,
+		NewUnmanaged<T> constr,
 		TypeLink typeDef,
 		UnsafeConsumer<IOMap<K, V>, IOException> session
 	) throws IOException{

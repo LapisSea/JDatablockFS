@@ -1,7 +1,5 @@
 package com.lapissea.cfs.type;
 
-import java.util.function.Supplier;
-
 public interface RuntimeType<T>{
 	
 	abstract class Abstract<L> implements RuntimeType<L>{
@@ -29,9 +27,9 @@ public interface RuntimeType<T>{
 	
 	class Lambda<L> extends Abstract<L>{
 		
-		private final Supplier<L> sup;
+		private final NewObj<L> sup;
 		
-		Lambda(Class<L> typ, Supplier<L> sup){
+		Lambda(Class<L> typ, NewObj<L> sup){
 			super(typ);
 			this.sup=sup;
 		}
@@ -41,7 +39,7 @@ public interface RuntimeType<T>{
 			return false;
 		}
 		@Override
-		public Supplier<L> emptyConstructor(){
+		public NewObj<L> emptyConstructor(){
 			return sup;
 		}
 	}
@@ -53,14 +51,14 @@ public interface RuntimeType<T>{
 		}
 		
 		return SupportedPrimitive.get(type).map(t->(RuntimeType<T>)t).orElseGet(()->new Abstract<>(type){
-			private Supplier<T> sup;
+			private NewObj<T> sup;
 			
 			@Override
 			public boolean getCanHavePointers(){
 				return false;
 			}
 			@Override
-			public Supplier<T> emptyConstructor(){
+			public NewObj<T> emptyConstructor(){
 				if(sup==null){
 					try{
 						var constr=getType().getConstructor();
@@ -82,6 +80,10 @@ public interface RuntimeType<T>{
 	
 	
 	boolean getCanHavePointers();
-	Supplier<T> emptyConstructor();
+	NewObj<T> emptyConstructor();
 	Class<T> getType();
+	
+	default T make(){
+		return emptyConstructor().make();
+	}
 }

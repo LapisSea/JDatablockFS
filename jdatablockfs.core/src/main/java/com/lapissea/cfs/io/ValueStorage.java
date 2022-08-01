@@ -258,7 +258,7 @@ public sealed interface ValueStorage<T>{
 				return null;
 			}
 			
-			return struct.getUnmanagedConstructor().create(provider, ref, type);
+			return struct.make(provider, ref, type);
 		}
 		
 		@Override

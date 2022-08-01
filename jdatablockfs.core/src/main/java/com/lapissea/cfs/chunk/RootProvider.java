@@ -66,12 +66,12 @@ public interface RootProvider extends DataProvider.Holder{
 						
 						var mem=AllocateTicket.bytes(siz).submit(provider);
 						
-						var inst=uStruct.getUnmanagedConstructor().create(provider, mem.getPtr().makeReference(), genericType);
+						var inst=uStruct.make(provider, mem.getPtr().makeReference(), genericType);
 						return (T)inst;
 					});
 				}else{
 					return withGenerator(()->{
-						var inst=struct.emptyConstructor().get();
+						var inst=struct.make();
 						if(struct.hasInvalidInitialNulls()){
 							inst.allocateNulls(provider);
 						}

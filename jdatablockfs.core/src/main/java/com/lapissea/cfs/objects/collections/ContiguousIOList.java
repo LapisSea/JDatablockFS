@@ -361,7 +361,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		var ctr=getElementType().emptyConstructor();
 		
 		addMany(count, ()->{
-			T val=ctr.get();
+			T val=ctr.make();
 			if(initializer!=null){
 				initializer.accept(val);
 			}
