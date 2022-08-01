@@ -652,7 +652,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 			synchronized(this){
 				if(uid==-1){
 					uid=nextUID();
-					if(STAT_LOGGING) logRegister(uid, this.toString());
+					if(STAT_LOGGING) logRegister(uid, this);
 				}
 			}
 		}
