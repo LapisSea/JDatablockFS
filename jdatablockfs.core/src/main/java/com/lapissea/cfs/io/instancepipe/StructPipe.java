@@ -202,6 +202,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	}
 	
 	
+	@SuppressWarnings("unchecked")
 	private CommandSet generateReferenceWalkCommands(){
 		var         builder  =CommandSet.builder();
 		var         hasDynmic=getType() instanceof Struct.Unmanaged<?> u&&u.isOverridingDynamicUnmanaged();
@@ -316,6 +317,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	
 	protected abstract List<IOField<T, ?>> initFields();
 	
+	@SuppressWarnings("unchecked")
 	protected SizeDescriptor<T> createSizeDescriptor(){
 		FieldSet<T> fields=getSpecificFields();
 		if(type instanceof Struct.Unmanaged<?> u){

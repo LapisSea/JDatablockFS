@@ -12,7 +12,6 @@ import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.compilation.FieldCompiler;
 import com.lapissea.cfs.type.field.IOField;
-import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.cfs.type.field.annotations.IOType;
@@ -323,7 +322,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		public String instanceToString(Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
 			return instanceToString0(
 				ioPool, instance, doShort, start, end, fieldValueSeparator, fieldSeparator,
-				Stream.concat(getFields().stream().filter(f->f.getName().indexOf(IOFieldTools.GENERATED_FIELD_SEPARATOR)==-1), instance.listUnmanagedFields())
+				Stream.concat(getFields().stream().filter(f->f.typeFlag(IOField.HAS_GENERATED_NAME)), instance.listUnmanagedFields())
 			);
 		}
 		
@@ -611,11 +610,6 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		return Objects.requireNonNull(fields);
 	}
 	
-	public IOField<T, ?> toIOField(Field field){
-		if(field.getDeclaringClass()!=getType()) throw new IllegalArgumentException();
-		return getFields().byName(field.getName()).orElseThrow();
-	}
-	
 	@Override
 	public boolean getCanHavePointers(){
 		waitForState(STATE_DONE);
@@ -628,7 +622,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	public String instanceToString(Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
 		return instanceToString0(
 			ioPool, instance, doShort, start, end, fieldValueSeparator, fieldSeparator,
-			fields.stream().filter(f->f.getName().indexOf(IOFieldTools.GENERATED_FIELD_SEPARATOR)==-1)
+			fields.stream().filter(f->f.typeFlag(IOField.HAS_GENERATED_NAME))
 		);
 	}
 	
@@ -711,7 +705,8 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	public GenericContext describeGenerics(TypeLink def){
 		return new GenericContext.Deferred(()->{
 			var params=getType().getTypeParameters();
-			var types =(Map.Entry<String, Type>[])new Map.Entry<?, ?>[params.length];
+			//noinspection unchecked
+			var types=(Map.Entry<String, Type>[])new Map.Entry<?, ?>[params.length];
 			for(int i=0;i<params.length;i++){
 				types[i]=Map.entry(params[i].getName(), def.arg(i).generic(null));
 			}

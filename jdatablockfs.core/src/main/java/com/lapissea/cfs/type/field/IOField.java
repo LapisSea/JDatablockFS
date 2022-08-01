@@ -345,6 +345,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	public static final int IOINSTANCE_FLAG       =1<<1;
 	public static final int PRIMITIVE_OR_ENUM_FLAG=1<<2;
 	public static final int HAS_NO_POINTERS_FLAG  =1<<3;
+	public static final int HAS_GENERATED_NAME    =1<<4;
 	
 	private int typeFlags=-1;
 	
@@ -374,6 +375,10 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		int typeFlags=0;
 		
 		if(accessor!=null){
+			if(getName().indexOf(IOFieldTools.GENERATED_FIELD_SEPARATOR)!=-1){
+				typeFlags|=HAS_GENERATED_NAME;
+			}
+			
 			boolean isDynamic=accessor.hasAnnotation(IOType.Dynamic.class);
 			if(isDynamic){
 				typeFlags|=DYNAMIC_FLAG;
@@ -550,6 +555,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	/**
 	 * @return string of the resolved value or null if string has no substance
 	 */
+	@SuppressWarnings({"rawtypes", "unchecked"})
 	public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
 		var val=get(ioPool, instance);
 		if(val==null){
@@ -670,9 +676,6 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		if(!lateDataInitialized){
 			throw new IllegalStateException(this.getName()+" late data not initialized");
 		}
-	}
-	public boolean lateDataInitialized(){
-		return lateDataInitialized;
 	}
 	
 	@Nullable

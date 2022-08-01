@@ -76,7 +76,11 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>> implements Clone
 		
 		
 		public final GenericContext getGenerics(){
-			if(genericCtx==null) genericCtx=getThisStruct().describeGenerics(typeDef);
+			if(genericCtx==null){
+				genericCtx=getThisStruct().describeGenerics(typeDef);
+			}else if(genericCtx instanceof GenericContext.Deferred d&&d.actualData()!=null){
+				genericCtx=d.actualData();
+			}
 			return genericCtx;
 		}
 		

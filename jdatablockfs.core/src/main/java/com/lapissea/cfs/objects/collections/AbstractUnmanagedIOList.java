@@ -47,11 +47,15 @@ public abstract class AbstractUnmanagedIOList<T, SELF extends AbstractUnmanagedI
 		var iThat=that.iterator();
 		
 		for(long i=0;i<siz;i++){
-			var vThis=iThis.next();
-			var vThat=iThat.next();
-			
-			if(!vThis.equals(vThat)){
-				return false;
+			try{
+				var vThis=iThis.ioNext();
+				var vThat=iThat.ioNext();
+				
+				if(!vThis.equals(vThat)){
+					return false;
+				}
+			}catch(IOException e){
+				throw new RuntimeException(e);
 			}
 		}
 		

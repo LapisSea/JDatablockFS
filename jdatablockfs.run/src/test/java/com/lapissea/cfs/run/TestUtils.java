@@ -32,7 +32,7 @@ public class TestUtils{
 		boolean shouldDeleteOk=false;
 		try{
 			shouldDeleteOk=Boolean.parseBoolean(System.getProperty("deleteOk"));
-		}catch(Throwable e){}
+		}catch(Throwable ignored){}
 		
 		
 		String sessionName=getSessionName(info);

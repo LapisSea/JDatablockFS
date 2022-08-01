@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.Objects;
 
+@SuppressWarnings("unused")
 public interface RootProvider extends DataProvider.Holder{
 	
 	final class Builder<T>{

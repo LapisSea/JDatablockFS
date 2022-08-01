@@ -15,8 +15,8 @@ public interface RuntimeType<T>{
 		@Override
 		public boolean equals(Object o){
 			return this==o||
-			       o instanceof RuntimeType<?> typ&&
-			       getType().equals(typ.getType());
+			       o instanceof RuntimeType<?> runtimeType&&
+			       getType().equals(runtimeType.getType());
 		}
 		
 		@Override

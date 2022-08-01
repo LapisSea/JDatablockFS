@@ -33,6 +33,7 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 		super(accessor);
 		this.fixed=fixed;
 		
+		@SuppressWarnings("unchecked")
 		var struct=(Struct<ValueType>)Struct.ofUnknown(getAccessor().getType());
 		if(fixed){
 			instancePipe=FixedContiguousStructPipe.of(struct, STATE_DONE);

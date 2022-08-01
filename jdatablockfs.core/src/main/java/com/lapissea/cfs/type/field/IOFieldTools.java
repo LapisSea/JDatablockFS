@@ -61,6 +61,7 @@ public class IOFieldTools{
 		
 		for(IOField<T, ?> field : mapData){
 			if(field instanceof IOField.Bit<?, ?> bit){
+				//noinspection unchecked
 				bitBuilder.add((IOField.Bit<T, ?>)bit);
 				continue;
 			}
@@ -138,7 +139,7 @@ public class IOFieldTools{
 	public static <T extends IOInstance<T>> String makeCollectionLenName(FieldAccessor<T> field){
 		return field.getName()+GENERATED_FIELD_SEPARATOR+"len";
 	}
-	public static <T extends IOInstance<T>> String makeNumberSizeName(String name){
+	public static String makeNumberSizeName(String name){
 		return name+GENERATED_FIELD_SEPARATOR+"nSiz";
 	}
 	public static <T extends IOInstance<T>> String makeGenericIDFieldName(FieldAccessor<T> field){
@@ -161,7 +162,7 @@ public class IOFieldTools{
 	public static <T extends IOInstance<T>> String makeRefName(FieldAccessor<T> accessor){
 		return makeRefName(accessor.getName());
 	}
-	public static <T extends IOInstance<T>> String makeRefName(String baseName){
+	public static String makeRefName(String baseName){
 		return baseName+GENERATED_FIELD_SEPARATOR+"ref";
 	}
 	

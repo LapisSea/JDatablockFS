@@ -13,7 +13,6 @@ import java.lang.annotation.Annotation;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 public final class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends AbstractPrimitiveAccessor<CTyp>{
 	
@@ -30,7 +29,7 @@ public final class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends Abstra
 	
 	private final VirtualFieldDefinition<CTyp, Object> type;
 	private final GetterFilter<CTyp, Object>           filter;
-	private       List<FieldAccessor<CTyp>>            deps;
+	private       List<FieldAccessor<CTyp>>            dependencies;
 	
 	private final int ptrIndex;
 	private final int primitiveOffset;
@@ -89,13 +88,13 @@ public final class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends Abstra
 	
 	@Override
 	public void init(IOField<CTyp, ?> field){
-		if(type.getGetFilter()!=null){
-			deps=getDeclaringStruct()
-				     .getFields()
-				     .stream()
-				     .filter(f->f.isDependency(field))
-				     .map(IOField::getAccessor)
-				     .collect(Collectors.toList());
+		if(filter!=null){
+			dependencies=getDeclaringStruct()
+				             .getFields()
+				             .stream()
+				             .filter(f->f.isDependency(field))
+				             .map(IOField::getAccessor)
+				             .toList();
 		}
 	}
 	
@@ -104,7 +103,7 @@ public final class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends Abstra
 	protected long getExactLong(Struct.Pool<CTyp> ioPool, CTyp instance){
 		long rawVal=getTargetPool(ioPool, instance).getLong(this);
 		if(filter==null) return rawVal;
-		return ((GetterFilter.L<CTyp>)(Object)filter).filterPrimitive(ioPool, instance, deps, rawVal);
+		return ((GetterFilter.L<CTyp>)(Object)filter).filterPrimitive(ioPool, instance, dependencies, rawVal);
 	}
 	@Override
 	protected void setExactLong(Struct.Pool<CTyp> ioPool, CTyp instance, long value){
@@ -116,7 +115,7 @@ public final class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends Abstra
 	protected int getExactInt(Struct.Pool<CTyp> ioPool, CTyp instance){
 		int rawVal=getTargetPool(ioPool, instance).getInt(this);
 		if(filter==null) return rawVal;
-		return ((GetterFilter.I<CTyp>)(Object)filter).filterPrimitive(ioPool, instance, deps, rawVal);
+		return ((GetterFilter.I<CTyp>)(Object)filter).filterPrimitive(ioPool, instance, dependencies, rawVal);
 	}
 	@Override
 	protected void setExactInt(Struct.Pool<CTyp> ioPool, CTyp instance, int value){getTargetPool(ioPool, instance).setInt(this, value);}
@@ -155,7 +154,7 @@ public final class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends Abstra
 		var pool  =getTargetPool(ioPool, instance, true);
 		var rawVal=pool==null?null:pool.get(this);
 		if(filter==null) return rawVal;
-		return filter.filter(ioPool, instance, deps, rawVal);
+		return filter.filter(ioPool, instance, dependencies, rawVal);
 	}
 	@Override
 	protected void setExactObject(Struct.Pool<CTyp> ioPool, CTyp instance, Object value){

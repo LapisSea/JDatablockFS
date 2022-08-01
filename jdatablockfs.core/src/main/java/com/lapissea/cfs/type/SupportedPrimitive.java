@@ -87,6 +87,7 @@ public enum SupportedPrimitive implements RuntimeType<Object>{
 	public Object getDefaultValue(){
 		return defVal;
 	}
+	@SuppressWarnings("unchecked")
 	@Override
 	public Class<Object> getType(){
 		return (Class<Object>)primitive;
