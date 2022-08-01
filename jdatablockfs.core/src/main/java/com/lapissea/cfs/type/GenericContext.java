@@ -7,18 +7,17 @@ import com.lapissea.util.TextUtil;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
 
 public interface GenericContext{
 	
-	class MapConstant implements GenericContext{
+	final class MapConstant implements GenericContext{
 		private final Map<String, Type> actualTypes;
 		
 		public MapConstant(Map<String, Type> actualTypes){
-			this.actualTypes=new HashMap<>(actualTypes);
+			this.actualTypes=Map.copyOf(actualTypes);
 		}
 		
 		@Override
@@ -35,7 +34,7 @@ public interface GenericContext{
 		}
 	}
 	
-	class Deferred implements GenericContext{
+	final class Deferred implements GenericContext{
 		
 		private GenericContext           data;
 		private Supplier<GenericContext> dataSource;
@@ -53,6 +52,10 @@ public interface GenericContext{
 			if(data!=null) return;
 			data=Objects.requireNonNull(dataSource.get());
 			dataSource=null;
+		}
+		
+		public GenericContext actualData(){
+			return data;
 		}
 		
 		@Override

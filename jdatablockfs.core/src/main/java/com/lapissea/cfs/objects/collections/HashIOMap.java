@@ -150,7 +150,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		super(provider, reference, typeDef);
 		cache=readOnly?new HashMap<>():null;
 		
-		if(isSelfDataEmpty()&&!readOnly){
+		if(!readOnly&&isSelfDataEmpty()){
 			newBuckets();
 			writeManagedFields();
 			fillBuckets(buckets, bucketPO2);

@@ -97,11 +97,18 @@ public abstract class AbstractUnmanagedIOList<T, SELF extends AbstractUnmanagedI
 	@Override
 	public boolean isFreed(){
 		if(super.isFreed()) return true;
-		try{
-			return getDataProvider().getMemoryManager().getFreeChunks().contains(getReference().getPtr());
-		}catch(IOException e){
-			throw new RuntimeException(e);
+		if(DEBUG_VALIDATION){
+			boolean dataFreed;
+			try{
+				dataFreed=getDataProvider().getMemoryManager().getFreeChunks().contains(getReference().getPtr());
+			}catch(IOException e){
+				throw new RuntimeException(e);
+			}
+			if(dataFreed){
+				throw new IllegalStateException();
+			}
 		}
+		return false;
 	}
 	
 	@Override

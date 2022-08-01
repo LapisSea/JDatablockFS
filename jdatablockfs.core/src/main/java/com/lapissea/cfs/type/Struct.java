@@ -32,7 +32,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.ConsoleColors.GREEN_BRIGHT;
@@ -713,11 +712,12 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	
 	public GenericContext describeGenerics(TypeLink def){
 		return new GenericContext.Deferred(()->{
-			var parms=getClass().getTypeParameters();
-			var types=IntStream.range(0, parms.length)
-			                   .boxed()
-			                   .collect(Collectors.toMap(i->parms[i].getName(), i->def.arg(i).generic(null)));
-			return new GenericContext.MapConstant(types);
+			var params=getType().getTypeParameters();
+			var types =(Map.Entry<String, Type>[])new Map.Entry<?, ?>[params.length];
+			for(int i=0;i<params.length;i++){
+				types[i]=Map.entry(params[i].getName(), def.arg(i).generic(null));
+			}
+			return new GenericContext.MapConstant(Map.ofEntries(types));
 		});
 	}
 	

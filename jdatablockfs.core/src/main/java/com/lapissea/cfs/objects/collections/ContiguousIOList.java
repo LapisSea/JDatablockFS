@@ -32,7 +32,7 @@ import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
 @SuppressWarnings("unchecked")
-public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIOList<T>> implements RandomAccess{
+public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIOList<T>> implements RandomAccess{
 	
 	private static final TypeLink.Check TYPE_CHECK=new TypeLink.Check(
 		ContiguousIOList.class,
@@ -52,12 +52,10 @@ public class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIO
 	private final Map<Long, T> cache;
 	
 	public ContiguousIOList(DataProvider provider, Reference reference, TypeLink typeDef) throws IOException{
-		super(provider, reference, typeDef);
-		TYPE_CHECK.ensureValid(typeDef);
+		super(provider, reference, typeDef, TYPE_CHECK);
 		cache=readOnly?new HashMap<>():null;
 		
 		var magnetProvider=provider.withRouter(t->t.withPositionMagnet(t.positionMagnet().orElse(getReference().getPtr().getValue())));
-		
 		this.storage=(ValueStorage<T>)ValueStorage.makeStorage(magnetProvider, typeDef.arg(0), getGenerics(), true);
 		
 		if(!readOnly&&isSelfDataEmpty()){
