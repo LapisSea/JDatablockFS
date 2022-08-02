@@ -2,7 +2,6 @@
   <configuration default="false" name="World" type="Application" factoryName="Application">
     <option name="MAIN_CLASS_NAME" value="com.lapissea.cfs.run.world.World" />
     <module name="jdatablockfs.run" />
-    <option name="VM_PARAMETERS" value="-Ddfs.printCompilation=true -Ddfs.typeValidation=false" />
     <option name="WORKING_DIRECTORY" value="$ProjectFileDir$/run/main" />
     <extension name="coverage">
       <pattern>
