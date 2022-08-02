@@ -10,13 +10,9 @@ import com.lapissea.cfs.run.sparseimage.SparseImage;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.MemoryWalker;
 import com.lapissea.cfs.type.field.IOField;
-import com.lapissea.util.LogUtil;
 import org.openjdk.jmh.annotations.*;
 
-import java.io.File;
 import java.io.IOException;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -27,40 +23,8 @@ import java.util.concurrent.TimeUnit;
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 public class IOWalkBench{
 	
-	public static void main(String[] args){
-		if(args.length==1&&args[0].equals("jit")){
-			System.setProperty("radius", "80");
-			var     b      =new IOWalkBench();
-			Instant instant=Instant.now();
-			int     i      =0;
-			
-			while(Duration.between(instant, Instant.now()).toSeconds()<20){
-				i++;
-				if(i<50000){
-					instant=Instant.now();
-				}else if(i%10==0){
-					LogUtil.println("=====Iterating=====", Duration.between(instant, Instant.now()).toSeconds());
-					b.rec=new MemoryWalker.PointerRecord(){
-						@Override
-						public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, IOField.Ref<T, ?> field, Reference valueReference) throws IOException{
-							return MemoryWalker.CONTINUE;
-						}
-						@Override
-						public <T extends IOInstance<T>> int logChunkPointer(Reference instanceReference, T instance, IOField<T, ChunkPointer> field, ChunkPointer value) throws IOException{
-							return MemoryWalker.CONTINUE;
-						}
-					};
-				}
-				b.walk30();
-			}
-			LogUtil.println(new File("mylogfile.log").getAbsolutePath());
-			return;
-		}
-		new IOWalkBench().doWalk();
-	}
-	
-	private final Cluster                    cluster;
-	private       MemoryWalker.PointerRecord rec=new MemoryWalker.PointerRecord(){
+	private final Cluster cluster;
+	MemoryWalker.PointerRecord rec=new MemoryWalker.PointerRecord(){
 		@Override
 		public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, IOField.Ref<T, ?> field, Reference valueReference) throws IOException{
 			return MemoryWalker.CONTINUE;
