@@ -34,6 +34,9 @@ public class MemoryManagementBenchmark{
 	@Param({"0", "50", "15000"})
 	public int entropy;
 	
+	@Param({"1", "50", "200"})
+	public int allocations;
+	
 	@Setup
 	public void initSrc(){
 		try{
@@ -85,9 +88,9 @@ public class MemoryManagementBenchmark{
 	}
 	
 	@Benchmark
-	public void alloc50(){
+	public void alloc(){
 		try{
-			alloc(cls, AllocateTicket.bytes(16), 50);
+			alloc(cls, AllocateTicket.bytes(16), allocations);
 		}catch(Exception e){
 			throw new RuntimeException(e);
 		}

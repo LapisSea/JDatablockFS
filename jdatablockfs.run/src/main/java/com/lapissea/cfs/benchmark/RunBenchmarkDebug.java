@@ -1,58 +1,56 @@
 package com.lapissea.cfs.benchmark;
 
-import com.lapissea.cfs.objects.ChunkPointer;
-import com.lapissea.cfs.objects.Reference;
-import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.MemoryWalker;
-import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.util.LogUtil;
 
 import java.io.File;
-import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.function.Consumer;
 
+@SuppressWarnings("Convert2MethodRef")
 public class RunBenchmarkDebug{
 	
 	public static void main(String[] args){
 //		doWalk(args);
 		
 		var bench=new MemoryManagementBenchmark();
+		bench.entropy=15000;
+		bench.allocations=200;
 		bench.initSrc();
-		bench.initData();
-		bench.alloc50();
+		
+		jitHandle(new String[]{"jit"}, bench, ioWalkBench->{
+			bench.initData();
+			bench.alloc();
+		});
 	}
 	
 	private static void doWalk(String[] args){
+		jitHandle(args, new IOWalkBench(), ioWalkBench->{
+			ioWalkBench.doWalk();
+		});
+	}
+	
+	private static <T> void jitHandle(String[] args, T t, Consumer<T> run){
 		if(args.length==1&&args[0].equals("jit")){
-			System.setProperty("radius", "80");
-			var     b      =new IOWalkBench();
-			Instant instant=Instant.now();
-			int     i      =0;
+			Instant start=Instant.now();
+			Instant print=Instant.now();
+			int     i    =0;
 			
-			while(Duration.between(instant, Instant.now()).toSeconds()<20){
+			while(Duration.between(start, Instant.now()).toSeconds()<20){
 				i++;
 				if(i<50000){
-					instant=Instant.now();
-				}else if(i%10==0){
-					LogUtil.println("=====Iterating=====", Duration.between(instant, Instant.now()).toSeconds());
-					b.rec=new MemoryWalker.PointerRecord(){
-						@Override
-						public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, IOField.Ref<T, ?> field, Reference valueReference) throws IOException{
-							return MemoryWalker.CONTINUE;
-						}
-						@Override
-						public <T extends IOInstance<T>> int logChunkPointer(Reference instanceReference, T instance, IOField<T, ChunkPointer> field, ChunkPointer value) throws IOException{
-							return MemoryWalker.CONTINUE;
-						}
-					};
+					start=Instant.now();
 				}
-				b.walk30();
+				if(Duration.between(print, Instant.now()).toMillis()>=1000){
+					print=Instant.now();
+					LogUtil.println("=====Iterating=====", Duration.between(start, Instant.now()).toSeconds());
+				}
+				run.accept(t);
 			}
 			LogUtil.println(new File("mylogfile.log").getAbsolutePath());
-			return;
+		}else{
+			run.accept(t);
 		}
-		new IOWalkBench().doWalk();
 	}
 	
 }
