@@ -1,5 +1,6 @@
 package com.lapissea.cfs.objects.collections;
 
+import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.ChunkBuilder;
@@ -17,6 +18,7 @@ import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.access.AbstractFieldAccessor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
+import com.lapissea.cfs.type.field.access.TypeFlag;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.ShouldNeverHappenError;
@@ -75,6 +77,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	private static <T> FieldAccessor<ContiguousIOList<T>> fieldAccessor(Type elementType, long index){
 		return new AbstractFieldAccessor<>(null, ""){
 			private String lazyName;
+			private final int typeID=TypeFlag.getId(Utils.typeToRaw(elementType));
 			@NotNull
 			@Override
 			public String getName(){
@@ -91,6 +94,10 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 			@Override
 			public Type getGenericType(GenericContext genericContext){
 				return elementType;
+			}
+			@Override
+			public int getTypeID(){
+				return typeID;
 			}
 			
 			@Override

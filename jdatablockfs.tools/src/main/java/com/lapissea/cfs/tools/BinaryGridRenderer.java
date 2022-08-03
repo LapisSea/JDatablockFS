@@ -26,6 +26,7 @@ import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.AbstractFieldAccessor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
+import com.lapissea.cfs.type.field.access.TypeFlag;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.cfs.type.field.fields.reflection.BitFieldMerger;
@@ -1560,6 +1561,10 @@ public class BinaryGridRenderer implements DataRenderer{
 												return Optional.empty();
 											}
 											@Override
+											public int getTypeID(){
+												return TypeFlag.ID_OBJECT;
+											}
+											@Override
 											public Struct<T> getDeclaringStruct(){
 												return instance.getThisStruct();
 											}
@@ -1608,6 +1613,10 @@ public class BinaryGridRenderer implements DataRenderer{
 										@Override
 										public Struct<T> getDeclaringStruct(){
 											return instance.getThisStruct();
+										}
+										@Override
+										public int getTypeID(){
+											return TypeFlag.ID_OBJECT;
 										}
 										@NotNull
 										@Override
@@ -1698,6 +1707,10 @@ public class BinaryGridRenderer implements DataRenderer{
 				return NumberSize.class;
 			}
 			@Override
+			public int getTypeID(){
+				return TypeFlag.ID_OBJECT;
+			}
+			@Override
 			public Object get(Struct.Pool<T> ioPool, T instance){
 				return arrayLenSiz;
 			}
@@ -1716,6 +1729,10 @@ public class BinaryGridRenderer implements DataRenderer{
 			@Override
 			public Type getGenericType(GenericContext genericContext){
 				return int.class;
+			}
+			@Override
+			public int getTypeID(){
+				return TypeFlag.ID_OBJECT;
 			}
 			@Override
 			public Object get(Struct.Pool<T> ioPool, T instance){

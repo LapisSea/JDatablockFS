@@ -53,6 +53,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	
 	private final Type     genericType;
 	private final Class<?> rawType;
+	private final int      typeId;
 	
 	private final Field        field;
 	private final MethodHandle getter;
@@ -63,6 +64,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 		this.field=field;
 		this.genericType=Utils.prottectFromVarType(genericType);
 		this.rawType=Utils.typeToRaw(this.genericType);
+		typeId=TypeFlag.getId(rawType);
 		
 		getter.ifPresent(get->{
 			if(!Utils.genericInstanceOf(get.getGenericReturnType(), genericType)){
@@ -103,6 +105,10 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	@Override
 	public Class<?> getType(){
 		return rawType;
+	}
+	@Override
+	public int getTypeID(){
+		return typeId;
 	}
 	
 	@Override

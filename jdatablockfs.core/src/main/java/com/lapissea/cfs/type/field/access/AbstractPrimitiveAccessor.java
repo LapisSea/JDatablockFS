@@ -7,19 +7,10 @@ import com.lapissea.cfs.type.Struct;
 import com.lapissea.util.ShouldNeverHappenError;
 
 import java.lang.reflect.Type;
-import java.util.Map;
+
+import static com.lapissea.cfs.type.field.access.TypeFlag.*;
 
 public abstract class AbstractPrimitiveAccessor<CTyp extends IOInstance<CTyp>> extends AbstractFieldAccessor<CTyp>{
-	
-	private static final int ID_OBJECT =0;
-	private static final int ID_DOUBLE =1;
-	private static final int ID_FLOAT  =2;
-	private static final int ID_BYTE   =3;
-	private static final int ID_BOOLEAN=4;
-	private static final int ID_LONG   =5;
-	private static final int ID_INT    =6;
-	private static final int ID_SHORT  =7;
-	private static final int ID_CHAR   =8;
 	
 	private final Type     genericType;
 	private final Class<?> rawType;
@@ -30,16 +21,7 @@ public abstract class AbstractPrimitiveAccessor<CTyp extends IOInstance<CTyp>> e
 		
 		Class<?> type=Utils.typeToRaw(genericType);
 		
-		if(type.isPrimitive()) typeID=Map.of(
-			double.class, ID_DOUBLE,
-			float.class, ID_FLOAT,
-			byte.class, ID_BYTE,
-			boolean.class, ID_BOOLEAN,
-			long.class, ID_LONG,
-			int.class, ID_INT,
-			short.class, ID_SHORT,
-			char.class, ID_CHAR).get(type);
-		else typeID=ID_OBJECT;
+		typeID=TypeFlag.getId(type);
 		
 		this.genericType=Utils.prottectFromVarType(genericType);
 		this.rawType=Utils.typeToRaw(this.genericType);
@@ -48,6 +30,10 @@ public abstract class AbstractPrimitiveAccessor<CTyp extends IOInstance<CTyp>> e
 	@Override
 	public final Class<?> getType(){
 		return rawType;
+	}
+	@Override
+	public int getTypeID(){
+		return typeID;
 	}
 	
 	@Override

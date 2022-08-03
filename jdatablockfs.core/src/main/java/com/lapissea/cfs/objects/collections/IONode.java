@@ -18,6 +18,7 @@ import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.AbstractFieldAccessor;
+import com.lapissea.cfs.type.field.access.TypeFlag;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.cfs.type.field.annotations.IOValue;
@@ -81,6 +82,10 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 				return Object.class;
 			}
 			@Override
+			public int getTypeID(){
+				return TypeFlag.ID_OBJECT;
+			}
+			@Override
 			public T get(Struct.Pool<IONode<T>> ioPool, IONode<T> instance){
 				try{
 					return instance.getValue();
@@ -134,6 +139,10 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 			public Type getGenericType(GenericContext genericContext){
 				if(genericContext==null) return IONode.class;
 				throw new NotImplementedException();
+			}
+			@Override
+			public int getTypeID(){
+				return TypeFlag.ID_OBJECT;
 			}
 			@Override
 			public Object get(Struct.Pool<IONode<T>> ioPool, IONode<T> instance){

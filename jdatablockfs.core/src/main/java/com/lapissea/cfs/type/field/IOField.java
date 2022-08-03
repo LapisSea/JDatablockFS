@@ -36,6 +36,7 @@ import java.util.stream.Stream;
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.internal.StatIOField.*;
 import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
+import static com.lapissea.cfs.type.field.access.TypeFlag.*;
 
 public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	
@@ -598,26 +599,44 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		return Optional.of(TextUtil.toString(val));
 	}
 	
-	@SuppressWarnings("unchecked")
 	public boolean instancesEqual(Struct.Pool<T> ioPool1, T inst1, Struct.Pool<T> ioPool2, T inst2){
+		var acc=getAccessor();
+		var id =acc.getTypeID();
+		return switch(id){
+			case ID_OBJECT -> instancesEqualObject(ioPool1, inst1, ioPool2, inst2);
+			case ID_INT -> acc.getInt(ioPool1, inst1)==acc.getInt(ioPool2, inst2);
+			case ID_LONG -> acc.getLong(ioPool1, inst1)==acc.getLong(ioPool2, inst2);
+			case ID_DOUBLE -> acc.getDouble(ioPool1, inst1)==acc.getDouble(ioPool2, inst2);
+			case ID_FLOAT -> acc.getFloat(ioPool1, inst1)==acc.getFloat(ioPool2, inst2);
+			case ID_SHORT -> acc.getShort(ioPool1, inst1)==acc.getShort(ioPool2, inst2);
+			case ID_BYTE -> acc.getByte(ioPool1, inst1)==acc.getByte(ioPool2, inst2);
+			case ID_BOOLEAN -> acc.getBoolean(ioPool1, inst1)==acc.getBoolean(ioPool2, inst2);
+			case ID_CHAR -> acc.getChar(ioPool1, inst1)==acc.getChar(ioPool2, inst2);
+			default -> throw new IllegalStateException(id+"");
+		};
+	}
+	
+	@SuppressWarnings("unchecked")
+	private boolean instancesEqualObject(Struct.Pool<T> ioPool1, T inst1, Struct.Pool<T> ioPool2, T inst2){
+		var acc =getAccessor();
+		var type=acc.getType();
+		
 		var o1=get(ioPool1, inst1);
 		var o2=get(ioPool2, inst2);
 		
 		if(getNullability()==IONullability.Mode.DEFAULT_IF_NULL&&(o1==null||o2==null)){
 			if(o1==null&&o2==null) return true;
-			var acc=getAccessor();
 			
-			if(IOInstance.isInstance(acc.getType())){
-				var typ=Struct.ofUnknown(acc.getType());
-				
-				if(o1==null) o1=(ValueType)typ.make();
-				if(o2==null) o2=(ValueType)typ.make();
+			if(IOInstance.isInstance(type)){
+				var struct=Struct.ofUnknown(type);
+				if(o1==null) o1=(ValueType)struct.make();
+				else o2=(ValueType)struct.make();
 			}else{
 				throw new NotImplementedException(acc.getType()+"");//TODO implement equals of numbers?
 			}
 		}
 		
-		var isArray=getAccessor().getType().isArray();
+		var isArray=type.isArray();
 		if(!isArray&&typeFlag(DYNAMIC_FLAG)){
 			var obj=o1!=null?o1:o2;
 			isArray=obj!=null&&obj.getClass().isArray();
@@ -646,7 +665,20 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	}
 	
 	public int instanceHashCode(Struct.Pool<T> ioPool, T instance){
-		return Objects.hashCode(get(ioPool, instance));
+		var acc=getAccessor();
+		var id =acc.getTypeID();
+		return switch(id){
+			case ID_OBJECT -> Objects.hashCode(get(ioPool, instance));
+			case ID_INT -> Integer.hashCode(acc.getInt(ioPool, instance));
+			case ID_LONG -> Long.hashCode(acc.getLong(ioPool, instance));
+			case ID_DOUBLE -> Double.hashCode(acc.getDouble(ioPool, instance));
+			case ID_FLOAT -> Float.hashCode(acc.getFloat(ioPool, instance));
+			case ID_SHORT -> Short.hashCode(acc.getShort(ioPool, instance));
+			case ID_BYTE -> Byte.hashCode(acc.getByte(ioPool, instance));
+			case ID_BOOLEAN -> Boolean.hashCode(acc.getBoolean(ioPool, instance));
+			case ID_CHAR -> Character.hashCode(acc.getChar(ioPool, instance));
+			default -> throw new IllegalStateException(id+"");
+		};
 	}
 	
 	public void init(){

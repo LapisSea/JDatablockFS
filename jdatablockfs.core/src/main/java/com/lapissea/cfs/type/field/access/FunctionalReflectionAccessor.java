@@ -53,6 +53,7 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 	
 	private final Type     genericType;
 	private final Class<?> rawType;
+	private final int      typeID;
 	
 	private final MethodHandle getter;
 	private final MethodHandle setter;
@@ -64,6 +65,7 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 		this.annotations=annotations;
 		this.genericType=genericType;
 		this.rawType=Utils.typeToRaw(genericType);
+		typeID=TypeFlag.getId(rawType);
 		
 		if(!Utils.genericInstanceOf(getter.getReturnType(), genericType)){
 			throw new MalformedStructLayout("getter returns "+getter.getReturnType()+" but "+genericType+" is required\n"+getter);
@@ -97,6 +99,10 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 	@Override
 	public Class<?> getType(){
 		return rawType;
+	}
+	@Override
+	public int getTypeID(){
+		return typeID;
 	}
 	
 	@Override
