@@ -60,7 +60,7 @@ import static com.lapissea.util.PoolOwnThread.async;
 import static com.lapissea.util.UtilL.TRUE;
 import static org.lwjgl.glfw.GLFW.*;
 
-@SuppressWarnings({"UnnecessaryLocalVariable", "SameParameterValue"})
+@SuppressWarnings({"UnnecessaryLocalVariable", "SameParameterValue", "rawtypes", "unchecked"})
 public class BinaryGridRenderer implements DataRenderer{
 	
 	static{

@@ -37,6 +37,7 @@ import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.internal.StatIOField.*;
 import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 import static com.lapissea.cfs.type.field.access.TypeFlag.*;
+import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 
 public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	
@@ -191,7 +192,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 						var val=get(ioPool, instance);
 						
 						if(val==null){
-							if(allowExternalMod&&getNullability()==IONullability.Mode.DEFAULT_IF_NULL){
+							if(allowExternalMod&&getNullability()==DEFAULT_IF_NULL){
 								val=newDefault();
 							}else{
 								return new Reference();
@@ -368,8 +369,9 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	}
 	
 	public int typeFlags(){
-		if(typeFlags==-1) typeFlags=calcTypeFlags();
-		return typeFlags;
+		var f=typeFlags;
+		if(f==-1) f=typeFlags=calcTypeFlags();
+		return f;
 	}
 	
 	private int calcTypeFlags(){
@@ -453,7 +455,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		return switch(getNullability()){
 			case NOT_NULL -> requireValNN(value);
 			case NULLABLE -> value;
-			case DEFAULT_IF_NULL -> throw new IllegalStateException(this+" does not support "+IONullability.Mode.DEFAULT_IF_NULL);
+			case DEFAULT_IF_NULL -> throw new IllegalStateException(this+" does not support "+DEFAULT_IF_NULL);
 		};
 	}
 	
@@ -624,7 +626,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		var o1=get(ioPool1, inst1);
 		var o2=get(ioPool2, inst2);
 		
-		if(getNullability()==IONullability.Mode.DEFAULT_IF_NULL&&(o1==null||o2==null)){
+		if(getNullability()==DEFAULT_IF_NULL&&(o1==null||o2==null)){
 			if(o1==null&&o2==null) return true;
 			
 			if(IOInstance.isInstance(type)){

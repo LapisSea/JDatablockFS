@@ -272,14 +272,14 @@ public sealed interface IOTypeDB{
 			
 			if(TYPE_VALIDATION){
 				newDefs.entrySet().removeIf(e->!e.getValue().isIoInstance());
-				checkNewTypeValidity(newDefs);
+				if(!newDefs.isEmpty()){
+					checkNewTypeValidity(newDefs);
+				}
 			}
 			return new TypeID(newID, true);
 		}
 		
 		private void checkNewTypeValidity(Map<TypeName, TypeDef> newDefs){
-			if(newDefs.isEmpty()) return;
-			
 			var names=newDefs.entrySet().stream().filter(e->!e.getValue().isUnmanaged()).map(e->e.getKey().typeName).collect(Collectors.toSet());
 			var classLoader=new TemplateClassLoader(this, this.getClass().getClassLoader()){
 				@Override
