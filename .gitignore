@@ -4,7 +4,6 @@
 !.gitignore
 !/LICENSE
 !/README.md
-!/CODE_OF_CONDUCT.md
 !.editorconfig
 
 !/jdatablockfs.core/
