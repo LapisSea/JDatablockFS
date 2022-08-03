@@ -303,7 +303,7 @@ public sealed interface IOTypeDB{
 			for(var name : names){
 				try{
 					var cls=Class.forName(name, true, classLoader);
-					Struct.ofUnknown(cls);
+					Struct.ofUnknown(cls, StagedInit.STATE_DONE);
 				}catch(Throwable ex){
 					throw new RuntimeException("Invalid stored class "+name+"\n"+TextUtil.toNamedPrettyJson(newDefs.get(new TypeName(name))), ex);
 				}

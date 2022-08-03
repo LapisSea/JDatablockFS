@@ -292,7 +292,7 @@ public class MemoryWalker{
 									}
 									if(!dynamic){
 										var typ=refField.getAccessor().getType();
-										if(!Struct.ofUnknown(typ).getCanHavePointers()){
+										if(!Struct.canUnknownHavePointers(typ)){
 											continue;
 										}
 									}
@@ -373,7 +373,7 @@ public class MemoryWalker{
 									if(type.isArray()){
 										var component=type.componentType();
 										if(IOInstance.isInstance(component)){
-											if(!Struct.ofUnknown(component).getCanHavePointers()){
+											if(!Struct.canUnknownHavePointers(component)){
 												continue;
 											}
 											var array=(IOInstance<?>[])field.get(ioPool, instance);

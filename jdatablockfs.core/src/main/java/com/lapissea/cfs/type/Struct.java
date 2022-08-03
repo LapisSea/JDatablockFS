@@ -362,14 +362,25 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	@SuppressWarnings({"unchecked", "rawtypes"})
+	public static Struct<?> ofUnknown(@NotNull Class<?> instanceClass, int minRequestedStage){
+		validateStructType(instanceClass);
+		var s=of0((Class<? extends IOInstance>)instanceClass, minRequestedStage==STATE_DONE);
+		s.waitForState(minRequestedStage);
+		return s;
+	}
+	
+	@SuppressWarnings({"unchecked", "rawtypes"})
 	public static Struct<?> ofUnknown(@NotNull Class<?> instanceClass){
+		validateStructType(instanceClass);
+		return of((Class<? extends IOInstance>)instanceClass);
+	}
+	
+	private static void validateStructType(Class<?> instanceClass){
 		Objects.requireNonNull(instanceClass);
 		
 		if(!IOInstance.isInstance(instanceClass)){
 			throw new IllegalArgumentException(instanceClass.getName()+" is not an "+IOInstance.class.getSimpleName());
 		}
-		
-		return of((Class<? extends IOInstance>)instanceClass);
 	}
 	
 	public static <T extends IOInstance<T>> Struct<T> of(Class<T> instanceClass, int minRequestedStage){
@@ -565,8 +576,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			
 			if(IOInstance.isInstance(acc.getType())){
 				if(!IOInstance.isManaged(acc.getType())) return true;
-				var s=Struct.ofUnknown(acc.getType());
-				if(s.getCanHavePointers()) return true;
+				return Struct.canUnknownHavePointers(acc.getType());
 			}
 			return false;
 		});
@@ -608,6 +618,11 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			}
 		}
 		return Objects.requireNonNull(fields);
+	}
+	
+	public static boolean canUnknownHavePointers(@NotNull Class<?> instanceClass){
+		var s=ofUnknown(instanceClass, STATE_DONE);
+		return s.canHavePointers;
 	}
 	
 	@Override

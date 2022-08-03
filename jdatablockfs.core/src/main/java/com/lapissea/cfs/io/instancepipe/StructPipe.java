@@ -255,8 +255,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			Class<?> type=accessor.getType();
 			
 			if(field.typeFlag(IOField.IOINSTANCE_FLAG)){
-				Struct<?> struct=Struct.ofUnknown(type);
-				if(struct.getCanHavePointers()){
+				if(Struct.canUnknownHavePointers(type)){
 					builder.potentialReference();
 				}else{
 					builder.skipField(field);
