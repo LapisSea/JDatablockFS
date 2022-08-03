@@ -408,7 +408,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 			if(IOInstance.isInstance(type)){
 				typeFlags|=IOINSTANCE_FLAG;
 				
-				if(!isDynamic&&!(this instanceof IOField.Ref)&&!Struct.ofUnknown(type).getCanHavePointers()){
+				if(!isDynamic&&!(this instanceof IOField.Ref)&&!Struct.canUnknownHavePointers(type)){
 					typeFlags|=HAS_NO_POINTERS_FLAG;
 				}
 			}

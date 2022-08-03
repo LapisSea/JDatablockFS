@@ -467,7 +467,7 @@ public class DisplayIpc implements DataLogger{
 	
 	@Override
 	public Session getSession(String name){
-		if(sessionCreator==null) throw new IllegalStateException("This server has been closed");
+		if(sessionCreator==null) throw new Closed("This server has been closed");
 		synchronized(sessions){
 			return sessions.computeIfAbsent(name, sessionCreator);
 		}

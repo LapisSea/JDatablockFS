@@ -2,6 +2,13 @@ package com.lapissea.cfs.tools.logging;
 
 public interface DataLogger{
 	
+	class Closed extends IllegalStateException{
+		public Closed(){}
+		public Closed(String message){
+			super(message);
+		}
+	}
+	
 	interface Session{
 		class Blank implements Session{
 			public static final Session INSTANCE=new Blank();

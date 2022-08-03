@@ -119,6 +119,7 @@ public class LoggedMemoryUtils{
 					while(!preBuf.isEmpty()){
 						ses.log(preBuf.remove(0));
 					}
+				}catch(DataLogger.Closed ignored){
 				}finally{
 					lock.unlock();
 				}
