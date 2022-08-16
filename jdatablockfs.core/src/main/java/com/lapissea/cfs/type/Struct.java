@@ -322,7 +322,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		public String instanceToString(Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
 			return instanceToString0(
 				ioPool, instance, doShort, start, end, fieldValueSeparator, fieldSeparator,
-				Stream.concat(getFields().stream().filter(f->f.typeFlag(IOField.HAS_GENERATED_NAME)), instance.listUnmanagedFields())
+				Stream.concat(getFields().stream().filter(f->!f.typeFlag(IOField.HAS_GENERATED_NAME)), instance.listUnmanagedFields())
 			);
 		}
 		
@@ -637,7 +637,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	public String instanceToString(Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
 		return instanceToString0(
 			ioPool, instance, doShort, start, end, fieldValueSeparator, fieldSeparator,
-			fields.stream().filter(f->f.typeFlag(IOField.HAS_GENERATED_NAME))
+			fields.stream().filter(f->!f.typeFlag(IOField.HAS_GENERATED_NAME))
 		);
 	}
 	
