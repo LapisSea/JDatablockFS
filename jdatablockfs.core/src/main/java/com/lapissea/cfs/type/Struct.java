@@ -10,6 +10,7 @@ import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.Reference;
+import com.lapissea.cfs.type.compilation.DefInstanceCompiler;
 import com.lapissea.cfs.type.compilation.FieldCompiler;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
@@ -412,6 +413,10 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	
 	@SuppressWarnings("unchecked")
 	private static <T extends IOInstance<T>, S extends Struct<T>> S compile(Class<T> instanceClass, Function<Class<T>, S> newStruct){
+		if(UtilL.instanceOf(instanceClass, IOInstance.Def.class)){
+			return compile(DefInstanceCompiler.compile(instanceClass), newStruct);
+		}
+		
 		if(Modifier.isAbstract(instanceClass.getModifiers())){
 			throw new IllegalArgumentException("Can not compile "+instanceClass.getName()+" because it is abstract");
 		}
