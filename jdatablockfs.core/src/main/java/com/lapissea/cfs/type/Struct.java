@@ -328,7 +328,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		
 		public FieldSet<T> getUnmanagedStaticFields(){
 			if(unmanagedStaticFields==null){
-				unmanagedStaticFields=FieldCompiler.create().compileStaticUnmanaged(this);
+				unmanagedStaticFields=FieldCompiler.compileStaticUnmanaged(this);
 			}
 			
 			return unmanagedStaticFields;
@@ -487,7 +487,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 				}
 			}
 			
-			this.fields=FieldCompiler.create().compile(this);
+			this.fields=FieldCompiler.compile(this);
 			setInitState(STATE_FIELD_MAKE);
 			for(IOField<T, ?> field : this.fields){
 				try{
