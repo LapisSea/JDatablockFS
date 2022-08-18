@@ -4,16 +4,20 @@ import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.SupportedPrimitive;
-import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
 import java.lang.annotation.Annotation;
-import java.lang.reflect.Array;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.RecursiveAction;
+import java.util.concurrent.RecursiveTask;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -31,6 +35,21 @@ public class DefInstanceCompiler{
 	}
 	
 	private record FieldStub(Method method, String varName, Type type, Style style){}
+	
+	private record FieldInfo(String name, Type type, List<Annotation> annotations, Optional<FieldStub> getter, Optional<FieldStub> setter){
+		Stream<FieldStub> stubs(){return Stream.concat(getter.stream(), setter.stream());}
+	}
+	
+	private static final class ImplNode<T extends IOInstance<T>>{
+		enum State{
+			NEW, COMPILING, DONE
+		}
+		
+		private final Lock lock=new ReentrantLock();
+		
+		private State    state=State.NEW;
+		private Class<T> impl;
+	}
 	
 	private static Optional<String> namePrefix(Method m, String prefix){
 		var name=m.getName();
@@ -89,16 +108,58 @@ public class DefInstanceCompiler{
 			Stream.of(Object.class)
 		).toList();
 	
+	private static final ConcurrentHashMap<Class<?>, ImplNode<?>> CACHE=new ConcurrentHashMap<>();
+	
 	public static <T extends IOInstance<T>> Class<T> compile(Class<T> interf){
 		if(!interf.isInterface()||!UtilL.instanceOf(interf, IOInstance.Def.class)){
 			throw new IllegalArgumentException(interf+"");
 		}
 		
-		LogUtil.println("compiling", interf);
+		@SuppressWarnings("unchecked")
+		var node=(ImplNode<T>)CACHE.computeIfAbsent(interf, i->new ImplNode<>());
 		
-		List<FieldStub> getters=new ArrayList<>();
-		List<FieldStub> setters=new ArrayList<>();
-		
+		node.lock.lock();
+		try{
+			switch(node.state){
+				case null -> throw new ShouldNeverHappenError();
+				case NEW -> {}
+				case COMPILING -> throw new MalformedStructLayout("Type requires itself to compile");
+				case DONE -> {return node.impl;}
+			}
+			
+			node.state=ImplNode.State.COMPILING;
+			
+			List<FieldStub> getters=new ArrayList<>();
+			List<FieldStub> setters=new ArrayList<>();
+			collectMethods(interf, getters, setters);
+			
+			checkStyles(getters, setters);
+			
+			var fieldInfo=mergeStubs(getters, setters);
+			
+			checkTypes(fieldInfo);
+			checkAnnotations(fieldInfo);
+			checkModel(fieldInfo);
+			
+			var impl=generateImpl(interf, fieldInfo);
+			
+			node.impl=impl;
+			node.state=ImplNode.State.DONE;
+			
+			return impl;
+		}catch(Throwable e){
+			node.state=ImplNode.State.NEW;
+			throw e;
+		}finally{
+			node.lock.unlock();
+		}
+	}
+	
+	private static <T extends IOInstance<T>> Class<T> generateImpl(Class<T> interf, List<FieldInfo> fieldInfo){
+		throw new NotImplementedException();
+	}
+	
+	private static <T extends IOInstance<T>> void collectMethods(Class<T> interf, List<FieldStub> getters, List<FieldStub> setters){
 		for(Method method : interf.getMethods()){
 			if(IGNORE_TYPES.contains(method.getDeclaringClass())) continue;
 			
@@ -112,7 +173,31 @@ public class DefInstanceCompiler{
 				throw new MalformedStructLayout(method+" is not a setter or a getter!");
 			}
 		}
-		
+	}
+	
+	
+	private static List<FieldInfo> mergeStubs(List<FieldStub> getters, List<FieldStub> setters){
+		return Stream.concat(getters.stream(), setters.stream())
+		             .map(FieldStub::varName)
+		             .distinct()
+		             .map(name->{
+			             var getter=getters.stream().filter(s->s.varName.equals(name)).findAny();
+			             var setter=setters.stream().filter(s->s.varName.equals(name)).findAny();
+			
+			             var type=getter.or(()->setter).map(FieldStub::type).orElseThrow();
+			
+			             var anns=Stream.concat(getter.stream(), setter.stream())
+			                            .map(f->f.method.getAnnotations())
+			                            .flatMap(Arrays::stream)
+			                            .filter(a->FieldCompiler.ANNOTATION_TYPES.contains(a.annotationType()))
+			                            .toList();
+			
+			             return new FieldInfo(name, type, anns, getter, setter);
+		             })
+		             .toList();
+	}
+	
+	private static void checkStyles(List<FieldStub> getters, List<FieldStub> setters){
 		var styles=Stream.concat(getters.stream(), setters.stream()).collect(Collectors.groupingBy(FieldStub::style));
 		
 		if(styles.size()>1){
@@ -131,14 +216,33 @@ public class DefInstanceCompiler{
 				      .collect(Collectors.joining("\n"))
 			);
 		}
+	}
+	private static void checkAnnotations(List<FieldInfo> fields){
+		var problems=fields.stream()
+		                   .map(gs->{
+			                        var dup=gs.stubs()
+			                                  .flatMap(g->Arrays.stream(g.method.getAnnotations()))
+			                                  .filter(a->FieldCompiler.ANNOTATION_TYPES.contains(a.annotationType()))
+			                                  .collect(Collectors.groupingBy(Annotation::annotationType))
+			                                  .values().stream()
+			                                  .filter(l->l.size()>1)
+			                                  .map(l->"\t\t"+l.get(0).annotationType().getName())
+			                                  .collect(Collectors.joining("\n"));
+			                        if(dup.isEmpty()) return "";
+			                        return "\t"+gs.name+":\n"+dup;
+		                        }
+		                   ).filter(s->!s.isEmpty())
+		                   .collect(Collectors.joining("\n"));
 		
-		var fields=Stream.concat(getters.stream(), setters.stream()).collect(Collectors.groupingBy(FieldStub::varName));
-		
-		var problems=fields.values()
-		                   .stream()
-		                   .filter(gs->gs.stream().collect(Collectors.groupingBy(s->s.type)).size()>1)
-		                   .map(gs->"\t"+gs.get(0).varName+":\n"+
-		                            "\t\t"+gs.stream().map(g->(g.style!=Style.RAW?g.method.getName()+":\t":"")+g.type+"")
+		if(!problems.isEmpty()){
+			throw new MalformedStructLayout("Duplicate annotations:\n"+problems);
+		}
+	}
+	private static void checkTypes(List<FieldInfo> fields){
+		var problems=fields.stream()
+		                   .filter(gs->gs.stubs().collect(Collectors.groupingBy(s->s.type)).size()>1)
+		                   .map(gs->"\t"+gs.name+":\n"+
+		                            "\t\t"+gs.stubs().map(g->(g.style!=Style.RAW?g.method.getName()+":\t":"")+g.type+"")
 		                                     .collect(Collectors.joining("\n\t\t"))
 		                   )
 		                   .collect(Collectors.joining("\n"));
@@ -146,35 +250,11 @@ public class DefInstanceCompiler{
 		if(!problems.isEmpty()){
 			throw new MalformedStructLayout("Mismatched types:\n"+problems);
 		}
-		problems=fields.values()
-		               .stream()
-		               .map(gs->{
-			                    var dup=gs.stream()
-			                                 .flatMap(g->Arrays.stream(g.method.getAnnotations()))
-			                                 .collect(Collectors.groupingBy(Annotation::annotationType))
-			                                 .values().stream()
-			                                 .filter(l->l.size()>1)
-			                                 .map(l->"\t\t"+l.get(0).annotationType().getName())
-			                                 .collect(Collectors.joining("\n"));
-			                    if(dup.isEmpty()) return "";
-			                    return "\t"+gs.get(0).varName+":\n"+dup;
-		                    }
-		               ).filter(s->!s.isEmpty())
-		               .collect(Collectors.joining("\n"));
-		
-		if(!problems.isEmpty()){
-			throw new MalformedStructLayout("Duplicate annotations:\n"+problems);
-		}
-		
-		var reg=FieldCompiler.create().registry();
-		for(List<FieldStub> value : fields.values()){
-			var type=value.get(0).type;
-			var anns=value.stream().map(f->f.method.getAnnotations()).flatMap(Arrays::stream).toList();
-			reg.requireCanCreate(type, GetAnnotation.from(anns));
-		}
-		
-		throw new NotImplementedException();
 	}
-	
-	
+	private static void checkModel(List<FieldInfo> fieldInfo){
+		var reg=FieldCompiler.registry();
+		for(var field : fieldInfo){
+			reg.requireCanCreate(field.type, GetAnnotation.from(field.annotations));
+		}
+	}
 }
