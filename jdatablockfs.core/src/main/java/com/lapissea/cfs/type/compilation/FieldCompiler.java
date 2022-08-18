@@ -42,12 +42,6 @@ public class FieldCompiler{
 	
 	protected record LogicalAnnotation<T extends Annotation>(T annotation, AnnotationLogic<T> logic){}
 	
-	private static final FieldCompiler INST=new FieldCompiler();
-	
-	public static FieldCompiler create(){
-		return INST;
-	}
-	
 	private record AnnotatedField<T extends IOInstance<T>>(
 		IOField<T, ?> field,
 		List<LogicalAnnotation<Annotation>> annotations
@@ -58,13 +52,10 @@ public class FieldCompiler{
 		}
 	}
 	
-	protected FieldCompiler(){
-	}
-	
 	/**
 	 * Scans an unmanaged struct for
 	 */
-	public <T extends IOInstance.Unmanaged<T>> FieldSet<T> compileStaticUnmanaged(Struct.Unmanaged<T> struct){
+	public static <T extends IOInstance.Unmanaged<T>> FieldSet<T> compileStaticUnmanaged(Struct.Unmanaged<T> struct){
 		var type=struct.getType();
 		
 		var methods=type.getDeclaredMethods();
@@ -124,7 +115,7 @@ public class FieldCompiler{
 	 *
 	 * @return a {@link FieldSet} containing all {@link IOValue} fields
 	 */
-	public <T extends IOInstance<T>> FieldSet<T> compile(Struct<T> struct){
+	public static <T extends IOInstance<T>> FieldSet<T> compile(Struct<T> struct){
 		List<FieldAccessor<T>> accessor=scanFields(struct);
 		
 		List<AnnotatedField<T>> fields=new ArrayList<>(Math.max(accessor.size()*2, accessor.size()+5));//Give extra capacity for virtual fields
@@ -142,7 +133,7 @@ public class FieldCompiler{
 		return FieldSet.of(fields.stream().map(AnnotatedField::field));
 	}
 	
-	private <T extends IOInstance<T>> Collection<IOField<T, ?>> generateDependencies(List<AnnotatedField<T>> fields, List<LogicalAnnotation<Annotation>> depAn, IOField<T, ?> field){
+	private static <T extends IOInstance<T>> Collection<IOField<T, ?>> generateDependencies(List<AnnotatedField<T>> fields, List<LogicalAnnotation<Annotation>> depAn, IOField<T, ?> field){
 		Collection<IOField<T, ?>> dependencies=new HashSet<>();
 		
 		for(var ann : depAn){
@@ -167,7 +158,7 @@ public class FieldCompiler{
 		return dependencies;
 	}
 	
-	private <T extends IOInstance<T>> void validate(List<AnnotatedField<T>> parsed){
+	private static <T extends IOInstance<T>> void validate(List<AnnotatedField<T>> parsed){
 		for(var pair : parsed){
 			var nam=pair.field.getName();
 			for(char c : new char[]{'.', '/', '\\', ' '}){
@@ -183,7 +174,7 @@ public class FieldCompiler{
 		}
 	}
 	
-	private <T extends IOInstance<T>> void initLateData(List<AnnotatedField<T>> fields){
+	private static <T extends IOInstance<T>> void initLateData(List<AnnotatedField<T>> fields){
 		for(var pair : fields){
 			var depAn=pair.annotations;
 			var field=pair.field;
@@ -192,7 +183,7 @@ public class FieldCompiler{
 		}
 	}
 	
-	private <T extends IOInstance<T>> void generateVirtualFields(List<AnnotatedField<T>> parsed, Struct<T> struct){
+	private static <T extends IOInstance<T>> void generateVirtualFields(List<AnnotatedField<T>> parsed, Struct<T> struct){
 		
 		Map<VirtualFieldDefinition.StoragePool, Integer> accessIndex    =new EnumMap<>(VirtualFieldDefinition.StoragePool.class);
 		Map<VirtualFieldDefinition.StoragePool, Integer> primitiveOffset=new EnumMap<>(VirtualFieldDefinition.StoragePool.class);
@@ -252,7 +243,7 @@ public class FieldCompiler{
 	}
 	
 	
-	protected IterablePP<Field> deepFieldsByAnnotation(Class<?> clazz, Class<? extends Annotation> type){
+	protected static IterablePP<Field> deepFieldsByAnnotation(Class<?> clazz, Class<? extends Annotation> type){
 		return IterablePP
 			       .nullTerminated(()->new Supplier<Class<?>>(){
 				       Class<?> c=clazz;
@@ -273,7 +264,7 @@ public class FieldCompiler{
 			       .filtered(f->f.isAnnotationPresent(type));
 	}
 	
-	protected <T extends IOInstance<T>> List<FieldAccessor<T>> scanFields(Struct<T> struct){
+	protected static <T extends IOInstance<T>> List<FieldAccessor<T>> scanFields(Struct<T> struct){
 		var cl=struct.getType();
 		
 		List<FieldAccessor<T>> fields    =new ArrayList<>();
@@ -370,15 +361,15 @@ public class FieldCompiler{
 		return fields;
 	}
 	
-	private Stream<String> calcGetPrefixes(Field field)  {return calcGetPrefixes(field.getType());}
-	private Stream<String> calcGetPrefixes(Method method){return calcGetPrefixes(method.getReturnType());}
-	private Stream<String> calcGetPrefixes(Class<?> typ){
+	private static Stream<String> calcGetPrefixes(Field field)  {return calcGetPrefixes(field.getType());}
+	private static Stream<String> calcGetPrefixes(Method method){return calcGetPrefixes(method.getReturnType());}
+	private static Stream<String> calcGetPrefixes(Class<?> typ){
 		var isBool=typ==boolean.class||typ==Boolean.class;
 		if(isBool) return Stream.of("is", "get");
 		return Stream.of("get");
 	}
 	
-	private Optional<String> getMethodFieldName(String prefix, Method m){
+	private static Optional<String> getMethodFieldName(String prefix, Method m){
 		IOValue ann  =m.getAnnotation(IOValue.class);
 		var     mName=m.getName();
 		if(!mName.startsWith(prefix)) return Optional.empty();
@@ -393,13 +384,13 @@ public class FieldCompiler{
 			return Optional.of(ann.name());
 		}
 	}
-	private boolean checkMethod(String fieldName, String prefix, Method m){
+	private static boolean checkMethod(String fieldName, String prefix, Method m){
 		if(Modifier.isStatic(m.getModifiers())) return false;
 		if(!m.isAnnotationPresent(IOValue.class)) return false;
 		var name=getMethodFieldName(prefix, m);
 		return name.isPresent()&&name.get().equals(fieldName);
 	}
-	private String getFieldName(Field field){
+	private static String getFieldName(Field field){
 		String fieldName;
 		{
 			var ann=field.getAnnotation(IOValue.class);
@@ -408,10 +399,10 @@ public class FieldCompiler{
 		return fieldName;
 	}
 	
-	private Type getType(Field field){
+	private static Type getType(Field field){
 		return getType(field.getGenericType(), field::getAnnotation);
 	}
-	private Type getType(Type defaultType, GetAnnotation getAnnotation){
+	private static Type getType(Type defaultType, GetAnnotation getAnnotation){
 		Type type        =defaultType;
 		var  typeOverride=getAnnotation.get(IOValue.OverrideType.class);
 		if(typeOverride!=null){
@@ -438,12 +429,12 @@ public class FieldCompiler{
 		return type;
 	}
 	
-	private Stream<Method> allMethods(Class<?> clazz){
+	private static Stream<Method> allMethods(Class<?> clazz){
 		return Stream.iterate(clazz, Objects::nonNull, (UnaryOperator<Class<?>>)Class::getSuperclass)
 		             .flatMap(c->Arrays.stream(c.getDeclaredMethods()));
 	}
 	
-	private static final class LogicalAnnType{
+	static final class LogicalAnnType{
 		private final Class<Annotation>           type;
 		private       AnnotationLogic<Annotation> logic;
 		
@@ -476,29 +467,39 @@ public class FieldCompiler{
 		}
 	}
 	
-	private final List<LogicalAnnType> annotationScan=
+	@SuppressWarnings("unchecked")
+	static final List<Class<? extends Annotation>> ANNOTATION_TYPES=
 		activeAnnotations()
 			.stream()
-			.flatMap(ann->Stream.concat(Stream.of(ann), Arrays.stream(ann.getClasses())))
-			.map(LogicalAnnType::new)
+			.flatMap(ann->Stream.concat(
+				Stream.of(ann),
+				Arrays.stream(ann.getClasses())
+				      .filter(Class::isAnnotation)
+				      .map(c->(Class<? extends Annotation>)c)
+			))
 			.toList();
 	
-	protected <T extends IOInstance<T>> List<LogicalAnnotation<Annotation>> scanAnnotations(IOField<T, ?> field){
-		return annotationScan.stream()
-		                     .map(logTyp->field.getAccessor()
-		                                       .getAnnotation(logTyp.type)
-		                                       .map(ann->new LogicalAnnotation<>(ann, logTyp.logic())))
-		                     .filter(Optional::isPresent)
-		                     .map(Optional::get)
-		                     .toList();
+	private static final List<LogicalAnnType> LOGICAL_ANN_TYPES=
+		ANNOTATION_TYPES.stream()
+		                .map(LogicalAnnType::new)
+		                .toList();
+	
+	protected static <T extends IOInstance<T>> List<LogicalAnnotation<Annotation>> scanAnnotations(IOField<T, ?> field){
+		return LOGICAL_ANN_TYPES.stream()
+		                        .map(logTyp->field.getAccessor()
+		                                          .getAnnotation(logTyp.type)
+		                                          .map(ann->new LogicalAnnotation<>(ann, logTyp.logic())))
+		                        .filter(Optional::isPresent)
+		                        .map(Optional::get)
+		                        .toList();
 	}
 	
 	
 	private static final CompletableFuture<RegistryNode.Registry> REGISTRY=FieldRegistry.make();
 	
-	protected RegistryNode.Registry registry(){return REGISTRY.join();}
+	protected static RegistryNode.Registry registry(){return REGISTRY.join();}
 	
-	protected Set<Class<? extends Annotation>> activeAnnotations(){
+	private static Set<Class<? extends Annotation>> activeAnnotations(){
 		return Set.of(
 			IOValue.class,
 			IODependency.class,
