@@ -97,7 +97,7 @@ public class TemplateClassLoader extends ClassLoader{
 	private void generateIOInstance(TypeNamed classType, JorthWriter writer) throws MalformedJorthException{
 		
 		writer.write("#TOKEN(0) genClassName      define", classType.name);
-		writer.write("#TOKEN(0) IOInstance        define", IOInstance.class.getName());
+		writer.write("#TOKEN(0) IOInstance        define", IOInstance.Managed.class.getName());
 		writer.write("#TOKEN(0) IOValue           define", IOValue.class.getName());
 		writer.write("#TOKEN(0) IONullability     define", IONullability.class.getName());
 		writer.write("#TOKEN(0) IOType.Dynamic    define", IOType.Dynamic.class.getName());

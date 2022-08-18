@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Objects;
 
 @StructPipe.Special
-public final class Reference extends IOInstance<Reference>{
+public final class Reference extends IOInstance.Managed<Reference>{
 	
 	@SuppressWarnings("unchecked")
 	public static final Struct<Reference> STRUCT=(Struct<Reference>)Struct.thisClass();

@@ -41,7 +41,7 @@ _You can find the complete code of the example in `/jdatablockfs.run/src/main/ja
 
 ```java
 //Setting up classes
-public static class IP extends IOInstance<IP>{
+public static class IP extends IOInstance.Managed<IP>{
 	@IOValue
 	double latitude, longitude;
 	
@@ -57,7 +57,7 @@ public static class IP extends IOInstance<IP>{
 	}
 }
 
-public static class IPSet extends IOInstance<IPSet>{
+public static class IPSet extends IOInstance.Managed<IPSet>{
 	@IOValue
 	IOList<IP> ips;
 }

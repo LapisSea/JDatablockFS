@@ -149,9 +149,9 @@ public sealed interface IOTypeDB{
 		}
 	}
 	
-	final class PersistentDB extends IOInstance<PersistentDB> implements IOTypeDB{
+	final class PersistentDB extends IOInstance.Managed<PersistentDB> implements IOTypeDB{
 		
-		private static final class TypeName extends IOInstance<TypeName>{
+		private static final class TypeName extends IOInstance.Managed<TypeName>{
 			@IOValue
 			private String typeName;
 			

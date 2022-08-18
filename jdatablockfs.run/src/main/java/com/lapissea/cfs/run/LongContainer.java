@@ -3,7 +3,7 @@ package com.lapissea.cfs.run;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 
-public class LongContainer extends IOInstance<LongContainer>{
+public class LongContainer extends IOInstance.Managed<LongContainer>{
 	
 	@IOValue
 	public long value;

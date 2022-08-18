@@ -36,7 +36,7 @@ import static com.lapissea.util.PoolOwnThread.async;
 
 public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	
-	private static class BucketEntry<K, V> extends IOInstance<BucketEntry<K, V>>{
+	private static class BucketEntry<K, V> extends IOInstance.Managed<BucketEntry<K, V>>{
 		
 		@SuppressWarnings("unchecked")
 		private static final StructPipe<BucketEntry<Object, Object>> PIPE=ContiguousStructPipe.of((Class<BucketEntry<Object, Object>>)(Object)BucketEntry.class);
@@ -75,7 +75,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		}
 	}
 	
-	private static class Bucket<K, V> extends IOInstance<Bucket<K, V>> implements Iterable<BucketEntry<K, V>>{
+	private static class Bucket<K, V> extends IOInstance.Managed<Bucket<K, V>> implements Iterable<BucketEntry<K, V>>{
 		@IOValue
 		@IONullability(NULLABLE)
 		private IONode<BucketEntry<K, V>> node;

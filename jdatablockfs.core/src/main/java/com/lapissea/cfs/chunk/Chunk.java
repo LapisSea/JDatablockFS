@@ -106,7 +106,7 @@ import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
  */
 @Struct.NoDefaultConstructor
 @StructPipe.Special
-public final class Chunk extends IOInstance<Chunk> implements RandomIO.Creator, DataProvider.Holder, Comparable<Chunk>{
+public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.Creator, DataProvider.Holder, Comparable<Chunk>{
 	
 	/**
 	 * Internal implementation of the {@link ContiguousStructPipe}. This may be removed in the future as the generated/generic pipes get further optimized

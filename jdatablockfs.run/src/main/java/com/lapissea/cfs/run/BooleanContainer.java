@@ -3,7 +3,7 @@ package com.lapissea.cfs.run;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 
-public class BooleanContainer extends IOInstance<BooleanContainer>{
+public class BooleanContainer extends IOInstance.Managed<BooleanContainer>{
 	
 	@IOValue
 	public boolean value;

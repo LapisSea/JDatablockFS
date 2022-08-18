@@ -17,9 +17,9 @@ import java.util.stream.Collectors;
 
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NULLABLE;
 
-public final class TypeDef extends IOInstance<TypeDef>{
+public final class TypeDef extends IOInstance.Managed<TypeDef>{
 	
-	public static final class FieldDef extends IOInstance<FieldDef>{
+	public static final class FieldDef extends IOInstance.Managed<FieldDef>{
 		@IOValue
 		private TypeLink type;
 		
@@ -79,7 +79,7 @@ public final class TypeDef extends IOInstance<TypeDef>{
 		}
 	}
 	
-	public static final class EnumConstant extends IOInstance<EnumConstant>{
+	public static final class EnumConstant extends IOInstance.Managed<EnumConstant>{
 		
 		@IOValue
 		private String name;

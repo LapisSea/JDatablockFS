@@ -16,11 +16,11 @@ import java.util.function.Function;
 
 public final class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends AbstractPrimitiveAccessor<CTyp>{
 	
-	private static final Function<IOInstance<?>, Struct.Pool<?>> GETTER=Access.makeLambda(IOInstance.class, "getVirtualPool", Function.class);
+	private static final Function<IOInstance.Managed<?>, Struct.Pool<?>> GETTER=Access.makeLambda(IOInstance.Managed.class, "getVirtualPool", Function.class);
 	
 	@SuppressWarnings("unchecked")
 	private static <T extends IOInstance<T>> Struct.Pool<T> getVirtualPool(T instance){
-		var pool=(Struct.Pool<T>)GETTER.apply(instance);
+		var pool=(Struct.Pool<T>)GETTER.apply((IOInstance.Managed<?>)instance);//TODO: fix this upcast. IOInstance needs to provide?
 		if(pool==null){
 			throw new NullPointerException("Tried to access instance pool where there is none");
 		}

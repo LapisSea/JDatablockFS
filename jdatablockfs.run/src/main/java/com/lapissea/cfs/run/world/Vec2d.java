@@ -3,7 +3,7 @@ package com.lapissea.cfs.run.world;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 
-public class Vec2d extends IOInstance<Vec2d>{
+public class Vec2d extends IOInstance.Managed<Vec2d>{
 	
 	@IOValue
 	public float x, y;

@@ -3,7 +3,7 @@ package com.lapissea.cfs.run;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 
-public class Dummy extends IOInstance<Dummy>{
+public class Dummy extends IOInstance.Managed<Dummy>{
 	
 	private static int COUNT=0;
 	

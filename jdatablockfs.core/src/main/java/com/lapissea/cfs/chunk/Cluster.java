@@ -91,14 +91,14 @@ public class Cluster implements DataProvider{
 	}
 	
 	
-	public static class RootRef extends IOInstance<RootRef>{
+	public static class RootRef extends IOInstance.Managed<RootRef>{
 		@IOValue
 		@IOValue.Reference(dataPipeType=FLEXIBLE)
 		@IONullability(DEFAULT_IF_NULL)
 		private Metadata metadata;
 	}
 	
-	private static class IOChunkPointer extends IOInstance<IOChunkPointer>{
+	private static class IOChunkPointer extends IOInstance.Managed<IOChunkPointer>{
 		
 		@IOValue
 		private ChunkPointer val=ChunkPointer.NULL;
@@ -118,7 +118,7 @@ public class Cluster implements DataProvider{
 		}
 	}
 	
-	private static class Metadata extends IOInstance<Metadata>{
+	private static class Metadata extends IOInstance.Managed<Metadata>{
 		
 		@IOValue
 		@IONullability(NULLABLE)

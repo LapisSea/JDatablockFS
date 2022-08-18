@@ -23,6 +23,8 @@ module JDatablockFS.core {
 	exports com.lapissea.cfs.exceptions;
 	
 	exports com.lapissea.cfs.type.field.access to JDatablockFS.tools, jlapisutil;
+	exports com.lapissea.cfs.type.compilation to jlapisutil;
+	opens  com.lapissea.cfs.type.compilation to jlapisutil;
 	
 	exports com.lapissea.cfs.type.field.fields.reflection to JDatablockFS.tools, jlapisutil;
 	exports com.lapissea.cfs.logging to JDatablockFS.tools, JDatablockFS.run;

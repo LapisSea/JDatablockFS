@@ -3,7 +3,7 @@ package com.lapissea.cfs.objects;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 
-public class ObjectID extends IOInstance<ObjectID>{
+public class ObjectID extends IOInstance.Managed<ObjectID>{
 	
 	@IOValue
 	private String id;

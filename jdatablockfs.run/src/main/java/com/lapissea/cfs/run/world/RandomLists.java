@@ -1,6 +1,7 @@
 package com.lapissea.cfs.run.world;
 
 import com.lapissea.cfs.chunk.Cluster;
+import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.run.Configuration;
 import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.util.UtilL;
@@ -27,6 +28,7 @@ public class RandomLists{
 				logger.get().getSession("l"+listCount);
 				
 				var task=CompletableFuture.runAsync(()->{
+					Log.trace("Starting: {} lists",listCount);
 					try{
 						var rand=new Random((long)listCount<<4);
 						try{

@@ -8,9 +8,9 @@ import com.lapissea.cfs.type.field.annotations.IOValue;
 
 import java.io.IOException;
 
-public class Image extends IOInstance<Image>{
+public class Image extends IOInstance.Managed<Image>{
 	
-	public static class Pixel extends IOInstance<Pixel>{
+	public static class Pixel extends IOInstance.Managed<Pixel>{
 		@IOValue
 		private float r;
 		@IOValue

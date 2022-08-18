@@ -6,7 +6,7 @@ import com.lapissea.cfs.type.field.annotations.IOValue;
 import java.util.ArrayList;
 import java.util.List;
 
-public class Entity extends IOInstance<Entity>{
+public class Entity extends IOInstance.Managed<Entity>{
 	
 	@IOValue
 	public Vec2d pos=new Vec2d();

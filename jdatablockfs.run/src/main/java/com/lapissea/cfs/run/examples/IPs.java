@@ -13,7 +13,7 @@ import java.util.Objects;
 public class IPs{
 	
 	
-	public static class IP extends IOInstance<IP>{
+	public static class IP extends IOInstance.Managed<IP>{
 		@IOValue
 		double latitude, longitude;
 		
@@ -29,7 +29,7 @@ public class IPs{
 		}
 	}
 	
-	public static class IPSet extends IOInstance<IPSet>{
+	public static class IPSet extends IOInstance.Managed<IPSet>{
 		@IOValue
 		IOList<IP> ips;
 	}

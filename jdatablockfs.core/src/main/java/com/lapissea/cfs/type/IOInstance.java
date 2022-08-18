@@ -22,9 +22,154 @@ import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.INS
 import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 
 @SuppressWarnings({"UnusedReturnValue", "unused"})
-public abstract class IOInstance<SELF extends IOInstance<SELF>> implements Cloneable{
+public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Cloneable{
 	
-	public abstract static class Unmanaged<SELF extends Unmanaged<SELF>> extends IOInstance<SELF> implements DataProvider.Holder{
+	abstract non-sealed class Managed<SELF extends Managed<SELF>> implements IOInstance<SELF>{
+		
+		private Struct<SELF>      thisStruct;
+		private Struct.Pool<SELF> virtualFields;
+		
+		public Managed(){}
+		
+		public Managed(Struct<SELF> thisStruct){
+			if(DEBUG_VALIDATION){
+				if(!thisStruct.getType().equals(getClass())){
+					throw new IllegalArgumentException(thisStruct+" is not "+getClass());
+				}
+			}
+			this.thisStruct=thisStruct;
+			virtualFields=getThisStruct().allocVirtualVarPool(INSTANCE);
+		}
+		
+		@SuppressWarnings("unchecked")
+		private void init(){
+			thisStruct=Struct.of((Class<SELF>)getClass());
+			virtualFields=getThisStruct().allocVirtualVarPool(INSTANCE);
+		}
+		
+		@Override
+		public Struct<SELF> getThisStruct(){
+			if(thisStruct==null) init();
+			return thisStruct;
+		}
+		
+		private Struct.Pool<SELF> getVirtualPool(){
+			if(thisStruct==null) init();
+			return virtualFields;
+		}
+		
+		@SuppressWarnings("unchecked")
+		protected final SELF self(){return (SELF)this;}
+		
+		@Override
+		public String toString(){
+			return getThisStruct().instanceToString(getThisStruct().allocVirtualVarPool(IO), self(), false);
+		}
+		@Override
+		public String toShortString(){
+			return getThisStruct().instanceToString(getThisStruct().allocVirtualVarPool(IO), self(), true);
+		}
+		
+		@Override
+		public boolean equals(Object o){
+			if(this==o) return true;
+			
+			if(!(o instanceof IOInstance<?> that)) return false;
+			var struct=getThisStruct();
+			if(that.getThisStruct()!=struct) return false;
+			
+			var ioPool1=struct.allocVirtualVarPool(IO);
+			var ioPool2=struct.allocVirtualVarPool(IO);
+			for(var field : struct.getFields()){
+				if(!field.instancesEqual(ioPool1, self(), ioPool2, (SELF)that)) return false;
+			}
+			
+			return true;
+		}
+		
+		@Override
+		public int hashCode(){
+			int result=1;
+			var ioPool=getThisStruct().allocVirtualVarPool(IO);
+			for(var field : getThisStruct().getFields()){
+				result=31*result+field.instanceHashCode(ioPool, self());
+			}
+			return result;
+		}
+		
+		@Override
+		public void allocateNulls(DataProvider provider) throws IOException{
+			var pool=getThisStruct().allocVirtualVarPool(IO);
+			//noinspection unchecked
+			for(var ref : getThisStruct().getFields().byFieldTypeIter((Class<IOField.Ref<SELF, ?>>)(Object)IOField.Ref.class)){
+				if(!ref.isNull(pool, self()))
+					continue;
+				ref.allocate(self(), provider, getGenericContext());
+			}
+		}
+		
+		private GenericContext getGenericContext(){
+			//TODO: find generic context?
+			return null;
+		}
+		
+		
+		@SuppressWarnings("unchecked")
+		@Override
+		public SELF clone(){
+			SELF c;
+			try{
+				c=(SELF)super.clone();
+			}catch(CloneNotSupportedException e){
+				throw new RuntimeException(e);
+			}
+			
+			for(IOField<SELF, ?> field : getThisStruct().getFields()){
+				if(field.typeFlag(IOField.PRIMITIVE_OR_ENUM_FLAG)){
+					continue;
+				}
+				var acc=field.getAccessor();
+				if(acc instanceof VirtualAccessor<?> vAcc&&vAcc.getStoragePool()==IO){
+					continue;
+				}
+				var typ=acc.getType();
+				if(typ.isArray()){
+					var arrField=(IOField<SELF, Object[]>)field;
+					
+					var arr=arrField.get(null, (SELF)this);
+					if(arr==null) continue;
+					
+					arr=arr.clone();
+					
+					if(isInstance(typ.componentType())){
+						var iArr=(IOInstance<?>[])arr;
+						for(int i=0;i<iArr.length;i++){
+							var el=iArr[i];
+							iArr[i]=el.clone();
+						}
+					}
+					
+					arrField.set(null, c, arr);
+					continue;
+				}
+				
+				if(!isInstance(typ)) continue;
+				if(isUnmanaged(typ)) continue;
+				var instField=(IOField<SELF, IOInstance<?>>)field;
+				
+				var val=instField.get(null, (SELF)this);
+				if(val==null) continue;
+				
+				val=val.clone();
+				
+				instField.set(null, c, val);
+			}
+			
+			return c;
+		}
+	}
+	
+	abstract class Unmanaged<SELF extends Unmanaged<SELF>> extends IOInstance.Managed<SELF> implements DataProvider.Holder{
 		
 		private final DataProvider   provider;
 		private       Reference      reference;
@@ -194,166 +339,48 @@ public abstract class IOInstance<SELF extends IOInstance<SELF>> implements Clone
 		protected final void allocateNulls() throws IOException{
 			allocateNulls(getDataProvider());
 		}
-	}
-	
-	private Struct<SELF>      thisStruct;
-	private Struct.Pool<SELF> virtualFields;
-	
-	public IOInstance(){}
-	
-	public IOInstance(Struct<SELF> thisStruct){
-		if(DEBUG_VALIDATION){
-			if(!thisStruct.getType().equals(getClass())){
-				throw new IllegalArgumentException(thisStruct+" is not "+getClass());
-			}
+		
+		@Override
+		public SELF clone() throws UnsupportedOperationException{
+			throw new UnsupportedOperationException("Unmanaged objects can not be cloned");
 		}
-		this.thisStruct=thisStruct;
-		virtualFields=getThisStruct().allocVirtualVarPool(INSTANCE);
 	}
 	
-	@SuppressWarnings("unchecked")
-	private void init(){
-		thisStruct=Struct.of((Class<SELF>)getClass());
-		virtualFields=getThisStruct().allocVirtualVarPool(INSTANCE);
-	}
 	
-	public Struct<SELF> getThisStruct(){
-		if(thisStruct==null) init();
-		return thisStruct;
-	}
+	Struct<SELF> getThisStruct();
 	
-	private Struct.Pool<SELF> getVirtualPool(){
-		if(thisStruct==null) init();
-		return virtualFields;
-	}
+	void allocateNulls(DataProvider provider) throws IOException;
 	
-	@SuppressWarnings("unchecked")
-	protected final SELF self(){return (SELF)this;}
-	
-	@Override
-	public String toString(){
-		return getThisStruct().instanceToString(getThisStruct().allocVirtualVarPool(IO), self(), false);
-	}
-	public String toShortString(){
+	default String toShortString(){
 		return getThisStruct().instanceToString(getThisStruct().allocVirtualVarPool(IO), self(), true);
 	}
 	
-	public String toString(boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+	default String toString(boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
 		return getThisStruct().instanceToString(getThisStruct().allocVirtualVarPool(IO), self(), doShort, start, end, fieldValueSeparator, fieldSeparator);
 	}
 	
-	@Override
-	public boolean equals(Object o){
-		if(this==o) return true;
-		
-		if(!(o instanceof IOInstance<?> that)) return false;
-		var struct=getThisStruct();
-		if(that.getThisStruct()!=struct) return false;
-		
-		var ioPool1=struct.allocVirtualVarPool(IO);
-		var ioPool2=struct.allocVirtualVarPool(IO);
-		for(var field : struct.getFields()){
-			if(!field.instancesEqual(ioPool1, self(), ioPool2, (SELF)that)) return false;
-		}
-		
-		return true;
-	}
-	@Override
-	public int hashCode(){
-		int result=1;
-		var ioPool=getThisStruct().allocVirtualVarPool(IO);
-		for(var field : getThisStruct().getFields()){
-			result=31*result+field.instanceHashCode(ioPool, self());
-		}
-		return result;
-	}
+	SELF clone();
 	
-	public void allocateNulls(DataProvider provider) throws IOException{
-		var pool=getThisStruct().allocVirtualVarPool(IO);
-		//noinspection unchecked
-		for(var ref : getThisStruct().getFields().byFieldTypeIter((Class<IOField.Ref<SELF, ?>>)(Object)IOField.Ref.class)){
-			if(!ref.isNull(pool, self()))
-				continue;
-			ref.allocate(self(), provider, getGenericContext());
-		}
-	}
+	@SuppressWarnings("unchecked")
+	private SELF self(){return (SELF)this;}
 	
-	private GenericContext getGenericContext(){
-		//TODO: find generic context?
-		return null;
-	}
-	
-	public static boolean isInstance(TypeLink type){
+	static boolean isInstance(TypeLink type){
 		return isInstance(type.getTypeClass(null));
 	}
-	public static boolean isInstance(Class<?> type){
+	static boolean isInstance(Class<?> type){
 		return UtilL.instanceOf(type, IOInstance.class);
 	}
 	
-	public static boolean isManaged(TypeLink type){
+	static boolean isManaged(TypeLink type){
 		return isManaged(type.getTypeClass(null));
 	}
 	
-	public static boolean isUnmanaged(Class<?> type){
+	static boolean isUnmanaged(Class<?> type){
 		return UtilL.instanceOf(type, IOInstance.Unmanaged.class);
 	}
-	public static boolean isManaged(Class<?> type){
+	static boolean isManaged(Class<?> type){
 		var isInstance =isInstance(type);
 		var isUnmanaged=UtilL.instanceOf(type, IOInstance.Unmanaged.class);
 		return isInstance&&!isUnmanaged;
-	}
-	
-	@SuppressWarnings("unchecked")
-	@Override
-	protected SELF clone(){
-		if(this instanceof IOInstance.Unmanaged){
-			throw new UnsupportedOperationException("Unmanaged objects can not be cloned");
-		}
-		
-		SELF c;
-		try{
-			c=(SELF)super.clone();
-		}catch(CloneNotSupportedException e){
-			throw new RuntimeException(e);
-		}
-		
-		for(IOField<SELF, ?> field : getThisStruct().getFields()){
-			if(field.getAccessor() instanceof VirtualAccessor acc&&acc.getStoragePool()==IO){
-				continue;
-			}
-			var typ=field.getAccessor().getType();
-			if(typ.isArray()){
-				var arrField=(IOField<SELF, Object[]>)field;
-				
-				var arr=arrField.get(null, (SELF)this);
-				if(arr==null) continue;
-				
-				arr=arr.clone();
-				
-				if(IOInstance.isInstance(typ.componentType())){
-					var iArr=(IOInstance<?>[])arr;
-					for(int i=0;i<iArr.length;i++){
-						var el=iArr[i];
-						iArr[i]=el.clone();
-					}
-				}
-				
-				arrField.set(null, c, arr);
-				continue;
-			}
-			
-			if(!IOInstance.isInstance(typ)) continue;
-			if(IOInstance.isUnmanaged(typ)) continue;
-			var instField=(IOField<SELF, IOInstance<?>>)field;
-			
-			var val=instField.get(null, (SELF)this);
-			if(val==null) continue;
-			
-			val=val.clone();
-			
-			instField.set(null, c, val);
-		}
-		
-		return c;
 	}
 }

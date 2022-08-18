@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
 
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NULLABLE;
 
-public final class TypeLink extends IOInstance<TypeLink>{
+public final class TypeLink extends IOInstance.Managed<TypeLink>{
 	
 	public static class Check{
 		private final Consumer<Class<?>>       rawCheck;

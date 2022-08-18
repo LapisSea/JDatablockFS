@@ -15,7 +15,7 @@ import com.lapissea.util.NotNull;
 import java.io.IOException;
 import java.util.Objects;
 
-public final class AutoText extends IOInstance<AutoText> implements CharSequence{
+public final class AutoText extends IOInstance.Managed<AutoText> implements CharSequence{
 	
 	public static final Struct<AutoText>     STRUCT=Struct.of(AutoText.class);
 	public static final StructPipe<AutoText> PIPE  =ContiguousStructPipe.of(STRUCT);

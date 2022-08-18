@@ -34,7 +34,7 @@ import static org.testng.AssertJUnit.assertEquals;
 
 public class GeneralTypeHandlingTests{
 	
-	public static class Deps extends IOInstance<Deps>{
+	public static class Deps extends IOInstance.Managed<Deps>{
 		
 		@IOValue
 		@IODependency("b")
@@ -52,7 +52,7 @@ public class GeneralTypeHandlingTests{
 		public int d;
 	}
 	
-	public static class Arr extends IOInstance<Arr>{
+	public static class Arr extends IOInstance.Managed<Arr>{
 		@IOValue
 		public float[] arr;
 	}
@@ -159,7 +159,7 @@ public class GeneralTypeHandlingTests{
 	
 	public enum RandomEnum{A, B, C}
 	
-	public static class EnumContainer extends IOInstance<EnumContainer>{
+	public static class EnumContainer extends IOInstance.Managed<EnumContainer>{
 		@IOValue
 		RandomEnum r=RandomEnum.A;
 	}

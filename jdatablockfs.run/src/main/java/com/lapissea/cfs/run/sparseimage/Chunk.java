@@ -4,7 +4,7 @@ package com.lapissea.cfs.run.sparseimage;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 
-public class Chunk extends IOInstance<Chunk>{
+public class Chunk extends IOInstance.Managed<Chunk>{
 	
 	@IOValue
 	private int x;

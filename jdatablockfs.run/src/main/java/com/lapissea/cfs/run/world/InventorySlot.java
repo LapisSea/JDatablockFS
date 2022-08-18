@@ -4,7 +4,7 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 
-public class InventorySlot extends IOInstance<InventorySlot>{
+public class InventorySlot extends IOInstance.Managed<InventorySlot>{
 	
 	@IOValue
 	@IODependency.VirtualNumSize
