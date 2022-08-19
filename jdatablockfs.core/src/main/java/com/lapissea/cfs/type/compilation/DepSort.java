@@ -1,4 +1,4 @@
-package com.lapissea.cfs.type;
+package com.lapissea.cfs.type.compilation;
 
 import com.lapissea.cfs.Index;
 import com.lapissea.util.NotNull;

@@ -1,7 +1,8 @@
-package com.lapissea.cfs.type;
+package com.lapissea.cfs.type.field;
 
 import com.lapissea.cfs.Utils;
-import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.util.UtilL;
 

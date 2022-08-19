@@ -1,6 +1,10 @@
-package com.lapissea.cfs.type;
+package com.lapissea.cfs.type.compilation;
 
 import com.lapissea.cfs.GlobalConfig;
+import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.IOTypeDB;
+import com.lapissea.cfs.type.TypeDef;
+import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.access.AnnotatedType;
 import com.lapissea.cfs.type.field.annotations.IODependency;
