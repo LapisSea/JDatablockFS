@@ -24,6 +24,18 @@ import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 @SuppressWarnings({"UnusedReturnValue", "unused"})
 public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Cloneable{
 	
+	/**
+	 * <p>
+	 * This interface is used to declare the object layout of a <i>managed</i> instance. This means any interface that extends
+	 * this can be thought of as an equivalent to {@link Managed}. An implementation will be generated as needed.
+	 * </p>
+	 * <p>
+	 * Any interface that extends this (directly or indirectly) must only contain getters and setters of fields. All "fields"
+	 * are implicitly an IOField
+	 * </p>
+	 */
+	non-sealed interface Def<SELF extends Def<SELF>> extends IOInstance<SELF>{}
+	
 	abstract non-sealed class Managed<SELF extends Managed<SELF>> implements IOInstance<SELF>{
 		
 		private Struct<SELF>      thisStruct;
