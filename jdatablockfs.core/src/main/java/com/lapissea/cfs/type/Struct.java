@@ -414,7 +414,9 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	@SuppressWarnings("unchecked")
 	private static <T extends IOInstance<T>, S extends Struct<T>> S compile(Class<T> instanceClass, Function<Class<T>, S> newStruct){
 		if(UtilL.instanceOf(instanceClass, IOInstance.Def.class)){
-			return compile(DefInstanceCompiler.compile(instanceClass), newStruct);
+			if(!UtilL.instanceOf(instanceClass, IOInstance.Managed.class)){
+				return compile(DefInstanceCompiler.compile(instanceClass), newStruct);
+			}
 		}
 		
 		if(Modifier.isAbstract(instanceClass.getModifiers())){

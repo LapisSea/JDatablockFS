@@ -1,15 +1,21 @@
 package com.lapissea.cfs.type.compilation;
 
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
+import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.SupportedPrimitive;
-import com.lapissea.util.NotImplementedException;
-import com.lapissea.util.ShouldNeverHappenError;
-import com.lapissea.util.TextUtil;
-import com.lapissea.util.UtilL;
+import com.lapissea.cfs.type.TypeLink;
+import com.lapissea.cfs.type.field.IOFieldTools;
+import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.jorth.JorthCompiler;
+import com.lapissea.jorth.JorthWriter;
+import com.lapissea.jorth.MalformedJorthException;
+import com.lapissea.util.*;
+import com.lapissea.util.function.UnsafeBiConsumer;
 
 import java.lang.annotation.Annotation;
+import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.util.*;
@@ -18,11 +24,13 @@ import java.util.concurrent.RecursiveAction;
 import java.util.concurrent.RecursiveTask;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.type.SupportedPrimitive.BOOLEAN;
+import static java.lang.reflect.Modifier.isStatic;
 
 public class DefInstanceCompiler{
 	
@@ -156,7 +164,131 @@ public class DefInstanceCompiler{
 	}
 	
 	private static <T extends IOInstance<T>> Class<T> generateImpl(Class<T> interf, List<FieldInfo> fieldInfo){
-		throw new NotImplementedException();
+		
+		try{
+			JorthCompiler jorth=new JorthCompiler(DefInstanceCompiler.class.getClassLoader());
+			
+			try(var writer=jorth.writeCode()){
+				writer.write(
+					"""
+						public visibility
+						#TOKEN(1) implements
+						[#TOKEN(0)] #TOKEN(2) extends
+						#TOKEN(0) class start
+						""",
+					interf.getName()+"€Impl",
+					interf.getName(),
+					IOInstance.Managed.class.getName()
+				);
+				
+				for(FieldInfo info : fieldInfo){
+					var type=Objects.requireNonNull(TypeLink.of(info.type));
+					
+					writer.write("private visibility");
+					
+					Set<Class<?>> annTypes=new HashSet<>();
+					for(var ann : info.annotations){
+						if(!annTypes.add(ann.annotationType())) continue;
+						
+						writer.write("{");
+						scanAnnotation(ann, (name, value)->{
+							writer.write("#TOKEN(0) #TOKEN(1)", switch(value){
+								case null -> "null";
+								case String s -> "'"+s.replace("'", "\\'")+"'";
+								case Enum<?> e -> e.name();
+								case Boolean v -> v.toString();
+								case Class<?> c -> c.getName();
+								case Number n -> {
+									if(SupportedPrimitive.isAny(n.getClass())) yield n+"";
+									throw new UnsupportedOperationException();
+								}
+								default -> throw new NotImplementedException();
+							}, name);
+						});
+						writer.write("} #TOKEN(0) @", ann.annotationType().getName());
+					}
+					
+					writer.write(
+						"#RAW(0) #TOKEN(1) field",
+						JorthUtils.toJorthGeneric(type),
+						info.name
+					);
+					
+					var jtyp=JorthUtils.toJorthGeneric(Objects.requireNonNull(TypeLink.of(info.type)));
+					if(info.getter.isPresent()){
+						var stub  =info.getter.get();
+						var method=stub.method;
+						
+						writer.write(
+							"""
+								public visibility
+								#TOKEN(3) @
+								#RAW(1) returns
+								#TOKEN(0) function start
+									this #TOKEN(2) get
+								end
+								""",
+							method.getName(),
+							jtyp,
+							info.name,
+							Override.class.getName()
+						);
+						
+					}
+					if(info.setter.isPresent()){
+						var stub  =info.setter.get();
+						var method=stub.method;
+						
+						writer.write(
+							"""
+								public visibility
+								#TOKEN(3) @
+								#RAW(1) arg1 arg
+								#TOKEN(0) function start
+									<arg> arg1 get
+									this #TOKEN(2) set
+								end
+								""",
+							method.getName(),
+							jtyp,
+							info.name,
+							Override.class.getName()
+						);
+						
+					}
+				}
+			}
+			
+			//noinspection unchecked
+			return (Class<T>)Access.privateLookupIn(interf).defineClass(jorth.classBytecode());
+			
+		}catch(IllegalAccessException|MalformedJorthException e){
+			throw new RuntimeException(e);
+		}
+	}
+	
+	private static void scanAnnotation(Annotation ann, UnsafeBiConsumer<String, Object, MalformedJorthException> entry) throws MalformedJorthException{
+		
+		var c=ann.getClass();
+		for(Method m : ann.annotationType().getMethods()){
+			if(m.getParameterCount()!=0) continue;
+			if(isStatic(m.getModifiers())) continue;
+			
+			if(m.getName().equals("annotationType")) continue;
+			
+			try{
+				c.getSuperclass().getMethod(m.getName());
+				continue;
+			}catch(NoSuchMethodException ignored){}
+			Object val;
+			try{
+				m.setAccessible(true);
+				val=m.invoke(ann);
+			}catch(Throwable e){
+				throw new RuntimeException(e);
+			}
+			entry.accept(m.getName(), val);
+		}
 	}
 	
 	private static <T extends IOInstance<T>> void collectMethods(Class<T> interf, List<FieldStub> getters, List<FieldStub> setters){
@@ -184,13 +316,31 @@ public class DefInstanceCompiler{
 			             var getter=getters.stream().filter(s->s.varName.equals(name)).findAny();
 			             var setter=setters.stream().filter(s->s.varName.equals(name)).findAny();
 			
-			             var type=getter.or(()->setter).map(FieldStub::type).orElseThrow();
+			             var gors=getter.or(()->setter).orElseThrow();
+			
+			             var type=gors.type;
 			
 			             var anns=Stream.concat(getter.stream(), setter.stream())
 			                            .map(f->f.method.getAnnotations())
 			                            .flatMap(Arrays::stream)
 			                            .filter(a->FieldCompiler.ANNOTATION_TYPES.contains(a.annotationType()))
-			                            .toList();
+			                            .collect(Collectors.toList());
+			
+			             IOValue valBack=null;
+			             var     iter   =anns.iterator();
+			             while(iter.hasNext()){
+				             var ann=iter.next();
+				             if(ann instanceof IOValue val){
+					             if(val.name().equals("")){
+						             valBack=val;
+						             iter.remove();
+						             continue;
+					             }
+					             throw new MalformedStructLayout(gors.varName+": @IOValue can not contain a name");
+				             }
+			             }
+			             if(valBack==null) valBack=IOFieldTools.makeAnnotation(IOValue.class);
+			             anns.add(valBack);
 			
 			             return new FieldInfo(name, type, anns, getter, setter);
 		             })
