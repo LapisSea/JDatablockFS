@@ -66,7 +66,7 @@ public class BinaryGridRenderer implements DataRenderer{
 	static{
 		ForkJoinPool.commonPool().execute(()->{
 			try{
-				Cluster.init(MemoryData.builder().build()).rootWalker().walk(true, e->{});
+				Cluster.init(MemoryData.builder().build()).rootWalker(MemoryWalker.PointerRecord.NOOP, false).walk();
 			}catch(IOException ignored){}
 		});
 	}
@@ -749,7 +749,7 @@ public class BinaryGridRenderer implements DataRenderer{
 			if(cluster!=null){
 				DataProvider provider=cluster;
 				var          cl      =cluster;
-				var          root    =cluster.rootWalker().getRoot();
+				var          root    =cluster.rootWalker(null, false).getRoot();
 				
 				
 				List<DrawFont.StringDraw> strings, stringOutlines;
@@ -778,7 +778,7 @@ public class BinaryGridRenderer implements DataRenderer{
 				
 				try{
 					try{
-						cluster.rootWalker().walk(true, ref->{
+						cluster.rootWalker(MemoryWalker.PointerRecord.of(ref->{
 							if(!ref.isNull()){
 								try{
 									for(Chunk chunk : new ChainWalker(ref.getPtr().dereference(cl))){
@@ -788,7 +788,7 @@ public class BinaryGridRenderer implements DataRenderer{
 									throw UtilL.uncheckedThrow(e);
 								}
 							}
-						});
+						}), true).walk();
 					}catch(IOException e){
 						throw new RuntimeException(e);
 					}

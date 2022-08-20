@@ -151,7 +151,7 @@ public class DefragmentManager{
 			}
 		};
 		
-		cluster.rootWalker().walk(record);
+		cluster.rootWalker(record, false).walk();
 		
 		cluster.getMemoryManager().free(toFree);
 		return record.moved;
@@ -164,7 +164,7 @@ public class DefragmentManager{
 			
 			List<Chunk> toFree=new ArrayList<>();
 			
-			cluster.rootWalker().walk(new MemoryWalker.PointerRecord(){
+			cluster.rootWalker(new MemoryWalker.PointerRecord(){
 				@SuppressWarnings({"rawtypes", "unchecked"})
 				@Override
 				public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, IOField.Ref<T, ?> field, Reference valueReference) throws IOException{
@@ -210,7 +210,7 @@ public class DefragmentManager{
 				public <T extends IOInstance<T>> int logChunkPointer(Reference instanceReference, T instance, IOField<T, ChunkPointer> field, ChunkPointer value) throws IOException{
 					return CONTINUE;
 				}
-			});
+			}, false).walk();
 			
 			cluster.getMemoryManager().free(toFree);
 		}
@@ -396,12 +396,12 @@ public class DefragmentManager{
 			}
 		};
 		
-		cluster.rootWalker().walk(true, ref->{
+		cluster.rootWalker(MemoryWalker.PointerRecord.of(ref->{
 			if(ref.isNull()) return;
 			for(Chunk chunk : ref.getPtr().dereference(cluster).collectNext()){
 				pushChunk.accept(chunk);
 			}
-		});
+		}), true).walk();
 		
 		if(!unreferencedChunks.isEmpty()){
 			List<Chunk> unreferenced=new ArrayList<>(Math.toIntExact(unreferencedChunks.trueSize()));
@@ -417,7 +417,7 @@ public class DefragmentManager{
 	
 	private boolean moveChunkExact(final Cluster cluster, ChunkPointer oldChunk, ChunkPointer newChunk) throws IOException{
 		
-		var fin=cluster.rootWalker().walk(new MemoryWalker.PointerRecord(){
+		var fin=cluster.rootWalker(new MemoryWalker.PointerRecord(){
 			@Override
 			public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, IOField.Ref<T, ?> field, Reference valueReference){
 				if(valueReference.getPtr().equals(oldChunk)){
@@ -434,7 +434,7 @@ public class DefragmentManager{
 				}
 				return CONTINUE;
 			}
-		});
+		}, false).walk();
 		
 		return fin==END;
 	}
@@ -466,7 +466,7 @@ public class DefragmentManager{
 		
 		boolean[]         found ={false};
 		Set<ChunkPointer> toFree=new HashSet<>();
-		cluster.rootWalker().walk(new MemoryWalker.PointerRecord(){
+		cluster.rootWalker(new MemoryWalker.PointerRecord(){
 			boolean foundCh;
 			@Override
 			public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, IOField.Ref<T, ?> field, Reference valueReference){
@@ -492,7 +492,7 @@ public class DefragmentManager{
 			public <T extends IOInstance<T>> int logChunkPointer(Reference instanceReference, T instance, IOField<T, ChunkPointer> field, ChunkPointer value){
 				return CONTINUE;
 			}
-		});
+		}, false).walk();
 		if(!found[0]){
 			throw new IOException("Failed to find "+oldRef);
 		}
@@ -501,7 +501,7 @@ public class DefragmentManager{
 	
 	private Reference findReferenceUser(final Cluster cluster, Reference ref) throws IOException{
 		Reference[] found={null};
-		cluster.rootWalker().walk(new MemoryWalker.PointerRecord(){
+		cluster.rootWalker(new MemoryWalker.PointerRecord(){
 			@Override
 			public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, IOField.Ref<T, ?> field, Reference valueReference){
 				if(valueReference.equals(ref)){
@@ -514,7 +514,7 @@ public class DefragmentManager{
 			public <T extends IOInstance<T>> int logChunkPointer(Reference instanceReference, T instance, IOField<T, ChunkPointer> field, ChunkPointer value){
 				return CONTINUE;
 			}
-		});
+		}, false).walk();
 		if(found[0]==null){
 			throw new IOException("Failed to find ");
 		}

@@ -8,6 +8,7 @@ import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.ObjectID;
+import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.objects.collections.AbstractUnmanagedIOMap;
 import com.lapissea.cfs.objects.collections.HashIOMap;
 import com.lapissea.cfs.objects.collections.IOList;
@@ -18,7 +19,6 @@ import com.lapissea.cfs.type.MemoryWalker;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
-import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.IOException;
@@ -266,17 +266,10 @@ public class Cluster implements DataProvider{
 		
 		Set<ChunkPointer> referenced=new HashSet<>();
 		
-		rootWalker().walk(true, ref->{
-			if(!ref.isNull()){
-				try{
-					for(Chunk chunk : new ChainWalker(ref.getPtr().dereference(this))){
-						referenced.add(chunk.getPtr());
-					}
-				}catch(IOException e){
-					throw UtilL.uncheckedThrow(e);
-				}
-			}
-		});
+		rootWalker(MemoryWalker.PointerRecord.of(ref->{
+			if(ref.isNull()) return;
+			ref.getPtr().dereference(this).streamNext().map(Chunk::getPtr).forEach(referenced::add);
+		}), true).walk();
 		
 		for(Chunk chunk : getFirstChunk().chunksAhead()){
 			if(referenced.contains(chunk.getPtr())){
@@ -296,8 +289,14 @@ public class Cluster implements DataProvider{
 		);
 	}
 	
-	public MemoryWalker rootWalker() throws IOException{
-		return new MemoryWalker(this, root, getFirstChunk().getPtr().makeReference(), Cluster.ROOT_PIPE);
+	public MemoryWalker rootWalker(MemoryWalker.PointerRecord rec, boolean refRoot) throws IOException{
+		return rootWalker(rec, refRoot, false);
+	}
+	public MemoryWalker rootWalker(MemoryWalker.PointerRecord rec, boolean refRoot, boolean recordStats) throws IOException{
+		if(refRoot){
+			rec.log(new Reference(), null, null, FIRST_CHUNK_PTR.makeReference());
+		}
+		return new MemoryWalker(this, root, getFirstChunk().getPtr().makeReference(), Cluster.ROOT_PIPE, recordStats, rec);
 	}
 	
 	public void defragment() throws IOException{

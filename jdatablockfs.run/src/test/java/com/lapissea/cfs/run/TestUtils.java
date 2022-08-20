@@ -70,7 +70,7 @@ public class TestUtils{
 			}catch(Throwable e){
 				throw new RuntimeException("Failed cluster session", e);
 			}
-			c.rootWalker().walk(true, r->{});
+			c.rootWalker(MemoryWalker.PointerRecord.NOOP, false).walk();
 		});
 	}
 	

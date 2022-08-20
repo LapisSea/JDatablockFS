@@ -5,6 +5,7 @@ import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.cfs.tools.logging.MemFrame;
+import com.lapissea.cfs.type.MemoryWalker;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeRunnable;
@@ -235,7 +236,7 @@ public class DisplayHost{
 				async(()->{//dry run cluster to load and compile classes while display is loading
 					try{
 						var cl=new Cluster(MemoryData.builder().withRaw(data).asReadOnly().build());
-						cl.rootWalker().walk(true, r->{});
+						cl.rootWalker(MemoryWalker.PointerRecord.NOOP, true).walk();
 					}catch(IOException e){
 						e.printStackTrace();
 					}
