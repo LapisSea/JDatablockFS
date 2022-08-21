@@ -2,29 +2,25 @@ package com.lapissea.cfs.type.compilation;
 
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.internal.Access;
-import com.lapissea.cfs.type.GetAnnotation;
-import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.SupportedPrimitive;
-import com.lapissea.cfs.type.TypeLink;
+import com.lapissea.cfs.logging.Log;
+import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.jorth.JorthCompiler;
-import com.lapissea.jorth.JorthWriter;
 import com.lapissea.jorth.MalformedJorthException;
-import com.lapissea.util.*;
+import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.ShouldNeverHappenError;
+import com.lapissea.util.TextUtil;
+import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeBiConsumer;
 
 import java.lang.annotation.Annotation;
-import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.RecursiveAction;
-import java.util.concurrent.RecursiveTask;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -164,6 +160,8 @@ public class DefInstanceCompiler{
 	}
 	
 	private static <T extends IOInstance<T>> Class<T> generateImpl(Class<T> interf, List<FieldInfo> fieldInfo){
+		var implName=interf.getName()+"€Impl";
+		Log.trace("Generating implementation for {}", interf);
 		
 		try{
 			JorthCompiler jorth=new JorthCompiler(DefInstanceCompiler.class.getClassLoader());
@@ -257,6 +255,28 @@ public class DefInstanceCompiler{
 						
 					}
 				}
+				
+				writer.write(
+					"""
+						private visibility
+						static final
+						[#TOKEN(1)] #TOKEN(0) $STRUCT field
+						
+						<clinit> function start
+							#TOKEN(0) class
+							#TOKEN(1) of (1) static call
+							#TOKEN(0) $STRUCT set
+						end
+						
+						public visibility
+						<init> function start
+							this this get
+							#TOKEN(0) $STRUCT get
+							super
+						end
+						""",
+					implName,
+					Struct.class.getName());
 			}
 			
 			//noinspection unchecked
