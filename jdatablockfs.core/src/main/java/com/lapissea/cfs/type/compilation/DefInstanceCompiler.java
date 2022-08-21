@@ -260,7 +260,7 @@ public class DefInstanceCompiler{
 					"""
 						private visibility
 						static final
-						[#TOKEN(1)] #TOKEN(0) $STRUCT field
+						[#TOKEN(0)] #TOKEN(1) $STRUCT field
 						
 						<clinit> function start
 							#TOKEN(0) class
