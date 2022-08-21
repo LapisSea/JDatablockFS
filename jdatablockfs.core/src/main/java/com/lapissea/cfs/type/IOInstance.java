@@ -2,6 +2,7 @@ package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.chunk.MemoryOperations;
+import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
@@ -41,7 +42,12 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			return constr(Struct.of(type), arg1Type);
 		}
 		static <T extends Def<T>, A1> Function<A1, T> constr(Struct<T> type, Class<A1> arg1Type){
-			throw new NotImplementedException();
+			try{
+				var ctor=type.getType().getConstructor(arg1Type);
+				return Access.makeLambda(ctor, Function.class);
+			}catch(NoSuchMethodException e){
+				throw new RuntimeException(e);
+			}
 		}
 		
 	}

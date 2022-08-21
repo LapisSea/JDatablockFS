@@ -3,10 +3,12 @@ package com.lapissea.cfs.type.compilation;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.logging.Log;
+import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.jorth.JorthCompiler;
+import com.lapissea.jorth.JorthWriter;
 import com.lapissea.jorth.MalformedJorthException;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
@@ -240,17 +242,26 @@ public class DefInstanceCompiler{
 						writer.write(
 							"""
 								public visibility
-								#TOKEN(3) @
+								#TOKEN(2) @
 								#RAW(1) arg1 arg
 								#TOKEN(0) function start
 									<arg> arg1 get
-									this #TOKEN(2) set
-								end
 								""",
 							method.getName(),
 							jtyp,
-							info.name,
 							Override.class.getName()
+						);
+						
+						if(info.type==ChunkPointer.class){
+							nullCheck(writer);
+						}
+						
+						writer.write(
+							"""
+									this #TOKEN(0) set
+								end
+								""",
+							info.name
 						);
 						
 					}
@@ -273,10 +284,43 @@ public class DefInstanceCompiler{
 							this this get
 							#TOKEN(0) $STRUCT get
 							super
-						end
 						""",
 					implName,
 					Struct.class.getName());
+				
+				for(FieldInfo info : fieldInfo){
+					if(info.type!=ChunkPointer.class) continue;
+					writer.write(ChunkPointer.class.getName()).write("NULL get");
+					writer.write("this").write(info.name).write("set");
+				}
+				writer.write("end");
+				
+				writer.write("public visibility");
+				for(int i=0;i<fieldInfo.size();i++){
+					FieldInfo info   =fieldInfo.get(i);
+					var       type   =JorthUtils.toJorthGeneric(Objects.requireNonNull(TypeLink.of(info.type)));
+					var       argName="arg"+i;
+					writer.write("#RAW(0) #TOKEN(1) arg", type, argName);
+				}
+				
+				writer.write(
+					"""
+						<init> function start
+							this this get
+							#TOKEN(0) $STRUCT get
+							super
+						""",
+					implName);
+				
+				for(int i=0;i<fieldInfo.size();i++){
+					FieldInfo info=fieldInfo.get(i);
+					writer.write("<arg>").write("arg"+i).write("get");
+					if(info.type==ChunkPointer.class){
+						nullCheck(writer);
+					}
+					writer.write("this").write(info.name).write("set");
+				}
+				writer.write("end");
 			}
 			
 			//noinspection unchecked
@@ -285,6 +329,16 @@ public class DefInstanceCompiler{
 		}catch(IllegalAccessException|MalformedJorthException e){
 			throw new RuntimeException(e);
 		}
+	}
+	
+	private static void nullCheck(JorthWriter writer) throws MalformedJorthException{
+		writer.write(
+			"""
+				dup
+				#TOKEN(0) requireNonNull (1) static call
+				pop
+				""",
+			Objects.class.getName());
 	}
 	
 	private static void scanAnnotation(Annotation ann, UnsafeBiConsumer<String, Object, MalformedJorthException> entry) throws MalformedJorthException{
