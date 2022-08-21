@@ -762,7 +762,7 @@ public class GraphRenderer implements DataRenderer{
 				n.debStr="";
 			});
 			
-			scan(root, cluster, 8, cluster.rootWalker().getRoot());
+			scan(root, cluster, 8, cluster.rootWalker(null, false).getRoot());
 		}finally{
 			bubbleDeep(root, n->n.children.removeIf(ref->{
 				if(!ref.touched){

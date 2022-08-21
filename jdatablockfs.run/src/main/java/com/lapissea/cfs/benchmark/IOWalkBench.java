@@ -62,8 +62,8 @@ public class IOWalkBench{
 	
 	public void doWalk(){
 		try{
-			var r=cluster.rootWalker();
-			r.walk(rec);
+			var r=cluster.rootWalker(rec, false);
+			r.walk();
 		}catch(Exception e){
 			throw new RuntimeException(e);
 		}

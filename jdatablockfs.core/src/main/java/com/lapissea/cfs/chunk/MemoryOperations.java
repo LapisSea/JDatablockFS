@@ -7,6 +7,7 @@ import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
+import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.collections.IOList.IOIterator;
 import com.lapissea.cfs.type.IOInstance;
@@ -14,6 +15,7 @@ import com.lapissea.cfs.type.MemoryWalker;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
+import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
 import java.util.*;
@@ -674,12 +676,15 @@ public class MemoryOperations{
 		Set<Chunk> chunks=new HashSet<>();
 		var        prov  =val.getDataProvider();
 		
-		new MemoryWalker(val).walk(true, ref->{
+		UnsafeConsumer<Reference, IOException> rec=ref->{
 			if(ref.isNull()){
 				return;
 			}
 			ref.getPtr().dereference(prov).streamNext().forEach(chunks::add);
-		});
+		};
+		
+		rec.accept(val.getReference());
+		new MemoryWalker(val, false, MemoryWalker.PointerRecord.of(rec)).walk();
 		
 		prov.getMemoryManager().free(chunks);
 	}

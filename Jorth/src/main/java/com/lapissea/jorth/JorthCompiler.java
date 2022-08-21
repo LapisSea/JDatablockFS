@@ -499,7 +499,7 @@ public class JorthCompiler{
 					}
 					
 					if(currentMethod.getStack().size()==0) throw new MalformedJorthException("super needs this on stack, add \"this this get\" before super");
-					var args=new ArrayList<>(currentMethod.getStack().asList());
+					var args=currentMethod.getStack().asList().stream().map(GenType::rawType).collect(Collectors.toList());
 					if(!new GenType(classInfo.name).equals(args.remove(0))){
 						throw new MalformedJorthException("super needs this on stack, add \"this this get\" before super");
 					}
@@ -880,6 +880,10 @@ public class JorthCompiler{
 					case "function" -> {
 						requireTokenCount(1);
 						var functionName=pop();
+						
+						if("<clinit>".equals(functionName.source)){
+							isStatic=true;
+						}
 						
 						var staticOo=isStatic?ACC_STATIC:0;
 						

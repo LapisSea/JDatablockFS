@@ -54,13 +54,15 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		public Managed(){}
 		
 		public Managed(Struct<SELF> thisStruct){
-			if(DEBUG_VALIDATION){
-				if(!thisStruct.getType().equals(getClass())){
-					throw new IllegalArgumentException(thisStruct+" is not "+getClass());
-				}
-			}
+			if(DEBUG_VALIDATION) checkStruct(thisStruct);
 			this.thisStruct=thisStruct;
 			virtualFields=getThisStruct().allocVirtualVarPool(INSTANCE);
+		}
+		
+		private void checkStruct(Struct<SELF> thisStruct){
+			if(!thisStruct.getType().equals(getClass())){
+				throw new IllegalArgumentException(thisStruct+" is not "+getClass());
+			}
 		}
 		
 		@SuppressWarnings("unchecked")
