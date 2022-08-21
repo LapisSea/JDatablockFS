@@ -527,6 +527,10 @@ public class JorthCompiler{
 					currentMethod.dup();
 					return true;
 				}
+				case "pop" -> {
+					currentMethod.pop();
+					return true;
+				}
 				case "new_array" -> {
 					var arrayElementType=readGenericType();
 					if(!arrayElementType.args().isEmpty()){
