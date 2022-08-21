@@ -15,6 +15,7 @@ import com.lapissea.util.UtilL;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Objects;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
@@ -34,7 +35,16 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 	 * are implicitly an IOField
 	 * </p>
 	 */
-	non-sealed interface Def<SELF extends Def<SELF>> extends IOInstance<SELF>{}
+	non-sealed interface Def<SELF extends Def<SELF>> extends IOInstance<SELF>{
+		
+		static <T extends Def<T>, A1> Function<A1, T> constr(Class<T> type, Class<A1> arg1Type){
+			return constr(Struct.of(type), arg1Type);
+		}
+		static <T extends Def<T>, A1> Function<A1, T> constr(Struct<T> type, Class<A1> arg1Type){
+			throw new NotImplementedException();
+		}
+		
+	}
 	
 	abstract non-sealed class Managed<SELF extends Managed<SELF>> implements IOInstance<SELF>{
 		
