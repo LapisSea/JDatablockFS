@@ -10,6 +10,7 @@ import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 public record GenType(String typeName, int arrayDimensions, List<GenType> args, Types type){
@@ -115,5 +116,27 @@ public record GenType(String typeName, int arrayDimensions, List<GenType> args, 
 	public GenType elementType(){
 		if(arrayDimensions==0) throw new RuntimeException("Not an array: "+this);
 		return new GenType(typeName, arrayDimensions-1, args, type);
+	}
+	
+	@Override
+	public boolean equals(Object o){
+		if(this==o) return true;
+		if(!(o instanceof GenType that)) return false;
+		
+		var thisArgs=this.args;
+		var thatArgs=that.args;
+		
+		if(thisArgs.size()!=thatArgs.size()&&(thisArgs.size()==0||thatArgs.size()==0)){
+			thisArgs=thatArgs=List.of();
+		}
+		
+		if(arrayDimensions!=that.arrayDimensions) return false;
+		if(!Objects.equals(typeName, that.typeName)) return false;
+		if(!Objects.equals(thisArgs, thatArgs)) return false;
+		return type==that.type;
+	}
+	@Override
+	public int hashCode(){
+		return typeName.hashCode()+arrayDimensions+args.size()*100;
 	}
 }
