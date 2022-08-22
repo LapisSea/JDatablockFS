@@ -71,11 +71,11 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 		
 		@Override
 		public String toString(){
-			return name+(nullability!=null?" "+nullability:"")+": "+type+(dependencies==null||dependencies.length==0?"":"(deps = ["+String.join(", ", dependencies)+"])");
+			return name+(nullability!=IONullability.Mode.NOT_NULL?" "+nullability:"")+": "+type.toString()+(dependencies==null||dependencies.length==0?"":"(deps = ["+String.join(", ", dependencies)+"])");
 		}
 		@Override
 		public String toShortString(){
-			return name+(nullability!=null?" "+nullability.shortName:"")+": "+Utils.toShortString(type);
+			return name+(nullability!=IONullability.Mode.NOT_NULL?" "+nullability.shortName:"")+": "+Utils.toShortString(type);
 		}
 	}
 	
@@ -90,6 +90,11 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 		}
 		
 		public String getName(){
+			return name;
+		}
+		
+		@Override
+		public String toString(){
 			return name;
 		}
 	}

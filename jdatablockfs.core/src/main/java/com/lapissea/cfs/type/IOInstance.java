@@ -65,11 +65,11 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		
 		@Override
 		public String toString(){
-			return getThisStruct().instanceToString(getThisStruct().allocVirtualVarPool(IO), self(), false);
+			return getThisStruct().instanceToString(self(), false);
 		}
 		@Override
 		public String toShortString(){
-			return getThisStruct().instanceToString(getThisStruct().allocVirtualVarPool(IO), self(), true);
+			return getThisStruct().instanceToString(self(), true);
 		}
 		
 		@Override
@@ -354,11 +354,11 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 	void allocateNulls(DataProvider provider) throws IOException;
 	
 	default String toShortString(){
-		return getThisStruct().instanceToString(getThisStruct().allocVirtualVarPool(IO), self(), true);
+		return getThisStruct().instanceToString(self(), true);
 	}
 	
 	default String toString(boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
-		return getThisStruct().instanceToString(getThisStruct().allocVirtualVarPool(IO), self(), doShort, start, end, fieldValueSeparator, fieldSeparator);
+		return getThisStruct().instanceToString(self(), doShort, start, end, fieldValueSeparator, fieldSeparator);
 	}
 	
 	SELF clone();

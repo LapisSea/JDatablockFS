@@ -2,7 +2,6 @@ package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
-import com.lapissea.cfs.exceptions.FieldIsNullException;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.internal.MemPrimitive;
@@ -632,8 +631,14 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		return canHavePointers;
 	}
 	
+	public String instanceToString(T instance, boolean doShort){
+		return instanceToString(allocVirtualVarPool(IO), instance, doShort);
+	}
 	public String instanceToString(Pool<T> ioPool, T instance, boolean doShort){
 		return instanceToString(ioPool, instance, doShort, "{", "}", "=", ", ");
+	}
+	public String instanceToString(T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+		return instanceToString(allocVirtualVarPool(IO), instance, doShort, start, end, fieldValueSeparator, fieldSeparator);
 	}
 	public String instanceToString(Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
 		return instanceToString0(
@@ -643,38 +648,45 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	protected String instanceToString0(Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator, Stream<IOField<T, ?>> fields){
-		var prefix=start;
-		
+		var    prefix=start;
+		String name  =null;
 		if(!doShort){
-			var simple=getType().getSimpleName();
-			var index =simple.lastIndexOf('$');
-			if(index!=-1) simple=simple.substring(index+1);
+			name=getType().getSimpleName();
+			var index=name.lastIndexOf('$');
+			if(index!=-1) name=name.substring(index+1);
 			
-			prefix=simple+prefix;
+			prefix=name+prefix;
 		}
 		
-		StringJoiner joiner=new StringJoiner(fieldSeparator, prefix, end);
-		
-		var i=fields.iterator();
-		while(i.hasNext()){
-			var field=i.next();
-			
-			Optional<String> str;
-			try{
-				str=field.instanceToString(ioPool, instance, doShort||TextUtil.USE_SHORT_IN_COLLECTIONS);
-			}catch(FieldIsNullException e){
-				str=Optional.of("<UNINITIALIZED>");
-			}catch(Throwable e){
-				str=Optional.of("CORRUPTED: "+e.getMessage());
+		Function<IOField<T, ?>, Optional<String>> fieldMapper=field->{
+			if(SupportedPrimitive.get(field.getAccessor().getType()).orElse(null)==SupportedPrimitive.BOOLEAN){
+				Boolean val=(Boolean)field.get(ioPool, instance);
+				if(val!=null){
+					return val?Optional.of(field.getName()):Optional.empty();
+				}
 			}
 			
-			if(str.isEmpty()) continue;
+			Optional<String> valStr;
+			if(field.getNullability()==NOT_NULL&&field.isNull(ioPool, instance)){
+				valStr=Optional.of("<UNINITIALIZED>");
+			}else{
+				try{
+					valStr=field.instanceToString(ioPool, instance, doShort||TextUtil.USE_SHORT_IN_COLLECTIONS);
+				}catch(Throwable e){
+					valStr=Optional.of("CORRUPTED: "+e.getMessage());
+				}
+			}
 			
-			StringJoiner f=new StringJoiner("");
-			f.add(field.getName()).add(fieldValueSeparator).add(str.get());
-			joiner.merge(f);
+			return valStr.map(value->field.getName()+fieldValueSeparator+value);
+		};
+		var str=fields.map(fieldMapper)
+		              .filter(Optional::isPresent).map(Optional::get)
+		              .collect(Collectors.joining(fieldSeparator, prefix, end));
+		
+		if(!doShort){
+			if(str.equals(prefix+end)) return name;
 		}
-		return joiner.toString();
+		return str;
 	}
 	
 	@Override
