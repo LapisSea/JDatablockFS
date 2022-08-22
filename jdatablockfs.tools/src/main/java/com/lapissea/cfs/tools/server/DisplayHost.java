@@ -151,8 +151,10 @@ public class DisplayHost{
 								System.gc();
 							};
 							case FINISH -> ()->{
-								out.write(2);
-								out.flush();
+								try{
+									out.write(2);
+									out.flush();
+								}catch(SocketException ignored){}
 								getSession().finish();
 								running=false;
 							};
