@@ -260,4 +260,32 @@ public class Utils{
 		return StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE)
 		                  .walk(s->stream.apply(s).findFirst().orElseThrow());
 	}
+	
+	
+	public static String classNameToHuman(String name, boolean doShort){
+		int arrayLevels=0;
+		for(int i=0;i<name.length();i++){
+			if(name.charAt(i)=='[') arrayLevels++;
+			else break;
+		}
+		name=name.substring(arrayLevels);
+		if(name.startsWith("L")) name=name.substring(1, name.length()-1);
+		
+		
+		if(doShort){
+			var index=name.lastIndexOf('.');
+			name=(index!=-1?name.substring(name.lastIndexOf('.')):name)+
+			     ("[]".repeat(arrayLevels));
+		}else{
+			var parts=TextUtil.splitByChar(name, '.');
+			if(parts.length==1) name=name+("[]".repeat(arrayLevels));
+			else name=Arrays.stream(parts)
+			                .limit(parts.length-1)
+			                .map(c->c.charAt(0)+"")
+			                .collect(Collectors.joining("."))+
+			          "."+parts[parts.length-1]+
+			          ("[]".repeat(arrayLevels));
+		}
+		return name;
+	}
 }

@@ -25,7 +25,7 @@ import java.util.function.BiFunction;
 import static com.lapissea.cfs.objects.NumberSize.*;
 import static com.lapissea.cfs.type.WordSpace.BIT;
 
-public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> extends IOField<T, ValueType>{
+public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType> extends IOField<T, ValueType>{
 	
 	public static <T extends IOInstance<T>> IOField<T, ?> make(FieldAccessor<T> field){
 		return SupportedPrimitive.get(field.getType()).map(t->switch(t){
@@ -40,7 +40,7 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}).orElseThrow();
 	}
 	
-	public static class FDouble<T extends IOInstance<T>> extends IOFieldPrimitive<T, Double>{
+	public static final class FDouble<T extends IOInstance<T>> extends IOFieldPrimitive<T, Double>{
 		
 		
 		public FDouble(FieldAccessor<T> field){
@@ -86,8 +86,10 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
-		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
-			return Optional.of(String.valueOf(getValue(ioPool, instance)));
+		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort){
+			var val=getValue(ioPool, instance);
+			if(val==0) return Optional.empty();
+			return Optional.of(String.valueOf(val));
 		}
 		
 		@Override
@@ -100,7 +102,7 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 	}
 	
-	public static class FChar<T extends IOInstance<T>> extends IOFieldPrimitive<T, Character>{
+	public static final class FChar<T extends IOInstance<T>> extends IOFieldPrimitive<T, Character>{
 		
 		
 		public FChar(FieldAccessor<T> field){
@@ -146,7 +148,7 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
-		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort){
 			return Optional.of(String.valueOf(getValue(ioPool, instance)));
 		}
 		
@@ -160,7 +162,7 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 	}
 	
-	public static class FFloat<T extends IOInstance<T>> extends IOFieldPrimitive<T, Float>{
+	public static final class FFloat<T extends IOInstance<T>> extends IOFieldPrimitive<T, Float>{
 		
 		
 		public FFloat(FieldAccessor<T> field){
@@ -206,8 +208,10 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
-		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
-			return Optional.of(String.valueOf(getValue(ioPool, instance)));
+		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort){
+			var val=getValue(ioPool, instance);
+			if(val==0) return Optional.empty();
+			return Optional.of(String.valueOf(val));
 		}
 		
 		@Override
@@ -220,7 +224,7 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 	}
 	
-	public static class FLong<T extends IOInstance<T>> extends IOFieldPrimitive<T, Long>{
+	public static final class FLong<T extends IOInstance<T>> extends IOFieldPrimitive<T, Long>{
 		
 		private final boolean unsigned;
 		
@@ -275,8 +279,10 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
-		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
-			return Optional.of(String.valueOf(getValue(ioPool, instance)));
+		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort){
+			var val=getValue(ioPool, instance);
+			if(val==0) return Optional.empty();
+			return Optional.of(String.valueOf(val));
 		}
 		
 		@Override
@@ -289,7 +295,7 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 	}
 	
-	public static class FInt<T extends IOInstance<T>> extends IOFieldPrimitive<T, Integer>{
+	public static final class FInt<T extends IOInstance<T>> extends IOFieldPrimitive<T, Integer>{
 		
 		private final boolean unsigned;
 		
@@ -350,8 +356,10 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
-		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
-			return Optional.of(String.valueOf(getValue(ioPool, instance)));
+		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort){
+			var val=getValue(ioPool, instance);
+			if(val==0) return Optional.empty();
+			return Optional.of(String.valueOf(val));
 		}
 		
 		@Override
@@ -364,7 +372,7 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 	}
 	
-	public static class FShort<T extends IOInstance<T>> extends IOFieldPrimitive<T, Short>{
+	public static final class FShort<T extends IOInstance<T>> extends IOFieldPrimitive<T, Short>{
 		
 		private final boolean unsigned;
 		
@@ -425,8 +433,10 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
-		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
-			return Optional.of(String.valueOf(getValue(ioPool, instance)));
+		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort){
+			var val=getValue(ioPool, instance);
+			if(val==0) return Optional.empty();
+			return Optional.of(String.valueOf(val));
 		}
 		
 		@Override
@@ -439,9 +449,7 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 	}
 	
-	public static class FByte<T extends IOInstance<T>> extends IOFieldPrimitive<T, Byte>{
-		
-		private final boolean unsigned;
+	public static final class FByte<T extends IOInstance<T>> extends IOFieldPrimitive<T, Byte>{
 		
 		public FByte(FieldAccessor<T> field){
 			this(field, false);
@@ -449,7 +457,6 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		
 		public FByte(FieldAccessor<T> field, boolean forceFixed){
 			super(field, true, BYTE);
-			unsigned=field.hasAnnotation(IOValue.Unsigned.class);
 		}
 		@Override
 		protected EnumSet<NumberSize> allowedSizes(){
@@ -486,8 +493,10 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}
 		
 		@Override
-		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
-			return Optional.of(String.valueOf(getValue(ioPool, instance)));
+		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort){
+			var val=getValue(ioPool, instance);
+			if(val==0) return Optional.empty();
+			return Optional.of(String.valueOf(val));
 		}
 		
 		@Override
@@ -540,6 +549,10 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		
 		@Override
 		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+			return instanceToString(ioPool, instance, doShort);
+		}
+		@Override
+		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort){
 			return Optional.of(String.valueOf(getValue(ioPool, instance)));
 		}
 		
@@ -618,5 +631,10 @@ public abstract class IOFieldPrimitive<T extends IOInstance<T>, ValueType> exten
 		}catch(ReflectiveOperationException e){
 			throw new RuntimeException(e);
 		}
+	}
+	
+	@Override
+	public final Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+		return instanceToString(ioPool, instance, doShort);
 	}
 }

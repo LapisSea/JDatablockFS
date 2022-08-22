@@ -203,24 +203,16 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 		if(args.length==0) argStr="";
 		else argStr=Arrays.stream(args).map(Objects::toString).collect(Collectors.joining(", ", "<", ">"));
 		
-		return getTypeName()+argStr;
+		return Utils.classNameToHuman(getTypeName(), false)+argStr;
 	}
+	
 	@Override
 	public String toShortString(){
 		String argStr;
 		if(args.length==0) argStr="";
 		else argStr=Arrays.stream(args).map(t->t==null?"null":t.toShortString()).collect(Collectors.joining(", ", "<", ">"));
 		
-		String nam=shortTypeString();
-		return nam+argStr;
-	}
-	private String shortTypeString(){
-		var nam =getTypeName();
-		var last=nam.lastIndexOf('.');
-		if(last!=-1){
-			nam=nam.substring(last+1);
-		}
-		return nam;
+		return Utils.classNameToHuman(getTypeName(), true)+argStr;
 	}
 	public Type generic(IOTypeDB db){
 		if(generic==null) generic=SyntheticParameterizedType.of(getTypeClass(db), Arrays.stream(args).map(t->t.getTypeClass(db)).toArray(Type[]::new));

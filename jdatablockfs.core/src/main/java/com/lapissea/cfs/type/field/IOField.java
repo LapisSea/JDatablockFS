@@ -35,7 +35,6 @@ import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.internal.StatIOField.*;
-import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 import static com.lapissea.cfs.type.field.access.TypeFlag.*;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 
@@ -593,12 +592,14 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 			}
 			
 			var struct=inst.getThisStruct();
-			return Optional.of(struct.instanceToString(struct.allocVirtualVarPool(IO), inst, doShort, start, end, fieldValueSeparator, fieldSeparator));
+			return Optional.of(struct.instanceToString(inst, doShort, start, end, fieldValueSeparator, fieldSeparator));
 		}
-		if(doShort){
-			return Optional.of(Utils.toShortString(val));
-		}
-		return Optional.of(TextUtil.toString(val));
+		
+		return Optional.of(
+			doShort?
+			Utils.toShortString(val):
+			TextUtil.toString(val)
+		);
 	}
 	
 	public boolean instancesEqual(Struct.Pool<T> ioPool1, T inst1, Struct.Pool<T> ioPool2, T inst2){

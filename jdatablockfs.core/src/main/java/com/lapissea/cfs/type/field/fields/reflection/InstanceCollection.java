@@ -24,6 +24,7 @@ import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.util.ShouldNeverHappenError;
+import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
 import java.lang.reflect.Array;
@@ -119,6 +120,19 @@ public class InstanceCollection{
 			}
 			
 			dataAdapter.skipReadData(collectionSize, ioPool, provider, src, instance, genericContext);
+		}
+		
+		@Override
+		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+			var val=get(ioPool, instance);
+			if(val==null||dataAdapter.getSize(get(ioPool, instance))==0){
+				return Optional.empty();
+			}
+			return Optional.of(
+				doShort?
+				Utils.toShortString(val):
+				TextUtil.toString(val)
+			);
 		}
 	}
 	
@@ -295,6 +309,19 @@ public class InstanceCollection{
 		@Override
 		public ObjectPipe<CollectionType, Void> getReferencedPipe(T instance){
 			return refPipe;
+		}
+		
+		@Override
+		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+			var val=get(ioPool, instance);
+			if(val==null||dataAdapter.getSize(get(ioPool, instance))==0){
+				return Optional.empty();
+			}
+			return Optional.of(
+				doShort?
+				Utils.toShortString(val):
+				TextUtil.toString(val)
+			);
 		}
 	}
 	

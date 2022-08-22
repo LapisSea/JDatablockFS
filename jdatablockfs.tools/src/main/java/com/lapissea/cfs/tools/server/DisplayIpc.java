@@ -1,6 +1,5 @@
 package com.lapissea.cfs.tools.server;
 
-import com.lapissea.cfs.ConsoleColors;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.MemFrame;
 import com.lapissea.util.UtilL;
@@ -25,8 +24,9 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+import static com.lapissea.cfs.ConsoleColors.RESET;
+import static com.lapissea.cfs.ConsoleColors.YELLOW_BRIGHT;
 import static com.lapissea.cfs.logging.Log.info;
-import static com.lapissea.cfs.logging.Log.trace;
 import static com.lapissea.cfs.logging.Log.warn;
 import static com.lapissea.cfs.tools.server.ServerCommons.Action;
 import static com.lapissea.cfs.tools.server.ServerCommons.getLocalLoggerImpl;
@@ -39,7 +39,7 @@ public class DisplayIpc implements DataLogger{
 		
 		public IpcSession(Info conn, String name, Map<String, Object> config) throws IOException{
 			var socket=sessionConnection(conn, name, config);
-			info(ConsoleColors.YELLOW_BRIGHT+"Server session({}) established"+ConsoleColors.RESET, name);
+			info(YELLOW_BRIGHT+"Server session({}) established"+RESET, name);
 			
 			boolean threadedOutput=Boolean.parseBoolean(config.getOrDefault("threadedOutput", "false").toString());
 			
@@ -105,7 +105,7 @@ public class DisplayIpc implements DataLogger{
 					public void terminating(Action action){
 						try{
 							sendAction.accept(action, buff->{});
-							trace("Closing connection to: {}", name);
+							info(YELLOW_BRIGHT+"Closing connection to: {}"+RESET, name);
 							socketOut.flush();
 							socket.close();
 						}catch(SocketException ignored){
@@ -157,7 +157,7 @@ public class DisplayIpc implements DataLogger{
 //								}
 								
 							}
-							trace("Closing async connection to: {}", name);
+							info(YELLOW_BRIGHT+"Closing async connection to: {}"+RESET, name);
 							try{
 								socketOut.flush();
 								socket.close();
@@ -368,7 +368,7 @@ public class DisplayIpc implements DataLogger{
 				out.flush();
 			}
 			
-			return new Socket(InetAddress.getLocalHost(), realPort);
+			return new Socket(con.addr, realPort);
 		}
 		
 		@Override
