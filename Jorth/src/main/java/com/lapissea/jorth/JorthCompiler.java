@@ -252,7 +252,18 @@ public class JorthCompiler{
 				}
 				case "new" -> {
 					var type=pop();
-					currentMethod.newObject(type.source);
+					if(type.source.matches("\\(\\d+\\)")){
+						var argCount=Integer.parseInt(type.source.substring(1, type.source.length()-1));
+						type=pop();
+						var def=getClassInfo(type.source);
+						currentMethod.newObject(def.name);
+						
+						currentMethod.dup();
+						currentMethod.callInit(IntStream.range(0, argCount).map(i->argCount-(i+1)).mapToObj(currentMethod.getStack()::peek).toList());
+					}else{
+						var def=getClassInfo(type.source);
+						currentMethod.newObject(def.name);
+					}
 					return true;
 				}
 				case "cast" -> {
