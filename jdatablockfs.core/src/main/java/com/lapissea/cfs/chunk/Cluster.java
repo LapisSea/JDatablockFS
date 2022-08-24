@@ -13,7 +13,10 @@ import com.lapissea.cfs.objects.collections.AbstractUnmanagedIOMap;
 import com.lapissea.cfs.objects.collections.HashIOMap;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.collections.IOMap;
-import com.lapissea.cfs.type.*;
+import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.IOTypeDB;
+import com.lapissea.cfs.type.MemoryWalker;
+import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.function.UnsafeSupplier;
@@ -188,7 +191,7 @@ public class Cluster implements DataProvider{
 		
 		root=ROOT_PIPE.readNew(this, ch, null);
 		var frees =meta().freeChunks;
-		var mapped=frees.map(IOChunkPointer::getVal, IOInstance.Def.constr(IOChunkPointer.class, ChunkPointer.class));
+		var mapped=frees.map(IOChunkPointer::getVal, IOInstance.Def.make(IOChunkPointer.class, ChunkPointer.class));
 		memoryManager=new PersistentMemoryManager(this, mapped);
 	}
 	

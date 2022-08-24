@@ -15,7 +15,9 @@ import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
@@ -38,16 +40,26 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 	 */
 	non-sealed interface Def<SELF extends Def<SELF>> extends IOInstance<SELF>{
 		
-		static <T extends Def<T>, A1> Function<A1, T> constr(Class<T> type, Class<A1> arg1Type){
-			return constr(Struct.of(type), arg1Type);
+		String IMPL_NAME_POSTFIX="€Impl";
+		
+		static <T extends Def<T>, A1> Function<A1, T> make(Class<T> type, Class<A1> arg1Type){
+			return make(Struct.of(type), arg1Type);
 		}
-		static <T extends Def<T>, A1> Function<A1, T> constr(Struct<T> type, Class<A1> arg1Type){
-			try{
-				var ctor=type.getType().getConstructor(arg1Type);
-				return Access.makeLambda(ctor, Function.class);
-			}catch(NoSuchMethodException e){
-				throw new RuntimeException(e);
+		
+		static <T extends Def<T>, A1> Function<A1, T> make(Struct<T> type, Class<A1> arg1Type){
+			record Sig(Class<?> c, Class<?> arg){}
+			class Cache{
+				static final Map<Sig, Function<?, ?>> CH=new ConcurrentHashMap<>();
 			}
+			//noinspection unchecked
+			return (Function<A1, T>)Cache.CH.computeIfAbsent(new Sig(type.getType(), arg1Type), t->{
+				try{
+					var ctor=t.c.getConstructor(t.arg);
+					return Access.makeLambda(ctor, Function.class);
+				}catch(ReflectiveOperationException e){
+					throw new RuntimeException(e);
+				}
+			});
 		}
 		
 	}

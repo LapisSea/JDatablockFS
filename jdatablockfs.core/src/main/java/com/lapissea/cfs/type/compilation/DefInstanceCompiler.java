@@ -15,6 +15,7 @@ import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeBiConsumer;
+import com.lapissea.util.function.UnsafeConsumer;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
@@ -31,6 +32,9 @@ import static com.lapissea.cfs.type.SupportedPrimitive.BOOLEAN;
 import static java.lang.reflect.Modifier.isStatic;
 
 public class DefInstanceCompiler{
+	
+	private static final boolean PRINT_BYTECODE=GlobalConfig.configFlag("classGen.printBytecode", false);
+	private static final boolean EXIT_ON_FAIL  =GlobalConfig.configFlag("classGen.exitOnFail", false);
 	
 	private enum Style{
 		NAMED("FieldType getName() / void setName(FieldType newValue)"),
@@ -147,7 +151,16 @@ public class DefInstanceCompiler{
 			checkAnnotations(fieldInfo);
 			checkModel(fieldInfo);
 			
-			var impl=generateImpl(interf, fieldInfo);
+			Class<T> impl;
+			try{
+				impl=generateImpl(interf, fieldInfo);
+			}catch(Throwable e){
+				if(EXIT_ON_FAIL){
+					e.printStackTrace();
+					System.exit(1);
+				}
+				throw e;
+			}
 			
 			node.impl=impl;
 			node.state=ImplNode.State.DONE;
@@ -162,7 +175,7 @@ public class DefInstanceCompiler{
 	}
 	
 	private static <T extends IOInstance<T>> Class<T> generateImpl(Class<T> interf, List<FieldInfo> fieldInfo){
-		var implName=interf.getName()+"€Impl";
+		var implName=interf.getName()+IOInstance.Def.IMPL_NAME_POSTFIX;
 		Log.trace("Generating implementation for {}", interf);
 		
 		try{
@@ -176,7 +189,7 @@ public class DefInstanceCompiler{
 						[#TOKEN(0)] #TOKEN(2) extends
 						#TOKEN(0) class start
 						""",
-					interf.getName()+"€Impl",
+					implName,
 					interf.getName(),
 					IOInstance.Managed.class.getName()
 				);
