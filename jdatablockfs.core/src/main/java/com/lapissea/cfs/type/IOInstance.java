@@ -14,6 +14,10 @@ import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Objects;
@@ -39,6 +43,15 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 	 * </p>
 	 */
 	non-sealed interface Def<SELF extends Def<SELF>> extends IOInstance<SELF>{
+		
+		@Retention(RetentionPolicy.RUNTIME)
+		@Target({ElementType.TYPE})
+		@interface ToString{
+			boolean name() default true;
+			boolean curly() default true;
+			boolean fNames() default true;
+			String[] filter() default {};
+		}
 		
 		String IMPL_NAME_POSTFIX="€Impl";
 		

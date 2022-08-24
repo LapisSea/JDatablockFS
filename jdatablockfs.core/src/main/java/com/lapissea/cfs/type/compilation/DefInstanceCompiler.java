@@ -1,5 +1,6 @@
 package com.lapissea.cfs.type.compilation;
 
+import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.logging.Log;
@@ -195,153 +196,240 @@ public class DefInstanceCompiler{
 				);
 				
 				for(FieldInfo info : fieldInfo){
-					var type=Objects.requireNonNull(TypeLink.of(info.type));
-					
-					writer.write("private visibility");
-					
-					Set<Class<?>> annTypes=new HashSet<>();
-					for(var ann : info.annotations){
-						if(!annTypes.add(ann.annotationType())) continue;
-						
-						writer.write("{");
-						scanAnnotation(ann, (name, value)->{
-							writer.write("#TOKEN(0) #TOKEN(1)", switch(value){
-								case null -> "null";
-								case String s -> "'"+s.replace("'", "\\'")+"'";
-								case Enum<?> e -> e.name();
-								case Boolean v -> v.toString();
-								case Class<?> c -> c.getName();
-								case Number n -> {
-									if(SupportedPrimitive.isAny(n.getClass())) yield n+"";
-									throw new UnsupportedOperationException();
-								}
-								default -> throw new NotImplementedException();
-							}, name);
-						});
-						writer.write("} #TOKEN(0) @", ann.annotationType().getName());
-					}
-					
-					writer.write(
-						"#RAW(0) #TOKEN(1) field",
-						JorthUtils.toJorthGeneric(type),
-						info.name
-					);
-					
-					var jtyp=JorthUtils.toJorthGeneric(Objects.requireNonNull(TypeLink.of(info.type)));
-					if(info.getter.isPresent()){
-						var stub  =info.getter.get();
-						var method=stub.method;
-						
-						writer.write(
-							"""
-								public visibility
-								#TOKEN(3) @
-								#RAW(1) returns
-								#TOKEN(0) function start
-									this #TOKEN(2) get
-								end
-								""",
-							method.getName(),
-							jtyp,
-							info.name,
-							Override.class.getName()
-						);
-						
-					}
-					if(info.setter.isPresent()){
-						var stub  =info.setter.get();
-						var method=stub.method;
-						
-						writer.write(
-							"""
-								public visibility
-								#TOKEN(2) @
-								#RAW(1) arg1 arg
-								#TOKEN(0) function start
-									<arg> arg1 get
-								""",
-							method.getName(),
-							jtyp,
-							Override.class.getName()
-						);
-						
-						if(info.type==ChunkPointer.class){
-							nullCheck(writer);
-						}
-						
-						writer.write(
-							"""
-									this #TOKEN(0) set
-								end
-								""",
-							info.name
-						);
-						
-					}
+					defineField(writer, info);
+					implementUserAccess(writer, info);
 				}
 				
-				writer.write(
-					"""
-						private visibility
-						static final
-						[#TOKEN(0)] #TOKEN(1) $STRUCT field
-						
-						<clinit> function start
-							#TOKEN(0) class
-							#TOKEN(1) of (1) static call
-							#TOKEN(0) $STRUCT set
-						end
-						
-						public visibility
-						<init> function start
-							this this get
-							#TOKEN(0) $STRUCT get
-							super
-						""",
-					implName,
-					Struct.class.getName());
+				defineStatics(implName, writer);
 				
-				for(FieldInfo info : fieldInfo){
-					if(info.type!=ChunkPointer.class) continue;
-					writer.write(ChunkPointer.class.getName()).write("NULL get");
-					writer.write("this").write(info.name).write("set");
+				generateConstructors(fieldInfo, implName, writer);
+				
+				var toStrAnn=interf.getAnnotation(IOInstance.Def.ToString.class);
+				if(toStrAnn!=null){
+					generateToString(interf, toStrAnn, fieldInfo, writer);
 				}
-				writer.write("end");
-				
-				writer.write("public visibility");
-				for(int i=0;i<fieldInfo.size();i++){
-					FieldInfo info   =fieldInfo.get(i);
-					var       type   =JorthUtils.toJorthGeneric(Objects.requireNonNull(TypeLink.of(info.type)));
-					var       argName="arg"+i;
-					writer.write("#RAW(0) #TOKEN(1) arg", type, argName);
-				}
-				
-				writer.write(
-					"""
-						<init> function start
-							this this get
-							#TOKEN(0) $STRUCT get
-							super
-						""",
-					implName);
-				
-				for(int i=0;i<fieldInfo.size();i++){
-					FieldInfo info=fieldInfo.get(i);
-					writer.write("<arg>").write("arg"+i).write("get");
-					if(info.type==ChunkPointer.class){
-						nullCheck(writer);
-					}
-					writer.write("this").write(info.name).write("set");
-				}
-				writer.write("end");
 			}
 			
 			//noinspection unchecked
-			return (Class<T>)Access.privateLookupIn(interf).defineClass(jorth.classBytecode());
+			return (Class<T>)Access.privateLookupIn(interf).defineClass(jorth.classBytecode(PRINT_BYTECODE));
 			
 		}catch(IllegalAccessException|MalformedJorthException e){
 			throw new RuntimeException(e);
 		}
+	}
+	
+	private static void generateToString(Class<?> interf, IOInstance.Def.ToString toStrAnn, List<FieldInfo> fieldInfo, JorthWriter writer) throws MalformedJorthException{
+		
+		writer.write(
+			"""
+				public visibility
+				#TOKEN(0) returns
+				toString function start
+					#TOKEN(1) (0) new
+				""",
+			String.class.getName(),
+			StringBuilder.class.getName()
+		);
+		
+		if(toStrAnn.name()){
+			append(writer, w->w.write("'#RAW(0)'", interf.getSimpleName()));
+		}
+		if(toStrAnn.curly()){
+			append(writer, w->w.write("'{'"));
+		}
+		
+		var     filter=Arrays.asList(toStrAnn.filter());
+		boolean first =true;
+		for(FieldInfo info : fieldInfo){
+			if(!filter.isEmpty()&&!filter.contains(info.name)){
+				continue;
+			}
+			if(!first){
+				append(writer, w->w.write("', '"));
+			}
+			first=false;
+			
+			if(toStrAnn.fNames()){
+				append(writer, w->w.write("'#RAW(0): '", info.name));
+			}
+			append(writer, w->w.write(
+				"""
+					this #TOKEN(0) get
+					#TOKEN(1) toString (1) static call
+					""",
+				info.name,
+				Objects.class.getName()));
+		}
+		
+		if(toStrAnn.curly()){
+			append(writer, w->w.write("'}'"));
+		}
+		
+		writer.write(
+			"""
+					toString (0) call
+				end
+				""");
+	}
+	
+	private static void append(JorthWriter writer, UnsafeConsumer<JorthWriter, MalformedJorthException> val) throws MalformedJorthException{
+		writer.write("dup");
+		val.accept(writer);
+		writer.write(
+			"""
+				append (1) call
+				pop
+				"""
+		);
+	}
+	
+	private static void generateConstructors(List<FieldInfo> fieldInfo, String implName, JorthWriter writer) throws MalformedJorthException{
+		writer.write(
+			"""
+				public visibility
+				<init> function start
+					this this get
+					#TOKEN(0) $STRUCT get
+					super
+				""",
+			implName,
+			Struct.class.getName());
+		
+		for(FieldInfo info : fieldInfo){
+			if(info.type!=ChunkPointer.class) continue;
+			writer.write(ChunkPointer.class.getName()).write("NULL get");
+			writer.write("this").write(info.name).write("set");
+		}
+		writer.write("end");
+		
+		writer.write("public visibility");
+		for(int i=0;i<fieldInfo.size();i++){
+			FieldInfo info   =fieldInfo.get(i);
+			var       type   =JorthUtils.toJorthGeneric(Objects.requireNonNull(TypeLink.of(info.type)));
+			var       argName="arg"+i;
+			writer.write("#RAW(0) #TOKEN(1) arg", type, argName);
+		}
+		
+		writer.write(
+			"""
+				<init> function start
+					this this get
+					#TOKEN(0) $STRUCT get
+					super
+				""",
+			implName);
+		
+		for(int i=0;i<fieldInfo.size();i++){
+			FieldInfo info=fieldInfo.get(i);
+			writer.write("<arg>").write("arg"+i).write("get");
+			if(info.type==ChunkPointer.class){
+				nullCheck(writer);
+			}
+			writer.write("this").write(info.name).write("set");
+		}
+		writer.write("end");
+	}
+	
+	private static void defineStatics(String implName, JorthWriter writer) throws MalformedJorthException{
+		writer.write(
+			"""
+				private visibility
+				static final
+				[#TOKEN(0)] #TOKEN(1) $STRUCT field
+				
+				<clinit> function start
+					#TOKEN(0) class
+					#TOKEN(1) of (1) static call
+					#TOKEN(0) $STRUCT set
+				end
+				""",
+			implName,
+			Struct.class.getName());
+	}
+	
+	private static void implementUserAccess(JorthWriter writer, FieldInfo info) throws MalformedJorthException{
+		var jtyp=JorthUtils.toJorthGeneric(Objects.requireNonNull(TypeLink.of(info.type)));
+		if(info.getter.isPresent()){
+			var stub  =info.getter.get();
+			var method=stub.method;
+			
+			writer.write(
+				"""
+					public visibility
+					#TOKEN(3) @
+					#RAW(1) returns
+					#TOKEN(0) function start
+						this #TOKEN(2) get
+					end
+					""",
+				method.getName(),
+				jtyp,
+				info.name,
+				Override.class.getName()
+			);
+			
+		}
+		if(info.setter.isPresent()){
+			var stub  =info.setter.get();
+			var method=stub.method;
+			
+			writer.write(
+				"""
+					public visibility
+					#TOKEN(2) @
+					#RAW(1) arg1 arg
+					#TOKEN(0) function start
+						<arg> arg1 get
+					""",
+				method.getName(),
+				jtyp,
+				Override.class.getName()
+			);
+			
+			if(info.type==ChunkPointer.class){
+				nullCheck(writer);
+			}
+			
+			writer.write(
+				"""
+						this #TOKEN(0) set
+					end
+					""",
+				info.name
+			);
+		}
+	}
+	
+	private static void defineField(JorthWriter writer, FieldInfo info) throws MalformedJorthException{
+		var type=Objects.requireNonNull(TypeLink.of(info.type));
+		
+		writer.write("private visibility");
+		
+		Set<Class<?>> annTypes=new HashSet<>();
+		for(var ann : info.annotations){
+			if(!annTypes.add(ann.annotationType())) continue;
+			
+			writer.write("{");
+			scanAnnotation(ann, (name, value)->writer.write("#TOKEN(0) #TOKEN(1)", switch(value){
+				case null -> "null";
+				case String s -> "'"+s.replace("'", "\\'")+"'";
+				case Enum<?> e -> e.name();
+				case Boolean v -> v.toString();
+				case Class<?> c -> c.getName();
+				case Number n -> {
+					if(SupportedPrimitive.isAny(n.getClass())) yield n+"";
+					throw new UnsupportedOperationException();
+				}
+				default -> throw new NotImplementedException();
+			}, name));
+			writer.write("} #TOKEN(0) @", ann.annotationType().getName());
+		}
+		
+		writer.write(
+			"#RAW(0) #TOKEN(1) field",
+			JorthUtils.toJorthGeneric(type),
+			info.name
+		);
 	}
 	
 	private static void nullCheck(JorthWriter writer) throws MalformedJorthException{
@@ -393,7 +481,6 @@ public class DefInstanceCompiler{
 			}
 		}
 	}
-	
 	
 	private static List<FieldInfo> mergeStubs(List<FieldStub> getters, List<FieldStub> setters){
 		return Stream.concat(getters.stream(), setters.stream())
