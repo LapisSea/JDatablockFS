@@ -79,24 +79,14 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 		}
 	}
 	
-	public static final class EnumConstant extends IOInstance.Managed<EnumConstant>{
+	@IOInstance.Def.ToString(name=false, fNames=false, curly=false)
+	public interface EnumConstant extends IOInstance.Def<EnumConstant>{
 		
-		@IOValue
-		private String name;
-		
-		public EnumConstant(){}
-		public <T extends Enum<T>> EnumConstant(T constant){
-			name=constant.name();
+		private static EnumConstant of(Enum<?> e){
+			return IOInstance.Def.make(EnumConstant.class, String.class).apply(e.name());
 		}
 		
-		public String getName(){
-			return name;
-		}
-		
-		@Override
-		public String toString(){
-			return name;
-		}
+		String getName();
 	}
 	
 	
@@ -126,7 +116,7 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 		if(type.isEnum()){
 			//noinspection unchecked,rawtypes
 			enumConstants=Arrays.stream(((Class<Enum>)type).getEnumConstants())
-			                    .map(EnumConstant::new)
+			                    .map(EnumConstant::of)
 			                    .toArray(EnumConstant[]::new);
 		}
 	}
