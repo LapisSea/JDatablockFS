@@ -206,7 +206,27 @@ public class DefInstanceCompiler{
 				
 				var toStrAnn=interf.getAnnotation(IOInstance.Def.ToString.class);
 				if(toStrAnn!=null){
-					generateToString(interf, toStrAnn, fieldInfo, writer);
+					generateToString(interf, toStrAnn, "toString", fieldInfo, writer);
+					if(toStrAnn.name()){
+						generateToString(interf, IOFieldTools.makeAnnotation(IOInstance.Def.ToString.class, Map.of(
+							"name", false,
+							"curly", toStrAnn.curly(),
+							"fNames", toStrAnn.fNames(),
+							"filter", toStrAnn.filter()
+						)), "toShortString", fieldInfo, writer);
+					}else{
+						writer.write(
+							"""
+								public visibility
+								#TOKEN(0) returns
+								toShortString function start
+									this this get
+									toString (0) call
+								end
+								""",
+							String.class.getName()
+						);
+					}
 				}
 			}
 			
@@ -218,17 +238,18 @@ public class DefInstanceCompiler{
 		}
 	}
 	
-	private static void generateToString(Class<?> interf, IOInstance.Def.ToString toStrAnn, List<FieldInfo> fieldInfo, JorthWriter writer) throws MalformedJorthException{
+	private static void generateToString(Class<?> interf, IOInstance.Def.ToString toStrAnn, String name, List<FieldInfo> fieldInfo, JorthWriter writer) throws MalformedJorthException{
 		
 		writer.write(
 			"""
 				public visibility
 				#TOKEN(0) returns
-				toString function start
+				#TOKEN(2) function start
 					#TOKEN(1) (0) new
 				""",
 			String.class.getName(),
-			StringBuilder.class.getName()
+			StringBuilder.class.getName(),
+			name
 		);
 		
 		if(toStrAnn.name()){
