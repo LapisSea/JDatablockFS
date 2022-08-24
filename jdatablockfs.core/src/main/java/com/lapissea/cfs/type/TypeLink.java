@@ -2,6 +2,7 @@ package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.SyntheticParameterizedType;
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.NotImplementedException;
@@ -177,6 +178,7 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 			return Class.forName(name);
 		}catch(ClassNotFoundException e){
 			Objects.requireNonNull(db);
+			Log.trace("Loading template: {}", name);
 			try{
 				return Class.forName(name, true, db.getTemplateLoader());
 			}catch(ClassNotFoundException ex){

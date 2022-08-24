@@ -35,6 +35,7 @@ public class TemplateClassLoader extends ClassLoader{
 	
 	private static final boolean PRINT_GENERATING_INFO=GlobalConfig.configFlag("classGen.printGeneratingInfo", false);
 	private static final boolean PRINT_BYTECODE       =GlobalConfig.configFlag("classGen.printBytecode", false);
+	private static final boolean EXIT_ON_FAIL         =GlobalConfig.configFlag("classGen.exitOnFail", false);
 	
 	private final IOTypeDB db;
 	
@@ -57,7 +58,15 @@ public class TemplateClassLoader extends ClassLoader{
 		var classData=CLASS_DATA_CACHE.get(new TypeNamed(className, def));
 		if(classData==null){
 			var typ=new TypeNamed(className, def.clone());
-			classData=jorthGenerate(typ, def.isIoInstance()?this::generateIOInstance:this::generateEnum);
+			try{
+				classData=jorthGenerate(typ, def.isIoInstance()?this::generateIOInstance:this::generateEnum);
+			}catch(Throwable e){
+				if(EXIT_ON_FAIL){
+					e.printStackTrace();
+					System.exit(-1);
+				}
+				throw e;
+			}
 			CLASS_DATA_CACHE.put(typ, classData);
 		}
 		
