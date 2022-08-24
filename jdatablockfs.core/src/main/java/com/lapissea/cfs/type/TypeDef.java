@@ -146,10 +146,20 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 	}
 	@Override
 	public String toShortString(){
-		return Arrays.stream(fields).map(FieldDef::toShortString).collect(Collectors.joining(", ", (ioInstance?"IO":"")+(unmanaged?"U":"")+"{", "}"));
+		return toString();
 	}
 	@Override
 	public String toString(){
-		return Arrays.stream(fields).map(FieldDef::toString).collect(Collectors.joining(", ", (ioInstance?"IO":"")+(unmanaged?"U":"")+"{", "}"));
+		StringBuilder sb=new StringBuilder();
+		if(isIoInstance()) sb.append("IO");
+		if(isUnmanaged()) sb.append("U");
+		sb.append('{');
+		if(!getEnumConstants().isEmpty()){
+			sb.append(getEnumConstants().stream().map(Objects::toString).collect(Collectors.joining(", ")));
+		}
+		sb.append(Arrays.stream(fields).map(FieldDef::toShortString).collect(Collectors.joining(", ")));
+		sb.append('}');
+		
+		return sb.toString();
 	}
 }
