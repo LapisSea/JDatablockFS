@@ -20,6 +20,7 @@ import com.lapissea.util.function.UnsafeConsumer;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -183,26 +184,32 @@ public class DefInstanceCompiler{
 			JorthCompiler jorth=new JorthCompiler(DefInstanceCompiler.class.getClassLoader());
 			
 			try(var writer=jorth.writeCode()){
+				writer.write("#TOKEN(0) typ.impl               define", implName);
+				writer.write("#TOKEN(0) typ.interf             define", interf.getName());
+				writer.write("#TOKEN(0) typ.IOInstance.Managed define", IOInstance.Managed.class.getName());
+				writer.write("#TOKEN(0) typ.Override           define", Override.class.getName());
+				writer.write("#TOKEN(0) typ.String             define", String.class.getName());
+				writer.write("#TOKEN(0) typ.StringBuilder      define", StringBuilder.class.getName());
+				writer.write("#TOKEN(0) typ.Objects            define", Objects.class.getName());
+				writer.write("#TOKEN(0) typ.Struct             define", Struct.class.getName());
+				writer.write("#TOKEN(0) typ.ChunkPointer       define", ChunkPointer.class.getName());
+				
 				writer.write(
 					"""
 						public visibility
-						#TOKEN(1) implements
-						[#TOKEN(0)] #TOKEN(2) extends
-						#TOKEN(0) class start
-						""",
-					implName,
-					interf.getName(),
-					IOInstance.Managed.class.getName()
-				);
+						typ.interf implements
+						[typ.impl] typ.IOInstance.Managed extends
+						typ.impl class start
+						""");
 				
 				for(FieldInfo info : fieldInfo){
 					defineField(writer, info);
 					implementUserAccess(writer, info);
 				}
 				
-				defineStatics(implName, writer);
+				defineStatics(writer);
 				
-				generateConstructors(fieldInfo, implName, writer);
+				generateConstructors(fieldInfo, writer);
 				
 				var toStrAnn=interf.getAnnotation(IOInstance.Def.ToString.class);
 				if(toStrAnn!=null){
@@ -218,14 +225,12 @@ public class DefInstanceCompiler{
 						writer.write(
 							"""
 								public visibility
-								#TOKEN(0) returns
+								typ.String returns
 								toShortString function start
 									this this get
 									toString (0) call
 								end
-								""",
-							String.class.getName()
-						);
+								""");
 					}
 				}
 			}
@@ -243,12 +248,10 @@ public class DefInstanceCompiler{
 		writer.write(
 			"""
 				public visibility
-				#TOKEN(0) returns
-				#TOKEN(2) function start
-					#TOKEN(1) (0) new
+				typ.String returns
+				#TOKEN(0) function start
+					typ.StringBuilder (0) new
 				""",
-			String.class.getName(),
-			StringBuilder.class.getName(),
 			name
 		);
 		
@@ -276,10 +279,10 @@ public class DefInstanceCompiler{
 			append(writer, w->w.write(
 				"""
 					this #TOKEN(0) get
-					#TOKEN(1) toString (1) static call
+					typ.Objects toString (1) static call
 					""",
-				info.name,
-				Objects.class.getName()));
+				info.name
+			));
 		}
 		
 		if(toStrAnn.curly()){
@@ -304,21 +307,19 @@ public class DefInstanceCompiler{
 		);
 	}
 	
-	private static void generateConstructors(List<FieldInfo> fieldInfo, String implName, JorthWriter writer) throws MalformedJorthException{
+	private static void generateConstructors(List<FieldInfo> fieldInfo, JorthWriter writer) throws MalformedJorthException{
 		writer.write(
 			"""
 				public visibility
 				<init> function start
 					this this get
-					#TOKEN(0) $STRUCT get
+					typ.impl $STRUCT get
 					super
-				""",
-			implName,
-			Struct.class.getName());
+				""");
 		
 		for(FieldInfo info : fieldInfo){
 			if(info.type!=ChunkPointer.class) continue;
-			writer.write(ChunkPointer.class.getName()).write("NULL get");
+			writer.write("typ.ChunkPointer NULL get");
 			writer.write("this").write(info.name).write("set");
 		}
 		writer.write("end");
@@ -335,10 +336,9 @@ public class DefInstanceCompiler{
 			"""
 				<init> function start
 					this this get
-					#TOKEN(0) $STRUCT get
+					typ.impl $STRUCT get
 					super
-				""",
-			implName);
+				""");
 		
 		for(int i=0;i<fieldInfo.size();i++){
 			FieldInfo info=fieldInfo.get(i);
@@ -351,21 +351,19 @@ public class DefInstanceCompiler{
 		writer.write("end");
 	}
 	
-	private static void defineStatics(String implName, JorthWriter writer) throws MalformedJorthException{
+	private static void defineStatics(JorthWriter writer) throws MalformedJorthException{
 		writer.write(
 			"""
 				private visibility
 				static final
-				[#TOKEN(0)] #TOKEN(1) $STRUCT field
+				[#TOKEN(0)] typ.Struct $STRUCT field
 				
 				<clinit> function start
-					#TOKEN(0) class
-					#TOKEN(1) of (1) static call
-					#TOKEN(0) $STRUCT set
+					typ.impl class
+					typ.Struct of (1) static call
+					typ.impl $STRUCT set
 				end
-				""",
-			implName,
-			Struct.class.getName());
+				""");
 	}
 	
 	private static void implementUserAccess(JorthWriter writer, FieldInfo info) throws MalformedJorthException{
@@ -377,7 +375,7 @@ public class DefInstanceCompiler{
 			writer.write(
 				"""
 					public visibility
-					#TOKEN(3) @
+					typ.Override @
 					#RAW(1) returns
 					#TOKEN(0) function start
 						this #TOKEN(2) get
@@ -385,8 +383,7 @@ public class DefInstanceCompiler{
 					""",
 				method.getName(),
 				jtyp,
-				info.name,
-				Override.class.getName()
+				info.name
 			);
 			
 		}
@@ -397,14 +394,13 @@ public class DefInstanceCompiler{
 			writer.write(
 				"""
 					public visibility
-					#TOKEN(2) @
+					typ.Override @
 					#RAW(1) arg1 arg
 					#TOKEN(0) function start
 						<arg> arg1 get
 					""",
 				method.getName(),
-				jtyp,
-				Override.class.getName()
+				jtyp
 			);
 			
 			if(info.type==ChunkPointer.class){
@@ -457,10 +453,9 @@ public class DefInstanceCompiler{
 		writer.write(
 			"""
 				dup
-				#TOKEN(0) requireNonNull (1) static call
+				typ.Objects requireNonNull (1) static call
 				pop
-				""",
-			Objects.class.getName());
+				""");
 	}
 	
 	private static void scanAnnotation(Annotation ann, UnsafeBiConsumer<String, Object, MalformedJorthException> entry) throws MalformedJorthException{
@@ -489,7 +484,12 @@ public class DefInstanceCompiler{
 	
 	private static <T extends IOInstance<T>> void collectMethods(Class<T> interf, List<FieldStub> getters, List<FieldStub> setters){
 		for(Method method : interf.getMethods()){
-			if(IGNORE_TYPES.contains(method.getDeclaringClass())) continue;
+			if(Modifier.isStatic(method.getModifiers())||!Modifier.isAbstract(method.getModifiers())){
+				continue;
+			}
+			if(IGNORE_TYPES.contains(method.getDeclaringClass())){
+				continue;
+			}
 			
 			var getter=GETTER_PATTERNS.stream().map(f->f.apply(method)).filter(Optional::isPresent).map(Optional::get).findFirst();
 			var setter=SETTER_PATTERNS.stream().map(f->f.apply(method)).filter(Optional::isPresent).map(Optional::get).findFirst();
