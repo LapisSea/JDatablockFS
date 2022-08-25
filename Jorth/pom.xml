@@ -8,7 +8,7 @@
 	<version>0.0.1</version>
 
 	<parent>
-		<groupId>com.github.lapissea</groupId>
+		<groupId>com.github.lapissea.jdatablockfs</groupId>
 		<artifactId>JDatablockFS</artifactId>
 		<version>1.0</version>
 	</parent>

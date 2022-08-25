@@ -5,12 +5,12 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<parent>
-		<groupId>com.github.lapissea</groupId>
+		<groupId>com.github.lapissea.jdatablockfs</groupId>
 		<artifactId>JDatablockFS</artifactId>
 		<version>1.0</version>
 	</parent>
 
-	<artifactId>jdatablockfs.core</artifactId>
+	<artifactId>core</artifactId>
 	<version>1.0</version>
 
 	<dependencies>
@@ -19,7 +19,7 @@
 			<artifactId>jlapisutil</artifactId>
 		</dependency>
 		<dependency>
-			<groupId>com.github.lapissea</groupId>
+			<groupId>com.github.lapissea.jdatablockfs</groupId>
 			<artifactId>Jorth</artifactId>
 			<version>0.0.1</version>
 		</dependency>

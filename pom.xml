@@ -15,7 +15,7 @@
 		<maven-compiler-plugin-version>3.10.1</maven-compiler-plugin-version>
 	</properties>
 
-	<groupId>com.github.lapissea</groupId>
+	<groupId>com.github.lapissea.jdatablockfs</groupId>
 	<artifactId>JDatablockFS</artifactId>
 	<packaging>pom</packaging>
 
