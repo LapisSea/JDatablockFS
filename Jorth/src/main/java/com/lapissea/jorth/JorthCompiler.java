@@ -74,16 +74,48 @@ public class JorthCompiler{
 	
 	public record ClassInfo(String name, List<ClassInfo> parents, List<FunctionInfo> functions, List<ConstructorInfo> constructors, List<FieldInfo> fields){
 		
+		private static class LazyList<T> extends AbstractList<T>{
+			
+			private          Supplier<List<T>> make;
+			private volatile List<T>           real;
+			
+			private LazyList(Supplier<List<T>> make){
+				this.make=make;
+			}
+			
+			private List<T> get(){
+				if(real==null){
+					make();
+				}
+				
+				return real;
+			}
+			private synchronized void make(){
+				if(real!=null) return;
+				real=make.get();
+				make=null;
+			}
+			
+			@Override
+			public T get(int index){
+				return get().get(index);
+			}
+			@Override
+			public int size(){
+				return get().size();
+			}
+		}
+		
 		ClassInfo(Class<?> clazz){
 			this(
 				clazz.getName(),
-				Stream.concat(Stream.of(clazz.getSuperclass()), Arrays.stream(clazz.getInterfaces()))
-				      .filter(Objects::nonNull)
-				      .map(ClassInfo::new)
-				      .toList(),
-				getFunctions(clazz),
-				getConstructors(clazz),
-				getFields(clazz)
+				new LazyList<>(()->Stream.concat(Stream.of(clazz.getSuperclass()), Arrays.stream(clazz.getInterfaces()))
+				                         .filter(Objects::nonNull)
+				                         .map(ClassInfo::new)
+				                         .toList()),
+				new LazyList<>(()->getFunctions(clazz)),
+				new LazyList<>(()->getConstructors(clazz)),
+				new LazyList<>(()->getFields(clazz))
 			);
 		}
 		private static List<FieldInfo> getFields(Class<?> clazz){
@@ -1388,6 +1420,8 @@ public class JorthCompiler{
 		return getClassInfo(type.arrayDimensions()>0?Utils.makeArrayName(type.typeName(), type.arrayDimensions()):type.typeName());
 	}
 	
+	private final Map<String, ClassInfo> classInfoCache=new HashMap<>();
+	
 	public ClassInfo getClassInfo(String name) throws MalformedJorthException{
 		if(name.contains("/")){
 			throw new IllegalArgumentException(name);
@@ -1408,6 +1442,21 @@ public class JorthCompiler{
 			}
 		}
 		
+		ClassInfo cached;
+		synchronized(classInfoCache){
+			cached=classInfoCache.get(name);
+		}
+		if(cached!=null) return cached;
+		
+		var info=computeClassInfo(name);
+		synchronized(classInfoCache){
+			classInfoCache.put(name, info);
+		}
+		
+		return info;
+	}
+	
+	private ClassInfo computeClassInfo(String name) throws MalformedJorthException{
 		Class<?> clazz;
 		try{
 			clazz=Class.forName(name, false, classLoader);
