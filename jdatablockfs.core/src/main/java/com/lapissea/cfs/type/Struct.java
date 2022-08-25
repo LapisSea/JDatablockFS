@@ -413,13 +413,16 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	
 	@SuppressWarnings("unchecked")
 	private static <T extends IOInstance<T>, S extends Struct<T>> S compile(Class<T> instanceClass, Function<Class<T>, S> newStruct){
-		if(UtilL.instanceOf(instanceClass, IOInstance.Def.class)){
-			if(!UtilL.instanceOf(instanceClass, IOInstance.Managed.class)){
-				return compile(DefInstanceCompiler.compile(instanceClass), newStruct);
-			}
+		boolean needsImpl=DefInstanceCompiler.needsCompile(instanceClass);
+		
+		Class<T> concreteClass;
+		if(DefInstanceCompiler.needsCompile(instanceClass)){
+			concreteClass=DefInstanceCompiler.compile(instanceClass);
+		}else{
+			concreteClass=instanceClass;
 		}
 		
-		if(Modifier.isAbstract(instanceClass.getModifiers())){
+		if(!needsImpl&&Modifier.isAbstract(instanceClass.getModifiers())){
 			throw new IllegalArgumentException("Can not compile "+instanceClass.getName()+" because it is abstract");
 		}
 		
@@ -442,9 +445,10 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			try{
 				STRUCT_COMPILE.put(instanceClass, Thread.currentThread());
 				
-				struct=newStruct.apply(instanceClass);
+				struct=newStruct.apply(concreteClass);
 				
 				STRUCT_CACHE.put(instanceClass, struct);
+				if(needsImpl) STRUCT_CACHE.put(concreteClass, struct);
 			}catch(Throwable e){
 				throw new MalformedStructLayout("Failed to compile "+instanceClass.getName(), e);
 			}finally{

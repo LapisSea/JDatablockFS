@@ -22,6 +22,7 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
@@ -54,6 +55,10 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		}
 		
 		String IMPL_NAME_POSTFIX="€Impl";
+		
+		static <T extends Def<T>> NewObj<T> make(Class<T> type){
+			return Struct.of(type).emptyConstructor();
+		}
 		
 		static <T extends Def<T>, A1> Function<A1, T> make(Class<T> type, Class<A1> arg1Type){
 			return make(Struct.of(type), arg1Type);

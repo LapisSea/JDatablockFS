@@ -122,8 +122,12 @@ public class DefInstanceCompiler{
 	
 	private static final ConcurrentHashMap<Class<?>, ImplNode<?>> CACHE=new ConcurrentHashMap<>();
 	
+	public static boolean needsCompile(Class<?> clazz){
+		return clazz.isInterface()&&UtilL.instanceOf(clazz, IOInstance.Def.class);
+	}
+	
 	public static <T extends IOInstance<T>> Class<T> compile(Class<T> interf){
-		if(!interf.isInterface()||!UtilL.instanceOf(interf, IOInstance.Def.class)){
+		if(!needsCompile(interf)){
 			throw new IllegalArgumentException(interf+"");
 		}
 		
