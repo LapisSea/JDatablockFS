@@ -23,7 +23,6 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.TimeUnit;
 
 import static com.lapissea.cfs.logging.Log.info;
 import static com.lapissea.cfs.logging.Log.nonFatal;
@@ -102,7 +101,7 @@ public class DisplayHost{
 				}catch(Throwable e){
 					e.printStackTrace();
 				}
-			}, e->new Thread(e).start());
+			}, e->Thread.ofVirtual().start(e));
 			
 			var workerPool=Executors.newFixedThreadPool(ForkJoinPool.getCommonPoolParallelism());
 			
@@ -185,12 +184,9 @@ public class DisplayHost{
 					break;
 				}
 			}
-			workerPool.shutdown();
-			try{
-				workerPool.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
-			}catch(InterruptedException ignored){}
-			runner.join();
 			
+			workerPool.close();
+			runner.join();
 			
 			info("disconnected {}", client);
 		}
@@ -260,15 +256,14 @@ public class DisplayHost{
 				e.printStackTrace();
 				continue;
 			}
-			
-			new Thread(()->{
+			Thread.ofVirtual().name("Session: "+sesCounter+"/"+ses.sessionName).start(()->{
 				try(ses;var client=ses.open()){
 					new Sess(ses.sessionName, client).run();
 				}catch(Exception e){
 					e.printStackTrace();
 				}
 				System.gc();
-			}, "Session: "+sesCounter+"/"+ses.sessionName).start();
+			});
 		}
 	}
 	

@@ -2,8 +2,8 @@ package com.lapissea.cfs.internal;
 
 import com.lapissea.cfs.ConsoleColors;
 import com.lapissea.cfs.logging.AverageDouble;
-import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
@@ -34,12 +34,13 @@ public class StatIOField{
 	
 	static{
 		if(StatIOField.class.getClassLoader().getParent()==ClassLoader.getPlatformClassLoader()){
-			Runtime.getRuntime().addShutdownHook(new Thread(()->{
+			Runtime.getRuntime().addShutdownHook(Thread.ofPlatform().name("Field logging shutdown").unstarted(()->{
 				flush();
 				printStats();
-			}, "Field logging shutdown"));
+			}));
 		}
-		var t=new Thread(()->{
+		
+		Thread.ofPlatform().daemon().name("Action flusher").start(()->{
 			while(true){
 				if(!TASKS.isEmpty()){
 					Runnable task;
@@ -56,9 +57,7 @@ public class StatIOField{
 				
 				flush();
 			}
-		}, "Action flusher");
-		t.setDaemon(true);
-		t.start();
+		});
 	}
 	
 	private static CharSequence breakdown(int stat, IOField<?, ?> field){
@@ -124,7 +123,7 @@ public class StatIOField{
 					delta.entrySet().stream().filter(e->e.getValue().getCount()>1)
 					     .collect(Collectors.groupingBy(e->{
 						     var acc=INFO.get(e.getKey()).getAccessor();
-						     return acc==null?(Class<?>)Object.class:acc.getType();
+						     return (Class<?>)(acc==null?Object.class:acc.getType());
 					     }))
 					     .entrySet()
 					     .stream()

@@ -93,11 +93,7 @@ public class OpenGLBackend extends RenderBackend{
 	private ImGuiImplGl3 imGuiGl3;
 	
 	public OpenGLBackend(){
-		Thread glThread=new Thread(this::displayLifecycle, "display");
-		glThread.setDaemon(false);
-		glThread.start();
-		
-		this.glThread=glThread;
+		this.glThread=Thread.ofPlatform().name("display").daemon().start(this::displayLifecycle);
 
 //		var path="/roboto/regular";
 		var path="/CourierPrime/Regular";

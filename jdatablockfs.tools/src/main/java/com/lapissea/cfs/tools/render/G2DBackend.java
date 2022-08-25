@@ -306,9 +306,7 @@ public class G2DBackend extends RenderBackend{
 	
 	@Override
 	public void start(Runnable start){
-		renderThread=new Thread(start, "display");
-		renderThread.setDaemon(false);
-		renderThread.start();
+		renderThread=Thread.ofPlatform().name("display").daemon().start(start);
 	}
 	
 	@Override

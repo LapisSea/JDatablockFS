@@ -111,7 +111,7 @@ public class LoggedMemoryUtils{
 		}else{
 			var  preBuf=new LinkedList<MemFrame>();
 			Lock lock  =new ReentrantLock();
-			new Thread(()->{
+			Thread.ofVirtual().start(()->{
 				UtilL.sleepUntil(logger::isInited, 20);
 				lock.lock();
 				try{
@@ -123,7 +123,7 @@ public class LoggedMemoryUtils{
 				}finally{
 					lock.unlock();
 				}
-			}).start();
+			});
 			
 			long[] frameId={0};
 			proxyLogger=(data, ids)->{
