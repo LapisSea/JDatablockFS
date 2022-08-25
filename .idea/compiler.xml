@@ -13,7 +13,18 @@
         <module name="jdatablockfs.run" />
         <module name="jdatablockfs.core" />
         <module name="Jorth" />
+      </profile>
+      <profile name="Annotation profile for jdatablockfs.tools" enabled="true">
+        <sourceOutputDir name="../target/tools/generated-sources/annotations" />
+        <sourceTestOutputDir name="../target/tools/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
         <module name="jdatablockfs.tools" />
+      </profile>
+      <profile name="Annotation profile for JDatablockFS" enabled="true">
+        <sourceOutputDir name="../target/core/generated-sources/annotations" />
+        <sourceTestOutputDir name="../target/core/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <module name="jdatablockfs.core" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel target="18">

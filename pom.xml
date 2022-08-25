@@ -13,6 +13,8 @@
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
 		<maven-compiler-plugin-version>3.10.1</maven-compiler-plugin-version>
+
+		<child-build-dir>../target</child-build-dir>
 	</properties>
 
 	<groupId>com.github.lapissea.jdatablockfs</groupId>
@@ -43,20 +45,4 @@
 			</dependency>
 		</dependencies>
 	</dependencyManagement>
-
-	<build>
-		<plugins>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-compiler-plugin</artifactId>
-				<version>3.8.0</version>
-				<configuration>
-					<release>${maven.compiler.release}</release>
-					<compilerArgs>--enable-preview</compilerArgs>
-					<source>${java.version}</source>
-					<target>${java.version}</target>
-				</configuration>
-			</plugin>
-		</plugins>
-	</build>
 </project>
