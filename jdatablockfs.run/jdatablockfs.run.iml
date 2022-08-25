@@ -21,8 +21,8 @@
     <orderEntry type="library" name="Maven: org.ow2.asm:asm-util:9.3" level="project" />
     <orderEntry type="library" name="Maven: org.ow2.asm:asm-tree:9.3" level="project" />
     <orderEntry type="library" name="Maven: org.ow2.asm:asm-analysis:9.3" level="project" />
-    <orderEntry type="library" name="Maven: org.roaringbitmap:RoaringBitmap:0.9.30" level="project" />
-    <orderEntry type="library" scope="RUNTIME" name="Maven: org.roaringbitmap:shims:0.9.30" level="project" />
+    <orderEntry type="library" name="Maven: org.roaringbitmap:RoaringBitmap:0.9.31" level="project" />
+    <orderEntry type="library" scope="RUNTIME" name="Maven: org.roaringbitmap:shims:0.9.31" level="project" />
     <orderEntry type="library" name="Maven: ru.vyarus:generics-resolver:3.0.3" level="project" />
     <orderEntry type="library" name="Maven: com.github.lapissea:glfw-window:1.0.3" level="project" />
     <orderEntry type="library" name="Maven: org.lwjgl:lwjgl-assimp:3.3.1" level="project" />
