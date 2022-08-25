@@ -98,7 +98,7 @@ public class DisplayManager implements DataLogger{
 		
 		display.registerMouseScroll(delta->{
 			
-			new Thread(()->{
+			Thread.ofVirtual().start(()->{
 				int     steps =10;
 				float[] deltas=new float[steps];
 				for(int i=0;i<deltas.length;i++){
@@ -120,7 +120,7 @@ public class DisplayManager implements DataLogger{
 					renderer.markFrameDirty();
 					UtilL.sleep(16);
 				}
-			}).start();
+			});
 			
 			if(ImGui.getIO().getWantCaptureMouse()){
 				renderer.markFrameDirty();

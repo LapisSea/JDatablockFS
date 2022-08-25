@@ -5,7 +5,7 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<properties>
-		<java.version>18</java.version>
+		<java.version>19</java.version>
 		<maven.compiler.release>${java.version}</maven.compiler.release>
 		<maven.compiler.target>${java.version}</maven.compiler.target>
 		<maven.compiler.source>${java.version}</maven.compiler.source>
@@ -13,9 +13,13 @@
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
 		<maven-compiler-plugin-version>3.10.1</maven-compiler-plugin-version>
+		<maven-gpg-plugin-version>3.0.1</maven-gpg-plugin-version>
+		<maven-source-plugin-version>3.2.1</maven-source-plugin-version>
+
+		<child-build-dir>../target</child-build-dir>
 	</properties>
 
-	<groupId>com.github.lapissea</groupId>
+	<groupId>com.github.lapissea.jdatablockfs</groupId>
 	<artifactId>JDatablockFS</artifactId>
 	<packaging>pom</packaging>
 
@@ -43,20 +47,4 @@
 			</dependency>
 		</dependencies>
 	</dependencyManagement>
-
-	<build>
-		<plugins>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-compiler-plugin</artifactId>
-				<version>3.8.0</version>
-				<configuration>
-					<release>${maven.compiler.release}</release>
-					<compilerArgs>--enable-preview</compilerArgs>
-					<source>${java.version}</source>
-					<target>${java.version}</target>
-				</configuration>
-			</plugin>
-		</plugins>
-	</build>
 </project>
