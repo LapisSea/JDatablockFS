@@ -35,6 +35,7 @@ import static com.lapissea.util.PoolOwnThread.async;
 
 public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	
+	@Def.ToString.Format("[!!className]{@key: @value}")
 	@SuppressWarnings({"unchecked"})
 	private interface BucketEntry<K, V> extends IOInstance.Def<BucketEntry<K, V>>{
 		

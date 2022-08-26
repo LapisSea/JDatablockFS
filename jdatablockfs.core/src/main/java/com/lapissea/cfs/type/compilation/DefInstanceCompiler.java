@@ -6,6 +6,7 @@ import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.type.*;
+import com.lapissea.cfs.type.compilation.ToStringFormat.ToStringFragment.*;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.jorth.JorthCompiler;
@@ -26,6 +27,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -215,26 +217,18 @@ public class DefInstanceCompiler{
 				
 				generateConstructors(fieldInfo, writer);
 				
-				var toStrAnn=interf.getAnnotation(IOInstance.Def.ToString.class);
-				if(toStrAnn!=null){
-					generateToString(interf, toStrAnn, "toString", fieldInfo, writer);
-					if(toStrAnn.name()){
-						generateToString(interf, IOFieldTools.makeAnnotation(IOInstance.Def.ToString.class, Map.of(
-							"name", false,
-							"curly", toStrAnn.curly(),
-							"fNames", toStrAnn.fNames(),
-							"filter", toStrAnn.filter()
-						)), "toShortString", fieldInfo, writer);
-					}else{
-						writer.write(
-							"""
-								public visibility
-								typ.String returns
-								toShortString function start
-									this this get
-									toString (0) call
-								end
-								""");
+				stringSaga:
+				{
+					var format=interf.getAnnotation(IOInstance.Def.ToString.Format.class);
+					if(format!=null){
+						generateFormatToString(interf, fieldInfo, writer, format);
+						break stringSaga;
+					}
+					
+					var toStrAnn=interf.getAnnotation(IOInstance.Def.ToString.class);
+					if(toStrAnn!=null){
+						generateSimpleToString(interf, fieldInfo, writer, toStrAnn);
+						break stringSaga;
 					}
 				}
 			}
@@ -247,7 +241,129 @@ public class DefInstanceCompiler{
 		}
 	}
 	
-	private static void generateToString(Class<?> interf, IOInstance.Def.ToString toStrAnn, String name, List<FieldInfo> fieldInfo, JorthWriter writer) throws MalformedJorthException{
+	private static <T extends IOInstance<T>> void generateFormatToString(Class<T> interf, List<FieldInfo> fieldInfo, JorthWriter writer, IOInstance.Def.ToString.Format format) throws MalformedJorthException{
+		var fragment=ToStringFormat.parse(format.value(), fieldInfo.stream().map(FieldInfo::name).toList());
+		
+		generateFormatToString(interf, fieldInfo, "toString", true, fragment, writer);
+		generateFormatToString(interf, fieldInfo, "toShortString", false, fragment, writer);
+	}
+	
+	private static <T extends IOInstance<T>> void generateSimpleToString(Class<T> interf, List<FieldInfo> fieldInfo, JorthWriter writer, IOInstance.Def.ToString toStrAnn) throws MalformedJorthException{
+		generateSimpleToString(interf, toStrAnn, "toString", fieldInfo, writer);
+		if(toStrAnn.name()){
+			generateSimpleToString(interf, IOFieldTools.makeAnnotation(IOInstance.Def.ToString.class, Map.of(
+				"name", false,
+				"curly", toStrAnn.curly(),
+				"fNames", toStrAnn.fNames(),
+				"filter", toStrAnn.filter()
+			)), "toShortString", fieldInfo, writer);
+		}else{
+			writer.write(
+				"""
+					public visibility
+					typ.String returns
+					toShortString function start
+						this this get
+						toString (0) call
+					end
+					""");
+		}
+	}
+	
+	private static void generateFormatToString(Class<?> interf, List<FieldInfo> fieldInfo, String name, boolean all, ToStringFormat.ToStringFragment fragment, JorthWriter writer) throws MalformedJorthException{
+		
+		writer.write(
+			"""
+				public visibility
+				typ.String returns
+				#TOKEN(0) function start
+					typ.StringBuilder (0) new
+				""",
+			name
+		);
+		
+		List<ToStringFormat.ToStringFragment> compact=new ArrayList<>();
+		processFragments(interf, fragment, all, frag->{
+			if(compact.isEmpty()){
+				compact.add(frag);
+				return;
+			}
+			if(frag instanceof Literal l2&&compact.get(compact.size()-1) instanceof Literal l1){
+				compact.set(compact.size()-1, new Literal(l1.value()+l2.value()));
+				return;
+			}
+			compact.add(frag);
+		});
+		
+		executeStringFragment(interf, fieldInfo, new Concat(compact), all, writer);
+		
+		writer.write(
+			"""
+					toString (0) call
+				end
+				""");
+	}
+	
+	private static void processFragments(Class<?> interf, ToStringFormat.ToStringFragment fragment, boolean all, Consumer<ToStringFormat.ToStringFragment> out) throws MalformedJorthException{
+		switch(fragment){
+			case NOOP f -> {}
+			case Concat f -> {
+				for(var child : f.fragments()){
+					processFragments(interf, child, all, out);
+				}
+			}
+			case Literal f -> out.accept(f);
+			case SpecialValue f -> {
+				switch(f.value()){
+					case CLASS_NAME -> out.accept(new Literal(interf.getSimpleName()));
+					case null -> throw new NullPointerException();
+				}
+			}
+			case FieldValue frag -> out.accept(frag);
+			case OptionalBlock f -> {
+				if(all){
+					processFragments(interf, f.content(), true, out);
+				}
+			}
+		}
+	}
+	
+	private static void executeStringFragment(Class<?> interf, List<FieldInfo> fieldInfo, ToStringFormat.ToStringFragment fragment, boolean all, JorthWriter writer) throws MalformedJorthException{
+		switch(fragment){
+			case NOOP f -> {return;}
+			case Concat f -> {
+				for(var child : f.fragments()){
+					executeStringFragment(interf, fieldInfo, child, all, writer);
+				}
+			}
+			case Literal f -> {
+				append(writer, w->w.write("'#RAW(0)'", f.value()));
+			}
+			case SpecialValue f -> {
+				switch(f.value()){
+					case CLASS_NAME -> {
+						append(writer, w->w.write("'#RAW(0)'", interf.getSimpleName()));
+					}
+					case null -> throw new NullPointerException();
+				}
+			}
+			case FieldValue frag -> {
+				var field=fieldInfo.stream().filter(n->n.name.equals(frag.name())).findFirst().orElseThrow();
+				append(writer, w->w.write(
+					"""
+						this #TOKEN(0) get
+						typ.Objects toString (1) static call
+						""", field.name));
+			}
+			case OptionalBlock f -> {
+				if(all){
+					executeStringFragment(interf, fieldInfo, f.content(), true, writer);
+				}
+			}
+		}
+	}
+	
+	private static void generateSimpleToString(Class<?> interf, IOInstance.Def.ToString toStrAnn, String name, List<FieldInfo> fieldInfo, JorthWriter writer) throws MalformedJorthException{
 		
 		writer.write(
 			"""

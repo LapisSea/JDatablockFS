@@ -48,6 +48,13 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		@Retention(RetentionPolicy.RUNTIME)
 		@Target({ElementType.TYPE})
 		@interface ToString{
+			
+			@Retention(RetentionPolicy.RUNTIME)
+			@Target({ElementType.TYPE})
+			@interface Format{
+				String value();
+			}
+			
 			boolean name() default true;
 			boolean curly() default true;
 			boolean fNames() default true;
