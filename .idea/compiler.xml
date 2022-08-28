@@ -11,19 +11,9 @@
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <module name="jdatablockfs.run" />
-        <module name="Jorth" />
-      </profile>
-      <profile name="Annotation profile for jdatablockfs.tools" enabled="true">
-        <sourceOutputDir name="../target/tools/generated-sources/annotations" />
-        <sourceTestOutputDir name="../target/tools/generated-test-sources/test-annotations" />
-        <outputRelativeToContentRoot value="true" />
-        <module name="jdatablockfs.tools" />
-      </profile>
-      <profile name="Annotation profile for JDatablockFS" enabled="true">
-        <sourceOutputDir name="../target/core/generated-sources/annotations" />
-        <sourceTestOutputDir name="../target/core/generated-test-sources/test-annotations" />
-        <outputRelativeToContentRoot value="true" />
         <module name="jdatablockfs.core" />
+        <module name="Jorth" />
+        <module name="jdatablockfs.tools" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel target="19">
@@ -31,7 +21,7 @@
       <module name="jdatablockfs.core" target="19" />
       <module name="jdatablockfs.run" target="19" />
       <module name="jdatablockfs.tools" target="19" />
-      <module name="Jorth" target="19" />
+      <module name="Jorth" target="17" />
     </bytecodeTargetLevel>
   </component>
 </project>
