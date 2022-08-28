@@ -145,6 +145,8 @@ public class DefInstanceCompiler{
 				case DONE -> {return node.impl;}
 			}
 			
+			Log.trace("Generating implementation of: {}", interf.getName());
+			
 			node.state=ImplNode.State.COMPILING;
 			
 			List<FieldStub> getters=new ArrayList<>();
@@ -184,7 +186,6 @@ public class DefInstanceCompiler{
 	
 	private static <T extends IOInstance<T>> Class<T> generateImpl(Class<T> interf, List<FieldInfo> fieldInfo){
 		var implName=interf.getName()+IOInstance.Def.IMPL_NAME_POSTFIX;
-		Log.trace("Generating implementation for {}", interf);
 		
 		try{
 			JorthCompiler jorth=new JorthCompiler(DefInstanceCompiler.class.getClassLoader());
@@ -557,7 +558,8 @@ public class DefInstanceCompiler{
 					if(SupportedPrimitive.isAny(n.getClass())) yield n+"";
 					throw new UnsupportedOperationException();
 				}
-				default -> throw new NotImplementedException();
+				case String[] strs -> Arrays.stream(strs).collect(Collectors.joining(" ", "[", "]"));
+				default -> throw new NotImplementedException(value.getClass()+"");
 			}, name));
 			writer.write("} #TOKEN(0) @", ann.annotationType().getName());
 		}

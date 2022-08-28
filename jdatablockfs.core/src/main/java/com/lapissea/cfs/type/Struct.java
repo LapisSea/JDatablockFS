@@ -416,7 +416,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		boolean needsImpl=DefInstanceCompiler.needsCompile(instanceClass);
 		
 		Class<T> concreteClass;
-		if(DefInstanceCompiler.needsCompile(instanceClass)){
+		if(needsImpl){
 			concreteClass=DefInstanceCompiler.compile(instanceClass);
 		}else{
 			concreteClass=instanceClass;
