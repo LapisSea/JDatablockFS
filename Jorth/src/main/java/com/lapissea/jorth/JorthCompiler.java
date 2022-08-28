@@ -195,6 +195,7 @@ public class JorthCompiler{
 	
 	private final List<GenType> classInterfaces=new ArrayList<>();
 	private       Visibility    classVisibility;
+	private       boolean       isClassInterface;
 	private       boolean       addedInit;
 	private       boolean       addedClinit;
 	private       Visibility    visibility     =Visibility.PUBLIC;
@@ -902,6 +903,13 @@ public class JorthCompiler{
 						var className=pop().source;
 						startClass(className);
 					}
+					case "interface" -> {
+						if(currentClass!=null) throw new MalformedJorthException("Class "+currentClass+" already started!");
+						requireTokenCount(1);
+						var className=pop().source;
+						isClassInterface=true;
+						startClass(className);
+					}
 					case "enum" -> {
 						if(currentClass!=null) throw new MalformedJorthException("Class "+currentClass+" already started!");
 						if(!classExtension.equals(new GenType(Object.class))){
@@ -924,62 +932,7 @@ public class JorthCompiler{
 						fieldVisitor.visitEnd();
 						addFieldInfoToClass(new FieldInfo("$VALUES", className, valuesType, true));
 					}
-					case "function" -> {
-						requireTokenCount(1);
-						var functionName=pop();
-						
-						if("<clinit>".equals(functionName.source)){
-							isStatic=true;
-						}
-						
-						var staticOo=isStatic?ACC_STATIC:0;
-						
-						String genericReturnStr=returnType!=null?Utils.genericSignature(returnType):"V";
-						
-						Supplier<Stream<GenType>> argTypes=
-							()->methodArguments.stream()
-							                   .sorted(Comparator.comparingInt(LocalVariableStack.Variable::accessIndex))
-							                   .map(LocalVariableStack.Variable::type);
-						
-						var genericArgs=argTypes.get()
-						                        .map(Utils::genericSignature)
-						                        .collect(Collectors.joining());
-						
-						String returnStr=returnType!=null?Utils.genericSignature(returnType.rawType()):"V";
-						
-						var args=argTypes.get()
-						                 .map(GenType::rawType)
-						                 .map(Utils::genericSignature)
-						                 .collect(Collectors.joining());
-						
-						
-						String descriptor="("+args+")"+returnStr, signature="("+genericArgs+")"+genericReturnStr;
-						if(signature.equals(descriptor)) signature=null;
-						
-						var dest=currentClass.visitMethod(visibility.opCode+staticOo, functionName.source, descriptor, signature, null);
-						
-						for(AnnotationData annotation : annotations){
-							var annV=dest.visitAnnotation(Utils.genericSignature(new GenType(annotation.className(), 0, List.of())), true);
-							annotation.args.forEach(annV::visit);
-							annV.visitEnd();
-						}
-						annotations.clear();
-						
-						var info=new FunctionInfo(functionName.source, classInfo.name, returnType==null?GenType.VOID:returnType, methodArguments.stream().map(LocalVariableStack.Variable::type).toList(), isStatic?CallType.STATIC:CallType.VIRTUAL, isStatic, false, null);
-						classInfo=new ClassInfo(classInfo.name, classInfo.parents, Stream.concat(classInfo.functions.stream(), Stream.of(info)).toList(), classInfo.constructors, classInfo.fields);
-						
-						currentMethod=new JorthMethod(this, dest, functionName.source, classInfo.name, returnType, isStatic);
-						currentMethod.start();
-						
-						isStatic=false;
-						
-						if("<clinit>".equals(functionName.source)){
-							addedClinit=true;
-						}
-						if("<init>".equals(functionName.source)){
-							addedInit=true;
-						}
-					}
+					case "function" -> startFunction(true);
 					default -> throw new MalformedJorthException("Unknown subject "+subject+". Can not start it");
 				}
 				
@@ -1054,8 +1007,95 @@ public class JorthCompiler{
 			}
 		}
 		
+		if(isClassInterface){
+			switch(token.source){
+				case "function" -> {
+					startFunction(false);
+					return true;
+				}
+			}
+		}
+		
 		rawTokens.write(token);
 		return false;
+	}
+	
+	private void startFunction(boolean body) throws MalformedJorthException{
+		requireTokenCount(1);
+		var functionName=pop();
+		
+		if("<clinit>".equals(functionName.source)){
+			isStatic=true;
+		}
+		if(isStatic) body=true;
+		if(body&&isClassInterface&&!isStatic) throw new MalformedJorthException("Interface methods can not have bodies");
+		
+		var staticOo=isStatic?ACC_STATIC:0;
+		
+		String genericReturnStr=returnType!=null?Utils.genericSignature(returnType):"V";
+		
+		Supplier<Stream<GenType>> argTypes=
+			()->methodArguments.stream()
+			                   .sorted(Comparator.comparingInt(LocalVariableStack.Variable::accessIndex))
+			                   .map(LocalVariableStack.Variable::type);
+		
+		var genericArgs=argTypes.get()
+		                        .map(Utils::genericSignature)
+		                        .collect(Collectors.joining());
+		
+		String returnStr=returnType!=null?Utils.genericSignature(returnType.rawType()):"V";
+		
+		var args=argTypes.get()
+		                 .map(GenType::rawType)
+		                 .map(Utils::genericSignature)
+		                 .collect(Collectors.joining());
+		
+		
+		String descriptor="("+args+")"+returnStr, signature="("+genericArgs+")"+genericReturnStr;
+		if(signature.equals(descriptor)) signature=null;
+		
+		var dest=currentClass.visitMethod(visibility.opCode|staticOo|(!body&&isClassInterface?ACC_ABSTRACT:0), functionName.source, descriptor, signature, null);
+		
+		for(AnnotationData annotation : annotations){
+			var annV=dest.visitAnnotation(Utils.genericSignature(new GenType(annotation.className(), 0, List.of())), true);
+			for(Map.Entry<String, Object> entry : annotation.args.entrySet()){
+				String key  =entry.getKey();
+				Object value=entry.getValue();
+				if(value instanceof Enum<?> e){
+					var typ=Utils.genericSignature(new GenType(e.getClass()));
+					annV.visitEnum(key, typ, e.name());
+				}else if(value==null) annV.visit(key, null);
+				else if(value.getClass().isArray()){
+					var len=Array.getLength(value);
+					var v  =annV.visitArray(key);
+					for(int i=0;i<len;i++){
+						v.visit(null, Array.get(value, i));
+					}
+					v.visitEnd();
+				}
+			}
+			annV.visitEnd();
+		}
+		annotations.clear();
+		
+		var info=new FunctionInfo(functionName.source, classInfo.name, returnType==null?GenType.VOID:returnType, methodArguments.stream().map(LocalVariableStack.Variable::type).toList(), isStatic?CallType.STATIC:CallType.VIRTUAL, isStatic, false, null);
+		classInfo=new ClassInfo(classInfo.name, classInfo.parents, Stream.concat(classInfo.functions.stream(), Stream.of(info)).toList(), classInfo.constructors, classInfo.fields);
+		
+		if(body){
+			currentMethod=new JorthMethod(this, dest, functionName.source, classInfo.name, returnType, isStatic);
+			currentMethod.start();
+		}else{
+			dest.visitEnd();
+		}
+		
+		isStatic=false;
+		
+		if("<clinit>".equals(functionName.source)){
+			addedClinit=true;
+		}
+		if("<init>".equals(functionName.source)){
+			addedInit=true;
+		}
 	}
 	private void addFieldInfoToClass(FieldInfo fieldInfo){
 		classInfo=new ClassInfo(classInfo.name, classInfo.parents, classInfo.functions, classInfo.constructors,
@@ -1086,7 +1126,15 @@ public class JorthCompiler{
 		var nam=Utils.undotify(className);
 		var ext=Utils.undotify(classExtension.typeName());
 		
-		currentClass.visit(V11, classVisibility.opCode|ACC_SUPER|ACC_FINAL|(isClassEnum?ACC_ENUM:0), nam, signature.toString(), ext, interfaces);
+		int access=classVisibility.opCode;
+		if(isClassInterface){
+			access|=ACC_ABSTRACT|ACC_INTERFACE;
+		}else{
+			access|=ACC_SUPER|ACC_FINAL;
+		}
+		if(isClassEnum) access|=ACC_ENUM;
+		
+		currentClass.visit(V18, access, nam, signature.toString(), ext, interfaces);
 		
 		visibility=Visibility.PUBLIC;
 	}
@@ -1292,7 +1340,7 @@ public class JorthCompiler{
 	public byte[] classBytecode() throws MalformedJorthException{return classBytecode(false);}
 	public byte[] classBytecode(boolean printBytecode) throws MalformedJorthException{
 		
-		if(!addedInit){
+		if(!addedInit&&!isClassInterface){
 			generateDefaultConstructors();
 		}
 		if(isClassEnum){
