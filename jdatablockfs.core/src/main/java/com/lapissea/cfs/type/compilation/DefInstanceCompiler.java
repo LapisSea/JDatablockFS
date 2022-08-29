@@ -419,7 +419,7 @@ public class DefInstanceCompiler{
 				append(writer, w->w.write(
 					"""
 						this #TOKEN(0) get
-						typ.Objects toString (1) static call
+						typ.String valueOf (1) static call
 						""", field.name));
 			}
 			case OptionalBlock f -> {
@@ -466,7 +466,7 @@ public class DefInstanceCompiler{
 			append(writer, w->w.write(
 				"""
 					this #TOKEN(0) get
-					typ.Objects toString (1) static call
+					typ.String valueOf (1) static call
 					""",
 				info.name
 			));
@@ -823,7 +823,8 @@ public class DefInstanceCompiler{
 	private static void checkModel(List<FieldInfo> fieldInfo){
 		var reg=FieldCompiler.registry();
 		for(var field : fieldInfo){
-			reg.requireCanCreate(field.type, GetAnnotation.from(field.annotations));
+			var ann=GetAnnotation.from(field.annotations);
+			reg.requireCanCreate(FieldCompiler.getType(field.type, ann), ann);
 		}
 	}
 }
