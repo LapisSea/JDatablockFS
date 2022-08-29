@@ -7,6 +7,7 @@ import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
+import com.lapissea.cfs.type.compilation.DefInstanceCompiler;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.util.NotImplementedException;
@@ -92,6 +93,14 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			});
 		}
 		
+		static <T extends Def<T>> T of(Class<T> clazz, Object... args){
+			var ctr=DefInstanceCompiler.dataConstructor(clazz);
+			try{
+				return ctr.newInstance(args);
+			}catch(ReflectiveOperationException e){
+				throw new RuntimeException(e);
+			}
+		}
 	}
 	
 	abstract non-sealed class Managed<SELF extends Managed<SELF>> implements IOInstance<SELF>{

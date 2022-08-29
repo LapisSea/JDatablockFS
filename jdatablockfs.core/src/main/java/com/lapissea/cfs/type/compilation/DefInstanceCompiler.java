@@ -1,6 +1,7 @@
 package com.lapissea.cfs.type.compilation;
 
 import com.lapissea.cfs.GlobalConfig;
+import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.logging.Log;
@@ -20,6 +21,7 @@ import com.lapissea.util.function.UnsafeBiConsumer;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
@@ -63,8 +65,27 @@ public class DefInstanceCompiler{
 		
 		private final Lock lock=new ReentrantLock();
 		
-		private State    state=State.NEW;
-		private Class<T> impl;
+		private State          state=State.NEW;
+		private Class<T>       interf;
+		private Class<T>       impl;
+		private Constructor<T> dataConstructor;
+		
+		public ImplNode(Class<T> interf){
+			this.interf=interf;
+		}
+		
+		private void init(Class<T> impl, Optional<List<FieldInfo>> oOrderedFields){
+			this.impl=impl;
+			if(oOrderedFields.isPresent()){
+				var ordered=oOrderedFields.get();
+				
+				try{
+					dataConstructor=impl.getConstructor(ordered.stream().map(f->Utils.typeToRaw(f.type)).toArray(Class[]::new));
+				}catch(NoSuchMethodException e){
+					throw new ShouldNeverHappenError(e);
+				}
+			}
+		}
 	}
 	
 	private static Optional<String> namePrefix(Method m, String prefix){
@@ -130,13 +151,22 @@ public class DefInstanceCompiler{
 		return clazz.isInterface()&&UtilL.instanceOf(clazz, IOInstance.Def.class);
 	}
 	
+	public static <T extends IOInstance<T>> Constructor<T> dataConstructor(Class<T> interf){
+		var ctr=compile0(interf).dataConstructor;
+		if(ctr==null) throw new RuntimeException("Please add "+IOInstance.Def.Order.class.getName()+" to "+interf.getName());
+		return ctr;
+	}
+	
 	public static <T extends IOInstance<T>> Class<T> compile(Class<T> interf){
+		return compile0(interf).impl;
+	}
+	private static <T extends IOInstance<T>> ImplNode<T> compile0(Class<T> interf){
 		if(!needsCompile(interf)){
 			throw new IllegalArgumentException(interf+"");
 		}
 		
 		@SuppressWarnings("unchecked")
-		var node=(ImplNode<T>)CACHE.computeIfAbsent(interf, i->new ImplNode<>());
+		var node=(ImplNode<T>)CACHE.computeIfAbsent(interf, i->new ImplNode<>((Class<T>)i));
 		
 		node.lock.lock();
 		try{
@@ -144,7 +174,7 @@ public class DefInstanceCompiler{
 				case null -> throw new ShouldNeverHappenError();
 				case NEW -> {}
 				case COMPILING -> throw new MalformedStructLayout("Type requires itself to compile");
-				case DONE -> {return node.impl;}
+				case DONE -> {return node;}
 			}
 			
 			Log.trace("Generating implementation of: {}", interf.getName());
@@ -183,10 +213,11 @@ public class DefInstanceCompiler{
 				throw e;
 			}
 			
-			node.impl=impl;
+			node.init(impl, orderedFields);
+			
 			node.state=ImplNode.State.DONE;
 			
-			return impl;
+			return node;
 		}catch(Throwable e){
 			node.state=ImplNode.State.NEW;
 			throw e;
