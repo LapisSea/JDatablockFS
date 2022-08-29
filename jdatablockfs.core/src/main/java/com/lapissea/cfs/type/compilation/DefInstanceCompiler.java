@@ -48,6 +48,8 @@ public class DefInstanceCompiler{
 		Style(String humanPattern){this.humanPattern=humanPattern;}
 	}
 	
+	private record Specials(Method set){}
+	
 	private record FieldStub(Method method, String varName, Type type, Style style){}
 	
 	private record FieldInfo(String name, Type type, List<Annotation> annotations, Optional<FieldStub> getter, Optional<FieldStub> setter){
@@ -149,13 +151,22 @@ public class DefInstanceCompiler{
 			
 			node.state=ImplNode.State.COMPILING;
 			
-			List<FieldStub> getters=new ArrayList<>();
-			List<FieldStub> setters=new ArrayList<>();
-			collectMethods(interf, getters, setters);
+			var getters =new ArrayList<FieldStub>();
+			var setters =new ArrayList<FieldStub>();
+			var specials=collectMethods(interf, getters, setters);
 			
 			checkStyles(getters, setters);
 			
 			var fieldInfo=mergeStubs(getters, setters);
+			
+			var orderedFields=getOrder(interf, fieldInfo)
+				                  .map(names->names.stream()
+				                                   .map(name->fieldInfo.stream().filter(f->f.name.equals(name)).findAny())
+				                                   .map(Optional::orElseThrow)
+				                                   .toList())
+				                  .or(()->fieldInfo.size()>1?Optional.empty():Optional.of(fieldInfo));
+			
+			checkClass(interf, specials, fieldInfo, orderedFields);
 			
 			checkTypes(fieldInfo);
 			checkAnnotations(fieldInfo);
@@ -163,7 +174,7 @@ public class DefInstanceCompiler{
 			
 			Class<T> impl;
 			try{
-				impl=generateImpl(interf, fieldInfo);
+				impl=generateImpl(interf, specials, fieldInfo, orderedFields);
 			}catch(Throwable e){
 				if(EXIT_ON_FAIL){
 					e.printStackTrace();
@@ -184,7 +195,35 @@ public class DefInstanceCompiler{
 		}
 	}
 	
-	private static <T extends IOInstance<T>> Class<T> generateImpl(Class<T> interf, List<FieldInfo> fieldInfo){
+	
+	private static <T extends IOInstance<T>> void checkClass(Class<T> interf, Specials specials, List<FieldInfo> fields, Optional<List<FieldInfo>> oOrderedFields){
+		
+		if(specials.set!=null){
+			if(oOrderedFields.isEmpty()){
+				throw new MalformedStructLayout(interf.getName()+" has a full setter but no argument order. Please add "+IOInstance.Def.Order.class.getName()+" to the type");
+			}
+			
+			var orderedFields=oOrderedFields.get();
+			
+			var set=specials.set;
+			if(set.getParameterCount()!=orderedFields.size()){
+				throw new MalformedStructLayout(set+" has "+set.getParameterCount()+" parameters but has "+orderedFields.size()+" fields");
+			}
+			
+			var parms=set.getGenericParameterTypes();
+			for(int i=0;i<orderedFields.size();i++){
+				var field   =orderedFields.get(i);
+				var parmType=parms[i];
+				
+				if(field.type.equals(parmType)) continue;
+				
+				//TODO: implement fits type instead of exact match
+				throw new MalformedStructLayout(field.name+" has the type of "+field.type.getTypeName()+" but set argument is "+parmType);
+			}
+		}
+	}
+	
+	private static <T extends IOInstance<T>> Class<T> generateImpl(Class<T> interf, Specials specials, List<FieldInfo> fieldInfo, Optional<List<FieldInfo>> orderedFields){
 		var implName=interf.getName()+IOInstance.Def.IMPL_NAME_POSTFIX;
 		
 		try{
@@ -216,7 +255,38 @@ public class DefInstanceCompiler{
 				
 				defineStatics(writer);
 				
-				generateConstructors(fieldInfo, writer);
+				
+				generateConstructors(fieldInfo, orderedFields, writer);
+				
+				if(specials.set!=null){
+					var ordered=orderedFields.orElseThrow();
+					
+					var set=specials.set;
+					
+					for(FieldInfo info : ordered){
+						var type=Objects.requireNonNull(TypeLink.of(info.type));
+						writer.write(
+							"#RAW(0) #TOKEN(1) arg",
+							JorthUtils.toJorthGeneric(type),
+							info.name);
+					}
+					
+					writer.write(
+						"""
+							public visibility
+							#TOKEN(0) function start
+							""",
+						set.getName());
+					
+					for(FieldInfo info : ordered){
+						writer.write("<arg> #TOKEN(0) get", info.name);
+						if(info.type==ChunkPointer.class){
+							nullCheck(writer);
+						}
+						writer.write("this #TOKEN(0) set", info.name);
+					}
+					writer.write("end");
+				}
 				
 				stringSaga:
 				{
@@ -331,20 +401,16 @@ public class DefInstanceCompiler{
 	
 	private static void executeStringFragment(Class<?> interf, List<FieldInfo> fieldInfo, ToStringFormat.ToStringFragment fragment, boolean all, JorthWriter writer) throws MalformedJorthException{
 		switch(fragment){
-			case NOOP f -> {return;}
+			case NOOP ignored -> {}
 			case Concat f -> {
 				for(var child : f.fragments()){
 					executeStringFragment(interf, fieldInfo, child, all, writer);
 				}
 			}
-			case Literal f -> {
-				append(writer, w->w.write("'#RAW(0)'", f.value()));
-			}
+			case Literal f -> append(writer, w->w.write("'#RAW(0)'", f.value()));
 			case SpecialValue f -> {
 				switch(f.value()){
-					case CLASS_NAME -> {
-						append(writer, w->w.write("'#RAW(0)'", interf.getSimpleName()));
-					}
+					case CLASS_NAME -> append(writer, w->w.write("'#RAW(0)'", interf.getSimpleName()));
 					case null -> throw new NullPointerException();
 				}
 			}
@@ -428,7 +494,7 @@ public class DefInstanceCompiler{
 		);
 	}
 	
-	private static void generateConstructors(List<FieldInfo> fieldInfo, JorthWriter writer) throws MalformedJorthException{
+	private static void generateConstructors(List<FieldInfo> fieldInfo, Optional<List<FieldInfo>> oOrderedFields, JorthWriter writer) throws MalformedJorthException{
 		writer.write(
 			"""
 				public visibility
@@ -445,31 +511,57 @@ public class DefInstanceCompiler{
 		}
 		writer.write("end");
 		
-		writer.write("public visibility");
-		for(int i=0;i<fieldInfo.size();i++){
-			FieldInfo info   =fieldInfo.get(i);
-			var       type   =JorthUtils.toJorthGeneric(Objects.requireNonNull(TypeLink.of(info.type)));
-			var       argName="arg"+i;
-			writer.write("#RAW(0) #TOKEN(1) arg", type, argName);
-		}
-		
-		writer.write(
-			"""
-				<init> function start
-					this this get
-					typ.impl $STRUCT get
-					super
-				""");
-		
-		for(int i=0;i<fieldInfo.size();i++){
-			FieldInfo info=fieldInfo.get(i);
-			writer.write("<arg>").write("arg"+i).write("get");
-			if(info.type==ChunkPointer.class){
-				nullCheck(writer);
+		if(oOrderedFields.isPresent()){
+			var orderedFields=oOrderedFields.get();
+			
+			writer.write("public visibility");
+			for(int i=0;i<orderedFields.size();i++){
+				FieldInfo info   =orderedFields.get(i);
+				var       type   =JorthUtils.toJorthGeneric(Objects.requireNonNull(TypeLink.of(info.type)));
+				var       argName="arg"+i;
+				writer.write("#RAW(0) #TOKEN(1) arg", type, argName);
 			}
-			writer.write("this").write(info.name).write("set");
+			
+			writer.write(
+				"""
+					<init> function start
+						this this get
+						typ.impl $STRUCT get
+						super
+					""");
+			
+			for(int i=0;i<orderedFields.size();i++){
+				FieldInfo info=orderedFields.get(i);
+				writer.write("<arg>").write("arg"+i).write("get");
+				if(info.type==ChunkPointer.class){
+					nullCheck(writer);
+				}
+				writer.write("this").write(info.name).write("set");
+			}
+			writer.write("end");
 		}
-		writer.write("end");
+	}
+	
+	private static Optional<List<String>> getOrder(Class<?> interf, List<FieldInfo> fieldInfo){
+		var order=interf.getAnnotation(IOInstance.Def.Order.class);
+		if(order==null) return Optional.empty();
+		
+		var check  =fieldInfo.stream().map(FieldInfo::name).collect(Collectors.toSet());
+		var ordered=List.of(order.value());
+		
+		for(String name : ordered){
+			if(check.remove(name)) continue;
+			throw new MalformedStructLayout(
+				name+" does not exist in "+interf.getName()+".\n"+
+				"Existing field names: "+fieldInfo.stream().map(FieldInfo::name).toList()
+			);
+		}
+		
+		if(!check.isEmpty()){
+			throw new MalformedStructLayout(check+" are not listed in the order annotation");
+		}
+		
+		return Optional.of(ordered);
 	}
 	
 	private static void defineStatics(JorthWriter writer) throws MalformedJorthException{
@@ -604,12 +696,20 @@ public class DefInstanceCompiler{
 		}
 	}
 	
-	private static <T extends IOInstance<T>> void collectMethods(Class<T> interf, List<FieldStub> getters, List<FieldStub> setters){
+	private static <T extends IOInstance<T>> Specials collectMethods(Class<T> interf, List<FieldStub> getters, List<FieldStub> setters){
+		Method set=null;
 		for(Method method : interf.getMethods()){
 			if(Modifier.isStatic(method.getModifiers())||!Modifier.isAbstract(method.getModifiers())){
 				continue;
 			}
 			if(IGNORE_TYPES.contains(method.getDeclaringClass())){
+				continue;
+			}
+			
+			if(List.of("set", "setAll").contains(method.getName())){
+				if(method.getReturnType()!=void.class) throw new MalformedStructLayout("set can not have a return type");
+				if(set!=null) throw new MalformedStructLayout("duplicate set method");
+				set=method;
 				continue;
 			}
 			
@@ -623,6 +723,7 @@ public class DefInstanceCompiler{
 				throw new MalformedStructLayout(method+" is not a setter or a getter!");
 			}
 		}
+		return new Specials(set);
 	}
 	
 	private static List<FieldInfo> mergeStubs(List<FieldStub> getters, List<FieldStub> setters){
@@ -684,6 +785,7 @@ public class DefInstanceCompiler{
 			);
 		}
 	}
+	
 	private static void checkAnnotations(List<FieldInfo> fields){
 		var problems=fields.stream()
 		                   .map(gs->{

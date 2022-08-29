@@ -22,7 +22,6 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
@@ -44,6 +43,12 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 	 * </p>
 	 */
 	non-sealed interface Def<SELF extends Def<SELF>> extends IOInstance<SELF>{
+		
+		@Retention(RetentionPolicy.RUNTIME)
+		@Target({ElementType.TYPE})
+		@interface Order{
+			String[] value();
+		}
 		
 		@Retention(RetentionPolicy.RUNTIME)
 		@Target({ElementType.TYPE})

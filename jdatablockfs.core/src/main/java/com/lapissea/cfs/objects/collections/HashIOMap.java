@@ -35,8 +35,9 @@ import static com.lapissea.util.PoolOwnThread.async;
 
 public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	
-	@Def.ToString.Format("[!!className]{@key: @value}")
 	@SuppressWarnings({"unchecked"})
+	@Def.ToString.Format("[!!className]{@key: @value}")
+	@Def.Order({"key", "value"})
 	private interface BucketEntry<K, V> extends IOInstance.Def<BucketEntry<K, V>>{
 		
 		Struct<BucketEntry<Object, Object>>     STRUCT=Struct.of((Class<BucketEntry<Object, Object>>)(Object)BucketEntry.class);
@@ -44,11 +45,11 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		
 		static <V, K> BucketEntry<K, V> of(K key, V value){
 			var e=(BucketEntry<K, V>)STRUCT.make();
-			//TODO: make user ordered constructor
-			e.key(key);
-			e.value(value);
+			e.set(key, value);
 			return e;
 		}
+		
+		void set(K key, V value);
 		
 		@IONullability(NULLABLE)
 		@IOType.Dynamic
