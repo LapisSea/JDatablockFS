@@ -347,7 +347,7 @@ public class DefInstanceCompiler{
 					
 					var toStrAnn=interf.getAnnotation(IOInstance.Def.ToString.class);
 					if(toStrAnn!=null){
-						generateSimpleToString(interf, fieldInfo, writer, toStrAnn);
+						generateStandardToString(interf, orderedFields.orElse(fieldInfo), writer, toStrAnn);
 						break stringSaga;
 					}
 				}
@@ -368,10 +368,10 @@ public class DefInstanceCompiler{
 		generateFormatToString(interf, fieldInfo, "toShortString", false, fragment, writer);
 	}
 	
-	private static <T extends IOInstance<T>> void generateSimpleToString(Class<T> interf, List<FieldInfo> fieldInfo, JorthWriter writer, IOInstance.Def.ToString toStrAnn) throws MalformedJorthException{
-		generateSimpleToString(interf, toStrAnn, "toString", fieldInfo, writer);
+	private static <T extends IOInstance<T>> void generateStandardToString(Class<T> interf, List<FieldInfo> fieldInfo, JorthWriter writer, IOInstance.Def.ToString toStrAnn) throws MalformedJorthException{
+		generateStandardToString(interf, toStrAnn, "toString", fieldInfo, writer);
 		if(toStrAnn.name()){
-			generateSimpleToString(interf, IOFieldTools.makeAnnotation(IOInstance.Def.ToString.class, Map.of(
+			generateStandardToString(interf, IOFieldTools.makeAnnotation(IOInstance.Def.ToString.class, Map.of(
 				"name", false,
 				"curly", toStrAnn.curly(),
 				"fNames", toStrAnn.fNames(),
@@ -479,7 +479,7 @@ public class DefInstanceCompiler{
 		}
 	}
 	
-	private static void generateSimpleToString(Class<?> interf, IOInstance.Def.ToString toStrAnn, String name, List<FieldInfo> fieldInfo, JorthWriter writer) throws MalformedJorthException{
+	private static void generateStandardToString(Class<?> interf, IOInstance.Def.ToString toStrAnn, String name, List<FieldInfo> fieldInfo, JorthWriter writer) throws MalformedJorthException{
 		
 		writer.write(
 			"""
