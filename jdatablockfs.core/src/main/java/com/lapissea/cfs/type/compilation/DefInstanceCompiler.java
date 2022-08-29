@@ -150,6 +150,20 @@ public class DefInstanceCompiler{
 	public static boolean needsCompile(Class<?> clazz){
 		return clazz.isInterface()&&UtilL.instanceOf(clazz, IOInstance.Def.class);
 	}
+	public static <T extends IOInstance.Def<T>> Class<T> unmap(Class<?> impl){
+		if(!UtilL.instanceOf(impl, IOInstance.Def.class)) throw new IllegalArgumentException(impl.getName()+"");
+		var clazz=impl;
+		while(true){
+			for(Class<?> interf : clazz.getInterfaces()){
+				var node=CACHE.get(interf);
+				if(node.impl==impl){
+					return (Class<T>)node.interf;
+				}
+			}
+			clazz=clazz.getSuperclass();
+			if(clazz==null) throw new ShouldNeverHappenError("???");
+		}
+	}
 	
 	public static <T extends IOInstance<T>> Constructor<T> dataConstructor(Class<T> interf){
 		var ctr=compile0(interf).dataConstructor;

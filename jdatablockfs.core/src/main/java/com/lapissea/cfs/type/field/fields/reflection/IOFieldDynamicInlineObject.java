@@ -431,12 +431,12 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 				var val=get(ioPool, instance);
 				if(val==null) return new IOTypeDB.TypeID(-1, false);
 				
-				TypeLink def;
-				if(val instanceof IOInstance.Unmanaged<?> unmanaged){
-					def=unmanaged.getTypeDef();
-				}else{
-					def=TypeLink.of(val.getClass());
-				}
+				TypeLink def=switch(val){
+					case IOInstance.Unmanaged<?> unmanaged -> unmanaged.getTypeDef();
+					case IOInstance.Def<?> interf -> TypeLink.of(IOInstance.Def.unmap(interf.getClass()));
+					case Object inst -> TypeLink.of(inst.getClass());
+				};
+				
 				return provider.getTypeDb().toID(def, record);
 			}
 			@Override

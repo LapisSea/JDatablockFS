@@ -101,6 +101,11 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 				throw new RuntimeException(e);
 			}
 		}
+		
+		@SuppressWarnings("rawtypes")
+		static <T extends IOInstance.Def<T>> Class<T> unmap(Class<? extends Def> impl){
+			return DefInstanceCompiler.unmap(impl);
+		}
 	}
 	
 	abstract non-sealed class Managed<SELF extends Managed<SELF>> implements IOInstance<SELF>{
