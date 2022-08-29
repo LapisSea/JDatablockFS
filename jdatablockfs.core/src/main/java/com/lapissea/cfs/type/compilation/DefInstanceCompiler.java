@@ -640,7 +640,7 @@ public class DefInstanceCompiler{
 			if(!annTypes.add(ann.annotationType())) continue;
 			
 			writer.write("{");
-			scanAnnotation(ann, (name, value)->writer.write("#TOKEN(0) #TOKEN(1)", switch(value){
+			scanAnnotation(ann, (name, value)->writer.write("#RAW(0) #TOKEN(1)", switch(value){
 				case null -> "null";
 				case String s -> "'"+s.replace("'", "\\'")+"'";
 				case Enum<?> e -> e.name();
