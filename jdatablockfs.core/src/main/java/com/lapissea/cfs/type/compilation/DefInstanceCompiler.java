@@ -188,7 +188,7 @@ public class DefInstanceCompiler{
 		var implName=interf.getName()+IOInstance.Def.IMPL_NAME_POSTFIX;
 		
 		try{
-			JorthCompiler jorth=new JorthCompiler(DefInstanceCompiler.class.getClassLoader());
+			JorthCompiler jorth=new JorthCompiler(interf.getClassLoader());
 			
 			try(var writer=jorth.writeCode()){
 				writer.write("#TOKEN(0) typ.impl               define", implName);
