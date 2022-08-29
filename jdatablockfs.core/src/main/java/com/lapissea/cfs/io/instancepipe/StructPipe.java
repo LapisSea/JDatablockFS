@@ -74,7 +74,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			var err=errors.get(struct);
 			if(err!=null) throw err;
 			
-			COMPILATION.log("Requested pipe({}): {}", shortPipeName(type), struct.getType().getName());
+			COMPILATION.log("Requested pipe({}): {}", (Supplier<String>)()->shortPipeName(type), struct.getType().getName());
 			
 			P created;
 			try{
