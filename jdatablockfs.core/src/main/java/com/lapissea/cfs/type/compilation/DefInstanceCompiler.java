@@ -150,7 +150,10 @@ public class DefInstanceCompiler{
 	public static boolean needsCompile(Class<?> clazz){
 		return clazz.isInterface()&&UtilL.instanceOf(clazz, IOInstance.Def.class);
 	}
+	
+	@SuppressWarnings("unchecked")
 	public static <T extends IOInstance.Def<T>> Class<T> unmap(Class<?> impl){
+		Objects.requireNonNull(impl);
 		if(!UtilL.instanceOf(impl, IOInstance.Def.class)) throw new IllegalArgumentException(impl.getName()+"");
 		var clazz=impl;
 		while(true){
@@ -166,15 +169,16 @@ public class DefInstanceCompiler{
 	}
 	
 	public static <T extends IOInstance<T>> Constructor<T> dataConstructor(Class<T> interf){
-		var ctr=compile0(interf).dataConstructor;
+		var ctr=getNode(interf).dataConstructor;
 		if(ctr==null) throw new RuntimeException("Please add "+IOInstance.Def.Order.class.getName()+" to "+interf.getName());
 		return ctr;
 	}
 	
 	public static <T extends IOInstance<T>> Class<T> compile(Class<T> interf){
-		return compile0(interf).impl;
+		return getNode(interf).impl;
 	}
-	private static <T extends IOInstance<T>> ImplNode<T> compile0(Class<T> interf){
+	
+	private static <T extends IOInstance<T>> ImplNode<T> getNode(Class<T> interf){
 		if(!needsCompile(interf)){
 			throw new IllegalArgumentException(interf+"");
 		}
