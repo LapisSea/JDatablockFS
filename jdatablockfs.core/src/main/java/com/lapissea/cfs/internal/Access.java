@@ -192,6 +192,15 @@ public class Access{
 		}
 	}
 	
+	public static MethodHandle makeMethodHandle(@NotNull Constructor<?> method){
+		try{
+			var lookup=getLookup(method.getDeclaringClass());
+			method.setAccessible(true);
+			return lookup.unreflectConstructor(method);
+		}catch(Throwable e){
+			throw new RuntimeException("failed to create MethodHandle\n"+method, e);
+		}
+	}
 	public static MethodHandle makeMethodHandle(@NotNull Method method){
 		try{
 			var lookup=getLookup(method.getDeclaringClass());
