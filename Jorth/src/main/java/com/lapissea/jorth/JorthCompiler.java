@@ -72,7 +72,7 @@ public class JorthCompiler{
 		}
 	}
 	
-	public record ClassInfo(String name, List<ClassInfo> parents, List<FunctionInfo> functions, List<ConstructorInfo> constructors, List<FieldInfo> fields){
+	public record ClassInfo(String name, boolean isInterface, List<ClassInfo> parents, List<FunctionInfo> functions, List<ConstructorInfo> constructors, List<FieldInfo> fields){
 		
 		private static class LazyList<T> extends AbstractList<T>{
 			
@@ -109,6 +109,7 @@ public class JorthCompiler{
 		ClassInfo(Class<?> clazz){
 			this(
 				clazz.getName(),
+				clazz.isInterface(),
 				new LazyList<>(()->Stream.concat(Stream.of(clazz.getSuperclass()), Arrays.stream(clazz.getInterfaces()))
 				                         .filter(Objects::nonNull)
 				                         .map(ClassInfo::new)
@@ -901,14 +902,14 @@ public class JorthCompiler{
 						if(currentClass!=null) throw new MalformedJorthException("Class "+currentClass+" already started!");
 						requireTokenCount(1);
 						var className=pop().source;
-						startClass(className);
+						startClass(className, false);
 					}
 					case "interface" -> {
 						if(currentClass!=null) throw new MalformedJorthException("Class "+currentClass+" already started!");
 						requireTokenCount(1);
 						var className=pop().source;
 						isClassInterface=true;
-						startClass(className);
+						startClass(className, true);
 					}
 					case "enum" -> {
 						if(currentClass!=null) throw new MalformedJorthException("Class "+currentClass+" already started!");
@@ -922,7 +923,7 @@ public class JorthCompiler{
 						
 						isClassEnum=true;
 						
-						startClass(className);
+						startClass(className, false);
 						
 						var valuesType=new GenType(className, 1, List.of());
 						
@@ -1079,7 +1080,7 @@ public class JorthCompiler{
 		annotations.clear();
 		
 		var info=new FunctionInfo(functionName.source, classInfo.name, returnType==null?GenType.VOID:returnType, methodArguments.stream().map(LocalVariableStack.Variable::type).toList(), isStatic?CallType.STATIC:CallType.VIRTUAL, isStatic, false, null);
-		classInfo=new ClassInfo(classInfo.name, classInfo.parents, Stream.concat(classInfo.functions.stream(), Stream.of(info)).toList(), classInfo.constructors, classInfo.fields);
+		classInfo=new ClassInfo(classInfo.name, classInfo.isInterface, classInfo.parents, Stream.concat(classInfo.functions.stream(), Stream.of(info)).toList(), classInfo.constructors, classInfo.fields);
 		
 		if(body){
 			currentMethod=new JorthMethod(this, dest, functionName.source, classInfo.name, returnType, isStatic);
@@ -1098,12 +1099,12 @@ public class JorthCompiler{
 		}
 	}
 	private void addFieldInfoToClass(FieldInfo fieldInfo){
-		classInfo=new ClassInfo(classInfo.name, classInfo.parents, classInfo.functions, classInfo.constructors,
+		classInfo=new ClassInfo(classInfo.name, classInfo.isInterface, classInfo.parents, classInfo.functions, classInfo.constructors,
 		                        Stream.concat(classInfo.fields.stream(), Stream.of(fieldInfo)).toList());
 	}
 	
-	private void startClass(String className){
-		classInfo=new ClassInfo(className, Stream.concat(Stream.of(classExtension), classInterfaces.stream()).map(g->{
+	private void startClass(String className, boolean isInterface){
+		classInfo=new ClassInfo(className, isInterface, Stream.concat(Stream.of(classExtension), classInterfaces.stream()).map(g->{
 			try{
 				return getClassInfo(g);
 			}catch(MalformedJorthException e){
@@ -1215,7 +1216,8 @@ public class JorthCompiler{
 			var args=stack.asList().subList(stack.size()-argCount, stack.size());
 			currentMethod.invoke(funct.callType, funct.declaringClass, funct.name, args, funct.returnType(), false);
 		}else{
-			currentMethod.invoke(functionName.equals("<init>")?CallType.SPECIAL:funct.callType, funct.declaringClass, funct.name, funct.arguments, funct.returnType(), false);
+			var type=functionName.equals("<init>")?CallType.SPECIAL:funct.callType;
+			currentMethod.invoke(type, funct.declaringClass, funct.name, funct.arguments, funct.returnType(), callerInfo.isInterface);
 		}
 	}
 	
@@ -1484,7 +1486,7 @@ public class JorthCompiler{
 					if(name.charAt(arrayDimensions)=='[') arrayDimensions++;
 					else break;
 				}
-				return new ClassInfo(name, List.of(),
+				return new ClassInfo(name, false, List.of(),
 				                     List.of(ClassInfo.makeArrayClone(name, arrayDimensions)),
 				                     List.of(), List.of());
 			}
