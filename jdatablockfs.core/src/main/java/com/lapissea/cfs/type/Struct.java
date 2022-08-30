@@ -413,11 +413,11 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	
 	@SuppressWarnings("unchecked")
 	private static <T extends IOInstance<T>, S extends Struct<T>> S compile(Class<T> instanceClass, Function<Class<T>, S> newStruct){
-		boolean needsImpl=DefInstanceCompiler.needsCompile(instanceClass);
+		boolean needsImpl=IOInstance.Def.isTemplate(instanceClass);
 		
 		Class<T> concreteClass;
 		if(needsImpl){
-			concreteClass=DefInstanceCompiler.compile(instanceClass);
+			concreteClass=DefInstanceCompiler.getImpl(instanceClass);
 		}else{
 			concreteClass=instanceClass;
 		}

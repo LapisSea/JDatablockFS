@@ -147,7 +147,7 @@ public class DefInstanceCompiler{
 	
 	private static final ConcurrentHashMap<Class<?>, ImplNode<?>> CACHE=new ConcurrentHashMap<>();
 	
-	public static boolean needsCompile(Class<?> clazz){
+	public static boolean isTemplate(Class<?> clazz){
 		return clazz.isInterface()&&UtilL.instanceOf(clazz, IOInstance.Def.class);
 	}
 	
@@ -174,12 +174,12 @@ public class DefInstanceCompiler{
 		return ctr;
 	}
 	
-	public static <T extends IOInstance<T>> Class<T> compile(Class<T> interf){
+	public static <T extends IOInstance<T>> Class<T> getImpl(Class<T> interf){
 		return getNode(interf).impl;
 	}
 	
 	private static <T extends IOInstance<T>> ImplNode<T> getNode(Class<T> interf){
-		if(!needsCompile(interf)){
+		if(!isTemplate(interf)){
 			throw new IllegalArgumentException(interf+"");
 		}
 		
@@ -243,7 +243,6 @@ public class DefInstanceCompiler{
 			node.lock.unlock();
 		}
 	}
-	
 	
 	private static <T extends IOInstance<T>> void checkClass(Class<T> interf, Specials specials, List<FieldInfo> fields, Optional<List<FieldInfo>> oOrderedFields){
 		
@@ -856,6 +855,7 @@ public class DefInstanceCompiler{
 			throw new MalformedStructLayout("Duplicate annotations:\n"+problems);
 		}
 	}
+	
 	private static void checkTypes(List<FieldInfo> fields){
 		var problems=fields.stream()
 		                   .filter(gs->gs.stubs().collect(Collectors.groupingBy(s->s.type)).size()>1)
@@ -869,6 +869,7 @@ public class DefInstanceCompiler{
 			throw new MalformedStructLayout("Mismatched types:\n"+problems);
 		}
 	}
+	
 	private static void checkModel(List<FieldInfo> fieldInfo){
 		var reg=FieldCompiler.registry();
 		for(var field : fieldInfo){

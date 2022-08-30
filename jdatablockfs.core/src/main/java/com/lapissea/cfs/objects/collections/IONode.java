@@ -13,7 +13,6 @@ import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.*;
-import com.lapissea.cfs.type.compilation.DefInstanceCompiler;
 import com.lapissea.cfs.type.field.*;
 import com.lapissea.cfs.type.field.access.AbstractFieldAccessor;
 import com.lapissea.cfs.type.field.access.TypeFlag;
@@ -196,7 +195,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 			var c=t.getTypeClass(null);
 			if(SupportedPrimitive.isAny(c)) return;
 			if(!IOInstance.isManaged(c)) throw new ClassCastException("not managed");
-			if(Modifier.isAbstract(c.getModifiers())&&!DefInstanceCompiler.needsCompile(c)) throw new ClassCastException(c+" is abstract");
+			if(Modifier.isAbstract(c.getModifiers())&&!IOInstance.Def.isTemplate(c)) throw new ClassCastException(c+" is abstract");
 		})
 	);
 	
