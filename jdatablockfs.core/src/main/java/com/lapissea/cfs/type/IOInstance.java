@@ -19,6 +19,7 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import java.lang.invoke.MethodHandle;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Objects;
@@ -43,6 +44,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 	 * are implicitly an IOField
 	 * </p>
 	 */
+	@SuppressWarnings("unchecked")
 	non-sealed interface Def<SELF extends Def<SELF>> extends IOInstance<SELF>{
 		
 		@Retention(RetentionPolicy.RUNTIME)
@@ -69,21 +71,18 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		
 		String IMPL_NAME_POSTFIX="€Impl";
 		
-		static <T extends Def<T>> NewObj<T> make(Class<T> type){
+		static <T extends Def<T>> NewObj<T> constrRef(Class<T> type){
 			return Struct.of(type).emptyConstructor();
 		}
-		
-		static <T extends Def<T>, A1> Function<A1, T> make(Class<T> type, Class<A1> arg1Type){
-			return make(Struct.of(type), arg1Type);
-		}
-		
-		static <T extends Def<T>, A1> Function<A1, T> make(Struct<T> type, Class<A1> arg1Type){
+		static <T extends Def<T>, A1> Function<A1, T> constrRef(Class<T> type, Class<A1> arg1Type){
 			record Sig(Class<?> c, Class<?> arg){}
 			class Cache{
 				static final Map<Sig, Function<?, ?>> CH=new ConcurrentHashMap<>();
 			}
+			if(DefInstanceCompiler.isDefinition(type)) type=DefInstanceCompiler.getImpl(type);
+			
 			//noinspection unchecked
-			return (Function<A1, T>)Cache.CH.computeIfAbsent(new Sig(type.getType(), arg1Type), t->{
+			return (Function<A1, T>)Cache.CH.computeIfAbsent(new Sig(type, arg1Type), t->{
 				try{
 					var ctor=t.c.getConstructor(t.arg);
 					return Access.makeLambda(ctor, Function.class);
@@ -93,40 +92,60 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			});
 		}
 		
+		static <T extends Def<T>> T of(Class<T> clazz, int arg1){
+			var ctr=DefInstanceCompiler.dataConstructor(clazz);
+			try{
+				return (T)ctr.invokeExact(arg1);
+			}catch(Throwable e){
+				throw failNew(clazz, e);
+			}
+		}
+		static <T extends Def<T>> T of(Class<T> clazz, long arg1){
+			var ctr=DefInstanceCompiler.dataConstructor(clazz);
+			try{
+				return (T)ctr.invokeExact(arg1);
+			}catch(Throwable e){
+				throw failNew(clazz, e);
+			}
+		}
 		static <T extends Def<T>> T of(Class<T> clazz, Object arg1){
 			var ctr=DefInstanceCompiler.dataConstructor(clazz);
 			try{
-				//noinspection unchecked
 				return (T)ctr.invoke(arg1);
 			}catch(Throwable e){
-				throw new RuntimeException(e);
+				throw failNew(clazz, e);
 			}
 		}
 		static <T extends Def<T>> T of(Class<T> clazz, Object arg1, Object arg2){
 			var ctr=DefInstanceCompiler.dataConstructor(clazz);
 			try{
-				//noinspection unchecked
 				return (T)ctr.invoke(arg1, arg2);
 			}catch(Throwable e){
-				throw new RuntimeException(e);
+				throw failNew(clazz, e);
 			}
 		}
 		static <T extends Def<T>> T of(Class<T> clazz, Object... args){
 			var ctr=DefInstanceCompiler.dataConstructor(clazz);
 			try{
-				//noinspection unchecked
 				return (T)ctr.invokeWithArguments(args);
 			}catch(Throwable e){
-				throw new RuntimeException(e);
+				throw failNew(clazz, e);
 			}
+		}
+		
+		private static RuntimeException failNew(Class<?> clazz, Throwable e){
+			throw new RuntimeException("Failed to instantiate "+clazz.getName(), e);
 		}
 		
 		@SuppressWarnings("rawtypes")
 		static <T extends IOInstance.Def<T>> Class<T> unmap(Class<? extends Def> impl){
 			return DefInstanceCompiler.unmap(impl);
 		}
-		static boolean isTemplate(Class<?> c){
-			return DefInstanceCompiler.isTemplate(c);
+		static boolean isDefinition(Class<?> c){
+			return DefInstanceCompiler.isDefinition(c);
+		}
+		static <T extends Def<T>, A1> MethodHandle dataConstructor(Class<T> type){
+			return DefInstanceCompiler.dataConstructor(type);
 		}
 	}
 	
@@ -189,6 +208,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			var ioPool1=struct.allocVirtualVarPool(IO);
 			var ioPool2=struct.allocVirtualVarPool(IO);
 			for(var field : struct.getFields()){
+				//noinspection unchecked
 				if(!field.instancesEqual(ioPool1, self(), ioPool2, (SELF)that)) return false;
 			}
 			

@@ -195,7 +195,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 			var c=t.getTypeClass(null);
 			if(SupportedPrimitive.isAny(c)) return;
 			if(!IOInstance.isManaged(c)) throw new ClassCastException("not managed");
-			if(Modifier.isAbstract(c.getModifiers())&&!IOInstance.Def.isTemplate(c)) throw new ClassCastException(c+" is abstract");
+			if(Modifier.isAbstract(c.getModifiers())&&!IOInstance.Def.isDefinition(c)) throw new ClassCastException(c+" is abstract");
 		})
 	);
 	

@@ -152,7 +152,7 @@ public class DefInstanceCompiler{
 	
 	private static final ConcurrentHashMap<Class<?>, ImplNode<?>> CACHE=new ConcurrentHashMap<>();
 	
-	public static boolean isTemplate(Class<?> clazz){
+	public static boolean isDefinition(Class<?> clazz){
 		return clazz.isInterface()&&UtilL.instanceOf(clazz, IOInstance.Def.class);
 	}
 	
@@ -176,7 +176,7 @@ public class DefInstanceCompiler{
 	public static <T extends IOInstance<T>> MethodHandle dataConstructor(Class<T> interf){
 		@SuppressWarnings("unchecked")
 		var node=(ImplNode<T>)CACHE.get(interf);
-		if(node==null) node=getNode(interf);
+		if(node==null||node.state!=ImplNode.State.DONE) node=getNode(interf);
 		var ctr=node.dataConstructor;
 		if(ctr==null) fail(interf);
 		return ctr;
@@ -191,7 +191,7 @@ public class DefInstanceCompiler{
 	}
 	
 	private static <T extends IOInstance<T>> ImplNode<T> getNode(Class<T> interf){
-		if(!isTemplate(interf)){
+		if(!isDefinition(interf)){
 			throw new IllegalArgumentException(interf+"");
 		}
 		
@@ -242,6 +242,9 @@ public class DefInstanceCompiler{
 				}
 				throw e;
 			}
+			
+			//Eagerly load struct
+			Struct.of(impl);
 			
 			node.init(impl, orderedFields);
 			

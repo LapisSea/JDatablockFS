@@ -84,7 +84,7 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 	public interface EnumConstant extends IOInstance.Def<EnumConstant>{
 		
 		private static EnumConstant of(Enum<?> e){
-			return IOInstance.Def.make(EnumConstant.class, String.class).apply(e.name());
+			return IOInstance.Def.of(EnumConstant.class, e.name());
 		}
 		
 		String getName();
