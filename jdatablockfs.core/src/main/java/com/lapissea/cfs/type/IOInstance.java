@@ -93,11 +93,30 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			});
 		}
 		
+		static <T extends Def<T>> T of(Class<T> clazz, Object arg1){
+			var ctr=DefInstanceCompiler.dataConstructor(clazz);
+			try{
+				//noinspection unchecked
+				return (T)ctr.invoke(arg1);
+			}catch(Throwable e){
+				throw new RuntimeException(e);
+			}
+		}
+		static <T extends Def<T>> T of(Class<T> clazz, Object arg1, Object arg2){
+			var ctr=DefInstanceCompiler.dataConstructor(clazz);
+			try{
+				//noinspection unchecked
+				return (T)ctr.invoke(arg1, arg2);
+			}catch(Throwable e){
+				throw new RuntimeException(e);
+			}
+		}
 		static <T extends Def<T>> T of(Class<T> clazz, Object... args){
 			var ctr=DefInstanceCompiler.dataConstructor(clazz);
 			try{
-				return ctr.newInstance(args);
-			}catch(ReflectiveOperationException e){
+				//noinspection unchecked
+				return (T)ctr.invokeWithArguments(args);
+			}catch(Throwable e){
 				throw new RuntimeException(e);
 			}
 		}

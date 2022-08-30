@@ -21,7 +21,7 @@ import com.lapissea.util.function.UnsafeBiConsumer;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.lang.annotation.Annotation;
-import java.lang.reflect.Constructor;
+import java.lang.invoke.MethodHandle;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
@@ -50,7 +50,11 @@ public class DefInstanceCompiler{
 		Style(String humanPattern){this.humanPattern=humanPattern;}
 	}
 	
-	private record Specials(Method set){}
+	private record Specials(
+		Optional<Method> set,
+		Optional<Method> toStr,
+		Optional<Method> toShortStr
+	){}
 	
 	private record FieldStub(Method method, String varName, Type type, Style style){}
 	
@@ -65,10 +69,10 @@ public class DefInstanceCompiler{
 		
 		private final Lock lock=new ReentrantLock();
 		
-		private State          state=State.NEW;
-		private Class<T>       interf;
-		private Class<T>       impl;
-		private Constructor<T> dataConstructor;
+		private       State        state=State.NEW;
+		private final Class<T>     interf;
+		private       Class<T>     impl;
+		private       MethodHandle dataConstructor;
 		
 		public ImplNode(Class<T> interf){
 			this.interf=interf;
@@ -80,7 +84,8 @@ public class DefInstanceCompiler{
 				var ordered=oOrderedFields.get();
 				
 				try{
-					dataConstructor=impl.getConstructor(ordered.stream().map(f->Utils.typeToRaw(f.type)).toArray(Class[]::new));
+					var ctr=impl.getConstructor(ordered.stream().map(f->Utils.typeToRaw(f.type)).toArray(Class[]::new));
+					dataConstructor=Access.makeMethodHandle(ctr);
 				}catch(NoSuchMethodException e){
 					throw new ShouldNeverHappenError(e);
 				}
@@ -168,10 +173,17 @@ public class DefInstanceCompiler{
 		}
 	}
 	
-	public static <T extends IOInstance<T>> Constructor<T> dataConstructor(Class<T> interf){
-		var ctr=getNode(interf).dataConstructor;
-		if(ctr==null) throw new RuntimeException("Please add "+IOInstance.Def.Order.class.getName()+" to "+interf.getName());
+	public static <T extends IOInstance<T>> MethodHandle dataConstructor(Class<T> interf){
+		@SuppressWarnings("unchecked")
+		var node=(ImplNode<T>)CACHE.get(interf);
+		if(node==null) node=getNode(interf);
+		var ctr=node.dataConstructor;
+		if(ctr==null) fail(interf);
 		return ctr;
+	}
+	
+	private static <T extends IOInstance<T>> void fail(Class<T> interf){
+		throw new RuntimeException("Please add "+IOInstance.Def.Order.class.getName()+" to "+interf.getName());
 	}
 	
 	public static <T extends IOInstance<T>> Class<T> getImpl(Class<T> interf){
@@ -246,14 +258,15 @@ public class DefInstanceCompiler{
 	
 	private static <T extends IOInstance<T>> void checkClass(Class<T> interf, Specials specials, List<FieldInfo> fields, Optional<List<FieldInfo>> oOrderedFields){
 		
-		if(specials.set!=null){
+		if(specials.set.isPresent()){
+			var set=specials.set.get();
+			
 			if(oOrderedFields.isEmpty()){
 				throw new MalformedStructLayout(interf.getName()+" has a full setter but no argument order. Please add "+IOInstance.Def.Order.class.getName()+" to the type");
 			}
 			
 			var orderedFields=oOrderedFields.get();
 			
-			var set=specials.set;
 			if(set.getParameterCount()!=orderedFields.size()){
 				throw new MalformedStructLayout(set+" has "+set.getParameterCount()+" parameters but has "+orderedFields.size()+" fields");
 			}
@@ -306,10 +319,11 @@ public class DefInstanceCompiler{
 				
 				generateConstructors(fieldInfo, orderedFields, writer);
 				
-				if(specials.set!=null){
+				if(specials.set.isPresent()){
+					var set=specials.set.get();
+					
 					var ordered=orderedFields.orElseThrow();
 					
-					var set=specials.set;
 					
 					for(FieldInfo info : ordered){
 						var type=Objects.requireNonNull(TypeLink.of(info.type));
@@ -336,17 +350,19 @@ public class DefInstanceCompiler{
 					writer.write("end");
 				}
 				
+				generateSpecialToString(interf, writer, specials);
+				
 				stringSaga:
 				{
 					var format=interf.getAnnotation(IOInstance.Def.ToString.Format.class);
 					if(format!=null){
-						generateFormatToString(interf, fieldInfo, writer, format);
+						generateFormatToString(interf, fieldInfo, specials, writer, format);
 						break stringSaga;
 					}
 					
 					var toStrAnn=interf.getAnnotation(IOInstance.Def.ToString.class);
 					if(toStrAnn!=null){
-						generateStandardToString(interf, orderedFields.orElse(fieldInfo), writer, toStrAnn);
+						generateStandardToString(interf, orderedFields.orElse(fieldInfo), specials, writer, toStrAnn);
 						break stringSaga;
 					}
 				}
@@ -360,32 +376,64 @@ public class DefInstanceCompiler{
 		}
 	}
 	
-	private static <T extends IOInstance<T>> void generateFormatToString(Class<T> interf, List<FieldInfo> fieldInfo, JorthWriter writer, IOInstance.Def.ToString.Format format) throws MalformedJorthException{
-		var fragment=ToStringFormat.parse(format.value(), fieldInfo.stream().map(FieldInfo::name).toList());
-		
-		generateFormatToString(interf, fieldInfo, "toString", true, fragment, writer);
-		generateFormatToString(interf, fieldInfo, "toShortString", false, fragment, writer);
+	private static <T extends IOInstance<T>> void generateSpecialToString(Class<T> interf, JorthWriter writer, Specials specials) throws MalformedJorthException{
+		if(specials.toStr.isPresent()){
+			generateSpecialToString(interf, writer, specials.toStr.get());
+		}
+		if(specials.toShortStr.isPresent()){
+			generateSpecialToString(interf, writer, specials.toShortStr.get());
+		}
 	}
 	
-	private static <T extends IOInstance<T>> void generateStandardToString(Class<T> interf, List<FieldInfo> fieldInfo, JorthWriter writer, IOInstance.Def.ToString toStrAnn) throws MalformedJorthException{
-		generateStandardToString(interf, toStrAnn, "toString", fieldInfo, writer);
-		if(toStrAnn.name()){
-			generateStandardToString(interf, IOFieldTools.makeAnnotation(IOInstance.Def.ToString.class, Map.of(
-				"name", false,
-				"curly", toStrAnn.curly(),
-				"fNames", toStrAnn.fNames(),
-				"filter", toStrAnn.filter()
-			)), "toShortString", fieldInfo, writer);
-		}else{
-			writer.write(
-				"""
-					public visibility
-					typ.String returns
-					toShortString function start
-						this this get
-						toString (0) call
-					end
-					""");
+	private static <T extends IOInstance<T>> void generateSpecialToString(Class<T> interf, JorthWriter writer, Method method) throws MalformedJorthException{
+		writer.write(
+			"""
+				public visibility
+				typ.String returns
+				#TOKEN(0) function start
+					this this get
+					#TOKEN(1) #TOKEN(0) (1) static call
+				end
+				""",
+			method.getName(),
+			interf.getName());
+	}
+	
+	private static <T extends IOInstance<T>> void generateFormatToString(Class<T> interf, List<FieldInfo> fieldInfo, Specials specials, JorthWriter writer, IOInstance.Def.ToString.Format format) throws MalformedJorthException{
+		var fragment=ToStringFormat.parse(format.value(), fieldInfo.stream().map(FieldInfo::name).toList());
+		
+		if(specials.toStr.isEmpty()){
+			generateFormatToString(interf, fieldInfo, "toString", true, fragment, writer);
+		}
+		if(specials.toShortStr.isEmpty()){
+			generateFormatToString(interf, fieldInfo, "toShortString", false, fragment, writer);
+		}
+	}
+	
+	private static <T extends IOInstance<T>> void generateStandardToString(Class<T> interf, List<FieldInfo> fieldInfo, Specials specials, JorthWriter writer, IOInstance.Def.ToString toStrAnn) throws MalformedJorthException{
+		
+		if(specials.toStr.isEmpty()){
+			generateStandardToString(interf, toStrAnn, "toString", fieldInfo, writer);
+		}
+		if(specials.toShortStr.isEmpty()){
+			if(toStrAnn.name()){
+				generateStandardToString(interf, IOFieldTools.makeAnnotation(IOInstance.Def.ToString.class, Map.of(
+					"name", false,
+					"curly", toStrAnn.curly(),
+					"fNames", toStrAnn.fNames(),
+					"filter", toStrAnn.filter()
+				)), "toShortString", fieldInfo, writer);
+			}else{
+				writer.write(
+					"""
+						public visibility
+						typ.String returns
+						toShortString function start
+							this this get
+							toString (0) call
+						end
+						""");
+			}
 		}
 	}
 	
@@ -745,7 +793,30 @@ public class DefInstanceCompiler{
 	}
 	
 	private static <T extends IOInstance<T>> Specials collectMethods(Class<T> interf, List<FieldStub> getters, List<FieldStub> setters){
-		Method set=null;
+		var set       =Optional.<Method>empty();
+		var toStr     =Optional.<Method>empty();
+		var toShortStr=Optional.<Method>empty();
+		
+		var q=new LinkedList<Class<?>>();
+		q.add(interf);
+		var last=new LinkedList<Class<?>>();
+		while(!q.isEmpty()){
+			var clazz=q.remove(0);
+			last.add(clazz);
+			
+			toStr=toStr.or(()->Arrays.stream(clazz.getMethods()).filter(m->isToString(clazz, m, "toString")).findAny());
+			toShortStr=toShortStr.or(()->Arrays.stream(clazz.getMethods()).filter(m->isToString(clazz, m, "toShortString")).findAny());
+			if(toStr.isPresent()&&toShortStr.isPresent()) break;
+			
+			if(q.isEmpty()){
+				last.stream()
+				    .flatMap(t->Arrays.stream(t.getInterfaces()))
+				    .filter(i->i!=IOInstance.Def.class&&UtilL.instanceOf(interf, IOInstance.Def.class))
+				    .forEach(q::add);
+				last.clear();
+			}
+		}
+		
 		for(Method method : interf.getMethods()){
 			if(Modifier.isStatic(method.getModifiers())||!Modifier.isAbstract(method.getModifiers())){
 				continue;
@@ -756,8 +827,8 @@ public class DefInstanceCompiler{
 			
 			if(List.of("set", "setAll").contains(method.getName())){
 				if(method.getReturnType()!=void.class) throw new MalformedStructLayout("set can not have a return type");
-				if(set!=null) throw new MalformedStructLayout("duplicate set method");
-				set=method;
+				if(set.isPresent()) throw new MalformedStructLayout("duplicate set method");
+				set=Optional.of(method);
 				continue;
 			}
 			
@@ -771,7 +842,17 @@ public class DefInstanceCompiler{
 				throw new MalformedStructLayout(method+" is not a setter or a getter!");
 			}
 		}
-		return new Specials(set);
+		
+		return new Specials(set, toStr, toShortStr);
+	}
+	
+	private static boolean isToString(Class<?> interf, Method method, String name){
+		if(!Modifier.isStatic(method.getModifiers())) return false;
+		if(!method.getName().equals(name)) return false;
+		if(method.getReturnType()!=String.class) return false;
+		if(method.getParameterCount()!=1) return false;
+		var type=method.getParameterTypes()[0];
+		return UtilL.instanceOf(type, interf);
 	}
 	
 	private static List<FieldInfo> mergeStubs(List<FieldStub> getters, List<FieldStub> setters){
