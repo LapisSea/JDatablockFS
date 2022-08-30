@@ -663,7 +663,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		String name  =null;
 		if(!doShort){
 			name=getType().getSimpleName();
-			if(UtilL.instanceOf(getType(), IOInstance.Def.class)&&name.endsWith(IOInstance.Def.IMPL_NAME_POSTFIX)){
+			if(UtilL.instanceOf(getType(), IOInstance.Def.class)&&name.contains(IOInstance.Def.IMPL_NAME_POSTFIX)){
 				name=name.substring(0, name.length()-IOInstance.Def.IMPL_NAME_POSTFIX.length());
 			}
 			if(Modifier.isStatic(getType().getModifiers())){
