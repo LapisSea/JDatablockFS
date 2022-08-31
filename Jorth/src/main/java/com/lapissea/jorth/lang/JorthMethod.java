@@ -11,7 +11,10 @@ import org.objectweb.asm.MethodVisitor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import static org.objectweb.asm.Opcodes.*;
@@ -111,14 +114,14 @@ public class JorthMethod{
 		}
 	}
 	
-	private final LinkedList<Label> branchLabels=new LinkedList<>();
-	
 	private final JorthCompiler context;
 	private final MethodVisitor mv;
 	private final String        name;
 	private final String        className;
 	private final GenType       returnType;
 	private final boolean       isStatic;
+	
+	private boolean thrown;
 	
 	private Stack typeStack=new Stack();
 	
@@ -170,6 +173,7 @@ public class JorthMethod{
 	}
 	
 	public void invoke(CallType type, String className, String methodName, List<GenType> args, GenType returnType, boolean isInterface) throws MalformedJorthException{
+		noThrow();
 		String undottedClassName=Utils.undotify(className);
 		
 		popAndCheckArguments(className, methodName, args);
@@ -210,6 +214,7 @@ public class JorthMethod{
 	}
 	
 	public void callInit(List<GenType> args) throws MalformedJorthException{
+		noThrow();
 		popAndCheckArguments("", "", args);
 		var owner=popTypeStack();
 		var nam  =Utils.undotify(owner.typeName());
@@ -217,7 +222,8 @@ public class JorthMethod{
 		invokeRaw(CallType.SPECIAL, nam, "<init>", sig, false);
 	}
 	
-	public void pop(){
+	public void pop() throws MalformedJorthException{
+		noThrow();
 		var top=popTypeStack();
 		
 		switch(top.type().slotCount){
@@ -227,7 +233,8 @@ public class JorthMethod{
 		}
 	}
 	
-	public void swap(){
+	public void swap() throws MalformedJorthException{
+		noThrow();
 		var top     =popTypeStack();
 		var belowTop=popTypeStack();
 		
@@ -262,30 +269,34 @@ public class JorthMethod{
 		}
 	}
 	
-	public void loadString(String str){
+	public void loadString(String str) throws MalformedJorthException{
+		noThrow();
 		mv.visitLdcInsn(str);
 		pushTypeStack(GenType.STRING);
 	}
 	
-	public void getFieldIns(JorthCompiler.FieldInfo info){
+	public void getFieldIns(JorthCompiler.FieldInfo info) throws MalformedJorthException{
 		if(info.isStatic()){
 			getFieldStaticIns(info.declaringClass(), info.name(), info.type());
 		}else{
 			getFieldIns(info.declaringClass(), info.name(), info.type());
 		}
 	}
-	public void getFieldStaticIns(String owner, String name, GenType fieldType){
+	public void getFieldStaticIns(String owner, String name, GenType fieldType) throws MalformedJorthException{
+		noThrow();
 		mv.visitFieldInsn(GETSTATIC, Utils.undotify(owner), name, Utils.genericSignature(fieldType.rawType()));
 		pushTypeStack(fieldType);
 	}
 	
-	public void getFieldIns(String owner, String name, GenType fieldType){
+	public void getFieldIns(String owner, String name, GenType fieldType) throws MalformedJorthException{
+		noThrow();
 		mv.visitFieldInsn(GETFIELD, Utils.undotify(owner), name, Utils.genericSignature(fieldType.rawType()));
 		popTypeStack();
 		pushTypeStack(fieldType);
 	}
 	
-	public void setFieldIns(JorthCompiler.FieldInfo info){
+	public void setFieldIns(JorthCompiler.FieldInfo info) throws MalformedJorthException{
+		noThrow();
 		if(info.isStatic()){
 			setFieldStaticIns(info.declaringClass(), info.name(), info.type());
 		}else{
@@ -293,28 +304,33 @@ public class JorthMethod{
 		}
 	}
 	
-	public void setFieldStaticIns(String owner, String name, GenType fieldType){
+	public void setFieldStaticIns(String owner, String name, GenType fieldType) throws MalformedJorthException{
+		noThrow();
 		mv.visitFieldInsn(PUTSTATIC, Utils.undotify(owner), name, Utils.genericSignature(fieldType.rawType()));
 		popTypeStack();
 	}
 	
-	public void setFieldIns(String owner, String name, GenType fieldType){
+	public void setFieldIns(String owner, String name, GenType fieldType) throws MalformedJorthException{
+		noThrow();
 		mv.visitFieldInsn(PUTFIELD, Utils.undotify(owner), name, Utils.genericSignature(fieldType.rawType()));
 		popTypeStack();
 		popTypeStack();
 	}
 	
-	public void loadArgument(LocalVariableStack.Variable arg){
+	public void loadArgument(LocalVariableStack.Variable arg) throws MalformedJorthException{
+		noThrow();
 		mv.visitVarInsn(arg.type().type().loadOp, arg.accessIndex()+(isStatic?0:1));
 		pushTypeStack(arg.type());
 	}
 	
-	public void loadThis(){
+	public void loadThis() throws MalformedJorthException{
+		noThrow();
 		mv.visitVarInsn(ALOAD, 0);
 		pushTypeStack(new GenType(className));
 	}
 	
 	public void returnOp() throws MalformedJorthException{
+		noThrow();
 		if(returnType!=null){
 			var popped=popTypeStack();
 			if(!popped.instanceOf(context, returnType)) throw new MalformedJorthException("Method returns "+returnType+" but "+popped+" is on stack");
@@ -329,10 +345,11 @@ public class JorthMethod{
 		}
 	}
 	
-	public void newObject(Class<?> clas){
+	public void newObject(Class<?> clas) throws MalformedJorthException{
 		newObject(clas.getName());
 	}
-	public void newObject(String className){
+	public void newObject(String className) throws MalformedJorthException{
+		noThrow();
 		if(className.contains("/")) throw new RuntimeException(className);
 		mv.visitTypeInsn(NEW, Utils.undotify(className));
 		pushTypeStack(new GenType(className));
@@ -341,7 +358,8 @@ public class JorthMethod{
 	 * ... a, b
 	 * ... a, b, a, b
 	 */
-	public void dupAB(){
+	public void dupAB() throws MalformedJorthException{
+		noThrow();
 		var a=typeStack.peek(0);
 		var b=typeStack.peek(1);
 		if(a.type().slotCount!=1) throw new NotImplementedException();
@@ -354,7 +372,8 @@ public class JorthMethod{
 	 * ... a
 	 * ... a, a
 	 */
-	public void dup(){
+	public void dup() throws MalformedJorthException{
+		noThrow();
 		if(peekTypeStack().type().slotCount!=1) throw new NotImplementedException();
 		pushTypeStack(peekTypeStack());
 		mv.visitInsn(DUP);
@@ -364,7 +383,8 @@ public class JorthMethod{
 	 * ... a, b
 	 * ... b, a, b
 	 */
-	public void dupTo1Below(){
+	public void dupTo1Below() throws MalformedJorthException{
+		noThrow();
 		if(peekTypeStack().type().slotCount!=1) throw new NotImplementedException();
 		typeStack.insert(1, peekTypeStack());
 		mv.visitInsn(DUP_X1);
@@ -378,6 +398,7 @@ public class JorthMethod{
 		return typeStack;
 	}
 	public void add() throws MalformedJorthException{
+		noThrow();
 		var a=popTypeStack();
 		var b=popTypeStack();
 		
@@ -409,6 +430,7 @@ public class JorthMethod{
 	private void DDToDOp(int op) throws MalformedJorthException{numNumToOp(List.of(Types.DOUBLE), Types.DOUBLE, op);}
 	
 	private void numNumToOp(List<Types> input, Types result, int op) throws MalformedJorthException{
+		noThrow();
 		for(int i=0;i<2;i++){
 			var operand=popTypeStack();
 			if(!input.contains(operand.type())) throw new MalformedJorthException("argument "+i+": "+operand+" is not "+input);
@@ -441,6 +463,7 @@ public class JorthMethod{
 	public void doubleMul() throws MalformedJorthException {DDToDOp(DMUL);}
 	
 	private void intTo(int op, Types type) throws MalformedJorthException{
+		noThrow();
 		var typ=popTypeStack();
 		if(typ.type()!=Types.INT) throw new MalformedJorthException(typ+" is not int");
 		pushTypeStack(type.genTyp);
@@ -455,6 +478,7 @@ public class JorthMethod{
 	public void intToDouble() throws MalformedJorthException{intTo(I2D, Types.DOUBLE);}
 	
 	public void growToInt() throws MalformedJorthException{
+		noThrow();
 		var typ=popTypeStack();
 		if(!List.of(Types.BYTE, Types.CHAR, Types.SHORT).contains(typ.type())) throw new MalformedJorthException(typ+" is not a smaller int");
 		pushTypeStack(Types.INT.genTyp);
@@ -462,6 +486,7 @@ public class JorthMethod{
 	
 	
 	public void nullBlock(UnsafeRunnable<MalformedJorthException> ifNull, UnsafeRunnable<MalformedJorthException> ifNotNull) throws MalformedJorthException{
+		noThrow();
 		
 		var typ=popTypeStack();
 		if(typ.type()!=Types.OBJECT) throw new MalformedJorthException(typ+" is not an object");
@@ -506,7 +531,8 @@ public class JorthMethod{
 		mv.visitJumpInsn(GOTO, point.asmLabel);
 	}
 	
-	public void loadInt(int value){
+	public void loadInt(int value) throws MalformedJorthException{
+		noThrow();
 		pushTypeStack(Types.INT.genTyp);
 		switch(value){
 			case 0 -> mv.visitInsn(ICONST_0);
@@ -519,7 +545,8 @@ public class JorthMethod{
 		}
 	}
 	
-	public void loadBoolean(boolean value){
+	public void loadBoolean(boolean value) throws MalformedJorthException{
+		noThrow();
 		pushTypeStack(Types.BOOLEAN.genTyp);
 		if(value){
 			mv.visitInsn(ICONST_1);
@@ -530,6 +557,7 @@ public class JorthMethod{
 	
 	
 	public void intIntEqualityToBool() throws MalformedJorthException{
+		noThrow();
 		GenType typ;
 		if((typ=popTypeStack()).type()!=Types.INT) throw new MalformedJorthException(typ+" (arg1) is not an int");
 		if((typ=popTypeStack()).type()!=Types.INT) throw new MalformedJorthException(typ+" (arg2) is not an int");
@@ -554,6 +582,7 @@ public class JorthMethod{
 	}
 	
 	public void castTo(GenType castType) throws MalformedJorthException{
+		noThrow();
 		var type=popTypeStack();
 		if(!castType.instanceOf(context, type)){
 			throw new MalformedJorthException("cannot cast "+type+" to "+castType);
@@ -564,13 +593,15 @@ public class JorthMethod{
 		pushTypeStack(castType);
 	}
 	
-	public void classToStack(String className){
+	public void classToStack(String className) throws MalformedJorthException{
+		noThrow();
 		var cType=new GenType(className);
 		mv.visitLdcInsn(org.objectweb.asm.Type.getType(Utils.genericSignature(cType)));
 		pushTypeStack(new GenType(Class.class.getName(), 0, List.of(cType)));
 	}
 	
 	public void allocateNewArray(GenType type) throws MalformedJorthException{
+		noThrow();
 		var arraySize=popTypeStack();
 		if(!List.of(Types.INT, Types.SHORT, Types.BYTE).contains(arraySize.type())){
 			throw new MalformedJorthException("Array size is not an integer");
@@ -587,6 +618,7 @@ public class JorthMethod{
 	}
 	
 	public void arrayStore() throws MalformedJorthException{
+		noThrow();
 		var value=popTypeStack();
 		var index=popTypeStack();
 		if(!List.of(Types.INT, Types.SHORT, Types.BYTE).contains(index.type())){
@@ -602,5 +634,26 @@ public class JorthMethod{
 		}
 		
 		mv.visitInsn(AASTORE);
+	}
+	
+	private void noThrow() throws MalformedJorthException{
+		if(isThrown()){
+			throw new MalformedJorthException("No more code after throw");
+		}
+	}
+	
+	public void aThrow() throws MalformedJorthException{
+		var exception=popTypeStack();
+		if(!exception.instanceOf(context, new GenType(Throwable.class))){
+			throw new MalformedJorthException(exception+" is not a throwable");
+		}
+		
+		mv.visitInsn(ATHROW);
+		thrown=true;
+		end();
+	}
+	
+	public boolean isThrown(){
+		return thrown;
 	}
 }

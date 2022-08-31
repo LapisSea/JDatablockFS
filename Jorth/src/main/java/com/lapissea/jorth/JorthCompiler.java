@@ -284,6 +284,10 @@ public class JorthCompiler{
 					doCall();
 					return true;
 				}
+				case "throw" -> {
+					currentMethod.aThrow();
+					return true;
+				}
 				case "new" -> {
 					var type=pop();
 					if(type.source.matches("\\(\\d+\\)")){
@@ -969,9 +973,11 @@ public class JorthCompiler{
 				switch(subject.lower()){
 					case "function" -> {
 						try{
-							currentMethod.returnOp();
-							
-							currentMethod.end();
+							if(!currentMethod.isThrown()){
+								currentMethod.returnOp();
+								
+								currentMethod.end();
+							}
 							currentMethod=null;
 							returnType=null;
 							methodArguments.clear();
@@ -1073,6 +1079,8 @@ public class JorthCompiler{
 						v.visit(null, Array.get(value, i));
 					}
 					v.visitEnd();
+				}else{
+					annV.visit(key, value);
 				}
 			}
 			annV.visitEnd();
