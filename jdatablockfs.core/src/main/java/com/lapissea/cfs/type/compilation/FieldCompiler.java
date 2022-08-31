@@ -521,7 +521,7 @@ public class FieldCompiler{
 			IOValue.class,
 			IODependency.class,
 			IONullability.class,
-			IOType.class
+			IODynamic.class
 		);
 	}
 	
