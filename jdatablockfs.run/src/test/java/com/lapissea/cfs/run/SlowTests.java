@@ -13,7 +13,11 @@ import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.cfs.type.TypeLink;
+import com.lapissea.cfs.type.field.annotations.IOCompression;
 import com.lapissea.util.LateInit;
+import com.lapissea.util.LogUtil;
+import com.lapissea.util.NanoTimer;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.io.*;
@@ -154,6 +158,56 @@ public class SlowTests{
 			}
 		});
 		
+	}
+	
+	
+	@DataProvider(name="comps")
+	Object[][] comps(){
+		return Arrays.stream(IOCompression.Type.values()).map(t->new Object[]{t}).toArray(Object[][]::new);
+	}
+	
+	@Test(dataProvider="comps")
+	void compressionIntegrity(IOCompression.Type type){
+		NanoTimer t=new NanoTimer();
+		t.start();
+		randomBatch(500000, (r, iter, tick)->{
+			if(tick){
+				info("iteration: {}", iter);
+			}
+			
+			try{
+				byte[] raw;
+				if(iter==0){
+					raw=new byte[10];
+					Arrays.fill(raw, (byte)(1));
+				}else{
+					raw=new byte[r.nextInt(1000)];
+					for(int i=0;i<raw.length;){
+						if(r.nextFloat()<0.2){
+							for(int to=Math.min(i+r.nextInt(300)+1, raw.length);i<to;i++){
+								raw[i]=(byte)r.nextInt(256);
+							}
+						}else{
+							var b=(byte)r.nextInt(256);
+							for(int to=Math.min(i+r.nextInt(200)+1, raw.length);i<to;i++){
+								raw[i]=b;
+							}
+						}
+					}
+				}
+				
+				byte[] compressed  =type.pack(raw);
+				byte[] uncompressed=type.unpack(compressed);
+				
+				assertEquals(uncompressed, raw, "Failed on "+iter);
+			}catch(AssertionError e){
+				throw e;
+			}catch(Throwable e){
+				throw new RuntimeException(iter+"", e);
+			}
+		});
+		t.end();
+		LogUtil.println("time: ", t.ms());
 	}
 	
 	@Test
