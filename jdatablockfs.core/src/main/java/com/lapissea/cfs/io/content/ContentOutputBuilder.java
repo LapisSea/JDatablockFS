@@ -16,6 +16,10 @@ public class ContentOutputBuilder extends ByteArrayOutputStream implements Conte
 		out.write(buf, 0, count);
 	}
 	
+	public void writeTo(ContentOutputBuilder out){
+		out.write(buf, 0, count);
+	}
+	
 	@Override
 	public void writeWord(long v, int len) throws IOException{
 		

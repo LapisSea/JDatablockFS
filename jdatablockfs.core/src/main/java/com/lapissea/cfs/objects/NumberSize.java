@@ -9,7 +9,6 @@ import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
-import com.lapissea.util.ShouldNeverHappenError;
 
 import java.io.IOException;
 import java.math.BigInteger;
@@ -114,9 +113,8 @@ public enum NumberSize{
 			case INT -> out.writeInt4(Float.floatToIntBits((float)value));
 			case LONG -> out.writeInt8(Double.doubleToLongBits(value));
 			case SHORT -> out.writeInt2(IUtils.floatToShortBits((float)value));
-			case VOID -> {}
+			case VOID, null -> {}
 			case BYTE, SMALL_INT, BIG_INT, SMALL_LONG -> throw new UnsupportedOperationException();
-			case null -> throw new ShouldNeverHappenError();
 		}
 	}
 	
@@ -153,7 +151,7 @@ public enum NumberSize{
 			case BIG_INT -> out.writeInt5(value);
 			case SMALL_LONG -> out.writeInt6(value);
 			case LONG -> out.writeInt8(value);
-			case null -> throw new ShouldNeverHappenError();
+			case null -> {}
 		}
 	}
 	
