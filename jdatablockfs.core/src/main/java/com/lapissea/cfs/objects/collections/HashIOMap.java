@@ -1,7 +1,6 @@
 package com.lapissea.cfs.objects.collections;
 
 import com.lapissea.cfs.IterablePP;
-import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.ValueStorage;
 import com.lapissea.cfs.io.impl.MemoryData;
@@ -36,42 +35,38 @@ import static com.lapissea.util.PoolOwnThread.async;
 
 public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	
-	private static class BucketEntry<K, V> extends IOInstance.Managed<BucketEntry<K, V>>{
+	@SuppressWarnings({"unchecked"})
+	@Def.ToString.Format("[!!className]{@key: @value}")
+	@Def.Order({"key", "value"})
+	private interface BucketEntry<K, V> extends IOInstance.Def<BucketEntry<K, V>>{
 		
-		@SuppressWarnings("unchecked")
-		private static final StructPipe<BucketEntry<Object, Object>> PIPE=ContiguousStructPipe.of((Class<BucketEntry<Object, Object>>)(Object)BucketEntry.class);
+		Struct<BucketEntry<Object, Object>>     STRUCT=Struct.of((Class<BucketEntry<Object, Object>>)(Object)BucketEntry.class);
+		StructPipe<BucketEntry<Object, Object>> PIPE  =ContiguousStructPipe.of(STRUCT);
 		
-		@IOValue
+		static <V, K> BucketEntry<K, V> of(K key, V value){
+			var e=(BucketEntry<K, V>)STRUCT.make();
+			e.set(key, value);
+			return e;
+		}
+		
+		void set(K key, V value);
+		
 		@IONullability(NULLABLE)
 		@IOType.Dynamic
-		private K key;
+		K key();
+		void key(K key);
 		
-		@IOValue
 		@IONullability(NULLABLE)
 		@IOType.Dynamic
-		private V value;
+		V value();
+		void value(V value);
 		
-		@Override
-		public String toString(){
-			return this.getClass().getSimpleName()+toShortString();
-		}
-		@Override
-		public String toShortString(){
-			return "{"+Utils.toShortString(key)+" = "+Utils.toShortString(value)+"}";
+		default IOEntry.Modifiable<K, V> unsupported(){
+			return new IOEntry.Modifiable.Unsupported<>(key(), value());
 		}
 		
-		public BucketEntry(){}
-		public BucketEntry(K key, V value){
-			this.key=key;
-			this.value=value;
-		}
-		
-		public IOEntry.Modifiable<K, V> unsupported(){
-			return new IOEntry.Modifiable.Unsupported<>(key, value);
-		}
-		
-		public IOEntry<K, V> unmodifiable(){
-			return IOEntry.of(key, value);
+		default IOEntry<K, V> unmodifiable(){
+			return IOEntry.of(key(), value());
 		}
 	}
 	
@@ -84,7 +79,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 			if(node==null) return null;
 			for(IONode<BucketEntry<K, V>> entry : node){
 				var value=entry.getValue();
-				if(value!=null&&Objects.equals(value.key, key)){
+				if(value!=null&&Objects.equals(value.key(), key)){
 					return value;
 				}
 			}
@@ -95,7 +90,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		public void put(BucketEntry<K, V> entry) throws IOException{
 			for(var node : node){
 				var e=node.getValue();
-				if(e!=null&&Objects.equals(e.key, entry.key)){
+				if(e!=null&&Objects.equals(e.key(), entry.key())){
 					node.setValue(entry);
 					return;
 				}
@@ -374,9 +369,9 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 			             .orElseThrow();
 		}
 		
-		BucketEntry<K, V> be=new BucketEntry<>();
+		BucketEntry<K, V> be=BucketEntry.of(null, null);
 		if(!n.readValueField(be, keyVar)) return new KeyResult<>(null, false);
-		return new KeyResult<>(be.key, true);
+		return new KeyResult<>(be.key(), true);
 	}
 	
 	private void transferRewire(IOList<Bucket<K, V>> oldBuckets, IOList<Bucket<K, V>> newBuckets, short newPO2) throws IOException{
@@ -426,16 +421,16 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		}
 		
 		@Override
-		public K getKey(){return data.key;}
+		public K getKey(){return data.key();}
 		@Override
-		public V getValue(){return data.value;}
+		public V getValue(){return data.value();}
 		
 		private void fastSet(V value) throws IOException{
-			data.value=value;
+			data.value(value);
 			currentBucket.put(data);
 		}
 		private void mapSet(V value) throws IOException{
-			data.value=value;
+			data.value(value);
 			HashIOMap.this.put(getKey(), value);
 		}
 		
@@ -638,12 +633,12 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		
 		var entry=bucket.getEntryByKey(key);
 		if(entry!=null){
-			entry.value=value;
+			entry.value(value);
 			bucket.put(entry);
 			return OVERWRITE;
 		}
 		
-		BucketEntry<K, V> newEntry=new BucketEntry<>(key, value);
+		BucketEntry<K, V> newEntry=BucketEntry.of(key, value);
 		
 		if(bucket.node==null){
 			bucket.node=allocNewNode(newEntry, (Unmanaged<?>)buckets);

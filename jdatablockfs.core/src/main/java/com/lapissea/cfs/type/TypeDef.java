@@ -8,6 +8,7 @@ import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.ArrayViewList;
 import com.lapissea.util.NotNull;
+import com.lapissea.util.UtilL;
 
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
@@ -79,24 +80,14 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 		}
 	}
 	
-	public static final class EnumConstant extends IOInstance.Managed<EnumConstant>{
+	@IOInstance.Def.ToString(name=false, fNames=false, curly=false)
+	public interface EnumConstant extends IOInstance.Def<EnumConstant>{
 		
-		@IOValue
-		private String name;
-		
-		public EnumConstant(){}
-		public <T extends Enum<T>> EnumConstant(T constant){
-			name=constant.name();
+		private static EnumConstant of(Enum<?> e){
+			return IOInstance.Def.of(EnumConstant.class, e.name());
 		}
 		
-		public String getName(){
-			return name;
-		}
-		
-		@Override
-		public String toString(){
-			return name;
-		}
+		String getName();
 	}
 	
 	
@@ -119,14 +110,14 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 		ioInstance=IOInstance.isInstance(type);
 		unmanaged=IOInstance.isUnmanaged(type);
 		if(ioInstance){
-			if(!Modifier.isAbstract(type.getModifiers())){
+			if(!Modifier.isAbstract(type.getModifiers())||UtilL.instanceOf(type, IOInstance.Def.class)){
 				fields=Struct.ofUnknown(type).getFields().stream().map(FieldDef::new).toArray(FieldDef[]::new);
 			}
 		}
 		if(type.isEnum()){
 			//noinspection unchecked,rawtypes
 			enumConstants=Arrays.stream(((Class<Enum>)type).getEnumConstants())
-			                    .map(EnumConstant::new)
+			                    .map(EnumConstant::of)
 			                    .toArray(EnumConstant[]::new);
 		}
 	}

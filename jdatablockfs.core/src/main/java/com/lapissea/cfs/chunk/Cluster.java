@@ -98,24 +98,9 @@ public class Cluster implements DataProvider{
 		private Metadata metadata;
 	}
 	
-	private static class IOChunkPointer extends IOInstance.Managed<IOChunkPointer>{
-		
-		@IOValue
-		private ChunkPointer val=ChunkPointer.NULL;
-		
-		private IOChunkPointer(){}
-		private IOChunkPointer(ChunkPointer val){
-			this.val=val;
-		}
-		
-		private ChunkPointer getVal(){
-			return val;
-		}
-		
-		@Override
-		public String toString(){
-			return val.toString();
-		}
+	@IOInstance.Def.ToString(name=false, curly=false, fNames=false)
+	private interface IOChunkPointer extends IOInstance.Def<IOChunkPointer>{
+		ChunkPointer getVal();
 	}
 	
 	private static class Metadata extends IOInstance.Managed<Metadata>{
@@ -201,7 +186,9 @@ public class Cluster implements DataProvider{
 		}
 		
 		root=ROOT_PIPE.readNew(this, ch, null);
-		memoryManager=new PersistentMemoryManager(this, meta().freeChunks.map(IOChunkPointer::getVal, IOChunkPointer::new));
+		var frees =meta().freeChunks;
+		var mapped=frees.map(IOChunkPointer::getVal, IOInstance.Def.constrRef(IOChunkPointer.class, ChunkPointer.class));
+		memoryManager=new PersistentMemoryManager(this, mapped);
 	}
 	
 	@Override

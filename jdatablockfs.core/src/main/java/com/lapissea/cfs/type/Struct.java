@@ -9,6 +9,7 @@ import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.Reference;
+import com.lapissea.cfs.type.compilation.DefInstanceCompiler;
 import com.lapissea.cfs.type.compilation.FieldCompiler;
 import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
@@ -412,7 +413,16 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	
 	@SuppressWarnings("unchecked")
 	private static <T extends IOInstance<T>, S extends Struct<T>> S compile(Class<T> instanceClass, Function<Class<T>, S> newStruct){
-		if(Modifier.isAbstract(instanceClass.getModifiers())){
+		boolean needsImpl=IOInstance.Def.isDefinition(instanceClass);
+		
+		Class<T> concreteClass;
+		if(needsImpl){
+			concreteClass=DefInstanceCompiler.getImpl(instanceClass);
+		}else{
+			concreteClass=instanceClass;
+		}
+		
+		if(!needsImpl&&Modifier.isAbstract(instanceClass.getModifiers())){
 			throw new IllegalArgumentException("Can not compile "+instanceClass.getName()+" because it is abstract");
 		}
 		
@@ -435,9 +445,10 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			try{
 				STRUCT_COMPILE.put(instanceClass, Thread.currentThread());
 				
-				struct=newStruct.apply(instanceClass);
+				struct=newStruct.apply(concreteClass);
 				
 				STRUCT_CACHE.put(instanceClass, struct);
+				if(needsImpl) STRUCT_CACHE.put(concreteClass, struct);
 			}catch(Throwable e){
 				throw new MalformedStructLayout("Failed to compile "+instanceClass.getName(), e);
 			}finally{
@@ -650,8 +661,13 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		String name  =null;
 		if(!doShort){
 			name=getType().getSimpleName();
-			var index=name.lastIndexOf('$');
-			if(index!=-1) name=name.substring(index+1);
+			if(UtilL.instanceOf(getType(), IOInstance.Def.class)&&name.contains(IOInstance.Def.IMPL_NAME_POSTFIX)){
+				name=name.substring(0, name.length()-IOInstance.Def.IMPL_NAME_POSTFIX.length());
+			}
+			if(Modifier.isStatic(getType().getModifiers())){
+				var index=name.lastIndexOf('$');
+				if(index!=-1) name=name.substring(index+1);
+			}
 			
 			prefix=name+prefix;
 		}

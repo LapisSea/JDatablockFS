@@ -5,33 +5,27 @@ import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.field.annotations.IOValue;
 
 import java.io.IOException;
 import java.util.Objects;
 
 public class IPs{
 	
-	
-	public static class IP extends IOInstance.Managed<IP>{
-		@IOValue
-		double latitude, longitude;
+	@IOInstance.Def.Order({"latitude", "longitude", "v6"})
+	@IOInstance.Def.ToString.Format("{@v6 at @latitude / @longitude}")
+	public interface IP extends IOInstance.Def<IP>{
 		
-		@IOValue
-		String v6;
-		
-		//Every IOInstance needs an empty constructor
-		public IP(){}
-		public IP(double latitude, double longitude, String v6){
-			this.latitude=latitude;
-			this.longitude=longitude;
-			this.v6=v6;
+		static IP of(double latitude, double longitude, String v6){
+			return IOInstance.Def.of(IP.class, latitude, longitude, v6);
 		}
+		
+		double latitude();
+		double longitude();
+		String v6();
 	}
 	
-	public static class IPSet extends IOInstance.Managed<IPSet>{
-		@IOValue
-		IOList<IP> ips;
+	public interface IPSet extends IOInstance.Def<IPSet>{
+		IOList<IP> ips();
 	}
 	
 	
@@ -57,14 +51,14 @@ public class IPs{
 		var cluster=Cluster.init(memory);
 		
 		//Ask root provider for an IPSet with the id of my ips
-		IPSet set=cluster.getRootProvider().request(IPSet.class, "my ips");
+		var ips=cluster.getRootProvider().request(IPSet.class, "my ips").ips();
 		
 		//Nice thing to do, reduces possibility of fragmentation. This is only useful when adding element by element. addAll does not benefit from this
-		set.ips.requestCapacity(2);
+		ips.requestCapacity(2);
 		
 		//Adding sample data to database:
-		set.ips.add(new IP(0.2213415, 0.71346, "2001:0db8:85a3:0000:0000:8a2e:0370:7334"));
-		set.ips.add(new IP(0.6234, 0.51341123, "2001:0db8:0:1:1:1:1:1"));
+		ips.add(IP.of(0.2213415, 0.71346, "2001:0db8:85a3:0000:0000:8a2e:0370:7334"));
+		ips.add(IP.of(0.6234, 0.51341123, "2001:0db8:0:1:1:1:1:1"));
 	}
 	
 	

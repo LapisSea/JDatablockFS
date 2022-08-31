@@ -1,6 +1,7 @@
 package com.lapissea.cfs.type.compilation;
 
 import com.lapissea.cfs.GlobalConfig;
+import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.IOTypeDB;
 import com.lapissea.cfs.type.TypeDef;
@@ -58,6 +59,7 @@ public class TemplateClassLoader extends ClassLoader{
 		var classData=CLASS_DATA_CACHE.get(new TypeNamed(className, def));
 		if(classData==null){
 			var typ=new TypeNamed(className, def.clone());
+			Log.trace("Generating template: {}", className);
 			try{
 				classData=jorthGenerate(typ, def.isIoInstance()?this::generateIOInstance:this::generateEnum);
 			}catch(Throwable e){
@@ -87,7 +89,6 @@ public class TemplateClassLoader extends ClassLoader{
 		byte[] byt;
 		try{
 			byt=jorth.classBytecode(PRINT_BYTECODE);
-			
 		}catch(MalformedJorthException e){
 			throw new RuntimeException(e);
 		}
@@ -110,7 +111,7 @@ public class TemplateClassLoader extends ClassLoader{
 	private void generateIOInstance(TypeNamed classType, JorthWriter writer) throws MalformedJorthException{
 		
 		writer.write("#TOKEN(0) genClassName      define", classType.name);
-		writer.write("#TOKEN(0) IOInstance        define", IOInstance.Managed.class.getName());
+		writer.write("#TOKEN(0) IOInstance.Def    define", IOInstance.Def.class.getName());
 		writer.write("#TOKEN(0) IOValue           define", IOValue.class.getName());
 		writer.write("#TOKEN(0) IONullability     define", IONullability.class.getName());
 		writer.write("#TOKEN(0) IOType.Dynamic    define", IOType.Dynamic.class.getName());
@@ -121,9 +122,9 @@ public class TemplateClassLoader extends ClassLoader{
 		
 		writer.write(
 			"""
-				[genClassName] IOInstance extends
+				[genClassName] IOInstance.Def implements
 				public visibility
-				genClassName class start
+				genClassName interface start
 				"""
 		);
 		
@@ -151,26 +152,10 @@ public class TemplateClassLoader extends ClassLoader{
 			
 			writer.write(
 				"""
-					private visibility
-					IOValue @
-					#RAW(0) #TOKEN(1) field
-					""",
-				type,
-				field.getName());
-		}
-		for(var field : classType.def.getFields()){
-			var type=toJorthGeneric(field.getType());
-			
-			writer.write(
-				"""
-					public visibility
 					#RAW(0) returns
-					#TOKEN(1) function start
-						this #TOKEN(2) get
-					end
+					#TOKEN(1) function
 					""",
 				type,
-				"get"+TextUtil.firstToUpperCase(field.getName()),
 				field.getName());
 		}
 	}

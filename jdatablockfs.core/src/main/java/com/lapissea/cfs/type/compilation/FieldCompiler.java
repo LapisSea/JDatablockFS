@@ -5,10 +5,10 @@ import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.SyntheticParameterizedType;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
-import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
 import com.lapissea.cfs.type.field.access.*;
@@ -415,10 +415,11 @@ public class FieldCompiler{
 		return fieldName;
 	}
 	
-	private static Type getType(Field field){
+	static Type getType(Field field){
 		return getType(field.getGenericType(), field::getAnnotation);
 	}
-	private static Type getType(Type defaultType, GetAnnotation getAnnotation){
+	
+	static Type getType(Type defaultType, GetAnnotation getAnnotation){
 		Type type        =defaultType;
 		var  typeOverride=getAnnotation.get(IOValue.OverrideType.class);
 		if(typeOverride!=null){
