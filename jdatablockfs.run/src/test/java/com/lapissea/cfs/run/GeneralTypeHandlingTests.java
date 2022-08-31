@@ -27,6 +27,7 @@ import org.testng.annotations.Test;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.type.StagedInit.STATE_DONE;
@@ -186,6 +187,20 @@ public class GeneralTypeHandlingTests{
 			GeneralTypeHandlingTests.class.getMethod("make"),
 			GeneralTypeHandlingTests.class.getMethod("use", byte[].class)
 		);
+	}
+	
+	public interface Partial extends IOInstance.Def<Partial>{
+		int a();
+		int b();
+	}
+	
+	@Test(expectedExceptions=UnsupportedOperationException.class)
+	void partialImpl(){
+		Class<Partial> partialImpl=IOInstance.Def.partialImplementation(Partial.class, Set.of("a"));
+		
+		Partial partial=IOInstance.Def.of(partialImpl);
+		
+		partial.b();
 	}
 	
 }

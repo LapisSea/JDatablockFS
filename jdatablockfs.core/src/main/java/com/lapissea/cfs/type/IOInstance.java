@@ -20,9 +20,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.lang.invoke.MethodHandle;
-import java.util.Arrays;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Stream;
@@ -92,6 +90,10 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			});
 		}
 		
+		static <T extends Def<T>> T of(Class<T> clazz){
+			return Struct.of(clazz).make();
+		}
+		
 		static <T extends Def<T>> T of(Class<T> clazz, int arg1){
 			var ctr=DefInstanceCompiler.dataConstructor(clazz);
 			try{
@@ -146,6 +148,10 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		}
 		static <T extends Def<T>, A1> MethodHandle dataConstructor(Class<T> type){
 			return DefInstanceCompiler.dataConstructor(type);
+		}
+		
+		static <T extends Def<T>> Class<T> partialImplementation(Class<T> type, Set<String> includedFieldNames){
+			return DefInstanceCompiler.getImplPartial(new DefInstanceCompiler.Key<>(type, Optional.of(includedFieldNames)));
 		}
 	}
 	
