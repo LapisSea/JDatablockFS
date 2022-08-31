@@ -5,6 +5,7 @@ module JDatablockFS.core {
 	requires RoaringBitmap;
 	requires Jorth;
 	requires generics.resolver;
+	requires org.lz4.java;
 	
 	exports com.lapissea.cfs.type.field.annotations;
 	exports com.lapissea.cfs.objects;
