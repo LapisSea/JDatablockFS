@@ -481,12 +481,6 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	private Struct(Class<T> type, boolean runNow){
 		this.type=type;
 		init(runNow, ()->{
-			if(!(this instanceof Struct.Unmanaged)){
-				if(!getType().isAnnotationPresent(NoDefaultConstructor.class)){
-					emptyConstructor=Access.findConstructor(getType(), NewObj.Instance.class);
-				}
-			}
-			
 			this.fields=FieldCompiler.compile(this);
 			setInitState(STATE_FIELD_MAKE);
 			for(IOField<T, ?> field : this.fields){
@@ -502,6 +496,10 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			poolPrimitiveSizes=calcPoolPrimitiveSizes();
 			hasPools=calcHasPools();
 			canHavePointers=calcCanHavePointers();
+			
+			if(emptyConstructor==null&&!getType().isAnnotationPresent(NoDefaultConstructor.class)){
+				findEmptyConstructor();
+			}
 		});
 	}
 	
@@ -692,12 +690,21 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	@Override
 	public NewObj.Instance<T> emptyConstructor(){
 		if(emptyConstructor==null){
-			waitForState(STATE_FIELD_MAKE);
-			if(emptyConstructor==null&&getType().isAnnotationPresent(NoDefaultConstructor.class)){
+			findEmptyConstructor();
+			if(emptyConstructor==null){
 				throw new UnsupportedOperationException();
 			}
 		}
 		return Objects.requireNonNull(emptyConstructor);
+	}
+	
+	private void findEmptyConstructor(){
+		if(getType().isAnnotationPresent(NoDefaultConstructor.class)){
+			throw new UnsupportedOperationException("NoDefaultConstructor is present");
+		}
+		if(!(this instanceof Struct.Unmanaged)){
+			emptyConstructor=Access.findConstructor(getType(), NewObj.Instance.class);
+		}
 	}
 	
 	public boolean hasInvalidInitialNulls(){

@@ -304,7 +304,7 @@ public class FieldCompiler{
 			}
 		}
 		
-		var hangingMethods=ioMethods.stream().filter(method->!usedFields.contains(method)).toList();
+		var hangingMethods=ioMethods.stream().filter(method->!usedFields.contains(method)).collect(Collectors.toList());
 		
 		Map<String, PairM<Method, Method>> transientFieldsMap=new HashMap<>();
 		
@@ -313,6 +313,22 @@ public class FieldCompiler{
 			                              .findFirst().ifPresent(s->transientFieldsMap.computeIfAbsent(s, n->new PairM<>()).obj1=hangingMethod);
 			getMethodFieldName("set", hangingMethod).ifPresent(s->transientFieldsMap.computeIfAbsent(s, n->new PairM<>()).obj2=hangingMethod);
 		}
+		
+		hangingMethods.removeIf(hangingMethod->{
+			var f=hangingMethod.getAnnotation(IOValue.class);
+			if(f==null||f.name().isEmpty()) return false;
+			
+			if(CompilationTools.asGetterStub(hangingMethod).isPresent()){
+				transientFieldsMap.computeIfAbsent(f.name(), n->new PairM<>()).obj1=hangingMethod;
+				return true;
+			}
+			if(CompilationTools.asSetterStub(hangingMethod).isPresent()){
+				transientFieldsMap.computeIfAbsent(f.name(), n->new PairM<>()).obj2=hangingMethod;
+				return true;
+			}
+			
+			return false;
+		});
 		
 		var errors=transientFieldsMap.entrySet()
 		                             .stream()
