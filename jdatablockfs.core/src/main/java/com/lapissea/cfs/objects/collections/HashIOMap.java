@@ -13,8 +13,8 @@ import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
+import com.lapissea.cfs.type.field.annotations.IODynamic;
 import com.lapissea.cfs.type.field.annotations.IONullability;
-import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.ObjectHolder;
@@ -52,12 +52,12 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		void set(K key, V value);
 		
 		@IONullability(NULLABLE)
-		@IOType.Dynamic
+		@IODynamic
 		K key();
 		void key(K key);
 		
 		@IONullability(NULLABLE)
-		@IOType.Dynamic
+		@IODynamic
 		V value();
 		void value(V value);
 		

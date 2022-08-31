@@ -16,8 +16,8 @@ import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
+import com.lapissea.cfs.type.field.annotations.IODynamic;
 import com.lapissea.cfs.type.field.annotations.IONullability;
-import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.Nullable;
@@ -381,7 +381,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 				typeFlags|=HAS_GENERATED_NAME;
 			}
 			
-			boolean isDynamic=accessor.hasAnnotation(IOType.Dynamic.class);
+			boolean isDynamic=accessor.hasAnnotation(IODynamic.class);
 			if(isDynamic){
 				typeFlags|=DYNAMIC_FLAG;
 			}

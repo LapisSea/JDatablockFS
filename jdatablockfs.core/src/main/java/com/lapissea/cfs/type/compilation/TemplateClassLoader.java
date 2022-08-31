@@ -9,8 +9,8 @@ import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.access.AnnotatedType;
 import com.lapissea.cfs.type.field.annotations.IODependency;
+import com.lapissea.cfs.type.field.annotations.IODynamic;
 import com.lapissea.cfs.type.field.annotations.IONullability;
-import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.jorth.JorthCompiler;
 import com.lapissea.jorth.JorthWriter;
@@ -114,7 +114,7 @@ public class TemplateClassLoader extends ClassLoader{
 		writer.write("#TOKEN(0) IOInstance.Def    define", IOInstance.Def.class.getName());
 		writer.write("#TOKEN(0) IOValue           define", IOValue.class.getName());
 		writer.write("#TOKEN(0) IONullability     define", IONullability.class.getName());
-		writer.write("#TOKEN(0) IOType.Dynamic    define", IOType.Dynamic.class.getName());
+		writer.write("#TOKEN(0) IODynamic         define", IODynamic.class.getName());
 		writer.write("#TOKEN(0) IODependency      define", IODependency.class.getName());
 		writer.write("#TOKEN(0) IODependency      define", IODependency.class.getName());
 		writer.write("#TOKEN(0) IOValue.Reference define", IOValue.Reference.class.getName());
@@ -132,13 +132,13 @@ public class TemplateClassLoader extends ClassLoader{
 			var type=toJorthGeneric(field.getType());
 			
 			if(IONullability.NullLogic.canHave(new AnnotatedType.Simple(
-				field.isDynamic()?List.of(IOFieldTools.makeAnnotation(IOType.Dynamic.class)):List.of(),
+				field.isDynamic()?List.of(IOFieldTools.makeAnnotation(IODynamic.class)):List.of(),
 				field.getType().getTypeClass(db)
 			))){
 				writer.write("{#TOKEN(0)} IONullability @", field.getNullability().toString());
 			}
 			if(field.isDynamic()){
-				writer.write("IOType.Dynamic @");
+				writer.write("IODynamic @");
 			}
 			if(field.isUnsigned()){
 				writer.write("IOValue.Unsigned @");

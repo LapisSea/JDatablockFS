@@ -28,7 +28,7 @@ import com.lapissea.cfs.type.field.access.AbstractFieldAccessor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.access.TypeFlag;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
-import com.lapissea.cfs.type.field.annotations.IOType;
+import com.lapissea.cfs.type.field.annotations.IODynamic;
 import com.lapissea.cfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.util.*;
@@ -1370,7 +1370,7 @@ public class BinaryGridRenderer implements DataRenderer{
 					size=sizeDesc.calcUnknown(ioPool, ctx.provider, instance, sizeDesc.getWordSpace());
 					
 					try{
-						if(acc!=null&&acc.hasAnnotation(IOType.Dynamic.class)){
+						if(acc!=null&&acc.hasAnnotation(IODynamic.class)){
 							
 							var inst=field.get(ioPool, instance);
 							if(inst==null) continue;

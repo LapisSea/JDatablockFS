@@ -15,7 +15,7 @@ import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
-import com.lapissea.cfs.type.field.annotations.IOType;
+import com.lapissea.cfs.type.field.annotations.IODynamic;
 import com.lapissea.util.*;
 
 import java.io.IOException;
@@ -577,7 +577,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			var acc=f.getAccessor();
 			if(acc==null) return true;
 			
-			if(acc.hasAnnotation(IOType.Dynamic.class)) return true;
+			if(acc.hasAnnotation(IODynamic.class)) return true;
 			if(f instanceof IOField.Ref) return true;
 			
 			if(acc.getType()==ChunkPointer.class) return true;

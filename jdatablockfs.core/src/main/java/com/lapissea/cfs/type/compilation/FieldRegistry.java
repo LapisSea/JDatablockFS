@@ -5,7 +5,7 @@ import com.lapissea.cfs.objects.INumber;
 import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
-import com.lapissea.cfs.type.field.annotations.IOType;
+import com.lapissea.cfs.type.field.annotations.IODynamic;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.reflection.*;
 import com.lapissea.util.NotImplementedException;
@@ -24,7 +24,7 @@ class FieldRegistry{
 			reg.register(new RegistryNode(){
 				@Override
 				public boolean canCreate(Type type, GetAnnotation annotations){
-					return annotations.isPresent(IOType.Dynamic.class);
+					return annotations.isPresent(IODynamic.class);
 				}
 				@Override
 				public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){

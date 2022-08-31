@@ -3,8 +3,8 @@ package com.lapissea.cfs.type;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
+import com.lapissea.cfs.type.field.annotations.IODynamic;
 import com.lapissea.cfs.type.field.annotations.IONullability;
-import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.ArrayViewList;
 import com.lapissea.util.NotNull;
@@ -49,7 +49,7 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 			type=TypeLink.of(field.getAccessor().getGenericType(null));
 			name=field.getName();
 			nullability=field.getAccessor().getAnnotation(IONullability.class).map(IONullability::value).orElse(IONullability.Mode.NOT_NULL);
-			isDynamic=field.getAccessor().hasAnnotation(IOType.Dynamic.class);
+			isDynamic=field.getAccessor().hasAnnotation(IODynamic.class);
 			referenceType=field.getAccessor().getAnnotation(IOValue.Reference.class).map(IOValue.Reference::dataPipeType).orElse(null);
 			var deps=field.dependencyStream().map(IOField::getName).collect(Collectors.toSet());
 			if(field.getAccessor().getType().isArray()) deps.remove(IOFieldTools.makeCollectionLenName(field.getAccessor()));

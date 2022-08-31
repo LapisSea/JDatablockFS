@@ -16,8 +16,8 @@ import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.*;
 import com.lapissea.cfs.type.field.access.AbstractFieldAccessor;
 import com.lapissea.cfs.type.field.access.TypeFlag;
+import com.lapissea.cfs.type.field.annotations.IODynamic;
 import com.lapissea.cfs.type.field.annotations.IONullability;
-import com.lapissea.cfs.type.field.annotations.IOType;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.annotations.IOValueUnmanaged;
 import com.lapissea.util.NotImplementedException;
@@ -61,7 +61,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	}
 	
 	private static final List<Annotation> ANNOTATIONS=List.of(
-		IOFieldTools.makeAnnotation(IOType.Dynamic.class, Map.of()),
+		IOFieldTools.makeAnnotation(IODynamic.class, Map.of()),
 		IOFieldTools.makeAnnotation(IONullability.class, Map.of("value", IONullability.Mode.NULLABLE))
 	);
 	

@@ -2,7 +2,7 @@ package com.lapissea.cfs.run;
 
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
-import com.lapissea.cfs.type.field.annotations.IOType;
+import com.lapissea.cfs.type.field.annotations.IODynamic;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -13,7 +13,7 @@ public class TypeGenTests{
 		int getNum();
 		void setNum(int num);
 		
-		@IOType.Dynamic
+		@IODynamic
 		Object getDyn();
 		void setDyn(Object a);
 	}
