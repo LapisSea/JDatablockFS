@@ -15,13 +15,18 @@ public @interface IOCompression{
 		 */
 		RLE(RlePacker::new),
 		/**
-		 * LZ4 compression is a balance between RLE and GZIP where RLE is very fast and not very good and GZIP is slow and highly compressible.
+		 * LZ4 fast compression is a very fast compression algorithm similar in speed to RLE but works better on higher noise/variation data.
 		 */
-		LZ4(Lz4Packer::new),
+		LZ4_FAST(Lz4Packer.Fast::new),
 		/**
-		 * Your standard gzip compression. Not comparably fast but has the best compression ratio.
+		 * LZ4 compression is a balance between RLE and GZIP. It is significantly slower than RLE but is also produces higher compression
+		 * ratio. This is probably the right choice if type of data is unkown.
 		 */
-		GZIP(GzipPacker::new);
+		LZ4(Lz4Packer.High::new),
+		/**
+		 * Your standard gzip compression. Pretty slow but has the best compression ratio.
+		 */
+		GZIP(GzipPacker::new),
 		
 		private Supplier<Packer> src;
 		private Packer           packer;
