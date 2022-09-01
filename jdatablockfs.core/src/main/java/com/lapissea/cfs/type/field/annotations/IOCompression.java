@@ -8,7 +8,7 @@ public @interface IOCompression{
 	enum Type{
 		/**
 		 * (modified) Run length encoding: Very simple and very fast. Works great for data with low noise/variation. (eg: 20 values in a row are the same)<br/>
-		 * In addition a raw block and a packed length block have been added to reduce fragility and increase compression ratio
+		 * In addition, a raw block and a packed length block have been added to reduce fragility and increase compression ratio at a small sacrifice in speed.
 		 */
 		RLE(RlePacker::new),
 		/**
