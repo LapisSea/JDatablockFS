@@ -153,38 +153,36 @@ public final class RlePacker implements Packer{
 		}
 		
 		private int scanSize(){
-			int pos  =0;
-			int desiz=0;
-			while(pos<packedData.length){
-				int head=packedData[pos]&0xFF;
-				pos++;
-				switch(head&0b11){
+			int packedPos =0;
+			int rawSizeSum=0;
+			while(packedPos<packedData.length){
+				int head   =packedData[packedPos++]&0xFF;
+				var blockId=head&0b11;
+				var dataNum=head>>2;
+				switch(blockId){
 					case REPEAT_1B -> {
-						var siz=NumberSize.ordinal(head>>2);
-						var len=readLen(siz, pos);
-						pos+=1+siz.bytes;
-						desiz+=len;
+						var siz=NumberSize.ordinal(dataNum);
+						var len=readLen(siz, packedPos);
+						packedPos+=1+siz.bytes;
+						rawSizeSum+=len;
 					}
 					case REPEAT_1B_PACKED_LEN -> {
-						var len=head>>2;
-						pos++;
-						desiz+=len;
+						packedPos++;
+						rawSizeSum+=dataNum;
 					}
 					case RAW_BLOCK -> {
-						var siz=NumberSize.ordinal(head>>2);
-						var len=readLen(siz, pos);
-						pos+=siz.bytes+len;
-						desiz+=len;
+						var siz=NumberSize.ordinal(dataNum);
+						var len=readLen(siz, packedPos);
+						packedPos+=siz.bytes+len;
+						rawSizeSum+=len;
 					}
 					case RAW_BLOCK_PACKED_LEN -> {
-						var len=head>>2;
-						pos+=len;
-						desiz+=len;
+						packedPos+=dataNum;
+						rawSizeSum+=dataNum;
 					}
-					default -> throw new IllegalStateException();
 				}
 			}
-			return desiz;
+			return rawSizeSum;
 		}
 		
 		private byte[] raw;
@@ -204,7 +202,6 @@ public final class RlePacker implements Packer{
 					case REPEAT_1B_PACKED_LEN -> copyIncByte(dataNum);
 					case RAW_BLOCK -> copyInc(readLenInc(dataNum));
 					case RAW_BLOCK_PACKED_LEN -> copyInc(dataNum);
-					default -> throw new IllegalStateException();
 				}
 			}
 			
