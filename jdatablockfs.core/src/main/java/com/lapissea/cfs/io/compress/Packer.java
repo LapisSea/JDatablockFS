@@ -8,7 +8,7 @@ import com.lapissea.cfs.objects.NumberSize;
 
 import java.io.IOException;
 
-public sealed interface Packer permits GzipPacker, RlePacker, Lz4Packer{
+public sealed interface Packer permits GzipPacker, RlePacker, Lz4Packer, BruteBestPacker{
 	byte[] pack(byte[] data);
 	byte[] unpack(byte[] packedData);
 	

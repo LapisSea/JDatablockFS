@@ -1,9 +1,6 @@
 package com.lapissea.cfs.type.field.annotations;
 
-import com.lapissea.cfs.io.compress.GzipPacker;
-import com.lapissea.cfs.io.compress.Lz4Packer;
-import com.lapissea.cfs.io.compress.Packer;
-import com.lapissea.cfs.io.compress.RlePacker;
+import com.lapissea.cfs.io.compress.*;
 
 import java.util.function.Supplier;
 
@@ -27,6 +24,11 @@ public @interface IOCompression{
 		 * Your standard gzip compression. Pretty slow but has the best compression ratio.
 		 */
 		GZIP(GzipPacker::new),
+		/**
+		 * An experimental amalgamation of all previous types where all of them are ran and the smallest output is picked. This is horribly
+		 * inefficient and slow and should probably not be used.
+		 */
+		BRUTE_BEST(BruteBestPacker::new);
 		
 		private Supplier<Packer> src;
 		private Packer           packer;
