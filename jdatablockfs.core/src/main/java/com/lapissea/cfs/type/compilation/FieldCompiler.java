@@ -10,7 +10,6 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
-import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
 import com.lapissea.cfs.type.field.access.*;
 import com.lapissea.cfs.type.field.annotations.*;
@@ -41,25 +40,12 @@ public class FieldCompiler{
 	
 	private static final FieldAccess FIELD_ACCESS=GlobalConfig.configEnum("fieldAccess", Runtime.version().feature()<=18?FieldAccess.UNSAFE:FieldAccess.VAR_HANDLE);
 	
-	protected record LogicalAnnotation<T extends Annotation>(T annotation, AnnotationLogic<T> logic){
-		@SuppressWarnings("unchecked")
-		public LogicalAnnotation(T annotation){
-			this(annotation, (AnnotationLogic<T>)LOGICAL_ANN_TYPES.stream().filter(typ->typ.type==annotation.annotationType()).findAny().orElseThrow().logic);
-		}
-	}
+	protected record LogicalAnnotation<T extends Annotation>(T annotation, AnnotationLogic<T> logic){}
 	
 	private record AnnotatedField<T extends IOInstance<T>>(
 		IOField<T, ?> field,
 		List<LogicalAnnotation<Annotation>> annotations
 	) implements Comparable<AnnotatedField<T>>{
-		public AnnotatedField(IOField<T, ?> field, List<LogicalAnnotation<Annotation>> annotations){
-			this.field=Objects.requireNonNull(field);
-			if(annotations.stream().noneMatch(an->an.annotation instanceof IOValue)){
-				annotations=Stream.concat(annotations.stream(), Stream.<Annotation>of(IOFieldTools.makeAnnotation(IOValue.class)).map(LogicalAnnotation::new)).toList();
-			}
-			this.annotations=annotations;
-		}
-		
 		@Override
 		public int compareTo(AnnotatedField<T> o){
 			return field().getAccessor().compareTo(o.field.getAccessor());

@@ -5,11 +5,13 @@ import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
+import com.lapissea.cfs.type.field.annotations.IOValue;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Type;
 import java.util.Collection;
 import java.util.List;
+import java.util.stream.Stream;
 
 /**
  * This class holds the necessary information to request the struct compiler
@@ -75,6 +77,10 @@ public final class VirtualFieldDefinition<IO extends IOInstance<IO>, T>{
 		this.name=name;
 		this.type=type;
 		this.getFilter=getFilter;
+		
+		if(annotations.stream().noneMatch(an->an instanceof IOValue)){
+			annotations=Stream.concat(annotations.stream(), Stream.of(IOFieldTools.makeAnnotation(IOValue.class))).toList();
+		}
 		this.annotations=GetAnnotation.from(annotations);
 	}
 	
