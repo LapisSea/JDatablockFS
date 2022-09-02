@@ -16,6 +16,7 @@ import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
+import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.cfs.type.field.annotations.IODynamic;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
@@ -685,7 +686,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	}
 	
 	public void init(){
-		getAccessor().init(this);
+		if(getAccessor() instanceof VirtualAccessor<T> vacc) vacc.init(this);
 	}
 	
 	public long uid(){

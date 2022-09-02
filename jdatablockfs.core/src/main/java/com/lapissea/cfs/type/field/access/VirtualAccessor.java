@@ -86,7 +86,6 @@ public final class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends Abstra
 		return type.getAnnotations().isPresent(annotationClass);
 	}
 	
-	@Override
 	public void init(IOField<CTyp, ?> field){
 		if(filter!=null){
 			if(dependencies!=null){

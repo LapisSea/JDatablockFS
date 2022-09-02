@@ -2,7 +2,6 @@ package com.lapissea.cfs.type.field.access;
 
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
-import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.util.NotNull;
 
 public interface FieldAccessor<CTyp extends IOInstance<CTyp>> extends AnnotatedType, Comparable<FieldAccessor<CTyp>>{
@@ -45,9 +44,6 @@ public interface FieldAccessor<CTyp extends IOInstance<CTyp>> extends AnnotatedT
 	default int compareTo(FieldAccessor<CTyp> o){
 		return getName().compareTo(o.getName());
 	}
-	
-	
-	default void init(IOField<CTyp, ?> field){}
 	
 	default boolean canBeNull(){
 		return true;
