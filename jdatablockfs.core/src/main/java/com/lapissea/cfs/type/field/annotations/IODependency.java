@@ -26,6 +26,7 @@ import static com.lapissea.cfs.type.field.annotations.IODependency.VirtualNumSiz
 public @interface IODependency{
 	
 	AnnotationLogic<IODependency> LOGIC=new AnnotationLogic<>(){
+		@NotNull
 		@Override
 		public Set<String> getDependencyValueNames(FieldAccessor<?> field, IODependency annotation){
 			return Set.of(annotation.value());

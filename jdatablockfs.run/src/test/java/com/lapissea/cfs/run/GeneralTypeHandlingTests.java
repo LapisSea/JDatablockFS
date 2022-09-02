@@ -19,6 +19,7 @@ import com.lapissea.cfs.type.StagedInit;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.annotations.IOCompression;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import org.testng.annotations.DataProvider;
@@ -31,7 +32,9 @@ import java.util.Set;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.type.StagedInit.STATE_DONE;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.testng.AssertJUnit.assertEquals;
+import static org.testng.AssertJUnit.assertTrue;
 
 public class GeneralTypeHandlingTests{
 	
@@ -201,6 +204,52 @@ public class GeneralTypeHandlingTests{
 		Partial partial=IOInstance.Def.of(partialImpl);
 		
 		partial.b();
+	}
+	
+	@IOInstance.Def.Order({"name", "data"})
+	public interface NamedBlob extends IOInstance.Def<NamedBlob>{
+		String name();
+		@IOCompression(IOCompression.Type.RLE)
+		byte[] data();
+	}
+	
+	@Test
+	void compressByteArray() throws IOException{
+		var blob=IOInstance.Def.of(
+			NamedBlob.class, "Hello world",
+			"""
+				aaaaaaaaaayyyyyyyyyyyyyyyyyy lmaooooooooooooooooooooo
+				""".getBytes(UTF_8)
+		);
+		
+		TestUtils.testChunkProvider(TestInfo.of(), provider->{
+			var pipe=ContiguousStructPipe.of(NamedBlob.class);
+			
+			var chunk=AllocateTicket.bytes(64).submit(provider);
+			
+			pipe.write(chunk, blob);
+			assertTrue("Compression not working", chunk.chainSize()<64);
+			var read=pipe.readNew(chunk, null);
+			
+			assertEquals(blob, read);
+		});
+	}
+	
+	@DataProvider(name="templateTypes")
+	Object[][] templateTypes(){
+		return new Object[][]{
+			{Partial.class, null},
+			{NamedBlob.class, new Object[]{"aaa", new byte[10]}},
+			};
+	}
+	
+	@Test(dataProvider="templateTypes")
+	<T extends IOInstance.Def<T>> void newTemplate(Class<T> type, Object[] args) throws IOException{
+		if(args==null){
+			IOInstance.Def.of(type);
+		}else{
+			IOInstance.Def.of(type, args);
+		}
 	}
 	
 }

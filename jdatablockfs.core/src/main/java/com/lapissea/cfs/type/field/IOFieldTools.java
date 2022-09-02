@@ -4,7 +4,10 @@ import com.lapissea.cfs.Index;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.objects.NumberSize;
-import com.lapissea.cfs.type.*;
+import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.SupportedPrimitive;
+import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.compilation.DepSort;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
@@ -165,6 +168,13 @@ public class IOFieldTools{
 	}
 	public static String makeRefName(String baseName){
 		return baseName+GENERATED_FIELD_SEPARATOR+"ref";
+	}
+	
+	public static <T extends IOInstance<T>> String makePackName(FieldAccessor<T> accessor){
+		return makePackName(accessor.getName());
+	}
+	public static String makePackName(String baseName){
+		return baseName+GENERATED_FIELD_SEPARATOR+"pack";
 	}
 	
 	public static <E extends Annotation> E makeAnnotation(Class<E> annotationType){
