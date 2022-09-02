@@ -65,7 +65,7 @@ public record GenType(String typeName, int arrayDimensions, List<GenType> args, 
 		this(typeName, 0, List.of());
 	}
 	public GenType(String typeName, int arrayDimensions, List<GenType> args){
-		this(typeName, arrayDimensions, List.copyOf(args), makeTyp(typeName));
+		this(typeName, arrayDimensions, List.copyOf(args), arrayDimensions>0?Types.OBJECT:makeTyp(typeName));
 	}
 	
 	@Override

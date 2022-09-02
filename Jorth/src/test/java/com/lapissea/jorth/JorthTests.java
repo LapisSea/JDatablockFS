@@ -8,14 +8,12 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Field;
 import java.util.EnumSet;
 import java.util.List;
-import java.util.function.Function;
 
 import static com.lapissea.jorth.TestUtils.generateAndLoadInstance;
 import static com.lapissea.jorth.TestUtils.generateAndLoadInstanceSimple;
 import static org.testng.AssertJUnit.assertEquals;
 import static org.testng.AssertJUnit.assertFalse;
 import static org.testng.AssertJUnit.assertTrue;
-import static org.testng.internal.junit.ArrayAsserts.assertArrayEquals;
 
 public class JorthTests{
 	
@@ -253,6 +251,8 @@ public class JorthTests{
 		LogUtil.println(test.invoke(null, 2));
 	}
 	
+	/*
+	//TODO
 	@Test
 	void whileTest() throws ReflectiveOperationException{
 		
@@ -292,6 +292,7 @@ public class JorthTests{
 		
 		assertArrayEquals(a, b);
 	}
+	*/
 	
 	@Test
 	void functionCallTest() throws ReflectiveOperationException{

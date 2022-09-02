@@ -231,15 +231,17 @@ public class JorthCompiler{
 			d.write(token);
 			return;
 		}
-
+		
+		functionLogLine(token);
 //		var deb=rawTokens+" "+token;
 		if(consume(writer, token)){
 //			LogUtil.println(deb);
-			functionLogLine(token);
 		}
 	}
 	
 	private void functionLogLine(Token token){
+		if(currentMethod==null) return;
+		currentMethod.logLine(token.line);
 	}
 	
 	private boolean consume(JorthWriter writer, Token token) throws MalformedJorthException{
@@ -1523,5 +1525,8 @@ public class JorthCompiler{
 		}
 		
 		return new ClassInfo(clazz);
+	}
+	public int getLastLine(){
+		return lastLine;
 	}
 }
