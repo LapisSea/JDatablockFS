@@ -147,8 +147,11 @@ public class JorthMethod{
 	
 	public void start(){
 		mv.visitCode();
+		lastLineLabel=new Label();
+		mv.visitLabel(lastLineLabel);
 	}
 	public void end(){
+		mv.visitLineNumber(lastLine, lastLineLabel);
 		mv.visitMaxs(0, 0);
 		mv.visitEnd();
 	}
@@ -655,5 +658,15 @@ public class JorthMethod{
 	
 	public boolean isThrown(){
 		return thrown;
+	}
+	
+	private int   lastLine=-2;
+	private Label lastLineLabel;
+	public void logLine(int line){
+		if(line==lastLine) return;
+		lastLine=line;
+		mv.visitLineNumber(line, lastLineLabel);
+		lastLineLabel=new Label();
+		mv.visitLabel(lastLineLabel);
 	}
 }
