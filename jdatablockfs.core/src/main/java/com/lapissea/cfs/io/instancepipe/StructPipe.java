@@ -189,12 +189,15 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		init(runNow, ()->{
 			this.ioFields=FieldSet.of(initFields());
 			setInitState(STATE_IO_FIELD);
-			earlyNullChecks=Utils.nullIfEmpty(getNonNulls());
 			
 			type.waitForState(STATE_DONE);
 			sizeDescription=Objects.requireNonNull(createSizeDescriptor());
 			generators=Utils.nullIfEmpty(ioFields.stream().flatMap(IOField::generatorStream).toList());
 			referenceWalkCommands=generateReferenceWalkCommands();
+			earlyNullChecks=Utils.nullIfEmpty(
+				getNonNulls().filter(f->generators==null||generators.stream().noneMatch(gen->gen.field()==f))
+				             .toList()
+			);
 		});
 	}
 	
@@ -307,8 +310,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		);
 	}
 	
-	private List<IOField<T, ?>> getNonNulls(){
-		return ioFields.unpackedStream().filter(f->f.getNullability()==IONullability.Mode.NOT_NULL&&f.getAccessor().canBeNull()).toList();
+	private Stream<IOField<T, ?>> getNonNulls(){
+		return ioFields.unpackedStream().filter(f->f.getNullability()==IONullability.Mode.NOT_NULL&&f.getAccessor().canBeNull());
 	}
 	
 	protected abstract List<IOField<T, ?>> initFields();
