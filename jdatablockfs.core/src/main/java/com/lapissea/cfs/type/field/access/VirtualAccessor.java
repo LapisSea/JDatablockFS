@@ -89,6 +89,9 @@ public final class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends Abstra
 	@Override
 	public void init(IOField<CTyp, ?> field){
 		if(filter!=null){
+			if(dependencies!=null){
+				throw new IllegalStateException();
+			}
 			dependencies=getDeclaringStruct()
 				             .getFields()
 				             .stream()

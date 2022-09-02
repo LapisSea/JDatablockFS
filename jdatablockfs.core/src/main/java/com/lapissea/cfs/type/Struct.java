@@ -501,7 +501,6 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 					throw new RuntimeException("Failed to init "+field, e);
 				}
 			}
-			this.fields.forEach(IOField::init);
 			setInitState(STATE_INIT_FIELDS);
 			poolSizes=calcPoolSizes();
 			poolPrimitiveSizes=calcPoolPrimitiveSizes();

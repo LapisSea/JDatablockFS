@@ -53,7 +53,7 @@ public class DefInstanceCompiler{
 		@Override
 		public String toString(){
 			return "{"+
-			       name+": "+(type instanceof Class<?> c?Utils.classNameToHuman(c.getName(), false):type.getTypeName())+
+			       name+": "+Utils.typeToHuman(type, false)+
 			       getter.map(v->" getter: "+v).orElse("")+
 			       setter.map(v->" setter: "+v).orElse("")+
 			       "}";

@@ -1,5 +1,6 @@
 package com.lapissea.cfs.type.field;
 
+import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
@@ -81,4 +82,9 @@ public final class VirtualFieldDefinition<IO extends IOInstance<IO>, T>{
 	public Type getType()                    {return type;}
 	public GetterFilter<IO, T> getGetFilter(){return getFilter;}
 	public GetAnnotation getAnnotations()    {return annotations;}
+	
+	@Override
+	public String toString(){
+		return getName()+": "+Utils.typeToHuman(type, false);
+	}
 }

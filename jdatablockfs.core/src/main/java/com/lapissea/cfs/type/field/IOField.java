@@ -501,7 +501,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		return null;
 	}
 	
-	public Stream<ValueGeneratorInfo<T, ?>> generatorStream(){
+	public final Stream<ValueGeneratorInfo<T, ?>> generatorStream(){
 		var gens=getGenerators();
 		return gens==null?Stream.of():gens.stream();
 	}

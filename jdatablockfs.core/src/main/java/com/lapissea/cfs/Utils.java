@@ -288,4 +288,10 @@ public class Utils{
 		}
 		return name;
 	}
+	public static String typeToHuman(Type type, boolean doShort){
+		if(type instanceof Class<?> c){
+			return classNameToHuman(c.getName(), doShort);
+		}
+		return type.getTypeName();
+	}
 }
