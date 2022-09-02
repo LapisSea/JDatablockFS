@@ -50,6 +50,14 @@ public class DefInstanceCompiler{
 	
 	private record FieldInfo(String name, Type type, List<Annotation> annotations, Optional<FieldStub> getter, Optional<FieldStub> setter){
 		Stream<FieldStub> stubs(){return Stream.concat(getter.stream(), setter.stream());}
+		@Override
+		public String toString(){
+			return "{"+
+			       name+": "+(type instanceof Class<?> c?Utils.classNameToHuman(c.getName(), false):type.getTypeName())+
+			       getter.map(v->" getter: "+v).orElse("")+
+			       setter.map(v->" setter: "+v).orElse("")+
+			       "}";
+		}
 	}
 	
 	public record Key<T extends IOInstance<T>>(Class<T> clazz, Optional<Set<String>> includeNames){

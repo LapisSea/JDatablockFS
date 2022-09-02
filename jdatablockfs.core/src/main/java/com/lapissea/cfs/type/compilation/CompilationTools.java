@@ -21,7 +21,12 @@ public class CompilationTools{
 		Style(String humanPattern){this.humanPattern=humanPattern;}
 	}
 	
-	record FieldStub(Method method, String varName, Type type, Style style){}
+	record FieldStub(Method method, String varName, Type type, Style style){
+		@Override
+		public String toString(){
+			return varName+"("+style+")";
+		}
+	}
 	
 	private static Optional<String> namePrefix(Method m, String prefix){
 		var name=m.getName();
