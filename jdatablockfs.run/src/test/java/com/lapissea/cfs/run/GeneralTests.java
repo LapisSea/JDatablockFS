@@ -41,7 +41,7 @@ import static org.testng.Assert.assertEquals;
 public class GeneralTests{
 	
 	@BeforeSuite
-	static void init() throws IOException{
+	void init() throws IOException{
 		if(GlobalConfig.configFlag("test.tabPrint", false)){
 			LogUtil.Init.attach(USE_CALL_POS|USE_TABULATED_HEADER);
 		}

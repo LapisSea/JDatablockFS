@@ -48,7 +48,7 @@ public class FieldCompiler{
 	) implements Comparable<AnnotatedField<T>>{
 		@Override
 		public int compareTo(AnnotatedField<T> o){
-			return field().getAccessor().compareTo(o.field.getAccessor());
+			return field.getAccessor().compareTo(o.field.getAccessor());
 		}
 	}
 	
