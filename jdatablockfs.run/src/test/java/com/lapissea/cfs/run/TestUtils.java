@@ -1,5 +1,6 @@
 package com.lapissea.cfs.run;
 
+import com.lapissea.cfs.MagicID;
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.chunk.DataProvider;
@@ -57,7 +58,7 @@ public class TestUtils{
 	
 	static void testChunkProvider(TestInfo info, UnsafeConsumer<DataProvider, IOException> session) throws IOException{
 		testRawMem(info, mem->{
-			mem.write(true, Cluster.getMagicId());
+			mem.write(true, MagicID.get());
 			session.accept(DataProvider.newVerySimpleProvider(mem));
 		});
 	}

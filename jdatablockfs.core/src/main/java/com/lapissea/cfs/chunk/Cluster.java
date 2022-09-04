@@ -1,10 +1,9 @@
 package com.lapissea.cfs.chunk;
 
 import com.lapissea.cfs.IterablePP;
-import com.lapissea.cfs.exceptions.InvalidMagicIDException;
+import com.lapissea.cfs.MagicID;
 import com.lapissea.cfs.exceptions.MalformedPointerException;
 import com.lapissea.cfs.io.IOInterface;
-import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.ObjectID;
@@ -22,7 +21,6 @@ import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
@@ -30,38 +28,19 @@ import java.util.Set;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NULLABLE;
 import static com.lapissea.cfs.type.field.annotations.IOValue.Reference.PipeType.FLEXIBLE;
-import static java.nio.charset.StandardCharsets.UTF_8;
 
 public class Cluster implements DataProvider{
-	
-	private static final ByteBuffer MAGIC_ID=ByteBuffer.wrap("BYT-BAE".getBytes(UTF_8)).asReadOnlyBuffer();
 	
 	public static final  FixedContiguousStructPipe<RootRef> ROOT_PIPE;
 	private static final ChunkPointer                       FIRST_CHUNK_PTR;
 	
 	static{
-		try{
+		try{//TODO: add clinit exception detection and report
 			ROOT_PIPE=FixedContiguousStructPipe.of(RootRef.class);
-			FIRST_CHUNK_PTR=ChunkPointer.of(MAGIC_ID.limit());
+			FIRST_CHUNK_PTR=ChunkPointer.of(MagicID.size());
 		}catch(Throwable e){
 			e.printStackTrace();
 			throw e;
-		}
-	}
-	
-	public static ByteBuffer getMagicId(){
-		return MAGIC_ID.asReadOnlyBuffer();
-	}
-	
-	private static void readMagic(ContentReader src) throws InvalidMagicIDException{
-		ByteBuffer magicId;
-		try{
-			magicId=ByteBuffer.wrap(src.readInts1(MAGIC_ID.limit()));
-			if(!magicId.equals(MAGIC_ID)){
-				throw new InvalidMagicIDException("ID: "+UTF_8.decode(magicId));
-			}
-		}catch(IOException e){
-			throw new InvalidMagicIDException("There is no valid magic id, was Cluster.init called?", e);
 		}
 	}
 	
@@ -70,7 +49,7 @@ public class Cluster implements DataProvider{
 			var provider=DataProvider.newVerySimpleProvider(data);
 			
 			try(var io=data.write(true)){
-				io.write(MAGIC_ID);
+				MagicID.write(io);
 			}
 			
 			var firstChunk=AllocateTicket.withData(ROOT_PIPE, provider, new RootRef())
@@ -174,9 +153,7 @@ public class Cluster implements DataProvider{
 	public Cluster(IOInterface source) throws IOException{
 		this.source=source;
 		
-		try(var io=source.read()){
-			readMagic(io);
-		}
+		source.read(MagicID::read);
 		
 		Chunk ch=getFirstChunk();
 		

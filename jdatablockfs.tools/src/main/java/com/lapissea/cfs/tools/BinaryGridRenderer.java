@@ -2,6 +2,7 @@ package com.lapissea.cfs.tools;
 
 
 import com.lapissea.cfs.GlobalConfig;
+import com.lapissea.cfs.MagicID;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.*;
 import com.lapissea.cfs.io.ChunkChainIO;
@@ -710,7 +711,7 @@ public class BinaryGridRenderer implements DataRenderer{
 		startFrame(ctx);
 		
 		byte[] bytes=ctx.bytes;
-		var    magic=Cluster.getMagicId();
+		var    magic=MagicID.get();
 		
 		var hasMagic=bytes.length>=magic.limit()&&magic.mismatch(ByteBuffer.wrap(bytes).limit(magic.limit()))==-1;
 		if(!hasMagic&&!errorMode){

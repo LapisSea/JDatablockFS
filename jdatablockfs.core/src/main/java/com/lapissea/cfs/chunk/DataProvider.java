@@ -1,5 +1,6 @@
 package com.lapissea.cfs.chunk;
 
+import com.lapissea.cfs.MagicID;
 import com.lapissea.cfs.exceptions.DesyncedCacheException;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.impl.MemoryData;
@@ -48,7 +49,7 @@ public interface DataProvider{
 		}
 		@Override
 		public Chunk getFirstChunk() throws IOException{
-			return getChunk(ChunkPointer.of(Cluster.getMagicId().limit()));
+			return getChunk(ChunkPointer.of(MagicID.size()));
 		}
 		@Override
 		public String toString(){
@@ -63,7 +64,7 @@ public interface DataProvider{
 	static DataProvider newVerySimpleProvider(MemoryData.EventLogger onWrite) throws IOException{
 		var data=new MemoryData.Builder()
 			         .withOnWrite(onWrite)
-			         .withInitial(dest->dest.write(Cluster.getMagicId()))
+			         .withInitial(MagicID::write)
 			         .build();
 		return newVerySimpleProvider(data);
 	}

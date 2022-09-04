@@ -1,7 +1,7 @@
 package com.lapissea.cfs.benchmark;
 
+import com.lapissea.cfs.MagicID;
 import com.lapissea.cfs.chunk.Chunk;
-import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
@@ -21,7 +21,7 @@ public class ChunkBenchmark{
 	public ChunkBenchmark(){
 		try{
 			chunk=new Chunk(
-				DataProvider.newVerySimpleProvider(), ChunkPointer.of(Cluster.getMagicId().limit()),
+				DataProvider.newVerySimpleProvider(), ChunkPointer.of(MagicID.size()),
 				NumberSize.SHORT, 1000, 1000,
 				NumberSize.SHORT, ChunkPointer.of(1000)
 			);
