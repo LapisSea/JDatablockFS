@@ -7,6 +7,7 @@ import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
+import com.lapissea.cfs.objects.ObjectID;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.objects.collections.ContiguousIOList;
 import com.lapissea.cfs.objects.collections.HashIOMap;
@@ -34,7 +35,6 @@ import java.util.stream.Stream;
 import static com.lapissea.cfs.type.StagedInit.STATE_DONE;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.testng.AssertJUnit.assertEquals;
-import static org.testng.AssertJUnit.assertTrue;
 
 public class GeneralTypeHandlingTests{
 	
@@ -215,21 +215,17 @@ public class GeneralTypeHandlingTests{
 	
 	@Test
 	void compressByteArray() throws IOException{
-		var blob=IOInstance.Def.of(
-			NamedBlob.class, "Hello world",
-			"""
-				aaaaaaaaaayyyyyyyyyyyyyyyyyy lmaooooooooooooooooooooo
-				""".getBytes(UTF_8)
-		);
-		
-		TestUtils.testChunkProvider(TestInfo.of(), provider->{
-			var pipe=ContiguousStructPipe.of(NamedBlob.class);
-			
-			var chunk=AllocateTicket.bytes(64).submit(provider);
-			
-			pipe.write(chunk, blob);
-			assertTrue("Compression not working", chunk.chainSize()<64);
-			var read=pipe.readNew(chunk, null);
+		TestUtils.testCluster(TestInfo.of(), provider->{
+			var blob=IOInstance.Def.of(
+				NamedBlob.class, "Hello world",
+				"""
+					aaaaaaaaaayyyyyyyyyyyyyyyyyy lmaooooooooooooooooooooo
+					""".getBytes(UTF_8)
+			);
+			provider.getRootProvider().provide(blob, new ObjectID("obj"));
+			var read=provider.getRootProvider().request(NamedBlob.class, "obj");
+
+//			assertTrue("Compression not working", chunk.chainSize()<64);
 			
 			assertEquals(blob, read);
 		});

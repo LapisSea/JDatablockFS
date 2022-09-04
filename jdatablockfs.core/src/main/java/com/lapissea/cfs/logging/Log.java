@@ -35,6 +35,19 @@ public class Log{
 		default -> throw new IllegalStateException(level+" is not a recognised logging level");
 	}).orElse(GlobalConfig.RELEASE_MODE?WARN:INFO);
 	
+	static{
+		if(GlobalConfig.DEBUG_VALIDATION){
+			info(
+				"""
+					Running with debugging:
+						RELEASE_MODE: {}
+						TYPE_VALIDATION: {}
+						PRINT_COMPILATION: {}
+					""",
+				GlobalConfig.RELEASE_MODE, GlobalConfig.TYPE_VALIDATION, GlobalConfig.PRINT_COMPILATION
+			);
+		}
+	}
 	
 	public static final class Channel{
 		

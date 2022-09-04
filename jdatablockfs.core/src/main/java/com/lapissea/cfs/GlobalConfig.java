@@ -1,39 +1,21 @@
 package com.lapissea.cfs;
 
+import com.lapissea.util.LogUtil;
+
+import java.net.URL;
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.Optional;
-
-import static com.lapissea.cfs.logging.Log.info;
-import static com.lapissea.util.PoolOwnThread.async;
 
 public class GlobalConfig{
 	
 	private static final String CONFIG_PROPERTY_PREFIX="dfs.";
 	
-	public static final boolean DEBUG_VALIDATION;
+	public static final boolean DEBUG_VALIDATION=GlobalConfig.class.desiredAssertionStatus();
 	
-	public static final boolean RELEASE_MODE;
-	public static final boolean TYPE_VALIDATION;
-	public static       boolean PRINT_COMPILATION;
-	
-	static{
-		DEBUG_VALIDATION=GlobalConfig.class.desiredAssertionStatus();
-		RELEASE_MODE=configFlag("releaseMode", Objects.toString(GlobalConfig.class.getResource(GlobalConfig.class.getSimpleName()+".class")).startsWith("jar:"));
-		
-		TYPE_VALIDATION=configFlag("typeValidation", DEBUG_VALIDATION);
-		PRINT_COMPILATION=configFlag("printCompilation", false);
-		
-		if(DEBUG_VALIDATION) async(()->info(
-			"""
-				Running with debugging:
-					RELEASE_MODE: {}
-					TYPE_VALIDATION: {}
-					PRINT_COMPILATION: {}
-				""",
-			RELEASE_MODE, TYPE_VALIDATION, PRINT_COMPILATION
-		));
-	}
+	public static final boolean RELEASE_MODE     =configFlag("releaseMode", isInJar());
+	public static final boolean TYPE_VALIDATION  =configFlag("typeValidation", DEBUG_VALIDATION);
+	public static       boolean PRINT_COMPILATION=configFlag("printCompilation", false);
 	
 	public static Optional<String> configProp(String name){
 		return Utils.optionalProperty(CONFIG_PROPERTY_PREFIX+name);
@@ -58,4 +40,17 @@ public class GlobalConfig{
 		                       .orElse(defaultValue);
 	}
 	
+	private static boolean isInJar(){
+		URL url=GlobalConfig.class.getResource(GlobalConfig.class.getSimpleName()+".class");
+		Objects.requireNonNull(url);
+		var proto=url.getProtocol();
+		return switch(proto){
+			case "jar", "war" -> true;
+			case "file" -> false;
+			default -> {
+				LogUtil.printlnEr("Warning:", proto, " is an unknown source protocol");
+				yield false;
+			}
+		};
+	}
 }
