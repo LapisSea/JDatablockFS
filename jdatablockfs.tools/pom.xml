@@ -6,7 +6,7 @@
 
 	<properties>
 		<github.spair.version>1.86.4</github.spair.version>
-		<lwjgl.version>3.3.1</lwjgl.version>
+		<lwjgl.version>3.3.2-SNAPSHOT</lwjgl.version>
 		<joml.version>1.10.4</joml.version>
 		<lwjgl.natives>natives-windows</lwjgl.natives>
 	</properties>
@@ -111,6 +111,19 @@
 			</dependency>
 		</dependencies>
 	</dependencyManagement>
+
+	<repositories>
+		<repository>
+			<id>sonatype-snapshots</id>
+			<url>https://oss.sonatype.org/content/repositories/snapshots</url>
+			<releases>
+				<enabled>false</enabled>
+			</releases>
+			<snapshots>
+				<enabled>true</enabled>
+			</snapshots>
+		</repository>
+	</repositories>
 
 	<profiles>
 		<profile>
