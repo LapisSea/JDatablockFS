@@ -1,5 +1,7 @@
 package com.lapissea.cfs.tools.utils;
 
+import com.lapissea.cfs.type.BlacklistClassLoader;
+
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.function.Predicate;

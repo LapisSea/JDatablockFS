@@ -1,4 +1,4 @@
-package com.lapissea.cfs.tools.utils;
+package com.lapissea.cfs.type;
 
 import java.io.IOException;
 import java.util.List;
@@ -7,9 +7,14 @@ import java.util.function.Predicate;
 public final class BlacklistClassLoader extends ClassLoader{
 	
 	private final List<Predicate<String>> blacklist;
+	private final boolean                 deepBlacklist;
 	
 	public BlacklistClassLoader(ClassLoader parent, List<Predicate<String>> blacklist){
+		this(true, parent, blacklist);
+	}
+	public BlacklistClassLoader(boolean deepBlacklist, ClassLoader parent, List<Predicate<String>> blacklist){
 		super(parent);
+		this.deepBlacklist=deepBlacklist;
 		this.blacklist=List.copyOf(blacklist);
 	}
 	@Override
@@ -21,6 +26,7 @@ public final class BlacklistClassLoader extends ClassLoader{
 		if(name.startsWith("java.lang")) return getParent().loadClass(name);
 		
 		var cls=super.loadClass(name, resolve);
+		if(!deepBlacklist) return cls;
 		
 		if(cls.getClassLoader()==getParent()){
 			synchronized(getClassLoadingLock(name)){

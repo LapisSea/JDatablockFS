@@ -15,8 +15,7 @@ import com.lapissea.util.TextUtil;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Modifier;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -181,10 +180,12 @@ public sealed interface IOTypeDB{
 			var db=new MemoryOnlyDB();
 			try{
 				for(var c : new Class<?>[]{
+					byte.class,
 					int.class,
 					long.class,
 					float.class,
 					double.class,
+					Byte.class,
 					Integer.class,
 					Long.class,
 					Float.class,
@@ -271,44 +272,54 @@ public sealed interface IOTypeDB{
 			
 			defs.putAll(newDefs);
 			
-			if(TYPE_VALIDATION){
-				newDefs.entrySet().removeIf(e->!e.getValue().isIoInstance());
-				if(!newDefs.isEmpty()){
-					checkNewTypeValidity(newDefs);
-				}
-			}
+			if(TYPE_VALIDATION) checkNewTypeValidity(newDefs);
 			return new TypeID(newID, true);
 		}
 		
 		private void checkNewTypeValidity(Map<TypeName, TypeDef> newDefs){
-			var names=newDefs.entrySet().stream().filter(e->!e.getValue().isUnmanaged()).map(e->e.getKey().typeName).collect(Collectors.toSet());
-			var classLoader=new TemplateClassLoader(this, this.getClass().getClassLoader()){
-				@Override
-				protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException{
-					if(names.contains(name)){
-						synchronized(getClassLoadingLock(name)){
-							Class<?> c=findLoadedClass(name);
-							if(c==null){
-								c=findClass(name);
-							}
-							if(resolve){
-								resolveClass(c);
-							}
-							return c;
-						}
-					}
-					return super.loadClass(name, resolve);
-				}
-			};
+			newDefs.entrySet().removeIf(e->!e.getValue().isIoInstance());
+			if(newDefs.isEmpty()) return;
+			
+			class Validated{
+				private static final Set<String> VALS=new HashSet<>();
+			}
+			synchronized(Validated.VALS){
+				newDefs.entrySet().removeIf(e->Validated.VALS.contains(e.getKey().typeName));
+				if(newDefs.isEmpty()) return;
+				newDefs.keySet().stream().map(n->n.typeName).forEach(Validated.VALS::add);
+			}
+			
+			var names=newDefs.entrySet()
+			                 .stream()
+			                 .filter(e->!e.getValue().isUnmanaged())
+			                 .map(e->e.getKey().typeName)
+			                 .collect(Collectors.toSet());
+			
+			RuntimeException e=null;
 			
 			for(var name : names){
 				try{
-					var cls=Class.forName(name, true, classLoader);
+					var cls=Class.forName(
+						name, true,
+						new TemplateClassLoader(
+							this,
+							new BlacklistClassLoader(
+								false,
+								this.getClass().getClassLoader(),
+								List.of(name::equals)
+							)
+						));
 					Struct.ofUnknown(cls, StagedInit.STATE_DONE);
 				}catch(Throwable ex){
-					throw new RuntimeException("Invalid stored class "+name+"\n"+TextUtil.toNamedPrettyJson(newDefs.get(new TypeName(name))), ex);
+					synchronized(Validated.VALS){
+						Validated.VALS.remove(name);
+					}
+					var e1=new RuntimeException("Invalid stored class "+name+"\n"+TextUtil.toNamedPrettyJson(newDefs.get(new TypeName(name))), ex);
+					if(e==null) e=e1;
+					else e.addSuppressed(e1);
 				}
 			}
+			if(e!=null) throw e;
 		}
 		
 		private void recordType(MemoryOnlyDB builtIn, TypeLink type, Map<TypeName, TypeDef> newDefs) throws IOException{
@@ -328,6 +339,7 @@ public sealed interface IOTypeDB{
 				while(base.isArray()){
 					base=base.componentType();
 				}
+				if(base.isPrimitive()) return;
 				recordType(builtIn, new TypeLink(base), newDefs);
 				return;
 			}
