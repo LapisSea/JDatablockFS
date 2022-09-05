@@ -32,9 +32,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.lapissea.cfs.ConsoleColors.*;
 import static java.lang.reflect.Modifier.isStatic;
 
 public class DefInstanceCompiler{
@@ -200,7 +202,12 @@ public class DefInstanceCompiler{
 		
 		var key   =node.key;
 		var interf=key.clazz;
-		Log.trace("Generating implementation of: {}", interf.getName());
+		
+		var hash=interf.getClassLoader().hashCode();
+		Log.trace("Generating implementation of: {} - {}", interf.getName(), (Supplier<String>)()->{
+			var cols=List.of(BLACK, RED, GREEN, YELLOW, BLUE, PURPLE, CYAN, WHITE);
+			return cols.get((int)(Integer.toUnsignedLong(hash)%cols.size()))+Integer.toHexString(hash)+RESET;
+		});
 		
 		var getters =new ArrayList<FieldStub>();
 		var setters =new ArrayList<FieldStub>();

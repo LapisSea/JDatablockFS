@@ -33,6 +33,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.ConsoleColors.GREEN_BRIGHT;
+import static com.lapissea.cfs.ConsoleColors.RESET;
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.GlobalConfig.PRINT_COMPILATION;
 import static com.lapissea.cfs.Utils.getCallee;
@@ -440,7 +441,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			var existing=STRUCT_CACHE.get(instanceClass);
 			if(existing!=null) return (S)existing;
 			
-			COMPILATION.log("Requested struct: {}", instanceClass.getName());
+			Log.trace("{}Requested struct: {}{}", GREEN_BRIGHT, instanceClass.getName(), RESET);
 			
 			try{
 				STRUCT_COMPILE.put(instanceClass, Thread.currentThread());

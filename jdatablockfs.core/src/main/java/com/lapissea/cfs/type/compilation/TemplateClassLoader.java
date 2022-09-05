@@ -26,9 +26,12 @@ import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
-public class TemplateClassLoader extends ClassLoader{
+import static com.lapissea.cfs.ConsoleColors.*;
+
+public final class TemplateClassLoader extends ClassLoader{
 	
 	private record TypeNamed(String name, TypeDef def){}
 	
@@ -59,7 +62,13 @@ public class TemplateClassLoader extends ClassLoader{
 		var classData=CLASS_DATA_CACHE.get(new TypeNamed(className, def));
 		if(classData==null){
 			var typ=new TypeNamed(className, def.clone());
-			Log.trace("Generating template: {}", className);
+			
+			var hash=hashCode();
+			Log.trace("Generating template: {} - {}", className, (Supplier<String>)()->{
+				var cols=List.of(BLACK, RED, GREEN, YELLOW, BLUE, PURPLE, CYAN, WHITE);
+				return cols.get((int)(Integer.toUnsignedLong(hash)%cols.size()))+Integer.toHexString(hash)+" "+RESET;
+			});
+			
 			try{
 				classData=jorthGenerate(typ, def.isIoInstance()?this::generateIOInstance:this::generateEnum);
 			}catch(Throwable e){

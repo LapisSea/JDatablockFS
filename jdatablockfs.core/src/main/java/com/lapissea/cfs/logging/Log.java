@@ -86,10 +86,11 @@ public class Log{
 			return receiver.apply(message);
 		}
 		
-		public void log(String message)                          {if(enabled) log(new StringBuilder(message));}
-		public void log(String message, Object arg1)             {if(enabled) log(resolveArgs(message, arg1));}
-		public void log(String message, Object arg1, Object arg2){if(enabled) log(resolveArgs(message, arg1, arg2));}
-		public void log(String message, Object... args)          {if(enabled) log(resolveArgs(message, args));}
+		public void log(String message)                                       {if(enabled) log(new StringBuilder(message));}
+		public void log(String message, Object arg1)                          {if(enabled) log(resolveArgs(message, arg1));}
+		public void log(String message, Object arg1, Object arg2)             {if(enabled) log(resolveArgs(message, arg1, arg2));}
+		public void log(String message, Object arg1, Object arg2, Object arg3){if(enabled) log(resolveArgs(message, arg1, arg2, arg3));}
+		public void log(String message, Object... args)                       {if(enabled) log(resolveArgs(message, args));}
 		private void log(StringBuilder message){
 			log0(receiver.apply(message));
 		}
@@ -108,35 +109,39 @@ public class Log{
 	}
 	
 	
-	public static void warn(String message)                          {if(LOG_LEVEL>=WARN) warn0(message);}
-	public static void warn(String message, Object arg1)             {if(LOG_LEVEL>=WARN) warn0(resolveArgs(message, arg1));}
-	public static void warn(String message, Object arg1, Object arg2){if(LOG_LEVEL>=WARN) warn0(resolveArgs(message, arg1, arg2));}
-	public static void warn(String message, Object... args)          {if(LOG_LEVEL>=WARN) warn0(resolveArgs(message, args));}
+	public static void warn(String message)                                       {if(LOG_LEVEL>=WARN) warn0(message);}
+	public static void warn(String message, Object arg1)                          {if(LOG_LEVEL>=WARN) warn0(resolveArgs(message, arg1));}
+	public static void warn(String message, Object arg1, Object arg2)             {if(LOG_LEVEL>=WARN) warn0(resolveArgs(message, arg1, arg2));}
+	public static void warn(String message, Object arg1, Object arg2, Object arg3){if(LOG_LEVEL>=WARN) warn0(resolveArgs(message, arg1, arg2, arg3));}
+	public static void warn(String message, Object... args)                       {if(LOG_LEVEL>=WARN) warn0(resolveArgs(message, args));}
 	private static void warn0(CharSequence message){
 		LogUtil.printlnEr(message);
 	}
 	
-	public static void info(String message)                          {if(LOG_LEVEL>=INFO) info0(message);}
-	public static void info(String message, Object arg1)             {if(LOG_LEVEL>=INFO) info0(resolveArgs(message, arg1));}
-	public static void info(String message, Object arg1, Object arg2){if(LOG_LEVEL>=INFO) info0(resolveArgs(message, arg1, arg2));}
-	public static void info(String message, Object... args)          {if(LOG_LEVEL>=INFO) info0(resolveArgs(message, args));}
+	public static void info(String message)                                       {if(LOG_LEVEL>=INFO) info0(message);}
+	public static void info(String message, Object arg1)                          {if(LOG_LEVEL>=INFO) info0(resolveArgs(message, arg1));}
+	public static void info(String message, Object arg1, Object arg2)             {if(LOG_LEVEL>=INFO) info0(resolveArgs(message, arg1, arg2));}
+	public static void info(String message, Object arg1, Object arg2, Object arg3){if(LOG_LEVEL>=INFO) info0(resolveArgs(message, arg1, arg2, arg3));}
+	public static void info(String message, Object... args)                       {if(LOG_LEVEL>=INFO) info0(resolveArgs(message, args));}
 	private static void info0(CharSequence message){
 		LogUtil.println(message);
 	}
 	
-	public static void debug(String message)                          {if(LOG_LEVEL>=DEBUG) debug0(message);}
-	public static void debug(String message, Object arg1)             {if(LOG_LEVEL>=DEBUG) debug0(resolveArgs(message, arg1));}
-	public static void debug(String message, Object arg1, Object arg2){if(LOG_LEVEL>=DEBUG) debug0(resolveArgs(message, arg1, arg2));}
-	public static void debug(String message, Object... args)          {if(LOG_LEVEL>=DEBUG) debug0(resolveArgs(message, args));}
+	public static void debug(String message)                                       {if(LOG_LEVEL>=DEBUG) debug0(message);}
+	public static void debug(String message, Object arg1)                          {if(LOG_LEVEL>=DEBUG) debug0(resolveArgs(message, arg1));}
+	public static void debug(String message, Object arg1, Object arg2)             {if(LOG_LEVEL>=DEBUG) debug0(resolveArgs(message, arg1, arg2));}
+	public static void debug(String message, Object arg1, Object arg2, Object arg3){if(LOG_LEVEL>=DEBUG) debug0(resolveArgs(message, arg1, arg2, arg3));}
+	public static void debug(String message, Object... args)                       {if(LOG_LEVEL>=DEBUG) debug0(resolveArgs(message, args));}
 	private static void debug0(CharSequence message){
 		LogUtil.println(message);
 	}
 	
-	public static void traceCall()                                        {if(LOG_LEVEL>=TRACE) traceCall0("", getFrame(1));}
-	public static void traceCall(String message)                          {if(LOG_LEVEL>=TRACE) traceCall0(message, getFrame(1));}
-	public static void traceCall(String message, Object arg1)             {if(LOG_LEVEL>=TRACE) traceCall0(resolveArgs(message, arg1), getFrame(1));}
-	public static void traceCall(String message, Object arg1, Object arg2){if(LOG_LEVEL>=TRACE) traceCall0(resolveArgs(message, arg1, arg2), getFrame(1));}
-	public static void traceCall(String message, Object... args)          {if(LOG_LEVEL>=TRACE) traceCall0(resolveArgs(message, args), getFrame(1));}
+	public static void traceCall()                                                     {if(LOG_LEVEL>=TRACE) traceCall0("", getFrame(1));}
+	public static void traceCall(String message)                                       {if(LOG_LEVEL>=TRACE) traceCall0(message, getFrame(1));}
+	public static void traceCall(String message, Object arg1)                          {if(LOG_LEVEL>=TRACE) traceCall0(resolveArgs(message, arg1), getFrame(1));}
+	public static void traceCall(String message, Object arg1, Object arg2)             {if(LOG_LEVEL>=TRACE) traceCall0(resolveArgs(message, arg1, arg2), getFrame(1));}
+	public static void traceCall(String message, Object arg1, Object arg2, Object arg3){if(LOG_LEVEL>=TRACE) traceCall0(resolveArgs(message, arg1, arg2, arg3), getFrame(1));}
+	public static void traceCall(String message, Object... args)                       {if(LOG_LEVEL>=TRACE) traceCall0(resolveArgs(message, args), getFrame(1));}
 	private static void traceCall0(CharSequence message, StackWalker.StackFrame frame){
 		var sb=new StringBuilder();
 		Utils.frameToStr(sb, frame);
@@ -144,18 +149,20 @@ public class Log{
 		trace(sb.toString());
 	}
 	
-	public static void trace(String message, Object arg1)             {if(LOG_LEVEL>=TRACE) trace0(resolveArgs(message, arg1));}
-	public static void trace(String message, Object arg1, Object arg2){if(LOG_LEVEL>=TRACE) trace0(resolveArgs(message, arg1, arg2));}
-	public static void trace(String message, Object... args)          {if(LOG_LEVEL>=TRACE) trace0(resolveArgs(message, args));}
-	public static void trace(String message)                          {if(LOG_LEVEL>=TRACE) trace0(message);}
+	public static void trace(String message, Object arg1)                          {if(LOG_LEVEL>=TRACE) trace0(resolveArgs(message, arg1));}
+	public static void trace(String message, Object arg1, Object arg2)             {if(LOG_LEVEL>=TRACE) trace0(resolveArgs(message, arg1, arg2));}
+	public static void trace(String message, Object arg1, Object arg2, Object arg3){if(LOG_LEVEL>=TRACE) trace0(resolveArgs(message, arg1, arg2, arg3));}
+	public static void trace(String message, Object... args)                       {if(LOG_LEVEL>=TRACE) trace0(resolveArgs(message, args));}
+	public static void trace(String message)                                       {if(LOG_LEVEL>=TRACE) trace0(message);}
 	private static void trace0(CharSequence message){
 		if(LOG_LEVEL>=TRACE) LogUtil.println(message);
 	}
 	
-	public static void smallTrace(String message, Object arg1)             {if(LOG_LEVEL>=SMALL_TRACE) smallTrace0(resolveArgs(message, arg1));}
-	public static void smallTrace(String message, Object arg1, Object arg2){if(LOG_LEVEL>=SMALL_TRACE) smallTrace0(resolveArgs(message, arg1, arg2));}
-	public static void smallTrace(String message, Object... args)          {if(LOG_LEVEL>=SMALL_TRACE) smallTrace0(resolveArgs(message, args));}
-	public static void smallTrace(String message)                          {if(LOG_LEVEL>=SMALL_TRACE) smallTrace0(message);}
+	public static void smallTrace(String message, Object arg1)                          {if(LOG_LEVEL>=SMALL_TRACE) smallTrace0(resolveArgs(message, arg1));}
+	public static void smallTrace(String message, Object arg1, Object arg2)             {if(LOG_LEVEL>=SMALL_TRACE) smallTrace0(resolveArgs(message, arg1, arg2));}
+	public static void smallTrace(String message, Object arg1, Object arg2, Object arg3){if(LOG_LEVEL>=SMALL_TRACE) smallTrace0(resolveArgs(message, arg1, arg2, arg3));}
+	public static void smallTrace(String message, Object... args)                       {if(LOG_LEVEL>=SMALL_TRACE) smallTrace0(resolveArgs(message, args));}
+	public static void smallTrace(String message)                                       {if(LOG_LEVEL>=SMALL_TRACE) smallTrace0(message);}
 	private static void smallTrace0(CharSequence message){
 		if(LOG_LEVEL>=SMALL_TRACE) LogUtil.println(message);
 	}
@@ -167,6 +174,14 @@ public class Log{
 		if(LOG_LEVEL>=WARN) nonFatal0(error, resolveArgs(Objects.requireNonNull(message), args));
 	}
 	
+	private static StringBuilder resolveArgs(String message, Object arg1, Object arg2, Object arg3){
+		var formatted=new StringBuilder(message.length()+32);
+		formatted.append(message);
+		resolveArg(formatted, arg1);
+		resolveArg(formatted, arg2);
+		resolveArg(formatted, arg3);
+		return formatted;
+	}
 	private static StringBuilder resolveArgs(String message, Object arg1, Object arg2){
 		var formatted=new StringBuilder(message.length()+32);
 		formatted.append(message);
