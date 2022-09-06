@@ -33,6 +33,7 @@ import java.util.Set;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.type.StagedInit.STATE_DONE;
+import static com.lapissea.cfs.type.field.annotations.IOCompression.Type.RLE;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.testng.AssertJUnit.assertEquals;
 
@@ -209,7 +210,7 @@ public class GeneralTypeHandlingTests{
 	@IOInstance.Def.Order({"name", "data"})
 	public interface NamedBlob extends IOInstance.Def<NamedBlob>{
 		String name();
-		@IOCompression(IOCompression.Type.RLE)
+		@IOCompression(RLE)
 		byte[] data();
 	}
 	

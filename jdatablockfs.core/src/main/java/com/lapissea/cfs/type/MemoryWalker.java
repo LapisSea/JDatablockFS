@@ -185,18 +185,16 @@ public class MemoryWalker{
 						if(skipBit) continue wh;
 						
 						//repeat cmd cases
-						switch(cmd){
-							case SKIPF_IF_NULL -> {
-								var offset=cmds.read8();
-								
-								var inst=field.get(ioPool, instance);
-								if(inst!=null){
-									if(inst instanceof Reference ref&&!ref.isNull()) continue;
-									if(inst instanceof ChunkPointer ptr&&!ptr.isNull()) continue;
-								}
-								skipBits|=1L<<offset;
-								continue;
+						if(cmd==SKIPF_IF_NULL){
+							var offset=cmds.read8();
+							
+							var inst=field.get(ioPool, instance);
+							if(inst!=null){
+								if(inst instanceof Reference ref&&!ref.isNull()) continue;
+								if(inst instanceof ChunkPointer ptr&&!ptr.isNull()) continue;
 							}
+							skipBits|=1L<<offset;
+							continue;
 						}
 						break;
 					}
@@ -204,28 +202,11 @@ public class MemoryWalker{
 					//no value cases
 					switch(cmd){
 						case SKIPB_B, SKIPB_I, SKIPB_L -> {
-							var extra=cmds.read8();
-							var siz=switch(cmd){
-								case SKIPB_B -> cmds.read8();
-								case SKIPB_I -> cmds.read32();
-								case SKIPB_L -> cmds.read64();
-								default -> throw new ShouldNeverHappenError();
-							};
-							for(int i=0;i<extra;i++){
-								iterator.next();
-							}
-							fieldOffset+=siz;
+							fieldOffset+=knownSizeSkip(iterator, cmds, cmd);
 							continue;
 						}
 						case SKIPB_UNKOWN -> {
-							var  extra   =cmds.read8();
-							var  sizeDesc=field.getSizeDescriptor();
-							long skipSize=sizeDesc.calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
-							
-							for(int i=0;i<extra;i++){
-								iterator.next();
-							}
-							fieldOffset+=skipSize;
+							fieldOffset+=unknownSizeSkip(iterator, cmds, instance, ioPool, field);
 							continue;
 						}
 					}
@@ -272,9 +253,7 @@ public class MemoryWalker{
 										inlineDirtyButContinue=true;
 									}else{
 										if(shouldSave(res)){
-											if(inlinedParent){
-												return SAVE|END;
-											}
+											if(inlinedParent) return SAVE|END;
 											
 											try(var io=reference.io(provider)){
 												pipe.write(provider, io, instance);
@@ -445,6 +424,31 @@ public class MemoryWalker{
 			return CONTINUE|SAVE;
 		}
 		return CONTINUE;
+	}
+	
+	private <T extends IOInstance<T>> long unknownSizeSkip(Iterator<IOField<T, ?>> iterator, CmdReader cmds, T instance, Struct.Pool<T> ioPool, IOField<T, ?> field){
+		var  extra   =cmds.read8();
+		var  sizeDesc=field.getSizeDescriptor();
+		long skipSize=sizeDesc.calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
+		
+		for(int i=0;i<extra;i++){
+			iterator.next();
+		}
+		return skipSize;
+	}
+	
+	private static <T extends IOInstance<T>> long knownSizeSkip(Iterator<IOField<T, ?>> iterator, CmdReader cmds, int cmd){
+		var extra=cmds.read8();
+		var siz=switch(cmd){
+			case SKIPB_B -> cmds.read8();
+			case SKIPB_I -> cmds.read32();
+			case SKIPB_L -> cmds.read64();
+			default -> throw new ShouldNeverHappenError();
+		};
+		for(int i=0;i<extra;i++){
+			iterator.next();
+		}
+		return siz;
 	}
 	
 	private static <T extends IOInstance<T>> CmdReader unmanagedCmd(IOInstance<T> instance){
