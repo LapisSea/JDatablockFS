@@ -254,12 +254,7 @@ public class InstanceCollection{
 			}
 			
 			if(val!=null){
-				try(var ignored=provider.getSource().openIOTransaction()){
-					try(var io=ref.io(provider)){
-						refPipe.write(provider, io, val);
-						io.trim();
-					}
-				}
+				ref.writeAtomic(provider, true, refPipe, val);
 			}
 		}
 		@Override
@@ -272,13 +267,7 @@ public class InstanceCollection{
 				}
 			}
 			
-			CollectionType data;
-			try(var io=ref.io(provider)){
-				data=refPipe.read(provider, io, null, genericContext);
-			}
-			
-			set(ioPool, instance, data);
-			
+			set(ioPool, instance, ref.read(provider, refPipe, null, genericContext));
 		}
 		
 		@Override

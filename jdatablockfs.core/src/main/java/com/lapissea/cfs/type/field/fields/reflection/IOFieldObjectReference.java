@@ -97,11 +97,7 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 				case DEFAULT_IF_NULL -> struct.make();
 			};
 		}
-		ValueType val=struct.make();
-		try(var io=readNew.io(provider)){
-			instancePipe.read(provider, io, val, genericContext);
-		}
-		return val;
+		return readNew.readNew(provider, instancePipe, genericContext);
 	}
 	
 	@Override
@@ -121,9 +117,7 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 		}
 		
 		if(val!=null){
-			try(var io=ref.io(provider)){
-				instancePipe.write(provider, io, val);
-			}
+			ref.write(provider, false, instancePipe, val);
 		}
 	}
 	

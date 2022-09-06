@@ -9,6 +9,7 @@ import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
+import com.lapissea.cfs.io.instancepipe.ObjectPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
@@ -18,6 +19,8 @@ import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.util.ShouldNeverHappenError;
+import com.lapissea.util.function.UnsafeConsumer;
+import com.lapissea.util.function.UnsafeFunction;
 
 import java.io.IOException;
 import java.util.List;
@@ -168,6 +171,40 @@ public final class Reference extends IOInstance.Managed<Reference>{
 	public RandomIO io(DataProvider provider) throws IOException{
 		return OffsetIO.of(ptr.dereference(provider), offset);
 	}
+	
+	public void io(DataProvider provider, UnsafeConsumer<RandomIO, IOException> session) throws IOException{
+		try(var io=io(provider)){
+			session.accept(io);
+		}
+	}
+	public <T> T ioMap(DataProvider provider, UnsafeFunction<RandomIO, T, IOException> session) throws IOException{
+		try(var io=io(provider)){
+			return session.apply(io);
+		}
+	}
+	
+	public <T> void writeAtomic(DataProvider provider, boolean trim, ObjectPipe<T, ?> pipe, T val) throws IOException{
+		try(var ignored=provider.getSource().openIOTransaction()){
+			write(provider, trim, pipe, val);
+		}
+	}
+	public <T> void write(DataProvider provider, boolean trim, ObjectPipe<T, ?> pipe, T val) throws IOException{
+		try(var io=io(provider)){
+			pipe.write(provider, io, val);
+			if(trim) io.trim();
+		}
+	}
+	public <T> T readNew(DataProvider provider, ObjectPipe<T, ?> pipe, GenericContext genericContext) throws IOException{
+		try(var io=io(provider)){
+			return pipe.readNew(provider, io, genericContext);
+		}
+	}
+	public <T> T read(DataProvider provider, ObjectPipe<T, ?> pipe, T instance, GenericContext genericContext) throws IOException{
+		try(var io=io(provider)){
+			return pipe.read(provider, io, instance, genericContext);
+		}
+	}
+	
 	
 	public ChunkPointer getPtr(){return ptr;}
 	public long getOffset()     {return offset;}

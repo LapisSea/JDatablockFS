@@ -2,6 +2,7 @@ package com.lapissea.cfs.tools;
 
 import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.chunk.DataProvider;
+import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
@@ -223,9 +224,7 @@ public class GraphRenderer implements DataRenderer{
 			pos(pos);
 			try{
 				if(val instanceof IOInstance.Unmanaged u){
-					try(var io=u.getReference().io(provider)){
-						size=io.remaining();
-					}
+					size=u.getReference().ioMap(provider, RandomIO::remaining);
 				}else if(val==null) size=0;
 				else{
 					size=ContiguousStructPipe.sizeOfUnknown(provider, (IOInstance)val, WordSpace.BYTE);

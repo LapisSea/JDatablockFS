@@ -255,9 +255,7 @@ public class MemoryWalker{
 										if(shouldSave(res)){
 											if(inlinedParent) return SAVE|END;
 											
-											try(var io=reference.io(provider)){
-												pipe.write(provider, io, instance);
-											}
+											reference.write(provider, false, pipe, instance);
 										}
 										switch(getFlow(res)){
 											case CONTINUE -> {}
@@ -505,9 +503,7 @@ public class MemoryWalker{
 			if(instance instanceof IOInstance.Unmanaged<?>){
 				field.set(ioPool, instance, fieldValue);
 			}else{
-				try(var io=instanceReference.io(provider)){
-					pipe.write(provider, io, instance);
-				}
+				instanceReference.write(provider, false, pipe, instance);
 			}
 		}
 		

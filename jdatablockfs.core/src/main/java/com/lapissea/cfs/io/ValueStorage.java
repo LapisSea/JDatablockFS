@@ -164,9 +164,7 @@ public sealed interface ValueStorage<T>{
 			if(ref.isNull()){
 				return null;
 			}
-			try(var io=ref.io(provider)){
-				return pipe.readNew(provider, io, ctx);
-			}
+			return ref.readNew(provider, pipe, ctx);
 		}
 		
 		@Override
@@ -182,10 +180,7 @@ public sealed interface ValueStorage<T>{
 				return;
 			}
 			
-			try(var io=ref.io(provider)){
-				pipe.write(provider, io, src);
-				io.trim();
-			}
+			ref.write(provider, true, pipe, src);
 		}
 		
 		@Override
@@ -230,9 +225,7 @@ public sealed interface ValueStorage<T>{
 		public void readSingle(ContentReader src, T dest, IOField<T, ?> field) throws IOException{
 			var ref=Reference.FIXED_PIPE.readNew(provider, src, null);
 			ref.requireNonNull();
-			try(var io=ref.io(provider)){
-				pipe.readSingleField(pipe.makeIOPool(), provider, io, field, dest, ctx);
-			}
+			ref.io(provider, io->pipe.readSingleField(pipe.makeIOPool(), provider, io, field, dest, ctx));
 		}
 	}
 	
@@ -392,9 +385,7 @@ public sealed interface ValueStorage<T>{
 			if(ref.isNull()){
 				return null;
 			}
-			try(var io=ref.io(provider)){
-				return AutoText.PIPE.readNew(provider, io, null).getData();
-			}
+			return ref.readNew(provider, AutoText.PIPE, null).getData();
 		}
 		
 		@Override
@@ -409,11 +400,7 @@ public sealed interface ValueStorage<T>{
 				Reference.FIXED_PIPE.write(provider, dest, ch.getPtr().makeReference());
 				return;
 			}
-			
-			try(var io=ref.io(provider)){
-				AutoText.PIPE.write(provider, io, new AutoText(src));
-				io.trim();
-			}
+			ref.write(provider, true, AutoText.PIPE, new AutoText(src));
 		}
 		
 		@Override
