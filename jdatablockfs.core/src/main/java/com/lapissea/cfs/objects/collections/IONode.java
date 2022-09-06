@@ -344,20 +344,24 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 			}
 			return valueStorage.readNew(io);
 		}catch(IOException e){
-			StringBuilder sb=new StringBuilder();
-			sb.append("@ ").append(this.getReference().addOffset(valueStart()).infoString(getDataProvider())).append(": ");
-			var cause=e.getCause();
-			while(cause!=null&&cause.getClass()==IOException.class&&cause.getLocalizedMessage()!=null){
-				sb.append(e.getLocalizedMessage()).append(": ");
-				cause=cause.getCause();
-			}
-			if(cause!=null){
-				sb.append(cause.getClass().getSimpleName());
-				var msg=cause.getLocalizedMessage();
-				if(msg!=null) sb.append(": ").append(msg);
-			}
-			throw new IOException(sb.toString(), e);
+			throw readFail(e);
 		}
+	}
+	
+	private IOException readFail(IOException e) throws IOException{
+		StringBuilder sb=new StringBuilder();
+		sb.append("@ ").append(this.getReference().addOffset(valueStart()).infoString(getDataProvider())).append(": ");
+		var cause=e.getCause();
+		while(cause!=null&&cause.getClass()==IOException.class&&cause.getLocalizedMessage()!=null){
+			sb.append(e.getLocalizedMessage()).append(": ");
+			cause=cause.getCause();
+		}
+		if(cause!=null){
+			sb.append(cause.getClass().getSimpleName());
+			var msg=cause.getLocalizedMessage();
+			if(msg!=null) sb.append(": ").append(msg);
+		}
+		return new IOException(sb.toString(), e);
 	}
 	
 	private void requireNonFreed() throws IOException{

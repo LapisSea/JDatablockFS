@@ -212,7 +212,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	}
 	
 	
-	protected RandomIO ioAtElement(long index) throws IOException{
+	private RandomIO ioAtElement(long index) throws IOException{
 		var io=selfIO();
 		try{
 			var pos=calcElementOffset(index);
