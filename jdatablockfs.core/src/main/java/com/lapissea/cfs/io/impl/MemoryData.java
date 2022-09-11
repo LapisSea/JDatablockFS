@@ -96,7 +96,7 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 			
 			int remaining=(int)(getSize()-getPos());
 			if(remaining<=0) return -1;
-			return read1(data, pos++)&0xFF;
+			return read1(fileData, pos++)&0xFF;
 		}
 		
 		@Override
@@ -125,7 +125,7 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 				throw new EOFException();
 			}
 			
-			long val=MemoryData.this.read8(data, pos, len);
+			long val=MemoryData.this.read8(fileData, pos, len);
 			pos+=len;
 			return val;
 		}
@@ -138,7 +138,7 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 			if(remaining<=0) return -1;
 			
 			int clampedLen=Math.min(remaining, len);
-			readN(data, pos, b, off, clampedLen);
+			readN(fileData, pos, b, off, clampedLen);
 			return clampedLen;
 		}
 		
@@ -153,7 +153,7 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 			
 			int remaining=(int)(getCapacity()-getPos());
 			if(remaining<=0) setCapacity(Math.max(4, Math.max(getCapacity()+1, getCapacity()+1-remaining)));
-			write1(data, pos, (byte)b);
+			write1(fileData, pos, (byte)b);
 			logWriteEvent(pos);
 			pos++;
 			used=Math.max(used, pos);
@@ -199,7 +199,7 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 			used=Math.max(used, Math.toIntExact(required));
 			
 			for(var e : writeData){
-				writeN(e.data(), e.dataOffset(), data, Math.toIntExact(e.ioOffset()), e.dataLength());
+				writeN(e.data(), e.dataOffset(), fileData, Math.toIntExact(e.ioOffset()), e.dataLength());
 			}
 			
 			if(onWrite!=null){
@@ -213,7 +213,7 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 			int remaining=(int)(getCapacity()-getPos());
 			if(remaining<len) setCapacity(Math.max(4, Math.max((int)(getCapacity()*4D/3), getCapacity()+len-remaining)));
 			
-			writeN(b, off, data, pos, len);
+			writeN(b, off, fileData, pos, len);
 		}
 		
 		@Override
@@ -229,7 +229,7 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 			int remaining=(int)(getCapacity()-getPos());
 			if(remaining<len) setCapacity(Math.max(4, Math.max((int)(getCapacity()*4D/3), getCapacity()+len-remaining)));
 			
-			MemoryData.this.write8(v, data, pos, len);
+			MemoryData.this.write8(v, fileData, pos, len);
 			var oldPos=pos;
 			pos+=len;
 			used=Math.max(used, pos);
@@ -304,7 +304,7 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 	
 	public transient EventLogger onWrite;
 	
-	protected DataType data;
+	protected DataType fileData;
 	protected int      used;
 	
 	private final boolean readOnly;
@@ -313,13 +313,13 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 	private       boolean             transactionOpen;
 	private final IOTransactionBuffer transactionBuff=new IOTransactionBuffer();
 	
-	public MemoryData(DataType data, Builder info){
+	private MemoryData(DataType fileData, Builder info){
 		
-		var ok=getLength(data)>=used;
-		if(!ok) throw new IllegalArgumentException(TextUtil.toString(getLength(data), ">=", used));
+		var ok=getLength(fileData)>=used;
+		if(!ok) throw new IllegalArgumentException(TextUtil.toString(getLength(fileData), ">=", used));
 		
-		this.data=data;
-		this.used=info.getUsed()==-1?getLength(data):info.getUsed();
+		this.fileData=fileData;
+		this.used=info.getUsed()==-1?getLength(fileData):info.getUsed();
 		this.readOnly=info.isReadOnly();
 		
 		onWrite=info.getOnWrite();
@@ -372,12 +372,12 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 			return;
 		}
 		
-		long lastCapacity=getLength(data);
+		long lastCapacity=getLength(fileData);
 		if(lastCapacity==newCapacity) return;
 		
 		if(lastCapacity<newCapacity||lastCapacity>newCapacity*2L){
 			var newc=lastCapacity<newCapacity?(int)Math.max(newCapacity, lastCapacity*4/3):newCapacity;
-			data=resize(data, newc);
+			fileData=resize(fileData, newc);
 		}
 		used=Math.min(used, newCapacity);
 		
@@ -408,7 +408,7 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 	public byte[] readAll() throws IOException{
 		if(transactionOpen) return IOInterface.super.readAll();
 		var copy=new byte[used];
-		readN(data, 0, copy, 0, used);
+		readN(fileData, 0, copy, 0, used);
 		return copy;
 	}
 	
@@ -421,24 +421,24 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 	public boolean equals(Object o){
 		return this==o||
 		       o instanceof MemoryData<?> that&&
-		       data.equals(that.data);
+		       fileData.equals(that.fileData);
 	}
 	
 	@Override
 	public int hashCode(){
-		return data.hashCode();
+		return fileData.hashCode();
 	}
 	
-	protected abstract int getLength(DataType data);
-	protected abstract DataType resize(DataType oldData, int newSize);
+	protected abstract int getLength(DataType fileData);
+	protected abstract DataType resize(DataType oldFileData, int newFileSize);
 	
-	protected abstract byte read1(DataType data, int i);
-	protected abstract void write1(DataType data, int i, byte b);
-	protected abstract void readN(DataType src, int index, byte[] dest, int off, int len);
-	protected abstract void writeN(byte[] src, int index, DataType dest, int off, int len);
+	protected abstract byte read1(DataType fileData, int fileOffset);
+	protected abstract void write1(DataType fileData, int fileOffset, byte b);
+	protected abstract void readN(DataType fileData, int fileOffset, byte[] dest, int off, int len);
+	protected abstract void writeN(byte[] src, int srcOffset, DataType fileData, int fileOffset, int len);
 	
-	protected abstract long read8(DataType data, int index, int len);
-	protected abstract void write8(long src, DataType dest, int off, int len);
+	protected abstract long read8(DataType fileData, int fileOffset, int len);
+	protected abstract void write8(long value, DataType fileData, int fileOffset, int len);
 	
 	public static Builder builder(){
 		return new Builder();
@@ -550,103 +550,103 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 	public MemoryData<?> asReadOnly(){
 		if(isReadOnly()) return this;
 		return (switch(this){
-			case Arr d -> builder().withRaw(d.data).withUsedLength(used);
-			case Buff d -> builder().withRaw(d.data).withUsedLength(used);
+			case Arr d -> builder().withRaw(d.fileData).withUsedLength(used);
+			case Buff d -> builder().withRaw(d.fileData).withUsedLength(used);
 		}).asReadOnly().build();
 	}
 	
 	private static final class Arr extends MemoryData<byte[]>{
 		
-		public Arr(byte[] data, Builder info){
+		private Arr(byte[] data, Builder info){
 			super(data, info);
 		}
 		
 		@Override
-		protected int getLength(byte[] data){
-			return data.length;
+		protected int getLength(byte[] fileData){
+			return fileData.length;
 		}
 		@Override
-		protected byte read1(byte[] data, int i){
-			return data[i];
+		protected byte read1(byte[] fileData, int fileOffset){
+			return fileData[fileOffset];
 		}
 		@Override
-		protected void write1(byte[] data, int i, byte b){
-			data[i]=b;
+		protected void write1(byte[] fileData, int fileOffset, byte b){
+			fileData[fileOffset]=b;
 		}
 		@Override
-		protected void readN(byte[] src, int index, byte[] dest, int off, int len){
-			System.arraycopy(src, index, dest, off, len);
+		protected void readN(byte[] fileData, int fileOffset, byte[] dest, int off, int len){
+			System.arraycopy(fileData, fileOffset, dest, off, len);
 		}
 		@Override
-		protected void writeN(byte[] src, int index, byte[] dest, int off, int len){
-			System.arraycopy(src, index, dest, off, len);
+		protected void writeN(byte[] src, int srcOffset, byte[] fileData, int fileOffset, int len){
+			System.arraycopy(src, srcOffset, fileData, fileOffset, len);
 		}
 		@Override
-		protected byte[] resize(byte[] oldData, int newSize){
-			return Arrays.copyOf(oldData, newSize);
+		protected byte[] resize(byte[] oldFileData, int newFileSize){
+			return Arrays.copyOf(oldFileData, newFileSize);
 		}
 		
 		@Override
-		protected long read8(byte[] data, int index, int len){
-			return Utils.read8(data, index, len);
+		protected long read8(byte[] fileData, int fileOffset, int len){
+			return Utils.read8(fileData, fileOffset, len);
 		}
 		@Override
-		protected void write8(long src, byte[] dest, int off, int len){
-			Utils.write8(src, dest, off, len);
+		protected void write8(long value, byte[] fileData, int fileOffset, int len){
+			Utils.write8(value, fileData, fileOffset, len);
 		}
 	}
 	
 	private static final class Buff extends MemoryData<ByteBuffer>{
 		
-		public Buff(ByteBuffer data, Builder info){
+		private Buff(ByteBuffer data, Builder info){
 			super(data, info);
 		}
 		
 		@Override
-		protected int getLength(ByteBuffer data){
-			return data.limit();
+		protected int getLength(ByteBuffer fileData){
+			return fileData.limit();
 		}
 		@Override
-		protected byte read1(ByteBuffer data, int i){
-			return data.get(i);
+		protected byte read1(ByteBuffer fileData, int fileOffset){
+			return fileData.get(fileOffset);
 		}
 		@Override
-		protected void write1(ByteBuffer data, int i, byte b){
-			data.put(i, b);
+		protected void write1(ByteBuffer fileData, int fileOffset, byte b){
+			fileData.put(fileOffset, b);
 		}
 		@Override
-		protected void readN(ByteBuffer src, int index, byte[] dest, int off, int len){
-			src.get(index, dest, off, len);
+		protected void readN(ByteBuffer fileData, int fileOffset, byte[] dest, int off, int len){
+			fileData.get(fileOffset, dest, off, len);
 		}
 		@Override
-		protected void writeN(byte[] src, int index, ByteBuffer dest, int off, int len){
-			dest.put(off, src, index, len);
+		protected void writeN(byte[] src, int srcOffset, ByteBuffer fileData, int fileOffset, int len){
+			fileData.put(fileOffset, src, srcOffset, len);
 		}
 		@Override
-		protected ByteBuffer resize(ByteBuffer oldData, int newSize){
-			ByteBuffer newData=ByteBuffer.allocate(newSize);
-			oldData.position(0);
-			newData.put(oldData);
-			newData.position(0);
-			return newData;
+		protected ByteBuffer resize(ByteBuffer oldFileData, int newFileSize){
+			ByteBuffer newFile=ByteBuffer.allocate(newFileSize);
+			oldFileData.position(0);
+			newFile.put(oldFileData);
+			newFile.position(0);
+			return newFile;
 		}
 		
 		@Override
-		protected long read8(ByteBuffer data, int index, int len){
+		protected long read8(ByteBuffer fileData, int fileOffset, int len){
 			final var lm1=len-1;
 			long      val=0;
 			for(int i=0;i<len;i++){
-				val|=(data.get(index+i)&255L)<<((lm1-i)*8);
+				val|=(fileData.get(fileOffset+i)&255L)<<((lm1-i)*8);
 			}
 			return val;
 		}
 		
 		@Override
-		protected void write8(long src, ByteBuffer dest, int off, int len){
+		protected void write8(long value, ByteBuffer fileData, int fileOffset, int len){
 			final var lm1=len-1;
 			
 			for(int i=0;i<len;i++){
-				dest.put(off+i, (byte)(src >>> ((lm1-i)*8)));
+				fileData.put(fileOffset+i, (byte)(value >>> ((lm1-i)*8)));
 			}
 		}
 		
