@@ -8,7 +8,7 @@ import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
@@ -44,14 +44,14 @@ public class IOFieldBooleanArray<T extends IOInstance<T>> extends IOField<T, boo
 		return descriptor;
 	}
 	@Override
-	public void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+	public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		var arr=get(ioPool, instance);
 		try(var b=new BitOutputStream(dest)){
 			b.writeBits(arr);
 		}
 	}
 	@Override
-	public void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		int       size=arraySize.getValue(ioPool, instance);
 		boolean[] data=new boolean[size];
 		try(var b=new BitInputStream(src, size)){
@@ -61,7 +61,7 @@ public class IOFieldBooleanArray<T extends IOInstance<T>> extends IOField<T, boo
 	}
 	
 	@Override
-	public void skipRead(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public void skipRead(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		int size=arraySize.getValue(ioPool, instance);
 		src.skipExact(size);
 	}

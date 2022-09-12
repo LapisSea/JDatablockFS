@@ -57,11 +57,11 @@ public interface DataProvider{
 		}
 	}
 	
-	static DataProvider newVerySimpleProvider() throws IOException{
+	static DataProvider newVerySimpleProvider(){
 		return newVerySimpleProvider((MemoryData.EventLogger)null);
 	}
 	
-	static DataProvider newVerySimpleProvider(MemoryData.EventLogger onWrite) throws IOException{
+	static DataProvider newVerySimpleProvider(MemoryData.EventLogger onWrite){
 		var data=new MemoryData.Builder()
 			         .withOnWrite(onWrite)
 			         .withInitial(MagicID::write)

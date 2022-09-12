@@ -19,10 +19,7 @@ import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
-import com.lapissea.cfs.type.GenericContext;
-import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.Struct;
-import com.lapissea.cfs.type.WordSpace;
+import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.annotations.IODependency;
@@ -147,7 +144,7 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		}
 		
 		@Override
-		protected void doWrite(DataProvider provider, ContentWriter dest, Struct.Pool<Chunk> ioPool, Chunk instance) throws IOException{
+		protected void doWrite(DataProvider provider, ContentWriter dest, VarPool<Chunk> ioPool, Chunk instance) throws IOException{
 			
 			var siz     =getSizeDescriptor().requireMax(WordSpace.BYTE);
 			var destBuff=new ContentOutputBuilder((int)siz);
@@ -169,7 +166,7 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		}
 		
 		@Override
-		protected Chunk doRead(Struct.Pool<Chunk> ioPool, DataProvider provider, ContentReader src, Chunk instance, GenericContext genericContext) throws IOException{
+		protected Chunk doRead(VarPool<Chunk> ioPool, DataProvider provider, ContentReader src, Chunk instance, GenericContext genericContext) throws IOException{
 			NumberSize bns;
 			NumberSize nns;
 			try(var f=FlagReader.read(src, NumberSize.BYTE)){

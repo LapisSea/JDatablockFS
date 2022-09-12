@@ -7,10 +7,7 @@ import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.objects.NumberSize;
-import com.lapissea.cfs.type.GenericContext;
-import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.Struct;
-import com.lapissea.cfs.type.WordSpace;
+import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
@@ -115,18 +112,18 @@ public class FixedContiguousStructPipe<T extends IOInstance<T>> extends StructPi
 		return (SizeDescriptor.Fixed<E>)super.getSizeDescriptor();
 	}
 	
-	private void setMax(T instance, Struct.Pool<T> ioPool){
+	private void setMax(T instance, VarPool<T> ioPool){
 		maxValues.forEach((k, v)->k.set(ioPool, instance, v));
 	}
 	
 	@Override
-	protected void doWrite(DataProvider provider, ContentWriter dest, Struct.Pool<T> ioPool, T instance) throws IOException{
+	protected void doWrite(DataProvider provider, ContentWriter dest, VarPool<T> ioPool, T instance) throws IOException{
 		if(maxValues!=null) setMax(instance, ioPool);
 		writeIOFields(getSpecificFields(), ioPool, provider, dest, instance);
 	}
 	
 	@Override
-	protected T doRead(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	protected T doRead(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		if(maxValues!=null) setMax(instance, ioPool);
 		readIOFields(getSpecificFields(), ioPool, provider, src, instance, genericContext);
 		return instance;

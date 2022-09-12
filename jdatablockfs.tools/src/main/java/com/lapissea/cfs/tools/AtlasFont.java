@@ -29,8 +29,8 @@ public class AtlasFont extends DrawFont{
 		for(int y=0;y<image.getHeight();y++){
 			for(int x=0;x<image.getWidth();x++){
 				int pixel=pixels[y*image.getWidth()+x];
-				buffer.put((byte)((pixel >> 16)&0xFF)); // Red component
-				buffer.put((byte)((pixel >> 8)&0xFF)); // Green component
+				buffer.put((byte)((pixel>>16)&0xFF)); // Red component
+				buffer.put((byte)((pixel>>8)&0xFF)); // Green component
 				buffer.put((byte)(pixel&0xFF)); // Blue component
 			}
 		}
@@ -127,10 +127,10 @@ public class AtlasFont extends DrawFont{
 				}
 				
 				"""
-				.replace("$texelSizeX", (1F/atlasInfo.getWidth())+"")
-				.replace("$texelSizeY", (1F/atlasInfo.getHeight())+"")
-				.replace("$distanceRange", atlasInfo.getDistanceRange()+"")
-				.replace("$size", atlasInfo.getSize()+"");
+				         .replace("$texelSizeX", (1F/atlasInfo.getWidth())+"")
+				         .replace("$texelSizeY", (1F/atlasInfo.getHeight())+"")
+				         .replace("$distanceRange", atlasInfo.getDistanceRange()+"")
+				         .replace("$size", atlasInfo.getSize()+"");
 			
 			openglTask.accept(()->{
 				program=GlUtils.makeShaderProgram(

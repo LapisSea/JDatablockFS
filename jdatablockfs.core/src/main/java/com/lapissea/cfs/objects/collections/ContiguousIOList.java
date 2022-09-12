@@ -101,11 +101,11 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 			}
 			
 			@Override
-			public T get(Struct.Pool<ContiguousIOList<T>> ioPool, ContiguousIOList<T> instance){
+			public T get(VarPool<ContiguousIOList<T>> ioPool, ContiguousIOList<T> instance){
 				return instance.getUnsafe(index);
 			}
 			@Override
-			public void set(Struct.Pool<ContiguousIOList<T>> ioPool, ContiguousIOList<T> instance, Object value){
+			public void set(VarPool<ContiguousIOList<T>> ioPool, ContiguousIOList<T> instance, Object value){
 				try{
 					instance.set(index, (T)value);
 				}catch(IOException e){

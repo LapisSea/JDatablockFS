@@ -7,6 +7,7 @@ import com.lapissea.cfs.objects.INumber;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.VarPool;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.UtilL;
@@ -30,7 +31,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 			constructor=Access.findConstructor(getType(), LongFunction.class, long.class);
 		}
 		@Override
-		public long getLong(Struct.Pool<CTyp> ioPool, CTyp instance){
+		public long getLong(VarPool<CTyp> ioPool, CTyp instance){
 			var num=(INumber)get(ioPool, instance);
 			if(num==null){
 				throw new NullPointerException("value in "+getType().getName()+"#"+getName()+" is null but INumber is a non nullable type");
@@ -38,7 +39,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 			return num.getValue();
 		}
 		@Override
-		public void setLong(Struct.Pool<CTyp> ioPool, CTyp instance, long value){
+		public void setLong(VarPool<CTyp> ioPool, CTyp instance, long value){
 			set(ioPool, instance, constructor.apply(value));
 		}
 	}
@@ -120,7 +121,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	}
 	
 	@Override
-	public Object get(Struct.Pool<CTyp> ioPool, CTyp instance){
+	public Object get(VarPool<CTyp> ioPool, CTyp instance){
 		try{
 			if(getter!=null){
 				return getter.invoke(instance);
@@ -133,7 +134,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	}
 	
 	@Override
-	public void set(Struct.Pool<CTyp> ioPool, CTyp instance, Object value){
+	public void set(VarPool<CTyp> ioPool, CTyp instance, Object value){
 		try{
 			if(setter!=null){
 				setter.invoke(instance, value);
@@ -146,7 +147,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	}
 	
 	@Override
-	public double getDouble(Struct.Pool<CTyp> ioPool, CTyp instance){
+	public double getDouble(VarPool<CTyp> ioPool, CTyp instance){
 		try{
 			if(getter!=null){
 				return (double)getter.invoke(instance);
@@ -159,7 +160,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	}
 	
 	@Override
-	public void setDouble(Struct.Pool<CTyp> ioPool, CTyp instance, double value){
+	public void setDouble(VarPool<CTyp> ioPool, CTyp instance, double value){
 		try{
 			if(setter!=null){
 				setter.invoke(instance, value);
@@ -172,7 +173,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	}
 	
 	@Override
-	public float getFloat(Struct.Pool<CTyp> ioPool, CTyp instance){
+	public float getFloat(VarPool<CTyp> ioPool, CTyp instance){
 		try{
 			if(getter!=null){
 				return (float)getter.invoke(instance);
@@ -185,7 +186,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	}
 	
 	@Override
-	public void setFloat(Struct.Pool<CTyp> ioPool, CTyp instance, float value){
+	public void setFloat(VarPool<CTyp> ioPool, CTyp instance, float value){
 		try{
 			if(setter!=null){
 				setter.invoke(instance, value);
@@ -198,7 +199,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	}
 	
 	@Override
-	public byte getByte(Struct.Pool<CTyp> ioPool, CTyp instance){
+	public byte getByte(VarPool<CTyp> ioPool, CTyp instance){
 		try{
 			if(getter!=null){
 				return (byte)getter.invoke(instance);
@@ -211,7 +212,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	}
 	
 	@Override
-	public void setByte(Struct.Pool<CTyp> ioPool, CTyp instance, byte value){
+	public void setByte(VarPool<CTyp> ioPool, CTyp instance, byte value){
 		try{
 			if(setter!=null){
 				setter.invoke(instance, value);
@@ -224,7 +225,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	}
 	
 	@Override
-	public boolean getBoolean(Struct.Pool<CTyp> ioPool, CTyp instance){
+	public boolean getBoolean(VarPool<CTyp> ioPool, CTyp instance){
 		try{
 			if(getter!=null){
 				return (boolean)getter.invoke(instance);
@@ -237,7 +238,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	}
 	
 	@Override
-	public void setBoolean(Struct.Pool<CTyp> ioPool, CTyp instance, boolean value){
+	public void setBoolean(VarPool<CTyp> ioPool, CTyp instance, boolean value){
 		try{
 			if(setter!=null){
 				setter.invoke(instance, value);
@@ -251,7 +252,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	
 	
 	@Override
-	public long getLong(Struct.Pool<CTyp> ioPool, CTyp instance){
+	public long getLong(VarPool<CTyp> ioPool, CTyp instance){
 		try{
 			if(getter!=null){
 				return (long)getter.invoke(instance);
@@ -264,7 +265,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	}
 	
 	@Override
-	public void setLong(Struct.Pool<CTyp> ioPool, CTyp instance, long value){
+	public void setLong(VarPool<CTyp> ioPool, CTyp instance, long value){
 		try{
 			if(setter!=null){
 				setter.invoke(instance, value);
@@ -277,7 +278,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	}
 	
 	@Override
-	public int getInt(Struct.Pool<CTyp> ioPool, CTyp instance){
+	public int getInt(VarPool<CTyp> ioPool, CTyp instance){
 		try{
 			if(getter!=null){
 				return (int)getter.invoke(instance);
@@ -290,7 +291,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	}
 	
 	@Override
-	public void setInt(Struct.Pool<CTyp> ioPool, CTyp instance, int value){
+	public void setInt(VarPool<CTyp> ioPool, CTyp instance, int value){
 		try{
 			if(setter!=null){
 				setter.invoke(instance, value);
@@ -303,7 +304,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	}
 	
 	@Override
-	public short getShort(Struct.Pool<CTyp> ioPool, CTyp instance){
+	public short getShort(VarPool<CTyp> ioPool, CTyp instance){
 		try{
 			if(getter!=null){
 				return (Short)getter.invoke(instance);
@@ -316,7 +317,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	}
 	
 	@Override
-	public void setShort(Struct.Pool<CTyp> ioPool, CTyp instance, short value){
+	public void setShort(VarPool<CTyp> ioPool, CTyp instance, short value){
 		try{
 			if(setter!=null){
 				setter.invoke(instance, value);

@@ -3,6 +3,7 @@ package com.lapissea.cfs.type.field.access;
 import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition.GetterFilter;
@@ -16,11 +17,11 @@ import java.util.function.Function;
 
 public final class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends AbstractPrimitiveAccessor<CTyp>{
 	
-	private static final Function<IOInstance.Managed<?>, Struct.Pool<?>> GETTER=Access.makeLambda(IOInstance.Managed.class, "getVirtualPool", Function.class);
+	private static final Function<IOInstance.Managed<?>, VarPool<?>> GETTER=Access.makeLambda(IOInstance.Managed.class, "getVirtualPool", Function.class);
 	
 	@SuppressWarnings("unchecked")
-	private static <T extends IOInstance<T>> Struct.Pool<T> getVirtualPool(T instance){
-		var pool=(Struct.Pool<T>)GETTER.apply((IOInstance.Managed<?>)instance);//TODO: fix this upcast. IOInstance needs to provide?
+	private static <T extends IOInstance<T>> VarPool<T> getVirtualPool(T instance){
+		var pool=(VarPool<T>)GETTER.apply((IOInstance.Managed<?>)instance);//TODO: fix this upcast. IOInstance needs to provide?
 		if(pool==null){
 			throw new NullPointerException("Tried to access instance pool where there is none");
 		}
@@ -102,71 +103,71 @@ public final class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends Abstra
 	
 	@SuppressWarnings("unchecked")
 	@Override
-	protected long getExactLong(Struct.Pool<CTyp> ioPool, CTyp instance){
+	protected long getExactLong(VarPool<CTyp> ioPool, CTyp instance){
 		long rawVal=getTargetPool(ioPool, instance).getLong(this);
 		if(filter==null) return rawVal;
 		return ((GetterFilter.L<CTyp>)(Object)filter).filterPrimitive(ioPool, instance, dependencies, rawVal);
 	}
 	@Override
-	protected void setExactLong(Struct.Pool<CTyp> ioPool, CTyp instance, long value){
+	protected void setExactLong(VarPool<CTyp> ioPool, CTyp instance, long value){
 		getTargetPool(ioPool, instance).setLong(this, value);
 	}
 	
 	@SuppressWarnings("unchecked")
 	@Override
-	protected int getExactInt(Struct.Pool<CTyp> ioPool, CTyp instance){
+	protected int getExactInt(VarPool<CTyp> ioPool, CTyp instance){
 		int rawVal=getTargetPool(ioPool, instance).getInt(this);
 		if(filter==null) return rawVal;
 		return ((GetterFilter.I<CTyp>)(Object)filter).filterPrimitive(ioPool, instance, dependencies, rawVal);
 	}
 	@Override
-	protected void setExactInt(Struct.Pool<CTyp> ioPool, CTyp instance, int value){getTargetPool(ioPool, instance).setInt(this, value);}
+	protected void setExactInt(VarPool<CTyp> ioPool, CTyp instance, int value){getTargetPool(ioPool, instance).setInt(this, value);}
 	
 	@Override
-	protected short getExactShort(Struct.Pool<CTyp> ioPool, CTyp instance){return (short)getExactObject(ioPool, instance);}
+	protected short getExactShort(VarPool<CTyp> ioPool, CTyp instance){return (short)getExactObject(ioPool, instance);}
 	@Override
-	protected void setExactShort(Struct.Pool<CTyp> ioPool, CTyp instance, short value){setExactObject(ioPool, instance, value);}
+	protected void setExactShort(VarPool<CTyp> ioPool, CTyp instance, short value){setExactObject(ioPool, instance, value);}
 	@Override
-	protected char getExactChar(Struct.Pool<CTyp> ioPool, CTyp instance){return (char)getExactObject(ioPool, instance);}
+	protected char getExactChar(VarPool<CTyp> ioPool, CTyp instance){return (char)getExactObject(ioPool, instance);}
 	@Override
-	protected void setExactChar(Struct.Pool<CTyp> ioPool, CTyp instance, char value){setExactObject(ioPool, instance, value);}
+	protected void setExactChar(VarPool<CTyp> ioPool, CTyp instance, char value){setExactObject(ioPool, instance, value);}
 	
 	@Override
-	protected byte getExactByte(Struct.Pool<CTyp> ioPool, CTyp instance){return getTargetPool(ioPool, instance).getByte(this);}
+	protected byte getExactByte(VarPool<CTyp> ioPool, CTyp instance){return getTargetPool(ioPool, instance).getByte(this);}
 	@Override
-	protected void setExactByte(Struct.Pool<CTyp> ioPool, CTyp instance, byte value){getTargetPool(ioPool, instance).setByte(this, value);}
+	protected void setExactByte(VarPool<CTyp> ioPool, CTyp instance, byte value){getTargetPool(ioPool, instance).setByte(this, value);}
 	
 	@Override
-	protected double getExactDouble(Struct.Pool<CTyp> ioPool, CTyp instance){return (double)getExactObject(ioPool, instance);}
+	protected double getExactDouble(VarPool<CTyp> ioPool, CTyp instance){return (double)getExactObject(ioPool, instance);}
 	@Override
-	protected void setExactDouble(Struct.Pool<CTyp> ioPool, CTyp instance, double value){setExactObject(ioPool, instance, value);}
+	protected void setExactDouble(VarPool<CTyp> ioPool, CTyp instance, double value){setExactObject(ioPool, instance, value);}
 	
 	@Override
-	protected float getExactFloat(Struct.Pool<CTyp> ioPool, CTyp instance){return (float)getExactObject(ioPool, instance);}
+	protected float getExactFloat(VarPool<CTyp> ioPool, CTyp instance){return (float)getExactObject(ioPool, instance);}
 	@Override
-	protected void setExactFloat(Struct.Pool<CTyp> ioPool, CTyp instance, float value){setExactObject(ioPool, instance, value);}
+	protected void setExactFloat(VarPool<CTyp> ioPool, CTyp instance, float value){setExactObject(ioPool, instance, value);}
 	
 	@Override
-	protected boolean getExactBoolean(Struct.Pool<CTyp> ioPool, CTyp instance){return getTargetPool(ioPool, instance).getBoolean(this);}
+	protected boolean getExactBoolean(VarPool<CTyp> ioPool, CTyp instance){return getTargetPool(ioPool, instance).getBoolean(this);}
 	@Override
-	protected void setExactBoolean(Struct.Pool<CTyp> ioPool, CTyp instance, boolean value){getTargetPool(ioPool, instance).setBoolean(this, value);}
+	protected void setExactBoolean(VarPool<CTyp> ioPool, CTyp instance, boolean value){getTargetPool(ioPool, instance).setBoolean(this, value);}
 	
 	@Override
-	protected Object getExactObject(Struct.Pool<CTyp> ioPool, CTyp instance){
+	protected Object getExactObject(VarPool<CTyp> ioPool, CTyp instance){
 		var pool  =getTargetPool(ioPool, instance, true);
 		var rawVal=pool==null?null:pool.get(this);
 		if(filter==null) return rawVal;
 		return filter.filter(ioPool, instance, dependencies, rawVal);
 	}
 	@Override
-	protected void setExactObject(Struct.Pool<CTyp> ioPool, CTyp instance, Object value){
+	protected void setExactObject(VarPool<CTyp> ioPool, CTyp instance, Object value){
 		getTargetPool(ioPool, instance).set(this, value);
 	}
 	
-	private Struct.Pool<CTyp> getTargetPool(Struct.Pool<CTyp> ioPool, CTyp instance){
+	private VarPool<CTyp> getTargetPool(VarPool<CTyp> ioPool, CTyp instance){
 		return getTargetPool(ioPool, instance, false);
 	}
-	private Struct.Pool<CTyp> getTargetPool(Struct.Pool<CTyp> ioPool, CTyp instance, boolean retNull){
+	private VarPool<CTyp> getTargetPool(VarPool<CTyp> ioPool, CTyp instance, boolean retNull){
 		return switch(getStoragePool()){
 			case INSTANCE -> getVirtualPool(instance);
 			case IO -> {

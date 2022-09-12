@@ -3,10 +3,7 @@ package com.lapissea.cfs.io.instancepipe;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
-import com.lapissea.cfs.type.GenericContext;
-import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.Struct;
-import com.lapissea.cfs.type.WordSpace;
+import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 
@@ -52,12 +49,12 @@ public class ContiguousStructPipe<T extends IOInstance<T>> extends StructPipe<T>
 	}
 	
 	@Override
-	protected void doWrite(DataProvider provider, ContentWriter dest, Struct.Pool<T> ioPool, T instance) throws IOException{
+	protected void doWrite(DataProvider provider, ContentWriter dest, VarPool<T> ioPool, T instance) throws IOException{
 		writeIOFields(getSpecificFields(), ioPool, provider, dest, instance);
 	}
 	
 	@Override
-	protected T doRead(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	protected T doRead(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		readIOFields(getSpecificFields(), ioPool, provider, src, instance, genericContext);
 		return instance;
 	}

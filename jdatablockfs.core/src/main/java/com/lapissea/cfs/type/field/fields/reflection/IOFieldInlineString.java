@@ -6,7 +6,7 @@ import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
@@ -39,19 +39,19 @@ public class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends IOField.
 		);
 	}
 	
-	private AutoText getWrapped(Struct.Pool<CTyp> ioPool, CTyp instance){
+	private AutoText getWrapped(VarPool<CTyp> ioPool, CTyp instance){
 		var raw=get(ioPool, instance);
 		if(raw==null) return null;
 		return new AutoText(raw);
 	}
 	
 	@Override
-	public String get(Struct.Pool<CTyp> ioPool, CTyp instance){
+	public String get(VarPool<CTyp> ioPool, CTyp instance){
 		return getNullable(ioPool, instance, ()->"");
 	}
 	
 	@Override
-	public void set(Struct.Pool<CTyp> ioPool, CTyp instance, String value){
+	public void set(VarPool<CTyp> ioPool, CTyp instance, String value){
 		super.set(ioPool, instance, switch(getNullability()){
 			case DEFAULT_IF_NULL, NULLABLE -> value;
 			case NOT_NULL -> Objects.requireNonNull(value);
@@ -64,7 +64,7 @@ public class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends IOField.
 	}
 	
 	@Override
-	public void write(Struct.Pool<CTyp> ioPool, DataProvider provider, ContentWriter dest, CTyp instance) throws IOException{
+	public void write(VarPool<CTyp> ioPool, DataProvider provider, ContentWriter dest, CTyp instance) throws IOException{
 		if(nullable()&&getIsNull(ioPool, instance)) return;
 		var val=getWrapped(ioPool, instance);
 		if(val==null&&!nullable()){
@@ -73,7 +73,7 @@ public class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends IOField.
 		AutoText.PIPE.write(provider, dest, val);
 	}
 	
-	private AutoText readNew(Struct.Pool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
+	private AutoText readNew(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
 		if(nullable()){
 			if(getIsNull(ioPool, instance)) return null;
 		}
@@ -82,13 +82,13 @@ public class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends IOField.
 	}
 	
 	@Override
-	public void read(Struct.Pool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
+	public void read(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
 		var text=readNew(ioPool, provider, src, instance, genericContext);
 		set(ioPool, instance, text==null?null:text.getData());
 	}
 	
 	@Override
-	public void skipRead(Struct.Pool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
+	public void skipRead(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
 		readNew(ioPool, provider, src, instance, genericContext);
 	}
 	

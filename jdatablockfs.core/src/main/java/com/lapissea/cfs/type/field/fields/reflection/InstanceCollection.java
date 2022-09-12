@@ -15,7 +15,7 @@ import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.BasicSizeDescriptor;
 import com.lapissea.cfs.type.field.IOField;
@@ -73,7 +73,7 @@ public class InstanceCollection{
 		}
 		
 		@Override
-		public CollectionType get(Struct.Pool<T> ioPool, T instance){
+		public CollectionType get(VarPool<T> ioPool, T instance){
 			return getNullable(ioPool, instance);
 		}
 		
@@ -89,7 +89,7 @@ public class InstanceCollection{
 		}
 		
 		@Override
-		public void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 			if(nullable()){
 				if(getIsNull(ioPool, instance)){
 					return;
@@ -99,7 +99,7 @@ public class InstanceCollection{
 			dataAdapter.writeData(get(ioPool, instance), provider, dest);
 		}
 		@Override
-		public void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			if(nullable()){
 				if(getIsNull(ioPool, instance)){
 					set(ioPool, instance, null);
@@ -112,7 +112,7 @@ public class InstanceCollection{
 		}
 		
 		@Override
-		public void skipRead(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		public void skipRead(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			if(nullable()){
 				if(getIsNull(ioPool, instance)){
 					return;
@@ -123,7 +123,7 @@ public class InstanceCollection{
 		}
 		
 		@Override
-		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+		public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
 			var val=get(ioPool, instance);
 			if(val==null||dataAdapter.getSize(get(ioPool, instance))==0){
 				return Optional.empty();
@@ -222,7 +222,7 @@ public class InstanceCollection{
 		}
 		
 		@Override
-		public CollectionType get(Struct.Pool<T> ioPool, T instance){
+		public CollectionType get(VarPool<T> ioPool, T instance){
 			return getNullable(ioPool, instance);
 		}
 		
@@ -243,7 +243,7 @@ public class InstanceCollection{
 		}
 		
 		@Override
-		public void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 			var val=get(ioPool, instance);
 			if(val==null&&getNullability()==IONullability.Mode.DEFAULT_IF_NULL){
 				val=newDefault();
@@ -258,7 +258,7 @@ public class InstanceCollection{
 			}
 		}
 		@Override
-		public void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			var ref=Objects.requireNonNull(getRef(instance));
 			if(nullable()){
 				if(ref.isNull()){
@@ -271,7 +271,7 @@ public class InstanceCollection{
 		}
 		
 		@Override
-		public void skipRead(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		public void skipRead(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			//nothing to do. Reference field stores the actual pointer
 		}
 		
@@ -301,7 +301,7 @@ public class InstanceCollection{
 		}
 		
 		@Override
-		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+		public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
 			var val=get(ioPool, instance);
 			if(val==null||dataAdapter.getSize(get(ioPool, instance))==0){
 				return Optional.empty();
@@ -438,7 +438,7 @@ public class InstanceCollection{
 			}
 		}
 		
-		protected CollectionType readData(IOField<T, Integer> collectionSize, Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		protected CollectionType readData(IOField<T, Integer> collectionSize, VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			int size=collectionSize.get(ioPool, instance);
 			return readData(size, provider, src, genericContext);
 		}
@@ -453,7 +453,7 @@ public class InstanceCollection{
 			return data;
 		}
 		
-		private void skipReadData(IOField<T, Integer> collectionSize, Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		private void skipReadData(IOField<T, Integer> collectionSize, VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			
 			var pip=getValPipe();
 			

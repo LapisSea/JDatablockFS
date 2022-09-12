@@ -3,7 +3,7 @@ package com.lapissea.cfs.type.field;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 
@@ -16,14 +16,14 @@ import java.util.stream.LongStream;
 import static com.lapissea.cfs.type.WordSpace.BIT;
 import static com.lapissea.cfs.type.WordSpace.BYTE;
 
-public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>> extends BasicSizeDescriptor<Inst, Struct.Pool<Inst>>{
+public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>> extends BasicSizeDescriptor<Inst, VarPool<Inst>>{
 	
 	interface Sizer<T extends IOInstance<T>>{
-		long calc(Struct.Pool<T> ioPool, DataProvider prov, T value);
+		long calc(VarPool<T> ioPool, DataProvider prov, T value);
 	}
 	
 	@SuppressWarnings("unchecked")
-	final class Fixed<T extends IOInstance<T>> implements IFixed<T, Struct.Pool<T>>, SizeDescriptor<T>{
+	final class Fixed<T extends IOInstance<T>> implements IFixed<T, VarPool<T>>, SizeDescriptor<T>{
 		
 		private static final Fixed<?>[] BIT_CACHE =LongStream.range(0, 9).mapToObj(i->new Fixed<>(BIT, i)).toArray(Fixed<?>[]::new);
 		private static final Fixed<?>[] BYTE_CACHE=LongStream.range(0, 17).mapToObj(i->new Fixed<>(BYTE, i)).toArray(Fixed<?>[]::new);
@@ -165,7 +165,7 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>> extends Ba
 		}
 		
 		@Override
-		public long calcUnknown(Struct.Pool<Inst> ioPool, DataProvider provider, Inst instance, WordSpace wordSpace){
+		public long calcUnknown(VarPool<Inst> ioPool, DataProvider provider, Inst instance, WordSpace wordSpace){
 			var unmapped=unknownSize.calc(ioPool, provider, instance);
 			return mapSize(wordSpace, unmapped);
 		}
@@ -198,7 +198,7 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>> extends Ba
 		}
 		
 		@Override
-		public long calcUnknown(Struct.Pool<Inst> ioPool, DataProvider provider, Inst instance, WordSpace wordSpace){
+		public long calcUnknown(VarPool<Inst> ioPool, DataProvider provider, Inst instance, WordSpace wordSpace){
 			var num=(NumberSize)accessor.get(ioPool, instance);
 			return switch(wordSpace){
 				case BYTE -> num.bytes;

@@ -83,7 +83,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 				return TypeFlag.ID_OBJECT;
 			}
 			@Override
-			public T get(Struct.Pool<IONode<T>> ioPool, IONode<T> instance){
+			public T get(VarPool<IONode<T>> ioPool, IONode<T> instance){
 				try{
 					return instance.getValue();
 				}catch(IOException e){
@@ -91,7 +91,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 				}
 			}
 			@Override
-			public void set(Struct.Pool<IONode<T>> ioPool, IONode<T> instance, Object value){
+			public void set(VarPool<IONode<T>> ioPool, IONode<T> instance, Object value){
 				try{
 					if(value!=null){
 						var arg=instance.getTypeDef().arg(0);
@@ -142,7 +142,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 				return TypeFlag.ID_OBJECT;
 			}
 			@Override
-			public Object get(Struct.Pool<IONode<T>> ioPool, IONode<T> instance){
+			public Object get(VarPool<IONode<T>> ioPool, IONode<T> instance){
 				try{
 					return instance.getNext();
 				}catch(IOException e){
@@ -150,7 +150,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 				}
 			}
 			@Override
-			public void set(Struct.Pool<IONode<T>> ioPool, IONode<T> instance, Object value){
+			public void set(VarPool<IONode<T>> ioPool, IONode<T> instance, Object value){
 				try{
 					instance.setNext((IONode<T>)value);
 				}catch(IOException e){

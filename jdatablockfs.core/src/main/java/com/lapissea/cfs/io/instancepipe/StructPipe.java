@@ -40,7 +40,7 @@ import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.GlobalConfig.PRINT_COMPILATION;
 import static com.lapissea.cfs.GlobalConfig.TYPE_VALIDATION;
 
-public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit implements ObjectPipe<T, Struct.Pool<T>>{
+public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit implements ObjectPipe<T, VarPool<T>>{
 	
 	private static final Log.Channel COMPILATION=Log.channel(PRINT_COMPILATION&&!Access.DEV_CACHE, Log.Channel.colored(CYAN_BRIGHT));
 	
@@ -435,7 +435,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		doWrite(provider, dest, ioPool, instance);
 	}
 	
-	protected abstract void doWrite(DataProvider provider, ContentWriter dest, Struct.Pool<T> ioPool, T instance) throws IOException;
+	protected abstract void doWrite(DataProvider provider, ContentWriter dest, VarPool<T> ioPool, T instance) throws IOException;
 	
 	
 	@Override
@@ -455,7 +455,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		return doRead(makeIOPool(), provider, src, instance, genericContext);
 	}
 	
-	protected abstract T doRead(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException;
+	protected abstract T doRead(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException;
 	
 	@Override
 	public final SizeDescriptor<T> getSizeDescriptor(){
@@ -478,7 +478,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		return ioFields;
 	}
 	
-	public void earlyCheckNulls(Struct.Pool<T> ioPool, T instance){
+	public void earlyCheckNulls(VarPool<T> ioPool, T instance){
 		waitForState(STATE_DONE);
 		if(earlyNullChecks==null) return;
 		for(var field : earlyNullChecks){
@@ -488,7 +488,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		}
 	}
 	
-	protected void writeIOFields(FieldSet<T> fields, Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+	protected void writeIOFields(FieldSet<T> fields, VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		if(Access.DEV_CACHE) throw new RuntimeException();
 		
 		ContentOutputBuilder destBuff=null;
@@ -528,7 +528,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		}
 	}
 	
-	private ContentWriter validateAndSafeDestination(FieldSet<T> fields, Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+	private ContentWriter validateAndSafeDestination(FieldSet<T> fields, VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		ContentWriter safe=null;
 		if(!(instance instanceof IOInstance.Unmanaged<?>)){
 			waitForState(STATE_DONE);
@@ -562,7 +562,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		return safe;
 	}
 	
-	private void generateAll(Struct.Pool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException{
+	private void generateAll(VarPool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException{
 		for(var generator : generators){
 			try{
 				generator.generate(ioPool, provider, instance, allowExternalMod);
@@ -572,7 +572,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		}
 	}
 	
-	private void writeFieldKnownSize(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter target, T instance, IOField<T, ?> field) throws IOException{
+	private void writeFieldKnownSize(VarPool<T> ioPool, DataProvider provider, ContentWriter target, T instance, IOField<T, ?> field) throws IOException{
 		var desc    =field.getSizeDescriptor();
 		var bytes   =desc.calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
 		var safeBuff=target.writeTicket(bytes).requireExact().submit();
@@ -729,7 +729,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		
 	}
 	
-	protected void readIOFields(FieldSet<T> fields, Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	protected void readIOFields(FieldSet<T> fields, VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		for(IOField<T, ?> field : fields){
 			if(DEBUG_VALIDATION){
 				readFieldSafe(ioPool, provider, src, instance, genericContext, field);
@@ -739,7 +739,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		}
 	}
 	
-	public void readSingleField(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, IOField<T, ?> selectedField, T instance, GenericContext genericContext) throws IOException{
+	public void readSingleField(VarPool<T> ioPool, DataProvider provider, ContentReader src, IOField<T, ?> selectedField, T instance, GenericContext genericContext) throws IOException{
 		if(DEBUG_VALIDATION){
 			checkExistenceOfField(selectedField);
 		}
@@ -779,7 +779,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		throw new IllegalArgumentException(selectedField+" is not listed!");
 	}
 	
-	private void readFieldSafe(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext, IOField<T, ?> field) throws IOException{
+	private void readFieldSafe(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext, IOField<T, ?> field) throws IOException{
 		var desc =field.getSizeDescriptor();
 		var fixed=desc.getFixed(WordSpace.BYTE);
 		if(fixed.isPresent()){
@@ -809,7 +809,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	}
 	
 	@Override
-	public Struct.Pool<T> makeIOPool(){
+	public VarPool<T> makeIOPool(){
 		return getType().allocVirtualVarPool(VirtualFieldDefinition.StoragePool.IO);
 	}
 	

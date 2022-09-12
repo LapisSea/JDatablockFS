@@ -28,7 +28,7 @@ public class RandomLists{
 				logger.get().getSession("l"+listCount);
 				
 				var task=CompletableFuture.runAsync(()->{
-					Log.trace("Starting: {} lists",listCount);
+					Log.trace("Starting: {} lists", listCount);
 					try{
 						var rand=new Random((long)listCount<<4);
 						try{

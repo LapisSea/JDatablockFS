@@ -424,7 +424,7 @@ public class MemoryWalker{
 		return CONTINUE;
 	}
 	
-	private <T extends IOInstance<T>> long unknownSizeSkip(Iterator<IOField<T, ?>> iterator, CmdReader cmds, T instance, Struct.Pool<T> ioPool, IOField<T, ?> field){
+	private <T extends IOInstance<T>> long unknownSizeSkip(Iterator<IOField<T, ?>> iterator, CmdReader cmds, T instance, VarPool<T> ioPool, IOField<T, ?> field){
 		var  extra   =cmds.read8();
 		var  sizeDesc=field.getSizeDescriptor();
 		long skipSize=sizeDesc.calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
@@ -453,7 +453,7 @@ public class MemoryWalker{
 		return ((IOInstance.Unmanaged<?>)instance).getUnmanagedReferenceWalkCommands();
 	}
 	
-	private <T extends IOInstance<T>> int handlePtr(T instance, StructPipe<T> pipe, Reference reference, Struct.Pool<T> ioPool, IOField<T, ChunkPointer> ptrField) throws IOException{
+	private <T extends IOInstance<T>> int handlePtr(T instance, StructPipe<T> pipe, Reference reference, VarPool<T> ioPool, IOField<T, ChunkPointer> ptrField) throws IOException{
 		var ch=ptrField.get(ioPool, instance);
 		
 		if(!ch.isNull()){
@@ -491,7 +491,7 @@ public class MemoryWalker{
 	}
 	
 	private <T extends IOInstance<T>, FT> int handleResult(
-		Struct.Pool<T> ioPool, T instance, StructPipe<T> pipe,
+		VarPool<T> ioPool, T instance, StructPipe<T> pipe,
 		boolean inlinedParent, Reference instanceReference,
 		IOField<T, FT> field, FT fieldValue,
 		int res

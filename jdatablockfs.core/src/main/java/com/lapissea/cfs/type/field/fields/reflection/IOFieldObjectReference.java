@@ -12,6 +12,7 @@ import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
@@ -80,7 +81,7 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	}
 	
 	@Override
-	public ValueType get(Struct.Pool<T> ioPool, T instance){
+	public ValueType get(VarPool<T> ioPool, T instance){
 		return getNullable(ioPool, instance, ()->null);
 	}
 	
@@ -106,7 +107,7 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	}
 	
 	@Override
-	public void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+	public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		var val=get(ioPool, instance);
 		if(val==null&&getNullability()==IONullability.Mode.DEFAULT_IF_NULL){
 			val=struct.make();
@@ -122,12 +123,12 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	}
 	
 	@Override
-	public void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		set(ioPool, instance, readValue(provider, Objects.requireNonNull(getRef(instance)), genericContext));
 	}
 	
 	@Override
-	public void skipRead(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public void skipRead(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		//nothing to do. Reference field stores the actual pointer
 	}
 }

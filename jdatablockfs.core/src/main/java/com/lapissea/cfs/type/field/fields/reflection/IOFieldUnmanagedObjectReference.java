@@ -79,7 +79,7 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 	}
 	
 	@Override
-	public ValueType get(Struct.Pool<T> ioPool, T instance){
+	public ValueType get(VarPool<T> ioPool, T instance){
 		var val=super.get(ioPool, instance);
 		if(val==null){
 			if(nullable()) return null;
@@ -123,17 +123,17 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 	}
 	
 	@Override
-	public void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+	public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		referencePipe.write(provider, dest, getReference(instance));
 	}
 	
 	@Override
-	public void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		set(ioPool, instance, makeValueObject(provider, referencePipe.readNew(provider, src, null), genericContext));
 	}
 	
 	@Override
-	public void skipRead(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public void skipRead(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		if(src.optionallySkipExact(referencePipe.getSizeDescriptor().getFixed(WordSpace.BYTE))){
 			return;
 		}

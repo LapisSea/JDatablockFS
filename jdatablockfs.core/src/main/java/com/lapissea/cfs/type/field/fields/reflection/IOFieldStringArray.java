@@ -6,7 +6,7 @@ import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
@@ -43,7 +43,7 @@ public class IOFieldStringArray<T extends IOInstance<T>> extends IOField<T, Stri
 		return descriptor;
 	}
 	@Override
-	public void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+	public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		var arr =get(ioPool, instance);
 		var text=new AutoText();
 		for(String s : arr){
@@ -52,7 +52,7 @@ public class IOFieldStringArray<T extends IOInstance<T>> extends IOField<T, Stri
 		}
 	}
 	@Override
-	public void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		int size=arraySize.getValue(ioPool, instance);
 		
 		var arr=new String[size];
@@ -67,7 +67,7 @@ public class IOFieldStringArray<T extends IOInstance<T>> extends IOField<T, Stri
 	}
 	
 	@Override
-	public void skipRead(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public void skipRead(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		readReported(ioPool, provider, src, instance, genericContext);
 	}
 }

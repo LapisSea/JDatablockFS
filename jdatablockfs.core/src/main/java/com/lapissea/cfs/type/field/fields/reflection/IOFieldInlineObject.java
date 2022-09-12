@@ -7,10 +7,7 @@ import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
-import com.lapissea.cfs.type.GenericContext;
-import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.Struct;
-import com.lapissea.cfs.type.WordSpace;
+import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
@@ -62,12 +59,12 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 	}
 	
 	@Override
-	public ValueType get(Struct.Pool<CTyp> ioPool, CTyp instance){
+	public ValueType get(VarPool<CTyp> ioPool, CTyp instance){
 		return getNullable(ioPool, instance, ()->instancePipe.getType().make());
 	}
 	
 	@Override
-	public void set(Struct.Pool<CTyp> ioPool, CTyp instance, ValueType value){
+	public void set(VarPool<CTyp> ioPool, CTyp instance, ValueType value){
 		super.set(ioPool, instance, switch(getNullability()){
 			case DEFAULT_IF_NULL, NULLABLE -> value;
 			case NOT_NULL -> Objects.requireNonNull(value);
@@ -85,7 +82,7 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 	}
 	
 	@Override
-	public void write(Struct.Pool<CTyp> ioPool, DataProvider provider, ContentWriter dest, CTyp instance) throws IOException{
+	public void write(VarPool<CTyp> ioPool, DataProvider provider, ContentWriter dest, CTyp instance) throws IOException{
 		var val=get(ioPool, instance);
 		if(nullable()){
 			if(val==null){
@@ -98,7 +95,7 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 		instancePipe.write(provider, dest, val);
 	}
 	
-	private ValueType readNew(Struct.Pool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
+	private ValueType readNew(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
 		if(nullable()){
 			boolean isNull=getIsNull(ioPool, instance);
 			if(isNull){
@@ -113,12 +110,12 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 	}
 	
 	@Override
-	public void read(Struct.Pool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
+	public void read(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
 		set(ioPool, instance, readNew(ioPool, provider, src, instance, genericContext));
 	}
 	
 	@Override
-	public void skipRead(Struct.Pool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
+	public void skipRead(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
 		if(src.optionallySkipExact(descriptor.getFixed(WordSpace.BYTE))){
 			return;
 		}

@@ -6,7 +6,7 @@ import com.lapissea.cfs.io.bit.BitReader;
 import com.lapissea.cfs.io.bit.BitWriter;
 import com.lapissea.cfs.io.bit.EnumUniverse;
 import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
@@ -34,7 +34,7 @@ public class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> extends IOF
 	}
 	
 	@Override
-	public E get(Struct.Pool<T> ioPool, T instance){
+	public E get(VarPool<T> ioPool, T instance){
 		E e=super.get(ioPool, instance);
 		if(e==null){
 			switch(getNullability()){
@@ -47,19 +47,19 @@ public class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> extends IOF
 		return e;
 	}
 	@Override
-	public void set(Struct.Pool<T> ioPool, T instance, E value){
+	public void set(VarPool<T> ioPool, T instance, E value){
 		super.set(ioPool, instance, switch(getNullability()){
 			case NULLABLE, DEFAULT_IF_NULL -> value;
 			case NOT_NULL -> Objects.requireNonNull(value);
 		});
 	}
 	@Override
-	public void writeBits(Struct.Pool<T> ioPool, BitWriter<?> dest, T instance) throws IOException{
+	public void writeBits(VarPool<T> ioPool, BitWriter<?> dest, T instance) throws IOException{
 		dest.writeEnum(enumUniverse, get(ioPool, instance), nullable());
 	}
 	
 	@Override
-	public void readBits(Struct.Pool<T> ioPool, BitReader src, T instance) throws IOException{
+	public void readBits(VarPool<T> ioPool, BitReader src, T instance) throws IOException{
 		set(ioPool, instance, src.readEnum(enumUniverse, nullable()));
 	}
 	
@@ -69,7 +69,7 @@ public class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> extends IOF
 	}
 	
 	@Override
-	public boolean instancesEqual(Struct.Pool<T> ioPool1, T inst1, Struct.Pool<T> ioPool2, T inst2){
+	public boolean instancesEqual(VarPool<T> ioPool1, T inst1, VarPool<T> ioPool2, T inst2){
 		return get(ioPool1, inst1)==get(ioPool2, inst2);
 	}
 	

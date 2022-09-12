@@ -267,7 +267,7 @@ public class BinaryGridRenderer implements DataRenderer{
 	
 	private <T extends IOInstance<T>> void annotateBitField(
 		AnnotateCtx ctx,
-		Struct.Pool<T> ioPool, T instance, IOField<T, ?> field,
+		VarPool<T> ioPool, T instance, IOField<T, ?> field,
 		Color col, int bitOffset, long bitSize, Reference reference, long fieldOffset
 	) throws IOException{
 		var renderCtx=ctx.renderCtx;
@@ -328,7 +328,7 @@ public class BinaryGridRenderer implements DataRenderer{
 	
 	private <T extends IOInstance<T>> void annotateByteField(
 		AnnotateCtx ctx,
-		Struct.Pool<T> ioPool, T instance, IOField<T, ?> field,
+		VarPool<T> ioPool, T instance, IOField<T, ?> field,
 		Color col, Reference reference, Range fieldRange
 	){
 		Range hover    =null;
@@ -1579,11 +1579,11 @@ public class BinaryGridRenderer implements DataRenderer{
 												return Float.class;
 											}
 											@Override
-											public Object get(Struct.Pool<T> ioPool, T instance){
+											public Object get(VarPool<T> ioPool, T instance){
 												return inst[index[0]];
 											}
 											@Override
-											public void set(Struct.Pool<T> ioPool, T instance, Object value){
+											public void set(VarPool<T> ioPool, T instance, Object value){
 												throw new UnsupportedOperationException();
 											}
 										});
@@ -1629,11 +1629,11 @@ public class BinaryGridRenderer implements DataRenderer{
 											return String.class;
 										}
 										@Override
-										public Object get(Struct.Pool<T> ioPool, T instance){
+										public Object get(VarPool<T> ioPool, T instance){
 											return inst[index[0]];
 										}
 										@Override
-										public void set(Struct.Pool<T> ioPool, T instance, Object value){
+										public void set(VarPool<T> ioPool, T instance, Object value){
 											throw new UnsupportedOperationException();
 										}
 									}, null);
@@ -1691,7 +1691,7 @@ public class BinaryGridRenderer implements DataRenderer{
 			}
 		}
 	}
-	private <T extends IOInstance<T>> void annotateDynamicArrayValueLength(AnnotateCtx ctx, T instance, Reference reference, long fieldOffset, Struct.Pool<T> ioPool, IOField<T, Object> field, Color col, Object[] arr){
+	private <T extends IOInstance<T>> void annotateDynamicArrayValueLength(AnnotateCtx ctx, T instance, Reference reference, long fieldOffset, VarPool<T> ioPool, IOField<T, Object> field, Color col, Object[] arr){
 		var arrayLenSiz=NumberSize.bySize(arr.length);
 		
 		var arrayLenName    =IOFieldTools.makeCollectionLenName(field.getAccessor());
@@ -1712,11 +1712,11 @@ public class BinaryGridRenderer implements DataRenderer{
 				return TypeFlag.ID_OBJECT;
 			}
 			@Override
-			public Object get(Struct.Pool<T> ioPool, T instance){
+			public Object get(VarPool<T> ioPool, T instance){
 				return arrayLenSiz;
 			}
 			@Override
-			public void set(Struct.Pool<T> ioPool, T instance, Object value){
+			public void set(VarPool<T> ioPool, T instance, Object value){
 				throw new UnsupportedOperationException();
 			}
 		}, SizeDescriptor.Fixed.of(1)), col, reference, Range.fromSize(fieldOffset, 1));
@@ -1736,11 +1736,11 @@ public class BinaryGridRenderer implements DataRenderer{
 				return TypeFlag.ID_OBJECT;
 			}
 			@Override
-			public Object get(Struct.Pool<T> ioPool, T instance){
+			public Object get(VarPool<T> ioPool, T instance){
 				return arr.length;
 			}
 			@Override
-			public void set(Struct.Pool<T> ioPool, T instance, Object value){
+			public void set(VarPool<T> ioPool, T instance, Object value){
 				throw new UnsupportedOperationException();
 			}
 		}, SizeDescriptor.Fixed.of(arrayLenSiz.bytes)), col, reference, Range.fromSize(fieldOffset+1, arrayLenSiz.bytes));

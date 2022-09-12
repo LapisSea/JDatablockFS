@@ -3,7 +3,7 @@ package com.lapissea.cfs.type.field.annotations;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.compilation.AnnotationLogic;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
@@ -99,10 +99,10 @@ public @interface IODependency{
 					getName(field, ann),
 					NumberSize.class,
 					new VirtualFieldDefinition.GetterFilter<T, NumberSize>(){
-						private NumberSize calcMax(Struct.Pool<T> ioPool, T inst, List<FieldAccessor<T>> deps){
+						private NumberSize calcMax(VarPool<T> ioPool, T inst, List<FieldAccessor<T>> deps){
 							return NumberSize.bySize(calcMaxVal(ioPool, inst, deps));
 						}
-						private long calcMaxVal(Struct.Pool<T> ioPool, T inst, List<FieldAccessor<T>> deps){
+						private long calcMaxVal(VarPool<T> ioPool, T inst, List<FieldAccessor<T>> deps){
 							return switch(deps.size()){
 								case 1 -> deps.get(0).getLong(ioPool, inst);
 								case 2 -> {
@@ -123,7 +123,7 @@ public @interface IODependency{
 							};
 						}
 						@Override
-						public NumberSize filter(Struct.Pool<T> ioPool, T inst, List<FieldAccessor<T>> deps, NumberSize val){
+						public NumberSize filter(VarPool<T> ioPool, T inst, List<FieldAccessor<T>> deps, NumberSize val){
 							NumberSize s=(switch(ann.retention()){
 								case GROW_ONLY -> {
 									if(val==ann.max()) yield ann.max();

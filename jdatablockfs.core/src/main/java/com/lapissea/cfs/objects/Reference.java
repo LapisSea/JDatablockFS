@@ -14,6 +14,7 @@ import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IOValue;
@@ -50,7 +51,7 @@ public final class Reference extends IOInstance.Managed<Reference>{
 					throw new ShouldNeverHappenError(f.toString());
 				}
 				@Override
-				protected void doWrite(DataProvider provider, ContentWriter dest, Struct.Pool<Reference> ioPool, Reference instance) throws IOException{
+				protected void doWrite(DataProvider provider, ContentWriter dest, VarPool<Reference> ioPool, Reference instance) throws IOException{
 					
 					var off=instance.getOffset();
 					var ptr=instance.getPtr();
@@ -65,7 +66,7 @@ public final class Reference extends IOInstance.Managed<Reference>{
 					ptrSize.write(dest, ptr);
 				}
 				@Override
-				protected Reference doRead(Struct.Pool<Reference> ioPool, DataProvider provider, ContentReader src, Reference instance, GenericContext genericContext) throws IOException{
+				protected Reference doRead(VarPool<Reference> ioPool, DataProvider provider, ContentReader src, Reference instance, GenericContext genericContext) throws IOException{
 					int flags     =src.readInt1()&0xFF;
 					var offsetSize=NumberSize.ordinal(flags&0b111);
 					var ptrSize   =NumberSize.ordinal((flags >>> 3)&0b111);
@@ -95,7 +96,7 @@ public final class Reference extends IOInstance.Managed<Reference>{
 					throw new ShouldNeverHappenError(f.toString());
 				}
 				@Override
-				protected void doWrite(DataProvider provider, ContentWriter dest, Struct.Pool<Reference> ioPool, Reference instance) throws IOException{
+				protected void doWrite(DataProvider provider, ContentWriter dest, VarPool<Reference> ioPool, Reference instance) throws IOException{
 					
 					var off=instance.getOffset();
 					var ptr=instance.getPtr();
@@ -104,7 +105,7 @@ public final class Reference extends IOInstance.Managed<Reference>{
 					dest.writeInt8(ptr.getValue());
 				}
 				@Override
-				protected Reference doRead(Struct.Pool<Reference> ioPool, DataProvider provider, ContentReader src, Reference instance, GenericContext genericContext) throws IOException{
+				protected Reference doRead(VarPool<Reference> ioPool, DataProvider provider, ContentReader src, Reference instance, GenericContext genericContext) throws IOException{
 					var off=src.readInt8();
 					var ptr=ChunkPointer.of(src.readInt8());
 					

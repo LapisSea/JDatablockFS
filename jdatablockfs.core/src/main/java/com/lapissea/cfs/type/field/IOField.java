@@ -77,15 +77,15 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		}
 		
 		@Override
-		public void write(Struct.Pool<Inst> ioPool, DataProvider provider, ContentWriter dest, Inst instance) throws IOException{
+		public void write(VarPool<Inst> ioPool, DataProvider provider, ContentWriter dest, Inst instance) throws IOException{
 			throw new UnsupportedOperationException();
 		}
 		@Override
-		public void read(Struct.Pool<Inst> ioPool, DataProvider provider, ContentReader src, Inst instance, GenericContext genericContext) throws IOException{
+		public void read(VarPool<Inst> ioPool, DataProvider provider, ContentReader src, Inst instance, GenericContext genericContext) throws IOException{
 			throw new UnsupportedOperationException();
 		}
 		@Override
-		public void skipRead(Struct.Pool<Inst> ioPool, DataProvider provider, ContentReader src, Inst instance, GenericContext genericContext) throws IOException{
+		public void skipRead(VarPool<Inst> ioPool, DataProvider provider, ContentReader src, Inst instance, GenericContext genericContext) throws IOException{
 			throw new UnsupportedOperationException();
 		}
 	}
@@ -117,15 +117,15 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 			}
 			
 			@Override
-			public void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+			public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 				throw new UnsupportedOperationException();
 			}
 			@Override
-			public void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+			public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 				throw new UnsupportedOperationException();
 			}
 			@Override
-			public void skipRead(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+			public void skipRead(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 				throw new UnsupportedOperationException();
 			}
 			@Override
@@ -173,7 +173,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 			public List<ValueGeneratorInfo<T, ?>> getGenerators(){
 				return List.of(new ValueGeneratorInfo<>(referenceField, new ValueGenerator<>(){
 					@Override
-					public boolean shouldGenerate(Struct.Pool<T> ioPool, DataProvider provider, T instance){
+					public boolean shouldGenerate(VarPool<T> ioPool, DataProvider provider, T instance){
 						boolean refNull=switch(getNullability()){
 							case NOT_NULL, DEFAULT_IF_NULL -> false;
 							case NULLABLE -> {
@@ -188,7 +188,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 						return refNull!=isRefNull;
 					}
 					@Override
-					public Reference generate(Struct.Pool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException{
+					public Reference generate(VarPool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException{
 						var val=get(ioPool, instance);
 						
 						if(val==null){
@@ -241,7 +241,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		
 		@Deprecated
 		@Override
-		public final void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+		public final void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 			try(var writer=new BitOutputStream(dest)){
 				writeBits(ioPool, writer, instance);
 				if(DEBUG_VALIDATION){
@@ -252,7 +252,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		
 		@Deprecated
 		@Override
-		public final void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		public final void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			try(var reader=new BitInputStream(src, getSizeDescriptor().getFixed(WordSpace.BIT).orElse(-1))){
 				readBits(ioPool, reader, instance);
 				if(DEBUG_VALIDATION){
@@ -263,7 +263,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		
 		@Deprecated
 		@Override
-		public final void skipRead(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		public final void skipRead(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			if(src.optionallySkipExact(getSizeDescriptor().getFixed(WordSpace.BYTE))){
 				return;
 			}
@@ -276,8 +276,8 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 			}
 		}
 		
-		public abstract void writeBits(Struct.Pool<T> ioPool, BitWriter<?> dest, T instance) throws IOException;
-		public abstract void readBits(Struct.Pool<T> ioPool, BitReader src, T instance) throws IOException;
+		public abstract void writeBits(VarPool<T> ioPool, BitWriter<?> dest, T instance) throws IOException;
+		public abstract void readBits(VarPool<T> ioPool, BitReader src, T instance) throws IOException;
 		public abstract void skipReadBits(BitReader src, T instance) throws IOException;
 		
 		@Override
@@ -309,19 +309,19 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 			
 			return List.of(new ValueGeneratorInfo<>(isNull, new ValueGenerator<T, Boolean>(){
 				@Override
-				public boolean shouldGenerate(Struct.Pool<T> ioPool, DataProvider provider, T instance){
+				public boolean shouldGenerate(VarPool<T> ioPool, DataProvider provider, T instance){
 					var isNullRec    =get(ioPool, instance)==null;
 					var writtenIsNull=isNull.getValue(ioPool, instance);
 					return writtenIsNull!=isNullRec;
 				}
 				@Override
-				public Boolean generate(Struct.Pool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod){
+				public Boolean generate(VarPool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod){
 					return get(ioPool, instance)==null;
 				}
 			}));
 		}
 		
-		protected final boolean getIsNull(Struct.Pool<T> ioPool, T instance){
+		protected final boolean getIsNull(VarPool<T> ioPool, T instance){
 			if(DEBUG_VALIDATION){
 				if(!nullable()) throw new RuntimeException("Checking if null on a non nullable field");
 			}
@@ -422,7 +422,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		return typeFlags;
 	}
 	
-	public boolean isNull(Struct.Pool<T> ioPool, T instance){
+	public boolean isNull(VarPool<T> ioPool, T instance){
 		if(!getAccessor().canBeNull()) return false;
 		try{
 			var val=get(ioPool, instance);
@@ -436,7 +436,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		}
 	}
 	
-	protected final ValueType getNullable(Struct.Pool<T> ioPool, T instance, Supplier<ValueType> createDefaultIfNull){
+	protected final ValueType getNullable(VarPool<T> ioPool, T instance, Supplier<ValueType> createDefaultIfNull){
 		var value=get0(ioPool, instance);
 		return switch(getNullability()){
 			case NOT_NULL -> requireValNN(value);
@@ -450,7 +450,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		};
 	}
 	
-	protected final ValueType getNullable(Struct.Pool<T> ioPool, T instance){
+	protected final ValueType getNullable(VarPool<T> ioPool, T instance){
 		var value=get0(ioPool, instance);
 		return switch(getNullability()){
 			case NOT_NULL -> requireValNN(value);
@@ -459,30 +459,30 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		};
 	}
 	
-	public ValueType get(Struct.Pool<T> ioPool, T instance){
+	public ValueType get(VarPool<T> ioPool, T instance){
 		return get0(ioPool, instance);
 	}
 	@SuppressWarnings("unchecked")
-	private ValueType get0(Struct.Pool<T> ioPool, T instance){
+	private ValueType get0(VarPool<T> ioPool, T instance){
 		return (ValueType)getAccessor().get(ioPool, instance);
 	}
 	
-	public void set(Struct.Pool<T> ioPool, T instance, ValueType value){
+	public void set(VarPool<T> ioPool, T instance, ValueType value){
 		getAccessor().set(ioPool, instance, value);
 	}
 	
 	public abstract SizeDescriptor<T> getSizeDescriptor();
 	
 	public interface ValueGenerator<T extends IOInstance<T>, ValType>{
-		boolean shouldGenerate(Struct.Pool<T> ioPool, DataProvider provider, T instance) throws IOException;
-		ValType generate(Struct.Pool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException;
+		boolean shouldGenerate(VarPool<T> ioPool, DataProvider provider, T instance) throws IOException;
+		ValType generate(VarPool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException;
 	}
 	
 	public record ValueGeneratorInfo<T extends IOInstance<T>, ValType>(
 		IOField<T, ValType> field,
 		ValueGenerator<T, ValType> generator
 	){
-		public void generate(Struct.Pool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException{
+		public void generate(VarPool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException{
 			if(generator.shouldGenerate(ioPool, provider, instance)){
 				var val=generator.generate(ioPool, provider, instance, allowExternalMod);
 				field.set(ioPool, instance, val);
@@ -509,9 +509,9 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	
 	
 	@Nullable
-	public abstract void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException;
+	public abstract void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException;
 	@Nullable
-	public final void writeReported(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+	public final void writeReported(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		try{
 			if(STAT_LOGGING) logStart(WRITE_ACTION, uid());
 			write(ioPool, provider, dest, instance);
@@ -521,8 +521,8 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		}
 	}
 	
-	public abstract void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException;
-	public final void readReported(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public abstract void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException;
+	public final void readReported(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		try{
 			if(STAT_LOGGING) logStart(READ_ACTION, uid());
 			read(ioPool, provider, src, instance, genericContext);
@@ -532,8 +532,8 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		}
 	}
 	
-	public abstract void skipRead(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException;
-	public final void skipReadReported(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public abstract void skipRead(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException;
+	public final void skipReadReported(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		try{
 			if(STAT_LOGGING) logStart(SKIP_READ_ACTION, uid());
 			skipRead(ioPool, provider, src, instance, genericContext);
@@ -551,7 +551,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	/**
 	 * @return string of the resolved value or null if string has no substance
 	 */
-	public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort){
+	public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort){
 		return instanceToString(ioPool, instance, doShort, "{", "}", "=", ", ");
 	}
 	
@@ -559,7 +559,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	 * @return string of the resolved value or null if string has no substance
 	 */
 	@SuppressWarnings({"rawtypes", "unchecked"})
-	public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+	public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
 		var val=get(ioPool, instance);
 		if(val==null){
 			if(getNullability()==IONullability.Mode.NOT_NULL){
@@ -603,7 +603,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		);
 	}
 	
-	public boolean instancesEqual(Struct.Pool<T> ioPool1, T inst1, Struct.Pool<T> ioPool2, T inst2){
+	public boolean instancesEqual(VarPool<T> ioPool1, T inst1, VarPool<T> ioPool2, T inst2){
 		var acc=getAccessor();
 		var id =acc.getTypeID();
 		return switch(id){
@@ -621,7 +621,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	}
 	
 	@SuppressWarnings("unchecked")
-	private boolean instancesEqualObject(Struct.Pool<T> ioPool1, T inst1, Struct.Pool<T> ioPool2, T inst2){
+	private boolean instancesEqualObject(VarPool<T> ioPool1, T inst1, VarPool<T> ioPool2, T inst2){
 		var acc =getAccessor();
 		var type=acc.getType();
 		
@@ -668,7 +668,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		return Objects.equals(o1, o2);
 	}
 	
-	public int instanceHashCode(Struct.Pool<T> ioPool, T instance){
+	public int instanceHashCode(VarPool<T> ioPool, T instance){
 		var acc=getAccessor();
 		var id =acc.getTypeID();
 		return switch(id){

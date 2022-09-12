@@ -3,7 +3,7 @@ package com.lapissea.cfs.type.field;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 
@@ -21,24 +21,24 @@ public final class VirtualFieldDefinition<IO extends IOInstance<IO>, T>{
 	
 	public interface GetterFilter<IO extends IOInstance<IO>, T>{
 		interface I<IO extends IOInstance<IO>> extends GetterFilter<IO, Integer>{
-			int filterPrimitive(Struct.Pool<IO> ioPool, IO instance, List<FieldAccessor<IO>> dependencies, int value);
+			int filterPrimitive(VarPool<IO> ioPool, IO instance, List<FieldAccessor<IO>> dependencies, int value);
 			@Override
 			@Deprecated
-			default Integer filter(Struct.Pool<IO> ioPool, IO instance, List<FieldAccessor<IO>> dependencies, Integer value){
+			default Integer filter(VarPool<IO> ioPool, IO instance, List<FieldAccessor<IO>> dependencies, Integer value){
 				return filterPrimitive(ioPool, instance, dependencies, value);
 			}
 		}
 		
 		interface L<IO extends IOInstance<IO>> extends GetterFilter<IO, Long>{
-			long filterPrimitive(Struct.Pool<IO> ioPool, IO instance, List<FieldAccessor<IO>> dependencies, long value);
+			long filterPrimitive(VarPool<IO> ioPool, IO instance, List<FieldAccessor<IO>> dependencies, long value);
 			@Override
 			@Deprecated
-			default Long filter(Struct.Pool<IO> ioPool, IO instance, List<FieldAccessor<IO>> dependencies, Long value){
+			default Long filter(VarPool<IO> ioPool, IO instance, List<FieldAccessor<IO>> dependencies, Long value){
 				return filterPrimitive(ioPool, instance, dependencies, value);
 			}
 		}
 		
-		T filter(Struct.Pool<IO> ioPool, IO instance, List<FieldAccessor<IO>> dependencies, T value);
+		T filter(VarPool<IO> ioPool, IO instance, List<FieldAccessor<IO>> dependencies, T value);
 	}
 	
 	public enum StoragePool{

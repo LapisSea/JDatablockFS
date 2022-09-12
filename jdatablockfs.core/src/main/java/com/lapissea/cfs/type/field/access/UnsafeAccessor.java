@@ -6,6 +6,7 @@ import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.objects.INumber;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.VarPool;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.UtilL;
@@ -74,98 +75,98 @@ public sealed class UnsafeAccessor<CTyp extends IOInstance<CTyp>> extends Abstra
 		}
 		
 		@Override
-		public Object get(Struct.Pool<CTyp> ioPool, CTyp instance){
+		public Object get(VarPool<CTyp> ioPool, CTyp instance){
 			if(getter!=null) return getter(instance);
 			else return super.get(ioPool, instance);
 		}
 		
 		@Override
-		public void set(Struct.Pool<CTyp> ioPool, CTyp instance, Object value){
+		public void set(VarPool<CTyp> ioPool, CTyp instance, Object value){
 			if(setter!=null) setter(instance, value);
 			else super.set(ioPool, instance, value);
 		}
 		
 		@Override
-		public double getDouble(Struct.Pool<CTyp> ioPool, CTyp instance){
+		public double getDouble(VarPool<CTyp> ioPool, CTyp instance){
 			if(getter!=null) return (double)getter(instance);
 			else return super.getDouble(ioPool, instance);
 		}
 		
 		@Override
-		public void setDouble(Struct.Pool<CTyp> ioPool, CTyp instance, double value){
+		public void setDouble(VarPool<CTyp> ioPool, CTyp instance, double value){
 			if(setter!=null) setter(instance, value);
 			else super.setDouble(ioPool, instance, value);
 		}
 		
 		@Override
-		public float getFloat(Struct.Pool<CTyp> ioPool, CTyp instance){
+		public float getFloat(VarPool<CTyp> ioPool, CTyp instance){
 			if(getter!=null) return (float)getter(instance);
 			else return super.getFloat(ioPool, instance);
 		}
 		
 		@Override
-		public void setFloat(Struct.Pool<CTyp> ioPool, CTyp instance, float value){
+		public void setFloat(VarPool<CTyp> ioPool, CTyp instance, float value){
 			if(setter!=null) setter(instance, value);
 			else super.setFloat(ioPool, instance, value);
 		}
 		
 		@Override
-		public byte getByte(Struct.Pool<CTyp> ioPool, CTyp instance){
+		public byte getByte(VarPool<CTyp> ioPool, CTyp instance){
 			if(getter!=null) return (byte)getter(instance);
 			else return super.getByte(ioPool, instance);
 		}
 		
 		@Override
-		public void setByte(Struct.Pool<CTyp> ioPool, CTyp instance, byte value){
+		public void setByte(VarPool<CTyp> ioPool, CTyp instance, byte value){
 			if(setter!=null) setter(instance, value);
 			else super.setByte(ioPool, instance, value);
 		}
 		
 		@Override
-		public boolean getBoolean(Struct.Pool<CTyp> ioPool, CTyp instance){
+		public boolean getBoolean(VarPool<CTyp> ioPool, CTyp instance){
 			if(getter!=null) return (boolean)getter(instance);
 			else return super.getBoolean(ioPool, instance);
 		}
 		
 		@Override
-		public void setBoolean(Struct.Pool<CTyp> ioPool, CTyp instance, boolean value){
+		public void setBoolean(VarPool<CTyp> ioPool, CTyp instance, boolean value){
 			if(setter!=null) setter(instance, value);
 			else super.setBoolean(ioPool, instance, value);
 		}
 		
 		
 		@Override
-		public long getLong(Struct.Pool<CTyp> ioPool, CTyp instance){
+		public long getLong(VarPool<CTyp> ioPool, CTyp instance){
 			if(getter!=null) return (long)getter(instance);
 			else return super.getLong(ioPool, instance);
 		}
 		
 		@Override
-		public void setLong(Struct.Pool<CTyp> ioPool, CTyp instance, long value){
+		public void setLong(VarPool<CTyp> ioPool, CTyp instance, long value){
 			if(setter!=null) setter(instance, value);
 			else super.setLong(ioPool, instance, value);
 		}
 		
 		@Override
-		public int getInt(Struct.Pool<CTyp> ioPool, CTyp instance){
+		public int getInt(VarPool<CTyp> ioPool, CTyp instance){
 			if(getter!=null) return (int)getter(instance);
 			else return super.getInt(ioPool, instance);
 		}
 		
 		@Override
-		public void setInt(Struct.Pool<CTyp> ioPool, CTyp instance, int value){
+		public void setInt(VarPool<CTyp> ioPool, CTyp instance, int value){
 			if(setter!=null) setter(instance, value);
 			else super.setInt(ioPool, instance, value);
 		}
 		
 		@Override
-		public short getShort(Struct.Pool<CTyp> ioPool, CTyp instance){
+		public short getShort(VarPool<CTyp> ioPool, CTyp instance){
 			if(getter!=null) return (Short)getter(instance);
 			else return super.getShort(ioPool, instance);
 		}
 		
 		@Override
-		public void setShort(Struct.Pool<CTyp> ioPool, CTyp instance, short value){
+		public void setShort(VarPool<CTyp> ioPool, CTyp instance, short value){
 			if(setter!=null) setter(instance, value);
 			else super.setShort(ioPool, instance, value);
 		}
@@ -180,7 +181,7 @@ public sealed class UnsafeAccessor<CTyp extends IOInstance<CTyp>> extends Abstra
 			constructor=Access.findConstructor(getType(), LongFunction.class, long.class);
 		}
 		@Override
-		public long getLong(Struct.Pool<CTyp> ioPool, CTyp instance){
+		public long getLong(VarPool<CTyp> ioPool, CTyp instance){
 			var num=(INumber)get(ioPool, instance);
 			if(num==null){
 				throw new NullPointerException("value in "+getType().getName()+"#"+getName()+" is null but INumber is a non nullable type");
@@ -188,7 +189,7 @@ public sealed class UnsafeAccessor<CTyp extends IOInstance<CTyp>> extends Abstra
 			return num.getValue();
 		}
 		@Override
-		public void setLong(Struct.Pool<CTyp> ioPool, CTyp instance, long value){
+		public void setLong(VarPool<CTyp> ioPool, CTyp instance, long value){
 			set(ioPool, instance, constructor.apply(value));
 		}
 	}
@@ -226,83 +227,83 @@ public sealed class UnsafeAccessor<CTyp extends IOInstance<CTyp>> extends Abstra
 	}
 	
 	@Override
-	protected void setExactShort(Struct.Pool<CTyp> ioPool, CTyp instance, short value){
+	protected void setExactShort(VarPool<CTyp> ioPool, CTyp instance, short value){
 		UNSAFE.putShort(instance, fieldOffset, value);
 	}
 	@Override
-	protected short getExactShort(Struct.Pool<CTyp> ioPool, CTyp instance){
+	protected short getExactShort(VarPool<CTyp> ioPool, CTyp instance){
 		return UNSAFE.getShort(instance, fieldOffset);
 	}
 	
 	@Override
-	protected void setExactChar(Struct.Pool<CTyp> ioPool, CTyp instance, char value){
+	protected void setExactChar(VarPool<CTyp> ioPool, CTyp instance, char value){
 		UNSAFE.putChar(instance, fieldOffset, value);
 	}
 	@Override
-	protected char getExactChar(Struct.Pool<CTyp> ioPool, CTyp instance){
+	protected char getExactChar(VarPool<CTyp> ioPool, CTyp instance){
 		return UNSAFE.getChar(instance, fieldOffset);
 	}
 	
 	@Override
-	protected long getExactLong(Struct.Pool<CTyp> ioPool, CTyp instance){
+	protected long getExactLong(VarPool<CTyp> ioPool, CTyp instance){
 		return UNSAFE.getLong(instance, fieldOffset);
 	}
 	@Override
-	protected void setExactLong(Struct.Pool<CTyp> ioPool, CTyp instance, long value){
+	protected void setExactLong(VarPool<CTyp> ioPool, CTyp instance, long value){
 		UNSAFE.putLong(instance, fieldOffset, value);
 	}
 	
 	@Override
-	protected byte getExactByte(Struct.Pool<CTyp> ioPool, CTyp instance){
+	protected byte getExactByte(VarPool<CTyp> ioPool, CTyp instance){
 		return UNSAFE.getByte(instance, fieldOffset);
 	}
 	@Override
-	protected void setExactByte(Struct.Pool<CTyp> ioPool, CTyp instance, byte value){
+	protected void setExactByte(VarPool<CTyp> ioPool, CTyp instance, byte value){
 		UNSAFE.putByte(instance, fieldOffset, value);
 	}
 	
 	@Override
-	protected int getExactInt(Struct.Pool<CTyp> ioPool, CTyp instance){
+	protected int getExactInt(VarPool<CTyp> ioPool, CTyp instance){
 		return UNSAFE.getInt(instance, fieldOffset);
 	}
 	@Override
-	protected void setExactInt(Struct.Pool<CTyp> ioPool, CTyp instance, int value){
+	protected void setExactInt(VarPool<CTyp> ioPool, CTyp instance, int value){
 		UNSAFE.putInt(instance, fieldOffset, value);
 	}
 	
 	@Override
-	protected double getExactDouble(Struct.Pool<CTyp> ioPool, CTyp instance){
+	protected double getExactDouble(VarPool<CTyp> ioPool, CTyp instance){
 		return UNSAFE.getDouble(instance, fieldOffset);
 	}
 	@Override
-	protected void setExactDouble(Struct.Pool<CTyp> ioPool, CTyp instance, double value){
+	protected void setExactDouble(VarPool<CTyp> ioPool, CTyp instance, double value){
 		UNSAFE.putDouble(instance, fieldOffset, value);
 	}
 	
 	@Override
-	protected void setExactFloat(Struct.Pool<CTyp> ioPool, CTyp instance, float value){
+	protected void setExactFloat(VarPool<CTyp> ioPool, CTyp instance, float value){
 		UNSAFE.putFloat(instance, fieldOffset, value);
 	}
 	@Override
-	protected float getExactFloat(Struct.Pool<CTyp> ioPool, CTyp instance){
+	protected float getExactFloat(VarPool<CTyp> ioPool, CTyp instance){
 		return UNSAFE.getFloat(instance, fieldOffset);
 	}
 	
 	@Override
-	protected void setExactBoolean(Struct.Pool<CTyp> ioPool, CTyp instance, boolean value){
+	protected void setExactBoolean(VarPool<CTyp> ioPool, CTyp instance, boolean value){
 		UNSAFE.putBoolean(instance, fieldOffset, value);
 	}
 	@Override
-	protected boolean getExactBoolean(Struct.Pool<CTyp> ioPool, CTyp instance){
+	protected boolean getExactBoolean(VarPool<CTyp> ioPool, CTyp instance){
 		return UNSAFE.getBoolean(instance, fieldOffset);
 	}
 	
 	@Override
-	protected Object getExactObject(Struct.Pool<CTyp> ioPool, CTyp instance){
+	protected Object getExactObject(VarPool<CTyp> ioPool, CTyp instance){
 		return UNSAFE.getObject(instance, fieldOffset);
 	}
 	@Override
-	protected void setExactObject(Struct.Pool<CTyp> ioPool, CTyp instance, Object value){
+	protected void setExactObject(VarPool<CTyp> ioPool, CTyp instance, Object value){
 		UNSAFE.putObject(instance, fieldOffset, getType().cast(value));
 	}
 }

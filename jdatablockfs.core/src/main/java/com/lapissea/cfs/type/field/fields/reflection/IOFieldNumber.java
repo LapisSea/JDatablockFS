@@ -8,7 +8,7 @@ import com.lapissea.cfs.objects.INumber;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
@@ -25,10 +25,10 @@ import static com.lapissea.cfs.objects.NumberSize.VOID;
 public class IOFieldNumber<T extends IOInstance<T>, E extends INumber> extends IOField<T, E>{
 	private static final NumberSize size=NumberSize.LONG;
 	
-	private final boolean                                   forceFixed;
-	private       BiFunction<Struct.Pool<T>, T, NumberSize> dynamicSize;
-	private       LongFunction<E>                           constructor;
-	private       SizeDescriptor<T>                         sizeDescriptor;
+	private final boolean                               forceFixed;
+	private       BiFunction<VarPool<T>, T, NumberSize> dynamicSize;
+	private       LongFunction<E>                       constructor;
+	private       SizeDescriptor<T>                     sizeDescriptor;
 	
 	public IOFieldNumber(FieldAccessor<T> accessor){
 		this(accessor, false);
@@ -55,24 +55,24 @@ public class IOFieldNumber<T extends IOInstance<T>, E extends INumber> extends I
 		return new IOFieldNumber<>(getAccessor(), true);
 	}
 	
-	private NumberSize getSize(Struct.Pool<T> ioPool, T instance){
+	private NumberSize getSize(VarPool<T> ioPool, T instance){
 		if(dynamicSize!=null) return dynamicSize.apply(ioPool, instance);
 		return size;
 	}
 	
 	@Override
-	public void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+	public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		var size=getSize(ioPool, instance);
 		size.write(dest, get(ioPool, instance));
 	}
 	
 	@Override
-	public void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		var size=getSize(ioPool, instance);
 		set(ioPool, instance, constructor.apply(size.read(src)));
 	}
 	@Override
-	public void skipRead(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public void skipRead(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		var size=getSize(ioPool, instance);
 		size.read(src);
 	}

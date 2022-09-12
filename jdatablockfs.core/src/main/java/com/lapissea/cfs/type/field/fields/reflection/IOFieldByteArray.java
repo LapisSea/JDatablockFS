@@ -5,7 +5,7 @@ import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
@@ -57,12 +57,12 @@ public class IOFieldByteArray<T extends IOInstance<T>> extends IOField<T, byte[]
 		}
 		return List.of(new ValueGeneratorInfo<>(compressed, new ValueGenerator<T, byte[]>(){
 			@Override
-			public boolean shouldGenerate(Struct.Pool<T> ioPool, DataProvider provider, T instance) throws IOException{
+			public boolean shouldGenerate(VarPool<T> ioPool, DataProvider provider, T instance) throws IOException{
 				byte[] compr=compressed.get(ioPool, instance);
 				return compr==null;
 			}
 			@Override
-			public byte[] generate(Struct.Pool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException{
+			public byte[] generate(VarPool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException{
 				byte[] raw=get(ioPool, instance);
 				return compression.pack(raw);
 			}
@@ -73,7 +73,7 @@ public class IOFieldByteArray<T extends IOInstance<T>> extends IOField<T, byte[]
 		return descriptor;
 	}
 	@Override
-	public void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+	public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		var arr=get(ioPool, instance);
 		if(compression!=null){
 			return;
@@ -81,7 +81,7 @@ public class IOFieldByteArray<T extends IOInstance<T>> extends IOField<T, byte[]
 		dest.writeInts1(arr);
 	}
 	@Override
-	public void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		if(compression!=null){
 			var data=compression.unpack(compressed.get(ioPool, instance));
 			set(ioPool, instance, data);
@@ -95,7 +95,7 @@ public class IOFieldByteArray<T extends IOInstance<T>> extends IOField<T, byte[]
 	}
 	
 	@Override
-	public void skipRead(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public void skipRead(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		int size=arraySize.getValue(ioPool, instance);
 		src.skipExact(size);
 	}

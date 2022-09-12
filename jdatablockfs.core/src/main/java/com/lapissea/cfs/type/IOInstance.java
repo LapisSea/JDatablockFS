@@ -157,8 +157,8 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 	
 	abstract non-sealed class Managed<SELF extends Managed<SELF>> implements IOInstance<SELF>{
 		
-		private Struct<SELF>      thisStruct;
-		private Struct.Pool<SELF> virtualFields;
+		private Struct<SELF>  thisStruct;
+		private VarPool<SELF> virtualFields;
 		
 		public Managed(){}
 		
@@ -186,7 +186,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			return thisStruct;
 		}
 		
-		private Struct.Pool<SELF> getVirtualPool(){
+		private VarPool<SELF> getVirtualPool(){
 			if(thisStruct==null) init();
 			return virtualFields;
 		}

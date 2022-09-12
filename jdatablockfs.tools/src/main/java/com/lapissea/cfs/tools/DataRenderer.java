@@ -1,7 +1,7 @@
 package com.lapissea.cfs.tools;
 
 import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.field.IOField;
 
 import java.awt.Color;
@@ -69,7 +69,7 @@ public interface DataRenderer{
 		}
 	}
 	
-	record FieldVal<T extends IOInstance<T>>(Struct.Pool<T> ioPool, T instance, IOField<T, ?> field){
+	record FieldVal<T extends IOInstance<T>>(VarPool<T> ioPool, T instance, IOField<T, ?> field){
 		Optional<String> instanceToString(boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
 			return field.instanceToString(ioPool, instance, doShort, start, end, fieldValueSeparator, fieldSeparator);
 		}

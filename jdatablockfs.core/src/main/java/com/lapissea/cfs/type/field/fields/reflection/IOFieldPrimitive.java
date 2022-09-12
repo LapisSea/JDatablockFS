@@ -8,8 +8,8 @@ import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.SupportedPrimitive;
+import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
@@ -54,50 +54,50 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			return EnumSet.of(VOID, SHORT, INT, LONG);
 		}
 		
-		private double getValue(Struct.Pool<T> ioPool, T instance){
+		private double getValue(VarPool<T> ioPool, T instance){
 			return getAccessor().getDouble(ioPool, instance);
 		}
 		
-		public void setValue(Struct.Pool<T> ioPool, T instance, double value){
+		public void setValue(VarPool<T> ioPool, T instance, double value){
 			getAccessor().setDouble(ioPool, instance, value);
 		}
 		
 		@Deprecated
 		@Override
-		public Double get(Struct.Pool<T> ioPool, T instance){
+		public Double get(VarPool<T> ioPool, T instance){
 			return getValue(ioPool, instance);
 		}
 		@Deprecated
 		@Override
-		public void set(Struct.Pool<T> ioPool, T instance, Double value){
+		public void set(VarPool<T> ioPool, T instance, Double value){
 			setValue(ioPool, instance, value);
 		}
 		
 		@Override
-		public void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 			var size=getSize(ioPool, instance);
 			size.writeFloating(dest, getValue(ioPool, instance));
 		}
 		
 		@Override
-		public void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			var size=getSize(ioPool, instance);
 			setValue(ioPool, instance, size.readFloating(src));
 		}
 		
 		@Override
-		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort){
+		public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort){
 			var val=getValue(ioPool, instance);
 			if(val==0) return Optional.empty();
 			return Optional.of(String.valueOf(val));
 		}
 		
 		@Override
-		public boolean instancesEqual(Struct.Pool<T> ioPool1, T inst1, Struct.Pool<T> ioPool2, T inst2){
+		public boolean instancesEqual(VarPool<T> ioPool1, T inst1, VarPool<T> ioPool2, T inst2){
 			return getValue(ioPool1, inst1)==getValue(ioPool2, inst2);
 		}
 		@Override
-		public int instanceHashCode(Struct.Pool<T> ioPool, T instance){
+		public int instanceHashCode(VarPool<T> ioPool, T instance){
 			return Double.hashCode(getValue(ioPool, instance));
 		}
 	}
@@ -116,48 +116,48 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			return EnumSet.of(VOID, BYTE, SHORT);
 		}
 		
-		private char getValue(Struct.Pool<T> ioPool, T instance){
+		private char getValue(VarPool<T> ioPool, T instance){
 			return getAccessor().getChar(ioPool, instance);
 		}
 		
-		public void setValue(Struct.Pool<T> ioPool, T instance, char value){
+		public void setValue(VarPool<T> ioPool, T instance, char value){
 			getAccessor().setChar(ioPool, instance, value);
 		}
 		
 		@Deprecated
 		@Override
-		public Character get(Struct.Pool<T> ioPool, T instance){
+		public Character get(VarPool<T> ioPool, T instance){
 			return getValue(ioPool, instance);
 		}
 		@Deprecated
 		@Override
-		public void set(Struct.Pool<T> ioPool, T instance, Character value){
+		public void set(VarPool<T> ioPool, T instance, Character value){
 			setValue(ioPool, instance, value);
 		}
 		
 		@Override
-		public void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 			var size=getSize(ioPool, instance);
 			size.writeFloating(dest, getValue(ioPool, instance));
 		}
 		
 		@Override
-		public void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			var size=getSize(ioPool, instance);
 			setValue(ioPool, instance, (char)size.read(src));
 		}
 		
 		@Override
-		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort){
+		public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort){
 			return Optional.of(String.valueOf(getValue(ioPool, instance)));
 		}
 		
 		@Override
-		public boolean instancesEqual(Struct.Pool<T> ioPool1, T inst1, Struct.Pool<T> ioPool2, T inst2){
+		public boolean instancesEqual(VarPool<T> ioPool1, T inst1, VarPool<T> ioPool2, T inst2){
 			return getValue(ioPool1, inst1)==getValue(ioPool2, inst2);
 		}
 		@Override
-		public int instanceHashCode(Struct.Pool<T> ioPool, T instance){
+		public int instanceHashCode(VarPool<T> ioPool, T instance){
 			return Character.hashCode(getValue(ioPool, instance));
 		}
 	}
@@ -176,50 +176,50 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			return EnumSet.of(VOID, SHORT, INT);
 		}
 		
-		private float getValue(Struct.Pool<T> ioPool, T instance){
+		private float getValue(VarPool<T> ioPool, T instance){
 			return getAccessor().getFloat(ioPool, instance);
 		}
 		
-		public void setValue(Struct.Pool<T> ioPool, T instance, float value){
+		public void setValue(VarPool<T> ioPool, T instance, float value){
 			getAccessor().setFloat(ioPool, instance, value);
 		}
 		
 		@Deprecated
 		@Override
-		public Float get(Struct.Pool<T> ioPool, T instance){
+		public Float get(VarPool<T> ioPool, T instance){
 			return getValue(ioPool, instance);
 		}
 		@Deprecated
 		@Override
-		public void set(Struct.Pool<T> ioPool, T instance, Float value){
+		public void set(VarPool<T> ioPool, T instance, Float value){
 			setValue(ioPool, instance, value);
 		}
 		
 		@Override
-		public void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 			var size=getSize(ioPool, instance);
 			size.writeFloating(dest, getValue(ioPool, instance));
 		}
 		
 		@Override
-		public void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			var size=getSize(ioPool, instance);
 			setValue(ioPool, instance, (float)size.readFloating(src));
 		}
 		
 		@Override
-		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort){
+		public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort){
 			var val=getValue(ioPool, instance);
 			if(val==0) return Optional.empty();
 			return Optional.of(String.valueOf(val));
 		}
 		
 		@Override
-		public boolean instancesEqual(Struct.Pool<T> ioPool1, T inst1, Struct.Pool<T> ioPool2, T inst2){
+		public boolean instancesEqual(VarPool<T> ioPool1, T inst1, VarPool<T> ioPool2, T inst2){
 			return getValue(ioPool1, inst1)==getValue(ioPool2, inst2);
 		}
 		@Override
-		public int instanceHashCode(Struct.Pool<T> ioPool, T instance){
+		public int instanceHashCode(VarPool<T> ioPool, T instance){
 			return Float.hashCode(getValue(ioPool, instance));
 		}
 	}
@@ -236,27 +236,27 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			unsigned=field.hasAnnotation(IOValue.Unsigned.class);
 		}
 		
-		public long getValue(Struct.Pool<T> ioPool, T instance){
+		public long getValue(VarPool<T> ioPool, T instance){
 			return getAccessor().getLong(ioPool, instance);
 		}
 		
-		public void setValue(Struct.Pool<T> ioPool, T instance, long value){
+		public void setValue(VarPool<T> ioPool, T instance, long value){
 			getAccessor().setLong(ioPool, instance, value);
 		}
 		
 		@Deprecated
 		@Override
-		public Long get(Struct.Pool<T> ioPool, T instance){
+		public Long get(VarPool<T> ioPool, T instance){
 			return getValue(ioPool, instance);
 		}
 		@Deprecated
 		@Override
-		public void set(Struct.Pool<T> ioPool, T instance, Long value){
+		public void set(VarPool<T> ioPool, T instance, Long value){
 			setValue(ioPool, instance, value);
 		}
 		
 		@Override
-		public void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 			var size=getSize(ioPool, instance);
 			var val =getValue(ioPool, instance);
 			if(unsigned){
@@ -267,7 +267,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		
 		@Override
-		public void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			var  size=getSize(ioPool, instance);
 			long val;
 			if(unsigned){
@@ -279,18 +279,18 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		
 		@Override
-		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort){
+		public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort){
 			var val=getValue(ioPool, instance);
 			if(val==0) return Optional.empty();
 			return Optional.of(String.valueOf(val));
 		}
 		
 		@Override
-		public boolean instancesEqual(Struct.Pool<T> ioPool1, T inst1, Struct.Pool<T> ioPool2, T inst2){
+		public boolean instancesEqual(VarPool<T> ioPool1, T inst1, VarPool<T> ioPool2, T inst2){
 			return getValue(ioPool1, inst1)==getValue(ioPool2, inst2);
 		}
 		@Override
-		public int instanceHashCode(Struct.Pool<T> ioPool, T instance){
+		public int instanceHashCode(VarPool<T> ioPool, T instance){
 			return Long.hashCode(getValue(ioPool, instance));
 		}
 	}
@@ -313,27 +313,27 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			return all;
 		}
 		
-		public int getValue(Struct.Pool<T> ioPool, T instance){
+		public int getValue(VarPool<T> ioPool, T instance){
 			return getAccessor().getInt(ioPool, instance);
 		}
 		
-		public void setValue(Struct.Pool<T> ioPool, T instance, int value){
+		public void setValue(VarPool<T> ioPool, T instance, int value){
 			getAccessor().setInt(ioPool, instance, value);
 		}
 		
 		@Deprecated
 		@Override
-		public Integer get(Struct.Pool<T> ioPool, T instance){
+		public Integer get(VarPool<T> ioPool, T instance){
 			return getValue(ioPool, instance);
 		}
 		@Deprecated
 		@Override
-		public void set(Struct.Pool<T> ioPool, T instance, Integer value){
+		public void set(VarPool<T> ioPool, T instance, Integer value){
 			setValue(ioPool, instance, value);
 		}
 		
 		@Override
-		public void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 			var size=getSize(ioPool, instance);
 			var val =getValue(ioPool, instance);
 			if(unsigned){
@@ -344,7 +344,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		
 		@Override
-		public void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			var size=getSize(ioPool, instance);
 			int val;
 			if(unsigned){
@@ -356,18 +356,18 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		
 		@Override
-		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort){
+		public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort){
 			var val=getValue(ioPool, instance);
 			if(val==0) return Optional.empty();
 			return Optional.of(String.valueOf(val));
 		}
 		
 		@Override
-		public boolean instancesEqual(Struct.Pool<T> ioPool1, T inst1, Struct.Pool<T> ioPool2, T inst2){
+		public boolean instancesEqual(VarPool<T> ioPool1, T inst1, VarPool<T> ioPool2, T inst2){
 			return getValue(ioPool1, inst1)==getValue(ioPool2, inst2);
 		}
 		@Override
-		public int instanceHashCode(Struct.Pool<T> ioPool, T instance){
+		public int instanceHashCode(VarPool<T> ioPool, T instance){
 			return Integer.hashCode(getValue(ioPool, instance));
 		}
 	}
@@ -390,27 +390,27 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			return all;
 		}
 		
-		private short getValue(Struct.Pool<T> ioPool, T instance){
+		private short getValue(VarPool<T> ioPool, T instance){
 			return getAccessor().getShort(ioPool, instance);
 		}
 		
-		public void setValue(Struct.Pool<T> ioPool, T instance, short value){
+		public void setValue(VarPool<T> ioPool, T instance, short value){
 			getAccessor().setShort(ioPool, instance, value);
 		}
 		
 		@Deprecated
 		@Override
-		public Short get(Struct.Pool<T> ioPool, T instance){
+		public Short get(VarPool<T> ioPool, T instance){
 			return getValue(ioPool, instance);
 		}
 		@Deprecated
 		@Override
-		public void set(Struct.Pool<T> ioPool, T instance, Short value){
+		public void set(VarPool<T> ioPool, T instance, Short value){
 			setValue(ioPool, instance, value);
 		}
 		
 		@Override
-		public void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 			var size=getSize(ioPool, instance);
 			var val =getValue(ioPool, instance);
 			if(unsigned){
@@ -421,7 +421,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		
 		@Override
-		public void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			var   size=getSize(ioPool, instance);
 			short val;
 			if(unsigned){
@@ -433,18 +433,18 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		
 		@Override
-		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort){
+		public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort){
 			var val=getValue(ioPool, instance);
 			if(val==0) return Optional.empty();
 			return Optional.of(String.valueOf(val));
 		}
 		
 		@Override
-		public boolean instancesEqual(Struct.Pool<T> ioPool1, T inst1, Struct.Pool<T> ioPool2, T inst2){
+		public boolean instancesEqual(VarPool<T> ioPool1, T inst1, VarPool<T> ioPool2, T inst2){
 			return getValue(ioPool1, inst1)==getValue(ioPool2, inst2);
 		}
 		@Override
-		public int instanceHashCode(Struct.Pool<T> ioPool, T instance){
+		public int instanceHashCode(VarPool<T> ioPool, T instance){
 			return Short.hashCode(getValue(ioPool, instance));
 		}
 	}
@@ -463,48 +463,48 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			return EnumSet.of(BYTE);
 		}
 		
-		public byte getValue(Struct.Pool<T> ioPool, T instance){
+		public byte getValue(VarPool<T> ioPool, T instance){
 			return getAccessor().getByte(ioPool, instance);
 		}
 		
-		public void setValue(Struct.Pool<T> ioPool, T instance, byte value){
+		public void setValue(VarPool<T> ioPool, T instance, byte value){
 			getAccessor().setByte(ioPool, instance, value);
 		}
 		
 		@Deprecated
 		@Override
-		public Byte get(Struct.Pool<T> ioPool, T instance){
+		public Byte get(VarPool<T> ioPool, T instance){
 			return getValue(ioPool, instance);
 		}
 		@Deprecated
 		@Override
-		public void set(Struct.Pool<T> ioPool, T instance, Byte value){
+		public void set(VarPool<T> ioPool, T instance, Byte value){
 			setValue(ioPool, instance, value);
 		}
 		
 		@Override
-		public void write(Struct.Pool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 			dest.writeInt1(getValue(ioPool, instance));
 		}
 		
 		@Override
-		public void read(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			setValue(ioPool, instance, src.readInt1());
 		}
 		
 		@Override
-		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort){
+		public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort){
 			var val=getValue(ioPool, instance);
 			if(val==0) return Optional.empty();
 			return Optional.of(String.valueOf(val));
 		}
 		
 		@Override
-		public boolean instancesEqual(Struct.Pool<T> ioPool1, T inst1, Struct.Pool<T> ioPool2, T inst2){
+		public boolean instancesEqual(VarPool<T> ioPool1, T inst1, VarPool<T> ioPool2, T inst2){
 			return getValue(ioPool2, inst1)==getValue(ioPool1, inst2);
 		}
 		@Override
-		public int instanceHashCode(Struct.Pool<T> ioPool, T instance){
+		public int instanceHashCode(VarPool<T> ioPool, T instance){
 			return Byte.hashCode(getValue(ioPool, instance));
 		}
 	}
@@ -515,31 +515,31 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			super(field);
 		}
 		
-		public boolean getValue(Struct.Pool<T> ioPool, T instance){
+		public boolean getValue(VarPool<T> ioPool, T instance){
 			return getAccessor().getBoolean(ioPool, instance);
 		}
 		
-		public void setValue(Struct.Pool<T> ioPool, T instance, boolean value){
+		public void setValue(VarPool<T> ioPool, T instance, boolean value){
 			getAccessor().setBoolean(ioPool, instance, value);
 		}
 		
 		@Deprecated
 		@Override
-		public Boolean get(Struct.Pool<T> ioPool, T instance){
+		public Boolean get(VarPool<T> ioPool, T instance){
 			return getValue(ioPool, instance);
 		}
 		@Deprecated
 		@Override
-		public void set(Struct.Pool<T> ioPool, T instance, Boolean value){
+		public void set(VarPool<T> ioPool, T instance, Boolean value){
 			setValue(ioPool, instance, value);
 		}
 		
 		@Override
-		public void writeBits(Struct.Pool<T> ioPool, BitWriter<?> dest, T instance) throws IOException{
+		public void writeBits(VarPool<T> ioPool, BitWriter<?> dest, T instance) throws IOException{
 			dest.writeBoolBit(getValue(ioPool, instance));
 		}
 		@Override
-		public void readBits(Struct.Pool<T> ioPool, BitReader src, T instance) throws IOException{
+		public void readBits(VarPool<T> ioPool, BitReader src, T instance) throws IOException{
 			setValue(ioPool, instance, src.readBoolBit());
 		}
 		@Override
@@ -548,20 +548,20 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 		
 		@Override
-		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+		public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
 			return instanceToString(ioPool, instance, doShort);
 		}
 		@Override
-		public Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort){
+		public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort){
 			return Optional.of(String.valueOf(getValue(ioPool, instance)));
 		}
 		
 		@Override
-		public boolean instancesEqual(Struct.Pool<T> ioPool1, T inst1, Struct.Pool<T> ioPool2, T inst2){
+		public boolean instancesEqual(VarPool<T> ioPool1, T inst1, VarPool<T> ioPool2, T inst2){
 			return getValue(ioPool1, inst1)==getValue(ioPool2, inst2);
 		}
 		@Override
-		public int instanceHashCode(Struct.Pool<T> ioPool, T instance){
+		public int instanceHashCode(VarPool<T> ioPool, T instance){
 			return Boolean.hashCode(getValue(ioPool, instance));
 		}
 		
@@ -571,10 +571,10 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 	}
 	
-	private final boolean                                   forceFixed;
-	private final NumberSize                                size;
-	private       BiFunction<Struct.Pool<T>, T, NumberSize> dynamicSize;
-	private       SizeDescriptor<T>                         sizeDescriptor;
+	private final boolean                               forceFixed;
+	private final NumberSize                            size;
+	private       BiFunction<VarPool<T>, T, NumberSize> dynamicSize;
+	private       SizeDescriptor<T>                     sizeDescriptor;
 	
 	protected IOFieldPrimitive(FieldAccessor<T> field, boolean forceFixed, NumberSize size){
 		super(field);
@@ -604,7 +604,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	}
 	
 	@Override
-	public void skipRead(Struct.Pool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public void skipRead(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		var size=getSize(ioPool, instance);
 		src.skipExact(size.bytes);
 	}
@@ -613,7 +613,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		return EnumSet.allOf(NumberSize.class);
 	}
 	
-	protected NumberSize getSize(Struct.Pool<T> ioPool, T instance){
+	protected NumberSize getSize(VarPool<T> ioPool, T instance){
 		if(dynamicSize!=null) return dynamicSize.apply(ioPool, instance);
 		return size;
 	}
@@ -634,7 +634,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	}
 	
 	@Override
-	public final Optional<String> instanceToString(Struct.Pool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+	public final Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
 		return instanceToString(ioPool, instance, doShort);
 	}
 }
