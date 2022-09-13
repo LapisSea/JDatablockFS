@@ -3,10 +3,7 @@ package com.lapissea.cfs.type.field.fields.reflection;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
-import com.lapissea.cfs.io.bit.BitInputStream;
-import com.lapissea.cfs.io.bit.BitOutputStream;
-import com.lapissea.cfs.io.bit.FlagReader;
-import com.lapissea.cfs.io.bit.FlagWriter;
+import com.lapissea.cfs.io.bit.*;
 import com.lapissea.cfs.io.content.ContentOutputBuilder;
 import com.lapissea.cfs.io.content.ContentOutputStream;
 import com.lapissea.cfs.io.content.ContentReader;
@@ -99,6 +96,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 					yield ContiguousStructPipe.sizeOfUnknown(prov, inst, WordSpace.BYTE);
 				}
 			}
+			case Enum<?> e -> Utils.bitToByte(EnumUniverse.get(e.getClass()).bitSize);
 			default -> {
 				var type=val.getClass();
 				if(type.isArray()){
@@ -158,6 +156,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 			}
 			case IOInstance.Unmanaged inst -> REF_PIPE.write(provider, dest, inst.getReference());
 			case IOInstance inst -> ContiguousStructPipe.of(inst.getThisStruct()).write(provider, dest, inst);
+			case Enum e -> FlagWriter.writeSingle(dest, EnumUniverse.get(e.getClass()), e);
 			
 			default -> {
 				var type=val.getClass();
@@ -327,6 +326,10 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		if(IOInstance.isInstance(typ)){
 			var struct=Struct.ofUnknown(typ);
 			return readStruct(provider, src, genericContext, struct);
+		}
+		if(typ.isEnum()){
+			var universe=EnumUniverse.getUnknown(typ);
+			return FlagReader.readSingle(src, universe);
 		}
 		
 		if(typ.isArray()){
