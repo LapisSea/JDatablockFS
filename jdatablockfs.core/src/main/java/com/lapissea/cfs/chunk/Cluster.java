@@ -128,7 +128,7 @@ public class Cluster implements DataProvider{
 		}
 		
 		@Override
-		public <T> void provide(T obj, ObjectID id) throws IOException{
+		public <T> void provide(ObjectID id, T obj) throws IOException{
 			Objects.requireNonNull(obj);
 			var meta=meta();
 			meta.rootObjects.put(id, obj);

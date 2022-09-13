@@ -199,6 +199,17 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 		return args[index];
 	}
 	
+	public Type genericArg(int index, IOTypeDB db){
+		return args[index].generic(db);
+	}
+	
+	public TypeLink[] argsCopy(){
+		return Arrays.stream(args).map(IOInstance::clone).toArray(TypeLink[]::new);
+	}
+	public Type[] genericArgsCopy(IOTypeDB db){
+		return Arrays.stream(args).map(arg->arg.generic(db)).toArray(Type[]::new);
+	}
+	
 	@Override
 	public String toString(){
 		String argStr;

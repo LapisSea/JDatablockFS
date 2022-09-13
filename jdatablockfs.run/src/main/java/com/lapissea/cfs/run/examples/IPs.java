@@ -24,11 +24,6 @@ public class IPs{
 		String v6();
 	}
 	
-	public interface IPSet extends IOInstance.Def<IPSet>{
-		IOList<IP> ips();
-	}
-	
-	
 	public static void main(String[] args) throws IOException{
 		
 		// run this instead if you have a display server running and this program has a config.json to get a real time display of what is happening
@@ -36,12 +31,8 @@ public class IPs{
 		
 		//No need to hassle with a real file, just make an empty in ram IOInterface
 		IOInterface memory=MemoryData.builder().build();
-		run(memory);
-	}
-	
-	public static void run(IOInterface memory) throws IOException{
-		createData(memory);
 		
+		createData(memory);
 		printData(memory);
 	}
 	
@@ -51,7 +42,7 @@ public class IPs{
 		var cluster=Cluster.init(memory);
 		
 		//Ask root provider for an IPSet with the id of my ips
-		var ips=cluster.getRootProvider().request(IPSet.class, "my ips").ips();
+		IOList<IP> ips=cluster.getRootProvider().request("my ips", IOList.class, IP.class);
 		
 		//Nice thing to do, reduces possibility of fragmentation. This is only useful when adding element by element. addAll does not benefit from this
 		ips.requestCapacity(2);

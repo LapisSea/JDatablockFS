@@ -35,7 +35,7 @@ public class RandomLists{
 							var cl=Cluster.init(mem);
 							var p =cl.getRootProvider();
 							for(int i=0;i<400;i++){
-								var m=p.request(Map.class, "map"+rand.nextInt(listCount));
+								var m=p.request("map"+rand.nextInt(listCount), Map.class);
 								m.entities.addNew(e->{
 									e.inventory.add(new InventorySlot());
 								});

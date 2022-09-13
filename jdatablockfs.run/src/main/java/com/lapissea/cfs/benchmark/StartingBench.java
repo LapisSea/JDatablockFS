@@ -19,7 +19,7 @@ public class StartingBench{
 		try{
 			var mem  =MemoryData.builder().build();
 			var roots=Cluster.init(mem).getRootProvider();
-			roots.request(Reference.class, "benchy");
+			roots.request("benchy", Reference.class);
 		}catch(Throwable e){
 			throw new RuntimeException(e);
 		}

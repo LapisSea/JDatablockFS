@@ -171,7 +171,7 @@ public class GeneralTypeHandlingTests{
 	
 	public static byte[] make() throws IOException{
 		var data=MemoryData.builder().build();
-		Cluster.init(data).getRootProvider().request(EnumContainer.class, "hello!");
+		Cluster.init(data).getRootProvider().request("hello!", EnumContainer.class);
 		return data.readAll();
 	}
 	public static void use(byte[] data) throws IOException{
@@ -223,8 +223,8 @@ public class GeneralTypeHandlingTests{
 					aaaaaaaaaayyyyyyyyyyyyyyyyyy lmaooooooooooooooooooooo
 					""".getBytes(UTF_8)
 			);
-			provider.getRootProvider().provide(blob, new ObjectID("obj"));
-			var read=provider.getRootProvider().request(NamedBlob.class, "obj");
+			provider.getRootProvider().provide(new ObjectID("obj"), blob);
+			var read=provider.getRootProvider().request("obj", NamedBlob.class);
 
 //			assertTrue("Compression not working", chunk.chainSize()<64);
 			

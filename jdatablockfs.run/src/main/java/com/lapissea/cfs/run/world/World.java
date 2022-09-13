@@ -11,7 +11,7 @@ public class World{
 	
 	public static void main(String[] args) throws IOException{
 		LoggedMemoryUtils.simpleLoggedMemorySession(mem->{
-			var map=Cluster.init(mem).getRootProvider().request(Map.class, "map");
+			var map=Cluster.init(mem).getRootProvider().request("map", Map.class);
 			
 			map.entities.addMultipleNew(20, e->{
 				e.pos.x=(Rand.f()-0.5F)*20;

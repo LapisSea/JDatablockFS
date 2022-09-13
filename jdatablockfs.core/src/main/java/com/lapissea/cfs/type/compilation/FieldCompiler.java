@@ -438,7 +438,8 @@ public class FieldCompiler{
 			if(impl!=null){
 				var      rawType=SyntheticParameterizedType.generalize(type);
 				Class<?> raw    =impl.value();
-				Type[]   parms  =rawType.getActualTypeArguments();
+				if(!IOInstance.isInstance(raw)) throw new IllegalStateException();
+				Type[] parms=rawType.getActualTypeArguments();
 				type=SyntheticParameterizedType.of(raw, parms);
 			}
 		}

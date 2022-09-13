@@ -1,11 +1,13 @@
 package com.lapissea.cfs.chunk;
 
 import com.lapissea.cfs.IterablePP;
+import com.lapissea.cfs.io.bit.EnumUniverse;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.objects.ObjectID;
 import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.cfs.type.*;
+import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.IOException;
@@ -54,8 +56,16 @@ public interface RootProvider extends DataProvider.Holder{
 			var provider=this.provider.getDataProvider();
 			var rawType =genericType.getTypeClass(provider.getTypeDb());
 			
-			var p=SupportedPrimitive.get(rawType).map(typ->withGenerator(()->(T)typ.getDefaultValue()));
-			if(p.isPresent()) return p.get();
+			if(!IOInstance.isInstance(rawType)){
+				var defTypAnn=rawType.getAnnotation(IOValue.OverrideType.DefaultImpl.class);
+				if(defTypAnn!=null){
+					var defTyp=defTypAnn.value();
+					if(!IOInstance.isInstance(defTyp)) throw new IllegalStateException();
+					Type[] args=genericType.genericArgsCopy(provider.getTypeDb());
+					
+					return withType(TypeLink.of(defTypAnn.value(), args));
+				}
+			}
 			
 			if(IOInstance.isInstance(rawType)){
 				var struct=Struct.ofUnknown(rawType);
@@ -81,6 +91,21 @@ public interface RootProvider extends DataProvider.Holder{
 				}
 			}
 			
+			if(genericType.argCount()!=0) throw new IllegalStateException(rawType.getName()+" should not be generic");
+			
+			var p=SupportedPrimitive.get(rawType).map(typ->withGenerator(()->(T)typ.getDefaultValue()));
+			if(p.isPresent()) return p.get();
+			
+			if(rawType.isEnum()){
+				var universe=EnumUniverse.getUnknown(rawType);
+				if(universe.size()==0) throw new IllegalArgumentException();
+				return withGenerator(()->(T)universe.get(0));
+			}
+			
+			if(rawType==String.class){
+				return withGenerator(()->(T)"");
+			}
+			
 			throw new IllegalArgumentException("Unrecognised type: "+rawType.getSimpleName()+" in "+genericType);
 		}
 		
@@ -97,11 +122,15 @@ public interface RootProvider extends DataProvider.Holder{
 		return new Builder<>(this);
 	}
 	
-	default <T extends IOInstance<T>> T request(Struct<T> type, String id) throws IOException{return this.builder().withId(id).withType(type.getType()).request();}
-	default <T> T request(Class<T> type, String id) throws IOException                       {return this.builder().withId(id).withType(type).request();}
+	default <T> T request(String id, Class<?> raw, Class<?>... args) throws IOException      {return this.<T>builder().withId(id).withType(TypeLink.of(raw, args)).request();}
+	default <T extends IOInstance<T>> T request(String id, Struct<T> type) throws IOException{return this.builder().withId(id).withType(type.getType()).request();}
+	default <T> T request(String id, Class<T> type) throws IOException                       {return this.builder().withId(id).withType(type).request();}
 	
 	<T> T request(ObjectID id, UnsafeSupplier<T, IOException> objectGenerator) throws IOException;
-	<T> void provide(T obj, ObjectID id) throws IOException;
+	default <T> void provide(String id, T obj) throws IOException{
+		provide(new ObjectID(id), obj);
+	}
+	<T> void provide(ObjectID id, T obj) throws IOException;
 	
 	
 	IterablePP<IOMap.IOEntry<ObjectID, Object>> listAll();
