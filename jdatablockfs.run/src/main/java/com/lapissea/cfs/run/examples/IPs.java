@@ -41,7 +41,7 @@ public class IPs{
 		//Cluster.init acts as a clean slate for the memory field. Any previously contained data will be deleted
 		var cluster=Cluster.init(memory);
 		
-		//Ask root provider for an IPSet with the id of my ips
+		//Ask root provider for list of IPs with the id of "my ips"
 		IOList<IP> ips=cluster.getRootProvider().request("my ips", IOList.class, IP.class);
 		
 		//Nice thing to do, reduces possibility of fragmentation. This is only useful when adding element by element. addAll does not benefit from this
