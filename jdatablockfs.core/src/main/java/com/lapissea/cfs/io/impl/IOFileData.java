@@ -1,8 +1,8 @@
 package com.lapissea.cfs.io.impl;
 
 import com.lapissea.cfs.GlobalConfig;
-import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.internal.IUtils;
+import com.lapissea.cfs.internal.MemPrimitive;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.IOTransactionBuffer;
 import com.lapissea.cfs.io.RandomIO;
@@ -425,12 +425,12 @@ public final class IOFileData implements IOInterface, Closeable{
 		fileData.seek(fileOffset);
 		byte[] buff=new byte[len];
 		fileData.readFully(buff);
-		return Utils.read8(buff, 0, len);
+		return MemPrimitive.getWord(buff, 0, len);
 	}
 	private void write8(long value, long fileOffset, int len) throws IOException{
 		fileData.seek(fileOffset);
 		byte[] buff=new byte[len];
-		Utils.write8(value, buff, 0, len);
+		MemPrimitive.setWord(value, buff, 0, len);
 		fileData.write(buff);
 	}
 	

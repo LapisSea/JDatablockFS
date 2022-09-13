@@ -1,6 +1,5 @@
 package com.lapissea.cfs;
 
-import com.lapissea.cfs.internal.MyUnsafe;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.util.NotImplementedException;
@@ -177,43 +176,6 @@ public class Utils{
 	public static String toShortString(Object o){
 		if(o instanceof IOInstance<?> i) return i.toShortString();
 		return TextUtil.toShortString(o);
-	}
-	
-	private static final int BARR_OFF=MyUnsafe.UNSAFE.arrayBaseOffset(byte[].class);
-	
-	public static long read8(byte[] data, int off, int len){
-		if(!MyUnsafe.IS_BIG_ENDIAN&&len==8){
-			Objects.checkFromIndexSize(off, len, data.length);
-			return Long.reverseBytes(MyUnsafe.UNSAFE.getLong(data, BARR_OFF+off));
-		}
-		
-		final var lm1=len-1;
-		long      val=0;
-		for(int i=0;i<len;i++){
-			val|=(data[off+i]&255L)<<((lm1-i)*8);
-		}
-		return val;
-	}
-	
-	public static void write8(long v, byte[] writeBuffer, int off, int len){
-		if(v==0){
-			for(int i=off, j=off+len;i<j;i++){
-				writeBuffer[i]=0;
-			}
-			return;
-		}
-		
-		if(!MyUnsafe.IS_BIG_ENDIAN&&len==8){
-			Objects.checkFromIndexSize(off, len, writeBuffer.length);
-			MyUnsafe.UNSAFE.putLong(writeBuffer, BARR_OFF+off, Long.reverseBytes(v));
-			return;
-		}
-		
-		final var lm1=len-1;
-		
-		for(int i=0;i<len;i++){
-			writeBuffer[off+i]=(byte)(v >>> ((lm1-i)*8));
-		}
 	}
 	
 	public static Optional<String> optionalProperty(String name){

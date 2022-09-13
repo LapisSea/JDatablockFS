@@ -1,6 +1,6 @@
 package com.lapissea.cfs.io;
 
-import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.internal.MemPrimitive;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
@@ -165,7 +165,7 @@ public final class IOTransactionBuffer{
 			if(writeEvents.isEmpty()){
 				byte[] buf=new byte[len];
 				base.read(offset, buf, 0, len);
-				return Utils.read8(buf, 0, len);
+				return MemPrimitive.getWord(buf, 0, len);
 			}
 			
 			
@@ -181,14 +181,14 @@ public final class IOTransactionBuffer{
 				var end=event.end();
 				if(end>=newEnd){
 					var eventOffset=(int)(offset-eStart);
-					return Utils.read8(event.data, eventOffset, len);
+					return MemPrimitive.getWord(event.data, eventOffset, len);
 				}
 				break;
 			}
 			
 			byte[] buf=new byte[len];
 			read0(base, offset, buf, 0, len);
-			return Utils.read8(buf, 0, len);
+			return MemPrimitive.getWord(buf, 0, len);
 		}finally{
 			l.unlock();
 		}
@@ -326,7 +326,7 @@ public final class IOTransactionBuffer{
 	}
 	private static WriteEvent makeWordEvent(long offset, long v, int len){
 		byte[] arr=new byte[len];
-		Utils.write8(v, arr, 0, len);
+		MemPrimitive.setWord(v, arr, 0, len);
 		return new WriteEvent(offset, arr);
 	}
 	
@@ -376,14 +376,14 @@ public final class IOTransactionBuffer{
 				if(end>=newEnd){
 					var start      =event.start();
 					var eventOffset=(int)(offset-start);
-					Utils.write8(v, event.data, eventOffset, len);
+					MemPrimitive.setWord(v, event.data, eventOffset, len);
 					return;
 				}
 				break;
 			}
 			
 			byte[] arr=new byte[len];
-			Utils.write8(v, arr, 0, len);
+			MemPrimitive.setWord(v, arr, 0, len);
 			write0(offset, arr, 0, len);
 			
 			

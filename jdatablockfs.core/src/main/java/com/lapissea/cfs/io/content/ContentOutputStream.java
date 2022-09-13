@@ -1,6 +1,6 @@
 package com.lapissea.cfs.io.content;
 
-import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.internal.MemPrimitive;
 import com.lapissea.util.NotNull;
 
 import java.io.IOException;
@@ -28,7 +28,7 @@ public abstract class ContentOutputStream extends OutputStream implements Conten
 		}
 		@Override
 		public void writeWord(long v, int len) throws IOException{
-			Utils.write8(v, ba, pos, len);
+			MemPrimitive.setWord(v, ba, pos, len);
 			pos+=len;
 		}
 		

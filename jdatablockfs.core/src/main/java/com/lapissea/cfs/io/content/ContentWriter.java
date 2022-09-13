@@ -1,7 +1,7 @@
 package com.lapissea.cfs.io.content;
 
 import com.lapissea.cfs.BufferErrorSupplier;
-import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.internal.MemPrimitive;
 import com.lapissea.util.MathUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.BiIntConsumer;
@@ -293,7 +293,7 @@ public interface ContentWriter extends AutoCloseable{
 			@Override
 			public void writeWord(long v, int len) throws IOException{
 				if(count+len<=buf.length){
-					Utils.write8(v, buf, count, len);
+					MemPrimitive.setWord(v, buf, count, len);
 				}
 				count+=len;
 				earlyCheck();

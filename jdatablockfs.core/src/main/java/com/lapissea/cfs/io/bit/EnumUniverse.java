@@ -1,13 +1,12 @@
 package com.lapissea.cfs.io.bit;
 
 import com.lapissea.cfs.GlobalConfig;
+import com.lapissea.cfs.internal.MyUnsafe;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
-import sun.misc.Unsafe;
 
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.util.*;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -25,34 +24,21 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
 	private static final UGet UNSAFE_GETTER;
 	
 	static{
-		Unsafe us  =null;
-		long   uOff=-1;
-		
+		var uOff=OptionalLong.empty();
 		try{
-			if(Runtime.version().feature()>18) throw new RuntimeException();
-			Field f=Unsafe.class.getDeclaredField("theUnsafe");
-			f.setAccessible(true);
-			us=(Unsafe)f.get(null);
+			uOff=MyUnsafe.objectFieldOffset(EnumSet.class.getDeclaredField("universe"));
 		}catch(Throwable ignored){}
 		
-		if(us!=null){
-			try{
-				uOff=us.objectFieldOffset(EnumSet.class.getDeclaredField("universe"));
-			}catch(Throwable e){
-				us=null;
-			}
-		}
-		if(us==null) UNSAFE_GETTER=null;
+		if(uOff.isEmpty()) UNSAFE_GETTER=null;
 		else{
-			long   universeOffset=uOff;
-			Unsafe unsafe        =us;
+			long universeOffset=uOff.getAsLong();
 			
 			UGet uget=new UGet(){
 				@Override
 				public <E extends Enum<E>> E[] get(Class<E> type){
 					try{
 						@SuppressWarnings("unchecked")
-						E[] universe=(E[])unsafe.getObject(EnumSet.noneOf(type), universeOffset);
+						E[] universe=(E[])MyUnsafe.UNSAFE.getObject(EnumSet.noneOf(type), universeOffset);
 						if(GlobalConfig.DEBUG_VALIDATION){
 							if(!Arrays.equals(universe, getUniverseSafe(type))){
 								return null;

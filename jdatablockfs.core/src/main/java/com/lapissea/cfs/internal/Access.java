@@ -49,7 +49,7 @@ public class Access{
 		
 		long offset;
 		try{
-			offset=UNSAFE.objectFieldOffset(Mirror.class.getDeclaredField("allowedModes"));
+			offset=MyUnsafe.objectFieldOffset(Mirror.class.getDeclaredField("allowedModes")).orElseThrow();
 		}catch(NoSuchFieldException e){
 			throw new RuntimeException(e);
 		}
@@ -135,7 +135,7 @@ public class Access{
 			corruptPermissions(local);
 			return local;
 		}else{
-			throw new NotImplementedException("Ask for consent not implemented");
+			throw new NotImplementedException("Ask for consent not implemented");//TODO implement consent
 		}
 	}
 	

@@ -1,7 +1,7 @@
 package com.lapissea.cfs.io.impl;
 
-import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.internal.IUtils;
+import com.lapissea.cfs.internal.MemPrimitive;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.IOTransactionBuffer;
 import com.lapissea.cfs.io.RandomIO;
@@ -125,7 +125,7 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 				throw new EOFException();
 			}
 			
-			long val=MemoryData.this.read8(fileData, pos, len);
+			long val=MemoryData.this.readWord(fileData, pos, len);
 			pos+=len;
 			return val;
 		}
@@ -229,7 +229,7 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 			int remaining=(int)(getCapacity()-getPos());
 			if(remaining<len) setCapacity(Math.max(4, Math.max((int)(getCapacity()*4D/3), getCapacity()+len-remaining)));
 			
-			MemoryData.this.write8(v, fileData, pos, len);
+			MemoryData.this.writeWord(v, fileData, pos, len);
 			var oldPos=pos;
 			pos+=len;
 			used=Math.max(used, pos);
@@ -437,8 +437,8 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 	protected abstract void readN(DataType fileData, int fileOffset, byte[] dest, int off, int len);
 	protected abstract void writeN(byte[] src, int srcOffset, DataType fileData, int fileOffset, int len);
 	
-	protected abstract long read8(DataType fileData, int fileOffset, int len);
-	protected abstract void write8(long value, DataType fileData, int fileOffset, int len);
+	protected abstract long readWord(DataType fileData, int fileOffset, int len);
+	protected abstract void writeWord(long value, DataType fileData, int fileOffset, int len);
 	
 	public static Builder builder(){
 		return new Builder();
@@ -587,12 +587,12 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 		}
 		
 		@Override
-		protected long read8(byte[] fileData, int fileOffset, int len){
-			return Utils.read8(fileData, fileOffset, len);
+		protected long readWord(byte[] fileData, int fileOffset, int len){
+			return MemPrimitive.getWord(fileData, fileOffset, len);
 		}
 		@Override
-		protected void write8(long value, byte[] fileData, int fileOffset, int len){
-			Utils.write8(value, fileData, fileOffset, len);
+		protected void writeWord(long value, byte[] fileData, int fileOffset, int len){
+			MemPrimitive.setWord(value, fileData, fileOffset, len);
 		}
 	}
 	
@@ -632,7 +632,7 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 		}
 		
 		@Override
-		protected long read8(ByteBuffer fileData, int fileOffset, int len){
+		protected long readWord(ByteBuffer fileData, int fileOffset, int len){
 			final var lm1=len-1;
 			long      val=0;
 			for(int i=0;i<len;i++){
@@ -642,7 +642,7 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 		}
 		
 		@Override
-		protected void write8(long value, ByteBuffer fileData, int fileOffset, int len){
+		protected void writeWord(long value, ByteBuffer fileData, int fileOffset, int len){
 			final var lm1=len-1;
 			
 			for(int i=0;i<len;i++){

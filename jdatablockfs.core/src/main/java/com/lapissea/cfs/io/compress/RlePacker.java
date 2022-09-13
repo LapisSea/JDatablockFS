@@ -1,6 +1,6 @@
 package com.lapissea.cfs.io.compress;
 
-import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.internal.MemPrimitive;
 import com.lapissea.cfs.objects.NumberSize;
 
 import java.util.Arrays;
@@ -110,7 +110,7 @@ public final class RlePacker implements Packer{
 			switch(siz){
 				case VOID -> {}
 				case BYTE -> packed[pos]=(byte)num;
-				default -> Utils.write8(num, packed, pos, siz.bytes);
+				default -> MemPrimitive.setWord(num, packed, pos, siz.bytes);
 			}
 		}
 		
@@ -148,7 +148,7 @@ public final class RlePacker implements Packer{
 			return switch(siz){
 				case VOID -> 0;
 				case BYTE -> packedData[pos]&0xFF;
-				default -> (int)Utils.read8(packedData, pos, siz.bytes);
+				default -> (int)MemPrimitive.getWord(packedData, pos, siz.bytes);
 			};
 		}
 		

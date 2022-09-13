@@ -1,6 +1,6 @@
 package com.lapissea.cfs.io.content;
 
-import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.internal.MemPrimitive;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -29,7 +29,7 @@ public class ContentOutputBuilder extends ByteArrayOutputStream implements Conte
 			ContentWriter.super.writeWord(v, len);
 			return;
 		}
-		Utils.write8(v, buf, count, len);
+		MemPrimitive.setWord(v, buf, count, len);
 		count+=len;
 	}
 	
