@@ -74,7 +74,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			if(cached!=null) return cached;
 			
 			
-			return compile(instanceClass, Unmanaged::new);
+			return compile(instanceClass, Unmanaged::new, false);
 		}
 		
 		private final NewUnmanaged<T> unmanagedConstructor;
@@ -206,16 +206,16 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			if(!IOInstance.isInstance(t)) throw new ClassCastException(t.getName()+" is not an "+IOInstance.class.getSimpleName());
 			if(IOInstance.isUnmanaged(t)) throw new ClassCastException(t.getName()+" is unmanaged!");
 			return new Struct<>(t, runNow);
-		});
+		}, runNow);
 	}
 	
 	@SuppressWarnings("unchecked")
-	private static <T extends IOInstance<T>, S extends Struct<T>> S compile(Class<T> instanceClass, Function<Class<T>, S> newStruct){
+	private static <T extends IOInstance<T>, S extends Struct<T>> S compile(Class<T> instanceClass, Function<Class<T>, S> newStruct, boolean runNow){
 		boolean needsImpl=IOInstance.Def.isDefinition(instanceClass);
 		
 		Class<T> concreteClass;
 		if(needsImpl){
-			concreteClass=DefInstanceCompiler.getImpl(instanceClass);
+			concreteClass=DefInstanceCompiler.getImpl(instanceClass, runNow);
 		}else{
 			concreteClass=instanceClass;
 		}
@@ -229,13 +229,13 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		var lock=STRUCT_CACHE_LOCK.writeLock();
 		lock.lock();
 		try{
-			Thread thread=STRUCT_COMPILE.get(instanceClass);
+			Thread thread=STRUCT_COMPILE.get(concreteClass);
 			if(thread!=null&&thread==Thread.currentThread()){
 				throw new MalformedStructLayout("Recursive struct compilation");
 			}
 			
 			//If class was compiled in another thread this should early exit
-			var existing=STRUCT_CACHE.get(instanceClass);
+			var existing=STRUCT_CACHE.get(concreteClass);
 			if(existing!=null) return (S)existing;
 			
 			Log.trace("{}Requested struct: {}{}", GREEN_BRIGHT, instanceClass.getName(), RESET);
@@ -256,7 +256,15 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			lock.unlock();
 		}
 		
-		COMPILATION.on(()->StagedInit.runBaseStageTask(()->COMPILATION.log(TextUtil.toTable(struct.getType().getName(), struct.getFields()))));
+		COMPILATION.on(()->{
+			Runnable run=()->{
+				var name=struct.getType().getName();
+				if(name.endsWith(IOInstance.Def.IMPL_NAME_POSTFIX)) name=name.substring(0, name.length()-IOInstance.Def.IMPL_NAME_POSTFIX.length());
+				COMPILATION.log(TextUtil.toTable(name, struct.getFields()));
+			};
+			if(runNow) run.run();
+			else StagedInit.runBaseStageTask(run);
+		});
 		
 		return struct;
 	}

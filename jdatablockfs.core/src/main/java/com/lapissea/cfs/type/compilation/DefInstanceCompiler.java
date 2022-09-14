@@ -141,7 +141,7 @@ public class DefInstanceCompiler{
 		var key=new Key<>(interf);
 		@SuppressWarnings("unchecked")
 		var node=(ImplNode<T>)CACHE.get(key);
-		if(node==null||node.state!=ImplNode.State.DONE) node=getNode(key);
+		if(node==null||node.state!=ImplNode.State.DONE) node=getNode(key, false);
 		var ctr=node.dataConstructor;
 		if(ctr==null) fail(interf);
 		return ctr;
@@ -151,17 +151,17 @@ public class DefInstanceCompiler{
 		throw new RuntimeException("Please add "+IOInstance.Def.Order.class.getName()+" to "+interf.getName());
 	}
 	
-	public static <T extends IOInstance<T>> Class<T> getImpl(Class<T> interf){
-		return getNode(new Key<>(interf)).impl;
+	public static <T extends IOInstance<T>> Class<T> getImpl(Class<T> interf, boolean structNow){
+		return getNode(new Key<>(interf), structNow).impl;
 	}
 	
 	
 	public static <T extends IOInstance.Def<T>> Class<T> getImplPartial(Key<T> key){
 		if(key.includeNames.isEmpty()) throw new IllegalArgumentException("Names can not be empty");
-		return getNode(key).impl;
+		return getNode(key, false).impl;
 	}
 	
-	private static <T extends IOInstance<T>> ImplNode<T> getNode(Key<T> key){
+	private static <T extends IOInstance<T>> ImplNode<T> getNode(Key<T> key, boolean structNow){
 		Class<T> interf=key.clazz;
 		if(!isDefinition(interf)){
 			throw new IllegalArgumentException(interf+" type must be an IOInstance.Def");
@@ -183,7 +183,8 @@ public class DefInstanceCompiler{
 			
 			try{
 				//Eagerly load struct
-				Struct.of(impl);
+				if(structNow) Struct.of(impl, StagedInit.STATE_DONE);
+				else Struct.of(impl);
 			}catch(Throwable e){
 				Log.warn("Failed to preload {}. Cause: {}", impl.getName(), e.getMessage());
 			}

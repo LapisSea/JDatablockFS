@@ -77,7 +77,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			class Cache{
 				static final Map<Sig, Function<?, ?>> CH=new ConcurrentHashMap<>();
 			}
-			if(DefInstanceCompiler.isDefinition(type)) type=DefInstanceCompiler.getImpl(type);
+			if(DefInstanceCompiler.isDefinition(type)) type=DefInstanceCompiler.getImpl(type, false);
 			
 			//noinspection unchecked
 			return (Function<A1, T>)Cache.CH.computeIfAbsent(new Sig(type, arg1Type), t->{
