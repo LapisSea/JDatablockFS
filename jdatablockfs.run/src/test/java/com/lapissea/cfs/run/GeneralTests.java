@@ -7,7 +7,6 @@ import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.content.ContentInputStream;
 import com.lapissea.cfs.io.content.ContentOutputStream;
-import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.NumberSize;
@@ -65,7 +64,7 @@ public class GeneralTests{
 			try(var dummy=AllocateTicket.bytes(1).submit(DataProvider.newVerySimpleProvider()).io()){
 				dummy.write(1);
 			}
-			AllocateTicket.bytes(10).submit(Cluster.init(MemoryData.builder().build()));
+			AllocateTicket.bytes(10).submit(Cluster.emptyMem());
 		}
 	}
 	

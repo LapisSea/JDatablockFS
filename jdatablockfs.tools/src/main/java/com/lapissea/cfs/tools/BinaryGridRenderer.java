@@ -44,7 +44,6 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.nio.ByteBuffer;
 import java.util.*;
-import java.util.concurrent.ForkJoinPool;
 import java.util.function.Consumer;
 import java.util.function.IntPredicate;
 import java.util.function.Supplier;
@@ -65,9 +64,9 @@ import static org.lwjgl.glfw.GLFW.*;
 public class BinaryGridRenderer implements DataRenderer{
 	
 	static{
-		ForkJoinPool.commonPool().execute(()->{
+		Thread.ofVirtual().start(()->{
 			try{
-				Cluster.init(MemoryData.builder().build()).rootWalker(MemoryWalker.PointerRecord.NOOP, false).walk();
+				Cluster.emptyMem().rootWalker(MemoryWalker.PointerRecord.NOOP, false).walk();
 			}catch(IOException ignored){}
 		});
 	}

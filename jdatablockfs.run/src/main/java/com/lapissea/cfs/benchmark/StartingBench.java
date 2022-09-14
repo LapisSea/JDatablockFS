@@ -1,7 +1,6 @@
 package com.lapissea.cfs.benchmark;
 
 import com.lapissea.cfs.chunk.Cluster;
-import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.objects.Reference;
 import org.openjdk.jmh.annotations.*;
 
@@ -17,8 +16,7 @@ public class StartingBench{
 	@BenchmarkMode(Mode.SingleShotTime)
 	public void initAndRoot(){
 		try{
-			var mem  =MemoryData.builder().build();
-			var roots=Cluster.init(mem).getRootProvider();
+			var roots=Cluster.emptyMem().getRootProvider();
 			roots.request("benchy", Reference.class);
 		}catch(Throwable e){
 			throw new RuntimeException(e);

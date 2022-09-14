@@ -1,7 +1,6 @@
 package com.lapissea.cfs.benchmark;
 
 import com.lapissea.cfs.chunk.Cluster;
-import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.objects.collections.HashIOMap;
 import com.lapissea.cfs.objects.collections.IOMap;
 import org.openjdk.jmh.annotations.*;
@@ -19,7 +18,7 @@ public class MapWriteBench{
 	@SuppressWarnings("unchecked")
 	@Benchmark
 	public void write() throws IOException{
-		var cluster=Cluster.init(MemoryData.builder().build());
+		var cluster=Cluster.emptyMem();
 		IOMap<Object, Object> map=cluster.getRootProvider()
 		                                 .builder()
 		                                 .withId("map")

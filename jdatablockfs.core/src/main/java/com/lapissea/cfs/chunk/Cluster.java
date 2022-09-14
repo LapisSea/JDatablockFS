@@ -4,6 +4,7 @@ import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.MagicID;
 import com.lapissea.cfs.exceptions.MalformedPointerException;
 import com.lapissea.cfs.io.IOInterface;
+import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.ObjectID;
@@ -42,6 +43,10 @@ public class Cluster implements DataProvider{
 			e.printStackTrace();
 			throw e;
 		}
+	}
+	
+	public static Cluster emptyMem() throws IOException{
+		return Cluster.init(MemoryData.builder().build());
 	}
 	
 	public static Cluster init(IOInterface data) throws IOException{
