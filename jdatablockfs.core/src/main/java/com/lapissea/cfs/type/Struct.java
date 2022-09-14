@@ -183,13 +183,21 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	public static <T extends IOInstance<T>> Struct<T> of(Class<T> instanceClass, int minRequestedStage){
-		var s=of0(instanceClass, minRequestedStage==STATE_DONE);
-		s.waitForState(minRequestedStage);
-		return s;
+		try{
+			var s=of0(instanceClass, minRequestedStage==STATE_DONE);
+			s.waitForState(minRequestedStage);
+			return s;
+		}catch(Throwable e){
+			throw Utils.interceptClInit(e);
+		}
 	}
 	
 	public static <T extends IOInstance<T>> Struct<T> of(Class<T> instanceClass){
-		return of0(instanceClass, false);
+		try{
+			return of0(instanceClass, false);
+		}catch(Throwable e){
+			throw Utils.interceptClInit(e);
+		}
 	}
 	
 	@SuppressWarnings("unchecked")

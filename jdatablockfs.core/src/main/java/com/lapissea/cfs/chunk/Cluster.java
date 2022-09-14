@@ -32,18 +32,8 @@ import static com.lapissea.cfs.type.field.annotations.IOValue.Reference.PipeType
 
 public class Cluster implements DataProvider{
 	
-	public static final  FixedContiguousStructPipe<RootRef> ROOT_PIPE;
-	private static final ChunkPointer                       FIRST_CHUNK_PTR;
-	
-	static{
-		try{//TODO: add clinit exception detection and report
-			ROOT_PIPE=FixedContiguousStructPipe.of(RootRef.class);
-			FIRST_CHUNK_PTR=ChunkPointer.of(MagicID.size());
-		}catch(Throwable e){
-			e.printStackTrace();
-			throw e;
-		}
-	}
+	public static final  FixedContiguousStructPipe<RootRef> ROOT_PIPE      =FixedContiguousStructPipe.of(RootRef.class);
+	private static final ChunkPointer                       FIRST_CHUNK_PTR=ChunkPointer.of(MagicID.size());
 	
 	public static Cluster emptyMem() throws IOException{
 		return Cluster.init(MemoryData.builder().build());

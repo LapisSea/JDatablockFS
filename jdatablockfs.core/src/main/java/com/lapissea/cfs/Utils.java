@@ -2,6 +2,7 @@ package com.lapissea.cfs;
 
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
@@ -255,5 +256,18 @@ public class Utils{
 			return classNameToHuman(c.getName(), doShort);
 		}
 		return type.getTypeName();
+	}
+	
+	public static RuntimeException interceptClInit(Throwable e){
+		var trace=e.getStackTrace();
+		for(var el : trace){
+			if(List.of("of", "make").contains(el.getMethodName())) continue;
+			if(el.getMethodName().equals("<clinit>")){
+				LogUtil.println("CLINIT ERROR");
+				e.printStackTrace();
+			}
+			break;
+		}
+		throw UtilL.uncheckedThrow(e);
 	}
 }

@@ -155,16 +155,24 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	
 	@SuppressWarnings("unchecked")
 	public static <T extends IOInstance<T>, P extends StructPipe<T>> P of(Class<P> type, Struct<T> struct, int minRequestedStage){
-		var group=(StructGroup<T, P>)CACHE.computeIfAbsent(type, StructGroup::new);
-		var pipe =group.make(struct, minRequestedStage==STATE_DONE);
-		pipe.waitForState(minRequestedStage);
-		return pipe;
+		try{
+			var group=(StructGroup<T, P>)CACHE.computeIfAbsent(type, StructGroup::new);
+			var pipe =group.make(struct, minRequestedStage==STATE_DONE);
+			pipe.waitForState(minRequestedStage);
+			return pipe;
+		}catch(Throwable e){
+			throw Utils.interceptClInit(e);
+		}
 	}
 	
 	@SuppressWarnings("unchecked")
 	public static <T extends IOInstance<T>, P extends StructPipe<T>> P of(Class<P> type, Struct<T> struct){
-		var group=(StructGroup<T, P>)CACHE.computeIfAbsent(type, StructGroup::new);
-		return group.make(struct, false);
+		try{
+			var group=(StructGroup<T, P>)CACHE.computeIfAbsent(type, StructGroup::new);
+			return group.make(struct, false);
+		}catch(Throwable e){
+			throw Utils.interceptClInit(e);
+		}
 	}
 	
 	@SuppressWarnings("unchecked")
