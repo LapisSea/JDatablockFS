@@ -1,7 +1,7 @@
 package com.lapissea.cfs.type.compilation;
 
 import com.lapissea.cfs.Utils;
-import com.lapissea.cfs.exceptions.MalformedStructLayout;
+import com.lapissea.cfs.exceptions.IllegalField;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
@@ -33,7 +33,7 @@ public interface RegistryNode{
 		public abstract <T extends IOInstance<T>> IOField<T, ? extends ValTyp> create(FieldAccessor<T> field, GenericContext genericContext);
 	}
 	
-	class Registry implements RegistryNode{
+	class FieldRegistry implements RegistryNode{
 		
 		private final List<RegistryNode> nodes=new ArrayList<>();
 		
@@ -41,8 +41,8 @@ public interface RegistryNode{
 			nodes.add(node);
 		}
 		
-		private MalformedStructLayout fail(Type type){
-			throw new MalformedStructLayout("Unable to find implementation of "+IOField.class.getSimpleName()+" from "+type);
+		private IllegalField fail(Type type){
+			throw new IllegalField("Unable to find implementation of "+IOField.class.getSimpleName()+" from "+type);
 		}
 		private RegistryNode find(Type type, GetAnnotation annotation){
 			for(var node : nodes){

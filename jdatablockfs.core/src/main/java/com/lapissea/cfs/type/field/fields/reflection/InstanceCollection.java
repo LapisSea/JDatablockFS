@@ -3,7 +3,7 @@ package com.lapissea.cfs.type.field.fields.reflection;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.DataProvider;
-import com.lapissea.cfs.exceptions.MalformedStructLayout;
+import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.io.bit.FlagReader;
 import com.lapissea.cfs.io.bit.FlagWriter;
 import com.lapissea.cfs.io.content.ContentReader;
@@ -328,7 +328,7 @@ public class InstanceCollection{
 				var raw =Utils.typeToRaw(type);
 				var comp=raw.componentType();
 				if(comp==null) throw new ShouldNeverHappenError();
-				if(comp.isArray()) throw new MalformedStructLayout(this+" is multi dimensional array: "+type);
+				if(comp.isArray()) throw new MalformedStruct(this+" is multi dimensional array: "+type);
 				return (Class<ElementType>)comp;
 			}
 			
@@ -403,8 +403,8 @@ public class InstanceCollection{
 		public DataAdapter(FieldAccessor<T> accessor){
 			var type=accessor.getGenericType(null);
 			component=getComponentType(type);
-			if(!IOInstance.isInstance(component)) throw new MalformedStructLayout(this+" is not of type List<IOInstance>: "+type);
-			if(IOInstance.isUnmanaged(component)) throw new MalformedStructLayout(this+" element type is unmanaged: "+type);
+			if(!IOInstance.isInstance(component)) throw new MalformedStruct(this+" is not of type List<IOInstance>: "+type);
+			if(IOInstance.isUnmanaged(component)) throw new MalformedStruct(this+" element type is unmanaged: "+type);
 			
 			//preload pipe
 			if(TYPE_VALIDATION){

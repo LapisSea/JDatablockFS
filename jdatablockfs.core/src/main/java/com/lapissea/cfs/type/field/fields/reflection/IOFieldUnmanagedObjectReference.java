@@ -4,7 +4,7 @@ import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.FieldIsNullException;
-import com.lapissea.cfs.exceptions.MalformedStructLayout;
+import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
@@ -35,7 +35,7 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 	public IOFieldUnmanagedObjectReference(FieldAccessor<T> accessor, boolean fixed){
 		super(accessor);
 		if(getNullability()==DEFAULT_IF_NULL){
-			throw new MalformedStructLayout(DEFAULT_IF_NULL+" is not supported for unmanaged objects");
+			throw new MalformedStruct(DEFAULT_IF_NULL+" is not supported for unmanaged objects");
 		}
 		
 		if(fixed){

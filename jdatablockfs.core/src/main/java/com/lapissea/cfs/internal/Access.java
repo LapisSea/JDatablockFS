@@ -2,7 +2,7 @@ package com.lapissea.cfs.internal;
 
 import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.Utils;
-import com.lapissea.cfs.exceptions.MalformedStructLayout;
+import com.lapissea.cfs.exceptions.MissingConstruct;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.type.IOInstance;
@@ -232,7 +232,7 @@ public class Access{
 				
 				return makeLambda(of, functionalInterface);
 			}catch(ReflectiveOperationException ofe){
-				var e=new MalformedStructLayout(clazz.getName()+" does not have a valid constructor or of static method with arguments of "+Arrays.toString(parameterTypes));
+				var e=new MissingConstruct(clazz.getName()+" does not have a valid constructor or of static method with arguments of "+Arrays.toString(parameterTypes));
 				e.addSuppressed(ce);
 				e.addSuppressed(ofe);
 				throw e;

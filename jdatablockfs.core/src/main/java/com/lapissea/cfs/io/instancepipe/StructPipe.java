@@ -4,7 +4,7 @@ import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.FieldIsNullException;
 import com.lapissea.cfs.exceptions.MalformedObjectException;
-import com.lapissea.cfs.exceptions.MalformedStructLayout;
+import com.lapissea.cfs.exceptions.MalformedPipe;
 import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.content.ContentOutputBuilder;
@@ -54,10 +54,10 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			P make(Struct<T> type, boolean runNow);
 		}
 		
-		private final Map<Struct<T>, Supplier<P>>           specials=new HashMap<>();
-		private final PipeConstructor<T, P>                 lConstructor;
-		private final Class<?>                              type;
-		private final Map<Struct<T>, MalformedStructLayout> errors  =new ConcurrentHashMap<>();
+		private final Map<Struct<T>, Supplier<P>>   specials=new HashMap<>();
+		private final PipeConstructor<T, P>         lConstructor;
+		private final Class<?>                      type;
+		private final Map<Struct<T>, MalformedPipe> errors  =new ConcurrentHashMap<>();
 		
 		private StructGroup(Class<? extends StructPipe<?>> type){
 			try{
@@ -94,7 +94,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 					created=lConstructor.make(struct, runNow);
 				}
 			}catch(Throwable e){
-				var me=new MalformedStructLayout("Failed to compile "+type.getSimpleName()+" for "+struct.getType().getName(), e);
+				var me=new MalformedPipe("Failed to compile "+type.getSimpleName()+" for "+struct.getType().getName(), e);
 				errors.put(struct, me);
 				throw me;
 			}

@@ -18,9 +18,9 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 class FieldRegistry{
-	static CompletableFuture<RegistryNode.Registry> make(){
+	static CompletableFuture<RegistryNode.FieldRegistry> make(){
 		return CompletableFuture.supplyAsync(()->{
-			var reg=new RegistryNode.Registry();
+			var reg=new RegistryNode.FieldRegistry();
 			reg.register(new RegistryNode(){
 				@Override
 				public boolean canCreate(Type type, GetAnnotation annotations){

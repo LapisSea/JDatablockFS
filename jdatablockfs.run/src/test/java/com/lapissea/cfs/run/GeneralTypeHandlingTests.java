@@ -2,7 +2,7 @@ package com.lapissea.cfs.run;
 
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.Cluster;
-import com.lapissea.cfs.exceptions.MalformedStructLayout;
+import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
@@ -125,7 +125,7 @@ public class GeneralTypeHandlingTests{
 		StructPipe<T> pipe;
 		try{
 			pipe=ContiguousStructPipe.of(struct, STATE_DONE);
-		}catch(MalformedStructLayout|StagedInit.WaitException ignored){
+		}catch(MalformedStruct|StagedInit.WaitException ignored){
 			pipe=null;
 		}
 		if(pipe!=null){
@@ -133,7 +133,7 @@ public class GeneralTypeHandlingTests{
 		}
 		try{
 			pipe=FixedContiguousStructPipe.of(struct, STATE_DONE);
-		}catch(MalformedStructLayout|StagedInit.WaitException ignored){
+		}catch(MalformedStruct|StagedInit.WaitException ignored){
 			pipe=null;
 		}
 		if(pipe!=null){

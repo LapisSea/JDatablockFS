@@ -1,6 +1,6 @@
 package com.lapissea.cfs.type.field.annotations;
 
-import com.lapissea.cfs.exceptions.MalformedStructLayout;
+import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.io.compress.*;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.compilation.AnnotationLogic;
@@ -72,7 +72,7 @@ public @interface IOCompression{
 	AnnotationLogic<IOCompression> LOGIC=new AnnotationLogic<>(){
 		@Override
 		public void validate(FieldAccessor<?> field, IOCompression annotation){
-			if(field.getType()!=byte[].class) throw new MalformedStructLayout("IOCompression only on byte[] for now");
+			if(field.getType()!=byte[].class) throw new MalformedStruct("IOCompression only on byte[] for now");
 		}
 		
 		@NotNull

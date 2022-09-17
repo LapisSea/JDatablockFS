@@ -3,7 +3,9 @@ package com.lapissea.cfs.io.instancepipe;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.FixedFormatNotSupportedException;
-import com.lapissea.cfs.exceptions.MalformedStructLayout;
+import com.lapissea.cfs.exceptions.IllegalField;
+import com.lapissea.cfs.exceptions.MalformedStruct;
+import com.lapissea.cfs.exceptions.UnsupportedStructLayout;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.objects.NumberSize;
@@ -72,13 +74,13 @@ public class FixedContiguousStructPipe<T extends IOInstance<T>> extends StructPi
 					IOFieldTools::mergeBitSpace
 				));
 		}catch(FixedFormatNotSupportedException e){
-			throw new MalformedStructLayout(getType().getType().getName()+" does not support fixed size layout because of "+e.getField(), e);
+			throw new UnsupportedStructLayout(getType().getType().getName()+" does not support fixed size layout because of "+e.getField(), e);
 		}
 	}
 	private Map<IOField<T, NumberSize>, NumberSize> computeMaxValues(){
 		var badFields=sizeFieldStream().filter(IOField::hasDependencies).map(IOField::toString).collect(Collectors.joining(", "));
 		if(!badFields.isEmpty()){
-			throw new MalformedStructLayout(badFields+" should not have dependencies");
+			throw new IllegalField(badFields+" should not have dependencies");
 		}
 		
 		return sizeFieldStream()
@@ -94,7 +96,7 @@ public class FixedContiguousStructPipe<T extends IOInstance<T>> extends StructPi
 				                                                          .findAny().orElseThrow())
 				                         .reduce((a, b)->{
 					                         if(a!=b){
-						                         throw new MalformedStructLayout("inconsistent dependency sizes"+sizingField);
+						                         throw new MalformedStruct("inconsistent dependency sizes"+sizingField);
 					                         }
 					                         return a;
 				                         })

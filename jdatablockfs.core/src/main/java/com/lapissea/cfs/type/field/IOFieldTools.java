@@ -2,7 +2,7 @@ package com.lapissea.cfs.type.field;
 
 import com.lapissea.cfs.Index;
 import com.lapissea.cfs.Utils;
-import com.lapissea.cfs.exceptions.MalformedStructLayout;
+import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
@@ -106,7 +106,7 @@ public class IOFieldTools{
 			                 .thenComparing(IOField::getName)
 			);
 		}catch(DepSort.CycleException e){
-			throw new MalformedStructLayout("Field dependency cycle detected:\n"+TextUtil.toTable(e.cycle.mapData(fields)), e);
+			throw new MalformedStruct("Field dependency cycle detected:\n"+TextUtil.toTable(e.cycle.mapData(fields)), e);
 		}
 	}
 	

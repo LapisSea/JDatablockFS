@@ -2,7 +2,7 @@ package com.lapissea.cfs.type.field.fields.reflection;
 
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
-import com.lapissea.cfs.exceptions.MalformedStructLayout;
+import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.io.bit.*;
 import com.lapissea.cfs.io.content.ContentOutputBuilder;
 import com.lapissea.cfs.io.content.ContentOutputStream;
@@ -47,7 +47,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		super(accessor);
 		
 		if(getNullability()==IONullability.Mode.DEFAULT_IF_NULL){
-			throw new MalformedStructLayout("DEFAULT_IF_NULL is not supported on dynamic fields!");
+			throw new MalformedStruct("DEFAULT_IF_NULL is not supported on dynamic fields!");
 		}
 		
 		Type type=accessor.getGenericType(null);

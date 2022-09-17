@@ -1,6 +1,6 @@
 package com.lapissea.cfs.type.field.annotations;
 
-import com.lapissea.cfs.exceptions.MalformedStructLayout;
+import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.VarPool;
@@ -58,7 +58,7 @@ public @interface IODependency{
 			@Override
 			public void validate(FieldAccessor<?> field, ArrayLenSize annotation){
 				if(!field.getType().isArray()){
-					throw new MalformedStructLayout(ArrayLenSize.class.getSimpleName()+" can be used only on arrays");
+					throw new MalformedStruct(ArrayLenSize.class.getSimpleName()+" can be used only on arrays");
 				}
 			}
 		};

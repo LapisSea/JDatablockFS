@@ -2,6 +2,7 @@ package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
+import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.exceptions.MalformedStructLayout;
 import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
@@ -234,31 +235,34 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		
 		S struct;
 		
-		var lock=STRUCT_CACHE_LOCK.writeLock();
+		var lock =STRUCT_CACHE_LOCK.writeLock();
+		var comp =STRUCT_COMPILE;
+		var cache=STRUCT_CACHE;
+		
 		lock.lock();
 		try{
-			Thread thread=STRUCT_COMPILE.get(concreteClass);
+			Thread thread=comp.get(concreteClass);
 			if(thread!=null&&thread==Thread.currentThread()){
 				throw new MalformedStructLayout("Recursive struct compilation");
 			}
 			
 			//If class was compiled in another thread this should early exit
-			var existing=STRUCT_CACHE.get(concreteClass);
+			var existing=cache.get(concreteClass);
 			if(existing!=null) return (S)existing;
 			
 			Log.trace("{}Requested struct: {}{}", GREEN_BRIGHT, instanceClass.getName(), RESET);
 			
 			try{
-				STRUCT_COMPILE.put(instanceClass, Thread.currentThread());
+				comp.put(instanceClass, Thread.currentThread());
 				
 				struct=newStruct.apply(concreteClass);
 				
-				STRUCT_CACHE.put(instanceClass, struct);
-				if(needsImpl) STRUCT_CACHE.put(concreteClass, struct);
+				cache.put(instanceClass, struct);
+				if(needsImpl) cache.put(concreteClass, struct);
 			}catch(Throwable e){
-				throw new MalformedStructLayout("Failed to compile "+instanceClass.getName(), e);
+				throw new MalformedStruct("Failed to compile "+instanceClass.getName(), e);
 			}finally{
-				STRUCT_COMPILE.remove(instanceClass);
+				comp.remove(instanceClass);
 			}
 		}finally{
 			lock.unlock();

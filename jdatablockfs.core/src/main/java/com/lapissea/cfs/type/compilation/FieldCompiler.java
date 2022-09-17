@@ -4,7 +4,8 @@ import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.SyntheticParameterizedType;
 import com.lapissea.cfs.Utils;
-import com.lapissea.cfs.exceptions.MalformedStructLayout;
+import com.lapissea.cfs.exceptions.IllegalField;
+import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
@@ -77,24 +78,24 @@ public class FieldCompiler{
 		                 .collect(Collectors.joining("\t\n"));
 		
 		if(!err.isEmpty()){
-			throw new MalformedStructLayout(type.getSimpleName()+" methods with duplicated indices:\n"+err);
+			throw new MalformedStruct(type.getSimpleName()+" methods with duplicated indices:\n"+err);
 		}
 		
 		for(Method valueMethod : valueDefs){
 			if(!Modifier.isStatic(valueMethod.getModifiers())){
-				throw new MalformedStructLayout(valueMethod+" is not static!");
+				throw new IllegalField(valueMethod+" is not static!");
 			}
 			
 			var context=GenericsResolver.resolve(valueMethod.getDeclaringClass()).method(valueMethod);
 			
 			if(!UtilL.instanceOf(context.resolveReturnClass(), IOField.class)){
-				throw new MalformedStructLayout(valueMethod+" does not return "+IOField.class.getName());
+				throw new IllegalField(valueMethod+" does not return "+IOField.class.getName());
 			}
 			
 			Class<?> ioFieldOwner=context.returnType().type(IOField.class).generic("T");
 			
 			if(ioFieldOwner!=valueMethod.getDeclaringClass()){
-				throw new MalformedStructLayout(valueMethod+" does not return IOField of same owner type!\n"+ioFieldOwner.getName()+"\n"+valueMethod.getDeclaringClass().getName());
+				throw new IllegalField(valueMethod+" does not return IOField of same owner type!\n"+ioFieldOwner.getName()+"\n"+valueMethod.getDeclaringClass().getName());
 			}
 		}
 		
@@ -145,7 +146,7 @@ public class FieldCompiler{
 			var missingNames=depNames.stream()
 			                         .filter(name->fields.stream().noneMatch(f->f.field.getName().equals(name)))
 			                         .collect(Collectors.joining(", "));
-			if(!missingNames.isEmpty()) throw new MalformedStructLayout("Could not find dependencies "+missingNames+" on field "+field.getAccessor());
+			if(!missingNames.isEmpty()) throw new IllegalField("Could not find dependencies "+missingNames+" on field "+field.getAccessor());
 			
 			for(String nam : depNames){
 				IOField<T, ?> e=fields.stream().filter(f->f.field.getName().equals(nam)).findAny().orElseThrow().field;
@@ -163,7 +164,7 @@ public class FieldCompiler{
 			var nam=pair.field.getName();
 			for(char c : new char[]{'.', '/', '\\', ' '}){
 				if(nam.indexOf(c)!=-1){
-					throw new MalformedStructLayout("Character '"+c+"' is not allowed in field name \""+nam+"\"! ");
+					throw new IllegalField("Character '"+c+"' is not allowed in field name \""+nam+"\"! ");
 				}
 			}
 			
@@ -200,7 +201,7 @@ public class FieldCompiler{
 						if(existing!=null){
 							var gTyp=existing.getGenericType(null);
 							if(!gTyp.equals(s.getType())){
-								throw new MalformedStructLayout("Virtual field "+existing.getName()+" already defined but has a type conflict of "+gTyp+" and "+s.getType());
+								throw new IllegalField("Virtual field "+existing.getName()+" already defined but has a type conflict of "+gTyp+" and "+s.getType());
 							}
 							continue;
 						}
@@ -300,7 +301,7 @@ public class FieldCompiler{
 					case REFLECTION -> ReflectionAccessor.make(struct, field, getter, setter, fieldName, type);
 				});
 			}catch(Throwable e){
-				throw new MalformedStructLayout("Failed to scan field #"+field.getName(), e);
+				throw new MalformedStruct("Failed to scan field #"+field.getName(), e);
 			}
 		}
 		
@@ -336,7 +337,7 @@ public class FieldCompiler{
 		                             .map(e->Map.of("fieldName", e.getKey(), "getter", e.getValue().obj1!=null, "setter", e.getValue().obj2!=null))
 		                             .toList();
 		if(!errors.isEmpty()){
-			throw new MalformedStructLayout("Invalid transient (getter+setter, no value) IO field for "+cl.getName()+":\n"+TextUtil.toTable(errors));
+			throw new IllegalField("Invalid transient (getter+setter, no value) IO field for "+cl.getName()+":\n"+TextUtil.toTable(errors));
 		}
 		
 		var unusedWaning=hangingMethods.stream()
@@ -349,7 +350,7 @@ public class FieldCompiler{
 		                               ):""))
 		                               .collect(Collectors.joining("\n"));
 		if(!unusedWaning.isEmpty()){
-			throw new MalformedStructLayout("There are unused or invalid methods marked with "+IOValue.class.getSimpleName()+"\n"+unusedWaning);
+			throw new MalformedStruct("There are unused or invalid methods marked with "+IOValue.class.getSimpleName()+"\n"+unusedWaning);
 		}
 		
 		fields.sort(Comparator.naturalOrder());
@@ -368,7 +369,7 @@ public class FieldCompiler{
 			
 			Type setType=setter.getGenericParameterTypes()[0];
 			if(!Utils.genericInstanceOf(type, setType)){
-				throw new MalformedStructLayout(setType+" is not a valid argument in\n"+setter);
+				throw new IllegalField(setType+" is not a valid argument in\n"+setter);
 			}
 			
 			UtilL.addRemainSorted(fields, FunctionalReflectionAccessor.make(struct, name, getter, setter, annotations, type));
@@ -513,9 +514,9 @@ public class FieldCompiler{
 	}
 	
 	
-	private static final CompletableFuture<RegistryNode.Registry> REGISTRY=FieldRegistry.make();
+	private static final CompletableFuture<RegistryNode.FieldRegistry> REGISTRY=com.lapissea.cfs.type.compilation.FieldRegistry.make();
 	
-	protected static RegistryNode.Registry registry(){return REGISTRY.join();}
+	protected static RegistryNode.FieldRegistry registry(){return REGISTRY.join();}
 	
 	private static Set<Class<? extends Annotation>> activeAnnotations(){
 		return Set.of(

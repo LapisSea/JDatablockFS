@@ -1,7 +1,7 @@
 package com.lapissea.cfs.type.field.fields.reflection;
 
 import com.lapissea.cfs.exceptions.FieldIsNullException;
-import com.lapissea.cfs.exceptions.MalformedStructLayout;
+import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.io.bit.BitReader;
 import com.lapissea.cfs.io.bit.BitWriter;
 import com.lapissea.cfs.io.bit.EnumUniverse;
@@ -29,7 +29,7 @@ public class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> extends IOF
 		sizeDescriptor=SizeDescriptor.Fixed.of(WordSpace.BIT, enumUniverse.getBitSize(nullable()));
 		
 		if(getNullability()==DEFAULT_IF_NULL&&enumUniverse.isEmpty()){
-			throw new MalformedStructLayout(DEFAULT_IF_NULL+" is not supported for empty enums");
+			throw new MalformedStruct(DEFAULT_IF_NULL+" is not supported for empty enums");
 		}
 	}
 	

@@ -2,7 +2,7 @@ package com.lapissea.cfs.io;
 
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.DataProvider;
-import com.lapissea.cfs.exceptions.MalformedStructLayout;
+import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
@@ -440,7 +440,7 @@ public sealed interface ValueStorage<T>{
 			if(fixedOnly){
 				try{
 					return new FixedInstance<>(generics, provider, FixedContiguousStructPipe.of(struct, STATE_DONE));
-				}catch(MalformedStructLayout ignored){
+				}catch(MalformedStruct ignored){
 					return new FixedReferencedInstance<>(generics, provider, ContiguousStructPipe.of(struct));
 				}
 			}

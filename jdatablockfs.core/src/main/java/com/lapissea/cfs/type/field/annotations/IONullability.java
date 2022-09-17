@@ -1,6 +1,6 @@
 package com.lapissea.cfs.type.field.annotations;
 
-import com.lapissea.cfs.exceptions.MalformedStructLayout;
+import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.SupportedPrimitive;
 import com.lapissea.cfs.type.compilation.AnnotationLogic;
@@ -33,9 +33,9 @@ public @interface IONullability{
 			@Override
 			public void validate(FieldAccessor<?> field, Elements annotation){
 				var typ=field.getType();
-				if(!typ.isArray()) throw new MalformedStructLayout(Elements.class.getName()+" can be used only on arrays");
+				if(!typ.isArray()) throw new MalformedStruct(Elements.class.getName()+" can be used only on arrays");
 				if(IOInstance.isInstance(typ.componentType())){
-					throw new MalformedStructLayout(Elements.class.getName()+" array must be of "+IOInstance.class.getName()+" type");
+					throw new MalformedStruct(Elements.class.getName()+" array must be of "+IOInstance.class.getName()+" type");
 				}
 			}
 			
@@ -86,10 +86,10 @@ public @interface IONullability{
 		@Override
 		public void validate(FieldAccessor<?> field, IONullability annotation){
 			if(!canHave(field)){
-				throw new MalformedStructLayout(field+" is not a supported field");
+				throw new MalformedStruct(field+" is not a supported field");
 			}
 			if(SupportedPrimitive.get(field.getType()).isPresent()&&annotation.value()==Mode.DEFAULT_IF_NULL){
-				throw new MalformedStructLayout("Wrapper type on "+field+" does not support "+Mode.DEFAULT_IF_NULL+" mode");
+				throw new MalformedStruct("Wrapper type on "+field+" does not support "+Mode.DEFAULT_IF_NULL+" mode");
 			}
 		}
 		

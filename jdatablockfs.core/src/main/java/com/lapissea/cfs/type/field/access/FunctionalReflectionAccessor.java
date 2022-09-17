@@ -1,7 +1,7 @@
 package com.lapissea.cfs.type.field.access;
 
 import com.lapissea.cfs.Utils;
-import com.lapissea.cfs.exceptions.MalformedStructLayout;
+import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.objects.INumber;
 import com.lapissea.cfs.type.*;
@@ -65,20 +65,20 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 		typeID=TypeFlag.getId(rawType);
 		
 		if(!Utils.genericInstanceOf(getter.getReturnType(), genericType)){
-			throw new MalformedStructLayout("getter returns "+getter.getReturnType()+" but "+genericType+" is required\n"+getter);
+			throw new MalformedStruct("getter returns "+getter.getReturnType()+" but "+genericType+" is required\n"+getter);
 		}
 		if(getter.getParameterCount()!=0){
-			throw new MalformedStructLayout("getter must not have arguments\n"+getter);
+			throw new MalformedStruct("getter must not have arguments\n"+getter);
 		}
 		
 		if(!Utils.genericInstanceOf(setter.getReturnType(), Void.TYPE)){
-			throw new MalformedStructLayout("setter returns "+setter.getReturnType()+" but "+genericType+" is required\n"+setter);
+			throw new MalformedStruct("setter returns "+setter.getReturnType()+" but "+genericType+" is required\n"+setter);
 		}
 		if(setter.getParameterCount()!=1){
-			throw new MalformedStructLayout("setter must have 1 argument of "+genericType+"\n"+setter);
+			throw new MalformedStruct("setter must have 1 argument of "+genericType+"\n"+setter);
 		}
 		if(!Utils.genericInstanceOf(setter.getGenericParameterTypes()[0], genericType)){
-			throw new MalformedStructLayout("setter argument is "+setter.getGenericParameterTypes()[0]+" but "+genericType+" is required\n"+setter);
+			throw new MalformedStruct("setter argument is "+setter.getGenericParameterTypes()[0]+" but "+genericType+" is required\n"+setter);
 		}
 		
 		this.getter=Access.makeMethodHandle(getter);

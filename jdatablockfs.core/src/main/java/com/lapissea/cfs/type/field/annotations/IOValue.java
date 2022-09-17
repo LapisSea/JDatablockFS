@@ -1,7 +1,7 @@
 package com.lapissea.cfs.type.field.annotations;
 
 import com.lapissea.cfs.SyntheticParameterizedType;
-import com.lapissea.cfs.exceptions.MalformedStructLayout;
+import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.SupportedPrimitive;
 import com.lapissea.cfs.type.compilation.AnnotationLogic;
@@ -74,10 +74,10 @@ public @interface IOValue{
 				var refF=field.getDeclaringStruct().getType().getDeclaredField(field.getName());
 				
 				if(Modifier.isStatic(refF.getModifiers())){
-					throw new MalformedStructLayout(field+" can not be static!");
+					throw new MalformedStruct(field+" can not be static!");
 				}
 				if(Modifier.isFinal(refF.getModifiers())){
-					throw new MalformedStructLayout(field+" can not be final!");
+					throw new MalformedStruct(field+" can not be final!");
 				}
 			}catch(NoSuchFieldException ignored){}
 		}
@@ -95,10 +95,10 @@ public @interface IOValue{
 					return;
 				}
 				if(!IOInstance.isInstance(field.getType())){
-					throw new MalformedStructLayout("Reference annotation can be used only in IOInstance types or collections but "+field+" is not");
+					throw new MalformedStruct("Reference annotation can be used only in IOInstance types or collections but "+field+" is not");
 				}
 				if(IOInstance.isUnmanaged(field.getType())){
-					throw new MalformedStructLayout("Reference annotation can be used only in IOInstance regular types but "+field+" is unmanaged");
+					throw new MalformedStruct("Reference annotation can be used only in IOInstance regular types but "+field+" is unmanaged");
 				}
 			}
 			@NotNull
@@ -144,13 +144,13 @@ public @interface IOValue{
 				
 				if(typeOverride.value()!=Object.class){
 					if(!UtilL.instanceOf(typeOverride.value(), rawType.getRawType())){
-						throw new MalformedStructLayout(typeOverride.value().getName()+" is not a valid override of "+rawType.getRawType().getName()+" on field "+field.getName());
+						throw new MalformedStruct(typeOverride.value().getName()+" is not a valid override of "+rawType.getRawType().getName()+" on field "+field.getName());
 					}
 				}
 				
 				var overridingArgs=typeOverride.genericArgs();
 				if(overridingArgs.length!=0){
-					if(rawType.getActualTypeArgumentCount()!=overridingArgs.length) throw new MalformedStructLayout(
+					if(rawType.getActualTypeArgumentCount()!=overridingArgs.length) throw new MalformedStruct(
 						field.getName()+" "+IOValue.OverrideType.class.getSimpleName()+
 						" generic arguments do not match the count of "+rawType.getActualTypeArgumentCount());
 					
@@ -158,7 +158,7 @@ public @interface IOValue{
 						var parmType      =(Class<?>)rawType.getActualTypeArgument(i);
 						var overridingType=(Class<?>)overridingArgs[i];
 						if(!UtilL.instanceOf(overridingType, parmType)){
-							throw new MalformedStructLayout("Parm "+overridingType.getName()+" @"+i+" is not a valid override of "+parmType.getName()+" on field "+field.getName());
+							throw new MalformedStruct("Parm "+overridingType.getName()+" @"+i+" is not a valid override of "+parmType.getName()+" on field "+field.getName());
 						}
 					}
 				}
@@ -179,7 +179,7 @@ public @interface IOValue{
 			@Override
 			public void validate(FieldAccessor<?> field, Unsigned typeOverride){
 				switch(SupportedPrimitive.get(field.getType()).orElse(null)){
-					case null, BOOLEAN, FLOAT, DOUBLE, CHAR -> throw new MalformedStructLayout(field+" can not be unsigned");
+					case null, BOOLEAN, FLOAT, DOUBLE, CHAR -> throw new MalformedStruct(field+" can not be unsigned");
 					case BYTE, SHORT, INT, LONG -> {}
 				}
 			}

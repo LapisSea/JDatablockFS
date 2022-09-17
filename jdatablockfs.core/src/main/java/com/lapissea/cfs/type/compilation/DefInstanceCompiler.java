@@ -2,7 +2,8 @@ package com.lapissea.cfs.type.compilation;
 
 import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.Utils;
-import com.lapissea.cfs.exceptions.MalformedStructLayout;
+import com.lapissea.cfs.exceptions.MalformedStruct;
+import com.lapissea.cfs.exceptions.MalformedTemplateStruct;
 import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.objects.ChunkPointer;
@@ -175,7 +176,7 @@ public class DefInstanceCompiler{
 			switch(node.state){
 				case null -> throw new ShouldNeverHappenError();
 				case NEW -> {}
-				case COMPILING -> throw new MalformedStructLayout("Type requires itself to compile");
+				case COMPILING -> throw new MalformedStruct("Type requires itself to compile");
 				case DONE -> {return node;}
 			}
 			
@@ -265,13 +266,13 @@ public class DefInstanceCompiler{
 			var set=specials.set.get();
 			
 			if(oOrderedFields.isEmpty()){
-				throw new MalformedStructLayout(interf.getName()+" has a full setter but no argument order. Please add "+IOInstance.Def.Order.class.getName()+" to the type");
+				throw new MalformedTemplateStruct(interf.getName()+" has a full setter but no argument order. Please add "+IOInstance.Def.Order.class.getName()+" to the type");
 			}
 			
 			var orderedFields=oOrderedFields.get();
 			
 			if(set.getParameterCount()!=orderedFields.size()){
-				throw new MalformedStructLayout(set+" has "+set.getParameterCount()+" parameters but has "+orderedFields.size()+" fields");
+				throw new MalformedTemplateStruct(set+" has "+set.getParameterCount()+" parameters but has "+orderedFields.size()+" fields");
 			}
 			
 			var parms=set.getGenericParameterTypes();
@@ -282,7 +283,7 @@ public class DefInstanceCompiler{
 				if(field.type.equals(parmType)) continue;
 				
 				//TODO: implement fits type instead of exact match
-				throw new MalformedStructLayout(field.name+" has the type of "+field.type.getTypeName()+" but set argument is "+parmType);
+				throw new MalformedTemplateStruct(field.name+" has the type of "+field.type.getTypeName()+" but set argument is "+parmType);
 			}
 		}
 	}
@@ -671,14 +672,14 @@ public class DefInstanceCompiler{
 		
 		for(String name : ordered){
 			if(check.remove(name)) continue;
-			throw new MalformedStructLayout(
+			throw new MalformedTemplateStruct(
 				name+" does not exist in "+interf.getName()+".\n"+
 				"Existing field names: "+fieldInfo.stream().map(FieldInfo::name).toList()
 			);
 		}
 		
 		if(!check.isEmpty()){
-			throw new MalformedStructLayout(check+" are not listed in the order annotation");
+			throw new MalformedTemplateStruct(check+" are not listed in the order annotation");
 		}
 		
 		return Optional.of(ordered);
@@ -894,8 +895,8 @@ public class DefInstanceCompiler{
 			}
 			
 			if(List.of("set", "setAll").contains(method.getName())){
-				if(method.getReturnType()!=void.class) throw new MalformedStructLayout("set can not have a return type");
-				if(set.isPresent()) throw new MalformedStructLayout("duplicate set method");
+				if(method.getReturnType()!=void.class) throw new MalformedTemplateStruct("set can not have a return type");
+				if(set.isPresent()) throw new MalformedTemplateStruct("duplicate set method");
 				set=Optional.of(method);
 				continue;
 			}
@@ -907,7 +908,7 @@ public class DefInstanceCompiler{
 			setter.ifPresent(setters::add);
 			
 			if(getter.or(()->setter).isEmpty()){
-				throw new MalformedStructLayout(method+" is not a setter or a getter!");
+				throw new MalformedTemplateStruct(method+" is not a setter or a getter!");
 			}
 		}
 		
@@ -951,7 +952,7 @@ public class DefInstanceCompiler{
 						             iter.remove();
 						             continue;
 					             }
-					             throw new MalformedStructLayout(gors.varName()+": @IOValue can not contain a name");
+					             throw new MalformedTemplateStruct(gors.varName()+": @IOValue can not contain a name");
 				             }
 			             }
 			             if(valBack==null) valBack=IOFieldTools.makeAnnotation(IOValue.class);
@@ -967,7 +968,7 @@ public class DefInstanceCompiler{
 		
 		if(styles.size()>1){
 			var style=styles.entrySet().stream().reduce((a, b)->a.getValue().size()>b.getValue().size()?a:b).map(Map.Entry::getKey).orElseThrow();
-			throw new MalformedStructLayout(
+			throw new MalformedTemplateStruct(
 				"Inconsistent getter/setter styles!\n"+
 				"Style patterns:\n"+styles.keySet().stream().map(s->"\t"+s+":\t"+s.humanPattern).collect(Collectors.joining("\n"))+"\n"+
 				"Most common style is:\n"+style+"\n"+
@@ -1001,7 +1002,7 @@ public class DefInstanceCompiler{
 		                   .collect(Collectors.joining("\n"));
 		
 		if(!problems.isEmpty()){
-			throw new MalformedStructLayout("Duplicate annotations:\n"+problems);
+			throw new MalformedTemplateStruct("Duplicate annotations:\n"+problems);
 		}
 	}
 	
@@ -1015,7 +1016,7 @@ public class DefInstanceCompiler{
 		                   .collect(Collectors.joining("\n"));
 		
 		if(!problems.isEmpty()){
-			throw new MalformedStructLayout("Mismatched types:\n"+problems);
+			throw new MalformedTemplateStruct("Mismatched types:\n"+problems);
 		}
 	}
 	

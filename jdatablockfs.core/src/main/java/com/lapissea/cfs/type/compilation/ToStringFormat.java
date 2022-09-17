@@ -1,6 +1,6 @@
 package com.lapissea.cfs.type.compilation;
 
-import com.lapissea.cfs.exceptions.MalformedStructLayout;
+import com.lapissea.cfs.exceptions.MalformedStruct;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -79,7 +79,7 @@ public class ToStringFormat{
 							break;
 						}catch(IllegalArgumentException e){
 							if(org==null) org=e;
-							if(range.from==range.to) throw new MalformedStructLayout(org);
+							if(range.from==range.to) throw new MalformedStruct(org);
 						}
 						range=new Range(range.from, range.to-1);
 					}
@@ -103,7 +103,7 @@ public class ToStringFormat{
 				
 				ToStringFragment val;
 				while(true){
-					if(range.from==range.to) throw new MalformedStructLayout(format.substring(rangeOrg.from, rangeOrg.to)+" is an unknown name");
+					if(range.from==range.to) throw new MalformedStruct(format.substring(rangeOrg.from, rangeOrg.to)+" is an unknown name");
 					var name=format.substring(range.from, range.to);
 					if(names.contains(name)){
 						val=new ToStringFragment.FieldValue(name);
@@ -128,7 +128,7 @@ public class ToStringFormat{
 							break findTo;
 						}
 					}
-					throw new MalformedStructLayout("illegal string format: "+format+" Opened [ but was not closed");
+					throw new MalformedStruct("illegal string format: "+format+" Opened [ but was not closed");
 				}
 				
 				roots.add(new ToStringFragment.OptionalBlock(parse(format.substring(from, to), names)));
