@@ -316,7 +316,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		
 		protected Unmanaged(DataProvider provider, Reference reference, TypeLink typeDef, TypeLink.Check check){
 			this(provider, reference, typeDef);
-			check.ensureValid(typeDef);
+			check.ensureValid(typeDef, provider.getTypeDb());
 		}
 		
 		public Unmanaged(DataProvider provider, Reference reference, TypeLink typeDef){
@@ -498,15 +498,8 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 	@SuppressWarnings("unchecked")
 	private SELF self(){return (SELF)this;}
 	
-	static boolean isInstance(TypeLink type){
-		return isInstance(type.getTypeClass(null));
-	}
 	static boolean isInstance(Class<?> type){
 		return UtilL.instanceOf(type, IOInstance.class);
-	}
-	
-	static boolean isManaged(TypeLink type){
-		return isManaged(type.getTypeClass(null));
 	}
 	
 	static boolean isUnmanaged(Class<?> type){

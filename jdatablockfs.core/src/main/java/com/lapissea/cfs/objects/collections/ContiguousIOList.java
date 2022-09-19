@@ -38,9 +38,10 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	
 	private static final TypeLink.Check TYPE_CHECK=new TypeLink.Check(
 		ContiguousIOList.class,
-		List.of(t->{
-			if(IOInstance.isInstance(t)) return;
-			if(SupportedPrimitive.isAny(t.getTypeClass(null))) return;
+		List.of((t, db)->{
+			var cls=t.getTypeClass(db);
+			if(IOInstance.isInstance(cls)) return;
+			if(SupportedPrimitive.isAny(cls)) return;
 			throw new ClassCastException("not instance or primitive");
 		})
 	);

@@ -88,9 +88,10 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 	
 	private static final TypeLink.Check LIST_TYPE_CHECK=new TypeLink.Check(
 		LinkedIOList.class,
-		List.of(t->{
-			if(SupportedPrimitive.isAny(t.getTypeClass(null))) return;
-			if(!IOInstance.isManaged(t)){
+		List.of((t, db)->{
+			var cls=t.getTypeClass(db);
+			if(SupportedPrimitive.isAny(cls)) return;
+			if(!IOInstance.isManaged(cls)){
 				throw new RuntimeException("not managed");
 			}
 		})

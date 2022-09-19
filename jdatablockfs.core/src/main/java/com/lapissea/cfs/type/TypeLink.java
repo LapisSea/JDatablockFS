@@ -19,20 +19,24 @@ import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NULLABL
 public final class TypeLink extends IOInstance.Managed<TypeLink>{
 	
 	public static class Check{
-		private final Consumer<Class<?>>       rawCheck;
-		private final List<Consumer<TypeLink>> argChecks;
+		public interface ArgCheck{
+			void check(TypeLink type, IOTypeDB db);
+		}
 		
-		public Check(Class<?> rawType, List<Consumer<TypeLink>> argChecks){
+		private final Consumer<Class<?>> rawCheck;
+		private final List<ArgCheck>     argChecks;
+		
+		public Check(Class<?> rawType, List<ArgCheck> argChecks){
 			this(t->{
 				if(!t.equals(rawType)) throw new ClassCastException(rawType+" is not "+t);
 			}, argChecks);
 		}
-		public Check(Consumer<Class<?>> rawCheck, List<Consumer<TypeLink>> argChecks){
+		public Check(Consumer<Class<?>> rawCheck, List<ArgCheck> argChecks){
 			this.rawCheck=rawCheck;
 			this.argChecks=List.copyOf(argChecks);
 		}
 		
-		public void ensureValid(TypeLink type){
+		public void ensureValid(TypeLink type, IOTypeDB db){
 			try{
 				rawCheck.accept(type.getTypeClass(null));
 				if(type.argCount()!=argChecks.size()) throw new IllegalArgumentException("Argument count in "+type+" should be "+argChecks.size()+" but is "+type.argCount());
@@ -44,7 +48,7 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 					var ch =argChecks.get(i);
 					
 					try{
-						ch.accept(typ);
+						ch.check(typ, db);
 					}catch(Throwable e){
 						errs.add(new IllegalArgumentException("Argument "+typ+" at "+i+" is not valid!", e));
 					}
@@ -177,7 +181,9 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 		try{
 			return Class.forName(name);
 		}catch(ClassNotFoundException e){
-			Objects.requireNonNull(db);
+			if(db==null){
+				throw new RuntimeException(name+" was unable to be resolved and there is no db provided");
+			}
 			Log.trace("Loading template: {}", name);
 			try{
 				return Class.forName(name, true, db.getTemplateLoader());

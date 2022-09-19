@@ -191,8 +191,8 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	
 	private static final TypeLink.Check NODE_TYPE_CHECK=new TypeLink.Check(
 		IONode.class,
-		List.of(t->{
-			var c=t.getTypeClass(null);
+		List.of((t, db)->{
+			var c=t.getTypeClass(db);
 			if(SupportedPrimitive.isAny(c)) return;
 			if(!IOInstance.isManaged(c)) throw new ClassCastException("not managed");
 			if(Modifier.isAbstract(c.getModifiers())&&!IOInstance.Def.isDefinition(c)) throw new ClassCastException(c+" is abstract");

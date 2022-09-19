@@ -95,7 +95,7 @@ class FieldRegistry{
 					if(!(type instanceof ParameterizedType parmType)) return false;
 					if(parmType.getRawType()!=List.class&&parmType.getRawType()!=ArrayList.class) return false;
 					var args=parmType.getActualTypeArguments();
-					return IOInstance.isManaged(Objects.requireNonNull(TypeLink.of(args[0])));
+					return IOInstance.isManaged(Objects.requireNonNull(TypeLink.of(args[0])).getTypeClass(null));
 				}
 				@Override
 				public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
