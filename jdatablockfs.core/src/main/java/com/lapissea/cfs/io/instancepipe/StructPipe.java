@@ -54,10 +54,10 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			P make(Struct<T> type, boolean runNow);
 		}
 		
-		private final Map<Struct<T>, Supplier<P>>   specials=new HashMap<>();
-		private final PipeConstructor<T, P>         lConstructor;
-		private final Class<?>                      type;
-		private final Map<Struct<T>, MalformedPipe> errors  =new ConcurrentHashMap<>();
+		private final Map<Struct<T>, Supplier<P>> specials=new HashMap<>();
+		private final PipeConstructor<T, P>       lConstructor;
+		private final Class<?>                    type;
+		private final Map<Struct<T>, Throwable>   errors  =new ConcurrentHashMap<>();
 		
 		private StructGroup(Class<? extends StructPipe<?>> type){
 			try{
@@ -72,7 +72,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			var cached=get(struct);
 			if(cached!=null) return cached;
 			var err=errors.get(struct);
-			if(err!=null) throw err;
+			if(err!=null) throw err instanceof RuntimeException e?e:new RuntimeException(err);
 			
 			COMPILATION.log("Requested pipe({}): {}", (Supplier<String>)()->shortPipeName(type), struct.getType().getName());
 			
@@ -94,9 +94,9 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 					created=lConstructor.make(struct, runNow);
 				}
 			}catch(Throwable e){
-				var me=new MalformedPipe("Failed to compile "+type.getSimpleName()+" for "+struct.getType().getName(), e);
-				errors.put(struct, me);
-				throw me;
+				e.addSuppressed(new MalformedPipe("Failed to compile "+type.getSimpleName()+" for "+struct.getType().getName(), e));
+				errors.put(struct, e);
+				throw e;
 			}
 			
 			put(struct, created);

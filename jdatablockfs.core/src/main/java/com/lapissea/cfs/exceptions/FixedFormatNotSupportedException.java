@@ -2,7 +2,7 @@ package com.lapissea.cfs.exceptions;
 
 import com.lapissea.cfs.type.field.IOField;
 
-public class FixedFormatNotSupportedException extends UnsupportedOperationException{
+public class FixedFormatNotSupportedException extends UnsupportedStructLayout{
 	private final IOField<?, ?> field;
 	
 	private static String makeMsg(IOField<?, ?> field){
