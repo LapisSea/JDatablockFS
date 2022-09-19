@@ -4,7 +4,10 @@ import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.ValueStorage;
 import com.lapissea.cfs.objects.Reference;
-import com.lapissea.cfs.type.*;
+import com.lapissea.cfs.type.RuntimeType;
+import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.TypeLink;
+import com.lapissea.cfs.type.TypeLink.Check.ArgCheck;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IONullability;
@@ -14,9 +17,11 @@ import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.OptionalLong;
+
+import static com.lapissea.cfs.type.TypeLink.Check.ArgCheck.RawCheck.INSTANCE_MANAGED;
+import static com.lapissea.cfs.type.TypeLink.Check.ArgCheck.RawCheck.PRIMITIVE;
 
 @SuppressWarnings("unchecked")
 public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>{
@@ -88,13 +93,7 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 	
 	private static final TypeLink.Check LIST_TYPE_CHECK=new TypeLink.Check(
 		LinkedIOList.class,
-		List.of((t, db)->{
-			var cls=t.getTypeClass(db);
-			if(SupportedPrimitive.isAny(cls)) return;
-			if(!IOInstance.isManaged(cls)){
-				throw new RuntimeException("not managed");
-			}
-		})
+		ArgCheck.rawAny(PRIMITIVE, INSTANCE_MANAGED)
 	);
 	
 	private final IOField<LinkedIOList<T>, IONode<T>> headField=(IOField<LinkedIOList<T>, IONode<T>>)Struct.Unmanaged.thisClass().getFields().byName("head").orElseThrow();

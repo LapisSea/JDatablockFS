@@ -7,11 +7,14 @@ import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.NotImplementedException;
 
+import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.WildcardType;
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NULLABLE;
@@ -20,20 +23,81 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 	
 	public static class Check{
 		public interface ArgCheck{
+			interface RawCheck{
+				
+				RawCheck PRIMITIVE       =of(SupportedPrimitive::isAny, "is not primitive");
+				RawCheck INSTANCE        =of(
+					type->IOInstance.isInstance(type)&&(!Modifier.isAbstract(type.getModifiers())||IOInstance.Def.isDefinition(type)),
+					type->{
+						if(Modifier.isAbstract(type.getModifiers())&&!IOInstance.Def.isDefinition(type)){
+							return type.getSimpleName()+" is an IOInstance but is not an instantiable class";
+						}
+						return type.getSimpleName()+" is not an IOInstance";
+					});
+				RawCheck INSTANCE_MANAGED=INSTANCE.and(of(IOInstance::isManaged, "is not a managed IOInstance"));
+				
+				
+				default RawCheck and(RawCheck other){
+					var that=this;
+					return new RawCheck(){
+						@Override
+						public boolean check(Class<?> type){
+							return that.check(type)&&other.check(type);
+						}
+						@Override
+						public String errMsg(Class<?> type){
+							if(that.check(type)) return that.errMsg(type);
+							return other.errMsg(type);
+						}
+					};
+				}
+				static RawCheck of(Predicate<Class<?>> check, String errTypeAnd){
+					return of(check, type->type.getSimpleName()+" "+errTypeAnd);
+				}
+				static RawCheck of(Predicate<Class<?>> check, Function<Class<?>, String> errorMessage){
+					return new RawCheck(){
+						@Override
+						public boolean check(Class<?> type){
+							return check.test(type);
+						}
+						@Override
+						public String errMsg(Class<?> type){
+							return errorMessage.apply(type);
+						}
+					};
+				}
+				
+				boolean check(Class<?> type);
+				String errMsg(Class<?> type);
+			}
+			
+			static ArgCheck rawAny(RawCheck... anyOf){
+				var args=List.of(anyOf);
+				return (type, db)->{
+					var resolved=type.getTypeClass(db);
+					for(var arg : args){
+						if(arg.check(resolved)){
+							return;
+						}
+					}
+					throw new IllegalStateException("No matching type requirement:\n\t"+args.stream().map(c->c.errMsg(resolved)).collect(Collectors.joining("\n\t")));
+				};
+			}
+			
 			void check(TypeLink type, IOTypeDB db);
 		}
 		
 		private final Consumer<Class<?>> rawCheck;
 		private final List<ArgCheck>     argChecks;
 		
-		public Check(Class<?> rawType, List<ArgCheck> argChecks){
+		public Check(Class<?> rawType, ArgCheck... argChecks){
 			this(t->{
 				if(!t.equals(rawType)) throw new ClassCastException(rawType+" is not "+t);
 			}, argChecks);
 		}
-		public Check(Consumer<Class<?>> rawCheck, List<ArgCheck> argChecks){
+		public Check(Consumer<Class<?>> rawCheck, ArgCheck... argChecks){
 			this.rawCheck=rawCheck;
-			this.argChecks=List.copyOf(argChecks);
+			this.argChecks=List.of(argChecks);
 		}
 		
 		public void ensureValid(TypeLink type, IOTypeDB db){

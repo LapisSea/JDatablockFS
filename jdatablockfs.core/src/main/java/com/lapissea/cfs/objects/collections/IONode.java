@@ -13,6 +13,7 @@ import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.*;
+import com.lapissea.cfs.type.TypeLink.Check.ArgCheck;
 import com.lapissea.cfs.type.field.*;
 import com.lapissea.cfs.type.field.access.AbstractFieldAccessor;
 import com.lapissea.cfs.type.field.access.TypeFlag;
@@ -27,11 +28,12 @@ import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.lang.annotation.Annotation;
-import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.*;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.type.TypeLink.Check.ArgCheck.RawCheck.INSTANCE_MANAGED;
+import static com.lapissea.cfs.type.TypeLink.Check.ArgCheck.RawCheck.PRIMITIVE;
 import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 
 public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements IterablePP<IONode<T>>{
@@ -191,12 +193,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	
 	private static final TypeLink.Check NODE_TYPE_CHECK=new TypeLink.Check(
 		IONode.class,
-		List.of((t, db)->{
-			var c=t.getTypeClass(db);
-			if(SupportedPrimitive.isAny(c)) return;
-			if(!IOInstance.isManaged(c)) throw new ClassCastException("not managed");
-			if(Modifier.isAbstract(c.getModifiers())&&!IOInstance.Def.isDefinition(c)) throw new ClassCastException(c+" is abstract");
-		})
+		ArgCheck.rawAny(PRIMITIVE, INSTANCE_MANAGED)
 	);
 	
 	private static final IOField<?, NumberSize> NEXT_SIZE_FIELD         =Struct.thisClass().getFields().requireExact(NumberSize.class, "nextSize");

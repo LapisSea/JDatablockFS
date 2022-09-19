@@ -33,17 +33,15 @@ import java.util.*;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
+import static com.lapissea.cfs.type.TypeLink.Check.ArgCheck.RawCheck.INSTANCE;
+import static com.lapissea.cfs.type.TypeLink.Check.ArgCheck.RawCheck.PRIMITIVE;
+
 @SuppressWarnings("unchecked")
 public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIOList<T>> implements RandomAccess{
 	
 	private static final TypeLink.Check TYPE_CHECK=new TypeLink.Check(
 		ContiguousIOList.class,
-		List.of((t, db)->{
-			var cls=t.getTypeClass(db);
-			if(IOInstance.isInstance(cls)) return;
-			if(SupportedPrimitive.isAny(cls)) return;
-			throw new ClassCastException("not instance or primitive");
-		})
+		TypeLink.Check.ArgCheck.rawAny(PRIMITIVE, INSTANCE)
 	);
 	
 	@IOValue
