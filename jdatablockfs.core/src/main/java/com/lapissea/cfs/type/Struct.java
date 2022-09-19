@@ -412,7 +412,9 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	
 	@Override
 	public String toString(){
-		var sj=new StringJoiner(", ", getType().getSimpleName()+"{", "}");
+		var name=getType().getSimpleName();
+		if(name.endsWith(IOInstance.Def.IMPL_NAME_POSTFIX)) name=name.substring(0, name.length()-IOInstance.Def.IMPL_NAME_POSTFIX.length());
+		var sj=new StringJoiner(", ", name+"{", "}");
 		if(this instanceof Struct.Unmanaged){
 			sj.add("Unmanaged");
 		}

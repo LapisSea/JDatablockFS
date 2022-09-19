@@ -51,7 +51,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		
 		@Override
 		public T ioNext() throws IOException{
-			var node=nodes.next();
+			var node=nodes.ioNext();
 			return node.getValue();
 		}
 		@Override

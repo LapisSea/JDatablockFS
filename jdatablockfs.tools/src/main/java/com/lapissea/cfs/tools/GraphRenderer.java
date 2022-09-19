@@ -456,7 +456,7 @@ public class GraphRenderer implements DataRenderer{
 			}
 		}
 		
-		var spMap     =undead?new HashMap<PosIndex, List<Bubble>>(flatBubbles.size()):this.spatialMap;
+		var spMap     =undead?HashMap.<PosIndex, List<Bubble>>newHashMap(flatBubbles.size()):this.spatialMap;
 		var bucketSize=fillSpatialMap(flatBubbles, spMap);
 		
 		(flatBubbles.size()>64?flatBubbles.parallelStream():flatBubbles.stream()).forEach(bubble->pushAppart(bubble, spMap, bucketSize));

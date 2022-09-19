@@ -412,7 +412,7 @@ public sealed interface IOTypeDB{
 		@Override
 		public String toShortString(){
 			if(data==null) return "{uninitialized}";
-			return "{"+data.size()+" links, "+defs.size()+" class definitions}";
+			return "{"+data.size()+" "+TextUtil.plural("link", (int)data.size())+", "+defs.size()+" class "+TextUtil.plural("definition", (int)defs.size())+"}";
 		}
 	}
 	
