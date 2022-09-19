@@ -304,8 +304,8 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	T getValue() throws IOException{
 		if(readOnly){
 			if(!valueRead){
-				valueRead=true;
 				valueCache=readValue();
+				valueRead=true;
 			}
 			return valueCache;
 		}
@@ -409,8 +409,8 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	private ChunkPointer getNextPtr() throws IOException{
 		if(readOnly){
 			if(!nextPtrRead){
-				nextPtrRead=true;
 				nextPtrCache=readNextPtr();
+				nextPtrRead=true;
 			}
 			return nextPtrCache;
 		}
@@ -436,8 +436,8 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	IONode<T> getNext() throws IOException{
 		if(readOnly){
 			if(!nextRead){
-				nextRead=true;
 				nextCache=readNext();
+				nextRead=true;
 			}
 			return nextCache;
 		}
