@@ -26,11 +26,11 @@ import org.testng.annotations.BeforeSuite;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
-import java.util.Objects;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 import static com.lapissea.cfs.type.StagedInit.STATE_DONE;
 import static com.lapissea.util.LogUtil.Init.USE_CALL_POS;
@@ -45,27 +45,29 @@ public class GeneralTests{
 			LogUtil.Init.attach(USE_CALL_POS|USE_TABULATED_HEADER);
 		}
 		
+		List<Struct<?>> tasks=new ArrayList<>();
+		
 		if(GlobalConfig.configFlag("test.standardInit", false)){
-			Stream.of(Chunk.class, Reference.class, AutoText.class, Cluster.RootRef.class, ContiguousIOList.class, LinkedIOList.class, HashIOMap.class, TypeDef.class)
-			      .map(c->{
-				      try{
-					      return Struct.ofUnknown(c);
-				      }catch(Throwable e){
-					      e.printStackTrace();
-					      return null;
-				      }
-			      })
-			      .filter(Objects::nonNull)
-			      .toList()
-			      .forEach(c->c.waitForState(STATE_DONE));
+			for(var typ : List.of(Chunk.class, Reference.class, AutoText.class, Cluster.RootRef.class, ContiguousIOList.class, LinkedIOList.class, HashIOMap.class, TypeDef.class)){
+				try{
+					tasks.add(Struct.ofUnknown(typ));
+				}catch(Throwable e){
+					e.printStackTrace();
+				}
+			}
 		}
 		
 		if(GlobalConfig.configFlag("test.earlyRunCode", true)){
-			try(var dummy=AllocateTicket.bytes(1).submit(DataProvider.newVerySimpleProvider()).io()){
-				dummy.write(1);
+			for(var prov : List.of(DataProvider.newVerySimpleProvider(), Cluster.emptyMem())){
+				try(var dummy=AllocateTicket.bytes(10).submit(prov).io()){
+					dummy.write(1);
+					dummy.writeInt4(69);
+					dummy.write(new byte[5]);
+				}
 			}
-			AllocateTicket.bytes(10).submit(Cluster.emptyMem());
 		}
+		
+		tasks.forEach(c->c.waitForState(STATE_DONE));
 	}
 	
 	@Test
