@@ -14,6 +14,8 @@ import com.lapissea.cfs.type.field.BasicSizeDescriptor;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
+import com.lapissea.cfs.type.field.fields.NoIOField;
+import com.lapissea.cfs.type.field.fields.RefField;
 import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.IOException;
@@ -81,7 +83,7 @@ public sealed interface ValueStorage<T>{
 		
 		@Override
 		public <I extends IOInstance<I>> IOField<I, T> field(FieldAccessor<I> accessor, UnsafeSupplier<RandomIO, IOException> ioAt){
-			return new IOField.NoIO<>(accessor, makeSizeDescriptor(provider, accessor, pipe));
+			return new NoIOField<>(accessor, makeSizeDescriptor(provider, accessor, pipe));
 		}
 		
 		@Override
@@ -130,7 +132,7 @@ public sealed interface ValueStorage<T>{
 		
 		@Override
 		public <I extends IOInstance<I>> IOField<I, T> field(FieldAccessor<I> accessor, UnsafeSupplier<RandomIO, IOException> ioAt){
-			return new IOField.NoIO<>(accessor, SizeDescriptor.Fixed.of(size));
+			return new NoIOField<>(accessor, SizeDescriptor.Fixed.of(size));
 		}
 		
 		@Override
@@ -190,7 +192,7 @@ public sealed interface ValueStorage<T>{
 		
 		@Override
 		public <I extends IOInstance<I>> IOField<I, T> field(FieldAccessor<I> accessor, UnsafeSupplier<RandomIO, IOException> ioAt){
-			return new IOField.Ref.NoIO<>(accessor, Reference.FIXED_PIPE.getFixedDescriptor()){
+			return new RefField.NoIO<>(accessor, Reference.FIXED_PIPE.getFixedDescriptor()){
 				@Override
 				public void setReference(I instance, Reference newRef){
 					try(var io=ioAt.get()){
@@ -319,7 +321,7 @@ public sealed interface ValueStorage<T>{
 		
 		@Override
 		public <I extends IOInstance<I>> IOField<I, T> field(FieldAccessor<I> accessor, UnsafeSupplier<RandomIO, IOException> ioAt){
-			return new IOField.NoIO<>(accessor, SizeDescriptor.Fixed.of(size));
+			return new NoIOField<>(accessor, SizeDescriptor.Fixed.of(size));
 		}
 		@SuppressWarnings("unchecked")
 		@Override
@@ -355,7 +357,7 @@ public sealed interface ValueStorage<T>{
 		@Override
 		public <I extends IOInstance<I>> IOField<I, String> field(FieldAccessor<I> accessor, UnsafeSupplier<RandomIO, IOException> ioAt){
 			var d=AutoText.PIPE.getSizeDescriptor();
-			return new IOField.NoIO<>(accessor, SizeDescriptor.Unknown.of(d.getWordSpace(), d.getMin(), d.getMax(), (ioPool, prov, value)->{
+			return new NoIOField<>(accessor, SizeDescriptor.Unknown.of(d.getWordSpace(), d.getMin(), d.getMax(), (ioPool, prov, value)->{
 				var str=(String)accessor.get(ioPool, value);
 				if(str==null) return 0;
 				return AutoText.PIPE.getSizeDescriptor().calcUnknown(null, prov, new AutoText(str), d.getWordSpace());
@@ -410,7 +412,7 @@ public sealed interface ValueStorage<T>{
 		
 		@Override
 		public <I extends IOInstance<I>> IOField<I, String> field(FieldAccessor<I> accessor, UnsafeSupplier<RandomIO, IOException> ioAt){
-			return new IOField.NoIO<>(accessor, Reference.FIXED_PIPE.getFixedDescriptor());
+			return new NoIOField<>(accessor, Reference.FIXED_PIPE.getFixedDescriptor());
 		}
 		
 		@Override

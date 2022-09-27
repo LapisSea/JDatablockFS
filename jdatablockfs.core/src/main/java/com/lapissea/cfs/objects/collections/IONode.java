@@ -21,6 +21,8 @@ import com.lapissea.cfs.type.field.annotations.IODynamic;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.annotations.IOValueUnmanaged;
+import com.lapissea.cfs.type.field.fields.NoIOField;
+import com.lapissea.cfs.type.field.fields.RefField;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.ShouldNeverHappenError;
@@ -121,7 +123,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 			return siz;
 		});
 		
-		return new IOField.NoIO<>(valueAccessor, valDesc);
+		return new NoIOField<>(valueAccessor, valDesc);
 	}
 	
 	@IOValueUnmanaged(index=1)
@@ -161,7 +163,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 			}
 		};
 		
-		var next=new IOField.Ref.NoIO<IONode<T>, IONode<T>>(nextAccessor, SizeDescriptor.Unknown.of(WordSpace.BYTE, 0, NumberSize.LARGEST.optionalBytesLong, (ioPool, prov, node)->node.nextSize.bytes)){
+		var next=new RefField.NoIO<IONode<T>, IONode<T>>(nextAccessor, SizeDescriptor.Unknown.of(WordSpace.BYTE, 0, NumberSize.LARGEST.optionalBytesLong, (ioPool, prov, node)->node.nextSize.bytes)){
 			@Override
 			public void setReference(IONode<T> instance, Reference newRef){
 				if(newRef.getOffset()!=0) throw new NotImplementedException();

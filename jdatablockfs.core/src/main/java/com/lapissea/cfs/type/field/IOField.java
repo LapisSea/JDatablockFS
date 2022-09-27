@@ -1,10 +1,10 @@
 package com.lapissea.cfs.type.field;
 
-import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.FieldIsNullException;
 import com.lapissea.cfs.exceptions.FixedFormatNotSupportedException;
+import com.lapissea.cfs.io.IO;
 import com.lapissea.cfs.io.bit.BitInputStream;
 import com.lapissea.cfs.io.bit.BitOutputStream;
 import com.lapissea.cfs.io.bit.BitReader;
@@ -17,324 +17,24 @@ import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
-import com.lapissea.cfs.type.field.annotations.IODynamic;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.Nullable;
-import com.lapissea.util.TextUtil;
-import com.lapissea.util.UtilL;
 
 import java.io.IOException;
-import java.lang.reflect.Array;
-import java.lang.reflect.Method;
-import java.lang.reflect.ParameterizedType;
-import java.util.*;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.internal.StatIOField.*;
-import static com.lapissea.cfs.type.field.access.TypeFlag.*;
+import static com.lapissea.cfs.type.field.FieldSupport.STAT_LOGGING;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 
-public abstract class IOField<T extends IOInstance<T>, ValueType>{
-	
-	private static final boolean STAT_LOGGING=GlobalConfig.configFlag("logging.fieldTimes", false);
-	
-	static{
-		TextUtil.SHORT_TO_STRINGS.register(OptionalLong.class, l->l.isEmpty()?"()L":"("+l.getAsLong()+")L");
-	}
-	
-	public abstract static class FixedSizeDescriptor<Inst extends IOInstance<Inst>, ValueType> extends IOField<Inst, ValueType>{
-		
-		private final SizeDescriptor<Inst> sizeDescriptor;
-		
-		public FixedSizeDescriptor(FieldAccessor<Inst> accessor, SizeDescriptor<Inst> sizeDescriptor){
-			super(accessor);
-			this.sizeDescriptor=sizeDescriptor;
-		}
-		
-		@Override
-		public SizeDescriptor<Inst> getSizeDescriptor(){
-			return sizeDescriptor;
-		}
-	}
-	
-	public static class NoIO<Inst extends IOInstance<Inst>, ValueType> extends IOField<Inst, ValueType>{
-		
-		private final SizeDescriptor<Inst> sizeDescriptor;
-		
-		public NoIO(FieldAccessor<Inst> accessor, SizeDescriptor<Inst> sizeDescriptor){
-			super(accessor);
-			this.sizeDescriptor=sizeDescriptor;
-		}
-		
-		@Override
-		public SizeDescriptor<Inst> getSizeDescriptor(){
-			return sizeDescriptor;
-		}
-		
-		@Override
-		public void write(VarPool<Inst> ioPool, DataProvider provider, ContentWriter dest, Inst instance) throws IOException{
-			throw new UnsupportedOperationException();
-		}
-		@Override
-		public void read(VarPool<Inst> ioPool, DataProvider provider, ContentReader src, Inst instance, GenericContext genericContext) throws IOException{
-			throw new UnsupportedOperationException();
-		}
-		@Override
-		public void skipRead(VarPool<Inst> ioPool, DataProvider provider, ContentReader src, Inst instance, GenericContext genericContext) throws IOException{
-			throw new UnsupportedOperationException();
-		}
-	}
-	
-	public abstract static class Ref<T extends IOInstance<T>, Type> extends IOField<T, Type>{
-		
-		public abstract static class InstRef<T extends IOInstance<T>, Type extends IOInstance<Type>> extends Ref<T, Type> implements Inst<T, Type>{
-			public InstRef(FieldAccessor<T> accessor){
-				super(accessor);
-			}
-		}
-		
-		public interface Inst<T extends IOInstance<T>, Type extends IOInstance<Type>>{
-			StructPipe<Type> getReferencedPipe(T instance);
-		}
-		
-		public abstract static class NoIO<T extends IOInstance<T>, ValueType extends IOInstance<ValueType>> extends InstRef<T, ValueType>{
-			
-			private final SizeDescriptor<T> sizeDescriptor;
-			
-			public NoIO(FieldAccessor<T> accessor, SizeDescriptor<T> sizeDescriptor){
-				super(accessor);
-				this.sizeDescriptor=sizeDescriptor;
-			}
-			
-			@Override
-			public SizeDescriptor<T> getSizeDescriptor(){
-				return sizeDescriptor;
-			}
-			
-			@Override
-			public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
-				throw new UnsupportedOperationException();
-			}
-			@Override
-			public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-				throw new UnsupportedOperationException();
-			}
-			@Override
-			public void skipRead(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-				throw new UnsupportedOperationException();
-			}
-			@Override
-			public void allocate(T instance, DataProvider provider, GenericContext genericContext) throws IOException{
-				throw new UnsupportedOperationException();
-			}
-		}
-		
-		public abstract static class ReferenceCompanion<T extends IOInstance<T>, ValueType> extends IOField.Ref<T, ValueType>{
-			
-			private IOField<T, Reference> referenceField;
-			
-			public ReferenceCompanion(FieldAccessor<T> accessor){
-				super(accessor);
-			}
-			
-			@Override
-			public void init(){
-				super.init();
-				referenceField=getDependencies().requireExact(Reference.class, IOFieldTools.makeRefName(getAccessor()));
-			}
-			
-			protected void setRef(T instance, Reference newRef){
-				referenceField.set(null, instance, newRef);
-			}
-			protected Reference getRef(T instance){
-				return referenceField.get(null, instance);
-			}
-			
-			@Override
-			public Reference getReference(T instance){
-				var ref=getRef(instance);
-				if(ref.isNull()){
-					return switch(getNullability()){
-						case NOT_NULL -> throw new NullPointerException();
-						case NULLABLE -> get(null, instance)!=null?null:ref;
-						case DEFAULT_IF_NULL -> null;
-					};
-					
-				}
-				return ref;
-			}
-			
-			@Override
-			public List<ValueGeneratorInfo<T, ?>> getGenerators(){
-				return List.of(new ValueGeneratorInfo<>(referenceField, new ValueGenerator<>(){
-					@Override
-					public boolean shouldGenerate(VarPool<T> ioPool, DataProvider provider, T instance){
-						boolean refNull=switch(getNullability()){
-							case NOT_NULL, DEFAULT_IF_NULL -> false;
-							case NULLABLE -> {
-								var val=get(ioPool, instance);
-								yield val==null;
-							}
-						};
-						
-						var     ref      =getRef(instance);
-						boolean isRefNull=ref==null||ref.isNull();
-						
-						return refNull!=isRefNull;
-					}
-					@Override
-					public Reference generate(VarPool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException{
-						var val=get(ioPool, instance);
-						
-						if(val==null){
-							if(allowExternalMod&&getNullability()==DEFAULT_IF_NULL){
-								val=newDefault();
-							}else{
-								return new Reference();
-							}
-						}
-						
-						if(DEBUG_VALIDATION){
-							var ref=getRef(instance);
-							if(ref!=null&&!ref.isNull()) throw new IllegalStateException();
-						}
-						if(!allowExternalMod) throw new RuntimeException("data modification should not be done here");
-						return allocNew(provider, val);
-					}
-				}));
-			}
-			
-			protected abstract ValueType newDefault();
-			protected abstract Reference allocNew(DataProvider provider, ValueType val) throws IOException;
-		}
-		
-		public Ref(FieldAccessor<T> accessor){
-			super(accessor);
-		}
-		
-		public void allocateUnmanaged(T instance) throws IOException{
-			IOInstance.Unmanaged<?> unmanaged=(IOInstance.Unmanaged<?>)instance;
-			allocate(instance, unmanaged.getDataProvider(), unmanaged.getGenerics());
-		}
-		
-		public abstract void allocate(T instance, DataProvider provider, GenericContext genericContext) throws IOException;
-		public abstract void setReference(T instance, Reference newRef);
-		public abstract Reference getReference(T instance);
-		public abstract ObjectPipe<Type, ?> getReferencedPipe(T instance);
-		
-		@Override
-		public IOField.Ref<T, Type> implMaxAsFixedSize(){
-			throw new NotImplementedException();
-		}
-	}
-	
-	public abstract static class Bit<T extends IOInstance<T>, Type> extends IOField<T, Type>{
-		
-		protected Bit(FieldAccessor<T> field){
-			super(field);
-		}
-		
-		@Deprecated
-		@Override
-		public final void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
-			try(var writer=new BitOutputStream(dest)){
-				writeBits(ioPool, writer, instance);
-				if(DEBUG_VALIDATION){
-					writer.requireWritten(getSizeDescriptor().calcUnknown(ioPool, provider, instance, WordSpace.BIT));
-				}
-			}
-		}
-		
-		@Deprecated
-		@Override
-		public final void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-			try(var reader=new BitInputStream(src, getSizeDescriptor().getFixed(WordSpace.BIT).orElse(-1))){
-				readBits(ioPool, reader, instance);
-				if(DEBUG_VALIDATION){
-					reader.requireRead(getSizeDescriptor().calcUnknown(ioPool, provider, instance, WordSpace.BIT));
-				}
-			}
-		}
-		
-		@Deprecated
-		@Override
-		public final void skipRead(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-			if(src.optionallySkipExact(getSizeDescriptor().getFixed(WordSpace.BYTE))){
-				return;
-			}
-			
-			try(var reader=new BitInputStream(src, -1)){
-				skipReadBits(reader, instance);
-				if(DEBUG_VALIDATION){
-					reader.requireRead(getSizeDescriptor().calcUnknown(ioPool, provider, instance, WordSpace.BIT));
-				}
-			}
-		}
-		
-		public abstract void writeBits(VarPool<T> ioPool, BitWriter<?> dest, T instance) throws IOException;
-		public abstract void readBits(VarPool<T> ioPool, BitReader src, T instance) throws IOException;
-		public abstract void skipReadBits(BitReader src, T instance) throws IOException;
-		
-		@Override
-		public IOField.Bit<T, Type> implMaxAsFixedSize(){
-			throw new NotImplementedException();
-		}
-	}
-	
-	public abstract static class NullFlagCompany<T extends IOInstance<T>, Type> extends IOField<T, Type>{
-		
-		private IOFieldPrimitive.FBoolean<T> isNull;
-		
-		protected NullFlagCompany(FieldAccessor<T> field){
-			super(field);
-		}
-		
-		@Override
-		public void init(){
-			super.init();
-			if(nullable()){
-				isNull=declaringStruct().getFields().requireExactBoolean(IOFieldTools.makeNullFlagName(getAccessor()));
-			}
-		}
-		
-		@Override
-		public List<ValueGeneratorInfo<T, ?>> getGenerators(){
-			
-			if(!nullable()) return null;
-			
-			return List.of(new ValueGeneratorInfo<>(isNull, new ValueGenerator<T, Boolean>(){
-				@Override
-				public boolean shouldGenerate(VarPool<T> ioPool, DataProvider provider, T instance){
-					var isNullRec    =get(ioPool, instance)==null;
-					var writtenIsNull=isNull.getValue(ioPool, instance);
-					return writtenIsNull!=isNullRec;
-				}
-				@Override
-				public Boolean generate(VarPool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod){
-					return get(ioPool, instance)==null;
-				}
-			}));
-		}
-		
-		protected final boolean getIsNull(VarPool<T> ioPool, T instance){
-			if(DEBUG_VALIDATION){
-				if(!nullable()) throw new RuntimeException("Checking if null on a non nullable field");
-			}
-			
-			return isNull.getValue(ioPool, instance);
-		}
-		
-	}
-	
-	private static final AtomicLong UID_COUNT=new AtomicLong();
-	private static long nextUID(){
-		return UID_COUNT.incrementAndGet();
-	}
+public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<T>{
 	
 	private final FieldAccessor<T> accessor;
 	
@@ -370,56 +70,8 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	
 	public int typeFlags(){
 		var f=typeFlags;
-		if(f==-1) f=typeFlags=calcTypeFlags();
+		if(f==-1) f=typeFlags=FieldSupport.typeFlags(this);
 		return f;
-	}
-	
-	private int calcTypeFlags(){
-		int typeFlags=0;
-		
-		if(accessor!=null){
-			if(getName().indexOf(IOFieldTools.GENERATED_FIELD_SEPARATOR)!=-1){
-				typeFlags|=HAS_GENERATED_NAME;
-			}
-			
-			boolean isDynamic=accessor.hasAnnotation(IODynamic.class);
-			if(isDynamic){
-				typeFlags|=DYNAMIC_FLAG;
-			}
-			
-			var typeGen=accessor.getGenericType(null);
-			while(true){
-				if(typeGen instanceof Class<?> c){
-					if(c.isArray()){
-						typeGen=c.componentType();
-						continue;
-					}
-				}
-				if(UtilL.instanceOf(Utils.typeToRaw(typeGen), List.class)){
-					typeGen=switch(typeGen){
-						case Class<?> c -> typeGen=Object.class;
-						case ParameterizedType t -> t.getActualTypeArguments()[0];
-						default -> throw new NotImplementedException(typeGen.getClass()+"");
-					};
-					continue;
-				}
-				break;
-			}
-			
-			var type=Utils.typeToRaw(typeGen);
-			
-			if(IOInstance.isInstance(type)){
-				typeFlags|=IOINSTANCE_FLAG;
-				
-				if(!isDynamic&&!(this instanceof IOField.Ref)&&!Struct.canUnknownHavePointers(type)){
-					typeFlags|=HAS_NO_POINTERS_FLAG;
-				}
-			}
-			if(SupportedPrimitive.isAny(type)||type.isEnum()){
-				typeFlags|=PRIMITIVE_OR_ENUM_FLAG;
-			}
-		}
-		return typeFlags;
 	}
 	
 	public boolean isNull(VarPool<T> ioPool, T instance){
@@ -509,8 +161,6 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	
 	
 	@Nullable
-	public abstract void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException;
-	@Nullable
 	public final void writeReported(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		try{
 			if(STAT_LOGGING) logStart(WRITE_ACTION, uid());
@@ -521,7 +171,6 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		}
 	}
 	
-	public abstract void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException;
 	public final void readReported(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		try{
 			if(STAT_LOGGING) logStart(READ_ACTION, uid());
@@ -532,7 +181,6 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		}
 	}
 	
-	public abstract void skipRead(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException;
 	public final void skipReadReported(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		try{
 			if(STAT_LOGGING) logStart(SKIP_READ_ACTION, uid());
@@ -549,140 +197,25 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	
 	
 	/**
-	 * @return string of the resolved value or null if string has no substance
+	 * @return string of the resolved value or no value if string has no substance
 	 */
 	public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort){
 		return instanceToString(ioPool, instance, doShort, "{", "}", "=", ", ");
 	}
 	
 	/**
-	 * @return string of the resolved value or null if string has no substance
+	 * @return string of the resolved value or no value if string has no substance
 	 */
-	@SuppressWarnings({"rawtypes", "unchecked"})
 	public Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
-		var val=get(ioPool, instance);
-		if(val==null){
-			if(getNullability()==IONullability.Mode.NOT_NULL){
-				throw new FieldIsNullException(this);
-			}
-			return Optional.empty();
-		}
-		
-		if(val instanceof IOInstance inst){
-			if("{".equals(start)&&"}".equals(end)&&"=".equals(fieldValueSeparator)&&", ".equals(fieldSeparator)){
-				defaultStr:
-				try{
-					var    t=inst.getClass();
-					Method strMethod;
-					if(doShort){
-						try{
-							strMethod=t.getMethod("toShortString");
-						}catch(ReflectiveOperationException e){
-							strMethod=t.getMethod("toString");
-						}
-					}else{
-						strMethod=t.getMethod("toString");
-					}
-					var declaring=strMethod.getDeclaringClass();
-					if(declaring==IOInstance.class){
-						break defaultStr;
-					}
-					
-					return Optional.ofNullable((String)strMethod.invoke(inst));
-				}catch(ReflectiveOperationException ignored){}
-			}
-			
-			var struct=inst.getThisStruct();
-			return Optional.of(struct.instanceToString(inst, doShort, start, end, fieldValueSeparator, fieldSeparator));
-		}
-		
-		return Optional.of(
-			doShort?
-			Utils.toShortString(val):
-			TextUtil.toString(val)
-		);
+		return FieldSupport.instanceToString(this, ioPool, instance, doShort, start, end, fieldValueSeparator, fieldSeparator);
 	}
 	
 	public boolean instancesEqual(VarPool<T> ioPool1, T inst1, VarPool<T> ioPool2, T inst2){
-		var acc=getAccessor();
-		var id =acc.getTypeID();
-		return switch(id){
-			case ID_OBJECT -> instancesEqualObject(ioPool1, inst1, ioPool2, inst2);
-			case ID_INT -> acc.getInt(ioPool1, inst1)==acc.getInt(ioPool2, inst2);
-			case ID_LONG -> acc.getLong(ioPool1, inst1)==acc.getLong(ioPool2, inst2);
-			case ID_DOUBLE -> acc.getDouble(ioPool1, inst1)==acc.getDouble(ioPool2, inst2);
-			case ID_FLOAT -> acc.getFloat(ioPool1, inst1)==acc.getFloat(ioPool2, inst2);
-			case ID_SHORT -> acc.getShort(ioPool1, inst1)==acc.getShort(ioPool2, inst2);
-			case ID_BYTE -> acc.getByte(ioPool1, inst1)==acc.getByte(ioPool2, inst2);
-			case ID_BOOLEAN -> acc.getBoolean(ioPool1, inst1)==acc.getBoolean(ioPool2, inst2);
-			case ID_CHAR -> acc.getChar(ioPool1, inst1)==acc.getChar(ioPool2, inst2);
-			default -> throw new IllegalStateException(id+"");
-		};
-	}
-	
-	@SuppressWarnings("unchecked")
-	private boolean instancesEqualObject(VarPool<T> ioPool1, T inst1, VarPool<T> ioPool2, T inst2){
-		var acc =getAccessor();
-		var type=acc.getType();
-		
-		var o1=get(ioPool1, inst1);
-		var o2=get(ioPool2, inst2);
-		
-		if(getNullability()==DEFAULT_IF_NULL&&(o1==null||o2==null)){
-			if(o1==null&&o2==null) return true;
-			
-			if(IOInstance.isInstance(type)){
-				var struct=Struct.ofUnknown(type);
-				if(o1==null) o1=(ValueType)struct.make();
-				else o2=(ValueType)struct.make();
-			}else{
-				throw new NotImplementedException(acc.getType()+"");//TODO implement equals of numbers?
-			}
-		}
-		
-		var isArray=type.isArray();
-		if(!isArray&&typeFlag(DYNAMIC_FLAG)){
-			var obj=o1!=null?o1:o2;
-			isArray=obj!=null&&obj.getClass().isArray();
-		}
-		if(isArray){
-			if(o1==o2) return true;
-			if(o1==null||o2==null) return false;
-			int l1=Array.getLength(o1);
-			int l2=Array.getLength(o2);
-			if(l1!=l2) return false;
-			return switch(o1){
-				case byte[] arr -> Arrays.equals(arr, (byte[])o2);
-				case short[] arr -> Arrays.equals(arr, (short[])o2);
-				case int[] arr -> Arrays.equals(arr, (int[])o2);
-				case long[] arr -> Arrays.equals(arr, (long[])o2);
-				case float[] arr -> Arrays.equals(arr, (float[])o2);
-				case double[] arr -> Arrays.equals(arr, (double[])o2);
-				case char[] arr -> Arrays.equals(arr, (char[])o2);
-				case boolean[] arr -> Arrays.equals(arr, (boolean[])o2);
-				case Object[] arr -> Arrays.equals(arr, (Object[])o2);
-				default -> throw new NotImplementedException(o1.getClass().getName());
-			};
-		}
-		
-		return Objects.equals(o1, o2);
+		return FieldSupport.compare(this, ioPool1, inst1, ioPool2, inst2);
 	}
 	
 	public int instanceHashCode(VarPool<T> ioPool, T instance){
-		var acc=getAccessor();
-		var id =acc.getTypeID();
-		return switch(id){
-			case ID_OBJECT -> Objects.hashCode(get(ioPool, instance));
-			case ID_INT -> Integer.hashCode(acc.getInt(ioPool, instance));
-			case ID_LONG -> Long.hashCode(acc.getLong(ioPool, instance));
-			case ID_DOUBLE -> Double.hashCode(acc.getDouble(ioPool, instance));
-			case ID_FLOAT -> Float.hashCode(acc.getFloat(ioPool, instance));
-			case ID_SHORT -> Short.hashCode(acc.getShort(ioPool, instance));
-			case ID_BYTE -> Byte.hashCode(acc.getByte(ioPool, instance));
-			case ID_BOOLEAN -> Boolean.hashCode(acc.getBoolean(ioPool, instance));
-			case ID_CHAR -> Character.hashCode(acc.getChar(ioPool, instance));
-			default -> throw new IllegalStateException(id+"");
-		};
+		return FieldSupport.hash(this, ioPool, instance);
 	}
 	
 	public void init(){
@@ -693,7 +226,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 		if(uid==-1){
 			synchronized(this){
 				if(uid==-1){
-					uid=nextUID();
+					uid=FieldSupport.nextUID();
 					if(STAT_LOGGING) logRegister(uid, this);
 				}
 			}
@@ -732,7 +265,8 @@ public abstract class IOField<T extends IOInstance<T>, ValueType>{
 	
 	public boolean hasDependencies(){
 		requireLateData();
-		return dependencies!=null&&!dependencies.isEmpty();
+		assert dependencies==null||!dependencies.isEmpty();
+		return dependencies!=null;
 	}
 	
 	public String toShortString(){

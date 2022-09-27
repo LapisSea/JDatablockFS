@@ -7,6 +7,7 @@ import com.lapissea.cfs.logging.AverageDouble;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.fields.RefField;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
@@ -69,7 +70,7 @@ public class MemoryWalker{
 		static PointerRecord of(UnsafeConsumer<Reference, IOException> consumer){
 			return new PointerRecord(){
 				@Override
-				public <I extends IOInstance<I>> int log(Reference instanceReference, I instance, IOField.Ref<I, ?> field, Reference valueReference) throws IOException{
+				public <I extends IOInstance<I>> int log(Reference instanceReference, I instance, RefField<I, ?> field, Reference valueReference) throws IOException{
 					consumer.accept(valueReference);
 					return CONTINUE;
 				}
@@ -84,7 +85,7 @@ public class MemoryWalker{
 		/**
 		 * @return if walking should continue
 		 */
-		<T extends IOInstance<T>> int log(Reference instanceReference, T instance, IOField.Ref<T, ?> field, Reference valueReference) throws IOException;
+		<T extends IOInstance<T>> int log(Reference instanceReference, T instance, RefField<T, ?> field, Reference valueReference) throws IOException;
 		/**
 		 * @return if walking should continue
 		 */
@@ -223,7 +224,7 @@ public class MemoryWalker{
 					
 					//legacy fallback
 					if(cmd==POTENTIAL_REF){
-						if(field instanceof IOField.Ref){
+						if(field instanceof RefField){
 							cmd=REF_FIELD;
 						}
 					}
@@ -238,8 +239,8 @@ public class MemoryWalker{
 								var dynamic   =field.typeFlag(IOField.DYNAMIC_FLAG);
 								var isInstance=field.typeFlag(IOField.IOINSTANCE_FLAG);
 								
-								IOField.Ref<T, T> refField=(IOField.Ref<T, T>)field;
-								var               ref     =refField.getReference(instance);
+								RefField<T, T> refField=(RefField<T, T>)field;
+								var            ref     =refField.getReference(instance);
 								
 								if(ref.isNull()) continue;
 								
@@ -275,7 +276,7 @@ public class MemoryWalker{
 										}
 									}
 									
-									var instRefField=(IOField.Ref<T, T> & IOField.Ref.Inst<T, T>)refField;
+									var instRefField=(RefField<T, T> & RefField.Inst<T, T>)refField;
 									
 									if(timer!=null) timer.ignoreStart();
 									var res=walkStructFull(instRefField.get(ioPool, instance), ref, instRefField.getReferencedPipe(instance), false);

@@ -24,6 +24,7 @@ import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.cfs.type.field.fields.BitField;
 import com.lapissea.cfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
@@ -134,8 +135,8 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 			var f=getType().getFields();
 			return List.of(
 				new BitFieldMerger<>(List.of(
-					(IOField.Bit<Chunk, ?>)f.requireExact(NumberSize.class, "bodyNumSize"),
-					(IOField.Bit<Chunk, ?>)f.requireExact(NumberSize.class, "nextSize")
+					(BitField<Chunk, ?>)f.requireExact(NumberSize.class, "bodyNumSize"),
+					(BitField<Chunk, ?>)f.requireExact(NumberSize.class, "nextSize")
 				)),
 				f.requireExact(long.class, "capacity"),
 				f.requireExact(long.class, "size"),

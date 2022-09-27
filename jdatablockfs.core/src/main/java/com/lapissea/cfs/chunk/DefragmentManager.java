@@ -8,6 +8,7 @@ import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.MemoryWalker;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.fields.RefField;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.function.UnsafeConsumer;
@@ -115,7 +116,7 @@ public class DefragmentManager{
 			boolean moved=false;
 			@SuppressWarnings({"unchecked", "rawtypes"})
 			@Override
-			public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, IOField.Ref<T, ?> field, Reference valueReference) throws IOException{
+			public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, RefField<T, ?> field, Reference valueReference) throws IOException{
 				if(!valueReference.getPtr().equals(target)){
 					return CONTINUE;
 				}
@@ -167,7 +168,7 @@ public class DefragmentManager{
 			cluster.rootWalker(new MemoryWalker.PointerRecord(){
 				@SuppressWarnings({"rawtypes", "unchecked"})
 				@Override
-				public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, IOField.Ref<T, ?> field, Reference valueReference) throws IOException{
+				public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, RefField<T, ?> field, Reference valueReference) throws IOException{
 					if(instance instanceof IOInstance.Unmanaged u){
 						var p   =u.getReference().getPtr();
 						var user=findReferenceUser(cluster, u.getReference());
@@ -419,7 +420,7 @@ public class DefragmentManager{
 		
 		var fin=cluster.rootWalker(new MemoryWalker.PointerRecord(){
 			@Override
-			public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, IOField.Ref<T, ?> field, Reference valueReference){
+			public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, RefField<T, ?> field, Reference valueReference){
 				if(valueReference.getPtr().equals(oldChunk)){
 					field.setReference(instance, new Reference(newChunk, valueReference.getOffset()));
 					return END|SAVE;
@@ -469,7 +470,7 @@ public class DefragmentManager{
 		cluster.rootWalker(new MemoryWalker.PointerRecord(){
 			boolean foundCh;
 			@Override
-			public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, IOField.Ref<T, ?> field, Reference valueReference){
+			public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, RefField<T, ?> field, Reference valueReference){
 				var ptr=oldRef.getPtr();
 				if(valueReference.getPtr().equals(ptr)){
 					
@@ -503,7 +504,7 @@ public class DefragmentManager{
 		Reference[] found={null};
 		cluster.rootWalker(new MemoryWalker.PointerRecord(){
 			@Override
-			public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, IOField.Ref<T, ?> field, Reference valueReference){
+			public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, RefField<T, ?> field, Reference valueReference){
 				if(valueReference.equals(ref)){
 					found[0]=instanceReference;
 					return END;

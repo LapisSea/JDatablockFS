@@ -12,6 +12,7 @@ import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
+import com.lapissea.cfs.type.field.fields.RefField;
 import com.lapissea.util.Rand;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
@@ -781,7 +782,7 @@ public class GraphRenderer implements DataRenderer{
 		while(iter.hasNext()){
 			var field=iter.next();
 			
-			if(!(field instanceof IOField.Ref<T, Object> refField)){
+			if(!(field instanceof RefField<T, Object> refField)){
 				if(field.getAccessor().getType()==ChunkPointer.class){
 					var    val  =field.get(pool, inst);
 					Bubble child=parent.child(undead, path+"."+field.getName());
@@ -823,7 +824,7 @@ public class GraphRenderer implements DataRenderer{
 		while(iter.hasNext()){
 			IOField<T, Object> field=iter.next();
 			
-			if(!(field instanceof IOField.Ref<T, Object> refField)){
+			if(!(field instanceof RefField<T, Object> refField)){
 				if(field.getAccessor().getType()==ChunkPointer.class){
 					var    val  =field.get(pool, inst);
 					Bubble child=bubble.child(undead, field.getName());

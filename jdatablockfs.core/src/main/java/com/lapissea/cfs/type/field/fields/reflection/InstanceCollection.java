@@ -23,6 +23,8 @@ import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
+import com.lapissea.cfs.type.field.fields.NullFlagCompanyField;
+import com.lapissea.cfs.type.field.fields.RefField;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 
@@ -42,7 +44,7 @@ import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 public class InstanceCollection{
 	
 	public static class InlineField<T extends IOInstance<T>, ElementType extends IOInstance<ElementType>, CollectionType>
-		extends IOField.NullFlagCompany<T, CollectionType>{
+		extends NullFlagCompanyField<T, CollectionType>{
 		
 		private final DataAdapter<T, ElementType, CollectionType> dataAdapter;
 		
@@ -137,7 +139,7 @@ public class InstanceCollection{
 	}
 	
 	public static class ReferenceField<T extends IOInstance<T>, ElementType extends IOInstance<ElementType>, CollectionType>
-		extends IOField.Ref.ReferenceCompanion<T, CollectionType>{
+		extends RefField.ReferenceCompanion<T, CollectionType>{
 		
 		private final DataAdapter<T, ElementType, CollectionType> dataAdapter;
 		

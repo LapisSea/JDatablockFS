@@ -8,16 +8,16 @@ import com.lapissea.cfs.io.bit.EnumUniverse;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.WordSpace;
-import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
+import com.lapissea.cfs.type.field.fields.BitField;
 
 import java.io.IOException;
 import java.util.Objects;
 
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 
-public class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> extends IOField.Bit<T, E>{
+public class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> extends BitField<T, E>{
 	
 	private final EnumUniverse<E>   enumUniverse;
 	private final SizeDescriptor<T> sizeDescriptor;

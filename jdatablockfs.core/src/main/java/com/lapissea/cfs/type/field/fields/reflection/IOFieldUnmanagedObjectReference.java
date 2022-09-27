@@ -12,16 +12,16 @@ import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.*;
-import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
+import com.lapissea.cfs.type.field.fields.RefField;
 import com.lapissea.util.NotImplementedException;
 
 import java.io.IOException;
 
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 
-public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType extends IOInstance.Unmanaged<ValueType>> extends IOField.Ref.InstRef<T, ValueType>{
+public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType extends IOInstance.Unmanaged<ValueType>> extends RefField.InstRef<T, ValueType>{
 	
 	
 	private final SizeDescriptor<T>           descriptor;
@@ -97,7 +97,7 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 		return val!=null?val.getPipe():null;
 	}
 	@Override
-	public Ref<T, ValueType> implMaxAsFixedSize(){
+	public RefField<T, ValueType> implMaxAsFixedSize(){
 		return new IOFieldUnmanagedObjectReference<>(getAccessor(), true);
 	}
 	

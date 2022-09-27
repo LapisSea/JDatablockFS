@@ -18,6 +18,7 @@ import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.*;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
+import com.lapissea.cfs.type.field.fields.RefField;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
 
@@ -223,7 +224,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		}
 		
 		var refs=fields.stream()
-		               .map(f->f instanceof IOField.Ref<?, ?> ref?ref:null)
+		               .map(f->f instanceof RefField<?, ?> ref?ref:null)
 		               .filter(Objects::nonNull)
 		               .map(ref->fields.byName(IOFieldTools.makeRefName(ref.getAccessor())).map(f->Map.entry(f, ref)))
 		               .filter(Optional::isPresent)
@@ -250,7 +251,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				continue;
 			}
 			
-			if(field instanceof IOField.Ref){
+			if(field instanceof RefField){
 				builder.referenceField();
 				continue;
 			}

@@ -30,6 +30,9 @@ import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.access.TypeFlag;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.cfs.type.field.annotations.IODynamic;
+import com.lapissea.cfs.type.field.fields.BitField;
+import com.lapissea.cfs.type.field.fields.NoIOField;
+import com.lapissea.cfs.type.field.fields.RefField;
 import com.lapissea.cfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.util.*;
@@ -360,7 +363,7 @@ public class BinaryGridRenderer implements DataRenderer{
 		String           both;
 		
 		var fStr=field.toShortString();
-		if(field instanceof IOField.Ref refField){
+		if(field instanceof RefField refField){
 			//noinspection unchecked
 			var ref=refField.getReference(instance);
 			if(ref!=null&&!ref.isNull()) fStr+=" @ "+ref;
@@ -1407,11 +1410,11 @@ public class BinaryGridRenderer implements DataRenderer{
 							continue;
 						}
 						
-						if(field instanceof IOField.Ref refO){
-							IOField.Ref<T, ?> refField=(IOField.Ref<T, ?>)refO;
-							var               ref     =refField.getReference(instance);
-							boolean           diffPos =true;
-							Pointer           ptr     =null;
+						if(field instanceof RefField refO){
+							RefField<T, ?> refField=(RefField<T, ?>)refO;
+							var            ref     =refField.getReference(instance);
+							boolean        diffPos =true;
+							Pointer        ptr     =null;
 							if(!ref.isNull()){
 								var from=reference.addOffset(fieldOffset).calcGlobalOffset(ctx.provider);
 								var to  =ref.calcGlobalOffset(ctx.provider);
@@ -1447,7 +1450,7 @@ public class BinaryGridRenderer implements DataRenderer{
 							}
 							if(!diffPos) ctx.popStrings(renderer);
 							
-							if(refField instanceof IOField.Ref.Inst instRef){
+							if(refField instanceof RefField.Inst instRef){
 								annotateStruct(ctx, (T)refField.get(ioPool, instance), ref, instRef.getReferencedPipe(instance), generics(instance, parentGenerics), diffPos);
 							}else{
 								ObjectPipe pip     =refField.getReferencedPipe(instance);
@@ -1461,7 +1464,7 @@ public class BinaryGridRenderer implements DataRenderer{
 						if(field instanceof BitFieldMerger<T> merger){
 							int bitOffset=0;
 							drawByteRanges(rctx, List.of(Range.fromSize(trueOffset, size)), col, false, true);
-							for(IOField.Bit<T, ?> bit : merger.fieldGroup()){
+							for(BitField<T, ?> bit : merger.fieldGroup()){
 								
 								var bCol=ColorUtils.makeCol(rand, typeHash, bit);
 								var siz =bit.getSizeDescriptor().calcUnknown(ioPool, ctx.provider, instance, WordSpace.BIT);
@@ -1604,7 +1607,7 @@ public class BinaryGridRenderer implements DataRenderer{
 									
 									long  arrOffset=0;
 									int[] index    ={0};
-									var f=new IOField.NoIO<T, String>(new FieldAccessor<>(){
+									var f=new NoIOField<T, String>(new FieldAccessor<>(){
 										@NotNull
 										@Override
 										public <T1 extends Annotation> Optional<T1> getAnnotation(Class<T1> annotationClass){
@@ -1696,7 +1699,7 @@ public class BinaryGridRenderer implements DataRenderer{
 		var arrayLenName    =IOFieldTools.makeCollectionLenName(field.getAccessor());
 		var arrayLenSizeName=IOFieldTools.makeNumberSizeName(arrayLenName);
 		
-		annotateByteField(ctx, ioPool, instance, new IOField.NoIO<>(new AbstractFieldAccessor<T>(null, arrayLenSizeName){
+		annotateByteField(ctx, ioPool, instance, new NoIOField<>(new AbstractFieldAccessor<T>(null, arrayLenSizeName){
 			@NotNull
 			@Override
 			public <T1 extends Annotation> Optional<T1> getAnnotation(Class<T1> annotationClass){
@@ -1720,7 +1723,7 @@ public class BinaryGridRenderer implements DataRenderer{
 			}
 		}, SizeDescriptor.Fixed.of(1)), col, reference, Range.fromSize(fieldOffset, 1));
 		
-		annotateByteField(ctx, ioPool, instance, new IOField.NoIO<>(new AbstractFieldAccessor<T>(null, arrayLenName){
+		annotateByteField(ctx, ioPool, instance, new NoIOField<>(new AbstractFieldAccessor<T>(null, arrayLenName){
 			@NotNull
 			@Override
 			public <T1 extends Annotation> Optional<T1> getAnnotation(Class<T1> annotationClass){

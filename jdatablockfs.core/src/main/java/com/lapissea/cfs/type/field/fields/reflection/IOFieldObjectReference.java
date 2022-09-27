@@ -13,11 +13,11 @@ import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.VarPool;
-import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.cfs.type.field.fields.RefField;
 import com.lapissea.util.ShouldNeverHappenError;
 
 import java.io.IOException;
@@ -25,7 +25,7 @@ import java.util.Objects;
 
 import static com.lapissea.cfs.type.StagedInit.STATE_DONE;
 
-public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends IOInstance<ValueType>> extends IOField.Ref.ReferenceCompanion<T, ValueType> implements IOField.Ref.Inst<T, ValueType>{
+public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends IOInstance<ValueType>> extends RefField.ReferenceCompanion<T, ValueType> implements RefField.Inst<T, ValueType>{
 	
 	
 	private final SizeDescriptor<T>     descriptor;

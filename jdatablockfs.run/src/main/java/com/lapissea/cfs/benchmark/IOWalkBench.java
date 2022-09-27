@@ -10,6 +10,7 @@ import com.lapissea.cfs.run.sparseimage.SparseImage;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.MemoryWalker;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.fields.RefField;
 import org.openjdk.jmh.annotations.*;
 
 import java.io.IOException;
@@ -26,7 +27,7 @@ public class IOWalkBench{
 	private final Cluster cluster;
 	MemoryWalker.PointerRecord rec=new MemoryWalker.PointerRecord(){
 		@Override
-		public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, IOField.Ref<T, ?> field, Reference valueReference) throws IOException{
+		public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, RefField<T, ?> field, Reference valueReference) throws IOException{
 			return MemoryWalker.CONTINUE;
 		}
 		@Override

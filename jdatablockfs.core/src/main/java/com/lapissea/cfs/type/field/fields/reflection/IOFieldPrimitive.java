@@ -15,6 +15,7 @@ import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.cfs.type.field.fields.BitField;
 
 import java.io.IOException;
 import java.util.Comparator;
@@ -509,7 +510,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 	}
 	
-	public static class FBoolean<T extends IOInstance<T>> extends IOField.Bit<T, Boolean>{
+	public static class FBoolean<T extends IOInstance<T>> extends BitField<T, Boolean>{
 		
 		protected FBoolean(FieldAccessor<T> field){
 			super(field);

@@ -15,6 +15,7 @@ import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
+import com.lapissea.cfs.type.field.fields.BitField;
 import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
@@ -37,7 +38,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 		}
 	}
 	
-	private final List<IOField.Bit<T, ?>> group;
+	private final List<BitField<T, ?>> group;
 	
 	private final List<ValueGeneratorInfo<T, ?>> generators;
 	
@@ -45,7 +46,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 	
 	private final Optional<BitLayout> safetyBits;
 	
-	public BitFieldMerger(List<IOField.Bit<T, ?>> group){
+	public BitFieldMerger(List<BitField<T, ?>> group){
 		super(null);
 		if(group.isEmpty()) throw new IllegalArgumentException("group is empty");
 		
@@ -94,7 +95,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 		}
 	}
 	
-	private void writeBitsCheckedSize(VarPool<T> ioPool, BitOutputStream stream, T instance, DataProvider provider, Bit<T, ?> fi) throws IOException{
+	private void writeBitsCheckedSize(VarPool<T> ioPool, BitOutputStream stream, T instance, DataProvider provider, BitField<T, ?> fi) throws IOException{
 		long size=fi.getSizeDescriptor().calcUnknown(ioPool, provider, instance, WordSpace.BIT);
 		var  oldW=stream.getTotalBits();
 		
@@ -117,7 +118,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 		}
 	}
 	
-	private void readBitsCheckedSize(VarPool<T> ioPool, BitInputStream stream, T instance, DataProvider provider, Bit<T, ?> fi) throws IOException{
+	private void readBitsCheckedSize(VarPool<T> ioPool, BitInputStream stream, T instance, DataProvider provider, BitField<T, ?> fi) throws IOException{
 		long size=fi.getSizeDescriptor().calcUnknown(ioPool, provider, instance, WordSpace.BIT);
 		var  oldW=stream.getTotalBits();
 		
@@ -144,7 +145,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 		}
 	}
 	
-	private void skipBitsCheckedSize(VarPool<T> ioPool, DataProvider provider, T instance, BitInputStream stream, Bit<T, ?> fi) throws IOException{
+	private void skipBitsCheckedSize(VarPool<T> ioPool, DataProvider provider, T instance, BitInputStream stream, BitField<T, ?> fi) throws IOException{
 		long size=fi.getSizeDescriptor().calcUnknown(ioPool, provider, instance, WordSpace.BIT);
 		var  oldW=stream.getTotalBits();
 		
@@ -190,7 +191,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 	
 	@Override
 	public IOField<T, Object> implMaxAsFixedSize(){
-		return new BitFieldMerger<>(group.stream().<Bit<T, ?>>map(Bit::implMaxAsFixedSize).toList());
+		return new BitFieldMerger<>(group.stream().<BitField<T, ?>>map(BitField::implMaxAsFixedSize).toList());
 	}
 	
 	@Override
@@ -198,7 +199,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 		return group.stream();
 	}
 	
-	public List<Bit<T, ?>> fieldGroup(){
+	public List<BitField<T, ?>> fieldGroup(){
 		return group;
 	}
 	

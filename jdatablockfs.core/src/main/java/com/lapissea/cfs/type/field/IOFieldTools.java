@@ -13,6 +13,7 @@ import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IONullability;
+import com.lapissea.cfs.type.field.fields.BitField;
 import com.lapissea.cfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.ShouldNeverHappenError;
@@ -50,7 +51,7 @@ public class IOFieldTools{
 	
 	public static <T extends IOInstance<T>> List<IOField<T, ?>> mergeBitSpace(List<IOField<T, ?>> mapData){
 		var result    =new LinkedList<IOField<T, ?>>();
-		var bitBuilder=new LinkedList<IOField.Bit<T, ?>>();
+		var bitBuilder=new LinkedList<BitField<T, ?>>();
 		
 		Runnable pushBuilt=()->{
 			switch(bitBuilder.size()){
@@ -64,9 +65,9 @@ public class IOFieldTools{
 		};
 		
 		for(IOField<T, ?> field : mapData){
-			if(field instanceof IOField.Bit<?, ?> bit){
+			if(field instanceof BitField<?, ?> bit){
 				//noinspection unchecked
-				bitBuilder.add((IOField.Bit<T, ?>)bit);
+				bitBuilder.add((BitField<T, ?>)bit);
 				continue;
 			}
 			pushBuilt.run();
@@ -280,5 +281,9 @@ public class IOFieldTools{
 		return (E)Proxy.newProxyInstance(annotationType.getClassLoader(),
 		                                 new Class[]{annotationType},
 		                                 new FakeAnnotation());
+	}
+	
+	public static boolean isGenerated(IOField<?, ?> field){
+		return field.getName().indexOf(GENERATED_FIELD_SEPARATOR)!=-1;
 	}
 }

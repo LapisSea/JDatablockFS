@@ -16,6 +16,7 @@ import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.annotations.IODynamic;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.cfs.type.field.fields.RefField;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.ObjectHolder;
 import com.lapissea.util.TextUtil;
@@ -194,7 +195,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	@SuppressWarnings("unchecked")
 	private void newBuckets() throws IOException{
 		getThisStruct().getFields()
-		               .requireExactFieldType(IOField.Ref.class, "buckets")
+		               .requireExactFieldType(RefField.class, "buckets")
 		               .allocateUnmanaged(this);
 	}
 	

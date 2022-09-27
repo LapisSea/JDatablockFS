@@ -11,13 +11,14 @@ import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
+import com.lapissea.cfs.type.field.fields.NullFlagCompanyField;
 
 import java.io.IOException;
 import java.util.Objects;
 
 import static com.lapissea.cfs.type.StagedInit.STATE_DONE;
 
-public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extends IOInstance<ValueType>> extends IOField.NullFlagCompany<CTyp, ValueType>{
+public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extends IOInstance<ValueType>> extends NullFlagCompanyField<CTyp, ValueType>{
 	
 	private final SizeDescriptor<CTyp>  descriptor;
 	private final StructPipe<ValueType> instancePipe;

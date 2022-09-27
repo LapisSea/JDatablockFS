@@ -234,8 +234,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		@Override
 		public void allocateNulls(DataProvider provider) throws IOException{
 			var pool=getThisStruct().allocVirtualVarPool(IO);
-			//noinspection unchecked
-			for(var ref : getThisStruct().getFields().byFieldTypeIter((Class<IOField.Ref<SELF, ?>>)(Object)IOField.Ref.class)){
+			for(var ref : getThisStruct().getFields().onlyRefs()){
 				if(!ref.isNull(pool, self()))
 					continue;
 				ref.allocate(self(), provider, getGenericContext());

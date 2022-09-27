@@ -3,6 +3,7 @@ package com.lapissea.cfs.type.field;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.field.fields.RefField;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.util.UtilL;
 
@@ -135,7 +136,7 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	
 	@SuppressWarnings("unchecked")
 	private FieldSet(){
-		this.data=(IOField<T, ?>[])new IOField[0];
+		this(new IOField[0]);
 	}
 	
 	private FieldSet(IOField<T, ?>[] data){
@@ -240,8 +241,9 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		return stream().filter(type::isInstance).map(type::cast);
 	}
 	
-	public <E extends IOField<T, ?>> Iterable<? extends E> byFieldTypeIter(Class<E> type){
-		return ()->stream().filter(type::isInstance).map(type::cast).iterator();
+	@SuppressWarnings("unchecked")
+	public <E extends RefField<T, ?>> Iterable<E> onlyRefs(){
+		return ()->stream().filter(e->e instanceof RefField).map(e->(E)e).iterator();
 	}
 	
 	public <E> IOField<T, E> requireExact(Class<E> type, String name){
