@@ -410,11 +410,6 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 	}
 	
 	@Override
-	public ValueType get(VarPool<CTyp> ioPool, CTyp instance){
-		return getNullable(ioPool, instance);
-	}
-	
-	@Override
 	public void set(VarPool<CTyp> ioPool, CTyp instance, ValueType value){
 		super.set(ioPool, instance, switch(getNullability()){
 			case DEFAULT_IF_NULL, NULLABLE -> value;

@@ -204,6 +204,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		}
 		
 		@Override
+		@SuppressWarnings("unchecked")
 		public boolean equals(Object o){
 			if(this==o) return true;
 			
@@ -211,11 +212,8 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			var struct=getThisStruct();
 			if(that.getThisStruct()!=struct) return false;
 			
-			var ioPool1=struct.allocVirtualVarPool(IO);
-			var ioPool2=struct.allocVirtualVarPool(IO);
-			for(var field : struct.getFields()){
-				//noinspection unchecked
-				if(!field.instancesEqual(ioPool1, self(), ioPool2, (SELF)that)) return false;
+			for(var field : struct.getInstanceFields()){
+				if(!field.instancesEqual(null, self(), null, (SELF)that)) return false;
 			}
 			
 			return true;
@@ -224,18 +222,16 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		@Override
 		public int hashCode(){
 			int result=1;
-			var ioPool=getThisStruct().allocVirtualVarPool(IO);
-			for(var field : getThisStruct().getFields()){
-				result=31*result+field.instanceHashCode(ioPool, self());
+			for(var field : getThisStruct().getInstanceFields()){
+				result=31*result+field.instanceHashCode(null, self());
 			}
 			return result;
 		}
 		
 		@Override
 		public void allocateNulls(DataProvider provider) throws IOException{
-			var pool=getThisStruct().allocVirtualVarPool(IO);
-			for(var ref : getThisStruct().getFields().onlyRefs()){
-				if(!ref.isNull(pool, self()))
+			for(var ref : getThisStruct().getInstanceFields().onlyRefs()){
+				if(!ref.isNull(null, self()))
 					continue;
 				ref.allocate(self(), provider, getGenericContext());
 			}

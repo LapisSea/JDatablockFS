@@ -58,8 +58,7 @@ public class IOFieldByteArray<T extends IOInstance<T>> extends IOField<T, byte[]
 		return List.of(new ValueGeneratorInfo<>(compressed, new ValueGenerator<T, byte[]>(){
 			@Override
 			public boolean shouldGenerate(VarPool<T> ioPool, DataProvider provider, T instance) throws IOException{
-				byte[] compr=compressed.get(ioPool, instance);
-				return compr==null;
+				return compressed.isNull(ioPool, instance);
 			}
 			@Override
 			public byte[] generate(VarPool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException{

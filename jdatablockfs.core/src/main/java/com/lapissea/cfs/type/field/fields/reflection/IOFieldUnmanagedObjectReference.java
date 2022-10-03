@@ -80,7 +80,7 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 	
 	@Override
 	public ValueType get(VarPool<T> ioPool, T instance){
-		var val=super.get(ioPool, instance);
+		var val=rawGet(ioPool, instance);
 		if(val==null){
 			if(nullable()) return null;
 			throw new FieldIsNullException(this);

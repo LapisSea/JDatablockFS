@@ -75,11 +75,6 @@ public class InstanceCollection{
 		}
 		
 		@Override
-		public CollectionType get(VarPool<T> ioPool, T instance){
-			return getNullable(ioPool, instance);
-		}
-		
-		@Override
 		public void init(){
 			super.init();
 			collectionSize=declaringStruct().getFields().requireExact(int.class, IOFieldTools.makeCollectionLenName(getAccessor()));
@@ -221,11 +216,6 @@ public class InstanceCollection{
 					return null;
 				}
 			};
-		}
-		
-		@Override
-		public CollectionType get(VarPool<T> ioPool, T instance){
-			return getNullable(ioPool, instance);
 		}
 		
 		@Override

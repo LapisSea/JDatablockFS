@@ -5,21 +5,15 @@ import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.FieldIsNullException;
 import com.lapissea.cfs.exceptions.FixedFormatNotSupportedException;
 import com.lapissea.cfs.io.IO;
-import com.lapissea.cfs.io.bit.BitInputStream;
-import com.lapissea.cfs.io.bit.BitOutputStream;
-import com.lapissea.cfs.io.bit.BitReader;
-import com.lapissea.cfs.io.bit.BitWriter;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
-import com.lapissea.cfs.io.instancepipe.ObjectPipe;
-import com.lapissea.cfs.io.instancepipe.StructPipe;
-import com.lapissea.cfs.objects.Reference;
-import com.lapissea.cfs.type.*;
+import com.lapissea.cfs.type.GenericContext;
+import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
-import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
-import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.Nullable;
 
 import java.io.IOException;
@@ -29,7 +23,6 @@ import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
-import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.internal.StatIOField.*;
 import static com.lapissea.cfs.type.field.FieldSupport.STAT_LOGGING;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
@@ -89,12 +82,12 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 	}
 	
 	protected final ValueType getNullable(VarPool<T> ioPool, T instance, Supplier<ValueType> createDefaultIfNull){
-		var value=get0(ioPool, instance);
+		var value=rawGet(ioPool, instance);
+		if(value!=null) return value;
 		return switch(getNullability()){
-			case NOT_NULL -> requireValNN(value);
-			case NULLABLE -> value;
+			case NOT_NULL -> throw new FieldIsNullException(this);
+			case NULLABLE -> null;
 			case DEFAULT_IF_NULL -> {
-				if(value!=null) yield value;
 				var newVal=createDefaultIfNull.get();
 				set(ioPool, instance, newVal);
 				yield newVal;
@@ -103,19 +96,22 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 	}
 	
 	protected final ValueType getNullable(VarPool<T> ioPool, T instance){
-		var value=get0(ioPool, instance);
-		return switch(getNullability()){
-			case NOT_NULL -> requireValNN(value);
-			case NULLABLE -> value;
+		var value=rawGet(ioPool, instance);
+		if(value!=null) return value;
+		switch(getNullability()){
+			case NOT_NULL -> throw new FieldIsNullException(this);
+			case null, NULLABLE -> {}
 			case DEFAULT_IF_NULL -> throw new IllegalStateException(this+" does not support "+DEFAULT_IF_NULL);
-		};
+		}
+		return null;
 	}
 	
 	public ValueType get(VarPool<T> ioPool, T instance){
-		return get0(ioPool, instance);
+		return getNullable(ioPool, instance);
 	}
+	
 	@SuppressWarnings("unchecked")
-	private ValueType get0(VarPool<T> ioPool, T instance){
+	protected final ValueType rawGet(VarPool<T> ioPool, T instance){
 		return (ValueType)getAccessor().get(ioPool, instance);
 	}
 	

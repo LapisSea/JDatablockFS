@@ -296,6 +296,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	private final Class<T> type;
 	
 	private FieldSet<T> fields;
+	private FieldSet<T> instanceFields;
 	
 	short[] poolObjectsSize;
 	short[] poolPrimitivesSize;
@@ -439,6 +440,13 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	@Override
 	public Class<T> getType(){
 		return type;
+	}
+	
+	public FieldSet<T> getInstanceFields(){
+		if(instanceFields==null){
+			instanceFields=FieldSet.of(getFields().stream().filter(e->!(e.getAccessor() instanceof VirtualAccessor<T> vacc&&vacc.getStoragePool()==IO)));
+		}
+		return instanceFields;
 	}
 	
 	public FieldSet<T> getFields(){

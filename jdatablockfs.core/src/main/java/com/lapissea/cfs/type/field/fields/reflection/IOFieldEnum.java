@@ -1,6 +1,5 @@
 package com.lapissea.cfs.type.field.fields.reflection;
 
-import com.lapissea.cfs.exceptions.FieldIsNullException;
 import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.io.bit.BitReader;
 import com.lapissea.cfs.io.bit.BitWriter;
@@ -35,17 +34,9 @@ public class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> extends Bit
 	
 	@Override
 	public E get(VarPool<T> ioPool, T instance){
-		E e=super.get(ioPool, instance);
-		if(e==null){
-			switch(getNullability()){
-				case NOT_NULL -> throw new FieldIsNullException(this);
-				case DEFAULT_IF_NULL -> e=enumUniverse.get(0);
-				case NULLABLE -> {}
-				case null -> throw new NullPointerException();
-			}
-		}
-		return e;
+		return getNullable(ioPool, instance, ()->enumUniverse.get(0));
 	}
+	
 	@Override
 	public void set(VarPool<T> ioPool, T instance, E value){
 		super.set(ioPool, instance, switch(getNullability()){
