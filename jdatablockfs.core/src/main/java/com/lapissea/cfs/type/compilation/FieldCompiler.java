@@ -29,7 +29,10 @@ import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static java.util.Comparator.comparingInt;
 import static java.util.function.Function.identity;
+import static java.util.stream.Collectors.groupingBy;
+import static java.util.stream.Collectors.joining;
 
 public class FieldCompiler{
 	
@@ -57,28 +60,25 @@ public class FieldCompiler{
 	 * Scans an unmanaged struct for
 	 */
 	public static <T extends IOInstance.Unmanaged<T>> FieldSet<T> compileStaticUnmanaged(Struct.Unmanaged<T> struct){
-		var type=struct.getType();
-		
-		var methods=type.getDeclaredMethods();
-		
-		var valueDefs=Arrays.stream(methods)
-		                    .filter(m->m.isAnnotationPresent(IOValueUnmanaged.class))
-		                    .sorted(Comparator.comparingInt(m->-m.getAnnotation(IOValueUnmanaged.class).index()))
-		                    .toList();
+		var valueDefs=deepClasses(struct.getType()).flatArray(Class::getDeclaredMethods)
+		                                           .stream()
+		                                           .filter(m->m.isAnnotationPresent(IOValueUnmanaged.class))
+		                                           .sorted(comparingInt(FieldCompiler::unmanagedIndex).reversed())
+		                                           .toList();
 		if(valueDefs.isEmpty()) return FieldSet.of();
 		
-		var err=valueDefs.stream()
-		                 .collect(Collectors.groupingBy(m->m.getAnnotation(IOValueUnmanaged.class).index()))
-		                 .values()
-		                 .stream()
-		                 .filter(l->l.size()>1)
-		                 .map(l->l.stream()
-		                          .map(Method::getName)
-		                          .collect(Collectors.joining(", ")))
-		                 .collect(Collectors.joining("\t\n"));
+		var duplicates=valueDefs.stream()
+		                        .collect(groupingBy(FieldCompiler::unmanagedIndex))
+		                        .values()
+		                        .stream()
+		                        .filter(l->l.size()>1)
+		                        .map(l->l.stream()
+		                                 .map(Method::getName)
+		                                 .collect(joining(", ")))
+		                        .collect(joining("\n\t"));
 		
-		if(!err.isEmpty()){
-			throw new MalformedStruct(type.getSimpleName()+" methods with duplicated indices:\n"+err);
+		if(!duplicates.isEmpty()){
+			throw new MalformedStruct(struct.getType().getSimpleName()+" methods with duplicated indices:\n\t"+duplicates);
 		}
 		
 		for(Method valueMethod : valueDefs){
@@ -109,6 +109,9 @@ public class FieldCompiler{
 				throw new RuntimeException(e);
 			}
 		}));
+	}
+	private static int unmanagedIndex(Method m){
+		return m.getAnnotation(IOValueUnmanaged.class).index();
 	}
 	
 	/**
@@ -145,7 +148,7 @@ public class FieldCompiler{
 			
 			var missingNames=depNames.stream()
 			                         .filter(name->fields.stream().noneMatch(f->f.field.getName().equals(name)))
-			                         .collect(Collectors.joining(", "));
+			                         .collect(joining(", "));
 			if(!missingNames.isEmpty()) throw new IllegalField("Could not find dependencies "+missingNames+" on field "+field.getAccessor());
 			
 			for(String nam : depNames){
@@ -186,10 +189,10 @@ public class FieldCompiler{
 	
 	private static <T extends IOInstance<T>> void generateVirtualFields(List<AnnotatedField<T>> parsed, Struct<T> struct){
 		
-		Map<VirtualFieldDefinition.StoragePool, Integer> accessIndex    =new EnumMap<>(VirtualFieldDefinition.StoragePool.class);
-		Map<VirtualFieldDefinition.StoragePool, Integer> primitiveOffset=new EnumMap<>(VirtualFieldDefinition.StoragePool.class);
-		Map<String, FieldAccessor<T>>                    virtualData    =new HashMap<>();
-		Map<String, FieldAccessor<T>>                    newVirtualData =new HashMap<>();
+		var accessIndex    =new EnumMap<VirtualFieldDefinition.StoragePool, Integer>(VirtualFieldDefinition.StoragePool.class);
+		var primitiveOffset=new EnumMap<VirtualFieldDefinition.StoragePool, Integer>(VirtualFieldDefinition.StoragePool.class);
+		var virtualData    =new HashMap<String, FieldAccessor<T>>();
+		var newVirtualData =new HashMap<String, FieldAccessor<T>>();
 		
 		List<AnnotatedField<T>> toRun=new ArrayList<>(parsed);
 		
@@ -244,23 +247,25 @@ public class FieldCompiler{
 	}
 	
 	
+	protected static IterablePP<Class<?>> deepClasses(Class<?> clazz){
+		return IterablePP.nullTerminated(()->new Supplier<>(){
+			Class<?> c=clazz;
+			@Override
+			public Class<?> get(){
+				if(c==null) return null;
+				var tmp=c;
+				var cp =c.getSuperclass();
+				if(cp!=null&&(cp==IOInstance.class||!IOInstance.isInstance(cp))){
+					cp=null;
+				}
+				c=cp==c?null:cp;
+				
+				return tmp;
+			}
+		});
+	}
 	protected static IterablePP<Field> deepFieldsByAnnotation(Class<?> clazz, Class<? extends Annotation> type){
-		return IterablePP
-			       .nullTerminated(()->new Supplier<Class<?>>(){
-				       Class<?> c=clazz;
-				       @Override
-				       public Class<?> get(){
-					       if(c==null) return null;
-					       var tmp=c;
-					       var cp =c.getSuperclass();
-					       if(cp!=null&&(cp==IOInstance.class||!IOInstance.isInstance(cp))){
-						       cp=null;
-					       }
-					       c=cp==c?null:cp;
-					
-					       return tmp;
-				       }
-			       })
+		return deepClasses(clazz)
 			       .flatMap(c->Arrays.asList(c.getDeclaredFields()).iterator())
 			       .filtered(f->f.isAnnotationPresent(type));
 	}
@@ -346,9 +351,9 @@ public class FieldCompiler{
 		                                                            .flatMap(PairM::<Method>stream)
 		                                                            .noneMatch(mt->mt==m))
 		                               .map(method->method+""+(fields.stream().anyMatch(f->f.getName().equals(method.getName()))?(
-			                               " did you mean "+calcGetPrefixes(method).map(p->p+TextUtil.firstToUpperCase(method.getName())).collect(Collectors.joining(" or "))+"?"
+			                               " did you mean "+calcGetPrefixes(method).map(p->p+TextUtil.firstToUpperCase(method.getName())).collect(joining(" or "))+"?"
 		                               ):""))
-		                               .collect(Collectors.joining("\n"));
+		                               .collect(joining("\n"));
 		if(!unusedWaning.isEmpty()){
 			throw new MalformedStruct("There are unused or invalid methods marked with "+IOValue.class.getSimpleName()+"\n"+unusedWaning);
 		}

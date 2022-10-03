@@ -1,5 +1,6 @@
 package com.lapissea.cfs;
 
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Optional;
@@ -61,6 +62,12 @@ public interface IterablePP<T> extends Iterable<T>{
 		};
 	}
 	
+	default <L> IterablePP<L> flatArray(Function<T, L[]> flatten){
+		return flatMap(e->Arrays.asList(flatten.apply(e)).iterator());
+	}
+	default <L> IterablePP<L> flatData(Function<T, Iterable<L>> flatten){
+		return flatMap(e->flatten.apply(e).iterator());
+	}
 	default <L> IterablePP<L> flatMap(Function<T, Iterator<L>> flatten){
 		var that=this;
 		return ()->new Iterator<L>(){

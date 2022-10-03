@@ -22,7 +22,7 @@ public abstract class StagedInit{
 		}
 	}
 	
-	public static final int ERROR=-2, STATE_NOT_STARTED=-1, STATE_START=0, STATE_DONE=Integer.MAX_VALUE;
+	public static final int STATE_ERROR=-2, STATE_NOT_STARTED=-1, STATE_START=0, STATE_DONE=Integer.MAX_VALUE;
 	
 	private       int       state=STATE_NOT_STARTED;
 	private       Throwable e;
@@ -47,7 +47,7 @@ public abstract class StagedInit{
 				init.run();
 				setInitState(STATE_DONE);
 			}catch(Throwable e){
-				state=ERROR;
+				state=STATE_ERROR;
 				this.e=e;
 				synchronized(lock){
 					lock.notifyAll();
@@ -65,11 +65,11 @@ public abstract class StagedInit{
 	}
 	
 	private void validateNewState(int state){
-		if(state<=this.state){
-			throw new IllegalArgumentException("State must advance");
-		}
 		if(listStates().mapToInt(StateInfo::id).noneMatch(id->id==state)){
 			throw new IllegalArgumentException("Unknown state: "+state);
+		}
+		if(state<=this.state){
+			throw new IllegalArgumentException("State must advance! Current state: "+stateToString(this.state)+", Requested state: "+stateToString(state));
 		}
 	}
 	
@@ -103,7 +103,7 @@ public abstract class StagedInit{
 	
 	public record StateInfo(int id, String name){
 		private static final List<StateInfo> BASE_STATES=List.of(
-			new StateInfo(ERROR, "ERROR"),
+			new StateInfo(STATE_ERROR, "ERROR"),
 			new StateInfo(STATE_NOT_STARTED, "NOT_STARTED"),
 			new StateInfo(STATE_START, "START"),
 			new StateInfo(STATE_DONE, "DONE")

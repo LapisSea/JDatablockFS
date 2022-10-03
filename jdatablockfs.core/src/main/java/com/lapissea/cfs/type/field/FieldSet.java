@@ -5,6 +5,7 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.fields.RefField;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
+import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
 
 import java.util.*;
@@ -213,6 +214,7 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	public Spliterator<IOField<T, ?>> spliterator(){
 		return new FieldSetSpliterator<>(this);
 	}
+	@NotNull
 	@Override
 	public Iterator<IOField<T, ?>> iterator(){
 		return new FieldSetIterator();
