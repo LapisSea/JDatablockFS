@@ -325,13 +325,55 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	
 	protected abstract List<IOField<T, ?>> initFields();
 	
-	@SuppressWarnings("unchecked")
-	protected SizeDescriptor<T> createSizeDescriptor(){
+	
+	protected record SizeGroup<T extends IOInstance<T>>(
+		SizeDescriptor.UnknownNum<T> num,
+		List<IOField<T, ?>> fields
+	){
+		protected SizeGroup(SizeDescriptor.UnknownNum<T> num, List<IOField<T, ?>> fields){
+			this.num=Objects.requireNonNull(num);
+			this.fields=List.copyOf(fields);
+		}
+	}
+	
+	protected record SizeRelationReport<T extends IOInstance<T>>(
+		FieldSet<T> allFields,
+		WordSpace wordSpace,
+		long knownFixed,
+		long min,
+		OptionalLong max,
+		boolean dynamic,
+		List<SizeGroup<T>> sizeGroups,
+		List<IOField<T, ?>> genericUnknown
+	){
+		protected SizeRelationReport(
+			FieldSet<T> allFields, WordSpace wordSpace, long knownFixed, long min, OptionalLong max,
+			boolean dynamic, List<SizeGroup<T>> sizeGroups, List<IOField<T, ?>> genericUnknown
+		){
+			if(min<0) throw new IllegalArgumentException();
+			
+			max.ifPresent(maxV->{
+				if(min>maxV) throw new IllegalStateException("min is greater than max");
+				if(knownFixed>maxV) throw new IllegalStateException("knownFixed is greater than max");
+			});
+			
+			this.allFields=Objects.requireNonNull(allFields);
+			this.wordSpace=Objects.requireNonNull(wordSpace);
+			this.knownFixed=knownFixed;
+			this.min=min;
+			this.max=max;
+			this.dynamic=dynamic;
+			this.sizeGroups=List.copyOf(sizeGroups);
+			this.genericUnknown=List.copyOf(genericUnknown);
+		}
+	}
+	
+	protected SizeRelationReport<T> createSizeReport(int minGroup, boolean ordered){
 		FieldSet<T> fields=getSpecificFields();
 		if(type instanceof Struct.Unmanaged<?> u){
-			FieldSet<T> f=(FieldSet<T>)u.getUnmanagedStaticFields();
-			if(!f.isEmpty()){
-				fields=FieldSet.of(Stream.concat(fields.stream(), f.stream()));
+			var unmanagedStatic=(FieldSet<T>)u.getUnmanagedStaticFields();
+			if(!unmanagedStatic.isEmpty()){
+				fields=FieldSet.of(Stream.concat(fields.stream(), unmanagedStatic.stream()));
 			}
 		}
 		
@@ -339,15 +381,15 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		
 		var hasDynamicFields=type instanceof Struct.Unmanaged<?> u&&u.isOverridingDynamicUnmanaged();
 		
+		
 		if(!hasDynamicFields){
-			
-			var bitSpace=IOFieldTools.sumVarsIfAll(fields, desc->desc.getFixed(wordSpace));
-			if(bitSpace.isPresent()){
-				return SizeDescriptor.Fixed.of(wordSpace, bitSpace.getAsLong());
+			var sumFixedO=IOFieldTools.sumVarsIfAll(fields, desc->desc.getFixed(wordSpace));
+			if(sumFixedO.isPresent()){
+				var sumFixed=sumFixedO.getAsLong();
+				return new SizeRelationReport<>(fields, wordSpace, sumFixed, sumFixed, sumFixedO, false, List.of(), List.of());
 			}
 		}
 		
-		var unknownFields=fields.stream().filter(f->!f.getSizeDescriptor().hasFixed()).toList();
 		var knownFixed=IOFieldTools.sumVars(fields, d->{
 			var fixed=d.getFixed(wordSpace);
 			if(fixed.isPresent()){
@@ -361,36 +403,81 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		var max=hasDynamicFields?OptionalLong.empty():IOFieldTools.sumVarsIfAll(fields, siz->siz.getMax(wordSpace));
 		
 		
-		Map<SizeDescriptor.UnknownNum<T>, List<SizeDescriptor.UnknownNum<T>>> numMap;
-		numMap=unknownFields.stream()
-		                    .filter(f->f.getSizeDescriptor() instanceof SizeDescriptor.UnknownNum)
-		                    .map(f->(SizeDescriptor.UnknownNum<T>)f.getSizeDescriptor())
-		                    .collect(Collectors.groupingBy(f->f));
+		List<SizeGroup<T>> groups;
+		if(ordered){
+			SizeDescriptor.UnknownNum<T> key  =null;
+			List<IOField<T, ?>>          group=new ArrayList<>(4);
+			groups=new ArrayList<>();
+			
+			for(IOField<T, ?> field : fields){
+				if(!(field.getSizeDescriptor() instanceof SizeDescriptor.UnknownNum<T> acc)) continue;
+				
+				if(acc.equals(key)){
+					group.add(field);
+					continue;
+				}
+				
+				if(!group.isEmpty()){
+					groups.add(new SizeGroup<>(key, group));
+					group.clear();
+				}
+				key=acc;
+			}
+			
+		}else{
+			groups=fields.stream()
+			             .filter(f->f.getSizeDescriptor() instanceof SizeDescriptor.UnknownNum)
+			             .collect(Collectors.groupingBy(f->(SizeDescriptor.UnknownNum<T>)f.getSizeDescriptor()))
+			             .entrySet().stream()
+			             .map(e->new SizeGroup<>(e.getKey(), e.getValue()))
+			             .collect(Collectors.toList());
+		}
 		
-		numMap.entrySet().removeIf(e->e.getValue().size()==1);
+		groups.removeIf(e->e.fields.size()<minGroup);
 		
-		var unknownUnknownFields=unknownFields.stream()
-		                                      .filter(f->!numMap.containsKey(f.getSizeDescriptor()))
-		                                      .toList();
+		var groupNumberSet=groups.stream().map(e->e.num).collect(Collectors.toUnmodifiableSet());
+		
+		return new SizeRelationReport<>(
+			fields, wordSpace, knownFixed, min, max, hasDynamicFields,
+			groups,
+			fields.stream()
+			      .filter(f->!f.getSizeDescriptor().hasFixed())
+			      .filter(f->!(f.getSizeDescriptor() instanceof SizeDescriptor.UnknownNum<T> num&&groupNumberSet.contains(num)))
+			      .toList()
+		);
+	}
+	
+	@SuppressWarnings("unchecked")
+	protected SizeDescriptor<T> createSizeDescriptor(){
+		var report=createSizeReport(2, false);
+		
+		if(!report.dynamic&&report.max.orElse(-1)==report.min){
+			return SizeDescriptor.Fixed.of(report.wordSpace, report.min);
+		}
+		
+		var wordSpace     =report.wordSpace;
+		var knownFixed    =report.knownFixed;
+		var genericUnknown=report.genericUnknown;
 		
 		FieldAccessor<T>[] unkownNumAcc;
 		int[]              unkownNumAccMul;
 		
-		if(numMap.isEmpty()){
+		if(report.sizeGroups.isEmpty()){
 			unkownNumAcc=null;
 			unkownNumAccMul=null;
 		}else{
-			unkownNumAcc=new FieldAccessor[numMap.size()];
-			unkownNumAccMul=new int[numMap.size()];
+			unkownNumAcc=new FieldAccessor[report.sizeGroups.size()];
+			unkownNumAccMul=new int[report.sizeGroups.size()];
 			int i=0;
-			for(var e : numMap.entrySet()){
-				unkownNumAcc[i]=e.getKey().getAccessor();
-				unkownNumAccMul[i]=e.getValue().size();
+			for(var e : report.sizeGroups){
+				unkownNumAcc[i]=e.num.getAccessor();
+				unkownNumAccMul[i]=e.fields.size();
 				i++;
 			}
 		}
 		
-		return SizeDescriptor.Unknown.of(wordSpace, min, max, (ioPool, prov, inst)->{
+		
+		return SizeDescriptor.Unknown.of(wordSpace, report.min, report.max, (ioPool, prov, inst)->{
 			checkNull(inst);
 			
 			try{
@@ -401,19 +488,19 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			}catch(IOException e){
 				throw new RuntimeException(e);
 			}
-			var unkownSum=IOFieldTools.sumVars(unknownUnknownFields, d->{
+			var unkownSum=IOFieldTools.sumVars(genericUnknown, d->{
 				return d.calcUnknown(ioPool, prov, inst, wordSpace);
 			});
 			
 			if(unkownNumAcc!=null){
 				for(int i=0;i<unkownNumAcc.length;i++){
-					var  acc=unkownNumAcc[i];
-					var  num=(NumberSize)acc.get(ioPool, inst);
-					long mul=unkownNumAccMul[i];
+					var  accessor  =unkownNumAcc[i];
+					var  numberSize=(NumberSize)accessor.get(ioPool, inst);
+					long multiplier=unkownNumAccMul[i];
 					unkownSum+=switch(wordSpace){
-						case BIT -> num.bits();
-						case BYTE -> num.bytes;
-					}*mul;
+						case BIT -> numberSize.bits();
+						case BYTE -> numberSize.bytes;
+					}*multiplier;
 				}
 			}
 			return knownFixed+unkownSum;
