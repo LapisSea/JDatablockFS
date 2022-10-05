@@ -44,8 +44,12 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		Struct<BucketEntry<Object, Object>>     STRUCT=Struct.of((Class<BucketEntry<Object, Object>>)(Object)BucketEntry.class);
 		StructPipe<BucketEntry<Object, Object>> PIPE  =ContiguousStructPipe.of(STRUCT);
 		
-		static <V, K> BucketEntry<K, V> of(K key, V value){
-			var e=(BucketEntry<K, V>)STRUCT.make();
+		static <K, V> BucketEntry<K, V> of(){
+			return (BucketEntry<K, V>)STRUCT.make();
+		}
+		
+		static <K, V> BucketEntry<K, V> of(K key, V value){
+			var e=BucketEntry.<K, V>of();
 			e.set(key, value);
 			return e;
 		}
@@ -370,7 +374,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 			             .orElseThrow();
 		}
 		
-		BucketEntry<K, V> be=BucketEntry.of(null, null);
+		var be=BucketEntry.<K, V>of();
 		if(!n.readValueField(be, keyVar)) return new KeyResult<>(null, false);
 		return new KeyResult<>(be.key(), true);
 	}

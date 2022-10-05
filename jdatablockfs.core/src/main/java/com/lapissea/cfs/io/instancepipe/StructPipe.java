@@ -682,8 +682,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	}
 	
 	private record IODependency<T extends IOInstance<T>>(
-		List<IOField<T, ?>> writeFields,
-		List<IOField<T, ?>> readFields,
+		FieldSet<T> writeFields,
+		FieldSet<T> readFields,
 		List<IOField.ValueGeneratorInfo<T, ?>> generators
 	){}
 	
@@ -763,7 +763,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		);
 	}
 	
-	private List<IOField<T, ?>> fieldSetToOrderedList(Set<IOField<T, ?>> fieldsSet){
+	private FieldSet<T> fieldSetToOrderedList(Set<IOField<T, ?>> fieldsSet){
 		List<IOField<T, ?>> result=new ArrayList<>(fieldsSet.size());
 		for(IOField<T, ?> f : getSpecificFields()){
 			var iter      =f.streamUnpackedFields().iterator();
@@ -780,7 +780,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		if(!fieldsSet.isEmpty()){
 			throw new IllegalStateException(fieldsSet+"");
 		}
-		return List.copyOf(result);
+		return FieldSet.of(result);
 	}
 	
 	
@@ -843,6 +843,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		var deps      =getDeps(selectedField);
 		var fields    =deps.readFields;
 		int checkIndex=0;
+		int limit     =fields.size();
 		
 		for(IOField<T, ?> field : getSpecificFields()){
 			if(fields.get(checkIndex)==field){
@@ -854,7 +855,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 					field.readReported(ioPool, provider, src, instance, genericContext);
 				}
 				
-				if(checkIndex==fields.size()){
+				if(checkIndex==limit){
 					return;
 				}
 				

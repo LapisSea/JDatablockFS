@@ -43,7 +43,7 @@ import static java.lang.reflect.Modifier.isStatic;
 public class DefInstanceCompiler{
 	
 	private static final boolean PRINT_BYTECODE=GlobalConfig.configFlag("classGen.printBytecode", false);
-	private static final boolean EXIT_ON_FAIL  =GlobalConfig.configFlag("classGen.exitOnFail", false);
+	private static final boolean EXIT_ON_FAIL  =GlobalConfig.configFlag("classGen.exitOnFail", !GlobalConfig.RELEASE_MODE);
 	
 	private record Specials(
 		Optional<Method> set,

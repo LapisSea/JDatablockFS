@@ -161,7 +161,7 @@ public class SlowTests{
 	}
 	
 	
-	@DataProvider(name="comps")
+	@DataProvider(name="comps", parallel=true)
 	Object[][] comps(){
 		return Arrays.stream(IOCompression.Type.values()).map(t->new Object[]{t}).toArray(Object[][]::new);
 	}
