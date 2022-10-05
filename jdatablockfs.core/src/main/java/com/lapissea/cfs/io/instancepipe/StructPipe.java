@@ -861,7 +861,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				continue;
 			}
 			
-			field.skipReadReported(ioPool, provider, src, instance, genericContext);
+			field.skipReported(ioPool, provider, src, instance, genericContext);
 		}
 		throw new IllegalArgumentException(selectedField+" is not listed!");
 	}

@@ -88,8 +88,11 @@ public class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends NullFlag
 	}
 	
 	@Override
-	public void skipRead(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
-		readNew(ioPool, provider, src, instance, genericContext);
+	public void skip(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
+		if(nullable()){
+			if(getIsNull(ioPool, instance)) return;
+		}
+		AutoText.PIPE.skip(provider, src, genericContext);
 	}
 	
 	@Override

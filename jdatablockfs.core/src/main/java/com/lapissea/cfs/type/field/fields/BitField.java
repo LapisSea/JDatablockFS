@@ -49,7 +49,7 @@ public abstract class BitField<T extends IOInstance<T>, Type> extends IOField<T,
 	
 	@Deprecated
 	@Override
-	public final void skipRead(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public final void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		if(src.optionallySkipExact(getSizeDescriptor().getFixed(WordSpace.BYTE))){
 			return;
 		}

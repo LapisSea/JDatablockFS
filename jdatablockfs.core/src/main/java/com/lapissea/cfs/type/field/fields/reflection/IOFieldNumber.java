@@ -72,9 +72,9 @@ public class IOFieldNumber<T extends IOInstance<T>, E extends INumber> extends I
 		set(ioPool, instance, constructor.apply(size.read(src)));
 	}
 	@Override
-	public void skipRead(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		var size=getSize(ioPool, instance);
-		size.read(src);
+		size.skip(src);
 	}
 	
 	@Override

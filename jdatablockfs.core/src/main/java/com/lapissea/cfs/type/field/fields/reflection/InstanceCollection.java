@@ -109,7 +109,7 @@ public class InstanceCollection{
 		}
 		
 		@Override
-		public void skipRead(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		public void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			if(nullable()){
 				if(getIsNull(ioPool, instance)){
 					return;
@@ -158,15 +158,22 @@ public class InstanceCollection{
 					dataAdapter.writeData(instance, provider, dest);
 				}
 				@Override
+				public void skip(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+					var size=readSiz(src);
+					dataAdapter.skipData(size, provider, src, genericContext);
+				}
+				@Override
 				public CollectionType read(DataProvider provider, ContentReader src, CollectionType instance, GenericContext genericContext) throws IOException{
-					var sizSiz=FlagReader.readSingle(src, NumberSize.FLAG_INFO);
-					int size  =(int)sizSiz.read(src);
+					int size=readSiz(src);
 					return dataAdapter.readData(size, provider, src, genericContext);
+				}
+				private int readSiz(ContentReader src) throws IOException{
+					var sizSiz=FlagReader.readSingle(src, NumberSize.FLAG_INFO);
+					return (int)sizSiz.read(src);
 				}
 				@Override
 				public CollectionType readNew(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
-					var sizSiz=FlagReader.readSingle(src, NumberSize.FLAG_INFO);
-					int size  =(int)sizSiz.read(src);
+					int size=readSiz(src);
 					return dataAdapter.readData(size, provider, src, genericContext);
 				}
 				@Override
@@ -263,7 +270,7 @@ public class InstanceCollection{
 		}
 		
 		@Override
-		public void skipRead(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		public void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 			//nothing to do. Reference field stores the actual pointer
 		}
 		
@@ -446,18 +453,19 @@ public class InstanceCollection{
 		}
 		
 		private void skipReadData(IOField<T, Integer> collectionSize, VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-			
-			var pip=getValPipe();
-			
-			int size            =collectionSize.get(ioPool, instance);
-			var fixedElementSize=pip.getSizeDescriptor().getFixed(WordSpace.BYTE);
-			if(fixedElementSize.isPresent()){
-				src.skipExact(size*fixedElementSize.getAsLong());
-				return;
-			}
-			ElementType inst=pip.getType().make();
-			for(int i=0;i<size;i++){
-				pip.read(provider, src, inst, genericContext);
+			int size=collectionSize.get(ioPool, instance);
+			skipData(size, provider, src, genericContext);
+		}
+		
+		protected void skipData(int size, DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+			var pip  =getValPipe();
+			var fixed=pip.getSizeDescriptor().getFixed(WordSpace.BYTE);
+			if(fixed.isPresent()){
+				src.skipExact(size*fixed.getAsLong());
+			}else{
+				for(int i=0;i<size;i++){
+					pip.skip(provider, src, genericContext);
+				}
 			}
 		}
 		

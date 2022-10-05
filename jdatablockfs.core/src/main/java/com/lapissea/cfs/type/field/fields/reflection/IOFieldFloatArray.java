@@ -53,7 +53,7 @@ public class IOFieldFloatArray<T extends IOInstance<T>> extends IOField<T, float
 	}
 	
 	@Override
-	public void skipRead(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		int size=arraySize.getValue(ioPool, instance);
 		src.skipExact(size*4L);
 	}

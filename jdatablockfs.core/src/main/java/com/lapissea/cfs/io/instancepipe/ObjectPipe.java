@@ -14,6 +14,7 @@ import java.io.IOException;
 public interface ObjectPipe<T, PoolType>{
 	
 	void write(DataProvider provider, ContentWriter dest, T instance) throws IOException;
+	void skip(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException;
 	T read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException;
 	T readNew(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException;
 	BasicSizeDescriptor<T, PoolType> getSizeDescriptor();

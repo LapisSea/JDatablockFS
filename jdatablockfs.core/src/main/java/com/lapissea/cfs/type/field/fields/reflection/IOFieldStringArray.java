@@ -67,7 +67,10 @@ public class IOFieldStringArray<T extends IOInstance<T>> extends IOField<T, Stri
 	}
 	
 	@Override
-	public void skipRead(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		readReported(ioPool, provider, src, instance, genericContext);
+	public void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		int size=arraySize.getValue(ioPool, instance);
+		for(int i=0;i<size;i++){
+			AutoText.PIPE.skip(provider, src, null);
+		}
 	}
 }

@@ -382,12 +382,12 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		}
 		
 		if(typ==String.class){
-			AutoText.PIPE.readNew(provider, src, genericContext);
+			AutoText.PIPE.skip(provider, src, genericContext);
 			return;
 		}
 		if(IOInstance.isInstance(typ)){
 			if(IOInstance.isUnmanaged(typ)){
-				REF_PIPE.readNew(provider, src, genericContext);
+				REF_PIPE.skip(provider, src, genericContext);
 			}else{
 				skipReadStruct(provider, src, genericContext, Struct.ofUnknown(typ));
 			}
@@ -406,7 +406,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		if(src.optionallySkipExact(pipe.getSizeDescriptor().getFixed(WordSpace.BYTE))){
 			return;
 		}
-		pipe.readNew(provider, src, genericContext);
+		pipe.skip(provider, src, genericContext);
 	}
 	
 	@Override
@@ -487,7 +487,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 	}
 	
 	@Override
-	public void skipRead(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
+	public void skip(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
 		if(nullable()){
 			if(getIsNull(ioPool, instance)){
 				return;

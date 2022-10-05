@@ -131,6 +131,10 @@ public enum NumberSize{
 		};
 	}
 	
+	public void skip(ContentReader in) throws IOException{
+		in.skipExact(bytes);
+	}
+	
 	public long readSigned(ContentReader in) throws IOException{
 		return toSigned(read(in));
 	}

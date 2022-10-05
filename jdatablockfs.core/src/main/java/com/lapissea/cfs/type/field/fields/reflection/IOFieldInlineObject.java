@@ -101,7 +101,7 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 			boolean isNull=getIsNull(ioPool, instance);
 			if(isNull){
 				if(fixed){
-					src.readInts1((int)getSizeDescriptor().requireFixed(WordSpace.BYTE));
+					src.skipExact((int)getSizeDescriptor().requireFixed(WordSpace.BYTE));
 				}
 				return null;
 			}
@@ -116,11 +116,20 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 	}
 	
 	@Override
-	public void skipRead(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
+	public void skip(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
 		if(src.optionallySkipExact(descriptor.getFixed(WordSpace.BYTE))){
 			return;
 		}
 		
-		readNew(ioPool, provider, src, instance, genericContext);
+		if(nullable()){
+			boolean isNull=getIsNull(ioPool, instance);
+			if(isNull){
+				if(fixed){
+					src.skipExact((int)getSizeDescriptor().requireFixed(WordSpace.BYTE));
+				}
+				return;
+			}
+		}
+		instancePipe.skip(provider, src, genericContext);
 	}
 }

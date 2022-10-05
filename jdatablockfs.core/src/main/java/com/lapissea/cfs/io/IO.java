@@ -15,7 +15,7 @@ public interface IO<T extends IOInstance<T>>{
 	@Nullable
 	void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException;
 	void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException;
-	void skipRead(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException;
+	void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException;
 	
 	interface DisabledIO<T extends IOInstance<T>> extends IO<T>{
 		@Override
@@ -27,7 +27,7 @@ public interface IO<T extends IOInstance<T>>{
 			throw new UnsupportedOperationException();
 		}
 		@Override
-		default void skipRead(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext){
+		default void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext){
 			throw new UnsupportedOperationException();
 		}
 	}

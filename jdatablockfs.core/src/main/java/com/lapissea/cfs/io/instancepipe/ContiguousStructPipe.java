@@ -58,4 +58,9 @@ public class ContiguousStructPipe<T extends IOInstance<T>> extends StructPipe<T>
 		readIOFields(getSpecificFields(), ioPool, provider, src, instance, genericContext);
 		return instance;
 	}
+	
+	@Override
+	public void skip(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+		readNew(provider, src, genericContext);
+	}
 }

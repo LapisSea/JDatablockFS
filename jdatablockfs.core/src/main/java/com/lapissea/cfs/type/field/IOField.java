@@ -177,17 +177,17 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 		}
 	}
 	
-	public final void skipReadReported(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public final void skipReported(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		try{
 			if(STAT_LOGGING) logStart(SKIP_READ_ACTION, uid());
-			skipRead(ioPool, provider, src, instance, genericContext);
+			skip(ioPool, provider, src, instance, genericContext);
 			if(STAT_LOGGING) logEnd(SKIP_READ_ACTION, uid());
 		}catch(Exception e){
-			throw reportSkipReadFail(this, e);
+			throw reportSkipFail(this, e);
 		}
 	}
 	
-	protected IOException reportSkipReadFail(IOField<T, ?> fi, Exception e) throws IOException{
+	protected IOException reportSkipFail(IOField<T, ?> fi, Exception e) throws IOException{
 		throw new IOException("Failed to skip read "+fi, e);
 	}
 	

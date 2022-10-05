@@ -130,4 +130,9 @@ public class FixedContiguousStructPipe<T extends IOInstance<T>> extends StructPi
 		readIOFields(getSpecificFields(), ioPool, provider, src, instance, genericContext);
 		return instance;
 	}
+	
+	@Override
+	public void skip(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+		src.skipExact(getFixedDescriptor().get());
+	}
 }

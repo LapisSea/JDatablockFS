@@ -605,9 +605,9 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	}
 	
 	@Override
-	public void skipRead(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		var size=getSize(ioPool, instance);
-		src.skipExact(size.bytes);
+		size.skip(src);
 	}
 	
 	protected EnumSet<NumberSize> allowedSizes(){
