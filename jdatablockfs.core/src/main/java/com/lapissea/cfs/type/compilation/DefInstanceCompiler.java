@@ -228,7 +228,7 @@ public class DefInstanceCompiler{
 			                                   .toList())
 			                  .or(()->fieldInfo.size()>1?Optional.empty():Optional.of(fieldInfo));
 		
-		checkClass(interf, specials, fieldInfo, orderedFields);
+		checkClass(interf, specials, orderedFields);
 		
 		checkTypes(fieldInfo);
 		checkAnnotations(fieldInfo);
@@ -260,7 +260,7 @@ public class DefInstanceCompiler{
 		}
 	}
 	
-	private static <T extends IOInstance<T>> void checkClass(Class<T> interf, Specials specials, List<FieldInfo> fields, Optional<List<FieldInfo>> oOrderedFields){
+	private static <T extends IOInstance<T>> void checkClass(Class<T> interf, Specials specials, Optional<List<FieldInfo>> oOrderedFields){
 		
 		if(specials.set.isPresent()){
 			var set=specials.set.get();

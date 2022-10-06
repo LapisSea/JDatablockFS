@@ -397,6 +397,7 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 		
 		return transferTo(out, buffSize);
 	}
+	@Override
 	default long transferTo(OutputStream out) throws IOException{
 		int buffSize=8192;
 		

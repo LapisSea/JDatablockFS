@@ -156,7 +156,6 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 	}
 	
 	
-	@Nullable
 	public final void writeReported(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		try{
 			if(STAT_LOGGING) logStart(WRITE_ACTION, uid());

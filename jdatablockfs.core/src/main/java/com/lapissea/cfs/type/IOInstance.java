@@ -22,6 +22,7 @@ import java.lang.annotation.Target;
 import java.lang.invoke.MethodHandle;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
@@ -72,6 +73,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		static <T extends Def<T>> NewObj<T> constrRef(Class<T> type){
 			return Struct.of(type).emptyConstructor();
 		}
+		
 		static <T extends Def<T>, A1> Function<A1, T> constrRef(Class<T> type, Class<A1> arg1Type){
 			record Sig(Class<?> c, Class<?> arg){}
 			class Cache{
@@ -84,6 +86,24 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 				try{
 					var ctor=t.c.getConstructor(t.arg);
 					return Access.makeLambda(ctor, Function.class);
+				}catch(ReflectiveOperationException e){
+					throw new RuntimeException(e);
+				}
+			});
+		}
+		
+		static <T extends Def<T>, A1, A2> BiFunction<A1, A2, T> constrRef(Class<T> type, Class<A1> arg1Type, Class<A1> arg2Type){
+			record Sig(Class<?> c, Class<?> arg1, Class<?> arg2){}
+			class Cache{
+				static final Map<Sig, BiFunction<?, ?, ?>> CH=new ConcurrentHashMap<>();
+			}
+			if(DefInstanceCompiler.isDefinition(type)) type=DefInstanceCompiler.getImpl(type, false);
+			
+			//noinspection unchecked
+			return (BiFunction<A1, A2, T>)Cache.CH.computeIfAbsent(new Sig(type, arg1Type, arg2Type), t->{
+				try{
+					var ctor=t.c.getConstructor(t.arg1, t.arg2);
+					return Access.makeLambda(ctor, BiFunction.class);
 				}catch(ReflectiveOperationException e){
 					throw new RuntimeException(e);
 				}
