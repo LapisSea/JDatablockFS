@@ -183,14 +183,9 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 			skip(ioPool, provider, src, instance, genericContext);
 			if(STAT_LOGGING) logEnd(SKIP_READ_ACTION, uid());
 		}catch(Exception e){
-			throw reportSkipFail(this, e);
+			throw new IOException("Failed to skip read "+this, e);
 		}
 	}
-	
-	protected IOException reportSkipFail(IOField<T, ?> fi, Exception e) throws IOException{
-		throw new IOException("Failed to skip read "+fi, e);
-	}
-	
 	
 	/**
 	 * @return string of the resolved value or no value if string has no substance

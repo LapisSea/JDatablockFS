@@ -239,7 +239,7 @@ public class DefInstanceCompiler{
 			impl=generateImpl(key, specials, fieldInfo, orderedFields);
 		}catch(Throwable e){
 			if(EXIT_ON_FAIL){
-				e.printStackTrace();
+				new RuntimeException("failed to compile "+interf.getName(), e).printStackTrace();
 				System.exit(1);
 			}
 			throw e;
