@@ -418,10 +418,18 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				}
 				
 				if(!group.isEmpty()){
-					groups.add(new SizeGroup<>(key, group));
+					if(group.size()>=minGroup){
+						groups.add(new SizeGroup<>(key, group));
+					}
 					group.clear();
 				}
 				key=acc;
+				group.add(field);
+			}
+			if(!group.isEmpty()){
+				if(group.size()>=minGroup){
+					groups.add(new SizeGroup<>(key, group));
+				}
 			}
 			
 		}else{
@@ -429,11 +437,10 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			             .filter(f->f.getSizeDescriptor() instanceof SizeDescriptor.UnknownNum)
 			             .collect(Collectors.groupingBy(f->(SizeDescriptor.UnknownNum<T>)f.getSizeDescriptor()))
 			             .entrySet().stream()
+			             .filter(e->e.getValue().size()>=minGroup)
 			             .map(e->new SizeGroup<>(e.getKey(), e.getValue()))
 			             .collect(Collectors.toList());
 		}
-		
-		groups.removeIf(e->e.fields.size()<minGroup);
 		
 		var groupNumberSet=groups.stream().map(e->e.num).collect(Collectors.toUnmodifiableSet());
 		
@@ -721,7 +728,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		while(shouldRun){
 			shouldRun=false;
 			
-			for(IOField<T, ?> field : new HashSet<>(selectedWriteFieldsSet)){
+			for(IOField<T, ?> field : List.copyOf(selectedWriteFieldsSet)){
 				if(field.hasDependencies()){
 					if(selectedWriteFieldsSet.addAll(field.getDependencies())) shouldRun=true;
 				}
@@ -732,20 +739,45 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 					}
 				}
 			}
-			for(IOField<T, ?> field : new HashSet<>(selectedReadFieldsSet)){
+			for(IOField<T, ?> field : List.copyOf(selectedReadFieldsSet)){
 				if(field.hasDependencies()){
 					if(selectedReadFieldsSet.addAll(field.getDependencies())) shouldRun=true;
 				}
 			}
 			
-			for(IOField<T, ?> field : new HashSet<>(selectedWriteFieldsSet)){
+			//Find field and add to read fields when the field is skipped but is a dependency of another
+			// skipped field that may need the dependency to correctly skip
+			skipDependency:
+			for(IOField<T, ?> field : selectedReadFieldsSet){
+				var fields=getSpecificFields();
+				var index =fields.indexOf(field);
+				if(index==-1) continue;
+				
+				var before=new ArrayList<>(fields.subList(0, index));
+				
+				before.removeIf(selectedReadFieldsSet::contains);
+				
+				for(IOField<T, ?> skipped : before){
+					//is skipped field dependency of another skipped field whos size may depend on it.
+					if(before.stream().filter(e->!e.getSizeDescriptor().hasFixed())
+					         .filter(e->e.getDependencies()!=null).flatMap(e->e.getDependencies().stream())
+					         .anyMatch(e->e==skipped)){
+						selectedReadFieldsSet.add(skipped);
+						shouldRun=true;
+						break skipDependency;
+					}
+				}
+				
+			}
+			
+			for(IOField<T, ?> field : List.copyOf(selectedWriteFieldsSet)){
 				if(field.getSizeDescriptor().hasFixed()){
 					continue;
 				}
 				
 				var fields=getSpecificFields();
 				var index =fields.indexOf(field);
-				assert index!=-1;//TODO handle fields in fields
+				if(index==-1) throw new AssertionError();//TODO handle fields in fields
 				for(int i=index+1;i<fields.size();i++){
 					if(selectedWriteFieldsSet.add(fields.get(i))) shouldRun=true;
 				}
