@@ -4,6 +4,7 @@ import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.MalformedStruct;
+import com.lapissea.cfs.exceptions.RecursiveStructCompilation;
 import com.lapissea.cfs.io.bit.FlagReader;
 import com.lapissea.cfs.io.bit.FlagWriter;
 import com.lapissea.cfs.io.content.ContentReader;
@@ -11,6 +12,7 @@ import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.ObjectPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
+import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.GenericContext;
@@ -405,11 +407,15 @@ public class InstanceCollection{
 			if(!IOInstance.isInstance(component)) throw new MalformedStruct(this+" is not of type List<IOInstance>: "+type);
 			if(IOInstance.isUnmanaged(component)) throw new MalformedStruct(this+" element type is unmanaged: "+type);
 			
-			//preload pipe
-			if(TYPE_VALIDATION){
-				runBaseStageTask(this::getValPipe);
-			}else{
-				ContiguousStructPipe.of(component);
+			try{
+				//preload pipe
+				if(TYPE_VALIDATION){
+					runBaseStageTask(this::getValPipe);
+				}else{
+					ContiguousStructPipe.of(component);
+				}
+			}catch(RecursiveStructCompilation e){
+				Log.debug("recursive compilation for {}", component);
 			}
 			
 		}
