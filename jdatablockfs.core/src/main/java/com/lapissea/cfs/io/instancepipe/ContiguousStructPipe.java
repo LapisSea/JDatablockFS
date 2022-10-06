@@ -3,11 +3,14 @@ package com.lapissea.cfs.io.instancepipe;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
+import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.*;
+import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Supplier;
 
@@ -59,8 +62,75 @@ public class ContiguousStructPipe<T extends IOInstance<T>> extends StructPipe<T>
 		return instance;
 	}
 	
+	private sealed interface Cmd{
+		record SkipFixed(long size) implements Cmd{}
+		
+		record Skip() implements Cmd{}
+		
+		record Read() implements Cmd{}
+	}
+	
+	private record SkipData<T extends IOInstance<T>>(FieldSet<T> fields, Cmd[] cmds, boolean makeInst){
+		static final NumberSize[] NONE=new NumberSize[0];
+		
+	}
+	
+	private SkipData<T> skipCache;
+	
+	private SkipData<T> skipData(){
+		var s=skipCache;
+		if(s==null) skipCache=s=calcSkip();
+		return s;
+	}
+	private SkipData<T> calcSkip(){
+		var report=createSizeReport(0);
+		if(report.dynamic()) return null;
+		
+		FieldSet<T> fields=report.allFields();
+		List<Cmd>   cmds  =new ArrayList<>(fields.size());
+		
+		for(IOField<T, ?> field : fields){
+			
+			if(field.streamUnpackedFields().flatMap(fields::streamDependentOn).findAny().isPresent()){
+				cmds.add(new Cmd.Read());
+				continue;
+			}
+			
+			var fixed=field.getSizeDescriptor().getFixed(WordSpace.BYTE);
+			if(fixed.isPresent()){
+				var siz=fixed.getAsLong();
+				if(cmds.get(cmds.size()-1) instanceof Cmd.SkipFixed f){
+					cmds.set(cmds.size()-1, new Cmd.SkipFixed(f.size+siz));
+				}else{
+					cmds.add(new Cmd.SkipFixed(siz));
+				}
+				continue;
+			}
+			
+			cmds.add(new Cmd.Skip());
+		}
+		
+		return new SkipData<>(fields, cmds.toArray(Cmd[]::new), cmds.stream().anyMatch(c->c instanceof Cmd.Skip||c instanceof Cmd.Read));
+	}
+	
 	@Override
 	public void skip(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
-		readNew(provider, src, genericContext);
+		var skip=skipData();
+		if(skip==null){
+			readNew(provider, src, genericContext);
+			return;
+		}
+		
+		var pool=skip.makeInst?makeIOPool():null;
+		var inst=skip.makeInst?getType().make():null;
+		
+		for(int i=0;i<skip.cmds.length;i++){
+			switch(skip.cmds[i]){
+				case Cmd.SkipFixed skipFixed -> src.skipExact(skipFixed.size);
+				case Cmd.Read ignore -> skip.fields.get(i).read(pool, provider, src, inst, genericContext);
+				case Cmd.Skip ignore -> skip.fields.get(i).skip(pool, provider, src, inst, genericContext);
+				case null -> throw new NullPointerException();
+			}
+		}
 	}
 }

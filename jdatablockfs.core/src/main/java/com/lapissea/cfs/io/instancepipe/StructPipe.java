@@ -368,7 +368,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		}
 	}
 	
-	protected SizeRelationReport<T> createSizeReport(int minGroup, boolean ordered){
+	protected SizeRelationReport<T> createSizeReport(int minGroup){
 		FieldSet<T> fields=getSpecificFields();
 		if(type instanceof Struct.Unmanaged<?> u){
 			var unmanagedStatic=(FieldSet<T>)u.getUnmanagedStaticFields();
@@ -403,44 +403,13 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		var max=hasDynamicFields?OptionalLong.empty():IOFieldTools.sumVarsIfAll(fields, siz->siz.getMax(wordSpace));
 		
 		
-		List<SizeGroup<T>> groups;
-		if(ordered){
-			SizeDescriptor.UnknownNum<T> key  =null;
-			List<IOField<T, ?>>          group=new ArrayList<>(4);
-			groups=new ArrayList<>();
-			
-			for(IOField<T, ?> field : fields){
-				if(!(field.getSizeDescriptor() instanceof SizeDescriptor.UnknownNum<T> acc)) continue;
-				
-				if(acc.equals(key)){
-					group.add(field);
-					continue;
-				}
-				
-				if(!group.isEmpty()){
-					if(group.size()>=minGroup){
-						groups.add(new SizeGroup<>(key, group));
-					}
-					group.clear();
-				}
-				key=acc;
-				group.add(field);
-			}
-			if(!group.isEmpty()){
-				if(group.size()>=minGroup){
-					groups.add(new SizeGroup<>(key, group));
-				}
-			}
-			
-		}else{
-			groups=fields.stream()
-			             .filter(f->f.getSizeDescriptor() instanceof SizeDescriptor.UnknownNum)
-			             .collect(Collectors.groupingBy(f->(SizeDescriptor.UnknownNum<T>)f.getSizeDescriptor()))
-			             .entrySet().stream()
-			             .filter(e->e.getValue().size()>=minGroup)
-			             .map(e->new SizeGroup<>(e.getKey(), e.getValue()))
-			             .collect(Collectors.toList());
-		}
+		var groups=fields.stream()
+		                 .filter(f->f.getSizeDescriptor() instanceof SizeDescriptor.UnknownNum)
+		                 .collect(Collectors.groupingBy(f->(SizeDescriptor.UnknownNum<T>)f.getSizeDescriptor()))
+		                 .entrySet().stream()
+		                 .filter(e->e.getValue().size()>=minGroup)
+		                 .map(e->new SizeGroup<>(e.getKey(), e.getValue()))
+		                 .collect(Collectors.toList());
 		
 		var groupNumberSet=groups.stream().map(e->e.num).collect(Collectors.toUnmodifiableSet());
 		
@@ -456,7 +425,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	
 	@SuppressWarnings("unchecked")
 	protected SizeDescriptor<T> createSizeDescriptor(){
-		var report=createSizeReport(2, false);
+		var report=createSizeReport(2);
 		
 		if(!report.dynamic&&report.max.orElse(-1)==report.min){
 			return SizeDescriptor.Fixed.of(report.wordSpace, report.min);
@@ -688,7 +657,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		}
 	}
 	
-	private record IODependency<T extends IOInstance<T>>(
+	protected record IODependency<T extends IOInstance<T>>(
 		FieldSet<T> writeFields,
 		FieldSet<T> readFields,
 		List<IOField.ValueGeneratorInfo<T, ?>> generators
@@ -697,7 +666,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	private final Map<IOField<T, ?>, IODependency<T>> singleDependencyCache    =new HashMap<>();
 	private final ReadWriteLock                       singleDependencyCacheLock=new ReentrantReadWriteLock();
 	
-	private IODependency<T> getDeps(IOField<T, ?> selectedField){
+	protected IODependency<T> getDeps(IOField<T, ?> selectedField){
 		var r=singleDependencyCacheLock.readLock();
 		r.lock();
 		try{

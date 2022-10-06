@@ -366,7 +366,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		
 		throw new NotImplementedException(typ+"");
 	}
-	private void skipReadTyp(TypeLink typDef, DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+	private void skipTyp(TypeLink typDef, DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
 		var        typ=typDef.getTypeClass(provider.getTypeDb());
 		NumberSize siz=null;
 		if(typ==Boolean.class) siz=NumberSize.BYTE;
@@ -389,8 +389,9 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 			if(IOInstance.isUnmanaged(typ)){
 				REF_PIPE.skip(provider, src, genericContext);
 			}else{
-				skipReadStruct(provider, src, genericContext, Struct.ofUnknown(typ));
+				skipStruct(provider, src, genericContext, Struct.ofUnknown(typ));
 			}
+			return;
 		}
 		
 		throw new NotImplementedException(typ+"");
@@ -401,7 +402,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		pipe.read(provider, src, inst, genericContext);
 		return inst;
 	}
-	private void skipReadStruct(DataProvider provider, ContentReader src, GenericContext genericContext, Struct<?> struct) throws IOException{
+	private void skipStruct(DataProvider provider, ContentReader src, GenericContext genericContext, Struct<?> struct) throws IOException{
 		var pipe=ContiguousStructPipe.of(struct);
 		if(src.optionallySkipExact(pipe.getSizeDescriptor().getFixed(WordSpace.BYTE))){
 			return;
@@ -495,6 +496,6 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		}
 		
 		TypeLink typ=getType(ioPool, provider, instance);
-		skipReadTyp(typ, provider, src, genericContext);
+		skipTyp(typ, provider, src, genericContext);
 	}
 }
