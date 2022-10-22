@@ -48,7 +48,7 @@ public @interface IOValue{
 				IO, IOFieldTools.makeCollectionLenName(field), int.class,
 				(VirtualFieldDefinition.GetterFilter.I<T>)(ioPool, instance, dependencies, value)->{
 					if(value>0) return value;
-					var arr=field.get(ioPool, instance);
+					var arr=instance==null?null:field.get(ioPool, instance);
 					if(arr!=null){
 						if(isList) return ((List<?>)arr).size();
 						return Array.getLength(arr);

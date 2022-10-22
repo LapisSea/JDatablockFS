@@ -1,18 +1,21 @@
 package com.lapissea.cfs.io.instancepipe;
 
 import com.lapissea.cfs.chunk.DataProvider;
+import com.lapissea.cfs.internal.MemPrimitive;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
-import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
+import com.lapissea.cfs.type.field.access.VirtualAccessor;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Supplier;
+
+import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.INSTANCE;
 
 public class ContiguousStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 	
@@ -62,18 +65,11 @@ public class ContiguousStructPipe<T extends IOInstance<T>> extends StructPipe<T>
 		return instance;
 	}
 	
-	private sealed interface Cmd{
-		record SkipFixed(long size) implements Cmd{}
-		
-		record Skip() implements Cmd{}
-		
-		record Read() implements Cmd{}
-	}
+	private static final int SKIP_FIXED=0;
+	private static final int SKIP      =1;
+	private static final int READ      =2;
 	
-	private record SkipData<T extends IOInstance<T>>(FieldSet<T> fields, Cmd[] cmds, boolean makeInst){
-		static final NumberSize[] NONE=new NumberSize[0];
-		
-	}
+	private record SkipData<T extends IOInstance<T>>(FieldSet<T> fields, byte[] cmds, boolean needsInstance, boolean needsPool){}
 	
 	private SkipData<T> skipCache;
 	
@@ -82,35 +78,92 @@ public class ContiguousStructPipe<T extends IOInstance<T>> extends StructPipe<T>
 		if(s==null) skipCache=s=calcSkip();
 		return s;
 	}
+	
 	private SkipData<T> calcSkip(){
+		interface CmdBuild{
+			boolean needsPool();
+			boolean needsInstance();
+			int siz();
+			void write(int off, byte[] dest);
+			
+			record Skip() implements CmdBuild{
+				@Override
+				public boolean needsPool(){return true;}
+				@Override
+				public boolean needsInstance(){return false;}
+				@Override
+				public int siz(){return 1;}
+				@Override
+				public void write(int off, byte[] dest){
+					dest[off]=SKIP;
+				}
+			}
+			
+			record SkipFixed(long bytes) implements CmdBuild{
+				@Override
+				public boolean needsPool(){return false;}
+				@Override
+				public boolean needsInstance(){return false;}
+				@Override
+				public int siz(){return 9;}
+				@Override
+				public void write(int off, byte[] dest){
+					dest[off]=SKIP_FIXED;
+					MemPrimitive.setLong(dest, off+1, bytes);
+				}
+			}
+			
+			record Read(boolean needsInstance) implements CmdBuild{
+				@Override
+				public boolean needsPool(){return true;}
+				@Override
+				public int siz(){return 1;}
+				@Override
+				public void write(int off, byte[] dest){
+					dest[off]=READ;
+				}
+			}
+		}
+		
 		var report=createSizeReport(0);
 		if(report.dynamic()) return null;
 		
-		FieldSet<T> fields=report.allFields();
-		List<Cmd>   cmds  =new ArrayList<>(fields.size());
+		FieldSet<T>    fields=report.allFields();
+		List<CmdBuild> cmds  =new ArrayList<>(fields.size());
 		
 		for(IOField<T, ?> field : fields){
+			var needsInstance=!field.streamUnpackedFields().allMatch(f->f.getAccessor() instanceof VirtualAccessor<T> acc&&acc.getStoragePool()!=INSTANCE);
 			
 			if(field.streamUnpackedFields().flatMap(fields::streamDependentOn).findAny().isPresent()){
-				cmds.add(new Cmd.Read());
+				cmds.add(new CmdBuild.Read(needsInstance));
 				continue;
 			}
 			
 			var fixed=field.getSizeDescriptor().getFixed(WordSpace.BYTE);
 			if(fixed.isPresent()){
 				var siz=fixed.getAsLong();
-				if(cmds.get(cmds.size()-1) instanceof Cmd.SkipFixed f){
-					cmds.set(cmds.size()-1, new Cmd.SkipFixed(f.size+siz));
+				if(!cmds.isEmpty()&&cmds.get(cmds.size()-1) instanceof CmdBuild.SkipFixed f){
+					cmds.set(cmds.size()-1, new CmdBuild.SkipFixed(f.bytes+siz));
 				}else{
-					cmds.add(new Cmd.SkipFixed(siz));
+					cmds.add(new CmdBuild.SkipFixed(siz));
 				}
 				continue;
 			}
 			
-			cmds.add(new Cmd.Skip());
+			cmds.add(new CmdBuild.Skip());
 		}
 		
-		return new SkipData<>(fields, cmds.toArray(Cmd[]::new), cmds.stream().anyMatch(c->c instanceof Cmd.Skip||c instanceof Cmd.Read));
+		var buff=new byte[cmds.stream().mapToInt(CmdBuild::siz).sum()];
+		var pos =0;
+		for(var c : cmds){
+			c.write(pos, buff);
+			pos+=c.siz();
+		}
+		
+		boolean needsInstance=cmds.stream().anyMatch(CmdBuild::needsInstance);
+		boolean needsPool    =cmds.stream().anyMatch(CmdBuild::needsPool)&&makeIOPool()!=null;
+		
+		return new SkipData<>(fields, buff, needsInstance, needsPool);
 	}
 	
 	@Override
@@ -121,15 +174,16 @@ public class ContiguousStructPipe<T extends IOInstance<T>> extends StructPipe<T>
 			return;
 		}
 		
-		var pool=skip.makeInst?makeIOPool():null;
-		var inst=skip.makeInst?getType().make():null;
+		var pool=skip.needsPool?makeIOPool():null;
+		var inst=skip.needsInstance?getType().make():null;
 		
-		for(int i=0;i<skip.cmds.length;i++){
-			switch(skip.cmds[i]){
-				case Cmd.SkipFixed skipFixed -> src.skipExact(skipFixed.size);
-				case Cmd.Read ignore -> skip.fields.get(i).read(pool, provider, src, inst, genericContext);
-				case Cmd.Skip ignore -> skip.fields.get(i).skip(pool, provider, src, inst, genericContext);
-				case null -> throw new NullPointerException();
+		var cmds=skip.cmds;
+		for(int f=0, c=0;c<cmds.length;f++){
+			switch(cmds[c++]){
+				case SKIP_FIXED -> src.skipExact(MemPrimitive.getLong(cmds, (c+=8)-8));
+				case READ -> skip.fields.get(f).read(pool, provider, src, inst, genericContext);
+				case SKIP -> skip.fields.get(f).skip(pool, provider, src, inst, genericContext);
+				default -> throw new IllegalStateException();
 			}
 		}
 	}
