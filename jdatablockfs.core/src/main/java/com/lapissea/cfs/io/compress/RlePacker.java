@@ -30,6 +30,7 @@ public final class RlePacker implements Packer{
 			for(int i=0;i<data.length;i++){
 				byte b=data[i];
 				int  j=i+1;
+				//Check the i'th byte and walk until the end or change of byte
 				for(;j<data.length;j++){
 					if(data[j]!=b) break;
 				}
@@ -37,6 +38,7 @@ public final class RlePacker implements Packer{
 				
 				if(repeats<=2){
 					var last=b;
+					//Continue walking on j from i until data stops changing. This marks the end of a raw block
 					for(;j<data.length;j++){
 						var d1=data[j];
 						if(d1==last){
@@ -46,6 +48,8 @@ public final class RlePacker implements Packer{
 					}
 					var len  =j-i;
 					var start=j-len;
+					
+					//Optimized final raw block flush. Remove need for array copy in makeFinal
 					if(j==data.length&&rawSize==0){
 						var siz    =NumberSize.bySize(len);
 						var needed =1+siz.bytes+len;
@@ -61,6 +65,8 @@ public final class RlePacker implements Packer{
 						System.arraycopy(data, start, packed, pos, len);
 						return makeFinal();
 					}
+					
+					//append raw block
 					if(raw.length<len+rawSize) raw=Arrays.copyOf(raw, Math.max(raw.length*2, len+rawSize));
 					System.arraycopy(data, start, raw, rawSize, len);
 					rawSize+=len;
@@ -190,6 +196,8 @@ public final class RlePacker implements Packer{
 		private int    packedPos=0;
 		
 		private byte[] decompress(){
+			//2 pass scan. First scan for size of compressed array then create it.
+			// Apparently faster in benchmarks
 			int size=scanSize();
 			raw=new byte[size];
 			
