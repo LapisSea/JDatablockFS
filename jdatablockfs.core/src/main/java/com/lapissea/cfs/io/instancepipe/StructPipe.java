@@ -191,7 +191,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	
 	private List<IOField.ValueGeneratorInfo<T, ?>> generators;
 	
-	public static final int STATE_IO_FIELD=1;
+	public static final int STATE_IO_FIELD=1, STATE_SIZE_DESC=2;
 	
 	public StructPipe(Struct<T> type, boolean runNow){
 		this.type=type;
@@ -199,8 +199,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			this.ioFields=FieldSet.of(initFields());
 			setInitState(STATE_IO_FIELD);
 			
-			type.waitForState(STATE_DONE);
 			sizeDescription=Objects.requireNonNull(createSizeDescriptor());
+			setInitState(STATE_SIZE_DESC);
 			generators=Utils.nullIfEmpty(ioFields.stream().flatMap(IOField::generatorStream).toList());
 			referenceWalkCommands=generateReferenceWalkCommands();
 			earlyNullChecks=Utils.nullIfEmpty(
@@ -315,7 +315,10 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	protected Stream<StateInfo> listStates(){
 		return Stream.concat(
 			super.listStates(),
-			Stream.of(new StateInfo(STATE_IO_FIELD, "IO_FIELD"))
+			Stream.of(
+				new StateInfo(STATE_IO_FIELD, "IO_FIELD"),
+				new StateInfo(STATE_SIZE_DESC, "SIZE_DESC")
+			)
 		);
 	}
 	
@@ -535,13 +538,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	
 	@Override
 	public final SizeDescriptor<T> getSizeDescriptor(){
-		if(sizeDescription==null){
-			waitForState(STATE_DONE);
-			if(sizeDescription==null){
-				waitForState(STATE_DONE);
-			}
-			if(sizeDescription==null) throw new IllegalStateException();
-		}
+		waitForState(STATE_SIZE_DESC);
 		return sizeDescription;
 	}
 	
