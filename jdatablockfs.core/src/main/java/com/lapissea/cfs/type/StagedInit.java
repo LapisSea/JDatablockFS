@@ -73,6 +73,22 @@ public abstract class StagedInit{
 		}
 	}
 	
+	public record Timing(StagedInit owner, double ms, int from, int to){
+		@Override
+		public String toString(){
+			return "{"+owner.stateToString(from)+"..."+owner.stateToString(to)+" - "+ms+"}";
+		}
+	}
+	
+	public final Timing waitForStateTimed(int state){
+		if(this.state>=state) return null;
+		var t1  =System.nanoTime();
+		var from=getEstimatedState();
+		waitForState0(state);
+		var t2=System.nanoTime();
+		var to=getEstimatedState();
+		return new Timing(this, (t2-t1)/1000000D, from, to);
+	}
 	public final void waitForState(int state){
 		if(this.state>=state) return;
 		waitForState0(state);

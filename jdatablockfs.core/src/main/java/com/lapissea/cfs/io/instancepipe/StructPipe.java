@@ -381,6 +381,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		
 		var hasDynamicFields=type instanceof Struct.Unmanaged<?> u&&u.isOverridingDynamicUnmanaged();
 		
+		type.waitForState(STATE_DONE);
 		
 		if(!hasDynamicFields){
 			var sumFixedO=IOFieldTools.sumVarsIfAll(fields, desc->desc.getFixed(wordSpace));
@@ -456,14 +457,16 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		return SizeDescriptor.Unknown.of(wordSpace, report.min, report.max, (ioPool, prov, inst)->{
 			checkNull(inst);
 			
-			try{
-				waitForState(STATE_DONE);
-				if(generators!=null){
+			waitForState(STATE_DONE);
+			
+			if(generators!=null){
+				try{
 					generateAll(ioPool, prov, inst, false);
+				}catch(IOException e){
+					throw new RuntimeException(e);
 				}
-			}catch(IOException e){
-				throw new RuntimeException(e);
 			}
+			
 			var unkownSum=IOFieldTools.sumVars(genericUnknown, d->{
 				return d.calcUnknown(ioPool, prov, inst, wordSpace);
 			});
@@ -479,6 +482,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 					}*multiplier;
 				}
 			}
+			
 			return knownFixed+unkownSum;
 		});
 	}

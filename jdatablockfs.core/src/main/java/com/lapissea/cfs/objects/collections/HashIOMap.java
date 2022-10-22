@@ -18,7 +18,6 @@ import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.RefField;
 import com.lapissea.util.LogUtil;
-import com.lapissea.util.ObjectHolder;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
@@ -157,39 +156,6 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		}
 		readManagedFields();
 	}
-	
-	private short calcNewSize(IOList<Bucket<K, V>> buckets, short bucketPO2){
-		Map<Integer, ObjectHolder<Integer>> counts=new HashMap<>();
-		
-		short newBucketPO2=bucketPO2;
-		
-		int[] hashes=rawKeyStream(buckets).mapToInt(this::toHash).parallel().toArray();
-		
-		boolean overflow=true;
-		while(overflow){
-			overflow=false;
-			counts.clear();
-			
-			if((((int)newBucketPO2)+1)>Short.MAX_VALUE){
-				throw new IndexOutOfBoundsException();
-			}
-			
-			newBucketPO2++;
-			int newSize=1<<newBucketPO2;
-			
-			for(int hash : hashes){
-				int smallHash=hash%newSize;
-				var val      =counts.computeIfAbsent(smallHash, h->new ObjectHolder<>(0));
-				val.obj++;
-				if(val.obj>RESIZE_TRIGGER){
-					overflow=true;
-					break;
-				}
-			}
-		}
-		return newBucketPO2;
-	}
-	
 	
 	private void fillBuckets(IOList<Bucket<K, V>> buckets, short bucketPO2) throws IOException{
 		var siz=1L<<bucketPO2;
