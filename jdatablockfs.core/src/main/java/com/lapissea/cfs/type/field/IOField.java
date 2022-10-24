@@ -7,6 +7,7 @@ import com.lapissea.cfs.exceptions.FixedFormatNotSupportedException;
 import com.lapissea.cfs.io.IO;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
+import com.lapissea.cfs.objects.Stringify;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
@@ -27,7 +28,7 @@ import static com.lapissea.cfs.internal.StatIOField.*;
 import static com.lapissea.cfs.type.field.FieldSupport.STAT_LOGGING;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 
-public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<T>{
+public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<T>, Stringify{
 	
 	private final FieldAccessor<T> accessor;
 	
@@ -129,7 +130,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 	public record ValueGeneratorInfo<T extends IOInstance<T>, ValType>(
 		IOField<T, ValType> field,
 		ValueGenerator<T, ValType> generator
-	){
+	) implements Stringify{
 		public void generate(VarPool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException{
 			if(generator.shouldGenerate(ioPool, provider, instance)){
 				var val=generator.generate(ioPool, provider, instance, allowExternalMod);
@@ -140,6 +141,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 		public String toString(){
 			return ValueGeneratorInfo.class.getSimpleName()+"{modifies "+field+"}";
 		}
+		@Override
 		public String toShortString(){
 			return "{mod "+Utils.toShortString(field)+"}";
 		}
@@ -259,6 +261,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 		return dependencies!=null;
 	}
 	
+	@Override
 	public String toShortString(){
 		return Objects.requireNonNull(getName());
 	}

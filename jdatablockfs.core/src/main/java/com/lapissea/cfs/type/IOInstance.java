@@ -7,6 +7,7 @@ import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
+import com.lapissea.cfs.objects.Stringify;
 import com.lapissea.cfs.type.compilation.DefInstanceCompiler;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
@@ -31,7 +32,7 @@ import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.INS
 import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
 
 @SuppressWarnings({"UnusedReturnValue", "unused"})
-public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Cloneable{
+public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Cloneable, Stringify{
 	
 	/**
 	 * <p>
@@ -500,6 +501,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 	
 	void allocateNulls(DataProvider provider) throws IOException;
 	
+	@Override
 	default String toShortString(){
 		return getThisStruct().instanceToString(self(), true);
 	}

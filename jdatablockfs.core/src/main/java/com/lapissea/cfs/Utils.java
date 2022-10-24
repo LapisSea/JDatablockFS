@@ -1,7 +1,7 @@
 package com.lapissea.cfs;
 
+import com.lapissea.cfs.objects.Stringify;
 import com.lapissea.cfs.objects.collections.IOList;
-import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
@@ -175,7 +175,7 @@ public class Utils{
 	}
 	
 	public static String toShortString(Object o){
-		if(o instanceof IOInstance<?> i) return i.toShortString();
+		if(o instanceof Stringify s) return s.toShortString();
 		return TextUtil.toShortString(o);
 	}
 	

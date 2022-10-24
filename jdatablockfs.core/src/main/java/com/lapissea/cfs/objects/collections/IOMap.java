@@ -2,6 +2,7 @@ package com.lapissea.cfs.objects.collections;
 
 import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.objects.Stringify;
 import com.lapissea.util.Nullable;
 
 import java.io.IOException;
@@ -45,11 +46,12 @@ public interface IOMap<K, V> extends IterablePP<IOMap.IOEntry<K, V>>{
 			void set(V value) throws IOException;
 		}
 		
-		abstract class Abstract<K, V> implements IOEntry<K, V>{
+		abstract class Abstract<K, V> implements IOEntry<K, V>, Stringify{
 			@Override
 			public String toString(){
 				return this.getClass().getSimpleName()+"{"+Utils.toShortString(getKey())+" = "+Utils.toShortString(getValue())+"}";
 			}
+			@Override
 			public String toShortString(){
 				return "{"+Utils.toShortString(getKey())+" = "+Utils.toShortString(getValue())+"}";
 			}

@@ -2,11 +2,12 @@ package com.lapissea.cfs.io;
 
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
+import com.lapissea.cfs.objects.Stringify;
 
 import java.io.IOException;
 import java.util.Collection;
 
-public final class OffsetIO implements RandomIO{
+public final class OffsetIO implements RandomIO, Stringify{
 	
 	public static RandomIO of(RandomIO.Creator parent, long offset) throws IOException{
 		return offset==0?parent.io():new OffsetIO(parent, offset);
@@ -162,6 +163,7 @@ public final class OffsetIO implements RandomIO{
 		       '}';
 	}
 	
+	@Override
 	public String toShortString(){
 		return "{"+parent+" +"+offset+'}';
 	}

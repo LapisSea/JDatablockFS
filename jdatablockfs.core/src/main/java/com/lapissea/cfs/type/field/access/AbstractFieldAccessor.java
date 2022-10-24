@@ -1,12 +1,13 @@
 package com.lapissea.cfs.type.field.access;
 
+import com.lapissea.cfs.objects.Stringify;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.util.NotNull;
 
 import java.util.Objects;
 
-public abstract class AbstractFieldAccessor<CTyp extends IOInstance<CTyp>> implements FieldAccessor<CTyp>{
+public abstract class AbstractFieldAccessor<CTyp extends IOInstance<CTyp>> implements FieldAccessor<CTyp>, Stringify{
 	
 	private final Struct<CTyp> declaringStruct;
 	private final String       name;
@@ -34,6 +35,7 @@ public abstract class AbstractFieldAccessor<CTyp extends IOInstance<CTyp>> imple
 		var struct=getDeclaringStruct();
 		return getType().getName()+" "+(struct==null?"":struct.getType().getSimpleName())+"#"+strName();
 	}
+	@Override
 	public String toShortString(){
 		return getType().getSimpleName()+" "+strName();
 	}

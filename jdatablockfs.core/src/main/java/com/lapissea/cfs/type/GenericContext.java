@@ -2,6 +2,7 @@ package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.SyntheticParameterizedType;
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.objects.Stringify;
 import com.lapissea.util.TextUtil;
 
 import java.lang.reflect.ParameterizedType;
@@ -13,7 +14,7 @@ import java.util.function.Supplier;
 
 public interface GenericContext{
 	
-	final class MapConstant implements GenericContext{
+	final class MapConstant implements GenericContext, Stringify{
 		private final Map<String, Type> actualTypes;
 		
 		public MapConstant(Map<String, Type> actualTypes){
@@ -29,12 +30,13 @@ public interface GenericContext{
 		public String toString(){
 			return "Ctx"+TextUtil.toString(actualTypes);
 		}
+		@Override
 		public String toShortString(){
 			return "Ctx"+Utils.toShortString(actualTypes);
 		}
 	}
 	
-	final class Deferred implements GenericContext{
+	final class Deferred implements GenericContext, Stringify{
 		
 		private GenericContext           data;
 		private Supplier<GenericContext> dataSource;
@@ -76,6 +78,7 @@ public interface GenericContext{
 			if(data==null) return "DeferredCtx{?}";
 			return "Deferred"+data+"";
 		}
+		@Override
 		public String toShortString(){
 			if(data==null) return "DeferredCtx";
 			return "Deferred"+data+"";
