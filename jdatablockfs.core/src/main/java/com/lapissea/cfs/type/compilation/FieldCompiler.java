@@ -78,7 +78,7 @@ public class FieldCompiler{
 		                        .collect(joining("\n\t"));
 		
 		if(!duplicates.isEmpty()){
-			throw new MalformedStruct(struct.getType().getSimpleName()+" methods with duplicated indices:\n\t"+duplicates);
+			throw new MalformedStruct(struct.cleanName()+" methods with duplicated indices:\n\t"+duplicates);
 		}
 		
 		for(Method valueMethod : valueDefs){

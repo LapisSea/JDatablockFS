@@ -268,7 +268,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 	@Override
 	public String toString(){
 		var struct=getAccessor().getDeclaringStruct();
-		return (struct==null?"":struct.getType().getSimpleName())+"#"+toShortString();
+		return (struct==null?"":struct.cleanName())+"#"+toShortString();
 	}
 	
 	

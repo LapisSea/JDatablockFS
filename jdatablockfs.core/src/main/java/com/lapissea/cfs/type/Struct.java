@@ -412,11 +412,21 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		});
 	}
 	
+	public String cleanName(){
+		var name=getType().getSimpleName();
+		if(UtilL.instanceOf(getType(), IOInstance.Def.class)){
+			var index=name.indexOf(IOInstance.Def.IMPL_NAME_POSTFIX);
+			if(index!=-1){
+				name=name.substring(0, index);
+			}
+		}
+		return name;
+	}
+	
 	@Override
 	public String toString(){
-		var name=getType().getSimpleName();
-		if(name.endsWith(IOInstance.Def.IMPL_NAME_POSTFIX)) name=name.substring(0, name.length()-IOInstance.Def.IMPL_NAME_POSTFIX.length());
-		var sj=new StringJoiner(", ", name+"{", "}");
+		var name=cleanName();
+		var sj  =new StringJoiner(", ", name+"{", "}");
 		if(this instanceof Struct.Unmanaged){
 			sj.add("Unmanaged");
 		}
@@ -490,10 +500,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		var    prefix=start;
 		String name  =null;
 		if(!doShort){
-			name=getType().getSimpleName();
-			if(UtilL.instanceOf(getType(), IOInstance.Def.class)&&name.contains(IOInstance.Def.IMPL_NAME_POSTFIX)){
-				name=name.substring(0, name.length()-IOInstance.Def.IMPL_NAME_POSTFIX.length());
-			}
+			name=cleanName();
 			if(Modifier.isStatic(getType().getModifiers())){
 				var index=name.lastIndexOf('$');
 				if(index!=-1) name=name.substring(index+1);
