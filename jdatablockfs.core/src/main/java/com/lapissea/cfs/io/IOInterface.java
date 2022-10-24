@@ -1,6 +1,7 @@
 package com.lapissea.cfs.io;
 
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.objects.Stringify;
 import com.lapissea.util.function.UnsafeRunnable;
 import com.lapissea.util.function.UnsafeSupplier;
 
@@ -78,19 +79,18 @@ public interface IOInterface extends RandomIO.Creator{
 	
 	default IOInterface asReadOnly(){
 		if(isReadOnly()) return this;
-		var that=this;
-		return new IOInterface(){
+		class ReadOnly implements IOInterface, Stringify{
 			@Override
 			public boolean isReadOnly(){
 				return true;
 			}
 			@Override
 			public IOTransaction openIOTransaction(){
-				return that.openIOTransaction();
+				return IOInterface.this.openIOTransaction();
 			}
 			@Override
 			public RandomIO io() throws IOException{
-				var io=that.readOnlyIO();
+				var io=IOInterface.this.readOnlyIO();
 				if(!io.isReadOnly()){
 					throw new IllegalStateException();
 				}
@@ -98,11 +98,13 @@ public interface IOInterface extends RandomIO.Creator{
 			}
 			@Override
 			public String toString(){
-				return that.toString();
+				return IOInterface.this.toString();
 			}
+			@Override
 			public String toShortString(){
-				return Utils.toShortString(that);
+				return Utils.toShortString(IOInterface.this);
 			}
-		};
+		}
+		return new ReadOnly();
 	}
 }

@@ -51,24 +51,24 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 		this.accessor=accessor;
 	}
 	
-	public void initLateData(FieldSet<T> dependencies){
+	public final void initLateData(FieldSet<T> dependencies){
 		if(lateDataInitialized) throw new IllegalStateException("already initialized");
 		
 		this.dependencies=dependencies==null?null:Utils.nullIfEmpty(dependencies);
 		lateDataInitialized=true;
 	}
 	
-	public boolean typeFlag(int flag){
+	public final boolean typeFlag(int flag){
 		return (typeFlags()&flag)==flag;
 	}
 	
-	public int typeFlags(){
+	public final int typeFlags(){
 		var f=typeFlags;
 		if(f==-1) f=typeFlags=FieldSupport.typeFlags(this);
 		return f;
 	}
 	
-	public boolean isNull(VarPool<T> ioPool, T instance){
+	public final boolean isNull(VarPool<T> ioPool, T instance){
 		if(!getAccessor().canBeNull()) return false;
 		try{
 			var val=get(ioPool, instance);
@@ -214,7 +214,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 		if(getAccessor() instanceof VirtualAccessor<T> vacc) vacc.init(this);
 	}
 	
-	public long uid(){
+	public final long uid(){
 		if(uid==-1){
 			synchronized(this){
 				if(uid==-1){
@@ -226,9 +226,9 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 		return uid;
 	}
 	
-	public String getName()              {return getAccessor().getName();}
-	public FieldAccessor<T> getAccessor(){return accessor;}
-	public Struct<T> declaringStruct(){
+	public String getName()                    {return getAccessor().getName();}
+	public final FieldAccessor<T> getAccessor(){return accessor;}
+	public final Struct<T> declaringStruct(){
 		var acc=getAccessor();
 		return acc==null?null:acc.getDeclaringStruct();
 	}
@@ -240,22 +240,22 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 	}
 	
 	@Nullable
-	public FieldSet<T> getDependencies(){
+	public final FieldSet<T> getDependencies(){
 		requireLateData();
 		return dependencies;
 	}
 	
-	public Stream<IOField<T, ?>> dependencyStream(){
-		requireLateData();
-		return dependencies!=null?dependencies.stream():Stream.of();
+	public final Stream<IOField<T, ?>> dependencyStream(){
+		var d=getDependencies();
+		return d!=null?d.stream():Stream.of();
 	}
 	
-	public boolean isDependency(IOField<T, ?> depField){
+	public final boolean isDependency(IOField<T, ?> depField){
 		requireLateData();
 		return dependencies!=null&&dependencies.contains(depField);
 	}
 	
-	public boolean hasDependencies(){
+	public final boolean hasDependencies(){
 		requireLateData();
 		assert dependencies==null||!dependencies.isEmpty();
 		return dependencies!=null;
@@ -306,18 +306,16 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 		throw unsupportedFixed();
 	}
 	
-	public IONullability.Mode getNullability(){
-		if(nullability==null){
-			nullability=accessor==null?IONullability.Mode.NULLABLE:IOFieldTools.getNullability(accessor);
-		}
+	public final IONullability.Mode getNullability(){
+		if(nullability==null) calcNullability();
 		return nullability;
 	}
-	public boolean nullable(){
-		return getNullability()==IONullability.Mode.NULLABLE;
+	private void calcNullability(){
+		nullability=accessor==null?IONullability.Mode.NULLABLE:IOFieldTools.getNullability(accessor);
 	}
 	
-	protected final ValueType requireValNN(ValueType value){
-		return FieldIsNullException.requireNonNull(this, value);
+	public final boolean nullable(){
+		return getNullability()==IONullability.Mode.NULLABLE;
 	}
 	
 	@Override
