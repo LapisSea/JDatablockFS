@@ -223,6 +223,24 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		}
 	}
 	
+	public static <T> IONode<T> allocValNode(RandomIO valueBytes, IONode<T> next, TypeLink nodeType, DataProvider provider, OptionalLong positionMagnet) throws IOException{
+		int nextBytes;
+		if(next!=null) nextBytes=NumberSize.bySize(next.getReference().getPtr()).bytes;
+		else nextBytes=calcOptimalNextSize(provider).bytes;
+		
+		var bytes=1+nextBytes+valueBytes.remaining();
+		
+		try(var ignored=provider.getSource().openIOTransaction()){
+			var chunk=AllocateTicket.bytes(bytes).withPositionMagnet(positionMagnet).submit(provider);
+			var node =new IONode<>(provider, chunk.getPtr().makeReference(), nodeType, null, next);
+			node.ensureNextSpace();
+			try(var io=node.getValueDataIO()){
+				valueBytes.transferTo(io);
+			}
+			return node;
+		}
+	}
+	
 	private final ValueStorage<T> valueStorage;
 	
 	@IOValue
@@ -289,6 +307,11 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		return getReference().hashCode();
 	}
 	
+	private void ensureNextSpace() throws IOException{
+		try(var io=this.getReference().io(this)){
+			ensureNextSpace(io);
+		}
+	}
 	private void ensureNextSpace(RandomIO io) throws IOException{
 		var valueStart=valueStart();
 		var skipped   =io.skip(valueStart);
@@ -311,9 +334,9 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		return readValue();
 	}
 	
-	private T readValue() throws IOException{
-		
-		try(var io=selfIO()){
+	RandomIO getValueDataIO() throws IOException{
+		var io=selfIO();
+		try{
 			var s=io.getSize();
 			if(s==0) return null;
 			if(s<NEXT_SIZE_FIELD_MIN_SIZE) return null;
@@ -324,9 +347,9 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 			}
 			nextSize=FlagReader.readSingle(io, NumberSize.FLAG_INFO);
 
-//				if(DEBUG_VALIDATION){
-//					requireNonFreed();
-//				}
+//			if(DEBUG_VALIDATION){
+//				requireNonFreed();
+//			}
 			
 			long toSkip =nextSize.bytes;
 			long skipped=0;
@@ -338,6 +361,17 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 				}
 				skipped+=skippedChunk;
 			}
+			return io;
+		}catch(Throwable e){
+			io.close();
+			throw e;
+		}
+	}
+	
+	private T readValue() throws IOException{
+		var io=getValueDataIO();
+		if(io==null) return null;
+		try(io){
 			if(io.remaining()==0){
 				return null;
 			}

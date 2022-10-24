@@ -158,6 +158,10 @@ public interface DataProvider{
 			public Chunk alloc(AllocateTicket ticket) throws IOException{
 				return src().alloc(router.apply(ticket));
 			}
+			@Override
+			public String toString(){
+				return super.toString();
+			}
 		}
 		
 		return new Routed();

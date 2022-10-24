@@ -2,6 +2,7 @@ package com.lapissea.cfs.objects.collections;
 
 import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.chunk.DataProvider;
+import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.ValueStorage;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
@@ -131,7 +132,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		}
 	}
 	
-	private static final int RESIZE_TRIGGER=4;
+	private static final int RESIZE_TRIGGER=1;
 	
 	@IOValue
 	@IOValue.Unsigned
@@ -192,7 +193,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		}else{
 			long pos=0;
 			
-			boolean disableAsync=size()<=512*RESIZE_TRIGGER*3;
+			boolean disableAsync=size()<=512*2;
 			
 			Log.traceCall("method: reallocate and transfer, size: {}, async: {}", size(), !disableAsync);
 			
@@ -305,8 +306,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 					
 					var node=bucket.node;
 					if(node==null){
-						var entry=iter.next().getValue();
-						node=allocNewNode(entry, (Unmanaged<?>)newBuckets);
+						node=allocNewNode(iter.next()::getValueDataIO, (Unmanaged<?>)newBuckets);
 						bucket.node=node;
 						setBucket(newBuckets, smallHash, bucket);
 					}else{
@@ -314,7 +314,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 					}
 					
 					while(iter.hasNext()){
-						var newNode=allocNewNode(iter.next().getValue(), node);
+						var newNode=allocNewNode(iter.next()::getValueDataIO, node);
 						
 						node.setNext(newNode);
 						node=newNode;
@@ -659,6 +659,17 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 			OptionalLong.of(magnet.getReference().getPtr().getValue())
 		);
 	}
+	private IONode<BucketEntry<K, V>> allocNewNode(RandomIO.Creator entryBytes, IOInstance.Unmanaged<?> magnet) throws IOException{
+		try(var io=entryBytes.io()){
+			return IONode.allocValNode(
+				io,
+				null,
+				BUCKET_NODE_TYPE,
+				getDataProvider(),
+				OptionalLong.of(magnet.getReference().getPtr().getValue())
+			);
+		}
+	}
 	
 	
 	private Bucket<K, V> getBucket(IOList<Bucket<K, V>> buckets, K key, short bucketPO2) throws IOException{
@@ -702,6 +713,9 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		return h2h(h);
 	}
 	private static int h2h(int x){
+//		Inlined:
+//		return new Random(x).nextInt();
+		
 		long mul=0x5DEECE66DL, mask=0xFFFFFFFFFFFFL;
 		return (int)(((((x^mul)&mask)*mul+0xBL)&mask) >>> 17);
 	}
