@@ -7,7 +7,7 @@ import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.content.ContentInputStream;
 import com.lapissea.cfs.io.content.ContentOutputStream;
-import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
+import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Reference;
@@ -259,7 +259,7 @@ public class GeneralTests{
 		TestUtils.testChunkProvider(TestInfo.of(), provider->{
 			String data="this is a test!";
 			
-			StructPipe<StringContainer> pipe=ContiguousStructPipe.of(StringContainer.class);
+			StructPipe<StringContainer> pipe=StandardStructPipe.of(StringContainer.class);
 			
 			var chunk=AllocateTicket.bytes(64).submit(provider);
 			
@@ -290,7 +290,7 @@ public class GeneralTests{
 	@Test(dataProvider="strings")
 	void autoTextTest(String data) throws IOException{
 		TestUtils.testChunkProvider(TestInfo.of(data), provider->{
-			StructPipe<AutoText> pipe=ContiguousStructPipe.of(AutoText.class);
+			StructPipe<AutoText> pipe=StandardStructPipe.of(AutoText.class);
 			
 			var chunk=AllocateTicket.bytes(64).submit(provider);
 			
@@ -334,6 +334,8 @@ public class GeneralTests{
 			                .withGenerator(()->new GenericContainer<>(IntStream.range(0, 3).mapToObj(Dummy::new).toArray(Dummy[]::new)))
 			                .withId("dummy_array")
 			                .request();
+			
+			
 			
 			LogUtil.println(dummies.toString());
 			

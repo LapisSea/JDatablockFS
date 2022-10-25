@@ -4,8 +4,8 @@ import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.UnsupportedStructLayout;
 import com.lapissea.cfs.io.content.ContentReader;
-import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
-import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
+import com.lapissea.cfs.io.instancepipe.FixedStructPipe;
+import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.objects.text.AutoText;
@@ -48,11 +48,11 @@ public sealed interface ValueStorage<T>{
 	
 	final class Instance<T extends IOInstance<T>> implements ValueStorage.InstanceBased<T>{
 		
-		private final GenericContext          ctx;
-		private final DataProvider            provider;
-		private final ContiguousStructPipe<T> pipe;
+		private final GenericContext        ctx;
+		private final DataProvider          provider;
+		private final StandardStructPipe<T> pipe;
 		
-		public Instance(GenericContext ctx, DataProvider provider, ContiguousStructPipe<T> pipe){
+		public Instance(GenericContext ctx, DataProvider provider, StandardStructPipe<T> pipe){
 			this.ctx=ctx;
 			this.provider=provider;
 			this.pipe=pipe;
@@ -77,7 +77,7 @@ public sealed interface ValueStorage<T>{
 		public BasicSizeDescriptor<T, ?> getSizeDescriptor(){
 			return pipe.getSizeDescriptor();
 		}
-		public ContiguousStructPipe<T> getPipe(){
+		public StandardStructPipe<T> getPipe(){
 			return pipe;
 		}
 		
@@ -99,12 +99,12 @@ public sealed interface ValueStorage<T>{
 	
 	final class FixedInstance<T extends IOInstance<T>> implements ValueStorage.InstanceBased<T>{
 		
-		private final GenericContext               ctx;
-		private final DataProvider                 provider;
-		private final FixedContiguousStructPipe<T> pipe;
-		private final long                         size;
+		private final GenericContext     ctx;
+		private final DataProvider       provider;
+		private final FixedStructPipe<T> pipe;
+		private final long               size;
 		
-		public FixedInstance(GenericContext ctx, DataProvider provider, FixedContiguousStructPipe<T> pipe){
+		public FixedInstance(GenericContext ctx, DataProvider provider, FixedStructPipe<T> pipe){
 			this.ctx=ctx;
 			this.provider=provider;
 			this.pipe=pipe;
@@ -126,7 +126,7 @@ public sealed interface ValueStorage<T>{
 			return size;
 		}
 		
-		public FixedContiguousStructPipe<T> getPipe(){
+		public FixedStructPipe<T> getPipe(){
 			return pipe;
 		}
 		
@@ -441,12 +441,12 @@ public sealed interface ValueStorage<T>{
 			var struct=Struct.ofUnknown(clazz);
 			if(fixedOnly){
 				try{
-					return new FixedInstance<>(generics, provider, FixedContiguousStructPipe.of(struct, STATE_DONE));
+					return new FixedInstance<>(generics, provider, FixedStructPipe.of(struct, STATE_DONE));
 				}catch(UnsupportedStructLayout ignored){
-					return new FixedReferencedInstance<>(generics, provider, ContiguousStructPipe.of(struct));
+					return new FixedReferencedInstance<>(generics, provider, StandardStructPipe.of(struct));
 				}
 			}
-			return new Instance<>(generics, provider, ContiguousStructPipe.of(struct));
+			return new Instance<>(generics, provider, StandardStructPipe.of(struct));
 		}
 	}
 	

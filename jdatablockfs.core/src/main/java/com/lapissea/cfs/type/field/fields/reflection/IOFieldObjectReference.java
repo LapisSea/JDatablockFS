@@ -5,8 +5,8 @@ import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
-import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
-import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
+import com.lapissea.cfs.io.instancepipe.FixedStructPipe;
+import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.GenericContext;
@@ -41,8 +41,8 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 		struct=(Struct<ValueType>)Struct.ofUnknown(getAccessor().getType());
 		var typ=accessor.getAnnotation(IOValue.Reference.class).map(IOValue.Reference::dataPipeType).orElseThrow();
 		instancePipe=switch(typ){
-			case FIXED -> FixedContiguousStructPipe.of(struct, STATE_DONE);
-			case FLEXIBLE -> ContiguousStructPipe.of(struct);
+			case FIXED -> FixedStructPipe.of(struct, STATE_DONE);
+			case FLEXIBLE -> StandardStructPipe.of(struct);
 		};
 		
 	}

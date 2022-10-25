@@ -9,8 +9,8 @@ import com.lapissea.cfs.io.bit.FlagReader;
 import com.lapissea.cfs.io.bit.FlagWriter;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
-import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
 import com.lapissea.cfs.io.instancepipe.ObjectPipe;
+import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.objects.NumberSize;
@@ -412,7 +412,7 @@ public class InstanceCollection{
 				if(TYPE_VALIDATION){
 					runBaseStageTask(this::getValPipe);
 				}else{
-					ContiguousStructPipe.of(component);
+					StandardStructPipe.of(component);
 				}
 			}catch(RecursiveStructCompilation e){
 				Log.debug("recursive compilation for {}", component);
@@ -422,7 +422,7 @@ public class InstanceCollection{
 		
 		private StructPipe<ElementType> getValPipe(){
 			if(valPipe==null){
-				valPipe=ContiguousStructPipe.of(component, STATE_DONE);
+				valPipe=StandardStructPipe.of(component, STATE_DONE);
 			}
 			return valPipe;
 		}

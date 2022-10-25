@@ -4,7 +4,7 @@ import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.chunk.MemoryOperations;
 import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.io.RandomIO;
-import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
+import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.objects.Stringify;
@@ -477,7 +477,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		}
 		
 		protected StructPipe<SELF> newPipe(){
-			return ContiguousStructPipe.of(getThisStruct());
+			return StandardStructPipe.of(getThisStruct());
 		}
 		
 		public final StructPipe<SELF> getPipe(){

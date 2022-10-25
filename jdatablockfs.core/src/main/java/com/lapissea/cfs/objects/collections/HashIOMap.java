@@ -2,11 +2,11 @@ package com.lapissea.cfs.objects.collections;
 
 import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.chunk.DataProvider;
-import com.lapissea.cfs.io.IOInterface;
+import com.lapissea.cfs.io.IOTransaction;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.ValueStorage;
 import com.lapissea.cfs.io.impl.MemoryData;
-import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
+import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.objects.Reference;
@@ -41,7 +41,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	private interface BucketEntry<K, V> extends IOInstance.Def<BucketEntry<K, V>>{
 		
 		Struct<BucketEntry<Object, Object>>     STRUCT=Struct.of((Class<BucketEntry<Object, Object>>)(Object)BucketEntry.class);
-		StructPipe<BucketEntry<Object, Object>> PIPE  =ContiguousStructPipe.of(STRUCT);
+		StructPipe<BucketEntry<Object, Object>> PIPE  =StandardStructPipe.of(STRUCT);
 		
 		static <K, V> BucketEntry<K, V> of(){
 			return (BucketEntry<K, V>)STRUCT.make();
@@ -254,7 +254,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 			
 			Bucket<K, V>              bucket     =newBuckets.get(smallHash);
 			IONode<BucketEntry<K, V>> last       =bucket.nodeStream().reduce((a, b)->b).orElse(null);
-			IOInterface.IOTransaction transaction=null;
+			IOTransaction             transaction=null;
 			
 			if(last!=null||noods.size()>1){
 				transaction=getDataProvider().getSource().openIOTransaction();

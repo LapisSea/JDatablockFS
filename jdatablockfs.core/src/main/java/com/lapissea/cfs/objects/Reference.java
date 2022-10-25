@@ -7,9 +7,9 @@ import com.lapissea.cfs.io.OffsetIO;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
-import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
-import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
+import com.lapissea.cfs.io.instancepipe.FixedStructPipe;
 import com.lapissea.cfs.io.instancepipe.ObjectPipe;
+import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
@@ -36,7 +36,7 @@ public final class Reference extends IOInstance.Managed<Reference>{
 	static{
 		boolean useOptimized=GlobalConfig.configFlag("abBenchmark.referenceOptimizedPipe", true);
 		if(useOptimized){
-			ContiguousStructPipe.registerSpecialImpl(STRUCT, ()->new ContiguousStructPipe<>(STRUCT, true){
+			StandardStructPipe.registerSpecialImpl(STRUCT, ()->new StandardStructPipe<>(STRUCT, true){
 				@Override
 				protected List<IOField<Reference, ?>> initFields(){
 					var f=super.initFields();
@@ -82,7 +82,7 @@ public final class Reference extends IOInstance.Managed<Reference>{
 					return instance;
 				}
 			});
-			FixedContiguousStructPipe.registerSpecialImpl(STRUCT, ()->new FixedContiguousStructPipe<>(STRUCT, true){
+			FixedStructPipe.registerSpecialImpl(STRUCT, ()->new FixedStructPipe<>(STRUCT, true){
 				@Override
 				protected List<IOField<Reference, ?>> initFields(){
 					var f=super.initFields();
@@ -118,7 +118,7 @@ public final class Reference extends IOInstance.Managed<Reference>{
 		}
 	}
 	
-	public static final FixedContiguousStructPipe<Reference> FIXED_PIPE=FixedContiguousStructPipe.of(STRUCT);
+	public static final FixedStructPipe<Reference> FIXED_PIPE=FixedStructPipe.of(STRUCT);
 	
 	private static final class IOContext implements RandomIO.Creator{
 		private final Reference    ref;

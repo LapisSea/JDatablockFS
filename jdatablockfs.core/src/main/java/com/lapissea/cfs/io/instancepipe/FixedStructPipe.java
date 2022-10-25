@@ -26,30 +26,30 @@ import java.util.stream.Stream;
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 import static java.util.function.Predicate.not;
 
-public class FixedContiguousStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
+public class FixedStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 	
-	public static <T extends IOInstance<T>> FixedContiguousStructPipe<T> of(Class<T> type){
+	public static <T extends IOInstance<T>> FixedStructPipe<T> of(Class<T> type){
 		return of(Struct.of(type));
 	}
-	public static <T extends IOInstance<T>> FixedContiguousStructPipe<T> of(Class<T> type, int minRequestedStage){
+	public static <T extends IOInstance<T>> FixedStructPipe<T> of(Class<T> type, int minRequestedStage){
 		return of(Struct.of(type), minRequestedStage);
 	}
-	public static <T extends IOInstance<T>> FixedContiguousStructPipe<T> of(Struct<T> struct){
-		return of(FixedContiguousStructPipe.class, struct);
+	public static <T extends IOInstance<T>> FixedStructPipe<T> of(Struct<T> struct){
+		return of(FixedStructPipe.class, struct);
 	}
-	public static <T extends IOInstance<T>> FixedContiguousStructPipe<T> of(Struct<T> struct, int minRequestedStage){
-		return of(FixedContiguousStructPipe.class, struct, minRequestedStage);
+	public static <T extends IOInstance<T>> FixedStructPipe<T> of(Struct<T> struct, int minRequestedStage){
+		return of(FixedStructPipe.class, struct, minRequestedStage);
 	}
 	
 	@SuppressWarnings("unchecked")
-	public static <T extends IOInstance<T>, P extends FixedContiguousStructPipe<T>> void registerSpecialImpl(Struct<T> struct, Supplier<P> newType){
-		StructPipe.registerSpecialImpl(struct, (Class<P>)(Object)FixedContiguousStructPipe.class, newType);
+	public static <T extends IOInstance<T>, P extends FixedStructPipe<T>> void registerSpecialImpl(Struct<T> struct, Supplier<P> newType){
+		StructPipe.registerSpecialImpl(struct, (Class<P>)(Object)FixedStructPipe.class, newType);
 	}
 	
 	private final Map<IOField<T, NumberSize>, NumberSize> maxValues;
 	
-	public FixedContiguousStructPipe(Struct<T> type, boolean runNow){
-		super(type, runNow);
+	public FixedStructPipe(Struct<T> type, boolean initNow){
+		super(type, initNow);
 		
 		maxValues=Utils.nullIfEmpty(computeMaxValues());
 		

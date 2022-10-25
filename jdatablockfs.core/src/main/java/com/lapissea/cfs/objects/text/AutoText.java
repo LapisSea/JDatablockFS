@@ -3,7 +3,7 @@ package com.lapissea.cfs.objects.text;
 import com.lapissea.cfs.io.content.ContentInputStream;
 import com.lapissea.cfs.io.content.ContentOutputStream;
 import com.lapissea.cfs.io.content.ContentWriter;
-import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
+import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.text.Encoding.CharEncoding;
 import com.lapissea.cfs.type.IOInstance;
@@ -18,7 +18,7 @@ import java.util.Objects;
 public final class AutoText extends IOInstance.Managed<AutoText> implements CharSequence{
 	
 	public static final Struct<AutoText>     STRUCT=Struct.of(AutoText.class);
-	public static final StructPipe<AutoText> PIPE  =ContiguousStructPipe.of(STRUCT);
+	public static final StructPipe<AutoText> PIPE  =StandardStructPipe.of(STRUCT);
 	
 	private String       data;
 	private byte[]       dataSrc;

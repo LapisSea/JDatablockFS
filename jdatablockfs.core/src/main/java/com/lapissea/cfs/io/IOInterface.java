@@ -5,7 +5,6 @@ import com.lapissea.cfs.objects.Stringify;
 import com.lapissea.util.function.UnsafeRunnable;
 import com.lapissea.util.function.UnsafeSupplier;
 
-import java.io.Closeable;
 import java.io.IOException;
 
 
@@ -13,21 +12,6 @@ import java.io.IOException;
  * This interface is a container or accessor of binary data that can provide a way to write/read contents in a random or sequential manner.
  */
 public interface IOInterface extends RandomIO.Creator{
-	
-	interface IOTransaction extends Closeable{
-		/**
-		 * Optional information used for profiling or debugging.
-		 *
-		 * @return number of separate ranges of bytes that may contain data that has changed
-		 */
-		int getChunkCount();
-		/**
-		 * Optional information used for profiling or debugging.
-		 *
-		 * @return number of bytes that may have been overwritten
-		 */
-		long getTotalBytes();
-	}
 	
 	default void setIOSize(long requestedSize) throws IOException{
 		try(var io=io()){

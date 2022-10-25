@@ -1,7 +1,7 @@
 package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.chunk.DataProvider;
-import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
+import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.objects.ObjectID;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.objects.collections.ContiguousIOList;
@@ -356,7 +356,7 @@ public sealed interface IOTypeDB{
 			if(def.isUnmanaged()) return;
 			
 			if(TYPE_VALIDATION){
-				ContiguousStructPipe.of(type.getThisStruct()).checkTypeIntegrity(type);
+				StandardStructPipe.of(type.getThisStruct()).checkTypeIntegrity(type);
 			}
 			
 			

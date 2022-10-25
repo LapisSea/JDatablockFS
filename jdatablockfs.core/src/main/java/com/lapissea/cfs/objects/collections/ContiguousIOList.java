@@ -9,7 +9,7 @@ import com.lapissea.cfs.exceptions.BitDepthOutOfSpaceException;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.ValueStorage;
 import com.lapissea.cfs.io.impl.MemoryData;
-import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
+import com.lapissea.cfs.io.instancepipe.FixedStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
@@ -70,7 +70,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	
 	@Override
 	protected StructPipe<ContiguousIOList<T>> newPipe(){
-		return FixedContiguousStructPipe.of(getThisStruct());
+		return FixedStructPipe.of(getThisStruct());
 	}
 	
 	
@@ -118,7 +118,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		return "Element["+index+"]";
 	}
 	
-	private static final FixedContiguousStructPipe<Reference> REF_PIPE=FixedContiguousStructPipe.of(Reference.STRUCT);
+	private static final FixedStructPipe<Reference> REF_PIPE=FixedStructPipe.of(Reference.STRUCT);
 	private static <T extends IOInstance.Unmanaged<T>> IOField<ContiguousIOList<T>, ?> eFieldUnmanagedInst(Type elementType, long index){
 		return new RefField.NoIO<ContiguousIOList<T>, T>(fieldAccessor(elementType, index), REF_PIPE.getFixedDescriptor()){
 			@Override

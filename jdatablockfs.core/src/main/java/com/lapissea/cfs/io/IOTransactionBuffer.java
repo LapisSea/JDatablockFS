@@ -12,7 +12,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
 /**
- * This class implements the logic necessary for {@link IOInterface.IOTransaction}. The changes are
+ * This class implements the logic necessary for {@link IOTransaction}. The changes are
  * stored in memory as a sorted list of {@link WriteEvent}. If the transaction corsses a threshold
  * where it has too many events. It will attempt to merge them as to minimise overhead of writing new
  * changes but at the cost of total data that needs to be written once it has been exported on close.
@@ -654,11 +654,11 @@ public final class IOTransactionBuffer{
 		}
 	}
 	
-	public IOInterface.IOTransaction open(RandomIO.Creator target, VarHandle transactionOpenVar){
+	public IOTransaction open(RandomIO.Creator target, VarHandle transactionOpenVar){
 		var oldTransactionOpen=(boolean)transactionOpenVar.get(target);
 		transactionOpenVar.set(target, true);
 		
-		return new IOInterface.IOTransaction(){
+		return new IOTransaction(){
 			private final int startingChunkCount=DEBUG_VALIDATION&&oldTransactionOpen?getChunkCount():0;
 			private final long startingTotalBytes=DEBUG_VALIDATION&&oldTransactionOpen?getTotalBytes():0;
 			

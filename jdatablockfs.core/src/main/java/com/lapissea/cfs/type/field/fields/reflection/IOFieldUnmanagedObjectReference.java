@@ -7,8 +7,8 @@ import com.lapissea.cfs.exceptions.FieldIsNullException;
 import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
-import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
-import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
+import com.lapissea.cfs.io.instancepipe.FixedStructPipe;
+import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.*;
@@ -39,16 +39,16 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 		}
 		
 		if(fixed){
-			var pip=FixedContiguousStructPipe.of(Reference.class);
+			var pip=FixedStructPipe.of(Reference.class);
 			referencePipe=pip;
 			descriptor=pip.getFixedDescriptor();
 		}else{
-			referencePipe=ContiguousStructPipe.of(Reference.class);
+			referencePipe=StandardStructPipe.of(Reference.class);
 			descriptor=referencePipe.getSizeDescriptor().map(this::getReference);
 		}
 		
 		struct=Struct.Unmanaged.ofUnmanaged((Class<ValueType>)getAccessor().getType());
-		instancePipe=ContiguousStructPipe.of(struct);
+		instancePipe=StandardStructPipe.of(struct);
 	}
 	
 	@Override

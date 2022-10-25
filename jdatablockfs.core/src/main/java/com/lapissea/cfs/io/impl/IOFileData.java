@@ -4,6 +4,7 @@ import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.internal.IUtils;
 import com.lapissea.cfs.internal.MemPrimitive;
 import com.lapissea.cfs.io.IOInterface;
+import com.lapissea.cfs.io.IOTransaction;
 import com.lapissea.cfs.io.IOTransactionBuffer;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.util.NotNull;

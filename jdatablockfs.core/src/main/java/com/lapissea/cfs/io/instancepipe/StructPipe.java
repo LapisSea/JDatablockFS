@@ -193,9 +193,9 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	
 	public static final int STATE_IO_FIELD=1, STATE_SIZE_DESC=2;
 	
-	public StructPipe(Struct<T> type, boolean runNow){
+	public StructPipe(Struct<T> type, boolean initNow){
 		this.type=type;
-		init(runNow, ()->{
+		init(initNow, ()->{
 			this.ioFields=FieldSet.of(initFields());
 			setInitState(STATE_IO_FIELD);
 			

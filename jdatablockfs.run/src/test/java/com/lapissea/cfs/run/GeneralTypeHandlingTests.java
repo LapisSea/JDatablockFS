@@ -4,8 +4,8 @@ import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.io.impl.MemoryData;
-import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
-import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
+import com.lapissea.cfs.io.instancepipe.FixedStructPipe;
+import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ObjectID;
 import com.lapissea.cfs.objects.Reference;
@@ -93,7 +93,7 @@ public class GeneralTypeHandlingTests{
 	@Test
 	void genericTest() throws IOException{
 		TestUtils.testChunkProvider(TestInfo.of(), provider->{
-			var pipe=ContiguousStructPipe.of(GenericContainer.class);
+			var pipe=StandardStructPipe.of(GenericContainer.class);
 			
 			var chunk=AllocateTicket.bytes(64).submit(provider);
 			
@@ -124,7 +124,7 @@ public class GeneralTypeHandlingTests{
 		
 		StructPipe<T> pipe;
 		try{
-			pipe=ContiguousStructPipe.of(struct, STATE_DONE);
+			pipe=StandardStructPipe.of(struct, STATE_DONE);
 		}catch(MalformedStruct|StagedInit.WaitException ignored){
 			pipe=null;
 		}
@@ -132,7 +132,7 @@ public class GeneralTypeHandlingTests{
 			pipe.checkTypeIntegrity(struct.make());
 		}
 		try{
-			pipe=FixedContiguousStructPipe.of(struct, STATE_DONE);
+			pipe=FixedStructPipe.of(struct, STATE_DONE);
 		}catch(MalformedStruct|StagedInit.WaitException ignored){
 			pipe=null;
 		}

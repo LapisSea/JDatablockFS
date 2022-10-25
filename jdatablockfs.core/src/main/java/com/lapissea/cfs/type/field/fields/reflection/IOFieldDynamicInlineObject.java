@@ -8,7 +8,7 @@ import com.lapissea.cfs.io.content.ContentOutputBuilder;
 import com.lapissea.cfs.io.content.ContentOutputStream;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
-import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
+import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Reference;
@@ -38,7 +38,7 @@ import static com.lapissea.cfs.type.StagedInit.STATE_DONE;
 
 public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType> extends NullFlagCompanyField<CTyp, ValueType>{
 	
-	private static final StructPipe<Reference> REF_PIPE=ContiguousStructPipe.of(Reference.class);
+	private static final StructPipe<Reference> REF_PIPE=StandardStructPipe.of(Reference.class);
 	
 	private final SizeDescriptor<CTyp>        descriptor;
 	private       IOFieldPrimitive.FInt<CTyp> typeID;
@@ -56,7 +56,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		long minKnownTypeSize=Long.MAX_VALUE;
 		try{
 			Struct<?>         struct =Struct.ofUnknown(Utils.typeToRaw(type));
-			SizeDescriptor<?> typDesc=ContiguousStructPipe.of(struct, STATE_DONE).getSizeDescriptor();
+			SizeDescriptor<?> typDesc=StandardStructPipe.of(struct, STATE_DONE).getSizeDescriptor();
 			minKnownTypeSize=typDesc.getMin(WordSpace.BYTE);
 		}catch(IllegalArgumentException ignored){}
 		
@@ -93,7 +93,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 				if(inst instanceof IOInstance.Unmanaged<?> u){
 					yield REF_PIPE.calcUnknownSize(prov, u.getReference(), WordSpace.BYTE);
 				}else{
-					yield ContiguousStructPipe.sizeOfUnknown(prov, inst, WordSpace.BYTE);
+					yield StandardStructPipe.sizeOfUnknown(prov, inst, WordSpace.BYTE);
 				}
 			}
 			case Enum<?> e -> Utils.bitToByte(EnumUniverse.get(e.getClass()).bitSize);
@@ -121,7 +121,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 							yield Stream.of((IOInstance.Unmanaged<?>[])val).mapToLong(i->REF_PIPE.calcUnknownSize(prov, i.getReference(), WordSpace.BYTE)).sum();
 						}
 						
-						StructPipe pip=ContiguousStructPipe.of(struct);
+						StructPipe pip=StandardStructPipe.of(struct);
 						
 						if(pip.getSizeDescriptor().hasFixed()){
 							yield pip.getSizeDescriptor().requireFixed(WordSpace.BYTE)*len+lenSize;
@@ -155,7 +155,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 				dest.writeInts1(array);
 			}
 			case IOInstance.Unmanaged inst -> REF_PIPE.write(provider, dest, inst.getReference());
-			case IOInstance inst -> ContiguousStructPipe.of(inst.getThisStruct()).write(provider, dest, inst);
+			case IOInstance inst -> StandardStructPipe.of(inst.getThisStruct()).write(provider, dest, inst);
 			case Enum e -> FlagWriter.writeSingle(dest, EnumUniverse.get(e.getClass()), e);
 			
 			default -> {
@@ -188,7 +188,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 							break;
 						}
 						
-						StructPipe pip=ContiguousStructPipe.of(struct);
+						StructPipe pip=StandardStructPipe.of(struct);
 						
 						ContentOutputBuilder b=new ContentOutputBuilder(Math.toIntExact(pip.getSizeDescriptor().getFixed(WordSpace.BYTE).orElse(128)));
 						for(var i : (IOInstance<?>[])val){
@@ -354,7 +354,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 					return arr;
 				}
 				
-				var pip=ContiguousStructPipe.of(struct);
+				var pip=StandardStructPipe.of(struct);
 				
 				var arr=(IOInstance<?>[])Array.newInstance(e, len);
 				for(int i=0;i<arr.length;i++){
@@ -397,13 +397,13 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		throw new NotImplementedException(typ+"");
 	}
 	private <T extends IOInstance<T>> T readStruct(DataProvider provider, ContentReader src, GenericContext genericContext, Struct<T> struct) throws IOException{
-		var pipe=ContiguousStructPipe.of(struct);
+		var pipe=StandardStructPipe.of(struct);
 		var inst=struct.make();
 		pipe.read(provider, src, inst, genericContext);
 		return inst;
 	}
 	private void skipStruct(DataProvider provider, ContentReader src, GenericContext genericContext, Struct<?> struct) throws IOException{
-		var pipe=ContiguousStructPipe.of(struct);
+		var pipe=StandardStructPipe.of(struct);
 		if(src.optionallySkipExact(pipe.getSizeDescriptor().getFixed(WordSpace.BYTE))){
 			return;
 		}

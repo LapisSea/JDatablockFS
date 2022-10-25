@@ -5,7 +5,7 @@ import com.lapissea.cfs.MagicID;
 import com.lapissea.cfs.exceptions.MalformedPointerException;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.impl.MemoryData;
-import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
+import com.lapissea.cfs.io.instancepipe.FixedStructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.ObjectID;
 import com.lapissea.cfs.objects.Reference;
@@ -32,8 +32,8 @@ import static com.lapissea.cfs.type.field.annotations.IOValue.Reference.PipeType
 
 public class Cluster implements DataProvider{
 	
-	public static final  FixedContiguousStructPipe<RootRef> ROOT_PIPE      =FixedContiguousStructPipe.of(RootRef.class);
-	private static final ChunkPointer                       FIRST_CHUNK_PTR=ChunkPointer.of(MagicID.size());
+	public static final  FixedStructPipe<RootRef> ROOT_PIPE      =FixedStructPipe.of(RootRef.class);
+	private static final ChunkPointer             FIRST_CHUNK_PTR=ChunkPointer.of(MagicID.size());
 	
 	public static Cluster emptyMem() throws IOException{
 		return Cluster.init(MemoryData.builder().build());

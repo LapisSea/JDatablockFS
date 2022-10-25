@@ -7,9 +7,9 @@ import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.*;
 import com.lapissea.cfs.io.ChunkChainIO;
 import com.lapissea.cfs.io.impl.MemoryData;
-import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
-import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
+import com.lapissea.cfs.io.instancepipe.FixedStructPipe;
 import com.lapissea.cfs.io.instancepipe.ObjectPipe;
+import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.INumber;
@@ -798,7 +798,7 @@ public class BinaryGridRenderer implements DataRenderer{
 					
 					annotateStruct(annCtx, root,
 					               cluster.getFirstChunk().getPtr().makeReference(),
-					               FixedContiguousStructPipe.of(root.getThisStruct()),
+					               FixedStructPipe.of(root.getThisStruct()),
 					               null, true);
 					
 				}catch(Throwable e){
@@ -1542,7 +1542,7 @@ public class BinaryGridRenderer implements DataRenderer{
 									List<IOInstance<?>> inst=(List<IOInstance<?>>)(isList?instTmp:ArrayViewList.create((Object[])instTmp, null));
 									if(inst.isEmpty()) continue;
 									
-									StructPipe elementPipe=ContiguousStructPipe.of(Struct.ofUnknown(inst.get(0).getClass()));
+									StructPipe elementPipe=StandardStructPipe.of(Struct.ofUnknown(inst.get(0).getClass()));
 									long       arrOffset  =0;
 									for(IOInstance val : inst){
 										annotateStruct(ctx, val, reference.addOffset(fieldOffset+arrOffset), elementPipe, generics(instance, parentGenerics), annotate);

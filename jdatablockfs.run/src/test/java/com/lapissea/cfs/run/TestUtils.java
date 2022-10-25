@@ -5,7 +5,7 @@ import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.IOInterface;
-import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
+import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.tools.logging.DataLogger;
@@ -91,7 +91,7 @@ public class TestUtils{
 			
 			T obj=constr.make(provider, ref, typeDef);
 			
-			var actualSize=ContiguousStructPipe.sizeOfUnknown(provider, obj, WordSpace.BYTE);
+			var actualSize=StandardStructPipe.sizeOfUnknown(provider, obj, WordSpace.BYTE);
 			
 			if(actualSize>initalCapacity){
 				warn("Initial capacity is {} but object has allocated {}", initalCapacity, actualSize);
@@ -147,7 +147,7 @@ public class TestUtils{
 		TypeLink typeDef,
 		UnsafeConsumer<IOMap<K, V>, IOException> session
 	) throws IOException{
-		int initial=(int)ContiguousStructPipe.of(Struct.ofUnknown(typeDef.getTypeClass(null)), STATE_DONE).getSizeDescriptor().getMax(WordSpace.BYTE).orElse(8);
+		int initial=(int)StandardStructPipe.of(Struct.ofUnknown(typeDef.getTypeClass(null)), STATE_DONE).getSizeDescriptor().getMax(WordSpace.BYTE).orElse(8);
 		complexObjectIntegrityTest(info, initial, constr, typeDef, map->{
 			var splitter=Splitter.map(map, new ReferenceMemoryIOMap<>(), TestUtils::checkCompliance);
 			session.accept(splitter);

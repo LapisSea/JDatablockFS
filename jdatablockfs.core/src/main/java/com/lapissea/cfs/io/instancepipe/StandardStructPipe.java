@@ -17,33 +17,33 @@ import java.util.function.Supplier;
 
 import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.INSTANCE;
 
-public class ContiguousStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
+public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 	
 	public static <T extends IOInstance<T>> long sizeOfUnknown(DataProvider provider, T instance, WordSpace wordSpace){
-		var pip=ContiguousStructPipe.of(instance.getThisStruct());
+		var pip=StandardStructPipe.of(instance.getThisStruct());
 		return pip.calcUnknownSize(provider, instance, wordSpace);
 	}
 	
-	public static <T extends IOInstance<T>> ContiguousStructPipe<T> of(Class<T> type){
+	public static <T extends IOInstance<T>> StandardStructPipe<T> of(Class<T> type){
 		return of(Struct.of(type));
 	}
-	public static <T extends IOInstance<T>> ContiguousStructPipe<T> of(Class<T> type, int minRequestedStage){
+	public static <T extends IOInstance<T>> StandardStructPipe<T> of(Class<T> type, int minRequestedStage){
 		return of(Struct.of(type), minRequestedStage);
 	}
-	public static <T extends IOInstance<T>> ContiguousStructPipe<T> of(Struct<T> struct){
-		return of(ContiguousStructPipe.class, struct);
+	public static <T extends IOInstance<T>> StandardStructPipe<T> of(Struct<T> struct){
+		return of(StandardStructPipe.class, struct);
 	}
-	public static <T extends IOInstance<T>> ContiguousStructPipe<T> of(Struct<T> struct, int minRequestedStage){
-		return of(ContiguousStructPipe.class, struct, minRequestedStage);
+	public static <T extends IOInstance<T>> StandardStructPipe<T> of(Struct<T> struct, int minRequestedStage){
+		return of(StandardStructPipe.class, struct, minRequestedStage);
 	}
 	
 	@SuppressWarnings("unchecked")
-	public static <T extends IOInstance<T>, P extends ContiguousStructPipe<T>> void registerSpecialImpl(Struct<T> struct, Supplier<P> newType){
-		StructPipe.registerSpecialImpl(struct, (Class<P>)(Object)ContiguousStructPipe.class, newType);
+	public static <T extends IOInstance<T>, P extends StandardStructPipe<T>> void registerSpecialImpl(Struct<T> struct, Supplier<P> newType){
+		StructPipe.registerSpecialImpl(struct, (Class<P>)(Object)StandardStructPipe.class, newType);
 	}
 	
-	public ContiguousStructPipe(Struct<T> type, boolean runNow){
-		super(type, runNow);
+	public StandardStructPipe(Struct<T> type, boolean initNow){
+		super(type, initNow);
 	}
 	
 	@Override

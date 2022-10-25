@@ -2,7 +2,7 @@ package com.lapissea.cfs.chunk;
 
 import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.io.bit.EnumUniverse;
-import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
+import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.objects.ObjectID;
 import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.objects.text.AutoText;
@@ -72,7 +72,7 @@ public interface RootProvider extends DataProvider.Holder{
 				
 				if(struct instanceof Struct.Unmanaged<?> uStruct){
 					return withGenerator(()->{
-						var pipe=ContiguousStructPipe.of(struct);
+						var pipe=StandardStructPipe.of(struct);
 						var siz =pipe.getSizeDescriptor().calcAllocSize(WordSpace.BYTE);
 						
 						var mem=AllocateTicket.bytes(siz).submit(provider);

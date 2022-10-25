@@ -15,7 +15,7 @@ import com.lapissea.cfs.io.bit.FlagWriter;
 import com.lapissea.cfs.io.content.ContentOutputBuilder;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
-import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
+import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
@@ -107,15 +107,15 @@ import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.Creator, DataProvider.Holder, Comparable<Chunk>{
 	
 	/**
-	 * Internal implementation of the {@link ContiguousStructPipe}. This may be removed in the future as the generated/generic pipes get further optimized
+	 * Internal implementation of the {@link StandardStructPipe}. This may be removed in the future as the generated/generic pipes get further optimized
 	 */
-	private static class OptimizedChunkPipe extends ContiguousStructPipe<Chunk>{
+	private static class OptimizedChunkPipe extends StandardStructPipe<Chunk>{
 		
 		static{
 			if(DEBUG_VALIDATION){
 				var check="bodyNumSize + nextSize 1 byte capacity NS(bodyNumSize): 0-8 bytes size NS(bodyNumSize): 0-8 bytes nextPtr NS(nextSize): 0-8 bytes ";
 				var sb   =new StringBuilder(check.length());
-				var p    =ContiguousStructPipe.of(STRUCT, STATE_DONE);
+				var p    =StandardStructPipe.of(STRUCT, STATE_DONE);
 				for(IOField<Chunk, ?> specificField : p.getSpecificFields()){
 					sb.append(specificField.getName()).append(' ').append(specificField.getSizeDescriptor()).append(' ');
 				}
@@ -204,9 +204,9 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	static{
 		STRUCT=Struct.of(Chunk.class);
 		if(GlobalConfig.configFlag("abBenchmark.chunkOptimizedPipe", true)){
-			ContiguousStructPipe.registerSpecialImpl(STRUCT, OptimizedChunkPipe::new);
+			StandardStructPipe.registerSpecialImpl(STRUCT, OptimizedChunkPipe::new);
 		}
-		PIPE=ContiguousStructPipe.of(STRUCT);
+		PIPE=StandardStructPipe.of(STRUCT);
 	}
 	
 	

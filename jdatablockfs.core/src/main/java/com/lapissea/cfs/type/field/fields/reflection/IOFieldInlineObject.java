@@ -4,8 +4,8 @@ import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.internal.IUtils;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
-import com.lapissea.cfs.io.instancepipe.ContiguousStructPipe;
-import com.lapissea.cfs.io.instancepipe.FixedContiguousStructPipe;
+import com.lapissea.cfs.io.instancepipe.FixedStructPipe;
+import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
@@ -34,8 +34,8 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 		@SuppressWarnings("unchecked")
 		var struct=(Struct<ValueType>)Struct.ofUnknown(getAccessor().getType());
 		if(fixed){
-			instancePipe=FixedContiguousStructPipe.of(struct, STATE_DONE);
-		}else instancePipe=ContiguousStructPipe.of(struct);
+			instancePipe=FixedStructPipe.of(struct, STATE_DONE);
+		}else instancePipe=StandardStructPipe.of(struct);
 		
 		var desc=instancePipe.getSizeDescriptor();
 		
