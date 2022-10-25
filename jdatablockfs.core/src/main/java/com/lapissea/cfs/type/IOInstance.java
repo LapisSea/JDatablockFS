@@ -14,6 +14,7 @@ import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
+import com.lapissea.util.function.TriFunction;
 
 import java.io.IOException;
 import java.lang.annotation.ElementType;
@@ -105,6 +106,41 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 				try{
 					var ctor=t.c.getConstructor(t.arg1, t.arg2);
 					return Access.makeLambda(ctor, BiFunction.class);
+				}catch(ReflectiveOperationException e){
+					throw new RuntimeException(e);
+				}
+			});
+		}
+		
+		static <T extends Def<T>, A1, A2, A3> TriFunction<A1, A2, A3, T> constrRef(Class<T> type, Class<A1> arg1Type, Class<A1> arg2Type, Class<A1> arg3Type){
+			record Sig(Class<?> c, Class<?> arg1, Class<?> arg2, Class<?> arg3){}
+			class Cache{
+				static final Map<Sig, TriFunction<?, ?, ?, ?>> CH=new ConcurrentHashMap<>();
+			}
+			if(DefInstanceCompiler.isDefinition(type)) type=DefInstanceCompiler.getImpl(type, false);
+			
+			//noinspection unchecked
+			return (TriFunction<A1, A2, A3, T>)Cache.CH.computeIfAbsent(new Sig(type, arg1Type, arg2Type, arg3Type), t->{
+				try{
+					var ctor=t.c.getConstructor(t.arg1, t.arg2, t.arg3);
+					return Access.makeLambda(ctor, TriFunction.class);
+				}catch(ReflectiveOperationException e){
+					throw new RuntimeException(e);
+				}
+			});
+		}
+		
+		static <T extends Def<T>> MethodHandle constrRef(Class<T> type, Class<?>... argTypes){
+			record Sig(Class<?> c, Class<?>[] args){}
+			class Cache{
+				static final Map<Sig, MethodHandle> CH=new ConcurrentHashMap<>();
+			}
+			if(DefInstanceCompiler.isDefinition(type)) type=DefInstanceCompiler.getImpl(type, false);
+			
+			return Cache.CH.computeIfAbsent(new Sig(type, argTypes.clone()), t->{
+				try{
+					var ctor=t.c.getConstructor(t.args);
+					return Access.makeMethodHandle(ctor);
 				}catch(ReflectiveOperationException e){
 					throw new RuntimeException(e);
 				}
