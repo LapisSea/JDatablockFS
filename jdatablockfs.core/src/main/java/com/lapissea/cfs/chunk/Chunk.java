@@ -127,13 +127,7 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		}
 		
 		public OptimizedChunkPipe(){
-			super(STRUCT, true);
-		}
-		
-		@Override
-		protected List<IOField<Chunk, ?>> initFields(){
-			var f=getType().getFields();
-			return List.of(
+			super(STRUCT, (type, f)->List.of(
 				new BitFieldMerger<>(List.of(
 					(BitField<Chunk, ?>)f.requireExact(NumberSize.class, "bodyNumSize"),
 					(BitField<Chunk, ?>)f.requireExact(NumberSize.class, "nextSize")
@@ -141,7 +135,7 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 				f.requireExact(long.class, "capacity"),
 				f.requireExact(long.class, "size"),
 				f.requireExact(ChunkPointer.class, "nextPtr")
-			);
+			), true);
 		}
 		
 		@Override

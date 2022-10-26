@@ -193,10 +193,10 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	
 	public static final int STATE_IO_FIELD=1, STATE_SIZE_DESC=2;
 	
-	public StructPipe(Struct<T> type, boolean initNow){
+	public StructPipe(Struct<T> type, PipeFieldCompiler<T> compiler, boolean initNow){
 		this.type=type;
 		init(initNow, ()->{
-			this.ioFields=FieldSet.of(initFields());
+			this.ioFields=FieldSet.of(compiler.compile(getType(), getType().getFields()));
 			setInitState(STATE_IO_FIELD);
 			
 			sizeDescription=Objects.requireNonNull(createSizeDescriptor());
@@ -325,9 +325,6 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	private Stream<IOField<T, ?>> getNonNulls(){
 		return ioFields.unpackedStream().filter(f->f.getNullability()==IONullability.Mode.NOT_NULL&&f.getAccessor().canBeNull());
 	}
-	
-	protected abstract List<IOField<T, ?>> initFields();
-	
 	
 	protected record SizeGroup<T extends IOInstance<T>>(
 		SizeDescriptor.UnknownNum<T> num,
