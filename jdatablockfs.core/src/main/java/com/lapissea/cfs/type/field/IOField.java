@@ -291,6 +291,18 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 	}
 	
 	public interface VaryingSizeProvider{
+		static VaryingSizeProvider allFixed(NumberSize fixed){
+			return new VaryingSizeProvider(){
+				@Override
+				public NumberSize provide(NumberSize max){
+					return max==null?fixed:max.min(fixed);
+				}
+				@Override
+				public String toString(){
+					return "AllFixed("+fixed+")";
+				}
+			};
+		}
 		NumberSize provide(NumberSize max);
 	}
 	

@@ -1,7 +1,6 @@
 package com.lapissea.cfs.io.instancepipe;
 
 import com.lapissea.cfs.chunk.DataProvider;
-import com.lapissea.cfs.io.ValueStorage;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.objects.NumberSize;
@@ -24,11 +23,11 @@ public class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseFixedSt
 	
 	private final Map<IOField<T, NumberSize>, UnsafeSupplier<NumberSize, IOException>> config;
 	
-	public FixedVaryingStructPipe(Struct<T> type, boolean initNow, ValueStorage.StorageRule.VariableFixed rule){
+	public FixedVaryingStructPipe(Struct<T> type, boolean initNow, IOField.VaryingSizeProvider rule){
 		super(type, (t, structFields)->{
 			var sizeFields=sizeFieldStream(structFields).collect(Collectors.toSet());
 			return fixedFields(t, structFields, sizeFields::contains, f->{
-				return f.forceMaxAsFixedSize(rule.provider());
+				return f.forceMaxAsFixedSize(rule);
 			});
 		}, initNow);
 		if(type instanceof Struct.Unmanaged){

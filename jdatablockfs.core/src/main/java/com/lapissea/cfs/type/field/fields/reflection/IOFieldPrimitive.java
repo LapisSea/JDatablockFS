@@ -45,8 +45,8 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	public static final class FDouble<T extends IOInstance<T>> extends IOFieldPrimitive<T, Double>{
 		
 		
-		public FDouble(FieldAccessor<T> field)                    {this(field, false);}
-		public FDouble(FieldAccessor<T> field, boolean forceFixed){super(field, forceFixed, LONG);}
+		public FDouble(FieldAccessor<T> field)                     {this(field, false);}
+		private FDouble(FieldAccessor<T> field, boolean forceFixed){super(field, forceFixed, LONG);}
 		
 		@Override
 		protected EnumSet<NumberSize> allowedSizes(){
@@ -611,7 +611,10 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	@Override
 	public IOField<T, ValueType> maxAsFixedSize(VaryingSizeProvider varyingSizeProvider){
 		try{
-			return (IOField<T, ValueType>)getClass().getConstructor(FieldAccessor.class, boolean.class).newInstance(getAccessor(), true);
+			return (IOField<T, ValueType>)
+				       getClass()
+					       .getConstructor(FieldAccessor.class, VaryingSizeProvider.class)
+					       .newInstance(getAccessor(), varyingSizeProvider);
 		}catch(ReflectiveOperationException e){
 			throw new RuntimeException(e);
 		}

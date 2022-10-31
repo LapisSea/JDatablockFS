@@ -7,9 +7,8 @@ import com.lapissea.cfs.exceptions.FieldIsNullException;
 import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
-import com.lapissea.cfs.io.instancepipe.FixedStructPipe;
-import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
-import com.lapissea.cfs.io.instancepipe.StructPipe;
+import com.lapissea.cfs.io.instancepipe.*;
+import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.SizeDescriptor;
@@ -30,16 +29,21 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 	private final StructPipe<Reference>       referencePipe;
 	
 	public IOFieldUnmanagedObjectReference(FieldAccessor<T> accessor){
-		this(accessor, false);
+		this(accessor, null);
 	}
-	private IOFieldUnmanagedObjectReference(FieldAccessor<T> accessor, boolean fixed){
+	private IOFieldUnmanagedObjectReference(FieldAccessor<T> accessor, NumberSize fixed){
 		super(accessor);
 		if(getNullability()==DEFAULT_IF_NULL){
 			throw new MalformedStruct(DEFAULT_IF_NULL+" is not supported for unmanaged objects");
 		}
 		
-		if(fixed){
-			var pip=FixedStructPipe.of(Reference.class);
+		if(fixed!=null){
+			BaseFixedStructPipe<Reference> pip;
+			if(fixed==NumberSize.LARGEST){
+				pip=FixedStructPipe.of(Reference.STRUCT);
+			}else{
+				pip=new FixedVaryingStructPipe<>(Reference.STRUCT, true, VaryingSizeProvider.allFixed(fixed));
+			}
 			referencePipe=pip;
 			descriptor=pip.getFixedDescriptor();
 		}else{
@@ -98,7 +102,7 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 	}
 	@Override
 	public RefField<T, ValueType> maxAsFixedSize(VaryingSizeProvider varyingSizeProvider){
-		return new IOFieldUnmanagedObjectReference<>(getAccessor(), true);
+		return new IOFieldUnmanagedObjectReference<>(getAccessor(), varyingSizeProvider.provide(NumberSize.LARGEST));
 	}
 	
 	private Reference getReference(ValueType val){

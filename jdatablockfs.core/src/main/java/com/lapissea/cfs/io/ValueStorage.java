@@ -469,7 +469,7 @@ public sealed interface ValueStorage<T>{
 			
 			LogUtil.println(fixed.getSpecificFields());
 			
-			var varying=new FixedVaryingStructPipe<>(struct, true, rule);
+			var varying=new FixedVaryingStructPipe<>(struct, true, rule.provider);
 
 //			if(varying.getConfig().isEmpty()){
 //				return new FixedInstance<>(generics, provider, fixed);
