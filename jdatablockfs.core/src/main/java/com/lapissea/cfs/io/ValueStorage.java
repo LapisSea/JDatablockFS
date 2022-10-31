@@ -4,10 +4,7 @@ import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.UnsupportedStructLayout;
 import com.lapissea.cfs.io.content.ContentReader;
-import com.lapissea.cfs.io.instancepipe.FixedStructPipe;
-import com.lapissea.cfs.io.instancepipe.FixedVaryingStructPipe;
-import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
-import com.lapissea.cfs.io.instancepipe.StructPipe;
+import com.lapissea.cfs.io.instancepipe.*;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.objects.text.AutoText;
@@ -103,12 +100,12 @@ public sealed interface ValueStorage<T>{
 	
 	final class FixedInstance<T extends IOInstance<T>> implements ValueStorage.InstanceBased<T>{
 		
-		private final GenericContext     ctx;
-		private final DataProvider       provider;
-		private final FixedStructPipe<T> pipe;
-		private final long               size;
+		private final GenericContext         ctx;
+		private final DataProvider           provider;
+		private final BaseFixedStructPipe<T> pipe;
+		private final long                   size;
 		
-		public FixedInstance(GenericContext ctx, DataProvider provider, FixedStructPipe<T> pipe){
+		public FixedInstance(GenericContext ctx, DataProvider provider, BaseFixedStructPipe<T> pipe){
 			this.ctx=ctx;
 			this.provider=provider;
 			this.pipe=pipe;
@@ -130,7 +127,7 @@ public sealed interface ValueStorage<T>{
 			return size;
 		}
 		
-		public FixedStructPipe<T> getPipe(){
+		public BaseFixedStructPipe<T> getPipe(){
 			return pipe;
 		}
 		
@@ -434,7 +431,7 @@ public sealed interface ValueStorage<T>{
 		
 		record FixedOnly() implements StorageRule{}
 		
-		record VariableFixed(Supplier<UnsafeSupplier<NumberSize, IOException>> config) implements StorageRule{}
+		record VariableFixed(Supplier<NumberSize> config) implements StorageRule{}
 	}
 	
 	static ValueStorage<?> makeStorage(DataProvider provider, TypeLink typeDef, GenericContext generics, StorageRule rule){
@@ -478,13 +475,13 @@ public sealed interface ValueStorage<T>{
 			
 			LogUtil.println(fixed.getSpecificFields());
 			
-			var varying=new FixedVaryingStructPipe<>(struct, true, rule.config);
+			var varying=new FixedVaryingStructPipe<>(struct, true, rule);
 
 //			if(varying.getConfig().isEmpty()){
 //				return new FixedInstance<>(generics, provider, fixed);
 //			}
 			
-			return new Instance<>(generics, provider, varying);
+			return new FixedInstance<>(generics, provider, varying);
 		}catch(UnsupportedStructLayout ignored1){
 			LogUtil.printlnEr(struct+" variable fixed not implemented");
 			return new FixedReferencedInstance<>(generics, provider, StandardStructPipe.of(struct));

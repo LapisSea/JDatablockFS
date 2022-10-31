@@ -11,8 +11,14 @@ import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
+import com.lapissea.cfs.type.field.SizeDescriptor;
 
-import java.util.*;
+import java.util.AbstractMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -25,17 +31,15 @@ public abstract class BaseFixedStructPipe<T extends IOInstance<T>> extends Struc
 	}
 	
 	
-	protected static <T extends IOInstance<T>> List<IOField<T, ?>> fixedFieldsSet(Struct<T> type, FieldSet<T> structFields, Set<IOField<T, NumberSize>> sizeFields){
+	protected static <T extends IOInstance<T>> List<IOField<T, ?>> fixedFields(Struct<T> type, FieldSet<T> structFields, Predicate<IOField<T, ?>> checkFixed, Function<IOField<T, ?>, IOField<T, ?>> makeFixed){
 		type.waitForState(Struct.STATE_INIT_FIELDS);
 		try{
 			return IOFieldTools.stepFinal(
 				structFields,
 				List.of(
-					IOFieldTools.streamStep(s->s.map(f->{
-						return sizeFields.contains(f)?f:f.forceMaxAsFixedSize();
-					})),
+					IOFieldTools.streamStep(s->s.map(f->checkFixed.test(f)?f:makeFixed.apply(f))),
 					IOFieldTools::dependencyReorder,
-					IOFieldTools.streamStep(s->s.filter(not(sizeFields::contains))),
+					IOFieldTools.streamStep(s->s.filter(not(checkFixed))),
 					IOFieldTools::mergeBitSpace
 				));
 		}catch(FixedFormatNotSupportedException e){
@@ -76,4 +80,7 @@ public abstract class BaseFixedStructPipe<T extends IOInstance<T>> extends Struc
 		return structFields.stream().map(f->IOFieldTools.getDynamicSize(f.getAccessor())).filter(Optional::isPresent).map(Optional::get);
 	}
 	
+	public <E extends IOInstance<E>> SizeDescriptor.Fixed<E> getFixedDescriptor(){
+		return (SizeDescriptor.Fixed<E>)super.getSizeDescriptor();
+	}
 }

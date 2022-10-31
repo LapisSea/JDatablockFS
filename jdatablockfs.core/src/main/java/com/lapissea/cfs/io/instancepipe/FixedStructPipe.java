@@ -10,7 +10,6 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.field.IOField;
-import com.lapissea.cfs.type.field.SizeDescriptor;
 
 import java.io.IOException;
 import java.util.Map;
@@ -24,7 +23,7 @@ public class FixedStructPipe<T extends IOInstance<T>> extends BaseFixedStructPip
 	public static <T extends IOInstance<T>> PipeFieldCompiler<T> compiler(){
 		return (t, structFields)->{
 			var sizeFields=sizeFieldStream(structFields).collect(Collectors.toSet());
-			return fixedFieldsSet(t, structFields, sizeFields);
+			return fixedFields(t, structFields, sizeFields::contains, IOField::forceMaxAsFixedSize);
 		};
 	}
 	
@@ -61,10 +60,6 @@ public class FixedStructPipe<T extends IOInstance<T>> extends BaseFixedStructPip
 				if(!getSizeDescriptor().hasFixed()) throw new RuntimeException();
 			}
 		}
-	}
-	
-	public <E extends IOInstance<E>> SizeDescriptor.Fixed<E> getFixedDescriptor(){
-		return (SizeDescriptor.Fixed<E>)super.getSizeDescriptor();
 	}
 	
 	private void setMax(T instance, VarPool<T> ioPool){

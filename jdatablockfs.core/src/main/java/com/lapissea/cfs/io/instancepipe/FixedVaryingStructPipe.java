@@ -1,6 +1,7 @@
 package com.lapissea.cfs.io.instancepipe;
 
 import com.lapissea.cfs.chunk.DataProvider;
+import com.lapissea.cfs.io.ValueStorage;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.objects.NumberSize;
@@ -17,16 +18,18 @@ import com.lapissea.util.function.UnsafeSupplier;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
-import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 public class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseFixedStructPipe<T>{
 	
 	private final Map<IOField<T, NumberSize>, UnsafeSupplier<NumberSize, IOException>> config;
 	
-	public FixedVaryingStructPipe(Struct<T> type, boolean initNow, Supplier<UnsafeSupplier<NumberSize, IOException>> numProvider){
+	public FixedVaryingStructPipe(Struct<T> type, boolean initNow, ValueStorage.StorageRule.VariableFixed rule){
 		super(type, (t, structFields)->{
-			return fixedFieldsSet(t, structFields, Set.of());
+			var sizeFields=sizeFieldStream(structFields).collect(Collectors.toSet());
+			return fixedFields(t, structFields, sizeFields::contains, f->{
+				f.forceMaxAsFixedSize();
+			});
 		}, initNow);
 		if(type instanceof Struct.Unmanaged){
 			throw new IllegalArgumentException("Unmanaged types are not supported");
