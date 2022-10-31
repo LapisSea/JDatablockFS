@@ -5,6 +5,7 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.SupportedPrimitive;
 import com.lapissea.cfs.type.compilation.AnnotationLogic;
 import com.lapissea.cfs.type.field.IOFieldTools;
+import com.lapissea.cfs.type.field.StoragePool;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
 import com.lapissea.cfs.type.field.access.AnnotatedType;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
@@ -45,7 +46,7 @@ public @interface IONullability{
 				if(annotation.value()!=Mode.NULLABLE) return List.of();
 				
 				return List.of(new VirtualFieldDefinition<T, boolean[]>(
-					VirtualFieldDefinition.StoragePool.IO,
+					StoragePool.IO,
 					IOFieldTools.makeNullElementsFlagName(field),
 					boolean[].class,
 					(ioPool, instance, dependencies, value)->{
@@ -124,7 +125,7 @@ public @interface IONullability{
 			if(!isNullable(field)) return List.of();
 			
 			return List.of(new VirtualFieldDefinition<T, Boolean>(
-				VirtualFieldDefinition.StoragePool.IO,
+				StoragePool.IO,
 				IOFieldTools.makeNullFlagName(field),
 				boolean.class
 			));

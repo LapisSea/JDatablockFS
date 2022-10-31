@@ -28,7 +28,6 @@ import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.AbstractFieldAccessor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.access.TypeFlag;
-import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.cfs.type.field.annotations.IODynamic;
 import com.lapissea.cfs.type.field.fields.BitField;
 import com.lapissea.cfs.type.field.fields.NoIOField;
@@ -58,7 +57,7 @@ import static com.lapissea.cfs.logging.Log.trace;
 import static com.lapissea.cfs.logging.Log.warn;
 import static com.lapissea.cfs.tools.ColorUtils.alpha;
 import static com.lapissea.cfs.tools.render.RenderBackend.DrawMode;
-import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
+import static com.lapissea.cfs.type.field.StoragePool.IO;
 import static com.lapissea.util.PoolOwnThread.async;
 import static com.lapissea.util.UtilL.TRUE;
 import static org.lwjgl.glfw.GLFW.*;
@@ -1352,8 +1351,7 @@ public class BinaryGridRenderer implements DataRenderer{
 				IOField<T, Object> field=iterator.next();
 				try{
 					
-					var acc=field.getAccessor();
-					if(acc instanceof VirtualAccessor<T> vAcc&&vAcc.getStoragePool()==IO){
+					if(Utils.isVirtual(field, IO)){
 						try{
 							reference.withContext(ctx.provider).io(io->{
 								pipe.readSingleField(ioPool, ctx.provider, io, field, instance, generics(instance, parentGenerics));
@@ -1373,6 +1371,8 @@ public class BinaryGridRenderer implements DataRenderer{
 					size=sizeDesc.calcUnknown(ioPool, ctx.provider, instance, sizeDesc.getWordSpace());
 					
 					try{
+						var acc=field.getAccessor();
+						
 						if(acc!=null&&acc.hasAnnotation(IODynamic.class)){
 							
 							var inst=field.get(ioPool, instance);

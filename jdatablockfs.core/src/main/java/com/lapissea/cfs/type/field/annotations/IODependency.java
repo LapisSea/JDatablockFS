@@ -17,8 +17,8 @@ import java.lang.annotation.Target;
 import java.util.List;
 import java.util.Set;
 
-import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.INSTANCE;
-import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
+import static com.lapissea.cfs.type.field.StoragePool.INSTANCE;
+import static com.lapissea.cfs.type.field.StoragePool.IO;
 import static com.lapissea.cfs.type.field.annotations.IODependency.VirtualNumSize.RetentionPolicy.GHOST;
 
 @Retention(RetentionPolicy.RUNTIME)

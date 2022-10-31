@@ -41,7 +41,7 @@ import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.GlobalConfig.TYPE_VALIDATION;
 import static com.lapissea.cfs.type.StagedInit.STATE_DONE;
 import static com.lapissea.cfs.type.StagedInit.runBaseStageTask;
-import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
+import static com.lapissea.cfs.type.field.StoragePool.IO;
 
 public class InstanceCollection{
 	

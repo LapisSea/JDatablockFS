@@ -2,6 +2,10 @@ package com.lapissea.cfs;
 
 import com.lapissea.cfs.objects.Stringify;
 import com.lapissea.cfs.objects.collections.IOList;
+import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.StoragePool;
+import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
@@ -269,5 +273,15 @@ public class Utils{
 			break;
 		}
 		throw UtilL.uncheckedThrow(e);
+	}
+	
+	public static boolean isVirtual(IOField<?, ?> field, StoragePool pool){
+		return field.getAccessor() instanceof VirtualAccessor<?> acc&&
+		       (pool==null||acc.getStoragePool()==pool);
+	}
+	public static <T extends IOInstance<T>> VirtualAccessor<T> getVirtual(IOField<T, ?> field, StoragePool pool){
+		return field.getAccessor() instanceof VirtualAccessor<T> acc&&
+		       (pool==null||acc.getStoragePool()==pool)
+		       ?acc:null;
 	}
 }

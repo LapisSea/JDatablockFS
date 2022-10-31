@@ -1,5 +1,6 @@
 package com.lapissea.cfs.type;
 
+import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.chunk.MemoryOperations;
 import com.lapissea.cfs.internal.Access;
@@ -10,7 +11,6 @@ import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.objects.Stringify;
 import com.lapissea.cfs.type.compilation.DefInstanceCompiler;
 import com.lapissea.cfs.type.field.IOField;
-import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
@@ -29,8 +29,8 @@ import java.util.function.Function;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
-import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.INSTANCE;
-import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
+import static com.lapissea.cfs.type.field.StoragePool.INSTANCE;
+import static com.lapissea.cfs.type.field.StoragePool.IO;
 
 @SuppressWarnings({"UnusedReturnValue", "unused"})
 public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Cloneable, Stringify{
@@ -314,10 +314,10 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 				if(field.typeFlag(IOField.PRIMITIVE_OR_ENUM_FLAG)){
 					continue;
 				}
-				var acc=field.getAccessor();
-				if(acc instanceof VirtualAccessor<?> vAcc&&vAcc.getStoragePool()==IO){
+				if(Utils.isVirtual(field, IO)){
 					continue;
 				}
+				var acc=field.getAccessor();
 				var typ=acc.getType();
 				if(typ.isArray()){
 					var arrField=(IOField<SELF, Object[]>)field;

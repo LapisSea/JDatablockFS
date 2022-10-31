@@ -5,6 +5,7 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.StoragePool;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition.GetterFilter;
 import com.lapissea.util.NotNull;
@@ -37,7 +38,7 @@ public final class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends Abstra
 	private final int primitiveSize;
 	
 	public VirtualAccessor(Struct<CTyp> struct, VirtualFieldDefinition<CTyp, Object> type, int ptrIndex, int primitiveOffset, int primitiveSize){
-		super(struct, type.getName(), type.getType());
+		super(struct, type.name, type.type);
 		
 		boolean noPtr=ptrIndex<0;
 		boolean noOff=primitiveOffset<0;
@@ -57,7 +58,7 @@ public final class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends Abstra
 		this.primitiveOffset=primitiveOffset;
 		this.primitiveSize=primitiveSize;
 		
-		filter=type.getGetFilter();
+		filter=type.getFilter;
 	}
 	
 	public int getPtrIndex(){
@@ -72,7 +73,7 @@ public final class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends Abstra
 		return primitiveSize;
 	}
 	
-	public VirtualFieldDefinition.StoragePool getStoragePool(){
+	public StoragePool getStoragePool(){
 		return type.storagePool;
 	}
 	
@@ -80,11 +81,11 @@ public final class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends Abstra
 	@Nullable
 	@Override
 	public <T extends Annotation> Optional<T> getAnnotation(Class<T> annotationClass){
-		return Optional.ofNullable(type.getAnnotations().get(annotationClass));
+		return Optional.ofNullable(type.annotations.get(annotationClass));
 	}
 	@Override
 	public boolean hasAnnotation(Class<? extends Annotation> annotationClass){
-		return type.getAnnotations().isPresent(annotationClass);
+		return type.annotations.isPresent(annotationClass);
 	}
 	
 	public void init(IOField<CTyp, ?> field){

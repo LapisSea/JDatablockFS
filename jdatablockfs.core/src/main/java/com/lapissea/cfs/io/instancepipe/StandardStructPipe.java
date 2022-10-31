@@ -1,5 +1,6 @@
 package com.lapissea.cfs.io.instancepipe;
 
+import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.internal.MemPrimitive;
 import com.lapissea.cfs.io.content.ContentReader;
@@ -8,14 +9,13 @@ import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
-import com.lapissea.cfs.type.field.access.VirtualAccessor;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Supplier;
 
-import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.INSTANCE;
+import static com.lapissea.cfs.type.field.StoragePool.IO;
 
 public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 	
@@ -132,7 +132,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		List<CmdBuild> cmds  =new ArrayList<>(fields.size());
 		
 		for(IOField<T, ?> field : fields){
-			var needsInstance=!field.streamUnpackedFields().allMatch(f->f.getAccessor() instanceof VirtualAccessor<T> acc&&acc.getStoragePool()!=INSTANCE);
+			var needsInstance=!field.streamUnpackedFields().allMatch(f->Utils.isVirtual(f, IO));
 			
 			if(field.streamUnpackedFields().flatMap(fields::streamDependentOn).findAny().isPresent()){
 				cmds.add(new CmdBuild.Read(needsInstance));

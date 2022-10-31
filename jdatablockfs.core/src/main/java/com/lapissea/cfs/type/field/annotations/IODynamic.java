@@ -3,6 +3,7 @@ package com.lapissea.cfs.type.field.annotations;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.compilation.AnnotationLogic;
 import com.lapissea.cfs.type.field.IOFieldTools;
+import com.lapissea.cfs.type.field.StoragePool;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.util.NotNull;
@@ -25,7 +26,7 @@ public @interface IODynamic{
 		@Override
 		public <T extends IOInstance<T>> List<VirtualFieldDefinition<T, ?>> injectPerInstanceValue(FieldAccessor<T> field, IODynamic annotation){
 			return List.of(new VirtualFieldDefinition<T, Integer>(
-				VirtualFieldDefinition.StoragePool.IO,
+				StoragePool.IO,
 				IOFieldTools.makeGenericIDFieldName(field),
 				int.class,
 				List.of(IOFieldTools.makeAnnotation(IODependency.VirtualNumSize.class, Map.of()), IOValue.Unsigned.INSTANCE)

@@ -2,12 +2,11 @@ package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.internal.MemPrimitive;
-import com.lapissea.cfs.type.field.IOField;
-import com.lapissea.cfs.type.field.VirtualFieldDefinition;
+import com.lapissea.cfs.type.field.StoragePool;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.util.NotImplementedException;
 
-import java.util.List;
+import java.util.Arrays;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -26,7 +25,7 @@ public interface VarPool<T extends IOInstance<T>>{
 		private Object[] pool;
 		private byte[]   primitives;
 		
-		GeneralVarArray(Struct<T> typ, VirtualFieldDefinition.StoragePool pool){
+		GeneralVarArray(Struct<T> typ, StoragePool pool){
 			poolId=(byte)pool.ordinal();
 			this.typ=typ;
 			
@@ -42,11 +41,18 @@ public interface VarPool<T extends IOInstance<T>>{
 				throw new IllegalArgumentException(accessor.getDeclaringStruct()+" != "+typ);
 			}
 		}
-		private void protectAccessor(VirtualAccessor<T> accessor, List<Class<?>> types){
+		private void protectAccessor(VirtualAccessor<T> accessor, Class<?>... types){
 			protectAccessor(accessor);
 			
-			if(types.stream().noneMatch(type->accessor.getType()==type)){
-				throw new IllegalArgumentException(accessor.getType()+" != "+types.stream().map(Class::getName).collect(Collectors.joining(" || ", "(", ")")));
+			if(Arrays.stream(types).noneMatch(type->accessor.getType()==type)){
+				throw new IllegalArgumentException(accessor.getType()+" != "+Arrays.stream(types).map(Class::getName).collect(Collectors.joining(" || ", "(", ")")));
+			}
+		}
+		private void protectAccessor(VirtualAccessor<T> accessor, Class<?> type){
+			protectAccessor(accessor);
+			
+			if(accessor.getType()!=type){
+				throw new IllegalArgumentException(accessor.getType()+" != "+type);
 			}
 		}
 		
@@ -95,7 +101,7 @@ public interface VarPool<T extends IOInstance<T>>{
 		
 		@Override
 		public long getLong(VirtualAccessor<T> accessor){
-			if(DEBUG_VALIDATION) protectAccessor(accessor, List.of(long.class, int.class));
+			if(DEBUG_VALIDATION) protectAccessor(accessor, long.class, int.class);
 			
 			if(primitives==null) return 0;
 			
@@ -107,7 +113,7 @@ public interface VarPool<T extends IOInstance<T>>{
 		}
 		@Override
 		public void setLong(VirtualAccessor<T> accessor, long value){
-			if(DEBUG_VALIDATION) protectAccessor(accessor, List.of(long.class));
+			if(DEBUG_VALIDATION) protectAccessor(accessor, long.class);
 			
 			if(primitives==null){
 				if(value==0) return;
@@ -118,14 +124,14 @@ public interface VarPool<T extends IOInstance<T>>{
 		
 		@Override
 		public int getInt(VirtualAccessor<T> accessor){
-			if(DEBUG_VALIDATION) protectAccessor(accessor, List.of(int.class));
+			if(DEBUG_VALIDATION) protectAccessor(accessor, int.class);
 			
 			if(primitives==null) return 0;
 			return MemPrimitive.getInt(primitives, accessor.getPrimitiveOffset());
 		}
 		@Override
 		public void setInt(VirtualAccessor<T> accessor, int value){
-			if(DEBUG_VALIDATION) protectAccessor(accessor, List.of(int.class, long.class));
+			if(DEBUG_VALIDATION) protectAccessor(accessor, int.class, long.class);
 			
 			if(primitives==null){
 				if(value==0) return;
@@ -141,23 +147,23 @@ public interface VarPool<T extends IOInstance<T>>{
 		
 		@Override
 		public boolean getBoolean(VirtualAccessor<T> accessor){
-			if(DEBUG_VALIDATION) protectAccessor(accessor, List.of(boolean.class));
+			if(DEBUG_VALIDATION) protectAccessor(accessor, boolean.class);
 			return getByte0(accessor)==1;
 		}
 		@Override
 		public void setBoolean(VirtualAccessor<T> accessor, boolean value){
-			if(DEBUG_VALIDATION) protectAccessor(accessor, List.of(boolean.class));
+			if(DEBUG_VALIDATION) protectAccessor(accessor, boolean.class);
 			setByte0(accessor, (byte)(value?1:0));
 		}
 		
 		@Override
 		public byte getByte(VirtualAccessor<T> accessor){
-			if(DEBUG_VALIDATION) protectAccessor(accessor, List.of(byte.class));
+			if(DEBUG_VALIDATION) protectAccessor(accessor, byte.class);
 			return getByte0(accessor);
 		}
 		@Override
 		public void setByte(VirtualAccessor<T> accessor, byte value){
-			if(DEBUG_VALIDATION) protectAccessor(accessor, List.of(byte.class));
+			if(DEBUG_VALIDATION) protectAccessor(accessor, byte.class);
 			setByte0(accessor, value);
 		}
 		
@@ -178,9 +184,8 @@ public interface VarPool<T extends IOInstance<T>>{
 		public String toString(){
 			return typ.getFields()
 			          .stream()
-			          .map(IOField::getAccessor)
-			          .filter(f->f instanceof VirtualAccessor<T> acc&&acc.getStoragePool().ordinal()==poolId)
-			          .map(f->(VirtualAccessor<T>)f)
+			          .map(f->Utils.getVirtual(f, StoragePool.values()[poolId]))
+			          .filter(Objects::nonNull)
 			          .map(c->c.getName()+": "+Utils.toShortString(get(c)))
 			          .collect(Collectors.joining(", ", Utils.classNameToHuman(typ.getType().getName(), false)+"{", "}"));
 		}
