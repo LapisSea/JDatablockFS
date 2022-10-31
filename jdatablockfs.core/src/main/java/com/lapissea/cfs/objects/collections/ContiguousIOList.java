@@ -60,7 +60,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		cache=readOnly?new HashMap<>():null;
 		
 		var magnetProvider=provider.withRouter(t->t.withPositionMagnet(t.positionMagnet().orElse(getReference().getPtr().getValue())));
-		this.storage=(ValueStorage<T>)ValueStorage.makeStorage(magnetProvider, typeDef.arg(0), getGenerics(), new StorageRule.VariableFixed(()->NumberSize.INT));
+		this.storage=(ValueStorage<T>)ValueStorage.makeStorage(magnetProvider, typeDef.arg(0), getGenerics(), new StorageRule.VariableFixed(max->max.min(NumberSize.INT)));
 		
 		Assert(this.storage.inlineSize()!=-1);
 		

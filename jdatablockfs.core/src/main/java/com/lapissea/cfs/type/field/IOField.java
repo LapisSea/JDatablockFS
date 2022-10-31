@@ -7,6 +7,7 @@ import com.lapissea.cfs.exceptions.FixedFormatNotSupportedException;
 import com.lapissea.cfs.io.IO;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
+import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Stringify;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
@@ -289,12 +290,19 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 		return new FixedFormatNotSupportedException(this);
 	}
 	
+	public interface VaryingSizeProvider{
+		NumberSize provide(NumberSize max);
+	}
+	
 	public final IOField<T, ValueType> forceMaxAsFixedSize(){
+		return forceMaxAsFixedSize(null);
+	}
+	public final IOField<T, ValueType> forceMaxAsFixedSize(VaryingSizeProvider provider){
 		if(getSizeDescriptor().hasFixed()) return this;
 		if(!getSizeDescriptor().hasMax()){
 			throw unsupportedFixed();
 		}
-		var f=implMaxAsFixedSize();
+		var f=maxAsFixedSize(provider==null?max->max:provider);
 		f.initLateData(getDependencies());
 		f.init();
 		if(!f.getSizeDescriptor().hasFixed()) throw new RuntimeException(this+" failed to make itself fixed");
@@ -302,7 +310,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 	}
 	
 	
-	protected IOField<T, ValueType> implMaxAsFixedSize(){
+	protected IOField<T, ValueType> maxAsFixedSize(VaryingSizeProvider varyingSizeProvider){
 		throw unsupportedFixed();
 	}
 	

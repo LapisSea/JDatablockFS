@@ -73,7 +73,7 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 	}
 	
 	@Override
-	public IOField<CTyp, ValueType> implMaxAsFixedSize(){
+	public IOField<CTyp, ValueType> maxAsFixedSize(VaryingSizeProvider varyingSizeProvider){
 		return new IOFieldInlineObject<>(getAccessor(), true);
 	}
 	

@@ -5,7 +5,6 @@ import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.UnsupportedStructLayout;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.instancepipe.*;
-import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.cfs.type.*;
@@ -19,7 +18,6 @@ import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.IOException;
-import java.util.function.Supplier;
 
 import static com.lapissea.cfs.type.StagedInit.STATE_DONE;
 
@@ -422,16 +420,12 @@ public sealed interface ValueStorage<T>{
 		}
 	}
 	
-	interface FuckIdkNameThisLater{
-		UnsafeSupplier<NumberSize, IOException> numberSlot();
-	}
-	
 	sealed interface StorageRule{
 		record Default() implements StorageRule{}
 		
 		record FixedOnly() implements StorageRule{}
 		
-		record VariableFixed(Supplier<NumberSize> config) implements StorageRule{}
+		record VariableFixed(IOField.VaryingSizeProvider provider) implements StorageRule{}
 	}
 	
 	static ValueStorage<?> makeStorage(DataProvider provider, TypeLink typeDef, GenericContext generics, StorageRule rule){

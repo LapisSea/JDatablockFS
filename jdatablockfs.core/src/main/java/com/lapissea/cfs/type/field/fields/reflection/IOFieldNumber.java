@@ -51,7 +51,7 @@ public class IOFieldNumber<T extends IOInstance<T>, E extends INumber> extends I
 		                       .orElse(SizeDescriptor.Fixed.of(size.bytes));
 	}
 	@Override
-	public IOField<T, E> implMaxAsFixedSize(){
+	public IOField<T, E> maxAsFixedSize(VaryingSizeProvider varyingSizeProvider){
 		return new IOFieldNumber<>(getAccessor(), true);
 	}
 	

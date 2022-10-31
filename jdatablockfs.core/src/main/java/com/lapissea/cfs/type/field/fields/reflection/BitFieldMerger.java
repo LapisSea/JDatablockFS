@@ -190,8 +190,8 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 	}
 	
 	@Override
-	public IOField<T, Object> implMaxAsFixedSize(){
-		return new BitFieldMerger<>(group.stream().<BitField<T, ?>>map(BitField::implMaxAsFixedSize).toList());
+	public IOField<T, Object> maxAsFixedSize(VaryingSizeProvider varyingSizeProvider){
+		return new BitFieldMerger<>(group.stream().<BitField<T, ?>>map(f->f.maxAsFixedSize(varyingSizeProvider)).toList());
 	}
 	
 	@Override

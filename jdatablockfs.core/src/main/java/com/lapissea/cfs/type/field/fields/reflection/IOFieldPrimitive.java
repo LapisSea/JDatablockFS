@@ -609,7 +609,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	
 	@SuppressWarnings("unchecked")
 	@Override
-	public IOField<T, ValueType> implMaxAsFixedSize(){
+	public IOField<T, ValueType> maxAsFixedSize(VaryingSizeProvider varyingSizeProvider){
 		try{
 			return (IOField<T, ValueType>)getClass().getConstructor(FieldAccessor.class, boolean.class).newInstance(getAccessor(), true);
 		}catch(ReflectiveOperationException e){

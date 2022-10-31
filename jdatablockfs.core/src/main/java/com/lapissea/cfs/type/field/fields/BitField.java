@@ -67,7 +67,7 @@ public abstract class BitField<T extends IOInstance<T>, Type> extends IOField<T,
 	public abstract void skipReadBits(BitReader src, T instance) throws IOException;
 	
 	@Override
-	public BitField<T, Type> implMaxAsFixedSize(){
+	public BitField<T, Type> maxAsFixedSize(VaryingSizeProvider varyingSizeProvider){
 		throw new NotImplementedException();
 	}
 }

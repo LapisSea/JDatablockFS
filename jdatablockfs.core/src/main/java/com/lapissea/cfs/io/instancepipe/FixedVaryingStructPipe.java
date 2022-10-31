@@ -28,7 +28,7 @@ public class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseFixedSt
 		super(type, (t, structFields)->{
 			var sizeFields=sizeFieldStream(structFields).collect(Collectors.toSet());
 			return fixedFields(t, structFields, sizeFields::contains, f->{
-				f.forceMaxAsFixedSize();
+				return f.forceMaxAsFixedSize(rule.provider());
 			});
 		}, initNow);
 		if(type instanceof Struct.Unmanaged){
