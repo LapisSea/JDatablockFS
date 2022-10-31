@@ -11,6 +11,7 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.StoragePool;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
 import com.lapissea.cfs.type.field.access.*;
 import com.lapissea.cfs.type.field.annotations.*;
@@ -189,8 +190,8 @@ public class FieldCompiler{
 	
 	private static <T extends IOInstance<T>> void generateVirtualFields(List<AnnotatedField<T>> parsed, Struct<T> struct){
 		
-		var accessIndex    =new EnumMap<VirtualFieldDefinition.StoragePool, Integer>(VirtualFieldDefinition.StoragePool.class);
-		var primitiveOffset=new EnumMap<VirtualFieldDefinition.StoragePool, Integer>(VirtualFieldDefinition.StoragePool.class);
+		var accessIndex    =new EnumMap<StoragePool, Integer>(StoragePool.class);
+		var primitiveOffset=new EnumMap<StoragePool, Integer>(StoragePool.class);
 		var virtualData    =new HashMap<String, FieldAccessor<T>>();
 		var newVirtualData =new HashMap<String, FieldAccessor<T>>();
 		
@@ -200,24 +201,24 @@ public class FieldCompiler{
 			for(var runAnn : toRun){
 				for(var logicalAnn : runAnn.annotations){
 					for(var s : logicalAnn.logic().injectPerInstanceValue(runAnn.field.getAccessor(), logicalAnn.annotation())){
-						var existing=virtualData.get(s.getName());
+						var existing=virtualData.get(s.name);
 						if(existing!=null){
 							var gTyp=existing.getGenericType(null);
-							if(!gTyp.equals(s.getType())){
-								throw new IllegalField("Virtual field "+existing.getName()+" already defined but has a type conflict of "+gTyp+" and "+s.getType());
+							if(!gTyp.equals(s.type)){
+								throw new IllegalField("Virtual field "+existing.getName()+" already defined but has a type conflict of "+gTyp+" and "+s.type);
 							}
 							continue;
 						}
 						
 						int primitiveSize, off, ptrIndex;
 						
-						if(!(s.getType() instanceof Class<?> c)||!c.isPrimitive()){
+						if(!(s.type instanceof Class<?> c)||!c.isPrimitive()){
 							primitiveSize=off=-1;
 							ptrIndex=accessIndex.compute(s.storagePool, (k, v)->v==null?0:v+1);
 						}else{
-							if(List.of(long.class, double.class).contains(s.getType())){
+							if(List.of(long.class, double.class).contains(s.type)){
 								primitiveSize=8;
-							}else if(List.of(byte.class, boolean.class).contains(s.getType())){
+							}else if(List.of(byte.class, boolean.class).contains(s.type)){
 								primitiveSize=1;
 							}else{
 								primitiveSize=4;
@@ -230,8 +231,8 @@ public class FieldCompiler{
 						}
 						
 						FieldAccessor<T> accessor=new VirtualAccessor<>(struct, (VirtualFieldDefinition<T, Object>)s, ptrIndex, off, primitiveSize);
-						virtualData.put(s.getName(), accessor);
-						newVirtualData.put(s.getName(), accessor);
+						virtualData.put(s.name, accessor);
+						newVirtualData.put(s.name, accessor);
 					}
 				}
 			}

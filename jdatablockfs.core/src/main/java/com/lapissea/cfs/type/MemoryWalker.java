@@ -21,7 +21,7 @@ import java.util.Map;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.type.CommandSet.*;
-import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
+import static com.lapissea.cfs.type.field.StoragePool.IO;
 
 public class MemoryWalker{
 	

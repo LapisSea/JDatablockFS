@@ -41,26 +41,11 @@ public final class VirtualFieldDefinition<IO extends IOInstance<IO>, T>{
 		T filter(VarPool<IO> ioPool, IO instance, List<FieldAccessor<IO>> dependencies, T value);
 	}
 	
-	public enum StoragePool{
-		/**
-		 * Values in this storage pool remain as long as the instance is alive.
-		 */
-		INSTANCE("<<"),
-		/**
-		 * Values in this storage pool remain as long as there is an IO operation is executing.
-		 * Used for fields that are only needed to correctly read another field such as length of an array.
-		 */
-		IO("IO");
-		
-		public final String shortName;
-		StoragePool(String shortName){this.shortName=shortName;}
-	}
-	
-	public final  StoragePool         storagePool;
-	private final String              name;
-	private final Type                type;
-	private final GetterFilter<IO, T> getFilter;
-	private final GetAnnotation       annotations;
+	public final StoragePool         storagePool;
+	public final String              name;
+	public final Type                type;
+	public final GetterFilter<IO, T> getFilter;
+	public final GetAnnotation       annotations;
 	
 	public VirtualFieldDefinition(StoragePool storagePool, String name, Type type){
 		this(storagePool, name, type, null, List.of());
@@ -84,13 +69,8 @@ public final class VirtualFieldDefinition<IO extends IOInstance<IO>, T>{
 		this.annotations=GetAnnotation.from(annotations);
 	}
 	
-	public String getName()                  {return name;}
-	public Type getType()                    {return type;}
-	public GetterFilter<IO, T> getGetFilter(){return getFilter;}
-	public GetAnnotation getAnnotations()    {return annotations;}
-	
 	@Override
 	public String toString(){
-		return getName()+": "+Utils.typeToHuman(type, false);
+		return name+": "+Utils.typeToHuman(type, false);
 	}
 }

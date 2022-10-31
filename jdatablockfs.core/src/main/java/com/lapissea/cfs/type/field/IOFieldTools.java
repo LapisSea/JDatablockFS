@@ -10,7 +10,6 @@ import com.lapissea.cfs.type.SupportedPrimitive;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.compilation.DepSort;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
-import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.fields.BitField;
@@ -98,7 +97,7 @@ public class IOFieldTools{
 				                 return order;
 			                 })
 			                 //Pull any temporary fields back to reduce unessecary field skipping when re-reading them
-			                 .thenComparingInt(f->f.getAccessor() instanceof VirtualAccessor<T> a&&a.getStoragePool()!=VirtualFieldDefinition.StoragePool.INSTANCE?0:1)
+			                 .thenComparingInt(f->Utils.isVirtual(f, StoragePool.IO)?0:1)
 			                 //pull any cheap to read/write fields back
 			                 .thenComparingInt(f->f.getAccessor().getType().isEnum()||SupportedPrimitive.isAny(f.getAccessor().getType())?0:1)
 			                 //Encourage fields with similar dependencies to be next to each other

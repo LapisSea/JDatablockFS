@@ -13,7 +13,7 @@ import com.lapissea.cfs.type.compilation.DefInstanceCompiler;
 import com.lapissea.cfs.type.compilation.FieldCompiler;
 import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
-import com.lapissea.cfs.type.field.VirtualFieldDefinition;
+import com.lapissea.cfs.type.field.StoragePool;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.cfs.type.field.annotations.IODynamic;
 import com.lapissea.cfs.type.field.fields.RefField;
@@ -37,7 +37,7 @@ import static com.lapissea.cfs.ConsoleColors.GREEN_BRIGHT;
 import static com.lapissea.cfs.ConsoleColors.RESET;
 import static com.lapissea.cfs.GlobalConfig.PRINT_COMPILATION;
 import static com.lapissea.cfs.Utils.getCallee;
-import static com.lapissea.cfs.type.field.VirtualFieldDefinition.StoragePool.IO;
+import static com.lapissea.cfs.type.field.StoragePool.IO;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NOT_NULL;
 
 public sealed class Struct<T extends IOInstance<T>> extends StagedInit implements RuntimeType<T>{
@@ -345,16 +345,13 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	private Stream<VirtualAccessor<T>> virtualAccessorStream(){
-		return getFields().stream()
-		                  .map(IOField::getAccessor)
-		                  .filter(f->f instanceof VirtualAccessor)
-		                  .map(c->((VirtualAccessor<T>)c));
+		return getFields().stream().map(t->Utils.getVirtual(t, null)).filter(Objects::nonNull);
 	}
 	
 	private short[] calcPoolObjectsSize(){
 		var vPools=virtualAccessorStream().map(VirtualAccessor::getStoragePool).toList();
 		if(vPools.isEmpty()) return null;
-		var poolPointerSizes=new short[VirtualFieldDefinition.StoragePool.values().length];
+		var poolPointerSizes=new short[StoragePool.values().length];
 		for(var vPool : vPools){
 			if(poolPointerSizes[vPool.ordinal()]==Short.MAX_VALUE) throw new OutOfMemoryError();
 			poolPointerSizes[vPool.ordinal()]++;
@@ -365,7 +362,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	private short[] calcPoolPrimitivesSize(){
 		var vPools=virtualAccessorStream().filter(a->a.getPrimitiveSize()>0).collect(Collectors.groupingBy(VirtualAccessor::getStoragePool));
 		if(vPools.isEmpty()) return null;
-		var poolSizes=new short[VirtualFieldDefinition.StoragePool.values().length];
+		var poolSizes=new short[StoragePool.values().length];
 		for(var e : vPools.entrySet()){
 			var siz=e.getValue()
 			         .stream()
@@ -454,7 +451,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	
 	public FieldSet<T> getInstanceFields(){
 		if(instanceFields==null){
-			instanceFields=FieldSet.of(getFields().stream().filter(e->!(e.getAccessor() instanceof VirtualAccessor<T> vacc&&vacc.getStoragePool()==IO)));
+			instanceFields=FieldSet.of(getFields().stream().filter(e->!Utils.isVirtual(e, IO)));
 		}
 		return instanceFields;
 	}
@@ -584,7 +581,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	@Nullable
-	public VarPool<T> allocVirtualVarPool(VirtualFieldDefinition.StoragePool pool){
+	public VarPool<T> allocVirtualVarPool(StoragePool pool){
 		waitForState(STATE_DONE);
 		if(hasPools==null||!hasPools[pool.ordinal()]) return null;
 		return new VarPool.GeneralVarArray<>(this, pool);

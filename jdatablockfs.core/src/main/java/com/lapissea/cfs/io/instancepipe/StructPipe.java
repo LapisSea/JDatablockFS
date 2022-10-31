@@ -906,7 +906,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	
 	@Override
 	public VarPool<T> makeIOPool(){
-		return getType().allocVirtualVarPool(VirtualFieldDefinition.StoragePool.IO);
+		return getType().allocVirtualVarPool(StoragePool.IO);
 	}
 	
 	public void checkTypeIntegrity(T inst) throws IOException{

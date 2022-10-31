@@ -11,7 +11,7 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
-import com.lapissea.cfs.type.field.VirtualFieldDefinition;
+import com.lapissea.cfs.type.field.StoragePool;
 import com.lapissea.cfs.type.field.fields.RefField;
 import com.lapissea.util.Rand;
 import com.lapissea.util.TextUtil;
@@ -778,7 +778,7 @@ public class GraphRenderer implements DataRenderer{
 		var struct=inst.getThisStruct();
 		var iter  =makeFieldIterator(inst, struct);
 		
-		var pool=struct.allocVirtualVarPool(VirtualFieldDefinition.StoragePool.IO);
+		var pool=struct.allocVirtualVarPool(StoragePool.IO);
 		while(iter.hasNext()){
 			var field=iter.next();
 			
@@ -820,7 +820,7 @@ public class GraphRenderer implements DataRenderer{
 		var struct=inst.getThisStruct();
 		var iter  =makeFieldIterator(inst, struct);
 		
-		var pool=struct.allocVirtualVarPool(VirtualFieldDefinition.StoragePool.IO);
+		var pool=struct.allocVirtualVarPool(StoragePool.IO);
 		while(iter.hasNext()){
 			IOField<T, Object> field=iter.next();
 			

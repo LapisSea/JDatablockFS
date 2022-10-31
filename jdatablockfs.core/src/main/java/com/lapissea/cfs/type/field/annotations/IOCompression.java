@@ -5,6 +5,7 @@ import com.lapissea.cfs.io.compress.*;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.compilation.AnnotationLogic;
 import com.lapissea.cfs.type.field.IOFieldTools;
+import com.lapissea.cfs.type.field.StoragePool;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.util.NotNull;
@@ -79,7 +80,7 @@ public @interface IOCompression{
 		@Override
 		public <T extends IOInstance<T>> List<VirtualFieldDefinition<T, ?>> injectPerInstanceValue(FieldAccessor<T> field, IOCompression annotation){
 			return List.of(new VirtualFieldDefinition<>(
-				VirtualFieldDefinition.StoragePool.IO,
+				StoragePool.IO,
 				IOFieldTools.makePackName(field),
 				byte[].class
 			));
