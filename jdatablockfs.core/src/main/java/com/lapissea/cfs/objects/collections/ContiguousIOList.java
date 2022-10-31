@@ -8,6 +8,7 @@ import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.BitDepthOutOfSpaceException;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.ValueStorage;
+import com.lapissea.cfs.io.ValueStorage.StorageRule;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.io.instancepipe.FixedStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
@@ -36,6 +37,7 @@ import java.util.stream.Stream;
 
 import static com.lapissea.cfs.type.TypeLink.Check.ArgCheck.RawCheck.INSTANCE;
 import static com.lapissea.cfs.type.TypeLink.Check.ArgCheck.RawCheck.PRIMITIVE;
+import static com.lapissea.util.UtilL.Assert;
 
 @SuppressWarnings("unchecked")
 public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, ContiguousIOList<T>> implements RandomAccess{
@@ -58,7 +60,9 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		cache=readOnly?new HashMap<>():null;
 		
 		var magnetProvider=provider.withRouter(t->t.withPositionMagnet(t.positionMagnet().orElse(getReference().getPtr().getValue())));
-		this.storage=(ValueStorage<T>)ValueStorage.makeStorage(magnetProvider, typeDef.arg(0), getGenerics(), true);
+		this.storage=(ValueStorage<T>)ValueStorage.makeStorage(magnetProvider, typeDef.arg(0), getGenerics(), new StorageRule.VariableFixed(null));
+		
+		Assert(this.storage.inlineSize()!=-1);
 		
 		if(!readOnly&&isSelfDataEmpty()){
 			writeManagedFields();

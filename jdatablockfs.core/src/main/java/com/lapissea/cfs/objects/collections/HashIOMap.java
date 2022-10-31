@@ -27,7 +27,6 @@ import java.io.IOException;
 import java.util.*;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
-import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
@@ -157,7 +156,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	
 	private void fillBuckets(IOList<Bucket<K, V>> buckets, short bucketPO2) throws IOException{
 		var siz=1L<<bucketPO2;
-		buckets.addAll(LongStream.range(0, siz-buckets.size()).mapToObj(i->new Bucket<K, V>()).toList());
+		buckets.addMultipleNew(siz-buckets.size());
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -465,7 +464,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		if(!(value instanceof IOInstance.Unmanaged)){
 			try{
 				var d=MemoryData.builder().build();
-				var v=ValueStorage.makeStorage(DataProvider.newVerySimpleProvider(d), TypeLink.of(value.getClass()), getGenerics(), false);
+				var v=ValueStorage.makeStorage(DataProvider.newVerySimpleProvider(d), TypeLink.of(value.getClass()), getGenerics(), new ValueStorage.StorageRule.Default());
 				//noinspection unchecked
 				((ValueStorage<V>)v).write(d.io(), value);
 			}catch(Throwable e){

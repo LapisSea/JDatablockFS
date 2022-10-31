@@ -5,8 +5,10 @@ import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.UnsupportedStructLayout;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.instancepipe.FixedStructPipe;
+import com.lapissea.cfs.io.instancepipe.FixedVaryingStructPipe;
 import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
+import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.cfs.type.*;
@@ -16,9 +18,11 @@ import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.fields.NoIOField;
 import com.lapissea.cfs.type.field.fields.RefField;
+import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.IOException;
+import java.util.function.Supplier;
 
 import static com.lapissea.cfs.type.StagedInit.STATE_DONE;
 
@@ -48,11 +52,11 @@ public sealed interface ValueStorage<T>{
 	
 	final class Instance<T extends IOInstance<T>> implements ValueStorage.InstanceBased<T>{
 		
-		private final GenericContext        ctx;
-		private final DataProvider          provider;
-		private final StandardStructPipe<T> pipe;
+		private final GenericContext ctx;
+		private final DataProvider   provider;
+		private final StructPipe<T>  pipe;
 		
-		public Instance(GenericContext ctx, DataProvider provider, StandardStructPipe<T> pipe){
+		public Instance(GenericContext ctx, DataProvider provider, StructPipe<T> pipe){
 			this.ctx=ctx;
 			this.provider=provider;
 			this.pipe=pipe;
@@ -77,7 +81,7 @@ public sealed interface ValueStorage<T>{
 		public BasicSizeDescriptor<T, ?> getSizeDescriptor(){
 			return pipe.getSizeDescriptor();
 		}
-		public StandardStructPipe<T> getPipe(){
+		public StructPipe<T> getPipe(){
 			return pipe;
 		}
 		
@@ -136,7 +140,7 @@ public sealed interface ValueStorage<T>{
 		}
 		
 		@Override
-		public RuntimeType<T> getType(){
+		public Struct<T> getType(){
 			return pipe.getType();
 		}
 		
@@ -421,7 +425,19 @@ public sealed interface ValueStorage<T>{
 		}
 	}
 	
-	static ValueStorage<?> makeStorage(DataProvider provider, TypeLink typeDef, GenericContext generics, boolean fixedOnly){
+	interface FuckIdkNameThisLater{
+		UnsafeSupplier<NumberSize, IOException> numberSlot();
+	}
+	
+	sealed interface StorageRule{
+		record Default() implements StorageRule{}
+		
+		record FixedOnly() implements StorageRule{}
+		
+		record VariableFixed(Supplier<UnsafeSupplier<NumberSize, IOException>> config) implements StorageRule{}
+	}
+	
+	static ValueStorage<?> makeStorage(DataProvider provider, TypeLink typeDef, GenericContext generics, StorageRule rule){
 		Class<?> clazz=typeDef.getTypeClass(provider.getTypeDb());
 		{
 			var primitive=SupportedPrimitive.get(clazz);
@@ -431,22 +447,47 @@ public sealed interface ValueStorage<T>{
 		}
 		
 		if(clazz==String.class){
-			if(fixedOnly) return new FixedReferenceString(provider);
-			return new InlineString(provider);
+			return switch(rule){
+				case StorageRule.Default ignored -> new InlineString(provider);
+				case StorageRule.FixedOnly ignored -> new FixedReferenceString(provider);
+				case StorageRule.VariableFixed ignored -> new FixedReferenceString(provider);
+			};
 		}
 		
 		if(!IOInstance.isManaged(clazz)){
 			return new UnmanagedInstance<>(typeDef, provider);
 		}else{
 			var struct=Struct.ofUnknown(clazz);
-			if(fixedOnly){
-				try{
-					return new FixedInstance<>(generics, provider, FixedStructPipe.of(struct, STATE_DONE));
-				}catch(UnsupportedStructLayout ignored){
-					return new FixedReferencedInstance<>(generics, provider, StandardStructPipe.of(struct));
+			return switch(rule){
+				case StorageRule.Default ignored -> new Instance<>(generics, provider, StandardStructPipe.of(struct));
+				case StorageRule.FixedOnly ignored -> {
+					try{
+						yield new FixedInstance<>(generics, provider, FixedStructPipe.of(struct, STATE_DONE));
+					}catch(UnsupportedStructLayout ignored1){
+						yield new FixedReferencedInstance<>(generics, provider, StandardStructPipe.of(struct));
+					}
 				}
-			}
-			return new Instance<>(generics, provider, StandardStructPipe.of(struct));
+				case StorageRule.VariableFixed conf -> makeVarying(provider, generics, conf, struct);
+			};
+		}
+	}
+	
+	private static <T extends IOInstance<T>> ValueStorage<T> makeVarying(DataProvider provider, GenericContext generics, StorageRule.VariableFixed rule, Struct<T> struct){
+		try{
+			var fixed=FixedStructPipe.of(struct, STATE_DONE);
+			
+			LogUtil.println(fixed.getSpecificFields());
+			
+			var varying=new FixedVaryingStructPipe<>(struct, true, rule.config);
+
+//			if(varying.getConfig().isEmpty()){
+//				return new FixedInstance<>(generics, provider, fixed);
+//			}
+			
+			return new Instance<>(generics, provider, varying);
+		}catch(UnsupportedStructLayout ignored1){
+			LogUtil.printlnEr(struct+" variable fixed not implemented");
+			return new FixedReferencedInstance<>(generics, provider, StandardStructPipe.of(struct));
 		}
 	}
 	

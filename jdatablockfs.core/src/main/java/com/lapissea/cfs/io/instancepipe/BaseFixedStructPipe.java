@@ -31,7 +31,9 @@ public abstract class BaseFixedStructPipe<T extends IOInstance<T>> extends Struc
 			return IOFieldTools.stepFinal(
 				structFields,
 				List.of(
-					IOFieldTools.streamStep(s->s.map(f->sizeFields.contains(f)?f:f.forceMaxAsFixedSize())),
+					IOFieldTools.streamStep(s->s.map(f->{
+						return sizeFields.contains(f)?f:f.forceMaxAsFixedSize();
+					})),
 					IOFieldTools::dependencyReorder,
 					IOFieldTools.streamStep(s->s.filter(not(sizeFields::contains))),
 					IOFieldTools::mergeBitSpace

@@ -88,4 +88,8 @@ public class FixedStructPipe<T extends IOInstance<T>> extends BaseFixedStructPip
 	public void skip(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
 		src.skipExact(getFixedDescriptor().get());
 	}
+	
+	public Map<IOField<T, NumberSize>, NumberSize> getMaxValues(){
+		return maxValues;
+	}
 }
