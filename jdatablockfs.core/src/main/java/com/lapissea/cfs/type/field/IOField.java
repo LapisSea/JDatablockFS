@@ -291,11 +291,24 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 	}
 	
 	public interface VaryingSizeProvider{
+		
+		VaryingSizeProvider ALL_MAX=new VaryingSizeProvider(){
+			@Override
+			public NumberSize provide(NumberSize max){
+				return max;
+			}
+			@Override
+			public String toString(){
+				return "ALL_MAX";
+			}
+		};
+		
 		static VaryingSizeProvider allFixed(NumberSize fixed){
+			if(fixed==NumberSize.LARGEST) return ALL_MAX;
 			return new VaryingSizeProvider(){
 				@Override
 				public NumberSize provide(NumberSize max){
-					return max==null?fixed:max.min(fixed);
+					return max.min(fixed);
 				}
 				@Override
 				public String toString(){
@@ -310,11 +323,11 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 		return forceMaxAsFixedSize(null);
 	}
 	public final IOField<T, ValueType> forceMaxAsFixedSize(VaryingSizeProvider provider){
-		if(getSizeDescriptor().hasFixed()) return this;
+		if(provider==null&&getSizeDescriptor().hasFixed()) return this;
 		if(!getSizeDescriptor().hasMax()){
 			throw unsupportedFixed();
 		}
-		var f=maxAsFixedSize(provider==null?max->max:provider);
+		var f=maxAsFixedSize(provider==null?VaryingSizeProvider.ALL_MAX:provider);
 		f.initLateData(getDependencies());
 		f.init();
 		if(!f.getSizeDescriptor().hasFixed()) throw new RuntimeException(this+" failed to make itself fixed");

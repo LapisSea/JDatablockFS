@@ -13,6 +13,7 @@ import com.lapissea.cfs.type.field.IOField;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -20,9 +21,9 @@ import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
 public class FixedStructPipe<T extends IOInstance<T>> extends BaseFixedStructPipe<T>{
 	
-	public static <T extends IOInstance<T>> PipeFieldCompiler<T> compiler(){
+	public static <T extends IOInstance<T>> PipeFieldCompiler<T, RuntimeException> compiler(){
 		return (t, structFields)->{
-			var sizeFields=sizeFieldStream(structFields).collect(Collectors.toSet());
+			Set<IOField<T, ?>> sizeFields=sizeFieldStream(structFields).collect(Collectors.toSet());
 			return fixedFields(t, structFields, sizeFields::contains, IOField::forceMaxAsFixedSize);
 		};
 	}
@@ -50,7 +51,7 @@ public class FixedStructPipe<T extends IOInstance<T>> extends BaseFixedStructPip
 	public FixedStructPipe(Struct<T> type, boolean initNow){
 		this(type, compiler(), initNow);
 	}
-	public FixedStructPipe(Struct<T> type, PipeFieldCompiler<T> compiler, boolean initNow){
+	public FixedStructPipe(Struct<T> type, PipeFieldCompiler<T, RuntimeException> compiler, boolean initNow){
 		super(type, compiler, initNow);
 		
 		maxValues=Utils.nullIfEmpty(computeMaxValues(getType().getFields()));

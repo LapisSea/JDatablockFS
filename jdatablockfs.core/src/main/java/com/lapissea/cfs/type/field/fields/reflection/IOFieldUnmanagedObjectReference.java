@@ -7,8 +7,9 @@ import com.lapissea.cfs.exceptions.FieldIsNullException;
 import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
-import com.lapissea.cfs.io.instancepipe.*;
-import com.lapissea.cfs.objects.NumberSize;
+import com.lapissea.cfs.io.instancepipe.FixedVaryingStructPipe;
+import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
+import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.SizeDescriptor;
@@ -31,19 +32,14 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 	public IOFieldUnmanagedObjectReference(FieldAccessor<T> accessor){
 		this(accessor, null);
 	}
-	private IOFieldUnmanagedObjectReference(FieldAccessor<T> accessor, NumberSize fixed){
+	private IOFieldUnmanagedObjectReference(FieldAccessor<T> accessor, VaryingSizeProvider varyingSizeProvider){
 		super(accessor);
 		if(getNullability()==DEFAULT_IF_NULL){
 			throw new MalformedStruct(DEFAULT_IF_NULL+" is not supported for unmanaged objects");
 		}
 		
-		if(fixed!=null){
-			BaseFixedStructPipe<Reference> pip;
-			if(fixed==NumberSize.LARGEST){
-				pip=FixedStructPipe.of(Reference.STRUCT);
-			}else{
-				pip=new FixedVaryingStructPipe<>(Reference.STRUCT, true, VaryingSizeProvider.allFixed(fixed));
-			}
+		if(varyingSizeProvider!=null){
+			var pip=FixedVaryingStructPipe.tryVarying(Reference.STRUCT, varyingSizeProvider);
 			referencePipe=pip;
 			descriptor=pip.getFixedDescriptor();
 		}else{
@@ -102,7 +98,7 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 	}
 	@Override
 	public RefField<T, ValueType> maxAsFixedSize(VaryingSizeProvider varyingSizeProvider){
-		return new IOFieldUnmanagedObjectReference<>(getAccessor(), varyingSizeProvider.provide(NumberSize.LARGEST));
+		return new IOFieldUnmanagedObjectReference<>(getAccessor(), varyingSizeProvider==null?VaryingSizeProvider.ALL_MAX:varyingSizeProvider);
 	}
 	
 	private Reference getReference(ValueType val){

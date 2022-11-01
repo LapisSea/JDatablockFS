@@ -10,17 +10,45 @@ import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.field.IOField;
 
 import java.io.IOException;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 public class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseFixedStructPipe<T>{
 	
-	public FixedVaryingStructPipe(Struct<T> type, boolean initNow, IOField.VaryingSizeProvider rule){
+	public static <T extends IOInstance<T>> BaseFixedStructPipe<T> tryVarying(Struct<T> type, IOField.VaryingSizeProvider rule){
+		if(rule==IOField.VaryingSizeProvider.ALL_MAX){
+			return FixedStructPipe.of(type, STATE_DONE);
+		}
+		try{
+			return new FixedVaryingStructPipe<>(type, rule);
+		}catch(UseFixed e){
+			return FixedStructPipe.of(type, STATE_DONE);
+		}
+	}
+	
+	public static final class UseFixed extends Exception{}
+	
+	public FixedVaryingStructPipe(Struct<T> type, IOField.VaryingSizeProvider rule) throws UseFixed{
 		super(type, (t, structFields)->{
-			var sizeFields=sizeFieldStream(structFields).collect(Collectors.toSet());
-			return fixedFields(t, structFields, sizeFields::contains, f->{
-				return f.forceMaxAsFixedSize(rule);
+			if(rule==IOField.VaryingSizeProvider.ALL_MAX){
+				throw new UseFixed();
+			}
+			Set<IOField<T, ?>> sizeFields=sizeFieldStream(structFields).collect(Collectors.toSet());
+			
+			boolean[] effectivelyAllMax={true};
+			IOField.VaryingSizeProvider snitchRule=max->{
+				var actual=rule.provide(max);
+				if(actual!=max) effectivelyAllMax[0]=false;
+				return actual;
+			};
+			var result=fixedFields(t, structFields, sizeFields::contains, f->{
+				return f.forceMaxAsFixedSize(snitchRule);
 			});
-		}, initNow);
+			if(effectivelyAllMax[0]){
+				throw new UseFixed();
+			}
+			return result;
+		}, true);
 		if(type instanceof Struct.Unmanaged){
 			throw new IllegalArgumentException("Unmanaged types are not supported");
 		}

@@ -14,7 +14,6 @@ import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.fields.NoIOField;
 import com.lapissea.cfs.type.field.fields.RefField;
-import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.IOException;
@@ -458,23 +457,14 @@ public sealed interface ValueStorage<T>{
 						yield new FixedReferencedInstance<>(generics, provider, StandardStructPipe.of(struct));
 					}
 				}
-				case StorageRule.VariableFixed conf -> makeVarying(provider, generics, conf, struct);
+				case StorageRule.VariableFixed conf -> {
+					try{
+						yield new FixedInstance<>(generics, provider, FixedVaryingStructPipe.tryVarying(struct, conf.provider));
+					}catch(UnsupportedStructLayout ignored){
+						yield new FixedReferencedInstance<>(generics, provider, StandardStructPipe.of(struct));
+					}
+				}
 			};
-		}
-	}
-	
-	private static <T extends IOInstance<T>> ValueStorage<T> makeVarying(DataProvider provider, GenericContext generics, StorageRule.VariableFixed rule, Struct<T> struct){
-		try{
-			var varying=new FixedVaryingStructPipe<>(struct, true, rule.provider);
-
-//			if(varying.getConfig().isEmpty()){
-//				return new FixedInstance<>(generics, provider, fixed);
-//			}
-			
-			return new FixedInstance<>(generics, provider, varying);
-		}catch(UnsupportedStructLayout ignored1){
-			LogUtil.printlnEr(struct+" variable fixed not implemented");
-			return new FixedReferencedInstance<>(generics, provider, StandardStructPipe.of(struct));
 		}
 	}
 	

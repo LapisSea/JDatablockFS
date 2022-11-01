@@ -22,6 +22,7 @@ import com.lapissea.cfs.type.field.fields.RefField;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
+import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.lang.annotation.ElementType;
@@ -194,10 +195,14 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	
 	public static final int STATE_IO_FIELD=1, STATE_SIZE_DESC=2;
 	
-	public StructPipe(Struct<T> type, PipeFieldCompiler<T> compiler, boolean initNow){
+	public <E extends Exception> StructPipe(Struct<T> type, PipeFieldCompiler<T, E> compiler, boolean initNow) throws E{
 		this.type=type;
 		init(initNow, ()->{
-			this.ioFields=FieldSet.of(compiler.compile(getType(), getType().getFields()));
+			try{
+				this.ioFields=FieldSet.of(compiler.compile(getType(), getType().getFields()));
+			}catch(Exception e){
+				throw UtilL.uncheckedThrow(e);
+			}
 			setInitState(STATE_IO_FIELD);
 			
 			sizeDescription=Objects.requireNonNull(createSizeDescriptor());

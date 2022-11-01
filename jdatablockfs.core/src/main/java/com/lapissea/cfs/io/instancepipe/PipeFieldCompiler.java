@@ -7,6 +7,6 @@ import com.lapissea.cfs.type.field.IOField;
 
 import java.util.List;
 
-public interface PipeFieldCompiler<T extends IOInstance<T>>{
-	List<IOField<T, ?>> compile(Struct<T> type, FieldSet<T> structFields);
+public interface PipeFieldCompiler<T extends IOInstance<T>, E extends Exception>{
+	List<IOField<T, ?>> compile(Struct<T> type, FieldSet<T> structFields) throws E;
 }

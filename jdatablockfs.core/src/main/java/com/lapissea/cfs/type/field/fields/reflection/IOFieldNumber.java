@@ -33,7 +33,7 @@ public class IOFieldNumber<T extends IOInstance<T>, E extends INumber> extends I
 	public IOFieldNumber(FieldAccessor<T> accessor){
 		this(accessor, null);
 	}
-	public IOFieldNumber(FieldAccessor<T> accessor, NumberSize maxSize){
+	private IOFieldNumber(FieldAccessor<T> accessor, NumberSize maxSize){
 		super(accessor);
 		this.forceFixed=maxSize!=null;
 		this.maxSize=maxSize==null?LARGEST:maxSize;

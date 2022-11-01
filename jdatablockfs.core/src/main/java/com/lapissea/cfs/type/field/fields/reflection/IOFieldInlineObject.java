@@ -4,7 +4,7 @@ import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.internal.IUtils;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
-import com.lapissea.cfs.io.instancepipe.FixedStructPipe;
+import com.lapissea.cfs.io.instancepipe.FixedVaryingStructPipe;
 import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.type.*;
@@ -12,12 +12,9 @@ import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.fields.NullFlagCompanyField;
-import com.lapissea.util.LogUtil;
 
 import java.io.IOException;
 import java.util.Objects;
-
-import static com.lapissea.cfs.type.StagedInit.STATE_DONE;
 
 public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extends IOInstance<ValueType>> extends NullFlagCompanyField<CTyp, ValueType>{
 	
@@ -26,16 +23,16 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 	private final boolean               fixed;
 	
 	public IOFieldInlineObject(FieldAccessor<CTyp> accessor){
-		this(accessor, false);
+		this(accessor, null);
 	}
-	public IOFieldInlineObject(FieldAccessor<CTyp> accessor, boolean fixed){
+	private IOFieldInlineObject(FieldAccessor<CTyp> accessor, VaryingSizeProvider varyingSizeProvider){
 		super(accessor);
-		this.fixed=fixed;
+		this.fixed=varyingSizeProvider!=null;
 		
 		@SuppressWarnings("unchecked")
 		var struct=(Struct<ValueType>)Struct.ofUnknown(getAccessor().getType());
 		if(fixed){
-			instancePipe=FixedStructPipe.of(struct, STATE_DONE);
+			instancePipe=FixedVaryingStructPipe.tryVarying(struct, varyingSizeProvider);
 		}else instancePipe=StandardStructPipe.of(struct);
 		
 		var desc=instancePipe.getSizeDescriptor();
@@ -75,8 +72,7 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 	
 	@Override
 	public IOField<CTyp, ValueType> maxAsFixedSize(VaryingSizeProvider varyingSizeProvider){
-		LogUtil.printlnEr("IOFieldInlineObject no varying size impl");
-		return new IOFieldInlineObject<>(getAccessor(), true);
+		return new IOFieldInlineObject<>(getAccessor(), varyingSizeProvider);
 	}
 	
 	@Override

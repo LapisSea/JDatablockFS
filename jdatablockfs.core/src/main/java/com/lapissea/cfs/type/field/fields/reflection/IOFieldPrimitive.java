@@ -617,10 +617,12 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	@Override
 	public IOField<T, ValueType> maxAsFixedSize(VaryingSizeProvider varyingSizeProvider){
 		try{
+			var size=varyingSizeProvider.provide(maxAllowed());
+			if(forceFixed&&maxSize==size) return this;
 			return (IOField<T, ValueType>)
 				       getClass()
 					       .getConstructor(FieldAccessor.class, NumberSize.class)
-					       .newInstance(getAccessor(), varyingSizeProvider.provide(maxAllowed()));
+					       .newInstance(getAccessor(), size);
 		}catch(ReflectiveOperationException e){
 			throw new RuntimeException(e);
 		}

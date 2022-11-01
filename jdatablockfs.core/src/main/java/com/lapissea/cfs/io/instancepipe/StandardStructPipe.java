@@ -19,7 +19,7 @@ import static com.lapissea.cfs.type.field.StoragePool.IO;
 
 public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 	
-	public static <T extends IOInstance<T>> PipeFieldCompiler<T> compiler(){
+	public static <T extends IOInstance<T>> PipeFieldCompiler<T, RuntimeException> compiler(){
 		return (t, structFields)->IOFieldTools.stepFinal(structFields, List.of(
 			IOFieldTools::dependencyReorder,
 			IOFieldTools::mergeBitSpace
@@ -49,7 +49,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		StructPipe.registerSpecialImpl(struct, (Class<P>)(Object)StandardStructPipe.class, newType);
 	}
 	
-	protected StandardStructPipe(Struct<T> type, PipeFieldCompiler<T> compiler, boolean initNow){
+	protected StandardStructPipe(Struct<T> type, PipeFieldCompiler<T, RuntimeException> compiler, boolean initNow){
 		super(type, compiler, initNow);
 	}
 	public StandardStructPipe(Struct<T> type, boolean initNow){
