@@ -20,6 +20,7 @@ import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.fields.RefField;
 import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
@@ -84,7 +85,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 					try{
 						Class.forName(typ.getName(), true, typ.getClassLoader());
 					}catch(ClassNotFoundException e){
-						throw new AssertionError(e);  // Can't happen
+						throw new ShouldNeverHappenError(e);
 					}
 				}
 				

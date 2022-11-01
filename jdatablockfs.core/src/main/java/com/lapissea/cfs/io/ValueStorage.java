@@ -465,10 +465,6 @@ public sealed interface ValueStorage<T>{
 	
 	private static <T extends IOInstance<T>> ValueStorage<T> makeVarying(DataProvider provider, GenericContext generics, StorageRule.VariableFixed rule, Struct<T> struct){
 		try{
-			var fixed=FixedStructPipe.of(struct, STATE_DONE);
-			
-			LogUtil.println(fixed.getSpecificFields());
-			
 			var varying=new FixedVaryingStructPipe<>(struct, true, rule.provider);
 
 //			if(varying.getConfig().isEmpty()){

@@ -12,6 +12,7 @@ import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.fields.NullFlagCompanyField;
+import com.lapissea.util.LogUtil;
 
 import java.io.IOException;
 import java.util.Objects;
@@ -74,6 +75,7 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 	
 	@Override
 	public IOField<CTyp, ValueType> maxAsFixedSize(VaryingSizeProvider varyingSizeProvider){
+		LogUtil.printlnEr("IOFieldInlineObject no varying size impl");
 		return new IOFieldInlineObject<>(getAccessor(), true);
 	}
 	

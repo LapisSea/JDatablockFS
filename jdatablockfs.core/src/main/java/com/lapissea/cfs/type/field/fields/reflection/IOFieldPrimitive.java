@@ -45,8 +45,8 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	public static final class FDouble<T extends IOInstance<T>> extends IOFieldPrimitive<T, Double>{
 		
 		
-		public FDouble(FieldAccessor<T> field)                     {this(field, false);}
-		private FDouble(FieldAccessor<T> field, boolean forceFixed){super(field, forceFixed, LONG);}
+		public FDouble(FieldAccessor<T> field)                  {this(field, null);}
+		private FDouble(FieldAccessor<T> field, NumberSize size){super(field, size);}
 		
 		@Override
 		protected EnumSet<NumberSize> allowedSizes(){
@@ -103,9 +103,8 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	
 	public static final class FChar<T extends IOInstance<T>> extends IOFieldPrimitive<T, Character>{
 		
-		
-		public FChar(FieldAccessor<T> field)                    {this(field, false);}
-		public FChar(FieldAccessor<T> field, boolean forceFixed){super(field, forceFixed, SHORT);}
+		public FChar(FieldAccessor<T> field)                 {this(field, null);}
+		public FChar(FieldAccessor<T> field, NumberSize size){super(field, size);}
 		
 		@Override
 		protected EnumSet<NumberSize> allowedSizes(){
@@ -160,9 +159,8 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	
 	public static final class FFloat<T extends IOInstance<T>> extends IOFieldPrimitive<T, Float>{
 		
-		
-		public FFloat(FieldAccessor<T> field)                    {this(field, false);}
-		public FFloat(FieldAccessor<T> field, boolean forceFixed){super(field, forceFixed, INT);}
+		public FFloat(FieldAccessor<T> field)                 {this(field, null);}
+		public FFloat(FieldAccessor<T> field, NumberSize size){super(field, size);}
 		
 		@Override
 		protected EnumSet<NumberSize> allowedSizes(){
@@ -221,9 +219,9 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		
 		private final boolean unsigned;
 		
-		public FLong(FieldAccessor<T> field){this(field, false);}
-		public FLong(FieldAccessor<T> field, boolean forceFixed){
-			super(field, forceFixed, LONG);
+		public FLong(FieldAccessor<T> field){this(field, null);}
+		public FLong(FieldAccessor<T> field, NumberSize size){
+			super(field, size);
 			unsigned=field.hasAnnotation(IOValue.Unsigned.class);
 		}
 		
@@ -295,9 +293,9 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		
 		private final boolean unsigned;
 		
-		public FInt(FieldAccessor<T> field){this(field, false);}
-		public FInt(FieldAccessor<T> field, boolean forceFixed){
-			super(field, forceFixed, INT);
+		public FInt(FieldAccessor<T> field){this(field, null);}
+		public FInt(FieldAccessor<T> field, NumberSize size){
+			super(field, size);
 			unsigned=field.hasAnnotation(IOValue.Unsigned.class);
 		}
 		@Override
@@ -370,9 +368,9 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		
 		private final boolean unsigned;
 		
-		public FShort(FieldAccessor<T> field){this(field, false);}
-		public FShort(FieldAccessor<T> field, boolean forceFixed){
-			super(field, forceFixed, SHORT);
+		public FShort(FieldAccessor<T> field){this(field, null);}
+		public FShort(FieldAccessor<T> field, NumberSize size){
+			super(field, size);
 			unsigned=field.hasAnnotation(IOValue.Unsigned.class);
 		}
 		@Override
@@ -443,8 +441,8 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	
 	public static final class FByte<T extends IOInstance<T>> extends IOFieldPrimitive<T, Byte>{
 		
-		public FByte(FieldAccessor<T> field)                    {this(field, false);}
-		public FByte(FieldAccessor<T> field, boolean forceFixed){super(field, forceFixed, BYTE);}
+		public FByte(FieldAccessor<T> field)                 {this(field, null);}
+		public FByte(FieldAccessor<T> field, NumberSize size){super(field, size);}
 		
 		@Override
 		protected EnumSet<NumberSize> allowedSizes(){
@@ -562,10 +560,14 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	private       BiFunction<VarPool<T>, T, NumberSize> dynamicSize;
 	private       SizeDescriptor<T>                     sizeDescriptor;
 	
-	protected IOFieldPrimitive(FieldAccessor<T> field, boolean forceFixed, NumberSize maxSize){
+	protected IOFieldPrimitive(FieldAccessor<T> field, NumberSize maxSize){
 		super(field);
-		this.forceFixed=forceFixed;
-		this.maxSize=maxSize;
+		var maxAllowed=maxAllowed();
+		
+		if(maxSize!=null&&maxSize.greaterThan(maxAllowed)) throw new IllegalArgumentException(maxSize+" > "+maxAllowed);
+		this.forceFixed=maxSize!=null;
+		
+		this.maxSize=maxSize!=null?maxSize:maxAllowed;
 	}
 	
 	@Override
@@ -597,6 +599,10 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	
 	protected abstract EnumSet<NumberSize> allowedSizes();
 	
+	private NumberSize maxAllowed(){
+		return allowedSizes().stream().reduce(NumberSize::max).orElseThrow();
+	}
+	
 	protected NumberSize getSize(VarPool<T> ioPool, T instance){
 		if(dynamicSize!=null) return dynamicSize.apply(ioPool, instance);
 		return maxSize;
@@ -613,8 +619,8 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		try{
 			return (IOField<T, ValueType>)
 				       getClass()
-					       .getConstructor(FieldAccessor.class, VaryingSizeProvider.class)
-					       .newInstance(getAccessor(), varyingSizeProvider);
+					       .getConstructor(FieldAccessor.class, NumberSize.class)
+					       .newInstance(getAccessor(), varyingSizeProvider.provide(maxAllowed()));
 		}catch(ReflectiveOperationException e){
 			throw new RuntimeException(e);
 		}

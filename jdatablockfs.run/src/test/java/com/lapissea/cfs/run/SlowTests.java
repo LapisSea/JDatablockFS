@@ -385,6 +385,7 @@ public class SlowTests{
 					}
 				}
 				try{
+					if(splitter.size()>=1023) return;
 					splitter.put(i, ("int("+i+")").repeat(new Random(provider.getSource().getIOSize()+i).nextInt(20)));
 					i++;
 				}catch(Throwable e){

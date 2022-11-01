@@ -23,19 +23,20 @@ import static com.lapissea.cfs.objects.NumberSize.LARGEST;
 import static com.lapissea.cfs.objects.NumberSize.VOID;
 
 public class IOFieldNumber<T extends IOInstance<T>, E extends INumber> extends IOField<T, E>{
-	private static final NumberSize size=NumberSize.LONG;
 	
 	private final boolean                               forceFixed;
+	private final NumberSize                            maxSize;
 	private       BiFunction<VarPool<T>, T, NumberSize> dynamicSize;
 	private       LongFunction<E>                       constructor;
 	private       SizeDescriptor<T>                     sizeDescriptor;
 	
 	public IOFieldNumber(FieldAccessor<T> accessor){
-		this(accessor, false);
+		this(accessor, null);
 	}
-	public IOFieldNumber(FieldAccessor<T> accessor, boolean forceFixed){
+	public IOFieldNumber(FieldAccessor<T> accessor, NumberSize maxSize){
 		super(accessor);
-		this.forceFixed=forceFixed;
+		this.forceFixed=maxSize!=null;
+		this.maxSize=maxSize==null?LARGEST:maxSize;
 	}
 	
 	@Override
@@ -48,16 +49,16 @@ public class IOFieldNumber<T extends IOInstance<T>, E extends INumber> extends I
 		fieldOps.ifPresent(f->dynamicSize=f::get);
 		
 		sizeDescriptor=fieldOps.map(field->SizeDescriptor.Unknown.of(VOID, Optional.of(LARGEST), field.getAccessor()))
-		                       .orElse(SizeDescriptor.Fixed.of(size.bytes));
+		                       .orElse(SizeDescriptor.Fixed.of(maxSize.bytes));
 	}
 	@Override
 	public IOField<T, E> maxAsFixedSize(VaryingSizeProvider varyingSizeProvider){
-		return new IOFieldNumber<>(getAccessor(), true);
+		return new IOFieldNumber<>(getAccessor(), varyingSizeProvider.provide(LARGEST));
 	}
 	
 	private NumberSize getSize(VarPool<T> ioPool, T instance){
 		if(dynamicSize!=null) return dynamicSize.apply(ioPool, instance);
-		return size;
+		return maxSize;
 	}
 	
 	@Override
