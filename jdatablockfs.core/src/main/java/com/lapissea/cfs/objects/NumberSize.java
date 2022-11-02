@@ -16,6 +16,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
+import java.util.stream.IntStream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
@@ -32,6 +33,15 @@ public enum NumberSize{
 	SMALL_LONG('l', 6),
 	LONG      ('L', 8);
 	// @formatter:on
+	
+	private static final NumberSize[] BYTE_MAP;
+	
+	static{
+		var all=values();
+		BYTE_MAP=IntStream.range(0, Arrays.stream(all).mapToInt(NumberSize::bytes).max().orElseThrow()+1)
+		                  .mapToObj(b->Arrays.stream(all).filter(f->f.bytes>=b).reduce(NumberSize::min).orElseThrow())
+		                  .toArray(NumberSize[]::new);
+	}
 	
 	private static final long[] MAX_SIZES=Arrays.stream(values()).mapToLong(NumberSize::maxSize).toArray();
 	private static final int[]  BYTES    =Arrays.stream(values()).mapToInt(NumberSize::bytes).toArray();
@@ -53,11 +63,15 @@ public enum NumberSize{
 		return bySize(size.getValue());
 	}
 	
+	public static NumberSize bySize(long size, boolean unsigned){
+		return bySize(unsigned?Math.max(0, size):Math.abs(size));
+	}
+	
 	public static NumberSize bySize(long size){
-		for(int i=0;i<MAX_SIZES.length;i++){
-			if(MAX_SIZES[i]>=size) return FLAG_INFO.get(i);
+		if(size<0){
+			throw new IllegalArgumentException();
 		}
-		throw new RuntimeException("Extremely large value: "+size);
+		return byBytes(BitUtils.bitsToBytes(Long.SIZE-Long.numberOfLeadingZeros(size)));
 	}
 	
 	public static NumberSize byBits(int bits){
@@ -65,13 +79,7 @@ public enum NumberSize{
 	}
 	
 	public static NumberSize byBytes(int bytes){
-		for(int i=0;i<BYTES.length;i++){
-			if(BYTES[i]>=bytes){
-				if(FLAG_INFO==null) return values()[i];
-				return FLAG_INFO.get(i);
-			}
-		}
-		throw new RuntimeException("Extremely large byte length: "+bytes);
+		return BYTE_MAP[bytes];
 	}
 	
 	private int nextId=-2;

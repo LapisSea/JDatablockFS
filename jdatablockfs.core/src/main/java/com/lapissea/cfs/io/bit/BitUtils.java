@@ -38,7 +38,7 @@ public class BitUtils{
 	}
 	
 	public static long ceilDiv(long dividend, long divisor){
-		return (int)Math.ceil(dividend/(double)divisor);
+		return (long)Math.ceil(dividend/(double)divisor);
 	}
 	
 	public static int bitsToBytes(int bits){
