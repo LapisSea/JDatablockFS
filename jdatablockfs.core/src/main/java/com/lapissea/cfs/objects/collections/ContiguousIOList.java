@@ -17,11 +17,13 @@ import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.VaryingSize;
 import com.lapissea.cfs.type.field.access.AbstractFieldAccessor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.access.TypeFlag;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.RefField;
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.function.UnsafeConsumer;
@@ -60,7 +62,12 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		cache=readOnly?new HashMap<>():null;
 		
 		var magnetProvider=provider.withRouter(t->t.withPositionMagnet(t.positionMagnet().orElse(getReference().getPtr().getValue())));
-		this.storage=(ValueStorage<T>)ValueStorage.makeStorage(magnetProvider, typeDef.arg(0), getGenerics(), new StorageRule.VariableFixed(max->max.min(NumberSize.INT)));
+		
+		var rec=VaryingSize.Provider.record((max, id)->{
+			return max.min(NumberSize.SMALL_INT);
+		});
+		
+		this.storage=(ValueStorage<T>)ValueStorage.makeStorage(magnetProvider, typeDef.arg(0), getGenerics(), new StorageRule.VariableFixed(rec));
 		
 		Assert(this.storage.inlineSize()!=-1);
 		
@@ -231,6 +238,8 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	private void writeAt(long index, T value) throws IOException{
 		try(var io=ioAtElement(index)){
 			storage.write(io, value);
+		}catch(VaryingSize.TooSmallVarying e){
+			throw new NotImplementedException(e);
 		}
 	}
 	

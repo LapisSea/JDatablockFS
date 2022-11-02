@@ -11,10 +11,7 @@ import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.WordSpace;
-import com.lapissea.cfs.type.field.FieldSet;
-import com.lapissea.cfs.type.field.IOField;
-import com.lapissea.cfs.type.field.IOFieldTools;
-import com.lapissea.cfs.type.field.SizeDescriptor;
+import com.lapissea.cfs.type.field.*;
 import com.lapissea.cfs.type.field.fields.BitField;
 import com.lapissea.util.TextUtil;
 
@@ -190,8 +187,8 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 	}
 	
 	@Override
-	public IOField<T, Object> maxAsFixedSize(VaryingSizeProvider varyingSizeProvider){
-		return new BitFieldMerger<>(group.stream().<BitField<T, ?>>map(f->f.maxAsFixedSize(varyingSizeProvider)).toList());
+	public IOField<T, Object> maxAsFixedSize(VaryingSize.Provider varProvider){
+		return new BitFieldMerger<>(group.stream().<BitField<T, ?>>map(f->f.maxAsFixedSize(varProvider)).toList());
 	}
 	
 	@Override

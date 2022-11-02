@@ -11,6 +11,7 @@ import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.BasicSizeDescriptor;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
+import com.lapissea.cfs.type.field.VaryingSize;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.fields.NoIOField;
 import com.lapissea.cfs.type.field.fields.RefField;
@@ -424,7 +425,7 @@ public sealed interface ValueStorage<T>{
 		
 		record FixedOnly() implements StorageRule{}
 		
-		record VariableFixed(IOField.VaryingSizeProvider provider) implements StorageRule{}
+		record VariableFixed(VaryingSize.Provider provider) implements StorageRule{}
 	}
 	
 	static ValueStorage<?> makeStorage(DataProvider provider, TypeLink typeDef, GenericContext generics, StorageRule rule){

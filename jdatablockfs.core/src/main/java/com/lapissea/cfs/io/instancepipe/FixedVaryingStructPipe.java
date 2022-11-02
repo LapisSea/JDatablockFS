@@ -8,6 +8,7 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.VaryingSize;
 
 import java.io.IOException;
 import java.util.Set;
@@ -15,8 +16,8 @@ import java.util.stream.Collectors;
 
 public class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseFixedStructPipe<T>{
 	
-	public static <T extends IOInstance<T>> BaseFixedStructPipe<T> tryVarying(Struct<T> type, IOField.VaryingSizeProvider rule){
-		if(rule==IOField.VaryingSizeProvider.ALL_MAX){
+	public static <T extends IOInstance<T>> BaseFixedStructPipe<T> tryVarying(Struct<T> type, VaryingSize.Provider rule){
+		if(rule==VaryingSize.Provider.ALL_MAX){
 			return FixedStructPipe.of(type, STATE_IO_FIELD);
 		}
 		try{
@@ -28,17 +29,17 @@ public class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseFixedSt
 	
 	public static final class UseFixed extends Exception{}
 	
-	public FixedVaryingStructPipe(Struct<T> type, IOField.VaryingSizeProvider rule) throws UseFixed{
+	public FixedVaryingStructPipe(Struct<T> type, VaryingSize.Provider rule) throws UseFixed{
 		super(type, (t, structFields)->{
-			if(rule==IOField.VaryingSizeProvider.ALL_MAX){
+			if(rule==VaryingSize.Provider.ALL_MAX){
 				throw new UseFixed();
 			}
 			Set<IOField<T, ?>> sizeFields=sizeFieldStream(structFields).collect(Collectors.toSet());
 			
 			boolean[] effectivelyAllMax={true};
-			IOField.VaryingSizeProvider snitchRule=max->{
+			VaryingSize.Provider snitchRule=max->{
 				var actual=rule.provide(max);
-				if(actual!=max) effectivelyAllMax[0]=false;
+				if(actual.size!=max) effectivelyAllMax[0]=false;
 				return actual;
 			};
 			var result=fixedFields(t, structFields, sizeFields::contains, f->{

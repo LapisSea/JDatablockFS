@@ -7,7 +7,6 @@ import com.lapissea.cfs.exceptions.FixedFormatNotSupportedException;
 import com.lapissea.cfs.io.IO;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
-import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Stringify;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
@@ -164,6 +163,8 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 			if(STAT_LOGGING) logStart(WRITE_ACTION, uid());
 			write(ioPool, provider, dest, instance);
 			if(STAT_LOGGING) logEnd(WRITE_ACTION, uid());
+		}catch(VaryingSize.TooSmallVarying e){
+			throw e;
 		}catch(Exception e){
 			throw new IOException("Failed to write "+this, e);
 		}
@@ -290,44 +291,15 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 		return new FixedFormatNotSupportedException(this);
 	}
 	
-	public interface VaryingSizeProvider{
-		
-		VaryingSizeProvider ALL_MAX=new VaryingSizeProvider(){
-			@Override
-			public NumberSize provide(NumberSize max){
-				return max;
-			}
-			@Override
-			public String toString(){
-				return "ALL_MAX";
-			}
-		};
-		
-		static VaryingSizeProvider allFixed(NumberSize fixed){
-			if(fixed==NumberSize.LARGEST) return ALL_MAX;
-			return new VaryingSizeProvider(){
-				@Override
-				public NumberSize provide(NumberSize max){
-					return max.min(fixed);
-				}
-				@Override
-				public String toString(){
-					return "AllFixed("+fixed+")";
-				}
-			};
-		}
-		NumberSize provide(NumberSize max);
-	}
-	
 	public final IOField<T, ValueType> forceMaxAsFixedSize(){
 		return forceMaxAsFixedSize(null);
 	}
-	public final IOField<T, ValueType> forceMaxAsFixedSize(VaryingSizeProvider provider){
+	public final IOField<T, ValueType> forceMaxAsFixedSize(VaryingSize.Provider provider){
 		if(provider==null&&getSizeDescriptor().hasFixed()) return this;
 		if(!getSizeDescriptor().hasMax()){
 			throw unsupportedFixed();
 		}
-		var f=maxAsFixedSize(provider==null?VaryingSizeProvider.ALL_MAX:provider);
+		var f=maxAsFixedSize(provider==null?VaryingSize.Provider.ALL_MAX:provider);
 		f.initLateData(getDependencies());
 		f.init();
 		if(!f.getSizeDescriptor().hasFixed()) throw new RuntimeException(this+" failed to make itself fixed");
@@ -335,7 +307,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 	}
 	
 	
-	protected IOField<T, ValueType> maxAsFixedSize(VaryingSizeProvider varyingSizeProvider){
+	protected IOField<T, ValueType> maxAsFixedSize(VaryingSize.Provider varProvider){
 		throw unsupportedFixed();
 	}
 	

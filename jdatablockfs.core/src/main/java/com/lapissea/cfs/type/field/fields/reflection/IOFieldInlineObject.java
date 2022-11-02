@@ -10,6 +10,7 @@ import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
+import com.lapissea.cfs.type.field.VaryingSize;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.fields.NullFlagCompanyField;
 
@@ -25,14 +26,14 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 	public IOFieldInlineObject(FieldAccessor<CTyp> accessor){
 		this(accessor, null);
 	}
-	private IOFieldInlineObject(FieldAccessor<CTyp> accessor, VaryingSizeProvider varyingSizeProvider){
+	private IOFieldInlineObject(FieldAccessor<CTyp> accessor, VaryingSize.Provider varProvider){
 		super(accessor);
-		this.fixed=varyingSizeProvider!=null;
+		this.fixed=varProvider!=null;
 		
 		@SuppressWarnings("unchecked")
 		var struct=(Struct<ValueType>)Struct.ofUnknown(getAccessor().getType());
 		if(fixed){
-			instancePipe=FixedVaryingStructPipe.tryVarying(struct, varyingSizeProvider);
+			instancePipe=FixedVaryingStructPipe.tryVarying(struct, varProvider);
 		}else instancePipe=StandardStructPipe.of(struct);
 		
 		var desc=instancePipe.getSizeDescriptor();
@@ -71,8 +72,8 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 	}
 	
 	@Override
-	public IOField<CTyp, ValueType> maxAsFixedSize(VaryingSizeProvider varyingSizeProvider){
-		return new IOFieldInlineObject<>(getAccessor(), varyingSizeProvider);
+	public IOField<CTyp, ValueType> maxAsFixedSize(VaryingSize.Provider varProvider){
+		return new IOFieldInlineObject<>(getAccessor(), varProvider);
 	}
 	
 	@Override

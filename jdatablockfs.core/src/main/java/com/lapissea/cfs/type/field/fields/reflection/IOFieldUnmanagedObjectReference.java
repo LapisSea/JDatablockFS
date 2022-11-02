@@ -13,6 +13,7 @@ import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.SizeDescriptor;
+import com.lapissea.cfs.type.field.VaryingSize;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.fields.RefField;
 import com.lapissea.util.NotImplementedException;
@@ -32,14 +33,14 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 	public IOFieldUnmanagedObjectReference(FieldAccessor<T> accessor){
 		this(accessor, null);
 	}
-	private IOFieldUnmanagedObjectReference(FieldAccessor<T> accessor, VaryingSizeProvider varyingSizeProvider){
+	private IOFieldUnmanagedObjectReference(FieldAccessor<T> accessor, VaryingSize.Provider varProvider){
 		super(accessor);
 		if(getNullability()==DEFAULT_IF_NULL){
 			throw new MalformedStruct(DEFAULT_IF_NULL+" is not supported for unmanaged objects");
 		}
 		
-		if(varyingSizeProvider!=null){
-			var pip=FixedVaryingStructPipe.tryVarying(Reference.STRUCT, varyingSizeProvider);
+		if(varProvider!=null){
+			var pip=FixedVaryingStructPipe.tryVarying(Reference.STRUCT, varProvider);
 			referencePipe=pip;
 			descriptor=pip.getFixedDescriptor();
 		}else{
@@ -97,8 +98,8 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 		return val!=null?val.getPipe():null;
 	}
 	@Override
-	public RefField<T, ValueType> maxAsFixedSize(VaryingSizeProvider varyingSizeProvider){
-		return new IOFieldUnmanagedObjectReference<>(getAccessor(), varyingSizeProvider==null?VaryingSizeProvider.ALL_MAX:varyingSizeProvider);
+	public RefField<T, ValueType> maxAsFixedSize(VaryingSize.Provider varProvider){
+		return new IOFieldUnmanagedObjectReference<>(getAccessor(), varProvider==null?VaryingSize.Provider.ALL_MAX:varProvider);
 	}
 	
 	private Reference getReference(ValueType val){
