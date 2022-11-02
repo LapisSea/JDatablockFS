@@ -134,7 +134,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		@Override
 		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 			var val =getValue(ioPool, instance);
-			var size=getSafeSize(ioPool, instance, NumberSize.bySize(val));
+			var size=getSafeSize(ioPool, instance, true, val);
 			size.writeFloating(dest, val);
 		}
 		
@@ -254,7 +254,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		@Override
 		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 			var val =getValue(ioPool, instance);
-			var size=getSafeSize(ioPool, instance, NumberSize.bySize(val));
+			var size=getSafeSize(ioPool, instance, unsigned, val);
 			if(unsigned){
 				size.write(dest, val);
 			}else{
@@ -329,7 +329,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		@Override
 		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 			var val =getValue(ioPool, instance);
-			var size=getSafeSize(ioPool, instance, NumberSize.bySize(val));
+			var size=getSafeSize(ioPool, instance, unsigned, val);
 			if(unsigned){
 				size.write(dest, val);
 			}else{
@@ -404,7 +404,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		@Override
 		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 			var val =getValue(ioPool, instance);
-			var size=getSafeSize(ioPool, instance, NumberSize.bySize(val));
+			var size=getSafeSize(ioPool, instance, unsigned, val);
 			if(unsigned){
 				size.write(dest, val);
 			}else{
@@ -606,6 +606,9 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		return allowedSizes().stream().reduce(NumberSize::max).orElseThrow();
 	}
 	
+	protected NumberSize getSafeSize(VarPool<T> ioPool, T instance, boolean unsigned, long num){
+		return getSafeSize(ioPool, instance, NumberSize.bySize(num, unsigned));
+	}
 	protected NumberSize getSafeSize(VarPool<T> ioPool, T instance, NumberSize neededNum){
 		if(dynamicSize!=null) return dynamicSize.apply(ioPool, instance);
 		return maxSize.safeSize(neededNum);
