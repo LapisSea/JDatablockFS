@@ -18,7 +18,7 @@ import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.IOException;
 
-import static com.lapissea.cfs.type.StagedInit.STATE_DONE;
+import static com.lapissea.cfs.io.instancepipe.StructPipe.STATE_IO_FIELD;
 
 public sealed interface ValueStorage<T>{
 	
@@ -452,7 +452,7 @@ public sealed interface ValueStorage<T>{
 				case StorageRule.Default ignored -> new Instance<>(generics, provider, StandardStructPipe.of(struct));
 				case StorageRule.FixedOnly ignored -> {
 					try{
-						yield new FixedInstance<>(generics, provider, FixedStructPipe.of(struct, STATE_DONE));
+						yield new FixedInstance<>(generics, provider, FixedStructPipe.of(struct, STATE_IO_FIELD));
 					}catch(UnsupportedStructLayout ignored1){
 						yield new FixedReferencedInstance<>(generics, provider, StandardStructPipe.of(struct));
 					}

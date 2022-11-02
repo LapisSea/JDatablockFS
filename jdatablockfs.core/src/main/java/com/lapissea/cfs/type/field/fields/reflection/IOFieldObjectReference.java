@@ -23,7 +23,7 @@ import com.lapissea.util.ShouldNeverHappenError;
 import java.io.IOException;
 import java.util.Objects;
 
-import static com.lapissea.cfs.type.StagedInit.STATE_DONE;
+import static com.lapissea.cfs.io.instancepipe.StructPipe.STATE_IO_FIELD;
 
 public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends IOInstance<ValueType>> extends RefField.ReferenceCompanion<T, ValueType> implements RefField.Inst<T, ValueType>{
 	
@@ -41,7 +41,7 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 		struct=(Struct<ValueType>)Struct.ofUnknown(getAccessor().getType());
 		var typ=accessor.getAnnotation(IOValue.Reference.class).map(IOValue.Reference::dataPipeType).orElseThrow();
 		instancePipe=switch(typ){
-			case FIXED -> FixedStructPipe.of(struct, STATE_DONE);
+			case FIXED -> FixedStructPipe.of(struct, STATE_IO_FIELD);
 			case FLEXIBLE -> StandardStructPipe.of(struct);
 		};
 		

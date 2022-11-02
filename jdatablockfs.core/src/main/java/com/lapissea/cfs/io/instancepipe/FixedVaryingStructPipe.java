@@ -17,12 +17,12 @@ public class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseFixedSt
 	
 	public static <T extends IOInstance<T>> BaseFixedStructPipe<T> tryVarying(Struct<T> type, IOField.VaryingSizeProvider rule){
 		if(rule==IOField.VaryingSizeProvider.ALL_MAX){
-			return FixedStructPipe.of(type, STATE_DONE);
+			return FixedStructPipe.of(type, STATE_IO_FIELD);
 		}
 		try{
 			return new FixedVaryingStructPipe<>(type, rule);
 		}catch(UseFixed e){
-			return FixedStructPipe.of(type, STATE_DONE);
+			return FixedStructPipe.of(type, STATE_IO_FIELD);
 		}
 	}
 	
