@@ -94,13 +94,19 @@ public @interface IODependency{
 			@NotNull
 			@Override
 			public <T extends IOInstance<T>> List<VirtualFieldDefinition<T, ?>> injectPerInstanceValue(FieldAccessor<T> field, VirtualNumSize ann){
+				var unsigned=field.hasAnnotation(IOValue.Unsigned.class);
 				return List.of(new VirtualFieldDefinition<>(
 					ann.retention()==GHOST?IO:INSTANCE,
 					getName(field, ann),
 					NumberSize.class,
 					new VirtualFieldDefinition.GetterFilter<T, NumberSize>(){
 						private NumberSize calcMax(VarPool<T> ioPool, T inst, List<FieldAccessor<T>> deps){
-							return NumberSize.bySize(calcMaxVal(ioPool, inst, deps));
+							var len=calcMaxVal(ioPool, inst, deps);
+							if(len<0){
+								if(unsigned) return NumberSize.VOID;
+								len*=-1;
+							}
+							return NumberSize.bySize(len);
 						}
 						private long calcMaxVal(VarPool<T> ioPool, T inst, List<FieldAccessor<T>> deps){
 							return switch(deps.size()){
