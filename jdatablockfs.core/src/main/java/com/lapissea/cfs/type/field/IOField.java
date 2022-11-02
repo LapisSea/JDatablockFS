@@ -300,8 +300,10 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 			throw unsupportedFixed();
 		}
 		var f=maxAsFixedSize(provider==null?VaryingSize.Provider.ALL_MAX:provider);
-		f.initLateData(getDependencies());
-		f.init();
+		if(f!=this){
+			f.initLateData(getDependencies());
+			f.init();
+		}
 		if(!f.getSizeDescriptor().hasFixed()) throw new RuntimeException(this+" failed to make itself fixed");
 		return f;
 	}
