@@ -83,7 +83,7 @@ public final class MemFrame implements Serializable{
 			return null;
 		}
 		
-		var diffFrame=new MemFrame(frame.frameId(), prev, bs.length, allRanges.stream().map(range->{
+		var diffFrame=new MemFrame(frame.frameId(), frame.timeDelta(), prev, bs.length, allRanges.stream().map(range->{
 			var    siz  =range.to-range.from;
 			byte[] chunk=new byte[siz];
 			System.arraycopy(bs, range.from, chunk, 0, siz);
@@ -106,14 +106,16 @@ public final class MemFrame implements Serializable{
 	private final List<DiffChunk> diff;
 	
 	private final long   frameId;
+	private final long   timeDelta;
 	private final byte[] bytes;
 	private final long[] ids;
 	private final String e;
 	
 	public transient boolean askForCompress;
 	
-	private MemFrame(long frameId, MemFrame prev, int len, List<DiffChunk> diff, long[] ids, String e){
+	private MemFrame(long frameId, long timeDelta, MemFrame prev, int len, List<DiffChunk> diff, long[] ids, String e){
 		this.frameId=frameId;
+		this.timeDelta=timeDelta;
 		this.len=len;
 		this.bytes=null;
 		this.ids=ids;
@@ -121,8 +123,9 @@ public final class MemFrame implements Serializable{
 		this.prev=prev;
 		this.diff=diff;
 	}
-	public MemFrame(long frameId, byte[] bytes, long[] ids, String e){
+	public MemFrame(long frameId, long timeDelta, byte[] bytes, long[] ids, String e){
 		this.frameId=frameId;
+		this.timeDelta=timeDelta;
 		this.bytes=bytes;
 		this.ids=ids;
 		this.e=e;
@@ -131,8 +134,8 @@ public final class MemFrame implements Serializable{
 		this.diff=null;
 	}
 	
-	public MemFrame(long frameId, byte[] data, long[] ids, Throwable e){
-		this(frameId, data, ids, errorToStr(e));
+	public MemFrame(long frameId, long timeDelta, byte[] data, long[] ids, Throwable e){
+		this(frameId, timeDelta, data, ids, errorToStr(e));
 	}
 	public static String errorToStr(Throwable e){
 		StringBuffer b=new StringBuffer();
@@ -177,6 +180,9 @@ public final class MemFrame implements Serializable{
 	public String e()  {return e;}
 	public long frameId(){
 		return frameId;
+	}
+	public long timeDelta(){
+		return timeDelta;
 	}
 	@Override
 	public boolean equals(Object obj){

@@ -16,6 +16,8 @@ import imgui.ImVec2;
 import imgui.flag.ImGuiConfigFlags;
 
 import java.awt.Color;
+import java.text.NumberFormat;
+import java.time.Duration;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
@@ -231,6 +233,21 @@ public class DisplayManager implements DataLogger{
 						var f=sessionHost.activeFrame.get();
 						renderer.getDisplay().setTitle(
 							"Binary display - frame: "+(f==-1?"NaN":f)+
+							(f>0?sessionHost.activeSession.get()
+							                              .map(s->{
+								                              var d=Duration.ofNanos(
+									                              s.frames.get(f).memData().timeDelta()-
+									                              s.frames.get(f-1).memData().timeDelta()
+								                              );
+								                              var format=NumberFormat.getInstance();
+								                              format.setMinimumFractionDigits(2);
+								                              format.setMaximumFractionDigits(2);
+								                              if(d.toMillis()>500) return format.format(d.toMillis()/1000D)+"S";
+								                              if(d.toNanos()>10_000) return format.format(d.toNanos()/1000_000D)+"ms";
+								                              return d.toNanos()+"ns";
+							                              })
+							                              .map(t->", Time: "+t)
+							                              .orElse(""):"")+
 							sessionHost.activeSession.get().map(s->" - Session: "+s.getName()).orElse("")
 						);
 					}

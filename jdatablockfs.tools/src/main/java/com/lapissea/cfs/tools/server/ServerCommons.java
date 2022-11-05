@@ -105,19 +105,21 @@ class ServerCommons{
 		return new ObjectIO(){
 			@Override
 			public MemFrame readFrame(DataInputStream stream) throws IOException{
-				long frameId =stream.readLong();
-				var  bytes   =readSafe(stream);
-				var  idBuffer=ByteBuffer.wrap(readSafe(stream)).asLongBuffer();
-				var  ids     =new long[idBuffer.limit()];
+				long frameId  =stream.readLong();
+				long timeDelta=stream.readLong();
+				var  bytes    =readSafe(stream);
+				var  idBuffer =ByteBuffer.wrap(readSafe(stream)).asLongBuffer();
+				var  ids      =new long[idBuffer.limit()];
 				idBuffer.get(ids);
 				var e=new String(readSafe(stream), StandardCharsets.UTF_8);
 				
-				return new MemFrame(frameId, bytes, ids, e);
+				return new MemFrame(frameId, timeDelta, bytes, ids, e);
 			}
 			
 			@Override
 			public void writeFrame(DataOutputStream stream, MemFrame frame) throws IOException{
 				stream.writeLong(frame.frameId());
+				stream.writeLong(frame.timeDelta());
 				writeSafe(stream, b->b.write(frame.bytes()));
 				writeSafe(stream, b->{
 					var data=new byte[frame.ids().length*Long.BYTES];
@@ -136,7 +138,7 @@ class ServerCommons{
 			@Override
 			public MemFrame readFrame(DataInputStream stream) throws IOException{
 				readSafe(stream);
-				return new MemFrame(-1, new byte[8], new long[0], new Throwable());
+				return new MemFrame(-1, -1, new byte[8], new long[0], new Throwable());
 			}
 			@Override
 			public void writeFrame(DataOutputStream stream, MemFrame frame) throws IOException{
