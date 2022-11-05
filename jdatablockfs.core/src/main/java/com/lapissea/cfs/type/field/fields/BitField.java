@@ -25,14 +25,19 @@ public abstract class BitField<T extends IOInstance<T>, Type> extends IOField<T,
 		super(field);
 	}
 	
+	private void checkWritten(VarPool<T> ioPool, DataProvider provider, T instance, BitOutputStream writer) throws IOException{
+		writer.requireWritten(getSizeDescriptor().calcUnknown(ioPool, provider, instance, WordSpace.BIT));
+	}
+	private void checkRead(VarPool<T> ioPool, DataProvider provider, T instance, BitInputStream reader) throws IOException{
+		reader.requireRead(getSizeDescriptor().calcUnknown(ioPool, provider, instance, WordSpace.BIT));
+	}
+	
 	@Deprecated
 	@Override
 	public final void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		try(var writer=new BitOutputStream(dest)){
 			writeBits(ioPool, writer, instance);
-			if(DEBUG_VALIDATION){
-				writer.requireWritten(getSizeDescriptor().calcUnknown(ioPool, provider, instance, WordSpace.BIT));
-			}
+			if(DEBUG_VALIDATION) checkWritten(ioPool, provider, instance, writer);
 		}
 	}
 	
@@ -41,9 +46,7 @@ public abstract class BitField<T extends IOInstance<T>, Type> extends IOField<T,
 	public final void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		try(var reader=new BitInputStream(src, getSizeDescriptor().getFixed(WordSpace.BIT).orElse(-1))){
 			readBits(ioPool, reader, instance);
-			if(DEBUG_VALIDATION){
-				reader.requireRead(getSizeDescriptor().calcUnknown(ioPool, provider, instance, WordSpace.BIT));
-			}
+			if(DEBUG_VALIDATION) checkRead(ioPool, provider, instance, reader);
 		}
 	}
 	
@@ -56,9 +59,7 @@ public abstract class BitField<T extends IOInstance<T>, Type> extends IOField<T,
 		
 		try(var reader=new BitInputStream(src, -1)){
 			skipReadBits(reader, instance);
-			if(DEBUG_VALIDATION){
-				reader.requireRead(getSizeDescriptor().calcUnknown(ioPool, provider, instance, WordSpace.BIT));
-			}
+			if(DEBUG_VALIDATION) checkRead(ioPool, provider, instance, reader);
 		}
 	}
 	

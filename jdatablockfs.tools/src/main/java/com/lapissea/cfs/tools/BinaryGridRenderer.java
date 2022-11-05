@@ -1557,7 +1557,7 @@ public class BinaryGridRenderer implements DataRenderer{
 									if(size==arrSiz*4L){
 										long  arrOffset=0;
 										int[] index    ={0};
-										var f=new IOFieldPrimitive.FFloat<T>(new FieldAccessor<>(){
+										var f=IOFieldPrimitive.make(new FieldAccessor<T>(){
 											@NotNull
 											@Override
 											public <T1 extends Annotation> Optional<T1> getAnnotation(Class<T1> annotationClass){
