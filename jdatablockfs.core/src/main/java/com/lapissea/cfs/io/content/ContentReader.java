@@ -12,6 +12,8 @@ import java.util.Objects;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
 
+import static com.lapissea.cfs.GlobalConfig.BATCH_BYTES;
+
 @SuppressWarnings({"PointlessArithmeticExpression", "PointlessBitwiseExpression", "unused", "UnusedReturnValue"})
 public interface ContentReader extends AutoCloseable{
 	
@@ -24,7 +26,7 @@ public interface ContentReader extends AutoCloseable{
 		if(buff.hasArray()&&!buff.isReadOnly()){
 			return read(buff.array(), buff.position()+buff.arrayOffset(), length);
 		}
-		byte[] bb  =new byte[Math.min(length, 1024)];
+		byte[] bb  =new byte[Math.min(length, BATCH_BYTES)];
 		int    read=read(bb);
 		if(read>0){
 			buff.put(bb, 0, read);
@@ -440,16 +442,16 @@ public interface ContentReader extends AutoCloseable{
 	}
 	
 	default BufferTicket readTicket(long amount){return readTicket(Math.toIntExact(amount));}
-	default BufferTicket readTicket(int amount) {return new BufferTicket(this, amount, null);}
-	
-	default long transferTo(ContentWriter out) throws IOException{
-		return transferTo(out, 8192);
+	default BufferTicket readTicket(int amount){
+		return new BufferTicket(this, amount, null);
 	}
-	default long transferTo(ContentWriter out, int buffSize) throws IOException{
+	
+	default long transferTo(ContentWriter out) throws IOException{return transferTo(out, BATCH_BYTES);}
+	default long transferTo(ContentWriter out, int batchSize) throws IOException{
 		Objects.requireNonNull(out);
 		long transferred=0;
 		
-		byte[] buffer=new byte[buffSize];
+		byte[] buffer=new byte[batchSize];
 		int    read;
 		while((read=this.read(buffer))>=0){
 			out.write(buffer, 0, read);
@@ -457,14 +459,13 @@ public interface ContentReader extends AutoCloseable{
 		}
 		return transferred;
 	}
-	default long transferTo(OutputStream out) throws IOException{
-		return transferTo(out, 8192);
-	}
-	default long transferTo(OutputStream out, int buffSize) throws IOException{
+	
+	default long transferTo(OutputStream out) throws IOException{return transferTo(out, BATCH_BYTES);}
+	default long transferTo(OutputStream out, int batchSize) throws IOException{
 		Objects.requireNonNull(out);
 		long transferred=0;
 		
-		byte[] buffer=new byte[buffSize];
+		byte[] buffer=new byte[batchSize];
 		int    read;
 		while((read=this.read(buffer))>=0){
 			out.write(buffer, 0, read);

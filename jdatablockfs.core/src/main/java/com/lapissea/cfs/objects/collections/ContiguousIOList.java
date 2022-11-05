@@ -34,6 +34,7 @@ import java.util.*;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
+import static com.lapissea.cfs.GlobalConfig.BATCH_BYTES;
 import static com.lapissea.cfs.type.TypeLink.Check.ArgCheck.RawCheck.INSTANCE;
 import static com.lapissea.cfs.type.TypeLink.Check.ArgCheck.RawCheck.PRIMITIVE;
 
@@ -311,7 +312,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 			var totalPos=pos+count*elSiz;
 			io.ensureCapacity(totalPos);
 			
-			long targetBytes=Math.min(1024, elSiz*count);
+			long targetBytes=Math.min(BATCH_BYTES, elSiz*count);
 			long targetCount=Math.min(count, Math.max(1, targetBytes/elSiz));
 			
 			var targetCap=targetCount*elSiz;
