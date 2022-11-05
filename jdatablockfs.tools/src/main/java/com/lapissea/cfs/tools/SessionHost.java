@@ -59,7 +59,7 @@ public class SessionHost implements DataLogger{
 					MemFrame lastFull;
 					{
 						var f=tmpFrames.remove(0);
-						lastFull=new MemFrame(f.memData.frameId(), f.memData.bytes(), f.memData.ids(), f.memData.e());
+						lastFull=new MemFrame(f.memData.frameId(), f.memData.timeDelta(), f.memData.bytes(), f.memData.ids(), f.memData.e());
 						frames.add(new CachedFrame(lastFull, f.parsed));
 					}
 					while(!tmpFrames.isEmpty()){
@@ -67,7 +67,7 @@ public class SessionHost implements DataLogger{
 						var diff=MemFrame.diff(lastFull, fr.memData);
 						frames.add(new CachedFrame(diff==null?fr.memData:diff, fr.parsed));
 						if(diff==null){
-							lastFull=new MemFrame(fr.memData.frameId(), fr.memData.bytes(), fr.memData.ids(), fr.memData.e());
+							lastFull=new MemFrame(fr.memData.frameId(), fr.memData.timeDelta(), fr.memData.bytes(), fr.memData.ids(), fr.memData.e());
 						}
 					}
 					System.gc();

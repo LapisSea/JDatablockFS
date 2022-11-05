@@ -20,6 +20,8 @@ import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.Objects;
 
+import static com.lapissea.cfs.GlobalConfig.BATCH_BYTES;
+
 /**
  * This interface represents a session where data can be read and optionally modified. Once
  * an instance with this interface is created, it should always be closed as the underlying
@@ -388,7 +390,7 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 	
 	@Override
 	default long transferTo(ContentWriter out) throws IOException{
-		int buffSize=8192;
+		int buffSize=BATCH_BYTES;
 		
 		var remaining=remaining();
 		if(remaining<buffSize){
@@ -399,7 +401,7 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 	}
 	@Override
 	default long transferTo(OutputStream out) throws IOException{
-		int buffSize=8192;
+		int buffSize=BATCH_BYTES;
 		
 		var remaining=remaining();
 		if(remaining<buffSize){

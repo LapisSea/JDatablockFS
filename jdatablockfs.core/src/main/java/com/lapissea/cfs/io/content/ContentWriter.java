@@ -10,6 +10,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+import static com.lapissea.cfs.GlobalConfig.BATCH_BYTES;
+
 @SuppressWarnings({"PointlessBitwiseExpression", "PointlessArithmeticExpression", "unused"})
 public interface ContentWriter extends AutoCloseable{
 	
@@ -22,7 +24,7 @@ public interface ContentWriter extends AutoCloseable{
 		if(b.hasArray()&&!b.isReadOnly()){
 			write(b.array(), off+b.arrayOffset(), len);
 		}else{
-			byte[] buff=new byte[MathUtil.snap(len, 8, 1024)];
+			byte[] buff=new byte[MathUtil.snap(len, 8, BATCH_BYTES)];
 			
 			int remaining=len;
 			int pos      =off+b.position();

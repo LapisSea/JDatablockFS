@@ -12,6 +12,8 @@ import java.util.Objects;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
 
+import static com.lapissea.cfs.GlobalConfig.BATCH_BYTES;
+
 @SuppressWarnings({"PointlessArithmeticExpression", "PointlessBitwiseExpression", "unused", "UnusedReturnValue"})
 public interface ContentReader extends AutoCloseable{
 	
@@ -24,7 +26,7 @@ public interface ContentReader extends AutoCloseable{
 		if(buff.hasArray()&&!buff.isReadOnly()){
 			return read(buff.array(), buff.position()+buff.arrayOffset(), length);
 		}
-		byte[] bb  =new byte[Math.min(length, 1024)];
+		byte[] bb  =new byte[Math.min(length, BATCH_BYTES)];
 		int    read=read(bb);
 		if(read>0){
 			buff.put(bb, 0, read);
@@ -89,20 +91,19 @@ public interface ContentReader extends AutoCloseable{
 		return false;
 	}
 	
+	private static void failSkip(long toSkip, long skipped) throws IOException{
+		throw new IOException("Failed to skip "+toSkip+" bytes! Actually skipped: "+skipped);
+	}
 	default void skipExact(long toSkip) throws IOException{
 		if(toSkip<0) throw new IllegalArgumentException("toSkip can not be negative");
-		long skipped=0;
-		while(skipped<toSkip){
-			long remaining   =toSkip-skipped;
-			var  skippedChunk=skip(remaining);
-			if(skippedChunk==0){
-				throw new IOException("Failed to skip "+toSkip+" bytes! Actually skipped: "+skipped);
-			}
-			skipped+=skippedChunk;
+		long skipSum=0;
+		while(skipSum<toSkip){
+			long remaining=toSkip-skipSum;
+			var  skipped  =skip(remaining);
+			if(skipped==0) failSkip(toSkip, skipSum);
+			skipSum+=skipped;
 		}
-		if(skipped!=toSkip){
-			throw new IOException("Failed to skip "+toSkip+" bytes! Actually skipped: "+skipped);
-		}
+		if(skipSum!=toSkip) failSkip(toSkip, skipSum);
 	}
 	
 	default char[] readChars2(int elementsToRead) throws IOException{
@@ -406,7 +407,9 @@ public interface ContentReader extends AutoCloseable{
 	}
 	
 	default byte[] readRemaining() throws IOException{
-		return inStream().readAllBytes();
+		try(var in=inStream()){
+			return in.readAllBytes();
+		}
 	}
 	
 	default ContentInputStream inStream(){return new ContentReaderInputStream(this);}
@@ -440,16 +443,16 @@ public interface ContentReader extends AutoCloseable{
 	}
 	
 	default BufferTicket readTicket(long amount){return readTicket(Math.toIntExact(amount));}
-	default BufferTicket readTicket(int amount) {return new BufferTicket(this, amount, null);}
-	
-	default long transferTo(ContentWriter out) throws IOException{
-		return transferTo(out, 8192);
+	default BufferTicket readTicket(int amount){
+		return new BufferTicket(this, amount, null);
 	}
-	default long transferTo(ContentWriter out, int buffSize) throws IOException{
+	
+	default long transferTo(ContentWriter out) throws IOException{return transferTo(out, BATCH_BYTES);}
+	default long transferTo(ContentWriter out, int batchSize) throws IOException{
 		Objects.requireNonNull(out);
 		long transferred=0;
 		
-		byte[] buffer=new byte[buffSize];
+		byte[] buffer=new byte[batchSize];
 		int    read;
 		while((read=this.read(buffer))>=0){
 			out.write(buffer, 0, read);
@@ -457,14 +460,13 @@ public interface ContentReader extends AutoCloseable{
 		}
 		return transferred;
 	}
-	default long transferTo(OutputStream out) throws IOException{
-		return transferTo(out, 8192);
-	}
-	default long transferTo(OutputStream out, int buffSize) throws IOException{
+	
+	default long transferTo(OutputStream out) throws IOException{return transferTo(out, BATCH_BYTES);}
+	default long transferTo(OutputStream out, int batchSize) throws IOException{
 		Objects.requireNonNull(out);
 		long transferred=0;
 		
-		byte[] buffer=new byte[buffSize];
+		byte[] buffer=new byte[batchSize];
 		int    read;
 		while((read=this.read(buffer))>=0){
 			out.write(buffer, 0, read);

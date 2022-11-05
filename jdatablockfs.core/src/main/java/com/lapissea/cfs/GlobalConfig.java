@@ -16,6 +16,7 @@ public class GlobalConfig{
 	public static final boolean RELEASE_MODE     =configFlag("releaseMode", isInJar());
 	public static final boolean TYPE_VALIDATION  =configFlag("typeValidation", DEBUG_VALIDATION);
 	public static       boolean PRINT_COMPILATION=configFlag("printCompilation", false);
+	public static final int     BATCH_BYTES      =configInt("batchBytes", 1<<13);
 	
 	public static Optional<String> configProp(String name){
 		return Utils.optionalProperty(CONFIG_PROPERTY_PREFIX+name);

@@ -107,7 +107,7 @@ public class LoggedMemoryUtils{
 							id=frameId;
 							frameId++;
 						}
-						ses.log(new MemFrame(id, data.readAll(), ids.toArray(), new Throwable()));
+						ses.log(new MemFrame(id, System.nanoTime(), data.readAll(), ids.toArray(), new Throwable()));
 					}
 				};
 			}
@@ -141,7 +141,7 @@ public class LoggedMemoryUtils{
 					id=frameId[0];
 					frameId[0]++;
 				}
-				var memFrame=new MemFrame(id, data.readAll(), ids.toArray(), new Throwable());
+				var memFrame=new MemFrame(id, System.nanoTime(), data.readAll(), ids.toArray(), new Throwable());
 				lock.lock();
 				try{
 					if(logger.isInited()){

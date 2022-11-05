@@ -132,8 +132,8 @@ public final class OffsetIO implements RandomIO, Stringify{
 		return parent.readRemaining();
 	}
 	@Override
-	public long transferTo(ContentWriter out, int buffSize) throws IOException{
-		return parent.transferTo(out, buffSize);
+	public long transferTo(ContentWriter out, int batchSize) throws IOException{
+		return parent.transferTo(out, batchSize);
 	}
 	@Override
 	public ContentReader.BufferTicket readTicket(long amount){

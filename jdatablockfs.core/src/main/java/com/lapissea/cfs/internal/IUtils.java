@@ -2,6 +2,8 @@ package com.lapissea.cfs.internal;
 
 import java.io.IOException;
 
+import static com.lapissea.cfs.GlobalConfig.BATCH_BYTES;
+
 public class IUtils{
 	
 	public interface ConsumerBaII{
@@ -42,9 +44,9 @@ public class IUtils{
 		}
 		return Float.intBitsToFloat((hbits&0x8000)<<16|(exp|mant)<<13);
 	}
+	
 	public static void zeroFill(ConsumerBaII dest, long size) throws IOException{
-		
-		var  part=new byte[(int)Math.min(size, 1024)];
+		var  part=new byte[(int)Math.min(size, BATCH_BYTES)];
 		long left=size;
 		while(left>0){
 			int write=(int)Math.min(left, part.length);

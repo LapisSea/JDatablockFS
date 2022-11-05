@@ -240,7 +240,7 @@ public class DisplayHost{
 					}
 				});
 				var ses=getDisplay().join().getSession("default");
-				ses.log(new MemFrame(0, data, new long[0], ""));
+				ses.log(new MemFrame(0, System.nanoTime(), data, new long[0], ""));
 				info("Loaded initialData.");
 			}catch(Throwable e){
 				nonFatal(e, "Failed to load initialData");
