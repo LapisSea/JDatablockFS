@@ -163,7 +163,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 			if(STAT_LOGGING) logStart(WRITE_ACTION, uid());
 			write(ioPool, provider, dest, instance);
 			if(STAT_LOGGING) logEnd(WRITE_ACTION, uid());
-		}catch(VaryingSize.TooSmallVarying e){
+		}catch(VaryingSize.TooSmall e){
 			throw e;
 		}catch(Exception e){
 			throw new IOException("Failed to write "+this, e);

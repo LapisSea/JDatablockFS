@@ -588,12 +588,16 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			generateAll(ioPool, provider, instance, true);
 		}
 		
-		for(IOField<T, ?> field : fields){
-			if(DEBUG_VALIDATION){
-				writeFieldKnownSize(ioPool, provider, target, instance, field);
-			}else{
-				field.writeReported(ioPool, provider, target, instance);
+		try{
+			for(IOField<T, ?> field : fields){
+				if(DEBUG_VALIDATION){
+					writeFieldKnownSize(ioPool, provider, target, instance, field);
+				}else{
+					field.writeReported(ioPool, provider, target, instance);
+				}
 			}
+		}catch(VaryingSize.TooSmall e){
+			throw makeInvalid(fields, ioPool, instance, e);
 		}
 		
 		if(destBuff!=null){
@@ -602,6 +606,43 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		if(DEBUG_VALIDATION){
 			dest.close();
 		}
+	}
+	
+	private VaryingSize.TooSmall makeInvalid(FieldSet<T> fields, VarPool<T> ioPool, T instance, VaryingSize.TooSmall e){
+		var all=scanInvalidSizes(fields, ioPool, instance);
+		if(e.tooSmallIdMap.equals(all.tooSmallIdMap)){
+			throw e;
+		}
+		all.addSuppressed(e);
+		return all;
+	}
+	
+	private VaryingSize.TooSmall scanInvalidSizes(FieldSet<T> fields, VarPool<T> ioPool, T instance){
+		Map<VaryingSize, NumberSize> tooSmallIdMap=new HashMap<>();
+		
+		var provider=DataProvider.newVerySimpleProvider();
+		try(var blackHole=new ContentWriter(){
+			@Override
+			public void write(int b){}
+			@Override
+			public void write(byte[] b, int off, int len){}
+		}){
+			for(IOField<T, ?> field : fields){
+				try{
+					field.writeReported(ioPool, provider, blackHole, instance);
+				}catch(VaryingSize.TooSmall e){
+					e.tooSmallIdMap.forEach((varying, size)->{
+						var num=tooSmallIdMap.get(varying);
+						if(num==null) num=size;
+						else if(num.greaterThan(size)) return;
+						tooSmallIdMap.put(varying, num);
+					});
+				}
+			}
+		}catch(IOException e){
+			throw new RuntimeException(e);
+		}
+		return new VaryingSize.TooSmall(tooSmallIdMap);
 	}
 	
 	private ContentWriter validateAndSafeDestination(FieldSet<T> fields, VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{

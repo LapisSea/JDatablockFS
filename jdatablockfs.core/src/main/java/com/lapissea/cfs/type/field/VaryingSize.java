@@ -2,9 +2,12 @@ package com.lapissea.cfs.type.field;
 
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Stringify;
+import com.lapissea.util.TextUtil;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 public class VaryingSize implements Stringify{
 	
@@ -69,15 +72,19 @@ public class VaryingSize implements Stringify{
 		VaryingSize provide(NumberSize max);
 	}
 	
-	public static final class TooSmallVarying extends RuntimeException{
-		public final VaryingSize size;
+	public static final class TooSmall extends RuntimeException{
+		public final Map<VaryingSize, NumberSize> tooSmallIdMap;
 		
-		public TooSmallVarying(VaryingSize size){
-			this.size=size;
+		public TooSmall(Map<VaryingSize, NumberSize> tooSmallIdMap){
+			this.tooSmallIdMap=Map.copyOf(tooSmallIdMap);
 		}
+		public TooSmall(VaryingSize size, NumberSize neededSize){
+			this(Map.of(size, neededSize));
+		}
+		
 		@Override
 		public String toString(){
-			return this.getClass().getSimpleName()+": "+size;
+			return this.getClass().getSimpleName()+": "+TextUtil.toString(tooSmallIdMap);
 		}
 	}
 	
@@ -85,7 +92,8 @@ public class VaryingSize implements Stringify{
 	private final int        id;
 	
 	public VaryingSize(NumberSize size, int id){
-		this.size=size;
+		if(id<0&&id!=-1) throw new IllegalArgumentException();
+		this.size=Objects.requireNonNull(size);
 		this.id=id;
 	}
 	
@@ -95,20 +103,27 @@ public class VaryingSize implements Stringify{
 	public NumberSize safeSize(NumberSize neededSize){
 		if(neededSize.greaterThan(size)){
 			if(id==-1) throw new UnsupportedOperationException();
-			throw new TooSmallVarying(this);
+			throw new TooSmall(this, neededSize);
 		}
 		return size;
 	}
 	
-	public int getId(){
-		return id;
-	}
 	@Override
 	public String toString(){
-		return "VaryingSize{"+size+(id==-1?"":" @"+id)+'}';
+		return "VaryingSize"+toShortString();
 	}
 	@Override
 	public String toShortString(){
 		return "{"+size+(id==-1?"":" @"+id)+'}';
+	}
+	
+	@Override
+	public boolean equals(Object o){
+		return this==o||o instanceof VaryingSize that&&id==that.id&&size==that.size;
+		
+	}
+	@Override
+	public int hashCode(){
+		return 31*size.hashCode()+id;
 	}
 }

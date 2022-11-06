@@ -49,6 +49,55 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		ContiguousIOList.class,
 		TypeLink.Check.ArgCheck.rawAny(PRIMITIVE, INSTANCE)
 	);
+
+//	@SuppressWarnings({"unchecked"})
+//	@IOValueUnmanaged(index=0)
+//	private static <T> IOField<ContiguousIOList<T>, NumberSize[]> makeValField(){
+//		var valueAccessor=new AbstractFieldAccessor<ContiguousIOList<T>>(null, "value"){
+//			@NotNull
+//			@Override
+//			public <T1 extends Annotation> Optional<T1> getAnnotation(Class<T1> annotationClass){
+//				return Optional.empty();
+//			}
+//			@Override
+//			public Type getGenericType(GenericContext genericContext){
+//				return NumberSize[].class;
+//			}
+//			@Override
+//			public int getTypeID(){
+//				return TypeFlag.ID_OBJECT;
+//			}
+//			@Override
+//			public T get(VarPool<ContiguousIOList<T>> ioPool, ContiguousIOList<T> instance){
+//				try{
+//					return instance.getValue();
+//				}catch(IOException e){
+//					throw new RuntimeException(e);
+//				}
+//			}
+//			@Override
+//			public void set(VarPool<ContiguousIOList<T>> ioPool, ContiguousIOList<T> instance, Object value){
+//				try{
+//					if(value!=null){
+//						var arg=instance.getTypeDef().arg(0);
+//						if(!UtilL.instanceOfObj(value, arg.getTypeClass(instance.getDataProvider().getTypeDb()))) throw new ClassCastException(arg+" not compatible with "+value);
+//					}
+//
+//					instance.setValue((T)value);
+//				}catch(IOException e){
+//					throw new RuntimeException(e);
+//				}
+//			}
+//		};
+//
+//		SizeDescriptor<ContiguousIOList<T>> valDesc=SizeDescriptor.Unknown.of(WordSpace.BIT, 0, OptionalLong.empty(), (ioPool, prov, inst)->{
+//			var              type=inst.getTypeDef().arg(0);
+//			List<NumberSize> args=FixedVaryingStructPipe.scanArgs(type);
+//			return (long)NumberSize.FLAG_INFO.bitSize*args.size();
+//		});
+//
+//		return new NoIOField<>(valueAccessor, valDesc);
+//	}
 	
 	@IOValue
 	@IOValue.Unsigned
@@ -65,7 +114,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		var magnetProvider=provider.withRouter(t->t.withPositionMagnet(t.positionMagnet().orElse(getReference().getPtr().getValue())));
 		
 		var rec=VaryingSize.Provider.record((max, id)->{
-			return max.min(NumberSize.SMALL_INT);
+			return max.min(NumberSize.VOID);
 		});
 		
 		this.storage=(ValueStorage<T>)ValueStorage.makeStorage(magnetProvider, typeDef.arg(0), getGenerics(), new StorageRule.VariableFixed(rec));
@@ -239,7 +288,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	private void writeAt(long index, T value) throws IOException{
 		try(var io=ioAtElement(index)){
 			storage.write(io, value);
-		}catch(VaryingSize.TooSmallVarying e){
+		}catch(VaryingSize.TooSmall e){
 			throw new NotImplementedException(e);
 		}
 	}
@@ -326,7 +375,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 			io.ensureCapacity(totalPos);
 			
 			long targetBytes=Math.min(BATCH_BYTES, elSiz*count);
-			long targetCount=Math.min(count, Math.max(1, targetBytes/elSiz));
+			long targetCount=elSiz==0?count:Math.min(count, Math.max(1, targetBytes/elSiz));
 			
 			var targetCap=targetCount*elSiz;
 			
