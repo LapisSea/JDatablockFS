@@ -69,7 +69,7 @@ public final class Reference extends IOInstance.Managed<Reference>{
 					var offsetSize=NumberSize.ordinal(flags&0b111);
 					var ptrSize   =NumberSize.ordinal((flags >>> 3)&0b111);
 					if((flags&(0b11<<6))!=(0b11<<6)){
-						throw new IOException();
+						throw new IOException("Illegal reference bits");
 					}
 					
 					var off=offsetSize.read(src);

@@ -282,7 +282,7 @@ public class MemoryWalker{
 									var res=walkStructFull(instRefField.get(ioPool, instance), ref, instRefField.getReferencedPipe(instance), false);
 									if(timer!=null) timer.ignoreEnd();
 									if(shouldSave(res)){
-										throw new NotImplementedException();//TODO
+										throw new NotImplementedException("Saving a referenced instance is not implemented yet");//TODO
 									}
 									switch(getFlow(res)){
 										case CONTINUE -> {}
@@ -301,7 +301,7 @@ public class MemoryWalker{
 									if(timer!=null) timer.ignoreEnd();
 									
 									if(shouldSave(res)){
-										throw new NotImplementedException();//TODO
+										throw new NotImplementedException("Saving a dynamic unmanged instance is not implemented yet");//TODO
 									}
 									switch(res&FLOW_MASK){
 										case CONTINUE -> {
@@ -316,8 +316,12 @@ public class MemoryWalker{
 								if(inst instanceof IOInstance fieldValueInstance){
 									if(!fieldValueInstance.getThisStruct().getCanHavePointers()) continue;
 									{
+										StructPipe instancePipe;
+										if(dynamicPhase) instancePipe=((IOInstance.Unmanaged)instance).getFieldPipe(field, fieldValueInstance);
+										else instancePipe=StructPipe.of(pipe.getClass(), fieldValueInstance.getThisStruct());
+										
 										if(timer!=null) timer.ignoreStart();
-										var res=walkStructFull(fieldValueInstance, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), fieldValueInstance.getThisStruct()), true);
+										var res=walkStructFull(fieldValueInstance, reference.addOffset(fieldOffset), instancePipe, true);
 										if(timer!=null) timer.ignoreEnd();
 										
 										var result=handleResult(ioPool, instance, pipe, inlinedParent, reference, (IOField<T, Object>)field, inst, res);
@@ -344,14 +348,17 @@ public class MemoryWalker{
 											}
 											var array=(IOInstance<?>[])field.get(ioPool, instance);
 											if(array==null||array.length==0) continue;
-											var pip=StructPipe.of(pipe.getClass(), array[0].getThisStruct());
+											StructPipe pip;
+											if(dynamicPhase) pip=((IOInstance.Unmanaged)instance).getFieldPipe(field, array[0]);
+											else pip=StructPipe.of(pipe.getClass(), array[0].getThisStruct());
+											
 											for(IOInstance<?> inst : array){
 												{
 													if(timer!=null) timer.ignoreStart();
 													var res=walkStructFull((T)inst, reference.addOffset(fieldOffset), pip, true);
 													if(timer!=null) timer.ignoreEnd();
 													if(shouldSave(res)){
-														throw new NotImplementedException();//TODO
+														throw new NotImplementedException("Saving an array of instances is not implemented yet");//TODO
 													}
 													switch(getFlow(res)){
 														case CONTINUE -> {}
@@ -374,8 +381,12 @@ public class MemoryWalker{
 										var fieldValue=(IOInstance<?>)field.get(ioPool, instance);
 										if(fieldValue!=null){
 											{
+												StructPipe pip;
+												if(dynamicPhase) pip=((IOInstance.Unmanaged)instance).getFieldPipe(field, fieldValue);
+												else pip=StructPipe.of(pipe.getClass(), fieldValue.getThisStruct());
+												
 												if(timer!=null) timer.ignoreStart();
-												var res=walkStructFull((T)fieldValue, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), fieldValue.getThisStruct()), true);
+												var res=walkStructFull((T)fieldValue, reference.addOffset(fieldOffset), pip, true);
 												if(timer!=null) timer.ignoreEnd();
 												if(shouldSave(res)&&getFlow(res)==CONTINUE&&inlinedParent){
 													inlineDirtyButContinue=true;
