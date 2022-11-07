@@ -7,6 +7,7 @@ import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.util.*;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -161,6 +162,42 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
 		dest.writeBits(source==null?0:source.ordinal()+1, nullableBitSize);
 	}
 	
+	public void write(List<T> enums, BitWriter<?> dest) throws IOException{
+		int len=enums.size();
+		if(len==0||bitSize==0) return;
+		
+		int maxBatch=63/bitSize;
+		for(int start=0;start<len;start+=maxBatch){
+			var batchSize=Math.min(len-start, maxBatch);
+			
+			long batch=0;
+			for(int i=0;i<batchSize;i++){
+				batch|=((long)enums.get(i).ordinal())<<(i*bitSize);
+			}
+			dest.writeBits(batch, batchSize);
+		}
+	}
+	
+	@SuppressWarnings("unchecked")
+	public T[] read(int len, BitReader src) throws IOException{
+		var arr=(T[])Array.newInstance(type, len);
+		if(bitSize==0||len==0) return arr;
+		
+		var mask    =BitUtils.makeMask(bitSize);
+		int maxBatch=63/bitSize;
+		for(int start=0;start<len;start+=maxBatch){
+			var batchSize=Math.min(len-start, maxBatch);
+			
+			long batch=src.readBits(batchSize);
+			
+			for(int i=0;i<batchSize;i++){
+				arr[i+start]=get((int)((batch >>> i)&mask));
+			}
+		}
+		
+		return arr;
+	}
+
 	public NumberSize numSize(boolean nullable){
 		return nullable?nullableNumberSize:numberSize;
 	}

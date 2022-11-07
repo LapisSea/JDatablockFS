@@ -19,6 +19,9 @@ public interface BitReader{
 	default <T extends Enum<T>> T readEnum(EnumUniverse<T> info) throws IOException{
 		return info.read(this);
 	}
+	default <T extends Enum<T>> T[] readEnums(EnumUniverse<T> info, int len) throws IOException{
+		return info.read(len, this);
+	}
 	default void skipEnum(EnumUniverse<?> info) throws IOException{
 		info.readSkip(this);
 	}
