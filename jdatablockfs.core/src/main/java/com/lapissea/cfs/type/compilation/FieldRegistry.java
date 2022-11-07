@@ -132,6 +132,32 @@ class FieldRegistry{
 					return new IOFieldInlineObject<>(field);
 				}
 			});
+			
+			reg.register(new RegistryNode(){
+				@Override
+				public boolean canCreate(Type type, GetAnnotation annotations){
+					var raw=Utils.typeToRaw(type);
+					if(!raw.isArray()) return false;
+					return raw.componentType().isEnum();
+				}
+				@Override
+				public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
+					return new IOFieldEnumArray<>(field);
+				}
+			});
+			reg.register(new RegistryNode(){
+				@Override
+				public boolean canCreate(Type type, GetAnnotation annotations){
+					if(!(type instanceof ParameterizedType parmType)) return false;
+					if(parmType.getRawType()!=List.class&&parmType.getRawType()!=ArrayList.class) return false;
+					var args=parmType.getActualTypeArguments();
+					return Utils.typeToRaw(args[0]).isEnum();
+				}
+				@Override
+				public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
+					return new IOFieldEnumList<>(field);
+				}
+			});
 			return reg;
 		});
 	}
