@@ -7,6 +7,7 @@ import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.io.instancepipe.FixedStructPipe;
 import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
+import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.ObjectID;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.objects.collections.ContiguousIOList;
@@ -247,6 +248,17 @@ public class GeneralTypeHandlingTests{
 		}else{
 			IOInstance.Def.of(type, args);
 		}
+	}
+	
+	public interface NumSet extends IOInstance.Def<NumSet>{
+		List<NumberSize> nums();
+	}
+	
+	@Test
+	<T extends IOInstance.Def<T>> void newTemplate(){
+		
+	
+	
 	}
 	
 }
