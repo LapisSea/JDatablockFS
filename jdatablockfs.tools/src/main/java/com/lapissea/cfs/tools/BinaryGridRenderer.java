@@ -378,14 +378,17 @@ public class BinaryGridRenderer implements DataRenderer{
 			ctx.renderCtx.hoverMessages.add(new HoverMessage(UtilL.stream(ranges).toList(), color, new Object[]{field+": ", new FieldVal<>(ioPool, instance, field)}));
 		}
 		
+		if(renderCtx.pixelsPerByte<6) return;
 		
 		if(str.isPresent()&&getStringBounds(renderCtx.renderer, both).width()>rectWidth){
-			var font=renderCtx.renderer.getFontScale();
-			initFont(renderCtx, 0.4F);
-			var rect=bestRange.toRect(ctx.renderCtx);
-			rect.y+=renderCtx.renderer.getFontScale()*-0.8;
-			drawStringInInfo(renderCtx.renderer, color, fStr, rect, false, ctx.strings);
-			renderCtx.renderer.setFontScale(font);
+			if(renderCtx.pixelsPerByte>8){
+				var font=renderCtx.renderer.getFontScale();
+				initFont(renderCtx, 0.4F);
+				var rect=bestRange.toRect(ctx.renderCtx);
+				rect.y+=renderCtx.renderer.getFontScale()*-0.8;
+				drawStringInInfo(renderCtx.renderer, color, fStr, rect, false, ctx.strings);
+				renderCtx.renderer.setFontScale(font);
+			}
 			
 			var drawStr=str;
 			
