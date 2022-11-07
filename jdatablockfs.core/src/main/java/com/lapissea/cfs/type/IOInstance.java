@@ -485,6 +485,18 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			return pipe;
 		}
 		
+		@SuppressWarnings("unchecked")
+		public <VT extends IOInstance<VT>> StructPipe<VT> getFieldPipe(IOField<SELF, VT> unmanagedField, VT fieldValue){
+			Struct<VT> struct;
+			if(unmanagedField.typeFlag(IOField.DYNAMIC_FLAG)){
+				struct=fieldValue.getThisStruct();
+			}else{
+				struct=Struct.of((Class<VT>)unmanagedField.getAccessor().getType());
+			}
+			
+			return StructPipe.of(pipe.getClass(), struct);
+		}
+		
 		protected final void writeManagedFields() throws IOException{
 			if(readOnly){
 				throw new UnsupportedOperationException();

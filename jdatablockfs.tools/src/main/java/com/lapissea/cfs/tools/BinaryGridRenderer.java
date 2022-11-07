@@ -28,7 +28,6 @@ import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.AbstractFieldAccessor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.access.TypeFlag;
-import com.lapissea.cfs.type.field.annotations.IODynamic;
 import com.lapissea.cfs.type.field.fields.BitField;
 import com.lapissea.cfs.type.field.fields.NoIOField;
 import com.lapissea.cfs.type.field.fields.RefField;
@@ -1335,7 +1334,7 @@ public class BinaryGridRenderer implements DataRenderer{
 			Random           rand    =new Random();
 			renderer.setLineWidth(4);
 			
-			var iterator=makeFieldIterator(instance, pipe);
+			Iterator<IOField<T, ?>> iterator=pipe.getSpecificFields().iterator();
 			
 			long fieldOffset=0;
 			long offsetStart;
@@ -1346,9 +1345,21 @@ public class BinaryGridRenderer implements DataRenderer{
 				offsetStart=reference.calcGlobalOffset(ctx.provider);
 			}
 			
+			var unmanagedStage=false;
+			
 			var ioPool=instance.getThisStruct().allocVirtualVarPool(IO);
-			while(iterator.hasNext()){
-				IOField<T, Object> field=iterator.next();
+			while(true){
+				if(!iterator.hasNext()){
+					if(instance instanceof IOInstance.Unmanaged<?> unmanaged){
+						if(!unmanagedStage){
+							iterator=(Iterator<IOField<T, ?>>)(Object)unmanaged.listUnmanagedFields().iterator();
+							unmanagedStage=true;
+						}else break;
+						continue;
+					}else break;
+				}
+				
+				var field=(IOField<T, Object>)iterator.next();
 				try{
 					
 					if(Utils.isVirtual(field, IO)){
@@ -1382,15 +1393,16 @@ public class BinaryGridRenderer implements DataRenderer{
 								continue;
 							}
 							if(inst instanceof IOInstance<?> ioi){
-								annotateStruct(ctx, (T)ioi, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), ioi.getThisStruct()), generics(instance, parentGenerics), annotate);
+								StructPipe pip=getStructPipe(instance, pipe, unmanagedStage, field, ioi);
+								annotateStruct(ctx, (T)ioi, reference.addOffset(fieldOffset), pip, generics(instance, parentGenerics), annotate);
 								continue;
 							}
 							if(inst instanceof IOInstance<?>[] arr){
 								annotateDynamicArrayValueLength(ctx, instance, reference, fieldOffset, ioPool, field, col, arr);
 								if(arr.length>0){
-									var arrayOffset=fieldOffset+1+NumberSize.bySize(arr.length).bytes;
-									var pip        =StructPipe.of(pipe.getClass(), arr[0].getThisStruct());
-									var gens       =generics(instance, parentGenerics);
+									var        arrayOffset=fieldOffset+1+NumberSize.bySize(arr.length).bytes;
+									StructPipe pip        =getStructPipe(instance, pipe, unmanagedStage, field, arr[0]);
+									var        gens       =generics(instance, parentGenerics);
 									for(var val : arr){
 										annotateStruct(ctx, (T)val, reference.addOffset(arrayOffset), pip, gens, annotate);
 										arrayOffset+=pip.calcUnknownSize(ctx.provider, val, WordSpace.BYTE);
@@ -1517,7 +1529,8 @@ public class BinaryGridRenderer implements DataRenderer{
 							if(IOInstance.isInstance(typ)){
 								var inst=(IOInstance<?>)field.get(ioPool, instance);
 								if(inst!=null){
-									annotateStruct(ctx, (T)inst, reference.addOffset(fieldOffset), StructPipe.of(pipe.getClass(), inst.getThisStruct()), generics(instance, parentGenerics), annotate);
+									StructPipe pip=getStructPipe(instance, pipe, unmanagedStage, field, inst);
+									annotateStruct(ctx, (T)inst, reference.addOffset(fieldOffset), pip, generics(instance, parentGenerics), annotate);
 								}
 								continue;
 							}
@@ -1693,6 +1706,14 @@ public class BinaryGridRenderer implements DataRenderer{
 			}
 		}
 	}
+	private static <T extends IOInstance<T>> StructPipe getStructPipe(IOInstance instance, StructPipe<T> pipe, boolean unmanagedStage, IOField<T, Object> field, IOInstance<? extends IOInstance<?>> inst){
+		if(unmanagedStage){
+			return ((IOInstance.Unmanaged)instance).getFieldPipe(field, inst);
+		}else{
+			return StructPipe.of(pipe.getClass(), inst.getThisStruct());
+		}
+	}
+	
 	private <T extends IOInstance<T>> void annotateDynamicArrayValueLength(AnnotateCtx ctx, T instance, Reference reference, long fieldOffset, VarPool<T> ioPool, IOField<T, Object> field, Color col, Object[] arr){
 		var arrayLenSiz=NumberSize.bySize(arr.length);
 		
@@ -1759,17 +1780,6 @@ public class BinaryGridRenderer implements DataRenderer{
 			instStr="<err toString "+e1.getMessage()+" for "+instance.getClass().getName()+">";
 		}
 		return instStr;
-	}
-	
-	
-	@SuppressWarnings("unchecked")
-	private <T extends IOInstance<T>> Iterator<IOField<T, Object>> makeFieldIterator(T instance, StructPipe<T> pipe){
-		var fields=pipe.getSpecificFields();
-		if(instance instanceof IOInstance.Unmanaged unmanaged){
-			return Stream.concat(fields.stream(), unmanaged.listUnmanagedFields()).iterator();
-		}else{
-			return (Iterator<IOField<T, Object>>)(Object)fields.iterator();
-		}
 	}
 	
 	@Override

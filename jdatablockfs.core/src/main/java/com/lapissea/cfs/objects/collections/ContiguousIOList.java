@@ -74,6 +74,18 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		return FixedStructPipe.of(getThisStruct());
 	}
 	
+	@Override
+	public <VT extends IOInstance<VT>> StructPipe<VT> getFieldPipe(IOField<ContiguousIOList<T>, VT> unmanagedField, VT fieldValue){
+		return (StructPipe<VT>)switch(storage){
+			case ValueStorage.FixedInstance<?> fixedInstance -> fixedInstance.getPipe();
+			case ValueStorage.UnmanagedInstance<?> unmanagedInstance -> ((IOInstance.Unmanaged<?>)fieldValue).getPipe();
+			case ValueStorage.FixedReferencedInstance<?> fixedReferencedInstance -> Reference.FIXED_PIPE;
+			case ValueStorage.Instance<?> ignored -> throw new UnsupportedOperationException();
+			case ValueStorage.FixedReferenceString ignored -> throw new UnsupportedOperationException();
+			case ValueStorage.InlineString ignored -> throw new UnsupportedOperationException();
+			case ValueStorage.Primitive<?> ignored -> throw new UnsupportedOperationException();
+		};
+	}
 	
 	private static <T> FieldAccessor<ContiguousIOList<T>> fieldAccessor(Type elementType, long index){
 		return new AbstractFieldAccessor<>(null, ""){
