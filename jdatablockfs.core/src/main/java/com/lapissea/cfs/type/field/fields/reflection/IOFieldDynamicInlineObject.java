@@ -96,7 +96,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 					yield StandardStructPipe.sizeOfUnknown(prov, inst, WordSpace.BYTE);
 				}
 			}
-			case Enum<?> e -> Utils.bitToByte(EnumUniverse.get(e.getClass()).bitSize);
+			case Enum<?> e -> Utils.bitToByte(EnumUniverse.of(e.getClass()).bitSize);
 			default -> {
 				var type=val.getClass();
 				if(type.isArray()){
@@ -156,7 +156,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 			}
 			case IOInstance.Unmanaged inst -> REF_PIPE.write(provider, dest, inst.getReference());
 			case IOInstance inst -> StandardStructPipe.of(inst.getThisStruct()).write(provider, dest, inst);
-			case Enum e -> FlagWriter.writeSingle(dest, EnumUniverse.get(e.getClass()), e);
+			case Enum e -> FlagWriter.writeSingle(dest, EnumUniverse.of(e.getClass()), e);
 			
 			default -> {
 				var type=val.getClass();
@@ -328,7 +328,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 			return readStruct(provider, src, genericContext, struct);
 		}
 		if(typ.isEnum()){
-			var universe=EnumUniverse.getUnknown(typ);
+			var universe=EnumUniverse.ofUnknown(typ);
 			return FlagReader.readSingle(src, universe);
 		}
 		

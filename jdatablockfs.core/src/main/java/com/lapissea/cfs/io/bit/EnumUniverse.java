@@ -73,13 +73,13 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
 	}
 	
 	@SuppressWarnings("unchecked")
-	public static <T extends Enum<T>> EnumUniverse<T> getUnknown(Class<?> type){
+	public static <T extends Enum<T>> EnumUniverse<T> ofUnknown(Class<?> type){
 		ensureEnum(type);
-		return get((Class<T>)type);
+		return of((Class<T>)type);
 	}
 	
 	@SuppressWarnings("unchecked")
-	public static <T extends Enum<T>> EnumUniverse<T> get(Class<T> type){
+	public static <T extends Enum<T>> EnumUniverse<T> of(Class<T> type){
 		EnumUniverse<T> flags;
 		
 		var read=CACHE_LOCK.readLock();

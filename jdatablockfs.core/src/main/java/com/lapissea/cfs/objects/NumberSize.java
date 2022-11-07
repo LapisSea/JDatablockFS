@@ -46,7 +46,7 @@ public enum NumberSize{
 	private static final long[] MAX_SIZES=Arrays.stream(values()).mapToLong(NumberSize::maxSize).toArray();
 	private static final int[]  BYTES    =Arrays.stream(values()).mapToInt(NumberSize::bytes).toArray();
 	
-	public static final EnumUniverse<NumberSize> FLAG_INFO=EnumUniverse.get(NumberSize.class);
+	public static final EnumUniverse<NumberSize> FLAG_INFO=EnumUniverse.of(NumberSize.class);
 	
 	public static final NumberSize SMALEST_REAL=BYTE;
 	public static final NumberSize LARGEST     =LONG;

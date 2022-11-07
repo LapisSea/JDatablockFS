@@ -97,7 +97,7 @@ public interface RootProvider extends DataProvider.Holder{
 			if(p.isPresent()) return p.get();
 			
 			if(rawType.isEnum()){
-				var universe=EnumUniverse.getUnknown(rawType);
+				var universe=EnumUniverse.ofUnknown(rawType);
 				if(universe.size()==0) throw new IllegalArgumentException();
 				return withGenerator(()->(T)universe.get(0));
 			}
