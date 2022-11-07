@@ -1373,7 +1373,7 @@ public class BinaryGridRenderer implements DataRenderer{
 					try{
 						var acc=field.getAccessor();
 						
-						if(acc!=null&&acc.hasAnnotation(IODynamic.class)){
+						if(acc!=null&&field.typeFlag(IOField.DYNAMIC_FLAG)){
 							
 							var inst=field.get(ioPool, instance);
 							if(inst==null) continue;

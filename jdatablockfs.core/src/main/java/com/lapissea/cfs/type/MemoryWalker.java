@@ -282,7 +282,7 @@ public class MemoryWalker{
 									var res=walkStructFull(instRefField.get(ioPool, instance), ref, instRefField.getReferencedPipe(instance), false);
 									if(timer!=null) timer.ignoreEnd();
 									if(shouldSave(res)){
-										throw new NotImplementedException();//TODO
+										throw new NotImplementedException("Saving a referenced instance is not implemented yet");//TODO
 									}
 									switch(getFlow(res)){
 										case CONTINUE -> {}
@@ -301,7 +301,7 @@ public class MemoryWalker{
 									if(timer!=null) timer.ignoreEnd();
 									
 									if(shouldSave(res)){
-										throw new NotImplementedException();//TODO
+										throw new NotImplementedException("Saving a dynamic unmanged instance is not implemented yet");//TODO
 									}
 									switch(res&FLOW_MASK){
 										case CONTINUE -> {
@@ -351,7 +351,7 @@ public class MemoryWalker{
 													var res=walkStructFull((T)inst, reference.addOffset(fieldOffset), pip, true);
 													if(timer!=null) timer.ignoreEnd();
 													if(shouldSave(res)){
-														throw new NotImplementedException();//TODO
+														throw new NotImplementedException("Saving an array of instances is not implemented yet");//TODO
 													}
 													switch(getFlow(res)){
 														case CONTINUE -> {}
