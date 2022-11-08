@@ -172,9 +172,9 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
 			
 			long batch=0;
 			for(int i=0;i<batchSize;i++){
-				batch|=((long)enums.get(i).ordinal())<<(i*bitSize);
+				batch|=((long)enums.get(start+i).ordinal())<<(i*bitSize);
 			}
-			dest.writeBits(batch, batchSize);
+			dest.writeBits(batch, batchSize*bitSize);
 		}
 	}
 	
@@ -188,16 +188,16 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
 		for(int start=0;start<len;start+=maxBatch){
 			var batchSize=Math.min(len-start, maxBatch);
 			
-			long batch=src.readBits(batchSize);
+			long batch=src.readBits(batchSize*bitSize);
 			
 			for(int i=0;i<batchSize;i++){
-				arr[i+start]=get((int)((batch >>> i)&mask));
+				arr[i+start]=get((int)((batch >>> (i*bitSize))&mask));
 			}
 		}
 		
 		return arr;
 	}
-
+	
 	public NumberSize numSize(boolean nullable){
 		return nullable?nullableNumberSize:numberSize;
 	}
