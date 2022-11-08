@@ -3,6 +3,7 @@ package com.lapissea.cfs.run;
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.exceptions.MalformedStruct;
+import com.lapissea.cfs.io.bit.EnumUniverse;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.io.instancepipe.FixedStructPipe;
 import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
@@ -29,6 +30,7 @@ import org.testng.annotations.Test;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Random;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -247,6 +249,101 @@ public class GeneralTypeHandlingTests{
 		}else{
 			IOInstance.Def.of(type, args);
 		}
+	}
+	
+	public enum E1b{
+		E0
+	}
+	
+	public enum E2b{
+		E00,
+		E01,
+		E11
+	}
+	
+	public enum E3b{
+		E000,
+		E001,
+		E010,
+		E011,
+		E100,
+		E101,
+		E110,
+		E111,
+	}
+	
+	public enum E4b{
+		E0000,
+		E0001,
+		E0010,
+		E0011,
+		E0100,
+		E0101,
+		E0110,
+		E0111,
+		E1000,
+		E1001,
+		E1010,
+		E1011,
+		E1100,
+		E1101,
+		E1110,
+		E1111,
+	}
+	
+	public interface E1 extends IOInstance.Def<E1>{
+		List<E1b> nums();
+	}
+	
+	public interface E2 extends IOInstance.Def<E2>{
+		List<E2b> nums();
+	}
+	
+	public interface E3 extends IOInstance.Def<E3>{
+		List<E3b> nums();
+	}
+	
+	public interface E4 extends IOInstance.Def<E4>{
+		List<E4b> nums();
+	}
+	
+	@DataProvider(name="enumHolders")
+	Object[][] enumHolders(){
+		return new Object[][]{
+			{E1.class, E1b.class},
+			{E2.class, E2b.class},
+			{E3.class, E3b.class},
+			{E4.class, E4b.class},
+			};
+	}
+	
+	@Test(dataProvider="enumHolders")
+	<T extends IOInstance.Def<T>, E extends Enum<E>> void enumIntegrity(Class<T> type, Class<E> eType){
+		var r   =new Random(69420);
+		var info=EnumUniverse.of(eType);
+		var pip =StandardStructPipe.of(type);
+		var data=com.lapissea.cfs.chunk.DataProvider.newVerySimpleProvider();
+		for(int i=0;i<1000;i++){
+			
+			var set=IOInstance.Def.of(
+				type,
+				r.ints(r.nextLong(i+1)+1, 0, info.size())
+				 .mapToObj(info::get)
+				 .toList()
+			);
+			
+			try(var io=data.getSource().io()){
+				io.setPos(0);
+				pip.write(data, io, set);
+				io.setPos(0);
+				var read=pip.readNew(data, io, null);
+				assertEquals("Failed equality on "+i, set, read);
+			}catch(IOException e){
+				throw new RuntimeException(i+"", e);
+			}
+		}
+		
+		
 	}
 	
 }

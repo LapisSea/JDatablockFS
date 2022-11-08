@@ -1,6 +1,7 @@
 package com.lapissea.cfs.io.bit;
 
 import java.io.IOException;
+import java.util.List;
 
 public interface BitWriter<SELF extends BitWriter<SELF>>{
 	
@@ -22,6 +23,10 @@ public interface BitWriter<SELF extends BitWriter<SELF>>{
 	}
 	
 	default <T extends Enum<T>> SELF writeEnum(EnumUniverse<T> info, T val) throws IOException{
+		info.write(val, this);
+		return self();
+	}
+	default <T extends Enum<T>> SELF writeEnums(EnumUniverse<T> info, List<T> val) throws IOException{
 		info.write(val, this);
 		return self();
 	}

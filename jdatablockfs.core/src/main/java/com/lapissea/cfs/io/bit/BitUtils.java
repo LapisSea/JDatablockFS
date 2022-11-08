@@ -26,10 +26,10 @@ public class BitUtils{
 	}
 	
 	public static long makeMask(int size){
-		if(size>64) throw new IllegalArgumentException("mask size must be 64 or less but was "+size);
-		if(size<0) throw new IllegalArgumentException("mask size must be positive but was "+size);
-		if(size==64) return -1;
+		assert size<=64:"mask size must be 64 or less but was "+size;
+		assert size>=0:"mask size must be positive but was "+size;
 		
+		if(size==64) return -1;
 		return (1L<<size)-1L;
 	}
 	

@@ -1,5 +1,6 @@
 package com.lapissea.cfs.io.bit;
 
+import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.IllegalBitValueException;
 import com.lapissea.cfs.io.content.ContentReader;
 
@@ -27,23 +28,24 @@ public class BitInputStream implements BitReader, AutoCloseable{
 		
 		int bitsToRead=numOBits-bufferedBits;
 		if(bitsToRead>0){
-			int toRead=bitsToBytes(bitsToRead);
+			int bytesToRead=bitsToBytes(bitsToRead);
 			
 			if(expectedBits>0){
-				int remainingExpected=(int)(expectedBits-totalBits);
+				int remainingExpected=(int)(expectedBits-(totalBits+bufferedBits));
 				if(remainingExpected>0){
 					var alreadyBuffered=bitsToBytes(bufferedBits);
 					var maxToRead      =8-alreadyBuffered;
-					toRead=Math.min(Math.max(toRead, remainingExpected/8), maxToRead);
+					var expectedBytes  =Utils.bitToByte(remainingExpected);
+					bytesToRead=Math.min(Math.max(bytesToRead, expectedBytes), maxToRead);
 				}
 			}
 			
-			if(toRead==1){
+			if(bytesToRead==1){
 				buffer|=(long)source.tryRead()<<bufferedBits;
 				bufferedBits+=Byte.SIZE;
 			}else{
-				buffer|=Long.reverseBytes(source.readWord(toRead)<<((8-toRead)*8))<<bufferedBits;
-				bufferedBits+=toRead*Byte.SIZE;
+				buffer|=Long.reverseBytes(source.readWord(bytesToRead)<<((8-bytesToRead)*8))<<bufferedBits;
+				bufferedBits+=bytesToRead*Byte.SIZE;
 			}
 		}
 	}
@@ -51,13 +53,31 @@ public class BitInputStream implements BitReader, AutoCloseable{
 	@Override
 	public long readBits(int numOBits) throws IOException{
 		prepareBits(numOBits);
-		if(numOBits>bufferedBits) throw new IOException("ran out of bits");
+		if(numOBits>bufferedBits){
+			int l=bufferedBits;
+			int r=numOBits-l;
+			
+			var lBits=buffer;
+			totalBits+=bufferedBits;
+			buffer=0;
+			bufferedBits=0;
+			
+			prepareBits(r);
+			var rBits=buffer&makeMask(r);
+			advance(r);
+			
+			return (rBits<<l)|lBits;
+		}
 		
 		var result=(buffer&makeMask(numOBits));
+		advance(numOBits);
+		return result;
+	}
+	
+	private void advance(int numOBits){
+		totalBits+=numOBits;
 		buffer >>>= numOBits;
 		bufferedBits-=numOBits;
-		totalBits+=numOBits;
-		return result;
 	}
 	
 	@Override

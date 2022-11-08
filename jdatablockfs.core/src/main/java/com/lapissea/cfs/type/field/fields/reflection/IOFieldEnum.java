@@ -24,7 +24,7 @@ public class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> extends Bit
 	public IOFieldEnum(FieldAccessor<T> field){
 		super(field);
 		
-		enumUniverse=EnumUniverse.getUnknown(field.getType());
+		enumUniverse=EnumUniverse.ofUnknown(field.getType());
 		sizeDescriptor=SizeDescriptor.Fixed.of(WordSpace.BIT, enumUniverse.getBitSize(nullable()));
 		
 		if(getNullability()==DEFAULT_IF_NULL&&enumUniverse.isEmpty()){
