@@ -5,7 +5,6 @@ import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.bit.BitInputStream;
 import com.lapissea.cfs.io.bit.BitOutputStream;
 import com.lapissea.cfs.io.bit.EnumUniverse;
-import com.lapissea.cfs.io.content.ContentOutputStream;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.type.GenericContext;
@@ -55,12 +54,7 @@ public class IOFieldEnumList<T extends IOInstance<T>, E extends Enum<E>> extends
 	@Override
 	public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		var enums=get(ioPool, instance);
-		var len  =enums.size();
-		var bytes=new byte[byteCount(len)];
-		try(var s=new BitOutputStream(new ContentOutputStream.BA(bytes))){
-			s.writeEnums(universe, enums);
-		}
-		dest.write(bytes);
+		new BitOutputStream(dest).writeEnums(universe, enums).close();
 	}
 	@Override
 	public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
