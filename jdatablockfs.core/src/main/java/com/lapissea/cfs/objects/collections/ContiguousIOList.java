@@ -1,10 +1,7 @@
 package com.lapissea.cfs.objects.collections;
 
 import com.lapissea.cfs.Utils;
-import com.lapissea.cfs.chunk.AllocateTicket;
-import com.lapissea.cfs.chunk.Chunk;
-import com.lapissea.cfs.chunk.ChunkBuilder;
-import com.lapissea.cfs.chunk.DataProvider;
+import com.lapissea.cfs.chunk.*;
 import com.lapissea.cfs.exceptions.BitDepthOutOfSpaceException;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.ValueStorage;
@@ -421,49 +418,73 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	}
 	
 	private void defragData(long extraSlots) throws IOException{
-		defragData(getReference().getPtr().dereference(getDataProvider()), extraSlots, Math.max(5, size()/8));
+		defragData(getReference().getPtr().dereference(getDataProvider()), extraSlots, 8);
 	}
 	private void defragData(Chunk ch, long extraSlots, long max) throws IOException{
 		if(max<=2) return;
-		if(ch.streamNext().limit(max).count()==max){
-			var next    =ch.requireNext();
-			var existing=next.streamNext().mapToLong(Chunk::getCapacity).sum();
-			
-			var nextNext=next.next();
-			if(nextNext!=null){
-				var nnExisting=nextNext.streamNext().mapToLong(Chunk::getCapacity).sum();
-				if(nnExisting*10<=existing){
-					defragData(next, extraSlots, max-1);
-					return;
-				}
+		var nextCount=ch.streamNext().limit(max+1).count();
+		if(nextCount<max) return;
+		if(nextCount==max){
+			var cap=0L;
+			for(Chunk chunk : new ChainWalker(ch)){
+				cap+=chunk.hasNextPtr()?chunk.getSize():chunk.getCapacity();
 			}
-			
-			var extra=extraSlots*getElementSize();
-			
-			var newNext=AllocateTicket.bytes(existing+extra)
-			                          .withPositionMagnet(ch)
-			                          .withDataPopulated((prov, io)->{
-				                          try(var ioSrc=next.io()){
-					                          ioSrc.transferTo(io);
-				                          }
-			                          })
-			                          .withApproval(Chunk.sizeFitsPointer(ch.getNextSize()))
-			                          .withExplicitNextSize(Optional.of(NumberSize.bySize(getDataProvider().getSource().getIOSize())))
-			                          .submit(getDataProvider());
-			if(newNext==null){
-				defragData(next, extraSlots, max-1);
+			var neededCap=calcElementOffset(size()+extraSlots);
+			if(cap>=neededCap){
 				return;
 			}
-			
-			try{
-				ch.setNextPtr(newNext.getPtr());
-			}catch(BitDepthOutOfSpaceException e){
-				throw new RuntimeException(e);
-			}
-			ch.syncStruct();
-			
-			getDataProvider().getMemoryManager().free(next.collectNext());
 		}
+		
+		record Point(Chunk target, Chunk realloc){}
+		
+		Point point;
+		{
+			
+			Point optimal   =null;
+			Chunk mergePoint=ch.requireNext();
+			int   steps     =0;
+			while(mergePoint.streamNext().limit(3).count()==3){
+				if(steps>=max) break;
+				steps++;
+				var next=mergePoint.requireNext();
+				if(mergePoint.getCapacity()>next.getCapacity()*2){
+					optimal=new Point(mergePoint, next);
+				}
+				mergePoint=next;
+			}
+			if(optimal==null){
+				optimal=new Point(ch, ch.requireNext());
+			}
+			point=optimal;
+		}
+		
+		var forwardCap=point.realloc.streamNext().mapToLong(Chunk::getCapacity).sum();
+		
+		var extra=extraSlots*getElementSize();
+		
+		var newNext=AllocateTicket.bytes(forwardCap+extra)
+		                          .withPositionMagnet(point.target)
+		                          .withDataPopulated((prov, io)->{
+			                          try(var ioSrc=point.realloc.io()){
+				                          ioSrc.transferTo(io);
+			                          }
+		                          })
+		                          .withApproval(Chunk.sizeFitsPointer(point.target.getNextSize()))
+		                          .withExplicitNextSize(Optional.of(NumberSize.bySize(getDataProvider().getSource().getIOSize())))
+		                          .submit(getDataProvider());
+		if(newNext==null){
+			defragData(point.realloc, extraSlots, max-1);
+			return;
+		}
+		
+		try{
+			point.target.setNextPtr(newNext.getPtr());
+		}catch(BitDepthOutOfSpaceException e){
+			throw new RuntimeException(e);
+		}
+		point.target.syncStruct();
+		
+		getDataProvider().getMemoryManager().free(point.realloc.collectNext());
 	}
 	
 	private void squash(long index, long size) throws IOException{
