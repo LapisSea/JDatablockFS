@@ -13,6 +13,7 @@ import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
+import com.lapissea.cfs.type.field.VaryingSize;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.util.NotImplementedException;
 
@@ -96,7 +97,8 @@ public abstract class BitField<T extends IOInstance<T>, Type> extends IOField<T,
 	public abstract void skipReadBits(BitReader src, T instance) throws IOException;
 	
 	@Override
-	public BitField<T, Type> implMaxAsFixedSize(){
+	public BitField<T, Type> maxAsFixedSize(VaryingSize.Provider varProvider){
+		if(getSizeDescriptor().hasFixed()) return this;
 		throw new NotImplementedException();
 	}
 }

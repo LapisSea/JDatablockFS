@@ -265,7 +265,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		var magnetProvider=provider.withRouter(t->t.withPositionMagnet(t.positionMagnet().orElse(getReference().getPtr().getValue())));
 		
 		//noinspection unchecked
-		valueStorage=(ValueStorage<T>)ValueStorage.makeStorage(magnetProvider, typeDef.arg(0), getGenerics(), false);
+		valueStorage=(ValueStorage<T>)ValueStorage.makeStorage(magnetProvider, typeDef.arg(0), getGenerics(), new ValueStorage.StorageRule.Default());
 		
 		if(isSelfDataEmpty()){
 			nextSize=calcOptimalNextSize(provider);

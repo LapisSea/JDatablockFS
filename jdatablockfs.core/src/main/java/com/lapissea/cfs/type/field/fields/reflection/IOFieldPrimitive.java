@@ -13,6 +13,7 @@ import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
+import com.lapissea.cfs.type.field.VaryingSize;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.BitField;
@@ -31,26 +32,28 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	
 	public static <T extends IOInstance<T>> IOField<T, ?> make(FieldAccessor<T> field){
 		return SupportedPrimitive.get(field.getType()).map(t->switch(t){
-			case DOUBLE -> new FDouble<>(field);
-			case CHAR -> new FChar<>(field);
-			case FLOAT -> new FFloat<>(field);
-			case LONG -> new FLong<>(field);
-			case INT -> new FInt<>(field);
-			case SHORT -> new FShort<>(field);
-			case BYTE -> new FByte<>(field);
+			case DOUBLE -> new FDouble<>(field, null);
+			case CHAR -> new FChar<>(field, null);
+			case FLOAT -> new FFloat<>(field, null);
+			case LONG -> new FLong<>(field, null);
+			case INT -> new FInt<>(field, null);
+			case SHORT -> new FShort<>(field, null);
+			case BYTE -> new FByte<>(field, null);
 			case BOOLEAN -> new FBoolean<>(field);
-		}).orElseThrow();
+		}).orElseThrow(()->new IllegalArgumentException(field.getType().getName()+" is not a primitive"));
 	}
 	
 	public static final class FDouble<T extends IOInstance<T>> extends IOFieldPrimitive<T, Double>{
 		
-		
-		public FDouble(FieldAccessor<T> field)                    {this(field, false);}
-		public FDouble(FieldAccessor<T> field, boolean forceFixed){super(field, forceFixed, LONG);}
+		private FDouble(FieldAccessor<T> field, VaryingSize size){super(field, size);}
 		
 		@Override
 		protected EnumSet<NumberSize> allowedSizes(){
 			return EnumSet.of(VOID, SHORT, INT, LONG);
+		}
+		@Override
+		protected IOField<T, Double> wSize(VaryingSize size){
+			return new FDouble<>(getAccessor(), size);
 		}
 		
 		private double getValue(VarPool<T> ioPool, T instance){
@@ -74,7 +77,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		
 		@Override
 		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
-			var size=getSize(ioPool, instance);
+			var size=getSafeSize(ioPool, instance, LONG);
 			size.writeFloating(dest, getValue(ioPool, instance));
 		}
 		
@@ -103,13 +106,15 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	
 	public static final class FChar<T extends IOInstance<T>> extends IOFieldPrimitive<T, Character>{
 		
-		
-		public FChar(FieldAccessor<T> field)                    {this(field, false);}
-		public FChar(FieldAccessor<T> field, boolean forceFixed){super(field, forceFixed, SHORT);}
+		private FChar(FieldAccessor<T> field, VaryingSize size){super(field, size);}
 		
 		@Override
 		protected EnumSet<NumberSize> allowedSizes(){
 			return EnumSet.of(VOID, BYTE, SHORT);
+		}
+		@Override
+		protected IOField<T, Character> wSize(VaryingSize size){
+			return new FChar<>(getAccessor(), size);
 		}
 		
 		private char getValue(VarPool<T> ioPool, T instance){
@@ -133,8 +138,9 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		
 		@Override
 		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
-			var size=getSize(ioPool, instance);
-			size.writeFloating(dest, getValue(ioPool, instance));
+			var val =getValue(ioPool, instance);
+			var size=getSafeSize(ioPool, instance, true, val);
+			size.writeFloating(dest, val);
 		}
 		
 		@Override
@@ -160,13 +166,15 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	
 	public static final class FFloat<T extends IOInstance<T>> extends IOFieldPrimitive<T, Float>{
 		
-		
-		public FFloat(FieldAccessor<T> field)                    {this(field, false);}
-		public FFloat(FieldAccessor<T> field, boolean forceFixed){super(field, forceFixed, INT);}
+		private FFloat(FieldAccessor<T> field, VaryingSize size){super(field, size);}
 		
 		@Override
 		protected EnumSet<NumberSize> allowedSizes(){
 			return EnumSet.of(VOID, SHORT, INT);
+		}
+		@Override
+		protected IOField<T, Float> wSize(VaryingSize size){
+			return new FFloat<>(getAccessor(), size);
 		}
 		
 		private float getValue(VarPool<T> ioPool, T instance){
@@ -190,7 +198,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		
 		@Override
 		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
-			var size=getSize(ioPool, instance);
+			var size=getSafeSize(ioPool, instance, INT);
 			size.writeFloating(dest, getValue(ioPool, instance));
 		}
 		
@@ -221,15 +229,18 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		
 		private final boolean unsigned;
 		
-		public FLong(FieldAccessor<T> field){this(field, false);}
-		public FLong(FieldAccessor<T> field, boolean forceFixed){
-			super(field, forceFixed, LONG);
+		private FLong(FieldAccessor<T> field, VaryingSize size){
+			super(field, size);
 			unsigned=field.hasAnnotation(IOValue.Unsigned.class);
 		}
 		
 		@Override
 		protected EnumSet<NumberSize> allowedSizes(){
 			return EnumSet.allOf(NumberSize.class);
+		}
+		@Override
+		protected IOField<T, Long> wSize(VaryingSize size){
+			return new FLong<>(getAccessor(), size);
 		}
 		
 		public long getValue(VarPool<T> ioPool, T instance){
@@ -253,8 +264,8 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		
 		@Override
 		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
-			var size=getSize(ioPool, instance);
 			var val =getValue(ioPool, instance);
+			var size=getSafeSize(ioPool, instance, unsigned, val);
 			if(unsigned){
 				size.write(dest, val);
 			}else{
@@ -295,9 +306,8 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		
 		private final boolean unsigned;
 		
-		public FInt(FieldAccessor<T> field){this(field, false);}
-		public FInt(FieldAccessor<T> field, boolean forceFixed){
-			super(field, forceFixed, INT);
+		private FInt(FieldAccessor<T> field, VaryingSize size){
+			super(field, size);
 			unsigned=field.hasAnnotation(IOValue.Unsigned.class);
 		}
 		@Override
@@ -305,6 +315,10 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			var all=EnumSet.allOf(NumberSize.class);
 			all.removeIf(s->s.greaterThan(INT));
 			return all;
+		}
+		@Override
+		protected IOField<T, Integer> wSize(VaryingSize size){
+			return new FInt<>(getAccessor(), size);
 		}
 		
 		public int getValue(VarPool<T> ioPool, T instance){
@@ -328,8 +342,8 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		
 		@Override
 		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
-			var size=getSize(ioPool, instance);
 			var val =getValue(ioPool, instance);
+			var size=getSafeSize(ioPool, instance, unsigned, val);
 			if(unsigned){
 				size.write(dest, val);
 			}else{
@@ -370,9 +384,8 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		
 		private final boolean unsigned;
 		
-		public FShort(FieldAccessor<T> field){this(field, false);}
-		public FShort(FieldAccessor<T> field, boolean forceFixed){
-			super(field, forceFixed, SHORT);
+		private FShort(FieldAccessor<T> field, VaryingSize size){
+			super(field, size);
 			unsigned=field.hasAnnotation(IOValue.Unsigned.class);
 		}
 		@Override
@@ -380,6 +393,10 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			var all=EnumSet.allOf(NumberSize.class);
 			all.removeIf(s->s.greaterThan(SHORT));
 			return all;
+		}
+		@Override
+		protected IOField<T, Short> wSize(VaryingSize size){
+			return new FShort<>(getAccessor(), size);
 		}
 		
 		private short getValue(VarPool<T> ioPool, T instance){
@@ -403,8 +420,8 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		
 		@Override
 		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
-			var size=getSize(ioPool, instance);
 			var val =getValue(ioPool, instance);
+			var size=getSafeSize(ioPool, instance, unsigned, val);
 			if(unsigned){
 				size.write(dest, val);
 			}else{
@@ -443,12 +460,15 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	
 	public static final class FByte<T extends IOInstance<T>> extends IOFieldPrimitive<T, Byte>{
 		
-		public FByte(FieldAccessor<T> field)                    {this(field, false);}
-		public FByte(FieldAccessor<T> field, boolean forceFixed){super(field, forceFixed, BYTE);}
+		private FByte(FieldAccessor<T> field, VaryingSize size){super(field, size);}
 		
 		@Override
 		protected EnumSet<NumberSize> allowedSizes(){
 			return EnumSet.of(BYTE);
+		}
+		@Override
+		protected IOField<T, Byte> wSize(VaryingSize size){
+			return new FByte<>(getAccessor(), size);
 		}
 		
 		public byte getValue(VarPool<T> ioPool, T instance){
@@ -472,6 +492,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		
 		@Override
 		public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+			maxSize.safeSize(BYTE);
 			dest.writeInt1(getValue(ioPool, instance));
 		}
 		
@@ -497,9 +518,9 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 	}
 	
-	public static class FBoolean<T extends IOInstance<T>> extends BitField<T, Boolean>{
+	public static final class FBoolean<T extends IOInstance<T>> extends BitField<T, Boolean>{
 		
-		protected FBoolean(FieldAccessor<T> field){super(field);}
+		private FBoolean(FieldAccessor<T> field){super(field);}
 		
 		public boolean getValue(VarPool<T> ioPool, T instance){
 			return getAccessor().getBoolean(ioPool, instance);
@@ -557,22 +578,26 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		}
 	}
 	
-	private final boolean                               forceFixed;
-	private final NumberSize                            maxSize;
-	private       BiFunction<VarPool<T>, T, NumberSize> dynamicSize;
-	private       SizeDescriptor<T>                     sizeDescriptor;
+	private final   boolean                               forceFixed;
+	protected final VaryingSize                           maxSize;
+	private         BiFunction<VarPool<T>, T, NumberSize> dynamicSize;
+	private         SizeDescriptor<T>                     sizeDescriptor;
 	
-	protected IOFieldPrimitive(FieldAccessor<T> field, boolean forceFixed, NumberSize maxSize){
+	protected IOFieldPrimitive(FieldAccessor<T> field, VaryingSize maxSize){
 		super(field);
-		this.forceFixed=forceFixed;
-		this.maxSize=maxSize;
+		var maxAllowed=maxAllowed();
+		
+		if(maxSize!=null&&maxSize.size.greaterThan(maxAllowed)) throw new IllegalArgumentException(maxSize+" > "+maxAllowed);
+		this.forceFixed=maxSize!=null;
+		
+		this.maxSize=maxSize!=null?maxSize:new VaryingSize(maxAllowed, -1);
 	}
 	
 	@Override
 	public void init(){
 		super.init();
 		var fieldOpt=forceFixed?Optional.<IOField<T, NumberSize>>empty():IOFieldTools.getDynamicSize(getAccessor());
-		var allowed =EnumSet.copyOf(allowedSizes().stream().filter(s->s.lesserThanOrEqual(maxSize)).collect(Collectors.toSet()));
+		var allowed =EnumSet.copyOf(allowedSizes().stream().filter(s->s.lesserThanOrEqual(maxSize.size)).collect(Collectors.toSet()));
 		if(fieldOpt.isPresent()){
 			var field=fieldOpt.get();
 			dynamicSize=(ioPool, instance)->{
@@ -585,7 +610,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 				allowed.stream().max(Comparator.naturalOrder()),
 				field.getAccessor());
 		}else{
-			sizeDescriptor=SizeDescriptor.Fixed.of(maxSize.bytes);
+			sizeDescriptor=SizeDescriptor.Fixed.of(maxSize.size.bytes);
 		}
 	}
 	
@@ -597,9 +622,20 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	
 	protected abstract EnumSet<NumberSize> allowedSizes();
 	
+	private NumberSize maxAllowed(){
+		return allowedSizes().stream().reduce(NumberSize::max).orElseThrow();
+	}
+	
+	protected NumberSize getSafeSize(VarPool<T> ioPool, T instance, boolean unsigned, long num){
+		return getSafeSize(ioPool, instance, NumberSize.bySize(num, unsigned));
+	}
+	protected NumberSize getSafeSize(VarPool<T> ioPool, T instance, NumberSize neededNum){
+		if(dynamicSize!=null) return dynamicSize.apply(ioPool, instance);
+		return maxSize.safeSize(neededNum);
+	}
 	protected NumberSize getSize(VarPool<T> ioPool, T instance){
 		if(dynamicSize!=null) return dynamicSize.apply(ioPool, instance);
-		return maxSize;
+		return maxSize.size;
 	}
 	
 	@Override
@@ -607,15 +643,13 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		return sizeDescriptor;
 	}
 	
-	@SuppressWarnings("unchecked")
 	@Override
-	public IOField<T, ValueType> implMaxAsFixedSize(){
-		try{
-			return (IOField<T, ValueType>)getClass().getConstructor(FieldAccessor.class, boolean.class).newInstance(getAccessor(), true);
-		}catch(ReflectiveOperationException e){
-			throw new RuntimeException(e);
-		}
+	public IOField<T, ValueType> maxAsFixedSize(VaryingSize.Provider varProvider){
+		var size=varProvider.provide(maxAllowed(), false);
+		if(forceFixed&&maxSize==size) return this;
+		return wSize(size);
 	}
+	protected abstract IOField<T, ValueType> wSize(VaryingSize size);
 	
 	@Override
 	public final Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){

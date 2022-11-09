@@ -125,7 +125,7 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 			getTypeDef().arg(0)
 		);
 		
-		valueStorage=(ValueStorage<T>)ValueStorage.makeStorage(provider, typeDef.arg(0), getGenerics(), false);
+		valueStorage=(ValueStorage<T>)ValueStorage.makeStorage(provider, typeDef.arg(0), getGenerics(), new ValueStorage.StorageRule.Default());
 		
 		if(isSelfDataEmpty()){
 			writeManagedFields();

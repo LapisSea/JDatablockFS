@@ -4,15 +4,14 @@ import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.UnsupportedStructLayout;
 import com.lapissea.cfs.io.content.ContentReader;
-import com.lapissea.cfs.io.instancepipe.FixedStructPipe;
-import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
-import com.lapissea.cfs.io.instancepipe.StructPipe;
+import com.lapissea.cfs.io.instancepipe.*;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.BasicSizeDescriptor;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
+import com.lapissea.cfs.type.field.VaryingSize;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.fields.NoIOField;
 import com.lapissea.cfs.type.field.fields.RefField;
@@ -20,7 +19,7 @@ import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.IOException;
 
-import static com.lapissea.cfs.type.StagedInit.STATE_DONE;
+import static com.lapissea.cfs.io.instancepipe.StructPipe.STATE_IO_FIELD;
 
 public sealed interface ValueStorage<T>{
 	
@@ -48,11 +47,11 @@ public sealed interface ValueStorage<T>{
 	
 	final class Instance<T extends IOInstance<T>> implements ValueStorage.InstanceBased<T>{
 		
-		private final GenericContext        ctx;
-		private final DataProvider          provider;
-		private final StandardStructPipe<T> pipe;
+		private final GenericContext ctx;
+		private final DataProvider   provider;
+		private final StructPipe<T>  pipe;
 		
-		public Instance(GenericContext ctx, DataProvider provider, StandardStructPipe<T> pipe){
+		public Instance(GenericContext ctx, DataProvider provider, StructPipe<T> pipe){
 			this.ctx=ctx;
 			this.provider=provider;
 			this.pipe=pipe;
@@ -77,7 +76,7 @@ public sealed interface ValueStorage<T>{
 		public BasicSizeDescriptor<T, ?> getSizeDescriptor(){
 			return pipe.getSizeDescriptor();
 		}
-		public StandardStructPipe<T> getPipe(){
+		public StructPipe<T> getPipe(){
 			return pipe;
 		}
 		
@@ -99,12 +98,12 @@ public sealed interface ValueStorage<T>{
 	
 	final class FixedInstance<T extends IOInstance<T>> implements ValueStorage.InstanceBased<T>{
 		
-		private final GenericContext     ctx;
-		private final DataProvider       provider;
-		private final FixedStructPipe<T> pipe;
-		private final long               size;
+		private final GenericContext         ctx;
+		private final DataProvider           provider;
+		private final BaseFixedStructPipe<T> pipe;
+		private final long                   size;
 		
-		public FixedInstance(GenericContext ctx, DataProvider provider, FixedStructPipe<T> pipe){
+		public FixedInstance(GenericContext ctx, DataProvider provider, BaseFixedStructPipe<T> pipe){
 			this.ctx=ctx;
 			this.provider=provider;
 			this.pipe=pipe;
@@ -126,7 +125,7 @@ public sealed interface ValueStorage<T>{
 			return size;
 		}
 		
-		public FixedStructPipe<T> getPipe(){
+		public BaseFixedStructPipe<T> getPipe(){
 			return pipe;
 		}
 		
@@ -136,7 +135,7 @@ public sealed interface ValueStorage<T>{
 		}
 		
 		@Override
-		public RuntimeType<T> getType(){
+		public Struct<T> getType(){
 			return pipe.getType();
 		}
 		
@@ -146,23 +145,41 @@ public sealed interface ValueStorage<T>{
 		}
 	}
 	
+	
+	private static void writeNew(RandomIO dest, AllocateTicket ticket, DataProvider provider, BaseFixedStructPipe<Reference> refPipe) throws IOException{
+		if(dest instanceof ChunkChainIO io){
+			ticket=ticket.withPositionMagnet(io.calcGlobalPos());
+		}
+		var ch=ticket.submit(provider);
+		try{
+			refPipe.write(provider, dest, ch.getPtr().makeReference());
+		}catch(Throwable e){
+			provider.getMemoryManager().free(ch);
+			throw e;
+		}
+	}
+	
 	final class FixedReferencedInstance<T extends IOInstance<T>> implements ValueStorage.InstanceBased<T>{
-		
-		private static final long SIZE=Reference.FIXED_PIPE.getFixedDescriptor().get(WordSpace.BYTE);
 		
 		private final GenericContext ctx;
 		private final DataProvider   provider;
 		private final StructPipe<T>  pipe;
 		
-		public FixedReferencedInstance(GenericContext ctx, DataProvider provider, StructPipe<T> pipe){
+		private final BaseFixedStructPipe<Reference> refPipe;
+		private final long                           size;
+		
+		public FixedReferencedInstance(GenericContext ctx, DataProvider provider, BaseFixedStructPipe<Reference> refPipe, StructPipe<T> pipe){
 			this.ctx=ctx;
 			this.provider=provider;
 			this.pipe=pipe;
+			this.refPipe=refPipe;
+			
+			size=refPipe.getFixedDescriptor().get(WordSpace.BYTE);
 		}
 		
 		@Override
 		public T readNew(ContentReader src) throws IOException{
-			var ref=Reference.FIXED_PIPE.readNew(provider, src, null);
+			var ref=refPipe.readNew(provider, src, null);
 			if(ref.isNull()){
 				return null;
 			}
@@ -171,32 +188,26 @@ public sealed interface ValueStorage<T>{
 		
 		@Override
 		public void write(RandomIO dest, T src) throws IOException{
-			var ref=dest.remaining()==0?new Reference():Reference.FIXED_PIPE.readNew(provider, dest, null);
+			var ref=dest.remaining()==0?new Reference():refPipe.readNew(provider, dest, null);
 			if(ref.isNull()){
-				var ticket=AllocateTicket.withData(pipe, provider, src);
-				if(dest instanceof ChunkChainIO io){
-					ticket=ticket.withPositionMagnet(io.calcGlobalPos());
-				}
-				var ch=ticket.submit(provider);
-				Reference.FIXED_PIPE.write(provider, dest, ch.getPtr().makeReference());
-				return;
+				writeNew(dest, AllocateTicket.withData(pipe, provider, src), provider, refPipe);
+			}else{
+				ref.write(provider, true, pipe, src);
 			}
-			
-			ref.write(provider, true, pipe, src);
 		}
 		
 		@Override
 		public long inlineSize(){
-			return SIZE;
+			return size;
 		}
 		
 		@Override
 		public <I extends IOInstance<I>> IOField<I, T> field(FieldAccessor<I> accessor, UnsafeSupplier<RandomIO, IOException> ioAt){
-			return new RefField.NoIO<>(accessor, Reference.FIXED_PIPE.getFixedDescriptor()){
+			return new RefField.NoIO<>(accessor, refPipe.getFixedDescriptor()){
 				@Override
 				public void setReference(I instance, Reference newRef){
 					try(var io=ioAt.get()){
-						Reference.FIXED_PIPE.write(provider, io, newRef);
+						refPipe.write(provider, io, newRef);
 					}catch(IOException e){
 						throw new RuntimeException(e);
 					}
@@ -205,7 +216,7 @@ public sealed interface ValueStorage<T>{
 				@Override
 				public Reference getReference(I instance){
 					try(var io=ioAt.get()){
-						return Reference.FIXED_PIPE.readNew(provider, io, null);
+						return refPipe.readNew(provider, io, null);
 					}catch(IOException e){
 						throw new RuntimeException(e);
 					}
@@ -225,7 +236,7 @@ public sealed interface ValueStorage<T>{
 		
 		@Override
 		public void readSingle(ContentReader src, T dest, IOField<T, ?> field) throws IOException{
-			var ref=Reference.FIXED_PIPE.readNew(provider, src, null);
+			var ref=refPipe.readNew(provider, src, null);
 			ref.requireNonNull();
 			ref.io(provider, io->pipe.readSingleField(pipe.makeIOPool(), provider, io, field, dest, ctx));
 		}
@@ -233,22 +244,25 @@ public sealed interface ValueStorage<T>{
 	
 	final class UnmanagedInstance<T extends IOInstance.Unmanaged<T>> implements ValueStorage<T>{
 		
-		private static final long SIZE=Reference.FIXED_PIPE.getFixedDescriptor().get(WordSpace.BYTE);
-		
 		private final TypeLink            type;
 		private final DataProvider        provider;
 		private final Struct.Unmanaged<T> struct;
 		
+		private final BaseFixedStructPipe<Reference> refPipe;
+		private final long                           size;
+		
 		@SuppressWarnings("unchecked")
-		public UnmanagedInstance(TypeLink type, DataProvider provider){
+		public UnmanagedInstance(TypeLink type, DataProvider provider, BaseFixedStructPipe<Reference> refPipe){
 			this.type=type;
 			this.provider=provider;
+			this.refPipe=refPipe;
+			size=refPipe.getFixedDescriptor().get(WordSpace.BYTE);
 			struct=(Struct.Unmanaged<T>)Struct.Unmanaged.ofUnknown(type.getTypeClass(provider.getTypeDb()));
 		}
 		
 		@Override
 		public T readNew(ContentReader src) throws IOException{
-			var ref=Reference.FIXED_PIPE.readNew(provider, src, null);
+			var ref=refPipe.readNew(provider, src, null);
 			if(ref.isNull()){
 				return null;
 			}
@@ -258,12 +272,12 @@ public sealed interface ValueStorage<T>{
 		
 		@Override
 		public void write(RandomIO dest, T src) throws IOException{
-			Reference.FIXED_PIPE.write(provider, dest, src.getReference());
+			refPipe.write(provider, dest, src.getReference());
 		}
 		
 		@Override
 		public long inlineSize(){
-			return SIZE;
+			return size;
 		}
 		
 		@Override
@@ -371,19 +385,23 @@ public sealed interface ValueStorage<T>{
 	
 	final class FixedReferenceString implements ValueStorage<String>{
 		
-		private static final long SIZE=Reference.FIXED_PIPE.getFixedDescriptor().get(WordSpace.BYTE);
 		
 		private static final RuntimeType<String> TYPE=RuntimeType.of(String.class);
 		
 		private final DataProvider provider;
 		
-		public FixedReferenceString(DataProvider provider){
+		private final BaseFixedStructPipe<Reference> refPipe;
+		private final long                           size;
+		
+		public FixedReferenceString(DataProvider provider, BaseFixedStructPipe<Reference> refPipe){
 			this.provider=provider;
+			this.refPipe=refPipe;
+			size=refPipe.getFixedDescriptor().get(WordSpace.BYTE);
 		}
 		
 		@Override
 		public String readNew(ContentReader src) throws IOException{
-			var ref=Reference.FIXED_PIPE.readNew(provider, src, null);
+			var ref=refPipe.readNew(provider, src, null);
 			if(ref.isNull()){
 				return null;
 			}
@@ -392,27 +410,22 @@ public sealed interface ValueStorage<T>{
 		
 		@Override
 		public void write(RandomIO dest, String src) throws IOException{
-			var ref=dest.remaining()==0?new Reference():Reference.FIXED_PIPE.readNew(provider, dest, null);
+			var ref=dest.remaining()==0?new Reference():refPipe.readNew(provider, dest, null);
 			if(ref.isNull()){
-				var ticket=AllocateTicket.withData(AutoText.PIPE, provider, new AutoText(src));
-				if(dest instanceof ChunkChainIO io){
-					ticket=ticket.withPositionMagnet(io.calcGlobalPos());
-				}
-				var ch=ticket.submit(provider);
-				Reference.FIXED_PIPE.write(provider, dest, ch.getPtr().makeReference());
-				return;
+				writeNew(dest, AllocateTicket.withData(AutoText.PIPE, provider, new AutoText(src)), provider, refPipe);
+			}else{
+				ref.write(provider, true, AutoText.PIPE, new AutoText(src));
 			}
-			ref.write(provider, true, AutoText.PIPE, new AutoText(src));
 		}
 		
 		@Override
 		public long inlineSize(){
-			return SIZE;
+			return size;
 		}
 		
 		@Override
 		public <I extends IOInstance<I>> IOField<I, String> field(FieldAccessor<I> accessor, UnsafeSupplier<RandomIO, IOException> ioAt){
-			return new NoIOField<>(accessor, Reference.FIXED_PIPE.getFixedDescriptor());
+			return new NoIOField<>(accessor, refPipe.getFixedDescriptor());
 		}
 		
 		@Override
@@ -421,7 +434,15 @@ public sealed interface ValueStorage<T>{
 		}
 	}
 	
-	static ValueStorage<?> makeStorage(DataProvider provider, TypeLink typeDef, GenericContext generics, boolean fixedOnly){
+	sealed interface StorageRule{
+		record Default() implements StorageRule{}
+		
+		record FixedOnly() implements StorageRule{}
+		
+		record VariableFixed(VaryingSize.Provider provider) implements StorageRule{}
+	}
+	
+	static ValueStorage<?> makeStorage(DataProvider provider, TypeLink typeDef, GenericContext generics, StorageRule rule){
 		Class<?> clazz=typeDef.getTypeClass(provider.getTypeDb());
 		{
 			var primitive=SupportedPrimitive.get(clazz);
@@ -431,22 +452,38 @@ public sealed interface ValueStorage<T>{
 		}
 		
 		if(clazz==String.class){
-			if(fixedOnly) return new FixedReferenceString(provider);
-			return new InlineString(provider);
+			return switch(rule){
+				case StorageRule.Default ignored -> new InlineString(provider);
+				case StorageRule.FixedOnly ignored -> new FixedReferenceString(provider, Reference.FIXED_PIPE);
+				case StorageRule.VariableFixed conf -> new FixedReferenceString(provider, FixedVaryingStructPipe.tryVarying(Reference.STRUCT, conf.provider));
+			};
 		}
 		
 		if(!IOInstance.isManaged(clazz)){
-			return new UnmanagedInstance<>(typeDef, provider);
+			return switch(rule){
+				case StorageRule.Default ignored -> new UnmanagedInstance<>(typeDef, provider, Reference.FIXED_PIPE);//TODO: implement standard reference unmanaged
+				case StorageRule.FixedOnly ignored -> new UnmanagedInstance<>(typeDef, provider, Reference.FIXED_PIPE);
+				case StorageRule.VariableFixed conf -> new UnmanagedInstance<>(typeDef, provider, FixedVaryingStructPipe.tryVarying(Reference.STRUCT, conf.provider));
+			};
 		}else{
 			var struct=Struct.ofUnknown(clazz);
-			if(fixedOnly){
-				try{
-					return new FixedInstance<>(generics, provider, FixedStructPipe.of(struct, STATE_DONE));
-				}catch(UnsupportedStructLayout ignored){
-					return new FixedReferencedInstance<>(generics, provider, StandardStructPipe.of(struct));
+			return switch(rule){
+				case StorageRule.Default ignored -> new Instance<>(generics, provider, StandardStructPipe.of(struct));
+				case StorageRule.FixedOnly ignored -> {
+					try{
+						yield new FixedInstance<>(generics, provider, FixedStructPipe.of(struct, STATE_IO_FIELD));
+					}catch(UnsupportedStructLayout ignored1){
+						yield new FixedReferencedInstance<>(generics, provider, Reference.FIXED_PIPE, StandardStructPipe.of(struct));
+					}
 				}
-			}
-			return new Instance<>(generics, provider, StandardStructPipe.of(struct));
+				case StorageRule.VariableFixed conf -> {
+					try{
+						yield new FixedInstance<>(generics, provider, FixedVaryingStructPipe.tryVarying(struct, conf.provider));
+					}catch(UnsupportedStructLayout ignored){
+						yield new FixedReferencedInstance<>(generics, provider, FixedVaryingStructPipe.tryVarying(Reference.STRUCT, conf.provider), StandardStructPipe.of(struct));
+					}
+				}
+			};
 		}
 	}
 	

@@ -36,20 +36,18 @@ public final class Reference extends IOInstance.Managed<Reference>{
 	static{
 		boolean useOptimized=GlobalConfig.configFlag("abBenchmark.referenceOptimizedPipe", true);
 		if(useOptimized){
-			StandardStructPipe.registerSpecialImpl(STRUCT, ()->new StandardStructPipe<>(STRUCT, true){
-				@Override
-				protected List<IOField<Reference, ?>> initFields(){
-					var f=super.initFields();
-					if(
-						f.get(0) instanceof BitFieldMerger<?> m&&m.fieldGroup().stream().map(IOField::getName).toList().equals(List.of("offsetSize", "ptrSize"))&&
-						f.get(1).getName().equals("offset")&&
-						f.get(2).getName().equals("ptr")
-					){
-						return f;
-					}
-					
-					throw new ShouldNeverHappenError(f.toString());
+			StandardStructPipe.registerSpecialImpl(STRUCT, ()->new StandardStructPipe<>(STRUCT, (t, structFields)->{
+				var f=StandardStructPipe.<Reference>compiler().compile(t, structFields);
+				if(
+					f.get(0) instanceof BitFieldMerger<?> m&&m.fieldGroup().stream().map(IOField::getName).toList().equals(List.of("offsetSize", "ptrSize"))&&
+					f.get(1).getName().equals("offset")&&
+					f.get(2).getName().equals("ptr")
+				){
+					return f;
 				}
+				
+				throw new ShouldNeverHappenError(f.toString());
+			}, true){
 				@Override
 				protected void doWrite(DataProvider provider, ContentWriter dest, VarPool<Reference> ioPool, Reference instance) throws IOException{
 					
@@ -82,19 +80,17 @@ public final class Reference extends IOInstance.Managed<Reference>{
 					return instance;
 				}
 			});
-			FixedStructPipe.registerSpecialImpl(STRUCT, ()->new FixedStructPipe<>(STRUCT, true){
-				@Override
-				protected List<IOField<Reference, ?>> initFields(){
-					var f=super.initFields();
-					if(
-						f.get(0).getName().equals("offset")&&
-						f.get(1).getName().equals("ptr")
-					){
-						return f;
-					}
-					
-					throw new ShouldNeverHappenError(f.toString());
+			FixedStructPipe.registerSpecialImpl(STRUCT, ()->new FixedStructPipe<>(STRUCT, (t, structFields)->{
+				var f=FixedStructPipe.<Reference>compiler().compile(t, structFields);
+				if(
+					f.get(0).getName().equals("offset")&&
+					f.get(1).getName().equals("ptr")
+				){
+					return f;
 				}
+				
+				throw new ShouldNeverHappenError(f.toString());
+			}, true){
 				@Override
 				protected void doWrite(DataProvider provider, ContentWriter dest, VarPool<Reference> ioPool, Reference instance) throws IOException{
 					

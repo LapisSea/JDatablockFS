@@ -19,6 +19,13 @@ import static com.lapissea.cfs.type.field.StoragePool.IO;
 
 public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 	
+	public static <T extends IOInstance<T>> PipeFieldCompiler<T, RuntimeException> compiler(){
+		return (t, structFields)->IOFieldTools.stepFinal(structFields, List.of(
+			IOFieldTools::dependencyReorder,
+			IOFieldTools::mergeBitSpace
+		));
+	}
+	
 	public static <T extends IOInstance<T>> long sizeOfUnknown(DataProvider provider, T instance, WordSpace wordSpace){
 		var pip=StandardStructPipe.of(instance.getThisStruct());
 		return pip.calcUnknownSize(provider, instance, wordSpace);
@@ -42,16 +49,11 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		StructPipe.registerSpecialImpl(struct, (Class<P>)(Object)StandardStructPipe.class, newType);
 	}
 	
-	public StandardStructPipe(Struct<T> type, boolean initNow){
-		super(type, initNow);
+	protected StandardStructPipe(Struct<T> type, PipeFieldCompiler<T, RuntimeException> compiler, boolean initNow){
+		super(type, compiler, initNow);
 	}
-	
-	@Override
-	protected List<IOField<T, ?>> initFields(){
-		return IOFieldTools.stepFinal(getType().getFields(), List.of(
-			IOFieldTools::dependencyReorder,
-			IOFieldTools::mergeBitSpace
-		));
+	public StandardStructPipe(Struct<T> type, boolean initNow){
+		super(type, compiler(), initNow);
 	}
 	
 	@Override

@@ -163,6 +163,8 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 			if(STAT_LOGGING) logStart(WRITE_ACTION, uid());
 			write(ioPool, provider, dest, instance);
 			if(STAT_LOGGING) logEnd(WRITE_ACTION, uid());
+		}catch(VaryingSize.TooSmall e){
+			throw e;
 		}catch(Exception e){
 			throw new IOException("Failed to write "+this, e);
 		}
@@ -290,19 +292,24 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 	}
 	
 	public final IOField<T, ValueType> forceMaxAsFixedSize(){
-		if(getSizeDescriptor().hasFixed()) return this;
+		return forceMaxAsFixedSize(null);
+	}
+	public final IOField<T, ValueType> forceMaxAsFixedSize(VaryingSize.Provider provider){
+		if(provider==null&&getSizeDescriptor().hasFixed()) return this;
 		if(!getSizeDescriptor().hasMax()){
 			throw unsupportedFixed();
 		}
-		var f=implMaxAsFixedSize();
-		f.initLateData(getDependencies());
-		f.init();
+		var f=maxAsFixedSize(provider==null?VaryingSize.Provider.ALL_MAX:provider);
+		if(f!=this){
+			f.initLateData(getDependencies());
+			f.init();
+		}
 		if(!f.getSizeDescriptor().hasFixed()) throw new RuntimeException(this+" failed to make itself fixed");
 		return f;
 	}
 	
 	
-	protected IOField<T, ValueType> implMaxAsFixedSize(){
+	protected IOField<T, ValueType> maxAsFixedSize(VaryingSize.Provider varProvider){
 		throw unsupportedFixed();
 	}
 	
