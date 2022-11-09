@@ -4,6 +4,7 @@ import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
+import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.INumber;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.GenericContext;
@@ -54,7 +55,8 @@ public class IOFieldNumber<T extends IOInstance<T>, E extends INumber> extends I
 	}
 	@Override
 	public IOField<T, E> maxAsFixedSize(VaryingSize.Provider varProvider){
-		return new IOFieldNumber<>(getAccessor(), varProvider.provide(LARGEST));
+		var ptr=getAccessor().getType()==ChunkPointer.class;
+		return new IOFieldNumber<>(getAccessor(), varProvider.provide(LARGEST, ptr));
 	}
 	
 	private NumberSize getSize(VarPool<T> ioPool, T instance){

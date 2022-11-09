@@ -1,10 +1,7 @@
 package com.lapissea.cfs.objects.collections;
 
 import com.lapissea.cfs.Utils;
-import com.lapissea.cfs.chunk.AllocateTicket;
-import com.lapissea.cfs.chunk.Chunk;
-import com.lapissea.cfs.chunk.ChunkBuilder;
-import com.lapissea.cfs.chunk.DataProvider;
+import com.lapissea.cfs.chunk.*;
 import com.lapissea.cfs.exceptions.BitDepthOutOfSpaceException;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.ValueStorage;
@@ -69,12 +66,18 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 			readManagedFields();
 		}
 		
-		var rec=VaryingSize.Provider.record((max, id)->{
+		var rec=VaryingSize.Provider.record((max, ptr, id)->{
 			NumberSize num;
 			if(varyingBuffer!=null){
 				num=varyingBuffer.get(id);
 			}else{
-				num=NumberSize.VOID;
+				if(ptr){
+					try{
+						num=NumberSize.bySize(getDataProvider().getSource().getIOSize());
+					}catch(IOException e){
+						throw new RuntimeException(e);
+					}
+				}else num=NumberSize.VOID;
 			}
 			return max.min(num);
 		});

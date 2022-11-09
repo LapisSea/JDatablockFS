@@ -18,7 +18,7 @@ public class VaryingSize implements Stringify{
 		final class Recorder implements Provider{
 			
 			public interface Mapper{
-				NumberSize map(NumberSize max, int id);
+				NumberSize map(NumberSize max, boolean ptr, int id);
 			}
 			
 			private final List<NumberSize> data=new ArrayList<>();
@@ -29,9 +29,9 @@ public class VaryingSize implements Stringify{
 			}
 			
 			@Override
-			public VaryingSize provide(NumberSize max){
+			public VaryingSize provide(NumberSize max, boolean ptr){
 				var id    =data.size();
-				var actual=mapper.map(max, id);
+				var actual=mapper.map(max, ptr, id);
 				data.add(actual);
 				return new VaryingSize(actual, id);
 			}
@@ -50,7 +50,7 @@ public class VaryingSize implements Stringify{
 			}
 			
 			@Override
-			public VaryingSize provide(NumberSize max){
+			public VaryingSize provide(NumberSize max, boolean ptr){
 				var id    =counter;
 				var actual=data.get(id);
 				counter++;
@@ -60,7 +60,7 @@ public class VaryingSize implements Stringify{
 		
 		Provider ALL_MAX=new Provider(){
 			@Override
-			public VaryingSize provide(NumberSize max){
+			public VaryingSize provide(NumberSize max, boolean ptr){
 				return new VaryingSize(max, -1);
 			}
 			@Override
@@ -80,7 +80,7 @@ public class VaryingSize implements Stringify{
 			if(size==NumberSize.LARGEST) return ALL_MAX;
 			return new Provider(){
 				@Override
-				public VaryingSize provide(NumberSize max){
+				public VaryingSize provide(NumberSize max, boolean ptr){
 					return new VaryingSize(max.min(size), id);
 				}
 				@Override
@@ -89,7 +89,7 @@ public class VaryingSize implements Stringify{
 				}
 			};
 		}
-		VaryingSize provide(NumberSize max);
+		VaryingSize provide(NumberSize max, boolean ptr);
 	}
 	
 	public static final class TooSmall extends RuntimeException{
