@@ -324,7 +324,12 @@ public sealed interface IOTypeDB{
 		
 		private void recordType(MemoryOnlyDB builtIn, TypeLink type, Map<TypeName, TypeDef> newDefs) throws IOException{
 			var isBuiltIn=builtIn.getDefinitionFromClassName(type.getTypeName())!=null;
-			if(isBuiltIn) return;
+			if(isBuiltIn){
+				for(int i=0;i<type.argCount();i++){
+					recordType(builtIn, type.arg(i), newDefs);
+				}
+				return;
+			}
 			
 			var typeName=new TypeName(type.getTypeName());
 			
