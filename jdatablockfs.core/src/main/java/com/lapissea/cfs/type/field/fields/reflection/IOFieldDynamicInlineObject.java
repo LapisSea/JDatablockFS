@@ -447,7 +447,8 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 			}
 			@Override
 			public Integer generate(VarPool<CTyp> ioPool, DataProvider provider, CTyp instance, boolean allowExternalMod) throws IOException{
-				return getId(ioPool, provider, instance, allowExternalMod).val();
+				var typ=getId(ioPool, provider, instance, allowExternalMod);
+				return typ.val();
 			}
 		});
 		
