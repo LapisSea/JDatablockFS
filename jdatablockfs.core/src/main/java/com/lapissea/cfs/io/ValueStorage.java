@@ -145,6 +145,20 @@ public sealed interface ValueStorage<T>{
 		}
 	}
 	
+	
+	private static void writeNew(RandomIO dest, AllocateTicket ticket, DataProvider provider, BaseFixedStructPipe<Reference> refPipe) throws IOException{
+		if(dest instanceof ChunkChainIO io){
+			ticket=ticket.withPositionMagnet(io.calcGlobalPos());
+		}
+		var ch=ticket.submit(provider);
+		try{
+			refPipe.write(provider, dest, ch.getPtr().makeReference());
+		}catch(Throwable e){
+			provider.getMemoryManager().free(ch);
+			throw e;
+		}
+	}
+	
 	final class FixedReferencedInstance<T extends IOInstance<T>> implements ValueStorage.InstanceBased<T>{
 		
 		private final GenericContext ctx;
@@ -176,16 +190,10 @@ public sealed interface ValueStorage<T>{
 		public void write(RandomIO dest, T src) throws IOException{
 			var ref=dest.remaining()==0?new Reference():refPipe.readNew(provider, dest, null);
 			if(ref.isNull()){
-				var ticket=AllocateTicket.withData(pipe, provider, src);
-				if(dest instanceof ChunkChainIO io){
-					ticket=ticket.withPositionMagnet(io.calcGlobalPos());
-				}
-				var ch=ticket.submit(provider);
-				refPipe.write(provider, dest, ch.getPtr().makeReference());
-				return;
+				writeNew(dest, AllocateTicket.withData(pipe, provider, src), provider, refPipe);
+			}else{
+				ref.write(provider, true, pipe, src);
 			}
-			
-			ref.write(provider, true, pipe, src);
 		}
 		
 		@Override
@@ -404,15 +412,10 @@ public sealed interface ValueStorage<T>{
 		public void write(RandomIO dest, String src) throws IOException{
 			var ref=dest.remaining()==0?new Reference():refPipe.readNew(provider, dest, null);
 			if(ref.isNull()){
-				var ticket=AllocateTicket.withData(AutoText.PIPE, provider, new AutoText(src));
-				if(dest instanceof ChunkChainIO io){
-					ticket=ticket.withPositionMagnet(io.calcGlobalPos());
-				}
-				var ch=ticket.submit(provider);
-				refPipe.write(provider, dest, ch.getPtr().makeReference());
-				return;
+				writeNew(dest, AllocateTicket.withData(AutoText.PIPE, provider, new AutoText(src)), provider, refPipe);
+			}else{
+				ref.write(provider, true, AutoText.PIPE, new AutoText(src));
 			}
-			ref.write(provider, true, AutoText.PIPE, new AutoText(src));
 		}
 		
 		@Override
