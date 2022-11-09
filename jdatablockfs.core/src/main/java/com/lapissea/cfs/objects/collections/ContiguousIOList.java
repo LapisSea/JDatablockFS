@@ -387,10 +387,16 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	
 	@Override
 	public void addAll(Collection<T> values) throws IOException{
+		if(values.isEmpty()) return;
 		addMany(values.size(), values.iterator()::next);
 	}
 	
 	private void addMany(long count, UnsafeSupplier<T, IOException> source) throws IOException{
+		if(count==0) return;
+		if(count==1){
+			add(source.get());
+			return;
+		}
 		if(storage instanceof ValueStorage.UnmanagedInstance){//TODO is this necessary? Test and maybe remove
 			requestCapacity(size()+count);
 			for(long i=0;i<count;i++){
@@ -423,14 +429,30 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 				long lastI=0;
 				long i    =0;
 				
+				List<T> bufferedElements=new ArrayList<>();
+				
 				for(long c=0;c<count;c++){
 					T value=source.get();
+					bufferedElements.add(value);
 					
-					storage.write(buffIo, value);
+					try{
+						storage.write(buffIo, value);
+					}catch(VaryingSize.TooSmall e){
+						var change=i-lastI;
+						if(change>0) flush.accept(change);
+						
+						growVaryingSizes(e);
+						
+						addAll(bufferedElements);
+						addMany(count-c-1, source);
+						
+						return;
+					}
 					
 					i++;
 					var s=buffIo.getPos();
 					if(s>=targetCap){
+						bufferedElements.clear();
 						var change=i-lastI;
 						lastI=i;
 						flush.accept(change);
