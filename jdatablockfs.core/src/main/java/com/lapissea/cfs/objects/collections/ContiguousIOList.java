@@ -259,16 +259,16 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		try(var io=ioAtElement(index)){
 			storage.write(io, value);
 		}catch(VaryingSize.TooSmall e){
-			growVaryingSizes(e);
+			growVaryingSizes(e.tooSmallIdMap);
 			try(var io=ioAtElement(index)){
 				storage.write(io, value);
 			}
 		}
 	}
 	
-	private void growVaryingSizes(VaryingSize.TooSmall e) throws IOException{
+	private void growVaryingSizes(Map<VaryingSize, NumberSize> tooSmallIdMap) throws IOException{
 		var newBuffer=new ArrayList<>(varyingBuffer);
-		e.tooSmallIdMap.forEach((v, s)->newBuffer.set(v.getId(), s));
+		tooSmallIdMap.forEach((v, s)->newBuffer.set(v.getId(), s));
 		var newVarying=List.copyOf(newBuffer);
 		
 		var oldStorage=storage;
@@ -441,7 +441,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 						var change=i-lastI;
 						if(change>0) flush.accept(change);
 						
-						growVaryingSizes(e);
+						growVaryingSizes(e.tooSmallIdMap);
 						
 						addAll(bufferedElements);
 						addMany(count-c-1, source);
