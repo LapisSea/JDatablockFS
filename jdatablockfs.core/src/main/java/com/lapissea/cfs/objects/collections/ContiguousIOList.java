@@ -66,18 +66,14 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 			readManagedFields();
 		}
 		
+		var ptrSize=NumberSize.bySize(getDataProvider().getSource().getIOSize());
+		
 		var rec=VaryingSize.Provider.record((max, ptr, id)->{
 			NumberSize num;
 			if(varyingBuffer!=null){
 				num=varyingBuffer.get(id);
 			}else{
-				if(ptr){
-					try{
-						num=NumberSize.bySize(getDataProvider().getSource().getIOSize());
-					}catch(IOException e){
-						throw new RuntimeException(e);
-					}
-				}else num=NumberSize.VOID;
+				num=ptr?ptrSize:NumberSize.VOID;
 			}
 			return max.min(num);
 		});
