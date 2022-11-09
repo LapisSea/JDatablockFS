@@ -13,6 +13,7 @@ import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.VaryingSize;
+import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.util.NotImplementedException;
 
@@ -21,6 +22,33 @@ import java.io.IOException;
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
 public abstract class BitField<T extends IOInstance<T>, Type> extends IOField<T, Type>{
+	
+	public static final class NoIO<T extends IOInstance<T>, Type> extends BitField<T, Type>{
+		
+		private final SizeDescriptor<T> sizeDescriptor;
+		
+		public NoIO(FieldAccessor<T> accessor, SizeDescriptor<T> sizeDescriptor){
+			super(accessor);
+			this.sizeDescriptor=sizeDescriptor;
+		}
+		
+		@Override
+		public SizeDescriptor<T> getSizeDescriptor(){
+			return sizeDescriptor;
+		}
+		@Override
+		public void writeBits(VarPool<T> ioPool, BitWriter<?> dest, T instance){
+			throw new UnsupportedOperationException();
+		}
+		@Override
+		public void readBits(VarPool<T> ioPool, BitReader src, T instance){
+			throw new UnsupportedOperationException();
+		}
+		@Override
+		public void skipReadBits(BitReader src, T instance){
+			throw new UnsupportedOperationException();
+		}
+	}
 	
 	protected BitField(FieldAccessor<T> field){
 		super(field);

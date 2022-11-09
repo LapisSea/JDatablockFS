@@ -6,6 +6,7 @@ import com.lapissea.cfs.MagicID;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.*;
 import com.lapissea.cfs.io.ChunkChainIO;
+import com.lapissea.cfs.io.bit.EnumUniverse;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.io.instancepipe.FixedStructPipe;
 import com.lapissea.cfs.io.instancepipe.ObjectPipe;
@@ -1664,6 +1665,63 @@ public class BinaryGridRenderer implements DataRenderer{
 											reference,
 											Range.fromSize(fieldOffset+arrOffset, siz));
 										arrOffset+=siz;
+									}
+									continue;
+								}
+								if(comp.isEnum()){
+									var        instO =field.get(ioPool, instance);
+									List<Enum> inst  =isList?(List<Enum>)instO:Arrays.asList((Enum[])instO);
+									var        arrSiz=inst.size();
+									
+									int bitOffset=0;
+									drawByteRanges(rctx, List.of(Range.fromSize(trueOffset, size)), col, false, true);
+									
+									var universe =EnumUniverse.ofUnknown(comp);
+									var arrOffset=0;
+									for(int i=0;i<arrSiz;i++){
+										var bCol=ColorUtils.makeCol(rand, typeHash, field);
+										var siz =universe.bitSize;
+										
+										var ii=i;
+										var bit=new BitField.NoIO<T, Enum>(new FieldAccessor<T>(){
+											@Override
+											public int getTypeID(){
+												return TypeFlag.ID_OBJECT;
+											}
+											@Override
+											public Struct<T> getDeclaringStruct(){
+												return instance.getThisStruct();
+											}
+											@NotNull
+											@Override
+											public String getName(){
+												return "["+ii+"]";
+											}
+											@Override
+											public Object get(VarPool<T> ioPool, T instance){
+												return inst.get(ii);
+											}
+											@Override
+											public void set(VarPool<T> ioPool, T instance, Object value){
+												throw new UnsupportedOperationException();
+											}
+											@NotNull
+											@Override
+											public <T1 extends Annotation> Optional<T1> getAnnotation(Class<T1> annotationClass){
+												return Optional.empty();
+											}
+											@Override
+											public Type getGenericType(GenericContext genericContext){
+												return comp;
+											}
+										}, SizeDescriptor.Fixed.of(WordSpace.BIT, siz));
+										
+										if(annotate) annotateBitField(ctx, ioPool, instance, bit, bCol, bitOffset, siz, reference, fieldOffset+arrOffset);
+										bitOffset+=siz;
+										while(bitOffset>=8){
+											bitOffset-=8;
+											arrOffset++;
+										}
 									}
 									continue;
 								}
