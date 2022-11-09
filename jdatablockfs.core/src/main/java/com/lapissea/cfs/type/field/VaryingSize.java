@@ -41,6 +41,23 @@ public class VaryingSize implements Stringify{
 			}
 		}
 		
+		final class Repeater implements Provider{
+			private final List<NumberSize> data;
+			private       int              counter;
+			
+			public Repeater(List<NumberSize> data){
+				this.data=List.copyOf(data);
+			}
+			
+			@Override
+			public VaryingSize provide(NumberSize max){
+				var id    =counter;
+				var actual=data.get(id);
+				counter++;
+				return new VaryingSize(actual, id);
+			}
+		}
+		
 		Provider ALL_MAX=new Provider(){
 			@Override
 			public VaryingSize provide(NumberSize max){
@@ -54,6 +71,9 @@ public class VaryingSize implements Stringify{
 		
 		static Recorder record(Recorder.Mapper mapper){
 			return new Recorder(mapper);
+		}
+		static Provider repeat(List<NumberSize> data){
+			return new Repeater(data);
 		}
 		
 		static Provider constLimit(NumberSize size, int id){
@@ -106,6 +126,10 @@ public class VaryingSize implements Stringify{
 			throw new TooSmall(this, neededSize);
 		}
 		return size;
+	}
+	
+	public int getId(){
+		return id;
 	}
 	
 	@Override
