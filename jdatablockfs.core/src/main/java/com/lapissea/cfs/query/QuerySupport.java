@@ -18,7 +18,7 @@ public enum QuerySupport{
 		
 		OptionalLong count();
 		
-		Iterator<Accessor<T>> elements();
+		Iterator<Accessor<T>> elements(Set<String> readFields);
 	}
 	
 	private static final class StagedQuery<T> implements Query<T>{
@@ -37,7 +37,7 @@ public enum QuerySupport{
 			var c=data.count();
 			if(c.isPresent()) return c.getAsLong();
 			long count=0;
-			var  es   =data.elements();
+			var  es   =data.elements(null);
 			while(es.hasNext()){
 				es.next();
 				count++;
@@ -46,7 +46,7 @@ public enum QuerySupport{
 		}
 		@Override
 		public Optional<T> any() throws IOException{
-			var es=data.elements();
+			var es=data.elements(null);
 			if(es.hasNext()){
 				return Optional.of(es.next().get());
 			}
@@ -65,21 +65,23 @@ public enum QuerySupport{
 					return OptionalLong.empty();
 				}
 				@Override
-				public Iterator<Accessor<T>> elements(){
-					var src=data.elements();
+				public Iterator<Accessor<T>> elements(Set<String> readFields){
+					var src=data.elements(readFields);
 					return new Iterator<Accessor<T>>(){
 						Accessor<T> next;
 						void calcNext(){
 							if(next!=null) return;
 							while(src.hasNext()){
+								T   value;
 								var candidate=src.next();
 								try{
-									if(filter.test(candidate.get())){
-										next=candidate;
-										break;
-									}
+									value=candidate.get();
 								}catch(IOException e){
 									throw UtilL.uncheckedThrow(e);
+								}
+								if(filter.test(value)){
+									next=candidate;
+									break;
 								}
 							}
 						}

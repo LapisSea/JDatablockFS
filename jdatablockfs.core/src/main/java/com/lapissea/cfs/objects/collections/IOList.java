@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 @SuppressWarnings("unused")
@@ -620,6 +621,15 @@ public interface IOList<T> extends IterablePP<T>{
 		};
 	}
 	
+	
+	default Query<T> query(String expression, Object... args){
+		return query().filter(expression, args);
+	}
+	
+	default Query<T> query(Set<String> readFields, Predicate<T> filter){
+		return query().filter(readFields, filter);
+	}
+	
 	default Query<T> query(){
 		return QuerySupport.of(new QuerySupport.Data<>(){
 			@Override
@@ -631,7 +641,7 @@ public interface IOList<T> extends IterablePP<T>{
 				return OptionalLong.of(size());
 			}
 			@Override
-			public Iterator<QuerySupport.Accessor<T>> elements(){
+			public Iterator<QuerySupport.Accessor<T>> elements(Set<String> readFields){
 				var size=size();
 				return new Iterator<>(){
 					long cursor;

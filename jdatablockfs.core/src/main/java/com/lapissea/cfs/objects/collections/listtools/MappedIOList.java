@@ -286,7 +286,7 @@ public abstract class MappedIOList<From, To> implements IOList<To>{
 				throw NotImplementedException.infer();//TODO: implement .count()
 			}
 			@Override
-			public Iterator<QuerySupport.Accessor<To>> elements(){
+			public Iterator<QuerySupport.Accessor<To>> elements(Set<String> readFields){
 				throw NotImplementedException.infer();//TODO: implement .elements()
 			}
 		});

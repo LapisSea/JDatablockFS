@@ -39,7 +39,7 @@ public class IPs{
 	
 	public static void run(IOInterface memory) throws IOException{
 		createData(memory);
-		printData(memory);
+//		printData(memory);
 	}
 	
 	public static void createData(IOInterface memory) throws IOException{
@@ -57,7 +57,7 @@ public class IPs{
 		ips.add(IP.of(0.2213415, 0.71346, "2001:0db8:85a3:0000:0000:8a2e:0370:7334"));
 		ips.add(IP.of(0.6234, 0.51341123, "2001:0db8:0:1:1:1:1:1"));
 		
-		LogUtil.println(ips.query().filter("latitude > {0}", 0.5).any());
+		LogUtil.println(ips.query("latitude > {0}", 0.5).any());
 	}
 	
 	

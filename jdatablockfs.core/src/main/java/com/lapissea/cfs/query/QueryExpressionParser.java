@@ -8,7 +8,10 @@ import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.UtilL;
 
 import java.lang.reflect.Array;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiPredicate;
 import java.util.function.Consumer;
@@ -29,6 +32,10 @@ public class QueryExpressionParser{
 		ArgSource arg();
 	}
 	
+	private interface FieldRef{
+		String name();
+	}
+	
 	private sealed interface Check{
 		record And(Check l, Check r) implements Check{
 			@Override
@@ -45,17 +52,17 @@ public class QueryExpressionParser{
 			public Stream<Check> deep(){return Stream.of(Stream.of(this), check.deep()).flatMap(s->s);}
 		}
 		
-		record Equals(String name, ArgSource arg) implements Check, ArgContain{
+		record Equals(String name, ArgSource arg) implements Check, ArgContain, FieldRef{
 			@Override
 			public Stream<Check> deep(){return Stream.of(this);}
 		}
 		
-		record GreaterThan(String name, ArgSource arg) implements Check, ArgContain{
+		record GreaterThan(String name, ArgSource arg) implements Check, ArgContain, FieldRef{
 			@Override
 			public Stream<Check> deep(){return Stream.of(this);}
 		}
 		
-		record LessThan(String name, ArgSource arg) implements Check, ArgContain{
+		record LessThan(String name, ArgSource arg) implements Check, ArgContain, FieldRef{
 			@Override
 			public Stream<Check> deep(){return Stream.of(this);}
 		}
@@ -84,12 +91,10 @@ public class QueryExpressionParser{
 	}
 	
 	private static <T> FilterResult<T> parse(FilterQuery<T> filterQuery){
-//		filterQuery.expression.chars();
-		var fields=new HashSet<String>();
-		
 		Check check=expressionToCheck(filterQuery.expression);
 		
-		var args=check.deep().filter(c->c instanceof ArgContain).map(c->((ArgContain)c).arg()).collect(Collectors.toSet());
+		var args  =check.deep().filter(c->c instanceof ArgContain).map(c->((ArgContain)c).arg()).collect(Collectors.toSet());
+		var fields=check.deep().filter(c->c instanceof FieldRef).map(c->((FieldRef)c).name()).collect(Collectors.toUnmodifiableSet());
 		
 		Consumer<T>              argCheck =generateArgCheck(args);
 		BiPredicate<Object[], T> predicate=generateFilter(args, check);
@@ -185,9 +190,9 @@ public class QueryExpressionParser{
 		public String brace(){
 			skipWhite();
 			if(str.charAt(pos)!='(') return null;
-			pos++;  +
+			pos++;
 			
-						
+			
 			int[] depth={1};
 			return advance((i, c)->{
 				if(c=='(') depth[0]++;
