@@ -6,6 +6,7 @@ import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.util.LogUtil;
 
 import java.io.IOException;
 import java.util.Objects;
@@ -55,6 +56,8 @@ public class IPs{
 		//Adding sample data to database:
 		ips.add(IP.of(0.2213415, 0.71346, "2001:0db8:85a3:0000:0000:8a2e:0370:7334"));
 		ips.add(IP.of(0.6234, 0.51341123, "2001:0db8:0:1:1:1:1:1"));
+		
+		LogUtil.println(ips.query().filter("latitude > {0}", 0.5).any());
 	}
 	
 	

@@ -5,6 +5,8 @@ import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.objects.collections.listtools.IOListRangeView;
 import com.lapissea.cfs.objects.collections.listtools.MappedIOList;
 import com.lapissea.cfs.objects.collections.listtools.MemoryWrappedIOList;
+import com.lapissea.cfs.query.Query;
+import com.lapissea.cfs.query.QuerySupport;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.function.FunctionOL;
@@ -306,6 +308,9 @@ public interface IOList<T> extends IterablePP<T>{
 		void ioAdd(T t) throws IOException;
 	}
 	
+	
+	Class<T> elementType();
+	
 	long size();
 	
 	default T getUnsafe(long index){
@@ -604,14 +609,43 @@ public interface IOList<T> extends IterablePP<T>{
 		return new IOListRangeView<>(this, from, to);
 	}
 	
-	default <To> IOList<To> map(Function<T, To> map, Function<To, T> unmap){
+	default <To> IOList<To> map(Class<To> mappedType, Function<T, To> map, Function<To, T> unmap){
 		Objects.requireNonNull(map);
 		Objects.requireNonNull(unmap);
-		return new MappedIOList<>(this){
+		return new MappedIOList<>(this, mappedType){
 			@Override
 			protected To map(T v){return map.apply(v);}
 			@Override
 			protected T unmap(To v){return unmap.apply(v);}
 		};
+	}
+	
+	default Query<T> query(){
+		return QuerySupport.of(new QuerySupport.Data<>(){
+			@Override
+			public Class<T> elementType(){
+				return IOList.this.elementType();
+			}
+			@Override
+			public OptionalLong count(){
+				return OptionalLong.of(size());
+			}
+			@Override
+			public Iterator<QuerySupport.Accessor<T>> elements(){
+				var size=size();
+				return new Iterator<>(){
+					long cursor;
+					@Override
+					public boolean hasNext(){
+						return cursor<size;
+					}
+					@Override
+					public QuerySupport.Accessor<T> next(){
+						var i=cursor++;
+						return ()->IOList.this.get(i);
+					}
+				};
+			}
+		});
 	}
 }

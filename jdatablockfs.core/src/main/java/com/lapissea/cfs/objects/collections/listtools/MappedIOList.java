@@ -1,6 +1,9 @@
 package com.lapissea.cfs.objects.collections.listtools;
 
 import com.lapissea.cfs.objects.collections.IOList;
+import com.lapissea.cfs.query.Query;
+import com.lapissea.cfs.query.QuerySupport;
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;
 
@@ -10,15 +13,21 @@ import java.util.stream.Stream;
 
 public abstract class MappedIOList<From, To> implements IOList<To>{
 	private final IOList<From> data;
+	private final Class<To>    mappedType;
 	
-	protected MappedIOList(IOList<From> data){
+	protected MappedIOList(IOList<From> data, Class<To> mappedType){
 		this.data=data;
+		this.mappedType=mappedType;
 	}
 	
 	
 	protected abstract To map(From v);
 	protected abstract From unmap(To v);
 	
+	@Override
+	public Class<To> elementType(){
+		return mappedType;
+	}
 	
 	@Override
 	public long size(){
@@ -264,5 +273,22 @@ public abstract class MappedIOList<From, To> implements IOList<To>{
 	@Override
 	public long indexOf(To value) throws IOException{
 		return data.indexOf(unmap(value));
+	}
+	@Override
+	public Query<To> query(){
+		return QuerySupport.of(new QuerySupport.Data<To>(){
+			@Override
+			public Class<To> elementType(){
+				throw NotImplementedException.infer();//TODO: implement .elementType()
+			}
+			@Override
+			public OptionalLong count(){
+				throw NotImplementedException.infer();//TODO: implement .count()
+			}
+			@Override
+			public Iterator<QuerySupport.Accessor<To>> elements(){
+				throw NotImplementedException.infer();//TODO: implement .elements()
+			}
+		});
 	}
 }

@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.StringJoiner;
 import java.util.function.Supplier;
 
@@ -14,10 +15,22 @@ public class MemoryWrappedIOList<T> implements IOList<T>{
 	
 	private final List<T>     data;
 	private final Supplier<T> typeConstructor;
+	private       Class<T>    elementType;
 	
 	public MemoryWrappedIOList(List<T> data, Supplier<T> typeConstructor){
 		this.data=data;
 		this.typeConstructor=typeConstructor;
+		
+		Class<?> c;
+		if(typeConstructor!=null) c=typeConstructor.get().getClass();
+		else c=data.stream().filter(Objects::nonNull).findAny().map(Object::getClass).orElse(null);
+		elementType=(Class<T>)c;
+	}
+	
+	@Override
+	public Class<T> elementType(){
+		if(elementType==null) elementType=(Class<T>)data.stream().filter(Objects::nonNull).findAny().map(Object::getClass).orElseThrow();
+		return elementType;
 	}
 	
 	@Override

@@ -332,6 +332,11 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	}
 	
 	@Override
+	public Class<T> elementType(){
+		return storage.getType().getType();
+	}
+	
+	@Override
 	public long size(){
 		return size;
 	}

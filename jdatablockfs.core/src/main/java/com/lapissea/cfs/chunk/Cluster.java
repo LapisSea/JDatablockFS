@@ -159,7 +159,7 @@ public class Cluster implements DataProvider{
 		
 		root=ROOT_PIPE.readNew(this, ch, null);
 		var frees =meta().freeChunks;
-		var mapped=frees.map(IOChunkPointer::getVal, IOInstance.Def.constrRef(IOChunkPointer.class, ChunkPointer.class));
+		var mapped=frees.map(ChunkPointer.class, IOChunkPointer::getVal, IOInstance.Def.constrRef(IOChunkPointer.class, ChunkPointer.class));
 		memoryManager=new PersistentMemoryManager(this, mapped);
 	}
 	

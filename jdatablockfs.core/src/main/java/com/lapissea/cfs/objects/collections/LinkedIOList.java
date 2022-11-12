@@ -152,6 +152,11 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 	}
 	
 	@Override
+	public Class<T> elementType(){
+		return valueStorage.getType().getType();
+	}
+	
+	@Override
 	public long size(){
 		return size;
 	}

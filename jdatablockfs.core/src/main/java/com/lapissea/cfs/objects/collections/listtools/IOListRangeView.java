@@ -40,6 +40,12 @@ public class IOListRangeView<T> implements IOList<T>{
 	public Stream<T> stream(){
 		return data.stream().skip(from).limit(subSize);
 	}
+	
+	@Override
+	public Class<T> elementType(){
+		return data.elementType();
+	}
+	
 	@Override
 	public long size(){
 		var size=data.size();

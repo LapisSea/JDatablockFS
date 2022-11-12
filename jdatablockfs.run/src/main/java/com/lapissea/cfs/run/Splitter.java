@@ -74,6 +74,10 @@ public class Splitter{
 			}
 			
 			@Override
+			public Class<E> elementType(){
+				return a.elementType();
+			}
+			@Override
 			public long size(){
 				return a.size();
 			}
