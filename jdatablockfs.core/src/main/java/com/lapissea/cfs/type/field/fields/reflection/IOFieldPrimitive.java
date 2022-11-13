@@ -52,7 +52,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			return EnumSet.of(VOID, SHORT, INT, LONG);
 		}
 		@Override
-		protected IOField<T, Double> wSize(VaryingSize size){
+		protected IOField<T, Double> withVaryingSize(VaryingSize size){
 			return new FDouble<>(getAccessor(), size);
 		}
 		
@@ -113,7 +113,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			return EnumSet.of(VOID, BYTE, SHORT);
 		}
 		@Override
-		protected IOField<T, Character> wSize(VaryingSize size){
+		protected IOField<T, Character> withVaryingSize(VaryingSize size){
 			return new FChar<>(getAccessor(), size);
 		}
 		
@@ -173,7 +173,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			return EnumSet.of(VOID, SHORT, INT);
 		}
 		@Override
-		protected IOField<T, Float> wSize(VaryingSize size){
+		protected IOField<T, Float> withVaryingSize(VaryingSize size){
 			return new FFloat<>(getAccessor(), size);
 		}
 		
@@ -239,7 +239,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			return EnumSet.allOf(NumberSize.class);
 		}
 		@Override
-		protected IOField<T, Long> wSize(VaryingSize size){
+		protected IOField<T, Long> withVaryingSize(VaryingSize size){
 			return new FLong<>(getAccessor(), size);
 		}
 		
@@ -317,7 +317,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			return all;
 		}
 		@Override
-		protected IOField<T, Integer> wSize(VaryingSize size){
+		protected IOField<T, Integer> withVaryingSize(VaryingSize size){
 			return new FInt<>(getAccessor(), size);
 		}
 		
@@ -395,7 +395,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			return all;
 		}
 		@Override
-		protected IOField<T, Short> wSize(VaryingSize size){
+		protected IOField<T, Short> withVaryingSize(VaryingSize size){
 			return new FShort<>(getAccessor(), size);
 		}
 		
@@ -467,7 +467,7 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 			return EnumSet.of(BYTE);
 		}
 		@Override
-		protected IOField<T, Byte> wSize(VaryingSize size){
+		protected IOField<T, Byte> withVaryingSize(VaryingSize size){
 			return new FByte<>(getAccessor(), size);
 		}
 		
@@ -647,9 +647,9 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	public IOField<T, ValueType> maxAsFixedSize(VaryingSize.Provider varProvider){
 		var size=varProvider.provide(maxAllowed(), false);
 		if(forceFixed&&maxSize==size) return this;
-		return wSize(size);
+		return withVaryingSize(size);
 	}
-	protected abstract IOField<T, ValueType> wSize(VaryingSize size);
+	protected abstract IOField<T, ValueType> withVaryingSize(VaryingSize size);
 	
 	@Override
 	public final Optional<String> instanceToString(VarPool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
