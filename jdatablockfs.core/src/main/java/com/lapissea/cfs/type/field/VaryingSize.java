@@ -4,10 +4,8 @@ import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Stringify;
 import com.lapissea.util.TextUtil;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
+import java.util.function.BiConsumer;
 
 public class VaryingSize implements Stringify{
 	
@@ -24,6 +22,9 @@ public class VaryingSize implements Stringify{
 			private final List<NumberSize> data=new ArrayList<>();
 			private final Mapper           mapper;
 			
+			private final Map<Integer, Integer> marks=new HashMap<>();
+			private       int                   markIdCount;
+			
 			public Recorder(Mapper mapper){
 				this.mapper=mapper;
 			}
@@ -36,6 +37,21 @@ public class VaryingSize implements Stringify{
 				return new VaryingSize(actual, id);
 			}
 			
+			@Override
+			public int mark(){
+				int id=markIdCount++;
+				marks.put(id, data.size());
+				return id;
+			}
+			@Override
+			public void reset(int id){
+				var size=marks.get(id);
+				while(data.size()>size){
+					data.remove(data.size()-1);
+				}
+				marks.entrySet().removeIf(e->e.getKey()>=id);
+			}
+			
 			public List<NumberSize> export(){
 				return List.copyOf(data);
 			}
@@ -44,6 +60,9 @@ public class VaryingSize implements Stringify{
 		final class Repeater implements Provider{
 			private final List<NumberSize> data;
 			private       int              counter;
+			
+			private final Map<Integer, Integer> marks=new HashMap<>();
+			private       int                   markIdCount;
 			
 			public Repeater(List<NumberSize> data){
 				this.data=List.copyOf(data);
@@ -56,9 +75,20 @@ public class VaryingSize implements Stringify{
 				counter++;
 				return new VaryingSize(actual, id);
 			}
+			@Override
+			public int mark(){
+				int id=markIdCount++;
+				marks.put(id, counter);
+				return id;
+			}
+			@Override
+			public void reset(int id){
+				counter=marks.get(id);
+				marks.entrySet().removeIf(e->e.getKey()>=id);
+			}
 		}
 		
-		Provider ALL_MAX=new Provider(){
+		Provider ALL_MAX=new NoMark(){
 			@Override
 			public VaryingSize provide(NumberSize max, boolean ptr){
 				return new VaryingSize(max, -1);
@@ -78,7 +108,7 @@ public class VaryingSize implements Stringify{
 		
 		static Provider constLimit(NumberSize size, int id){
 			if(size==NumberSize.LARGEST) return ALL_MAX;
-			return new Provider(){
+			return new NoMark(){
 				@Override
 				public VaryingSize provide(NumberSize max, boolean ptr){
 					return new VaryingSize(max.min(size), id);
@@ -89,7 +119,44 @@ public class VaryingSize implements Stringify{
 				}
 			};
 		}
+		
+		static Provider intercept(Provider src, BiConsumer<NumberSize, VaryingSize> intercept){
+			return new Provider(){
+				@Override
+				public VaryingSize provide(NumberSize max, boolean ptr){
+					var actual=src.provide(max, ptr);
+					intercept.accept(max, actual);
+					return actual;
+				}
+				@Override
+				public int mark(){
+					return src.mark();
+				}
+				@Override
+				public void reset(int id){
+					src.reset(id);
+				}
+			};
+		}
 		VaryingSize provide(NumberSize max, boolean ptr);
+		
+		interface NoMark extends Provider{
+			@Override
+			default int mark(){return 0;}
+			@Override
+			default void reset(int id){}
+		}
+		
+		/**
+		 * Notates the start of an object.
+		 *
+		 * @return a unique ID
+		 */
+		int mark();
+		/**
+		 * Ignores all sizes since the start of the mark. Use when creating an object fails.
+		 */
+		void reset(int id);
 	}
 	
 	public static final class TooSmall extends RuntimeException{

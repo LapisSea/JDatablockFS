@@ -477,9 +477,11 @@ public sealed interface ValueStorage<T>{
 					}
 				}
 				case StorageRule.VariableFixed conf -> {
+					int id=conf.provider.mark();
 					try{
 						yield new FixedInstance<>(generics, provider, FixedVaryingStructPipe.tryVarying(struct, conf.provider));
 					}catch(UnsupportedStructLayout ignored){
+						conf.provider.reset(id);
 						yield new FixedReferencedInstance<>(generics, provider, FixedVaryingStructPipe.tryVarying(Reference.STRUCT, conf.provider), StandardStructPipe.of(struct));
 					}
 				}

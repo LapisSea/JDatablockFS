@@ -37,11 +37,10 @@ public class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseFixedSt
 			Set<IOField<T, ?>> sizeFields=sizeFieldStream(structFields).collect(Collectors.toSet());
 			
 			boolean[] effectivelyAllMax={true};
-			VaryingSize.Provider snitchRule=(max, ptr)->{
-				var actual=rule.provide(max, ptr);
+			var snitchRule=VaryingSize.Provider.intercept(rule, (max, actual)->{
 				if(actual.size!=max) effectivelyAllMax[0]=false;
-				return actual;
-			};
+			});
+			
 			var result=fixedFields(t, structFields, sizeFields::contains, f->{
 				return f.forceMaxAsFixedSize(snitchRule);
 			});
