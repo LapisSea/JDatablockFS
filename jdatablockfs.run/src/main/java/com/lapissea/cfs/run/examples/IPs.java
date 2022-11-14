@@ -6,7 +6,6 @@ import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.util.LogUtil;
 
 import java.io.IOException;
 import java.util.Objects;
@@ -39,7 +38,7 @@ public class IPs{
 	
 	public static void run(IOInterface memory) throws IOException{
 		createData(memory);
-//		printData(memory);
+		printData(memory);
 	}
 	
 	public static void createData(IOInterface memory) throws IOException{
@@ -51,19 +50,17 @@ public class IPs{
 		IOList<IP> ips=cluster.getRootProvider().request("my ips", IOList.class, IP.class);
 		
 		//Nice thing to do, reduces possibility of fragmentation. This is only useful when adding element by element. addAll does not benefit from this
-		ips.requestCapacity(2);
+		ips.requestRelativeCapacity(2);
 		
 		//Adding sample data to database:
 		ips.add(IP.of(0.2213415, 0.71346, "2001:0db8:85a3:0000:0000:8a2e:0370:7334"));
 		ips.add(IP.of(0.6234, 0.51341123, "2001:0db8:0:1:1:1:1:1"));
-		
-		LogUtil.println(ips.query("latitude > {0}", 0.5).any());
 	}
 	
 	
 	private static void printData(IOInterface memory) throws IOException{
-		System.out.println(memory.hexdump());
-		System.out.println();
+//		System.out.println(memory.hexdump());
+//		System.out.println();
 		System.out.println("Data in memory:");
 		
 		for(var e : new Cluster(memory).getRootProvider().listAll()){

@@ -545,6 +545,9 @@ public interface IOList<T> extends IterablePP<T>{
 	 * It is not required to do so but is desirable. No exact capacity allocation is required.
 	 */
 	void requestCapacity(long capacity) throws IOException;
+	default void requestRelativeCapacity(long extra) throws IOException{
+		requestCapacity(size()+extra);
+	}
 	void trim() throws IOException;
 	long getCapacity() throws IOException;
 	
