@@ -1,17 +1,17 @@
 package com.lapissea.cfs.query;
 
+import com.lapissea.cfs.io.bit.EnumUniverse;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
 import java.lang.reflect.Array;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
@@ -22,6 +22,51 @@ import static java.lang.Double.parseDouble;
 import static java.lang.Long.parseLong;
 
 public class QueryExpressionParser{
+	
+	private interface Matched{
+		List<String> matches();
+	}
+	
+	private enum Connector implements Matched{
+		AND(Check.And::new, "&&", "&", "and"),
+		OR(Check.Or::new, "||", "|", "or");
+		
+		final BiFunction<Check, Check, Check> ctor;
+		final List<String>                    matches;
+		
+		Connector(BiFunction<Check, Check, Check> ctor, String... matches){
+			this.ctor=ctor;
+			this.matches=List.of(matches);
+		}
+		@Override
+		public List<String> matches(){
+			return matches;
+		}
+		Check gnu(Check l, Check r){
+			return ctor.apply(l, r);
+		}
+	}
+	
+	private enum Comparison implements Matched{
+		EQUALS(Check.Equals::new, "==", "=", "is", "equals"),
+		GREATER(Check.GreaterThan::new, ">"),
+		GREATER_OR_EQUAL((src, arg)->new Check.Or(new Check.GreaterThan(src, arg), new Check.Equals(src, arg)), ">="),
+		LESSER(Check.LessThan::new, "<"),
+		LESSER_OR_EQUAL((src, arg)->new Check.Or(new Check.LessThan(src, arg), new Check.Equals(src, arg)), "<="),
+//		IN(Check.In::new, "in"),
+		;
+		
+		final BiFunction<String, ArgSource, Check> ctor;
+		final List<String>                         matches;
+		Comparison(BiFunction<String, ArgSource, Check> ctor, String... matches){
+			this.ctor=ctor;
+			this.matches=List.of(matches);
+		}
+		@Override
+		public List<String> matches(){
+			return matches;
+		}
+	}
 	
 	private sealed interface ArgSource{
 		record Root() implements ArgSource{
@@ -38,7 +83,7 @@ public class QueryExpressionParser{
 			}
 		}
 		
-		record Litelar(Object value) implements ArgSource{
+		record Literal(Object value) implements ArgSource{
 			@Override
 			public String toString(){
 				return value+"";
@@ -119,7 +164,7 @@ public class QueryExpressionParser{
 	}
 	
 	private static <T> FilterResult<T> parse(FilterQuery<T> filterQuery){
-		Check check=expressionToCheck(filterQuery.expression);
+		Check check=expressionToCheck(filterQuery.type, filterQuery.expression);
 		
 		var args  =deep(check).filter(c->c instanceof ArgContain).map(c->((ArgContain)c).arg()).collect(Collectors.toSet());
 		var fields=deep(check).filter(c->c instanceof FieldRef).map(c->((FieldRef)c).name()).collect(Collectors.toUnmodifiableSet());
@@ -131,21 +176,48 @@ public class QueryExpressionParser{
 	}
 	
 	private static <T> BiPredicate<Object[], T> generateFilter(Set<ArgSource> argSet, Check check){
-		return (args, obj)->reflectionCheck(args, obj, check);
+		return (args, obj)->{
+			return reflectionCheck(args, obj, check);
+		};
 	}
 	
 	@SuppressWarnings({"rawtypes", "unchecked"})
 	private static <T> boolean reflectionCheck(Object[] args, T obj, Check check){
 		return switch(check){
-			case Check.And and -> reflectionCheck(args, obj, and.l)&&reflectionCheck(args, obj, and.r);
+			case Check.And and -> {
+				var l=reflectionCheck(args, obj, and.l);
+				var r=reflectionCheck(args, obj, and.r);
+				yield l&&r;
+			}
+			case Check.Or or -> {
+				var l=reflectionCheck(args, obj, or.l);
+				if(l) yield true;
+				var r=reflectionCheck(args, obj, or.r);
+				yield r;
+			}
+			case Check.Not not -> !reflectionCheck(args, obj, not.check);
 			case Check.Equals equals -> {
 				Object arg=getArg(args, equals.arg);
 				if(arg==null) yield obj==null;
-				IOField f=Struct.ofUnknown(obj.getClass()).getFields().byName(equals.name).orElseThrow();
-				if(!UtilL.instanceOf(obj.getClass(), f.getAccessor().getType())){
-					throw new ClassCastException(obj+" not compatible with "+f);
+				IOField field =Struct.ofUnknown(obj.getClass()).getFields().byName(equals.name).orElseThrow();
+				var     typ   =field.getAccessor().getType();
+				var     argTyp=arg.getClass();
+				
+				if(arg instanceof Number num&&(typ==byte.class||typ==short.class||typ==int.class||typ==long.class||typ==float.class||typ==double.class)){
+					var val=(Number)field.get(null, (IOInstance)obj);
+					if(val instanceof Double d){
+						yield d==num.doubleValue();
+					}
+					if(val instanceof Float f){
+						yield f==num.floatValue();
+					}
+					yield val.longValue()==num.longValue();
 				}
-				var val=f.get(null, (IOInstance)obj);
+				
+				if(!UtilL.instanceOf(argTyp, typ)){
+					throw new ClassCastException(obj+" not compatible with "+field);
+				}
+				var val=field.get(null, (IOInstance)obj);
 				yield arg.equals(val);
 			}
 			case Check.GreaterThan equals -> {
@@ -160,8 +232,6 @@ public class QueryExpressionParser{
 				Number  val=(Number)f.get(null, (IOInstance)obj);
 				yield val.doubleValue()<arg.doubleValue();
 			}
-			case Check.Not not -> !reflectionCheck(args, obj, not.check);
-			case Check.Or or -> reflectionCheck(args, obj, or.l)||reflectionCheck(args, obj, or.r);
 		};
 	}
 	
@@ -169,7 +239,7 @@ public class QueryExpressionParser{
 		return switch(arg){
 			case ArgSource.GetArray getArray -> Array.get(getArg(args, getArray.source), getArray.index);
 			case ArgSource.Root root -> args;
-			case ArgSource.Litelar litelar -> litelar.value;
+			case ArgSource.Literal literal -> literal.value;
 		};
 	}
 	
@@ -181,6 +251,13 @@ public class QueryExpressionParser{
 			case Check.GreaterThan c -> Stream.of(c);
 			case Check.LessThan c -> Stream.of(c);
 			case Check.Not c -> Stream.of(Stream.of(c), deep(c.check)).flatMap(s->s);
+		};
+	}
+	private static Optional<Class<?>> argType(ArgSource arg){
+		return switch(arg){
+			case ArgSource.GetArray getArray -> Optional.empty();
+			case ArgSource.Root root -> throw new UnsupportedOperationException();
+			case ArgSource.Literal literal -> Optional.of(literal.value.getClass());
 		};
 	}
 	
@@ -289,27 +366,46 @@ public class QueryExpressionParser{
 			return result;
 		}
 		
-		private boolean and()    {return match("&", "&&", "and");}
-		private boolean or()     {return match("||", "|", "or");}
-		private boolean not()    {return match("!", "not");}
-		private boolean equals() {return match("==", "=", "is", "equals");}
-		private boolean greater(){return match(">");}
-		private boolean lesser() {return match("<");}
-		private boolean in()     {return match("in");}
+		private <T extends Enum<T>&Matched> T match(Class<T> toCheck){
+			return match(toCheck, true);
+		}
+		private <T extends Enum<T>&Matched> T match(Class<T> toCheck, boolean require){
+			var universe=EnumUniverse.of(toCheck);
+			var result=universe.stream().flatMap(c->c.matches().stream().map(m->Map.entry(c, m)))
+			                   .sorted(Comparator.comparingInt(e->-e.getValue().length()))
+			                   .filter(e->match(e.getValue())).findFirst().map(Map.Entry::getKey);
+			if(require&&result.isEmpty()){
+				throw new RuntimeException(
+					"Expected any of: "+universe.stream().flatMap(c->c.matches().stream())
+					                            .collect(Collectors.joining(", "))
+				);
+			}
+			return result.orElse(null);
+		}
+		
+		private boolean not(){
+			return match("!", "not");
+		}
 		
 		private boolean match(String... matches){
-			skipWhite();
 			for(var match : matches){
-				if(startsWith(match)){
-					boolean validEnd;
-					if(Character.isLetter(match.charAt(match.length()-1))){
-						var c=str.charAt(pos+match.length());
-						validEnd=Character.isWhitespace(c)||List.of('(', ')', '[', ']', '{', '}', '<', '>', '!', '?', '&', '|', '=').contains(c);
-					}else validEnd=true;
-					if(validEnd){
-						pos+=match.length();
-						return true;
-					}
+				if(match(match)){
+					return true;
+				}
+			}
+			return false;
+		}
+		private boolean match(String match){
+			skipWhite();
+			if(startsWith(match)){
+				boolean validEnd;
+				if(Character.isLetter(match.charAt(match.length()-1))){
+					var c=str.charAt(pos+match.length());
+					validEnd=Character.isWhitespace(c)||List.of('(', ')', '[', ']', '{', '}', '<', '>', '!', '?', '&', '|', '=').contains(c);
+				}else validEnd=true;
+				if(validEnd){
+					pos+=match.length();
+					return true;
 				}
 			}
 			return false;
@@ -325,46 +421,45 @@ public class QueryExpressionParser{
 				else break;
 			}
 		}
+		@Override
+		public String toString(){
+			return str.substring(pos);
+		}
 	}
 	
 	private static class Parser{
-		private final Reader  reader;
-		private       boolean notNext=false;
 		
-		private Parser(Reader reader){
+		private final Class<?> type;
+		private final Reader   reader;
+		private       boolean  notNext=false;
+		
+		private Parser(Class<?> type, Reader reader){
+			this.type=type;
 			this.reader=reader;
 		}
 		
 		Check parse(){
+			
 			Check check=null;
 			while(true){
+				reader.skipWhite();
+				if(reader.str.length()==reader.pos){
+					if(check==null) throw new RuntimeException("Unexpected end");
+					return check;
+				}
+				
 				if(!notNext&&reader.not()){
 					notNext=true;
 					continue;
 				}
 				
 				if(check!=null){
-					if(reader.and()){
-						var r=requireNextCheck();
-						check=new Check.And(check, r);
-						continue;
-					}
-					if(reader.or()){
-						var r=requireNextCheck();
-						check=new Check.Or(check, r);
-						continue;
-					}
+					var con=reader.match(Connector.class);
+					var r  =requireNextCheck();
+					check=con.gnu(check, r);
 				}else{
 					check=requireNextCheck();
-					continue;
 				}
-				
-				reader.skipWhite();
-				if(reader.str.length()!=reader.pos){
-					throw new RuntimeException("Unexpected end. Remaining: \""+reader.str.substring(reader.pos)+"\"");
-				}
-				
-				return check;
 			}
 		}
 		
@@ -384,29 +479,54 @@ public class QueryExpressionParser{
 		private Check nextCheck0(){
 			var brace=reader.brace();
 			if(brace!=null){
-				return expressionToCheck(brace);
+				return expressionToCheck(type, brace);
 			}
 			
 			var fieldName=reader.field();
 			if(fieldName!=null){
-				
-				if(reader.equals()){
-					var source=source();
-					return new Check.Equals(fieldName, source);
-				}
-				if(reader.greater()){
-					var source=source();
-					return new Check.GreaterThan(fieldName, source);
-				}
-				if(reader.lesser()){
-					var source=source();
-					return new Check.LessThan(fieldName, source);
-				}
-				
-				throw new RuntimeException("Unexpected syntax. Expected == or > or <");
+				var comp  =reader.match(Comparison.class);
+				var source=source();
+				checkComparison(fieldName, source);
+				return comp.ctor.apply(fieldName, source);
 			}
 			
 			throw new NotImplementedException();
+		}
+		
+		private void checkComparison(String fieldName, ArgSource source){
+			var type   =fieldType(fieldName);
+			var argType=argType(source);
+			argType.ifPresent(typ->{
+				if(UtilL.instanceOf(typ, type)){
+					throw new ClassCastException("Cannot cast "+typ.getName()+" to "+type.getName());
+				}
+			});
+		}
+		
+		private Class<?> fieldType(String fieldName){
+			if(IOInstance.isInstance(type)){
+				return Struct.ofUnknown(type).getFields().byName(fieldName)
+				             .orElseThrow(()->noField(fieldName))
+				             .getAccessor().getType();
+			}
+			
+			var field=Arrays.stream(type.getFields()).filter(f->f.getName().equals(fieldName)).findAny();
+			if(field.isPresent()){
+				return field.get().getType();
+			}
+			
+			try{
+				var getter=type.getMethod("get"+TextUtil.firstToUpperCase(fieldName));
+				if(getter.getReturnType()!=void.class){
+					return getter.getReturnType();
+				}
+			}catch(NoSuchMethodException ignored){}
+			
+			throw noField(fieldName);
+		}
+		
+		private RuntimeException noField(String fieldName){
+			return new RuntimeException(fieldName+" does not exist in "+type.getName());
 		}
 		
 		private ArgSource source(){
@@ -417,14 +537,14 @@ public class QueryExpressionParser{
 			}
 			var num=reader.number();
 			if(num!=null){
-				return new ArgSource.Litelar(num);
+				return new ArgSource.Literal(num);
 			}
 			
 			throw new RuntimeException("???");
 		}
 	}
 	
-	private static Check expressionToCheck(String expression){
-		return new Parser(new Reader(expression)).parse();
+	private static Check expressionToCheck(Class<?> type, String expression){
+		return new Parser(type, new Reader(expression)).parse();
 	}
 }
