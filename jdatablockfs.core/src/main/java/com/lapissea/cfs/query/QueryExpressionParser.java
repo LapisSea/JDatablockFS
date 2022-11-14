@@ -1,10 +1,10 @@
 package com.lapissea.cfs.query;
 
+import com.lapissea.cfs.exceptions.InvalidQueryString;
 import com.lapissea.cfs.io.bit.EnumUniverse;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.IOField;
-import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
@@ -29,7 +29,8 @@ public class QueryExpressionParser{
 	
 	private enum Connector implements Matched{
 		AND(Check.And::new, "&&", "&", "and"),
-		OR(Check.Or::new, "||", "|", "or");
+		OR(Check.Or::new, "||", "|", "or"),
+		;
 		
 		final BiFunction<Check, Check, Check> ctor;
 		final List<String>                    matches;
@@ -164,7 +165,7 @@ public class QueryExpressionParser{
 	}
 	
 	private static <T> FilterResult<T> parse(FilterQuery<T> filterQuery){
-		Check check=expressionToCheck(filterQuery.type, filterQuery.expression);
+		Check check=expressionToCheck(filterQuery.type, filterQuery.expression, null);
 		
 		var args  =deep(check).filter(c->c instanceof ArgContain).map(c->((ArgContain)c).arg()).collect(Collectors.toSet());
 		var fields=deep(check).filter(c->c instanceof FieldRef).map(c->((FieldRef)c).name()).collect(Collectors.toUnmodifiableSet());
@@ -278,7 +279,11 @@ public class QueryExpressionParser{
 		
 		private String advance(Test predicate){
 			var start=pos;
-			for(int i=pos;i<str.length();i++){
+			for(int i=pos;;i++){
+				if(i>=str.length()){
+					pos=i;
+					break;
+				}
 				var c=str.charAt(i);
 				if(predicate.test(i, c)){
 					continue;
@@ -304,7 +309,7 @@ public class QueryExpressionParser{
 			pos++;
 			var inside=advance((i, c)->c!='}');
 			pos++;
-			return inside;
+			return inside==null?"":inside;
 		}
 		
 		public String brace(){
@@ -375,10 +380,10 @@ public class QueryExpressionParser{
 			                   .sorted(Comparator.comparingInt(e->-e.getValue().length()))
 			                   .filter(e->match(e.getValue())).findFirst().map(Map.Entry::getKey);
 			if(require&&result.isEmpty()){
-				throw new RuntimeException(
-					"Expected any of: "+universe.stream().flatMap(c->c.matches().stream())
-					                            .collect(Collectors.joining(", "))
-				);
+				throw new InvalidQueryString(
+					"Expected any "+toCheck.getSimpleName()+
+					" ("+universe.stream().flatMap(c->c.matches().stream()).collect(Collectors.joining(", "))+")"+
+					atTemplate(pos));
 			}
 			return result.orElse(null);
 		}
@@ -425,6 +430,22 @@ public class QueryExpressionParser{
 		public String toString(){
 			return str.substring(pos);
 		}
+		
+		RuntimeException nextWordBad(String message){
+			var    pos =this.pos;
+			var    word=regex(Pattern.compile("^\\S+"));
+			String msg;
+			if(word==null) msg="Unexpected end";
+			else msg="\""+word+"\" "+message;
+			
+			throw new InvalidQueryString(msg+atTemplate(pos));
+		}
+		
+		private String atTemplate(int pos){
+			return "\n"+
+			       str+"\n"+
+			       " ".repeat(pos)+"^";
+		}
 	}
 	
 	private static class Parser{
@@ -432,10 +453,12 @@ public class QueryExpressionParser{
 		private final Class<?> type;
 		private final Reader   reader;
 		private       boolean  notNext=false;
+		private final int[]    argCounter;
 		
-		private Parser(Class<?> type, Reader reader){
+		private Parser(Class<?> type, Reader reader, int[] argCounter){
 			this.type=type;
 			this.reader=reader;
+			this.argCounter=argCounter;
 		}
 		
 		Check parse(){
@@ -444,7 +467,7 @@ public class QueryExpressionParser{
 			while(true){
 				reader.skipWhite();
 				if(reader.str.length()==reader.pos){
-					if(check==null) throw new RuntimeException("Unexpected end");
+					if(check==null) throw new InvalidQueryString("Unexpected end");
 					return check;
 				}
 				
@@ -455,16 +478,12 @@ public class QueryExpressionParser{
 				
 				if(check!=null){
 					var con=reader.match(Connector.class);
-					var r  =requireNextCheck();
+					var r  =nextCheck();
 					check=con.gnu(check, r);
 				}else{
-					check=requireNextCheck();
+					check=nextCheck();
 				}
 			}
-		}
-		
-		private Check requireNextCheck(){
-			return Objects.requireNonNull(nextCheck(), "Unexpected end");
 		}
 		
 		private Check nextCheck(){
@@ -479,7 +498,7 @@ public class QueryExpressionParser{
 		private Check nextCheck0(){
 			var brace=reader.brace();
 			if(brace!=null){
-				return expressionToCheck(type, brace);
+				return expressionToCheck(type, brace, argCounter);
 			}
 			
 			var fieldName=reader.field();
@@ -490,7 +509,7 @@ public class QueryExpressionParser{
 				return comp.ctor.apply(fieldName, source);
 			}
 			
-			throw new NotImplementedException();
+			throw reader.nextWordBad("unexpected token");
 		}
 		
 		private void checkComparison(String fieldName, ArgSource source){
@@ -526,25 +545,30 @@ public class QueryExpressionParser{
 		}
 		
 		private RuntimeException noField(String fieldName){
-			return new RuntimeException(fieldName+" does not exist in "+type.getName());
+			return new InvalidQueryString(fieldName+" does not exist in "+type.getName());
 		}
 		
 		private ArgSource source(){
 			var argStr=reader.squiggly();
 			if(argStr!=null){
-				int index=Integer.parseInt(argStr);
+				int index;
+				if(argStr.isEmpty()){
+					index=argCounter[0]++;
+				}else{
+					index=Integer.parseInt(argStr);
+				}
 				return new ArgSource.GetArray(index, new ArgSource.Root());
 			}
 			var num=reader.number();
 			if(num!=null){
 				return new ArgSource.Literal(num);
 			}
-			
-			throw new RuntimeException("???");
+			throw reader.nextWordBad("is not a valid literal or value source");
 		}
 	}
 	
-	private static Check expressionToCheck(Class<?> type, String expression){
-		return new Parser(type, new Reader(expression)).parse();
+	private static Check expressionToCheck(Class<?> type, String expression, int[] argCounter){
+		if(argCounter==null) argCounter=new int[1];
+		return new Parser(type, new Reader(expression), argCounter).parse();
 	}
 }

@@ -34,7 +34,17 @@ public class QueryTests{
 		);
 		
 		assertEquals(Optional.of(new FF(3, 3)), list.query("a > 2").first());
-		assertEquals(Optional.of(new FF(4, 2)), list.query("a>=3 && b<=2").first());
+		assertEquals(Optional.of(new FF(4, 2)), list.query("a >= 3 && b <= 2").first());
+		
+		for(long i=0;i<list.size();i++){
+			assertEquals(Optional.of(list.get(i)), list.query("a == {}", i+1).first());
+		}
+		
+		assertEquals(3, list.query("a > 2").count());
+		assertEquals(2, list.query("a == 2 || a == 3").count());
+		
+		assertEquals(Optional.of(new FF(2, 4)), list.query("a%2==0").first());
+		assertEquals(2, list.query("a%2==0").count());
 	}
 	
 }
