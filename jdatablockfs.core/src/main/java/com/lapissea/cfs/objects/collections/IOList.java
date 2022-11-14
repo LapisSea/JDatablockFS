@@ -89,6 +89,10 @@ public interface IOList<T> extends IterablePP<T>{
 		}
 	}
 	
+	@SafeVarargs
+	static <T> IOList<T> of(T... data){
+		return new MemoryWrappedIOList<>(List.of(data), null);
+	}
 	static <T> IOList<T> wrap(List<T> data){
 		return new MemoryWrappedIOList<>(data, null);
 	}

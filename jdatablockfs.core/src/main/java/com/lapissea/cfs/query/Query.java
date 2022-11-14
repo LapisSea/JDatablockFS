@@ -11,6 +11,9 @@ public interface Query<T>{
 	
 	long count();
 	
+	default Optional<T> first() throws IOException{
+		return any();//TODO: ordered execution
+	}
 	Optional<T> any() throws IOException;
 	
 	default Query<T> filter(String expression, Object... args){
