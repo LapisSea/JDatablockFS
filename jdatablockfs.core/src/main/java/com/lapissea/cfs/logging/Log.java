@@ -6,6 +6,7 @@ import com.lapissea.cfs.Utils;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
 
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -177,40 +178,84 @@ public class Log{
 	private static StringBuilder resolveArgs(String message, Object arg1, Object arg2, Object arg3){
 		var formatted=new StringBuilder(message.length()+32);
 		formatted.append(message);
-		resolveArg(formatted, arg1);
-		resolveArg(formatted, arg2);
-		resolveArg(formatted, arg3);
+		int start=0;
+		start=resolveArg(formatted, arg1, start);
+		start=resolveArg(formatted, arg2, start);
+		start=resolveArg(formatted, arg3, start);
 		return formatted;
 	}
 	private static StringBuilder resolveArgs(String message, Object arg1, Object arg2){
 		var formatted=new StringBuilder(message.length()+32);
 		formatted.append(message);
-		resolveArg(formatted, arg1);
-		resolveArg(formatted, arg2);
+		int start=0;
+		start=resolveArg(formatted, arg1, start);
+		start=resolveArg(formatted, arg2, start);
 		return formatted;
 	}
 	private static StringBuilder resolveArgs(String message, Object arg1){
 		var formatted=new StringBuilder(message.length()+32);
 		formatted.append(message);
-		resolveArg(formatted, arg1);
+		resolveArg(formatted, arg1, 0);
 		return formatted;
 	}
 	
 	private static StringBuilder resolveArgs(String message, Object[] args){
 		var formatted=new StringBuilder(message.length()+32);
 		formatted.append(message);
+		int start=0;
 		for(Object arg : args){
-			resolveArg(formatted, arg);
+			start=resolveArg(formatted, arg, start);
 		}
 		return formatted;
 	}
 	
+	private static final Map<String, String> COLORS=Map.of(
+		"BLACK", ConsoleColors.BLACK,
+		"RED", ConsoleColors.RED,
+		"GREEN", ConsoleColors.GREEN,
+		"YELLOW", ConsoleColors.YELLOW,
+		"BLUE", ConsoleColors.BLUE,
+		"PURPLE", ConsoleColors.PURPLE,
+		"CYAN", ConsoleColors.CYAN,
+		"WHITE", ConsoleColors.WHITE
+	);
 	
-	private static void resolveArg(StringBuilder formatted, Object arg){
-		var index=formatted.indexOf("{}");
-		if(index==-1) throw new IllegalArgumentException();
+	private static int resolveArg(StringBuilder formatted, Object arg, int start){
 		if(arg instanceof Supplier<?> supplier) arg=supplier.get();
-		formatted.replace(index, index+2, TextUtil.toString(arg));
+		for(int i=start;i<formatted.length()-1;i++){
+			var c1=formatted.charAt(i);
+			var c2=formatted.charAt(i+1);
+			if(c1=='{'&&c2=='}'){
+				if(formatted.length()>i+2){
+					var c3=formatted.charAt(i+2);
+					if(c3=='#'){
+						int hStart=i+3;
+						int len   =formatted.length()-hStart;
+						var any=COLORS.entrySet().stream()
+						              .filter(e->e.getKey().length()<=len)
+						              .filter(e->{
+							              var s=e.getKey();
+							              for(int j=0;j<s.length();j++){
+								              var z1=s.charAt(j);
+								              var z2=Character.toUpperCase(formatted.charAt(hStart+j));
+								              if(z1!=z2) return false;
+							              }
+							              return true;
+						              }).findAny();
+						if(any.isPresent()){
+							var replace=any.get().getValue()+TextUtil.toString(arg)+ConsoleColors.RESET;
+							formatted.replace(i, hStart+any.get().getKey().length(), replace);
+							return i+replace.length();
+						}
+					}
+				}
+				var replace=TextUtil.toString(arg);
+				formatted.replace(i, i+2, replace);
+				return i+replace.length();
+			}
+		}
+		
+		throw new IllegalArgumentException();
 	}
 	
 	public static void nonFatal0(Throwable error, CharSequence message){
