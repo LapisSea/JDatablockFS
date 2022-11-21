@@ -6,6 +6,7 @@ import com.lapissea.cfs.type.field.annotations.IOValue;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Optional;
 
 import static org.testng.Assert.assertEquals;
@@ -23,6 +24,20 @@ public class QueryTests{
 		}
 	}
 	
+	static class StringyBoi extends IOInstance.Managed<StringyBoi>{
+		@IOValue
+		String str;
+		
+		@IOValue
+		List<String> strs;
+		
+		public StringyBoi(){}
+		public StringyBoi(String str, List<String> strs){
+			this.str=str;
+			this.strs=strs;
+		}
+	}
+	
 	@Test
 	void comparison() throws IOException{
 		var list=IOList.of(
@@ -33,18 +48,39 @@ public class QueryTests{
 			new FF(5, 1)
 		);
 		
+		assertEquals(Optional.of(new FF(1, 5)), list.query("a is 1").first());
+		assertEquals(Optional.of(new FF(5, 1)), list.query("b is 1").first());
+		assertEquals(Optional.of(new FF(2, 4)), list.query("a is not 1").first());
+		
 		assertEquals(Optional.of(new FF(3, 3)), list.query("a > 2").first());
 		assertEquals(Optional.of(new FF(4, 2)), list.query("a >= 3 && b <= 2").first());
 		
 		for(long i=0;i<list.size();i++){
 			assertEquals(Optional.of(list.get(i)), list.query("a == {}", i+1).first());
+			assertEquals(Optional.of(list.get(i)), list.query("a == {}+1", i).first());
 		}
 		
 		assertEquals(3, list.query("a > 2").count());
 		assertEquals(2, list.query("a == 2 || a == 3").count());
 		
+		assertEquals(Optional.of(new FF(3, 3)), list.query("a == b").any());
+		
 		assertEquals(Optional.of(new FF(2, 4)), list.query("a%2==0").first());
 		assertEquals(2, list.query("a%2==0").count());
+		assertEquals(3, list.query("a%2!=0").count());
+	}
+	
+	@Test
+	void inTest() throws IOException{
+		var list=IOList.of(
+			new StringyBoi("Jomama", List.of("foo", "bar")),
+			new StringyBoi("bar", List.of("foo", "bar")),
+			new StringyBoi("420", List.of()),
+			new StringyBoi("mamamia", List.of("69"))
+		);
+		
+		assertEquals(1, list.query("str in strs").count());
+		assertEquals(2, list.query("'mama' in str").count());
 	}
 	
 }

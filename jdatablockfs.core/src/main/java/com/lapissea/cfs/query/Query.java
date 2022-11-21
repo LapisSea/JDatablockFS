@@ -9,7 +9,7 @@ public interface Query<T>{
 	
 	Class<T> elementType();
 	
-	long count();
+	long count() throws IOException;
 	
 	default Optional<T> first() throws IOException{
 		return any();//TODO: ordered execution

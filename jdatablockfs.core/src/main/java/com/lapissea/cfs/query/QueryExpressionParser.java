@@ -1,10 +1,14 @@
 package com.lapissea.cfs.query;
 
+import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.InvalidQueryString;
 import com.lapissea.cfs.io.bit.EnumUniverse;
+import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.SupportedPrimitive;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
@@ -14,6 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -25,6 +30,31 @@ public class QueryExpressionParser{
 	
 	private interface Matched{
 		List<String> matches();
+	}
+	
+	private enum Modifier implements Matched{
+		MODULUS(DataSource.Modulus::new, "%", "mod"),
+		ADD(DataSource.Add::new, "+", "add"),
+//		SUBTRACT(DataSource.Subtract::new, "-", "sub"),
+//		DIVIDE(DataSource.Divide::new, "/", "div"),
+//		MULTIPLY(DataSource.Multiply::new, "-", "mul"),
+//		POWER(DataSource.Power::new, "^", "pow"),
+		;
+		
+		final BiFunction<DataSource, DataSource, DataSource> ctor;
+		final List<String>                                   matches;
+		
+		Modifier(BiFunction<DataSource, DataSource, DataSource> ctor, String... matches){
+			this.ctor=ctor;
+			this.matches=List.of(matches);
+		}
+		@Override
+		public List<String> matches(){
+			return matches;
+		}
+		DataSource gnu(DataSource l, DataSource r){
+			return ctor.apply(l, r);
+		}
 	}
 	
 	private enum Connector implements Matched{
@@ -50,16 +80,17 @@ public class QueryExpressionParser{
 	
 	private enum Comparison implements Matched{
 		EQUALS(Check.Equals::new, "==", "=", "is", "equals"),
+		NOT_EQUALS((src, arg)->negate(new Check.Equals(src, arg)), "!=", "is not"),
 		GREATER(Check.GreaterThan::new, ">"),
-		GREATER_OR_EQUAL((src, arg)->new Check.Or(new Check.GreaterThan(src, arg), new Check.Equals(src, arg)), ">="),
+		GREATER_OR_EQUAL((src, arg)->negate(new Check.LessThan(src, arg)), ">="),
 		LESSER(Check.LessThan::new, "<"),
-		LESSER_OR_EQUAL((src, arg)->new Check.Or(new Check.LessThan(src, arg), new Check.Equals(src, arg)), "<="),
-//		IN(Check.In::new, "in"),
+		LESSER_OR_EQUAL((src, arg)->negate(new Check.GreaterThan(src, arg)), "<="),
+		IN(Check.In::new, "in"),
 		;
 		
-		final BiFunction<String, ArgSource, Check> ctor;
-		final List<String>                         matches;
-		Comparison(BiFunction<String, ArgSource, Check> ctor, String... matches){
+		final BiFunction<DataSource, DataSource, Check> ctor;
+		final List<String>                              matches;
+		Comparison(BiFunction<DataSource, DataSource, Check> ctor, String... matches){
 			this.ctor=ctor;
 			this.matches=List.of(matches);
 		}
@@ -69,35 +100,58 @@ public class QueryExpressionParser{
 		}
 	}
 	
-	private sealed interface ArgSource{
-		record Root() implements ArgSource{
+	private sealed interface DataSource{
+		record Root() implements DataSource{
 			@Override
 			public String toString(){
-				return "args";
+				return "ARG!";
 			}
 		}
 		
-		record GetArray(int index, ArgSource source) implements ArgSource{
+		record GetArray(int index, DataSource source) implements DataSource{
 			@Override
 			public String toString(){
 				return source+"["+index+"]";
 			}
 		}
 		
-		record Literal(Object value) implements ArgSource{
+		record Literal(Object value) implements DataSource{
 			@Override
 			public String toString(){
-				return value+"";
+				return switch(value){
+					case String s -> "'"+s+"'";
+					case Float s -> s+"F";
+					case Double s -> s+"D";
+					case Long s -> s+"L";
+					default -> value+"";
+				};
+			}
+		}
+		
+		record Field(Function<Object, Object> getter, Class<?> type, String name) implements DataSource{
+			@Override
+			public String toString(){
+				return "#"+name;
+			}
+		}
+		
+		record Modulus(DataSource src, DataSource mod) implements DataSource{
+			@Override
+			public String toString(){
+				return src+"%"+mod;
+			}
+		}
+		
+		record Add(DataSource l, DataSource r) implements DataSource{
+			@Override
+			public String toString(){
+				return l+" + "+r;
 			}
 		}
 	}
 	
-	private interface ArgContain{
-		ArgSource arg();
-	}
-	
-	private interface FieldRef{
-		String name();
+	private interface DataSourceContain{
+		Stream<DataSource> sources();
 	}
 	
 	private sealed interface Check{
@@ -118,28 +172,51 @@ public class QueryExpressionParser{
 		record Not(Check check) implements Check{
 			@Override
 			public String toString(){
-				return "!"+check;
+				return "!("+check+")";
 			}
 		}
 		
-		record Equals(String name, ArgSource arg) implements Check, ArgContain, FieldRef{
+		record Equals(DataSource field, DataSource arg) implements Check, DataSourceContain{
 			@Override
 			public String toString(){
-				return name+" == "+arg;
+				return field+" == "+arg;
+			}
+			@Override
+			public Stream<DataSource> sources(){
+				return Stream.of(field, arg);
 			}
 		}
 		
-		record GreaterThan(String name, ArgSource arg) implements Check, ArgContain, FieldRef{
+		record GreaterThan(DataSource field, DataSource arg) implements Check, DataSourceContain{
 			@Override
 			public String toString(){
-				return name+" > "+arg;
+				return field+" > "+arg;
+			}
+			@Override
+			public Stream<DataSource> sources(){
+				return Stream.of(field, arg);
 			}
 		}
 		
-		record LessThan(String name, ArgSource arg) implements Check, ArgContain, FieldRef{
+		record LessThan(DataSource field, DataSource arg) implements Check, DataSourceContain{
 			@Override
 			public String toString(){
-				return name+" < "+arg;
+				return field+" < "+arg;
+			}
+			@Override
+			public Stream<DataSource> sources(){
+				return Stream.of(field, arg);
+			}
+		}
+		
+		record In(DataSource needle, DataSource hay) implements Check, DataSourceContain{
+			@Override
+			public String toString(){
+				return "("+needle+" in "+hay+")";
+			}
+			@Override
+			public Stream<DataSource> sources(){
+				return Stream.of(needle, hay);
 			}
 		}
 	}
@@ -165,24 +242,31 @@ public class QueryExpressionParser{
 	}
 	
 	private static <T> FilterResult<T> parse(FilterQuery<T> filterQuery){
-		Check check=expressionToCheck(filterQuery.type, filterQuery.expression, null);
+		Check compiledCheck=expressionToCheck(filterQuery.type, filterQuery.expression, null);
 		
-		var args  =deep(check).filter(c->c instanceof ArgContain).map(c->((ArgContain)c).arg()).collect(Collectors.toSet());
-		var fields=deep(check).filter(c->c instanceof FieldRef).map(c->((FieldRef)c).name()).collect(Collectors.toUnmodifiableSet());
+		Log.trace("Compiled check for {}#cyan - \"{}#red\": {}#blue",
+		          filterQuery.type.getSimpleName(), filterQuery.expression, compiledCheck);
 		
-		Consumer<T>              argCheck =generateArgCheck(args);
-		BiPredicate<Object[], T> predicate=generateFilter(args, check);
+		var fields=deep(compiledCheck).filter(c->c instanceof DataSourceContain)
+		                              .flatMap(c->((DataSourceContain)c).sources())
+		                              .flatMap(QueryExpressionParser::deep)
+		                              .filter(s->s instanceof DataSource.Field)
+		                              .map(s->((DataSource.Field)s))
+		                              .map(f->f.name)
+		                              .collect(Collectors.toSet());
+		
+		Consumer<T>              argCheck =t->{};
+		BiPredicate<Object[], T> predicate=generateFilter(compiledCheck);
 		
 		return new FilterResult<>(Set.copyOf(fields), argCheck, predicate);
 	}
 	
-	private static <T> BiPredicate<Object[], T> generateFilter(Set<ArgSource> argSet, Check check){
+	private static <T> BiPredicate<Object[], T> generateFilter(Check check){
 		return (args, obj)->{
 			return reflectionCheck(args, obj, check);
 		};
 	}
 	
-	@SuppressWarnings({"rawtypes", "unchecked"})
 	private static <T> boolean reflectionCheck(Object[] args, T obj, Check check){
 		return switch(check){
 			case Check.And and -> {
@@ -198,49 +282,124 @@ public class QueryExpressionParser{
 			}
 			case Check.Not not -> !reflectionCheck(args, obj, not.check);
 			case Check.Equals equals -> {
-				Object arg=getArg(args, equals.arg);
-				if(arg==null) yield obj==null;
-				IOField field =Struct.ofUnknown(obj.getClass()).getFields().byName(equals.name).orElseThrow();
-				var     typ   =field.getAccessor().getType();
-				var     argTyp=arg.getClass();
+				Object val=getArg(args, obj, equals.field);
+				Object arg=getArg(args, obj, equals.arg);
+				if(arg==null) yield val==null;
 				
-				if(arg instanceof Number num&&(typ==byte.class||typ==short.class||typ==int.class||typ==long.class||typ==float.class||typ==double.class)){
-					var val=(Number)field.get(null, (IOInstance)obj);
-					if(val instanceof Double d){
-						yield d==num.doubleValue();
+				if(arg instanceof Number argN&&val instanceof Number valN){
+					if(valN instanceof Double d){
+						yield d==argN.doubleValue();
 					}
-					if(val instanceof Float f){
-						yield f==num.floatValue();
+					if(valN instanceof Float f){
+						yield f==argN.floatValue();
 					}
-					yield val.longValue()==num.longValue();
+					yield valN.longValue()==argN.longValue();
 				}
 				
-				if(!UtilL.instanceOf(argTyp, typ)){
-					throw new ClassCastException(obj+" not compatible with "+field);
+				if(!UtilL.instanceOf(arg.getClass(), val.getClass())){
+					throw new ClassCastException(obj+" not compatible with "+equals.field);
 				}
-				var val=field.get(null, (IOInstance)obj);
 				yield arg.equals(val);
 			}
 			case Check.GreaterThan equals -> {
-				Number  arg=(Number)getArg(args, equals.arg);
-				IOField f  =Struct.ofUnknown(obj.getClass()).getFields().byName(equals.name).orElseThrow();
-				Number  val=(Number)f.get(null, (IOInstance)obj);
+				var val=(Number)getArg(args, obj, equals.field);
+				var arg=(Number)getArg(args, obj, equals.arg);
 				yield val.doubleValue()>arg.doubleValue();
 			}
 			case Check.LessThan equals -> {
-				Number  arg=(Number)getArg(args, equals.arg);
-				IOField f  =Struct.ofUnknown(obj.getClass()).getFields().byName(equals.name).orElseThrow();
-				Number  val=(Number)f.get(null, (IOInstance)obj);
+				var val=(Number)getArg(args, obj, equals.field);
+				var arg=(Number)getArg(args, obj, equals.arg);
 				yield val.doubleValue()<arg.doubleValue();
+			}
+			case Check.In in -> {
+				var needle=getArg(args, obj, in.needle);
+				var hay   =getArg(args, obj, in.hay);
+				if(hay==null) yield false;
+				if(hay instanceof String str){
+					yield str.contains((CharSequence)needle);
+				}
+				
+				if(hay instanceof List<?> list){
+					yield list.contains(needle);
+				}
+				
+				if(hay.getClass().isArray()){
+					var size=Array.getLength(hay);
+					for(int i=0;i<size;i++){
+						var el=Array.get(hay, i);
+						if(Objects.equals(hay, needle)){
+							yield true;
+						}
+					}
+				}
+				
+				yield false;
 			}
 		};
 	}
 	
-	private static Object getArg(Object[] args, ArgSource arg){
+	private static <T> Object getArg(Object[] args, T obj, DataSource arg){
 		return switch(arg){
-			case ArgSource.GetArray getArray -> Array.get(getArg(args, getArray.source), getArray.index);
-			case ArgSource.Root root -> args;
-			case ArgSource.Literal literal -> literal.value;
+			case DataSource.GetArray getArray -> Array.get(getArg(args, obj, getArray.source), getArray.index);
+			case DataSource.Root root -> args;
+			case DataSource.Literal literal -> literal.value;
+			case DataSource.Field field -> field.getter.apply(obj);
+			case DataSource.Modulus modulus -> {
+				var src=getArg(args, obj, modulus.src);
+				var mod=((Number)getArg(args, obj, modulus.mod)).intValue();
+				yield switch(src){
+					case Integer n -> n%mod;
+					case Long n -> n%mod;
+					case Double n -> n%mod;
+					case Float n -> n%mod;
+					default -> throw new IllegalStateException("Unexpected value: "+src);
+				};
+			}
+			case DataSource.Add add -> {
+				var l=(Number)getArg(args, obj, add.l);
+				var r=(Number)getArg(args, obj, add.r);
+				yield addAB(l, r);
+			}
+		};
+	}
+	
+	private static Class<?> addTyp(Class<?> l, Class<?> r){
+		var lt=SupportedPrimitive.get(l).orElseThrow();
+		var rt=SupportedPrimitive.get(r).orElseThrow();
+		if(lt.getType()!=rt.getType()) throw new NotImplementedException();
+		return lt.getType();
+	}
+	private static Object addAB(Number l, Number r){
+		return switch(l){
+			case Integer a -> switch(r){
+				case Integer b -> a+b;
+				case Long b -> a+b;
+				case Double b -> a+b;
+				case Float b -> a+b;
+				default -> throw new IllegalStateException("Unexpected value: "+l);
+			};
+			case Long a -> switch(r){
+				case Integer b -> a+b;
+				case Long b -> a+b;
+				case Double b -> a+b;
+				case Float b -> a+b;
+				default -> throw new IllegalStateException("Unexpected value: "+l);
+			};
+			case Double a -> switch(r){
+				case Integer b -> a+b;
+				case Long b -> a+b;
+				case Double b -> a+b;
+				case Float b -> a+b;
+				default -> throw new IllegalStateException("Unexpected value: "+l);
+			};
+			case Float a -> switch(r){
+				case Integer b -> a+b;
+				case Long b -> a+b;
+				case Double b -> a+b;
+				case Float b -> a+b;
+				default -> throw new IllegalStateException("Unexpected value: "+l);
+			};
+			default -> throw new IllegalStateException("Unexpected value: "+l);
 		};
 	}
 	
@@ -252,17 +411,45 @@ public class QueryExpressionParser{
 			case Check.GreaterThan c -> Stream.of(c);
 			case Check.LessThan c -> Stream.of(c);
 			case Check.Not c -> Stream.of(Stream.of(c), deep(c.check)).flatMap(s->s);
+			case Check.In c -> Stream.of(c);
 		};
 	}
-	private static Optional<Class<?>> argType(ArgSource arg){
+	private static Stream<DataSource> deep(DataSource data){
+		return Stream.concat(Stream.of(data), switch(data){
+			case DataSource.Add c -> Stream.concat(deep(c.l), deep(c.r));
+			case DataSource.GetArray c -> deep(c.source);
+			case DataSource.Modulus c -> Stream.concat(deep(c.src), deep(c.mod));
+			case DataSource.Literal c -> Stream.<DataSource>empty();
+			case DataSource.Field c -> Stream.<DataSource>empty();
+			case DataSource.Root c -> Stream.<DataSource>empty();
+		});
+	}
+	private static Optional<Class<?>> argType(DataSource arg){
 		return switch(arg){
-			case ArgSource.GetArray getArray -> Optional.empty();
-			case ArgSource.Root root -> throw new UnsupportedOperationException();
-			case ArgSource.Literal literal -> Optional.of(literal.value.getClass());
+			case DataSource.GetArray getArray -> Optional.empty();
+			case DataSource.Root root -> throw new UnsupportedOperationException();
+			case DataSource.Literal literal -> Optional.of(literal.value.getClass());
+			case DataSource.Field field -> Optional.of(field.type);
+			case DataSource.Modulus modulus -> argType(modulus.src);
+			case DataSource.Add add -> {
+				var l=argType(add.l);
+				var r=argType(add.r);
+				if(l.isPresent()&&r.isPresent()){
+					yield Optional.of(addTyp(l.get(), r.get()));
+				}
+				yield Optional.empty();
+			}
 		};
 	}
 	
-	private static <T> Consumer<T> generateArgCheck(Set<ArgSource> args){
+	private static Check negate(Check check){
+		return switch(check){
+			case Check.Not not -> not.check;
+			default -> new Check.Not(check);
+		};
+	}
+	
+	private static <T> Consumer<T> generateArgCheck(Set<DataSource> args){
 		return t->{};
 	}
 	
@@ -325,6 +512,14 @@ public class QueryExpressionParser{
 			});
 		}
 		
+		public String string(){
+			skipWhite();
+			if(str.charAt(pos)!='\'') return null;
+			pos++;
+			var inside=advance((i, c)->c!='\'');
+			pos++;
+			return inside==null?"":inside;
+		}
 		public Number number(){
 			var hex=regex(Pattern.compile("^[-+]?0[xX][0-9a-fA-F_]+"));
 			if(hex!=null){
@@ -431,11 +626,11 @@ public class QueryExpressionParser{
 			return str.substring(pos);
 		}
 		
-		RuntimeException nextWordBad(String message){
+		InvalidQueryString nextWordBad(String message){
 			var    pos =this.pos;
 			var    word=regex(Pattern.compile("^\\S+"));
 			String msg;
-			if(word==null) msg="Unexpected end";
+			if(word==null) msg="Unexpected end. "+message;
 			else msg="\""+word+"\" "+message;
 			
 			throw new InvalidQueryString(msg+atTemplate(pos));
@@ -478,66 +673,110 @@ public class QueryExpressionParser{
 				
 				if(check!=null){
 					var con=reader.match(Connector.class);
-					var r  =nextCheck();
+					var r  =check();
 					check=con.gnu(check, r);
 				}else{
-					check=nextCheck();
+					check=check();
 				}
 			}
 		}
 		
-		private Check nextCheck(){
-			var check=nextCheck0();
+		private Check check(){
+			var check=nextCheck();
 			if(check==null) return null;
 			if(notNext){
 				notNext=false;
-				check=new Check.Not(check);
+				check=negate(check);
 			}
 			return check;
 		}
-		private Check nextCheck0(){
+		private Check nextCheck(){
 			var brace=reader.brace();
 			if(brace!=null){
 				return expressionToCheck(type, brace, argCounter);
 			}
 			
-			var fieldName=reader.field();
-			if(fieldName!=null){
+			var field=readField();
+			if(field!=null){
 				var comp  =reader.match(Comparison.class);
 				var source=source();
-				checkComparison(fieldName, source);
-				return comp.ctor.apply(fieldName, source);
+				checkComparison(field, source);
+				return comp.ctor.apply(field, source);
 			}
 			
-			throw reader.nextWordBad("unexpected token");
+			var str=reader.string();
+			if(str!=null){
+				if(Comparison.IN.matches().stream().noneMatch(reader::match)){
+					throw reader.nextWordBad(
+						"Expected "+Comparison.IN.matches().stream().collect(Collectors.joining(" or "))+
+						" after left hand string literal"
+					);
+				}
+				var pos   =reader.pos;
+				var source=source();
+				if(deep(source).noneMatch(s->s instanceof DataSource.Field)){
+					reader.pos=pos;
+					throw reader.nextWordBad("No field on left or right side of IN");
+				}
+				
+				return new Check.In(new DataSource.Literal(str), source);
+			}
+			
+			throw reader.nextWordBad("Unexpected token");
 		}
 		
-		private void checkComparison(String fieldName, ArgSource source){
-			var type   =fieldType(fieldName);
-			var argType=argType(source);
-			argType.ifPresent(typ->{
-				if(UtilL.instanceOf(typ, type)){
-					throw new ClassCastException("Cannot cast "+typ.getName()+" to "+type.getName());
-				}
+		private DataSource readField(){
+			var name=reader.field();
+			if(name==null) return null;
+			DataSource field=findField(name);
+			return modifiedData(field);
+		}
+		
+		private void checkComparison(DataSource l, DataSource r){
+			argType(l).ifPresent(lType->{
+				argType(r).ifPresent(rType->{
+					if(lType!=rType&&UtilL.instanceOf(lType, rType)){
+						throw new ClassCastException("Cannot cast "+lType+" to "+rType);
+					}
+				});
 			});
 		}
 		
-		private Class<?> fieldType(String fieldName){
+		@SuppressWarnings({"rawtypes", "unchecked"})
+		private DataSource.Field findField(String fieldName){
 			if(IOInstance.isInstance(type)){
-				return Struct.ofUnknown(type).getFields().byName(fieldName)
-				             .orElseThrow(()->noField(fieldName))
-				             .getAccessor().getType();
+				IOField field=Struct.ofUnknown(type).getFields().byName(fieldName)
+				                    .orElseThrow(()->noField(fieldName));
+				if(Utils.isVirtual(field, null)){
+					throw new NotImplementedException("Virtual field access not implemented");
+				}
+				var acc=field.getAccessor();
+				
+				return new DataSource.Field(obj->acc.get(null, (IOInstance)obj), acc.getType(), acc.getName());
 			}
 			
-			var field=Arrays.stream(type.getFields()).filter(f->f.getName().equals(fieldName)).findAny();
-			if(field.isPresent()){
-				return field.get().getType();
+			var fieldO=Arrays.stream(type.getFields()).filter(f->f.getName().equals(fieldName)).findAny();
+			if(fieldO.isPresent()){
+				var field=fieldO.get();
+				return new DataSource.Field(obj->{
+					try{
+						return field.get(obj);
+					}catch(IllegalAccessException e){
+						throw new RuntimeException(e);
+					}
+				}, field.getType(), field.getName());
 			}
 			
 			try{
 				var getter=type.getMethod("get"+TextUtil.firstToUpperCase(fieldName));
 				if(getter.getReturnType()!=void.class){
-					return getter.getReturnType();
+					return new DataSource.Field(obj->{
+						try{
+							return getter.invoke(obj);
+						}catch(ReflectiveOperationException e){
+							throw new RuntimeException(e);
+						}
+					}, getter.getReturnType(), fieldName);
 				}
 			}catch(NoSuchMethodException ignored){}
 			
@@ -548,7 +787,21 @@ public class QueryExpressionParser{
 			return new InvalidQueryString(fieldName+" does not exist in "+type.getName());
 		}
 		
-		private ArgSource source(){
+		private DataSource modifiedData(DataSource data){
+			while(true){
+				var mod=reader.match(Modifier.class, false);
+				if(mod==null) break;
+				var src=nextSource();
+				data=mod.gnu(data, src);
+			}
+			return data;
+		}
+		
+		private DataSource source(){
+			var soruce=nextSource();
+			return modifiedData(soruce);
+		}
+		private DataSource nextSource(){
 			var argStr=reader.squiggly();
 			if(argStr!=null){
 				int index;
@@ -557,12 +810,21 @@ public class QueryExpressionParser{
 				}else{
 					index=Integer.parseInt(argStr);
 				}
-				return new ArgSource.GetArray(index, new ArgSource.Root());
+				return new DataSource.GetArray(index, new DataSource.Root());
 			}
 			var num=reader.number();
 			if(num!=null){
-				return new ArgSource.Literal(num);
+				return new DataSource.Literal(num);
 			}
+			var str=reader.string();
+			if(str!=null){
+				return new DataSource.Literal(str);
+			}
+			var fieldName=reader.field();
+			if(fieldName!=null){
+				return findField(fieldName);
+			}
+			
 			throw reader.nextWordBad("is not a valid literal or value source");
 		}
 	}
