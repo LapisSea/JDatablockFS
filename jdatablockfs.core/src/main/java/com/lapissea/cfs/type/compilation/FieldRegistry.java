@@ -117,6 +117,19 @@ class FieldRegistry{
 					return new IOFieldStringArray<>(field);
 				}
 			});
+			reg.register(new RegistryNode(){
+				@Override
+				public boolean canCreate(Type type, GetAnnotation annotations){
+					if(!(type instanceof ParameterizedType parmType)) return false;
+					if(parmType.getRawType()!=List.class&&parmType.getRawType()!=ArrayList.class) return false;
+					var args=parmType.getActualTypeArguments();
+					return Utils.typeToRaw(args[0])==String.class;
+				}
+				@Override
+				public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
+					return new IOFieldStringList<>(field);
+				}
+			});
 			reg.register(new RegistryNode.InstanceOf<>(IOInstance.class){
 				@Override
 				public <T extends IOInstance<T>> IOField<T, ? extends IOInstance> create(FieldAccessor<T> field, GenericContext genericContext){
