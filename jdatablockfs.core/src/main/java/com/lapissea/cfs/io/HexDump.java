@@ -58,13 +58,11 @@ public class HexDump{
 			
 			for(int i=0;i<lineSiz;i++){
 				char c=(char)line[i];
-				
 				result.append((char)switch(c){
 					case 0 -> '␀';
 					case '\n' -> '↵';
-					case '\t' -> '↹';
-//					case ' ' -> '⌴';
-					default -> DISPLAYABLE.get(c)?c:'·';
+					case '\t' -> '.';
+					default -> c>=37&&c!=127&&DISPLAYABLE.get(c)?c:'·';
 				});
 			}
 			if(read<size) result.append('\n');

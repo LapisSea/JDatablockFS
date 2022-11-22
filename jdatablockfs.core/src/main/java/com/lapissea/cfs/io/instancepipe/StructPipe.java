@@ -231,8 +231,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		}
 		
 		var refs=fields.stream()
-		               .map(f->f instanceof RefField<?, ?> ref?ref:null)
-		               .filter(Objects::nonNull)
+		               .filter(RefField.class::isInstance)
+		               .map(RefField.class::cast)
 		               .map(ref->fields.byName(IOFieldTools.makeRefName(ref.getAccessor())).map(f->Map.entry(f, ref)))
 		               .filter(Optional::isPresent)
 		               .map(Optional::get)
@@ -823,18 +823,24 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			
 			for(IOField<T, ?> field : List.copyOf(selectedWriteFieldsSet)){
 				if(field.hasDependencies()){
-					if(selectedWriteFieldsSet.addAll(field.getDependencies())) shouldRun=true;
+					if(selectedWriteFieldsSet.addAll(field.getDependencies())){
+						shouldRun=true;
+					}
 				}
 				var gens=field.getGenerators();
 				if(gens!=null){
 					for(var gen : gens){
-						if(selectedWriteFieldsSet.add(gen.field())) shouldRun=true;
+						if(selectedWriteFieldsSet.add(gen.field())){
+							shouldRun=true;
+						}
 					}
 				}
 			}
 			for(IOField<T, ?> field : List.copyOf(selectedReadFieldsSet)){
 				if(field.hasDependencies()){
-					if(selectedReadFieldsSet.addAll(field.getDependencies())) shouldRun=true;
+					if(selectedReadFieldsSet.addAll(field.getDependencies())){
+						shouldRun=true;
+					}
 				}
 			}
 			
@@ -844,7 +850,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			for(IOField<T, ?> field : selectedReadFieldsSet){
 				var fields=getSpecificFields();
 				var index =fields.indexOf(field);
-				if(index==-1) continue;
+				if(index<=0) continue;
 				
 				var before=new ArrayList<>(fields.subList(0, index));
 				
@@ -872,7 +878,9 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				var index =fields.indexOf(field);
 				if(index==-1) throw new AssertionError();//TODO handle fields in fields
 				for(int i=index+1;i<fields.size();i++){
-					if(selectedWriteFieldsSet.add(fields.get(i))) shouldRun=true;
+					if(selectedWriteFieldsSet.add(fields.get(i))){
+						shouldRun=true;
+					}
 				}
 			}
 		}

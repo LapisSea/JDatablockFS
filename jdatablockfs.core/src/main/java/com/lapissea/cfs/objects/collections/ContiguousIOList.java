@@ -353,14 +353,18 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	public T get(long index) throws IOException{
 		checkSize(index);
 		if(readOnly){
-			if(cache.containsKey(index)){
-				return cache.get(index);
-			}
-			var val=readAt(index);
-			cache.put(index, val);
-			return val;
+			return getCached(index);
 		}
 		return readAt(index);
+	}
+	
+	private T getCached(long index) throws IOException{
+		if(cache.containsKey(index)){
+			return cache.get(index);
+		}
+		var val=readAt(index);
+		cache.put(index, val);
+		return val;
 	}
 	
 	@Override
@@ -711,12 +715,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 					return Optional.of(full->{
 						checkSize(index);
 						if(readOnly){
-							if(cache.containsKey(index)){
-								return cache.get(index);
-							}
-							var val=readAt(index);
-							cache.put(index, val);
-							return val;
+							return getCached(index);
 						}
 						try(var io=ioAtElement(index)){
 							if(!full&&fields!=null&&storage instanceof ValueStorage.InstanceBased i){
