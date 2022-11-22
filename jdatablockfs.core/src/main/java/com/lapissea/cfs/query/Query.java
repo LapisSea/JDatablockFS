@@ -19,7 +19,7 @@ public interface Query<T>{
 	default Query<T> filter(String expression, Object... args){
 		var result=QueryExpressionParser.filter(elementType(), expression);
 		var filter=result.filter();
-		return filter(result.readFields(), o->filter.test(args, o));
+		return filter(result.readFields(), o->filter.test(new QueryContext(args, o)));
 	}
 	
 	Query<T> filter(Set<String> readFields, Predicate<T> filter);
