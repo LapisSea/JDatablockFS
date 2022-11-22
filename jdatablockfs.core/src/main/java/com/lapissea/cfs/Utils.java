@@ -284,4 +284,27 @@ public class Utils{
 		       (pool==null||acc.getStoragePool()==pool)
 		       ?acc:null;
 	}
+	
+	public static <T> Set<T> join(Set<T> a, Set<T> b){
+		if(a.size()<b.size()){
+			var tmp=a;
+			a=b;
+			b=tmp;
+		}
+		
+		int addCount=0;
+		for(T t : b){
+			if(!a.contains(t)){
+				addCount++;
+			}
+		}
+		
+		if(addCount==0) return a;
+		
+		var all=HashSet.<T>newHashSet(a.size()+addCount);
+		all.addAll(a);
+		all.addAll(b);
+		return Set.copyOf(all);
+	}
+	
 }

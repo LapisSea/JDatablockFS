@@ -788,8 +788,9 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	}
 	
 	private IODependency<T> generateFieldsDependency(FieldSet<T> selectedFields){
-		if(selectedFields.size()==getSpecificFields().size()){
-			return new IODependency<>(getSpecificFields(), getSpecificFields(), generators);
+		var all=getSpecificFields();
+		if(selectedFields.size()==all.size()){
+			return new IODependency<>(all, all, generators);
 		}
 		var writeFields=new HashSet<IOField<T, ?>>();
 		var readFields =new HashSet<IOField<T, ?>>();
@@ -799,7 +800,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			readFields.addAll(part.readFields);
 			if(part.generators!=null) generators.addAll(part.generators);
 		}
-		return IODependency.of(getSpecificFields(), writeFields, readFields);
+		return IODependency.of(all, writeFields, readFields);
 	}
 	
 	private IODependency<T> generateFieldDependency(IOField<T, ?> selectedField){
@@ -935,16 +936,22 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		readDeps(ioPool, provider, src, deps, instance, genericContext);
 	}
 	public void readSelectiveFields(VarPool<T> ioPool, DataProvider provider, ContentReader src, FieldSet<T> selectedFields, T instance, GenericContext genericContext) throws IOException{
+		var all=getSpecificFields();
 		if(DEBUG_VALIDATION){
 			for(IOField<T, ?> selectedField : selectedFields){
 				checkExistenceOfField(selectedField);
 			}
-			if(selectedFields.size()==getSpecificFields().size()){
+			if(selectedFields.size()==all.size()){
 				throw new IllegalArgumentException("reading all fields");
 			}
 		}
 		
 		var deps=getDeps(selectedFields);
+		if(deps.readFields.size()==all.size()){
+			readIOFields(all, ioPool, provider, src, instance, genericContext);
+			return;
+		}
+		
 		readDeps(ioPool, provider, src, deps, instance, genericContext);
 	}
 	

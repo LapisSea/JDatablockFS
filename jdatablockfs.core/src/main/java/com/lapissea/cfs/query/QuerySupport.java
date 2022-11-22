@@ -1,7 +1,8 @@
 package com.lapissea.cfs.query;
 
+import com.lapissea.cfs.Utils;
+
 import java.io.IOException;
-import java.util.HashSet;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
@@ -72,26 +73,9 @@ public enum QuerySupport{
 				}
 				@Override
 				public DIter<T> elements(Set<String> readFields){
-					var         names=check.fieldNames();
-					Set<String> allReadFields;
-					merge:
-					{
-						if(names.size()>readFields.size()){
-							if(names.containsAll(readFields)){
-								allReadFields=names;
-								break merge;
-							}
-						}else{
-							if(readFields.containsAll(names)){
-								allReadFields=readFields;
-								break merge;
-							}
-						}
-						allReadFields=new HashSet<>(names);
-						allReadFields.addAll(readFields);
-					}
-					
-					var src=data.elements(allReadFields);
+					var chFields=check.fieldNames();
+					var fields  =Utils.join(chFields, readFields);
+					var src     =data.elements(fields);
 					return ()->{
 						while(true){
 							var candidate=src.next();
