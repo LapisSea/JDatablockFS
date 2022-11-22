@@ -8,6 +8,7 @@ import com.lapissea.cfs.objects.collections.LinkedIOList;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.util.LogUtil;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
@@ -27,10 +28,14 @@ public class QueryTests{
 		@IOValue
 		float a, b;
 		
+		@IOValue
+		byte[] someData;
+		
 		public FF(){}
 		public FF(float a, float b){
 			this.a=a;
 			this.b=b;
+			someData=new byte[69];
 		}
 	}
 	
@@ -41,10 +46,14 @@ public class QueryTests{
 		@IOValue
 		List<String> strs;
 		
+		@IOValue
+		byte[] someData;
+		
 		public StringyBoi(){}
 		public StringyBoi(String str, List<String> strs){
 			this.str=str;
 			this.strs=strs;
+			someData=new byte[69];
 		}
 	}
 	
