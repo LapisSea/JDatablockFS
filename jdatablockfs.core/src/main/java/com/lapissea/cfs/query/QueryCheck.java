@@ -1,5 +1,8 @@
 package com.lapissea.cfs.query;
 
+import java.util.Set;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public sealed interface QueryCheck{
@@ -19,6 +22,14 @@ public sealed interface QueryCheck{
 	}
 	default QueryCheck negate(){
 		return new Not(this);
+	}
+	
+	default Set<String> fieldNames(){
+		return deep().filter(QueryCheck.SourceContain.class::isInstance).map(QueryCheck.SourceContain.class::cast)
+		             .flatMap(QueryCheck.SourceContain::deepSources)
+		             .filter(QueryValueSource.Field.class::isInstance).map(QueryValueSource.Field.class::cast)
+		             .map(QueryValueSource.Field::name)
+		             .collect(Collectors.toUnmodifiableSet());
 	}
 	
 	record And(QueryCheck l, QueryCheck r) implements QueryCheck{
@@ -99,6 +110,29 @@ public sealed interface QueryCheck{
 		@Override
 		public Stream<QueryValueSource> sources(){
 			return Stream.of(needle, hay);
+		}
+	}
+	
+	record Lambda(Predicate<Object> lambda, Set<String> fieldNames) implements QueryCheck{
+		@Override
+		public String toString(){
+			return "(obj->{java})";
+		}
+	}
+	
+	static QueryCheck cached(QueryCheck check){
+		if(check instanceof CachedMetadata||check instanceof Lambda) return check;
+		return new CachedMetadata(check, check.fieldNames());
+	}
+	
+	record CachedMetadata(QueryCheck check, Set<String> fieldNames) implements QueryCheck{
+		public CachedMetadata(QueryCheck check, Set<String> fieldNames){
+			this.check=check;
+			this.fieldNames=Set.copyOf(fieldNames);
+		}
+		@Override
+		public String toString(){
+			return check.toString();
 		}
 	}
 }

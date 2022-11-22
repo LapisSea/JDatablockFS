@@ -154,6 +154,8 @@ public enum ReflectionExecutor{
 				
 				yield false;
 			}
+			case QueryCheck.Lambda lambda -> lambda.lambda().test(ctx.obj());
+			case QueryCheck.CachedMetadata cachedMetadata -> executeCheck(ctx, cachedMetadata.check());
 		};
 	}
 	

@@ -15,7 +15,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
-import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -106,7 +105,7 @@ public class QueryExpressionParser{
 		}
 	}
 	
-	public record FilterResult<T>(Set<String> readFields, Consumer<T> argCheck, Predicate<QueryContext> filter){}
+	public record FilterResult<T>(Consumer<T> argCheck, QueryCheck check){}
 	
 	
 	private static final Map<FilterQuery<?>, FilterResult<?>> FILTER_CACHE=new ConcurrentHashMap<>();
@@ -122,22 +121,7 @@ public class QueryExpressionParser{
 		Log.trace("Compiled check for {}#cyan - \"{}#red\": {}#blue",
 		          filterQuery.type.getSimpleName(), filterQuery.expression, compiledCheck);
 		
-		var fields=compiledCheck.deep()
-		                        .filter(QueryCheck.SourceContain.class::isInstance)
-		                        .map(QueryCheck.SourceContain.class::cast)
-		                        .flatMap(QueryCheck.SourceContain::deepSources)
-		                        .filter(QueryValueSource.Field.class::isInstance)
-		                        .map(QueryValueSource.Field.class::cast)
-		                        .map(QueryValueSource.Field::name)
-		                        .collect(Collectors.toSet());
-		
-		var predicate=generateFilter(compiledCheck);
-		
-		return new FilterResult<>(Set.copyOf(fields), t->{}, predicate);
-	}
-	
-	private static Predicate<QueryContext> generateFilter(QueryCheck check){
-		return ctx->ReflectionExecutor.executeCheck(ctx, check);
+		return new FilterResult<>(t->{}, QueryCheck.cached(compiledCheck));
 	}
 	
 	

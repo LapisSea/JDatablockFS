@@ -12,7 +12,10 @@ import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Reference;
+import com.lapissea.cfs.query.Query;
+import com.lapissea.cfs.query.QuerySupport;
 import com.lapissea.cfs.type.*;
+import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.VaryingSize;
 import com.lapissea.cfs.type.field.access.AbstractFieldAccessor;
@@ -682,6 +685,51 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		var eSiz   =getElementSize();
 		if(eSiz==0) return size();
 		return (size-headSiz)/eSiz;
+	}
+	@Override
+	public Query<T> query(){
+		return QuerySupport.of(ListData.of(this, readFields->{
+			var         size=size();
+			var         ctor=getElementType().emptyConstructor();
+			FieldSet<?> fields;
+			if(storage instanceof ValueStorage.InstanceBased<?> i){
+				var struct=Struct.ofUnknown(i.getType().getType());
+				if(struct.getFields().size()==readFields.size()){
+					fields=null;
+				}else{
+					fields=FieldSet.of(struct.getFields().stream().filter(f->readFields.contains(f.getName())));
+				}
+			}else fields=null;
+			
+			return new QuerySupport.DIter<T>(){
+				long cursor;
+				
+				@Override
+				public Optional<QuerySupport.Accessor<T>> next(){
+					if(cursor>=size) return Optional.empty();
+					var index=cursor++;
+					return Optional.of(full->{
+						checkSize(index);
+						if(readOnly){
+							if(cache.containsKey(index)){
+								return cache.get(index);
+							}
+							var val=readAt(index);
+							cache.put(index, val);
+							return val;
+						}
+						try(var io=ioAtElement(index)){
+							if(!full&&fields!=null&&storage instanceof ValueStorage.InstanceBased i){
+								var val=ctor.make();
+								i.readSelective(io, (IOInstance)val, fields);
+								return val;
+							}
+							return storage.readNew(io);
+						}
+					});
+				}
+			};
+		}));
 	}
 	
 	@Override

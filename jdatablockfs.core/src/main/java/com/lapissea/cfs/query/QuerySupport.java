@@ -1,24 +1,30 @@
 package com.lapissea.cfs.query;
 
-import com.lapissea.util.UtilL;
-
 import java.io.IOException;
-import java.util.*;
-import java.util.function.Predicate;
+import java.util.HashSet;
+import java.util.Optional;
+import java.util.OptionalLong;
+import java.util.Set;
 
 public enum QuerySupport{
 	;
 	
 	public interface Accessor<T>{
-		T get() throws IOException;
+		T get(boolean full) throws IOException;
+	}
+	
+	public interface DIter<T>{
+		Optional<Accessor<T>> next() throws IOException;
 	}
 	
 	public interface Data<T>{
+		
+		
 		Class<T> elementType();
 		
 		OptionalLong count();
 		
-		Iterator<Accessor<T>> elements(Set<String> readFields);
+		DIter<T> elements(Set<String> readFields);
 	}
 	
 	private static final class StagedQuery<T> implements Query<T>{
@@ -33,27 +39,27 @@ public enum QuerySupport{
 			return data.elementType();
 		}
 		@Override
-		public long count(){
+		public long count() throws IOException{
 			var c=data.count();
 			if(c.isPresent()) return c.getAsLong();
 			long count=0;
-			var  es   =data.elements(null);
-			while(es.hasNext()){
-				es.next();
+			var  es   =data.elements(Set.of());
+			while(es.next().isPresent()){
 				count++;
 			}
 			return count;
 		}
 		@Override
 		public Optional<T> any() throws IOException{
-			var es=data.elements(null);
-			if(es.hasNext()){
-				return Optional.of(es.next().get());
+			var es   =data.elements(Set.of());
+			var match=es.next();
+			if(match.isPresent()){
+				return Optional.of(match.get().get(true));
 			}
 			return Optional.empty();
 		}
 		@Override
-		public Query<T> filter(Set<String> readFields, Predicate<T> filter){
+		public Query<T> filter(QueryCheck check, Object... args){
 			var type=data.elementType();
 			return new StagedQuery<>(new Data<>(){
 				@Override
@@ -65,38 +71,36 @@ public enum QuerySupport{
 					return OptionalLong.empty();
 				}
 				@Override
-				public Iterator<Accessor<T>> elements(Set<String> readFields){
-					var src=data.elements(readFields);
-					return new Iterator<Accessor<T>>(){
-						Accessor<T> next;
-						void calcNext(){
-							if(next!=null) return;
-							while(src.hasNext()){
-								T   value;
-								var candidate=src.next();
-								try{
-									value=candidate.get();
-								}catch(IOException e){
-									throw UtilL.uncheckedThrow(e);
-								}
-								if(filter.test(value)){
-									next=candidate;
-									break;
-								}
+				public DIter<T> elements(Set<String> readFields){
+					var         names=check.fieldNames();
+					Set<String> allReadFields;
+					merge:
+					{
+						if(names.size()>readFields.size()){
+							if(names.containsAll(readFields)){
+								allReadFields=names;
+								break merge;
+							}
+						}else{
+							if(readFields.containsAll(names)){
+								allReadFields=readFields;
+								break merge;
 							}
 						}
-						@Override
-						public boolean hasNext(){
-							calcNext();
-							return next!=null;
-						}
-						@Override
-						public Accessor<T> next(){
-							calcNext();
-							Objects.requireNonNull(next);
-							var n=next;
-							next=null;
-							return n;
+						allReadFields=new HashSet<>(names);
+						allReadFields.addAll(readFields);
+					}
+					
+					var src=data.elements(allReadFields);
+					return ()->{
+						while(true){
+							var candidate=src.next();
+							if(candidate.isEmpty()) return Optional.empty();
+							var acc    =candidate.get();
+							var partial=acc.get(false);
+							if(ReflectionExecutor.executeCheck(new QueryContext(args, partial), check)){
+								return Optional.of(acc);
+							}
 						}
 					};
 				}

@@ -6,6 +6,7 @@ import com.lapissea.cfs.objects.collections.listtools.IOListRangeView;
 import com.lapissea.cfs.objects.collections.listtools.MappedIOList;
 import com.lapissea.cfs.objects.collections.listtools.MemoryWrappedIOList;
 import com.lapissea.cfs.query.Query;
+import com.lapissea.cfs.query.QueryCheck;
 import com.lapissea.cfs.query.QuerySupport;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.Nullable;
@@ -634,35 +635,45 @@ public interface IOList<T> extends IterablePP<T>{
 	}
 	
 	default Query<T> query(Set<String> readFields, Predicate<T> filter){
-		return query().filter(readFields, filter);
+		return query().filter(new QueryCheck.Lambda((Predicate<Object>)filter, readFields));
+	}
+	
+	abstract class ListData<T> implements QuerySupport.Data<T>{
+		
+		public static <T> QuerySupport.Data<T> of(IOList<T> list, Function<Set<String>, QuerySupport.DIter<T>> elements){
+			return new ListData<>(list){
+				@Override
+				public QuerySupport.DIter<T> elements(Set<String> readFields){
+					return elements.apply(readFields);
+				}
+			};
+		}
+		
+		private final IOList<T> l;
+		protected ListData(IOList<T> l){this.l=l;}
+		
+		@Override
+		public Class<T> elementType(){
+			return l.elementType();
+		}
+		@Override
+		public OptionalLong count(){
+			return OptionalLong.of(l.size());
+		}
 	}
 	
 	default Query<T> query(){
-		return QuerySupport.of(new QuerySupport.Data<>(){
-			@Override
-			public Class<T> elementType(){
-				return IOList.this.elementType();
-			}
-			@Override
-			public OptionalLong count(){
-				return OptionalLong.of(size());
-			}
-			@Override
-			public Iterator<QuerySupport.Accessor<T>> elements(Set<String> readFields){
-				var size=size();
-				return new Iterator<>(){
-					long cursor;
-					@Override
-					public boolean hasNext(){
-						return cursor<size;
-					}
-					@Override
-					public QuerySupport.Accessor<T> next(){
-						var i=cursor++;
-						return ()->IOList.this.get(i);
-					}
-				};
-			}
-		});
+		return QuerySupport.of(ListData.of(this, readFields->{
+			var size=size();
+			return new QuerySupport.DIter<T>(){
+				long cursor;
+				@Override
+				public Optional<QuerySupport.Accessor<T>> next(){
+					if(cursor>=size) return Optional.empty();
+					var i=cursor++;
+					return Optional.of(full->IOList.this.get(i));
+				}
+			};
+		}));
 	}
 }
