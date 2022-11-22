@@ -29,6 +29,7 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import java.lang.reflect.ParameterizedType;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -285,6 +286,13 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			if(type==String.class){
 				builder.skipField(field);
 				continue;
+			}
+			if(UtilL.instanceOf(type, List.class)){
+				var elType=((ParameterizedType)accessor.getGenericType(null)).getActualTypeArguments()[0];
+				if(elType==String.class){
+					builder.skipField(field);
+					continue;
+				}
 			}
 			
 			if(type.isArray()){
