@@ -18,10 +18,7 @@ import java.lang.annotation.Target;
 import java.lang.reflect.Array;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import static com.lapissea.cfs.type.field.StoragePool.INSTANCE;
 import static com.lapissea.cfs.type.field.StoragePool.IO;
@@ -64,7 +61,7 @@ public @interface IOValue{
 		@Override
 		public Set<String> getDependencyValueNames(FieldAccessor<?> field, IOValue annotation){
 			var type=field.getType();
-			if(!type.isArray()) return Set.of();
+			if(!type.isArray()&&!UtilL.instanceOf(type, Collection.class)) return Set.of();
 			
 			return Set.of(IOFieldTools.makeCollectionLenName(field));
 		}
