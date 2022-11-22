@@ -706,10 +706,65 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		FieldSet<T> writeFields,
 		FieldSet<T> readFields,
 		List<IOField.ValueGeneratorInfo<T, ?>> generators
-	){}
+	){
+		private static <T extends IOInstance<T>> FieldSet<T> fieldSetToOrderedList(FieldSet<T> source, Set<IOField<T, ?>> fieldsSet){
+			List<IOField<T, ?>> result=new ArrayList<>(fieldsSet.size());
+			for(IOField<T, ?> f : source){
+				var iter      =f.streamUnpackedFields().iterator();
+				var anyRemoved=false;
+				while(iter.hasNext()){
+					var fi=iter.next();
+					if(fieldsSet.remove(fi)) anyRemoved=true;
+				}
+				
+				if(anyRemoved){
+					result.add(f);
+				}
+			}
+			if(!fieldsSet.isEmpty()){
+				throw new IllegalStateException(fieldsSet+"");
+			}
+			return FieldSet.of(result);
+		}
+		
+		private static <T extends IOInstance<T>> IODependency<T> of(FieldSet<T> source, Set<IOField<T, ?>> writeFields, Set<IOField<T, ?>> readFields){
+			var w=fieldSetToOrderedList(source, writeFields);
+			var r=fieldSetToOrderedList(source, readFields);
+			var g=Utils.nullIfEmpty(writeFields.stream().flatMap(IOField::generatorStream).toList());
+			return new IODependency<>(w, r, g);
+		}
+	}
 	
 	private final Map<IOField<T, ?>, IODependency<T>> singleDependencyCache    =new HashMap<>();
 	private final ReadWriteLock                       singleDependencyCacheLock=new ReentrantReadWriteLock();
+	
+	private final Map<FieldSet<T>, IODependency<T>> multiDependencyCache    =new HashMap<>();
+	private final ReadWriteLock                     multiDependencyCacheLock=new ReentrantReadWriteLock();
+	
+	protected IODependency<T> getDeps(FieldSet<T> selectedFields){
+		if(selectedFields.size()==1){
+			return getDeps(selectedFields.get(0));
+		}
+		
+		var r=multiDependencyCacheLock.readLock();
+		r.lock();
+		try{
+			var cached=multiDependencyCache.get(selectedFields);
+			if(cached!=null) return cached;
+		}finally{
+			r.unlock();
+		}
+		var w=multiDependencyCacheLock.writeLock();
+		w.lock();
+		try{
+			var field=generateFieldsDependency(selectedFields);
+			multiDependencyCache.put(selectedFields, field);
+			return field;
+		}finally{
+			w.unlock();
+		}
+		
+	}
 	
 	protected IODependency<T> getDeps(IOField<T, ?> selectedField){
 		var r=singleDependencyCacheLock.readLock();
@@ -730,6 +785,21 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		}finally{
 			w.unlock();
 		}
+	}
+	
+	private IODependency<T> generateFieldsDependency(FieldSet<T> selectedFields){
+		if(selectedFields.size()==getSpecificFields().size()){
+			return new IODependency<>(getSpecificFields(), getSpecificFields(), generators);
+		}
+		var writeFields=new HashSet<IOField<T, ?>>();
+		var readFields =new HashSet<IOField<T, ?>>();
+		for(IOField<T, ?> selectedField : selectedFields){
+			var part=getDeps(selectedField);
+			writeFields.addAll(part.writeFields);
+			readFields.addAll(part.readFields);
+			if(part.generators!=null) generators.addAll(part.generators);
+		}
+		return IODependency.of(getSpecificFields(), writeFields, readFields);
 	}
 	
 	private IODependency<T> generateFieldDependency(IOField<T, ?> selectedField){
@@ -798,35 +868,11 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			}
 		}
 		
-		var writeFields=fieldSetToOrderedList(selectedWriteFieldsSet);
-		var readFields =fieldSetToOrderedList(selectedReadFieldsSet);
-		var generators =writeFields.stream().flatMap(IOField::generatorStream).toList();
-		
-		return new IODependency<>(
-			writeFields,
-			readFields,
-			Utils.nullIfEmpty(generators)
+		return IODependency.of(
+			getSpecificFields(),
+			selectedWriteFieldsSet,
+			selectedReadFieldsSet
 		);
-	}
-	
-	private FieldSet<T> fieldSetToOrderedList(Set<IOField<T, ?>> fieldsSet){
-		List<IOField<T, ?>> result=new ArrayList<>(fieldsSet.size());
-		for(IOField<T, ?> f : getSpecificFields()){
-			var iter      =f.streamUnpackedFields().iterator();
-			var anyRemoved=false;
-			while(iter.hasNext()){
-				var fi=iter.next();
-				if(fieldsSet.remove(fi)) anyRemoved=true;
-			}
-			
-			if(anyRemoved){
-				result.add(f);
-			}
-		}
-		if(!fieldsSet.isEmpty()){
-			throw new IllegalStateException(fieldsSet+"");
-		}
-		return FieldSet.of(result);
 	}
 	
 	
@@ -885,9 +931,28 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		if(DEBUG_VALIDATION){
 			checkExistenceOfField(selectedField);
 		}
+		var deps=getDeps(selectedField);
+		readDeps(ioPool, provider, src, deps, instance, genericContext);
+	}
+	public void readSelectiveFields(VarPool<T> ioPool, DataProvider provider, ContentReader src, FieldSet<T> selectedFields, T instance, GenericContext genericContext) throws IOException{
+		if(DEBUG_VALIDATION){
+			for(IOField<T, ?> selectedField : selectedFields){
+				checkExistenceOfField(selectedField);
+			}
+			if(selectedFields.size()==getSpecificFields().size()){
+				throw new IllegalArgumentException("reading all fields");
+			}
+		}
 		
-		var deps      =getDeps(selectedField);
-		var fields    =deps.readFields;
+		var deps=getDeps(selectedFields);
+		readDeps(ioPool, provider, src, deps, instance, genericContext);
+	}
+	
+	private void readDeps(VarPool<T> ioPool, DataProvider provider, ContentReader src, IODependency<T> deps, T instance, GenericContext genericContext) throws IOException{
+		var fields=deps.readFields;
+		if(fields.isEmpty()){
+			return;
+		}
 		int checkIndex=0;
 		int limit     =fields.size();
 		
@@ -910,7 +975,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			
 			field.skipReported(ioPool, provider, src, instance, genericContext);
 		}
-		throw new IllegalArgumentException(selectedField+" is not listed!");
+		throw new IllegalArgumentException();
 	}
 	
 	private void checkExistenceOfField(IOField<T, ?> selectedField){

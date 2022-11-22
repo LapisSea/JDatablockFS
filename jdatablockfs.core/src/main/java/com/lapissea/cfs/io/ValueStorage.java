@@ -8,10 +8,7 @@ import com.lapissea.cfs.io.instancepipe.*;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.cfs.type.*;
-import com.lapissea.cfs.type.field.BasicSizeDescriptor;
-import com.lapissea.cfs.type.field.IOField;
-import com.lapissea.cfs.type.field.SizeDescriptor;
-import com.lapissea.cfs.type.field.VaryingSize;
+import com.lapissea.cfs.type.field.*;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.fields.NoIOField;
 import com.lapissea.cfs.type.field.fields.RefField;
@@ -25,6 +22,7 @@ public sealed interface ValueStorage<T>{
 	
 	sealed interface InstanceBased<T extends IOInstance<T>> extends ValueStorage<T>{
 		void readSingle(ContentReader src, T dest, IOField<T, ?> field) throws IOException;
+		void readSelective(ContentReader src, T dest, FieldSet<T> fields) throws IOException;
 	}
 	
 	private static <I extends IOInstance<I>, T extends IOInstance<T>> SizeDescriptor<I> makeSizeDescriptor(DataProvider provider, FieldAccessor<I> accessor, StructPipe<T> pipe){
@@ -94,6 +92,10 @@ public sealed interface ValueStorage<T>{
 		public void readSingle(ContentReader src, T dest, IOField<T, ?> field) throws IOException{
 			pipe.readSingleField(pipe.makeIOPool(), provider, src, field, dest, ctx);
 		}
+		@Override
+		public void readSelective(ContentReader src, T dest, FieldSet<T> fields) throws IOException{
+			pipe.readSelectiveFields(pipe.makeIOPool(), provider, src, fields, dest, ctx);
+		}
 	}
 	
 	final class FixedInstance<T extends IOInstance<T>> implements ValueStorage.InstanceBased<T>{
@@ -142,6 +144,10 @@ public sealed interface ValueStorage<T>{
 		@Override
 		public void readSingle(ContentReader src, T dest, IOField<T, ?> field) throws IOException{
 			pipe.readSingleField(pipe.makeIOPool(), provider, src, field, dest, ctx);
+		}
+		@Override
+		public void readSelective(ContentReader src, T dest, FieldSet<T> fields) throws IOException{
+			pipe.readSelectiveFields(pipe.makeIOPool(), provider, src, fields, dest, ctx);
 		}
 	}
 	
@@ -239,6 +245,12 @@ public sealed interface ValueStorage<T>{
 			var ref=refPipe.readNew(provider, src, null);
 			ref.requireNonNull();
 			ref.io(provider, io->pipe.readSingleField(pipe.makeIOPool(), provider, io, field, dest, ctx));
+		}
+		@Override
+		public void readSelective(ContentReader src, T dest, FieldSet<T> fields) throws IOException{
+			var ref=refPipe.readNew(provider, src, null);
+			ref.requireNonNull();
+			ref.io(provider, io->pipe.readSelectiveFields(pipe.makeIOPool(), provider, io, fields, dest, ctx));
 		}
 	}
 	
