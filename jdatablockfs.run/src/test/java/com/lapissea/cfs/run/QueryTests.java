@@ -6,6 +6,7 @@ import com.lapissea.cfs.objects.collections.ContiguousIOList;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.collections.LinkedIOList;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import org.testng.annotations.Test;
 
@@ -17,6 +18,10 @@ import java.util.Optional;
 import static org.testng.Assert.assertEquals;
 
 public class QueryTests{
+	static{
+		Struct.of(FF.class);
+		Struct.of(StringyBoi.class);
+	}
 	
 	static class FF extends IOInstance.Managed<FF>{
 		@IOValue
@@ -43,17 +48,25 @@ public class QueryTests{
 		}
 	}
 	
-	@org.testng.annotations.DataProvider
-	Object[][] fflists() throws IOException{
+	<T extends IOInstance<T>> Object[][] lists(Class<T> el) throws IOException{
 		var cl=Cluster.init(new MemoryData.Builder().build());
 		return new Object[][]{
 			{IOList.wrap(new ArrayList<>())},
-			{cl.getRootProvider().request("arr", ContiguousIOList.class, FF.class)},
-			{cl.getRootProvider().request("lin", LinkedIOList.class, FF.class)},
+			{cl.getRootProvider().request("arr", ContiguousIOList.class, el)},
+			{cl.getRootProvider().request("lin", LinkedIOList.class, el)},
 			};
 	}
 	
-	@Test(dataProvider="fflists")
+	@org.testng.annotations.DataProvider
+	Object[][] ffLists() throws IOException{
+		return lists(FF.class);
+	}
+	@org.testng.annotations.DataProvider
+	Object[][] stringyLists() throws IOException{
+		return lists(StringyBoi.class);
+	}
+	
+	@Test(dataProvider="ffLists")
 	void comparison(IOList<FF> list) throws IOException{
 		list.addAll(List.of(
 			new FF(1, 5),
@@ -85,14 +98,14 @@ public class QueryTests{
 		assertEquals(3, list.query("a%2!=0").count());
 	}
 	
-	@Test
-	void inTest() throws IOException{
-		var list=IOList.of(
+	@Test(dataProvider="stringyLists")
+	void inTest(IOList<StringyBoi> list) throws IOException{
+		list.addAll(List.of(
 			new StringyBoi("Jomama", List.of("foo", "bar")),
 			new StringyBoi("bar", List.of("foo", "bar")),
 			new StringyBoi("420", List.of()),
 			new StringyBoi("mamamia", List.of("69"))
-		);
+		));
 		
 		assertEquals(1, list.query("str in strs").count());
 		assertEquals(2, list.query("'mama' in str").count());
