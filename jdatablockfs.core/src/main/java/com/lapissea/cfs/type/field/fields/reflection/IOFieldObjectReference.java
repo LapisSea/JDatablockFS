@@ -38,7 +38,7 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 		
 		descriptor=SizeDescriptor.Fixed.empty();
 		
-		struct=(Struct<ValueType>)Struct.ofUnknown(getAccessor().getType());
+		struct=(Struct<ValueType>)Struct.ofUnknown(getType());
 		var typ=accessor.getAnnotation(IOValue.Reference.class).map(IOValue.Reference::dataPipeType).orElseThrow();
 		instancePipe=switch(typ){
 			case FIXED -> FixedStructPipe.of(struct, STATE_IO_FIELD);

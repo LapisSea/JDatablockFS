@@ -236,7 +236,7 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	
 	@SuppressWarnings("unchecked")
 	public <E> Stream<IOField<T, E>> byType(Class<E> type){
-		return stream().filter(f->UtilL.instanceOf(f.getAccessor().getType(), type)).map(f->(IOField<T, E>)f);
+		return stream().filter(f->UtilL.instanceOf(f.getType(), type)).map(f->(IOField<T, E>)f);
 	}
 	
 	public <E extends IOField<T, ?>> Stream<? extends E> byFieldType(Class<E> type){

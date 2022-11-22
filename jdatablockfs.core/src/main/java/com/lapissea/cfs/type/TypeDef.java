@@ -52,7 +52,7 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 			isDynamic=field.getAccessor().hasAnnotation(IODynamic.class);
 			referenceType=field.getAccessor().getAnnotation(IOValue.Reference.class).map(IOValue.Reference::dataPipeType).orElse(null);
 			var deps=field.dependencyStream().map(IOField::getName).collect(Collectors.toSet());
-			if(field.getAccessor().getType().isArray()) deps.remove(IOFieldTools.makeCollectionLenName(field.getAccessor()));
+			if(field.getType().isArray()) deps.remove(IOFieldTools.makeCollectionLenName(field.getAccessor()));
 			if(isDynamic) deps.remove(IOFieldTools.makeGenericIDFieldName(field.getAccessor()));
 			dependencies=deps.toArray(String[]::new);
 			unsigned=field.getAccessor().hasAnnotation(IOValue.Unsigned.class);

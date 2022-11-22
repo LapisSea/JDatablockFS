@@ -229,6 +229,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 	}
 	
 	public String getName()                    {return getAccessor().getName();}
+	public Class<?> getType()                  {return getAccessor().getType();}
 	public final FieldAccessor<T> getAccessor(){return accessor;}
 	public final Struct<T> declaringStruct(){
 		var acc=getAccessor();

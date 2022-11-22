@@ -31,7 +31,7 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 		this.fixed=varProvider!=null;
 		
 		@SuppressWarnings("unchecked")
-		var struct=(Struct<ValueType>)Struct.ofUnknown(getAccessor().getType());
+		var struct=(Struct<ValueType>)Struct.ofUnknown(getType());
 		if(fixed){
 			instancePipe=FixedVaryingStructPipe.tryVarying(struct, varProvider);
 		}else instancePipe=StandardStructPipe.of(struct);

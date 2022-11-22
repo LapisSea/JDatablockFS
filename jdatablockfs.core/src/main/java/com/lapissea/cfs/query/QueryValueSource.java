@@ -78,7 +78,7 @@ public sealed interface QueryValueSource{
 			}
 			@Override
 			public Class<?> type(){
-				return field.getAccessor().getType();
+				return field.getType();
 			}
 			@Override
 			public String name(){

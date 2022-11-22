@@ -491,7 +491,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			if(unmanagedField.typeFlag(IOField.DYNAMIC_FLAG)){
 				struct=fieldValue.getThisStruct();
 			}else{
-				struct=Struct.of((Class<VT>)unmanagedField.getAccessor().getType());
+				struct=Struct.of((Class<VT>)unmanagedField.getType());
 			}
 			
 			return StructPipe.of(pipe.getClass(), struct);

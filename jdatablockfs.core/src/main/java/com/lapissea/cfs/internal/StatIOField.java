@@ -73,11 +73,11 @@ public class StatIOField{
 		StringBuilder sb=new StringBuilder();
 		sb.append("\t".repeat(depth));
 		var avg=fieldAvg(stat, field);
-		sb.append(ConsoleColors.GREEN_BRIGHT).append(field).append(": ").append(field.getAccessor().getType().getSimpleName()).append(ConsoleColors.RESET).append(": ")
+		sb.append(ConsoleColors.GREEN_BRIGHT).append(field).append(": ").append(field.getType().getSimpleName()).append(ConsoleColors.RESET).append(": ")
 		  .append(form.format(avg/total)).append(" ")
 //		  .append(form.format(avg/global)).append(" global")
 		;
-		var         s=Struct.ofUnknown(field.getAccessor().getType());
+		var         s=Struct.ofUnknown(field.getType());
 		FieldSet<?> fields;
 		fields=s.getFields();
 		if(s instanceof Struct.Unmanaged<?> u){

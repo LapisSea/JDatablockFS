@@ -99,7 +99,7 @@ public class IOFieldTools{
 			                 //Pull any temporary fields back to reduce unessecary field skipping when re-reading them
 			                 .thenComparingInt(f->Utils.isVirtual(f, StoragePool.IO)?0:1)
 			                 //pull any cheap to read/write fields back
-			                 .thenComparingInt(f->f.getAccessor().getType().isEnum()||SupportedPrimitive.isAny(f.getAccessor().getType())?0:1)
+			                 .thenComparingInt(f->f.getType().isEnum()||SupportedPrimitive.isAny(f.getType())?0:1)
 			                 //Encourage fields with similar dependencies to be next to each other
 			                 .thenComparing(f->f.dependencyStream().map(IOField::getName).collect(Collectors.joining(" / ")))
 			                 //Eliminate JVM entropy. Make initial field order irrelevant

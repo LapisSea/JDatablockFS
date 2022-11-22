@@ -507,7 +507,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		}
 		
 		Function<IOField<T, ?>, Optional<String>> fieldMapper=field->{
-			if(SupportedPrimitive.get(field.getAccessor().getType()).orElse(null)==SupportedPrimitive.BOOLEAN){
+			if(SupportedPrimitive.get(field.getType()).orElse(null)==SupportedPrimitive.BOOLEAN){
 				Boolean val=(Boolean)field.get(ioPool, instance);
 				if(val!=null){
 					return val?Optional.of(field.getName()):Optional.empty();

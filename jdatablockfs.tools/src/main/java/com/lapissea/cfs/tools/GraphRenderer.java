@@ -783,7 +783,7 @@ public class GraphRenderer implements DataRenderer{
 			var field=iter.next();
 			
 			if(!(field instanceof RefField<T, Object> refField)){
-				if(field.getAccessor().getType()==ChunkPointer.class){
+				if(field.getType()==ChunkPointer.class){
 					var    val  =field.get(pool, inst);
 					Bubble child=parent.child(undead, path+"."+field.getName());
 					child.setVal(val==null?0:((ChunkPointer)val).getValue(), provider, val);
@@ -825,7 +825,7 @@ public class GraphRenderer implements DataRenderer{
 			IOField<T, Object> field=iter.next();
 			
 			if(!(field instanceof RefField<T, Object> refField)){
-				if(field.getAccessor().getType()==ChunkPointer.class){
+				if(field.getType()==ChunkPointer.class){
 					var    val  =field.get(pool, inst);
 					Bubble child=bubble.child(undead, field.getName());
 					child.setVal(val==null?0:((ChunkPointer)val).getValue(), provider, val);

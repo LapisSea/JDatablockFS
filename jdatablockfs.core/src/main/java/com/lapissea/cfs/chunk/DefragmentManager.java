@@ -122,7 +122,7 @@ public class DefragmentManager{
 				}
 				
 				
-				var type=field.getAccessor().getType();
+				var type=field.getType();
 				
 				if(IOInstance.isUnmanaged(type)){
 					var moved=reallocateUnmanaged(cluster, (IOInstance.Unmanaged)field.get(null, instance), approve);
@@ -181,7 +181,7 @@ public class DefragmentManager{
 						boolean after=instanceReference.getPtr().compareTo(valueReference.getPtr())<0;
 						if(after) return CONTINUE;
 						
-						var type=field.getAccessor().getType();
+						var type=field.getType();
 						
 						if(IOInstance.isUnmanaged(type)){
 							var moved=reallocateUnmanaged(cluster, (IOInstance.Unmanaged)field.get(null, instance));

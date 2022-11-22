@@ -44,7 +44,7 @@ public class IOFieldNumber<T extends IOInstance<T>, E extends INumber> extends I
 	@Override
 	public void init(){
 		super.init();
-		this.constructor=Access.findConstructor(getAccessor().getType(), LongFunction.class, long.class);
+		this.constructor=Access.findConstructor(getType(), LongFunction.class, long.class);
 		
 		Optional<IOField<T, NumberSize>> fieldOps=forceFixed?Optional.empty():IOFieldTools.getDynamicSize(getAccessor());
 		
@@ -55,7 +55,7 @@ public class IOFieldNumber<T extends IOInstance<T>, E extends INumber> extends I
 	}
 	@Override
 	public IOField<T, E> maxAsFixedSize(VaryingSize.Provider varProvider){
-		var ptr=getAccessor().getType()==ChunkPointer.class;
+		var ptr=getType()==ChunkPointer.class;
 		return new IOFieldNumber<>(getAccessor(), varProvider.provide(LARGEST, ptr));
 	}
 	

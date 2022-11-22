@@ -270,7 +270,7 @@ public class MemoryWalker{
 										continue;
 									}
 									if(!dynamic){
-										var typ=refField.getAccessor().getType();
+										var typ=refField.getType();
 										if(!Struct.canUnknownHavePointers(typ)){
 											continue;
 										}
