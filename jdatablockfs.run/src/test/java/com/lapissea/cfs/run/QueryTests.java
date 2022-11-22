@@ -1,11 +1,16 @@
 package com.lapissea.cfs.run;
 
+import com.lapissea.cfs.chunk.Cluster;
+import com.lapissea.cfs.io.impl.MemoryData;
+import com.lapissea.cfs.objects.collections.ContiguousIOList;
 import com.lapissea.cfs.objects.collections.IOList;
+import com.lapissea.cfs.objects.collections.LinkedIOList;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -38,15 +43,25 @@ public class QueryTests{
 		}
 	}
 	
-	@Test
-	void comparison() throws IOException{
-		var list=IOList.of(
+	@org.testng.annotations.DataProvider
+	Object[][] fflists() throws IOException{
+		var cl=Cluster.init(new MemoryData.Builder().build());
+		return new Object[][]{
+			{IOList.wrap(new ArrayList<>())},
+			{cl.getRootProvider().request("arr", ContiguousIOList.class, FF.class)},
+			{cl.getRootProvider().request("lin", LinkedIOList.class, FF.class)},
+			};
+	}
+	
+	@Test(dataProvider="fflists")
+	void comparison(IOList<FF> list) throws IOException{
+		list.addAll(List.of(
 			new FF(1, 5),
 			new FF(2, 4),
 			new FF(3, 3),
 			new FF(4, 2),
 			new FF(5, 1)
-		);
+		));
 		
 		assertEquals(Optional.of(new FF(1, 5)), list.query("a is 1").first());
 		assertEquals(Optional.of(new FF(5, 1)), list.query("b is 1").first());

@@ -132,8 +132,8 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	}
 	
 	
-	private final IOField<T, ?>[] data;
-	private       int             hash=-1;
+	private IOField<T, ?>[] data;
+	private int             hash=-1;
 	
 	@SuppressWarnings("unchecked")
 	private FieldSet(){
@@ -186,28 +186,51 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		if(that==null) return false;
 		if(this==that) return true;
 		
-		var len=this.data.length;
-		if(that.data.length!=len) return false;
+		var thisData=this.data;
+		var thatData=that.data;
+		if(thisData==thatData) return true;
+		
+		var len=thisData.length;
+		if(thatData.length!=len) return false;
+		
+		int h1=this.hash, h2=that.hash;
+		if(h1!=-1&&h2!=-1&&h1!=h2){
+			return false;
+		}
+		
+		boolean allSame=true;
 		for(int i=0;i<len;i++){
-			var thisEl=this.data[i];
-			var thatEl=that.data[i];
+			var thisEl=thisData[i];
+			var thatEl=thatData[i];
+			if(thisEl==thatEl) continue;
+			allSame=false;
 			if(!thisEl.equals(thatEl)){
 				return false;
 			}
 		}
+		
+		if(allSame){
+			//noinspection RedundantCast,unchecked
+			((FieldSet<T>)that).data=this.data;
+			if(this.hash!=-1) that.hash=this.hash;
+			else if(that.hash!=-1) this.hash=that.hash;
+		}
+		
 		return true;
 	}
 	
 	@Override
 	public int hashCode(){
-		if(hash==-1){
-			int hashCode=1;
-			for(var e : data){
-				hashCode=31*hashCode+e.hashCode();
-			}
-			hash=hashCode==-1?-2:hashCode;
-		}
+		if(hash==-1) calcHash();
 		return hash;
+	}
+	
+	private void calcHash(){
+		int hashCode=1;
+		for(var e : data){
+			hashCode=31*hashCode+e.hashCode();
+		}
+		hash=hashCode==-1?-2:hashCode;
 	}
 	
 	@Override

@@ -8,8 +8,8 @@ import java.lang.reflect.Array;
 import java.util.List;
 import java.util.Objects;
 
-public class ReflectionExecutor{
-	
+public enum ReflectionExecutor{
+	;
 	
 	private static Object addAB(Number l, Number r){
 		return switch(l){
@@ -50,6 +50,7 @@ public class ReflectionExecutor{
 			case QueryValueSource.GetArray getArray -> Array.get(getArg(ctx, getArray.source()), getArray.index());
 			case QueryValueSource.Root ignored -> ctx.args();
 			case QueryValueSource.Literal literal -> literal.value();
+			case QueryValueSource.Field.IO io -> ((IOField)io.field()).get(null, (IOInstance)ctx.obj());
 			case QueryValueSource.Field.Getter getter -> {
 				var m=getter.method();
 				try{
@@ -58,7 +59,6 @@ public class ReflectionExecutor{
 					throw new RuntimeException(e);
 				}
 			}
-			case QueryValueSource.Field.IO io -> ((IOField)io.field()).get(null, (IOInstance)ctx.obj());
 			case QueryValueSource.Field.Raw raw -> {
 				var m=raw.field();
 				try{

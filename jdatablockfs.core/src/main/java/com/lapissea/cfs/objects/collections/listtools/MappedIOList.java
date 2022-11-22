@@ -1,9 +1,6 @@
 package com.lapissea.cfs.objects.collections.listtools;
 
 import com.lapissea.cfs.objects.collections.IOList;
-import com.lapissea.cfs.query.Query;
-import com.lapissea.cfs.query.QuerySupport;
-import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;
 
@@ -273,22 +270,5 @@ public abstract class MappedIOList<From, To> implements IOList<To>{
 	@Override
 	public long indexOf(To value) throws IOException{
 		return data.indexOf(unmap(value));
-	}
-	@Override
-	public Query<To> query(){
-		return QuerySupport.of(new QuerySupport.Data<To>(){
-			@Override
-			public Class<To> elementType(){
-				throw NotImplementedException.infer();//TODO: implement .elementType()
-			}
-			@Override
-			public OptionalLong count(){
-				throw NotImplementedException.infer();//TODO: implement .count()
-			}
-			@Override
-			public Iterator<QuerySupport.Accessor<To>> elements(Set<String> readFields){
-				throw NotImplementedException.infer();//TODO: implement .elements()
-			}
-		});
 	}
 }
