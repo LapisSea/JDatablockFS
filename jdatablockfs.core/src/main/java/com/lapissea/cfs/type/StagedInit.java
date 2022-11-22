@@ -100,7 +100,7 @@ public abstract class StagedInit{
 	
 	public static class WaitException extends RuntimeException{
 		public WaitException(String message, Throwable cause){
-			super(message, cause);
+			super(message, Objects.requireNonNull(cause));
 		}
 	}
 	

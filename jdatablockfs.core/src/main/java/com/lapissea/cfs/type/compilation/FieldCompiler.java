@@ -307,7 +307,7 @@ public class FieldCompiler{
 					case REFLECTION -> ReflectionAccessor.make(struct, field, getter, setter, fieldName, type);
 				});
 			}catch(Throwable e){
-				throw new MalformedStruct("Failed to scan field #"+field.getName(), e);
+				throw new MalformedStruct("Failed to scan field #"+field.getName()+" on "+struct.cleanName(), e);
 			}
 		}
 		

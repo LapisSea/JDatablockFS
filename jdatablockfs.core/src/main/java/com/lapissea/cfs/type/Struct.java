@@ -1,5 +1,6 @@
 package com.lapissea.cfs.type;
 
+import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.MalformedStruct;
@@ -269,11 +270,27 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			lock.unlock();
 		}
 		
+		if(!COMPILATION.isEnabled()&&!GlobalConfig.RELEASE_MODE){
+			Thread.ofVirtual().start(()->{
+				try{
+					struct.waitForState(STATE_DONE);
+					Log.trace("Struct compiled: {}#cyan", struct);
+				}catch(Throwable e){
+					Throwable e1=e;
+					while(e1 instanceof WaitException) e1=e1.getCause();
+					Log.warn("Failed to compile struct asynchronously: {}#red because - {}: {}", struct.cleanFullName(), e1.getClass().getSimpleName(), e1.getMessage());
+				}
+			});
+		}
+		
 		COMPILATION.on(()->{
 			Runnable run=()->{
-				var name=struct.getType().getName();
-				if(name.endsWith(IOInstance.Def.IMPL_NAME_POSTFIX)) name=name.substring(0, name.length()-IOInstance.Def.IMPL_NAME_POSTFIX.length());
-				COMPILATION.log(TextUtil.toTable(name, struct.getFields()));
+				try{
+					struct.waitForState(STATE_DONE);
+				}catch(Throwable e){
+					Log.warn("Failed to compile struct asynchronously: {}#red because {}", struct.cleanName(), e);
+				}
+				COMPILATION.log(TextUtil.toTable(struct.cleanFullName(), struct.getFields()));
 			};
 			if(runNow) run.run();
 			else StagedInit.runBaseStageTask(run);
@@ -409,8 +426,9 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		});
 	}
 	
-	public String cleanName(){
-		var name=getType().getSimpleName();
+	public String cleanName()    {return stripDef(getType().getSimpleName());}
+	public String cleanFullName(){return stripDef(getType().getName());}
+	private String stripDef(String name){
 		if(UtilL.instanceOf(getType(), IOInstance.Def.class)){
 			var index=name.indexOf(IOInstance.Def.IMPL_NAME_POSTFIX);
 			if(index!=-1){

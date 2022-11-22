@@ -15,16 +15,16 @@ import static com.lapissea.cfs.Utils.getFrame;
 
 public class Log{
 	
-	private static final int NONE       =Integer.MIN_VALUE;
-	private static final int MIN        =0;
-	private static final int WARN       =1;
-	private static final int INFO       =2;
-	private static final int DEBUG      =3;
-	private static final int TRACE      =4;
-	private static final int SMALL_TRACE=5;
-	private static final int ALL        =Integer.MAX_VALUE;
+	public static final int NONE       =Integer.MIN_VALUE;
+	public static final int MIN        =0;
+	public static final int WARN       =1;
+	public static final int INFO       =2;
+	public static final int DEBUG      =3;
+	public static final int TRACE      =4;
+	public static final int SMALL_TRACE=5;
+	public static final int ALL        =Integer.MAX_VALUE;
 	
-	private static final int LOG_LEVEL=GlobalConfig.configProp("log.level").map(String::toUpperCase).map(level->switch(level){
+	public static final int LOG_LEVEL=GlobalConfig.configProp("log.level").map(String::toUpperCase).map(level->switch(level){
 		case "NONE" -> NONE;
 		case "MIN" -> MIN;
 		case "WARN" -> WARN;
