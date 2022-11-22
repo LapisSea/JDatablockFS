@@ -846,8 +846,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			
 			//Find field and add to read fields when the field is skipped but is a dependency of another
 			// skipped field that may need the dependency to correctly skip
-			skipDependency:
-			for(IOField<T, ?> field : selectedReadFieldsSet){
+			for(IOField<T, ?> field : List.copyOf(selectedReadFieldsSet)){
 				var fields=getSpecificFields();
 				var index =fields.indexOf(field);
 				if(index<=0) continue;
@@ -859,11 +858,10 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				for(IOField<T, ?> skipped : before){
 					//is skipped field dependency of another skipped field whos size may depend on it.
 					if(before.stream().filter(e->!e.getSizeDescriptor().hasFixed())
-					         .filter(e->e.getDependencies()!=null).flatMap(e->e.getDependencies().stream())
-					         .anyMatch(e->e==skipped)){
+					         .flatMap(IOField::dependencyStream)
+					         .anyMatch(e->skipped.streamUnpackedFields().anyMatch(s->s==e))){
 						selectedReadFieldsSet.add(skipped);
 						shouldRun=true;
-						break skipDependency;
 					}
 				}
 				

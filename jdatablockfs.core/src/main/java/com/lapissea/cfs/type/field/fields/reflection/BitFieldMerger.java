@@ -193,7 +193,7 @@ public class BitFieldMerger<T extends IOInstance<T>> extends IOField<T, Object>{
 	
 	@Override
 	public Stream<? extends IOField<T, ?>> streamUnpackedFields(){
-		return group.stream();
+		return Stream.concat(Stream.of(this), group.stream());
 	}
 	
 	public List<BitField<T, ?>> fieldGroup(){
