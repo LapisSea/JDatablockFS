@@ -525,10 +525,11 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		}
 		
 		protected final long calcInstanceSize(WordSpace wordSpace){
-			var siz=getPipe().getSizeDescriptor();
+			var pip=getPipe();
+			var siz=pip.getSizeDescriptor();
 			var f  =siz.getFixed(wordSpace);
 			if(f.isPresent()) return f.getAsLong();
-			return siz.calcUnknown(getPipe().makeIOPool(), getDataProvider(), self(), wordSpace);
+			return siz.calcUnknown(pip.makeIOPool(), getDataProvider(), self(), wordSpace);
 		}
 		
 		public final Reference getReference(){

@@ -84,14 +84,14 @@ public abstract class StagedInit{
 		if(this.state>=state) return null;
 		var t1  =System.nanoTime();
 		var from=getEstimatedState();
-		waitForState0(state);
+		actuallyWaitForState(state);
 		var t2=System.nanoTime();
 		var to=getEstimatedState();
 		return new Timing(this, (t2-t1)/1000000D, from, to);
 	}
 	public final void waitForState(int state){
 		if(this.state>=state) return;
-		waitForState0(state);
+		actuallyWaitForState(state);
 	}
 	
 	protected int getEstimatedState(){
@@ -166,7 +166,7 @@ public abstract class StagedInit{
 		
 	}
 	
-	private void waitForState0(int state){
+	private void actuallyWaitForState(int state){
 		while(true){
 			synchronized(lock){
 				checkErr();

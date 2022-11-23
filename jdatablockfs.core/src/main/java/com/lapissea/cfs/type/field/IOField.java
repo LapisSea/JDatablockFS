@@ -339,7 +339,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 		return acc.equals(ioField.getAccessor());
 	}
 	@Override
-	public int hashCode(){
+	public final int hashCode(){
 		return getName().hashCode();
 	}
 }

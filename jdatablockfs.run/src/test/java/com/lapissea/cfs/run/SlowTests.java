@@ -78,7 +78,7 @@ public class SlowTests{
 			baked=d.readAll();
 		}
 		
-		randomBatch(500000, (r, iter, tick)->{
+		randomBatch(50000, (r, iter, tick)->{
 			if(tick){
 				info("iteration: {}", iter);
 			}
