@@ -276,8 +276,13 @@ public class QueryExpressionParser{
 			if(startsWith(match)){
 				boolean validEnd;
 				if(Character.isLetter(match.charAt(match.length()-1))){
-					var c=str.charAt(pos+match.length());
-					validEnd=Character.isWhitespace(c)||List.of('(', ')', '[', ']', '{', '}', '<', '>', '!', '?', '&', '|', '=').contains(c);
+					var p=pos+match.length();
+					if(str.length()<=p){
+						validEnd=true;
+					}else{
+						var c=str.charAt(p);
+						validEnd=Character.isWhitespace(c)||List.of('(', ')', '[', ']', '{', '}', '<', '>', '!', '?', '&', '|', '=').contains(c);
+					}
 				}else validEnd=true;
 				if(validEnd){
 					pos+=match.length();
@@ -411,7 +416,7 @@ public class QueryExpressionParser{
 		private void checkComparison(QueryValueSource l, QueryValueSource r){
 			argType(l).ifPresent(lType->{
 				argType(r).ifPresent(rType->{
-					if(lType!=rType&&UtilL.instanceOf(lType, rType)){
+					if(lType!=rType&&rType!=Object.class&&UtilL.instanceOf(lType, rType)){
 						throw new ClassCastException("Cannot cast "+lType+" to "+rType);
 					}
 				});
@@ -479,6 +484,9 @@ public class QueryExpressionParser{
 			var str=tokenizer.string();
 			if(str!=null){
 				return new QueryValueSource.Literal(str);
+			}
+			if(tokenizer.match("null")){
+				return new QueryValueSource.Literal(null);
 			}
 			var fieldName=tokenizer.field();
 			if(fieldName!=null){

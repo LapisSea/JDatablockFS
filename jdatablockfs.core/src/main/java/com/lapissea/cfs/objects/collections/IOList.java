@@ -196,35 +196,6 @@ public interface IOList<T> extends IterablePP<T>{
 		}
 	}
 	
-	interface IOIterator<T>{
-		interface Iter<T> extends IOIterator<T>, Iterator<T>{
-			@Deprecated
-			@Override
-			default T next(){
-				try{
-					return ioNext();
-				}catch(IOException e){
-					throw new RuntimeException(e);
-				}
-			}
-			@Override
-			@Deprecated
-			default void remove(){
-				try{
-					ioRemove();
-				}catch(IOException e){
-					throw new RuntimeException(e);
-				}
-			}
-		}
-		
-		boolean hasNext();
-		T ioNext() throws IOException;
-		default void ioRemove() throws IOException{
-			throw new UnsupportedOperationException(getClass().toString());
-		}
-	}
-	
 	interface IOListIterator<T> extends IOIterator<T>{
 		
 		abstract class AbstractIndex<T> implements IOListIterator<T>{
@@ -640,10 +611,10 @@ public interface IOList<T> extends IterablePP<T>{
 	
 	abstract class ListData<T> implements QuerySupport.Data<T>{
 		
-		public static <T> QuerySupport.Data<T> of(IOList<T> list, Function<Set<String>, QuerySupport.DIter<T>> elements){
+		public static <T> QuerySupport.Data<T> of(IOList<T> list, Function<Set<String>, QuerySupport.AccessIterator<T>> elements){
 			return new ListData<>(list){
 				@Override
-				public QuerySupport.DIter<T> elements(Set<String> readFields){
+				public QuerySupport.AccessIterator<T> elements(Set<String> readFields){
 					return elements.apply(readFields);
 				}
 			};
@@ -665,13 +636,13 @@ public interface IOList<T> extends IterablePP<T>{
 	default Query<T> query(){
 		return QuerySupport.of(ListData.of(this, readFields->{
 			var size=size();
-			return new QuerySupport.DIter<T>(){
+			return new QuerySupport.AccessIterator<T>(){
 				long cursor;
 				@Override
-				public Optional<QuerySupport.Accessor<T>> next(){
-					if(cursor>=size) return Optional.empty();
+				public QuerySupport.Accessor<T> next(){
+					if(cursor>=size) return null;
 					var i=cursor++;
-					return Optional.of(full->IOList.this.get(i));
+					return full->IOList.this.get(i);
 				}
 			};
 		}));

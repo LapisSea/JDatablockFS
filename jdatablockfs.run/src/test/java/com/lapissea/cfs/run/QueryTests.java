@@ -8,7 +8,7 @@ import com.lapissea.cfs.objects.collections.LinkedIOList;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.annotations.IOValue;
-import com.lapissea.util.LogUtil;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
@@ -66,11 +66,11 @@ public class QueryTests{
 			};
 	}
 	
-	@org.testng.annotations.DataProvider
+	@DataProvider
 	Object[][] ffLists() throws IOException{
 		return lists(FF.class);
 	}
-	@org.testng.annotations.DataProvider
+	@DataProvider
 	Object[][] stringyLists() throws IOException{
 		return lists(StringyBoi.class);
 	}
@@ -91,6 +91,7 @@ public class QueryTests{
 		
 		assertEquals(Optional.of(new FF(3, 3)), list.query("a > 2").first());
 		assertEquals(Optional.of(new FF(4, 2)), list.query("a >= 3 && b <= 2").first());
+		assertEquals(Optional.of(new FF(4, 2)), list.query("a >= 3").filter("b <= 2").first());
 		
 		for(long i=0;i<list.size();i++){
 			assertEquals(Optional.of(list.get(i)), list.query("a == {}", i+1).first());
@@ -105,6 +106,8 @@ public class QueryTests{
 		assertEquals(Optional.of(new FF(2, 4)), list.query("a%2==0").first());
 		assertEquals(2, list.query("a%2==0").count());
 		assertEquals(3, list.query("a%2!=0").count());
+		
+		assertEquals(List.of(new FF(2, 4), new FF(4, 2)), list.query("a%2==0").all().toList());
 	}
 	
 	@Test(dataProvider="stringyLists")
@@ -118,6 +121,7 @@ public class QueryTests{
 		
 		assertEquals(1, list.query("str in strs").count());
 		assertEquals(2, list.query("'mama' in str").count());
+		assertEquals(Optional.empty(), list.query("str is null").any());
 	}
 	
 }

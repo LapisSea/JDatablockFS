@@ -1,5 +1,6 @@
 package com.lapissea.cfs.objects.collections.listtools;
 
+import com.lapissea.cfs.objects.collections.IOIterator;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;

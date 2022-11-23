@@ -40,7 +40,7 @@ import static com.lapissea.cfs.type.field.StoragePool.IO;
 
 public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements IterablePP<IONode<T>>{
 	
-	private static class LinkedValueIterator<T> implements IOList.IOIterator.Iter<T>{
+	private static class LinkedValueIterator<T> implements IOIterator.Iter<T>{
 		
 		private final Iter<IONode<T>> nodes;
 		
@@ -570,7 +570,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		return this.getClass().getSimpleName()+toShortString();
 	}
 	
-	private static class NodeIterator<T> implements IOList.IOIterator.Iter<IONode<T>>{
+	private static class NodeIterator<T> implements IOIterator.Iter<IONode<T>>{
 		
 		private IONode<T>   node;
 		private IOException e;
@@ -605,10 +605,10 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		}
 	}
 	@Override
-	public final IOList.IOIterator.Iter<IONode<T>> iterator(){
+	public final IOIterator.Iter<IONode<T>> iterator(){
 		return new NodeIterator<>(this);
 	}
-	public final IOList.IOIterator.Iter<T> valueIterator(){
+	public final IOIterator.Iter<T> valueIterator(){
 		return new LinkedValueIterator<>(this);
 	}
 	

@@ -50,6 +50,7 @@ public sealed interface QueryValueSource{
 		@Override
 		public String toString(){
 			return switch(value){
+				case null -> "null";
 				case String s -> "'"+s+"'";
 				case Float s -> s+"F";
 				case Double s -> s+"D";

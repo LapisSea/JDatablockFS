@@ -1,7 +1,7 @@
 package com.lapissea.cfs;
 
 import com.lapissea.cfs.objects.Stringify;
-import com.lapissea.cfs.objects.collections.IOList;
+import com.lapissea.cfs.objects.collections.IOIterator;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.StoragePool;
@@ -163,7 +163,7 @@ public class Utils{
 	}
 	
 	
-	private static final IOList.IOIterator.Iter<?> EMPTY_ITER=new IOList.IOIterator.Iter<>(){
+	private static final IOIterator.Iter<?> EMPTY_ITER=new IOIterator.Iter<>(){
 		@Override
 		public boolean hasNext(){
 			return false;
@@ -174,8 +174,8 @@ public class Utils{
 		}
 	};
 	
-	public static <T> IOList.IOIterator.Iter<T> emptyIter(){
-		return (IOList.IOIterator.Iter<T>)EMPTY_ITER;
+	public static <T> IOIterator.Iter<T> emptyIter(){
+		return (IOIterator.Iter<T>)EMPTY_ITER;
 	}
 	
 	public static String toShortString(Object o){

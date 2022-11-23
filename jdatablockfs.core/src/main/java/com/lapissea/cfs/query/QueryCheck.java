@@ -1,5 +1,6 @@
 package com.lapissea.cfs.query;
 
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -122,17 +123,43 @@ public sealed interface QueryCheck{
 	
 	static QueryCheck cached(QueryCheck check){
 		if(check instanceof CachedMetadata||check instanceof Lambda) return check;
-		return new CachedMetadata(check, check.fieldNames());
+		return new CachedMetadata(check);
+	}
+	static QueryCheck uncache(QueryCheck check){
+		if(check instanceof CachedMetadata c) return c.check;
+		return check;
 	}
 	
-	record CachedMetadata(QueryCheck check, Set<String> fieldNames) implements QueryCheck{
-		public CachedMetadata(QueryCheck check, Set<String> fieldNames){
+	final class CachedMetadata implements QueryCheck{
+		private final QueryCheck  check;
+		private       Set<String> fieldNames;
+		
+		public CachedMetadata(QueryCheck check){
 			this.check=check;
-			this.fieldNames=Set.copyOf(fieldNames);
 		}
+		
 		@Override
 		public String toString(){
 			return check.toString();
 		}
+		
+		public QueryCheck check(){return check;}
+		@Override
+		public Set<String> fieldNames(){
+			if(fieldNames==null) fieldNames=check.fieldNames();
+			return fieldNames;
+		}
+		@Override
+		public boolean equals(Object obj){
+			return obj==this||
+			       obj instanceof CachedMetadata that&&
+			       Objects.equals(this.fieldNames(), that.fieldNames())&&
+			       Objects.equals(this.check, that.check);
+		}
+		@Override
+		public int hashCode(){
+			return Objects.hash(check, fieldNames);
+		}
+		
 	}
 }

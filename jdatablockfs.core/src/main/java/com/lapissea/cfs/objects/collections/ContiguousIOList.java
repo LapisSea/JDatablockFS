@@ -690,6 +690,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		if(eSiz==0) return size();
 		return (size-headSiz)/eSiz;
 	}
+	
 	@Override
 	public Query<T> query(){
 		return QuerySupport.of(ListData.of(this, readFields->{
@@ -705,14 +706,15 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 				}
 			}else fields=null;
 			
-			return new QuerySupport.DIter<T>(){
+			return new QuerySupport.AccessIterator<T>(){
 				long cursor;
 				
+				@SuppressWarnings("rawtypes")
 				@Override
-				public Optional<QuerySupport.Accessor<T>> next(){
-					if(cursor>=size) return Optional.empty();
+				public QuerySupport.Accessor<T> next(){
+					if(cursor>=size) return null;
 					var index=cursor++;
-					return Optional.of(full->{
+					return full->{
 						checkSize(index);
 						if(readOnly){
 							return getCached(index);
@@ -725,7 +727,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 							}
 							return storage.readNew(io);
 						}
-					});
+					};
 				}
 			};
 		}));
