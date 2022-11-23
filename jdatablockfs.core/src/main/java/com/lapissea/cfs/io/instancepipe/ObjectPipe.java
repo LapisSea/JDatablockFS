@@ -28,6 +28,11 @@ public interface ObjectPipe<T, PoolType>{
 			write(dest.getDataProvider(), io, instance);
 		}
 	}
+	default void write(DataProvider provider, RandomIO.Creator dest, T instance) throws IOException{
+		try(var io=dest.io()){
+			write(provider, io, instance);
+		}
+	}
 	
 	default <Prov extends DataProvider.Holder&RandomIO.Creator> T readNew(Prov src, GenericContext genericContext) throws IOException{
 		try(var io=src.io()){
@@ -45,6 +50,11 @@ public interface ObjectPipe<T, PoolType>{
 	default <Prov extends DataProvider.Holder&RandomIO.Creator> T read(Prov src, T instance, GenericContext genericContext) throws IOException{
 		try(var io=src.io()){
 			return read(src.getDataProvider(), io, instance, genericContext);
+		}
+	}
+	default T read(DataProvider provider, RandomIO.Creator src, T instance, GenericContext genericContext) throws IOException{
+		try(var io=src.io()){
+			return read(provider, io, instance, genericContext);
 		}
 	}
 	

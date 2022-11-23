@@ -1369,7 +1369,7 @@ public class BinaryGridRenderer implements DataRenderer{
 					if(Utils.isVirtual(field, IO)){
 						try{
 							reference.withContext(ctx.provider).io(io->{
-								pipe.readSingleField(ioPool, ctx.provider, io, field, instance, generics(instance, parentGenerics));
+								pipe.readDeps(ioPool, ctx.provider, io, pipe.getFieldDependency().getDeps(field), instance, generics(instance, parentGenerics));
 							});
 						}catch(Throwable e){
 							drawByteRangesForced(ctx.renderCtx, List.of(Range.fromSize(reference.calcGlobalOffset(ctx.provider), 1)), Color.RED, false);

@@ -15,14 +15,18 @@ import com.lapissea.cfs.type.field.fields.RefField;
 import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.IOException;
+import java.util.Set;
 
 import static com.lapissea.cfs.io.instancepipe.StructPipe.STATE_IO_FIELD;
 
 public sealed interface ValueStorage<T>{
 	
 	sealed interface InstanceBased<T extends IOInstance<T>> extends ValueStorage<T>{
-		void readSingle(ContentReader src, T dest, IOField<T, ?> field) throws IOException;
-		void readSelective(ContentReader src, T dest, FieldSet<T> fields) throws IOException;
+		void readSelective(ContentReader src, T dest, FieldDependency.Ticket<T> depTicket) throws IOException;
+		T readNewSelective(ContentReader src, FieldDependency.Ticket<T> depTicket) throws IOException;
+		FieldDependency.Ticket<T> depTicket(IOField<T, ?> field);
+		FieldDependency.Ticket<T> depTicket(FieldSet<T> fields);
+		FieldDependency.Ticket<T> depTicket(Set<String> names);
 	}
 	
 	private static <I extends IOInstance<I>, T extends IOInstance<T>> SizeDescriptor<I> makeSizeDescriptor(DataProvider provider, FieldAccessor<I> accessor, StructPipe<T> pipe){
@@ -89,12 +93,25 @@ public sealed interface ValueStorage<T>{
 		}
 		
 		@Override
-		public void readSingle(ContentReader src, T dest, IOField<T, ?> field) throws IOException{
-			pipe.readSingleField(pipe.makeIOPool(), provider, src, field, dest, ctx);
+		public void readSelective(ContentReader src, T dest, FieldDependency.Ticket<T> depTicket) throws IOException{
+			pipe.readDeps(pipe.makeIOPool(), provider, src, depTicket, dest, ctx);
 		}
 		@Override
-		public void readSelective(ContentReader src, T dest, FieldSet<T> fields) throws IOException{
-			pipe.readSelectiveFields(pipe.makeIOPool(), provider, src, fields, dest, ctx);
+		public T readNewSelective(ContentReader src, FieldDependency.Ticket<T> depTicket) throws IOException{
+			return pipe.readNewSelective(provider, src, depTicket, ctx);
+		}
+		
+		@Override
+		public FieldDependency.Ticket<T> depTicket(IOField<T, ?> field){
+			return pipe.getFieldDependency().getDeps(field);
+		}
+		@Override
+		public FieldDependency.Ticket<T> depTicket(FieldSet<T> ioFields){
+			return pipe.getFieldDependency().getDeps(ioFields);
+		}
+		@Override
+		public FieldDependency.Ticket<T> depTicket(Set<String> ioFields){
+			return pipe.getFieldDependency().getDeps(ioFields);
 		}
 	}
 	
@@ -142,12 +159,25 @@ public sealed interface ValueStorage<T>{
 		}
 		
 		@Override
-		public void readSingle(ContentReader src, T dest, IOField<T, ?> field) throws IOException{
-			pipe.readSingleField(pipe.makeIOPool(), provider, src, field, dest, ctx);
+		public void readSelective(ContentReader src, T dest, FieldDependency.Ticket<T> depTicket) throws IOException{
+			pipe.readDeps(pipe.makeIOPool(), provider, src, depTicket, dest, ctx);
 		}
 		@Override
-		public void readSelective(ContentReader src, T dest, FieldSet<T> fields) throws IOException{
-			pipe.readSelectiveFields(pipe.makeIOPool(), provider, src, fields, dest, ctx);
+		public T readNewSelective(ContentReader src, FieldDependency.Ticket<T> depTicket) throws IOException{
+			return pipe.readNewSelective(provider, src, depTicket, ctx);
+		}
+		
+		@Override
+		public FieldDependency.Ticket<T> depTicket(IOField<T, ?> field){
+			return pipe.getFieldDependency().getDeps(field);
+		}
+		@Override
+		public FieldDependency.Ticket<T> depTicket(FieldSet<T> ioFields){
+			return pipe.getFieldDependency().getDeps(ioFields);
+		}
+		@Override
+		public FieldDependency.Ticket<T> depTicket(Set<String> ioFields){
+			return pipe.getFieldDependency().getDeps(ioFields);
 		}
 	}
 	
@@ -241,16 +271,29 @@ public sealed interface ValueStorage<T>{
 		}
 		
 		@Override
-		public void readSingle(ContentReader src, T dest, IOField<T, ?> field) throws IOException{
+		public void readSelective(ContentReader src, T dest, FieldDependency.Ticket<T> depTicket) throws IOException{
 			var ref=refPipe.readNew(provider, src, null);
 			ref.requireNonNull();
-			ref.io(provider, io->pipe.readSingleField(pipe.makeIOPool(), provider, io, field, dest, ctx));
+			ref.io(provider, io->pipe.readDeps(pipe.makeIOPool(), provider, io, depTicket, dest, ctx));
 		}
 		@Override
-		public void readSelective(ContentReader src, T dest, FieldSet<T> fields) throws IOException{
+		public T readNewSelective(ContentReader src, FieldDependency.Ticket<T> depTicket) throws IOException{
 			var ref=refPipe.readNew(provider, src, null);
 			ref.requireNonNull();
-			ref.io(provider, io->pipe.readSelectiveFields(pipe.makeIOPool(), provider, io, fields, dest, ctx));
+			return ref.ioMap(provider, io->pipe.readNewSelective(provider, io, depTicket, ctx));
+		}
+		
+		@Override
+		public FieldDependency.Ticket<T> depTicket(IOField<T, ?> field){
+			return pipe.getFieldDependency().getDeps(field);
+		}
+		@Override
+		public FieldDependency.Ticket<T> depTicket(FieldSet<T> ioFields){
+			return pipe.getFieldDependency().getDeps(ioFields);
+		}
+		@Override
+		public FieldDependency.Ticket<T> depTicket(Set<String> ioFields){
+			return pipe.getFieldDependency().getDeps(ioFields);
 		}
 	}
 	

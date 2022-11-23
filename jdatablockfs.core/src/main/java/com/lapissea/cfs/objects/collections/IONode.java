@@ -619,7 +619,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		var based=(ValueStorage.InstanceBased)valueStorage;
 		try(var io=this.getReference().io(this)){
 			io.skipExact(valueStart());
-			based.readSingle(io, (IOInstance)dest, field);
+			based.readSelective(io, (IOInstance)dest, based.depTicket(field));
 		}
 		return true;
 	}

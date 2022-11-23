@@ -513,7 +513,8 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		
 		protected final void readManagedField(IOField<SELF, ?> field) throws IOException{
 			try(var io=getReference().io(this)){
-				getPipe().readSingleField(getPipe().makeIOPool(), provider, io, field, self(), getGenerics());
+				var pip=getPipe();
+				pip.readDeps(pip.makeIOPool(), provider, io, pip.getFieldDependency().getDeps(field), self(), getGenerics());
 			}
 		}
 		

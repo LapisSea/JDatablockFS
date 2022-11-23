@@ -32,8 +32,6 @@ import java.lang.annotation.Target;
 import java.lang.reflect.ParameterizedType;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -194,6 +192,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	
 	private List<IOField.ValueGeneratorInfo<T, ?>> generators;
 	
+	private FieldDependency<T> fieldDependency;
+	
 	public static final int STATE_IO_FIELD=1, STATE_SIZE_DESC=2;
 	
 	public <E extends Exception> StructPipe(Struct<T> type, PipeFieldCompiler<T, E> compiler, boolean initNow) throws E{
@@ -204,6 +204,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			}catch(Exception e){
 				throw UtilL.uncheckedThrow(e);
 			}
+			fieldDependency=new FieldDependency<>(ioFields);
 			setInitState(STATE_IO_FIELD);
 			
 			sizeDescription=Objects.requireNonNull(createSizeDescriptor());
@@ -471,14 +472,10 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		return SizeDescriptor.Unknown.of(wordSpace, report.min, report.max, (ioPool, prov, inst)->{
 			checkNull(inst);
 			
-			waitForState(STATE_DONE);
-			
-			if(generators!=null){
-				try{
-					generateAll(ioPool, prov, inst, false);
-				}catch(IOException e){
-					throw new RuntimeException(e);
-				}
+			try{
+				generateAll(ioPool, prov, inst, false);
+			}catch(IOException e){
+				throw new RuntimeException(e);
 			}
 			
 			var unkownSum=IOFieldTools.sumVars(genericUnknown, d->{
@@ -510,14 +507,6 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		Objects.requireNonNull(inst, ()->"instance of type "+getType()+" is null!");
 	}
 	
-	
-	public final void write(DataProvider provider, RandomIO.Creator dest, T instance) throws IOException{
-		var ioPool=makeIOPool();
-		earlyCheckNulls(ioPool, instance);
-		try(var io=dest.io()){
-			doWrite(provider, io, ioPool, instance);
-		}
-	}
 	@Override
 	public final void write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		var ioPool=makeIOPool();
@@ -528,20 +517,20 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	protected abstract void doWrite(DataProvider provider, ContentWriter dest, VarPool<T> ioPool, T instance) throws IOException;
 	
 	
+	public final T readNewSelective(DataProvider provider, ContentReader src, FieldDependency.Ticket<T> depTicket, GenericContext genericContext) throws IOException{
+		T instance=type.make();
+		readDeps(makeIOPool(), provider, src, depTicket, instance, genericContext);
+		return instance;
+	}
+	
 	@Override
-	public T readNew(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+	public final T readNew(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
 		T instance=type.make();
 		return doRead(makeIOPool(), provider, src, instance, genericContext);
 	}
 	
-	public T read(DataProvider provider, RandomIO.Creator src, T instance, GenericContext genericContext) throws IOException{
-		try(var io=src.io()){
-			return doRead(makeIOPool(), provider, io, instance, genericContext);
-		}
-	}
-	
 	@Override
-	public T read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+	public final T read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		return doRead(makeIOPool(), provider, src, instance, genericContext);
 	}
 	
@@ -553,16 +542,21 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		return sizeDescription;
 	}
 	
-	public Struct<T> getType(){
+	public final Struct<T> getType(){
 		return type;
 	}
 	
-	public FieldSet<T> getSpecificFields(){
+	public final FieldSet<T> getSpecificFields(){
 		waitForState(STATE_IO_FIELD);
 		return ioFields;
 	}
 	
-	public void earlyCheckNulls(VarPool<T> ioPool, T instance){
+	public final FieldDependency<T> getFieldDependency(){
+		waitForState(STATE_IO_FIELD);
+		return fieldDependency;
+	}
+	
+	public final void earlyCheckNulls(VarPool<T> ioPool, T instance){
 		waitForState(STATE_DONE);
 		if(earlyNullChecks==null) return;
 		for(var field : earlyNullChecks){
@@ -572,15 +566,19 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		}
 	}
 	
-	protected void writeIOFields(FieldSet<T> fields, VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
+	protected final void writeIOFields(FieldSet<T> fields, VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		if(Access.DEV_CACHE) throw new RuntimeException();
 		
 		ContentOutputBuilder destBuff=null;
 		ContentWriter        target;
+		boolean              close   =false;
 		
 		if(DEBUG_VALIDATION){
 			var safe=validateAndSafeDestination(fields, ioPool, provider, dest, instance);
-			if(safe!=null) dest=safe;
+			if(safe!=null){
+				dest=safe;
+				close=true;
+			}
 		}
 		
 		if(dest.isDirect()){
@@ -591,10 +589,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			target=dest;
 		}
 		
-		waitForState(STATE_DONE);
-		if(generators!=null){
-			generateAll(ioPool, provider, instance, true);
-		}
+		generateAll(ioPool, provider, instance, true);
 		
 		try{
 			for(IOField<T, ?> field : fields){
@@ -611,7 +606,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		if(destBuff!=null){
 			destBuff.writeTo(dest);
 		}
-		if(DEBUG_VALIDATION){
+		if(close){
 			dest.close();
 		}
 	}
@@ -654,40 +649,44 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	}
 	
 	private ContentWriter validateAndSafeDestination(FieldSet<T> fields, VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
-		ContentWriter safe=null;
-		if(!(instance instanceof IOInstance.Unmanaged<?>)){
-			waitForState(STATE_DONE);
-			if(generators!=null){
-				generateAll(ioPool, provider, instance, true);
-			}
-			var siz=getSizeDescriptor().calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
-			
-			var sum=0L;
+		if(instance instanceof IOInstance.Unmanaged) return null;
+		
+		generateAll(ioPool, provider, instance, true);
+		var siz=getSizeDescriptor().calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
+		
+		var sum=0L;
+		for(IOField<T, ?> field : fields){
+			var desc =field.getSizeDescriptor();
+			var bytes=desc.calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
+			sum+=bytes;
+		}
+		
+		if(sum!=siz){
+			StringJoiner sj=new StringJoiner("\n");
+			sj.add("total"+siz);
 			for(IOField<T, ?> field : fields){
 				var desc =field.getSizeDescriptor();
 				var bytes=desc.calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
-				sum+=bytes;
+				sj.add(field+" "+bytes+" "+desc.hasFixed()+" "+desc.getWordSpace());
 			}
-			
-			if(sum!=siz){
-				StringJoiner sj=new StringJoiner("\n");
-				sj.add("total"+siz);
-				for(IOField<T, ?> field : fields){
-					var desc =field.getSizeDescriptor();
-					var bytes=desc.calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
-					sj.add(field+" "+bytes+" "+desc.hasFixed()+" "+desc.getWordSpace());
-				}
-				throw new RuntimeException(sj.toString());
-			}
-			
-			safe=dest.writeTicket(siz).requireExact((written, expected)->{
-				return new IOException(written+" "+expected+" on "+instance);
-			}).submit();
+			throw new RuntimeException(sj.toString());
 		}
-		return safe;
+		
+		return dest.writeTicket(siz).requireExact((written, expected)->{
+			return new IOException(written+" "+expected+" on "+instance);
+		}).submit();
 	}
 	
+	private boolean hasGenerators(){
+		waitForState(STATE_DONE);
+		return generators!=null;
+	}
 	private void generateAll(VarPool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException{
+		if(hasGenerators()){
+			generateAll(generators, ioPool, provider, instance, allowExternalMod);
+		}
+	}
+	private void generateAll(List<IOField.ValueGeneratorInfo<T, ?>> generators, VarPool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException{
 		for(var generator : generators){
 			try{
 				generator.generate(ioPool, provider, instance, allowExternalMod);
@@ -710,201 +709,17 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		}
 	}
 	
-	protected record IODependency<T extends IOInstance<T>>(
-		FieldSet<T> writeFields,
-		FieldSet<T> readFields,
-		List<IOField.ValueGeneratorInfo<T, ?>> generators
-	){
-		private static <T extends IOInstance<T>> FieldSet<T> fieldSetToOrderedList(FieldSet<T> source, Set<IOField<T, ?>> fieldsSet){
-			List<IOField<T, ?>> result=new ArrayList<>(fieldsSet.size());
-			for(IOField<T, ?> f : source){
-				var iter      =f.streamUnpackedFields().iterator();
-				var anyRemoved=false;
-				while(iter.hasNext()){
-					var fi=iter.next();
-					if(fieldsSet.remove(fi)) anyRemoved=true;
-				}
-				
-				if(anyRemoved){
-					result.add(f);
-				}
-			}
-			if(!fieldsSet.isEmpty()){
-				throw new IllegalStateException(fieldsSet+"");
-			}
-			return FieldSet.of(result);
-		}
-		
-		private static <T extends IOInstance<T>> IODependency<T> of(FieldSet<T> source, Set<IOField<T, ?>> writeFields, Set<IOField<T, ?>> readFields){
-			var w=fieldSetToOrderedList(source, writeFields);
-			var r=fieldSetToOrderedList(source, readFields);
-			var g=Utils.nullIfEmpty(writeFields.stream().flatMap(IOField::generatorStream).toList());
-			return new IODependency<>(w, r, g);
-		}
-	}
-	
-	private final Map<IOField<T, ?>, IODependency<T>> singleDependencyCache    =new HashMap<>();
-	private final ReadWriteLock                       singleDependencyCacheLock=new ReentrantReadWriteLock();
-	
-	private final Map<FieldSet<T>, IODependency<T>> multiDependencyCache    =new HashMap<>();
-	private final ReadWriteLock                     multiDependencyCacheLock=new ReentrantReadWriteLock();
-	
-	protected IODependency<T> getDeps(FieldSet<T> selectedFields){
-		if(selectedFields.size()==1){
-			return getDeps(selectedFields.get(0));
-		}
-		
-		var r=multiDependencyCacheLock.readLock();
-		r.lock();
-		try{
-			var cached=multiDependencyCache.get(selectedFields);
-			if(cached!=null) return cached;
-		}finally{
-			r.unlock();
-		}
-		var w=multiDependencyCacheLock.writeLock();
-		w.lock();
-		try{
-			var field=generateFieldsDependency(selectedFields);
-			multiDependencyCache.put(selectedFields, field);
-			return field;
-		}finally{
-			w.unlock();
-		}
-		
-	}
-	
-	protected IODependency<T> getDeps(IOField<T, ?> selectedField){
-		var r=singleDependencyCacheLock.readLock();
-		r.lock();
-		try{
-			var cached=singleDependencyCache.get(selectedField);
-			if(cached!=null) return cached;
-		}finally{
-			r.unlock();
-		}
-		
-		var w=singleDependencyCacheLock.writeLock();
-		w.lock();
-		try{
-			var field=generateFieldDependency(selectedField);
-			singleDependencyCache.put(selectedField, field);
-			return field;
-		}finally{
-			w.unlock();
-		}
-	}
-	
-	private IODependency<T> generateFieldsDependency(FieldSet<T> selectedFields){
-		var all=getSpecificFields();
-		if(selectedFields.size()==all.size()){
-			return new IODependency<>(all, all, generators);
-		}
-		var writeFields=new HashSet<IOField<T, ?>>();
-		var readFields =new HashSet<IOField<T, ?>>();
-		for(IOField<T, ?> selectedField : selectedFields){
-			var part=getDeps(selectedField);
-			writeFields.addAll(part.writeFields);
-			readFields.addAll(part.readFields);
-			if(part.generators!=null) generators.addAll(part.generators);
-		}
-		return IODependency.of(all, writeFields, readFields);
-	}
-	
-	private IODependency<T> generateFieldDependency(IOField<T, ?> selectedField){
-		Set<IOField<T, ?>> selectedWriteFieldsSet=new HashSet<>();
-		selectedWriteFieldsSet.add(selectedField);
-		Set<IOField<T, ?>> selectedReadFieldsSet=new HashSet<>();
-		selectedReadFieldsSet.add(selectedField);
-		
-		boolean shouldRun=true;
-		while(shouldRun){
-			shouldRun=false;
-			
-			for(IOField<T, ?> field : List.copyOf(selectedWriteFieldsSet)){
-				if(field.hasDependencies()){
-					if(selectedWriteFieldsSet.addAll(field.getDependencies())){
-						shouldRun=true;
-					}
-				}
-				var gens=field.getGenerators();
-				if(gens!=null){
-					for(var gen : gens){
-						if(selectedWriteFieldsSet.add(gen.field())){
-							shouldRun=true;
-						}
-					}
-				}
-			}
-			for(IOField<T, ?> field : List.copyOf(selectedReadFieldsSet)){
-				if(field.hasDependencies()){
-					if(selectedReadFieldsSet.addAll(field.getDependencies())){
-						shouldRun=true;
-					}
-				}
-			}
-			
-			//Find field and add to read fields when the field is skipped but is a dependency of another
-			// skipped field that may need the dependency to correctly skip
-			for(IOField<T, ?> field : List.copyOf(selectedReadFieldsSet)){
-				var fields=getSpecificFields();
-				var index =fields.indexOf(field);
-				if(index<=0) continue;
-				
-				var before=new ArrayList<>(fields.subList(0, index));
-				
-				before.removeIf(selectedReadFieldsSet::contains);
-				
-				for(IOField<T, ?> skipped : before){
-					//is skipped field dependency of another skipped field whos size may depend on it.
-					if(before.stream().filter(e->!e.getSizeDescriptor().hasFixed())
-					         .flatMap(IOField::dependencyStream)
-					         .anyMatch(e->skipped.streamUnpackedFields().anyMatch(s->s==e))){
-						selectedReadFieldsSet.add(skipped);
-						shouldRun=true;
-					}
-				}
-				
-			}
-			
-			for(IOField<T, ?> field : List.copyOf(selectedWriteFieldsSet)){
-				if(field.getSizeDescriptor().hasFixed()){
-					continue;
-				}
-				
-				var fields=getSpecificFields();
-				var index =fields.indexOf(field);
-				if(index==-1) throw new AssertionError();//TODO handle fields in fields
-				for(int i=index+1;i<fields.size();i++){
-					if(selectedWriteFieldsSet.add(fields.get(i))){
-						shouldRun=true;
-					}
-				}
-			}
-		}
-		
-		return IODependency.of(
-			getSpecificFields(),
-			selectedWriteFieldsSet,
-			selectedReadFieldsSet
-		);
-	}
-	
-	
 	public void writeSingleField(DataProvider provider, RandomIO dest, IOField<T, ?> selectedField, T instance) throws IOException{
-		if(DEBUG_VALIDATION){
-			checkExistenceOfField(selectedField);
-		}
-		
-		var deps  =getDeps(selectedField);
-		var fields=deps.writeFields;
+		var deps=getFieldDependency().getDeps(selectedField);
+		writeDeps(provider, dest, deps, instance);
+	}
+	
+	public void writeDeps(DataProvider provider, RandomIO dest, FieldDependency.Ticket<T> deps, T instance) throws IOException{
+		var fields=deps.writeFields();
 		var ioPool=makeIOPool();
 		
-		if(deps.generators!=null){
-			for(var generator : deps.generators){
-				generator.generate(ioPool, provider, instance, true);
-			}
-		}
+		var gen=deps.generators();
+		if(gen!=null) generateAll(gen, ioPool, provider, instance, true);
 		
 		int checkIndex=0;
 		
@@ -929,63 +744,43 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			
 			dest.skipExact(bytes);
 		}
-		
 	}
 	
 	protected void readIOFields(FieldSet<T> fields, VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		for(IOField<T, ?> field : fields){
-			if(DEBUG_VALIDATION){
-				readFieldSafe(ioPool, provider, src, instance, genericContext, field);
-			}else{
-				field.readReported(ioPool, provider, src, instance, genericContext);
-			}
+			readField(ioPool, provider, src, instance, genericContext, field);
 		}
 	}
 	
-	public void readSingleField(VarPool<T> ioPool, DataProvider provider, ContentReader src, IOField<T, ?> selectedField, T instance, GenericContext genericContext) throws IOException{
-		if(DEBUG_VALIDATION){
-			checkExistenceOfField(selectedField);
-		}
-		var deps=getDeps(selectedField);
-		readDeps(ioPool, provider, src, deps, instance, genericContext);
-	}
 	public void readSelectiveFields(VarPool<T> ioPool, DataProvider provider, ContentReader src, FieldSet<T> selectedFields, T instance, GenericContext genericContext) throws IOException{
 		var all=getSpecificFields();
-		if(DEBUG_VALIDATION){
-			for(IOField<T, ?> selectedField : selectedFields){
-				checkExistenceOfField(selectedField);
-			}
-			if(selectedFields.size()==all.size()){
-				throw new IllegalArgumentException("reading all fields");
-			}
-		}
-		
-		var deps=getDeps(selectedFields);
-		if(deps.readFields.size()==all.size()){
+		if(selectedFields.size()==all.size()){
 			readIOFields(all, ioPool, provider, src, instance, genericContext);
 			return;
 		}
 		
+		var deps=getFieldDependency().getDeps(selectedFields);
 		readDeps(ioPool, provider, src, deps, instance, genericContext);
 	}
 	
-	private void readDeps(VarPool<T> ioPool, DataProvider provider, ContentReader src, IODependency<T> deps, T instance, GenericContext genericContext) throws IOException{
-		var fields=deps.readFields;
+	public void readDeps(VarPool<T> ioPool, DataProvider provider, ContentReader src, FieldDependency.Ticket<T> deps, T instance, GenericContext genericContext) throws IOException{
+		var fields=deps.readFields();
 		if(fields.isEmpty()){
 			return;
 		}
+		if(fields.size()==ioFields.size()){
+			readIOFields(ioFields, ioPool, provider, src, instance, genericContext);
+			return;
+		}
+		
 		int checkIndex=0;
 		int limit     =fields.size();
 		
-		for(IOField<T, ?> field : getSpecificFields()){
+		for(IOField<T, ?> field : ioFields){
 			if(fields.get(checkIndex)==field){
 				checkIndex++;
 				
-				if(DEBUG_VALIDATION){
-					readFieldSafe(ioPool, provider, src, instance, genericContext, field);
-				}else{
-					field.readReported(ioPool, provider, src, instance, genericContext);
-				}
+				readField(ioPool, provider, src, instance, genericContext, field);
 				
 				if(checkIndex==limit){
 					return;
@@ -996,16 +791,14 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			
 			field.skipReported(ioPool, provider, src, instance, genericContext);
 		}
-		throw new IllegalArgumentException();
 	}
 	
-	private void checkExistenceOfField(IOField<T, ?> selectedField){
-		for(IOField<T, ?> field : getSpecificFields()){
-			if(field==selectedField){
-				return;
-			}
+	private void readField(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext, IOField<T, ?> field) throws IOException{
+		if(DEBUG_VALIDATION){
+			readFieldSafe(ioPool, provider, src, instance, genericContext, field);
+		}else{
+			field.readReported(ioPool, provider, src, instance, genericContext);
 		}
-		throw new IllegalArgumentException(selectedField+" is not listed!");
 	}
 	
 	private void readFieldSafe(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext, IOField<T, ?> field) throws IOException{
