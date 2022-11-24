@@ -134,6 +134,7 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	
 	private IOField<T, ?>[] data;
 	private int             hash=-1;
+	private byte            age =Byte.MIN_VALUE;
 	
 	private Map<String, Integer> nameLookup;
 	
@@ -203,10 +204,20 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		
 		//Deduplicate array + short-circuit further equals
 		if(allSame){
-			//noinspection RedundantCast,unchecked
-			((FieldSet<T>)that).data=this.data;
-			if(this.hash!=-1) that.hash=this.hash;
+			//noinspection unchecked
+			var tt=(FieldSet<T>)that;
+			
+			if(this.age<Byte.MAX_VALUE) this.age++;
+			if(tt.age<Byte.MAX_VALUE) tt.age++;
+			
+			if(this.age<tt.age){
+				tt.hashCode();
+				this.data=tt.data;
+			}else tt.data=this.data;
+			
+			if(this.hash!=-1) tt.hash=this.hash;
 			else if(that.hash!=-1) this.hash=that.hash;
+			
 		}
 		
 		return true;

@@ -18,7 +18,7 @@ import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import static java.lang.Double.parseDouble;
+import static java.lang.Float.parseFloat;
 import static java.lang.Long.parseLong;
 
 public class QueryExpressionParser{
@@ -200,23 +200,30 @@ public class QueryExpressionParser{
 			var hex=regex(Pattern.compile("^[-+]?0[xX][0-9a-fA-F_]+"));
 			if(hex!=null){
 				hex=cleanNumber(hex, "0x");
-				return parseLong(hex, 16);
+				return lToMinNum(parseLong(hex, 16));
 			}
 			var bin=regex(Pattern.compile("^[-+]??0[bB][0-1_]+"));
 			if(bin!=null){
 				bin=cleanNumber(bin, "0b");
-				return parseLong(bin.replace("_", ""), 2);
+				return lToMinNum(parseLong(bin, 2));
 			}
 			var dec=regex(Pattern.compile("^[-+]??[0-9_]*\\.?[0-9_]*"));
 			if(dec!=null){
 				dec=cleanNumber(dec, null);
 				if(dec.contains(".")){
-					return parseDouble(dec.replace("_", ""));
+					return parseFloat(dec.replace("_", ""));
 				}
-				return parseLong(dec);
+				return lToMinNum(parseLong(dec));
 			}
 			
 			return null;
+		}
+		
+		private static Number lToMinNum(long l){
+			if(l>=Byte.MIN_VALUE&&l<=Byte.MAX_VALUE) return (byte)l;
+			if(l>=Short.MIN_VALUE&&l<=Short.MAX_VALUE) return (short)l;
+			if(l>=Integer.MIN_VALUE&&l<=Integer.MAX_VALUE) return (int)l;
+			return l;
 		}
 		
 		private static String cleanNumber(String num, String prefix){
@@ -337,7 +344,7 @@ public class QueryExpressionParser{
 			this.argCounter=argCounter;
 		}
 		
-		QueryCheck parse(){
+		QueryCheck checkExpression(){
 			
 			QueryCheck check=null;
 			while(true){
@@ -499,6 +506,10 @@ public class QueryExpressionParser{
 	
 	private static QueryCheck expressionToCheck(Class<?> type, String expression, int[] argCounter){
 		if(argCounter==null) argCounter=new int[1];
-		return new Parser(type, new Tokenizer(expression), argCounter).parse();
+		return new Parser(type, new Tokenizer(expression), argCounter).checkExpression();
+	}
+	
+	public static QueryValueSource mapping(Class<?> elementType, String expression){
+		return new Parser(elementType, new Tokenizer(expression), null).source();
 	}
 }

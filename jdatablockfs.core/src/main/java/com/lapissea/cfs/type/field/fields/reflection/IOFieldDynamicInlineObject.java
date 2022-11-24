@@ -432,7 +432,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 				
 				TypeLink def=switch(val){
 					case IOInstance.Unmanaged<?> unmanaged -> unmanaged.getTypeDef();
-					case IOInstance.Def<?> interf -> TypeLink.of(IOInstance.Def.unmap(interf.getClass()));
+					case IOInstance.Def<?> interf -> TypeLink.of(IOInstance.Def.unmap(interf.getClass()).orElseThrow());
 					case Object inst -> TypeLink.of(inst.getClass());
 				};
 				

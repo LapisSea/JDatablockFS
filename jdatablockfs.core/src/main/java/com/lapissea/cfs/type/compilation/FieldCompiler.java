@@ -295,8 +295,15 @@ public class FieldCompiler{
 					return Optional.empty();
 				};
 				
-				var getter=calcGetPrefixes(field).map(getMethod).filter(Optional::isPresent).map(Optional::get).findAny();
-				var setter=getMethod.apply("set");
+				Optional<Method> getter;
+				Optional<Method> setter;
+				if(UtilL.instanceOf(cl, IOInstance.Def.class)){
+					getter=ioMethods.stream().filter(m->m.getParameterCount()==0).filter(m->m.getAnnotation(IOValue.class).name().equals(fieldName)).findAny();
+					setter=ioMethods.stream().filter(m->m.getParameterCount()==1).filter(m->m.getAnnotation(IOValue.class).name().equals(fieldName)).findAny();
+				}else{
+					getter=calcGetPrefixes(field).map(getMethod).filter(Optional::isPresent).map(Optional::get).findAny();
+					setter=getMethod.apply("set");
+				}
 				
 				getter.ifPresent(usedFields::add);
 				setter.ifPresent(usedFields::add);

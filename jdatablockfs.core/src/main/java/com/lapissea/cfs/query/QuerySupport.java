@@ -1,10 +1,13 @@
 package com.lapissea.cfs.query;
 
+import com.lapissea.cfs.OptionalPP;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.objects.collections.IOIterator;
+import com.lapissea.util.NotImplementedException;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public enum QuerySupport{
 	;
@@ -49,13 +52,13 @@ public enum QuerySupport{
 			return count;
 		}
 		@Override
-		public Optional<T> any() throws IOException{
+		public OptionalPP<T> any() throws IOException{
 			var es   =data.elements(Set.of());
 			var match=es.next();
 			if(match!=null){
-				return Optional.of(match.get(true));
+				return OptionalPP.of(match.get(true));
 			}
-			return Optional.empty();
+			return OptionalPP.empty();
 		}
 		
 		@Override
@@ -63,31 +66,80 @@ public enum QuerySupport{
 			var elements=data.elements(Set.of());
 			return new IOIterator<>(){
 				private Accessor<T> acc;
-				private boolean first=true;
+				private boolean run=true;
 				
-				private void first() throws IOException{
-					if(first){
-						first=false;
+				private void run() throws IOException{
+					if(run){
+						run=false;
 						acc=elements.next();
 					}
 				}
 				
 				@Override
 				public boolean hasNext() throws IOException{
-					first();
+					run();
 					return acc!=null;
 				}
 				@Override
 				public T ioNext() throws IOException{
-					first();
+					run();
 					if(acc==null){
 						throw new NoSuchElementException();
 					}
 					var t=acc.get(true);
-					acc=elements.next();
+					run=true;
 					return t;
 				}
 			};
+		}
+		@Override
+		public long deleteAll() throws IOException{
+			throw NotImplementedException.infer();//TODO: implement StagedQuery.deleteAll()
+		}
+		
+		
+		private static final class MappedData<T> implements Data<T>{
+			private final Data<?>          base;
+			private final Class<T>         elementType;
+			private final QueryValueSource source;
+			private final Object[]         args;
+			private final Set<String>      fieldNames;
+			
+			private MappedData(Data<?> base, QueryValueSource source, Object[] args){
+				this.base=base;
+				this.elementType=Objects.requireNonNull((Class<T>)source.type());
+				this.source=source;
+				this.args=args;
+				fieldNames=source.deep()
+				                 .filter(QueryValueSource.Field.class::isInstance)
+				                 .map(QueryValueSource.Field.class::cast)
+				                 .map(QueryValueSource.Field::name)
+				                 .collect(Collectors.toSet());
+			}
+			
+			@Override
+			public Class<T> elementType(){return elementType;}
+			@Override
+			public OptionalLong count(){return OptionalLong.empty();}
+			
+			@Override
+			public AccessIterator<T> elements(Set<String> readFields){
+				var fields=Utils.join(readFields, fieldNames);
+				var src   =base.elements(fields);
+				return ()->{
+					var acc=src.next();
+					if(acc==null) return null;
+					return full->{
+						var val=acc.get(full);
+						return (T)QueryExecutor.getValueDef(new QueryContext(args, val), source);
+					};
+				};
+			}
+		}
+		
+		@Override
+		public <R> Query<R> map(QueryValueSource field, Object... args){
+			return new StagedQuery<>(new MappedData<>(data, field, args));
 		}
 		
 		private static final class FilteredData<T> implements Data<T>{
@@ -118,7 +170,7 @@ public enum QuerySupport{
 						var acc=src.next();
 						if(acc==null) return null;
 						var partial=acc.get(false);
-						if(ReflectionExecutor.executeCheck(new QueryContext(args, partial), check)){
+						if(QueryExecutor.executeCheckDef(new QueryContext(args, partial), check)){
 							return acc;
 						}
 					}

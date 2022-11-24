@@ -3,7 +3,10 @@ package com.lapissea.cfs.objects.collections;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.ValueStorage;
+import com.lapissea.cfs.io.instancepipe.FieldDependency;
 import com.lapissea.cfs.objects.Reference;
+import com.lapissea.cfs.query.Query;
+import com.lapissea.cfs.query.QuerySupport;
 import com.lapissea.cfs.type.RuntimeType;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.TypeLink;
@@ -169,14 +172,18 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 	public T get(long index) throws IOException{
 		checkSize(index);
 		if(readOnly){
-			if(cache.containsKey(index)){
-				return cache.get(index);
-			}
-			var val=getNode(index).getValue();
-			cache.put(index, val);
-			return val;
+			return getCached(index);
 		}
 		return getNode(index).getValue();
+	}
+	
+	private T getCached(long index) throws IOException{
+		if(cache.containsKey(index)){
+			return cache.get(index);
+		}
+		var val=getNode(index).getValue();
+		cache.put(index, val);
+		return val;
 	}
 	
 	@Override
@@ -371,5 +378,54 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 	@Override
 	protected String getStringPrefix(){
 		return "L";
+	}
+	
+	
+	@Override
+	public Query<T> query(){
+		return QuerySupport.of(ListData.of(this, readFields->{
+			var                       size=size();
+			FieldDependency.Ticket<?> depTicket;
+			if(valueStorage instanceof ValueStorage.InstanceBased<?> i){
+				var t=i.depTicket(readFields);
+				depTicket=t.fullRead()?null:t;
+			}else depTicket=null;
+			
+			return new QuerySupport.AccessIterator<T>(){
+				long cursor;
+				
+				IOIterator.Iter<IONode<T>> iter;
+				long iterCursor;
+				
+				@SuppressWarnings("rawtypes")
+				@Override
+				public QuerySupport.Accessor<T> next(){
+					if(cursor>=size) return null;
+					var index=cursor++;
+					return full->{
+						checkSize(index);
+						
+						if(iter==null||iterCursor>=index+1){
+							var head=getHead();
+							if(head==null) iter=Utils.emptyIter();
+							else iter=head.iterator();
+							iterCursor=0;
+						}
+						
+						IONode<T> node;
+						while(true){
+							node=iter.ioNext();
+							iterCursor++;
+							if(iterCursor==index+1) break;
+						}
+						
+						if(!full&&depTicket!=null&&valueStorage instanceof ValueStorage.InstanceBased i){
+							return node.readValueSelective(depTicket, true);
+						}
+						return node.getValue();
+					};
+				}
+			};
+		}));
 	}
 }

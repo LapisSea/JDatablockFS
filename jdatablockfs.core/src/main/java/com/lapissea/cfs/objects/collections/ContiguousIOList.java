@@ -715,7 +715,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 						}
 						try(var io=ioAtElement(index)){
 							if(!full&&depTicket!=null&&storage instanceof ValueStorage.InstanceBased i){
-								return (T)i.readNewSelective(io, depTicket);
+								return (T)i.readNewSelective(io, depTicket, true);
 							}
 							return storage.readNew(io);
 						}

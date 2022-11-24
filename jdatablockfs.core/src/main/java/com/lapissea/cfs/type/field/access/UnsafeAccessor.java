@@ -55,8 +55,8 @@ public sealed class UnsafeAccessor<CTyp extends IOInstance<CTyp>> extends Abstra
 				}
 			});
 			
-			this.getter=getter.map(Access::makeMethodHandle).orElse(null);
-			this.setter=setter.map(Access::makeMethodHandle).orElse(null);
+			this.getter=getter.map(AbstractPrimitiveAccessor::findParent).map(Access::makeMethodHandle).orElse(null);
+			this.setter=setter.map(AbstractPrimitiveAccessor::findParent).map(Access::makeMethodHandle).orElse(null);
 		}
 		
 		private Object getter(CTyp instance){

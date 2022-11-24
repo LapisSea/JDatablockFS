@@ -8,6 +8,7 @@ import com.lapissea.cfs.internal.IUtils;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.ValueStorage;
 import com.lapissea.cfs.io.bit.FlagReader;
+import com.lapissea.cfs.io.instancepipe.FieldDependency;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
@@ -616,10 +617,25 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	public boolean readValueField(T dest, IOField<?, ?> field) throws IOException{
 		if(DEBUG_VALIDATION) validateField(dest, field);
 		if(!hasValue()) return false;
+		return readValueSelective(dest, ((ValueStorage.InstanceBased)valueStorage).depTicket(field));
+	}
+	
+	public T readValueSelective(FieldDependency.Ticket<?> depTicket, boolean strictHolder) throws IOException{
+		if(!hasValue()) return null;
 		var based=(ValueStorage.InstanceBased)valueStorage;
 		try(var io=this.getReference().io(this)){
 			io.skipExact(valueStart());
-			based.readSelective(io, (IOInstance)dest, based.depTicket(field));
+			return (T)based.readNewSelective(io, depTicket, strictHolder);
+		}
+	}
+	
+	@SuppressWarnings({"rawtypes", "unchecked"})
+	public boolean readValueSelective(T dest, FieldDependency.Ticket<?> depTicket) throws IOException{
+		if(!hasValue()) return false;
+		var based=(ValueStorage.InstanceBased)valueStorage;
+		try(var io=this.getReference().io(this)){
+			io.skipExact(valueStart());
+			based.readSelective(io, (IOInstance)dest, depTicket);
 		}
 		return true;
 	}

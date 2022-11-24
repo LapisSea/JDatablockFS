@@ -25,13 +25,13 @@ import com.lapissea.util.function.UnsafeConsumer;
 
 import java.lang.annotation.Annotation;
 import java.lang.invoke.MethodHandle;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
-import java.lang.reflect.Type;
+import java.lang.reflect.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -44,6 +44,8 @@ public class DefInstanceCompiler{
 	
 	private static final boolean PRINT_BYTECODE=GlobalConfig.configFlag("classGen.printBytecode", false);
 	private static final boolean EXIT_ON_FAIL  =GlobalConfig.configFlag("classGen.exitOnFail", !GlobalConfig.RELEASE_MODE);
+	
+	private static final String COMPLETION_POSTFIX="€Full";
 	
 	private record Specials(
 		Optional<Method> set,
@@ -122,20 +124,34 @@ public class DefInstanceCompiler{
 	}
 	
 	@SuppressWarnings("unchecked")
-	public static <T extends IOInstance.Def<T>> Class<T> unmap(Class<?> impl){
+	public static <T extends IOInstance.Def<T>> Optional<Class<T>> unmap(Class<?> impl){
 		Objects.requireNonNull(impl);
 		if(!UtilL.instanceOf(impl, IOInstance.Def.class)) throw new IllegalArgumentException(impl.getName()+"");
 		var clazz=impl;
 		while(true){
 			for(Class<?> interf : clazz.getInterfaces()){
+				if(interf.getName().endsWith(COMPLETION_POSTFIX)){
+					var rl=COMPLETION_LOCK.readLock();
+					rl.lock();
+					try{
+						var i     =interf;
+						var unfull=COMPLETION_CACHE.entrySet().stream().filter(e->e.getValue()==i).findAny().map(Map.Entry::getKey);
+						if(unfull.isPresent()){
+							interf=unfull.get();
+						}
+					}finally{
+						rl.unlock();
+					}
+				}
 				var node=CACHE.get(new Key(interf));
-				if(node.impl==impl){
-					return (Class<T>)node.key.clazz;
+				if(node!=null&&node.impl==impl){
+					return Optional.of((Class<T>)node.key.clazz);
 				}
 			}
 			clazz=clazz.getSuperclass();
-			if(clazz==null) throw new ShouldNeverHappenError("???");
+			if(clazz==null) break;
 		}
+		return Optional.empty();
 	}
 	
 	public static <T extends IOInstance<T>> MethodHandle dataConstructor(Class<T> interf){
@@ -206,10 +222,14 @@ public class DefInstanceCompiler{
 		var interf=key.clazz;
 		
 		var hash=interf.getClassLoader().hashCode();
-		Log.trace("Generating implementation of: {} - {}", interf.getName(), (Supplier<String>)()->{
+		Log.trace("Generating implementation of: {}#cyan fields: {} - {}", interf.getName(), ((Optional<Object>)(Object)node.key.includeNames).orElse("<ALL>"), (Supplier<String>)()->{
 			var cols=List.of(BLACK, RED, GREEN, YELLOW, BLUE, PURPLE, CYAN, WHITE);
 			return cols.get((int)(Integer.toUnsignedLong(hash)%cols.size()))+Integer.toHexString(hash)+RESET;
 		});
+		
+		interf=completeInterface(interf);
+		key=new Key<>(interf, key.includeNames);
+		
 		
 		var getters =new ArrayList<FieldStub>();
 		var setters =new ArrayList<FieldStub>();
@@ -249,6 +269,112 @@ public class DefInstanceCompiler{
 		
 		node.state=ImplNode.State.DONE;
 		return impl;
+	}
+	
+	private static final Map<Class<?>, Class<?>> COMPLETION_CACHE=new HashMap<>();
+	private static final ReadWriteLock           COMPLETION_LOCK =new ReentrantReadWriteLock();
+	
+	@SuppressWarnings("unchecked")
+	private static <T extends IOInstance<T>> Class<T> completeInterface(Class<T> interf){
+		var rl=COMPLETION_LOCK.readLock();
+		rl.lock();
+		try{
+			var cached=COMPLETION_CACHE.get(interf);
+			if(cached!=null) return (Class<T>)cached;
+		}finally{
+			rl.unlock();
+		}
+		
+		var wl=COMPLETION_LOCK.writeLock();
+		wl.lock();
+		try{
+			var cached=COMPLETION_CACHE.get(interf);
+			if(cached!=null) return (Class<T>)cached;
+			
+			Class<?> complete=generateCompletedInterface(interf);
+			COMPLETION_CACHE.put(interf, complete);
+			return (Class<T>)complete;
+		}finally{
+			wl.unlock();
+		}
+	}
+	
+	private static <T extends IOInstance<T>> Class<?> generateCompletedInterface(Class<T> interf){
+		
+		var getters=new ArrayList<FieldStub>();
+		var setters=new ArrayList<FieldStub>();
+		collectMethods(interf, getters, setters);
+		var style=checkStyles(getters, setters);
+		
+		var missingGetters=new HashSet<String>();
+		var missingSetters=new HashSet<String>();
+		
+		Stream.concat(getters.stream(), setters.stream()).map(FieldStub::varName).distinct().forEach(name->{
+			if(getters.stream().noneMatch(s->s.varName().equals(name))) missingGetters.add(name);
+			if(setters.stream().noneMatch(s->s.varName().equals(name))) missingSetters.add(name);
+		});
+		
+		if(missingGetters.isEmpty()&&missingSetters.isEmpty()){
+			return interf;
+		}
+		
+		Log.trace("Generating completion of {}#cyan - missing getters: {}, missing setters: {}", interf.getName(), missingGetters, missingSetters);
+		
+		JorthCompiler jorth=new JorthCompiler(interf.getClassLoader());
+		try{
+			
+			try(var writer=jorth.writeCode()){
+				writeAnnotations(writer, Arrays.asList(interf.getAnnotations()));
+				writer.write("#TOKEN(0) typ.impl define", interf.getName()+COMPLETION_POSTFIX);
+				writer.write(
+					"""
+						#TOKEN(0) implements
+						typ.impl interface start
+						""",
+					interf.getName());
+				
+				for(String name : missingSetters){
+					var setterName=switch(style){
+						case NAMED -> "set"+TextUtil.firstToUpperCase(name);
+						case RAW -> name;
+					};
+					var type=getters.stream().filter(s->s.varName().equals(name)).findAny().map(FieldStub::type).orElseThrow();
+					var jtyp=JorthUtils.toJorthGeneric(Objects.requireNonNull(TypeLink.of(type)));
+					
+					writer.write(
+						"""
+							public visibility
+							#RAW(0) arg1 arg
+							#TOKEN(1) function
+							""",
+						jtyp,
+						setterName
+					);
+				}
+				for(String name : missingGetters){
+					var getterName=switch(style){
+						case NAMED -> "get"+TextUtil.firstToUpperCase(name);
+						case RAW -> name;
+					};
+					var type=setters.stream().filter(s->s.varName().equals(name)).findAny().map(FieldStub::type).orElseThrow();
+					var jtyp=JorthUtils.toJorthGeneric(Objects.requireNonNull(TypeLink.of(type)));
+					
+					writer.write(
+						"""
+							public visibility
+							#RAW(0) returns
+							#TOKEN(1) function
+							""",
+						jtyp,
+						getterName
+					);
+				}
+			}
+			
+			return Access.privateLookupIn(interf).defineClass(jorth.classBytecode(PRINT_BYTECODE));
+		}catch(IllegalAccessException|MalformedJorthException e){
+			throw new RuntimeException(e);
+		}
 	}
 	
 	private static void checkIncludeNames(List<FieldInfo> fieldInfo, Set<String> includeNames){
@@ -302,6 +428,7 @@ public class DefInstanceCompiler{
 				writer.write("#TOKEN(0) typ.String                        define", String.class.getName());
 				writer.write("#TOKEN(0) typ.Struct                        define", Struct.class.getName());
 				writer.write("#TOKEN(0) typ.Objects                       define", Objects.class.getName());
+				writer.write("#TOKEN(0) typ.IOValue                       define", IOValue.class.getName());
 				writer.write("#TOKEN(0) typ.Override                      define", Override.class.getName());
 				writer.write("#TOKEN(0) typ.ChunkPointer                  define", ChunkPointer.class.getName());
 				writer.write("#TOKEN(0) typ.StringBuilder                 define", StringBuilder.class.getName());
@@ -327,16 +454,19 @@ public class DefInstanceCompiler{
 				
 				defineStatics(writer);
 				
+				var includedFields =key.includeNames().map(include->fieldInfo.stream().filter(f->include.contains(f.name)).toList()).orElse(fieldInfo);
+				var includedOrdered=key.includeNames().map(include->orderedFields.map(o->o.stream().filter(f->include.contains(f.name)).toList())).orElse(orderedFields);
 				
-				generateConstructors(fieldInfo, orderedFields, writer);
+				generateDefaultConstructor(writer, includedFields);
+				generateDataConstructor(writer, orderedFields, key.includeNames);
+				if(key.includeNames.isPresent()){
+					generateDataConstructor(writer, includedOrdered, key.includeNames);
+				}
 				
 				if(specials.set.isPresent()){
 					var set=specials.set.get();
 					
-					var ordered=orderedFields.orElseThrow();
-					
-					
-					for(FieldInfo info : ordered){
+					for(FieldInfo info : orderedFields.orElseThrow()){
 						var type=Objects.requireNonNull(TypeLink.of(info.type));
 						writer.write(
 							"#RAW(0) #TOKEN(1) arg",
@@ -351,7 +481,7 @@ public class DefInstanceCompiler{
 							""",
 						set.getName());
 					
-					for(FieldInfo info : ordered){
+					for(FieldInfo info : includedOrdered.orElseThrow()){
 						writer.write("<arg> #TOKEN(0) get", info.name);
 						if(info.type==ChunkPointer.class){
 							nullCheck(writer);
@@ -367,7 +497,7 @@ public class DefInstanceCompiler{
 				{
 					var format=interf.getAnnotation(IOInstance.Def.ToString.Format.class);
 					if(format!=null){
-						generateFormatToString(key, fieldInfo, specials, writer, format);
+						generateFormatToString(key, includedFields, specials, writer, format);
 						break stringSaga;
 					}
 					
@@ -376,7 +506,7 @@ public class DefInstanceCompiler{
 						toStrAnn=IOFieldTools.makeAnnotation(IOInstance.Def.ToString.class);
 					}
 					if(toStrAnn!=null){
-						generateStandardToString(key, orderedFields.orElse(fieldInfo), specials, writer, toStrAnn);
+						generateStandardToString(key, includedOrdered.orElse(includedFields), specials, writer, toStrAnn);
 						break stringSaga;
 					}
 				}
@@ -560,7 +690,10 @@ public class DefInstanceCompiler{
 		);
 		
 		if(toStrAnn.name()){
-			append(writer, w->w.write("'#RAW(0)'", key.clazz.getSimpleName()));
+			var nam=key.clazz.getSimpleName();
+			if(nam.endsWith(COMPLETION_POSTFIX)) nam=nam.substring(0, nam.length()-COMPLETION_POSTFIX.length());
+			var clean=nam;
+			append(writer, w->w.write("'#RAW(0)'", clean));
 		}
 		if(toStrAnn.curly()){
 			append(writer, w->w.write("'{'"));
@@ -615,7 +748,7 @@ public class DefInstanceCompiler{
 		);
 	}
 	
-	private static void generateConstructors(List<FieldInfo> fieldInfo, Optional<List<FieldInfo>> oOrderedFields, JorthWriter writer) throws MalformedJorthException{
+	private static void generateDefaultConstructor(JorthWriter writer, List<FieldInfo> fieldInfo) throws MalformedJorthException{
 		writer.write(
 			"""
 				public visibility
@@ -631,6 +764,9 @@ public class DefInstanceCompiler{
 			writer.write("this").write(info.name).write("set");
 		}
 		writer.write("end");
+	}
+	
+	private static void generateDataConstructor(JorthWriter writer, Optional<List<FieldInfo>> oOrderedFields, Optional<Set<String>> includeNames) throws MalformedJorthException{
 		
 		if(oOrderedFields.isPresent()){
 			var orderedFields=oOrderedFields.get();
@@ -652,10 +788,17 @@ public class DefInstanceCompiler{
 					""");
 			
 			for(int i=0;i<orderedFields.size();i++){
-				FieldInfo info=orderedFields.get(i);
-				writer.write("<arg>").write("arg"+i).write("get");
-				if(info.type==ChunkPointer.class){
+				FieldInfo info    =orderedFields.get(i);
+				boolean   included=includeNames.map(in->in.contains(info.name)).orElse(true);
+				boolean   isPtr   =info.type==ChunkPointer.class;
+				if(included||isPtr){
+					writer.write("<arg>").write("arg"+i).write("get");
+				}
+				if(isPtr){
 					nullCheck(writer);
+				}
+				if(!included){
+					continue;
 				}
 				writer.write("this").write(info.name).write("set");
 			}
@@ -663,9 +806,35 @@ public class DefInstanceCompiler{
 		}
 	}
 	
+	private static Optional<Class<?>> upperSame(Class<?> interf){
+		
+		var its=Arrays.stream(interf.getInterfaces()).filter(DefInstanceCompiler::isDefinition).toList();
+		if(its.size()!=1) return Optional.empty();
+		
+		Set<String> parentNames=collectNames(its.get(0));
+		Set<String> thisNames  =collectNames(interf);
+		if(parentNames.equals(thisNames)){
+			return Optional.of(its.get(0));
+		}
+		return Optional.empty();
+	}
+	private static Set<String> collectNames(Class<?> its){
+		var getters=new ArrayList<FieldStub>();
+		var setters=new ArrayList<FieldStub>();
+		//noinspection unchecked,rawtypes
+		collectMethods((Class<IOInstance>)its, getters, setters);
+		return Stream.concat(getters.stream(), setters.stream()).map(FieldStub::varName).collect(Collectors.toSet());
+	}
+	
 	private static Optional<List<String>> getOrder(Class<?> interf, List<FieldInfo> fieldInfo){
 		var order=interf.getAnnotation(IOInstance.Def.Order.class);
-		if(order==null) return Optional.empty();
+		if(order==null){
+			var its=Arrays.stream(interf.getInterfaces()).filter(DefInstanceCompiler::isDefinition).toList();
+			if(its.size()!=1) return Optional.empty();
+			
+			var upper=upperSame(interf);
+			return upper.map(u->getOrder(u, fieldInfo)).filter(Optional::isPresent).map(Optional::get);
+		}
 		
 		var check  =fieldInfo.stream().map(FieldInfo::name).collect(Collectors.toSet());
 		var ordered=List.of(order.value());
@@ -702,53 +871,61 @@ public class DefInstanceCompiler{
 	
 	private static void implementUserAccess(JorthWriter writer, FieldInfo info) throws MalformedJorthException{
 		var jtyp=JorthUtils.toJorthGeneric(Objects.requireNonNull(TypeLink.of(info.type)));
-		if(info.getter.isPresent()){
-			var stub  =info.getter.get();
-			var method=stub.method();
-			
-			writer.write(
-				"""
-					public visibility
-					typ.Override @
-					#RAW(1) returns
-					#TOKEN(0) function start
-						this #TOKEN(2) get
-					end
-					""",
-				method.getName(),
-				jtyp,
-				info.name
-			);
-			
+		
+		var getterName=info.getter.map(s->s.method().getName()).orElseGet(()->{
+			var setter=info.setter.orElseThrow();
+			return switch(setter.style()){
+				case NAMED -> "get"+TextUtil.firstToUpperCase(setter.varName());
+				case RAW -> setter.varName();
+			};
+		});
+		var setterName=info.setter.map(s->s.method().getName()).orElseGet(()->{
+			var setter=info.getter.orElseThrow();
+			return switch(setter.style()){
+				case NAMED -> "get"+TextUtil.firstToUpperCase(setter.varName());
+				case RAW -> setter.varName();
+			};
+		});
+		writer.write(
+			"""
+				public visibility
+				{'#TOKEN(2)' name} typ.IOValue @
+				typ.Override @
+				#RAW(1) returns
+				#TOKEN(0) function start
+					this #TOKEN(2) get
+				end
+				""",
+			getterName,
+			jtyp,
+			info.name
+		);
+		
+		writer.write(
+			"""
+				public visibility
+				{'#TOKEN(2)' name} typ.IOValue @
+				typ.Override @
+				#RAW(1) arg1 arg
+				#TOKEN(0) function start
+					<arg> arg1 get
+				""",
+			setterName,
+			jtyp,
+			info.name
+		);
+		
+		if(info.type==ChunkPointer.class){
+			nullCheck(writer);
 		}
-		if(info.setter.isPresent()){
-			var stub  =info.setter.get();
-			var method=stub.method();
-			
-			writer.write(
-				"""
-					public visibility
-					typ.Override @
-					#RAW(1) arg1 arg
-					#TOKEN(0) function start
-						<arg> arg1 get
-					""",
-				method.getName(),
-				jtyp
-			);
-			
-			if(info.type==ChunkPointer.class){
-				nullCheck(writer);
-			}
-			
-			writer.write(
-				"""
-						this #TOKEN(0) set
-					end
-					""",
-				info.name
-			);
-		}
+		
+		writer.write(
+			"""
+					this #TOKEN(0) set
+				end
+				""",
+			info.name
+		);
 	}
 	
 	private static void defineNoField(JorthWriter writer, FieldInfo info) throws MalformedJorthException{
@@ -963,8 +1140,8 @@ public class DefInstanceCompiler{
 		             .toList();
 	}
 	
-	private static void checkStyles(List<FieldStub> getters, List<FieldStub> setters){
-		var styles=Stream.concat(getters.stream(), setters.stream()).collect(Collectors.groupingBy(FieldStub::style));
+	private static Style checkStyles(List<FieldStub> getters, List<FieldStub> setters){
+		Map<Style, List<FieldStub>> styles=Stream.concat(getters.stream(), setters.stream()).collect(Collectors.groupingBy(FieldStub::style));
 		
 		if(styles.size()>1){
 			var style=styles.entrySet().stream().reduce((a, b)->a.getValue().size()>b.getValue().size()?a:b).map(Map.Entry::getKey).orElseThrow();
@@ -982,6 +1159,7 @@ public class DefInstanceCompiler{
 				      .collect(Collectors.joining("\n"))
 			);
 		}
+		return styles.keySet().iterator().next();
 	}
 	
 	private static void checkAnnotations(List<FieldInfo> fields){
@@ -1008,7 +1186,15 @@ public class DefInstanceCompiler{
 	
 	private static void checkTypes(List<FieldInfo> fields){
 		var problems=fields.stream()
-		                   .filter(gs->gs.stubs().collect(Collectors.groupingBy(FieldStub::type)).size()>1)
+		                   .filter(gs->gs.stubs().collect(Collectors.groupingBy((FieldStub f)->switch(f.type()){
+			                   case Class<?> c -> c;
+			                   case ParameterizedType p -> p;
+			                   case TypeVariable<?> t -> Utils.extractFromVarType(t);
+			                   default -> {
+				                   var t=f.type();
+				                   throw new NotImplementedException(t.getClass().getName());
+			                   }
+		                   })).size()>1)
 		                   .map(gs->"\t"+gs.name+":\n"+
 		                            "\t\t"+gs.stubs().map(g->(g.style()!=Style.RAW?g.method().getName()+":\t":"")+g.type()+"")
 		                                     .collect(Collectors.joining("\n\t\t"))

@@ -723,6 +723,7 @@ public class JorthCompiler{
 						UnsafeBiConsumer<FunctionInfo, Token, MalformedJorthException> addVal=(name, tok)->{
 							map.put(name, Optional.of(switch(name.returnType.type()){
 								case INT -> Integer.parseInt(tok.source);
+								case BOOLEAN -> Boolean.parseBoolean(tok.source);
 								case OBJECT -> {
 									if(tok instanceof ArrToken arTok){
 										var arr=arTok.arr;

@@ -7,11 +7,30 @@ import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.VarPool;
 import com.lapissea.util.ShouldNeverHappenError;
 
+import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 
 import static com.lapissea.cfs.type.field.access.TypeFlag.*;
 
 public abstract class AbstractPrimitiveAccessor<CTyp extends IOInstance<CTyp>> extends AbstractFieldAccessor<CTyp>{
+	
+	protected static Method findParent(Method method){
+		var cl=method.getDeclaringClass();
+		for(var interf : cl.getInterfaces()){
+			try{
+				var mth=interf.getMethod(method.getName(), method.getParameterTypes());
+				return findParent(mth);
+			}catch(ReflectiveOperationException ignored){}
+		}
+		var sup=cl.getSuperclass();
+		if(sup!=Object.class&&sup!=null){
+			try{
+				var mth=sup.getDeclaredMethod(method.getName(), method.getParameterTypes());
+				return findParent(mth);
+			}catch(ReflectiveOperationException ignored){}
+		}
+		return method;
+	}
 	
 	private final Type     genericType;
 	private final Class<?> rawType;

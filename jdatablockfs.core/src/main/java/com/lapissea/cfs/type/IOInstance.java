@@ -197,7 +197,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		}
 		
 		@SuppressWarnings("rawtypes")
-		static <T extends IOInstance.Def<T>> Class<T> unmap(Class<? extends Def> impl){
+		static <T extends IOInstance.Def<T>> Optional<Class<T>> unmap(Class<? extends Def> impl){
 			return DefInstanceCompiler.unmap(impl);
 		}
 		static boolean isDefinition(Class<?> c){

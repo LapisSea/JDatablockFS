@@ -517,8 +517,13 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	protected abstract void doWrite(DataProvider provider, ContentWriter dest, VarPool<T> ioPool, T instance) throws IOException;
 	
 	
-	public final T readNewSelective(DataProvider provider, ContentReader src, FieldDependency.Ticket<T> depTicket, GenericContext genericContext) throws IOException{
-		T instance=type.make();
+	public final T readNewSelective(DataProvider provider, ContentReader src, FieldDependency.Ticket<T> depTicket, GenericContext genericContext, boolean strictHolder) throws IOException{
+		T instance;
+		if(strictHolder&&type.isDefinition()){
+			instance=type.partialImplementation(depTicket.readFields()).make();
+		}else{
+			instance=type.make();
+		}
 		readDeps(makeIOPool(), provider, src, depTicket, instance, genericContext);
 		return instance;
 	}

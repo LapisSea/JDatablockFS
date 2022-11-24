@@ -88,8 +88,8 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 			}
 		});
 		
-		this.getter=getter.map(Access::makeMethodHandle).orElse(null);
-		this.setter=setter.map(Access::makeMethodHandle).orElse(null);
+		this.getter=getter.map(AbstractPrimitiveAccessor::findParent).map(Access::makeMethodHandle).orElse(null);
+		this.setter=setter.map(AbstractPrimitiveAccessor::findParent).map(Access::makeMethodHandle).orElse(null);
 	}
 	
 	@NotNull

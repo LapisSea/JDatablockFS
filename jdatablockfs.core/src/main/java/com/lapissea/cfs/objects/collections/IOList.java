@@ -101,6 +101,10 @@ public interface IOList<T> extends IterablePP<T>{
 		return new MemoryWrappedIOList<>(data, typeConstructor);
 	}
 	
+	static boolean isWrapped(IOList<?> list){
+		return list instanceof MemoryWrappedIOList;
+	}
+	
 	static <T> long findSortedClosest(IOList<T> freeChunks, FunctionOL<T> distanceMapping) throws IOException{
 		switch((int)freeChunks.size()){
 			case 0 -> {return -1;}

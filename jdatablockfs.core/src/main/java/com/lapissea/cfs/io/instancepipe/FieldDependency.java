@@ -12,6 +12,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 public class FieldDependency<T extends IOInstance<T>>{
 	
 	public record Ticket<T extends IOInstance<T>>(
+		boolean fullWrite,
+		boolean fullRead,
 		FieldSet<T> writeFields,
 		FieldSet<T> readFields,
 		List<IOField.ValueGeneratorInfo<T, ?>> generators
@@ -87,11 +89,11 @@ public class FieldDependency<T extends IOInstance<T>>{
 	
 	private Ticket<T> generateFieldsDependency(FieldSet<T> selectedFields){
 		if(selectedFields.isEmpty()){
-			return new Ticket<T>(FieldSet.of(), FieldSet.of(), List.of());
+			return new Ticket<T>(false, false, FieldSet.of(), FieldSet.of(), List.of());
 		}
 		selectedFields.forEach(this::checkExistenceOfField);
 		if(selectedFields.size()==allFields.size()){
-			return new Ticket<>(allFields, allFields, collectGenerators(allFields));
+			return new Ticket<>(true, true, allFields, allFields, collectGenerators(allFields));
 		}
 		var writeFields=new HashSet<IOField<T, ?>>();
 		var readFields =new HashSet<IOField<T, ?>>();
@@ -206,7 +208,7 @@ public class FieldDependency<T extends IOInstance<T>>{
 		var w=fieldSetToOrderedList(allFields, writeFields);
 		var r=fieldSetToOrderedList(allFields, readFields);
 		var g=collectGenerators(writeFields);
-		return new Ticket<>(w, r, g);
+		return new Ticket<>(w.equals(allFields), r.equals(allFields), w, r, g);
 	}
 	
 	private void checkExistenceOfField(IOField<T, ?> selectedField){

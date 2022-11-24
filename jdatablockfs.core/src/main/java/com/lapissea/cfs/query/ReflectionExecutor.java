@@ -8,12 +8,31 @@ import java.lang.reflect.Array;
 import java.util.List;
 import java.util.Objects;
 
-public enum ReflectionExecutor{
-	;
+public class ReflectionExecutor extends QueryExecutor{
 	
 	private static Object addAB(Number l, Number r){
 		return switch(l){
+			case Byte a -> switch(r){
+				case Byte b -> a+b;
+				case Short b -> a+b;
+				case Integer b -> a+b;
+				case Long b -> a+b;
+				case Double b -> a+b;
+				case Float b -> a+b;
+				default -> throw new IllegalStateException("Unexpected value: "+l);
+			};
+			case Short a -> switch(r){
+				case Byte b -> a+b;
+				case Short b -> a+b;
+				case Integer b -> a+b;
+				case Long b -> a+b;
+				case Double b -> a+b;
+				case Float b -> a+b;
+				default -> throw new IllegalStateException("Unexpected value: "+l);
+			};
 			case Integer a -> switch(r){
+				case Byte b -> a+b;
+				case Short b -> a+b;
 				case Integer b -> a+b;
 				case Long b -> a+b;
 				case Double b -> a+b;
@@ -21,6 +40,8 @@ public enum ReflectionExecutor{
 				default -> throw new IllegalStateException("Unexpected value: "+l);
 			};
 			case Long a -> switch(r){
+				case Byte b -> a+b;
+				case Short b -> a+b;
 				case Integer b -> a+b;
 				case Long b -> a+b;
 				case Double b -> a+b;
@@ -28,6 +49,8 @@ public enum ReflectionExecutor{
 				default -> throw new IllegalStateException("Unexpected value: "+l);
 			};
 			case Double a -> switch(r){
+				case Byte b -> a+b;
+				case Short b -> a+b;
 				case Integer b -> a+b;
 				case Long b -> a+b;
 				case Double b -> a+b;
@@ -35,6 +58,8 @@ public enum ReflectionExecutor{
 				default -> throw new IllegalStateException("Unexpected value: "+l);
 			};
 			case Float a -> switch(r){
+				case Byte b -> a+b;
+				case Short b -> a+b;
 				case Integer b -> a+b;
 				case Long b -> a+b;
 				case Double b -> a+b;
@@ -45,9 +70,10 @@ public enum ReflectionExecutor{
 		};
 	}
 	
-	private static Object getArg(QueryContext ctx, QueryValueSource arg){
+	@Override
+	public Object getValue(QueryContext ctx, QueryValueSource arg){
 		return switch(arg){
-			case QueryValueSource.GetArray getArray -> Array.get(getArg(ctx, getArray.source()), getArray.index());
+			case QueryValueSource.GetArray getArray -> Array.get(getValue(ctx, getArray.source()), getArray.index());
 			case QueryValueSource.Root ignored -> ctx.args();
 			case QueryValueSource.Literal literal -> literal.value();
 			case QueryValueSource.Field.IO io -> ((IOField)io.field()).get(null, (IOInstance)ctx.obj());
@@ -68,8 +94,8 @@ public enum ReflectionExecutor{
 				}
 			}
 			case QueryValueSource.Modulus modulus -> {
-				var src=getArg(ctx, modulus.src());
-				var mod=((Number)getArg(ctx, modulus.mod())).intValue();
+				var src=getValue(ctx, modulus.src());
+				var mod=((Number)getValue(ctx, modulus.mod())).intValue();
 				yield switch(src){
 					case Integer n -> n%mod;
 					case Long n -> n%mod;
@@ -79,14 +105,15 @@ public enum ReflectionExecutor{
 				};
 			}
 			case QueryValueSource.Add add -> {
-				var l=(Number)getArg(ctx, add.l());
-				var r=(Number)getArg(ctx, add.r());
+				var l=(Number)getValue(ctx, add.l());
+				var r=(Number)getValue(ctx, add.r());
 				yield addAB(l, r);
 			}
 		};
 	}
 	
-	public static boolean executeCheck(QueryContext ctx, QueryCheck check){
+	@Override
+	public boolean executeCheck(QueryContext ctx, QueryCheck check){
 		return switch(check){
 			case QueryCheck.And and -> {
 				var l=executeCheck(ctx, and.l());
@@ -101,8 +128,8 @@ public enum ReflectionExecutor{
 			}
 			case QueryCheck.Not not -> !executeCheck(ctx, not.check());
 			case QueryCheck.Equals equals -> {
-				Object val=getArg(ctx, equals.l());
-				Object arg=getArg(ctx, equals.r());
+				Object val=getValue(ctx, equals.l());
+				Object arg=getValue(ctx, equals.r());
 				if(arg==null) yield val==null;
 				
 				if(arg instanceof Number argN&&val instanceof Number valN){
@@ -121,18 +148,18 @@ public enum ReflectionExecutor{
 				yield arg.equals(val);
 			}
 			case QueryCheck.GreaterThan equals -> {
-				var val=(Number)getArg(ctx, equals.field());
-				var arg=(Number)getArg(ctx, equals.arg());
+				var val=(Number)getValue(ctx, equals.field());
+				var arg=(Number)getValue(ctx, equals.arg());
 				yield val.doubleValue()>arg.doubleValue();
 			}
 			case QueryCheck.LessThan equals -> {
-				var val=(Number)getArg(ctx, equals.field());
-				var arg=(Number)getArg(ctx, equals.arg());
+				var val=(Number)getValue(ctx, equals.field());
+				var arg=(Number)getValue(ctx, equals.arg());
 				yield val.doubleValue()<arg.doubleValue();
 			}
 			case QueryCheck.In in -> {
-				var needle=getArg(ctx, in.needle());
-				var hay   =getArg(ctx, in.hay());
+				var needle=getValue(ctx, in.needle());
+				var hay   =getValue(ctx, in.hay());
 				if(hay==null) yield false;
 				if(hay instanceof String str){
 					yield str.contains((CharSequence)needle);

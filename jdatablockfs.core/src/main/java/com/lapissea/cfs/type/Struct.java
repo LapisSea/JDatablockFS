@@ -311,6 +311,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	private final Class<T> type;
+	private       boolean  isDefinition;
 	
 	private FieldSet<T> fields;
 	private FieldSet<T> instanceFields;
@@ -329,6 +330,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	private Struct(Class<T> type, boolean runNow){
 		this.type=type;
 		init(runNow, ()->{
+			isDefinition=UtilL.instanceOf(getType(), IOInstance.Def.class);
 			this.fields=FieldCompiler.compile(this);
 			setInitState(STATE_FIELD_MAKE);
 			for(IOField<T, ?> field : this.fields){
@@ -633,5 +635,27 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	@Override
 	public int hashCode(){
 		return type.getName().hashCode();
+	}
+	
+	private final Map<FieldSet<T>, Struct<T>> partialCache=new HashMap<>();
+	
+	public boolean isDefinition(){
+		waitForState(STATE_FIELD_MAKE);
+		return isDefinition;
+	}
+	@SuppressWarnings({"unchecked", "rawtypes"})
+	public Struct<T> partialImplementation(FieldSet<T> fields){
+		return partialCache.computeIfAbsent(fields, f->makeImpl((FieldSet)f));
+	}
+	@SuppressWarnings({"unchecked"})
+	private <E extends IOInstance.Def<E>> Struct<E> makeImpl(FieldSet<E> f){
+		if(!isDefinition()){
+			throw new UnsupportedOperationException();
+		}
+		var impl=IOInstance.Def.partialImplementation(
+			(Class<E>)IOInstance.Def.unmap((Class<E>)type).orElseThrow(),
+			f.stream().map(IOField::getName).collect(Collectors.toUnmodifiableSet())
+		);
+		return Struct.of(impl);
 	}
 }

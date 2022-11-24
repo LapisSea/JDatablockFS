@@ -23,7 +23,7 @@ public sealed interface ValueStorage<T>{
 	
 	sealed interface InstanceBased<T extends IOInstance<T>> extends ValueStorage<T>{
 		void readSelective(ContentReader src, T dest, FieldDependency.Ticket<T> depTicket) throws IOException;
-		T readNewSelective(ContentReader src, FieldDependency.Ticket<T> depTicket) throws IOException;
+		T readNewSelective(ContentReader src, FieldDependency.Ticket<T> depTicket, boolean strictHolder) throws IOException;
 		FieldDependency.Ticket<T> depTicket(IOField<T, ?> field);
 		FieldDependency.Ticket<T> depTicket(FieldSet<T> fields);
 		FieldDependency.Ticket<T> depTicket(Set<String> names);
@@ -97,8 +97,8 @@ public sealed interface ValueStorage<T>{
 			pipe.readDeps(pipe.makeIOPool(), provider, src, depTicket, dest, ctx);
 		}
 		@Override
-		public T readNewSelective(ContentReader src, FieldDependency.Ticket<T> depTicket) throws IOException{
-			return pipe.readNewSelective(provider, src, depTicket, ctx);
+		public T readNewSelective(ContentReader src, FieldDependency.Ticket<T> depTicket, boolean strictHolder) throws IOException{
+			return pipe.readNewSelective(provider, src, depTicket, ctx, strictHolder);
 		}
 		
 		@Override
@@ -163,8 +163,8 @@ public sealed interface ValueStorage<T>{
 			pipe.readDeps(pipe.makeIOPool(), provider, src, depTicket, dest, ctx);
 		}
 		@Override
-		public T readNewSelective(ContentReader src, FieldDependency.Ticket<T> depTicket) throws IOException{
-			return pipe.readNewSelective(provider, src, depTicket, ctx);
+		public T readNewSelective(ContentReader src, FieldDependency.Ticket<T> depTicket, boolean strictHolder) throws IOException{
+			return pipe.readNewSelective(provider, src, depTicket, ctx, strictHolder);
 		}
 		
 		@Override
@@ -277,10 +277,10 @@ public sealed interface ValueStorage<T>{
 			ref.io(provider, io->pipe.readDeps(pipe.makeIOPool(), provider, io, depTicket, dest, ctx));
 		}
 		@Override
-		public T readNewSelective(ContentReader src, FieldDependency.Ticket<T> depTicket) throws IOException{
+		public T readNewSelective(ContentReader src, FieldDependency.Ticket<T> depTicket, boolean strictHolder) throws IOException{
 			var ref=refPipe.readNew(provider, src, null);
 			ref.requireNonNull();
-			return ref.ioMap(provider, io->pipe.readNewSelective(provider, io, depTicket, ctx));
+			return ref.ioMap(provider, io->pipe.readNewSelective(provider, io, depTicket, ctx, strictHolder));
 		}
 		
 		@Override
