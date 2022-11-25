@@ -33,18 +33,21 @@ public class IOFieldNumber<T extends IOInstance<T>, E extends INumber> extends I
 	private       SizeDescriptor<T>                     sizeDescriptor;
 	
 	public IOFieldNumber(FieldAccessor<T> accessor){
-		this(accessor, null);
+		this(accessor, null, null);
 	}
-	private IOFieldNumber(FieldAccessor<T> accessor, VaryingSize maxSize){
+	private IOFieldNumber(FieldAccessor<T> accessor, VaryingSize maxSize, LongFunction<E> constructor){
 		super(accessor);
 		this.forceFixed=maxSize!=null;
 		this.maxSize=maxSize==null?VaryingSize.MAX:maxSize;
+		this.constructor=constructor;
 	}
 	
 	@Override
 	public void init(){
 		super.init();
-		this.constructor=Access.findConstructor(getType(), LongFunction.class, long.class);
+		if(constructor==null){
+			this.constructor=Access.findConstructor(getType(), LongFunction.class, long.class);
+		}
 		
 		Optional<IOField<T, NumberSize>> fieldOps=forceFixed?Optional.empty():IOFieldTools.getDynamicSize(getAccessor());
 		
@@ -56,7 +59,7 @@ public class IOFieldNumber<T extends IOInstance<T>, E extends INumber> extends I
 	@Override
 	public IOField<T, E> maxAsFixedSize(VaryingSize.Provider varProvider){
 		var ptr=getType()==ChunkPointer.class;
-		return new IOFieldNumber<>(getAccessor(), varProvider.provide(LARGEST, ptr));
+		return new IOFieldNumber<>(getAccessor(), varProvider.provide(LARGEST, ptr), constructor);
 	}
 	
 	private NumberSize getSize(VarPool<T> ioPool, T instance){
