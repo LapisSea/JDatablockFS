@@ -38,14 +38,38 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.ConsoleColors.*;
+import static com.lapissea.cfs.type.IOInstance.Def.IMPL_COMPLETION_POSTFIX;
 import static java.lang.reflect.Modifier.isStatic;
 
 public class DefInstanceCompiler{
 	
+	public static void init(){}
+	static{
+		//First run warmup
+		Thread.ofVirtual().start(()->{
+			JorthCompiler compiler=new JorthCompiler(JorthCompiler.class.getClassLoader());
+			try{
+				try(var writer=compiler.writeCode()){
+					writer.write(
+						"""
+							public visibility
+							dummy class start
+								public visibility
+								int returns
+								bar function start
+									0
+								end
+							""");
+				}
+				compiler.classBytecode(false);
+			}catch(Throwable e){
+				e.printStackTrace();
+			}
+		});
+	}
+	
 	private static final boolean PRINT_BYTECODE=GlobalConfig.configFlag("classGen.printBytecode", false);
 	private static final boolean EXIT_ON_FAIL  =GlobalConfig.configFlag("classGen.exitOnFail", !GlobalConfig.RELEASE_MODE);
-	
-	private static final String COMPLETION_POSTFIX="€Full";
 	
 	private record Specials(
 		Optional<Method> set,
@@ -119,10 +143,6 @@ public class DefInstanceCompiler{
 	
 	private static final ConcurrentHashMap<Key<?>, ImplNode<?>> CACHE=new ConcurrentHashMap<>();
 	
-	public static boolean isDefinition(Class<?> clazz){
-		return clazz.isInterface()&&UtilL.instanceOf(clazz, IOInstance.Def.class);
-	}
-	
 	@SuppressWarnings("unchecked")
 	public static <T extends IOInstance.Def<T>> Optional<Class<T>> unmap(Class<?> impl){
 		Objects.requireNonNull(impl);
@@ -130,7 +150,7 @@ public class DefInstanceCompiler{
 		var clazz=impl;
 		while(true){
 			for(Class<?> interf : clazz.getInterfaces()){
-				if(interf.getName().endsWith(COMPLETION_POSTFIX)){
+				if(interf.getName().endsWith(IMPL_COMPLETION_POSTFIX)){
 					var rl=COMPLETION_LOCK.readLock();
 					rl.lock();
 					try{
@@ -180,7 +200,7 @@ public class DefInstanceCompiler{
 	
 	private static <T extends IOInstance<T>> ImplNode<T> getNode(Key<T> key, boolean structNow){
 		Class<T> interf=key.clazz;
-		if(!isDefinition(interf)){
+		if(!IOInstance.Def.isDefinition(interf)){
 			throw new IllegalArgumentException(interf+" type must be an IOInstance.Def");
 		}
 		
@@ -196,16 +216,17 @@ public class DefInstanceCompiler{
 				case DONE -> {return node;}
 			}
 			
-			Class<T> impl=compile(node);
+			compile(node);
 			
-			try{
-				//Eagerly load struct
-				if(structNow) Struct.of(impl, StagedInit.STATE_DONE);
-				else Struct.of(impl);
-			}catch(Throwable e){
+			StagedInit.runBaseStageTask(()->{
+				try{
+					//Eagerly load struct
+					Struct.of(node.impl).waitForStateDone();
+				}catch(Throwable e){
 					var e1=StagedInit.WaitException.unwait(e);
-					Log.warn("Failed to preload {}. Cause: {}", impl.getName(), e1.getMessage());
+					Log.warn("Failed to preload {}. Cause: {}", node.impl.getName(), e1.getMessage());
 				}
+			});
 			
 			return node;
 		}catch(Throwable e){
@@ -216,7 +237,7 @@ public class DefInstanceCompiler{
 		}
 	}
 	
-	private static <T extends IOInstance<T>> Class<T> compile(ImplNode<T> node){
+	private static <T extends IOInstance<T>> void compile(ImplNode<T> node){
 		node.state=ImplNode.State.COMPILING;
 		
 		var key   =node.key;
@@ -269,7 +290,6 @@ public class DefInstanceCompiler{
 		node.init(impl, orderedFields);
 		
 		node.state=ImplNode.State.DONE;
-		return impl;
 	}
 	
 	private static final Map<Class<?>, Class<?>> COMPLETION_CACHE=new HashMap<>();
@@ -326,7 +346,7 @@ public class DefInstanceCompiler{
 			
 			try(var writer=jorth.writeCode()){
 				writeAnnotations(writer, Arrays.asList(interf.getAnnotations()));
-				writer.write("#TOKEN(0) typ.impl define", interf.getName()+COMPLETION_POSTFIX);
+				writer.write("#TOKEN(0) typ.impl define", interf.getName()+IMPL_COMPLETION_POSTFIX);
 				writer.write(
 					"""
 						#TOKEN(0) implements
@@ -692,7 +712,7 @@ public class DefInstanceCompiler{
 		
 		if(toStrAnn.name()){
 			var nam=key.clazz.getSimpleName();
-			if(nam.endsWith(COMPLETION_POSTFIX)) nam=nam.substring(0, nam.length()-COMPLETION_POSTFIX.length());
+			if(nam.endsWith(IMPL_COMPLETION_POSTFIX)) nam=nam.substring(0, nam.length()-IMPL_COMPLETION_POSTFIX.length());
 			var clean=nam;
 			append(writer, w->w.write("'#RAW(0)'", clean));
 		}
@@ -809,7 +829,7 @@ public class DefInstanceCompiler{
 	
 	private static Optional<Class<?>> upperSame(Class<?> interf){
 		
-		var its=Arrays.stream(interf.getInterfaces()).filter(DefInstanceCompiler::isDefinition).toList();
+		var its=Arrays.stream(interf.getInterfaces()).filter(IOInstance.Def::isDefinition).toList();
 		if(its.size()!=1) return Optional.empty();
 		
 		Set<String> parentNames=collectNames(its.get(0));
@@ -830,7 +850,7 @@ public class DefInstanceCompiler{
 	private static Optional<List<String>> getOrder(Class<?> interf, List<FieldInfo> fieldInfo){
 		var order=interf.getAnnotation(IOInstance.Def.Order.class);
 		if(order==null){
-			var its=Arrays.stream(interf.getInterfaces()).filter(DefInstanceCompiler::isDefinition).toList();
+			var its=Arrays.stream(interf.getInterfaces()).filter(IOInstance.Def::isDefinition).toList();
 			if(its.size()!=1) return Optional.empty();
 			
 			var upper=upperSame(interf);

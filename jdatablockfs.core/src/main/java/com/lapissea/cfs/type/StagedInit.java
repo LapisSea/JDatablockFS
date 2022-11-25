@@ -2,10 +2,13 @@ package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.internal.Runner;
+import com.lapissea.cfs.logging.Log;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 
 import java.util.*;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
@@ -28,20 +31,18 @@ public abstract class StagedInit{
 	private       Throwable e;
 	private final Object    lock =new Object();
 	
-	public StagedInit(){
-		if(DEBUG_VALIDATION){
-			validateStates();
-		}
-	}
-	
 	protected void init(boolean runNow, Runnable init){
 		if(runNow){
+			if(DEBUG_VALIDATION) validateStates();
+			
 			setInitState(STATE_START);
 			init.run();
 			setInitState(STATE_DONE);
+			
 			return;
 		}
 		runBaseStageTask(()->{
+			if(DEBUG_VALIDATION) validateStates();
 			try{
 				setInitState(STATE_START);
 				init.run();
@@ -98,6 +99,26 @@ public abstract class StagedInit{
 	public final void waitForState(int state){
 		if(this.state>=state) return;
 		actuallyWaitForState(state);
+	}
+	
+	public final void runOnStateDone(Runnable onEvent, Consumer<Throwable> onFail){
+		runOnState(STATE_DONE, onEvent, onFail);
+	}
+	
+	public final void runOnState(int state, Runnable onEvent, Consumer<Throwable> onFail){
+		if(this.state>=state){
+			onEvent.run();
+		}else{
+			Thread.ofVirtual().start(()->{
+				try{
+					waitForState(state);
+				}catch(Throwable e){
+					if(onFail!=null) onFail.accept(e);
+					return;
+				}
+				onEvent.run();
+			});
+		}
 	}
 	
 	protected int getEstimatedState(){
@@ -159,7 +180,7 @@ public abstract class StagedInit{
 		return StateInfo.BASE_STATES.stream();
 	}
 	
-	private void validateStates(){
+	protected final void validateStates(){
 		Set<Integer>   ids     =new HashSet<>();
 		Set<String>    names   =new HashSet<>();
 		List<String>   problems=new ArrayList<>();
@@ -186,11 +207,16 @@ public abstract class StagedInit{
 	}
 	
 	private void actuallyWaitForState(int state){
+		long start=System.nanoTime();
 		while(true){
 			synchronized(lock){
 				checkErr();
 				if(this.state>=state){
 					checkErr();
+					var delta=System.nanoTime()-start;
+					if(delta>300_000_000){
+						Log.debug("Long wait on {}#yellow in {}#yellow for {}#redms", (Supplier<Object>)()->stateToString(state), this, delta/1000_000);
+					}
 					return;
 				}
 				try{

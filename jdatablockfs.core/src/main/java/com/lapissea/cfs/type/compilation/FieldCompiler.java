@@ -61,11 +61,12 @@ public class FieldCompiler{
 	 * Scans an unmanaged struct for
 	 */
 	public static <T extends IOInstance.Unmanaged<T>> FieldSet<T> compileStaticUnmanaged(Struct.Unmanaged<T> struct){
-		var valueDefs=deepClasses(struct.getType()).flatArray(Class::getDeclaredMethods)
-		                                           .stream()
-		                                           .filter(m->m.isAnnotationPresent(IOValueUnmanaged.class))
-		                                           .sorted(comparingInt(FieldCompiler::unmanagedIndex).reversed())
-		                                           .toList();
+		var valueDefs=deepClasses(struct.getConcreteType())
+			              .flatArray(Class::getDeclaredMethods)
+			              .stream()
+			              .filter(m->m.isAnnotationPresent(IOValueUnmanaged.class))
+			              .sorted(comparingInt(FieldCompiler::unmanagedIndex).reversed())
+			              .toList();
 		if(valueDefs.isEmpty()) return FieldSet.of();
 		
 		var duplicates=valueDefs.stream()
@@ -272,7 +273,7 @@ public class FieldCompiler{
 	}
 	
 	protected static <T extends IOInstance<T>> List<FieldAccessor<T>> scanFields(Struct<T> struct){
-		var cl=struct.getType();
+		var cl=struct.getConcreteType();
 		
 		List<FieldAccessor<T>> fields    =new ArrayList<>();
 		Set<Method>            usedFields=new HashSet<>();

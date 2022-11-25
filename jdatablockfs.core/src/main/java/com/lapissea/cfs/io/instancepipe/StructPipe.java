@@ -76,7 +76,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			var err=errors.get(struct);
 			if(err!=null) throw err instanceof RuntimeException e?e:new RuntimeException(err);
 			
-			COMPILATION.log("Requested pipe({}): {}", (Supplier<String>)()->shortPipeName(type), struct.getType().getName());
+			COMPILATION.log("Requested pipe({}): {}", (Supplier<String>)()->shortPipeName(type), struct.getFullName());
 			
 			P created;
 			try{
@@ -96,7 +96,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 					created=lConstructor.make(struct, runNow);
 				}
 			}catch(Throwable e){
-				e.addSuppressed(new MalformedPipe("Failed to compile "+type.getSimpleName()+" for "+struct.getType().getName(), e));
+				e.addSuppressed(new MalformedPipe("Failed to compile "+type.getSimpleName()+" for "+struct.getFullName(), e));
 				errors.put(struct, e);
 				throw e;
 			}
@@ -104,7 +104,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			put(struct, created);
 			
 			COMPILATION.on(()->StagedInit.runBaseStageTask(()->{
-				String s="Compiled: "+struct.getType().getName()+"\n"+
+				String s="Compiled: "+struct.getFullName()+"\n"+
 				         "\tPipe type: "+BLUE_BRIGHT+created.getClass().getName()+CYAN_BRIGHT+"\n"+
 				         "\tSize: "+BLUE_BRIGHT+created.getSizeDescriptor()+CYAN_BRIGHT+"\n"+
 				         "\tReference commands: "+created.getReferenceWalkCommands();

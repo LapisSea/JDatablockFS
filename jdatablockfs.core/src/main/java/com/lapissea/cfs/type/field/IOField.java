@@ -120,6 +120,14 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 		getAccessor().set(ioPool, instance, value);
 	}
 	
+	public final SizeDescriptor<T> getSizeDescriptorSafe(){
+		var struct=declaringStruct();
+		if(struct!=null){
+			struct.waitForState(Struct.STATE_INIT_FIELDS);
+		}
+		return getSizeDescriptor();
+	}
+	
 	public abstract SizeDescriptor<T> getSizeDescriptor();
 	
 	public interface ValueGenerator<T extends IOInstance<T>, ValType>{

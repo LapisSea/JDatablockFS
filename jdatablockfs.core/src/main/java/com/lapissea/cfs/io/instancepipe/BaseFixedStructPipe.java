@@ -43,7 +43,7 @@ public abstract class BaseFixedStructPipe<T extends IOInstance<T>> extends Struc
 					IOFieldTools::mergeBitSpace
 				));
 		}catch(FixedFormatNotSupportedException e){
-			throw new UnsupportedStructLayout(type.getType().getName()+" does not support fixed size layout because of "+e.getField(), e);
+			throw new UnsupportedStructLayout(type.getFullName()+" does not support fixed size layout because of "+e.getField(), e);
 		}
 	}
 	
@@ -56,10 +56,7 @@ public abstract class BaseFixedStructPipe<T extends IOInstance<T>> extends Struc
 		return sizeFieldStream(structFields)
 			       .map(sizingField->{
 				       var size=getType().getFields().streamDependentOn(sizingField)
-				                         .mapToLong(v->{
-					                         v.declaringStruct().waitForState(Struct.STATE_INIT_FIELDS);
-					                         return v.getSizeDescriptor().requireMax(WordSpace.BYTE);
-				                         })
+				                         .mapToLong(v->v.getSizeDescriptorSafe().requireMax(WordSpace.BYTE))
 				                         .distinct()
 				                         .mapToObj(l->NumberSize.FLAG_INFO.stream()
 				                                                          .filter(s->s.bytes==l)

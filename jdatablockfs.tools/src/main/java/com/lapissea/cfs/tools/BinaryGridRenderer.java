@@ -1330,7 +1330,7 @@ public class BinaryGridRenderer implements DataRenderer{
 			if(ctx.stack.contains(frame)) return;
 			ctx.stack.add(frame);
 			
-			var typeHash=instance.getThisStruct().getType().getName().hashCode();
+			var typeHash=instance.getThisStruct().getFullName().hashCode();
 			
 			var rctx=ctx.renderCtx;
 			

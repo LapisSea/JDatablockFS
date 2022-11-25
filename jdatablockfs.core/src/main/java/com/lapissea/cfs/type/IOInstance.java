@@ -70,7 +70,8 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			String[] filter() default {};
 		}
 		
-		String IMPL_NAME_POSTFIX="€Impl";
+		String IMPL_NAME_POSTFIX      ="€Impl";
+		String IMPL_COMPLETION_POSTFIX="€Full";
 		
 		static <T extends Def<T>> NewObj<T> constrRef(Class<T> type){
 			return Struct.of(type).emptyConstructor();
@@ -81,7 +82,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			class Cache{
 				static final Map<Sig, Function<?, ?>> CH=new ConcurrentHashMap<>();
 			}
-			if(DefInstanceCompiler.isDefinition(type)) type=DefInstanceCompiler.getImpl(type, false);
+			if(isDefinition(type)) type=DefInstanceCompiler.getImpl(type, false);
 			
 			//noinspection unchecked
 			return (Function<A1, T>)Cache.CH.computeIfAbsent(new Sig(type, arg1Type), t->{
@@ -99,7 +100,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			class Cache{
 				static final Map<Sig, BiFunction<?, ?, ?>> CH=new ConcurrentHashMap<>();
 			}
-			if(DefInstanceCompiler.isDefinition(type)) type=DefInstanceCompiler.getImpl(type, false);
+			if(isDefinition(type)) type=DefInstanceCompiler.getImpl(type, false);
 			
 			//noinspection unchecked
 			return (BiFunction<A1, A2, T>)Cache.CH.computeIfAbsent(new Sig(type, arg1Type, arg2Type), t->{
@@ -117,7 +118,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			class Cache{
 				static final Map<Sig, TriFunction<?, ?, ?, ?>> CH=new ConcurrentHashMap<>();
 			}
-			if(DefInstanceCompiler.isDefinition(type)) type=DefInstanceCompiler.getImpl(type, false);
+			if(isDefinition(type)) type=DefInstanceCompiler.getImpl(type, false);
 			
 			//noinspection unchecked
 			return (TriFunction<A1, A2, A3, T>)Cache.CH.computeIfAbsent(new Sig(type, arg1Type, arg2Type, arg3Type), t->{
@@ -135,7 +136,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			class Cache{
 				static final Map<Sig, MethodHandle> CH=new ConcurrentHashMap<>();
 			}
-			if(DefInstanceCompiler.isDefinition(type)) type=DefInstanceCompiler.getImpl(type, false);
+			if(isDefinition(type)) type=DefInstanceCompiler.getImpl(type, false);
 			
 			return Cache.CH.computeIfAbsent(new Sig(type, argTypes.clone()), t->{
 				try{
@@ -201,7 +202,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			return DefInstanceCompiler.unmap(impl);
 		}
 		static boolean isDefinition(Class<?> c){
-			return DefInstanceCompiler.isDefinition(c);
+			return c.isInterface()&&UtilL.instanceOf(c, IOInstance.Def.class);
 		}
 		static <T extends Def<T>, A1> MethodHandle dataConstructor(Class<T> type){
 			return DefInstanceCompiler.dataConstructor(type);
@@ -226,7 +227,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		}
 		
 		private void checkStruct(Struct<SELF> thisStruct){
-			if(!thisStruct.getType().equals(getClass())){
+			if(!thisStruct.getConcreteType().equals(getClass())){
 				throw new IllegalArgumentException(thisStruct+" is not "+getClass());
 			}
 		}
