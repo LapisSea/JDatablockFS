@@ -19,7 +19,7 @@ public class CompilationBench{
 		Struct.clear();
 		StructPipe.clear();
 		var s=Struct.of(HashIOMap.class);
-		s.waitForState(Struct.STATE_DONE);
+		s.waitForStateDone();
 	}
 	
 	@Benchmark
@@ -29,7 +29,7 @@ public class CompilationBench{
 	@BenchmarkMode(Mode.SingleShotTime)
 	public void hashmapDryRun(){
 		var s=Struct.of(HashIOMap.class);
-		s.waitForState(Struct.STATE_DONE);
+		s.waitForStateDone();
 	}
 	
 }

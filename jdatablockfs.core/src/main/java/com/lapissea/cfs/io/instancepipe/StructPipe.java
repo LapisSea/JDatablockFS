@@ -224,7 +224,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		var         builder  =CommandSet.builder();
 		var         hasDynmic=getType() instanceof Struct.Unmanaged<?> u&&u.isOverridingDynamicUnmanaged();
 		FieldSet<T> fields;
-		getType().waitForState(STATE_DONE);
+		getType().waitForStateDone();
 		if(getType() instanceof Struct.Unmanaged<?> unmanaged){
 			fields=FieldSet.of(Stream.concat(getSpecificFields().stream(), unmanaged.getUnmanagedStaticFields().stream().map(f->(IOField<T, ?>)f)).toList());
 		}else{
@@ -322,7 +322,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	
 	
 	public CommandSet getReferenceWalkCommands(){
-		waitForState(STATE_DONE);
+		waitForStateDone();
 		return referenceWalkCommands;
 	}
 	
@@ -396,7 +396,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		
 		var hasDynamicFields=type instanceof Struct.Unmanaged<?> u&&u.isOverridingDynamicUnmanaged();
 		
-		type.waitForState(STATE_DONE);
+		type.waitForStateDone();
 		
 		if(!hasDynamicFields){
 			var sumFixedO=IOFieldTools.sumVarsIfAll(fields, desc->desc.getFixed(wordSpace));
@@ -562,7 +562,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	}
 	
 	public final void earlyCheckNulls(VarPool<T> ioPool, T instance){
-		waitForState(STATE_DONE);
+		waitForStateDone();
 		if(earlyNullChecks==null) return;
 		for(var field : earlyNullChecks){
 			if(field.isNull(ioPool, instance)){
@@ -683,7 +683,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	}
 	
 	private boolean hasGenerators(){
-		waitForState(STATE_DONE);
+		waitForStateDone();
 		return generators!=null;
 	}
 	private void generateAll(VarPool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException{

@@ -89,6 +89,12 @@ public abstract class StagedInit{
 		var to=getEstimatedState();
 		return new Timing(this, (t2-t1)/1000000D, from, to);
 	}
+	
+	public final void waitForStateDone(){
+		if(this.state==STATE_DONE) return;
+		actuallyWaitForState(STATE_DONE);
+	}
+	
 	public final void waitForState(int state){
 		if(this.state>=state) return;
 		actuallyWaitForState(state);

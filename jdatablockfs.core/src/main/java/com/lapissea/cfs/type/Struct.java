@@ -273,7 +273,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		if(!COMPILATION.isEnabled()&&!GlobalConfig.RELEASE_MODE){
 			Thread.ofVirtual().start(()->{
 				try{
-					struct.waitForState(STATE_DONE);
+					struct.waitForStateDone();
 					Log.trace("Struct compiled: {}#cyan", struct);
 				}catch(Throwable e){
 					Throwable e1=e;
@@ -286,7 +286,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		COMPILATION.on(()->{
 			Runnable run=()->{
 				try{
-					struct.waitForState(STATE_DONE);
+					struct.waitForStateDone();
 				}catch(Throwable e){
 					Log.warn("Failed to compile struct asynchronously: {}#red because {}", struct.cleanName(), e);
 				}
@@ -479,9 +479,6 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	public FieldSet<T> getFields(){
 		if(fields==null){
 			waitForState(STATE_FIELD_MAKE);
-			if(fields==null){
-				waitForState(STATE_FIELD_MAKE);
-			}
 		}
 		return Objects.requireNonNull(fields);
 	}
@@ -493,7 +490,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	
 	@Override
 	public boolean getCanHavePointers(){
-		waitForState(STATE_DONE);
+		waitForStateDone();
 		return canHavePointers;
 	}
 	
@@ -584,7 +581,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 				return false;
 			}
 			
-			waitForState(STATE_DONE);
+			waitForStateDone();
 			
 			boolean inv=false;
 			if(fields.unpackedStream().anyMatch(f->f.getNullability()==NOT_NULL)){
@@ -602,7 +599,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	
 	@Nullable
 	public VarPool<T> allocVirtualVarPool(StoragePool pool){
-		waitForState(STATE_DONE);
+		waitForStateDone();
 		if(hasPools==null||!hasPools[pool.ordinal()]) return null;
 		return new VarPool.GeneralVarArray<>(this, pool);
 	}
