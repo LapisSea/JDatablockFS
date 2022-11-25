@@ -1,5 +1,6 @@
 package com.lapissea.cfs.run.world;
 
+import com.lapissea.cfs.ConsoleColors;
 import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.run.Configuration;
@@ -22,13 +23,14 @@ public class RandomLists{
 	
 	public static void main(Configuration.View conf){
 		IntStream.range(conf.getInt("min", 1), conf.getInt("max", 10)).mapToObj(listCount->{
+		IntStream.range(conf.getInt("min", 1), conf.getInt("max", 50)).mapToObj(listCount->{
 			try{
 				var logger=LoggedMemoryUtils.createLoggerFromConfig();
 				var mem   =LoggedMemoryUtils.newLoggedMemory("l"+listCount, logger);
 				logger.get().getSession("l"+listCount);
 				
 				var task=CompletableFuture.runAsync(()->{
-					Log.trace("Starting: {} lists", listCount);
+					Log.trace(ConsoleColors.PURPLE+"Starting: {} lists"+ConsoleColors.RESET, listCount);
 					try{
 						var rand=new Random((long)listCount<<4);
 						try{
@@ -45,12 +47,12 @@ public class RandomLists{
 							logger.block();
 							mem.onWrite.log(mem, LongStream.of());
 						}
-					}catch(IOException e){
+					}catch(Throwable e){
 						e.printStackTrace();
 					}finally{
 						logger.get().destroy();
 					}
-				});
+				}, Thread.ofVirtual()::start);
 				if(conf.getBoolean("async", true)) UtilL.sleep(10);
 				else task.join();
 				return task;

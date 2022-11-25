@@ -597,9 +597,9 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	public void init(){
 		super.init();
 		var fieldOpt=forceFixed?Optional.<IOField<T, NumberSize>>empty():IOFieldTools.getDynamicSize(getAccessor());
-		var allowed =EnumSet.copyOf(allowedSizes().stream().filter(s->s.lesserThanOrEqual(maxSize.size)).collect(Collectors.toSet()));
 		if(fieldOpt.isPresent()){
-			var field=fieldOpt.get();
+			var allowed=EnumSet.copyOf(allowedSizes().stream().filter(s->s.lesserThanOrEqual(maxSize.size)).collect(Collectors.toSet()));
+			var field  =fieldOpt.get();
 			dynamicSize=(ioPool, instance)->{
 				var val=field.get(ioPool, instance);
 				if(!allowed.contains(val)) throw new IllegalStateException(val+" is not an allowed size in "+allowed+" at "+this+" with dynamic size "+field);

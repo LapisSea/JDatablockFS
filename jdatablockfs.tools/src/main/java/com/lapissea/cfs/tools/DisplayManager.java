@@ -235,16 +235,20 @@ public class DisplayManager implements DataLogger{
 							"Binary display - frame: "+(f==-1?"NaN":f)+
 							(f>0?sessionHost.activeSession.get()
 							                              .map(s->{
-								                              var d=Duration.ofNanos(
-									                              s.frames.get(f).memData().timeDelta()-
-									                              s.frames.get(f-1).memData().timeDelta()
-								                              );
-								                              var format=NumberFormat.getInstance();
-								                              format.setMinimumFractionDigits(2);
-								                              format.setMaximumFractionDigits(2);
-								                              if(d.toMillis()>500) return format.format(d.toMillis()/1000D)+"S";
-								                              if(d.toNanos()>10_000) return format.format(d.toNanos()/1000_000D)+"ms";
-								                              return d.toNanos()+"ns";
+								                              try{
+									                              var d=Duration.ofNanos(
+										                              s.frames.get(f).memData().timeDelta()-
+										                              s.frames.get(f-1).memData().timeDelta()
+									                              );
+									                              var format=NumberFormat.getInstance();
+									                              format.setMinimumFractionDigits(2);
+									                              format.setMaximumFractionDigits(2);
+									                              if(d.toMillis()>500) return format.format(d.toMillis()/1000D)+"S";
+									                              if(d.toNanos()>10_000) return format.format(d.toNanos()/1000_000D)+"ms";
+									                              return d.toNanos()+"ns";
+								                              }catch(IndexOutOfBoundsException e){
+									                              return "ERR";
+								                              }
 							                              })
 							                              .map(t->", Time: "+t)
 							                              .orElse(""):"")+

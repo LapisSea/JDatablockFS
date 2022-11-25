@@ -370,11 +370,15 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	
 	private NewObj.Instance<T> emptyConstructor;
 	
+	private int hash=-1;
+	
 	public static final int STATE_CONCRETE_TYPE=1, STATE_FIELD_MAKE=2, STATE_INIT_FIELDS=3;
 	
 	private Struct(Class<T> type, boolean runNow){
-		this.type=type;
+		this.type=Objects.requireNonNull(type);
 		init(runNow, ()->{
+			calcHash();
+			
 			isDefinition=UtilL.instanceOf(type, IOInstance.Def.class);
 			if(IOInstance.Def.isDefinition(type)){
 				concreteType=DefInstanceCompiler.getImpl(type, runNow);
@@ -539,9 +543,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	public FieldSet<T> getFields(){
-		if(fields==null){
-			waitForState(STATE_FIELD_MAKE);
-		}
+		waitForState(STATE_FIELD_MAKE);
 		return Objects.requireNonNull(fields);
 	}
 	
@@ -693,7 +695,12 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	
 	@Override
 	public int hashCode(){
-		return type.getName().hashCode();
+		if(hash==-1) calcHash();
+		return hash;
+	}
+	private void calcHash(){
+		var h=getFullName().hashCode();
+		hash=h==-1?0:h;
 	}
 	
 	private final Map<FieldSet<T>, Struct<T>> partialCache=Collections.synchronizedMap(new HashMap<>());

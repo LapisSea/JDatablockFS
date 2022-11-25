@@ -74,7 +74,8 @@ public class Access{
 			throw new RuntimeException("failed to create lambda for "+method+" with "+functionalInterface, e);
 		}
 	}
-	public static synchronized <FInter, T extends FInter> T makeLambda(Constructor<?> constructor, Class<FInter> functionalInterface){
+	
+	public static <FInter, T extends FInter> T makeLambda(Constructor<?> constructor, Class<FInter> functionalInterface){
 		try{
 			constructor.setAccessible(true);
 			var lookup=getLookup(constructor.getDeclaringClass());

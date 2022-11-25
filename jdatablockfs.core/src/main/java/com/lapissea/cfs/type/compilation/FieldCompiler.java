@@ -528,7 +528,7 @@ public class FieldCompiler{
 	}
 	
 	
-	private static final CompletableFuture<RegistryNode.FieldRegistry> REGISTRY=com.lapissea.cfs.type.compilation.FieldRegistry.make();
+	private static final CompletableFuture<RegistryNode.FieldRegistry> REGISTRY=FieldRegistry.make();
 	
 	protected static RegistryNode.FieldRegistry registry(){return REGISTRY.join();}
 	

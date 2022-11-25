@@ -224,8 +224,10 @@ public sealed interface ValueStorage<T>{
 		
 		@Override
 		public void write(RandomIO dest, T src) throws IOException{
+			var pos=dest.getPos();
 			var ref=dest.remaining()==0?new Reference():refPipe.readNew(provider, dest, null);
 			if(ref.isNull()){
+				dest.setPos(pos);
 				writeNew(dest, AllocateTicket.withData(pipe, provider, src), provider, refPipe);
 			}else{
 				ref.write(provider, true, pipe, src);

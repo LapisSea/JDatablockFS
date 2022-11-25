@@ -5,7 +5,6 @@ import com.lapissea.cfs.objects.Stringify;
 import com.lapissea.util.TextUtil;
 
 import java.util.*;
-import java.util.function.BiConsumer;
 
 public class VaryingSize implements Stringify{
 	
@@ -120,12 +119,16 @@ public class VaryingSize implements Stringify{
 			};
 		}
 		
-		static Provider intercept(Provider src, BiConsumer<NumberSize, VaryingSize> intercept){
+		interface Intercept{
+			void intercept(NumberSize max, boolean ptr, VaryingSize actual);
+		}
+		
+		static Provider intercept(Provider src, Intercept intercept){
 			return new Provider(){
 				@Override
 				public VaryingSize provide(NumberSize max, boolean ptr){
 					var actual=src.provide(max, ptr);
-					intercept.accept(max, actual);
+					intercept.intercept(max, ptr, actual);
 					return actual;
 				}
 				@Override

@@ -2,6 +2,7 @@ package com.lapissea.cfs.chunk;
 
 import com.lapissea.cfs.MagicID;
 import com.lapissea.cfs.exceptions.DesyncedCacheException;
+import com.lapissea.cfs.exceptions.MalformedPointerException;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.objects.ChunkPointer;
@@ -94,6 +95,11 @@ public interface DataProvider{
 	}
 	
 	private void ensureChunkValid(ChunkPointer ptr) throws IOException{
+		var siz=getSource().getIOSize();
+		if(ptr.getValue()>=siz){
+			throw new MalformedPointerException(ptr.getValue()+" is pointing outside file (file size: "+siz+")");
+		}
+		
 		var cached=getChunkCache().get(ptr);
 		if(cached==null) return;
 		var read=readChunk(ptr);

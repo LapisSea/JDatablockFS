@@ -6,8 +6,9 @@ public class Runner{
 	
 	private static final AtomicLong TASK_NUM=new AtomicLong();
 	public static void compileTask(Runnable task){
+		var index=TASK_NUM.incrementAndGet();
 		Thread.ofVirtual()
-		      .name("comp", TASK_NUM.incrementAndGet())
+		      .name("comp", index)
 		      .start(task);
 	}
 	
