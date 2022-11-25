@@ -172,6 +172,6 @@ class FieldRegistry{
 				}
 			});
 			return reg;
-		});
+		}, Thread.ofVirtual()::start);
 	}
 }

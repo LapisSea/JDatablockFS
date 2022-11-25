@@ -214,7 +214,7 @@ public sealed interface IOTypeDB{
 			}
 			FIRST_ID=db.maxID();
 			return db;
-		});
+		}, Thread.ofVirtual()::start);
 		
 		private static void registerBuiltIn(MemoryOnlyDB builtIn, Class<?> c){
 			builtIn.toID(c, true);
