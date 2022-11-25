@@ -22,7 +22,6 @@ public class RandomLists{
 	}
 	
 	public static void main(Configuration.View conf){
-		IntStream.range(conf.getInt("min", 1), conf.getInt("max", 10)).mapToObj(listCount->{
 		IntStream.range(conf.getInt("min", 1), conf.getInt("max", 50)).mapToObj(listCount->{
 			try{
 				var logger=LoggedMemoryUtils.createLoggerFromConfig();
