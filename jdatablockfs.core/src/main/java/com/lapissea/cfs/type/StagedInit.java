@@ -30,20 +30,26 @@ public abstract class StagedInit{
 	private       int       state=STATE_NOT_STARTED;
 	private       Throwable e;
 	private final Object    lock =new Object();
+	private       Thread    initThread;
 	
 	protected void init(boolean runNow, Runnable init){
 		if(runNow){
 			if(DEBUG_VALIDATION) validateStates();
-			
-			setInitState(STATE_START);
-			init.run();
-			setInitState(STATE_DONE);
+			initThread=Thread.currentThread();
+			try{
+				setInitState(STATE_START);
+				init.run();
+				setInitState(STATE_DONE);
+			}finally{
+				initThread=null;
+			}
 			
 			return;
 		}
 		runBaseStageTask(()->{
 			if(DEBUG_VALIDATION) validateStates();
 			try{
+				initThread=Thread.currentThread();
 				setInitState(STATE_START);
 				init.run();
 				setInitState(STATE_DONE);
@@ -53,6 +59,8 @@ public abstract class StagedInit{
 				synchronized(lock){
 					lock.notifyAll();
 				}
+			}finally{
+				initThread=null;
 			}
 		});
 	}
@@ -207,6 +215,10 @@ public abstract class StagedInit{
 	}
 	
 	private void actuallyWaitForState(int state){
+		if(initThread==Thread.currentThread()){
+			throw new RuntimeException("Self deadlock");
+		}
+		
 		long start=System.nanoTime();
 		while(true){
 			synchronized(lock){
