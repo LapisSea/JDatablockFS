@@ -105,8 +105,21 @@ public abstract class StagedInit{
 	}
 	
 	public static class WaitException extends RuntimeException{
+		public static Throwable unwait(Throwable e){
+			if(e instanceof WaitException w){
+				return w.getWaitedCause();
+			}
+			return e;
+		}
 		public WaitException(String message, Throwable cause){
 			super(message, Objects.requireNonNull(cause));
+		}
+		public Throwable getWaitedCause(){
+			var c=getCause();
+			if(c instanceof WaitException w){
+				return w.getWaitedCause();
+			}
+			return c;
 		}
 	}
 	

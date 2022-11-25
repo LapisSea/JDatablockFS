@@ -276,8 +276,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 					struct.waitForStateDone();
 					Log.trace("Struct compiled: {}#cyan", struct);
 				}catch(Throwable e){
-					Throwable e1=e;
-					while(e1 instanceof WaitException) e1=e1.getCause();
+					var e1=StagedInit.WaitException.unwait(e);
 					Log.warn("Failed to compile struct asynchronously: {}#red because - {}: {}", struct.cleanFullName(), e1.getClass().getSimpleName(), e1.getMessage());
 				}
 			});

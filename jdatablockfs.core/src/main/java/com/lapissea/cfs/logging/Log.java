@@ -209,15 +209,23 @@ public class Log{
 		return formatted;
 	}
 	
-	private static final Map<String, String> COLORS=Map.of(
-		"BLACK", ConsoleColors.BLACK,
-		"RED", ConsoleColors.RED,
-		"GREEN", ConsoleColors.GREEN,
-		"YELLOW", ConsoleColors.YELLOW,
-		"BLUE", ConsoleColors.BLUE,
-		"PURPLE", ConsoleColors.PURPLE,
-		"CYAN", ConsoleColors.CYAN,
-		"WHITE", ConsoleColors.WHITE
+	private static final Map<String, String> COLORS=Map.ofEntries(
+		Map.entry("BLACK", ConsoleColors.BLACK),
+		Map.entry("BLACKBRIGHT", ConsoleColors.BLACK_BRIGHT),
+		Map.entry("RED", ConsoleColors.RED),
+		Map.entry("REDBRIGHT", ConsoleColors.RED_BRIGHT),
+		Map.entry("GREEN", ConsoleColors.GREEN),
+		Map.entry("GREENBRIGHT", ConsoleColors.GREEN_BRIGHT),
+		Map.entry("YELLOW", ConsoleColors.YELLOW),
+		Map.entry("YELLOWBRIGHT", ConsoleColors.YELLOW_BRIGHT),
+		Map.entry("BLUE", ConsoleColors.BLUE),
+		Map.entry("BLUEBRIGHT", ConsoleColors.BLUE_BRIGHT),
+		Map.entry("PURPLE", ConsoleColors.PURPLE),
+		Map.entry("PURPLEBRIGHT", ConsoleColors.PURPLE_BRIGHT),
+		Map.entry("CYAN", ConsoleColors.CYAN),
+		Map.entry("CYANBRIGHT", ConsoleColors.CYAN_BRIGHT),
+		Map.entry("WHITE", ConsoleColors.WHITE),
+		Map.entry("WHITEBRIGHT", ConsoleColors.WHITE_BRIGHT)
 	);
 	
 	private static int resolveArg(StringBuilder formatted, Object arg, int start){
@@ -241,7 +249,11 @@ public class Log{
 								              if(z1!=z2) return false;
 							              }
 							              return true;
-						              }).findAny();
+						              })
+						              .limit(2)
+						              .reduce((r, l)->r.getKey().length()>
+						                              l.getKey().length()?
+						                              r:l);
 						if(any.isPresent()){
 							var replace=any.get().getValue()+TextUtil.toString(arg)+ConsoleColors.RESET;
 							formatted.replace(i, hStart+any.get().getKey().length(), replace);

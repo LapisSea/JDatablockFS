@@ -47,7 +47,9 @@ public class TestUtils{
 		}finally{
 			var ses=LOGGER.get().getSession(sessionName);
 			if(deleting){
-				trace("deleting ok session {}", sessionName);
+				if(ses!=DataLogger.Session.Blank.INSTANCE){
+					trace("deleting ok session {}", sessionName);
+				}
 				ses.delete();
 			}else{
 				ses.finish();

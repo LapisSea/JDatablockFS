@@ -203,8 +203,9 @@ public class DefInstanceCompiler{
 				if(structNow) Struct.of(impl, StagedInit.STATE_DONE);
 				else Struct.of(impl);
 			}catch(Throwable e){
-				Log.warn("Failed to preload {}. Cause: {}", impl.getName(), e.getMessage());
-			}
+					var e1=StagedInit.WaitException.unwait(e);
+					Log.warn("Failed to preload {}. Cause: {}", impl.getName(), e1.getMessage());
+				}
 			
 			return node;
 		}catch(Throwable e){
@@ -222,7 +223,7 @@ public class DefInstanceCompiler{
 		var interf=key.clazz;
 		
 		var hash=interf.getClassLoader().hashCode();
-		Log.trace("Generating implementation of: {}#cyan fields: {} - {}", interf.getName(), ((Optional<Object>)(Object)node.key.includeNames).orElse("<ALL>"), (Supplier<String>)()->{
+		Log.trace("Generating implementation of: {}#cyanBright fields: {} - {}", interf.getName(), ((Optional<Object>)(Object)node.key.includeNames).orElse("<ALL>"), (Supplier<String>)()->{
 			var cols=List.of(BLACK, RED, GREEN, YELLOW, BLUE, PURPLE, CYAN, WHITE);
 			return cols.get((int)(Integer.toUnsignedLong(hash)%cols.size()))+Integer.toHexString(hash)+RESET;
 		});

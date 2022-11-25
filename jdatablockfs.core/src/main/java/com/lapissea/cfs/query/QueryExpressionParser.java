@@ -15,6 +15,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -119,7 +120,12 @@ public class QueryExpressionParser{
 		QueryCheck compiledCheck=expressionToCheck(filterQuery.type, filterQuery.expression, null);
 		
 		Log.trace("Compiled check for {}#cyan - \"{}#red\": {}#blue",
-		          filterQuery.type.getSimpleName(), filterQuery.expression, compiledCheck);
+		          (Supplier<Object>)()->{
+			          if(IOInstance.isInstance(filterQuery.type)){
+				          return Struct.ofUnknown(filterQuery.type).cleanName();
+			          }
+			          return filterQuery.type.getSimpleName();
+		          }, filterQuery.expression, compiledCheck);
 		
 		return new FilterResult<>(t->{}, QueryCheck.cached(compiledCheck));
 	}
