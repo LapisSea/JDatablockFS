@@ -33,7 +33,6 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -240,22 +239,29 @@ public class DefInstanceCompiler{
 	private static <T extends IOInstance<T>> void compile(ImplNode<T> node){
 		node.state=ImplNode.State.COMPILING;
 		
-		var key   =node.key;
-		var interf=key.clazz;
+		var key=node.key;
 		
-		var hash=interf.getClassLoader().hashCode();
-		Log.trace("Generating implementation of: {}#cyanBright fields: {} - {}", interf.getName(), ((Optional<Object>)(Object)node.key.includeNames).orElse("<ALL>"), (Supplier<String>)()->{
-			var cols=List.of(BLACK, RED, GREEN, YELLOW, BLUE, PURPLE, CYAN, WHITE);
-			return cols.get((int)(Integer.toUnsignedLong(hash)%cols.size()))+Integer.toHexString(hash)+RESET;
-		});
+		var inter=key.clazz;
+		var hash =inter.getClassLoader().hashCode();
+		Log.trace(
+			"Generating implementation of: {}#cyan{}#cyanBright fields: {} - {}", ()->{
+				var cols=List.of(BLACK, RED, GREEN, YELLOW, BLUE, PURPLE, CYAN, WHITE);
+				return List.of(
+					inter.getName().substring(0, inter.getName().length()-inter.getSimpleName().length()),
+					inter.getSimpleName(),
+					((Optional<Object>)(Object)node.key.includeNames).orElse("<ALL>"),
+					cols.get((int)(Integer.toUnsignedLong(hash)%cols.size()))+Integer.toHexString(hash)+RESET
+				);
+			}
+		);
 		
-		interf=completeInterface(interf);
-		key=new Key<>(interf, key.includeNames);
+		var completeInter=completeInterface(inter);
+		key=new Key<>(completeInter, key.includeNames);
 		
 		
 		var getters =new ArrayList<FieldStub>();
 		var setters =new ArrayList<FieldStub>();
-		var specials=collectMethods(interf, getters, setters);
+		var specials=collectMethods(completeInter, getters, setters);
 		
 		checkStyles(getters, setters);
 		
@@ -263,14 +269,14 @@ public class DefInstanceCompiler{
 		
 		key.includeNames.ifPresent(strings->checkIncludeNames(fieldInfo, strings));
 		
-		var orderedFields=getOrder(interf, fieldInfo)
+		var orderedFields=getOrder(completeInter, fieldInfo)
 			                  .map(names->names.stream()
 			                                   .map(name->fieldInfo.stream().filter(f->f.name.equals(name)).findAny())
 			                                   .map(Optional::orElseThrow)
 			                                   .toList())
 			                  .or(()->fieldInfo.size()>1?Optional.empty():Optional.of(fieldInfo));
 		
-		checkClass(interf, specials, orderedFields);
+		checkClass(completeInter, specials, orderedFields);
 		
 		checkTypes(fieldInfo);
 		checkAnnotations(fieldInfo);
@@ -281,7 +287,7 @@ public class DefInstanceCompiler{
 			impl=generateImpl(key, specials, fieldInfo, orderedFields);
 		}catch(Throwable e){
 			if(EXIT_ON_FAIL){
-				new RuntimeException("failed to compile "+interf.getName(), e).printStackTrace();
+				new RuntimeException("failed to compile "+completeInter.getName(), e).printStackTrace();
 				System.exit(1);
 			}
 			throw e;
@@ -339,7 +345,7 @@ public class DefInstanceCompiler{
 			return interf;
 		}
 		
-		Log.trace("Generating completion of {}#cyan - missing getters: {}, missing setters: {}", interf.getName(), missingGetters, missingSetters);
+		Log.trace("Generating completion of {}#cyan - missing getters: {}, missing setters: {}", interf.getSimpleName(), missingGetters, missingSetters);
 		
 		JorthCompiler jorth=new JorthCompiler(interf.getClassLoader());
 		try{

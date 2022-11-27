@@ -227,7 +227,7 @@ public abstract class StagedInit{
 					checkErr();
 					var delta=System.nanoTime()-start;
 					if(delta>300_000_000){
-						Log.debug("Long wait on {}#yellow in {}#yellow for {}#redms", (Supplier<Object>)()->stateToString(state), this, delta/1000_000);
+						Log.debug("Long wait on {}#yellow in {}#yellow for {#red{}ms#}", (Supplier<Object>)()->stateToString(state), this, delta/1000_000);
 					}
 					return;
 				}

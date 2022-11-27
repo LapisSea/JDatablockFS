@@ -119,7 +119,7 @@ public class QueryExpressionParser{
 	private static <T> FilterResult<T> parse(FilterQuery<T> filterQuery){
 		QueryCheck compiledCheck=expressionToCheck(filterQuery.type, filterQuery.expression, null);
 		
-		Log.trace("Compiled check for {}#cyan - \"{}#red\": {}#blue",
+		Log.trace("Compiled check for {}#cyan - {#red\"{}\"#}: {}#blue",
 		          (Supplier<Object>)()->{
 			          if(IOInstance.isInstance(filterQuery.type)){
 				          return Struct.ofUnknown(filterQuery.type).cleanName();

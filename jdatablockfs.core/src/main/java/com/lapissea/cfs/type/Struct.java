@@ -249,7 +249,11 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			var existing=getCachedUnsafe(instanceClass, lock);
 			if(existing!=null) return (S)existing;
 			
-			Log.trace("Requested struct: {}#greenBright", instanceClass.getName());
+			Log.trace("Requested struct: {}#green{}#greenBright",
+			          ()->List.of(
+				          instanceClass.getName().substring(0, instanceClass.getName().length()-instanceClass.getSimpleName().length()),
+				          instanceClass.getSimpleName()
+			          ));
 			
 			try{
 				STRUCT_THREAD_LOG.put(instanceClass, Thread.currentThread());
@@ -282,10 +286,10 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		}, null);
 		
 		
-		if(!GlobalConfig.RELEASE_MODE&&Log.LOG_LEVEL>=Log.WARN){
+		if(!GlobalConfig.RELEASE_MODE&&Log.WARN){
 			if(!COMPILATION.isEnabled()){
 				struct.runOnStateDone(
-					()->Log.trace("Struct compiled: {}#cyan", struct),
+					()->Log.trace("Struct compiled: {}#cyan{}#cyanBright", struct.getFullName().substring(0, struct.getFullName().length()-struct.cleanName().length()), struct),
 					e->{
 						var e1=StagedInit.WaitException.unwait(e);
 						Log.warn("Failed to compile struct asynchronously: {}#red because - {}: {}", struct.cleanFullName(), e1.getClass().getSimpleName(), e1.getMessage());
