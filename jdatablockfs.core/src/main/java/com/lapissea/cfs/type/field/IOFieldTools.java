@@ -88,7 +88,7 @@ public class IOFieldTools{
 			                                                       .findAny()
 			                                                       .orElseThrow())
 			).sort(Comparator.comparingInt((IOField<T, ?> f)->{//Pull fixed fields back and enforce word space sort order
-				                 var order=f.getSizeDescriptorSafe().getWordSpace().sortOrder;
+				                 var order=f.sizeDescriptorSafe().getWordSpace().sortOrder;
 				                 if(!f.getSizeDescriptor().hasFixed()){
 					                 order+=100000;
 				                 }

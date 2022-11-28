@@ -22,7 +22,7 @@ public class RandomLists{
 	}
 	
 	public static void main(Configuration.View conf){
-		IntStream.range(conf.getInt("min", 1), conf.getInt("max", 50)).mapToObj(listCount->{
+		IntStream.range(conf.getInt("min", 1), conf.getInt("max", 30)).mapToObj(listCount->{
 			try{
 				var logger=LoggedMemoryUtils.createLoggerFromConfig();
 				var mem   =LoggedMemoryUtils.newLoggedMemory("l"+listCount, logger);
@@ -51,7 +51,7 @@ public class RandomLists{
 					}finally{
 						logger.get().destroy();
 					}
-				}, Thread.ofVirtual()::start);
+				});
 				if(conf.getBoolean("async", true)) UtilL.sleep(10);
 				else task.join();
 				return task;

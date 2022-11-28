@@ -22,6 +22,10 @@ public class GlobalConfig{
 		return Utils.optionalProperty(CONFIG_PROPERTY_PREFIX+name);
 	}
 	
+	public static String propName(String name){
+		return CONFIG_PROPERTY_PREFIX+name;
+	}
+	
 	public static boolean configFlag(String name, boolean defaultValue){
 		return configProp(name).map(Boolean::valueOf).orElse(defaultValue);
 	}

@@ -61,7 +61,7 @@ public class Access{
 		if(match.isEmpty()){
 			match=Arrays.stream(type.getDeclaredMethods()).filter(m->m.getName().equals(name)).limit(2).toList();
 		}
-		if(match.size()>1) throw new IllegalArgumentException("Ambitious method name");
+		if(match.size()>1) throw new IllegalArgumentException("Ambiguous method name");
 		return makeLambda(match.get(0), functionalInterface);
 	}
 	

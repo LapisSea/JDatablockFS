@@ -46,15 +46,14 @@ public class FixedStructPipe<T extends IOInstance<T>> extends BaseFixedStructPip
 		StructPipe.registerSpecialImpl(struct, (Class<P>)(Object)FixedStructPipe.class, newType);
 	}
 	
-	private final Map<IOField<T, NumberSize>, NumberSize> maxValues;
+	private Map<IOField<T, NumberSize>, NumberSize> maxValues;
+	private boolean                                 maxValuesInited=false;
 	
 	public FixedStructPipe(Struct<T> type, boolean initNow){
 		this(type, compiler(), initNow);
 	}
 	public FixedStructPipe(Struct<T> type, PipeFieldCompiler<T, RuntimeException> compiler, boolean initNow){
 		super(type, compiler, initNow);
-		
-		maxValues=Utils.nullIfEmpty(computeMaxValues(getType().getFields()));
 		
 		if(DEBUG_VALIDATION){
 			if(!(type instanceof Struct.Unmanaged)){
@@ -66,15 +65,21 @@ public class FixedStructPipe<T extends IOInstance<T>> extends BaseFixedStructPip
 	private void setMax(T instance, VarPool<T> ioPool){
 		maxValues.forEach((k, v)->k.set(ioPool, instance, v));
 	}
+	private void initMax(){
+		maxValuesInited=true;
+		maxValues=Utils.nullIfEmpty(computeMaxValues(getType().getFields()));
+	}
 	
 	@Override
 	protected void doWrite(DataProvider provider, ContentWriter dest, VarPool<T> ioPool, T instance) throws IOException{
+		if(!maxValuesInited) initMax();
 		if(maxValues!=null) setMax(instance, ioPool);
 		writeIOFields(getSpecificFields(), ioPool, provider, dest, instance);
 	}
 	
 	@Override
 	protected T doRead(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
+		if(!maxValuesInited) initMax();
 		if(maxValues!=null) setMax(instance, ioPool);
 		readIOFields(getSpecificFields(), ioPool, provider, src, instance, genericContext);
 		return instance;
@@ -83,9 +88,5 @@ public class FixedStructPipe<T extends IOInstance<T>> extends BaseFixedStructPip
 	@Override
 	public void skip(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
 		src.skipExact(getFixedDescriptor().get());
-	}
-	
-	public Map<IOField<T, NumberSize>, NumberSize> getMaxValues(){
-		return maxValues;
 	}
 }

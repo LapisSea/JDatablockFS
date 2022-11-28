@@ -530,7 +530,9 @@ public class FieldCompiler{
 	
 	private static final CompletableFuture<RegistryNode.FieldRegistry> REGISTRY=FieldRegistry.make();
 	
-	protected static RegistryNode.FieldRegistry registry(){return REGISTRY.join();}
+	protected static RegistryNode.FieldRegistry registry(){
+		return REGISTRY.join();
+	}
 	
 	private static Set<Class<? extends Annotation>> activeAnnotations(){
 		return Set.of(

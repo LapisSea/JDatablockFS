@@ -120,7 +120,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 		getAccessor().set(ioPool, instance, value);
 	}
 	
-	public final SizeDescriptor<T> getSizeDescriptorSafe(){
+	public final SizeDescriptor<T> sizeDescriptorSafe(){
 		var struct=declaringStruct();
 		if(struct!=null){
 			struct.waitForState(Struct.STATE_INIT_FIELDS);

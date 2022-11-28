@@ -17,6 +17,27 @@ import static com.lapissea.cfs.Utils.getFrame;
 
 public class Log{
 	
+	private record Tag(String name, String cmd){}
+	
+	private static final List<Tag> COLORS=List.of(
+		new Tag("BLACK", ConsoleColors.BLACK),
+		new Tag("BLACKBRIGHT", ConsoleColors.BLACK_BRIGHT),
+		new Tag("RED", ConsoleColors.RED),
+		new Tag("REDBRIGHT", ConsoleColors.RED_BRIGHT),
+		new Tag("GREEN", ConsoleColors.GREEN),
+		new Tag("GREENBRIGHT", ConsoleColors.GREEN_BRIGHT),
+		new Tag("YELLOW", ConsoleColors.YELLOW),
+		new Tag("YELLOWBRIGHT", ConsoleColors.YELLOW_BRIGHT),
+		new Tag("BLUE", ConsoleColors.BLUE),
+		new Tag("BLUEBRIGHT", ConsoleColors.BLUE_BRIGHT),
+		new Tag("PURPLE", ConsoleColors.PURPLE),
+		new Tag("PURPLEBRIGHT", ConsoleColors.PURPLE_BRIGHT),
+		new Tag("CYAN", ConsoleColors.CYAN),
+		new Tag("CYANBRIGHT", ConsoleColors.CYAN_BRIGHT),
+		new Tag("WHITE", ConsoleColors.WHITE),
+		new Tag("WHITEBRIGHT", ConsoleColors.WHITE_BRIGHT)
+	);
+	
 	private static final int NONE_LEVEL       =Integer.MIN_VALUE;
 	private static final int MIN_LEVEL        =0;
 	private static final int WARN_LEVEL       =1;
@@ -38,19 +59,19 @@ public class Log{
 		default -> throw new IllegalStateException(level+" is not a recognised logging level");
 	}).orElse(GlobalConfig.RELEASE_MODE?WARN_LEVEL:INFO_LEVEL);
 	
-	public static final boolean MIN        =MIN_LEVEL>=LEVEL;
-	public static final boolean WARN       =WARN_LEVEL>=LEVEL;
-	public static final boolean INFO       =INFO_LEVEL>=LEVEL;
-	public static final boolean DEBUG      =DEBUG_LEVEL>=LEVEL;
-	public static final boolean TRACE      =TRACE_LEVEL>=LEVEL;
-	public static final boolean SMALL_TRACE=SMALL_TRACE_LEVEL>=LEVEL;
+	public static final boolean MIN        =MIN_LEVEL<=LEVEL;
+	public static final boolean WARN       =WARN_LEVEL<=LEVEL;
+	public static final boolean INFO       =INFO_LEVEL<=LEVEL;
+	public static final boolean DEBUG      =DEBUG_LEVEL<=LEVEL;
+	public static final boolean TRACE      =TRACE_LEVEL<=LEVEL;
+	public static final boolean SMALL_TRACE=SMALL_TRACE_LEVEL<=LEVEL;
 	public static final boolean ALL        =true;
 	
 	static{
 		if(GlobalConfig.DEBUG_VALIDATION){
 			info(
 				"""
-					Running with debugging:
+					{#yellowBrightRunning with debugging:#}
 						RELEASE_MODE: {}
 						TYPE_VALIDATION: {}
 						PRINT_COMPILATION: {}
@@ -267,16 +288,14 @@ public class Log{
 			
 			if(i<message.length()-1){
 				if(c=='{'&&message.charAt(i+1)=='#'){
-					var colO=findColor(message, i+2);
-					if(colO.isPresent()){
-						var col=colO.get();
-						var cmd=col.cmd;
-						formatted.append(cmd);
-						colorStack.add(last);
-						last=cmd;
-						i+=1+col.name.length();
-						continue;
-					}
+					var col=findColor(message, i+2).orElseThrow(
+						()->new IllegalArgumentException("Illegal log format, opened format block with {#... could not find a valid color"));
+					var cmd=col.cmd;
+					formatted.append(cmd);
+					colorStack.add(last);
+					last=cmd;
+					i+=1+col.name.length();
+					continue;
 				}else if(c=='#'&&message.charAt(i+1)=='}'){
 					formatted.append(colorStack.remove(colorStack.size()-1));
 					i++;
@@ -291,27 +310,6 @@ public class Log{
 		}
 		formatted.append(ConsoleColors.RESET);
 	}
-	
-	private record Tag(String name, String cmd){}
-	
-	private static final List<Tag> COLORS=List.of(
-		new Tag("BLACK", ConsoleColors.BLACK),
-		new Tag("BLACKBRIGHT", ConsoleColors.BLACK_BRIGHT),
-		new Tag("RED", ConsoleColors.RED),
-		new Tag("REDBRIGHT", ConsoleColors.RED_BRIGHT),
-		new Tag("GREEN", ConsoleColors.GREEN),
-		new Tag("GREENBRIGHT", ConsoleColors.GREEN_BRIGHT),
-		new Tag("YELLOW", ConsoleColors.YELLOW),
-		new Tag("YELLOWBRIGHT", ConsoleColors.YELLOW_BRIGHT),
-		new Tag("BLUE", ConsoleColors.BLUE),
-		new Tag("BLUEBRIGHT", ConsoleColors.BLUE_BRIGHT),
-		new Tag("PURPLE", ConsoleColors.PURPLE),
-		new Tag("PURPLEBRIGHT", ConsoleColors.PURPLE_BRIGHT),
-		new Tag("CYAN", ConsoleColors.CYAN),
-		new Tag("CYANBRIGHT", ConsoleColors.CYAN_BRIGHT),
-		new Tag("WHITE", ConsoleColors.WHITE),
-		new Tag("WHITEBRIGHT", ConsoleColors.WHITE_BRIGHT)
-	);
 	
 	private static int resolveArg(StringBuilder formatted, Object arg, int start){
 		if(arg instanceof Supplier<?> supplier) arg=supplier.get();
