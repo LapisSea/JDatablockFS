@@ -6,6 +6,7 @@ import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.exceptions.RecursiveStructCompilation;
 import com.lapissea.cfs.internal.Access;
+import com.lapissea.cfs.internal.Runner;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.objects.ChunkPointer;
@@ -45,7 +46,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	
 	static{
 		//Preload for faster first start
-		Thread.ofVirtual().start(DefInstanceCompiler::init);
+		Runner.run(DefInstanceCompiler::init);
 	}
 	
 	private static final Log.Channel COMPILATION=Log.channel(PRINT_COMPILATION&&!Access.DEV_CACHE, Log.Channel.colored(GREEN_BRIGHT));

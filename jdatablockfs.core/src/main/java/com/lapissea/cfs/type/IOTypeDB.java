@@ -1,6 +1,7 @@
 package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.chunk.DataProvider;
+import com.lapissea.cfs.internal.Runner;
 import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.objects.ObjectID;
 import com.lapissea.cfs.objects.Reference;
@@ -176,7 +177,7 @@ public sealed interface IOTypeDB{
 		
 		//Init async, improves first run time, does not load a bunch of classes in static initializer
 		private static       int                             FIRST_ID=-1;
-		private static final CompletableFuture<MemoryOnlyDB> BUILT_IN=CompletableFuture.supplyAsync(()->{
+		private static final CompletableFuture<MemoryOnlyDB> BUILT_IN=Runner.async(()->{
 			var db=new MemoryOnlyDB();
 			try{
 				for(var c : new Class<?>[]{
@@ -214,7 +215,7 @@ public sealed interface IOTypeDB{
 			}
 			FIRST_ID=db.maxID();
 			return db;
-		}, Thread.ofVirtual()::start);
+		});
 		
 		private static void registerBuiltIn(MemoryOnlyDB builtIn, Class<?> c){
 			builtIn.toID(c, true);

@@ -19,7 +19,7 @@ public abstract class StagedInit{
 	
 	public static void runBaseStageTask(Runnable task){
 		if(DO_ASYNC){
-			Runner.compileTask(task);
+			Runner.run(task);
 		}else{
 			task.run();
 		}
@@ -117,7 +117,7 @@ public abstract class StagedInit{
 		if(this.state>=state){
 			onEvent.run();
 		}else{
-			Thread.ofVirtual().start(()->{
+			Runner.run(()->{
 				try{
 					waitForState(state);
 				}catch(Throwable e){

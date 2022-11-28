@@ -43,29 +43,6 @@ import static java.lang.reflect.Modifier.isStatic;
 public class DefInstanceCompiler{
 	
 	public static void init(){}
-	static{
-		//First run warmup
-		Thread.ofVirtual().start(()->{
-			JorthCompiler compiler=new JorthCompiler(JorthCompiler.class.getClassLoader());
-			try{
-				try(var writer=compiler.writeCode()){
-					writer.write(
-						"""
-							public visibility
-							dummy class start
-								public visibility
-								int returns
-								bar function start
-									0
-								end
-							""");
-				}
-				compiler.classBytecode(false);
-			}catch(Throwable e){
-				e.printStackTrace();
-			}
-		});
-	}
 	
 	private static final boolean PRINT_BYTECODE=GlobalConfig.configFlag("classGen.printBytecode", false);
 	private static final boolean EXIT_ON_FAIL  =GlobalConfig.configFlag("classGen.exitOnFail", !GlobalConfig.RELEASE_MODE);
@@ -1239,5 +1216,30 @@ public class DefInstanceCompiler{
 			var ann=GetAnnotation.from(field.annotations);
 			reg.requireCanCreate(FieldCompiler.getType(field.type, ann), ann);
 		}
+	}
+	
+	static{
+		//First run warmup
+		Thread.ofVirtual().start(()->{
+			if(!CACHE.isEmpty()) return;
+			JorthCompiler compiler=new JorthCompiler(JorthCompiler.class.getClassLoader());
+			try{
+				try(var writer=compiler.writeCode()){
+					writer.write(
+						"""
+							public visibility
+							dummy class start
+								public visibility
+								int returns
+								bar function start
+									0
+								end
+							""");
+				}
+				compiler.classBytecode(false);
+			}catch(Throwable e){
+				e.printStackTrace();
+			}
+		});
 	}
 }

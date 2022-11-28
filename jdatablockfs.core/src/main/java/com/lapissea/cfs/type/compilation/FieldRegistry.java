@@ -1,6 +1,7 @@
 package com.lapissea.cfs.type.compilation;
 
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.internal.Runner;
 import com.lapissea.cfs.objects.INumber;
 import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
@@ -19,7 +20,7 @@ import java.util.concurrent.CompletableFuture;
 
 class FieldRegistry{
 	static CompletableFuture<RegistryNode.FieldRegistry> make(){
-		return CompletableFuture.supplyAsync(()->{
+		return Runner.async(()->{
 			var reg=new RegistryNode.FieldRegistry();
 			reg.register(new RegistryNode(){
 				@Override
@@ -172,6 +173,6 @@ class FieldRegistry{
 				}
 			});
 			return reg;
-		}, Thread.ofVirtual()::start);
+		});
 	}
 }
