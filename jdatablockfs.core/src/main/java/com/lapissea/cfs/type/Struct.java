@@ -532,8 +532,17 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		return type;
 	}
 	public Class<T> getConcreteType(){
-		waitForState(STATE_CONCRETE_TYPE);
+		if(concreteType==null) resolveConcrete();
 		return concreteType;
+	}
+	
+	private void resolveConcrete(){
+		isDefinition=UtilL.instanceOf(type, IOInstance.Def.class);
+		if(IOInstance.Def.isDefinition(type)){
+			waitForState(STATE_CONCRETE_TYPE);
+		}else{
+			concreteType=type;
+		}
 	}
 	
 	public String getFullName(){

@@ -32,6 +32,8 @@ import java.lang.annotation.Target;
 import java.lang.reflect.ParameterizedType;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -59,7 +61,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		private final Map<Struct<T>, Supplier<P>> specials=new HashMap<>();
 		private final PipeConstructor<T, P>       lConstructor;
 		private final Class<?>                    type;
-		private final Map<Struct<T>, Throwable>   errors  =new ConcurrentHashMap<>();
+		private final Map<Struct<T>, Throwable>   errors  =new HashMap<>();
+		private final Map<Struct<T>, Lock>        locks   =Collections.synchronizedMap(new HashMap<>());
 		
 		private StructGroup(Class<? extends StructPipe<?>> type){
 			try{
@@ -73,10 +76,34 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		P make(Struct<T> struct, boolean runNow){
 			var cached=get(struct);
 			if(cached!=null) return cached;
+			return compute(struct, runNow);
+		}
+		
+		private P compute(Struct<T> struct, boolean runNow){
+			var lock=locks.computeIfAbsent(struct, __->new ReentrantLock());
+			lock.lock();
+			try{
+				var cached=get(struct);
+				if(cached!=null) return cached;
+				
+				var pipe=safeCompute(struct, runNow);
+				locks.remove(struct);
+				return pipe;
+			}finally{
+				lock.unlock();
+			}
+		}
+		
+		P safeCompute(Struct<T> struct, boolean runNow){
 			var err=errors.get(struct);
 			if(err!=null) throw err instanceof RuntimeException e?e:new RuntimeException(err);
 			
-			COMPILATION.log("Requested pipe({}): {}", (Supplier<String>)()->shortPipeName(type), struct.getFullName());
+			Log.trace("Requested pipe({}#greenBright): {}#blue{}#blueBright", ()->{
+				var name    =struct.cleanFullName();
+				var smolName=struct.cleanName();
+				
+				return List.of(shortPipeName(type), name.substring(0, name.length()-smolName.length()), smolName);
+			});
 			
 			P created;
 			try{
@@ -117,28 +144,6 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				
 				COMPILATION.log(s);
 			}));
-			
-			if(TYPE_VALIDATION&&!(struct instanceof Struct.Unmanaged)){
-				if(Access.DEV_CACHE){
-					created.getType().emptyConstructor();
-				}else{
-					T inst;
-					try{
-						inst=created.getType().make();
-					}catch(Throwable e){
-						inst=null;
-					}
-					if(inst!=null){
-						try{
-							created.checkTypeIntegrity(inst);
-						}catch(FieldIsNullException ignored){
-						}catch(IOException e){
-							e.printStackTrace();
-							throw new RuntimeException(e);
-						}
-					}
-				}
-			}
 			
 			return created;
 		}
@@ -215,9 +220,33 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				getNonNulls().filter(f->generators==null||generators.stream().noneMatch(gen->gen.field()==f))
 				             .toList()
 			);
-		});
+		}, this::postValidate);
 	}
 	
+	protected void postValidate(){
+		if(TYPE_VALIDATION&&!(getType() instanceof Struct.Unmanaged)){
+			var type=getType();
+			if(Access.DEV_CACHE){
+				type.emptyConstructor();
+			}else{
+				T inst;
+				try{
+					inst=type.make();
+				}catch(Throwable e){
+					inst=null;
+				}
+				if(inst!=null){
+					try{
+						checkTypeIntegrity(inst);
+					}catch(FieldIsNullException ignored){
+					}catch(IOException e){
+						e.printStackTrace();
+						throw new RuntimeException(e);
+					}
+				}
+			}
+		}
+	}
 	
 	@SuppressWarnings("unchecked")
 	private CommandSet generateReferenceWalkCommands(){

@@ -54,12 +54,18 @@ public class FixedStructPipe<T extends IOInstance<T>> extends BaseFixedStructPip
 	}
 	public FixedStructPipe(Struct<T> type, PipeFieldCompiler<T, RuntimeException> compiler, boolean initNow){
 		super(type, compiler, initNow);
-		
+	}
+	
+	@Override
+	protected void postValidate(){
 		if(DEBUG_VALIDATION){
-			if(!(type instanceof Struct.Unmanaged)){
-				if(!getSizeDescriptor().hasFixed()) throw new RuntimeException();
+			if(!(getType() instanceof Struct.Unmanaged)){
+				if(!getSizeDescriptor().hasFixed()){
+					throw new RuntimeException("Unmanaged type not fixed");
+				}
 			}
 		}
+		super.postValidate();
 	}
 	
 	private void setMax(T instance, VarPool<T> ioPool){

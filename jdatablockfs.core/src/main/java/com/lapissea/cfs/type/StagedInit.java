@@ -33,6 +33,9 @@ public abstract class StagedInit{
 	private       Thread    initThread;
 	
 	protected void init(boolean runNow, Runnable init){
+		init(runNow, init, null);
+	}
+	protected void init(boolean runNow, Runnable init, Runnable postValidate){
 		if(runNow){
 			if(DEBUG_VALIDATION) validateStates();
 			initThread=Thread.currentThread();
@@ -40,6 +43,9 @@ public abstract class StagedInit{
 				setInitState(STATE_START);
 				init.run();
 				setInitState(STATE_DONE);
+				if(postValidate!=null){
+					postValidate.run();
+				}
 			}finally{
 				initThread=null;
 			}
@@ -53,6 +59,9 @@ public abstract class StagedInit{
 				setInitState(STATE_START);
 				init.run();
 				setInitState(STATE_DONE);
+				if(postValidate!=null){
+					postValidate.run();
+				}
 			}catch(Throwable e){
 				state=STATE_ERROR;
 				this.e=e;
