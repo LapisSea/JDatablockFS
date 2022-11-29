@@ -24,13 +24,13 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-import static com.lapissea.cfs.ConsoleColors.RESET;
-import static com.lapissea.cfs.ConsoleColors.YELLOW_BRIGHT;
 import static com.lapissea.cfs.logging.Log.info;
 import static com.lapissea.cfs.logging.Log.trace;
 import static com.lapissea.cfs.logging.Log.warn;
 import static com.lapissea.cfs.tools.server.ServerCommons.Action;
 import static com.lapissea.cfs.tools.server.ServerCommons.getLocalLoggerImpl;
+import static com.lapissea.util.ConsoleColors.RESET;
+import static com.lapissea.util.ConsoleColors.YELLOW_BRIGHT;
 
 public class DisplayIpc implements DataLogger{
 	

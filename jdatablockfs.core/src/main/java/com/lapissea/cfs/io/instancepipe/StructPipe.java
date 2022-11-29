@@ -38,11 +38,11 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static com.lapissea.cfs.ConsoleColors.BLUE_BRIGHT;
-import static com.lapissea.cfs.ConsoleColors.CYAN_BRIGHT;
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.GlobalConfig.PRINT_COMPILATION;
 import static com.lapissea.cfs.GlobalConfig.TYPE_VALIDATION;
+import static com.lapissea.util.ConsoleColors.BLUE_BRIGHT;
+import static com.lapissea.util.ConsoleColors.CYAN_BRIGHT;
 
 public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit implements ObjectPipe<T, VarPool<T>>{
 	

@@ -29,7 +29,7 @@ import static com.lapissea.cfs.logging.Log.nonFatal;
 import static com.lapissea.cfs.tools.server.ServerCommons.Action;
 import static com.lapissea.util.LogUtil.Init.USE_CALL_POS;
 import static com.lapissea.util.LogUtil.Init.USE_TABULATED_HEADER;
-import static com.lapissea.util.PoolOwnThread.async;
+import static com.lapissea.util.UtilL.async;
 
 public class DisplayHost{
 	public static void main(String[] args) throws IOException{
@@ -213,7 +213,7 @@ public class DisplayHost{
 		
 		@Override
 		public void close(){
-			UtilL.closeSilenty(sessionServer);
+			UtilL.closeSilently(sessionServer);
 		}
 	}
 	

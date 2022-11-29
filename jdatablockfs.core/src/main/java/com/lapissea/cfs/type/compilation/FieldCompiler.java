@@ -15,6 +15,7 @@ import com.lapissea.cfs.type.field.StoragePool;
 import com.lapissea.cfs.type.field.VirtualFieldDefinition;
 import com.lapissea.cfs.type.field.access.*;
 import com.lapissea.cfs.type.field.annotations.*;
+import com.lapissea.util.LateInit;
 import com.lapissea.util.PairM;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
@@ -23,7 +24,6 @@ import ru.vyarus.java.generics.resolver.GenericsResolver;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
@@ -528,10 +528,10 @@ public class FieldCompiler{
 	}
 	
 	
-	private static final CompletableFuture<RegistryNode.FieldRegistry> REGISTRY=FieldRegistry.make();
+	private static final LateInit.Safe<RegistryNode.FieldRegistry> REGISTRY=FieldRegistry.make();
 	
 	protected static RegistryNode.FieldRegistry registry(){
-		return REGISTRY.join();
+		return REGISTRY.get();
 	}
 	
 	private static Set<Class<? extends Annotation>> activeAnnotations(){

@@ -1,10 +1,10 @@
 package com.lapissea.cfs.internal;
 
-import com.lapissea.cfs.ConsoleColors;
 import com.lapissea.cfs.logging.AverageDouble;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.util.ConsoleColors;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
 

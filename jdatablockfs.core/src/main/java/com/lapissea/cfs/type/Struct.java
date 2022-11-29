@@ -36,11 +36,11 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static com.lapissea.cfs.ConsoleColors.GREEN_BRIGHT;
 import static com.lapissea.cfs.GlobalConfig.PRINT_COMPILATION;
 import static com.lapissea.cfs.Utils.getCallee;
 import static com.lapissea.cfs.type.field.StoragePool.IO;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NOT_NULL;
+import static com.lapissea.util.ConsoleColors.GREEN_BRIGHT;
 
 public sealed class Struct<T extends IOInstance<T>> extends StagedInit implements RuntimeType<T>{
 	

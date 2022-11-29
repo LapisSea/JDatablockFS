@@ -52,7 +52,7 @@ public class LoggedMemoryUtils{
 	}
 	public static void simpleLoggedMemorySession(String sessionName, UnsafeConsumer<IOInterface, IOException> session) throws IOException{
 		
-		LateInit<DataLogger> logger=LoggedMemoryUtils.createLoggerFromConfig();
+		var logger=LoggedMemoryUtils.createLoggerFromConfig();
 		
 		try{
 			var mem=LoggedMemoryUtils.newLoggedMemory(sessionName, logger);
@@ -69,7 +69,7 @@ public class LoggedMemoryUtils{
 		}
 	}
 	
-	public static LateInit<DataLogger> createLoggerFromConfig(){
+	public static LateInit.Safe<DataLogger> createLoggerFromConfig(){
 		var config=readConfig();
 		
 		if(LogUtil.Init.OUT==System.out){
@@ -81,7 +81,7 @@ public class LoggedMemoryUtils{
 		
 		var type=loggerConfig.getOrDefault("type", "none").toString();
 		
-		return new LateInit<>(()->switch(type){
+		return new LateInit.Safe<>(()->switch(type){
 			case "none" -> DataLogger.Blank.INSTANCE;
 			case "direct" -> new DisplayManager();
 			case "server" -> new DisplayIpc(loggerConfig);
@@ -89,9 +89,9 @@ public class LoggedMemoryUtils{
 		});
 	}
 	
-	public static MemoryData<?> newLoggedMemory(String sessionName, LateInit<DataLogger> logger) throws IOException{
+	public static MemoryData<?> newLoggedMemory(String sessionName, LateInit<DataLogger, RuntimeException> logger) throws IOException{
 		MemoryData.EventLogger proxyLogger;
-		if(logger.isInited()){
+		if(logger.isInitialized()){
 			DataLogger disp=logger.get();
 			if(disp instanceof DataLogger.Blank){
 				proxyLogger=(d, i)->{};
@@ -115,7 +115,7 @@ public class LoggedMemoryUtils{
 			var  preBuf=new LinkedList<MemFrame>();
 			Lock lock  =new ReentrantLock();
 			Thread.ofVirtual().start(()->{
-				UtilL.sleepUntil(logger::isInited, 20);
+				UtilL.sleepUntil(logger::isInitialized, 20);
 				lock.lock();
 				try{
 					var ses=logger.get().getSession(sessionName);
@@ -130,7 +130,7 @@ public class LoggedMemoryUtils{
 			
 			long[] frameId={0};
 			proxyLogger=(data, ids)->{
-				if(logger.isInited()){
+				if(logger.isInitialized()){
 					var d=logger.get();
 					if(!d.isActive()){
 						return;
@@ -144,7 +144,7 @@ public class LoggedMemoryUtils{
 				var memFrame=new MemFrame(id, System.nanoTime(), data.readAll(), ids.toArray(), new Throwable());
 				lock.lock();
 				try{
-					if(logger.isInited()){
+					if(logger.isInitialized()){
 						var ses=logger.get().getSession(sessionName);
 						while(!preBuf.isEmpty()){
 							ses.log(preBuf.remove(0));

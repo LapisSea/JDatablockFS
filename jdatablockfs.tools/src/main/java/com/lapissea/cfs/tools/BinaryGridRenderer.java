@@ -58,8 +58,8 @@ import static com.lapissea.cfs.logging.Log.warn;
 import static com.lapissea.cfs.tools.ColorUtils.alpha;
 import static com.lapissea.cfs.tools.render.RenderBackend.DrawMode;
 import static com.lapissea.cfs.type.field.StoragePool.IO;
-import static com.lapissea.util.PoolOwnThread.async;
 import static com.lapissea.util.UtilL.TRUE;
+import static com.lapissea.util.UtilL.async;
 import static org.lwjgl.glfw.GLFW.*;
 
 @SuppressWarnings({"UnnecessaryLocalVariable", "SameParameterValue", "rawtypes", "unchecked"})
@@ -135,7 +135,7 @@ public class BinaryGridRenderer implements DataRenderer{
 	private final RenderBackend          direct;
 	private final RenderBackend.Buffered buff;
 	
-	private final NanoTimer frameTimer=new NanoTimer();
+	private final NanoTimer.Avg frameTimer=new NanoTimer.Avg();
 	
 	private Optional<SessionHost.HostedSession> displayedSession=Optional.empty();
 	
@@ -376,7 +376,7 @@ public class BinaryGridRenderer implements DataRenderer{
 		}
 		
 		if(hover!=null){
-			ctx.renderCtx.hoverMessages.add(new HoverMessage(UtilL.stream(ranges).toList(), color, new Object[]{field+": ", new FieldVal<>(ioPool, instance, field)}));
+			ctx.renderCtx.hoverMessages.add(new HoverMessage(StreamUtil.stream(ranges).toList(), color, new Object[]{field+": ", new FieldVal<>(ioPool, instance, field)}));
 		}
 		
 		if(renderCtx.pixelsPerByte<6) return;
@@ -1756,7 +1756,7 @@ public class BinaryGridRenderer implements DataRenderer{
 			var ranges=instance instanceof Chunk?List.of(Range.fromSize(offsetStart, fieldOffset)):DrawUtils.chainRangeResolve(ctx.provider, reference, 0, fieldOffset);
 			for(Range range : ranges){
 				if(rctx.isRangeHovered(range)){
-					rctx.hoverMessages.add(new HoverMessage(UtilL.stream(ranges).toList(), ColorUtils.makeCol(rand, typeHash, offsetStart+""), new Object[]{"Inst: ", instance}));
+					rctx.hoverMessages.add(new HoverMessage(StreamUtil.stream(ranges).toList(), ColorUtils.makeCol(rand, typeHash, offsetStart+""), new Object[]{"Inst: ", instance}));
 					break;
 				}
 			}

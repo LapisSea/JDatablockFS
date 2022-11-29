@@ -22,7 +22,7 @@ import java.util.LinkedList;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
-import static com.lapissea.util.PoolOwnThread.async;
+import static com.lapissea.util.UtilL.async;
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL20.glUseProgram;

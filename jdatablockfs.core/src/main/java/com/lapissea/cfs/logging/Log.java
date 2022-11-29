@@ -1,8 +1,8 @@
 package com.lapissea.cfs.logging;
 
-import com.lapissea.cfs.ConsoleColors;
 import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.Utils;
+import com.lapissea.util.ConsoleColors;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
 
@@ -16,6 +16,9 @@ import java.util.function.Supplier;
 import static com.lapissea.cfs.Utils.getFrame;
 
 public class Log{
+	static{
+		LogUtil.registerSkipClass(Log.class);
+	}
 	
 	private record Tag(String name, String cmd){}
 	

@@ -24,7 +24,7 @@ import static org.testng.Assert.assertEquals;
 
 public class TestUtils{
 	
-	private static final LateInit<DataLogger> LOGGER=LoggedMemoryUtils.createLoggerFromConfig();
+	private static final LateInit<DataLogger, RuntimeException> LOGGER=LoggedMemoryUtils.createLoggerFromConfig();
 	
 	
 	static void testRawMem(TestInfo info, UnsafeConsumer<IOInterface, IOException> session) throws IOException{

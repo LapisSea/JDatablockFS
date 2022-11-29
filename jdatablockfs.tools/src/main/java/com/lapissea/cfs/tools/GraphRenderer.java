@@ -30,7 +30,7 @@ import java.util.function.Consumer;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-import static com.lapissea.util.PoolOwnThread.async;
+import static com.lapissea.util.UtilL.async;
 
 public class GraphRenderer implements DataRenderer{
 	

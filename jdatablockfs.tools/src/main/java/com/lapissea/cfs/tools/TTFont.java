@@ -27,7 +27,7 @@ import java.util.function.Function;
 import java.util.stream.IntStream;
 
 import static com.lapissea.cfs.logging.Log.nonFatal;
-import static com.lapissea.util.PoolOwnThread.async;
+import static com.lapissea.util.UtilL.async;
 import static org.lwjgl.opengl.GL11.glColor4f;
 import static org.lwjgl.system.MemoryStack.stackPush;
 

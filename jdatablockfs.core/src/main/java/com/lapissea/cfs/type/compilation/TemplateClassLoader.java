@@ -29,7 +29,7 @@ import java.util.Map;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
-import static com.lapissea.cfs.ConsoleColors.*;
+import static com.lapissea.util.ConsoleColors.*;
 
 public final class TemplateClassLoader extends ClassLoader{
 	

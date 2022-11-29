@@ -9,6 +9,7 @@ import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IODynamic;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.reflection.*;
+import com.lapissea.util.LateInit;
 import com.lapissea.util.NotImplementedException;
 
 import java.lang.reflect.ParameterizedType;
@@ -16,10 +17,9 @@ import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
 
 class FieldRegistry{
-	static CompletableFuture<RegistryNode.FieldRegistry> make(){
+	static LateInit.Safe<RegistryNode.FieldRegistry> make(){
 		return Runner.async(()->{
 			var reg=new RegistryNode.FieldRegistry();
 			reg.register(new RegistryNode(){

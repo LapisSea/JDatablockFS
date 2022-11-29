@@ -2,11 +2,17 @@ package com.lapissea.cfs.internal;
 
 import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.logging.Log;
+import com.lapissea.util.LateInit;
+import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
+import com.lapissea.util.function.UnsafeSupplier;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
@@ -169,16 +175,11 @@ public class Runner{
 		}
 	}
 	
-	public static <T> CompletableFuture<T> async(Supplier<T> task){
-		var c=new CompletableFuture<T>();
-		run(()->{
-			try{
-				c.complete(task.get());
-			}catch(Throwable e){
-				c.completeExceptionally(e);
-			}
-		});
-		return c;
+	public static <T> LateInit.Safe<T> async(Supplier<T> task){
+		return new LateInit.Safe<>(task, Runner::run);
+	}
+	public static <T, E extends Throwable> LateInit<T, E> asyncChecked(UnsafeSupplier<T, E> task){
+		return new LateInit<>(task, Runner::run);
 	}
 	
 }

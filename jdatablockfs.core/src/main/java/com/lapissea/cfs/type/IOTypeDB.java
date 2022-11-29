@@ -11,13 +11,13 @@ import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.objects.collections.LinkedIOList;
 import com.lapissea.cfs.type.compilation.TemplateClassLoader;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.util.LateInit;
 import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Modifier;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
@@ -176,8 +176,8 @@ public sealed interface IOTypeDB{
 		}
 		
 		//Init async, improves first run time, does not load a bunch of classes in static initializer
-		private static       int                             FIRST_ID=-1;
-		private static final CompletableFuture<MemoryOnlyDB> BUILT_IN=Runner.async(()->{
+		private static       int                         FIRST_ID=-1;
+		private static final LateInit.Safe<MemoryOnlyDB> BUILT_IN=Runner.async(()->{
 			var db=new MemoryOnlyDB();
 			try{
 				for(var c : new Class<?>[]{
@@ -201,7 +201,6 @@ public sealed interface IOTypeDB{
 					TypeDef.class,
 					PersistentDB.class,
 					IOInstance.class,
-					TypeDef.class,
 					ObjectID.class,
 					ContiguousIOList.class,
 					LinkedIOList.class,
@@ -249,7 +248,7 @@ public sealed interface IOTypeDB{
 		
 		@Override
 		public TypeID toID(TypeLink type, boolean recordNew) throws IOException{
-			var builtIn=BUILT_IN.join();
+			var builtIn=BUILT_IN.get();
 			var id     =builtIn.toID(type, false);
 			if(id.stored()) return id;
 			
@@ -373,7 +372,7 @@ public sealed interface IOTypeDB{
 		
 		@Override
 		public TypeLink fromID(int id) throws IOException{
-			var builtIn=BUILT_IN.join();
+			var builtIn=BUILT_IN.get();
 			if(builtIn.hasID(id)){
 				return builtIn.fromID(id);
 			}
@@ -388,7 +387,7 @@ public sealed interface IOTypeDB{
 		
 		@Override
 		public TypeDef getDefinitionFromClassName(String className) throws IOException{
-			var builtIn=BUILT_IN.join();
+			var builtIn=BUILT_IN.get();
 			if(className==null||className.isEmpty()) return null;
 			{
 				var def=builtIn.getDefinitionFromClassName(className);

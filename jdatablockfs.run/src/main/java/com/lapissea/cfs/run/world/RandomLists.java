@@ -1,10 +1,10 @@
 package com.lapissea.cfs.run.world;
 
-import com.lapissea.cfs.ConsoleColors;
 import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.run.Configuration;
 import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
+import com.lapissea.util.ConsoleColors;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.UtilL;
 

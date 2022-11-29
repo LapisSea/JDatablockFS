@@ -67,9 +67,8 @@ public class SlowTests{
 	
 	@Test
 	void ioMultiWrite() throws IOException{
-		LateInit<DataLogger> logger;
-		logger=new LateInit<>(()->DataLogger.Blank.INSTANCE);
-//		logger=LoggedMemoryUtils.createLoggerFromConfig();
+		var logger=new LateInit<>(()->DataLogger.Blank.INSTANCE);
+//		var logger=LoggedMemoryUtils.createLoggerFromConfig();
 		
 		byte[] baked;
 		{
@@ -168,7 +167,7 @@ public class SlowTests{
 	
 	@Test(dataProvider="comps")
 	void compressionIntegrity(IOCompression.Type type){
-		NanoTimer t=new NanoTimer();
+		NanoTimer t=new NanoTimer.Simple();
 		t.start();
 		randomBatch(200000, (r, iter, tick)->{
 			if(tick){
