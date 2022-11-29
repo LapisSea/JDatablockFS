@@ -208,12 +208,12 @@ public class QueryExpressionParser{
 				hex=cleanNumber(hex, "0x");
 				return lToMinNum(parseLong(hex, 16));
 			}
-			var bin=regex(Pattern.compile("^[-+]??0[bB][0-1_]+"));
+			var bin=regex(Pattern.compile("^[-+]?0[bB][0-1_]+"));
 			if(bin!=null){
 				bin=cleanNumber(bin, "0b");
 				return lToMinNum(parseLong(bin, 2));
 			}
-			var dec=regex(Pattern.compile("^[-+]??[0-9_]*\\.?[0-9_]*"));
+			var dec=regex(Pattern.compile("^[-+]?[0-9_]*\\.?[0-9]+[0-9_]*"));
 			if(dec!=null){
 				dec=cleanNumber(dec, null);
 				if(dec.contains(".")){

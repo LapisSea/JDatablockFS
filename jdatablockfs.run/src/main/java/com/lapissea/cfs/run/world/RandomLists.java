@@ -5,6 +5,7 @@ import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.run.Configuration;
 import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
+import com.lapissea.util.LogUtil;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
@@ -16,6 +17,7 @@ import java.util.stream.LongStream;
 public class RandomLists{
 	
 	public static void main(String[] args){
+		LogUtil.Init.attach(LogUtil.Init.USE_CALL_POS|LogUtil.Init.USE_TABULATED_HEADER|LogUtil.Init.USE_CALL_THREAD);
 		Configuration conf=new Configuration();
 		conf.load(new Configuration.Loader.DashedNameValueArgs(args));
 		main(conf.getView());
@@ -51,7 +53,7 @@ public class RandomLists{
 					}finally{
 						logger.get().destroy();
 					}
-				});
+				}, Thread.ofVirtual()::start);
 				if(conf.getBoolean("async", true)) UtilL.sleep(10);
 				else task.join();
 				return task;

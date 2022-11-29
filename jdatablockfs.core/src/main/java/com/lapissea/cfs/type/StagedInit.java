@@ -15,7 +15,8 @@ import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
 public abstract class StagedInit{
 	
-	private static final boolean DO_ASYNC=GlobalConfig.configFlag("asyncLoad", true);
+	private static final boolean DO_ASYNC           =GlobalConfig.configFlag("loading.async", true);
+	private static final int     LONG_WAIT_THRESHOLD=GlobalConfig.configInt("loading.longWaitThreshold", 300);
 	
 	public static void runBaseStageTask(Runnable task){
 		if(DO_ASYNC){
@@ -223,6 +224,7 @@ public abstract class StagedInit{
 		
 	}
 	
+	
 	private void actuallyWaitForState(int state){
 		if(initThread==Thread.currentThread()){
 			throw new RuntimeException("Self deadlock");
@@ -235,7 +237,7 @@ public abstract class StagedInit{
 				if(this.state>=state){
 					checkErr();
 					var delta=System.nanoTime()-start;
-					if(delta>300_000_000){
+					if(delta>LONG_WAIT_THRESHOLD*1_000_000L){
 						Log.debug("Long wait on {}#yellow in {}#yellow for {#red{}ms#}", (Supplier<Object>)()->stateToString(state), this, delta/1000_000);
 					}
 					return;

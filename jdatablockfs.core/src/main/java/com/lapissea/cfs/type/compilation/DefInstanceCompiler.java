@@ -36,8 +36,8 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static com.lapissea.cfs.ConsoleColors.*;
 import static com.lapissea.cfs.type.IOInstance.Def.IMPL_COMPLETION_POSTFIX;
+import static com.lapissea.util.ConsoleColors.*;
 import static java.lang.reflect.Modifier.isStatic;
 
 public class DefInstanceCompiler{
@@ -295,7 +295,7 @@ public class DefInstanceCompiler{
 			var cached=COMPLETION_CACHE.get(interf);
 			if(cached!=null) return (Class<T>)cached;
 			
-			Class<?> complete=generateCompletedInterface(interf);
+			Class<?> complete=complete(interf);
 			COMPLETION_CACHE.put(interf, complete);
 			return (Class<T>)complete;
 		}finally{
@@ -303,7 +303,7 @@ public class DefInstanceCompiler{
 		}
 	}
 	
-	private static <T extends IOInstance<T>> Class<?> generateCompletedInterface(Class<T> interf){
+	private static <T extends IOInstance<T>> Class<?> complete(Class<T> interf){
 		
 		var getters=new ArrayList<FieldStub>();
 		var setters=new ArrayList<FieldStub>();
