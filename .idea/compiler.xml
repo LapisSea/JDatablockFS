@@ -31,7 +31,7 @@
       <module name="jdatablockfs.core" target="19" />
       <module name="jdatablockfs.run" target="19" />
       <module name="jdatablockfs.tools" target="19" />
-      <module name="Jorth" target="17" />
+      <module name="Jorth" target="19" />
     </bytecodeTargetLevel>
   </component>
 </project>

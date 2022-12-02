@@ -4,4 +4,5 @@ module Jorth {
 	requires org.objectweb.asm.util;
 	
 	exports com.lapissea.jorth;
+	exports com.lapissea.jorth.v2;
 }
