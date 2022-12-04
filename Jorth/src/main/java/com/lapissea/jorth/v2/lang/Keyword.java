@@ -21,6 +21,7 @@ public enum Keyword{
 	IMPLEMENTS,
 	SUPER,
 	NEW,
+	CALL,
 	WHAT_THE_STACK("???");
 	
 	public final String key;

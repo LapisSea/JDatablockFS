@@ -199,12 +199,11 @@ public final class Jorth extends CodeDestination{
 				e.end();
 			}
 			case VISIBILITY -> {
-				if(currentFunction!=null)throw new MalformedJorthException("Can not define visibility inside function");
+				if(currentFunction!=null) throw new MalformedJorthException("Can not define visibility inside function");
 				if(visibilityBuffer!=null) throw new MalformedJorthException("Visibility already defined");
 				visibilityBuffer=source.readEnum(Visibility.class);
 			}
 			case ACCESS -> {
-				if(currentFunction!=null)throw new MalformedJorthException("Can not define access inside function");
 				var e=source.readEnum(Access.class);
 				if(!accessSet.add(e)){
 					throw new MalformedJorthException(e+" already defined");
@@ -232,6 +231,17 @@ public final class Jorth extends CodeDestination{
 			case NEW -> {
 				var clazz=source.readClassName(importsFun);
 				currentFunction.newOp(clazz, List.of());
+			}
+			case CALL -> {
+				ClassName staticOwner=null;
+				
+				var acc=popAccessSet();
+				if(acc.remove(Access.STATIC)) staticOwner=source.readClassName(importsFun);
+				if(!acc.isEmpty()) throw new MalformedJorthException("Illegal access "+acc);
+				
+				var functionName=source.readWord();
+				source.requireKeyword(Keyword.START);
+				startStack.add(currentFunction.startCall(staticOwner, functionName));
 			}
 			case SUPER -> currentFunction.superOp();
 			case WHAT_THE_STACK -> throw new MalformedJorthException("Debug token '???' at line "+source.line()+" encountered. Current stack:\n"+currentFunction.getStack());

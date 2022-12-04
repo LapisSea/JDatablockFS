@@ -363,6 +363,30 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		writer.visitMethodInsn(callOp, ownerName, name, signature, ownerType==ClassType.INTERFACE);
 	}
 	
+	public Endable startCall(ClassName staticOwner, String functionName){
+		var mark=code().stack.mark();
+		
+		return ()->{
+			var stack   =code().stack;
+			var argCount=stack.size()-mark;
+			if(argCount<0) throw new MalformedJorthException("Negative stack delta inside arg block");
+			var args=new ArrayList<GenericType>(argCount);
+			for(int i=0;i<argCount;i++){
+				args.add(stack.peek(mark+i));
+			}
+			
+			var signature=new Signature(functionName, args);
+			if(staticOwner!=null){
+				var cInfo=typeSource.byName(staticOwner);
+				var info =cInfo.getFunction(signature);
+			}else{
+				var callee=stack.peek(mark-1);
+			}
+			
+			throw new NotImplementedException("Function ending not supported");
+		};
+	}
+	
 	public void loadStringOp(String str){
 		writer.visitLdcInsn(str);
 		code().stack.push(GenericType.STRING);

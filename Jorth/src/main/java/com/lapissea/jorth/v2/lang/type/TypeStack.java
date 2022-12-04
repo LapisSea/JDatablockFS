@@ -41,8 +41,21 @@ public class TypeStack{
 		return parent.isEmpty();
 	}
 	
+	public int size(){
+		if(parent==null) return stack.size();
+		return parent.size()+stack.size();
+	}
+	
 	public void requireElements(int count) throws MalformedJorthException{
 		if(stack.size()>=count) return;
 		throw new MalformedJorthException("Required at least "+count+" "+TextUtil.plural("element", count)+" on the stack");
+	}
+	public int mark(){
+		return 0;
+	}
+	public GenericType peek(int pos){
+		int localPos=pos-parent.size();
+		if(localPos<0) return parent.peek(pos);
+		return stack.get(localPos);
 	}
 }

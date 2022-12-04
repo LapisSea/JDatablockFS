@@ -53,13 +53,14 @@ public class JorthTmp{
 						returns #String
 					start
 						new #StringBuilder
-						'{foo: '
-						call append
+						call append start
+							'{foo: '
+						end
 						
-						get this foo
-						call append
-						
-						call toString
+						call append start
+							get this foo
+						end
+						call toString start end
 					end
 				end
 				""");
