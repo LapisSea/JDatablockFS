@@ -14,14 +14,14 @@ import java.io.IOException;
 public interface IOInterface extends RandomIO.Creator{
 	
 	default void setIOSize(long requestedSize) throws IOException{
-		try(var io=io()){
+		try(var io = io()){
 			io.ensureCapacity(requestedSize);
 			io.setSize(requestedSize);
 		}
 	}
 	
 	default long getIOSize() throws IOException{
-		try(var io=io()){
+		try(var io = io()){
 			return io.getSize();
 		}
 	}
@@ -51,12 +51,12 @@ public interface IOInterface extends RandomIO.Creator{
 	IOTransaction openIOTransaction();
 	
 	default <E extends Throwable> void openIOTransaction(UnsafeRunnable<E> session) throws E, IOException{
-		try(var ignored=openIOTransaction()){
+		try(var ignored = openIOTransaction()){
 			session.run();
 		}
 	}
 	default <T, E extends Throwable> T openIOTransaction(UnsafeSupplier<T, E> session) throws E, IOException{
-		try(var ignored=openIOTransaction()){
+		try(var ignored = openIOTransaction()){
 			return session.get();
 		}
 	}
@@ -74,7 +74,7 @@ public interface IOInterface extends RandomIO.Creator{
 			}
 			@Override
 			public RandomIO io() throws IOException{
-				var io=IOInterface.this.readOnlyIO();
+				var io = IOInterface.this.readOnlyIO();
 				if(!io.isReadOnly()){
 					throw new IllegalStateException();
 				}

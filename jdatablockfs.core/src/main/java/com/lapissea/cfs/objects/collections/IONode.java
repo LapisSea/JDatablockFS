@@ -46,7 +46,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		private final Iter<IONode<T>> nodes;
 		
 		private LinkedValueIterator(IONode<T> node){
-			nodes=node.iterator();
+			nodes = node.iterator();
 		}
 		
 		@Override
@@ -56,7 +56,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		
 		@Override
 		public T ioNext() throws IOException{
-			var node=nodes.ioNext();
+			var node = nodes.ioNext();
 			return node.getValue();
 		}
 		@Override
@@ -65,19 +65,19 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		}
 	}
 	
-	private static final List<Annotation> ANNOTATIONS=List.of(
+	private static final List<Annotation> ANNOTATIONS = List.of(
 		IOFieldTools.makeAnnotation(IODynamic.class, Map.of()),
 		IOFieldTools.makeAnnotation(IONullability.class, Map.of("value", IONullability.Mode.NULLABLE))
 	);
 	
 	@SuppressWarnings({"unchecked", "rawtypes"})
-	@IOValueUnmanaged(index=0)
+	@IOValueUnmanaged(index = 0)
 	private static <T> IOField<IONode<T>, Object> makeValField(){
-		var valueAccessor=new AbstractFieldAccessor<IONode<T>>(null, "value"){
+		var valueAccessor = new AbstractFieldAccessor<IONode<T>>(null, "value"){
 			@NotNull
 			@Override
 			public <T1 extends Annotation> Optional<T1> getAnnotation(Class<T1> annotationClass){
-				return ANNOTATIONS.stream().filter(a->UtilL.instanceOfObj(a, annotationClass)).map(a->(T1)a).findAny();
+				return ANNOTATIONS.stream().filter(a -> UtilL.instanceOfObj(a, annotationClass)).map(a -> (T1)a).findAny();
 			}
 			@Override
 			public Type getGenericType(GenericContext genericContext){
@@ -98,9 +98,9 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 			@Override
 			public void set(VarPool<IONode<T>> ioPool, IONode<T> instance, Object value){
 				try{
-					if(value!=null){
-						var arg=instance.getTypeDef().arg(0);
-						if(!UtilL.instanceOfObj(value, arg.getTypeClass(instance.getDataProvider().getTypeDb()))) throw new ClassCastException(arg+" not compatible with "+value);
+					if(value != null){
+						var arg = instance.getTypeDef().arg(0);
+						if(!UtilL.instanceOfObj(value, arg.getTypeClass(instance.getDataProvider().getTypeDb()))) throw new ClassCastException(arg + " not compatible with " + value);
 					}
 					
 					instance.setValue((T)value);
@@ -110,10 +110,10 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 			}
 		};
 		
-		SizeDescriptor<IONode<T>> valDesc=SizeDescriptor.Unknown.of(WordSpace.BYTE, 0, OptionalLong.empty(), (ioPool, prov, inst)->{
-			var val=valueAccessor.get(ioPool, inst);
-			if(val==null) return 0;
-			var siz=inst.valueStorage.inlineSize();
+		SizeDescriptor<IONode<T>> valDesc = SizeDescriptor.Unknown.of(WordSpace.BYTE, 0, OptionalLong.empty(), (ioPool, prov, inst) -> {
+			var val = valueAccessor.get(ioPool, inst);
+			if(val == null) return 0;
+			var siz = inst.valueStorage.inlineSize();
 			if(inst.valueStorage instanceof ValueStorage.Instance iStor){
 				try{
 					return iStor.getPipe().calcUnknownSize(prov, (IOInstance)inst.getValue(), WordSpace.BYTE);
@@ -127,19 +127,19 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		return new NoIOField<>(valueAccessor, valDesc);
 	}
 	
-	@IOValueUnmanaged(index=1)
+	@IOValueUnmanaged(index = 1)
 	@SuppressWarnings("unchecked")
 	private static <T extends IOInstance<T>> IOField<IONode<T>, IONode<T>> makeNextField(){
-		var nextAccessor=new AbstractFieldAccessor<IONode<T>>(null, "next"){
+		var nextAccessor = new AbstractFieldAccessor<IONode<T>>(null, "next"){
 			@NotNull
 			@Override
 			public <T1 extends Annotation> Optional<T1> getAnnotation(Class<T1> annotationClass){
-				if(annotationClass!=IONullability.class) return Optional.empty();
+				if(annotationClass != IONullability.class) return Optional.empty();
 				return (Optional<T1>)Optional.of(ANNOTATIONS.get(1));
 			}
 			@Override
 			public Type getGenericType(GenericContext genericContext){
-				if(genericContext==null) return IONode.class;
+				if(genericContext == null) return IONode.class;
 				throw new NotImplementedException();
 			}
 			@Override
@@ -164,10 +164,10 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 			}
 		};
 		
-		var next=new RefField.NoIO<IONode<T>, IONode<T>>(nextAccessor, SizeDescriptor.Unknown.of(WordSpace.BYTE, 0, NumberSize.LARGEST.optionalBytesLong, (ioPool, prov, node)->node.nextSize.bytes)){
+		var next = new RefField.NoIO<IONode<T>, IONode<T>>(nextAccessor, SizeDescriptor.Unknown.of(WordSpace.BYTE, 0, NumberSize.LARGEST.optionalBytesLong, (ioPool, prov, node) -> node.nextSize.bytes)){
 			@Override
 			public void setReference(IONode<T> instance, Reference newRef){
-				if(newRef.getOffset()!=0) throw new NotImplementedException();
+				if(newRef.getOffset() != 0) throw new NotImplementedException();
 				try{
 					instance.setNextRaw(newRef.getPtr());
 				}catch(IOException e){
@@ -178,11 +178,11 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 			public Reference getReference(IONode<T> instance){
 				ChunkPointer next;
 				try{
-					next=instance.getNextPtr();
+					next = instance.getNextPtr();
 				}catch(IOException e){
 					throw new RuntimeException(e);
 				}
-				return next.isNull()?new Reference():next.makeReference();
+				return next.isNull()? new Reference() : next.makeReference();
 			}
 			@Override
 			public StructPipe<IONode<T>> getReferencedPipe(IONode<T> instance){
@@ -194,13 +194,13 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		return next;
 	}
 	
-	private static final TypeLink.Check NODE_TYPE_CHECK=new TypeLink.Check(
+	private static final TypeLink.Check NODE_TYPE_CHECK = new TypeLink.Check(
 		IONode.class,
 		ArgCheck.rawAny(PRIMITIVE, INSTANCE_MANAGED)
 	);
 	
-	private static final IOField<?, NumberSize> NEXT_SIZE_FIELD         =Struct.thisClass().getFields().requireExact(NumberSize.class, "nextSize");
-	private static final int                    NEXT_SIZE_FIELD_MIN_SIZE=Math.toIntExact(getNextSizeField().getSizeDescriptor().getMin(WordSpace.BYTE));
+	private static final IOField<?, NumberSize> NEXT_SIZE_FIELD          = Struct.thisClass().getFields().requireExact(NumberSize.class, "nextSize");
+	private static final int                    NEXT_SIZE_FIELD_MIN_SIZE = Math.toIntExact(getNextSizeField().getSizeDescriptor().getMin(WordSpace.BYTE));
 	
 	private static NumberSize calcOptimalNextSize(DataProvider provider) throws IOException{
 		return NumberSize.bySize(provider.getSource().getIOSize()).next();
@@ -209,33 +209,33 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	@SuppressWarnings({"rawtypes", "unchecked"})
 	public static <T> IONode<T> allocValNode(T value, IONode<T> next, BasicSizeDescriptor<T, ?> sizeDescriptor, TypeLink nodeType, DataProvider provider, OptionalLong positionMagnet) throws IOException{
 		int nextBytes;
-		if(next!=null) nextBytes=NumberSize.bySize(next.getReference().getPtr()).bytes;
-		else nextBytes=calcOptimalNextSize(provider).bytes;
+		if(next != null) nextBytes = NumberSize.bySize(next.getReference().getPtr()).bytes;
+		else nextBytes = calcOptimalNextSize(provider).bytes;
 		
-		var bytes=1+nextBytes+switch(sizeDescriptor){
+		var bytes = 1 + nextBytes + switch(sizeDescriptor){
 			case SizeDescriptor.Fixed<?> fixed -> fixed.get(WordSpace.BYTE);
 			case SizeDescriptor.Unknown unknown -> unknown.calcUnknown(((IOInstance<?>)value).getThisStruct().allocVirtualVarPool(IO), provider, value, WordSpace.BYTE);
 			case BasicSizeDescriptor<T, ?> basic -> basic.calcUnknown(null, provider, value, WordSpace.BYTE);
 		};
 		
-		try(var ignored=provider.getSource().openIOTransaction()){
-			var chunk=AllocateTicket.bytes(bytes).withPositionMagnet(positionMagnet).submit(provider);
+		try(var ignored = provider.getSource().openIOTransaction()){
+			var chunk = AllocateTicket.bytes(bytes).withPositionMagnet(positionMagnet).submit(provider);
 			return new IONode<>(provider, chunk.getPtr().makeReference(), nodeType, value, next);
 		}
 	}
 	
 	public static <T> IONode<T> allocValNode(RandomIO valueBytes, IONode<T> next, TypeLink nodeType, DataProvider provider, OptionalLong positionMagnet) throws IOException{
 		int nextBytes;
-		if(next!=null) nextBytes=NumberSize.bySize(next.getReference().getPtr()).bytes;
-		else nextBytes=calcOptimalNextSize(provider).bytes;
+		if(next != null) nextBytes = NumberSize.bySize(next.getReference().getPtr()).bytes;
+		else nextBytes = calcOptimalNextSize(provider).bytes;
 		
-		var bytes=1+nextBytes+valueBytes.remaining();
+		var bytes = 1 + nextBytes + valueBytes.remaining();
 		
-		try(var ignored=provider.getSource().openIOTransaction()){
-			var chunk=AllocateTicket.bytes(bytes).withPositionMagnet(positionMagnet).submit(provider);
-			var node =new IONode<>(provider, chunk.getPtr().makeReference(), nodeType, null, next);
+		try(var ignored = provider.getSource().openIOTransaction()){
+			var chunk = AllocateTicket.bytes(bytes).withPositionMagnet(positionMagnet).submit(provider);
+			var node  = new IONode<>(provider, chunk.getPtr().makeReference(), nodeType, null, next);
 			node.ensureNextSpace();
-			try(var io=node.getValueDataIO()){
+			try(var io = node.getValueDataIO()){
 				valueBytes.transferTo(io);
 			}
 			return node;
@@ -250,26 +250,26 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	public IONode(DataProvider provider, Reference reference, TypeLink typeDef, T val, IONode<T> next) throws IOException{
 		this(provider, reference, typeDef);
 		
-		var newSiz=calcOptimalNextSize(provider);
+		var newSiz = calcOptimalNextSize(provider);
 		if(newSiz.greaterThan(nextSize)){
-			nextSize=newSiz;
+			nextSize = newSiz;
 			writeManagedFields();
 		}
 		
-		if(next!=null) setNext(next);
-		if(val!=null) setValue(val);
+		if(next != null) setNext(next);
+		if(val != null) setValue(val);
 	}
 	
 	public IONode(DataProvider provider, Reference reference, TypeLink typeDef) throws IOException{
 		super(provider, reference, typeDef, NODE_TYPE_CHECK);
 		
-		var magnetProvider=provider.withRouter(t->t.withPositionMagnet(t.positionMagnet().orElse(getReference().getPtr().getValue())));
+		var magnetProvider = provider.withRouter(t -> t.withPositionMagnet(t.positionMagnet().orElse(getReference().getPtr().getValue())));
 		
 		//noinspection unchecked
-		valueStorage=(ValueStorage<T>)ValueStorage.makeStorage(magnetProvider, typeDef.arg(0), getGenerics(), new ValueStorage.StorageRule.Default());
+		valueStorage = (ValueStorage<T>)ValueStorage.makeStorage(magnetProvider, typeDef.arg(0), getGenerics(), new ValueStorage.StorageRule.Default());
 		
 		if(isSelfDataEmpty()){
-			nextSize=calcOptimalNextSize(provider);
+			nextSize = calcOptimalNextSize(provider);
 			if(!readOnly) writeManagedFields();
 		}else{
 			readManagedFields();
@@ -278,7 +278,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	
 	@Override
 	public boolean equals(Object o){
-		if(this==o) return true;
+		if(this == o) return true;
 		if(!(o instanceof IONode<?> that)) return false;
 		
 		if(!this.getReference().equals(that.getReference())){
@@ -292,11 +292,11 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 			if(!this.getNextPtr().equals(that.getNextPtr())){
 				return false;
 			}
-			if(this.hasValue()!=that.hasValue()){
+			if(this.hasValue() != that.hasValue()){
 				return false;
 			}
-			var v1=this.getValue();
-			var v2=that.getValue();
+			var v1 = this.getValue();
+			var v2 = that.getValue();
 			return Objects.equals(v1, v2);
 		}catch(IOException e){
 			throw new RuntimeException(e);
@@ -309,14 +309,14 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	}
 	
 	private void ensureNextSpace() throws IOException{
-		try(var io=this.getReference().io(this)){
+		try(var io = this.getReference().io(this)){
 			ensureNextSpace(io);
 		}
 	}
 	private void ensureNextSpace(RandomIO io) throws IOException{
-		var valueStart=valueStart();
-		var skipped   =io.skip(valueStart);
-		var toWrite   =valueStart-skipped;
+		var valueStart = valueStart();
+		var skipped    = io.skip(valueStart);
+		var toWrite    = valueStart - skipped;
 		IUtils.zeroFill(io::write, toWrite);
 		io.setPos(0);
 	}
@@ -327,8 +327,8 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	T getValue() throws IOException{
 		if(readOnly){
 			if(!valueRead){
-				valueCache=readValue();
-				valueRead=true;
+				valueCache = readValue();
+				valueRead = true;
 			}
 			return valueCache;
 		}
@@ -336,31 +336,31 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	}
 	
 	RandomIO getValueDataIO() throws IOException{
-		var io=selfIO();
+		var io = selfIO();
 		try{
-			var s=io.getSize();
-			if(s==0) return null;
+			var s = io.getSize();
+			if(s == 0) return null;
 			if(s<NEXT_SIZE_FIELD_MIN_SIZE) return null;
 			if(DEBUG_VALIDATION){
 				if(!getPipe().getSpecificFields().get(0).equals(getNextSizeField())){
 					throw new ShouldNeverHappenError();
 				}
 			}
-			nextSize=FlagReader.readSingle(io, NumberSize.FLAG_INFO);
+			nextSize = FlagReader.readSingle(io, NumberSize.FLAG_INFO);
 
 //			if(DEBUG_VALIDATION){
 //				requireNonFreed();
 //			}
 			
-			long toSkip =nextSize.bytes;
-			long skipped=0;
+			long toSkip  = nextSize.bytes;
+			long skipped = 0;
 			while(skipped<toSkip){
-				long remaining   =toSkip-skipped;
-				var  skippedChunk=io.skip(remaining);
-				if(skippedChunk==0){
+				long remaining    = toSkip - skipped;
+				var  skippedChunk = io.skip(remaining);
+				if(skippedChunk == 0){
 					return null;
 				}
-				skipped+=skippedChunk;
+				skipped += skippedChunk;
 			}
 			return io;
 		}catch(Throwable e){
@@ -370,10 +370,10 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	}
 	
 	private T readValue() throws IOException{
-		var io=getValueDataIO();
-		if(io==null) return null;
+		var io = getValueDataIO();
+		if(io == null) return null;
 		try(io){
-			if(io.remaining()==0){
+			if(io.remaining() == 0){
 				return null;
 			}
 			return valueStorage.readNew(io);
@@ -383,32 +383,32 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	}
 	
 	private IOException readFail(IOException e) throws IOException{
-		StringBuilder sb=new StringBuilder();
+		StringBuilder sb = new StringBuilder();
 		sb.append("@ ").append(this.getReference().addOffset(valueStart()).infoString(getDataProvider())).append(": ");
-		var cause=e.getCause();
-		while(cause!=null&&cause.getClass()==IOException.class&&cause.getLocalizedMessage()!=null){
+		var cause = e.getCause();
+		while(cause != null && cause.getClass() == IOException.class && cause.getLocalizedMessage() != null){
 			sb.append(e.getLocalizedMessage()).append(": ");
-			cause=cause.getCause();
+			cause = cause.getCause();
 		}
-		if(cause!=null){
+		if(cause != null){
 			sb.append(cause.getClass().getSimpleName());
-			var msg=cause.getLocalizedMessage();
-			if(msg!=null) sb.append(": ").append(msg);
+			var msg = cause.getLocalizedMessage();
+			if(msg != null) sb.append(": ").append(msg);
 		}
 		return new IOException(sb.toString(), e);
 	}
 	
 	private void requireNonFreed() throws IOException{
-		var ch   =this.getReference().getPtr();
-		var frees=getDataProvider().getMemoryManager().getFreeChunks();
+		var ch    = this.getReference().getPtr();
+		var frees = getDataProvider().getMemoryManager().getFreeChunks();
 		if(frees.contains(ch)){
-			throw new RuntimeException(frees+" "+ch);
+			throw new RuntimeException(frees + " " + ch);
 		}
 	}
 	
 	boolean hasValue() throws IOException{
-		var nextStart=nextStart();
-		try(var io=this.getReference().io(this)){
+		var nextStart = nextStart();
+		try(var io = this.getReference().io(this)){
 			if(io.remaining()<nextStart){
 				return false;
 			}
@@ -418,9 +418,9 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 			}
 			io.skipExact(nextSize.bytes);
 			if(DEBUG_VALIDATION){
-				if(valueStart()!=io.getPos()) throw new AssertionError();
+				if(valueStart() != io.getPos()) throw new AssertionError();
 			}
-			return io.remaining()!=0;
+			return io.remaining() != 0;
 		}
 	}
 	
@@ -428,10 +428,10 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		if(readOnly){
 			throw new UnsupportedOperationException();
 		}
-		try(var io=this.getReference().io(this)){
+		try(var io = this.getReference().io(this)){
 			ensureNextSpace(io);
 			io.skipExact(valueStart());
-			if(value!=null){
+			if(value != null){
 				valueStorage.write(io, value);
 			}
 			io.trim();
@@ -443,8 +443,8 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	private ChunkPointer getNextPtr() throws IOException{
 		if(readOnly){
 			if(!nextPtrRead){
-				nextPtrCache=readNextPtr();
-				nextPtrRead=true;
+				nextPtrCache = readNextPtr();
+				nextPtrRead = true;
 			}
 			return nextPtrCache;
 		}
@@ -453,13 +453,13 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	private ChunkPointer readNextPtr() throws IOException{
 		readManagedFields();
 		ChunkPointer chunk;
-		try(var io=getReference().io(this)){
-			var start=nextStart();
+		try(var io = getReference().io(this)){
+			var start = nextStart();
 			if(io.remaining()<=start){
 				return ChunkPointer.NULL;
 			}
 			io.skipExact(start);
-			chunk=ChunkPointer.read(nextSize, io);
+			chunk = ChunkPointer.read(nextSize, io);
 		}
 		return chunk;
 	}
@@ -470,8 +470,8 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	IONode<T> getNext() throws IOException{
 		if(readOnly){
 			if(!nextRead){
-				nextCache=readNext();
-				nextRead=true;
+				nextCache = readNext();
+				nextRead = true;
 			}
 			return nextCache;
 		}
@@ -484,14 +484,14 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	
 	private IONode<T> readNext() throws IOException{
 		
-		var ptr=getNextPtr();
+		var ptr = getNextPtr();
 		if(ptr.isNull()) return null;
 		
 		return new IONode<>(getDataProvider(), new Reference(ptr, 0), getTypeDef());
 	}
 	
 	private long nextStart(){
-		IOField<IONode<T>, NumberSize> f=getNextSizeField();
+		IOField<IONode<T>, NumberSize> f = getNextSizeField();
 		return switch(f.getSizeDescriptor()){
 			case SizeDescriptor.Unknown<IONode<T>> u -> u.calcUnknown(getPipe().makeIOPool(), getDataProvider(), this, WordSpace.BYTE);
 			case SizeDescriptor.Fixed<IONode<T>> fixed -> fixed.get(WordSpace.BYTE);
@@ -504,35 +504,35 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	}
 	
 	private long valueStart(){
-		return nextStart()+nextSize.bytes;
+		return nextStart() + nextSize.bytes;
 	}
 	
 	public void setNext(IONode<T> next) throws IOException{
 		ChunkPointer ptr;
-		if(next==null) ptr=ChunkPointer.NULL;
-		else ptr=next.getReference().getPtr();
+		if(next == null) ptr = ChunkPointer.NULL;
+		else ptr = next.getReference().getPtr();
 		
 		setNextRaw(ptr);
 	}
 	private void setNextRaw(ChunkPointer ptr) throws IOException{
-		var oldPtr=getNextPtr();
+		var oldPtr = getNextPtr();
 		if(oldPtr.equals(ptr)){
 			return;
 		}
 		
-		var newSiz=NumberSize.bySize(ptr);
+		var newSiz = NumberSize.bySize(ptr);
 		if(newSiz.greaterThan(nextSize)){
-			var val =getValue();
-			var grow=newSiz.bytes-nextSize.bytes;
-			nextSize=newSiz;
-			getReference().withContext(this).io(io->io.ensureCapacity(io.getCapacity()+grow));
-			try(var ignored=getDataProvider().getSource().openIOTransaction()){
+			var val  = getValue();
+			var grow = newSiz.bytes - nextSize.bytes;
+			nextSize = newSiz;
+			getReference().withContext(this).io(io -> io.ensureCapacity(io.getCapacity() + grow));
+			try(var ignored = getDataProvider().getSource().openIOTransaction()){
 				writeManagedFields();
 				setValue(val);
 			}
 		}
 		
-		try(var io=getReference().io(this)){
+		try(var io = getReference().io(this)){
 			io.skipExact(nextStart());
 			nextSize.write(io, ptr);
 		}
@@ -545,16 +545,16 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		}
 		
 		String  val;
-		boolean valCorrupted=false;
+		boolean valCorrupted = false;
 		try{
-			val=Utils.toShortString(getValue());
+			val = Utils.toShortString(getValue());
 		}catch(Throwable e){
-			val="CORRUPTED: "+e;
-			valCorrupted=true;
+			val = "CORRUPTED: " + e;
+			valCorrupted = true;
 		}
-		var result=new StringBuilder().append("{").append(Utils.toShortString(val));
+		var result = new StringBuilder().append("{").append(Utils.toShortString(val));
 		try{
-			var next=getNextPtr();
+			var next = getNextPtr();
 			if(!next.isNull()){
 				result.append(" -> ").append(next);
 			}
@@ -568,7 +568,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	}
 	@Override
 	public String toString(){
-		return this.getClass().getSimpleName()+toShortString();
+		return this.getClass().getSimpleName() + toShortString();
 	}
 	
 	private static class NodeIterator<T> implements IOIterator.Iter<IONode<T>>{
@@ -577,31 +577,31 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		private IOException e;
 		
 		private NodeIterator(IONode<T> node){
-			this.node=node;
+			this.node = node;
 		}
 		
 		@Override
 		public boolean hasNext(){
-			return node!=null;
+			return node != null;
 		}
 		
 		@Override
 		public IONode<T> ioNext() throws IOException{
 			
-			if(e!=null){
+			if(e != null){
 				throw e;
 			}
 			
 			IONode<T> next;
 			try{
-				next=node.getNext();
+				next = node.getNext();
 			}catch(IOException e){
-				this.e=e;
-				next=null;
+				this.e = e;
+				next = null;
 			}
 			
-			var current=node;
-			node=next;
+			var current = node;
+			node = next;
 			return current;
 		}
 	}
@@ -622,8 +622,8 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	
 	public T readValueSelective(FieldDependency.Ticket<?> depTicket, boolean strictHolder) throws IOException{
 		if(!hasValue()) return null;
-		var based=(ValueStorage.InstanceBased)valueStorage;
-		try(var io=this.getReference().io(this)){
+		var based = (ValueStorage.InstanceBased)valueStorage;
+		try(var io = this.getReference().io(this)){
 			io.skipExact(valueStart());
 			return (T)based.readNewSelective(io, depTicket, strictHolder);
 		}
@@ -632,8 +632,8 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	@SuppressWarnings({"rawtypes", "unchecked"})
 	public boolean readValueSelective(T dest, FieldDependency.Ticket<?> depTicket) throws IOException{
 		if(!hasValue()) return false;
-		var based=(ValueStorage.InstanceBased)valueStorage;
-		try(var io=this.getReference().io(this)){
+		var based = (ValueStorage.InstanceBased)valueStorage;
+		try(var io = this.getReference().io(this)){
 			io.skipExact(valueStart());
 			based.readSelective(io, (IOInstance)dest, depTicket);
 		}
@@ -641,12 +641,12 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	}
 	
 	private void validateField(T dest, IOField<?, ?> field){
-		var struct=field.getAccessor().getDeclaringStruct();
+		var struct = field.getAccessor().getDeclaringStruct();
 		if(!UtilL.instanceOf(dest.getClass(), struct.getType())){
-			throw new ClassCastException(dest.getClass()+" is not compatible with "+field);
+			throw new ClassCastException(dest.getClass() + " is not compatible with " + field);
 		}
 		if(!(valueStorage instanceof ValueStorage.InstanceBased)){
-			throw new UnsupportedOperationException("Node with type of "+valueStorage.getType().getType()+" is not a valid instance");
+			throw new UnsupportedOperationException("Node with type of " + valueStorage.getType().getType() + " is not a valid instance");
 		}
 	}
 }

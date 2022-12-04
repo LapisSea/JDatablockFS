@@ -27,7 +27,7 @@ public class IPs{
 	
 	public static void main(String[] args) throws IOException{
 		// set this to true if you have a display server running and this program has a config.json to get a real time display of what is happening
-		boolean useDisplayServer=false;
+		boolean useDisplayServer = false;
 		if(useDisplayServer){
 			LoggedMemoryUtils.simpleLoggedMemorySession(IPs::run);
 		}else{
@@ -44,10 +44,10 @@ public class IPs{
 	public static void createData(IOInterface memory) throws IOException{
 		//Memory needs to be initialized with an empty database.
 		//Cluster.init acts as a clean slate for the memory field. Any previously contained data will be deleted
-		var cluster=Cluster.init(memory);
+		var cluster = Cluster.init(memory);
 		
 		//Ask root provider for list of IPs with the id of "my ips"
-		IOList<IP> ips=cluster.getRootProvider().request("my ips", IOList.class, IP.class);
+		IOList<IP> ips = cluster.getRootProvider().request("my ips", IOList.class, IP.class);
 		
 		//Nice thing to do, reduces possibility of fragmentation. This is only useful when adding element by element. addAll does not benefit from this
 		ips.requestRelativeCapacity(2);
@@ -64,7 +64,7 @@ public class IPs{
 		System.out.println("Data in memory:");
 		
 		for(var e : new Cluster(memory).getRootProvider().listAll()){
-			System.out.println(e.getKey()+": "+switch(e.getValue()){
+			System.out.println(e.getKey() + ": " + switch(e.getValue()){
 				//Just a fancy toString that every IOInstance has that allows for printing the data in a more appealing way
 				case IOInstance<?> inst -> inst.toString(false, "{\n\t", "\n}", ": ", ",\n\t");
 				default -> Objects.toString(e.getValue());

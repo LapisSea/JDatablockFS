@@ -13,28 +13,28 @@ import java.util.stream.LongStream;
 public class SparseImage{
 	
 	public static void main(String[] args) throws IOException{
-		var config=new Configuration();
+		var config = new Configuration();
 		config.load(new Configuration.Loader.JsonArgs(new File("SparseImage.json"), true));
 		config.load(new Configuration.Loader.DashedNameValueArgs(args));
-		long tim=System.currentTimeMillis();
+		long tim = System.currentTimeMillis();
 		main(config.getView());
-		LogUtil.println(System.currentTimeMillis()-tim);
+		LogUtil.println(System.currentTimeMillis() - tim);
 	}
 	
 	public static void main(Configuration.View args) throws IOException{
 		
 		LogUtil.Init.attach(0);
 		
-		String sessionName="default";
-		var    logger     =LoggedMemoryUtils.createLoggerFromConfig();
+		String sessionName = "default";
+		var    logger      = LoggedMemoryUtils.createLoggerFromConfig();
 		
 		try{
-			var mem=LoggedMemoryUtils.newLoggedMemory(sessionName, logger);
-			logger.ifInited(l->l.getSession(sessionName).reset());
+			var mem = LoggedMemoryUtils.newLoggedMemory(sessionName, logger);
+			logger.ifInited(l -> l.getSession(sessionName).reset());
 			
 			try{
 				LogUtil.println("init");
-				var cluster=Cluster.init(mem);
+				var cluster = Cluster.init(mem);
 				
 				LogUtil.println("run");
 				run(cluster, args);
@@ -51,16 +51,16 @@ public class SparseImage{
 	
 	public static void run(Cluster cluster, Configuration.View args) throws IOException{
 		
-		int radius    =args.getInt("radius", 50);
-		int iterations=args.getInt("iterations", 100);
+		int radius     = args.getInt("radius", 50);
+		int iterations = args.getInt("iterations", 100);
 		
 		LogUtil.println("data gen");
-		var image=cluster.getRootProvider().request("my image", Image.class);
+		var image = cluster.getRootProvider().request("my image", Image.class);
 		
-		Random r=new Random(1);
-		for(int i=0;i<iterations;i++){
-			int x=(int)(Math.pow(r.nextFloat(), 3)*radius);
-			int y=(int)(Math.pow(r.nextFloat(), 3)*radius);
+		Random r = new Random(1);
+		for(int i = 0; i<iterations; i++){
+			int x = (int)(Math.pow(r.nextFloat(), 3)*radius);
+			int y = (int)(Math.pow(r.nextFloat(), 3)*radius);
 			image.set(x, y, r.nextFloat(), r.nextFloat(), 1);
 		}
 		

@@ -64,61 +64,61 @@ public class GeneralTypeHandlingTests{
 		public float[] arr;
 	}
 	
-	@DataProvider(name="genericObjects")
+	@DataProvider(name = "genericObjects")
 	static Object[][] genericObjects(){
-		var deps=new Deps();
-		deps.a=1;
-		deps.b=2;
-		deps.c=3;
-		deps.d=4;
-		var arr=new Arr();
-		arr.arr=new float[]{1, 2, 3, 4, 5};
+		var deps = new Deps();
+		deps.a = 1;
+		deps.b = 2;
+		deps.c = 3;
+		deps.d = 4;
+		var arr = new Arr();
+		arr.arr = new float[]{1, 2, 3, 4, 5};
 		return new Object[][]{{Dummy.first()}, {deps}, {arr}};
 	}
 	
-	@Test(dataProvider="genericObjects")
+	@Test(dataProvider = "genericObjects")
 	<T extends IOInstance<T>> void genericStorage(T obj) throws IOException{
-		TestUtils.testCluster(TestInfo.of(obj), ses->{
-			var ls=ses.getRootProvider().<IOList<GenericContainer<?>>>builder().withType(TypeLink.ofFlat(
+		TestUtils.testCluster(TestInfo.of(obj), ses -> {
+			var ls = ses.getRootProvider().<IOList<GenericContainer<?>>>builder().withType(TypeLink.ofFlat(
 				LinkedIOList.class,
 				GenericContainer.class, Object.class
 			)).withId("list").request();
 			
-			var c=new GenericContainer<>(obj);
+			var c = new GenericContainer<>(obj);
 			ls.clear();
 			ls.add(c);
-			var read=ls.get(0).value;
+			var read = ls.get(0).value;
 			assertEquals(obj, read);
 		});
 	}
 	
 	@Test
 	void genericTest() throws IOException{
-		TestUtils.testChunkProvider(TestInfo.of(), provider->{
-			var pipe=StandardStructPipe.of(GenericContainer.class);
+		TestUtils.testChunkProvider(TestInfo.of(), provider -> {
+			var pipe = StandardStructPipe.of(GenericContainer.class);
 			
-			var chunk=AllocateTicket.bytes(64).submit(provider);
+			var chunk = AllocateTicket.bytes(64).submit(provider);
 			
-			var container=new GenericContainer<>();
+			var container = new GenericContainer<>();
 			
-			container.value=new Dummy(123);
+			container.value = new Dummy(123);
 			
 			pipe.write(chunk, container);
-			var read=pipe.readNew(chunk, null);
+			var read = pipe.readNew(chunk, null);
 			
 			assertEquals(container, read);
 			
 			
-			container.value="This is a test.";
+			container.value = "This is a test.";
 			
 			pipe.write(chunk, container);
-			read=pipe.readNew(chunk, null);
+			read = pipe.readNew(chunk, null);
 			
 			assertEquals(container, read);
 		});
 	}
 	
-	@Test(dataProvider="types")
+	@Test(dataProvider = "types")
 	<T extends IOInstance<T>> void checkIntegrity(Struct<T> struct) throws IOException{
 		if(struct instanceof Struct.Unmanaged){
 			return;
@@ -126,24 +126,24 @@ public class GeneralTypeHandlingTests{
 		
 		StructPipe<T> pipe;
 		try{
-			pipe=StandardStructPipe.of(struct, STATE_DONE);
+			pipe = StandardStructPipe.of(struct, STATE_DONE);
 		}catch(MalformedStruct|StagedInit.WaitException ignored){
-			pipe=null;
+			pipe = null;
 		}
-		if(pipe!=null){
+		if(pipe != null){
 			pipe.checkTypeIntegrity(struct.make());
 		}
 		try{
-			pipe=FixedStructPipe.of(struct, STATE_DONE);
+			pipe = FixedStructPipe.of(struct, STATE_DONE);
 		}catch(MalformedStruct|StagedInit.WaitException ignored){
-			pipe=null;
+			pipe = null;
 		}
-		if(pipe!=null){
+		if(pipe != null){
 			pipe.checkTypeIntegrity(struct.make());
 		}
 	}
 	
-	@DataProvider(name="types")
+	@DataProvider(name = "types")
 	private static Object[][] types(){
 		return Stream.of(
 			             Reference.class,
@@ -156,10 +156,10 @@ public class GeneralTypeHandlingTests{
 			             IntContainer.class,
 			             LongContainer.class,
 			             Dummy.class
-		             ).flatMap(p->Stream.concat(Stream.of(p), Arrays.stream(p.getDeclaredClasses())))
+		             ).flatMap(p -> Stream.concat(Stream.of(p), Arrays.stream(p.getDeclaredClasses())))
 		             .filter(IOInstance::isInstance)
 		             .map(Struct::ofUnknown)
-		             .map(o->new Object[]{o})
+		             .map(o -> new Object[]{o})
 		             .toArray(Object[][]::new);
 	}
 	
@@ -168,28 +168,28 @@ public class GeneralTypeHandlingTests{
 	
 	public static class EnumContainer extends IOInstance.Managed<EnumContainer>{
 		@IOValue
-		RandomEnum r=RandomEnum.A;
+		RandomEnum r = RandomEnum.A;
 	}
 	
 	public static byte[] make() throws IOException{
-		var data=MemoryData.builder().build();
+		var data = MemoryData.builder().build();
 		Cluster.init(data).getRootProvider().request("hello!", EnumContainer.class);
 		return data.readAll();
 	}
 	public static void use(byte[] data) throws IOException{
-		var cluster=new Cluster(MemoryData.builder().withRaw(data).build());
+		var cluster = new Cluster(MemoryData.builder().withRaw(data).build());
 		
-		var r        =cluster.getRootProvider().builder().withId("hello!").withGenerator(()->{throw new RuntimeException();});
-		var container=(IOInstance<?>)r.request();
+		var r         = cluster.getRootProvider().builder().withId("hello!").withGenerator(() -> { throw new RuntimeException(); });
+		var container = (IOInstance<?>)r.request();
 		
-		IOField f=container.getThisStruct().getFields().byName("r").orElseThrow();
+		IOField f = container.getThisStruct().getFields().byName("r").orElseThrow();
 		assertEquals(f.instanceToString(null, container, false).orElse(null), "A");
 	}
 	
 	@Test
 	void enumSerialization() throws NoSuchMethodException{
 		ToolUtils.simulateMissingClasses(
-			List.of(n->List.of(RandomEnum.class.getName(), EnumContainer.class.getName()).contains(n)),
+			List.of(n -> List.of(RandomEnum.class.getName(), EnumContainer.class.getName()).contains(n)),
 			GeneralTypeHandlingTests.class.getMethod("make"),
 			GeneralTypeHandlingTests.class.getMethod("use", byte[].class)
 		);
@@ -200,11 +200,11 @@ public class GeneralTypeHandlingTests{
 		int b();
 	}
 	
-	@Test(expectedExceptions=UnsupportedOperationException.class)
+	@Test(expectedExceptions = UnsupportedOperationException.class)
 	void partialImpl(){
-		Class<Partial> partialImpl=IOInstance.Def.partialImplementation(Partial.class, Set.of("a"));
+		Class<Partial> partialImpl = IOInstance.Def.partialImplementation(Partial.class, Set.of("a"));
 		
-		Partial partial=IOInstance.Def.of(partialImpl);
+		Partial partial = IOInstance.Def.of(partialImpl);
 		
 		partial.b();
 	}
@@ -218,15 +218,15 @@ public class GeneralTypeHandlingTests{
 	
 	@Test
 	void compressByteArray() throws IOException{
-		TestUtils.testCluster(TestInfo.of(), provider->{
-			var blob=IOInstance.Def.of(
+		TestUtils.testCluster(TestInfo.of(), provider -> {
+			var blob = IOInstance.Def.of(
 				NamedBlob.class, "Hello world",
 				"""
 					aaaaaaaaaayyyyyyyyyyyyyyyyyy lmaooooooooooooooooooooo
 					""".getBytes(UTF_8)
 			);
 			provider.getRootProvider().provide(new ObjectID("obj"), blob);
-			var read=provider.getRootProvider().request("obj", NamedBlob.class);
+			var read = provider.getRootProvider().request("obj", NamedBlob.class);
 
 //			assertTrue("Compression not working", chunk.chainSize()<64);
 			
@@ -234,7 +234,7 @@ public class GeneralTypeHandlingTests{
 		});
 	}
 	
-	@DataProvider(name="templateTypes")
+	@DataProvider(name = "templateTypes")
 	Object[][] templateTypes(){
 		return new Object[][]{
 			{Partial.class, null},
@@ -242,9 +242,9 @@ public class GeneralTypeHandlingTests{
 			};
 	}
 	
-	@Test(dataProvider="templateTypes")
+	@Test(dataProvider = "templateTypes")
 	<T extends IOInstance.Def<T>> void newTemplate(Class<T> type, Object[] args) throws IOException{
-		if(args==null){
+		if(args == null){
 			IOInstance.Def.of(type);
 		}else{
 			IOInstance.Def.of(type, args);
@@ -307,7 +307,7 @@ public class GeneralTypeHandlingTests{
 		List<E4b> nums();
 	}
 	
-	@DataProvider(name="enumHolders")
+	@DataProvider(name = "enumHolders")
 	Object[][] enumHolders(){
 		return new Object[][]{
 			{E1.class, E1b.class},
@@ -317,29 +317,29 @@ public class GeneralTypeHandlingTests{
 			};
 	}
 	
-	@Test(dataProvider="enumHolders")
+	@Test(dataProvider = "enumHolders")
 	<T extends IOInstance.Def<T>, E extends Enum<E>> void enumIntegrity(Class<T> type, Class<E> eType){
-		var r   =new Random(69420);
-		var info=EnumUniverse.of(eType);
-		var pip =StandardStructPipe.of(type);
-		var data=com.lapissea.cfs.chunk.DataProvider.newVerySimpleProvider();
-		for(int i=0;i<1000;i++){
+		var r    = new Random(69420);
+		var info = EnumUniverse.of(eType);
+		var pip  = StandardStructPipe.of(type);
+		var data = com.lapissea.cfs.chunk.DataProvider.newVerySimpleProvider();
+		for(int i = 0; i<1000; i++){
 			
-			var set=IOInstance.Def.of(
+			var set = IOInstance.Def.of(
 				type,
-				r.ints(r.nextLong(i+1)+1, 0, info.size())
+				r.ints(r.nextLong(i + 1) + 1, 0, info.size())
 				 .mapToObj(info::get)
 				 .toList()
 			);
 			
-			try(var io=data.getSource().io()){
+			try(var io = data.getSource().io()){
 				io.setPos(0);
 				pip.write(data, io, set);
 				io.setPos(0);
-				var read=pip.readNew(data, io, null);
-				assertEquals("Failed equality on "+i, set, read);
+				var read = pip.readNew(data, io, null);
+				assertEquals("Failed equality on " + i, set, read);
 			}catch(IOException e){
-				throw new RuntimeException(i+"", e);
+				throw new RuntimeException(i + "", e);
 			}
 		}
 		

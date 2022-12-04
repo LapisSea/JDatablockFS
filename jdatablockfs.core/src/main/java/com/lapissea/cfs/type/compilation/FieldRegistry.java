@@ -20,8 +20,8 @@ import java.util.Objects;
 
 class FieldRegistry{
 	static LateInit.Safe<RegistryNode.FieldRegistry> make(){
-		return Runner.async(()->{
-			var reg=new RegistryNode.FieldRegistry();
+		return Runner.async(() -> {
+			var reg = new RegistryNode.FieldRegistry();
 			reg.register(new RegistryNode(){
 				@Override
 				public boolean canCreate(Type type, GetAnnotation annotations){
@@ -78,7 +78,7 @@ class FieldRegistry{
 			reg.register(new RegistryNode(){
 				@Override
 				public boolean canCreate(Type type, GetAnnotation annotations){
-					var raw=Utils.typeToRaw(type);
+					var raw = Utils.typeToRaw(type);
 					if(!raw.isArray()) return false;
 					return IOInstance.isManaged(raw.componentType());
 				}
@@ -94,8 +94,8 @@ class FieldRegistry{
 				@Override
 				public boolean canCreate(Type type, GetAnnotation annotations){
 					if(!(type instanceof ParameterizedType parmType)) return false;
-					if(parmType.getRawType()!=List.class&&parmType.getRawType()!=ArrayList.class) return false;
-					var args=parmType.getActualTypeArguments();
+					if(parmType.getRawType() != List.class && parmType.getRawType() != ArrayList.class) return false;
+					var args = parmType.getActualTypeArguments();
 					return IOInstance.isManaged(Objects.requireNonNull(TypeLink.of(args[0])).getTypeClass(null));
 				}
 				@Override
@@ -122,9 +122,9 @@ class FieldRegistry{
 				@Override
 				public boolean canCreate(Type type, GetAnnotation annotations){
 					if(!(type instanceof ParameterizedType parmType)) return false;
-					if(parmType.getRawType()!=List.class&&parmType.getRawType()!=ArrayList.class) return false;
-					var args=parmType.getActualTypeArguments();
-					return Utils.typeToRaw(args[0])==String.class;
+					if(parmType.getRawType() != List.class && parmType.getRawType() != ArrayList.class) return false;
+					var args = parmType.getActualTypeArguments();
+					return Utils.typeToRaw(args[0]) == String.class;
 				}
 				@Override
 				public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
@@ -134,8 +134,8 @@ class FieldRegistry{
 			reg.register(new RegistryNode.InstanceOf<>(IOInstance.class){
 				@Override
 				public <T extends IOInstance<T>> IOField<T, ? extends IOInstance> create(FieldAccessor<T> field, GenericContext genericContext){
-					Class<?> raw      =field.getType();
-					var      unmanaged=!IOInstance.isManaged(raw);
+					Class<?> raw       = field.getType();
+					var      unmanaged = !IOInstance.isManaged(raw);
 					
 					if(unmanaged){
 						return new IOFieldUnmanagedObjectReference<>(field);
@@ -150,7 +150,7 @@ class FieldRegistry{
 			reg.register(new RegistryNode(){
 				@Override
 				public boolean canCreate(Type type, GetAnnotation annotations){
-					var raw=Utils.typeToRaw(type);
+					var raw = Utils.typeToRaw(type);
 					if(!raw.isArray()) return false;
 					return raw.componentType().isEnum();
 				}
@@ -163,8 +163,8 @@ class FieldRegistry{
 				@Override
 				public boolean canCreate(Type type, GetAnnotation annotations){
 					if(!(type instanceof ParameterizedType parmType)) return false;
-					if(parmType.getRawType()!=List.class&&parmType.getRawType()!=ArrayList.class) return false;
-					var args=parmType.getActualTypeArguments();
+					if(parmType.getRawType() != List.class && parmType.getRawType() != ArrayList.class) return false;
+					var args = parmType.getActualTypeArguments();
 					return Utils.typeToRaw(args[0]).isEnum();
 				}
 				@Override

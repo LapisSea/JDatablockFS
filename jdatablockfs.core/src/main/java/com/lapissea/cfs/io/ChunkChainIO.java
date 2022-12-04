@@ -26,52 +26,52 @@ public final class ChunkChainIO implements RandomIO{
 	private final RandomIO source;
 	
 	public ChunkChainIO(Chunk head) throws IOException{
-		this.head=head;
+		this.head = head;
 		if(DEBUG_VALIDATION){
 			head.requireReal();
 		}
 		restartCursor();
-		source=head.getDataProvider().getSource().io();
+		source = head.getDataProvider().getSource().io();
 	}
 	
 	public void revalidate() throws IOException{
-		var pos=localPos;
+		var pos = localPos;
 		restartCursor();
 		setCursor(pos);
 	}
 	
 	private void restartCursor(){
-		cursor=head;
-		cursorStart=0;
-		localPos=0;
+		cursor = head;
+		cursorStart = 0;
+		localPos = 0;
 	}
 	
 	private void checkCursorInChain() throws IOException{
 		head.requireReal();
 		
-		if(head==cursor) return;
+		if(head == cursor) return;
 		
 		cursor.requireReal();
 		
 		for(Chunk chunk : new ChainWalker(head)){
-			if(chunk==cursor) return;
+			if(chunk == cursor) return;
 		}
-		throw new MalformedClusterDataException(cursor+" not in "+head.collectNext());
+		throw new MalformedClusterDataException(cursor + " not in " + head.collectNext());
 	}
 	
 	private long calcCursorEnd(){
-		return cursorStart+cursorEffectiveCapacity();
+		return cursorStart + cursorEffectiveCapacity();
 	}
 	
 	public long calcCursorOffset(){
-		return localPos-cursorStart;
+		return localPos - cursorStart;
 	}
 	
 	public long calcGlobalPos(){
 		return calcGlobalPos(calcCursorOffset());
 	}
 	private long calcGlobalPos(long offset){
-		return cursor.dataStart()+offset;
+		return cursor.dataStart() + offset;
 	}
 	
 	private long cursorEffectiveCapacity(){
@@ -86,16 +86,16 @@ public final class ChunkChainIO implements RandomIO{
 	 * @return flag if cursor has advanced
 	 */
 	private boolean tryAdvanceCursor() throws IOException{
-		var last=cursor;
-		var next=cursor.next();
-		if(next==null) return false;
-		cursor=next;
-		cursorStart+=last.getSize();
+		var last = cursor;
+		var next = cursor.next();
+		if(next == null) return false;
+		cursor = next;
+		cursorStart += last.getSize();
 		return true;
 	}
 	
 	private void advanceCursorBy(long amount) throws IOException{
-		setCursor(localPos+amount);
+		setCursor(localPos + amount);
 	}
 	
 	private RandomIO syncedSource() throws IOException{
@@ -114,28 +114,28 @@ public final class ChunkChainIO implements RandomIO{
 		try{
 			if(pos<localPos){
 				if(pos>=cursorStart){
-					localPos=pos;
+					localPos = pos;
 					return;
 				}
 				restartCursor();
 			}
 			
 			while(true){
-				long curserEnd=calcCursorEnd();
+				long curserEnd = calcCursorEnd();
 				if(curserEnd>pos){
-					localPos=pos;
+					localPos = pos;
 					return;
 				}
 				
 				if(!tryAdvanceCursor()){//end reached
-					localPos=curserEnd;
+					localPos = curserEnd;
 					return;
 				}
 			}
 		}finally{
 			if(DEBUG_VALIDATION){
-				if(calcCursorOffset()<0) throw new AssertionError("cursorOffset "+calcCursorOffset()+" < 0");
-				if(calcCursorOffset()>cursor.getSize()) throw new AssertionError("cursorOffset "+calcCursorOffset()+" > "+cursor.getSize());
+				if(calcCursorOffset()<0) throw new AssertionError("cursorOffset " + calcCursorOffset() + " < 0");
+				if(calcCursorOffset()>cursor.getSize()) throw new AssertionError("cursorOffset " + calcCursorOffset() + " > " + cursor.getSize());
 				checkCursorInChain();
 			}
 		}
@@ -147,7 +147,7 @@ public final class ChunkChainIO implements RandomIO{
 	}
 	
 	@Override
-	public long getPos(){return localPos;}
+	public long getPos(){ return localPos; }
 	
 	@Override
 	public RandomIO setPos(long pos) throws IOException{
@@ -159,12 +159,12 @@ public final class ChunkChainIO implements RandomIO{
 		return mapSum(head, mapper);
 	}
 	private long mapSum(Chunk start, FunctionOL<Chunk> mapper) throws IOException{
-		long sum=0;
+		long sum = 0;
 		
-		Chunk chunk=start;
-		while(chunk!=null){
-			sum+=mapper.apply(chunk);
-			chunk=chunk.next();
+		Chunk chunk = start;
+		while(chunk != null){
+			sum += mapper.apply(chunk);
+			chunk = chunk.next();
 		}
 		
 		return sum;
@@ -177,21 +177,21 @@ public final class ChunkChainIO implements RandomIO{
 	
 	@Override
 	public RandomIO setCapacity(long newCapacity) throws IOException{
-		long prev=0;
+		long prev = 0;
 		
-		Chunk chunk=Objects.requireNonNull(head);
+		Chunk chunk = Objects.requireNonNull(head);
 		while(true){
 			
-			long contentStart=prev;
-			long contentEnd  =contentStart+chunk.getSize();
+			long contentStart = prev;
+			long contentEnd   = contentStart + chunk.getSize();
 			
-			if(newCapacity>=contentStart&&newCapacity<=contentEnd){
+			if(newCapacity>=contentStart && newCapacity<=contentEnd){
 				
-				long chunkSpace=newCapacity-contentStart;
+				long chunkSpace = newCapacity - contentStart;
 				
-				Chunk next=chunk.next();
+				Chunk next = chunk.next();
 				
-				chunk.modifyAndSave(ch->{
+				chunk.modifyAndSave(ch -> {
 					ch.clampSize(chunkSpace);
 					ch.clearNextPtr();
 				});
@@ -199,24 +199,24 @@ public final class ChunkChainIO implements RandomIO{
 					chunk.zeroOutFromTo(chunkSpace, chunk.getSize());
 				}
 				
-				if(next!=null){
+				if(next != null){
 					next.freeChaining();
 					revalidate();
 				}
 				
-				var cap=getCapacity();
+				var cap = getCapacity();
 				if(cap<newCapacity){
-					throw new IOException("Capacity not allocated for: "+head.collectNext()+" "+cap+" < "+newCapacity);
+					throw new IOException("Capacity not allocated for: " + head.collectNext() + " " + cap + " < " + newCapacity);
 				}
 				
 				return this;
 			}
-			prev+=chunk.getCapacity();
+			prev += chunk.getCapacity();
 			if(!chunk.hasNextPtr()) break;
-			chunk=Objects.requireNonNull(chunk.next());
+			chunk = Objects.requireNonNull(chunk.next());
 		}
 		
-		long toGrow=newCapacity-prev;
+		long toGrow = newCapacity - prev;
 		if(toGrow<=0){
 			return this;
 		}
@@ -225,13 +225,13 @@ public final class ChunkChainIO implements RandomIO{
 		
 		//If grow has changed the header of cursor in a way that causes
 		//an out of bounds for the cursor offset, then revalidate
-		var offset=calcCursorOffset();
-		if(offset<0||offset>=cursor.getSize()){
+		var offset = calcCursorOffset();
+		if(offset<0 || offset>=cursor.getSize()){
 			revalidate();
 		}
 		
-		var cap=getCapacity();
-		if(cap<newCapacity) throw new IOException(cap+" < "+newCapacity);
+		var cap = getCapacity();
+		if(cap<newCapacity) throw new IOException(cap + " < " + newCapacity);
 		return this;
 	}
 	@Override
@@ -247,35 +247,35 @@ public final class ChunkChainIO implements RandomIO{
 	
 	@Override
 	public int read() throws IOException{
-		long cOff     =calcCursorOffset();
-		long remaining=cursor.getSize()-cOff;
-		if(remaining==0){
+		long cOff      = calcCursorOffset();
+		long remaining = cursor.getSize() - cOff;
+		if(remaining == 0){
 			if(tryAdvanceCursor()){
 				return read();
 			}
 			return -1;
 		}
-		int b=syncedSource().read();
+		int b = syncedSource().read();
 		advanceCursorBy(1);
 		return b;
 	}
 	@Override
 	public int read(byte[] b, int off, int len) throws IOException{
 		Objects.requireNonNull(b);
-		if(len==0) return 0;
+		if(len == 0) return 0;
 		
-		long cOff     =calcCursorOffset();
-		long remaining=cursor.getSize()-cOff;
-		if(remaining==0){
+		long cOff      = calcCursorOffset();
+		long remaining = cursor.getSize() - cOff;
+		if(remaining == 0){
 			if(tryAdvanceCursor()){
 				return read(b, off, len);
 			}
 			return -1;
 		}
 		
-		int toRead=(int)Math.min(len, remaining);
+		int toRead = (int)Math.min(len, remaining);
 		
-		int read=syncedSource().read(b, off, toRead);
+		int read = syncedSource().read(b, off, toRead);
 		if(read>0){
 			advanceCursorBy(read);
 		}
@@ -284,19 +284,19 @@ public final class ChunkChainIO implements RandomIO{
 	
 	@Override
 	public long readWord(int len) throws IOException{
-		if(len==0) return 0;
+		if(len == 0) return 0;
 		
-		long val=0;
+		long val = 0;
 		
-		var toReadReamining=len;
+		var toReadReamining = len;
 		while(toReadReamining>0){
-			long cOff     =calcCursorOffset();
-			long remaining=cursor.getSize()-cOff;
-			if(remaining==0) throw new EOFException();
+			long cOff      = calcCursorOffset();
+			long remaining = cursor.getSize() - cOff;
+			if(remaining == 0) throw new EOFException();
 			
-			int toRead=(int)Math.min(toReadReamining, remaining);
-			toReadReamining-=toRead;
-			val|=syncedSource().readWord(toRead)<<(toReadReamining*8);
+			int toRead = (int)Math.min(toReadReamining, remaining);
+			toReadReamining -= toRead;
+			val |= syncedSource().readWord(toRead)<<(toReadReamining*8);
 			advanceCursorBy(toRead);
 		}
 		
@@ -305,8 +305,8 @@ public final class ChunkChainIO implements RandomIO{
 	
 	
 	private void ensureForwardCapacity(long amount) throws IOException{
-		long cOff     =calcCursorOffset();
-		long remaining=cursor.getCapacity()-cOff;
+		long cOff      = calcCursorOffset();
+		long remaining = cursor.getCapacity() - cOff;
 		
 		if(amount<=remaining) return;
 		
@@ -315,18 +315,18 @@ public final class ChunkChainIO implements RandomIO{
 			checkCursorInChain();
 		}
 		
-		Chunk last =cursor;
-		Chunk chunk=last.next();
+		Chunk last  = cursor;
+		Chunk chunk = last.next();
 		
-		if(chunk!=null){
+		if(chunk != null){
 			for(Chunk c : new ChainWalker(chunk)){
-				remaining+=chunk.getCapacity();
+				remaining += chunk.getCapacity();
 				if(amount<=remaining) return;
-				last=c;
+				last = c;
 			}
 		}
 		
-		long toAllocate=amount-remaining;
+		long toAllocate = amount - remaining;
 		last.growBy(head, toAllocate);
 		
 		revalidate();
@@ -345,12 +345,12 @@ public final class ChunkChainIO implements RandomIO{
 		}
 		
 		while(true){
-			long offset=calcCursorOffset();
-			long cRem  =cursor.getCapacity()-offset;
+			long offset = calcCursorOffset();
+			long cRem   = cursor.getCapacity() - offset;
 			if(cRem>=len){
-				cursor.pushSize(offset+len);
+				cursor.pushSize(offset + len);
 				if(cursor.dirty()){
-					var chunks=new ArrayList<WriteChunk>(2);
+					var chunks = new ArrayList<WriteChunk>(2);
 					writeHeadToBuf(chunks, cursor);
 					chunks.add(new WriteChunk(calcGlobalPos(), off, len, b));
 					source.writeAtOffsets(chunks);
@@ -368,61 +368,61 @@ public final class ChunkChainIO implements RandomIO{
 			}
 			break;
 		}
-		var request=multiMappedWrite(b, off, len);
+		var request = multiMappedWrite(b, off, len);
 		if(request>0){
 			ensureForwardCapacity(len);
-			request=multiMappedWrite(b, off, len);
-			if(request!=0) throw new IllegalStateException();
+			request = multiMappedWrite(b, off, len);
+			if(request != 0) throw new IllegalStateException();
 		}
 	}
 	
 	private int multiMappedWrite(byte[] data, int off, int len) throws IOException{
 		
-		var offset         =calcCursorOffset();
-		var cursorRemaining=cursor.getCapacity()-offset;
-		int eventSize      =2;
+		var offset          = calcCursorOffset();
+		var cursorRemaining = cursor.getCapacity() - offset;
+		int eventSize       = 2;
 		{
-			int remaining=len;
-			remaining-=cursorRemaining;
+			int remaining = len;
+			remaining -= cursorRemaining;
 			
-			var ch=cursor;
+			var ch = cursor;
 			while(remaining>0){
-				var next=ch.next();
-				if(next==null){
+				var next = ch.next();
+				if(next == null){
 					return remaining;
 				}
-				ch=next;
-				remaining-=ch.getCapacity();
-				eventSize+=2;
+				ch = next;
+				remaining -= ch.getCapacity();
+				eventSize += 2;
 			}
 		}
 		
-		List<WriteChunk> chunks=new ArrayList<>(eventSize);
+		List<WriteChunk> chunks = new ArrayList<>(eventSize);
 		
-		int dataOffset=off;
-		int remaining =len;
+		int dataOffset = off;
+		int remaining  = len;
 		
 		WriteChunk cursorWrite;
 		{
-			var toWrite=(int)Math.min(remaining, cursorRemaining);
-			cursorWrite=new WriteChunk(calcGlobalPos(), dataOffset, toWrite, data);
-			remaining-=toWrite;
-			dataOffset+=toWrite;
+			var toWrite = (int)Math.min(remaining, cursorRemaining);
+			cursorWrite = new WriteChunk(calcGlobalPos(), dataOffset, toWrite, data);
+			remaining -= toWrite;
+			dataOffset += toWrite;
 			
-			cursor.pushSize(offset+toWrite);
+			cursor.pushSize(offset + toWrite);
 		}
 		
 		writeHeadToBuf(chunks, cursor);
 		chunks.add(cursorWrite);
 		
-		var ch=cursor;
+		var ch = cursor;
 		while(remaining>0){
-			ch=Objects.requireNonNull(ch.next());
+			ch = Objects.requireNonNull(ch.next());
 			
-			var toWrite=(int)Math.min(remaining, ch.getCapacity());
-			var event  =new WriteChunk(ch.dataStart(), dataOffset, toWrite, data);
-			remaining-=toWrite;
-			dataOffset+=toWrite;
+			var toWrite = (int)Math.min(remaining, ch.getCapacity());
+			var event   = new WriteChunk(ch.dataStart(), dataOffset, toWrite, data);
+			remaining -= toWrite;
+			dataOffset += toWrite;
 			
 			ch.pushSize(toWrite);
 			writeHeadToBuf(chunks, ch);
@@ -442,15 +442,15 @@ public final class ChunkChainIO implements RandomIO{
 		dest.add(writeHeadToBuf(chunk));
 	}
 	private WriteChunk writeHeadToBuf(Chunk chunk) throws IOException{
-		byte[] headBuf=new byte[chunk.getHeaderSize()];
+		byte[] headBuf = new byte[chunk.getHeaderSize()];
 		chunk.writeHeader(new ContentOutputStream.BA(headBuf));
 		return new WriteChunk(chunk.getPtr().getValue(), headBuf);
 	}
 	
 	@Override
 	public void writeWord(long v, int len) throws IOException{
-		long offset=calcCursorOffset();
-		long cRem  =cursor.getCapacity()-offset;
+		long offset = calcCursorOffset();
+		long cRem   = cursor.getCapacity() - offset;
 		
 		if(cRem<len){
 			RandomIO.super.writeWord(v, len);
@@ -458,34 +458,34 @@ public final class ChunkChainIO implements RandomIO{
 		}
 		
 		syncedSource().writeWord(v, len);
-		cursor.modifyAndSave(c->c.pushSize(offset+len));
+		cursor.modifyAndSave(c -> c.pushSize(offset + len));
 		advanceCursorBy(len);
 	}
 	
 	@Override
 	public void fillZero(long requestedMemory) throws IOException{
-		long  remaining=requestedMemory;
-		Chunk chunk    =cursor;
+		long  remaining = requestedMemory;
+		Chunk chunk     = cursor;
 		{
-			long offset =calcCursorOffset();
-			long cRem   =chunk.getSize()-offset;
-			int  toWrite=(int)Math.min(remaining, cRem);
-			source.setPos(chunk.dataStart()+offset).fillZero(toWrite);
-			remaining-=toWrite;
-			chunk=chunk.next();
+			long offset  = calcCursorOffset();
+			long cRem    = chunk.getSize() - offset;
+			int  toWrite = (int)Math.min(remaining, cRem);
+			source.setPos(chunk.dataStart() + offset).fillZero(toWrite);
+			remaining -= toWrite;
+			chunk = chunk.next();
 		}
 		
-		while(remaining>0&&chunk!=null){
-			long cRem=chunk.getSize();
-			if(cRem==0&&!chunk.hasNextPtr()){
+		while(remaining>0 && chunk != null){
+			long cRem = chunk.getSize();
+			if(cRem == 0 && !chunk.hasNextPtr()){
 				return;
 			}
 			
-			int toWrite=(int)Math.min(remaining, cRem);
+			int toWrite = (int)Math.min(remaining, cRem);
 			source.setPos(chunk.dataStart()).fillZero(toWrite);
 			
-			remaining-=toWrite;
-			chunk=chunk.next();
+			remaining -= toWrite;
+			chunk = chunk.next();
 		}
 		syncSourceCursor();
 	}
@@ -496,74 +496,74 @@ public final class ChunkChainIO implements RandomIO{
 	
 	@Override
 	public void writeAtOffsets(Collection<WriteChunk> data) throws IOException{
-		var requiredCapacity=data.stream().mapToLong(WriteChunk::ioEnd).max().orElse(0);
-		if(requiredCapacity==0) return;
+		var requiredCapacity = data.stream().mapToLong(WriteChunk::ioEnd).max().orElse(0);
+		if(requiredCapacity == 0) return;
 		ensureCapacity(requiredCapacity);
 		
-		var chunks=head.collectNext();
+		var chunks = head.collectNext();
 		
-		long[] localRanges=new long[chunks.size()*2];
+		long[] localRanges = new long[chunks.size()*2];
 		
-		var offset=0L;
-		for(int i=0;i<chunks.size();i++){
-			var chunk=chunks.get(i);
-			var cap  =chunk.getCapacity();
-			localRanges[i*2]=offset;
-			localRanges[i*2+1]=offset+cap;
-			offset+=cap;
+		var offset = 0L;
+		for(int i = 0; i<chunks.size(); i++){
+			var chunk = chunks.get(i);
+			var cap   = chunk.getCapacity();
+			localRanges[i*2] = offset;
+			localRanges[i*2 + 1] = offset + cap;
+			offset += cap;
 		}
 		
-		var mappedChunks=new ArrayList<WriteChunk>((int)(data.size()*1.1));
+		var mappedChunks = new ArrayList<WriteChunk>((int)(data.size()*1.1));
 		
-		var iter=data.iterator();
-		var redo=new LinkedList<WriteChunk>();
+		var iter = data.iterator();
+		var redo = new LinkedList<WriteChunk>();
 		
-		int pushIndex=0;
+		int pushIndex = 0;
 		
-		while(iter.hasNext()||!redo.isEmpty()){
+		while(iter.hasNext() || !redo.isEmpty()){
 			WriteChunk unmapped;
-			if(!redo.isEmpty()) unmapped=redo.remove(0);
+			if(!redo.isEmpty()) unmapped = redo.remove(0);
 			else{
-				unmapped=iter.next();
+				unmapped = iter.next();
 			}
 			
-			var eStart=unmapped.ioOffset();
+			var eStart = unmapped.ioOffset();
 			
-			int index=findIndex(localRanges, eStart);
+			int index = findIndex(localRanges, eStart);
 			
-			var start      =localRanges[index*2];
-			var end        =localRanges[index*2+1];
-			var size       =end-start;
-			var chunkOffset=eStart-start;
+			var start       = localRanges[index*2];
+			var end         = localRanges[index*2 + 1];
+			var size        = end - start;
+			var chunkOffset = eStart - start;
 			
-			var remaining=size-chunkOffset;
+			var remaining = size - chunkOffset;
 			
 			
-			var chunk=chunks.get(index);
+			var chunk = chunks.get(index);
 			
 			if(remaining<unmapped.dataLength()){
-				var split=unmapped.split(Math.toIntExact(remaining));
-				unmapped=split.before();
+				var split = unmapped.split(Math.toIntExact(remaining));
+				unmapped = split.before();
 				redo.add(split.after());
 			}
 			
-			var w=unmapped.withOffset(chunk.dataStart()+chunkOffset);
+			var w = unmapped.withOffset(chunk.dataStart() + chunkOffset);
 			
 			mappedChunks.add(w);
 			if(pushIndex<index){
-				for(int j=pushIndex;j<index;j++){
-					var c=chunks.get(j);
+				for(int j = pushIndex; j<index; j++){
+					var c = chunks.get(j);
 					c.setSize(c.getCapacity());
 				}
-				pushIndex=index;
+				pushIndex = index;
 			}
-			chunk.pushSize(chunkOffset+unmapped.dataLength());
+			chunk.pushSize(chunkOffset + unmapped.dataLength());
 		}
 		
 		for(Chunk chunk : chunks){
 			if(!chunk.dirty()) continue;
-			byte[] d=new byte[chunk.getHeaderSize()];
-			try(var out=new ContentOutputStream.BA(d)){
+			byte[] d = new byte[chunk.getHeaderSize()];
+			try(var out = new ContentOutputStream.BA(d)){
 				chunk.writeHeader(out);
 			}
 			UtilL.addRemainSorted(mappedChunks, new WriteChunk(chunk.getPtr().getValue(), d));
@@ -573,12 +573,12 @@ public final class ChunkChainIO implements RandomIO{
 	}
 	
 	private int findIndex(long[] localRanges, long writeStart){
-		for(int i=0;i<localRanges.length/2;i++){
-			var start=localRanges[i*2];
+		for(int i = 0; i<localRanges.length/2; i++){
+			var start = localRanges[i*2];
 			if(writeStart>=start){
-				var end        =localRanges[i*2+1];
-				var size       =end-start;
-				var chunkOffset=writeStart-start;
+				var end         = localRanges[i*2 + 1];
+				var size        = end - start;
+				var chunkOffset = writeStart - start;
 				if(chunkOffset>=size){
 					continue;
 				}
@@ -590,13 +590,13 @@ public final class ChunkChainIO implements RandomIO{
 	
 	@Override
 	public void setSize(long targetSize) throws IOException{
-		long remaining=targetSize;
+		long remaining = targetSize;
 		
 		if(DEBUG_VALIDATION){
-			if(getCapacity()<targetSize) throw new IllegalArgumentException(getCapacity()+">="+targetSize);
+			if(getCapacity()<targetSize) throw new IllegalArgumentException(getCapacity() + ">=" + targetSize);
 		}
 		
-		Chunk chunk=head;
+		Chunk chunk = head;
 		while(true){
 			if(remaining<chunk.getSize()){
 				chunk.clampSize(remaining);
@@ -605,27 +605,27 @@ public final class ChunkChainIO implements RandomIO{
 			}
 			chunk.syncStruct();
 			
-			var newSize=chunk.getSize();
-			remaining=Math.max(0, remaining-newSize);
+			var newSize = chunk.getSize();
+			remaining = Math.max(0, remaining - newSize);
 			
-			var next=chunk.next();
-			if(next==null){
+			var next = chunk.next();
+			if(next == null){
 				break;
 			}
-			chunk=next;
+			chunk = next;
 		}
 		
 		if(remaining>0){
-			var siz   =chunk.getSize();
-			var cap   =chunk.getCapacity();
-			var newSiz=siz+remaining;
-			if(cap<newSiz) throw new IOException("size too big! "+cap+" "+newSiz);
+			var siz    = chunk.getSize();
+			var cap    = chunk.getCapacity();
+			var newSiz = siz + remaining;
+			if(cap<newSiz) throw new IOException("size too big! " + cap + " " + newSiz);
 			
-			chunk.modifyAndSave(c->c.setSize(newSiz));
+			chunk.modifyAndSave(c -> c.setSize(newSiz));
 		}
 		
 		if(DEBUG_VALIDATION){
-			if(targetSize!=getSize()) throw new IllegalStateException(targetSize+"!="+getSize());
+			if(targetSize != getSize()) throw new IllegalStateException(targetSize + "!=" + getSize());
 		}
 	}
 	
@@ -641,16 +641,16 @@ public final class ChunkChainIO implements RandomIO{
 	public String toString(){
 		String siz;
 		try{
-			siz=getSize()+"";
+			siz = getSize() + "";
 		}catch(IOException e){
-			siz="?";
+			siz = "?";
 		}
 		String cap;
 		try{
-			cap=getCapacity()+"";
+			cap = getCapacity() + "";
 		}catch(IOException e){
-			cap="?";
+			cap = "?";
 		}
-		return this.getClass().getSimpleName()+"{@"+getPos()+" / "+siz+"("+cap+"), pos="+cursor.getPtr()+"+"+calcCursorOffset()+"}";
+		return this.getClass().getSimpleName() + "{@" + getPos() + " / " + siz + "(" + cap + "), pos=" + cursor.getPtr() + "+" + calcCursorOffset() + "}";
 	}
 }

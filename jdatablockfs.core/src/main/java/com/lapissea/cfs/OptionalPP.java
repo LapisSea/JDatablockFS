@@ -12,18 +12,18 @@ import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 public final class OptionalPP<T>{
-	private static final OptionalPP<?> EMPTY=new OptionalPP<>(null);
+	private static final OptionalPP<?> EMPTY = new OptionalPP<>(null);
 	
 	private final T value;
 	
 	public static <T> OptionalPP<T> empty(){
 		@SuppressWarnings("unchecked")
-		OptionalPP<T> t=(OptionalPP<T>)EMPTY;
+		OptionalPP<T> t = (OptionalPP<T>)EMPTY;
 		return t;
 	}
 	
 	private OptionalPP(T value){
-		this.value=value;
+		this.value = value;
 	}
 	
 	public static <T> OptionalPP<T> of(T value){
@@ -31,26 +31,26 @@ public final class OptionalPP<T>{
 	}
 	
 	public static <T> OptionalPP<T> ofNullable(T value){
-		return value==null?empty():new OptionalPP<>(value);
+		return value == null? empty() : new OptionalPP<>(value);
 	}
 	
 	public T get(){
-		if(value==null){
+		if(value == null){
 			throw new NoSuchElementException("No value present");
 		}
 		return value;
 	}
 	
 	public boolean isPresent(){
-		return value!=null;
+		return value != null;
 	}
 	
 	public boolean isEmpty(){
-		return value==null;
+		return value == null;
 	}
 	
 	public <E extends Throwable> void ifPresent(UnsafeConsumer<? super T, E> action) throws E{
-		if(value!=null){
+		if(value != null){
 			action.accept(value);
 		}
 	}
@@ -59,7 +59,7 @@ public final class OptionalPP<T>{
 		if(!isPresent()){
 			return this;
 		}else{
-			return predicate.test(value)?this:empty();
+			return predicate.test(value)? this : empty();
 		}
 	}
 	
@@ -78,7 +78,7 @@ public final class OptionalPP<T>{
 			return empty();
 		}else{
 			@SuppressWarnings("unchecked")
-			OptionalPP<U> r=(OptionalPP<U>)mapper.apply(value);
+			OptionalPP<U> r = (OptionalPP<U>)mapper.apply(value);
 			return Objects.requireNonNull(r);
 		}
 	}
@@ -89,7 +89,7 @@ public final class OptionalPP<T>{
 			return this;
 		}else{
 			@SuppressWarnings("unchecked")
-			OptionalPP<T> r=(OptionalPP<T>)supplier.get();
+			OptionalPP<T> r = (OptionalPP<T>)supplier.get();
 			return Objects.requireNonNull(r);
 		}
 	}
@@ -103,22 +103,22 @@ public final class OptionalPP<T>{
 	}
 	
 	public T orElse(T other){
-		return value!=null?value:other;
+		return value != null? value : other;
 	}
 	
 	public <E extends Throwable> T orElseGet(UnsafeSupplier<? extends T, E> supplier) throws E{
-		return value!=null?value:supplier.get();
+		return value != null? value : supplier.get();
 	}
 	
 	public T orElseThrow(){
-		if(value==null){
+		if(value == null){
 			throw new NoSuchElementException("No value present");
 		}
 		return value;
 	}
 	
 	public <X extends Throwable> T orElseThrow(Supplier<? extends X> exceptionSupplier) throws X{
-		if(value!=null){
+		if(value != null){
 			return value;
 		}else{
 			throw exceptionSupplier.get();
@@ -127,12 +127,12 @@ public final class OptionalPP<T>{
 	
 	@Override
 	public boolean equals(Object obj){
-		if(this==obj){
+		if(this == obj){
 			return true;
 		}
 		
 		return obj instanceof OptionalPP<?> other
-		       &&Objects.equals(value, other.value);
+		       && Objects.equals(value, other.value);
 	}
 	
 	/**
@@ -159,9 +159,9 @@ public final class OptionalPP<T>{
 	 */
 	@Override
 	public String toString(){
-		return value!=null
-		       ?("OptionalPP["+value+"]")
-		       :"OptionalPP.empty";
+		return value != null
+		       ? ("OptionalPP[" + value + "]")
+		       : "OptionalPP.empty";
 	}
 	
 	public Optional<T> toOptional(){

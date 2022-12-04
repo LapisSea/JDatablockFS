@@ -10,13 +10,13 @@ import java.util.concurrent.TimeUnit;
 public class StartingBench{
 	
 	@Benchmark
-	@Fork(value=200, warmups=1)
-	@Warmup(iterations=0)
-	@Measurement(iterations=1)
+	@Fork(value = 200, warmups = 1)
+	@Warmup(iterations = 0)
+	@Measurement(iterations = 1)
 	@BenchmarkMode(Mode.SingleShotTime)
 	public void initAndRoot(){
 		try{
-			var roots=Cluster.emptyMem().getRootProvider();
+			var roots = Cluster.emptyMem().getRootProvider();
 			roots.request("benchy", Reference.class);
 		}catch(Throwable e){
 			throw new RuntimeException(e);

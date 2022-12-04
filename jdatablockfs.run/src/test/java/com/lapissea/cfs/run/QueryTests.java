@@ -47,16 +47,16 @@ public class QueryTests{
 		@IOValue
 		byte[] someData;
 		
-		public StringyBoi(){}
+		public StringyBoi(){ }
 		public StringyBoi(String str, List<String> strs){
-			this.str=str;
-			this.strs=strs;
-			someData=new byte[69];
+			this.str = str;
+			this.strs = strs;
+			someData = new byte[69];
 		}
 	}
 	
 	<T extends IOInstance<T>> Object[][] lists(Class<T> el) throws IOException{
-		var cl=Cluster.init(new MemoryData.Builder().build());
+		var cl = Cluster.init(new MemoryData.Builder().build());
 		return new Object[][]{
 			{IOList.wrap(new ArrayList<>())},
 			{cl.getRootProvider().request("arr", ContiguousIOList.class, el)},
@@ -90,22 +90,22 @@ public class QueryTests{
 		));
 	}
 	
-	@Test(dataProvider="ffLists", expectedExceptions=UnsupportedOperationException.class)
+	@Test(dataProvider = "ffLists", expectedExceptions = UnsupportedOperationException.class)
 	void invalidAccess(IOList<FF> list) throws IOException{
 		fillFF(list);
 		if(IOList.isWrapped(list)){
 			//Ignore memory impl
 			throw new UnsupportedOperationException();
 		}
-		var badQuery=list.query(Set.of("b"), el->el.a()>1);
+		var badQuery = list.query(Set.of("b"), el -> el.a()>1);
 		badQuery.first();
 	}
 	
-	@Test(dataProvider="ffLists")
+	@Test(dataProvider = "ffLists")
 	void comparison(IOList<FF> list) throws IOException{
 		fillFF(list);
 		
-		assertEquals(OptionalPP.of(2F), list.query(Set.of("a"), el->el.a()>1).first().map(FF::a));
+		assertEquals(OptionalPP.of(2F), list.query(Set.of("a"), el -> el.a()>1).first().map(FF::a));
 		
 		assertEquals(OptionalPP.of(FF.of(1, 5)), list.query("a is 1").first());
 		assertEquals(OptionalPP.of(FF.of(5, 1)), list.query("b is 1").first());
@@ -115,8 +115,8 @@ public class QueryTests{
 		assertEquals(OptionalPP.of(FF.of(4, 2)), list.query("a >= 3 && b <= 2").first());
 		assertEquals(OptionalPP.of(FF.of(4, 2)), list.query("a >= 3").filter("b <= 2").first());
 		
-		for(long i=0;i<list.size();i++){
-			assertEquals(OptionalPP.of(list.get(i)), list.query("a == {}", i+1).first());
+		for(long i = 0; i<list.size(); i++){
+			assertEquals(OptionalPP.of(list.get(i)), list.query("a == {}", i + 1).first());
 			assertEquals(OptionalPP.of(list.get(i)), list.query("a == {}+1", i).first());
 		}
 		
@@ -134,7 +134,7 @@ public class QueryTests{
 		assertEquals(List.of(2F, 4F), list.query("a%2==0").<List<Float>>map("a").all().toList());
 	}
 	
-	@Test(dataProvider="stringyLists")
+	@Test(dataProvider = "stringyLists")
 	void inTest(IOList<StringyBoi> list) throws IOException{
 		fillStringy(list);
 		assertEquals(1, list.query("str in strs").count());

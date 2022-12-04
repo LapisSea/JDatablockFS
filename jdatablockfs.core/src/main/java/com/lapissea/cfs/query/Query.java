@@ -22,7 +22,7 @@ public interface Query<T>{
 	
 	
 	default <R> Query<R> map(String expression, Object... args){
-		var result=QueryExpressionParser.mapping(elementType(), expression);
+		var result = QueryExpressionParser.mapping(elementType(), expression);
 		return map(result, args);
 	}
 	<R> Query<R> map(QueryValueSource field, Object... args);
@@ -31,7 +31,7 @@ public interface Query<T>{
 		return filter(expression, ZeroArrays.ZERO_OBJECT);
 	}
 	default Query<T> filter(String expression, Object... args){
-		var result=QueryExpressionParser.filter(elementType(), expression);
+		var result = QueryExpressionParser.filter(elementType(), expression);
 		return filter(result.check(), args);
 	}
 	

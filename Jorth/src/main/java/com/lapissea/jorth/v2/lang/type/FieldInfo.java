@@ -12,9 +12,9 @@ public interface FieldInfo{
 		private final ClassName   owner;
 		private final GenericType type;
 		public OfReflective(Field field){
-			this.field=field;
-			owner=ClassName.of(field.getDeclaringClass());
-			type=GenericType.of(field.getGenericType());
+			this.field = field;
+			owner = ClassName.of(field.getDeclaringClass());
+			type = GenericType.of(field.getGenericType());
 		}
 		
 		@Override

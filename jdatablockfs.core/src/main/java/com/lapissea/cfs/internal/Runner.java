@@ -20,86 +20,86 @@ public class Runner{
 	
 	private static class Task implements Runnable{
 		
-		private static final AtomicLong ID_COUNTER=new AtomicLong();
+		private static final AtomicLong ID_COUNTER = new AtomicLong();
 		
-		private final long     id   =ID_COUNTER.getAndIncrement();
+		private final long     id    = ID_COUNTER.getAndIncrement();
 		private final Runnable task;
 		private       boolean  started;
-		private final long     start=System.nanoTime();
+		private final long     start = System.nanoTime();
 		private       int      counter;
 		
 		private Task(Runnable task){
-			this.task=task;
+			this.task = task;
 		}
 		
 		@Override
 		public void run(){
 			synchronized(this){
 				if(started) return;
-				started=true;
+				started = true;
 			}
 			this.task.run();
 		}
 	}
 	
-	private static final List<Task> TASKS=new ArrayList<>();
+	private static final List<Task> TASKS = new ArrayList<>();
 	
-	private static int     VIRTUAL_CHOKE=0;
-	private static boolean CHERRY       =true;
+	private static int     VIRTUAL_CHOKE = 0;
+	private static boolean CHERRY        = true;
 	
 	private static ExecutorService PLATFORM_EXECUTOR;
 	
-	public static final  String  BASE_NAME        ="Task";
-	private static final String  MUTE_CHOKE_NAME  ="runner.muteWarning";
-	private static final String  MS_THRESHOLD_NAME="runner.chokeTime";
-	private static final boolean ONLY_VIRTUAL     =GlobalConfig.configFlag("runner.onlyVirtual", false);
+	public static final  String  BASE_NAME         = "Task";
+	private static final String  MUTE_CHOKE_NAME   = "runner.muteWarning";
+	private static final String  MS_THRESHOLD_NAME = "runner.chokeTime";
+	private static final boolean ONLY_VIRTUAL      = GlobalConfig.configFlag("runner.onlyVirtual", false);
 	
 	private static ExecutorService getPlatformExecutor(){
-		if(PLATFORM_EXECUTOR!=null) return PLATFORM_EXECUTOR;
+		if(PLATFORM_EXECUTOR != null) return PLATFORM_EXECUTOR;
 		
 		synchronized(Runner.class){
-			if(PLATFORM_EXECUTOR!=null) return PLATFORM_EXECUTOR;
+			if(PLATFORM_EXECUTOR != null) return PLATFORM_EXECUTOR;
 			
-			PLATFORM_EXECUTOR=new ThreadPoolExecutor(
-					0, Integer.MAX_VALUE,
-					500, TimeUnit.MILLISECONDS,
-					new SynchronousQueue<>(),
-					Thread.ofPlatform()
-					      .group(new ThreadGroup(TextUtil.plural(BASE_NAME)))
-					      .priority(Thread.MAX_PRIORITY)//High priority. The faster the threads die the better.
-					      .name(BASE_NAME+"PWorker", 0)
-					      .daemon(true)::unstarted
+			PLATFORM_EXECUTOR = new ThreadPoolExecutor(
+				0, Integer.MAX_VALUE,
+				500, TimeUnit.MILLISECONDS,
+				new SynchronousQueue<>(),
+				Thread.ofPlatform()
+				      .group(new ThreadGroup(TextUtil.plural(BASE_NAME)))
+				      .priority(Thread.MAX_PRIORITY)//High priority. The faster the threads die the better.
+				      .name(BASE_NAME + "PWorker", 0)
+				      .daemon(true)::unstarted
 			);
 		}
 		return PLATFORM_EXECUTOR;
 	}
 	
 	static{
-		Thread.ofPlatform().name(BASE_NAME+"-watcher").daemon(true).start(()->{
+		Thread.ofPlatform().name(BASE_NAME + "-watcher").daemon(true).start(() -> {
 			if(ONLY_VIRTUAL) return;
-			int timeThreshold=GlobalConfig.configInt(MS_THRESHOLD_NAME, 100);
-			var toRestart    =new ArrayList<Task>();
+			int timeThreshold = GlobalConfig.configInt(MS_THRESHOLD_NAME, 100);
+			var toRestart     = new ArrayList<Task>();
 			while(true){
-				boolean counted=false;
+				boolean counted = false;
 				synchronized(TASKS){
 					if(TASKS.isEmpty()){
 						try{
-							TASKS.wait(CHERRY?200:20);
+							TASKS.wait(CHERRY? 200 : 20);
 						}catch(InterruptedException e){
 							throw new RuntimeException(e);
 						}
 						continue;
 					}
-					for(int i=TASKS.size()-1;i>=0;i--){
-						var t=TASKS.get(i);
+					for(int i = TASKS.size() - 1; i>=0; i--){
+						var t = TASKS.get(i);
 						if(t.started){
 							TASKS.remove(i);
 							continue;
 						}
-						if(System.nanoTime()-t.start>timeThreshold*1000_000L){
+						if(System.nanoTime() - t.start>timeThreshold*1000_000L){
 							if(t.counter<20){
 								t.counter++;
-								counted=true;
+								counted = true;
 								continue;
 							}
 							TASKS.remove(i);
@@ -116,13 +116,13 @@ public class Runner{
 				
 				for(Task task : toRestart){
 					Log.debug("{#redPerformance:#} Virtual threads choking, running task {}#green on platform", task.id);
-					getPlatformExecutor().execute(()->{
+					getPlatformExecutor().execute(() -> {
 						synchronized(task){
 							if(task.started) return;
-							task.started=true;
+							task.started = true;
 						}
 						synchronized(Runner.class){
-							if(VIRTUAL_CHOKE<100) VIRTUAL_CHOKE+=5;
+							if(VIRTUAL_CHOKE<100) VIRTUAL_CHOKE += 5;
 						}
 						task.task.run();
 						Log.trace("{#redPerformance:#} Choked task {}#green completed", task.id);
@@ -137,9 +137,9 @@ public class Runner{
 	
 	private static void pop(){
 		if(CHERRY){
-			CHERRY=false;
+			CHERRY = false;
 			if(!GlobalConfig.configFlag(MUTE_CHOKE_NAME, false)){
-				Log.warn("Virtual threads choking! Starting platform thread fallback to prevent possible deadlocks.\n"+
+				Log.warn("Virtual threads choking! Starting platform thread fallback to prevent possible deadlocks.\n" +
 				         "\"{}\" property may be used to configure choke time threshold. (Set \"{}\" to true to mute this)",
 				         GlobalConfig.propName(MUTE_CHOKE_NAME), GlobalConfig.propName(MUTE_CHOKE_NAME));
 			}
@@ -159,7 +159,7 @@ public class Runner{
 	}
 	
 	private static void robustRun(Runnable task){
-		var t=new Task(task);
+		var t = new Task(task);
 		
 		Thread.ofVirtual().name(BASE_NAME, t.id).start(t);
 		if(VIRTUAL_CHOKE>0){

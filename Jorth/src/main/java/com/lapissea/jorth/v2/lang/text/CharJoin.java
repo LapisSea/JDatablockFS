@@ -14,16 +14,16 @@ public class CharJoin implements CharSequence{
 	private int          lastStart, lastEnd;
 	
 	public CharJoin(List<? extends CharSequence> data){
-		this.data=data;
-		int sum=0;
+		this.data = data;
+		int sum = 0;
 		for(var part : data){
-			sum+=part.length();
+			sum += part.length();
 		}
-		this.size=sum;
+		this.size = sum;
 		
 		if(!data.isEmpty()){
-			lastAccessed=data.get(0);
-			lastEnd=lastAccessed.length();
+			lastAccessed = data.get(0);
+			lastEnd = lastAccessed.length();
 		}
 	}
 	
@@ -33,56 +33,56 @@ public class CharJoin implements CharSequence{
 	}
 	@Override
 	public char charAt(int index){
-		if(lastStart>index||lastEnd<=index){
+		if(lastStart>index || lastEnd<=index){
 			calc(index);
 		}
-		return lastAccessed.charAt(index-lastStart);
+		return lastAccessed.charAt(index - lastStart);
 	}
 	private void calc(int index){
-		int off=0;
+		int off = 0;
 		for(var datum : data){
-			int start=off;
-			int size =datum.length();
-			int end  =start+size;
+			int start = off;
+			int size  = datum.length();
+			int end   = start + size;
 			
-			if(start<=index&&end>index){
-				lastAccessed=datum;
-				lastStart=start;
-				lastEnd=end;
+			if(start<=index && end>index){
+				lastAccessed = datum;
+				lastStart = start;
+				lastEnd = end;
 				return;
 			}
 			
-			off+=size;
+			off += size;
 		}
-		throw new IndexOutOfBoundsException(index+"");
+		throw new IndexOutOfBoundsException(index + "");
 	}
 	
 	@Override
 	public CharSequence subSequence(int start, int end){
 		Objects.checkFromToIndex(start, end, length());
 		
-		int off   =0;
-		var result=new ArrayList<CharSequence>();
+		int off    = 0;
+		var result = new ArrayList<CharSequence>();
 		for(var part : data){
-			int startPart=off;
-			int size     =part.length();
-			int endPart  =startPart+size;
+			int startPart = off;
+			int size      = part.length();
+			int endPart   = startPart + size;
 			
 			if(endPart<start){
-				off+=size;
+				off += size;
 				continue;
 			}
 			if(startPart>=end) break;
 			
-			int startOff=start-startPart;
-			int endOff  =size+end-endPart;
-			if(startOff==0&&endOff==size) return part;
+			int startOff = start - startPart;
+			int endOff   = size + end - endPart;
+			if(startOff == 0 && endOff == size) return part;
 			
 			result.add(CharSubview.of(part, Math.max(startOff, 0), Math.min(endOff, size)));
 			
-			off+=size;
+			off += size;
 		}
-		if(result.size()==1) return result.get(0);
+		if(result.size() == 1) return result.get(0);
 		return new CharJoin(result);
 	}
 	
@@ -93,7 +93,7 @@ public class CharJoin implements CharSequence{
 	
 	@Override
 	public String toString(){
-		var sb=new StringBuilder(length());
+		var sb = new StringBuilder(length());
 		data.forEach(sb::append);
 		return sb.toString();
 	}

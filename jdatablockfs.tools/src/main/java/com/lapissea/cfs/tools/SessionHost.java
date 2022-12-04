@@ -16,11 +16,11 @@ public class SessionHost implements DataLogger{
 	
 	public static final class ParsedFrame{
 		int                    index;
-		WeakReference<Cluster> cluster=new WeakReference<>(null);
+		WeakReference<Cluster> cluster = new WeakReference<>(null);
 		Throwable              displayError;
 		Chunk                  lastHoverChunk;
 		public ParsedFrame(int index){
-			this.index=index;
+			this.index = index;
 		}
 		
 		public Optional<Cluster> getCluster(){
@@ -28,18 +28,18 @@ public class SessionHost implements DataLogger{
 		}
 	}
 	
-	public record CachedFrame(MemFrame memData, ParsedFrame parsed){}
+	public record CachedFrame(MemFrame memData, ParsedFrame parsed){ }
 	
 	public class HostedSession implements Session{
-		public final List<CachedFrame> frames  =new ArrayList<>();
-		public final ChangeRegistryInt framePos=new ChangeRegistryInt(-1);
+		public final List<CachedFrame> frames   = new ArrayList<>();
+		public final ChangeRegistryInt framePos = new ChangeRegistryInt(-1);
 		
 		private boolean markForDeletion;
 		
 		private final String name;
 		
 		private HostedSession(String name){
-			this.name=name;
+			this.name = name;
 			framePos.register(activeFrame::set);
 		}
 		
@@ -52,22 +52,22 @@ public class SessionHost implements DataLogger{
 		public void log(MemFrame frame){
 			if(frames.size()>10000){
 				synchronized(frames){
-					var               ints     =new Random().ints(0, frames.size()).distinct().limit(1000).toArray();
-					List<CachedFrame> tmpFrames=new LinkedList<>();
-					IntStream.range(0, (int)(frames.size()*0.7)).filter(i->!UtilL.contains(ints, i)).mapToObj(frames::get).forEach(tmpFrames::add);
+					var               ints      = new Random().ints(0, frames.size()).distinct().limit(1000).toArray();
+					List<CachedFrame> tmpFrames = new LinkedList<>();
+					IntStream.range(0, (int)(frames.size()*0.7)).filter(i -> !UtilL.contains(ints, i)).mapToObj(frames::get).forEach(tmpFrames::add);
 					frames.clear();
 					MemFrame lastFull;
 					{
-						var f=tmpFrames.remove(0);
-						lastFull=new MemFrame(f.memData.frameId(), f.memData.timeDelta(), f.memData.bytes(), f.memData.ids(), f.memData.e());
+						var f = tmpFrames.remove(0);
+						lastFull = new MemFrame(f.memData.frameId(), f.memData.timeDelta(), f.memData.bytes(), f.memData.ids(), f.memData.e());
 						frames.add(new CachedFrame(lastFull, f.parsed));
 					}
 					while(!tmpFrames.isEmpty()){
-						var fr  =tmpFrames.remove(0);
-						var diff=MemFrame.diff(lastFull, fr.memData);
-						frames.add(new CachedFrame(diff==null?fr.memData:diff, fr.parsed));
-						if(diff==null){
-							lastFull=new MemFrame(fr.memData.frameId(), fr.memData.timeDelta(), fr.memData.bytes(), fr.memData.ids(), fr.memData.e());
+						var fr   = tmpFrames.remove(0);
+						var diff = MemFrame.diff(lastFull, fr.memData);
+						frames.add(new CachedFrame(diff == null? fr.memData : diff, fr.parsed));
+						if(diff == null){
+							lastFull = new MemFrame(fr.memData.frameId(), fr.memData.timeDelta(), fr.memData.bytes(), fr.memData.ids(), fr.memData.e());
 						}
 					}
 					System.gc();
@@ -75,7 +75,7 @@ public class SessionHost implements DataLogger{
 			}
 			
 			synchronized(frames){
-				frames.add(new CachedFrame(frame, new ParsedFrame(frames.isEmpty()?0:frames.get(frames.size()-1).parsed.index+1)));
+				frames.add(new CachedFrame(frame, new ParsedFrame(frames.isEmpty()? 0 : frames.get(frames.size() - 1).parsed.index + 1)));
 			}
 			synchronized(framePos){
 				framePos.set(-1);
@@ -83,7 +83,7 @@ public class SessionHost implements DataLogger{
 		}
 		
 		@Override
-		public void finish(){}
+		public void finish(){ }
 		
 		@Override
 		public void reset(){
@@ -94,23 +94,23 @@ public class SessionHost implements DataLogger{
 		@Override
 		public void delete(){
 			reset();
-			markForDeletion=true;
-			sessionMarkedForDeletion=true;
+			markForDeletion = true;
+			sessionMarkedForDeletion = true;
 		}
 		
 		public void setFrame(int frame){
-			if(frame>frames.size()-1) frame=frames.size()-1;
+			if(frame>frames.size() - 1) frame = frames.size() - 1;
 			framePos.set(frame);
 		}
 	}
 	
-	private boolean sessionMarkedForDeletion=false;
-	private boolean destroyed               =false;
+	private boolean sessionMarkedForDeletion = false;
+	private boolean destroyed                = false;
 	
-	private final Map<String, HostedSession> sessions=new LinkedHashMap<>();
+	private final Map<String, HostedSession> sessions = new LinkedHashMap<>();
 	
-	public final ChangeRegistry<Optional<HostedSession>> activeSession=new ChangeRegistry<>(Optional.empty());
-	public final ChangeRegistryInt                       activeFrame  =new ChangeRegistryInt(-1);
+	public final ChangeRegistry<Optional<HostedSession>> activeSession = new ChangeRegistry<>(Optional.empty());
+	public final ChangeRegistryInt                       activeFrame   = new ChangeRegistryInt(-1);
 	
 	
 	private long lastSessionSet;
@@ -121,11 +121,11 @@ public class SessionHost implements DataLogger{
 		
 		HostedSession ses;
 		synchronized(sessions){
-			ses=sessions.computeIfAbsent(name, HostedSession::new);
+			ses = sessions.computeIfAbsent(name, HostedSession::new);
 		}
-		var tim=System.nanoTime();
-		if(tim-lastSessionSet>4000_000_000L&&activeSession.get().orElse(null)!=ses){
-			lastSessionSet=tim;
+		var tim = System.nanoTime();
+		if(tim - lastSessionSet>4000_000_000L && activeSession.get().orElse(null) != ses){
+			lastSessionSet = tim;
 			setActiveSession(ses);
 		}
 		
@@ -137,17 +137,17 @@ public class SessionHost implements DataLogger{
 	
 	public void cleanUpSessions(){
 		if(!sessionMarkedForDeletion) return;
-		sessionMarkedForDeletion=false;
+		sessionMarkedForDeletion = false;
 		
 		synchronized(sessions){
-			sessions.values().removeIf(s->s.markForDeletion);
-			activeSession.get().filter(s->s.markForDeletion).flatMap(s->sessions.values().stream().findAny()).ifPresent(this::setActiveSession);
+			sessions.values().removeIf(s -> s.markForDeletion);
+			activeSession.get().filter(s -> s.markForDeletion).flatMap(s -> sessions.values().stream().findAny()).ifPresent(this::setActiveSession);
 		}
 	}
 	
 	@Override
 	public void destroy(){
-		destroyed=true;
+		destroyed = true;
 		synchronized(sessions){
 			sessions.values().forEach(Session::finish);
 			sessions.clear();
@@ -169,22 +169,22 @@ public class SessionHost implements DataLogger{
 			
 			find:
 			{
-				HostedSession last=null;
+				HostedSession last = null;
 				for(var value : sessions.values()){
-					ses=last;
-					last=value;
-					var as=activeSession.get();
-					if(as.isPresent()&&value==as.get()){
-						if(ses==null){
+					ses = last;
+					last = value;
+					var as = activeSession.get();
+					if(as.isPresent() && value == as.get()){
+						if(ses == null){
 							for(var session : sessions.values()){
-								last=session;
+								last = session;
 							}
-							ses=last;
+							ses = last;
 						}
 						break find;
 					}
 				}
-				ses=sessions.values().iterator().next();
+				ses = sessions.values().iterator().next();
 			}
 		}
 		setActiveSession(ses);
@@ -195,18 +195,18 @@ public class SessionHost implements DataLogger{
 		synchronized(sessions){
 			if(sessions.size()<=1) return;
 			
-			boolean found=false;
+			boolean found = false;
 			find:
 			{
 				for(var value : sessions.values()){
 					if(found){
-						ses=value;
+						ses = value;
 						break find;
 					}
-					var as=activeSession.get();
-					found=as.isPresent()&&value==as.get();
+					var as = activeSession.get();
+					found = as.isPresent() && value == as.get();
 				}
-				ses=sessions.values().iterator().next();
+				ses = sessions.values().iterator().next();
 			}
 		}
 		setActiveSession(ses);

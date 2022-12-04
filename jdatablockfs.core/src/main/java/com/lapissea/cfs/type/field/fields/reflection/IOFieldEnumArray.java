@@ -27,12 +27,12 @@ public class IOFieldEnumArray<T extends IOInstance<T>, E extends Enum<E>> extend
 	
 	public IOFieldEnumArray(FieldAccessor<T> accessor){
 		super(accessor);
-		universe=EnumUniverse.of((Class<E>)accessor.getType().componentType());
+		universe = EnumUniverse.of((Class<E>)accessor.getType().componentType());
 		
-		descriptor=SizeDescriptor.Unknown.of(0, OptionalLong.empty(), (ioPool, prov, inst)->{
-			var siz=arraySize.getValue(ioPool, inst);
+		descriptor = SizeDescriptor.Unknown.of(0, OptionalLong.empty(), (ioPool, prov, inst) -> {
+			var siz = arraySize.getValue(ioPool, inst);
 			if(siz>0) return byteCount(siz);
-			var arr=get(ioPool, inst);
+			var arr = get(ioPool, inst);
 			return byteCount(arr.length);
 		});
 	}
@@ -40,7 +40,7 @@ public class IOFieldEnumArray<T extends IOInstance<T>, E extends Enum<E>> extend
 	@Override
 	public void init(){
 		super.init();
-		arraySize=declaringStruct().getFields().requireExactInt(IOFieldTools.makeCollectionLenName(getAccessor()));
+		arraySize = declaringStruct().getFields().requireExactInt(IOFieldTools.makeCollectionLenName(getAccessor()));
 	}
 	
 	@Override
@@ -49,22 +49,22 @@ public class IOFieldEnumArray<T extends IOInstance<T>, E extends Enum<E>> extend
 	}
 	@Override
 	public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
-		var enums=get(ioPool, instance);
+		var enums = get(ioPool, instance);
 		new BitOutputStream(dest).writeEnums(universe, Arrays.asList(enums)).close();
 	}
 	@Override
 	public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		int size=arraySize.getValue(ioPool, instance);
+		int size = arraySize.getValue(ioPool, instance);
 		E[] enums;
-		try(var s=new BitInputStream(src, (long)universe.bitSize*size)){
-			enums=s.readEnums(universe, size);
+		try(var s = new BitInputStream(src, (long)universe.bitSize*size)){
+			enums = s.readEnums(universe, size);
 		}
 		set(ioPool, instance, enums);
 	}
 	
 	@Override
 	public void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		int size=arraySize.getValue(ioPool, instance);
+		int size = arraySize.getValue(ioPool, instance);
 		src.skipExact(size);
 	}
 	

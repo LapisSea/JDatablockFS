@@ -29,19 +29,19 @@ public enum Keyword{
 	public static final Map<String, Keyword> MAP;
 	
 	Keyword(String customKey){
-		this.key=customKey;
+		this.key = customKey;
 	}
 	Keyword(){
-		key=name();
+		key = name();
 	}
 	
 	static{
-		var values=Keyword.values();
-		var map   =HashMap.<String, Keyword>newHashMap(values.length);
+		var values = Keyword.values();
+		var map    = HashMap.<String, Keyword>newHashMap(values.length);
 		for(Keyword value : values){
 			map.put(value.key.toLowerCase(), value);
 		}
-		MAP=Map.copyOf(map);
+		MAP = Map.copyOf(map);
 	}
 	
 }

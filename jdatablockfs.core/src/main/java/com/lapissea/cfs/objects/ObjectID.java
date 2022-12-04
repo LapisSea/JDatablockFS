@@ -8,9 +8,9 @@ public class ObjectID extends IOInstance.Managed<ObjectID>{
 	@IOValue
 	private String id;
 	
-	public ObjectID(){}
+	public ObjectID(){ }
 	public ObjectID(String id){
-		this.id=id;
+		this.id = id;
 	}
 	
 	@Override

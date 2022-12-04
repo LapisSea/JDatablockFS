@@ -20,7 +20,7 @@ import java.util.Set;
 @Target({ElementType.FIELD, ElementType.METHOD})
 public @interface IODynamic{
 	
-	AnnotationLogic<IODynamic> LOGIC=new AnnotationLogic<>(){
+	AnnotationLogic<IODynamic> LOGIC = new AnnotationLogic<>(){
 		
 		@NotNull
 		@Override

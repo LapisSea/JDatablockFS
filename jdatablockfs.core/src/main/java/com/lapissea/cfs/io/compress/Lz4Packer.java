@@ -22,7 +22,7 @@ public abstract sealed class Lz4Packer implements Packer{
 		private final Supplier<LZ4Factory> factorySupplier;
 		
 		FactoryProvider(Supplier<LZ4Factory> factorySupplier){
-			this.factorySupplier=factorySupplier;
+			this.factorySupplier = factorySupplier;
 		}
 		
 		private LZ4Factory get(){
@@ -30,14 +30,14 @@ public abstract sealed class Lz4Packer implements Packer{
 		}
 	}
 	
-	private static final FactoryProvider FACTORY_PROVIDER=GlobalConfig.configEnum("lz4.compatibility", FactoryProvider.ANY);
+	private static final FactoryProvider FACTORY_PROVIDER = GlobalConfig.configEnum("lz4.compatibility", FactoryProvider.ANY);
 	
 	public static final class High extends Lz4Packer{
 		
 		@Override
 		LZ4Compressor getCompressor(){
 			class Compressor{
-				private static final LZ4Compressor INST=FACTORY_PROVIDER.get().highCompressor();
+				private static final LZ4Compressor INST = FACTORY_PROVIDER.get().highCompressor();
 			}
 			return Compressor.INST;
 		}
@@ -48,7 +48,7 @@ public abstract sealed class Lz4Packer implements Packer{
 		@Override
 		LZ4Compressor getCompressor(){
 			class Compressor{
-				private static final LZ4Compressor INST=FACTORY_PROVIDER.get().fastCompressor();
+				private static final LZ4Compressor INST = FACTORY_PROVIDER.get().fastCompressor();
 			}
 			return Compressor.INST;
 		}
@@ -58,20 +58,20 @@ public abstract sealed class Lz4Packer implements Packer{
 	
 	@Override
 	public byte[] pack(byte[] data){
-		var sizeBytes =sizeBytes(data.length);
-		var compressor=getCompressor();
-		var dest      =new byte[compressor.maxCompressedLength(data.length)+sizeBytes];
+		var sizeBytes  = sizeBytes(data.length);
+		var compressor = getCompressor();
+		var dest       = new byte[compressor.maxCompressedLength(data.length) + sizeBytes];
 		writeSiz(dest, data.length);
-		var compressedSize=compressor.compress(data, 0, data.length, dest, sizeBytes);
-		return Arrays.copyOf(dest, compressedSize+sizeBytes);
+		var compressedSize = compressor.compress(data, 0, data.length, dest, sizeBytes);
+		return Arrays.copyOf(dest, compressedSize + sizeBytes);
 	}
 	
 	@Override
 	public byte[] unpack(byte[] packedData){
 		class Decompressor{
-			private static final LZ4FastDecompressor INST=FACTORY_PROVIDER.get().fastDecompressor();
+			private static final LZ4FastDecompressor INST = FACTORY_PROVIDER.get().fastDecompressor();
 		}
-		int orgLen=readSiz(packedData);
+		int orgLen = readSiz(packedData);
 		return Decompressor.INST.decompress(packedData, sizeBytes(orgLen), orgLen);
 	}
 }

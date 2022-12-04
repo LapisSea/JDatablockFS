@@ -30,37 +30,37 @@ public @interface IONullability{
 	@interface Elements{
 		
 		
-		AnnotationLogic<Elements> LOGIC=new AnnotationLogic<>(){
+		AnnotationLogic<Elements> LOGIC = new AnnotationLogic<>(){
 			@Override
 			public void validate(FieldAccessor<?> field, Elements annotation){
-				var typ=field.getType();
-				if(!typ.isArray()) throw new MalformedStruct(Elements.class.getName()+" can be used only on arrays");
+				var typ = field.getType();
+				if(!typ.isArray()) throw new MalformedStruct(Elements.class.getName() + " can be used only on arrays");
 				if(IOInstance.isInstance(typ.componentType())){
-					throw new MalformedStruct(Elements.class.getName()+" array must be of "+IOInstance.class.getName()+" type");
+					throw new MalformedStruct(Elements.class.getName() + " array must be of " + IOInstance.class.getName() + " type");
 				}
 			}
 			
 			@NotNull
 			@Override
 			public <T extends IOInstance<T>> List<VirtualFieldDefinition<T, ?>> injectPerInstanceValue(FieldAccessor<T> field, Elements annotation){
-				if(annotation.value()!=Mode.NULLABLE) return List.of();
+				if(annotation.value() != Mode.NULLABLE) return List.of();
 				
 				return List.of(new VirtualFieldDefinition<T, boolean[]>(
 					StoragePool.IO,
 					IOFieldTools.makeNullElementsFlagName(field),
 					boolean[].class,
-					(ioPool, instance, dependencies, value)->{
-						if(value!=null) return value;
+					(ioPool, instance, dependencies, value) -> {
+						if(value != null) return value;
 						
-						var instances=(IOInstance<?>[])field.get(ioPool, instance);
-						if(instances==null) return null;
+						var instances = (IOInstance<?>[])field.get(ioPool, instance);
+						if(instances == null) return null;
 						
-						var noNulls=true;
-						var gen    =new boolean[instances.length];
-						for(int i=0;i<instances.length;i++){
-							var nl=instances[i]==null;
-							if(nl) noNulls=false;
-							gen[i]=nl;
+						var noNulls = true;
+						var gen     = new boolean[instances.length];
+						for(int i = 0; i<instances.length; i++){
+							var nl = instances[i] == null;
+							if(nl) noNulls = false;
+							gen[i] = nl;
 						}
 						if(noNulls) return null;
 						return gen;
@@ -72,7 +72,7 @@ public @interface IONullability{
 			@NotNull
 			@Override
 			public Set<String> getDependencyValueNames(FieldAccessor<?> field, Elements annotation){
-				if(annotation.value()!=Mode.NULLABLE) return Set.of();
+				if(annotation.value() != Mode.NULLABLE) return Set.of();
 				
 				return Set.of(IOFieldTools.makeNullElementsFlagName(field));
 			}
@@ -87,26 +87,26 @@ public @interface IONullability{
 		@Override
 		public void validate(FieldAccessor<?> field, IONullability annotation){
 			if(!canHave(field)){
-				throw new MalformedStruct(field+" is not a supported field");
+				throw new MalformedStruct(field + " is not a supported field");
 			}
-			if(SupportedPrimitive.get(field.getType()).isPresent()&&annotation.value()==Mode.DEFAULT_IF_NULL){
-				throw new MalformedStruct("Wrapper type on "+field+" does not support "+Mode.DEFAULT_IF_NULL+" mode");
+			if(SupportedPrimitive.get(field.getType()).isPresent() && annotation.value() == Mode.DEFAULT_IF_NULL){
+				throw new MalformedStruct("Wrapper type on " + field + " does not support " + Mode.DEFAULT_IF_NULL + " mode");
 			}
 		}
 		
 		public static boolean canHave(AnnotatedType field){
-			var typ=field.getType();
+			var typ = field.getType();
 			if(typ.isPrimitive()) return false;
-			return field.hasAnnotation(IODynamic.class)||typ.isArray()||
+			return field.hasAnnotation(IODynamic.class) || typ.isArray() ||
 			       Stream.concat(
 				       Stream.of(IOInstance.class, Enum.class, String.class),
-				       Arrays.stream(SupportedPrimitive.values()).map(p->p.wrapper)
-			       ).anyMatch(c->UtilL.instanceOf(typ, c));
+				       Arrays.stream(SupportedPrimitive.values()).map(p -> p.wrapper)
+			       ).anyMatch(c -> UtilL.instanceOf(typ, c));
 		}
 		
 		
 		private <T extends IOInstance<T>> boolean isNullable(FieldAccessor<T> field){
-			return field.getAnnotation(IONullability.class).map(IONullability::value).orElseThrow()==IONullability.Mode.NULLABLE;
+			return field.getAnnotation(IONullability.class).map(IONullability::value).orElseThrow() == IONullability.Mode.NULLABLE;
 		}
 		
 		private <T extends IOInstance<T>> boolean canHaveNullabilityField(FieldAccessor<T> field){
@@ -115,7 +115,7 @@ public @interface IONullability{
 			if(IOInstance.isInstance(field.getType())){
 				return IOInstance.isManaged(field.getType());
 			}
-			return UtilL.instanceOf(field.getType(), String.class)||field.hasAnnotation(IODynamic.class);
+			return UtilL.instanceOf(field.getType(), String.class) || field.hasAnnotation(IODynamic.class);
 		}
 		
 		@NotNull
@@ -141,7 +141,7 @@ public @interface IONullability{
 		}
 	}
 	
-	AnnotationLogic<IONullability> LOGIC=new NullLogic();
+	AnnotationLogic<IONullability> LOGIC = new NullLogic();
 	
 	enum Mode{
 		NOT_NULL("NN"),
@@ -149,7 +149,7 @@ public @interface IONullability{
 		DEFAULT_IF_NULL("DN");
 		
 		public final String shortName;
-		Mode(String shortName){this.shortName=shortName;}
+		Mode(String shortName){ this.shortName = shortName; }
 	}
 	
 	Mode value() default Mode.NOT_NULL;

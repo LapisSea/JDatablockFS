@@ -41,7 +41,7 @@ public class GeneralTests{
 			LogUtil.Init.attach(USE_CALL_POS|USE_TABULATED_HEADER);
 		}
 		
-		List<Struct<?>> tasks=new ArrayList<>();
+		List<Struct<?>> tasks = new ArrayList<>();
 		
 		if(GlobalConfig.configFlag("test.standardInit", false)){
 			for(var typ : List.of(Chunk.class, Reference.class, AutoText.class, Cluster.RootRef.class, ContiguousIOList.class, LinkedIOList.class, HashIOMap.class, TypeDef.class)){
@@ -55,7 +55,7 @@ public class GeneralTests{
 		
 		if(GlobalConfig.configFlag("test.earlyRunCode", true)){
 			for(var prov : List.of(DataProvider.newVerySimpleProvider(), Cluster.emptyMem())){
-				try(var dummy=AllocateTicket.bytes(10).submit(prov).io()){
+				try(var dummy = AllocateTicket.bytes(10).submit(prov).io()){
 					dummy.write(1);
 					dummy.writeInt4(69);
 					dummy.write(new byte[5]);
@@ -72,8 +72,8 @@ public class GeneralTests{
 			signedIO(numberSize, 0);
 			signedIO(numberSize, numberSize.signedMaxValue);
 			signedIO(numberSize, numberSize.signedMinValue);
-			if(numberSize!=NumberSize.VOID){
-				var iter=new Random(10).longs(numberSize.signedMinValue, numberSize.signedMaxValue).limit(1000).iterator();
+			if(numberSize != NumberSize.VOID){
+				var iter = new Random(10).longs(numberSize.signedMinValue, numberSize.signedMaxValue).limit(1000).iterator();
 				while(iter.hasNext()){
 					signedIO(numberSize, iter.nextLong());
 				}
@@ -82,116 +82,116 @@ public class GeneralTests{
 	}
 	
 	void signedIO(NumberSize numberSize, long value) throws IOException{
-		byte[] buf=new byte[8];
+		byte[] buf = new byte[8];
 		numberSize.writeSigned(new ContentOutputStream.BA(buf), value);
-		var read=numberSize.readSigned(new ContentInputStream.BA(buf));
+		var read = numberSize.readSigned(new ContentInputStream.BA(buf));
 		
-		assertEquals(read, value, value+" was not read or written correctly with "+numberSize);
+		assertEquals(read, value, value + " was not read or written correctly with " + numberSize);
 	}
 	
-	@org.testng.annotations.DataProvider(name="chunkSizeNumbers")
+	@org.testng.annotations.DataProvider(name = "chunkSizeNumbers")
 	public static Object[][] chunkSizeNumbers(){
 		return new Object[][]{{0}, {10}, {255}, {256}, {1000}, {10000}};
 	}
 	
-	@Test(dataProvider="chunkSizeNumbers")
+	@Test(dataProvider = "chunkSizeNumbers")
 	void chunkHeadIntegrity(long capacity) throws IOException{
-		TestUtils.testChunkProvider(TestInfo.of(capacity), provider->{
-			var chunk=AllocateTicket.bytes(capacity).submit(provider);
+		TestUtils.testChunkProvider(TestInfo.of(capacity), provider -> {
+			var chunk = AllocateTicket.bytes(capacity).submit(provider);
 			
-			var providerRead=DataProvider.newVerySimpleProvider(provider.getSource());
-			var readChunk   =providerRead.getChunk(chunk.getPtr());
+			var providerRead = DataProvider.newVerySimpleProvider(provider.getSource());
+			var readChunk    = providerRead.getChunk(chunk.getPtr());
 			
 			assertEquals(readChunk, chunk);
 		});
 	}
 	
-	@Test(dataProvider="chunkSizeNumbers")
+	@Test(dataProvider = "chunkSizeNumbers")
 	void chunkBodyIntegrity(long capacity) throws IOException{
-		TestUtils.testChunkProvider(TestInfo.of(capacity), provider->{
-			var chunkSecond=AllocateTicket.bytes(1).submit(provider);
-			var chunk      =AllocateTicket.bytes(capacity).withNext(chunkSecond).submit(provider);
+		TestUtils.testChunkProvider(TestInfo.of(capacity), provider -> {
+			var chunkSecond = AllocateTicket.bytes(1).submit(provider);
+			var chunk       = AllocateTicket.bytes(capacity).withNext(chunkSecond).submit(provider);
 //			var chunk      =AllocateTicket.bytes(capacity).submit(provider);
 			
-			byte[] bodyData=new byte[(int)capacity];
-			for(int i=0;i<bodyData.length;i++){
-				bodyData[i]=(byte)i;
+			byte[] bodyData = new byte[(int)capacity];
+			for(int i = 0; i<bodyData.length; i++){
+				bodyData[i] = (byte)i;
 			}
 			
 			chunk.write(true, bodyData);
 			
-			var readBody=chunk.readAll();
+			var readBody = chunk.readAll();
 			assertEquals(readBody, bodyData);
 		});
 	}
 	
-	@Test(dataProvider="chunkSizeNumbers")
+	@Test(dataProvider = "chunkSizeNumbers")
 	void chunkBodyChainedIntegrity(long capacity) throws IOException{
-		TestUtils.testChunkProvider(TestInfo.of(capacity), provider->{
+		TestUtils.testChunkProvider(TestInfo.of(capacity), provider -> {
 			
-			var ticket     =AllocateTicket.bytes(capacity/2);
-			var chunkSecond=ticket.submit(provider);
-			var chunk      =ticket.withNext(chunkSecond).submit(provider);
+			var ticket      = AllocateTicket.bytes(capacity/2);
+			var chunkSecond = ticket.submit(provider);
+			var chunk       = ticket.withNext(chunkSecond).submit(provider);
 			
-			byte[] bodyData=new byte[(int)capacity];
-			for(int i=0;i<bodyData.length;i++){
-				bodyData[i]=(byte)i;
+			byte[] bodyData = new byte[(int)capacity];
+			for(int i = 0; i<bodyData.length; i++){
+				bodyData[i] = (byte)i;
 			}
 			
 			chunk.write(true, bodyData);
 			
-			var readBody=chunk.readAll();
+			var readBody = chunk.readAll();
 			assertEquals(readBody, bodyData);
 		});
 	}
 	
 	@Test
 	void blankCluster() throws IOException{
-		TestUtils.testCluster(TestInfo.of(), ses->{});
+		TestUtils.testCluster(TestInfo.of(), ses -> { });
 	}
 	
-	@org.testng.annotations.DataProvider(name="lists")
+	@org.testng.annotations.DataProvider(name = "lists")
 	public static Object[][] lists(){
 		return new Object[][]{{ContiguousIOList.class}, {LinkedIOList.class}};
 	}
 	
-	@Test(dataProvider="lists")
-	<L extends IOInstance.Unmanaged<L>&IOList<Integer>> void listTestIntAdd(Class<L> listType) throws IOException{
-		listEqualityTest(TestInfo.of(listType), listType, Integer.class, list->{
+	@Test(dataProvider = "lists")
+	<L extends IOInstance.Unmanaged<L> & IOList<Integer>> void listTestIntAdd(Class<L> listType) throws IOException{
+		listEqualityTest(TestInfo.of(listType), listType, Integer.class, list -> {
 			list.add(69);
 			list.add(420);
 		}, true);
 	}
 	
-	@Test(dataProvider="lists")
-	<L extends IOInstance.Unmanaged<L>&IOList<Dummy>> void listTestSimpleAdd(Class<L> listType) throws IOException{
-		listEqualityTest(TestInfo.of(listType), listType, Dummy.class, list->{
+	@Test(dataProvider = "lists")
+	<L extends IOInstance.Unmanaged<L> & IOList<Dummy>> void listTestSimpleAdd(Class<L> listType) throws IOException{
+		listEqualityTest(TestInfo.of(listType), listType, Dummy.class, list -> {
 			list.add(new Dummy(69));
 			list.add(new Dummy(420));
 		}, false);
 	}
 	
-	@Test(dataProvider="lists")
-	<L extends IOInstance.Unmanaged<L>&IOList<Dummy>> void listSingleAdd(Class<L> listType) throws IOException{
-		listEqualityTest(TestInfo.of(listType), listType, Dummy.class, list->{
+	@Test(dataProvider = "lists")
+	<L extends IOInstance.Unmanaged<L> & IOList<Dummy>> void listSingleAdd(Class<L> listType) throws IOException{
+		listEqualityTest(TestInfo.of(listType), listType, Dummy.class, list -> {
 			list.add(Dummy.first());
 		}, false);
 	}
 	
-	@Test(dataProvider="lists")
-	<L extends IOInstance.Unmanaged<L>&IOList<BooleanContainer>> void listBitValue(Class<L> listType) throws IOException{
-		listEqualityTest(TestInfo.of(listType), listType, BooleanContainer.class, list->{
-			var rand=new Random(1);
-			var vals=IntStream.range(0, 100)
-			                  .mapToObj(i->new BooleanContainer(rand.nextBoolean()))
-			                  .collect(Collectors.toList());
+	@Test(dataProvider = "lists")
+	<L extends IOInstance.Unmanaged<L> & IOList<BooleanContainer>> void listBitValue(Class<L> listType) throws IOException{
+		listEqualityTest(TestInfo.of(listType), listType, BooleanContainer.class, list -> {
+			var rand = new Random(1);
+			var vals = IntStream.range(0, 100)
+			                    .mapToObj(i -> new BooleanContainer(rand.nextBoolean()))
+			                    .collect(Collectors.toList());
 			list.addAll(vals);
 		}, true);
 	}
 	
-	@Test(dataProvider="lists")
-	<L extends IOInstance.Unmanaged<L>&IOList<Dummy>> void listInsert(Class<L> listType) throws IOException{
-		listEqualityTest(TestInfo.of(listType), listType, Dummy.class, list->{
+	@Test(dataProvider = "lists")
+	<L extends IOInstance.Unmanaged<L> & IOList<Dummy>> void listInsert(Class<L> listType) throws IOException{
+		listEqualityTest(TestInfo.of(listType), listType, Dummy.class, list -> {
 			list.add(new Dummy('1'));
 			list.add(new Dummy('2'));
 			list.add(new Dummy('3'));
@@ -201,9 +201,9 @@ public class GeneralTests{
 		}, false);
 	}
 	
-	@Test(dataProvider="lists")
-	<L extends IOInstance.Unmanaged<L>&IOList<Dummy>> void listIndexRemove(Class<L> listType) throws IOException{
-		listEqualityTest(TestInfo.of(listType), listType, Dummy.class, list->{
+	@Test(dataProvider = "lists")
+	<L extends IOInstance.Unmanaged<L> & IOList<Dummy>> void listIndexRemove(Class<L> listType) throws IOException{
+		listEqualityTest(TestInfo.of(listType), listType, Dummy.class, list -> {
 			list.add(new Dummy(69));
 			list.add(new Dummy(360));
 			list.add(new Dummy(420));
@@ -212,9 +212,9 @@ public class GeneralTests{
 		}, false);
 	}
 	
-	@Test(dataProvider="lists")
-	<L extends IOInstance.Unmanaged<L>&IOList<Dummy>> void listComplexIndexRemove(Class<L> listType) throws IOException{
-		listEqualityTest(TestInfo.of(listType), listType, Dummy.class, list->{
+	@Test(dataProvider = "lists")
+	<L extends IOInstance.Unmanaged<L> & IOList<Dummy>> void listComplexIndexRemove(Class<L> listType) throws IOException{
+		listEqualityTest(TestInfo.of(listType), listType, Dummy.class, list -> {
 			list.add(Dummy.first());
 			list.add(Dummy.auto());
 			list.add(Dummy.auto());
@@ -235,7 +235,7 @@ public class GeneralTests{
 			TestInfo.of(),
 			HashIOMap<Integer, Integer>::new,
 			TypeLink.of(HashIOMap.class, Integer.class, Integer.class),
-			map->{
+			map -> {
 				map.put(0, 10);
 				map.put(0, 11);
 				map.put(1, 12);
@@ -252,24 +252,24 @@ public class GeneralTests{
 	
 	@Test
 	void stringTest() throws IOException{
-		TestUtils.testChunkProvider(TestInfo.of(), provider->{
-			String data="this is a test!";
+		TestUtils.testChunkProvider(TestInfo.of(), provider -> {
+			String data = "this is a test!";
 			
-			StructPipe<StringContainer> pipe=StandardStructPipe.of(StringContainer.class);
+			StructPipe<StringContainer> pipe = StandardStructPipe.of(StringContainer.class);
 			
-			var chunk=AllocateTicket.bytes(64).submit(provider);
+			var chunk = AllocateTicket.bytes(64).submit(provider);
 			
-			var text=new StringContainer(data);
+			var text = new StringContainer(data);
 			
 			pipe.write(provider, chunk, text);
-			var read=pipe.readNew(chunk, null);
+			var read = pipe.readNew(chunk, null);
 			
 			assertEquals(text, read);
 		});
 	}
 	
 	
-	@org.testng.annotations.DataProvider(name="strings")
+	@org.testng.annotations.DataProvider(name = "strings")
 	public static Object[][] strings(){
 		return new Object[][]{
 			{""},
@@ -279,21 +279,21 @@ public class GeneralTests{
 			{"dgasf_gfao124581z523tg eagdgisndgim315   qTGE254ghaerza573q6 wr gewr2$afas -.,/7-+41561552030,15.ds"},
 			{"I ❤️ you"},
 			{"\u00ff"},
-			{IntStream.range(0, 1000).mapToObj(i->"loong string!? ("+i+")").collect(Collectors.joining(", "))},
+			{IntStream.range(0, 1000).mapToObj(i -> "loong string!? (" + i + ")").collect(Collectors.joining(", "))},
 			};
 	}
 	
-	@Test(dataProvider="strings")
+	@Test(dataProvider = "strings")
 	void autoTextTest(String data) throws IOException{
-		TestUtils.testChunkProvider(TestInfo.of(data), provider->{
-			StructPipe<AutoText> pipe=StandardStructPipe.of(AutoText.class);
+		TestUtils.testChunkProvider(TestInfo.of(data), provider -> {
+			StructPipe<AutoText> pipe = StandardStructPipe.of(AutoText.class);
 			
-			var chunk=AllocateTicket.bytes(64).submit(provider);
+			var chunk = AllocateTicket.bytes(64).submit(provider);
 			
-			var text=new AutoText(data);
+			var text = new AutoText(data);
 			
 			pipe.write(provider, chunk, text);
-			var read=pipe.readNew(chunk, null);
+			var read = pipe.readNew(chunk, null);
 			
 			assertEquals(text, read);
 		});
@@ -308,11 +308,11 @@ public class GeneralTests{
 		listEqualityTest(info, ContiguousIOList.class, typ, session, useCluster);
 	}
 	
-	static <T, L extends IOInstance.Unmanaged<L>&IOList<T>> void listEqualityTest(TestInfo info, Class<L> listType, Class<T> typ, UnsafeConsumer<IOList<T>, IOException> session, boolean useCluster) throws IOException{
+	static <T, L extends IOInstance.Unmanaged<L> & IOList<T>> void listEqualityTest(TestInfo info, Class<L> listType, Class<T> typ, UnsafeConsumer<IOList<T>, IOException> session, boolean useCluster) throws IOException{
 		TestUtils.ioListComplianceSequence(
 			info, 64,
-			(provider, reference, typeDef)->{
-				var lTyp=Struct.Unmanaged.ofUnmanaged(listType);
+			(provider, reference, typeDef) -> {
+				var lTyp = Struct.Unmanaged.ofUnmanaged(listType);
 				return lTyp.make(provider, reference, typeDef);
 			},
 			TypeLink.of(listType, typ),
@@ -322,14 +322,14 @@ public class GeneralTests{
 	
 	@Test
 	void checkMemoryWalk() throws IOException{
-		TestUtils.testCluster(TestInfo.of(), cluster->{
+		TestUtils.testCluster(TestInfo.of(), cluster -> {
 			
-			var prov=cluster.getRootProvider();
+			var prov = cluster.getRootProvider();
 			
-			var dummies=prov.builder()
-			                .withGenerator(()->new GenericContainer<>(IntStream.range(0, 3).mapToObj(Dummy::new).toArray(Dummy[]::new)))
-			                .withId("dummy_array")
-			                .request();
+			var dummies = prov.builder()
+			                  .withGenerator(() -> new GenericContainer<>(IntStream.range(0, 3).mapToObj(Dummy::new).toArray(Dummy[]::new)))
+			                  .withId("dummy_array")
+			                  .request();
 			
 			
 			

@@ -22,21 +22,21 @@ public interface FunctionInfo{
 			this(name, List.of());
 		}
 		public Signature(String name, List<GenericType> args){
-			this.name=name;
-			var argTmp=List.copyOf(args);
-			var copy  =false;
-			for(int i=0;i<argTmp.size();i++){
+			this.name = name;
+			var argTmp = List.copyOf(args);
+			var copy   = false;
+			for(int i = 0; i<argTmp.size(); i++){
 				if(argTmp.get(i).args().isEmpty()) continue;
-				if(!copy) argTmp=new ArrayList<>(argTmp);
-				copy=true;
+				if(!copy) argTmp = new ArrayList<>(argTmp);
+				copy = true;
 				argTmp.set(i, argTmp.get(i).withoutArgs());
 			}
-			if(copy) argTmp=List.copyOf(args);
-			this.args=argTmp;
+			if(copy) argTmp = List.copyOf(args);
+			this.args = argTmp;
 		}
 		@Override
 		public String toString(){
-			return "name("+args.stream().map(GenericType::toString).collect(Collectors.joining(", "))+")";
+			return "name(" + args.stream().map(GenericType::toString).collect(Collectors.joining(", ")) + ")";
 		}
 	}
 	
@@ -48,16 +48,16 @@ public interface FunctionInfo{
 		private final List<GenericType> args;
 		
 		public OfMethod(TypeSource source, Method method) throws MalformedJorthException{
-			this.method=method;
-			owner=source.byName(ClassName.of(method.getDeclaringClass()));
-			returnType=GenericType.of(method.getGenericReturnType());
+			this.method = method;
+			owner = source.byName(ClassName.of(method.getDeclaringClass()));
+			returnType = GenericType.of(method.getGenericReturnType());
 			
-			var tArgs=method.getGenericParameterTypes();
-			var args =new ArrayList<GenericType>(tArgs.length);
+			var tArgs = method.getGenericParameterTypes();
+			var args  = new ArrayList<GenericType>(tArgs.length);
 			for(Type tArg : tArgs){
 				args.add(GenericType.of(tArg));
 			}
-			this.args=args;
+			this.args = args;
 		}
 		
 		@Override
@@ -71,7 +71,7 @@ public interface FunctionInfo{
 		@Override
 		public Visibility visibility(){
 			if(Modifier.isPublic(method.getModifiers())){
-				return Visibility.PRIVATE;
+				return Visibility.PUBLIC;
 			}
 			if(Modifier.isProtected(method.getModifiers())){
 				return Visibility.PROTECTED;
@@ -99,20 +99,20 @@ public interface FunctionInfo{
 	
 	class OfConstructor implements FunctionInfo{
 		
-		private final Constructor<?> ctor;
-		private final ClassInfo      owner;
+		private final Constructor<?>    ctor;
+		private final ClassInfo         owner;
 		private final List<GenericType> args;
 		
 		public OfConstructor(TypeSource source, Constructor<?> ctor) throws MalformedJorthException{
-			this.ctor=ctor;
-			owner=source.byName(ClassName.of(ctor.getDeclaringClass()));
+			this.ctor = ctor;
+			owner = source.byName(ClassName.of(ctor.getDeclaringClass()));
 			
-			var tArgs=ctor.getGenericParameterTypes();
-			var args =new ArrayList<GenericType>(tArgs.length);
+			var tArgs = ctor.getGenericParameterTypes();
+			var args  = new ArrayList<GenericType>(tArgs.length);
 			for(Type tArg : tArgs){
 				args.add(GenericType.of(tArg));
 			}
-			this.args=args;
+			this.args = args;
 		}
 		
 		@Override

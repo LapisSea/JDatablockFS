@@ -13,18 +13,18 @@ import static com.lapissea.cfs.type.WordSpace.BYTE;
 public interface BasicSizeDescriptor<T, PoolType>{
 	
 	static String toString(BasicSizeDescriptor<?, ?> size){
-		var fixed=size.getFixed();
-		var siz  =size.getWordSpace();
+		var fixed = size.getFixed();
+		var siz   = size.getWordSpace();
 		if(fixed.isPresent()){
-			var fixedVal=fixed.getAsLong();
-			return fixedVal+" "+TextUtil.plural(siz.friendlyName, (int)fixedVal);
+			var fixedVal = fixed.getAsLong();
+			return fixedVal + " " + TextUtil.plural(siz.friendlyName, (int)fixedVal);
 		}
 		
-		var min=size.getMin();
-		var max=size.getMax();
+		var min = size.getMin();
+		var max = size.getMax();
 		
-		StringBuilder sb=new StringBuilder();
-		if(min>0||max.isPresent()){
+		StringBuilder sb = new StringBuilder();
+		if(min>0 || max.isPresent()){
 			sb.append(min);
 			if(max.isPresent()) sb.append('-').append(max.getAsLong());
 			else sb.append("<?");
@@ -41,14 +41,14 @@ public interface BasicSizeDescriptor<T, PoolType>{
 		@SuppressWarnings("unchecked")
 		final class Basic<T, PoolType> implements IFixed<T, PoolType>{
 			
-			private static final Basic<?, ?>[] BIT_CACHE =LongStream.range(0, 9).mapToObj(i->new Basic<>(BIT, i)).toArray(Basic<?, ?>[]::new);
-			private static final Basic<?, ?>[] BYTE_CACHE=LongStream.range(0, 17).mapToObj(i->new Basic<>(BYTE, i)).toArray(Basic<?, ?>[]::new);
+			private static final Basic<?, ?>[] BIT_CACHE  = LongStream.range(0, 9).mapToObj(i -> new Basic<>(BIT, i)).toArray(Basic<?, ?>[]::new);
+			private static final Basic<?, ?>[] BYTE_CACHE = LongStream.range(0, 17).mapToObj(i -> new Basic<>(BYTE, i)).toArray(Basic<?, ?>[]::new);
 			
 			private static <T, PoolType> Basic<T, PoolType> ofByte(long bytes){
-				return bytes>=BYTE_CACHE.length?new Basic<>(BYTE, bytes):(Basic<T, PoolType>)BYTE_CACHE[(int)bytes];
+				return bytes>=BYTE_CACHE.length? new Basic<>(BYTE, bytes) : (Basic<T, PoolType>)BYTE_CACHE[(int)bytes];
 			}
 			private static <T, PoolType> Basic<T, PoolType> ofBit(long bytes){
-				return bytes>=BIT_CACHE.length?new Basic<>(BIT, bytes):(Basic<T, PoolType>)BIT_CACHE[(int)bytes];
+				return bytes>=BIT_CACHE.length? new Basic<>(BIT, bytes) : (Basic<T, PoolType>)BIT_CACHE[(int)bytes];
 			}
 			
 			public static <T, PoolType> Basic<T, PoolType> of(long bytes){
@@ -66,8 +66,8 @@ public interface BasicSizeDescriptor<T, PoolType>{
 			private final WordSpace wordSpace;
 			
 			private Basic(WordSpace wordSpace, long size){
-				this.size=size;
-				this.wordSpace=wordSpace;
+				this.size = size;
+				this.wordSpace = wordSpace;
 			}
 			
 			@Override
@@ -87,17 +87,17 @@ public interface BasicSizeDescriptor<T, PoolType>{
 			
 			@Override
 			public boolean equals(Object o){
-				return this==o||
-				       o instanceof BasicSizeDescriptor<?, ?> that&&
-				       that.hasFixed()&&
-				       this.size==that.getFixed().orElseThrow()&&
-				       this.wordSpace==that.getWordSpace();
+				return this == o ||
+				       o instanceof BasicSizeDescriptor<?, ?> that &&
+				       that.hasFixed() &&
+				       this.size == that.getFixed().orElseThrow() &&
+				       this.wordSpace == that.getWordSpace();
 			}
 			
 			@Override
 			public int hashCode(){
-				int result=wordSpace.hashCode();
-				result=31*result+(int)(size^(size >>> 32));
+				int result = wordSpace.hashCode();
+				result = 31*result + (int)(size^(size >>> 32));
 				return result;
 			}
 		}
@@ -105,7 +105,7 @@ public interface BasicSizeDescriptor<T, PoolType>{
 		default long sizedVal(WordSpace wordSpace){
 			return mapSize(wordSpace, get());
 		}
-		default long get(WordSpace wordSpace){return sizedVal(wordSpace);}
+		default long get(WordSpace wordSpace){ return sizedVal(wordSpace); }
 		long get();
 		
 		@Override
@@ -168,11 +168,11 @@ public interface BasicSizeDescriptor<T, PoolType>{
 	}
 	
 	OptionalLong getFixed();
-	default OptionalLong getFixed(WordSpace wordSpace){return mapSize(wordSpace, getFixed());}
-	default boolean hasFixed()                        {return getFixed().isPresent();}
+	default OptionalLong getFixed(WordSpace wordSpace){ return mapSize(wordSpace, getFixed()); }
+	default boolean hasFixed()                        { return getFixed().isPresent(); }
 	
 	default long requireFixed(WordSpace wordSpace){
-		return getFixed(wordSpace).orElseThrow(()->new IllegalStateException("Fixed size is required "+this));
+		return getFixed(wordSpace).orElseThrow(() -> new IllegalStateException("Fixed size is required " + this));
 	}
 	default long requireMax(WordSpace wordSpace){
 		return getMax(wordSpace).orElseThrow();
@@ -183,12 +183,12 @@ public interface BasicSizeDescriptor<T, PoolType>{
 	}
 	
 	default long fixedOrMin(WordSpace wordSpace){
-		var fixed=getFixed(wordSpace);
+		var fixed = getFixed(wordSpace);
 		if(fixed.isPresent()) return fixed.getAsLong();
 		return getMin(wordSpace);
 	}
 	default OptionalLong fixedOrMax(WordSpace wordSpace){
-		var fixed=getFixed(wordSpace);
+		var fixed = getFixed(wordSpace);
 		if(fixed.isPresent()) return fixed;
 		return getMax(wordSpace);
 	}
@@ -203,17 +203,17 @@ public interface BasicSizeDescriptor<T, PoolType>{
 	}
 	
 	default long calcAllocSize(WordSpace wordSpace){
-		var val=getFixed();
+		var val = getFixed();
 		if(val.isEmpty()){
-			var max=getMax();
+			var max = getMax();
 			if(max.isPresent()){
-				var min=getMin();
-				val=OptionalLong.of((min+max.getAsLong())/2);
+				var min = getMin();
+				val = OptionalLong.of((min + max.getAsLong())/2);
 			}
 		}
 		if(val.isEmpty()){
-			var min=getMin();
-			var siz=Math.max(min, 32);
+			var min = getMin();
+			var siz = Math.max(min, 32);
 			return mapSize(wordSpace, siz);
 		}
 		

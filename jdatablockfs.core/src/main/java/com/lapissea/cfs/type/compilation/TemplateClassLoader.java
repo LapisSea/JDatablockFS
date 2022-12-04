@@ -33,44 +33,44 @@ import static com.lapissea.util.ConsoleColors.*;
 
 public final class TemplateClassLoader extends ClassLoader{
 	
-	private record TypeNamed(String name, TypeDef def){}
+	private record TypeNamed(String name, TypeDef def){ }
 	
-	private static final Map<TypeNamed, byte[]> CLASS_DATA_CACHE=Collections.synchronizedMap(new WeakValueHashMap<>());
+	private static final Map<TypeNamed, byte[]> CLASS_DATA_CACHE = Collections.synchronizedMap(new WeakValueHashMap<>());
 	
-	private static final boolean PRINT_GENERATING_INFO=GlobalConfig.configFlag("classGen.printGeneratingInfo", false);
-	private static final boolean PRINT_BYTECODE       =GlobalConfig.configFlag("classGen.printBytecode", false);
-	private static final boolean EXIT_ON_FAIL         =GlobalConfig.configFlag("classGen.exitOnFail", false);
+	private static final boolean PRINT_GENERATING_INFO = GlobalConfig.configFlag("classGen.printGeneratingInfo", false);
+	private static final boolean PRINT_BYTECODE        = GlobalConfig.configFlag("classGen.printBytecode", false);
+	private static final boolean EXIT_ON_FAIL          = GlobalConfig.configFlag("classGen.exitOnFail", false);
 	
 	private final IOTypeDB db;
 	
 	public TemplateClassLoader(IOTypeDB db, ClassLoader parent){
-		super(TemplateClassLoader.class.getSimpleName()+"{"+db+"}", parent);
-		this.db=db;
+		super(TemplateClassLoader.class.getSimpleName() + "{" + db + "}", parent);
+		this.db = db;
 	}
 	
 	@Override
 	protected Class<?> findClass(String className) throws ClassNotFoundException{
-		TypeDef def=getDef(className);
+		TypeDef def = getDef(className);
 		if(def.isUnmanaged()){
-			throw new UnsupportedOperationException(className+" is unmanaged! All unmanaged types must be present! Unmanaged types may contain mechanism not understood by the base IO engine.");
+			throw new UnsupportedOperationException(className + " is unmanaged! All unmanaged types must be present! Unmanaged types may contain mechanism not understood by the base IO engine.");
 		}
 		
-		if(!def.isIoInstance()&&!def.isEnum()){
-			throw new UnsupportedOperationException("Can not generate: "+className+". It is not an "+IOInstance.class.getSimpleName()+" or Enum");
+		if(!def.isIoInstance() && !def.isEnum()){
+			throw new UnsupportedOperationException("Can not generate: " + className + ". It is not an " + IOInstance.class.getSimpleName() + " or Enum");
 		}
 		
-		var classData=CLASS_DATA_CACHE.get(new TypeNamed(className, def));
-		if(classData==null){
-			var typ=new TypeNamed(className, def.clone());
+		var classData = CLASS_DATA_CACHE.get(new TypeNamed(className, def));
+		if(classData == null){
+			var typ = new TypeNamed(className, def.clone());
 			
-			var hash=hashCode();
-			Log.trace("Generating template: {} - {}", className, (Supplier<String>)()->{
-				var cols=List.of(BLACK, RED, GREEN, YELLOW, BLUE, PURPLE, CYAN);
-				return cols.get((int)(Integer.toUnsignedLong(hash)%cols.size()))+Integer.toHexString(hash)+" "+RESET;
+			var hash = hashCode();
+			Log.trace("Generating template: {} - {}", className, (Supplier<String>)() -> {
+				var cols = List.of(BLACK, RED, GREEN, YELLOW, BLUE, PURPLE, CYAN);
+				return cols.get((int)(Integer.toUnsignedLong(hash)%cols.size())) + Integer.toHexString(hash) + " " + RESET;
 			});
 			
 			try{
-				classData=jorthGenerate(typ, def.isIoInstance()?this::generateIOInstance:this::generateEnum);
+				classData = jorthGenerate(typ, def.isIoInstance()? this::generateIOInstance : this::generateEnum);
 			}catch(Throwable e){
 				if(EXIT_ON_FAIL){
 					e.printStackTrace();
@@ -85,19 +85,19 @@ public final class TemplateClassLoader extends ClassLoader{
 	}
 	
 	private byte[] jorthGenerate(TypeNamed classType, UnsafeBiConsumer<TypeNamed, JorthWriter, MalformedJorthException> generator){
-		if(PRINT_GENERATING_INFO) LogUtil.println("generating", "\n"+TextUtil.toTable(classType.name, classType.def.getFields()));
+		if(PRINT_GENERATING_INFO) LogUtil.println("generating", "\n" + TextUtil.toTable(classType.name, classType.def.getFields()));
 		
-		var jorth=new JorthCompiler(this);
+		var jorth = new JorthCompiler(this);
 		
-		try(var writer=jorth.writeCode()){
+		try(var writer = jorth.writeCode()){
 			generator.accept(classType, writer);
 		}catch(MalformedJorthException e){
-			throw new RuntimeException("Failed to generate class "+classType.name, e);
+			throw new RuntimeException("Failed to generate class " + classType.name, e);
 		}
 		
 		byte[] byt;
 		try{
-			byt=jorth.classBytecode(PRINT_BYTECODE);
+			byt = jorth.classBytecode(PRINT_BYTECODE);
 		}catch(MalformedJorthException e){
 			throw new RuntimeException(e);
 		}
@@ -138,10 +138,10 @@ public final class TemplateClassLoader extends ClassLoader{
 		);
 		
 		for(var field : classType.def.getFields()){
-			var type=toJorthGeneric(field.getType());
+			var type = toJorthGeneric(field.getType());
 			
 			if(IONullability.NullLogic.canHave(new AnnotatedType.Simple(
-				field.isDynamic()?List.of(IOFieldTools.makeAnnotation(IODynamic.class)):List.of(),
+				field.isDynamic()? List.of(IOFieldTools.makeAnnotation(IODynamic.class)) : List.of(),
 				field.getType().getTypeClass(db)
 			))){
 				writer.write("{#TOKEN(0)} IONullability @", field.getNullability().toString());
@@ -152,7 +152,7 @@ public final class TemplateClassLoader extends ClassLoader{
 			if(field.isUnsigned()){
 				writer.write("IOValue.Unsigned @");
 			}
-			if(field.getReferenceType()!=null){
+			if(field.getReferenceType() != null){
 				writer.write("{#TOKEN(0) dataPipeType} IOValue.Reference @", field.getReferenceType().toString());
 			}
 			if(!field.getDependencies().isEmpty()){
@@ -170,20 +170,20 @@ public final class TemplateClassLoader extends ClassLoader{
 	}
 	
 	private String toJorthGeneric(TypeLink typ){
-		StringBuilder sb=new StringBuilder();
+		StringBuilder sb = new StringBuilder();
 		if(typ.argCount()>0){
 			sb.append("[");
-			for(int i=0;i<typ.argCount();i++){
-				var arg=typ.arg(i);
+			for(int i = 0; i<typ.argCount(); i++){
+				var arg = typ.arg(i);
 				sb.append(toJorthGeneric(arg)).append(" ");
 			}
 			sb.append("] ");
 		}
 		if(typ.getTypeName().startsWith("[")){
-			var nam=typ.getTypeName();
+			var nam = typ.getTypeName();
 			while(nam.startsWith("[")){
 				sb.append("array ");
-				nam=nam.substring(1);
+				nam = nam.substring(1);
 			}
 			sb.append(switch(nam){
 				case "B" -> "byte";
@@ -195,8 +195,8 @@ public final class TemplateClassLoader extends ClassLoader{
 				case "C" -> "char";
 				case "Z" -> "boolean";
 				default -> {
-					if(!nam.startsWith("L")||!nam.endsWith(";")) throw new NotImplementedException("Unknown type: "+nam);
-					yield nam.substring(1, nam.length()-1);
+					if(!nam.startsWith("L") || !nam.endsWith(";")) throw new NotImplementedException("Unknown type: " + nam);
+					yield nam.substring(1, nam.length() - 1);
 				}
 			});
 			return sb.toString();
@@ -208,12 +208,12 @@ public final class TemplateClassLoader extends ClassLoader{
 	private TypeDef getDef(String name) throws ClassNotFoundException{
 		TypeDef def;
 		try{
-			def=db.getDefinitionFromClassName(name);
+			def = db.getDefinitionFromClassName(name);
 		}catch(IOException e){
 			throw new RuntimeException("Failed to fetch data from database", e);
 		}
-		if(def==null){
-			throw new ClassNotFoundException(name+" is not defined in database");
+		if(def == null){
+			throw new ClassNotFoundException(name + " is not defined in database");
 		}
 		return def;
 	}

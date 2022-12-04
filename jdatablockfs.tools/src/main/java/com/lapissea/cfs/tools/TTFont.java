@@ -49,30 +49,30 @@ public class TTFont extends DrawFont{
 		final int   bitmapWidth;
 		final int   bitmapHeight;
 		
-		long lastUsed=System.currentTimeMillis();
+		long lastUsed = System.currentTimeMillis();
 		
 		private Bitmap(float pixelHeight){
-			this.pixelHeight=pixelHeight;
+			this.pixelHeight = pixelHeight;
 			
-			var bitmapWidth =32;
-			var bitmapHeight=32;
+			var bitmapWidth  = 32;
+			var bitmapHeight = 32;
 			
-			charInfo=STBTTBakedChar.malloc(max-min);
+			charInfo = STBTTBakedChar.malloc(max - min);
 			
 			
 			ByteBuffer bitmap;
 			
 			while(true){
 				try{
-					bitmap=BufferUtils.createByteBuffer(bitmapWidth*bitmapHeight);
+					bitmap = BufferUtils.createByteBuffer(bitmapWidth*bitmapHeight);
 					if(STBTruetype.stbtt_BakeFontBitmap(ttfBB, pixelHeight, bitmap, bitmapWidth, bitmapHeight, min, charInfo)<=0){
 						throw new IllegalArgumentException();
 					}
 				}catch(IllegalArgumentException e){
 					if(bitmapWidth<bitmapHeight){
-						bitmapWidth*=2;
+						bitmapWidth *= 2;
 					}else{
-						bitmapHeight*=2;
+						bitmapHeight *= 2;
 					}
 					continue;
 				}
@@ -80,41 +80,41 @@ public class TTFont extends DrawFont{
 				break;
 				
 			}
-			this.bitmapWidth=bitmapWidth;
-			this.bitmapHeight=bitmapHeight;
+			this.bitmapWidth = bitmapWidth;
+			this.bitmapHeight = bitmapHeight;
 			
-			ByteBuffer fillBitmap   =bitmap;
-			ByteBuffer outlineBitmap=BufferUtils.createByteBuffer(fillBitmap.capacity());
+			ByteBuffer fillBitmap    = bitmap;
+			ByteBuffer outlineBitmap = BufferUtils.createByteBuffer(fillBitmap.capacity());
 			
 			interface PixelGetter{
 				int get(int x, int y);
 			}
 			
-			PixelGetter get=(x, y)->{
-				int index=x*this.bitmapWidth+y;
+			PixelGetter get = (x, y) -> {
+				int index = x*this.bitmapWidth + y;
 				return fillBitmap.get(index)&0xFF;
 			};
 			
-			for(int x=0;x<bitmapWidth;x++){
-				for(int y=0;y<bitmapHeight;y++){
-					int b   =get.get(x, y);
-					int diff=0;
+			for(int x = 0; x<bitmapWidth; x++){
+				for(int y = 0; y<bitmapHeight; y++){
+					int b    = get.get(x, y);
+					int diff = 0;
 					
-					if(x>0) diff=Math.max(diff, Math.abs(get.get(x-1, y)-b));
-					if(y>0) diff=Math.max(diff, Math.abs(get.get(x, y-1)-b));
-					if(x<bitmapWidth-1) diff=Math.max(diff, Math.abs(get.get(x+1, y)-b));
-					if(y<bitmapHeight-1) diff=Math.max(diff, Math.abs(get.get(x, y+1)-b));
+					if(x>0) diff = Math.max(diff, Math.abs(get.get(x - 1, y) - b));
+					if(y>0) diff = Math.max(diff, Math.abs(get.get(x, y - 1) - b));
+					if(x<bitmapWidth - 1) diff = Math.max(diff, Math.abs(get.get(x + 1, y) - b));
+					if(y<bitmapHeight - 1) diff = Math.max(diff, Math.abs(get.get(x, y + 1) - b));
 					
 					
-					int index=x*bitmapWidth+y;
+					int index = x*bitmapWidth + y;
 					outlineBitmap.put(index, (byte)diff);
 				}
 			}
-			boolean[] instant={false};
-			openglTask.accept(()->{
-				instant[0]=true;
-				texture=GlUtils.uploadTexture(this.bitmapWidth, this.bitmapHeight, GL11.GL_ALPHA, fillBitmap);
-				outlineTexture=GlUtils.uploadTexture(this.bitmapWidth, this.bitmapHeight, GL11.GL_ALPHA, outlineBitmap);
+			boolean[] instant = {false};
+			openglTask.accept(() -> {
+				instant[0] = true;
+				texture = GlUtils.uploadTexture(this.bitmapWidth, this.bitmapHeight, GL11.GL_ALPHA, fillBitmap);
+				outlineTexture = GlUtils.uploadTexture(this.bitmapWidth, this.bitmapHeight, GL11.GL_ALPHA, outlineBitmap);
 			});
 			if(!instant[0]){
 				renderRequest.run();
@@ -122,7 +122,7 @@ public class TTFont extends DrawFont{
 		}
 		
 		void free(){
-			openglTask.accept(()->{
+			openglTask.accept(() -> {
 				charInfo.free();
 				texture.delete();
 				outlineTexture.delete();
@@ -130,14 +130,14 @@ public class TTFont extends DrawFont{
 		}
 	}
 	
-	private final ReadWriteLock      cacheLock  =new ReentrantReadWriteLock();
-	private final List<Bitmap>       bitmapCache=new ArrayList<>();
+	private final ReadWriteLock      cacheLock   = new ReentrantReadWriteLock();
+	private final List<Bitmap>       bitmapCache = new ArrayList<>();
 	private final RenderBackend      renderer;
 	private final Runnable           renderRequest;
 	private final Consumer<Runnable> openglTask;
 	
 	private static byte[] readData(String ttfPath){
-		try(var io=Objects.requireNonNull(TTFont.class.getResourceAsStream(ttfPath))){
+		try(var io = Objects.requireNonNull(TTFont.class.getResourceAsStream(ttfPath))){
 			return io.readAllBytes();
 		}catch(IOException e){
 			throw new RuntimeException(e);
@@ -148,39 +148,39 @@ public class TTFont extends DrawFont{
 		this(readData(ttfPath), renderer, renderRequest, openglTask);
 	}
 	public TTFont(byte[] ttfData, RenderBackend renderer, Runnable renderRequest, Consumer<Runnable> openglTask){
-		this.renderer=renderer;
-		this.renderRequest=renderRequest;
-		this.openglTask=openglTask;
+		this.renderer = renderer;
+		this.renderRequest = renderRequest;
+		this.openglTask = openglTask;
 		
 		
-		ttfBB=ByteBuffer.allocateDirect(ttfData.length).order(ByteOrder.nativeOrder());
+		ttfBB = ByteBuffer.allocateDirect(ttfData.length).order(ByteOrder.nativeOrder());
 		ttfBB.put(ttfData);
 		ttfBB.flip();
 		
-		info=STBTTFontinfo.create();
+		info = STBTTFontinfo.create();
 		if(!STBTruetype.stbtt_InitFont(info, ttfBB)){
 			throw new IllegalStateException("Failed to initialize font information.");
 		}
 		
-		try(MemoryStack stack=stackPush()){
-			IntBuffer pAscent =stack.mallocInt(1);
-			IntBuffer pDescent=stack.mallocInt(1);
-			IntBuffer pLineGap=stack.mallocInt(1);
+		try(MemoryStack stack = stackPush()){
+			IntBuffer pAscent  = stack.mallocInt(1);
+			IntBuffer pDescent = stack.mallocInt(1);
+			IntBuffer pLineGap = stack.mallocInt(1);
 			
 			STBTruetype.stbtt_GetFontVMetrics(info, pAscent, pDescent, pLineGap);
 			
 		}
-		replacer=STBTruetype.stbtt_FindGlyphIndex(info, 11111);
-		int min=255;
-		for(int i=0;i<256;i++){
-			int g=STBTruetype.stbtt_FindGlyphIndex(info, i);
-			if(g!=replacer){
-				min=i;
+		replacer = STBTruetype.stbtt_FindGlyphIndex(info, 11111);
+		int min = 255;
+		for(int i = 0; i<256; i++){
+			int g = STBTruetype.stbtt_FindGlyphIndex(info, i);
+			if(g != replacer){
+				min = i;
 				break;
 			}
 		}
-		this.min=min;
-		this.max=min+10;
+		this.min = min;
+		this.max = min + 10;
 		
 	}
 	
@@ -188,23 +188,23 @@ public class TTFont extends DrawFont{
 	
 	private Bitmap getBitmap(float pixelHeight){
 		
-		var    r=cacheLock.readLock();
+		var    r = cacheLock.readLock();
 		Bitmap best;
 		try{
 			r.lock();
 			
 			if(bitmapCache.isEmpty()) bitmapCache.add(new Bitmap(Math.min(pixelHeight, 20)));
-			best=bitmapCache.get(0);
+			best = bitmapCache.get(0);
 			for(Bitmap bitmap : bitmapCache){
-				if(bitmap.texture==null) continue;
+				if(bitmap.texture == null) continue;
 				
-				var bestDist=Math.abs(best.pixelHeight-pixelHeight);
-				var thisDist=Math.abs(bitmap.pixelHeight-pixelHeight);
+				var bestDist = Math.abs(best.pixelHeight - pixelHeight);
+				var thisDist = Math.abs(bitmap.pixelHeight - pixelHeight);
 				if(thisDist<0.5){
-					bitmap.lastUsed=System.currentTimeMillis();
+					bitmap.lastUsed = System.currentTimeMillis();
 					return bitmap;
 				}
-				if(thisDist<bestDist) best=bitmap;
+				if(thisDist<bestDist) best = bitmap;
 				
 			}
 		}finally{
@@ -217,31 +217,31 @@ public class TTFont extends DrawFont{
 				r.lock();
 				
 				for(Bitmap bitmap : bitmapCache){
-					var thisDist=Math.abs(bitmap.pixelHeight-pixelHeight);
+					var thisDist = Math.abs(bitmap.pixelHeight - pixelHeight);
 					if(thisDist<0.5) break gen;
 				}
 			}finally{
 				r.unlock();
 			}
 			
-			generating=true;
-			async(()->{
+			generating = true;
+			async(() -> {
 				try{
-					Bitmap bitmap=new Bitmap(pixelHeight);
+					Bitmap bitmap = new Bitmap(pixelHeight);
 					
 					try{
 						r.lock();
 						if(bitmapCache.size()>7){
 							IntStream.range(0, bitmapCache.size())
 							         .boxed()
-							         .min(Comparator.comparingLong(i->bitmapCache.get(i).lastUsed))
-							         .ifPresent(i->bitmapCache.remove((int)i).free());
+							         .min(Comparator.comparingLong(i -> bitmapCache.get(i).lastUsed))
+							         .ifPresent(i -> bitmapCache.remove((int)i).free());
 						}
-						bitmap.lastUsed=System.currentTimeMillis();
+						bitmap.lastUsed = System.currentTimeMillis();
 					}finally{
 						r.unlock();
 					}
-					var w=cacheLock.writeLock();
+					var w = cacheLock.writeLock();
 					try{
 						w.lock();
 						bitmapCache.add(bitmap);
@@ -250,12 +250,12 @@ public class TTFont extends DrawFont{
 					}
 					renderRequest.run();
 				}finally{
-					generating=false;
+					generating = false;
 				}
 			});
 		}
 		
-		best.lastUsed=System.currentTimeMillis();
+		best.lastUsed = System.currentTimeMillis();
 		return best;
 	}
 	
@@ -263,57 +263,57 @@ public class TTFont extends DrawFont{
 	public Bounds getStringBounds(String string, float fontScale){
 		pushMax(string);
 		
-		float minX=0;
-		float minY=Float.MAX_VALUE;
-		float maxX=Float.MIN_VALUE;
-		float maxY=Float.MIN_VALUE;
+		float minX = 0;
+		float minY = Float.MAX_VALUE;
+		float maxX = Float.MIN_VALUE;
+		float maxY = Float.MIN_VALUE;
 		
-		Bitmap bitmap=getBitmap(fontScale);
+		Bitmap bitmap = getBitmap(fontScale);
 		
-		float scale=fontScale/bitmap.pixelHeight;
+		float scale = fontScale/bitmap.pixelHeight;
 		
-		try(MemoryStack stack=stackPush()){
+		try(MemoryStack stack = stackPush()){
 			
-			FloatBuffer x=stack.floats(0.0f);
-			FloatBuffer y=stack.floats(0.0f);
+			FloatBuffer x = stack.floats(0.0f);
+			FloatBuffer y = stack.floats(0.0f);
 			
-			STBTTAlignedQuad q=STBTTAlignedQuad.malloc(stack);
+			STBTTAlignedQuad q = STBTTAlignedQuad.malloc(stack);
 			
-			for(int i=0;i<string.length();i++){
-				char cp=string.charAt(i);
-				if(cp<=31) cp=' ';
+			for(int i = 0; i<string.length(); i++){
+				char cp = string.charAt(i);
+				if(cp<=31) cp = ' ';
 				try{
-					STBTruetype.stbtt_GetBakedQuad(bitmap.charInfo, bitmap.bitmapWidth, bitmap.bitmapHeight, cp-min, x, y, q, true);
+					STBTruetype.stbtt_GetBakedQuad(bitmap.charInfo, bitmap.bitmapWidth, bitmap.bitmapHeight, cp - min, x, y, q, true);
 					
-					minX=Math.min(q.x0(), minX);
-					minX=Math.min(q.x1(), minX);
-					minY=Math.min(q.y0(), minY);
-					minY=Math.min(q.y1(), minY);
+					minX = Math.min(q.x0(), minX);
+					minX = Math.min(q.x1(), minX);
+					minY = Math.min(q.y0(), minY);
+					minY = Math.min(q.y1(), minY);
 					
-					maxX=Math.max(q.x0(), maxX);
-					maxX=Math.max(q.x1(), maxX);
-					maxY=Math.max(q.y0(), maxY);
-					maxY=Math.max(q.y1(), maxY);
+					maxX = Math.max(q.x0(), maxX);
+					maxX = Math.max(q.x1(), maxX);
+					maxY = Math.max(q.y0(), maxY);
+					maxY = Math.max(q.y1(), maxY);
 				}catch(IllegalArgumentException e){
-					nonFatal(e, cp+"");
+					nonFatal(e, cp + "");
 				}
 			}
 		}
-		return new Bounds((maxX-minX)*scale, (maxY-minY)*scale);
+		return new Bounds((maxX - minX)*scale, (maxY - minY)*scale);
 	}
 	
 	private void pushMax(String string){
-		int maxRequested=0;
-		for(int i=0;i<string.length();i++){
-			int cp=string.charAt(i);
+		int maxRequested = 0;
+		for(int i = 0; i<string.length(); i++){
+			int cp = string.charAt(i);
 			if(cp>255) continue;
 			if(cp<=31) continue;
-			maxRequested=Math.max(maxRequested, cp+1);
+			maxRequested = Math.max(maxRequested, cp + 1);
 		}
 		if(max<maxRequested){
-			max=maxRequested;
+			max = maxRequested;
 			
-			var r=cacheLock.writeLock();
+			var r = cacheLock.writeLock();
 			try{
 				r.lock();
 				bitmapCache.forEach(Bitmap::free);
@@ -331,7 +331,7 @@ public class TTFont extends DrawFont{
 		}
 	}
 	public void outlineString(Color color, String string, float pixelHeight, float x, float y){
-		drawString(color, string, pixelHeight, x, y, bitmap->bitmap.outlineTexture);
+		drawString(color, string, pixelHeight, x, y, bitmap -> bitmap.outlineTexture);
 	}
 	
 	@Override
@@ -341,43 +341,43 @@ public class TTFont extends DrawFont{
 		}
 	}
 	public void fillString(Color color, String string, float pixelHeight, float x, float y){
-		drawString(color, string, pixelHeight, x, y, bitmap->bitmap.texture);
+		drawString(color, string, pixelHeight, x, y, bitmap -> bitmap.texture);
 	}
 	
 	private void drawString(Color color, String string, float pixelHeight, float xOff, float yOff, Function<Bitmap, GlUtils.Texture> getTex){
 		pushMax(string);
 		
-		Bitmap bitmap=getBitmap(pixelHeight);
-		var    tex   =getTex.apply(bitmap);
-		if(tex==null){
+		Bitmap bitmap = getBitmap(pixelHeight);
+		var    tex    = getTex.apply(bitmap);
+		if(tex == null){
 			return;
 		}
 		glColor4f(color.getRed()/255F, color.getGreen()/255F, color.getBlue()/255F, color.getAlpha()/255F);
-		float scale=pixelHeight/bitmap.pixelHeight;
+		float scale = pixelHeight/bitmap.pixelHeight;
 		
-		try(MemoryStack stack=stackPush()){
+		try(MemoryStack stack = stackPush()){
 			
-			FloatBuffer x=stack.floats(0.0f);
-			FloatBuffer y=stack.floats(0.0f);
+			FloatBuffer x = stack.floats(0.0f);
+			FloatBuffer y = stack.floats(0.0f);
 			
-			STBTTAlignedQuad q=STBTTAlignedQuad.malloc(stack);
+			STBTTAlignedQuad q = STBTTAlignedQuad.malloc(stack);
 			tex.bind(GL11.GL_TEXTURE_2D);
 			GL11.glEnable(GL11.GL_TEXTURE_2D);
 			
-			try(var ignored=renderer.bulkDraw(RenderBackend.DrawMode.QUADS)){
-				for(int i=0;i<string.length();i++){
-					char cp=string.charAt(i);
-					if(cp<=31) cp=' ';
+			try(var ignored = renderer.bulkDraw(RenderBackend.DrawMode.QUADS)){
+				for(int i = 0; i<string.length(); i++){
+					char cp = string.charAt(i);
+					if(cp<=31) cp = ' ';
 					
 					
-					STBTruetype.stbtt_GetBakedQuad(bitmap.charInfo, bitmap.bitmapWidth, bitmap.bitmapHeight, cp-min, x, y, q, true);
+					STBTruetype.stbtt_GetBakedQuad(bitmap.charInfo, bitmap.bitmapWidth, bitmap.bitmapHeight, cp - min, x, y, q, true);
 					
 					
 					float
-						x0=q.x0()*scale+xOff,
-						x1=q.x1()*scale+xOff,
-						y0=q.y0()*scale+yOff,
-						y1=q.y1()*scale+yOff;
+						x0 = q.x0()*scale + xOff,
+						x1 = q.x1()*scale + xOff,
+						y0 = q.y0()*scale + yOff,
+						y1 = q.y1()*scale + yOff;
 					
 					GL11.glTexCoord2f(q.s0(), q.t0());
 					GL11.glVertex2f(x0, y0);
@@ -403,7 +403,7 @@ public class TTFont extends DrawFont{
 	public boolean canFontDisplay(char c){
 		if(c<min) return false;
 		if(c>max) return false;
-		int g=STBTruetype.stbtt_FindGlyphIndex(info, c);
-		return g!=replacer;
+		int g = STBTruetype.stbtt_FindGlyphIndex(info, c);
+		return g != replacer;
 	}
 }

@@ -8,12 +8,12 @@ import java.util.function.Supplier;
 public class FieldIsNullException extends NullPointerException{
 	
 	public static <T> T requireNonNull(IOField<?, ?> field, T obj){
-		if(obj==null){
+		if(obj == null){
 			throw new FieldIsNullException(
 				field,
-				()->(field.declaringStruct()!=null?Utils.typeToHuman(field.declaringStruct().getType(), false)+".":"")+
-				    field.toShortString()+
-				    " should not be null"
+				() -> (field.declaringStruct() != null? Utils.typeToHuman(field.declaringStruct().getType(), false) + "." : "") +
+				      field.toShortString() +
+				      " should not be null"
 			);
 		}
 		return obj;
@@ -26,13 +26,13 @@ public class FieldIsNullException extends NullPointerException{
 	public final IOField<?, ?> field;
 	
 	public FieldIsNullException(IOField<?, ?> field){
-		this.field=field;
-		msgMake=()->Utils.typeToHuman(this.field.getClass(), false)+" - "+this.field+" is null";
+		this.field = field;
+		msgMake = () -> Utils.typeToHuman(this.field.getClass(), false) + " - " + this.field + " is null";
 	}
 	
 	public FieldIsNullException(IOField<?, ?> field, Supplier<String> msgMake){
-		this.msgMake=msgMake;
-		this.field=field;
+		this.msgMake = msgMake;
+		this.field = field;
 	}
 	
 	@Override
@@ -42,7 +42,7 @@ public class FieldIsNullException extends NullPointerException{
 	
 	@Override
 	public String getMessage(){
-		if(msg==null) msg=msgMake.get();
+		if(msg == null) msg = msgMake.get();
 		return msg;
 	}
 }

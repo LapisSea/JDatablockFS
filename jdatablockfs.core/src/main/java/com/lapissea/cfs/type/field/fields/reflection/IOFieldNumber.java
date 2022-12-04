@@ -37,63 +37,63 @@ public class IOFieldNumber<T extends IOInstance<T>, E extends INumber> extends I
 	}
 	private IOFieldNumber(FieldAccessor<T> accessor, VaryingSize maxSize, LongFunction<E> constructor){
 		super(accessor);
-		this.forceFixed=maxSize!=null;
-		this.maxSize=maxSize==null?VaryingSize.MAX:maxSize;
-		this.constructor=constructor;
+		this.forceFixed = maxSize != null;
+		this.maxSize = maxSize == null? VaryingSize.MAX : maxSize;
+		this.constructor = constructor;
 	}
 	
 	@Override
 	public void init(){
 		super.init();
-		if(constructor==null){
-			this.constructor=Access.findConstructor(getType(), LongFunction.class, long.class);
+		if(constructor == null){
+			this.constructor = Access.findConstructor(getType(), LongFunction.class, long.class);
 		}
 		
-		Optional<IOField<T, NumberSize>> fieldOps=forceFixed?Optional.empty():IOFieldTools.getDynamicSize(getAccessor());
+		Optional<IOField<T, NumberSize>> fieldOps = forceFixed? Optional.empty() : IOFieldTools.getDynamicSize(getAccessor());
 		
-		fieldOps.ifPresent(f->dynamicSize=f::get);
+		fieldOps.ifPresent(f -> dynamicSize = f::get);
 		
-		sizeDescriptor=fieldOps.map(field->SizeDescriptor.Unknown.of(VOID, Optional.of(LARGEST), field.getAccessor()))
-		                       .orElse(SizeDescriptor.Fixed.of(maxSize.size.bytes));
+		sizeDescriptor = fieldOps.map(field -> SizeDescriptor.Unknown.of(VOID, Optional.of(LARGEST), field.getAccessor()))
+		                         .orElse(SizeDescriptor.Fixed.of(maxSize.size.bytes));
 	}
 	@Override
 	public IOField<T, E> maxAsFixedSize(VaryingSize.Provider varProvider){
-		var ptr=getType()==ChunkPointer.class;
+		var ptr = getType() == ChunkPointer.class;
 		return new IOFieldNumber<>(getAccessor(), varProvider.provide(LARGEST, ptr), constructor);
 	}
 	
 	private NumberSize getSize(VarPool<T> ioPool, T instance){
-		if(dynamicSize!=null) return dynamicSize.apply(ioPool, instance);
+		if(dynamicSize != null) return dynamicSize.apply(ioPool, instance);
 		return maxSize.size;
 	}
 	private NumberSize getSafeSize(VarPool<T> ioPool, T instance, long num){
-		if(dynamicSize!=null) return dynamicSize.apply(ioPool, instance);
+		if(dynamicSize != null) return dynamicSize.apply(ioPool, instance);
 		return maxSize.safeNumber(num);
 	}
 	
 	@Override
 	public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
-		var oVal=get(ioPool, instance);
-		var val =oVal==null?0:oVal.getValue();
+		var oVal = get(ioPool, instance);
+		var val  = oVal == null? 0 : oVal.getValue();
 		
-		var size=getSafeSize(ioPool, instance, val);
+		var size = getSafeSize(ioPool, instance, val);
 		size.write(dest, val);
 	}
 	
 	@Override
 	public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		var size=getSize(ioPool, instance);
+		var size = getSize(ioPool, instance);
 		set(ioPool, instance, constructor.apply(size.read(src)));
 	}
 	@Override
 	public void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		var size=getSize(ioPool, instance);
+		var size = getSize(ioPool, instance);
 		size.skip(src);
 	}
 	
 	@Override
 	public SizeDescriptor<T> getSizeDescriptor(){
-		if(sizeDescriptor==null) throw new IllegalStateException(this+" not initialized");
+		if(sizeDescriptor == null) throw new IllegalStateException(this + " not initialized");
 		return sizeDescriptor;
 	}
 }

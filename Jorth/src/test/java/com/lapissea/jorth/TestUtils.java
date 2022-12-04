@@ -9,7 +9,7 @@ import java.nio.ByteBuffer;
 public class TestUtils{
 	
 	static Class<?> generateAndLoadInstanceSimple(String className, UnsafeConsumer<JorthWriter, MalformedJorthException> generator) throws ReflectiveOperationException{
-		return generateAndLoadInstance(className, writer->{
+		return generateAndLoadInstance(className, writer -> {
 			
 			//Define constants / imports
 			writer.write("#TOKEN(0) Str define", String.class.getName());
@@ -30,32 +30,32 @@ public class TestUtils{
 	
 	static Class<?> generateAndLoadInstance(String className, UnsafeConsumer<JorthWriter, MalformedJorthException> generator) throws ReflectiveOperationException{
 		
-		var loader=new ClassLoader(TestUtils.class.getClassLoader()){
+		var loader = new ClassLoader(TestUtils.class.getClassLoader()){
 			@Override
 			protected Class<?> findClass(String name) throws ClassNotFoundException{
 				
 				if(name.equals(className)){
-					var jorth=new JorthCompiler(this);
+					var jorth = new JorthCompiler(this);
 					try{
 						
-						try(var writer=jorth.writeCode()){
+						try(var writer = jorth.writeCode()){
 							generator.accept(writer);
 						}
 						
-						var byt=jorth.classBytecode();
+						var byt = jorth.classBytecode();
 						BytecodeUtils.printClass(byt);
 						
 						return defineClass(name, ByteBuffer.wrap(byt), null);
 					}catch(MalformedJorthException e){
-						throw new RuntimeException("Failed to generate class "+className, e);
+						throw new RuntimeException("Failed to generate class " + className, e);
 					}
 				}
 				return super.findClass(name);
 			}
 		};
 		
-		var cls=Class.forName(className, true, loader);
-		if(!cls.getName().equals(className)) throw new AssertionError(cls.getName()+" "+className);
+		var cls = Class.forName(className, true, loader);
+		if(!cls.getName().equals(className)) throw new AssertionError(cls.getName() + " " + className);
 		
 		LogUtil.println("Compiled:", cls);
 		LogUtil.println("========================================================================");

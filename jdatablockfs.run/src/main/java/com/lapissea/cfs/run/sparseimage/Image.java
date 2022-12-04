@@ -18,16 +18,16 @@ public class Image extends IOInstance.Managed<Image>{
 		@IOValue
 		private float b;
 		
-		public Pixel(){}
+		public Pixel(){ }
 		
 		public Pixel(float r, float g, float b){
-			this.r=r;
-			this.g=g;
-			this.b=b;
+			this.r = r;
+			this.g = g;
+			this.b = b;
 		}
 	}
 	
-	private static final int CHUNK_SIZE=Utils.optionalProperty("chunkSize").map(Integer::valueOf).orElse(4);
+	private static final int CHUNK_SIZE = Utils.optionalProperty("chunkSize").map(Integer::valueOf).orElse(4);
 	
 	@IOValue
 	@IOValue.OverrideType(LinkedIOList.class)
@@ -35,37 +35,37 @@ public class Image extends IOInstance.Managed<Image>{
 	
 	
 	public void set(int x, int y, float r, float g, float b) throws IOException{
-		int chunkX=x/CHUNK_SIZE;
-		int chunkY=y/CHUNK_SIZE;
+		int chunkX = x/CHUNK_SIZE;
+		int chunkY = y/CHUNK_SIZE;
 		
-		var  dist    =Double.MAX_VALUE;
-		long addIndex=0;
+		var  dist     = Double.MAX_VALUE;
+		long addIndex = 0;
 		
-		var iter=chunks.listIterator();
+		var iter = chunks.listIterator();
 		while(iter.hasNext()){
-			var c=iter.ioNext();
+			var c = iter.ioNext();
 			if(!c.isXY(chunkX, chunkY)){
-				int xDif=chunkX-c.getX();
-				int yDif=chunkY-c.getY();
-				var d   =Math.sqrt(xDif*xDif+yDif*yDif);
+				int xDif = chunkX - c.getX();
+				int yDif = chunkY - c.getY();
+				var d    = Math.sqrt(xDif*xDif + yDif*yDif);
 				if(d<dist){
-					dist=d;
-					addIndex=iter.nextIndex();
+					dist = d;
+					addIndex = iter.nextIndex();
 				}
 				continue;
 			}
 			
-			int localX=x-chunkX*CHUNK_SIZE;
-			int localY=y-chunkY*CHUNK_SIZE;
-			int index =localX+localY*CHUNK_SIZE;
+			int localX = x - chunkX*CHUNK_SIZE;
+			int localY = y - chunkY*CHUNK_SIZE;
+			int index  = localX + localY*CHUNK_SIZE;
 			
-			c.pixels[index]=new Pixel(r, g, b);
+			c.pixels[index] = new Pixel(r, g, b);
 			
 			iter.ioSet(c);
 			return;
 		}
 		
-		var ch=new Chunk(chunkX, chunkY, CHUNK_SIZE);
+		var ch = new Chunk(chunkX, chunkY, CHUNK_SIZE);
 		chunks.add(addIndex, ch);
 		set(x, y, r, g, b);
 	}

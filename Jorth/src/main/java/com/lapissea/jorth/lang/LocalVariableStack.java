@@ -7,16 +7,16 @@ import java.util.stream.Stream;
 
 public class LocalVariableStack{
 	
-	public record Variable(int accessIndex, String name, GenType type){}
+	public record Variable(int accessIndex, String name, GenType type){ }
 	
-	private final Map<String, Variable> stack=new LinkedHashMap<>();
+	private final Map<String, Variable> stack = new LinkedHashMap<>();
 	private       int                   accessCounter;
 	
 	
 	public Variable make(String name, GenType type){
 		
-		var var=new Variable(accessCounter, name, type);
-		accessCounter+=type.type().slotCount;
+		var var = new Variable(accessCounter, name, type);
+		accessCounter += type.type().slotCount;
 		
 		stack.put(name, var);
 		
@@ -37,6 +37,6 @@ public class LocalVariableStack{
 	
 	public void clear(){
 		stack.clear();
-		accessCounter=0;
+		accessCounter = 0;
 	}
 }

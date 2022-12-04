@@ -28,13 +28,13 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 		
 		public Num(Struct<CTyp> struct, Field field, Optional<Method> getter, Optional<Method> setter, String name, Type genericType){
 			super(struct, field, getter, setter, name, genericType);
-			constructor=Access.findConstructor(getType(), LongFunction.class, long.class);
+			constructor = Access.findConstructor(getType(), LongFunction.class, long.class);
 		}
 		@Override
 		public long getLong(VarPool<CTyp> ioPool, CTyp instance){
-			var num=(INumber)get(ioPool, instance);
-			if(num==null){
-				throw new NullPointerException("value in "+getType().getName()+"#"+getName()+" is null but INumber is a non nullable type");
+			var num = (INumber)get(ioPool, instance);
+			if(num == null){
+				throw new NullPointerException("value in " + getType().getName() + "#" + getName() + " is null but INumber is a non nullable type");
 			}
 			return num.getValue();
 		}
@@ -45,7 +45,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	}
 	
 	public static <T extends IOInstance<T>> FieldAccessor<T> make(Struct<T> struct, Field field, Optional<Method> getter, Optional<Method> setter, String name, Type genericType){
-		if(genericType instanceof Class<?> c&&UtilL.instanceOf(c, INumber.class)){
+		if(genericType instanceof Class<?> c && UtilL.instanceOf(c, INumber.class)){
 			return new ReflectionAccessor.Num<>(struct, field, getter, setter, name, genericType);
 		}else{
 			return new ReflectionAccessor<>(struct, field, getter, setter, name, genericType);
@@ -62,34 +62,34 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	
 	public ReflectionAccessor(Struct<CTyp> struct, Field field, Optional<Method> getter, Optional<Method> setter, String name, Type genericType){
 		super(struct, name);
-		this.field=field;
-		this.genericType=Utils.prottectFromVarType(genericType);
-		this.rawType=Utils.typeToRaw(this.genericType);
-		typeId=TypeFlag.getId(rawType);
+		this.field = field;
+		this.genericType = Utils.prottectFromVarType(genericType);
+		this.rawType = Utils.typeToRaw(this.genericType);
+		typeId = TypeFlag.getId(rawType);
 		
-		getter.ifPresent(get->{
+		getter.ifPresent(get -> {
 			if(!Utils.genericInstanceOf(get.getGenericReturnType(), genericType)){
-				throw new MalformedStruct("getter returns "+get.getGenericReturnType()+" but "+genericType+" is required\n"+get);
+				throw new MalformedStruct("getter returns " + get.getGenericReturnType() + " but " + genericType + " is required\n" + get);
 			}
-			if(get.getParameterCount()!=0){
-				throw new MalformedStruct("getter must not have arguments\n"+get);
+			if(get.getParameterCount() != 0){
+				throw new MalformedStruct("getter must not have arguments\n" + get);
 			}
 		});
 		
-		setter.ifPresent(set->{
+		setter.ifPresent(set -> {
 			if(!Utils.genericInstanceOf(set.getReturnType(), Void.TYPE)){
-				throw new MalformedStruct("setter returns "+set.getReturnType()+" but "+genericType+" is required\n"+set);
+				throw new MalformedStruct("setter returns " + set.getReturnType() + " but " + genericType + " is required\n" + set);
 			}
-			if(set.getParameterCount()!=1){
-				throw new MalformedStruct("setter must have 1 argument of "+genericType+"\n"+set);
+			if(set.getParameterCount() != 1){
+				throw new MalformedStruct("setter must have 1 argument of " + genericType + "\n" + set);
 			}
 			if(!Utils.genericInstanceOf(set.getGenericParameterTypes()[0], genericType)){
-				throw new MalformedStruct("setter argument is "+set.getGenericParameterTypes()[0]+" but "+genericType+" is required\n"+set);
+				throw new MalformedStruct("setter argument is " + set.getGenericParameterTypes()[0] + " but " + genericType + " is required\n" + set);
 			}
 		});
 		
-		this.getter=getter.map(AbstractPrimitiveAccessor::findParent).map(Access::makeMethodHandle).orElse(null);
-		this.setter=setter.map(AbstractPrimitiveAccessor::findParent).map(Access::makeMethodHandle).orElse(null);
+		this.getter = getter.map(AbstractPrimitiveAccessor::findParent).map(Access::makeMethodHandle).orElse(null);
+		this.setter = setter.map(AbstractPrimitiveAccessor::findParent).map(Access::makeMethodHandle).orElse(null);
 	}
 	
 	@NotNull
@@ -114,7 +114,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	
 	@Override
 	public Type getGenericType(GenericContext genericContext){
-		if(genericContext==null){
+		if(genericContext == null){
 			return genericType;
 		}
 		return genericContext.resolveType(genericType);
@@ -123,7 +123,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	@Override
 	public Object get(VarPool<CTyp> ioPool, CTyp instance){
 		try{
-			if(getter!=null){
+			if(getter != null){
 				return getter.invoke(instance);
 			}else{
 				return field.get(instance);
@@ -136,7 +136,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	@Override
 	public void set(VarPool<CTyp> ioPool, CTyp instance, Object value){
 		try{
-			if(setter!=null){
+			if(setter != null){
 				setter.invoke(instance, value);
 			}else{
 				field.set(instance, value);
@@ -149,7 +149,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	@Override
 	public double getDouble(VarPool<CTyp> ioPool, CTyp instance){
 		try{
-			if(getter!=null){
+			if(getter != null){
 				return (double)getter.invoke(instance);
 			}else{
 				return field.getDouble(instance);
@@ -162,7 +162,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	@Override
 	public void setDouble(VarPool<CTyp> ioPool, CTyp instance, double value){
 		try{
-			if(setter!=null){
+			if(setter != null){
 				setter.invoke(instance, value);
 			}else{
 				field.setDouble(instance, value);
@@ -175,7 +175,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	@Override
 	public float getFloat(VarPool<CTyp> ioPool, CTyp instance){
 		try{
-			if(getter!=null){
+			if(getter != null){
 				return (float)getter.invoke(instance);
 			}else{
 				return field.getFloat(instance);
@@ -188,7 +188,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	@Override
 	public void setFloat(VarPool<CTyp> ioPool, CTyp instance, float value){
 		try{
-			if(setter!=null){
+			if(setter != null){
 				setter.invoke(instance, value);
 			}else{
 				field.setFloat(instance, value);
@@ -201,7 +201,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	@Override
 	public byte getByte(VarPool<CTyp> ioPool, CTyp instance){
 		try{
-			if(getter!=null){
+			if(getter != null){
 				return (byte)getter.invoke(instance);
 			}else{
 				return field.getByte(instance);
@@ -214,7 +214,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	@Override
 	public void setByte(VarPool<CTyp> ioPool, CTyp instance, byte value){
 		try{
-			if(setter!=null){
+			if(setter != null){
 				setter.invoke(instance, value);
 			}else{
 				field.setByte(instance, value);
@@ -227,7 +227,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	@Override
 	public boolean getBoolean(VarPool<CTyp> ioPool, CTyp instance){
 		try{
-			if(getter!=null){
+			if(getter != null){
 				return (boolean)getter.invoke(instance);
 			}else{
 				return field.getBoolean(instance);
@@ -240,7 +240,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	@Override
 	public void setBoolean(VarPool<CTyp> ioPool, CTyp instance, boolean value){
 		try{
-			if(setter!=null){
+			if(setter != null){
 				setter.invoke(instance, value);
 			}else{
 				field.setBoolean(instance, value);
@@ -254,7 +254,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	@Override
 	public long getLong(VarPool<CTyp> ioPool, CTyp instance){
 		try{
-			if(getter!=null){
+			if(getter != null){
 				return (long)getter.invoke(instance);
 			}else{
 				return field.getLong(instance);
@@ -267,7 +267,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	@Override
 	public void setLong(VarPool<CTyp> ioPool, CTyp instance, long value){
 		try{
-			if(setter!=null){
+			if(setter != null){
 				setter.invoke(instance, value);
 			}else{
 				field.setLong(instance, value);
@@ -280,7 +280,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	@Override
 	public int getInt(VarPool<CTyp> ioPool, CTyp instance){
 		try{
-			if(getter!=null){
+			if(getter != null){
 				return (int)getter.invoke(instance);
 			}else{
 				return field.getInt(instance);
@@ -293,7 +293,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	@Override
 	public void setInt(VarPool<CTyp> ioPool, CTyp instance, int value){
 		try{
-			if(setter!=null){
+			if(setter != null){
 				setter.invoke(instance, value);
 			}else{
 				field.setInt(instance, value);
@@ -306,7 +306,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	@Override
 	public short getShort(VarPool<CTyp> ioPool, CTyp instance){
 		try{
-			if(getter!=null){
+			if(getter != null){
 				return (Short)getter.invoke(instance);
 			}else{
 				return field.getShort(instance);
@@ -319,7 +319,7 @@ public sealed class ReflectionAccessor<CTyp extends IOInstance<CTyp>> extends Ab
 	@Override
 	public void setShort(VarPool<CTyp> ioPool, CTyp instance, short value){
 		try{
-			if(setter!=null){
+			if(setter != null){
 				setter.invoke(instance, value);
 			}else{
 				field.setShort(instance, value);

@@ -13,32 +13,32 @@ public abstract class ContentOutputStream extends OutputStream implements Conten
 		private final byte[] ba;
 		private       int    pos;
 		
-		public BA(byte[] ba){this.ba=ba;}
+		public BA(byte[] ba){ this.ba = ba; }
 		
 		@Override
 		public void write(int b) throws IOException{
-			ba[pos]=(byte)b;
+			ba[pos] = (byte)b;
 			pos++;
 		}
 		
 		@Override
 		public void write(@NotNull byte[] b, int off, int len) throws IOException{
 			System.arraycopy(b, off, ba, pos, len);
-			pos+=len;
+			pos += len;
 		}
 		@Override
 		public void writeWord(long v, int len) throws IOException{
 			MemPrimitive.setWord(v, ba, pos, len);
-			pos+=len;
+			pos += len;
 		}
 		
 		public void reset(){
-			pos=0;
+			pos = 0;
 		}
 		
 		@Override
 		public String toString(){
-			return this.getClass().getSimpleName()+"{"+pos+"/"+ba.length+"}";
+			return this.getClass().getSimpleName() + "{" + pos + "/" + ba.length + "}";
 		}
 	}
 	
@@ -46,7 +46,7 @@ public abstract class ContentOutputStream extends OutputStream implements Conten
 		private final ByteBuffer bb;
 		
 		public BB(ByteBuffer bb){
-			this.bb=bb;
+			this.bb = bb;
 		}
 		
 		@Override
@@ -61,7 +61,7 @@ public abstract class ContentOutputStream extends OutputStream implements Conten
 		
 		@Override
 		public String toString(){
-			return this.getClass().getSimpleName()+"{"+bb.position()+"/"+bb.limit()+"}";
+			return this.getClass().getSimpleName() + "{" + bb.position() + "/" + bb.limit() + "}";
 		}
 	}
 	
@@ -70,7 +70,7 @@ public abstract class ContentOutputStream extends OutputStream implements Conten
 		private final OutputStream os;
 		
 		public Wrapp(OutputStream os){
-			this.os=os;
+			this.os = os;
 		}
 		
 		@Override

@@ -23,7 +23,7 @@ public interface GetAnnotation{
 	}
 	
 	static GetAnnotation from(Collection<? extends Annotation> data){
-		return from(data.stream().collect(Collectors.toUnmodifiableMap(Annotation::annotationType, an->an)));
+		return from(data.stream().collect(Collectors.toUnmodifiableMap(Annotation::annotationType, an -> an)));
 	}
 	static GetAnnotation from(Map<Class<? extends Annotation>, Annotation> data){
 		if(data.isEmpty()) return new GetAnnotation(){
@@ -36,7 +36,7 @@ public interface GetAnnotation{
 				return false;
 			}
 		};
-		var dataFinal=Map.copyOf(data);
+		var dataFinal = Map.copyOf(data);
 		return new GetAnnotation(){
 			@Override
 			public <T extends Annotation> T get(Class<T> annotationClass){
@@ -51,6 +51,6 @@ public interface GetAnnotation{
 	
 	<T extends Annotation> T get(Class<T> annotationClass);
 	default boolean isPresent(Class<? extends Annotation> annotationClass){
-		return get(annotationClass)!=null;
+		return get(annotationClass) != null;
 	}
 }

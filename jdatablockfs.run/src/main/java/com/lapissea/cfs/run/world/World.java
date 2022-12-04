@@ -10,23 +10,23 @@ public class World{
 	
 	
 	public static void main(String[] args) throws IOException{
-		LoggedMemoryUtils.simpleLoggedMemorySession(mem->{
-			var map=Cluster.init(mem).getRootProvider().request("map", Map.class);
+		LoggedMemoryUtils.simpleLoggedMemorySession(mem -> {
+			var map = Cluster.init(mem).getRootProvider().request("map", Map.class);
 			
-			map.entities.addMultipleNew(20, e->{
-				e.pos.x=(Rand.f()-0.5F)*20;
-				e.pos.y=(Rand.f()-0.5F)*20;
+			map.entities.addMultipleNew(20, e -> {
+				e.pos.x = (Rand.f() - 0.5F)*20;
+				e.pos.y = (Rand.f() - 0.5F)*20;
 				e.inventory.add(new InventorySlot());
 			});
-			map.entities.modify(5, e->{
-				e.inventory.add(new InventorySlot());
-				return e;
-			});
-			map.entities.modify(5, e->{
+			map.entities.modify(5, e -> {
 				e.inventory.add(new InventorySlot());
 				return e;
 			});
-			map.entities.modify(5, e->{
+			map.entities.modify(5, e -> {
+				e.inventory.add(new InventorySlot());
+				return e;
+			});
+			map.entities.modify(5, e -> {
 				e.inventory.clear();
 				return e;
 			});

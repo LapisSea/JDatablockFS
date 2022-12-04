@@ -8,14 +8,14 @@ import java.io.Serial;
 public class DesyncedCacheException extends IOException{
 	
 	@Serial
-	private static final long serialVersionUID=6669766626830188682L;
+	private static final long serialVersionUID = 6669766626830188682L;
 	
 	public DesyncedCacheException(){
 	
 	}
 	
 	public <T> DesyncedCacheException(T cached, T actual){
-		this("Cache desync\n"+TextUtil.toTable("cached/actual", cached, actual));
+		this("Cache desync\n" + TextUtil.toTable("cached/actual", cached, actual));
 	}
 	
 	public DesyncedCacheException(String message){

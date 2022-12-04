@@ -13,6 +13,6 @@ public enum CallType{
 	public final int op;
 	
 	CallType(int op){
-		this.op=op;
+		this.op = op;
 	}
 }

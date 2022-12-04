@@ -27,15 +27,15 @@ public class Preload{
 		}
 		if(!added.add(cls)) return;
 		
-		Thread.ofVirtual().start(()->{
+		Thread.ofVirtual().start(() -> {
 			
 			try{
 				l.ensureInitialized(cls);
-			}catch(Exception ignored){}
+			}catch(Exception ignored){ }
 			
 			if(cls.isInterface()){
-				var permitted=cls.getPermittedSubclasses();
-				if(permitted!=null){
+				var permitted = cls.getPermittedSubclasses();
+				if(permitted != null){
 					for(Class<?> c : permitted){
 						preload(l, c, added);
 					}
@@ -48,12 +48,12 @@ public class Preload{
 	}
 	
 	private static void preload(){
-		Thread.ofVirtual().start(()->{
+		Thread.ofVirtual().start(() -> {
 			try{
-				ClassWriter w=new ClassWriter(ClassWriter.COMPUTE_MAXS|ClassWriter.COMPUTE_FRAMES);
+				ClassWriter w = new ClassWriter(ClassWriter.COMPUTE_MAXS|ClassWriter.COMPUTE_FRAMES);
 				w.visit(V19, 0, "", "", "", null);
 				w.visitField(0, "", "", null, null).visitEnd();
-				var m=w.visitMethod(0, "", "()V", null, null);
+				var m = w.visitMethod(0, "", "()V", null, null);
 				m.visitMaxs(0, 0);
 				m.visitEnd();
 				w.visitEnd();
@@ -62,11 +62,11 @@ public class Preload{
 				e.printStackTrace();
 			}
 		});
-		Thread.ofVirtual().start(()->{
+		Thread.ofVirtual().start(() -> {
 			try{
-				var cg=new ClassGen(TypeSource.of(Jorth.class.getClassLoader()), ClassName.of(Object.class), ClassType.CLASS, Visibility.PUBLIC, GenericType.OBJECT, List.of(), Set.of());
+				var cg = new ClassGen(TypeSource.of(Jorth.class.getClassLoader()), ClassName.of(Object.class), ClassType.CLASS, Visibility.PUBLIC, GenericType.OBJECT, List.of(), Set.of());
 				cg.defineField(Visibility.PUBLIC, Set.of(), GenericType.OBJECT, "");
-				var fun=new FunctionGen(cg, "", Visibility.PUBLIC, Set.of(), GenericType.OBJECT, new LinkedHashMap<>());
+				var fun = new FunctionGen(cg, "", Visibility.PUBLIC, Set.of(), GenericType.OBJECT, new LinkedHashMap<>());
 				fun.getOp("this", "");
 				fun.end();
 				cg.end();
@@ -75,9 +75,9 @@ public class Preload{
 			}
 		});
 		
-		Thread.ofVirtual().start(()->{
-			var           l    =MethodHandles.lookup();
-			Set<Class<?>> added=Collections.synchronizedSet(new HashSet<>());
+		Thread.ofVirtual().start(() -> {
+			var           l     = MethodHandles.lookup();
+			Set<Class<?>> added = Collections.synchronizedSet(new HashSet<>());
 			
 			for(var cls : List.of(
 				Jorth.class,
@@ -103,8 +103,8 @@ public class Preload{
 				preload(l, cls, added);
 			}
 			
-			for(Access access : EnumSet.noneOf(Access.class)){}
-			for(Object v : new LinkedHashMap<>().values()){}
+			for(Access access : EnumSet.noneOf(Access.class)){ }
+			for(Object v : new LinkedHashMap<>().values()){ }
 		});
 	}
 	
@@ -112,5 +112,5 @@ public class Preload{
 		preload();
 	}
 	
-	public static void init(){}
+	public static void init(){ }
 }

@@ -22,41 +22,41 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		private final FieldSet<E> fields;
 		
 		private FieldSetSpliterator(FieldSet<E> list){
-			this.index=0;
-			this.fence=-1;
+			this.index = 0;
+			this.fence = -1;
 			
-			this.fields=list;
+			this.fields = list;
 		}
 		
 		private FieldSetSpliterator(FieldSetSpliterator<E> parent,
 		                            int origin, int fence){
-			this.index=origin;
-			this.fence=fence;
+			this.index = origin;
+			this.fence = fence;
 			
-			this.fields=parent.fields;
+			this.fields = parent.fields;
 		}
 		
 		private int getFence(){
 			int hi;
-			if((hi=fence)<0){
-				hi=fence=fields.size();
+			if((hi = fence)<0){
+				hi = fence = fields.size();
 			}
 			return hi;
 		}
 		
 		@Override
 		public Spliterator<IOField<E, ?>> trySplit(){
-			int hi=getFence(), lo=index, mid=(lo+hi) >>> 1;
-			return (lo>=mid)?null:new FieldSetSpliterator<>(this, lo, index=mid);
+			int hi = getFence(), lo = index, mid = (lo + hi) >>> 1;
+			return (lo>=mid)? null : new FieldSetSpliterator<>(this, lo, index = mid);
 		}
 		
 		@Override
 		public boolean tryAdvance(Consumer<? super IOField<E, ?>> action){
-			if(action==null)
+			if(action == null)
 				throw new NullPointerException();
-			int hi=getFence(), i=index;
+			int hi = getFence(), i = index;
 			if(i<hi){
-				index=i+1;
+				index = i + 1;
 				action.accept(get(fields, i));
 				return true;
 			}
@@ -66,17 +66,17 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		@Override
 		public void forEachRemaining(Consumer<? super IOField<E, ?>> action){
 			Objects.requireNonNull(action);
-			int hi=getFence();
-			int i =index;
-			index=hi;
-			for(;i<hi;i++){
+			int hi = getFence();
+			int i  = index;
+			index = hi;
+			for(; i<hi; i++){
 				action.accept(get(fields, i));
 			}
 		}
 		
 		@Override
 		public long estimateSize(){
-			return getFence()-index;
+			return getFence() - index;
 		}
 		
 		@Override
@@ -109,7 +109,7 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		}
 	}
 	
-	private static final FieldSet<?> EMPTY=new FieldSet<>();
+	private static final FieldSet<?> EMPTY = new FieldSet<>();
 	
 	@SuppressWarnings("unchecked")
 	public static <T extends IOInstance<T>> FieldSet<T> of(){
@@ -118,13 +118,13 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	
 	@SuppressWarnings("unchecked")
 	public static <T extends IOInstance<T>> FieldSet<T> of(Stream<IOField<T, ?>> stream){
-		var data=stream.map(Objects::requireNonNull).distinct().toArray(IOField[]::new);
-		if(data.length==0) return of();
+		var data = stream.map(Objects::requireNonNull).distinct().toArray(IOField[]::new);
+		if(data.length == 0) return of();
 		return new FieldSet<>((IOField<T, ?>[])data);
 	}
 	
 	public static <T extends IOInstance<T>> FieldSet<T> of(Collection<IOField<T, ?>> data){
-		if(data==null||data.isEmpty()) return of();
+		if(data == null || data.isEmpty()) return of();
 		return switch(data){
 			case FieldSet<T> f -> f;
 			default -> of(data.stream());
@@ -133,8 +133,8 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	
 	
 	private IOField<T, ?>[] data;
-	private int             hash=-1;
-	private byte            age =Byte.MIN_VALUE;
+	private int             hash = -1;
+	private byte            age  = Byte.MIN_VALUE;
 	
 	private Map<String, Integer> nameLookup;
 	
@@ -144,24 +144,24 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	}
 	
 	private FieldSet(IOField<T, ?>[] data){
-		this.data=data;
+		this.data = data;
 	}
 	
 	@Override
 	public String toString(){
 		if(isEmpty()) return "[]";
 		
-		StringJoiner sj  =new StringJoiner(", ", "[", "]");
-		Struct<?>    last=null;
+		StringJoiner sj   = new StringJoiner(", ", "[", "]");
+		Struct<?>    last = null;
 		for(IOField<T, ?> e : this){
-			Struct<?> now=null;
-			if(e.getAccessor()!=null){
-				now=e.getAccessor().getDeclaringStruct();
+			Struct<?> now = null;
+			if(e.getAccessor() != null){
+				now = e.getAccessor().getDeclaringStruct();
 			}
 			
 			if(!Objects.equals(now, last)){
-				last=now;
-				sj.add(now==null?"<NoParent>":now.cleanName()+": "+e.getName());
+				last = now;
+				sj.add(now == null? "<NoParent>" : now.cleanName() + ": " + e.getName());
 			}else{
 				sj.add(e.getName());
 			}
@@ -171,32 +171,32 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	
 	@Override
 	public boolean equals(Object o){
-		return this==o||
-		       o instanceof FieldSet<?> that&&
+		return this == o ||
+		       o instanceof FieldSet<?> that &&
 		       equals(that);
 	}
 	public boolean equals(FieldSet<?> that){
-		if(that==null) return false;
-		if(this==that) return true;
+		if(that == null) return false;
+		if(this == that) return true;
 		
-		var thisData=this.data;
-		var thatData=that.data;
-		if(thisData==thatData) return true;
+		var thisData = this.data;
+		var thatData = that.data;
+		if(thisData == thatData) return true;
 		
-		var len=thisData.length;
-		if(thatData.length!=len) return false;
+		var len = thisData.length;
+		if(thatData.length != len) return false;
 		
-		int h1=this.hash, h2=that.hash;
-		if(h1!=-1&&h2!=-1&&h1!=h2){
+		int h1 = this.hash, h2 = that.hash;
+		if(h1 != -1 && h2 != -1 && h1 != h2){
 			return false;
 		}
 		
-		boolean allSame=true;
-		for(int i=0;i<len;i++){
-			var thisEl=thisData[i];
-			var thatEl=thatData[i];
-			if(thisEl==thatEl) continue;
-			allSame=false;
+		boolean allSame = true;
+		for(int i = 0; i<len; i++){
+			var thisEl = thisData[i];
+			var thatEl = thatData[i];
+			if(thisEl == thatEl) continue;
+			allSame = false;
 			if(!thisEl.equals(thatEl)){
 				return false;
 			}
@@ -205,18 +205,18 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		//Deduplicate array + short-circuit further equals
 		if(allSame){
 			//noinspection unchecked
-			var tt=(FieldSet<T>)that;
+			var tt = (FieldSet<T>)that;
 			
 			if(this.age<Byte.MAX_VALUE) this.age++;
 			if(tt.age<Byte.MAX_VALUE) tt.age++;
 			
 			if(this.age<tt.age){
 				tt.hashCode();
-				this.data=tt.data;
-			}else tt.data=this.data;
+				this.data = tt.data;
+			}else tt.data = this.data;
 			
-			if(this.hash!=-1) tt.hash=this.hash;
-			else if(that.hash!=-1) this.hash=that.hash;
+			if(this.hash != -1) tt.hash = this.hash;
+			else if(that.hash != -1) this.hash = that.hash;
 			
 		}
 		
@@ -225,16 +225,16 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	
 	@Override
 	public int hashCode(){
-		if(hash==-1) calcHash();
+		if(hash == -1) calcHash();
 		return hash;
 	}
 	
 	private void calcHash(){
-		int hashCode=1;
+		int hashCode = 1;
 		for(var e : data){
-			hashCode=31*hashCode+e.hashCode();
+			hashCode = 31*hashCode + e.hashCode();
 		}
-		hash=hashCode==-1?-2:hashCode;
+		hash = hashCode == -1? -2 : hashCode;
 	}
 	
 	@Override
@@ -258,21 +258,21 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	}
 	
 	public Optional<IOField<T, ?>> byName(String name){
-		if(nameLookup==null) buildNameLookup();
+		if(nameLookup == null) buildNameLookup();
 		return Optional.ofNullable(nameLookup.get(name)).map(this::get);
 	}
 	
 	private void buildNameLookup(){
-		var builder=HashMap.<String, Integer>newHashMap(size());
-		for(int i=0;i<size();i++){
+		var builder = HashMap.<String, Integer>newHashMap(size());
+		for(int i = 0; i<size(); i++){
 			builder.put(get(i).getName(), i);
 		}
-		nameLookup=Map.copyOf(builder);
+		nameLookup = Map.copyOf(builder);
 	}
 	
 	@SuppressWarnings("unchecked")
 	public <E> Stream<IOField<T, E>> byType(Class<E> type){
-		return stream().filter(f->UtilL.instanceOf(f.getType(), type)).map(f->(IOField<T, E>)f);
+		return stream().filter(f -> UtilL.instanceOf(f.getType(), type)).map(f -> (IOField<T, E>)f);
 	}
 	
 	public <E extends IOField<T, ?>> Stream<? extends E> byFieldType(Class<E> type){
@@ -281,7 +281,7 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	
 	@SuppressWarnings("unchecked")
 	public IterablePP<RefField<T, ?>> onlyRefs(){
-		return ()->stream().filter(e->e instanceof RefField).<RefField<T, ?>>map(e->(RefField<T, ?>)e).iterator();
+		return () -> stream().filter(e -> e instanceof RefField).<RefField<T, ?>>map(e -> (RefField<T, ?>)e).iterator();
 	}
 	
 	public <E> IOField<T, E> requireExact(Class<E> type, String name){
@@ -289,7 +289,7 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	}
 	
 	public <E> Optional<IOField<T, E>> exact(Class<E> type, String name){
-		return byType(type).filter(f->f.getName().equals(name)).findAny();
+		return byType(type).filter(f -> f.getName().equals(name)).findAny();
 	}
 	
 	public <E extends IOField<T, ?>> Optional<? extends E> exactFieldType(Class<E> type, String name){
@@ -319,7 +319,7 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	}
 	
 	public Stream<IOField<T, ?>> streamDependentOn(IOField<T, ?> field){
-		return stream().filter(f->f.isDependency(field));
+		return stream().filter(f -> f.isDependency(field));
 	}
 	
 	@Override

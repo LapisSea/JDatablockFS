@@ -14,9 +14,9 @@ public interface DataRenderer{
 		
 		private final List<DataRenderer> renderers;
 		private       DataRenderer       active;
-		private       int                activeIndex=-1;
+		private       int                activeIndex = -1;
 		public Split(List<DataRenderer> renderers){
-			this.renderers=List.copyOf(renderers);
+			this.renderers = List.copyOf(renderers);
 			if(this.renderers.isEmpty()) throw new IllegalArgumentException();
 			next();
 		}
@@ -56,8 +56,8 @@ public interface DataRenderer{
 		
 		public synchronized void next(){
 			activeIndex++;
-			if(activeIndex>=renderers.size()) activeIndex=0;
-			active=renderers.get(activeIndex);
+			if(activeIndex>=renderers.size()) activeIndex = 0;
+			active = renderers.get(activeIndex);
 			active.markDirty();
 			active.notifyResize();
 		}
@@ -65,7 +65,7 @@ public interface DataRenderer{
 	
 	record HoverMessage(List<DrawUtils.Range> ranges, Color color, Object[] data){
 		boolean isRangeEmpty(){
-			return ranges.isEmpty()||ranges.stream().allMatch(r->r.size()==0);
+			return ranges.isEmpty() || ranges.stream().allMatch(r -> r.size() == 0);
 		}
 	}
 	

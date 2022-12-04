@@ -36,11 +36,11 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	public IOFieldObjectReference(FieldAccessor<T> accessor){
 		super(accessor);
 		
-		descriptor=SizeDescriptor.Fixed.empty();
+		descriptor = SizeDescriptor.Fixed.empty();
 		
-		struct=(Struct<ValueType>)Struct.ofUnknown(getType());
-		var typ=accessor.getAnnotation(IOValue.Reference.class).map(IOValue.Reference::dataPipeType).orElseThrow();
-		instancePipe=switch(typ){
+		struct = (Struct<ValueType>)Struct.ofUnknown(getType());
+		var typ = accessor.getAnnotation(IOValue.Reference.class).map(IOValue.Reference::dataPipeType).orElseThrow();
+		instancePipe = switch(typ){
 			case FIXED -> FixedStructPipe.of(struct, STATE_IO_FIELD);
 			case FLEXIBLE -> StandardStructPipe.of(struct);
 		};
@@ -49,7 +49,7 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	
 	@Override
 	public void allocate(T instance, DataProvider provider, GenericContext genericContext) throws IOException{
-		var val=newDefault();
+		var val = newDefault();
 		allocAndSet(instance, provider, val);
 		set(null, instance, val);
 	}
@@ -57,7 +57,7 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	public void setReference(T instance, Reference newRef){
 		Objects.requireNonNull(newRef);
 		if(newRef.isNull()){
-			if(getNullability()==IONullability.Mode.NOT_NULL){
+			if(getNullability() == IONullability.Mode.NOT_NULL){
 				throw new NullPointerException();
 			}
 		}
@@ -65,13 +65,13 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	}
 	
 	private void allocAndSet(T instance, DataProvider provider, ValueType val) throws IOException{
-		var ref=allocNew(provider, val);
+		var ref = allocNew(provider, val);
 		setRef(instance, ref);
 	}
 	
 	@Override
 	protected Reference allocNew(DataProvider provider, ValueType val) throws IOException{
-		Chunk chunk=AllocateTicket.withData(instancePipe, provider, val).submit(provider);
+		Chunk chunk = AllocateTicket.withData(instancePipe, provider, val).submit(provider);
 		return chunk.getPtr().makeReference();
 	}
 	
@@ -82,7 +82,7 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	
 	@Override
 	public ValueType get(VarPool<T> ioPool, T instance){
-		return getNullable(ioPool, instance, ()->null);
+		return getNullable(ioPool, instance, () -> null);
 	}
 	
 	@Override
@@ -108,16 +108,16 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	
 	@Override
 	public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
-		var val=get(ioPool, instance);
-		if(val==null&&getNullability()==IONullability.Mode.DEFAULT_IF_NULL){
-			val=struct.make();
+		var val = get(ioPool, instance);
+		if(val == null && getNullability() == IONullability.Mode.DEFAULT_IF_NULL){
+			val = struct.make();
 		}
-		var ref=getReference(instance);
-		if(val!=null&&(ref==null||ref.isNull())){
+		var ref = getReference(instance);
+		if(val != null && (ref == null || ref.isNull())){
 			throw new ShouldNeverHappenError();//Generators have not been called if this is true
 		}
 		
-		if(val!=null){
+		if(val != null){
 			ref.write(provider, false, instancePipe, val);
 		}
 	}

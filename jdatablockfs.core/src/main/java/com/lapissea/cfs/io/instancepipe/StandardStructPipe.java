@@ -20,14 +20,14 @@ import static com.lapissea.cfs.type.field.StoragePool.IO;
 public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 	
 	public static <T extends IOInstance<T>> PipeFieldCompiler<T, RuntimeException> compiler(){
-		return (t, structFields)->IOFieldTools.stepFinal(structFields, List.of(
+		return (t, structFields) -> IOFieldTools.stepFinal(structFields, List.of(
 			IOFieldTools::dependencyReorder,
 			IOFieldTools::mergeBitSpace
 		));
 	}
 	
 	public static <T extends IOInstance<T>> long sizeOfUnknown(DataProvider provider, T instance, WordSpace wordSpace){
-		var pip=StandardStructPipe.of(instance.getThisStruct());
+		var pip = StandardStructPipe.of(instance.getThisStruct());
 		return pip.calcUnknownSize(provider, instance, wordSpace);
 	}
 	
@@ -67,17 +67,17 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		return instance;
 	}
 	
-	private static final int SKIP_FIXED=0;
-	private static final int SKIP      =1;
-	private static final int READ      =2;
+	private static final int SKIP_FIXED = 0;
+	private static final int SKIP       = 1;
+	private static final int READ       = 2;
 	
-	private record SkipData<T extends IOInstance<T>>(FieldSet<T> fields, byte[] cmds, boolean needsInstance, boolean needsPool){}
+	private record SkipData<T extends IOInstance<T>>(FieldSet<T> fields, byte[] cmds, boolean needsInstance, boolean needsPool){ }
 	
 	private SkipData<T> skipCache;
 	
 	private SkipData<T> skipData(){
-		var s=skipCache;
-		if(s==null) skipCache=s=calcSkip();
+		var s = skipCache;
+		if(s == null) skipCache = s = calcSkip();
 		return s;
 	}
 	
@@ -90,62 +90,62 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 			
 			record Skip() implements CmdBuild{
 				@Override
-				public boolean needsPool(){return true;}
+				public boolean needsPool(){ return true; }
 				@Override
-				public boolean needsInstance(){return false;}
+				public boolean needsInstance(){ return false; }
 				@Override
-				public int siz(){return 1;}
+				public int siz(){ return 1; }
 				@Override
 				public void write(int off, byte[] dest){
-					dest[off]=SKIP;
+					dest[off] = SKIP;
 				}
 			}
 			
 			record SkipFixed(long bytes) implements CmdBuild{
 				@Override
-				public boolean needsPool(){return false;}
+				public boolean needsPool(){ return false; }
 				@Override
-				public boolean needsInstance(){return false;}
+				public boolean needsInstance(){ return false; }
 				@Override
-				public int siz(){return 9;}
+				public int siz(){ return 9; }
 				@Override
 				public void write(int off, byte[] dest){
-					dest[off]=SKIP_FIXED;
-					MemPrimitive.setLong(dest, off+1, bytes);
+					dest[off] = SKIP_FIXED;
+					MemPrimitive.setLong(dest, off + 1, bytes);
 				}
 			}
 			
 			record Read(boolean needsInstance) implements CmdBuild{
 				@Override
-				public boolean needsPool(){return true;}
+				public boolean needsPool(){ return true; }
 				@Override
-				public int siz(){return 1;}
+				public int siz(){ return 1; }
 				@Override
 				public void write(int off, byte[] dest){
-					dest[off]=READ;
+					dest[off] = READ;
 				}
 			}
 		}
 		
-		var report=createSizeReport(0);
+		var report = createSizeReport(0);
 		if(report.dynamic()) return null;
 		
-		FieldSet<T>    fields=report.allFields();
-		List<CmdBuild> cmds  =new ArrayList<>(fields.size());
+		FieldSet<T>    fields = report.allFields();
+		List<CmdBuild> cmds   = new ArrayList<>(fields.size());
 		
 		for(IOField<T, ?> field : fields){
-			var needsInstance=!field.streamUnpackedFields().allMatch(f->Utils.isVirtual(f, IO));
+			var needsInstance = !field.streamUnpackedFields().allMatch(f -> Utils.isVirtual(f, IO));
 			
 			if(field.streamUnpackedFields().flatMap(fields::streamDependentOn).findAny().isPresent()){
 				cmds.add(new CmdBuild.Read(needsInstance));
 				continue;
 			}
 			
-			var fixed=field.getSizeDescriptor().getFixed(WordSpace.BYTE);
+			var fixed = field.getSizeDescriptor().getFixed(WordSpace.BYTE);
 			if(fixed.isPresent()){
-				var siz=fixed.getAsLong();
-				if(!cmds.isEmpty()&&cmds.get(cmds.size()-1) instanceof CmdBuild.SkipFixed f){
-					cmds.set(cmds.size()-1, new CmdBuild.SkipFixed(f.bytes+siz));
+				var siz = fixed.getAsLong();
+				if(!cmds.isEmpty() && cmds.get(cmds.size() - 1) instanceof CmdBuild.SkipFixed f){
+					cmds.set(cmds.size() - 1, new CmdBuild.SkipFixed(f.bytes + siz));
 				}else{
 					cmds.add(new CmdBuild.SkipFixed(siz));
 				}
@@ -155,34 +155,34 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 			cmds.add(new CmdBuild.Skip());
 		}
 		
-		var buff=new byte[cmds.stream().mapToInt(CmdBuild::siz).sum()];
-		var pos =0;
+		var buff = new byte[cmds.stream().mapToInt(CmdBuild::siz).sum()];
+		var pos  = 0;
 		for(var c : cmds){
 			c.write(pos, buff);
-			pos+=c.siz();
+			pos += c.siz();
 		}
 		
-		boolean needsInstance=cmds.stream().anyMatch(CmdBuild::needsInstance);
-		boolean needsPool    =cmds.stream().anyMatch(CmdBuild::needsPool)&&makeIOPool()!=null;
+		boolean needsInstance = cmds.stream().anyMatch(CmdBuild::needsInstance);
+		boolean needsPool     = cmds.stream().anyMatch(CmdBuild::needsPool) && makeIOPool() != null;
 		
 		return new SkipData<>(fields, buff, needsInstance, needsPool);
 	}
 	
 	@Override
 	public void skip(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
-		var skip=skipData();
-		if(skip==null){
+		var skip = skipData();
+		if(skip == null){
 			readNew(provider, src, genericContext);
 			return;
 		}
 		
-		var pool=skip.needsPool?makeIOPool():null;
-		var inst=skip.needsInstance?getType().make():null;
+		var pool = skip.needsPool? makeIOPool() : null;
+		var inst = skip.needsInstance? getType().make() : null;
 		
-		var cmds=skip.cmds;
-		for(int f=0, c=0;c<cmds.length;f++){
+		var cmds = skip.cmds;
+		for(int f = 0, c = 0; c<cmds.length; f++){
 			switch(cmds[c++]){
-				case SKIP_FIXED -> src.skipExact(MemPrimitive.getLong(cmds, (c+=8)-8));
+				case SKIP_FIXED -> src.skipExact(MemPrimitive.getLong(cmds, (c += 8) - 8));
 				case READ -> skip.fields.get(f).read(pool, provider, src, inst, genericContext);
 				case SKIP -> skip.fields.get(f).skip(pool, provider, src, inst, genericContext);
 				default -> throw new IllegalStateException();

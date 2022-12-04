@@ -39,25 +39,25 @@ public class DisplayIpc implements DataLogger{
 		private final Session proxy;
 		
 		public IpcSession(Info conn, String name, Map<String, Object> config) throws IOException{
-			var socket=sessionConnection(conn, name, config);
-			info(YELLOW_BRIGHT+"Server session({}) established"+RESET, name);
+			var socket = sessionConnection(conn, name, config);
+			info(YELLOW_BRIGHT + "Server session({}) established" + RESET, name);
 			
-			boolean threadedOutput=Boolean.parseBoolean(config.getOrDefault("threadedOutput", "false").toString());
+			boolean threadedOutput = Boolean.parseBoolean(config.getOrDefault("threadedOutput", "false").toString());
 			
-			record Event(boolean compressed, byte[] b, int off, int len){}
+			record Event(boolean compressed, byte[] b, int off, int len){ }
 			
-			var socketIn =socket.getInputStream();
-			var socketOut=socket.getOutputStream();
+			var socketIn  = socket.getInputStream();
+			var socketOut = socket.getOutputStream();
 			
-			var io=ServerCommons.makeIO();
+			var io = ServerCommons.makeIO();
 			
 			UnsafeRunnable<IOException> ping;
 			
 			DataLogger.Session proxy;
 			
 			if(!threadedOutput){
-				Lock sendActionLock=new ReentrantLock();
-				UnsafeBiConsumer<Action, UnsafeConsumer<DataOutputStream, IOException>, IOException> sendAction=(a, data)->{
+				Lock sendActionLock = new ReentrantLock();
+				UnsafeBiConsumer<Action, UnsafeConsumer<DataOutputStream, IOException>, IOException> sendAction = (a, data) -> {
 					sendActionLock.lock();
 					try{
 						socketOut.write(a.ordinal());
@@ -68,9 +68,9 @@ public class DisplayIpc implements DataLogger{
 					}
 				};
 				
-				ping=()->sendAction.accept(Action.PING, __->{});
+				ping = () -> sendAction.accept(Action.PING, __ -> { });
 				
-				proxy=new DataLogger.Session(){
+				proxy = new DataLogger.Session(){
 					@Override
 					public String getName(){
 						return name;
@@ -78,7 +78,7 @@ public class DisplayIpc implements DataLogger{
 					@Override
 					public void log(MemFrame frame){
 						try{
-							sendAction.accept(Action.LOG, buff->io.writeFrame(buff, frame));
+							sendAction.accept(Action.LOG, buff -> io.writeFrame(buff, frame));
 						}catch(SocketException ignored){
 						}catch(IOException e){
 							throw new RuntimeException(e);
@@ -88,7 +88,7 @@ public class DisplayIpc implements DataLogger{
 					@Override
 					public void reset(){
 						try{
-							sendAction.accept(Action.RESET, buff->{});
+							sendAction.accept(Action.RESET, buff -> { });
 						}catch(SocketException ignored){
 						}catch(IOException e){
 							e.printStackTrace();
@@ -105,8 +105,8 @@ public class DisplayIpc implements DataLogger{
 					}
 					public void terminating(Action action){
 						try{
-							sendAction.accept(action, buff->{});
-							info(YELLOW_BRIGHT+"Closing connection to: {}"+RESET, name);
+							sendAction.accept(action, buff -> { });
+							info(YELLOW_BRIGHT + "Closing connection to: {}" + RESET, name);
 							socketOut.flush();
 							socket.close();
 						}catch(SocketException ignored){
@@ -117,15 +117,15 @@ public class DisplayIpc implements DataLogger{
 				};
 			}else{
 				
-				var asyncWriter=new Object(){
+				var asyncWriter = new Object(){
 					
-					private boolean running=true;
-					private final List<Event> queue=new LinkedList<>();
+					private boolean running = true;
+					private final List<Event> queue = new LinkedList<>();
 					private final Thread t;
 					private boolean fullFlag;
 					
 					{
-						t=Thread.ofVirtual().name("socket writer").start(()->{
+						t = Thread.ofVirtual().name("socket writer").start(() -> {
 //							long lastTimeMs  =0;
 //							long writtenBytes=0;
 							
@@ -136,7 +136,7 @@ public class DisplayIpc implements DataLogger{
 								}
 								Event e;
 								synchronized(queue){
-									e=queue.remove(0);
+									e = queue.remove(0);
 								}
 
 //								writtenBytes+=e.len;
@@ -158,7 +158,7 @@ public class DisplayIpc implements DataLogger{
 //								}
 								
 							}
-							info(YELLOW_BRIGHT+"Closing async connection to: {}"+RESET, name);
+							info(YELLOW_BRIGHT + "Closing async connection to: {}" + RESET, name);
 							try{
 								socketOut.flush();
 								socket.close();
@@ -171,18 +171,18 @@ public class DisplayIpc implements DataLogger{
 					
 					
 					public void write(Event e){
-						if(!fullFlag&&queue.size()>16){
+						if(!fullFlag && queue.size()>16){
 							synchronized(queue){
-								if(queue.stream().mapToLong(e1->e1.len).sum()<4*1024*1024){
-									fullFlag=true;
+								if(queue.stream().mapToLong(e1 -> e1.len).sum()<4*1024*1024){
+									fullFlag = true;
 								}
 							}
 						}
-						UtilL.sleepWhile(()->{
+						UtilL.sleepWhile(() -> {
 							if(queue.size()<16) return false;
 							
 							synchronized(queue){
-								if(queue.stream().mapToLong(e1->e1.len).sum()<8*1024*1024) return false;
+								if(queue.stream().mapToLong(e1 -> e1.len).sum()<8*1024*1024) return false;
 							}
 							return true;
 						});
@@ -192,7 +192,7 @@ public class DisplayIpc implements DataLogger{
 					}
 					
 					public void close(){
-						running=false;
+						running = false;
 						try{
 							t.join();
 						}catch(InterruptedException e){
@@ -201,14 +201,14 @@ public class DisplayIpc implements DataLogger{
 					}
 				};
 				
-				var queue    =new LinkedList<CompletableFuture<List<Event>>>();
-				var queueLock=new ReentrantLock();
-				var hasTasks =queueLock.newCondition();
-				var worker=new Thread("Socket data sender"){
-					private boolean run=true;
+				var queue     = new LinkedList<CompletableFuture<List<Event>>>();
+				var queueLock = new ReentrantLock();
+				var hasTasks  = queueLock.newCondition();
+				var worker = new Thread("Socket data sender"){
+					private boolean run = true;
 					@Override
 					public void run(){
-						while(run||!queue.isEmpty()){
+						while(run || !queue.isEmpty()){
 							CompletableFuture<List<Event>> r;
 							
 							queueLock.lock();
@@ -222,12 +222,12 @@ public class DisplayIpc implements DataLogger{
 									continue;
 								}
 								
-								r=queue.remove(0);
+								r = queue.remove(0);
 							}finally{
 								queueLock.unlock();
 							}
 							
-							var d=r.join();
+							var d = r.join();
 							for(Event event : d){
 								asyncWriter.write(event);
 							}
@@ -236,7 +236,7 @@ public class DisplayIpc implements DataLogger{
 					}
 					
 					private void end(){
-						run=false;
+						run = false;
 						queueLock.lock();
 						try{
 							hasTasks.signalAll();
@@ -252,8 +252,8 @@ public class DisplayIpc implements DataLogger{
 				};
 				worker.start();
 				
-				BiFunction<Action, UnsafeConsumer<DataOutputStream, IOException>, List<Event>> sendAction=(a, data)->{
-					var buff=new ByteArrayOutputStream(){
+				BiFunction<Action, UnsafeConsumer<DataOutputStream, IOException>, List<Event>> sendAction = (a, data) -> {
+					var buff = new ByteArrayOutputStream(){
 						Event event(){
 							return new Event(false, this.buf, 0, count);
 						}
@@ -267,7 +267,7 @@ public class DisplayIpc implements DataLogger{
 					return List.of(buff.event());
 				};
 				
-				var tmpProxy=new Session(){
+				var tmpProxy = new Session(){
 					
 					private boolean deleting;
 					@Override
@@ -275,7 +275,7 @@ public class DisplayIpc implements DataLogger{
 						return name;
 					}
 					
-					private final int max=Runtime.getRuntime().availableProcessors();
+					private final int max = Runtime.getRuntime().availableProcessors();
 					
 					private void exec(Supplier<List<Event>> e){
 						if(!worker.run) throw new IllegalStateException();
@@ -296,12 +296,12 @@ public class DisplayIpc implements DataLogger{
 					
 					@Override
 					public void log(MemFrame frame){
-						exec(()->{
+						exec(() -> {
 							if(deleting) return List.of();
-							return sendAction.apply(Action.LOG, buff->{
+							return sendAction.apply(Action.LOG, buff -> {
 								if(asyncWriter.fullFlag){
-									asyncWriter.fullFlag=false;
-									frame.askForCompress=true;
+									asyncWriter.fullFlag = false;
+									frame.askForCompress = true;
 								}
 								io.writeFrame(buff, frame);
 							});
@@ -310,60 +310,60 @@ public class DisplayIpc implements DataLogger{
 					
 					@Override
 					public void reset(){
-						exec(()->{
+						exec(() -> {
 							if(deleting) return List.of();
-							return sendAction.apply(Action.RESET, buff->{});
+							return sendAction.apply(Action.RESET, buff -> { });
 						});
 					}
 					@Override
 					public void delete(){
-						deleting=true;
-						exec(()->sendAction.apply(Action.DELETE, buff->{}));
+						deleting = true;
+						exec(() -> sendAction.apply(Action.DELETE, buff -> { }));
 						stop();
 					}
 					
 					@Override
 					public void finish(){
-						exec(()->sendAction.apply(Action.FINISH, buff->{}));
+						exec(() -> sendAction.apply(Action.FINISH, buff -> { }));
 						try{
 							socketIn.read();
-						}catch(IOException e){}
+						}catch(IOException e){ }
 						stop();
 					}
 				};
-				proxy=tmpProxy;
-				ping=()->tmpProxy.exec(()->sendAction.apply(Action.PING, buff->{}));
+				proxy = tmpProxy;
+				ping = () -> tmpProxy.exec(() -> sendAction.apply(Action.PING, buff -> { }));
 			}
 			
-			Thread.ofVirtual().name(name+" poke machine").start(()->{
+			Thread.ofVirtual().name(name + " poke machine").start(() -> {
 				try{
 					while(!socket.isClosed()){
 						ping.run();
 						socketIn.read();
 						UtilL.sleep(1000);
 					}
-				}catch(Throwable ignored){}
+				}catch(Throwable ignored){ }
 				trace("Stopped poking {}", name);
 			});
 			
 			proxy.reset();
-			this.proxy=proxy;
+			this.proxy = proxy;
 			
 		}
 		
-		public record Info(InetAddress addr, int timeout){}
+		public record Info(InetAddress addr, int timeout){ }
 		
 		private static Socket sessionConnection(Info con, String sessionName, Map<String, Object> config) throws IOException{
-			int port=((Number)config.getOrDefault("port", 6666)).intValue();
+			int port = ((Number)config.getOrDefault("port", 6666)).intValue();
 			
-			var socketMake=new Socket();
+			var socketMake = new Socket();
 			socketMake.connect(new InetSocketAddress(con.addr, port), con.timeout);
 			
 			int realPort;
-			try(var preSocket=socketMake){
-				var in=new DataInputStream(preSocket.getInputStream());
-				realPort=in.readInt();
-				var out=new DataOutputStream(preSocket.getOutputStream());
+			try(var preSocket = socketMake){
+				var in = new DataInputStream(preSocket.getInputStream());
+				realPort = in.readInt();
+				var out = new DataOutputStream(preSocket.getOutputStream());
 				out.writeUTF(sessionName);
 				out.flush();
 			}
@@ -395,69 +395,69 @@ public class DisplayIpc implements DataLogger{
 	
 	
 	private Function<String, Session> sessionCreator;
-	private boolean                   active=true;
+	private boolean                   active = true;
 	
 	private final Map<String, Object>  config;
-	private final Map<String, Session> sessions=new HashMap<>();
+	private final Map<String, Session> sessions = new HashMap<>();
 	
-	private static final Map<InetAddress, Long> FAILS=new ConcurrentHashMap<>();
+	private static final Map<InetAddress, Long> FAILS = new ConcurrentHashMap<>();
 	
 	public DisplayIpc(Map<String, Object> config){
-		this.config=config;
+		this.config = config;
 		
 		initSession();
 	}
 	
 	private void initSession(){
-		sessionCreator=name->{
+		sessionCreator = name -> {
 			InetAddress address;
 			try{
-				address=InetAddress.getLocalHost();
+				address = InetAddress.getLocalHost();
 			}catch(UnknownHostException e){
 				throw new RuntimeException(e);
 			}
 			
 			String  msg;
-			boolean tryConnect=true;
+			boolean tryConnect = true;
 			try{
-				var t=FAILS.get(address);
-				if(t!=null){
-					if(System.currentTimeMillis()>t+1000){
+				var t = FAILS.get(address);
+				if(t != null){
+					if(System.currentTimeMillis()>t + 1000){
 						FAILS.remove(address);
 					}else{
-						tryConnect=false;
+						tryConnect = false;
 					}
 				}
 				
 				if(tryConnect){
 					return new IpcSession(new IpcSession.Info(address, 20), name, config);
-				}else msg=null;
+				}else msg = null;
 			}catch(SocketTimeoutException e){
-				msg="Could not contact the server for \""+name+"\"";
+				msg = "Could not contact the server for \"" + name + "\"";
 			}catch(Throwable e){
-				msg="Unexpected error: "+e;
+				msg = "Unexpected error: " + e;
 			}
-			FAILS.computeIfAbsent(address, c->{
+			FAILS.computeIfAbsent(address, c -> {
 				warn("Giving up on connecting to {} for 1s", address);
 				return System.currentTimeMillis();
 			});
 			
-			var type=config.getOrDefault("server-fallback", "local").toString();
+			var type = config.getOrDefault("server-fallback", "local").toString();
 			
-			sessionCreator=switch(type){
+			sessionCreator = switch(type){
 				case "local" -> {
 					if(tryConnect) warn("{}, switching to local server session.", msg);
 					yield getLocalLoggerImpl()::getSession;
 				}
 				case "none" -> {
-					active=false;
+					active = false;
 					if(tryConnect) warn("{}, switching to no output.", msg);
-					yield s->Session.Blank.INSTANCE;
+					yield s -> Session.Blank.INSTANCE;
 				}
 				default -> {
-					active=false;
+					active = false;
 					if(tryConnect) warn("{}, unknown type \"{}\", defaulting to no output.", msg, type);
-					yield s->Session.Blank.INSTANCE;
+					yield s -> Session.Blank.INSTANCE;
 				}
 			};
 			
@@ -467,7 +467,7 @@ public class DisplayIpc implements DataLogger{
 	
 	@Override
 	public Session getSession(String name){
-		if(sessionCreator==null) throw new Closed("This server has been closed");
+		if(sessionCreator == null) throw new Closed("This server has been closed");
 		synchronized(sessions){
 			return sessions.computeIfAbsent(name, sessionCreator);
 		}
@@ -475,7 +475,7 @@ public class DisplayIpc implements DataLogger{
 	
 	@Override
 	public void destroy(){
-		sessionCreator=null;
+		sessionCreator = null;
 		synchronized(sessions){
 			for(Session session : sessions.values()){
 				session.finish();

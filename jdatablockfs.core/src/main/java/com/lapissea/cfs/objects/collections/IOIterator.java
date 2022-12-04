@@ -45,8 +45,8 @@ public interface IOIterator<T>{
 		return collect(Collectors.toUnmodifiableList());
 	}
 	default <A, R> R collect(Collector<T, A, R> collector) throws IOException{
-		var accumulator=collector.supplier().get();
-		var accumulate =collector.accumulator();
+		var accumulator = collector.supplier().get();
+		var accumulate  = collector.accumulator();
 		while(hasNext()){
 			accumulate.accept(accumulator, ioNext());
 		}

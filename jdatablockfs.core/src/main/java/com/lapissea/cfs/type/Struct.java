@@ -49,11 +49,11 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		Runner.run(DefInstanceCompiler::init);
 	}
 	
-	private static final Log.Channel COMPILATION=Log.channel(PRINT_COMPILATION&&!Access.DEV_CACHE, Log.Channel.colored(GREEN_BRIGHT));
+	private static final Log.Channel COMPILATION = Log.channel(PRINT_COMPILATION && !Access.DEV_CACHE, Log.Channel.colored(GREEN_BRIGHT));
 	
 	@Retention(RetentionPolicy.RUNTIME)
 	@Target(ElementType.TYPE)
-	public @interface NoDefaultConstructor{}
+	public @interface NoDefaultConstructor{ }
 	
 	public static final class Unmanaged<T extends IOInstance.Unmanaged<T>> extends Struct<T>{
 		
@@ -70,7 +70,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			Objects.requireNonNull(instanceClass);
 			
 			if(!IOInstance.isUnmanaged(instanceClass)){
-				throw new IllegalArgumentException(instanceClass.getName()+" is not an "+IOInstance.Unmanaged.class.getName());
+				throw new IllegalArgumentException(instanceClass.getName() + " is not an " + IOInstance.Unmanaged.class.getName());
 			}
 			
 			return ofUnmanaged((Class<? extends IOInstance.Unmanaged>)instanceClass);
@@ -79,8 +79,8 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		public static <T extends IOInstance.Unmanaged<T>> Unmanaged<T> ofUnmanaged(Class<T> instanceClass){
 			Objects.requireNonNull(instanceClass);
 			
-			Unmanaged<T> cached=(Unmanaged<T>)getCached(instanceClass);
-			if(cached!=null) return cached;
+			Unmanaged<T> cached = (Unmanaged<T>)getCached(instanceClass);
+			if(cached != null) return cached;
 			
 			
 			return compile(instanceClass, Unmanaged::new, false);
@@ -92,17 +92,17 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		
 		private Unmanaged(Class<T> type){
 			super(type, false);
-			overridingDynamicUnmanaged=checkOverridingUnmanaged();
-			unmanagedConstructor=Access.findConstructor(getType(), NewUnmanaged.class, Access.getFunctionalMethod(NewUnmanaged.class).getParameterTypes());
+			overridingDynamicUnmanaged = checkOverridingUnmanaged();
+			unmanagedConstructor = Access.findConstructor(getType(), NewUnmanaged.class, Access.getFunctionalMethod(NewUnmanaged.class).getParameterTypes());
 		}
 		
 		private boolean checkOverridingUnmanaged(){
-			Class<?> t=getType();
+			Class<?> t = getType();
 			while(true){
 				try{
 					return !t.getDeclaredMethod("listDynamicUnmanagedFields").getDeclaringClass().equals(IOInstance.Unmanaged.class);
 				}catch(NoSuchMethodException e){
-					t=t.getSuperclass();
+					t = t.getSuperclass();
 				}
 			}
 		}
@@ -130,13 +130,13 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		public String instanceToString(VarPool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
 			return instanceToString0(
 				ioPool, instance, doShort, start, end, fieldValueSeparator, fieldSeparator,
-				Stream.concat(getFields().stream().filter(f->!f.typeFlag(IOField.HAS_GENERATED_NAME)), instance.listUnmanagedFields())
+				Stream.concat(getFields().stream().filter(f -> !f.typeFlag(IOField.HAS_GENERATED_NAME)), instance.listUnmanagedFields())
 			);
 		}
 		
 		public FieldSet<T> getUnmanagedStaticFields(){
-			if(unmanagedStaticFields==null){
-				unmanagedStaticFields=FieldCompiler.compileStaticUnmanaged(this);
+			if(unmanagedStaticFields == null){
+				unmanagedStaticFields = FieldCompiler.compileStaticUnmanaged(this);
 			}
 			
 			return unmanagedStaticFields;
@@ -144,18 +144,18 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	private static class WaitHolder{
-		private boolean wait=true;
+		private boolean wait = true;
 	}
 	
-	private static final ReadWriteLock STRUCT_CACHE_LOCK=new ReentrantReadWriteLock();
+	private static final ReadWriteLock STRUCT_CACHE_LOCK = new ReentrantReadWriteLock();
 	
-	private static final Map<Class<?>, Struct<?>>  STRUCT_CACHE     =new WeakValueHashMap<>();
-	private static final Map<Class<?>, WaitHolder> NON_CONCRETE_WAIT=new HashMap<>();
-	private static final Map<Class<?>, Thread>     STRUCT_THREAD_LOG=new HashMap<>();
+	private static final Map<Class<?>, Struct<?>>  STRUCT_CACHE      = new WeakValueHashMap<>();
+	private static final Map<Class<?>, WaitHolder> NON_CONCRETE_WAIT = new HashMap<>();
+	private static final Map<Class<?>, Thread>     STRUCT_THREAD_LOG = new HashMap<>();
 	
 	public static void clear(){
 		if(!Access.DEV_CACHE) throw new RuntimeException();
-		var lock=STRUCT_CACHE_LOCK.writeLock();
+		var lock = STRUCT_CACHE_LOCK.writeLock();
 		lock.lock();
 		try{
 			if(!STRUCT_THREAD_LOG.isEmpty()) throw new RuntimeException();
@@ -177,7 +177,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	@SuppressWarnings({"unchecked", "rawtypes"})
 	public static Struct<?> ofUnknown(@NotNull Class<?> instanceClass, int minRequestedStage){
 		validateStructType(instanceClass);
-		var s=of0((Class<? extends IOInstance>)instanceClass, minRequestedStage==STATE_DONE);
+		var s = of0((Class<? extends IOInstance>)instanceClass, minRequestedStage == STATE_DONE);
 		s.waitForState(minRequestedStage);
 		return s;
 	}
@@ -192,13 +192,13 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		Objects.requireNonNull(instanceClass);
 		
 		if(!IOInstance.isInstance(instanceClass)){
-			throw new IllegalArgumentException(instanceClass.getName()+" is not an "+IOInstance.class.getSimpleName());
+			throw new IllegalArgumentException(instanceClass.getName() + " is not an " + IOInstance.class.getSimpleName());
 		}
 	}
 	
 	public static <T extends IOInstance<T>> Struct<T> of(Class<T> instanceClass, int minRequestedStage){
 		try{
-			var s=of0(instanceClass, minRequestedStage==STATE_DONE);
+			var s = of0(instanceClass, minRequestedStage == STATE_DONE);
 			s.waitForState(minRequestedStage);
 			return s;
 		}catch(Throwable e){
@@ -218,41 +218,41 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	private static <T extends IOInstance<T>> Struct<T> of0(Class<T> instanceClass, boolean runNow){
 		Objects.requireNonNull(instanceClass);
 		
-		Struct<T> cached=getCached(instanceClass);
-		if(cached!=null) return cached;
+		Struct<T> cached = getCached(instanceClass);
+		if(cached != null) return cached;
 		
 		if(IOInstance.isUnmanaged(instanceClass)){
 			return (Struct<T>)Unmanaged.ofUnknown(instanceClass);
 		}
-		return compile(instanceClass, t->{
-			if(!IOInstance.isInstance(t)) throw new ClassCastException(t.getName()+" is not an "+IOInstance.class.getSimpleName());
-			if(IOInstance.isUnmanaged(t)) throw new ClassCastException(t.getName()+" is unmanaged!");
+		return compile(instanceClass, t -> {
+			if(!IOInstance.isInstance(t)) throw new ClassCastException(t.getName() + " is not an " + IOInstance.class.getSimpleName());
+			if(IOInstance.isUnmanaged(t)) throw new ClassCastException(t.getName() + " is unmanaged!");
 			return new Struct<>(t, runNow);
 		}, runNow);
 	}
 	
 	@SuppressWarnings("unchecked")
 	private static <T extends IOInstance<T>, S extends Struct<T>> S compile(Class<T> instanceClass, Function<Class<T>, S> newStruct, boolean runNow){
-		boolean needsImpl=IOInstance.Def.isDefinition(instanceClass);
+		boolean needsImpl = IOInstance.Def.isDefinition(instanceClass);
 		
-		if(!needsImpl&&Modifier.isAbstract(instanceClass.getModifiers())){
-			throw new IllegalArgumentException("Can not compile "+instanceClass.getName()+" because it is abstract");
+		if(!needsImpl && Modifier.isAbstract(instanceClass.getModifiers())){
+			throw new IllegalArgumentException("Can not compile " + instanceClass.getName() + " because it is abstract");
 		}
 		
 		S struct;
 		
-		var lock=STRUCT_CACHE_LOCK.writeLock();
+		var lock = STRUCT_CACHE_LOCK.writeLock();
 		lock.lock();
 		try{
 			recursiveCompileCheck(instanceClass);
 			
 			//If class was compiled in another thread this should early exit
-			var existing=getCachedUnsafe(instanceClass, lock);
-			if(existing!=null) return (S)existing;
+			var existing = getCachedUnsafe(instanceClass, lock);
+			if(existing != null) return (S)existing;
 			
 			Log.trace("Requested struct: {}#green{}#greenBright",
-			          ()->List.of(
-				          instanceClass.getName().substring(0, instanceClass.getName().length()-instanceClass.getSimpleName().length()),
+			          () -> List.of(
+				          instanceClass.getName().substring(0, instanceClass.getName().length() - instanceClass.getSimpleName().length()),
 				          instanceClass.getSimpleName()
 			          ));
 			
@@ -260,11 +260,11 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 				STRUCT_THREAD_LOG.put(instanceClass, Thread.currentThread());
 				if(needsImpl) NON_CONCRETE_WAIT.put(instanceClass, new WaitHolder());
 				
-				struct=newStruct.apply(instanceClass);
+				struct = newStruct.apply(instanceClass);
 				
 				STRUCT_CACHE.put(instanceClass, struct);
 			}catch(Throwable e){
-				throw new MalformedStruct("Failed to compile "+instanceClass.getName(), e);
+				throw new MalformedStruct("Failed to compile " + instanceClass.getName(), e);
 			}finally{
 				STRUCT_THREAD_LOG.remove(instanceClass);
 			}
@@ -272,34 +272,34 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			lock.unlock();
 		}
 		
-		if(needsImpl) struct.runOnState(STATE_CONCRETE_TYPE, ()->{
+		if(needsImpl) struct.runOnState(STATE_CONCRETE_TYPE, () -> {
 			try{
-				var impl=struct.getConcreteType();
-				var wl  =STRUCT_CACHE_LOCK.writeLock();
+				var impl = struct.getConcreteType();
+				var wl   = STRUCT_CACHE_LOCK.writeLock();
 				wl.lock();
 				try{
 					STRUCT_CACHE.put(impl, struct);
-					NON_CONCRETE_WAIT.remove(instanceClass).wait=false;
+					NON_CONCRETE_WAIT.remove(instanceClass).wait = false;
 				}finally{
 					wl.unlock();
 				}
-			}catch(Throwable ignored){}
+			}catch(Throwable ignored){ }
 		}, null);
 		
 		
-		if(!GlobalConfig.RELEASE_MODE&&Log.WARN){
+		if(!GlobalConfig.RELEASE_MODE && Log.WARN){
 			if(!COMPILATION.isEnabled()){
 				struct.runOnStateDone(
-					()->Log.trace("Struct compiled: {}#cyan{}#cyanBright", struct.getFullName().substring(0, struct.getFullName().length()-struct.cleanName().length()), struct),
-					e->{
-						var e1=StagedInit.WaitException.unwait(e);
+					() -> Log.trace("Struct compiled: {}#cyan{}#cyanBright", struct.getFullName().substring(0, struct.getFullName().length() - struct.cleanName().length()), struct),
+					e -> {
+						var e1 = StagedInit.WaitException.unwait(e);
 						Log.warn("Failed to compile struct asynchronously: {}#red because - {}: {}", struct.cleanFullName(), e1.getClass().getSimpleName(), e1.getMessage());
 					}
 				);
 			}else{
 				struct.runOnStateDone(
-					()->COMPILATION.log(TextUtil.toTable(struct.cleanFullName(), struct.getFields())),
-					e->Log.warn("Failed to compile struct asynchronously: {}#red because {}", struct.cleanName(), e)
+					() -> COMPILATION.log(TextUtil.toTable(struct.cleanFullName(), struct.getFields())),
+					e -> Log.warn("Failed to compile struct asynchronously: {}#red because {}", struct.cleanName(), e)
 				);
 			}
 		}
@@ -308,7 +308,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	private static <T extends IOInstance<T>> Struct<T> getCached(Class<T> instanceClass){
-		var lock=STRUCT_CACHE_LOCK.readLock();
+		var lock = STRUCT_CACHE_LOCK.readLock();
 		try{
 			lock.lock();
 			return getCachedUnsafe(instanceClass, lock);
@@ -324,17 +324,17 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	private static <T extends IOInstance<T>> void waitNonConcrete(Class<T> instanceClass, Lock lock){
-		if(instanceClass.isInterface()||!UtilL.instanceOf(instanceClass, IOInstance.Def.class)){
+		if(instanceClass.isInterface() || !UtilL.instanceOf(instanceClass, IOInstance.Def.class)){
 			return;
 		}
 		
-		var queue=new ArrayDeque<Class<?>>();
+		var queue = new ArrayDeque<Class<?>>();
 		queue.push(instanceClass);
 		while(!queue.isEmpty()){
-			var cl=queue.pop();
+			var cl = queue.pop();
 			for(var interf : cl.getInterfaces()){
-				var holder=NON_CONCRETE_WAIT.get(interf);
-				if(holder!=null){
+				var holder = NON_CONCRETE_WAIT.get(interf);
+				if(holder != null){
 					if(holder.wait){
 						recursiveCompileCheck(interf);
 					}
@@ -347,14 +347,14 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 				}
 				queue.push(interf);
 			}
-			var sup=cl.getSuperclass();
-			if(sup!=null&&UtilL.instanceOf(sup, IOInstance.Def.class)) queue.push(sup);
+			var sup = cl.getSuperclass();
+			if(sup != null && UtilL.instanceOf(sup, IOInstance.Def.class)) queue.push(sup);
 		}
 	}
 	
 	private static void recursiveCompileCheck(Class<?> interf){
-		Thread thread=STRUCT_THREAD_LOG.get(interf);
-		if(thread!=null&&thread==Thread.currentThread()){
+		Thread thread = STRUCT_THREAD_LOG.get(interf);
+		if(thread != null && thread == Thread.currentThread()){
 			throw new RecursiveStructCompilation("Recursive struct compilation");
 		}
 	}
@@ -371,42 +371,42 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	private boolean[] hasPools;
 	
 	private boolean canHavePointers;
-	private byte    invalidInitialNulls=-1;
+	private byte    invalidInitialNulls = -1;
 	
 	private NewObj.Instance<T> emptyConstructor;
 	
-	private int hash=-1;
+	private int hash = -1;
 	
-	public static final int STATE_CONCRETE_TYPE=1, STATE_FIELD_MAKE=2, STATE_INIT_FIELDS=3;
+	public static final int STATE_CONCRETE_TYPE = 1, STATE_FIELD_MAKE = 2, STATE_INIT_FIELDS = 3;
 	
 	private Struct(Class<T> type, boolean runNow){
-		this.type=Objects.requireNonNull(type);
-		init(runNow, ()->{
+		this.type = Objects.requireNonNull(type);
+		init(runNow, () -> {
 			calcHash();
 			
-			isDefinition=UtilL.instanceOf(type, IOInstance.Def.class);
+			isDefinition = UtilL.instanceOf(type, IOInstance.Def.class);
 			if(IOInstance.Def.isDefinition(type)){
-				concreteType=DefInstanceCompiler.getImpl(type, runNow);
-			}else concreteType=type;
+				concreteType = DefInstanceCompiler.getImpl(type, runNow);
+			}else concreteType = type;
 			
 			setInitState(STATE_CONCRETE_TYPE);
 			
-			this.fields=FieldCompiler.compile(this);
+			this.fields = FieldCompiler.compile(this);
 			setInitState(STATE_FIELD_MAKE);
 			for(IOField<T, ?> field : this.fields){
 				try{
 					field.init();
 				}catch(Throwable e){
-					throw new RuntimeException("Failed to init "+field, e);
+					throw new RuntimeException("Failed to init " + field, e);
 				}
 			}
 			setInitState(STATE_INIT_FIELDS);
-			poolObjectsSize=calcPoolObjectsSize();
-			poolPrimitivesSize=calcPoolPrimitivesSize();
-			hasPools=calcHasPools();
-			canHavePointers=calcCanHavePointers();
+			poolObjectsSize = calcPoolObjectsSize();
+			poolPrimitivesSize = calcPoolPrimitivesSize();
+			hasPools = calcHasPools();
+			canHavePointers = calcCanHavePointers();
 			
-			if(emptyConstructor==null&&!getType().isAnnotationPresent(NoDefaultConstructor.class)){
+			if(emptyConstructor == null && !getType().isAnnotationPresent(NoDefaultConstructor.class)){
 				findEmptyConstructor();
 			}
 		});
@@ -425,45 +425,45 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	private Stream<VirtualAccessor<T>> virtualAccessorStream(){
-		return getFields().stream().map(t->Utils.getVirtual(t, null)).filter(Objects::nonNull);
+		return getFields().stream().map(t -> Utils.getVirtual(t, null)).filter(Objects::nonNull);
 	}
 	
 	private short[] calcPoolObjectsSize(){
-		var vPools=virtualAccessorStream().map(VirtualAccessor::getStoragePool).toList();
+		var vPools = virtualAccessorStream().map(VirtualAccessor::getStoragePool).toList();
 		if(vPools.isEmpty()) return null;
-		var poolPointerSizes=new short[StoragePool.values().length];
+		var poolPointerSizes = new short[StoragePool.values().length];
 		for(var vPool : vPools){
-			if(poolPointerSizes[vPool.ordinal()]==Short.MAX_VALUE) throw new OutOfMemoryError();
+			if(poolPointerSizes[vPool.ordinal()] == Short.MAX_VALUE) throw new OutOfMemoryError();
 			poolPointerSizes[vPool.ordinal()]++;
 		}
 		return poolPointerSizes;
 	}
 	
 	private short[] calcPoolPrimitivesSize(){
-		var vPools=virtualAccessorStream().filter(a->a.getPrimitiveSize()>0).collect(Collectors.groupingBy(VirtualAccessor::getStoragePool));
+		var vPools = virtualAccessorStream().filter(a -> a.getPrimitiveSize()>0).collect(Collectors.groupingBy(VirtualAccessor::getStoragePool));
 		if(vPools.isEmpty()) return null;
-		var poolSizes=new short[StoragePool.values().length];
+		var poolSizes = new short[StoragePool.values().length];
 		for(var e : vPools.entrySet()){
-			var siz=e.getValue()
-			         .stream()
-			         .mapToInt(VirtualAccessor::getPrimitiveSize)
-			         .sum();
+			var siz = e.getValue()
+			           .stream()
+			           .mapToInt(VirtualAccessor::getPrimitiveSize)
+			           .sum();
 			if(siz>Short.MAX_VALUE) throw new OutOfMemoryError();
-			poolSizes[e.getKey().ordinal()]=(short)siz;
+			poolSizes[e.getKey().ordinal()] = (short)siz;
 		}
 		return poolSizes;
 	}
 	
 	private boolean[] calcHasPools(){
-		if(poolObjectsSize==null&&poolPrimitivesSize==null){
+		if(poolObjectsSize == null && poolPrimitivesSize == null){
 			return null;
 		}
-		var b=new boolean[poolObjectsSize==null?poolPrimitivesSize.length:poolObjectsSize.length];
-		for(int i=0;i<b.length;i++){
-			boolean p=poolObjectsSize!=null&&poolObjectsSize[i]>0;
-			boolean n=poolPrimitivesSize!=null&&poolPrimitivesSize[i]>0;
+		var b = new boolean[poolObjectsSize == null? poolPrimitivesSize.length : poolObjectsSize.length];
+		for(int i = 0; i<b.length; i++){
+			boolean p = poolObjectsSize != null && poolObjectsSize[i]>0;
+			boolean n = poolPrimitivesSize != null && poolPrimitivesSize[i]>0;
 			
-			b[i]=p||n;
+			b[i] = p || n;
 		}
 		
 		return b;
@@ -471,15 +471,15 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	
 	private boolean calcCanHavePointers(){
 		if(this instanceof Struct.Unmanaged) return true;
-		return getFields().stream().anyMatch(f->{
-			var acc=f.getAccessor();
-			if(acc==null) return true;
+		return getFields().stream().anyMatch(f -> {
+			var acc = f.getAccessor();
+			if(acc == null) return true;
 			
 			if(acc.hasAnnotation(IODynamic.class)) return true;
 			if(f instanceof RefField) return true;
 			
-			if(acc.getType()==ChunkPointer.class) return true;
-			if(acc.getType()==Reference.class) return true;
+			if(acc.getType() == ChunkPointer.class) return true;
+			if(acc.getType() == Reference.class) return true;
 			
 			if(IOInstance.isInstance(acc.getType())){
 				if(!IOInstance.isManaged(acc.getType())) return true;
@@ -489,14 +489,14 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		});
 	}
 	
-	public String cleanName()    {return stripDef(getType().getSimpleName());}
-	public String cleanFullName(){return stripDef(getFullName());}
+	public String cleanName()    { return stripDef(getType().getSimpleName()); }
+	public String cleanFullName(){ return stripDef(getFullName()); }
 	private String stripDef(String name){
 		if(UtilL.instanceOf(getType(), IOInstance.Def.class)){
-			var index=name.indexOf(IOInstance.Def.IMPL_COMPLETION_POSTFIX);
-			index=Math.min(index, name.indexOf(IOInstance.Def.IMPL_NAME_POSTFIX, index==-1?0:index));
-			if(index!=-1){
-				name=name.substring(0, index);
+			var index = name.indexOf(IOInstance.Def.IMPL_COMPLETION_POSTFIX);
+			index = Math.min(index, name.indexOf(IOInstance.Def.IMPL_NAME_POSTFIX, index == -1? 0 : index));
+			if(index != -1){
+				name = name.substring(0, index);
 			}
 		}
 		return name;
@@ -504,24 +504,24 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	
 	@Override
 	public String toString(){
-		var name=cleanName();
-		var sj  =new StringJoiner(", ", name+"{", "}");
+		var name = cleanName();
+		var sj   = new StringJoiner(", ", name + "{", "}");
 		if(this instanceof Struct.Unmanaged){
 			sj.add("Unmanaged");
 		}
-		var e=getErr();
-		if(e!=null){
-			var msg=e.getLocalizedMessage();
-			sj.add("INVALID: "+(msg==null?e.getClass().getSimpleName():msg));
+		var e = getErr();
+		if(e != null){
+			var msg = e.getLocalizedMessage();
+			sj.add("INVALID: " + (msg == null? e.getClass().getSimpleName() : msg));
 		}
-		var state=getEstimatedState();
-		if(state!=STATE_DONE){
-			if(e==null) sj.add("init-state: "+stateToString(state));
+		var state = getEstimatedState();
+		if(state != STATE_DONE){
+			if(e == null) sj.add("init-state: " + stateToString(state));
 		}
 		if(state>=STATE_FIELD_MAKE){
-			var fields =getFields();
-			var dynamic=this instanceof Struct.Unmanaged<?> u&&u.isOverridingDynamicUnmanaged();
-			sj.add((dynamic?"+":"")+fields.size()+" "+TextUtil.plural("field", fields.size()+(dynamic?10:0)));
+			var fields  = getFields();
+			var dynamic = this instanceof Struct.Unmanaged<?> u && u.isOverridingDynamicUnmanaged();
+			sj.add((dynamic? "+" : "") + fields.size() + " " + TextUtil.plural("field", fields.size() + (dynamic? 10 : 0)));
 		}
 		
 		return sj.toString();
@@ -532,16 +532,16 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		return type;
 	}
 	public Class<T> getConcreteType(){
-		if(concreteType==null) resolveConcrete();
+		if(concreteType == null) resolveConcrete();
 		return concreteType;
 	}
 	
 	private void resolveConcrete(){
-		isDefinition=UtilL.instanceOf(type, IOInstance.Def.class);
+		isDefinition = UtilL.instanceOf(type, IOInstance.Def.class);
 		if(IOInstance.Def.isDefinition(type)){
 			waitForState(STATE_CONCRETE_TYPE);
 		}else{
-			concreteType=type;
+			concreteType = type;
 		}
 	}
 	
@@ -550,8 +550,8 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	public FieldSet<T> getInstanceFields(){
-		if(instanceFields==null){
-			instanceFields=FieldSet.of(getFields().stream().filter(e->!Utils.isVirtual(e, IO)));
+		if(instanceFields == null){
+			instanceFields = FieldSet.of(getFields().stream().filter(e -> !Utils.isVirtual(e, IO)));
 		}
 		return instanceFields;
 	}
@@ -562,7 +562,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	public static boolean canUnknownHavePointers(@NotNull Class<?> instanceClass){
-		var s=ofUnknown(instanceClass, STATE_DONE);
+		var s = ofUnknown(instanceClass, STATE_DONE);
 		return s.canHavePointers;
 	}
 	
@@ -584,59 +584,59 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	public String instanceToString(VarPool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
 		return instanceToString0(
 			ioPool, instance, doShort, start, end, fieldValueSeparator, fieldSeparator,
-			fields.stream().filter(f->!f.typeFlag(IOField.HAS_GENERATED_NAME))
+			fields.stream().filter(f -> !f.typeFlag(IOField.HAS_GENERATED_NAME))
 		);
 	}
 	
 	protected String instanceToString0(VarPool<T> ioPool, T instance, boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator, Stream<IOField<T, ?>> fields){
-		var    prefix=start;
-		String name  =null;
+		var    prefix = start;
+		String name   = null;
 		if(!doShort){
-			name=cleanName();
+			name = cleanName();
 			if(Modifier.isStatic(getType().getModifiers())){
-				var index=name.lastIndexOf('$');
-				if(index!=-1) name=name.substring(index+1);
+				var index = name.lastIndexOf('$');
+				if(index != -1) name = name.substring(index + 1);
 			}
 			
-			prefix=name+prefix;
+			prefix = name + prefix;
 		}
 		
-		Function<IOField<T, ?>, Optional<String>> fieldMapper=field->{
-			if(SupportedPrimitive.get(field.getType()).orElse(null)==SupportedPrimitive.BOOLEAN){
-				Boolean val=(Boolean)field.get(ioPool, instance);
-				if(val!=null){
-					return val?Optional.of(field.getName()):Optional.empty();
+		Function<IOField<T, ?>, Optional<String>> fieldMapper = field -> {
+			if(SupportedPrimitive.get(field.getType()).orElse(null) == SupportedPrimitive.BOOLEAN){
+				Boolean val = (Boolean)field.get(ioPool, instance);
+				if(val != null){
+					return val? Optional.of(field.getName()) : Optional.empty();
 				}
 			}
 			
 			Optional<String> valStr;
-			if(field.getNullability()==NOT_NULL&&field.isNull(ioPool, instance)){
-				valStr=Optional.of("<UNINITIALIZED>");
+			if(field.getNullability() == NOT_NULL && field.isNull(ioPool, instance)){
+				valStr = Optional.of("<UNINITIALIZED>");
 			}else{
 				try{
-					valStr=field.instanceToString(ioPool, instance, doShort||TextUtil.USE_SHORT_IN_COLLECTIONS);
+					valStr = field.instanceToString(ioPool, instance, doShort || TextUtil.USE_SHORT_IN_COLLECTIONS);
 				}catch(Throwable e){
-					valStr=Optional.of("CORRUPTED: "+e.getMessage());
+					valStr = Optional.of("CORRUPTED: " + e.getMessage());
 				}
 			}
 			
-			return valStr.map(value->field.getName()+fieldValueSeparator+value);
+			return valStr.map(value -> field.getName() + fieldValueSeparator + value);
 		};
-		var str=fields.map(fieldMapper)
-		              .filter(Optional::isPresent).map(Optional::get)
-		              .collect(Collectors.joining(fieldSeparator, prefix, end));
+		var str = fields.map(fieldMapper)
+		                .filter(Optional::isPresent).map(Optional::get)
+		                .collect(Collectors.joining(fieldSeparator, prefix, end));
 		
 		if(!doShort){
-			if(str.equals(prefix+end)) return name;
+			if(str.equals(prefix + end)) return name;
 		}
 		return str;
 	}
 	
 	@Override
 	public NewObj.Instance<T> emptyConstructor(){
-		if(emptyConstructor==null){
+		if(emptyConstructor == null){
 			findEmptyConstructor();
-			if(emptyConstructor==null){
+			if(emptyConstructor == null){
 				throw new UnsupportedOperationException();
 			}
 		}
@@ -648,47 +648,47 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			throw new UnsupportedOperationException("NoDefaultConstructor is present");
 		}
 		if(!(this instanceof Struct.Unmanaged)){
-			emptyConstructor=Access.findConstructor(getConcreteType(), NewObj.Instance.class);
+			emptyConstructor = Access.findConstructor(getConcreteType(), NewObj.Instance.class);
 		}
 	}
 	
 	public boolean hasInvalidInitialNulls(){
-		if(invalidInitialNulls==-1){
+		if(invalidInitialNulls == -1){
 			if(this instanceof Unmanaged){
-				invalidInitialNulls=(byte)0;
+				invalidInitialNulls = (byte)0;
 				return false;
 			}
 			
 			waitForStateDone();
 			
-			boolean inv=false;
-			if(fields.unpackedStream().anyMatch(f->f.getNullability()==NOT_NULL)){
-				var obj =make();
-				var pool=allocVirtualVarPool(IO);
-				inv=fields.unpackedStream()
-				          .filter(f->f.getNullability()==NOT_NULL)
-				          .anyMatch(f->f.isNull(pool, obj));
+			boolean inv = false;
+			if(fields.unpackedStream().anyMatch(f -> f.getNullability() == NOT_NULL)){
+				var obj  = make();
+				var pool = allocVirtualVarPool(IO);
+				inv = fields.unpackedStream()
+				            .filter(f -> f.getNullability() == NOT_NULL)
+				            .anyMatch(f -> f.isNull(pool, obj));
 			}
-			invalidInitialNulls=(byte)(inv?1:0);
+			invalidInitialNulls = (byte)(inv? 1 : 0);
 			return inv;
 		}
-		return invalidInitialNulls==1;
+		return invalidInitialNulls == 1;
 	}
 	
 	@Nullable
 	public VarPool<T> allocVirtualVarPool(StoragePool pool){
 		waitForStateDone();
-		if(hasPools==null||!hasPools[pool.ordinal()]) return null;
+		if(hasPools == null || !hasPools[pool.ordinal()]) return null;
 		return new VarPool.GeneralVarArray<>(this, pool);
 	}
 	
 	public GenericContext describeGenerics(TypeLink def){
-		return new GenericContext.Deferred(()->{
-			var params=getType().getTypeParameters();
+		return new GenericContext.Deferred(() -> {
+			var params = getType().getTypeParameters();
 			//noinspection unchecked
-			var types=(Map.Entry<String, Type>[])new Map.Entry<?, ?>[params.length];
-			for(int i=0;i<params.length;i++){
-				types[i]=Map.entry(params[i].getName(), def.genericArg(i, null));
+			var types = (Map.Entry<String, Type>[])new Map.Entry<?, ?>[params.length];
+			for(int i = 0; i<params.length; i++){
+				types[i] = Map.entry(params[i].getName(), def.genericArg(i, null));
 			}
 			return new GenericContext.MapConstant(Map.ofEntries(types));
 		});
@@ -696,28 +696,28 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	
 	@Override
 	public boolean equals(Object o){
-		return this==o||
-		       o instanceof Struct<?> that&&
+		return this == o ||
+		       o instanceof Struct<?> that &&
 		       equals(that);
 	}
 	
 	public boolean equals(Struct<?> o){
-		return this==o||
-		       o!=null&&
+		return this == o ||
+		       o != null &&
 		       type.equals(o.type);
 	}
 	
 	@Override
 	public int hashCode(){
-		if(hash==-1) calcHash();
+		if(hash == -1) calcHash();
 		return hash;
 	}
 	private void calcHash(){
-		var h=getFullName().hashCode();
-		hash=h==-1?0:h;
+		var h = getFullName().hashCode();
+		hash = h == -1? 0 : h;
 	}
 	
-	private final Map<FieldSet<T>, Struct<T>> partialCache=Collections.synchronizedMap(new HashMap<>());
+	private final Map<FieldSet<T>, Struct<T>> partialCache = Collections.synchronizedMap(new HashMap<>());
 	
 	public boolean isDefinition(){
 		waitForState(STATE_CONCRETE_TYPE);
@@ -726,10 +726,10 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	@SuppressWarnings({"unchecked", "rawtypes"})
 	public Struct<T> partialImplementation(FieldSet<T> fields){
 		//synchronized get put pattern because makeimpl is thread safe
-		var cached=partialCache.get(fields);
-		if(cached!=null) return cached;
+		var cached = partialCache.get(fields);
+		if(cached != null) return cached;
 		
-		var impl=makeImpl((FieldSet)fields);
+		var impl = makeImpl((FieldSet)fields);
 		partialCache.put(fields, impl);
 		
 		return impl;
@@ -739,12 +739,12 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		if(!isDefinition()){
 			throw new UnsupportedOperationException();
 		}
-		var typ=(Class<E>)getType();
+		var typ = (Class<E>)getType();
 		if(!typ.isInterface()){
-			typ=(Class<E>)IOInstance.Def.unmap((Class<E>)type).orElseThrow();
+			typ = (Class<E>)IOInstance.Def.unmap((Class<E>)type).orElseThrow();
 		}
-		var names=f.stream().map(IOField::getName).collect(Collectors.toUnmodifiableSet());
-		var impl =IOInstance.Def.partialImplementation(typ, names);
+		var names = f.stream().map(IOField::getName).collect(Collectors.toUnmodifiableSet());
+		var impl  = IOInstance.Def.partialImplementation(typ, names);
 		return Struct.of(impl);
 	}
 }

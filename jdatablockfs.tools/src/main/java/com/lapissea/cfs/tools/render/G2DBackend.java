@@ -35,7 +35,7 @@ public class G2DBackend extends RenderBackend{
 	private BufferedImage b1, b2;
 	private Graphics2D currentGraphics;
 	
-	private final Deque<AffineTransform> transformStack=new LinkedList<>();
+	private final Deque<AffineTransform> transformStack = new LinkedList<>();
 	
 	private final DisplayInterface displayInterface;
 	
@@ -45,24 +45,24 @@ public class G2DBackend extends RenderBackend{
 	private int mouseX;
 	private int mouseY;
 	
-	private final EnumSet<DisplayInterface.MouseKey> mouseDowns=EnumSet.noneOf(DisplayInterface.MouseKey.class);
+	private final EnumSet<DisplayInterface.MouseKey> mouseDowns = EnumSet.noneOf(DisplayInterface.MouseKey.class);
 	
 	private       Thread          renderThread;
-	private final Deque<Runnable> tasks=new LinkedList<>();
+	private final Deque<Runnable> tasks = new LinkedList<>();
 	
 	private ImGuiImplG2D imguiImpl;
 	
-	private final DrawFont font=new DrawFont(){
+	private final DrawFont font = new DrawFont(){
 		@Override
 		public void fillStrings(List<StringDraw> strings){
-			for(List<StringDraw> batch : strings.size()<=1?List.of(strings):strings.stream().collect(Collectors.groupingBy(StringDraw::pixelHeight)).values()){
-				var pixelHeight=batch.get(0).pixelHeight();
+			for(List<StringDraw> batch : strings.size()<=1? List.of(strings) : strings.stream().collect(Collectors.groupingBy(StringDraw::pixelHeight)).values()){
+				var pixelHeight = batch.get(0).pixelHeight();
 				currentGraphics.setFont(currentGraphics.getFont().deriveFont(pixelHeight*0.8F));
 				for(StringDraw sd : batch){
-					var col=alphaScale(sd.color(), pixelHeight, false);
+					var col = alphaScale(sd.color(), pixelHeight, false);
 					if(col.getAlpha()<2) continue;
 					
-					var t=currentGraphics.getTransform();
+					var t = currentGraphics.getTransform();
 					currentGraphics.translate(sd.x(), sd.y());
 					currentGraphics.scale(sd.xScale(), 1);
 					
@@ -76,16 +76,16 @@ public class G2DBackend extends RenderBackend{
 		@Override
 		public void outlineStrings(List<StringDraw> strings){
 			
-			for(List<StringDraw> batch : strings.size()<=1?List.of(strings):strings.stream().collect(Collectors.groupingBy(StringDraw::pixelHeight)).values()){
-				var pixelHeight=batch.get(0).pixelHeight();
+			for(List<StringDraw> batch : strings.size()<=1? List.of(strings) : strings.stream().collect(Collectors.groupingBy(StringDraw::pixelHeight)).values()){
+				var pixelHeight = batch.get(0).pixelHeight();
 				currentGraphics.setFont(currentGraphics.getFont().deriveFont(pixelHeight*0.8F));
 				
 				setStrokeWidth(1);
 				for(StringDraw sd : batch){
-					var col=alphaScale(sd.color(), pixelHeight, true);
+					var col = alphaScale(sd.color(), pixelHeight, true);
 					if(col.getAlpha()<2) continue;
 					currentGraphics.setColor(col);
-					var transform=new AffineTransform();
+					var transform = new AffineTransform();
 					transform.translate(sd.x(), sd.y());
 					transform.scale(sd.xScale(), 1);
 					currentGraphics.draw(new TextLayout(sd.string(), currentGraphics.getFont(), currentGraphics.getFontRenderContext()).getOutline(transform));
@@ -95,7 +95,7 @@ public class G2DBackend extends RenderBackend{
 		@Override
 		public Bounds getStringBounds(String string, float fontScale){
 			currentGraphics.setFont(currentGraphics.getFont().deriveFont(fontScale/2));
-			var rect=currentGraphics.getFontMetrics().getStringBounds(string, currentGraphics);
+			var rect = currentGraphics.getFontMetrics().getStringBounds(string, currentGraphics);
 			return new DrawFont.Bounds((float)(rect.getWidth()), (float)(rect.getHeight()));
 		}
 		@Override
@@ -104,9 +104,9 @@ public class G2DBackend extends RenderBackend{
 		}
 		
 		private Color alphaScale(Color color, float pixelHeight, boolean outline){
-			var   minSpace=outline?20:5;
-			float alphaMul=clamp(0, 1, (pixelHeight-minSpace)/3);
-			var   newCol  =new Color(color.getRed(), color.getGreen(), color.getBlue(), (int)(color.getAlpha()*alphaMul));
+			var   minSpace = outline? 20 : 5;
+			float alphaMul = clamp(0, 1, (pixelHeight - minSpace)/3);
+			var   newCol   = new Color(color.getRed(), color.getGreen(), color.getBlue(), (int)(color.getAlpha()*alphaMul));
 			return newCol;
 		}
 	};
@@ -116,17 +116,17 @@ public class G2DBackend extends RenderBackend{
 			case BUTTON1 -> DisplayInterface.MouseKey.LEFT;
 			case BUTTON2 -> DisplayInterface.MouseKey.RIGHT;
 			default -> {
-				throw new RuntimeException("Unknown event"+e);
+				throw new RuntimeException("Unknown event" + e);
 			}
 		};
 	}
 	
 	public G2DBackend(){
-		frame=new JFrame();
-		imguiImpl=ImGuiUtils.makeG2DImpl();
+		frame = new JFrame();
+		imguiImpl = ImGuiUtils.makeG2DImpl();
 		
-		File f=new File("wind");
-		try(var in=new BufferedReader(new FileReader(f))){
+		File f = new File("wind");
+		try(var in = new BufferedReader(new FileReader(f))){
 			frame.setLocation(Integer.parseInt(in.readLine()), Integer.parseInt(in.readLine()));
 			frame.setSize(Integer.parseInt(in.readLine()), Integer.parseInt(in.readLine()));
 		}catch(Throwable ignored){
@@ -134,7 +134,7 @@ public class G2DBackend extends RenderBackend{
 			frame.setLocationRelativeTo(null);
 		}
 		
-		panel=new JPanel(){
+		panel = new JPanel(){
 			@Override
 			public void update(Graphics g){
 				paint((Graphics2D)g);
@@ -145,7 +145,7 @@ public class G2DBackend extends RenderBackend{
 			}
 			
 			public void paint(Graphics2D g){
-				if(displayBuffer==null) return;
+				if(displayBuffer == null) return;
 				g.drawImage(displayBuffer, 0, 0, panel.getWidth(), panel.getHeight(), null);
 			}
 		};
@@ -156,8 +156,8 @@ public class G2DBackend extends RenderBackend{
 		
 		panel.addMouseMotionListener(new MouseMotionAdapter(){
 			public void ev(MouseEvent e){
-				mouseX=e.getX();
-				mouseY=e.getY();
+				mouseX = e.getX();
+				mouseY = e.getY();
 			}
 			@Override
 			public void mouseMoved(MouseEvent e){
@@ -179,7 +179,7 @@ public class G2DBackend extends RenderBackend{
 			}
 		});
 		
-		displayInterface=new DisplayInterface(){
+		displayInterface = new DisplayInterface(){
 			@Override
 			public int getWidth(){
 				return panel.getWidth();
@@ -306,7 +306,7 @@ public class G2DBackend extends RenderBackend{
 	
 	@Override
 	public void start(Runnable start){
-		renderThread=Thread.ofPlatform().name("display").daemon().start(start);
+		renderThread = Thread.ofPlatform().name("display").daemon().start(start);
 	}
 	
 	@Override
@@ -378,7 +378,7 @@ public class G2DBackend extends RenderBackend{
 	}
 	@Override
 	public void clearFrame(){
-		var col=readColor();
+		var col = readColor();
 		currentGraphics.setColor(Color.GRAY);
 		currentGraphics.fillRect(0, 0, getDisplay().getWidth(), getDisplay().getHeight());
 		currentGraphics.setColor(col);
@@ -393,24 +393,24 @@ public class G2DBackend extends RenderBackend{
 	}
 	@Override
 	public void preRender(){
-		if(Thread.currentThread()!=renderThread) throw new IllegalStateException();
-		if(currentGraphics!=null) throw new IllegalStateException();
+		if(Thread.currentThread() != renderThread) throw new IllegalStateException();
+		if(currentGraphics != null) throw new IllegalStateException();
 		
 		flushTasks();
 		
-		int w=getDisplay().getWidth();
-		int h=getDisplay().getHeight();
-		if(b1==null||b1.getWidth()!=w||b1.getHeight()!=h){
-			b1=panel.getGraphicsConfiguration().createCompatibleImage(w, h, Transparency.OPAQUE);
+		int w = getDisplay().getWidth();
+		int h = getDisplay().getHeight();
+		if(b1 == null || b1.getWidth() != w || b1.getHeight() != h){
+			b1 = panel.getGraphicsConfiguration().createCompatibleImage(w, h, Transparency.OPAQUE);
 		}
 		
-		activeBuffer=b1;
+		activeBuffer = b1;
 		
-		var tmp=b1;
-		b1=b2;
-		b2=tmp;
+		var tmp = b1;
+		b1 = b2;
+		b2 = tmp;
 		
-		currentGraphics=activeBuffer.createGraphics();
+		currentGraphics = activeBuffer.createGraphics();
 		currentGraphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 		currentGraphics.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 		currentGraphics.setRenderingHint(RenderingHints.KEY_COLOR_RENDERING, RenderingHints.VALUE_COLOR_RENDER_QUALITY);
@@ -425,13 +425,13 @@ public class G2DBackend extends RenderBackend{
 	
 	@Override
 	public void postRender(){
-		var data=ImGui.getDrawData();
-		if(data.ptr!=0) imguiImpl.renderDrawData(currentGraphics, data);
+		var data = ImGui.getDrawData();
+		if(data.ptr != 0) imguiImpl.renderDrawData(currentGraphics, data);
 		
 		currentGraphics.dispose();
-		currentGraphics=null;
+		currentGraphics = null;
 		
-		displayBuffer=activeBuffer;
+		displayBuffer = activeBuffer;
 		
 		panel.repaint();
 	}
@@ -441,7 +441,7 @@ public class G2DBackend extends RenderBackend{
 	}
 	@Override
 	public void runLater(Runnable task){
-		if(Thread.currentThread()==renderThread){
+		if(Thread.currentThread() == renderThread){
 			task.run();
 		}else{
 			synchronized(tasks){

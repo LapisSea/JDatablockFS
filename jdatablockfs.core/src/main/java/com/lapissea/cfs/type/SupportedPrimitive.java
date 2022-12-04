@@ -16,7 +16,7 @@ public enum SupportedPrimitive implements RuntimeType<Object>{
 	BYTE(byte.class, Byte.class, SizeDescriptor.Fixed.of(1)),
 	BOOLEAN(boolean.class, Boolean.class, SizeDescriptor.Fixed.of(WordSpace.BIT, 1));
 	
-	private static final SupportedPrimitive[] UNIVERSE=values();
+	private static final SupportedPrimitive[] UNIVERSE = values();
 	
 	public static Optional<SupportedPrimitive> get(Type type){
 		if(!(type instanceof Class<?> clazz)) return Optional.empty();
@@ -45,7 +45,7 @@ public enum SupportedPrimitive implements RuntimeType<Object>{
 	}
 	
 	public static boolean isAny(Type type){
-		return type instanceof Class<?> c&&isAny(c);
+		return type instanceof Class<?> c && isAny(c);
 	}
 	public static boolean isAny(Class<?> clazz){
 		for(var p : UNIVERSE){
@@ -62,17 +62,17 @@ public enum SupportedPrimitive implements RuntimeType<Object>{
 	private final Object defVal;
 	
 	SupportedPrimitive(Class<?> primitive, Class<?> wrapper, SizeDescriptor.Fixed<?> maxSize){
-		this.primitive=primitive;
-		this.wrapper=wrapper;
-		this.maxSize=maxSize;
-		this.defVal=Array.get(Array.newInstance(primitive, 1), 0);
+		this.primitive = primitive;
+		this.wrapper = wrapper;
+		this.maxSize = maxSize;
+		this.defVal = Array.get(Array.newInstance(primitive, 1), 0);
 	}
 	
 	public boolean isStrict(Class<?> clazz){
-		return clazz==primitive;
+		return clazz == primitive;
 	}
 	public boolean is(Class<?> clazz){
-		return clazz==primitive||clazz==wrapper;
+		return clazz == primitive || clazz == wrapper;
 	}
 	
 	

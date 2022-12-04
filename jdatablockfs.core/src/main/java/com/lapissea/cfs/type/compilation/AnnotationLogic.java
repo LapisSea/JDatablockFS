@@ -12,11 +12,11 @@ import java.util.Set;
 public interface AnnotationLogic<Ann extends Annotation>{
 	
 	@NotNull
-	default Set<String> getDependencyValueNames(FieldAccessor<?> field, Ann annotation){return Set.of();}
+	default Set<String> getDependencyValueNames(FieldAccessor<?> field, Ann annotation){ return Set.of(); }
 	
-	default void validate(FieldAccessor<?> field, Ann annotation){}
+	default void validate(FieldAccessor<?> field, Ann annotation){ }
 	
 	@NotNull
-	default <T extends IOInstance<T>> List<VirtualFieldDefinition<T, ?>> injectPerInstanceValue(FieldAccessor<T> field, Ann annotation){return List.of();}
+	default <T extends IOInstance<T>> List<VirtualFieldDefinition<T, ?>> injectPerInstanceValue(FieldAccessor<T> field, Ann annotation){ return List.of(); }
 	
 }

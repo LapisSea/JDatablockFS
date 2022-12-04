@@ -24,7 +24,7 @@ public abstract class NullFlagCompanyField<T extends IOInstance<T>, Type> extend
 	public void init(){
 		super.init();
 		if(nullable()){
-			isNull=declaringStruct().getFields().requireExactBoolean(IOFieldTools.makeNullFlagName(getAccessor()));
+			isNull = declaringStruct().getFields().requireExactBoolean(IOFieldTools.makeNullFlagName(getAccessor()));
 		}
 	}
 	
@@ -36,13 +36,13 @@ public abstract class NullFlagCompanyField<T extends IOInstance<T>, Type> extend
 		return List.of(new ValueGeneratorInfo<>(isNull, new ValueGenerator<T, Boolean>(){
 			@Override
 			public boolean shouldGenerate(VarPool<T> ioPool, DataProvider provider, T instance){
-				var isNullRec    =get(ioPool, instance)==null;
-				var writtenIsNull=isNull.getValue(ioPool, instance);
-				return writtenIsNull!=isNullRec;
+				var isNullRec     = get(ioPool, instance) == null;
+				var writtenIsNull = isNull.getValue(ioPool, instance);
+				return writtenIsNull != isNullRec;
 			}
 			@Override
 			public Boolean generate(VarPool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod){
-				return get(ioPool, instance)==null;
+				return get(ioPool, instance) == null;
 			}
 		}));
 	}

@@ -12,5 +12,5 @@ public enum StoragePool{
 	IO("IO");
 	
 	public final String shortName;
-	StoragePool(String shortName){this.shortName=shortName;}
+	StoragePool(String shortName){ this.shortName = shortName; }
 }

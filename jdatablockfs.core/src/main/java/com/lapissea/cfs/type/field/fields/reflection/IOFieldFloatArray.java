@@ -23,17 +23,17 @@ public class IOFieldFloatArray<T extends IOInstance<T>> extends IOField<T, float
 	public IOFieldFloatArray(FieldAccessor<T> accessor){
 		super(accessor);
 		
-		descriptor=SizeDescriptor.Unknown.of(0, OptionalLong.empty(), (ioPool, prov, inst)->{
-			var siz=arraySize.getValue(ioPool, inst);
+		descriptor = SizeDescriptor.Unknown.of(0, OptionalLong.empty(), (ioPool, prov, inst) -> {
+			var siz = arraySize.getValue(ioPool, inst);
 			if(siz>0) return siz*4L;
-			var arr=get(ioPool, inst);
+			var arr = get(ioPool, inst);
 			return arr.length*4L;
 		});
 	}
 	@Override
 	public void init(){
 		super.init();
-		arraySize=declaringStruct().getFields().requireExactInt(IOFieldTools.makeCollectionLenName(getAccessor()));
+		arraySize = declaringStruct().getFields().requireExactInt(IOFieldTools.makeCollectionLenName(getAccessor()));
 	}
 	
 	@Override
@@ -42,19 +42,19 @@ public class IOFieldFloatArray<T extends IOInstance<T>> extends IOField<T, float
 	}
 	@Override
 	public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
-		var arr=get(ioPool, instance);
+		var arr = get(ioPool, instance);
 		dest.writeFloats4(arr);
 	}
 	@Override
 	public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		int size=arraySize.getValue(ioPool, instance);
-		var data=src.readFloats4(size);
+		int size = arraySize.getValue(ioPool, instance);
+		var data = src.readFloats4(size);
 		set(ioPool, instance, data);
 	}
 	
 	@Override
 	public void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		int size=arraySize.getValue(ioPool, instance);
+		int size = arraySize.getValue(ioPool, instance);
 		src.skipExact(size*4L);
 	}
 }

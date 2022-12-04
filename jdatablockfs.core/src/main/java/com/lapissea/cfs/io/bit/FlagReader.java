@@ -14,23 +14,23 @@ public class FlagReader implements BitReader, AutoCloseable{
 	
 	@NotNull
 	public static <T extends Enum<T>> T readSingle(ContentReader in, EnumUniverse<T> enumInfo) throws IOException{
-		var size=enumInfo.numSize(false);
+		var size = enumInfo.numSize(false);
 		
-		if(size==NumberSize.BYTE){
-			int data=in.readUnsignedInt1();
+		if(size == NumberSize.BYTE){
+			int data = in.readUnsignedInt1();
 			
-			var eSiz         =enumInfo.bitSize;
-			int integrityBits=((1<<eSiz)-1)<<eSiz;
+			var eSiz          = enumInfo.bitSize;
+			int integrityBits = ((1<<eSiz) - 1)<<eSiz;
 			
-			if((data&integrityBits)!=integrityBits){
+			if((data&integrityBits) != integrityBits){
 				throw new IllegalBitValueException(BitUtils.binaryRangeFindZero(data, 8, 0));
 			}
 			
-			return enumInfo.get((int)(data&((1L<<eSiz)-1L)));
+			return enumInfo.get((int)(data&((1L<<eSiz) - 1L)));
 		}
 		
 		
-		try(var flags=new FlagReader(size.read(in), size.bits())){
+		try(var flags = new FlagReader(size.read(in), size.bits())){
 			return flags.readEnum(enumInfo);
 		}
 	}
@@ -48,9 +48,9 @@ public class FlagReader implements BitReader, AutoCloseable{
 	}
 	
 	public FlagReader(long data, int bitCount){
-		totalBitCount=bitCount;
-		this.data=data;
-		this.bitCount=bitCount;
+		totalBitCount = bitCount;
+		this.data = data;
+		this.bitCount = bitCount;
 	}
 	
 	public int remainingCount(){
@@ -61,9 +61,9 @@ public class FlagReader implements BitReader, AutoCloseable{
 	public long readBits(int numOBits) throws IOException{
 		if(bitCount<numOBits) throw new IOException("ran out of bits");
 		
-		var result=(data&makeMask(numOBits));
+		var result = (data&makeMask(numOBits));
 		data >>>= numOBits;
-		bitCount-=numOBits;
+		bitCount -= numOBits;
 		return result;
 	}
 	
@@ -78,13 +78,13 @@ public class FlagReader implements BitReader, AutoCloseable{
 	
 	@Override
 	public String toString(){
-		StringBuilder sb=new StringBuilder(remainingCount());
+		StringBuilder sb = new StringBuilder(remainingCount());
 		sb.append(Long.toBinaryString(data));
 		while(sb.length()<remainingCount()) sb.insert(0, '-');
 		return sb.toString();
 	}
 	
 	public int readCount(){
-		return totalBitCount-bitCount;
+		return totalBitCount - bitCount;
 	}
 }

@@ -18,7 +18,7 @@ public interface GenericContext{
 		private final Map<String, Type> actualTypes;
 		
 		public MapConstant(Map<String, Type> actualTypes){
-			this.actualTypes=Map.copyOf(actualTypes);
+			this.actualTypes = Map.copyOf(actualTypes);
 		}
 		
 		@Override
@@ -28,11 +28,11 @@ public interface GenericContext{
 		
 		@Override
 		public String toString(){
-			return "Ctx"+TextUtil.toString(actualTypes);
+			return "Ctx" + TextUtil.toString(actualTypes);
 		}
 		@Override
 		public String toShortString(){
-			return "Ctx"+Utils.toShortString(actualTypes);
+			return "Ctx" + Utils.toShortString(actualTypes);
 		}
 	}
 	
@@ -42,18 +42,18 @@ public interface GenericContext{
 		private Supplier<GenericContext> dataSource;
 		
 		public Deferred(Supplier<GenericContext> dataSource){
-			this.dataSource=dataSource;
+			this.dataSource = dataSource;
 		}
 		
 		private GenericContext getData(){
-			if(data==null) fillData();
+			if(data == null) fillData();
 			return data;
 		}
 		
 		private synchronized void fillData(){
-			if(data!=null) return;
-			data=Objects.requireNonNull(dataSource.get());
-			dataSource=null;
+			if(data != null) return;
+			data = Objects.requireNonNull(dataSource.get());
+			dataSource = null;
 		}
 		
 		public GenericContext actualData(){
@@ -75,30 +75,30 @@ public interface GenericContext{
 		}
 		@Override
 		public String toString(){
-			if(data==null) return "DeferredCtx{?}";
-			return "Deferred"+data+"";
+			if(data == null) return "DeferredCtx{?}";
+			return "Deferred" + data + "";
 		}
 		@Override
 		public String toShortString(){
-			if(data==null) return "DeferredCtx";
-			return "Deferred"+data+"";
+			if(data == null) return "DeferredCtx";
+			return "Deferred" + data + "";
 		}
 	}
 	
 	Type getTypeByName(String name);
 	
 	private Type getTyp(String name){
-		var type=getTypeByName(name);
-		if(type!=null) return type;
+		var type = getTypeByName(name);
+		if(type != null) return type;
 		
-		throw new RuntimeException(name+" is not present");
+		throw new RuntimeException(name + " is not present");
 	}
 	
 	default Type resolveVarType(TypeVariable<?> var){
-		var realType=getTyp(var.getName());
+		var realType = getTyp(var.getName());
 		for(Type bound : var.getBounds()){
 			if(!Utils.genericInstanceOf(realType, bound)){
-				throw new ClassCastException(realType+" is not valid for "+bound);
+				throw new ClassCastException(realType + " is not valid for " + bound);
 			}
 		}
 		return realType;
@@ -109,12 +109,12 @@ public interface GenericContext{
 			return switch(genericType){
 				case null -> null;
 				case ParameterizedType parmType -> {
-					var args =parmType.getActualTypeArguments();
-					var dirty=false;
-					for(int i=0;i<args.length;i++){
+					var args  = parmType.getActualTypeArguments();
+					var dirty = false;
+					for(int i = 0; i<args.length; i++){
 						if(args[i] instanceof TypeVariable<?> var){
-							args[i]=resolveVarType(var);
-							dirty=true;
+							args[i] = resolveVarType(var);
+							dirty = true;
 						}
 					}
 					if(dirty){
@@ -125,7 +125,7 @@ public interface GenericContext{
 				default -> genericType;
 			};
 		}catch(Throwable e){
-			throw new IllegalArgumentException("Failed to resolve "+genericType, e);
+			throw new IllegalArgumentException("Failed to resolve " + genericType, e);
 		}
 	}
 }

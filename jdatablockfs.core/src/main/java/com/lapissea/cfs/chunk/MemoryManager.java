@@ -59,9 +59,9 @@ public interface MemoryManager extends DataProvider.Holder{
 		private final   List<AllocToStrategy> allocTos;
 		
 		public StrategyImpl(DataProvider context){
-			this.context=context;
-			this.allocs=List.copyOf(createAllocs());
-			this.allocTos=List.copyOf(createAllocTos());
+			this.context = context;
+			this.allocs = List.copyOf(createAllocs());
+			this.allocTos = List.copyOf(createAllocTos());
 		}
 		
 		protected abstract List<AllocStrategy> createAllocs();
@@ -82,55 +82,55 @@ public interface MemoryManager extends DataProvider.Holder{
 			
 			if(DEBUG_VALIDATION) MemoryOperations.checkValidityOfChainAlloc(context, firstChunk, target);
 			
-			var last=target;
+			var last = target;
 			
-			long remaining=toAllocate;
+			long remaining = toAllocate;
 			strategyLoop:
 			while(remaining>0){
-				last=last.last();
+				last = last.last();
 				
 				for(AllocToStrategy allocTo : allocTos){
-					long allocated=allocTo.allocTo(firstChunk, last, remaining);
+					long allocated = allocTo.allocTo(firstChunk, last, remaining);
 					
 					if(DEBUG_VALIDATION){
 						checkChainData(firstChunk);
 						
-						if(last.dirty()) throw new RuntimeException(last+" is dirty");
+						if(last.dirty()) throw new RuntimeException(last + " is dirty");
 						if(allocated<0){
 							throw new IllegalStateException();
 						}
 					}
-					if(allocated==0) continue;
+					if(allocated == 0) continue;
 					
-					remaining-=allocated;
+					remaining -= allocated;
 					if(allocated>0){
 						continue strategyLoop;
 					}
 				}
 				
-				throw new UnknownAllocationMethodException("Tried to allocate "+toAllocate+" bytes to "+last.getPtr()+" but there is no known way to do that");
+				throw new UnknownAllocationMethodException("Tried to allocate " + toAllocate + " bytes to " + last.getPtr() + " but there is no known way to do that");
 			}
 			
 		}
 		
 		private void checkChainData(Chunk firstChunk) throws IOException{
-			var ch=firstChunk;
-			while(ch!=null){
-				var n=ch.next();
-				if(n!=null&&n.getSize()>0){
-					if(ch.getCapacity()!=ch.getSize()){
-						throw new IllegalStateException(ch+" is not full but has next with data");
+			var ch = firstChunk;
+			while(ch != null){
+				var n = ch.next();
+				if(n != null && n.getSize()>0){
+					if(ch.getCapacity() != ch.getSize()){
+						throw new IllegalStateException(ch + " is not full but has next with data");
 					}
 				}
-				ch=n;
+				ch = n;
 			}
 		}
 		
 		@Override
 		public Chunk alloc(AllocateTicket ticket) throws IOException{
-			long minSize=minAllocationCapacity();
+			long minSize = minAllocationCapacity();
 			if(ticket.bytes()<minSize){
-				ticket=ticket.withBytes(minSize);
+				ticket = ticket.withBytes(minSize);
 			}
 			
 			Chunk chunk;
@@ -138,8 +138,8 @@ public interface MemoryManager extends DataProvider.Holder{
 			tryStrategies:
 			{
 				for(var alloc : allocs){
-					chunk=alloc.alloc(context, ticket);
-					if(chunk!=null){
+					chunk = alloc.alloc(context, ticket);
+					if(chunk != null){
 						if(DEBUG_VALIDATION) postAllocValidate(ticket, chunk);
 						break tryStrategies;
 					}
@@ -148,8 +148,8 @@ public interface MemoryManager extends DataProvider.Holder{
 			}
 			
 			
-			var initial=ticket.dataPopulator();
-			if(initial!=null){
+			var initial = ticket.dataPopulator();
+			if(initial != null){
 				initial.accept(chunk);
 			}
 			
@@ -158,12 +158,12 @@ public interface MemoryManager extends DataProvider.Holder{
 		
 		private static void postAllocValidate(AllocateTicket ticket, Chunk chunk) throws IOException{
 			chunk.requireReal();
-			var nsizO=ticket.explicitNextSize();
+			var nsizO = ticket.explicitNextSize();
 			if(nsizO.isPresent()){
-				var nsiz =nsizO.get();
-				var chSiz=chunk.getNextSize();
+				var nsiz  = nsizO.get();
+				var chSiz = chunk.getNextSize();
 				if(nsiz.greaterThan(chSiz)){
-					throw new IllegalStateException("Allocation did not respect explicit next size since "+nsiz+" > "+chSiz);
+					throw new IllegalStateException("Allocation did not respect explicit next size since " + nsiz + " > " + chSiz);
 				}
 			}
 		}
@@ -180,11 +180,11 @@ public interface MemoryManager extends DataProvider.Holder{
 	 * Frees a set of chunks listed in the pointers parameter and all their next chunks
 	 */
 	default void freeChains(Collection<ChunkPointer> chainStarts) throws IOException{
-		List<Chunk> chunks=new ArrayList<>(chainStarts.size());
+		List<Chunk> chunks = new ArrayList<>(chainStarts.size());
 		for(var ptr : chainStarts){
 			if(DEBUG_VALIDATION){
-				if(chunks.stream().anyMatch(c->c.getPtr().equals(ptr))){
-					throw new RuntimeException("Duplicate pointer passed "+ptr);
+				if(chunks.stream().anyMatch(c -> c.getPtr().equals(ptr))){
+					throw new RuntimeException("Duplicate pointer passed " + ptr);
 				}
 			}
 			ptr.dereference(getDataProvider()).streamNext().forEach(chunks::add);

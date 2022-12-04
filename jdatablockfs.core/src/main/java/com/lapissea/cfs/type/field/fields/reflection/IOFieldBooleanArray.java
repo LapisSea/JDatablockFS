@@ -26,17 +26,17 @@ public class IOFieldBooleanArray<T extends IOInstance<T>> extends IOField<T, boo
 	public IOFieldBooleanArray(FieldAccessor<T> accessor){
 		super(accessor);
 		
-		descriptor=SizeDescriptor.Unknown.of(0, OptionalLong.empty(), (ioPool, prov, inst)->{
-			var siz=arraySize.getValue(ioPool, inst);
+		descriptor = SizeDescriptor.Unknown.of(0, OptionalLong.empty(), (ioPool, prov, inst) -> {
+			var siz = arraySize.getValue(ioPool, inst);
 			if(siz>0) return siz;
-			var arr=get(ioPool, inst);
+			var arr = get(ioPool, inst);
 			return BitUtils.bitsToBytes(arr.length);
 		});
 	}
 	@Override
 	public void init(){
 		super.init();
-		arraySize=declaringStruct().getFields().requireExactInt(IOFieldTools.makeCollectionLenName(getAccessor()));
+		arraySize = declaringStruct().getFields().requireExactInt(IOFieldTools.makeCollectionLenName(getAccessor()));
 	}
 	
 	@Override
@@ -45,16 +45,16 @@ public class IOFieldBooleanArray<T extends IOInstance<T>> extends IOField<T, boo
 	}
 	@Override
 	public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
-		var arr=get(ioPool, instance);
-		try(var b=new BitOutputStream(dest)){
+		var arr = get(ioPool, instance);
+		try(var b = new BitOutputStream(dest)){
 			b.writeBits(arr);
 		}
 	}
 	@Override
 	public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		int       size=arraySize.getValue(ioPool, instance);
-		boolean[] data=new boolean[size];
-		try(var b=new BitInputStream(src, size)){
+		int       size = arraySize.getValue(ioPool, instance);
+		boolean[] data = new boolean[size];
+		try(var b = new BitInputStream(src, size)){
 			b.readBits(data);
 		}
 		set(ioPool, instance, data);
@@ -62,7 +62,7 @@ public class IOFieldBooleanArray<T extends IOInstance<T>> extends IOField<T, boo
 	
 	@Override
 	public void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		int size=arraySize.getValue(ioPool, instance);
+		int size = arraySize.getValue(ioPool, instance);
 		src.skipExact(size);
 	}
 }

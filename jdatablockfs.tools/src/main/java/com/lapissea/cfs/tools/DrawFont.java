@@ -5,7 +5,7 @@ import java.util.Arrays;
 import java.util.List;
 
 public abstract class DrawFont{
-	public static record Bounds(float width, float height){}
+	public static record Bounds(float width, float height){ }
 	
 	public static record StringDraw(float pixelHeight, float xScale, Color color, String string, float x, float y){
 		public StringDraw(float pixelHeight, Color color, String string, float x, float y){
@@ -26,7 +26,7 @@ public abstract class DrawFont{
 	public abstract Bounds getStringBounds(String string, float fontScale);
 	
 	public boolean canFontDisplay(byte c){
-		if(c==0) return false;
+		if(c == 0) return false;
 		return canFontDisplay((char)(c&0xFF));
 	}
 	public abstract boolean canFontDisplay(char c);

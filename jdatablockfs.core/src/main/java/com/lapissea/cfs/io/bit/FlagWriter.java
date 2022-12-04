@@ -16,7 +16,7 @@ public class FlagWriter implements BitWriter<FlagWriter>{
 		
 		public AutoPop(NumberSize numberSize, ContentWriter dest){
 			super(numberSize);
-			this.dest=dest;
+			this.dest = dest;
 		}
 		
 		@Override
@@ -26,17 +26,17 @@ public class FlagWriter implements BitWriter<FlagWriter>{
 	}
 	
 	public static <T extends Enum<T>> void writeSingle(ContentWriter target, EnumUniverse<T> enumInfo, T value) throws IOException{
-		var size=enumInfo.numSize(false);
+		var size = enumInfo.numSize(false);
 		
-		if(size==NumberSize.BYTE){
-			var eSiz         =enumInfo.bitSize;
-			int integrityBits=((1<<eSiz)-1)<<eSiz;
+		if(size == NumberSize.BYTE){
+			var eSiz          = enumInfo.bitSize;
+			int integrityBits = ((1<<eSiz) - 1)<<eSiz;
 			
 			target.writeInt1(value.ordinal()|integrityBits);
 			return;
 		}
 		
-		var flags=new FlagWriter(size);
+		var flags = new FlagWriter(size);
 		
 		flags.writeEnum(enumInfo, value);
 		
@@ -48,16 +48,16 @@ public class FlagWriter implements BitWriter<FlagWriter>{
 	private       int        written;
 	
 	public FlagWriter(NumberSize numberSize){
-		this.numberSize=numberSize;
-		written=0;
-		buffer=0;
+		this.numberSize = numberSize;
+		written = 0;
+		buffer = 0;
 	}
 	
 	
 	@Override
 	public FlagWriter writeBits(long data, int bitCount){
 		if(DEBUG_VALIDATION){
-			if((data&makeMask(bitCount))!=data) throw new IllegalArgumentException();
+			if((data&makeMask(bitCount)) != data) throw new IllegalArgumentException();
 		}
 		checkBuffer(bitCount);
 		write(data, bitCount);
@@ -69,27 +69,27 @@ public class FlagWriter implements BitWriter<FlagWriter>{
 	}
 	
 	public int remainingCount(){
-		return numberSize.bytes*Byte.SIZE-written;
+		return numberSize.bytes*Byte.SIZE - written;
 	}
 	
 	public FlagWriter fillNOne(int n){
 		checkBuffer(n);
 		
-		int maxBatch=63;
+		int maxBatch = 63;
 		if(n>maxBatch){
 			write(1L, 1);
 			n--;
 		}
-		write((1L<<n)-1L, n);
+		write((1L<<n) - 1L, n);
 		return this;
 	}
 	
 	private void checkBuffer(int n){
-		if(written+n>numberSize.bits()) throw new RuntimeException("ran out of bits "+(written+n)+" > "+numberSize.bits());
+		if(written + n>numberSize.bits()) throw new RuntimeException("ran out of bits " + (written + n) + " > " + numberSize.bits());
 	}
 	private void write(long data, int bitCount){
-		buffer|=data<<written;
-		written+=bitCount;
+		buffer |= data<<written;
+		written += bitCount;
 	}
 	
 	public void export(ContentWriter dest) throws IOException{
@@ -98,7 +98,7 @@ public class FlagWriter implements BitWriter<FlagWriter>{
 	
 	@Override
 	public String toString(){
-		StringBuilder sb=new StringBuilder(remainingCount());
+		StringBuilder sb = new StringBuilder(remainingCount());
 		sb.append(Long.toBinaryString(buffer));
 		while(sb.length()<numberSize.bytes*Byte.SIZE) sb.insert(0, '-');
 		return sb.toString();

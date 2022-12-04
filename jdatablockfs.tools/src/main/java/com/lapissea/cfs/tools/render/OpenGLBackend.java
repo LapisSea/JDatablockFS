@@ -35,10 +35,10 @@ public class OpenGLBackend extends RenderBackend{
 	}
 	
 	public static void glErrorPrint(){
-		int errorCode=glGetError();
-		if(errorCode==GL_NO_ERROR) return;
+		int errorCode = glGetError();
+		if(errorCode == GL_NO_ERROR) return;
 		
-		var err=switch(errorCode){
+		var err = switch(errorCode){
 			case GL_INVALID_ENUM -> "INVALID_ENUM";
 			case GL_INVALID_VALUE -> "INVALID_VALUE";
 			case GL_INVALID_OPERATION -> "INVALID_OPERATION";
@@ -46,7 +46,7 @@ public class OpenGLBackend extends RenderBackend{
 			case GL_STACK_UNDERFLOW -> "STACK_UNDERFLOW";
 			case GL_OUT_OF_MEMORY -> "OUT_OF_MEMORY";
 			case GL_INVALID_FRAMEBUFFER_OPERATION -> "INVALID_FRAMEBUFFER_OPERATION";
-			default -> "Unknown error"+errorCode;
+			default -> "Unknown error" + errorCode;
 		};
 		
 		new RuntimeException(err).printStackTrace();
@@ -59,7 +59,7 @@ public class OpenGLBackend extends RenderBackend{
 		}
 		@Override
 		protected void start(DrawMode mode){
-			inactive=isBulkDrawing();
+			inactive = isBulkDrawing();
 			if(inactive) return;
 			
 			glErrorPrint();
@@ -77,14 +77,14 @@ public class OpenGLBackend extends RenderBackend{
 		}
 	}
 	
-	private boolean destroyRequested=false;
+	private boolean destroyRequested = false;
 	
-	private final Deque<Runnable> glTasks=new LinkedList<>();
+	private final Deque<Runnable> glTasks = new LinkedList<>();
 	
 	private final Thread   glThread;
 	private final DrawFont font;
 	
-	public final  GlfwWindow       window=new GlfwWindow();
+	public final  GlfwWindow       window = new GlfwWindow();
 	private final DisplayInterface displayInterface;
 	
 	private CompletableFuture<?> glInit;
@@ -93,25 +93,25 @@ public class OpenGLBackend extends RenderBackend{
 	private ImGuiImplGl3 imGuiGl3;
 	
 	public OpenGLBackend(){
-		this.glThread=Thread.ofPlatform().name("display").daemon().start(this::displayLifecycle);
+		this.glThread = Thread.ofPlatform().name("display").daemon().start(this::displayLifecycle);
 
 //		var path="/roboto/regular";
-		var path="/CourierPrime/Regular";
+		var path = "/CourierPrime/Regular";
 
 //		font=new TTFont(path+"/font.ttf", this, this::markFrameDirty, this::runLater);
 		try{
-			var atlas=new MSDFAtlas(path);
+			var atlas = new MSDFAtlas(path);
 			
-			font=new AtlasFont(atlas, this, this::markFrameDirty, this::runLater);
+			font = new AtlasFont(atlas, this, this::markFrameDirty, this::runLater);
 		}catch(Throwable e){
 			throw new RuntimeException("failed to load font", e);
 		}
 		
-		UtilL.sleepWhile(()->glInit==null);
+		UtilL.sleepWhile(() -> glInit == null);
 		glInit.join();
-		glInit=null;
+		glInit = null;
 		
-		displayInterface=new DisplayInterface(){
+		displayInterface = new DisplayInterface(){
 			@Override
 			public int getWidth(){
 				return window.size.x();
@@ -135,7 +135,7 @@ public class OpenGLBackend extends RenderBackend{
 			}
 			@Override
 			public void registerKeyboardButton(Consumer<KeyboardEvent> listener){
-				window.registryKeyboardKey.register(glfwE->{
+				window.registryKeyboardKey.register(glfwE -> {
 					listener.accept(new KeyboardEvent(switch(glfwE.getType()){
 						case DOWN -> ActionType.DOWN;
 						case UP -> ActionType.UP;
@@ -146,13 +146,13 @@ public class OpenGLBackend extends RenderBackend{
 			
 			@Override
 			public void registerMouseButton(Consumer<MouseEvent> listener){
-				window.registryMouseButton.register(e->{
-					var key=switch(e.getKey()){
+				window.registryMouseButton.register(e -> {
+					var key = switch(e.getKey()){
 						case GLFW_MOUSE_BUTTON_LEFT -> MouseKey.LEFT;
 						case GLFW_MOUSE_BUTTON_RIGHT -> MouseKey.RIGHT;
 						default -> null;
 					};
-					if(key==null) return;
+					if(key == null) return;
 					listener.accept(new MouseEvent(key, switch(e.getType()){
 						case DOWN -> ActionType.DOWN;
 						case UP -> ActionType.UP;
@@ -162,7 +162,7 @@ public class OpenGLBackend extends RenderBackend{
 			}
 			@Override
 			public void registerMouseScroll(Consumer<Integer> listener){
-				window.registryMouseScroll.register(vec->listener.accept((int)vec.y()));
+				window.registryMouseScroll.register(vec -> listener.accept((int)vec.y()));
 			}
 			@Override
 			public void registerMouseMove(Runnable listener){
@@ -182,7 +182,7 @@ public class OpenGLBackend extends RenderBackend{
 			}
 			@Override
 			public void requestClose(){
-				destroyRequested=true;
+				destroyRequested = true;
 				window.requestClose();
 			}
 			@Override
@@ -224,11 +224,11 @@ public class OpenGLBackend extends RenderBackend{
 		window.size.set(600, 600);
 		window.centerWindow();
 		
-		var stateFile=new File("glfw-win.json");
+		var stateFile = new File("glfw-win.json");
 		window.autoHandleStateSaving(stateFile);
 		window.autoF11Toggle();
 		
-		window.onDestroy(()->{
+		window.onDestroy(() -> {
 			window.saveState(stateFile);
 			System.exit(0);
 		});
@@ -259,17 +259,17 @@ public class OpenGLBackend extends RenderBackend{
 		glDepthMask(false);
 		glfwSwapInterval(0);
 		
-		imGuiGl3=ImGuiUtils.makeGL3Impl();
+		imGuiGl3 = ImGuiUtils.makeGL3Impl();
 	}
 	
 	private void displayLifecycle(){
-		glInit=async(this::initWindow, Runnable::run);
+		glInit = async(this::initWindow, Runnable::run);
 		
-		window.whileOpen(()->{
-			UtilL.sleepWhile(()->start==null, 10);
+		window.whileOpen(() -> {
+			UtilL.sleepWhile(() -> start == null, 10);
 			start.run();
 		});
-		destroyRequested=true;
+		destroyRequested = true;
 		if(window.isCreated()){
 			window.requestClose();
 			window.destroy();
@@ -278,7 +278,7 @@ public class OpenGLBackend extends RenderBackend{
 	
 	@Override
 	public void start(Runnable start){
-		this.start=start;
+		this.start = start;
 	}
 	
 	@Override
@@ -294,7 +294,7 @@ public class OpenGLBackend extends RenderBackend{
 	
 	@Override
 	public void runLater(Runnable task){
-		if(Thread.currentThread()==glThread){
+		if(Thread.currentThread() == glThread){
 			task.run();
 		}else{
 			glTasks.add(task);
@@ -303,8 +303,8 @@ public class OpenGLBackend extends RenderBackend{
 	
 	@Override
 	public void postRender(){
-		var data=ImGui.getDrawData();
-		if(data.ptr!=0) imGuiGl3.renderDrawData(data);
+		var data = ImGui.getDrawData();
+		if(data.ptr != 0) imGuiGl3.renderDrawData(data);
 		
 		window.swapBuffers();
 	}
@@ -382,30 +382,30 @@ public class OpenGLBackend extends RenderBackend{
 	
 	@Override
 	public Color readColor(){
-		float[] color=new float[4];
+		float[] color = new float[4];
 		glGetFloatv(GL_CURRENT_COLOR, color);
 		return new Color(color[0], color[1], color[2], color[3]);
 	}
 	
 	@Override
 	public void drawLine(double xFrom, double yFrom, double xTo, double yTo){
-		var angle =-Math.atan2(xTo-xFrom, yTo-yFrom);
-		var length=MathUtil.length(xFrom-xTo, yTo-yFrom);
+		var angle  = -Math.atan2(xTo - xFrom, yTo - yFrom);
+		var length = MathUtil.length(xFrom - xTo, yTo - yFrom);
 		
-		Point2D.Double  p=new Point2D.Double();
-		AffineTransform t=new AffineTransform();
+		Point2D.Double  p = new Point2D.Double();
+		AffineTransform t = new AffineTransform();
 		t.setToIdentity();
 		t.translate(xFrom, yFrom);
 		t.rotate(angle);
 		
-		double x    =-getLineWidth()/2;
-		double width=getLineWidth();
+		double x     = -getLineWidth()/2;
+		double width = getLineWidth();
 		
 		if(!isBulkDrawing()) glBegin(GL_QUADS);
 		
 		vertex2dCpuTrans(p, t, x, 0);
-		vertex2dCpuTrans(p, t, x+width, 0);
-		vertex2dCpuTrans(p, t, x+width, length);
+		vertex2dCpuTrans(p, t, x + width, 0);
+		vertex2dCpuTrans(p, t, x + width, length);
 		vertex2dCpuTrans(p, t, x, length);
 		
 		if(!isBulkDrawing()){
@@ -432,9 +432,9 @@ public class OpenGLBackend extends RenderBackend{
 	private void draw4Points(double x, double y, double width, double height, int drawMode){
 		if(!isBulkDrawing()) glBegin(drawMode);
 		glVertex3d(x, y, 0);
-		glVertex3d(x+width, y, 0);
-		glVertex3d(x+width, y+height, 0);
-		glVertex3d(x, y+height, 0);
+		glVertex3d(x + width, y, 0);
+		glVertex3d(x + width, y + height, 0);
+		glVertex3d(x, y + height, 0);
 		if(!isBulkDrawing()){
 			glEnd();
 			debSwap();

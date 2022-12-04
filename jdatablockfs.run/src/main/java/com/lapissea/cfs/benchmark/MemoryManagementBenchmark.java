@@ -16,8 +16,8 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
-@Warmup(iterations=4, time=1000, timeUnit=TimeUnit.MILLISECONDS)
-@Measurement(iterations=15, time=500, timeUnit=TimeUnit.MILLISECONDS)
+@Warmup(iterations = 4, time = 1000, timeUnit = TimeUnit.MILLISECONDS)
+@Measurement(iterations = 15, time = 500, timeUnit = TimeUnit.MILLISECONDS)
 @State(Scope.Thread)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 public class MemoryManagementBenchmark{
@@ -25,8 +25,8 @@ public class MemoryManagementBenchmark{
 	private byte[] src;
 	
 	private static byte[] generate(UnsafeConsumer<Cluster, IOException> action) throws IOException{
-		var data=MemoryData.builder().build();
-		var c   =Cluster.init(data);
+		var data = MemoryData.builder().build();
+		var c    = Cluster.init(data);
 		action.accept(c);
 		return data.readAll();
 	}
@@ -40,14 +40,14 @@ public class MemoryManagementBenchmark{
 	@Setup
 	public void initSrc(){
 		try{
-			src=generate(c->{
-				Random      r  =new Random(69);
-				List<Chunk> chs=new ArrayList<>();
-				for(int i=0;i<entropy;i++){
-					if(r.nextFloat()>0.5||chs.size()<2){
-						chs.add(AllocateTicket.bytes(8+r.nextInt(64)).submit(c));
+			src = generate(c -> {
+				Random      r   = new Random(69);
+				List<Chunk> chs = new ArrayList<>();
+				for(int i = 0; i<entropy; i++){
+					if(r.nextFloat()>0.5 || chs.size()<2){
+						chs.add(AllocateTicket.bytes(8 + r.nextInt(64)).submit(c));
 					}else{
-						var ch=chs.remove(r.nextInt(chs.size()-1));
+						var ch = chs.remove(r.nextInt(chs.size() - 1));
 						if(ch.checkLastPhysical()){
 							chs.add(ch);
 							continue;
@@ -68,9 +68,9 @@ public class MemoryManagementBenchmark{
 	
 	@Setup(Level.Invocation)
 	public void initData(){
-		mem=MemoryData.builder().withRaw(src).build();
+		mem = MemoryData.builder().withRaw(src).build();
 		try{
-			cls=new Cluster(mem);
+			cls = new Cluster(mem);
 		}catch(IOException e){
 			throw new RuntimeException(e);
 		}
@@ -80,7 +80,7 @@ public class MemoryManagementBenchmark{
 	//	@Benchmark
 	public void initCluster(Blackhole hole){
 		try{
-			var c=new Cluster(mem);
+			var c = new Cluster(mem);
 			hole.consume(c);
 		}catch(Exception e){
 			throw new RuntimeException(e);
@@ -97,8 +97,8 @@ public class MemoryManagementBenchmark{
 	}
 	
 	private void alloc(Cluster c, AllocateTicket ticket, int count) throws IOException{
-		var man=c.getMemoryManager();
-		for(int i=0;i<count;i++){
+		var man = c.getMemoryManager();
+		for(int i = 0; i<count; i++){
 			ticket.submit(man);
 		}
 	}

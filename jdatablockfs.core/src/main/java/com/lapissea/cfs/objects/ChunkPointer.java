@@ -9,7 +9,7 @@ import java.io.IOException;
 
 public final class ChunkPointer implements INumber, Comparable<ChunkPointer>{
 	
-	public static final ChunkPointer NULL=new ChunkPointer(0);
+	public static final ChunkPointer NULL = new ChunkPointer(0);
 	
 	@NotNull
 	public static ChunkPointer read(NumberSize size, ContentReader src) throws IOException{
@@ -18,7 +18,7 @@ public final class ChunkPointer implements INumber, Comparable<ChunkPointer>{
 	
 	@NotNull
 	public static ChunkPointer of(long value){
-		return value==0?NULL:new ChunkPointer(value);
+		return value == 0? NULL : new ChunkPointer(value);
 	}
 	
 	@Deprecated
@@ -31,14 +31,14 @@ public final class ChunkPointer implements INumber, Comparable<ChunkPointer>{
 	}
 	
 	public static long getValueNullable(ChunkPointer ptr){
-		return ptr==null?0:ptr.getValue();
+		return ptr == null? 0 : ptr.getValue();
 	}
 	
 	private final long value;
 	
 	private ChunkPointer(long value){
 		if(value<0) throw new IllegalArgumentException();
-		this.value=value;
+		this.value = value;
 	}
 	
 	@Override
@@ -56,10 +56,10 @@ public final class ChunkPointer implements INumber, Comparable<ChunkPointer>{
 		if(isNull()) return "NULL";
 		
 		if(getValue()>9999){
-			var h=Long.toHexString(getValue()).toUpperCase();
-			return "x"+h;
+			var h = Long.toHexString(getValue()).toUpperCase();
+			return "x" + h;
 		}
-		return "*"+getValue();
+		return "*" + getValue();
 	}
 	
 	public ChunkPointer addPtr(INumber value){
@@ -69,7 +69,7 @@ public final class ChunkPointer implements INumber, Comparable<ChunkPointer>{
 	
 	public ChunkPointer addPtr(long value){
 		requireNonNull();
-		return new ChunkPointer(getValue()+value);
+		return new ChunkPointer(getValue() + value);
 	}
 	
 	public long add(INumber value){
@@ -79,13 +79,13 @@ public final class ChunkPointer implements INumber, Comparable<ChunkPointer>{
 	
 	public long add(long value){
 		requireNonNull();
-		return getValue()+value;
+		return getValue() + value;
 	}
 	
 	@Override
 	public boolean equals(Object o){
-		return o==this||
-		       o instanceof INumber num&&
+		return o == this ||
+		       o instanceof INumber num &&
 		       equals(num.getValue());
 	}
 	
@@ -106,7 +106,7 @@ public final class ChunkPointer implements INumber, Comparable<ChunkPointer>{
 		if(isNull()) throw new NullPointerException("Pointer is null");
 	}
 	public boolean isNull(){
-		return getValue()==0;
+		return getValue() == 0;
 	}
 	
 	@Override

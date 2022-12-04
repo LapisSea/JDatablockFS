@@ -4,7 +4,7 @@ public abstract class QueryExecutor{
 	
 	private static QueryExecutor instance;
 	public static QueryExecutor getInstance(){
-		if(instance==null) instance=new ReflectionExecutor();
+		if(instance == null) instance = new ReflectionExecutor();
 		return instance;
 	}
 	

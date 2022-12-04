@@ -37,44 +37,44 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 	
 	private IONullability.Mode nullability;
 	
-	public static final int DYNAMIC_FLAG          =1<<0;
-	public static final int IOINSTANCE_FLAG       =1<<1;
-	public static final int PRIMITIVE_OR_ENUM_FLAG=1<<2;
-	public static final int HAS_NO_POINTERS_FLAG  =1<<3;
-	public static final int HAS_GENERATED_NAME    =1<<4;
+	public static final int DYNAMIC_FLAG           = 1<<0;
+	public static final int IOINSTANCE_FLAG        = 1<<1;
+	public static final int PRIMITIVE_OR_ENUM_FLAG = 1<<2;
+	public static final int HAS_NO_POINTERS_FLAG   = 1<<3;
+	public static final int HAS_GENERATED_NAME     = 1<<4;
 	
-	private int typeFlags=-1;
+	private int typeFlags = -1;
 	
-	private volatile long uid=-1;
+	private volatile long uid = -1;
 	
 	public IOField(FieldAccessor<T> accessor){
-		this.accessor=accessor;
+		this.accessor = accessor;
 	}
 	
 	public final void initLateData(FieldSet<T> dependencies){
 		if(lateDataInitialized) throw new IllegalStateException("already initialized");
 		
-		this.dependencies=dependencies==null?null:Utils.nullIfEmpty(dependencies);
-		lateDataInitialized=true;
+		this.dependencies = dependencies == null? null : Utils.nullIfEmpty(dependencies);
+		lateDataInitialized = true;
 	}
 	
 	public final boolean typeFlag(int flag){
-		return (typeFlags()&flag)==flag;
+		return (typeFlags()&flag) == flag;
 	}
 	
 	public final int typeFlags(){
-		var f=typeFlags;
-		if(f==-1) f=typeFlags=FieldSupport.typeFlags(this);
+		var f = typeFlags;
+		if(f == -1) f = typeFlags = FieldSupport.typeFlags(this);
 		return f;
 	}
 	
 	public final boolean isNull(VarPool<T> ioPool, T instance){
 		if(!getAccessor().canBeNull()) return false;
 		try{
-			var val=get(ioPool, instance);
-			return val==null;
+			var val = get(ioPool, instance);
+			return val == null;
 		}catch(FieldIsNullException npe){
-			if(npe.field==this){
+			if(npe.field == this){
 				return true;
 			}else{
 				throw npe;
@@ -83,13 +83,13 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 	}
 	
 	protected final ValueType getNullable(VarPool<T> ioPool, T instance, Supplier<ValueType> createDefaultIfNull){
-		var value=rawGet(ioPool, instance);
-		if(value!=null) return value;
+		var value = rawGet(ioPool, instance);
+		if(value != null) return value;
 		return switch(getNullability()){
 			case NOT_NULL -> throw new FieldIsNullException(this);
 			case NULLABLE -> null;
 			case DEFAULT_IF_NULL -> {
-				var newVal=createDefaultIfNull.get();
+				var newVal = createDefaultIfNull.get();
 				set(ioPool, instance, newVal);
 				yield newVal;
 			}
@@ -97,12 +97,12 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 	}
 	
 	protected final ValueType getNullable(VarPool<T> ioPool, T instance){
-		var value=rawGet(ioPool, instance);
-		if(value!=null) return value;
+		var value = rawGet(ioPool, instance);
+		if(value != null) return value;
 		switch(getNullability()){
 			case NOT_NULL -> throw new FieldIsNullException(this);
-			case null, NULLABLE -> {}
-			case DEFAULT_IF_NULL -> throw new IllegalStateException(this+" does not support "+DEFAULT_IF_NULL);
+			case null, NULLABLE -> { }
+			case DEFAULT_IF_NULL -> throw new IllegalStateException(this + " does not support " + DEFAULT_IF_NULL);
 		}
 		return null;
 	}
@@ -121,8 +121,8 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 	}
 	
 	public final SizeDescriptor<T> sizeDescriptorSafe(){
-		var struct=declaringStruct();
-		if(struct!=null){
+		var struct = declaringStruct();
+		if(struct != null){
 			struct.waitForState(Struct.STATE_INIT_FIELDS);
 		}
 		return getSizeDescriptor();
@@ -141,17 +141,17 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 	) implements Stringify{
 		public void generate(VarPool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException{
 			if(generator.shouldGenerate(ioPool, provider, instance)){
-				var val=generator.generate(ioPool, provider, instance, allowExternalMod);
+				var val = generator.generate(ioPool, provider, instance, allowExternalMod);
 				field.set(ioPool, instance, val);
 			}
 		}
 		@Override
 		public String toString(){
-			return ValueGeneratorInfo.class.getSimpleName()+"{modifies "+field+"}";
+			return ValueGeneratorInfo.class.getSimpleName() + "{modifies " + field + "}";
 		}
 		@Override
 		public String toShortString(){
-			return "{mod "+Utils.toShortString(field)+"}";
+			return "{mod " + Utils.toShortString(field) + "}";
 		}
 	}
 	
@@ -161,8 +161,8 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 	}
 	
 	public final Stream<ValueGeneratorInfo<T, ?>> generatorStream(){
-		var gens=getGenerators();
-		return gens==null?Stream.of():gens.stream();
+		var gens = getGenerators();
+		return gens == null? Stream.of() : gens.stream();
 	}
 	
 	
@@ -174,7 +174,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 		}catch(VaryingSize.TooSmall e){
 			throw e;
 		}catch(Exception e){
-			throw new IOException("Failed to write "+this, e);
+			throw new IOException("Failed to write " + this, e);
 		}
 	}
 	
@@ -184,7 +184,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 			read(ioPool, provider, src, instance, genericContext);
 			if(STAT_LOGGING) logEnd(READ_ACTION, uid());
 		}catch(Exception e){
-			throw new IOException("Failed to read "+this, e);
+			throw new IOException("Failed to read " + this, e);
 		}
 	}
 	
@@ -194,7 +194,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 			skip(ioPool, provider, src, instance, genericContext);
 			if(STAT_LOGGING) logEnd(SKIP_READ_ACTION, uid());
 		}catch(Exception e){
-			throw new IOException("Failed to skip read "+this, e);
+			throw new IOException("Failed to skip read " + this, e);
 		}
 	}
 	
@@ -225,10 +225,10 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 	}
 	
 	public final long uid(){
-		if(uid==-1){
+		if(uid == -1){
 			synchronized(this){
-				if(uid==-1){
-					uid=FieldSupport.nextUID();
+				if(uid == -1){
+					uid = FieldSupport.nextUID();
 					if(STAT_LOGGING) logRegister(uid, this);
 				}
 			}
@@ -236,17 +236,17 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 		return uid;
 	}
 	
-	public String getName()                    {return getAccessor().getName();}
-	public Class<?> getType()                  {return getAccessor().getType();}
-	public final FieldAccessor<T> getAccessor(){return accessor;}
+	public String getName()                    { return getAccessor().getName(); }
+	public Class<?> getType()                  { return getAccessor().getType(); }
+	public final FieldAccessor<T> getAccessor(){ return accessor; }
 	public final Struct<T> declaringStruct(){
-		var acc=getAccessor();
-		return acc==null?null:acc.getDeclaringStruct();
+		var acc = getAccessor();
+		return acc == null? null : acc.getDeclaringStruct();
 	}
 	
 	private void requireLateData(){
 		if(!lateDataInitialized){
-			throw new IllegalStateException(this.getName()+" late data not initialized");
+			throw new IllegalStateException(this.getName() + " late data not initialized");
 		}
 	}
 	
@@ -257,19 +257,19 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 	}
 	
 	public final Stream<IOField<T, ?>> dependencyStream(){
-		var d=getDependencies();
-		return d!=null?d.stream():Stream.of();
+		var d = getDependencies();
+		return d != null? d.stream() : Stream.of();
 	}
 	
 	public final boolean isDependency(IOField<T, ?> depField){
 		requireLateData();
-		return dependencies!=null&&dependencies.contains(depField);
+		return dependencies != null && dependencies.contains(depField);
 	}
 	
 	public final boolean hasDependencies(){
 		requireLateData();
-		assert dependencies==null||!dependencies.isEmpty();
-		return dependencies!=null;
+		assert dependencies == null || !dependencies.isEmpty();
+		return dependencies != null;
 	}
 	
 	@Override
@@ -278,8 +278,8 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 	}
 	@Override
 	public String toString(){
-		var struct=getAccessor().getDeclaringStruct();
-		return (struct==null?"":struct.cleanName())+"#"+toShortString();
+		var struct = getAccessor().getDeclaringStruct();
+		return (struct == null? "" : struct.cleanName()) + "#" + toShortString();
 	}
 	
 	
@@ -290,7 +290,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 		return Stream.of(this);
 	}
 	
-	protected void throwInformativeFixedSizeError(){}
+	protected void throwInformativeFixedSizeError(){ }
 	private FixedFormatNotSupportedException unsupportedFixed(){
 		try{
 			throwInformativeFixedSizeError();
@@ -304,16 +304,16 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 		return forceMaxAsFixedSize(null);
 	}
 	public final IOField<T, ValueType> forceMaxAsFixedSize(VaryingSize.Provider provider){
-		if(provider==null&&getSizeDescriptor().hasFixed()) return this;
+		if(provider == null && getSizeDescriptor().hasFixed()) return this;
 		if(!getSizeDescriptor().hasMax()){
 			throw unsupportedFixed();
 		}
-		var f=maxAsFixedSize(provider==null?VaryingSize.Provider.ALL_MAX:provider);
-		if(f!=this){
+		var f = maxAsFixedSize(provider == null? VaryingSize.Provider.ALL_MAX : provider);
+		if(f != this){
 			f.initLateData(getDependencies());
 			f.init();
 		}
-		if(!f.getSizeDescriptor().hasFixed()) throw new RuntimeException(this+" failed to make itself fixed");
+		if(!f.getSizeDescriptor().hasFixed()) throw new RuntimeException(this + " failed to make itself fixed");
 		return f;
 	}
 	
@@ -323,25 +323,25 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 	}
 	
 	public final IONullability.Mode getNullability(){
-		if(nullability==null) calcNullability();
+		if(nullability == null) calcNullability();
 		return nullability;
 	}
 	private void calcNullability(){
-		nullability=accessor==null?IONullability.Mode.NULLABLE:IOFieldTools.getNullability(accessor);
+		nullability = accessor == null? IONullability.Mode.NULLABLE : IOFieldTools.getNullability(accessor);
 	}
 	
 	public final boolean nullable(){
-		return getNullability()==IONullability.Mode.NULLABLE;
+		return getNullability() == IONullability.Mode.NULLABLE;
 	}
 	
 	@Override
 	public boolean equals(Object o){
-		if(this==o) return true;
+		if(this == o) return true;
 		if(!(o instanceof IOField<?, ?> ioField)) return false;
 		
-		var acc=getAccessor();
-		if(acc==null){
-			if(ioField.getAccessor()!=null) return false;
+		var acc = getAccessor();
+		if(acc == null){
+			if(ioField.getAccessor() != null) return false;
 			return getName().equals(ioField.getName());
 		}
 		return acc.equals(ioField.getAccessor());

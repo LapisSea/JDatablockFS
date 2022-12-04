@@ -50,15 +50,15 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 		}
 		
 		default StringBuilder hexdump(String title, int maxWidth) throws IOException{
-			return ioMap(io->HexDump.hexDump(io, title, maxWidth));
+			return ioMap(io -> HexDump.hexDump(io, title, maxWidth));
 		}
 		
 		/**
 		 * Reads all bytes from start to end in to a byte[]. This method may fail if the data size is larger than {@link Integer#MAX_VALUE}.
 		 */
 		default byte[] readAll() throws IOException{
-			try(var io=io()){
-				byte[] data=new byte[Math.toIntExact(io.getSize())];
+			try(var io = io()){
+				byte[] data = new byte[Math.toIntExact(io.getSize())];
 				io.readFully(data);
 				return data;
 			}
@@ -81,7 +81,7 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 		default <T> T ioMapAt(long offset, UnsafeFunction<RandomIO, T, IOException> session) throws IOException{
 			Objects.requireNonNull(session);
 			
-			try(var io=ioAt(offset)){
+			try(var io = ioAt(offset)){
 				return session.apply(io);
 			}
 		}
@@ -89,7 +89,7 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 		 * Provides a new instance of {@link RandomIO} where its initial position will be at the specified offset.
 		 */
 		default RandomIO ioAt(long offset) throws IOException{
-			var io=io();
+			var io = io();
 			io.skipExact(offset);
 			return io;
 		}
@@ -100,7 +100,7 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 		default <T> T ioMap(UnsafeFunction<RandomIO, T, IOException> session) throws IOException{
 			Objects.requireNonNull(session);
 			
-			try(var io=io()){
+			try(var io = io()){
 				return session.apply(io);
 			}
 		}
@@ -120,7 +120,7 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 		default void ioAt(long offset, UnsafeConsumer<RandomIO, IOException> session) throws IOException{
 			Objects.requireNonNull(session);
 			
-			try(var io=ioAt(offset)){
+			try(var io = ioAt(offset)){
 				session.accept(io);
 			}
 		}
@@ -131,7 +131,7 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 		default void io(UnsafeConsumer<RandomIO, IOException> session) throws IOException{
 			Objects.requireNonNull(session);
 			
-			try(var io=io()){
+			try(var io = io()){
 				session.accept(io);
 			}
 		}
@@ -142,21 +142,21 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 		RandomIO io() throws IOException;
 		
 		default RandomIO readOnlyIO() throws IOException{
-			var io=io();
+			var io = io();
 			if(io.isReadOnly()) return io;
 			return new RandomIOReadOnly(io);
 		}
 		
-		default void write(boolean trimOnClose, ByteBuffer data) throws IOException         {write(0, trimOnClose, data);}
+		default void write(boolean trimOnClose, ByteBuffer data) throws IOException         { write(0, trimOnClose, data); }
 		
-		default void write(boolean trimOnClose, byte[] data) throws IOException             {write(0, trimOnClose, data);}
+		default void write(boolean trimOnClose, byte[] data) throws IOException             { write(0, trimOnClose, data); }
 		
-		default void write(long offset, boolean trimOnClose, byte[] data) throws IOException{write(offset, trimOnClose, data.length, data);}
+		default void write(long offset, boolean trimOnClose, byte[] data) throws IOException{ write(offset, trimOnClose, data.length, data); }
 		
 		default void write(long offset, boolean trimOnClose, int length, byte[] data) throws IOException{
 			Objects.requireNonNull(data);
 			
-			try(var io=ioAt(offset)){
+			try(var io = ioAt(offset)){
 				io.write(data, 0, length);
 				if(trimOnClose) io.trim();
 			}
@@ -165,7 +165,7 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 		default void write(long offset, boolean trimOnClose, ByteBuffer data) throws IOException{
 			Objects.requireNonNull(data);
 			
-			try(var io=ioAt(offset)){
+			try(var io = ioAt(offset)){
 				io.write(data);
 				if(trimOnClose) io.trim();
 			}
@@ -186,7 +186,7 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 		 *                    7, 8, 9, 3, 4, 5
 		 */
 		@NotNull
-		default ContentOutputStream write(boolean trimOnClose) throws IOException{return write(0, trimOnClose);}
+		default ContentOutputStream write(boolean trimOnClose) throws IOException{ return write(0, trimOnClose); }
 		
 		/**
 		 * Provides an {@link OutputStream} that can be used as a specialised write only version of {@link RandomIO}.
@@ -210,29 +210,29 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 		
 		
 		@NotNull
-		default <T> T read(UnsafeFunction<ContentInputStream, T, IOException> reader) throws IOException{return read(0, reader);}
+		default <T> T read(UnsafeFunction<ContentInputStream, T, IOException> reader) throws IOException{ return read(0, reader); }
 		
 		@NotNull
 		default <T> T read(long offset, @NotNull UnsafeFunction<ContentInputStream, T, IOException> reader) throws IOException{
 			Objects.requireNonNull(reader);
 			
-			try(var io=read(offset)){
+			try(var io = read(offset)){
 				return Objects.requireNonNull(reader.apply(io));
 			}
 		}
 		
-		default void read(UnsafeConsumer<ContentInputStream, IOException> reader) throws IOException{read(0, reader);}
+		default void read(UnsafeConsumer<ContentInputStream, IOException> reader) throws IOException{ read(0, reader); }
 		
 		default void read(long offset, @NotNull UnsafeConsumer<ContentInputStream, IOException> reader) throws IOException{
 			Objects.requireNonNull(reader);
 			
-			try(var io=read(offset)){
+			try(var io = read(offset)){
 				reader.accept(io);
 			}
 		}
 		
 		@NotNull
-		default ContentInputStream read() throws IOException{return read(0);}
+		default ContentInputStream read() throws IOException{ return read(0); }
 		
 		@NotNull
 		default ContentInputStream read(long offset) throws IOException{
@@ -241,33 +241,33 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 		
 		
 		default byte[] read(long offset, int length) throws IOException{
-			byte[] dest=new byte[length];
+			byte[] dest = new byte[length];
 			read(offset, dest);
 			return dest;
 		}
 		
-		default void read(long offset, byte[] dest) throws IOException{read(offset, dest.length, dest);}
+		default void read(long offset, byte[] dest) throws IOException{ read(offset, dest.length, dest); }
 		
 		default void read(long offset, int length, byte[] dest) throws IOException{
-			if(length==0) return;
-			try(var io=ioAt(offset)){
+			if(length == 0) return;
+			try(var io = ioAt(offset)){
 				io.readFully(dest, 0, length);
 			}
 		}
 		
 		default void transferTo(IOInterface dest, boolean trimOnClose) throws IOException{
-			try(var in=read();
-			    var out=dest.write(trimOnClose)){
+			try(var in = read();
+			    var out = dest.write(trimOnClose)){
 				in.transferTo((OutputStream)out);
 			}
 		}
 		default void transferTo(ContentWriter dest) throws IOException{
-			try(var in=io()){
+			try(var in = io()){
 				in.transferTo(dest);
 			}
 		}
 		default void transferTo(OutputStream dest) throws IOException{
-			try(var in=io()){
+			try(var in = io()){
 				in.transferTo(dest);
 			}
 		}
@@ -275,7 +275,7 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 	
 	
 	default boolean isEmpty() throws IOException{
-		return getSize()==0;
+		return getSize() == 0;
 	}
 	
 	void setSize(long requestedSize) throws IOException;
@@ -305,24 +305,24 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 	void flush() throws IOException;
 	
 	default void trim() throws IOException{
-		var pos =getPos();
-		var size=getSize();
+		var pos  = getPos();
+		var size = getSize();
 		if(pos>=size) return;
 		setCapacity(pos);
 	}
 	
 	@Override
 	default long skip(long n) throws IOException{
-		if(n==0) return 0;
-		long toSkip=Math.min(n, remaining());
-		setPos(getPos()+toSkip);
+		if(n == 0) return 0;
+		long toSkip = Math.min(n, remaining());
+		setPos(getPos() + toSkip);
 		return toSkip;
 	}
 	
 	default long remaining() throws IOException{
-		long siz=getSize();
-		long pos=getPos();
-		return siz-pos;
+		long siz = getSize();
+		long pos = getPos();
+		return siz - pos;
 	}
 	
 	////////
@@ -335,16 +335,16 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 	default int read(byte[] b, int off, int len) throws IOException{
 		Objects.checkFromIndexSize(off, len, b.length);
 		
-		int i=off;
-		for(int j=off+len;i<j;i++){
-			var bi=read();
+		int i = off;
+		for(int j = off + len; i<j; i++){
+			var bi = read();
 			if(bi<0){
-				if(i==off) return -1;
+				if(i == off) return -1;
 				break;
 			}
-			b[i]=(byte)bi;
+			b[i] = (byte)bi;
 		}
-		return i-off;
+		return i - off;
 	}
 	
 	
@@ -358,7 +358,7 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 	default void write(byte[] b, int off, int len) throws IOException{
 		Objects.checkFromIndexSize(off, len, b.length);
 		
-		for(int i=off, j=off+len;i<j;i++){
+		for(int i = off, j = off + len; i<j; i++){
 			write(b[i]);
 		}
 	}
@@ -381,8 +381,8 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 	}
 	
 	@Override
-	default ContentOutputStream outStream(){return outStream(true);}
-	default ContentOutputStream outStream(boolean trimOnClose){return new RandomOutputStream(this, trimOnClose);}
+	default ContentOutputStream outStream(){ return outStream(true); }
+	default ContentOutputStream outStream(boolean trimOnClose){ return new RandomOutputStream(this, trimOnClose); }
 	
 	default ChunkPointer posAsPtr() throws IOException{
 		return ChunkPointer.of(getPos());
@@ -390,22 +390,22 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 	
 	@Override
 	default long transferTo(ContentWriter out) throws IOException{
-		int buffSize=BATCH_BYTES;
+		int buffSize = BATCH_BYTES;
 		
-		var remaining=remaining();
+		var remaining = remaining();
 		if(remaining<buffSize){
-			buffSize=Math.max((int)remaining, 8);
+			buffSize = Math.max((int)remaining, 8);
 		}
 		
 		return transferTo(out, buffSize);
 	}
 	@Override
 	default long transferTo(OutputStream out) throws IOException{
-		int buffSize=BATCH_BYTES;
+		int buffSize = BATCH_BYTES;
 		
-		var remaining=remaining();
+		var remaining = remaining();
 		if(remaining<buffSize){
-			buffSize=Math.max((int)remaining, 8);
+			buffSize = Math.max((int)remaining, 8);
 		}
 		
 		return transferTo(out, buffSize);
@@ -420,38 +420,38 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 		}
 		public WriteChunk{
 			Objects.requireNonNull(data);
-			if(ioOffset<0) throw new IllegalArgumentException("ioOffset ("+ioOffset+") can't be negative");
-			if(dataOffset<0) throw new IllegalArgumentException("dataOffset ("+dataOffset+") can't be negative");
-			if(dataLength<0) throw new IllegalArgumentException("dataLength ("+dataLength+") can't be negative");
-			if(dataOffset+dataLength>data.length) throw new IndexOutOfBoundsException(
-				"dataOffset ("+dataOffset+") + dataLength ("+dataLength+") must be less or equal to data.length ("+data.length+")");
+			if(ioOffset<0) throw new IllegalArgumentException("ioOffset (" + ioOffset + ") can't be negative");
+			if(dataOffset<0) throw new IllegalArgumentException("dataOffset (" + dataOffset + ") can't be negative");
+			if(dataLength<0) throw new IllegalArgumentException("dataLength (" + dataLength + ") can't be negative");
+			if(dataOffset + dataLength>data.length) throw new IndexOutOfBoundsException(
+				"dataOffset (" + dataOffset + ") + dataLength (" + dataLength + ") must be less or equal to data.length (" + data.length + ")");
 		}
 		
 		public long ioEnd(){
-			return ioOffset+dataLength;
+			return ioOffset + dataLength;
 		}
 		
 		public WriteChunk withOffset(long ioOffset){
 			return new WriteChunk(ioOffset, dataOffset, dataLength, data);
 		}
 		
-		public record Split(WriteChunk before, WriteChunk after){}
+		public record Split(WriteChunk before, WriteChunk after){ }
 		
 		public Split split(int pos){
-			if(pos==0) throw new IllegalArgumentException();
+			if(pos == 0) throw new IllegalArgumentException();
 			Objects.checkIndex(pos, data.length);
 			
-			var before=new WriteChunk(ioOffset, dataOffset, pos, data);
-			var after =new WriteChunk(ioOffset+pos, dataOffset+pos, dataLength-pos, data);
+			var before = new WriteChunk(ioOffset, dataOffset, pos, data);
+			var after  = new WriteChunk(ioOffset + pos, dataOffset + pos, dataLength - pos, data);
 			
 			return new Split(before, after);
 		}
 		
 		@Override
 		public int compareTo(WriteChunk o){
-			var c=Long.compare(ioOffset, o.ioOffset);
-			if(c==0) c=Integer.compare(dataOffset, o.dataOffset);
-			if(c==0) c=Integer.compare(dataLength, o.dataLength);
+			var c = Long.compare(ioOffset, o.ioOffset);
+			if(c == 0) c = Integer.compare(dataOffset, o.dataOffset);
+			if(c == 0) c = Integer.compare(dataLength, o.dataLength);
 			return c;
 		}
 	}

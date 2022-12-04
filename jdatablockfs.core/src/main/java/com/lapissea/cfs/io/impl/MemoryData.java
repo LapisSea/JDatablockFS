@@ -29,17 +29,17 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 		
 		private int pos;
 		
-		public MemRandomIO(){}
+		public MemRandomIO(){ }
 		
 		public MemRandomIO(int pos){
 			if(pos<0) throw new IndexOutOfBoundsException(pos);
-			this.pos=pos;
+			this.pos = pos;
 		}
 		
 		@Override
 		public MemRandomIO setPos(long pos){
 			if(pos<0) throw new IndexOutOfBoundsException();
-			this.pos=Math.toIntExact(pos);
+			this.pos = Math.toIntExact(pos);
 			return this;
 		}
 		
@@ -57,9 +57,9 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 		public void setSize(long targetSize){
 			if(targetSize<0) throw new IllegalArgumentException();
 			if(transactionOpen) throw new UnsupportedOperationException();
-			var cap=getCapacity();
-			if(targetSize>cap) targetSize=cap;
-			MemoryData.this.used=Math.toIntExact(targetSize);
+			var cap = getCapacity();
+			if(targetSize>cap) targetSize = cap;
+			MemoryData.this.used = Math.toIntExact(targetSize);
 		}
 		
 		@Override
@@ -75,27 +75,27 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 			if(readOnly) throw new UnsupportedOperationException();
 			
 			MemoryData.this.setCapacity(newCapacity);
-			pos=(int)Math.min(pos, getSize());
+			pos = (int)Math.min(pos, getSize());
 			return this;
 		}
 		
 		@Override
-		public void close(){}
+		public void close(){ }
 		
 		@Override
-		public void flush(){}
+		public void flush(){ }
 		
 		@Override
 		public int read() throws IOException{
 			if(transactionOpen){
-				int b=transactionBuff.readByte(this::readAt, pos);
+				int b = transactionBuff.readByte(this::readAt, pos);
 				if(b>=0){
 					this.pos++;
 				}
 				return b;
 			}
 			
-			int remaining=(int)(getSize()-getPos());
+			int remaining = (int)(getSize() - getPos());
 			if(remaining<=0) return -1;
 			return read1(fileData, pos++)&0xFF;
 		}
@@ -103,31 +103,31 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 		@Override
 		public int read(byte[] b, int off, int len) throws IOException{
 			if(transactionOpen){
-				int read=transactionBuff.read(this::readAt, pos, b, off, len);
-				pos+=read;
+				int read = transactionBuff.read(this::readAt, pos, b, off, len);
+				pos += read;
 				return read;
 			}
 			
-			int read=readAt(pos, b, off, len);
-			if(read>=0) pos+=read;
+			int read = readAt(pos, b, off, len);
+			if(read>=0) pos += read;
 			return read;
 		}
 		
 		@Override
 		public long readWord(int len) throws IOException{
 			if(transactionOpen){
-				var word=transactionBuff.readWord(this::readAt, pos, len);
-				pos+=len;
+				var word = transactionBuff.readWord(this::readAt, pos, len);
+				pos += len;
 				return word;
 			}
 			
-			int remaining=used-pos;
+			int remaining = used - pos;
 			if(remaining<len){
 				throw new EOFException();
 			}
 			
-			long val=MemoryData.this.readWord(fileData, pos, len);
-			pos+=len;
+			long val = MemoryData.this.readWord(fileData, pos, len);
+			pos += len;
 			return val;
 		}
 		
@@ -135,10 +135,10 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 			return readAt((int)pos, b, off, len);
 		}
 		private int readAt(int pos, byte[] b, int off, int len){
-			int remaining=(int)(getSize()-pos);
+			int remaining = (int)(getSize() - pos);
 			if(remaining<=0) return -1;
 			
-			int clampedLen=Math.min(remaining, len);
+			int clampedLen = Math.min(remaining, len);
 			readN(fileData, pos, b, off, clampedLen);
 			return clampedLen;
 		}
@@ -152,12 +152,12 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 				return;
 			}
 			
-			int remaining=(int)(getCapacity()-getPos());
-			if(remaining<=0) setCapacity(Math.max(4, Math.max(getCapacity()+1, getCapacity()+1-remaining)));
+			int remaining = (int)(getCapacity() - getPos());
+			if(remaining<=0) setCapacity(Math.max(4, Math.max(getCapacity() + 1, getCapacity() + 1 - remaining)));
 			write1(fileData, pos, (byte)b);
 			logWriteEvent(pos);
 			pos++;
-			used=Math.max(used, pos);
+			used = Math.max(used, pos);
 		}
 		
 		@Override
@@ -169,18 +169,18 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 			if(readOnly) throw new UnsupportedOperationException();
 			if(transactionOpen){
 				transactionBuff.write(pos, b, off, len);
-				if(pushPos) pos+=len;
+				if(pushPos) pos += len;
 				return;
 			}
 			
-			var oldPos=pos;
+			var oldPos = pos;
 			write0(b, off, len);
 			
 			if(pushPos){
-				pos+=len;
-				used=Math.max(used, pos);
+				pos += len;
+				used = Math.max(used, pos);
 			}
-			logWriteEvent(oldPos, oldPos+len);
+			logWriteEvent(oldPos, oldPos + len);
 		}
 		
 		@Override
@@ -194,25 +194,25 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 				return;
 			}
 			
-			var required=writeData.stream().mapToLong(WriteChunk::ioEnd).max().orElseThrow();
+			var required = writeData.stream().mapToLong(WriteChunk::ioEnd).max().orElseThrow();
 			if(getCapacity()<required) setCapacity(Math.max(4, Math.max((int)(getCapacity()*4D/3), required)));
 			
-			used=Math.max(used, Math.toIntExact(required));
+			used = Math.max(used, Math.toIntExact(required));
 			
 			for(var e : writeData){
 				writeN(e.data(), e.dataOffset(), fileData, Math.toIntExact(e.ioOffset()), e.dataLength());
 			}
 			
-			if(onWrite!=null){
-				logWriteEvent(writeData.stream().flatMapToLong(e->LongStream.range(e.ioOffset(), e.ioOffset()+e.dataLength())));
+			if(onWrite != null){
+				logWriteEvent(writeData.stream().flatMapToLong(e -> LongStream.range(e.ioOffset(), e.ioOffset() + e.dataLength())));
 			}
 		}
 		
 		private void write0(byte[] b, int off, int len){
-			if(len==0) return;
+			if(len == 0) return;
 			
-			int remaining=(int)(getCapacity()-getPos());
-			if(remaining<len) setCapacity(Math.max(4, Math.max((int)(getCapacity()*4D/3), getCapacity()+len-remaining)));
+			int remaining = (int)(getCapacity() - getPos());
+			if(remaining<len) setCapacity(Math.max(4, Math.max((int)(getCapacity()*4D/3), getCapacity() + len - remaining)));
 			
 			writeN(b, off, fileData, pos, len);
 		}
@@ -221,27 +221,27 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 		public void writeWord(long v, int len) throws IOException{
 			if(transactionOpen){
 				transactionBuff.writeWord(pos, v, len);
-				pos+=len;
+				pos += len;
 				return;
 			}
 			
-			if(len==0) return;
+			if(len == 0) return;
 			
-			int remaining=(int)(getCapacity()-getPos());
-			if(remaining<len) setCapacity(Math.max(4, Math.max((int)(getCapacity()*4D/3), getCapacity()+len-remaining)));
+			int remaining = (int)(getCapacity() - getPos());
+			if(remaining<len) setCapacity(Math.max(4, Math.max((int)(getCapacity()*4D/3), getCapacity() + len - remaining)));
 			
 			MemoryData.this.writeWord(v, fileData, pos, len);
-			var oldPos=pos;
-			pos+=len;
-			used=Math.max(used, pos);
-			logWriteEvent(oldPos, oldPos+len);
+			var oldPos = pos;
+			pos += len;
+			used = Math.max(used, pos);
+			logWriteEvent(oldPos, oldPos + len);
 		}
 		
 		@Override
 		public void fillZero(long requestedMemory) throws IOException{
 			if(readOnly) throw new UnsupportedOperationException();
 			
-			IUtils.zeroFill((b, off, len)->write(b, off, len, false), requestedMemory);
+			IUtils.zeroFill((b, off, len) -> write(b, off, len, false), requestedMemory);
 		}
 		@Override
 		public boolean isReadOnly(){
@@ -250,36 +250,36 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 		
 		@Override
 		public String toString(){
-			int count=64;
+			int count = 64;
 			
-			int start=(int)getPos(), end=start+count;
+			int start = (int)getPos(), end = start + count;
 			
-			var used=(int)getSize();
+			var used = (int)getSize();
 			
-			int overshoot=end-used;
+			int overshoot = end - used;
 			if(overshoot>0){
-				start=Math.max(0, start-overshoot);
-				end=used;
+				start = Math.max(0, start - overshoot);
+				end = used;
 			}
 			
-			String transactionStr=transactionOpen?", transaction: {"+transactionBuff.infoString()+"}":"";
+			String transactionStr = transactionOpen? ", transaction: {" + transactionBuff.infoString() + "}" : "";
 			
-			String name=getClass().getSimpleName();
-			String pre ="{pos="+getPos()+transactionStr;
-			if(start!=0||start!=end){
-				pre+=", data=";
+			String name = getClass().getSimpleName();
+			String pre  = "{pos=" + getPos() + transactionStr;
+			if(start != 0 || start != end){
+				pre += ", data=";
 			}
-			if(start!=0) pre+=start+" ... ";
+			if(start != 0) pre += start + " ... ";
 			
-			var more=used-end;
-			var post=more==0?"}":" ... "+more+"}";
+			var more = used - end;
+			var post = more == 0? "}" : " ... " + more + "}";
 			
-			var result=new StringBuilder(name.length()+pre.length()+post.length()+end-start);
+			var result = new StringBuilder(name.length() + pre.length() + post.length() + end - start);
 			
 			result.append(name).append(pre);
-			try(var io=ioAt(start)){
-				for(int i=start;i<end-1;i++){
-					char c=(char)io.readInt1();
+			try(var io = ioAt(start)){
+				for(int i = start; i<end - 1; i++){
+					char c = (char)io.readInt1();
 					result.append(switch(c){
 						case 0 -> '␀';
 						case '\n' -> '↵';
@@ -312,27 +312,27 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 	
 	@SuppressWarnings("unused")
 	private       boolean             transactionOpen;
-	private final IOTransactionBuffer transactionBuff=new IOTransactionBuffer();
+	private final IOTransactionBuffer transactionBuff = new IOTransactionBuffer();
 	
 	private MemoryData(DataType fileData, Builder info){
 		
-		var ok=getLength(fileData)>=used;
+		var ok = getLength(fileData)>=used;
 		if(!ok) throw new IllegalArgumentException(TextUtil.toString(getLength(fileData), ">=", used));
 		
-		this.fileData=fileData;
-		this.used=info.getUsed()==-1?getLength(fileData):info.getUsed();
-		this.readOnly=info.isReadOnly();
+		this.fileData = fileData;
+		this.used = info.getUsed() == -1? getLength(fileData) : info.getUsed();
+		this.readOnly = info.isReadOnly();
 		
-		onWrite=info.getOnWrite();
+		onWrite = info.getOnWrite();
 	}
 	
 	private void logWriteEvent(long single){
-		if(onWrite!=null){
+		if(onWrite != null){
 			logWriteEvent(LongStream.of(single));
 		}
 	}
 	private void logWriteEvent(long start, long end){
-		if(onWrite!=null){
+		if(onWrite != null){
 			logWriteEvent(LongStream.range(start, end));
 		}
 	}
@@ -368,19 +368,19 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 	private void setCapacity(int newCapacity){
 		if(readOnly) throw new UnsupportedOperationException();
 		if(transactionOpen){
-			var siz=transactionBuff.getCapacity(used);
+			var siz = transactionBuff.getCapacity(used);
 			transactionBuff.capacityChange(Math.min(siz, newCapacity));
 			return;
 		}
 		
-		long lastCapacity=getLength(fileData);
-		if(lastCapacity==newCapacity) return;
+		long lastCapacity = getLength(fileData);
+		if(lastCapacity == newCapacity) return;
 		
-		if(lastCapacity<newCapacity||lastCapacity>newCapacity*2L){
-			var newc=lastCapacity<newCapacity?(int)Math.max(newCapacity, lastCapacity*4/3):newCapacity;
-			fileData=resize(fileData, newc);
+		if(lastCapacity<newCapacity || lastCapacity>newCapacity*2L){
+			var newc = lastCapacity<newCapacity? (int)Math.max(newCapacity, lastCapacity*4/3) : newCapacity;
+			fileData = resize(fileData, newc);
 		}
-		used=Math.min(used, newCapacity);
+		used = Math.min(used, newCapacity);
 		
 		logWriteEvent(lastCapacity, newCapacity);
 	}
@@ -394,7 +394,7 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 	
 	static{
 		try{
-			TRANSACTION_OPEN=MethodHandles.lookup().findVarHandle(MemoryData.class, "transactionOpen", boolean.class);
+			TRANSACTION_OPEN = MethodHandles.lookup().findVarHandle(MemoryData.class, "transactionOpen", boolean.class);
 		}catch(ReflectiveOperationException e){
 			throw new Error(e);
 		}
@@ -408,20 +408,20 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 	@Override
 	public byte[] readAll() throws IOException{
 		if(transactionOpen) return IOInterface.super.readAll();
-		var copy=new byte[used];
+		var copy = new byte[used];
 		readN(fileData, 0, copy, 0, used);
 		return copy;
 	}
 	
 	@Override
 	public String toString(){
-		return MemoryData.class.getSimpleName()+"."+getClass().getSimpleName()+"#"+Integer.toHexString(hashCode());
+		return MemoryData.class.getSimpleName() + "." + getClass().getSimpleName() + "#" + Integer.toHexString(hashCode());
 	}
 	
 	@Override
 	public boolean equals(Object o){
-		return this==o||
-		       o instanceof MemoryData<?> that&&
+		return this == o ||
+		       o instanceof MemoryData<?> that &&
 		       fileData.equals(that.fileData);
 	}
 	
@@ -456,13 +456,13 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 	@SuppressWarnings("unused")
 	public static class Builder{
 		private UnsafeSupplier<Object, IOException> dataProducer;
-		private boolean                             readOnly=false;
-		private int                                 used    =-1;
+		private boolean                             readOnly = false;
+		private int                                 used     = -1;
 		private EventLogger                         onWrite;
 		
 		public Builder withInitial(DataInitializer init){
-			this.dataProducer=()->{
-				var builder=new ContentOutputBuilder(32);
+			this.dataProducer = () -> {
+				var builder = new ContentOutputBuilder(32);
 				init.init(builder);
 				return builder.toByteArray();
 			};
@@ -470,22 +470,22 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 		}
 		
 		public Builder withCapacity(int capacity){
-			this.dataProducer=()->new byte[capacity];
+			this.dataProducer = () -> new byte[capacity];
 			return this;
 		}
 		public Builder withData(IOInterface data){
-			this.dataProducer=data::readAll;
+			this.dataProducer = data::readAll;
 			return this;
 		}
 		
 		public Builder withRaw(byte[] data){
-			var clone=data.clone();
-			this.dataProducer=()->clone;
+			var clone = data.clone();
+			this.dataProducer = () -> clone;
 			return this;
 		}
 		
 		public Builder withRaw(ByteBuffer data){
-			var d=ByteBuffer.allocate(data.limit());
+			var d = ByteBuffer.allocate(data.limit());
 			d.put(data.position(0));
 			d.position(0);
 			return withRaw0(d);
@@ -493,27 +493,27 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 		
 		private Builder withRaw0(Object data){
 			Objects.requireNonNull(data);
-			this.dataProducer=()->data;
+			this.dataProducer = () -> data;
 			return this;
 		}
 		
 		public Builder asReadOnly(){
-			this.readOnly=true;
+			this.readOnly = true;
 			return this;
 		}
 		
 		public Builder withUsedLength(int used){
-			this.used=used;
+			this.used = used;
 			return this;
 		}
 		
 		public Builder withOnWrite(EventLogger onWrite){
-			this.onWrite=onWrite;
+			this.onWrite = onWrite;
 			return this;
 		}
 		
 		private Object readData() throws IOException{
-			if(dataProducer==null) return withCapacity(32).readData();
+			if(dataProducer == null) return withCapacity(32).readData();
 			
 			return dataProducer.get();
 		}
@@ -533,16 +533,16 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 		public MemoryData<?> build(){
 			Object actualData;
 			try{
-				actualData=readData();
+				actualData = readData();
 			}catch(IOException e){
 				throw new RuntimeException(e);
 			}
-			dataProducer=null;
+			dataProducer = null;
 			
 			return switch(actualData){
 				case byte[] data -> new Arr(data, this);
 				case ByteBuffer data -> new Buff(data, this);
-				default -> throw new RuntimeException("unknown data type "+actualData);
+				default -> throw new RuntimeException("unknown data type " + actualData);
 			};
 		}
 	}
@@ -572,7 +572,7 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 		}
 		@Override
 		protected void write1(byte[] fileData, int fileOffset, byte b){
-			fileData[fileOffset]=b;
+			fileData[fileOffset] = b;
 		}
 		@Override
 		protected void readN(byte[] fileData, int fileOffset, byte[] dest, int off, int len){
@@ -625,7 +625,7 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 		}
 		@Override
 		protected ByteBuffer resize(ByteBuffer oldFileData, int newFileSize){
-			ByteBuffer newFile=ByteBuffer.allocate(newFileSize);
+			ByteBuffer newFile = ByteBuffer.allocate(newFileSize);
 			oldFileData.position(0);
 			newFile.put(oldFileData);
 			newFile.position(0);
@@ -634,20 +634,20 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 		
 		@Override
 		protected long readWord(ByteBuffer fileData, int fileOffset, int len){
-			final var lm1=len-1;
-			long      val=0;
-			for(int i=0;i<len;i++){
-				val|=(fileData.get(fileOffset+i)&255L)<<((lm1-i)*8);
+			final var lm1 = len - 1;
+			long      val = 0;
+			for(int i = 0; i<len; i++){
+				val |= (fileData.get(fileOffset + i)&255L)<<((lm1 - i)*8);
 			}
 			return val;
 		}
 		
 		@Override
 		protected void writeWord(long value, ByteBuffer fileData, int fileOffset, int len){
-			final var lm1=len-1;
+			final var lm1 = len - 1;
 			
-			for(int i=0;i<len;i++){
-				fileData.put(fileOffset+i, (byte)(value >>> ((lm1-i)*8)));
+			for(int i = 0; i<len; i++){
+				fileData.put(fileOffset + i, (byte)(value >>> ((lm1 - i)*8)));
 			}
 		}
 		

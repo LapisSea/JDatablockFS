@@ -9,7 +9,7 @@ import java.util.stream.Stream;
 
 public class ReferenceMemoryIOMap<K, V> implements IOMap<K, V>{
 	
-	private final HashMap<K, V> data=new HashMap<>();
+	private final HashMap<K, V> data = new HashMap<>();
 	
 	@Override
 	public long size(){
@@ -20,7 +20,7 @@ public class ReferenceMemoryIOMap<K, V> implements IOMap<K, V>{
 	public IOEntry.Modifiable<K, V> getEntry(K key){
 		if(!data.containsKey(key)) return null;
 		
-		var k=data.get(key);
+		var k = data.get(key);
 		return new IOEntry.Modifiable.Abstract<>(){
 			@Override
 			public K getKey(){
@@ -52,7 +52,7 @@ public class ReferenceMemoryIOMap<K, V> implements IOMap<K, V>{
 	}
 	@Override
 	public boolean remove(K key) throws IOException{
-		var had=data.containsKey(key);
+		var had = data.containsKey(key);
 		data.remove(key);
 		return had;
 	}

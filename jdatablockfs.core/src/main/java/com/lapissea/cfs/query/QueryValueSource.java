@@ -33,7 +33,7 @@ public sealed interface QueryValueSource{
 	record GetArray(int index, QueryValueSource source) implements QueryValueSource{
 		@Override
 		public String toString(){
-			return source+"["+index+"]";
+			return source + "[" + index + "]";
 		}
 		
 		@Override
@@ -51,16 +51,16 @@ public sealed interface QueryValueSource{
 		public String toString(){
 			return switch(value){
 				case null -> "null";
-				case String s -> "'"+s+"'";
-				case Float s -> s+"F";
-				case Double s -> s+"D";
-				case Long s -> s+"L";
-				default -> value+"";
+				case String s -> "'" + s + "'";
+				case Float s -> s + "F";
+				case Double s -> s + "D";
+				case Long s -> s + "L";
+				default -> value + "";
 			};
 		}
 		@Override
 		public Class<?> type(){
-			return value==null?Object.class:value.getClass();
+			return value == null? Object.class : value.getClass();
 		}
 	}
 	
@@ -87,7 +87,7 @@ public sealed interface QueryValueSource{
 			}
 			@Override
 			public String toString(){
-				return "#"+name();
+				return "#" + name();
 			}
 		}
 		
@@ -107,13 +107,13 @@ public sealed interface QueryValueSource{
 			}
 			@Override
 			public String toString(){
-				return "#"+name();
+				return "#" + name();
 			}
 		}
 		
 		record Getter(Method method, String name) implements Field{
 			private static String strip(String name){
-				if(name.length()>=4&&Character.isUpperCase(name.charAt(3))&&name.startsWith("get")){
+				if(name.length()>=4 && Character.isUpperCase(name.charAt(3)) && name.startsWith("get")){
 					return TextUtil.firstToLowerCase(name.substring(3));
 				}
 				return name;
@@ -132,7 +132,7 @@ public sealed interface QueryValueSource{
 			}
 			@Override
 			public String toString(){
-				return "#"+name();
+				return "#" + name();
 			}
 		}
 	}
@@ -140,7 +140,7 @@ public sealed interface QueryValueSource{
 	record Modulus(QueryValueSource src, QueryValueSource mod) implements QueryValueSource{
 		@Override
 		public String toString(){
-			return src+"%"+mod;
+			return src + "%" + mod;
 		}
 		
 		@Override
@@ -156,7 +156,7 @@ public sealed interface QueryValueSource{
 	record Add(QueryValueSource l, QueryValueSource r) implements QueryValueSource{
 		@Override
 		public String toString(){
-			return l+" + "+r;
+			return l + " + " + r;
 		}
 		
 		@Override
@@ -165,9 +165,9 @@ public sealed interface QueryValueSource{
 		}
 		@Override
 		public Class<?> type(){
-			var l=this.l.type();
-			var r=this.r.type();
-			if(l!=null&&r!=null){
+			var l = this.l.type();
+			var r = this.r.type();
+			if(l != null && r != null){
 				return QueryUtils.addTyp(l, r);
 			}
 			return null;

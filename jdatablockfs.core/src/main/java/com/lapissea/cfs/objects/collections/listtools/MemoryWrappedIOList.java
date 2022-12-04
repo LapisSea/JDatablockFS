@@ -18,18 +18,18 @@ public class MemoryWrappedIOList<T> implements IOList<T>{
 	private       Class<T>    elementType;
 	
 	public MemoryWrappedIOList(List<T> data, Supplier<T> typeConstructor){
-		this.data=data;
-		this.typeConstructor=typeConstructor;
+		this.data = data;
+		this.typeConstructor = typeConstructor;
 		
 		Class<?> c;
-		if(typeConstructor!=null) c=typeConstructor.get().getClass();
-		else c=data.stream().filter(Objects::nonNull).findAny().map(Object::getClass).orElse(null);
-		elementType=(Class<T>)c;
+		if(typeConstructor != null) c = typeConstructor.get().getClass();
+		else c = data.stream().filter(Objects::nonNull).findAny().map(Object::getClass).orElse(null);
+		elementType = (Class<T>)c;
 	}
 	
 	@Override
 	public Class<T> elementType(){
-		if(elementType==null) elementType=(Class<T>)data.stream().filter(Objects::nonNull).findAny().map(Object::getClass).orElseThrow();
+		if(elementType == null) elementType = (Class<T>)data.stream().filter(Objects::nonNull).findAny().map(Object::getClass).orElseThrow();
 		return elementType;
 	}
 	
@@ -64,9 +64,9 @@ public class MemoryWrappedIOList<T> implements IOList<T>{
 	
 	@Override
 	public T addNew(UnsafeConsumer<T, IOException> initializer) throws IOException{
-		if(typeConstructor==null) throw new UnsupportedEncodingException();
-		T t=typeConstructor.get();
-		if(initializer!=null){
+		if(typeConstructor == null) throw new UnsupportedEncodingException();
+		T t = typeConstructor.get();
+		if(initializer != null){
 			initializer.accept(t);
 		}
 		add(t);
@@ -75,9 +75,9 @@ public class MemoryWrappedIOList<T> implements IOList<T>{
 	
 	@Override
 	public void addMultipleNew(long count, UnsafeConsumer<T, IOException> initializer) throws IOException{
-		if(typeConstructor==null) throw new UnsupportedEncodingException();
-		if(data instanceof ArrayList<T> l) l.ensureCapacity(Math.toIntExact(l.size()+count));
-		for(long i=0;i<count;i++){
+		if(typeConstructor == null) throw new UnsupportedEncodingException();
+		if(data instanceof ArrayList<T> l) l.ensureCapacity(Math.toIntExact(l.size() + count));
+		for(long i = 0; i<count; i++){
 			addNew(initializer);
 		}
 	}
@@ -108,7 +108,7 @@ public class MemoryWrappedIOList<T> implements IOList<T>{
 	
 	@Override
 	public String toString(){
-		StringJoiner sj=new StringJoiner(", ", "RAM{size: "+size()+"}"+"[", "]");
+		StringJoiner sj = new StringJoiner(", ", "RAM{size: " + size() + "}" + "[", "]");
 		IOList.elementSummary(sj, this);
 		return sj.toString();
 	}

@@ -12,7 +12,7 @@ public class NoIOField<Inst extends IOInstance<Inst>, ValueType> extends IOField
 	
 	public NoIOField(FieldAccessor<Inst> accessor, SizeDescriptor<Inst> sizeDescriptor){
 		super(accessor);
-		this.sizeDescriptor=sizeDescriptor;
+		this.sizeDescriptor = sizeDescriptor;
 	}
 	
 	@Override

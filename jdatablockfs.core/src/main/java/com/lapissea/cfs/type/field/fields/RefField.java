@@ -36,7 +36,7 @@ public abstract class RefField<T extends IOInstance<T>, Type> extends IOField<T,
 		
 		public NoIO(FieldAccessor<T> accessor, SizeDescriptor<T> sizeDescriptor){
 			super(accessor);
-			this.sizeDescriptor=sizeDescriptor;
+			this.sizeDescriptor = sizeDescriptor;
 		}
 		
 		@Override
@@ -61,7 +61,7 @@ public abstract class RefField<T extends IOInstance<T>, Type> extends IOField<T,
 		@Override
 		public void init(){
 			super.init();
-			referenceField=getDependencies().requireExact(Reference.class, IOFieldTools.makeRefName(getAccessor()));
+			referenceField = getDependencies().requireExact(Reference.class, IOFieldTools.makeRefName(getAccessor()));
 		}
 		
 		protected void setRef(T instance, Reference newRef){
@@ -73,11 +73,11 @@ public abstract class RefField<T extends IOInstance<T>, Type> extends IOField<T,
 		
 		@Override
 		public Reference getReference(T instance){
-			var ref=getRef(instance);
+			var ref = getRef(instance);
 			if(ref.isNull()){
 				return switch(getNullability()){
 					case NOT_NULL -> throw new NullPointerException();
-					case NULLABLE -> get(null, instance)!=null?null:ref;
+					case NULLABLE -> get(null, instance) != null? null : ref;
 					case DEFAULT_IF_NULL -> null;
 				};
 				
@@ -90,34 +90,34 @@ public abstract class RefField<T extends IOInstance<T>, Type> extends IOField<T,
 			return List.of(new ValueGeneratorInfo<>(referenceField, new ValueGenerator<>(){
 				@Override
 				public boolean shouldGenerate(VarPool<T> ioPool, DataProvider provider, T instance){
-					boolean refNull=switch(getNullability()){
+					boolean refNull = switch(getNullability()){
 						case NOT_NULL, DEFAULT_IF_NULL -> false;
 						case NULLABLE -> {
-							var val=get(ioPool, instance);
-							yield val==null;
+							var val = get(ioPool, instance);
+							yield val == null;
 						}
 					};
 					
-					var     ref      =getRef(instance);
-					boolean isRefNull=ref==null||ref.isNull();
+					var     ref       = getRef(instance);
+					boolean isRefNull = ref == null || ref.isNull();
 					
-					return refNull!=isRefNull;
+					return refNull != isRefNull;
 				}
 				@Override
 				public Reference generate(VarPool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException{
-					var val=get(ioPool, instance);
+					var val = get(ioPool, instance);
 					
-					if(val==null){
-						if(allowExternalMod&&getNullability()==DEFAULT_IF_NULL){
-							val=newDefault();
+					if(val == null){
+						if(allowExternalMod && getNullability() == DEFAULT_IF_NULL){
+							val = newDefault();
 						}else{
 							return new Reference();
 						}
 					}
 					
 					if(DEBUG_VALIDATION){
-						var ref=getRef(instance);
-						if(ref!=null&&!ref.isNull()) throw new IllegalStateException();
+						var ref = getRef(instance);
+						if(ref != null && !ref.isNull()) throw new IllegalStateException();
 					}
 					if(!allowExternalMod) throw new RuntimeException("data modification should not be done here");
 					return allocNew(provider, val);
@@ -134,7 +134,7 @@ public abstract class RefField<T extends IOInstance<T>, Type> extends IOField<T,
 	}
 	
 	public void allocateUnmanaged(T instance) throws IOException{
-		IOInstance.Unmanaged<?> unmanaged=(IOInstance.Unmanaged<?>)instance;
+		IOInstance.Unmanaged<?> unmanaged = (IOInstance.Unmanaged<?>)instance;
 		allocate(instance, unmanaged.getDataProvider(), unmanaged.getGenerics());
 	}
 	

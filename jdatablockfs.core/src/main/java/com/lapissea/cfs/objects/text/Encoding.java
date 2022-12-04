@@ -41,58 +41,58 @@ class Encoding{
 			     UTF_8.newDecoder().onUnmappableCharacter(REPORT).onMalformedInput(REPORT));
 		}
 		
-		private static final ThreadLocal<UTF> UTFS=ThreadLocal.withInitial(UTF::new);
+		private static final ThreadLocal<UTF> UTFS = ThreadLocal.withInitial(UTF::new);
 		
-		private static UTF get(){return UTFS.get();}
+		private static UTF get(){ return UTFS.get(); }
 	}
 	
 	private record TableCoding(byte[] indexTable, int offset, char[] chars, int bits, char[] ranges, int optimizedBlockCharCount, int optimizedBlockBytes){
 		static TableCoding of(char... table){
 			assert table.length<=Byte.MAX_VALUE;
 			
-			int bits=1;
+			int bits = 1;
 			while(table.length>1<<bits) bits++;
-			assert table.length==(1<<bits);
+			assert table.length == (1<<bits);
 			
-			int min=IntStream.range(0, table.length).map(i->table[i]).min().orElseThrow();
-			int max=IntStream.range(0, table.length).map(i->table[i]).max().orElse(-2)+1;
+			int min = IntStream.range(0, table.length).map(i -> table[i]).min().orElseThrow();
+			int max = IntStream.range(0, table.length).map(i -> table[i]).max().orElse(-2) + 1;
 			
-			byte[] tableIndex=new byte[max-min];
+			byte[] tableIndex = new byte[max - min];
 			Arrays.fill(tableIndex, (byte)0xFF);
 			
-			for(int i=0, j=table.length;i<j;i++){
-				char c=table[i];
-				tableIndex[c-min]=(byte)i;
+			for(int i = 0, j = table.length; i<j; i++){
+				char c = table[i];
+				tableIndex[c - min] = (byte)i;
 			}
-			var ranges=buildRanges(table);
+			var ranges = buildRanges(table);
 			
 			
 			
 			int optimizedBlockCount;
 			if(GlobalConfig.configFlag("abBenchmark.disableBlockCoding", false)){
-				optimizedBlockCount=-1;
+				optimizedBlockCount = -1;
 			}else{
-				optimizedBlockCount=1;
-				while((optimizedBlockCount*bits)%Byte.SIZE!=0){
+				optimizedBlockCount = 1;
+				while((optimizedBlockCount*bits)%Byte.SIZE != 0){
 					optimizedBlockCount++;
 					if(optimizedBlockCount*bits>Long.SIZE){
-						optimizedBlockCount=-1;
+						optimizedBlockCount = -1;
 						break;
 					}
 				}
 			}
 			
-			if(optimizedBlockCount!=-1){
-				int optimizedBlockFillRepeats=1;
+			if(optimizedBlockCount != -1){
+				int optimizedBlockFillRepeats = 1;
 				while(true){
-					var newOptimizedBlockCount=optimizedBlockCount*(optimizedBlockFillRepeats+1);
+					var newOptimizedBlockCount = optimizedBlockCount*(optimizedBlockFillRepeats + 1);
 					if(newOptimizedBlockCount*bits>Long.SIZE) break;
 					optimizedBlockFillRepeats++;
 				}
-				optimizedBlockCount*=optimizedBlockFillRepeats;
+				optimizedBlockCount *= optimizedBlockFillRepeats;
 			}
 			
-			int optimizedBlockBytes=optimizedBlockCount*bits/Byte.SIZE;
+			int optimizedBlockBytes = optimizedBlockCount*bits/Byte.SIZE;
 			
 			
 			return new TableCoding(tableIndex, min, table, bits, ranges, optimizedBlockCount, optimizedBlockBytes);
@@ -100,21 +100,21 @@ class Encoding{
 		
 		@SuppressWarnings("PointlessArithmeticExpression")
 		private static char[] buildRanges(char[] table){
-			List<PairM<Character, Character>> rangeBuilder=new ArrayList<>();
+			List<PairM<Character, Character>> rangeBuilder = new ArrayList<>();
 			cLoop:
 			for(char c : table){
 				
 				merging:
 				while(rangeBuilder.size()>1){
-					for(int beforeIndex=0;beforeIndex<rangeBuilder.size();beforeIndex++){
-						var before=rangeBuilder.get(beforeIndex);
+					for(int beforeIndex = 0; beforeIndex<rangeBuilder.size(); beforeIndex++){
+						var before = rangeBuilder.get(beforeIndex);
 						
-						for(int afterIndex=0;afterIndex<rangeBuilder.size();afterIndex++){
-							if(afterIndex==beforeIndex) continue;
-							var after=rangeBuilder.get(afterIndex);
+						for(int afterIndex = 0; afterIndex<rangeBuilder.size(); afterIndex++){
+							if(afterIndex == beforeIndex) continue;
+							var after = rangeBuilder.get(afterIndex);
 							
 							if(before.obj2.equals(after.obj1)){
-								before.obj2=after.obj2;
+								before.obj2 = after.obj2;
 								rangeBuilder.remove(afterIndex);
 								continue merging;
 							}
@@ -124,16 +124,16 @@ class Encoding{
 				}
 				
 				for(var range : rangeBuilder){
-					var from=range.obj1;
-					var to  =range.obj2;
-					if(from<=c&&c<=to){
+					var from = range.obj1;
+					var to   = range.obj2;
+					if(from<=c && c<=to){
 						continue cLoop;
 					}
-					if(from-1==c){
+					if(from - 1 == c){
 						range.obj1--;
 						continue cLoop;
 					}
-					if(to+1==c){
+					if(to + 1 == c){
 						range.obj2++;
 						continue cLoop;
 					}
@@ -142,11 +142,11 @@ class Encoding{
 				rangeBuilder.add(new PairM<>(c, c));
 			}
 			
-			char[] ranges=new char[rangeBuilder.size()*2];
-			for(int i=0;i<rangeBuilder.size();i++){
-				var r=rangeBuilder.get(i);
-				ranges[i*2+0]=r.obj1;
-				ranges[i*2+1]=r.obj2;
+			char[] ranges = new char[rangeBuilder.size()*2];
+			for(int i = 0; i<rangeBuilder.size(); i++){
+				var r = rangeBuilder.get(i);
+				ranges[i*2 + 0] = r.obj1;
+				ranges[i*2 + 1] = r.obj2;
 			}
 			
 			if(DEBUG_VALIDATION){
@@ -157,34 +157,34 @@ class Encoding{
 		}
 		
 		private static void validateRanges(char[] table, char[] ranges){
-			for(char c=Character.MIN_VALUE;c<Character.MAX_VALUE;c++){
+			for(char c = Character.MIN_VALUE; c<Character.MAX_VALUE; c++){
 				
-				boolean oldR=false;
+				boolean oldR = false;
 				for(char t : table){
-					if(t==c){
-						oldR=true;
+					if(t == c){
+						oldR = true;
 						break;
 					}
 				}
 				
-				boolean newR=false;
-				for(int i=0;i<ranges.length;i+=2){
-					int from=ranges[i];
-					int to  =ranges[i+1];
-					if(from<=c&&c<=to){
-						newR=true;
+				boolean newR = false;
+				for(int i = 0; i<ranges.length; i += 2){
+					int from = ranges[i];
+					int to   = ranges[i + 1];
+					if(from<=c && c<=to){
+						newR = true;
 						break;
 					}
 				}
 				
-				if(oldR!=newR){
-					throw new RuntimeException(c+"");
+				if(oldR != newR){
+					throw new RuntimeException(c + "");
 				}
 			}
 		}
 		
-		private int encode(char c)    {return indexTable[c-offset];}
-		private char decode(int index){return chars[index];}
+		private int encode(char c)    { return indexTable[c - offset]; }
+		private char decode(int index){ return chars[index]; }
 		
 		private int calcSize(String str){
 			return calcSize(str.length());
@@ -195,26 +195,26 @@ class Encoding{
 		
 		
 		private void write(ContentWriter w, String s) throws IOException{
-			int i=0;
+			int i = 0;
 			
-			if(optimizedBlockCharCount!=-1&&s.length()>=optimizedBlockCharCount){
-				byte[] buf=new byte[Long.BYTES];
-				var    lb =ByteBuffer.wrap(buf).order(ByteOrder.LITTLE_ENDIAN).asLongBuffer();
+			if(optimizedBlockCharCount != -1 && s.length()>=optimizedBlockCharCount){
+				byte[] buf = new byte[Long.BYTES];
+				var    lb  = ByteBuffer.wrap(buf).order(ByteOrder.LITTLE_ENDIAN).asLongBuffer();
 				
-				while(s.length()-i>=optimizedBlockCharCount){
-					long acum =0;
-					int  start=i;
-					for(int j=0;j<optimizedBlockCharCount;j++){
-						acum|=((long)encode(s.charAt(start+j)))<<(bits*j);
+				while(s.length() - i>=optimizedBlockCharCount){
+					long acum  = 0;
+					int  start = i;
+					for(int j = 0; j<optimizedBlockCharCount; j++){
+						acum |= ((long)encode(s.charAt(start + j)))<<(bits*j);
 					}
 					lb.put(0, acum);
 					w.write(buf, 0, optimizedBlockBytes);
-					i+=optimizedBlockCharCount;
+					i += optimizedBlockCharCount;
 				}
 			}
 			if(i<s.length()){
-				try(var stream=new BitOutputStream(w)){
-					for(;i<s.length();i++){
+				try(var stream = new BitOutputStream(w)){
+					for(; i<s.length(); i++){
 						stream.writeBits(encode(s.charAt(i)), bits);
 					}
 				}
@@ -222,30 +222,30 @@ class Encoding{
 		}
 		
 		private void read(ContentInputStream w, int charCount, StringBuilder sb) throws IOException{
-			int i=0;
+			int i = 0;
 			
-			if(optimizedBlockCharCount!=-1&&charCount>=optimizedBlockCharCount){
-				byte[] buf =new byte[Long.BYTES];
-				var    lb  =ByteBuffer.wrap(buf).order(ByteOrder.LITTLE_ENDIAN).asLongBuffer();
-				var    mask=BitUtils.makeMask(bits);
+			if(optimizedBlockCharCount != -1 && charCount>=optimizedBlockCharCount){
+				byte[] buf  = new byte[Long.BYTES];
+				var    lb   = ByteBuffer.wrap(buf).order(ByteOrder.LITTLE_ENDIAN).asLongBuffer();
+				var    mask = BitUtils.makeMask(bits);
 				
-				char[] dest=new char[optimizedBlockCharCount];
+				char[] dest = new char[optimizedBlockCharCount];
 				
-				while(charCount-i>=optimizedBlockCharCount){
+				while(charCount - i>=optimizedBlockCharCount){
 					w.readFully(buf, 0, optimizedBlockBytes);
-					var acum=lb.get(0);
-					for(int j=0;j<optimizedBlockCharCount;j++){
-						dest[j]=decode((int)((acum>>(bits*j))&mask));
+					var acum = lb.get(0);
+					for(int j = 0; j<optimizedBlockCharCount; j++){
+						dest[j] = decode((int)((acum>>(bits*j))&mask));
 					}
 					sb.append(dest);
-					i+=optimizedBlockCharCount;
+					i += optimizedBlockCharCount;
 				}
 			}
 			if(i<charCount){
-				try(var stream=new BitInputStream(w, charCount-i)){
-					for(;i<charCount;i++){
-						int  index=(int)stream.readBits(bits);
-						char c    =decode(index);
+				try(var stream = new BitInputStream(w, charCount - i)){
+					for(; i<charCount; i++){
+						int  index = (int)stream.readBits(bits);
+						char c     = decode(index);
 						
 						sb.append(c);
 					}
@@ -253,11 +253,11 @@ class Encoding{
 			}
 		}
 		private boolean isCompatible(String s){
-			return s.chars().allMatch(c->{
-				for(int i=0;i<ranges.length;i+=2){
-					int from=ranges[i];
-					int to  =ranges[i+1];
-					if(from<=c&&c<=to){
+			return s.chars().allMatch(c -> {
+				for(int i = 0; i<ranges.length; i += 2){
+					int from = ranges[i];
+					int to   = ranges[i + 1];
+					if(from<=c && c<=to){
 						return true;
 					}
 				}
@@ -297,10 +297,10 @@ class Encoding{
 		)),
 		ASCII(
 			1, String::length,
-			s->s.chars().allMatch(c->c<0xFF),
-			(w, text)->w.write(text.getBytes(US_ASCII)),
-			(r, charCount, dest)->{
-				var data=r.readInts1(charCount);
+			s -> s.chars().allMatch(c -> c<0xFF),
+			(w, text) -> w.write(text.getBytes(US_ASCII)),
+			(r, charCount, dest) -> {
+				var data = r.readInts1(charCount);
 				dest.append(new CharSequence(){
 					@Override
 					public int length(){
@@ -318,31 +318,31 @@ class Encoding{
 			}),
 		UTF8(
 			1.1F, CharEncoding::utf8Len,
-			s->tryEncode(UTF.get().utf8Enc(), s),
-			(w, s)->encode(UTF.get().utf8Enc(), s, w),
-			(w, charCount, dest)->{
-				char[] buff     =new char[Math.min(1024, charCount)];
-				int    remaining=charCount;
+			s -> tryEncode(UTF.get().utf8Enc(), s),
+			(w, s) -> encode(UTF.get().utf8Enc(), s, w),
+			(w, charCount, dest) -> {
+				char[] buff      = new char[Math.min(1024, charCount)];
+				int    remaining = charCount;
 				
-				try(Reader reader=new InputStreamReader(w, UTF.get().utf8Dec())){
+				try(Reader reader = new InputStreamReader(w, UTF.get().utf8Dec())){
 					while(remaining>0){
-						int read=reader.read(buff, 0, Math.min(buff.length, remaining));
-						if(read==-1) throw new EOFException();
+						int read = reader.read(buff, 0, Math.min(buff.length, remaining));
+						if(read == -1) throw new EOFException();
 						dest.append(buff, 0, read);
-						remaining-=read;
+						remaining -= read;
 					}
 				}
 				
 			});
 		
-		public static final CharEncoding DEFAULT=ASCII;
+		public static final CharEncoding DEFAULT = ASCII;
 		
-		private static final CharEncoding[] SORTED=Arrays.stream(CharEncoding.values()).sorted(Comparator.comparingDouble(c->c.sizeWeight)).toArray(CharEncoding[]::new);
+		private static final CharEncoding[] SORTED = Arrays.stream(CharEncoding.values()).sorted(Comparator.comparingDouble(c -> c.sizeWeight)).toArray(CharEncoding[]::new);
 		public static CharEncoding findBest(String data){
 			if(data.isEmpty()){
 				return DEFAULT;
 			}
-			if(data.length()==1){
+			if(data.length() == 1){
 				//Can't do better than 1 byte. Prefer ASCII if possible because ASCII fast as fuck boi
 				if(ASCII.canEncode(data)){
 					return ASCII;
@@ -353,19 +353,19 @@ class Encoding{
 					return f;
 				}
 			}
-			throw new RuntimeException("Unable to encode \""+data+'"');
+			throw new RuntimeException("Unable to encode \"" + data + '"');
 		}
 		
 		private static int utf8Len(String s){
-			int count=0;
-			for(int i=0, len=s.length();i<len;i++){
-				char ch=s.charAt(i);
+			int count = 0;
+			for(int i = 0, len = s.length(); i<len; i++){
+				char ch = s.charAt(i);
 				if(ch<=0x7F) count++;
-				else if(ch<=0x7FF) count+=2;
+				else if(ch<=0x7FF) count += 2;
 				else if(Character.isHighSurrogate(ch)){
-					count+=4;
+					count += 4;
 					++i;
-				}else count+=3;
+				}else count += 3;
 				
 			}
 			return count;
@@ -381,7 +381,7 @@ class Encoding{
 		}
 		
 		private static void encode(CharsetEncoder en, String s, ContentWriter w) throws IOException{
-			var b=encode(en, s);
+			var b = encode(en, s);
 			w.write(b.array(), 0, b.limit());
 		}
 		
@@ -406,17 +406,17 @@ class Encoding{
 		private final UnsafeBiConsumer<ContentWriter, String, IOException> write;
 		private final Read                                                 read;
 		
-		CharEncoding(TableCoding coder){this(coder.bits/8F, coder::calcSize, coder::isCompatible, coder::write, coder::read);}
+		CharEncoding(TableCoding coder){ this(coder.bits/8F, coder::calcSize, coder::isCompatible, coder::write, coder::read); }
 		CharEncoding(float sizeWeight, FunctionOI<String> calcSize,
 		             Predicate<String> canEncode,
 		             UnsafeBiConsumer<ContentWriter, String, IOException> write,
 		             Read read
 		){
-			this.sizeWeight=sizeWeight;
-			this.calcSize=calcSize;
-			this.canEncode=canEncode;
-			this.write=write;
-			this.read=read;
+			this.sizeWeight = sizeWeight;
+			this.calcSize = calcSize;
+			this.canEncode = canEncode;
+			this.write = write;
+			this.read = read;
 		}
 		
 		public int calcSize(String str){

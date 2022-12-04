@@ -33,15 +33,15 @@ import static com.lapissea.cfs.GlobalConfig.TYPE_VALIDATION;
 public sealed interface IOTypeDB{
 	final class MemoryOnlyDB implements IOTypeDB{
 		
-		private final ReadWriteLock rwLock=new ReentrantReadWriteLock();
+		private final ReadWriteLock rwLock = new ReentrantReadWriteLock();
 		
-		private final Map<String, TypeDef> defs=new HashMap<>();
+		private final Map<String, TypeDef> defs = new HashMap<>();
 		
-		private final Map<Integer, TypeLink> idToTyp=new HashMap<>();
-		private final Map<TypeLink, Integer> typToID=new HashMap<>();
-		private       int                    maxID  =0;
+		private final Map<Integer, TypeLink> idToTyp = new HashMap<>();
+		private final Map<TypeLink, Integer> typToID = new HashMap<>();
+		private       int                    maxID   = 0;
 		
-		private WeakReference<ClassLoader> templateLoader=new WeakReference<>(null);
+		private WeakReference<ClassLoader> templateLoader = new WeakReference<>(null);
 		
 		@Override
 		public TypeID toID(Class<?> type, boolean recordNew){
@@ -50,11 +50,11 @@ public sealed interface IOTypeDB{
 		
 		@Override
 		public TypeID toID(TypeLink type, boolean recordNew){
-			var lock=rwLock.readLock();
+			var lock = rwLock.readLock();
 			lock.lock();
 			try{
-				var id=typToID.get(type);
-				if(id!=null) return new TypeID(id, true);
+				var id = typToID.get(type);
+				if(id != null) return new TypeID(id, true);
 			}finally{
 				lock.unlock();
 			}
@@ -62,14 +62,14 @@ public sealed interface IOTypeDB{
 		}
 		
 		private TypeID newID(TypeLink type, boolean recordNew){
-			var lock=rwLock.writeLock();
+			var lock = rwLock.writeLock();
 			lock.lock();
 			try{
-				var newID=maxID()+1;
+				var newID = maxID() + 1;
 				if(!recordNew) return new TypeID(newID, false);
 				idToTyp.put(newID, type);
 				typToID.put(type, newID);
-				maxID=newID;
+				maxID = newID;
 				
 				recordType(type);
 				return new TypeID(newID, true);
@@ -80,9 +80,9 @@ public sealed interface IOTypeDB{
 		
 		private void recordType(TypeLink type){
 			if(!defs.containsKey(type.getTypeName())){
-				var def=new TypeDef(type.getTypeClass(null));
+				var def = new TypeDef(type.getTypeClass(null));
 				if(!def.isUnmanaged()){
-					defs.computeIfAbsent(type.getTypeName(), n->new TypeDef(type.getTypeClass(null)));
+					defs.computeIfAbsent(type.getTypeName(), n -> new TypeDef(type.getTypeClass(null)));
 				}else{
 					defs.put(type.getTypeName(), null);
 				}
@@ -91,19 +91,19 @@ public sealed interface IOTypeDB{
 					recordType(field.getType());
 				}
 			}
-			for(int i=0;i<type.argCount();i++){
+			for(int i = 0; i<type.argCount(); i++){
 				recordType(type.arg(i));
 			}
 		}
 		
 		@Override
 		public TypeLink fromID(int id){
-			var lock=rwLock.readLock();
+			var lock = rwLock.readLock();
 			lock.lock();
 			try{
-				var type=idToTyp.get(id);
-				if(type==null){
-					throw new RuntimeException("Unknown type from ID of "+id);
+				var type = idToTyp.get(id);
+				if(type == null){
+					throw new RuntimeException("Unknown type from ID of " + id);
 				}
 				return type;
 			}finally{
@@ -112,7 +112,7 @@ public sealed interface IOTypeDB{
 		}
 		
 		public boolean hasType(TypeLink type){
-			var lock=rwLock.readLock();
+			var lock = rwLock.readLock();
 			lock.lock();
 			try{
 				return typToID.containsKey(type);
@@ -121,7 +121,7 @@ public sealed interface IOTypeDB{
 			}
 		}
 		public boolean hasID(int id){
-			var lock=rwLock.readLock();
+			var lock = rwLock.readLock();
 			lock.lock();
 			try{
 				return idToTyp.containsKey(id);
@@ -136,16 +136,16 @@ public sealed interface IOTypeDB{
 		
 		@Override
 		public ClassLoader getTemplateLoader(){
-			var l=templateLoader.get();
-			if(l==null){
-				templateLoader=new WeakReference<>(l=new TemplateClassLoader(this, getClass().getClassLoader()));
+			var l = templateLoader.get();
+			if(l == null){
+				templateLoader = new WeakReference<>(l = new TemplateClassLoader(this, getClass().getClassLoader()));
 			}
 			return l;
 		}
 		
 		@Override
 		public TypeDef getDefinitionFromClassName(String className){
-			if(className==null||className.isEmpty()) return null;
+			if(className == null || className.isEmpty()) return null;
 			return defs.get(className);
 		}
 	}
@@ -156,9 +156,9 @@ public sealed interface IOTypeDB{
 			@IOValue
 			private String typeName;
 			
-			public TypeName(){}
+			public TypeName(){ }
 			public TypeName(String typeName){
-				this.typeName=typeName;
+				this.typeName = typeName;
 			}
 			
 			@Override
@@ -168,17 +168,17 @@ public sealed interface IOTypeDB{
 			
 			@Override
 			public String toShortString(){
-				var nam  =typeName;
-				var index=nam.lastIndexOf('.');
-				if(index!=-1) return nam.substring(index+1);
+				var nam   = typeName;
+				var index = nam.lastIndexOf('.');
+				if(index != -1) return nam.substring(index + 1);
 				return nam;
 			}
 		}
 		
 		//Init async, improves first run time, does not load a bunch of classes in static initializer
-		private static       int                         FIRST_ID=-1;
-		private static final LateInit.Safe<MemoryOnlyDB> BUILT_IN=Runner.async(()->{
-			var db=new MemoryOnlyDB();
+		private static       int                         FIRST_ID = -1;
+		private static final LateInit.Safe<MemoryOnlyDB> BUILT_IN = Runner.async(() -> {
+			var db = new MemoryOnlyDB();
 			try{
 				for(var c : new Class<?>[]{
 					byte.class,
@@ -212,7 +212,7 @@ public sealed interface IOTypeDB{
 				e.printStackTrace();
 				throw new RuntimeException(e);
 			}
-			FIRST_ID=db.maxID();
+			FIRST_ID = db.maxID();
 			return db;
 		});
 		
@@ -220,19 +220,19 @@ public sealed interface IOTypeDB{
 			builtIn.toID(c, true);
 			
 			for(var dc : c.getDeclaredClasses()){
-				if(Modifier.isAbstract(dc.getModifiers())||!IOInstance.isInstance(dc)) continue;
+				if(Modifier.isAbstract(dc.getModifiers()) || !IOInstance.isInstance(dc)) continue;
 				registerBuiltIn(builtIn, dc);
 			}
-			var cl=c;
-			while(cl!=null&&cl!=Object.class){
+			var cl = c;
+			while(cl != null && cl != Object.class){
 				
 				for(var field : cl.getDeclaredFields()){
-					if(field.isAnnotationPresent(IOValue.class)&&IOInstance.isInstance(field.getType())){
+					if(field.isAnnotationPresent(IOValue.class) && IOInstance.isInstance(field.getType())){
 						registerBuiltIn(builtIn, field.getType());
 					}
 				}
 				
-				cl=cl.getSuperclass();
+				cl = cl.getSuperclass();
 			}
 		}
 		
@@ -244,30 +244,30 @@ public sealed interface IOTypeDB{
 		@IOValue.OverrideType(HashIOMap.class)
 		private IOMap<TypeName, TypeDef> defs;
 		
-		private WeakReference<ClassLoader> templateLoader=new WeakReference<>(null);
+		private WeakReference<ClassLoader> templateLoader = new WeakReference<>(null);
 		
 		@Override
 		public TypeID toID(TypeLink type, boolean recordNew) throws IOException{
-			var builtIn=BUILT_IN.get();
-			var id     =builtIn.toID(type, false);
+			var builtIn = BUILT_IN.get();
+			var id      = builtIn.toID(type, false);
 			if(id.stored()) return id;
 			
-			int max=0;
+			int max = 0;
 			for(var entry : data){
-				var key=entry.getKey();
+				var key = entry.getKey();
 				if(entry.getValue().equals(type)){
 					return new TypeID(key, true);
 				}
-				max=Math.max(key, max);
+				max = Math.max(key, max);
 			}
 			
-			max=Math.max(FIRST_ID, max);
+			max = Math.max(FIRST_ID, max);
 			
-			var newID=max+1;
+			var newID = max + 1;
 			if(!recordNew) return new TypeID(newID, false);
 			
 			data.put(newID, type);
-			var newDefs=new HashMap<TypeName, TypeDef>();
+			var newDefs = new HashMap<TypeName, TypeDef>();
 			recordType(builtIn, type, newDefs);
 			
 			defs.putAll(newDefs);
@@ -277,29 +277,29 @@ public sealed interface IOTypeDB{
 		}
 		
 		private void checkNewTypeValidity(Map<TypeName, TypeDef> newDefs){
-			newDefs.entrySet().removeIf(e->!e.getValue().isIoInstance());
+			newDefs.entrySet().removeIf(e -> !e.getValue().isIoInstance());
 			if(newDefs.isEmpty()) return;
 			
 			class Validated{
-				private static final Set<String> VALS=new HashSet<>();
+				private static final Set<String> VALS = new HashSet<>();
 			}
 			synchronized(Validated.VALS){
-				newDefs.entrySet().removeIf(e->Validated.VALS.contains(e.getKey().typeName));
+				newDefs.entrySet().removeIf(e -> Validated.VALS.contains(e.getKey().typeName));
 				if(newDefs.isEmpty()) return;
-				newDefs.keySet().stream().map(n->n.typeName).forEach(Validated.VALS::add);
+				newDefs.keySet().stream().map(n -> n.typeName).forEach(Validated.VALS::add);
 			}
 			
-			var names=newDefs.entrySet()
-			                 .stream()
-			                 .filter(e->!e.getValue().isUnmanaged())
-			                 .map(e->e.getKey().typeName)
-			                 .collect(Collectors.toSet());
+			var names = newDefs.entrySet()
+			                   .stream()
+			                   .filter(e -> !e.getValue().isUnmanaged())
+			                   .map(e -> e.getKey().typeName)
+			                   .collect(Collectors.toSet());
 			
-			RuntimeException e=null;
+			RuntimeException e = null;
 			
 			for(var name : names){
 				try{
-					var cls=Class.forName(
+					var cls = Class.forName(
 						name, true,
 						new TemplateClassLoader(
 							this,
@@ -314,47 +314,47 @@ public sealed interface IOTypeDB{
 					synchronized(Validated.VALS){
 						Validated.VALS.remove(name);
 					}
-					var e1=new RuntimeException("Invalid stored class "+name+"\n"+TextUtil.toNamedPrettyJson(newDefs.get(new TypeName(name))), ex);
-					if(e==null) e=e1;
+					var e1 = new RuntimeException("Invalid stored class " + name + "\n" + TextUtil.toNamedPrettyJson(newDefs.get(new TypeName(name))), ex);
+					if(e == null) e = e1;
 					else e.addSuppressed(e1);
 				}
 			}
-			if(e!=null) throw e;
+			if(e != null) throw e;
 		}
 		
 		private void recordType(MemoryOnlyDB builtIn, TypeLink type, Map<TypeName, TypeDef> newDefs) throws IOException{
-			var isBuiltIn=builtIn.getDefinitionFromClassName(type.getTypeName())!=null;
+			var isBuiltIn = builtIn.getDefinitionFromClassName(type.getTypeName()) != null;
 			if(isBuiltIn){
-				for(int i=0;i<type.argCount();i++){
+				for(int i = 0; i<type.argCount(); i++){
 					recordType(builtIn, type.arg(i), newDefs);
 				}
 				return;
 			}
 			
-			var typeName=new TypeName(type.getTypeName());
+			var typeName = new TypeName(type.getTypeName());
 			
-			var added  =newDefs.containsKey(typeName);
-			var defined=defs.containsKey(typeName);
+			var added   = newDefs.containsKey(typeName);
+			var defined = defs.containsKey(typeName);
 			
-			if(added||defined) return;
+			if(added || defined) return;
 			
-			var typ=type.getTypeClass(null);
+			var typ = type.getTypeClass(null);
 			if(typ.isArray()){
-				var base=typ;
+				var base = typ;
 				while(base.isArray()){
-					base=base.componentType();
+					base = base.componentType();
 				}
 				if(base.isPrimitive()) return;
 				recordType(builtIn, new TypeLink(base), newDefs);
 				return;
 			}
 			
-			var def=new TypeDef(typ);
+			var def = new TypeDef(typ);
 			if(!def.isUnmanaged()){
 				newDefs.put(typeName, def);
 			}
 			
-			for(int i=0;i<type.argCount();i++){
+			for(int i = 0; i<type.argCount(); i++){
 				recordType(builtIn, type.arg(i), newDefs);
 			}
 			
@@ -372,14 +372,14 @@ public sealed interface IOTypeDB{
 		
 		@Override
 		public TypeLink fromID(int id) throws IOException{
-			var builtIn=BUILT_IN.get();
+			var builtIn = BUILT_IN.get();
 			if(builtIn.hasID(id)){
 				return builtIn.fromID(id);
 			}
 			
-			var type=data.get(id);
-			if(type==null){
-				throw new RuntimeException("Unknown type from ID of "+id);
+			var type = data.get(id);
+			if(type == null){
+				throw new RuntimeException("Unknown type from ID of " + id);
 			}
 			
 			return type;
@@ -387,11 +387,11 @@ public sealed interface IOTypeDB{
 		
 		@Override
 		public TypeDef getDefinitionFromClassName(String className) throws IOException{
-			var builtIn=BUILT_IN.get();
-			if(className==null||className.isEmpty()) return null;
+			var builtIn = BUILT_IN.get();
+			if(className == null || className.isEmpty()) return null;
 			{
-				var def=builtIn.getDefinitionFromClassName(className);
-				if(def!=null) return def;
+				var def = builtIn.getDefinitionFromClassName(className);
+				if(def != null) return def;
 			}
 			
 			return defs.get(new TypeName(className));
@@ -402,22 +402,22 @@ public sealed interface IOTypeDB{
 		}
 		@Override
 		public ClassLoader getTemplateLoader(){
-			var l=templateLoader.get();
-			if(l==null){
-				templateLoader=new WeakReference<>(l=new TemplateClassLoader(this, getClass().getClassLoader()));
+			var l = templateLoader.get();
+			if(l == null){
+				templateLoader = new WeakReference<>(l = new TemplateClassLoader(this, getClass().getClassLoader()));
 			}
 			return l;
 		}
 		
 		@Override
 		public String toString(){
-			return getClass().getSimpleName()+toShortString();
+			return getClass().getSimpleName() + toShortString();
 		}
 		
 		@Override
 		public String toShortString(){
-			if(data==null) return "{uninitialized}";
-			return "{"+data.size()+" "+TextUtil.plural("link", (int)data.size())+", "+defs.size()+" class "+TextUtil.plural("definition", (int)defs.size())+"}";
+			if(data == null) return "{uninitialized}";
+			return "{" + data.size() + " " + TextUtil.plural("link", (int)data.size()) + ", " + defs.size() + " class " + TextUtil.plural("definition", (int)defs.size()) + "}";
 		}
 	}
 	
@@ -425,7 +425,7 @@ public sealed interface IOTypeDB{
 		return toID(TypeLink.of(type), recordNew);
 	}
 	
-	record TypeID(int val, boolean stored){}
+	record TypeID(int val, boolean stored){ }
 	
 	TypeID toID(TypeLink type, boolean recordNew) throws IOException;
 	TypeLink fromID(int id) throws IOException;

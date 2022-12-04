@@ -50,30 +50,30 @@ public @interface IOCompression{
 		private Packer           packer;
 		
 		Type(Supplier<Packer> src){
-			this.src=src;
+			this.src = src;
 		}
 		
 		private Packer getPacker(){
-			if(packer==null) gen();
+			if(packer == null) gen();
 			return packer;
 		}
 		private void gen(){
 			synchronized(this){
-				if(packer!=null) return;
-				packer=src.get();
-				src=null;
+				if(packer != null) return;
+				packer = src.get();
+				src = null;
 			}
 		}
-		public byte[] pack(byte[] data)        {return getPacker().pack(data);}
-		public byte[] unpack(byte[] packedData){return getPacker().unpack(packedData);}
+		public byte[] pack(byte[] data)        { return getPacker().pack(data); }
+		public byte[] unpack(byte[] packedData){ return getPacker().unpack(packedData); }
 	}
 	
 	Type value() default Type.LZ4;
 	
-	AnnotationLogic<IOCompression> LOGIC=new AnnotationLogic<>(){
+	AnnotationLogic<IOCompression> LOGIC = new AnnotationLogic<>(){
 		@Override
 		public void validate(FieldAccessor<?> field, IOCompression annotation){
-			if(field.getType()!=byte[].class) throw new MalformedStruct("IOCompression only on byte[] for now");
+			if(field.getType() != byte[].class) throw new MalformedStruct("IOCompression only on byte[] for now");
 		}
 		
 		@NotNull

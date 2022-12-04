@@ -22,7 +22,7 @@ public final class ChunkSet implements Set<ChunkPointer>{
 	
 	private sealed interface Index{
 		final class Bitmap32 implements Index{
-			private final RoaringBitmap data=new RoaringBitmap();
+			private final RoaringBitmap data = new RoaringBitmap();
 			
 			@Override
 			public boolean isEmpty(){
@@ -34,7 +34,7 @@ public final class ChunkSet implements Set<ChunkPointer>{
 			}
 			@Override
 			public boolean contains(long index){
-				if(index>Integer.MAX_VALUE||index<0) return false;
+				if(index>Integer.MAX_VALUE || index<0) return false;
 				return data.contains((int)index);
 			}
 			
@@ -49,26 +49,26 @@ public final class ChunkSet implements Set<ChunkPointer>{
 			}
 			@Override
 			public void or(Index other){
-				var d=((Bitmap32)other).data;
+				var d = ((Bitmap32)other).data;
 				data.or(d);
 			}
 			@Override
 			public void and(Index other){
-				var d=((Bitmap32)other).data;
+				var d = ((Bitmap32)other).data;
 				data.and(d);
 			}
 			@Override
 			public void andNot(Index other){
-				var d=((Bitmap32)other).data;
+				var d = ((Bitmap32)other).data;
 				data.andNot(d);
 			}
 			@Override
 			public LongStream stream(){
-				return data.stream().mapToLong(i->i);
+				return data.stream().mapToLong(i -> i);
 			}
 			@Override
 			public long calcEnd(){
-				return data.getReverseIntIterator().next()+1;
+				return data.getReverseIntIterator().next() + 1;
 			}
 			@Override
 			public long calcStart(){
@@ -77,7 +77,7 @@ public final class ChunkSet implements Set<ChunkPointer>{
 		}
 		
 		final class Bitmap64 implements Index{
-			private final Roaring64Bitmap data=new Roaring64Bitmap();
+			private final Roaring64Bitmap data = new Roaring64Bitmap();
 			
 			@Override
 			public boolean isEmpty(){
@@ -102,17 +102,17 @@ public final class ChunkSet implements Set<ChunkPointer>{
 			}
 			@Override
 			public void or(Index other){
-				var d=((Bitmap64)other).data;
+				var d = ((Bitmap64)other).data;
 				data.or(d);
 			}
 			@Override
 			public void and(Index other){
-				var d=((Bitmap64)other).data;
+				var d = ((Bitmap64)other).data;
 				data.and(d);
 			}
 			@Override
 			public void andNot(Index other){
-				var d=((Bitmap64)other).data;
+				var d = ((Bitmap64)other).data;
 				data.andNot(d);
 			}
 			@Override
@@ -121,7 +121,7 @@ public final class ChunkSet implements Set<ChunkPointer>{
 			}
 			@Override
 			public long calcEnd(){
-				return data.getReverseLongIterator().next()+1;
+				return data.getReverseLongIterator().next() + 1;
 			}
 			@Override
 			public long calcStart(){
@@ -147,12 +147,12 @@ public final class ChunkSet implements Set<ChunkPointer>{
 		long calcStart();
 	}
 	
-	private static final Supplier<Index> NEW_INDEX=Index.Bitmap32::new;
+	private static final Supplier<Index> NEW_INDEX = Index.Bitmap32::new;
 	
-	private final Index index=NEW_INDEX.get();
+	private final Index index = NEW_INDEX.get();
 	
-	private long end  =-1;
-	private long start=-1;
+	private long end   = -1;
+	private long start = -1;
 	private long size;
 	
 	public ChunkSet(){
@@ -165,7 +165,7 @@ public final class ChunkSet implements Set<ChunkPointer>{
 		addAll(data);
 	}
 	public ChunkSet(IOList<ChunkPointer> data) throws IOException{
-		var iter=data.iterator();
+		var iter = data.iterator();
 		while(iter.hasNext()){
 			add(iter.ioNext());
 		}
@@ -192,14 +192,14 @@ public final class ChunkSet implements Set<ChunkPointer>{
 	}
 	
 	public long lastIndex(){
-		return end-1;
+		return end - 1;
 	}
 	@Override
 	public boolean isEmpty(){
-		return size==0;
+		return size == 0;
 	}
 	public long rageSize(){
-		return end-start;
+		return end - start;
 	}
 	
 	/**
@@ -214,7 +214,7 @@ public final class ChunkSet implements Set<ChunkPointer>{
 		return size;
 	}
 	
-	public void add(Chunk chunk){add(chunk.getPtr());}
+	public void add(Chunk chunk){ add(chunk.getPtr()); }
 	@Override
 	public boolean add(ChunkPointer ptr){
 		return add(ptr.getValue());
@@ -224,18 +224,18 @@ public final class ChunkSet implements Set<ChunkPointer>{
 		return ptrStream(c).allMatch(this::contains);
 	}
 	private Stream<ChunkPointer> ptrStream(Collection<?> c){
-		return c.stream().map(o->o instanceof ChunkPointer ptr?ptr:o instanceof Chunk ch?ch.getPtr():null).filter(Objects::nonNull);
+		return c.stream().map(o -> o instanceof ChunkPointer ptr? ptr : o instanceof Chunk ch? ch.getPtr() : null).filter(Objects::nonNull);
 	}
 	@Override
 	public boolean addAll(Collection<? extends ChunkPointer> c){
 		if(c.isEmpty()) return false;
 		
-		var toAdd=ptrsToIndex(c.stream());
+		var toAdd = ptrsToIndex(c.stream());
 		
-		boolean change=calcStart(toAdd)<start||calcEnd(toAdd)>end;
+		boolean change = calcStart(toAdd)<start || calcEnd(toAdd)>end;
 		
 		if(!change){
-			change=toAdd.stream().anyMatch(i->!index.contains(i));
+			change = toAdd.stream().anyMatch(i -> !index.contains(i));
 		}
 		if(!change) return false;
 		
@@ -244,7 +244,7 @@ public final class ChunkSet implements Set<ChunkPointer>{
 	}
 	
 	private Index ptrsToIndex(Stream<? extends ChunkPointer> c){
-		var bitmap=NEW_INDEX.get();
+		var bitmap = NEW_INDEX.get();
 		c.mapToInt(ChunkPointer::getValueInt).forEach(bitmap::add);
 		return bitmap;
 	}
@@ -258,18 +258,18 @@ public final class ChunkSet implements Set<ChunkPointer>{
 	private void recalcInfo(){
 		calcStart();
 		calcEnd();
-		start=index.stream().count();
+		start = index.stream().count();
 	}
 	
 	@Override
 	public boolean retainAll(Collection<?> c){
 		if(c.isEmpty()){
-			boolean hadData=!isEmpty();
+			boolean hadData = !isEmpty();
 			clear();
 			return hadData;
 		}
 		
-		var toRetain=ptrsToIndex(ptrStream(c));
+		var toRetain = ptrsToIndex(ptrStream(c));
 		
 		if(toRetain.isEmpty()){
 			return retainAll(List.of());
@@ -288,15 +288,15 @@ public final class ChunkSet implements Set<ChunkPointer>{
 	public boolean removeAll(Collection<?> c){
 		if(c.isEmpty()) return false;
 		
-		var toRemove=ptrsToIndex(ptrStream(c));
+		var toRemove = ptrsToIndex(ptrStream(c));
 		
 		if(toRemove.isEmpty()) return false;
 		
 		index.andNot(toRemove);
 		if(index.isEmpty()){
-			start=-1;
-			end=-1;
-			size=0;
+			start = -1;
+			end = -1;
+			size = 0;
 			return true;
 		}
 		recalcInfo();
@@ -307,11 +307,11 @@ public final class ChunkSet implements Set<ChunkPointer>{
 		if(contains(ptr)) return false;
 		
 		if(isEmpty()){
-			start=ptr;
-			end=ptr+1;
+			start = ptr;
+			end = ptr + 1;
 		}else{
-			end=Math.max(end, ptr+1);
-			start=Math.min(start, ptr);
+			end = Math.max(end, ptr + 1);
+			start = Math.min(start, ptr);
 		}
 		size++;
 		index.add(Math.toIntExact(ptr));
@@ -322,49 +322,49 @@ public final class ChunkSet implements Set<ChunkPointer>{
 	
 	@SuppressWarnings({"ReplaceInefficientStreamCount", "UnnecessaryToStringCall"})
 	private void checkData(){
-		if(size()!=longStream().count()){
-			throw new IllegalStateException(size()+" "+stream().count());
+		if(size() != longStream().count()){
+			throw new IllegalStateException(size() + " " + stream().count());
 		}
 		if(!isEmpty()){
-			var start=calcStart(index);
-			var end  =calcEnd(index);
-			if(start!=this.start) throw new IllegalStateException("corrupt start: "+this.start+" "+index.toString());
-			if(end!=this.end) throw new IllegalStateException("corrupt end: "+lastIndex()+" "+index);
+			var start = calcStart(index);
+			var end   = calcEnd(index);
+			if(start != this.start) throw new IllegalStateException("corrupt start: " + this.start + " " + index.toString());
+			if(end != this.end) throw new IllegalStateException("corrupt end: " + lastIndex() + " " + index);
 		}
 	}
 	
-	public boolean remove(Chunk chunk)     {return remove(chunk.getPtr());}
-	public boolean remove(ChunkPointer ptr){return remove(ptr.getValue());}
+	public boolean remove(Chunk chunk)     { return remove(chunk.getPtr()); }
+	public boolean remove(ChunkPointer ptr){ return remove(ptr.getValue()); }
 	@Override
-	public boolean remove(Object o){return o instanceof ChunkPointer ptr&&remove(ptr.getValue());}
+	public boolean remove(Object o){ return o instanceof ChunkPointer ptr && remove(ptr.getValue()); }
 	public boolean remove(long ptr){
 		checkEmpty();
 		if(!contains(ptr)) return false;
 		
-		if(rageSize()==1){
+		if(rageSize() == 1){
 			clear();
 		}else{
 			if(!index.contains(ptr)) throw new IllegalStateException("contains() invalid");
 			size--;
 			index.remove(ptr);
 			
-			if(ptr==start) calcStart();
-			if(ptr==lastIndex()) calcEnd();
+			if(ptr == start) calcStart();
+			if(ptr == lastIndex()) calcEnd();
 		}
 		if(DEBUG_VALIDATION) checkData();
 		return true;
 	}
 	
 	private void calcEnd(){
-		end=calcEnd(index);
+		end = calcEnd(index);
 	}
 	private void calcStart(){
-		start=calcStart(index);
+		start = calcStart(index);
 	}
 	
 	public void removeFirst(){
 		checkEmpty();
-		if(rageSize()==1){
+		if(rageSize() == 1){
 			clear();
 		}else{
 			if(!index.contains(Math.toIntExact(start))) throw new IllegalStateException("First element must exist");
@@ -377,7 +377,7 @@ public final class ChunkSet implements Set<ChunkPointer>{
 	
 	public void removeLast(){
 		checkEmpty();
-		if(rageSize()==1){
+		if(rageSize() == 1){
 			clear();
 		}else{
 			if(!index.contains(Math.toIntExact(lastIndex()))) throw new IllegalStateException("Last element must exist");
@@ -390,24 +390,24 @@ public final class ChunkSet implements Set<ChunkPointer>{
 	
 	@Override
 	public void clear(){
-		start=-1;
-		end=-1;
-		size=0;
+		start = -1;
+		end = -1;
+		size = 0;
 		index.clear();
 	}
 	
-	public boolean contains(Chunk chunk)     {return contains(chunk.getPtr());}
-	public boolean contains(ChunkPointer ptr){return contains(ptr.getValue());}
+	public boolean contains(Chunk chunk)     { return contains(chunk.getPtr()); }
+	public boolean contains(ChunkPointer ptr){ return contains(ptr.getValue()); }
 	@Override
-	public boolean contains(Object o){return o instanceof ChunkPointer ptr&&contains(ptr.getValue());}
+	public boolean contains(Object o){ return o instanceof ChunkPointer ptr && contains(ptr.getValue()); }
 	public boolean contains(long ptr){
-		var size=rageSize();
-		if(size==0) return false;
-		if(size==1) return ptr==start;
+		var size = rageSize();
+		if(size == 0) return false;
+		if(size == 1) return ptr == start;
 		
-		var last=lastIndex();
-		if(ptr<start||last<ptr) return false;
-		if(ptr==start||ptr==last) return true;
+		var last = lastIndex();
+		if(ptr<start || last<ptr) return false;
+		if(ptr == start || ptr == last) return true;
 		return index.contains(Math.toIntExact(ptr));
 	}
 	
@@ -420,10 +420,10 @@ public final class ChunkSet implements Set<ChunkPointer>{
 	}
 	
 	public OptionalLong optionalMin(){
-		return isEmpty()?OptionalLong.empty():OptionalLong.of(min());
+		return isEmpty()? OptionalLong.empty() : OptionalLong.of(min());
 	}
 	public OptionalLong optionalMax(){
-		return isEmpty()?OptionalLong.empty():OptionalLong.of(max());
+		return isEmpty()? OptionalLong.empty() : OptionalLong.of(max());
 	}
 	public long min(){
 		return start;
@@ -447,11 +447,11 @@ public final class ChunkSet implements Set<ChunkPointer>{
 	@Override
 	public <T> T[] toArray(@NotNull T[] a){
 		if(trueSize()>Integer.MAX_VALUE) throw new OutOfMemoryError();
-		int size=(int)this.size;
-		T[] r   =a.length>=size?a:(T[])Array.newInstance(a.getClass().getComponentType(), size);
-		int i   =0;
+		int size = (int)this.size;
+		T[] r    = a.length>=size? a : (T[])Array.newInstance(a.getClass().getComponentType(), size);
+		int i    = 0;
 		for(ChunkPointer ptr : this){
-			r[i++]=(T)ptr;
+			r[i++] = (T)ptr;
 		}
 		return r;
 	}
@@ -462,6 +462,6 @@ public final class ChunkSet implements Set<ChunkPointer>{
 	
 	@Override
 	public String toString(){
-		return longStream().limit(50).mapToObj(Long::toString).collect(Collectors.joining(", ", "*[", size()>50?"...]":"]"));
+		return longStream().limit(50).mapToObj(Long::toString).collect(Collectors.joining(", ", "*[", size()>50? "...]" : "]"));
 	}
 }

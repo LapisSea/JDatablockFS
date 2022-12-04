@@ -43,44 +43,44 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 		@IONullability(NULLABLE)
 		private IOValue.Reference.PipeType referenceType;
 		
-		public FieldDef(){}
+		public FieldDef(){ }
 		
 		public FieldDef(IOField<?, ?> field){
-			type=TypeLink.of(field.getAccessor().getGenericType(null));
-			name=field.getName();
-			nullability=field.getAccessor().getAnnotation(IONullability.class).map(IONullability::value).orElse(IONullability.Mode.NOT_NULL);
-			isDynamic=field.getAccessor().hasAnnotation(IODynamic.class);
-			referenceType=field.getAccessor().getAnnotation(IOValue.Reference.class).map(IOValue.Reference::dataPipeType).orElse(null);
-			var deps=field.dependencyStream().map(IOField::getName).collect(Collectors.toSet());
+			type = TypeLink.of(field.getAccessor().getGenericType(null));
+			name = field.getName();
+			nullability = field.getAccessor().getAnnotation(IONullability.class).map(IONullability::value).orElse(IONullability.Mode.NOT_NULL);
+			isDynamic = field.getAccessor().hasAnnotation(IODynamic.class);
+			referenceType = field.getAccessor().getAnnotation(IOValue.Reference.class).map(IOValue.Reference::dataPipeType).orElse(null);
+			var deps = field.dependencyStream().map(IOField::getName).collect(Collectors.toSet());
 			if(field.getType().isArray()) deps.remove(IOFieldTools.makeCollectionLenName(field.getAccessor()));
 			if(isDynamic) deps.remove(IOFieldTools.makeGenericIDFieldName(field.getAccessor()));
-			dependencies=deps.toArray(String[]::new);
-			unsigned=field.getAccessor().hasAnnotation(IOValue.Unsigned.class);
+			dependencies = deps.toArray(String[]::new);
+			unsigned = field.getAccessor().hasAnnotation(IOValue.Unsigned.class);
 		}
 		
-		public TypeLink getType()  {return type;}
-		public String getName()    {return name;}
-		public boolean isDynamic() {return isDynamic;}
-		public boolean isUnsigned(){return unsigned;}
+		public TypeLink getType()  { return type; }
+		public String getName()    { return name; }
+		public boolean isDynamic() { return isDynamic; }
+		public boolean isUnsigned(){ return unsigned; }
 		
 		public List<String> getDependencies(){
-			return dependencies==null?List.of():ArrayViewList.create(dependencies, null);
+			return dependencies == null? List.of() : ArrayViewList.create(dependencies, null);
 		}
 		
-		public IONullability.Mode getNullability()          {return nullability;}
-		public IOValue.Reference.PipeType getReferenceType(){return referenceType;}
+		public IONullability.Mode getNullability()          { return nullability; }
+		public IOValue.Reference.PipeType getReferenceType(){ return referenceType; }
 		
 		@Override
 		public String toString(){
-			return name+(nullability!=IONullability.Mode.NOT_NULL?" "+nullability:"")+": "+type.toString()+(dependencies==null||dependencies.length==0?"":"(deps = ["+String.join(", ", dependencies)+"])");
+			return name + (nullability != IONullability.Mode.NOT_NULL? " " + nullability : "") + ": " + type.toString() + (dependencies == null || dependencies.length == 0? "" : "(deps = [" + String.join(", ", dependencies) + "])");
 		}
 		@Override
 		public String toShortString(){
-			return name+(nullability!=IONullability.Mode.NOT_NULL?" "+nullability.shortName:"")+": "+Utils.toShortString(type);
+			return name + (nullability != IONullability.Mode.NOT_NULL? " " + nullability.shortName : "") + ": " + Utils.toShortString(type);
 		}
 	}
 	
-	@IOInstance.Def.ToString(name=false, fNames=false, curly=false)
+	@IOInstance.Def.ToString(name = false, fNames = false, curly = false)
 	public interface EnumConstant extends IOInstance.Def<EnumConstant>{
 		
 		private static EnumConstant of(Enum<?> e){
@@ -97,37 +97,37 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 	private boolean unmanaged;
 	
 	@IOValue
-	private FieldDef[] fields=new FieldDef[0];
+	private FieldDef[] fields = new FieldDef[0];
 	
 	@IOValue
 	@IONullability(NULLABLE)
 	private EnumConstant[] enumConstants;
 	
-	public TypeDef(){}
+	public TypeDef(){ }
 	
 	public TypeDef(@NotNull Class<?> type){
 		Objects.requireNonNull(type);
-		ioInstance=IOInstance.isInstance(type);
-		unmanaged=IOInstance.isUnmanaged(type);
+		ioInstance = IOInstance.isInstance(type);
+		unmanaged = IOInstance.isUnmanaged(type);
 		if(ioInstance){
-			if(!Modifier.isAbstract(type.getModifiers())||UtilL.instanceOf(type, IOInstance.Def.class)){
-				fields=Struct.ofUnknown(type).getFields().stream().map(FieldDef::new).toArray(FieldDef[]::new);
+			if(!Modifier.isAbstract(type.getModifiers()) || UtilL.instanceOf(type, IOInstance.Def.class)){
+				fields = Struct.ofUnknown(type).getFields().stream().map(FieldDef::new).toArray(FieldDef[]::new);
 			}
 		}
 		if(type.isEnum()){
 			//noinspection unchecked,rawtypes
-			enumConstants=Arrays.stream(((Class<Enum>)type).getEnumConstants())
-			                    .map(EnumConstant::of)
-			                    .toArray(EnumConstant[]::new);
+			enumConstants = Arrays.stream(((Class<Enum>)type).getEnumConstants())
+			                      .map(EnumConstant::of)
+			                      .toArray(EnumConstant[]::new);
 		}
 	}
 	
-	public boolean isUnmanaged() {return unmanaged;}
-	public boolean isIoInstance(){return ioInstance;}
-	public boolean isEnum()      {return enumConstants!=null;}
+	public boolean isUnmanaged() { return unmanaged; }
+	public boolean isIoInstance(){ return ioInstance; }
+	public boolean isEnum()      { return enumConstants != null; }
 	
 	public List<FieldDef> getFields(){
-		if(fields==null) return List.of();
+		if(fields == null) return List.of();
 		return ArrayViewList.create(fields, null);
 	}
 	
@@ -141,7 +141,7 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 	}
 	@Override
 	public String toString(){
-		StringBuilder sb=new StringBuilder();
+		StringBuilder sb = new StringBuilder();
 		if(isIoInstance()) sb.append("IO");
 		if(isUnmanaged()) sb.append("U");
 		sb.append('{');

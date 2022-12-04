@@ -7,10 +7,10 @@ public class StructLayout extends IOInstance.Managed<StructLayout>{
 	@IOValue
 	private String typeName;
 	
-	public StructLayout(){}
+	public StructLayout(){ }
 	
 	public StructLayout(String typeName){
-		this.typeName=typeName;
+		this.typeName = typeName;
 	}
 	
 	

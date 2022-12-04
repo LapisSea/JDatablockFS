@@ -23,14 +23,14 @@ public class ContentOutputBuilder extends ByteArrayOutputStream implements Conte
 	@Override
 	public void writeWord(long v, int len) throws IOException{
 		
-		int oldCapacity=buf.length;
-		int minGrowth  =count+len-oldCapacity;
+		int oldCapacity = buf.length;
+		int minGrowth   = count + len - oldCapacity;
 		if(minGrowth>0){
 			ContentWriter.super.writeWord(v, len);
 			return;
 		}
 		MemPrimitive.setWord(v, buf, count, len);
-		count+=len;
+		count += len;
 	}
 	
 	@Override
@@ -40,7 +40,7 @@ public class ContentOutputBuilder extends ByteArrayOutputStream implements Conte
 	
 	@Override
 	public void writeBoolean(boolean v){
-		writeInt1(v?1:0);
+		writeInt1(v? 1 : 0);
 	}
 	
 	@Override

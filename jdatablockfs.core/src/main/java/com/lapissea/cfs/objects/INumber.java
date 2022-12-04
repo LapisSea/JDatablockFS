@@ -17,7 +17,7 @@ public interface INumber{
 	long getValue();
 	
 	default boolean equals(long value){
-		return getValue()==value;
+		return getValue() == value;
 	}
 	
 	default int compareTo(long o){

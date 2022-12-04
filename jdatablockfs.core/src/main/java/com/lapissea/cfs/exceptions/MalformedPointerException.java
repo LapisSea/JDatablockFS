@@ -6,7 +6,7 @@ import java.io.Serial;
 public class MalformedPointerException extends IOException{
 	
 	@Serial
-	private static final long serialVersionUID=6669766626830188682L;
+	private static final long serialVersionUID = 6669766626830188682L;
 	public MalformedPointerException(){
 	}
 	

@@ -16,8 +16,8 @@ public abstract class ContentInputStream extends InputStream implements ContentR
 		private ContentReader source;
 		
 		public Joining2(ContentReader first, ContentReader second){
-			this.other=second;
-			source=first;
+			this.other = second;
+			source = first;
 		}
 		
 		@Override
@@ -26,17 +26,17 @@ public abstract class ContentInputStream extends InputStream implements ContentR
 		}
 		
 		private boolean shouldPop(int val){
-			return val<0&&other!=null;
+			return val<0 && other != null;
 		}
 		
 		private void pop(){
-			source=other;
-			other=null;
+			source = other;
+			other = null;
 		}
 		
 		@Override
 		public int read() throws IOException{
-			int b=source.read();
+			int b = source.read();
 			if(shouldPop(b)){
 				pop();
 				return read();
@@ -46,7 +46,7 @@ public abstract class ContentInputStream extends InputStream implements ContentR
 		
 		@Override
 		public int read(@NotNull byte[] b, int off, int len) throws IOException{
-			int read=source.read(b, off, len);
+			int read = source.read(b, off, len);
 			if(shouldPop(read)){
 				pop();
 				return read(b, off, len);
@@ -56,8 +56,8 @@ public abstract class ContentInputStream extends InputStream implements ContentR
 		
 		@Override
 		public String toString(){
-			if(other==null) return "Joining{"+source+'}';
-			return "Joining{"+source+" + "+other+'}';
+			if(other == null) return "Joining{" + source + '}';
+			return "Joining{" + source + " + " + other + '}';
 		}
 	}
 	
@@ -67,38 +67,38 @@ public abstract class ContentInputStream extends InputStream implements ContentR
 		private       int    pos;
 		
 		public BA(byte[] ba){
-			this.ba=ba;
+			this.ba = ba;
 		}
 		
 		
 		@Override
 		public int read() throws IOException{
-			int rem=available();
-			if(rem==0) return -1;
+			int rem = available();
+			if(rem == 0) return -1;
 			return ba[pos++]&0xFF;
 		}
 		
 		@Override
 		public int read(@NotNull byte[] b, int off, int len) throws IOException{
-			int rem=available();
-			if(rem==0) return -1;
-			int read=Math.min(len, rem);
+			int rem = available();
+			if(rem == 0) return -1;
+			int read = Math.min(len, rem);
 			System.arraycopy(ba, pos, b, off, read);
-			pos+=read;
+			pos += read;
 			return read;
 		}
 		@Override
 		public long readWord(int len) throws IOException{
-			int rem=available();
+			int rem = available();
 			if(rem<len) throw new EOFException();
-			var val=MemPrimitive.getWord(ba, pos, len);
-			pos+=len;
+			var val = MemPrimitive.getWord(ba, pos, len);
+			pos += len;
 			return val;
 		}
 		
 		@Override
 		public String toString(){
-			return this.getClass().getSimpleName()+"{"+pos+"/"+ba.length+"}";
+			return this.getClass().getSimpleName() + "{" + pos + "/" + ba.length + "}";
 		}
 		
 		@Override
@@ -108,7 +108,7 @@ public abstract class ContentInputStream extends InputStream implements ContentR
 		
 		@Override
 		public int available(){
-			return ba.length-pos;
+			return ba.length - pos;
 		}
 		
 		public int getPos(){
@@ -121,28 +121,28 @@ public abstract class ContentInputStream extends InputStream implements ContentR
 		private final ByteBuffer bb;
 		
 		public BB(ByteBuffer bb){
-			this.bb=bb;
+			this.bb = bb;
 		}
 		
 		@Override
 		public int read() throws IOException{
-			int rem=available();
-			if(rem==0) return -1;
+			int rem = available();
+			if(rem == 0) return -1;
 			return bb.get();
 		}
 		
 		@Override
 		public int read(@NotNull byte[] b, int off, int len) throws IOException{
-			int rem=available();
-			if(rem==0) return -1;
-			if(len<rem) len=rem;
+			int rem = available();
+			if(rem == 0) return -1;
+			if(len<rem) len = rem;
 			bb.get(b, off, len);
 			return len;
 		}
 		
 		@Override
 		public String toString(){
-			return this.getClass().getSimpleName()+"{"+bb.position()+"/"+bb.limit()+"}";
+			return this.getClass().getSimpleName() + "{" + bb.position() + "/" + bb.limit() + "}";
 		}
 		
 		@Override
@@ -161,7 +161,7 @@ public abstract class ContentInputStream extends InputStream implements ContentR
 		private final InputStream in;
 		
 		public Wrapp(InputStream in){
-			this.in=in;
+			this.in = in;
 		}
 		
 		

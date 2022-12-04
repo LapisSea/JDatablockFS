@@ -22,8 +22,8 @@ import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 public class FixedStructPipe<T extends IOInstance<T>> extends BaseFixedStructPipe<T>{
 	
 	public static <T extends IOInstance<T>> PipeFieldCompiler<T, RuntimeException> compiler(){
-		return (t, structFields)->{
-			Set<IOField<T, ?>> sizeFields=sizeFieldStream(structFields).collect(Collectors.toSet());
+		return (t, structFields) -> {
+			Set<IOField<T, ?>> sizeFields = sizeFieldStream(structFields).collect(Collectors.toSet());
 			return fixedFields(t, structFields, sizeFields::contains, IOField::forceMaxAsFixedSize);
 		};
 	}
@@ -47,7 +47,7 @@ public class FixedStructPipe<T extends IOInstance<T>> extends BaseFixedStructPip
 	}
 	
 	private Map<IOField<T, NumberSize>, NumberSize> maxValues;
-	private boolean                                 maxValuesInited=false;
+	private boolean                                 maxValuesInited = false;
 	
 	public FixedStructPipe(Struct<T> type, boolean initNow){
 		this(type, compiler(), initNow);
@@ -69,24 +69,24 @@ public class FixedStructPipe<T extends IOInstance<T>> extends BaseFixedStructPip
 	}
 	
 	private void setMax(T instance, VarPool<T> ioPool){
-		maxValues.forEach((k, v)->k.set(ioPool, instance, v));
+		maxValues.forEach((k, v) -> k.set(ioPool, instance, v));
 	}
 	private void initMax(){
-		maxValuesInited=true;
-		maxValues=Utils.nullIfEmpty(computeMaxValues(getType().getFields()));
+		maxValuesInited = true;
+		maxValues = Utils.nullIfEmpty(computeMaxValues(getType().getFields()));
 	}
 	
 	@Override
 	protected void doWrite(DataProvider provider, ContentWriter dest, VarPool<T> ioPool, T instance) throws IOException{
 		if(!maxValuesInited) initMax();
-		if(maxValues!=null) setMax(instance, ioPool);
+		if(maxValues != null) setMax(instance, ioPool);
 		writeIOFields(getSpecificFields(), ioPool, provider, dest, instance);
 	}
 	
 	@Override
 	protected T doRead(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		if(!maxValuesInited) initMax();
-		if(maxValues!=null) setMax(instance, ioPool);
+		if(maxValues != null) setMax(instance, ioPool);
 		readIOFields(getSpecificFields(), ioPool, provider, src, instance, genericContext);
 		return instance;
 	}

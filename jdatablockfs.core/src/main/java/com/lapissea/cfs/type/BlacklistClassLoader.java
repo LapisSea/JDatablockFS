@@ -14,26 +14,26 @@ public final class BlacklistClassLoader extends ClassLoader{
 	}
 	public BlacklistClassLoader(boolean deepBlacklist, ClassLoader parent, List<Predicate<String>> blacklist){
 		super(parent);
-		this.deepBlacklist=deepBlacklist;
-		this.blacklist=List.copyOf(blacklist);
+		this.deepBlacklist = deepBlacklist;
+		this.blacklist = List.copyOf(blacklist);
 	}
 	@Override
 	protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException{
-		if(blacklist.stream().anyMatch(b->b.test(name))){
-			throw new ClassNotFoundException("Blacklisted: "+name);
+		if(blacklist.stream().anyMatch(b -> b.test(name))){
+			throw new ClassNotFoundException("Blacklisted: " + name);
 		}
 		
 		if(name.startsWith("java.lang")) return getParent().loadClass(name);
 		
-		var cls=super.loadClass(name, resolve);
+		var cls = super.loadClass(name, resolve);
 		if(!deepBlacklist) return cls;
 		
-		if(cls.getClassLoader()==getParent()){
+		if(cls.getClassLoader() == getParent()){
 			synchronized(getClassLoadingLock(name)){
-				var r=getResourceAsStream(name.replace('.', '/')+".class");
-				if(r==null) return getParent().loadClass(name);
+				var r = getResourceAsStream(name.replace('.', '/') + ".class");
+				if(r == null) return getParent().loadClass(name);
 				try(r){
-					var bb=r.readAllBytes();
+					var bb = r.readAllBytes();
 					return defineClass(name, bb, 0, bb.length);
 				}catch(IOException e){
 					throw new RuntimeException(e);

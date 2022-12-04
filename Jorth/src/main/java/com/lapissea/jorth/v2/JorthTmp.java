@@ -1,42 +1,30 @@
 package com.lapissea.jorth.v2;
 
+import com.lapissea.jorth.MalformedJorthException;
 import com.lapissea.jorth.lang.BytecodeUtils;
 import com.lapissea.util.LogUtil;
+import com.lapissea.util.function.UnsafeConsumer;
 
 import java.lang.invoke.MethodHandles;
 
 public class JorthTmp{
 	
-	String foo;
-	
-	static{
-		LogUtil.println("hi");
-	}
-	
-	JorthTmp(){
-		foo="123";
-	}
-	
 	public static void main(String[] args) throws Throwable{
 		LogUtil.println("Starting");
-		Thread.ofVirtual().start(()->{});
-		long t=System.currentTimeMillis();
+		Thread.ofVirtual().start(() -> { });
 		
-		var jorth=new Jorth(null, true);
-		jorth.addImport(String.class);
-		jorth.addImport(StringBuilder.class);
-		
-		var writer=jorth.writer();
-		
-		writer.write(
-			"""
-				visibility public
-				class com.lapissea.jorth.v2.FooBar start
-					visibility public
+		test2();
+	}
+	
+	private static void test1() throws Throwable{
+		var cls = timedClass("com.lapissea.jorth.v2.FooBar", writer -> {
+			writer.write(
+				"""
+					visibility private
 					field foo #String
 					
 					visibility public
-					function getFoo
+					function fooGet
 						returns #String
 					start
 						get this foo
@@ -53,31 +41,78 @@ public class JorthTmp{
 						returns #String
 					start
 						new #StringBuilder
-						call append start
-							'{foo: '
-						end
+						call append start '{foo: ' end
 						
 						call append start
 							get this foo
 						end
+						call append start '}' end
 						call toString start end
 					end
-				end
-				""");
+					""");
+		});
 		
-		var file=jorth.getClassFile("com.lapissea.jorth.v2.FooBar");
 		
-		LogUtil.println();
-		LogUtil.println(System.currentTimeMillis()-t);
-		BytecodeUtils.printClass(file);
-		var cls=MethodHandles.lookup().defineClass(file);
 		LogUtil.println();
 		LogUtil.println(cls);
 		
-		var inst=cls.getConstructor().newInstance();
+		var inst = cls.getConstructor().newInstance();
 		LogUtil.println(inst);
 		
-		LogUtil.println(cls.getMethod("getFoo").invoke(inst));
+		LogUtil.println(cls.getMethod("fooGet").invoke(inst));
 	}
 	
+	private static void test2() throws Throwable{
+		var cls = timedClass("com.lapissea.jorth.v2.FooBar2", writer -> {
+			writer.write(
+				"""
+					visibility public
+					function toString
+						arg val int
+						returns #String
+					start
+						get #arg val 1 equals
+						if start
+							'is 1' return
+						end
+						
+						'isn't 1' return
+					end
+					""");
+		});
+		
+		
+		LogUtil.println();
+		LogUtil.println(cls);
+		
+		var inst = cls.getConstructor().newInstance();
+		LogUtil.println(inst);
+		
+		LogUtil.println(cls.getMethod("fooGet").invoke(inst));
+	}
+	
+	static Class<?> timedClass(String name, UnsafeConsumer<CodeStream, MalformedJorthException> write) throws MalformedJorthException, IllegalAccessException{
+		long t = System.currentTimeMillis();
+		
+		var jorth = new Jorth(null, true);
+		jorth.addImport(String.class);
+		jorth.addImport(StringBuilder.class);
+		
+		var writer = jorth.writer();
+		
+		writer.write(
+			"""
+				visibility public
+				class {!} start
+				""", name);
+		write.accept(writer);
+		writer.write("end");
+		
+		var file = jorth.getClassFile(name);
+		
+		LogUtil.println();
+		LogUtil.println(System.currentTimeMillis() - t);
+		BytecodeUtils.printClass(file);
+		return MethodHandles.lookup().defineClass(file);
+	}
 }

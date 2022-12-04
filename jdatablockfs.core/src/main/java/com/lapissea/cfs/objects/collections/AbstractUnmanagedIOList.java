@@ -19,37 +19,37 @@ public abstract class AbstractUnmanagedIOList<T, SELF extends AbstractUnmanagedI
 	
 	private IOField<SELF, ?> sizeField;
 	
-	public AbstractUnmanagedIOList(DataProvider provider, Reference reference, TypeLink typeDef, TypeLink.Check check){super(provider, reference, typeDef, check);}
-	public AbstractUnmanagedIOList(DataProvider provider, Reference reference, TypeLink typeDef)                      {super(provider, reference, typeDef);}
+	public AbstractUnmanagedIOList(DataProvider provider, Reference reference, TypeLink typeDef, TypeLink.Check check){ super(provider, reference, typeDef, check); }
+	public AbstractUnmanagedIOList(DataProvider provider, Reference reference, TypeLink typeDef)                      { super(provider, reference, typeDef); }
 	
 	public abstract RuntimeType<T> getElementType();
 	
 	@Override
 	public boolean equals(Object o){
-		if(this==o){
+		if(this == o){
 			return true;
 		}
 		if(!(o instanceof IOList<?> that)){
 			return false;
 		}
 		
-		var siz=size();
-		if(siz!=that.size()){
+		var siz = size();
+		if(siz != that.size()){
 			return false;
 		}
 		
-		if(that instanceof AbstractUnmanagedIOList<?, ?> ioL&&
+		if(that instanceof AbstractUnmanagedIOList<?, ?> ioL &&
 		   !getElementType().equals(ioL.getElementType())){
 			return false;
 		}
 		
-		var iThis=iterator();
-		var iThat=that.iterator();
+		var iThis = iterator();
+		var iThat = that.iterator();
 		
-		for(long i=0;i<siz;i++){
+		for(long i = 0; i<siz; i++){
 			try{
-				var vThis=iThis.ioNext();
-				var vThat=iThat.ioNext();
+				var vThis = iThis.ioNext();
+				var vThat = iThat.ioNext();
 				
 				if(!vThis.equals(vThat)){
 					return false;
@@ -64,17 +64,17 @@ public abstract class AbstractUnmanagedIOList<T, SELF extends AbstractUnmanagedI
 	
 	@Override
 	public int hashCode(){
-		int result=1;
-		result=31*result+getReference().hashCode();
-		result=31*result+getElementType().hashCode();
+		int result = 1;
+		result = 31*result + getReference().hashCode();
+		result = 31*result + getElementType().hashCode();
 		return result;
 	}
 	
 	@NotNull
-	protected String getStringPrefix(){return "";}
+	protected String getStringPrefix(){ return ""; }
 	
 	private String freeStr(){
-		return getStringPrefix()+"{size: "+size()+", at: "+getReference()+" deallocated}";
+		return getStringPrefix() + "{size: " + size() + ", at: " + getReference() + " deallocated}";
 	}
 	
 	@Override
@@ -83,7 +83,7 @@ public abstract class AbstractUnmanagedIOList<T, SELF extends AbstractUnmanagedI
 			return freeStr();
 		}
 		
-		StringJoiner sj=new StringJoiner(", ", getStringPrefix()+"{size: "+size()+"}"+"[", "]");
+		StringJoiner sj = new StringJoiner(", ", getStringPrefix() + "{size: " + size() + "}" + "[", "]");
 		IOList.elementSummary(sj, this);
 		return sj.toString();
 	}
@@ -93,7 +93,7 @@ public abstract class AbstractUnmanagedIOList<T, SELF extends AbstractUnmanagedI
 			return freeStr();
 		}
 		
-		StringJoiner sj=new StringJoiner(", ", "[", "]");
+		StringJoiner sj = new StringJoiner(", ", "[", "]");
 		IOList.elementSummary(sj, this);
 		return sj.toString();
 	}
@@ -104,7 +104,7 @@ public abstract class AbstractUnmanagedIOList<T, SELF extends AbstractUnmanagedI
 		if(DEBUG_VALIDATION){
 			boolean dataFreed;
 			try{
-				dataFreed=getDataProvider().getMemoryManager().getFreeChunks().contains(getReference().getPtr());
+				dataFreed = getDataProvider().getMemoryManager().getFreeChunks().contains(getReference().getPtr());
 			}catch(IOException e){
 				throw new RuntimeException(e);
 			}
@@ -130,23 +130,23 @@ public abstract class AbstractUnmanagedIOList<T, SELF extends AbstractUnmanagedI
 	
 	@Override
 	public T addNew(UnsafeConsumer<T, IOException> initializer) throws IOException{
-		T val=getElementType().make();
-		if(initializer!=null){
+		T val = getElementType().make();
+		if(initializer != null){
 			initializer.accept(val);
 		}
 		add(val);
 		if(DEBUG_VALIDATION){
-			get(size()-1);
+			get(size() - 1);
 		}
 		return val;
 	}
 	
 	protected void deltaSize(long delta) throws IOException{
-		if(sizeField==null){
-			var pipe=newPipe();
-			sizeField=pipe.getSpecificFields().byName("size").orElseThrow();
+		if(sizeField == null){
+			var pipe = newPipe();
+			sizeField = pipe.getSpecificFields().byName("size").orElseThrow();
 		}
-		setSize(size()+delta);
+		setSize(size() + delta);
 		writeManagedField(sizeField);
 	}
 	
@@ -156,6 +156,6 @@ public abstract class AbstractUnmanagedIOList<T, SELF extends AbstractUnmanagedI
 		checkSize(index, 0);
 	}
 	protected final void checkSize(long index, long sizeMod){
-		Objects.checkIndex(index, size()+sizeMod);
+		Objects.checkIndex(index, size() + sizeMod);
 	}
 }

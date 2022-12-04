@@ -17,22 +17,22 @@ public abstract class AbstractUnmanagedIOMap<K, V> extends IOInstance.Unmanaged<
 	@IODependency.VirtualNumSize
 	private long size;
 	
-	private final IOFieldPrimitive.FLong<AbstractUnmanagedIOMap<K, V>> sizeField=getThisStruct().getFields().requireExactLong("size");
+	private final IOFieldPrimitive.FLong<AbstractUnmanagedIOMap<K, V>> sizeField = getThisStruct().getFields().requireExactLong("size");
 	
-	protected AbstractUnmanagedIOMap(DataProvider provider, Reference reference, TypeLink typeDef, TypeLink.Check check){super(provider, reference, typeDef, check);}
-	public AbstractUnmanagedIOMap(DataProvider provider, Reference reference, TypeLink typeDef)                         {super(provider, reference, typeDef);}
+	protected AbstractUnmanagedIOMap(DataProvider provider, Reference reference, TypeLink typeDef, TypeLink.Check check){ super(provider, reference, typeDef, check); }
+	public AbstractUnmanagedIOMap(DataProvider provider, Reference reference, TypeLink typeDef)                         { super(provider, reference, typeDef); }
 	
 	@Override
-	public long size(){return size;}
+	public long size(){ return size; }
 	
 	protected void deltaSize(long delta) throws IOException{
-		this.size+=delta;
-		getDataProvider().getSource().openIOTransaction(()->writeManagedField(sizeField));
+		this.size += delta;
+		getDataProvider().getSource().openIOTransaction(() -> writeManagedField(sizeField));
 	}
 	
 	@Override
 	public boolean equals(Object o){
-		if(o==this)
+		if(o == this)
 			return true;
 		
 		if(!(o instanceof IOMap m)) return false;
@@ -45,18 +45,18 @@ public abstract class AbstractUnmanagedIOMap<K, V> extends IOInstance.Unmanaged<
 	}
 	
 	public boolean equals(IOMap<K, V> m) throws IOException{
-		var siz =size();
-		var mSiz=m.size();
-		if(siz!=mSiz){
+		var siz  = size();
+		var mSiz = m.size();
+		if(siz != mSiz){
 			return false;
 		}
 		
 		try{
 			for(IOEntry<K, V> e : this){
-				K key  =e.getKey();
-				V value=e.getValue();
-				if(value==null){
-					if(!(m.get(key)==null&&m.containsKey(key)))
+				K key   = e.getKey();
+				V value = e.getValue();
+				if(value == null){
+					if(!(m.get(key) == null && m.containsKey(key)))
 						return false;
 				}else{
 					if(!value.equals(m.get(key)))

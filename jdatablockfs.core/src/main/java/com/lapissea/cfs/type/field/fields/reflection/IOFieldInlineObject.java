@@ -28,27 +28,27 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 	}
 	private IOFieldInlineObject(FieldAccessor<CTyp> accessor, VaryingSize.Provider varProvider){
 		super(accessor);
-		this.fixed=varProvider!=null;
+		this.fixed = varProvider != null;
 		
 		@SuppressWarnings("unchecked")
-		var struct=(Struct<ValueType>)Struct.ofUnknown(getType());
+		var struct = (Struct<ValueType>)Struct.ofUnknown(getType());
 		if(fixed){
-			instancePipe=FixedVaryingStructPipe.tryVarying(struct, varProvider);
-		}else instancePipe=StandardStructPipe.of(struct);
+			instancePipe = FixedVaryingStructPipe.tryVarying(struct, varProvider);
+		}else instancePipe = StandardStructPipe.of(struct);
 		
-		var desc=instancePipe.getSizeDescriptor();
+		var desc = instancePipe.getSizeDescriptor();
 		
-		var fixedSiz=desc.getFixed();
+		var fixedSiz = desc.getFixed();
 		if(fixedSiz.isPresent()){
-			descriptor=SizeDescriptor.Fixed.of(desc.getWordSpace(), fixedSiz.getAsLong());
+			descriptor = SizeDescriptor.Fixed.of(desc.getWordSpace(), fixedSiz.getAsLong());
 		}else{
-			descriptor=SizeDescriptor.Unknown.of(
+			descriptor = SizeDescriptor.Unknown.of(
 				desc.getWordSpace(),
-				nullable()?0:desc.getMin(),
+				nullable()? 0 : desc.getMin(),
 				desc.getMax(),
-				(ioPool, prov, inst)->{
-					var val=get(null, inst);
-					if(val==null){
+				(ioPool, prov, inst) -> {
+					var val = get(null, inst);
+					if(val == null){
 						if(!nullable()) throw new NullPointerException();
 						return 0;
 					}
@@ -60,7 +60,7 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 	
 	@Override
 	public ValueType get(VarPool<CTyp> ioPool, CTyp instance){
-		return getNullable(ioPool, instance, ()->instancePipe.getType().make());
+		return getNullable(ioPool, instance, () -> instancePipe.getType().make());
 	}
 	
 	@Override
@@ -83,9 +83,9 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 	
 	@Override
 	public void write(VarPool<CTyp> ioPool, DataProvider provider, ContentWriter dest, CTyp instance) throws IOException{
-		var val=get(ioPool, instance);
+		var val = get(ioPool, instance);
 		if(nullable()){
-			if(val==null){
+			if(val == null){
 				if(fixed){
 					IUtils.zeroFill(dest::write, (int)getSizeDescriptor().requireFixed(WordSpace.BYTE));
 				}
@@ -97,7 +97,7 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 	
 	private ValueType readNew(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
 		if(nullable()){
-			boolean isNull=getIsNull(ioPool, instance);
+			boolean isNull = getIsNull(ioPool, instance);
 			if(isNull){
 				if(fixed){
 					src.skipExact((int)getSizeDescriptor().requireFixed(WordSpace.BYTE));
@@ -121,7 +121,7 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 		}
 		
 		if(nullable()){
-			boolean isNull=getIsNull(ioPool, instance);
+			boolean isNull = getIsNull(ioPool, instance);
 			if(isNull){
 				if(fixed){
 					src.skipExact((int)getSizeDescriptor().requireFixed(WordSpace.BYTE));

@@ -25,7 +25,7 @@ import static com.lapissea.cfs.type.field.annotations.IODependency.VirtualNumSiz
 @Target({ElementType.FIELD, ElementType.METHOD})
 public @interface IODependency{
 	
-	AnnotationLogic<IODependency> LOGIC=new AnnotationLogic<>(){
+	AnnotationLogic<IODependency> LOGIC = new AnnotationLogic<>(){
 		@NotNull
 		@Override
 		public Set<String> getDependencyValueNames(FieldAccessor<?> field, IODependency annotation){
@@ -39,7 +39,7 @@ public @interface IODependency{
 	@Target({ElementType.FIELD, ElementType.METHOD})
 	@interface NumSize{
 		
-		AnnotationLogic<NumSize> LOGIC=new AnnotationLogic<>(){
+		AnnotationLogic<NumSize> LOGIC = new AnnotationLogic<>(){
 			@NotNull
 			@Override
 			public Set<String> getDependencyValueNames(FieldAccessor<?> field, NumSize annotation){
@@ -54,11 +54,11 @@ public @interface IODependency{
 	@Target({ElementType.FIELD, ElementType.METHOD})
 	@interface ArrayLenSize{
 		
-		AnnotationLogic<ArrayLenSize> LOGIC=new AnnotationLogic<>(){
+		AnnotationLogic<ArrayLenSize> LOGIC = new AnnotationLogic<>(){
 			@Override
 			public void validate(FieldAccessor<?> field, ArrayLenSize annotation){
 				if(!field.getType().isArray()){
-					throw new MalformedStruct(ArrayLenSize.class.getSimpleName()+" can be used only on arrays");
+					throw new MalformedStruct(ArrayLenSize.class.getSimpleName() + " can be used only on arrays");
 				}
 			}
 		};
@@ -84,7 +84,7 @@ public @interface IODependency{
 			}
 			
 			public static String getName(FieldAccessor<?> field, VirtualNumSize size){
-				var nam=size.name();
+				var nam = size.name();
 				if(nam.isEmpty()){
 					return IOFieldTools.makeNumberSizeName(field.getName());
 				}
@@ -94,17 +94,17 @@ public @interface IODependency{
 			@NotNull
 			@Override
 			public <T extends IOInstance<T>> List<VirtualFieldDefinition<T, ?>> injectPerInstanceValue(FieldAccessor<T> field, VirtualNumSize ann){
-				var unsigned=field.hasAnnotation(IOValue.Unsigned.class);
+				var unsigned = field.hasAnnotation(IOValue.Unsigned.class);
 				return List.of(new VirtualFieldDefinition<>(
-					ann.retention()==GHOST?IO:INSTANCE,
+					ann.retention() == GHOST? IO : INSTANCE,
 					getName(field, ann),
 					NumberSize.class,
 					new VirtualFieldDefinition.GetterFilter<T, NumberSize>(){
 						private NumberSize calcMax(VarPool<T> ioPool, T inst, List<FieldAccessor<T>> deps){
-							var len=calcMaxVal(ioPool, inst, deps);
+							var len = calcMaxVal(ioPool, inst, deps);
 							if(len<0){
 								if(unsigned) return NumberSize.VOID;
-								len*=-1;
+								len *= -1;
 							}
 							return NumberSize.bySize(len);
 						}
@@ -112,16 +112,16 @@ public @interface IODependency{
 							return switch(deps.size()){
 								case 1 -> deps.get(0).getLong(ioPool, inst);
 								case 2 -> {
-									long a=deps.get(0).getLong(ioPool, inst);
-									long b=deps.get(1).getLong(ioPool, inst);
+									long a = deps.get(0).getLong(ioPool, inst);
+									long b = deps.get(1).getLong(ioPool, inst);
 									yield Math.max(a, b);
 								}
 								default -> {
-									long best=Long.MIN_VALUE;
+									long best = Long.MIN_VALUE;
 									for(var d : deps){
-										long newVal=d.getLong(ioPool, inst);
+										long newVal = d.getLong(ioPool, inst);
 										if(newVal>best){
-											best=newVal;
+											best = newVal;
 										}
 									}
 									yield best;
@@ -130,18 +130,18 @@ public @interface IODependency{
 						}
 						@Override
 						public NumberSize filter(VarPool<T> ioPool, T inst, List<FieldAccessor<T>> deps, NumberSize val){
-							NumberSize s=(switch(ann.retention()){
+							NumberSize s = (switch(ann.retention()){
 								case GROW_ONLY -> {
-									if(val==ann.max()) yield ann.max();
-									yield calcMax(ioPool, inst, deps).max(val==null?NumberSize.VOID:val);
+									if(val == ann.max()) yield ann.max();
+									yield calcMax(ioPool, inst, deps).max(val == null? NumberSize.VOID : val);
 								}
 								case RIGID_INITIAL, GHOST -> {
-									yield val==null?calcMax(ioPool, inst, deps):val;
+									yield val == null? calcMax(ioPool, inst, deps) : val;
 								}
 							}).max(ann.min());
 							
 							if(s.greaterThan(ann.max())){
-								throw new RuntimeException(s+" can't fit in to "+ann.max());
+								throw new RuntimeException(s + " can't fit in to " + ann.max());
 							}
 							
 							return s;
@@ -150,7 +150,7 @@ public @interface IODependency{
 			}
 		}
 		
-		AnnotationLogic<VirtualNumSize> LOGIC=new Logic();
+		AnnotationLogic<VirtualNumSize> LOGIC = new Logic();
 		
 		
 		String name() default "";

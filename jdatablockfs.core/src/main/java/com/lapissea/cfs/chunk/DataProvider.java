@@ -23,13 +23,13 @@ public interface DataProvider{
 	}
 	
 	class VerySimple implements DataProvider{
-		private final IOTypeDB      typeDB       =new IOTypeDB.MemoryOnlyDB();
-		private final ChunkCache    cache        =ChunkCache.strong();
-		private final MemoryManager memoryManager=new VerySimpleMemoryManager(this);
+		private final IOTypeDB      typeDB        = new IOTypeDB.MemoryOnlyDB();
+		private final ChunkCache    cache         = ChunkCache.strong();
+		private final MemoryManager memoryManager = new VerySimpleMemoryManager(this);
 		private final IOInterface   data;
 		
 		public VerySimple(IOInterface data){
-			this.data=data;
+			this.data = data;
 		}
 		
 		@Override
@@ -63,10 +63,10 @@ public interface DataProvider{
 	}
 	
 	static DataProvider newVerySimpleProvider(MemoryData.EventLogger onWrite){
-		var data=new MemoryData.Builder()
-			         .withOnWrite(onWrite)
-			         .withInitial(MagicID::write)
-			         .build();
+		var data = new MemoryData.Builder()
+			           .withOnWrite(onWrite)
+			           .withInitial(MagicID::write)
+			           .build();
 		return newVerySimpleProvider(data);
 	}
 	
@@ -95,14 +95,14 @@ public interface DataProvider{
 	}
 	
 	private void ensureChunkValid(ChunkPointer ptr) throws IOException{
-		var siz=getSource().getIOSize();
+		var siz = getSource().getIOSize();
 		if(ptr.getValue()>=siz){
-			throw new MalformedPointerException(ptr.getValue()+" is pointing outside file (file size: "+siz+")");
+			throw new MalformedPointerException(ptr.getValue() + " is pointing outside file (file size: " + siz + ")");
 		}
 		
-		var cached=getChunkCache().get(ptr);
-		if(cached==null) return;
-		var read=readChunk(ptr);
+		var cached = getChunkCache().get(ptr);
+		if(cached == null) return;
+		var read = readChunk(ptr);
 		if(!read.equals(cached)){
 			throw new DesyncedCacheException(read, cached);
 		}
@@ -119,12 +119,12 @@ public interface DataProvider{
 	default boolean isLastPhysical(Chunk chunk) throws IOException{
 		return chunk.dataEnd()>=getSource().getIOSize();
 	}
-	default void validate(){}
+	default void validate(){ }
 	
 	default void checkCached(Chunk chunk){
-		Chunk cached=getChunkCached(chunk.getPtr());
-		if(cached!=chunk){
-			throw new IllegalStateException("Fake "+chunk);
+		Chunk cached = getChunkCached(chunk.getPtr());
+		if(cached != chunk){
+			throw new IllegalStateException("Fake " + chunk);
 		}
 	}
 	
@@ -135,22 +135,22 @@ public interface DataProvider{
 			}
 			
 			@Override
-			public IOTypeDB getTypeDb(){return DataProvider.this.getTypeDb();}
+			public IOTypeDB getTypeDb(){ return DataProvider.this.getTypeDb(); }
 			@Override
-			public IOInterface getSource(){return DataProvider.this.getSource();}
+			public IOInterface getSource(){ return DataProvider.this.getSource(); }
 			@Override
-			public MemoryManager getMemoryManager(){return this;}
+			public MemoryManager getMemoryManager(){ return this; }
 			@Override
-			public ChunkCache getChunkCache(){return DataProvider.this.getChunkCache();}
+			public ChunkCache getChunkCache(){ return DataProvider.this.getChunkCache(); }
 			@Override
-			public Chunk getFirstChunk() throws IOException{return DataProvider.this.getFirstChunk();}
+			public Chunk getFirstChunk() throws IOException{ return DataProvider.this.getFirstChunk(); }
 			
 			@Override
-			public DefragSes openDefragmentMode(){return src().openDefragmentMode();}
+			public DefragSes openDefragmentMode(){ return src().openDefragmentMode(); }
 			@Override
-			public IOList<ChunkPointer> getFreeChunks(){return src().getFreeChunks();}
+			public IOList<ChunkPointer> getFreeChunks(){ return src().getFreeChunks(); }
 			@Override
-			public DataProvider getDataProvider(){return this;}
+			public DataProvider getDataProvider(){ return this; }
 			@Override
 			public void free(Collection<Chunk> toFree) throws IOException{
 				src().free(toFree);

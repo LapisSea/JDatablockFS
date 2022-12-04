@@ -13,7 +13,7 @@ public enum Access{
 	public final int flag;
 	
 	Access(int flag){
-		this.flag=flag;
+		this.flag = flag;
 	}
 	
 }

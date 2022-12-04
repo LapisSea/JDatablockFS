@@ -28,22 +28,22 @@ import static com.lapissea.util.LogUtil.Init.USE_TABULATED_HEADER;
 
 public class LoggedMemoryUtils{
 	
-	private static WeakReference<Map<String, Object>> CONFIG=new WeakReference<>(null);
+	private static WeakReference<Map<String, Object>> CONFIG = new WeakReference<>(null);
 	
 	public static Map<String, Object> readConfig(){
-		Map<String, Object> config=CONFIG.get();
-		if(config!=null) return config;
+		Map<String, Object> config = CONFIG.get();
+		if(config != null) return config;
 		
 		Map<String, Object> newConf;
 		
-		try(var r=new FileReader(new File("config.json").getAbsoluteFile())){
-			newConf=new HashMap<>(new GsonBuilder().create().<Map<String, Object>>fromJson(r, HashMap.class));
+		try(var r = new FileReader(new File("config.json").getAbsoluteFile())){
+			newConf = new HashMap<>(new GsonBuilder().create().<Map<String, Object>>fromJson(r, HashMap.class));
 		}catch(Exception e){
-			newConf=new HashMap<>();
-			Log.warn("Unable to load config: "+e);
+			newConf = new HashMap<>();
+			Log.warn("Unable to load config: " + e);
 		}
 		
-		CONFIG=new WeakReference<>(Collections.unmodifiableMap(newConf));
+		CONFIG = new WeakReference<>(Collections.unmodifiableMap(newConf));
 		return newConf;
 	}
 	
@@ -52,11 +52,11 @@ public class LoggedMemoryUtils{
 	}
 	public static void simpleLoggedMemorySession(String sessionName, UnsafeConsumer<IOInterface, IOException> session) throws IOException{
 		
-		var logger=LoggedMemoryUtils.createLoggerFromConfig();
+		var logger = LoggedMemoryUtils.createLoggerFromConfig();
 		
 		try{
-			var mem=LoggedMemoryUtils.newLoggedMemory(sessionName, logger);
-			logger.ifInited(l->l.getSession(sessionName).reset());
+			var mem = LoggedMemoryUtils.newLoggedMemory(sessionName, logger);
+			logger.ifInited(l -> l.getSession(sessionName).reset());
 			
 			try{
 				session.accept(mem);
@@ -70,41 +70,41 @@ public class LoggedMemoryUtils{
 	}
 	
 	public static LateInit.Safe<DataLogger> createLoggerFromConfig(){
-		var config=readConfig();
+		var config = readConfig();
 		
-		if(LogUtil.Init.OUT==System.out){
-			var fancy=Boolean.parseBoolean(config.getOrDefault("fancyPrint", "true").toString());
-			LogUtil.Init.attach(fancy?USE_CALL_POS|USE_TABULATED_HEADER:0);
+		if(LogUtil.Init.OUT == System.out){
+			var fancy = Boolean.parseBoolean(config.getOrDefault("fancyPrint", "true").toString());
+			LogUtil.Init.attach(fancy? USE_CALL_POS|USE_TABULATED_HEADER : 0);
 		}
 		
-		var loggerConfig=(Map<String, Object>)config.getOrDefault("logger", Map.of());
+		var loggerConfig = (Map<String, Object>)config.getOrDefault("logger", Map.of());
 		
-		var type=loggerConfig.getOrDefault("type", "none").toString();
+		var type = loggerConfig.getOrDefault("type", "none").toString();
 		
-		return new LateInit.Safe<>(()->switch(type){
+		return new LateInit.Safe<>(() -> switch(type){
 			case "none" -> DataLogger.Blank.INSTANCE;
 			case "direct" -> new DisplayManager();
 			case "server" -> new DisplayIpc(loggerConfig);
-			default -> throw new IllegalArgumentException("logger.type unknown value \""+type+"\"");
+			default -> throw new IllegalArgumentException("logger.type unknown value \"" + type + "\"");
 		});
 	}
 	
 	public static MemoryData<?> newLoggedMemory(String sessionName, LateInit<DataLogger, RuntimeException> logger) throws IOException{
 		MemoryData.EventLogger proxyLogger;
 		if(logger.isInitialized()){
-			DataLogger disp=logger.get();
+			DataLogger disp = logger.get();
 			if(disp instanceof DataLogger.Blank){
-				proxyLogger=(d, i)->{};
+				proxyLogger = (d, i) -> { };
 			}else{
-				var ses=disp.getSession(sessionName);
-				if(ses==DataLogger.Session.Blank.INSTANCE) proxyLogger=(d, i)->{};
-				else proxyLogger=new MemoryData.EventLogger(){
-					private long frameId=0;
+				var ses = disp.getSession(sessionName);
+				if(ses == DataLogger.Session.Blank.INSTANCE) proxyLogger = (d, i) -> { };
+				else proxyLogger = new MemoryData.EventLogger(){
+					private long frameId = 0;
 					@Override
 					public void log(MemoryData<?> data, LongStream ids) throws IOException{
 						long id;
 						synchronized(this){
-							id=frameId;
+							id = frameId;
 							frameId++;
 						}
 						ses.log(new MemFrame(id, System.nanoTime(), data.readAll(), ids.toArray(), new Throwable()));
@@ -112,13 +112,13 @@ public class LoggedMemoryUtils{
 				};
 			}
 		}else{
-			var  preBuf=new LinkedList<MemFrame>();
-			Lock lock  =new ReentrantLock();
-			Thread.ofVirtual().start(()->{
+			var  preBuf = new LinkedList<MemFrame>();
+			Lock lock   = new ReentrantLock();
+			Thread.ofVirtual().start(() -> {
 				UtilL.sleepUntil(logger::isInitialized, 20);
 				lock.lock();
 				try{
-					var ses=logger.get().getSession(sessionName);
+					var ses = logger.get().getSession(sessionName);
 					while(!preBuf.isEmpty()){
 						ses.log(preBuf.remove(0));
 					}
@@ -128,24 +128,24 @@ public class LoggedMemoryUtils{
 				}
 			});
 			
-			long[] frameId={0};
-			proxyLogger=(data, ids)->{
+			long[] frameId = {0};
+			proxyLogger = (data, ids) -> {
 				if(logger.isInitialized()){
-					var d=logger.get();
+					var d = logger.get();
 					if(!d.isActive()){
 						return;
 					}
 				}
 				long id;
 				synchronized(frameId){
-					id=frameId[0];
+					id = frameId[0];
 					frameId[0]++;
 				}
-				var memFrame=new MemFrame(id, System.nanoTime(), data.readAll(), ids.toArray(), new Throwable());
+				var memFrame = new MemFrame(id, System.nanoTime(), data.readAll(), ids.toArray(), new Throwable());
 				lock.lock();
 				try{
 					if(logger.isInitialized()){
-						var ses=logger.get().getSession(sessionName);
+						var ses = logger.get().getSession(sessionName);
 						while(!preBuf.isEmpty()){
 							ses.log(preBuf.remove(0));
 						}
@@ -159,7 +159,7 @@ public class LoggedMemoryUtils{
 			};
 		}
 		
-		MemoryData<?> mem=MemoryData.builder().withCapacity(0).withOnWrite(proxyLogger).build();
+		MemoryData<?> mem = MemoryData.builder().withCapacity(0).withOnWrite(proxyLogger).build();
 		
 		mem.onWrite.log(mem, LongStream.of());
 		

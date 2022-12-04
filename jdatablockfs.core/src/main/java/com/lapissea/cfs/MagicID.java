@@ -11,7 +11,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 public class MagicID{
 	
-	private static final ByteBuffer MAGIC_ID=ByteBuffer.wrap("BYT-BAE".getBytes(UTF_8)).asReadOnlyBuffer();
+	private static final ByteBuffer MAGIC_ID = ByteBuffer.wrap("BYT-BAE".getBytes(UTF_8)).asReadOnlyBuffer();
 	
 	public static int size(){
 		return MAGIC_ID.limit();
@@ -23,9 +23,9 @@ public class MagicID{
 	public static void read(ContentReader src) throws InvalidMagicIDException{
 		ByteBuffer magicId;
 		try{
-			magicId=ByteBuffer.wrap(src.readInts1(MAGIC_ID.limit()));
+			magicId = ByteBuffer.wrap(src.readInts1(MAGIC_ID.limit()));
 			if(!magicId.equals(MAGIC_ID)){
-				throw new InvalidMagicIDException("ID: "+UTF_8.decode(magicId));
+				throw new InvalidMagicIDException("ID: " + UTF_8.decode(magicId));
 			}
 		}catch(IOException e){
 			throw new InvalidMagicIDException("There is no valid magic id, was Cluster.init called?", e);

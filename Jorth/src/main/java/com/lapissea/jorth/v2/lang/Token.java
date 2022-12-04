@@ -11,13 +11,13 @@ public sealed interface Token{
 	
 	record KWord(int line, Keyword keyword) implements Token{
 		public void require(Keyword keyword) throws MalformedJorthException{
-			if(this.keyword!=keyword) throw new MalformedJorthException("Required keyword is "+keyword+" but got "+this.keyword);
+			if(this.keyword != keyword) throw new MalformedJorthException("Required keyword is " + keyword + " but got " + this.keyword);
 		}
 		
 		@SuppressWarnings("unchecked")
 		@Override
 		public <T extends Token> Optional<T> as(Class<T> type){
-			if(type==Word.class){
+			if(type == Word.class){
 				return Optional.of((T)new Word(line, keyword.name().toLowerCase()));
 			}
 			return Token.super.as(type);
@@ -29,20 +29,20 @@ public sealed interface Token{
 			this(line, find(type, word));
 		}
 		
-		private static final Map<Class<? extends Enum<?>>, Map<String, Enum<?>>> CACHE=new ConcurrentHashMap<>();
+		private static final Map<Class<? extends Enum<?>>, Map<String, Enum<?>>> CACHE = new ConcurrentHashMap<>();
 		
 		@SuppressWarnings("unchecked")
 		public static <E extends Enum<E>> E find(Class<E> type, String word) throws MalformedJorthException{
-			var map=(Map<String, E>)CACHE.computeIfAbsent(type, t->{
-				var values=t.getEnumConstants();
-				var m     =HashMap.<String, Enum<?>>newHashMap(values.length);
+			var map = (Map<String, E>)CACHE.computeIfAbsent(type, t -> {
+				var values = t.getEnumConstants();
+				var m      = HashMap.<String, Enum<?>>newHashMap(values.length);
 				for(Enum<?> value : values){
 					m.put(value.name().toLowerCase(), value);
 				}
 				return Map.copyOf(m);
 			});
-			var e=map.get(word);
-			if(e==null) throw new MalformedJorthException("Expected any of "+map.values()+" but got "+word);
+			var e = map.get(word);
+			if(e == null) throw new MalformedJorthException("Expected any of " + map.values() + " but got " + word);
 			return e;
 		}
 	}
@@ -55,14 +55,14 @@ public sealed interface Token{
 		@SuppressWarnings("unchecked")
 		@Override
 		public <T extends Token> Optional<T> as(Class<T> type){
-			if(type==CWord.class){
+			if(type == CWord.class){
 				return Optional.of((T)new CWord(line, ClassName.dotted(value)));
 			}
-			if(type==SmolWord.class){
-				if(value.length()==1){
+			if(type == SmolWord.class){
+				if(value.length() == 1){
 					return Optional.of((T)new SmolWord(line, value.charAt(0)));
 				}else{
-					throw new ClassCastException("Can not convert "+this+" to "+SmolWord.class.getName());
+					throw new ClassCastException("Can not convert " + this + " to " + SmolWord.class.getName());
 				}
 			}
 			return Token.super.as(type);
@@ -71,14 +71,14 @@ public sealed interface Token{
 	
 	record SmolWord(int line, char value) implements Token{
 		public boolean is(char check){
-			return value==check;
+			return value == check;
 		}
 		
 		@SuppressWarnings("unchecked")
 		@Override
 		public <T extends Token> Optional<T> as(Class<T> type){
-			if(type==Word.class){
-				return Optional.of((T)new Word(line, value+""));
+			if(type == Word.class){
+				return Optional.of((T)new Word(line, value + ""));
 			}
 			return Token.super.as(type);
 		}
@@ -92,22 +92,22 @@ public sealed interface Token{
 		@SuppressWarnings("unchecked")
 		@Override
 		public <T extends Token> Optional<T> as(Class<T> type){
-			if(type==Word.class){
+			if(type == Word.class){
 				return Optional.of((T)new Word(line, value.dotted()));
 			}
 			return Token.super.as(type);
 		}
 	}
 	
-	record StrValue(int line, String value) implements Token{}
+	record StrValue(int line, String value) implements Token{ }
 	
-	record IntVal(int line, int value) implements Token{}
+	record IntVal(int line, int value) implements Token{ }
 	
-	record FloatVal(int line, float value) implements Token{}
+	record FloatVal(int line, float value) implements Token{ }
 	
-	record Null(int line) implements Token{}
+	record Null(int line) implements Token{ }
 	
-	record Bool(int line, boolean value) implements Token{}
+	record Bool(int line, boolean value) implements Token{ }
 	
 	
 	int line();
@@ -119,10 +119,10 @@ public sealed interface Token{
 		return Optional.empty();
 	}
 	default <T extends Token> T requireAs(Class<T> type) throws MalformedJorthException{
-		var o=as(type);
+		var o = as(type);
 		if(o.isPresent()){
 			return o.get();
 		}
-		throw new MalformedJorthException("Required token type "+type.getSimpleName()+" but got "+this);
+		throw new MalformedJorthException("Required token type " + type.getSimpleName() + " but got " + this);
 	}
 }

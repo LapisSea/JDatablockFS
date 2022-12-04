@@ -13,7 +13,7 @@ public class RandomInputStream extends ContentInputStream{
 	private       long     mark;
 	
 	public RandomInputStream(RandomIO io){
-		this.io=io;
+		this.io = io;
 	}
 	
 	@Override
@@ -39,7 +39,7 @@ public class RandomInputStream extends ContentInputStream{
 	@Override
 	public synchronized void mark(int readLimit){
 		try{
-			mark=io.getPos();
+			mark = io.getPos();
 		}catch(IOException e){
 			throw new RuntimeException(e);
 		}
@@ -57,7 +57,7 @@ public class RandomInputStream extends ContentInputStream{
 	
 	@Override
 	public String toString(){
-		return this.getClass().getSimpleName()+"{"+TextUtil.toString(io)+'}';
+		return this.getClass().getSimpleName() + "{" + TextUtil.toString(io) + '}';
 	}
 	
 	@Override

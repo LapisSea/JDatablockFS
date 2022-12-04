@@ -18,14 +18,14 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-@Warmup(iterations=16, time=500, timeUnit=TimeUnit.MILLISECONDS)
-@Measurement(iterations=30, time=2000, timeUnit=TimeUnit.MILLISECONDS)
+@Warmup(iterations = 16, time = 500, timeUnit = TimeUnit.MILLISECONDS)
+@Measurement(iterations = 30, time = 2000, timeUnit = TimeUnit.MILLISECONDS)
 @State(Scope.Thread)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 public class IOWalkBench{
 	
 	private final Cluster cluster;
-	MemoryWalker.PointerRecord rec=new MemoryWalker.PointerRecord(){
+	MemoryWalker.PointerRecord rec = new MemoryWalker.PointerRecord(){
 		@Override
 		public <T extends IOInstance<T>> int log(Reference instanceReference, T instance, RefField<T, ?> field, Reference valueReference) throws IOException{
 			return MemoryWalker.CONTINUE;
@@ -38,23 +38,23 @@ public class IOWalkBench{
 	
 	public IOWalkBench(){
 		try{
-			IOInterface mem =MemoryData.builder().build();
-			var         c   =Cluster.init(mem);
-			var         conf=new Configuration();
+			IOInterface mem  = MemoryData.builder().build();
+			var         c    = Cluster.init(mem);
+			var         conf = new Configuration();
 			
-			Map<String, Object> vals=new HashMap<>();
-			if(System.getProperty("radius")!=null){
+			Map<String, Object> vals = new HashMap<>();
+			if(System.getProperty("radius") != null){
 				vals.put("radius", System.getProperty("radius"));
 			}
 			
-			conf.load(()->vals.entrySet().stream());
+			conf.load(() -> vals.entrySet().stream());
 			SparseImage.run(c, conf.getView());
 			
 			if("true".equals(System.getProperty("read_only_benchy"))){
-				mem=mem.asReadOnly();
+				mem = mem.asReadOnly();
 			}
 			
-			cluster=new Cluster(mem);
+			cluster = new Cluster(mem);
 		}catch(IOException e){
 			throw new RuntimeException(e);
 		}
@@ -63,7 +63,7 @@ public class IOWalkBench{
 	
 	public void doWalk(){
 		try{
-			var r=cluster.rootWalker(rec, false);
+			var r = cluster.rootWalker(rec, false);
 			r.walk();
 		}catch(Exception e){
 			throw new RuntimeException(e);
@@ -71,19 +71,19 @@ public class IOWalkBench{
 	}
 	
 	@Benchmark
-	@Fork(jvmArgsAppend="-Ddfs.fieldAccess=varhandle")
+	@Fork(jvmArgsAppend = "-Ddfs.fieldAccess=varhandle")
 	public void walkAccVarHandle(){
 		doWalk();
 	}
 	
 	@Benchmark
-	@Fork(jvmArgsAppend="-Ddfs.fieldAccess=reflection")
+	@Fork(jvmArgsAppend = "-Ddfs.fieldAccess=reflection")
 	public void walkAccReflection(){
 		doWalk();
 	}
 	
 	@Benchmark
-	@Fork(jvmArgsAppend="-Ddfs.fieldAccess=unsafe")
+	@Fork(jvmArgsAppend = "-Ddfs.fieldAccess=unsafe")
 	public void walkAccUnsafe(){
 		doWalk();
 	}
@@ -93,18 +93,18 @@ public class IOWalkBench{
 		doWalk();
 	}
 	@Benchmark
-	@Fork(jvmArgsAppend="-Dradius=2")
+	@Fork(jvmArgsAppend = "-Dradius=2")
 	public void walk2(){
 		doWalk();
 	}
 	@Benchmark
-	@Fork(jvmArgsAppend="-Dradius=80")
+	@Fork(jvmArgsAppend = "-Dradius=80")
 	public void walk30(){
 		doWalk();
 	}
 	
 	@Benchmark
-	@Fork(jvmArgsAppend="-Dread_only_benchy=true")
+	@Fork(jvmArgsAppend = "-Dread_only_benchy=true")
 	public void walkReadOnly(){
 		doWalk();
 	}

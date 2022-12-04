@@ -23,18 +23,18 @@ public class IOListRangeView<T> implements IOList<T>{
 		if(to<from) throw new IllegalArgumentException("from is bigger than to!");
 		if(data.size()<to) throw new IndexOutOfBoundsException();
 		
-		this.data=data;
-		this.from=from;
-		this.to=to;
-		subSize=to-from;
+		this.data = data;
+		this.from = from;
+		this.to = to;
+		subSize = to - from;
 	}
 	
 	private long toGlobalIndex(long index){
 		if(index<0) throw new IndexOutOfBoundsException();
-		return index+from;
+		return index + from;
 	}
 	private long toLocalIndex(long index){
-		return index-from;
+		return index - from;
 	}
 	
 	@Override
@@ -49,9 +49,9 @@ public class IOListRangeView<T> implements IOList<T>{
 	
 	@Override
 	public long size(){
-		var size=data.size();
+		var size = data.size();
 		if(size<=from) return 0;
-		return Math.min(size-from, subSize);
+		return Math.min(size - from, subSize);
 	}
 	@Override
 	public T getUnsafe(long index){
@@ -72,7 +72,7 @@ public class IOListRangeView<T> implements IOList<T>{
 	@Override
 	public void add(T value) throws IOException{
 		if(data.size()<=from) throw new IndexOutOfBoundsException();
-		if(data.size()>to-1){
+		if(data.size()>to - 1){
 			throw new IndexOutOfBoundsException();
 		}
 		add(size(), value);
@@ -80,7 +80,7 @@ public class IOListRangeView<T> implements IOList<T>{
 	@Override
 	public void addAll(Collection<T> values) throws IOException{
 		if(data.size()<=from) throw new IndexOutOfBoundsException();
-		if(data.size()>to-values.size()){
+		if(data.size()>to - values.size()){
 			throw new IndexOutOfBoundsException();
 		}
 		data.addAll(values);
@@ -96,17 +96,17 @@ public class IOListRangeView<T> implements IOList<T>{
 	}
 	@Override
 	public IOIterator.Iter<T> iterator(){
-		var iter=listIterator(0);
+		var iter = listIterator(0);
 		return new IOIterator.Iter<>(){
-			private long i=0;
+			private long i = 0;
 			@Override
 			public boolean hasNext(){
-				if(i==subSize) return false;
+				if(i == subSize) return false;
 				return iter.hasNext();
 			}
 			@Override
 			public T ioNext() throws IOException{
-				if(i==subSize) throw new NoSuchElementException();
+				if(i == subSize) throw new NoSuchElementException();
 				i++;
 				return iter.ioNext();
 			}
@@ -119,11 +119,11 @@ public class IOListRangeView<T> implements IOList<T>{
 	
 	@Override
 	public IOListIterator<T> listIterator(long startIndex){
-		var iter=data.listIterator(toGlobalIndex(startIndex));
+		var iter = data.listIterator(toGlobalIndex(startIndex));
 		return new IOListIterator<>(){
 			@Override
 			public boolean hasNext(){
-				return iter.hasNext()&&iter.nextIndex()<to;
+				return iter.hasNext() && iter.nextIndex()<to;
 			}
 			@Override
 			public T ioNext() throws IOException{
@@ -132,7 +132,7 @@ public class IOListRangeView<T> implements IOList<T>{
 			}
 			@Override
 			public boolean hasPrevious(){
-				return iter.hasPrevious()&&iter.previousIndex()>=from;
+				return iter.hasPrevious() && iter.previousIndex()>=from;
 			}
 			@Override
 			public T ioPrevious() throws IOException{
@@ -167,7 +167,7 @@ public class IOListRangeView<T> implements IOList<T>{
 	}
 	@Override
 	public boolean isEmpty(){
-		return size()==0;
+		return size() == 0;
 	}
 	@Override
 	public T addNew() throws IOException{
@@ -187,13 +187,13 @@ public class IOListRangeView<T> implements IOList<T>{
 	}
 	@Override
 	public void clear() throws IOException{
-		for(long i=data.size()-1;i>=from;i--){
+		for(long i = data.size() - 1; i>=from; i--){
 			data.remove(i);
 		}
 	}
 	@Override
 	public void requestCapacity(long capacity) throws IOException{
-		data.requestCapacity(capacity+from);
+		data.requestCapacity(capacity + from);
 	}
 	@Override
 	public void trim() throws IOException{
@@ -223,12 +223,12 @@ public class IOListRangeView<T> implements IOList<T>{
 	}
 	@Override
 	public IOList<T> subListView(long from, long to){
-		return new IOListRangeView<>(data, this.from+from, this.from+to);
+		return new IOListRangeView<>(data, this.from + from, this.from + to);
 	}
 	
 	@Override
 	public String toString(){
-		StringJoiner sj=new StringJoiner(", ", "{size: "+size()+"}"+"[", "]");
+		StringJoiner sj = new StringJoiner(", ", "{size: " + size() + "}" + "[", "]");
 		IOList.elementSummary(sj, this);
 		return sj.toString();
 	}

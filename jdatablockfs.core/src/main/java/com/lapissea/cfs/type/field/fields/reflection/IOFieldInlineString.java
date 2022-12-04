@@ -22,15 +22,15 @@ public class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends NullFlag
 		super(accessor);
 		
 		
-		var desc=AutoText.PIPE.getSizeDescriptor();
+		var desc = AutoText.PIPE.getSizeDescriptor();
 		
-		descriptor=SizeDescriptor.Unknown.of(
+		descriptor = SizeDescriptor.Unknown.of(
 			desc.getWordSpace(),
-			nullable()?0:desc.getMin(),
+			nullable()? 0 : desc.getMin(),
 			desc.getMax(),
-			(ioPool, prov, inst)->{
-				var val=getWrapped(null, inst);
-				if(val==null){
+			(ioPool, prov, inst) -> {
+				var val = getWrapped(null, inst);
+				if(val == null){
 					if(nullable()) return 0;
 					throw new NullPointerException();
 				}
@@ -40,14 +40,14 @@ public class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends NullFlag
 	}
 	
 	private AutoText getWrapped(VarPool<CTyp> ioPool, CTyp instance){
-		var raw=get(ioPool, instance);
-		if(raw==null) return null;
+		var raw = get(ioPool, instance);
+		if(raw == null) return null;
 		return new AutoText(raw);
 	}
 	
 	@Override
 	public String get(VarPool<CTyp> ioPool, CTyp instance){
-		return getNullable(ioPool, instance, ()->"");
+		return getNullable(ioPool, instance, () -> "");
 	}
 	
 	@Override
@@ -65,9 +65,9 @@ public class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends NullFlag
 	
 	@Override
 	public void write(VarPool<CTyp> ioPool, DataProvider provider, ContentWriter dest, CTyp instance) throws IOException{
-		if(nullable()&&getIsNull(ioPool, instance)) return;
-		var val=getWrapped(ioPool, instance);
-		if(val==null&&!nullable()){
+		if(nullable() && getIsNull(ioPool, instance)) return;
+		var val = getWrapped(ioPool, instance);
+		if(val == null && !nullable()){
 			throw new NullPointerException();
 		}
 		AutoText.PIPE.write(provider, dest, val);
@@ -83,8 +83,8 @@ public class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends NullFlag
 	
 	@Override
 	public void read(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
-		var text=readNew(ioPool, provider, src, instance, genericContext);
-		set(ioPool, instance, text==null?null:text.getData());
+		var text = readNew(ioPool, provider, src, instance, genericContext);
+		set(ioPool, instance, text == null? null : text.getData());
 	}
 	
 	@Override

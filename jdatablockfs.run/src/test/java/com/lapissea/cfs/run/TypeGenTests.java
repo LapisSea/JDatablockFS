@@ -20,20 +20,20 @@ public class TypeGenTests{
 	
 	@Test
 	void iTypeFields(){
-		Struct<SimpleType> struct=Struct.of(SimpleType.class);
+		Struct<SimpleType> struct = Struct.of(SimpleType.class);
 		
-		var simpleInstance=struct.emptyConstructor().make();
+		var simpleInstance = struct.emptyConstructor().make();
 		{
-			var a=69;
-			var b=420;
+			var a = 69;
+			var b = 420;
 			simpleInstance.setNum(a);
 			assertEquals(simpleInstance.getNum(), a);
 			simpleInstance.setNum(b);
 			assertEquals(simpleInstance.getNum(), b);
 		}
 		{
-			var a="Hello object";
-			var b=Double.valueOf(420.69);
+			var a = "Hello object";
+			var b = Double.valueOf(420.69);
 			simpleInstance.setDyn(a);
 			assertEquals(simpleInstance.getDyn(), a);
 			simpleInstance.setDyn(b);

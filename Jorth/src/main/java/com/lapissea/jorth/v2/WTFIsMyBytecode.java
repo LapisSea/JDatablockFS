@@ -3,7 +3,7 @@ package com.lapissea.jorth.v2;
 public class WTFIsMyBytecode{
 	
 	static{
-		int a=0;
+		int a = 0;
 	}
 	
 	

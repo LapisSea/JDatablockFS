@@ -14,8 +14,8 @@ public abstract class MappedIOList<From, To> implements IOList<To>{
 	private final Class<To>    mappedType;
 	
 	protected MappedIOList(IOList<From> data, Class<To> mappedType){
-		this.data=data;
-		this.mappedType=mappedType;
+		this.data = data;
+		this.mappedType = mappedType;
 	}
 	
 	
@@ -33,7 +33,7 @@ public abstract class MappedIOList<From, To> implements IOList<To>{
 	}
 	@Override
 	public To get(long index) throws IOException{
-		var v=data.get(index);
+		var v = data.get(index);
 		return map(v);
 	}
 	
@@ -55,11 +55,11 @@ public abstract class MappedIOList<From, To> implements IOList<To>{
 	}
 	@Override
 	public To addNew(UnsafeConsumer<To, IOException> initializer) throws IOException{
-		return map(data.addNew(from->initializer.accept(map(from))));
+		return map(data.addNew(from -> initializer.accept(map(from))));
 	}
 	@Override
 	public void addMultipleNew(long count, UnsafeConsumer<To, IOException> initializer) throws IOException{
-		data.addMultipleNew(count, from->initializer.accept(map(from)));
+		data.addMultipleNew(count, from -> initializer.accept(map(from)));
 	}
 	
 	@Override
@@ -69,7 +69,7 @@ public abstract class MappedIOList<From, To> implements IOList<To>{
 	
 	@Override
 	public String toString(){
-		StringJoiner sj=new StringJoiner(", ", "{size: "+size()+"}"+"[", "]");
+		StringJoiner sj = new StringJoiner(", ", "{size: " + size() + "}" + "[", "]");
 		IOList.elementSummary(sj, this);
 		return sj.toString();
 	}
@@ -122,24 +122,24 @@ public abstract class MappedIOList<From, To> implements IOList<To>{
 	@Override
 	public boolean equals(Object o){
 		
-		if(this==o){
+		if(this == o){
 			return true;
 		}
 		if(!(o instanceof IOList<?> that)){
 			return false;
 		}
 		
-		var siz=size();
-		if(siz!=that.size()){
+		var siz = size();
+		if(siz != that.size()){
 			return false;
 		}
 		
-		var iThis=iterator();
-		var iThat=that.iterator();
+		var iThis = iterator();
+		var iThat = that.iterator();
 		
-		for(long i=0;i<siz;i++){
-			var vThis=iThis.next();
-			var vThat=iThat.next();
+		for(long i = 0; i<siz; i++){
+			var vThis = iThis.next();
+			var vThat = iThat.next();
 			
 			if(!vThis.equals(vThat)){
 				return false;
@@ -156,7 +156,7 @@ public abstract class MappedIOList<From, To> implements IOList<To>{
 	
 	@Override
 	public void addAll(Collection<To> values) throws IOException{
-		List<From> mapped=new ArrayList<>(values.size());
+		List<From> mapped = new ArrayList<>(values.size());
 		for(To v : values){
 			mapped.add(unmap(v));
 		}
@@ -166,7 +166,7 @@ public abstract class MappedIOList<From, To> implements IOList<To>{
 	@Override
 	public IOIterator.Iter<To> iterator(){
 		return new IOIterator.Iter<>(){
-			private final Iter<From> src=data.iterator();
+			private final Iter<From> src = data.iterator();
 			@Override
 			public boolean hasNext(){
 				return src.hasNext();
@@ -195,7 +195,7 @@ public abstract class MappedIOList<From, To> implements IOList<To>{
 	@Override
 	public IOListIterator<To> listIterator(long startIndex){
 		return new IOListIterator<>(){
-			private final IOListIterator<From> src=data.listIterator(startIndex);
+			private final IOListIterator<From> src = data.listIterator(startIndex);
 			@Override
 			public boolean hasNext(){
 				return src.hasNext();
@@ -237,7 +237,7 @@ public abstract class MappedIOList<From, To> implements IOList<To>{
 	
 	@Override
 	public void modify(long index, UnsafeFunction<To, To, IOException> modifier) throws IOException{
-		data.modify(index, obj->unmap(modifier.apply(map(obj))));
+		data.modify(index, obj -> unmap(modifier.apply(map(obj))));
 	}
 	@Override
 	public boolean isEmpty(){

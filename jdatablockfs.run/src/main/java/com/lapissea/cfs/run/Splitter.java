@@ -45,7 +45,7 @@ public class Splitter{
 			}
 			@Override
 			public boolean remove(K key) throws IOException{
-				var removed=a.remove(key);
+				var removed = a.remove(key);
 				b.remove(key);
 				test();
 				return removed;
@@ -117,7 +117,7 @@ public class Splitter{
 			}
 			@Override
 			public E addNew(UnsafeConsumer<E, IOException> initializer) throws IOException{
-				var val=a.addNew(initializer);
+				var val = a.addNew(initializer);
 				b.addNew(initializer);
 				test();
 				return val;

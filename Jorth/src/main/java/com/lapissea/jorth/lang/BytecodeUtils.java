@@ -18,12 +18,12 @@ public class BytecodeUtils{
 		}
 	}
 	public static void printClass(byte[] in){
-		ClassReader cr=new ClassReader(in);
+		ClassReader cr = new ClassReader(in);
 		cr.accept(new TraceClassVisitor(new PrintWriter(System.out)), 0);
 	}
 	
 	public static void printClass(InputStream in) throws Exception{
-		ClassReader cr=new ClassReader(in);
+		ClassReader cr = new ClassReader(in);
 		cr.accept(new TraceClassVisitor(new PrintWriter(System.out)), 0);
 	}
 }

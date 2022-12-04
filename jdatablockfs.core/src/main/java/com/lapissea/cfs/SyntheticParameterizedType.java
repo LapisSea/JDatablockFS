@@ -12,12 +12,12 @@ import static com.lapissea.cfs.Utils.extractFromVarType;
 public final class SyntheticParameterizedType implements ParameterizedType{
 	
 	public static Type of(Type ownerType, Class<?> rawType, Type[] actualTypeArguments){
-		if(actualTypeArguments.length==0) return rawType;
+		if(actualTypeArguments.length == 0) return rawType;
 		return new SyntheticParameterizedType(ownerType, rawType, actualTypeArguments);
 	}
 	
 	public static Type of(Class<?> rawType, Type[] actualTypeArguments){
-		if(actualTypeArguments.length==0) return rawType;
+		if(actualTypeArguments.length == 0) return rawType;
 		return new SyntheticParameterizedType(rawType, actualTypeArguments);
 	}
 	
@@ -34,9 +34,9 @@ public final class SyntheticParameterizedType implements ParameterizedType{
 	private final Class<?> rawType;
 	
 	private SyntheticParameterizedType(Type ownerType, Class<?> rawType, Type... actualTypeArguments){
-		this.ownerType=ownerType;
-		this.actualTypeArguments=actualTypeArguments.clone();
-		this.rawType=rawType;
+		this.ownerType = ownerType;
+		this.actualTypeArguments = actualTypeArguments.clone();
+		this.rawType = rawType;
 	}
 	
 	private SyntheticParameterizedType(Class<?> rawType, Type... actualTypeArguments){
@@ -67,30 +67,30 @@ public final class SyntheticParameterizedType implements ParameterizedType{
 	
 	@Override
 	public int hashCode(){
-		int result=Arrays.hashCode(actualTypeArguments);
-		result=31*result+(ownerType!=null?ownerType.hashCode():0);
-		result=31*result+(rawType!=null?rawType.hashCode():0);
+		int result = Arrays.hashCode(actualTypeArguments);
+		result = 31*result + (ownerType != null? ownerType.hashCode() : 0);
+		result = 31*result + (rawType != null? rawType.hashCode() : 0);
 		return result;
 	}
 	
 	@Override
 	public boolean equals(Object o){
 		if(o instanceof ParameterizedType parmType){
-			return Objects.equals(rawType, parmType.getRawType())&&
-			       Objects.equals(ownerType, parmType.getOwnerType())&&
+			return Objects.equals(rawType, parmType.getRawType()) &&
+			       Objects.equals(ownerType, parmType.getOwnerType()) &&
 			       Arrays.equals(actualTypeArguments, parmType instanceof SyntheticParameterizedType parmTypeDef?
-			                                          parmTypeDef.actualTypeArguments:
+			                                          parmTypeDef.actualTypeArguments :
 			                                          parmType.getActualTypeArguments());
 		}
 		if(o instanceof Type type){
-			return ownerType==null&&
-			       actualTypeArguments.length==0&&
+			return ownerType == null &&
+			       actualTypeArguments.length == 0 &&
 			       Objects.equals(rawType, type);
 		}
 		return false;
 	}
 	@Override
 	public String toString(){
-		return rawType.getTypeName()+(actualTypeArguments.length==0?"":Arrays.stream(actualTypeArguments).map(Type::getTypeName).collect(Collectors.joining(", ", "<", ">")));
+		return rawType.getTypeName() + (actualTypeArguments.length == 0? "" : Arrays.stream(actualTypeArguments).map(Type::getTypeName).collect(Collectors.joining(", ", "<", ">")));
 	}
 }

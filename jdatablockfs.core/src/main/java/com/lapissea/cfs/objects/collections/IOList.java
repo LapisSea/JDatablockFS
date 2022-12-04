@@ -26,20 +26,20 @@ import java.util.function.Supplier;
 public interface IOList<T> extends IterablePP<T>{
 	
 	static <T> void elementSummary(StringJoiner sb, IOList<T> data){
-		var iter=data.iterator();
+		var iter = data.iterator();
 		
-		var push=new Consumer<String>(){
-			private String repeatBuff=null;
-			private int repeatCount=0;
+		var push = new Consumer<String>(){
+			private String repeatBuff = null;
+			private int repeatCount = 0;
 			private long repeatIndexStart;
-			private long count=0;
+			private long count = 0;
 			
 			@Override
 			public void accept(String str){
-				if(repeatBuff==null){
-					repeatBuff=str;
-					repeatCount=1;
-					repeatIndexStart=count;
+				if(repeatBuff == null){
+					repeatBuff = str;
+					repeatCount = 1;
+					repeatIndexStart = count;
 					return;
 				}
 				if(repeatBuff.equals(str)){
@@ -47,7 +47,7 @@ public interface IOList<T> extends IterablePP<T>{
 					return;
 				}
 				
-				if(repeatCount!=0){
+				if(repeatCount != 0){
 					flush();
 				}
 				
@@ -55,16 +55,16 @@ public interface IOList<T> extends IterablePP<T>{
 			}
 			private void flush(){
 				if(repeatCount>4){
-					if(repeatIndexStart==0) sb.add(repeatBuff+" ("+repeatCount+" times)");
-					else sb.add(repeatBuff+" ("+repeatCount+" times @"+repeatIndexStart+")");
+					if(repeatIndexStart == 0) sb.add(repeatBuff + " (" + repeatCount + " times)");
+					else sb.add(repeatBuff + " (" + repeatCount + " times @" + repeatIndexStart + ")");
 				}else{
-					for(int i=0;i<repeatCount;i++){
+					for(int i = 0; i<repeatCount; i++){
 						sb.add(repeatBuff);
 					}
 				}
-				repeatBuff=null;
-				repeatCount=0;
-				repeatIndexStart=0;
+				repeatBuff = null;
+				repeatCount = 0;
+				repeatIndexStart = 0;
 			}
 		};
 		
@@ -73,16 +73,16 @@ public interface IOList<T> extends IterablePP<T>{
 				push.flush();
 				return;
 			}
-			if(sb.length()+(push.repeatCount==0?0:(push.repeatCount*(push.repeatBuff.length()+2)+8))>300){
+			if(sb.length() + (push.repeatCount == 0? 0 : (push.repeatCount*(push.repeatBuff.length() + 2) + 8))>300){
 				push.flush();
-				sb.add("... "+(data.size()-push.count)+" more");
+				sb.add("... " + (data.size() - push.count) + " more");
 				return;
 			}
 			Object e;
 			try{
-				e=iter.ioNext();
+				e = iter.ioNext();
 			}catch(Throwable ex){
-				e="CORRUPT: "+ex.getClass().getSimpleName();
+				e = "CORRUPT: " + ex.getClass().getSimpleName();
 			}
 			push.count++;
 			
@@ -107,31 +107,31 @@ public interface IOList<T> extends IterablePP<T>{
 	
 	static <T> long findSortedClosest(IOList<T> freeChunks, FunctionOL<T> distanceMapping) throws IOException{
 		switch((int)freeChunks.size()){
-			case 0 -> {return -1;}
-			case 1 -> {return 0;}
+			case 0 -> { return -1; }
+			case 1 -> { return 0; }
 		}
 		
-		long min=0, max=freeChunks.size()-1;
+		long min = 0, max = freeChunks.size() - 1;
 		
-		long minDist=distanceMapping.apply(freeChunks.get(min));
-		long maxDist=distanceMapping.apply(freeChunks.get(max));
+		long minDist = distanceMapping.apply(freeChunks.get(min));
+		long maxDist = distanceMapping.apply(freeChunks.get(max));
 		
-		while(max-min>1){
-			var mid    =(min+max)/2;
-			var midDist=distanceMapping.apply(freeChunks.get(mid));
+		while(max - min>1){
+			var mid     = (min + max)/2;
+			var midDist = distanceMapping.apply(freeChunks.get(mid));
 			
 			if(midDist<minDist){
-				minDist=midDist;
-				min=mid;
+				minDist = midDist;
+				min = mid;
 				continue;
 			}
 			if(midDist<maxDist){
-				maxDist=midDist;
-				max=mid;
+				maxDist = midDist;
+				max = mid;
 			}
 		}
 		
-		return minDist<maxDist?min:max;
+		return minDist<maxDist? min : max;
 	}
 	
 	static <T extends Comparable<T>> long addRemainSorted(IOList<T> list, T value) throws IOException{
@@ -145,22 +145,22 @@ public interface IOList<T> extends IterablePP<T>{
 			return 0;
 		}
 		if(value.compareTo(list.peekLast().orElseThrow())>0){
-			var index=list.size();
+			var index = list.size();
 			list.add(value);
 			return index;
 		}
 		
-		long lo=0;
-		long hi=list.size()-1;
+		long lo = 0;
+		long hi = list.size() - 1;
 		
 		while(lo<=hi){
-			long mid=(hi+lo)/2;
+			long mid = (hi + lo)/2;
 			
-			int comp=value.compareTo(list.get(mid));
+			int comp = value.compareTo(list.get(mid));
 			if(comp<0){
-				hi=mid-1;
+				hi = mid - 1;
 			}else if(comp>0){
-				lo=mid+1;
+				lo = mid + 1;
 			}else{
 				list.add(mid, value);
 				return mid;
@@ -174,24 +174,24 @@ public interface IOList<T> extends IterablePP<T>{
 	static <T extends Comparable<T>> void scuffedCycleSort(IOList<T> list) throws IOException{
 		
 		// Loop through the array to find cycles to rotate.
-		for(long cycleStart=0;cycleStart<list.size()-1;cycleStart++){
-			T item=list.get(cycleStart);
+		for(long cycleStart = 0; cycleStart<list.size() - 1; cycleStart++){
+			T item = list.get(cycleStart);
 			
 			// Find where to put the item.
-			long pos=cycleStart;
-			for(long i=cycleStart+1;i<list.size();i++){
+			long pos = cycleStart;
+			for(long i = cycleStart + 1; i<list.size(); i++){
 				if(list.get(i).compareTo(item)<0) pos++;
 			}
 			
 			// If the item is already there, this is not a cycle.
-			if(pos==cycleStart) continue;
+			if(pos == cycleStart) continue;
 			
 			// Otherwise, put the item there or right after any duplicates.
 			while(item.equals(list.get(pos))){
 				pos++;
 			}
 			{
-				T temp=list.get(pos);
+				T temp = list.get(pos);
 				list.set(pos, item);
 				
 				list.set(cycleStart, temp);
@@ -205,10 +205,10 @@ public interface IOList<T> extends IterablePP<T>{
 		abstract class AbstractIndex<T> implements IOListIterator<T>{
 			
 			private long cursor;
-			private long lastRet=-1;
+			private long lastRet = -1;
 			
 			public AbstractIndex(long cursorStart){
-				this.cursor=cursorStart;
+				this.cursor = cursorStart;
 			}
 			
 			protected abstract T getElement(long index) throws IOException;
@@ -223,29 +223,29 @@ public interface IOList<T> extends IterablePP<T>{
 			}
 			@Override
 			public T ioNext() throws IOException{
-				var i   =cursor;
-				var next=getElement(i);
-				lastRet=i;
-				cursor=i+1;
+				var i    = cursor;
+				var next = getElement(i);
+				lastRet = i;
+				cursor = i + 1;
 				return next;
 			}
 			@Override
 			public boolean hasPrevious(){
-				return cursor!=0;
+				return cursor != 0;
 			}
 			
 			@Override
 			public T ioPrevious() throws IOException{
-				var i       =cursor-1;
-				var previous=getElement(i);
-				lastRet=cursor=i;
+				var i        = cursor - 1;
+				var previous = getElement(i);
+				lastRet = cursor = i;
 				return previous;
 			}
 			
 			@Override
-			public long nextIndex(){return cursor;}
+			public long nextIndex(){ return cursor; }
 			@Override
-			public long previousIndex(){return cursor-1;}
+			public long previousIndex(){ return cursor - 1; }
 			
 			@Override
 			public void ioRemove() throws IOException{
@@ -254,7 +254,7 @@ public interface IOList<T> extends IterablePP<T>{
 				removeElement(lastRet);
 				
 				if(lastRet<cursor) cursor--;
-				lastRet=-1;
+				lastRet = -1;
 			}
 			
 			@Override
@@ -265,10 +265,10 @@ public interface IOList<T> extends IterablePP<T>{
 			
 			@Override
 			public void ioAdd(T t) throws IOException{
-				var i=cursor;
+				var i = cursor;
 				addElement(i, t);
-				lastRet=-1;
-				cursor=i+1;
+				lastRet = -1;
+				cursor = i + 1;
 			}
 		}
 		
@@ -309,7 +309,7 @@ public interface IOList<T> extends IterablePP<T>{
 	void add(T value) throws IOException;
 	
 	default void addAll(Collection<T> values) throws IOException{
-		requestCapacity(size()+values.size());
+		requestCapacity(size() + values.size());
 		for(T value : values){
 			add(value);
 		}
@@ -333,23 +333,23 @@ public interface IOList<T> extends IterablePP<T>{
 				this(origin, size());
 			}
 			private RandomAccessIteratorSpliterator(long origin, long size){
-				this.index=origin;
-				this.size=size;
+				this.index = origin;
+				this.size = size;
 			}
 			
 			@Override
 			public Spliterator<T> trySplit(){
-				long lo=index, mid=(lo+size) >>> 1;
-				return (lo>=mid)?null: // divide range in half unless too small
-				       new RandomAccessIteratorSpliterator(lo, index=mid);
+				long lo = index, mid = (lo + size) >>> 1;
+				return (lo>=mid)? null : // divide range in half unless too small
+				       new RandomAccessIteratorSpliterator(lo, index = mid);
 			}
 			
 			@Override
 			public boolean tryAdvance(Consumer<? super T> action){
-				if(action==null) throw new NullPointerException();
-				long i=index;
+				if(action == null) throw new NullPointerException();
+				long i = index;
 				if(i<size){
-					index=i+1;
+					index = i + 1;
 					action.accept(get(getIterator(i), i));
 					return true;
 				}
@@ -359,17 +359,17 @@ public interface IOList<T> extends IterablePP<T>{
 			@Override
 			public void forEachRemaining(Consumer<? super T> action){
 				Objects.requireNonNull(action);
-				long i   =index;
-				var  iter=getIterator(i);
-				index=size;
-				for(;i<size;i++){
+				long i    = index;
+				var  iter = getIterator(i);
+				index = size;
+				for(; i<size; i++){
 					action.accept(get(iter, i));
 				}
 			}
 			
 			@Override
 			public long estimateSize(){
-				return size-index;
+				return size - index;
 			}
 			
 			@Override
@@ -378,13 +378,13 @@ public interface IOList<T> extends IterablePP<T>{
 			}
 			
 			private IOListIterator<T> getIterator(long i){
-				var iter=iterator;
-				if(iter==null) iterator=iter=listIterator(i);
+				var iter = iterator;
+				if(iter == null) iterator = iter = listIterator(i);
 				return iter;
 			}
 			
 			private static <E> E get(IOListIterator<E> list, long i){
-				if(i!=list.nextIndex()) throw new AssertionError(i+" "+(list.nextIndex()));
+				if(i != list.nextIndex()) throw new AssertionError(i + " " + (list.nextIndex()));
 				try{
 					return list.ioNext();
 				}catch(IndexOutOfBoundsException ex){
@@ -398,11 +398,11 @@ public interface IOList<T> extends IterablePP<T>{
 		final class IteratorSpliterator implements Spliterator<T>{
 			
 			private final IOListIterator<T> it;
-			private final long              size=size();
+			private final long              size = size();
 			private       long              index;
 			
 			public IteratorSpliterator(long start){
-				it=listIterator(start);
+				it = listIterator(start);
 			}
 			
 			
@@ -413,9 +413,9 @@ public interface IOList<T> extends IterablePP<T>{
 				}
 				T val;
 				try{
-					val=it.ioNext();
+					val = it.ioNext();
 				}catch(IOException e){
-					throw new RuntimeException("Failed to provide element: "+(it.nextIndex()-1), e);
+					throw new RuntimeException("Failed to provide element: " + (it.nextIndex() - 1), e);
 				}
 				index++;
 				action.accept(val);
@@ -427,7 +427,7 @@ public interface IOList<T> extends IterablePP<T>{
 			}
 			@Override
 			public long estimateSize(){
-				return size-index;
+				return size - index;
 			}
 			@Override
 			public int characteristics(){
@@ -443,10 +443,10 @@ public interface IOList<T> extends IterablePP<T>{
 	default IOIterator.Iter<T> iterator(){
 		//NOT GOOD FOR LINKED LISTS
 		final class IndexAccessIterator implements IOIterator.Iter<T>{
-			long index=0;
+			long index = 0;
 			@Override
 			public boolean hasNext(){
-				var siz=size();
+				var siz = size();
 				return index<siz;
 			}
 			@Override
@@ -461,7 +461,7 @@ public interface IOList<T> extends IterablePP<T>{
 		return new IndexAccessIterator();
 	}
 	
-	default IOListIterator<T> listIterator(){return listIterator(0);}
+	default IOListIterator<T> listIterator(){ return listIterator(0); }
 	default IOListIterator<T> listIterator(long startIndex){
 		//NOT GOOD FOR LINKED LISTS
 		final class IndexAccessListIterator extends IOListIterator.AbstractIndex<T>{
@@ -496,15 +496,15 @@ public interface IOList<T> extends IterablePP<T>{
 	}
 	
 	default void modify(long index, UnsafeFunction<T, T, IOException> modifier) throws IOException{
-		T oldObj=get(index);
-		T newObj=modifier.apply(oldObj);
-		if(oldObj==newObj||!oldObj.equals(newObj)){
+		T oldObj = get(index);
+		T newObj = modifier.apply(oldObj);
+		if(oldObj == newObj || !oldObj.equals(newObj)){
 			set(index, newObj);
 		}
 	}
 	
 	default boolean isEmpty(){
-		return size()==0;
+		return size() == 0;
 	}
 	
 	default T addNew() throws IOException{
@@ -526,20 +526,20 @@ public interface IOList<T> extends IterablePP<T>{
 	 */
 	void requestCapacity(long capacity) throws IOException;
 	default void requestRelativeCapacity(long extra) throws IOException{
-		requestCapacity(size()+extra);
+		requestCapacity(size() + extra);
 	}
 	void trim() throws IOException;
 	long getCapacity() throws IOException;
 	
 	default boolean contains(T value) throws IOException{
-		return indexOf(value)!=-1;
+		return indexOf(value) != -1;
 	}
 	
 	default long indexOf(T value) throws IOException{
-		var  iter =iterator();
-		long index=0;
+		var  iter  = iterator();
+		long index = 0;
 		while(iter.hasNext()){
-			var el=iter.ioNext();
+			var el = iter.ioNext();
 			if(Objects.equals(el, value)){
 				return index;
 			}
@@ -560,7 +560,7 @@ public interface IOList<T> extends IterablePP<T>{
 	}
 	default Optional<T> popFirst() throws IOException{
 		if(isEmpty()) return Optional.empty();
-		var first=get(0);
+		var first = get(0);
 		remove(0);
 		return Optional.of(first);
 	}
@@ -575,12 +575,12 @@ public interface IOList<T> extends IterablePP<T>{
 	
 	default Optional<T> peekLast() throws IOException{
 		if(isEmpty()) return Optional.empty();
-		return Optional.of(get(size()-1));
+		return Optional.of(get(size() - 1));
 	}
 	default Optional<T> popLast() throws IOException{
 		if(isEmpty()) return Optional.empty();
-		var index=size()-1;
-		var first=get(index);
+		var index = size() - 1;
+		var first = get(index);
 		remove(index);
 		return Optional.of(first);
 	}
@@ -598,9 +598,9 @@ public interface IOList<T> extends IterablePP<T>{
 		Objects.requireNonNull(unmap);
 		return new MappedIOList<>(this, mappedType){
 			@Override
-			protected To map(T v){return map.apply(v);}
+			protected To map(T v){ return map.apply(v); }
 			@Override
-			protected T unmap(To v){return unmap.apply(v);}
+			protected T unmap(To v){ return unmap.apply(v); }
 		};
 	}
 	
@@ -625,7 +625,7 @@ public interface IOList<T> extends IterablePP<T>{
 		}
 		
 		private final IOList<T> l;
-		protected ListData(IOList<T> l){this.l=l;}
+		protected ListData(IOList<T> l){ this.l = l; }
 		
 		@Override
 		public Class<T> elementType(){
@@ -638,15 +638,15 @@ public interface IOList<T> extends IterablePP<T>{
 	}
 	
 	default Query<T> query(){
-		return QuerySupport.of(ListData.of(this, readFields->{
-			var size=size();
+		return QuerySupport.of(ListData.of(this, readFields -> {
+			var size = size();
 			return new QuerySupport.AccessIterator<T>(){
 				long cursor;
 				@Override
 				public QuerySupport.Accessor<T> next(){
 					if(cursor>=size) return null;
-					var i=cursor++;
-					return full->IOList.this.get(i);
+					var i = cursor++;
+					return full -> IOList.this.get(i);
 				}
 			};
 		}));

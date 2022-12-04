@@ -11,14 +11,14 @@ public class MyUnsafe{
 	
 	public static final Unsafe UNSAFE;
 	
-	public static final  boolean IS_BIG_ENDIAN=ByteOrder.nativeOrder()==ByteOrder.BIG_ENDIAN;
-	private static final boolean OFFSET_ENABLE=Runtime.version().feature()<=19;
+	public static final  boolean IS_BIG_ENDIAN = ByteOrder.nativeOrder() == ByteOrder.BIG_ENDIAN;
+	private static final boolean OFFSET_ENABLE = Runtime.version().feature()<=19;
 	
 	static{
 		try{
-			Constructor<Unsafe> unsafeConstructor=Unsafe.class.getDeclaredConstructor();
+			Constructor<Unsafe> unsafeConstructor = Unsafe.class.getDeclaredConstructor();
 			unsafeConstructor.setAccessible(true);
-			UNSAFE=unsafeConstructor.newInstance();
+			UNSAFE = unsafeConstructor.newInstance();
 		}catch(ReflectiveOperationException e){
 			e.printStackTrace();
 			throw new RuntimeException(e);

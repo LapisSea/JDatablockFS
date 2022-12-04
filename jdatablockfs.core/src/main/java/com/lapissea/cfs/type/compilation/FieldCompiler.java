@@ -43,9 +43,9 @@ public class FieldCompiler{
 		REFLECTION
 	}
 	
-	private static final FieldAccess FIELD_ACCESS=GlobalConfig.configEnum("fieldAccess", Runtime.version().feature()<=18?FieldAccess.UNSAFE:FieldAccess.VAR_HANDLE);
+	private static final FieldAccess FIELD_ACCESS = GlobalConfig.configEnum("fieldAccess", Runtime.version().feature()<=18? FieldAccess.UNSAFE : FieldAccess.VAR_HANDLE);
 	
-	protected record LogicalAnnotation<T extends Annotation>(T annotation, AnnotationLogic<T> logic){}
+	protected record LogicalAnnotation<T extends Annotation>(T annotation, AnnotationLogic<T> logic){ }
 	
 	private record AnnotatedField<T extends IOInstance<T>>(
 		IOField<T, ?> field,
@@ -61,47 +61,47 @@ public class FieldCompiler{
 	 * Scans an unmanaged struct for
 	 */
 	public static <T extends IOInstance.Unmanaged<T>> FieldSet<T> compileStaticUnmanaged(Struct.Unmanaged<T> struct){
-		var valueDefs=deepClasses(struct.getConcreteType())
-			              .flatArray(Class::getDeclaredMethods)
-			              .stream()
-			              .filter(m->m.isAnnotationPresent(IOValueUnmanaged.class))
-			              .sorted(comparingInt(FieldCompiler::unmanagedIndex).reversed())
-			              .toList();
+		var valueDefs = deepClasses(struct.getConcreteType())
+			                .flatArray(Class::getDeclaredMethods)
+			                .stream()
+			                .filter(m -> m.isAnnotationPresent(IOValueUnmanaged.class))
+			                .sorted(comparingInt(FieldCompiler::unmanagedIndex).reversed())
+			                .toList();
 		if(valueDefs.isEmpty()) return FieldSet.of();
 		
-		var duplicates=valueDefs.stream()
-		                        .collect(groupingBy(FieldCompiler::unmanagedIndex))
-		                        .values()
-		                        .stream()
-		                        .filter(l->l.size()>1)
-		                        .map(l->l.stream()
-		                                 .map(Method::getName)
-		                                 .collect(joining(", ")))
-		                        .collect(joining("\n\t"));
+		var duplicates = valueDefs.stream()
+		                          .collect(groupingBy(FieldCompiler::unmanagedIndex))
+		                          .values()
+		                          .stream()
+		                          .filter(l -> l.size()>1)
+		                          .map(l -> l.stream()
+		                                     .map(Method::getName)
+		                                     .collect(joining(", ")))
+		                          .collect(joining("\n\t"));
 		
 		if(!duplicates.isEmpty()){
-			throw new MalformedStruct(struct.cleanName()+" methods with duplicated indices:\n\t"+duplicates);
+			throw new MalformedStruct(struct.cleanName() + " methods with duplicated indices:\n\t" + duplicates);
 		}
 		
 		for(Method valueMethod : valueDefs){
 			if(!Modifier.isStatic(valueMethod.getModifiers())){
-				throw new IllegalField(valueMethod+" is not static!");
+				throw new IllegalField(valueMethod + " is not static!");
 			}
 			
-			var context=GenericsResolver.resolve(valueMethod.getDeclaringClass()).method(valueMethod);
+			var context = GenericsResolver.resolve(valueMethod.getDeclaringClass()).method(valueMethod);
 			
 			if(!UtilL.instanceOf(context.resolveReturnClass(), IOField.class)){
-				throw new IllegalField(valueMethod+" does not return "+IOField.class.getName());
+				throw new IllegalField(valueMethod + " does not return " + IOField.class.getName());
 			}
 			
-			Class<?> ioFieldOwner=context.returnType().type(IOField.class).generic("T");
+			Class<?> ioFieldOwner = context.returnType().type(IOField.class).generic("T");
 			
-			if(ioFieldOwner!=valueMethod.getDeclaringClass()){
-				throw new IllegalField(valueMethod+" does not return IOField of same owner type!\n"+ioFieldOwner.getName()+"\n"+valueMethod.getDeclaringClass().getName());
+			if(ioFieldOwner != valueMethod.getDeclaringClass()){
+				throw new IllegalField(valueMethod + " does not return IOField of same owner type!\n" + ioFieldOwner.getName() + "\n" + valueMethod.getDeclaringClass().getName());
 			}
 		}
 		
-		return FieldSet.of(valueDefs.stream().map(valueDef->{
+		return FieldSet.of(valueDefs.stream().map(valueDef -> {
 			valueDef.setAccessible(true);
 			
 			try{
@@ -122,11 +122,11 @@ public class FieldCompiler{
 	 * @return a {@link FieldSet} containing all {@link IOValue} fields
 	 */
 	public static <T extends IOInstance<T>> FieldSet<T> compile(Struct<T> struct){
-		List<FieldAccessor<T>> accessor=scanFields(struct);
+		List<FieldAccessor<T>> accessor = scanFields(struct);
 		
-		List<AnnotatedField<T>> fields=new ArrayList<>(Math.max(accessor.size()*2, accessor.size()+5));//Give extra capacity for virtual fields
+		List<AnnotatedField<T>> fields = new ArrayList<>(Math.max(accessor.size()*2, accessor.size() + 5));//Give extra capacity for virtual fields
 		for(var a : accessor){
-			var f=registry().create(a, null);
+			var f = registry().create(a, null);
 			fields.add(new AnnotatedField<>(f, scanAnnotations(f)));
 		}
 		
@@ -140,21 +140,21 @@ public class FieldCompiler{
 	}
 	
 	private static <T extends IOInstance<T>> Collection<IOField<T, ?>> generateDependencies(List<AnnotatedField<T>> fields, List<LogicalAnnotation<Annotation>> depAn, IOField<T, ?> field){
-		Collection<IOField<T, ?>> dependencies=new HashSet<>();
+		Collection<IOField<T, ?>> dependencies = new HashSet<>();
 		
 		for(var ann : depAn){
 			ann.logic().validate(field.getAccessor(), ann.annotation());
 			
-			var depNames=ann.logic().getDependencyValueNames(field.getAccessor(), ann.annotation());
-			if(depNames.size()==0) continue;
+			var depNames = ann.logic().getDependencyValueNames(field.getAccessor(), ann.annotation());
+			if(depNames.size() == 0) continue;
 			
-			var missingNames=depNames.stream()
-			                         .filter(name->fields.stream().noneMatch(f->f.field.getName().equals(name)))
-			                         .collect(joining(", "));
-			if(!missingNames.isEmpty()) throw new IllegalField("Could not find dependencies "+missingNames+" on field "+field.getAccessor());
+			var missingNames = depNames.stream()
+			                           .filter(name -> fields.stream().noneMatch(f -> f.field.getName().equals(name)))
+			                           .collect(joining(", "));
+			if(!missingNames.isEmpty()) throw new IllegalField("Could not find dependencies " + missingNames + " on field " + field.getAccessor());
 			
 			for(String nam : depNames){
-				IOField<T, ?> e=fields.stream().filter(f->f.field.getName().equals(nam)).findAny().orElseThrow().field;
+				IOField<T, ?> e = fields.stream().filter(f -> f.field.getName().equals(nam)).findAny().orElseThrow().field;
 				if(!dependencies.add(e)){
 					//TODO: decide if duplicated dependencies should be tolerated
 //					throw new MalformedStructLayout("Duplicate dependency "+e.getAccessor());
@@ -166,14 +166,14 @@ public class FieldCompiler{
 	
 	private static <T extends IOInstance<T>> void validate(List<AnnotatedField<T>> parsed){
 		for(var pair : parsed){
-			var nam=pair.field.getName();
+			var nam = pair.field.getName();
 			for(char c : new char[]{'.', '/', '\\', ' '}){
-				if(nam.indexOf(c)!=-1){
-					throw new IllegalField("Character '"+c+"' is not allowed in field name \""+nam+"\"! ");
+				if(nam.indexOf(c) != -1){
+					throw new IllegalField("Character '" + c + "' is not allowed in field name \"" + nam + "\"! ");
 				}
 			}
 			
-			var field=pair.field.getAccessor();
+			var field = pair.field.getAccessor();
 			for(var ann : pair.annotations){
 				ann.logic().validate(field, ann.annotation());
 			}
@@ -182,8 +182,8 @@ public class FieldCompiler{
 	
 	private static <T extends IOInstance<T>> void initLateData(List<AnnotatedField<T>> fields){
 		for(var pair : fields){
-			var depAn=pair.annotations;
-			var field=pair.field;
+			var depAn = pair.annotations;
+			var field = pair.field;
 			
 			field.initLateData(FieldSet.of(generateDependencies(fields, depAn, field)));
 		}
@@ -191,47 +191,47 @@ public class FieldCompiler{
 	
 	private static <T extends IOInstance<T>> void generateVirtualFields(List<AnnotatedField<T>> parsed, Struct<T> struct){
 		
-		var accessIndex    =new EnumMap<StoragePool, Integer>(StoragePool.class);
-		var primitiveOffset=new EnumMap<StoragePool, Integer>(StoragePool.class);
-		var virtualData    =new HashMap<String, FieldAccessor<T>>();
-		var newVirtualData =new HashMap<String, FieldAccessor<T>>();
+		var accessIndex     = new EnumMap<StoragePool, Integer>(StoragePool.class);
+		var primitiveOffset = new EnumMap<StoragePool, Integer>(StoragePool.class);
+		var virtualData     = new HashMap<String, FieldAccessor<T>>();
+		var newVirtualData  = new HashMap<String, FieldAccessor<T>>();
 		
-		List<AnnotatedField<T>> toRun=new ArrayList<>(parsed);
+		List<AnnotatedField<T>> toRun = new ArrayList<>(parsed);
 		
 		do{
 			for(var runAnn : toRun){
 				for(var logicalAnn : runAnn.annotations){
 					for(var s : logicalAnn.logic().injectPerInstanceValue(runAnn.field.getAccessor(), logicalAnn.annotation())){
-						var existing=virtualData.get(s.name);
-						if(existing!=null){
-							var gTyp=existing.getGenericType(null);
+						var existing = virtualData.get(s.name);
+						if(existing != null){
+							var gTyp = existing.getGenericType(null);
 							if(!gTyp.equals(s.type)){
-								throw new IllegalField("Virtual field "+existing.getName()+" already defined but has a type conflict of "+gTyp+" and "+s.type);
+								throw new IllegalField("Virtual field " + existing.getName() + " already defined but has a type conflict of " + gTyp + " and " + s.type);
 							}
 							continue;
 						}
 						
 						int primitiveSize, off, ptrIndex;
 						
-						if(!(s.type instanceof Class<?> c)||!c.isPrimitive()){
-							primitiveSize=off=-1;
-							ptrIndex=accessIndex.compute(s.storagePool, (k, v)->v==null?0:v+1);
+						if(!(s.type instanceof Class<?> c) || !c.isPrimitive()){
+							primitiveSize = off = -1;
+							ptrIndex = accessIndex.compute(s.storagePool, (k, v) -> v == null? 0 : v + 1);
 						}else{
 							if(List.of(long.class, double.class).contains(s.type)){
-								primitiveSize=8;
+								primitiveSize = 8;
 							}else if(List.of(byte.class, boolean.class).contains(s.type)){
-								primitiveSize=1;
+								primitiveSize = 1;
 							}else{
-								primitiveSize=4;
+								primitiveSize = 4;
 							}
-							off=primitiveOffset.getOrDefault(s.storagePool, 0);
-							int offEnd=off+primitiveSize;
+							off = primitiveOffset.getOrDefault(s.storagePool, 0);
+							int offEnd = off + primitiveSize;
 							primitiveOffset.put(s.storagePool, offEnd);
 							
-							ptrIndex=-1;
+							ptrIndex = -1;
 						}
 						
-						FieldAccessor<T> accessor=new VirtualAccessor<>(struct, (VirtualFieldDefinition<T, Object>)s, ptrIndex, off, primitiveSize);
+						FieldAccessor<T> accessor = new VirtualAccessor<>(struct, (VirtualFieldDefinition<T, Object>)s, ptrIndex, off, primitiveSize);
 						virtualData.put(s.name, accessor);
 						newVirtualData.put(s.name, accessor);
 					}
@@ -239,8 +239,8 @@ public class FieldCompiler{
 			}
 			toRun.clear();
 			for(var virtual : newVirtualData.values()){
-				var field    =registry().create(virtual, null);
-				var annotated=new AnnotatedField<>(field, scanAnnotations(field));
+				var field     = registry().create(virtual, null);
+				var annotated = new AnnotatedField<>(field, scanAnnotations(field));
 				toRun.add(annotated);
 				UtilL.addRemainSorted(parsed, annotated);
 			}
@@ -250,17 +250,17 @@ public class FieldCompiler{
 	
 	
 	protected static IterablePP<Class<?>> deepClasses(Class<?> clazz){
-		return IterablePP.nullTerminated(()->new Supplier<>(){
-			Class<?> c=clazz;
+		return IterablePP.nullTerminated(() -> new Supplier<>(){
+			Class<?> c = clazz;
 			@Override
 			public Class<?> get(){
-				if(c==null) return null;
-				var tmp=c;
-				var cp =c.getSuperclass();
-				if(cp!=null&&(cp==IOInstance.class||!IOInstance.isInstance(cp))){
-					cp=null;
+				if(c == null) return null;
+				var tmp = c;
+				var cp  = c.getSuperclass();
+				if(cp != null && (cp == IOInstance.class || !IOInstance.isInstance(cp))){
+					cp = null;
 				}
-				c=cp==c?null:cp;
+				c = cp == c? null : cp;
 				
 				return tmp;
 			}
@@ -268,28 +268,28 @@ public class FieldCompiler{
 	}
 	protected static IterablePP<Field> deepFieldsByAnnotation(Class<?> clazz, Class<? extends Annotation> type){
 		return deepClasses(clazz)
-			       .flatMap(c->Arrays.asList(c.getDeclaredFields()).iterator())
-			       .filtered(f->f.isAnnotationPresent(type));
+			       .flatMap(c -> Arrays.asList(c.getDeclaredFields()).iterator())
+			       .filtered(f -> f.isAnnotationPresent(type));
 	}
 	
 	protected static <T extends IOInstance<T>> List<FieldAccessor<T>> scanFields(Struct<T> struct){
-		var cl=struct.getConcreteType();
+		var cl = struct.getConcreteType();
 		
-		List<FieldAccessor<T>> fields    =new ArrayList<>();
-		Set<Method>            usedFields=new HashSet<>();
+		List<FieldAccessor<T>> fields     = new ArrayList<>();
+		Set<Method>            usedFields = new HashSet<>();
 		
-		var ioMethods=allMethods(cl).filter(m->m.isAnnotationPresent(IOValue.class)).toList();
+		var ioMethods = allMethods(cl).filter(m -> m.isAnnotationPresent(IOValue.class)).toList();
 		
 		for(Field field : deepFieldsByAnnotation(cl, IOValue.class)){
 			try{
-				Type type=getType(field);
+				Type type = getType(field);
 				
 				registry().requireCanCreate(type, field::getAnnotation);
 				field.setAccessible(true);
 				
-				String fieldName=getFieldName(field);
+				String fieldName = getFieldName(field);
 				
-				Function<String, Optional<Method>> getMethod=prefix->{
+				Function<String, Optional<Method>> getMethod = prefix -> {
 					for(Method m : ioMethods){
 						if(checkMethod(fieldName, prefix, m)) return Optional.of(m);
 					}
@@ -299,11 +299,11 @@ public class FieldCompiler{
 				Optional<Method> getter;
 				Optional<Method> setter;
 				if(UtilL.instanceOf(cl, IOInstance.Def.class)){
-					getter=ioMethods.stream().filter(m->m.getParameterCount()==0).filter(m->m.getAnnotation(IOValue.class).name().equals(fieldName)).findAny();
-					setter=ioMethods.stream().filter(m->m.getParameterCount()==1).filter(m->m.getAnnotation(IOValue.class).name().equals(fieldName)).findAny();
+					getter = ioMethods.stream().filter(m -> m.getParameterCount() == 0).filter(m -> m.getAnnotation(IOValue.class).name().equals(fieldName)).findAny();
+					setter = ioMethods.stream().filter(m -> m.getParameterCount() == 1).filter(m -> m.getAnnotation(IOValue.class).name().equals(fieldName)).findAny();
 				}else{
-					getter=calcGetPrefixes(field).map(getMethod).filter(Optional::isPresent).map(Optional::get).findAny();
-					setter=getMethod.apply("set");
+					getter = calcGetPrefixes(field).map(getMethod).filter(Optional::isPresent).map(Optional::get).findAny();
+					setter = getMethod.apply("set");
 				}
 				
 				getter.ifPresent(usedFields::add);
@@ -315,75 +315,75 @@ public class FieldCompiler{
 					case REFLECTION -> ReflectionAccessor.make(struct, field, getter, setter, fieldName, type);
 				});
 			}catch(Throwable e){
-				throw new MalformedStruct("Failed to scan field #"+field.getName()+" on "+struct.cleanName(), e);
+				throw new MalformedStruct("Failed to scan field #" + field.getName() + " on " + struct.cleanName(), e);
 			}
 		}
 		
-		var hangingMethods=ioMethods.stream().filter(method->!usedFields.contains(method)).collect(Collectors.toList());
+		var hangingMethods = ioMethods.stream().filter(method -> !usedFields.contains(method)).collect(Collectors.toList());
 		
-		Map<String, PairM<Method, Method>> transientFieldsMap=new HashMap<>();
+		Map<String, PairM<Method, Method>> transientFieldsMap = new HashMap<>();
 		
 		for(Method hangingMethod : hangingMethods){
-			calcGetPrefixes(hangingMethod).map(p->getMethodFieldName(p, hangingMethod)).filter(Optional::isPresent).map(Optional::get)
-			                              .findFirst().ifPresent(s->transientFieldsMap.computeIfAbsent(s, n->new PairM<>()).obj1=hangingMethod);
-			getMethodFieldName("set", hangingMethod).ifPresent(s->transientFieldsMap.computeIfAbsent(s, n->new PairM<>()).obj2=hangingMethod);
+			calcGetPrefixes(hangingMethod).map(p -> getMethodFieldName(p, hangingMethod)).filter(Optional::isPresent).map(Optional::get)
+			                              .findFirst().ifPresent(s -> transientFieldsMap.computeIfAbsent(s, n -> new PairM<>()).obj1 = hangingMethod);
+			getMethodFieldName("set", hangingMethod).ifPresent(s -> transientFieldsMap.computeIfAbsent(s, n -> new PairM<>()).obj2 = hangingMethod);
 		}
 		
-		hangingMethods.removeIf(hangingMethod->{
-			var f=hangingMethod.getAnnotation(IOValue.class);
-			if(f==null||f.name().isEmpty()) return false;
+		hangingMethods.removeIf(hangingMethod -> {
+			var f = hangingMethod.getAnnotation(IOValue.class);
+			if(f == null || f.name().isEmpty()) return false;
 			
 			if(CompilationTools.asGetterStub(hangingMethod).isPresent()){
-				transientFieldsMap.computeIfAbsent(f.name(), n->new PairM<>()).obj1=hangingMethod;
+				transientFieldsMap.computeIfAbsent(f.name(), n -> new PairM<>()).obj1 = hangingMethod;
 				return true;
 			}
 			if(CompilationTools.asSetterStub(hangingMethod).isPresent()){
-				transientFieldsMap.computeIfAbsent(f.name(), n->new PairM<>()).obj2=hangingMethod;
+				transientFieldsMap.computeIfAbsent(f.name(), n -> new PairM<>()).obj2 = hangingMethod;
 				return true;
 			}
 			
 			return false;
 		});
 		
-		var errors=transientFieldsMap.entrySet()
-		                             .stream()
-		                             .filter(e->e.getValue().obj1==null||e.getValue().obj2==null)
-		                             .map(e->Map.of("fieldName", e.getKey(), "getter", e.getValue().obj1!=null, "setter", e.getValue().obj2!=null))
-		                             .toList();
+		var errors = transientFieldsMap.entrySet()
+		                               .stream()
+		                               .filter(e -> e.getValue().obj1 == null || e.getValue().obj2 == null)
+		                               .map(e -> Map.of("fieldName", e.getKey(), "getter", e.getValue().obj1 != null, "setter", e.getValue().obj2 != null))
+		                               .toList();
 		if(!errors.isEmpty()){
-			throw new IllegalField("Invalid transient (getter+setter, no value) IO field for "+cl.getName()+":\n"+TextUtil.toTable(errors));
+			throw new IllegalField("Invalid transient (getter+setter, no value) IO field for " + cl.getName() + ":\n" + TextUtil.toTable(errors));
 		}
 		
-		var unusedWaning=hangingMethods.stream()
-		                               .filter(m->transientFieldsMap.values()
-		                                                            .stream()
-		                                                            .flatMap(PairM::<Method>stream)
-		                                                            .noneMatch(mt->mt==m))
-		                               .map(method->method+""+(fields.stream().anyMatch(f->f.getName().equals(method.getName()))?(
-			                               " did you mean "+calcGetPrefixes(method).map(p->p+TextUtil.firstToUpperCase(method.getName())).collect(joining(" or "))+"?"
-		                               ):""))
-		                               .collect(joining("\n"));
+		var unusedWaning = hangingMethods.stream()
+		                                 .filter(m -> transientFieldsMap.values()
+		                                                                .stream()
+		                                                                .flatMap(PairM::<Method>stream)
+		                                                                .noneMatch(mt -> mt == m))
+		                                 .map(method -> method + "" + (fields.stream().anyMatch(f -> f.getName().equals(method.getName()))? (
+			                                 " did you mean " + calcGetPrefixes(method).map(p -> p + TextUtil.firstToUpperCase(method.getName())).collect(joining(" or ")) + "?"
+		                                 ) : ""))
+		                                 .collect(joining("\n"));
 		if(!unusedWaning.isEmpty()){
-			throw new MalformedStruct("There are unused or invalid methods marked with "+IOValue.class.getSimpleName()+"\n"+unusedWaning);
+			throw new MalformedStruct("There are unused or invalid methods marked with " + IOValue.class.getSimpleName() + "\n" + unusedWaning);
 		}
 		
 		fields.sort(Comparator.naturalOrder());
 		
 		for(var e : transientFieldsMap.entrySet()){
-			String name=e.getKey();
-			var    p   =e.getValue();
+			String name = e.getKey();
+			var    p    = e.getValue();
 			
-			Method getter=p.obj1, setter=p.obj2;
+			Method getter = p.obj1, setter = p.obj2;
 			
-			var annotations=GetAnnotation.from(Stream.of(getter.getAnnotations(), setter.getAnnotations())
-			                                         .flatMap(Arrays::stream)
-			                                         .distinct()
-			                                         .collect(Collectors.toMap(Annotation::annotationType, identity())));
-			Type type=getType(getter.getGenericReturnType(), annotations);
+			var annotations = GetAnnotation.from(Stream.of(getter.getAnnotations(), setter.getAnnotations())
+			                                           .flatMap(Arrays::stream)
+			                                           .distinct()
+			                                           .collect(Collectors.toMap(Annotation::annotationType, identity())));
+			Type type = getType(getter.getGenericReturnType(), annotations);
 			
-			Type setType=setter.getGenericParameterTypes()[0];
+			Type setType = setter.getGenericParameterTypes()[0];
 			if(!Utils.genericInstanceOf(type, setType)){
-				throw new IllegalField(setType+" is not a valid argument in\n"+setter);
+				throw new IllegalField(setType + " is not a valid argument in\n" + setter);
 			}
 			
 			UtilL.addRemainSorted(fields, FunctionalReflectionAccessor.make(struct, name, getter, setter, annotations, type));
@@ -392,22 +392,22 @@ public class FieldCompiler{
 		return fields;
 	}
 	
-	private static Stream<String> calcGetPrefixes(Field field)  {return calcGetPrefixes(field.getType());}
-	private static Stream<String> calcGetPrefixes(Method method){return calcGetPrefixes(method.getReturnType());}
+	private static Stream<String> calcGetPrefixes(Field field)  { return calcGetPrefixes(field.getType()); }
+	private static Stream<String> calcGetPrefixes(Method method){ return calcGetPrefixes(method.getReturnType()); }
 	private static Stream<String> calcGetPrefixes(Class<?> typ){
-		var isBool=typ==boolean.class||typ==Boolean.class;
+		var isBool = typ == boolean.class || typ == Boolean.class;
 		if(isBool) return Stream.of("is", "get");
 		return Stream.of("get");
 	}
 	
 	private static Optional<String> getMethodFieldName(String prefix, Method m){
-		IOValue ann  =m.getAnnotation(IOValue.class);
-		var     mName=m.getName();
+		IOValue ann   = m.getAnnotation(IOValue.class);
+		var     mName = m.getName();
 		if(!mName.startsWith(prefix)) return Optional.empty();
 		
 		if(ann.name().isEmpty()){
-			if(mName.length()<=prefix.length()||Character.isLowerCase(mName.charAt(prefix.length()))) return Optional.empty();
-			StringBuilder name=new StringBuilder(mName.length()-prefix.length());
+			if(mName.length()<=prefix.length() || Character.isLowerCase(mName.charAt(prefix.length()))) return Optional.empty();
+			StringBuilder name = new StringBuilder(mName.length() - prefix.length());
 			name.append(mName, prefix.length(), mName.length());
 			name.setCharAt(0, Character.toLowerCase(name.charAt(0)));
 			return Optional.of(name.toString());
@@ -418,14 +418,14 @@ public class FieldCompiler{
 	private static boolean checkMethod(String fieldName, String prefix, Method m){
 		if(Modifier.isStatic(m.getModifiers())) return false;
 		if(!m.isAnnotationPresent(IOValue.class)) return false;
-		var name=getMethodFieldName(prefix, m);
-		return name.isPresent()&&name.get().equals(fieldName);
+		var name = getMethodFieldName(prefix, m);
+		return name.isPresent() && name.get().equals(fieldName);
 	}
 	private static String getFieldName(Field field){
 		String fieldName;
 		{
-			var ann=field.getAnnotation(IOValue.class);
-			fieldName=ann.name().isEmpty()?field.getName():ann.name();
+			var ann = field.getAnnotation(IOValue.class);
+			fieldName = ann.name().isEmpty()? field.getName() : ann.name();
 		}
 		return fieldName;
 	}
@@ -435,27 +435,27 @@ public class FieldCompiler{
 	}
 	
 	static Type getType(Type defaultType, GetAnnotation getAnnotation){
-		Type type        =defaultType;
-		var  typeOverride=getAnnotation.get(IOValue.OverrideType.class);
-		if(typeOverride!=null){
-			var      rawType=SyntheticParameterizedType.generalize(type);
-			Class<?> raw    =rawType.getRawType();
-			Type[]   parms  =rawType.getActualTypeArguments();
+		Type type         = defaultType;
+		var  typeOverride = getAnnotation.get(IOValue.OverrideType.class);
+		if(typeOverride != null){
+			var      rawType = SyntheticParameterizedType.generalize(type);
+			Class<?> raw     = rawType.getRawType();
+			Type[]   parms   = rawType.getActualTypeArguments();
 			
-			if(typeOverride.value()!=Object.class) raw=typeOverride.value();
-			if(typeOverride.genericArgs().length!=0) parms=typeOverride.genericArgs();
+			if(typeOverride.value() != Object.class) raw = typeOverride.value();
+			if(typeOverride.genericArgs().length != 0) parms = typeOverride.genericArgs();
 			
-			type=SyntheticParameterizedType.of(raw, parms);
+			type = SyntheticParameterizedType.of(raw, parms);
 		}
-		var rt=Utils.typeToRaw(type);
+		var rt = Utils.typeToRaw(type);
 		if(rt.isInterface()){
-			var impl=rt.getAnnotation(IOValue.OverrideType.DefaultImpl.class);
-			if(impl!=null){
-				var      rawType=SyntheticParameterizedType.generalize(type);
-				Class<?> raw    =impl.value();
+			var impl = rt.getAnnotation(IOValue.OverrideType.DefaultImpl.class);
+			if(impl != null){
+				var      rawType = SyntheticParameterizedType.generalize(type);
+				Class<?> raw     = impl.value();
 				if(!IOInstance.isInstance(raw)) throw new IllegalStateException();
-				Type[] parms=rawType.getActualTypeArguments();
-				type=SyntheticParameterizedType.of(raw, parms);
+				Type[] parms = rawType.getActualTypeArguments();
+				type = SyntheticParameterizedType.of(raw, parms);
 			}
 		}
 		
@@ -464,7 +464,7 @@ public class FieldCompiler{
 	
 	private static Stream<Method> allMethods(Class<?> clazz){
 		return Stream.iterate(clazz, Objects::nonNull, (UnaryOperator<Class<?>>)Class::getSuperclass)
-		             .flatMap(c->Arrays.stream(c.getDeclaredMethods()));
+		             .flatMap(c -> Arrays.stream(c.getDeclaredMethods()));
 	}
 	
 	static final class LogicalAnnType{
@@ -473,62 +473,62 @@ public class FieldCompiler{
 		
 		@SuppressWarnings("unchecked")
 		private LogicalAnnType(Class<?> type){
-			this.type=(Class<Annotation>)type;
+			this.type = (Class<Annotation>)type;
 		}
 		
 		public AnnotationLogic<Annotation> logic(){
-			if(logic==null) logic=getAnnotationLogic(type);
+			if(logic == null) logic = getAnnotationLogic(type);
 			return logic;
 		}
 		
 		@SuppressWarnings("unchecked")
 		private AnnotationLogic<Annotation> getAnnotationLogic(Class<?> t){
 			try{
-				Field logic=t.getField("LOGIC");
+				Field logic = t.getField("LOGIC");
 				
-				if(!(logic.getGenericType() instanceof ParameterizedType parmType&&
-				     AnnotationLogic.class.equals(parmType.getRawType())&&
+				if(!(logic.getGenericType() instanceof ParameterizedType parmType &&
+				     AnnotationLogic.class.equals(parmType.getRawType()) &&
 				     Arrays.equals(parmType.getActualTypeArguments(), new Type[]{t}))){
 					
-					throw new ClassCastException(logic+" is not a type of "+AnnotationLogic.class.getName()+"<"+t.getName()+">");
+					throw new ClassCastException(logic + " is not a type of " + AnnotationLogic.class.getName() + "<" + t.getName() + ">");
 				}
 				
 				return (AnnotationLogic<Annotation>)logic.get(null);
 			}catch(NoSuchFieldException|IllegalAccessException e){
-				throw new RuntimeException("Class "+t.getName()+" does not contain an AnnotationLogic LOGIC field", e);
+				throw new RuntimeException("Class " + t.getName() + " does not contain an AnnotationLogic LOGIC field", e);
 			}
 		}
 	}
 	
 	@SuppressWarnings("unchecked")
-	static final List<Class<? extends Annotation>> ANNOTATION_TYPES=
+	static final List<Class<? extends Annotation>> ANNOTATION_TYPES =
 		activeAnnotations()
 			.stream()
-			.flatMap(ann->Stream.concat(
+			.flatMap(ann -> Stream.concat(
 				Stream.of(ann),
 				Arrays.stream(ann.getClasses())
 				      .filter(Class::isAnnotation)
-				      .map(c->(Class<? extends Annotation>)c)
+				      .map(c -> (Class<? extends Annotation>)c)
 			))
 			.toList();
 	
-	private static final List<LogicalAnnType> LOGICAL_ANN_TYPES=
+	private static final List<LogicalAnnType> LOGICAL_ANN_TYPES =
 		ANNOTATION_TYPES.stream()
 		                .map(LogicalAnnType::new)
 		                .toList();
 	
 	protected static <T extends IOInstance<T>> List<LogicalAnnotation<Annotation>> scanAnnotations(IOField<T, ?> field){
 		return LOGICAL_ANN_TYPES.stream()
-		                        .map(logTyp->field.getAccessor()
-		                                          .getAnnotation(logTyp.type)
-		                                          .map(ann->new LogicalAnnotation<>(ann, logTyp.logic())))
+		                        .map(logTyp -> field.getAccessor()
+		                                            .getAnnotation(logTyp.type)
+		                                            .map(ann -> new LogicalAnnotation<>(ann, logTyp.logic())))
 		                        .filter(Optional::isPresent)
 		                        .map(Optional::get)
 		                        .toList();
 	}
 	
 	
-	private static final LateInit.Safe<RegistryNode.FieldRegistry> REGISTRY=FieldRegistry.make();
+	private static final LateInit.Safe<RegistryNode.FieldRegistry> REGISTRY = FieldRegistry.make();
 	
 	protected static RegistryNode.FieldRegistry registry(){
 		return REGISTRY.get();

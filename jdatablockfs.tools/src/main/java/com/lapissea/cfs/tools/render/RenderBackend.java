@@ -11,7 +11,7 @@ import java.util.function.Consumer;
 
 public abstract class RenderBackend{
 	
-	public static final boolean DRAW_DEBUG=GlobalConfig.configFlag("tools.drawDebug", false);
+	public static final boolean DRAW_DEBUG = GlobalConfig.configFlag("tools.drawDebug", false);
 	
 	public static class Buffered extends RenderBackend{
 		
@@ -43,9 +43,9 @@ public abstract class RenderBackend{
 			final class FillQuads extends ArgBuff4<FillQuads>{
 				@Override
 				public void draw(RenderBackend backend){
-					try(var ignored=backend.bulkDraw(DrawMode.QUADS)){
-						for(int i=0;i<len;i++){
-							backend.fillQuad(data[i*4], data[i*4+1], data[i*4+2], data[i*4+3]);
+					try(var ignored = backend.bulkDraw(DrawMode.QUADS)){
+						for(int i = 0; i<len; i++){
+							backend.fillQuad(data[i*4], data[i*4 + 1], data[i*4 + 2], data[i*4 + 3]);
 						}
 					}
 				}
@@ -68,9 +68,9 @@ public abstract class RenderBackend{
 			final class DrawLines extends ArgBuff4<DrawLines>{
 				@Override
 				public void draw(RenderBackend backend){
-					try(var ignored=backend.bulkDraw(DrawMode.QUADS)){
-						for(int i=0;i<len;i++){
-							backend.drawLine(data[i*4], data[i*4+1], data[i*4+2], data[i*4+3]);
+					try(var ignored = backend.bulkDraw(DrawMode.QUADS)){
+						for(int i = 0; i<len; i++){
+							backend.drawLine(data[i*4], data[i*4 + 1], data[i*4 + 2], data[i*4 + 3]);
 						}
 					}
 				}
@@ -78,48 +78,48 @@ public abstract class RenderBackend{
 			
 			abstract non-sealed class ArgBuff4<SELF extends ArgBuff4<SELF>> implements Cloneable, Command{
 				protected double[] data;
-				protected int      len=0;
-				private   int      cap=0;
+				protected int      len = 0;
+				private   int      cap = 0;
 				private   boolean  protecc;
 				
 				private SELF snap;
 				
 				void add(double a, double b, double c, double d){
-					snap=null;
+					snap = null;
 					if(protecc){
-						cap=(int)(cap*3F/2);
-						data=Arrays.copyOf(data, cap*4);
-						protecc=false;
+						cap = (int)(cap*3F/2);
+						data = Arrays.copyOf(data, cap*4);
+						protecc = false;
 					}
 					
-					if(cap==0){
-						cap=2;
-						data=new double[8];
-					}else if(len==cap){
-						cap=(int)(cap*3F/2);
-						data=Arrays.copyOf(data, cap*4);
+					if(cap == 0){
+						cap = 2;
+						data = new double[8];
+					}else if(len == cap){
+						cap = (int)(cap*3F/2);
+						data = Arrays.copyOf(data, cap*4);
 					}
 					
-					data[len*4]=a;
-					data[len*4+1]=b;
-					data[len*4+2]=c;
-					data[len*4+3]=d;
+					data[len*4] = a;
+					data[len*4 + 1] = b;
+					data[len*4 + 2] = c;
+					data[len*4 + 3] = d;
 					len++;
 				}
 				
 				@Override
 				public String toString(){
-					return this.getClass().getSimpleName()+"{"+len+"}";
+					return this.getClass().getSimpleName() + "{" + len + "}";
 				}
 				
 				@SuppressWarnings("unchecked")
 				public SELF snap(){
-					if(snap==null){
+					if(snap == null){
 						try{
-							var q=(ArgBuff4<SELF>)clone();
-							q.cap=len;
-							q.protecc=true;
-							snap=(SELF)q;
+							var q = (ArgBuff4<SELF>)clone();
+							q.cap = len;
+							q.protecc = true;
+							snap = (SELF)q;
 						}catch(Throwable e){
 							throw new RuntimeException(e);
 						}
@@ -201,9 +201,9 @@ public abstract class RenderBackend{
 		
 		private final RenderBackend backend;
 		
-		private final ArrayList<Command> buffer=new ArrayList<>();
+		private final ArrayList<Command> buffer = new ArrayList<>();
 		
-		private final DrawFont font=new DrawFont(){
+		private final DrawFont font = new DrawFont(){
 			@Override
 			public void fillStrings(List<StringDraw> strings){
 				buffer.add(new Command.FillStrings(List.copyOf(strings)));
@@ -223,7 +223,7 @@ public abstract class RenderBackend{
 		};
 		
 		public Buffered(RenderBackend backend){
-			this.backend=backend;
+			this.backend = backend;
 		}
 		
 		public void clear(){
@@ -232,9 +232,9 @@ public abstract class RenderBackend{
 		
 		public void draw(){
 			if(backend instanceof Buffered b){
-				b.buffer.ensureCapacity(b.buffer.size()+buffer.size());
+				b.buffer.ensureCapacity(b.buffer.size() + buffer.size());
 				for(Command command : buffer){
-					b.buffer.add(command instanceof Command.ArgBuff4 buf?buf.snap():command);
+					b.buffer.add(command instanceof Command.ArgBuff4 buf? buf.snap() : command);
 				}
 				return;
 			}
@@ -270,8 +270,8 @@ public abstract class RenderBackend{
 		
 		@Override
 		public void setFontScale(float fontScale){
-			if(!buffer.isEmpty()&&buffer.get(buffer.size()-1) instanceof Command.SetFontScale){
-				buffer.set(buffer.size()-1, new Command.SetFontScale(fontScale));
+			if(!buffer.isEmpty() && buffer.get(buffer.size() - 1) instanceof Command.SetFontScale){
+				buffer.set(buffer.size() - 1, new Command.SetFontScale(fontScale));
 			}else{
 				buffer.add(new Command.SetFontScale(fontScale));
 			}
@@ -280,8 +280,8 @@ public abstract class RenderBackend{
 		}
 		@Override
 		public void setLineWidth(float line){
-			if(!buffer.isEmpty()&&buffer.get(buffer.size()-1) instanceof Command.SetLineWidth){
-				buffer.set(buffer.size()-1, new Command.SetLineWidth(line));
+			if(!buffer.isEmpty() && buffer.get(buffer.size() - 1) instanceof Command.SetLineWidth){
+				buffer.set(buffer.size() - 1, new Command.SetLineWidth(line));
 			}else{
 				buffer.add(new Command.SetLineWidth(line));
 			}
@@ -291,10 +291,10 @@ public abstract class RenderBackend{
 		@Override
 		public void fillQuad(double x, double y, double width, double height){
 			if(!buffer.isEmpty()){
-				var last=buffer.get(buffer.size()-1);
+				var last = buffer.get(buffer.size() - 1);
 				if(last instanceof Command.FillQuad q){
-					buffer.remove(buffer.size()-1);
-					var qs=new Command.FillQuads();
+					buffer.remove(buffer.size() - 1);
+					var qs = new Command.FillQuads();
 					qs.add(q.x, q.y, q.width, q.height);
 					qs.add(x, y, width, height);
 					buffer.add(qs);
@@ -314,10 +314,10 @@ public abstract class RenderBackend{
 		@Override
 		public void drawLine(double xFrom, double yFrom, double xTo, double yTo){
 			if(!buffer.isEmpty()){
-				var last=buffer.get(buffer.size()-1);
+				var last = buffer.get(buffer.size() - 1);
 				if(last instanceof Command.DrawLine q){
-					buffer.remove(buffer.size()-1);
-					var qs=new Command.DrawLines();
+					buffer.remove(buffer.size() - 1);
+					var qs = new Command.DrawLines();
 					qs.add(q.xFrom, q.yFrom, q.xTo, q.yTo);
 					qs.add(xFrom, yFrom, xTo, yTo);
 					buffer.add(qs);
@@ -333,8 +333,8 @@ public abstract class RenderBackend{
 		}
 		@Override
 		public void setColor(Color color){
-			if(!buffer.isEmpty()&&buffer.get(buffer.size()-1) instanceof Command.SetColor){
-				buffer.set(buffer.size()-1, new Command.SetColor(color));
+			if(!buffer.isEmpty() && buffer.get(buffer.size() - 1) instanceof Command.SetColor){
+				buffer.set(buffer.size() - 1, new Command.SetColor(color));
 			}else{
 				buffer.add(new Command.SetColor(color));
 			}
@@ -353,7 +353,7 @@ public abstract class RenderBackend{
 		}
 		@Override
 		public Color readColor(){
-			for(int i=buffer.size()-1;i>=0;i--){
+			for(int i = buffer.size() - 1; i>=0; i--){
 				if(buffer.get(i) instanceof Command.SetColor c){
 					return c.color;
 				}
@@ -367,7 +367,7 @@ public abstract class RenderBackend{
 		}
 		@Override
 		public void clearFrame(){
-			var col=readColor();
+			var col = readColor();
 			buffer.clear();
 			setColor(col);
 			buffer.add(new Command.ClearFrame());
@@ -402,8 +402,8 @@ public abstract class RenderBackend{
 	private static List<CreatorSource> BACKEND_SOURCES;
 	
 	public static synchronized List<CreatorSource> getBackendSources(){
-		if(BACKEND_SOURCES==null){
-			BACKEND_SOURCES=new ArrayList<>(List.of(
+		if(BACKEND_SOURCES == null){
+			BACKEND_SOURCES = new ArrayList<>(List.of(
 				OpenGLBackend::new,
 				G2DBackend::new
 			));
@@ -420,16 +420,16 @@ public abstract class RenderBackend{
 			MIDDLE(2);
 			
 			public final int id;
-			MouseKey(int id){this.id=id;}
+			MouseKey(int id){ this.id = id; }
 		}
 		
 		enum ActionType{
 			DOWN, UP, HOLD
 		}
 		
-		record MouseEvent(MouseKey click, ActionType type){}
+		record MouseEvent(MouseKey click, ActionType type){ }
 		
-		record KeyboardEvent(ActionType type, int key){}
+		record KeyboardEvent(ActionType type, int key){ }
 		
 		int getWidth();
 		int getHeight();
@@ -469,13 +469,13 @@ public abstract class RenderBackend{
 		
 		public BulkDraw(DrawMode mode){
 			start(mode);
-			val=bulkDrawing;
-			bulkDrawing=true;
+			val = bulkDrawing;
+			bulkDrawing = true;
 		}
 		
 		@Override
 		public void close(){
-			bulkDrawing=val;
+			bulkDrawing = val;
 			end();
 		}
 		
@@ -487,16 +487,16 @@ public abstract class RenderBackend{
 	private float   fontScale;
 	private float   lineWidth;
 	
-	private boolean shouldRender=true;
+	private boolean shouldRender = true;
 	
 	public abstract void start(Runnable start);
 	
 	public void markFrameDirty(){
-		shouldRender=true;
+		shouldRender = true;
 	}
 	public boolean notifyDirtyFrame(){
 		if(!shouldRender) return false;
-		shouldRender=false;
+		shouldRender = false;
 		return true;
 	}
 	public boolean isFrameDirty(){
@@ -508,7 +508,7 @@ public abstract class RenderBackend{
 	}
 	
 	public void setFontScale(float fontScale){
-		this.fontScale=fontScale;
+		this.fontScale = fontScale;
 	}
 	public float getFontScale(){
 		return fontScale;
@@ -518,7 +518,7 @@ public abstract class RenderBackend{
 		return lineWidth;
 	}
 	public void setLineWidth(float line){
-		lineWidth=line;
+		lineWidth = line;
 	}
 	
 	public abstract DisplayInterface getDisplay();

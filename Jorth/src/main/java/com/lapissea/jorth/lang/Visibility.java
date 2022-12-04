@@ -15,17 +15,17 @@ public enum Visibility{
 	public final String lower;
 	
 	Visibility(int code){
-		this.opCode=code;
-		lower=name().toLowerCase();
+		this.opCode = code;
+		lower = name().toLowerCase();
 	}
 	
 	public static Visibility fromName(String name) throws MalformedJorthException{
-		var lower=name.toLowerCase();
+		var lower = name.toLowerCase();
 		for(Visibility value : values()){
 			if(lower.equals(value.lower)){
 				return value;
 			}
 		}
-		throw new MalformedJorthException("Unknown visibility "+name);
+		throw new MalformedJorthException("Unknown visibility " + name);
 	}
 }

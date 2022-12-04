@@ -23,43 +23,43 @@ public interface ObjectPipe<T, PoolType>{
 	default void write(DataProvider.Holder holder, ContentWriter dest, T instance) throws IOException{
 		write(holder.getDataProvider(), dest, instance);
 	}
-	default <Prov extends DataProvider.Holder&RandomIO.Creator> void write(Prov dest, T instance) throws IOException{
-		try(var io=dest.io()){
+	default <Prov extends DataProvider.Holder & RandomIO.Creator> void write(Prov dest, T instance) throws IOException{
+		try(var io = dest.io()){
 			write(dest.getDataProvider(), io, instance);
 		}
 	}
 	default void write(DataProvider provider, RandomIO.Creator dest, T instance) throws IOException{
-		try(var io=dest.io()){
+		try(var io = dest.io()){
 			write(provider, io, instance);
 		}
 	}
 	
-	default <Prov extends DataProvider.Holder&RandomIO.Creator> T readNew(Prov src, GenericContext genericContext) throws IOException{
-		try(var io=src.io()){
+	default <Prov extends DataProvider.Holder & RandomIO.Creator> T readNew(Prov src, GenericContext genericContext) throws IOException{
+		try(var io = src.io()){
 			return readNew(src.getDataProvider(), io, genericContext);
 		}
 	}
 	
 	default T readNew(DataProvider provider, RandomIO.Creator src, GenericContext genericContext) throws IOException{
-		try(var io=src.io()){
+		try(var io = src.io()){
 			return readNew(provider, io, genericContext);
 		}
 	}
 	
 	
-	default <Prov extends DataProvider.Holder&RandomIO.Creator> T read(Prov src, T instance, GenericContext genericContext) throws IOException{
-		try(var io=src.io()){
+	default <Prov extends DataProvider.Holder & RandomIO.Creator> T read(Prov src, T instance, GenericContext genericContext) throws IOException{
+		try(var io = src.io()){
 			return read(src.getDataProvider(), io, instance, genericContext);
 		}
 	}
 	default T read(DataProvider provider, RandomIO.Creator src, T instance, GenericContext genericContext) throws IOException{
-		try(var io=src.io()){
+		try(var io = src.io()){
 			return read(provider, io, instance, genericContext);
 		}
 	}
 	
-	default <Prov extends DataProvider.Holder&RandomIO.Creator> void modify(Prov src, UnsafeConsumer<T, IOException> modifier, GenericContext genericContext) throws IOException{
-		T val=readNew(src, genericContext);
+	default <Prov extends DataProvider.Holder & RandomIO.Creator> void modify(Prov src, UnsafeConsumer<T, IOException> modifier, GenericContext genericContext) throws IOException{
+		T val = readNew(src, genericContext);
 		modifier.accept(val);
 		write(src, val);
 	}

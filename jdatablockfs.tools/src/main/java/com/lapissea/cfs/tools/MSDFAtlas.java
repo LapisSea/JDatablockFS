@@ -24,12 +24,12 @@ public class MSDFAtlas{
 		private final int    height;
 		private final String yOrigin;
 		public Info(String type, int distanceRange, int size, int width, int height, String yOrigin){
-			this.type=type;
-			this.distanceRange=distanceRange;
-			this.size=size;
-			this.width=width;
-			this.height=height;
-			this.yOrigin=yOrigin;
+			this.type = type;
+			this.distanceRange = distanceRange;
+			this.size = size;
+			this.width = width;
+			this.height = height;
+			this.yOrigin = yOrigin;
 		}
 		public String getType(){
 			return type;
@@ -51,14 +51,14 @@ public class MSDFAtlas{
 		}
 		@Override
 		public boolean equals(Object obj){
-			if(obj==this) return true;
-			if(obj==null||obj.getClass()!=this.getClass()) return false;
-			var that=(Info)obj;
-			return Objects.equals(this.type, that.type)&&
-			       this.distanceRange==that.distanceRange&&
-			       this.size==that.size&&
-			       this.width==that.width&&
-			       this.height==that.height&&
+			if(obj == this) return true;
+			if(obj == null || obj.getClass() != this.getClass()) return false;
+			var that = (Info)obj;
+			return Objects.equals(this.type, that.type) &&
+			       this.distanceRange == that.distanceRange &&
+			       this.size == that.size &&
+			       this.width == that.width &&
+			       this.height == that.height &&
 			       Objects.equals(this.yOrigin, that.yOrigin);
 		}
 		@Override
@@ -75,12 +75,12 @@ public class MSDFAtlas{
 		private final double underlineY;
 		private final double underlineThickness;
 		public Metrics(double emSize, double lineHeight, double ascender, double descender, double underlineY, double underlineThickness){
-			this.emSize=emSize;
-			this.lineHeight=lineHeight;
-			this.ascender=ascender;
-			this.descender=descender;
-			this.underlineY=underlineY;
-			this.underlineThickness=underlineThickness;
+			this.emSize = emSize;
+			this.lineHeight = lineHeight;
+			this.ascender = ascender;
+			this.descender = descender;
+			this.underlineY = underlineY;
+			this.underlineThickness = underlineThickness;
 		}
 		public double getEmSize(){
 			return emSize;
@@ -102,15 +102,15 @@ public class MSDFAtlas{
 		}
 		@Override
 		public boolean equals(Object obj){
-			if(obj==this) return true;
-			if(obj==null||obj.getClass()!=this.getClass()) return false;
-			var that=(Metrics)obj;
-			return Double.doubleToLongBits(this.emSize)==Double.doubleToLongBits(that.emSize)&&
-			       Double.doubleToLongBits(this.lineHeight)==Double.doubleToLongBits(that.lineHeight)&&
-			       Double.doubleToLongBits(this.ascender)==Double.doubleToLongBits(that.ascender)&&
-			       Double.doubleToLongBits(this.descender)==Double.doubleToLongBits(that.descender)&&
-			       Double.doubleToLongBits(this.underlineY)==Double.doubleToLongBits(that.underlineY)&&
-			       Double.doubleToLongBits(this.underlineThickness)==Double.doubleToLongBits(that.underlineThickness);
+			if(obj == this) return true;
+			if(obj == null || obj.getClass() != this.getClass()) return false;
+			var that = (Metrics)obj;
+			return Double.doubleToLongBits(this.emSize) == Double.doubleToLongBits(that.emSize) &&
+			       Double.doubleToLongBits(this.lineHeight) == Double.doubleToLongBits(that.lineHeight) &&
+			       Double.doubleToLongBits(this.ascender) == Double.doubleToLongBits(that.ascender) &&
+			       Double.doubleToLongBits(this.descender) == Double.doubleToLongBits(that.descender) &&
+			       Double.doubleToLongBits(this.underlineY) == Double.doubleToLongBits(that.underlineY) &&
+			       Double.doubleToLongBits(this.underlineThickness) == Double.doubleToLongBits(that.underlineThickness);
 		}
 		@Override
 		public int hashCode(){
@@ -124,10 +124,10 @@ public class MSDFAtlas{
 		private final Bounds planeBounds;
 		private final Bounds atlasBounds;
 		public Glyph(int unicode, float advance, Bounds planeBounds, Bounds atlasBounds){
-			this.unicode=unicode;
-			this.advance=advance;
-			this.planeBounds=planeBounds;
-			this.atlasBounds=atlasBounds;
+			this.unicode = unicode;
+			this.advance = advance;
+			this.planeBounds = planeBounds;
+			this.atlasBounds = atlasBounds;
 		}
 		public int getUnicode(){
 			return unicode;
@@ -144,11 +144,11 @@ public class MSDFAtlas{
 		
 		@Override
 		public boolean equals(Object obj){
-			if(obj==this) return true;
-			if(obj==null||obj.getClass()!=this.getClass()) return false;
-			var that=(Glyph)obj;
-			return this.unicode==that.unicode&&
-			       Double.doubleToLongBits(this.advance)==Double.doubleToLongBits(that.advance)&&
+			if(obj == this) return true;
+			if(obj == null || obj.getClass() != this.getClass()) return false;
+			var that = (Glyph)obj;
+			return this.unicode == that.unicode &&
+			       Double.doubleToLongBits(this.advance) == Double.doubleToLongBits(that.advance) &&
 			       Objects.equals(this.planeBounds, that.planeBounds);
 		}
 		@Override
@@ -163,10 +163,10 @@ public class MSDFAtlas{
 		private final float right;
 		private final float top;
 		public Bounds(float left, float bottom, float right, float top){
-			this.left=left;
-			this.bottom=bottom;
-			this.right=right;
-			this.top=top;
+			this.left = left;
+			this.bottom = bottom;
+			this.right = right;
+			this.top = top;
 		}
 		public float getLeft(){
 			return left;
@@ -182,13 +182,13 @@ public class MSDFAtlas{
 		}
 		@Override
 		public boolean equals(Object obj){
-			if(obj==this) return true;
-			if(obj==null||obj.getClass()!=this.getClass()) return false;
-			var that=(Bounds)obj;
-			return Double.doubleToLongBits(this.left)==Double.doubleToLongBits(that.left)&&
-			       Double.doubleToLongBits(this.bottom)==Double.doubleToLongBits(that.bottom)&&
-			       Double.doubleToLongBits(this.right)==Double.doubleToLongBits(that.right)&&
-			       Double.doubleToLongBits(this.top)==Double.doubleToLongBits(that.top);
+			if(obj == this) return true;
+			if(obj == null || obj.getClass() != this.getClass()) return false;
+			var that = (Bounds)obj;
+			return Double.doubleToLongBits(this.left) == Double.doubleToLongBits(that.left) &&
+			       Double.doubleToLongBits(this.bottom) == Double.doubleToLongBits(that.bottom) &&
+			       Double.doubleToLongBits(this.right) == Double.doubleToLongBits(that.right) &&
+			       Double.doubleToLongBits(this.top) == Double.doubleToLongBits(that.top);
 		}
 		@Override
 		public int hashCode(){
@@ -202,10 +202,10 @@ public class MSDFAtlas{
 		private final List<Glyph> glyphs;
 		private final List<?>     kerning;
 		public AtlasInfo(Info atlas, Metrics metrics, List<Glyph> glyphs, List<?> kerning){
-			this.atlas=atlas;
-			this.metrics=metrics;
-			this.glyphs=glyphs;
-			this.kerning=kerning;
+			this.atlas = atlas;
+			this.metrics = metrics;
+			this.glyphs = glyphs;
+			this.kerning = kerning;
 		}
 		public Info getAtlas(){
 			return atlas;
@@ -221,12 +221,12 @@ public class MSDFAtlas{
 		}
 		@Override
 		public boolean equals(Object obj){
-			if(obj==this) return true;
-			if(obj==null||obj.getClass()!=this.getClass()) return false;
-			var that=(AtlasInfo)obj;
-			return Objects.equals(this.atlas, that.atlas)&&
-			       Objects.equals(this.metrics, that.metrics)&&
-			       Objects.equals(this.glyphs, that.glyphs)&&
+			if(obj == this) return true;
+			if(obj == null || obj.getClass() != this.getClass()) return false;
+			var that = (AtlasInfo)obj;
+			return Objects.equals(this.atlas, that.atlas) &&
+			       Objects.equals(this.metrics, that.metrics) &&
+			       Objects.equals(this.glyphs, that.glyphs) &&
 			       Objects.equals(this.kerning, that.kerning);
 		}
 		@Override
@@ -247,25 +247,25 @@ public class MSDFAtlas{
 	private       WeakReference<BufferedImage>               imageRef;
 	private final UnsafeSupplier<BufferedImage, IOException> image;
 	
-	private final Map<Character, Glyph> glyphCache=new HashMap<>();
+	private final Map<Character, Glyph> glyphCache = new HashMap<>();
 	
 	public MSDFAtlas(String atlasFolder) throws IOException{
 		this(atlasFolder, "atlas");
 	}
 	public MSDFAtlas(String atlasFolder, String atlasName) throws IOException{
-		this(()->binStream(atlasFolder+"/"+atlasName+".png"), textStream(atlasFolder+"/"+atlasName+".json"));
+		this(() -> binStream(atlasFolder + "/" + atlasName + ".png"), textStream(atlasFolder + "/" + atlasName + ".json"));
 	}
 	public MSDFAtlas(Supplier<InputStream> png, Reader json) throws IOException{
 		png.get().close();
-		image=()->{
-			var img=imageRef==null?null:imageRef.get();
-			if(img==null){
-				img=ImageIO.read(png.get());
-				imageRef=new WeakReference<>(img);
+		image = () -> {
+			var img = imageRef == null? null : imageRef.get();
+			if(img == null){
+				img = ImageIO.read(png.get());
+				imageRef = new WeakReference<>(img);
 			}
 			return img;
 		};
-		info=new GsonBuilder().create().fromJson(json, AtlasInfo.class);
+		info = new GsonBuilder().create().fromJson(json, AtlasInfo.class);
 	}
 	public AtlasInfo getInfo(){
 		return info;
@@ -286,20 +286,20 @@ public class MSDFAtlas{
 	}
 	private Glyph getGlyph0(char ch){
 		return getGlyphOptional0(ch).orElseGet(
-			()->Stream.of('\uFFFD', '?', ' ')
-			          .map(this::getGlyphOptional0)
-			          .filter(Optional::isPresent)
-			          .map(Optional::get)
-			          .findFirst()
-			          .orElseThrow()
+			() -> Stream.of('\uFFFD', '?', ' ')
+			            .map(this::getGlyphOptional0)
+			            .filter(Optional::isPresent)
+			            .map(Optional::get)
+			            .findFirst()
+			            .orElseThrow()
 		);
 	}
 	public Optional<Glyph> getGlyphOptional(char ch){
-		var opt=getGlyphOptional0(ch);
-		opt.ifPresent(glyph->glyphCache.put(ch, glyph));
+		var opt = getGlyphOptional0(ch);
+		opt.ifPresent(glyph -> glyphCache.put(ch, glyph));
 		return opt;
 	}
 	private Optional<Glyph> getGlyphOptional0(char ch){
-		return info.glyphs.stream().filter(g->g.getUnicode()==ch).findAny();
+		return info.glyphs.stream().filter(g -> g.getUnicode() == ch).findAny();
 	}
 }

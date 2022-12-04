@@ -25,7 +25,7 @@ public class Index{
 	
 	private final class BList<T> extends Bound<T>{
 		private final List<T> unbound;
-		public BList(List<T> data){this.unbound=data;}
+		public BList(List<T> data){ this.unbound = data; }
 		
 		@Override
 		protected T getUnmapped(int index){
@@ -35,7 +35,7 @@ public class Index{
 	
 	private final class BArr<T> extends Bound<T>{
 		private final T[] unbound;
-		public BArr(T[] data){this.unbound=data;}
+		public BArr(T[] data){ this.unbound = data; }
 		
 		@Override
 		protected T getUnmapped(int index){
@@ -46,7 +46,7 @@ public class Index{
 	private final int[] data;
 	
 	public Index(int[] rawIndex){
-		this.data=Objects.requireNonNull(rawIndex);
+		this.data = Objects.requireNonNull(rawIndex);
 	}
 	
 	public int size(){

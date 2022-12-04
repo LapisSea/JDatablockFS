@@ -9,21 +9,21 @@ import java.util.Optional;
 
 public class GlobalConfig{
 	
-	private static final String CONFIG_PROPERTY_PREFIX="dfs.";
+	private static final String CONFIG_PROPERTY_PREFIX = "dfs.";
 	
-	public static final boolean DEBUG_VALIDATION=GlobalConfig.class.desiredAssertionStatus();
+	public static final boolean DEBUG_VALIDATION = GlobalConfig.class.desiredAssertionStatus();
 	
-	public static final boolean RELEASE_MODE     =configFlag("releaseMode", isInJar());
-	public static final boolean TYPE_VALIDATION  =configFlag("typeValidation", DEBUG_VALIDATION);
-	public static       boolean PRINT_COMPILATION=configFlag("printCompilation", false);
-	public static final int     BATCH_BYTES      =configInt("batchBytes", 1<<13);
+	public static final boolean RELEASE_MODE      = configFlag("releaseMode", isInJar());
+	public static final boolean TYPE_VALIDATION   = configFlag("typeValidation", DEBUG_VALIDATION);
+	public static       boolean PRINT_COMPILATION = configFlag("printCompilation", false);
+	public static final int     BATCH_BYTES       = configInt("batchBytes", 1<<13);
 	
 	public static Optional<String> configProp(String name){
-		return Utils.optionalProperty(CONFIG_PROPERTY_PREFIX+name);
+		return Utils.optionalProperty(CONFIG_PROPERTY_PREFIX + name);
 	}
 	
 	public static String propName(String name){
-		return CONFIG_PROPERTY_PREFIX+name;
+		return CONFIG_PROPERTY_PREFIX + name;
 	}
 	
 	public static boolean configFlag(String name, boolean defaultValue){
@@ -36,19 +36,19 @@ public class GlobalConfig{
 	@SuppressWarnings("unchecked")
 	public static <T extends Enum<T>> T configEnum(String name, T defaultValue){
 		Objects.requireNonNull(defaultValue);
-		return configProp(name).map(s->Arrays.stream(defaultValue.getClass().getEnumConstants())
-		                                     .map(e->(T)e)
-		                                     .filter(e->e.name().equalsIgnoreCase(s))
-		                                     .findAny())
+		return configProp(name).map(s -> Arrays.stream(defaultValue.getClass().getEnumConstants())
+		                                       .map(e -> (T)e)
+		                                       .filter(e -> e.name().equalsIgnoreCase(s))
+		                                       .findAny())
 		                       .filter(Optional::isPresent)
 		                       .map(Optional::get)
 		                       .orElse(defaultValue);
 	}
 	
 	private static boolean isInJar(){
-		URL url=GlobalConfig.class.getResource(GlobalConfig.class.getSimpleName()+".class");
+		URL url = GlobalConfig.class.getResource(GlobalConfig.class.getSimpleName() + ".class");
 		Objects.requireNonNull(url);
-		var proto=url.getProtocol();
+		var proto = url.getProtocol();
 		return switch(proto){
 			case "jar", "war" -> true;
 			case "file" -> false;

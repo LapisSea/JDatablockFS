@@ -9,10 +9,10 @@ import java.util.List;
 public class Entity extends IOInstance.Managed<Entity>{
 	
 	@IOValue
-	public Vec2d pos=new Vec2d();
+	public Vec2d pos = new Vec2d();
 	
 	@IOValue
 //	@IOValue.Reference
-	public List<InventorySlot> inventory=new ArrayList<>();
+	public List<InventorySlot> inventory = new ArrayList<>();
 	
 }

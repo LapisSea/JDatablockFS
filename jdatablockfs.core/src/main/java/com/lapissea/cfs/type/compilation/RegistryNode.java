@@ -18,7 +18,7 @@ public interface RegistryNode{
 		
 		private final Class<ValTyp> typ;
 		public InstanceOf(Class<ValTyp> typ){
-			this.typ=typ;
+			this.typ = typ;
 		}
 		
 		public Class<ValTyp> getType(){
@@ -35,14 +35,14 @@ public interface RegistryNode{
 	
 	class FieldRegistry implements RegistryNode{
 		
-		private final List<RegistryNode> nodes=new ArrayList<>();
+		private final List<RegistryNode> nodes = new ArrayList<>();
 		
 		public void register(RegistryNode node){
 			nodes.add(node);
 		}
 		
 		private IllegalField fail(Type type){
-			throw new IllegalField("Unable to find implementation of "+IOField.class.getSimpleName()+" from "+type);
+			throw new IllegalField("Unable to find implementation of " + IOField.class.getSimpleName() + " from " + type);
 		}
 		private RegistryNode find(Type type, GetAnnotation annotation){
 			for(var node : nodes){
@@ -59,13 +59,13 @@ public interface RegistryNode{
 		
 		@Override
 		public boolean canCreate(Type type, GetAnnotation annotations){
-			return find(type, annotations)!=null;
+			return find(type, annotations) != null;
 		}
 		
 		@Override
 		public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
-			var node=find(field.getGenericType(genericContext), GetAnnotation.from(field));
-			if(node!=null) return node.create(field, genericContext);
+			var node = find(field.getGenericType(genericContext), GetAnnotation.from(field));
+			if(node != null) return node.create(field, genericContext);
 			throw fail(field.getGenericType(genericContext));
 		}
 	}

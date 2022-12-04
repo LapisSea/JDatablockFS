@@ -26,16 +26,16 @@ public class IOFieldStringArray<T extends IOInstance<T>> extends IOField<T, Stri
 	public IOFieldStringArray(FieldAccessor<T> accessor){
 		super(accessor);
 		
-		descriptor=SizeDescriptor.Unknown.of(0, OptionalLong.empty(), (ioPool, prov, inst)->{
-			var arr=get(ioPool, inst);
-			if(arr==null) return 0;
-			return Arrays.stream(arr).map(AutoText::new).mapToLong(t->AutoText.PIPE.calcUnknownSize(prov, t, WordSpace.BYTE)).sum();
+		descriptor = SizeDescriptor.Unknown.of(0, OptionalLong.empty(), (ioPool, prov, inst) -> {
+			var arr = get(ioPool, inst);
+			if(arr == null) return 0;
+			return Arrays.stream(arr).map(AutoText::new).mapToLong(t -> AutoText.PIPE.calcUnknownSize(prov, t, WordSpace.BYTE)).sum();
 		});
 	}
 	@Override
 	public void init(){
 		super.init();
-		arraySize=declaringStruct().getFields().requireExactInt(IOFieldTools.makeCollectionLenName(getAccessor()));
+		arraySize = declaringStruct().getFields().requireExactInt(IOFieldTools.makeCollectionLenName(getAccessor()));
 	}
 	
 	@Override
@@ -44,8 +44,8 @@ public class IOFieldStringArray<T extends IOInstance<T>> extends IOField<T, Stri
 	}
 	@Override
 	public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
-		var arr =get(ioPool, instance);
-		var text=new AutoText();
+		var arr  = get(ioPool, instance);
+		var text = new AutoText();
 		for(String s : arr){
 			text.setData(s);
 			AutoText.PIPE.write(provider, dest, text);
@@ -53,14 +53,14 @@ public class IOFieldStringArray<T extends IOInstance<T>> extends IOField<T, Stri
 	}
 	@Override
 	public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		int size=arraySize.getValue(ioPool, instance);
+		int size = arraySize.getValue(ioPool, instance);
 		
-		var arr=new String[size];
+		var arr = new String[size];
 		
-		var text=new AutoText();
-		for(int i=0;i<arr.length;i++){
+		var text = new AutoText();
+		for(int i = 0; i<arr.length; i++){
 			AutoText.PIPE.read(provider, src, text, null);
-			arr[i]=text.getData();
+			arr[i] = text.getData();
 		}
 		
 		set(ioPool, instance, arr);
@@ -68,8 +68,8 @@ public class IOFieldStringArray<T extends IOInstance<T>> extends IOField<T, Stri
 	
 	@Override
 	public void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-		int size=arraySize.getValue(ioPool, instance);
-		for(int i=0;i<size;i++){
+		int size = arraySize.getValue(ioPool, instance);
+		for(int i = 0; i<size; i++){
 			AutoText.PIPE.skip(provider, src, null);
 		}
 	}

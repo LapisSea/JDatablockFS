@@ -18,22 +18,22 @@ public interface ClassInfo{
 		
 		private final TypeSource                   source;
 		private final Class<?>                     clazz;
-		private final Map<String, FieldInfo>       fields   =new HashMap<>();
-		private final Map<Signature, FunctionInfo> functions=new HashMap<>();
+		private final Map<String, FieldInfo>       fields    = new HashMap<>();
+		private final Map<Signature, FunctionInfo> functions = new HashMap<>();
 		
 		public OfClass(TypeSource source, Class<?> clazz){
-			this.source=source;
-			this.clazz=clazz;
+			this.source = source;
+			this.clazz = clazz;
 		}
 		
 		@Override
 		public FieldInfo getField(String name) throws MalformedJorthException{
-			var f=fields.get(name);
-			if(f!=null) return f;
+			var f = fields.get(name);
+			if(f != null) return f;
 			try{
-				f=FieldInfo.of(UtilL.getDeepDeclaredField(clazz, name));
+				f = FieldInfo.of(UtilL.getDeepDeclaredField(clazz, name));
 			}catch(ReflectiveOperationException e){
-				throw new MalformedJorthException(name+" does not exist in "+clazz, e);
+				throw new MalformedJorthException(name + " does not exist in " + clazz, e);
 			}
 			fields.put(name, f);
 			return f;
@@ -41,22 +41,24 @@ public interface ClassInfo{
 		
 		@Override
 		public FunctionInfo getFunction(Signature signature) throws MalformedJorthException{
-			var f=functions.get(signature);
-			if(f!=null) return f;
+			var f = functions.get(signature);
+			if(f != null) return f;
 			try{
 				
-				var args=new Class<?>[signature.args().size()];
-				for(int i=0;i<signature.args().size();i++){
-					var name=signature.args().get(i).raw();
-					args[i]=clazz.getClassLoader().loadClass(name.dotted());
+				var args = new Class<?>[signature.args().size()];
+				for(int i = 0; i<signature.args().size(); i++){
+					var name   = signature.args().get(i).raw();
+					var loader = clazz.getClassLoader();
+					if(loader == null) loader = this.getClass().getClassLoader();
+					args[i] = loader.loadClass(name.dotted());
 				}
 				
 				if(signature.name().equals("<init>")){
 					return FunctionInfo.of(source, clazz.getConstructor(args));
 				}
-				f=FunctionInfo.of(source, getDeepDeclaredMethod(clazz, signature.name(), args));
+				f = FunctionInfo.of(source, getDeepDeclaredMethod(clazz, signature.name(), args));
 			}catch(ReflectiveOperationException e){
-				throw new MalformedJorthException(signature+" does not exist in "+clazz, e);
+				throw new MalformedJorthException(signature + " does not exist in " + clazz, e);
 			}
 			functions.put(signature, f);
 			return f;
@@ -65,7 +67,7 @@ public interface ClassInfo{
 			try{
 				return type.getDeclaredMethod(name, args);
 			}catch(ReflectiveOperationException e){
-				if(type==Object.class) throw e;
+				if(type == Object.class) throw e;
 				return getDeepDeclaredMethod(type.getSuperclass(), name, args);
 			}
 		}
@@ -77,8 +79,8 @@ public interface ClassInfo{
 		@Override
 		public ClassInfo superType() throws MalformedJorthException{
 			if(clazz.isPrimitive()) return null;
-			var sup=clazz.getSuperclass();
-			if(sup==null) return null;
+			var sup = clazz.getSuperclass();
+			if(sup == null) return null;
 			return source.byName(ClassName.of(sup));
 		}
 		@Override

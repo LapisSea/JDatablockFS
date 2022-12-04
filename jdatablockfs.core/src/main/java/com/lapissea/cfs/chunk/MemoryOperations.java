@@ -30,40 +30,40 @@ import static com.lapissea.cfs.logging.Log.smallTrace;
 public class MemoryOperations{
 	
 	public static void purgePossibleChunkHeaders(DataProvider provider, long from, long size) throws IOException{
-		var maxHeaderSize=(int)Chunk.PIPE.getSizeDescriptor().requireMax(WordSpace.BYTE);
+		var maxHeaderSize = (int)Chunk.PIPE.getSizeDescriptor().requireMax(WordSpace.BYTE);
 		
-		ChunkSet possibleHeaders=new ChunkSet();
-		try(var io=provider.getSource().read(from)){
-			for(int i=0;i<size;i++){
+		ChunkSet possibleHeaders = new ChunkSet();
+		try(var io = provider.getSource().read(from)){
+			for(int i = 0; i<size; i++){
 				if(Chunk.earlyCheckChunkAt(io)){
 					possibleHeaders.add(i);
 				}
 			}
 		}
 		
-		boolean noTrim=false;
+		boolean noTrim = false;
 		
-		List<RandomIO.WriteChunk> writes=new ArrayList<>();
-		byte[]                    b1    ={0};
+		List<RandomIO.WriteChunk> writes = new ArrayList<>();
+		byte[]                    b1     = {0};
 		
 		while(!possibleHeaders.isEmpty()){
 			
-			long lastUnknown=-1;
-			int  removeCount=0;
+			long lastUnknown = -1;
+			int  removeCount = 0;
 			
 			
 			//test unknowns
-			var iter=(noTrim?LongStream.of(possibleHeaders.last().getValue()):possibleHeaders.longStream()).iterator();
+			var iter = (noTrim? LongStream.of(possibleHeaders.last().getValue()) : possibleHeaders.longStream()).iterator();
 			while(iter.hasNext()){
-				var headIndex=iter.nextLong();
+				var headIndex = iter.nextLong();
 				
-				var pos=headIndex+from;
+				var pos = headIndex + from;
 				
 				try{
 					Chunk.readChunk(provider, ChunkPointer.of(pos));
 				}catch(Throwable e){
 					//invalid only if last
-					lastUnknown=Math.max(lastUnknown, headIndex);
+					lastUnknown = Math.max(lastUnknown, headIndex);
 					continue;
 				}
 				
@@ -73,68 +73,68 @@ public class MemoryOperations{
 				removeCount++;
 			}
 			if(!writes.isEmpty()){
-				try(var io=provider.getSource().io()){
+				try(var io = provider.getSource().io()){
 					io.writeAtOffsets(writes);
 				}
 				writes.clear();
 			}
 			
-			if(lastUnknown!=-1){
+			if(lastUnknown != -1){
 				possibleHeaders.remove(lastUnknown);
 			}
 			if(possibleHeaders.isEmpty()) break;
 			
-			if(removeCount>1) noTrim=false;
+			if(removeCount>1) noTrim = false;
 			if(noTrim) continue;
 			
-			noTrim=true;
+			noTrim = true;
 			//pop alone headers, no change will make them valid
-			iter=possibleHeaders.longStream().iterator();
-			long lastIndex=-maxHeaderSize*2L;
-			var  index    =iter.nextLong();
+			iter = possibleHeaders.longStream().iterator();
+			long lastIndex = -maxHeaderSize*2L;
+			var  index     = iter.nextLong();
 			while(iter.hasNext()){
-				var nextIndex=iter.nextLong();
+				var nextIndex = iter.nextLong();
 				
-				if(Math.min(Math.abs(lastIndex-index), Math.abs(nextIndex-index))>maxHeaderSize){
+				if(Math.min(Math.abs(lastIndex - index), Math.abs(nextIndex - index))>maxHeaderSize){
 					possibleHeaders.remove(index);
-					noTrim=false;
+					noTrim = false;
 				}else{
-					lastIndex=index;
+					lastIndex = index;
 				}
-				index=nextIndex;
+				index = nextIndex;
 			}
 		}
 	}
 	
 	private static long binaryFindWedge(IOList<ChunkPointer> a, ChunkPointer key) throws IOException{
-		long low =0;
-		long high=a.size()-1;
+		long low  = 0;
+		long high = a.size() - 1;
 		
 		while(low<=high){
-			long mid   =(low+high) >>> 1;
-			var  midVal=a.get(mid);
+			long mid    = (low + high) >>> 1;
+			var  midVal = a.get(mid);
 			
 			int cmp;
-			int cmp1=midVal.compareTo(key);
+			int cmp1 = midVal.compareTo(key);
 			if(cmp1<0){
-				var nextMid=mid+1;
+				var nextMid = mid + 1;
 				if(nextMid>=a.size()){
 					return nextMid;
 				}
-				var nextMidVal=a.get(nextMid);
-				int cmp2      =nextMidVal.compareTo(key);
+				var nextMidVal = a.get(nextMid);
+				int cmp2       = nextMidVal.compareTo(key);
 				if(cmp2>=0){
 					return nextMid;
 				}
-				cmp=cmp1;
-			}else if(mid==0){
+				cmp = cmp1;
+			}else if(mid == 0){
 				return mid;
 			}else{
-				cmp=cmp1;
+				cmp = cmp1;
 			}
 			
-			if(cmp<0) low=mid+1;
-			else if(cmp>0) high=mid-1;
+			if(cmp<0) low = mid + 1;
+			else if(cmp>0) high = mid - 1;
 			else return mid; // key found
 		}
 		return -1;  // key not found.
@@ -144,28 +144,28 @@ public class MemoryOperations{
 		for(Chunk newCh : newData){
 			if(DEBUG_VALIDATION) checkOptimal(provider, data);
 			
-			var newPtr=newCh.getPtr();
+			var newPtr = newCh.getPtr();
 			if(data.isEmpty()){
 				data.add(newPtr);
 				continue;
 			}
-			var insertIndex=binaryFindWedge(data, newPtr);
-			if(insertIndex==0){
-				var existing=data.get(0).dereference(provider);
-				var next    =newCh;
+			var insertIndex = binaryFindWedge(data, newPtr);
+			if(insertIndex == 0){
+				var existing = data.get(0).dereference(provider);
+				var next     = newCh;
 				if(existing.compareTo(next)<0){
-					var tmp=next;
-					next=existing;
-					existing=tmp;
+					var tmp = next;
+					next = existing;
+					existing = tmp;
 				}
 				if(next.isNextPhysical(existing)){
 					freeListReplace(data, 0, newCh);
 					mergeFreeChunks(next, existing);
 					//check if next element in free list is now next physical and merge+remove from list
 					if(data.size()>1){
-						var ptr=data.get(1);
+						var ptr = data.get(1);
 						if(existing.isNextPhysical(ptr)){
-							var ch=ptr.dereference(provider);
+							var ch = ptr.dereference(provider);
 							data.remove(1);
 							mergeFreeChunks(existing, ch);
 						}
@@ -177,12 +177,12 @@ public class MemoryOperations{
 				continue;
 			}
 			
-			var prev=data.get(insertIndex-1).dereference(provider);
+			var prev = data.get(insertIndex - 1).dereference(provider);
 			if(prev.isNextPhysical(newCh)){
 				mergeFreeChunks(prev, newCh);
 				//check if next element in free list is now next physical and merge+remove from list
 				if(data.size()>insertIndex){
-					var ch=data.get(insertIndex).dereference(provider);
+					var ch = data.get(insertIndex).dereference(provider);
 					if(prev.isNextPhysical(ch)){
 						data.remove(insertIndex);
 						mergeFreeChunks(prev, ch);
@@ -190,7 +190,7 @@ public class MemoryOperations{
 				}
 			}else{
 				if(data.size()>insertIndex){
-					var next=data.get(insertIndex).dereference(provider);
+					var next = data.get(insertIndex).dereference(provider);
 					
 					if(newCh.isNextPhysical(next)){
 						freeListReplace(data, insertIndex, newCh);
@@ -214,15 +214,15 @@ public class MemoryOperations{
 	}
 	
 	private static void checkOptimal(DataProvider provider, IOList<ChunkPointer> data) throws IOException{
-		ChunkPointer last=null;
+		ChunkPointer last = null;
 		for(ChunkPointer val : data){
-			if(last!=null){
-				if(last.compareTo(val)>=0) throw new IllegalStateException(last+" >= "+val+" in "+data);
-				var prev=last.dereference(provider);
-				var c   =val.dereference(provider);
-				if(prev.isNextPhysical(c)) throw new IllegalStateException(prev+" connected to "+c+" in "+data);
+			if(last != null){
+				if(last.compareTo(val)>=0) throw new IllegalStateException(last + " >= " + val + " in " + data);
+				var prev = last.dereference(provider);
+				var c    = val.dereference(provider);
+				if(prev.isNextPhysical(c)) throw new IllegalStateException(prev + " connected to " + c + " in " + data);
 			}
-			last=val;
+			last = val;
 		}
 	}
 	private static void clearFree(Chunk newCh) throws IOException{
@@ -238,25 +238,25 @@ public class MemoryOperations{
 	}
 	
 	private static void prepareFreeChunkMerge(Chunk prev, Chunk next){
-		var wholeSize=next.getHeaderSize()+next.getCapacity();
-		prev.setCapacityAndModifyNumSize(prev.getCapacity()+wholeSize);
-		if(prev.dataEnd()!=next.dataEnd()) throw new IllegalStateException(prev+" and "+next+" are not connected");
+		var wholeSize = next.getHeaderSize() + next.getCapacity();
+		prev.setCapacityAndModifyNumSize(prev.getCapacity() + wholeSize);
+		if(prev.dataEnd() != next.dataEnd()) throw new IllegalStateException(prev + " and " + next + " are not connected");
 	}
 	
 	
-	private static final boolean PURGE_ACCIDENTAL=GlobalConfig.configFlag("purgeAccidentalChunkHeaders", GlobalConfig.DEBUG_VALIDATION);
+	private static final boolean PURGE_ACCIDENTAL = GlobalConfig.configFlag("purgeAccidentalChunkHeaders", GlobalConfig.DEBUG_VALIDATION);
 	
 	public static List<Chunk> mergeChunks(Collection<Chunk> data) throws IOException{
-		List<Chunk> toDestroy=new ArrayList<>();
-		List<Chunk> oks      =new ArrayList<>();
+		List<Chunk> toDestroy = new ArrayList<>();
+		List<Chunk> oks       = new ArrayList<>();
 		
 		{
-			List<Chunk> chunks=new ArrayList<>(data);
+			List<Chunk> chunks = new ArrayList<>(data);
 			chunks.sort(Chunk::compareTo);
 			while(chunks.size()>1){
-				var prev =chunks.get(chunks.size()-2);
-				var chunk=chunks.remove(chunks.size()-1);
-				assert prev.getPtr().getValue()<chunk.getPtr().getValue():prev.getPtr()+" "+chunk.getPtr();
+				var prev  = chunks.get(chunks.size() - 2);
+				var chunk = chunks.remove(chunks.size() - 1);
+				assert prev.getPtr().getValue()<chunk.getPtr().getValue() : prev.getPtr() + " " + chunk.getPtr();
 				if(prev.isNextPhysical(chunk)){
 					prepareFreeChunkMerge(prev, chunk);
 					
@@ -265,7 +265,7 @@ public class MemoryOperations{
 					oks.add(chunk);
 				}
 			}
-			var chunk=chunks.remove(chunks.size()-1);
+			var chunk = chunks.remove(chunks.size() - 1);
 			oks.add(chunk);
 		}
 		
@@ -275,24 +275,24 @@ public class MemoryOperations{
 		
 		if(!toDestroy.isEmpty()){
 			toDestroy.sort(Comparator.naturalOrder());
-			byte[] empty   =new byte[(int)Chunk.PIPE.getSizeDescriptor().requireMax(WordSpace.BYTE)];
-			var    provider=toDestroy.get(0).getDataProvider();
-			try(var io=provider.getSource().io()){
-				io.writeAtOffsets(toDestroy.stream().map(c->new RandomIO.WriteChunk(c.getPtr().getValue(), empty, c.getHeaderSize())).toList());
+			byte[] empty    = new byte[(int)Chunk.PIPE.getSizeDescriptor().requireMax(WordSpace.BYTE)];
+			var    provider = toDestroy.get(0).getDataProvider();
+			try(var io = provider.getSource().io()){
+				io.writeAtOffsets(toDestroy.stream().map(c -> new RandomIO.WriteChunk(c.getPtr().getValue(), empty, c.getHeaderSize())).toList());
 			}
 			for(Chunk chunk : toDestroy){
 				provider.getChunkCache().notifyDestroyed(chunk);
 			}
 		}
 		
-		ExecutorService service=null;
+		ExecutorService service = null;
 		
 		for(Chunk chunk : oks){
 			
 			if(PURGE_ACCIDENTAL){
 				if(chunk.getCapacity()>3000){
-					if(service==null) service=Executors.newWorkStealingPool();
-					service.execute(()->{
+					if(service == null) service = Executors.newWorkStealingPool();
+					service.execute(() -> {
 						try{
 							purgePossibleChunkHeaders(chunk.getDataProvider(), chunk.dataStart(), chunk.getCapacity());
 						}catch(IOException e){
@@ -304,7 +304,7 @@ public class MemoryOperations{
 				}
 			}
 		}
-		if(service!=null){
+		if(service != null){
 			service.shutdown();
 			try{
 				while(!service.awaitTermination(Long.MAX_VALUE, TimeUnit.MILLISECONDS)) ;
@@ -320,21 +320,21 @@ public class MemoryOperations{
 	public static long growFileAlloc(Chunk target, long toAllocate) throws IOException{
 		smallTrace("growing {} by {} by growing file", target, toAllocate);
 		
-		DataProvider context=target.getDataProvider();
+		DataProvider context = target.getDataProvider();
 		
 		if(context.isLastPhysical(target)){
-			var remaining=target.getBodyNumSize().remaining(target.getCapacity());
-			var toGrow   =Math.min(toAllocate, remaining);
+			var remaining = target.getBodyNumSize().remaining(target.getCapacity());
+			var toGrow    = Math.min(toAllocate, remaining);
 			if(toGrow>0){
-				try(var io=context.getSource().io()){
-					var old=io.getCapacity();
-					io.setCapacity(old+toGrow);
+				try(var io = context.getSource().io()){
+					var old = io.getCapacity();
+					io.setCapacity(old + toGrow);
 					io.setPos(old);
 					IUtils.zeroFill(io::write, toGrow);
 				}
-				target.modifyAndSave(ch->{
+				target.modifyAndSave(ch -> {
 					try{
-						ch.setCapacity(ch.getCapacity()+toGrow);
+						ch.setCapacity(ch.getCapacity() + toGrow);
 					}catch(BitDepthOutOfSpaceException e){
 						/*
 						 * toGrow is clamped to the remaining bitspace of body num size. If this happens
@@ -350,19 +350,19 @@ public class MemoryOperations{
 	}
 	
 	public static long allocateBySimpleNextAssign(MemoryManager manager, Chunk first, Chunk target, long toAllocate) throws IOException{
-		if(target.getNextSize()==NumberSize.VOID){
+		if(target.getNextSize() == NumberSize.VOID){
 			return 0;
 		}
 		
-		boolean isChain=first!=target;
+		boolean isChain = first != target;
 		
-		var toPin=AllocateTicket.bytes(toAllocate)
-		                        .withApproval(Chunk.sizeFitsPointer(target.getNextSize()))
-		                        .withPositionMagnet(target)
-		                        .withExplicitNextSize(explicitNextSize(manager, isChain))
-		                        .submit(manager);
-		if(toPin==null) return 0;
-		target.modifyAndSave(c->{
+		var toPin = AllocateTicket.bytes(toAllocate)
+		                          .withApproval(Chunk.sizeFitsPointer(target.getNextSize()))
+		                          .withPositionMagnet(target)
+		                          .withExplicitNextSize(explicitNextSize(manager, isChain))
+		                          .submit(manager);
+		if(toPin == null) return 0;
+		target.modifyAndSave(c -> {
 			try{
 				c.setNextPtr(toPin.getPtr());
 			}catch(BitDepthOutOfSpaceException e){
@@ -375,103 +375,103 @@ public class MemoryOperations{
 	public static long allocateByGrowingHeaderNextAssign(MemoryManager manager, Chunk first, Chunk target, long toAllocate) throws IOException{
 		if(target.hasNextPtr()) throw new IllegalArgumentException();
 		
-		boolean isChain=first!=target;
+		boolean isChain = first != target;
 		
-		var siz=target.getNextSize();
+		var siz = target.getNextSize();
 		
-		var ticket=AllocateTicket.DEFAULT.withExplicitNextSize(explicitNextSize(manager, isChain))
-		                                 .withPositionMagnet(target);
+		var ticket = AllocateTicket.DEFAULT.withExplicitNextSize(explicitNextSize(manager, isChain))
+		                                   .withPositionMagnet(target);
 		
 		Chunk toPin;
 		int   growth;
 		do{
-			if(siz==NumberSize.LARGEST){
+			if(siz == NumberSize.LARGEST){
 				throw new OutOfMemoryError();
 			}
 			
-			siz=siz.next();
-			growth=siz.bytes-target.getNextSize().bytes;
+			siz = siz.next();
+			growth = siz.bytes - target.getNextSize().bytes;
 			
 			if(target.getCapacity()<growth){
 				return 0;
 			}
 			
-			toPin=ticket.withBytes(toAllocate+growth)
-			            .withApproval(Chunk.sizeFitsPointer(siz))
-			            .submit(manager);
-		}while(toPin==null);
+			toPin = ticket.withBytes(toAllocate + growth)
+			              .withApproval(Chunk.sizeFitsPointer(siz))
+			              .submit(manager);
+		}while(toPin == null);
 		
-		IOInterface source=target.getDataProvider().getSource();
+		IOInterface source = target.getDataProvider().getSource();
 		
-		int shiftSize=Math.toIntExact(Math.min(target.getCapacity()-growth, target.getSize()));
+		int shiftSize = Math.toIntExact(Math.min(target.getCapacity() - growth, target.getSize()));
 		if(shiftSize<0){
-			shiftSize=0;
+			shiftSize = 0;
 		}
 		byte[] toShift;
-		try(var io=target.io()){
-			toShift=io.readInts1(shiftSize);
-			try(var pio=toPin.io()){
+		try(var io = target.io()){
+			toShift = io.readInts1(shiftSize);
+			try(var pio = toPin.io()){
 				io.transferTo(pio);
 			}
 		}
 		
-		var oldCapacity=target.getCapacity();
+		var oldCapacity = target.getCapacity();
 		
 		target.requireReal();
 		try{
 			target.setNextSize(siz);
 			target.setNextPtr(toPin.getPtr());
 			target.setSize(shiftSize);
-			target.setCapacity(oldCapacity-growth);
+			target.setCapacity(oldCapacity - growth);
 		}catch(BitDepthOutOfSpaceException e){
 			throw new ShouldNeverHappenError(e);
 		}
-		try(var ignored=source.openIOTransaction()){
+		try(var ignored = source.openIOTransaction()){
 			target.syncStruct();
 			source.write(target.dataStart(), false, toShift);
 		}
 		
-		return (target.getCapacity()+toPin.getCapacity())-oldCapacity;
+		return (target.getCapacity() + toPin.getCapacity()) - oldCapacity;
 	}
 	
 	
 	private static IOIterator<ChunkPointer> magnetisedFreeChunkIterator(DataProvider context, OptionalLong magnet) throws IOException{
-		var freeChunks=context.getMemoryManager().getFreeChunks();
-		if(magnet.isEmpty()||freeChunks.size()<=1){
+		var freeChunks = context.getMemoryManager().getFreeChunks();
+		if(magnet.isEmpty() || freeChunks.size()<=1){
 			return freeChunks.iterator();
 		}
 		
-		var pos=magnet.getAsLong();
+		var pos = magnet.getAsLong();
 		
-		long index=IOList.findSortedClosest(freeChunks, ch->Math.abs(ch.getValue()-pos));
+		long index = IOList.findSortedClosest(freeChunks, ch -> Math.abs(ch.getValue() - pos));
 		
-		var after =freeChunks.listIterator(index);
-		var before=freeChunks.listIterator(index);
+		var after  = freeChunks.listIterator(index);
+		var before = freeChunks.listIterator(index);
 		
 		return new IOIterator<>(){
 			private boolean toggle;
 			private IOList.IOListIterator<ChunkPointer> lastRet;
 			@Override
 			public boolean hasNext(){
-				return after.hasNext()||before.hasPrevious();
+				return after.hasNext() || before.hasPrevious();
 			}
 			@Override
 			public ChunkPointer ioNext() throws IOException{
-				toggle=!toggle;
+				toggle = !toggle;
 				
 				if(toggle){
 					if(after.hasNext()){
-						lastRet=after;
+						lastRet = after;
 						return after.ioNext();
 					}
-					lastRet=before;
+					lastRet = before;
 					return before.ioPrevious();
 				}else{
 					if(before.hasPrevious()){
-						lastRet=before;
+						lastRet = before;
 						return before.ioPrevious();
 					}
-					lastRet=after;
+					lastRet = after;
 					return after.ioNext();
 				}
 			}
@@ -483,30 +483,30 @@ public class MemoryOperations{
 	}
 	
 	public static Chunk allocateReuseFreeChunk(DataProvider context, AllocateTicket ticket) throws IOException{
-		for(var iterator=magnetisedFreeChunkIterator(context, ticket.positionMagnet());iterator.hasNext();){
-			Chunk c=iterator.ioNext().dereference(context);
-			assert c.getNextSize()==NumberSize.VOID;
-			NumberSize neededNextSize   =ticket.calcNextSize();
-			var        effectiveCapacity=c.getCapacity()-neededNextSize.bytes;
+		for(var iterator = magnetisedFreeChunkIterator(context, ticket.positionMagnet()); iterator.hasNext(); ){
+			Chunk c = iterator.ioNext().dereference(context);
+			assert c.getNextSize() == NumberSize.VOID;
+			NumberSize neededNextSize    = ticket.calcNextSize();
+			var        effectiveCapacity = c.getCapacity() - neededNextSize.bytes;
 			if(effectiveCapacity<ticket.bytes()) continue;
 			
-			var freeSpace=effectiveCapacity-ticket.bytes();
+			var freeSpace = effectiveCapacity - ticket.bytes();
 			
-			var potentialChunk=chBuilderFromTicket(context, c.getPtr(), ticket).create();
-			if(freeSpace>c.getHeaderSize()+potentialChunk.getHeaderSize()){
-				Chunk reallocate=chipEndProbe(context, ticket, c);
-				if(reallocate!=null) return reallocate;
+			var potentialChunk = chBuilderFromTicket(context, c.getPtr(), ticket).create();
+			if(freeSpace>c.getHeaderSize() + potentialChunk.getHeaderSize()){
+				Chunk reallocate = chipEndProbe(context, ticket, c);
+				if(reallocate != null) return reallocate;
 			}
 			
 			if(freeSpace<8){
 				if(ticket.approve(c)){
 					iterator.ioRemove();
 					try{
-						var oldHSiz=c.getHeaderSize();
+						var oldHSiz = c.getHeaderSize();
 						c.setNextSize(neededNextSize);
 						c.setNextPtr(ticket.next());
-						var newHSiz=c.getHeaderSize();
-						c.setCapacity(c.getCapacity()+oldHSiz-newHSiz);
+						var newHSiz = c.getHeaderSize();
+						c.setCapacity(c.getCapacity() + oldHSiz - newHSiz);
 						c.syncStruct();
 					}catch(BitDepthOutOfSpaceException e){
 						throw new ShouldNeverHappenError(e);
@@ -519,17 +519,17 @@ public class MemoryOperations{
 	}
 	
 	private static Chunk chipEndProbe(DataProvider context, AllocateTicket ticket, Chunk ch) throws IOException{
-		var ptr    =ch.getPtr();
-		var builder=chBuilderFromTicket(context, ptr, ticket);
+		var ptr     = ch.getPtr();
+		var builder = chBuilderFromTicket(context, ptr, ticket);
 		
-		var reallocate=builder.create();
+		var reallocate = builder.create();
 		
-		var siz=reallocate.totalSize();
-		var end=ch.dataEnd();
-		builder.withPtr(ChunkPointer.of(end-siz));
-		reallocate=builder.create();
+		var siz = reallocate.totalSize();
+		var end = ch.dataEnd();
+		builder.withPtr(ChunkPointer.of(end - siz));
+		reallocate = builder.create();
 		
-		if(reallocate.dataEnd()!=ch.dataEnd()) throw new IllegalStateException();
+		if(reallocate.dataEnd() != ch.dataEnd()) throw new IllegalStateException();
 		
 		if(!ticket.approve(reallocate)){
 			return null;
@@ -537,7 +537,7 @@ public class MemoryOperations{
 		
 		reallocate.writeHeader();
 		
-		ch.setCapacityAndModifyNumSize(ch.getCapacity()-reallocate.totalSize());
+		ch.setCapacityAndModifyNumSize(ch.getCapacity() - reallocate.totalSize());
 		ch.writeHeader();
 		context.getChunkCache().add(reallocate);
 		return reallocate;
@@ -551,15 +551,15 @@ public class MemoryOperations{
 	
 	public static Chunk allocateAppendToFile(DataProvider context, AllocateTicket ticket) throws IOException{
 		
-		var src  =context.getSource();
-		var ioSiz=src.getIOSize();
+		var src   = context.getSource();
+		var ioSiz = src.getIOSize();
 		
-		ChunkBuilder builder=chBuilderFromTicket(context, ChunkPointer.of(ioSiz), ticket);
+		ChunkBuilder builder = chBuilderFromTicket(context, ChunkPointer.of(ioSiz), ticket);
 		
-		var chunk=builder.create();
+		var chunk = builder.create();
 		if(!ticket.approve(chunk)) return null;
 		
-		try(var io=src.ioAt(chunk.getPtr().getValue())){
+		try(var io = src.ioAt(chunk.getPtr().getValue())){
 			chunk.writeHeader(io);
 			IUtils.zeroFill(io::write, chunk.getCapacity());
 		}
@@ -572,38 +572,38 @@ public class MemoryOperations{
 //		assert firstChunk.getDataProvider()==context;
 //		assert target.getDataProvider()==context;
 		
-		var ptr=firstChunk.getPtr();
+		var ptr = firstChunk.getPtr();
 		
-		var prev=new PhysicalChunkWalker(context.getFirstChunk())
-			         .stream()
-			         .filter(Chunk::hasNextPtr)
-			         .map(Chunk::getNextPtr)
-			         .filter(p->p.equals(ptr))
-			         .findAny();
+		var prev = new PhysicalChunkWalker(context.getFirstChunk())
+			           .stream()
+			           .filter(Chunk::hasNextPtr)
+			           .map(Chunk::getNextPtr)
+			           .filter(p -> p.equals(ptr))
+			           .findAny();
 		
 		if(prev.isPresent()){
-			var ch=context.getChunk(prev.get());
-			throw new IllegalArgumentException(firstChunk+" is not the first chunk! "+ch+" declares it as next.");
+			var ch = context.getChunk(prev.get());
+			throw new IllegalArgumentException(firstChunk + " is not the first chunk! " + ch + " declares it as next.");
 		}
 		
-		if(firstChunk.streamNext().noneMatch(c->c==target)){
+		if(firstChunk.streamNext().noneMatch(c -> c == target)){
 			throw new IllegalArgumentException(TextUtil.toString(target, "is in the chain of", firstChunk, "descendents:", firstChunk.collectNext()));
 		}
 	}
 	
 	public static long growFreeAlloc(MemoryManager manager, Chunk target, long toAllocate) throws IOException{
-		var end=target.dataEnd();
-		for(var iter=manager.getFreeChunks().listIterator();iter.hasNext();){
-			ChunkPointer freePtr=iter.ioNext();
+		var end = target.dataEnd();
+		for(var iter = manager.getFreeChunks().listIterator(); iter.hasNext(); ){
+			ChunkPointer freePtr = iter.ioNext();
 			if(!freePtr.equals(end)) continue;
 			
-			var provider =manager.getDataProvider();
-			var freeChunk=freePtr.dereference(provider);
-			var size     =freeChunk.totalSize();
+			var provider  = manager.getDataProvider();
+			var freeChunk = freePtr.dereference(provider);
+			var size      = freeChunk.totalSize();
 			
-			var remaining=size-toAllocate;
+			var remaining = size - toAllocate;
 			if(remaining<16){
-				var newCapacity=target.getCapacity()+size;
+				var newCapacity = target.getCapacity() + size;
 				
 				if(!target.getBodyNumSize().canFit(newCapacity)){
 					return 0;
@@ -621,26 +621,26 @@ public class MemoryOperations{
 				return size;
 			}
 			
-			long safeToAllocate=toAllocate;
+			long safeToAllocate = toAllocate;
 			
 			Chunk ch;
 			long  newCapacity;
 			while(true){
-				ch=new ChunkBuilder(provider, freePtr.addPtr(safeToAllocate)).create();
-				ch.setCapacityAndModifyNumSize(size-ch.getHeaderSize()-safeToAllocate);
+				ch = new ChunkBuilder(provider, freePtr.addPtr(safeToAllocate)).create();
+				ch.setCapacityAndModifyNumSize(size - ch.getHeaderSize() - safeToAllocate);
 				
-				newCapacity=target.getCapacity()+safeToAllocate;
+				newCapacity = target.getCapacity() + safeToAllocate;
 				if(!target.getBodyNumSize().canFit(newCapacity)){
-					safeToAllocate=target.getBodyNumSize().maxSize()-target.getCapacity();
+					safeToAllocate = target.getBodyNumSize().maxSize() - target.getCapacity();
 					continue;
 				}
 				break;
 			}
-			if(safeToAllocate==0) continue;
+			if(safeToAllocate == 0) continue;
 			
-			try(var ignored=provider.getSource().openIOTransaction()){
+			try(var ignored = provider.getSource().openIOTransaction()){
 				ch.writeHeader();
-				ch=ch.getPtr().dereference(provider);
+				ch = ch.getPtr().dereference(provider);
 				
 				iter.ioSet(ch.getPtr());
 				
@@ -653,7 +653,7 @@ public class MemoryOperations{
 				target.syncStruct();
 			}
 			if(safeToAllocate<freeChunk.getHeaderSize()){
-				try(var io=provider.getSource().ioAt(freeChunk.getPtr().getValue())){
+				try(var io = provider.getSource().ioAt(freeChunk.getPtr().getValue())){
 					IUtils.zeroFill(io::write, safeToAllocate);
 				}
 				provider.getChunkCache().notifyDestroyed(freeChunk);
@@ -673,10 +673,10 @@ public class MemoryOperations{
 	}
 	
 	public static <U extends IOInstance.Unmanaged<U>> void freeSelfAndReferenced(U val) throws IOException{
-		Set<Chunk> chunks=new HashSet<>();
-		var        prov  =val.getDataProvider();
+		Set<Chunk> chunks = new HashSet<>();
+		var        prov   = val.getDataProvider();
 		
-		UnsafeConsumer<Reference, IOException> rec=ref->{
+		UnsafeConsumer<Reference, IOException> rec = ref -> {
 			if(ref.isNull()){
 				return;
 			}

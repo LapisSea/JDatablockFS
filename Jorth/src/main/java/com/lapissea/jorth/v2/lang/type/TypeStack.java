@@ -10,11 +10,11 @@ import java.util.stream.Stream;
 
 public class TypeStack{
 	
-	private final List<GenericType> stack=new ArrayList<>();
+	private final List<GenericType> stack = new ArrayList<>();
 	private final TypeStack         parent;
 	
 	public TypeStack(TypeStack parent){
-		this.parent=parent;
+		this.parent = parent;
 	}
 	
 	@Override
@@ -23,7 +23,7 @@ public class TypeStack{
 	}
 	
 	public Stream<GenericType> totalStack(){
-		if(parent==null) return stack.stream();
+		if(parent == null) return stack.stream();
 		return Stream.concat(parent.totalStack(), stack.stream());
 	}
 	
@@ -32,29 +32,30 @@ public class TypeStack{
 	}
 	public GenericType pop() throws MalformedJorthException{
 		requireElements(1);
-		return stack.remove(stack.size()-1);
+		return stack.remove(stack.size() - 1);
 	}
 	
 	public boolean isEmpty(){
 		if(!stack.isEmpty()) return false;
-		if(parent==null) return true;
+		if(parent == null) return true;
 		return parent.isEmpty();
 	}
 	
 	public int size(){
-		if(parent==null) return stack.size();
-		return parent.size()+stack.size();
+		if(parent == null) return stack.size();
+		return parent.size() + stack.size();
 	}
 	
 	public void requireElements(int count) throws MalformedJorthException{
 		if(stack.size()>=count) return;
-		throw new MalformedJorthException("Required at least "+count+" "+TextUtil.plural("element", count)+" on the stack");
+		throw new MalformedJorthException("Required at least " + count + " " + TextUtil.plural("element", count) + " on the stack");
 	}
-	public int mark(){
-		return 0;
-	}
+	
 	public GenericType peek(int pos){
-		int localPos=pos-parent.size();
+		if(parent == null){
+			return stack.get(pos);
+		}
+		int localPos = pos - parent.size();
 		if(localPos<0) return parent.peek(pos);
 		return stack.get(localPos);
 	}

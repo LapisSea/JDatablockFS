@@ -13,8 +13,8 @@ public abstract class AbstractFieldAccessor<CTyp extends IOInstance<CTyp>> imple
 	private final String       name;
 	
 	protected AbstractFieldAccessor(Struct<CTyp> declaringStruct, String name){
-		this.declaringStruct=declaringStruct;
-		this.name=Objects.requireNonNull(name);
+		this.declaringStruct = declaringStruct;
+		this.name = Objects.requireNonNull(name);
 	}
 	
 	@Override
@@ -28,31 +28,31 @@ public abstract class AbstractFieldAccessor<CTyp extends IOInstance<CTyp>> imple
 		return name;
 	}
 	
-	protected String strName(){return getName();}
+	protected String strName(){ return getName(); }
 	
 	@Override
 	public String toString(){
-		var struct=getDeclaringStruct();
-		return getType().getName()+" "+(struct==null?"":struct.cleanName())+"#"+strName();
+		var struct = getDeclaringStruct();
+		return getType().getName() + " " + (struct == null? "" : struct.cleanName()) + "#" + strName();
 	}
 	@Override
 	public String toShortString(){
-		return getType().getSimpleName()+" "+strName();
+		return getType().getSimpleName() + " " + strName();
 	}
 	
 	@Override
 	public boolean equals(Object o){
-		return this==o||
-		       o instanceof FieldAccessor<?> that&&
-		       Objects.equals(getDeclaringStruct(), that.getDeclaringStruct())&&
+		return this == o ||
+		       o instanceof FieldAccessor<?> that &&
+		       Objects.equals(getDeclaringStruct(), that.getDeclaringStruct()) &&
 		       getName().equals(that.getName());
 	}
 	
 	@Override
 	public int hashCode(){
-		var struct=getDeclaringStruct();
-		int result=struct==null?0:struct.hashCode();
-		result=31*result+getName().hashCode();
+		var struct = getDeclaringStruct();
+		int result = struct == null? 0 : struct.hashCode();
+		result = 31*result + getName().hashCode();
 		return result;
 	}
 }

@@ -24,17 +24,17 @@ public class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> extends Bit
 	public IOFieldEnum(FieldAccessor<T> field){
 		super(field);
 		
-		enumUniverse=EnumUniverse.ofUnknown(field.getType());
-		sizeDescriptor=SizeDescriptor.Fixed.of(WordSpace.BIT, enumUniverse.getBitSize(nullable()));
+		enumUniverse = EnumUniverse.ofUnknown(field.getType());
+		sizeDescriptor = SizeDescriptor.Fixed.of(WordSpace.BIT, enumUniverse.getBitSize(nullable()));
 		
-		if(getNullability()==DEFAULT_IF_NULL&&enumUniverse.isEmpty()){
-			throw new MalformedStruct(DEFAULT_IF_NULL+" is not supported for empty enums");
+		if(getNullability() == DEFAULT_IF_NULL && enumUniverse.isEmpty()){
+			throw new MalformedStruct(DEFAULT_IF_NULL + " is not supported for empty enums");
 		}
 	}
 	
 	@Override
 	public E get(VarPool<T> ioPool, T instance){
-		return getNullable(ioPool, instance, ()->enumUniverse.get(0));
+		return getNullable(ioPool, instance, () -> enumUniverse.get(0));
 	}
 	
 	@Override
@@ -61,7 +61,7 @@ public class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> extends Bit
 	
 	@Override
 	public boolean instancesEqual(VarPool<T> ioPool1, T inst1, VarPool<T> ioPool2, T inst2){
-		return get(ioPool1, inst1)==get(ioPool2, inst2);
+		return get(ioPool1, inst1) == get(ioPool2, inst2);
 	}
 	
 	@Override

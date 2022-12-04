@@ -58,19 +58,19 @@ public final class VirtualFieldDefinition<IO extends IOInstance<IO>, T>{
 		this(storagePool, name, type, getFilter, List.of());
 	}
 	public VirtualFieldDefinition(StoragePool storagePool, String name, Type type, GetterFilter<IO, T> getFilter, Collection<Annotation> annotations){
-		this.storagePool=storagePool;
-		this.name=name;
-		this.type=type;
-		this.getFilter=getFilter;
+		this.storagePool = storagePool;
+		this.name = name;
+		this.type = type;
+		this.getFilter = getFilter;
 		
-		if(annotations.stream().noneMatch(an->an instanceof IOValue)){
-			annotations=Stream.concat(annotations.stream(), Stream.of(IOFieldTools.makeAnnotation(IOValue.class))).toList();
+		if(annotations.stream().noneMatch(an -> an instanceof IOValue)){
+			annotations = Stream.concat(annotations.stream(), Stream.of(IOFieldTools.makeAnnotation(IOValue.class))).toList();
 		}
-		this.annotations=GetAnnotation.from(annotations);
+		this.annotations = GetAnnotation.from(annotations);
 	}
 	
 	@Override
 	public String toString(){
-		return name+": "+Utils.typeToHuman(type, false);
+		return name + ": " + Utils.typeToHuman(type, false);
 	}
 }

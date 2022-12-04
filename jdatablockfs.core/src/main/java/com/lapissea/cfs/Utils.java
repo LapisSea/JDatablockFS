@@ -27,23 +27,23 @@ public class Utils{
 	
 	public static void fairDistribute(long[] values, long toDistribute){
 		
-		long totalUsage=Arrays.stream(values).sum();
+		long totalUsage = Arrays.stream(values).sum();
 		
-		var free=toDistribute-totalUsage;
+		var free = toDistribute - totalUsage;
 		
 		if(free>0){
-			int toUse=values.length;
+			int toUse = values.length;
 			do{
-				var bulkAdd=free/toUse;
+				var bulkAdd = free/toUse;
 				
-				for(int i=0;i<toUse;i++){
-					values[i]+=bulkAdd;
-					free-=bulkAdd;
+				for(int i = 0; i<toUse; i++){
+					values[i] += bulkAdd;
+					free -= bulkAdd;
 				}
 				toUse--;
 			}while(free>0);
 		}else{
-			Assert(free==0);
+			Assert(free == 0);
 		}
 	}
 	
@@ -54,13 +54,13 @@ public class Utils{
 		return (long)Math.ceil(bits/(double)Byte.SIZE);
 	}
 	public static OptionalLong bitToByte(OptionalLong bits){
-		return bits.isPresent()?OptionalLong.of(bitToByte(bits.getAsLong())):bits;
+		return bits.isPresent()? OptionalLong.of(bitToByte(bits.getAsLong())) : bits;
 	}
 	
 	public static OptionalLong addIfBoth(OptionalLong a, OptionalLong b){
 		if(a.isEmpty()) return a;
 		if(b.isEmpty()) return b;
-		return OptionalLong.of(a.getAsLong()+b.getAsLong());
+		return OptionalLong.of(a.getAsLong() + b.getAsLong());
 	}
 	
 	public static OptionalLong maxIfBoth(OptionalLong a, OptionalLong b){
@@ -82,10 +82,10 @@ public class Utils{
 		return byteArrayToBitString(data, 0, length);
 	}
 	public static String byteArrayToBitString(byte[] data, int offset, int length){
-		return IntStream.range(offset, offset+length)
-		                .map(i->data[i]&0xFF)
-		                .mapToObj(b->String.format("%8s", Integer.toBinaryString(b)).replace(' ', '0'))
-		                .map(s->new StringBuilder(s).reverse())
+		return IntStream.range(offset, offset + length)
+		                .map(i -> data[i]&0xFF)
+		                .mapToObj(b -> String.format("%8s", Integer.toBinaryString(b)).replace(' ', '0'))
+		                .map(s -> new StringBuilder(s).reverse())
 		                .collect(Collectors.joining());
 	}
 	
@@ -110,9 +110,9 @@ public class Utils{
 	}
 	
 	public static Type extractFromVarType(TypeVariable<?> c){
-		var bounds=c.getBounds();
-		if(bounds.length==1){
-			var typ=bounds[0];
+		var bounds = c.getBounds();
+		if(bounds.length == 1){
+			var typ = bounds[0];
 			return typ;
 		}
 		throw new NotImplementedException(TextUtil.toString("wut? ", bounds));
@@ -124,29 +124,29 @@ public class Utils{
 		if(testType instanceof TypeVariable<?> c) return genericInstanceOf(extractFromVarType(c), type);
 		if(type instanceof TypeVariable<?> c) return genericInstanceOf(testType, extractFromVarType(c));
 		
-		if(type instanceof Class||testType instanceof Class<?>){
-			var rawTestType=typeToRaw(testType);
-			var rawType    =typeToRaw(type);
+		if(type instanceof Class || testType instanceof Class<?>){
+			var rawTestType = typeToRaw(testType);
+			var rawType     = typeToRaw(type);
 			return UtilL.instanceOf(rawTestType, rawType);
 		}
 		
-		var pTestType=(ParameterizedType)testType;
-		var pType    =(ParameterizedType)type;
+		var pTestType = (ParameterizedType)testType;
+		var pType     = (ParameterizedType)type;
 		
-		var rawTestType=(Class<?>)pTestType.getRawType();
-		var rawType    =(Class<?>)pType.getRawType();
+		var rawTestType = (Class<?>)pTestType.getRawType();
+		var rawType     = (Class<?>)pType.getRawType();
 		
-		var rawCast=UtilL.instanceOf(rawTestType, rawType);
+		var rawCast = UtilL.instanceOf(rawTestType, rawType);
 		if(!rawCast) return false;
 		
-		Type[] testArgs=pTestType.getActualTypeArguments();
-		Type[] args    =pType.getActualTypeArguments();
+		Type[] testArgs = pTestType.getActualTypeArguments();
+		Type[] args     = pType.getActualTypeArguments();
 		
-		if(testArgs.length!=args.length){
+		if(testArgs.length != args.length){
 			return false;
 		}
 		
-		for(int i=0;i<testArgs.length;i++){
+		for(int i = 0; i<testArgs.length; i++){
 			if(!genericInstanceOf(testArgs[i], args[i])) return false;
 		}
 		
@@ -163,7 +163,7 @@ public class Utils{
 	}
 	
 	
-	private static final IOIterator.Iter<?> EMPTY_ITER=new IOIterator.Iter<>(){
+	private static final IOIterator.Iter<?> EMPTY_ITER = new IOIterator.Iter<>(){
 		@Override
 		public boolean hasNext(){
 			return false;
@@ -196,62 +196,62 @@ public class Utils{
 		if(addLine) sb.append('(').append(frame.getLineNumber()).append(')');
 	}
 	public static void classToStr(StringBuilder sb, Class<?> clazz){
-		var enclosing=clazz.getEnclosingClass();
-		if(enclosing!=null){
+		var enclosing = clazz.getEnclosingClass();
+		if(enclosing != null){
 			classToStr(sb, enclosing);
 			sb.append('.').append(clazz.getSimpleName());
 			return;
 		}
 		
-		var p=clazz.getPackageName();
-		for(int i=0;i<p.length();i++){
-			if(i==0){
+		var p = clazz.getPackageName();
+		for(int i = 0; i<p.length(); i++){
+			if(i == 0){
 				sb.append(p.charAt(i));
-			}else if(p.charAt(i-1)=='.'){
-				sb.append(p, i-1, i+1);
+			}else if(p.charAt(i - 1) == '.'){
+				sb.append(p, i - 1, i + 1);
 			}
 		}
 		sb.append('.').append(clazz.getSimpleName());
 	}
 	public static Class<?> getCallee(int depth){
-		return getCallee(s->s.skip(depth+2));
+		return getCallee(s -> s.skip(depth + 2));
 	}
 	public static Class<?> getCallee(Function<Stream<StackWalker.StackFrame>, Stream<StackWalker.StackFrame>> stream){
 		return StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE)
-		                  .walk(s->stream.apply(s).findFirst().orElseThrow().getDeclaringClass());
+		                  .walk(s -> stream.apply(s).findFirst().orElseThrow().getDeclaringClass());
 	}
 	public static StackWalker.StackFrame getFrame(int depth){
-		return getFrame(s->s.skip(depth+2));
+		return getFrame(s -> s.skip(depth + 2));
 	}
 	public static StackWalker.StackFrame getFrame(Function<Stream<StackWalker.StackFrame>, Stream<StackWalker.StackFrame>> stream){
 		return StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE)
-		                  .walk(s->stream.apply(s).findFirst().orElseThrow());
+		                  .walk(s -> stream.apply(s).findFirst().orElseThrow());
 	}
 	
 	
 	public static String classNameToHuman(String name, boolean doShort){
-		int arrayLevels=0;
-		for(int i=0;i<name.length();i++){
-			if(name.charAt(i)=='[') arrayLevels++;
+		int arrayLevels = 0;
+		for(int i = 0; i<name.length(); i++){
+			if(name.charAt(i) == '[') arrayLevels++;
 			else break;
 		}
-		name=name.substring(arrayLevels);
-		if(name.startsWith("L")) name=name.substring(1, name.length()-1);
+		name = name.substring(arrayLevels);
+		if(name.startsWith("L")) name = name.substring(1, name.length() - 1);
 		
 		
 		if(doShort){
-			var index=name.lastIndexOf('.');
-			name=(index!=-1?name.substring(name.lastIndexOf('.')):name)+
-			     ("[]".repeat(arrayLevels));
+			var index = name.lastIndexOf('.');
+			name = (index != -1? name.substring(name.lastIndexOf('.')) : name) +
+			       ("[]".repeat(arrayLevels));
 		}else{
-			var parts=TextUtil.splitByChar(name, '.');
-			if(parts.length==1) name=name+("[]".repeat(arrayLevels));
-			else name=Arrays.stream(parts)
-			                .limit(parts.length-1)
-			                .map(c->c.charAt(0)+"")
-			                .collect(Collectors.joining("."))+
-			          "."+parts[parts.length-1]+
-			          ("[]".repeat(arrayLevels));
+			var parts = TextUtil.splitByChar(name, '.');
+			if(parts.length == 1) name = name + ("[]".repeat(arrayLevels));
+			else name = Arrays.stream(parts)
+			                  .limit(parts.length - 1)
+			                  .map(c -> c.charAt(0) + "")
+			                  .collect(Collectors.joining(".")) +
+			            "." + parts[parts.length - 1] +
+			            ("[]".repeat(arrayLevels));
 		}
 		return name;
 	}
@@ -263,7 +263,7 @@ public class Utils{
 	}
 	
 	public static RuntimeException interceptClInit(Throwable e){
-		var trace=e.getStackTrace();
+		var trace = e.getStackTrace();
 		for(var el : trace){
 			if(List.of("of", "make").contains(el.getMethodName())) continue;
 			if(el.getMethodName().equals("<clinit>")){
@@ -276,32 +276,32 @@ public class Utils{
 	}
 	
 	public static boolean isVirtual(IOField<?, ?> field, StoragePool pool){
-		return field.getAccessor() instanceof VirtualAccessor<?> acc&&
-		       (pool==null||acc.getStoragePool()==pool);
+		return field.getAccessor() instanceof VirtualAccessor<?> acc &&
+		       (pool == null || acc.getStoragePool() == pool);
 	}
 	public static <T extends IOInstance<T>> VirtualAccessor<T> getVirtual(IOField<T, ?> field, StoragePool pool){
-		return field.getAccessor() instanceof VirtualAccessor<T> acc&&
-		       (pool==null||acc.getStoragePool()==pool)
-		       ?acc:null;
+		return field.getAccessor() instanceof VirtualAccessor<T> acc &&
+		       (pool == null || acc.getStoragePool() == pool)
+		       ? acc : null;
 	}
 	
 	public static <T> Set<T> join(Set<T> a, Set<T> b){
 		if(a.size()<b.size()){
-			var tmp=a;
-			a=b;
-			b=tmp;
+			var tmp = a;
+			a = b;
+			b = tmp;
 		}
 		
-		int addCount=0;
+		int addCount = 0;
 		for(T t : b){
 			if(!a.contains(t)){
 				addCount++;
 			}
 		}
 		
-		if(addCount==0) return a;
+		if(addCount == 0) return a;
 		
-		var all=HashSet.<T>newHashSet(a.size()+addCount);
+		var all = HashSet.<T>newHashSet(a.size() + addCount);
 		all.addAll(a);
 		all.addAll(b);
 		return Set.copyOf(all);

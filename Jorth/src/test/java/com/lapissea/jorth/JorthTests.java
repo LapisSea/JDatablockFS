@@ -23,15 +23,15 @@ public class JorthTests{
 	
 	
 	public static class TestCls{
-		boolean flag=false;
-		static boolean staticFlag=false;
+		boolean flag = false;
+		static boolean staticFlag = false;
 		
 		public void flag(){
-			flag=true;
+			flag = true;
 		}
 		
 		public static void staticFlag(){
-			staticFlag=true;
+			staticFlag = true;
 		}
 	}
 	
@@ -45,9 +45,9 @@ public class JorthTests{
 	@Test
 	void mathClass() throws ReflectiveOperationException{
 		
-		var className="jorth.Gen$$";
+		var className = "jorth.Gen$$";
 		
-		var cls=generateAndLoadInstance(className, writer->{
+		var cls = generateAndLoadInstance(className, writer -> {
 			
 			//Define constants / imports
 			writer.write("#TOKEN(0) Str define", String.class.getName());
@@ -98,52 +98,52 @@ public class JorthTests{
 		Object ival;
 		
 		
-		ival=cls.getMethod("add", int.class, int.class).invoke(null, 10, 2);
+		ival = cls.getMethod("add", int.class, int.class).invoke(null, 10, 2);
 		assertEquals(12, ival);
 		
-		ival=cls.getMethod("sub", int.class, int.class).invoke(null, 10, 2);
+		ival = cls.getMethod("sub", int.class, int.class).invoke(null, 10, 2);
 		assertEquals(8, ival);
 		
-		ival=cls.getMethod("mul", int.class, int.class).invoke(null, 10, 2);
+		ival = cls.getMethod("mul", int.class, int.class).invoke(null, 10, 2);
 		assertEquals(20, ival);
 		
-		ival=cls.getMethod("div", int.class, int.class).invoke(null, 10, 2);
+		ival = cls.getMethod("div", int.class, int.class).invoke(null, 10, 2);
 		assertEquals(5, ival);
 		
 		
-		ival=cls.getMethod("add", float.class, float.class).invoke(null, 10, 0.2F);
-		assertEquals(10+0.2F, ival);
+		ival = cls.getMethod("add", float.class, float.class).invoke(null, 10, 0.2F);
+		assertEquals(10 + 0.2F, ival);
 		
-		ival=cls.getMethod("sub", float.class, float.class).invoke(null, 10, 0.2F);
-		assertEquals(10-0.2F, ival);
+		ival = cls.getMethod("sub", float.class, float.class).invoke(null, 10, 0.2F);
+		assertEquals(10 - 0.2F, ival);
 		
-		ival=cls.getMethod("mul", float.class, float.class).invoke(null, 10, 0.2F);
+		ival = cls.getMethod("mul", float.class, float.class).invoke(null, 10, 0.2F);
 		assertEquals(10*0.2F, ival);
 		
-		ival=cls.getMethod("div", float.class, float.class).invoke(null, 10, 0.2F);
+		ival = cls.getMethod("div", float.class, float.class).invoke(null, 10, 0.2F);
 		assertEquals(10/0.2F, ival);
 		
 		
-		ival=cls.getMethod("add", double.class, double.class).invoke(null, 10, 0.2D);
-		assertEquals(10+0.2D, ival);
+		ival = cls.getMethod("add", double.class, double.class).invoke(null, 10, 0.2D);
+		assertEquals(10 + 0.2D, ival);
 		
-		ival=cls.getMethod("sub", double.class, double.class).invoke(null, 10, 0.2D);
-		assertEquals(10-0.2D, ival);
+		ival = cls.getMethod("sub", double.class, double.class).invoke(null, 10, 0.2D);
+		assertEquals(10 - 0.2D, ival);
 		
-		ival=cls.getMethod("mul", double.class, double.class).invoke(null, 10, 0.2D);
+		ival = cls.getMethod("mul", double.class, double.class).invoke(null, 10, 0.2D);
 		assertEquals(10*0.2D, ival);
 		
-		ival=cls.getMethod("div", double.class, double.class).invoke(null, 10, 0.2D);
+		ival = cls.getMethod("div", double.class, double.class).invoke(null, 10, 0.2D);
 		assertEquals(10/0.2D, ival);
 		
 	}
 	@Test
 	void concatTest() throws ReflectiveOperationException{
 		
-		var className="jorth.Gen$$";
-		var str      ="string concat works with $type: ";
+		var className = "jorth.Gen$$";
+		var str       = "string concat works with $type: ";
 		
-		var cls=generateAndLoadInstanceSimple(className, writer->{
+		var cls = generateAndLoadInstanceSimple(className, writer -> {
 			writer.write(
 				"""
 					[$type] myMacro macro start
@@ -187,9 +187,9 @@ public class JorthTests{
 	@Test
 	void comparisonTest() throws ReflectiveOperationException{
 		
-		var className="jorth.Gen$$";
+		var className = "jorth.Gen$$";
 		
-		var cls=generateAndLoadInstanceSimple(className, writer->{
+		var cls = generateAndLoadInstanceSimple(className, writer -> {
 			writer.write(
 				"""
 					[$typ] compareFunct macro start
@@ -209,14 +209,14 @@ public class JorthTests{
 			writer.write("[int] compareFunct macro resolve");
 		});
 		
-		var testStr=cls.getMethod("compare", String.class, String.class);
+		var testStr = cls.getMethod("compare", String.class, String.class);
 		assertEquals(false, testStr.invoke(null, "0", "1"));
 		assertEquals(true, testStr.invoke(null, "1", "1"));
 		assertEquals(false, testStr.invoke(null, null, "1"));
 		assertEquals(false, testStr.invoke(null, "0", null));
 		assertEquals(true, testStr.invoke(null, null, null));
 		
-		var test=cls.getMethod("compare", int.class, int.class);
+		var test = cls.getMethod("compare", int.class, int.class);
 		assertEquals(false, test.invoke(null, 11, 10));
 		assertEquals(true, test.invoke(null, 10, 10));
 	}
@@ -224,9 +224,9 @@ public class JorthTests{
 	@Test
 	void ifTest() throws ReflectiveOperationException{
 		
-		var className="jorth.Gen$$";
+		var className = "jorth.Gen$$";
 		
-		var cls=generateAndLoadInstanceSimple(className, writer->{
+		var cls = generateAndLoadInstanceSimple(className, writer -> {
 			writer.write(
 				"""
 					static
@@ -244,7 +244,7 @@ public class JorthTests{
 					""");
 		});
 		
-		var test=cls.getMethod("test", int.class);
+		var test = cls.getMethod("test", int.class);
 		
 		LogUtil.println(test.invoke(null, 0));
 		LogUtil.println(test.invoke(null, 1));
@@ -297,7 +297,7 @@ public class JorthTests{
 	@Test
 	void functionCallTest() throws ReflectiveOperationException{
 		
-		var cls=generateAndLoadInstanceSimple(TestCls.class.getPackageName()+".Gen$$", writer->{
+		var cls = generateAndLoadInstanceSimple(TestCls.class.getPackageName() + ".Gen$$", writer -> {
 			writer.write("#TOKEN(0) LogUtil define", LogUtil.class.getName());
 			writer.write(
 				"""
@@ -337,12 +337,12 @@ public class JorthTests{
 				TestCls.class.getName());
 		});
 		
-		TestCls test=new TestCls();
+		TestCls test = new TestCls();
 		assertFalse(test.flag);
 		cls.getMethod("testFlag", TestCls.class).invoke(null, test);
 		assertTrue(test.flag);
 		
-		var inst=cls.getConstructor().newInstance();
+		var inst = cls.getConstructor().newInstance();
 		LogUtil.println(cls.getMethod("useCall").invoke(inst));
 		
 		cls.getMethod("printToConsole").invoke(null);
@@ -351,9 +351,9 @@ public class JorthTests{
 	@Test
 	void fieldClass() throws ReflectiveOperationException{
 		
-		var className="jorth.Gen$$";
+		var className = "jorth.Gen$$";
 		
-		var cls=generateAndLoadInstanceSimple(className, writer->{
+		var cls = generateAndLoadInstanceSimple(className, writer -> {
 			
 			writer.write(
 				"""
@@ -382,14 +382,14 @@ public class JorthTests{
 					""");
 		});
 		
-		var constr=cls.getConstructor();
-		var inst  =constr.newInstance();
+		var constr = cls.getConstructor();
+		var inst   = constr.newInstance();
 		
-		var msg="this is a test";
+		var msg = "this is a test";
 		
 		cls.getMethod("init", String.class).invoke(inst, msg);
 		
-		var str=inst.toString();
+		var str = inst.toString();
 		
 		LogUtil.println(cls, "says", str);
 		assertEquals(msg, str);
@@ -398,9 +398,9 @@ public class JorthTests{
 	@Test
 	void fieldArrayClass() throws ReflectiveOperationException{
 		
-		var className="jorth.Gen$$";
+		var className = "jorth.Gen$$";
 		
-		var cls=generateAndLoadInstanceSimple(className, writer->{
+		var cls = generateAndLoadInstanceSimple(className, writer -> {
 			
 			writer.write(
 				"""
@@ -449,9 +449,9 @@ public class JorthTests{
 	@Test
 	void fieldAnnotationClass() throws ReflectiveOperationException{
 		
-		var className="jorth.Gen$$";
+		var className = "jorth.Gen$$";
 		
-		var cls=generateAndLoadInstanceSimple(className, writer->{
+		var cls = generateAndLoadInstanceSimple(className, writer -> {
 			writer.write("#TOKEN(0) Ann define", MultiAnn.class.getName());
 			writer.write(
 				"""
@@ -469,9 +469,9 @@ public class JorthTests{
 	@Test
 	void overrideClass() throws ReflectiveOperationException{
 		
-		var className="jorth.Gen$$";
+		var className = "jorth.Gen$$";
 		
-		var cls=generateAndLoadInstance(className, writer->{
+		var cls = generateAndLoadInstance(className, writer -> {
 			
 			//Define constants / imports
 			writer.write("#TOKEN(0) Str define", String.class.getName());
@@ -488,11 +488,11 @@ public class JorthTests{
 			);
 		});
 		
-		var constr=cls.getConstructor();
-		var inst  =constr.newInstance();
-		var str   =inst.toString();
+		var constr = cls.getConstructor();
+		var inst   = constr.newInstance();
+		var str    = inst.toString();
 		
-		var expected=new ISayHello().toString();
+		var expected = new ISayHello().toString();
 		
 		LogUtil.println(cls, "says", str);
 		assertEquals(str, expected);
@@ -500,10 +500,10 @@ public class JorthTests{
 	
 	@Test
 	void dummyClass() throws ReflectiveOperationException{
-		var msg="Ayyyy it works!";
+		var msg = "Ayyyy it works!";
 		
-		var className="jorth.Gen$$";
-		var cls=generateAndLoadInstanceSimple(className, writer->{
+		var className = "jorth.Gen$$";
+		var cls = generateAndLoadInstanceSimple(className, writer -> {
 			writer.write(
 				"""
 					Str returns
@@ -514,9 +514,9 @@ public class JorthTests{
 				msg);
 		});
 		
-		var constr=cls.getConstructor();
-		var inst  =constr.newInstance();
-		var str   =inst.toString();
+		var constr = cls.getConstructor();
+		var inst   = constr.newInstance();
+		var str    = inst.toString();
 		
 		LogUtil.println(cls, "says", str);
 		assertEquals(msg, str);
@@ -526,8 +526,8 @@ public class JorthTests{
 	@Test
 	<T extends Enum<T>> void simpleEnum() throws ReflectiveOperationException{
 		
-		var className="jorth.SimpleEnum$$";
-		var cls=generateAndLoadInstance(className, writer->{
+		var className = "jorth.SimpleEnum$$";
+		var cls = generateAndLoadInstance(className, writer -> {
 			writer.write(
 				"""
 					public visibility

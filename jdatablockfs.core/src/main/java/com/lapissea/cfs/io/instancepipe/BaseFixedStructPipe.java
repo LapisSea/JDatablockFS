@@ -37,44 +37,44 @@ public abstract class BaseFixedStructPipe<T extends IOInstance<T>> extends Struc
 			return IOFieldTools.stepFinal(
 				structFields,
 				List.of(
-					IOFieldTools.streamStep(s->s.map(f->checkFixed.test(f)?f:makeFixed.apply(f))),
+					IOFieldTools.streamStep(s -> s.map(f -> checkFixed.test(f)? f : makeFixed.apply(f))),
 					IOFieldTools::dependencyReorder,
-					IOFieldTools.streamStep(s->s.filter(not(checkFixed))),
+					IOFieldTools.streamStep(s -> s.filter(not(checkFixed))),
 					IOFieldTools::mergeBitSpace
 				));
 		}catch(FixedFormatNotSupportedException e){
-			throw new UnsupportedStructLayout(type.getFullName()+" does not support fixed size layout because of "+e.getField(), e);
+			throw new UnsupportedStructLayout(type.getFullName() + " does not support fixed size layout because of " + e.getField(), e);
 		}
 	}
 	
 	protected Map<IOField<T, NumberSize>, NumberSize> computeMaxValues(FieldSet<T> structFields){
-		var badFields=sizeFieldStream(structFields).filter(IOField::hasDependencies).map(IOField::toString).collect(Collectors.joining(", "));
+		var badFields = sizeFieldStream(structFields).filter(IOField::hasDependencies).map(IOField::toString).collect(Collectors.joining(", "));
 		if(!badFields.isEmpty()){
-			throw new IllegalField(badFields+" should not have dependencies");
+			throw new IllegalField(badFields + " should not have dependencies");
 		}
 		
 		return sizeFieldStream(structFields)
-			       .map(sizingField->{
-				       var size=getType().getFields().streamDependentOn(sizingField)
-				                         .mapToLong(v->v.sizeDescriptorSafe().requireMax(WordSpace.BYTE))
-				                         .distinct()
-				                         .mapToObj(l->NumberSize.FLAG_INFO.stream()
-				                                                          .filter(s->s.bytes==l)
-				                                                          .findAny().orElseThrow())
-				                         .reduce((a, b)->{
-					                         if(a!=b){
-						                         throw new MalformedStruct("inconsistent dependency sizes"+sizingField);
-					                         }
-					                         return a;
-				                         })
-				                         .orElse(NumberSize.LARGEST);
+			       .map(sizingField -> {
+				       var size = getType().getFields().streamDependentOn(sizingField)
+				                           .mapToLong(v -> v.sizeDescriptorSafe().requireMax(WordSpace.BYTE))
+				                           .distinct()
+				                           .mapToObj(l -> NumberSize.FLAG_INFO.stream()
+				                                                              .filter(s -> s.bytes == l)
+				                                                              .findAny().orElseThrow())
+				                           .reduce((a, b) -> {
+					                           if(a != b){
+						                           throw new MalformedStruct("inconsistent dependency sizes" + sizingField);
+					                           }
+					                           return a;
+				                           })
+				                           .orElse(NumberSize.LARGEST);
 				       return new AbstractMap.SimpleEntry<>(sizingField, size);
 			       })
 			       .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 	}
 	
 	protected static <T extends IOInstance<T>> Stream<IOField<T, NumberSize>> sizeFieldStream(FieldSet<T> structFields){
-		return structFields.stream().map(f->IOFieldTools.getDynamicSize(f.getAccessor())).filter(Optional::isPresent).map(Optional::get);
+		return structFields.stream().map(f -> IOFieldTools.getDynamicSize(f.getAccessor())).filter(Optional::isPresent).map(Optional::get);
 	}
 	
 	public <E extends IOInstance<E>> SizeDescriptor.Fixed<E> getFixedDescriptor(){

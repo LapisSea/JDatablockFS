@@ -13,7 +13,7 @@ public enum Visibility{
 	public final int flag;
 	
 	Visibility(int flag){
-		this.flag=flag;
+		this.flag = flag;
 	}
 	
 }

@@ -25,48 +25,48 @@ public class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseFixedSt
 	
 	private static class ProviderReply<T extends IOInstance<T>>{
 		
-		private record Step(NumberSize max, boolean ptr){}
+		private record Step(NumberSize max, boolean ptr){ }
 		
 		private final Struct<T> type;
 		
 		private List<Step> steps;
 		
-		private final Map<List<NumberSize>, FixedVaryingStructPipe<T>> cache=new ConcurrentHashMap<>();
+		private final Map<List<NumberSize>, FixedVaryingStructPipe<T>> cache = new ConcurrentHashMap<>();
 		
 		private ProviderReply(Struct<T> type){
-			this.type=type;
+			this.type = type;
 		}
 		
 		private FixedVaryingStructPipe<T> make(VaryingSize.Provider rule) throws UseFixed{
-			if(steps==null){
-				List<Step> steps=new ArrayList<>();
-				var pip=new FixedVaryingStructPipe<>(
+			if(steps == null){
+				List<Step> steps = new ArrayList<>();
+				var pip = new FixedVaryingStructPipe<>(
 					type,
-					VaryingSize.Provider.intercept(rule, (max, ptr, actual)->steps.add(new Step(max, ptr)))
+					VaryingSize.Provider.intercept(rule, (max, ptr, actual) -> steps.add(new Step(max, ptr)))
 				);
-				this.steps=List.copyOf(steps);
+				this.steps = List.copyOf(steps);
 				return pip;
 			}
 			
-			List<NumberSize> buff=new ArrayList<>(steps.size());
+			List<NumberSize> buff = new ArrayList<>(steps.size());
 			for(Step step : steps){
 				buff.add(rule.provide(step.max, step.ptr).size);
 			}
 			{
-				var cached=cache.get(buff);
-				if(cached!=null){
+				var cached = cache.get(buff);
+				if(cached != null){
 					return cached;
 				}
 			}
 			synchronized(cache){
-				var cached=cache.get(buff);
-				if(cached!=null){
+				var cached = cache.get(buff);
+				if(cached != null){
 					return cached;
 				}
 				
 				Log.trace("Creating new varying pip of {}#cyan with {}#purpleBright", type, buff);
 				
-				var pipe=new FixedVaryingStructPipe<>(type, VaryingSize.Provider.repeat(buff));
+				var pipe = new FixedVaryingStructPipe<>(type, VaryingSize.Provider.repeat(buff));
 				cache.put(buff, pipe);
 				
 				return pipe;
@@ -75,17 +75,17 @@ public class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseFixedSt
 		
 	}
 	
-	private static final Map<Struct<?>, UnsupportedStructLayout> FAILS      =new ConcurrentHashMap<>();
-	private static final Map<Struct<?>, ProviderReply<?>>        REPLY_CACHE=new ConcurrentHashMap<>();
+	private static final Map<Struct<?>, UnsupportedStructLayout> FAILS       = new ConcurrentHashMap<>();
+	private static final Map<Struct<?>, ProviderReply<?>>        REPLY_CACHE = new ConcurrentHashMap<>();
 	
 	@SuppressWarnings("unchecked")
 	public static <T extends IOInstance<T>> BaseFixedStructPipe<T> tryVarying(Struct<T> type, VaryingSize.Provider rule){
 		{
-			var e=FAILS.get(type);
-			if(e!=null) throw e;
+			var e = FAILS.get(type);
+			if(e != null) throw e;
 		}
 		try{
-			if(rule==VaryingSize.Provider.ALL_MAX){
+			if(rule == VaryingSize.Provider.ALL_MAX){
 				return FixedStructPipe.of(type, STATE_IO_FIELD);
 			}
 			
@@ -103,21 +103,21 @@ public class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseFixedSt
 		}
 	}
 	
-	public static final class UseFixed extends Exception{}
+	public static final class UseFixed extends Exception{ }
 	
 	private FixedVaryingStructPipe(Struct<T> type, VaryingSize.Provider rule) throws UseFixed{
-		super(type, (t, structFields)->{
-			if(rule==VaryingSize.Provider.ALL_MAX){
+		super(type, (t, structFields) -> {
+			if(rule == VaryingSize.Provider.ALL_MAX){
 				throw new UseFixed();
 			}
-			Set<IOField<T, ?>> sizeFields=sizeFieldStream(structFields).collect(Collectors.toSet());
+			Set<IOField<T, ?>> sizeFields = sizeFieldStream(structFields).collect(Collectors.toSet());
 			
-			boolean[] effectivelyAllMax={true};
-			var snitchRule=VaryingSize.Provider.intercept(rule, (max, ptr, actual)->{
-				if(actual.size!=max) effectivelyAllMax[0]=false;
+			boolean[] effectivelyAllMax = {true};
+			var snitchRule = VaryingSize.Provider.intercept(rule, (max, ptr, actual) -> {
+				if(actual.size != max) effectivelyAllMax[0] = false;
 			});
 			
-			var result=fixedFields(t, structFields, sizeFields::contains, f->{
+			var result = fixedFields(t, structFields, sizeFields::contains, f -> {
 				return f.forceMaxAsFixedSize(snitchRule);
 			});
 			if(effectivelyAllMax[0]){
@@ -143,7 +143,7 @@ public class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseFixedSt
 	
 	@Override
 	public void skip(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
-		T instance=getType().make();
+		T instance = getType().make();
 		read(provider, src, instance, genericContext);
 	}
 }

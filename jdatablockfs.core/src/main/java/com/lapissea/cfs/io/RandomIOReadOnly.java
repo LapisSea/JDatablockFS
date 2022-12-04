@@ -8,9 +8,9 @@ public class RandomIOReadOnly implements RandomIO{
 	
 	public RandomIOReadOnly(RandomIO io){
 		while(io instanceof RandomIOReadOnly ro){
-			io=ro.io;
+			io = ro.io;
 		}
-		this.io=io;
+		this.io = io;
 	}
 	
 	@Override
@@ -71,7 +71,7 @@ public class RandomIOReadOnly implements RandomIO{
 	
 	@Override
 	public String toString(){
-		return "ReadOnly{"+io.toString()+"}";
+		return "ReadOnly{" + io.toString() + "}";
 	}
 	
 	@Override

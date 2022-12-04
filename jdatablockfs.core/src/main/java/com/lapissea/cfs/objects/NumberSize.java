@@ -37,26 +37,26 @@ public enum NumberSize{
 	private static final NumberSize[] BYTE_MAP;
 	
 	static{
-		var all=values();
-		BYTE_MAP=IntStream.range(0, Arrays.stream(all).mapToInt(NumberSize::bytes).max().orElseThrow()+1)
-		                  .mapToObj(b->Arrays.stream(all).filter(f->f.bytes>=b).reduce(NumberSize::min).orElseThrow())
-		                  .toArray(NumberSize[]::new);
+		var all = values();
+		BYTE_MAP = IntStream.range(0, Arrays.stream(all).mapToInt(NumberSize::bytes).max().orElseThrow() + 1)
+		                    .mapToObj(b -> Arrays.stream(all).filter(f -> f.bytes>=b).reduce(NumberSize::min).orElseThrow())
+		                    .toArray(NumberSize[]::new);
 	}
 	
-	private static final long[] MAX_SIZES=Arrays.stream(values()).mapToLong(NumberSize::maxSize).toArray();
-	private static final int[]  BYTES    =Arrays.stream(values()).mapToInt(NumberSize::bytes).toArray();
+	private static final long[] MAX_SIZES = Arrays.stream(values()).mapToLong(NumberSize::maxSize).toArray();
+	private static final int[]  BYTES     = Arrays.stream(values()).mapToInt(NumberSize::bytes).toArray();
 	
-	public static final EnumUniverse<NumberSize> FLAG_INFO=EnumUniverse.of(NumberSize.class);
+	public static final EnumUniverse<NumberSize> FLAG_INFO = EnumUniverse.of(NumberSize.class);
 	
-	public static final NumberSize SMALEST_REAL=BYTE;
-	public static final NumberSize LARGEST     =LONG;
+	public static final NumberSize SMALEST_REAL = BYTE;
+	public static final NumberSize LARGEST      = LONG;
 	
 	public static NumberSize ordinal(int index){
 		return FLAG_INFO.get(index);
 	}
 	
 	public static NumberSize bySizeVoidable(@Nullable INumber size){
-		return size==null?VOID:bySize(size);
+		return size == null? VOID : bySize(size);
 	}
 	
 	public static NumberSize bySize(INumber size){
@@ -64,14 +64,14 @@ public enum NumberSize{
 	}
 	
 	public static NumberSize bySize(long size, boolean unsigned){
-		return bySize(unsigned?Math.max(0, size):Math.abs(size));
+		return bySize(unsigned? Math.max(0, size) : Math.abs(size));
 	}
 	
 	public static NumberSize bySize(long size){
 		if(size<0){
 			throw new IllegalArgumentException();
 		}
-		return byBytes(BitUtils.bitsToBytes(Long.SIZE-Long.numberOfLeadingZeros(size)));
+		return byBytes(BitUtils.bitsToBytes(Long.SIZE - Long.numberOfLeadingZeros(size)));
 	}
 	
 	public static NumberSize byBits(int bits){
@@ -82,8 +82,8 @@ public enum NumberSize{
 		return BYTE_MAP[bytes];
 	}
 	
-	private int nextId=-2;
-	private int prevId=-2;
+	private int nextId = -2;
+	private int prevId = -2;
 	
 	public final int  bytes;
 	public final long maxSize;
@@ -95,15 +95,15 @@ public enum NumberSize{
 	public final OptionalLong optionalBytesLong;
 	
 	NumberSize(char shortName, int bytes){
-		this.shortName=shortName;
-		this.bytes=bytes;
-		this.maxSize=BigInteger.ONE.shiftLeft(bytes*8).subtract(BigInteger.ONE).min(BigInteger.valueOf(Long.MAX_VALUE)).longValueExact();
-		var signBase=BigInteger.ONE.shiftLeft(bytes*8-1);
-		this.signedMaxValue=signBase.subtract(BigInteger.ONE).max(BigInteger.ZERO).longValueExact();
-		this.signedMinValue=signBase.multiply(BigInteger.valueOf(-1)).longValueExact();
+		this.shortName = shortName;
+		this.bytes = bytes;
+		this.maxSize = BigInteger.ONE.shiftLeft(bytes*8).subtract(BigInteger.ONE).min(BigInteger.valueOf(Long.MAX_VALUE)).longValueExact();
+		var signBase = BigInteger.ONE.shiftLeft(bytes*8 - 1);
+		this.signedMaxValue = signBase.subtract(BigInteger.ONE).max(BigInteger.ZERO).longValueExact();
+		this.signedMinValue = signBase.multiply(BigInteger.valueOf(-1)).longValueExact();
 		
-		optionalBytes=OptionalInt.of(bytes);
-		optionalBytesLong=OptionalLong.of(bytes);
+		optionalBytes = OptionalInt.of(bytes);
+		optionalBytesLong = OptionalLong.of(bytes);
 	}
 	
 	public double readFloating(ContentReader in) throws IOException{
@@ -121,7 +121,7 @@ public enum NumberSize{
 			case INT -> out.writeInt4(Float.floatToIntBits((float)value));
 			case LONG -> out.writeInt8(Double.doubleToLongBits(value));
 			case SHORT -> out.writeInt2(IUtils.floatToShortBits((float)value));
-			case VOID, null -> {}
+			case VOID, null -> { }
 			case BYTE, SMALL_INT, BIG_INT, SMALL_LONG -> throw new UnsupportedOperationException();
 		}
 	}
@@ -148,14 +148,14 @@ public enum NumberSize{
 	}
 	
 	public void write(ContentWriter out, INumber value) throws IOException{
-		write(out, value==null?0:value.getValue());
+		write(out, value == null? 0 : value.getValue());
 	}
 	
 	public void write(ContentWriter out, long value) throws IOException{
 		if(DEBUG_VALIDATION) validateUnsigned(value);
 		
 		switch(this){
-			case VOID -> {}
+			case VOID -> { }
 			case BYTE -> out.writeInt1((int)value);
 			case SHORT -> out.writeInt2((int)value);
 			case SMALL_INT -> out.writeInt3((int)value);
@@ -163,7 +163,7 @@ public enum NumberSize{
 			case BIG_INT -> out.writeInt5(value);
 			case SMALL_LONG -> out.writeInt6(value);
 			case LONG -> out.writeInt8(value);
-			case null -> {}
+			case null -> { }
 		}
 	}
 	
@@ -173,8 +173,8 @@ public enum NumberSize{
 		}catch(BitDepthOutOfSpaceException e){
 			throw new RuntimeException(e);
 		}
-		if(value<0&&this!=LONG&&this!=VOID){
-			throw new IllegalStateException(value+" is signed! "+this);
+		if(value<0 && this != LONG && this != VOID){
+			throw new IllegalStateException(value + " is signed! " + this);
 		}
 	}
 	private void validateSigned(long value){
@@ -191,56 +191,56 @@ public enum NumberSize{
 	}
 	
 	private long toUnsigned(long value){
-		if(this==LONG) return value;
+		if(this == LONG) return value;
 		return value&this.maxSize;
 	}
 	private long toSigned(long value){
-		if(this==LONG||this==VOID) return value;
+		if(this == LONG || this == VOID) return value;
 		if(value<=signedMaxValue) return value;
-		return value-maxSize-1;
+		return value - maxSize - 1;
 	}
 	
 	public NumberSize prev(){
-		if(prevId==-2){
-			prevId=FLAG_INFO.stream().filter(n->n.lesserThan(this)).max(Comparator.comparingInt(NumberSize::bytes)).map(Enum::ordinal).orElse(-1);
+		if(prevId == -2){
+			prevId = FLAG_INFO.stream().filter(n -> n.lesserThan(this)).max(Comparator.comparingInt(NumberSize::bytes)).map(Enum::ordinal).orElse(-1);
 		}
-		if(prevId==-1) return this;
+		if(prevId == -1) return this;
 		return ordinal(prevId);
 	}
 	
 	public NumberSize next(){
-		if(nextId==-2){
-			nextId=FLAG_INFO.stream().filter(n->n.greaterThan(this)).min(Comparator.comparingInt(NumberSize::bytes)).map(Enum::ordinal).orElse(-1);
+		if(nextId == -2){
+			nextId = FLAG_INFO.stream().filter(n -> n.greaterThan(this)).min(Comparator.comparingInt(NumberSize::bytes)).map(Enum::ordinal).orElse(-1);
 		}
-		if(nextId==-1) return this;
+		if(nextId == -1) return this;
 		return ordinal(nextId);
 	}
 	
 	public boolean greaterThanOrEqual(NumberSize other){
-		if(other==this) return true;
+		if(other == this) return true;
 		return bytes>=other.bytes;
 	}
 	public boolean lesserThanOrEqual(NumberSize other){
-		if(other==this) return true;
+		if(other == this) return true;
 		return bytes<=other.bytes;
 	}
 	
 	public boolean greaterThan(NumberSize other){
-		if(other==this) return false;
+		if(other == this) return false;
 		return bytes>other.bytes;
 	}
 	
 	public boolean lesserThan(NumberSize other){
-		if(other==this) return false;
+		if(other == this) return false;
 		return bytes<other.bytes;
 	}
 	
 	public NumberSize max(NumberSize other){
-		return greaterThan(other)?this:other;
+		return greaterThan(other)? this : other;
 	}
 	
 	public NumberSize min(NumberSize other){
-		return lesserThan(other)?this:other;
+		return lesserThan(other)? this : other;
 	}
 	
 	public boolean canFit(INumber num){
@@ -252,11 +252,11 @@ public enum NumberSize{
 	}
 	
 	public boolean canFitSigned(long num){
-		return signedMinValue<=num&&num<=signedMaxValue;
+		return signedMinValue<=num && num<=signedMaxValue;
 	}
 	
 	public long remaining(long num){
-		return maxSize-num;
+		return maxSize - num;
 	}
 	
 	public void ensureCanFit(@Nullable ChunkPointer num) throws BitDepthOutOfSpaceException{
@@ -282,7 +282,7 @@ public enum NumberSize{
 	}
 	
 	public NumberSize requireNonVoid(){
-		if(this==VOID) throw new RuntimeException("Value must not be "+VOID);
+		if(this == VOID) throw new RuntimeException("Value must not be " + VOID);
 		return this;
 	}
 	
@@ -295,10 +295,10 @@ public enum NumberSize{
 	}
 	
 	public String binaryString(long value){
-		var    bitCount=bits();
-		String bits    =Long.toBinaryString(value&BitUtils.makeMask(bitCount));
-		if(bits.length()==bitCount) return bits;
-		return "0".repeat(bitCount-bits.length())+bits;
+		var    bitCount = bits();
+		String bits     = Long.toBinaryString(value&BitUtils.makeMask(bitCount));
+		if(bits.length() == bitCount) return bits;
+		return "0".repeat(bitCount - bits.length()) + bits;
 	}
 	
 	public long maxSize(){

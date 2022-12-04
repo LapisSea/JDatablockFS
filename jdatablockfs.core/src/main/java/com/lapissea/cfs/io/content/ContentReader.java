@@ -21,13 +21,13 @@ public interface ContentReader extends AutoCloseable{
 		buff.put((byte)tryRead());
 	}
 	default int read(ByteBuffer buff, int length) throws IOException{
-		if(length>buff.remaining()) throw new IndexOutOfBoundsException("reading "+length+" remaining "+buff.remaining());
+		if(length>buff.remaining()) throw new IndexOutOfBoundsException("reading " + length + " remaining " + buff.remaining());
 		
-		if(buff.hasArray()&&!buff.isReadOnly()){
-			return read(buff.array(), buff.position()+buff.arrayOffset(), length);
+		if(buff.hasArray() && !buff.isReadOnly()){
+			return read(buff.array(), buff.position() + buff.arrayOffset(), length);
 		}
-		byte[] bb  =new byte[Math.min(length, BATCH_BYTES)];
-		int    read=read(bb);
+		byte[] bb   = new byte[Math.min(length, BATCH_BYTES)];
+		int    read = read(bb);
 		if(read>0){
 			buff.put(bb, 0, read);
 		}
@@ -35,7 +35,7 @@ public interface ContentReader extends AutoCloseable{
 	}
 	
 	default int tryRead() throws IOException{
-		var b=read();
+		var b = read();
 		if(b<0) throw new EOFException();
 		return b;
 	}
@@ -49,14 +49,14 @@ public interface ContentReader extends AutoCloseable{
 	int read(byte[] b, int off, int len) throws IOException;
 	
 	default long readWord(final int len) throws IOException{
-		byte[] readBuffer=new byte[8];
+		byte[] readBuffer = new byte[8];
 		readFully(readBuffer, 0, len);
 		
-		final var lm1=len-1;
+		final var lm1 = len - 1;
 		
-		long val=0;
-		for(int i=0;i<len;i++){
-			val|=(readBuffer[i]&0xFFL)<<((lm1-i)*8);
+		long val = 0;
+		for(int i = 0; i<len; i++){
+			val |= (readBuffer[i]&0xFFL)<<((lm1 - i)*8);
 		}
 		return val;
 	}
@@ -92,39 +92,39 @@ public interface ContentReader extends AutoCloseable{
 	}
 	
 	private static void failSkip(long toSkip, long skipped) throws IOException{
-		throw new IOException("Failed to skip "+toSkip+" bytes! Actually skipped: "+skipped);
+		throw new IOException("Failed to skip " + toSkip + " bytes! Actually skipped: " + skipped);
 	}
 	default void skipExact(long toSkip) throws IOException{
 		if(toSkip<0) throw new IllegalArgumentException("toSkip can not be negative");
-		long skipSum=0;
+		long skipSum = 0;
 		while(skipSum<toSkip){
-			long remaining=toSkip-skipSum;
-			var  skipped  =skip(remaining);
-			if(skipped==0) failSkip(toSkip, skipSum);
-			skipSum+=skipped;
+			long remaining = toSkip - skipSum;
+			var  skipped   = skip(remaining);
+			if(skipped == 0) failSkip(toSkip, skipSum);
+			skipSum += skipped;
 		}
-		if(skipSum!=toSkip) failSkip(toSkip, skipSum);
+		if(skipSum != toSkip) failSkip(toSkip, skipSum);
 	}
 	
 	default char[] readChars2(int elementsToRead) throws IOException{
-		int bytesPerElement =2;
-		int elementsPerChunk=Math.min(elementsToRead, 256);
+		int bytesPerElement  = 2;
+		int elementsPerChunk = Math.min(elementsToRead, 256);
 		
-		var result=new char[elementsToRead];
-		var buff  =new byte[elementsPerChunk*bytesPerElement];
+		var result = new char[elementsToRead];
+		var buff   = new byte[elementsPerChunk*bytesPerElement];
 		
-		int remaining=result.length;
+		int remaining = result.length;
 		while(remaining>0){
-			int read=result.length-remaining;
+			int read = result.length - remaining;
 			
-			int readElements=Math.min(remaining, elementsPerChunk);
+			int readElements = Math.min(remaining, elementsPerChunk);
 			readFully(buff, 0, readElements*bytesPerElement);
 			
-			for(int i=0;i<readElements;i++){
-				result[read+i]=readChar2(buff, i*bytesPerElement);
+			for(int i = 0; i<readElements; i++){
+				result[read + i] = readChar2(buff, i*bytesPerElement);
 			}
 			
-			remaining-=readElements;
+			remaining -= readElements;
 		}
 		
 		return result;
@@ -135,8 +135,8 @@ public interface ContentReader extends AutoCloseable{
 	}
 	
 	private char readChar2(byte[] readBuffer, int offset){
-		return (char)((readBuffer[offset+0]<<8)+
-		              (readBuffer[offset+1]<<0));
+		return (char)((readBuffer[offset + 0]<<8) +
+		              (readBuffer[offset + 1]<<0));
 	}
 	
 	
@@ -145,11 +145,11 @@ public interface ContentReader extends AutoCloseable{
 	}
 	
 	default int[] readUnsignedInts1(int elementsToRead) throws IOException{
-		return readInts(elementsToRead, 1, (buff, i)->Byte.toUnsignedInt(buff[i]));
+		return readInts(elementsToRead, 1, (buff, i) -> Byte.toUnsignedInt(buff[i]));
 	}
 	
 	default boolean readBoolean() throws IOException{
-		return readUnsignedInt1()!=0;
+		return readUnsignedInt1() != 0;
 	}
 	
 	default byte readInt1() throws IOException{
@@ -157,31 +157,31 @@ public interface ContentReader extends AutoCloseable{
 	}
 	
 	default byte[] readInts1(int elementsToRead) throws IOException{
-		byte[] result=new byte[elementsToRead];
+		byte[] result = new byte[elementsToRead];
 		readFully(result);
 		return result;
 	}
 	
 	
 	default short[] readInts2(int elementsToRead) throws IOException{
-		int bytesPerElement =2;
-		int elementsPerChunk=Math.min(elementsToRead, 256);
+		int bytesPerElement  = 2;
+		int elementsPerChunk = Math.min(elementsToRead, 256);
 		
-		var result=new short[elementsToRead];
-		var buff  =new byte[elementsPerChunk*bytesPerElement];
+		var result = new short[elementsToRead];
+		var buff   = new byte[elementsPerChunk*bytesPerElement];
 		
-		int remaining=result.length;
+		int remaining = result.length;
 		while(remaining>0){
-			int read=result.length-remaining;
+			int read = result.length - remaining;
 			
-			int readElements=Math.min(remaining, elementsPerChunk);
+			int readElements = Math.min(remaining, elementsPerChunk);
 			readFully(buff, 0, readElements*bytesPerElement);
 			
-			for(int i=0;i<readElements;i++){
-				result[read+i]=readInt2(buff, i*bytesPerElement);
+			for(int i = 0; i<readElements; i++){
+				result[read + i] = readInt2(buff, i*bytesPerElement);
 			}
 			
-			remaining-=readElements;
+			remaining -= readElements;
 		}
 		
 		return result;
@@ -191,8 +191,8 @@ public interface ContentReader extends AutoCloseable{
 		return (short)readWord(2);
 	}
 	private short readInt2(byte[] readBuffer, int offset){
-		return (short)(((readBuffer[offset+0]&255)<<8)+
-		               ((readBuffer[offset+1]&255)<<0));
+		return (short)(((readBuffer[offset + 0]&255)<<8) +
+		               ((readBuffer[offset + 1]&255)<<0));
 	}
 	
 	
@@ -204,8 +204,8 @@ public interface ContentReader extends AutoCloseable{
 		return (int)readWord(2);
 	}
 	private int readUnsignedInt2(byte[] readBuffer, int offset){
-		return ((readBuffer[offset+0]&255)<<8)+
-		       ((readBuffer[offset+1]&255)<<0);
+		return ((readBuffer[offset + 0]&255)<<8) +
+		       ((readBuffer[offset + 1]&255)<<0);
 	}
 	
 	
@@ -217,9 +217,9 @@ public interface ContentReader extends AutoCloseable{
 		return (int)readWord(3);
 	}
 	private int readUnsignedInt3(byte[] readBuffer, int offset){
-		return (((readBuffer[offset+0]&255)<<16)+
-		        ((readBuffer[offset+1]&255)<<8)+
-		        ((readBuffer[offset+2]&255)<<0));
+		return (((readBuffer[offset + 0]&255)<<16) +
+		        ((readBuffer[offset + 1]&255)<<8) +
+		        ((readBuffer[offset + 2]&255)<<0));
 	}
 	
 	
@@ -243,10 +243,10 @@ public interface ContentReader extends AutoCloseable{
 		return (int)readWord(4);
 	}
 	private int readInt4(byte[] readBuffer, int offset){
-		return (((readBuffer[offset+0]&255)<<24)+
-		        ((readBuffer[offset+1]&255)<<16)+
-		        ((readBuffer[offset+2]&255)<<8)+
-		        ((readBuffer[offset+3]&255)<<0));
+		return (((readBuffer[offset + 0]&255)<<24) +
+		        ((readBuffer[offset + 1]&255)<<16) +
+		        ((readBuffer[offset + 2]&255)<<8) +
+		        ((readBuffer[offset + 3]&255)<<0));
 	}
 	
 	
@@ -258,11 +258,11 @@ public interface ContentReader extends AutoCloseable{
 		return readWord(5);
 	}
 	private long readUnsignedInt5(byte[] readBuffer, int offset){
-		return (((long)(readBuffer[offset+0]&255)<<32)+
-		        ((long)(readBuffer[offset+1]&255)<<24)+
-		        ((readBuffer[offset+2]&255)<<16)+
-		        ((readBuffer[offset+3]&255)<<8)+
-		        ((readBuffer[offset+4]&255)<<0));
+		return (((long)(readBuffer[offset + 0]&255)<<32) +
+		        ((long)(readBuffer[offset + 1]&255)<<24) +
+		        ((readBuffer[offset + 2]&255)<<16) +
+		        ((readBuffer[offset + 3]&255)<<8) +
+		        ((readBuffer[offset + 4]&255)<<0));
 	}
 	
 	
@@ -274,12 +274,12 @@ public interface ContentReader extends AutoCloseable{
 		return readWord(6);
 	}
 	private long readUnsignedInt6(byte[] readBuffer, int offset){
-		return (((long)(readBuffer[offset+0]&255)<<40)+
-		        ((long)(readBuffer[offset+1]&255)<<32)+
-		        ((long)(readBuffer[offset+2]&255)<<24)+
-		        ((readBuffer[offset+3]&255)<<16)+
-		        ((readBuffer[offset+4]&255)<<8)+
-		        ((readBuffer[offset+5]&255)<<0));
+		return (((long)(readBuffer[offset + 0]&255)<<40) +
+		        ((long)(readBuffer[offset + 1]&255)<<32) +
+		        ((long)(readBuffer[offset + 2]&255)<<24) +
+		        ((readBuffer[offset + 3]&255)<<16) +
+		        ((readBuffer[offset + 4]&255)<<8) +
+		        ((readBuffer[offset + 5]&255)<<0));
 	}
 	
 	default long[] readInts8(int elementsToRead) throws IOException{
@@ -290,58 +290,58 @@ public interface ContentReader extends AutoCloseable{
 		return readWord(8);
 	}
 	private long readInt8(byte[] readBuffer, int offset){
-		return (((long)readBuffer[offset+0]<<56)+
-		        ((long)(readBuffer[offset+1]&255)<<48)+
-		        ((long)(readBuffer[offset+2]&255)<<40)+
-		        ((long)(readBuffer[offset+3]&255)<<32)+
-		        ((long)(readBuffer[offset+4]&255)<<24)+
-		        ((readBuffer[offset+5]&255)<<16)+
-		        ((readBuffer[offset+6]&255)<<8)+
-		        ((readBuffer[offset+7]&255)<<0));
+		return (((long)readBuffer[offset + 0]<<56) +
+		        ((long)(readBuffer[offset + 1]&255)<<48) +
+		        ((long)(readBuffer[offset + 2]&255)<<40) +
+		        ((long)(readBuffer[offset + 3]&255)<<32) +
+		        ((long)(readBuffer[offset + 4]&255)<<24) +
+		        ((readBuffer[offset + 5]&255)<<16) +
+		        ((readBuffer[offset + 6]&255)<<8) +
+		        ((readBuffer[offset + 7]&255)<<0));
 	}
 	
 	
 	private int[] readInts(int elementsToRead, int bytesPerElement, ReadIntFromBuff reader) throws IOException{
-		int elementsPerChunk=Math.min(elementsToRead, 256);
+		int elementsPerChunk = Math.min(elementsToRead, 256);
 		
-		var result=new int[elementsToRead];
-		var buff  =new byte[elementsPerChunk*bytesPerElement];
+		var result = new int[elementsToRead];
+		var buff   = new byte[elementsPerChunk*bytesPerElement];
 		
-		int remaining=result.length;
+		int remaining = result.length;
 		while(remaining>0){
-			int read=result.length-remaining;
+			int read = result.length - remaining;
 			
-			int readElements=Math.min(remaining, elementsPerChunk);
+			int readElements = Math.min(remaining, elementsPerChunk);
 			readFully(buff, 0, readElements*bytesPerElement);
 			
-			for(int i=0;i<readElements;i++){
-				result[read+i]=reader.read(buff, i*bytesPerElement);
+			for(int i = 0; i<readElements; i++){
+				result[read + i] = reader.read(buff, i*bytesPerElement);
 			}
 			
-			remaining-=readElements;
+			remaining -= readElements;
 		}
 		
 		return result;
 	}
 	
 	private long[] readLongs(int elementsToRead, int bytesPerElement, ReadLongFromBuff reader) throws IOException{
-		int elementsPerChunk=Math.min(elementsToRead, 256);
+		int elementsPerChunk = Math.min(elementsToRead, 256);
 		
-		var result=new long[elementsToRead];
-		var buff  =new byte[elementsPerChunk*bytesPerElement];
+		var result = new long[elementsToRead];
+		var buff   = new byte[elementsPerChunk*bytesPerElement];
 		
-		int remaining=result.length;
+		int remaining = result.length;
 		while(remaining>0){
-			int read=result.length-remaining;
+			int read = result.length - remaining;
 			
-			int readElements=Math.min(remaining, elementsPerChunk);
+			int readElements = Math.min(remaining, elementsPerChunk);
 			readFully(buff, 0, readElements*bytesPerElement);
 			
-			for(int i=0;i<readElements;i++){
-				result[read+i]=reader.read(buff, i*bytesPerElement);
+			for(int i = 0; i<readElements; i++){
+				result[read + i] = reader.read(buff, i*bytesPerElement);
 			}
 			
-			remaining-=readElements;
+			remaining -= readElements;
 		}
 		
 		return result;
@@ -351,15 +351,15 @@ public interface ContentReader extends AutoCloseable{
 		return Float.intBitsToFloat((int)readWord(4));
 	}
 	default float[] readFloats4(int count) throws IOException{
-		var buff=new float[count];
+		var buff = new float[count];
 		readFloats4(buff);
 		return buff;
 	}
 	default void readFloats4(float[] f) throws IOException{
-		int    numSize=4;
-		byte[] bb     =readInts1(f.length*numSize);
-		for(int i=0;i<f.length;i++){
-			f[i]=readFloat4(bb, i*numSize);
+		int    numSize = 4;
+		byte[] bb      = readInts1(f.length*numSize);
+		for(int i = 0; i<f.length; i++){
+			f[i] = readFloat4(bb, i*numSize);
 		}
 	}
 	
@@ -371,15 +371,15 @@ public interface ContentReader extends AutoCloseable{
 		return Double.longBitsToDouble(readWord(4));
 	}
 	default double[] readFloats8(int count) throws IOException{
-		var buff=new double[count];
+		var buff = new double[count];
 		readFloats8(buff);
 		return buff;
 	}
 	default void readFloats8(double[] f) throws IOException{
-		int    numSize=8;
-		byte[] bb     =readInts1(f.length*numSize);
-		for(int i=0;i<f.length;i++){
-			f[i]=readFloat8(bb, i*numSize);
+		int    numSize = 8;
+		byte[] bb      = readInts1(f.length*numSize);
+		for(int i = 0; i<f.length; i++){
+			f[i] = readFloat8(bb, i*numSize);
 		}
 	}
 	
@@ -395,27 +395,27 @@ public interface ContentReader extends AutoCloseable{
 		Objects.requireNonNull(b);
 		if(len<0) throw new IndexOutOfBoundsException();
 		
-		int n=0;
+		int n = 0;
 		while(n<len){
-			int count=read(b, off+n, len-n);
+			int count = read(b, off + n, len - n);
 			if(count<0){
-				throw new EOFException("Underflow! requested="+len+", read="+n+", remaining="+(len-n));
+				throw new EOFException("Underflow! requested=" + len + ", read=" + n + ", remaining=" + (len - n));
 			}
-			n+=count;
+			n += count;
 		}
 		return b;
 	}
 	
 	default byte[] readRemaining() throws IOException{
-		try(var in=inStream()){
+		try(var in = inStream()){
 			return in.readAllBytes();
 		}
 	}
 	
-	default ContentInputStream inStream(){return new ContentReaderInputStream(this);}
+	default ContentInputStream inStream(){ return new ContentReaderInputStream(this); }
 	
 	@Override
-	default void close() throws IOException{}
+	default void close() throws IOException{ }
 	
 	
 	record BufferTicket(ContentReader target, int amount, BufferErrorSupplier<? extends IOException> errorOnMismatch){
@@ -427,14 +427,14 @@ public interface ContentReader extends AutoCloseable{
 		}
 		
 		public ContentInputStream submit() throws IOException{
-			if(amount==0) return new ContentInputStream.BA(ZeroArrays.ZERO_BYTE);
+			if(amount == 0) return new ContentInputStream.BA(ZeroArrays.ZERO_BYTE);
 			
 			return new ContentInputStream.BA(target.readInts1(amount)){
 				@Override
 				public void close() throws IOException{
 					super.close();
-					if(errorOnMismatch!=null){
-						var av=available();
+					if(errorOnMismatch != null){
+						var av = available();
 						if(av>0) throw errorOnMismatch.apply(getPos(), amount);
 					}
 				}
@@ -442,35 +442,35 @@ public interface ContentReader extends AutoCloseable{
 		}
 	}
 	
-	default BufferTicket readTicket(long amount){return readTicket(Math.toIntExact(amount));}
+	default BufferTicket readTicket(long amount){ return readTicket(Math.toIntExact(amount)); }
 	default BufferTicket readTicket(int amount){
 		return new BufferTicket(this, amount, null);
 	}
 	
-	default long transferTo(ContentWriter out) throws IOException{return transferTo(out, BATCH_BYTES);}
+	default long transferTo(ContentWriter out) throws IOException{ return transferTo(out, BATCH_BYTES); }
 	default long transferTo(ContentWriter out, int batchSize) throws IOException{
 		Objects.requireNonNull(out);
-		long transferred=0;
+		long transferred = 0;
 		
-		byte[] buffer=new byte[batchSize];
+		byte[] buffer = new byte[batchSize];
 		int    read;
-		while((read=this.read(buffer))>=0){
+		while((read = this.read(buffer))>=0){
 			out.write(buffer, 0, read);
-			transferred+=read;
+			transferred += read;
 		}
 		return transferred;
 	}
 	
-	default long transferTo(OutputStream out) throws IOException{return transferTo(out, BATCH_BYTES);}
+	default long transferTo(OutputStream out) throws IOException{ return transferTo(out, BATCH_BYTES); }
 	default long transferTo(OutputStream out, int batchSize) throws IOException{
 		Objects.requireNonNull(out);
-		long transferred=0;
+		long transferred = 0;
 		
-		byte[] buffer=new byte[batchSize];
+		byte[] buffer = new byte[batchSize];
 		int    read;
-		while((read=this.read(buffer))>=0){
+		while((read = this.read(buffer))>=0){
 			out.write(buffer, 0, read);
-			transferred+=read;
+			transferred += read;
 		}
 		return transferred;
 	}

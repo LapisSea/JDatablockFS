@@ -33,29 +33,29 @@ public sealed class VarHandleAccessor<CTyp extends IOInstance<CTyp>> extends Abs
 		public Funct(Struct<CTyp> struct, Field field, Optional<Method> getter, Optional<Method> setter, String name, Type genericType){
 			super(struct, field, name, genericType);
 			
-			getter.ifPresent(get->{
+			getter.ifPresent(get -> {
 				if(!Utils.genericInstanceOf(get.getGenericReturnType(), genericType)){
-					throw new MalformedStruct("getter returns "+get.getGenericReturnType()+" but "+genericType+" is required\n"+get);
+					throw new MalformedStruct("getter returns " + get.getGenericReturnType() + " but " + genericType + " is required\n" + get);
 				}
-				if(get.getParameterCount()!=0){
-					throw new MalformedStruct("getter must not have arguments\n"+get);
+				if(get.getParameterCount() != 0){
+					throw new MalformedStruct("getter must not have arguments\n" + get);
 				}
 			});
 			
-			setter.ifPresent(set->{
+			setter.ifPresent(set -> {
 				if(!Utils.genericInstanceOf(set.getReturnType(), Void.TYPE)){
-					throw new MalformedStruct("setter returns "+set.getReturnType()+" but "+genericType+" is required\n"+set);
+					throw new MalformedStruct("setter returns " + set.getReturnType() + " but " + genericType + " is required\n" + set);
 				}
-				if(set.getParameterCount()!=1){
-					throw new MalformedStruct("setter must have 1 argument of "+genericType+"\n"+set);
+				if(set.getParameterCount() != 1){
+					throw new MalformedStruct("setter must have 1 argument of " + genericType + "\n" + set);
 				}
 				if(!Utils.genericInstanceOf(set.getGenericParameterTypes()[0], genericType)){
-					throw new MalformedStruct("setter argument is "+set.getGenericParameterTypes()[0]+" but "+genericType+" is required\n"+set);
+					throw new MalformedStruct("setter argument is " + set.getGenericParameterTypes()[0] + " but " + genericType + " is required\n" + set);
 				}
 			});
 			
-			this.getter=getter.map(AbstractPrimitiveAccessor::findParent).map(Access::makeMethodHandle).orElse(null);
-			this.setter=setter.map(AbstractPrimitiveAccessor::findParent).map(Access::makeMethodHandle).orElse(null);
+			this.getter = getter.map(AbstractPrimitiveAccessor::findParent).map(Access::makeMethodHandle).orElse(null);
+			this.setter = setter.map(AbstractPrimitiveAccessor::findParent).map(Access::makeMethodHandle).orElse(null);
 		}
 		
 		private Object getter(CTyp instance){
@@ -75,98 +75,98 @@ public sealed class VarHandleAccessor<CTyp extends IOInstance<CTyp>> extends Abs
 		
 		@Override
 		public Object get(VarPool<CTyp> ioPool, CTyp instance){
-			if(getter!=null) return getter(instance);
+			if(getter != null) return getter(instance);
 			else return super.get(ioPool, instance);
 		}
 		
 		@Override
 		public void set(VarPool<CTyp> ioPool, CTyp instance, Object value){
-			if(setter!=null) setter(instance, value);
+			if(setter != null) setter(instance, value);
 			else super.set(ioPool, instance, value);
 		}
 		
 		@Override
 		public double getDouble(VarPool<CTyp> ioPool, CTyp instance){
-			if(getter!=null) return (double)getter(instance);
+			if(getter != null) return (double)getter(instance);
 			else return super.getDouble(ioPool, instance);
 		}
 		
 		@Override
 		public void setDouble(VarPool<CTyp> ioPool, CTyp instance, double value){
-			if(setter!=null) setter(instance, value);
+			if(setter != null) setter(instance, value);
 			else super.setDouble(ioPool, instance, value);
 		}
 		
 		@Override
 		public float getFloat(VarPool<CTyp> ioPool, CTyp instance){
-			if(getter!=null) return (float)getter(instance);
+			if(getter != null) return (float)getter(instance);
 			else return super.getFloat(ioPool, instance);
 		}
 		
 		@Override
 		public void setFloat(VarPool<CTyp> ioPool, CTyp instance, float value){
-			if(setter!=null) setter(instance, value);
+			if(setter != null) setter(instance, value);
 			else super.setFloat(ioPool, instance, value);
 		}
 		
 		@Override
 		public byte getByte(VarPool<CTyp> ioPool, CTyp instance){
-			if(getter!=null) return (byte)getter(instance);
+			if(getter != null) return (byte)getter(instance);
 			else return super.getByte(ioPool, instance);
 		}
 		
 		@Override
 		public void setByte(VarPool<CTyp> ioPool, CTyp instance, byte value){
-			if(setter!=null) setter(instance, value);
+			if(setter != null) setter(instance, value);
 			else super.setByte(ioPool, instance, value);
 		}
 		
 		@Override
 		public boolean getBoolean(VarPool<CTyp> ioPool, CTyp instance){
-			if(getter!=null) return (boolean)getter(instance);
+			if(getter != null) return (boolean)getter(instance);
 			else return super.getBoolean(ioPool, instance);
 		}
 		
 		@Override
 		public void setBoolean(VarPool<CTyp> ioPool, CTyp instance, boolean value){
-			if(setter!=null) setter(instance, value);
+			if(setter != null) setter(instance, value);
 			else super.setBoolean(ioPool, instance, value);
 		}
 		
 		
 		@Override
 		public long getLong(VarPool<CTyp> ioPool, CTyp instance){
-			if(getter!=null) return (long)getter(instance);
+			if(getter != null) return (long)getter(instance);
 			else return super.getLong(ioPool, instance);
 		}
 		
 		@Override
 		public void setLong(VarPool<CTyp> ioPool, CTyp instance, long value){
-			if(setter!=null) setter(instance, value);
+			if(setter != null) setter(instance, value);
 			else super.setLong(ioPool, instance, value);
 		}
 		
 		@Override
 		public int getInt(VarPool<CTyp> ioPool, CTyp instance){
-			if(getter!=null) return (int)getter(instance);
+			if(getter != null) return (int)getter(instance);
 			else return super.getInt(ioPool, instance);
 		}
 		
 		@Override
 		public void setInt(VarPool<CTyp> ioPool, CTyp instance, int value){
-			if(setter!=null) setter(instance, value);
+			if(setter != null) setter(instance, value);
 			else super.setInt(ioPool, instance, value);
 		}
 		
 		@Override
 		public short getShort(VarPool<CTyp> ioPool, CTyp instance){
-			if(getter!=null) return (Short)getter(instance);
+			if(getter != null) return (Short)getter(instance);
 			else return super.getShort(ioPool, instance);
 		}
 		
 		@Override
 		public void setShort(VarPool<CTyp> ioPool, CTyp instance, short value){
-			if(setter!=null) setter(instance, value);
+			if(setter != null) setter(instance, value);
 			else super.setShort(ioPool, instance, value);
 		}
 	}
@@ -177,13 +177,13 @@ public sealed class VarHandleAccessor<CTyp extends IOInstance<CTyp>> extends Abs
 		
 		public Num(Struct<CTyp> struct, Field field, Optional<Method> getter, Optional<Method> setter, String name, Type genericType){
 			super(struct, field, getter, setter, name, genericType);
-			constructor=Access.findConstructor(getType(), LongFunction.class, long.class);
+			constructor = Access.findConstructor(getType(), LongFunction.class, long.class);
 		}
 		@Override
 		public long getLong(VarPool<CTyp> ioPool, CTyp instance){
-			var num=(INumber)get(ioPool, instance);
-			if(num==null){
-				throw new NullPointerException("value in "+getType().getName()+"#"+getName()+" is null but INumber is a non nullable type");
+			var num = (INumber)get(ioPool, instance);
+			if(num == null){
+				throw new NullPointerException("value in " + getType().getName() + "#" + getName() + " is null but INumber is a non nullable type");
 			}
 			return num.getValue();
 		}
@@ -194,10 +194,10 @@ public sealed class VarHandleAccessor<CTyp extends IOInstance<CTyp>> extends Abs
 	}
 	
 	public static <T extends IOInstance<T>> FieldAccessor<T> make(Struct<T> struct, Field field, Optional<Method> getter, Optional<Method> setter, String name, Type genericType){
-		if(genericType instanceof Class<?> c&&UtilL.instanceOf(c, INumber.class)){
+		if(genericType instanceof Class<?> c && UtilL.instanceOf(c, INumber.class)){
 			return new VarHandleAccessor.Num<>(struct, field, getter, setter, name, genericType);
 		}else{
-			if(getter.isEmpty()&&setter.isEmpty()){
+			if(getter.isEmpty() && setter.isEmpty()){
 				return new VarHandleAccessor<>(struct, field, name, genericType);
 			}
 			return new VarHandleAccessor.Funct<>(struct, field, getter, setter, name, genericType);
@@ -210,8 +210,8 @@ public sealed class VarHandleAccessor<CTyp extends IOInstance<CTyp>> extends Abs
 	
 	public VarHandleAccessor(Struct<CTyp> struct, Field field, String name, Type genericType){
 		super(struct, name, genericType);
-		handle=Access.makeVarHandle(field);
-		annotations=Arrays.stream(field.getAnnotations()).collect(Collectors.toMap(Annotation::annotationType, a->a));
+		handle = Access.makeVarHandle(field);
+		annotations = Arrays.stream(field.getAnnotations()).collect(Collectors.toMap(Annotation::annotationType, a -> a));
 	}
 	
 	@NotNull

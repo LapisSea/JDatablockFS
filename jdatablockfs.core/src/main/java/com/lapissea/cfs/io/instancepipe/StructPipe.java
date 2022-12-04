@@ -46,11 +46,11 @@ import static com.lapissea.util.ConsoleColors.CYAN_BRIGHT;
 
 public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit implements ObjectPipe<T, VarPool<T>>{
 	
-	private static final Log.Channel COMPILATION=Log.channel(PRINT_COMPILATION&&!Access.DEV_CACHE, Log.Channel.colored(CYAN_BRIGHT));
+	private static final Log.Channel COMPILATION = Log.channel(PRINT_COMPILATION && !Access.DEV_CACHE, Log.Channel.colored(CYAN_BRIGHT));
 	
 	@Retention(RetentionPolicy.RUNTIME)
 	@Target({ElementType.TYPE})
-	public @interface Special{}
+	public @interface Special{ }
 	
 	private static class StructGroup<T extends IOInstance<T>, P extends StructPipe<T>> extends ConcurrentHashMap<Struct<T>, P>{
 		
@@ -58,35 +58,35 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			P make(Struct<T> type, boolean runNow);
 		}
 		
-		private final Map<Struct<T>, Supplier<P>> specials=new HashMap<>();
+		private final Map<Struct<T>, Supplier<P>> specials = new HashMap<>();
 		private final PipeConstructor<T, P>       lConstructor;
 		private final Class<?>                    type;
-		private final Map<Struct<T>, Throwable>   errors  =new HashMap<>();
-		private final Map<Struct<T>, Lock>        locks   =Collections.synchronizedMap(new HashMap<>());
+		private final Map<Struct<T>, Throwable>   errors   = new HashMap<>();
+		private final Map<Struct<T>, Lock>        locks    = Collections.synchronizedMap(new HashMap<>());
 		
 		private StructGroup(Class<? extends StructPipe<?>> type){
 			try{
-				lConstructor=Access.makeLambda(type.getConstructor(Struct.class, boolean.class), PipeConstructor.class);
+				lConstructor = Access.makeLambda(type.getConstructor(Struct.class, boolean.class), PipeConstructor.class);
 			}catch(ReflectiveOperationException e){
 				throw new RuntimeException("Failed to get pipe constructor", e);
 			}
-			this.type=type;
+			this.type = type;
 		}
 		
 		P make(Struct<T> struct, boolean runNow){
-			var cached=get(struct);
-			if(cached!=null) return cached;
+			var cached = get(struct);
+			if(cached != null) return cached;
 			return compute(struct, runNow);
 		}
 		
 		private P compute(Struct<T> struct, boolean runNow){
-			var lock=locks.computeIfAbsent(struct, __->new ReentrantLock());
+			var lock = locks.computeIfAbsent(struct, __ -> new ReentrantLock());
 			lock.lock();
 			try{
-				var cached=get(struct);
-				if(cached!=null) return cached;
+				var cached = get(struct);
+				if(cached != null) return cached;
 				
-				var pipe=safeCompute(struct, runNow);
+				var pipe = safeCompute(struct, runNow);
 				locks.remove(struct);
 				return pipe;
 			}finally{
@@ -95,19 +95,19 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		}
 		
 		P safeCompute(Struct<T> struct, boolean runNow){
-			var err=errors.get(struct);
-			if(err!=null) throw err instanceof RuntimeException e?e:new RuntimeException(err);
+			var err = errors.get(struct);
+			if(err != null) throw err instanceof RuntimeException e? e : new RuntimeException(err);
 			
-			Log.trace("Requested pipe({}#greenBright): {}#blue{}#blueBright", ()->{
-				var name    =struct.cleanFullName();
-				var smolName=struct.cleanName();
+			Log.trace("Requested pipe({}#greenBright): {}#blue{}#blueBright", () -> {
+				var name     = struct.cleanFullName();
+				var smolName = struct.cleanName();
 				
-				return List.of(shortPipeName(type), name.substring(0, name.length()-smolName.length()), smolName);
+				return List.of(shortPipeName(type), name.substring(0, name.length() - smolName.length()), smolName);
 			});
 			
 			P created;
 			try{
-				var typ=struct.getType();
+				var typ = struct.getType();
 				if(typ.isAnnotationPresent(Special.class)){
 					try{
 						Class.forName(typ.getName(), true, typ.getClassLoader());
@@ -116,30 +116,30 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 					}
 				}
 				
-				var special=specials.get(struct);
-				if(special!=null){
-					created=special.get();
+				var special = specials.get(struct);
+				if(special != null){
+					created = special.get();
 				}else{
-					created=lConstructor.make(struct, runNow);
+					created = lConstructor.make(struct, runNow);
 				}
 			}catch(Throwable e){
-				e.addSuppressed(new MalformedPipe("Failed to compile "+type.getSimpleName()+" for "+struct.getFullName(), e));
+				e.addSuppressed(new MalformedPipe("Failed to compile " + type.getSimpleName() + " for " + struct.getFullName(), e));
 				errors.put(struct, e);
 				throw e;
 			}
 			
 			put(struct, created);
 			
-			COMPILATION.on(()->StagedInit.runBaseStageTask(()->{
-				String s="Compiled: "+struct.getFullName()+"\n"+
-				         "\tPipe type: "+BLUE_BRIGHT+created.getClass().getName()+CYAN_BRIGHT+"\n"+
-				         "\tSize: "+BLUE_BRIGHT+created.getSizeDescriptor()+CYAN_BRIGHT+"\n"+
-				         "\tReference commands: "+created.getReferenceWalkCommands();
+			COMPILATION.on(() -> StagedInit.runBaseStageTask(() -> {
+				String s = "Compiled: " + struct.getFullName() + "\n" +
+				           "\tPipe type: " + BLUE_BRIGHT + created.getClass().getName() + CYAN_BRIGHT + "\n" +
+				           "\tSize: " + BLUE_BRIGHT + created.getSizeDescriptor() + CYAN_BRIGHT + "\n" +
+				           "\tReference commands: " + created.getReferenceWalkCommands();
 				
-				var sFields=created.getSpecificFields();
+				var sFields = created.getSpecificFields();
 				
 				if(!sFields.equals(struct.getFields())){
-					s+="\n"+TextUtil.toTable(created.getSpecificFields());
+					s += "\n" + TextUtil.toTable(created.getSpecificFields());
 				}
 				
 				COMPILATION.log(s);
@@ -153,7 +153,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		}
 	}
 	
-	private static final ConcurrentHashMap<Class<? extends StructPipe<?>>, StructGroup<?, ?>> CACHE=new ConcurrentHashMap<>();
+	private static final ConcurrentHashMap<Class<? extends StructPipe<?>>, StructGroup<?, ?>> CACHE = new ConcurrentHashMap<>();
 	
 	public static void clear(){
 		if(!Access.DEV_CACHE) throw new RuntimeException();
@@ -163,8 +163,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	@SuppressWarnings("unchecked")
 	public static <T extends IOInstance<T>, P extends StructPipe<T>> P of(Class<P> type, Struct<T> struct, int minRequestedStage){
 		try{
-			var group=(StructGroup<T, P>)CACHE.computeIfAbsent(type, StructGroup::new);
-			var pipe =group.make(struct, minRequestedStage==STATE_DONE);
+			var group = (StructGroup<T, P>)CACHE.computeIfAbsent(type, StructGroup::new);
+			var pipe  = group.make(struct, minRequestedStage == STATE_DONE);
 			pipe.waitForState(minRequestedStage);
 			return pipe;
 		}catch(Throwable e){
@@ -175,7 +175,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	@SuppressWarnings("unchecked")
 	public static <T extends IOInstance<T>, P extends StructPipe<T>> P of(Class<P> type, Struct<T> struct){
 		try{
-			var group=(StructGroup<T, P>)CACHE.computeIfAbsent(type, StructGroup::new);
+			var group = (StructGroup<T, P>)CACHE.computeIfAbsent(type, StructGroup::new);
 			return group.make(struct, false);
 		}catch(Throwable e){
 			throw Utils.interceptClInit(e);
@@ -184,7 +184,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	
 	@SuppressWarnings("unchecked")
 	public static <T extends IOInstance<T>, P extends StructPipe<T>> void registerSpecialImpl(Struct<T> struct, Class<P> oldType, Supplier<P> newType){
-		var group=(StructGroup<T, P>)CACHE.computeIfAbsent(oldType, StructGroup::new);
+		var group = (StructGroup<T, P>)CACHE.computeIfAbsent(oldType, StructGroup::new);
 		group.registerSpecialImpl(struct, newType);
 	}
 	
@@ -199,43 +199,43 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	
 	private FieldDependency<T> fieldDependency;
 	
-	public static final int STATE_IO_FIELD=1, STATE_SIZE_DESC=2;
+	public static final int STATE_IO_FIELD = 1, STATE_SIZE_DESC = 2;
 	
 	public <E extends Exception> StructPipe(Struct<T> type, PipeFieldCompiler<T, E> compiler, boolean initNow) throws E{
-		this.type=type;
-		init(initNow, ()->{
+		this.type = type;
+		init(initNow, () -> {
 			try{
-				this.ioFields=FieldSet.of(compiler.compile(getType(), getType().getFields()));
+				this.ioFields = FieldSet.of(compiler.compile(getType(), getType().getFields()));
 			}catch(Exception e){
 				throw UtilL.uncheckedThrow(e);
 			}
-			fieldDependency=new FieldDependency<>(ioFields);
+			fieldDependency = new FieldDependency<>(ioFields);
 			setInitState(STATE_IO_FIELD);
 			
-			sizeDescription=Objects.requireNonNull(createSizeDescriptor());
+			sizeDescription = Objects.requireNonNull(createSizeDescriptor());
 			setInitState(STATE_SIZE_DESC);
-			generators=Utils.nullIfEmpty(ioFields.stream().flatMap(IOField::generatorStream).toList());
-			referenceWalkCommands=generateReferenceWalkCommands();
-			earlyNullChecks=Utils.nullIfEmpty(
-				getNonNulls().filter(f->generators==null||generators.stream().noneMatch(gen->gen.field()==f))
+			generators = Utils.nullIfEmpty(ioFields.stream().flatMap(IOField::generatorStream).toList());
+			referenceWalkCommands = generateReferenceWalkCommands();
+			earlyNullChecks = Utils.nullIfEmpty(
+				getNonNulls().filter(f -> generators == null || generators.stream().noneMatch(gen -> gen.field() == f))
 				             .toList()
 			);
 		}, this::postValidate);
 	}
 	
 	protected void postValidate(){
-		if(TYPE_VALIDATION&&!(getType() instanceof Struct.Unmanaged)){
-			var type=getType();
+		if(TYPE_VALIDATION && !(getType() instanceof Struct.Unmanaged)){
+			var type = getType();
 			if(Access.DEV_CACHE){
 				type.emptyConstructor();
 			}else{
 				T inst;
 				try{
-					inst=type.make();
+					inst = type.make();
 				}catch(Throwable e){
-					inst=null;
+					inst = null;
 				}
-				if(inst!=null){
+				if(inst != null){
 					try{
 						checkTypeIntegrity(inst);
 					}catch(FieldIsNullException ignored){
@@ -250,35 +250,35 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	
 	@SuppressWarnings("unchecked")
 	private CommandSet generateReferenceWalkCommands(){
-		var         builder  =CommandSet.builder();
-		var         hasDynmic=getType() instanceof Struct.Unmanaged<?> u&&u.isOverridingDynamicUnmanaged();
+		var         builder   = CommandSet.builder();
+		var         hasDynmic = getType() instanceof Struct.Unmanaged<?> u && u.isOverridingDynamicUnmanaged();
 		FieldSet<T> fields;
 		getType().waitForStateDone();
 		if(getType() instanceof Struct.Unmanaged<?> unmanaged){
-			fields=FieldSet.of(Stream.concat(getSpecificFields().stream(), unmanaged.getUnmanagedStaticFields().stream().map(f->(IOField<T, ?>)f)).toList());
+			fields = FieldSet.of(Stream.concat(getSpecificFields().stream(), unmanaged.getUnmanagedStaticFields().stream().map(f -> (IOField<T, ?>)f)).toList());
 		}else{
-			fields=getSpecificFields();
+			fields = getSpecificFields();
 		}
 		
-		var refs=fields.stream()
-		               .filter(RefField.class::isInstance)
-		               .map(RefField.class::cast)
-		               .map(ref->fields.byName(IOFieldTools.makeRefName(ref.getAccessor())).map(f->Map.entry(f, ref)))
-		               .filter(Optional::isPresent)
-		               .map(Optional::get)
-		               .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+		var refs = fields.stream()
+		                 .filter(RefField.class::isInstance)
+		                 .map(RefField.class::cast)
+		                 .map(ref -> fields.byName(IOFieldTools.makeRefName(ref.getAccessor())).map(f -> Map.entry(f, ref)))
+		                 .filter(Optional::isPresent)
+		                 .map(Optional::get)
+		                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 		
 		for(var field : fields){
-			var refVal=refs.get(field);
+			var refVal = refs.get(field);
 			
-			if(refVal!=null&&refVal.nullable()){
-				var refi=fields.indexOf(field);
-				var vali=fields.indexOf(refVal);
-				if(refi==-1||vali==-1) throw new IllegalStateException();
-				builder.skipFlowIfNull(vali-refi);
+			if(refVal != null && refVal.nullable()){
+				var refi = fields.indexOf(field);
+				var vali = fields.indexOf(refVal);
+				if(refi == -1 || vali == -1) throw new IllegalStateException();
+				builder.skipFlowIfNull(vali - refi);
 			}
 			
-			if(field.typeFlag(IOField.PRIMITIVE_OR_ENUM_FLAG)||field.typeFlag(IOField.HAS_NO_POINTERS_FLAG)){
+			if(field.typeFlag(IOField.PRIMITIVE_OR_ENUM_FLAG) || field.typeFlag(IOField.HAS_NO_POINTERS_FLAG)){
 				builder.skipField(field);
 				continue;
 			}
@@ -293,12 +293,12 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				continue;
 			}
 			
-			var accessor=field.getAccessor();
-			if(accessor==null){
+			var accessor = field.getAccessor();
+			if(accessor == null){
 				builder.skipField(field);
 				continue;
 			}
-			Class<?> type=accessor.getType();
+			Class<?> type = accessor.getType();
 			
 			if(field.typeFlag(IOField.IOINSTANCE_FLAG)){
 				if(Struct.canUnknownHavePointers(type)){
@@ -309,35 +309,35 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				continue;
 			}
 			
-			if(type==ChunkPointer.class){
+			if(type == ChunkPointer.class){
 				builder.chptr();
 				continue;
 			}
-			if(type==String.class){
+			if(type == String.class){
 				builder.skipField(field);
 				continue;
 			}
 			if(UtilL.instanceOf(type, List.class)){
-				var elType=((ParameterizedType)accessor.getGenericType(null)).getActualTypeArguments()[0];
-				if(elType==String.class){
+				var elType = ((ParameterizedType)accessor.getGenericType(null)).getActualTypeArguments()[0];
+				if(elType == String.class){
 					builder.skipField(field);
 					continue;
 				}
 			}
 			
 			if(type.isArray()){
-				var pType=type;
+				var pType = type;
 				while(pType.isArray()){
-					pType=pType.componentType();
+					pType = pType.componentType();
 				}
 				
-				if(SupportedPrimitive.isAny(pType)||pType.isEnum()||pType==String.class){
+				if(SupportedPrimitive.isAny(pType) || pType.isEnum() || pType == String.class){
 					builder.skipField(field);
 					continue;
 				}
 			}
 			
-			throw new NotImplementedException(field+" not handled");
+			throw new NotImplementedException(field + " not handled");
 		}
 		
 		if(hasDynmic){
@@ -367,7 +367,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	}
 	
 	private Stream<IOField<T, ?>> getNonNulls(){
-		return ioFields.unpackedStream().filter(f->f.getNullability()==IONullability.Mode.NOT_NULL&&f.getAccessor().canBeNull());
+		return ioFields.unpackedStream().filter(f -> f.getNullability() == IONullability.Mode.NOT_NULL && f.getAccessor().canBeNull());
 	}
 	
 	protected record SizeGroup<T extends IOInstance<T>>(
@@ -375,8 +375,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		List<IOField<T, ?>> fields
 	){
 		protected SizeGroup(SizeDescriptor.UnknownNum<T> num, List<IOField<T, ?>> fields){
-			this.num=Objects.requireNonNull(num);
-			this.fields=List.copyOf(fields);
+			this.num = Objects.requireNonNull(num);
+			this.fields = List.copyOf(fields);
 		}
 	}
 	
@@ -396,109 +396,109 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		){
 			if(min<0) throw new IllegalArgumentException();
 			
-			max.ifPresent(maxV->{
+			max.ifPresent(maxV -> {
 				if(min>maxV) throw new IllegalStateException("min is greater than max");
 				if(knownFixed>maxV) throw new IllegalStateException("knownFixed is greater than max");
 			});
 			
-			this.allFields=Objects.requireNonNull(allFields);
-			this.wordSpace=Objects.requireNonNull(wordSpace);
-			this.knownFixed=knownFixed;
-			this.min=min;
-			this.max=max;
-			this.dynamic=dynamic;
-			this.sizeGroups=List.copyOf(sizeGroups);
-			this.genericUnknown=List.copyOf(genericUnknown);
+			this.allFields = Objects.requireNonNull(allFields);
+			this.wordSpace = Objects.requireNonNull(wordSpace);
+			this.knownFixed = knownFixed;
+			this.min = min;
+			this.max = max;
+			this.dynamic = dynamic;
+			this.sizeGroups = List.copyOf(sizeGroups);
+			this.genericUnknown = List.copyOf(genericUnknown);
 		}
 	}
 	
 	protected SizeRelationReport<T> createSizeReport(int minGroup){
-		FieldSet<T> fields=getSpecificFields();
+		FieldSet<T> fields = getSpecificFields();
 		if(type instanceof Struct.Unmanaged<?> u){
-			var unmanagedStatic=(FieldSet<T>)u.getUnmanagedStaticFields();
+			var unmanagedStatic = (FieldSet<T>)u.getUnmanagedStaticFields();
 			if(!unmanagedStatic.isEmpty()){
-				fields=FieldSet.of(Stream.concat(fields.stream(), unmanagedStatic.stream()));
+				fields = FieldSet.of(Stream.concat(fields.stream(), unmanagedStatic.stream()));
 			}
 		}
 		
-		var wordSpace=IOFieldTools.minWordSpace(fields);
+		var wordSpace = IOFieldTools.minWordSpace(fields);
 		
-		var hasDynamicFields=type instanceof Struct.Unmanaged<?> u&&u.isOverridingDynamicUnmanaged();
+		var hasDynamicFields = type instanceof Struct.Unmanaged<?> u && u.isOverridingDynamicUnmanaged();
 		
 		type.waitForStateDone();
 		
 		if(!hasDynamicFields){
-			var sumFixedO=IOFieldTools.sumVarsIfAll(fields, desc->desc.getFixed(wordSpace));
+			var sumFixedO = IOFieldTools.sumVarsIfAll(fields, desc -> desc.getFixed(wordSpace));
 			if(sumFixedO.isPresent()){
-				var sumFixed=sumFixedO.getAsLong();
+				var sumFixed = sumFixedO.getAsLong();
 				return new SizeRelationReport<>(fields, wordSpace, sumFixed, sumFixed, sumFixedO, false, List.of(), List.of());
 			}
 		}
 		
-		var knownFixed=IOFieldTools.sumVars(fields, d->{
-			var fixed=d.getFixed(wordSpace);
+		var knownFixed = IOFieldTools.sumVars(fields, d -> {
+			var fixed = d.getFixed(wordSpace);
 			if(fixed.isPresent()){
-				var siz=fixed.getAsLong();
+				var siz = fixed.getAsLong();
 				return clampMinBit(wordSpace, siz);
 			}
 			return 0;
 		});
 		
-		var min=IOFieldTools.sumVars(fields, siz->siz.getMin(wordSpace));
-		var max=hasDynamicFields?OptionalLong.empty():IOFieldTools.sumVarsIfAll(fields, siz->siz.getMax(wordSpace));
+		var min = IOFieldTools.sumVars(fields, siz -> siz.getMin(wordSpace));
+		var max = hasDynamicFields? OptionalLong.empty() : IOFieldTools.sumVarsIfAll(fields, siz -> siz.getMax(wordSpace));
 		
 		
-		var groups=fields.stream()
-		                 .filter(f->f.getSizeDescriptor() instanceof SizeDescriptor.UnknownNum)
-		                 .collect(Collectors.groupingBy(f->(SizeDescriptor.UnknownNum<T>)f.getSizeDescriptor()))
-		                 .entrySet().stream()
-		                 .filter(e->e.getValue().size()>=minGroup)
-		                 .map(e->new SizeGroup<>(e.getKey(), e.getValue()))
-		                 .collect(Collectors.toList());
+		var groups = fields.stream()
+		                   .filter(f -> f.getSizeDescriptor() instanceof SizeDescriptor.UnknownNum)
+		                   .collect(Collectors.groupingBy(f -> (SizeDescriptor.UnknownNum<T>)f.getSizeDescriptor()))
+		                   .entrySet().stream()
+		                   .filter(e -> e.getValue().size()>=minGroup)
+		                   .map(e -> new SizeGroup<>(e.getKey(), e.getValue()))
+		                   .collect(Collectors.toList());
 		
-		var groupNumberSet=groups.stream().map(e->e.num).collect(Collectors.toUnmodifiableSet());
+		var groupNumberSet = groups.stream().map(e -> e.num).collect(Collectors.toUnmodifiableSet());
 		
 		return new SizeRelationReport<>(
 			fields, wordSpace, knownFixed, min, max, hasDynamicFields,
 			groups,
 			fields.stream()
-			      .filter(f->!f.getSizeDescriptor().hasFixed())
-			      .filter(f->!(f.getSizeDescriptor() instanceof SizeDescriptor.UnknownNum<T> num&&groupNumberSet.contains(num)))
+			      .filter(f -> !f.getSizeDescriptor().hasFixed())
+			      .filter(f -> !(f.getSizeDescriptor() instanceof SizeDescriptor.UnknownNum<T> num && groupNumberSet.contains(num)))
 			      .toList()
 		);
 	}
 	
 	@SuppressWarnings("unchecked")
 	protected SizeDescriptor<T> createSizeDescriptor(){
-		var report=createSizeReport(2);
+		var report = createSizeReport(2);
 		
-		if(!report.dynamic&&report.max.orElse(-1)==report.min){
+		if(!report.dynamic && report.max.orElse(-1) == report.min){
 			return SizeDescriptor.Fixed.of(report.wordSpace, report.min);
 		}
 		
-		var wordSpace     =report.wordSpace;
-		var knownFixed    =report.knownFixed;
-		var genericUnknown=report.genericUnknown;
+		var wordSpace      = report.wordSpace;
+		var knownFixed     = report.knownFixed;
+		var genericUnknown = report.genericUnknown;
 		
 		FieldAccessor<T>[] unkownNumAcc;
 		int[]              unkownNumAccMul;
 		
 		if(report.sizeGroups.isEmpty()){
-			unkownNumAcc=null;
-			unkownNumAccMul=null;
+			unkownNumAcc = null;
+			unkownNumAccMul = null;
 		}else{
-			unkownNumAcc=new FieldAccessor[report.sizeGroups.size()];
-			unkownNumAccMul=new int[report.sizeGroups.size()];
-			int i=0;
+			unkownNumAcc = new FieldAccessor[report.sizeGroups.size()];
+			unkownNumAccMul = new int[report.sizeGroups.size()];
+			int i = 0;
 			for(var e : report.sizeGroups){
-				unkownNumAcc[i]=e.num.getAccessor();
-				unkownNumAccMul[i]=e.fields.size();
+				unkownNumAcc[i] = e.num.getAccessor();
+				unkownNumAccMul[i] = e.fields.size();
 				i++;
 			}
 		}
 		
 		
-		return SizeDescriptor.Unknown.of(wordSpace, report.min, report.max, (ioPool, prov, inst)->{
+		return SizeDescriptor.Unknown.of(wordSpace, report.min, report.max, (ioPool, prov, inst) -> {
 			checkNull(inst);
 			
 			try{
@@ -507,38 +507,38 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				throw new RuntimeException(e);
 			}
 			
-			var unkownSum=IOFieldTools.sumVars(genericUnknown, d->{
+			var unkownSum = IOFieldTools.sumVars(genericUnknown, d -> {
 				return d.calcUnknown(ioPool, prov, inst, wordSpace);
 			});
 			
-			if(unkownNumAcc!=null){
-				for(int i=0;i<unkownNumAcc.length;i++){
-					var  accessor  =unkownNumAcc[i];
-					var  numberSize=(NumberSize)accessor.get(ioPool, inst);
-					long multiplier=unkownNumAccMul[i];
-					unkownSum+=switch(wordSpace){
+			if(unkownNumAcc != null){
+				for(int i = 0; i<unkownNumAcc.length; i++){
+					var  accessor   = unkownNumAcc[i];
+					var  numberSize = (NumberSize)accessor.get(ioPool, inst);
+					long multiplier = unkownNumAccMul[i];
+					unkownSum += switch(wordSpace){
 						case BIT -> numberSize.bits();
 						case BYTE -> numberSize.bytes;
 					}*multiplier;
 				}
 			}
 			
-			return knownFixed+unkownSum;
+			return knownFixed + unkownSum;
 		});
 	}
 	
 	private long clampMinBit(WordSpace wordSpace, long siz){
-		var bytes=WordSpace.mapSize(wordSpace, WordSpace.BYTE, siz);
+		var bytes = WordSpace.mapSize(wordSpace, WordSpace.BYTE, siz);
 		return WordSpace.mapSize(WordSpace.BYTE, wordSpace, bytes);
 	}
 	
 	private void checkNull(T inst){
-		Objects.requireNonNull(inst, ()->"instance of type "+getType()+" is null!");
+		Objects.requireNonNull(inst, () -> "instance of type " + getType() + " is null!");
 	}
 	
 	@Override
 	public final void write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
-		var ioPool=makeIOPool();
+		var ioPool = makeIOPool();
 		earlyCheckNulls(ioPool, instance);
 		doWrite(provider, dest, ioPool, instance);
 	}
@@ -548,10 +548,10 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	
 	public final T readNewSelective(DataProvider provider, ContentReader src, FieldDependency.Ticket<T> depTicket, GenericContext genericContext, boolean strictHolder) throws IOException{
 		T instance;
-		if(strictHolder&&type.isDefinition()){
-			instance=type.partialImplementation(depTicket.readFields()).make();
+		if(strictHolder && type.isDefinition()){
+			instance = type.partialImplementation(depTicket.readFields()).make();
 		}else{
-			instance=type.make();
+			instance = type.make();
 		}
 		readDeps(makeIOPool(), provider, src, depTicket, instance, genericContext);
 		return instance;
@@ -559,7 +559,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	
 	@Override
 	public final T readNew(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
-		T instance=type.make();
+		T instance = type.make();
 		return doRead(makeIOPool(), provider, src, instance, genericContext);
 	}
 	
@@ -592,7 +592,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	
 	public final void earlyCheckNulls(VarPool<T> ioPool, T instance){
 		waitForStateDone();
-		if(earlyNullChecks==null) return;
+		if(earlyNullChecks == null) return;
 		for(var field : earlyNullChecks){
 			if(field.isNull(ioPool, instance)){
 				throw new FieldIsNullException(field);
@@ -603,24 +603,24 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	protected final void writeIOFields(FieldSet<T> fields, VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		if(Access.DEV_CACHE) throw new RuntimeException();
 		
-		ContentOutputBuilder destBuff=null;
+		ContentOutputBuilder destBuff = null;
 		ContentWriter        target;
-		boolean              close   =false;
+		boolean              close    = false;
 		
 		if(DEBUG_VALIDATION){
-			var safe=validateAndSafeDestination(fields, ioPool, provider, dest, instance);
-			if(safe!=null){
-				dest=safe;
-				close=true;
+			var safe = validateAndSafeDestination(fields, ioPool, provider, dest, instance);
+			if(safe != null){
+				dest = safe;
+				close = true;
 			}
 		}
 		
 		if(dest.isDirect()){
-			var siz=getSizeDescriptor().calcAllocSize(WordSpace.BYTE);
-			destBuff=new ContentOutputBuilder((int)siz);
-			target=destBuff;
+			var siz = getSizeDescriptor().calcAllocSize(WordSpace.BYTE);
+			destBuff = new ContentOutputBuilder((int)siz);
+			target = destBuff;
 		}else{
-			target=dest;
+			target = dest;
 		}
 		
 		generateAll(ioPool, provider, instance, true);
@@ -637,7 +637,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			throw makeInvalid(fields, ioPool, instance, e);
 		}
 		
-		if(destBuff!=null){
+		if(destBuff != null){
 			destBuff.writeTo(dest);
 		}
 		if(close){
@@ -646,7 +646,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	}
 	
 	private VaryingSize.TooSmall makeInvalid(FieldSet<T> fields, VarPool<T> ioPool, T instance, VaryingSize.TooSmall e){
-		var all=scanInvalidSizes(fields, ioPool, instance);
+		var all = scanInvalidSizes(fields, ioPool, instance);
 		if(e.tooSmallIdMap.equals(all.tooSmallIdMap)){
 			throw e;
 		}
@@ -655,22 +655,22 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	}
 	
 	private VaryingSize.TooSmall scanInvalidSizes(FieldSet<T> fields, VarPool<T> ioPool, T instance){
-		Map<VaryingSize, NumberSize> tooSmallIdMap=new HashMap<>();
+		Map<VaryingSize, NumberSize> tooSmallIdMap = new HashMap<>();
 		
-		var provider=DataProvider.newVerySimpleProvider();
-		try(var blackHole=new ContentWriter(){
+		var provider = DataProvider.newVerySimpleProvider();
+		try(var blackHole = new ContentWriter(){
 			@Override
-			public void write(int b){}
+			public void write(int b){ }
 			@Override
-			public void write(byte[] b, int off, int len){}
+			public void write(byte[] b, int off, int len){ }
 		}){
 			for(IOField<T, ?> field : fields){
 				try{
 					field.writeReported(ioPool, provider, blackHole, instance);
 				}catch(VaryingSize.TooSmall e){
-					e.tooSmallIdMap.forEach((varying, size)->{
-						var num=tooSmallIdMap.get(varying);
-						if(num==null) num=size;
+					e.tooSmallIdMap.forEach((varying, size) -> {
+						var num = tooSmallIdMap.get(varying);
+						if(num == null) num = size;
 						else if(num.greaterThan(size)) return;
 						tooSmallIdMap.put(varying, num);
 					});
@@ -686,34 +686,34 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		if(instance instanceof IOInstance.Unmanaged) return null;
 		
 		generateAll(ioPool, provider, instance, true);
-		var siz=getSizeDescriptor().calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
+		var siz = getSizeDescriptor().calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
 		
-		var sum=0L;
+		var sum = 0L;
 		for(IOField<T, ?> field : fields){
-			var desc =field.getSizeDescriptor();
-			var bytes=desc.calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
-			sum+=bytes;
+			var desc  = field.getSizeDescriptor();
+			var bytes = desc.calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
+			sum += bytes;
 		}
 		
-		if(sum!=siz){
-			StringJoiner sj=new StringJoiner("\n");
-			sj.add("total"+siz);
+		if(sum != siz){
+			StringJoiner sj = new StringJoiner("\n");
+			sj.add("total" + siz);
 			for(IOField<T, ?> field : fields){
-				var desc =field.getSizeDescriptor();
-				var bytes=desc.calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
-				sj.add(field+" "+bytes+" "+desc.hasFixed()+" "+desc.getWordSpace());
+				var desc  = field.getSizeDescriptor();
+				var bytes = desc.calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
+				sj.add(field + " " + bytes + " " + desc.hasFixed() + " " + desc.getWordSpace());
 			}
 			throw new RuntimeException(sj.toString());
 		}
 		
-		return dest.writeTicket(siz).requireExact((written, expected)->{
-			return new IOException(written+" "+expected+" on "+instance);
+		return dest.writeTicket(siz).requireExact((written, expected) -> {
+			return new IOException(written + " " + expected + " on " + instance);
 		}).submit();
 	}
 	
 	private boolean hasGenerators(){
 		waitForStateDone();
-		return generators!=null;
+		return generators != null;
 	}
 	private void generateAll(VarPool<T> ioPool, DataProvider provider, T instance, boolean allowExternalMod) throws IOException{
 		if(hasGenerators()){
@@ -725,43 +725,43 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			try{
 				generator.generate(ioPool, provider, instance, allowExternalMod);
 			}catch(Throwable e){
-				throw new IOException("Failed to generate fields. Problem on "+generator, e);
+				throw new IOException("Failed to generate fields. Problem on " + generator, e);
 			}
 		}
 	}
 	
 	private void writeFieldKnownSize(VarPool<T> ioPool, DataProvider provider, ContentWriter target, T instance, IOField<T, ?> field) throws IOException{
-		var desc    =field.getSizeDescriptor();
-		var bytes   =desc.calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
-		var safeBuff=target.writeTicket(bytes).requireExact().submit();
+		var desc     = field.getSizeDescriptor();
+		var bytes    = desc.calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
+		var safeBuff = target.writeTicket(bytes).requireExact().submit();
 		field.writeReported(ioPool, provider, safeBuff, instance);
 		
 		try{
 			safeBuff.close();
 		}catch(Exception e){
-			throw new IOException(TextUtil.toString(field)+" ("+Utils.toShortString(field.get(ioPool, instance))+") did not write correctly", e);
+			throw new IOException(TextUtil.toString(field) + " (" + Utils.toShortString(field.get(ioPool, instance)) + ") did not write correctly", e);
 		}
 	}
 	
 	public void writeSingleField(DataProvider provider, RandomIO dest, IOField<T, ?> selectedField, T instance) throws IOException{
-		var deps=getFieldDependency().getDeps(selectedField);
+		var deps = getFieldDependency().getDeps(selectedField);
 		writeDeps(provider, dest, deps, instance);
 	}
 	
 	public void writeDeps(DataProvider provider, RandomIO dest, FieldDependency.Ticket<T> deps, T instance) throws IOException{
-		var fields=deps.writeFields();
-		var ioPool=makeIOPool();
+		var fields = deps.writeFields();
+		var ioPool = makeIOPool();
 		
-		var gen=deps.generators();
-		if(gen!=null) generateAll(gen, ioPool, provider, instance, true);
+		var gen = deps.generators();
+		if(gen != null) generateAll(gen, ioPool, provider, instance, true);
 		
-		int checkIndex=0;
+		int checkIndex = 0;
 		
 		for(IOField<T, ?> field : getSpecificFields()){
-			var desc =field.getSizeDescriptor();
-			var bytes=desc.calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
+			var desc  = field.getSizeDescriptor();
+			var bytes = desc.calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
 			
-			if(fields.get(checkIndex)==field){
+			if(fields.get(checkIndex) == field){
 				checkIndex++;
 				if(DEBUG_VALIDATION){
 					writeFieldKnownSize(ioPool, provider, dest, instance, field);
@@ -769,7 +769,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 					field.writeReported(ioPool, provider, dest, instance);
 				}
 				
-				if(checkIndex==fields.size()){
+				if(checkIndex == fields.size()){
 					return;
 				}
 				
@@ -787,36 +787,36 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	}
 	
 	public void readSelectiveFields(VarPool<T> ioPool, DataProvider provider, ContentReader src, FieldSet<T> selectedFields, T instance, GenericContext genericContext) throws IOException{
-		var all=getSpecificFields();
-		if(selectedFields.size()==all.size()){
+		var all = getSpecificFields();
+		if(selectedFields.size() == all.size()){
 			readIOFields(all, ioPool, provider, src, instance, genericContext);
 			return;
 		}
 		
-		var deps=getFieldDependency().getDeps(selectedFields);
+		var deps = getFieldDependency().getDeps(selectedFields);
 		readDeps(ioPool, provider, src, deps, instance, genericContext);
 	}
 	
 	public void readDeps(VarPool<T> ioPool, DataProvider provider, ContentReader src, FieldDependency.Ticket<T> deps, T instance, GenericContext genericContext) throws IOException{
-		var fields=deps.readFields();
+		var fields = deps.readFields();
 		if(fields.isEmpty()){
 			return;
 		}
-		if(fields.size()==ioFields.size()){
+		if(fields.size() == ioFields.size()){
 			readIOFields(ioFields, ioPool, provider, src, instance, genericContext);
 			return;
 		}
 		
-		int checkIndex=0;
-		int limit     =fields.size();
+		int checkIndex = 0;
+		int limit      = fields.size();
 		
 		for(IOField<T, ?> field : ioFields){
-			if(fields.get(checkIndex)==field){
+			if(fields.get(checkIndex) == field){
 				checkIndex++;
 				
 				readField(ioPool, provider, src, instance, genericContext, field);
 				
-				if(checkIndex==limit){
+				if(checkIndex == limit){
 					return;
 				}
 				
@@ -836,28 +836,28 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	}
 	
 	private void readFieldSafe(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext, IOField<T, ?> field) throws IOException{
-		var desc =field.getSizeDescriptor();
-		var fixed=desc.getFixed(WordSpace.BYTE);
+		var desc  = field.getSizeDescriptor();
+		var fixed = desc.getFixed(WordSpace.BYTE);
 		if(fixed.isPresent()){
-			long bytes=fixed.getAsLong();
+			long bytes = fixed.getAsLong();
 			
-			String extra=null;
+			String extra = null;
 			if(DEBUG_VALIDATION){
-				extra=" started on: "+src;
+				extra = " started on: " + src;
 			}
 			
-			var buf=src.readTicket(bytes).requireExact().submit();
+			var buf = src.readTicket(bytes).requireExact().submit();
 			
 			try{
 				field.readReported(ioPool, provider, buf, instance, genericContext);
 			}catch(Exception e){
-				throw new IOException(TextUtil.toString(field)+" failed to read!"+(DEBUG_VALIDATION?extra:""), e);
+				throw new IOException(TextUtil.toString(field) + " failed to read!" + (DEBUG_VALIDATION? extra : ""), e);
 			}
 			
 			try{
 				buf.close();
 			}catch(Exception e){
-				throw new IOException(TextUtil.toString(field)+" did not read correctly", e);
+				throw new IOException(TextUtil.toString(field) + " did not read correctly", e);
 			}
 		}else{
 			field.readReported(ioPool, provider, src, instance, genericContext);
@@ -870,39 +870,39 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	}
 	
 	public void checkTypeIntegrity(T inst) throws IOException{
-		var tmp=MemoryData.builder().build();
-		var man=DataProvider.newVerySimpleProvider(tmp);
+		var tmp = MemoryData.builder().build();
+		var man = DataProvider.newVerySimpleProvider(tmp);
 		
 		T instRead;
 		try{
 			write(man, tmp, inst);
-			instRead=readNew(man, tmp, null);
+			instRead = readNew(man, tmp, null);
 		}catch(IOException e){
-			throw new MalformedObjectException("Failed object IO "+getType(), e);
+			throw new MalformedObjectException("Failed object IO " + getType(), e);
 		}
 		
 		if(!instRead.equals(inst)){
-			throw new MalformedObjectException(getType()+" has failed integrity check. Source/read:\n"+inst+"\n"+instRead);
+			throw new MalformedObjectException(getType() + " has failed integrity check. Source/read:\n" + inst + "\n" + instRead);
 		}
 	}
 	
 	@Override
 	public String toString(){
-		return shortPipeName(getClass())+"("+type.cleanName()+")";
+		return shortPipeName(getClass()) + "(" + type.cleanName() + ")";
 	}
 	
 	private static String shortPipeName(Class<?> cls){
-		var pipName=cls.getSimpleName();
-		var end    ="StructPipe";
+		var pipName = cls.getSimpleName();
+		var end     = "StructPipe";
 		if(pipName.endsWith(end)){
-			pipName="~~"+pipName.substring(0, pipName.length()-end.length());
+			pipName = "~~" + pipName.substring(0, pipName.length() - end.length());
 		}
 		return pipName;
 	}
 	
 	@Override
 	public boolean equals(Object o){
-		if(this==o) return true;
+		if(this == o) return true;
 		if(!(o instanceof StructPipe<?> that)) return false;
 		
 		if(!type.equals(that.type)) return false;
@@ -910,8 +910,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	}
 	@Override
 	public int hashCode(){
-		int result=type.hashCode();
-		result=31*result+ioFields.hashCode();
+		int result = type.hashCode();
+		result = 31*result + ioFields.hashCode();
 		return result;
 	}
 }

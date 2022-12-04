@@ -17,8 +17,8 @@ public class Token{
 	public final String source;
 	
 	public Token(int line, String source){
-		this.line=line;
-		this.source=source;
+		this.line = line;
+		this.source = source;
 	}
 	public String getSource(){
 		return source;
@@ -34,7 +34,7 @@ public class Token{
 	}
 	
 	public boolean isNumber(){
-		return isInteger()||isFloating();
+		return isInteger() || isFloating();
 	}
 	
 	public boolean isInteger(){
@@ -47,11 +47,11 @@ public class Token{
 	}
 	
 	public boolean isStringLiteral(){
-		return source.startsWith("'")&&source.endsWith("'");
+		return source.startsWith("'") && source.endsWith("'");
 	}
 	public String getStringLiteralValue(){
 		assert isStringLiteral();
-		return source.substring(1, source.length()-1);
+		return source.substring(1, source.length() - 1);
 	}
 	
 	public String lower(){
@@ -74,7 +74,7 @@ public class Token{
 			throw new MalformedJorthException("Unexpected end of tokens");
 		}
 		
-		Sized EMPTY=new Sized(){
+		Sized EMPTY = new Sized(){
 			@Override
 			public Token pop() throws MalformedJorthException{
 				throw fail();
@@ -108,11 +108,11 @@ public class Token{
 		static Sequence of(Token token){
 			Objects.requireNonNull(token);
 			return new Sized(){
-				private boolean read=false;
+				private boolean read = false;
 				@Override
 				public Token pop() throws MalformedJorthException{
 					if(read) fail();
-					read=true;
+					read = true;
 					return token;
 				}
 				@Override
@@ -122,15 +122,15 @@ public class Token{
 				}
 				@Override
 				public Sequence clone(){
-					return read?EMPTY:of(token);
+					return read? EMPTY : of(token);
 				}
 				@Override
 				public int getRemaining(){
-					return read?0:1;
+					return read? 0 : 1;
 				}
 				@Override
 				public String toString(){
-					return read?"":"L"+token.line+" - "+token.source;
+					return read? "" : "L" + token.line + " - " + token.source;
 				}
 			};
 		}
@@ -139,24 +139,24 @@ public class Token{
 			
 			@Override
 			public boolean isEmpty(){
-				return getRemaining()==0;
+				return getRemaining() == 0;
 			}
 			@Override
 			public void requireCount(int count) throws MalformedJorthException{
-				if(getRemaining()<count) throw new MalformedJorthException("token requires at least "+count+" words!");
+				if(getRemaining()<count) throw new MalformedJorthException("token requires at least " + count + " words!");
 			}
 			public abstract String toString();
 			public abstract Sequence clone();
 		}
 		
 		final class Writable extends Sized{
-			private final List<Token> buffer=new ArrayList<>();
+			private final List<Token> buffer = new ArrayList<>();
 			
-			public Writable(){}
+			public Writable(){ }
 			public Writable(Collection<Token> initial){
 				buffer.addAll(initial);
 				for(Token token : buffer){
-					if(token==null) throw new NullPointerException();
+					if(token == null) throw new NullPointerException();
 				}
 			}
 			private Writable(List<Token> initial, int ignore){
@@ -169,12 +169,12 @@ public class Token{
 			@Override
 			public Token pop() throws MalformedJorthException{
 				if(isEmpty()) throw new MalformedJorthException("Unexpected end of tokens");
-				return buffer.remove(buffer.size()-1);
+				return buffer.remove(buffer.size() - 1);
 			}
 			@Override
 			public Token peek() throws MalformedJorthException{
 				if(isEmpty()) throw new MalformedJorthException("Unexpected end of tokens");
-				return buffer.get(buffer.size()-1);
+				return buffer.get(buffer.size() - 1);
 			}
 			@Override
 			public Sequence clone(){
@@ -190,24 +190,24 @@ public class Token{
 			}
 			@Override
 			public void requireCount(int count) throws MalformedJorthException{
-				if(buffer.size()<count) throw new MalformedJorthException("token requires at least "+count+" words!");
+				if(buffer.size()<count) throw new MalformedJorthException("token requires at least " + count + " words!");
 			}
 			@Override
 			public String toString(){
 				if(buffer.isEmpty()) return "";
 				
-				var sb       =new StringBuilder();
-				int firstLine=-1;
-				int lastLine =-1;
+				var sb        = new StringBuilder();
+				int firstLine = -1;
+				int lastLine  = -1;
 				for(Token token : buffer){
-					if(firstLine==-1) firstLine=token.line;
-					if(token.line!=lastLine){
+					if(firstLine == -1) firstLine = token.line;
+					if(token.line != lastLine){
 						sb.append("\nL").append(token.line).append(" -");
-						lastLine=token.line;
+						lastLine = token.line;
 					}
 					sb.append(' ').append(token.source);
 				}
-				if(firstLine==lastLine){
+				if(firstLine == lastLine){
 					sb.setCharAt(0, '\u200B');
 				}
 				return sb.toString();
@@ -232,7 +232,7 @@ public class Token{
 		}
 		
 		default <T> Stream<T> parseStream(UnsafeFunction<Sequence, T, MalformedJorthException> parser){
-			return Stream.generate(()->{
+			return Stream.generate(() -> {
 				if(isEmpty()) return null;
 				try{
 					return Objects.requireNonNull(parser.apply(this));
@@ -242,7 +242,7 @@ public class Token{
 			}).takeWhile(Objects::nonNull);
 		}
 		default <T> List<T> parseAll(UnsafeFunction<Sequence, T, MalformedJorthException> parser) throws MalformedJorthException{
-			var result=new ArrayList<T>();
+			var result = new ArrayList<T>();
 			parseAll(result::add, parser);
 			return result;
 		}

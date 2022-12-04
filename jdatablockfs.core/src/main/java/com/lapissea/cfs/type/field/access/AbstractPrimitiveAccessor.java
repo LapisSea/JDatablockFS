@@ -15,19 +15,19 @@ import static com.lapissea.cfs.type.field.access.TypeFlag.*;
 public abstract class AbstractPrimitiveAccessor<CTyp extends IOInstance<CTyp>> extends AbstractFieldAccessor<CTyp>{
 	
 	protected static Method findParent(Method method){
-		var cl=method.getDeclaringClass();
+		var cl = method.getDeclaringClass();
 		for(var interf : cl.getInterfaces()){
 			try{
-				var mth=interf.getMethod(method.getName(), method.getParameterTypes());
+				var mth = interf.getMethod(method.getName(), method.getParameterTypes());
 				return findParent(mth);
-			}catch(ReflectiveOperationException ignored){}
+			}catch(ReflectiveOperationException ignored){ }
 		}
-		var sup=cl.getSuperclass();
-		if(sup!=Object.class&&sup!=null){
+		var sup = cl.getSuperclass();
+		if(sup != Object.class && sup != null){
 			try{
-				var mth=sup.getDeclaredMethod(method.getName(), method.getParameterTypes());
+				var mth = sup.getDeclaredMethod(method.getName(), method.getParameterTypes());
 				return findParent(mth);
-			}catch(ReflectiveOperationException ignored){}
+			}catch(ReflectiveOperationException ignored){ }
 		}
 		return method;
 	}
@@ -39,12 +39,12 @@ public abstract class AbstractPrimitiveAccessor<CTyp extends IOInstance<CTyp>> e
 	public AbstractPrimitiveAccessor(Struct<CTyp> struct, String name, Type genericType){
 		super(struct, name);
 		
-		Class<?> type=Utils.typeToRaw(genericType);
+		Class<?> type = Utils.typeToRaw(genericType);
 		
-		typeID=TypeFlag.getId(type);
+		typeID = TypeFlag.getId(type);
 		
-		this.genericType=Utils.prottectFromVarType(genericType);
-		this.rawType=Utils.typeToRaw(this.genericType);
+		this.genericType = Utils.prottectFromVarType(genericType);
+		this.rawType = Utils.typeToRaw(this.genericType);
 	}
 	
 	@Override
@@ -58,7 +58,7 @@ public abstract class AbstractPrimitiveAccessor<CTyp extends IOInstance<CTyp>> e
 	
 	@Override
 	public final Type getGenericType(GenericContext genericContext){
-		if(genericContext==null){
+		if(genericContext == null){
 			return genericType;
 		}
 		return genericContext.resolveType(genericType);
@@ -301,6 +301,6 @@ public abstract class AbstractPrimitiveAccessor<CTyp extends IOInstance<CTyp>> e
 	}
 	@Override
 	public final boolean canBeNull(){
-		return typeID==ID_OBJECT;
+		return typeID == ID_OBJECT;
 	}
 }

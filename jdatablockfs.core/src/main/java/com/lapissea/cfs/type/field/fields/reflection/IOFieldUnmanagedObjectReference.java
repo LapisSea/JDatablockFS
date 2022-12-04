@@ -35,45 +35,45 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 	}
 	private IOFieldUnmanagedObjectReference(FieldAccessor<T> accessor, VaryingSize.Provider varProvider){
 		super(accessor);
-		if(getNullability()==DEFAULT_IF_NULL){
-			throw new MalformedStruct(DEFAULT_IF_NULL+" is not supported for unmanaged objects");
+		if(getNullability() == DEFAULT_IF_NULL){
+			throw new MalformedStruct(DEFAULT_IF_NULL + " is not supported for unmanaged objects");
 		}
 		
-		if(varProvider!=null){
-			var pip=FixedVaryingStructPipe.tryVarying(Reference.STRUCT, varProvider);
-			referencePipe=pip;
-			descriptor=pip.getFixedDescriptor();
+		if(varProvider != null){
+			var pip = FixedVaryingStructPipe.tryVarying(Reference.STRUCT, varProvider);
+			referencePipe = pip;
+			descriptor = pip.getFixedDescriptor();
 		}else{
-			referencePipe=StandardStructPipe.of(Reference.class);
-			descriptor=referencePipe.getSizeDescriptor().map(this::getReference);
+			referencePipe = StandardStructPipe.of(Reference.class);
+			descriptor = referencePipe.getSizeDescriptor().map(this::getReference);
 		}
 		
-		struct=Struct.Unmanaged.ofUnmanaged((Class<ValueType>)getType());
-		instancePipe=StandardStructPipe.of(struct);
+		struct = Struct.Unmanaged.ofUnmanaged((Class<ValueType>)getType());
+		instancePipe = StandardStructPipe.of(struct);
 	}
 	
 	@Override
 	public void allocate(T instance, DataProvider provider, GenericContext genericContext) throws IOException{
 		AllocateTicket t;
 		
-		var desc =instancePipe.getSizeDescriptor();
-		var fixed=desc.getFixed(WordSpace.BYTE);
+		var desc  = instancePipe.getSizeDescriptor();
+		var fixed = desc.getFixed(WordSpace.BYTE);
 		if(fixed.isPresent()){
-			t=AllocateTicket.bytes(fixed.getAsLong());
+			t = AllocateTicket.bytes(fixed.getAsLong());
 		}else{
-			var min=desc.getMin(WordSpace.BYTE);
-			var max=desc.getMax(WordSpace.BYTE).orElse(min+8);
-			t=AllocateTicket.bytes((min*2+max)/3);
+			var min = desc.getMin(WordSpace.BYTE);
+			var max = desc.getMax(WordSpace.BYTE).orElse(min + 8);
+			t = AllocateTicket.bytes((min*2 + max)/3);
 		}
-		Chunk chunk=t.submit(provider);
-		var   val  =makeValueObject(provider, chunk.getPtr().makeReference(), genericContext);
+		Chunk chunk = t.submit(provider);
+		var   val   = makeValueObject(provider, chunk.getPtr().makeReference(), genericContext);
 		set(null, instance, val);
 	}
 	
 	@Override
 	public void setReference(T instance, Reference newRef){
-		var old=get(null, instance);
-		if(old==null) throw new NotImplementedException();
+		var old = get(null, instance);
+		if(old == null) throw new NotImplementedException();
 		
 		old.notifyReferenceMovement(newRef);
 		assert old.getReference().equals(newRef);
@@ -81,8 +81,8 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 	
 	@Override
 	public ValueType get(VarPool<T> ioPool, T instance){
-		var val=rawGet(ioPool, instance);
-		if(val==null){
+		var val = rawGet(ioPool, instance);
+		if(val == null){
 			if(nullable()) return null;
 			throw new FieldIsNullException(this);
 		}
@@ -94,16 +94,16 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 	}
 	@Override
 	public StructPipe<ValueType> getReferencedPipe(T instance){
-		var val=get(null, instance);
-		return val!=null?val.getPipe():null;
+		var val = get(null, instance);
+		return val != null? val.getPipe() : null;
 	}
 	@Override
 	public RefField<T, ValueType> maxAsFixedSize(VaryingSize.Provider varProvider){
-		return new IOFieldUnmanagedObjectReference<>(getAccessor(), varProvider==null?VaryingSize.Provider.ALL_MAX:varProvider);
+		return new IOFieldUnmanagedObjectReference<>(getAccessor(), varProvider == null? VaryingSize.Provider.ALL_MAX : varProvider);
 	}
 	
 	private Reference getReference(ValueType val){
-		if(val==null){
+		if(val == null){
 			if(nullable()) return new Reference();
 			throw new NullPointerException();
 		}
@@ -114,7 +114,7 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 			if(nullable()) return null;
 			throw new NullPointerException();
 		}
-		var type=TypeLink.of(getAccessor().getGenericType(genericContext));
+		var type = TypeLink.of(getAccessor().getGenericType(genericContext));
 		return struct.make(provider, readNew, type);
 	}
 	

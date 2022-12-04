@@ -12,23 +12,23 @@ public class CompilationBench{
 	
 	@Benchmark
 //	@Fork(jvmArgsAppend="-Ddfs.abBenchmark.devCache=true")
-	@Warmup(iterations=6, time=2000, timeUnit=TimeUnit.MILLISECONDS)
-	@Measurement(iterations=3, time=2000, timeUnit=TimeUnit.MILLISECONDS)
+	@Warmup(iterations = 6, time = 2000, timeUnit = TimeUnit.MILLISECONDS)
+	@Measurement(iterations = 3, time = 2000, timeUnit = TimeUnit.MILLISECONDS)
 	@BenchmarkMode(Mode.Throughput)
 	public void hashmap(){
 		Struct.clear();
 		StructPipe.clear();
-		var s=Struct.of(HashIOMap.class);
+		var s = Struct.of(HashIOMap.class);
 		s.waitForStateDone();
 	}
 	
 	@Benchmark
-	@Fork(value=30)
-	@Warmup(iterations=0, time=2000, timeUnit=TimeUnit.MILLISECONDS)
-	@Measurement(iterations=1, time=2000, timeUnit=TimeUnit.MILLISECONDS)
+	@Fork(value = 30)
+	@Warmup(iterations = 0, time = 2000, timeUnit = TimeUnit.MILLISECONDS)
+	@Measurement(iterations = 1, time = 2000, timeUnit = TimeUnit.MILLISECONDS)
 	@BenchmarkMode(Mode.SingleShotTime)
 	public void hashmapDryRun(){
-		var s=Struct.of(HashIOMap.class);
+		var s = Struct.of(HashIOMap.class);
 		s.waitForStateDone();
 	}
 	

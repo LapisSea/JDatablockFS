@@ -21,14 +21,14 @@ public class AtlasFont extends DrawFont{
 	
 	private static ByteBuffer convertImageRGB(BufferedImage image){
 		
-		int[] pixels=new int[image.getWidth()*image.getHeight()];
+		int[] pixels = new int[image.getWidth()*image.getHeight()];
 		image.getRGB(0, 0, image.getWidth(), image.getHeight(), pixels, 0, image.getWidth());
 		
-		ByteBuffer buffer=BufferUtils.createByteBuffer(image.getWidth()*image.getHeight()*3);
+		ByteBuffer buffer = BufferUtils.createByteBuffer(image.getWidth()*image.getHeight()*3);
 		
-		for(int y=0;y<image.getHeight();y++){
-			for(int x=0;x<image.getWidth();x++){
-				int pixel=pixels[y*image.getWidth()+x];
+		for(int y = 0; y<image.getHeight(); y++){
+			for(int x = 0; x<image.getWidth(); x++){
+				int pixel = pixels[y*image.getWidth() + x];
 				buffer.put((byte)((pixel>>16)&0xFF)); // Red component
 				buffer.put((byte)((pixel>>8)&0xFF)); // Green component
 				buffer.put((byte)(pixel&0xFF)); // Blue component
@@ -40,14 +40,14 @@ public class AtlasFont extends DrawFont{
 	}
 	private static ByteBuffer convertImageA(BufferedImage image){
 		
-		int[] pixels=new int[image.getWidth()*image.getHeight()];
+		int[] pixels = new int[image.getWidth()*image.getHeight()];
 		image.getRGB(0, 0, image.getWidth(), image.getHeight(), pixels, 0, image.getWidth());
 		
-		ByteBuffer buffer=BufferUtils.createByteBuffer(image.getWidth()*image.getHeight());
+		ByteBuffer buffer = BufferUtils.createByteBuffer(image.getWidth()*image.getHeight());
 		
-		for(int y=0;y<image.getHeight();y++){
-			for(int x=0;x<image.getWidth();x++){
-				int pixel=pixels[y*image.getWidth()+x];
+		for(int y = 0; y<image.getHeight(); y++){
+			for(int x = 0; x<image.getWidth(); x++){
+				int pixel = pixels[y*image.getWidth() + x];
 				buffer.put((byte)(pixel&0xFF));
 			}
 		}
@@ -68,28 +68,28 @@ public class AtlasFont extends DrawFont{
 	
 	private final float[] advanceCache;
 	
-	private final RoaringBitmap isPresentCache=new RoaringBitmap();
+	private final RoaringBitmap isPresentCache = new RoaringBitmap();
 	private       int           isPresentCacheSize;
 	
 	public AtlasFont(MSDFAtlas atlas, RenderBackend renderer, Runnable renderRequest, Consumer<Runnable> openglTask){
-		this.atlas=atlas;
-		this.renderer=renderer;
+		this.atlas = atlas;
+		this.renderer = renderer;
 		
 		
-		var advanceCache=new float[256];
-		for(int i=0;i<advanceCache.length;i++){
-			advanceCache[i]=atlas.getGlyph(i).getAdvance();
+		var advanceCache = new float[256];
+		for(int i = 0; i<advanceCache.length; i++){
+			advanceCache[i] = atlas.getGlyph(i).getAdvance();
 		}
-		var stats=IntStream.range(0, advanceCache.length).mapToDouble(i->advanceCache[i]).summaryStatistics();
-		monospace=stats.getMax()-stats.getMin()<0.0001;
-		if(monospace) this.advanceCache=new float[]{(float)stats.getMax()};
+		var stats = IntStream.range(0, advanceCache.length).mapToDouble(i -> advanceCache[i]).summaryStatistics();
+		monospace = stats.getMax() - stats.getMin()<0.0001;
+		if(monospace) this.advanceCache = new float[]{(float)stats.getMax()};
 		else{
-			this.advanceCache=advanceCache;
+			this.advanceCache = advanceCache;
 		}
 		
 		if(!isMask()){
-			var atlasInfo=atlas.getInfo().getAtlas();
-			var frag="""
+			var atlasInfo = atlas.getInfo().getAtlas();
+			var frag = """
 				#version 130
 				
 				uniform sampler2D msdf;
@@ -127,27 +127,27 @@ public class AtlasFont extends DrawFont{
 				}
 				
 				"""
-				         .replace("$texelSizeX", (1F/atlasInfo.getWidth())+"")
-				         .replace("$texelSizeY", (1F/atlasInfo.getHeight())+"")
-				         .replace("$distanceRange", atlasInfo.getDistanceRange()+"")
-				         .replace("$size", atlasInfo.getSize()+"");
+				           .replace("$texelSizeX", (1F/atlasInfo.getWidth()) + "")
+				           .replace("$texelSizeY", (1F/atlasInfo.getHeight()) + "")
+				           .replace("$distanceRange", atlasInfo.getDistanceRange() + "")
+				           .replace("$size", atlasInfo.getSize() + "");
 			
-			openglTask.accept(()->{
-				program=GlUtils.makeShaderProgram(
+			openglTask.accept(() -> {
+				program = GlUtils.makeShaderProgram(
 					GlUtils.compileShader(GL_FRAGMENT_SHADER, frag)
 				);
-				drawSizeU=glGetUniformLocation(program, "drawSize");
-				outlineU=glGetUniformLocation(program, "outline");
+				drawSizeU = glGetUniformLocation(program, "drawSize");
+				outlineU = glGetUniformLocation(program, "outline");
 			});
 		}
-		async(()->{
-			var img=atlas.getImage();
+		async(() -> {
+			var img = atlas.getImage();
 			if(isMask()){
-				ByteBuffer bb=convertImageA(img);
-				openglTask.accept(()->texture=GlUtils.uploadTexture(img.getWidth(), img.getHeight(), GL11.GL_ALPHA, bb));
+				ByteBuffer bb = convertImageA(img);
+				openglTask.accept(() -> texture = GlUtils.uploadTexture(img.getWidth(), img.getHeight(), GL11.GL_ALPHA, bb));
 			}else{
-				ByteBuffer bb=convertImageRGB(img);
-				openglTask.accept(()->texture=GlUtils.uploadTexture(img.getWidth(), img.getHeight(), GL11.GL_RGB, bb));
+				ByteBuffer bb = convertImageRGB(img);
+				openglTask.accept(() -> texture = GlUtils.uploadTexture(img.getWidth(), img.getHeight(), GL11.GL_RGB, bb));
 			}
 			renderRequest.run();
 		});
@@ -166,28 +166,28 @@ public class AtlasFont extends DrawFont{
 	}
 	
 	private void drawString(List<StringDraw> strings, boolean outline){
-		if(texture==null) return;
+		if(texture == null) return;
 		if(!isMask()){
-			if(program==0) return;
+			if(program == 0) return;
 		}
 		if(strings.isEmpty()) return;
 		
-		var   metrics=atlas.getInfo().getMetrics();
-		float fsScale=(float)(1/(metrics.getAscender()-metrics.getDescender()));
+		var   metrics = atlas.getInfo().getMetrics();
+		float fsScale = (float)(1/(metrics.getAscender() - metrics.getDescender()));
 		
-		var minSpace=outline?20:5;
+		var minSpace = outline? 20 : 5;
 		
 		texture.bind(GL_TEXTURE_2D);
 		glEnable(GL_TEXTURE_2D);
 		
 		if(!isMask()){
 			glUseProgram(program);
-			glUniform1i(outlineU, outline?1:0);
+			glUniform1i(outlineU, outline? 1 : 0);
 		}
 		
-		Map<Integer, List<StringDraw>> sizeGropus=strings.stream().collect(Collectors.groupingBy(draw->(int)(draw.pixelHeight()*100)));
+		Map<Integer, List<StringDraw>> sizeGropus = strings.stream().collect(Collectors.groupingBy(draw -> (int)(draw.pixelHeight()*100)));
 		for(var draws : sizeGropus.values()){
-			var scale=(draws.get(0).pixelHeight()*fsScale);
+			var scale = (draws.get(0).pixelHeight()*fsScale);
 			
 			
 			if(!isMask()){
@@ -198,42 +198,42 @@ public class AtlasFont extends DrawFont{
 				continue;
 			}
 			
-			float alphaMul=Math.min(1, (scale-minSpace)/3);
+			float alphaMul = Math.min(1, (scale - minSpace)/3);
 			
-			try(var ignored=renderer.bulkDraw(RenderBackend.DrawMode.QUADS)){
+			try(var ignored = renderer.bulkDraw(RenderBackend.DrawMode.QUADS)){
 				for(StringDraw draw : draws){
-					var   col=draw.color();
-					float r  =col.getRed()/255F, g=col.getGreen()/255F, b=col.getBlue()/255F, a=(col.getAlpha()/255F)*alphaMul;
+					var   col = draw.color();
+					float r   = col.getRed()/255F, g = col.getGreen()/255F, b = col.getBlue()/255F, a = (col.getAlpha()/255F)*alphaMul;
 					
-					String string=draw.string();
-					float  xScale=draw.xScale();
-					float  xOff  =draw.x();
-					float  yOff  =draw.y();
+					String string = draw.string();
+					float  xScale = draw.xScale();
+					float  xOff   = draw.x();
+					float  yOff   = draw.y();
 					
-					float x=0, y=(float)metrics.getDescender();
+					float x = 0, y = (float)metrics.getDescender();
 					
-					for(int i=0;i<string.length();i++){
-						char c=string.charAt(i);
+					for(int i = 0; i<string.length(); i++){
+						char c = string.charAt(i);
 						
-						var glyph=getBakedGlyph(c);
+						var glyph = getBakedGlyph(c);
 						
 						if(glyph.empty){
-							x+=glyph.advance;
+							x += glyph.advance;
 							continue;
 						}
 						
 						float
-							x0=(glyph.x0+x)*scale*xScale+xOff,
-							x1=(glyph.x1+x)*scale*xScale+xOff,
-							y0=((-glyph.y0)+y)*scale+yOff,
-							y1=((-glyph.y1)+y)*scale+yOff;
+							x0 = (glyph.x0 + x)*scale*xScale + xOff,
+							x1 = (glyph.x1 + x)*scale*xScale + xOff,
+							y0 = ((-glyph.y0) + y)*scale + yOff,
+							y1 = ((-glyph.y1) + y)*scale + yOff;
 						
 						doVert(x0, y0, glyph.u0, glyph.v0, r, g, b, a);
 						doVert(x1, y0, glyph.u1, glyph.v0, r, g, b, a);
 						doVert(x1, y1, glyph.u1, glyph.v1, r, g, b, a);
 						doVert(x0, y1, glyph.u0, glyph.v1, r, g, b, a);
 						
-						x+=glyph.advance;
+						x += glyph.advance;
 					}
 				}
 			}
@@ -249,15 +249,15 @@ public class AtlasFont extends DrawFont{
 		float advance,
 		float x0, float x1, float y0, float y1,
 		float u0, float u1, float v0, float v1
-	){}
+	){ }
 	
-	private final BakedGlyph[] glyphCacheArray=new BakedGlyph[256];
+	private final BakedGlyph[] glyphCacheArray = new BakedGlyph[256];
 	
 	private BakedGlyph getBakedGlyph(char c){
 		if(c<glyphCacheArray.length){
-			var glyph=glyphCacheArray[c];
-			if(glyph==null){
-				glyphCacheArray[c]=glyph=bakeGlyph(c);
+			var glyph = glyphCacheArray[c];
+			if(glyph == null){
+				glyphCacheArray[c] = glyph = bakeGlyph(c);
 			}
 			return glyph;
 		}
@@ -268,20 +268,20 @@ public class AtlasFont extends DrawFont{
 	private BakedGlyph bakeGlyph(char c){
 		int aw, ah;
 		{
-			var a=atlas.getInfo().getAtlas();
-			aw=a.getWidth();
-			ah=a.getHeight();
+			var a = atlas.getInfo().getAtlas();
+			aw = a.getWidth();
+			ah = a.getHeight();
 		}
 		
-		var glyph   =atlas.getGlyph(c);
-		var bounds  =glyph.getPlaneBounds();
-		var uvBounds=glyph.getAtlasBounds();
+		var glyph    = atlas.getGlyph(c);
+		var bounds   = glyph.getPlaneBounds();
+		var uvBounds = glyph.getAtlasBounds();
 		
-		if(bounds==null||uvBounds==null) return new BakedGlyph(true, glyph.getAdvance(), 0, 0, 0, 0, 0, 0, 0, 0);
+		if(bounds == null || uvBounds == null) return new BakedGlyph(true, glyph.getAdvance(), 0, 0, 0, 0, 0, 0, 0, 0);
 		return new BakedGlyph(false,
 		                      glyph.getAdvance(),
 		                      bounds.getLeft(), bounds.getRight(), bounds.getBottom(), bounds.getTop(),
-		                      uvBounds.getLeft()/aw, uvBounds.getRight()/aw, 1-(uvBounds.getBottom()/ah), 1-(uvBounds.getTop()/ah)
+		                      uvBounds.getLeft()/aw, uvBounds.getRight()/aw, 1 - (uvBounds.getBottom()/ah), 1 - (uvBounds.getTop()/ah)
 		);
 	}
 	
@@ -293,7 +293,7 @@ public class AtlasFont extends DrawFont{
 	
 	@Override
 	public Bounds getStringBounds(String string, float fontScale){
-		float width=calcWidth(string);
+		float width = calcWidth(string);
 		return new Bounds(width*fontScale, fontScale);
 	}
 	
@@ -301,13 +301,13 @@ public class AtlasFont extends DrawFont{
 		if(monospace){
 			return string.length()*advanceCache[0];
 		}
-		var width=0F;
-		for(int i=0;i<string.length();i++){
-			var c=string.charAt(i);
+		var width = 0F;
+		for(int i = 0; i<string.length(); i++){
+			var c = string.charAt(i);
 			if(c<advanceCache.length){
-				width+=advanceCache[c];
+				width += advanceCache[c];
 			}else{
-				width+=atlas.getGlyph(c).getAdvance();
+				width += atlas.getGlyph(c).getAdvance();
 			}
 		}
 		return width;

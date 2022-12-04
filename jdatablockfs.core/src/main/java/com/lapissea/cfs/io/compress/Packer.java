@@ -13,12 +13,12 @@ public sealed interface Packer permits GzipPacker, RlePacker, Lz4Packer, BruteBe
 	byte[] unpack(byte[] packedData);
 	
 	static int sizeBytes(int siz){
-		return 1+NumberSize.bySize(siz).bytes;
+		return 1 + NumberSize.bySize(siz).bytes;
 	}
 	
 	static void writeSiz(byte[] dest, int siz){
-		var num=NumberSize.bySize(siz);
-		try(var io=new ContentOutputStream.BA(dest)){
+		var num = NumberSize.bySize(siz);
+		try(var io = new ContentOutputStream.BA(dest)){
 			FlagWriter.writeSingle(io, NumberSize.FLAG_INFO, num);
 			num.write(io, siz);
 		}catch(IOException e){
@@ -27,8 +27,8 @@ public sealed interface Packer permits GzipPacker, RlePacker, Lz4Packer, BruteBe
 	}
 	
 	static int readSiz(byte[] dest){
-		try(var io=new ContentInputStream.BA(dest)){
-			var siz=FlagReader.readSingle(io, NumberSize.FLAG_INFO);
+		try(var io = new ContentInputStream.BA(dest)){
+			var siz = FlagReader.readSingle(io, NumberSize.FLAG_INFO);
 			return Math.toIntExact(siz.read(io));
 		}catch(IOException e){
 			throw new RuntimeException(e);

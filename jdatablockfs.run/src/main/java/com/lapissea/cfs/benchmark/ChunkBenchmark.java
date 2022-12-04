@@ -10,8 +10,8 @@ import org.openjdk.jmh.annotations.*;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
-@Warmup(iterations=6, time=200, timeUnit=TimeUnit.MILLISECONDS)
-@Measurement(iterations=6, time=500, timeUnit=TimeUnit.MILLISECONDS)
+@Warmup(iterations = 6, time = 200, timeUnit = TimeUnit.MILLISECONDS)
+@Measurement(iterations = 6, time = 500, timeUnit = TimeUnit.MILLISECONDS)
 @State(Scope.Thread)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 public class ChunkBenchmark{
@@ -20,7 +20,7 @@ public class ChunkBenchmark{
 	
 	public ChunkBenchmark(){
 		try{
-			chunk=new Chunk(
+			chunk = new Chunk(
 				DataProvider.newVerySimpleProvider(), ChunkPointer.of(MagicID.size()),
 				NumberSize.SHORT, 1000, 1000,
 				NumberSize.SHORT, ChunkPointer.of(1000)
@@ -51,7 +51,7 @@ public class ChunkBenchmark{
 	}
 	
 	@Benchmark
-	@Fork(jvmArgsAppend="-Ddfs.abBenchmark.chunkOptimizedPipe=true")
+	@Fork(jvmArgsAppend = "-Ddfs.abBenchmark.chunkOptimizedPipe=true")
 	public void readGenerated(){
 		try{
 			chunk.readHeader();
@@ -61,7 +61,7 @@ public class ChunkBenchmark{
 	}
 	
 	@Benchmark
-	@Fork(jvmArgsAppend="-Ddfs.abBenchmark.chunkOptimizedPipe=true")
+	@Fork(jvmArgsAppend = "-Ddfs.abBenchmark.chunkOptimizedPipe=true")
 	public void writeGenerated(){
 		try{
 			chunk.writeHeader();

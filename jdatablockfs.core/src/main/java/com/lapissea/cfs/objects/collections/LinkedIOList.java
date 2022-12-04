@@ -40,20 +40,20 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 		
 		
 		private void resetNode() throws IOException{
-			node=getHead();
-			nodeIndex=0;
+			node = getHead();
+			nodeIndex = 0;
 		}
 		private void walkNode(long index) throws IOException{
-			if(node==null){
+			if(node == null){
 				resetNode();
 			}
-			if(nodeIndex==index) return;
+			if(nodeIndex == index) return;
 			if(nodeIndex>index){
 				resetNode();
 			}
 			
-			node=getNode(node, nodeIndex, index);
-			nodeIndex=index;
+			node = getNode(node, nodeIndex, index);
+			nodeIndex = index;
 		}
 		
 		@Override
@@ -65,7 +65,7 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 		@Override
 		protected void removeElement(long index) throws IOException{
 			if(index>0){
-				walkNode(index-1);
+				walkNode(index - 1);
 				popNodeFromPrev(node);
 			}else{
 				LinkedIOList.this.remove(index);
@@ -81,7 +81,7 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 		@Override
 		protected void addElement(long index, T value) throws IOException{
 			if(index>0){
-				walkNode(index-1);
+				walkNode(index - 1);
 				insertNodeInFrontOf(node, value);
 			}else{
 				LinkedIOList.this.add(index, value);
@@ -94,12 +94,12 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 		}
 	}
 	
-	private static final TypeLink.Check LIST_TYPE_CHECK=new TypeLink.Check(
+	private static final TypeLink.Check LIST_TYPE_CHECK = new TypeLink.Check(
 		LinkedIOList.class,
 		ArgCheck.rawAny(PRIMITIVE, INSTANCE_MANAGED)
 	);
 	
-	private final IOField<LinkedIOList<T>, IONode<T>> headField=(IOField<LinkedIOList<T>, IONode<T>>)Struct.Unmanaged.thisClass().getFields().byName("head").orElseThrow();
+	private final IOField<LinkedIOList<T>, IONode<T>> headField = (IOField<LinkedIOList<T>, IONode<T>>)Struct.Unmanaged.thisClass().getFields().byName("head").orElseThrow();
 	
 	@IOValue
 	@IONullability(IONullability.Mode.NULLABLE)
@@ -120,15 +120,15 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 	@SuppressWarnings("unchecked")
 	public LinkedIOList(DataProvider provider, Reference reference, TypeLink typeDef) throws IOException{
 		super(provider, reference, typeDef, LIST_TYPE_CHECK);
-		readOnly=getDataProvider().isReadOnly();
-		cache=readOnly?new HashMap<>():null;
+		readOnly = getDataProvider().isReadOnly();
+		cache = readOnly? new HashMap<>() : null;
 		
-		nodeType=new TypeLink(
+		nodeType = new TypeLink(
 			IONode.class,
 			getTypeDef().arg(0)
 		);
 		
-		valueStorage=(ValueStorage<T>)ValueStorage.makeStorage(provider, typeDef.arg(0), getGenerics(), new ValueStorage.StorageRule.Default());
+		valueStorage = (ValueStorage<T>)ValueStorage.makeStorage(provider, typeDef.arg(0), getGenerics(), new ValueStorage.StorageRule.Default());
 		
 		if(isSelfDataEmpty()){
 			writeManagedFields();
@@ -147,9 +147,9 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 		return getNode(getHead(), 0, index);
 	}
 	private IONode<T> getNode(IONode<T> start, long startIndex, long index) throws IOException{
-		var node=start;
-		for(long i=startIndex;i<index;i++){
-			node=node.getNext();
+		var node = start;
+		for(long i = startIndex; i<index; i++){
+			node = node.getNext();
 		}
 		return node;
 	}
@@ -165,7 +165,7 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 	}
 	@Override
 	protected void setSize(long size){
-		this.size=size;
+		this.size = size;
 	}
 	
 	@Override
@@ -181,7 +181,7 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 		if(cache.containsKey(index)){
 			return cache.get(index);
 		}
-		var val=getNode(index).getValue();
+		var val = getNode(index).getValue();
 		cache.put(index, val);
 		return val;
 	}
@@ -193,7 +193,7 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 	}
 	
 	private IONode<T> allocNode(T value, IONode<T> next) throws IOException{
-		var mag=OptionalLong.of((next==null?this:next).getReference().getPtr().getValue());
+		var mag = OptionalLong.of((next == null? this : next).getReference().getPtr().getValue());
 		return IONode.allocValNode(value, next, valueStorage.getSizeDescriptor(), nodeType, getDataProvider(), mag);
 	}
 	
@@ -201,33 +201,33 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 	public void add(long index, T value) throws IOException{
 		checkSize(index, 1);
 		
-		if(index==size()){
+		if(index == size()){
 			add(value);
 			return;
 		}
 		
-		if(index==0){
-			var head=getHead();
+		if(index == 0){
+			var head = getHead();
 			
 			setHead(allocNode(value, head));
 			deltaSize(1);
 			return;
 		}
 		
-		var prevNode=getNode(index-1);
+		var prevNode = getNode(index - 1);
 		
 		insertNodeInFrontOf(prevNode, value);
 	}
 	private void insertNodeInFrontOf(IONode<T> prevNode, T value) throws IOException{
-		var       node   =prevNode.getNext();
-		IONode<T> newNode=allocNode(value, node);
+		var       node    = prevNode.getNext();
+		IONode<T> newNode = allocNode(value, node);
 		prevNode.setNext(newNode);
 		deltaSize(1);
 	}
 	
 	@Override
 	public void add(T value) throws IOException{
-		IONode<T> newNode=allocNode(value, null);
+		IONode<T> newNode = allocNode(value, null);
 		
 		if(isEmpty()){
 			setHead(newNode);
@@ -242,28 +242,28 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 	public void remove(long index) throws IOException{
 		checkSize(index);
 		
-		if(index==0){
+		if(index == 0){
 			if(isLast(index)){
-				var oldHead=getHead();
+				var oldHead = getHead();
 				setHead(null);
 				oldHead.free();
 			}else{
-				var oldHead=getHead();
-				var newHead=getNode(1);
+				var oldHead = getHead();
+				var newHead = getNode(1);
 				setHead(newHead);
 				oldHead.setNext(null);
 				oldHead.free();
 			}
 			deltaSize(-1);
 		}else{
-			popNodeFromPrev(getNode(index-1));
+			popNodeFromPrev(getNode(index - 1));
 		}
 	}
 	
 	private void popNodeFromPrev(IONode<T> prevNode) throws IOException{
-		var toPop=prevNode.getNext();
-		if(toPop==null) return;
-		var nextNode=toPop.getNext();
+		var toPop = prevNode.getNext();
+		if(toPop == null) return;
+		var nextNode = toPop.getNext();
 		prevNode.setNext(nextNode);
 		deltaSize(-1);
 		toPop.setNext(null);
@@ -271,20 +271,20 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 	}
 	
 	private boolean isLast(long index){
-		return index==size()-1;
+		return index == size() - 1;
 	}
 	
 	private IONode<T> getLastNode() throws IOException{
-		return getNode(size()-1);
+		return getNode(size() - 1);
 	}
 	
 	private IONode<T> getHead() throws IOException{
-		if(!readOnly||head==null) readManagedField(headField);
+		if(!readOnly || head == null) readManagedField(headField);
 		return head;
 	}
 	private void setHead(IONode<T> head) throws IOException{
-		this.head=head;
-		getDataProvider().getSource().openIOTransaction(()->writeManagedField(headField));
+		this.head = head;
+		getDataProvider().getSource().openIOTransaction(() -> writeManagedField(headField));
 	}
 	
 	@Override
@@ -303,8 +303,8 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 						if(cache.containsKey(index)){
 							return cache.get(index);
 						}
-						if(src==null) src=new LinkedListIterator(index);
-						var e=src.getElement(index);
+						if(src == null) src = new LinkedListIterator(index);
+						var e = src.getElement(index);
 						cache.put(index, e);
 						return e;
 					}finally{
@@ -315,8 +315,8 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 		}
 		
 		try{
-			var head=getHead();
-			if(head==null) return Utils.emptyIter();
+			var head = getHead();
+			if(head == null) return Utils.emptyIter();
 			return head.valueIterator();
 		}catch(IOException e){
 			throw new RuntimeException(e);
@@ -330,25 +330,25 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 	
 	@Override
 	public void addMultipleNew(long count, UnsafeConsumer<T, IOException> initializer) throws IOException{
-		if(count==0) return;
+		if(count == 0) return;
 		if(count<0) throw new IllegalArgumentException("Count must be positive!");
 		
-		T val=getElementType().make();
+		T val = getElementType().make();
 		
 		
-		IONode<T> chainStart=null;
+		IONode<T> chainStart = null;
 		
-		for(long i=0;i<count;i++){
-			if(initializer!=null){
+		for(long i = 0; i<count; i++){
+			if(initializer != null){
 				initializer.accept(val);
 			}
 			//inverse order add, reduce chance for fragmentation by providing next node immediately
-			var nextNode=chainStart;
-			chainStart=allocNode(val, nextNode);
+			var nextNode = chainStart;
+			chainStart = allocNode(val, nextNode);
 		}
 		
-		var last=getLastNode();
-		if(last==null){
+		var last = getLastNode();
+		if(last == null){
 			setHead(chainStart);
 		}else{
 			last.setNext(chainStart);
@@ -358,16 +358,16 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 	public void clear() throws IOException{
 		if(isEmpty()) return;
 		
-		var head=getHead();
+		var head = getHead();
 		setHead(null);
 		deltaSize(-size());
 		
 		head.free();
 	}
 	@Override
-	public void requestCapacity(long capacity){}
+	public void requestCapacity(long capacity){ }
 	@Override
-	public void trim() throws IOException{}
+	public void trim() throws IOException{ }
 	
 	@Override
 	public long getCapacity() throws IOException{
@@ -383,13 +383,13 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 	
 	@Override
 	public Query<T> query(){
-		return QuerySupport.of(ListData.of(this, readFields->{
-			var                       size=size();
+		return QuerySupport.of(ListData.of(this, readFields -> {
+			var                       size = size();
 			FieldDependency.Ticket<?> depTicket;
 			if(valueStorage instanceof ValueStorage.InstanceBased<?> i){
-				var t=i.depTicket(readFields);
-				depTicket=t.fullRead()?null:t;
-			}else depTicket=null;
+				var t = i.depTicket(readFields);
+				depTicket = t.fullRead()? null : t;
+			}else depTicket = null;
 			
 			return new QuerySupport.AccessIterator<T>(){
 				long cursor;
@@ -401,25 +401,25 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 				@Override
 				public QuerySupport.Accessor<T> next(){
 					if(cursor>=size) return null;
-					var index=cursor++;
-					return full->{
+					var index = cursor++;
+					return full -> {
 						checkSize(index);
 						
-						if(iter==null||iterCursor>=index+1){
-							var head=getHead();
-							if(head==null) iter=Utils.emptyIter();
-							else iter=head.iterator();
-							iterCursor=0;
+						if(iter == null || iterCursor>=index + 1){
+							var head = getHead();
+							if(head == null) iter = Utils.emptyIter();
+							else iter = head.iterator();
+							iterCursor = 0;
 						}
 						
 						IONode<T> node;
 						while(true){
-							node=iter.ioNext();
+							node = iter.ioNext();
 							iterCursor++;
-							if(iterCursor==index+1) break;
+							if(iterCursor == index + 1) break;
 						}
 						
-						if(!full&&depTicket!=null&&valueStorage instanceof ValueStorage.InstanceBased i){
+						if(!full && depTicket != null && valueStorage instanceof ValueStorage.InstanceBased i){
 							return node.readValueSelective(depTicket, true);
 						}
 						return node.getValue();

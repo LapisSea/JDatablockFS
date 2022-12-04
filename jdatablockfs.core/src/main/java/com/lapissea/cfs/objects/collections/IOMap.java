@@ -16,7 +16,7 @@ public interface IOMap<K, V> extends IterablePP<IOMap.IOEntry<K, V>>{
 	interface IOEntry<K, V>{
 		
 		interface Modifiable<K, V> extends IOEntry<K, V>{
-			abstract class Abstract<K, V> extends IOEntry.Abstract<K, V> implements Modifiable<K, V>{}
+			abstract class Abstract<K, V> extends IOEntry.Abstract<K, V> implements Modifiable<K, V>{ }
 			
 			class Unsupported<K, V> extends Abstract<K, V>{
 				
@@ -24,8 +24,8 @@ public interface IOMap<K, V> extends IterablePP<IOMap.IOEntry<K, V>>{
 				private final V value;
 				
 				public Unsupported(K key, V value){
-					this.key=key;
-					this.value=value;
+					this.key = key;
+					this.value = value;
 				}
 				
 				@Override
@@ -49,27 +49,27 @@ public interface IOMap<K, V> extends IterablePP<IOMap.IOEntry<K, V>>{
 		abstract class Abstract<K, V> implements IOEntry<K, V>, Stringify{
 			@Override
 			public String toString(){
-				return this.getClass().getSimpleName()+"{"+Utils.toShortString(getKey())+" = "+Utils.toShortString(getValue())+"}";
+				return this.getClass().getSimpleName() + "{" + Utils.toShortString(getKey()) + " = " + Utils.toShortString(getValue()) + "}";
 			}
 			@Override
 			public String toShortString(){
-				return "{"+Utils.toShortString(getKey())+" = "+Utils.toShortString(getValue())+"}";
+				return "{" + Utils.toShortString(getKey()) + " = " + Utils.toShortString(getValue()) + "}";
 			}
 			@Override
 			public boolean equals(Object obj){
-				return obj==this||
-				       obj instanceof IOEntry<?, ?> e&&
-				       Objects.equals(getKey(), e.getKey())&&
+				return obj == this ||
+				       obj instanceof IOEntry<?, ?> e &&
+				       Objects.equals(getKey(), e.getKey()) &&
 				       Objects.equals(getValue(), e.getValue());
 			}
 			@Override
 			public int hashCode(){
-				var k=getKey();
-				var v=getKey();
+				var k = getKey();
+				var v = getKey();
 				
-				int result=1;
-				result=31*result+(k==null?0:k.hashCode());
-				result=31*result+(v==null?0:v.hashCode());
+				int result = 1;
+				result = 31*result + (k == null? 0 : k.hashCode());
+				result = 31*result + (v == null? 0 : v.hashCode());
 				return result;
 			}
 		}
@@ -79,8 +79,8 @@ public interface IOMap<K, V> extends IterablePP<IOMap.IOEntry<K, V>>{
 			private final V value;
 			
 			public Simple(K key, V value){
-				this.key=key;
-				this.value=value;
+				this.key = key;
+				this.value = value;
 			}
 			
 			@Override
@@ -123,7 +123,7 @@ public interface IOMap<K, V> extends IterablePP<IOMap.IOEntry<K, V>>{
 	long size();
 	
 	default boolean isEmpty(){
-		return size()==0;
+		return size() == 0;
 	}
 	
 	/**
@@ -139,7 +139,7 @@ public interface IOMap<K, V> extends IterablePP<IOMap.IOEntry<K, V>>{
 	 * @return true if map contains the key
 	 */
 	default boolean containsKey(K key) throws IOException{
-		return getEntry(key)!=null;
+		return getEntry(key) != null;
 	}
 	
 	/**
@@ -160,8 +160,8 @@ public interface IOMap<K, V> extends IterablePP<IOMap.IOEntry<K, V>>{
 	 * Retrieves a value that matches the provided key
 	 */
 	default V get(K key) throws IOException{
-		var e=getEntry(key);
-		if(e==null) return null;
+		var e = getEntry(key);
+		if(e == null) return null;
 		return e.getValue();
 	}
 	
@@ -187,24 +187,24 @@ public interface IOMap<K, V> extends IterablePP<IOMap.IOEntry<K, V>>{
 	
 	static <K, V> String toString(IOMap<K, V> map){
 		if(map.isEmpty()) return "{}";
-		var i=map.iterator();
+		var i = map.iterator();
 		
-		StringBuilder sb=new StringBuilder();
+		StringBuilder sb = new StringBuilder();
 		sb.append('{');
-		long count=0;
+		long count = 0;
 		while(true){
-			var e=i.next();
+			var e = i.next();
 			count++;
 			
-			K key  =e.getKey();
-			V value=e.getValue();
+			K key   = e.getKey();
+			V value = e.getValue();
 			
 			sb.append(Utils.toShortString(key));
 			sb.append('=');
 			sb.append(Utils.toShortString(value));
 			if(!i.hasNext()) return sb.append('}').toString();
 			if(sb.length()>300){
-				return sb.append(" ... ").append(map.size()-count).append("more }").toString();
+				return sb.append(" ... ").append(map.size() - count).append("more }").toString();
 			}
 			sb.append(',').append(' ');
 		}

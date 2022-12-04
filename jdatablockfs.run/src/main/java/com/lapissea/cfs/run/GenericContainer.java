@@ -11,8 +11,8 @@ public class GenericContainer<T> extends IOInstance.Managed<GenericContainer<T>>
 	public T value;
 	
 	public GenericContainer(T value){
-		this.value=value;
+		this.value = value;
 	}
 	
-	public GenericContainer(){}
+	public GenericContainer(){ }
 }

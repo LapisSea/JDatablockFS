@@ -15,8 +15,8 @@ import java.util.function.IntFunction;
 
 public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
 	
-	private static final Map<Class<? extends Enum>, EnumUniverse<?>> CACHE     =new HashMap<>();
-	private static final ReadWriteLock                               CACHE_LOCK=new ReentrantReadWriteLock();
+	private static final Map<Class<? extends Enum>, EnumUniverse<?>> CACHE      = new HashMap<>();
+	private static final ReadWriteLock                               CACHE_LOCK = new ReentrantReadWriteLock();
 	
 	private interface UGet{
 		<E extends Enum<E>> E[] get(Class<E> type);
@@ -25,21 +25,21 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
 	private static final UGet UNSAFE_GETTER;
 	
 	static{
-		var uOff=OptionalLong.empty();
+		var uOff = OptionalLong.empty();
 		try{
-			uOff=MyUnsafe.objectFieldOffset(EnumSet.class.getDeclaredField("universe"));
-		}catch(Throwable ignored){}
+			uOff = MyUnsafe.objectFieldOffset(EnumSet.class.getDeclaredField("universe"));
+		}catch(Throwable ignored){ }
 		
-		if(uOff.isEmpty()) UNSAFE_GETTER=null;
+		if(uOff.isEmpty()) UNSAFE_GETTER = null;
 		else{
-			long universeOffset=uOff.getAsLong();
+			long universeOffset = uOff.getAsLong();
 			
-			UGet uget=new UGet(){
+			UGet uget = new UGet(){
 				@Override
 				public <E extends Enum<E>> E[] get(Class<E> type){
 					try{
 						@SuppressWarnings("unchecked")
-						E[] universe=(E[])MyUnsafe.UNSAFE.getObject(EnumSet.noneOf(type), universeOffset);
+						E[] universe = (E[])MyUnsafe.UNSAFE.getObject(EnumSet.noneOf(type), universeOffset);
 						if(GlobalConfig.DEBUG_VALIDATION){
 							if(!Arrays.equals(universe, getUniverseSafe(type))){
 								return null;
@@ -53,24 +53,24 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
 			};
 			
 			enum DryRun{FOO, BAR}
-			if(uget.get(DryRun.class)==null) uget=null;
+			if(uget.get(DryRun.class) == null) uget = null;
 			
-			UNSAFE_GETTER=uget;
+			UNSAFE_GETTER = uget;
 		}
 	}
 	
-	private static <T extends Enum<T>> T[] getUniverseUnsafe(Class<T> type){return UNSAFE_GETTER==null?null:UNSAFE_GETTER.get(type);}
+	private static <T extends Enum<T>> T[] getUniverseUnsafe(Class<T> type){ return UNSAFE_GETTER == null? null : UNSAFE_GETTER.get(type); }
 	
-	private static <T extends Enum<T>> T[] getUniverseSafe(Class<T> type)  {return type.getEnumConstants();}
+	private static <T extends Enum<T>> T[] getUniverseSafe(Class<T> type)  { return type.getEnumConstants(); }
 	
 	private static <T extends Enum<T>> T[] getUniverse(Class<T> type){
-		T[] universe=getUniverseUnsafe(type);
-		if(universe==null) universe=getUniverseSafe(type);
+		T[] universe = getUniverseUnsafe(type);
+		if(universe == null) universe = getUniverseSafe(type);
 		return universe;
 	}
 	
 	private static void ensureEnum(Class<?> type){
-		if(!type.isEnum()) throw new IllegalArgumentException(type.getName()+" not an Enum");
+		if(!type.isEnum()) throw new IllegalArgumentException(type.getName() + " not an Enum");
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -83,23 +83,23 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
 	public static <T extends Enum<T>> EnumUniverse<T> of(Class<T> type){
 		EnumUniverse<T> flags;
 		
-		var read=CACHE_LOCK.readLock();
+		var read = CACHE_LOCK.readLock();
 		try{
 			read.lock();
-			flags=(EnumUniverse<T>)CACHE.get(type);
+			flags = (EnumUniverse<T>)CACHE.get(type);
 		}finally{
 			read.unlock();
 		}
 		
-		if(flags==null){
+		if(flags == null){
 			ensureEnum(type);
-			var write=CACHE_LOCK.writeLock();
+			var write = CACHE_LOCK.writeLock();
 			try{
 				write.lock();
 				
-				flags=(EnumUniverse<T>)CACHE.get(type);
-				if(flags==null){
-					var newFlags=new EnumUniverse<>(type);
+				flags = (EnumUniverse<T>)CACHE.get(type);
+				if(flags == null){
+					var newFlags = new EnumUniverse<>(type);
 					CACHE.put(type, newFlags);
 					return newFlags;
 				}
@@ -119,21 +119,21 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
 	private final NumberSize nullableNumberSize;
 	
 	private EnumUniverse(Class<T> type){
-		this.type=type;
-		universe=getUniverse(type);
+		this.type = type;
+		universe = getUniverse(type);
 		
-		bitSize=calcBits(size());
-		nullableBitSize=calcBits(size()+1);
+		bitSize = calcBits(size());
+		nullableBitSize = calcBits(size() + 1);
 		
-		numberSize=NumberSize.byBits(bitSize);
-		nullableNumberSize=NumberSize.byBits(nullableBitSize);
+		numberSize = NumberSize.byBits(bitSize);
+		nullableNumberSize = NumberSize.byBits(nullableBitSize);
 	}
 	
 	private int calcBits(int size){
 		return Math.max(1, (int)Math.ceil(Math.log(size)/Math.log(2)));
 	}
 	
-	public void readSkip(BitReader source) throws IOException{readSkip(source, false);}
+	public void readSkip(BitReader source) throws IOException{ readSkip(source, false); }
 	public void readSkip(BitReader source, boolean nullable) throws IOException{
 		source.skip(getBitSize(nullable));
 	}
@@ -144,9 +144,9 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
 	public T read(BitReader source, boolean nullable) throws IOException{
 		if(!nullable) return read(source);
 		
-		int ordinal=(int)source.readBits(nullableBitSize);
-		if(ordinal==0) return null;
-		return get(ordinal-1);
+		int ordinal = (int)source.readBits(nullableBitSize);
+		if(ordinal == 0) return null;
+		return get(ordinal - 1);
 	}
 	
 	public void write(T source, BitWriter<?> dest) throws IOException{
@@ -159,20 +159,20 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
 			write(source, dest);
 			return;
 		}
-		dest.writeBits(source==null?0:source.ordinal()+1, nullableBitSize);
+		dest.writeBits(source == null? 0 : source.ordinal() + 1, nullableBitSize);
 	}
 	
 	public void write(List<T> enums, BitWriter<?> dest) throws IOException{
-		int len=enums.size();
-		if(len==0||bitSize==0) return;
+		int len = enums.size();
+		if(len == 0 || bitSize == 0) return;
 		
-		int maxBatch=63/bitSize;
-		for(int start=0;start<len;start+=maxBatch){
-			var batchSize=Math.min(len-start, maxBatch);
+		int maxBatch = 63/bitSize;
+		for(int start = 0; start<len; start += maxBatch){
+			var batchSize = Math.min(len - start, maxBatch);
 			
-			long batch=0;
-			for(int i=0;i<batchSize;i++){
-				batch|=((long)enums.get(start+i).ordinal())<<(i*bitSize);
+			long batch = 0;
+			for(int i = 0; i<batchSize; i++){
+				batch |= ((long)enums.get(start + i).ordinal())<<(i*bitSize);
 			}
 			dest.writeBits(batch, batchSize*bitSize);
 		}
@@ -180,18 +180,18 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
 	
 	@SuppressWarnings("unchecked")
 	public T[] read(int len, BitReader src) throws IOException{
-		var arr=(T[])Array.newInstance(type, len);
-		if(bitSize==0||len==0) return arr;
+		var arr = (T[])Array.newInstance(type, len);
+		if(bitSize == 0 || len == 0) return arr;
 		
-		var mask    =BitUtils.makeMask(bitSize);
-		int maxBatch=63/bitSize;
-		for(int start=0;start<len;start+=maxBatch){
-			var batchSize=Math.min(len-start, maxBatch);
+		var mask     = BitUtils.makeMask(bitSize);
+		int maxBatch = 63/bitSize;
+		for(int start = 0; start<len; start += maxBatch){
+			var batchSize = Math.min(len - start, maxBatch);
 			
-			long batch=src.readBits(batchSize*bitSize);
+			long batch = src.readBits(batchSize*bitSize);
 			
-			for(int i=0;i<batchSize;i++){
-				arr[i+start]=get((int)((batch >>> (i*bitSize))&mask));
+			for(int i = 0; i<batchSize; i++){
+				arr[i + start] = get((int)((batch >>> (i*bitSize))&mask));
 			}
 		}
 		
@@ -199,11 +199,11 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
 	}
 	
 	public NumberSize numSize(boolean nullable){
-		return nullable?nullableNumberSize:numberSize;
+		return nullable? nullableNumberSize : numberSize;
 	}
 	
 	public int getBitSize(boolean nullable){
-		return nullable?nullableBitSize:bitSize;
+		return nullable? nullableBitSize : bitSize;
 	}
 	
 	@Override
@@ -220,7 +220,7 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
 	@Override
 	public Iterator<T> iterator(){
 		return new Iterator<>(){
-			int cursor=0;
+			int cursor = 0;
 			@Override
 			public boolean hasNext(){
 				return cursor<size();
@@ -235,10 +235,10 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
 	@SuppressWarnings("unchecked")
 	@Override
 	public int indexOf(Object o){
-		return o==null||o.getClass()!=type?-1:indexOf((T)o);
+		return o == null || o.getClass() != type? -1 : indexOf((T)o);
 	}
 	public int indexOf(T o){
-		return o==null?-1:o.ordinal();
+		return o == null? -1 : o.ordinal();
 	}
 	
 	@Override
@@ -248,7 +248,7 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
 	
 	@Override
 	public <T1> T1[] toArray(IntFunction<T1[]> generator){
-		T1[] arr=generator.apply(size());
+		T1[] arr = generator.apply(size());
 		System.arraycopy(universe, 0, (T1[])arr, 0, size());
 		return arr;
 	}
@@ -260,7 +260,7 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
 	
 	@Override
 	public <T1> T1[] toArray(T1[] a){
-		T1[] arr=a.length==size()?a:UtilL.array(a, size());
+		T1[] arr = a.length == size()? a : UtilL.array(a, size());
 		System.arraycopy(universe, 0, (T1[])arr, 0, size());
 		return arr;
 	}
@@ -268,7 +268,7 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
 	@Override
 	public ListIterator<T> listIterator(int index){
 		return new ListIterator<>(){
-			int cursor=index;
+			int cursor = index;
 			
 			@Override
 			public boolean hasNext(){
@@ -292,7 +292,7 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
 			}
 			@Override
 			public int previousIndex(){
-				return cursor-1;
+				return cursor - 1;
 			}
 			@Override
 			public void remove(){

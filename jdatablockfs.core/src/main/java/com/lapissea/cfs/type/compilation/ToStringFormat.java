@@ -10,17 +10,17 @@ import java.util.stream.Stream;
 public class ToStringFormat{
 	
 	public sealed interface ToStringFragment{
-		record NOOP() implements ToStringFragment{}
+		record NOOP() implements ToStringFragment{ }
 		
-		record Literal(String value) implements ToStringFragment{}
+		record Literal(String value) implements ToStringFragment{ }
 		
-		record Concat(List<ToStringFragment> fragments) implements ToStringFragment{}
+		record Concat(List<ToStringFragment> fragments) implements ToStringFragment{ }
 		
-		record FieldValue(String name) implements ToStringFragment{}
+		record FieldValue(String name) implements ToStringFragment{ }
 		
 		record SpecialValue(Value value) implements ToStringFragment{
 			SpecialValue(String name){
-				this(Arrays.stream(Value.values()).filter(v->v.name.equalsIgnoreCase(name)).findAny().orElseThrow());
+				this(Arrays.stream(Value.values()).filter(v -> v.name.equalsIgnoreCase(name)).findAny().orElseThrow());
 			}
 			
 			public enum Value{
@@ -28,13 +28,13 @@ public class ToStringFormat{
 				
 				public final String name;
 				Value(String name){
-					this.name=name;
+					this.name = name;
 				}
 			}
 			
 		}
 		
-		record OptionalBlock(ToStringFragment content) implements ToStringFragment{}
+		record OptionalBlock(ToStringFragment content) implements ToStringFragment{ }
 		
 		default Stream<ToStringFragment> deep(){
 			return switch(this){
@@ -49,52 +49,52 @@ public class ToStringFormat{
 		}
 	}
 	
-	private record Range(int from, int to){}
+	private record Range(int from, int to){ }
 	
 	public static ToStringFragment parse(String format, List<String> names){
-		List<ToStringFragment> roots=new ArrayList<>();
+		List<ToStringFragment> roots = new ArrayList<>();
 		
-		StringBuilder buff=new StringBuilder();
-		Runnable flushBuff=()->{
-			if(buff.length()==0) return;
+		StringBuilder buff = new StringBuilder();
+		Runnable flushBuff = () -> {
+			if(buff.length() == 0) return;
 			roots.add(new ToStringFragment.Literal(buff.toString()));
 			buff.setLength(0);
 		};
 		
-		for(int i=0;i<format.length();i++){
-			char c=format.charAt(i);
+		for(int i = 0; i<format.length(); i++){
+			char c = format.charAt(i);
 			
-			if(c=='!'&&buff.length()>=1){
-				var last=buff.charAt(buff.length()-1);
-				if(last=='!'){
-					buff.setLength(buff.length()-1);
+			if(c == '!' && buff.length()>=1){
+				var last = buff.charAt(buff.length() - 1);
+				if(last == '!'){
+					buff.setLength(buff.length() - 1);
 					flushBuff.run();
-					Range            range=scanWord(format, i);
+					Range            range = scanWord(format, i);
 					ToStringFragment val;
 					
-					IllegalArgumentException org=null;
+					IllegalArgumentException org = null;
 					while(true){
 						try{
-							val=new ToStringFragment.SpecialValue(format.substring(range.from, range.to));
+							val = new ToStringFragment.SpecialValue(format.substring(range.from, range.to));
 							break;
 						}catch(IllegalArgumentException e){
-							if(org==null) org=e;
-							if(range.from==range.to) throw new MalformedStruct(org);
+							if(org == null) org = e;
+							if(range.from == range.to) throw new MalformedStruct(org);
 						}
-						range=new Range(range.from, range.to-1);
+						range = new Range(range.from, range.to - 1);
 					}
 					
-					i=range.to;
+					i = range.to;
 					roots.add(val);
 					
 					continue;
 				}
 			}
-			if(c=='@'){
+			if(c == '@'){
 				
-				Range rangeOrg=scanWord(format, i), range=rangeOrg;
+				Range rangeOrg = scanWord(format, i), range = rangeOrg;
 				
-				if(range.from==range.to){
+				if(range.from == range.to){
 					buff.append(c);
 					continue;
 				}
@@ -103,32 +103,32 @@ public class ToStringFormat{
 				
 				ToStringFragment val;
 				while(true){
-					if(range.from==range.to) throw new MalformedStruct("Invalid toString format! Reason: "+format.substring(rangeOrg.from, rangeOrg.to)+" is an unknown name");
-					var name=format.substring(range.from, range.to);
+					if(range.from == range.to) throw new MalformedStruct("Invalid toString format! Reason: " + format.substring(rangeOrg.from, rangeOrg.to) + " is an unknown name");
+					var name = format.substring(range.from, range.to);
 					if(names.contains(name)){
-						val=new ToStringFragment.FieldValue(name);
+						val = new ToStringFragment.FieldValue(name);
 						break;
 					}
-					range=new Range(range.from, range.to-1);
+					range = new Range(range.from, range.to - 1);
 				}
 				
-				i=range.to-1;
+				i = range.to - 1;
 				roots.add(val);
 				continue;
 			}
-			if(c=='['){
+			if(c == '['){
 				flushBuff.run();
-				final int from=i+1, to;
+				final int from = i + 1, to;
 				findTo:
 				{
-					for(int j=from;j<format.length();j++){
-						c=format.charAt(j);
-						if(c==']'){
-							i=to=j;
+					for(int j = from; j<format.length(); j++){
+						c = format.charAt(j);
+						if(c == ']'){
+							i = to = j;
 							break findTo;
 						}
 					}
-					throw new MalformedStruct("illegal string format: "+format+" Opened [ but was not closed");
+					throw new MalformedStruct("illegal string format: " + format + " Opened [ but was not closed");
 				}
 				
 				roots.add(new ToStringFragment.OptionalBlock(parse(format.substring(from, to), names)));
@@ -148,19 +148,19 @@ public class ToStringFormat{
 	}
 	private static Range scanWord(String format, int i){
 		char      c;
-		final int from=i+1, to;
+		final int from = i + 1, to;
 		findTo:
 		{
-			for(int j=from;j<format.length();j++){
-				c=format.charAt(j);
+			for(int j = from; j<format.length(); j++){
+				c = format.charAt(j);
 				if(Character.isWhitespace(c)){
-					to=j;
+					to = j;
 					break findTo;
 				}
 			}
-			to=format.length();
+			to = format.length();
 		}
-		var range=new Range(from, to);
+		var range = new Range(from, to);
 		return range;
 	}
 }

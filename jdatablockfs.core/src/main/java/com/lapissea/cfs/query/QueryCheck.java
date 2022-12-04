@@ -36,7 +36,7 @@ public sealed interface QueryCheck{
 	record And(QueryCheck l, QueryCheck r) implements QueryCheck{
 		@Override
 		public String toString(){
-			return "("+l+" && "+r+")";
+			return "(" + l + " && " + r + ")";
 		}
 		@Override
 		public Stream<QueryCheck> innerValues(){
@@ -47,7 +47,7 @@ public sealed interface QueryCheck{
 	record Or(QueryCheck l, QueryCheck r) implements QueryCheck{
 		@Override
 		public String toString(){
-			return "("+l+" || "+r+")";
+			return "(" + l + " || " + r + ")";
 		}
 		@Override
 		public Stream<QueryCheck> innerValues(){
@@ -58,7 +58,7 @@ public sealed interface QueryCheck{
 	record Not(QueryCheck check) implements QueryCheck{
 		@Override
 		public String toString(){
-			return "!("+check+")";
+			return "!(" + check + ")";
 		}
 		@Override
 		public Stream<QueryCheck> innerValues(){
@@ -73,7 +73,7 @@ public sealed interface QueryCheck{
 	record Equals(QueryValueSource l, QueryValueSource r) implements QueryCheck, SourceContain{
 		@Override
 		public String toString(){
-			return l+" == "+r;
+			return l + " == " + r;
 		}
 		@Override
 		public Stream<QueryValueSource> sources(){
@@ -84,7 +84,7 @@ public sealed interface QueryCheck{
 	record GreaterThan(QueryValueSource field, QueryValueSource arg) implements QueryCheck, SourceContain{
 		@Override
 		public String toString(){
-			return field+" > "+arg;
+			return field + " > " + arg;
 		}
 		@Override
 		public Stream<QueryValueSource> sources(){
@@ -95,7 +95,7 @@ public sealed interface QueryCheck{
 	record LessThan(QueryValueSource field, QueryValueSource arg) implements QueryCheck, SourceContain{
 		@Override
 		public String toString(){
-			return field+" < "+arg;
+			return field + " < " + arg;
 		}
 		@Override
 		public Stream<QueryValueSource> sources(){
@@ -106,7 +106,7 @@ public sealed interface QueryCheck{
 	record In(QueryValueSource needle, QueryValueSource hay) implements QueryCheck, SourceContain{
 		@Override
 		public String toString(){
-			return "("+needle+" in "+hay+")";
+			return "(" + needle + " in " + hay + ")";
 		}
 		@Override
 		public Stream<QueryValueSource> sources(){
@@ -122,7 +122,7 @@ public sealed interface QueryCheck{
 	}
 	
 	static QueryCheck cached(QueryCheck check){
-		if(check instanceof CachedMetadata||check instanceof Lambda) return check;
+		if(check instanceof CachedMetadata || check instanceof Lambda) return check;
 		return new CachedMetadata(check);
 	}
 	static QueryCheck uncache(QueryCheck check){
@@ -135,7 +135,7 @@ public sealed interface QueryCheck{
 		private       Set<String> fieldNames;
 		
 		public CachedMetadata(QueryCheck check){
-			this.check=check;
+			this.check = check;
 		}
 		
 		@Override
@@ -143,17 +143,17 @@ public sealed interface QueryCheck{
 			return check.toString();
 		}
 		
-		public QueryCheck check(){return check;}
+		public QueryCheck check(){ return check; }
 		@Override
 		public Set<String> fieldNames(){
-			if(fieldNames==null) fieldNames=check.fieldNames();
+			if(fieldNames == null) fieldNames = check.fieldNames();
 			return fieldNames;
 		}
 		@Override
 		public boolean equals(Object obj){
-			return obj==this||
-			       obj instanceof CachedMetadata that&&
-			       Objects.equals(this.fieldNames(), that.fieldNames())&&
+			return obj == this ||
+			       obj instanceof CachedMetadata that &&
+			       Objects.equals(this.fieldNames(), that.fieldNames()) &&
 			       Objects.equals(this.check, that.check);
 		}
 		@Override

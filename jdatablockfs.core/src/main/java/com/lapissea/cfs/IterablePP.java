@@ -17,25 +17,25 @@ public interface IterablePP<T> extends Iterable<T>{
 	}
 	
 	default Optional<T> first(){
-		var iter=iterator();
+		var iter = iterator();
 		if(iter.hasNext()) return Optional.ofNullable(iter.next());
 		return Optional.empty();
 	}
 	
 	default IterablePP<T> filtered(Predicate<T> filter){
-		var that=this;
-		return ()->new Iterator<T>(){
-			final Iterator<T> src=that.iterator();
+		var that = this;
+		return () -> new Iterator<T>(){
+			final Iterator<T> src = that.iterator();
 			
 			T next;
 			boolean hasData;
 			
 			void calcNext(){
 				while(src.hasNext()){
-					T t=src.next();
+					T t = src.next();
 					if(filter.test(t)){
-						next=t;
-						hasData=true;
+						next = t;
+						hasData = true;
 						return;
 					}
 				}
@@ -55,23 +55,23 @@ public interface IterablePP<T> extends Iterable<T>{
 				try{
 					return next;
 				}finally{
-					next=null;
-					hasData=false;
+					next = null;
+					hasData = false;
 				}
 			}
 		};
 	}
 	
 	default <L> IterablePP<L> flatArray(Function<T, L[]> flatten){
-		return flatMap(e->Arrays.asList(flatten.apply(e)).iterator());
+		return flatMap(e -> Arrays.asList(flatten.apply(e)).iterator());
 	}
 	default <L> IterablePP<L> flatData(Function<T, Iterable<L>> flatten){
-		return flatMap(e->flatten.apply(e).iterator());
+		return flatMap(e -> flatten.apply(e).iterator());
 	}
 	default <L> IterablePP<L> flatMap(Function<T, Iterator<L>> flatten){
-		var that=this;
-		return ()->new Iterator<L>(){
-			final Iterator<T> src=that.iterator();
+		var that = this;
+		return () -> new Iterator<L>(){
+			final Iterator<T> src = that.iterator();
 			
 			Iterator<L> flat;
 			
@@ -80,13 +80,13 @@ public interface IterablePP<T> extends Iterable<T>{
 			
 			void doNext(){
 				while(true){
-					if(flat==null||!flat.hasNext()){
+					if(flat == null || !flat.hasNext()){
 						if(!src.hasNext()) return;
-						flat=flatten.apply(src.next());
+						flat = flatten.apply(src.next());
 						continue;
 					}
-					next=flat.next();
-					hasData=true;
+					next = flat.next();
+					hasData = true;
 					break;
 				}
 			}
@@ -105,17 +105,17 @@ public interface IterablePP<T> extends Iterable<T>{
 				try{
 					return next;
 				}finally{
-					hasData=false;
-					next=null;
+					hasData = false;
+					next = null;
 				}
 			}
 		};
 	}
 	
 	default <L> IterablePP<L> map(Function<T, L> mapper){
-		var that=this;
-		return ()->new Iterator<>(){
-			final Iterator<T> src=that.iterator();
+		var that = this;
+		return () -> new Iterator<>(){
+			final Iterator<T> src = that.iterator();
 			
 			@Override
 			public boolean hasNext(){
@@ -128,10 +128,10 @@ public interface IterablePP<T> extends Iterable<T>{
 		};
 	}
 	default IterablePP<T> skip(int count){
-		var that=this;
-		return ()->{
-			var iter=that.iterator();
-			for(int i=0;i<count;i++){
+		var that = this;
+		return () -> {
+			var iter = that.iterator();
+			for(int i = 0; i<count; i++){
 				if(!iter.hasNext()) break;
 				iter.next();
 			}
@@ -140,29 +140,29 @@ public interface IterablePP<T> extends Iterable<T>{
 	}
 	
 	static <T> IterablePP<T> nullTerminated(Supplier<Supplier<T>> supplier){
-		return ()->new Iterator<T>(){
-			final Supplier<T> src=supplier.get();
+		return () -> new Iterator<T>(){
+			final Supplier<T> src = supplier.get();
 			T next;
 			
 			void calcNext(){
-				next=src.get();
+				next = src.get();
 			}
 			
 			@Override
 			public boolean hasNext(){
-				if(next==null) calcNext();
-				return next!=null;
+				if(next == null) calcNext();
+				return next != null;
 			}
 			@Override
 			public T next(){
-				if(next==null){
+				if(next == null){
 					calcNext();
-					if(next==null) throw new NoSuchElementException();
+					if(next == null) throw new NoSuchElementException();
 				}
 				try{
 					return next;
 				}finally{
-					next=null;
+					next = null;
 				}
 			}
 		};

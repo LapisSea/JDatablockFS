@@ -21,7 +21,7 @@ public class JorthWriter implements AutoCloseable{
 			private       int          cursor;
 			
 			public Sequence(CharSequence data){
-				this.data=requireNonNull(data);
+				this.data = requireNonNull(data);
 			}
 			
 			@Override
@@ -43,59 +43,59 @@ public class JorthWriter implements AutoCloseable{
 	}
 	
 	private final UnsafeBiConsumer<JorthWriter, Token, MalformedJorthException> rawTokens;
-	private final Map<String, String>                                           overrides=new HashMap<>();
+	private final Map<String, String>                                           overrides = new HashMap<>();
 	
 	private int line;
 	JorthWriter(int startingLine, UnsafeBiConsumer<JorthWriter, Token, MalformedJorthException> rawTokens){
-		this.line=startingLine;
-		this.rawTokens=rawTokens;
+		this.line = startingLine;
+		this.rawTokens = rawTokens;
 	}
 	
 	private CharSequence inlineCodeValues(CharIterator data, String[] values) throws MalformedJorthException{
 		return inlineCodeValues(data, values, false);
 	}
 	private CharSequence inlineCodeValues(CharIterator data, String[] values, boolean inString) throws MalformedJorthException{
-		StringBuilder sb=new StringBuilder();
+		StringBuilder sb = new StringBuilder();
 		while(data.hasNext()){
-			char c=data.next();
+			char c = data.next();
 			
-			if(!inString&&c=='\''){
-				StringBuilder stringContents=new StringBuilder();
+			if(!inString && c == '\''){
+				StringBuilder stringContents = new StringBuilder();
 				transferStringContents(data, stringContents);
-				var s=inlineCodeValues(seq(stringContents), values, true);
+				var s = inlineCodeValues(seq(stringContents), values, true);
 				sb.append('\'');
 				sb.append(s);
 				sb.append('\'');
 				continue;
 			}
 			
-			if(c=='#'){
-				var token=readArgToken(data);
+			if(c == '#'){
+				var token = readArgToken(data);
 				if(token.index>=values.length){
-					throw new MalformedJorthException("Argument index is out of bounds! Index: "+token.index+" value count: "+values.length);
+					throw new MalformedJorthException("Argument index is out of bounds! Index: " + token.index + " value count: " + values.length);
 				}
 				
-				if(token.type==CodeArg.Type.RAW){
+				if(token.type == CodeArg.Type.RAW){
 					sb.append(values[token.index]);
 					continue;
 				}
-				if(token.type==CodeArg.Type.TOKEN){
+				if(token.type == CodeArg.Type.TOKEN){
 					sb.append(escapeToken(values[token.index]));
 					continue;
 				}
 				
-				throw new ShouldNeverHappenError(token.type+"");
+				throw new ShouldNeverHappenError(token.type + "");
 			}
-			if(inString&&c=='\'') sb.append('\\');
+			if(inString && c == '\'') sb.append('\\');
 			sb.append(c);
 		}
 		return sb;
 	}
 	
 	private CharSequence escapeToken(CharSequence value){
-		StringBuilder sb=new StringBuilder(value.length()+4);
-		for(int i=0;i<value.length();i++){
-			var c=value.charAt(i);
+		StringBuilder sb = new StringBuilder(value.length() + 4);
+		for(int i = 0; i<value.length(); i++){
+			var c = value.charAt(i);
 			if(Character.isWhitespace(c)){
 				sb.append('\\');
 			}
@@ -113,19 +113,19 @@ public class JorthWriter implements AutoCloseable{
 	private void transferStringContents(CharIterator data, StringBuilder dest) throws MalformedJorthException{
 		char c;
 		if(!data.hasNext()) stringFail();
-		boolean hasHash=false;
+		boolean hasHash = false;
 		while(true){
-			c=data.next();
+			c = data.next();
 			if(hasHash){
 				dest.append(c);
-				hasHash=false;
+				hasHash = false;
 				continue;
 			}
-			if(c=='\\'){
-				hasHash=true;
+			if(c == '\\'){
+				hasHash = true;
 				continue;
 			}
-			if(c=='\'') break;
+			if(c == '\'') break;
 			dest.append(c);
 			if(!data.hasNext()) stringFail();
 		}
@@ -141,20 +141,20 @@ public class JorthWriter implements AutoCloseable{
 		enum Type{
 			TOKEN, RAW;
 			
-			private final String lower=toString().toLowerCase();
+			private final String lower = toString().toLowerCase();
 			
-			private static final int MIN_LEN=Arrays.stream(Type.values()).mapToInt(t->t.name().length()).min().orElseThrow();
-			private static final int MAX_LEN=Arrays.stream(Type.values()).mapToInt(t->t.name().length()).max().orElseThrow();
+			private static final int MIN_LEN = Arrays.stream(Type.values()).mapToInt(t -> t.name().length()).min().orElseThrow();
+			private static final int MAX_LEN = Arrays.stream(Type.values()).mapToInt(t -> t.name().length()).max().orElseThrow();
 		}
 	}
 	
 	private CodeArg readArgToken(CharIterator data) throws MalformedJorthException{
-		var type=readType(data);
-		var c   =readOrUnexpected(data);
-		if(c!='(') throw new MalformedJorthException("Expected \"(number)\" but got "+c+" ...");
-		StringBuilder numStr=new StringBuilder();
+		var type = readType(data);
+		var c    = readOrUnexpected(data);
+		if(c != '(') throw new MalformedJorthException("Expected \"(number)\" but got " + c + " ...");
+		StringBuilder numStr = new StringBuilder();
 		while(true){
-			c=readOrUnexpected(data);
+			c = readOrUnexpected(data);
 			if(Character.isWhitespace(c)) continue;
 			break;
 		}
@@ -162,27 +162,27 @@ public class JorthWriter implements AutoCloseable{
 		while(true){
 			if(!Character.isDigit(c)) break;
 			numStr.append(c);
-			c=readOrUnexpected(data);
+			c = readOrUnexpected(data);
 		}
 		while(true){
 			if(Character.isWhitespace(c)){
-				c=readOrUnexpected(data);
+				c = readOrUnexpected(data);
 				continue;
 			}
 			break;
 		}
-		if(c!=')'){
-			throw new MalformedJorthException("Expected \"(number)\" but got ("+numStr+c);
+		if(c != ')'){
+			throw new MalformedJorthException("Expected \"(number)\" but got (" + numStr + c);
 		}
 		if(numStr.isEmpty()) throw new MalformedJorthException("Expected \"(number)\" but got ()");
-		var index=Integer.parseInt(numStr.toString());
+		var index = Integer.parseInt(numStr.toString());
 		return new CodeArg(type, index);
 	}
 	
 	private CodeArg.Type readType(CharIterator data) throws MalformedJorthException{
-		StringBuilder sb=new StringBuilder(CodeArg.Type.MAX_LEN);
-		for(int i=0;i<CodeArg.Type.MAX_LEN;i++){
-			char c=readOrUnexpected(data);
+		StringBuilder sb = new StringBuilder(CodeArg.Type.MAX_LEN);
+		for(int i = 0; i<CodeArg.Type.MAX_LEN; i++){
+			char c = readOrUnexpected(data);
 			if(!Character.isAlphabetic(c)){
 				throw tokenNameFail(sb);
 			}
@@ -190,7 +190,7 @@ public class JorthWriter implements AutoCloseable{
 			sb.append(Character.toLowerCase(c));
 			if(sb.length()>=CodeArg.Type.MIN_LEN){
 				for(var type : CodeArg.Type.values()){
-					if(sb.indexOf(type.lower)==0) return type;
+					if(sb.indexOf(type.lower) == 0) return type;
 				}
 			}
 		}
@@ -203,36 +203,36 @@ public class JorthWriter implements AutoCloseable{
 	}
 	
 	private MalformedJorthException tokenNameFail(CharSequence sb) throws MalformedJorthException{
-		throw new MalformedJorthException("Unknown # token \""+sb+"\"");
+		throw new MalformedJorthException("Unknown # token \"" + sb + "\"");
 	}
 	
-	public JorthWriter write(String codeChunk, String... values) throws MalformedJorthException      {return write(seq(requireNonNull(codeChunk)), values);}
-	public JorthWriter write(CharSequence codeChunk, String... values) throws MalformedJorthException{return write(seq(requireNonNull(codeChunk)), values);}
-	public JorthWriter write(CharIterator codeChunk, String... values) throws MalformedJorthException{return write(inlineCodeValues(requireNonNull(codeChunk), values));}
-	public JorthWriter write(String codeChunk) throws MalformedJorthException                        {return write(seq(requireNonNull(codeChunk)));}
-	public JorthWriter write(CharSequence codeChunk) throws MalformedJorthException                  {return write(seq(requireNonNull(codeChunk)));}
+	public JorthWriter write(String codeChunk, String... values) throws MalformedJorthException      { return write(seq(requireNonNull(codeChunk)), values); }
+	public JorthWriter write(CharSequence codeChunk, String... values) throws MalformedJorthException{ return write(seq(requireNonNull(codeChunk)), values); }
+	public JorthWriter write(CharIterator codeChunk, String... values) throws MalformedJorthException{ return write(inlineCodeValues(requireNonNull(codeChunk), values)); }
+	public JorthWriter write(String codeChunk) throws MalformedJorthException                        { return write(seq(requireNonNull(codeChunk))); }
+	public JorthWriter write(CharSequence codeChunk) throws MalformedJorthException                  { return write(seq(requireNonNull(codeChunk))); }
 	public JorthWriter write(CharIterator codeChunk) throws MalformedJorthException{
 		requireNonNull(codeChunk);
 		
 		
-		StringBuilder tokenBuffer=new StringBuilder();
+		StringBuilder tokenBuffer = new StringBuilder();
 		while(codeChunk.hasNext()){
 			
-			if(tokenBuffer.length()==2&&tokenBuffer.indexOf("//")==0){
+			if(tokenBuffer.length() == 2 && tokenBuffer.indexOf("//") == 0){
 				tokenBuffer.setLength(0);
 				while(codeChunk.hasNext()){
-					var c=codeChunk.next();
-					if(c=='\n') break;
+					var c = codeChunk.next();
+					if(c == '\n') break;
 				}
 				continue;
 			}
 			
-			char c=codeChunk.next();
+			char c = codeChunk.next();
 			
-			if(c=='\n') line++;
+			if(c == '\n') line++;
 			
-			if(c=='\\'){
-				var ch=readOrUnexpected(codeChunk);
+			if(c == '\\'){
+				var ch = readOrUnexpected(codeChunk);
 				
 				add(tokenBuffer, ch);
 				continue;
@@ -243,7 +243,7 @@ public class JorthWriter implements AutoCloseable{
 			}
 			
 			if(tokenBuffer.isEmpty()){
-				if(c=='\''){
+				if(c == '\''){
 					tokenBuffer.append('\'');
 					transferStringContents(codeChunk, tokenBuffer);
 					tokenBuffer.append('\'');
@@ -267,17 +267,17 @@ public class JorthWriter implements AutoCloseable{
 		}
 	}
 	private void add(StringBuilder tokenBuffer, char ch) throws MalformedJorthException{
-		List<Character> specials=List.of('[', ']', '{', '}');
+		List<Character> specials = List.of('[', ']', '{', '}');
 		
-		char spec=0;
+		char spec = 0;
 		
 		for(char special : specials){
-			if(ch==special){
-				spec=special;
+			if(ch == special){
+				spec = special;
 				break;
 			}
 		}
-		if(spec!=0){
+		if(spec != 0){
 			pushAndClear(tokenBuffer);
 			tokenBuffer.append(spec);
 			pushAndClear(tokenBuffer);
@@ -287,8 +287,8 @@ public class JorthWriter implements AutoCloseable{
 	}
 	
 	private void pushToken(String tokenStr) throws MalformedJorthException{
-		var override=overrides.get(tokenStr);
-		if(override!=null){
+		var override = overrides.get(tokenStr);
+		if(override != null){
 			rawTokens.accept(this, new Token(line, override));
 		}else{
 			rawTokens.accept(this, new Token(line, tokenStr));

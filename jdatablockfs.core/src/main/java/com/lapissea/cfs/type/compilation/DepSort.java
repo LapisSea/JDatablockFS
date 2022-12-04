@@ -15,8 +15,8 @@ public class DepSort<T>{
 		public final Index cycle;
 		
 		private CycleException(Index cycle){
-			super("Dependency cycle detected! Cycle index: "+cycle);
-			this.cycle=cycle;
+			super("Dependency cycle detected! Cycle index: " + cycle);
+			this.cycle = cycle;
 		}
 	}
 	
@@ -25,11 +25,11 @@ public class DepSort<T>{
 		private int   cursor;
 		
 		IntFill(){
-			this.data=new int[2];
+			this.data = new int[2];
 		}
 		void add(int i){
-			if(data.length==cursor) data=Arrays.copyOf(data, data.length*3/2);
-			data[cursor]=i;
+			if(data.length == cursor) data = Arrays.copyOf(data, data.length*3/2);
+			data[cursor] = i;
 			cursor++;
 		}
 		
@@ -37,11 +37,11 @@ public class DepSort<T>{
 			return cursor;
 		}
 		void clear(){
-			cursor=0;
+			cursor = 0;
 		}
 		boolean contains(int val){
-			for(int i=0;i<cursor;i++){
-				if(val==data[i]) return true;
+			for(int i = 0; i<cursor; i++){
+				if(val == data[i]) return true;
 			}
 			return false;
 		}
@@ -56,9 +56,9 @@ public class DepSort<T>{
 		private final BitSet  visited;
 		
 		TSort(){
-			stack=new IntFill();
-			index=new IntFill();
-			visited=new BitSet();
+			stack = new IntFill();
+			index = new IntFill();
+			visited = new BitSet();
 		}
 		private boolean visit(int i){
 			if(visited.get(i)) return false;
@@ -74,13 +74,13 @@ public class DepSort<T>{
 		Index sort(IntStream roots){
 			if(data.isEmpty()) return new Index(ZeroArrays.ZERO_INT);
 			
-			roots.forEach(i->{
+			roots.forEach(i -> {
 				stack.clear();
 				walkGraph(i);
 			});
-			if(index.size()!=data.size()) throw new RuntimeException("index not full");
+			if(index.size() != data.size()) throw new RuntimeException("index not full");
 			
-			var result=index.toIndex();
+			var result = index.toIndex();
 			clear();
 			return result;
 		}
@@ -93,7 +93,7 @@ public class DepSort<T>{
 			}
 			stack.add(i);
 			
-			getDependencies(i).forEach(index->{
+			getDependencies(i).forEach(index -> {
 				Objects.checkIndex(index, data.size());
 				walkGraph(index);
 			});
@@ -108,8 +108,8 @@ public class DepSort<T>{
 	private final Function<T, IntStream> getDependencies;
 	
 	public DepSort(@NotNull List<T> data, @NotNull Function<T, IntStream> getDependencies){
-		this.getDependencies=Objects.requireNonNull(getDependencies);
-		this.data=Objects.requireNonNull(data);
+		this.getDependencies = Objects.requireNonNull(getDependencies);
+		this.data = Objects.requireNonNull(data);
 	}
 	
 	public Index sort(){
@@ -119,8 +119,8 @@ public class DepSort<T>{
 	public final Index sort(Comparator<T> comparator){
 		return sort(IntStream.range(0, data.size())
 		                     .boxed()
-		                     .sorted((a, b)->comparator.compare(data.get(a), data.get(b)))
-		                     .mapToInt(i->i));
+		                     .sorted((a, b) -> comparator.compare(data.get(a), data.get(b)))
+		                     .mapToInt(i -> i));
 	}
 	
 	public Index sort(IntStream orderSuggestion){

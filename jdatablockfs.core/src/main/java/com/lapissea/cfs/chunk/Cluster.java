@@ -32,31 +32,31 @@ import static com.lapissea.cfs.type.field.annotations.IOValue.Reference.PipeType
 
 public class Cluster implements DataProvider{
 	
-	public static final  FixedStructPipe<RootRef> ROOT_PIPE      =FixedStructPipe.of(RootRef.class);
-	private static final ChunkPointer             FIRST_CHUNK_PTR=ChunkPointer.of(MagicID.size());
+	public static final  FixedStructPipe<RootRef> ROOT_PIPE       = FixedStructPipe.of(RootRef.class);
+	private static final ChunkPointer             FIRST_CHUNK_PTR = ChunkPointer.of(MagicID.size());
 	
 	public static Cluster emptyMem() throws IOException{
 		return Cluster.init(MemoryData.builder().build());
 	}
 	
 	public static Cluster init(IOInterface data) throws IOException{
-		data.openIOTransaction(()->{
-			var provider=DataProvider.newVerySimpleProvider(data);
+		data.openIOTransaction(() -> {
+			var provider = DataProvider.newVerySimpleProvider(data);
 			
-			try(var io=data.write(true)){
+			try(var io = data.write(true)){
 				MagicID.write(io);
 			}
 			
-			var firstChunk=AllocateTicket.withData(ROOT_PIPE, provider, new RootRef())
-			                             .withApproval(c->c.getPtr().equals(FIRST_CHUNK_PTR))
-			                             .submit(provider);
+			var firstChunk = AllocateTicket.withData(ROOT_PIPE, provider, new RootRef())
+			                               .withApproval(c -> c.getPtr().equals(FIRST_CHUNK_PTR))
+			                               .submit(provider);
 			
-			var db=new IOTypeDB.PersistentDB();
+			var db = new IOTypeDB.PersistentDB();
 			db.init(provider);
 			
-			ROOT_PIPE.modify(firstChunk, root->{
-				Metadata metadata=root.metadata;
-				metadata.db=db;
+			ROOT_PIPE.modify(firstChunk, root -> {
+				Metadata metadata = root.metadata;
+				metadata.db = db;
 				metadata.allocateNulls(provider);
 			}, null);
 		});
@@ -67,12 +67,12 @@ public class Cluster implements DataProvider{
 	
 	public static class RootRef extends IOInstance.Managed<RootRef>{
 		@IOValue
-		@IOValue.Reference(dataPipeType=FLEXIBLE)
+		@IOValue.Reference(dataPipeType = FLEXIBLE)
 		@IONullability(DEFAULT_IF_NULL)
 		private Metadata metadata;
 	}
 	
-	@IOInstance.Def.ToString(name=false, curly=false, fNames=false)
+	@IOInstance.Def.ToString(name = false, curly = false, fNames = false)
 	private interface IOChunkPointer extends IOInstance.Def<IOChunkPointer>{
 		ChunkPointer getVal();
 	}
@@ -81,7 +81,7 @@ public class Cluster implements DataProvider{
 		
 		@IOValue
 		@IONullability(NULLABLE)
-		@IOValue.OverrideType(value=HashIOMap.class)
+		@IOValue.OverrideType(value = HashIOMap.class)
 		private AbstractUnmanagedIOMap<ObjectID, Object> rootObjects;
 		
 		@IOValue
@@ -93,30 +93,30 @@ public class Cluster implements DataProvider{
 		private IOList<IOChunkPointer> freeChunks;
 	}
 	
-	private final ChunkCache chunkCache=ChunkCache.strong();
+	private final ChunkCache chunkCache = ChunkCache.strong();
 	
 	private final IOInterface       source;
 	private final MemoryManager     memoryManager;
-	private final DefragmentManager defragmentManager=new DefragmentManager(this);
+	private final DefragmentManager defragmentManager = new DefragmentManager(this);
 	
 	private final RootRef root;
 	
 	
-	private final RootProvider rootProvider=new RootProvider(){
+	private final RootProvider rootProvider = new RootProvider(){
 		@SuppressWarnings("unchecked")
 		@Override
 		public <T> T request(ObjectID id, UnsafeSupplier<T, IOException> objectGenerator) throws IOException{
 			Objects.requireNonNull(id);
 			Objects.requireNonNull(objectGenerator);
 			
-			var meta=meta();
+			var meta = meta();
 			
-			var existing=meta.rootObjects.get(id);
-			if(existing!=null){
+			var existing = meta.rootObjects.get(id);
+			if(existing != null){
 				return (T)existing;
 			}
 			
-			var inst=objectGenerator.get();
+			var inst = objectGenerator.get();
 			
 			meta.rootObjects.put(id, inst);
 			return inst;
@@ -125,7 +125,7 @@ public class Cluster implements DataProvider{
 		@Override
 		public <T> void provide(ObjectID id, T obj) throws IOException{
 			Objects.requireNonNull(obj);
-			var meta=meta();
+			var meta = meta();
 			meta.rootObjects.put(id, obj);
 		}
 		
@@ -136,7 +136,7 @@ public class Cluster implements DataProvider{
 		
 		@Override
 		public IterablePP<IOMap.IOEntry<ObjectID, Object>> listAll(){
-			return ()->meta().rootObjects.iterator();
+			return () -> meta().rootObjects.iterator();
 		}
 		
 		@Override
@@ -146,21 +146,21 @@ public class Cluster implements DataProvider{
 	};
 	
 	public Cluster(IOInterface source) throws IOException{
-		this.source=source;
+		this.source = source;
 		
 		source.read(MagicID::read);
 		
-		Chunk ch=getFirstChunk();
+		Chunk ch = getFirstChunk();
 		
-		var s=ROOT_PIPE.getFixedDescriptor().get(WordSpace.BYTE);
+		var s = ROOT_PIPE.getFixedDescriptor().get(WordSpace.BYTE);
 		if(s>ch.getSize()){
-			throw new IOException("no valid cluster data "+s+" "+ch.getSize());
+			throw new IOException("no valid cluster data " + s + " " + ch.getSize());
 		}
 		
-		root=ROOT_PIPE.readNew(this, ch, null);
-		var frees =meta().freeChunks;
-		var mapped=frees.map(ChunkPointer.class, IOChunkPointer::getVal, IOInstance.Def.constrRef(IOChunkPointer.class, ChunkPointer.class));
-		memoryManager=new PersistentMemoryManager(this, mapped);
+		root = ROOT_PIPE.readNew(this, ch, null);
+		var frees  = meta().freeChunks;
+		var mapped = frees.map(ChunkPointer.class, IOChunkPointer::getVal, IOInstance.Def.constrRef(IOChunkPointer.class, ChunkPointer.class));
+		memoryManager = new PersistentMemoryManager(this, mapped);
 	}
 	
 	@Override
@@ -178,7 +178,7 @@ public class Cluster implements DataProvider{
 	
 	@Override
 	public IOTypeDB getTypeDb(){
-		if(root==null) return null;
+		if(root == null) return null;
 		return meta().db;
 	}
 	
@@ -201,8 +201,8 @@ public class Cluster implements DataProvider{
 	
 	@Override
 	public String toString(){
-		return "Cluster{"+
-		       "source="+source+
+		return "Cluster{" +
+		       "source=" + source +
 		       '}';
 	}
 	
@@ -213,27 +213,27 @@ public class Cluster implements DataProvider{
 		double usefulDataRatio,
 		double chunkFragmentation,
 		double usedChunkEfficiency
-	){}
+	){ }
 	
 	public ChunkStatistics gatherStatistics() throws IOException{
 		
-		long totalBytes       =getSource().getIOSize();
-		long usedChunkCapacity=0;
-		long usefulBytes      =0;
-		long chunkCount       =0;
-		long hasNextCount     =0;
+		long totalBytes        = getSource().getIOSize();
+		long usedChunkCapacity = 0;
+		long usefulBytes       = 0;
+		long chunkCount        = 0;
+		long hasNextCount      = 0;
 		
-		Set<ChunkPointer> referenced=new HashSet<>();
+		Set<ChunkPointer> referenced = new HashSet<>();
 		
-		rootWalker(MemoryWalker.PointerRecord.of(ref->{
+		rootWalker(MemoryWalker.PointerRecord.of(ref -> {
 			if(ref.isNull()) return;
 			ref.getPtr().dereference(this).streamNext().map(Chunk::getPtr).forEach(referenced::add);
 		}), true).walk();
 		
 		for(Chunk chunk : getFirstChunk().chunksAhead()){
 			if(referenced.contains(chunk.getPtr())){
-				usefulBytes+=chunk.getSize();
-				usedChunkCapacity+=chunk.getCapacity();
+				usefulBytes += chunk.getSize();
+				usedChunkCapacity += chunk.getCapacity();
 			}
 			chunkCount++;
 			if(chunk.hasNextPtr()) hasNextCount++;

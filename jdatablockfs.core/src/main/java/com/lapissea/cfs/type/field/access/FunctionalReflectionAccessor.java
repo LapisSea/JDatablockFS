@@ -24,13 +24,13 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 		
 		public Num(Struct<CTyp> struct, GetAnnotation annotations, Method getter, Method setter, String name, Type genericType){
 			super(struct, annotations, getter, setter, name, genericType);
-			constructor=Access.findConstructor(getType(), LongFunction.class, long.class);
+			constructor = Access.findConstructor(getType(), LongFunction.class, long.class);
 		}
 		@Override
 		public long getLong(VarPool<CTyp> ioPool, CTyp instance){
-			var num=(INumber)get(ioPool, instance);
-			if(num==null){
-				throw new NullPointerException("value in "+getType().getName()+"#"+getName()+" is null but INumber is a non nullable type");
+			var num = (INumber)get(ioPool, instance);
+			if(num == null){
+				throw new NullPointerException("value in " + getType().getName() + "#" + getName() + " is null but INumber is a non nullable type");
 			}
 			return num.getValue();
 		}
@@ -59,30 +59,30 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 	
 	public FunctionalReflectionAccessor(Struct<CTyp> struct, GetAnnotation annotations, Method getter, Method setter, String name, Type genericType){
 		super(struct, name);
-		this.annotations=annotations;
-		this.genericType=genericType;
-		this.rawType=Utils.typeToRaw(genericType);
-		typeID=TypeFlag.getId(rawType);
+		this.annotations = annotations;
+		this.genericType = genericType;
+		this.rawType = Utils.typeToRaw(genericType);
+		typeID = TypeFlag.getId(rawType);
 		
 		if(!Utils.genericInstanceOf(getter.getReturnType(), genericType)){
-			throw new MalformedStruct("getter returns "+getter.getReturnType()+" but "+genericType+" is required\n"+getter);
+			throw new MalformedStruct("getter returns " + getter.getReturnType() + " but " + genericType + " is required\n" + getter);
 		}
-		if(getter.getParameterCount()!=0){
-			throw new MalformedStruct("getter must not have arguments\n"+getter);
+		if(getter.getParameterCount() != 0){
+			throw new MalformedStruct("getter must not have arguments\n" + getter);
 		}
 		
 		if(!Utils.genericInstanceOf(setter.getReturnType(), Void.TYPE)){
-			throw new MalformedStruct("setter returns "+setter.getReturnType()+" but "+genericType+" is required\n"+setter);
+			throw new MalformedStruct("setter returns " + setter.getReturnType() + " but " + genericType + " is required\n" + setter);
 		}
-		if(setter.getParameterCount()!=1){
-			throw new MalformedStruct("setter must have 1 argument of "+genericType+"\n"+setter);
+		if(setter.getParameterCount() != 1){
+			throw new MalformedStruct("setter must have 1 argument of " + genericType + "\n" + setter);
 		}
 		if(!Utils.genericInstanceOf(setter.getGenericParameterTypes()[0], genericType)){
-			throw new MalformedStruct("setter argument is "+setter.getGenericParameterTypes()[0]+" but "+genericType+" is required\n"+setter);
+			throw new MalformedStruct("setter argument is " + setter.getGenericParameterTypes()[0] + " but " + genericType + " is required\n" + setter);
 		}
 		
-		this.getter=Access.makeMethodHandle(getter);
-		this.setter=Access.makeMethodHandle(setter);
+		this.getter = Access.makeMethodHandle(getter);
+		this.setter = Access.makeMethodHandle(setter);
 	}
 	
 	@NotNull
@@ -241,6 +241,6 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 	
 	@Override
 	protected String strName(){
-		return getName()+"(F)";
+		return getName() + "(F)";
 	}
 }

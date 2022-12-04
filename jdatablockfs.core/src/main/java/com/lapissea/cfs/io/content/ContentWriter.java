@@ -20,19 +20,19 @@ public interface ContentWriter extends AutoCloseable{
 	}
 	
 	default void write(ByteBuffer b, int off, int len) throws IOException{
-		if(len==0) return;
-		if(b.hasArray()&&!b.isReadOnly()){
-			write(b.array(), off+b.arrayOffset(), len);
+		if(len == 0) return;
+		if(b.hasArray() && !b.isReadOnly()){
+			write(b.array(), off + b.arrayOffset(), len);
 		}else{
-			byte[] buff=new byte[MathUtil.snap(len, 8, BATCH_BYTES)];
+			byte[] buff = new byte[MathUtil.snap(len, 8, BATCH_BYTES)];
 			
-			int remaining=len;
-			int pos      =off+b.position();
+			int remaining = len;
+			int pos       = off + b.position();
 			while(remaining>0){
-				int toCpy=Math.min(remaining, buff.length);
+				int toCpy = Math.min(remaining, buff.length);
 				b.get(pos, buff, 0, toCpy);
-				pos+=toCpy;
-				remaining-=toCpy;
+				pos += toCpy;
+				remaining -= toCpy;
 				this.write(buff, 0, toCpy);
 			}
 		}
@@ -46,18 +46,18 @@ public interface ContentWriter extends AutoCloseable{
 	void write(byte[] b, int off, int len) throws IOException;
 	
 	default void writeWord(long v, int len) throws IOException{
-		byte[]    writeBuffer=new byte[len];
-		final var lm1        =len-1;
+		byte[]    writeBuffer = new byte[len];
+		final var lm1         = len - 1;
 		
-		for(int i=0;i<len;i++){
-			writeBuffer[i]=(byte)(v >>> ((lm1-i)*8));
+		for(int i = 0; i<len; i++){
+			writeBuffer[i] = (byte)(v >>> ((lm1 - i)*8));
 		}
 		
 		write(writeBuffer, 0, len);
 	}
 	
 	default void writeBoolean(boolean v) throws IOException{
-		writeInt1(v?1:0);
+		writeInt1(v? 1 : 0);
 	}
 	
 	
@@ -70,9 +70,9 @@ public interface ContentWriter extends AutoCloseable{
 	}
 	
 	default void writeInts2(int[] b) throws IOException{
-		int    numSize=2;
-		byte[] bb     =new byte[b.length*numSize];
-		for(int i=0;i<b.length;i++){
+		int    numSize = 2;
+		byte[] bb      = new byte[b.length*numSize];
+		for(int i = 0; i<b.length; i++){
 			writeInt2(bb, i*numSize, b[i]);
 		}
 		write(bb);
@@ -83,14 +83,14 @@ public interface ContentWriter extends AutoCloseable{
 	}
 	
 	private void writeInt2(byte[] writeBuffer, int off, int v){
-		writeBuffer[off+0]=(byte)((v >>> 8)&0xFF);
-		writeBuffer[off+1]=(byte)((v >>> 0)&0xFF);
+		writeBuffer[off + 0] = (byte)((v >>> 8)&0xFF);
+		writeBuffer[off + 1] = (byte)((v >>> 0)&0xFF);
 	}
 	
 	default void writeInts3(int[] b) throws IOException{
-		int    numSize=3;
-		byte[] bb     =new byte[b.length*numSize];
-		for(int i=0;i<b.length;i++){
+		int    numSize = 3;
+		byte[] bb      = new byte[b.length*numSize];
+		for(int i = 0; i<b.length; i++){
 			writeInt3(bb, i*numSize, b[i]);
 		}
 		write(bb, 0, bb.length);
@@ -101,15 +101,15 @@ public interface ContentWriter extends AutoCloseable{
 	}
 	
 	private void writeInt3(byte[] writeBuffer, int off, int v){
-		writeBuffer[off+0]=(byte)((v >>> 16)&0xFF);
-		writeBuffer[off+1]=(byte)((v >>> 8)&0xFF);
-		writeBuffer[off+2]=(byte)((v >>> 0)&0xFF);
+		writeBuffer[off + 0] = (byte)((v >>> 16)&0xFF);
+		writeBuffer[off + 1] = (byte)((v >>> 8)&0xFF);
+		writeBuffer[off + 2] = (byte)((v >>> 0)&0xFF);
 	}
 	
 	default void writeInts4(int[] b) throws IOException{
-		int    numSize=4;
-		byte[] bb     =new byte[b.length*numSize];
-		for(int i=0;i<b.length;i++){
+		int    numSize = 4;
+		byte[] bb      = new byte[b.length*numSize];
+		for(int i = 0; i<b.length; i++){
 			writeInt4(bb, i*numSize, b[i]);
 		}
 		write(bb, 0, bb.length);
@@ -120,16 +120,16 @@ public interface ContentWriter extends AutoCloseable{
 	}
 	
 	private void writeInt4(byte[] writeBuffer, int off, int v){
-		writeBuffer[off+0]=(byte)((v >>> 24)&0xFF);
-		writeBuffer[off+1]=(byte)((v >>> 16)&0xFF);
-		writeBuffer[off+2]=(byte)((v >>> 8)&0xFF);
-		writeBuffer[off+3]=(byte)((v >>> 0)&0xFF);
+		writeBuffer[off + 0] = (byte)((v >>> 24)&0xFF);
+		writeBuffer[off + 1] = (byte)((v >>> 16)&0xFF);
+		writeBuffer[off + 2] = (byte)((v >>> 8)&0xFF);
+		writeBuffer[off + 3] = (byte)((v >>> 0)&0xFF);
 	}
 	
 	default void writeInts5(long[] b) throws IOException{
-		int    numSize=5;
-		byte[] bb     =new byte[b.length*numSize];
-		for(int i=0;i<b.length;i++){
+		int    numSize = 5;
+		byte[] bb      = new byte[b.length*numSize];
+		for(int i = 0; i<b.length; i++){
 			writeInt5(bb, i*numSize, b[i]);
 		}
 		write(bb, 0, bb.length);
@@ -140,17 +140,17 @@ public interface ContentWriter extends AutoCloseable{
 	}
 	
 	private void writeInt5(byte[] writeBuffer, int off, long v){
-		writeBuffer[off+0]=(byte)(v >>> 32);
-		writeBuffer[off+1]=(byte)(v >>> 24);
-		writeBuffer[off+2]=(byte)(v >>> 16);
-		writeBuffer[off+3]=(byte)(v >>> 8);
-		writeBuffer[off+4]=(byte)(v >>> 0);
+		writeBuffer[off + 0] = (byte)(v >>> 32);
+		writeBuffer[off + 1] = (byte)(v >>> 24);
+		writeBuffer[off + 2] = (byte)(v >>> 16);
+		writeBuffer[off + 3] = (byte)(v >>> 8);
+		writeBuffer[off + 4] = (byte)(v >>> 0);
 	}
 	
 	default void writeInts6(long[] b) throws IOException{
-		int    numSize=6;
-		byte[] bb     =new byte[b.length*numSize];
-		for(int i=0;i<b.length;i++){
+		int    numSize = 6;
+		byte[] bb      = new byte[b.length*numSize];
+		for(int i = 0; i<b.length; i++){
 			writeInt6(bb, i*numSize, b[i]);
 		}
 		write(bb, 0, bb.length);
@@ -161,18 +161,18 @@ public interface ContentWriter extends AutoCloseable{
 	}
 	
 	private void writeInt6(byte[] writeBuffer, int off, long v){
-		writeBuffer[off+0]=(byte)(v >>> 40);
-		writeBuffer[off+1]=(byte)(v >>> 32);
-		writeBuffer[off+2]=(byte)(v >>> 24);
-		writeBuffer[off+3]=(byte)(v >>> 16);
-		writeBuffer[off+4]=(byte)(v >>> 8);
-		writeBuffer[off+5]=(byte)(v >>> 0);
+		writeBuffer[off + 0] = (byte)(v >>> 40);
+		writeBuffer[off + 1] = (byte)(v >>> 32);
+		writeBuffer[off + 2] = (byte)(v >>> 24);
+		writeBuffer[off + 3] = (byte)(v >>> 16);
+		writeBuffer[off + 4] = (byte)(v >>> 8);
+		writeBuffer[off + 5] = (byte)(v >>> 0);
 	}
 	
 	default void writeInts8(long[] b) throws IOException{
-		int    numSize=8;
-		byte[] bb     =new byte[b.length*numSize];
-		for(int i=0;i<b.length;i++){
+		int    numSize = 8;
+		byte[] bb      = new byte[b.length*numSize];
+		for(int i = 0; i<b.length; i++){
 			writeInt8(bb, i*numSize, b[i]);
 		}
 		write(bb, 0, bb.length);
@@ -183,20 +183,20 @@ public interface ContentWriter extends AutoCloseable{
 	}
 	
 	private void writeInt8(byte[] writeBuffer, int off, long v){
-		writeBuffer[off+0]=(byte)(v >>> 56);
-		writeBuffer[off+1]=(byte)(v >>> 48);
-		writeBuffer[off+2]=(byte)(v >>> 40);
-		writeBuffer[off+3]=(byte)(v >>> 32);
-		writeBuffer[off+4]=(byte)(v >>> 24);
-		writeBuffer[off+5]=(byte)(v >>> 16);
-		writeBuffer[off+6]=(byte)(v >>> 8);
-		writeBuffer[off+7]=(byte)(v >>> 0);
+		writeBuffer[off + 0] = (byte)(v >>> 56);
+		writeBuffer[off + 1] = (byte)(v >>> 48);
+		writeBuffer[off + 2] = (byte)(v >>> 40);
+		writeBuffer[off + 3] = (byte)(v >>> 32);
+		writeBuffer[off + 4] = (byte)(v >>> 24);
+		writeBuffer[off + 5] = (byte)(v >>> 16);
+		writeBuffer[off + 6] = (byte)(v >>> 8);
+		writeBuffer[off + 7] = (byte)(v >>> 0);
 	}
 	
 	default void writeFloats4(float[] f) throws IOException{
-		int    numSize=4;
-		byte[] bb     =new byte[f.length*numSize];
-		for(int i=0;i<f.length;i++){
+		int    numSize = 4;
+		byte[] bb      = new byte[f.length*numSize];
+		for(int i = 0; i<f.length; i++){
 			writeFloat4(bb, i*numSize, f[i]);
 		}
 		write(bb, 0, bb.length);
@@ -211,9 +211,9 @@ public interface ContentWriter extends AutoCloseable{
 	}
 	
 	default void writeFloats8(double[] f) throws IOException{
-		int    numSize=8;
-		byte[] bb     =new byte[f.length*numSize];
-		for(int i=0;i<f.length;i++){
+		int    numSize = 8;
+		byte[] bb      = new byte[f.length*numSize];
+		for(int i = 0; i<f.length; i++){
 			writeFloat8(bb, i*numSize, f[i]);
 		}
 		write(bb, 0, bb.length);
@@ -228,18 +228,18 @@ public interface ContentWriter extends AutoCloseable{
 	}
 	
 	default void writeChars2(String c) throws IOException{
-		int    numSize=2;
-		byte[] bb     =new byte[c.length()*numSize];
-		for(int i=0;i<c.length();i++){
+		int    numSize = 2;
+		byte[] bb      = new byte[c.length()*numSize];
+		for(int i = 0; i<c.length(); i++){
 			writeChar2(bb, i*numSize, c.charAt(i));
 		}
 		write(bb, 0, bb.length);
 	}
 	
 	default void writeChars2(char[] c) throws IOException{
-		int    numSize=2;
-		byte[] bb     =new byte[c.length*numSize];
-		for(int i=0;i<c.length;i++){
+		int    numSize = 2;
+		byte[] bb      = new byte[c.length*numSize];
+		for(int i = 0; i<c.length; i++){
 			writeChar2(bb, i*numSize, c[i]);
 		}
 		write(bb, 0, bb.length);
@@ -250,14 +250,14 @@ public interface ContentWriter extends AutoCloseable{
 	}
 	
 	private void writeChar2(byte[] writeBuffer, int off, int v){
-		writeBuffer[off+0]=(byte)((v >>> 8)&0xFF);
-		writeBuffer[off+1]=(byte)((v >>> 0)&0xFF);
+		writeBuffer[off + 0] = (byte)((v >>> 8)&0xFF);
+		writeBuffer[off + 1] = (byte)((v >>> 0)&0xFF);
 	}
 	
-	default ContentOutputStream outStream(){return new ContentReaderOutputStream(this);}
+	default ContentOutputStream outStream(){ return new ContentReaderOutputStream(this); }
 	
 	@Override
-	default void close() throws IOException{}
+	default void close() throws IOException{ }
 	
 	record BufferTicket(ContentWriter target, int amount, BufferErrorSupplier<? extends IOException> errorOnMismatch, BiIntConsumer<byte[]> onFinish){
 		public BufferTicket requireExact(){
@@ -278,10 +278,10 @@ public interface ContentWriter extends AutoCloseable{
 			
 			@Override
 			public void close() throws IOException{
-				if(errorOnMismatch!=null){
-					if(count!=amount) throw errorOnMismatch.apply(this.size(), amount);
+				if(errorOnMismatch != null){
+					if(count != amount) throw errorOnMismatch.apply(this.size(), amount);
 				}
-				if(onFinish!=null){
+				if(onFinish != null){
 					onFinish.accept(count, buf);
 				}
 				target.write(buf, 0, count);
@@ -294,10 +294,10 @@ public interface ContentWriter extends AutoCloseable{
 			}
 			@Override
 			public void writeWord(long v, int len) throws IOException{
-				if(count+len<=buf.length){
+				if(count + len<=buf.length){
 					MemPrimitive.setWord(v, buf, count, len);
 				}
-				count+=len;
+				count += len;
 				earlyCheck();
 			}
 			
@@ -307,7 +307,7 @@ public interface ContentWriter extends AutoCloseable{
 				earlyCheck();
 			}
 			private void earlyCheck(){
-				if(errorOnMismatch!=null){
+				if(errorOnMismatch != null){
 					if(count>amount) throw UtilL.uncheckedThrow(errorOnMismatch.apply(this.size(), amount));
 				}
 			}
@@ -323,8 +323,8 @@ public interface ContentWriter extends AutoCloseable{
 		}
 	}
 	
-	default BufferTicket writeTicket(long amount){return writeTicket(Math.toIntExact(amount));}
-	default BufferTicket writeTicket(int amount) {return new BufferTicket(this, amount, null, null);}
+	default BufferTicket writeTicket(long amount){ return writeTicket(Math.toIntExact(amount)); }
+	default BufferTicket writeTicket(int amount) { return new BufferTicket(this, amount, null, null); }
 	
 	/**
 	 * @return a flag that signifies if this writer has significant overhead when calling many small write operations.<br>

@@ -23,10 +23,10 @@ public final class ClassGen implements ClassInfo, Endable{
 	private final EnumSet<Access> accessSet;
 	public final  GenericType     extension;
 	
-	final ClassWriter writer=new ClassWriter(ClassWriter.COMPUTE_MAXS|ClassWriter.COMPUTE_FRAMES);
+	final ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS|ClassWriter.COMPUTE_FRAMES);
 	
-	private final Map<String, FieldGen>                    fields   =new HashMap<>();
-	private final Map<FunctionInfo.Signature, FunctionGen> functions=new HashMap<>();
+	private final Map<String, FieldGen>                    fields    = new HashMap<>();
+	private final Map<FunctionInfo.Signature, FunctionGen> functions = new HashMap<>();
 	
 	//	private boolean addedClinit;
 	private boolean addedInit;
@@ -39,37 +39,37 @@ public final class ClassGen implements ClassInfo, Endable{
 		GenericType extension, List<GenericType> interfaces,
 		Set<Access> accessSet
 	){
-		this.typeSource=typeSource;
-		this.name=name;
-		this.type=type;
-		this.visibility=visibility;
-		this.extension=extension;
-		this.accessSet=accessSet.isEmpty()?EnumSet.noneOf(Access.class):EnumSet.copyOf(accessSet);
+		this.typeSource = typeSource;
+		this.name = name;
+		this.type = type;
+		this.visibility = visibility;
+		this.extension = extension;
+		this.accessSet = accessSet.isEmpty()? EnumSet.noneOf(Access.class) : EnumSet.copyOf(accessSet);
 		
-		int accessFlags=visibility.flag|switch(type){
+		int accessFlags = visibility.flag|switch(type){
 			case CLASS -> ACC_SUPER|ACC_FINAL;
 			case INTERFACE -> ACC_ABSTRACT|ACC_INTERFACE;
 			case ENUM -> ACC_SUPER|ACC_FINAL|ACC_ENUM;
 		};
 		
 		
-		int len=extension.jvmSignatureLen();
+		int len = extension.jvmSignatureLen();
 		for(var interf : interfaces){
-			len+=interf.jvmSignatureLen();
+			len += interf.jvmSignatureLen();
 		}
-		var signature=new StringBuilder(len);
+		var signature = new StringBuilder(len);
 		extension.jvmSignature(signature);
 		for(var interf : interfaces){
 			interf.jvmSignature(signature);
 		}
-		assert signature.length()==len:signature.length()+" "+len;
+		assert signature.length() == len : signature.length() + " " + len;
 		
 		String[] interfaceStrings;
-		if(interfaces.isEmpty()) interfaceStrings=null;
+		if(interfaces.isEmpty()) interfaceStrings = null;
 		else{
-			interfaceStrings=new String[interfaces.size()];
-			for(int i=0;i<interfaces.size();i++){
-				interfaceStrings[i]=interfaces.get(i).raw().slashed();
+			interfaceStrings = new String[interfaces.size()];
+			for(int i = 0; i<interfaces.size(); i++){
+				interfaceStrings[i] = interfaces.get(i).raw().slashed();
 			}
 		}
 		
@@ -82,35 +82,35 @@ public final class ClassGen implements ClassInfo, Endable{
 //			defineFunction("<clinit>", Visibility.PUBLIC, Set.of(), null, new LinkedHashMap<>()).end();
 //		}
 		if(!addedInit){
-			var init=defineFunction("<init>", this.visibility, Set.of(), null, new LinkedHashMap<>());
+			var init = defineFunction("<init>", this.visibility, Set.of(), null, new LinkedHashMap<>());
 			init.getOp("this", "this");
 			init.superOp();
 			init.end();
 		}
 		
 		writer.visitEnd();
-		classFile=writer.toByteArray();
+		classFile = writer.toByteArray();
 	}
 	
 	public void defineField(Visibility visibility, Set<Access> accesses, GenericType type, String name) throws MalformedJorthException{
 		checkEnd();
-		if(fields.containsKey(name)) throw new MalformedJorthException("Field "+name+" already exists");
+		if(fields.containsKey(name)) throw new MalformedJorthException("Field " + name + " already exists");
 		fields.put(name, new FieldGen(this.name, visibility, name, type, accesses.contains(Access.STATIC)));
 		
 		
-		var descriptor=type.jvmDescriptor();
-		var signature =type.jvmSignature();
-		if(signature.equals(descriptor)) signature=null;
+		var descriptor = type.jvmDescriptor();
+		var signature  = type.jvmSignature();
+		if(signature.equals(descriptor)) signature = null;
 		
-		var access=visibility.flag;
+		var access = visibility.flag;
 		if(accesses.contains(Access.STATIC)){
-			access|=ACC_STATIC;
+			access |= ACC_STATIC;
 		}
 		if(accesses.contains(Access.FINAL)){
-			access|=ACC_FINAL;
+			access |= ACC_FINAL;
 		}
 		
-		var fieldVisitor=writer.visitField(access, name, descriptor.toString(), signature==null?null:signature.toString(), null);
+		var fieldVisitor = writer.visitField(access, name, descriptor.toString(), signature == null? null : signature.toString(), null);
 		
 		//TODO: annotations
 		
@@ -119,22 +119,22 @@ public final class ClassGen implements ClassInfo, Endable{
 	
 	public FunctionGen defineFunction(String name, Visibility visibility, Set<Access> access, GenericType returnType, LinkedHashMap<String, FunctionGen.ArgInfo> args) throws MalformedJorthException{
 		checkEnd();
-		var fun=new FunctionGen(this, name, visibility, access, returnType, args);
+		var fun = new FunctionGen(this, name, visibility, access, returnType, args);
 		
-		List<GenericType> argStr=new ArrayList<>(args.size());
+		List<GenericType> argStr = new ArrayList<>(args.size());
 		for(var value : args.values()){
 			argStr.add(value.type());
 		}
-		var sig=new FunctionInfo.Signature(name, argStr);
-		if(this.functions.put(sig, fun)!=null){
-			throw new MalformedJorthException("Duplicate method "+sig);
+		var sig = new FunctionInfo.Signature(name, argStr);
+		if(this.functions.put(sig, fun) != null){
+			throw new MalformedJorthException("Duplicate method " + sig);
 		}
 
 //		if("<clinit>".equals(name)){
 //			addedClinit=true;
 //		}
 		if("<init>".equals(name)){
-			addedInit=true;
+			addedInit = true;
 		}
 		
 		return fun;
@@ -142,9 +142,9 @@ public final class ClassGen implements ClassInfo, Endable{
 	
 	@Override
 	public FieldInfo getField(String name) throws MalformedJorthException{
-		var n=fields.get(name);
-		if(n==null){
-			throw new MalformedJorthException("Field "+name+" does not exist in "+this.name);
+		var n = fields.get(name);
+		if(n == null){
+			throw new MalformedJorthException("Field " + name + " does not exist in " + this.name);
 		}
 		return n;
 	}
@@ -169,7 +169,7 @@ public final class ClassGen implements ClassInfo, Endable{
 	}
 	
 	private void checkEnd(){
-		if(classFile!=null){
+		if(classFile != null){
 			throw new RuntimeException("Class ended");
 		}
 	}
@@ -180,9 +180,9 @@ public final class ClassGen implements ClassInfo, Endable{
 	
 	@Override
 	public FunctionInfo getFunction(FunctionInfo.Signature signature) throws MalformedJorthException{
-		var fun=functions.get(signature);
-		if(fun!=null) return fun;
-		throw new MalformedJorthException("Function of "+signature+" does not exist");
+		var fun = functions.get(signature);
+		if(fun != null) return fun;
+		throw new MalformedJorthException("Function of " + signature + " does not exist");
 	}
 	
 	@Override
