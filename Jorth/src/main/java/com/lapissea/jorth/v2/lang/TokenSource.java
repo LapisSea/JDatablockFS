@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 public interface TokenSource{
 	
@@ -28,24 +29,33 @@ public interface TokenSource{
 				listener.accept(tok);
 				return tok;
 			}
-			
 			@Override
-			public void addDefinition(String value, String key){
-				source.addDefinition(value, key);
+			public ClassName readClassName(Function<ClassName, ClassName> imports) throws MalformedJorthException{
+				var tok=source.readToken().requireAs(Token.CWord.class);
+				listener.accept(tok);
+				return imports.apply(tok.value());
 			}
 			@Override
-			public <E extends Enum<E>> Token.EWord<E> readEnum(Class<E> visibilityClass) throws MalformedJorthException{
+			public int line(){
+				return source.line();
+			}
+			@Override
+			public <E extends Enum<E>> E readEnum(Class<E> enumType) throws MalformedJorthException{
 				var t=source.readToken().requireAs(Token.Word.class);
-				var e=new Token.EWord<>(t.line(), visibilityClass, t.value());
+				var e=new Token.EWord<>(t.line(), enumType, t.value());
 				listener.accept(e);
-				return e;
+				return e.value();
 			}
 		};
 	}
 	
 	boolean hasMore();
 	
-	default <T extends Token> Optional<T> readToken(Function<Token, Optional<T>> predicate) throws MalformedJorthException{
+	default <T extends Token> boolean consumeTokenIf(Class<T> type, Predicate<T> predicate) throws MalformedJorthException{
+		return consumeTokenIf(t->t.as(type).filter(predicate)).isPresent();
+	}
+	
+	default <T> Optional<T> consumeTokenIf(Function<Token, Optional<T>> predicate) throws MalformedJorthException{
 		var mapped=predicate.apply(peekToken());
 		if(mapped.isPresent()){
 			readToken();
@@ -55,6 +65,19 @@ public interface TokenSource{
 	
 	Token readToken() throws MalformedJorthException;
 	Token peekToken() throws MalformedJorthException;
+	int line();
+	
+	default void requireWord(String word) throws MalformedJorthException{
+		var token=readToken();
+		if(word.length()==1&&token instanceof Token.SmolWord w){
+			if(w.is(word.charAt(0))) return;
+			throw new MalformedJorthException("Expected '"+word+"' but got '"+w.value()+"'");
+		}else{
+			var w=token.requireAs(Token.Word.class);
+			if(w.is(word)) return;
+			throw new MalformedJorthException("Expected '"+word+"' but got '"+w.value()+"'");
+		}
+	}
 	
 	default String readWord() throws MalformedJorthException{
 		return readToken().requireAs(Token.Word.class).value();
@@ -65,56 +88,42 @@ public interface TokenSource{
 	default void requireKeyword(Keyword kw) throws MalformedJorthException{
 		readToken().requireAs(Token.KWord.class).require(kw);
 	}
-	default <E extends Enum<E>> Token.EWord<E> readEnum(Class<E> visibilityClass) throws MalformedJorthException{
+	default <E extends Enum<E>> E readEnum(Class<E> enumType) throws MalformedJorthException{
 		var t=readToken().requireAs(Token.Word.class);
-		return new Token.EWord<>(t.line(), visibilityClass, t.value());
+		return Token.EWord.find(enumType, t.value());
+	}
+	default ClassName readClassName(Function<ClassName, ClassName> imports) throws MalformedJorthException{
+		return imports.apply(readToken().requireAs(Token.CWord.class).value());
 	}
 	
 	
 	// raw: foo.Bar
 	// array: foo.Bar array
-	// generic: foo.Bar<ay.Lmao, idk.Something>
+	// generic: foo.Bar<ay.Lmao idk.Something>
 	// generic array: foo.Bar<ay.Lmao idk.Something> array
-	default GenericType readType() throws MalformedJorthException{
-		return readType(true);
+	default GenericType readType(Function<ClassName, ClassName> imports) throws MalformedJorthException{
+		return readType(imports, true);
 	}
-	default GenericType readType(boolean allowArray) throws MalformedJorthException{
-		var raw =ClassName.dotted(readWord());
-		int dims=0;
-		var args=new ArrayList<GenericType>();
+	default GenericType readType(Function<ClassName, ClassName> imports, boolean allowArray) throws MalformedJorthException{
+		var raw=readClassName(imports);
 		
-		if(peekToken() instanceof Token.Word w){
-			if(w.value().equals("<")){
-				readToken();
+		var args=new ArrayList<GenericType>();
+		if(consumeTokenIf(Token.SmolWord.class, w->w.is('<'))){
+			while(true){
+				args.add(readType(imports));
 				
-				while(true){
-					args.add(readType());
-					
-					if(peekToken() instanceof Token.Word w2){
-						if(w2.value().equals(">")){
-							readToken();
-							break;
-						}
-					}
+				if(consumeTokenIf(Token.SmolWord.class, w->w.is('>'))){
+					break;
 				}
-				
 			}
 		}
 		
-		while(true){
-			if(peekToken() instanceof Token.Word w){
-				if(w.value().equals("array")){
-					dims++;
-					readToken();
-					if(!allowArray) throw new MalformedJorthException("Array not allowed");
-					continue;
-				}
-			}
-			break;
+		int dims=0;
+		while(consumeTokenIf(Token.Word.class, w->w.is("array"))){
+			dims++;
+			if(!allowArray) throw new MalformedJorthException("Array not allowed");
 		}
 		
 		return new GenericType(raw, dims, args);
 	}
-	
-	void addDefinition(String value, String key);
 }

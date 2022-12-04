@@ -14,10 +14,10 @@ public sealed interface Token{
 			if(this.keyword!=keyword) throw new MalformedJorthException("Required keyword is "+keyword+" but got "+this.keyword);
 		}
 		
+		@SuppressWarnings("unchecked")
 		@Override
 		public <T extends Token> Optional<T> as(Class<T> type){
 			if(type==Word.class){
-				//noinspection unchecked
 				return Optional.of((T)new Word(line, keyword.name().toLowerCase()));
 			}
 			return Token.super.as(type);
@@ -32,7 +32,7 @@ public sealed interface Token{
 		private static final Map<Class<? extends Enum<?>>, Map<String, Enum<?>>> CACHE=new ConcurrentHashMap<>();
 		
 		@SuppressWarnings("unchecked")
-		private static <E extends Enum<E>> E find(Class<E> type, String word) throws MalformedJorthException{
+		public static <E extends Enum<E>> E find(Class<E> type, String word) throws MalformedJorthException{
 			var map=(Map<String, E>)CACHE.computeIfAbsent(type, t->{
 				var values=t.getEnumConstants();
 				var m     =HashMap.<String, Enum<?>>newHashMap(values.length);
@@ -51,6 +51,52 @@ public sealed interface Token{
 		public boolean is(String check){
 			return value.equals(check);
 		}
+		
+		@SuppressWarnings("unchecked")
+		@Override
+		public <T extends Token> Optional<T> as(Class<T> type){
+			if(type==CWord.class){
+				return Optional.of((T)new CWord(line, ClassName.dotted(value)));
+			}
+			if(type==SmolWord.class){
+				if(value.length()==1){
+					return Optional.of((T)new SmolWord(line, value.charAt(0)));
+				}else{
+					throw new ClassCastException("Can not convert "+this+" to "+SmolWord.class.getName());
+				}
+			}
+			return Token.super.as(type);
+		}
+	}
+	
+	record SmolWord(int line, char value) implements Token{
+		public boolean is(char check){
+			return value==check;
+		}
+		
+		@SuppressWarnings("unchecked")
+		@Override
+		public <T extends Token> Optional<T> as(Class<T> type){
+			if(type==Word.class){
+				return Optional.of((T)new Word(line, value+""));
+			}
+			return Token.super.as(type);
+		}
+	}
+	
+	record CWord(int line, ClassName value) implements Token{
+		public boolean is(ClassName check){
+			return value.equals(check);
+		}
+		
+		@SuppressWarnings("unchecked")
+		@Override
+		public <T extends Token> Optional<T> as(Class<T> type){
+			if(type==Word.class){
+				return Optional.of((T)new Word(line, value.dotted()));
+			}
+			return Token.super.as(type);
+		}
 	}
 	
 	record StrValue(int line, String value) implements Token{}
@@ -60,6 +106,8 @@ public sealed interface Token{
 	record FloatVal(int line, float value) implements Token{}
 	
 	record Null(int line) implements Token{}
+	
+	record Bool(int line, boolean value) implements Token{}
 	
 	
 	int line();
@@ -75,6 +123,6 @@ public sealed interface Token{
 		if(o.isPresent()){
 			return o.get();
 		}
-		throw new MalformedJorthException("Required token type "+type.getSimpleName()+" but got "+this.getClass().getSimpleName());
+		throw new MalformedJorthException("Required token type "+type.getSimpleName()+" but got "+this);
 	}
 }

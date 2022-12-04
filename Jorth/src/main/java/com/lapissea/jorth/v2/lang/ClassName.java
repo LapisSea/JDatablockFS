@@ -1,5 +1,8 @@
 package com.lapissea.jorth.v2.lang;
 
+import com.lapissea.jorth.MalformedJorthException;
+import com.lapissea.jorth.v2.lang.type.TypeSource;
+
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -42,6 +45,23 @@ public final class ClassName{
 	
 	public String any(){
 		return dotted!=null?dotted:slashed;
+	}
+	
+	public boolean instanceOf(TypeSource source, ClassName right) throws MalformedJorthException{
+		if(this.equals(right)){
+			return true;
+		}
+		if(right.dotted().equals(Object.class.getName())){
+			return true;
+		}
+		if(this.dotted().equals(Object.class.getName())){
+			return false;
+		}
+		
+		var info     =source.byName(this);
+		var superType=info.superType();
+		if(superType==null) return false;
+		return superType.name().instanceOf(source, right);
 	}
 	
 	@Override

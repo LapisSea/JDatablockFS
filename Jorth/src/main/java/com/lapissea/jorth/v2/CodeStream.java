@@ -5,9 +5,7 @@ import com.lapissea.jorth.v2.lang.Tokenizer;
 import com.lapissea.jorth.v2.lang.text.CharJoin;
 import com.lapissea.jorth.v2.lang.text.CharSubview;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 
 public interface CodeStream{
 	
@@ -68,11 +66,5 @@ public interface CodeStream{
 		else join=new CharJoin(parts);
 		
 		write(join);
-	}
-	
-	void addDefinition(String value, String key);
-	
-	default void addImport(Class<?> type){
-		addDefinition(type.getName(), "typ."+type.getSimpleName());
 	}
 }

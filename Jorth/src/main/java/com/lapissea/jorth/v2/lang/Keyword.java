@@ -4,8 +4,6 @@ import java.util.HashMap;
 import java.util.Map;
 
 public enum Keyword{
-	DEFINE,
-	AS,
 	INTERFACE,
 	CLASS,
 	ENUM,
@@ -18,17 +16,29 @@ public enum Keyword{
 	GET,
 	SET,
 	VISIBILITY,
+	ACCESS,
 	EXTENDS,
 	IMPLEMENTS,
-	;
+	SUPER,
+	NEW,
+	WHAT_THE_STACK("???");
+	
+	public final String key;
 	
 	public static final Map<String, Keyword> MAP;
+	
+	Keyword(String customKey){
+		this.key=customKey;
+	}
+	Keyword(){
+		key=name();
+	}
 	
 	static{
 		var values=Keyword.values();
 		var map   =HashMap.<String, Keyword>newHashMap(values.length);
 		for(Keyword value : values){
-			map.put(value.name().toLowerCase(), value);
+			map.put(value.key.toLowerCase(), value);
 		}
 		MAP=Map.copyOf(map);
 	}
