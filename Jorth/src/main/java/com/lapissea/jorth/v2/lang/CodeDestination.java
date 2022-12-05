@@ -8,4 +8,6 @@ public abstract class CodeDestination{
 	
 	protected abstract void parse(TokenSource source) throws MalformedJorthException;
 	
+	public abstract void addImport(Class<?> clazz);
+	
 }

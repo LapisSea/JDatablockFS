@@ -12,7 +12,8 @@ public class JorthTmp{
 	public static void main(String[] args) throws Throwable{
 		LogUtil.println("Starting");
 		Thread.ofVirtual().start(() -> { });
-		
+
+//		test1();
 		test2();
 	}
 	
@@ -40,7 +41,7 @@ public class JorthTmp{
 					function toString
 						returns #String
 					start
-						new #StringBuilder
+						new #StringBuilder start end
 						call append start '{foo: ' end
 						
 						call append start
@@ -64,6 +65,7 @@ public class JorthTmp{
 	
 	private static void test2() throws Throwable{
 		var cls = timedClass("com.lapissea.jorth.v2.FooBar2", writer -> {
+			writer.addImport(LogUtil.class);
 			writer.write(
 				"""
 					visibility public
@@ -83,6 +85,8 @@ public class JorthTmp{
 					function throwHi
 						returns int
 					start
+						access static
+						call #LogUtil println start 'Heyyy I\\'m about to throw' end
 						new #RuntimeException start
 							'Hi! :D'
 						end throw
@@ -90,12 +94,7 @@ public class JorthTmp{
 					""");
 		});
 		
-		
-		LogUtil.println();
-		LogUtil.println(cls);
-		
 		var inst = cls.getConstructor().newInstance();
-		LogUtil.println(inst);
 		
 		LogUtil.println(cls.getMethod("if1", int.class).invoke(inst, 0));
 		LogUtil.println(cls.getMethod("if1", int.class).invoke(inst, 1));
@@ -104,14 +103,15 @@ public class JorthTmp{
 			cls.getMethod("throwHi").invoke(inst);
 			LogUtil.printlnEr(":(");
 		}catch(ReflectiveOperationException e){
+			e.getCause().printStackTrace();
 			LogUtil.println(e.getCause().getMessage());
 		}
 	}
 	
 	static Class<?> timedClass(String name, UnsafeConsumer<CodeStream, MalformedJorthException> write) throws MalformedJorthException, IllegalAccessException{
-		long t = System.currentTimeMillis();
-		
-		var jorth = new Jorth(null, true);
+		long    t     = System.currentTimeMillis();
+		boolean print = true;
+		var     jorth = new Jorth(null, print);
 		
 		var writer = jorth.writer();
 		
@@ -124,10 +124,10 @@ public class JorthTmp{
 		writer.write("end");
 		
 		var file = jorth.getClassFile(name);
-		
-		LogUtil.println();
-		LogUtil.println(System.currentTimeMillis() - t);
-		BytecodeUtils.printClass(file);
+		var t2   = System.currentTimeMillis();
+		if(print) LogUtil.println();
+		LogUtil.println("Time:", t2 - t);
+		if(print) BytecodeUtils.printClass(file);
 		return MethodHandles.lookup().defineClass(file);
 	}
 }

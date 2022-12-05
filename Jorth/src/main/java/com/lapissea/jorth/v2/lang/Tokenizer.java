@@ -260,4 +260,9 @@ public class Tokenizer implements CodeStream, TokenSource{
 		num = num.replace("_", "");
 		return num;
 	}
+	
+	@Override
+	public void addImport(Class<?> clazz){
+		dad.addImport(clazz);
+	}
 }

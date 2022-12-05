@@ -134,7 +134,20 @@ public final class FunctionGen implements Endable, FunctionInfo{
 			var type = stack.pop();
 			stack.push(type);
 			stack.push(type);
-			writer.visitInsn(DUP);
+			var bt = type.getBaseType();
+			writer.visitInsn(switch(bt.slots()){
+				case 1 -> DUP;
+				case 2 -> DUP2;
+				default -> throw new MalformedJorthException("Illegal base type: " + bt);
+			});
+		}
+		public void pop() throws MalformedJorthException{
+			var bt = stack.pop().getBaseType();
+			writer.visitInsn(switch(bt.slots()){
+				case 1 -> POP;
+				case 2 -> POP2;
+				default -> throw new MalformedJorthException("Illegal base type: " + bt);
+			});
 		}
 	}
 	
@@ -314,8 +327,9 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		var name  = function.name();
 		
 		int callOp;
-		if(function.isStatic()){
-			assert !superCall;
+		if(owner.type() == ClassType.INTERFACE){
+			callOp = INVOKEINTERFACE;
+		}else if(function.isStatic()){
 			callOp = INVOKESTATIC;
 		}else{
 			//https://stackoverflow.com/a/13764338
@@ -528,5 +542,8 @@ public final class FunctionGen implements Endable, FunctionInfo{
 	
 	public void dupOp() throws MalformedJorthException{
 		code().dup();
+	}
+	public void popOp() throws MalformedJorthException{
+		code().pop();
 	}
 }

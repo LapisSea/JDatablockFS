@@ -60,7 +60,7 @@ public final class Jorth extends CodeDestination{
 		return new Tokenizer(this, line);
 	}
 	
-	
+	@Override
 	public void addImport(Class<?> type){
 		imports.put("#" + type.getSimpleName(), ClassName.of(type));
 	}
@@ -267,6 +267,8 @@ public final class Jorth extends CodeDestination{
 				endStack.add(currentFunction.startCall(staticOwner, functionName));
 			}
 			case SUPER -> currentFunction.superOp();
+			case DUP -> currentFunction.dupOp();
+			case POP -> currentFunction.popOp();
 			case WHAT_THE_STACK -> throw new MalformedJorthException("Debug token '???' at line " + source.line() + " encountered. Current stack:\n" + currentFunction.getStack());
 			default -> throw new MalformedJorthException("Unexpected keyword " + keyword + " in function " + currentFunction);
 		}

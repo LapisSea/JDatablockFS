@@ -26,6 +26,7 @@ public enum Keyword{
 	IF,
 	RETURN,
 	THROW,
+	DUP, POP,
 	WHAT_THE_STACK("???");
 	
 	public final String key;

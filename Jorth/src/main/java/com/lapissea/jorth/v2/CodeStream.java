@@ -69,4 +69,6 @@ public interface CodeStream{
 		
 		write(join);
 	}
+	
+	void addImport(Class<?> clazz);
 }
