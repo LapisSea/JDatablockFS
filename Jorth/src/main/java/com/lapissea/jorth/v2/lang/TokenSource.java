@@ -32,6 +32,7 @@ public interface TokenSource{
 			@Override
 			public ClassName readClassName(Function<ClassName, ClassName> imports) throws MalformedJorthException{
 				var tok = source.readToken().requireAs(Token.CWord.class);
+				tok = new Token.CWord(tok.line(), imports.apply(tok.value()));
 				listener.accept(tok);
 				return imports.apply(tok.value());
 			}

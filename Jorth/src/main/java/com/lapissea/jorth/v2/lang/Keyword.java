@@ -22,6 +22,10 @@ public enum Keyword{
 	SUPER,
 	NEW,
 	CALL,
+	EQUALS,
+	IF,
+	RETURN,
+	THROW,
 	WHAT_THE_STACK("???");
 	
 	public final String key;

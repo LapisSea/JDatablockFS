@@ -36,13 +36,9 @@ public final class Jorth extends CodeDestination{
 	
 	private final Map<ClassName, ClassGen> classes = new HashMap<>();
 	
-	private final Function<ClassName, ClassName> importsFun = name -> imports.getOrDefault(name.dotted(), name);
+	private final Function<ClassName, ClassName> importsFun = this::resolveImport;
 	
-	public void addImport(Class<?> type){
-		imports.put("#" + type.getSimpleName(), ClassName.of(type));
-	}
-	
-	private final Deque<Endable> startStack = new ArrayDeque<>();
+	private final Deque<Endable> endStack = new ArrayDeque<>();
 	
 	private final boolean printBack;
 	
@@ -62,6 +58,22 @@ public final class Jorth extends CodeDestination{
 	
 	public CodeStream writer(){
 		return new Tokenizer(this, line);
+	}
+	
+	
+	public void addImport(Class<?> type){
+		imports.put("#" + type.getSimpleName(), ClassName.of(type));
+	}
+	
+	private ClassName resolveImport(ClassName name){
+		if(!name.any().startsWith("#")){
+			return name;
+		}
+		var mapped = imports.get(name.dotted());
+		if(mapped != null) return mapped;
+		var info = typeSource.maybeByName(ClassName.dotted("java.lang." + name.dotted().substring(1)));
+		if(info.isPresent()) return info.get().name();
+		return name;
 	}
 	
 	@Override
@@ -185,7 +197,7 @@ public final class Jorth extends CodeDestination{
 				
 				
 				currentFunction = currentClass.defineFunction(functionName, popVisibility(), popAccessSet(), returnType, args);
-				startStack.addLast(this::endFunction);
+				endStack.addLast(this::endFunction);
 			}
 			default -> throw new MalformedJorthException("Unexpected keyword " + keyword + " in class " + currentClass);
 		}
@@ -194,8 +206,8 @@ public final class Jorth extends CodeDestination{
 	private boolean anyKeyword(TokenSource source, Keyword keyword) throws MalformedJorthException{
 		switch(keyword){
 			case END -> {
-				if(startStack.isEmpty()) throw new MalformedJorthException("Stray end");
-				var e = startStack.removeLast();
+				if(endStack.isEmpty()) throw new MalformedJorthException("Stray end");
+				var e = endStack.removeLast();
 				e.end();
 			}
 			case VISIBILITY -> {
@@ -228,9 +240,20 @@ public final class Jorth extends CodeDestination{
 				var member = source.readWord();
 				currentFunction.setOp(owner, member);
 			}
+			case EQUALS -> currentFunction.equalsOp();
+			case IF -> {
+				source.requireKeyword(Keyword.START);
+				currentFunction.pushIfBool();
+				endStack.add(currentFunction::popIf);
+			}
+			case RETURN -> currentFunction.returnOp();
+			case THROW -> currentFunction.throwOp();
 			case NEW -> {
 				var clazz = source.readClassName(importsFun);
-				currentFunction.newOp(clazz, List.of());
+				source.requireKeyword(Keyword.START);
+				currentFunction.newOp(clazz);
+				currentFunction.dupOp();
+				endStack.add(currentFunction.startCall(null, "<init>"));
 			}
 			case CALL -> {
 				ClassName staticOwner = null;
@@ -241,7 +264,7 @@ public final class Jorth extends CodeDestination{
 				
 				var functionName = source.readWord();
 				source.requireKeyword(Keyword.START);
-				startStack.add(currentFunction.startCall(staticOwner, functionName));
+				endStack.add(currentFunction.startCall(staticOwner, functionName));
 			}
 			case SUPER -> currentFunction.superOp();
 			case WHAT_THE_STACK -> throw new MalformedJorthException("Debug token '???' at line " + source.line() + " encountered. Current stack:\n" + currentFunction.getStack());
@@ -265,7 +288,7 @@ public final class Jorth extends CodeDestination{
 				currentClass = new ClassGen(typeSource, className, ClassType.from(keyword), visibility, extension, interfaces, accessSet);
 				classes.put(className, currentClass);
 				this.interfaces.clear();
-				startStack.addLast(this::endClass);
+				endStack.addLast(this::endClass);
 			}
 			case EXTENDS -> {
 				if(extensionBuffer != null) throw new MalformedJorthException("Super class already defined");

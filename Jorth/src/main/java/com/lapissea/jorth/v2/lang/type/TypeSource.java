@@ -70,6 +70,9 @@ public interface TypeSource{
 	
 	Optional<ClassInfo> maybeByType(GenericType type);
 	
+	default Optional<ClassInfo> maybeByName(ClassName name){
+		return maybeByType(new GenericType(name));
+	}
 	default ClassInfo byName(ClassName name) throws MalformedJorthException{
 		return byType(new GenericType(name));
 	}

@@ -81,9 +81,8 @@ public final class ClassGen implements ClassInfo, Endable{
 //		if(!addedClinit){
 //			defineFunction("<clinit>", Visibility.PUBLIC, Set.of(), null, new LinkedHashMap<>()).end();
 //		}
-		if(!addedInit){
+		if(!addedInit && !accessSet.contains(Access.STATIC)){
 			var init = defineFunction("<init>", this.visibility, Set.of(), null, new LinkedHashMap<>());
-			init.getOp("this", "this");
 			init.superOp();
 			init.end();
 		}
@@ -119,6 +118,9 @@ public final class ClassGen implements ClassInfo, Endable{
 	
 	public FunctionGen defineFunction(String name, Visibility visibility, Set<Access> access, GenericType returnType, LinkedHashMap<String, FunctionGen.ArgInfo> args) throws MalformedJorthException{
 		checkEnd();
+		if(name.equals("<init>") && accessSet.contains(Access.STATIC)){
+			throw new MalformedJorthException("Static class can not be instantiated");
+		}
 		var fun = new FunctionGen(this, name, visibility, access, returnType, args);
 		
 		List<GenericType> argStr = new ArrayList<>(args.size());

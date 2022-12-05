@@ -191,7 +191,7 @@ public class Tokenizer implements CodeStream, TokenSource{
 					if(i == start){
 						pos++;
 						skipWhitespace();
-						return new Token.SmolWord(line, c1);
+						return smol(c1);
 					}
 					break;
 				}
@@ -205,7 +205,7 @@ public class Tokenizer implements CodeStream, TokenSource{
 			if(start + 1 == i){
 				var c = code.charAt(start);
 				skipWhitespace();
-				return new Token.SmolWord(line, c);
+				return smol(c);
 			}
 			
 			String rawWord;
@@ -242,6 +242,11 @@ public class Tokenizer implements CodeStream, TokenSource{
 		}
 		
 		return new Token.Word(lastLine, word);
+	}
+	
+	private Token smol(char c){
+		if(c>='0' && c<='9') return new Token.IntVal(line, c - '0');
+		return new Token.SmolWord(line, c);
 	}
 	
 	private static String cleanNumber(String num, int prefix){

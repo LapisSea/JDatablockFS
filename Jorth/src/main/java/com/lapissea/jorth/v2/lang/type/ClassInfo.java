@@ -11,6 +11,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 public interface ClassInfo{
 	
@@ -23,7 +24,7 @@ public interface ClassInfo{
 		
 		public OfClass(TypeSource source, Class<?> clazz){
 			this.source = source;
-			this.clazz = clazz;
+			this.clazz = Objects.requireNonNull(clazz);
 		}
 		
 		@Override
@@ -32,7 +33,7 @@ public interface ClassInfo{
 			if(f != null) return f;
 			try{
 				f = FieldInfo.of(UtilL.getDeepDeclaredField(clazz, name));
-			}catch(ReflectiveOperationException e){
+			}catch(Throwable e){
 				throw new MalformedJorthException(name + " does not exist in " + clazz, e);
 			}
 			fields.put(name, f);
@@ -47,10 +48,8 @@ public interface ClassInfo{
 				
 				var args = new Class<?>[signature.args().size()];
 				for(int i = 0; i<signature.args().size(); i++){
-					var name   = signature.args().get(i).raw();
-					var loader = clazz.getClassLoader();
-					if(loader == null) loader = this.getClass().getClassLoader();
-					args[i] = loader.loadClass(name.dotted());
+					var name = signature.args().get(i).raw();
+					args[i] = getLoader().loadClass(name.dotted());
 				}
 				
 				if(signature.name().equals("<init>")){
@@ -62,6 +61,11 @@ public interface ClassInfo{
 			}
 			functions.put(signature, f);
 			return f;
+		}
+		private ClassLoader getLoader(){
+			var loader = clazz.getClassLoader();
+			if(loader == null) loader = this.getClass().getClassLoader();
+			return loader;
 		}
 		private static Method getDeepDeclaredMethod(@NotNull Class<?> type, String name, Class<?>[] args) throws ReflectiveOperationException{
 			try{

@@ -67,7 +67,7 @@ public class JorthTmp{
 			writer.write(
 				"""
 					visibility public
-					function toString
+					function if1
 						arg val int
 						returns #String
 					start
@@ -76,7 +76,16 @@ public class JorthTmp{
 							'is 1' return
 						end
 						
-						'isn't 1' return
+						'isn\\'t 1' return
+					end
+					
+					visibility public
+					function throwHi
+						returns int
+					start
+						new #RuntimeException start
+							'Hi! :D'
+						end throw
 					end
 					""");
 		});
@@ -88,15 +97,21 @@ public class JorthTmp{
 		var inst = cls.getConstructor().newInstance();
 		LogUtil.println(inst);
 		
-		LogUtil.println(cls.getMethod("fooGet").invoke(inst));
+		LogUtil.println(cls.getMethod("if1", int.class).invoke(inst, 0));
+		LogUtil.println(cls.getMethod("if1", int.class).invoke(inst, 1));
+		LogUtil.println(cls.getMethod("if1", int.class).invoke(inst, 2));
+		try{
+			cls.getMethod("throwHi").invoke(inst);
+			LogUtil.printlnEr(":(");
+		}catch(ReflectiveOperationException e){
+			LogUtil.println(e.getCause().getMessage());
+		}
 	}
 	
 	static Class<?> timedClass(String name, UnsafeConsumer<CodeStream, MalformedJorthException> write) throws MalformedJorthException, IllegalAccessException{
 		long t = System.currentTimeMillis();
 		
 		var jorth = new Jorth(null, true);
-		jorth.addImport(String.class);
-		jorth.addImport(StringBuilder.class);
 		
 		var writer = jorth.writer();
 		

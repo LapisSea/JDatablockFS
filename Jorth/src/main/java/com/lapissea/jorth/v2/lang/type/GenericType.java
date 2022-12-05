@@ -71,12 +71,12 @@ public record GenericType(ClassName raw, int dims, List<GenericType> args){
 	);
 	
 	public BaseType getBaseType(){
-		if(dims == 0) return BaseType.OBJ;
+		if(dims != 0) return BaseType.OBJ;
 		return PRIMITIVES.getOrDefault(raw.any(), BaseType.OBJ);
 	}
 	
 	public Optional<BaseType> getPrimitiveType(){
-		if(dims == 0) return Optional.empty();
+		if(dims != 0) return Optional.empty();
 		return Optional.ofNullable(PRIMITIVES.get(raw.any()));
 	}
 	

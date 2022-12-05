@@ -5,6 +5,7 @@ import com.lapissea.jorth.v2.lang.ClassName;
 import com.lapissea.jorth.v2.lang.Endable;
 import com.lapissea.jorth.v2.lang.info.FunctionInfo;
 import com.lapissea.util.NotImplementedException;
+import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 
 import java.util.*;
@@ -21,6 +22,8 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		private final TypeStack stack;
 		
 		private boolean ended;
+		
+		private Label endLabel = new Label();
 		
 		public CodePath(MethodVisitor mv, TypeStack stack){
 			this.stack = stack;
@@ -221,23 +224,23 @@ public final class FunctionGen implements Endable, FunctionInfo{
 			case "this" -> {
 				info = this.owner;
 				loadThisIns();
+				
+				if(member.equals("this")){
+					return;
+				}
 			}
 			case "#arg" -> {
-				var arg = args.get(name);
+				var arg = args.get(member);
 				if(arg != null){
-					info = typeSource.byType(arg.type);
 					code.loadArgumentIns(arg);
+					return;
 				}else{
-					throw new MalformedJorthException("Argument " + name + " does not exist");
+					throw new MalformedJorthException("Argument " + member + " does not exist");
 				}
 			}
 			default -> {
 				info = typeSource.byType(new GenericType(ClassName.dotted(owner)));
 			}
-		}
-		
-		if(member.equals("this")){
-			return;
 		}
 		
 		var memberInfo = info.getField(member);
@@ -297,11 +300,9 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		invokeOp(sup.getFunction(new Signature("<init>")), true);
 	}
 	
-	public void newOp(ClassName clazz, List<GenericType> args) throws MalformedJorthException{
+	public void newOp(ClassName clazz){
 		writer.visitTypeInsn(NEW, clazz.slashed());
 		code().stack.push(new GenericType(clazz));
-		code().dup();
-		invokeOp(typeSource.byName(clazz).getFunction(new Signature("<init>", args)), false);
 	}
 	
 	private void loadThisIns(){
@@ -387,6 +388,78 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		};
 	}
 	
+	public void equalsOp() throws MalformedJorthException{
+		var stack = code().stack;
+		stack.requireElements(2);
+		
+		var a = stack.pop();
+		var b = stack.pop();
+		
+		if(!a.instanceOf(typeSource, b) && !b.instanceOf(typeSource, a)){
+			throw new MalformedJorthException(a + " not compatible with " + b);
+		}
+		
+		stack.push(GenericType.BOOL);
+		
+		var prim = a.getPrimitiveType();
+		if(prim.isPresent()){
+			if(prim.get().loadOp() == ILOAD){
+				comparisonToBool(IF_ICMPNE);
+			}else{
+				throw new NotImplementedException();
+			}
+		}
+	}
+	
+	public void pushIfBool() throws MalformedJorthException{
+		var stack = code().stack;
+		var typ   = stack.pop();
+		if(!typ.equals(GenericType.BOOL)){
+			throw new MalformedJorthException("Got " + typ + " but need a boolean for if statement");
+		}
+		
+		var newPath = new CodePath(writer, stack);
+		codeInfo.add(newPath);
+		
+		//Jump if false
+		writer.visitJumpInsn(IFEQ, newPath.endLabel);
+	}
+	
+	public void popIf() throws MalformedJorthException{
+		var ifPath = codeInfo.removeLast();
+		if(!ifPath.stack.isEmpty()){
+			throw new MalformedJorthException("If ended but there is data left in if code block");
+		}
+		writer.visitLabel(ifPath.endLabel);
+	}
+	
+	public void returnOp() throws MalformedJorthException{
+		code().end();
+	}
+	
+	public void throwOp() throws MalformedJorthException{
+		var stack = code().stack;
+		var typ   = stack.pop();
+		if(!typ.instanceOf(typeSource, new GenericType(ClassName.of(Throwable.class)))){
+			throw new MalformedJorthException("Got " + typ + " but need a boolean for if statement");
+		}
+		
+		writer.visitInsn(ATHROW);
+		code().ended = true;
+	}
+	
+	private void comparisonToBool(int ifNotOp){
+		Label falseL = new Label();
+		writer.visitJumpInsn(ifNotOp, falseL);
+		writer.visitInsn(ICONST_1);
+		Label endL = new Label();
+		writer.visitJumpInsn(GOTO, endL);
+		writer.visitLabel(falseL);
+		writer.visitInsn(ICONST_0);
+		writer.visitLabel(endL);
+	}
+	
+	
 	public void loadStringOp(String str){
 		writer.visitLdcInsn(str);
 		code().stack.push(GenericType.STRING);
@@ -451,5 +524,9 @@ public final class FunctionGen implements Endable, FunctionInfo{
 	@Override
 	public String toString(){
 		return name + "()";
+	}
+	
+	public void dupOp() throws MalformedJorthException{
+		code().dup();
 	}
 }
