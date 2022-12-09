@@ -12,8 +12,8 @@ import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IODynamic;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
-import com.lapissea.jorth.JorthCompiler;
-import com.lapissea.jorth.JorthWriter;
+import com.lapissea.jorth.CodeStream;
+import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.MalformedJorthException;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
@@ -84,27 +84,21 @@ public final class TemplateClassLoader extends ClassLoader{
 		return defineClass(className, ByteBuffer.wrap(classData), null);
 	}
 	
-	private byte[] jorthGenerate(TypeNamed classType, UnsafeBiConsumer<TypeNamed, JorthWriter, MalformedJorthException> generator){
+	private byte[] jorthGenerate(TypeNamed classType, UnsafeBiConsumer<TypeNamed, CodeStream, MalformedJorthException> generator){
 		if(PRINT_GENERATING_INFO) LogUtil.println("generating", "\n" + TextUtil.toTable(classType.name, classType.def.getFields()));
 		
-		var jorth = new JorthCompiler(this);
+		var jorth = new Jorth(this, true);
 		
-		try(var writer = jorth.writeCode()){
+		try(var writer = jorth.writer()){
 			generator.accept(classType, writer);
 		}catch(MalformedJorthException e){
 			throw new RuntimeException("Failed to generate class " + classType.name, e);
 		}
 		
-		byte[] byt;
-		try{
-			byt = jorth.classBytecode(PRINT_BYTECODE);
-		}catch(MalformedJorthException e){
-			throw new RuntimeException(e);
-		}
-		return byt;
+		return jorth.getClassFile(classType.name);
 	}
 	
-	private void generateEnum(TypeNamed classType, JorthWriter writer) throws MalformedJorthException{
+	private void generateEnum(TypeNamed classType, CodeStream writer) throws MalformedJorthException{
 		writer.write("#TOKEN(0) className define", classType.name);
 		writer.write(
 			"""
@@ -117,7 +111,7 @@ public final class TemplateClassLoader extends ClassLoader{
 		}
 	}
 	
-	private void generateIOInstance(TypeNamed classType, JorthWriter writer) throws MalformedJorthException{
+	private void generateIOInstance(TypeNamed classType, CodeStream writer) throws MalformedJorthException{
 		
 		writer.write("#TOKEN(0) genClassName      define", classType.name);
 		writer.write("#TOKEN(0) IOInstance.Def    define", IOInstance.Def.class.getName());

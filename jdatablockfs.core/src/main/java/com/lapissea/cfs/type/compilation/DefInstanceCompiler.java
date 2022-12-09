@@ -13,8 +13,8 @@ import com.lapissea.cfs.type.compilation.CompilationTools.Style;
 import com.lapissea.cfs.type.compilation.ToStringFormat.ToStringFragment.*;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.annotations.IOValue;
-import com.lapissea.jorth.JorthCompiler;
-import com.lapissea.jorth.JorthWriter;
+import com.lapissea.jorth.CodeStream;
+import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.MalformedJorthException;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
@@ -324,16 +324,18 @@ public class DefInstanceCompiler{
 		
 		Log.trace("Generating completion of {}#cyan - missing getters: {}, missing setters: {}", interf.getSimpleName(), missingGetters, missingSetters);
 		
-		JorthCompiler jorth = new JorthCompiler(interf.getClassLoader());
+		var completionName = interf.getName() + IMPL_COMPLETION_POSTFIX;
+		
+		var jorth = new Jorth(interf.getClassLoader(), false);
 		try{
 			
-			try(var writer = jorth.writeCode()){
+			try(var writer = jorth.writer()){
 				writeAnnotations(writer, Arrays.asList(interf.getAnnotations()));
-				writer.write("#TOKEN(0) typ.impl define", interf.getName() + IMPL_COMPLETION_POSTFIX);
+				writer.addImportAs(completionName, "typ.impl");
 				writer.write(
 					"""
-						#TOKEN(0) implements
-						typ.impl interface start
+						implements {!}
+						interface #typ.impl start
 						""",
 					interf.getName());
 				
@@ -348,11 +350,11 @@ public class DefInstanceCompiler{
 					writer.write(
 						"""
 							public visibility
-							#RAW(0) arg1 arg
-							#TOKEN(1) function
+							function {!}
+								arg arg1 {}
 							""",
-						jtyp,
-						setterName
+						setterName,
+						jtyp
 					);
 				}
 				for(String name : missingGetters){
@@ -366,8 +368,8 @@ public class DefInstanceCompiler{
 					writer.write(
 						"""
 							public visibility
-							#RAW(0) returns
-							#TOKEN(1) function
+							{} returns
+							{!} function
 							""",
 						jtyp,
 						getterName
@@ -375,7 +377,7 @@ public class DefInstanceCompiler{
 				}
 			}
 			
-			return Access.privateLookupIn(interf).defineClass(jorth.classBytecode(PRINT_BYTECODE));
+			return Access.privateLookupIn(interf).defineClass(jorth.getClassFile(completionName));
 		}catch(IllegalAccessException|MalformedJorthException e){
 			throw new RuntimeException(e);
 		}
@@ -424,30 +426,27 @@ public class DefInstanceCompiler{
 		var implName = interf.getName() + IOInstance.Def.IMPL_NAME_POSTFIX + names.map(n -> n.stream().collect(Collectors.joining("_", "€€fields~", ""))).orElse("");
 		
 		try{
-			JorthCompiler jorth = new JorthCompiler(interf.getClassLoader());
+			var jorth = new Jorth(interf.getClassLoader(), false);
 			
-			try(var writer = jorth.writeCode()){
-				writer.write("#TOKEN(0) typ.impl                          define", implName);
-				writer.write("#TOKEN(0) typ.interf                        define", interf.getName());
-				writer.write("#TOKEN(0) typ.String                        define", String.class.getName());
-				writer.write("#TOKEN(0) typ.Struct                        define", Struct.class.getName());
-				writer.write("#TOKEN(0) typ.Objects                       define", Objects.class.getName());
-				writer.write("#TOKEN(0) typ.IOValue                       define", IOValue.class.getName());
-				writer.write("#TOKEN(0) typ.Override                      define", Override.class.getName());
-				writer.write("#TOKEN(0) typ.ChunkPointer                  define", ChunkPointer.class.getName());
-				writer.write("#TOKEN(0) typ.StringBuilder                 define", StringBuilder.class.getName());
-				writer.write("#TOKEN(0) typ.IOInstance.Managed            define", IOInstance.Managed.class.getName());
-				writer.write("#TOKEN(0) typ.UnsupportedOperationException define", UnsupportedOperationException.class.getName());
+			jorth.addImportAs(implName, "typ.impl");
+			jorth.addImportAs(interf.getName(), "typ.interf");
+			jorth.addImports(
+				Struct.class, Objects.class, IOValue.class,
+				ChunkPointer.class, IOInstance.Managed.class,
+				UnsupportedOperationException.class
+			);
+			
+			try(var writer = jorth.writer()){
 				
 				writer.write(
 					"""
 						public visibility
-						typ.interf implements
-						[typ.impl] typ.IOInstance.Managed extends
-						typ.impl class start
+						implements #typ.interf
+						extends typ.IOInstance.Managed <#typ.impl>
+						class #typ.impl start
 						""");
 				
-				for(FieldInfo info : fieldInfo){
+				for(var info : fieldInfo){
 					if(isFieldIncluded(key, info.name)){
 						defineField(writer, info);
 						implementUserAccess(writer, info);
@@ -473,9 +472,9 @@ public class DefInstanceCompiler{
 					for(FieldInfo info : orderedFields.orElseThrow()){
 						var type = Objects.requireNonNull(TypeLink.of(info.type));
 						writer.write(
-							"#RAW(0) #TOKEN(1) arg",
-							JorthUtils.toJorthGeneric(type),
-							info.name);
+							"arg {!} {}",
+							info.name,
+							JorthUtils.toJorthGeneric(type));
 					}
 					
 					writer.write(
@@ -486,11 +485,11 @@ public class DefInstanceCompiler{
 						set.getName());
 					
 					for(FieldInfo info : includedOrdered.orElseThrow()){
-						writer.write("<arg> #TOKEN(0) get", info.name);
+						writer.write("get #arg {!}", info.name);
 						if(info.type == ChunkPointer.class){
 							nullCheck(writer);
 						}
-						writer.write("this #TOKEN(0) set", info.name);
+						writer.write("set this {!}", info.name);
 					}
 					writer.write("end");
 				}
@@ -517,7 +516,7 @@ public class DefInstanceCompiler{
 			}
 			
 			//noinspection unchecked
-			return (Class<T>)Access.privateLookupIn(interf).defineClass(jorth.classBytecode(PRINT_BYTECODE));
+			return (Class<T>)Access.privateLookupIn(interf).defineClass(jorth.getClassFile(implName));
 			
 		}catch(IllegalAccessException|MalformedJorthException e){
 			throw new RuntimeException(e);
@@ -528,7 +527,7 @@ public class DefInstanceCompiler{
 		return key.includeNames.map(ns -> ns.contains(name)).orElse(true);
 	}
 	
-	private static <T extends IOInstance<T>> void generateSpecialToString(Class<T> interf, JorthWriter writer, Specials specials) throws MalformedJorthException{
+	private static <T extends IOInstance<T>> void generateSpecialToString(Class<T> interf, CodeStream writer, Specials specials) throws MalformedJorthException{
 		if(specials.toStr.isPresent()){
 			generateSpecialToString(interf, writer, specials.toStr.get());
 		}
@@ -537,21 +536,22 @@ public class DefInstanceCompiler{
 		}
 	}
 	
-	private static <T extends IOInstance<T>> void generateSpecialToString(Class<T> interf, JorthWriter writer, Method method) throws MalformedJorthException{
+	private static <T extends IOInstance<T>> void generateSpecialToString(Class<T> interf, CodeStream writer, Method method) throws MalformedJorthException{
 		writer.write(
 			"""
 				public visibility
-				typ.String returns
-				#TOKEN(0) function start
-					this this get
-					#TOKEN(1) #TOKEN(0) (1) static call
+				function {!0}
+					returns typ.String
+				start
+					get this this
+					access static call {!1} {!0} start end
 				end
 				""",
 			method.getName(),
 			interf.getName());
 	}
 	
-	private static <T extends IOInstance<T>> void generateFormatToString(Key<T> interf, List<FieldInfo> fieldInfo, Specials specials, JorthWriter writer, IOInstance.Def.ToString.Format format) throws MalformedJorthException{
+	private static <T extends IOInstance<T>> void generateFormatToString(Key<T> interf, List<FieldInfo> fieldInfo, Specials specials, CodeStream writer, IOInstance.Def.ToString.Format format) throws MalformedJorthException{
 		var fragment = ToStringFormat.parse(format.value(), fieldInfo.stream().map(FieldInfo::name).toList());
 		
 		if(specials.toStr.isEmpty()){
@@ -562,7 +562,7 @@ public class DefInstanceCompiler{
 		}
 	}
 	
-	private static <T extends IOInstance<T>> void generateStandardToString(Key<T> key, List<FieldInfo> fieldInfo, Specials specials, JorthWriter writer, IOInstance.Def.ToString toStrAnn) throws MalformedJorthException{
+	private static <T extends IOInstance<T>> void generateStandardToString(Key<T> key, List<FieldInfo> fieldInfo, Specials specials, CodeStream writer, IOInstance.Def.ToString toStrAnn) throws MalformedJorthException{
 		
 		if(specials.toStr.isEmpty()){
 			generateStandardToString(key, toStrAnn, "toString", fieldInfo, writer);
@@ -579,24 +579,26 @@ public class DefInstanceCompiler{
 				writer.write(
 					"""
 						public visibility
-						typ.String returns
-						toShortString function start
-							this this get
-							toString (0) call
+						function toShortString
+							returns #String
+						start
+							get this this
+							call toString start end
 						end
 						""");
 			}
 		}
 	}
 	
-	private static void generateFormatToString(Key<?> key, List<FieldInfo> fieldInfo, String name, boolean all, ToStringFormat.ToStringFragment fragment, JorthWriter writer) throws MalformedJorthException{
+	private static void generateFormatToString(Key<?> key, List<FieldInfo> fieldInfo, String name, boolean all, ToStringFormat.ToStringFragment fragment, CodeStream writer) throws MalformedJorthException{
 		
 		writer.write(
 			"""
 				public visibility
-				typ.String returns
-				#TOKEN(0) function start
-					typ.StringBuilder (0) new
+				function {!}
+					returns #String
+				 start
+					#StringBuilder (0) new start end
 				""",
 			name
 		);
@@ -621,7 +623,7 @@ public class DefInstanceCompiler{
 		
 		writer.write(
 			"""
-					toString (0) call
+					call toString start end
 				end
 				""");
 	}
@@ -650,7 +652,7 @@ public class DefInstanceCompiler{
 		}
 	}
 	
-	private static void executeStringFragment(Class<?> interf, List<FieldInfo> fieldInfo, ToStringFormat.ToStringFragment fragment, boolean all, JorthWriter writer) throws MalformedJorthException{
+	private static void executeStringFragment(Class<?> interf, List<FieldInfo> fieldInfo, ToStringFormat.ToStringFragment fragment, boolean all, CodeStream writer) throws MalformedJorthException{
 		switch(fragment){
 			case NOOP ignored -> { }
 			case Concat f -> {
@@ -669,8 +671,9 @@ public class DefInstanceCompiler{
 				var field = fieldInfo.stream().filter(n -> n.name.equals(frag.name())).findFirst().orElseThrow();
 				append(writer, w -> w.write(
 					"""
-						this #TOKEN(0) get
-						typ.String valueOf (1) static call
+						get this {!}
+						access static
+						call #String valueOf
 						""", field.name));
 			}
 			case OptionalBlock f -> {
@@ -681,14 +684,15 @@ public class DefInstanceCompiler{
 		}
 	}
 	
-	private static void generateStandardToString(Key<?> key, IOInstance.Def.ToString toStrAnn, String name, List<FieldInfo> fieldInfo, JorthWriter writer) throws MalformedJorthException{
+	private static void generateStandardToString(Key<?> key, IOInstance.Def.ToString toStrAnn, String name, List<FieldInfo> fieldInfo, CodeStream writer) throws MalformedJorthException{
 		
 		writer.write(
 			"""
 				public visibility
-				typ.String returns
-				#TOKEN(0) function start
-					typ.StringBuilder (0) new
+				function {!}
+					returns #String
+				start
+					typ.StringBuilder new start end
 				""",
 			name
 		);
@@ -697,7 +701,7 @@ public class DefInstanceCompiler{
 			var nam = key.clazz.getSimpleName();
 			if(nam.endsWith(IMPL_COMPLETION_POSTFIX)) nam = nam.substring(0, nam.length() - IMPL_COMPLETION_POSTFIX.length());
 			var clean = nam;
-			append(writer, w -> w.write("'#RAW(0)'", clean));
+			append(writer, w -> w.write("'{}'", clean));
 		}
 		if(toStrAnn.curly()){
 			append(writer, w -> w.write("'{'"));
@@ -719,12 +723,13 @@ public class DefInstanceCompiler{
 			first = false;
 			
 			if(toStrAnn.fNames()){
-				append(writer, w -> w.write("'#RAW(0): '", info.name));
+				append(writer, w -> w.write("'{}: '", info.name));
 			}
 			append(writer, w -> w.write(
 				"""
-					this #TOKEN(0) get
-					typ.String valueOf (1) static call
+					get this {}
+					access static
+					call #String valueOf
 					""",
 				info.name
 			));
@@ -736,59 +741,66 @@ public class DefInstanceCompiler{
 		
 		writer.write(
 			"""
-					toString (0) call
+					call toString
 				end
 				""");
 	}
 	
-	private static void append(JorthWriter writer, UnsafeConsumer<JorthWriter, MalformedJorthException> val) throws MalformedJorthException{
-		writer.write("dup");
-		val.accept(writer);
+	private static void append(CodeStream writer, UnsafeConsumer<CodeStream, MalformedJorthException> val) throws MalformedJorthException{
 		writer.write(
 			"""
-				append (1) call
-				pop
-				"""
-		);
+				call append
+				start
+				""");
+		val.accept(writer);
+		writer.write("end");
 	}
 	
-	private static void generateDefaultConstructor(JorthWriter writer, List<FieldInfo> fieldInfo) throws MalformedJorthException{
+	private static void generateDefaultConstructor(CodeStream writer, List<FieldInfo> fieldInfo) throws MalformedJorthException{
 		writer.write(
 			"""
-				public visibility
-				<init> function start
-					this this get
-					typ.impl $STRUCT get
-					super
+				visibility public
+				function <init>
+				start
+					super start
+						access static
+						get #typ.impl $STRUCT
+					end
 				""");
 		
 		for(FieldInfo info : fieldInfo){
 			if(info.type != ChunkPointer.class) continue;
-			writer.write("typ.ChunkPointer NULL get");
-			writer.write("this").write(info.name).write("set");
+			writer.write("access static get #ChunkPointer NULL");
+			writer.write("set this {!}", info.name);
 		}
 		writer.write("end");
 	}
 	
-	private static void generateDataConstructor(JorthWriter writer, Optional<List<FieldInfo>> oOrderedFields, Optional<Set<String>> includeNames) throws MalformedJorthException{
+	private static void generateDataConstructor(CodeStream writer, Optional<List<FieldInfo>> oOrderedFields, Optional<Set<String>> includeNames) throws MalformedJorthException{
 		
 		if(oOrderedFields.isPresent()){
 			var orderedFields = oOrderedFields.get();
 			
-			writer.write("public visibility");
+			writer.write(
+				"""
+					visibility public
+					function <init>
+					""");
 			for(int i = 0; i<orderedFields.size(); i++){
 				FieldInfo info    = orderedFields.get(i);
 				var       type    = JorthUtils.toJorthGeneric(Objects.requireNonNull(TypeLink.of(info.type)));
 				var       argName = "arg" + i;
-				writer.write("#RAW(0) #TOKEN(1) arg", type, argName);
+				writer.write("arg {!} {}", argName, type);
 			}
 			
 			writer.write(
 				"""
-					<init> function start
-						this this get
-						typ.impl $STRUCT get
-						super
+					start
+						super start
+							get this this
+							access static
+							get #typ.impl $STRUCT get
+						end
 					""");
 			
 			for(int i = 0; i<orderedFields.size(); i++){
@@ -796,7 +808,7 @@ public class DefInstanceCompiler{
 				boolean   included = includeNames.map(in -> in.contains(info.name)).orElse(true);
 				boolean   isPtr    = info.type == ChunkPointer.class;
 				if(included || isPtr){
-					writer.write("<arg>").write("arg" + i).write("get");
+					writer.write("get #arg arg{}", i);
 				}
 				if(isPtr){
 					nullCheck(writer);
@@ -858,10 +870,10 @@ public class DefInstanceCompiler{
 		return Optional.of(ordered);
 	}
 	
-	private static void defineStatics(JorthWriter writer) throws MalformedJorthException{
+	private static void defineStatics(CodeStream writer) throws MalformedJorthException{
 		writer.write(
 			"""
-				private visibility
+				visibility private
 				static final
 				[#TOKEN(0)] typ.Struct $STRUCT field
 				
@@ -873,7 +885,7 @@ public class DefInstanceCompiler{
 				""");
 	}
 	
-	private static void implementUserAccess(JorthWriter writer, FieldInfo info) throws MalformedJorthException{
+	private static void implementUserAccess(CodeStream writer, FieldInfo info) throws MalformedJorthException{
 		var jtyp = JorthUtils.toJorthGeneric(Objects.requireNonNull(TypeLink.of(info.type)));
 		
 		var getterName = info.getter.map(s -> s.method().getName()).orElseGet(() -> {
@@ -892,7 +904,7 @@ public class DefInstanceCompiler{
 		});
 		writer.write(
 			"""
-				public visibility
+				visibility public
 				{'#TOKEN(2)' name} typ.IOValue @
 				typ.Override @
 				#RAW(1) returns
@@ -907,7 +919,7 @@ public class DefInstanceCompiler{
 		
 		writer.write(
 			"""
-				public visibility
+				visibility public
 				{'#TOKEN(2)' name} typ.IOValue @
 				typ.Override @
 				#RAW(1) arg1 arg
@@ -932,7 +944,7 @@ public class DefInstanceCompiler{
 		);
 	}
 	
-	private static void defineNoField(JorthWriter writer, FieldInfo info) throws MalformedJorthException{
+	private static void defineNoField(CodeStream writer, FieldInfo info) throws MalformedJorthException{
 		var jtyp = JorthUtils.toJorthGeneric(Objects.requireNonNull(TypeLink.of(info.type)));
 		
 		var getterName = info.getter.map(v -> v.method().getName()).orElseGet(() -> "get" + TextUtil.firstToUpperCase(info.name));
@@ -949,8 +961,8 @@ public class DefInstanceCompiler{
 		writer.write(
 			"""
 				public visibility
-				#RAW(0) returns
-				#TOKEN(1) function start
+				{} returns
+				{!} function start
 					typ.UnsupportedOperationException (0) new throw
 				end
 				""",
@@ -962,8 +974,8 @@ public class DefInstanceCompiler{
 		writer.write(
 			"""
 				public visibility
-				#RAW(0) arg1 arg
-				#TOKEN(1) function start
+				{} arg1 arg
+				{!} function start
 					typ.UnsupportedOperationException (0) new throw
 				end
 				""",
@@ -972,7 +984,7 @@ public class DefInstanceCompiler{
 		);
 	}
 	
-	private static void defineField(JorthWriter writer, FieldInfo info) throws MalformedJorthException{
+	private static void defineField(CodeStream writer, FieldInfo info) throws MalformedJorthException{
 		var type = Objects.requireNonNull(TypeLink.of(info.type));
 		
 		writer.write("private visibility");
@@ -980,19 +992,19 @@ public class DefInstanceCompiler{
 		writeAnnotations(writer, info.annotations);
 		
 		writer.write(
-			"#RAW(0) #TOKEN(1) field",
+			"{} {!} field",
 			JorthUtils.toJorthGeneric(type),
 			info.name
 		);
 	}
 	
-	private static void writeAnnotations(JorthWriter writer, List<Annotation> annotations) throws MalformedJorthException{
+	private static void writeAnnotations(CodeStream writer, List<Annotation> annotations) throws MalformedJorthException{
 		Set<Class<?>> annTypes = new HashSet<>();
 		for(var ann : annotations){
 			if(!annTypes.add(ann.annotationType())) continue;
 			
 			writer.write("{");
-			scanAnnotation(ann, (name, value) -> writer.write("#RAW(0) #TOKEN(1)", switch(value){
+			scanAnnotation(ann, (name, value) -> writer.write("{} {!}", switch(value){
 				case null -> "null";
 				case String s -> "'" + s.replace("'", "\\'") + "'";
 				case Enum<?> e -> e.name();
@@ -1009,7 +1021,7 @@ public class DefInstanceCompiler{
 		}
 	}
 	
-	private static void nullCheck(JorthWriter writer) throws MalformedJorthException{
+	private static void nullCheck(CodeStream writer) throws MalformedJorthException{
 		writer.write(
 			"""
 				dup
@@ -1216,30 +1228,5 @@ public class DefInstanceCompiler{
 			var ann = GetAnnotation.from(field.annotations);
 			reg.requireCanCreate(FieldCompiler.getType(field.type, ann), ann);
 		}
-	}
-	
-	static{
-		//First run warmup
-		Thread.ofVirtual().start(() -> {
-			if(!CACHE.isEmpty()) return;
-			JorthCompiler compiler = new JorthCompiler(JorthCompiler.class.getClassLoader());
-			try{
-				try(var writer = compiler.writeCode()){
-					writer.write(
-						"""
-							public visibility
-							dummy class start
-								public visibility
-								int returns
-								bar function start
-									0
-								end
-							""");
-				}
-				compiler.classBytecode(false);
-			}catch(Throwable e){
-				e.printStackTrace();
-			}
-		});
 	}
 }
