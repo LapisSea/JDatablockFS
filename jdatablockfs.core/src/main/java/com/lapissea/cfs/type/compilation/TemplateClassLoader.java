@@ -14,7 +14,7 @@ import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
-import com.lapissea.jorth.MalformedJorthException;
+import com.lapissea.jorth.MalformedJorth;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
@@ -84,21 +84,21 @@ public final class TemplateClassLoader extends ClassLoader{
 		return defineClass(className, ByteBuffer.wrap(classData), null);
 	}
 	
-	private byte[] jorthGenerate(TypeNamed classType, UnsafeBiConsumer<TypeNamed, CodeStream, MalformedJorthException> generator){
+	private byte[] jorthGenerate(TypeNamed classType, UnsafeBiConsumer<TypeNamed, CodeStream, MalformedJorth> generator){
 		if(PRINT_GENERATING_INFO) LogUtil.println("generating", "\n" + TextUtil.toTable(classType.name, classType.def.getFields()));
 		
 		var jorth = new Jorth(this, true);
 		
 		try(var writer = jorth.writer()){
 			generator.accept(classType, writer);
-		}catch(MalformedJorthException e){
+		}catch(MalformedJorth e){
 			throw new RuntimeException("Failed to generate class " + classType.name, e);
 		}
 		
 		return jorth.getClassFile(classType.name);
 	}
 	
-	private void generateEnum(TypeNamed classType, CodeStream writer) throws MalformedJorthException{
+	private void generateEnum(TypeNamed classType, CodeStream writer) throws MalformedJorth{
 		writer.write("#TOKEN(0) className define", classType.name);
 		writer.write(
 			"""
@@ -111,7 +111,7 @@ public final class TemplateClassLoader extends ClassLoader{
 		}
 	}
 	
-	private void generateIOInstance(TypeNamed classType, CodeStream writer) throws MalformedJorthException{
+	private void generateIOInstance(TypeNamed classType, CodeStream writer) throws MalformedJorth{
 		
 		writer.write("#TOKEN(0) genClassName      define", classType.name);
 		writer.write("#TOKEN(0) IOInstance.Def    define", IOInstance.Def.class.getName());

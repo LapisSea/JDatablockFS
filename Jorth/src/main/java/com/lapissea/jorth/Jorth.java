@@ -127,20 +127,20 @@ public final class Jorth extends CodeDestination{
 	}
 	
 	@Override
-	protected void parse(TokenSource source) throws MalformedJorthException{
+	protected void parse(TokenSource source) throws MalformedJorth{
 		var word = source.readToken();
 		
 		if(word instanceof Token.EWord<?> w){
 			switch(w.value()){
 				case Visibility vis -> {
-					if(currentFunction != null) throw new MalformedJorthException("Can not define visibility inside function");
-					if(visibilityBuffer != null) throw new MalformedJorthException("Visibility already defined");
+					if(currentFunction != null) throw new MalformedJorth("Can not define visibility inside function");
+					if(visibilityBuffer != null) throw new MalformedJorth("Visibility already defined");
 					visibilityBuffer = vis;
 					return;
 				}
 				case Access acc -> {
 					if(!accessSet.add(acc)){
-						throw new MalformedJorthException(acc + " already defined");
+						throw new MalformedJorth(acc + " already defined");
 					}
 					return;
 				}
@@ -172,11 +172,11 @@ public final class Jorth extends CodeDestination{
 			case Token.IntVal intVal -> requireFunction().loadIntOp(intVal.value());
 			case Token.StrValue sVal -> requireFunction().loadStringOp(sVal.value());
 			case Token.Bool booleVal -> requireFunction().loadBooleanOp(booleVal.value());
-			default -> throw new MalformedJorthException("Unexpected token " + word);
+			default -> throw new MalformedJorth("Unexpected token " + word);
 		}
 	}
 	
-	private void classKeyword(TokenSource source, Keyword keyword) throws MalformedJorthException{
+	private void classKeyword(TokenSource source, Keyword keyword) throws MalformedJorth{
 		switch(keyword){
 			case FIELD -> {
 				var name = source.readWord();
@@ -184,7 +184,7 @@ public final class Jorth extends CodeDestination{
 				currentClass.defineField(popVisibility(), Set.of(), type, name);
 			}
 			case FUNCTION -> {
-				if(currentFunction != null) throw new MalformedJorthException("Already inside function");
+				if(currentFunction != null) throw new MalformedJorth("Already inside function");
 				
 				var functionName = source.readWord();
 				if(functionName.equals("<")){
@@ -213,18 +213,18 @@ public final class Jorth extends CodeDestination{
 							var     access   = popAccessSet();
 							boolean isStatic = access.remove(Access.STATIC);
 							if(!access.isEmpty()){
-								throw new MalformedJorthException("Unsupported access on " + name + ": " + access);
+								throw new MalformedJorth("Unsupported access on " + name + ": " + access);
 							}
 							
 							if(args.put(name, new FunctionGen.ArgInfo(type, name, isStatic)) != null){
-								throw new MalformedJorthException("Duplicate arg " + name);
+								throw new MalformedJorth("Duplicate arg " + name);
 							}
 						}
 						case RETURNS -> {
-							if(returnType != null) throw new MalformedJorthException("Duplicate returns statement");
+							if(returnType != null) throw new MalformedJorth("Duplicate returns statement");
 							returnType = source.readType(importsFun);
 						}
-						default -> throw new MalformedJorthException("Unexpected keyword " + keyword);
+						default -> throw new MalformedJorth("Unexpected keyword " + keyword.key);
 					}
 				}
 				
@@ -232,14 +232,14 @@ public final class Jorth extends CodeDestination{
 				currentFunction = currentClass.defineFunction(functionName, popVisibility(), popAccessSet(), returnType, args);
 				endStack.addLast(this::endFunction);
 			}
-			default -> throw new MalformedJorthException("Unexpected keyword " + keyword + " in class " + currentClass);
+			default -> throw new MalformedJorth("Unexpected keyword " + keyword.key + " in class " + currentClass);
 		}
 	}
 	
-	private boolean anyKeyword(TokenSource source, Keyword keyword) throws MalformedJorthException{
+	private boolean anyKeyword(TokenSource source, Keyword keyword) throws MalformedJorth{
 		switch(keyword){
 			case END -> {
-				if(endStack.isEmpty()) throw new MalformedJorthException("Stray end");
+				if(endStack.isEmpty()) throw new MalformedJorth("Stray end");
 				var e = endStack.removeLast();
 				e.end();
 			}
@@ -250,7 +250,7 @@ public final class Jorth extends CodeDestination{
 		return true;
 	}
 	
-	private void functionKeyword(TokenSource source, Keyword keyword) throws MalformedJorthException{
+	private void functionKeyword(TokenSource source, Keyword keyword) throws MalformedJorth{
 		switch(keyword){
 			case GET -> {
 				var owner  = source.readWord();
@@ -282,7 +282,7 @@ public final class Jorth extends CodeDestination{
 				
 				var acc = popAccessSet();
 				if(acc.remove(Access.STATIC)) staticOwner = source.readClassName(importsFun);
-				if(!acc.isEmpty()) throw new MalformedJorthException("Illegal access " + acc);
+				if(!acc.isEmpty()) throw new MalformedJorth("Illegal access " + acc);
 				
 				var functionName = source.readWord();
 				source.requireKeyword(Keyword.START);
@@ -291,8 +291,8 @@ public final class Jorth extends CodeDestination{
 			case SUPER -> currentFunction.superOp();
 			case DUP -> currentFunction.dupOp();
 			case POP -> currentFunction.popOp();
-			case WHAT_THE_STACK -> throw new MalformedJorthException("Debug token '???' at line " + source.line() + " encountered. Current stack:\n" + currentFunction.getStack());
-			default -> throw new MalformedJorthException("Unexpected keyword " + keyword + " in function " + currentFunction);
+			case WHAT_THE_STACK -> throw new MalformedJorth("Debug token '???' at line " + source.line() + " encountered. Current stack:\n" + currentFunction.getStack());
+			default -> throw new MalformedJorth("Unexpected keyword " + keyword.key + " in function " + currentFunction);
 		}
 	}
 	
@@ -303,7 +303,7 @@ public final class Jorth extends CodeDestination{
 				source.requireKeyword(Keyword.START);
 				
 				if(classes.containsKey(className)){
-					throw new MalformedJorthException(className + " already defined or started");
+					throw new MalformedJorth(className + " already defined or started");
 				}
 				
 				var visibility = popVisibility();
@@ -315,27 +315,27 @@ public final class Jorth extends CodeDestination{
 				endStack.addLast(this::endClass);
 			}
 			case EXTENDS -> {
-				if(extensionBuffer != null) throw new MalformedJorthException("Super class already defined");
+				if(extensionBuffer != null) throw new MalformedJorth("Super class already defined");
 				extensionBuffer = source.readType(importsFun, false);
 			}
 			case IMPLEMENTS -> interfaces.add(source.readType(importsFun, false));
-			default -> throw new MalformedJorthException("Unexpected keyword " + keyword);
+			default -> throw new MalformedJorth("Unexpected keyword " + keyword.key);
 		}
 	}
 	
-	private void endFunction() throws MalformedJorthException{
+	private void endFunction() throws MalformedJorth{
 		currentFunction.end();
 		currentFunction = null;
 	}
 	
-	private void endClass() throws MalformedJorthException{
+	private void endClass() throws MalformedJorth{
 		currentClass.end();
 		currentClass = null;
 	}
 	
-	private FunctionGen requireFunction() throws MalformedJorthException{
+	private FunctionGen requireFunction() throws MalformedJorth{
 		if(currentFunction != null) return currentFunction;
-		throw new MalformedJorthException("Not inside function");
+		throw new MalformedJorth("Not inside function");
 	}
 	
 	private Visibility popVisibility(){

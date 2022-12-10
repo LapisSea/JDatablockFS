@@ -1,6 +1,6 @@
 package com.lapissea.jorth.lang;
 
-import com.lapissea.jorth.MalformedJorthException;
+import com.lapissea.jorth.MalformedJorth;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -10,8 +10,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public sealed interface Token{
 	
 	record KWord(int line, Keyword keyword) implements Token{
-		public void require(Keyword keyword) throws MalformedJorthException{
-			if(this.keyword != keyword) throw new MalformedJorthException("Required keyword is " + keyword + " but got " + this.keyword);
+		public void require(Keyword keyword) throws MalformedJorth{
+			if(this.keyword != keyword) throw new MalformedJorth("Required keyword is " + keyword + " but got " + this.keyword);
 		}
 		
 		@SuppressWarnings("unchecked")
@@ -25,18 +25,18 @@ public sealed interface Token{
 	}
 	
 	record EWord<E extends Enum<E>>(int line, E value) implements Token{
-		public EWord(int line, Class<E> type, String word) throws MalformedJorthException{
+		public EWord(int line, Class<E> type, String word) throws MalformedJorth{
 			this(line, find(type, word));
 		}
 		
 		private static final Map<Class<? extends Enum<?>>, Map<String, Enum<?>>> CACHE = new ConcurrentHashMap<>();
 		
-		public static <E extends Enum<E>> E find(Class<E> type, String word) throws MalformedJorthException{
+		public static <E extends Enum<E>> E find(Class<E> type, String word) throws MalformedJorth{
 			return find(type, word, true);
 		}
 		
 		@SuppressWarnings("unchecked")
-		public static <E extends Enum<E>> E find(Class<E> type, String word, boolean required) throws MalformedJorthException{
+		public static <E extends Enum<E>> E find(Class<E> type, String word, boolean required) throws MalformedJorth{
 			var map = (Map<String, E>)CACHE.computeIfAbsent(type, t -> {
 				var values = t.getEnumConstants();
 				var m      = HashMap.<String, Enum<?>>newHashMap(values.length);
@@ -47,7 +47,7 @@ public sealed interface Token{
 			});
 			var e = map.get(word);
 			if(e == null && required){
-				throw new MalformedJorthException("Expected any of " + map.values() + " but got " + word);
+				throw new MalformedJorth("Expected any of " + map.values() + " but got " + word);
 			}
 			return e;
 		}
@@ -68,7 +68,7 @@ public sealed interface Token{
 				if(value.length() == 1){
 					return Optional.of((T)new SmolWord(line, value.charAt(0)));
 				}else{
-					throw new ClassCastException("Can not convert " + this + " to " + SmolWord.class.getName());
+					return Optional.empty();
 				}
 			}
 			return Token.super.as(type);
@@ -124,11 +124,11 @@ public sealed interface Token{
 		}
 		return Optional.empty();
 	}
-	default <T extends Token> T requireAs(Class<T> type) throws MalformedJorthException{
+	default <T extends Token> T requireAs(Class<T> type) throws MalformedJorth{
 		var o = as(type);
 		if(o.isPresent()){
 			return o.get();
 		}
-		throw new MalformedJorthException("Required token type " + type.getSimpleName() + " but got " + this);
+		throw new MalformedJorth("Required token type " + type.getSimpleName() + " but got " + this);
 	}
 }

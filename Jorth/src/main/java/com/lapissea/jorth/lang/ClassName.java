@@ -1,6 +1,6 @@
 package com.lapissea.jorth.lang;
 
-import com.lapissea.jorth.MalformedJorthException;
+import com.lapissea.jorth.MalformedJorth;
 import com.lapissea.jorth.lang.type.TypeSource;
 
 import java.util.Map;
@@ -47,7 +47,7 @@ public final class ClassName{
 		return dotted != null? dotted : slashed;
 	}
 	
-	public boolean instanceOf(TypeSource source, ClassName right) throws MalformedJorthException{
+	public boolean instanceOf(TypeSource source, ClassName right) throws MalformedJorth{
 		if(this.equals(right)){
 			return true;
 		}

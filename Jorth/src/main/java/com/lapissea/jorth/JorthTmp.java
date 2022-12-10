@@ -106,7 +106,7 @@ public class JorthTmp{
 		}
 	}
 	
-	static Class<?> timedClass(String name, UnsafeConsumer<CodeStream, MalformedJorthException> write) throws MalformedJorthException, IllegalAccessException{
+	static Class<?> timedClass(String name, UnsafeConsumer<CodeStream, MalformedJorth> write) throws MalformedJorth, IllegalAccessException{
 		long    t     = System.currentTimeMillis();
 		boolean print = true;
 		var     jorth = new Jorth(null, print);

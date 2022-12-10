@@ -1,7 +1,7 @@
 package com.lapissea.jorth.lang;
 
-import com.lapissea.jorth.MalformedJorthException;
+import com.lapissea.jorth.MalformedJorth;
 
 public interface Endable{
-	void end() throws MalformedJorthException;
+	void end() throws MalformedJorth;
 }

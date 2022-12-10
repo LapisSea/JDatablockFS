@@ -1,6 +1,6 @@
 package com.lapissea.jorth.lang.info;
 
-import com.lapissea.jorth.MalformedJorthException;
+import com.lapissea.jorth.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.type.ClassInfo;
 import com.lapissea.jorth.lang.type.GenericType;
@@ -47,7 +47,7 @@ public interface FunctionInfo{
 		private final GenericType       returnType;
 		private final List<GenericType> args;
 		
-		public OfMethod(TypeSource source, Method method) throws MalformedJorthException{
+		public OfMethod(TypeSource source, Method method) throws MalformedJorth{
 			this.method = method;
 			owner = source.byName(ClassName.of(method.getDeclaringClass()));
 			returnType = GenericType.of(method.getGenericReturnType());
@@ -103,7 +103,7 @@ public interface FunctionInfo{
 		private final ClassInfo         owner;
 		private final List<GenericType> args;
 		
-		public OfConstructor(TypeSource source, Constructor<?> ctor) throws MalformedJorthException{
+		public OfConstructor(TypeSource source, Constructor<?> ctor) throws MalformedJorth{
 			this.ctor = ctor;
 			owner = source.byName(ClassName.of(ctor.getDeclaringClass()));
 			
@@ -152,10 +152,10 @@ public interface FunctionInfo{
 		}
 	}
 	
-	static FunctionInfo of(TypeSource source, Method method) throws MalformedJorthException{
+	static FunctionInfo of(TypeSource source, Method method) throws MalformedJorth{
 		return new OfMethod(source, method);
 	}
-	static FunctionInfo of(TypeSource source, Constructor<?> method) throws MalformedJorthException{
+	static FunctionInfo of(TypeSource source, Constructor<?> method) throws MalformedJorth{
 		return new OfConstructor(source, method);
 	}
 	

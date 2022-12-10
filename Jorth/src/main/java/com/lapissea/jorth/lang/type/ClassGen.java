@@ -1,6 +1,6 @@
 package com.lapissea.jorth.lang.type;
 
-import com.lapissea.jorth.MalformedJorthException;
+import com.lapissea.jorth.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.Endable;
 import com.lapissea.jorth.lang.info.FunctionInfo;
@@ -77,7 +77,7 @@ public final class ClassGen implements ClassInfo, Endable{
 	}
 	
 	@Override
-	public void end() throws MalformedJorthException{
+	public void end() throws MalformedJorth{
 //		if(!addedClinit){
 //			defineFunction("<clinit>", Visibility.PUBLIC, Set.of(), null, new LinkedHashMap<>()).end();
 //		}
@@ -91,9 +91,9 @@ public final class ClassGen implements ClassInfo, Endable{
 		classFile = writer.toByteArray();
 	}
 	
-	public void defineField(Visibility visibility, Set<Access> accesses, GenericType type, String name) throws MalformedJorthException{
+	public void defineField(Visibility visibility, Set<Access> accesses, GenericType type, String name) throws MalformedJorth{
 		checkEnd();
-		if(fields.containsKey(name)) throw new MalformedJorthException("Field " + name + " already exists");
+		if(fields.containsKey(name)) throw new MalformedJorth("Field " + name + " already exists");
 		fields.put(name, new FieldGen(this.name, visibility, name, type, accesses.contains(Access.STATIC)));
 		
 		
@@ -116,10 +116,10 @@ public final class ClassGen implements ClassInfo, Endable{
 		fieldVisitor.visitEnd();
 	}
 	
-	public FunctionGen defineFunction(String name, Visibility visibility, Set<Access> access, GenericType returnType, LinkedHashMap<String, FunctionGen.ArgInfo> args) throws MalformedJorthException{
+	public FunctionGen defineFunction(String name, Visibility visibility, Set<Access> access, GenericType returnType, LinkedHashMap<String, FunctionGen.ArgInfo> args) throws MalformedJorth{
 		checkEnd();
 		if(name.equals("<init>") && accessSet.contains(Access.STATIC)){
-			throw new MalformedJorthException("Static class can not be instantiated");
+			throw new MalformedJorth("Static class can not be instantiated");
 		}
 		var fun = new FunctionGen(this, name, visibility, access, returnType, args);
 		
@@ -129,7 +129,7 @@ public final class ClassGen implements ClassInfo, Endable{
 		}
 		var sig = new FunctionInfo.Signature(name, argStr);
 		if(this.functions.put(sig, fun) != null){
-			throw new MalformedJorthException("Duplicate method " + sig);
+			throw new MalformedJorth("Duplicate method " + sig);
 		}
 
 //		if("<clinit>".equals(name)){
@@ -143,10 +143,10 @@ public final class ClassGen implements ClassInfo, Endable{
 	}
 	
 	@Override
-	public FieldInfo getField(String name) throws MalformedJorthException{
+	public FieldInfo getField(String name) throws MalformedJorth{
 		var n = fields.get(name);
 		if(n == null){
-			throw new MalformedJorthException("Field " + name + " does not exist in " + this.name);
+			throw new MalformedJorth("Field " + name + " does not exist in " + this.name);
 		}
 		return n;
 	}
@@ -157,7 +157,7 @@ public final class ClassGen implements ClassInfo, Endable{
 	}
 	
 	@Override
-	public ClassInfo superType() throws MalformedJorthException{
+	public ClassInfo superType() throws MalformedJorth{
 		return typeSource.byType(extension);
 	}
 	@Override
@@ -181,10 +181,10 @@ public final class ClassGen implements ClassInfo, Endable{
 	}
 	
 	@Override
-	public FunctionInfo getFunction(FunctionInfo.Signature signature) throws MalformedJorthException{
+	public FunctionInfo getFunction(FunctionInfo.Signature signature) throws MalformedJorth{
 		var fun = functions.get(signature);
 		if(fun != null) return fun;
-		throw new MalformedJorthException("Function of " + signature + " does not exist");
+		throw new MalformedJorth("Function of " + signature + " does not exist");
 	}
 	
 	@Override

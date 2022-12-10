@@ -1,6 +1,6 @@
 package com.lapissea.jorth.lang.type;
 
-import com.lapissea.jorth.MalformedJorthException;
+import com.lapissea.jorth.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.info.FunctionInfo;
 import com.lapissea.jorth.lang.info.FunctionInfo.Signature;
@@ -28,20 +28,20 @@ public interface ClassInfo{
 		}
 		
 		@Override
-		public FieldInfo getField(String name) throws MalformedJorthException{
+		public FieldInfo getField(String name) throws MalformedJorth{
 			var f = fields.get(name);
 			if(f != null) return f;
 			try{
 				f = FieldInfo.of(UtilL.getDeepDeclaredField(clazz, name));
 			}catch(Throwable e){
-				throw new MalformedJorthException(name + " does not exist in " + clazz, e);
+				throw new MalformedJorth(name + " does not exist in " + clazz, e);
 			}
 			fields.put(name, f);
 			return f;
 		}
 		
 		@Override
-		public FunctionInfo getFunction(Signature signature) throws MalformedJorthException{
+		public FunctionInfo getFunction(Signature signature) throws MalformedJorth{
 			var f = functions.get(signature);
 			if(f != null) return f;
 			try{
@@ -57,7 +57,7 @@ public interface ClassInfo{
 				}
 				f = FunctionInfo.of(source, getDeepDeclaredMethod(clazz, signature.name(), args));
 			}catch(ReflectiveOperationException e){
-				throw new MalformedJorthException(signature + " does not exist in " + clazz, e);
+				throw new MalformedJorth(signature + " does not exist in " + clazz, e);
 			}
 			functions.put(signature, f);
 			return f;
@@ -81,7 +81,7 @@ public interface ClassInfo{
 			return ClassName.of(clazz);
 		}
 		@Override
-		public ClassInfo superType() throws MalformedJorthException{
+		public ClassInfo superType() throws MalformedJorth{
 			if(clazz.isPrimitive()) return null;
 			var sup = clazz.getSuperclass();
 			if(sup == null) return null;
@@ -99,11 +99,11 @@ public interface ClassInfo{
 		}
 	}
 	
-	FieldInfo getField(String name) throws MalformedJorthException;
-	FunctionInfo getFunction(Signature signature) throws MalformedJorthException;
+	FieldInfo getField(String name) throws MalformedJorth;
+	FunctionInfo getFunction(Signature signature) throws MalformedJorth;
 	
 	ClassName name();
-	ClassInfo superType() throws MalformedJorthException;
+	ClassInfo superType() throws MalformedJorth;
 	ClassType type();
 	
 	boolean isFinal();

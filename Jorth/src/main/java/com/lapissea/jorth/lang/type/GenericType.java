@@ -1,6 +1,6 @@
 package com.lapissea.jorth.lang.type;
 
-import com.lapissea.jorth.MalformedJorthException;
+import com.lapissea.jorth.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.util.NotImplementedException;
 
@@ -161,7 +161,7 @@ public record GenericType(ClassName raw, int dims, List<GenericType> args){
 		}
 	}
 	
-	public boolean instanceOf(TypeSource source, GenericType right) throws MalformedJorthException{
+	public boolean instanceOf(TypeSource source, GenericType right) throws MalformedJorth{
 		var thisInfo = this.getPrimitiveType().orElse(null);
 		var thatInfo = right.getPrimitiveType().orElse(null);
 		//If different types of base types

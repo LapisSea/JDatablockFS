@@ -1,6 +1,6 @@
 package com.lapissea.jorth.lang.type;
 
-import com.lapissea.jorth.MalformedJorthException;
+import com.lapissea.jorth.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
 
 import java.util.HashMap;
@@ -73,13 +73,13 @@ public interface TypeSource{
 	default Optional<ClassInfo> maybeByName(ClassName name){
 		return maybeByType(new GenericType(name));
 	}
-	default ClassInfo byName(ClassName name) throws MalformedJorthException{
+	default ClassInfo byName(ClassName name) throws MalformedJorth{
 		return byType(new GenericType(name));
 	}
-	default ClassInfo byType(GenericType type) throws MalformedJorthException{
+	default ClassInfo byType(GenericType type) throws MalformedJorth{
 		var opt = maybeByType(type);
 		if(opt.isEmpty()){
-			throw new MalformedJorthException(type + " could not be found");
+			throw new MalformedJorth(type + " could not be found");
 		}
 		return opt.get();
 	}

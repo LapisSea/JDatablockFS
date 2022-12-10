@@ -15,7 +15,7 @@ import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
-import com.lapissea.jorth.MalformedJorthException;
+import com.lapissea.jorth.MalformedJorth;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
@@ -378,7 +378,7 @@ public class DefInstanceCompiler{
 			}
 			
 			return Access.privateLookupIn(interf).defineClass(jorth.getClassFile(completionName));
-		}catch(IllegalAccessException|MalformedJorthException e){
+		}catch(IllegalAccessException|MalformedJorth e){
 			throw new RuntimeException(e);
 		}
 	}
@@ -518,7 +518,7 @@ public class DefInstanceCompiler{
 			//noinspection unchecked
 			return (Class<T>)Access.privateLookupIn(interf).defineClass(jorth.getClassFile(implName));
 			
-		}catch(IllegalAccessException|MalformedJorthException e){
+		}catch(IllegalAccessException|MalformedJorth e){
 			throw new RuntimeException(e);
 		}
 	}
@@ -527,7 +527,7 @@ public class DefInstanceCompiler{
 		return key.includeNames.map(ns -> ns.contains(name)).orElse(true);
 	}
 	
-	private static <T extends IOInstance<T>> void generateSpecialToString(Class<T> interf, CodeStream writer, Specials specials) throws MalformedJorthException{
+	private static <T extends IOInstance<T>> void generateSpecialToString(Class<T> interf, CodeStream writer, Specials specials) throws MalformedJorth{
 		if(specials.toStr.isPresent()){
 			generateSpecialToString(interf, writer, specials.toStr.get());
 		}
@@ -536,7 +536,7 @@ public class DefInstanceCompiler{
 		}
 	}
 	
-	private static <T extends IOInstance<T>> void generateSpecialToString(Class<T> interf, CodeStream writer, Method method) throws MalformedJorthException{
+	private static <T extends IOInstance<T>> void generateSpecialToString(Class<T> interf, CodeStream writer, Method method) throws MalformedJorth{
 		writer.write(
 			"""
 				public visibility
@@ -551,7 +551,7 @@ public class DefInstanceCompiler{
 			interf.getName());
 	}
 	
-	private static <T extends IOInstance<T>> void generateFormatToString(Key<T> interf, List<FieldInfo> fieldInfo, Specials specials, CodeStream writer, IOInstance.Def.ToString.Format format) throws MalformedJorthException{
+	private static <T extends IOInstance<T>> void generateFormatToString(Key<T> interf, List<FieldInfo> fieldInfo, Specials specials, CodeStream writer, IOInstance.Def.ToString.Format format) throws MalformedJorth{
 		var fragment = ToStringFormat.parse(format.value(), fieldInfo.stream().map(FieldInfo::name).toList());
 		
 		if(specials.toStr.isEmpty()){
@@ -562,7 +562,7 @@ public class DefInstanceCompiler{
 		}
 	}
 	
-	private static <T extends IOInstance<T>> void generateStandardToString(Key<T> key, List<FieldInfo> fieldInfo, Specials specials, CodeStream writer, IOInstance.Def.ToString toStrAnn) throws MalformedJorthException{
+	private static <T extends IOInstance<T>> void generateStandardToString(Key<T> key, List<FieldInfo> fieldInfo, Specials specials, CodeStream writer, IOInstance.Def.ToString toStrAnn) throws MalformedJorth{
 		
 		if(specials.toStr.isEmpty()){
 			generateStandardToString(key, toStrAnn, "toString", fieldInfo, writer);
@@ -590,7 +590,7 @@ public class DefInstanceCompiler{
 		}
 	}
 	
-	private static void generateFormatToString(Key<?> key, List<FieldInfo> fieldInfo, String name, boolean all, ToStringFormat.ToStringFragment fragment, CodeStream writer) throws MalformedJorthException{
+	private static void generateFormatToString(Key<?> key, List<FieldInfo> fieldInfo, String name, boolean all, ToStringFormat.ToStringFragment fragment, CodeStream writer) throws MalformedJorth{
 		
 		writer.write(
 			"""
@@ -628,7 +628,7 @@ public class DefInstanceCompiler{
 				""");
 	}
 	
-	private static void processFragments(Class<?> interf, ToStringFormat.ToStringFragment fragment, boolean all, Consumer<ToStringFormat.ToStringFragment> out) throws MalformedJorthException{
+	private static void processFragments(Class<?> interf, ToStringFormat.ToStringFragment fragment, boolean all, Consumer<ToStringFormat.ToStringFragment> out) throws MalformedJorth{
 		switch(fragment){
 			case NOOP ignored -> { }
 			case Concat f -> {
@@ -652,7 +652,7 @@ public class DefInstanceCompiler{
 		}
 	}
 	
-	private static void executeStringFragment(Class<?> interf, List<FieldInfo> fieldInfo, ToStringFormat.ToStringFragment fragment, boolean all, CodeStream writer) throws MalformedJorthException{
+	private static void executeStringFragment(Class<?> interf, List<FieldInfo> fieldInfo, ToStringFormat.ToStringFragment fragment, boolean all, CodeStream writer) throws MalformedJorth{
 		switch(fragment){
 			case NOOP ignored -> { }
 			case Concat f -> {
@@ -684,7 +684,7 @@ public class DefInstanceCompiler{
 		}
 	}
 	
-	private static void generateStandardToString(Key<?> key, IOInstance.Def.ToString toStrAnn, String name, List<FieldInfo> fieldInfo, CodeStream writer) throws MalformedJorthException{
+	private static void generateStandardToString(Key<?> key, IOInstance.Def.ToString toStrAnn, String name, List<FieldInfo> fieldInfo, CodeStream writer) throws MalformedJorth{
 		
 		writer.write(
 			"""
@@ -746,7 +746,7 @@ public class DefInstanceCompiler{
 				""");
 	}
 	
-	private static void append(CodeStream writer, UnsafeConsumer<CodeStream, MalformedJorthException> val) throws MalformedJorthException{
+	private static void append(CodeStream writer, UnsafeConsumer<CodeStream, MalformedJorth> val) throws MalformedJorth{
 		writer.write(
 			"""
 				call append
@@ -756,7 +756,7 @@ public class DefInstanceCompiler{
 		writer.write("end");
 	}
 	
-	private static void generateDefaultConstructor(CodeStream writer, List<FieldInfo> fieldInfo) throws MalformedJorthException{
+	private static void generateDefaultConstructor(CodeStream writer, List<FieldInfo> fieldInfo) throws MalformedJorth{
 		writer.write(
 			"""
 				visibility public
@@ -776,7 +776,7 @@ public class DefInstanceCompiler{
 		writer.write("end");
 	}
 	
-	private static void generateDataConstructor(CodeStream writer, Optional<List<FieldInfo>> oOrderedFields, Optional<Set<String>> includeNames) throws MalformedJorthException{
+	private static void generateDataConstructor(CodeStream writer, Optional<List<FieldInfo>> oOrderedFields, Optional<Set<String>> includeNames) throws MalformedJorth{
 		
 		if(oOrderedFields.isPresent()){
 			var orderedFields = oOrderedFields.get();
@@ -870,7 +870,7 @@ public class DefInstanceCompiler{
 		return Optional.of(ordered);
 	}
 	
-	private static void defineStatics(CodeStream writer) throws MalformedJorthException{
+	private static void defineStatics(CodeStream writer) throws MalformedJorth{
 		writer.write(
 			"""
 				visibility private
@@ -885,7 +885,7 @@ public class DefInstanceCompiler{
 				""");
 	}
 	
-	private static void implementUserAccess(CodeStream writer, FieldInfo info) throws MalformedJorthException{
+	private static void implementUserAccess(CodeStream writer, FieldInfo info) throws MalformedJorth{
 		var jtyp = JorthUtils.toJorthGeneric(Objects.requireNonNull(TypeLink.of(info.type)));
 		
 		var getterName = info.getter.map(s -> s.method().getName()).orElseGet(() -> {
@@ -944,7 +944,7 @@ public class DefInstanceCompiler{
 		);
 	}
 	
-	private static void defineNoField(CodeStream writer, FieldInfo info) throws MalformedJorthException{
+	private static void defineNoField(CodeStream writer, FieldInfo info) throws MalformedJorth{
 		var jtyp = JorthUtils.toJorthGeneric(Objects.requireNonNull(TypeLink.of(info.type)));
 		
 		var getterName = info.getter.map(v -> v.method().getName()).orElseGet(() -> "get" + TextUtil.firstToUpperCase(info.name));
@@ -984,7 +984,7 @@ public class DefInstanceCompiler{
 		);
 	}
 	
-	private static void defineField(CodeStream writer, FieldInfo info) throws MalformedJorthException{
+	private static void defineField(CodeStream writer, FieldInfo info) throws MalformedJorth{
 		var type = Objects.requireNonNull(TypeLink.of(info.type));
 		
 		writer.write("private visibility");
@@ -998,7 +998,7 @@ public class DefInstanceCompiler{
 		);
 	}
 	
-	private static void writeAnnotations(CodeStream writer, List<Annotation> annotations) throws MalformedJorthException{
+	private static void writeAnnotations(CodeStream writer, List<Annotation> annotations) throws MalformedJorth{
 		Set<Class<?>> annTypes = new HashSet<>();
 		for(var ann : annotations){
 			if(!annTypes.add(ann.annotationType())) continue;
@@ -1021,7 +1021,7 @@ public class DefInstanceCompiler{
 		}
 	}
 	
-	private static void nullCheck(CodeStream writer) throws MalformedJorthException{
+	private static void nullCheck(CodeStream writer) throws MalformedJorth{
 		writer.write(
 			"""
 				dup
@@ -1030,7 +1030,7 @@ public class DefInstanceCompiler{
 				""");
 	}
 	
-	private static void scanAnnotation(Annotation ann, UnsafeBiConsumer<String, Object, MalformedJorthException> entry) throws MalformedJorthException{
+	private static void scanAnnotation(Annotation ann, UnsafeBiConsumer<String, Object, MalformedJorth> entry) throws MalformedJorth{
 		
 		var c = ann.getClass();
 		for(Method m : ann.annotationType().getMethods()){

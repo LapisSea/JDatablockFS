@@ -1,6 +1,6 @@
 package com.lapissea.jorth.lang.type;
 
-import com.lapissea.jorth.MalformedJorthException;
+import com.lapissea.jorth.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.Endable;
 import com.lapissea.jorth.lang.info.FunctionInfo;
@@ -34,7 +34,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 			stack.push(new GenericType(owner.name));
 		}
 		
-		public void getFieldIns(FieldInfo field) throws MalformedJorthException{
+		public void getFieldIns(FieldInfo field) throws MalformedJorth{
 			var owner = field.owner();
 			var type  = field.type();
 			
@@ -49,7 +49,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 			stack.push(type);
 		}
 		
-		public void setFieldIns(FieldInfo field) throws MalformedJorthException{
+		public void setFieldIns(FieldInfo field) throws MalformedJorth{
 			var owner = field.owner();
 			var type  = field.type();
 			
@@ -76,18 +76,18 @@ public final class FunctionGen implements Endable, FunctionInfo{
 			stack.push(arg.type);
 		}
 		
-		public void end() throws MalformedJorthException{
+		public void end() throws MalformedJorth{
 			ended = true;
 			
 			GenericType.BaseType type;
 			
 			if(returnType != null){
 				var popped = stack.pop();
-				if(!popped.instanceOf(owner.typeSource, returnType)) throw new MalformedJorthException("Method returns " + returnType + " but " + popped + " is on stack");
+				if(!popped.instanceOf(owner.typeSource, returnType)) throw new MalformedJorth("Method returns " + returnType + " but " + popped + " is on stack");
 				type = popped.getBaseType();
 			}else{
 				if(!stack.isEmpty()){
-					throw new MalformedJorthException("Returning nothing (void) but there are values " + stack + " on the stack");
+					throw new MalformedJorth("Returning nothing (void) but there are values " + stack + " on the stack");
 				}
 				type = GenericType.BaseType.VOID;
 			}
@@ -95,7 +95,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 			writer.visitInsn(type.returnOp());
 		}
 		
-		public void swap() throws MalformedJorthException{
+		public void swap() throws MalformedJorth{
 			stack.requireElements(2);
 			var top      = stack.pop();
 			var belowTop = stack.pop();
@@ -130,7 +130,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 				default -> throw new NotImplementedException(top.toString());
 			}
 		}
-		public void dup() throws MalformedJorthException{
+		public void dup() throws MalformedJorth{
 			var type = stack.pop();
 			stack.push(type);
 			stack.push(type);
@@ -138,15 +138,15 @@ public final class FunctionGen implements Endable, FunctionInfo{
 			writer.visitInsn(switch(bt.slots()){
 				case 1 -> DUP;
 				case 2 -> DUP2;
-				default -> throw new MalformedJorthException("Illegal base type: " + bt);
+				default -> throw new MalformedJorth("Illegal base type: " + bt);
 			});
 		}
-		public void pop() throws MalformedJorthException{
+		public void pop() throws MalformedJorth{
 			var bt = stack.pop().getBaseType();
 			writer.visitInsn(switch(bt.slots()){
 				case 1 -> POP;
 				case 2 -> POP2;
-				default -> throw new MalformedJorthException("Illegal base type: " + bt);
+				default -> throw new MalformedJorth("Illegal base type: " + bt);
 			});
 		}
 	}
@@ -217,7 +217,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 	}
 	
 	@Override
-	public void end() throws MalformedJorthException{
+	public void end() throws MalformedJorth{
 		if(codeInfo.size() != 1){
 			throw new NotImplementedException();
 		}
@@ -230,7 +230,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		writer.visitEnd();
 	}
 	
-	public void getOp(String owner, String member) throws MalformedJorthException{
+	public void getOp(String owner, String member) throws MalformedJorth{
 		ClassInfo info;
 		var       code = code();
 		switch(owner){
@@ -248,7 +248,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 					code.loadArgumentIns(arg);
 					return;
 				}else{
-					throw new MalformedJorthException("Argument " + member + " does not exist");
+					throw new MalformedJorth("Argument " + member + " does not exist");
 				}
 			}
 			default -> {
@@ -259,7 +259,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		var memberInfo = info.getField(member);
 		code.getFieldIns(memberInfo);
 	}
-	public void setOp(String owner, String member) throws MalformedJorthException{
+	public void setOp(String owner, String member) throws MalformedJorth{
 		ClassInfo info;
 		switch(owner){
 			case "this" -> {
@@ -267,7 +267,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 				loadThisIns();
 				code().swap();
 			}
-			case "#arg" -> throw new MalformedJorthException("Can not set args");
+			case "#arg" -> throw new MalformedJorth("Can not set args");
 			default -> info = typeSource.byType(new GenericType(ClassName.dotted(owner)));
 		}
 		
@@ -304,7 +304,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		return code().stack;
 	}
 	
-	public void superOp() throws MalformedJorthException{
+	public void superOp() throws MalformedJorth{
 		if(!name.equals("<init>")){
 			throw new NotImplementedException("Super on non constructor not implemented");
 		}
@@ -322,7 +322,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		code().loadThisIns();
 	}
 	
-	public void invokeOp(FunctionInfo function, boolean superCall) throws MalformedJorthException{
+	public void invokeOp(FunctionInfo function, boolean superCall) throws MalformedJorth{
 		var owner = function.owner();
 		var name  = function.name();
 		
@@ -357,14 +357,14 @@ public final class FunctionGen implements Endable, FunctionInfo{
 			var arg    = argTypes.get(i);
 			if(popped.instanceOf(typeSource, arg)) continue;
 			
-			throw new MalformedJorthException("Argument " + i + " in " + owner.name() + "#" + name + " is " + arg + " but got " + popped);
+			throw new MalformedJorth("Argument " + i + " in " + owner.name() + "#" + name + " is " + arg + " but got " + popped);
 		}
 		if(!function.isStatic()){
 			var popped = stack.pop();
 			var arg    = new GenericType(owner.name());
 			
 			if(!popped.instanceOf(typeSource, arg)){
-				throw new MalformedJorthException("Function caller is " + owner.name() + " but callee on stack is " + popped);
+				throw new MalformedJorth("Function caller is " + owner.name() + " but callee on stack is " + popped);
 			}
 		}
 		
@@ -383,7 +383,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		return () -> {
 			var stack    = code().stack;
 			var argCount = stack.size() - mark;
-			if(argCount<0) throw new MalformedJorthException("Negative stack delta inside arg block");
+			if(argCount<0) throw new MalformedJorth("Negative stack delta inside arg block");
 			var args = new ArrayList<GenericType>(argCount);
 			for(int i = 0; i<argCount; i++){
 				args.add(stack.peek(mark + i));
@@ -402,7 +402,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		};
 	}
 	
-	public void equalsOp() throws MalformedJorthException{
+	public void equalsOp() throws MalformedJorth{
 		var stack = code().stack;
 		stack.requireElements(2);
 		
@@ -410,7 +410,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		var b = stack.pop();
 		
 		if(!a.instanceOf(typeSource, b) && !b.instanceOf(typeSource, a)){
-			throw new MalformedJorthException(a + " not compatible with " + b);
+			throw new MalformedJorth(a + " not compatible with " + b);
 		}
 		
 		stack.push(GenericType.BOOL);
@@ -425,11 +425,11 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		}
 	}
 	
-	public void pushIfBool() throws MalformedJorthException{
+	public void pushIfBool() throws MalformedJorth{
 		var stack = code().stack;
 		var typ   = stack.pop();
 		if(!typ.equals(GenericType.BOOL)){
-			throw new MalformedJorthException("Got " + typ + " but need a boolean for if statement");
+			throw new MalformedJorth("Got " + typ + " but need a boolean for if statement");
 		}
 		
 		var newPath = new CodePath(writer, stack);
@@ -439,23 +439,23 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		writer.visitJumpInsn(IFEQ, newPath.endLabel);
 	}
 	
-	public void popIf() throws MalformedJorthException{
+	public void popIf() throws MalformedJorth{
 		var ifPath = codeInfo.removeLast();
 		if(!ifPath.stack.isEmpty()){
-			throw new MalformedJorthException("If ended but there is data left in if code block");
+			throw new MalformedJorth("If ended but there is data left in if code block");
 		}
 		writer.visitLabel(ifPath.endLabel);
 	}
 	
-	public void returnOp() throws MalformedJorthException{
+	public void returnOp() throws MalformedJorth{
 		code().end();
 	}
 	
-	public void throwOp() throws MalformedJorthException{
+	public void throwOp() throws MalformedJorth{
 		var stack = code().stack;
 		var typ   = stack.pop();
 		if(!typ.instanceOf(typeSource, new GenericType(ClassName.of(Throwable.class)))){
-			throw new MalformedJorthException("Got " + typ + " but need a boolean for if statement");
+			throw new MalformedJorth("Got " + typ + " but need a boolean for if statement");
 		}
 		
 		writer.visitInsn(ATHROW);
@@ -540,10 +540,10 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		return name + "()";
 	}
 	
-	public void dupOp() throws MalformedJorthException{
+	public void dupOp() throws MalformedJorth{
 		code().dup();
 	}
-	public void popOp() throws MalformedJorthException{
+	public void popOp() throws MalformedJorth{
 		code().pop();
 	}
 }

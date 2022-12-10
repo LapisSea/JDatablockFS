@@ -1,10 +1,10 @@
 package com.lapissea.jorth.lang;
 
 import com.lapissea.jorth.CodeStream;
-import com.lapissea.jorth.MalformedJorthException;
+import com.lapissea.jorth.EndOfCode;
+import com.lapissea.jorth.MalformedJorth;
 import com.lapissea.jorth.lang.type.Access;
 import com.lapissea.jorth.lang.type.Visibility;
-import com.lapissea.util.NotImplementedException;
 
 import java.util.BitSet;
 import java.util.regex.Pattern;
@@ -51,7 +51,7 @@ public class Tokenizer implements CodeStream, TokenSource{
 	}
 	
 	@Override
-	public CodeStream write(CharSequence code) throws MalformedJorthException{
+	public CodeStream write(CharSequence code) throws MalformedJorth{
 		if(transformed == null) transformed = dad.transform(this);
 		pos = 0;
 		this.code = code;
@@ -94,7 +94,7 @@ public class Tokenizer implements CodeStream, TokenSource{
 		};
 	}
 	
-	private String scanInsideString() throws MalformedJorthException{
+	private String scanInsideString() throws MalformedJorth{
 		if(code.charAt(pos) != '\'') throw new RuntimeException();
 		pos++;
 		
@@ -104,7 +104,7 @@ public class Tokenizer implements CodeStream, TokenSource{
 		boolean escape = false;
 		
 		for(int i = start; ; i++){
-			if(i == code.length()) throw new MalformedJorthException("String was opened but not closed");
+			if(i == code.length()) throw new MalformedJorth("String was opened but not closed");
 			
 			var c = code.charAt(i);
 			
@@ -148,19 +148,19 @@ public class Tokenizer implements CodeStream, TokenSource{
 	
 	private Token peeked;
 	@Override
-	public Token peekToken() throws MalformedJorthException{
+	public Token peekToken() throws MalformedJorth{
 		if(peeked == null) peeked = readToken();
 		return peeked;
 	}
 	
 	@Override
-	public Token readToken() throws MalformedJorthException{
+	public Token readToken() throws MalformedJorth{
 		if(peeked != null){
 			var p = peeked;
 			peeked = null;
 			return p;
 		}
-		if(code == null) throw new MalformedJorthException("Unexpected end of code");
+		if(code == null) throw new EndOfCode();
 		
 		lastLine = this.line;
 		if(code.charAt(pos) == '\''){
@@ -204,7 +204,7 @@ public class Tokenizer implements CodeStream, TokenSource{
 				if(sb != null) sb.append(c1);
 			}
 			
-			if(start == i) throw new MalformedJorthException("Unexpected token");
+			if(start == i) throw new MalformedJorth("Unexpected token");
 			
 			pos = i;
 			if(start + 1 == i){
@@ -279,10 +279,10 @@ public class Tokenizer implements CodeStream, TokenSource{
 	}
 	@Override
 	public void addImportAs(String className, String name){
-		throw NotImplementedException.infer();//TODO: implement Tokenizer.addImportAs()
+		dad.addImportAs(className, name);
 	}
 	@Override
-	public void close() throws MalformedJorthException{
+	public void close() throws MalformedJorth{
 		//TODO: when/if async streaming is added, flush here
 	}
 }

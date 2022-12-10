@@ -1,6 +1,6 @@
 package com.lapissea.jorth.lang.type;
 
-import com.lapissea.jorth.MalformedJorthException;
+import com.lapissea.jorth.MalformedJorth;
 import com.lapissea.util.TextUtil;
 
 import java.util.ArrayList;
@@ -30,7 +30,7 @@ public class TypeStack{
 	public void push(GenericType type){
 		stack.add(type);
 	}
-	public GenericType pop() throws MalformedJorthException{
+	public GenericType pop() throws MalformedJorth{
 		requireElements(1);
 		return stack.remove(stack.size() - 1);
 	}
@@ -46,9 +46,9 @@ public class TypeStack{
 		return parent.size() + stack.size();
 	}
 	
-	public void requireElements(int count) throws MalformedJorthException{
+	public void requireElements(int count) throws MalformedJorth{
 		if(stack.size()>=count) return;
-		throw new MalformedJorthException("Required at least " + count + " " + TextUtil.plural("element", count) + " on the stack");
+		throw new MalformedJorth("Required at least " + count + " " + TextUtil.plural("element", count) + " on the stack");
 	}
 	
 	public GenericType peek(int pos){
