@@ -1,54 +1,50 @@
 package com.lapissea.jorth;
 
-import com.lapissea.jorth.old.JorthCompiler;
-import com.lapissea.jorth.old.JorthWriter;
 import com.lapissea.jorth.utils.BytecodeUtils;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.nio.ByteBuffer;
+import java.util.StringJoiner;
 
 public class TestUtils{
 	
-	static Class<?> generateAndLoadInstanceSimple(String className, UnsafeConsumer<JorthWriter, MalformedJorthException> generator) throws ReflectiveOperationException{
+	static Class<?> generateAndLoadInstanceSimple(String className, UnsafeConsumer<CodeStream, MalformedJorth> generator) throws ReflectiveOperationException{
 		return generateAndLoadInstance(className, writer -> {
-			
-			//Define constants / imports
-			writer.write("#TOKEN(0) Str define", String.class.getName());
-			writer.write("#TOKEN(0) Obj define", Object.class.getName());
-			
-			//define class
 			writer.write(
 				"""
-					public visibility
-					#TOKEN(0) class start
+					public class {!} start
 					""",
 				className
 			);
 			
 			generator.accept(writer);
+			writer.write("end");
 		});
 	}
 	
-	static Class<?> generateAndLoadInstance(String className, UnsafeConsumer<JorthWriter, MalformedJorthException> generator) throws ReflectiveOperationException{
+	static Class<?> generateAndLoadInstance(String className, UnsafeConsumer<CodeStream, MalformedJorth> generator) throws ReflectiveOperationException{
 		
 		var loader = new ClassLoader(TestUtils.class.getClassLoader()){
 			@Override
 			protected Class<?> findClass(String name) throws ClassNotFoundException{
 				
 				if(name.equals(className)){
-					var jorth = new JorthCompiler(this);
+					StringJoiner tokenStr = new StringJoiner(" ");
+					var          jorth    = new Jorth(null, tokenStr::add);
 					try{
 						
-						try(var writer = jorth.writeCode()){
+						try(var writer = jorth.writer()){
 							generator.accept(writer);
+						}finally{
+							LogUtil.println(tokenStr.toString());
 						}
 						
-						var byt = jorth.classBytecode();
+						var byt = jorth.getClassFile(className);
 						BytecodeUtils.printClass(byt);
 						
 						return defineClass(name, ByteBuffer.wrap(byt), null);
-					}catch(MalformedJorthException e){
+					}catch(MalformedJorth e){
 						throw new RuntimeException("Failed to generate class " + className, e);
 					}
 				}

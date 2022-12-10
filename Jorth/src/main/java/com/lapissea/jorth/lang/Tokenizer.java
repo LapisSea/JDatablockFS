@@ -226,10 +226,10 @@ public class Tokenizer implements CodeStream, TokenSource{
 		}
 		
 		var vis = Token.EWord.find(Visibility.class, word, false);
-		if(vis != null) return new Token.EWord<>(line, vis);
+		if(vis != null) return new Token.EWord<>(lastLine, vis);
 		
 		var acc = Token.EWord.find(Access.class, word, false);
-		if(acc != null) return new Token.EWord<>(line, acc);
+		if(acc != null) return new Token.EWord<>(lastLine, acc);
 		
 		
 		if(word.equals("null")) return new Token.Null(lastLine);
@@ -257,8 +257,14 @@ public class Tokenizer implements CodeStream, TokenSource{
 	}
 	
 	private Token smol(char c){
-		if(c>='0' && c<='9') return new Token.IntVal(line, c - '0');
-		return new Token.SmolWord(line, c);
+		var k = Keyword.SMOL_KEYS;
+		for(int i = 0; i<k.length; i++){
+			if(k[i] == c){
+				return new Token.KWord(lastLine, Keyword.SMOL_VALUES[i]);
+			}
+		}
+		if(c>='0' && c<='9') return new Token.IntVal(lastLine, c - '0');
+		return new Token.SmolWord(lastLine, c);
 	}
 	
 	private static String cleanNumber(String num, int prefix){

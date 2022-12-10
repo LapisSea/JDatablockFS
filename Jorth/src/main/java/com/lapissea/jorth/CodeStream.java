@@ -47,7 +47,7 @@ public interface CodeStream extends AutoCloseable{
 				}
 			}
 		}
-		throw new IllegalArgumentException("Could not find \"{}\"");
+		return -1;
 	}
 	
 	CodeStream write(CharSequence code) throws MalformedJorth;
@@ -55,8 +55,17 @@ public interface CodeStream extends AutoCloseable{
 	default CodeStream write(String code, Object... objs) throws MalformedJorth{
 		int start = 0;
 		var parts = new ArrayList<CharSequence>(objs.length*2 + 1);
-		for(int i = 0; i<objs.length; i++){
-			start = resolveArg(code, parts, objs, i, start);
+		int iter  = 0;
+		while(true){
+			var next = resolveArg(code, parts, objs, iter, start);
+			iter++;
+			if(next == -1){
+				if(iter<objs.length){
+					throw new IllegalArgumentException("Could not find \"{}\"");
+				}
+				break;
+			}
+			start = next;
 		}
 		if(start != code.length()){
 			parts.add(new CharSubview(code, start, code.length()));
@@ -74,6 +83,9 @@ public interface CodeStream extends AutoCloseable{
 	}
 	void addImport(String className);
 	void addImportAs(String className, String name);
+	default void addImportAs(Class<?> clazz, String name){
+		addImportAs(clazz.getName(), name);
+	}
 	
 	@Override
 	void close() throws MalformedJorth;

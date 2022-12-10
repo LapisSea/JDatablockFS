@@ -6,6 +6,10 @@ public class WTFIsMyBytecode{
 		int a = 0;
 	}
 	
+	static boolean ayy(Object a, Object b){
+		return a == b;
+	}
+	
 	
 	public WTFIsMyBytecode(){
 		int     a = 0, b = 0;

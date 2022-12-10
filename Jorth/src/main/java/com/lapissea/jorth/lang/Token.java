@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
 public sealed interface Token{
 	
@@ -61,8 +62,8 @@ public sealed interface Token{
 		@SuppressWarnings("unchecked")
 		@Override
 		public <T extends Token> Optional<T> as(Class<T> type){
-			if(type == CWord.class){
-				return Optional.of((T)new CWord(line, ClassName.dotted(value)));
+			if(type == ClassWord.class){
+				return Optional.of((T)new ClassWord(line, ClassName.dotted(value)));
 			}
 			if(type == SmolWord.class){
 				if(value.length() == 1){
@@ -90,9 +91,15 @@ public sealed interface Token{
 		}
 	}
 	
-	record CWord(int line, ClassName value) implements Token{
+	record ClassWord(int line, ClassName value) implements Token{
 		public boolean is(ClassName check){
 			return value.equals(check);
+		}
+		
+		public ClassWord resolve(Function<ClassName, ClassName> imports){
+			var imported = imports.apply(value);
+			if(imported.equals(value)) return this;
+			return new ClassWord(line, imported);
 		}
 		
 		@SuppressWarnings("unchecked")

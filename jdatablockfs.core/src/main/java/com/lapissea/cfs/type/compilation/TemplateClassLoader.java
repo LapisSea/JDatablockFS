@@ -87,7 +87,7 @@ public final class TemplateClassLoader extends ClassLoader{
 	private byte[] jorthGenerate(TypeNamed classType, UnsafeBiConsumer<TypeNamed, CodeStream, MalformedJorth> generator){
 		if(PRINT_GENERATING_INFO) LogUtil.println("generating", "\n" + TextUtil.toTable(classType.name, classType.def.getFields()));
 		
-		var jorth = new Jorth(this, true);
+		var jorth = new Jorth(this, null);
 		
 		try(var writer = jorth.writer()){
 			generator.accept(classType, writer);

@@ -1,6 +1,7 @@
 package com.lapissea.jorth.lang.text;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.IntStream;
@@ -13,6 +14,9 @@ public class CharJoin implements CharSequence{
 	private CharSequence lastAccessed;
 	private int          lastStart, lastEnd;
 	
+	public CharJoin(CharSequence... data){
+		this(Arrays.asList(data));
+	}
 	public CharJoin(List<? extends CharSequence> data){
 		this.data = data;
 		int sum = 0;

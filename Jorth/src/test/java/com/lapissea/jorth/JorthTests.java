@@ -8,6 +8,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Field;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 
 import static com.lapissea.jorth.TestUtils.generateAndLoadInstance;
 import static com.lapissea.jorth.TestUtils.generateAndLoadInstanceSimple;
@@ -48,51 +49,47 @@ public class JorthTests{
 		var className = "jorth.Gen$$";
 		
 		var cls = generateAndLoadInstance(className, writer -> {
-			
-			//Define constants / imports
-			writer.write("#TOKEN(0) Str define", String.class.getName());
-			writer.write("#TOKEN(0) Obj define", Object.class.getName());
-			
 			//define class
-			writer.write(
-				"""
-					public visibility
-					#TOKEN(0) class start
-					""",
-				className
-			);
+			writer.write("public class {!} start", className);
 			
-			writer.write(
-				"""
-					[$type1 $type2 $returnType $opName $op] mathOp macro start
-						static
-						$type1 arg1 arg
-						$type2 arg2 arg
-						$returnType returns
-						$opName function start
-							
-							<arg> arg1 get
-							<arg> arg2 get
-							$op
-							$returnType cast
-						end
-					macro end
+			var types = List.of("byte", "short", "int", "long", "float", "double");
+			for(int i = 0; i<types.size(); i++){
+				var type1 = types.get(i);
+				for(int j = 0; j<types.size(); j++){
+					var type2 = types.get(j);
 					
-					[$typ1 $typ2 $returnTyp] mathOps macro start
-						[$typ1 $typ2 $returnTyp add +] mathOp macro resolve
-						[$typ1 $typ2 $returnTyp sub -] mathOp macro resolve
-						[$typ1 $typ2 $returnTyp div /] mathOp macro resolve
-						[$typ1 $typ2 $returnTyp mul *] mathOp macro resolve
-					macro end
+					String returnType;
+					var    k = Math.max(i, j);
+					if((k == 4 || k == 5) && (i == 3 || j == 3)){
+						returnType = "double";
+					}else{
+						returnType = types.get(k);
+					}
 					
-					
-					[byte   byte   byte  ] mathOps macro resolve
-					[short  short  short ] mathOps macro resolve
-					[int    int    int   ] mathOps macro resolve
-					[long   long   long  ] mathOps macro resolve
-					[float  float  float ] mathOps macro resolve
-					[double double double] mathOps macro resolve
-					""");
+					for(var e : Map.of(
+						"add", "+",
+						"sub", "-",
+						"div", "/",
+						"mul", "*"
+					).entrySet()){
+						writer.write(
+							"""
+								static function {!}
+									arg arg1 {}
+									arg arg2 {}
+									returns {}
+								start
+									get #arg arg1
+									get #arg arg2
+									{!}
+								end
+								""",
+							e.getKey(),
+							type1, type2, returnType,
+							e.getValue());
+					}
+				}
+			}
 		});
 		
 		Object ival;
@@ -135,53 +132,6 @@ public class JorthTests{
 		
 		ival = cls.getMethod("div", double.class, double.class).invoke(null, 10, 0.2D);
 		assertEquals(10/0.2D, ival);
-		
-	}
-	@Test
-	void concatTest() throws ReflectiveOperationException{
-		
-		var className = "jorth.Gen$$";
-		var str       = "string concat works with $type: ";
-		
-		var cls = generateAndLoadInstanceSimple(className, writer -> {
-			writer.write(
-				"""
-					[$type] myMacro macro start
-						static
-						$type myArgumentName arg
-						Str returns
-						myFunctionName function start
-							
-							'#RAW(0)'
-							<arg> myArgumentName get
-							concat
-							
-						end
-					macro end
-					""",
-				str);
-			writer.write(
-				"""
-					{Str $type}    myMacro macro resolve
-					{Obj $type}    myMacro macro resolve
-					{byte $type}   myMacro macro resolve
-					{short $type}  myMacro macro resolve
-					{int $type}    myMacro macro resolve
-					{long $type}   myMacro macro resolve
-					{float $type}  myMacro macro resolve
-					{double $type} myMacro macro resolve
-					""");
-		});
-		
-		
-		LogUtil.println(cls.getMethod("myFunctionName", Object.class).invoke(null, new ISayHello()));
-		LogUtil.println(cls.getMethod("myFunctionName", String.class).invoke(null, (Object)null));
-		LogUtil.println(cls.getMethod("myFunctionName", String.class).invoke(null, "this is a test"));
-		LogUtil.println(cls.getMethod("myFunctionName", int.class).invoke(null, 123));
-		LogUtil.println(cls.getMethod("myFunctionName", long.class).invoke(null, 123L));
-		LogUtil.println(cls.getMethod("myFunctionName", float.class).invoke(null, 0.123F));
-		LogUtil.println(cls.getMethod("myFunctionName", double.class).invoke(null, 0.345));
-		
 	}
 	
 	@Test
@@ -190,23 +140,22 @@ public class JorthTests{
 		var className = "jorth.Gen$$";
 		
 		var cls = generateAndLoadInstanceSimple(className, writer -> {
-			writer.write(
-				"""
-					[$typ] compareFunct macro start
-						static
-						$typ arg1 arg
-						$typ arg2 arg
-						boolean returns
-						compare function start
-							<arg> arg1 get
-							<arg> arg2 get
+			
+			for(var typ : List.of("#String", "int")){
+				writer.write(
+					"""
+						static function compare
+							arg arg1 {0}
+							arg arg2 {0}
+							returns boolean
+						start
+							get #arg arg1
+							get #arg arg2
 							==
 						end
-					macro end
-					""");
-			
-			writer.write("[Str] compareFunct macro resolve");
-			writer.write("[int] compareFunct macro resolve");
+						""",
+					typ);
+			}
 		});
 		
 		var testStr = cls.getMethod("compare", String.class, String.class);
@@ -229,15 +178,21 @@ public class JorthTests{
 		var cls = generateAndLoadInstanceSimple(className, writer -> {
 			writer.write(
 				"""
-					static
-					int index arg
-					Str returns
-					test function start
-						
-						<arg> index get 1 == if
+					static function test
+						arg index int
+						returns #String
+					start
+						get #arg index 1 ==
+						if start
 							'ay'
-						else
-							'lmao ' <arg> index get concat
+							return
+						end
+						else start
+							#StringBuilder new
+							call append start 'lmao ' end
+							call append start get #arg index end
+							call toString
+							return
 						end
 						
 					end
@@ -251,87 +206,46 @@ public class JorthTests{
 		LogUtil.println(test.invoke(null, 2));
 	}
 	
-	/*
-	//TODO
-	@Test
-	void whileTest() throws ReflectiveOperationException{
-		
-		var className="jorth.Gen$$";
-		
-		var cls=generateAndLoadInstanceSimple(className, writer->{
-			writer.write(
-				"""
-					static
-					int start arg
-					Str returns
-					testWhile function start
-						<arg> start get
-						while dup 0 > start
-							5 -
-						end
-					end
-					""");
-		});
-		
-		Function<Integer, Integer> testWhileControl=start->{
-			int val=start;
-			while(val>0){
-				val-=5;
-			}
-			return val;
-		};
-		
-		var testWhile=cls.getMethod("testWhile", int.class);
-		
-		int[] a=new int[20];
-		int[] b=new int[20];
-		for(int i=0;i<20;i++){
-			a[i]=testWhileControl.apply(i);
-			b[i]=(int)testWhile.invoke(null, i);
-		}
-		
-		assertArrayEquals(a, b);
-	}
-	*/
-	
 	@Test
 	void functionCallTest() throws ReflectiveOperationException{
 		
 		var cls = generateAndLoadInstanceSimple(TestCls.class.getPackageName() + ".Gen$$", writer -> {
-			writer.write("#TOKEN(0) LogUtil define", LogUtil.class.getName());
+			writer.addImport(LogUtil.class);
 			writer.write(
 				"""
 					
-					static
-					printToConsole function start
-						'AAAYYYY LMAO'
-						LogUtil println (1) static call
+					static function printToConsole
+					start
+						static call LogUtil println start
+							'AAAYYYY LMAO'
+						end
 					end
 					
-					static
-					#TOKEN(0) obj arg
-					testFlag function start
-						<arg> obj get
+					static function testFlag
+						arg obj #Object
+					start
+						get #arg obj
 						flag (0) call
 						
-						#TOKEN(0) staticFlag (0) static call
+						static call {} staticFlag
 					end
 					
-					Str a arg
-					Str b arg
-					Str returns
-					concatCall function start
-						<arg> a get
-						<arg> b get
-						concat
+					function concatCal
+						arg a #String
+						arg b #String
+						returns #String
+					start
+						#StringBuilder new start get #arg a end
+						call append start get #arg b end
+						call toString
 					end
 					
-					Str returns
-					useCall function start
-						
-						this this get
+					function useCall
+						returns String
+					start
+						get this this
 						'ay ' 'lmao'
-						concatCall (2) call
+						call concatCall
 					end
 					""",
 				TestCls.class.getName());
@@ -343,7 +257,7 @@ public class JorthTests{
 		assertTrue(test.flag);
 		
 		var inst = cls.getConstructor().newInstance();
-		LogUtil.println(cls.getMethod("useCall").invoke(inst));
+		assertEquals("ay lmao", cls.getMethod("useCall").invoke(inst));
 		
 		cls.getMethod("printToConsole").invoke(null);
 	}
@@ -357,27 +271,26 @@ public class JorthTests{
 			
 			writer.write(
 				"""
-					public visibility
-					Str testString field
+					public field testString #String
 					"""
 			);
 			
 			writer.write(
 				"""
-					Str returns
-					toString function start
-					this testString get
+					function toString
+						returns #String
+					start
+						get this testString
 					end
 					""");
 			
 			writer.write(
 				"""
-					Str testString arg
-					init function start
-					
-					<arg> testString get
-					this testString set
-					
+					function init
+						arg testString #String
+					start
+						get #arg testString
+						set this testString
 					end
 					""");
 		});
@@ -404,20 +317,20 @@ public class JorthTests{
 			
 			writer.write(
 				"""
-					public visibility
-					Str noArray field
-					array Str 1dArray field
-					array array Str 2dArray field
+					public field noArray #String
+					public field 1dArray String array
+					public field 2dArray String array array
 					"""
 			);
 		});
 		
-		LogUtil.println(cls.getField("noArray").getType().isArray());
-		LogUtil.println(cls.getField("1dArray").getType().isArray());
-		
 		for(Field field : cls.getFields()){
 			LogUtil.println(field.toString(), field.getGenericType().toString());
 		}
+		
+		assertFalse(cls.getField("noArray").getType().isArray());
+		assertTrue(cls.getField("1dArray").getType().isArray());
+		assertTrue(cls.getField("2dArray").getType().componentType().isArray());
 	}
 	
 	@Retention(RetentionPolicy.RUNTIME)
@@ -452,18 +365,20 @@ public class JorthTests{
 		var className = "jorth.Gen$$";
 		
 		var cls = generateAndLoadInstanceSimple(className, writer -> {
-			writer.write("#TOKEN(0) Ann define", MultiAnn.class.getName());
+			writer.addImportAs(MultiAnn.class, "Ann");
 			writer.write(
 				"""
-					public visibility
-					{141 value 'xD' lol} Ann @
-					Str testString field
+					@ #Ann {141 value 'xD' lol}
+					public field testString #String
 					"""
 			);
 		});
-		
-		LogUtil.println(cls.getFields()[0].getDeclaredAnnotations());
-		
+		var anns = cls.getFields()[0].getDeclaredAnnotations();
+		LogUtil.println((Object[])anns);
+		assertEquals(1, anns.length);
+		var ann = (MultiAnn)anns[0];
+		assertEquals("xD", ann.lol());
+		assertEquals(141, ann.value());
 	}
 	
 	@Test
@@ -472,16 +387,12 @@ public class JorthTests{
 		var className = "jorth.Gen$$";
 		
 		var cls = generateAndLoadInstance(className, writer -> {
-			
-			//Define constants / imports
-			writer.write("#TOKEN(0) Str define", String.class.getName());
-			
-			//define class
 			writer.write(
 				"""
-					[#TOKEN(0)] #TOKEN(1) extends
+					extends {!1}<{!0}>
 					public visibility
-					#TOKEN(0) class start
+					{!0} class start
+					end
 					""",
 				className,
 				ISayHello.class.getName()
@@ -506,9 +417,10 @@ public class JorthTests{
 		var cls = generateAndLoadInstanceSimple(className, writer -> {
 			writer.write(
 				"""
-					Str returns
-					toString function start
-					'#RAW(0)'
+					function toString
+						returns #String
+					start
+						'{}'
 					end
 					""",
 				msg);
@@ -532,9 +444,8 @@ public class JorthTests{
 				"""
 					public visibility
 					#TOKEN(0) enum start
-					
-					FOO enum constant
-					BAR enum constant
+					enum FOO
+					enum BAR
 					""",
 				className);
 		});

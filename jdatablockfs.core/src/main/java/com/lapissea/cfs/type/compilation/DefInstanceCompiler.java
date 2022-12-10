@@ -326,7 +326,7 @@ public class DefInstanceCompiler{
 		
 		var completionName = interf.getName() + IMPL_COMPLETION_POSTFIX;
 		
-		var jorth = new Jorth(interf.getClassLoader(), false);
+		var jorth = new Jorth(interf.getClassLoader(), null);
 		try{
 			
 			try(var writer = jorth.writer()){
@@ -426,7 +426,7 @@ public class DefInstanceCompiler{
 		var implName = interf.getName() + IOInstance.Def.IMPL_NAME_POSTFIX + names.map(n -> n.stream().collect(Collectors.joining("_", "€€fields~", ""))).orElse("");
 		
 		try{
-			var jorth = new Jorth(interf.getClassLoader(), false);
+			var jorth = new Jorth(interf.getClassLoader(), null);
 			
 			jorth.addImportAs(implName, "typ.impl");
 			jorth.addImportAs(interf.getName(), "typ.interf");

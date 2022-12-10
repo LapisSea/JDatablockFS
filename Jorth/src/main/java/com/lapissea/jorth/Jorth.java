@@ -2,10 +2,10 @@ package com.lapissea.jorth;
 
 import com.lapissea.jorth.lang.*;
 import com.lapissea.jorth.lang.type.*;
-import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
 
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 import static com.lapissea.util.ConsoleColors.*;
@@ -39,9 +39,9 @@ public final class Jorth extends CodeDestination{
 	
 	private final Deque<Endable> endStack = new ArrayDeque<>();
 	
-	private final boolean printBack;
+	private final Consumer<CharSequence> printBack;
 	
-	public Jorth(ClassLoader classLoader, boolean printBack){
+	public Jorth(ClassLoader classLoader, Consumer<CharSequence> printBack){
 		this.printBack = printBack;
 		classLoader = classLoader == null? this.getClass().getClassLoader() : classLoader;
 		typeSource = TypeSource.concat(type -> {
@@ -93,7 +93,7 @@ public final class Jorth extends CodeDestination{
 	
 	@Override
 	protected TokenSource transform(TokenSource src){
-		if(!printBack) return src;
+		if(printBack == null) return src;
 		return TokenSource.listen(src, tok -> {
 			if(tok instanceof Token.KWord k){
 				switch(k.keyword()){
@@ -103,11 +103,11 @@ public final class Jorth extends CodeDestination{
 			}
 			
 			if(tok.line() != line){
-				LogUtil.print("\n" + "\t".repeat(tab));
+				printBack.accept("\n" + "\t".repeat(tab));
 				line = tok.line();
 			}
 			
-			LogUtil.print(switch(tok){
+			var tokStr = switch(tok){
 				case Token.Word t when t.value().contains(" ") -> "\033[4m" + t.value();
 				case Token.Word t -> t.value();
 				case Token.EWord<?> t -> PURPLE_BRIGHT + t.value();
@@ -120,9 +120,11 @@ public final class Jorth extends CodeDestination{
 				case Token.IntVal t -> BLUE_BRIGHT + t.value();
 				case Token.FloatVal t -> BLUE_BRIGHT + t.value();
 				case Token.Null ignored -> BLUE_BRIGHT + "null";
-				case Token.CWord t -> GREEN_BRIGHT + t.value();
+				case Token.ClassWord t -> GREEN_BRIGHT + t.value();
 				case Token.Bool bool -> GREEN_BRIGHT + bool.value();
-			} + RESET + " ");
+			};
+			
+			printBack.accept(tokStr + RESET);
 		});
 	}
 	
@@ -196,6 +198,9 @@ public final class Jorth extends CodeDestination{
 				GenericType returnType = null;
 				var         args       = new LinkedHashMap<String, FunctionGen.ArgInfo>();
 				
+				var vis = popVisibility();
+				var acc = popAccessSet();
+				
 				propCollect:
 				while(true){
 					if(source.peekToken() instanceof Token.KWord k && k.keyword() == Keyword.START){
@@ -210,13 +215,12 @@ public final class Jorth extends CodeDestination{
 							var name = source.readWord();
 							var type = source.readType(importsFun);
 							
-							var     access   = popAccessSet();
-							boolean isStatic = access.remove(Access.STATIC);
+							var access = popAccessSet();
 							if(!access.isEmpty()){
 								throw new MalformedJorth("Unsupported access on " + name + ": " + access);
 							}
 							
-							if(args.put(name, new FunctionGen.ArgInfo(type, name, isStatic)) != null){
+							if(args.put(name, new FunctionGen.ArgInfo(type, name)) != null){
 								throw new MalformedJorth("Duplicate arg " + name);
 							}
 						}
@@ -229,8 +233,11 @@ public final class Jorth extends CodeDestination{
 				}
 				
 				
-				currentFunction = currentClass.defineFunction(functionName, popVisibility(), popAccessSet(), returnType, args);
+				currentFunction = currentClass.defineFunction(functionName, vis, acc, returnType, args);
 				endStack.addLast(this::endFunction);
+			}
+			case AT -> {
+				throw new NotImplementedException();
 			}
 			default -> throw new MalformedJorth("Unexpected keyword " + keyword.key + " in class " + currentClass);
 		}
@@ -272,10 +279,9 @@ public final class Jorth extends CodeDestination{
 			case THROW -> currentFunction.throwOp();
 			case NEW -> {
 				var clazz = source.readClassName(importsFun);
-				source.requireKeyword(Keyword.START);
 				currentFunction.newOp(clazz);
 				currentFunction.dupOp();
-				endStack.add(currentFunction.startCall(null, "<init>"));
+				callStart(source, null, "<init>");
 			}
 			case CALL -> {
 				ClassName staticOwner = null;
@@ -284,9 +290,8 @@ public final class Jorth extends CodeDestination{
 				if(acc.remove(Access.STATIC)) staticOwner = source.readClassName(importsFun);
 				if(!acc.isEmpty()) throw new MalformedJorth("Illegal access " + acc);
 				
-				var functionName = source.readWord();
-				source.requireKeyword(Keyword.START);
-				endStack.add(currentFunction.startCall(staticOwner, functionName));
+				var funName = source.readWord();
+				callStart(source, staticOwner, funName);
 			}
 			case SUPER -> currentFunction.superOp();
 			case DUP -> currentFunction.dupOp();
@@ -296,7 +301,20 @@ public final class Jorth extends CodeDestination{
 		}
 	}
 	
-	private void topKeyword(TokenSource source, Keyword keyword) throws MalformedJorthException{
+	private void callStart(TokenSource source, ClassName staticOwner, String funName) throws MalformedJorth{
+		var hasStart = optionalStart(source);
+		var call     = currentFunction.startCall(staticOwner, funName);
+		if(hasStart){
+			endStack.add(call);
+		}else{
+			call.end();
+		}
+	}
+	private static boolean optionalStart(TokenSource source) throws MalformedJorth{
+		return source.consumeTokenIf(Token.KWord.class, w -> w.keyword() == Keyword.START);
+	}
+	
+	private void topKeyword(TokenSource source, Keyword keyword) throws MalformedJorth{
 		switch(keyword){
 			case INTERFACE, CLASS, ENUM -> {
 				var className = source.readClassName(importsFun);

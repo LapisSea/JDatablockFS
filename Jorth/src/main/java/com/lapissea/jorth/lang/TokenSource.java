@@ -31,9 +31,8 @@ public interface TokenSource{
 				return tok;
 			}
 			@Override
-			public ClassName readClassName(Function<ClassName, ClassName> imports) throws MalformedJorthException{
-				var tok = source.readToken().requireAs(Token.CWord.class);
-				tok = new Token.CWord(tok.line(), imports.apply(tok.value()));
+			public ClassName readClassName(Function<ClassName, ClassName> imports) throws MalformedJorth{
+				var tok = source.readToken().requireAs(Token.ClassWord.class).resolve(imports);
 				listener.accept(tok);
 				return imports.apply(tok.value());
 			}
@@ -100,8 +99,8 @@ public interface TokenSource{
 		var t = readToken().requireAs(Token.Word.class);
 		return Token.EWord.find(enumType, t.value());
 	}
-	default ClassName readClassName(Function<ClassName, ClassName> imports) throws MalformedJorthException{
-		return imports.apply(readToken().requireAs(Token.CWord.class).value());
+	default ClassName readClassName(Function<ClassName, ClassName> imports) throws MalformedJorth{
+		return imports.apply(readToken().requireAs(Token.ClassWord.class).value());
 	}
 	
 	

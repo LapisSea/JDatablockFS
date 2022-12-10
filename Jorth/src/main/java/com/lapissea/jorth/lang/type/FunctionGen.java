@@ -14,9 +14,9 @@ import static org.objectweb.asm.Opcodes.*;
 
 public final class FunctionGen implements Endable, FunctionInfo{
 	
-	public record ArgInfo(GenericType type, String name, boolean isStatic){ }
+	public record ArgInfo(GenericType type, String name){ }
 	
-	private record Arg(GenericType type, GenericType.BaseType info, String name, boolean isStatic, int accessIndex){ }
+	private record Arg(GenericType type, GenericType.BaseType info, String name, int accessIndex){ }
 	
 	private class CodePath{
 		private final TypeStack stack;
@@ -174,19 +174,11 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		
 		this.args = LinkedHashMap.newLinkedHashMap(args.size());
 		
-		int instanceCounter = 1;
-		int staticCounter   = 0;
+		int counter = isStatic()? 0 : 1;
 		for(ArgInfo value : args.values()){
 			var info = value.type.getBaseType();
-			int counter;
-			if(value.isStatic){
-				counter = staticCounter;
-				staticCounter += info.slots();
-			}else{
-				counter = instanceCounter;
-				instanceCounter += info.slots();
-			}
-			this.args.put(value.name, new Arg(value.type, info, value.name, value.isStatic, counter));
+			this.args.put(value.name, new Arg(value.type, info, value.name, counter));
+			counter += info.slots();
 		}
 		
 		if(owner.type == ClassType.INTERFACE){
@@ -418,10 +410,12 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		var prim = a.getPrimitiveType();
 		if(prim.isPresent()){
 			if(prim.get().loadOp() == ILOAD){
-				comparisonToBool(IF_ICMPNE);
+				branchCompareToBool(IF_ICMPNE);
 			}else{
 				throw new NotImplementedException();
 			}
+		}else{
+			branchCompareToBool(IF_ACMPNE);
 		}
 	}
 	
@@ -462,7 +456,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		code().ended = true;
 	}
 	
-	private void comparisonToBool(int ifNotOp){
+	private void branchCompareToBool(int ifNotOp){
 		Label falseL = new Label();
 		writer.visitJumpInsn(ifNotOp, falseL);
 		writer.visitInsn(ICONST_1);

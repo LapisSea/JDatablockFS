@@ -72,7 +72,7 @@ public class JorthTmp{
 						arg val int
 						returns #String
 					start
-						get #arg val 1 equals
+						get #arg val 1 ==
 						if start
 							'is 1' return
 						end
@@ -109,7 +109,7 @@ public class JorthTmp{
 	static Class<?> timedClass(String name, UnsafeConsumer<CodeStream, MalformedJorth> write) throws MalformedJorth, IllegalAccessException{
 		long    t     = System.currentTimeMillis();
 		boolean print = true;
-		var     jorth = new Jorth(null, print);
+		var     jorth = new Jorth(null, null);
 		
 		var writer = jorth.writer();
 		
