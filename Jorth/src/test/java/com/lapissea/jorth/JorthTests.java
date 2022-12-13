@@ -211,21 +211,22 @@ public class JorthTests{
 		
 		var cls = generateAndLoadInstanceSimple(TestCls.class.getPackageName() + ".Gen$$", writer -> {
 			writer.addImport(LogUtil.class);
+			writer.addImportAs(TestCls.class, "TestCls");
 			writer.write(
 				"""
 					
 					static function printToConsole
 					start
-						static call LogUtil println start
+						static call #LogUtil println start
 							'AAAYYYY LMAO'
 						end
 					end
 					
 					static function testFlag
-						arg obj #Object
+						arg obj #TestCls
 					start
 						get #arg obj
-						flag (0) call
+						call flag
 						
 						static call {} staticFlag
 					end
@@ -235,22 +236,23 @@ public class JorthTests{
 						arg b #String
 						returns #String
 					start
-						#StringBuilder new start get #arg a end
+						new #StringBuilder start get #arg a end
 						call append start get #arg b end
 						call toString
 					end
 					
 					function useCall
-						returns String
+						returns #String
 					start
 						get this this
-						'ay ' 'lmao'
-						call concatCall
+						'ay '
+						call concat start
+							'lmao'
+						end
 					end
 					""",
 				TestCls.class.getName());
 		});
-		
 		TestCls test = new TestCls();
 		assertFalse(test.flag);
 		cls.getMethod("testFlag", TestCls.class).invoke(null, test);
@@ -318,8 +320,8 @@ public class JorthTests{
 			writer.write(
 				"""
 					public field noArray #String
-					public field 1dArray String array
-					public field 2dArray String array array
+					public field 1dArray #String array
+					public field 2dArray #String array array
 					"""
 			);
 		});
@@ -368,7 +370,7 @@ public class JorthTests{
 			writer.addImportAs(MultiAnn.class, "Ann");
 			writer.write(
 				"""
-					@ #Ann {141 value 'xD' lol}
+					@ #Ann start value 141 lol 'xD' end
 					public field testString #String
 					"""
 			);
