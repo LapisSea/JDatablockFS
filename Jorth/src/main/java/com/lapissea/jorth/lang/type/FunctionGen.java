@@ -402,7 +402,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		};
 	}
 	
-	public void equalsOp() throws MalformedJorth{
+	public void compareEqualOp(boolean checkFor) throws MalformedJorth{
 		var stack = code().stack;
 		stack.requireElements(2);
 		
@@ -418,12 +418,12 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		var prim = a.getPrimitiveType();
 		if(prim.isPresent()){
 			if(prim.get().loadOp() == ILOAD){
-				branchCompareToBool(IF_ICMPNE);
+				branchCompareToBool(checkFor? IF_ICMPNE : IF_ICMPEQ);
 			}else{
 				throw new NotImplementedException();
 			}
 		}else{
-			branchCompareToBool(IF_ACMPNE);
+			branchCompareToBool(checkFor? IF_ACMPNE : IF_ACMPEQ);
 		}
 	}
 	

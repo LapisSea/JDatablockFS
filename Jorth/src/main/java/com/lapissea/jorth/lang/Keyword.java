@@ -20,7 +20,6 @@ public enum Keyword implements KeyedEnum{
 	SUPER,
 	NEW,
 	CALL,
-	EQUALS("=="),
 	IF,
 	RETURN,
 	THROW,

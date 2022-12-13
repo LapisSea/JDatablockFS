@@ -163,13 +163,31 @@ public final class Jorth extends CodeDestination{
 		}
 		
 		
-		switch(word){
-			case Token.NumToken.FloatVal fVal -> requireFunction().loadFloatOp(fVal.value());
-			case Token.NumToken.IntVal intVal -> requireFunction().loadIntOp(intVal.value());
-			case Token.StrValue sVal -> requireFunction().loadStringOp(sVal.value());
-			case Token.Bool booleVal -> requireFunction().loadBooleanOp(booleVal.value());
-			default -> throw new MalformedJorth("Unexpected token " + word);
+		if(currentFunction != null){
+			switch(word){
+				case Token.NumToken.FloatVal fVal -> requireFunction().loadFloatOp(fVal.value());
+				case Token.NumToken.IntVal intVal -> requireFunction().loadIntOp(intVal.value());
+				case Token.StrValue sVal -> requireFunction().loadStringOp(sVal.value());
+				case Token.Bool booleVal -> requireFunction().loadBooleanOp(booleVal.value());
+				default -> {
+					var oOp = word.asEnum(Operation.class);
+					if(oOp.isPresent()){
+						var op = oOp.get();
+						
+						switch(op){
+							case EQUALS -> currentFunction.compareEqualOp(true);
+							case NOT_EQUALS -> currentFunction.compareEqualOp(false);
+							default -> throw new NotImplementedException(op + " not implemented");
+						}
+						return;
+					}
+					
+					throw new MalformedJorth("Unexpected token " + word);
+				}
+			}
+			
 		}
+		
 	}
 	
 	private void classKeyword(TokenSource source, Keyword keyword) throws MalformedJorth{
@@ -297,7 +315,6 @@ public final class Jorth extends CodeDestination{
 				var member = source.readWord();
 				currentFunction.setOp(owner, member);
 			}
-			case EQUALS -> currentFunction.equalsOp();
 			case IF -> {
 				source.requireKeyword(Keyword.START);
 				currentFunction.pushIfBool();
