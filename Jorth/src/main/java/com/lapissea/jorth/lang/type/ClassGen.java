@@ -6,6 +6,7 @@ import com.lapissea.jorth.lang.Endable;
 import com.lapissea.jorth.lang.info.FunctionInfo;
 import org.objectweb.asm.ClassWriter;
 
+import java.lang.reflect.Array;
 import java.util.*;
 
 import static org.objectweb.asm.Opcodes.*;
@@ -48,7 +49,7 @@ public final class ClassGen implements ClassInfo, Endable{
 		
 		int accessFlags = visibility.flag|switch(type){
 			case CLASS -> ACC_SUPER|ACC_FINAL;
-			case INTERFACE -> ACC_ABSTRACT|ACC_INTERFACE;
+			case INTERFACE, ANNOTATION -> ACC_ABSTRACT|ACC_INTERFACE;
 			case ENUM -> ACC_SUPER|ACC_FINAL|ACC_ENUM;
 		};
 		
@@ -91,7 +92,7 @@ public final class ClassGen implements ClassInfo, Endable{
 		classFile = writer.toByteArray();
 	}
 	
-	public void defineField(Visibility visibility, Set<Access> accesses, GenericType type, String name) throws MalformedJorth{
+	public void defineField(Visibility visibility, Set<Access> accesses, Collection<AnnGen> annotations, GenericType type, String name) throws MalformedJorth{
 		checkEnd();
 		if(fields.containsKey(name)) throw new MalformedJorth("Field " + name + " already exists");
 		fields.put(name, new FieldGen(this.name, visibility, name, type, accesses.contains(Access.STATIC)));
@@ -111,7 +112,29 @@ public final class ClassGen implements ClassInfo, Endable{
 		
 		var fieldVisitor = writer.visitField(access, name, descriptor.toString(), signature == null? null : signature.toString(), null);
 		
-		//TODO: annotations
+		for(AnnGen annotation : annotations){
+			var annWriter = fieldVisitor.visitAnnotation(new GenericType(annotation.type()).jvmDescriptor().toString(), true);
+			for(var e : annotation.args().entrySet()){
+				var argName  = e.getKey();
+				var argValue = e.getValue();
+				
+				if(argValue.getClass().isArray()){
+					var arrAnn = annWriter.visitArray(argName);
+					for(int i = 0; i<Array.getLength(argValue); i++){
+						arrAnn.visit(null, Array.get(argValue, i));
+					}
+					arrAnn.visitEnd();
+					
+				}else if(argValue instanceof Enum<?> eVal){
+					annWriter.visitEnum(argName, GenericType.of(e.getClass()).jvmSignature().toString(), eVal.name());
+				}else{
+					annWriter.visit(argName, argValue);
+				}
+				
+			}
+			
+			annWriter.visitEnd();
+		}
 		
 		fieldVisitor.visitEnd();
 	}

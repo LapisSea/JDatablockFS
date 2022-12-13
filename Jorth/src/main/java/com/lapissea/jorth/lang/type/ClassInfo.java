@@ -89,6 +89,7 @@ public interface ClassInfo{
 		}
 		@Override
 		public ClassType type(){
+			if(clazz.isAnnotation()) return ClassType.ANNOTATION;
 			if(clazz.isInterface()) return ClassType.INTERFACE;
 			if(clazz.isEnum()) return ClassType.ENUM;
 			return ClassType.CLASS;

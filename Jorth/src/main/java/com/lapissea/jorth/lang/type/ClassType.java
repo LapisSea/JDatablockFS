@@ -3,7 +3,7 @@ package com.lapissea.jorth.lang.type;
 import com.lapissea.jorth.lang.Keyword;
 
 public enum ClassType{
-	CLASS, INTERFACE, ENUM;
+	CLASS, INTERFACE, ENUM, ANNOTATION;
 	
 	
 	public static ClassType from(Keyword keyword){

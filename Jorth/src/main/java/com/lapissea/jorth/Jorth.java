@@ -26,18 +26,17 @@ public final class Jorth extends CodeDestination{
 	private ClassGen    currentClass;
 	private FunctionGen currentFunction;
 	
-	private       Visibility        visibilityBuffer;
-	private       GenericType       extensionBuffer;
-	private final List<GenericType> interfaces = new ArrayList<>();
-	private final Set<Access>       accessSet  = EnumSet.noneOf(Access.class);
+	private       Visibility             visibilityBuffer;
+	private       GenericType            extensionBuffer;
+	private final List<GenericType>      interfaces  = new ArrayList<>();
+	private final Set<Access>            accessSet   = EnumSet.noneOf(Access.class);
+	private final Map<ClassName, AnnGen> annotations = new HashMap<>();
 	
-	private final Map<String, ClassName> imports = new HashMap<>();
-	
+	private final Map<String, ClassName>   imports = new HashMap<>();
 	private final Map<ClassName, ClassGen> classes = new HashMap<>();
 	
 	private final Function<ClassName, ClassName> importsFun = this::resolveImport;
-	
-	private final Deque<Endable> endStack = new ArrayDeque<>();
+	private final Deque<Endable>                 endStack   = new ArrayDeque<>();
 	
 	private final Consumer<CharSequence> printBack;
 	
@@ -176,9 +175,10 @@ public final class Jorth extends CodeDestination{
 	private void classKeyword(TokenSource source, Keyword keyword) throws MalformedJorth{
 		switch(keyword){
 			case FIELD -> {
+				var anns = popAnnotations().values();
 				var name = source.readWord();
 				var type = readType(source);
-				currentClass.defineField(popVisibility(), Set.of(), type, name);
+				currentClass.defineField(popVisibility(), Set.of(), anns, type, name);
 			}
 			case FUNCTION -> {
 				var functionName = source.readWord();
@@ -230,7 +230,39 @@ public final class Jorth extends CodeDestination{
 				endStack.addLast(this::endFunction);
 			}
 			case AT -> {
-				throw new NotImplementedException();
+				var annType = getReadClassName(source);
+				if(annotations.containsKey(annType)){
+					throw new MalformedJorth("Annotation " + annType + " already defined");
+				}
+				var tInfo = typeSource.byName(annType);
+				if(tInfo.type() != ClassType.ANNOTATION){
+					throw new MalformedJorth("Used non annotation class " + annType + " as annotation");
+				}
+				
+				var hasStart = optionalStart(source);
+				
+				var args = new HashMap<String, Object>();
+				
+				if(hasStart){
+					while(!source.consumeTokenIf(Token.KWord.class, w -> w.keyword() == Keyword.END)){
+						var name = source.readWord();
+						if(args.containsKey(name)){
+							throw new MalformedJorth("Duplicate field name in enum");
+						}
+						
+						
+						var tok = source.readToken();
+						var value = switch(tok){
+							case Token.NumToken t -> t.getNum();
+							case Token.StrValue t -> t.value();
+							default -> throw new MalformedJorth("Illegal token " + tok + " inside enum argument block");
+						};
+						
+						args.put(name, value);
+					}
+				}
+				
+				annotations.put(annType, new AnnGen(annType, args));
 			}
 			default -> throw new MalformedJorth("Unexpected keyword " + keyword.key + " in class " + currentClass);
 		}
@@ -367,6 +399,11 @@ public final class Jorth extends CodeDestination{
 	private EnumSet<Access> popAccessSet(){
 		var tmp = EnumSet.copyOf(accessSet);
 		accessSet.clear();
+		return tmp;
+	}
+	private Map<ClassName, AnnGen> popAnnotations(){
+		var tmp = Map.copyOf(annotations);
+		annotations.clear();
 		return tmp;
 	}
 	
