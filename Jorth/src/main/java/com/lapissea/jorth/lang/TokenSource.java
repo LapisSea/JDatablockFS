@@ -3,6 +3,7 @@ package com.lapissea.jorth.lang;
 import com.lapissea.jorth.EndOfCode;
 import com.lapissea.jorth.MalformedJorth;
 import com.lapissea.jorth.lang.type.GenericType;
+import com.lapissea.jorth.lang.type.KeyedEnum;
 
 import java.util.ArrayList;
 import java.util.Optional;
@@ -97,7 +98,7 @@ public interface TokenSource{
 	}
 	default <E extends Enum<E>> E readEnum(Class<E> enumType) throws MalformedJorth{
 		var t = readToken().requireAs(Token.Word.class);
-		return Token.EWord.find(enumType, t.value());
+		return KeyedEnum.get(enumType, t.value());
 	}
 	default ClassName readClassName(Function<ClassName, ClassName> imports) throws MalformedJorth{
 		return imports.apply(readToken().requireAs(Token.ClassWord.class).value());

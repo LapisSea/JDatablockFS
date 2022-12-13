@@ -1,11 +1,9 @@
 package com.lapissea.jorth.lang;
 
 import com.lapissea.jorth.MalformedJorth;
+import com.lapissea.jorth.lang.type.KeyedEnum;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
 public sealed interface Token{
@@ -23,34 +21,28 @@ public sealed interface Token{
 			}
 			return Token.super.as(type);
 		}
+		@Override
+		public <E extends Enum<E>> Optional<E> asEnum(Class<E> clazz){
+			return Optional.ofNullable(clazz == Keyword.class? (E)keyword : KeyedEnum.getOptional(clazz, keyword.key()));
+		}
 	}
 	
 	record EWord<E extends Enum<E>>(int line, E value) implements Token{
 		public EWord(int line, Class<E> type, String word) throws MalformedJorth{
-			this(line, find(type, word));
+			this(line, KeyedEnum.get(type, word));
 		}
-		
-		private static final Map<Class<? extends Enum<?>>, Map<String, Enum<?>>> CACHE = new ConcurrentHashMap<>();
-		
-		public static <E extends Enum<E>> E find(Class<E> type, String word) throws MalformedJorth{
-			return find(type, word, true);
-		}
-		
-		@SuppressWarnings("unchecked")
-		public static <E extends Enum<E>> E find(Class<E> type, String word, boolean required) throws MalformedJorth{
-			var map = (Map<String, E>)CACHE.computeIfAbsent(type, t -> {
-				var values = t.getEnumConstants();
-				var m      = HashMap.<String, Enum<?>>newHashMap(values.length);
-				for(Enum<?> value : values){
-					m.put(value.name().toLowerCase(), value);
-				}
-				return Map.copyOf(m);
-			});
-			var e = map.get(word);
-			if(e == null && required){
-				throw new MalformedJorth("Expected any of " + map.values() + " but got " + word);
-			}
-			return e;
+		@Override
+		public <E extends Enum<E>> Optional<E> asEnum(Class<E> clazz){
+			
+			return Optional.ofNullable(
+				clazz == value.getClass()?
+				(E)value :
+				KeyedEnum.getOptional(
+					clazz,
+					value instanceof KeyedEnum e?
+					e.key() : value.name().toLowerCase()
+				)
+			);
 		}
 	}
 	
@@ -74,6 +66,10 @@ public sealed interface Token{
 			}
 			return Token.super.as(type);
 		}
+		@Override
+		public <E extends Enum<E>> Optional<E> asEnum(Class<E> clazz){
+			return Optional.ofNullable(KeyedEnum.getOptional(clazz, value));
+		}
 	}
 	
 	record SmolWord(int line, char value) implements Token{
@@ -88,6 +84,10 @@ public sealed interface Token{
 				return Optional.of((T)new Word(line, value + ""));
 			}
 			return Token.super.as(type);
+		}
+		@Override
+		public <E extends Enum<E>> Optional<E> asEnum(Class<E> clazz){
+			return Optional.ofNullable(KeyedEnum.getOptional(clazz, value));
 		}
 	}
 	
@@ -153,5 +153,9 @@ public sealed interface Token{
 			return o.get();
 		}
 		throw new MalformedJorth("Required token type " + type.getSimpleName() + " but got " + this);
+	}
+	
+	default <E extends Enum<E>> Optional<E> asEnum(Class<E> clazz){
+		return as(Word.class).map(Word::value).map(KeyedEnum.getLookup(clazz)::getOptional);
 	}
 }

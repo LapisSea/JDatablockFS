@@ -4,6 +4,7 @@ import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.EndOfCode;
 import com.lapissea.jorth.MalformedJorth;
 import com.lapissea.jorth.lang.type.Access;
+import com.lapissea.jorth.lang.type.KeyedEnum;
 import com.lapissea.jorth.lang.type.Visibility;
 
 import java.util.BitSet;
@@ -220,15 +221,15 @@ public class Tokenizer implements CodeStream, TokenSource{
 			word = rawWord;
 		}
 		
-		var keyword = Keyword.MAP.get(word);
+		var keyword = Keyword.LOOKUP.get(word, false);
 		if(keyword != null){
 			return new Token.KWord(lastLine, keyword);
 		}
 		
-		var vis = Token.EWord.find(Visibility.class, word, false);
+		var vis = KeyedEnum.getOptional(Visibility.class, word);
 		if(vis != null) return new Token.EWord<>(lastLine, vis);
 		
-		var acc = Token.EWord.find(Access.class, word, false);
+		var acc = KeyedEnum.getOptional(Access.class, word);
 		if(acc != null) return new Token.EWord<>(lastLine, acc);
 		
 		
@@ -257,12 +258,9 @@ public class Tokenizer implements CodeStream, TokenSource{
 	}
 	
 	private Token smol(char c){
-		var k = Keyword.SMOL_KEYS;
-		for(int i = 0; i<k.length; i++){
-			if(k[i] == c){
-				return new Token.KWord(lastLine, Keyword.SMOL_VALUES[i]);
-			}
-		}
+		var k = Keyword.LOOKUP.getOptional(c);
+		if(k != null) return new Token.KWord(lastLine, k);
+		
 		if(c>='0' && c<='9') return new Token.NumToken.IntVal(lastLine, c - '0');
 		return new Token.SmolWord(lastLine, c);
 	}
