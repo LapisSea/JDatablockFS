@@ -61,18 +61,14 @@ public final class Jorth extends CodeDestination{
 	
 	@Override
 	public void addImport(String clasName){
-		String keyName;
-		var    pos = clasName.lastIndexOf('.');
-		if(pos != -1){
-			var sb = new StringBuilder();
-			sb.append('#');
-			sb.append(clasName, pos, clasName.length());
-			keyName = sb.toString();
-		}else{
-			keyName = "#" + clasName;
-		}
-		
-		imports.put(keyName, ClassName.dotted(clasName));
+		var pos = clasName.lastIndexOf('.') + 1;
+		imports.put(
+			new StringBuilder(1 + clasName.length() - pos)
+				.append('#')
+				.append(clasName, pos, clasName.length())
+				.toString(),
+			ClassName.dotted(clasName)
+		);
 	}
 	@Override
 	public void addImportAs(String clasName, String name){
@@ -117,8 +113,7 @@ public final class Jorth extends CodeDestination{
 					yield strCol + "'" + t.value().replace("'", CYAN + "\\'" + strCol) + "'";
 				}
 				case Token.SmolWord w -> w.value() + "";
-				case Token.IntVal t -> BLUE_BRIGHT + t.value();
-				case Token.FloatVal t -> BLUE_BRIGHT + t.value();
+				case Token.NumToken t -> BLUE_BRIGHT + t.getNum();
 				case Token.Null ignored -> BLUE_BRIGHT + "null";
 				case Token.ClassWord t -> GREEN_BRIGHT + t.value();
 				case Token.Bool bool -> GREEN_BRIGHT + bool.value();
@@ -170,8 +165,8 @@ public final class Jorth extends CodeDestination{
 		
 		
 		switch(word){
-			case Token.FloatVal fVal -> requireFunction().loadFloatOp(fVal.value());
-			case Token.IntVal intVal -> requireFunction().loadIntOp(intVal.value());
+			case Token.NumToken.FloatVal fVal -> requireFunction().loadFloatOp(fVal.value());
+			case Token.NumToken.IntVal intVal -> requireFunction().loadIntOp(intVal.value());
 			case Token.StrValue sVal -> requireFunction().loadStringOp(sVal.value());
 			case Token.Bool booleVal -> requireFunction().loadBooleanOp(booleVal.value());
 			default -> throw new MalformedJorth("Unexpected token " + word);
@@ -182,12 +177,10 @@ public final class Jorth extends CodeDestination{
 		switch(keyword){
 			case FIELD -> {
 				var name = source.readWord();
-				var type = source.readType(importsFun);
+				var type = readType(source);
 				currentClass.defineField(popVisibility(), Set.of(), type, name);
 			}
 			case FUNCTION -> {
-				if(currentFunction != null) throw new MalformedJorth("Already inside function");
-				
 				var functionName = source.readWord();
 				if(functionName.equals("<")){
 					functionName = "<" + source.readWord() + ">";
@@ -213,7 +206,7 @@ public final class Jorth extends CodeDestination{
 						}
 						case ARG -> {
 							var name = source.readWord();
-							var type = source.readType(importsFun);
+							var type = readType(source);
 							
 							var access = popAccessSet();
 							if(!access.isEmpty()){
@@ -226,7 +219,7 @@ public final class Jorth extends CodeDestination{
 						}
 						case RETURNS -> {
 							if(returnType != null) throw new MalformedJorth("Duplicate returns statement");
-							returnType = source.readType(importsFun);
+							returnType = readType(source);
 						}
 						default -> throw new MalformedJorth("Unexpected keyword " + keyword.key);
 					}
@@ -242,6 +235,9 @@ public final class Jorth extends CodeDestination{
 			default -> throw new MalformedJorth("Unexpected keyword " + keyword.key + " in class " + currentClass);
 		}
 	}
+	
+	private GenericType readType(TokenSource source) throws MalformedJorth      { return source.readType(importsFun); }
+	private ClassName getReadClassName(TokenSource source) throws MalformedJorth{ return source.readClassName(importsFun); }
 	
 	private boolean anyKeyword(TokenSource source, Keyword keyword) throws MalformedJorth{
 		switch(keyword){
@@ -278,20 +274,20 @@ public final class Jorth extends CodeDestination{
 			case RETURN -> currentFunction.returnOp();
 			case THROW -> currentFunction.throwOp();
 			case NEW -> {
-				var clazz = source.readClassName(importsFun);
+				var clazz = getReadClassName(source);
 				currentFunction.newOp(clazz);
 				currentFunction.dupOp();
-				callStart(source, null, "<init>");
+				doCall(source, null, "<init>");
 			}
 			case CALL -> {
 				ClassName staticOwner = null;
 				
 				var acc = popAccessSet();
-				if(acc.remove(Access.STATIC)) staticOwner = source.readClassName(importsFun);
+				if(acc.remove(Access.STATIC)) staticOwner = getReadClassName(source);
 				if(!acc.isEmpty()) throw new MalformedJorth("Illegal access " + acc);
 				
 				var funName = source.readWord();
-				callStart(source, staticOwner, funName);
+				doCall(source, staticOwner, funName);
 			}
 			case SUPER -> currentFunction.superOp();
 			case DUP -> currentFunction.dupOp();
@@ -301,7 +297,7 @@ public final class Jorth extends CodeDestination{
 		}
 	}
 	
-	private void callStart(TokenSource source, ClassName staticOwner, String funName) throws MalformedJorth{
+	private void doCall(TokenSource source, ClassName staticOwner, String funName) throws MalformedJorth{
 		var hasStart = optionalStart(source);
 		var call     = currentFunction.startCall(staticOwner, funName);
 		if(hasStart){
@@ -317,7 +313,7 @@ public final class Jorth extends CodeDestination{
 	private void topKeyword(TokenSource source, Keyword keyword) throws MalformedJorth{
 		switch(keyword){
 			case INTERFACE, CLASS, ENUM -> {
-				var className = source.readClassName(importsFun);
+				var className = getReadClassName(source);
 				source.requireKeyword(Keyword.START);
 				
 				if(classes.containsKey(className)){

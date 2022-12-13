@@ -239,17 +239,17 @@ public class Tokenizer implements CodeStream, TokenSource{
 		var c = word.charAt(0);
 		if(c == '-' || c == '.' || (c>='0' && c<='9')){
 			if(HEX_NUM.matcher(word).matches()){
-				return new Token.IntVal(lastLine, parseInt(cleanNumber(word, 2), 16));
+				return new Token.NumToken.IntVal(lastLine, parseInt(cleanNumber(word, 2), 16));
 			}
 			if(BIN_NUM.matcher(word).matches()){
-				return new Token.IntVal(lastLine, parseInt(cleanNumber(word, 2), 2));
+				return new Token.NumToken.IntVal(lastLine, parseInt(cleanNumber(word, 2), 2));
 			}
 			if(DEC_NUM.matcher(word).matches()){
 				var dec = cleanNumber(word, 0);
 				if(dec.contains(".")){
-					return new Token.FloatVal(lastLine, parseFloat(dec.replace("_", "")));
+					return new Token.NumToken.FloatVal(lastLine, parseFloat(dec.replace("_", "")));
 				}
-				return new Token.IntVal(lastLine, parseInt(dec));
+				return new Token.NumToken.IntVal(lastLine, parseInt(dec));
 			}
 		}
 		
@@ -263,7 +263,7 @@ public class Tokenizer implements CodeStream, TokenSource{
 				return new Token.KWord(lastLine, Keyword.SMOL_VALUES[i]);
 			}
 		}
-		if(c>='0' && c<='9') return new Token.IntVal(lastLine, c - '0');
+		if(c>='0' && c<='9') return new Token.NumToken.IntVal(lastLine, c - '0');
 		return new Token.SmolWord(lastLine, c);
 	}
 	

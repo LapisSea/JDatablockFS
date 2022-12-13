@@ -114,9 +114,25 @@ public sealed interface Token{
 	
 	record StrValue(int line, String value) implements Token{ }
 	
-	record IntVal(int line, int value) implements Token{ }
+	sealed interface NumToken extends Token{
+		
+		record IntVal(int line, int value) implements NumToken{
+			@Override
+			public Number getNum(){
+				return value;
+			}
+		}
+		
+		record FloatVal(int line, float value) implements NumToken{
+			@Override
+			public Number getNum(){
+				return value;
+			}
+		}
+		
+		Number getNum();
+	}
 	
-	record FloatVal(int line, float value) implements Token{ }
 	
 	record Null(int line) implements Token{ }
 	

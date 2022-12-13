@@ -36,7 +36,7 @@ public interface FunctionInfo{
 		}
 		@Override
 		public String toString(){
-			return "name(" + args.stream().map(GenericType::toString).collect(Collectors.joining(", ")) + ")";
+			return name + "(" + args.stream().map(GenericType::toString).collect(Collectors.joining(", ")) + ")";
 		}
 	}
 	
@@ -50,7 +50,7 @@ public interface FunctionInfo{
 		public OfMethod(TypeSource source, Method method) throws MalformedJorth{
 			this.method = method;
 			owner = source.byName(ClassName.of(method.getDeclaringClass()));
-			returnType = GenericType.of(method.getGenericReturnType());
+			returnType = method.getGenericReturnType() == void.class? null : GenericType.of(method.getGenericReturnType());
 			
 			var tArgs = method.getGenericParameterTypes();
 			var args  = new ArrayList<GenericType>(tArgs.length);

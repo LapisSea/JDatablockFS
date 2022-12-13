@@ -57,7 +57,7 @@ public interface ClassInfo{
 				}
 				f = FunctionInfo.of(source, getDeepDeclaredMethod(clazz, signature.name(), args));
 			}catch(ReflectiveOperationException e){
-				throw new MalformedJorth(signature + " does not exist in " + clazz, e);
+				throw new MalformedJorth(signature + " does not exist in " + clazz);
 			}
 			functions.put(signature, f);
 			return f;

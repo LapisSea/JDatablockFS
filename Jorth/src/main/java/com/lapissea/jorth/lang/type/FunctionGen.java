@@ -164,13 +164,18 @@ public final class FunctionGen implements Endable, FunctionInfo{
 	
 	private final ArrayDeque<CodePath> codeInfo = new ArrayDeque<>();
 	
-	public FunctionGen(ClassGen owner, String name, Visibility visibility, Set<Access> access, GenericType returnType, LinkedHashMap<String, ArgInfo> args){
+	public FunctionGen(ClassGen owner, String name, Visibility visibility, Set<Access> access, GenericType returnType, LinkedHashMap<String, ArgInfo> args) throws MalformedJorth{
 		this.owner = owner;
 		this.name = name;
 		this.access = access.isEmpty()? EnumSet.noneOf(Access.class) : EnumSet.copyOf(access);
 		this.returnType = returnType;
 		this.typeSource = owner.typeSource;
 		this.visibility = visibility;
+		
+		if(returnType != null) typeSource.byType(returnType);
+		for(ArgInfo value : args.values()){
+			typeSource.byType(value.type);
+		}
 		
 		this.args = LinkedHashMap.newLinkedHashMap(args.size());
 		
@@ -369,8 +374,17 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		writer.visitMethodInsn(callOp, ownerName, name, signature, ownerType == ClassType.INTERFACE);
 	}
 	
-	public Endable startCall(ClassName staticOwner, String functionName){
+	public Endable startCall(ClassName staticOwner, String functionName) throws MalformedJorth{
 		var mark = code().stack.size();
+		
+		ClassInfo cInfo;
+		if(staticOwner != null){
+			cInfo = typeSource.byName(staticOwner);
+		}else{
+			var stack = code().stack;
+			if(stack.isEmpty()) throw new MalformedJorth("Trying to call non static method but there is nothing on stack");
+			cInfo = typeSource.byType(stack.peek(mark - 1));
+		}
 		
 		return () -> {
 			var stack    = code().stack;
@@ -379,13 +393,6 @@ public final class FunctionGen implements Endable, FunctionInfo{
 			var args = new ArrayList<GenericType>(argCount);
 			for(int i = 0; i<argCount; i++){
 				args.add(stack.peek(mark + i));
-			}
-			
-			ClassInfo cInfo;
-			if(staticOwner != null){
-				cInfo = typeSource.byName(staticOwner);
-			}else{
-				cInfo = typeSource.byType(stack.peek(mark - 1));
 			}
 			
 			var info = cInfo.getFunction(new Signature(functionName, args));
