@@ -44,13 +44,24 @@ public interface ClassInfo{
 		public FunctionInfo getFunction(Signature signature) throws MalformedJorth{
 			var f = functions.get(signature);
 			if(f != null) return f;
-			try{
-				
-				var args = new Class<?>[signature.args().size()];
-				for(int i = 0; i<signature.args().size(); i++){
-					var name = signature.args().get(i).raw();
-					args[i] = getLoader().loadClass(name.dotted());
+			
+			var args = new Class<?>[signature.args().size()];
+			for(int i = 0; i<signature.args().size(); i++){
+				var arg = signature.args().get(i);
+				var pt  = arg.getPrimitiveType().map(GenericType.BaseType::type);
+				if(pt.isPresent()){
+					args[i] = pt.get();
+				}else{
+					var name = arg.raw();
+					try{
+						args[i] = getLoader().loadClass(name.dotted());
+					}catch(ClassNotFoundException e){
+						throw new RuntimeException(e);
+					}
 				}
+			}
+			
+			try{
 				
 				if(signature.name().equals("<init>")){
 					return FunctionInfo.of(source, clazz.getConstructor(args));

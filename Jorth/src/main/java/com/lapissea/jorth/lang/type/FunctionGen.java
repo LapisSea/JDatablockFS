@@ -77,6 +77,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		}
 		
 		public void end() throws MalformedJorth{
+			if(ended) return;
 			ended = true;
 			
 			GenericType.BaseType type;

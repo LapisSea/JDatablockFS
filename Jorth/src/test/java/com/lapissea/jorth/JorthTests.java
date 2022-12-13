@@ -187,23 +187,19 @@ public class JorthTests{
 							'ay'
 							return
 						end
-						else start
-							#StringBuilder new
-							call append start 'lmao ' end
-							call append start get #arg index end
-							call toString
-							return
-						end
-						
+						new #StringBuilder
+						call append start 'lmao ' end
+						call append start get #arg index end
+						call toString
 					end
 					""");
 		});
 		
 		var test = cls.getMethod("test", int.class);
 		
-		LogUtil.println(test.invoke(null, 0));
-		LogUtil.println(test.invoke(null, 1));
-		LogUtil.println(test.invoke(null, 2));
+		assertEquals("lmao 0", test.invoke(null, 0));
+		assertEquals("ay", test.invoke(null, 1));
+		assertEquals("lmao 2", test.invoke(null, 2));
 	}
 	
 	@Test
