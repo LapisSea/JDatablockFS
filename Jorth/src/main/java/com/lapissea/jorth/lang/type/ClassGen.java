@@ -90,7 +90,7 @@ public final class ClassGen implements ClassInfo, Endable{
 //		if(!addedClinit){
 //			defineFunction("<clinit>", Visibility.PUBLIC, Set.of(), null, new LinkedHashMap<>()).end();
 //		}
-		if(!addedInit && type == ClassType.CLASS && !accessSet.contains(Access.STATIC)){
+		if(!addedInit && (type == ClassType.CLASS || type == ClassType.ENUM) && !accessSet.contains(Access.STATIC)){
 			var parent = typeSource.byType(extension);
 			
 			if(parent.getFunctionsByName("<init>").anyMatch(f -> f.argumentTypes().isEmpty())){
@@ -117,8 +117,73 @@ public final class ClassGen implements ClassInfo, Endable{
 			}
 		}
 		
+		if(type == ClassType.ENUM){
+			generateEnumBoilerplate();
+		}
+		
 		writer.visitEnd();
 		classFile = writer.toByteArray();
+	}
+	
+	private void generateEnumBoilerplate() throws MalformedJorth{
+		var arrType = new GenericType(name, 1, List.of());
+		defineField(
+			Visibility.PRIVATE,
+			EnumSet.of(Access.STATIC, Access.FINAL),
+			List.of(),
+			arrType,
+			"$VALUES"
+		);
+		{
+			var fun = defineFunction(
+				"values",
+				Visibility.PUBLIC,
+				EnumSet.of(Access.STATIC),
+				arrType,
+				List.of()
+			);
+			
+			fun.getOp(name.dotted(), "$VALUES");
+			fun.startCall(null, "clone").end();
+			fun.castOp(arrType);
+			fun.end();
+		}
+		{
+			var fun = defineFunction(
+				"<clinit>",
+				Visibility.PUBLIC,
+				EnumSet.of(Access.STATIC),
+				null,
+				List.of()
+			);
+			
+			var constants = fields.values().stream().filter(FieldGen::isEnumConstant).toList();
+			
+			fun.loadIntOp(constants.size());
+			fun.newOp(arrType);
+			
+			for(int i = 0; i<constants.size(); i++){
+				FieldInfo field = constants.get(i);
+				if(!field.isEnumConstant()) continue;
+				
+				fun.dupOp();//array dup
+				fun.loadIntOp(i);//[i] = ...
+				
+				fun.newOp(new GenericType(name));// new enum(name,ordinal)
+				fun.dupOp();
+				var call = fun.startCall(null, "<init>");
+				fun.loadStringOp(field.name());
+				fun.loadIntOp(i);
+				call.end();
+				
+				fun.dupOp();
+				fun.setOp(name.dotted(), field.name());// Enum.NAME=obj
+				fun.setElementOP();
+			}
+			
+			fun.setOp(name.dotted(), "$VALUES");
+			fun.end();
+		}
 	}
 	
 	public void defineField(Visibility visibility, Set<Access> accesses, Collection<AnnGen> annotations, GenericType type, String name) throws MalformedJorth{

@@ -150,6 +150,15 @@ public final class FunctionGen implements Endable, FunctionInfo{
 				default -> throw new MalformedJorth("Illegal base type: " + bt);
 			});
 		}
+		public void cast(GenericType type) throws MalformedJorth{
+			var stackType = stack.pop();
+			
+			if(!type.instanceOf(typeSource, stackType)){
+				throw new MalformedJorth("Can not cast " + stackType + " to " + type);
+			}
+			stack.push(type);
+			writer.visitTypeInsn(CHECKCAST, type.jvmSignature().toString());
+		}
 	}
 	
 	private final ClassGen        owner;
@@ -323,13 +332,12 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		return code().stack;
 	}
 	
-	public void superOp() throws MalformedJorth{
+	public void superOp(List<GenericType> args) throws MalformedJorth{
 		if(!name.equals("<init>")){
 			throw new NotImplementedException("Super on non constructor not implemented");
 		}
-		loadThisIns();
 		var sup = owner.superType();
-		invokeOp(sup.getFunction(new Signature("<init>")), true);
+		invokeOp(sup.getFunction(new Signature("<init>", args)), true);
 	}
 	
 	public void newOp(GenericType type) throws MalformedJorth{
@@ -580,5 +588,8 @@ public final class FunctionGen implements Endable, FunctionInfo{
 	}
 	public void popOp() throws MalformedJorth{
 		code().pop();
+	}
+	public void castOp(GenericType type) throws MalformedJorth{
+		code().cast(type);
 	}
 }

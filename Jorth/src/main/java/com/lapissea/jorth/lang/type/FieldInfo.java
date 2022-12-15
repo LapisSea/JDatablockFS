@@ -18,6 +18,10 @@ public interface FieldInfo{
 		}
 		
 		@Override
+		public boolean isEnumConstant(){
+			return field.isEnumConstant();
+		}
+		@Override
 		public boolean isStatic(){
 			return Modifier.isStatic(field.getModifiers());
 		}
@@ -39,6 +43,7 @@ public interface FieldInfo{
 		return new OfReflective(field);
 	}
 	
+	boolean isEnumConstant();
 	boolean isStatic();
 	ClassName owner();
 	GenericType type();

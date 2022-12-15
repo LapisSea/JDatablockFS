@@ -287,6 +287,18 @@ public final class Jorth extends CodeDestination{
 				
 				annotations.put(annType, new AnnGen(annType, args));
 			}
+			case ENUM -> {
+				var enumName = source.readWord();
+				
+				currentClass.defineField(
+					Visibility.PUBLIC,
+					EnumSet.of(Access.STATIC, Access.FINAL, Access.ENUM),
+					List.of(),
+					new GenericType(currentClass.name),
+					enumName
+				);
+				
+			}
 			default -> throw new MalformedJorth("Unexpected keyword " + keyword.key + " in class " + currentClass);
 		}
 	}
@@ -343,7 +355,10 @@ public final class Jorth extends CodeDestination{
 				var funName = source.readWord();
 				doCall(source, staticOwner, funName);
 			}
-			case SUPER -> currentFunction.superOp();
+			case SUPER -> {
+				currentFunction.loadThisIns();
+				currentFunction.superOp(List.of());
+			}
 			case DUP -> currentFunction.dupOp();
 			case POP -> currentFunction.popOp();
 			case WHAT_THE_STACK -> throw new MalformedJorth("Debug token '???' at line " + source.line() + " encountered. Current stack:\n" + currentFunction.getStack());
@@ -377,6 +392,13 @@ public final class Jorth extends CodeDestination{
 				var visibility = popVisibility();
 				var extension  = popExtension();
 				var interfaces = popInterfaces();
+				
+				if(keyword == Keyword.ENUM){
+					if(!extension.equals(GenericType.OBJECT)){
+						throw new MalformedJorth("Can not extend enum");
+					}
+					extension = new GenericType(ClassName.of(Enum.class), 0, List.of(new GenericType(className)));
+				}
 				
 				currentClass = new ClassGen(typeSource, className, ClassType.from(keyword), visibility, extension, interfaces, accessSet);
 				classes.put(className, currentClass);
