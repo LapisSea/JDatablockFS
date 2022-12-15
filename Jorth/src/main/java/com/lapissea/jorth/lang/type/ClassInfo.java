@@ -41,6 +41,10 @@ public interface ClassInfo{
 			throw NotImplementedException.infer();//TODO: implement OfArray.getFunction()
 		}
 		@Override
+		public Stream<FunctionInfo> getFunctionsByName(String name){
+			throw NotImplementedException.infer();//TODO: implement OfArray.getFunctionsByName()
+		}
+		@Override
 		public ClassName name(){
 			return component.raw();
 		}
@@ -60,10 +64,11 @@ public interface ClassInfo{
 	
 	class OfClass implements ClassInfo{
 		
-		private final TypeSource                   source;
-		private final Class<?>                     clazz;
-		private final Map<String, FieldInfo>       fields    = new HashMap<>();
-		private final Map<Signature, FunctionInfo> functions = new HashMap<>();
+		private final TypeSource                      source;
+		private final Class<?>                        clazz;
+		private final Map<String, FieldInfo>          fields          = new HashMap<>();
+		private final Map<Signature, FunctionInfo>    functions       = new HashMap<>();
+		private final Map<String, List<FunctionInfo>> functionsByName = new HashMap<>();
 		
 		public OfClass(TypeSource source, Class<?> clazz){
 			this.source = source;
@@ -104,6 +109,8 @@ public interface ClassInfo{
 				}
 			}
 			
+			
+			
 			try{
 				
 				if(signature.name().equals("<init>")){
@@ -116,6 +123,43 @@ public interface ClassInfo{
 			functions.put(signature, f);
 			return f;
 		}
+		@Override
+		public Stream<? extends FunctionInfo> getFunctionsByName(String name){
+			return functionsByName.computeIfAbsent(name, this::findByName).stream();
+		}
+		
+		private List<FunctionInfo> findByName(String name){
+			var result = new HashMap<String, FunctionInfo>();
+			
+			if(name.equals("<init>")){
+				var ctors = clazz.getDeclaredConstructors();
+				return Arrays.stream(ctors).<FunctionInfo>map(c -> new FunctionInfo.OfConstructor(source, c)).toList();
+			}
+			
+			var c = clazz;
+			while(c != null){
+				Arrays.stream(c.getDeclaredMethods())
+				      .filter(f -> f.getName().equals(name))
+				      .filter(f -> result.containsKey(f.getName()))
+				      .forEach(f -> {
+					      var n = f.getName();
+					      functions.entrySet().stream()
+					               .filter(s -> s.getKey().name().equals(n))
+					               .findAny().map(Map.Entry::getValue)
+					               .ifPresentOrElse(
+						               info -> result.put(info.name(), info),
+						               () -> {
+							               var info = FunctionInfo.of(source, f);
+							               functions.put(new Signature(info.name(), Arrays.stream(f.getGenericParameterTypes()).map(GenericType::of).toList()), info);
+							               result.put(info.name(), info);
+						               });
+				      });
+				c = c.getSuperclass();
+			}
+			
+			return List.copyOf(result.values());
+		}
+		
 		private ClassLoader getLoader(){
 			var loader = clazz.getClassLoader();
 			if(loader == null) loader = this.getClass().getClassLoader();
@@ -156,6 +200,7 @@ public interface ClassInfo{
 	
 	FieldInfo getField(String name) throws MalformedJorth;
 	FunctionInfo getFunction(Signature signature) throws MalformedJorth;
+	Stream<? extends FunctionInfo> getFunctionsByName(String name);
 	
 	ClassName name();
 	ClassInfo superType() throws MalformedJorth;

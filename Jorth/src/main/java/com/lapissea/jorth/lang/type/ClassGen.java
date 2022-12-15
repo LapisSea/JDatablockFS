@@ -8,6 +8,7 @@ import org.objectweb.asm.ClassWriter;
 
 import java.lang.reflect.Array;
 import java.util.*;
+import java.util.stream.Stream;
 
 import static org.objectweb.asm.Opcodes.*;
 
@@ -89,10 +90,31 @@ public final class ClassGen implements ClassInfo, Endable{
 //		if(!addedClinit){
 //			defineFunction("<clinit>", Visibility.PUBLIC, Set.of(), null, new LinkedHashMap<>()).end();
 //		}
-		if(!addedInit && !accessSet.contains(Access.STATIC)){
-			var init = defineFunction("<init>", this.visibility, Set.of(), null, new LinkedHashMap<>());
-			init.superOp();
-			init.end();
+		if(!addedInit && type == ClassType.CLASS && !accessSet.contains(Access.STATIC)){
+			var parent = typeSource.byType(extension);
+			
+			if(parent.getFunctionsByName("<init>").anyMatch(f -> f.argumentTypes().isEmpty())){
+				var init = defineFunction("<init>", this.visibility, Set.of(), null, List.of());
+				init.loadThisIns();
+				init.superOp(List.of());
+				init.end();
+			}else{
+				for(var e : parent.getFunctionsByName("<init>").toList()){
+					var                       args    = e.argumentTypes();
+					List<FunctionGen.ArgInfo> argInfo = new ArrayList<>();
+					for(int i = 0; i<args.size(); i++){
+						argInfo.add(new FunctionGen.ArgInfo(e.argumentTypes().get(i), "arg" + i));
+					}
+					
+					var init = defineFunction("<init>", this.visibility, Set.of(), null, argInfo);
+					init.loadThisIns();
+					for(int i = 0; i<args.size(); i++){
+						init.getOp("#arg", "arg" + i);
+					}
+					init.superOp(e.argumentTypes());
+					init.end();
+				}
+			}
 		}
 		
 		writer.visitEnd();
@@ -212,6 +234,10 @@ public final class ClassGen implements ClassInfo, Endable{
 		var fun = functions.get(signature);
 		if(fun != null) return fun;
 		throw new MalformedJorth("Function of " + signature + " does not exist");
+	}
+	@Override
+	public Stream<? extends FunctionInfo> getFunctionsByName(String name){
+		return functions.values().stream().filter(f -> f.name().equals(name));
 	}
 	
 	@Override
