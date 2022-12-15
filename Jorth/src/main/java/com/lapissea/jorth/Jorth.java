@@ -43,12 +43,17 @@ public final class Jorth extends CodeDestination{
 	public Jorth(ClassLoader classLoader, Consumer<CharSequence> printBack){
 		this.printBack = printBack;
 		classLoader = classLoader == null? this.getClass().getClassLoader() : classLoader;
+		var that = this;
 		typeSource = TypeSource.concat(type -> {
 			var name = type.raw();
 			name = importsFun.apply(name);
 			if(currentClass == null || !currentClass.name.equals(name)) return Optional.empty();
-			if(type.dims() != 0){
-				throw new NotImplementedException();
+			if(type.dims()>0){
+				try{
+					return Optional.of(new ClassInfo.OfArray(that.typeSource, type.withDims(type.dims() - 1)));
+				}catch(MalformedJorth e){
+					throw new RuntimeException(e);
+				}
 			}
 			return Optional.of(currentClass);
 		}, TypeSource.of(classLoader));

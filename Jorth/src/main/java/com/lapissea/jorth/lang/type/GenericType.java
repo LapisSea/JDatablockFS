@@ -59,21 +59,21 @@ public record GenericType(ClassName raw, int dims, List<GenericType> args){
 		this.args = List.copyOf(args);
 	}
 	
-	public record BaseType(String jvmStr, Class<?> type, int returnOp, int loadOp, int slots){
-		public static final BaseType OBJ  = new BaseType("O", Object.class, ARETURN, ALOAD, 1);
-		public static final BaseType VOID = new BaseType("V", void.class, RETURN, -1, 0);
+	public record BaseType(String jvmStr, Class<?> type, int returnOp, int loadOp, int slots, boolean arrayIndexCompatible, int arrayStoreOP){
+		public static final BaseType OBJ  = new BaseType("O", Object.class, ARETURN, ALOAD, 1, false, AASTORE);
+		public static final BaseType VOID = new BaseType("V", void.class, RETURN, -1, 0, false, -1);
 	}
 	
 	private static final Map<String, BaseType> PRIMITIVES = Map.of(
 		"void", BaseType.VOID,
-		"char", new BaseType("C", char.class, IRETURN, ILOAD, 1),
-		"byte", new BaseType("B", byte.class, IRETURN, ILOAD, 1),
-		"short", new BaseType("S", short.class, IRETURN, ILOAD, 1),
-		"int", new BaseType("I", int.class, IRETURN, ILOAD, 1),
-		"long", new BaseType("J", long.class, LRETURN, LLOAD, 2),
-		"float", new BaseType("F", float.class, FRETURN, FLOAD, 1),
-		"double", new BaseType("D", double.class, DRETURN, DLOAD, 2),
-		"boolean", new BaseType("Z", boolean.class, IRETURN, ILOAD, 1)
+		"char", new BaseType("C", char.class, IRETURN, ILOAD, 1, false, CASTORE),
+		"byte", new BaseType("B", byte.class, IRETURN, ILOAD, 1, true, BASTORE),
+		"short", new BaseType("S", short.class, IRETURN, ILOAD, 1, true, SASTORE),
+		"int", new BaseType("I", int.class, IRETURN, ILOAD, 1, true, IASTORE),
+		"long", new BaseType("J", long.class, LRETURN, LLOAD, 2, false, LASTORE),
+		"float", new BaseType("F", float.class, FRETURN, FLOAD, 1, false, FASTORE),
+		"double", new BaseType("D", double.class, DRETURN, DLOAD, 2, false, DASTORE),
+		"boolean", new BaseType("Z", boolean.class, IRETURN, ILOAD, 1, false, BASTORE)
 	);
 	
 	public BaseType getBaseType(){

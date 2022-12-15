@@ -4,16 +4,59 @@ import com.lapissea.jorth.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.info.FunctionInfo;
 import com.lapissea.jorth.lang.info.FunctionInfo.Signature;
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
+import java.util.stream.Stream;
 
 public interface ClassInfo{
+	
+	class OfArray implements ClassInfo{
+		
+		private final TypeSource  source;
+		private final GenericType component;
+		
+		private final ClassInfo base;
+		
+		public OfArray(TypeSource source, GenericType component) throws MalformedJorth{
+			this.source = source;
+			this.component = component;
+			base = source.byType(GenericType.OBJECT);
+		}
+		
+		@Override
+		public FieldInfo getField(String name) throws MalformedJorth{
+			throw NotImplementedException.infer();//TODO: implement OfArray.getField()
+		}
+		@Override
+		public FunctionInfo getFunction(Signature signature) throws MalformedJorth{
+			try{
+				return base.getFunction(signature);
+			}catch(MalformedJorth e){ }
+			
+			throw NotImplementedException.infer();//TODO: implement OfArray.getFunction()
+		}
+		@Override
+		public ClassName name(){
+			return component.raw();
+		}
+		@Override
+		public ClassInfo superType() throws MalformedJorth{
+			throw NotImplementedException.infer();//TODO: implement OfArray.superType()
+		}
+		@Override
+		public ClassType type(){
+			return ClassType.CLASS;
+		}
+		@Override
+		public boolean isFinal(){
+			throw NotImplementedException.infer();//TODO: implement OfArray.isFinal()
+		}
+	}
 	
 	class OfClass implements ClassInfo{
 		

@@ -257,6 +257,27 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		var memberInfo = info.getField(member);
 		code.getFieldIns(memberInfo);
 	}
+	
+	public void setElementOP() throws MalformedJorth{
+		var stack = code().stack;
+		
+		var element = stack.pop();
+		var index   = stack.pop();
+		var array   = stack.pop();
+		
+		if(!index.getBaseType().arrayIndexCompatible()){
+			throw new MalformedJorth(index + " can not be used as array index");
+		}
+		if(array.dims() == 0){
+			throw new MalformedJorth(array + " is not an array");
+		}
+		if(!element.instanceOf(typeSource, array.withDims(array.dims() - 1))){
+			throw new MalformedJorth("can not store " + element + " in " + array);
+		}
+		
+		writer.visitInsn(element.getBaseType().arrayStoreOP());
+	}
+	
 	public void setOp(String owner, String member) throws MalformedJorth{
 		ClassInfo info;
 		switch(owner){
