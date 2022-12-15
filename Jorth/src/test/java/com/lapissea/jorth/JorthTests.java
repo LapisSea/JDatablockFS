@@ -1,6 +1,7 @@
 package com.lapissea.jorth;
 
 import com.lapissea.util.LogUtil;
+import com.lapissea.util.NotImplementedException;
 import org.testng.annotations.Test;
 
 import java.lang.annotation.Retention;
@@ -43,7 +44,8 @@ public class JorthTests{
 		}
 	}
 	
-	@Test
+	//TODO: Implement math
+	@Test(expectedExceptions = NotImplementedException.class)
 	void mathClass() throws ReflectiveOperationException{
 		
 		var className = "jorth.Gen$$";
@@ -389,7 +391,7 @@ public class JorthTests{
 				"""
 					extends {!1}<{!0}>
 					public visibility
-					{!0} class start
+					class {!0} start
 					end
 					""",
 				className,
@@ -436,17 +438,19 @@ public class JorthTests{
 	@Test
 	<T extends Enum<T>> void simpleEnum() throws ReflectiveOperationException{
 		
-		var className = "jorth.SimpleEnum$$";
+		var className = "com.lapissea.jorth.WtfIsMyEnumAAA";
 		var cls = generateAndLoadInstance(className, writer -> {
 			writer.write(
 				"""
-					public visibility
-					#TOKEN(0) enum start
-					enum FOO
-					enum BAR
+					public enum {!} start
+						enum FOO
+						enum BAR
+					end
 					""",
 				className);
 		});
+		cls.getEnumConstants();
+		LogUtil.println(cls.getEnumConstants());
 		
 		assertEquals(List.of("FOO", "BAR"), EnumSet.allOf((Class<T>)cls).stream().map(Enum::name).toList());
 	}

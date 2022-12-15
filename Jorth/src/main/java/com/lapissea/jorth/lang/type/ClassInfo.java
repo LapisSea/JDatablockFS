@@ -64,7 +64,7 @@ public interface ClassInfo{
 			try{
 				
 				if(signature.name().equals("<init>")){
-					return FunctionInfo.of(source, clazz.getConstructor(args));
+					return FunctionInfo.of(source, clazz.getDeclaredConstructor(args));
 				}
 				f = FunctionInfo.of(source, getDeepDeclaredMethod(clazz, signature.name(), args));
 			}catch(ReflectiveOperationException e){

@@ -165,7 +165,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 	
 	private final ArrayDeque<CodePath> codeInfo = new ArrayDeque<>();
 	
-	public FunctionGen(ClassGen owner, String name, Visibility visibility, Set<Access> access, GenericType returnType, LinkedHashMap<String, ArgInfo> args) throws MalformedJorth{
+	public FunctionGen(ClassGen owner, String name, Visibility visibility, Set<Access> access, GenericType returnType, Collection<ArgInfo> args) throws MalformedJorth{
 		this.owner = owner;
 		this.name = name;
 		this.access = access.isEmpty()? EnumSet.noneOf(Access.class) : EnumSet.copyOf(access);
@@ -174,14 +174,14 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		this.visibility = visibility;
 		
 		if(returnType != null) typeSource.byType(returnType);
-		for(ArgInfo value : args.values()){
+		for(ArgInfo value : args){
 			typeSource.byType(value.type);
 		}
 		
 		this.args = LinkedHashMap.newLinkedHashMap(args.size());
 		
 		int counter = isStatic()? 0 : 1;
-		for(ArgInfo value : args.values()){
+		for(ArgInfo value : args){
 			var info = value.type.getBaseType();
 			this.args.put(value.name, new Arg(value.type, info, value.name, counter));
 			counter += info.slots();
@@ -200,7 +200,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		}
 		
 		var argTypes = new ArrayList<GenericType>(args.size());
-		for(ArgInfo value : args.values()){
+		for(ArgInfo value : args){
 			argTypes.add(value.type);
 		}
 		
@@ -311,12 +311,24 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		invokeOp(sup.getFunction(new Signature("<init>")), true);
 	}
 	
-	public void newOp(ClassName clazz){
-		writer.visitTypeInsn(NEW, clazz.slashed());
-		code().stack.push(new GenericType(clazz));
+	public void newOp(GenericType type) throws MalformedJorth{
+		var stack = code().stack;
+		if(type.dims()>0){
+			var arraySize = stack.pop();
+			if(!List.of(int.class, short.class, byte.class).contains(arraySize.getBaseType().type())){
+				throw new MalformedJorth("Array size is not an integer");
+			}
+			if(type.dims()>1) throw new NotImplementedException("Multi array not implemented");//TODO
+			
+			writer.visitTypeInsn(type.getPrimitiveType().isPresent()? NEWARRAY : ANEWARRAY, type.raw().slashed());
+		}else{
+			writer.visitTypeInsn(NEW, type.raw().slashed());
+		}
+		
+		stack.push(type);
 	}
 	
-	private void loadThisIns(){
+	public void loadThisIns(){
 		code().loadThisIns();
 	}
 	

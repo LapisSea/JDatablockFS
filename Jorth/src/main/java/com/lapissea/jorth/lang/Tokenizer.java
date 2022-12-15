@@ -258,10 +258,11 @@ public class Tokenizer implements CodeStream, TokenSource{
 	}
 	
 	private Token smol(char c){
+		if(c>='0' && c<='9') return new Token.NumToken.IntVal(lastLine, c - '0');
+		
 		var k = Keyword.LOOKUP.getOptional(c);
 		if(k != null) return new Token.KWord(lastLine, k);
 		
-		if(c>='0' && c<='9') return new Token.NumToken.IntVal(lastLine, c - '0');
 		return new Token.SmolWord(lastLine, c);
 	}
 	

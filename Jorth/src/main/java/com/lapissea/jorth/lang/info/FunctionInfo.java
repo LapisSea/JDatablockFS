@@ -47,9 +47,13 @@ public interface FunctionInfo{
 		private final GenericType       returnType;
 		private final List<GenericType> args;
 		
-		public OfMethod(TypeSource source, Method method) throws MalformedJorth{
+		public OfMethod(TypeSource source, Method method){
 			this.method = method;
-			owner = source.byName(ClassName.of(method.getDeclaringClass()));
+			try{
+				owner = source.byName(ClassName.of(method.getDeclaringClass()));
+			}catch(MalformedJorth e){
+				throw new RuntimeException(e);
+			}
 			returnType = method.getGenericReturnType() == void.class? null : GenericType.of(method.getGenericReturnType());
 			
 			var tArgs = method.getGenericParameterTypes();
@@ -103,9 +107,13 @@ public interface FunctionInfo{
 		private final ClassInfo         owner;
 		private final List<GenericType> args;
 		
-		public OfConstructor(TypeSource source, Constructor<?> ctor) throws MalformedJorth{
+		public OfConstructor(TypeSource source, Constructor<?> ctor){
 			this.ctor = ctor;
-			owner = source.byName(ClassName.of(ctor.getDeclaringClass()));
+			try{
+				owner = source.byName(ClassName.of(ctor.getDeclaringClass()));
+			}catch(MalformedJorth e){
+				throw new RuntimeException(e);
+			}
 			
 			var tArgs = ctor.getGenericParameterTypes();
 			var args  = new ArrayList<GenericType>(tArgs.length);
@@ -152,10 +160,10 @@ public interface FunctionInfo{
 		}
 	}
 	
-	static FunctionInfo of(TypeSource source, Method method) throws MalformedJorth{
+	static FunctionInfo of(TypeSource source, Method method){
 		return new OfMethod(source, method);
 	}
-	static FunctionInfo of(TypeSource source, Constructor<?> method) throws MalformedJorth{
+	static FunctionInfo of(TypeSource source, Constructor<?> method){
 		return new OfConstructor(source, method);
 	}
 	

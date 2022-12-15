@@ -13,8 +13,15 @@ import static org.objectweb.asm.Opcodes.*;
 
 public final class ClassGen implements ClassInfo, Endable{
 	
-	public record FieldGen(ClassName owner, Visibility visibility, String name, GenericType type, boolean isStatic) implements FieldInfo{
-	
+	public record FieldGen(ClassName owner, Visibility visibility, String name, GenericType type, Set<Access> access) implements FieldInfo{
+		@Override
+		public boolean isStatic(){
+			return access.contains(Access.STATIC);
+		}
+		@Override
+		public boolean isEnumConstant(){
+			return access.contains(Access.ENUM);
+		}
 	}
 	
 	public final  TypeSource      typeSource;
@@ -26,7 +33,7 @@ public final class ClassGen implements ClassInfo, Endable{
 	
 	final ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS|ClassWriter.COMPUTE_FRAMES);
 	
-	private final Map<String, FieldGen>                    fields    = new HashMap<>();
+	private final Map<String, FieldGen>                    fields    = new LinkedHashMap<>();
 	private final Map<FunctionInfo.Signature, FunctionGen> functions = new HashMap<>();
 	
 	//	private boolean addedClinit;
@@ -95,20 +102,17 @@ public final class ClassGen implements ClassInfo, Endable{
 	public void defineField(Visibility visibility, Set<Access> accesses, Collection<AnnGen> annotations, GenericType type, String name) throws MalformedJorth{
 		checkEnd();
 		if(fields.containsKey(name)) throw new MalformedJorth("Field " + name + " already exists");
-		fields.put(name, new FieldGen(this.name, visibility, name, type, accesses.contains(Access.STATIC)));
+		fields.put(name, new FieldGen(this.name, visibility, name, type,
+		                              Collections.unmodifiableSet(accesses.isEmpty()?
+		                                                          EnumSet.noneOf(Access.class) :
+		                                                          EnumSet.copyOf(accesses))));
 		
 		
 		var descriptor = type.jvmDescriptor();
 		var signature  = type.jvmSignature();
 		if(signature.equals(descriptor)) signature = null;
 		
-		var access = visibility.flag;
-		if(accesses.contains(Access.STATIC)){
-			access |= ACC_STATIC;
-		}
-		if(accesses.contains(Access.FINAL)){
-			access |= ACC_FINAL;
-		}
+		var access = visibility.flag|accesses.stream().mapToInt(f -> f.flag).reduce((a, b) -> a|b).orElse(0);
 		
 		var fieldVisitor = writer.visitField(access, name, descriptor.toString(), signature == null? null : signature.toString(), null);
 		
@@ -139,7 +143,7 @@ public final class ClassGen implements ClassInfo, Endable{
 		fieldVisitor.visitEnd();
 	}
 	
-	public FunctionGen defineFunction(String name, Visibility visibility, Set<Access> access, GenericType returnType, LinkedHashMap<String, FunctionGen.ArgInfo> args) throws MalformedJorth{
+	public FunctionGen defineFunction(String name, Visibility visibility, Set<Access> access, GenericType returnType, Collection<FunctionGen.ArgInfo> args) throws MalformedJorth{
 		checkEnd();
 		if(name.equals("<init>") && accessSet.contains(Access.STATIC)){
 			throw new MalformedJorth("Static class can not be instantiated");
@@ -147,7 +151,7 @@ public final class ClassGen implements ClassInfo, Endable{
 		var fun = new FunctionGen(this, name, visibility, access, returnType, args);
 		
 		List<GenericType> argStr = new ArrayList<>(args.size());
-		for(var value : args.values()){
+		for(var value : args){
 			argStr.add(value.type());
 		}
 		var sig = new FunctionInfo.Signature(name, argStr);

@@ -7,4 +7,5 @@ module Jorth {
 	opens com.lapissea.jorth to jlapisutil;
 	opens com.lapissea.jorth.lang to jlapisutil;
 	opens com.lapissea.jorth.lang.type to jlapisutil;
+	opens com.lapissea.jorth.lang.info to jlapisutil;
 }

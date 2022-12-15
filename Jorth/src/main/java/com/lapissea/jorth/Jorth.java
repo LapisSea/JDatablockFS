@@ -244,7 +244,7 @@ public final class Jorth extends CodeDestination{
 				}
 				
 				
-				currentFunction = currentClass.defineFunction(functionName, vis, acc, returnType, args);
+				currentFunction = currentClass.defineFunction(functionName, vis, acc, returnType, args.values());
 				endStack.addLast(this::endFunction);
 			}
 			case AT -> {
@@ -324,7 +324,7 @@ public final class Jorth extends CodeDestination{
 			case THROW -> currentFunction.throwOp();
 			case NEW -> {
 				var clazz = getReadClassName(source);
-				currentFunction.newOp(clazz);
+				currentFunction.newOp(new GenericType(clazz));
 				currentFunction.dupOp();
 				doCall(source, null, "<init>");
 			}
@@ -371,10 +371,10 @@ public final class Jorth extends CodeDestination{
 				
 				var visibility = popVisibility();
 				var extension  = popExtension();
+				var interfaces = popInterfaces();
 				
 				currentClass = new ClassGen(typeSource, className, ClassType.from(keyword), visibility, extension, interfaces, accessSet);
 				classes.put(className, currentClass);
-				this.interfaces.clear();
 				endStack.addLast(this::endClass);
 			}
 			case EXTENDS -> {
@@ -411,6 +411,11 @@ public final class Jorth extends CodeDestination{
 		var tmp = extensionBuffer;
 		extensionBuffer = null;
 		if(tmp == null) tmp = GenericType.OBJECT;
+		return tmp;
+	}
+	private List<GenericType> popInterfaces(){
+		var tmp = List.copyOf(interfaces);
+		interfaces.clear();
 		return tmp;
 	}
 	private EnumSet<Access> popAccessSet(){
