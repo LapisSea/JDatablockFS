@@ -1,20 +1,31 @@
 package com.lapissea.jorth.lang.type;
 
 import com.lapissea.jorth.MalformedJorth;
-import com.lapissea.util.UtilL;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 public interface KeyedEnum{
 	
-	record Lookup<E extends Enum<E>>(Map<String, E> names, char[] smolKeys, E[] smolValues){
+	final class Lookup<E extends Enum<E>>{
+		
+		private record CNode<E extends Enum<E>>(char key, E val, CNode<E> next){ }
 		
 		private static final ConcurrentHashMap<Class<? extends Enum<?>>, Lookup<?>> CACHE = new ConcurrentHashMap<>();
+		
+		private final Map<String, E> names;
+		private final CNode<E>[]     smolNames;
+		private final Class<E>       type;
+		
+		private Lookup(Class<E> type, Map<String, E> names, CNode<E>[] smolNames){
+			this.names = names;
+			this.smolNames = smolNames;
+			this.type = type;
+		}
 		
 		private static <E extends Enum<E>> Lookup<E> make(Class<E> t){
 			var values = t.getEnumConstants();
@@ -26,29 +37,35 @@ public interface KeyedEnum{
 				else names.put(key, value);
 			}
 			
-			var smolKeys   = new char[count];
-			var smolValues = UtilL.array(t, count);
-			int i          = 0;
+			//noinspection unchecked
+			var smolNames = (CNode<E>[])new CNode[count];
+			
 			for(var value : values){
 				String key = value instanceof KeyedEnum e? e.key() : value.name().toLowerCase();
 				if(key.length() != 1) continue;
-				smolKeys[i] = key.charAt(0);
-				smolValues[i] = value;
-				i++;
+				var c = key.charAt(0);
+				int i = c%smolNames.length;
+				smolNames[i] = new CNode<>(c, value, smolNames[i]);
 			}
 			
-			return new Lookup<>(names, smolKeys, smolValues);
+			return new Lookup<>(t, Map.copyOf(names), smolNames);
 		}
 		
+		
+		private String elsStr(String start, String end){
+			return Stream.concat(
+				             Arrays.stream(smolNames).mapMulti((n, c) -> {
+					             while(n != null){
+						             c.accept(n.key + "");
+						             n = n.next;
+					             }
+				             }),
+				             names.keySet().stream()
+			             ).sorted()
+			             .collect(Collectors.joining(", ", start, end));
+		}
 		private MalformedJorth fail(String name){
-			return new MalformedJorth(
-				"Expected any of " +
-				Stream.concat(
-					      IntStream.range(0, smolKeys.length).mapToObj(i -> smolKeys[i] + ""),
-					      names.keySet().stream()
-				      ).sorted()
-				      .collect(Collectors.joining(", ", "[", "]")) +
-				" but got " + name);
+			return new MalformedJorth("Expected any of " + elsStr("[", "]") + " but got " + name);
 		}
 		
 		public E getOptional(char key){
@@ -87,14 +104,31 @@ public interface KeyedEnum{
 		}
 		
 		private E byChar(char key){
-			var k = smolKeys;
-			for(int i = 0; i<k.length; i++){
-				if(k[i] == key){
-					return smolValues[i];
-				}
+			int i    = key%smolNames.length;
+			var node = smolNames[i];
+			if(node == null) return null;
+			while(true){
+				if(node.key == key) return node.val;
+				if((node = node.next) == null) return null;
 			}
-			return null;
 		}
+		
+		@Override
+		public boolean equals(Object obj){
+			return obj == this ||
+			       obj instanceof Lookup<?> that &&
+			       this.type == that.type;
+		}
+		
+		@Override
+		public int hashCode(){
+			return type.hashCode();
+		}
+		@Override
+		public String toString(){
+			return elsStr("Lookup{", "}");
+		}
+		
 	}
 	
 	static <E extends Enum<E>> E get(Class<E> clazz, String key) throws MalformedJorth{
@@ -111,8 +145,8 @@ public interface KeyedEnum{
 		return getLookup(clazz).getOptional(key);
 	}
 	
+	@SuppressWarnings("unchecked")
 	static <E extends Enum<E>> Lookup<E> getLookup(Class<E> clazz){
-		@SuppressWarnings("unchecked")
 		var lookup = (Lookup<E>)Lookup.CACHE.get(clazz);
 		if(lookup == null) Lookup.CACHE.put(clazz, lookup = Lookup.make(clazz));
 		return lookup;
