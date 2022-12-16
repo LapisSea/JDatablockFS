@@ -4,7 +4,7 @@ import com.lapissea.jorth.utils.BytecodeUtils;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeConsumer;
 
-import java.lang.invoke.MethodHandles;
+import java.nio.ByteBuffer;
 
 public class JorthTmp{
 	
@@ -23,8 +23,7 @@ public class JorthTmp{
 					private
 					field foo #String
 					
-					public
-					function fooGet
+					public function fooGet
 						returns #String
 					start
 						get this foo
@@ -36,8 +35,7 @@ public class JorthTmp{
 						set this foo
 					end
 					
-					visibility public
-					function toString
+					public function toString
 						returns #String
 					start
 						new #StringBuilder start end
@@ -107,25 +105,41 @@ public class JorthTmp{
 	}
 	
 	static Class<?> timedClass(String name, UnsafeConsumer<CodeStream, MalformedJorth> write) throws MalformedJorth, IllegalAccessException{
+		var file = makeFile(name, write);
+		try{
+			return Class.forName(name, true, new ClassLoader(JorthTmp.class.getClassLoader()){
+				@Override
+				protected Class<?> findClass(String n) throws ClassNotFoundException{
+					if(n.equals(name)){
+						return defineClass(name, ByteBuffer.wrap(file), null);
+					}
+					return super.findClass(n);
+				}
+			});
+		}catch(ClassNotFoundException e){
+			throw new RuntimeException(e);
+		}
+	}
+	
+	static byte[] makeFile(String name, UnsafeConsumer<CodeStream, MalformedJorth> write) throws MalformedJorth, IllegalAccessException{
 		long    t     = System.currentTimeMillis();
 		boolean print = true;
 		var     jorth = new Jorth(null, null);
 		
-		var writer = jorth.writer();
-		
-		writer.write(
-			"""
-				visibility public
-				class {!} start
-				""", name);
-		write.accept(writer);
-		writer.write("end");
+		try(var writer = jorth.writer()){
+			writer.write(
+				"""
+					public class {!} start
+					""", name);
+			write.accept(writer);
+			writer.write("end");
+		}
 		
 		var file = jorth.getClassFile(name);
 		var t2   = System.currentTimeMillis();
 		if(print) LogUtil.println();
 		LogUtil.println("Time:", t2 - t);
 		if(print) BytecodeUtils.printClass(file);
-		return MethodHandles.lookup().defineClass(file);
+		return file;
 	}
 }

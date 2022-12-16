@@ -41,7 +41,7 @@ public interface CodeStream extends AutoCloseable{
 					objs[num] = str;
 					
 					if(escape) str = Tokenizer.escape(str);
-					dest.add(CharSubview.of(src, start, i));
+					if(start != i) dest.add(CharSubview.of(src, start, i));
 					if(!str.isEmpty()) dest.add(str);
 					return i + len;
 				}
