@@ -6,12 +6,9 @@ import com.lapissea.jorth.MalformedJorth;
 import com.lapissea.jorth.lang.type.Access;
 import com.lapissea.jorth.lang.type.KeyedEnum;
 import com.lapissea.jorth.lang.type.Visibility;
-import com.lapissea.util.LogUtil;
 import com.lapissea.util.UtilL;
 
-import java.util.ArrayDeque;
-import java.util.BitSet;
-import java.util.Deque;
+import java.util.*;
 import java.util.concurrent.Executor;
 import java.util.regex.Pattern;
 
@@ -409,23 +406,19 @@ public class Tokenizer implements CodeStream, TokenSource{
 	@Override
 	public void close() throws MalformedJorth{
 		setWorkerState(WorkerState.END);
-		var t = System.currentTimeMillis();
 		while(workerState != WorkerState.END_CONFIRM){
 			checkWorkerError();
 			waitForStateChange();
 		}
-		LogUtil.println(System.currentTimeMillis() - t);
-		LogUtil.println("done");
 	}
 	
-	private static final ThreadLocal<Boolean> alreadyThrown = ThreadLocal.withInitial(() -> false);
+	private final Set<Thread> alreadyThrown = Collections.synchronizedSet(new HashSet<>());
 	
 	private void checkWorkerError(){
 		if(workerError != null){
-			if(alreadyThrown.get()){
+			if(!alreadyThrown.add(Thread.currentThread())){
 				throw new IllegalStateException("Worker failed");
 			}
-			alreadyThrown.set(true);
 			throw UtilL.uncheckedThrow(workerError);
 		}
 	}
