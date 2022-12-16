@@ -198,7 +198,7 @@ public final class Jorth extends CodeDestination{
 	private void classKeyword(TokenSource source, Keyword keyword) throws MalformedJorth{
 		switch(keyword){
 			case FIELD -> {
-				var anns = popAnnotations().values();
+				var anns = popAnnotations();
 				var name = source.readWord();
 				var type = readType(source);
 				currentClass.defineField(popVisibility(), Set.of(), anns, type, name);
@@ -214,8 +214,9 @@ public final class Jorth extends CodeDestination{
 				GenericType returnType = null;
 				var         args       = new LinkedHashMap<String, FunctionGen.ArgInfo>();
 				
-				var vis = popVisibility();
-				var acc = popAccessSet();
+				var vis  = popVisibility();
+				var acc  = popAccessSet();
+				var anns = popAnnotations();
 				
 				propCollect:
 				while(true){
@@ -249,7 +250,7 @@ public final class Jorth extends CodeDestination{
 				}
 				
 				
-				currentFunction = currentClass.defineFunction(functionName, vis, acc, returnType, args.values());
+				currentFunction = currentClass.defineFunction(functionName, vis, acc, returnType, args.values(), anns);
 				endStack.addLast(this::endFunction);
 			}
 			case AT -> {
@@ -450,8 +451,8 @@ public final class Jorth extends CodeDestination{
 		accessSet.clear();
 		return tmp;
 	}
-	private Map<ClassName, AnnGen> popAnnotations(){
-		var tmp = Map.copyOf(annotations);
+	private List<AnnGen> popAnnotations(){
+		var tmp = List.copyOf(annotations.values());
 		annotations.clear();
 		return tmp;
 	}

@@ -174,7 +174,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 	
 	private final ArrayDeque<CodePath> codeInfo = new ArrayDeque<>();
 	
-	public FunctionGen(ClassGen owner, String name, Visibility visibility, Set<Access> access, GenericType returnType, Collection<ArgInfo> args) throws MalformedJorth{
+	public FunctionGen(ClassGen owner, String name, Visibility visibility, Set<Access> access, GenericType returnType, Collection<ArgInfo> args, List<AnnGen> anns) throws MalformedJorth{
 		this.owner = owner;
 		this.name = name;
 		this.access = access.isEmpty()? EnumSet.noneOf(Access.class) : EnumSet.copyOf(access);
@@ -219,6 +219,8 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		if(descriptor.equals(signature)) signature = null;
 		
 		writer = owner.writer.visitMethod(accessFlags, name, descriptor, signature, null);
+		
+		ClassGen.writeAnnotations(anns, writer::visitAnnotation);
 		
 		codeInfo.add(new CodePath(writer, new TypeStack(null)));
 	}

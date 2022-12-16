@@ -4,10 +4,12 @@ import com.lapissea.jorth.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.Endable;
 import com.lapissea.jorth.lang.info.FunctionInfo;
+import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.ClassWriter;
 
 import java.lang.reflect.Array;
 import java.util.*;
+import java.util.function.BiFunction;
 import java.util.stream.Stream;
 
 import static org.objectweb.asm.Opcodes.*;
@@ -37,7 +39,6 @@ public final class ClassGen implements ClassInfo, Endable{
 	private final Map<String, FieldGen>                    fields    = new LinkedHashMap<>();
 	private final Map<FunctionInfo.Signature, FunctionGen> functions = new HashMap<>();
 	
-	//	private boolean addedClinit;
 	private boolean addedInit;
 	
 	private byte[] classFile;
@@ -87,14 +88,11 @@ public final class ClassGen implements ClassInfo, Endable{
 	
 	@Override
 	public void end() throws MalformedJorth{
-//		if(!addedClinit){
-//			defineFunction("<clinit>", Visibility.PUBLIC, Set.of(), null, new LinkedHashMap<>()).end();
-//		}
 		if(!addedInit && (type == ClassType.CLASS || type == ClassType.ENUM) && !accessSet.contains(Access.STATIC)){
 			var parent = typeSource.byType(extension);
 			
 			if(parent.getFunctionsByName("<init>").anyMatch(f -> f.argumentTypes().isEmpty())){
-				var init = defineFunction("<init>", this.visibility, Set.of(), null, List.of());
+				var init = defineFunction("<init>", this.visibility, Set.of(), null, List.of(), List.of());
 				init.loadThisIns();
 				init.superOp(List.of());
 				init.end();
@@ -106,7 +104,7 @@ public final class ClassGen implements ClassInfo, Endable{
 						argInfo.add(new FunctionGen.ArgInfo(e.argumentTypes().get(i), "arg" + i));
 					}
 					
-					var init = defineFunction("<init>", this.visibility, Set.of(), null, argInfo);
+					var init = defineFunction("<init>", this.visibility, Set.of(), null, argInfo, List.of());
 					init.loadThisIns();
 					for(int i = 0; i<args.size(); i++){
 						init.getOp("#arg", "arg" + i);
@@ -140,8 +138,8 @@ public final class ClassGen implements ClassInfo, Endable{
 				Visibility.PUBLIC,
 				EnumSet.of(Access.STATIC),
 				arrType,
-				List.of()
-			);
+				List.of(),
+				List.of());
 			
 			fun.getOp(name.dotted(), "$VALUES");
 			fun.startCall(null, "clone").end();
@@ -154,8 +152,8 @@ public final class ClassGen implements ClassInfo, Endable{
 				Visibility.PUBLIC,
 				EnumSet.of(Access.STATIC),
 				null,
-				List.of()
-			);
+				List.of(),
+				List.of());
 			
 			var constants = fields.values().stream().filter(FieldGen::isEnumConstant).toList();
 			
@@ -203,8 +201,14 @@ public final class ClassGen implements ClassInfo, Endable{
 		
 		var fieldVisitor = writer.visitField(access, name, descriptor.toString(), signature == null? null : signature.toString(), null);
 		
+		writeAnnotations(annotations, fieldVisitor::visitAnnotation);
+		
+		fieldVisitor.visitEnd();
+	}
+	
+	public static void writeAnnotations(Collection<AnnGen> annotations, BiFunction<String, Boolean, AnnotationVisitor> visitor){
 		for(AnnGen annotation : annotations){
-			var annWriter = fieldVisitor.visitAnnotation(new GenericType(annotation.type()).jvmDescriptor().toString(), true);
+			var annWriter = visitor.apply(new GenericType(annotation.type()).jvmDescriptor().toString(), true);
 			for(var e : annotation.args().entrySet()){
 				var argName  = e.getKey();
 				var argValue = e.getValue();
@@ -226,16 +230,14 @@ public final class ClassGen implements ClassInfo, Endable{
 			
 			annWriter.visitEnd();
 		}
-		
-		fieldVisitor.visitEnd();
 	}
 	
-	public FunctionGen defineFunction(String name, Visibility visibility, Set<Access> access, GenericType returnType, Collection<FunctionGen.ArgInfo> args) throws MalformedJorth{
+	public FunctionGen defineFunction(String name, Visibility visibility, Set<Access> access, GenericType returnType, Collection<FunctionGen.ArgInfo> args, List<AnnGen> anns) throws MalformedJorth{
 		checkEnd();
 		if(name.equals("<init>") && accessSet.contains(Access.STATIC)){
 			throw new MalformedJorth("Static class can not be instantiated");
 		}
-		var fun = new FunctionGen(this, name, visibility, access, returnType, args);
+		var fun = new FunctionGen(this, name, visibility, access, returnType, args, anns);
 		
 		List<GenericType> argStr = new ArrayList<>(args.size());
 		for(var value : args){
@@ -245,10 +247,7 @@ public final class ClassGen implements ClassInfo, Endable{
 		if(this.functions.put(sig, fun) != null){
 			throw new MalformedJorth("Duplicate method " + sig);
 		}
-
-//		if("<clinit>".equals(name)){
-//			addedClinit=true;
-//		}
+		
 		if("<init>".equals(name)){
 			addedInit = true;
 		}
