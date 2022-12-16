@@ -168,6 +168,8 @@ public final class Jorth extends CodeDestination{
 		}
 		
 		
+		var ok = true;
+		
 		if(currentFunction != null){
 			switch(word){
 				case Token.NumToken.FloatVal fVal -> requireFunction().loadFloatOp(fVal.value());
@@ -186,13 +188,13 @@ public final class Jorth extends CodeDestination{
 						}
 						return;
 					}
-					
-					throw new MalformedJorth("Unexpected token " + word);
+					ok = false;
 				}
 			}
 			
-		}
+		}else ok = false;
 		
+		if(!ok) throw new MalformedJorth("Unexpected token " + word);
 	}
 	
 	private void classKeyword(TokenSource source, Keyword keyword) throws MalformedJorth{

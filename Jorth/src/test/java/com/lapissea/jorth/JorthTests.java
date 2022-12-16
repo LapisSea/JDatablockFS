@@ -360,7 +360,7 @@ public class JorthTests{
 	}
 	
 	@Test
-	void fieldAnnotationClass() throws ReflectiveOperationException{
+	void fieldAnnotation() throws ReflectiveOperationException{
 		
 		var className = "jorth.Gen$$";
 		
@@ -382,7 +382,7 @@ public class JorthTests{
 	}
 	
 	@Test
-	void methodAnnotationClass() throws ReflectiveOperationException{
+	void methodAnnotation() throws ReflectiveOperationException{
 		
 		var className = "jorth.Gen$$";
 		
@@ -412,8 +412,7 @@ public class JorthTests{
 			writer.write(
 				"""
 					extends {!1}<{!0}>
-					public visibility
-					class {!0} start
+					public class {!0} start
 					end
 					""",
 				className,
