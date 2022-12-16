@@ -5,6 +5,7 @@ import com.lapissea.jorth.lang.type.*;
 import com.lapissea.util.NotImplementedException;
 
 import java.util.*;
+import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -61,6 +62,9 @@ public final class Jorth extends CodeDestination{
 	
 	public CodeStream writer(){
 		return new Tokenizer(this, line);
+	}
+	public CodeStream writer(Executor executor){
+		return new Tokenizer(this, line, executor);
 	}
 	
 	@Override
@@ -129,7 +133,12 @@ public final class Jorth extends CodeDestination{
 	
 	@Override
 	protected void parse(TokenSource source) throws MalformedJorth{
-		var word = source.readToken();
+		Token word;
+		try{
+			word = source.readToken();
+		}catch(EndOfCode end){
+			return;
+		}
 		
 		if(word instanceof Token.EWord<?> w){
 			switch(w.value()){

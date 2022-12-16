@@ -6,8 +6,13 @@ import com.lapissea.jorth.MalformedJorth;
 import com.lapissea.jorth.lang.type.Access;
 import com.lapissea.jorth.lang.type.KeyedEnum;
 import com.lapissea.jorth.lang.type.Visibility;
+import com.lapissea.util.LogUtil;
+import com.lapissea.util.UtilL;
 
+import java.util.ArrayDeque;
 import java.util.BitSet;
+import java.util.Deque;
+import java.util.concurrent.Executor;
 import java.util.regex.Pattern;
 
 import static java.lang.Float.parseFloat;
@@ -33,7 +38,15 @@ public class Tokenizer implements CodeStream, TokenSource{
 		"[]{}',;/<>".chars().forEach(SPECIALS::set);
 	}
 	
+	private enum WorkerState{
+		WAIT, WAIT_HOT,
+		READ,
+		END, END_CONFIRM
+	}
+	
 	private final CodeDestination dad;
+	
+	private final Deque<CharSequence> codeBuffer = new ArrayDeque<>();
 	
 	private CharSequence code;
 	private int          pos;
@@ -41,31 +54,117 @@ public class Tokenizer implements CodeStream, TokenSource{
 	
 	private TokenSource transformed;
 	
+	private Throwable   workerError;
+	private WorkerState workerState = WorkerState.WAIT;
+	
 	public Tokenizer(CodeDestination dad, int line){
+		this(dad, line, Thread.ofVirtual().name("token consumer")::start);
+	}
+	public Tokenizer(CodeDestination dad, int line, Executor executor){
 		this.dad = dad;
 		this.line = line;
+		executor.execute(this::workerLoop);
+	}
+	
+	private void workerLoop(){
+		try{
+			while(workerState != WorkerState.END || hasMore()){
+				workerExec();
+			}
+			setWorkerState(WorkerState.END_CONFIRM);
+		}catch(Throwable e){
+			workerError = e;
+		}
+	}
+	
+	private void workerExec() throws MalformedJorth{
+		switch(workerState){
+			case WAIT -> waitForStateChange();
+			case WAIT_HOT -> {
+				if(waitHot()) return;
+				synchronized(this){
+					if(workerState == WorkerState.WAIT_HOT){
+						setWorkerState(WorkerState.WAIT);
+					}
+				}
+			}
+			case READ -> {
+				synchronized(this){
+					setWorkerState(WorkerState.WAIT_HOT);
+					if(code == null){
+						this.code = codeBuffer.removeFirst();
+						pos = 0;
+						skipWhitespace();
+						if(code == null){
+							if(hasMore()){
+								setWorkerState(WorkerState.READ);
+							}
+							return;
+						}
+					}
+				}
+				
+				parseExisting();
+			}
+			case END, END_CONFIRM -> {
+				//finish up
+				parseExisting();
+			}
+		}
+		
+	}
+	private void parseExisting() throws MalformedJorth{
+		while(hasMore()){
+			dad.parse(transformed);
+		}
+	}
+	private void setWorkerState(WorkerState workerState){
+		synchronized(this){
+			this.workerState = workerState;
+			notifyAll();
+		}
+	}
+	
+	private void waitForStateChange(){
+		synchronized(this){
+			try{
+				wait(2);
+			}catch(InterruptedException e){
+				throw new RuntimeException(e);
+			}
+		}
+	}
+	
+	private boolean waitHot(){
+		for(int i = 0; i<1000; i++){
+			Thread.yield();
+			if(workerState != WorkerState.WAIT_HOT) return true;
+			Thread.onSpinWait();
+		}
+		return false;
+	}
+	
+	private boolean workerEnding(){
+		return workerState == WorkerState.END || workerState == WorkerState.END_CONFIRM;
 	}
 	
 	@Override
 	public boolean hasMore(){
-		return code != null || peeked != null;
+		return code != null || peeked != null || !codeBuffer.isEmpty() || !workerEnding();
 	}
 	
 	@Override
 	public CodeStream write(CharSequence code) throws MalformedJorth{
 		if(transformed == null) transformed = dad.transform(this);
-		pos = 0;
-		this.code = code;
-		skipWhitespace();
-		while(hasMore()){
-			dad.parse(transformed);
+		synchronized(this){
+			checkWorkerError();
+			codeBuffer.addLast(code);
+			setWorkerState(WorkerState.READ);
 		}
-		line++;
-		
 		return this;
 	}
 	
-	private void skipWhitespace(){
+	private synchronized void skipWhitespace(){
 		if(pos == code.length()){
 			code = null;
 			return;
@@ -161,7 +260,26 @@ public class Tokenizer implements CodeStream, TokenSource{
 			peeked = null;
 			return p;
 		}
-		if(code == null) throw new EndOfCode();
+		
+		while(code == null){
+			synchronized(this){
+				if(!codeBuffer.isEmpty()){
+					code = codeBuffer.removeFirst();
+					pos = 0;
+					line++;
+					skipWhitespace();
+					continue;
+				}
+				
+				if(workerEnding() && !hasMore()){
+					throw new EndOfCode();
+				}
+			}
+			
+			
+			if(waitHot()) continue;
+			waitForStateChange();
+		}
 		
 		lastLine = this.line;
 		if(code.charAt(pos) == '\''){
@@ -205,7 +323,9 @@ public class Tokenizer implements CodeStream, TokenSource{
 				if(sb != null) sb.append(c1);
 			}
 			
-			if(start == i) throw new MalformedJorth("Unexpected token");
+			if(start == i){
+				throw new MalformedJorth("Unexpected token");
+			}
 			
 			pos = i;
 			if(start + 1 == i){
@@ -288,6 +408,25 @@ public class Tokenizer implements CodeStream, TokenSource{
 	}
 	@Override
 	public void close() throws MalformedJorth{
-		//TODO: when/if async streaming is added, flush here
+		setWorkerState(WorkerState.END);
+		var t = System.currentTimeMillis();
+		while(workerState != WorkerState.END_CONFIRM){
+			checkWorkerError();
+			waitForStateChange();
+		}
+		LogUtil.println(System.currentTimeMillis() - t);
+		LogUtil.println("done");
+	}
+	
+	private static final ThreadLocal<Boolean> alreadyThrown = ThreadLocal.withInitial(() -> false);
+	
+	private void checkWorkerError(){
+		if(workerError != null){
+			if(alreadyThrown.get()){
+				throw new IllegalStateException("Worker failed");
+			}
+			alreadyThrown.set(true);
+			throw UtilL.uncheckedThrow(workerError);
+		}
 	}
 }
