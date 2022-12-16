@@ -129,6 +129,7 @@ public final class Jorth extends CodeDestination{
 				case Token.Null ignored -> BLUE_BRIGHT + "null";
 				case Token.ClassWord t -> GREEN_BRIGHT + t.value();
 				case Token.Bool bool -> GREEN_BRIGHT + bool.value();
+				case Token.BracketedSet bracketedSet -> throw new IllegalStateException();
 			};
 			
 			printBack.accept(tokStr + RESET);
@@ -316,13 +317,21 @@ public final class Jorth extends CodeDestination{
 						}
 						
 						
-						var tok = source.readToken();
-						var value = switch(tok){
-							case Token.NumToken t -> t.getNum();
-							case Token.StrValue t -> t.value();
-							case Token.Bool t -> t.value();
-							default -> throw new MalformedJorth("Illegal token " + tok + " inside enum argument block");
-						};
+						var tok = source.readTokenOrBracketSet(true, '[');
+						
+						Object value;
+						
+						var set = tok.as(Token.BracketedSet.class);
+						if(set.isPresent()){
+							value = set.get().singleTypeUnpack();
+						}else{
+							value = switch(tok){
+								case Token.NumToken t -> t.getNum();
+								case Token.StrValue t -> t.value();
+								case Token.Bool t -> t.value();
+								default -> throw new MalformedJorth("Illegal token " + tok + " inside enum argument block");
+							};
+						}
 						
 						args.put(name, value);
 					}

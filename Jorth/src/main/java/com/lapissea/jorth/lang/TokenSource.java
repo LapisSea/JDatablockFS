@@ -1,11 +1,14 @@
 package com.lapissea.jorth.lang;
 
+import com.lapissea.jorth.BracketType;
 import com.lapissea.jorth.EndOfCode;
 import com.lapissea.jorth.MalformedJorth;
 import com.lapissea.jorth.lang.type.GenericType;
 import com.lapissea.jorth.lang.type.KeyedEnum;
+import com.lapissea.util.ZeroArrays;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -47,6 +50,19 @@ public interface TokenSource{
 				var e = new Token.EWord<>(t.line(), enumType, t.value());
 				listener.accept(e);
 				return e.value();
+			}
+			@Override
+			public Token readTokenOrBracketSet(boolean allowEmpty, char... allowed) throws MalformedJorth{
+				var t = source.readTokenOrBracketSet(allowEmpty, allowed);
+				t.as(Token.BracketedSet.class).ifPresentOrElse(b -> {
+					listener.accept(new Token.SmolWord(b.line(), b.type().open));
+					var c = b.contents();
+					for(var part : c){
+						listener.accept(part);
+					}
+					listener.accept(new Token.SmolWord(c.isEmpty()? b.line() : c.get(c.size() - 1).line(), b.type().close));
+				}, () -> listener.accept(t));
+				return t;
 			}
 		};
 	}
@@ -133,5 +149,34 @@ public interface TokenSource{
 		}
 		
 		return new GenericType(raw, dims, args);
+	}
+	
+	default Token readTokenOrBracketSet(boolean allowEmpty) throws MalformedJorth{
+		return readTokenOrBracketSet(allowEmpty, ZeroArrays.ZERO_CHAR);
+	}
+	default Token readTokenOrBracketSet(boolean allowEmpty, char... allowed) throws MalformedJorth{
+		var token   = readToken();
+		var bracket = token.as(Token.SmolWord.class).map(c -> BracketType.byOpen(c.value())).filter(Optional::isPresent).map(Optional::get);
+		
+		if(bracket.isEmpty()) return token;
+		var type = bracket.get();
+		
+		find:
+		if(allowed.length>0){
+			for(char c : allowed){
+				if(c == type.open) break find;
+			}
+			throw new MalformedJorth(type.openStr + type.closeStr + " is not allowed here");
+		}
+		
+		var contents = new ArrayList<Token>();
+		
+		while(!consumeTokenIf(Token.SmolWord.class, c -> c.value() == type.close)){
+			contents.add(readToken());
+		}
+		if(!allowEmpty && contents.isEmpty()){
+			throw new MalformedJorth("Empty " + type.openStr + type.closeStr + " is not allowed");
+		}
+		return new Token.BracketedSet(token.line(), type, List.copyOf(contents));
 	}
 }

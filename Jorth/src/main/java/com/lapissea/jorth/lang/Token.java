@@ -1,8 +1,11 @@
 package com.lapissea.jorth.lang;
 
+import com.lapissea.jorth.BracketType;
 import com.lapissea.jorth.MalformedJorth;
 import com.lapissea.jorth.lang.type.KeyedEnum;
+import com.lapissea.util.ZeroArrays;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
 
@@ -137,6 +140,43 @@ public sealed interface Token{
 	record Null(int line) implements Token{ }
 	
 	record Bool(int line, boolean value) implements Token{ }
+	
+	record BracketedSet(int line, BracketType type, List<Token> contents) implements Token{
+		public Object singleTypeUnpack() throws MalformedJorth{
+			if(contents.isEmpty()) return ZeroArrays.ZERO_OBJECT;
+			return switch(contents.get(0)){
+				case Token.NumToken.IntVal t -> {
+					var val = new int[contents.size()];
+					for(int i = 0; i<val.length; i++){
+						val[i] = ((Token.NumToken.IntVal)contents.get(i)).value();
+					}
+					yield val;
+				}
+				case Token.NumToken.FloatVal t -> {
+					var val = new float[contents.size()];
+					for(int i = 0; i<val.length; i++){
+						val[i] = ((Token.NumToken.FloatVal)contents.get(i)).value();
+					}
+					yield val;
+				}
+				case Token.StrValue t -> {
+					var val = new String[contents.size()];
+					for(int i = 0; i<val.length; i++){
+						val[i] = ((Token.StrValue)contents.get(i)).value();
+					}
+					yield val;
+				}
+				case Token.Bool t -> {
+					var val = new boolean[contents.size()];
+					for(int i = 0; i<val.length; i++){
+						val[i] = ((Token.Bool)contents.get(i)).value();
+					}
+					yield val;
+				}
+				default -> throw new MalformedJorth("Illegal token type " + contents.get(0) + " inside bracket block");
+			};
+		}
+	}
 	
 	
 	int line();
