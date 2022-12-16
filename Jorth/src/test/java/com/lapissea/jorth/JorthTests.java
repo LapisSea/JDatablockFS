@@ -402,6 +402,28 @@ public class JorthTests{
 		assertEquals("xD", ann.lol());
 		assertEquals(141, ann.value());
 	}
+	@Test
+	void classAnnotation() throws ReflectiveOperationException{
+		
+		var className = "jorth.Gen$$";
+		
+		var cls = generateAndLoadInstance(className, writer -> {
+			writer.addImportAs(MultiAnn.class, "Ann");
+			writer.write(
+				"""
+					@ #Ann start value 141 lol 'xD' end
+					public class {!} start end
+					""",
+				className
+			);
+		});
+		var anns = cls.getAnnotations();
+		LogUtil.println((Object[])anns);
+		assertEquals(1, anns.length);
+		var ann = (MultiAnn)anns[0];
+		assertEquals("xD", ann.lol());
+		assertEquals(141, ann.value());
+	}
 	
 	@Test
 	void overrideClass() throws ReflectiveOperationException{

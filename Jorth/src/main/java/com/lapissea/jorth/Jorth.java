@@ -255,6 +255,32 @@ public final class Jorth extends CodeDestination{
 				currentFunction = currentClass.defineFunction(functionName, vis, acc, returnType, args.values(), anns);
 				endStack.addLast(this::endFunction);
 			}
+			case ENUM -> {
+				var enumName = source.readWord();
+				
+				currentClass.defineField(
+					Visibility.PUBLIC,
+					EnumSet.of(Access.STATIC, Access.FINAL, Access.ENUM),
+					List.of(),
+					new GenericType(currentClass.name),
+					enumName
+				);
+				
+			}
+			default -> throw new MalformedJorth("Unexpected keyword " + keyword.key + " in class " + currentClass);
+		}
+	}
+	
+	private GenericType readType(TokenSource source) throws MalformedJorth      { return source.readType(importsFun); }
+	private ClassName getReadClassName(TokenSource source) throws MalformedJorth{ return source.readClassName(importsFun); }
+	
+	private boolean anyKeyword(TokenSource source, Keyword keyword) throws MalformedJorth{
+		switch(keyword){
+			case END -> {
+				if(endStack.isEmpty()) throw new MalformedJorth("Stray end");
+				var e = endStack.removeLast();
+				e.end();
+			}
 			case AT -> {
 				var annType = getReadClassName(source);
 				if(annotations.containsKey(annType)){
@@ -289,32 +315,6 @@ public final class Jorth extends CodeDestination{
 				}
 				
 				annotations.put(annType, new AnnGen(annType, args));
-			}
-			case ENUM -> {
-				var enumName = source.readWord();
-				
-				currentClass.defineField(
-					Visibility.PUBLIC,
-					EnumSet.of(Access.STATIC, Access.FINAL, Access.ENUM),
-					List.of(),
-					new GenericType(currentClass.name),
-					enumName
-				);
-				
-			}
-			default -> throw new MalformedJorth("Unexpected keyword " + keyword.key + " in class " + currentClass);
-		}
-	}
-	
-	private GenericType readType(TokenSource source) throws MalformedJorth      { return source.readType(importsFun); }
-	private ClassName getReadClassName(TokenSource source) throws MalformedJorth{ return source.readClassName(importsFun); }
-	
-	private boolean anyKeyword(TokenSource source, Keyword keyword) throws MalformedJorth{
-		switch(keyword){
-			case END -> {
-				if(endStack.isEmpty()) throw new MalformedJorth("Stray end");
-				var e = endStack.removeLast();
-				e.end();
 			}
 			default -> {
 				return false;
@@ -395,6 +395,7 @@ public final class Jorth extends CodeDestination{
 				var visibility = popVisibility();
 				var extension  = popExtension();
 				var interfaces = popInterfaces();
+				var anns       = popAnnotations();
 				
 				if(keyword == Keyword.ENUM){
 					if(!extension.equals(GenericType.OBJECT)){
@@ -403,7 +404,7 @@ public final class Jorth extends CodeDestination{
 					extension = new GenericType(ClassName.of(Enum.class), 0, List.of(new GenericType(className)));
 				}
 				
-				currentClass = new ClassGen(typeSource, className, ClassType.from(keyword), visibility, extension, interfaces, accessSet);
+				currentClass = new ClassGen(typeSource, className, ClassType.from(keyword), visibility, extension, interfaces, accessSet, anns);
 				classes.put(className, currentClass);
 				endStack.addLast(this::endClass);
 			}

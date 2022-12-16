@@ -47,8 +47,8 @@ public final class ClassGen implements ClassInfo, Endable{
 		TypeSource typeSource,
 		ClassName name, ClassType type, Visibility visibility,
 		GenericType extension, List<GenericType> interfaces,
-		Set<Access> accessSet
-	){
+		Set<Access> accessSet,
+		List<AnnGen> anns){
 		this.typeSource = typeSource;
 		this.name = name;
 		this.type = type;
@@ -84,6 +84,7 @@ public final class ClassGen implements ClassInfo, Endable{
 		}
 		
 		writer.visit(V19, accessFlags, name.slashed(), signature.toString(), extension.raw().slashed(), interfaceStrings);
+		writeAnnotations(anns, writer::visitAnnotation);
 	}
 	
 	@Override
