@@ -64,17 +64,19 @@ public record GenericType(ClassName raw, int dims, List<GenericType> args){
 		public static final BaseType VOID = new BaseType("V", void.class, RETURN, -1, 0, false, -1);
 	}
 	
+	//@formatter:off
 	private static final Map<String, BaseType> PRIMITIVES = Map.of(
-		"void", BaseType.VOID,
-		"char", new BaseType("C", char.class, IRETURN, ILOAD, 1, false, CASTORE),
-		"byte", new BaseType("B", byte.class, IRETURN, ILOAD, 1, true, BASTORE),
-		"short", new BaseType("S", short.class, IRETURN, ILOAD, 1, true, SASTORE),
-		"int", new BaseType("I", int.class, IRETURN, ILOAD, 1, true, IASTORE),
-		"long", new BaseType("J", long.class, LRETURN, LLOAD, 2, false, LASTORE),
-		"float", new BaseType("F", float.class, FRETURN, FLOAD, 1, false, FASTORE),
-		"double", new BaseType("D", double.class, DRETURN, DLOAD, 2, false, DASTORE),
+		"void",    BaseType.VOID,
+		"char",    new BaseType("C", char.class,    IRETURN, ILOAD, 1, false, CASTORE),
+		"byte",    new BaseType("B", byte.class,    IRETURN, ILOAD, 1, true,  BASTORE),
+		"short",   new BaseType("S", short.class,   IRETURN, ILOAD, 1, true,  SASTORE),
+		"int",     new BaseType("I", int.class,     IRETURN, ILOAD, 1, true,  IASTORE),
+		"long",    new BaseType("J", long.class,    LRETURN, LLOAD, 2, false, LASTORE),
+		"float",   new BaseType("F", float.class,   FRETURN, FLOAD, 1, false, FASTORE),
+		"double",  new BaseType("D", double.class,  DRETURN, DLOAD, 2, false, DASTORE),
 		"boolean", new BaseType("Z", boolean.class, IRETURN, ILOAD, 1, false, BASTORE)
 	);
+	//@formatter:on
 	
 	public BaseType getBaseType(){
 		if(dims != 0) return BaseType.OBJ;

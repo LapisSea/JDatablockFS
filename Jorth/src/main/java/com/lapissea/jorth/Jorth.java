@@ -41,6 +41,8 @@ public final class Jorth extends CodeDestination{
 	
 	private final Consumer<CharSequence> printBack;
 	
+	private boolean memberFlag;
+	
 	public Jorth(ClassLoader classLoader, Consumer<CharSequence> printBack){
 		this.printBack = printBack;
 		classLoader = classLoader == null? this.getClass().getClassLoader() : classLoader;
@@ -103,14 +105,17 @@ public final class Jorth extends CodeDestination{
 	protected TokenSource transform(TokenSource src){
 		if(printBack == null) return src;
 		return TokenSource.listen(src, tok -> {
+			var t0 = tab;
 			if(tok instanceof Token.KWord k){
 				switch(k.keyword()){
 					case START -> tab++;
 					case END -> tab--;
 				}
 			}
+			var toClassLevel = false;
 			
 			if(tok.line() != line){
+				toClassLevel = tab == 1 && memberFlag;
 				printBack.accept("\n" + "\t".repeat(tab));
 				line = tok.line();
 			}
@@ -132,6 +137,10 @@ public final class Jorth extends CodeDestination{
 				case Token.BracketedSet bracketedSet -> throw new IllegalStateException();
 			};
 			
+			if(toClassLevel){
+				memberFlag = false;
+				printBack.accept("\n" + "\t".repeat(tab));
+			}
 			printBack.accept(tokStr + RESET);
 		});
 	}
@@ -218,6 +227,7 @@ public final class Jorth extends CodeDestination{
 				var name = source.readWord();
 				var type = readType(source);
 				currentClass.defineField(popVisibility(), Set.of(), anns, type, name);
+				memberFlag = true;
 			}
 			case FUNCTION -> {
 				var functionName = source.readWord();
@@ -234,7 +244,10 @@ public final class Jorth extends CodeDestination{
 				var acc  = popAccessSet();
 				var anns = popAnnotations();
 				
-				boolean noBody = currentClass.type == ClassType.INTERFACE;
+				boolean interf = currentClass.type == ClassType.INTERFACE;
+				if(interf && vis != Visibility.PUBLIC) throw new MalformedJorth("Interface members must be public");
+				
+				boolean noBody = interf;
 				
 				propCollect:
 				while(true){
@@ -454,11 +467,13 @@ public final class Jorth extends CodeDestination{
 	private void endFunction() throws MalformedJorth{
 		currentFunction.end();
 		currentFunction = null;
+		memberFlag = true;
 	}
 	
 	private void endClass() throws MalformedJorth{
 		currentClass.end();
 		currentClass = null;
+		memberFlag = true;
 	}
 	
 	private FunctionGen requireFunction() throws MalformedJorth{

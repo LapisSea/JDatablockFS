@@ -17,6 +17,9 @@ import static java.lang.Integer.parseInt;
 
 public class Tokenizer implements CodeStream, TokenSource{
 	
+	private static final boolean SYNCHRONOUS_SAFETY =
+		UtilL.sysProperty("jorth.synchronousSafety").map(Boolean::valueOf).orElse(false);
+	
 	private static final BitSet SPECIALS = new BitSet();
 	
 	public static String escape(String src){
@@ -138,6 +141,11 @@ public class Tokenizer implements CodeStream, TokenSource{
 			if(workerState != WorkerState.WAIT_HOT) return true;
 			Thread.onSpinWait();
 		}
+		synchronized(this){
+			if(workerState == WorkerState.WAIT_HOT){
+				workerState = WorkerState.WAIT;
+			}
+		}
 		return false;
 	}
 	
@@ -153,10 +161,18 @@ public class Tokenizer implements CodeStream, TokenSource{
 	@Override
 	public CodeStream write(CharSequence code) throws MalformedJorth{
 		if(transformed == null) transformed = dad.transform(this);
+		var empty = SYNCHRONOUS_SAFETY && this.code == null && codeBuffer.isEmpty();
 		synchronized(this){
 			checkWorkerError();
 			codeBuffer.addLast(code);
 			setWorkerState(WorkerState.READ);
+		}
+		if(empty){
+			while(workerState != WorkerState.WAIT){
+				UtilL.sleep(1);
+				checkWorkerError();
+			}
+			checkWorkerError();
 		}
 		return this;
 	}
@@ -266,6 +282,8 @@ public class Tokenizer implements CodeStream, TokenSource{
 					line++;
 					skipWhitespace();
 					continue;
+				}else if(workerState == WorkerState.READ){
+					setWorkerState(WorkerState.WAIT_HOT);
 				}
 				
 				if(workerEnding() && !hasMore()){
