@@ -7,6 +7,7 @@ import org.testng.annotations.Test;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -496,5 +497,26 @@ public class JorthTests{
 		LogUtil.println(cls.getEnumConstants());
 		
 		assertEquals(List.of("FOO", "BAR"), EnumSet.allOf((Class<T>)cls).stream().map(Enum::name).toList());
+	}
+	
+	@Test
+	<T extends Enum<T>> void simpleInterface() throws ReflectiveOperationException{
+		
+		var className = "test.Interf";
+		var cls = generateAndLoadInstance(className, writer -> {
+			writer.write(
+				"""
+					public interface {!} start
+						function hello
+							returns #String
+						end
+					end
+					""",
+				className);
+		});
+		assertTrue(cls.isInterface());
+		var hello = cls.getMethod("hello");
+		LogUtil.println(hello);
+		assertTrue(Modifier.isAbstract(hello.getModifiers()));
 	}
 }

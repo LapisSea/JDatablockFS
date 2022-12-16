@@ -222,15 +222,20 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		
 		ClassGen.writeAnnotations(anns, writer::visitAnnotation);
 		
-		codeInfo.add(new CodePath(writer, new TypeStack(null)));
+		if(!this.access.contains(Access.ABSTRACT)){
+			codeInfo.add(new CodePath(writer, new TypeStack(null)));
+		}
 	}
 	
 	@Override
 	public void end() throws MalformedJorth{
+		if(codeInfo.isEmpty()){
+			writer.visitEnd();
+			return;
+		}
 		if(codeInfo.size() != 1){
 			throw new NotImplementedException();
 		}
-		
 		var c = code();
 		if(!c.ended){
 			c.end();

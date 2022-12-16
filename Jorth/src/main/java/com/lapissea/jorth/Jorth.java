@@ -234,13 +234,20 @@ public final class Jorth extends CodeDestination{
 				var acc  = popAccessSet();
 				var anns = popAnnotations();
 				
+				boolean noBody = currentClass.type == ClassType.INTERFACE;
+				
 				propCollect:
 				while(true){
 					if(source.peekToken() instanceof Token.KWord k && k.keyword() == Keyword.START){
 						tab -= 2;
 					}
-					switch(source.readKeyword()){
+					var k = source.readKeyword();
+					if(noBody && k == Keyword.END){
+						break;
+					}
+					switch(k){
 						case START -> {
+							if(noBody) throw new MalformedJorth("Can not start body of the function. Please use end instead of start");
 							tab++;
 							break propCollect;
 						}
@@ -261,13 +268,17 @@ public final class Jorth extends CodeDestination{
 							if(returnType != null) throw new MalformedJorth("Duplicate returns statement");
 							returnType = readType(source);
 						}
-						default -> throw new MalformedJorth("Unexpected keyword " + keyword.key);
+						default -> throw new MalformedJorth("Unexpected keyword " + k.key);
 					}
 				}
 				
 				
 				currentFunction = currentClass.defineFunction(functionName, vis, acc, returnType, args.values(), anns);
-				endStack.addLast(this::endFunction);
+				if(noBody){
+					endFunction();
+				}else{
+					endStack.addLast(this::endFunction);
+				}
 			}
 			case ENUM -> {
 				var enumName = source.readWord();
