@@ -539,4 +539,36 @@ public class JorthTests{
 		
 		assertEquals(actual, expected);
 	}
+	@Test
+	void superArgs() throws ReflectiveOperationException{
+		
+		var className   = "jorth.Gen$$";
+		var expectedStr = "Hi from super";
+		var cls = generateAndLoadInstance(className, writer -> {
+			writer.write(
+				"""
+					extends {!1}
+					public class {!0} start
+						
+						function <init> start
+							super start
+								'{2}'
+							end
+						end
+						
+					end
+					""",
+				className,
+				IStoreHello.class.getName(),
+				expectedStr
+			);
+		});
+		
+		var constr = cls.getConstructor();
+		var inst   = constr.newInstance();
+		var str    = inst.toString();
+		
+		LogUtil.println(cls, "says", str);
+		assertEquals(expectedStr, str);
+	}
 }

@@ -415,17 +415,21 @@ public final class FunctionGen implements Endable, FunctionInfo{
 	}
 	
 	public Endable startCall(ClassName staticOwner, String functionName) throws MalformedJorth{
-		var mark = code().stack.size();
-		
 		ClassInfo cInfo;
 		if(staticOwner != null){
 			cInfo = typeSource.byName(staticOwner);
 		}else{
 			var stack = code().stack;
+			stack.requireElements(1);
 			if(stack.isEmpty()) throw new MalformedJorth("Trying to call non static method but there is nothing on stack");
-			cInfo = typeSource.byType(stack.peek(mark - 1));
+			cInfo = typeSource.byType(stack.peek(stack.size() - 1));
 		}
 		
+		return startCallRaw(cInfo, functionName, false);
+	}
+	
+	public Endable startCallRaw(ClassInfo cInfo, String functionName, boolean superCall){
+		var mark = code().stack.size();
 		return () -> {
 			var stack    = code().stack;
 			var argCount = stack.size() - mark;
@@ -437,7 +441,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 			
 			var info = cInfo.getFunction(new Signature(functionName, args));
 			
-			invokeOp(info, false);
+			invokeOp(info, superCall);
 		};
 	}
 	

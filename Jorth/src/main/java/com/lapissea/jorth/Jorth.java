@@ -435,7 +435,12 @@ public final class Jorth extends CodeDestination{
 			}
 			case SUPER -> {
 				currentFunction.loadThisIns();
-				currentFunction.superOp(List.of());
+				var hasStart = optionalStart(source);
+				
+				var parent = currentClass.superType();
+				var call   = currentFunction.startCallRaw(parent, "<init>", true);
+				if(hasStart) endStack.add(call);
+				else call.end();
 			}
 			case DUP -> currentFunction.dupOp();
 			case POP -> currentFunction.popOp();
