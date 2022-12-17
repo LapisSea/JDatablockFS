@@ -60,6 +60,10 @@ public interface ClassInfo{
 		public boolean isFinal(){
 			throw NotImplementedException.infer();//TODO: implement OfArray.isFinal()
 		}
+		@Override
+		public List<GenericType> interfaces(){
+			return List.of();
+		}
 	}
 	
 	class OfClass implements ClassInfo{
@@ -196,6 +200,15 @@ public interface ClassInfo{
 		public boolean isFinal(){
 			return Modifier.isFinal(clazz.getModifiers());
 		}
+		
+		private List<GenericType> interfaces;
+		@Override
+		public List<GenericType> interfaces(){
+			if(interfaces == null){
+				interfaces = Arrays.stream(clazz.getGenericInterfaces()).map(GenericType::of).toList();
+			}
+			return interfaces;
+		}
 	}
 	
 	FieldInfo getField(String name) throws MalformedJorth;
@@ -207,4 +220,5 @@ public interface ClassInfo{
 	ClassType type();
 	
 	boolean isFinal();
+	List<GenericType> interfaces();
 }

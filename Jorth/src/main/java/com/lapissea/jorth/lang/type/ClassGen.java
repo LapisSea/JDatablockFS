@@ -32,7 +32,9 @@ public final class ClassGen implements ClassInfo, Endable{
 	public final  ClassType       type;
 	public final  Visibility      visibility;
 	private final EnumSet<Access> accessSet;
-	public final  GenericType     extension;
+	
+	public final  GenericType       extension;
+	private final List<GenericType> interfaces;
 	
 	final ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS|ClassWriter.COMPUTE_FRAMES);
 	
@@ -54,6 +56,7 @@ public final class ClassGen implements ClassInfo, Endable{
 		this.type = type;
 		this.visibility = visibility;
 		this.extension = extension;
+		this.interfaces = List.copyOf(interfaces);
 		this.accessSet = accessSet.isEmpty()? EnumSet.noneOf(Access.class) : EnumSet.copyOf(accessSet);
 		
 		int accessFlags = visibility.flag|switch(type){
@@ -308,5 +311,10 @@ public final class ClassGen implements ClassInfo, Endable{
 	@Override
 	public String toString(){
 		return name.toString();
+	}
+	
+	@Override
+	public List<GenericType> interfaces(){
+		return interfaces;
 	}
 }

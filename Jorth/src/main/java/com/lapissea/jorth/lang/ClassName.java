@@ -1,6 +1,7 @@
 package com.lapissea.jorth.lang;
 
 import com.lapissea.jorth.MalformedJorth;
+import com.lapissea.jorth.lang.type.GenericType;
 import com.lapissea.jorth.lang.type.TypeSource;
 
 import java.util.Map;
@@ -60,8 +61,14 @@ public final class ClassName{
 		
 		var info      = source.byName(this);
 		var superType = info.superType();
-		if(superType == null) return false;
-		return superType.name().instanceOf(source, right);
+		if(superType != null && superType.name().instanceOf(source, right)) return true;
+		var interfaces = info.interfaces();
+		for(GenericType interf : interfaces){
+			if(interf.raw().instanceOf(source, right)){
+				return true;
+			}
+		}
+		return false;
 	}
 	
 	@Override
