@@ -69,6 +69,12 @@ public interface TokenSource{
 	
 	boolean hasMore();
 	
+	default boolean consumeTokenIfIsText(char c) throws MalformedJorth{
+		return consumeTokenIf(Token.SmolWord.class, w -> w.is(c));
+	}
+	default boolean consumeTokenIfIsText(String text) throws MalformedJorth{
+		return consumeTokenIf(Token.Word.class, w -> w.is(text));
+	}
 	default <T extends Token> boolean consumeTokenIf(Class<T> type, Predicate<T> predicate) throws MalformedJorth{
 		return consumeTokenIf(t -> t.as(type).filter(predicate)).isPresent();
 	}
@@ -132,18 +138,14 @@ public interface TokenSource{
 		var raw = readClassName(imports);
 		
 		var args = new ArrayList<GenericType>();
-		if(consumeTokenIf(Token.SmolWord.class, w -> w.is('<'))){
-			while(true){
+		if(consumeTokenIfIsText('<')){
+			do{
 				args.add(readType(imports));
-				
-				if(consumeTokenIf(Token.SmolWord.class, w -> w.is('>'))){
-					break;
-				}
-			}
+			}while(!consumeTokenIfIsText('>'));
 		}
 		
 		int dims = 0;
-		while(consumeTokenIf(Token.Word.class, w -> w.is("array"))){
+		while(consumeTokenIfIsText("array")){
 			dims++;
 			if(!allowArray) throw new MalformedJorth("Array not allowed");
 		}
@@ -171,7 +173,7 @@ public interface TokenSource{
 		
 		var contents = new ArrayList<Token>();
 		
-		while(!consumeTokenIf(Token.SmolWord.class, c -> c.value() == type.close)){
+		while(!consumeTokenIfIsText(type.close)){
 			contents.add(readToken());
 		}
 		if(!allowEmpty && contents.isEmpty()){

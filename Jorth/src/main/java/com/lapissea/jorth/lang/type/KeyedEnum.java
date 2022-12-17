@@ -48,21 +48,23 @@ public interface KeyedEnum{
 				smolNames[i] = new CNode<>(c, value, smolNames[i]);
 			}
 			
-			return new Lookup<>(t, Map.copyOf(names), smolNames);
+			return new Lookup<>(t, Map.copyOf(names), smolNames.length == 0? null : smolNames);
 		}
 		
 		
 		private String elsStr(String start, String end){
-			return Stream.concat(
-				             Arrays.stream(smolNames).mapMulti((n, c) -> {
-					             while(n != null){
-						             c.accept(n.key + "");
-						             n = n.next;
-					             }
-				             }),
-				             names.keySet().stream()
-			             ).sorted()
-			             .collect(Collectors.joining(", ", start, end));
+			Stream<String> stream;
+			if(smolNames == null) stream = names.keySet().stream();
+			else stream = Stream.concat(
+				Arrays.stream(smolNames).mapMulti((n, c) -> {
+					while(n != null){
+						c.accept(n.key + "");
+						n = n.next;
+					}
+				}),
+				names.keySet().stream()
+			);
+			return stream.sorted().collect(Collectors.joining(", ", start, end));
 		}
 		private MalformedJorth fail(String name){
 			return new MalformedJorth("Expected any of " + elsStr("[", "]") + " but got " + name);
@@ -104,6 +106,7 @@ public interface KeyedEnum{
 		}
 		
 		private E byChar(char key){
+			if(smolNames == null) return null;
 			int i    = key%smolNames.length;
 			var node = smolNames[i];
 			if(node == null) return null;

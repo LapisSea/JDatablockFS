@@ -399,7 +399,7 @@ public final class Jorth extends CodeDestination{
 				}
 			}
 			case SET -> {
-				if(source.consumeTokenIf(Token.Word.class, w -> w.is("this"))){
+				if(source.consumeTokenIfIsText("this")){
 					var member = source.readWord();
 					currentFunction.loadThisIns();
 					currentFunction.swapOp();
