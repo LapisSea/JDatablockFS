@@ -16,10 +16,7 @@ import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.MalformedJorth;
-import com.lapissea.util.NotImplementedException;
-import com.lapissea.util.ShouldNeverHappenError;
-import com.lapissea.util.TextUtil;
-import com.lapissea.util.UtilL;
+import com.lapissea.util.*;
 import com.lapissea.util.function.UnsafeBiConsumer;
 import com.lapissea.util.function.UnsafeConsumer;
 
@@ -326,7 +323,8 @@ public class DefInstanceCompiler{
 		
 		var completionName = interf.getName() + IMPL_COMPLETION_POSTFIX;
 		
-		var jorth = new Jorth(interf.getClassLoader(), null);
+		var log   = PRINT_BYTECODE? new StringJoiner(" ") : null;
+		var jorth = new Jorth(interf.getClassLoader(), PRINT_BYTECODE? log::add : null);
 		try{
 			
 			try(var writer = jorth.writer()){
@@ -349,9 +347,9 @@ public class DefInstanceCompiler{
 					
 					writer.write(
 						"""
-							public visibility
 							function {!}
 								arg arg1 {}
+							end
 							""",
 						setterName,
 						jtyp
@@ -367,16 +365,17 @@ public class DefInstanceCompiler{
 					
 					writer.write(
 						"""
-							public visibility
-							{} returns
-							{!} function
+							function {!}
+								{} returns
+							end
 							""",
 						jtyp,
 						getterName
 					);
 				}
+				writer.write("end");
 			}
-			
+			if(PRINT_BYTECODE) Log.log("Generated jorth:\n" + log);
 			return Access.privateLookupIn(interf).defineClass(jorth.getClassFile(completionName));
 		}catch(IllegalAccessException|MalformedJorth e){
 			throw new RuntimeException(e);
@@ -420,13 +419,13 @@ public class DefInstanceCompiler{
 		}
 	}
 	
-	private static <T extends IOInstance<T>> Class<T> generateImpl(Key<T> key, Specials specials, List<FieldInfo> fieldInfo, Optional<List<FieldInfo>> orderedFields){
+	private static synchronized <T extends IOInstance<T>> Class<T> generateImpl(Key<T> key, Specials specials, List<FieldInfo> fieldInfo, Optional<List<FieldInfo>> orderedFields){
 		var interf   = key.clazz;
 		var names    = key.includeNames;
 		var implName = interf.getName() + IOInstance.Def.IMPL_NAME_POSTFIX + names.map(n -> n.stream().collect(Collectors.joining("_", "€€fields~", ""))).orElse("");
 		
 		try{
-			var jorth = new Jorth(interf.getClassLoader(), null);
+			var jorth = new Jorth(interf.getClassLoader(), s -> LogUtil.print(s + " "));
 			
 			jorth.addImportAs(implName, "typ.impl");
 			jorth.addImportAs(interf.getName(), "typ.interf");
@@ -440,10 +439,9 @@ public class DefInstanceCompiler{
 				
 				writer.write(
 					"""
-						public visibility
 						implements #typ.interf
-						extends typ.IOInstance.Managed <#typ.impl>
-						class #typ.impl start
+						extends #IOInstance.Managed <#typ.impl>
+						public class #typ.impl start
 						""");
 				
 				for(var info : fieldInfo){
@@ -541,7 +539,7 @@ public class DefInstanceCompiler{
 			"""
 				public visibility
 				function {!0}
-					returns typ.String
+					returns #String
 				start
 					get this this
 					access static call {!1} {!0} start end
@@ -692,7 +690,7 @@ public class DefInstanceCompiler{
 				function {!}
 					returns #String
 				start
-					typ.StringBuilder new start end
+					#StringBuilder new start end
 				""",
 			name
 		);
@@ -759,11 +757,9 @@ public class DefInstanceCompiler{
 	private static void generateDefaultConstructor(CodeStream writer, List<FieldInfo> fieldInfo) throws MalformedJorth{
 		writer.write(
 			"""
-				visibility public
-				function <init>
+				public function <init>
 				start
 					super start
-						access static
 						get #typ.impl $STRUCT
 					end
 				""");
@@ -781,11 +777,7 @@ public class DefInstanceCompiler{
 		if(oOrderedFields.isPresent()){
 			var orderedFields = oOrderedFields.get();
 			
-			writer.write(
-				"""
-					visibility public
-					function <init>
-					""");
+			writer.write("public function <init>");
 			for(int i = 0; i<orderedFields.size(); i++){
 				FieldInfo info    = orderedFields.get(i);
 				var       type    = JorthUtils.toJorthGeneric(Objects.requireNonNull(TypeLink.of(info.type)));
@@ -873,14 +865,13 @@ public class DefInstanceCompiler{
 	private static void defineStatics(CodeStream writer) throws MalformedJorth{
 		writer.write(
 			"""
-				visibility private
-				static final
-				[#TOKEN(0)] typ.Struct $STRUCT field
+				private static final field $STRUCT #Struct
 				
-				<clinit> function start
-					typ.impl class
-					typ.Struct of (1) static call
-					typ.impl $STRUCT set
+				function <clinit> start
+					static call #Struct of start
+						class #typ.impl
+					end
+					set #typ.impl $STRUCT
 				end
 				""");
 	}
@@ -904,12 +895,13 @@ public class DefInstanceCompiler{
 		});
 		writer.write(
 			"""
-				visibility public
-				{'#TOKEN(2)' name} typ.IOValue @
-				typ.Override @
-				#RAW(1) returns
-				#TOKEN(0) function start
-					this #TOKEN(2) get
+				public
+				@ #IOValue start name '{!2}' end
+				@ #Override
+				function {!0}
+					returns {1}
+				start
+					get this {!2}
 				end
 				""",
 			getterName,
@@ -919,12 +911,12 @@ public class DefInstanceCompiler{
 		
 		writer.write(
 			"""
-				visibility public
-				{'#TOKEN(2)' name} typ.IOValue @
-				typ.Override @
-				#RAW(1) arg1 arg
-				#TOKEN(0) function start
-					<arg> arg1 get
+				@ #IOValue start name '{!2}' end
+				@ #Override
+				public function {!0}
+					arg arg1 {1}
+				start
+					get #arg arg1
 				""",
 			setterName,
 			jtyp,
@@ -937,7 +929,7 @@ public class DefInstanceCompiler{
 		
 		writer.write(
 			"""
-					this #TOKEN(0) set
+					set this {!}
 				end
 				""",
 			info.name
@@ -963,7 +955,7 @@ public class DefInstanceCompiler{
 				public visibility
 				{} returns
 				{!} function start
-					typ.UnsupportedOperationException (0) new throw
+					#UnsupportedOperationException (0) new throw
 				end
 				""",
 			jtyp,
@@ -976,7 +968,7 @@ public class DefInstanceCompiler{
 				public visibility
 				{} arg1 arg
 				{!} function start
-					typ.UnsupportedOperationException (0) new throw
+					#UnsupportedOperationException (0) new throw
 				end
 				""",
 			jtyp,
@@ -987,14 +979,12 @@ public class DefInstanceCompiler{
 	private static void defineField(CodeStream writer, FieldInfo info) throws MalformedJorth{
 		var type = Objects.requireNonNull(TypeLink.of(info.type));
 		
-		writer.write("private visibility");
-		
 		writeAnnotations(writer, info.annotations);
 		
 		writer.write(
-			"{} {!} field",
-			JorthUtils.toJorthGeneric(type),
-			info.name
+			"private field {!} {}",
+			info.name,
+			JorthUtils.toJorthGeneric(type)
 		);
 	}
 	
@@ -1003,21 +993,24 @@ public class DefInstanceCompiler{
 		for(var ann : annotations){
 			if(!annTypes.add(ann.annotationType())) continue;
 			
-			writer.write("{");
-			scanAnnotation(ann, (name, value) -> writer.write("{} {!}", switch(value){
-				case null -> "null";
-				case String s -> "'" + s.replace("'", "\\'") + "'";
-				case Enum<?> e -> e.name();
-				case Boolean v -> v.toString();
-				case Class<?> c -> c.getName();
-				case Number n -> {
-					if(SupportedPrimitive.isAny(n.getClass())) yield n + "";
-					throw new UnsupportedOperationException();
-				}
-				case String[] strs -> Arrays.stream(strs).collect(Collectors.joining(" ", "[", "]"));
-				default -> throw new NotImplementedException(value.getClass() + "");
-			}, name));
-			writer.write("} #TOKEN(0) @", ann.annotationType().getName());
+			writer.write("@ {!} start", ann.annotationType().getName());
+			
+			scanAnnotation(ann, (name, value) -> {
+				writer.write("{!} {}", name, switch(value){
+					case null -> "null";
+					case String s -> "'" + s.replace("'", "\\'") + "'";
+					case Enum<?> e -> e.name();
+					case Boolean v -> v.toString();
+					case Class<?> c -> c.getName();
+					case Number n -> {
+						if(SupportedPrimitive.isAny(n.getClass())) yield n + "";
+						throw new UnsupportedOperationException();
+					}
+					case String[] strs -> Arrays.stream(strs).map(s -> "'" + s.replace("'", "\\'") + "'").collect(Collectors.joining(" ", "[", "]"));
+					default -> throw new NotImplementedException(value.getClass() + "");
+				});
+			});
+			writer.write("end");
 		}
 	}
 	
@@ -1025,7 +1018,7 @@ public class DefInstanceCompiler{
 		writer.write(
 			"""
 				dup
-				typ.Objects requireNonNull (1) static call
+				#Objects requireNonNull (1) static call
 				pop
 				""");
 	}

@@ -6,19 +6,12 @@ import com.lapissea.util.NotImplementedException;
 public class JorthUtils{
 	
 	public static String toJorthGeneric(TypeLink typ){
-		StringBuilder sb = new StringBuilder();
-		if(typ.argCount()>0){
-			sb.append("[");
-			for(int i = 0; i<typ.argCount(); i++){
-				var arg = typ.arg(i);
-				sb.append(toJorthGeneric(arg)).append(" ");
-			}
-			sb.append("] ");
-		}
+		StringBuilder sb   = new StringBuilder();
+		var           dims = 0;
 		if(typ.getTypeName().startsWith("[")){
 			var nam = typ.getTypeName();
 			while(nam.startsWith("[")){
-				sb.append("array ");
+				dims++;
 				nam = nam.substring(1);
 			}
 			sb.append(switch(nam){
@@ -35,9 +28,20 @@ public class JorthUtils{
 					yield nam.substring(1, nam.length() - 1);
 				}
 			});
-			return sb.toString();
+		}else{
+			sb.append(typ.getTypeName());
 		}
-		sb.append(typ.getTypeName());
+		
+		if(typ.argCount()>0){
+			sb.append('<');
+			for(int i = 0; i<typ.argCount(); i++){
+				var arg = typ.arg(i);
+				sb.append(toJorthGeneric(arg)).append(' ');
+			}
+			sb.append('>');
+		}
+		
+		sb.append(" array".repeat(dims));
 		return sb.toString();
 	}
 	
