@@ -423,6 +423,10 @@ public final class Jorth extends CodeDestination{
 			}
 			case DUP -> currentFunction.dupOp();
 			case POP -> currentFunction.popOp();
+			case CLASS -> {
+				var clazz = source.readClassName(importsFun);
+				currentFunction.loadClassTypeOp(clazz);
+			}
 			case WHAT_THE_STACK -> throw new MalformedJorth("Debug token '???' at line " + source.line() + " encountered. Current stack:\n" + currentFunction.getStack());
 			default -> throw new MalformedJorth("Unexpected keyword " + keyword.key + " in function " + currentFunction);
 		}

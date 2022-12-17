@@ -519,4 +519,24 @@ public class JorthTests{
 		LogUtil.println(hello);
 		assertTrue(Modifier.isAbstract(hello.getModifiers()));
 	}
+	
+	@Test
+	void getClassRef() throws ReflectiveOperationException{
+		var cls = generateAndLoadInstanceSimple("jorth.Gen$$", writer -> {
+			writer.write(
+				"""
+					static function getCls
+						returns #Class<#String>
+					start
+						class #String
+					end
+					"""
+			);
+		});
+		
+		var expected = String.class;
+		var actual   = cls.getMethod("getCls").invoke(null);
+		
+		assertEquals(actual, expected);
+	}
 }

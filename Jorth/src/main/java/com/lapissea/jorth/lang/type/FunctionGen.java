@@ -599,4 +599,12 @@ public final class FunctionGen implements Endable, FunctionInfo{
 	public void castOp(GenericType type) throws MalformedJorth{
 		code().cast(type);
 	}
+	
+	public void loadClassTypeOp(ClassName clazz){
+		var stack = code().stack;
+		var typ   = new GenericType(clazz);
+		writer.visitLdcInsn(org.objectweb.asm.Type.getType(typ.jvmSignatureStr()));
+		
+		stack.push(new GenericType(ClassName.of(Class.class), 0, List.of(typ)));
+	}
 }
