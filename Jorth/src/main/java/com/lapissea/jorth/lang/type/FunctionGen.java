@@ -45,7 +45,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 				}
 			}
 			
-			writer.visitFieldInsn(field.isStatic()? GETSTATIC : GETFIELD, owner.slashed(), field.name(), type.jvmSignature().toString());
+			writer.visitFieldInsn(field.isStatic()? GETSTATIC : GETFIELD, owner.slashed(), field.name(), type.jvmSignatureStr());
 			stack.push(type);
 		}
 		
@@ -68,7 +68,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 				}
 			}
 			
-			writer.visitFieldInsn(field.isStatic()? PUTSTATIC : PUTFIELD, owner.slashed(), field.name(), type.jvmSignature().toString());
+			writer.visitFieldInsn(field.isStatic()? PUTSTATIC : PUTFIELD, owner.slashed(), field.name(), type.jvmSignatureStr());
 		}
 		
 		public void loadArgumentIns(Arg arg){
@@ -157,7 +157,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 				throw new MalformedJorth("Can not cast " + stackType + " to " + type);
 			}
 			stack.push(type);
-			writer.visitTypeInsn(CHECKCAST, type.jvmSignature().toString());
+			writer.visitTypeInsn(CHECKCAST, type.jvmSignatureStr());
 		}
 	}
 	

@@ -88,6 +88,9 @@ public record GenericType(ClassName raw, int dims, List<GenericType> args){
 		return Optional.ofNullable(PRIMITIVES.get(raw.any()));
 	}
 	
+	public String jvmSignatureStr(){
+		return jvmSignature().toString();
+	}
 	public CharSequence jvmSignature(){
 		return jvmString(true);
 	}

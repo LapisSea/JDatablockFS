@@ -222,7 +222,7 @@ public final class ClassGen implements ClassInfo, Endable{
 					arrAnn.visitEnd();
 					
 				}else if(argValue instanceof Enum<?> eVal){
-					annWriter.visitEnum(argName, GenericType.of(e.getClass()).jvmSignature().toString(), eVal.name());
+					annWriter.visitEnum(argName, GenericType.of(e.getClass()).jvmSignatureStr(), eVal.name());
 				}else{
 					annWriter.visit(argName, argValue);
 				}
