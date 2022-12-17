@@ -244,34 +244,28 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		writer.visitEnd();
 	}
 	
-	public void getOp(String owner, String member) throws MalformedJorth{
-		ClassInfo info;
-		var       code = code();
-		switch(owner){
-			case "this" -> {
-				info = this.owner;
-				loadThisIns();
-				
-				if(member.equals("this")){
-					return;
-				}
-			}
-			case "#arg" -> {
-				var arg = args.get(member);
-				if(arg != null){
-					code.loadArgumentIns(arg);
-					return;
-				}else{
-					throw new MalformedJorth("Argument " + member + " does not exist");
-				}
-			}
-			default -> {
-				info = typeSource.byType(new GenericType(ClassName.dotted(owner)));
-			}
+	public void getStaticOp(ClassName owner, String member) throws MalformedJorth{
+		var info = typeSource.byName(owner);
+		doGet(member, info);
+	}
+	
+	public void getArgOp(String member) throws MalformedJorth{
+		var arg = args.get(member);
+		if(arg == null){
+			throw new MalformedJorth("Argument " + member + " does not exist");
 		}
-		
-		var memberInfo = info.getField(member);
-		code.getFieldIns(memberInfo);
+		code().loadArgumentIns(arg);
+	}
+	
+	public void getThisOp(String member) throws MalformedJorth{
+		loadThisIns();
+		if(member.equals("this")) return;
+		doGet(member, owner);
+	}
+	
+	private void doGet(String member, ClassInfo owner) throws MalformedJorth{
+		var memberInfo = owner.getField(member);
+		code().getFieldIns(memberInfo);
 	}
 	
 	public void setElementOP() throws MalformedJorth{
@@ -294,18 +288,15 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		writer.visitInsn(element.getBaseType().arrayStoreOP());
 	}
 	
-	public void setOp(String owner, String member) throws MalformedJorth{
-		ClassInfo info;
-		switch(owner){
-			case "this" -> {
-				info = this.owner;
-				loadThisIns();
-				code().swap();
-			}
-			case "#arg" -> throw new MalformedJorth("Can not set args");
-			default -> info = typeSource.byType(new GenericType(ClassName.dotted(owner)));
-		}
-		
+	public void setInstanceOp(String member) throws MalformedJorth{
+		var stack = code().stack;
+		stack.requireElements(2);
+		doSet(member, typeSource.byType(stack.peek(stack.size() - 2)));
+	}
+	public void setStaticOp(ClassName owner, String member) throws MalformedJorth{
+		doSet(member, typeSource.byName(owner));
+	}
+	private void doSet(String member, ClassInfo info) throws MalformedJorth{
 		var memberInfo = info.getField(member);
 		code().setFieldIns(memberInfo);
 	}
@@ -595,6 +586,9 @@ public final class FunctionGen implements Endable, FunctionInfo{
 	}
 	public void popOp() throws MalformedJorth{
 		code().pop();
+	}
+	public void swapOp() throws MalformedJorth{
+		code().swap();
 	}
 	public void castOp(GenericType type) throws MalformedJorth{
 		code().cast(type);

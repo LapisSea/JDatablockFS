@@ -111,7 +111,7 @@ public final class ClassGen implements ClassInfo, Endable{
 					var init = defineFunction("<init>", this.visibility, Set.of(), null, argInfo, List.of());
 					init.loadThisIns();
 					for(int i = 0; i<args.size(); i++){
-						init.getOp("#arg", "arg" + i);
+						init.getArgOp("arg" + i);
 					}
 					init.superOp(e.argumentTypes());
 					init.end();
@@ -145,7 +145,7 @@ public final class ClassGen implements ClassInfo, Endable{
 				List.of(),
 				List.of());
 			
-			fun.getOp(name.dotted(), "$VALUES");
+			fun.getStaticOp(name, "$VALUES");
 			fun.startCall(null, "clone").end();
 			fun.castOp(arrType);
 			fun.end();
@@ -179,11 +179,11 @@ public final class ClassGen implements ClassInfo, Endable{
 				call.end();
 				
 				fun.dupOp();
-				fun.setOp(name.dotted(), field.name());// Enum.NAME=obj
+				fun.setStaticOp(name, field.name());// Enum.NAME=obj
 				fun.setElementOP();
 			}
 			
-			fun.setOp(name.dotted(), "$VALUES");
+			fun.setStaticOp(name, "$VALUES");
 			fun.end();
 		}
 	}

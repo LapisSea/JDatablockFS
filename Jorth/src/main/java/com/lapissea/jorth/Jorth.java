@@ -386,14 +386,29 @@ public final class Jorth extends CodeDestination{
 	private void functionKeyword(TokenSource source, Keyword keyword) throws MalformedJorth{
 		switch(keyword){
 			case GET -> {
-				var owner  = source.readWord();
-				var member = source.readWord();
-				currentFunction.getOp(owner, member);
+				if(source.consumeTokenIfIsText("this")){
+					var member = source.readWord();
+					currentFunction.getThisOp(member);
+				}else if(source.consumeTokenIfIsText("#arg")){
+					var member = source.readWord();
+					currentFunction.getArgOp(member);
+				}else{
+					var owner  = source.readClassName(importsFun);
+					var member = source.readWord();
+					currentFunction.getStaticOp(owner, member);
+				}
 			}
 			case SET -> {
-				var owner  = source.readWord();
-				var member = source.readWord();
-				currentFunction.setOp(owner, member);
+				if(source.consumeTokenIf(Token.Word.class, w -> w.is("this"))){
+					var member = source.readWord();
+					currentFunction.loadThisIns();
+					currentFunction.swapOp();
+					currentFunction.setInstanceOp(member);
+				}else{
+					var owner  = source.readClassName(importsFun);
+					var member = source.readWord();
+					currentFunction.setStaticOp(owner, member);
+				}
 			}
 			case IF -> {
 				source.requireKeyword(Keyword.START);

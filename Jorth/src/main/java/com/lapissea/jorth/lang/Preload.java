@@ -67,7 +67,7 @@ public class Preload{
 				var cg = new ClassGen(TypeSource.of(Jorth.class.getClassLoader()), ClassName.of(Object.class), ClassType.CLASS, Visibility.PUBLIC, GenericType.OBJECT, List.of(), Set.of(), List.of());
 				cg.defineField(Visibility.PUBLIC, Set.of(), Set.of(), GenericType.OBJECT, "");
 				var fun = new FunctionGen(cg, "", Visibility.PUBLIC, Set.of(), GenericType.OBJECT, List.of(), List.of());
-				fun.getOp("this", "");
+				fun.getThisOp("");
 				fun.end();
 				cg.end();
 			}catch(Throwable e){
