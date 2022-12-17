@@ -231,10 +231,11 @@ public final class Jorth extends CodeDestination{
 	private void classKeyword(TokenSource source, Keyword keyword) throws MalformedJorth{
 		switch(keyword){
 			case FIELD -> {
-				var anns = popAnnotations();
-				var name = source.readWord();
-				var type = readType(source);
-				currentClass.defineField(popVisibility(), Set.of(), anns, type, name);
+				var anns   = popAnnotations();
+				var name   = source.readWord();
+				var access = popAccessSet();
+				var type   = readType(source);
+				currentClass.defineField(popVisibility(), access, anns, type, name);
 				memberFlag = true;
 			}
 			case FUNCTION -> {
