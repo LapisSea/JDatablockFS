@@ -1,7 +1,6 @@
 package com.lapissea.jorth;
 
 import com.lapissea.util.LogUtil;
-import com.lapissea.util.NotImplementedException;
 import org.testng.annotations.Test;
 
 import java.lang.annotation.Retention;
@@ -10,7 +9,6 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.EnumSet;
 import java.util.List;
-import java.util.Map;
 
 import static com.lapissea.jorth.TestUtils.generateAndLoadInstance;
 import static com.lapissea.jorth.TestUtils.generateAndLoadInstanceSimple;
@@ -45,97 +43,110 @@ public class JorthTests{
 		}
 	}
 	
-	//TODO: Implement math
-	@Test(expectedExceptions = NotImplementedException.class)
-	void mathClass() throws ReflectiveOperationException{
+	public abstract static class IStoreHello{
 		
-		var className = "jorth.Gen$$";
+		private final String str;
+		protected IStoreHello(String str){
+			this.str = str;
+		}
 		
-		var cls = generateAndLoadInstance(className, writer -> {
-			//define class
-			writer.write("public class {!} start", className);
-			
-			var types = List.of("byte", "short", "int", "long", "float", "double");
-			for(int i = 0; i<types.size(); i++){
-				var type1 = types.get(i);
-				for(int j = 0; j<types.size(); j++){
-					var type2 = types.get(j);
-					
-					String returnType;
-					var    k = Math.max(i, j);
-					if((k == 4 || k == 5) && (i == 3 || j == 3)){
-						returnType = "double";
-					}else{
-						returnType = types.get(k);
-					}
-					
-					for(var e : Map.of(
-						"add", "+",
-						"sub", "-",
-						"div", "/",
-						"mul", "*"
-					).entrySet()){
-						writer.write(
-							"""
-								static function {!}
-									arg arg1 {}
-									arg arg2 {}
-									returns {}
-								start
-									get #arg arg1
-									get #arg arg2
-									{!}
-								end
-								""",
-							e.getKey(),
-							type1, type2, returnType,
-							e.getValue());
-					}
-				}
-			}
-		});
-		
-		Object ival;
-		
-		
-		ival = cls.getMethod("add", int.class, int.class).invoke(null, 10, 2);
-		assertEquals(12, ival);
-		
-		ival = cls.getMethod("sub", int.class, int.class).invoke(null, 10, 2);
-		assertEquals(8, ival);
-		
-		ival = cls.getMethod("mul", int.class, int.class).invoke(null, 10, 2);
-		assertEquals(20, ival);
-		
-		ival = cls.getMethod("div", int.class, int.class).invoke(null, 10, 2);
-		assertEquals(5, ival);
-		
-		
-		ival = cls.getMethod("add", float.class, float.class).invoke(null, 10, 0.2F);
-		assertEquals(10 + 0.2F, ival);
-		
-		ival = cls.getMethod("sub", float.class, float.class).invoke(null, 10, 0.2F);
-		assertEquals(10 - 0.2F, ival);
-		
-		ival = cls.getMethod("mul", float.class, float.class).invoke(null, 10, 0.2F);
-		assertEquals(10*0.2F, ival);
-		
-		ival = cls.getMethod("div", float.class, float.class).invoke(null, 10, 0.2F);
-		assertEquals(10/0.2F, ival);
-		
-		
-		ival = cls.getMethod("add", double.class, double.class).invoke(null, 10, 0.2D);
-		assertEquals(10 + 0.2D, ival);
-		
-		ival = cls.getMethod("sub", double.class, double.class).invoke(null, 10, 0.2D);
-		assertEquals(10 - 0.2D, ival);
-		
-		ival = cls.getMethod("mul", double.class, double.class).invoke(null, 10, 0.2D);
-		assertEquals(10*0.2D, ival);
-		
-		ival = cls.getMethod("div", double.class, double.class).invoke(null, 10, 0.2D);
-		assertEquals(10/0.2D, ival);
+		@Override
+		public String toString(){
+			return str;
+		}
 	}
+
+//	//TODO: Implement math
+//	@Test(expectedExceptions = NotImplementedException.class)
+//	void mathClass() throws ReflectiveOperationException{
+//
+//		var className = "jorth.Gen$$";
+//
+//		var cls = generateAndLoadInstance(className, writer -> {
+//			//define class
+//			writer.write("public class {!} start", className);
+//
+//			var types = List.of("byte", "short", "int", "long", "float", "double");
+//			for(int i = 0; i<types.size(); i++){
+//				var type1 = types.get(i);
+//				for(int j = 0; j<types.size(); j++){
+//					var type2 = types.get(j);
+//
+//					String returnType;
+//					var    k = Math.max(i, j);
+//					if((k == 4 || k == 5) && (i == 3 || j == 3)){
+//						returnType = "double";
+//					}else{
+//						returnType = types.get(k);
+//					}
+//
+//					for(var e : Map.of(
+//						"add", "+",
+//						"sub", "-",
+//						"div", "/",
+//						"mul", "*"
+//					).entrySet()){
+//						writer.write(
+//							"""
+//								static function {!}
+//									arg arg1 {}
+//									arg arg2 {}
+//									returns {}
+//								start
+//									get #arg arg1
+//									get #arg arg2
+//									{!}
+//								end
+//								""",
+//							e.getKey(),
+//							type1, type2, returnType,
+//							e.getValue());
+//					}
+//				}
+//			}
+//		});
+//
+//		Object ival;
+//
+//
+//		ival = cls.getMethod("add", int.class, int.class).invoke(null, 10, 2);
+//		assertEquals(12, ival);
+//
+//		ival = cls.getMethod("sub", int.class, int.class).invoke(null, 10, 2);
+//		assertEquals(8, ival);
+//
+//		ival = cls.getMethod("mul", int.class, int.class).invoke(null, 10, 2);
+//		assertEquals(20, ival);
+//
+//		ival = cls.getMethod("div", int.class, int.class).invoke(null, 10, 2);
+//		assertEquals(5, ival);
+//
+//
+//		ival = cls.getMethod("add", float.class, float.class).invoke(null, 10, 0.2F);
+//		assertEquals(10 + 0.2F, ival);
+//
+//		ival = cls.getMethod("sub", float.class, float.class).invoke(null, 10, 0.2F);
+//		assertEquals(10 - 0.2F, ival);
+//
+//		ival = cls.getMethod("mul", float.class, float.class).invoke(null, 10, 0.2F);
+//		assertEquals(10*0.2F, ival);
+//
+//		ival = cls.getMethod("div", float.class, float.class).invoke(null, 10, 0.2F);
+//		assertEquals(10/0.2F, ival);
+//
+//
+//		ival = cls.getMethod("add", double.class, double.class).invoke(null, 10, 0.2D);
+//		assertEquals(10 + 0.2D, ival);
+//
+//		ival = cls.getMethod("sub", double.class, double.class).invoke(null, 10, 0.2D);
+//		assertEquals(10 - 0.2D, ival);
+//
+//		ival = cls.getMethod("mul", double.class, double.class).invoke(null, 10, 0.2D);
+//		assertEquals(10*0.2D, ival);
+//
+//		ival = cls.getMethod("div", double.class, double.class).invoke(null, 10, 0.2D);
+//		assertEquals(10/0.2D, ival);
+//	}
 	
 	@Test
 	void comparisonTest() throws ReflectiveOperationException{
@@ -434,7 +445,7 @@ public class JorthTests{
 		var cls = generateAndLoadInstance(className, writer -> {
 			writer.write(
 				"""
-					extends {!1}<{!0}>
+					extends {!1}
 					public class {!0} start
 					end
 					""",
