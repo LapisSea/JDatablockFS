@@ -161,20 +161,26 @@ public class Tokenizer implements CodeStream, TokenSource{
 	@Override
 	public CodeStream write(CharSequence code) throws MalformedJorth{
 		if(transformed == null) transformed = dad.transform(this);
-		var empty = SYNCHRONOUS_SAFETY && this.code == null && codeBuffer.isEmpty();
 		synchronized(this){
-			checkWorkerError();
+			writeError();
 			codeBuffer.addLast(code);
 			setWorkerState(WorkerState.READ);
 		}
-		if(empty){
+		if(SYNCHRONOUS_SAFETY){
 			while(workerState != WorkerState.WAIT){
 				UtilL.sleep(1);
-				checkWorkerError();
+				writeError();
 			}
-			checkWorkerError();
+			writeError();
 		}
 		return this;
+	}
+	private void writeError(){
+		try{
+			checkWorkerError();
+		}catch(Throwable e){
+			throw new RuntimeException(e);
+		}
 	}
 	
 	private synchronized void skipWhitespace(){

@@ -76,12 +76,18 @@ public final class Jorth extends CodeDestination{
 	@Override
 	public void addImport(String clasName){
 		var pos = clasName.lastIndexOf('.') + 1;
-		imports.put(
-			new StringBuilder(1 + clasName.length() - pos)
-				.append('#')
-				.append(clasName, pos, clasName.length())
-				.toString(),
-			ClassName.dotted(clasName)
+		
+		var n = new StringBuilder(1 + clasName.length() - pos)
+			        .append('#')
+			        .append(clasName, pos, clasName.length());
+		
+		for(int i = 0; i<n.length() - 1; i++){
+			if(n.charAt(i) == '$' && n.charAt(i + 1) != '$'){
+				n.setCharAt(i, '.');
+			}
+		}
+		
+		imports.put(n.toString(), ClassName.dotted(clasName)
 		);
 	}
 	@Override
@@ -217,7 +223,9 @@ public final class Jorth extends CodeDestination{
 			
 		}else ok = false;
 		
-		if(!ok) throw new MalformedJorth("Unexpected token " + word);
+		if(!ok){
+			throw new MalformedJorth("Unexpected token " + word);
+		}
 	}
 	
 	private void classKeyword(TokenSource source, Keyword keyword) throws MalformedJorth{
@@ -309,7 +317,11 @@ public final class Jorth extends CodeDestination{
 		}
 	}
 	
-	private GenericType readType(TokenSource source) throws MalformedJorth      { return source.readType(importsFun); }
+	private GenericType readType(TokenSource source) throws MalformedJorth{
+		var type = source.readType(importsFun);
+		typeSource.validateType(type);
+		return type;
+	}
 	private ClassName getReadClassName(TokenSource source) throws MalformedJorth{ return source.readClassName(importsFun); }
 	
 	private boolean anyKeyword(TokenSource source, Keyword keyword) throws MalformedJorth{
@@ -453,13 +465,23 @@ public final class Jorth extends CodeDestination{
 				
 				currentClass = new ClassGen(typeSource, className, ClassType.from(keyword), visibility, extension, interfaces, accessSet, anns);
 				classes.put(className, currentClass);
+				
+				typeSource.validateType(extension);
+				for(var interf : interfaces){
+					typeSource.validateType(interf);
+				}
 				endStack.addLast(this::endClass);
 			}
 			case EXTENDS -> {
 				if(extensionBuffer != null) throw new MalformedJorth("Super class already defined");
 				extensionBuffer = source.readType(importsFun, false);
+				typeSource.validateType(extensionBuffer.raw());
 			}
-			case IMPLEMENTS -> interfaces.add(source.readType(importsFun, false));
+			case IMPLEMENTS -> {
+				var interf = source.readType(importsFun, false);
+				typeSource.validateType(interf.raw());
+				interfaces.add(interf);
+			}
 			default -> throw new MalformedJorth("Unexpected keyword " + keyword.key);
 		}
 	}

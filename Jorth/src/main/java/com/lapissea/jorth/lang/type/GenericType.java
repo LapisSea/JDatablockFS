@@ -7,6 +7,7 @@ import com.lapissea.util.NotImplementedException;
 import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.lang.reflect.TypeVariable;
 import java.util.*;
 
 import static java.util.stream.Collectors.joining;
@@ -21,6 +22,9 @@ public record GenericType(ClassName raw, int dims, List<GenericType> args){
 	public static final GenericType FLOAT  = new GenericType(ClassName.of(float.class));
 	
 	public static GenericType of(Type type){
+		return of0(null, type);
+	}
+	private static GenericType of0(Set<Type> stack, Type type){
 		
 		if(type instanceof Class<?> c){
 			int dims = 0;
@@ -32,20 +36,33 @@ public record GenericType(ClassName raw, int dims, List<GenericType> args){
 		}
 		
 		if(type instanceof ParameterizedType p){
-			var raw   = of(p.getRawType());
+			var raw   = of0(stack, p.getRawType());
 			var tArgs = p.getActualTypeArguments();
 			var args  = new ArrayList<GenericType>(tArgs.length);
 			for(var arg : tArgs){
-				args.add(of(arg));
+				args.add(of0(stack, arg));
 			}
 			return new GenericType(raw.raw, raw.dims, args);
 		}
 		
 		if(type instanceof GenericArrayType p){
-			var t = of(p.getGenericComponentType());
+			var t = of0(stack, p.getGenericComponentType());
 			return t.withDims(t.dims + 1);
 		}
-		
+		if(type instanceof TypeVariable<?> var){
+			if(stack == null) stack = new HashSet<>();
+			if(stack.contains(var)){
+				var bounds = var.getBounds();
+				return of(switch(bounds[0]){
+					case Class<?> c -> c;
+					case ParameterizedType t -> t.getRawType();
+					default -> throw new NotImplementedException(bounds[0].getClass().getName());
+				});
+			}
+			stack.add(var);
+			var bounds = var.getBounds()[0];
+			return of0(stack, bounds);
+		}
 		throw new NotImplementedException(type.getClass().getName());
 	}
 	

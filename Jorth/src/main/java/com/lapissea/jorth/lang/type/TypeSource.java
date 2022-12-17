@@ -77,6 +77,7 @@ public interface TypeSource{
 		return byType(new GenericType(name));
 	}
 	default ClassInfo byType(GenericType type) throws MalformedJorth{
+		if(!type.args().isEmpty()) type = type.withoutArgs();
 		var opt = maybeByType(type);
 		if(opt.isEmpty()){
 			throw new MalformedJorth(type + " could not be found");
@@ -84,4 +85,13 @@ public interface TypeSource{
 		return opt.get();
 	}
 	
+	default void validateType(ClassName type) throws MalformedJorth{
+		byName(type);
+	}
+	default void validateType(GenericType type) throws MalformedJorth{
+		byName(type.raw());
+		for(GenericType arg : type.args()){
+			validateType(arg);
+		}
+	}
 }

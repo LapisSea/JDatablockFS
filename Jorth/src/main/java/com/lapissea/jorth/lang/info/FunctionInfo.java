@@ -31,7 +31,7 @@ public interface FunctionInfo{
 				copy = true;
 				argTmp.set(i, argTmp.get(i).withoutArgs());
 			}
-			if(copy) argTmp = List.copyOf(args);
+			if(copy) argTmp = List.copyOf(argTmp);
 			this.args = argTmp;
 		}
 		@Override
