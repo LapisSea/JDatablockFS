@@ -100,7 +100,7 @@ public interface ClassInfo{
 			var args = new Class<?>[signature.args().size()];
 			for(int i = 0; i<signature.args().size(); i++){
 				var arg = signature.args().get(i);
-				var pt  = arg.getPrimitiveType().map(GenericType.BaseType::type);
+				var pt  = arg.getPrimitiveType().map(BaseType::type);
 				if(pt.isPresent()){
 					args[i] = pt.get();
 				}else{

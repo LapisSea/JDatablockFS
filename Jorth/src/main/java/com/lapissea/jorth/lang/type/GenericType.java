@@ -11,7 +11,6 @@ import java.lang.reflect.TypeVariable;
 import java.util.*;
 
 import static java.util.stream.Collectors.joining;
-import static org.objectweb.asm.Opcodes.*;
 
 public record GenericType(ClassName raw, int dims, List<GenericType> args){
 	
@@ -76,33 +75,14 @@ public record GenericType(ClassName raw, int dims, List<GenericType> args){
 		this.args = List.copyOf(args);
 	}
 	
-	public record BaseType(String jvmStr, Class<?> type, int returnOp, int loadOp, int slots, boolean arrayIndexCompatible, int arrayStoreOP){
-		public static final BaseType OBJ  = new BaseType("O", Object.class, ARETURN, ALOAD, 1, false, AASTORE);
-		public static final BaseType VOID = new BaseType("V", void.class, RETURN, -1, 0, false, -1);
-	}
-	
-	//@formatter:off
-	private static final Map<String, BaseType> PRIMITIVES = Map.of(
-		"void",    BaseType.VOID,
-		"char",    new BaseType("C", char.class,    IRETURN, ILOAD, 1, false, CASTORE),
-		"byte",    new BaseType("B", byte.class,    IRETURN, ILOAD, 1, true,  BASTORE),
-		"short",   new BaseType("S", short.class,   IRETURN, ILOAD, 1, true,  SASTORE),
-		"int",     new BaseType("I", int.class,     IRETURN, ILOAD, 1, true,  IASTORE),
-		"long",    new BaseType("J", long.class,    LRETURN, LLOAD, 2, false, LASTORE),
-		"float",   new BaseType("F", float.class,   FRETURN, FLOAD, 1, false, FASTORE),
-		"double",  new BaseType("D", double.class,  DRETURN, DLOAD, 2, false, DASTORE),
-		"boolean", new BaseType("Z", boolean.class, IRETURN, ILOAD, 1, false, BASTORE)
-	);
-	//@formatter:on
-	
 	public BaseType getBaseType(){
 		if(dims != 0) return BaseType.OBJ;
-		return PRIMITIVES.getOrDefault(raw.any(), BaseType.OBJ);
+		return BaseType.of(raw);
 	}
 	
 	public Optional<BaseType> getPrimitiveType(){
 		if(dims != 0) return Optional.empty();
-		return Optional.ofNullable(PRIMITIVES.get(raw.any()));
+		return Optional.ofNullable(BaseType.ofPrimitive(raw));
 	}
 	
 	public String jvmSignatureStr(){
@@ -146,14 +126,16 @@ public record GenericType(ClassName raw, int dims, List<GenericType> args){
 		int len = dims;
 		
 		if(primitive == null){
-			len += 1 + raw.any().length();
+			var t = BaseType.ofPrimitive(raw);
+			if(t != null) len++;
+			else len += 1 + raw.any().length();
 			if(includeGenerics && !args.isEmpty()){
 				for(var arg : args){
 					len += arg.jvmStringLen(true);
 				}
 				len += 2;
 			}
-			len++;
+			if(t == null) len++;
 		}else{
 			len += primitive.length();
 		}
@@ -169,7 +151,10 @@ public record GenericType(ClassName raw, int dims, List<GenericType> args){
 		}
 		
 		if(primitive == null){
-			sb.append('L').append(raw.slashed());
+			var t = BaseType.ofPrimitive(raw);
+			if(t != null) sb.append(t.jvmStr);
+			else sb.append('L').append(raw.slashed());
+			
 			if(includeGenerics && !args.isEmpty()){
 				sb.append('<');
 				for(var arg : args){
@@ -177,7 +162,7 @@ public record GenericType(ClassName raw, int dims, List<GenericType> args){
 				}
 				sb.append('>');
 			}
-			sb.append(';');
+			if(t == null) sb.append(';');
 		}else{
 			sb.append(primitive);
 		}

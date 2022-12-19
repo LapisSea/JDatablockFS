@@ -2,9 +2,7 @@ package com.lapissea.jorth.lang.type;
 
 import com.lapissea.jorth.MalformedJorth;
 
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -29,8 +27,11 @@ public interface KeyedEnum{
 		
 		private static <E extends Enum<E>> Lookup<E> make(Class<E> t){
 			var values = t.getEnumConstants();
-			var names  = HashMap.<String, E>newHashMap(values.length);
-			int count  = 0;
+			return make(t, Arrays.asList(values));
+		}
+		private static <E extends Enum<E>> Lookup<E> make(Class<E> t, Collection<E> values){
+			var names = HashMap.<String, E>newHashMap(values.size());
+			int count = 0;
 			for(var value : values){
 				String key = value instanceof KeyedEnum e? e.key() : value.name().toLowerCase();
 				if(key.length() == 1) count++;
@@ -130,6 +131,24 @@ public interface KeyedEnum{
 		@Override
 		public String toString(){
 			return elsStr("Lookup{", "}");
+		}
+		
+		public Lookup<E> excluding(E... es){
+			if(es.length == 0) return this;
+			
+			var values = EnumSet.copyOf(names.values());
+			if(smolNames != null){
+				for(CNode<E> smolName : smolNames){
+					while(smolName != null){
+						values.add(smolName.val);
+						smolName = smolName.next;
+					}
+				}
+			}
+			for(E e : es){
+				values.remove(e);
+			}
+			return make(type, values);
 		}
 		
 	}

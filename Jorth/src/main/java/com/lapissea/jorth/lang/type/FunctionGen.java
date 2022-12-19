@@ -16,7 +16,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 	
 	public record ArgInfo(GenericType type, String name){ }
 	
-	private record Arg(GenericType type, GenericType.BaseType info, String name, int accessIndex){ }
+	private record Arg(GenericType type, BaseType info, String name, int accessIndex){ }
 	
 	private class CodePath{
 		private final TypeStack stack;
@@ -72,7 +72,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		}
 		
 		public void loadArgumentIns(Arg arg){
-			writer.visitVarInsn(arg.info.loadOp(), arg.accessIndex());
+			writer.visitVarInsn(arg.info.loadOp, arg.accessIndex());
 			stack.push(arg.type);
 		}
 		
@@ -80,7 +80,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 			if(ended) return;
 			ended = true;
 			
-			GenericType.BaseType type;
+			BaseType type;
 			
 			if(returnType != null){
 				var popped = stack.pop();
@@ -90,10 +90,10 @@ public final class FunctionGen implements Endable, FunctionInfo{
 				if(!stack.isEmpty()){
 					throw new MalformedJorth("Returning nothing (void) but there are values " + stack + " on the stack");
 				}
-				type = GenericType.BaseType.VOID;
+				type = BaseType.VOID;
 			}
 			
-			writer.visitInsn(type.returnOp());
+			writer.visitInsn(type.returnOp);
 		}
 		
 		public void swap() throws MalformedJorth{
@@ -104,9 +104,9 @@ public final class FunctionGen implements Endable, FunctionInfo{
 			stack.push(top);
 			stack.push(belowTop);
 			
-			switch(top.getBaseType().slots()){
+			switch(top.getBaseType().slots){
 				case 1 -> {
-					switch(belowTop.getBaseType().slots()){
+					switch(belowTop.getBaseType().slots){
 						case 1 -> writer.visitInsn(SWAP);
 						case 2 -> {
 							writer.visitInsn(DUP_X2);
@@ -116,7 +116,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 					}
 				}
 				case 2 -> {
-					switch(belowTop.getBaseType().slots()){
+					switch(belowTop.getBaseType().slots){
 						case 1 -> {
 							writer.visitInsn(DUP2_X1);
 							writer.visitInsn(POP2);
@@ -136,7 +136,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 			stack.push(type);
 			stack.push(type);
 			var bt = type.getBaseType();
-			writer.visitInsn(switch(bt.slots()){
+			writer.visitInsn(switch(bt.slots){
 				case 1 -> DUP;
 				case 2 -> DUP2;
 				default -> throw new MalformedJorth("Illegal base type: " + bt);
@@ -144,7 +144,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		}
 		public void pop() throws MalformedJorth{
 			var bt = stack.pop().getBaseType();
-			writer.visitInsn(switch(bt.slots()){
+			writer.visitInsn(switch(bt.slots){
 				case 1 -> POP;
 				case 2 -> POP2;
 				default -> throw new MalformedJorth("Illegal base type: " + bt);
@@ -193,7 +193,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		for(ArgInfo value : args){
 			var info = value.type.getBaseType();
 			this.args.put(value.name, new Arg(value.type, info, value.name, counter));
-			counter += info.slots();
+			counter += info.slots;
 		}
 		
 		if(owner.type == ClassType.INTERFACE){
@@ -275,7 +275,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		var index   = stack.pop();
 		var array   = stack.pop();
 		
-		if(!index.getBaseType().arrayIndexCompatible()){
+		if(!index.getBaseType().arrayIndexCompatible){
 			throw new MalformedJorth(index + " can not be used as array index");
 		}
 		if(array.dims() == 0){
@@ -285,7 +285,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 			throw new MalformedJorth("can not store " + element + " in " + array);
 		}
 		
-		writer.visitInsn(element.getBaseType().arrayStoreOP());
+		writer.visitInsn(element.getBaseType().arrayStoreOP);
 	}
 	
 	public void setInstanceOp(String member) throws MalformedJorth{
@@ -342,7 +342,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		var stack = code().stack;
 		if(type.dims()>0){
 			var arraySize = stack.pop();
-			if(!List.of(int.class, short.class, byte.class).contains(arraySize.getBaseType().type())){
+			if(!List.of(int.class, short.class, byte.class).contains(arraySize.getBaseType().type)){
 				throw new MalformedJorth("Array size is not an integer");
 			}
 			if(type.dims()>1) throw new NotImplementedException("Multi array not implemented");//TODO
@@ -460,7 +460,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		
 		var prim = a.getPrimitiveType();
 		if(prim.isPresent()){
-			if(prim.get().loadOp() == ILOAD){
+			if(prim.get().loadOp == ILOAD){
 				branchCompareToBool(checkFor? IF_ICMPNE : IF_ICMPEQ);
 			}else{
 				throw new NotImplementedException();

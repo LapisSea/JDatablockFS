@@ -1,6 +1,7 @@
 package com.lapissea.jorth.lang;
 
 import com.lapissea.jorth.MalformedJorth;
+import com.lapissea.jorth.lang.type.BaseType;
 import com.lapissea.jorth.lang.type.GenericType;
 import com.lapissea.jorth.lang.type.TypeSource;
 
@@ -96,5 +97,9 @@ public final class ClassName{
 	@Override
 	public int hashCode(){
 		return slashed().hashCode();
+	}
+	
+	public BaseType baseType(){
+		return BaseType.of(this);
 	}
 }
