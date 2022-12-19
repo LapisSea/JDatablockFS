@@ -4,6 +4,7 @@ import com.lapissea.jorth.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.jorth.lang.Endable;
 import com.lapissea.jorth.lang.info.FunctionInfo;
+import com.lapissea.util.NotImplementedException;
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.ClassWriter;
 
@@ -306,6 +307,10 @@ public final class ClassGen implements ClassInfo, Endable{
 	public Stream<? extends FunctionInfo> getFunctionsByName(String name){
 		return functions.values().stream().filter(f -> f.name().equals(name));
 	}
+	@Override
+	public Stream<? extends FunctionInfo> getFunctions(){
+		return functions.values().stream();
+	}
 	
 	@Override
 	public String toString(){
@@ -315,5 +320,10 @@ public final class ClassGen implements ClassInfo, Endable{
 	@Override
 	public List<GenericType> interfaces(){
 		return interfaces;
+	}
+	@Override
+	public List<Enum<?>> enumConstantNames(){
+		if(type != ClassType.ENUM) return List.of();
+		throw new NotImplementedException();//TODO
 	}
 }

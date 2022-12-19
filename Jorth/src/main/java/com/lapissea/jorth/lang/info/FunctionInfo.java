@@ -99,6 +99,10 @@ public interface FunctionInfo{
 		public List<GenericType> argumentTypes(){
 			return args;
 		}
+		@Override
+		public Object defaultEnumValue(){
+			return method.getDefaultValue();
+		}
 	}
 	
 	class OfConstructor implements FunctionInfo{
@@ -158,6 +162,10 @@ public interface FunctionInfo{
 		public List<GenericType> argumentTypes(){
 			return args;
 		}
+		@Override
+		public Object defaultEnumValue(){
+			return null;
+		}
 	}
 	
 	static FunctionInfo of(TypeSource source, Method method){
@@ -175,6 +183,7 @@ public interface FunctionInfo{
 	String name();
 	GenericType returnType();
 	List<GenericType> argumentTypes();
+	Object defaultEnumValue();
 	
 	default Signature makeSignature(){
 		return new Signature(name(), argumentTypes());

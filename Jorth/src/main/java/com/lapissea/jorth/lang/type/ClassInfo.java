@@ -45,6 +45,10 @@ public interface ClassInfo{
 			throw NotImplementedException.infer();//TODO: implement OfArray.getFunctionsByName()
 		}
 		@Override
+		public Stream<? extends FunctionInfo> getFunctions(){
+			throw NotImplementedException.infer();//TODO: implement OfArray.getFunctions()
+		}
+		@Override
 		public ClassName name(){
 			return component.raw();
 		}
@@ -62,6 +66,10 @@ public interface ClassInfo{
 		}
 		@Override
 		public List<GenericType> interfaces(){
+			return List.of();
+		}
+		@Override
+		public List<Enum<?>> enumConstantNames(){
 			return List.of();
 		}
 	}
@@ -94,8 +102,10 @@ public interface ClassInfo{
 		
 		@Override
 		public FunctionInfo getFunction(Signature signature) throws MalformedJorth{
-			var f = functions.get(signature);
-			if(f != null) return f;
+			{
+				var f = functions.get(signature);
+				if(f != null) return f;
+			}
 			
 			var args = new Class<?>[signature.args().size()];
 			for(int i = 0; i<signature.args().size(); i++){
@@ -112,24 +122,69 @@ public interface ClassInfo{
 					}
 				}
 			}
-			
-			
-			
 			try{
-				
 				if(signature.name().equals("<init>")){
 					return FunctionInfo.of(source, clazz.getDeclaredConstructor(args));
 				}
-				f = FunctionInfo.of(source, getDeepDeclaredMethod(clazz, signature.name(), args));
-			}catch(ReflectiveOperationException e){
+			}catch(NoSuchMethodException e){
 				throw new MalformedJorth(signature + " does not exist in " + clazz);
 			}
+			
+			Method method = null;
+			try{
+				method = getDeepDeclaredMethod(clazz, signature.name(), args);
+			}catch(ReflectiveOperationException e){
+				funs:
+				for(var info : findByName(signature.name())){
+					var fargs = info.argumentTypes();
+					var sargs = signature.args();
+					if(fargs.size() != sargs.size()){
+						continue;
+					}
+					for(int i = 0; i<sargs.size(); i++){
+						var s = sargs.get(i);
+						var f = fargs.get(i);
+						if(!s.instanceOf(source, f)){
+							continue funs;
+						}
+					}
+					return getFunction(new Signature(info.name(), info.argumentTypes()));
+				}
+			}
+			if(method == null){
+				throw new MalformedJorth(signature + " does not exist in " + clazz);
+			}
+			var f = FunctionInfo.of(source, method);
 			functions.put(signature, f);
 			return f;
 		}
 		@Override
 		public Stream<? extends FunctionInfo> getFunctionsByName(String name){
 			return functionsByName.computeIfAbsent(name, this::findByName).stream();
+		}
+		
+		private boolean allFun;
+		@Override
+		public Stream<? extends FunctionInfo> getFunctions(){
+			if(allFun) return functions.values().stream();
+			
+			Arrays.stream(clazz.getDeclaredConstructors())
+			      .forEach(c -> functions.computeIfAbsent(
+				      new Signature("<init>", Arrays.stream(c.getGenericParameterTypes()).map(GenericType::of).toList()),
+				      m -> new FunctionInfo.OfConstructor(source, c)
+			      ));
+			
+			var c = clazz;
+			while(c != null){
+				Arrays.stream(c.getDeclaredMethods())
+				      .forEach(f -> {
+					      var sig = new Signature(f.getName(), Arrays.stream(f.getGenericParameterTypes()).map(GenericType::of).toList());
+					      functions.computeIfAbsent(sig, s -> FunctionInfo.of(source, f));
+				      });
+				c = c.getSuperclass();
+			}
+			
+			return functions.values().stream();
 		}
 		
 		private List<FunctionInfo> findByName(String name){
@@ -200,11 +255,22 @@ public interface ClassInfo{
 			}
 			return interfaces;
 		}
+		private List<Enum<?>> constants;
+		
+		@Override
+		public List<Enum<?>> enumConstantNames(){
+			if(constants == null){
+				var c = (Enum<?>[])clazz.getEnumConstants();
+				constants = c == null? List.of() : List.of(c);
+			}
+			return constants;
+		}
 	}
 	
 	FieldInfo getField(String name) throws MalformedJorth;
 	FunctionInfo getFunction(Signature signature) throws MalformedJorth;
 	Stream<? extends FunctionInfo> getFunctionsByName(String name);
+	Stream<? extends FunctionInfo> getFunctions();
 	
 	ClassName name();
 	ClassInfo superType() throws MalformedJorth;
@@ -212,4 +278,5 @@ public interface ClassInfo{
 	
 	boolean isFinal();
 	List<GenericType> interfaces();
+	List<Enum<?>> enumConstantNames();
 }

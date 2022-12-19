@@ -579,6 +579,10 @@ public final class FunctionGen implements Endable, FunctionInfo{
 	public List<GenericType> argumentTypes(){
 		return args.values().stream().map(a -> a.type).toList();
 	}
+	@Override
+	public Object defaultEnumValue(){
+		return null;
+	}
 	
 	@Override
 	public String toString(){
