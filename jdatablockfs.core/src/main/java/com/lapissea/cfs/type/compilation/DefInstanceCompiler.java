@@ -13,6 +13,7 @@ import com.lapissea.cfs.type.compilation.CompilationTools.Style;
 import com.lapissea.cfs.type.compilation.ToStringFormat.ToStringFragment.*;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.jorth.BytecodeUtils;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.MalformedJorth;
@@ -343,7 +344,6 @@ public class DefInstanceCompiler{
 						case RAW -> name;
 					};
 					var type = getters.stream().filter(s -> s.varName().equals(name)).findAny().map(FieldStub::type).orElseThrow();
-					var jtyp = JorthUtils.toJorthGeneric(Objects.requireNonNull(TypeLink.of(type)));
 					
 					writer.write(
 						"""
@@ -352,7 +352,7 @@ public class DefInstanceCompiler{
 							end
 							""",
 						setterName,
-						jtyp
+						type
 					);
 				}
 				for(String name : missingGetters){
@@ -361,15 +361,13 @@ public class DefInstanceCompiler{
 						case RAW -> name;
 					};
 					var type = setters.stream().filter(s -> s.varName().equals(name)).findAny().map(FieldStub::type).orElseThrow();
-					var jtyp = JorthUtils.toJorthGeneric(Objects.requireNonNull(TypeLink.of(type)));
-					
 					writer.write(
 						"""
 							function {!}
 								{} returns
 							end
 							""",
-						jtyp,
+						type,
 						getterName
 					);
 				}
@@ -468,11 +466,10 @@ public class DefInstanceCompiler{
 					var set = specials.set.get();
 					
 					for(FieldInfo info : orderedFields.orElseThrow()){
-						var type = Objects.requireNonNull(TypeLink.of(info.type));
 						writer.write(
 							"arg {!} {}",
 							info.name,
-							JorthUtils.toJorthGeneric(type));
+							info.type);
 					}
 					
 					writer.write(
@@ -512,7 +509,7 @@ public class DefInstanceCompiler{
 					}
 				}
 			}
-			
+			BytecodeUtils.printClass(jorth.getClassFile(implName));
 			//noinspection unchecked
 			return (Class<T>)Access.privateLookupIn(interf).defineClass(jorth.getClassFile(implName));
 			
@@ -780,9 +777,8 @@ public class DefInstanceCompiler{
 			writer.write("public function <init>");
 			for(int i = 0; i<orderedFields.size(); i++){
 				FieldInfo info    = orderedFields.get(i);
-				var       type    = JorthUtils.toJorthGeneric(Objects.requireNonNull(TypeLink.of(info.type)));
 				var       argName = "arg" + i;
-				writer.write("arg {!} {}", argName, type);
+				writer.write("arg {!} {}", argName, info.type);
 			}
 			
 			writer.write(
@@ -877,7 +873,6 @@ public class DefInstanceCompiler{
 	}
 	
 	private static void implementUserAccess(CodeStream writer, FieldInfo info) throws MalformedJorth{
-		var jtyp = JorthUtils.toJorthGeneric(Objects.requireNonNull(TypeLink.of(info.type)));
 		
 		var getterName = info.getter.map(s -> s.method().getName()).orElseGet(() -> {
 			var setter = info.setter.orElseThrow();
@@ -905,7 +900,7 @@ public class DefInstanceCompiler{
 				end
 				""",
 			getterName,
-			jtyp,
+			info.type,
 			info.name
 		);
 		
@@ -919,7 +914,7 @@ public class DefInstanceCompiler{
 					get #arg arg1
 				""",
 			setterName,
-			jtyp,
+			info.type,
 			info.name
 		);
 		
@@ -937,8 +932,6 @@ public class DefInstanceCompiler{
 	}
 	
 	private static void defineNoField(CodeStream writer, FieldInfo info) throws MalformedJorth{
-		var jtyp = JorthUtils.toJorthGeneric(Objects.requireNonNull(TypeLink.of(info.type)));
-		
 		var getterName = info.getter.map(v -> v.method().getName()).orElseGet(() -> "get" + TextUtil.firstToUpperCase(info.name));
 		var setterName = info.setter.map(v -> v.method().getName()).orElseGet(() -> "set" + TextUtil.firstToUpperCase(info.name));
 		
@@ -952,39 +945,39 @@ public class DefInstanceCompiler{
 		writeAnnotations(writer, anns);
 		writer.write(
 			"""
-				public visibility
-				{} returns
-				{!} function start
-					#UnsupportedOperationException (0) new throw
+				public function {!}
+					returns {}
+				start
+					new #UnsupportedOperationException
+					throw
 				end
 				""",
-			jtyp,
-			getterName
+			getterName,
+			info.type
 		);
 		
 		writeAnnotations(writer, List.of(valAnn));
 		writer.write(
 			"""
-				public visibility
-				{} arg1 arg
-				{!} function start
-					#UnsupportedOperationException (0) new throw
+				public function {!}
+					arg arg0 {}
+				start
+					new #UnsupportedOperationException
+					throw
 				end
 				""",
-			jtyp,
-			setterName
+			setterName,
+			info.type
 		);
 	}
 	
 	private static void defineField(CodeStream writer, FieldInfo info) throws MalformedJorth{
-		var type = Objects.requireNonNull(TypeLink.of(info.type));
-		
 		writeAnnotations(writer, info.annotations);
 		
 		writer.write(
 			"private field {!} {}",
 			info.name,
-			JorthUtils.toJorthGeneric(type)
+			info.type
 		);
 	}
 	

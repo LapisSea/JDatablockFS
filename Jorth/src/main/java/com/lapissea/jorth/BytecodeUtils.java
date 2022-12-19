@@ -1,4 +1,4 @@
-package com.lapissea.jorth.utils;
+package com.lapissea.jorth;
 
 import com.lapissea.util.ByteBufferBackedInputStream;
 import org.objectweb.asm.ClassReader;

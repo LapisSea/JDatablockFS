@@ -4,6 +4,7 @@ import com.lapissea.jorth.lang.Tokenizer;
 import com.lapissea.jorth.lang.text.CharJoin;
 import com.lapissea.jorth.lang.text.CharSubview;
 
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -37,7 +38,14 @@ public interface CodeStream extends AutoCloseable{
 				if(num == -1) num = iter;
 				
 				if(c2 == '}'){
-					var str = Objects.toString(objs[num]);
+					var obj = objs[num];
+					var str = switch(obj){
+						case Type t -> {
+							if(escape) throw new IllegalArgumentException("Types should not be escaped");
+							yield JorthUtils.toJorthGeneric(t);
+						}
+						default -> Objects.toString(obj);
+					};
 					objs[num] = str;
 					
 					if(escape) str = Tokenizer.escape(str);
@@ -78,6 +86,11 @@ public interface CodeStream extends AutoCloseable{
 		return write(join);
 	}
 	
+	default void addImports(Class<?>... classes){
+		for(Class<?> clazz : classes){
+			addImport(clazz);
+		}
+	}
 	default void addImport(Class<?> clazz){
 		addImport(clazz.getName());
 	}

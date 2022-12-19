@@ -1,6 +1,5 @@
 package com.lapissea.jorth;
 
-import com.lapissea.jorth.utils.BytecodeUtils;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeConsumer;
 
