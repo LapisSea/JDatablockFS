@@ -7,14 +7,18 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Optional;
 
 import static com.lapissea.jorth.TestUtils.generateAndLoadInstance;
 import static com.lapissea.jorth.TestUtils.generateAndLoadInstanceSimple;
 import static org.testng.AssertJUnit.assertEquals;
 import static org.testng.AssertJUnit.assertFalse;
 import static org.testng.AssertJUnit.assertTrue;
+import static org.testng.internal.junit.ArrayAsserts.assertArrayEquals;
 
 public class JorthTests{
 	
@@ -361,6 +365,11 @@ public class JorthTests{
 		String lol();
 	}
 	
+	@Retention(RetentionPolicy.RUNTIME)
+	public @interface EnumAnn{
+		RetentionPolicy value();
+	}
+	
 	static class ay{
 		
 		@DefaultAnn(1234)
@@ -369,6 +378,47 @@ public class JorthTests{
 		public String     a;
 		public String[]   b;
 		public String[][] c;
+	}
+	
+	@Test
+	void defaultAnnotation() throws ReflectiveOperationException{
+		
+		var className = "jorth.Gen$$";
+		
+		var cls = generateAndLoadInstanceSimple(className, writer -> {
+			writer.addImportAs(DefaultAnn.class, "Ann");
+			writer.write(
+				"""
+					@ #Ann start value 321 end
+					public field a #String
+					
+					@ #Ann
+					public field b #String
+					"""
+			);
+		});
+		var a = (DefaultAnn)cls.getField("a").getDeclaredAnnotations()[0];
+		var b = (DefaultAnn)cls.getField("b").getDeclaredAnnotations()[0];
+		assertEquals(321, a.value());
+		assertEquals(123, b.value());
+	}
+	
+	@Test
+	void enumAnnotation() throws ReflectiveOperationException{
+		
+		var className = "jorth.Gen$$";
+		
+		var cls = generateAndLoadInstanceSimple(className, writer -> {
+			writer.addImportAs(EnumAnn.class, "Ann");
+			writer.write(
+				"""
+					@ #Ann start value CLASS end
+					public field a #String
+					"""
+			);
+		});
+		EnumAnn a = (EnumAnn)cls.getField("a").getDeclaredAnnotations()[0];
+		assertEquals(RetentionPolicy.CLASS, a.value());
 	}
 	
 	@Test
@@ -581,5 +631,22 @@ public class JorthTests{
 		
 		LogUtil.println(cls, "says", str);
 		assertEquals(expectedStr, str);
+	}
+	
+	@Test
+	void genericField() throws Exception{
+		var cls = generateAndLoadInstanceSimple("jorth.Gen$$", writer -> {
+			writer.addImport(Optional.class);
+			writer.write(
+				"""
+					field optStr #Optional<#String>
+					"""
+			);
+		});
+		
+		var generic = (ParameterizedType)cls.getField("optStr").getGenericType();
+		
+		assertEquals(Optional.class, generic.getRawType());
+		assertArrayEquals(new Type[]{String.class}, generic.getActualTypeArguments());
 	}
 }
