@@ -4,6 +4,7 @@ import com.lapissea.jorth.lang.*;
 import com.lapissea.jorth.lang.type.*;
 import com.lapissea.util.NotImplementedException;
 
+import java.lang.reflect.Array;
 import java.util.*;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
@@ -50,10 +51,11 @@ public final class Jorth extends CodeDestination{
 	}
 	
 	private Optional<ClassInfo> generatedClassInfo(GenericType type){
+		if(currentClass == null) return Optional.empty();
 		var name = type.raw();
 		name = importsFun.apply(name);
 		
-		if(currentClass == null || !currentClass.name.equals(name)){
+		if(!currentClass.name.equals(name)){
 			return Optional.empty();
 		}
 		if(type.dims()>0){
@@ -340,6 +342,16 @@ public final class Jorth extends CodeDestination{
 					throw new MalformedJorth("Used non annotation class " + annType + " as annotation");
 				}
 				
+				record EnumValue(GenericType type, Object val){ }
+				
+				var typeMap = new HashMap<String, EnumValue>();
+				
+				tInfo.getFunctions().filter(m -> {
+					if(m.name().equals("annotationType")) return false;
+					var n = m.owner().name();
+					return n.equals(annType);
+				}).forEach(f -> typeMap.put(f.name(), new EnumValue(f.returnType(), f.defaultEnumValue())));
+				
 				var hasStart = optionalStart(source);
 				
 				var args = new HashMap<String, Object>();
@@ -351,24 +363,10 @@ public final class Jorth extends CodeDestination{
 							throw new MalformedJorth("Duplicate field name in enum");
 						}
 						
+						var type = typeMap.get(name);
+						if(type == null) throw new MalformedJorth(name + " does not exist in " + annType);
 						
-						var tok = source.readTokenOrBracketSet(true, '[');
-						
-						Object value;
-						
-						var set = tok.as(Token.BracketedSet.class);
-						if(set.isPresent()){
-							value = set.get().singleTypeUnpack();
-						}else{
-							value = switch(tok){
-								case Token.NumToken t -> t.getNum();
-								case Token.StrValue t -> t.value();
-								case Token.Bool t -> t.value();
-								default -> throw new MalformedJorth("Illegal token " + tok + " inside enum argument block");
-							};
-						}
-						
-						args.put(name, value);
+						args.put(name, readValue(type.type, source));
 					}
 				}
 				
@@ -379,6 +377,73 @@ public final class Jorth extends CodeDestination{
 			}
 		}
 		return true;
+	}
+	
+	
+	private Object readValue(GenericType type, TokenSource source) throws MalformedJorth{
+		if(type.dims() == 0){
+			return readValue(type.raw(), source);
+		}
+		return parseBracketSet(type.raw(), type.dims(), source.bracketSet('['));
+	}
+	
+	private Object parseBracketSet(ClassName type, int dims, Token.BracketedSet source) throws MalformedJorth{
+		var t = type.baseType().type;
+		for(int i = 1; i<dims; i++){
+			t = t.arrayType();
+		}
+		var arr = Array.newInstance(t, source.contents().size());
+		
+		if(dims>1){
+			for(int i = 0; i<source.contents().size(); i++){
+				Array.set(arr, i, parseBracketSet(type, dims - 1, source.contents().get(i).requireAs(Token.BracketedSet.class)));
+			}
+		}else{
+			for(int i = 0; i<source.contents().size(); i++){
+				var v = source.contents().get(i);
+				Array.set(arr, i, readValue(type, TokenSource.of(() -> v)));
+			}
+		}
+		return arr;
+	}
+	private Object readValue(ClassName type, TokenSource source) throws MalformedJorth{
+		return switch(BaseType.of(type)){
+			case OBJ -> {
+				var info = typeSource.byName(type);
+				if(info.type() == ClassType.ENUM){
+					for(Enum<?> e : info.enumConstantNames()){
+						if(source.consumeTokenIfIsText(e.name())){
+							yield e;
+						}
+					}
+					
+					String t;
+					try{
+						t = source.readToken().toString();
+					}catch(EndOfCode e){
+						t = "<EOC>";
+					}
+					throw new MalformedJorth("Expected any of " + info.enumConstantNames() + " but got " + t);
+				}else{
+					if(type.equals(ClassName.of(String.class))){
+						yield source.readToken().requireAs(Token.StrValue.class).value();
+					}
+					if(type.equals(ClassName.of(Class.class))){
+						yield source.readClassName(importsFun);
+					}
+					throw new MalformedJorth("Unknown type: " + type);
+				}
+			}
+			case CHAR -> source.readChar();
+			case BYTE -> (byte)source.readInt();
+			case SHORT -> (short)source.readInt();
+			case INT -> source.readInt();
+			case LONG -> (long)source.readInt();
+			case FLOAT -> source.readFloat();
+			case DOUBLE -> (double)source.readFloat();
+			case BOOLEAN -> source.readBool();
+			case VOID -> throw new IllegalArgumentException();
+		};
 	}
 	
 	private void functionKeyword(TokenSource source, Keyword keyword) throws MalformedJorth{

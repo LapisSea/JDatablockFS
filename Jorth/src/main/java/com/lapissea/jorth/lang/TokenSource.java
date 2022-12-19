@@ -5,16 +5,60 @@ import com.lapissea.jorth.EndOfCode;
 import com.lapissea.jorth.MalformedJorth;
 import com.lapissea.jorth.lang.type.GenericType;
 import com.lapissea.jorth.lang.type.KeyedEnum;
-import com.lapissea.util.ZeroArrays;
+import com.lapissea.util.function.UnsafeSupplier;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 public interface TokenSource{
+	
+	
+	static TokenSource of(UnsafeSupplier<Token, MalformedJorth> tokenStream){
+		return new TokenSource(){
+			private MalformedJorth e;
+			private Token next;
+			
+			private void readNext(){
+				if(next != null) return;
+				try{
+					next = tokenStream.get();
+				}catch(MalformedJorth e){
+					this.e = e;
+				}
+			}
+			
+			@Override
+			public boolean hasMore(){
+				readNext();
+				return !(e instanceof EndOfCode);
+			}
+			@Override
+			public Token readToken() throws MalformedJorth{
+				readNext();
+				if(e != null) throw e;
+				var n = next;
+				next = null;
+				return n;
+			}
+			@Override
+			public Token peekToken() throws MalformedJorth{
+				readNext();
+				if(e != null) throw e;
+				return next;
+			}
+			@Override
+			public int line(){
+				readNext();
+				return next != null? next.line() : -1;
+			}
+		};
+	}
 	
 	static TokenSource listen(TokenSource source, Consumer<Token> listener){
 		return new TokenSource(){
@@ -52,8 +96,8 @@ public interface TokenSource{
 				return e.value();
 			}
 			@Override
-			public Token readTokenOrBracketSet(boolean allowEmpty, char... allowed) throws MalformedJorth{
-				var t = source.readTokenOrBracketSet(allowEmpty, allowed);
+			public Token.BracketedSet bracketSet(char... allowed) throws MalformedJorth{
+				var t = source.bracketSet(allowed);
 				t.as(Token.BracketedSet.class).ifPresentOrElse(b -> {
 					listener.accept(new Token.SmolWord(b.line(), b.type().open));
 					var c = b.contents();
@@ -109,6 +153,18 @@ public interface TokenSource{
 		}
 	}
 	
+	default int readChar() throws MalformedJorth{
+		return readToken().requireAs(Token.SmolWord.class).value();
+	}
+	default int readInt() throws MalformedJorth{
+		return readToken().requireAs(Token.NumToken.IntVal.class).value();
+	}
+	default float readFloat() throws MalformedJorth{
+		return readToken().requireAs(Token.NumToken.FloatVal.class).value();
+	}
+	default boolean readBool() throws MalformedJorth{
+		return readToken().requireAs(Token.Bool.class).value();
+	}
 	default String readWord() throws MalformedJorth{
 		return readToken().requireAs(Token.Word.class).value();
 	}
@@ -153,14 +209,15 @@ public interface TokenSource{
 		return new GenericType(raw, dims, args);
 	}
 	
-	default Token readTokenOrBracketSet(boolean allowEmpty) throws MalformedJorth{
-		return readTokenOrBracketSet(allowEmpty, ZeroArrays.ZERO_CHAR);
-	}
-	default Token readTokenOrBracketSet(boolean allowEmpty, char... allowed) throws MalformedJorth{
+	default Token.BracketedSet bracketSet(char... allowed) throws MalformedJorth{
 		var token   = readToken();
 		var bracket = token.as(Token.SmolWord.class).map(c -> BracketType.byOpen(c.value())).filter(Optional::isPresent).map(Optional::get);
-		
-		if(bracket.isEmpty()) return token;
+		if(bracket.isEmpty()){
+			var options = allowed.length == 0
+			              ? Arrays.stream(BracketType.values()).map(c -> c.openStr).collect(Collectors.joining(", "))
+			              : allowed;
+			throw new MalformedJorth("Expected any of " + options + " but got " + token);
+		}
 		var type = bracket.get();
 		
 		find:
@@ -174,10 +231,11 @@ public interface TokenSource{
 		var contents = new ArrayList<Token>();
 		
 		while(!consumeTokenIfIsText(type.close)){
+			if(peekToken().as(Token.SmolWord.class).filter(s -> s.is(type.open)).isPresent()){
+				contents.add(bracketSet(allowed));
+				continue;
+			}
 			contents.add(readToken());
-		}
-		if(!allowEmpty && contents.isEmpty()){
-			throw new MalformedJorth("Empty " + type.openStr + type.closeStr + " is not allowed");
 		}
 		return new Token.BracketedSet(token.line(), type, List.copyOf(contents));
 	}
