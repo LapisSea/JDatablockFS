@@ -216,7 +216,6 @@ public final class ClassGen implements ClassInfo, Endable{
 			for(var e : annotation.args().entrySet()){
 				var argName  = e.getKey();
 				var argValue = e.getValue();
-				
 				if(argValue.getClass().isArray()){
 					var arrAnn = annWriter.visitArray(argName);
 					for(int i = 0; i<Array.getLength(argValue); i++){
@@ -225,7 +224,7 @@ public final class ClassGen implements ClassInfo, Endable{
 					arrAnn.visitEnd();
 					
 				}else if(argValue instanceof Enum<?> eVal){
-					annWriter.visitEnum(argName, GenericType.of(e.getClass()).jvmSignatureStr(), eVal.name());
+					annWriter.visitEnum(argName, GenericType.of(eVal.getClass()).jvmSignatureStr(), eVal.name());
 				}else{
 					annWriter.visit(argName, argValue);
 				}

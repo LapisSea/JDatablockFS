@@ -35,7 +35,7 @@ public class Tokenizer implements CodeStream, TokenSource{
 	}
 	
 	static{
-		"[]{}',;/<>".chars().forEach(SPECIALS::set);
+		"[]{}',;/<>@".chars().forEach(SPECIALS::set);
 	}
 	
 	private enum WorkerState{
@@ -162,24 +162,24 @@ public class Tokenizer implements CodeStream, TokenSource{
 	public CodeStream write(CharSequence code) throws MalformedJorth{
 		if(transformed == null) transformed = dad.transform(this);
 		synchronized(this){
-			writeError();
+			writeError("<previous>");
 			codeBuffer.addLast(code);
 			setWorkerState(WorkerState.READ);
 		}
 		if(SYNCHRONOUS_SAFETY){
-			while(workerState != WorkerState.WAIT){
+			while(workerState != WorkerState.WAIT && workerState != WorkerState.WAIT_HOT){
 				UtilL.sleep(1);
-				writeError();
+				writeError(code);
 			}
-			writeError();
+			writeError(code);
 		}
 		return this;
 	}
-	private void writeError(){
+	private void writeError(CharSequence code){
 		try{
 			checkWorkerError();
 		}catch(Throwable e){
-			throw new RuntimeException(e);
+			throw new RuntimeException("\n" + code, e);
 		}
 	}
 	

@@ -175,4 +175,8 @@ public interface FunctionInfo{
 	String name();
 	GenericType returnType();
 	List<GenericType> argumentTypes();
+	
+	default Signature makeSignature(){
+		return new Signature(name(), argumentTypes());
+	}
 }

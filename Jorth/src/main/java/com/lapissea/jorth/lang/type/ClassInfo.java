@@ -133,7 +133,7 @@ public interface ClassInfo{
 		}
 		
 		private List<FunctionInfo> findByName(String name){
-			var result = new HashMap<String, FunctionInfo>();
+			var result = new ArrayList<FunctionInfo>();
 			
 			if(name.equals("<init>")){
 				var ctors = clazz.getDeclaredConstructors();
@@ -144,24 +144,15 @@ public interface ClassInfo{
 			while(c != null){
 				Arrays.stream(c.getDeclaredMethods())
 				      .filter(f -> f.getName().equals(name))
-				      .filter(f -> result.containsKey(f.getName()))
 				      .forEach(f -> {
-					      var n = f.getName();
-					      functions.entrySet().stream()
-					               .filter(s -> s.getKey().name().equals(n))
-					               .findAny().map(Map.Entry::getValue)
-					               .ifPresentOrElse(
-						               info -> result.put(info.name(), info),
-						               () -> {
-							               var info = FunctionInfo.of(source, f);
-							               functions.put(new Signature(info.name(), Arrays.stream(f.getGenericParameterTypes()).map(GenericType::of).toList()), info);
-							               result.put(info.name(), info);
-						               });
+					      var sig  = new Signature(name, Arrays.stream(f.getGenericParameterTypes()).map(GenericType::of).toList());
+					      var info = functions.computeIfAbsent(sig, s -> FunctionInfo.of(source, f));
+					      result.add(info);
 				      });
 				c = c.getSuperclass();
 			}
 			
-			return List.copyOf(result.values());
+			return List.copyOf(result);
 		}
 		
 		private ClassLoader getLoader(){

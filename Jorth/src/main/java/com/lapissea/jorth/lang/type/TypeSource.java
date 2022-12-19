@@ -37,24 +37,35 @@ public interface TypeSource{
 		
 		@Override
 		public Optional<ClassInfo> maybeByType(GenericType type){
-			var primitive = type.getPrimitiveType();
-			if(primitive.isPresent()){
-				return Optional.of(new ClassInfo.OfClass(this, primitive.get().type()));
-			}
 			var name   = type.raw().dotted();
 			var cached = cache.get(name);
 			if(cached != null) return cached;
 			
-			try{
-				var cls = Class.forName(name, false, classLoader);
-				for(int i = 0; i<type.dims(); i++){
-					cls = cls.arrayType();
+			var t = maybeByType0(type);
+			cache.put(name, t);
+			return t;
+		}
+		private Optional<ClassInfo> maybeByType0(GenericType type){
+			
+			var primitive = type.getPrimitiveType();
+			if(primitive.isPresent()){
+				return Optional.of(new ClassInfo.OfClass(this, primitive.get().type()));
+			}
+			
+			if(type.dims()>0){
+				try{
+					return Optional.of(new ClassInfo.OfArray(this, type.withDims(type.dims() - 1)));
+				}catch(MalformedJorth e){
+					throw new RuntimeException(e);
 				}
-				var result = Optional.<ClassInfo>of(new ClassInfo.OfClass(this, cls));
-				cache.put(name, result);
-				return result;
+			}
+			
+			try{
+				
+				var name = type.raw().dotted();
+				var cls  = Class.forName(name, false, classLoader);
+				return Optional.of(new ClassInfo.OfClass(this, cls));
 			}catch(ClassNotFoundException e){
-				cache.put(name, Optional.empty());
 				return Optional.empty();
 			}
 		}

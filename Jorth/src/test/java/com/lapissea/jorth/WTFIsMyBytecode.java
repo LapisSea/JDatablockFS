@@ -1,6 +1,10 @@
 package com.lapissea.jorth;
 
+import java.util.List;
+
 public class WTFIsMyBytecode{
+	
+	List<String> strs;
 	
 	static{
 		int a = 0;

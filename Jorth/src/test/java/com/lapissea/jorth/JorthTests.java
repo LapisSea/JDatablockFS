@@ -346,17 +346,17 @@ public class JorthTests{
 	}
 	
 	@Retention(RetentionPolicy.RUNTIME)
-	@interface ValueAnn{
+	public @interface ValueAnn{
 		int value();
 	}
 	
 	@Retention(RetentionPolicy.RUNTIME)
-	@interface DefaultAnn{
+	public @interface DefaultAnn{
 		int value() default 123;
 	}
 	
 	@Retention(RetentionPolicy.RUNTIME)
-	@interface MultiAnn{
+	public @interface MultiAnn{
 		int value();
 		String lol();
 	}
