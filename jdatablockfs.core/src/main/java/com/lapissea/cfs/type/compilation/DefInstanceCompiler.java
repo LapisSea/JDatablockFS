@@ -17,7 +17,10 @@ import com.lapissea.jorth.BytecodeUtils;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.MalformedJorth;
-import com.lapissea.util.*;
+import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.ShouldNeverHappenError;
+import com.lapissea.util.TextUtil;
+import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeBiConsumer;
 import com.lapissea.util.function.UnsafeConsumer;
 
@@ -423,7 +426,7 @@ public class DefInstanceCompiler{
 		var implName = interf.getName() + IOInstance.Def.IMPL_NAME_POSTFIX + names.map(n -> n.stream().collect(Collectors.joining("_", "€€fields~", ""))).orElse("");
 		
 		try{
-			var jorth = new Jorth(interf.getClassLoader(), s -> LogUtil.print(s + " "));
+			var jorth = new Jorth(interf.getClassLoader(), null);
 			
 			jorth.addImportAs(implName, "typ.impl");
 			jorth.addImportAs(interf.getName(), "typ.interf");
@@ -508,6 +511,7 @@ public class DefInstanceCompiler{
 						break stringSaga;
 					}
 				}
+				writer.write("end");
 			}
 			BytecodeUtils.printClass(jorth.getClassFile(implName));
 			//noinspection unchecked
@@ -573,12 +577,11 @@ public class DefInstanceCompiler{
 			}else{
 				writer.write(
 					"""
-						public visibility
-						function toShortString
+						public function toShortString
 							returns #String
 						start
 							get this this
-							call toString start end
+							call toString
 						end
 						""");
 			}
@@ -589,11 +592,10 @@ public class DefInstanceCompiler{
 		
 		writer.write(
 			"""
-				public visibility
-				function {!}
+				public function {!}
 					returns #String
 				 start
-					#StringBuilder (0) new start end
+					new #StringBuilder
 				""",
 			name
 		);
@@ -618,7 +620,7 @@ public class DefInstanceCompiler{
 		
 		writer.write(
 			"""
-					call toString start end
+					call toString
 				end
 				""");
 	}
@@ -666,9 +668,9 @@ public class DefInstanceCompiler{
 				var field = fieldInfo.stream().filter(n -> n.name.equals(frag.name())).findFirst().orElseThrow();
 				append(writer, w -> w.write(
 					"""
-						get this {!}
-						access static
-						call #String valueOf
+						static call #String valueOf start
+							get this {!}
+						end
 						""", field.name));
 			}
 			case OptionalBlock f -> {
@@ -683,11 +685,10 @@ public class DefInstanceCompiler{
 		
 		writer.write(
 			"""
-				public visibility
-				function {!}
+				public function {!}
 					returns #String
 				start
-					#StringBuilder new start end
+					new #StringBuilder
 				""",
 			name
 		);
@@ -720,14 +721,17 @@ public class DefInstanceCompiler{
 			if(toStrAnn.fNames()){
 				append(writer, w -> w.write("'{}: '", info.name));
 			}
-			append(writer, w -> w.write(
-				"""
-					get this {}
-					access static
-					call #String valueOf
-					""",
-				info.name
-			));
+			
+			append(writer, w -> {
+				w.write(
+					"""
+						static call #String valueOf start
+							get this {!}
+						end
+						""",
+					info.name
+				);
+			});
 		}
 		
 		if(toStrAnn.curly()){
@@ -744,8 +748,7 @@ public class DefInstanceCompiler{
 	private static void append(CodeStream writer, UnsafeConsumer<CodeStream, MalformedJorth> val) throws MalformedJorth{
 		writer.write(
 			"""
-				call append
-				start
+				call append start
 				""");
 		val.accept(writer);
 		writer.write("end");
@@ -763,7 +766,7 @@ public class DefInstanceCompiler{
 		
 		for(FieldInfo info : fieldInfo){
 			if(info.type != ChunkPointer.class) continue;
-			writer.write("access static get #ChunkPointer NULL");
+			writer.write("get #ChunkPointer NULL");
 			writer.write("set this {!}", info.name);
 		}
 		writer.write("end");
@@ -785,9 +788,7 @@ public class DefInstanceCompiler{
 				"""
 					start
 						super start
-							get this this
-							access static
-							get #typ.impl $STRUCT get
+							get #typ.impl $STRUCT
 						end
 					""");
 			
@@ -804,7 +805,7 @@ public class DefInstanceCompiler{
 				if(!included){
 					continue;
 				}
-				writer.write("this").write(info.name).write("set");
+				writer.write("set this {!}", info.name);
 			}
 			writer.write("end");
 		}
@@ -1010,8 +1011,9 @@ public class DefInstanceCompiler{
 	private static void nullCheck(CodeStream writer) throws MalformedJorth{
 		writer.write(
 			"""
-				dup
-				#Objects requireNonNull (1) static call
+				static call #Objects requireNonNull start
+					dup
+				end
 				pop
 				""");
 	}

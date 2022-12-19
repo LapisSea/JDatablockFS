@@ -5,7 +5,6 @@ import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.IOTypeDB;
 import com.lapissea.cfs.type.TypeDef;
-import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.access.AnnotatedType;
 import com.lapissea.cfs.type.field.annotations.IODependency;
@@ -16,7 +15,6 @@ import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.MalformedJorth;
 import com.lapissea.util.LogUtil;
-import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.WeakValueHashMap;
 import com.lapissea.util.function.UnsafeBiConsumer;
@@ -27,11 +25,14 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 import static com.lapissea.util.ConsoleColors.*;
 
 public final class TemplateClassLoader extends ClassLoader{
+	
+	static{
+		registerAsParallelCapable();
+	}
 	
 	private record TypeNamed(String name, TypeDef def){ }
 	
@@ -112,91 +113,58 @@ public final class TemplateClassLoader extends ClassLoader{
 	}
 	
 	private void generateIOInstance(TypeNamed classType, CodeStream writer) throws MalformedJorth{
-		
-		writer.write("#TOKEN(0) genClassName      define", classType.name);
-		writer.write("#TOKEN(0) IOInstance.Def    define", IOInstance.Def.class.getName());
-		writer.write("#TOKEN(0) IOValue           define", IOValue.class.getName());
-		writer.write("#TOKEN(0) IONullability     define", IONullability.class.getName());
-		writer.write("#TOKEN(0) IODynamic         define", IODynamic.class.getName());
-		writer.write("#TOKEN(0) IODependency      define", IODependency.class.getName());
-		writer.write("#TOKEN(0) IODependency      define", IODependency.class.getName());
-		writer.write("#TOKEN(0) IOValue.Reference define", IOValue.Reference.class.getName());
-		writer.write("#TOKEN(0) IOValue.Unsigned  define", IOValue.Unsigned.class.getName());
+		writer.addImportAs(classType.name, "genClassName");
+		writer.addImports(
+			IOInstance.Def.class,
+			IOValue.class,
+			IONullability.class,
+			IODynamic.class,
+			IODependency.class,
+			IOValue.Reference.class,
+			IOValue.Unsigned.class
+		);
 		
 		writer.write(
 			"""
-				[genClassName] IOInstance.Def implements
-				public visibility
-				genClassName interface start
+				implements #IOInstance.Def<#genClassName>
+				public interface #genClassName start
 				"""
 		);
 		
 		for(var field : classType.def.getFields()){
-			var type = toJorthGeneric(field.getType());
-			
 			if(IONullability.NullLogic.canHave(new AnnotatedType.Simple(
 				field.isDynamic()? List.of(IOFieldTools.makeAnnotation(IODynamic.class)) : List.of(),
 				field.getType().getTypeClass(db)
 			))){
-				writer.write("{#TOKEN(0)} IONullability @", field.getNullability().toString());
+				writer.write("@#IONullability start value {!} end", field.getNullability().toString());
 			}
 			if(field.isDynamic()){
-				writer.write("IODynamic @");
+				writer.write("@#IODynamic");
 			}
 			if(field.isUnsigned()){
-				writer.write("IOValue.Unsigned @");
+				writer.write("@#IOValue.Unsigned");
 			}
 			if(field.getReferenceType() != null){
-				writer.write("{#TOKEN(0) dataPipeType} IOValue.Reference @", field.getReferenceType().toString());
+				writer.write("@#IOValue.Reference start dataPipeType {!} end", field.getReferenceType().toString());
 			}
 			if(!field.getDependencies().isEmpty()){
-				writer.write("{#RAW(0)} IODependency @", field.getDependencies().stream().collect(Collectors.joining(" ", "[", "]")));
+				writer.write(" @#IODependency start value [");
+				for(String dependency : field.getDependencies()){
+					writer.write("'{}'", dependency);
+				}
+				writer.write("] end");
 			}
 			
 			writer.write(
 				"""
-					#RAW(0) returns
-					#TOKEN(1) function
+					function {!}
+						returns {}
+					end
 					""",
-				type,
-				field.getName());
+				field.getName(),
+				field.getType().generic(db));
 		}
-	}
-	
-	private String toJorthGeneric(TypeLink typ){
-		StringBuilder sb = new StringBuilder();
-		if(typ.argCount()>0){
-			sb.append("[");
-			for(int i = 0; i<typ.argCount(); i++){
-				var arg = typ.arg(i);
-				sb.append(toJorthGeneric(arg)).append(" ");
-			}
-			sb.append("] ");
-		}
-		if(typ.getTypeName().startsWith("[")){
-			var nam = typ.getTypeName();
-			while(nam.startsWith("[")){
-				sb.append("array ");
-				nam = nam.substring(1);
-			}
-			sb.append(switch(nam){
-				case "B" -> "byte";
-				case "S" -> "short";
-				case "I" -> "int";
-				case "J" -> "long";
-				case "F" -> "float";
-				case "D" -> "double";
-				case "C" -> "char";
-				case "Z" -> "boolean";
-				default -> {
-					if(!nam.startsWith("L") || !nam.endsWith(";")) throw new NotImplementedException("Unknown type: " + nam);
-					yield nam.substring(1, nam.length() - 1);
-				}
-			});
-			return sb.toString();
-		}
-		sb.append(typ.getTypeName());
-		return sb.toString();
+		writer.write("end");
 	}
 	
 	private TypeDef getDef(String name) throws ClassNotFoundException{
