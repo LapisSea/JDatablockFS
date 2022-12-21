@@ -36,7 +36,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		
 		public void getFieldIns(FieldInfo field) throws MalformedJorth{
 			var owner = field.owner();
-			var type  = field.type();
+			var type  = field.type().withoutArgs();
 			
 			if(!field.isStatic()){
 				var stackOwnerType = stack.pop().raw();
@@ -51,11 +51,11 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		
 		public void setFieldIns(FieldInfo field) throws MalformedJorth{
 			var owner = field.owner();
-			var type  = field.type();
+			var type  = field.type().withoutArgs();
 			
 			stack.requireElements(field.isStatic()? 1 : 2);
 			
-			var valueType = stack.pop();
+			var valueType = stack.pop().withoutArgs();
 			
 			if(!valueType.instanceOf(typeSource, type)){
 				throw new ClassCastException(valueType + " not compatible with " + type);
