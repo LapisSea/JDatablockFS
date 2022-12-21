@@ -1,5 +1,6 @@
 package com.lapissea.cfs.run.sparseimage;
 
+import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.run.Configuration;
 import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
@@ -10,9 +11,17 @@ import java.io.IOException;
 import java.util.Random;
 import java.util.stream.LongStream;
 
+import static com.lapissea.util.LogUtil.Init.USE_CALL_POS;
+import static com.lapissea.util.LogUtil.Init.USE_CALL_THREAD;
+import static com.lapissea.util.LogUtil.Init.USE_TABULATED_HEADER;
+import static com.lapissea.util.LogUtil.Init.USE_TIME_DELTA;
+
 public class SparseImage{
 	
-	public static void main(String[] args) throws IOException{
+	public static void main(String[] args) throws Exception{
+		
+		if(GlobalConfig.DEBUG_VALIDATION) LogUtil.Init.attach(USE_CALL_POS|USE_CALL_THREAD|USE_TIME_DELTA|USE_TABULATED_HEADER);
+		
 		var config = new Configuration();
 		config.load(new Configuration.Loader.JsonArgs(new File("SparseImage.json"), true));
 		config.load(new Configuration.Loader.DashedNameValueArgs(args));
@@ -22,9 +31,6 @@ public class SparseImage{
 	}
 	
 	public static void main(Configuration.View args) throws IOException{
-		
-		LogUtil.Init.attach(0);
-		
 		String sessionName = "default";
 		var    logger      = LoggedMemoryUtils.createLoggerFromConfig();
 		

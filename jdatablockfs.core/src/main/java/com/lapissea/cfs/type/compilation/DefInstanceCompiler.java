@@ -17,7 +17,10 @@ import com.lapissea.jorth.BytecodeUtils;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.MalformedJorth;
-import com.lapissea.util.*;
+import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.ShouldNeverHappenError;
+import com.lapissea.util.TextUtil;
+import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeBiConsumer;
 import com.lapissea.util.function.UnsafeConsumer;
 
@@ -422,8 +425,9 @@ public class DefInstanceCompiler{
 		var names    = key.includeNames;
 		var implName = interf.getName() + IOInstance.Def.IMPL_NAME_POSTFIX + names.map(n -> n.stream().collect(Collectors.joining("_", "€€fields~", ""))).orElse("");
 		
+		var log = PRINT_BYTECODE? new StringJoiner(" ") : null;
 		try{
-			var jorth = new Jorth(interf.getClassLoader(), null);
+			var jorth = new Jorth(interf.getClassLoader(), PRINT_BYTECODE? log::add : null);
 			
 			jorth.addImportAs(implName, "typ.impl");
 			jorth.addImportAs(interf.getName(), "typ.interf");
@@ -511,7 +515,10 @@ public class DefInstanceCompiler{
 			}
 			
 			var file = jorth.getClassFile(implName);
-			if(PRINT_BYTECODE) BytecodeUtils.printClass(file);
+			if(PRINT_BYTECODE){
+				Log.log(log.toString());
+				BytecodeUtils.printClass(file);
+			}
 			//noinspection unchecked
 			return (Class<T>)Access.privateLookupIn(interf).defineClass(file);
 			
