@@ -231,6 +231,16 @@ public abstract class StagedInit{
 		}
 		
 		long start = System.nanoTime();
+		
+		while(System.nanoTime() - start<2*1_000_000L){
+			Thread.onSpinWait();
+			if(this.state>=state){
+				checkErr();
+				return;
+			}
+			Thread.yield();
+		}
+		
 		while(true){
 			synchronized(lock){
 				checkErr();
