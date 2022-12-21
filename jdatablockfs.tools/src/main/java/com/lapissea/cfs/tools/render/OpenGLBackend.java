@@ -4,14 +4,12 @@ import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.tools.AtlasFont;
 import com.lapissea.cfs.tools.DrawFont;
 import com.lapissea.cfs.tools.MSDFAtlas;
-import com.lapissea.glfw.GlfwMonitor;
 import com.lapissea.glfw.GlfwWindow;
 import com.lapissea.util.MathUtil;
 import com.lapissea.util.UtilL;
 import imgui.ImGui;
 import imgui.gl3.ImGuiImplGl3;
 import org.lwjgl.glfw.GLFWErrorCallback;
-import org.lwjgl.opengl.GL;
 
 import java.awt.Color;
 import java.awt.geom.AffineTransform;
@@ -22,8 +20,12 @@ import java.util.LinkedList;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
+import static com.lapissea.glfw.GlfwWindow.Initializer.OpenGLSurfaceAPI.Profile.CORE;
 import static com.lapissea.util.UtilL.async;
-import static org.lwjgl.glfw.GLFW.*;
+import static org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT;
+import static org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_MIDDLE;
+import static org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_RIGHT;
+import static org.lwjgl.glfw.GLFW.glfwSwapInterval;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL20.glUseProgram;
 import static org.lwjgl.opengl.GL30.GL_INVALID_FRAMEBUFFER_OPERATION;
@@ -218,7 +220,6 @@ public class OpenGLBackend extends RenderBackend{
 			throw new RuntimeException("gl disabled");
 		}
 		
-		GlfwMonitor.init();
 		GLFWErrorCallback.createPrint(System.err).set();
 		
 		window.size.set(600, 600);
@@ -233,21 +234,17 @@ public class OpenGLBackend extends RenderBackend{
 			System.exit(0);
 		});
 		
-		glfwWindowHint(GLFW_SAMPLES, 8);
-		glfwWindowHint(GLFW_DOUBLEBUFFER, GLFW_TRUE);
 		
-		window.init(GlfwWindow.SurfaceAPI.OPENGL);
-		
-		window.grabContext();
-		
-		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-		glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-		glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
-		glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
-		
-		
-		GL.createCapabilities();
+		window.init(
+			s -> s.doubleBuffer(true)
+			      .withOpenGL(
+				      gl -> gl.withVersion(3.3)
+				              .withSamples(8)
+				              .withProfile(CORE)
+				              .forwardCompatible()
+				              .withDebugContext()
+			      )
+		);
 		
 		if(!destroyRequested){
 			window.show();
