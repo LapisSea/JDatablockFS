@@ -634,12 +634,37 @@ public class JorthTests{
 	}
 	
 	@Test
+	void genericFieldDefine() throws Exception{
+		var cls = generateAndLoadInstanceSimple("jorth.Gen$$", writer -> {
+			writer.addImport(Optional.class);
+			writer.write(
+				"""
+					field optStr #Optional<#String>
+					"""
+			);
+		});
+		
+		var generic = (ParameterizedType)cls.getField("optStr").getGenericType();
+		
+		assertEquals(Optional.class, generic.getRawType());
+		assertArrayEquals(new Type[]{String.class}, generic.getActualTypeArguments());
+	}
+	
+	@Test(dependsOnMethods = "genericFieldDefine")
 	void genericField() throws Exception{
 		var cls = generateAndLoadInstanceSimple("jorth.Gen$$", writer -> {
 			writer.addImport(Optional.class);
 			writer.write(
 				"""
 					field optStr #Optional<#String>
+					
+					function set
+						arg optStr #Optional<#String>
+					start
+						get #arg optStr
+						set this optStr
+					end
+					
 					"""
 			);
 		});
