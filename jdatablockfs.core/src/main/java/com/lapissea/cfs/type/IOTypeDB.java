@@ -361,7 +361,7 @@ public sealed interface IOTypeDB{
 			if(def.isUnmanaged()) return;
 			
 			if(TYPE_VALIDATION){
-				StandardStructPipe.of(type.getThisStruct()).checkTypeIntegrity(type);
+				StandardStructPipe.of(type.getThisStruct()).checkTypeIntegrity(type, false);
 			}
 			
 			

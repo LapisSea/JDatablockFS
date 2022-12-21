@@ -237,7 +237,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				}
 				if(inst != null){
 					try{
-						checkTypeIntegrity(inst);
+						checkTypeIntegrity(inst, true);
 					}catch(FieldIsNullException ignored){
 					}catch(IOException e){
 						e.printStackTrace();
@@ -869,14 +869,17 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		return getType().allocVirtualVarPool(StoragePool.IO);
 	}
 	
-	public void checkTypeIntegrity(T inst) throws IOException{
+	public void checkTypeIntegrity() throws IOException{
+		checkTypeIntegrity(type.make(), true);
+	}
+	public void checkTypeIntegrity(T inst, boolean init) throws IOException{
 		var man = DataProvider.newVerySimpleProvider();
 		
-		var ch = AllocateTicket.withData(this, man, inst).submit(man);
-		
-		if(inst.getThisStruct().hasInvalidInitialNulls()){
+		if(init && inst.getThisStruct().hasInvalidInitialNulls()){
 			inst.allocateNulls(man);
 		}
+		
+		var ch = AllocateTicket.withData(this, man, inst).submit(man);
 		
 		T instRead;
 		try{

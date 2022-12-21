@@ -131,7 +131,7 @@ public class GeneralTypeHandlingTests{
 			pipe = null;
 		}
 		if(pipe != null){
-			pipe.checkTypeIntegrity(struct.make());
+			pipe.checkTypeIntegrity();
 		}
 		try{
 			pipe = FixedStructPipe.of(struct, STATE_DONE);
@@ -139,7 +139,7 @@ public class GeneralTypeHandlingTests{
 			pipe = null;
 		}
 		if(pipe != null){
-			pipe.checkTypeIntegrity(struct.make());
+			pipe.checkTypeIntegrity();
 		}
 	}
 	
