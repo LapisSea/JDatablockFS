@@ -17,10 +17,7 @@ import com.lapissea.jorth.BytecodeUtils;
 import com.lapissea.jorth.CodeStream;
 import com.lapissea.jorth.Jorth;
 import com.lapissea.jorth.MalformedJorth;
-import com.lapissea.util.NotImplementedException;
-import com.lapissea.util.ShouldNeverHappenError;
-import com.lapissea.util.TextUtil;
-import com.lapissea.util.UtilL;
+import com.lapissea.util.*;
 import com.lapissea.util.function.UnsafeBiConsumer;
 import com.lapissea.util.function.UnsafeConsumer;
 
@@ -265,7 +262,7 @@ public class DefInstanceCompiler{
 			impl = generateImpl(key, specials, fieldInfo, orderedFields);
 		}catch(Throwable e){
 			if(EXIT_ON_FAIL){
-				new RuntimeException("failed to compile " + completeInter.getName(), e).printStackTrace();
+				new RuntimeException("failed to compile implementation for " + key.clazz.getName(), e).printStackTrace();
 				System.exit(1);
 			}
 			throw e;
@@ -477,8 +474,7 @@ public class DefInstanceCompiler{
 					
 					writer.write(
 						"""
-							public visibility
-							#TOKEN(0) function start
+							public function {} start
 							""",
 						set.getName());
 					

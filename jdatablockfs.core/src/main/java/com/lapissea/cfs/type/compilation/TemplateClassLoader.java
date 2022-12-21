@@ -100,15 +100,14 @@ public final class TemplateClassLoader extends ClassLoader{
 	}
 	
 	private void generateEnum(TypeNamed classType, CodeStream writer) throws MalformedJorth{
-		writer.write("#TOKEN(0) className define", classType.name);
 		writer.write(
 			"""
-				public visibility
-				className enum start
-				"""
+				public enum {!} start
+				""",
+			classType.name
 		);
 		for(var constant : classType.def.getEnumConstants()){
-			writer.write(constant.getName()).write("enum constant");
+			writer.write("enum {!}", constant.getName());
 		}
 	}
 	

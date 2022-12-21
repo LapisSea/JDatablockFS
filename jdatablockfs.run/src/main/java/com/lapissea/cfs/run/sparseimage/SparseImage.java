@@ -63,7 +63,7 @@ public class SparseImage{
 			int y = (int)(Math.pow(r.nextFloat(), 3)*radius);
 			image.set(x, y, r.nextFloat(), r.nextFloat(), 1);
 		}
-		
+		LogUtil.println("Defrag");
 		cluster.defragment();
 		
 	}
