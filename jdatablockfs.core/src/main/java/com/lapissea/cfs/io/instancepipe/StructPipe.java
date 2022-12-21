@@ -1,6 +1,7 @@
 package com.lapissea.cfs.io.instancepipe;
 
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.FieldIsNullException;
 import com.lapissea.cfs.exceptions.MalformedObjectException;
@@ -10,7 +11,6 @@ import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.content.ContentOutputBuilder;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
-import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
@@ -870,13 +870,18 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	}
 	
 	public void checkTypeIntegrity(T inst) throws IOException{
-		var tmp = MemoryData.builder().build();
-		var man = DataProvider.newVerySimpleProvider(tmp);
+		var man = DataProvider.newVerySimpleProvider();
+		
+		var ch = AllocateTicket.withData(this, man, inst).submit(man);
+		
+		if(inst.getThisStruct().hasInvalidInitialNulls()){
+			inst.allocateNulls(man);
+		}
 		
 		T instRead;
 		try{
-			write(man, tmp, inst);
-			instRead = readNew(man, tmp, null);
+			write(ch, inst);
+			instRead = readNew(ch, null);
 		}catch(IOException e){
 			throw new MalformedObjectException("Failed object IO " + getType(), e);
 		}
