@@ -200,11 +200,9 @@ public final class ClassGen implements ClassInfo, Endable{
 		
 		var descriptor = type.jvmDescriptor();
 		var signature  = type.jvmSignature();
-		if(signature.equals(descriptor)) signature = null;
 		
-		var access = visibility.flag|accesses.stream().mapToInt(f -> f.flag).reduce((a, b) -> a|b).orElse(0);
-		
-		var fieldVisitor = writer.visitField(access, name, descriptor.toString(), signature == null? null : signature.toString(), null);
+		var access       = visibility.flag|accesses.stream().mapToInt(f -> f.flag).reduce((a, b) -> a|b).orElse(0);
+		var fieldVisitor = writer.visitField(access, name, descriptor.toString(), signature.toString(), null);
 		
 		writeAnnotations(annotations, fieldVisitor::visitAnnotation);
 		

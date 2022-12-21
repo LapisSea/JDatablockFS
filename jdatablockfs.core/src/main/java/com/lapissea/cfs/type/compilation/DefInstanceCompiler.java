@@ -513,9 +513,11 @@ public class DefInstanceCompiler{
 				}
 				writer.write("end");
 			}
-			BytecodeUtils.printClass(jorth.getClassFile(implName));
+			
+			var file = jorth.getClassFile(implName);
+			if(PRINT_BYTECODE) BytecodeUtils.printClass(file);
 			//noinspection unchecked
-			return (Class<T>)Access.privateLookupIn(interf).defineClass(jorth.getClassFile(implName));
+			return (Class<T>)Access.privateLookupIn(interf).defineClass(file);
 			
 		}catch(IllegalAccessException|MalformedJorth e){
 			throw new RuntimeException(e);
