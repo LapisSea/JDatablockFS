@@ -39,17 +39,29 @@ public interface TokenSource{
 				return !(e instanceof EndOfCode);
 			}
 			@Override
-			public Token readToken() throws MalformedJorth{
+			public Token readToken(boolean required) throws MalformedJorth{
 				readNext();
-				if(e != null) throw e;
+				if(e != null){
+					if(!required && e instanceof EndOfCode){
+						e = null;
+						return null;
+					}
+					throw e;
+				}
 				var n = next;
 				next = null;
 				return n;
 			}
 			@Override
-			public Token peekToken() throws MalformedJorth{
+			public Token peekToken(boolean required) throws MalformedJorth{
 				readNext();
-				if(e != null) throw e;
+				if(e != null){
+					if(!required && e instanceof EndOfCode){
+						e = null;
+						return null;
+					}
+					throw e;
+				}
 				return next;
 			}
 			@Override
@@ -68,13 +80,13 @@ public interface TokenSource{
 			}
 			
 			@Override
-			public Token peekToken() throws MalformedJorth{
-				return source.peekToken();
+			public Token peekToken(boolean required) throws MalformedJorth{
+				return source.peekToken(required);
 			}
 			
 			@Override
-			public Token readToken() throws MalformedJorth{
-				var tok = source.readToken();
+			public Token readToken(boolean required) throws MalformedJorth{
+				var tok = source.readToken(required);
 				listener.accept(tok);
 				return tok;
 			}
@@ -124,21 +136,24 @@ public interface TokenSource{
 	}
 	
 	default <T> Optional<T> consumeTokenIf(Function<Token, Optional<T>> predicate) throws MalformedJorth{
-		Token peek;
-		try{
-			peek = peekToken();
-		}catch(EndOfCode e){
-			return Optional.empty();
-		}
+		Token peek = peekToken(false);
+		if(peek == null) return Optional.empty();
+		
 		var mapped = predicate.apply(peek);
 		if(mapped.isPresent()){
 			readToken();
 		}
 		return mapped;
 	}
+	default Token readToken() throws MalformedJorth{
+		return readToken(true);
+	}
+	default Token peekToken() throws MalformedJorth{
+		return peekToken(true);
+	}
 	
-	Token readToken() throws MalformedJorth;
-	Token peekToken() throws MalformedJorth;
+	Token readToken(boolean required) throws MalformedJorth;
+	Token peekToken(boolean required) throws MalformedJorth;
 	int line();
 	
 	default void requireWord(String word) throws MalformedJorth{

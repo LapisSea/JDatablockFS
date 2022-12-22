@@ -167,13 +167,13 @@ public class Tokenizer implements CodeStream, TokenSource{
 	
 	private Token peeked;
 	@Override
-	public Token peekToken() throws MalformedJorth{
-		if(peeked == null) peeked = readToken();
+	public Token peekToken(boolean required) throws MalformedJorth{
+		if(peeked == null) peeked = readToken(required);
 		return peeked;
 	}
 	
 	@Override
-	public Token readToken() throws MalformedJorth{
+	public Token readToken(boolean required) throws MalformedJorth{
 		if(peeked != null){
 			var p = peeked;
 			peeked = null;
@@ -190,8 +190,10 @@ public class Tokenizer implements CodeStream, TokenSource{
 			}
 			
 			if(!hasMore()){
+				if(required){
 					throw new EndOfCode();
 				}
+				return null;
 			}
 		}
 		
