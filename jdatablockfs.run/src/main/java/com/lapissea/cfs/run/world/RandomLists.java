@@ -49,7 +49,7 @@ public class RandomLists{
 							mem.onWrite.log(mem, LongStream.of());
 						}
 					}catch(Throwable e){
-						e.printStackTrace();
+						throw new RuntimeException(e);
 					}finally{
 						logger.get().destroy();
 					}

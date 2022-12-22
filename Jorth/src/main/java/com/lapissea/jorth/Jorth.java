@@ -617,6 +617,9 @@ public final class Jorth extends CodeDestination{
 	
 	public byte[] getClassFile(String name){
 		var cls = classes.get(ClassName.dotted(name));
+		if(cls == null){
+			throw new IllegalArgumentException(name + " is not defined");
+		}
 		
 		var file = cls.getClassFile();
 		if(file == null){

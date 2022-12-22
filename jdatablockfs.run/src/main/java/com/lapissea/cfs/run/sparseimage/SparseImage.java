@@ -1,6 +1,5 @@
 package com.lapissea.cfs.run.sparseimage;
 
-import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.run.Configuration;
 import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
@@ -20,7 +19,8 @@ public class SparseImage{
 	
 	public static void main(String[] args) throws Exception{
 		
-		if(GlobalConfig.DEBUG_VALIDATION) LogUtil.Init.attach(USE_CALL_POS|USE_CALL_THREAD|USE_TIME_DELTA|USE_TABULATED_HEADER);
+		LogUtil.Init.attach(USE_CALL_POS|USE_CALL_THREAD|USE_TIME_DELTA|USE_TABULATED_HEADER);
+		LogUtil.println("Start");
 		
 		var config = new Configuration();
 		config.load(new Configuration.Loader.JsonArgs(new File("SparseImage.json"), true));
