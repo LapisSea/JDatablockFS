@@ -36,12 +36,13 @@ public class Cluster implements DataProvider{
 	private static final ChunkPointer             FIRST_CHUNK_PTR = ChunkPointer.of(MagicID.size());
 	
 	public static Cluster emptyMem() throws IOException{
-		return Cluster.init(MemoryData.builder().build());
+		return Cluster.init(MemoryData.builder().withCapacity(MagicID.size()).build());
 	}
 	
 	public static Cluster init(IOInterface data) throws IOException{
 		data.openIOTransaction(() -> {
 			var provider = DataProvider.newVerySimpleProvider(data);
+			var db       = new IOTypeDB.PersistentDB();
 			
 			try(var io = data.write(true)){
 				MagicID.write(io);
@@ -51,7 +52,6 @@ public class Cluster implements DataProvider{
 			                               .withApproval(c -> c.getPtr().equals(FIRST_CHUNK_PTR))
 			                               .submit(provider);
 			
-			var db = new IOTypeDB.PersistentDB();
 			db.init(provider);
 			
 			ROOT_PIPE.modify(firstChunk, root -> {
@@ -255,7 +255,7 @@ public class Cluster implements DataProvider{
 		if(refRoot){
 			rec.log(new Reference(), null, null, FIRST_CHUNK_PTR.makeReference());
 		}
-		return new MemoryWalker(this, root, getFirstChunk().getPtr().makeReference(), Cluster.ROOT_PIPE, recordStats, rec);
+		return new MemoryWalker(this, root, getFirstChunk().getPtr().makeReference(), ROOT_PIPE, recordStats, rec);
 	}
 	
 	public void defragment() throws IOException{

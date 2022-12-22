@@ -232,13 +232,15 @@ public abstract class StagedInit{
 		
 		long start = System.nanoTime();
 		
-		while(System.nanoTime() - start<2*1_000_000L){
-			Thread.onSpinWait();
-			if(this.state>=state){
-				checkErr();
-				return;
+		while(System.nanoTime() - start<20*1_000_000L){
+			if(e != null) break;
+			for(int i = 0; i<1000; i++){
+				Thread.onSpinWait();
+				if(this.state>=state){
+					checkErr();
+					return;
+				}
 			}
-			Thread.yield();
 		}
 		
 		while(true){
