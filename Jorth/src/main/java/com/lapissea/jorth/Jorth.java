@@ -6,7 +6,6 @@ import com.lapissea.util.NotImplementedException;
 
 import java.lang.reflect.Array;
 import java.util.*;
-import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -70,9 +69,6 @@ public final class Jorth extends CodeDestination{
 	
 	public CodeStream writer(){
 		return new Tokenizer(this, line);
-	}
-	public CodeStream writer(Executor executor){
-		return new Tokenizer(this, line, executor);
 	}
 	
 	@Override

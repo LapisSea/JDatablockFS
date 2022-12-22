@@ -6,10 +6,10 @@ import com.lapissea.jorth.MalformedJorth;
 import com.lapissea.jorth.lang.type.Access;
 import com.lapissea.jorth.lang.type.KeyedEnum;
 import com.lapissea.jorth.lang.type.Visibility;
-import com.lapissea.util.UtilL;
 
-import java.util.*;
-import java.util.concurrent.Executor;
+import java.util.ArrayDeque;
+import java.util.BitSet;
+import java.util.Deque;
 import java.util.regex.Pattern;
 
 import static java.lang.Float.parseFloat;
@@ -17,10 +17,11 @@ import static java.lang.Integer.parseInt;
 
 public class Tokenizer implements CodeStream, TokenSource{
 	
-	private static final boolean SYNCHRONOUS_SAFETY =
-		UtilL.sysProperty("jorth.synchronousSafety").map(Boolean::valueOf).orElse(false);
-	
 	private static final BitSet SPECIALS = new BitSet();
+	
+	static{
+		"[]{}',;/<>@".chars().forEach(SPECIALS::set);
+	}
 	
 	public static String escape(String src){
 		var result = new StringBuilder(src.length() + 5);
@@ -34,16 +35,6 @@ public class Tokenizer implements CodeStream, TokenSource{
 		return result.toString();
 	}
 	
-	static{
-		"[]{}',;/<>@".chars().forEach(SPECIALS::set);
-	}
-	
-	private enum WorkerState{
-		WAIT, WAIT_HOT,
-		READ,
-		END, END_CONFIRM
-	}
-	
 	private final CodeDestination dad;
 	
 	private final Deque<CharSequence> codeBuffer = new ArrayDeque<>();
@@ -54,136 +45,45 @@ public class Tokenizer implements CodeStream, TokenSource{
 	
 	private TokenSource transformed;
 	
-	private Throwable   workerError;
-	private WorkerState workerState = WorkerState.WAIT;
-	
 	public Tokenizer(CodeDestination dad, int line){
-		this(dad, line, Thread.ofVirtual().name("token consumer")::start);
-	}
-	public Tokenizer(CodeDestination dad, int line, Executor executor){
 		this.dad = dad;
 		this.line = line;
-		executor.execute(this::workerLoop);
 	}
 	
-	private void workerLoop(){
-		try{
-			while(workerState != WorkerState.END || hasMore()){
-				workerExec();
-			}
-			setWorkerState(WorkerState.END_CONFIRM);
-		}catch(Throwable e){
-			workerError = e;
-		}
-	}
-	
-	private void workerExec() throws MalformedJorth{
-		switch(workerState){
-			case WAIT -> waitForStateChange();
-			case WAIT_HOT -> {
-				if(waitHot()) return;
-				synchronized(this){
-					if(workerState == WorkerState.WAIT_HOT){
-						setWorkerState(WorkerState.WAIT);
-					}
-				}
-			}
-			case READ -> {
-				synchronized(this){
-					setWorkerState(WorkerState.WAIT_HOT);
-					if(code == null){
-						this.code = codeBuffer.removeFirst();
-						pos = 0;
-						skipWhitespace();
-						if(code == null){
-							if(hasMore()){
-								setWorkerState(WorkerState.READ);
-							}
-							return;
-						}
-					}
-				}
-				
-				parseExisting();
-			}
-			case END, END_CONFIRM -> {
-				//finish up
-				parseExisting();
-			}
-		}
-		
-	}
 	private void parseExisting() throws MalformedJorth{
 		while(hasMore()){
 			dad.parse(transformed);
 		}
 	}
-	private void setWorkerState(WorkerState workerState){
-		synchronized(this){
-			this.workerState = workerState;
-			notifyAll();
-		}
-	}
-	
-	private void waitForStateChange(){
-		synchronized(this){
-			try{
-				wait(2);
-			}catch(InterruptedException e){
-				throw new RuntimeException(e);
-			}
-		}
-	}
-	
-	private boolean waitHot(){
-		for(int i = 0; i<1000; i++){
-			Thread.yield();
-			if(workerState != WorkerState.WAIT_HOT) return true;
-			Thread.onSpinWait();
-		}
-		synchronized(this){
-			if(workerState == WorkerState.WAIT_HOT){
-				workerState = WorkerState.WAIT;
-			}
-		}
-		return false;
-	}
-	
-	private boolean workerEnding(){
-		return workerState == WorkerState.END || workerState == WorkerState.END_CONFIRM;
-	}
 	
 	@Override
 	public boolean hasMore(){
-		return code != null || peeked != null || !codeBuffer.isEmpty() || !workerEnding();
+		return code != null || peeked != null || !codeBuffer.isEmpty();
 	}
+	
+	private boolean buffering;
 	
 	@Override
 	public CodeStream write(CharSequence code) throws MalformedJorth{
 		if(transformed == null) transformed = dad.transform(this);
-		synchronized(this){
-			writeError("<previous>");
-			codeBuffer.addLast(code);
-			setWorkerState(WorkerState.READ);
-		}
-		if(SYNCHRONOUS_SAFETY){
-			while(workerState != WorkerState.WAIT && workerState != WorkerState.WAIT_HOT){
-				UtilL.sleep(1);
-				writeError(code);
-			}
-			writeError(code);
+		codeBuffer.addLast(code);
+		if(!buffering){
+			parseExisting();
 		}
 		return this;
 	}
-	private void writeError(CharSequence code){
-		try{
-			checkWorkerError();
-		}catch(Throwable e){
-			throw new RuntimeException("\n" + code, e);
-		}
+	
+	@Override
+	public CodePart codePart(){
+		boolean lastBuffering = buffering;
+		buffering = true;
+		return () -> {
+			buffering = lastBuffering;
+			parseExisting();
+		};
 	}
 	
-	private synchronized void skipWhitespace(){
+	private void skipWhitespace(){
 		if(pos == code.length()){
 			code = null;
 			return;
@@ -281,25 +181,18 @@ public class Tokenizer implements CodeStream, TokenSource{
 		}
 		
 		while(code == null){
-			synchronized(this){
-				if(!codeBuffer.isEmpty()){
-					code = codeBuffer.removeFirst();
-					pos = 0;
-					line++;
-					skipWhitespace();
-					continue;
-				}else if(workerState == WorkerState.READ){
-					setWorkerState(WorkerState.WAIT_HOT);
-				}
-				
-				if(workerEnding() && !hasMore()){
+			if(!codeBuffer.isEmpty()){
+				code = codeBuffer.removeFirst();
+				pos = 0;
+				line++;
+				skipWhitespace();
+				continue;
+			}
+			
+			if(!hasMore()){
 					throw new EndOfCode();
 				}
 			}
-			
-			
-			if(waitHot()) continue;
-			waitForStateChange();
 		}
 		
 		lastLine = this.line;
@@ -429,21 +322,5 @@ public class Tokenizer implements CodeStream, TokenSource{
 	}
 	@Override
 	public void close() throws MalformedJorth{
-		setWorkerState(WorkerState.END);
-		while(workerState != WorkerState.END_CONFIRM){
-			checkWorkerError();
-			waitForStateChange();
-		}
-	}
-	
-	private final Set<Thread> alreadyThrown = Collections.synchronizedSet(new HashSet<>());
-	
-	private void checkWorkerError(){
-		if(workerError != null){
-			if(!alreadyThrown.add(Thread.currentThread())){
-				throw new IllegalStateException("Worker failed");
-			}
-			throw UtilL.uncheckedThrow(workerError);
-		}
 	}
 }

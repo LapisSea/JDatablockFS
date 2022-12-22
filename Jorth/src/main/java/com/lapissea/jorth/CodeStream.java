@@ -100,6 +100,12 @@ public interface CodeStream extends AutoCloseable{
 		addImportAs(clazz.getName(), name);
 	}
 	
+	interface CodePart extends AutoCloseable{
+		@Override
+		void close() throws MalformedJorth;
+	}
+	CodePart codePart();
+	
 	@Override
 	void close() throws MalformedJorth;
 }

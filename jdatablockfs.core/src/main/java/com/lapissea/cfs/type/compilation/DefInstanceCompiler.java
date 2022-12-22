@@ -5,7 +5,6 @@ import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.exceptions.MalformedTemplateStruct;
 import com.lapissea.cfs.internal.Access;
-import com.lapissea.cfs.internal.Runner;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.type.*;
@@ -332,7 +331,7 @@ public class DefInstanceCompiler{
 		var jorth = new Jorth(interf.getClassLoader(), PRINT_BYTECODE? log::add : null);
 		try{
 			
-			try(var writer = jorth.writer(Runner::run)){
+			try(var writer = jorth.writer()){
 				writeAnnotations(writer, Arrays.asList(interf.getAnnotations()));
 				writer.addImportAs(completionName, "typ.impl");
 				writer.write(
@@ -438,7 +437,7 @@ public class DefInstanceCompiler{
 				UnsupportedOperationException.class
 			);
 			
-			try(var writer = jorth.writer(Runner::run)){
+			try(var writer = jorth.writer()){
 				
 				writer.write(
 					"""
@@ -783,19 +782,21 @@ public class DefInstanceCompiler{
 		if(oOrderedFields.isPresent()){
 			var orderedFields = oOrderedFields.get();
 			
+			var part = writer.codePart();
 			writer.write("public function <init>");
 			for(int i = 0; i<orderedFields.size(); i++){
 				FieldInfo info    = orderedFields.get(i);
 				var       argName = "arg" + i;
 				writer.write("arg {!} {}", argName, info.type);
 			}
+			writer.write("start");
+			part.close();
 			
 			writer.write(
 				"""
-					start
-						super start
-							get #typ.impl $STRUCT
-						end
+					super start
+						get #typ.impl $STRUCT
+					end
 					""");
 			
 			for(int i = 0; i<orderedFields.size(); i++){
@@ -897,10 +898,9 @@ public class DefInstanceCompiler{
 		});
 		writer.write(
 			"""
-				public
 				@ #IOValue start name '{!2}' end
 				@ #Override
-				function {!0}
+				public function {!0}
 					returns {1}
 				start
 					get this {!2}
@@ -993,6 +993,7 @@ public class DefInstanceCompiler{
 		for(var ann : annotations){
 			if(!annTypes.add(ann.annotationType())) continue;
 			
+			var part = writer.codePart();
 			writer.write("@ {!} start", ann.annotationType().getName());
 			
 			scanAnnotation(ann, (name, value) -> {
@@ -1011,6 +1012,7 @@ public class DefInstanceCompiler{
 				});
 			});
 			writer.write("end");
+			part.close();
 		}
 	}
 	

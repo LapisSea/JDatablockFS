@@ -1,7 +1,6 @@
 package com.lapissea.cfs.type.compilation;
 
 import com.lapissea.cfs.GlobalConfig;
-import com.lapissea.cfs.internal.Runner;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.IOTypeDB;
@@ -93,7 +92,7 @@ public final class TemplateClassLoader extends ClassLoader{
 		var log   = PRINT_BYTECODE? new StringJoiner(" ") : null;
 		var jorth = new Jorth(this, PRINT_BYTECODE? log::add : null);
 		
-		try(var writer = jorth.writer(Runner::run)){
+		try(var writer = jorth.writer()){
 			generator.accept(classType, writer);
 		}catch(MalformedJorth e){
 			throw new RuntimeException("Failed to generate class " + classType.name, e);
@@ -151,11 +150,13 @@ public final class TemplateClassLoader extends ClassLoader{
 				writer.write("@#IOValue.Reference start dataPipeType {!} end", field.getReferenceType().toString());
 			}
 			if(!field.getDependencies().isEmpty()){
-				writer.write(" @#IODependency start value [");
-				for(String dependency : field.getDependencies()){
-					writer.write("'{}'", dependency);
+				try(var ignored = writer.codePart()){
+					writer.write(" @#IODependency start value [");
+					for(String dependency : field.getDependencies()){
+						writer.write("'{}'", dependency);
+					}
+					writer.write("] end");
 				}
-				writer.write("] end");
 			}
 			
 			writer.write(
