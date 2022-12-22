@@ -11,6 +11,7 @@ import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.StagedInit;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.field.IOField;
@@ -468,6 +469,8 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 				//noinspection unchecked
 				((ValueStorage<V>)v).write(d.io(), value);
 			}catch(Throwable e){
+				e = StagedInit.WaitException.unwait(e);
+				
 				String valStr;
 				try{
 					valStr = value.toString();

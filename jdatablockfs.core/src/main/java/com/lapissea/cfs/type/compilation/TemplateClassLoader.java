@@ -109,6 +109,7 @@ public final class TemplateClassLoader extends ClassLoader{
 		for(var constant : classType.def.getEnumConstants()){
 			writer.write("enum {!}", constant.getName());
 		}
+		writer.write("end");
 	}
 	
 	private void generateIOInstance(TypeNamed classType, CodeStream writer) throws MalformedJorth{

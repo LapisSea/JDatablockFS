@@ -724,8 +724,13 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		for(var generator : generators){
 			try{
 				generator.generate(ioPool, provider, instance, allowExternalMod);
-			}catch(Throwable e){
+			}catch(IOException e){
 				throw new IOException("Failed to generate fields. Problem on " + generator, e);
+			}catch(FieldIsNullException e){
+				e.addSuppressed(new RuntimeException("Failed to generate fields. Problem on " + generator));
+				throw e;
+			}catch(Throwable e){
+				throw new RuntimeException("Failed to generate fields. Problem on " + generator, e);
 			}
 		}
 	}
