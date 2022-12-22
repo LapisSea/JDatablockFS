@@ -131,7 +131,7 @@ public final class Jorth extends CodeDestination{
 			var tokStr = switch(tok){
 				case Token.Word t when t.value().contains(" ") -> "\033[4m" + t.value();
 				case Token.Word t -> t.value();
-				case Token.EWord<?> t -> PURPLE_BRIGHT + t.value();
+				case Token.EWord<?> t -> PURPLE_BRIGHT + (t.value() instanceof KeyedEnum e? e.key() : t.value().name().toLowerCase());
 				case Token.KWord t -> CYAN_BRIGHT + t.keyword().key;
 				case Token.StrValue t -> {
 					var strCol = PURPLE_BRIGHT;
@@ -623,7 +623,9 @@ public final class Jorth extends CodeDestination{
 		var cls = classes.get(ClassName.dotted(name));
 		
 		var file = cls.getClassFile();
-		if(file == null) throw new IllegalStateException("Class not ended");
+		if(file == null){
+			throw new IllegalStateException("Class " + name + " not ended");
+		}
 		
 		return file;
 	}

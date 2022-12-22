@@ -1,5 +1,6 @@
 package com.lapissea.cfs.chunk;
 
+import com.lapissea.cfs.exceptions.FieldIsNullException;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.instancepipe.ObjectPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
@@ -104,6 +105,8 @@ public record AllocateTicket(
 		var mngr = provider.getMemoryManager();
 		try{
 			return mngr.alloc(this);
+		}catch(FieldIsNullException e){
+			throw e;
 		}catch(Throwable e){
 			throw new IOException("Failed to submit " + this, e);
 		}
@@ -112,6 +115,8 @@ public record AllocateTicket(
 		var mngr = provider.getDataProvider().getMemoryManager();
 		try{
 			return mngr.alloc(this);
+		}catch(FieldIsNullException e){
+			throw e;
 		}catch(Throwable e){
 			throw new IOException("Failed to submit " + this, e);
 		}

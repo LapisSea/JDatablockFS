@@ -5,6 +5,7 @@ import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.exceptions.MalformedTemplateStruct;
 import com.lapissea.cfs.internal.Access;
+import com.lapissea.cfs.internal.Runner;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.type.*;
@@ -331,7 +332,7 @@ public class DefInstanceCompiler{
 		var jorth = new Jorth(interf.getClassLoader(), PRINT_BYTECODE? log::add : null);
 		try{
 			
-			try(var writer = jorth.writer()){
+			try(var writer = jorth.writer(Runner::run)){
 				writeAnnotations(writer, Arrays.asList(interf.getAnnotations()));
 				writer.addImportAs(completionName, "typ.impl");
 				writer.write(
@@ -437,7 +438,7 @@ public class DefInstanceCompiler{
 				UnsupportedOperationException.class
 			);
 			
-			try(var writer = jorth.writer()){
+			try(var writer = jorth.writer(Runner::run)){
 				
 				writer.write(
 					"""
@@ -662,10 +663,10 @@ public class DefInstanceCompiler{
 					executeStringFragment(interf, fieldInfo, child, all, writer);
 				}
 			}
-			case Literal f -> append(writer, w -> w.write("'#RAW(0)'", f.value()));
+			case Literal f -> append(writer, w -> w.write("'{}'", f.value()));
 			case SpecialValue f -> {
 				switch(f.value()){
-					case CLASS_NAME -> append(writer, w -> w.write("'#RAW(0)'", interf.getSimpleName()));
+					case CLASS_NAME -> append(writer, w -> w.write("'{}'", interf.getSimpleName()));
 					case null -> throw new NullPointerException();
 				}
 			}

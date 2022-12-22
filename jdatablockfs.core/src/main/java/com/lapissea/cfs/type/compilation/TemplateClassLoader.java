@@ -1,6 +1,7 @@
 package com.lapissea.cfs.type.compilation;
 
 import com.lapissea.cfs.GlobalConfig;
+import com.lapissea.cfs.internal.Runner;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.IOTypeDB;
@@ -24,6 +25,7 @@ import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.StringJoiner;
 import java.util.function.Supplier;
 
 import static com.lapissea.util.ConsoleColors.*;
@@ -88,14 +90,15 @@ public final class TemplateClassLoader extends ClassLoader{
 	private byte[] jorthGenerate(TypeNamed classType, UnsafeBiConsumer<TypeNamed, CodeStream, MalformedJorth> generator){
 		if(PRINT_GENERATING_INFO) LogUtil.println("generating", "\n" + TextUtil.toTable(classType.name, classType.def.getFields()));
 		
-		var jorth = new Jorth(this, null);
+		var log   = PRINT_BYTECODE? new StringJoiner(" ") : null;
+		var jorth = new Jorth(this, PRINT_BYTECODE? log::add : null);
 		
-		try(var writer = jorth.writer()){
+		try(var writer = jorth.writer(Runner::run)){
 			generator.accept(classType, writer);
 		}catch(MalformedJorth e){
 			throw new RuntimeException("Failed to generate class " + classType.name, e);
 		}
-		
+		if(PRINT_BYTECODE) Log.log(log.toString());
 		return jorth.getClassFile(classType.name);
 	}
 	
