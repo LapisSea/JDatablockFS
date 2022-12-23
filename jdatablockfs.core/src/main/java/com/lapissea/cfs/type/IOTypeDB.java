@@ -237,11 +237,9 @@ public sealed interface IOTypeDB{
 		}
 		
 		@IOValue
-		@IOValue.OverrideType(HashIOMap.class)
 		private IOMap<Integer, TypeLink> data;
 		
 		@IOValue
-		@IOValue.OverrideType(HashIOMap.class)
 		private IOMap<TypeName, TypeDef> defs;
 		
 		private WeakReference<ClassLoader> templateLoader = new WeakReference<>(null);

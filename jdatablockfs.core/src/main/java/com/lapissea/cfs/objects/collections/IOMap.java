@@ -3,6 +3,7 @@ package com.lapissea.cfs.objects.collections;
 import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.objects.Stringify;
+import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.Nullable;
 
 import java.io.IOException;
@@ -11,6 +12,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Stream;
 
+@IOValue.OverrideType.DefaultImpl(HashIOMap.class)
 public interface IOMap<K, V> extends IterablePP<IOMap.IOEntry<K, V>>{
 	
 	interface IOEntry<K, V>{
