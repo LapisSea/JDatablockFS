@@ -168,14 +168,6 @@ public class Runner{
 		}
 	}
 	
-	public static void run(Runnable task){
-		if(ONLY_VIRTUAL){
-			virtualRun(task);
-		}else{
-			robustRun(task);
-		}
-	}
-	
 	private static void virtualRun(Runnable task){
 		Thread.ofVirtual().name(BASE_NAME, Task.ID_COUNTER.incrementAndGet()).start(task);
 	}
@@ -186,6 +178,8 @@ public class Runner{
 		Thread.ofVirtual().name(BASE_NAME, t.id).start(t);
 		pingWatcher();
 		
+		// If tasks were choking recently, it is beneficial to
+		// immediately attempt to work on a platform thread
 		if(virtualChoke>0){
 			synchronized(Runner.class){
 				if(virtualChoke>0) virtualChoke--;
@@ -199,11 +193,47 @@ public class Runner{
 		}
 	}
 	
+	/**
+	 * <p>
+	 * Executes a task in a timely manner. By default, it will run the task on a new virtual thread but in odd cases where
+	 * congestion is high or all virtual threads are pinned due to synchronization, the task will be dispatched to a platform
+	 * worker pool.
+	 * </p>
+	 * <p>
+	 * If the thread has been waiting to start for more than {@link Runner#THRESHOLD_NAME_MILIS}, it may be executed on a
+	 * platform thread. <br>
+	 * A task might be ran on a platform thread right away if a task start has timed out recently.
+	 * </p>
+	 *
+	 * @param task A task to be executed
+	 */
+	public static void run(Runnable task){
+		if(ONLY_VIRTUAL){
+			virtualRun(task);
+		}else{
+			robustRun(task);
+		}
+	}
+	
+	/**
+	 * Creates a {@link LateInit} with no checked exception that is executed as a task. See {@link Runner#run)}<br>
+	 * This is useful when an expensive value can be computed asynchronously and fetched when ever it is ready and needed.
+	 *
+	 * @param task the constructor/generator of some data
+	 * @return a new {@link LateInit} with no checked exception.
+	 */
 	public static <T> LateInit.Safe<T> async(Supplier<T> task){
 		return new LateInit.Safe<>(task, Runner::run);
 	}
+	
+	/**
+	 * Creates a {@link LateInit} with an exception that is executed as a task. See {@link Runner#run)}<br>
+	 * This is useful when an expensive value can be computed asynchronously and fetched when ever it is ready and needed.
+	 *
+	 * @param task the constructor/generator of some data that may throw a checked exception
+	 * @return a new {@link LateInit} that may throw a checked exception
+	 */
 	public static <T, E extends Throwable> LateInit<T, E> asyncChecked(UnsafeSupplier<T, E> task){
 		return new LateInit<>(task, Runner::run);
 	}
-	
 }
