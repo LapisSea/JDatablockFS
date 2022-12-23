@@ -7,6 +7,8 @@ import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeSupplier;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -44,23 +46,25 @@ public class Runner{
 	
 	private static final List<Task> TASKS = new ArrayList<>();
 	
-	private static int     VIRTUAL_CHOKE = 0;
-	private static boolean CHERRY        = true;
+	public static final  String  BASE_NAME             = "Task";
+	private static final String  MUTE_CHOKE_NAME       = "runner.muteWarning";
+	private static final String  THRESHOLD_NAME_MILIS  = "runner.chokeTime";
+	private static final String  WATCHER_TIMEOUT_MILIS = "runner.watcherTimeout";
+	private static final boolean ONLY_VIRTUAL          = GlobalConfig.configFlag("runner.onlyVirtual", false);
 	
-	private static ExecutorService PLATFORM_EXECUTOR;
-	
-	public static final  String  BASE_NAME         = "Task";
-	private static final String  MUTE_CHOKE_NAME   = "runner.muteWarning";
-	private static final String  MS_THRESHOLD_NAME = "runner.chokeTime";
-	private static final boolean ONLY_VIRTUAL      = GlobalConfig.configFlag("runner.onlyVirtual", false);
+	private static int             virtualChoke = 0;
+	private static boolean         cherry       = true;
+	private static ExecutorService platformExecutor;
+	private static Instant         lastTask;
+	private static Thread          watcher;
 	
 	private static ExecutorService getPlatformExecutor(){
-		if(PLATFORM_EXECUTOR != null) return PLATFORM_EXECUTOR;
+		if(platformExecutor != null) return platformExecutor;
 		
 		synchronized(Runner.class){
-			if(PLATFORM_EXECUTOR != null) return PLATFORM_EXECUTOR;
+			if(platformExecutor != null) return platformExecutor;
 			
-			PLATFORM_EXECUTOR = new ThreadPoolExecutor(
+			platformExecutor = new ThreadPoolExecutor(
 				0, Integer.MAX_VALUE,
 				500, TimeUnit.MILLISECONDS,
 				new SynchronousQueue<>(),
@@ -71,25 +75,43 @@ public class Runner{
 				      .daemon(true)::unstarted
 			);
 		}
-		return PLATFORM_EXECUTOR;
+		return platformExecutor;
 	}
 	
-	static{
-		Thread.ofPlatform().name(BASE_NAME + "-watcher").daemon(true).start(() -> {
-			if(ONLY_VIRTUAL) return;
-			int timeThreshold = GlobalConfig.configInt(MS_THRESHOLD_NAME, 100);
-			var toRestart     = new ArrayList<Task>();
+	private static void pingWatcher(){
+		if(ONLY_VIRTUAL) return;
+		lastTask = Instant.now();
+		if(watcher == null){
+			watcher = startWatcher();
+		}
+	}
+	
+	private static Thread startWatcher(){
+		return Thread.ofPlatform().name(BASE_NAME + "-watcher").daemon(true).start(() -> {
+			Log.trace("{#yellowStarting " + BASE_NAME + "-watcher#}");
+			
+			int timeThreshold  = GlobalConfig.configInt(THRESHOLD_NAME_MILIS, 100);
+			int watcherTimeout = GlobalConfig.configInt(WATCHER_TIMEOUT_MILIS, 1000);
+			var toRestart      = new ArrayList<Task>();
 			while(true){
 				boolean counted = false;
 				synchronized(TASKS){
 					if(TASKS.isEmpty()){
+						var d = Duration.between(lastTask, Instant.now());
+						if(d.toMillis()>watcherTimeout){
+							watcher = null;
+							Log.trace("{#yellowShut down " + BASE_NAME + "-watcher#}");
+							return;
+						}
 						try{
-							TASKS.wait(CHERRY? 200 : 20);
+							TASKS.wait(cherry? 200 : 20);
 						}catch(InterruptedException e){
 							throw new RuntimeException(e);
 						}
 						continue;
 					}
+					lastTask = Instant.now();
+					
 					for(int i = TASKS.size() - 1; i>=0; i--){
 						var t = TASKS.get(i);
 						if(t.started){
@@ -122,7 +144,7 @@ public class Runner{
 							task.started = true;
 						}
 						synchronized(Runner.class){
-							if(VIRTUAL_CHOKE<100) VIRTUAL_CHOKE += 5;
+							if(virtualChoke<100) virtualChoke += 5;
 						}
 						task.task.run();
 						Log.trace("{#redPerformance:#} Choked task {}#green completed", task.id);
@@ -136,12 +158,12 @@ public class Runner{
 	}
 	
 	private static void pop(){
-		if(CHERRY){
-			CHERRY = false;
+		if(cherry){
+			cherry = false;
 			if(!GlobalConfig.configFlag(MUTE_CHOKE_NAME, false)){
 				Log.warn("Virtual threads choking! Starting platform thread fallback to prevent possible deadlocks.\n" +
 				         "\"{}\" property may be used to configure choke time threshold. (Set \"{}\" to true to mute this)",
-				         GlobalConfig.propName(MUTE_CHOKE_NAME), GlobalConfig.propName(MUTE_CHOKE_NAME));
+				         GlobalConfig.propName(THRESHOLD_NAME_MILIS), GlobalConfig.propName(MUTE_CHOKE_NAME));
 			}
 		}
 	}
@@ -162,9 +184,11 @@ public class Runner{
 		var t = new Task(task);
 		
 		Thread.ofVirtual().name(BASE_NAME, t.id).start(t);
-		if(VIRTUAL_CHOKE>0){
+		pingWatcher();
+		
+		if(virtualChoke>0){
 			synchronized(Runner.class){
-				if(VIRTUAL_CHOKE>0) VIRTUAL_CHOKE--;
+				if(virtualChoke>0) virtualChoke--;
 			}
 			getPlatformExecutor().execute(t);
 		}else{
