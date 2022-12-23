@@ -46,7 +46,7 @@ public class Runner{
 	
 	private static final List<Task> TASKS = new ArrayList<>();
 	
-	public static final  String  BASE_NAME             = "Task";
+	private static final String  BASE_NAME             = "Task";
 	private static final String  MUTE_CHOKE_NAME       = "runner.muteWarning";
 	private static final String  THRESHOLD_NAME_MILIS  = "runner.chokeTime";
 	private static final String  WATCHER_TIMEOUT_MILIS = "runner.watcherTimeout";
@@ -59,23 +59,23 @@ public class Runner{
 	private static Thread          watcher;
 	
 	private static ExecutorService getPlatformExecutor(){
-		if(platformExecutor != null) return platformExecutor;
-		
+		if(platformExecutor == null) makeExecutor();
+		return platformExecutor;
+	}
+	
+	private static void makeExecutor(){
 		synchronized(Runner.class){
-			if(platformExecutor != null) return platformExecutor;
-			
+			if(platformExecutor != null) return;
 			platformExecutor = new ThreadPoolExecutor(
 				0, Integer.MAX_VALUE,
 				500, TimeUnit.MILLISECONDS,
 				new SynchronousQueue<>(),
 				Thread.ofPlatform()
 				      .group(new ThreadGroup(TextUtil.plural(BASE_NAME)))
-				      .priority(Thread.MAX_PRIORITY)//High priority. The faster the threads die the better.
 				      .name(BASE_NAME + "PWorker", 0)
 				      .daemon(true)::unstarted
 			);
 		}
-		return platformExecutor;
 	}
 	
 	private static void pingWatcher(){
@@ -176,7 +176,6 @@ public class Runner{
 		var t = new Task(task);
 		
 		Thread.ofVirtual().name(BASE_NAME, t.id).start(t);
-		pingWatcher();
 		
 		// If tasks were choking recently, it is beneficial to
 		// immediately attempt to work on a platform thread
@@ -187,6 +186,7 @@ public class Runner{
 			getPlatformExecutor().execute(t);
 		}else{
 			synchronized(TASKS){
+				pingWatcher();
 				TASKS.add(t);
 				TASKS.notifyAll();
 			}

@@ -6,10 +6,17 @@ import java.util.StringJoiner;
 
 public interface JorthLogger{
 	
-	static JorthLogger make(){
-		return make(GlobalConfig.PRINT_BYTECODE);
+	enum CodeLog{
+		FALSE,
+		TRUE,
+		LIVE
 	}
-	static JorthLogger make(GlobalConfig.CodeLog level){
+	
+	static JorthLogger make(){
+		return make(GlobalConfig.configEnum("classGen.printBytecode", CodeLog.FALSE));
+	}
+	
+	static JorthLogger make(CodeLog level){
 		return switch(level){
 			case FALSE -> null;
 			case TRUE -> new JorthLogger(){

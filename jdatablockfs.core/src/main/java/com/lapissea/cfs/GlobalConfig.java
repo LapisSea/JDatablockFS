@@ -9,12 +9,6 @@ import java.util.Optional;
 
 public class GlobalConfig{
 	
-	public enum CodeLog{
-		FALSE,
-		TRUE,
-		LIVE
-	}
-	
 	private static final String CONFIG_PROPERTY_PREFIX = "dfs.";
 	
 	public static final boolean DEBUG_VALIDATION = GlobalConfig.class.desiredAssertionStatus();
@@ -23,7 +17,6 @@ public class GlobalConfig{
 	public static final boolean TYPE_VALIDATION   = configFlag("typeValidation", DEBUG_VALIDATION);
 	public static       boolean PRINT_COMPILATION = configFlag("printCompilation", false);
 	public static final int     BATCH_BYTES       = configInt("batchBytes", 1<<13);
-	public static final CodeLog PRINT_BYTECODE    = configEnum("classGen.printBytecode", CodeLog.FALSE);
 	
 	public static Optional<String> configProp(String name){
 		return Utils.optionalProperty(CONFIG_PROPERTY_PREFIX + name);
