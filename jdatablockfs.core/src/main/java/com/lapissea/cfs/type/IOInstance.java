@@ -194,6 +194,10 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		}
 		
 		private static RuntimeException failNew(Class<?> clazz, Throwable e){
+			if(e instanceof RuntimeException re){
+				re.addSuppressed(new RuntimeException("Failed to instantiate " + clazz.getName()));
+				throw re;
+			}
 			throw new RuntimeException("Failed to instantiate " + clazz.getName(), e);
 		}
 		

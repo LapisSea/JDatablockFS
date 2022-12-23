@@ -107,32 +107,21 @@ public interface ClassInfo{
 				if(f != null) return f;
 			}
 			
-			var args = new Class<?>[signature.args().size()];
-			for(int i = 0; i<signature.args().size(); i++){
-				var arg = signature.args().get(i);
-				var pt  = arg.getPrimitiveType().map(BaseType::type);
-				if(pt.isPresent()){
-					args[i] = pt.get();
-				}else{
-					var name = arg.raw();
-					try{
-						args[i] = getLoader().loadClass(name.dotted());
-					}catch(ClassNotFoundException e){
-						throw new RuntimeException(e);
+			RuntimeException[] fail = {null};
+			if(signature.name().equals("<init>")){
+				for(var ctor : clazz.getDeclaredConstructors()){
+					var argsC = ctor.getParameterTypes();
+					if(checkArgs(argsC, signature.args(), fail)){
+						return FunctionInfo.of(source, ctor);
 					}
 				}
-			}
-			try{
-				if(signature.name().equals("<init>")){
-					return FunctionInfo.of(source, clazz.getDeclaredConstructor(args));
-				}
-			}catch(NoSuchMethodException e){
+				if(fail[0] != null) throw fail[0];
 				throw new MalformedJorth(signature + " does not exist in " + clazz);
 			}
 			
 			Method method = null;
 			try{
-				method = getDeepDeclaredMethod(clazz, signature.name(), args);
+				method = getDeepDeclaredMethod(clazz, signature.name(), signature.args());
 			}catch(ReflectiveOperationException e){
 				funs:
 				for(var info : findByName(signature.name())){
@@ -215,13 +204,51 @@ public interface ClassInfo{
 			if(loader == null) loader = this.getClass().getClassLoader();
 			return loader;
 		}
-		private static Method getDeepDeclaredMethod(@NotNull Class<?> type, String name, Class<?>[] args) throws ReflectiveOperationException{
-			try{
-				return type.getDeclaredMethod(name, args);
-			}catch(ReflectiveOperationException e){
-				if(type == Object.class) throw e;
-				return getDeepDeclaredMethod(type.getSuperclass(), name, args);
+		private Method getDeepDeclaredMethod(@NotNull Class<?> type, String name, List<GenericType> args) throws ReflectiveOperationException{
+			var method = searchMethods(type.getDeclaredMethods(), name, args);
+			if(method != null){
+				return method;
 			}
+			
+			if(type == Object.class) throw new NoSuchMethodException(name);
+			return getDeepDeclaredMethod(type.getSuperclass(), name, args);
+		}
+		
+		private static Method searchMethods(Method[] methods, String name, List<GenericType> parameterTypes){
+			Method res = null;
+			for(Method m : methods){
+				if(m.getName().equals(name)
+				   && parameterTypes.equals(Arrays.stream(m.getParameterTypes()).map(GenericType::of).toList())
+				   && (res == null
+				       || (res.getReturnType() != m.getReturnType()
+				           && res.getReturnType().isAssignableFrom(m.getReturnType()))))
+					res = m;
+			}
+			return res;
+		}
+		private boolean checkArgs(Class<?>[] margs, List<GenericType> args, Throwable[] fail){
+			if(margs.length != args.size()) return false;
+			for(int i = 0; i<margs.length; i++){
+				var argC = margs[i];
+				var argS = args.get(i);
+				
+				if(argS.equals(GenericType.OBJECT)){
+					return argC == Object.class;
+				}
+				
+				var bt = BaseType.of(argC.getName());
+				if(bt != argS.getBaseType()) return false;
+				if(bt == BaseType.OBJ){
+					if(argC.equals(Object.class)) continue;
+					try{
+						if(GenericType.of(argC).instanceOf(source, argS)) continue;
+					}catch(Exception e){
+						fail[0] = e;
+					}
+					return false;
+				}
+			}
+			return true;
 		}
 		
 		@Override

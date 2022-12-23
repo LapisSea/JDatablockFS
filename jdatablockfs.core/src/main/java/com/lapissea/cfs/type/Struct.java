@@ -263,6 +263,9 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 				struct = newStruct.apply(instanceClass);
 				
 				STRUCT_CACHE.put(instanceClass, struct);
+			}catch(MalformedStruct e){
+				e.addSuppressed(new MalformedStruct("Failed to compile " + instanceClass.getName()));
+				throw e;
 			}catch(Throwable e){
 				throw new MalformedStruct("Failed to compile " + instanceClass.getName(), e);
 			}finally{

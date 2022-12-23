@@ -12,6 +12,7 @@ import com.lapissea.cfs.type.compilation.CompilationTools.FieldStub;
 import com.lapissea.cfs.type.compilation.CompilationTools.Style;
 import com.lapissea.cfs.type.compilation.ToStringFormat.ToStringFragment.*;
 import com.lapissea.cfs.type.field.IOFieldTools;
+import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.jorth.BytecodeUtils;
 import com.lapissea.jorth.CodeStream;
@@ -38,6 +39,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.type.IOInstance.Def.IMPL_COMPLETION_POSTFIX;
+import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NOT_NULL;
 import static com.lapissea.util.ConsoleColors.*;
 import static java.lang.reflect.Modifier.isStatic;
 
@@ -45,8 +47,7 @@ public class DefInstanceCompiler{
 	
 	public static void init(){ }
 	
-	private static final boolean PRINT_BYTECODE = GlobalConfig.configFlag("classGen.printBytecode", false);
-	private static final boolean EXIT_ON_FAIL   = GlobalConfig.configFlag("classGen.exitOnFail", !GlobalConfig.RELEASE_MODE);
+	private static final boolean EXIT_ON_FAIL = GlobalConfig.configFlag("classGen.exitOnFail", false);
 	
 	private record Specials(
 		Optional<Method> set,
@@ -233,6 +234,8 @@ public class DefInstanceCompiler{
 			}
 		);
 		
+		var humanName = inter.getSimpleName();
+		
 		var completeInter = completeInterface(inter);
 		key = new Key<>(completeInter, key.includeNames);
 		
@@ -262,7 +265,7 @@ public class DefInstanceCompiler{
 		
 		Class<T> impl;
 		try{
-			impl = generateImpl(key, specials, fieldInfo, orderedFields);
+			impl = generateImpl(key, specials, fieldInfo, orderedFields, humanName);
 		}catch(Throwable e){
 			if(EXIT_ON_FAIL){
 				new RuntimeException("failed to compile implementation for " + key.clazz.getName(), e).printStackTrace();
@@ -327,8 +330,8 @@ public class DefInstanceCompiler{
 		
 		var completionName = interf.getName() + IMPL_COMPLETION_POSTFIX;
 		
-		var log   = PRINT_BYTECODE? new StringJoiner(" ") : null;
-		var jorth = new Jorth(interf.getClassLoader(), PRINT_BYTECODE? log::add : null);
+		var log   = JorthLogger.make();
+		var jorth = new Jorth(interf.getClassLoader(), log == null? null : log::log);
 		try{
 			
 			try(var writer = jorth.writer()){
@@ -376,8 +379,14 @@ public class DefInstanceCompiler{
 				}
 				writer.write("end");
 			}
-			if(PRINT_BYTECODE) Log.log("Generated jorth:\n" + log);
-			return Access.privateLookupIn(interf).defineClass(jorth.getClassFile(completionName));
+			
+			var file = jorth.getClassFile(completionName);
+			
+			if(log != null){
+				Log.log("Generated jorth:\n" + log.output());
+				BytecodeUtils.printClass(file);
+			}
+			return Access.privateLookupIn(interf).defineClass(file);
 		}catch(IllegalAccessException|MalformedJorth e){
 			throw new RuntimeException(e);
 		}
@@ -420,14 +429,15 @@ public class DefInstanceCompiler{
 		}
 	}
 	
-	private static synchronized <T extends IOInstance<T>> Class<T> generateImpl(Key<T> key, Specials specials, List<FieldInfo> fieldInfo, Optional<List<FieldInfo>> orderedFields){
-		var interf   = key.clazz;
-		var names    = key.includeNames;
+	private static synchronized <T extends IOInstance<T>> Class<T> generateImpl(Key<T> key, Specials specials, List<FieldInfo> fieldInfo, Optional<List<FieldInfo>> orderedFields, String humanName){
+		var interf = key.clazz;
+		var names  = key.includeNames;
+		
 		var implName = interf.getName() + IOInstance.Def.IMPL_NAME_POSTFIX + names.map(n -> n.stream().collect(Collectors.joining("_", "€€fields~", ""))).orElse("");
 		
-		var log = PRINT_BYTECODE? new StringJoiner(" ") : null;
+		var log = JorthLogger.make();
 		try{
-			var jorth = new Jorth(interf.getClassLoader(), PRINT_BYTECODE? log::add : null);
+			var jorth = new Jorth(interf.getClassLoader(), log == null? null : log::log);
 			
 			jorth.addImportAs(implName, "typ.impl");
 			jorth.addImportAs(interf.getName(), "typ.interf");
@@ -498,7 +508,7 @@ public class DefInstanceCompiler{
 				{
 					var format = interf.getAnnotation(IOInstance.Def.ToString.Format.class);
 					if(format != null){
-						generateFormatToString(key, includedFields, specials, writer, format);
+						generateFormatToString(key, includedFields, specials, writer, format, humanName);
 						break stringSaga;
 					}
 					
@@ -515,8 +525,8 @@ public class DefInstanceCompiler{
 			}
 			
 			var file = jorth.getClassFile(implName);
-			if(PRINT_BYTECODE){
-				Log.log(log.toString());
+			if(log != null){
+				Log.log(log.output());
 				BytecodeUtils.printClass(file);
 			}
 			//noinspection unchecked
@@ -555,14 +565,14 @@ public class DefInstanceCompiler{
 			interf.getName());
 	}
 	
-	private static <T extends IOInstance<T>> void generateFormatToString(Key<T> interf, List<FieldInfo> fieldInfo, Specials specials, CodeStream writer, IOInstance.Def.ToString.Format format) throws MalformedJorth{
+	private static <T extends IOInstance<T>> void generateFormatToString(Key<T> interf, List<FieldInfo> fieldInfo, Specials specials, CodeStream writer, IOInstance.Def.ToString.Format format, String humanName) throws MalformedJorth{
 		var fragment = ToStringFormat.parse(format.value(), fieldInfo.stream().map(FieldInfo::name).toList());
 		
 		if(specials.toStr.isEmpty()){
-			generateFormatToString(interf, fieldInfo, "toString", true, fragment, writer);
+			generateFormatToString(interf, fieldInfo, "toString", true, fragment, writer, humanName);
 		}
 		if(specials.toShortStr.isEmpty()){
-			generateFormatToString(interf, fieldInfo, "toShortString", false, fragment, writer);
+			generateFormatToString(interf, fieldInfo, "toShortString", false, fragment, writer, humanName);
 		}
 	}
 	
@@ -593,7 +603,7 @@ public class DefInstanceCompiler{
 		}
 	}
 	
-	private static void generateFormatToString(Key<?> key, List<FieldInfo> fieldInfo, String name, boolean all, ToStringFormat.ToStringFragment fragment, CodeStream writer) throws MalformedJorth{
+	private static void generateFormatToString(Key<?> key, List<FieldInfo> fieldInfo, String name, boolean all, ToStringFormat.ToStringFragment fragment, CodeStream writer, String humanName) throws MalformedJorth{
 		
 		writer.write(
 			"""
@@ -619,9 +629,9 @@ public class DefInstanceCompiler{
 				return;
 			}
 			compact.add(frag);
-		});
+		}, humanName);
 		
-		executeStringFragment(key.clazz, fieldInfo, new Concat(compact), all, writer);
+		executeStringFragment(key.clazz, fieldInfo, new Concat(compact), all, writer, humanName);
 		
 		writer.write(
 			"""
@@ -630,42 +640,45 @@ public class DefInstanceCompiler{
 				""");
 	}
 	
-	private static void processFragments(Class<?> interf, ToStringFormat.ToStringFragment fragment, boolean all, Consumer<ToStringFormat.ToStringFragment> out) throws MalformedJorth{
+	private static void processFragments(Class<?> interf, ToStringFormat.ToStringFragment fragment, boolean all, Consumer<ToStringFormat.ToStringFragment> out, String humanName) throws MalformedJorth{
 		switch(fragment){
 			case NOOP ignored -> { }
 			case Concat f -> {
 				for(var child : f.fragments()){
-					processFragments(interf, child, all, out);
+					processFragments(interf, child, all, out, humanName);
 				}
 			}
 			case Literal f -> out.accept(f);
 			case SpecialValue f -> {
 				switch(f.value()){
-					case CLASS_NAME -> out.accept(new Literal(interf.getSimpleName()));
+					case CLASS_NAME -> out.accept(new Literal(humanName));
 					case null -> throw new NullPointerException();
 				}
 			}
 			case FieldValue frag -> out.accept(frag);
 			case OptionalBlock f -> {
 				if(all){
-					processFragments(interf, f.content(), true, out);
+					processFragments(interf, f.content(), true, out, humanName);
 				}
 			}
 		}
 	}
 	
-	private static void executeStringFragment(Class<?> interf, List<FieldInfo> fieldInfo, ToStringFormat.ToStringFragment fragment, boolean all, CodeStream writer) throws MalformedJorth{
+	private static void executeStringFragment(
+		Class<?> interf, List<FieldInfo> fieldInfo, ToStringFormat.ToStringFragment fragment,
+		boolean all, CodeStream writer, String humanName
+	) throws MalformedJorth{
 		switch(fragment){
 			case NOOP ignored -> { }
 			case Concat f -> {
 				for(var child : f.fragments()){
-					executeStringFragment(interf, fieldInfo, child, all, writer);
+					executeStringFragment(interf, fieldInfo, child, all, writer, humanName);
 				}
 			}
 			case Literal f -> append(writer, w -> w.write("'{}'", f.value()));
 			case SpecialValue f -> {
 				switch(f.value()){
-					case CLASS_NAME -> append(writer, w -> w.write("'{}'", interf.getSimpleName()));
+					case CLASS_NAME -> append(writer, w -> w.write("'{}'", humanName));
 					case null -> throw new NullPointerException();
 				}
 			}
@@ -680,7 +693,7 @@ public class DefInstanceCompiler{
 			}
 			case OptionalBlock f -> {
 				if(all){
-					executeStringFragment(interf, fieldInfo, f.content(), true, writer);
+					executeStringFragment(interf, fieldInfo, f.content(), true, writer, humanName);
 				}
 			}
 		}
@@ -802,11 +815,32 @@ public class DefInstanceCompiler{
 			for(int i = 0; i<orderedFields.size(); i++){
 				FieldInfo info     = orderedFields.get(i);
 				boolean   included = includeNames.map(in -> in.contains(info.name)).orElse(true);
-				boolean   isPtr    = info.type == ChunkPointer.class;
-				if(included || isPtr){
+				
+				boolean nullCheck;
+				if(info.type instanceof Class<?> c && c.isPrimitive()) nullCheck = false;
+				else nullCheck = info.type == ChunkPointer.class ||
+				                 info.annotations.stream()
+				                                 .filter(a -> a instanceof IONullability)
+				                                 .findAny()
+				                                 .map(a -> ((IONullability)a).value())
+				                                 .orElse(NOT_NULL) == NOT_NULL;
+				
+				if(nullCheck && !included){
+					writer.write(
+						"""
+							static call #Objects requireNonNull start
+								get #arg arg{}
+							end
+							pop
+							""", i);
+					continue;
+				}
+				
+				if(included || nullCheck){
 					writer.write("get #arg arg{}", i);
 				}
-				if(isPtr){
+				
+				if(nullCheck){
 					nullCheck(writer);
 				}
 				if(!included){

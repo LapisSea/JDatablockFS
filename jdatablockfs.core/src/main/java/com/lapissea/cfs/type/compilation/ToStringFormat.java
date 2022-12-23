@@ -1,6 +1,6 @@
 package com.lapissea.cfs.type.compilation;
 
-import com.lapissea.cfs.exceptions.MalformedStruct;
+import com.lapissea.cfs.exceptions.MalformedToStringFormat;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -75,16 +75,17 @@ public class ToStringFormat{
 					IllegalArgumentException org = null;
 					while(true){
 						try{
-							val = new ToStringFragment.SpecialValue(format.substring(range.from, range.to));
+							var trimmed = format.substring(range.from, range.to);
+							val = new ToStringFragment.SpecialValue(trimmed);
 							break;
 						}catch(IllegalArgumentException e){
 							if(org == null) org = e;
-							if(range.from == range.to) throw new MalformedStruct(org);
+							if(range.from == range.to) throw new MalformedToStringFormat("Unrecognised special value", org);
 						}
 						range = new Range(range.from, range.to - 1);
 					}
 					
-					i = range.to;
+					i = range.to - 1;
 					roots.add(val);
 					
 					continue;
@@ -103,7 +104,7 @@ public class ToStringFormat{
 				
 				ToStringFragment val;
 				while(true){
-					if(range.from == range.to) throw new MalformedStruct("Invalid toString format! Reason: " + format.substring(rangeOrg.from, rangeOrg.to) + " is an unknown name");
+					if(range.from == range.to) throw new MalformedToStringFormat("Invalid toString format! Reason: " + format.substring(rangeOrg.from, rangeOrg.to) + " is an unknown name");
 					var name = format.substring(range.from, range.to);
 					if(names.contains(name)){
 						val = new ToStringFragment.FieldValue(name);
@@ -128,7 +129,7 @@ public class ToStringFormat{
 							break findTo;
 						}
 					}
-					throw new MalformedStruct("illegal string format: " + format + " Opened [ but was not closed");
+					throw new MalformedToStringFormat("illegal string format: " + format + " Opened [ but was not closed");
 				}
 				
 				roots.add(new ToStringFragment.OptionalBlock(parse(format.substring(from, to), names)));
