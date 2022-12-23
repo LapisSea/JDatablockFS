@@ -248,7 +248,7 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 			if(db == null){
 				throw new RuntimeException(name + " was unable to be resolved and there is no db provided");
 			}
-			Log.trace("Loading template: {}", name);
+			Log.trace("Loading template: {}#yellow", name);
 			try{
 				return Class.forName(name, true, db.getTemplateLoader());
 			}catch(ClassNotFoundException ex){

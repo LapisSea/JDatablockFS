@@ -24,7 +24,6 @@ import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.StringJoiner;
 import java.util.function.Supplier;
 
 import static com.lapissea.util.ConsoleColors.*;
@@ -40,7 +39,6 @@ public final class TemplateClassLoader extends ClassLoader{
 	private static final Map<TypeNamed, byte[]> CLASS_DATA_CACHE = Collections.synchronizedMap(new WeakValueHashMap<>());
 	
 	private static final boolean PRINT_GENERATING_INFO = GlobalConfig.configFlag("classGen.printGeneratingInfo", false);
-	private static final boolean PRINT_BYTECODE        = GlobalConfig.configFlag("classGen.printBytecode", false);
 	private static final boolean EXIT_ON_FAIL          = GlobalConfig.configFlag("classGen.exitOnFail", false);
 	
 	private final IOTypeDB db;
@@ -89,15 +87,15 @@ public final class TemplateClassLoader extends ClassLoader{
 	private byte[] jorthGenerate(TypeNamed classType, UnsafeBiConsumer<TypeNamed, CodeStream, MalformedJorth> generator){
 		if(PRINT_GENERATING_INFO) LogUtil.println("generating", "\n" + TextUtil.toTable(classType.name, classType.def.getFields()));
 		
-		var log   = PRINT_BYTECODE? new StringJoiner(" ") : null;
-		var jorth = new Jorth(this, PRINT_BYTECODE? log::add : null);
+		var log   = JorthLogger.make();
+		var jorth = new Jorth(this, log == null? null : log::log);
 		
 		try(var writer = jorth.writer()){
 			generator.accept(classType, writer);
 		}catch(MalformedJorth e){
 			throw new RuntimeException("Failed to generate class " + classType.name, e);
 		}
-		if(PRINT_BYTECODE) Log.log(log.toString());
+		if(log != null) Log.log(log.output());
 		return jorth.getClassFile(classType.name);
 	}
 	
