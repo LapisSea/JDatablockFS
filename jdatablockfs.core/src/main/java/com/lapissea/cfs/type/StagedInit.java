@@ -1,12 +1,15 @@
 package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.GlobalConfig;
+import com.lapissea.cfs.internal.ClosableLock;
 import com.lapissea.cfs.internal.Runner;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 
 import java.util.*;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Condition;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -28,10 +31,12 @@ public abstract class StagedInit{
 	
 	public static final int STATE_ERROR = -2, STATE_NOT_STARTED = -1, STATE_START = 0, STATE_DONE = Integer.MAX_VALUE;
 	
-	private       int       state = STATE_NOT_STARTED;
-	private       Throwable e;
-	private final Object    lock  = new Object();
-	private       Thread    initThread;
+	private int       state = STATE_NOT_STARTED;
+	private Throwable e;
+	
+	private       Thread       initThread;
+	private final ClosableLock rLock     = ClosableLock.reentrant();
+	private final Condition    condition = rLock.newCondition();
 	
 	protected void init(boolean runNow, Runnable init){
 		init(runNow, init, null);
@@ -64,10 +69,10 @@ public abstract class StagedInit{
 					postValidate.run();
 				}
 			}catch(Throwable e){
-				state = STATE_ERROR;
-				this.e = e;
-				synchronized(lock){
-					lock.notifyAll();
+				try(var ignored = rLock.open()){
+					state = STATE_ERROR;
+					this.e = e;
+					condition.signalAll();
 				}
 			}finally{
 				initThread = null;
@@ -76,10 +81,10 @@ public abstract class StagedInit{
 	}
 	
 	protected final void setInitState(int state){
-		synchronized(lock){
+		try(var ignored = rLock.open()){
 			if(DEBUG_VALIDATION) validateNewState(state);
 			this.state = state;
-			lock.notifyAll();
+			condition.signalAll();
 		}
 	}
 	
@@ -163,16 +168,12 @@ public abstract class StagedInit{
 	}
 	
 	protected Throwable getErr(){
-		synchronized(lock){
-			return e;
-		}
+		return e;
 	}
 	
 	private void checkErr(){
-		synchronized(lock){
-			if(e == null) return;
-			throw new WaitException("Exception occurred while initializing: " + this, e);
-		}
+		if(e == null) return;
+		throw new WaitException("Exception occurred while initializing: " + this, e);
 	}
 	
 	public record StateInfo(int id, String name){
@@ -226,37 +227,27 @@ public abstract class StagedInit{
 	
 	
 	private void actuallyWaitForState(int state){
-		if(initThread == Thread.currentThread()){
+		var thread = Thread.currentThread();
+		if(initThread == thread){
 			throw new RuntimeException("Self deadlock");
 		}
 		
 		long start = System.nanoTime();
 		
-		while(e != null && System.nanoTime() - start<20*1_000_000L){
-			for(int i = 0; i<1000; i++){
-				Thread.onSpinWait();
-				if(this.state>=state){
-					checkErr();
-					return;
-				}
+		while(true){
+			try(var ignored = rLock.open()){
+				checkErr();
+				if(this.state>=state) break;
+				try{
+					condition.await(1, TimeUnit.SECONDS);
+				}catch(InterruptedException ignored1){ }
 			}
 		}
 		
-		while(true){
-			synchronized(lock){
-				checkErr();
-				if(this.state>=state){
-					checkErr();
-					var delta = System.nanoTime() - start;
-					if(delta>LONG_WAIT_THRESHOLD*1_000_000L){
-						Log.debug("Long wait on {}#yellow in {}#yellow for {#red{}ms#}", (Supplier<Object>)() -> stateToString(state), this, delta/1000_000);
-					}
-					return;
-				}
-				try{
-					lock.wait();
-				}catch(InterruptedException ignored){ }
-			}
+		checkErr();
+		var delta = System.nanoTime() - start;
+		if(delta>LONG_WAIT_THRESHOLD*1_000_000L){
+			Log.debug("Long wait on {}#yellow in {}#yellow for {#red{}ms#}", (Supplier<Object>)() -> stateToString(state), this, delta/1000_000);
 		}
 	}
 }

@@ -19,7 +19,9 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -398,7 +400,8 @@ public class DisplayIpc implements DataLogger{
 	private boolean                   active = true;
 	
 	private final Map<String, Object>  config;
-	private final Map<String, Session> sessions = new HashMap<>();
+	private final Map<String, Session> sessions     = new HashMap<>();
+	private final ReadWriteLock        sessionsLock = new ReentrantReadWriteLock();
 	
 	private static final Map<InetAddress, Long> FAILS = new ConcurrentHashMap<>();
 	
@@ -468,20 +471,31 @@ public class DisplayIpc implements DataLogger{
 	@Override
 	public Session getSession(String name){
 		if(sessionCreator == null) throw new Closed("This server has been closed");
-		synchronized(sessions){
+		var r = sessionsLock.readLock();
+		r.lock();
+		try{
+			var ses = sessions.get(name);
+			if(ses != null) return ses;
+		}finally{ r.unlock(); }
+		var w = sessionsLock.writeLock();
+		w.lock();
+		try{
 			return sessions.computeIfAbsent(name, sessionCreator);
-		}
+		}finally{ w.unlock(); }
 	}
 	
 	@Override
 	public void destroy(){
 		sessionCreator = null;
-		synchronized(sessions){
+		
+		var w = sessionsLock.writeLock();
+		w.lock();
+		try{
 			for(Session session : sessions.values()){
 				session.finish();
 			}
 			sessions.clear();
-		}
+		}finally{ w.unlock(); }
 	}
 	@Override
 	public boolean isActive(){

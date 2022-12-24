@@ -63,19 +63,17 @@ public class Runner{
 		return platformExecutor;
 	}
 	
-	private static void makeExecutor(){
-		synchronized(Runner.class){
-			if(platformExecutor != null) return;
-			platformExecutor = new ThreadPoolExecutor(
-				0, Integer.MAX_VALUE,
-				500, TimeUnit.MILLISECONDS,
-				new SynchronousQueue<>(),
-				Thread.ofPlatform()
-				      .group(new ThreadGroup(TextUtil.plural(BASE_NAME)))
-				      .name(BASE_NAME + "PWorker", 0)
-				      .daemon(true)::unstarted
-			);
-		}
+	private static synchronized void makeExecutor(){
+		if(platformExecutor != null) return;
+		platformExecutor = new ThreadPoolExecutor(
+			0, Integer.MAX_VALUE,
+			500, TimeUnit.MILLISECONDS,
+			new SynchronousQueue<>(),
+			Thread.ofPlatform()
+			      .group(new ThreadGroup(TextUtil.plural(BASE_NAME)))
+			      .name(BASE_NAME + "PWorker", 0)
+			      .daemon(true)::unstarted
+		);
 	}
 	
 	private static void pingWatcher(){
@@ -93,16 +91,29 @@ public class Runner{
 			int timeThreshold  = GlobalConfig.configInt(THRESHOLD_NAME_MILIS, 100);
 			int watcherTimeout = GlobalConfig.configInt(WATCHER_TIMEOUT_MILIS, 1000);
 			var toRestart      = new ArrayList<Task>();
+			
+			// debug wait prevents debugging sessions from often restarting the watcher by
+			// repeatedly sleeping for a short time and checking if it should still exit.
+			// When debugging the short sleeps will extend when ever the code is paused
+			var debugWait    = GlobalConfig.RELEASE_MODE? 0 : 200;
+			var debugCounter = 0;
+			
 			while(true){
 				boolean counted = false;
 				synchronized(TASKS){
 					if(TASKS.isEmpty()){
 						var d = Duration.between(lastTask, Instant.now());
-						if(d.toMillis()>watcherTimeout){
+						if(d.toMillis() - debugWait>watcherTimeout){
+							if(debugCounter<debugWait){
+								UtilL.sleep(1);
+								debugCounter++;
+								continue;
+							}
 							watcher = null;
 							Log.trace("{#yellowShut down " + BASE_NAME + "-watcher#}");
 							return;
 						}
+						debugCounter = 0;
 						try{
 							TASKS.wait(cherry? 200 : 20);
 						}catch(InterruptedException e){
@@ -111,6 +122,7 @@ public class Runner{
 						continue;
 					}
 					lastTask = Instant.now();
+					debugCounter = 0;
 					
 					for(int i = TASKS.size() - 1; i>=0; i--){
 						var t = TASKS.get(i);
