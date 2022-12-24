@@ -86,6 +86,9 @@ public sealed interface Token{
 			if(type == Word.class){
 				return Optional.of((T)new Word(line, value + ""));
 			}
+			if(type == ClassWord.class){
+				return Optional.of((T)new ClassWord(line, ClassName.dotted(value + "")));
+			}
 			return Token.super.as(type);
 		}
 		@Override

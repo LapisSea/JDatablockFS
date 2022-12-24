@@ -263,14 +263,9 @@ public class Utils{
 	}
 	
 	public static RuntimeException interceptClInit(Throwable e){
-		var trace = e.getStackTrace();
-		for(var el : trace){
-			if(List.of("of", "make").contains(el.getMethodName())) continue;
-			if(el.getMethodName().equals("<clinit>")){
-				LogUtil.println("CLINIT ERROR");
-				e.printStackTrace();
-			}
-			break;
+		if(StackWalker.getInstance().walk(s -> s.anyMatch(f -> f.getMethodName().equals("<clinit>")))){
+			LogUtil.printlnEr("CLINIT ERROR");
+			e.printStackTrace();
 		}
 		throw UtilL.uncheckedThrow(e);
 	}
