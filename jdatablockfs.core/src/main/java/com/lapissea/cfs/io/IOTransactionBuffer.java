@@ -1,13 +1,12 @@
 package com.lapissea.cfs.io;
 
 import com.lapissea.cfs.internal.MemPrimitive;
+import com.lapissea.cfs.internal.ReadWriteClosableLock;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.lang.invoke.VarHandle;
 import java.util.*;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
@@ -36,8 +35,8 @@ public final class IOTransactionBuffer{
 		}
 	}
 	
-	private final List<WriteEvent> writeEvents = new ArrayList<>();
-	private final ReadWriteLock    lock        = new ReentrantReadWriteLock();
+	private final List<WriteEvent>      writeEvents = new ArrayList<>();
+	private final ReadWriteClosableLock lock        = ReadWriteClosableLock.reentrant();
 	
 	private static boolean rangeOverlaps(long x1, long x2, long y1, long y2){
 		return x1<=(y2 - 1) && y1<=(x2 - 1);
@@ -51,12 +50,8 @@ public final class IOTransactionBuffer{
 		
 		int data;
 		
-		var l = lock.readLock();
-		l.lock();
-		try{
+		try(var ignored = lock.read()){
 			data = readSingle(offset);
-		}finally{
-			l.unlock();
 		}
 		if(data != -1) return data;
 		
@@ -140,9 +135,7 @@ public final class IOTransactionBuffer{
 	public int read(BaseAccess base, long offset, byte[] b, int off, int len) throws IOException{
 		doMerge(base, offset + len);
 		if(len == 0) return 0;
-		var l = lock.readLock();
-		l.lock();
-		try{
+		try(var ignored = lock.read()){
 			if(len == 1){
 				int byt = readSingle(offset);
 				if(byt != -1){
@@ -151,17 +144,13 @@ public final class IOTransactionBuffer{
 				}
 			}
 			return read0(base, offset, b, off, len);
-		}finally{
-			l.unlock();
 		}
 	}
 	
 	public long readWord(BaseAccess base, long offset, int len) throws IOException{
 		doMerge(base, offset + len);
 		if(len == 0) return 0;
-		var l = lock.readLock();
-		l.lock();
-		try{
+		try(var ignored = lock.read()){
 			if(writeEvents.isEmpty()){
 				byte[] buf = new byte[len];
 				base.read(offset, buf, 0, len);
@@ -189,8 +178,6 @@ public final class IOTransactionBuffer{
 			byte[] buf = new byte[len];
 			read0(base, offset, buf, 0, len);
 			return MemPrimitive.getWord(buf, 0, len);
-		}finally{
-			l.unlock();
 		}
 	}
 	
@@ -265,12 +252,8 @@ public final class IOTransactionBuffer{
 	private long modifiedCapacity = -1;
 	
 	public long getCapacity(long fallback){
-		var l = lock.readLock();
-		l.lock();
-		try{
+		try(var ignored = lock.read()){
 			return getCapacity0(fallback);
-		}finally{
-			l.unlock();
 		}
 	}
 	private long getCapacity0(long fallback){
@@ -288,12 +271,8 @@ public final class IOTransactionBuffer{
 	}
 	
 	public void capacityChange(long newCapacity){
-		var l = lock.writeLock();
-		l.lock();
-		try{
+		try(var ignored = lock.write()){
 			capacityChange0(newCapacity);
-		}finally{
-			l.unlock();
 		}
 	}
 	private void capacityChange0(long newCapacity){
@@ -335,21 +314,14 @@ public final class IOTransactionBuffer{
 	}
 	
 	public void write(long offset, byte[] b, int off, int len){
-		var l = lock.writeLock();
-		l.lock();
-		try{
+		try(var ignored = lock.write()){
 			write0(offset, b, off, len);
-		}finally{
-			l.unlock();
 		}
 	}
 	
 	public void writeWord(long offset, long v, int len){
-		var l = lock.writeLock();
-		l.lock();
-		
-		var newEnd = offset + len;
-		try{
+		try(var ignored = lock.write()){
+			var newEnd = offset + len;
 			if(!writeEvents.isEmpty()){
 				if(writeEvents.get(0).start()>newEnd){
 					writeEvents.add(0, makeWordEvent(offset, v, len));
@@ -385,10 +357,6 @@ public final class IOTransactionBuffer{
 			byte[] arr = new byte[len];
 			MemPrimitive.setWord(v, arr, 0, len);
 			write0(offset, arr, 0, len);
-			
-			
-		}finally{
-			l.unlock();
 		}
 	}
 	
@@ -518,9 +486,7 @@ public final class IOTransactionBuffer{
 		if(!optimize) return;
 		optimize = false;
 		
-		var l = lock.writeLock();
-		l.lock();
-		try{
+		try(var ignored = lock.write()){
 			for(int i = 0; i<writeEvents.size() - 1; i += 40){
 				dirty.add((int)((jitter + i)%(writeEvents.size() - 1)));
 			}
@@ -539,8 +505,6 @@ public final class IOTransactionBuffer{
 				}
 			}
 			dirty.clear();
-		}finally{
-			l.unlock();
 		}
 	}
 	
@@ -595,12 +559,8 @@ public final class IOTransactionBuffer{
 	public record TransactionExport(OptionalLong setCapacity, List<RandomIO.WriteChunk> writes){ }
 	
 	public TransactionExport export(){
-		var l = lock.writeLock();
-		l.lock();
-		try{
+		try(var ignored = lock.write()){
 			return export0();
-		}finally{
-			l.unlock();
 		}
 	}
 	private TransactionExport export0(){
@@ -620,37 +580,25 @@ public final class IOTransactionBuffer{
 	}
 	
 	public String infoString(){
-		var l = lock.readLock();
-		l.lock();
-		try{
+		try(var ignored = lock.read()){
 			if(writeEvents.isEmpty()) return "no data";
 			return getTotalBytes() + " bytes overridden in range " + writeEvents.get(0).start() + " - " + writeEvents.get(writeEvents.size() - 1).end();
-		}finally{
-			l.unlock();
 		}
 	}
 	
 	public int getChunkCount(){
-		var l = lock.readLock();
-		l.lock();
-		try{
+		try(var ignored = lock.read()){
 			return writeEvents.size();
-		}finally{
-			l.unlock();
 		}
 	}
 	
 	public long getTotalBytes(){
-		var l = lock.readLock();
-		l.lock();
-		try{
+		try(var ignored = lock.read()){
 			int sum = 0;
 			for(WriteEvent writeEvent : writeEvents){
 				sum += writeEvent.data.length;
 			}
 			return sum;
-		}finally{
-			l.unlock();
 		}
 	}
 	

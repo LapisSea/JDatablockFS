@@ -7,6 +7,7 @@ import com.lapissea.cfs.exceptions.FieldIsNullException;
 import com.lapissea.cfs.exceptions.MalformedObjectException;
 import com.lapissea.cfs.exceptions.MalformedPipe;
 import com.lapissea.cfs.internal.Access;
+import com.lapissea.cfs.internal.ClosableLock;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.content.ContentOutputBuilder;
 import com.lapissea.cfs.io.content.ContentReader;
@@ -32,8 +33,6 @@ import java.lang.annotation.Target;
 import java.lang.reflect.ParameterizedType;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -61,8 +60,9 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		private final Map<Struct<T>, Supplier<P>> specials = new HashMap<>();
 		private final PipeConstructor<T, P>       lConstructor;
 		private final Class<?>                    type;
-		private final Map<Struct<T>, Throwable>   errors   = new HashMap<>();
-		private final Map<Struct<T>, Lock>        locks    = Collections.synchronizedMap(new HashMap<>());
+		
+		private final Map<Struct<T>, Throwable>    errors = new HashMap<>();
+		private final Map<Struct<T>, ClosableLock> locks  = Collections.synchronizedMap(new HashMap<>());
 		
 		private StructGroup(Class<? extends StructPipe<?>> type){
 			try{
@@ -80,17 +80,13 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		}
 		
 		private P compute(Struct<T> struct, boolean runNow){
-			var lock = locks.computeIfAbsent(struct, __ -> new ReentrantLock());
-			lock.lock();
-			try{
+			try(var ignored = locks.computeIfAbsent(struct, __ -> ClosableLock.reentrant()).open()){
 				var cached = get(struct);
 				if(cached != null) return cached;
 				
 				var pipe = safeCompute(struct, runNow);
 				locks.remove(struct);
 				return pipe;
-			}finally{
-				lock.unlock();
 			}
 		}
 		

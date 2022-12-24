@@ -6,6 +6,7 @@ import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.exceptions.RecursiveStructCompilation;
 import com.lapissea.cfs.internal.Access;
+import com.lapissea.cfs.internal.ReadWriteClosableLock;
 import com.lapissea.cfs.internal.Runner;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.logging.Log;
@@ -30,8 +31,6 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.*;
 import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -147,7 +146,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		private boolean wait = true;
 	}
 	
-	private static final ReadWriteLock STRUCT_CACHE_LOCK = new ReentrantReadWriteLock();
+	private static final ReadWriteClosableLock STRUCT_CACHE_LOCK = ReadWriteClosableLock.reentrant();
 	
 	private static final Map<Class<?>, Struct<?>>  STRUCT_CACHE      = new WeakValueHashMap<>();
 	private static final Map<Class<?>, WaitHolder> NON_CONCRETE_WAIT = new HashMap<>();
@@ -155,14 +154,10 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	
 	public static void clear(){
 		if(!Access.DEV_CACHE) throw new RuntimeException();
-		var lock = STRUCT_CACHE_LOCK.writeLock();
-		lock.lock();
-		try{
+		try(var ignored = STRUCT_CACHE_LOCK.write()){
 			if(!STRUCT_THREAD_LOG.isEmpty()) throw new RuntimeException();
 			STRUCT_CACHE.clear();
 			StructPipe.clear();
-		}finally{
-			lock.unlock();
 		}
 	}
 	
@@ -241,13 +236,11 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		
 		S struct;
 		
-		var lock = STRUCT_CACHE_LOCK.writeLock();
-		lock.lock();
-		try{
+		try(var lock = STRUCT_CACHE_LOCK.write()){
 			recursiveCompileCheck(instanceClass);
 			
 			//If class was compiled in another thread this should early exit
-			var existing = getCachedUnsafe(instanceClass, lock);
+			var existing = getCachedUnsafe(instanceClass, lock.getLock());
 			if(existing != null) return (S)existing;
 			
 			Log.trace("Requested struct: {}#green{}#greenBright",
@@ -271,20 +264,14 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			}finally{
 				STRUCT_THREAD_LOG.remove(instanceClass);
 			}
-		}finally{
-			lock.unlock();
 		}
 		
 		if(needsImpl) struct.runOnState(STATE_CONCRETE_TYPE, () -> {
 			try{
 				var impl = struct.getConcreteType();
-				var wl   = STRUCT_CACHE_LOCK.writeLock();
-				wl.lock();
-				try{
+				try(var ignored = STRUCT_CACHE_LOCK.write()){
 					STRUCT_CACHE.put(impl, struct);
 					NON_CONCRETE_WAIT.remove(instanceClass).wait = false;
-				}finally{
-					wl.unlock();
 				}
 			}catch(Throwable ignored){ }
 		}, null);
@@ -311,12 +298,8 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	private static <T extends IOInstance<T>> Struct<T> getCached(Class<T> instanceClass){
-		var lock = STRUCT_CACHE_LOCK.readLock();
-		try{
-			lock.lock();
-			return getCachedUnsafe(instanceClass, lock);
-		}finally{
-			lock.unlock();
+		try(var lock = STRUCT_CACHE_LOCK.read()){
+			return getCachedUnsafe(instanceClass, lock.getLock());
 		}
 	}
 	

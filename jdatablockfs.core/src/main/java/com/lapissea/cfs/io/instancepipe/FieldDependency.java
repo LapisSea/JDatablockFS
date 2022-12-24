@@ -1,13 +1,12 @@
 package com.lapissea.cfs.io.instancepipe;
 
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.internal.ReadWriteClosableLock;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
 
 import java.util.*;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class FieldDependency<T extends IOInstance<T>>{
 	
@@ -21,10 +20,10 @@ public class FieldDependency<T extends IOInstance<T>>{
 	
 	
 	private final Map<IOField<T, ?>, Ticket<T>> singleDependencyCache     = new HashMap<>();
-	private final ReadWriteLock                 singleDependencyCacheLock = new ReentrantReadWriteLock();
+	private final ReadWriteClosableLock         singleDependencyCacheLock = ReadWriteClosableLock.reentrant();
 	
 	private final Map<FieldSet<T>, Ticket<T>> multiDependencyCache     = new HashMap<>();
-	private final ReadWriteLock               multiDependencyCacheLock = new ReentrantReadWriteLock();
+	private final ReadWriteClosableLock       multiDependencyCacheLock = ReadWriteClosableLock.reentrant();
 	
 	private final FieldSet<T> allFields;
 	
@@ -40,50 +39,33 @@ public class FieldDependency<T extends IOInstance<T>>{
 			return getDeps(selectedFields.get(0));
 		}
 		
-		var r = multiDependencyCacheLock.readLock();
-		r.lock();
-		try{
+		try(var ignored = multiDependencyCacheLock.read()){
 			var cached = multiDependencyCache.get(selectedFields);
 			if(cached != null) return cached;
-		}finally{
-			r.unlock();
 		}
-		var w = multiDependencyCacheLock.writeLock();
-		w.lock();
-		try{
+		try(var ignored = multiDependencyCacheLock.write()){
 			var cached = multiDependencyCache.get(selectedFields);
 			if(cached != null) return cached;
 			
 			var field = generateFieldsDependency(selectedFields);
 			multiDependencyCache.put(selectedFields, field);
 			return field;
-		}finally{
-			w.unlock();
 		}
-		
 	}
 	
 	public Ticket<T> getDeps(IOField<T, ?> selectedField){
-		var r = singleDependencyCacheLock.readLock();
-		r.lock();
-		try{
+		try(var ignored = singleDependencyCacheLock.read()){
 			var cached = singleDependencyCache.get(selectedField);
 			if(cached != null) return cached;
-		}finally{
-			r.unlock();
 		}
 		
-		var w = singleDependencyCacheLock.writeLock();
-		w.lock();
-		try{
+		try(var ignored = singleDependencyCacheLock.write()){
 			var cached = singleDependencyCache.get(selectedField);
 			if(cached != null) return cached;
 			
 			var field = generateFieldDependency(selectedField);
 			singleDependencyCache.put(selectedField, field);
 			return field;
-		}finally{
-			w.unlock();
 		}
 	}
 	

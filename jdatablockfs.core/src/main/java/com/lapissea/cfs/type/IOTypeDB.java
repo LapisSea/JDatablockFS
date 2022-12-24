@@ -1,6 +1,7 @@
 package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.chunk.DataProvider;
+import com.lapissea.cfs.internal.ReadWriteClosableLock;
 import com.lapissea.cfs.internal.Runner;
 import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.objects.ObjectID;
@@ -18,8 +19,6 @@ import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Modifier;
 import java.util.*;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 
 import static com.lapissea.cfs.GlobalConfig.TYPE_VALIDATION;
@@ -33,7 +32,7 @@ import static com.lapissea.cfs.GlobalConfig.TYPE_VALIDATION;
 public sealed interface IOTypeDB{
 	final class MemoryOnlyDB implements IOTypeDB{
 		
-		private final ReadWriteLock rwLock = new ReentrantReadWriteLock();
+		private final ReadWriteClosableLock rwLock = ReadWriteClosableLock.reentrant();
 		
 		private final Map<String, TypeDef> defs = new HashMap<>();
 		
@@ -50,21 +49,15 @@ public sealed interface IOTypeDB{
 		
 		@Override
 		public TypeID toID(TypeLink type, boolean recordNew){
-			var lock = rwLock.readLock();
-			lock.lock();
-			try{
+			try(var ignored = rwLock.read()){
 				var id = typToID.get(type);
 				if(id != null) return new TypeID(id, true);
-			}finally{
-				lock.unlock();
 			}
 			return newID(type, recordNew);
 		}
 		
 		private TypeID newID(TypeLink type, boolean recordNew){
-			var lock = rwLock.writeLock();
-			lock.lock();
-			try{
+			try(var ignored = rwLock.write()){
 				var newID = maxID() + 1;
 				if(!recordNew) return new TypeID(newID, false);
 				idToTyp.put(newID, type);
@@ -73,8 +66,6 @@ public sealed interface IOTypeDB{
 				
 				recordType(type);
 				return new TypeID(newID, true);
-			}finally{
-				lock.unlock();
 			}
 		}
 		
@@ -98,35 +89,23 @@ public sealed interface IOTypeDB{
 		
 		@Override
 		public TypeLink fromID(int id){
-			var lock = rwLock.readLock();
-			lock.lock();
-			try{
+			try(var ignored = rwLock.read()){
 				var type = idToTyp.get(id);
 				if(type == null){
 					throw new RuntimeException("Unknown type from ID of " + id);
 				}
 				return type;
-			}finally{
-				lock.unlock();
 			}
 		}
 		
 		public boolean hasType(TypeLink type){
-			var lock = rwLock.readLock();
-			lock.lock();
-			try{
+			try(var ignored = rwLock.read()){
 				return typToID.containsKey(type);
-			}finally{
-				lock.unlock();
 			}
 		}
 		public boolean hasID(int id){
-			var lock = rwLock.readLock();
-			lock.lock();
-			try{
+			try(var ignored = rwLock.read()){
 				return idToTyp.containsKey(id);
-			}finally{
-				lock.unlock();
 			}
 		}
 		

@@ -2,6 +2,7 @@ package com.lapissea.cfs.io.bit;
 
 import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.internal.MyUnsafe;
+import com.lapissea.cfs.internal.ReadWriteClosableLock;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
@@ -9,14 +10,12 @@ import com.lapissea.util.UtilL;
 import java.io.IOException;
 import java.lang.reflect.Array;
 import java.util.*;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.IntFunction;
 
 public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
 	
 	private static final Map<Class<? extends Enum>, EnumUniverse<?>> CACHE      = new HashMap<>();
-	private static final ReadWriteLock                               CACHE_LOCK = new ReentrantReadWriteLock();
+	private static final ReadWriteClosableLock                       CACHE_LOCK = ReadWriteClosableLock.reentrant();
 	
 	private interface UGet{
 		<E extends Enum<E>> E[] get(Class<E> type);
@@ -83,28 +82,19 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
 	public static <T extends Enum<T>> EnumUniverse<T> of(Class<T> type){
 		EnumUniverse<T> flags;
 		
-		var read = CACHE_LOCK.readLock();
-		try{
-			read.lock();
+		try(var ignored = CACHE_LOCK.read()){
 			flags = (EnumUniverse<T>)CACHE.get(type);
-		}finally{
-			read.unlock();
 		}
 		
 		if(flags == null){
 			ensureEnum(type);
-			var write = CACHE_LOCK.writeLock();
-			try{
-				write.lock();
-				
+			try(var ignored = CACHE_LOCK.write()){
 				flags = (EnumUniverse<T>)CACHE.get(type);
 				if(flags == null){
 					var newFlags = new EnumUniverse<>(type);
 					CACHE.put(type, newFlags);
 					return newFlags;
 				}
-			}finally{
-				write.unlock();
 			}
 		}
 		return flags;

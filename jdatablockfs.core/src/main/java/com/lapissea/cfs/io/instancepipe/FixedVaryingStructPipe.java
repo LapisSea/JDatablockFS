@@ -2,6 +2,7 @@ package com.lapissea.cfs.io.instancepipe;
 
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.UnsupportedStructLayout;
+import com.lapissea.cfs.internal.ReadWriteClosableLock;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.logging.Log;
@@ -14,10 +15,7 @@ import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.VaryingSize;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -31,7 +29,8 @@ public class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseFixedSt
 		
 		private List<Step> steps;
 		
-		private final Map<List<NumberSize>, FixedVaryingStructPipe<T>> cache = new ConcurrentHashMap<>();
+		private final Map<List<NumberSize>, FixedVaryingStructPipe<T>> cache     = new HashMap<>();
+		private final ReadWriteClosableLock                            cacheLock = ReadWriteClosableLock.reentrant();
 		
 		private ProviderReply(Struct<T> type){
 			this.type = type;
@@ -52,17 +51,15 @@ public class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseFixedSt
 			for(Step step : steps){
 				buff.add(rule.provide(step.max, step.ptr).size);
 			}
-			{
+			
+			try(var ignored = cacheLock.read()){
 				var cached = cache.get(buff);
-				if(cached != null){
-					return cached;
-				}
+				if(cached != null) return cached;
 			}
-			synchronized(cache){
+			
+			try(var ignored = cacheLock.write()){
 				var cached = cache.get(buff);
-				if(cached != null){
-					return cached;
-				}
+				if(cached != null) return cached;
 				
 				Log.trace("Creating new varying pip of {}#cyan with {}#purpleBright", type, buff);
 				
