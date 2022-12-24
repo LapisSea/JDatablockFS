@@ -30,8 +30,7 @@ import java.util.Objects;
 @StructPipe.Special
 public final class Reference extends IOInstance.Managed<Reference>{
 	
-	@SuppressWarnings("unchecked")
-	public static final Struct<Reference> STRUCT = (Struct<Reference>)Struct.thisClass();
+	public static final Struct<Reference> STRUCT = Struct.of(Reference.class);
 	
 	static{
 		boolean useOptimized = GlobalConfig.configFlag("abBenchmark.referenceOptimizedPipe", true);
@@ -114,7 +113,21 @@ public final class Reference extends IOInstance.Managed<Reference>{
 		}
 	}
 	
-	public static final FixedStructPipe<Reference> FIXED_PIPE = FixedStructPipe.of(STRUCT);
+	private static FixedStructPipe<Reference> FIXED_PIPE;
+	
+	static{
+		Thread.ofVirtual().start(Reference::ensurePipe);
+	}
+	
+	public static FixedStructPipe<Reference> fixedPipe(){
+		ensurePipe();
+		return FIXED_PIPE;
+	}
+	
+	private static void ensurePipe(){
+		if(FIXED_PIPE != null) return;
+		FIXED_PIPE = FixedStructPipe.of(STRUCT);
+	}
 	
 	private static final class IOContext implements RandomIO.Creator{
 		private final Reference    ref;

@@ -511,15 +511,15 @@ public sealed interface ValueStorage<T>{
 		if(clazz == String.class){
 			return switch(rule){
 				case StorageRule.Default ignored -> new InlineString(provider);
-				case StorageRule.FixedOnly ignored -> new FixedReferenceString(provider, Reference.FIXED_PIPE);
+				case StorageRule.FixedOnly ignored -> new FixedReferenceString(provider, Reference.fixedPipe());
 				case StorageRule.VariableFixed conf -> new FixedReferenceString(provider, FixedVaryingStructPipe.tryVarying(Reference.STRUCT, conf.provider));
 			};
 		}
 		
 		if(!IOInstance.isManaged(clazz)){
 			return switch(rule){
-				case StorageRule.Default ignored -> new UnmanagedInstance<>(typeDef, provider, Reference.FIXED_PIPE);//TODO: implement standard reference unmanaged
-				case StorageRule.FixedOnly ignored -> new UnmanagedInstance<>(typeDef, provider, Reference.FIXED_PIPE);
+				case StorageRule.Default ignored -> new UnmanagedInstance<>(typeDef, provider, Reference.fixedPipe());//TODO: implement standard reference unmanaged
+				case StorageRule.FixedOnly ignored -> new UnmanagedInstance<>(typeDef, provider, Reference.fixedPipe());
 				case StorageRule.VariableFixed conf -> new UnmanagedInstance<>(typeDef, provider, FixedVaryingStructPipe.tryVarying(Reference.STRUCT, conf.provider));
 			};
 		}else{
@@ -530,7 +530,7 @@ public sealed interface ValueStorage<T>{
 					try{
 						yield new FixedInstance<>(generics, provider, FixedStructPipe.of(struct, STATE_IO_FIELD));
 					}catch(UnsupportedStructLayout ignored1){
-						yield new FixedReferencedInstance<>(generics, provider, Reference.FIXED_PIPE, StandardStructPipe.of(struct));
+						yield new FixedReferencedInstance<>(generics, provider, Reference.fixedPipe(), StandardStructPipe.of(struct));
 					}
 				}
 				case StorageRule.VariableFixed conf -> {

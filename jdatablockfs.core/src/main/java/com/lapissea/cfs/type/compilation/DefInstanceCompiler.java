@@ -47,6 +47,33 @@ public class DefInstanceCompiler{
 	
 	public static void init(){ }
 	
+	static{
+		if(!Boolean.getBoolean("jorth.noPreload")){
+			Thread.ofVirtual().start(() -> {
+				var jorth = new Jorth(null, null);
+				try(var writer = jorth.writer()){
+					writer.write(
+						"""
+							class Preload start
+								
+								field a int
+								
+								function a
+									arg a int
+									returns int
+								start
+									get #arg a
+								end
+							end
+							"""
+					);
+				}catch(MalformedJorth e){
+					e.printStackTrace();
+				}
+			});
+		}
+	}
+	
 	private static final boolean EXIT_ON_FAIL = GlobalConfig.configFlag("classGen.exitOnFail", false);
 	
 	private record Specials(

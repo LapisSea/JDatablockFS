@@ -99,7 +99,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		return (StructPipe<VT>)switch(storage){
 			case ValueStorage.FixedInstance<?> fixedInstance -> fixedInstance.getPipe();
 			case ValueStorage.UnmanagedInstance<?> unmanagedInstance -> ((IOInstance.Unmanaged<?>)fieldValue).getPipe();
-			case ValueStorage.FixedReferencedInstance<?> fixedReferencedInstance -> Reference.FIXED_PIPE;
+			case ValueStorage.FixedReferencedInstance<?> fixedReferencedInstance -> Reference.fixedPipe();
 			case ValueStorage.Instance<?> ignored -> throw new UnsupportedOperationException();
 			case ValueStorage.FixedReferenceString ignored -> throw new UnsupportedOperationException();
 			case ValueStorage.InlineString ignored -> throw new UnsupportedOperationException();
