@@ -5,6 +5,8 @@ import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.exceptions.MalformedTemplateStruct;
 import com.lapissea.cfs.internal.Access;
+import com.lapissea.cfs.internal.ClosableLock;
+import com.lapissea.cfs.internal.ReadWriteClosableLock;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.type.*;
@@ -30,10 +32,6 @@ import java.lang.invoke.MethodHandle;
 import java.lang.reflect.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -52,11 +50,12 @@ public class DefInstanceCompiler{
 			Thread.ofVirtual().start(() -> {
 				var jorth = new Jorth(null, null);
 				try(var writer = jorth.writer()){
+					writer.codePart().close();
 					writer.write(
 						"""
-							class Preload start
+							class A start
 								
-								field a int
+								field a #String
 								
 								function a
 									arg a int
@@ -102,14 +101,20 @@ public class DefInstanceCompiler{
 			this.clazz = Objects.requireNonNull(clazz);
 			this.includeNames = includeNames.map(Set::copyOf);
 		}
+		
+		private Key<T> complete(){
+			return new Key<>(completeCached(clazz), includeNames);
+		}
 	}
+	
+	private record Result<T extends IOInstance<T>>(Class<T> impl, Optional<List<FieldInfo>> oOrderedFields){ }
 	
 	private static final class ImplNode<T extends IOInstance<T>>{
 		enum State{
 			NEW, COMPILING, DONE
 		}
 		
-		private final Lock lock = new ReentrantLock();
+		private final ClosableLock lock = ClosableLock.reentrant();
 		
 		private       State        state = State.NEW;
 		private final Key<T>       key;
@@ -120,10 +125,10 @@ public class DefInstanceCompiler{
 			this.key = key;
 		}
 		
-		private void init(Class<T> impl, Optional<List<FieldInfo>> oOrderedFields){
-			this.impl = impl;
-			if(oOrderedFields.isPresent()){
-				var ordered = oOrderedFields.get();
+		private void init(Result<T> result){
+			this.impl = result.impl;
+			if(result.oOrderedFields.isPresent()){
+				var ordered = result.oOrderedFields.get();
 				
 				try{
 					var ctr = impl.getConstructor(ordered.stream().map(f -> Utils.typeToRaw(f.type)).toArray(Class[]::new));
@@ -153,29 +158,25 @@ public class DefInstanceCompiler{
 		Objects.requireNonNull(impl);
 		if(!UtilL.instanceOf(impl, IOInstance.Def.class)) throw new IllegalArgumentException(impl.getName() + "");
 		var clazz = impl;
-		while(true){
+		do{
 			for(Class<?> interf : clazz.getInterfaces()){
 				if(interf.getName().endsWith(IMPL_COMPLETION_POSTFIX)){
-					var rl = COMPLETION_LOCK.readLock();
-					rl.lock();
-					try{
+					try(var ignored = COMPLETION_LOCK.read()){
 						var i      = interf;
 						var unfull = COMPLETION_CACHE.entrySet().stream().filter(e -> e.getValue() == i).findAny().map(Map.Entry::getKey);
 						if(unfull.isPresent()){
 							interf = unfull.get();
 						}
-					}finally{
-						rl.unlock();
 					}
 				}
+				//noinspection rawtypes
 				var node = CACHE.get(new Key(interf));
 				if(node != null && node.impl == impl){
 					return Optional.of((Class<T>)node.key.clazz);
 				}
 			}
 			clazz = clazz.getSuperclass();
-			if(clazz == null) break;
-		}
+		}while(clazz != null);
 		return Optional.empty();
 	}
 	
@@ -212,8 +213,7 @@ public class DefInstanceCompiler{
 		@SuppressWarnings("unchecked")
 		var node = (ImplNode<T>)CACHE.computeIfAbsent(key, i -> new ImplNode<>((Key<T>)i));
 		
-		node.lock.lock();
-		try{
+		try(var ignored = node.lock.open()){
 			switch(node.state){
 				case null -> throw new ShouldNeverHappenError();
 				case NEW -> { }
@@ -221,7 +221,7 @@ public class DefInstanceCompiler{
 				case DONE -> { return node; }
 			}
 			
-			compile(node);
+			compileNode(node);
 			
 			StagedInit.runBaseStageTask(() -> {
 				try{
@@ -237,15 +237,13 @@ public class DefInstanceCompiler{
 		}catch(Throwable e){
 			node.state = ImplNode.State.NEW;
 			throw e;
-		}finally{
-			node.lock.unlock();
 		}
 	}
 	
-	private static <T extends IOInstance<T>> void compile(ImplNode<T> node){
+	private static <T extends IOInstance<T>> void compileNode(ImplNode<T> node){
 		node.state = ImplNode.State.COMPILING;
 		
-		var key = node.key;
+		Key<T> key = node.key;
 		
 		var inter = key.clazz;
 		var hash  = inter.getClassLoader().hashCode();
@@ -262,10 +260,15 @@ public class DefInstanceCompiler{
 		);
 		
 		var humanName = inter.getSimpleName();
+		var compiled  = compile(key.complete(), humanName);
 		
-		var completeInter = completeInterface(inter);
-		key = new Key<>(completeInter, key.includeNames);
+		node.init(compiled);
 		
+		node.state = ImplNode.State.DONE;
+	}
+	
+	private static <T extends IOInstance<T>> Result<T> compile(Key<T> key, String humanName){
+		Class<T> completeInter = key.clazz;
 		
 		var getters  = new ArrayList<FieldStub>();
 		var setters  = new ArrayList<FieldStub>();
@@ -290,9 +293,9 @@ public class DefInstanceCompiler{
 		checkAnnotations(fieldInfo);
 		checkModel(fieldInfo);
 		
-		Class<T> impl;
 		try{
-			impl = generateImpl(key, specials, fieldInfo, orderedFields, humanName);
+			var impl = generateImpl(key, specials, fieldInfo, orderedFields, humanName);
+			return new Result<>(impl, orderedFields);
 		}catch(Throwable e){
 			if(EXIT_ON_FAIL){
 				new RuntimeException("failed to compile implementation for " + key.clazz.getName(), e).printStackTrace();
@@ -300,37 +303,25 @@ public class DefInstanceCompiler{
 			}
 			throw e;
 		}
-		
-		node.init(impl, orderedFields);
-		
-		node.state = ImplNode.State.DONE;
 	}
 	
 	private static final Map<Class<?>, Class<?>> COMPLETION_CACHE = new HashMap<>();
-	private static final ReadWriteLock           COMPLETION_LOCK  = new ReentrantReadWriteLock();
+	private static final ReadWriteClosableLock   COMPLETION_LOCK  = ReadWriteClosableLock.reentrant();
 	
 	@SuppressWarnings("unchecked")
-	private static <T extends IOInstance<T>> Class<T> completeInterface(Class<T> interf){
-		var rl = COMPLETION_LOCK.readLock();
-		rl.lock();
-		try{
+	private static <T extends IOInstance<T>> Class<T> completeCached(Class<T> interf){
+		try(var ignored = COMPLETION_LOCK.read()){
 			var cached = COMPLETION_CACHE.get(interf);
 			if(cached != null) return (Class<T>)cached;
-		}finally{
-			rl.unlock();
 		}
 		
-		var wl = COMPLETION_LOCK.writeLock();
-		wl.lock();
-		try{
+		try(var ignored = COMPLETION_LOCK.write()){
 			var cached = COMPLETION_CACHE.get(interf);
 			if(cached != null) return (Class<T>)cached;
 			
 			Class<?> complete = complete(interf);
 			COMPLETION_CACHE.put(interf, complete);
 			return (Class<T>)complete;
-		}finally{
-			wl.unlock();
 		}
 	}
 	
@@ -456,7 +447,7 @@ public class DefInstanceCompiler{
 		}
 	}
 	
-	private static synchronized <T extends IOInstance<T>> Class<T> generateImpl(Key<T> key, Specials specials, List<FieldInfo> fieldInfo, Optional<List<FieldInfo>> orderedFields, String humanName){
+	private static <T extends IOInstance<T>> Class<T> generateImpl(Key<T> key, Specials specials, List<FieldInfo> fieldInfo, Optional<List<FieldInfo>> orderedFields, String humanName){
 		var interf = key.clazz;
 		var names  = key.includeNames;
 		
@@ -1116,11 +1107,11 @@ public class DefInstanceCompiler{
 		var toStr      = Optional.<Method>empty();
 		var toShortStr = Optional.<Method>empty();
 		
-		var q = new LinkedList<Class<?>>();
-		q.add(interf);
-		var last = new LinkedList<Class<?>>();
+		var q = new ArrayDeque<Class<?>>(2);
+		q.addLast(interf);
+		var last = new ArrayList<Class<?>>(2);
 		while(!q.isEmpty()){
-			var clazz = q.remove(0);
+			var clazz = q.removeFirst();
 			last.add(clazz);
 			
 			toStr = toStr.or(() -> Arrays.stream(clazz.getMethods()).filter(m -> isToString(clazz, m, "toString")).findAny());
@@ -1131,7 +1122,7 @@ public class DefInstanceCompiler{
 				last.stream()
 				    .flatMap(t -> Arrays.stream(t.getInterfaces()))
 				    .filter(i -> i != IOInstance.Def.class && UtilL.instanceOf(interf, IOInstance.Def.class))
-				    .forEach(q::add);
+				    .forEach(q::addLast);
 				last.clear();
 			}
 		}

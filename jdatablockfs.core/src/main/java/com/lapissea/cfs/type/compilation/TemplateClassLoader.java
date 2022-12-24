@@ -159,8 +159,11 @@ public final class TemplateClassLoader extends ClassLoader{
 			
 			writer.write(
 				"""
-					function {!}
-						returns {}
+					function {!0}
+						returns {1}
+					end
+					function {!0}
+						arg {!0} {1}
 					end
 					""",
 				field.getName(),
