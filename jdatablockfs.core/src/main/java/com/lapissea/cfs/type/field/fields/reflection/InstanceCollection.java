@@ -4,7 +4,7 @@ import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.MalformedStruct;
-import com.lapissea.cfs.exceptions.RecursiveStructCompilation;
+import com.lapissea.cfs.exceptions.RecursiveSelfCompilation;
 import com.lapissea.cfs.io.bit.FlagReader;
 import com.lapissea.cfs.io.bit.FlagWriter;
 import com.lapissea.cfs.io.content.ContentReader;
@@ -414,7 +414,7 @@ public class InstanceCollection{
 				}else{
 					StandardStructPipe.of(component);
 				}
-			}catch(RecursiveStructCompilation e){
+			}catch(RecursiveSelfCompilation e){
 				Log.debug("recursive compilation for {}", component);
 			}
 			

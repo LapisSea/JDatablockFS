@@ -6,6 +6,7 @@ import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.FieldIsNullException;
 import com.lapissea.cfs.exceptions.MalformedObjectException;
 import com.lapissea.cfs.exceptions.MalformedPipe;
+import com.lapissea.cfs.exceptions.RecursiveSelfCompilation;
 import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.internal.ClosableLock;
 import com.lapissea.cfs.io.RandomIO;
@@ -61,8 +62,13 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		private final PipeConstructor<T, P>       lConstructor;
 		private final Class<?>                    type;
 		
-		private final Map<Struct<T>, Throwable>    errors = new HashMap<>();
-		private final Map<Struct<T>, ClosableLock> locks  = Collections.synchronizedMap(new HashMap<>());
+		private static class CompileInfo{
+			private ClosableLock lock = ClosableLock.reentrant();
+			private int          recursiveCompilingDepth;
+		}
+		
+		private final Map<Struct<T>, Throwable>   errors = new HashMap<>();
+		private final Map<Struct<T>, CompileInfo> locks  = Collections.synchronizedMap(new HashMap<>());
 		
 		private StructGroup(Class<? extends StructPipe<?>> type){
 			try{
@@ -80,9 +86,15 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		}
 		
 		private P compute(Struct<T> struct, boolean runNow){
-			try(var ignored = locks.computeIfAbsent(struct, __ -> ClosableLock.reentrant()).open()){
+			var info = locks.computeIfAbsent(struct, __ -> new CompileInfo());
+			try(var ignored = info.lock.open()){
 				var cached = get(struct);
 				if(cached != null) return cached;
+				
+				if(info.recursiveCompilingDepth>5){
+					throw new RecursiveSelfCompilation();
+				}
+				info.recursiveCompilingDepth++;
 				
 				var pipe = safeCompute(struct, runNow);
 				locks.remove(struct);

@@ -1,6 +1,7 @@
 package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.GlobalConfig;
+import com.lapissea.cfs.exceptions.RecursiveSelfCompilation;
 import com.lapissea.cfs.internal.ClosableLock;
 import com.lapissea.cfs.internal.Runner;
 import com.lapissea.cfs.logging.Log;
@@ -50,7 +51,11 @@ public abstract class StagedInit{
 				init.run();
 				setInitState(STATE_DONE);
 				if(postValidate != null){
-					postValidate.run();
+					try{
+						postValidate.run();
+					}catch(RecursiveSelfCompilation e){
+						Log.trace("{}#red has attempted to validate but it requires itself. Giving up.", this);//TODO: a better way?
+					}
 				}
 			}finally{
 				initThread = null;

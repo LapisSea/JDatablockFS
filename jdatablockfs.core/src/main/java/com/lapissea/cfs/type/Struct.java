@@ -4,7 +4,7 @@ import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.MalformedStruct;
-import com.lapissea.cfs.exceptions.RecursiveStructCompilation;
+import com.lapissea.cfs.exceptions.RecursiveSelfCompilation;
 import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.internal.ReadWriteClosableLock;
 import com.lapissea.cfs.internal.Runner;
@@ -341,7 +341,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	private static void recursiveCompileCheck(Class<?> interf){
 		Thread thread = STRUCT_THREAD_LOG.get(interf);
 		if(thread != null && thread == Thread.currentThread()){
-			throw new RecursiveStructCompilation("Recursive struct compilation");
+			throw new RecursiveSelfCompilation("Recursive struct compilation");
 		}
 	}
 	
