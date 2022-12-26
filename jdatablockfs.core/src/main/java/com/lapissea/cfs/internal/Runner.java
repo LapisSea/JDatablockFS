@@ -88,7 +88,7 @@ public class Runner{
 		return Thread.ofPlatform().name(BASE_NAME + "-watcher").daemon(true).start(() -> {
 			Log.trace("{#yellowStarting " + BASE_NAME + "-watcher#}");
 			
-			int timeThreshold  = GlobalConfig.configInt(THRESHOLD_NAME_MILIS, 100);
+			int timeThreshold  = GlobalConfig.configInt(THRESHOLD_NAME_MILIS, 2000/Runtime.getRuntime().availableProcessors());
 			int watcherTimeout = GlobalConfig.configInt(WATCHER_TIMEOUT_MILIS, 1000);
 			var toRestart      = new ArrayList<Task>();
 			
