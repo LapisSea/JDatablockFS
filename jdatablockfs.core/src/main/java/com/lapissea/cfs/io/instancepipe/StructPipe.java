@@ -96,9 +96,9 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				}
 				info.recursiveCompilingDepth++;
 				
-				var pipe = safeCompute(struct, runNow);
+				return createPipe(struct, runNow);
+			}finally{
 				locks.remove(struct);
-				return pipe;
 			}
 		}
 		
@@ -892,10 +892,9 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			inst.allocateNulls(man);
 		}
 		
-		var ch = AllocateTicket.withData(this, man, inst).submit(man);
-		
 		T instRead;
 		try{
+			var ch = AllocateTicket.withData(this, man, inst).submit(man);
 			write(ch, inst);
 			instRead = readNew(ch, null);
 		}catch(IOException e){

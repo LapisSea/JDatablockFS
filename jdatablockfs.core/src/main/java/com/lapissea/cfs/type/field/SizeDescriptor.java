@@ -1,11 +1,13 @@
 package com.lapissea.cfs.type.field;
 
 import com.lapissea.cfs.chunk.DataProvider;
+import com.lapissea.cfs.exceptions.FieldIsNullException;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
+import com.lapissea.cfs.type.field.annotations.IONullability;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -189,6 +191,9 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>> extends Ba
 			if(accessor.getType() != NumberSize.class){
 				throw new IllegalArgumentException(accessor + " is not of type " + NumberSize.class.getName());
 			}
+			if(IOFieldTools.getNullability(accessor) == IONullability.Mode.NULLABLE){
+				throw new IllegalArgumentException(accessor + " is nullable");
+			}
 			this.accessor = accessor;
 		}
 		
@@ -200,6 +205,9 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>> extends Ba
 		@Override
 		public long calcUnknown(VarPool<Inst> ioPool, DataProvider provider, Inst instance, WordSpace wordSpace){
 			var num = (NumberSize)accessor.get(ioPool, instance);
+			if(num == null){
+				throw new FieldIsNullException(null, () -> accessor + " value is null");
+			}
 			return switch(wordSpace){
 				case BYTE -> num.bytes;
 				case BIT -> num.bits();

@@ -27,7 +27,7 @@ public class FieldIsNullException extends NullPointerException{
 	
 	public FieldIsNullException(IOField<?, ?> field){
 		this.field = field;
-		msgMake = () -> Utils.typeToHuman(this.field.getClass(), false) + " - " + this.field + " is null";
+		msgMake = () -> this.field == null? "<unknown field>" : (Utils.typeToHuman(this.field.getClass(), false) + " - " + this.field) + " is null";
 	}
 	
 	public FieldIsNullException(IOField<?, ?> field, Supplier<String> msgMake){
