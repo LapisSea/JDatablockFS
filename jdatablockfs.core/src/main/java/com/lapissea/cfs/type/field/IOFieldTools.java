@@ -125,7 +125,14 @@ public class IOFieldTools{
 	}
 	
 	public static <T extends IOInstance<T>> OptionalLong sumVarsIfAll(Collection<? extends IOField<T, ?>> fields, Function<SizeDescriptor<T>, OptionalLong> mapper){
-		return fields.stream().map(IOField::getSizeDescriptor).map(mapper).reduce(OptionalLong.of(0), Utils::addIfBoth);
+		long sum = 0;
+		for(IOField<T, ?> field : fields){
+			var sizeDescriptor = field.getSizeDescriptor();
+			var size           = mapper.apply(sizeDescriptor);
+			if(size.isEmpty()) return size;
+			sum += size.getAsLong();
+		}
+		return OptionalLong.of(sum);
 	}
 	public static <T extends IOInstance<T>> long sumVars(Collection<? extends IOField<T, ?>> fields, ToLongFunction<SizeDescriptor<T>> mapper){
 		//return fields.stream().map(IOField::getSizeDescriptor).mapToLong(mapper).sum();
@@ -137,7 +144,13 @@ public class IOFieldTools{
 	}
 	
 	public static <T extends IOInstance<T>> WordSpace minWordSpace(Collection<? extends IOField<T, ?>> fields){
-		return fields.stream().map(IOField::getSizeDescriptor).map(SizeDescriptor::getWordSpace).reduce(WordSpace::min).orElse(WordSpace.MIN);
+		var acc = WordSpace.MIN;
+		for(IOField<T, ?> field : fields){
+			var descriptor = field.getSizeDescriptor();
+			var wordSpace  = descriptor.getWordSpace();
+			acc = acc.min(wordSpace);
+		}
+		return acc;
 	}
 	
 	public static <T extends IOInstance<T>> String makeCollectionLenName(FieldAccessor<T> field){
