@@ -105,7 +105,7 @@ public @interface IOValue{
 					INSTANCE,
 					IOFieldTools.makeRefName(field),
 					com.lapissea.cfs.objects.Reference.class,
-					List.of(IOFieldTools.makeAnnotation(IONullability.class, Map.of("value", IONullability.Mode.DEFAULT_IF_NULL)))
+					List.of(IOFieldTools.makeNullabilityAnn(IONullability.Mode.DEFAULT_IF_NULL))
 				));
 			}
 			@NotNull

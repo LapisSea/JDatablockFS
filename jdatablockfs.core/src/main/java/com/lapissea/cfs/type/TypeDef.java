@@ -48,7 +48,7 @@ public final class TypeDef extends IOInstance.Managed<TypeDef>{
 		public FieldDef(IOField<?, ?> field){
 			type = TypeLink.of(field.getAccessor().getGenericType(null));
 			name = field.getName();
-			nullability = field.getAccessor().getAnnotation(IONullability.class).map(IONullability::value).orElse(IONullability.Mode.NOT_NULL);
+			nullability = IOFieldTools.getNullability(field.getAccessor());
 			isDynamic = field.getAccessor().hasAnnotation(IODynamic.class);
 			referenceType = field.getAccessor().getAnnotation(IOValue.Reference.class).map(IOValue.Reference::dataPipeType).orElse(null);
 			var deps = field.dependencyStream().map(IOField::getName).collect(Collectors.toSet());

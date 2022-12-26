@@ -8,6 +8,7 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.SupportedPrimitive;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.compilation.DepSort;
+import com.lapissea.cfs.type.field.access.AnnotatedType;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IONullability;
@@ -30,6 +31,7 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NOT_NULL;
+import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NULLABLE;
 
 public class IOFieldTools{
 	
@@ -154,11 +156,14 @@ public class IOFieldTools{
 		return field.getName() + GENERATED_FIELD_SEPARATOR + "areNull";
 	}
 	
-	public static IONullability.Mode getNullability(FieldAccessor<?> field){
-		return getNullability(field, NOT_NULL);
+	public static boolean isNullable(AnnotatedType holder){
+		return getNullability(holder) == NULLABLE;
 	}
-	public static IONullability.Mode getNullability(FieldAccessor<?> field, IONullability.Mode defaultMode){
-		return field.getAnnotation(IONullability.class).map(IONullability::value).orElse(defaultMode);
+	public static IONullability.Mode getNullability(AnnotatedType holder){
+		return getNullability(holder, NOT_NULL);
+	}
+	public static IONullability.Mode getNullability(AnnotatedType holder, IONullability.Mode defaultMode){
+		return holder.getAnnotation(IONullability.class).map(IONullability::value).orElse(defaultMode);
 	}
 	
 	public static <T extends IOInstance<T>> String makeRefName(FieldAccessor<T> accessor){
@@ -175,10 +180,11 @@ public class IOFieldTools{
 		return baseName + GENERATED_FIELD_SEPARATOR + "pack";
 	}
 	
-	public static <E extends Annotation> E makeAnnotation(Class<E> annotationType){
-		return makeAnnotation(annotationType, Map.of());
+	public static IONullability makeNullabilityAnn(IONullability.Mode mode){
+		return makeAnnotation(IONullability.class, Map.of("value", mode));
 	}
 	
+	public static <E extends Annotation> E makeAnnotation(Class<E> annotationType){ return makeAnnotation(annotationType, Map.of()); }
 	public static <E extends Annotation> E makeAnnotation(Class<E> annotationType, @NotNull Map<String, Object> values){
 		Objects.requireNonNull(values);
 		Class<?>[] interfaces = annotationType.getInterfaces();

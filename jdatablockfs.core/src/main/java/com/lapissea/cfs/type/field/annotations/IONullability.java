@@ -18,7 +18,6 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -65,7 +64,7 @@ public @interface IONullability{
 						if(noNulls) return null;
 						return gen;
 					},
-					List.of(IOFieldTools.makeAnnotation(IONullability.class, Map.of("value", field.getAnnotation(IONullability.class).map(IONullability::value).orElse(Mode.NOT_NULL))))
+					List.of(IOFieldTools.makeNullabilityAnn(IOFieldTools.getNullability(field)))
 				));
 			}
 			
@@ -105,10 +104,6 @@ public @interface IONullability{
 		}
 		
 		
-		private <T extends IOInstance<T>> boolean isNullable(FieldAccessor<T> field){
-			return field.getAnnotation(IONullability.class).map(IONullability::value).orElseThrow() == IONullability.Mode.NULLABLE;
-		}
-		
 		private <T extends IOInstance<T>> boolean canHaveNullabilityField(FieldAccessor<T> field){
 			if(field.hasAnnotation(IOValue.Reference.class)) return false;
 			if(field.getType().isArray()) return true;
@@ -122,7 +117,7 @@ public @interface IONullability{
 		@Override
 		public <T extends IOInstance<T>> List<VirtualFieldDefinition<T, ?>> injectPerInstanceValue(FieldAccessor<T> field, IONullability annotation){
 			if(!canHaveNullabilityField(field)) return List.of();
-			if(!isNullable(field)) return List.of();
+			if(!IOFieldTools.isNullable(field)) return List.of();
 			
 			return List.of(new VirtualFieldDefinition<T, Boolean>(
 				StoragePool.IO,
@@ -135,7 +130,7 @@ public @interface IONullability{
 		@Override
 		public Set<String> getDependencyValueNames(FieldAccessor<?> field, IONullability annotation){
 			if(!canHaveNullabilityField(field)) return Set.of();
-			if(!isNullable(field)) return Set.of();
+			if(!IOFieldTools.isNullable(field)) return Set.of();
 			
 			return Set.of(IOFieldTools.makeNullFlagName(field));
 		}

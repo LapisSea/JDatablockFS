@@ -82,10 +82,10 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		P make(Struct<T> struct, boolean runNow){
 			var cached = get(struct);
 			if(cached != null) return cached;
-			return compute(struct, runNow);
+			return lockingMake(struct, runNow);
 		}
 		
-		private P compute(Struct<T> struct, boolean runNow){
+		private P lockingMake(Struct<T> struct, boolean runNow){
 			var info = locks.computeIfAbsent(struct, __ -> new CompileInfo());
 			try(var ignored = info.lock.open()){
 				var cached = get(struct);
@@ -102,7 +102,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			}
 		}
 		
-		P safeCompute(Struct<T> struct, boolean runNow){
+		private P createPipe(Struct<T> struct, boolean runNow){
 			var err = errors.get(struct);
 			if(err != null) throw err instanceof RuntimeException e? e : new RuntimeException(err);
 			

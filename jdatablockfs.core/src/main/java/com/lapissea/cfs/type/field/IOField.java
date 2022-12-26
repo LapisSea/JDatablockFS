@@ -173,7 +173,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 			if(STAT_LOGGING) logEnd(WRITE_ACTION, uid());
 		}catch(VaryingSize.TooSmall e){
 			throw e;
-		}catch(Exception e){
+		}catch(IOException e){
 			throw new IOException("Failed to write " + this, e);
 		}
 	}
@@ -183,7 +183,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 			if(STAT_LOGGING) logStart(READ_ACTION, uid());
 			read(ioPool, provider, src, instance, genericContext);
 			if(STAT_LOGGING) logEnd(READ_ACTION, uid());
-		}catch(Exception e){
+		}catch(IOException e){
 			throw new IOException("Failed to read " + this, e);
 		}
 	}
@@ -193,7 +193,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 			if(STAT_LOGGING) logStart(SKIP_READ_ACTION, uid());
 			skip(ioPool, provider, src, instance, genericContext);
 			if(STAT_LOGGING) logEnd(SKIP_READ_ACTION, uid());
-		}catch(Exception e){
+		}catch(IOException e){
 			throw new IOException("Failed to skip read " + this, e);
 		}
 	}
