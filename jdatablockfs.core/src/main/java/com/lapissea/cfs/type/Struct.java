@@ -372,7 +372,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			
 			isDefinition = UtilL.instanceOf(type, IOInstance.Def.class);
 			if(IOInstance.Def.isDefinition(type)){
-				concreteType = DefInstanceCompiler.getImpl(type, runNow);
+				concreteType = DefInstanceCompiler.getImpl(type);
 			}else concreteType = type;
 			
 			setInitState(STATE_CONCRETE_TYPE);

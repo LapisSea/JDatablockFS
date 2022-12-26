@@ -32,7 +32,7 @@ import static com.lapissea.cfs.type.field.annotations.IOValue.Reference.PipeType
 
 public class Cluster implements DataProvider{
 	
-	public static final  FixedStructPipe<RootRef> ROOT_PIPE       = FixedStructPipe.of(RootRef.class);
+	private static final FixedStructPipe<RootRef> ROOT_PIPE       = FixedStructPipe.of(RootRef.class);
 	private static final ChunkPointer             FIRST_CHUNK_PTR = ChunkPointer.of(MagicID.size());
 	
 	public static Cluster emptyMem() throws IOException{

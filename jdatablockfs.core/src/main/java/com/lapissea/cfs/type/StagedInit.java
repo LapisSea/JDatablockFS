@@ -20,7 +20,10 @@ import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 public abstract class StagedInit{
 	
 	private static final boolean DO_ASYNC            = GlobalConfig.configFlag("loading.async", true);
-	private static final int     LONG_WAIT_THRESHOLD = GlobalConfig.configInt("loading.longWaitThreshold", 300);
+	private static final int     LONG_WAIT_THRESHOLD = GlobalConfig.configInt(
+		"loading.longWaitThreshold",
+		GlobalConfig.RELEASE_MODE? -1 : 4000/Math.min(10, Runtime.getRuntime().availableProcessors())
+	);
 	
 	public static void runBaseStageTask(Runnable task){
 		if(DO_ASYNC){
@@ -250,9 +253,12 @@ public abstract class StagedInit{
 		}
 		
 		checkErr();
-		var delta = System.nanoTime() - start;
-		if(delta>LONG_WAIT_THRESHOLD*1_000_000L){
-			Log.debug("Long wait on {}#yellow in {}#yellow for {#red{}ms#}", (Supplier<Object>)() -> stateToString(state), this, delta/1000_000);
+		
+		if(LONG_WAIT_THRESHOLD>0){
+			var delta = System.nanoTime() - start;
+			if(delta>LONG_WAIT_THRESHOLD*1_000_000L){
+				Log.debug("Long wait on {}#yellow in {}#yellow for {#red{}ms#}", (Supplier<Object>)() -> stateToString(state), this, delta/1000_000);
+			}
 		}
 	}
 }

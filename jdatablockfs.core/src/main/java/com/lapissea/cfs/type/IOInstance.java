@@ -82,10 +82,9 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			class Cache{
 				static final Map<Sig, Function<?, ?>> CH = new ConcurrentHashMap<>();
 			}
-			if(isDefinition(type)) type = DefInstanceCompiler.getImpl(type, false);
 			
 			//noinspection unchecked
-			return (Function<A1, T>)Cache.CH.computeIfAbsent(new Sig(type, arg1Type), t -> {
+			return (Function<A1, T>)Cache.CH.computeIfAbsent(new Sig(ensureConcrete(type), arg1Type), t -> {
 				try{
 					var ctor = t.c.getConstructor(t.arg);
 					return Access.makeLambda(ctor, Function.class);
@@ -100,10 +99,8 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			class Cache{
 				static final Map<Sig, BiFunction<?, ?, ?>> CH = new ConcurrentHashMap<>();
 			}
-			if(isDefinition(type)) type = DefInstanceCompiler.getImpl(type, false);
-			
 			//noinspection unchecked
-			return (BiFunction<A1, A2, T>)Cache.CH.computeIfAbsent(new Sig(type, arg1Type, arg2Type), t -> {
+			return (BiFunction<A1, A2, T>)Cache.CH.computeIfAbsent(new Sig(ensureConcrete(type), arg1Type, arg2Type), t -> {
 				try{
 					var ctor = t.c.getConstructor(t.arg1, t.arg2);
 					return Access.makeLambda(ctor, BiFunction.class);
@@ -118,10 +115,8 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			class Cache{
 				static final Map<Sig, TriFunction<?, ?, ?, ?>> CH = new ConcurrentHashMap<>();
 			}
-			if(isDefinition(type)) type = DefInstanceCompiler.getImpl(type, false);
-			
 			//noinspection unchecked
-			return (TriFunction<A1, A2, A3, T>)Cache.CH.computeIfAbsent(new Sig(type, arg1Type, arg2Type, arg3Type), t -> {
+			return (TriFunction<A1, A2, A3, T>)Cache.CH.computeIfAbsent(new Sig(ensureConcrete(type), arg1Type, arg2Type, arg3Type), t -> {
 				try{
 					var ctor = t.c.getConstructor(t.arg1, t.arg2, t.arg3);
 					return Access.makeLambda(ctor, TriFunction.class);
@@ -136,9 +131,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			class Cache{
 				static final Map<Sig, MethodHandle> CH = new ConcurrentHashMap<>();
 			}
-			if(isDefinition(type)) type = DefInstanceCompiler.getImpl(type, false);
-			
-			return Cache.CH.computeIfAbsent(new Sig(type, argTypes.clone()), t -> {
+			return Cache.CH.computeIfAbsent(new Sig(ensureConcrete(type), argTypes.clone()), t -> {
 				try{
 					var ctor = t.c.getConstructor(t.args);
 					return Access.makeMethodHandle(ctor);
@@ -146,6 +139,11 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 					throw new RuntimeException(e);
 				}
 			});
+		}
+		
+		private static <T extends Def<T>> Class<T> ensureConcrete(Class<T> type){
+			if(!isDefinition(type)) return type;
+			return DefInstanceCompiler.getImpl(type);
 		}
 		
 		static <T extends Def<T>> T of(Class<T> clazz){

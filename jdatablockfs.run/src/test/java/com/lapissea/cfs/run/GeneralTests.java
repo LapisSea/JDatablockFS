@@ -10,13 +10,17 @@ import com.lapissea.cfs.io.content.ContentOutputStream;
 import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.NumberSize;
+import com.lapissea.cfs.objects.ObjectID;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.objects.collections.ContiguousIOList;
 import com.lapissea.cfs.objects.collections.HashIOMap;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.collections.LinkedIOList;
 import com.lapissea.cfs.objects.text.AutoText;
-import com.lapissea.cfs.type.*;
+import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.TypeDef;
+import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeConsumer;
 import org.testng.annotations.BeforeSuite;
@@ -43,17 +47,19 @@ public class GeneralTests{
 		
 		List<Struct<?>> tasks = new ArrayList<>();
 		
-		if(GlobalConfig.configFlag("test.standardInit", false)){
-			for(var typ : List.of(Chunk.class, Reference.class, AutoText.class, Cluster.RootRef.class, ContiguousIOList.class, LinkedIOList.class, HashIOMap.class, TypeDef.class)){
-				try{
-					tasks.add(Struct.ofUnknown(typ));
-				}catch(Throwable e){
-					e.printStackTrace();
-				}
+		try{
+			for(var typ : List.of(
+				Chunk.class, Reference.class, AutoText.class, Cluster.RootRef.class, ContiguousIOList.class,
+				LinkedIOList.class, HashIOMap.class, TypeDef.class, TypeLink.class, ObjectID.class
+			)){
+				tasks.add(Struct.ofUnknown(typ));
 			}
-		}
-		
-		if(GlobalConfig.configFlag("test.earlyRunCode", true)){
+			
+			tasks.forEach(t -> {
+				LogUtil.println("waiting for", t);
+				t.waitForStateDone();
+			});
+			
 			for(var prov : List.of(DataProvider.newVerySimpleProvider(), Cluster.emptyMem())){
 				try(var dummy = AllocateTicket.bytes(10).submit(prov).io()){
 					dummy.write(1);
@@ -61,9 +67,9 @@ public class GeneralTests{
 					dummy.write(new byte[5]);
 				}
 			}
+		}catch(Throwable e){
+			e.printStackTrace();
 		}
-		
-		tasks.forEach(StagedInit::waitForStateDone);
 	}
 	
 	@Test
