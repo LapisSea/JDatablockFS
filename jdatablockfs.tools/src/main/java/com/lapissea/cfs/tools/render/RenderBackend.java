@@ -395,23 +395,6 @@ public abstract class RenderBackend{
 		}
 	}
 	
-	public interface CreatorSource{
-		RenderBackend create();
-	}
-	
-	private static List<CreatorSource> BACKEND_SOURCES;
-	
-	public static synchronized List<CreatorSource> getBackendSources(){
-		if(BACKEND_SOURCES == null){
-			BACKEND_SOURCES = new ArrayList<>(List.of(
-				OpenGLBackend::new,
-				G2DBackend::new
-			));
-		}
-		return BACKEND_SOURCES;
-	}
-	
-	
 	public interface DisplayInterface{
 		
 		enum MouseKey{

@@ -3,6 +3,7 @@ package com.lapissea.cfs.chunk;
 import com.lapissea.cfs.MagicID;
 import com.lapissea.cfs.exceptions.DesyncedCacheException;
 import com.lapissea.cfs.exceptions.MalformedPointerException;
+import com.lapissea.cfs.io.IOHook;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.objects.ChunkPointer;
@@ -59,10 +60,10 @@ public interface DataProvider{
 	}
 	
 	static DataProvider newVerySimpleProvider(){
-		return newVerySimpleProvider((MemoryData.EventLogger)null);
+		return newVerySimpleProvider((IOHook)null);
 	}
 	
-	static DataProvider newVerySimpleProvider(MemoryData.EventLogger onWrite){
+	static DataProvider newVerySimpleProvider(IOHook onWrite){
 		var data = new MemoryData.Builder()
 			           .withOnWrite(onWrite)
 			           .withInitial(MagicID::write)

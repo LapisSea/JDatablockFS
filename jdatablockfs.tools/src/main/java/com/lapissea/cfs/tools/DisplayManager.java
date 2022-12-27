@@ -3,7 +3,9 @@ package com.lapissea.cfs.tools;
 import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.MemFrame;
+import com.lapissea.cfs.tools.render.G2DBackend;
 import com.lapissea.cfs.tools.render.ImGuiUtils;
+import com.lapissea.cfs.tools.render.OpenGLBackend;
 import com.lapissea.cfs.tools.render.RenderBackend;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.util.MathUtil;
@@ -51,14 +53,14 @@ public class DisplayManager implements DataLogger{
 		renderer = createBackend();
 		gridBuff = renderer.buffer();
 		
-		var graphRenderer = new GraphRenderer(renderer);
-		var gridRenderer  = new BinaryGridRenderer(RenderBackend.DRAW_DEBUG? renderer : gridBuff);
+		var graphRenderer = new DataRenderer.Lazy(() -> new GraphRenderer(renderer));
+		var gridRenderer  = new DataRenderer.Lazy(() -> new BinaryGridRenderer(RenderBackend.DRAW_DEBUG? renderer : gridBuff));
 		
 		splitRenderer = new DataRenderer.Split(List.of(gridRenderer, graphRenderer));
 		
 		Runnable updateTitle = () -> {
 			titleDirty = true;
-			gridRenderer.markDirty();
+			splitRenderer.markDirty();
 			renderer.markFrameDirty();
 		};
 		sessionHost.activeFrame.register(i -> updateTitle.run());
@@ -70,12 +72,15 @@ public class DisplayManager implements DataLogger{
 	private RenderBackend createBackend(){
 		var fails = new LinkedList<Throwable>();
 		
-		for(var source : RenderBackend.getBackendSources()){
-			try{
-				return source.create();
-			}catch(Throwable e){
-				fails.add(e);
-			}
+		try{
+			return new OpenGLBackend();
+		}catch(Throwable e){
+			fails.add(e);
+		}
+		try{
+			return new G2DBackend();
+		}catch(Throwable e){
+			fails.add(e);
 		}
 		
 		var e = new RuntimeException("Failed to create render display");

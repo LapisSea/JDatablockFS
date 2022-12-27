@@ -2,14 +2,12 @@ package com.lapissea.cfs.io.impl;
 
 import com.lapissea.cfs.internal.IUtils;
 import com.lapissea.cfs.internal.MemPrimitive;
-import com.lapissea.cfs.io.IOInterface;
-import com.lapissea.cfs.io.IOTransaction;
-import com.lapissea.cfs.io.IOTransactionBuffer;
-import com.lapissea.cfs.io.RandomIO;
+import com.lapissea.cfs.io.*;
 import com.lapissea.cfs.io.content.ContentOutputBuilder;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.TextUtil;
+import com.lapissea.util.ZeroArrays;
 import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.EOFException;
@@ -155,7 +153,7 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 			int remaining = (int)(getCapacity() - getPos());
 			if(remaining<=0) setCapacity(Math.max(4, Math.max(getCapacity() + 1, getCapacity() + 1 - remaining)));
 			write1(fileData, pos, (byte)b);
-			logWriteEvent(pos);
+			if(hook != null) logWriteEvent(pos);
 			pos++;
 			used = Math.max(used, pos);
 		}
@@ -180,7 +178,7 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 				pos += len;
 				used = Math.max(used, pos);
 			}
-			logWriteEvent(oldPos, oldPos + len);
+			if(hook != null) logWriteEvent(oldPos, oldPos + len);
 		}
 		
 		@Override
@@ -203,9 +201,7 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 				writeN(e.data(), e.dataOffset(), fileData, Math.toIntExact(e.ioOffset()), e.dataLength());
 			}
 			
-			if(onWrite != null){
-				logWriteEvent(writeData.stream().flatMapToLong(e -> LongStream.range(e.ioOffset(), e.ioOffset() + e.dataLength())));
-			}
+			if(hook != null) logWriteEvent(writeData.stream().flatMapToLong(e -> LongStream.range(e.ioOffset(), e.ioEnd())));
 		}
 		
 		private void write0(byte[] b, int off, int len){
@@ -234,7 +230,7 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 			var oldPos = pos;
 			pos += len;
 			used = Math.max(used, pos);
-			logWriteEvent(oldPos, oldPos + len);
+			if(hook != null) logWriteEvent(oldPos, oldPos + len);
 		}
 		
 		@Override
@@ -303,7 +299,7 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 		}
 	}
 	
-	public transient EventLogger onWrite;
+	private IOHook hook;
 	
 	protected DataType fileData;
 	protected int      used;
@@ -323,25 +319,25 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 		this.used = info.getUsed() == -1? getLength(fileData) : info.getUsed();
 		this.readOnly = info.isReadOnly();
 		
-		onWrite = info.getOnWrite();
+		hook = info.getOnWrite();
 	}
 	
 	private void logWriteEvent(long single){
-		if(onWrite != null){
-			logWriteEvent(LongStream.of(single));
-		}
+		logWriteEvent(LongStream.of(single));
 	}
 	private void logWriteEvent(long start, long end){
-		if(onWrite != null){
-			logWriteEvent(LongStream.range(start, end));
-		}
+		logWriteEvent(LongStream.range(start, end));
 	}
 	private void logWriteEvent(LongStream ids){
 		try{
-			onWrite.log(this, ids);
+			hook.writeEvent(this, ids);
 		}catch(Throwable e){
 			throw new RuntimeException("Exception on write event", e);
 		}
+	}
+	
+	public IOHook getHook(){
+		return hook;
 	}
 	
 	@Override
@@ -382,7 +378,7 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 		}
 		used = Math.min(used, newCapacity);
 		
-		logWriteEvent(lastCapacity, newCapacity);
+		if(hook != null) logWriteEvent(lastCapacity, newCapacity);
 	}
 	
 	@Override
@@ -445,10 +441,6 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 		return new Builder();
 	}
 	
-	public interface EventLogger{
-		void log(MemoryData<?> data, LongStream ids) throws IOException;
-	}
-	
 	public interface DataInitializer{
 		void init(ContentWriter dest) throws IOException;
 	}
@@ -458,7 +450,7 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 		private UnsafeSupplier<Object, IOException> dataProducer;
 		private boolean                             readOnly = false;
 		private int                                 used     = -1;
-		private EventLogger                         onWrite;
+		private IOHook                              onWrite;
 		
 		public Builder withInitial(DataInitializer init){
 			this.dataProducer = () -> {
@@ -507,18 +499,17 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 			return this;
 		}
 		
-		public Builder withOnWrite(EventLogger onWrite){
+		public Builder withOnWrite(IOHook onWrite){
 			this.onWrite = onWrite;
 			return this;
 		}
 		
 		private Object readData() throws IOException{
-			if(dataProducer == null) return withCapacity(32).readData();
-			
+			if(dataProducer == null) return ZeroArrays.ZERO_BYTE;
 			return dataProducer.get();
 		}
 		
-		public EventLogger getOnWrite(){
+		public IOHook getOnWrite(){
 			return onWrite;
 		}
 		

@@ -1,6 +1,7 @@
 package com.lapissea.cfs.run;
 
 import com.google.gson.GsonBuilder;
+import com.lapissea.util.UtilL;
 
 import java.io.File;
 import java.io.FileReader;
@@ -9,6 +10,7 @@ import java.util.AbstractMap;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
@@ -43,10 +45,10 @@ public class Configuration{
 						var str = val.toString();
 						try{
 							return new AbstractMap.SimpleImmutableEntry<>(name, Integer.parseInt(str));
-						}catch(NumberFormatException e){ }
+						}catch(NumberFormatException ignored){ }
 						try{
 							return new AbstractMap.SimpleImmutableEntry<>(name, Double.parseDouble(str));
-						}catch(NumberFormatException e1){ }
+						}catch(NumberFormatException ignored){ }
 						return new AbstractMap.SimpleImmutableEntry<>(name, str);
 					}
 				}).takeWhile(Objects::nonNull);
@@ -83,6 +85,9 @@ public class Configuration{
 	
 	public class View{
 		public int getInt(String name, int defaultValue){
+			while(readCounter.get()>0){
+				UtilL.sleep(1);
+			}
 			var val = arguments.get(name);
 			return switch(val){
 				case null -> defaultValue;
@@ -93,6 +98,9 @@ public class Configuration{
 			};
 		}
 		public boolean getBoolean(String name, boolean defaultValue){
+			while(readCounter.get()>0){
+				UtilL.sleep(1);
+			}
 			var val = arguments.get(name);
 			return switch(val){
 				case null -> defaultValue;
@@ -103,11 +111,23 @@ public class Configuration{
 		}
 	}
 	
-	private final Map<String, Object> arguments = new HashMap<>();
-	private final View                view      = new View();
+	private final Map<String, Object> arguments   = new HashMap<>();
+	private final View                view        = new View();
+	private final AtomicInteger       readCounter = new AtomicInteger();
 	
 	public void load(Loader source){
-		source.load().forEach(e -> arguments.put(e.getKey(), e.getValue()));
+		readCounter.incrementAndGet();
+		Thread.ofVirtual().start(() -> {
+			try{
+				source.load().forEach(e -> {
+					synchronized(arguments){
+						arguments.put(e.getKey(), e.getValue());
+					}
+				});
+			}finally{
+				readCounter.decrementAndGet();
+			}
+		});
 	}
 	
 	public View getView(){

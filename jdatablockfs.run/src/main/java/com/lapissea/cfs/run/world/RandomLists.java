@@ -46,7 +46,7 @@ public class RandomLists{
 							cl.defragment();
 						}finally{
 							logger.block();
-							mem.onWrite.log(mem, LongStream.of());
+							mem.getHook().writeEvent(mem, LongStream.of());
 						}
 					}catch(Throwable e){
 						throw new RuntimeException(e);

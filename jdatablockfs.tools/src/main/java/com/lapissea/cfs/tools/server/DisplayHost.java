@@ -218,13 +218,13 @@ public class DisplayHost{
 	}
 	
 	public void start(boolean lazyStart) throws IOException{
+		if(!lazyStart) getDisplay();
+		
 		var config = LoggedMemoryUtils.readConfig();
 		int port   = ((Number)config.getOrDefault("port", 6666)).intValue();
 		
 		ServerSocket server = new ServerSocket(port);
 		info("Started on port {}", port);
-		
-		if(!lazyStart) getDisplay();
 		
 		var initialData = System.getProperty("initialData");
 		if(initialData != null){

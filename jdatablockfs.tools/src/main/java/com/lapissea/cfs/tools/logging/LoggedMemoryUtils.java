@@ -1,14 +1,13 @@
 package com.lapissea.cfs.tools.logging;
 
 import com.google.gson.GsonBuilder;
+import com.lapissea.cfs.io.IOHook;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.tools.DisplayManager;
 import com.lapissea.cfs.tools.server.DisplayIpc;
 import com.lapissea.util.LateInit;
-import com.lapissea.util.LogUtil;
-import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.File;
@@ -22,9 +21,6 @@ import java.util.Map;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.LongStream;
-
-import static com.lapissea.util.LogUtil.Init.USE_CALL_POS;
-import static com.lapissea.util.LogUtil.Init.USE_TABULATED_HEADER;
 
 public class LoggedMemoryUtils{
 	
@@ -62,7 +58,7 @@ public class LoggedMemoryUtils{
 				session.accept(mem);
 			}finally{
 				logger.block();
-				mem.onWrite.log(mem, LongStream.of());
+				mem.getHook().writeEvent(mem, LongStream.of());
 			}
 		}finally{
 			logger.get().destroy();
@@ -70,99 +66,94 @@ public class LoggedMemoryUtils{
 	}
 	
 	public static LateInit.Safe<DataLogger> createLoggerFromConfig(){
-		var config = readConfig();
-		
-		if(LogUtil.Init.OUT == System.out){
-			var fancy = Boolean.parseBoolean(config.getOrDefault("fancyPrint", "true").toString());
-			LogUtil.Init.attach(fancy? USE_CALL_POS|USE_TABULATED_HEADER : 0);
-		}
-		
-		var loggerConfig = (Map<String, Object>)config.getOrDefault("logger", Map.of());
-		
-		var type = loggerConfig.getOrDefault("type", "none").toString();
-		
-		return new LateInit.Safe<>(() -> switch(type){
-			case "none" -> DataLogger.Blank.INSTANCE;
-			case "direct" -> new DisplayManager();
-			case "server" -> new DisplayIpc(loggerConfig);
-			default -> throw new IllegalArgumentException("logger.type unknown value \"" + type + "\"");
-		});
+		return new LateInit.Safe<>(() -> {
+			var config       = readConfig();
+			var loggerConfig = (Map<String, Object>)config.getOrDefault("logger", Map.of());
+			
+			var type = loggerConfig.getOrDefault("type", "none").toString();
+			return switch(type){
+				case "none" -> DataLogger.Blank.INSTANCE;
+				case "direct" -> new DisplayManager();
+				case "server" -> new DisplayIpc(loggerConfig);
+				default -> throw new IllegalArgumentException("logger.type unknown value \"" + type + "\"");
+			};
+		}, Thread.ofVirtual()::start);
 	}
 	
 	public static MemoryData<?> newLoggedMemory(String sessionName, LateInit<DataLogger, RuntimeException> logger) throws IOException{
-		MemoryData.EventLogger proxyLogger;
+		
+		IOHook proxyLogger = adaptToHook(sessionName, logger);
+		
+		MemoryData<?> mem = MemoryData.builder().withCapacity(0).withOnWrite(proxyLogger).build();
+		
+		mem.getHook().writeEvent(mem, LongStream.of());
+		
+		return mem;
+	}
+	
+	private static IOHook adaptToHook(String sessionName, LateInit<DataLogger, RuntimeException> logger){
+		long[] frameId = {0};
+		
 		if(logger.isInitialized()){
-			DataLogger disp = logger.get();
-			if(disp instanceof DataLogger.Blank){
-				proxyLogger = (d, i) -> { };
+			var l = logger.get();
+			if(!l.isActive()){
+				return (data, changeIds) -> { };
 			}else{
-				var ses = disp.getSession(sessionName);
-				if(ses == DataLogger.Session.Blank.INSTANCE) proxyLogger = (d, i) -> { };
-				else proxyLogger = new MemoryData.EventLogger(){
-					private long frameId = 0;
-					@Override
-					public void log(MemoryData<?> data, LongStream ids) throws IOException{
-						long id;
-						synchronized(this){
-							id = frameId;
-							frameId++;
-						}
-						ses.log(new MemFrame(id, System.nanoTime(), data.readAll(), ids.toArray(), new Throwable()));
-					}
+				return (data, changeIds) -> {
+					var memFrame = makeFrame(frameId, data, changeIds);
+					logger.get().getSession(sessionName).log(memFrame);
 				};
 			}
-		}else{
-			var  preBuf = new LinkedList<MemFrame>();
-			Lock lock   = new ReentrantLock();
-			Thread.ofVirtual().start(() -> {
-				UtilL.sleepUntil(logger::isInitialized, 20);
-				lock.lock();
-				try{
+		}
+		
+		var  preBuf = new LinkedList<MemFrame>();
+		Lock lock   = new ReentrantLock();
+		
+		Thread.ofVirtual().start(() -> {
+			logger.block();
+			lock.lock();
+			try{
+				var ses = logger.get().getSession(sessionName);
+				while(!preBuf.isEmpty()){
+					ses.log(preBuf.remove(0));
+				}
+			}catch(DataLogger.Closed ignored){
+			}finally{
+				lock.unlock();
+			}
+		});
+		
+		return (data, ids) -> {
+			if(logger.isInitialized()){
+				var d = logger.get();
+				if(!d.isActive()){
+					return;
+				}
+			}
+			var memFrame = makeFrame(frameId, data, ids);
+			lock.lock();
+			try{
+				if(logger.isInitialized()){
 					var ses = logger.get().getSession(sessionName);
 					while(!preBuf.isEmpty()){
 						ses.log(preBuf.remove(0));
 					}
-				}catch(DataLogger.Closed ignored){
-				}finally{
-					lock.unlock();
+					ses.log(memFrame);
+				}else{
+					preBuf.add(memFrame);
 				}
-			});
-			
-			long[] frameId = {0};
-			proxyLogger = (data, ids) -> {
-				if(logger.isInitialized()){
-					var d = logger.get();
-					if(!d.isActive()){
-						return;
-					}
-				}
-				long id;
-				synchronized(frameId){
-					id = frameId[0];
-					frameId[0]++;
-				}
-				var memFrame = new MemFrame(id, System.nanoTime(), data.readAll(), ids.toArray(), new Throwable());
-				lock.lock();
-				try{
-					if(logger.isInitialized()){
-						var ses = logger.get().getSession(sessionName);
-						while(!preBuf.isEmpty()){
-							ses.log(preBuf.remove(0));
-						}
-						ses.log(memFrame);
-					}else{
-						preBuf.add(memFrame);
-					}
-				}finally{
-					lock.unlock();
-				}
-			};
+			}finally{
+				lock.unlock();
+			}
+		};
+	}
+	
+	private static MemFrame makeFrame(long[] frameId, IOInterface data, LongStream ids) throws IOException{
+		long id;
+		synchronized(frameId){
+			id = frameId[0];
+			frameId[0]++;
 		}
-		
-		MemoryData<?> mem = MemoryData.builder().withCapacity(0).withOnWrite(proxyLogger).build();
-		
-		mem.onWrite.log(mem, LongStream.of());
-		
-		return mem;
+		return new MemFrame(id, System.nanoTime(), data.readAll(), ids.toArray(), new Throwable());
 	}
 }

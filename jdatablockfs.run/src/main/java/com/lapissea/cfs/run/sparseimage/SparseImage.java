@@ -47,7 +47,7 @@ public class SparseImage{
 				
 			}finally{
 				logger.block();
-				mem.onWrite.log(mem, LongStream.of());
+				mem.getHook().writeEvent(mem, LongStream.of());
 			}
 		}finally{
 			logger.get().destroy();

@@ -7,8 +7,63 @@ import com.lapissea.cfs.type.field.IOField;
 import java.awt.Color;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 public interface DataRenderer{
+	
+	class Lazy implements DataRenderer{
+		
+		private Supplier<DataRenderer>              maker;
+		private DataRenderer                        actual;
+		private Optional<SessionHost.HostedSession> displayedSession = Optional.empty();
+		
+		public Lazy(Supplier<DataRenderer> maker){
+			this.maker = maker;
+		}
+		
+		private synchronized void init(){
+			if(maker == null) return;
+			actual = maker.get();
+			actual.setDisplayedSession(displayedSession);
+			maker = null;
+		}
+		
+		@Override
+		public void markDirty(){
+			if(actual == null) return;
+			actual.markDirty();
+		}
+		@Override
+		public boolean isDirty(){
+			return actual == null || actual.isDirty();
+		}
+		@Override
+		public Optional<SessionHost.HostedSession> getDisplayedSession(){
+			if(actual == null) return displayedSession;
+			return actual.getDisplayedSession();
+		}
+		@Override
+		public void setDisplayedSession(Optional<SessionHost.HostedSession> displayedSession){
+			if(actual == null) this.displayedSession = displayedSession;
+			else actual.setDisplayedSession(displayedSession);
+		}
+		@Override
+		public int getFramePos(){
+			if(actual == null) return 0;
+			return actual.getFramePos();
+		}
+		@Override
+		public void notifyResize(){
+			if(actual == null) return;
+			actual.notifyResize();
+		}
+		@Override
+		public List<HoverMessage> render(){
+			if(actual == null) init();
+			return actual == null? List.of() : actual.render();
+		}
+		
+	}
 	
 	class Split implements DataRenderer{
 		
