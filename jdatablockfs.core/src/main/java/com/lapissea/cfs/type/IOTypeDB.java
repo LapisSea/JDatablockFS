@@ -1,7 +1,6 @@
 package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.chunk.DataProvider;
-import com.lapissea.cfs.internal.ReadWriteClosableLock;
 import com.lapissea.cfs.internal.Runner;
 import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.objects.ObjectID;
@@ -12,6 +11,7 @@ import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.objects.collections.LinkedIOList;
 import com.lapissea.cfs.type.compilation.TemplateClassLoader;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.cfs.utils.ReadWriteClosableLock;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.TextUtil;
 

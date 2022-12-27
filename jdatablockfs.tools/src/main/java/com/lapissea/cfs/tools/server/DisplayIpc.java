@@ -2,6 +2,8 @@ package com.lapissea.cfs.tools.server;
 
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.MemFrame;
+import com.lapissea.cfs.utils.ClosableLock;
+import com.lapissea.cfs.utils.ReadWriteClosableLock;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeBiConsumer;
 import com.lapissea.util.function.UnsafeConsumer;
@@ -18,10 +20,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -58,15 +56,12 @@ public class DisplayIpc implements DataLogger{
 			DataLogger.Session proxy;
 			
 			if(!threadedOutput){
-				Lock sendActionLock = new ReentrantLock();
+				var sendActionLock = ClosableLock.reentrant();
 				UnsafeBiConsumer<Action, UnsafeConsumer<DataOutputStream, IOException>, IOException> sendAction = (a, data) -> {
-					sendActionLock.lock();
-					try{
+					try(var ignored = sendActionLock.open()){
 						socketOut.write(a.ordinal());
 						ServerCommons.writeSafe(socketOut, data);
 						socketOut.flush();
-					}finally{
-						sendActionLock.unlock();
 					}
 				};
 				
@@ -204,7 +199,7 @@ public class DisplayIpc implements DataLogger{
 				};
 				
 				var queue     = new LinkedList<CompletableFuture<List<Event>>>();
-				var queueLock = new ReentrantLock();
+				var queueLock = ClosableLock.reentrant();
 				var hasTasks  = queueLock.newCondition();
 				var worker = new Thread("Socket data sender"){
 					private boolean run = true;
@@ -213,8 +208,7 @@ public class DisplayIpc implements DataLogger{
 						while(run || !queue.isEmpty()){
 							CompletableFuture<List<Event>> r;
 							
-							queueLock.lock();
-							try{
+							try(var ignored = queueLock.open()){
 								if(queue.isEmpty()){
 									try{
 										hasTasks.await();
@@ -225,8 +219,6 @@ public class DisplayIpc implements DataLogger{
 								}
 								
 								r = queue.remove(0);
-							}finally{
-								queueLock.unlock();
 							}
 							
 							var d = r.join();
@@ -239,11 +231,8 @@ public class DisplayIpc implements DataLogger{
 					
 					private void end(){
 						run = false;
-						queueLock.lock();
-						try{
+						try(var ignored = queueLock.open()){
 							hasTasks.signalAll();
-						}finally{
-							queueLock.unlock();
 						}
 						try{
 							join();
@@ -284,12 +273,9 @@ public class DisplayIpc implements DataLogger{
 						while(queue.size()>max){
 							UtilL.sleep(1);
 						}
-						queueLock.lock();
-						try{
+						try(var ignored = queueLock.open()){
 							queue.add(CompletableFuture.supplyAsync(e));
 							hasTasks.signalAll();
-						}finally{
-							queueLock.unlock();
 						}
 					}
 					private void stop(){
@@ -399,9 +385,9 @@ public class DisplayIpc implements DataLogger{
 	private Function<String, Session> sessionCreator;
 	private boolean                   active = true;
 	
-	private final Map<String, Object>  config;
-	private final Map<String, Session> sessions     = new HashMap<>();
-	private final ReadWriteLock        sessionsLock = new ReentrantReadWriteLock();
+	private final Map<String, Object>   config;
+	private final Map<String, Session>  sessions     = new HashMap<>();
+	private final ReadWriteClosableLock sessionsLock = ReadWriteClosableLock.reentrant();
 	
 	private static final Map<InetAddress, Long> FAILS = new ConcurrentHashMap<>();
 	
@@ -471,31 +457,25 @@ public class DisplayIpc implements DataLogger{
 	@Override
 	public Session getSession(String name){
 		if(sessionCreator == null) throw new Closed("This server has been closed");
-		var r = sessionsLock.readLock();
-		r.lock();
-		try{
+		try(var ignored = sessionsLock.read()){
 			var ses = sessions.get(name);
 			if(ses != null) return ses;
-		}finally{ r.unlock(); }
-		var w = sessionsLock.writeLock();
-		w.lock();
-		try{
+		}
+		try(var ignored = sessionsLock.write()){
 			return sessions.computeIfAbsent(name, sessionCreator);
-		}finally{ w.unlock(); }
+		}
 	}
 	
 	@Override
 	public void destroy(){
 		sessionCreator = null;
 		
-		var w = sessionsLock.writeLock();
-		w.lock();
-		try{
+		try(var ignored = sessionsLock.write()){
 			for(Session session : sessions.values()){
 				session.finish();
 			}
 			sessions.clear();
-		}finally{ w.unlock(); }
+		}
 	}
 	@Override
 	public boolean isActive(){

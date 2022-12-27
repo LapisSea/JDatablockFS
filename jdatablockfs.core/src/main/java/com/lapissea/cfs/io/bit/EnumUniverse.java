@@ -2,8 +2,8 @@ package com.lapissea.cfs.io.bit;
 
 import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.internal.MyUnsafe;
-import com.lapissea.cfs.internal.ReadWriteClosableLock;
 import com.lapissea.cfs.objects.NumberSize;
+import com.lapissea.cfs.utils.ReadWriteClosableLock;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
 

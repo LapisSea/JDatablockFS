@@ -2,7 +2,6 @@ package com.lapissea.cfs.io.instancepipe;
 
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.UnsupportedStructLayout;
-import com.lapissea.cfs.internal.ReadWriteClosableLock;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.logging.Log;
@@ -13,6 +12,7 @@ import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.VaryingSize;
+import com.lapissea.cfs.utils.ReadWriteClosableLock;
 
 import java.io.IOException;
 import java.util.*;

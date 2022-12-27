@@ -6,7 +6,6 @@ import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.exceptions.RecursiveSelfCompilation;
 import com.lapissea.cfs.internal.Access;
-import com.lapissea.cfs.internal.ReadWriteClosableLock;
 import com.lapissea.cfs.internal.Runner;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.logging.Log;
@@ -20,6 +19,7 @@ import com.lapissea.cfs.type.field.StoragePool;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.cfs.type.field.annotations.IODynamic;
 import com.lapissea.cfs.type.field.fields.RefField;
+import com.lapissea.cfs.utils.ReadWriteClosableLock;
 import com.lapissea.util.*;
 
 import java.io.IOException;

@@ -2,9 +2,9 @@ package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.exceptions.RecursiveSelfCompilation;
-import com.lapissea.cfs.internal.ClosableLock;
 import com.lapissea.cfs.internal.Runner;
 import com.lapissea.cfs.logging.Log;
+import com.lapissea.cfs.utils.ClosableLock;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 

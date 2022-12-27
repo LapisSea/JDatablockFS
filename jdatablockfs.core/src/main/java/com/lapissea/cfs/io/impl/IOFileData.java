@@ -1,12 +1,12 @@
 package com.lapissea.cfs.io.impl;
 
 import com.lapissea.cfs.GlobalConfig;
-import com.lapissea.cfs.internal.IUtils;
 import com.lapissea.cfs.internal.MemPrimitive;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.IOTransaction;
 import com.lapissea.cfs.io.IOTransactionBuffer;
 import com.lapissea.cfs.io.RandomIO;
+import com.lapissea.cfs.utils.IOUtils;
 import com.lapissea.util.NotNull;
 
 import java.io.*;
@@ -233,7 +233,7 @@ public final class IOFileData implements IOInterface, Closeable{
 		public void fillZero(long requestedMemory) throws IOException{
 			if(readOnly) throw new UnsupportedOperationException();
 			
-			IUtils.zeroFill((b, off, len) -> write(b, off, len, false), requestedMemory);
+			IOUtils.zeroFill((b, off, len) -> write(b, off, len, false), requestedMemory);
 		}
 		@Override
 		public boolean isReadOnly(){

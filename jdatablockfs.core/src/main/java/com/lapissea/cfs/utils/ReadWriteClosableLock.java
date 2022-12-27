@@ -1,4 +1,4 @@
-package com.lapissea.cfs.internal;
+package com.lapissea.cfs.utils;
 
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;

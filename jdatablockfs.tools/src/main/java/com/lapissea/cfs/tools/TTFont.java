@@ -2,6 +2,7 @@ package com.lapissea.cfs.tools;
 
 import com.lapissea.cfs.tools.render.GlUtils;
 import com.lapissea.cfs.tools.render.RenderBackend;
+import com.lapissea.cfs.utils.ReadWriteClosableLock;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.stb.STBTTAlignedQuad;
@@ -20,8 +21,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.IntStream;
@@ -130,11 +129,11 @@ public class TTFont extends DrawFont{
 		}
 	}
 	
-	private final ReadWriteLock      cacheLock   = new ReentrantReadWriteLock();
-	private final List<Bitmap>       bitmapCache = new ArrayList<>();
-	private final RenderBackend      renderer;
-	private final Runnable           renderRequest;
-	private final Consumer<Runnable> openglTask;
+	private final ReadWriteClosableLock cacheLock   = ReadWriteClosableLock.reentrant();
+	private final List<Bitmap>          bitmapCache = new ArrayList<>();
+	private final RenderBackend         renderer;
+	private final Runnable              renderRequest;
+	private final Consumer<Runnable>    openglTask;
 	
 	private static byte[] readData(String ttfPath){
 		try(var io = Objects.requireNonNull(TTFont.class.getResourceAsStream(ttfPath))){
@@ -188,10 +187,8 @@ public class TTFont extends DrawFont{
 	
 	private Bitmap getBitmap(float pixelHeight){
 		
-		var    r = cacheLock.readLock();
 		Bitmap best;
-		try{
-			r.lock();
+		try(var ignored = cacheLock.read()){
 			
 			if(bitmapCache.isEmpty()) bitmapCache.add(new Bitmap(Math.min(pixelHeight, 20)));
 			best = bitmapCache.get(0);
@@ -207,21 +204,15 @@ public class TTFont extends DrawFont{
 				if(thisDist<bestDist) best = bitmap;
 				
 			}
-		}finally{
-			r.unlock();
 		}
 		
 		gen:
 		if(!generating){
-			try{
-				r.lock();
-				
+			try(var ignored = cacheLock.read()){
 				for(Bitmap bitmap : bitmapCache){
 					var thisDist = Math.abs(bitmap.pixelHeight - pixelHeight);
 					if(thisDist<0.5) break gen;
 				}
-			}finally{
-				r.unlock();
 			}
 			
 			generating = true;
@@ -229,8 +220,7 @@ public class TTFont extends DrawFont{
 				try{
 					Bitmap bitmap = new Bitmap(pixelHeight);
 					
-					try{
-						r.lock();
+					try(var ignored = cacheLock.read()){
 						if(bitmapCache.size()>7){
 							IntStream.range(0, bitmapCache.size())
 							         .boxed()
@@ -238,15 +228,9 @@ public class TTFont extends DrawFont{
 							         .ifPresent(i -> bitmapCache.remove((int)i).free());
 						}
 						bitmap.lastUsed = System.currentTimeMillis();
-					}finally{
-						r.unlock();
 					}
-					var w = cacheLock.writeLock();
-					try{
-						w.lock();
+					try(var ignored = cacheLock.write()){
 						bitmapCache.add(bitmap);
-					}finally{
-						w.unlock();
 					}
 					renderRequest.run();
 				}finally{
@@ -313,13 +297,9 @@ public class TTFont extends DrawFont{
 		if(max<maxRequested){
 			max = maxRequested;
 			
-			var r = cacheLock.writeLock();
-			try{
-				r.lock();
+			try(var ignored = cacheLock.write()){
 				bitmapCache.forEach(Bitmap::free);
 				bitmapCache.clear();
-			}finally{
-				r.unlock();
 			}
 		}
 	}

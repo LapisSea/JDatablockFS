@@ -4,7 +4,6 @@ import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.DataProvider;
-import com.lapissea.cfs.internal.IUtils;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.ValueStorage;
 import com.lapissea.cfs.io.bit.FlagReader;
@@ -24,6 +23,7 @@ import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.annotations.IOValueUnmanaged;
 import com.lapissea.cfs.type.field.fields.NoIOField;
 import com.lapissea.cfs.type.field.fields.RefField;
+import com.lapissea.cfs.utils.IOUtils;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.ShouldNeverHappenError;
@@ -317,7 +317,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		var valueStart = valueStart();
 		var skipped    = io.skip(valueStart);
 		var toWrite    = valueStart - skipped;
-		IUtils.zeroFill(io::write, toWrite);
+		IOUtils.zeroFill(io::write, toWrite);
 		io.setPos(0);
 	}
 	

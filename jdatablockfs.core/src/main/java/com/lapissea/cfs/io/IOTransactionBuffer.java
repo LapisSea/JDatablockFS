@@ -1,7 +1,7 @@
 package com.lapissea.cfs.io;
 
 import com.lapissea.cfs.internal.MemPrimitive;
-import com.lapissea.cfs.internal.ReadWriteClosableLock;
+import com.lapissea.cfs.utils.ReadWriteClosableLock;
 import com.lapissea.util.UtilL;
 
 import java.io.IOException;

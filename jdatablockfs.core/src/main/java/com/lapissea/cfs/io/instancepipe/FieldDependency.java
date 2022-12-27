@@ -1,10 +1,10 @@
 package com.lapissea.cfs.io.instancepipe;
 
 import com.lapissea.cfs.Utils;
-import com.lapissea.cfs.internal.ReadWriteClosableLock;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.utils.ReadWriteClosableLock;
 
 import java.util.*;
 

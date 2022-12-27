@@ -7,6 +7,7 @@ import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.tools.DisplayManager;
 import com.lapissea.cfs.tools.server.DisplayIpc;
+import com.lapissea.cfs.utils.ClosableLock;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.function.UnsafeConsumer;
 
@@ -18,8 +19,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.LongStream;
 
 public class LoggedMemoryUtils{
@@ -106,20 +105,17 @@ public class LoggedMemoryUtils{
 			}
 		}
 		
-		var  preBuf = new LinkedList<MemFrame>();
-		Lock lock   = new ReentrantLock();
+		var preBuf = new LinkedList<MemFrame>();
+		var lock   = ClosableLock.reentrant();
 		
 		Thread.ofVirtual().start(() -> {
 			logger.block();
-			lock.lock();
-			try{
+			try(var ignored = lock.open()){
 				var ses = logger.get().getSession(sessionName);
 				while(!preBuf.isEmpty()){
 					ses.log(preBuf.remove(0));
 				}
 			}catch(DataLogger.Closed ignored){
-			}finally{
-				lock.unlock();
 			}
 		});
 		
@@ -131,8 +127,7 @@ public class LoggedMemoryUtils{
 				}
 			}
 			var memFrame = makeFrame(frameId, data, ids);
-			lock.lock();
-			try{
+			try(var ignored = lock.open()){
 				if(logger.isInitialized()){
 					var ses = logger.get().getSession(sessionName);
 					while(!preBuf.isEmpty()){
@@ -142,8 +137,6 @@ public class LoggedMemoryUtils{
 				}else{
 					preBuf.add(memFrame);
 				}
-			}finally{
-				lock.unlock();
 			}
 		};
 	}

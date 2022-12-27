@@ -1,7 +1,6 @@
 package com.lapissea.cfs.type.field.fields.reflection;
 
 import com.lapissea.cfs.chunk.DataProvider;
-import com.lapissea.cfs.internal.IUtils;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.instancepipe.FixedVaryingStructPipe;
@@ -13,6 +12,7 @@ import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.VaryingSize;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.fields.NullFlagCompanyField;
+import com.lapissea.cfs.utils.IOUtils;
 
 import java.io.IOException;
 import java.util.Objects;
@@ -87,7 +87,7 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 		if(nullable()){
 			if(val == null){
 				if(fixed){
-					IUtils.zeroFill(dest::write, (int)getSizeDescriptor().requireFixed(WordSpace.BYTE));
+					IOUtils.zeroFill(dest::write, (int)getSizeDescriptor().requireFixed(WordSpace.BYTE));
 				}
 				return;
 			}

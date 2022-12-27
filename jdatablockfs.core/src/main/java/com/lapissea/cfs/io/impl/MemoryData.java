@@ -1,10 +1,10 @@
 package com.lapissea.cfs.io.impl;
 
-import com.lapissea.cfs.internal.IUtils;
 import com.lapissea.cfs.internal.MemPrimitive;
 import com.lapissea.cfs.io.*;
 import com.lapissea.cfs.io.content.ContentOutputBuilder;
 import com.lapissea.cfs.io.content.ContentWriter;
+import com.lapissea.cfs.utils.IOUtils;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.ZeroArrays;
@@ -237,7 +237,7 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 		public void fillZero(long requestedMemory) throws IOException{
 			if(readOnly) throw new UnsupportedOperationException();
 			
-			IUtils.zeroFill((b, off, len) -> write(b, off, len, false), requestedMemory);
+			IOUtils.zeroFill((b, off, len) -> write(b, off, len, false), requestedMemory);
 		}
 		@Override
 		public boolean isReadOnly(){

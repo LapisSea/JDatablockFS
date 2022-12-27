@@ -1,10 +1,10 @@
-package com.lapissea.cfs.internal;
+package com.lapissea.cfs.utils;
 
 import java.io.IOException;
 
 import static com.lapissea.cfs.GlobalConfig.BATCH_BYTES;
 
-public class IUtils{
+public class IOUtils{
 	
 	public interface ConsumerBaII{
 		void accept(byte[] bytes, int off, int len) throws IOException;
