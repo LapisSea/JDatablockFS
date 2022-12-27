@@ -1,7 +1,6 @@
 package com.lapissea.cfs.run;
 
 import com.google.gson.GsonBuilder;
-import com.lapissea.util.UtilL;
 
 import java.io.File;
 import java.io.FileReader;
@@ -10,7 +9,6 @@ import java.util.AbstractMap;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
@@ -85,9 +83,6 @@ public class Configuration{
 	
 	public class View{
 		public int getInt(String name, int defaultValue){
-			while(readCounter.get()>0){
-				UtilL.sleep(1);
-			}
 			var val = arguments.get(name);
 			return switch(val){
 				case null -> defaultValue;
@@ -98,9 +93,6 @@ public class Configuration{
 			};
 		}
 		public boolean getBoolean(String name, boolean defaultValue){
-			while(readCounter.get()>0){
-				UtilL.sleep(1);
-			}
 			var val = arguments.get(name);
 			return switch(val){
 				case null -> defaultValue;
@@ -111,23 +103,11 @@ public class Configuration{
 		}
 	}
 	
-	private final Map<String, Object> arguments   = new HashMap<>();
-	private final View                view        = new View();
-	private final AtomicInteger       readCounter = new AtomicInteger();
+	private final Map<String, Object> arguments = new HashMap<>();
+	private final View                view      = new View();
 	
 	public void load(Loader source){
-		readCounter.incrementAndGet();
-		Thread.ofVirtual().start(() -> {
-			try{
-				source.load().forEach(e -> {
-					synchronized(arguments){
-						arguments.put(e.getKey(), e.getValue());
-					}
-				});
-			}finally{
-				readCounter.decrementAndGet();
-			}
-		});
+		source.load().forEach(e -> arguments.put(e.getKey(), e.getValue()));
 	}
 	
 	public View getView(){
