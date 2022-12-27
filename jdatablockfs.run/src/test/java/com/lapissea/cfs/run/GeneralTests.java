@@ -1,6 +1,5 @@
 package com.lapissea.cfs.run;
 
-import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.Cluster;
@@ -34,16 +33,16 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static com.lapissea.util.LogUtil.Init.USE_CALL_POS;
+import static com.lapissea.util.LogUtil.Init.USE_CALL_THREAD;
 import static com.lapissea.util.LogUtil.Init.USE_TABULATED_HEADER;
+import static com.lapissea.util.LogUtil.Init.USE_TIME_DELTA;
 import static org.testng.Assert.assertEquals;
 
 public class GeneralTests{
 	
 	@BeforeSuite
 	void init() throws IOException{
-		if(GlobalConfig.configFlag("test.tabPrint", false)){
-			LogUtil.Init.attach(USE_CALL_POS|USE_TABULATED_HEADER);
-		}
+		LogUtil.Init.attach(USE_CALL_POS|USE_CALL_THREAD|USE_TIME_DELTA|USE_TABULATED_HEADER);
 		
 		List<Struct<?>> tasks = new ArrayList<>();
 		
