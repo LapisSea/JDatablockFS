@@ -96,7 +96,7 @@ public @interface IONullability{
 		public static boolean canHave(AnnotatedType field){
 			var typ = field.getType();
 			if(typ.isPrimitive()) return false;
-			return field.hasAnnotation(IODynamic.class) || typ.isArray() ||
+			return IOFieldTools.isGeneric(field) || typ.isArray() ||
 			       Stream.concat(
 				       Stream.of(IOInstance.class, Enum.class, String.class),
 				       Arrays.stream(SupportedPrimitive.values()).map(p -> p.wrapper)
@@ -110,7 +110,7 @@ public @interface IONullability{
 			if(IOInstance.isInstance(field.getType())){
 				return IOInstance.isManaged(field.getType());
 			}
-			return UtilL.instanceOf(field.getType(), String.class) || field.hasAnnotation(IODynamic.class);
+			return UtilL.instanceOf(field.getType(), String.class) || IOFieldTools.isGeneric(field);
 		}
 		
 		@NotNull

@@ -15,9 +15,9 @@ import com.lapissea.cfs.type.compilation.DefInstanceCompiler;
 import com.lapissea.cfs.type.compilation.FieldCompiler;
 import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.StoragePool;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
-import com.lapissea.cfs.type.field.annotations.IODynamic;
 import com.lapissea.cfs.type.field.fields.RefField;
 import com.lapissea.cfs.utils.ReadWriteClosableLock;
 import com.lapissea.util.*;
@@ -461,7 +461,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			var acc = f.getAccessor();
 			if(acc == null) return true;
 			
-			if(acc.hasAnnotation(IODynamic.class)) return true;
+			if(IOFieldTools.isGeneric(acc)) return true;
 			if(f instanceof RefField) return true;
 			
 			if(acc.getType() == ChunkPointer.class) return true;

@@ -35,6 +35,10 @@ public interface GetAnnotation{
 			public boolean isPresent(Class<? extends Annotation> annotationClass){
 				return false;
 			}
+			@Override
+			public String toString(){
+				return "{}";
+			}
 		};
 		var dataFinal = Map.copyOf(data);
 		return new GetAnnotation(){
@@ -45,6 +49,10 @@ public interface GetAnnotation{
 			@Override
 			public boolean isPresent(Class<? extends Annotation> annotationClass){
 				return dataFinal.containsKey(annotationClass);
+			}
+			@Override
+			public String toString(){
+				return dataFinal.keySet().stream().map(Class::getSimpleName).collect(Collectors.joining(", ", "{", "}"));
 			}
 		};
 	}

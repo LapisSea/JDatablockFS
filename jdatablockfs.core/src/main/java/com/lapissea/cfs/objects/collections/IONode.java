@@ -17,10 +17,9 @@ import com.lapissea.cfs.type.TypeLink.Check.ArgCheck;
 import com.lapissea.cfs.type.field.*;
 import com.lapissea.cfs.type.field.access.AbstractFieldAccessor;
 import com.lapissea.cfs.type.field.access.TypeFlag;
-import com.lapissea.cfs.type.field.annotations.IODynamic;
 import com.lapissea.cfs.type.field.annotations.IONullability;
+import com.lapissea.cfs.type.field.annotations.IOUnmanagedValueInfo;
 import com.lapissea.cfs.type.field.annotations.IOValue;
-import com.lapissea.cfs.type.field.annotations.IOValueUnmanaged;
 import com.lapissea.cfs.type.field.fields.NoIOField;
 import com.lapissea.cfs.type.field.fields.RefField;
 import com.lapissea.cfs.utils.IOUtils;
@@ -32,7 +31,11 @@ import com.lapissea.util.UtilL;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Type;
-import java.util.*;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.OptionalLong;
+import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.type.TypeLink.Check.ArgCheck.RawCheck.INSTANCE_MANAGED;
@@ -66,132 +69,132 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	}
 	
 	private static final List<Annotation> ANNOTATIONS = List.of(
-		IOFieldTools.makeAnnotation(IODynamic.class, Map.of()),
-		IOFieldTools.makeAnnotation(IONullability.class, Map.of("value", IONullability.Mode.NULLABLE))
+		IOFieldTools.makeAnnotation(IOValue.Generic.class),
+		IOFieldTools.makeNullabilityAnn(IONullability.Mode.NULLABLE)
 	);
 	
+	@IOUnmanagedValueInfo
 	@SuppressWarnings({"unchecked", "rawtypes"})
-	@IOValueUnmanaged(index = 0)
-	private static <T> IOField<IONode<T>, Object> makeValField(){
-		var valueAccessor = new AbstractFieldAccessor<IONode<T>>(null, "value"){
-			@NotNull
-			@Override
-			public <T1 extends Annotation> Optional<T1> getAnnotation(Class<T1> annotationClass){
-				return ANNOTATIONS.stream().filter(a -> UtilL.instanceOfObj(a, annotationClass)).map(a -> (T1)a).findAny();
-			}
-			@Override
-			public Type getGenericType(GenericContext genericContext){
-				return Object.class;
-			}
-			@Override
-			public int getTypeID(){
-				return TypeFlag.ID_OBJECT;
-			}
-			@Override
-			public T get(VarPool<IONode<T>> ioPool, IONode<T> instance){
-				try{
-					return instance.getValue();
-				}catch(IOException e){
-					throw new RuntimeException(e);
+	private static <T> IOUnmanagedValueInfo.Data<IONode<T>> info(){
+		return () -> {
+			var valueAccessor = new AbstractFieldAccessor<IONode<T>>(null, "value"){
+				@NotNull
+				@Override
+				public <T1 extends Annotation> Optional<T1> getAnnotation(Class<T1> annotationClass){
+					return ANNOTATIONS.stream().filter(a -> UtilL.instanceOfObj(a, annotationClass)).map(a -> (T1)a).findAny();
 				}
-			}
-			@Override
-			public void set(VarPool<IONode<T>> ioPool, IONode<T> instance, Object value){
-				try{
-					if(value != null){
-						var arg = instance.getTypeDef().arg(0);
-						if(!UtilL.instanceOfObj(value, arg.getTypeClass(instance.getDataProvider().getTypeDb()))) throw new ClassCastException(arg + " not compatible with " + value);
+				@Override
+				public Type getGenericType(GenericContext genericContext){
+					return Object.class;
+				}
+				@Override
+				public int getTypeID(){
+					return TypeFlag.ID_OBJECT;
+				}
+				@Override
+				public T get(VarPool<IONode<T>> ioPool, IONode<T> instance){
+					try{
+						return instance.getValue();
+					}catch(IOException e){
+						throw new RuntimeException(e);
 					}
-					
-					instance.setValue((T)value);
-				}catch(IOException e){
-					throw new RuntimeException(e);
 				}
-			}
+				@Override
+				public void set(VarPool<IONode<T>> ioPool, IONode<T> instance, Object value){
+					try{
+						if(value != null){
+							var arg = instance.getTypeDef().arg(0);
+							if(!UtilL.instanceOfObj(value, arg.getTypeClass(instance.getDataProvider().getTypeDb()))) throw new ClassCastException(arg + " not compatible with " + value);
+						}
+						
+						instance.setValue((T)value);
+					}catch(IOException e){
+						throw new RuntimeException(e);
+					}
+				}
+			};
+			
+			SizeDescriptor<IONode<T>> valDesc = SizeDescriptor.Unknown.of(WordSpace.BYTE, 0, OptionalLong.empty(), (ioPool, prov, inst) -> {
+				var val = valueAccessor.get(ioPool, inst);
+				if(val == null) return 0;
+				var siz = inst.valueStorage.inlineSize();
+				if(inst.valueStorage instanceof ValueStorage.Instance iStor){
+					try{
+						return iStor.getPipe().calcUnknownSize(prov, (IOInstance)inst.getValue(), WordSpace.BYTE);
+					}catch(IOException e){
+						throw new RuntimeException(e);
+					}
+				}
+				return siz;
+			});
+			
+			var nextAccessor = new AbstractFieldAccessor<IONode<T>>(null, "next"){
+				@NotNull
+				@Override
+				public <T1 extends Annotation> Optional<T1> getAnnotation(Class<T1> annotationClass){
+					if(annotationClass != IONullability.class) return Optional.empty();
+					return (Optional<T1>)Optional.of(ANNOTATIONS.get(1));
+				}
+				@Override
+				public Type getGenericType(GenericContext genericContext){
+					if(genericContext == null) return IONode.class;
+					throw new NotImplementedException();
+				}
+				@Override
+				public int getTypeID(){
+					return TypeFlag.ID_OBJECT;
+				}
+				@Override
+				public Object get(VarPool<IONode<T>> ioPool, IONode<T> instance){
+					try{
+						return instance.getNext();
+					}catch(IOException e){
+						throw new RuntimeException(e);
+					}
+				}
+				@Override
+				public void set(VarPool<IONode<T>> ioPool, IONode<T> instance, Object value){
+					try{
+						instance.setNext((IONode<T>)value);
+					}catch(IOException e){
+						throw new RuntimeException(e);
+					}
+				}
+			};
+			
+			var next = new RefField.NoIO<IONode<T>, IONode<T>>(nextAccessor, SizeDescriptor.Unknown.of(WordSpace.BYTE, 0, NumberSize.LARGEST.optionalBytesLong, (ioPool, prov, node) -> node.nextSize.bytes)){
+				@Override
+				public void setReference(IONode<T> instance, Reference newRef){
+					if(newRef.getOffset() != 0) throw new NotImplementedException();
+					try{
+						instance.setNextRaw(newRef.getPtr());
+					}catch(IOException e){
+						throw new RuntimeException(e);
+					}
+				}
+				@Override
+				public Reference getReference(IONode<T> instance){
+					ChunkPointer next;
+					try{
+						next = instance.getNextPtr();
+					}catch(IOException e){
+						throw new RuntimeException(e);
+					}
+					return next.isNull()? new Reference() : next.makeReference();
+				}
+				@Override
+				public StructPipe<IONode<T>> getReferencedPipe(IONode<T> instance){
+					return instance.getPipe();
+				}
+			};
+			next.initLateData(FieldSet.of(List.of(getNextSizeField())));
+			
+			
+			return Stream.of(
+				next,
+				new NoIOField<>(valueAccessor, valDesc)
+			);
 		};
-		
-		SizeDescriptor<IONode<T>> valDesc = SizeDescriptor.Unknown.of(WordSpace.BYTE, 0, OptionalLong.empty(), (ioPool, prov, inst) -> {
-			var val = valueAccessor.get(ioPool, inst);
-			if(val == null) return 0;
-			var siz = inst.valueStorage.inlineSize();
-			if(inst.valueStorage instanceof ValueStorage.Instance iStor){
-				try{
-					return iStor.getPipe().calcUnknownSize(prov, (IOInstance)inst.getValue(), WordSpace.BYTE);
-				}catch(IOException e){
-					throw new RuntimeException(e);
-				}
-			}
-			return siz;
-		});
-		
-		return new NoIOField<>(valueAccessor, valDesc);
-	}
-	
-	@IOValueUnmanaged(index = 1)
-	@SuppressWarnings("unchecked")
-	private static <T extends IOInstance<T>> IOField<IONode<T>, IONode<T>> makeNextField(){
-		var nextAccessor = new AbstractFieldAccessor<IONode<T>>(null, "next"){
-			@NotNull
-			@Override
-			public <T1 extends Annotation> Optional<T1> getAnnotation(Class<T1> annotationClass){
-				if(annotationClass != IONullability.class) return Optional.empty();
-				return (Optional<T1>)Optional.of(ANNOTATIONS.get(1));
-			}
-			@Override
-			public Type getGenericType(GenericContext genericContext){
-				if(genericContext == null) return IONode.class;
-				throw new NotImplementedException();
-			}
-			@Override
-			public int getTypeID(){
-				return TypeFlag.ID_OBJECT;
-			}
-			@Override
-			public Object get(VarPool<IONode<T>> ioPool, IONode<T> instance){
-				try{
-					return instance.getNext();
-				}catch(IOException e){
-					throw new RuntimeException(e);
-				}
-			}
-			@Override
-			public void set(VarPool<IONode<T>> ioPool, IONode<T> instance, Object value){
-				try{
-					instance.setNext((IONode<T>)value);
-				}catch(IOException e){
-					throw new RuntimeException(e);
-				}
-			}
-		};
-		
-		var next = new RefField.NoIO<IONode<T>, IONode<T>>(nextAccessor, SizeDescriptor.Unknown.of(WordSpace.BYTE, 0, NumberSize.LARGEST.optionalBytesLong, (ioPool, prov, node) -> node.nextSize.bytes)){
-			@Override
-			public void setReference(IONode<T> instance, Reference newRef){
-				if(newRef.getOffset() != 0) throw new NotImplementedException();
-				try{
-					instance.setNextRaw(newRef.getPtr());
-				}catch(IOException e){
-					throw new RuntimeException(e);
-				}
-			}
-			@Override
-			public Reference getReference(IONode<T> instance){
-				ChunkPointer next;
-				try{
-					next = instance.getNextPtr();
-				}catch(IOException e){
-					throw new RuntimeException(e);
-				}
-				return next.isNull()? new Reference() : next.makeReference();
-			}
-			@Override
-			public StructPipe<IONode<T>> getReferencedPipe(IONode<T> instance){
-				return instance.getPipe();
-			}
-		};
-		next.initLateData(FieldSet.of(List.of(getNextSizeField())));
-		
-		return next;
 	}
 	
 	private static final TypeLink.Check NODE_TYPE_CHECK = new TypeLink.Check(

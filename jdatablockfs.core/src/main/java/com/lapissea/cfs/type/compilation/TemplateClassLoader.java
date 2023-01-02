@@ -8,7 +8,6 @@ import com.lapissea.cfs.type.TypeDef;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.access.AnnotatedType;
 import com.lapissea.cfs.type.field.annotations.IODependency;
-import com.lapissea.cfs.type.field.annotations.IODynamic;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.jorth.CodeStream;
@@ -114,42 +113,34 @@ public final class TemplateClassLoader extends ClassLoader{
 	
 	private void generateIOInstance(TypeNamed classType, CodeStream writer) throws MalformedJorth{
 		writer.addImportAs(classType.name, "genClassName");
-		writer.addImports(
-			IOInstance.Def.class,
-			IOValue.class,
-			IONullability.class,
-			IODynamic.class,
-			IODependency.class,
-			IOValue.Reference.class,
-			IOValue.Unsigned.class
-		);
 		
 		writer.write(
 			"""
-				implements #IOInstance.Def<#genClassName>
+				implements {}<#genClassName>
 				public interface #genClassName start
-				"""
+				""",
+			IOInstance.Def.class
 		);
 		
 		for(var field : classType.def.getFields()){
 			if(IONullability.NullLogic.canHave(new AnnotatedType.Simple(
-				field.isDynamic()? List.of(IOFieldTools.makeAnnotation(IODynamic.class)) : List.of(),
+				field.isDynamic()? List.of(IOFieldTools.makeAnnotation(IOValue.Generic.class)) : List.of(),
 				field.getType().getTypeClass(db)
 			))){
-				writer.write("@#IONullability start value {!} end", field.getNullability().toString());
+				writer.write("@{} start value {!} end", IONullability.class, field.getNullability().toString());
 			}
 			if(field.isDynamic()){
-				writer.write("@#IODynamic");
+				writer.write("@{}", IOValue.Generic.class);
 			}
 			if(field.isUnsigned()){
-				writer.write("@#IOValue.Unsigned");
+				writer.write("@{}", IOValue.Unsigned.class);
 			}
 			if(field.getReferenceType() != null){
-				writer.write("@#IOValue.Reference start dataPipeType {!} end", field.getReferenceType().toString());
+				writer.write("@{} start dataPipeType {!} end", IOValue.Reference.class, field.getReferenceType().toString());
 			}
 			if(!field.getDependencies().isEmpty()){
 				try(var ignored = writer.codePart()){
-					writer.write(" @#IODependency start value [");
+					writer.write(" @{} start value [", IODependency.class);
 					for(String dependency : field.getDependencies()){
 						writer.write("'{}'", dependency);
 					}

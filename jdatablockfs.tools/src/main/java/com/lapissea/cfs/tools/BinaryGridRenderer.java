@@ -1235,7 +1235,7 @@ public class BinaryGridRenderer implements DataRenderer{
 		}
 		
 		for(CRange flatRange : flatRanges){
-			DrawUtils.fillByteRange(alpha(flatRange.col, 0.15F), ctx, flatRange.rang);
+			DrawUtils.fillByteRange(alpha(flatRange.col, 0.3F), ctx, flatRange.rang);
 		}
 		
 		for(int i = ctx.hoverMessages.size() - 1; i>=0; i--){
@@ -1243,7 +1243,7 @@ public class BinaryGridRenderer implements DataRenderer{
 			if(hoverMessage.color() == null || hoverMessage.isRangeEmpty()){
 				continue;
 			}
-			ctx.renderer.setLineWidth(i + 1);
+			ctx.renderer.setLineWidth(1);
 			for(Range range : hoverMessage.ranges()){
 				outlineByteRange(hoverMessage.color(), ctx, range);
 			}

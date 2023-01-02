@@ -16,7 +16,6 @@ import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
-import com.lapissea.cfs.type.field.annotations.IODynamic;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.RefField;
@@ -54,11 +53,11 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		}
 		
 		@IONullability(NULLABLE)
-		@IODynamic
+		@IOValue.Generic
 		K key();
 		
 		@IONullability(NULLABLE)
-		@IODynamic
+		@IOValue.Generic
 		V value();
 		void value(V value);
 		

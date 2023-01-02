@@ -7,7 +7,6 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.SupportedPrimitive;
 import com.lapissea.cfs.type.VarPool;
-import com.lapissea.cfs.type.field.annotations.IODynamic;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.fields.RefField;
 import com.lapissea.util.NotImplementedException;
@@ -175,7 +174,7 @@ class FieldSupport{
 				typeFlags |= HAS_GENERATED_NAME;
 			}
 			
-			boolean isDynamic = accessor.hasAnnotation(IODynamic.class);
+			boolean isDynamic = IOFieldTools.isGeneric(accessor);
 			if(isDynamic){
 				typeFlags |= DYNAMIC_FLAG;
 			}

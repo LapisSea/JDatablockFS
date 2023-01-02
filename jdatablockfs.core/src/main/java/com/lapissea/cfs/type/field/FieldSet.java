@@ -123,6 +123,10 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		return new FieldSet<>((IOField<T, ?>[])data);
 	}
 	
+	@SafeVarargs
+	public static <T extends IOInstance<T>> FieldSet<T> of(IOField<T, ?>... data){
+		return of(Arrays.asList(data));
+	}
 	public static <T extends IOInstance<T>> FieldSet<T> of(Collection<IOField<T, ?>> data){
 		if(data == null || data.isEmpty()) return of();
 		return switch(data){

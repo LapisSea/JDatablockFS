@@ -12,12 +12,16 @@ import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.VarPool;
+import com.lapissea.cfs.type.field.access.AnnotatedType;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
+import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
 
 import java.io.IOException;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -28,7 +32,7 @@ import static com.lapissea.cfs.internal.StatIOField.*;
 import static com.lapissea.cfs.type.field.FieldSupport.STAT_LOGGING;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 
-public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<T>, Stringify{
+public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<T>, Stringify, AnnotatedType{
 	
 	private final FieldAccessor<T> accessor;
 	
@@ -236,8 +240,9 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 		return uid;
 	}
 	
-	public String getName()                    { return getAccessor().getName(); }
-	public Class<?> getType()                  { return getAccessor().getType(); }
+	public String getName(){ return getAccessor().getName(); }
+	@Override
+	public Class<?> getType(){ return getAccessor().getType(); }
 	public final FieldAccessor<T> getAccessor(){ return accessor; }
 	public final Struct<T> declaringStruct(){
 		var acc = getAccessor();
@@ -332,6 +337,25 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 	
 	public final boolean nullable(){
 		return getNullability() == IONullability.Mode.NULLABLE;
+	}
+	
+	@NotNull
+	@Override
+	public <T extends Annotation> Optional<T> getAnnotation(Class<T> annotationClass){
+		var acc = getAccessor();
+		if(acc == null) return Optional.empty();
+		return acc.getAnnotation(annotationClass);
+	}
+	@Override
+	public boolean hasAnnotation(Class<? extends Annotation> annotationClass){
+		var acc = getAccessor();
+		if(acc == null) return false;
+		return acc.hasAnnotation(annotationClass);
+	}
+	
+	@Override
+	public Type getGenericType(GenericContext genericContext){
+		return getAccessor().getGenericType(genericContext);
 	}
 	
 	@Override

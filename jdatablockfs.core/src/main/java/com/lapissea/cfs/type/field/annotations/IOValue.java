@@ -184,4 +184,29 @@ public @interface IOValue{
 		
 		
 	}
+	
+	@Retention(RetentionPolicy.RUNTIME)
+	@Target({ElementType.FIELD, ElementType.METHOD})
+	@interface Generic{
+		
+		AnnotationLogic<Generic> LOGIC = new AnnotationLogic<>(){
+			
+			@NotNull
+			@Override
+			public <T extends IOInstance<T>> List<VirtualFieldDefinition<T, ?>> injectPerInstanceValue(FieldAccessor<T> field, Generic annotation){
+				return List.of(new VirtualFieldDefinition<T, Integer>(
+					IO,
+					IOFieldTools.makeGenericIDFieldName(field),
+					int.class,
+					List.of(IOFieldTools.makeAnnotation(IODependency.VirtualNumSize.class, Map.of()), Unsigned.INSTANCE)
+				));
+			}
+			@NotNull
+			@Override
+			public Set<String> getDependencyValueNames(FieldAccessor<?> field, Generic annotation){
+				return Set.of(IOFieldTools.makeGenericIDFieldName(field));
+			}
+		};
+		
+	}
 }

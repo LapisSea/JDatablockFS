@@ -30,9 +30,7 @@ import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static java.util.Comparator.comparingInt;
 import static java.util.function.Function.identity;
-import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.joining;
 
 public class FieldCompiler{
@@ -64,24 +62,9 @@ public class FieldCompiler{
 		var valueDefs = deepClasses(struct.getConcreteType())
 			                .flatArray(Class::getDeclaredMethods)
 			                .stream()
-			                .filter(m -> m.isAnnotationPresent(IOValueUnmanaged.class))
-			                .sorted(comparingInt(FieldCompiler::unmanagedIndex).reversed())
+			                .filter(m -> m.isAnnotationPresent(IOUnmanagedValueInfo.class))
 			                .toList();
 		if(valueDefs.isEmpty()) return FieldSet.of();
-		
-		var duplicates = valueDefs.stream()
-		                          .collect(groupingBy(FieldCompiler::unmanagedIndex))
-		                          .values()
-		                          .stream()
-		                          .filter(l -> l.size()>1)
-		                          .map(l -> l.stream()
-		                                     .map(Method::getName)
-		                                     .collect(joining(", ")))
-		                          .collect(joining("\n\t"));
-		
-		if(!duplicates.isEmpty()){
-			throw new MalformedStruct(struct.cleanName() + " methods with duplicated indices:\n\t" + duplicates);
-		}
 		
 		for(Method valueMethod : valueDefs){
 			if(!Modifier.isStatic(valueMethod.getModifiers())){
@@ -90,30 +73,28 @@ public class FieldCompiler{
 			
 			var context = GenericsResolver.resolve(valueMethod.getDeclaringClass()).method(valueMethod);
 			
-			if(!UtilL.instanceOf(context.resolveReturnClass(), IOField.class)){
+			if(!UtilL.instanceOf(context.resolveReturnClass(), IOUnmanagedValueInfo.Data.class)){
 				throw new IllegalField(valueMethod + " does not return " + IOField.class.getName());
 			}
 			
-			Class<?> ioFieldOwner = context.returnType().type(IOField.class).generic("T");
+			Class<?> ioFieldOwner = context.returnType().type(IOUnmanagedValueInfo.Data.class).generic("T");
 			
 			if(ioFieldOwner != valueMethod.getDeclaringClass()){
 				throw new IllegalField(valueMethod + " does not return IOField of same owner type!\n" + ioFieldOwner.getName() + "\n" + valueMethod.getDeclaringClass().getName());
 			}
 		}
 		
-		return FieldSet.of(valueDefs.stream().map(valueDef -> {
+		return FieldSet.of(valueDefs.stream().flatMap(valueDef -> {
 			valueDef.setAccessible(true);
 			
 			try{
 				//noinspection unchecked
-				return (IOField<T, ?>)valueDef.invoke(null);
+				var data = (IOUnmanagedValueInfo.Data<T>)valueDef.invoke(null);
+				return data.getFields();
 			}catch(ReflectiveOperationException e){
 				throw new RuntimeException(e);
 			}
 		}));
-	}
-	private static int unmanagedIndex(Method m){
-		return m.getAnnotation(IOValueUnmanaged.class).index();
 	}
 	
 	/**
@@ -539,7 +520,6 @@ public class FieldCompiler{
 			IOValue.class,
 			IODependency.class,
 			IONullability.class,
-			IODynamic.class,
 			IOCompression.class
 		);
 	}

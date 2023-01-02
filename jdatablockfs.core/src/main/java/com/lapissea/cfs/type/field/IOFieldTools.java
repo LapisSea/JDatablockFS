@@ -4,6 +4,7 @@ import com.lapissea.cfs.Index;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.objects.NumberSize;
+import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.SupportedPrimitive;
 import com.lapissea.cfs.type.WordSpace;
@@ -12,11 +13,13 @@ import com.lapissea.cfs.type.field.access.AnnotatedType;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IONullability;
+import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.BitField;
 import com.lapissea.cfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
+import com.lapissea.util.WeakValueHashMap;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Array;
@@ -198,6 +201,7 @@ public class IOFieldTools{
 	}
 	
 	public static <E extends Annotation> E makeAnnotation(Class<E> annotationType){ return makeAnnotation(annotationType, Map.of()); }
+	@SuppressWarnings("unchecked")
 	public static <E extends Annotation> E makeAnnotation(Class<E> annotationType, @NotNull Map<String, Object> values){
 		Objects.requireNonNull(values);
 		Class<?>[] interfaces = annotationType.getInterfaces();
@@ -251,6 +255,8 @@ public class IOFieldTools{
 		
 		class FakeAnnotation implements Annotation, InvocationHandler{
 			
+			private static final Map<Class<?>, Annotation> NO_ARG_CACHE = Collections.synchronizedMap(new WeakValueHashMap<>());
+			
 			@Override
 			public Object invoke(Object proxy, Method method, Object[] args) throws Throwable{
 				if(safeValues.containsKey(method.getName())){
@@ -293,13 +299,30 @@ public class IOFieldTools{
 			}
 		}
 		
-		//noinspection unchecked
-		return (E)Proxy.newProxyInstance(annotationType.getClassLoader(),
-		                                 new Class[]{annotationType},
-		                                 new FakeAnnotation());
+		if(values.isEmpty()){
+			var cached = FakeAnnotation.NO_ARG_CACHE.get(annotationType);
+			if(cached != null) return (E)cached;
+		}
+		
+		var proxy = (E)Proxy.newProxyInstance(annotationType.getClassLoader(),
+		                                      new Class[]{annotationType},
+		                                      new FakeAnnotation());
+		
+		if(values.isEmpty()){
+			FakeAnnotation.NO_ARG_CACHE.put(annotationType, proxy);
+		}
+		
+		return proxy;
 	}
 	
 	public static boolean isGenerated(IOField<?, ?> field){
 		return field.getName().indexOf(GENERATED_FIELD_SEPARATOR) != -1;
+	}
+	
+	public static boolean isGeneric(AnnotatedType type){
+		return type.hasAnnotation(IOValue.Generic.class);
+	}
+	public static boolean isGeneric(GetAnnotation type){
+		return type.isPresent(IOValue.Generic.class);
 	}
 }
