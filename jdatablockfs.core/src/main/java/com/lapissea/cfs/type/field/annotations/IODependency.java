@@ -127,7 +127,7 @@ public @interface IODependency{
 			public static String getName(FieldAccessor<?> field, VirtualNumSize size){
 				var nam = size.name();
 				if(nam.isEmpty()){
-					return IOFieldTools.makeNumberSizeName(field.getName());
+					return IOFieldTools.makeNumberSizeName(field);
 				}
 				return nam;
 			}

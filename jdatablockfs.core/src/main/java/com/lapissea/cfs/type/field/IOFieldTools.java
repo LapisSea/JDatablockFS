@@ -118,7 +118,7 @@ public class IOFieldTools{
 			field.getAnnotation(IODependency.NumSize.class).map(IODependency.NumSize::value),
 			field.getAnnotation(IODependency.VirtualNumSize.class).map(e -> IODependency.VirtualNumSize.Logic.getName(field, e)),
 			//TODO: This is a bandage for template loaded classes, make annotation serialization more precise.
-			field.getAnnotation(IODependency.class).stream().flatMap(e -> Arrays.stream(e.value())).filter(name -> name.equals(makeNumberSizeName(field.getName()))).findAny()
+			field.getAnnotation(IODependency.class).stream().flatMap(e -> Arrays.stream(e.value())).filter(name -> name.equals(makeNumberSizeName(field))).findAny()
 		).filter(Optional::isPresent).map(Optional::get).findAny();
 		
 		if(dynSiz.isEmpty()) return Optional.empty();
@@ -156,20 +156,27 @@ public class IOFieldTools{
 		return acc;
 	}
 	
+	private static String makeVirtualName(String base, String extension){
+		return base + GENERATED_FIELD_SEPARATOR + extension;
+	}
+	
 	public static <T extends IOInstance<T>> String makeCollectionLenName(FieldAccessor<T> field){
-		return field.getName() + GENERATED_FIELD_SEPARATOR + "len";
+		return makeVirtualName(field.getName(), "len");
+	}
+	public static <T extends IOInstance<T>> String makeNumberSizeName(FieldAccessor<T> field){
+		return makeNumberSizeName(field.getName());
 	}
 	public static String makeNumberSizeName(String name){
-		return name + GENERATED_FIELD_SEPARATOR + "nSiz";
+		return makeVirtualName(name, "nSiz");
 	}
 	public static <T extends IOInstance<T>> String makeGenericIDFieldName(FieldAccessor<T> field){
-		return field.getName() + GENERATED_FIELD_SEPARATOR + "typeID";
+		return makeVirtualName(field.getName(), "typeID");
 	}
 	public static <T extends IOInstance<T>> String makeNullFlagName(FieldAccessor<T> field){
-		return field.getName() + GENERATED_FIELD_SEPARATOR + "isNull";
+		return makeVirtualName(field.getName(), "isNull");
 	}
 	public static <T extends IOInstance<T>> String makeNullElementsFlagName(FieldAccessor<T> field){
-		return field.getName() + GENERATED_FIELD_SEPARATOR + "areNull";
+		return makeVirtualName(field.getName(), "areNull");
 	}
 	
 	public static boolean isNullable(AnnotatedType holder){
@@ -186,14 +193,14 @@ public class IOFieldTools{
 		return makeRefName(accessor.getName());
 	}
 	public static String makeRefName(String baseName){
-		return baseName + GENERATED_FIELD_SEPARATOR + "ref";
+		return makeVirtualName(baseName, "ref");
 	}
 	
 	public static <T extends IOInstance<T>> String makePackName(FieldAccessor<T> accessor){
 		return makePackName(accessor.getName());
 	}
 	public static String makePackName(String baseName){
-		return baseName + GENERATED_FIELD_SEPARATOR + "pack";
+		return makeVirtualName(baseName, "pack");
 	}
 	
 	public static IONullability makeNullabilityAnn(IONullability.Mode mode){
