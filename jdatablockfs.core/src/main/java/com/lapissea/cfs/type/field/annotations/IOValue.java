@@ -23,6 +23,9 @@ import java.util.*;
 import static com.lapissea.cfs.type.field.StoragePool.INSTANCE;
 import static com.lapissea.cfs.type.field.StoragePool.IO;
 
+/**
+ * This annotation is a basic marker that a field should be saved.
+ */
 @SuppressWarnings("unused")
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.FIELD, ElementType.METHOD})
@@ -82,6 +85,11 @@ public @interface IOValue{
 	
 	String name() default "";
 	
+	/**
+	 * This annotation serves as an intent for this field to be referenced and not inlined in the object. This is useful
+	 * for things such as string that have no ability to be fixed and can improve efficiency as it can allow for the
+	 * holding object to be stored in a fixed form.
+	 */
 	@Retention(RetentionPolicy.RUNTIME)
 	@Target({ElementType.FIELD, ElementType.METHOD})
 	@interface Reference{
@@ -123,12 +131,20 @@ public @interface IOValue{
 		PipeType dataPipeType() default PipeType.FLEXIBLE;
 	}
 	
+	/**
+	 * This annotation serves as a hint for a field as to what type it should actually be. This is useful in
+	 * cases where for example, there is a field of an interface type. This type can not be instantiated.
+	 * Some actions such as automatically allocating values to fields that are null require an instantiable type.
+	 * In order to enable such actions this annotation is required. An IOList interface may have an OverrideType with
+	 * a value of SomeIOListImplementation and this class will be used to allocate an instance to the field.
+	 */
 	@Retention(RetentionPolicy.RUNTIME)
 	@Target({ElementType.FIELD, ElementType.METHOD})
 	@interface OverrideType{
 		
 		@Retention(RetentionPolicy.RUNTIME)
 		@interface DefaultImpl{
+			@SuppressWarnings("rawtypes")
 			Class<? extends IOInstance> value();
 		}
 		
@@ -166,6 +182,11 @@ public @interface IOValue{
 		Class<?>[] genericArgs() default {};
 	}
 	
+	/**
+	 * This annotation specifies that a number may not store negative values. This is useful for things such as sizes. Larger
+	 * values may take less space with this annotation. For example the maximum positive value of a signed 1 byte integer is 127
+	 * but an unsigned version may store up to 255.
+	 */
 	@Retention(RetentionPolicy.RUNTIME)
 	@Target({ElementType.FIELD, ElementType.METHOD})
 	@interface Unsigned{
@@ -185,6 +206,17 @@ public @interface IOValue{
 		
 	}
 	
+	/**
+	 * <p>
+	 * Allows an IOValue annotated field to have an unspecified value type. For example, field <code>Shape shape;</code> would
+	 * normally be able to only store an object of type <code>Shape</code> but with this annotation, values of
+	 * <code>Square, Circle, ...</code> are valid.
+	 * </p>
+	 * <p>
+	 * This flexibility comes at the cost of needing to store an ID of the exact type.
+	 * On fixed layouts, this will take up 4 bytes per field. On dynamic, it may use from 0 to 4 bytes + 3 bits in the size flag.
+	 * </p>
+	 */
 	@Retention(RetentionPolicy.RUNTIME)
 	@Target({ElementType.FIELD, ElementType.METHOD})
 	@interface Generic{
