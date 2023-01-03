@@ -99,8 +99,7 @@ public class OpenGLBackend extends RenderBackend{
 
 //		var path="/roboto/regular";
 		var path = "/CourierPrime/Regular";
-
-//		font=new TTFont(path+"/font.ttf", this, this::markFrameDirty, this::runLater);
+		
 		try{
 			var atlas = new MSDFAtlas(path);
 			

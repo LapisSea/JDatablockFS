@@ -25,7 +25,6 @@ public class ImGuiUtils{
 				bb = t.readAllBytes();
 			}
 			f.clearFonts();
-//			f.addFontFromMemoryTTF(bb, 16);
 			f.addFontFromMemoryTTF(bb, 16);
 			f.build();
 		}catch(Throwable e){
