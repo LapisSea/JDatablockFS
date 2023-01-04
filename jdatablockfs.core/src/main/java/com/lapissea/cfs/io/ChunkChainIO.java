@@ -98,13 +98,12 @@ public final class ChunkChainIO implements RandomIO{
 		setCursor(localPos + amount);
 	}
 	
-	private RandomIO syncedSource() throws IOException{
-		syncSourceCursor();
-		return source;
-	}
-	
 	private void syncSourceCursor() throws IOException{
 		source.setPos(calcGlobalPos());
+	}
+	
+	private void syncSourceCursor(long cursorLocalOffset) throws IOException{
+		source.setPos(calcGlobalPos(cursorLocalOffset));
 	}
 	
 	private void setCursor(long pos) throws IOException{
@@ -255,7 +254,8 @@ public final class ChunkChainIO implements RandomIO{
 			}
 			return -1;
 		}
-		int b = syncedSource().read();
+		syncSourceCursor(cOff);
+		int b = source.read();
 		advanceCursorBy(1);
 		return b;
 	}
@@ -275,7 +275,8 @@ public final class ChunkChainIO implements RandomIO{
 		
 		int toRead = (int)Math.min(len, remaining);
 		
-		int read = syncedSource().read(b, off, toRead);
+		syncSourceCursor(cOff);
+		int read = source.read(b, off, toRead);
 		if(read>0){
 			advanceCursorBy(read);
 		}
@@ -296,7 +297,8 @@ public final class ChunkChainIO implements RandomIO{
 			
 			int toRead = (int)Math.min(toReadReamining, remaining);
 			toReadReamining -= toRead;
-			val |= syncedSource().readWord(toRead)<<(toReadReamining*8);
+			syncSourceCursor(cOff);
+			val |= source.readWord(toRead)<<(toReadReamining*8);
 			advanceCursorBy(toRead);
 		}
 		
@@ -355,7 +357,8 @@ public final class ChunkChainIO implements RandomIO{
 					chunks.add(new WriteChunk(calcGlobalPos(), off, len, b));
 					source.writeAtOffsets(chunks);
 				}else{
-					syncedSource().write(b, off, len);
+					syncSourceCursor();
+					source.write(b, off, len);
 				}
 				advanceCursorBy(len);
 				return;
@@ -457,7 +460,8 @@ public final class ChunkChainIO implements RandomIO{
 			return;
 		}
 		
-		syncedSource().writeWord(v, len);
+		syncSourceCursor(offset);
+		source.writeWord(v, len);
 		cursor.modifyAndSave(c -> c.pushSize(offset + len));
 		advanceCursorBy(len);
 	}
