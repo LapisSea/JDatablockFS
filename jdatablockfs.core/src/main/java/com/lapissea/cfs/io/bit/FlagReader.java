@@ -78,9 +78,12 @@ public class FlagReader implements BitReader, AutoCloseable{
 	
 	@Override
 	public String toString(){
-		StringBuilder sb = new StringBuilder(remainingCount());
-		sb.append(Long.toBinaryString(data));
-		while(sb.length()<remainingCount()) sb.insert(0, '-');
+		var  sb  = new StringBuilder(totalBitCount);
+		long buf = data;
+		for(int i = 0; i<bitCount; i++){
+			sb.append((int)((buf>>(bitCount - i - 1))&1));
+		}
+		sb.append("~".repeat(Math.max(0, readCount())));
 		return sb.toString();
 	}
 	

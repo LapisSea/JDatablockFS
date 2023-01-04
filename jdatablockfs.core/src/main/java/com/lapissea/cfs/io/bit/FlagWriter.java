@@ -72,6 +72,7 @@ public class FlagWriter implements BitWriter<FlagWriter>{
 		return numberSize.bytes*Byte.SIZE - written;
 	}
 	
+	@Override
 	public FlagWriter fillNOne(int n){
 		checkBuffer(n);
 		
@@ -98,9 +99,13 @@ public class FlagWriter implements BitWriter<FlagWriter>{
 	
 	@Override
 	public String toString(){
-		StringBuilder sb = new StringBuilder(remainingCount());
-		sb.append(Long.toBinaryString(buffer));
-		while(sb.length()<numberSize.bytes*Byte.SIZE) sb.insert(0, '-');
+		var  bits = numberSize.bits();
+		var  sb   = new StringBuilder(bits);
+		long buf  = buffer;
+		sb.append("~".repeat(Math.max(0, bits - written)));
+		for(int i = 0; i<written; i++){
+			sb.append((int)((buf>>(written - i - 1))&1));
+		}
 		return sb.toString();
 	}
 }
