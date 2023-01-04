@@ -61,7 +61,7 @@ public class IOFieldTools{
 				case 0 -> { }
 				case 1 -> result.add(bitBuilder.remove(0));
 				default -> {
-					result.add(new BitFieldMerger<>(bitBuilder));
+					result.add(BitFieldMerger.of(bitBuilder));
 					bitBuilder.clear();
 				}
 			}
