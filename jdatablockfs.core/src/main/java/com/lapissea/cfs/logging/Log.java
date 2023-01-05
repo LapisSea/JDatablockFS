@@ -10,7 +10,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.function.Function;
 import java.util.function.Supplier;
 
 import static com.lapissea.cfs.Utils.getFrame;
@@ -84,67 +83,9 @@ public class Log{
 		}
 	}
 	
-	public static final class Channel{
-		
-		public static Function<StringBuilder, StringBuilder> colored(String color){
-			return msg -> {
-				msg.insert(0, color);
-				msg.append(ConsoleColors.RESET);
-				return msg;
-			};
-		}
-		
-		private static final Channel NOOP = new Channel(null, false);
-		
-		private final Function<StringBuilder, StringBuilder> receiver;
-		private final boolean                                enabled;
-		
-		private Channel(Function<StringBuilder, StringBuilder> receiver){
-			this(receiver, true);
-		}
-		private Channel(Function<StringBuilder, StringBuilder> receiver, boolean enabled){
-			this.receiver = receiver;
-			this.enabled = enabled;
-		}
-		
-		public void on(Runnable task){
-			if(isEnabled()){
-				task.run();
-			}
-		}
-		
-		public boolean isEnabled(){
-			return enabled;
-		}
-		
-		private synchronized StringBuilder map(StringBuilder message){
-			return receiver.apply(message);
-		}
-		
-		public void log(String message)                                                    { if(enabled) log(resolveArgs(message)); }
-		public void log(String message, Object arg1)                                       { if(enabled) log(resolveArgs(message, arg1)); }
-		public void log(String message, Object arg1, Object arg2)                          { if(enabled) log(resolveArgs(message, arg1, arg2)); }
-		public void log(String message, Object arg1, Object arg2, Object arg3)             { if(enabled) log(resolveArgs(message, arg1, arg2, arg3)); }
-		public void log(String message, Object arg1, Object arg2, Object arg3, Object arg4){ if(enabled) log(resolveArgs(message, arg1, arg2, arg3, arg4)); }
-		public void log(String message, Supplier<List<?>> lazyArgs)                        { if(enabled) log(resolveArgs(message, lazyArgs)); }
-		public void log(String message, Object... args)                                    { if(enabled) log(resolveArgs(message, args)); }
-		private void log(StringBuilder message){
-			log0(receiver.apply(message));
-		}
-	}
-	
-	public static Channel channel(boolean enabled, Function<StringBuilder, StringBuilder> out){
-		if(!enabled && MIN) return Channel.NOOP;
-		return new Channel(out);
-	}
-	
 	public static void log(String message){
 		if(LEVEL>=MIN_LEVEL) LogUtil.println(message);
 	}
-	public static void log0(CharSequence message){
-		LogUtil.println(message);
-	}
-	
 	
 	public static void warn(String message)                                                    { if(WARN) warn0(resolveArgs(message)); }
 	public static void warn(String message, Object arg1)                                       { if(WARN) warn0(resolveArgs(message, arg1)); }

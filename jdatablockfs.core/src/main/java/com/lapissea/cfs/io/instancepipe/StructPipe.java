@@ -43,10 +43,9 @@ import static com.lapissea.cfs.GlobalConfig.PRINT_COMPILATION;
 import static com.lapissea.cfs.GlobalConfig.TYPE_VALIDATION;
 import static com.lapissea.util.ConsoleColors.BLUE_BRIGHT;
 import static com.lapissea.util.ConsoleColors.CYAN_BRIGHT;
+import static com.lapissea.util.ConsoleColors.RESET;
 
 public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit implements ObjectPipe<T, VarPool<T>>{
-	
-	private static final Log.Channel COMPILATION = Log.channel(PRINT_COMPILATION && !Access.DEV_CACHE, Log.Channel.colored(CYAN_BRIGHT));
 	
 	@Retention(RetentionPolicy.RUNTIME)
 	@Target({ElementType.TYPE})
@@ -138,20 +137,22 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			
 			put(struct, created);
 			
-			COMPILATION.on(() -> StagedInit.runBaseStageTask(() -> {
-				String s = "Compiled: " + struct.getFullName() + "\n" +
-				           "\tPipe type: " + BLUE_BRIGHT + created.getClass().getName() + CYAN_BRIGHT + "\n" +
-				           "\tSize: " + BLUE_BRIGHT + created.getSizeDescriptor() + CYAN_BRIGHT + "\n" +
-				           "\tReference commands: " + created.getReferenceWalkCommands();
-				
-				var sFields = created.getSpecificFields();
-				
-				if(!sFields.equals(struct.getFields())){
-					s += "\n" + TextUtil.toTable(created.getSpecificFields());
-				}
-				
-				COMPILATION.log(s);
-			}));
+			if(PRINT_COMPILATION){
+				StagedInit.runBaseStageTask(() -> {
+					String s = "Compiled: " + struct.getFullName() + "\n" +
+					           "\tPipe type: " + BLUE_BRIGHT + created.getClass().getName() + CYAN_BRIGHT + "\n" +
+					           "\tSize: " + BLUE_BRIGHT + created.getSizeDescriptor() + CYAN_BRIGHT + "\n" +
+					           "\tReference commands: " + created.getReferenceWalkCommands();
+					
+					var sFields = created.getSpecificFields();
+					
+					if(!sFields.equals(struct.getFields())){
+						s += "\n" + TextUtil.toTable(created.getSpecificFields());
+					}
+					
+					Log.log(CYAN_BRIGHT + s + RESET);
+				});
+			}
 			
 			return created;
 		}
@@ -162,11 +163,6 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	}
 	
 	private static final ConcurrentHashMap<Class<? extends StructPipe<?>>, StructGroup<?, ?>> CACHE = new ConcurrentHashMap<>();
-	
-	public static void clear(){
-		if(!Access.DEV_CACHE) throw new RuntimeException();
-		CACHE.clear();
-	}
 	
 	@SuppressWarnings("unchecked")
 	public static <T extends IOInstance<T>, P extends StructPipe<T>> P of(Class<P> type, Struct<T> struct, int minRequestedStage){
@@ -234,23 +230,19 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	protected void postValidate(){
 		if(TYPE_VALIDATION && !(getType() instanceof Struct.Unmanaged)){
 			var type = getType();
-			if(Access.DEV_CACHE){
-				type.emptyConstructor();
-			}else{
-				T inst;
+			T   inst;
+			try{
+				inst = type.make();
+			}catch(Throwable e){
+				inst = null;
+			}
+			if(inst != null){
 				try{
-					inst = type.make();
-				}catch(Throwable e){
-					inst = null;
-				}
-				if(inst != null){
-					try{
-						checkTypeIntegrity(inst, true);
-					}catch(FieldIsNullException ignored){
-					}catch(IOException e){
-						e.printStackTrace();
-						throw new RuntimeException(e);
-					}
+					checkTypeIntegrity(inst, true);
+				}catch(FieldIsNullException ignored){
+				}catch(IOException e){
+					e.printStackTrace();
+					throw new RuntimeException(e);
 				}
 			}
 		}
@@ -609,8 +601,6 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	}
 	
 	protected final void writeIOFields(FieldSet<T> fields, VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
-		if(Access.DEV_CACHE) throw new RuntimeException();
-		
 		ContentOutputBuilder destBuff = null;
 		ContentWriter        target;
 		boolean              close    = false;

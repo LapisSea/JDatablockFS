@@ -27,8 +27,6 @@ import static java.lang.invoke.MethodHandles.Lookup.*;
 @SuppressWarnings("unchecked")
 public class Access{
 	
-	public static final boolean DEV_CACHE = GlobalConfig.configFlag("abBenchmark.devCache", false);
-	
 	private static final boolean USE_UNSAFE_LOOKUP = GlobalConfig.configFlag("corruptAccess", true);
 	
 	private static long calcModesOffset(){

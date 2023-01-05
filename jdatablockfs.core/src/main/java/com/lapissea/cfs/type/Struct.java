@@ -41,6 +41,7 @@ import static com.lapissea.cfs.Utils.getCallee;
 import static com.lapissea.cfs.type.field.StoragePool.IO;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NOT_NULL;
 import static com.lapissea.util.ConsoleColors.GREEN_BRIGHT;
+import static com.lapissea.util.ConsoleColors.RESET;
 
 /**
  * This is a struct. It is the IO version of a {@link Class}.<br/>
@@ -59,7 +60,6 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		Runner.run(DefInstanceCompiler::init);
 	}
 	
-	private static final Log.Channel COMPILATION = Log.channel(PRINT_COMPILATION && !Access.DEV_CACHE, Log.Channel.colored(GREEN_BRIGHT));
 	
 	/**
 	 * This annotation is not really supposed to be used. It is a workaround for structs that do not have a default constructor and are never
@@ -121,19 +121,22 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		public static <T extends IOInstance.Unmanaged<T>> Unmanaged<T> ofUnmanaged(Class<T> instanceClass){
 			Objects.requireNonNull(instanceClass);
 			
-			Unmanaged<T> cached = (Unmanaged<T>)getCached(instanceClass);
+			var cached = (Unmanaged<T>)getCached(instanceClass);
 			if(cached != null) return cached;
 			
+			if(!IOInstance.isUnmanaged(instanceClass)){
+				throw new ClassCastException(instanceClass.getName() + " is not unmanaged!");
+			}
 			
-			return compile(instanceClass, Unmanaged::new, false);
+			return compile(instanceClass, (MakeStruct<T, Unmanaged<T>>)Unmanaged::new, false);
 		}
 		
 		private final NewUnmanaged<T> unmanagedConstructor;
 		private final boolean         overridingDynamicUnmanaged;
 		private       FieldSet<T>     unmanagedStaticFields;
 		
-		private Unmanaged(Class<T> type){
-			super(type, false);
+		private Unmanaged(Class<T> type, boolean runNow){
+			super(type, runNow);
 			overridingDynamicUnmanaged = checkOverridingUnmanaged();
 			unmanagedConstructor = Access.findConstructor(getType(), NewUnmanaged.class, Access.getFunctionalMethod(NewUnmanaged.class).getParameterTypes());
 		}
@@ -194,15 +197,6 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	private static final Map<Class<?>, Struct<?>>  STRUCT_CACHE      = new WeakValueHashMap<>();
 	private static final Map<Class<?>, WaitHolder> NON_CONCRETE_WAIT = new HashMap<>();
 	private static final Map<Class<?>, Thread>     STRUCT_THREAD_LOG = new HashMap<>();
-	
-	public static void clear(){
-		if(!Access.DEV_CACHE) throw new RuntimeException();
-		try(var ignored = STRUCT_CACHE_LOCK.write()){
-			if(!STRUCT_THREAD_LOG.isEmpty()) throw new RuntimeException();
-			STRUCT_CACHE.clear();
-			StructPipe.clear();
-		}
-	}
 	
 	/**
 	 * This method looks up the class it has been called from and attempts to resovle it as a {@link Struct}
@@ -316,21 +310,26 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	private static <T extends IOInstance<T>> Struct<T> of0(Class<T> instanceClass, boolean runNow){
 		Objects.requireNonNull(instanceClass);
 		
-		Struct<T> cached = getCached(instanceClass);
+		var cached = getCached(instanceClass);
 		if(cached != null) return cached;
 		
 		if(IOInstance.isUnmanaged(instanceClass)){
 			return (Struct<T>)Unmanaged.ofUnknown(instanceClass);
 		}
-		return compile(instanceClass, t -> {
-			if(!IOInstance.isInstance(t)) throw new ClassCastException(t.getName() + " is not an " + IOInstance.class.getSimpleName());
-			if(IOInstance.isUnmanaged(t)) throw new ClassCastException(t.getName() + " is unmanaged!");
-			return new Struct<>(t, runNow);
-		}, runNow);
+		
+		return compile(instanceClass, (MakeStruct<T, Struct<T>>)Struct::new, runNow);
+	}
+	
+	private interface MakeStruct<T extends IOInstance<T>, S extends Struct<T>>{
+		S make(Class<T> type, boolean runNow);
 	}
 	
 	@SuppressWarnings("unchecked")
-	private static <T extends IOInstance<T>, S extends Struct<T>> S compile(Class<T> instanceClass, Function<Class<T>, S> newStruct, boolean runNow){
+	private static <T extends IOInstance<T>, S extends Struct<T>> S compile(Class<T> instanceClass, MakeStruct<T, S> newStruct, boolean runNow){
+		if(!IOInstance.isInstance(instanceClass)){
+			throw new ClassCastException(instanceClass.getName() + " is not an " + IOInstance.class.getSimpleName());
+		}
+		
 		boolean needsImpl = IOInstance.Def.isDefinition(instanceClass);
 		
 		if(!needsImpl && Modifier.isAbstract(instanceClass.getModifiers())){
@@ -356,7 +355,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 				STRUCT_THREAD_LOG.put(instanceClass, Thread.currentThread());
 				if(needsImpl) NON_CONCRETE_WAIT.put(instanceClass, new WaitHolder());
 				
-				struct = newStruct.apply(instanceClass);
+				struct = newStruct.make(instanceClass, runNow);
 				
 				STRUCT_CACHE.put(instanceClass, struct);
 			}catch(MalformedStruct e){
@@ -381,7 +380,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		
 		
 		if(!GlobalConfig.RELEASE_MODE && Log.WARN){
-			if(!COMPILATION.isEnabled()){
+			if(!PRINT_COMPILATION){
 				struct.runOnStateDone(
 					() -> Log.trace("Struct compiled: {}#cyan{}#cyanBright", struct.getFullName().substring(0, struct.getFullName().length() - struct.cleanName().length()), struct),
 					e -> {
@@ -391,7 +390,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 				);
 			}else{
 				struct.runOnStateDone(
-					() -> COMPILATION.log(TextUtil.toTable(struct.cleanFullName(), struct.getFields())),
+					() -> Log.log(GREEN_BRIGHT + TextUtil.toTable(struct.cleanFullName(), struct.getFields()) + RESET),
 					e -> Log.warn("Failed to compile struct asynchronously: {}#red because {}", struct.cleanName(), e)
 				);
 			}
@@ -463,6 +462,8 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	private byte    invalidInitialNulls = -1;
 	
 	private NewObj.Instance<T> emptyConstructor;
+	
+	private Map<FieldSet<T>, Struct<T>> partialCache;
 	
 	private int hash = -1;
 	
@@ -806,14 +807,17 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		hash = h == -1? 0 : h;
 	}
 	
-	private final Map<FieldSet<T>, Struct<T>> partialCache = Collections.synchronizedMap(new HashMap<>());
-	
 	public boolean isDefinition(){
 		waitForState(STATE_CONCRETE_TYPE);
 		return isDefinition;
 	}
+	
 	@SuppressWarnings({"unchecked", "rawtypes"})
 	public Struct<T> partialImplementation(FieldSet<T> fields){
+		synchronized(this){
+			if(partialCache == null) partialCache = Collections.synchronizedMap(new HashMap<>());
+		}
+		
 		//synchronized get put pattern because makeimpl is thread safe
 		var cached = partialCache.get(fields);
 		if(cached != null) return cached;
@@ -823,6 +827,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		
 		return impl;
 	}
+	
 	@SuppressWarnings({"unchecked"})
 	private <E extends IOInstance.Def<E>> Struct<E> makeImpl(FieldSet<E> f){
 		if(!isDefinition()){
