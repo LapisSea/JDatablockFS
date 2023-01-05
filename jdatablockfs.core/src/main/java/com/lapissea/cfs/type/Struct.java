@@ -18,6 +18,7 @@ import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.StoragePool;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
+import com.lapissea.cfs.type.field.annotations.IOUnmanagedValueInfo;
 import com.lapissea.cfs.type.field.fields.RefField;
 import com.lapissea.cfs.utils.ReadWriteClosableLock;
 import com.lapissea.util.*;
@@ -41,6 +42,16 @@ import static com.lapissea.cfs.type.field.StoragePool.IO;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NOT_NULL;
 import static com.lapissea.util.ConsoleColors.GREEN_BRIGHT;
 
+/**
+ * This is a struct. It is the IO version of a {@link Class}.<br/>
+ * It contains all the information about a class that is needed to do any IO operation. It is
+ * contains information about the fields (explicit and virtual) and has different useful values
+ * that are needed by other classes such as {@link StructPipe}. A struct may be initialized
+ * asynchronously. The initialization goes through different stages and values will require one of the
+ * state to be completed.
+ *
+ * @param <T> the type of the containing class
+ */
 public sealed class Struct<T extends IOInstance<T>> extends StagedInit implements RuntimeType<T>{
 	
 	static{
@@ -50,20 +61,46 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	
 	private static final Log.Channel COMPILATION = Log.channel(PRINT_COMPILATION && !Access.DEV_CACHE, Log.Channel.colored(GREEN_BRIGHT));
 	
+	/**
+	 * This annotation is not really supposed to be used. It is a workaround for structs that do not have a default constructor and are never
+	 * supposed to be created by the struct API. This is used only for the internal {@link com.lapissea.cfs.chunk.Chunk} but it may have its
+	 * uses elsewhere
+	 */
 	@Retention(RetentionPolicy.RUNTIME)
 	@Target(ElementType.TYPE)
 	public @interface NoDefaultConstructor{ }
 	
+	/**
+	 * This is an unmanaged struct. It is like the regular {@link Struct} but it contains extra information
+	 * about unmanaged types.<br/>
+	 * Unmanaged struct are types that contain custom low level IO logic. Every unmanaged struct needs to
+	 * properly state the data it contains trough things such as {@link IOInstance.Unmanaged#listDynamicUnmanagedFields}
+	 * for fields that may appear or change. For fields that are unchanging {@link IOUnmanagedValueInfo} is preferred.
+	 *
+	 * @param <T> the type of the containing class
+	 */
 	public static final class Unmanaged<T extends IOInstance.Unmanaged<T>> extends Struct<T>{
 		
 		public static Unmanaged<?> thisClass(){
 			return ofUnknown(getCallee(1));
 		}
 		
+		/**
+		 * This is a convenience overload of {@link Unmanaged#ofUnmanaged(Class)}
+		 *
+		 * @param instanceType a type whose raw value should implement {@link IOInstance}
+		 * @return an instance of a {@link Struct} or {@link Struct.Unmanaged}
+		 */
 		public static Unmanaged<?> ofUnknown(@NotNull Type instanceType){
 			return ofUnknown(Utils.typeToRaw(instanceType));
 		}
 		
+		/**
+		 * An unknown generics version of {@link Unmanaged#ofUnmanaged(Class)}
+		 *
+		 * @param instanceClass a class that should implement {@link IOInstance}
+		 * @return an instance of a {@link Struct} or {@link Struct.Unmanaged}
+		 */
 		@SuppressWarnings({"unchecked", "rawtypes"})
 		public static Unmanaged<?> ofUnknown(@NotNull Class<?> instanceClass){
 			Objects.requireNonNull(instanceClass);
@@ -75,6 +112,12 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			return ofUnmanaged((Class<? extends IOInstance.Unmanaged>)instanceClass);
 		}
 		
+		/**
+		 * This is the unmanaged only version of {@link Struct#of(Class)}
+		 *
+		 * @param instanceClass a non-null instance of a class that implements {@link IOInstance.Unmanaged}
+		 * @return an instance of a {@link Struct.Unmanaged}
+		 */
 		public static <T extends IOInstance.Unmanaged<T>> Unmanaged<T> ofUnmanaged(Class<T> instanceClass){
 			Objects.requireNonNull(instanceClass);
 			
@@ -161,14 +204,32 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		}
 	}
 	
+	/**
+	 * This method looks up the class it has been called from and attempts to resovle it as a {@link Struct}
+	 *
+	 * @return an instance of {@link Struct} whose type is the calling class of this method
+	 */
 	public static Struct<?> thisClass(){
 		return ofUnknown(getCallee(1));
 	}
 	
+	/**
+	 * This is a convenience overload of {@link Struct#of(Class)}
+	 *
+	 * @param instanceType a type whose raw value should implement {@link IOInstance}
+	 * @return an instance of a {@link Struct} or {@link Struct.Unmanaged}
+	 */
 	public static Struct<?> ofUnknown(@NotNull Type instanceType){
 		return ofUnknown(Utils.typeToRaw(instanceType));
 	}
 	
+	/**
+	 * This is a convenience overload for unknown generics version of {@link Struct#of(Class, int)}
+	 *
+	 * @param instanceClass     a class that should implement {@link IOInstance}
+	 * @param minRequestedStage see {@link Struct#of(Class)}
+	 * @return an instance of a {@link Struct} or {@link Struct.Unmanaged}
+	 */
 	@SuppressWarnings({"unchecked", "rawtypes"})
 	public static Struct<?> ofUnknown(@NotNull Class<?> instanceClass, int minRequestedStage){
 		validateStructType(instanceClass);
@@ -177,6 +238,12 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		return s;
 	}
 	
+	/**
+	 * An unknown generics version of {@link Struct#of(Class)}
+	 *
+	 * @param instanceClass a class that should implement {@link IOInstance}
+	 * @return an instance of a {@link Struct} or {@link Struct.Unmanaged}
+	 */
 	@SuppressWarnings({"unchecked", "rawtypes"})
 	public static Struct<?> ofUnknown(@NotNull Class<?> instanceClass){
 		validateStructType(instanceClass);
@@ -191,6 +258,24 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		}
 	}
 	
+	
+	/**
+	 * <p>
+	 * Creates a Struct out of a class that has been provided. <br/>
+	 * This class has to implement IOInstance (see {@link IOInstance.Managed},
+	 * {@link IOInstance.Unmanaged}, {@link IOInstance.Def}).
+	 * </p>
+	 * The returning {@link Struct} will be initialized up to the requested stage or more. If the
+	 * minRequestedStage is {@link StagedInit#STATE_DONE} then asynchronous logic will not be used
+	 * and this struct will be fully initialized in this thread.<br/>
+	 * It is not recommended to use this method in a static initializer as it is synchronized by the class
+	 * loading lock and may cause decreased startup performance or worse, deadlocks.
+	 *
+	 * @param instanceClass     a non-null instance of a class that implements {@link IOInstance}
+	 * @param minRequestedStage any of the {@link StagedInit#STATE_START}, {@link Struct#STATE_CONCRETE_TYPE},
+	 *                          {@link Struct#STATE_FIELD_MAKE}, {@link Struct#STATE_INIT_FIELDS}, {@link StagedInit#STATE_DONE}
+	 * @return an instance of a {@link Struct} or {@link Struct.Unmanaged}
+	 */
 	public static <T extends IOInstance<T>> Struct<T> of(Class<T> instanceClass, int minRequestedStage){
 		try{
 			var s = of0(instanceClass, minRequestedStage == STATE_DONE);
@@ -201,7 +286,25 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		}
 	}
 	
-	public static <T extends IOInstance<T>> Struct<T> of(Class<T> instanceClass){
+	/**
+	 * <p>
+	 * Creates a Struct out of a class that has been provided. <br/>
+	 * This class has to implement IOInstance (see {@link IOInstance.Managed},
+	 * {@link IOInstance.Unmanaged}, {@link IOInstance.Def}).
+	 * </p>
+	 * <br/>
+	 * <p>
+	 * The struct is always reused and will not need to initialize on subsequent of calls.<br/>
+	 * The struct may be initialized asynchronously to minimize the time in this
+	 * function. If the struct is used while it is still initializing it may cause
+	 * a blocking operation. This greatly improves the time needed to initialize
+	 * everything but could cause odd performance on first run.<br/>
+	 * </p>
+	 *
+	 * @param instanceClass a non-null instance of a class that implements {@link IOInstance}
+	 * @return an instance of a {@link Struct} or {@link Struct.Unmanaged}
+	 */
+	public static <T extends IOInstance<T>> Struct<T> of(@NotNull Class<T> instanceClass){
 		try{
 			return of0(instanceClass, false);
 		}catch(Throwable e){
