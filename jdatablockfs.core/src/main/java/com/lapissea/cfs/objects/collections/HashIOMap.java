@@ -128,7 +128,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	}
 	
 	private static final int  RESIZE_TRIGGER   = 1;
-	private static final byte HASH_GENERATIONS = 3;
+	static final         byte HASH_GENERATIONS = 3;
 	
 	@IOValue
 	@IOValue.Unsigned
@@ -664,14 +664,14 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		return Math.abs(hash)%(1<<bucketPO2);
 	}
 	
-	private int toHash(K key){
+	static <K> int toHash(K key){
 		if(key == null){
 			return 0;
 		}
 		var h = key.hashCode();
 		return h2h(h);
 	}
-	private static int h2h(int x){
+	static int h2h(int x){
 //		Inlined:
 //		return new Random(x).nextInt();
 		
