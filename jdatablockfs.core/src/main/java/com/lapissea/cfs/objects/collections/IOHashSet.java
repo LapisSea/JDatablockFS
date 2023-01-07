@@ -1,38 +1,19 @@
 package com.lapissea.cfs.objects.collections;
 
 import com.lapissea.cfs.chunk.DataProvider;
+import com.lapissea.cfs.internal.HashCommons;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.TypeLink;
-import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 
 import java.io.IOException;
 import java.util.Objects;
 
-import static com.lapissea.cfs.objects.collections.HashIOMap.HASH_GENERATIONS;
-import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NULLABLE;
-
 public class IOHashSet<T> extends IOInstance.Unmanaged<IOHashSet<T>> implements IOSet<T>{
 	
-	private static class ValueNode<T> extends IOInstance.Managed<ValueNode<T>>{
-		@IOValue
-		private boolean exists;
-		
-		@IOValue
-		@IONullability(NULLABLE)
-		@IOValue.Reference
-		private T value;
-		
-		public ValueNode(){ }
-		public ValueNode(T value){
-			this.value = value;
-			exists = true;
-		}
-	}
-	
 	@IOValue
-	private ContiguousIOList<ValueNode<T>> data;
+	private ContiguousIOList<IONode<T>> data;
 	
 	public IOHashSet(DataProvider provider, Reference reference, TypeLink typeDef) throws IOException{
 		super(provider, reference, typeDef);
@@ -43,55 +24,99 @@ public class IOHashSet<T> extends IOInstance.Unmanaged<IOHashSet<T>> implements 
 		
 	}
 	
-	
 	@Override
 	public boolean add(T value) throws IOException{
-		int hash = HashIOMap.toHash(value);
+		int hash = HashCommons.toHash(value);
 		
-		for(int i = 0; i<HASH_GENERATIONS; i++){
-			var index = Math.abs(hash)&data.size();
-			var val   = data.get(index);
-			
-			if(val.exists){
-				if(Objects.equals(value, val.value)) return false;
-				continue;
+		long      emptyIndex = -1;
+		IONode<T> strayNext  = null;
+		
+		for(int i = 0; i<HashCommons.HASH_GENERATIONS; i++){
+			var index    = Math.abs(hash)&data.size();
+			var rootNode = data.get(index);
+			if(rootNode == null){
+				if(emptyIndex == -1) emptyIndex = index;
+			}else{
+				IONode<T> last = null;
+				for(var node : rootNode){
+					if(Objects.equals(value, rootNode.getValue())){
+						return false;
+					}
+					last = node;
+				}
+				if(strayNext == null){
+					strayNext = last;
+				}
 			}
 			
-			hash = HashIOMap.h2h(hash);
+			hash = HashCommons.h2h(hash);
 		}
-		return false;
+		
+		IONode<T> newNode = allocByValue(value);
+		if(emptyIndex == -1){
+			data.set(emptyIndex, newNode);
+		}else{
+			assert strayNext != null;
+			strayNext.setNext(newNode);
+		}
+		
+		return true;
+	}
+	
+	private IONode<T> allocByValue(T value){
+		return null;
 	}
 	
 	@Override
 	public boolean remove(T value) throws IOException{
-		int hash = HashIOMap.toHash(value);
+		int hash = HashCommons.toHash(value);
 		
-		for(int i = 0; i<HASH_GENERATIONS; i++){
-			var index = Math.abs(hash)&data.size();
-			var val   = data.get(index);
-			
-			if(val.exists && Objects.equals(value, val.value)){
-				data.set(index, new ValueNode<>());
-				return true;
+		for(int i = 0; i<HashCommons.HASH_GENERATIONS; i++){
+			var index    = Math.abs(hash)&data.size();
+			var rootNode = data.get(index);
+			check:
+			if(rootNode != null){
+				var next = rootNode.getNext();
+				if(Objects.equals(value, rootNode.getValue())){
+					data.set(index, next);
+					rootNode.free();
+					return true;
+				}
+				if(next == null) break check;
+				IONode<T> last = rootNode;
+				for(var node : next){
+					if(Objects.equals(value, node.getValue())){
+						last.setNext(node.getNext());
+						node.free();
+						return true;
+					}
+					last = node;
+				}
 			}
 			
-			hash = HashIOMap.h2h(hash);
+			hash = HashCommons.h2h(hash);
 		}
+		
 		return false;
 	}
 	@Override
 	public boolean contains(T value) throws IOException{
-		int hash = HashIOMap.toHash(value);
+		int hash = HashCommons.toHash(value);
 		
-		for(int i = 0; i<HASH_GENERATIONS; i++){
-			var val = data.get(Math.abs(hash)&data.size());
+		for(int i = 0; i<HashCommons.HASH_GENERATIONS; i++){
+			var node = data.get(Math.abs(hash)&data.size());
 			
-			if(val.exists && Objects.equals(value, val.value)){
-				return true;
+			if(node != null){
+				for(IONode<T> tioNode : node){
+					if(Objects.equals(value, tioNode.getValue())){
+						return true;
+					}
+				}
 			}
 			
-			hash = HashIOMap.h2h(hash);
+			hash = HashCommons.h2h(hash);
 		}
+		
 		return false;
 	}
 	

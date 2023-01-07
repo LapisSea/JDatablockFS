@@ -2,6 +2,7 @@ package com.lapissea.cfs.objects.collections;
 
 import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.chunk.DataProvider;
+import com.lapissea.cfs.internal.HashCommons;
 import com.lapissea.cfs.io.IOTransaction;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.ValueStorage;
@@ -128,7 +129,6 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	}
 	
 	private static final int  RESIZE_TRIGGER   = 1;
-	static final         byte HASH_GENERATIONS = 3;
 	
 	@IOValue
 	@IOValue.Unsigned
@@ -230,9 +230,9 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 				var kr = readKey(n);
 				if(!kr.hasValue) continue;
 				var key  = kr.key;
-				var hash = toHash(key);
+				var hash = HashCommons.toHash(key);
 				
-				for(byte i = 0; i<HASH_GENERATIONS; i++){
+				for(byte i = 0; i<HashCommons.HASH_GENERATIONS; i++){
 					var smallHash = hashToSmall(hash, newPO2);
 					
 					if(!sortedNodes.containsKey(smallHash) && newBuckets.get(smallHash).node == null){
@@ -242,7 +242,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 					
 					hash = hashToNextHash(hash, newPO2);
 				}
-				hash = toHash(key);
+				hash = HashCommons.toHash(key);
 				sortedNodes.computeIfAbsent(hashToSmall(hash, newPO2), k -> new ArrayList<>(1)).add(n);
 			}
 		}
@@ -304,7 +304,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 					continue;
 				}
 				
-				var smallHash = hashToSmall(toHash(readKey(node).key), newPO2);
+				var smallHash = hashToSmall(HashCommons.toHash(readKey(node).key), newPO2);
 				
 				Bucket<K, V> bucket = getBucket(newBuckets, smallHash);
 				if(bucket.node == null){
@@ -363,7 +363,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		}
 		
 		private boolean tryUpdateData() throws IOException{
-			Bucket<K, V> bucket = getBucket(buckets, hashToSmall(toHash(getKey()), bucketPO2));
+			Bucket<K, V> bucket = getBucket(buckets, hashToSmall(HashCommons.toHash(getKey()), bucketPO2));
 			if(bucket == null) return false;
 			
 			currentBucket = bucket;
@@ -380,9 +380,9 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 			}
 		}
 		
-		var hash = toHash(key);
+		var hash = HashCommons.toHash(key);
 		
-		for(byte i = 0; i<HASH_GENERATIONS; i++){
+		for(byte i = 0; i<HashCommons.HASH_GENERATIONS; i++){
 			var          smallHash = hashToSmall(hash, bucketPO2);
 			Bucket<K, V> bucket    = getBucket(buckets, smallHash);
 			hash = hashToNextHash(hash, bucketPO2);
@@ -498,7 +498,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		Map<Integer, List<Map.Entry<K, V>>> sorted = new HashMap<>();
 		
 		for(Map.Entry<K, V> kvEntry : values.entrySet()){
-			sorted.computeIfAbsent(hashToSmall(toHash(kvEntry.getKey()), bucketPO2), i -> new ArrayList<>()).add(kvEntry);
+			sorted.computeIfAbsent(hashToSmall(HashCommons.toHash(kvEntry.getKey()), bucketPO2), i -> new ArrayList<>()).add(kvEntry);
 		}
 		
 		getDataProvider().getSource().openIOTransaction(() -> {
@@ -521,9 +521,9 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	
 	@Override
 	public boolean remove(K key) throws IOException{
-		var hash = toHash(key);
+		var hash = HashCommons.toHash(key);
 		
-		for(byte i = 0; i<HASH_GENERATIONS; i++){
+		for(byte i = 0; i<HashCommons.HASH_GENERATIONS; i++){
 			var smallHash = hashToSmall(hash, bucketPO2);
 			var bucket    = getBucket(buckets, smallHash);
 			hash = hashToSmall(hash, bucketPO2);
@@ -562,13 +562,13 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	}
 	
 	private PutAction putEntry(IOList<Bucket<K, V>> buckets, short bucketPO2, K key, V value) throws IOException{
-		int hash = toHash(key);
+		int hash = HashCommons.toHash(key);
 		
 		Bucket<K, V> bucket, first = null;
 		
 		var newEntry = BucketEntry.of(key, value);
 		
-		for(byte i = 0; i<HASH_GENERATIONS; i++){
+		for(byte i = 0; i<HashCommons.HASH_GENERATIONS; i++){
 			var smallHash = hashToSmall(hash, bucketPO2);
 			bucket = getBucket(buckets, smallHash);
 			if(first == null) first = bucket;
@@ -650,7 +650,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	}
 	
 	private int hashToNextHash(int hash, short bucketPO2){
-		var hashNext = h2h(hash);
+		var hashNext = HashCommons.h2h(hash);
 		
 		var smallHash     = hashToSmall(hash, bucketPO2);
 		var smallHashNext = hashToSmall(hashNext, bucketPO2);
@@ -664,19 +664,5 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		return Math.abs(hash)%(1<<bucketPO2);
 	}
 	
-	static <K> int toHash(K key){
-		if(key == null){
-			return 0;
-		}
-		var h = key.hashCode();
-		return h2h(h);
-	}
-	static int h2h(int x){
-//		Inlined:
-//		return new Random(x).nextInt();
-		
-		long mul = 0x5DEECE66DL, mask = 0xFFFFFFFFFFFFL;
-		return (int)(((((x^mul)&mask)*mul + 0xBL)&mask) >>> 17);
-	}
 }
 
