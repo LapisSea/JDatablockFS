@@ -390,7 +390,6 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	
 	@Override
 	public void add(T value) throws IOException{
-		Objects.requireNonNull(value);
 		defragData(1);
 		writeAt(size(), value);
 		deltaSize(1);

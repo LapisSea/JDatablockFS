@@ -5,6 +5,7 @@ import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.UnsupportedStructLayout;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.instancepipe.*;
+import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.cfs.type.*;
@@ -329,7 +330,7 @@ public sealed interface ValueStorage<T>{
 		
 		@Override
 		public void write(RandomIO dest, T src) throws IOException{
-			refPipe.write(provider, dest, src.getReference());
+			refPipe.write(provider, dest, src == null? new Reference() : src.getReference());
 		}
 		
 		@Override
@@ -488,6 +489,58 @@ public sealed interface ValueStorage<T>{
 		@Override
 		public RuntimeType<String> getType(){
 			return TYPE;
+		}
+	}
+	
+	final class UnknownIDObject implements ValueStorage<Object>{
+		
+		private final DataProvider provider;
+		
+		public UnknownIDObject(DataProvider provider){
+			this.provider = provider;
+		}
+		
+		@Override
+		public Object readNew(ContentReader src) throws IOException{
+			NumberSize.INT.read();
+			return AutoText.PIPE.readNew(provider, src, null).getData();
+		}
+		@Override
+		public void write(RandomIO dest, Object src) throws IOException{
+			AutoText.PIPE.write(provider, dest, new AutoText(src));
+		}
+		
+		@Override
+		public long inlineSize(){
+			return -1;
+		}
+		
+		@Override
+		public <I extends IOInstance<I>> IOField<I, Object> field(FieldAccessor<I> accessor, UnsafeSupplier<RandomIO, IOException> ioAt){
+			var d = AutoText.PIPE.getSizeDescriptor();
+			return new NoIOField<>(accessor, SizeDescriptor.Unknown.of(d.getWordSpace(), d.getMin(), d.getMax(), (ioPool, prov, value) -> {
+				var str = (String)accessor.get(ioPool, value);
+				if(str == null) return 0;
+				return AutoText.PIPE.getSizeDescriptor().calcUnknown(null, prov, new AutoText(str), d.getWordSpace());
+			}));
+		}
+		
+		@Override
+		public RuntimeType<Object> getType(){
+			return new RuntimeType<>(){
+				@Override
+				public boolean getCanHavePointers(){
+					return true;
+				}
+				@Override
+				public NewObj<Object> emptyConstructor(){
+					throw new UnsupportedOperationException();
+				}
+				@Override
+				public Class<Object> getType(){
+					return Object.class;
+				}
+			};
 		}
 	}
 	

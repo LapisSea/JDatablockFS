@@ -3,8 +3,8 @@ package com.lapissea.cfs.internal;
 public enum HashCommons{
 	;
 	
-	
 	public static final byte HASH_GENERATIONS = 3;
+	
 	public static <K> int toHash(K key){
 		if(key == null){
 			return 0;
@@ -12,6 +12,7 @@ public enum HashCommons{
 		var h = key.hashCode();
 		return h2h(h);
 	}
+	
 	public static int h2h(int x){
 //		Inlined:
 //		return new Random(x).nextInt();

@@ -213,8 +213,12 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 	
 	public TypeLink(Class<?> type, TypeLink... args){
 		setTypeName(type.getName());
-		this.args = (args == null || args.length == 0)? NO_ARGS : args.clone();
+		this.args = safeArgs(args);
 		this.typeClass = type;
+	}
+	
+	private static TypeLink[] safeArgs(TypeLink[] args){
+		return (args == null || args.length == 0)? NO_ARGS : args.clone();
 	}
 	
 	private void setTypeName(String typeName){
@@ -329,5 +333,15 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 		int result = getTypeName().hashCode();
 		result = 31*result + Arrays.hashCode(args);
 		return result;
+	}
+	
+	public TypeLink withArgs(TypeLink... args){
+		var l = new TypeLink();
+		
+		l.typeName = typeName;
+		l.typeClass = typeClass;
+		l.args = safeArgs(args);
+		
+		return l;
 	}
 }

@@ -13,7 +13,6 @@ import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.*;
-import com.lapissea.cfs.type.TypeLink.Check.ArgCheck;
 import com.lapissea.cfs.type.field.*;
 import com.lapissea.cfs.type.field.access.AbstractFieldAccessor;
 import com.lapissea.cfs.type.field.access.TypeFlag;
@@ -38,8 +37,6 @@ import java.util.OptionalLong;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
-import static com.lapissea.cfs.type.TypeLink.Check.ArgCheck.RawCheck.INSTANCE_MANAGED;
-import static com.lapissea.cfs.type.TypeLink.Check.ArgCheck.RawCheck.PRIMITIVE;
 import static com.lapissea.cfs.type.field.StoragePool.IO;
 
 public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements IterablePP<IONode<T>>{
@@ -199,7 +196,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	
 	private static final TypeLink.Check NODE_TYPE_CHECK = new TypeLink.Check(
 		IONode.class,
-		ArgCheck.rawAny(PRIMITIVE, INSTANCE_MANAGED)
+		(type, db) -> { }
 	);
 	
 	private static final IOField<?, NumberSize> NEXT_SIZE_FIELD          = Struct.thisClass().getFields().requireExact(NumberSize.class, "nextSize");
@@ -538,6 +535,15 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		try(var io = getReference().io(this)){
 			io.skipExact(nextStart());
 			nextSize.write(io, ptr);
+		}
+	}
+	
+	public IONode<T> getLast() throws IOException{
+		var node = this;
+		while(true){
+			var next = node.getNext();
+			if(next == null) return node;
+			node = next;
 		}
 	}
 	
