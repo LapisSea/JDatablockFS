@@ -1431,17 +1431,19 @@ public class BinaryGridRenderer implements DataRenderer{
 							var            ref      = refField.getReference(instance);
 							boolean        diffPos  = true;
 							Pointer        ptr      = null;
+							var            bSize    = sizeDesc.mapSize(WordSpace.BYTE, size);
+							
 							if(!ref.isNull()){
 								var from = reference.addOffset(fieldOffset).calcGlobalOffset(ctx.provider);
 								var to   = ref.calcGlobalOffset(ctx.provider);
 								diffPos = from != to;
 								if(diffPos){
-									ptr = new Pointer(from, to, (int)size, col, refField.toString(), 0.8F);
+									ptr = new Pointer(from, to, (int)bSize, col, refField.toString(), 0.8F);
 								}
 							}
 							try{
 								if(annotate){
-									annotateByteField(ctx, ioPool, instance, field, col, reference, Range.fromSize(fieldOffset, size));
+									annotateByteField(ctx, ioPool, instance, field, col, reference, Range.fromSize(fieldOffset, bSize));
 								}
 							}catch(Throwable e){
 								if(ptr != null){
