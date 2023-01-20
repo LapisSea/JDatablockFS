@@ -1,6 +1,5 @@
 package com.lapissea.cfs.io.compress;
 
-import com.lapissea.cfs.io.bit.FlagReader;
 import com.lapissea.cfs.io.bit.FlagWriter;
 import com.lapissea.cfs.io.content.ContentInputStream;
 import com.lapissea.cfs.io.content.ContentOutputStream;
@@ -28,8 +27,7 @@ public sealed interface Packer permits GzipPacker, RlePacker, Lz4Packer, BruteBe
 	
 	static int readSiz(byte[] dest){
 		try(var io = new ContentInputStream.BA(dest)){
-			var siz = FlagReader.readSingle(io, NumberSize.FLAG_INFO);
-			return Math.toIntExact(siz.read(io));
+			return io.readUnsignedInt4Dynamic();
 		}catch(IOException e){
 			throw new RuntimeException(e);
 		}

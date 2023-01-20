@@ -25,6 +25,10 @@ public class FlagWriter implements BitWriter<FlagWriter>{
 		}
 	}
 	
+	public static void writeSingle(ContentWriter target, boolean value) throws IOException{
+		target.writeInt1((value? 0b11111111 : 0b11111110));
+	}
+	
 	public static <T extends Enum<T>> void writeSingle(ContentWriter target, EnumUniverse<T> enumInfo, T value) throws IOException{
 		var size = enumInfo.numSize(false);
 		

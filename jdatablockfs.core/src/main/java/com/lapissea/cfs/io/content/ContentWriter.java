@@ -2,6 +2,8 @@ package com.lapissea.cfs.io.content;
 
 import com.lapissea.cfs.BufferErrorSupplier;
 import com.lapissea.cfs.internal.MemPrimitive;
+import com.lapissea.cfs.io.bit.FlagWriter;
+import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.util.MathUtil;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.BiIntConsumer;
@@ -115,6 +117,12 @@ public interface ContentWriter extends AutoCloseable{
 		write(bb, 0, bb.length);
 	}
 	
+	default void writeUnsignedInt4Dynamic(int v) throws IOException{
+		var siz = NumberSize.bySize(v);
+		FlagWriter.writeSingle(this, NumberSize.FLAG_INFO, siz);
+		siz.writeInt(this, v);
+	}
+	
 	default void writeInt4(int v) throws IOException{
 		writeWord(Integer.toUnsignedLong(v), 4);
 	}
@@ -176,6 +184,12 @@ public interface ContentWriter extends AutoCloseable{
 			writeInt8(bb, i*numSize, b[i]);
 		}
 		write(bb, 0, bb.length);
+	}
+	
+	default void writeUnsignedInt8Dynamic(long v) throws IOException{
+		var siz = NumberSize.bySize(v);
+		FlagWriter.writeSingle(this, NumberSize.FLAG_INFO, siz);
+		siz.write(this, v);
 	}
 	
 	default void writeInt8(long v) throws IOException{

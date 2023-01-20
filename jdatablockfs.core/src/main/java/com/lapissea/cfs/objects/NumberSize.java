@@ -67,6 +67,12 @@ public enum NumberSize{
 		return bySize(unsigned? Math.max(0, size) : Math.abs(size));
 	}
 	
+	public static NumberSize bySize(int size){
+		if(size<0){
+			throw new IllegalArgumentException();
+		}
+		return byBytes(BitUtils.bitsToBytes(Integer.SIZE - Integer.numberOfLeadingZeros(size)));
+	}
 	public static NumberSize bySize(long size){
 		if(size<0){
 			throw new IllegalArgumentException();
@@ -139,6 +145,17 @@ public enum NumberSize{
 		};
 	}
 	
+	public int readInt(ContentReader in) throws IOException{
+		return switch(this){
+			case VOID -> 0;
+			case BYTE -> in.readUnsignedInt1();
+			case SHORT -> in.readUnsignedInt2();
+			case SMALL_INT -> in.readUnsignedInt3();
+			case INT -> Math.toIntExact(in.readUnsignedInt4());
+			case BIG_INT, SMALL_LONG, LONG -> throw new IOException("Attempted to read too large of a number");
+		};
+	}
+	
 	public void skip(ContentReader in) throws IOException{
 		in.skipExact(bytes);
 	}
@@ -167,7 +184,31 @@ public enum NumberSize{
 		}
 	}
 	
+	public void writeInt(ContentWriter out, int value) throws IOException{
+		if(DEBUG_VALIDATION) validateUnsigned(value);
+		
+		switch(this){
+			case VOID -> { }
+			case BYTE -> out.writeInt1(value);
+			case SHORT -> out.writeInt2(value);
+			case SMALL_INT -> out.writeInt3(value);
+			case INT -> out.writeInt4(value);
+			case BIG_INT, SMALL_LONG, LONG -> throw new IOException("Attempted to write int in to too wide of a value");
+			case null -> { }
+		}
+	}
+	
 	private void validateUnsigned(long value){
+		try{
+			ensureCanFit(value);
+		}catch(BitDepthOutOfSpaceException e){
+			throw new RuntimeException(e);
+		}
+		if(value<0 && this != LONG && this != VOID){
+			throw new IllegalStateException(value + " is signed! " + this);
+		}
+	}
+	private void validateUnsigned(int value){
 		try{
 			ensureCanFit(value);
 		}catch(BitDepthOutOfSpaceException e){
@@ -251,6 +292,10 @@ public enum NumberSize{
 		return num<=maxSize;
 	}
 	
+	public boolean canFit(int num){
+		return num<=maxSize;
+	}
+	
 	public boolean canFitSigned(long num){
 		return signedMinValue<=num && num<=signedMaxValue;
 	}
@@ -268,6 +313,10 @@ public enum NumberSize{
 	}
 	
 	public void ensureCanFit(long num) throws BitDepthOutOfSpaceException{
+		if(!canFit(num)) throw new BitDepthOutOfSpaceException(this, num);
+	}
+	
+	public void ensureCanFit(int num) throws BitDepthOutOfSpaceException{
 		if(!canFit(num)) throw new BitDepthOutOfSpaceException(this, num);
 	}
 	

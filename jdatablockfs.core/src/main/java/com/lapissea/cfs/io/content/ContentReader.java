@@ -1,6 +1,7 @@
 package com.lapissea.cfs.io.content;
 
 import com.lapissea.cfs.BufferErrorSupplier;
+import com.lapissea.cfs.io.bit.FlagReader;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.util.ZeroArrays;
 
@@ -227,6 +228,11 @@ public interface ContentReader extends AutoCloseable{
 		return readLongs(elementsToRead, 4, this::readUnsignedInt4);
 	}
 	
+	default int readUnsignedInt4Dynamic() throws IOException{
+		NumberSize size = FlagReader.readSingle(this, NumberSize.FLAG_INFO);
+		return size.readInt(this);
+	}
+	
 	default long readUnsignedInt4() throws IOException{
 		return readWord(4);
 	}
@@ -284,6 +290,11 @@ public interface ContentReader extends AutoCloseable{
 	
 	default long[] readInts8(int elementsToRead) throws IOException{
 		return readLongs(elementsToRead, 8, this::readInt8);
+	}
+	
+	default long readUnsignedInt8Dynamic() throws IOException{
+		NumberSize size = FlagReader.readSingle(this, NumberSize.FLAG_INFO);
+		return size.read(this);
 	}
 	
 	default long readInt8() throws IOException{

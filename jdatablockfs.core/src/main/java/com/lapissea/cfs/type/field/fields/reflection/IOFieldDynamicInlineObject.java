@@ -312,11 +312,8 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 			throw new NotImplementedException("Unkown integer type" + typ);
 		}
 		if(typ == String.class) return AutoText.PIPE.readNew(provider, src, genericContext).getData();
-		if(typ == byte[].class){
-			var num = FlagReader.readSingle(src, NumberSize.FLAG_INFO);
-			var len = (int)num.read(src);
-			return src.readInts1(len);
-		}
+		if(typ == byte[].class) return src.readInts1(src.readUnsignedInt4Dynamic());
+		
 		if(IOInstance.isUnmanaged(typ)){
 			var uStruct = Struct.Unmanaged.ofUnknown(typ);
 			var ref     = REF_PIPE.readNew(provider, src, genericContext);
