@@ -1,5 +1,6 @@
 package com.lapissea.cfs.tools;
 
+import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.field.IOField;
@@ -126,6 +127,9 @@ public interface DataRenderer{
 	
 	record FieldVal<T extends IOInstance<T>>(VarPool<T> ioPool, T instance, IOField<T, ?> field){
 		Optional<String> instanceToString(boolean doShort, String start, String end, String fieldValueSeparator, String fieldSeparator){
+			if(field.getType() == byte[].class && instance instanceof AutoText t){
+				return Optional.of(t.getData());
+			}
 			return field.instanceToString(ioPool, instance, doShort, start, end, fieldValueSeparator, fieldSeparator);
 		}
 	}

@@ -58,7 +58,6 @@ import static com.lapissea.cfs.logging.Log.warn;
 import static com.lapissea.cfs.tools.ColorUtils.alpha;
 import static com.lapissea.cfs.tools.render.RenderBackend.DrawMode;
 import static com.lapissea.cfs.type.field.StoragePool.IO;
-import static com.lapissea.util.UtilL.TRUE;
 import static com.lapissea.util.UtilL.async;
 import static org.lwjgl.glfw.GLFW.*;
 
@@ -357,7 +356,9 @@ public class BinaryGridRenderer implements DataRenderer{
 		
 		var rectWidth = bestRange.toRect(ctx.renderCtx).width;
 		
-		Optional<String> str      = field.instanceToString(ioPool, instance, false);
+		var textData = field.getType() == byte[].class && instance instanceof AutoText;
+		
+		Optional<String> str      = textData? Optional.of(((AutoText)instance).getData()) : field.instanceToString(ioPool, instance, false);
 		Optional<String> shortStr = Optional.empty();
 		String           both;
 		
@@ -369,10 +370,10 @@ public class BinaryGridRenderer implements DataRenderer{
 		}
 		
 		var renderCtx = ctx.renderCtx;
-		both = fStr + (str.isEmpty()? "" : ": " + str.get());
-		if(str.isPresent() && getStringBounds(renderCtx.renderer, both).width()>rectWidth){
+		both = fStr + (str.map(value -> ": " + value).orElse(""));
+		if(str.isPresent() && !textData && getStringBounds(renderCtx.renderer, both).width()>rectWidth){
 			shortStr = field.instanceToString(ioPool, instance, true);
-			both = fStr + (shortStr.isEmpty()? "" : ": " + shortStr.get());
+			both = fStr + (shortStr.map(s -> ": " + s).orElse(""));
 		}
 		
 		if(hover != null){
@@ -391,16 +392,14 @@ public class BinaryGridRenderer implements DataRenderer{
 				renderCtx.renderer.setFontScale(font);
 			}
 			
-			var drawStr = str;
-			
-			if(getStringBounds(renderCtx.renderer, drawStr.get()).width()>rectWidth){
+			if(getStringBounds(renderCtx.renderer, str.get()).width()>rectWidth){
 				if(shortStr.isEmpty()) shortStr = field.instanceToString(ioPool, instance, true);
-				drawStr = shortStr;
+				str = shortStr;
 			}
 			var r = bestRange.toRect(ctx.renderCtx);
 			r.y += ctx.renderCtx.pixelsPerByte*0.1F;
 			
-			drawStr.ifPresent(s -> drawStringInInfo(renderCtx.renderer, color, s, r, false, ctx.strings, ctx.stringOutlines));
+			str.ifPresent(s -> drawStringInInfo(renderCtx.renderer, color, s, r, false, ctx.strings, ctx.stringOutlines));
 		}else{
 			initFont(renderCtx, 1);
 			drawStringInInfo(renderCtx.renderer, color, both, bestRange.toRect(ctx.renderCtx), false, ctx.strings, ctx.stringOutlines);
@@ -735,8 +734,14 @@ public class BinaryGridRenderer implements DataRenderer{
 		
 		ctx.renderer.setColor(alpha(Color.WHITE, 0.5F));
 		
-		List<Pointer>     ptrs          = new ArrayList<>();
-		Consumer<Pointer> pointerRecord = !TRUE()? p -> { } : ptrs::add;
+		List<Pointer> ptrs = new ArrayList<>();
+		Consumer<Pointer> pointerRecord =
+			RenderBackend.DRAW_DEBUG?
+			p -> {
+				drawPointers(ctx, parsed, List.of(p));
+				ptrs.add(p);
+			} :
+			ptrs::add;
 		
 		ChunkSet referenced = new ChunkSet();
 		try{
@@ -906,9 +911,9 @@ public class BinaryGridRenderer implements DataRenderer{
 	}
 	
 	private void drawByteRangesForced(RenderContext ctx, List<Range> ranges, Color color, boolean withChar){
-		var col        = color;
+		var col        = ColorUtils.mul(color, 0.8F);
 		var bitColor   = col;
-		var background = ColorUtils.mul(col, 0.5F);
+		var background = ColorUtils.mul(col, 0.6F);
 		
 		Consumer<Stream<Range>> drawIndex = r -> {
 			try(var ignored = ctx.renderer.bulkDraw(DrawMode.QUADS)){
@@ -1381,8 +1386,8 @@ public class BinaryGridRenderer implements DataRenderer{
 					
 					final long size;
 					
-					long trueOffset = offsetStart + fieldOffset;
-					var  sizeDesc   = field.getSizeDescriptor();
+					long      trueOffset = offsetStart + fieldOffset;
+					final var sizeDesc   = field.getSizeDescriptor();
 					size = sizeDesc.calcUnknown(ioPool, ctx.provider, instance, sizeDesc.getWordSpace());
 					
 					try{
@@ -1727,11 +1732,20 @@ public class BinaryGridRenderer implements DataRenderer{
 									}
 									continue;
 								}
+								
+								if(comp == byte.class){
+									annotateByteField(ctx, ioPool, instance, field, col, reference, Range.fromSize(fieldOffset, size));
+									continue;
+								}
 							}
+							
 							if(typ == String.class){
-								if(annotate) annotateByteField(ctx, ioPool, instance, field, col, reference, Range.fromSize(fieldOffset, size));
+								if(annotate){
+									annotateStruct(ctx, new AutoText((String)field.get(ioPool, instance)), reference.addOffset(fieldOffset), AutoText.PIPE, null, true);
+								}
 								continue;
 							}
+							
 							warn("unmanaged draw type: {} accessor: {}", typ, acc);
 						}
 					}finally{
