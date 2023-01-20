@@ -56,6 +56,19 @@ public sealed interface IOTypeDB{
 			return newID(type, recordNew);
 		}
 		
+		@Override
+		public int toID(Class<?> type){
+			return toID(TypeLink.of(type));
+		}
+		@Override
+		public int toID(TypeLink type){
+			try(var ignored = rwLock.read()){
+				var id = typToID.get(type);
+				if(id != null) return id;
+			}
+			return newID(type, true).requireStored();
+		}
+		
 		private TypeID newID(TypeLink type, boolean recordNew){
 			try(var ignored = rwLock.write()){
 				var newID = maxID() + 1;
@@ -196,7 +209,7 @@ public sealed interface IOTypeDB{
 		});
 		
 		private static void registerBuiltIn(MemoryOnlyDB builtIn, Class<?> c){
-			builtIn.toID(c, true);
+			builtIn.toID(c);
 			
 			for(var dc : c.getDeclaredClasses()){
 				if(Modifier.isAbstract(dc.getModifiers()) || !IOInstance.isInstance(dc)) continue;
@@ -398,11 +411,23 @@ public sealed interface IOTypeDB{
 		}
 	}
 	
+	default int toID(Class<?> type) throws IOException{
+		return toID(TypeLink.of(type), true).requireStored();
+	}
+	default int toID(TypeLink type) throws IOException{
+		return toID(type, true).requireStored();
+	}
+	
 	default TypeID toID(Class<?> type, boolean recordNew) throws IOException{
 		return toID(TypeLink.of(type), recordNew);
 	}
 	
-	record TypeID(int val, boolean stored){ }
+	record TypeID(int val, boolean stored){
+		int requireStored(){
+			if(!stored) throw new IllegalStateException("ID not stored");
+			return val;
+		}
+	}
 	
 	TypeID toID(TypeLink type, boolean recordNew) throws IOException;
 	TypeLink fromID(int id) throws IOException;

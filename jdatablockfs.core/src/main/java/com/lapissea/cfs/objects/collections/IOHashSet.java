@@ -134,7 +134,7 @@ public final class IOHashSet<T> extends IOInstance.Unmanaged<IOHashSet<T>> imple
 		var provider = getDataProvider();
 		try(var ignored = provider.getSource().openIOTransaction()){
 			var type = new TypeLink(IONode.class, getTypeDef().arg(0));
-			provider.getTypeDb().toID(type, true);
+			provider.getTypeDb().toID(type);
 			var chunk = AllocateTicket.bytes(4)
 			                          .withPositionMagnet(getReference().calcGlobalOffset(provider))
 			                          .submit(provider);
