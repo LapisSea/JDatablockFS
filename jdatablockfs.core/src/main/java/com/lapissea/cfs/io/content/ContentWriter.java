@@ -120,7 +120,13 @@ public interface ContentWriter extends AutoCloseable{
 	default void writeUnsignedInt4Dynamic(int v) throws IOException{
 		var siz = NumberSize.bySize(v);
 		FlagWriter.writeSingle(this, NumberSize.FLAG_INFO, siz);
-		siz.writeInt(this, v);
+		if(siz != NumberSize.VOID) siz.writeInt(this, v);
+	}
+	
+	default void writeInt4Dynamic(int v) throws IOException{
+		var siz = NumberSize.bySize(Math.abs(v));
+		FlagWriter.writeSingle(this, NumberSize.FLAG_INFO, siz);
+		if(siz != NumberSize.VOID) siz.writeIntSigned(this, v);
 	}
 	
 	default void writeInt4(int v) throws IOException{
@@ -190,6 +196,11 @@ public interface ContentWriter extends AutoCloseable{
 		var siz = NumberSize.bySize(v);
 		FlagWriter.writeSingle(this, NumberSize.FLAG_INFO, siz);
 		siz.write(this, v);
+	}
+	default void writeInt8Dynamic(long v) throws IOException{
+		var siz = NumberSize.bySize(Math.abs(v));
+		FlagWriter.writeSingle(this, NumberSize.FLAG_INFO, siz);
+		siz.writeSigned(this, v);
 	}
 	
 	default void writeInt8(long v) throws IOException{

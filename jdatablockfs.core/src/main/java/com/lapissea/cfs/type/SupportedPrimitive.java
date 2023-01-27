@@ -1,10 +1,10 @@
 package com.lapissea.cfs.type;
 
+import com.lapissea.cfs.OptionalPP;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Type;
-import java.util.Optional;
 
 public enum SupportedPrimitive implements RuntimeType<Object>{
 	DOUBLE(double.class, Double.class, SizeDescriptor.Fixed.of(8)),
@@ -18,23 +18,23 @@ public enum SupportedPrimitive implements RuntimeType<Object>{
 	
 	private static final SupportedPrimitive[] UNIVERSE = values();
 	
-	public static Optional<SupportedPrimitive> get(Type type){
-		if(!(type instanceof Class<?> clazz)) return Optional.empty();
+	public static OptionalPP<SupportedPrimitive> get(Type type){
+		if(!(type instanceof Class<?> clazz)) return OptionalPP.empty();
 		for(var p : UNIVERSE){
 			if(p.is(clazz)){
-				return Optional.of(p);
+				return OptionalPP.of(p);
 			}
 		}
-		return Optional.empty();
+		return OptionalPP.empty();
 	}
-	public static Optional<SupportedPrimitive> getStrict(Type type){
-		if(!(type instanceof Class<?> clazz)) return Optional.empty();
+	public static OptionalPP<SupportedPrimitive> getStrict(Type type){
+		if(!(type instanceof Class<?> clazz)) return OptionalPP.empty();
 		for(var p : UNIVERSE){
 			if(p.isStrict(clazz)){
-				return Optional.of(p);
+				return OptionalPP.of(p);
 			}
 		}
-		return Optional.empty();
+		return OptionalPP.empty();
 	}
 	
 	public static boolean isAnyStrict(Class<?> clazz){

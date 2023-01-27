@@ -164,6 +164,10 @@ public enum NumberSize{
 		return toSigned(read(in));
 	}
 	
+	public int readIntSigned(ContentReader in) throws IOException{
+		return toSigned(readInt(in));
+	}
+	
 	public void write(ContentWriter out, INumber value) throws IOException{
 		write(out, value == null? 0 : value.getValue());
 	}
@@ -225,10 +229,22 @@ public enum NumberSize{
 			throw new RuntimeException(e);
 		}
 	}
+	private void validateSigned(int value){
+		try{
+			ensureCanFitSigned(value);
+		}catch(BitDepthOutOfSpaceException e){
+			throw new RuntimeException(e);
+		}
+	}
 	
 	public void writeSigned(ContentWriter out, long value) throws IOException{
 		if(DEBUG_VALIDATION) validateSigned(value);
 		write(out, toUnsigned(value));
+	}
+	
+	public void writeIntSigned(ContentWriter out, int value) throws IOException{
+		if(DEBUG_VALIDATION) validateSigned(value);
+		writeInt(out, toUnsigned(value));
 	}
 	
 	private long toUnsigned(long value){
@@ -239,6 +255,15 @@ public enum NumberSize{
 		if(this == LONG || this == VOID) return value;
 		if(value<=signedMaxValue) return value;
 		return value - maxSize - 1;
+	}
+	
+	private int toUnsigned(int value){
+		return value&(int)this.maxSize;
+	}
+	private int toSigned(int value){
+		if(this == VOID) return value;
+		if(value<=signedMaxValue) return value;
+		return value - (int)maxSize - 1;
 	}
 	
 	public NumberSize prev(){
@@ -300,6 +325,10 @@ public enum NumberSize{
 		return signedMinValue<=num && num<=signedMaxValue;
 	}
 	
+	public boolean canFitSigned(int num){
+		return signedMinValue<=num && num<=signedMaxValue;
+	}
+	
 	public long remaining(long num){
 		return maxSize - num;
 	}
@@ -321,6 +350,10 @@ public enum NumberSize{
 	}
 	
 	public void ensureCanFitSigned(long num) throws BitDepthOutOfSpaceException{
+		if(!canFitSigned(num)) throw new BitDepthOutOfSpaceException(this, num);
+	}
+	
+	public void ensureCanFitSigned(int num) throws BitDepthOutOfSpaceException{
 		if(!canFitSigned(num)) throw new BitDepthOutOfSpaceException(this, num);
 	}
 	

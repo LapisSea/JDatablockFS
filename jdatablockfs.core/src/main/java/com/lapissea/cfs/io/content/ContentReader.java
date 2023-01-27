@@ -232,6 +232,10 @@ public interface ContentReader extends AutoCloseable{
 		NumberSize size = FlagReader.readSingle(this, NumberSize.FLAG_INFO);
 		return size.readInt(this);
 	}
+	default int readInt4Dynamic() throws IOException{
+		NumberSize size = FlagReader.readSingle(this, NumberSize.FLAG_INFO);
+		return size.readIntSigned(this);
+	}
 	
 	default long readUnsignedInt4() throws IOException{
 		return readWord(4);
@@ -295,6 +299,10 @@ public interface ContentReader extends AutoCloseable{
 	default long readUnsignedInt8Dynamic() throws IOException{
 		NumberSize size = FlagReader.readSingle(this, NumberSize.FLAG_INFO);
 		return size.read(this);
+	}
+	default long readInt8Dynamic() throws IOException{
+		NumberSize size = FlagReader.readSingle(this, NumberSize.FLAG_INFO);
+		return size.readSigned(this);
 	}
 	
 	default long readInt8() throws IOException{
