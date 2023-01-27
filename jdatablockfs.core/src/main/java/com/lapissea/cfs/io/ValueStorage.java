@@ -3,9 +3,11 @@ package com.lapissea.cfs.io;
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.UnsupportedStructLayout;
+import com.lapissea.cfs.io.bit.EnumUniverse;
+import com.lapissea.cfs.io.bit.FlagReader;
+import com.lapissea.cfs.io.bit.FlagWriter;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.instancepipe.*;
-import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.cfs.type.*;
@@ -13,6 +15,7 @@ import com.lapissea.cfs.type.field.*;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.fields.NoIOField;
 import com.lapissea.cfs.type.field.fields.RefField;
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.IOException;
@@ -494,20 +497,105 @@ public sealed interface ValueStorage<T>{
 	
 	final class UnknownIDObject implements ValueStorage<Object>{
 		
-		private final DataProvider provider;
+		private static final StandardStructPipe<Reference> REF_PIPE = StandardStructPipe.of(Reference.class);
 		
-		public UnknownIDObject(DataProvider provider){
+		private final DataProvider   provider;
+		private final GenericContext generics;
+		
+		public UnknownIDObject(DataProvider provider, GenericContext generics){
 			this.provider = provider;
+			this.generics = generics;
 		}
 		
 		@Override
 		public Object readNew(ContentReader src) throws IOException{
-			NumberSize.INT.read();
-			return AutoText.PIPE.readNew(provider, src, null).getData();
+			var id = src.readUnsignedInt4Dynamic();
+			if(id == 0) return null;
+			
+			var link = provider.getTypeDb().fromID(id);
+			var type = link.getTypeClass(provider.getTypeDb());
+			
+			var p = SupportedPrimitive.get(type).map(pr -> switch(pr){
+				case DOUBLE -> src.readFloat8();
+				case FLOAT -> src.readFloat4();
+				case CHAR -> src.readChar2();
+				case LONG -> src.readInt8Dynamic();
+				case INT -> src.readInt4Dynamic();
+				case SHORT -> src.readInt2();
+				case BYTE -> src.readInt1();
+				case BOOLEAN -> src.readBoolean();
+			});
+			if(p.isPresent()) return p.get();
+			
+			if(type == String.class){
+				return AutoText.PIPE.readNew(provider, src, null).getData();
+			}
+			
+			if(type.isEnum()){
+				var u = EnumUniverse.ofUnknown(type);
+				return FlagReader.readSingle(src, u);
+			}
+			
+			if(IOInstance.isInstance(type)){
+				if(IOInstance.isUnmanaged(type)){
+					var s   = Struct.Unmanaged.ofUnknown(type);
+					var ref = REF_PIPE.readNew(provider, src, null);
+					return s.make(provider, ref, link);
+				}
+				
+				var s    = Struct.ofUnknown(type);
+				var pipe = StandardStructPipe.of(s);
+				return pipe.readNew(provider, src, generics);
+			}
+			
+			throw new NotImplementedException("Unknown type: " + type);
 		}
 		@Override
 		public void write(RandomIO dest, Object src) throws IOException{
-			AutoText.PIPE.write(provider, dest, new AutoText(src));
+			var id = provider.getTypeDb().toID(src);
+			dest.writeUnsignedInt4Dynamic(id);
+			if(src == null) return;
+			
+			if(src instanceof String str){
+				AutoText.PIPE.write(provider, dest, new AutoText(str));
+				return;
+			}
+			
+			var type = src.getClass();
+			
+			var p = SupportedPrimitive.get(type);
+			if(p.isPresent()){
+				switch(p.get()){
+					case DOUBLE -> dest.writeFloat8((double)src);
+					case FLOAT -> dest.writeFloat4((float)src);
+					case CHAR -> dest.writeChar2((char)src);
+					case LONG -> dest.writeInt8Dynamic((long)src);
+					case INT -> dest.writeInt4Dynamic((int)src);
+					case SHORT -> dest.writeInt2((short)src);
+					case BYTE -> dest.writeInt1((byte)src);
+					case BOOLEAN -> dest.writeBoolean((boolean)src);
+				}
+				return;
+			}
+			
+			if(type.isEnum()){
+				EnumUniverse uni = EnumUniverse.ofUnknown(type);
+				FlagWriter.writeSingle(dest, uni, (Enum)src);
+				return;
+			}
+			
+			if(src instanceof IOInstance<?> inst){
+				if(inst instanceof IOInstance.Unmanaged<?> unm){
+					REF_PIPE.write(provider, dest, unm.getReference());
+					return;
+				}
+				
+				//noinspection unchecked
+				StandardStructPipe.of(inst.getClass()).write(provider, dest, inst);
+				return;
+			}
+			
+			throw new NotImplementedException("Unknown type: " + type);
 		}
 		
 		@Override
@@ -554,6 +642,9 @@ public sealed interface ValueStorage<T>{
 	
 	static ValueStorage<?> makeStorage(DataProvider provider, TypeLink typeDef, GenericContext generics, StorageRule rule){
 		Class<?> clazz = typeDef.getTypeClass(provider.getTypeDb());
+		if(clazz == Object.class){
+			return new UnknownIDObject(provider, generics);
+		}
 		{
 			var primitive = SupportedPrimitive.get(clazz);
 			if(primitive.isPresent()){

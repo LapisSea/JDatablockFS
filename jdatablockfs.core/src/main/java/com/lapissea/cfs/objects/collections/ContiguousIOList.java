@@ -23,6 +23,7 @@ import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.access.TypeFlag;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.RefField;
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.function.UnsafeConsumer;
@@ -98,12 +99,13 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	public <VT extends IOInstance<VT>> StructPipe<VT> getFieldPipe(IOField<ContiguousIOList<T>, VT> unmanagedField, VT fieldValue){
 		return (StructPipe<VT>)switch(storage){
 			case ValueStorage.FixedInstance<?> fixedInstance -> fixedInstance.getPipe();
-			case ValueStorage.UnmanagedInstance<?> unmanagedInstance -> ((IOInstance.Unmanaged<?>)fieldValue).getPipe();
+			case ValueStorage.UnmanagedInstance<?> unmanagedInstance -> ((Unmanaged<?>)fieldValue).getPipe();
 			case ValueStorage.FixedReferencedInstance<?> fixedReferencedInstance -> Reference.fixedPipe();
 			case ValueStorage.Instance<?> ignored -> throw new UnsupportedOperationException();
 			case ValueStorage.FixedReferenceString ignored -> throw new UnsupportedOperationException();
 			case ValueStorage.InlineString ignored -> throw new UnsupportedOperationException();
 			case ValueStorage.Primitive<?> ignored -> throw new UnsupportedOperationException();
+			case ValueStorage.UnknownIDObject unknownIDObject -> throw new NotImplementedException();
 		};
 	}
 	
@@ -230,6 +232,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 				yield new CommandSet.RepeaterEnd(PREF_SET, size());
 			}
 			case ValueStorage.FixedReferenceString __ -> new CommandSet.RepeaterEnd(PREF_SET, size());
+			case ValueStorage.UnknownIDObject unknownIDObject -> throw new NotImplementedException();
 		};
 	}
 	
@@ -493,7 +496,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		if(count == 0) return;
 		if(count<0) throw new IllegalArgumentException("Count must be positive!");
 		
-		var ctr = getElementType().emptyConstructor();
+		NewObj<T> ctr = storage instanceof ValueStorage.UnmanagedInstance? () -> null : getElementType().emptyConstructor();
 		
 		addMany(count, () -> {
 			T val = ctr.make();

@@ -1,5 +1,6 @@
 package com.lapissea.cfs.objects.collections;
 
+import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.chunk.DataProvider;
@@ -9,9 +10,11 @@ import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.util.LogUtil;
 
 import java.io.IOException;
 import java.util.Objects;
+import java.util.StringJoiner;
 
 public final class IOHashSet<T> extends IOInstance.Unmanaged<IOHashSet<T>> implements IOSet<T>{
 	
@@ -20,9 +23,10 @@ public final class IOHashSet<T> extends IOInstance.Unmanaged<IOHashSet<T>> imple
 		
 		var map = mem.getRootProvider().<IOHashSet<Object>>request("hi", IOHashSet.class);
 		
-		map.add(1);
-		map.add(2);
-		map.add(1);
+		for(int i = 0; i<10; i++){
+			map.add(i);
+			LogUtil.println(i, map);
+		}
 		
 	}
 	
@@ -39,25 +43,20 @@ public final class IOHashSet<T> extends IOInstance.Unmanaged<IOHashSet<T>> imple
 			allocateNulls();
 			writeManagedFields();
 			
-			int count = 2;
-			data.requestCapacity(count);
-			for(int i = 0; i<count; i++){
-				data.add(null);
-			}
+			data.addMultipleNew(2);
 		}
 	}
 	
 	@Override
 	public boolean add(T value) throws IOException{
-		if(size>data.size()) grow();
-		
-		int hash = HashCommons.toHash(value);
+		int hash  = HashCommons.toHash(value);
+		var width = data.size();
 		
 		long      emptyIndex = -1;
 		IONode<T> strayNext  = null;
 		
 		for(int i = 0; i<HashCommons.HASH_GENERATIONS; i++){
-			var index    = smallHash(hash);
+			var index    = smallHash(hash, width);
 			var rootNode = data.get(index);
 			if(rootNode == null){
 				if(emptyIndex == -1) emptyIndex = index;
@@ -69,7 +68,7 @@ public final class IOHashSet<T> extends IOInstance.Unmanaged<IOHashSet<T>> imple
 					}
 					last = node;
 				}
-				if(strayNext == null){
+				if(emptyIndex == -1 && strayNext == null){
 					strayNext = last;
 				}
 			}
@@ -77,8 +76,13 @@ public final class IOHashSet<T> extends IOInstance.Unmanaged<IOHashSet<T>> imple
 			hash = HashCommons.h2h(hash);
 		}
 		
+		if(size>=width){
+			grow();
+			return add(value);
+		}
+		
 		IONode<T> newNode = allocByValue(value);
-		if(emptyIndex == -1){
+		if(emptyIndex != -1){
 			data.set(emptyIndex, newNode);
 		}else{
 			assert strayNext != null;
@@ -91,11 +95,14 @@ public final class IOHashSet<T> extends IOInstance.Unmanaged<IOHashSet<T>> imple
 	
 	private void grow() throws IOException{
 		var provider = getDataProvider();
-		var siz      = data.getReference().ioMap(provider, RandomIO::remaining)*2;
-		var chunk = AllocateTicket.bytes(siz)
+		var b2       = data.getReference().ioMap(provider, RandomIO::remaining)*2;
+		var chunk = AllocateTicket.bytes(b2)
 		                          .withPositionMagnet(getReference().calcGlobalOffset(provider))
 		                          .submit(provider);
-		var newData = new ContiguousIOList<IONode<T>>(getDataProvider(), chunk.getPtr().makeReference(), data.getTypeDef());
+		var newData  = new ContiguousIOList<IONode<T>>(getDataProvider(), chunk.getPtr().makeReference(), data.getTypeDef());
+		var oldWidth = data.size();
+		var newWidth = oldWidth*2;
+		newData.addMultipleNew(newWidth);
 		
 		for(var rootNode : data){
 			if(rootNode == null) continue;
@@ -108,7 +115,7 @@ public final class IOHashSet<T> extends IOInstance.Unmanaged<IOHashSet<T>> imple
 				var hash = HashCommons.toHash(value);
 				
 				for(int i = 0; i<HashCommons.HASH_GENERATIONS; i++){
-					var index       = smallHash(hash);
+					var index       = smallHash(hash, newWidth);
 					var rootNodeNew = newData.get(index);
 					
 					if(rootNodeNew == null){
@@ -144,10 +151,11 @@ public final class IOHashSet<T> extends IOInstance.Unmanaged<IOHashSet<T>> imple
 	
 	@Override
 	public boolean remove(T value) throws IOException{
-		int hash = HashCommons.toHash(value);
+		int hash  = HashCommons.toHash(value);
+		var width = data.size();
 		
 		for(int i = 0; i<HashCommons.HASH_GENERATIONS; i++){
-			var index    = smallHash(hash);
+			var index    = smallHash(hash, width);
 			var rootNode = data.get(index);
 			check:
 			if(rootNode != null){
@@ -176,10 +184,10 @@ public final class IOHashSet<T> extends IOInstance.Unmanaged<IOHashSet<T>> imple
 	}
 	@Override
 	public boolean contains(T value) throws IOException{
-		int hash = HashCommons.toHash(value);
-		
+		int hash  = HashCommons.toHash(value);
+		var width = data.size();
 		for(int i = 0; i<HashCommons.HASH_GENERATIONS; i++){
-			var node = data.get(smallHash(hash));
+			var node = data.get(smallHash(hash, width));
 			
 			if(node != null){
 				for(IONode<T> tioNode : node){
@@ -197,15 +205,56 @@ public final class IOHashSet<T> extends IOInstance.Unmanaged<IOHashSet<T>> imple
 	
 	@Override
 	public IOIterator<T> iterator(){
-		return data.query("exists == true").<T>map("value").all();
+		return new IOIterator<>(){
+			private final IOIterator<IONode<T>> raw = data.iterator();
+			
+			private IOIterator<T> bucket;
+			
+			private boolean next() throws IOException{
+				while(raw.hasNext()){
+					var n = raw.ioNext();
+					if(n == null) continue;
+					bucket = n.valueIterator();
+					return true;
+				}
+				return false;
+			}
+			
+			private boolean has() throws IOException{
+				return bucket != null && bucket.hasNext();
+			}
+			
+			@Override
+			public boolean hasNext() throws IOException{
+				var has = has();
+				if(!has) has = next();
+				return has;
+			}
+			@Override
+			public T ioNext() throws IOException{
+				if(!has()) next();
+				return bucket.ioNext();
+			}
+		};
 	}
 	
-	private long smallHash(int hash){
-		return Math.abs(hash)%data.size();
+	private long smallHash(int hash, long size){
+		return Math.abs(hash)%size;
 	}
 	
 	@Override
 	public String toString(){
-		return data.toString();
+		try{
+			var iter = iterator();
+			var j    = new StringJoiner(", ", "{", "}");
+			
+			while(iter.hasNext()){
+				j.add(Utils.toShortString(iter.ioNext()));
+			}
+			
+			return j.toString();
+		}catch(Throwable e){
+			return "CORRUPTED_SET{" + e.getMessage() + "}";
+		}
 	}
 }
