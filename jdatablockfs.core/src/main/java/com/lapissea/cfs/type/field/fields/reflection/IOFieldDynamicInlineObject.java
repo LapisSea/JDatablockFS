@@ -426,14 +426,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 			private IOTypeDB.TypeID getId(VarPool<CTyp> ioPool, DataProvider provider, CTyp instance, boolean record) throws IOException{
 				var val = get(ioPool, instance);
 				if(val == null) return new IOTypeDB.TypeID(-1, false);
-				
-				TypeLink def = switch(val){
-					case IOInstance.Unmanaged<?> unmanaged -> unmanaged.getTypeDef();
-					case IOInstance.Def<?> interf -> TypeLink.of(IOInstance.Def.unmap(interf.getClass()).orElseThrow());
-					case Object inst -> TypeLink.of(inst.getClass());
-				};
-				
-				return provider.getTypeDb().toID(def, record);
+				return provider.getTypeDb().toID(val, record);
 			}
 			@Override
 			public boolean shouldGenerate(VarPool<CTyp> ioPool, DataProvider provider, CTyp instance) throws IOException{

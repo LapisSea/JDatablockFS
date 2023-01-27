@@ -411,6 +411,26 @@ public sealed interface IOTypeDB{
 		}
 	}
 	
+	private TypeLink makeLink(Object obj){
+		if(obj instanceof IOInstance.Unmanaged<?> u){
+			return u.getTypeDef();
+		}
+		if(obj instanceof IOInstance.Def<?> u){
+			return TypeLink.of(IOInstance.Def.unmap(u.getClass()).orElseThrow());
+		}
+		return TypeLink.of(obj.getClass());
+	}
+	
+	default int toID(Object obj) throws IOException{
+		if(obj == null) return 0;
+		return toID(makeLink(obj));
+	}
+	default TypeID toID(Object obj, boolean recordNew) throws IOException{
+		if(obj == null) return new TypeID(0, true);
+		var link = makeLink(obj);
+		return toID(link, recordNew);
+	}
+	
 	default int toID(Class<?> type) throws IOException{
 		return toID(TypeLink.of(type), true).requireStored();
 	}
