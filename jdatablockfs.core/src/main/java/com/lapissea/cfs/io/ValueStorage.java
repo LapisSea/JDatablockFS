@@ -321,6 +321,10 @@ public sealed interface ValueStorage<T>{
 			struct = (Struct.Unmanaged<T>)Struct.Unmanaged.ofUnknown(type.getTypeClass(provider.getTypeDb()));
 		}
 		
+		public BaseFixedStructPipe<Reference> getRefPipe(){
+			return refPipe;
+		}
+		
 		@Override
 		public T readNew(ContentReader src) throws IOException{
 			var ref = refPipe.readNew(provider, src, null);

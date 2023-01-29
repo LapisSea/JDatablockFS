@@ -8,7 +8,6 @@ import com.lapissea.cfs.io.ValueStorage;
 import com.lapissea.cfs.io.ValueStorage.StorageRule;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.io.instancepipe.FieldDependency;
-import com.lapissea.cfs.io.instancepipe.FixedStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
@@ -17,6 +16,7 @@ import com.lapissea.cfs.query.Query;
 import com.lapissea.cfs.query.QuerySupport;
 import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.VaryingSize;
 import com.lapissea.cfs.type.field.access.AbstractFieldAccessor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
@@ -153,9 +153,19 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		return "Element[" + index + "]";
 	}
 	
-	private static final FixedStructPipe<Reference> REF_PIPE = FixedStructPipe.of(Reference.STRUCT);
-	private static <T extends IOInstance.Unmanaged<T>> IOField<ContiguousIOList<T>, ?> eFieldUnmanagedInst(Type elementType, long index){
-		return new RefField.NoIO<ContiguousIOList<T>, T>(fieldAccessor(elementType, index), REF_PIPE.getFixedDescriptor()){
+	private static <T extends IOInstance.Unmanaged<T>> IOField<ContiguousIOList<T>, ?> eFieldUnmanagedInst(
+		Type elementType, long index, ValueStorage.UnmanagedInstance<T> storage
+	){
+		SizeDescriptor.Fixed<ContiguousIOList<T>> descriptor;
+		{
+			var descriptorTmp = storage.getSizeDescriptor();
+			var space         = descriptorTmp.getWordSpace();
+			descriptor = SizeDescriptor.Fixed.of(space, descriptorTmp.requireFixed(space));
+		}
+		
+		var refPipe = storage.getRefPipe();
+		
+		return new RefField.NoIO<ContiguousIOList<T>, T>(fieldAccessor(elementType, index), descriptor){
 			@Override
 			public StructPipe<T> getReferencedPipe(ContiguousIOList<T> instance){
 				try{
@@ -169,7 +179,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 			public void setReference(ContiguousIOList<T> instance, Reference newRef){
 				try{
 					try(var io = instance.ioAtElement(index)){
-						REF_PIPE.write(instance.getDataProvider(), io, newRef);
+						refPipe.write(instance.getDataProvider(), io, newRef);
 					}
 				}catch(IOException e){
 					throw new RuntimeException(e);
@@ -180,7 +190,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 			public Reference getReference(ContiguousIOList<T> instance){
 				try{
 					try(var io = instance.ioAtElement(index)){
-						return REF_PIPE.readNew(instance.getDataProvider(), io, instance.getGenerics());
+						return refPipe.readNew(instance.getDataProvider(), io, null);
 					}
 				}catch(IOException e){
 					throw new RuntimeException(e);
@@ -194,10 +204,10 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	public Stream<IOField<ContiguousIOList<T>, ?>> listDynamicUnmanagedFields(){
 		var typeDatabase = getDataProvider().getTypeDb();
 		var genericType  = getTypeDef().genericArg(0, typeDatabase);
-		var unmanaged    = storage instanceof ValueStorage.UnmanagedInstance;
+		var unmanaged    = storage instanceof ValueStorage.UnmanagedInstance<?> u? u : null;
 		return LongStream.range(0, size()).mapToObj(index -> {
-			if(unmanaged){
-				return (IOField<ContiguousIOList<T>, ?>)(Object)eFieldUnmanagedInst(genericType, index);
+			if(unmanaged != null){
+				return (IOField<ContiguousIOList<T>, ?>)(Object)eFieldUnmanagedInst(genericType, index, unmanaged);
 			}
 			return storage.field(fieldAccessor(genericType, index), () -> ioAtElement(index));
 		});

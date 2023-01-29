@@ -51,7 +51,7 @@ public abstract class AbstractUnmanagedIOList<T, SELF extends AbstractUnmanagedI
 				var vThis = iThis.ioNext();
 				var vThat = iThat.ioNext();
 				
-				if(!vThis.equals(vThat)){
+				if(!Objects.equals(vThis, vThat)){
 					return false;
 				}
 			}catch(IOException e){
