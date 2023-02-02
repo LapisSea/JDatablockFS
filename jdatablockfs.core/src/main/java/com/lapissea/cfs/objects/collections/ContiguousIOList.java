@@ -16,11 +16,13 @@ import com.lapissea.cfs.query.Query;
 import com.lapissea.cfs.query.QuerySupport;
 import com.lapissea.cfs.type.*;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.VaryingSize;
 import com.lapissea.cfs.type.field.access.AbstractFieldAccessor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.access.TypeFlag;
+import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.RefField;
 import com.lapissea.util.NotImplementedException;
@@ -109,8 +111,11 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		};
 	}
 	
-	private static <T> FieldAccessor<ContiguousIOList<T>> fieldAccessor(Type elementType, long index){
+	private static <T> FieldAccessor<ContiguousIOList<T>> fieldAccessor(Type elementType, long index, boolean nullable){
 		return new AbstractFieldAccessor<>(null, ""){
+			
+			private static final IONullability NULLABLE = IOFieldTools.makeNullabilityAnn(IONullability.Mode.NULLABLE);
+			
 			private String lazyName;
 			private final int typeID = TypeFlag.getId(Utils.typeToRaw(elementType));
 			@NotNull
@@ -124,6 +129,9 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 			@NotNull
 			@Override
 			public <F extends Annotation> Optional<F> getAnnotation(Class<F> annotationClass){
+				if(nullable && annotationClass == IONullability.class){
+					return Optional.of((F)NULLABLE);
+				}
 				return Optional.empty();
 			}
 			@Override
@@ -165,7 +173,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		
 		var refPipe = storage.getRefPipe();
 		
-		return new RefField.NoIO<ContiguousIOList<T>, T>(fieldAccessor(elementType, index), descriptor){
+		return new RefField.NoIO<ContiguousIOList<T>, T>(fieldAccessor(elementType, index, true), descriptor){
 			@Override
 			public StructPipe<T> getReferencedPipe(ContiguousIOList<T> instance){
 				try{
@@ -209,7 +217,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 			if(unmanaged != null){
 				return (IOField<ContiguousIOList<T>, ?>)(Object)eFieldUnmanagedInst(genericType, index, unmanaged);
 			}
-			return storage.field(fieldAccessor(genericType, index), () -> ioAtElement(index));
+			return storage.field(fieldAccessor(genericType, index, false), () -> ioAtElement(index));
 		});
 	}
 	
