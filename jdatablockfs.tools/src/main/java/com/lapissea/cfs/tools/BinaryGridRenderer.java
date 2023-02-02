@@ -1474,7 +1474,9 @@ public class BinaryGridRenderer implements DataRenderer{
 							if(!diffPos) ctx.popStrings(renderer);
 							
 							if(refField instanceof RefField.Inst instRef){
-								annotateStruct(ctx, (T)refField.get(ioPool, instance), ref, instRef.getReferencedPipe(instance), generics(instance, parentGenerics), diffPos);
+								if(!ref.isNull()){
+									annotateStruct(ctx, (T)refField.get(ioPool, instance), ref, instRef.getReferencedPipe(instance), generics(instance, parentGenerics), diffPos);
+								}
 							}else{
 								ObjectPipe pip      = refField.getReferencedPipe(instance);
 								var        refVal   = refField.get(null, instance);
@@ -1742,6 +1744,7 @@ public class BinaryGridRenderer implements DataRenderer{
 							if(typ == String.class){
 								if(annotate){
 									annotateStruct(ctx, new AutoText((String)field.get(ioPool, instance)), reference.addOffset(fieldOffset), AutoText.PIPE, null, true);
+									
 								}
 								continue;
 							}

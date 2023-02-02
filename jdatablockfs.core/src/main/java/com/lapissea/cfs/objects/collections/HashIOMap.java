@@ -128,8 +128,6 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		}
 	}
 	
-	private static final int  RESIZE_TRIGGER   = 1;
-	
 	@IOValue
 	@IOValue.Unsigned
 	private short bucketPO2 = 1;
@@ -455,7 +453,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		if(sizeFlag.inc == 0) return;
 		
 		deltaSize(sizeFlag.inc);
-		if(size()>=buckets.size()*RESIZE_TRIGGER){
+		if(size()>=buckets.size()){
 			reflow();
 		}
 	}
@@ -491,7 +489,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 			}
 		}
 		
-		if(size()>=(buckets.size() + values.size())*RESIZE_TRIGGER){
+		if(size()>=(buckets.size() + values.size())){
 			reflow();
 		}
 		

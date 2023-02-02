@@ -178,7 +178,8 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 		}catch(VaryingSize.TooSmall e){
 			throw e;
 		}catch(IOException e){
-			throw new IOException("Failed to write " + this, e);
+			e.addSuppressed(new IOException("Failed to write " + this));
+			throw e;
 		}
 	}
 	
@@ -188,7 +189,8 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 			read(ioPool, provider, src, instance, genericContext);
 			if(STAT_LOGGING) logEnd(READ_ACTION, uid());
 		}catch(IOException e){
-			throw new IOException("Failed to read " + this, e);
+			e.addSuppressed(new IOException("Failed to read " + this));
+			throw e;
 		}
 	}
 	

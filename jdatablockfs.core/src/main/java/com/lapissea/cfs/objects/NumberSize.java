@@ -64,18 +64,24 @@ public enum NumberSize{
 	}
 	
 	public static NumberSize bySize(long size, boolean unsigned){
-		return bySize(unsigned? Math.max(0, size) : Math.abs(size));
+		return unsigned? bySize(Math.max(0, size)) : bySizeSigned(size);
+	}
+	public static NumberSize bySizeSigned(long size){
+		return byBytes(BitUtils.bitsToBytes((Long.SIZE - Long.numberOfLeadingZeros(Math.abs(size))) + 1));
+	}
+	public static NumberSize bySizeSigned(int size){
+		return byBytes(BitUtils.bitsToBytes((Integer.SIZE - Integer.numberOfLeadingZeros(Math.abs(size))) + 1));
 	}
 	
 	public static NumberSize bySize(int size){
 		if(size<0){
-			throw new IllegalArgumentException();
+			throw new IllegalArgumentException(size + "");
 		}
 		return byBytes(BitUtils.bitsToBytes(Integer.SIZE - Integer.numberOfLeadingZeros(size)));
 	}
 	public static NumberSize bySize(long size){
 		if(size<0){
-			throw new IllegalArgumentException();
+			throw new IllegalArgumentException(size + "");
 		}
 		return byBytes(BitUtils.bitsToBytes(Long.SIZE - Long.numberOfLeadingZeros(size)));
 	}

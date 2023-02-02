@@ -124,7 +124,7 @@ public interface ContentWriter extends AutoCloseable{
 	}
 	
 	default void writeInt4Dynamic(int v) throws IOException{
-		var siz = NumberSize.bySize(Math.abs(v));
+		var siz = NumberSize.bySizeSigned(v);
 		FlagWriter.writeSingle(this, NumberSize.FLAG_INFO, siz);
 		if(siz != NumberSize.VOID) siz.writeIntSigned(this, v);
 	}

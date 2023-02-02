@@ -41,7 +41,7 @@ public class FieldCompiler{
 		REFLECTION
 	}
 	
-	private static final FieldAccess FIELD_ACCESS = GlobalConfig.configEnum("fieldAccess", Runtime.version().feature()<=18? FieldAccess.UNSAFE : FieldAccess.VAR_HANDLE);
+	private static final FieldAccess FIELD_ACCESS = GlobalConfig.configEnum("fieldAccess", Runtime.version().feature()<=19? FieldAccess.UNSAFE : FieldAccess.VAR_HANDLE);
 	
 	protected record LogicalAnnotation<T extends Annotation>(T annotation, AnnotationLogic<T> logic){ }
 	
