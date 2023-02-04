@@ -24,7 +24,7 @@ public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends
 		
 		public Num(Struct<CTyp> struct, GetAnnotation annotations, Method getter, Method setter, String name, Type genericType){
 			super(struct, annotations, getter, setter, name, genericType);
-			constructor = Access.findConstructor(getType(), LongFunction.class, long.class);
+			constructor = Access.findConstructor(getType(), LongFunction.class);
 		}
 		@Override
 		public long getLong(VarPool<CTyp> ioPool, CTyp instance){

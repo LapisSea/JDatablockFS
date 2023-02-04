@@ -46,7 +46,7 @@ public class IOFieldNumber<T extends IOInstance<T>, E extends INumber> extends I
 	public void init(){
 		super.init();
 		if(constructor == null){
-			this.constructor = Access.findConstructor(getType(), LongFunction.class, long.class);
+			this.constructor = Access.findConstructor(getType(), LongFunction.class);
 		}
 		
 		Optional<IOField<T, NumberSize>> fieldOps = forceFixed? Optional.empty() : IOFieldTools.getDynamicSize(getAccessor());

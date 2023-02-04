@@ -12,14 +12,13 @@ import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
 
 import java.lang.invoke.*;
+import java.lang.ref.WeakReference;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.security.ProtectionDomain;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 
 import static com.lapissea.cfs.internal.MyUnsafe.UNSAFE;
 import static java.lang.invoke.MethodHandles.Lookup.*;
@@ -193,7 +192,7 @@ public class Access{
 	
 	public static MethodHandle makeMethodHandle(@NotNull Constructor<?> method){
 		try{
-			var lookup = getLookup(method.getDeclaringClass());
+			var lookup = privateLookupIn(method.getDeclaringClass());
 			method.setAccessible(true);
 			return lookup.unreflectConstructor(method);
 		}catch(Throwable e){
@@ -202,7 +201,7 @@ public class Access{
 	}
 	public static MethodHandle makeMethodHandle(@NotNull Method method){
 		try{
-			var lookup = getLookup(method.getDeclaringClass());
+			var lookup = privateLookupIn(method.getDeclaringClass());
 			method.setAccessible(true);
 			return lookup.unreflect(method);
 		}catch(Throwable e){
@@ -210,8 +209,26 @@ public class Access{
 		}
 	}
 	
+	private static final Map<Class<?>, WeakReference<Class<?>[]>> ARG_CACHE = new WeakHashMap<>();
+	
+	public static <FInter, T extends FInter> T findConstructor(@NotNull Class<?> clazz, Class<FInter> functionalInterface){
+		Class<?>[] args;
+		typ:
+		synchronized(ARG_CACHE){
+			var ref = ARG_CACHE.get(functionalInterface);
+			if(ref != null){
+				args = ref.get();
+				if(args != null) break typ;
+			}
+			args = Access.getFunctionalMethod(functionalInterface).getParameterTypes();
+			ARG_CACHE.put(functionalInterface, new WeakReference<>(args));
+		}
+		
+		return findConstructorArgs(clazz, functionalInterface, args);
+	}
+	
 	@NotNull
-	public static <FInter, T extends FInter> T findConstructor(@NotNull Class<?> clazz, Class<FInter> functionalInterface, Class<?>... parameterTypes){
+	public static <FInter, T extends FInter> T findConstructorArgs(@NotNull Class<?> clazz, Class<FInter> functionalInterface, Class<?>... parameterTypes){
 		try{
 			Constructor<?> lconst;
 			if(Modifier.isPrivate(clazz.getModifiers())){

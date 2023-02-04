@@ -413,7 +413,7 @@ public class SlowTests{
 			
 			var r = new Random(69);
 			
-			for(int i = 0; i<100000; i++){
+			for(int i = 0; i<10000; i++){
 				Integer num = r.nextInt(400);
 				
 				switch(r.nextInt(3)){

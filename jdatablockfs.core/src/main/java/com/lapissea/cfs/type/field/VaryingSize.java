@@ -6,7 +6,7 @@ import com.lapissea.util.TextUtil;
 
 import java.util.*;
 
-public class VaryingSize implements Stringify{
+public final class VaryingSize implements Stringify{
 	
 	public static final VaryingSize MAX = new VaryingSize(NumberSize.LARGEST, -1);
 	

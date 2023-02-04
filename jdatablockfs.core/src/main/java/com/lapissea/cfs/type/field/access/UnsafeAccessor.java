@@ -178,7 +178,7 @@ public sealed class UnsafeAccessor<CTyp extends IOInstance<CTyp>> extends Abstra
 		
 		public Num(Struct<CTyp> struct, Field field, Optional<Method> getter, Optional<Method> setter, String name, Type genericType){
 			super(struct, field, getter, setter, name, genericType);
-			constructor = Access.findConstructor(getType(), LongFunction.class, long.class);
+			constructor = Access.findConstructor(getType(), LongFunction.class);
 		}
 		@Override
 		public long getLong(VarPool<CTyp> ioPool, CTyp instance){

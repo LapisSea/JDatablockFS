@@ -9,6 +9,7 @@ import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.util.Nullable;
+import com.lapissea.util.TextUtil;
 import com.lapissea.util.function.UnsafeBiConsumer;
 import com.lapissea.util.function.UnsafeConsumer;
 
@@ -16,6 +17,7 @@ import java.io.IOException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.StringJoiner;
 import java.util.function.Predicate;
 
 public record AllocateTicket(
@@ -138,4 +140,28 @@ public record AllocateTicket(
 		return NumberSize.bySize(next).max(explicitNextSize.orElse(NumberSize.VOID));
 	}
 	
+	@Override
+	public String toString(){
+		StringJoiner b = new StringJoiner(", ", "Aloc{", "}");
+		
+		b.add("bytes = " + bytes);
+		if(!next.isNull()) b.add("next = " + next);
+		explicitNextSize.ifPresent(v -> b.add("explicitNextSize = " + v));
+		positionMagnet.ifPresent(v -> b.add("positionMagnet = " + v));
+		approve.ifPresent(v -> {
+			if(TextUtil.overridesToString(v.getClass())){
+				b.add("approval = " + v);
+			}else{
+				b.add("With approval");
+			}
+		});
+		if(dataPopulator != null){
+			if(TextUtil.overridesToString(dataPopulator.getClass())){
+				b.add("dataPopulator = " + dataPopulator);
+			}else{
+				b.add("With data populator");
+			}
+		}
+		return b.toString();
+	}
 }

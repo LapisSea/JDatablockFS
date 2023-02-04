@@ -138,7 +138,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		private Unmanaged(Class<T> type, boolean runNow){
 			super(type, runNow);
 			overridingDynamicUnmanaged = checkOverridingUnmanaged();
-			unmanagedConstructor = Access.findConstructor(getType(), NewUnmanaged.class, Access.getFunctionalMethod(NewUnmanaged.class).getParameterTypes());
+			unmanagedConstructor = Access.findConstructor(getType(), NewUnmanaged.class);
 		}
 		
 		private boolean checkOverridingUnmanaged(){
