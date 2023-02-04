@@ -35,13 +35,16 @@ import static java.util.stream.Collectors.joining;
 
 public class FieldCompiler{
 	
-	private enum FieldAccess{
+	private enum AccessImplType{
 		UNSAFE,
 		VAR_HANDLE,
 		REFLECTION
 	}
 	
-	private static final FieldAccess FIELD_ACCESS = GlobalConfig.configEnum("fieldAccess", Runtime.version().feature()<=19? FieldAccess.UNSAFE : FieldAccess.VAR_HANDLE);
+	private static final AccessImplType FIELD_ACCESS = GlobalConfig.configEnum(
+		"fieldAccess",
+		Runtime.version().feature()<=19? AccessImplType.UNSAFE : AccessImplType.VAR_HANDLE
+	);
 	
 	protected record LogicalAnnotation<T extends Annotation>(T annotation, AnnotationLogic<T> logic){ }
 	
@@ -212,6 +215,7 @@ public class FieldCompiler{
 							ptrIndex = -1;
 						}
 						
+						//noinspection unchecked
 						FieldAccessor<T> accessor = new VirtualAccessor<>(struct, (VirtualFieldDefinition<T, Object>)s, ptrIndex, off, primitiveSize);
 						virtualData.put(s.name, accessor);
 						newVirtualData.put(s.name, accessor);
@@ -247,10 +251,10 @@ public class FieldCompiler{
 			}
 		});
 	}
-	protected static IterablePP<Field> deepFieldsByAnnotation(Class<?> clazz, Class<? extends Annotation> type){
+	protected static IterablePP<Field> deepIOValueFields(Class<?> clazz){
 		return deepClasses(clazz)
 			       .flatMap(c -> Arrays.asList(c.getDeclaredFields()).iterator())
-			       .filtered(f -> f.isAnnotationPresent(type));
+			       .filtered(f -> f.isAnnotationPresent(IOValue.class));
 	}
 	
 	protected static <T extends IOInstance<T>> List<FieldAccessor<T>> scanFields(Struct<T> struct){
@@ -261,7 +265,7 @@ public class FieldCompiler{
 		
 		var ioMethods = allMethods(cl).filter(m -> m.isAnnotationPresent(IOValue.class)).toList();
 		
-		for(Field field : deepFieldsByAnnotation(cl, IOValue.class)){
+		for(Field field : deepIOValueFields(cl)){
 			try{
 				Type type = getType(field);
 				
