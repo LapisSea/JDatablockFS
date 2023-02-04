@@ -8,6 +8,7 @@ import com.lapissea.cfs.io.bit.FlagReader;
 import com.lapissea.cfs.io.bit.FlagWriter;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.instancepipe.*;
+import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.cfs.type.*;
@@ -19,6 +20,7 @@ import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.IOException;
+import java.util.OptionalLong;
 import java.util.Set;
 
 import static com.lapissea.cfs.io.instancepipe.StructPipe.STATE_IO_FIELD;
@@ -509,6 +511,57 @@ public sealed interface ValueStorage<T>{
 		public UnknownIDObject(DataProvider provider, GenericContext generics){
 			this.provider = provider;
 			this.generics = generics;
+		}
+		
+		@Override
+		public BasicSizeDescriptor<Object, ?> getSizeDescriptor(){
+			return BasicSizeDescriptor.Unknown.of(WordSpace.BYTE, 1, OptionalLong.empty(), (pool, provider, src) -> {
+				int id;
+				try{
+					id = provider.getTypeDb().toID(src, false).val();
+				}catch(IOException e){
+					throw new RuntimeException(e);
+				}
+				
+				long size = 1;
+				
+				size += NumberSize.bySize(id).bytes;
+				if(src == null) return size;
+				
+				if(src instanceof String str){
+					size += AutoText.PIPE.getSizeDescriptor().calcUnknown(null, provider, new AutoText(str), WordSpace.BYTE);
+					return size;
+				}
+				
+				var type = src.getClass();
+				
+				var p = SupportedPrimitive.get(type);
+				if(p.isPresent()){
+					return size + switch(p.get()){
+						case DOUBLE -> 8;
+						case FLOAT -> 4;
+						case CHAR, SHORT -> 2;
+						case LONG -> 1 + NumberSize.bySizeSigned((long)src).bytes;
+						case INT -> 1 + NumberSize.bySizeSigned((int)src).bytes;
+						case BYTE, BOOLEAN -> 1;
+					};
+				}
+				
+				if(type.isEnum()){
+					return size + EnumUniverse.ofUnknown(type).numSize(false).bytes;
+				}
+				
+				if(src instanceof IOInstance<?> inst){
+					if(inst instanceof IOInstance.Unmanaged<?> unm){
+						return size + REF_PIPE.calcUnknownSize(provider, unm.getReference(), WordSpace.BYTE);
+					}
+					
+					//noinspection unchecked
+					return size + StandardStructPipe.of(inst.getClass()).calcUnknownSize(provider, inst, WordSpace.BYTE);
+				}
+				
+				throw new NotImplementedException("Unknown type: " + type);
+			});
 		}
 		
 		@Override

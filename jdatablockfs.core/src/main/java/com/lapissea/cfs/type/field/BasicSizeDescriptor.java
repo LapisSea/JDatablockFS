@@ -4,6 +4,7 @@ import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.util.TextUtil;
 
+import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.stream.LongStream;
 
@@ -11,6 +12,10 @@ import static com.lapissea.cfs.type.WordSpace.BIT;
 import static com.lapissea.cfs.type.WordSpace.BYTE;
 
 public interface BasicSizeDescriptor<T, PoolType>{
+	
+	interface Sizer<T, PoolType>{
+		long calc(PoolType pool, DataProvider prov, T value);
+	}
 	
 	static String toString(BasicSizeDescriptor<?, ?> size){
 		var fixed = size.getFixed();
@@ -150,6 +155,79 @@ public interface BasicSizeDescriptor<T, PoolType>{
 		@Override
 		default long getMin(){
 			return get();
+		}
+	}
+	
+	
+	abstract sealed class Unknown<Inst, PoolType> implements BasicSizeDescriptor<Inst, PoolType>{
+		
+		private static final class UnknownLambda<Inst, PoolType> extends BasicSizeDescriptor.Unknown<Inst, PoolType>{
+			
+			private final BasicSizeDescriptor.Sizer<Inst, PoolType> unknownSize;
+			
+			public UnknownLambda(WordSpace wordSpace, long min, OptionalLong max, BasicSizeDescriptor.Sizer<Inst, PoolType> unknownSize){
+				super(wordSpace, min, max);
+				this.unknownSize = unknownSize;
+			}
+			
+			@Override
+			public long calcUnknown(PoolType ioPool, DataProvider provider, Inst instance, WordSpace wordSpace){
+				var unmapped = unknownSize.calc(ioPool, provider, instance);
+				return mapSize(wordSpace, unmapped);
+			}
+			
+			@Override
+			public boolean equals(Object o){
+				return this == o ||
+				       o instanceof UnknownLambda<?, ?> that &&
+				       equalsVals(that) &&
+				       unknownSize == that.unknownSize;
+			}
+		}
+		
+		public static <Inst, PoolType> BasicSizeDescriptor<Inst, PoolType> of(long min, OptionalLong max, Sizer<Inst, PoolType> unknownSize){
+			return of(BYTE, min, max, unknownSize);
+		}
+		public static <Inst, PoolType> BasicSizeDescriptor<Inst, PoolType> of(WordSpace wordSpace, long min, OptionalLong max, Sizer<Inst, PoolType> unknownSize){
+			return new UnknownLambda<>(wordSpace, min, max, unknownSize);
+		}
+		
+		private final WordSpace    wordSpace;
+		private final long         min;
+		private final OptionalLong max;
+		
+		public Unknown(WordSpace wordSpace, long min, OptionalLong max){
+			this.wordSpace = wordSpace;
+			this.min = min;
+			this.max = Objects.requireNonNull(max);
+		}
+		
+		@Override
+		public WordSpace getWordSpace(){ return wordSpace; }
+		@Override
+		public OptionalLong getFixed(){ return OptionalLong.empty(); }
+		@Override
+		public OptionalLong getMax(){ return max; }
+		@Override
+		public long getMin(){ return min; }
+		
+		@Override
+		public String toString(){
+			return BasicSizeDescriptor.toString(this);
+		}
+		
+		@Override
+		public int hashCode(){
+			int result = wordSpace.hashCode();
+			result = 31*result + (int)(min^(min >>> 32));
+			result = 31*result + max.hashCode();
+			return result;
+		}
+		
+		protected boolean equalsVals(Unknown<?, ?> that){
+			return min == that.min &&
+			       wordSpace == that.wordSpace &&
+			       max.equals(that.max);
 		}
 	}
 	

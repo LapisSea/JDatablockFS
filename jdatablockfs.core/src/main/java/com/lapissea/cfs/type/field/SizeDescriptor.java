@@ -101,8 +101,8 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>> extends Ba
 	
 	abstract sealed class Unknown<Inst extends IOInstance<Inst>> implements SizeDescriptor<Inst>{
 		
-		public static <Inst extends IOInstance<Inst>> SizeDescriptor<Inst> of(long min, OptionalLong max, Sizer<Inst> unknownSize){ return of(BYTE, min, max, unknownSize); }
-		public static <Inst extends IOInstance<Inst>> SizeDescriptor<Inst> of(WordSpace wordSpace, long min, OptionalLong max, Sizer<Inst> unknownSize){
+		public static <Inst extends IOInstance<Inst>> SizeDescriptor<Inst> of(long min, OptionalLong max, SizeDescriptor.Sizer<Inst> unknownSize){ return of(BYTE, min, max, unknownSize); }
+		public static <Inst extends IOInstance<Inst>> SizeDescriptor<Inst> of(WordSpace wordSpace, long min, OptionalLong max, SizeDescriptor.Sizer<Inst> unknownSize){
 			return new UnknownLambda<>(wordSpace, min, max, unknownSize);
 		}
 		
@@ -143,7 +143,7 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>> extends Ba
 			return result;
 		}
 		
-		protected boolean equalsVals(Unknown<?> that){
+		protected boolean equalsVals(SizeDescriptor.Unknown<?> that){
 			return min == that.min &&
 			       wordSpace == that.wordSpace &&
 			       max.equals(that.max);
@@ -153,9 +153,9 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>> extends Ba
 	final class UnknownLambda<Inst extends IOInstance<Inst>> extends Unknown<Inst>{
 		
 		
-		private final Sizer<Inst> unknownSize;
+		private final SizeDescriptor.Sizer<Inst> unknownSize;
 		
-		public UnknownLambda(WordSpace wordSpace, long min, OptionalLong max, Sizer<Inst> unknownSize){
+		public UnknownLambda(WordSpace wordSpace, long min, OptionalLong max, SizeDescriptor.Sizer<Inst> unknownSize){
 			super(wordSpace, min, max);
 			this.unknownSize = unknownSize;
 		}
