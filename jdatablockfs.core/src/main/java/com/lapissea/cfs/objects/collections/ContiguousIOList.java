@@ -59,9 +59,10 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	@IOValue
 	private List<NumberSize> varyingBuffer;
 	
-	private ValueStorage<T> storage;
+	private       ValueStorage<T> storage;
+	private       int             headSize;
+	private final Map<Long, T>    cache;
 	
-	private final Map<Long, T> cache;
 	
 	public ContiguousIOList(DataProvider provider, Reference reference, TypeLink typeDef) throws IOException{
 		super(provider, reference, typeDef, TYPE_CHECK);
@@ -92,7 +93,13 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 			varyingBuffer = rec.export();
 			writeManagedFields();
 		}
+		calcHead();
 	}
+	
+	private void calcHead(){
+		headSize = (int)calcInstanceSize(WordSpace.BYTE);
+	}
+	
 	private DataProvider makeMagnetProvider(){
 		return getDataProvider().withRouter(t -> t.withPositionMagnet(t.positionMagnet().orElse(getReference().getPtr().getValue())));
 	}
@@ -258,8 +265,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		return calcElementOffset(index, getElementSize());
 	}
 	private long calcElementOffset(long index, long siz){
-		var headSiz = calcInstanceSize(WordSpace.BYTE);
-		return headSiz + siz*index;
+		return headSize + siz*index;
 	}
 	private long getElementSize(){
 		return storage.inlineSize();
@@ -347,6 +353,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 			}
 		}
 		storage = newStorage;
+		calcHead();
 	}
 	
 	private T readAt(long index) throws IOException{

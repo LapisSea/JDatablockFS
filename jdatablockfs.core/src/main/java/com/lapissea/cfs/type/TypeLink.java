@@ -170,13 +170,25 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 		
 		if(cleanGenericType instanceof ParameterizedType parm){
 			var args     = parm.getActualTypeArguments();
-			var genLinks = Arrays.stream(args).filter(arg -> !arg.equals(genericType)).map(TypeLink::of).toArray(TypeLink[]::new);
+			var genLinks = argLinks(genericType, args);
 			return new TypeLink(
 				(Class<?>)parm.getRawType(),
 				genLinks
 			);
 		}
 		return of((Class<?>)cleanGenericType);
+	}
+	
+	private static TypeLink[] argLinks(Type genericType, Type[] args){
+		TypeLink[] arr   = new TypeLink[args.length];
+		int        count = 0;
+		for(Type arg : args){
+			if(!arg.equals(genericType)){
+				arr[count++] = of(arg);
+			}
+		}
+		if(arr.length == count) return arr;
+		return Arrays.copyOf(arr, count);
 	}
 	
 	public static TypeLink of(Class<?> raw){
@@ -195,6 +207,11 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 		PRIMITIVE_MARKER + "Z", boolean.class,
 		PRIMITIVE_MARKER + "V", void.class
 	);
+	
+	private static final Map<String, String> PRIMITIVE_CLASS_NAMES_TO_SHORT =
+		PRIMITIVE_NAMES.entrySet()
+		               .stream()
+		               .collect(Collectors.toMap(e -> e.getValue().getName(), Map.Entry::getKey));
 	
 	private Class<?> typeClass;
 	
@@ -222,7 +239,7 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 	}
 	
 	private void setTypeName(String typeName){
-		this.typeName = PRIMITIVE_NAMES.entrySet().stream().filter(e -> e.getValue().getName().equals(typeName)).map(Map.Entry::getKey).findAny().orElse(typeName);
+		this.typeName = PRIMITIVE_CLASS_NAMES_TO_SHORT.getOrDefault(typeName, typeName);
 	}
 	
 	public String getTypeName(){

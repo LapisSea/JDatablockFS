@@ -403,6 +403,47 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	}
 	
 	@Override
+	public Iterator<IOEntry<K, V>> iterator(){
+		return new IOIterator.Iter<>(){
+			private IOIterator<IONode<BucketEntry<K, V>>> bucket;
+			private final IOIterator<Bucket<K, V>> iter = buckets.iterator();
+			
+			private boolean has() throws IOException{
+				return bucket != null && bucket.hasNext();
+			}
+			
+			private void ensure() throws IOException{
+				if(has()) return;
+				while(iter.hasNext()){
+					var next = iter.ioNext();
+					if(next.node != null){
+						bucket = next.node.iterator();
+						return;
+					}
+				}
+			}
+			
+			@Override
+			public boolean hasNext(){
+				try{
+					ensure();
+					return has();
+				}catch(IOException e){
+					throw new RuntimeException(e);
+				}
+			}
+			
+			@Override
+			public IOEntry<K, V> ioNext() throws IOException{
+				ensure();
+				var node  = bucket.ioNext();
+				var value = node.getValue();
+				return value.unmodifiable();
+			}
+		};
+	}
+	
+	@Override
 	public Stream<IOEntry<K, V>> stream(){
 		return rawEntryStream(buckets).map(BucketEntry::unmodifiable);
 	}

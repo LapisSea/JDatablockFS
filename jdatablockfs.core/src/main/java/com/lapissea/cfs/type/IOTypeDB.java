@@ -234,6 +234,9 @@ public sealed interface IOTypeDB{
 		@IOValue
 		private IOMap<TypeName, TypeDef> defs;
 		
+		private Map<TypeLink, Integer> reverseDataCache;
+		private int                    max;
+		
 		private WeakReference<ClassLoader> templateLoader = new WeakReference<>(null);
 		
 		@Override
@@ -242,21 +245,44 @@ public sealed interface IOTypeDB{
 			var id      = builtIn.toID(type, false);
 			if(id.stored()) return id;
 			
-			int max = 0;
-			for(var entry : data){
-				var key = entry.getKey();
-				if(entry.getValue().equals(type)){
-					return new TypeID(key, true);
+			if(reverseDataCache == null && data.size()<=100000){
+				reverseDataCache = HashMap.newHashMap((int)data.size());
+				
+				int max = FIRST_ID;
+				for(var entry : data){
+					var key   = entry.getKey();
+					var value = entry.getValue();
+					reverseDataCache.put(value, key);
+					max = Math.max(key, max);
 				}
-				max = Math.max(key, max);
+				this.max = max;
 			}
 			
-			max = Math.max(FIRST_ID, max);
+			int max;
+			
+			if(reverseDataCache != null){
+				var existing = reverseDataCache.get(type);
+				if(existing != null){
+					return new TypeID(existing, true);
+				}
+				max = this.max;
+			}else{
+				max = FIRST_ID;
+				for(var entry : data){
+					var key = entry.getKey();
+					if(entry.getValue().equals(type)){
+						return new TypeID(key, true);
+					}
+					max = Math.max(key, max);
+				}
+			}
+			
 			
 			var newID = max + 1;
 			if(!recordNew) return new TypeID(newID, false);
 			
 			data.put(newID, type);
+			reverseDataCache = null;
 			var newDefs = new HashMap<TypeName, TypeDef>();
 			recordType(builtIn, type, newDefs);
 			

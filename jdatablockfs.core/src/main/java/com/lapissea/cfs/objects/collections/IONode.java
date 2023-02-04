@@ -6,6 +6,7 @@ import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.ValueStorage;
+import com.lapissea.cfs.io.bit.BitOutputStream;
 import com.lapissea.cfs.io.bit.FlagReader;
 import com.lapissea.cfs.io.instancepipe.FieldDependency;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
@@ -27,6 +28,7 @@ import com.lapissea.util.NotNull;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Type;
@@ -208,9 +210,10 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	
 	@SuppressWarnings({"rawtypes", "unchecked"})
 	public static <T> IONode<T> allocValNode(T value, IONode<T> next, BasicSizeDescriptor<T, ?> sizeDescriptor, TypeLink nodeType, DataProvider provider, OptionalLong positionMagnet) throws IOException{
-		int nextBytes;
-		if(next != null) nextBytes = NumberSize.bySize(next.getReference().getPtr()).bytes;
-		else nextBytes = calcOptimalNextSize(provider).bytes;
+		NumberSize nextSize;
+		if(next != null) nextSize = NumberSize.bySize(next.getReference().getPtr());
+		else nextSize = calcOptimalNextSize(provider);
+		int nextBytes = nextSize.bytes;
 		
 		var bytes = 1 + nextBytes + switch(sizeDescriptor){
 			case SizeDescriptor.Fixed<?> fixed -> fixed.get(WordSpace.BYTE);
@@ -219,7 +222,12 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		};
 		
 		try(var ignored = provider.getSource().openIOTransaction()){
-			var chunk = AllocateTicket.bytes(bytes).withPositionMagnet(positionMagnet).submit(provider);
+			var chunk = AllocateTicket.bytes(bytes).withDataPopulated((p, io) -> {
+				try(var writer = new BitOutputStream(io)){
+					writer.writeEnum(NumberSize.FLAG_INFO, nextSize);
+				}
+				io.writeWord(0, nextBytes);
+			}).withPositionMagnet(positionMagnet).submit(provider);
 			return new IONode<>(provider, chunk.getPtr().makeReference(), nodeType, value, next);
 		}
 	}
@@ -268,11 +276,17 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		//noinspection unchecked
 		valueStorage = (ValueStorage<T>)ValueStorage.makeStorage(magnetProvider, typeDef.arg(0), getGenerics(), new ValueStorage.StorageRule.Default());
 		
-		if(isSelfDataEmpty()){
-			nextSize = calcOptimalNextSize(provider);
-			if(!readOnly) writeManagedFields();
-		}else{
+		try{
 			readManagedFields();
+		}catch(EOFException eof){
+			if(isSelfDataEmpty()){
+				nextSize = calcOptimalNextSize(provider);
+				if(!readOnly){
+					writeManagedFields();
+				}
+			}else{
+				throw eof;
+			}
 		}
 	}
 	
