@@ -9,6 +9,7 @@ import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.collections.HashIOMap;
+import com.lapissea.cfs.objects.collections.IOHashSet;
 import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
@@ -30,6 +31,7 @@ import java.util.stream.IntStream;
 
 import static com.lapissea.cfs.logging.Log.info;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
@@ -400,6 +402,50 @@ public class SlowTests{
 				}
 			}
 			info("iter {}, {}%", i, (provider.getSource().getIOSize()/(float)size)*100);
+		});
+	}
+	
+	@Test
+	void fuzzIOSet() throws IOException{
+		TestUtils.testCluster(TestInfo.of(), provider -> {
+			var set      = provider.getRootProvider().<IOHashSet<Object>>request("hi", IOHashSet.class);
+			var checkSet = new HashSet<>();
+			
+			var r = new Random(69);
+			
+			for(int i = 0; i<100000; i++){
+				Integer num = r.nextInt(400);
+				
+				switch(r.nextInt(3)){
+					case 0 -> {
+						var added1 = set.add(num);
+						var added2 = checkSet.add(num);
+//						LogUtil.println("ADD", num);
+						assertEquals(added1, added2);
+					}
+					case 1 -> {
+						var removed1 = set.remove(num);
+						var removed2 = checkSet.remove(num);
+//						LogUtil.println("REM", num);
+						assertEquals(removed1, removed2);
+					}
+					case 2 -> {
+						var c1 = set.contains(num);
+						var c2 = checkSet.contains(num);
+						assertEquals(c1, c2, "contains fail at " + i + " on " + num);
+					}
+				}
+				
+				assertEquals(set.size(), checkSet.size());
+				
+				var tmp    = HashSet.newHashSet(checkSet.size());
+				int finalI = i;
+				set.iterator().forRemaining(e -> {
+					assertTrue(tmp.add(e), "duplicated " + e + " at " + finalI);
+				});
+				assertEquals(tmp, checkSet, i + "");
+				
+			}
 		});
 	}
 	
