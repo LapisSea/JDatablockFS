@@ -3,6 +3,7 @@ package com.lapissea.cfs.objects.collections;
 import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.AllocateTicket;
+import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.ValueStorage;
@@ -208,39 +209,43 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		return NumberSize.bySize(provider.getSource().getIOSize()).next();
 	}
 	
+	private static <T> NumberSize getNextSize(IONode<T> next, DataProvider provider) throws IOException{
+		if(next != null) return NumberSize.bySize(next.getReference().getPtr());
+		else return calcOptimalNextSize(provider);
+	}
+	private static Chunk allocateNodeChunk(DataProvider provider, OptionalLong positionMagnet, NumberSize nextSize, long bytes) throws IOException{
+		int nextBytes = nextSize.bytes;
+		return AllocateTicket.bytes(bytes).withDataPopulated((p, io) -> {
+			try(var writer = new BitOutputStream(io)){
+				writer.writeEnum(NumberSize.FLAG_INFO, nextSize);
+			}
+			io.writeWord(0, nextBytes);
+		}).withPositionMagnet(positionMagnet).submit(provider);
+	}
+	
 	@SuppressWarnings({"rawtypes", "unchecked"})
 	public static <T> IONode<T> allocValNode(T value, IONode<T> next, BasicSizeDescriptor<T, ?> sizeDescriptor, TypeLink nodeType, DataProvider provider, OptionalLong positionMagnet) throws IOException{
-		NumberSize nextSize;
-		if(next != null) nextSize = NumberSize.bySize(next.getReference().getPtr());
-		else nextSize = calcOptimalNextSize(provider);
-		int nextBytes = nextSize.bytes;
+		var nextSize = getNextSize(next, provider);
 		
-		var bytes = 1 + nextBytes + switch(sizeDescriptor){
+		var bytes = 1 + nextSize.bytes + switch(sizeDescriptor){
 			case SizeDescriptor.Fixed<?> fixed -> fixed.get(WordSpace.BYTE);
 			case SizeDescriptor.Unknown unknown -> unknown.calcUnknown(((IOInstance<?>)value).getThisStruct().allocVirtualVarPool(IO), provider, value, WordSpace.BYTE);
 			case BasicSizeDescriptor<T, ?> basic -> basic.calcUnknown(null, provider, value, WordSpace.BYTE);
 		};
 		
 		try(var ignored = provider.getSource().openIOTransaction()){
-			var chunk = AllocateTicket.bytes(bytes).withDataPopulated((p, io) -> {
-				try(var writer = new BitOutputStream(io)){
-					writer.writeEnum(NumberSize.FLAG_INFO, nextSize);
-				}
-				io.writeWord(0, nextBytes);
-			}).withPositionMagnet(positionMagnet).submit(provider);
+			Chunk chunk = allocateNodeChunk(provider, positionMagnet, nextSize, bytes);
 			return new IONode<>(provider, chunk.getPtr().makeReference(), nodeType, value, next);
 		}
 	}
 	
 	public static <T> IONode<T> allocValNode(RandomIO valueBytes, IONode<T> next, TypeLink nodeType, DataProvider provider, OptionalLong positionMagnet) throws IOException{
-		int nextBytes;
-		if(next != null) nextBytes = NumberSize.bySize(next.getReference().getPtr()).bytes;
-		else nextBytes = calcOptimalNextSize(provider).bytes;
+		var nextSize = getNextSize(next, provider);
 		
-		var bytes = 1 + nextBytes + valueBytes.remaining();
+		var bytes = 1 + nextSize.bytes + valueBytes.remaining();
 		
 		try(var ignored = provider.getSource().openIOTransaction()){
-			var chunk = AllocateTicket.bytes(bytes).withPositionMagnet(positionMagnet).submit(provider);
+			var chunk = allocateNodeChunk(provider, positionMagnet, nextSize, bytes);
 			var node  = new IONode<>(provider, chunk.getPtr().makeReference(), nodeType, null, next);
 			node.ensureNextSpace();
 			try(var io = node.getValueDataIO()){
@@ -260,8 +265,10 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		
 		var newSiz = calcOptimalNextSize(provider);
 		if(newSiz.greaterThan(nextSize)){
+			var nextPtr = getNextPtr();
 			nextSize = newSiz;
 			writeManagedFields();
+			writeNextPtr(nextPtr);
 		}
 		
 		if(next != null) setNext(next);
@@ -533,7 +540,10 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		if(oldPtr.equals(ptr)){
 			return;
 		}
-		
+		writeNextPtr(ptr);
+	}
+	
+	private void writeNextPtr(ChunkPointer ptr) throws IOException{
 		var newSiz = NumberSize.bySize(ptr);
 		if(newSiz.greaterThan(nextSize)){
 			var val  = getValue();

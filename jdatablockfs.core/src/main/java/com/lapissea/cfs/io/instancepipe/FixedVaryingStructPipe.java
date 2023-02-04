@@ -128,6 +128,9 @@ public class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseFixedSt
 	}
 	
 	@Override
+	protected void postValidate(){ }
+	
+	@Override
 	protected void doWrite(DataProvider provider, ContentWriter dest, VarPool<T> ioPool, T instance) throws IOException{
 		writeIOFields(getSpecificFields(), ioPool, provider, dest, instance);
 	}
