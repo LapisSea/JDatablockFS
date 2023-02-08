@@ -563,7 +563,23 @@ public final class IOTransactionBuffer{
 		return false;
 	}
 	
-	public record TransactionExport(OptionalLong setCapacity, List<RandomIO.WriteChunk> writes){ }
+	public record TransactionExport(OptionalLong setCapacity, List<RandomIO.WriteChunk> writes){
+		
+		public void apply(RandomIO io) throws IOException{
+			switch(writes.size()){
+				case 0 -> { }
+				case 1 -> {
+					var e = writes.get(0);
+					io.setPos(e.ioOffset()).write(e.data(), e.dataOffset(), e.dataLength());
+				}
+				default -> io.writeAtOffsets(writes);
+			}
+			if(setCapacity.isPresent()){
+				io.setCapacity(setCapacity.getAsLong());
+			}
+		}
+		
+	}
 	
 	public TransactionExport export(){
 		try(var ignored = lock.write()){
@@ -631,21 +647,7 @@ public final class IOTransactionBuffer{
 				transactionOpenVar.set(target, oldTransactionOpen);
 				if(!oldTransactionOpen){
 					var data = export();
-					try(var io = target.io()){
-						var cap = data.setCapacity();
-						var w   = data.writes();
-						switch(w.size()){
-							case 0 -> { }
-							case 1 -> {
-								var e = w.get(0);
-								io.setPos(e.ioOffset()).write(e.data(), e.dataOffset(), e.dataLength());
-							}
-							default -> io.writeAtOffsets(w);
-						}
-						if(cap.isPresent()){
-							io.setCapacity(cap.getAsLong());
-						}
-					}
+					target.io(data::apply);
 				}
 			}
 			

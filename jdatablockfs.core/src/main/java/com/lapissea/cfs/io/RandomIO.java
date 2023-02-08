@@ -8,6 +8,7 @@ import com.lapissea.cfs.io.streams.RandomInputStream;
 import com.lapissea.cfs.io.streams.RandomOutputStream;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.INumber;
+import com.lapissea.cfs.utils.IOUtils;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.function.UnsafeConsumer;
@@ -458,5 +459,114 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 	
 	default boolean inTransaction(){
 		return false;
+	}
+	
+	/**
+	 * This serves as an atomic write statement. Data that is related and can not be written at once should use this.<br>
+	 * The function may refuse to create a local transaction buffer if it is already inside an active transaction (local or global).
+	 * If the transaction refuses, it returns the current instance.<br>
+	 * The returning io should only be closed if function did not refuse to make a buffer.
+	 *
+	 * @return RandomIO instance that may be the calling instance or a new buffer
+	 * @throws IOException source may throw io
+	 */
+	default RandomIO localTransactionBuffer() throws IOException{
+		if(inTransaction()) return this;
+		
+		if(isReadOnly()){
+			throw new IllegalStateException();
+		}
+		
+		var that = this;
+		class LocalTransactionIO implements RandomIO{
+			private final IOTransactionBuffer transactionBuffer = new IOTransactionBuffer(false);
+			
+			private       long size     = that.getSize();
+			private final long capacity = that.getCapacity();
+			private       long pos      = that.getPos();
+			
+			LocalTransactionIO() throws IOException{
+			}
+			
+			@Override
+			public void setSize(long requestedSize) throws IOException{
+				size = requestedSize;
+			}
+			@Override
+			public long getSize() throws IOException{
+				return size;
+			}
+			@Override
+			public long getPos() throws IOException{
+				return pos;
+			}
+			@Override
+			public RandomIO setPos(long pos) throws IOException{
+				this.pos = pos;
+				return this;
+			}
+			@Override
+			public long getCapacity() throws IOException{
+				return transactionBuffer.getCapacity(capacity);
+			}
+			@Override
+			public RandomIO setCapacity(long newCapacity) throws IOException{
+				transactionBuffer.capacityChange(newCapacity);
+				return this;
+			}
+			
+			@Override
+			public void close() throws IOException{
+				transactionBuffer.export().apply(that);
+				that.setPos(pos);
+			}
+			
+			@Override
+			public void flush() throws IOException{ }
+			
+			private int readAt(long offset, byte[] b, int off, int len) throws IOException{
+				that.setPos(offset);
+				return that.read(b, off, len);
+			}
+			
+			@Override
+			public int read() throws IOException{
+				var b = transactionBuffer.readByte(this::readAt, pos);
+				if(b>=0){
+					pos++;
+				}
+				return b;
+			}
+			@Override
+			public void write(int b) throws IOException{
+				transactionBuffer.writeByte(pos, b);
+				pos++;
+				if(size<=pos) size = pos + 1;
+			}
+			
+			@Override
+			public void writeAtOffsets(Collection<WriteChunk> data) throws IOException{
+				for(var e : data){
+					transactionBuffer.write(e.ioOffset(), e.data(), e.dataOffset(), e.dataLength());
+				}
+			}
+			@Override
+			public void fillZero(long requestedMemory) throws IOException{
+				var pos = this.pos;
+				IOUtils.zeroFill(this::write, requestedMemory);
+				this.pos = pos;
+			}
+			
+			@Override
+			public boolean isReadOnly(){
+				return false;
+			}
+			@Override
+			public boolean inTransaction(){
+				return true;
+			}
+		}
+		
+		return new LocalTransactionIO();
 	}
 }
