@@ -236,8 +236,9 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 		@Override
 		public void fillZero(long requestedMemory) throws IOException{
 			if(readOnly) throw new UnsupportedOperationException();
-			
-			IOUtils.zeroFill((b, off, len) -> write(b, off, len, false), requestedMemory);
+			var pos = this.pos;
+			IOUtils.zeroFill(this::write, requestedMemory);
+			this.pos = pos;
 		}
 		@Override
 		public boolean isReadOnly(){
@@ -304,7 +305,7 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 		}
 	}
 	
-	private IOHook hook;
+	private final IOHook hook;
 	
 	protected DataType fileData;
 	protected int      used;

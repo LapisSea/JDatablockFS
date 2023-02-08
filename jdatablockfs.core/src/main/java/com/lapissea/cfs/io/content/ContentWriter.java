@@ -309,7 +309,11 @@ public interface ContentWriter extends AutoCloseable{
 				if(onFinish != null){
 					onFinish.accept(count, buf);
 				}
-				target.write(buf, 0, count);
+				if(count == 1){
+					target.write(buf[0]);
+				}else{
+					target.write(buf, 0, count);
+				}
 			}
 			
 			@Override
