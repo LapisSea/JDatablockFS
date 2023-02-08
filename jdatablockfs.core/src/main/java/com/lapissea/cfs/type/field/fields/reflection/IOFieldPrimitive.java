@@ -520,7 +520,9 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	
 	public static final class FBoolean<T extends IOInstance<T>> extends BitField<T, Boolean>{
 		
-		private FBoolean(FieldAccessor<T> field){ super(field); }
+		private FBoolean(FieldAccessor<T> field){
+			super(field, SizeDescriptor.Fixed.of(BIT, 1));
+		}
 		
 		public boolean getValue(VarPool<T> ioPool, T instance){
 			return getAccessor().getBoolean(ioPool, instance);
@@ -571,17 +573,11 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 		public int instanceHashCode(VarPool<T> ioPool, T instance){
 			return Boolean.hashCode(getValue(ioPool, instance));
 		}
-		
-		@Override
-		public SizeDescriptor<T> getSizeDescriptor(){
-			return SizeDescriptor.Fixed.of(BIT, 1);
-		}
 	}
 	
 	private final   boolean                               forceFixed;
 	protected final VaryingSize                           maxSize;
 	private         BiFunction<VarPool<T>, T, NumberSize> dynamicSize;
-	private         SizeDescriptor<T>                     sizeDescriptor;
 	
 	protected IOFieldPrimitive(FieldAccessor<T> field, VaryingSize maxSize){
 		super(field);
@@ -605,12 +601,12 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 				if(!allowed.contains(val)) throw new IllegalStateException(val + " is not an allowed size in " + allowed + " at " + this + " with dynamic size " + field);
 				return val;
 			};
-			sizeDescriptor = SizeDescriptor.Unknown.of(
+			initSizeDescriptor(SizeDescriptor.Unknown.of(
 				allowed.stream().min(Comparator.naturalOrder()).orElse(VOID),
 				allowed.stream().max(Comparator.naturalOrder()),
-				field.getAccessor());
+				field.getAccessor()));
 		}else{
-			sizeDescriptor = SizeDescriptor.Fixed.of(maxSize.size.bytes);
+			initSizeDescriptor(SizeDescriptor.Fixed.of(maxSize.size.bytes));
 		}
 	}
 	
@@ -636,11 +632,6 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	protected NumberSize getSize(VarPool<T> ioPool, T instance){
 		if(dynamicSize != null) return dynamicSize.apply(ioPool, instance);
 		return maxSize.size;
-	}
-	
-	@Override
-	public SizeDescriptor<T> getSizeDescriptor(){
-		return sizeDescriptor;
 	}
 	
 	@Override

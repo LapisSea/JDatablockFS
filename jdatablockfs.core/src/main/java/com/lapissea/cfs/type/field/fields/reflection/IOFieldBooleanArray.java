@@ -19,19 +19,17 @@ import java.util.OptionalLong;
 
 public class IOFieldBooleanArray<T extends IOInstance<T>> extends IOField<T, boolean[]>{
 	
-	private final SizeDescriptor<T>        descriptor;
-	private       IOFieldPrimitive.FInt<T> arraySize;
-	
+	private IOFieldPrimitive.FInt<T> arraySize;
 	
 	public IOFieldBooleanArray(FieldAccessor<T> accessor){
 		super(accessor);
 		
-		descriptor = SizeDescriptor.Unknown.of(0, OptionalLong.empty(), (ioPool, prov, inst) -> {
+		initSizeDescriptor(SizeDescriptor.Unknown.of(0, OptionalLong.empty(), (ioPool, prov, inst) -> {
 			var siz = arraySize.getValue(ioPool, inst);
 			if(siz>0) return siz;
 			var arr = get(ioPool, inst);
 			return BitUtils.bitsToBytes(arr.length);
-		});
+		}));
 	}
 	@Override
 	public void init(){
@@ -39,10 +37,6 @@ public class IOFieldBooleanArray<T extends IOInstance<T>> extends IOField<T, boo
 		arraySize = declaringStruct().getFields().requireExactInt(IOFieldTools.makeCollectionLenName(getAccessor()));
 	}
 	
-	@Override
-	public SizeDescriptor<T> getSizeDescriptor(){
-		return descriptor;
-	}
 	@Override
 	public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		var arr = get(ioPool, instance);

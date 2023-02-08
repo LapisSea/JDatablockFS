@@ -12,7 +12,6 @@ import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.*;
-import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.VaryingSize;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.fields.RefField;
@@ -25,7 +24,6 @@ import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT
 public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType extends IOInstance.Unmanaged<ValueType>> extends RefField.InstRef<T, ValueType>{
 	
 	
-	private final SizeDescriptor<T>           descriptor;
 	private final Struct.Unmanaged<ValueType> struct;
 	private final StructPipe<ValueType>       instancePipe;
 	private final StructPipe<Reference>       referencePipe;
@@ -42,10 +40,10 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 		if(varProvider != null){
 			var pip = FixedVaryingStructPipe.tryVarying(Reference.STRUCT, varProvider);
 			referencePipe = pip;
-			descriptor = pip.getFixedDescriptor();
+			initSizeDescriptor(pip.getFixedDescriptor());
 		}else{
 			referencePipe = StandardStructPipe.of(Reference.class);
-			descriptor = referencePipe.getSizeDescriptor().map(this::getReference);
+			initSizeDescriptor(referencePipe.getSizeDescriptor().map(this::getReference));
 		}
 		
 		struct = Struct.Unmanaged.ofUnmanaged((Class<ValueType>)getType());
@@ -116,11 +114,6 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 		}
 		var type = TypeLink.of(getAccessor().getGenericType(genericContext));
 		return struct.make(provider, readNew, type);
-	}
-	
-	@Override
-	public SizeDescriptor<T> getSizeDescriptor(){
-		return descriptor;
 	}
 	
 	@Override

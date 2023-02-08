@@ -125,13 +125,8 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 		private SimpleMerger(List<BitField<T, ?>> group, NumberSize numSize){
 			super(group);
 			this.numSize = numSize;
-			bytes = getSizeDescriptor().get(WordSpace.BYTE);
+			bytes = ((SizeDescriptor.Fixed<T>)getSizeDescriptor()).get(WordSpace.BYTE);
 			oneBits = (int)(bytes*Byte.SIZE - IOFieldTools.sumVars(group, s -> s.requireFixed(WordSpace.BIT)));
-		}
-		
-		@Override
-		public SizeDescriptor.Fixed<T> getSizeDescriptor(){
-			return (SizeDescriptor.Fixed<T>)super.getSizeDescriptor();
 		}
 		
 		@Override
@@ -196,8 +191,6 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 	
 	private final List<ValueGeneratorInfo<T, ?>> generators;
 	
-	private final SizeDescriptor<T> sizeDescriptor;
-	
 	protected final Optional<BitLayout> safetyBits;
 	
 	private BitFieldMerger(List<BitField<T, ?>> group){
@@ -207,23 +200,18 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 		var bits      = IOFieldTools.sumVarsIfAll(group, SizeDescriptor::getFixed);
 		var fixedSize = Utils.bitToByte(bits);
 		if(fixedSize.isPresent()){
-			sizeDescriptor = SizeDescriptor.Fixed.of(fixedSize.getAsLong());
+			initSizeDescriptor(SizeDescriptor.Fixed.of(fixedSize.getAsLong()));
 			safetyBits = bits.stream().mapToObj(BitLayout::new).findAny();
 		}else{
 			safetyBits = Optional.empty();
-			sizeDescriptor = SizeDescriptor.Unknown.of(
+			initSizeDescriptor(SizeDescriptor.Unknown.of(
 				IOFieldTools.sumVars(group, SizeDescriptor::getMin),
 				IOFieldTools.sumVarsIfAll(group, SizeDescriptor::getMax),
 				(ioPool, prov, inst) -> Utils.bitToByte(IOFieldTools.sumVars(group, s -> s.calcUnknown(ioPool, prov, inst, WordSpace.BIT)))
-			);
+			));
 		}
 		initLateData(FieldSet.of(group.stream().flatMap(IOField::dependencyStream)));
 		generators = Utils.nullIfEmpty(streamUnpackedFields().flatMap(IOField::generatorStream).toList());
-	}
-	
-	@Override
-	public SizeDescriptor<T> getSizeDescriptor(){
-		return sizeDescriptor;
 	}
 	
 	@Override

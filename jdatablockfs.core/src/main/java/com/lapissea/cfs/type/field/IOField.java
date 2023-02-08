@@ -41,6 +41,8 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 	
 	private IONullability.Mode nullability;
 	
+	private SizeDescriptor<T> descriptor;
+	
 	public static final int DYNAMIC_FLAG           = 1<<0;
 	public static final int IOINSTANCE_FLAG        = 1<<1;
 	public static final int PRIMITIVE_OR_ENUM_FLAG = 1<<2;
@@ -51,6 +53,10 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 	
 	private volatile long uid = -1;
 	
+	protected IOField(FieldAccessor<T> accessor, SizeDescriptor<T> descriptor){
+		this.accessor = accessor;
+		initSizeDescriptor(descriptor);
+	}
 	public IOField(FieldAccessor<T> accessor){
 		this.accessor = accessor;
 	}
@@ -124,15 +130,25 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 		getAccessor().set(ioPool, instance, value);
 	}
 	
+	protected final void initSizeDescriptor(SizeDescriptor<T> descriptor){
+		Objects.requireNonNull(descriptor);
+		if(this.descriptor != null) throw new IllegalStateException("Descriptor already set");
+		this.descriptor = descriptor;
+	}
+	
 	public final SizeDescriptor<T> sizeDescriptorSafe(){
+		var d = descriptor;
+		if(d != null) return d;
 		var struct = declaringStruct();
 		if(struct != null){
 			struct.waitForState(Struct.STATE_INIT_FIELDS);
 		}
-		return getSizeDescriptor();
+		return descriptor;
 	}
 	
-	public abstract SizeDescriptor<T> getSizeDescriptor();
+	public final SizeDescriptor<T> getSizeDescriptor(){
+		return descriptor;
+	}
 	
 	public interface ValueGenerator<T extends IOInstance<T>, ValType>{
 		boolean shouldGenerate(VarPool<T> ioPool, DataProvider provider, T instance) throws IOException;
@@ -319,6 +335,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 		if(f != this){
 			f.initLateData(getDependencies());
 			f.init();
+			Objects.requireNonNull(f.getSizeDescriptor(), "Descriptor was not inited");
 		}
 		if(!f.getSizeDescriptor().hasFixed()) throw new RuntimeException(this + " failed to make itself fixed");
 		return f;

@@ -24,7 +24,6 @@ import java.util.OptionalLong;
 public class IOFieldEnumList<T extends IOInstance<T>, E extends Enum<E>> extends IOField<T, List<E>>{
 	
 	private final EnumUniverse<E>          universe;
-	private final SizeDescriptor<T>        descriptor;
 	private       IOFieldPrimitive.FInt<T> arraySize;
 	
 	public IOFieldEnumList(FieldAccessor<T> accessor){
@@ -33,12 +32,12 @@ public class IOFieldEnumList<T extends IOInstance<T>, E extends Enum<E>> extends
 		var etyp = ((ParameterizedType)gt).getActualTypeArguments()[0];
 		universe = EnumUniverse.of((Class<E>)etyp);
 		
-		descriptor = SizeDescriptor.Unknown.of(0, OptionalLong.empty(), (ioPool, prov, inst) -> {
+		initSizeDescriptor(SizeDescriptor.Unknown.of(0, OptionalLong.empty(), (ioPool, prov, inst) -> {
 			var siz = arraySize.getValue(ioPool, inst);
 			if(siz>0) return byteCount(siz);
 			var arr = get(ioPool, inst);
 			return byteCount(arr.size());
-		});
+		}));
 	}
 	
 	@Override
@@ -47,10 +46,6 @@ public class IOFieldEnumList<T extends IOInstance<T>, E extends Enum<E>> extends
 		arraySize = declaringStruct().getFields().requireExactInt(IOFieldTools.makeCollectionLenName(getAccessor()));
 	}
 	
-	@Override
-	public SizeDescriptor<T> getSizeDescriptor(){
-		return descriptor;
-	}
 	@Override
 	public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		var enums = get(ioPool, instance);

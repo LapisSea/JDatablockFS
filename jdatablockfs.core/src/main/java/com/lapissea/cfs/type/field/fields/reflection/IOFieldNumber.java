@@ -30,7 +30,6 @@ public class IOFieldNumber<T extends IOInstance<T>, E extends INumber> extends I
 	private final VaryingSize                           maxSize;
 	private       BiFunction<VarPool<T>, T, NumberSize> dynamicSize;
 	private       LongFunction<E>                       constructor;
-	private       SizeDescriptor<T>                     sizeDescriptor;
 	
 	public IOFieldNumber(FieldAccessor<T> accessor){
 		this(accessor, null, null);
@@ -53,8 +52,8 @@ public class IOFieldNumber<T extends IOInstance<T>, E extends INumber> extends I
 		
 		fieldOps.ifPresent(f -> dynamicSize = f::get);
 		
-		sizeDescriptor = fieldOps.map(field -> SizeDescriptor.Unknown.of(VOID, Optional.of(LARGEST), field.getAccessor()))
-		                         .orElse(SizeDescriptor.Fixed.of(maxSize.size.bytes));
+		initSizeDescriptor(fieldOps.map(field -> SizeDescriptor.Unknown.of(VOID, Optional.of(LARGEST), field.getAccessor()))
+		                           .orElse(SizeDescriptor.Fixed.of(maxSize.size.bytes)));
 	}
 	@Override
 	public IOField<T, E> maxAsFixedSize(VaryingSize.Provider varProvider){
@@ -89,11 +88,5 @@ public class IOFieldNumber<T extends IOInstance<T>, E extends INumber> extends I
 	public void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		var size = getSize(ioPool, instance);
 		size.skip(src);
-	}
-	
-	@Override
-	public SizeDescriptor<T> getSizeDescriptor(){
-		if(sizeDescriptor == null) throw new IllegalStateException(this + " not initialized");
-		return sizeDescriptor;
 	}
 }

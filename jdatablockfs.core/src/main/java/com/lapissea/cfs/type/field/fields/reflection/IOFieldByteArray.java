@@ -21,15 +21,14 @@ public class IOFieldByteArray<T extends IOInstance<T>> extends IOField<T, byte[]
 	private final IOCompression.Type compression;
 	private       IOField<T, byte[]> compressed;
 	
-	private final SizeDescriptor<T>        descriptor;
-	private       IOFieldPrimitive.FInt<T> arraySize;
+	private IOFieldPrimitive.FInt<T> arraySize;
 	
 	public IOFieldByteArray(FieldAccessor<T> accessor){
 		super(accessor);
 		
 		compression = accessor.getAnnotation(IOCompression.class).map(IOCompression::value).orElse(null);
 		
-		descriptor = SizeDescriptor.Unknown.of(0, OptionalLong.empty(), (ioPool, prov, inst) -> {
+		initSizeDescriptor(SizeDescriptor.Unknown.of(0, OptionalLong.empty(), (ioPool, prov, inst) -> {
 			if(compression != null){
 				return 0;
 			}
@@ -37,7 +36,7 @@ public class IOFieldByteArray<T extends IOInstance<T>> extends IOField<T, byte[]
 			if(siz>0) return siz;
 			var arr = get(ioPool, inst);
 			return arr.length;
-		});
+		}));
 	}
 	
 	@Override
@@ -67,10 +66,7 @@ public class IOFieldByteArray<T extends IOInstance<T>> extends IOField<T, byte[]
 			}
 		}));
 	}
-	@Override
-	public SizeDescriptor<T> getSizeDescriptor(){
-		return descriptor;
-	}
+	
 	@Override
 	public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		var arr = get(ioPool, instance);

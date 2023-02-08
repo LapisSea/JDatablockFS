@@ -22,19 +22,18 @@ import java.util.OptionalLong;
 public class IOFieldEnumArray<T extends IOInstance<T>, E extends Enum<E>> extends IOField<T, E[]>{
 	
 	private final EnumUniverse<E>          universe;
-	private final SizeDescriptor<T>        descriptor;
 	private       IOFieldPrimitive.FInt<T> arraySize;
 	
 	public IOFieldEnumArray(FieldAccessor<T> accessor){
 		super(accessor);
 		universe = EnumUniverse.of((Class<E>)accessor.getType().componentType());
 		
-		descriptor = SizeDescriptor.Unknown.of(0, OptionalLong.empty(), (ioPool, prov, inst) -> {
+		initSizeDescriptor(SizeDescriptor.Unknown.of(0, OptionalLong.empty(), (ioPool, prov, inst) -> {
 			var siz = arraySize.getValue(ioPool, inst);
 			if(siz>0) return byteCount(siz);
 			var arr = get(ioPool, inst);
 			return byteCount(arr.length);
-		});
+		}));
 	}
 	
 	@Override
@@ -43,10 +42,6 @@ public class IOFieldEnumArray<T extends IOInstance<T>, E extends Enum<E>> extend
 		arraySize = declaringStruct().getFields().requireExactInt(IOFieldTools.makeCollectionLenName(getAccessor()));
 	}
 	
-	@Override
-	public SizeDescriptor<T> getSizeDescriptor(){
-		return descriptor;
-	}
 	@Override
 	public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		var enums = get(ioPool, instance);

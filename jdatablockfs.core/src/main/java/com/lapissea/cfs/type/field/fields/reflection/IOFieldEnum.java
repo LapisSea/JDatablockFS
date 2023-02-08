@@ -18,14 +18,13 @@ import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT
 
 public class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> extends BitField<T, E>{
 	
-	private final EnumUniverse<E>   enumUniverse;
-	private final SizeDescriptor<T> sizeDescriptor;
+	private final EnumUniverse<E> enumUniverse;
 	
 	public IOFieldEnum(FieldAccessor<T> field){
 		super(field);
 		
 		enumUniverse = EnumUniverse.ofUnknown(field.getType());
-		sizeDescriptor = SizeDescriptor.Fixed.of(WordSpace.BIT, enumUniverse.getBitSize(nullable()));
+		initSizeDescriptor(SizeDescriptor.Fixed.of(WordSpace.BIT, enumUniverse.getBitSize(nullable())));
 		
 		if(getNullability() == DEFAULT_IF_NULL && enumUniverse.isEmpty()){
 			throw new MalformedStruct(DEFAULT_IF_NULL + " is not supported for empty enums");
@@ -63,10 +62,4 @@ public class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> extends Bit
 	public boolean instancesEqual(VarPool<T> ioPool1, T inst1, VarPool<T> ioPool2, T inst2){
 		return get(ioPool1, inst1) == get(ioPool2, inst2);
 	}
-	
-	@Override
-	public SizeDescriptor<T> getSizeDescriptor(){
-		return sizeDescriptor;
-	}
-	
 }

@@ -486,6 +486,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			for(IOField<T, ?> field : this.fields){
 				try{
 					field.init();
+					Objects.requireNonNull(field.getSizeDescriptor(), "Descriptor was not inited");
 				}catch(Throwable e){
 					throw new RuntimeException("Failed to init " + field, e);
 				}

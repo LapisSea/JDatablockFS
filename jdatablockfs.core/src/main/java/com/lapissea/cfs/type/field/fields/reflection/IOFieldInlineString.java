@@ -16,15 +16,13 @@ import java.util.Objects;
 
 public class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends NullFlagCompanyField<CTyp, String>{
 	
-	private final SizeDescriptor<CTyp> descriptor;
-	
 	public IOFieldInlineString(FieldAccessor<CTyp> accessor){
 		super(accessor);
 		
 		
 		var desc = AutoText.PIPE.getSizeDescriptor();
 		
-		descriptor = SizeDescriptor.Unknown.of(
+		initSizeDescriptor(SizeDescriptor.Unknown.of(
 			desc.getWordSpace(),
 			nullable()? 0 : desc.getMin(),
 			desc.getMax(),
@@ -36,7 +34,7 @@ public class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends NullFlag
 				}
 				return desc.calcUnknown(AutoText.PIPE.makeIOPool(), prov, val, desc.getWordSpace());
 			}
-		);
+		));
 	}
 	
 	private AutoText getWrapped(VarPool<CTyp> ioPool, CTyp instance){
@@ -56,11 +54,6 @@ public class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends NullFlag
 			case DEFAULT_IF_NULL, NULLABLE -> value;
 			case NOT_NULL -> Objects.requireNonNull(value);
 		});
-	}
-	
-	@Override
-	public SizeDescriptor<CTyp> getSizeDescriptor(){
-		return descriptor;
 	}
 	
 	@Override

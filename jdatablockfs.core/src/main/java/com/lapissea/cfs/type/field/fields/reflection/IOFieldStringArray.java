@@ -19,18 +19,17 @@ import java.util.OptionalLong;
 
 public class IOFieldStringArray<T extends IOInstance<T>> extends IOField<T, String[]>{
 	
-	private final SizeDescriptor<T>        descriptor;
-	private       IOFieldPrimitive.FInt<T> arraySize;
+	private IOFieldPrimitive.FInt<T> arraySize;
 	
 	
 	public IOFieldStringArray(FieldAccessor<T> accessor){
 		super(accessor);
 		
-		descriptor = SizeDescriptor.Unknown.of(0, OptionalLong.empty(), (ioPool, prov, inst) -> {
+		initSizeDescriptor(SizeDescriptor.Unknown.of(0, OptionalLong.empty(), (ioPool, prov, inst) -> {
 			var arr = get(ioPool, inst);
 			if(arr == null) return 0;
 			return Arrays.stream(arr).map(AutoText::new).mapToLong(t -> AutoText.PIPE.calcUnknownSize(prov, t, WordSpace.BYTE)).sum();
-		});
+		}));
 	}
 	@Override
 	public void init(){
@@ -38,10 +37,6 @@ public class IOFieldStringArray<T extends IOInstance<T>> extends IOField<T, Stri
 		arraySize = declaringStruct().getFields().requireExactInt(IOFieldTools.makeCollectionLenName(getAccessor()));
 	}
 	
-	@Override
-	public SizeDescriptor<T> getSizeDescriptor(){
-		return descriptor;
-	}
 	@Override
 	public void write(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		var arr  = get(ioPool, instance);

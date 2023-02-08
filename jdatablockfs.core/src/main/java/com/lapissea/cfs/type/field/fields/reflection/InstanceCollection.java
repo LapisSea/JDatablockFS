@@ -50,8 +50,7 @@ public class InstanceCollection{
 		
 		private final DataAdapter<T, ElementType, CollectionType> dataAdapter;
 		
-		private final SizeDescriptor<T>   descriptor;
-		private       IOField<T, Integer> collectionSize;
+		private IOField<T, Integer> collectionSize;
 		
 		@SuppressWarnings({"unchecked", "rawtypes"})
 		public InlineField(FieldAccessor<T> accessor, Class<? extends DataAdapter> dataAdapterType){
@@ -62,7 +61,7 @@ public class InstanceCollection{
 				throw new RuntimeException(e);
 			}
 			
-			descriptor = SizeDescriptor.Unknown.of(WordSpace.BYTE, 0, OptionalLong.empty(), (ioPool, prov, inst) -> {
+			initSizeDescriptor(SizeDescriptor.Unknown.of(WordSpace.BYTE, 0, OptionalLong.empty(), (ioPool, prov, inst) -> {
 				var arr = get(null, inst);
 				if(arr == null) return 0;
 				var size = dataAdapter.getSize(arr);
@@ -73,18 +72,13 @@ public class InstanceCollection{
 					return size*desc.requireFixed(WordSpace.BYTE);
 				}
 				return dataAdapter.getStream(arr).mapToLong(instance -> desc.calcUnknown(instance.getThisStruct().allocVirtualVarPool(IO), prov, instance, WordSpace.BYTE)).sum();
-			});
+			}));
 		}
 		
 		@Override
 		public void init(){
 			super.init();
 			collectionSize = declaringStruct().getFields().requireExact(int.class, IOFieldTools.makeCollectionLenName(getAccessor()));
-		}
-		
-		@Override
-		public SizeDescriptor<T> getSizeDescriptor(){
-			return descriptor;
 		}
 		
 		@Override
@@ -144,7 +138,7 @@ public class InstanceCollection{
 		
 		@SuppressWarnings({"unchecked", "rawtypes"})
 		public ReferenceField(FieldAccessor<T> accessor, Class<? extends DataAdapter> dataAdapterType){
-			super(accessor);
+			super(accessor, SizeDescriptor.Fixed.empty());
 			try{
 				dataAdapter = dataAdapterType.getConstructor(FieldAccessor.class).newInstance(accessor);
 			}catch(ReflectiveOperationException e){
@@ -236,11 +230,6 @@ public class InstanceCollection{
 		protected Reference allocNew(DataProvider provider, CollectionType val) throws IOException{
 			var ch = AllocateTicket.withData(refPipe, provider, val).submit(provider);
 			return ch.getPtr().makeReference();
-		}
-		
-		@Override
-		public SizeDescriptor<T> getSizeDescriptor(){
-			return SizeDescriptor.Fixed.empty();
 		}
 		
 		@Override

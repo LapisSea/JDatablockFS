@@ -19,7 +19,6 @@ import java.util.Objects;
 
 public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extends IOInstance<ValueType>> extends NullFlagCompanyField<CTyp, ValueType>{
 	
-	private final SizeDescriptor<CTyp>  descriptor;
 	private final StructPipe<ValueType> instancePipe;
 	private final boolean               fixed;
 	
@@ -40,9 +39,9 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 		
 		var fixedSiz = desc.getFixed();
 		if(fixedSiz.isPresent()){
-			descriptor = SizeDescriptor.Fixed.of(desc.getWordSpace(), fixedSiz.getAsLong());
+			initSizeDescriptor(SizeDescriptor.Fixed.of(desc.getWordSpace(), fixedSiz.getAsLong()));
 		}else{
-			descriptor = SizeDescriptor.Unknown.of(
+			initSizeDescriptor(SizeDescriptor.Unknown.of(
 				desc.getWordSpace(),
 				nullable()? 0 : desc.getMin(),
 				desc.getMax(),
@@ -54,7 +53,7 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 					}
 					return desc.calcUnknown(instancePipe.makeIOPool(), prov, val, desc.getWordSpace());
 				}
-			);
+			));
 		}
 	}
 	
@@ -74,11 +73,6 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 	@Override
 	public IOField<CTyp, ValueType> maxAsFixedSize(VaryingSize.Provider varProvider){
 		return new IOFieldInlineObject<>(getAccessor(), varProvider);
-	}
-	
-	@Override
-	public SizeDescriptor<CTyp> getSizeDescriptor(){
-		return descriptor;
 	}
 	
 	@Override
@@ -116,7 +110,7 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 	
 	@Override
 	public void skip(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
-		if(src.optionallySkipExact(descriptor.getFixed(WordSpace.BYTE))){
+		if(src.optionallySkipExact(getSizeDescriptor().getFixed(WordSpace.BYTE))){
 			return;
 		}
 		

@@ -28,15 +28,12 @@ import static com.lapissea.cfs.io.instancepipe.StructPipe.STATE_IO_FIELD;
 public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends IOInstance<ValueType>> extends RefField.ReferenceCompanion<T, ValueType> implements RefField.Inst<T, ValueType>{
 	
 	
-	private final SizeDescriptor<T>     descriptor;
 	private final Struct<ValueType>     struct;
 	private final StructPipe<ValueType> instancePipe;
 	
 	@SuppressWarnings("unchecked")
 	public IOFieldObjectReference(FieldAccessor<T> accessor){
-		super(accessor);
-		
-		descriptor = SizeDescriptor.Fixed.empty();
+		super(accessor, SizeDescriptor.Fixed.empty());
 		
 		struct = (Struct<ValueType>)Struct.ofUnknown(getType());
 		var typ = accessor.getAnnotation(IOValue.Reference.class).map(IOValue.Reference::dataPipeType).orElseThrow();
@@ -99,11 +96,6 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 			};
 		}
 		return readNew.readNew(provider, instancePipe, genericContext);
-	}
-	
-	@Override
-	public SizeDescriptor<T> getSizeDescriptor(){
-		return descriptor;
 	}
 	
 	@Override

@@ -40,8 +40,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 	
 	private static final StructPipe<Reference> REF_PIPE = StandardStructPipe.of(Reference.class);
 	
-	private final SizeDescriptor<CTyp>        descriptor;
-	private       IOFieldPrimitive.FInt<CTyp> typeID;
+	private IOFieldPrimitive.FInt<CTyp> typeID;
 	
 	public IOFieldDynamicInlineObject(FieldAccessor<CTyp> accessor){
 		super(accessor);
@@ -64,11 +63,11 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		
 		long minSize = Math.min(refDesc.getMin(WordSpace.BYTE), minKnownTypeSize);
 		
-		descriptor = SizeDescriptor.Unknown.of(minSize, OptionalLong.empty(), (ioPool, prov, inst) -> {
+		initSizeDescriptor(SizeDescriptor.Unknown.of(minSize, OptionalLong.empty(), (ioPool, prov, inst) -> {
 			var val = get(null, inst);
 			if(val == null) return 0;
 			return calcSize(prov, val);
-		});
+		}));
 	}
 	
 	@Override
@@ -413,11 +412,6 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 			case DEFAULT_IF_NULL, NULLABLE -> value;
 			case NOT_NULL -> Objects.requireNonNull(value);
 		});
-	}
-	
-	@Override
-	public SizeDescriptor<CTyp> getSizeDescriptor(){
-		return descriptor;
 	}
 	
 	@Override

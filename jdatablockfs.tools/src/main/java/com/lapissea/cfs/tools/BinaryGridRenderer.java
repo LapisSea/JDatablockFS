@@ -1664,7 +1664,9 @@ public class BinaryGridRenderer implements DataRenderer{
 										public void set(VarPool<T> ioPool, T instance, Object value){
 											throw new UnsupportedOperationException();
 										}
-									}, null);
+									}, SizeDescriptor.Unknown.of(0, OptionalLong.empty(), (ioPool1, prov, value) -> {
+										throw new ShouldNeverHappenError();
+									}));
 									for(int i = 0; i<arrSiz; i++){
 										index[0] = i;
 										var siz = AutoText.PIPE.calcUnknownSize(ctx.provider, new AutoText(inst[i]), WordSpace.BYTE);

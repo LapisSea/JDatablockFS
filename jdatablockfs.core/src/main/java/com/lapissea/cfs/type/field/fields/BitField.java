@@ -25,17 +25,10 @@ public abstract class BitField<T extends IOInstance<T>, Type> extends IOField<T,
 	
 	public static final class NoIO<T extends IOInstance<T>, Type> extends BitField<T, Type>{
 		
-		private final SizeDescriptor<T> sizeDescriptor;
-		
 		public NoIO(FieldAccessor<T> accessor, SizeDescriptor<T> sizeDescriptor){
-			super(accessor);
-			this.sizeDescriptor = sizeDescriptor;
+			super(accessor, sizeDescriptor);
 		}
 		
-		@Override
-		public SizeDescriptor<T> getSizeDescriptor(){
-			return sizeDescriptor;
-		}
 		@Override
 		public void writeBits(VarPool<T> ioPool, BitWriter<?> dest, T instance){
 			throw new UnsupportedOperationException();
@@ -52,6 +45,9 @@ public abstract class BitField<T extends IOInstance<T>, Type> extends IOField<T,
 	
 	protected BitField(FieldAccessor<T> field){
 		super(field);
+	}
+	public BitField(FieldAccessor<T> accessor, SizeDescriptor<T> descriptor){
+		super(accessor, descriptor);
 	}
 	
 	private void checkWritten(VarPool<T> ioPool, DataProvider provider, T instance, BitOutputStream writer) throws IOException{

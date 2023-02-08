@@ -24,6 +24,9 @@ public abstract class RefField<T extends IOInstance<T>, Type> extends IOField<T,
 		public InstRef(FieldAccessor<T> accessor){
 			super(accessor);
 		}
+		protected InstRef(FieldAccessor<T> accessor, SizeDescriptor<T> descriptor){
+			super(accessor, descriptor);
+		}
 	}
 	
 	public interface Inst<T extends IOInstance<T>, Type extends IOInstance<Type>>{
@@ -32,16 +35,8 @@ public abstract class RefField<T extends IOInstance<T>, Type> extends IOField<T,
 	
 	public abstract static class NoIO<T extends IOInstance<T>, ValueType extends IOInstance<ValueType>> extends InstRef<T, ValueType> implements DisabledIO<T>{
 		
-		private final SizeDescriptor<T> sizeDescriptor;
-		
 		public NoIO(FieldAccessor<T> accessor, SizeDescriptor<T> sizeDescriptor){
-			super(accessor);
-			this.sizeDescriptor = sizeDescriptor;
-		}
-		
-		@Override
-		public SizeDescriptor<T> getSizeDescriptor(){
-			return sizeDescriptor;
+			super(accessor, sizeDescriptor);
 		}
 		
 		@Override
@@ -56,6 +51,9 @@ public abstract class RefField<T extends IOInstance<T>, Type> extends IOField<T,
 		
 		public ReferenceCompanion(FieldAccessor<T> accessor){
 			super(accessor);
+		}
+		protected ReferenceCompanion(FieldAccessor<T> accessor, SizeDescriptor<T> descriptor){
+			super(accessor, descriptor);
 		}
 		
 		@Override
@@ -131,6 +129,9 @@ public abstract class RefField<T extends IOInstance<T>, Type> extends IOField<T,
 	
 	public RefField(FieldAccessor<T> accessor){
 		super(accessor);
+	}
+	protected RefField(FieldAccessor<T> accessor, SizeDescriptor<T> descriptor){
+		super(accessor, descriptor);
 	}
 	
 	public void allocateUnmanaged(T instance) throws IOException{
