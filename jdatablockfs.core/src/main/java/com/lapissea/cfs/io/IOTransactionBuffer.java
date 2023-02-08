@@ -36,7 +36,14 @@ public final class IOTransactionBuffer{
 	}
 	
 	private final List<WriteEvent>      writeEvents = new ArrayList<>();
-	private final ReadWriteClosableLock lock        = ReadWriteClosableLock.reentrant();
+	private final ReadWriteClosableLock lock;
+	
+	public IOTransactionBuffer(){
+		this(true);
+	}
+	public IOTransactionBuffer(boolean threadSafe){
+		lock = threadSafe? ReadWriteClosableLock.reentrant() : ReadWriteClosableLock.noop();
+	}
 	
 	private static boolean rangeOverlaps(long x1, long x2, long y1, long y2){
 		return x1<=(y2 - 1) && y1<=(x2 - 1);

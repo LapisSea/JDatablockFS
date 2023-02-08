@@ -1,5 +1,7 @@
 package com.lapissea.cfs.utils;
 
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -38,6 +40,46 @@ public interface ReadWriteClosableLock{
 		}
 		
 		return new ReentrantReadWriteClosableLock();
+	}
+	static ReadWriteClosableLock noop(){
+		final class NoopReadWriteClosableLock implements ReadWriteClosableLock{
+			
+			private static final Lock NOOP = new Lock(){
+				@Override
+				public void lock(){ }
+				@Override
+				public void lockInterruptibly(){ }
+				@Override
+				public boolean tryLock(){
+					return true;
+				}
+				@Override
+				public boolean tryLock(long time, TimeUnit unit){ return true; }
+				@Override
+				public void unlock(){ }
+				@Override
+				public Condition newCondition(){
+					throw new UnsupportedOperationException();
+				}
+			};
+			
+			private static final ReadWriteClosableLock NOOP_RW = new NoopReadWriteClosableLock();
+			
+			
+			private final LockSession readLock  = new LockSession(NOOP);
+			private final LockSession writeLock = new LockSession(NOOP);
+			
+			@Override
+			public LockSession read(){
+				return readLock;
+			}
+			@Override
+			public LockSession write(){
+				return writeLock;
+			}
+		}
+		
+		return NoopReadWriteClosableLock.NOOP_RW;
 	}
 	
 	LockSession read();
