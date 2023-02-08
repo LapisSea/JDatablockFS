@@ -241,6 +241,11 @@ public final class IOFileData implements IOInterface, Closeable{
 		}
 		
 		@Override
+		public boolean inTransaction(){
+			return transactionOpen;
+		}
+		
+		@Override
 		public String toString(){
 			int count = 64;
 			

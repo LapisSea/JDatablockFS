@@ -455,4 +455,8 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 			return c;
 		}
 	}
+	
+	default boolean inTransaction(){
+		return false;
+	}
 }

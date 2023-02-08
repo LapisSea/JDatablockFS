@@ -245,6 +245,11 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 		}
 		
 		@Override
+		public boolean inTransaction(){
+			return transactionOpen;
+		}
+		
+		@Override
 		public String toString(){
 			int count = 64;
 			

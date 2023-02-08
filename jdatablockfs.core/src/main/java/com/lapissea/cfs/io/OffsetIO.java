@@ -84,6 +84,11 @@ public final class OffsetIO implements RandomIO, Stringify{
 	}
 	
 	@Override
+	public boolean inTransaction(){
+		return parent.inTransaction();
+	}
+	
+	@Override
 	public int read(byte[] b, int off, int len) throws IOException{
 		return parent.read(b, off, len);
 	}

@@ -634,6 +634,11 @@ public final class ChunkChainIO implements RandomIO{
 	}
 	
 	@Override
+	public boolean inTransaction(){
+		return source.inTransaction();
+	}
+	
+	@Override
 	public long getSize() throws IOException{
 		return mapSum(Chunk::getSize);
 	}
