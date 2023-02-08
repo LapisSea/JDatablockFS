@@ -758,28 +758,35 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		var gen = deps.generators();
 		if(gen != null) generateAll(gen, ioPool, provider, instance, true);
 		
-		int checkIndex = 0;
+		var atomicIO = fields.size()>1? dest.localTransactionBuffer() : dest;
 		
-		for(IOField<T, ?> field : getSpecificFields()){
-			var desc  = field.getSizeDescriptor();
-			var bytes = desc.calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
-			
-			if(fields.get(checkIndex) == field){
-				checkIndex++;
-				if(DEBUG_VALIDATION){
-					writeFieldKnownSize(ioPool, provider, dest, instance, field);
-				}else{
-					field.writeReported(ioPool, provider, dest, instance);
+		int checkIndex = 0;
+		try{
+			for(IOField<T, ?> field : getSpecificFields()){
+				var desc  = field.getSizeDescriptor();
+				var bytes = desc.calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
+				
+				if(fields.get(checkIndex) == field){
+					checkIndex++;
+					if(DEBUG_VALIDATION){
+						writeFieldKnownSize(ioPool, provider, atomicIO, instance, field);
+					}else{
+						field.writeReported(ioPool, provider, atomicIO, instance);
+					}
+					
+					if(checkIndex == fields.size()){
+						return;
+					}
+					
+					continue;
 				}
 				
-				if(checkIndex == fields.size()){
-					return;
-				}
-				
-				continue;
+				atomicIO.skipExact(bytes);
 			}
-			
-			dest.skipExact(bytes);
+		}finally{
+			if(atomicIO != dest){
+				atomicIO.close();
+			}
 		}
 	}
 	

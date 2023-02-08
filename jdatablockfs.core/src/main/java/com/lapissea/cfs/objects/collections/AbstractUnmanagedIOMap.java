@@ -27,7 +27,7 @@ public abstract class AbstractUnmanagedIOMap<K, V> extends IOInstance.Unmanaged<
 	
 	protected void deltaSize(long delta) throws IOException{
 		this.size += delta;
-		getDataProvider().getSource().openIOTransaction(() -> writeManagedField(sizeField));
+		writeManagedField(sizeField);
 	}
 	
 	@Override
