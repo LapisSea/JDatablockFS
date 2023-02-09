@@ -17,7 +17,7 @@ public abstract class AbstractUnmanagedIOMap<K, V> extends IOInstance.Unmanaged<
 	@IODependency.VirtualNumSize
 	private long size;
 	
-	private final IOFieldPrimitive.FLong<AbstractUnmanagedIOMap<K, V>> sizeField = getThisStruct().getFields().requireExactLong("size");
+	private IOFieldPrimitive.FLong<AbstractUnmanagedIOMap<K, V>> sizeField;
 	
 	protected AbstractUnmanagedIOMap(DataProvider provider, Reference reference, TypeLink typeDef, TypeLink.Check check){ super(provider, reference, typeDef, check); }
 	public AbstractUnmanagedIOMap(DataProvider provider, Reference reference, TypeLink typeDef)                         { super(provider, reference, typeDef); }
@@ -26,6 +26,7 @@ public abstract class AbstractUnmanagedIOMap<K, V> extends IOInstance.Unmanaged<
 	public long size(){ return size; }
 	
 	protected void deltaSize(long delta) throws IOException{
+		if(sizeField == null) sizeField = getThisStruct().getFields().requireExactLong("size");
 		this.size += delta;
 		writeManagedField(sizeField);
 	}

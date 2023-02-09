@@ -47,10 +47,12 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 			return (BucketEntry<K, V>)STRUCT.make();
 		}
 		
-		@SuppressWarnings("rawtypes")
-		BiFunction<Object, Object, BucketEntry> NEW_BUCKET = IOInstance.Def.constrRef(BucketEntry.class, Object.class, Object.class);
 		static <K, V> BucketEntry<K, V> of(K key, V value){
-			return NEW_BUCKET.apply(key, value);
+			class Val{
+				private static final BiFunction<Object, Object, BucketEntry> NEW =
+					IOInstance.Def.constrRef(BucketEntry.class, Object.class, Object.class);
+			}
+			return Val.NEW.apply(key, value);
 		}
 		
 		@IONullability(NULLABLE)

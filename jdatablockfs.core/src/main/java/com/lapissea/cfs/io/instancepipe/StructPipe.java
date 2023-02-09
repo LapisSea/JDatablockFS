@@ -851,17 +851,12 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		if(fixed.isPresent()){
 			long bytes = fixed.getAsLong();
 			
-			String extra = null;
-			if(DEBUG_VALIDATION){
-				extra = " started on: " + src;
-			}
-			
 			var buf = src.readTicket(bytes).requireExact().submit();
 			
 			try{
 				field.readReported(ioPool, provider, buf, instance, genericContext);
 			}catch(Exception e){
-				throw new IOException(TextUtil.toString(field) + " failed to read!" + (DEBUG_VALIDATION? extra : ""), e);
+				throw new IOException(TextUtil.toString(field) + " failed to read!", e);
 			}
 			
 			try{

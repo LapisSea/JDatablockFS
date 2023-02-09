@@ -400,9 +400,21 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	private static <T extends IOInstance<T>> Struct<T> getCached(Class<T> instanceClass){
-		try(var lock = STRUCT_CACHE_LOCK.read()){
-			return getCachedUnsafe(instanceClass, lock.getLock());
+		class StableCache{
+			private static Map<Class<?>, Struct<?>> CACHE = new WeakValueHashMap<>();
 		}
+		
+		Struct<T> stable = (Struct<T>)StableCache.CACHE.get(instanceClass);
+		if(stable != null) return stable;
+		
+		Struct<T> cached;
+		try(var lock = STRUCT_CACHE_LOCK.read()){
+			cached = getCachedUnsafe(instanceClass, lock.getLock());
+			if(cached == null) return null;
+			
+			if(Rand.b(0.2F)) StableCache.CACHE = new WeakValueHashMap<>(STRUCT_CACHE);
+		}
+		return cached;
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -500,6 +512,11 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			if(emptyConstructor == null && !getType().isAnnotationPresent(NoDefaultConstructor.class)){
 				findEmptyConstructor();
 			}
+			Thread.ofVirtual().start(() -> {
+				for(IOField<T, ?> field : fields){
+					field.typeFlags();
+				}
+			});
 		});
 	}
 	
