@@ -21,6 +21,7 @@ import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.RefField;
 import com.lapissea.util.LogUtil;
+import com.lapissea.util.Rand;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 
@@ -140,7 +141,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	private int datasetID;
 	
 	private final Map<K, IOEntry.Modifiable<K, V>> cache;
-	
+	private final Map<Integer, Bucket<K, V>>       hotBuckets = new HashMap<>();
 	
 	public HashIOMap(DataProvider provider, Reference reference, TypeLink typeDef) throws IOException{
 		super(provider, reference, typeDef);
@@ -175,6 +176,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		
 		if(bucketPO2<0) throw new IllegalStateException();
 		
+		hotBuckets.clear();
 		newBuckets();
 		fillBuckets(buckets, bucketPO2);
 		
@@ -306,7 +308,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 				
 				var smallHash = hashToSmall(HashCommons.toHash(readKey(node).key), newPO2);
 				
-				Bucket<K, V> bucket = getBucket(newBuckets, smallHash);
+				Bucket<K, V> bucket = getBucket(null, newBuckets, smallHash);
 				if(bucket.node == null){
 					bucket.node = node;
 					setBucket(newBuckets, smallHash, bucket);
@@ -363,7 +365,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		}
 		
 		private boolean tryUpdateData() throws IOException{
-			Bucket<K, V> bucket = getBucket(buckets, hashToSmall(HashCommons.toHash(getKey()), bucketPO2));
+			Bucket<K, V> bucket = getBucket(hotBuckets, buckets, hashToSmall(HashCommons.toHash(getKey()), bucketPO2));
 			if(bucket == null) return false;
 			
 			currentBucket = bucket;
@@ -384,7 +386,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		
 		for(byte i = 0; i<HashCommons.HASH_GENERATIONS; i++){
 			var          smallHash = hashToSmall(hash, bucketPO2);
-			Bucket<K, V> bucket    = getBucket(buckets, smallHash);
+			Bucket<K, V> bucket    = getBucket(hotBuckets, buckets, smallHash);
 			hash = hashToNextHash(hash, bucketPO2);
 			
 			if(bucket == null) continue;
@@ -492,7 +494,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	@Override
 	public void put(K key, V value) throws IOException{
 		if(DEBUG_VALIDATION) checkValue(value);
-		var sizeFlag = putEntry(buckets, bucketPO2, key, value);
+		var sizeFlag = putEntry(hotBuckets, buckets, bucketPO2, key, value);
 		if(sizeFlag.inc == 0) return;
 		
 		deltaSize(sizeFlag.inc);
@@ -550,7 +552,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 					var key   = e.getKey();
 					var value = e.getValue();
 					
-					var action = putEntry(buckets, bucketPO2, key, value);
+					var action = putEntry(hotBuckets, buckets, bucketPO2, key, value);
 					deltaSize += action.inc;
 				}
 			}
@@ -566,7 +568,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		
 		for(byte i = 0; i<HashCommons.HASH_GENERATIONS; i++){
 			var smallHash = hashToSmall(hash, bucketPO2);
-			var bucket    = getBucket(buckets, smallHash);
+			var bucket    = getBucket(hotBuckets, buckets, smallHash);
 			hash = hashToSmall(hash, bucketPO2);
 			
 			if(bucket.node == null){
@@ -602,7 +604,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		PutAction(int inc){ this.inc = inc; }
 	}
 	
-	private PutAction putEntry(IOList<Bucket<K, V>> buckets, short bucketPO2, K key, V value) throws IOException{
+	private PutAction putEntry(Map<Integer, Bucket<K, V>> hotBuckets, IOList<Bucket<K, V>> buckets, short bucketPO2, K key, V value) throws IOException{
 		int hash = HashCommons.toHash(key);
 		
 		Bucket<K, V> bucket, first = null;
@@ -611,7 +613,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		
 		for(byte i = 0; i<HashCommons.HASH_GENERATIONS; i++){
 			var smallHash = hashToSmall(hash, bucketPO2);
-			bucket = getBucket(buckets, smallHash);
+			bucket = getBucket(hotBuckets, buckets, smallHash);
 			if(first == null) first = bucket;
 			
 			var entry = bucket.getEntryByKey(key);
@@ -678,10 +680,26 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		}
 	}
 	
-	
-	private Bucket<K, V> getBucket(IOList<Bucket<K, V>> buckets, int smallHash) throws IOException{
-		return buckets.get(smallHash);
+	private Bucket<K, V> getBucket(Map<Integer, Bucket<K, V>> hotBuckets, IOList<Bucket<K, V>> buckets, int smallHash) throws IOException{
+		if(hotBuckets != null){
+			var cached = hotBuckets.get(smallHash);
+			if(cached != null){
+				return cached;
+			}
+		}
+		
+		var bucket = buckets.get(smallHash);
+		
+		if(hotBuckets != null){
+			if(hotBuckets.size()>=64){
+				hotBuckets.keySet().stream().skip(Rand.i(hotBuckets.size() - 1)).limit(8).toList().forEach(hotBuckets::remove);
+			}
+			hotBuckets.put(smallHash, bucket);
+		}
+		
+		return bucket;
 	}
+	
 	private void setBucket(IOList<Bucket<K, V>> buckets, int smallHash, Bucket<K, V> bucket) throws IOException{
 		buckets.set(smallHash, bucket);
 		if(DEBUG_VALIDATION){
