@@ -7,6 +7,7 @@ import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.ValueStorage;
 import com.lapissea.cfs.io.ValueStorage.StorageRule;
 import com.lapissea.cfs.io.impl.MemoryData;
+import com.lapissea.cfs.io.instancepipe.BaseFixedStructPipe;
 import com.lapissea.cfs.io.instancepipe.FieldDependency;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
@@ -118,100 +119,105 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		};
 	}
 	
-	private static <T> FieldAccessor<ContiguousIOList<T>> fieldAccessor(Type elementType, long index, boolean nullable){
-		return new AbstractFieldAccessor<>(null, ""){
-			
-			private static final IONullability NULLABLE = IOFieldTools.makeNullabilityAnn(IONullability.Mode.NULLABLE);
-			
-			private String lazyName;
-			private final int typeID = TypeFlag.getId(Utils.typeToRaw(elementType));
-			@NotNull
-			@Override
-			public String getName(){
-				if(lazyName == null){
-					lazyName = elementName(index);
-				}
-				return lazyName;
-			}
-			@NotNull
-			@Override
-			public <F extends Annotation> Optional<F> getAnnotation(Class<F> annotationClass){
-				if(nullable && annotationClass == IONullability.class){
-					return Optional.of((F)NULLABLE);
-				}
-				return Optional.empty();
-			}
-			@Override
-			public Type getGenericType(GenericContext genericContext){
-				return elementType;
-			}
-			@Override
-			public int getTypeID(){
-				return typeID;
-			}
-			
-			@Override
-			public T get(VarPool<ContiguousIOList<T>> ioPool, ContiguousIOList<T> instance){
-				return instance.getUnsafe(index);
-			}
-			@Override
-			public void set(VarPool<ContiguousIOList<T>> ioPool, ContiguousIOList<T> instance, Object value){
-				try{
-					instance.set(index, (T)value);
-				}catch(IOException e){
-					throw new RuntimeException(e);
-				}
-			}
-		};
-	}
-	private static String elementName(long index){
-		return "Element[" + index + "]";
-	}
-	
-	private static <T extends IOInstance.Unmanaged<T>> IOField<ContiguousIOList<T>, ?> eFieldUnmanagedInst(
-		Type elementType, long index, ValueStorage.UnmanagedInstance<T> storage
-	){
-		SizeDescriptor.Fixed<ContiguousIOList<T>> descriptor;
-		{
-			var descriptorTmp = storage.getSizeDescriptor();
-			var space         = descriptorTmp.getWordSpace();
-			descriptor = SizeDescriptor.Fixed.of(space, descriptorTmp.requireFixed(space));
+	private static class IndexAccessor<T> extends AbstractFieldAccessor<ContiguousIOList<T>>{
+		
+		private static final IONullability NULLABLE = IOFieldTools.makeNullabilityAnn(IONullability.Mode.NULLABLE);
+		
+		private final Type    elementType;
+		private       long    index;
+		private final boolean nullable;
+		private final int     typeID;
+		
+		protected IndexAccessor(Type elementType, long index, boolean nullable){
+			super(null, "");
+			this.elementType = elementType;
+			this.index = index;
+			this.nullable = nullable;
+			typeID = TypeFlag.getId(Utils.typeToRaw(elementType));
 		}
 		
-		var refPipe = storage.getRefPipe();
+		@NotNull
+		@Override
+		public String getName(){
+			return elementName(index);
+		}
+		@NotNull
+		@Override
+		public <F extends Annotation> Optional<F> getAnnotation(Class<F> annotationClass){
+			if(nullable && annotationClass == IONullability.class){
+				return Optional.of((F)NULLABLE);
+			}
+			return Optional.empty();
+		}
 		
-		return new RefField.NoIO<ContiguousIOList<T>, T>(fieldAccessor(elementType, index, true), descriptor){
-			@Override
-			public StructPipe<T> getReferencedPipe(ContiguousIOList<T> instance){
-				try{
-					return instance.get(index).getPipe();
-				}catch(IOException e){
-					throw new RuntimeException(e);
-				}
+		@Override
+		public Type getGenericType(GenericContext genericContext){
+			return elementType;
+		}
+		@Override
+		public int getTypeID(){
+			return typeID;
+		}
+		
+		@Override
+		public T get(VarPool<ContiguousIOList<T>> ioPool, ContiguousIOList<T> instance){
+			return instance.getUnsafe(index);
+		}
+		@Override
+		public void set(VarPool<ContiguousIOList<T>> ioPool, ContiguousIOList<T> instance, Object value){
+			try{
+				instance.set(index, (T)value);
+			}catch(IOException e){
+				throw new RuntimeException(e);
 			}
-			
-			@Override
-			public void setReference(ContiguousIOList<T> instance, Reference newRef){
-				try{
-					try(var io = instance.ioAtElement(index)){
-						refPipe.write(instance.getDataProvider(), io, newRef);
-					}
-				}catch(IOException e){
-					throw new RuntimeException(e);
-				}
+		}
+	}
+	
+	private static class UnmanagedField<T extends IOInstance.Unmanaged<T>> extends RefField.NoIO<ContiguousIOList<T>, T>{
+		
+		private       long                           index;
+		private final BaseFixedStructPipe<Reference> refPipe;
+		
+		public UnmanagedField(FieldAccessor<ContiguousIOList<T>> accessor, long index, ValueStorage.UnmanagedInstance<T> storage){
+			super(accessor, SizeDescriptor.Fixed.of(storage.getSizeDescriptor()));
+			this.index = index;
+			refPipe = storage.getRefPipe();
+		}
+		
+		@Override
+		public StructPipe<T> getReferencedPipe(ContiguousIOList<T> instance){
+			try{
+				return instance.get(index).getPipe();
+			}catch(IOException e){
+				throw new RuntimeException(e);
 			}
-			
-			@Override
-			public Reference getReference(ContiguousIOList<T> instance){
-				try{
-					try(var io = instance.ioAtElement(index)){
-						return refPipe.readNew(instance.getDataProvider(), io, null);
-					}
-				}catch(IOException e){
-					throw new RuntimeException(e);
+		}
+		
+		@Override
+		public void setReference(ContiguousIOList<T> instance, Reference newRef){
+			try{
+				try(var io = instance.ioAtElement(index)){
+					refPipe.write(instance.getDataProvider(), io, newRef);
 				}
+			}catch(IOException e){
+				throw new RuntimeException(e);
 			}
-		};
+		}
+		
+		@Override
+		public Reference getReference(ContiguousIOList<T> instance){
+			try{
+				try(var io = instance.ioAtElement(index)){
+					return refPipe.readNew(instance.getDataProvider(), io, null);
+				}
+			}catch(IOException e){
+				throw new RuntimeException(e);
+			}
+		}
+	}
+	
+	private static String elementName(long index){
+		return "Element[" + index + "]";
 	}
 	
 	@NotNull
@@ -220,11 +226,53 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		var typeDatabase = getDataProvider().getTypeDb();
 		var genericType  = getTypeDef().genericArg(0, typeDatabase);
 		var unmanaged    = storage instanceof ValueStorage.UnmanagedInstance<?> u? u : null;
-		return LongStream.range(0, size()).mapToObj(index -> {
-			if(unmanaged != null){
-				return (IOField<ContiguousIOList<T>, ?>)(Object)eFieldUnmanagedInst(genericType, index, unmanaged);
+		
+		
+		//TODO: index hackery may cause problems?
+		//if(unmanaged != null){
+		//	return LongStream.range(0, size()).mapToObj(
+		//		index -> {
+		//			var f = new UnmanagedField<>(new IndexAccessor<>(genericType, index, true), index, unmanaged);
+		//			return (IOField<ContiguousIOList<T>, ?>)(Object)f;
+		//		}
+		//	);
+		//}
+		//return LongStream.range(0, size()).mapToObj(
+		//	index -> storage.field(new IndexAccessor<>(genericType, index, false), () -> ioAtElement(index))
+		//);
+		
+		
+		if(unmanaged != null){
+			var indexAccessor = new IndexAccessor<>(genericType, -1, true);
+			//noinspection rawtypes
+			var f = new UnmanagedField(indexAccessor, -1, unmanaged);
+			return LongStream.range(0, size()).mapToObj(
+				index -> {
+					indexAccessor.index = index;
+					f.index = index;
+					return f;
+				}
+			);
+		}
+		
+		var ioAt = new UnsafeSupplier<RandomIO, IOException>(){
+			private long index;
+			private RandomIO io;
+			@Override
+			public RandomIO get() throws IOException{
+				if(io == null) io = selfIO();
+				io.setPos(calcElementOffset(index));
+				return io;
 			}
-			return storage.field(fieldAccessor(genericType, index, false), () -> ioAtElement(index));
+		};
+		
+		var indexAccessor = new IndexAccessor<T>(genericType, -1, false);
+		var indexField    = storage.field(indexAccessor, ioAt);
+		
+		return LongStream.range(0, size()).mapToObj(index -> {
+			indexAccessor.index = index;
+			ioAt.index = index;
+			return indexField;
 		});
 	}
 	
@@ -319,7 +367,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		Map<Long, T> forwardBackup  = new HashMap<>();
 		long         forwardCounter = 0;
 		
-		getReference().io(getDataProvider(), io -> io.ensureCapacity(newSize));
+		selfIO(io -> io.ensureCapacity(newSize));
 		
 		try(var ignored = getDataProvider().getSource().openIOTransaction()){
 			
