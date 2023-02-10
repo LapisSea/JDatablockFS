@@ -88,7 +88,7 @@ public interface DataProvider{
 		return getChunkCache().get(ptr);
 	}
 	default Chunk getChunk(ChunkPointer ptr) throws IOException{
-		Objects.requireNonNull(ptr);
+		ptr.requireNonNull();
 		if(DEBUG_VALIDATION){
 			ensureChunkValid(ptr);
 		}

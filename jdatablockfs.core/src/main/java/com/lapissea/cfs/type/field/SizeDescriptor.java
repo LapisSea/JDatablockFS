@@ -30,7 +30,7 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>> extends Ba
 		private static final Fixed<?>[] BIT_CACHE  = LongStream.range(0, 9).mapToObj(i -> new Fixed<>(BIT, i)).toArray(Fixed<?>[]::new);
 		private static final Fixed<?>[] BYTE_CACHE = LongStream.range(0, 17).mapToObj(i -> new Fixed<>(BYTE, i)).toArray(Fixed<?>[]::new);
 		
-		public static <T extends IOInstance<T>> SizeDescriptor.Fixed<T> of(SizeDescriptor<?> size){
+		public static <T extends IOInstance<T>> SizeDescriptor.Fixed<T> of(BasicSizeDescriptor<?, ?> size){
 			if(!size.hasFixed()) throw new IllegalArgumentException("Can not create fixed size from a non fixed descriptor " + size);
 			if(size instanceof Fixed) return (Fixed<T>)size;
 			return of(size.getWordSpace(), size.getFixed().orElseThrow());
