@@ -21,6 +21,7 @@ import java.util.Set;
 import static com.lapissea.cfs.type.field.StoragePool.INSTANCE;
 import static com.lapissea.cfs.type.field.StoragePool.IO;
 import static com.lapissea.cfs.type.field.annotations.IODependency.VirtualNumSize.RetentionPolicy.GHOST;
+import static com.lapissea.cfs.type.field.annotations.IODependency.VirtualNumSize.RetentionPolicy.GROW_ONLY;
 
 /**
  * This annotation can specify that other field or fields are dependent on it. This is needed when
@@ -136,8 +137,13 @@ public @interface IODependency{
 			@Override
 			public <T extends IOInstance<T>> List<VirtualFieldDefinition<T, ?>> injectPerInstanceValue(FieldAccessor<T> field, VirtualNumSize ann){
 				var unsigned = field.hasAnnotation(IOValue.Unsigned.class);
+				
+				var retention = ann.retention();
+				var min       = ann.min();
+				var max       = ann.max();
+				
 				return List.of(new VirtualFieldDefinition<>(
-					ann.retention() == GHOST? IO : INSTANCE,
+					retention == GHOST? IO : INSTANCE,
 					getName(field, ann),
 					NumberSize.class,
 					new VirtualFieldDefinition.GetterFilter<T, NumberSize>(){
@@ -171,21 +177,22 @@ public @interface IODependency{
 						}
 						@Override
 						public NumberSize filter(VarPool<T> ioPool, T inst, List<FieldAccessor<T>> deps, NumberSize val){
-							NumberSize s = (switch(ann.retention()){
-								case GROW_ONLY -> {
-									if(val == ann.max()) yield ann.max();
-									yield calcMax(ioPool, inst, deps).max(val == null? NumberSize.VOID : val);
-								}
-								case RIGID_INITIAL, GHOST -> {
-									yield val == null? calcMax(ioPool, inst, deps) : val;
-								}
-							}).max(ann.min());
+							NumberSize raw;
 							
-							if(s.greaterThan(ann.max())){
-								throw new RuntimeException(s + " can't fit in to " + ann.max());
+							if(retention == GROW_ONLY){
+								if(val == max) raw = max;
+								else raw = calcMax(ioPool, inst, deps).max(val == null? NumberSize.VOID : val);
+							}else{
+								raw = val == null? calcMax(ioPool, inst, deps) : val;
 							}
 							
-							return s;
+							var size = raw.max(min);
+							
+							if(size.greaterThan(max)){
+								throw new RuntimeException(size + " can't fit in to " + max);
+							}
+							
+							return size;
 						}
 					}));
 			}
