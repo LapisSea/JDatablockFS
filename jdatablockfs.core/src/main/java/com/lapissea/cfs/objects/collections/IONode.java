@@ -330,7 +330,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	}
 	
 	private void ensureNextSpace() throws IOException{
-		try(var io = this.getReference().io(this)){
+		try(var io = selfIO()){
 			ensureNextSpace(io);
 		}
 	}
@@ -429,7 +429,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	
 	boolean hasValue() throws IOException{
 		var nextStart = nextStart();
-		try(var io = this.getReference().io(this)){
+		try(var io = selfIO()){
 			if(io.remaining()<nextStart){
 				return false;
 			}
@@ -449,7 +449,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		if(readOnly){
 			throw new UnsupportedOperationException();
 		}
-		try(var io = this.getReference().io(this)){
+		try(var io = selfIO()){
 			ensureNextSpace(io);
 			io.skipExact(valueStart());
 			if(value != null){
@@ -474,7 +474,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	private ChunkPointer readNextPtr() throws IOException{
 		readManagedFields();
 		ChunkPointer chunk;
-		try(var io = getReference().io(this)){
+		try(var io = selfIO()){
 			var start = nextStart();
 			if(io.remaining()<=start){
 				return ChunkPointer.NULL;
@@ -549,14 +549,14 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 			var val  = getValue();
 			var grow = newSiz.bytes - nextSize.bytes;
 			nextSize = newSiz;
-			getReference().withContext(this).io(io -> io.ensureCapacity(io.getCapacity() + grow));
+			selfIO(io -> io.ensureCapacity(io.getCapacity() + grow));
 			try(var ignored = getDataProvider().getSource().openIOTransaction()){
 				writeManagedFields();
 				setValue(val);
 			}
 		}
 		
-		try(var io = getReference().io(this)){
+		try(var io = selfIO()){
 			io.skipExact(nextStart());
 			nextSize.write(io, ptr);
 		}
@@ -656,7 +656,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	public T readValueSelective(FieldDependency.Ticket<?> depTicket, boolean strictHolder) throws IOException{
 		if(!hasValue()) return null;
 		var based = (ValueStorage.InstanceBased)valueStorage;
-		try(var io = this.getReference().io(this)){
+		try(var io = selfIO()){
 			io.skipExact(valueStart());
 			return (T)based.readNewSelective(io, depTicket, strictHolder);
 		}
@@ -666,7 +666,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 	public boolean readValueSelective(T dest, FieldDependency.Ticket<?> depTicket) throws IOException{
 		if(!hasValue()) return false;
 		var based = (ValueStorage.InstanceBased)valueStorage;
-		try(var io = this.getReference().io(this)){
+		try(var io = selfIO()){
 			io.skipExact(valueStart());
 			based.readSelective(io, (IOInstance)dest, depTicket);
 		}

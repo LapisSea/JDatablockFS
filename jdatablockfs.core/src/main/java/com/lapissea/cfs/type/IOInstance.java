@@ -1,6 +1,7 @@
 package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.chunk.MemoryOperations;
 import com.lapissea.cfs.internal.Access;
@@ -15,6 +16,7 @@ import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
 import com.lapissea.util.function.TriFunction;
+import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
 import java.lang.annotation.ElementType;
@@ -361,7 +363,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 	abstract class Unmanaged<SELF extends Unmanaged<SELF>> extends IOInstance.Managed<SELF> implements DataProvider.Holder{
 		
 		private final DataProvider   provider;
-		private       Reference      reference;
+		private       Chunk          identity;
 		private final TypeLink       typeDef;
 		private       GenericContext genericCtx;
 		
@@ -376,9 +378,21 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		
 		public Unmanaged(DataProvider provider, Reference reference, TypeLink typeDef){
 			this.provider = Objects.requireNonNull(provider);
-			this.reference = reference.requireNonNull();
+			setIdentity(reference);
 			this.typeDef = typeDef;
 			readOnly = getDataProvider().isReadOnly();
+		}
+		
+		private void setIdentity(Reference reference){
+			if(reference.getOffset() != 0) throw new IllegalStateException();
+			try{
+				identity = provider.getChunk(reference.getPtr());
+			}catch(IOException e){
+				throw new RuntimeException(e);
+			}
+		}
+		private Chunk getIdentity(){
+			return identity;
 		}
 		
 		@NotNull
@@ -423,10 +437,8 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			return provider;
 		}
 		
-		protected final boolean isSelfDataEmpty() throws IOException{
-			try(var io = selfIO()){
-				return io.getSize() == 0;
-			}
+		protected final boolean isSelfDataEmpty(){
+			return getIdentity().getSize() == 0;
 		}
 		
 		public final void notifyReferenceMovement(Reference newRef){
@@ -434,12 +446,12 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			
 			if(DEBUG_VALIDATION) ensureDataIntegrity(newRef);
 			
-			reference = newRef;
+			setIdentity(newRef);
 		}
 		
 		private void ensureDataIntegrity(Reference newRef){
 			byte[] oldData, newData;
-			try(var oldIo = reference.io(this);
+			try(var oldIo = selfIO();
 			    var newIo = newRef.io(this)
 			){
 				oldData = oldIo.readRemaining();
@@ -475,8 +487,14 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			notifyFreed();
 		}
 		
+		protected final void selfIO(UnsafeConsumer<RandomIO, IOException> session) throws IOException{
+			try(var io = selfIO()){
+				session.accept(io);
+			}
+		}
+		
 		protected final RandomIO selfIO() throws IOException{
-			return reference.io(provider);
+			return getIdentity().io();
 		}
 		
 		protected StructPipe<SELF> newPipe(){
@@ -515,14 +533,14 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		}
 		
 		protected final void readManagedField(IOField<SELF, ?> field) throws IOException{
-			try(var io = getReference().io(this)){
+			try(var io = selfIO()){
 				var pip = getPipe();
 				pip.readDeps(pip.makeIOPool(), provider, io, pip.getFieldDependency().getDeps(field), self(), getGenerics());
 			}
 		}
 		
 		protected final void writeManagedField(IOField<SELF, ?> field) throws IOException{
-			try(var io = getReference().io(this)){
+			try(var io = selfIO()){
 				getPipe().writeSingleField(provider, io, field, self());
 			}
 		}
@@ -536,7 +554,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		}
 		
 		public final Reference getReference(){
-			return reference;
+			return getIdentity().getPtr().makeReference();
 		}
 		
 		protected final void allocateNulls() throws IOException{
