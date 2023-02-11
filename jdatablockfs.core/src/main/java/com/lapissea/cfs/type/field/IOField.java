@@ -28,8 +28,6 @@ import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
-import static com.lapissea.cfs.internal.StatIOField.*;
-import static com.lapissea.cfs.type.field.FieldSupport.STAT_LOGGING;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 
 public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<T>, Stringify, AnnotatedType{
@@ -50,8 +48,6 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 	public static final int HAS_GENERATED_NAME     = 1<<4;
 	
 	private int typeFlags = -1;
-	
-	private volatile long uid = -1;
 	
 	protected IOField(FieldAccessor<T> accessor, SizeDescriptor<T> descriptor){
 		this.accessor = accessor;
@@ -188,11 +184,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 	
 	public final void writeReported(VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		try{
-			if(STAT_LOGGING) logStart(WRITE_ACTION, uid());
 			write(ioPool, provider, dest, instance);
-			if(STAT_LOGGING) logEnd(WRITE_ACTION, uid());
-		}catch(VaryingSize.TooSmall e){
-			throw e;
 		}catch(IOException e){
 			e.addSuppressed(new IOException("Failed to write " + this));
 			throw e;
@@ -201,9 +193,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 	
 	public final void readReported(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		try{
-			if(STAT_LOGGING) logStart(READ_ACTION, uid());
 			read(ioPool, provider, src, instance, genericContext);
-			if(STAT_LOGGING) logEnd(READ_ACTION, uid());
 		}catch(IOException e){
 			e.addSuppressed(new IOException("Failed to read " + this));
 			throw e;
@@ -212,9 +202,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 	
 	public final void skipReported(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		try{
-			if(STAT_LOGGING) logStart(SKIP_READ_ACTION, uid());
 			skip(ioPool, provider, src, instance, genericContext);
-			if(STAT_LOGGING) logEnd(SKIP_READ_ACTION, uid());
 		}catch(IOException e){
 			throw new IOException("Failed to skip read " + this, e);
 		}
@@ -244,18 +232,6 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 	
 	public void init(){
 		if(getAccessor() instanceof VirtualAccessor<T> vacc) vacc.init(this);
-	}
-	
-	public final long uid(){
-		if(uid == -1){
-			synchronized(this){
-				if(uid == -1){
-					uid = FieldSupport.nextUID();
-					if(STAT_LOGGING) logRegister(uid, this);
-				}
-			}
-		}
-		return uid;
 	}
 	
 	public String getName(){ return getAccessor().getName(); }

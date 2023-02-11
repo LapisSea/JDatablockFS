@@ -1,6 +1,5 @@
 package com.lapissea.cfs.type.field;
 
-import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.FieldIsNullException;
 import com.lapissea.cfs.type.IOInstance;
@@ -20,7 +19,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicLong;
 
 import static com.lapissea.cfs.type.field.IOField.*;
 import static com.lapissea.cfs.type.field.access.TypeFlag.*;
@@ -30,14 +28,6 @@ import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT
  * Stores bulk code for basic operations and information for {@link IOField}. Also provides emotional support
  */
 class FieldSupport{
-	static final boolean STAT_LOGGING = GlobalConfig.configFlag("logging.fieldTimes", false);
-	
-	private static final AtomicLong UID_COUNT = new AtomicLong();
-	static long nextUID(){
-		return UID_COUNT.incrementAndGet();
-	}
-	
-	
 	static <T extends IOInstance<T>> int hash(IOField<T, ?> field, VarPool<T> ioPool, T instance){
 		var acc = field.getAccessor();
 		var id  = acc.getTypeID();
