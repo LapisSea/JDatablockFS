@@ -29,6 +29,7 @@ import com.lapissea.cfs.type.field.fields.reflection.BitFieldMerger;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.ShouldNeverHappenError;
+import com.lapissea.util.UtilL;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
@@ -121,7 +122,7 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 				}
 				var res = sb.toString();
 				if(!check.equals(res)){
-					throw new ShouldNeverHappenError("\n" + check + "\n" + res);
+					throw UtilL.exitWithErrorMsg(check + "\n" + res);
 				}
 			}
 		}

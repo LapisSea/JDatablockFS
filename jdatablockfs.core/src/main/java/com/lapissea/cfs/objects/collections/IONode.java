@@ -141,6 +141,10 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 					throw new NotImplementedException();
 				}
 				@Override
+				public Class<?> getType(){
+					return IONode.class;
+				}
+				@Override
 				public int getTypeID(){
 					return TypeFlag.ID_OBJECT;
 				}

@@ -411,7 +411,7 @@ public class DisplayIpc implements DataLogger{
 			try{
 				var t = FAILS.get(address);
 				if(t != null){
-					if(System.currentTimeMillis()>t + 1000){
+					if(System.currentTimeMillis()>t + 5000){
 						FAILS.remove(address);
 					}else{
 						tryConnect = false;
@@ -427,7 +427,7 @@ public class DisplayIpc implements DataLogger{
 				msg = "Unexpected error: " + e;
 			}
 			FAILS.computeIfAbsent(address, c -> {
-				warn("Giving up on connecting to {} for 1s", address);
+				warn("Giving up on connecting to {} for 5s", address);
 				return System.currentTimeMillis();
 			});
 			

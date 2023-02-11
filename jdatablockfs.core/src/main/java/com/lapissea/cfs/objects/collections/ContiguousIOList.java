@@ -123,14 +123,16 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		
 		private static final IONullability NULLABLE = IOFieldTools.makeNullabilityAnn(IONullability.Mode.NULLABLE);
 		
-		private final Type    elementType;
-		private       long    index;
-		private final boolean nullable;
-		private final int     typeID;
+		private final Type     elementType;
+		private final Class<?> rawelementType;
+		private       long     index;
+		private final boolean  nullable;
+		private final int      typeID;
 		
 		protected IndexAccessor(Type elementType, long index, boolean nullable){
 			super(null, "");
 			this.elementType = elementType;
+			rawelementType = Utils.typeToRaw(elementType);
 			this.index = index;
 			this.nullable = nullable;
 			typeID = TypeFlag.getId(Utils.typeToRaw(elementType));
@@ -154,6 +156,11 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		public Type getGenericType(GenericContext genericContext){
 			return elementType;
 		}
+		@Override
+		public Class<?> getType(){
+			return rawelementType;
+		}
+		
 		@Override
 		public int getTypeID(){
 			return typeID;
