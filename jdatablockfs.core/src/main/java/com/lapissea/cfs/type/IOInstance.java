@@ -295,15 +295,9 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			for(var ref : getThisStruct().getInstanceFields().onlyRefs()){
 				if(!ref.isNull(null, self()))
 					continue;
-				ref.allocate(self(), provider, getGenericContext());
+				ref.allocate(self(), provider, null);
 			}
 		}
-		
-		private GenericContext getGenericContext(){
-			//TODO: find generic context?
-			return null;
-		}
-		
 		
 		@SuppressWarnings("unchecked")
 		@Override
@@ -324,11 +318,12 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 				}
 				var acc = field.getAccessor();
 				var typ = acc.getType();
+				if(typ == String.class) continue;
 				if(typ.isArray()){
 					var arrField = (IOField<SELF, Object[]>)field;
 					
 					var arr = arrField.get(null, (SELF)this);
-					if(arr == null) continue;
+					if(arr == null || arr.length == 0) continue;
 					
 					arr = arr.clone();
 					
