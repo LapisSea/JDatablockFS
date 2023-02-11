@@ -13,6 +13,7 @@ import com.lapissea.cfs.type.compilation.TemplateClassLoader;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.utils.ReadWriteClosableLock;
 import com.lapissea.util.LateInit;
+import com.lapissea.util.Rand;
 import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
@@ -234,8 +235,9 @@ public sealed interface IOTypeDB{
 		@IOValue
 		private IOMap<TypeName, TypeDef> defs;
 		
-		private Map<TypeLink, Integer> reverseDataCache;
-		private int                    max;
+		private final Map<Integer, TypeLink> dataCache = new HashMap<>();
+		private       Map<TypeLink, Integer> reverseDataCache;
+		private       int                    max;
 		
 		private WeakReference<ClassLoader> templateLoader = new WeakReference<>(null);
 		
@@ -393,10 +395,21 @@ public sealed interface IOTypeDB{
 				return builtIn.fromID(id);
 			}
 			
+			var cached = dataCache.get(id);
+			if(cached != null){
+				return cached.clone();
+			}
+			
 			var type = data.get(id);
 			if(type == null){
 				throw new RuntimeException("Unknown type from ID of " + id);
 			}
+			
+			if(dataCache.size()>64){
+				dataCache.remove(dataCache.keySet().stream().skip(Rand.i(dataCache.size() - 1)).findAny().orElseThrow());
+			}
+			dataCache.put(id, type);
+			
 			
 			return type;
 		}
