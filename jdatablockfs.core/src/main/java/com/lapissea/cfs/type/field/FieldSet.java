@@ -109,6 +109,55 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		}
 	}
 	
+	private final class FieldSetListIterator implements ListIterator<IOField<T, ?>>{
+		
+		private int cursor;
+		
+		public FieldSetListIterator(int cursor){
+			this.cursor = cursor;
+		}
+		
+		@Override
+		public boolean hasNext(){
+			return cursor<data.length;
+		}
+		
+		@Override
+		public IOField<T, ?> next(){
+			return data[cursor++];
+		}
+		
+		@Override
+		public boolean hasPrevious(){
+			return cursor != 0;
+		}
+		
+		@Override
+		public IOField<T, ?> previous(){
+			int i        = cursor - 1;
+			var previous = data[i];
+			cursor = i;
+			return previous;
+		}
+		
+		@Override
+		public int nextIndex(){
+			return cursor;
+		}
+		
+		@Override
+		public int previousIndex(){
+			return cursor - 1;
+		}
+		
+		@Override
+		public void remove(){ throw new UnsupportedOperationException(); }
+		@Override
+		public void set(IOField<T, ?> e){ throw new UnsupportedOperationException(); }
+		@Override
+		public void add(IOField<T, ?> e){ throw new UnsupportedOperationException(); }
+	}
+	
 	private static final FieldSet<?> EMPTY = new FieldSet<>();
 	
 	@SuppressWarnings("unchecked")
@@ -175,10 +224,17 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	
 	@Override
 	public boolean equals(Object o){
-		return this == o ||
-		       o instanceof FieldSet<?> that &&
-		       equals(that);
+		if(this == o) return true;
+		if(o instanceof FieldSet<?> that) return equals(that);
+		if(o instanceof Collection<?> col) return equals(col);
+		return false;
 	}
+	
+	public boolean equals(Collection<?> collection){
+		if(collection == null || collection.size() != size()) return false;
+		return containsAll(collection);
+	}
+	
 	public boolean equals(FieldSet<?> that){
 		if(that == null) return false;
 		if(this == that) return true;
@@ -215,9 +271,12 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 			if(tt.age<Byte.MAX_VALUE) tt.age++;
 			
 			if(this.age<tt.age){
-				tt.hashCode();
 				this.data = tt.data;
-			}else tt.data = this.data;
+				this.nameLookup = tt.nameLookup;
+			}else{
+				tt.data = this.data;
+				tt.nameLookup = this.nameLookup;
+			}
 			
 			if(this.hash != -1) tt.hash = this.hash;
 			else if(that.hash != -1) this.hash = that.hash;
@@ -242,6 +301,46 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	}
 	
 	@Override
+	public int indexOf(Object o){
+		if(!(o instanceof IOField<?, ?> f)) return -1;
+		if(size() == 1){
+			if(data[0].equals(f)){
+				return 0;
+			}
+			return -1;
+		}
+		var index = getNameLookup().get(f.getName());
+		if(index == null) return -1;
+		if(data[index].equals(f)){
+			return index;
+		}
+		
+		for(int i = 0; i<data.length; i++){
+			if(data[i].equals(f)) return i;
+		}
+		return -1;
+	}
+	
+	@Override
+	public int lastIndexOf(Object o){
+		return indexOf(o);
+	}
+	
+	@NotNull
+	@Override
+	public ListIterator<IOField<T, ?>> listIterator(int index){
+		return new FieldSetListIterator(index);
+	}
+	
+	@Override
+	public void forEach(Consumer<? super IOField<T, ?>> action){
+		Objects.requireNonNull(action);
+		for(var e : data){
+			action.accept(e);
+		}
+	}
+	
+	@Override
 	public Spliterator<IOField<T, ?>> spliterator(){
 		return new FieldSetSpliterator<>(this);
 	}
@@ -262,16 +361,34 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	}
 	
 	public Optional<IOField<T, ?>> byName(String name){
-		if(nameLookup == null) buildNameLookup();
-		return Optional.ofNullable(nameLookup.get(name)).map(this::get);
+		return Optional.ofNullable(getNameLookup().get(name)).map(this::get);
 	}
 	
+	private Map<String, Integer> getNameLookup(){
+		if(nameLookup == null) buildNameLookup();
+		return nameLookup;
+	}
 	private void buildNameLookup(){
 		var builder = HashMap.<String, Integer>newHashMap(size());
 		for(int i = 0; i<size(); i++){
 			builder.put(get(i).getName(), i);
 		}
 		nameLookup = Map.copyOf(builder);
+	}
+	
+	@Override
+	public boolean contains(Object o){
+		if(!(o instanceof IOField<?, ?> f)) return false;
+		if(size() == 1){
+			return data[0].equals(f);
+		}
+		
+		var index = getNameLookup().get(f.getName());
+		if(index == null) return false;
+		if(data[index].equals(f)){
+			return true;
+		}
+		return super.contains(o);
 	}
 	
 	@SuppressWarnings("unchecked")
