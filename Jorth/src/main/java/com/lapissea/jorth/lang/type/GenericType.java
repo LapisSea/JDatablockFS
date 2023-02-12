@@ -4,10 +4,7 @@ import com.lapissea.jorth.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.util.NotImplementedException;
 
-import java.lang.reflect.GenericArrayType;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
-import java.lang.reflect.TypeVariable;
+import java.lang.reflect.*;
 import java.util.*;
 
 import static java.util.stream.Collectors.joining;
@@ -61,6 +58,11 @@ public record GenericType(ClassName raw, int dims, List<GenericType> args){
 			stack.add(var);
 			var bounds = var.getBounds()[0];
 			return of0(stack, bounds);
+		}
+		if(type instanceof WildcardType w){
+			var up = w.getUpperBounds();
+			if(up.length != 1) throw new NotImplementedException();
+			return of0(stack, up[0]);
 		}
 		throw new NotImplementedException(type.getClass().getName());
 	}

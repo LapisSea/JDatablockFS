@@ -364,10 +364,10 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		var name  = function.name();
 		
 		int callOp;
-		if(owner.type() == ClassType.INTERFACE){
-			callOp = INVOKEINTERFACE;
-		}else if(function.isStatic()){
+		if(function.isStatic()){
 			callOp = INVOKESTATIC;
+		}else if(owner.type() == ClassType.INTERFACE){
+			callOp = INVOKEINTERFACE;
 		}else{
 			//https://stackoverflow.com/a/13764338
 			if(superCall ||
@@ -439,7 +439,27 @@ public final class FunctionGen implements Endable, FunctionInfo{
 				args.add(stack.peek(mark + i));
 			}
 			
-			var info = cInfo.getFunction(new Signature(functionName, args));
+			FunctionInfo info;
+			try{
+				info = cInfo.getFunction(new Signature(functionName, args));
+			}catch(MalformedJorth e){
+				info = cInfo.getFunctionsByName(functionName).filter(f -> {
+					var argsF = f.argumentTypes();
+					if(argsF.size() != args.size()) return false;
+					for(int i = 0; i<argsF.size(); i++){
+						var a = argsF.get(i);
+						var b = args.get(i);
+						try{
+							if(!b.instanceOf(typeSource, a)){
+								return false;
+							}
+						}catch(MalformedJorth ex){
+							throw new RuntimeException(ex);
+						}
+					}
+					return true;
+				}).findAny().orElseThrow(() -> e);
+			}
 			
 			invokeOp(info, superCall);
 		};

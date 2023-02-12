@@ -93,6 +93,8 @@ public class DefInstanceCompiler{
 		}
 	}
 	
+	private record CompletionInfo<T extends IOInstance<T>>(Class<T> base, Class<T> completed, Set<String> completedGetters, Set<String> completedSetters){ }
+	
 	public record Key<T extends IOInstance<T>>(Class<T> clazz, Optional<Set<String>> includeNames){
 		public Key(Class<T> clazz){
 			this(clazz, Optional.empty());
@@ -102,8 +104,8 @@ public class DefInstanceCompiler{
 			this.includeNames = includeNames.map(Set::copyOf);
 		}
 		
-		private Key<T> complete(){
-			return new Key<>(completeCached(clazz), includeNames);
+		private CompletionInfo<T> complete(){
+			return completeCached(clazz);
 		}
 	}
 	
@@ -163,7 +165,7 @@ public class DefInstanceCompiler{
 				if(interf.getName().endsWith(IMPL_COMPLETION_POSTFIX)){
 					try(var ignored = COMPLETION_LOCK.read()){
 						var i      = interf;
-						var unfull = COMPLETION_CACHE.entrySet().stream().filter(e -> e.getValue() == i).findAny().map(Map.Entry::getKey);
+						var unfull = COMPLETION_CACHE.entrySet().stream().filter(e -> e.getValue().completed == i).findAny().map(Map.Entry::getKey);
 						if(unfull.isPresent()){
 							interf = unfull.get();
 						}
@@ -260,15 +262,15 @@ public class DefInstanceCompiler{
 		);
 		
 		var humanName = inter.getSimpleName();
-		var compiled  = compile(key.complete(), humanName);
+		var compiled  = compile(key.complete(), key.includeNames, humanName);
 		
 		node.init(compiled);
 		
 		node.state = ImplNode.State.DONE;
 	}
 	
-	private static <T extends IOInstance<T>> Result<T> compile(Key<T> key, String humanName){
-		Class<T> completeInter = key.clazz;
+	private static <T extends IOInstance<T>> Result<T> compile(CompletionInfo<T> completion, Optional<Set<String>> includeNames, String humanName){
+		Class<T> completeInter = completion.completed;
 		
 		var getters  = new ArrayList<FieldStub>();
 		var setters  = new ArrayList<FieldStub>();
@@ -278,7 +280,7 @@ public class DefInstanceCompiler{
 		
 		var fieldInfo = mergeStubs(getters, setters);
 		
-		key.includeNames.ifPresent(strings -> checkIncludeNames(fieldInfo, strings));
+		includeNames.ifPresent(strings -> checkIncludeNames(fieldInfo, strings));
 		
 		var orderedFields = getOrder(completeInter, fieldInfo)
 			                    .map(names -> names.stream()
@@ -294,38 +296,38 @@ public class DefInstanceCompiler{
 		checkModel(fieldInfo);
 		
 		try{
-			var impl = generateImpl(key, specials, fieldInfo, orderedFields, humanName);
+			var impl = generateImpl(new Key<>(completeInter, includeNames), specials, fieldInfo, orderedFields, humanName);
 			return new Result<>(impl, orderedFields);
 		}catch(Throwable e){
 			if(EXIT_ON_FAIL){
-				new RuntimeException("failed to compile implementation for " + key.clazz.getName(), e).printStackTrace();
+				new RuntimeException("failed to compile implementation for " + completeInter.getName(), e).printStackTrace();
 				System.exit(1);
 			}
 			throw e;
 		}
 	}
 	
-	private static final Map<Class<?>, Class<?>> COMPLETION_CACHE = new HashMap<>();
-	private static final ReadWriteClosableLock   COMPLETION_LOCK  = ReadWriteClosableLock.reentrant();
+	private static final Map<Class<?>, CompletionInfo<?>> COMPLETION_CACHE = new HashMap<>();
+	private static final ReadWriteClosableLock            COMPLETION_LOCK  = ReadWriteClosableLock.reentrant();
 	
 	@SuppressWarnings("unchecked")
-	private static <T extends IOInstance<T>> Class<T> completeCached(Class<T> interf){
+	private static <T extends IOInstance<T>> CompletionInfo<T> completeCached(Class<T> interf){
 		try(var ignored = COMPLETION_LOCK.read()){
 			var cached = COMPLETION_CACHE.get(interf);
-			if(cached != null) return (Class<T>)cached;
+			if(cached != null) return (CompletionInfo<T>)cached;
 		}
 		
 		try(var ignored = COMPLETION_LOCK.write()){
 			var cached = COMPLETION_CACHE.get(interf);
-			if(cached != null) return (Class<T>)cached;
+			if(cached != null) return (CompletionInfo<T>)cached;
 			
-			Class<?> complete = complete(interf);
+			CompletionInfo<?> complete = complete(interf);
 			COMPLETION_CACHE.put(interf, complete);
-			return (Class<T>)complete;
+			return (CompletionInfo<T>)complete;
 		}
 	}
 	
-	private static <T extends IOInstance<T>> Class<?> complete(Class<T> interf){
+	private static <T extends IOInstance<T>> CompletionInfo<?> complete(Class<T> interf){
 		
 		var getters = new ArrayList<FieldStub>();
 		var setters = new ArrayList<FieldStub>();
@@ -341,7 +343,7 @@ public class DefInstanceCompiler{
 		});
 		
 		if(missingGetters.isEmpty() && missingSetters.isEmpty()){
-			return interf;
+			return new CompletionInfo<>(interf, interf, Set.of(), Set.of());
 		}
 		
 		Log.trace("Generating completion of {}#cyan - missing getters: {}, missing setters: {}", interf.getSimpleName(), missingGetters, missingSetters);
@@ -404,7 +406,10 @@ public class DefInstanceCompiler{
 				Log.log("Generated jorth:\n" + log.output());
 				BytecodeUtils.printClass(file);
 			}
-			return Access.privateLookupIn(interf).defineClass(file);
+			
+			//noinspection unchecked
+			var completed = (Class<T>)Access.privateLookupIn(interf).defineClass(file);
+			return new CompletionInfo<>(interf, completed, Set.copyOf(missingGetters), Set.copyOf(missingSetters));
 		}catch(IllegalAccessException|MalformedJorth e){
 			throw new RuntimeException(e);
 		}
@@ -571,12 +576,12 @@ public class DefInstanceCompiler{
 	private static <T extends IOInstance<T>> void generateSpecialToString(Class<T> interf, CodeStream writer, Method method) throws MalformedJorth{
 		writer.write(
 			"""
-				public visibility
-				function {!0}
+				public function {!0}
 					returns #String
 				start
-					get this this
-					access static call {!1} {!0} start end
+					static call {!1} {!0} start
+						get this this
+					end
 				end
 				""",
 			method.getName(),
@@ -1046,9 +1051,15 @@ public class DefInstanceCompiler{
 			if(!annTypes.add(ann.annotationType())) continue;
 			
 			var part = writer.codePart();
-			writer.write("@ {!} start", ann.annotationType().getName());
+			
+			boolean[] any = {false};
 			
 			scanAnnotation(ann, (name, value) -> {
+				if(!any[0]){
+					any[0] = true;
+					writer.write("@ {!} start", ann.annotationType().getName());
+				}
+				
 				writer.write("{!} {}", name, switch(value){
 					case null -> "null";
 					case String s -> "'" + s.replace("'", "\\'") + "'";
@@ -1063,7 +1074,8 @@ public class DefInstanceCompiler{
 					default -> throw new NotImplementedException(value.getClass() + "");
 				});
 			});
-			writer.write("end");
+			if(any[0]) writer.write("end");
+			else writer.write("@ {!}", ann.annotationType().getName());
 			part.close();
 		}
 	}
@@ -1114,7 +1126,14 @@ public class DefInstanceCompiler{
 			var clazz = q.removeFirst();
 			last.add(clazz);
 			
-			toStr = toStr.or(() -> Arrays.stream(clazz.getMethods()).filter(m -> isToString(clazz, m, "toString")).findAny());
+			toStr = toStr.or(() -> {
+				for(Method m : clazz.getDeclaredMethods()){
+					if(isToString(clazz, m, "toString")){
+						return Optional.of(m);
+					}
+				}
+				return Optional.empty();
+			});
 			toShortStr = toShortStr.or(() -> Arrays.stream(clazz.getMethods()).filter(m -> isToString(clazz, m, "toShortString")).findAny());
 			if(toStr.isPresent() && toShortStr.isPresent()) break;
 			

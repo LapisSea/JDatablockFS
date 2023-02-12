@@ -184,8 +184,10 @@ public interface ClassInfo{
 				return Arrays.stream(ctors).<FunctionInfo>map(c -> new FunctionInfo.OfConstructor(source, c)).toList();
 			}
 			
-			var c = clazz;
-			while(c != null){
+			var queue = new ArrayDeque<Class<?>>();
+			queue.add(clazz);
+			while(!queue.isEmpty()){
+				var c = queue.pop();
 				Arrays.stream(c.getDeclaredMethods())
 				      .filter(f -> f.getName().equals(name))
 				      .forEach(f -> {
@@ -193,7 +195,8 @@ public interface ClassInfo{
 					      var info = functions.computeIfAbsent(sig, s -> FunctionInfo.of(source, f));
 					      result.add(info);
 				      });
-				c = c.getSuperclass();
+				if(c.getSuperclass() != null) queue.add(c.getSuperclass());
+				queue.addAll(Arrays.asList(c.getInterfaces()));
 			}
 			
 			return List.copyOf(result);
@@ -211,7 +214,16 @@ public interface ClassInfo{
 			}
 			
 			if(type == Object.class) throw new NoSuchMethodException(name);
-			return getDeepDeclaredMethod(type.getSuperclass(), name, args);
+			var sup = type.getSuperclass();
+			if(sup != null){
+				var res = getDeepDeclaredMethod(sup, name, args);
+				if(res != null) return res;
+			}
+			for(Class<?> interf : type.getInterfaces()){
+				var res = getDeepDeclaredMethod(interf, name, args);
+				if(res != null) return res;
+			}
+			return null;
 		}
 		
 		private static Method searchMethods(Method[] methods, String name, List<GenericType> parameterTypes){
