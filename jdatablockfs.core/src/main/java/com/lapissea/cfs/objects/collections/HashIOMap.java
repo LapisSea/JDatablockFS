@@ -49,6 +49,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		}
 		
 		static <K, V> BucketEntry<K, V> of(K key, V value){
+			//noinspection rawtypes
 			class Val{
 				private static final BiFunction<Object, Object, BucketEntry> NEW =
 					IOInstance.Def.constrRef(BucketEntry.class, Object.class, Object.class);

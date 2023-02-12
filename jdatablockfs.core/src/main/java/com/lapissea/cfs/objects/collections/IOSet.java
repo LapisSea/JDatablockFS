@@ -4,6 +4,7 @@ package com.lapissea.cfs.objects.collections;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 
 import java.io.IOException;
+import java.util.Objects;
 
 @IOValue.OverrideType.DefaultImpl(IOHashSet.class)
 public interface IOSet<T>{
@@ -22,9 +23,24 @@ public interface IOSet<T>{
 	 * @return {@code true} if the set contained the specified element
 	 */
 	boolean remove(T value) throws IOException;
-	boolean contains(T value) throws IOException;
+	
+	default boolean contains(T value) throws IOException{
+		if(isEmpty()) return false;
+		var iter = iterator();
+		while(iter.hasNext()){
+			var next = iter.ioNext();
+			if(Objects.equals(next, value)){
+				return true;
+			}
+		}
+		return false;
+	}
 	
 	long size();
+	
+	default boolean isEmpty(){
+		return size() == 0;
+	}
 	
 	IOIterator<T> iterator();
 	
