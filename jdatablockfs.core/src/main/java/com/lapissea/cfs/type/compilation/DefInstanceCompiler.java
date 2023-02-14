@@ -93,7 +93,141 @@ public class DefInstanceCompiler{
 		}
 	}
 	
-	private record CompletionInfo<T extends IOInstance<T>>(Class<T> base, Class<T> completed, Set<String> completedGetters, Set<String> completedSetters){ }
+	private record CompletionInfo<T extends IOInstance<T>>(Class<T> base, Class<T> completed, Set<String> completedGetters, Set<String> completedSetters){
+		
+		private static final Map<Class<?>, CompletionInfo<?>> COMPLETION_CACHE = new HashMap<>();
+		private static final ReadWriteClosableLock            COMPLETION_LOCK  = ReadWriteClosableLock.reentrant();
+		
+		@SuppressWarnings("unchecked")
+		private static <T extends IOInstance<T>> CompletionInfo<T> completeCached(Class<T> interf){
+			try(var ignored = COMPLETION_LOCK.read()){
+				var cached = COMPLETION_CACHE.get(interf);
+				if(cached != null) return (CompletionInfo<T>)cached;
+			}
+			
+			try(var ignored = COMPLETION_LOCK.write()){
+				var cached = COMPLETION_CACHE.get(interf);
+				if(cached != null) return (CompletionInfo<T>)cached;
+				
+				CompletionInfo<?> complete = complete(interf);
+				COMPLETION_CACHE.put(interf, complete);
+				return (CompletionInfo<T>)complete;
+			}
+		}
+		
+		private static <T extends IOInstance<T>> CompletionInfo<?> complete(Class<T> interf){
+			
+			var getters = new ArrayList<FieldStub>();
+			var setters = new ArrayList<FieldStub>();
+			collectMethods(interf, getters, setters);
+			var style = checkStyles(getters, setters);
+			
+			var missingGetters = new HashSet<String>();
+			var missingSetters = new HashSet<String>();
+			
+			Stream.concat(getters.stream(), setters.stream()).map(FieldStub::varName).distinct().forEach(name -> {
+				if(getters.stream().noneMatch(s -> s.varName().equals(name))) missingGetters.add(name);
+				if(setters.stream().noneMatch(s -> s.varName().equals(name))) missingSetters.add(name);
+			});
+			
+			if(missingGetters.isEmpty() && missingSetters.isEmpty()){
+				return new CompletionInfo<>(interf, interf, Set.of(), Set.of());
+			}
+			
+			Log.trace("Generating completion of {}#cyan - missing getters: {}, missing setters: {}", interf.getSimpleName(), missingGetters, missingSetters);
+			
+			var completionName = interf.getName() + IMPL_COMPLETION_POSTFIX;
+			
+			var log   = JorthLogger.make();
+			var jorth = new Jorth(interf.getClassLoader(), log == null? null : log::log);
+			try{
+				
+				try(var writer = jorth.writer()){
+					writeAnnotations(writer, Arrays.asList(interf.getAnnotations()));
+					writer.addImportAs(completionName, "typ.impl");
+					writer.write(
+						"""
+							implements {!}
+							interface #typ.impl start
+							""",
+						interf.getName());
+					
+					for(String name : missingSetters){
+						var setterName = switch(style){
+							case NAMED -> "set" + TextUtil.firstToUpperCase(name);
+							case RAW -> name;
+						};
+						var type = getters.stream().filter(s -> s.varName().equals(name)).findAny().map(FieldStub::type).orElseThrow();
+						
+						writer.write(
+							"""
+								function {!}
+									arg arg1 {}
+								end
+								""",
+							setterName,
+							type
+						);
+					}
+					for(String name : missingGetters){
+						var getterName = switch(style){
+							case NAMED -> "get" + TextUtil.firstToUpperCase(name);
+							case RAW -> name;
+						};
+						var type = setters.stream().filter(s -> s.varName().equals(name)).findAny().map(FieldStub::type).orElseThrow();
+						writer.write(
+							"""
+								function {!}
+									{} returns
+								end
+								""",
+							type,
+							getterName
+						);
+					}
+					writer.write("end");
+				}
+				
+				var file = jorth.getClassFile(completionName);
+				
+				if(log != null){
+					Log.log("Generated jorth:\n" + log.output());
+					BytecodeUtils.printClass(file);
+				}
+				
+				//noinspection unchecked
+				var completed = (Class<T>)Access.privateLookupIn(interf).defineClass(file);
+				return new CompletionInfo<>(interf, completed, Set.copyOf(missingGetters), Set.copyOf(missingSetters));
+			}catch(IllegalAccessException|MalformedJorth e){
+				throw new RuntimeException(e);
+			}
+		}
+		
+		@SuppressWarnings("unchecked")
+		private static <T extends IOInstance.Def<T>> Optional<Class<T>> findSourceInterface(Class<?> impl){
+			var clazz = impl;
+			do{
+				for(Class<?> interf : clazz.getInterfaces()){
+					if(interf.getName().endsWith(IMPL_COMPLETION_POSTFIX)){
+						try(var ignored = COMPLETION_LOCK.read()){
+							var i      = interf;
+							var unfull = COMPLETION_CACHE.entrySet().stream().filter(e -> e.getValue().completed == i).findAny().map(Map.Entry::getKey);
+							if(unfull.isPresent()){
+								interf = unfull.get();
+							}
+						}
+					}
+					//noinspection rawtypes
+					var node = CACHE.get(new Key(interf));
+					if(node != null && node.impl == impl){
+						return Optional.of((Class<T>)node.key.clazz);
+					}
+				}
+				clazz = clazz.getSuperclass();
+			}while(clazz != null);
+			return Optional.empty();
+		}
+	}
 	
 	public record Key<T extends IOInstance<T>>(Class<T> clazz, Optional<Set<String>> includeNames){
 		public Key(Class<T> clazz){
@@ -105,7 +239,7 @@ public class DefInstanceCompiler{
 		}
 		
 		private CompletionInfo<T> complete(){
-			return completeCached(clazz);
+			return CompletionInfo.completeCached(clazz);
 		}
 	}
 	
@@ -155,31 +289,13 @@ public class DefInstanceCompiler{
 	
 	private static final ConcurrentHashMap<Key<?>, ImplNode<?>> CACHE = new ConcurrentHashMap<>();
 	
-	@SuppressWarnings("unchecked")
+	
 	public static <T extends IOInstance.Def<T>> Optional<Class<T>> unmap(Class<?> impl){
 		Objects.requireNonNull(impl);
-		if(!UtilL.instanceOf(impl, IOInstance.Def.class)) throw new IllegalArgumentException(impl.getName() + "");
-		var clazz = impl;
-		do{
-			for(Class<?> interf : clazz.getInterfaces()){
-				if(interf.getName().endsWith(IMPL_COMPLETION_POSTFIX)){
-					try(var ignored = COMPLETION_LOCK.read()){
-						var i      = interf;
-						var unfull = COMPLETION_CACHE.entrySet().stream().filter(e -> e.getValue().completed == i).findAny().map(Map.Entry::getKey);
-						if(unfull.isPresent()){
-							interf = unfull.get();
-						}
-					}
-				}
-				//noinspection rawtypes
-				var node = CACHE.get(new Key(interf));
-				if(node != null && node.impl == impl){
-					return Optional.of((Class<T>)node.key.clazz);
-				}
-			}
-			clazz = clazz.getSuperclass();
-		}while(clazz != null);
-		return Optional.empty();
+		if(!UtilL.instanceOf(impl, IOInstance.Def.class)){
+			throw new IllegalArgumentException(impl.getName() + "");
+		}
+		return CompletionInfo.findSourceInterface(impl);
 	}
 	
 	public static <T extends IOInstance<T>> MethodHandle dataConstructor(Class<T> interf){
@@ -304,114 +420,6 @@ public class DefInstanceCompiler{
 				System.exit(1);
 			}
 			throw e;
-		}
-	}
-	
-	private static final Map<Class<?>, CompletionInfo<?>> COMPLETION_CACHE = new HashMap<>();
-	private static final ReadWriteClosableLock            COMPLETION_LOCK  = ReadWriteClosableLock.reentrant();
-	
-	@SuppressWarnings("unchecked")
-	private static <T extends IOInstance<T>> CompletionInfo<T> completeCached(Class<T> interf){
-		try(var ignored = COMPLETION_LOCK.read()){
-			var cached = COMPLETION_CACHE.get(interf);
-			if(cached != null) return (CompletionInfo<T>)cached;
-		}
-		
-		try(var ignored = COMPLETION_LOCK.write()){
-			var cached = COMPLETION_CACHE.get(interf);
-			if(cached != null) return (CompletionInfo<T>)cached;
-			
-			CompletionInfo<?> complete = complete(interf);
-			COMPLETION_CACHE.put(interf, complete);
-			return (CompletionInfo<T>)complete;
-		}
-	}
-	
-	private static <T extends IOInstance<T>> CompletionInfo<?> complete(Class<T> interf){
-		
-		var getters = new ArrayList<FieldStub>();
-		var setters = new ArrayList<FieldStub>();
-		collectMethods(interf, getters, setters);
-		var style = checkStyles(getters, setters);
-		
-		var missingGetters = new HashSet<String>();
-		var missingSetters = new HashSet<String>();
-		
-		Stream.concat(getters.stream(), setters.stream()).map(FieldStub::varName).distinct().forEach(name -> {
-			if(getters.stream().noneMatch(s -> s.varName().equals(name))) missingGetters.add(name);
-			if(setters.stream().noneMatch(s -> s.varName().equals(name))) missingSetters.add(name);
-		});
-		
-		if(missingGetters.isEmpty() && missingSetters.isEmpty()){
-			return new CompletionInfo<>(interf, interf, Set.of(), Set.of());
-		}
-		
-		Log.trace("Generating completion of {}#cyan - missing getters: {}, missing setters: {}", interf.getSimpleName(), missingGetters, missingSetters);
-		
-		var completionName = interf.getName() + IMPL_COMPLETION_POSTFIX;
-		
-		var log   = JorthLogger.make();
-		var jorth = new Jorth(interf.getClassLoader(), log == null? null : log::log);
-		try{
-			
-			try(var writer = jorth.writer()){
-				writeAnnotations(writer, Arrays.asList(interf.getAnnotations()));
-				writer.addImportAs(completionName, "typ.impl");
-				writer.write(
-					"""
-						implements {!}
-						interface #typ.impl start
-						""",
-					interf.getName());
-				
-				for(String name : missingSetters){
-					var setterName = switch(style){
-						case NAMED -> "set" + TextUtil.firstToUpperCase(name);
-						case RAW -> name;
-					};
-					var type = getters.stream().filter(s -> s.varName().equals(name)).findAny().map(FieldStub::type).orElseThrow();
-					
-					writer.write(
-						"""
-							function {!}
-								arg arg1 {}
-							end
-							""",
-						setterName,
-						type
-					);
-				}
-				for(String name : missingGetters){
-					var getterName = switch(style){
-						case NAMED -> "get" + TextUtil.firstToUpperCase(name);
-						case RAW -> name;
-					};
-					var type = setters.stream().filter(s -> s.varName().equals(name)).findAny().map(FieldStub::type).orElseThrow();
-					writer.write(
-						"""
-							function {!}
-								{} returns
-							end
-							""",
-						type,
-						getterName
-					);
-				}
-				writer.write("end");
-			}
-			
-			var file = jorth.getClassFile(completionName);
-			
-			if(log != null){
-				Log.log("Generated jorth:\n" + log.output());
-				BytecodeUtils.printClass(file);
-			}
-			
-			//noinspection unchecked
-			var completed = (Class<T>)Access.privateLookupIn(interf).defineClass(file);
-			return new CompletionInfo<>(interf, completed, Set.copyOf(missingGetters), Set.copyOf(missingSetters));
-		}catch(IllegalAccessException|MalformedJorth e){
-			throw new RuntimeException(e);
 		}
 	}
 	
