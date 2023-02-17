@@ -11,7 +11,30 @@ import java.util.Objects;
 
 public interface CodeStream extends AutoCloseable{
 	
-	static int resolveArg(String src, List<CharSequence> dest, Object[] objs, int iter, int start){
+	static CharSequence processFragment(String code, Object... objs){
+		int start = 0;
+		var parts = new ArrayList<CharSequence>(objs.length*2 + 1);
+		int iter  = 0;
+		while(true){
+			var next = resolveArg(code, parts, objs, iter, start);
+			iter++;
+			if(next == -1){
+				if(iter<objs.length){
+					throw new IllegalArgumentException("Could not find \"{}\"");
+				}
+				break;
+			}
+			start = next;
+		}
+		if(start != code.length()){
+			parts.add(new CharSubview(code, start, code.length()));
+		}
+		
+		if(parts.size() == 1) return parts.get(0);
+		return new CharJoin(parts);
+	}
+	
+	private static int resolveArg(String src, List<CharSequence> dest, Object[] objs, int iter, int start){
 		for(int i = start; i<src.length(); i++){
 			var c1 = src.charAt(i);
 			if(c1 == '{'){
@@ -61,29 +84,7 @@ public interface CodeStream extends AutoCloseable{
 	CodeStream write(CharSequence code) throws MalformedJorth;
 	
 	default CodeStream write(String code, Object... objs) throws MalformedJorth{
-		int start = 0;
-		var parts = new ArrayList<CharSequence>(objs.length*2 + 1);
-		int iter  = 0;
-		while(true){
-			var next = resolveArg(code, parts, objs, iter, start);
-			iter++;
-			if(next == -1){
-				if(iter<objs.length){
-					throw new IllegalArgumentException("Could not find \"{}\"");
-				}
-				break;
-			}
-			start = next;
-		}
-		if(start != code.length()){
-			parts.add(new CharSubview(code, start, code.length()));
-		}
-		
-		CharSequence join;
-		if(parts.size() == 1) join = parts.get(0);
-		else join = new CharJoin(parts);
-		
-		return write(join);
+		return write(processFragment(code, objs));
 	}
 	
 	default void addImports(Class<?>... classes){

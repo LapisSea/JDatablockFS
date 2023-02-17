@@ -16,7 +16,6 @@ import com.lapissea.jorth.MalformedJorth;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.WeakValueHashMap;
-import com.lapissea.util.function.UnsafeBiConsumer;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -69,7 +68,7 @@ public final class TemplateClassLoader extends ClassLoader{
 			});
 			
 			try{
-				classData = jorthGenerate(typ, def.isIoInstance()? this::generateIOInstance : this::generateEnum);
+				classData = jorthGenerate(typ);
 			}catch(Throwable e){
 				if(EXIT_ON_FAIL){
 					e.printStackTrace();
@@ -83,14 +82,18 @@ public final class TemplateClassLoader extends ClassLoader{
 		return defineClass(className, ByteBuffer.wrap(classData), null);
 	}
 	
-	private byte[] jorthGenerate(TypeNamed classType, UnsafeBiConsumer<TypeNamed, CodeStream, MalformedJorth> generator){
+	private byte[] jorthGenerate(TypeNamed classType){
 		if(PRINT_GENERATING_INFO) LogUtil.println("generating", "\n" + TextUtil.toTable(classType.name, classType.def.getFields()));
 		
 		var log   = JorthLogger.make();
 		var jorth = new Jorth(this, log == null? null : log::log);
 		
 		try(var writer = jorth.writer()){
-			generator.accept(classType, writer);
+			if(classType.def.isIoInstance()){
+				generateIOInstance(classType, writer);
+			}else{
+				generateEnum(classType, writer);
+			}
 		}catch(MalformedJorth e){
 			throw new RuntimeException("Failed to generate class " + classType.name, e);
 		}

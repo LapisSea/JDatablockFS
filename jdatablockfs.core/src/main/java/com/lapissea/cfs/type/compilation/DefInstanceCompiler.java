@@ -40,7 +40,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.type.IOInstance.Def.IMPL_COMPLETION_POSTFIX;
-import static com.lapissea.cfs.type.compilation.JorthUtils.nullCheck;
 import static com.lapissea.cfs.type.compilation.JorthUtils.writeAnnotations;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NOT_NULL;
 import static com.lapissea.util.ConsoleColors.*;
@@ -544,7 +543,7 @@ public class DefInstanceCompiler{
 					for(FieldInfo info : includedOrdered.orElseThrow()){
 						writer.write("get #arg {!}", info.name);
 						if(info.type == ChunkPointer.class){
-							nullCheck(writer);
+							JorthUtils.nullCheck(writer);
 						}
 						writer.write("set this {!}", info.name);
 					}
@@ -874,26 +873,16 @@ public class DefInstanceCompiler{
 				                                 .map(a -> ((IONullability)a).value())
 				                                 .orElse(NOT_NULL) == NOT_NULL;
 				
-				if(nullCheck && !included){
-					writer.write(
-						"""
-							static call #Objects requireNonNull start
-								get #arg arg{}
-							end
-							pop
-							""", i);
-					continue;
-				}
-				
-				if(included || nullCheck){
-					writer.write("get #arg arg{}", i);
-				}
-				
-				if(nullCheck){
-					nullCheck(writer);
-				}
 				if(!included){
+					if(nullCheck){
+						JorthUtils.nullCheck(writer, "get #arg arg" + i);
+					}
 					continue;
+				}
+				
+				writer.write("get #arg arg" + i);
+				if(nullCheck){
+					JorthUtils.nullCheck(writer);
 				}
 				writer.write("set this {!}", info.name);
 			}
@@ -1008,7 +997,7 @@ public class DefInstanceCompiler{
 		);
 		
 		if(info.type == ChunkPointer.class){
-			nullCheck(writer);
+			JorthUtils.nullCheck(writer);
 		}
 		
 		writer.write(
