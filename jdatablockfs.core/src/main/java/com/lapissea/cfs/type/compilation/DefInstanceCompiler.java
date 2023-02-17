@@ -7,9 +7,13 @@ import com.lapissea.cfs.exceptions.MalformedTemplateStruct;
 import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.objects.ChunkPointer;
-import com.lapissea.cfs.type.*;
+import com.lapissea.cfs.type.GetAnnotation;
+import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.StagedInit;
+import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.compilation.CompilationTools.FieldStub;
 import com.lapissea.cfs.type.compilation.CompilationTools.Style;
+import com.lapissea.cfs.type.compilation.ToStringFormat.ToStringFragment;
 import com.lapissea.cfs.type.compilation.ToStringFormat.ToStringFragment.*;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.annotations.IONullability;
@@ -24,7 +28,6 @@ import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
-import com.lapissea.util.function.UnsafeBiConsumer;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.lang.annotation.Annotation;
@@ -37,11 +40,16 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.type.IOInstance.Def.IMPL_COMPLETION_POSTFIX;
+import static com.lapissea.cfs.type.compilation.JorthUtils.nullCheck;
+import static com.lapissea.cfs.type.compilation.JorthUtils.writeAnnotations;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NOT_NULL;
 import static com.lapissea.util.ConsoleColors.*;
-import static java.lang.reflect.Modifier.isStatic;
 
 public class DefInstanceCompiler{
+	
+	
+	//////////////////////////////// INIT /////////////////////////////////
+	
 	
 	public static void init(){ }
 	
@@ -73,7 +81,9 @@ public class DefInstanceCompiler{
 		}
 	}
 	
-	private static final boolean EXIT_ON_FAIL = GlobalConfig.configFlag("classGen.exitOnFail", false);
+	
+	//////////////////////////////// DATA /////////////////////////////////
+	
 	
 	private record Specials(
 		Optional<Method> set,
@@ -276,6 +286,9 @@ public class DefInstanceCompiler{
 		}
 	}
 	
+	
+	private static final boolean EXIT_ON_FAIL = GlobalConfig.configFlag("classGen.exitOnFail", false);
+	
 	private static final List<Class<?>> IGNORE_TYPES =
 		Stream.concat(
 			Stream.<Class<?>>iterate(
@@ -287,7 +300,11 @@ public class DefInstanceCompiler{
 			Stream.of(Object.class)
 		).toList();
 	
+	
 	private static final ConcurrentHashMap<Key<?>, ImplNode<?>> CACHE = new ConcurrentHashMap<>();
+	
+	
+	//////////////////////////////// API /////////////////////////////////
 	
 	
 	public static <T extends IOInstance.Def<T>> Optional<Class<T>> unmap(Class<?> impl){
@@ -304,23 +321,24 @@ public class DefInstanceCompiler{
 		var node = (ImplNode<T>)CACHE.get(key);
 		if(node == null || node.state != ImplNode.State.DONE) node = getNode(key);
 		var ctr = node.dataConstructor;
-		if(ctr == null) fail(interf);
+		if(ctr == null){
+			throw new RuntimeException("Please add " + IOInstance.Def.Order.class.getName() + " to " + interf.getName());
+		}
 		return ctr;
-	}
-	
-	private static <T extends IOInstance<T>> void fail(Class<T> interf){
-		throw new RuntimeException("Please add " + IOInstance.Def.Order.class.getName() + " to " + interf.getName());
 	}
 	
 	public static <T extends IOInstance<T>> Class<T> getImpl(Class<T> interf){
 		return getNode(new Key<>(interf)).impl;
 	}
 	
-	
 	public static <T extends IOInstance.Def<T>> Class<T> getImplPartial(Key<T> key){
 		if(key.includeNames.isEmpty()) throw new IllegalArgumentException("Names can not be empty");
 		return getNode(key).impl;
 	}
+	
+	
+	//////////////////////////////// IMPLEMENTATION /////////////////////////////////
+	
 	
 	private static <T extends IOInstance<T>> ImplNode<T> getNode(Key<T> key){
 		Class<T> interf = key.clazz;
@@ -371,7 +389,7 @@ public class DefInstanceCompiler{
 				return List.of(
 					inter.getName().substring(0, inter.getName().length() - inter.getSimpleName().length()),
 					inter.getSimpleName(),
-					((Optional<Object>)(Object)node.key.includeNames).orElse("<ALL>"),
+					node.key.includeNames.map(Object::toString).orElse("<ALL>"),
 					cols.get((int)(Integer.toUnsignedLong(hash)%cols.size())) + Integer.toHexString(hash) + RESET
 				);
 			}
@@ -634,7 +652,7 @@ public class DefInstanceCompiler{
 		}
 	}
 	
-	private static void generateFormatToString(Key<?> key, List<FieldInfo> fieldInfo, String name, boolean all, ToStringFormat.ToStringFragment fragment, CodeStream writer, String humanName) throws MalformedJorth{
+	private static void generateFormatToString(Key<?> key, List<FieldInfo> fieldInfo, String name, boolean all, ToStringFragment fragment, CodeStream writer, String humanName) throws MalformedJorth{
 		
 		writer.write(
 			"""
@@ -646,8 +664,8 @@ public class DefInstanceCompiler{
 			name
 		);
 		
-		List<ToStringFormat.ToStringFragment> compact = new ArrayList<>();
-		processFragments(key.clazz, fragment, all, frag -> {
+		List<ToStringFragment> compact = new ArrayList<>();
+		processFragments(fragment, all, frag -> {
 			if(frag instanceof FieldValue v && !isFieldIncluded(key, v.name())){
 				frag = new Literal("<no " + v.name() + ">");
 			}
@@ -662,7 +680,7 @@ public class DefInstanceCompiler{
 			compact.add(frag);
 		}, humanName);
 		
-		executeStringFragment(key.clazz, fieldInfo, new Concat(compact), all, writer, humanName);
+		executeStringFragment(fieldInfo, new Concat(compact), all, writer, humanName);
 		
 		writer.write(
 			"""
@@ -671,12 +689,12 @@ public class DefInstanceCompiler{
 				""");
 	}
 	
-	private static void processFragments(Class<?> interf, ToStringFormat.ToStringFragment fragment, boolean all, Consumer<ToStringFormat.ToStringFragment> out, String humanName) throws MalformedJorth{
+	private static void processFragments(ToStringFragment fragment, boolean all, Consumer<ToStringFragment> out, String humanName){
 		switch(fragment){
 			case NOOP ignored -> { }
 			case Concat f -> {
 				for(var child : f.fragments()){
-					processFragments(interf, child, all, out, humanName);
+					processFragments(child, all, out, humanName);
 				}
 			}
 			case Literal f -> out.accept(f);
@@ -689,21 +707,21 @@ public class DefInstanceCompiler{
 			case FieldValue frag -> out.accept(frag);
 			case OptionalBlock f -> {
 				if(all){
-					processFragments(interf, f.content(), true, out, humanName);
+					processFragments(f.content(), true, out, humanName);
 				}
 			}
 		}
 	}
 	
 	private static void executeStringFragment(
-		Class<?> interf, List<FieldInfo> fieldInfo, ToStringFormat.ToStringFragment fragment,
+		List<FieldInfo> fieldInfo, ToStringFragment fragment,
 		boolean all, CodeStream writer, String humanName
 	) throws MalformedJorth{
 		switch(fragment){
 			case NOOP ignored -> { }
 			case Concat f -> {
 				for(var child : f.fragments()){
-					executeStringFragment(interf, fieldInfo, child, all, writer, humanName);
+					executeStringFragment(fieldInfo, child, all, writer, humanName);
 				}
 			}
 			case Literal f -> append(writer, w -> w.write("'{}'", f.value()));
@@ -724,7 +742,7 @@ public class DefInstanceCompiler{
 			}
 			case OptionalBlock f -> {
 				if(all){
-					executeStringFragment(interf, fieldInfo, f.content(), true, writer, humanName);
+					executeStringFragment(fieldInfo, f.content(), true, writer, humanName);
 				}
 			}
 		}
@@ -883,8 +901,15 @@ public class DefInstanceCompiler{
 		}
 	}
 	
+	private static Set<String> collectNames(Class<?> its){
+		var getters = new ArrayList<FieldStub>();
+		var setters = new ArrayList<FieldStub>();
+		//noinspection unchecked,rawtypes
+		collectMethods((Class<IOInstance>)its, getters, setters);
+		return Stream.concat(getters.stream(), setters.stream()).map(FieldStub::varName).collect(Collectors.toSet());
+	}
+	
 	private static Optional<Class<?>> upperSame(Class<?> interf){
-		
 		var its = Arrays.stream(interf.getInterfaces()).filter(IOInstance.Def::isDefinition).toList();
 		if(its.size() != 1) return Optional.empty();
 		
@@ -895,14 +920,6 @@ public class DefInstanceCompiler{
 		}
 		return Optional.empty();
 	}
-	private static Set<String> collectNames(Class<?> its){
-		var getters = new ArrayList<FieldStub>();
-		var setters = new ArrayList<FieldStub>();
-		//noinspection unchecked,rawtypes
-		collectMethods((Class<IOInstance>)its, getters, setters);
-		return Stream.concat(getters.stream(), setters.stream()).map(FieldStub::varName).collect(Collectors.toSet());
-	}
-	
 	private static Optional<List<String>> getOrder(Class<?> interf, List<FieldInfo> fieldInfo){
 		var order = interf.getAnnotation(IOInstance.Def.Order.class);
 		if(order == null){
@@ -1051,75 +1068,6 @@ public class DefInstanceCompiler{
 			info.name,
 			info.type
 		);
-	}
-	
-	private static void writeAnnotations(CodeStream writer, List<Annotation> annotations) throws MalformedJorth{
-		Set<Class<?>> annTypes = new HashSet<>();
-		for(var ann : annotations){
-			if(!annTypes.add(ann.annotationType())) continue;
-			
-			var part = writer.codePart();
-			
-			boolean[] any = {false};
-			
-			scanAnnotation(ann, (name, value) -> {
-				if(!any[0]){
-					any[0] = true;
-					writer.write("@ {!} start", ann.annotationType().getName());
-				}
-				
-				writer.write("{!} {}", name, switch(value){
-					case null -> "null";
-					case String s -> "'" + s.replace("'", "\\'") + "'";
-					case Enum<?> e -> e.name();
-					case Boolean v -> v.toString();
-					case Class<?> c -> c.getName();
-					case Number n -> {
-						if(SupportedPrimitive.isAny(n.getClass())) yield n + "";
-						throw new UnsupportedOperationException();
-					}
-					case String[] strs -> Arrays.stream(strs).map(s -> "'" + s.replace("'", "\\'") + "'").collect(Collectors.joining(" ", "[", "]"));
-					default -> throw new NotImplementedException(value.getClass() + "");
-				});
-			});
-			if(any[0]) writer.write("end");
-			else writer.write("@ {!}", ann.annotationType().getName());
-			part.close();
-		}
-	}
-	
-	private static void nullCheck(CodeStream writer) throws MalformedJorth{
-		writer.write(
-			"""
-				static call #Objects requireNonNull start
-					dup
-				end
-				pop
-				""");
-	}
-	
-	private static void scanAnnotation(Annotation ann, UnsafeBiConsumer<String, Object, MalformedJorth> entry) throws MalformedJorth{
-		
-		var c = ann.getClass();
-		for(Method m : ann.annotationType().getMethods()){
-			if(m.getParameterCount() != 0) continue;
-			if(isStatic(m.getModifiers())) continue;
-			
-			if(m.getName().equals("annotationType")) continue;
-			
-			try{
-				c.getSuperclass().getMethod(m.getName());
-				continue;
-			}catch(NoSuchMethodException ignored){ }
-			Object val;
-			try{
-				m.setAccessible(true);
-				val = m.invoke(ann);
-			}catch(Throwable e){
-				throw new RuntimeException(e);
-			}
-			entry.accept(m.getName(), val);
-		}
 	}
 	
 	private static <T extends IOInstance<T>> Specials collectMethods(Class<T> interf, List<FieldStub> getters, List<FieldStub> setters){
