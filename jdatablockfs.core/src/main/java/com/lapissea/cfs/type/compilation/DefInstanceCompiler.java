@@ -429,7 +429,7 @@ public class DefInstanceCompiler{
 		checkModel(fieldInfo);
 		
 		try{
-			var impl = generateImpl(new Key<>(completeInter, includeNames), specials, fieldInfo, orderedFields, humanName);
+			var impl = generateImpl(completion, includeNames, specials, fieldInfo, orderedFields, humanName);
 			return new Result<>(impl, orderedFields);
 		}catch(Throwable e){
 			if(EXIT_ON_FAIL){
@@ -477,11 +477,14 @@ public class DefInstanceCompiler{
 		}
 	}
 	
-	private static <T extends IOInstance<T>> Class<T> generateImpl(Key<T> key, Specials specials, List<FieldInfo> fieldInfo, Optional<List<FieldInfo>> orderedFields, String humanName){
-		var interf = key.clazz;
-		var names  = key.includeNames;
+	private static <T extends IOInstance<T>> Class<T> generateImpl(
+		CompletionInfo<T> completion, Optional<Set<String>> includeNames, Specials specials,
+		List<FieldInfo> fieldInfo, Optional<List<FieldInfo>> orderedFields,
+		String humanName
+	){
+		var interf = completion.completed;
 		
-		var implName = interf.getName() + IOInstance.Def.IMPL_NAME_POSTFIX + names.map(n -> n.stream().collect(Collectors.joining("_", "€€fields~", ""))).orElse("");
+		var implName = interf.getName() + IOInstance.Def.IMPL_NAME_POSTFIX + includeNames.map(n -> n.stream().collect(Collectors.joining("_", "€€fields~", ""))).orElse("");
 		
 		var log = JorthLogger.make();
 		try{
@@ -505,7 +508,7 @@ public class DefInstanceCompiler{
 						""");
 				
 				for(var info : fieldInfo){
-					if(isFieldIncluded(key, info.name)){
+					if(isFieldIncluded(includeNames, info.name)){
 						defineField(writer, info);
 						implementUserAccess(writer, info);
 					}else{
@@ -515,13 +518,38 @@ public class DefInstanceCompiler{
 				
 				defineStatics(writer);
 				
-				var includedFields  = key.includeNames().map(include -> fieldInfo.stream().filter(f -> include.contains(f.name)).toList()).orElse(fieldInfo);
-				var includedOrdered = key.includeNames().map(include -> orderedFields.map(o -> o.stream().filter(f -> include.contains(f.name)).toList())).orElse(orderedFields);
+				var includedFields  = includeNames.map(include -> fieldInfo.stream().filter(f -> include.contains(f.name)).toList()).orElse(fieldInfo);
+				var includedOrdered = includeNames.map(include -> orderedFields.map(o -> o.stream().filter(f -> include.contains(f.name)).toList())).orElse(orderedFields);
 				
 				generateDefaultConstructor(writer, includedFields);
-				generateDataConstructor(writer, orderedFields, key.includeNames);
-				if(key.includeNames.isPresent()){
-					generateDataConstructor(writer, includedOrdered, key.includeNames);
+				generateDataConstructor(writer, orderedFields, includeNames);//All fields constructor
+				if(includeNames.isPresent()){
+					generateDataConstructor(writer, includedOrdered, includeNames);//Included only fields constructor
+				}
+				
+				readOnlyConstructor:
+				if(specials.set.isEmpty() && completion.completed != completion.base){
+					var setters = new ArrayList<FieldStub>();
+					collectMethods(completion.base, new ArrayList<>(), setters);
+					var setterNames = setters.stream().map(FieldStub::varName).collect(Collectors.toSet());
+					
+					var dataFields = includedFields.stream().filter(
+						f -> !setterNames.contains(f.name) && (includeNames.isEmpty() || includeNames.get().contains(f.name))
+					).toList();
+					if(dataFields.isEmpty()) break readOnlyConstructor;
+					if(orderedFields.isEmpty() && dataFields.size()>1) break readOnlyConstructor;
+					
+					var dfSet = Set.copyOf(dataFields);
+					
+					for(Optional<List<FieldInfo>> op : List.of(orderedFields, includedOrdered)){
+						if(op.isEmpty()) continue;
+						var fieldSet = Set.copyOf(op.get());
+						if(dfSet.equals(fieldSet)){
+							break readOnlyConstructor;
+						}
+					}
+					
+					generateDataConstructor(writer, Optional.of(dataFields), Optional.empty());
 				}
 				
 				if(specials.set.isPresent()){
@@ -556,16 +584,16 @@ public class DefInstanceCompiler{
 				{
 					var format = interf.getAnnotation(IOInstance.Def.ToString.Format.class);
 					if(format != null){
-						generateFormatToString(key, includedFields, specials, writer, format, humanName);
+						generateFormatToString(includeNames, includedFields, specials, writer, format, humanName);
 						break stringSaga;
 					}
 					
 					var toStrAnn = interf.getAnnotation(IOInstance.Def.ToString.class);
-					if(toStrAnn == null && key.includeNames.isPresent()){
+					if(toStrAnn == null && includeNames.isPresent()){
 						toStrAnn = IOFieldTools.makeAnnotation(IOInstance.Def.ToString.class);
 					}
 					if(toStrAnn != null){
-						generateStandardToString(key, includedOrdered.orElse(includedFields), specials, writer, toStrAnn);
+						generateStandardToString(completion, includeNames, includedOrdered.orElse(includedFields), specials, writer, toStrAnn);
 						break stringSaga;
 					}
 				}
@@ -585,8 +613,8 @@ public class DefInstanceCompiler{
 		}
 	}
 	
-	private static <T extends IOInstance<T>> Boolean isFieldIncluded(Key<T> key, String name){
-		return key.includeNames.map(ns -> ns.contains(name)).orElse(true);
+	private static <T extends IOInstance<T>> Boolean isFieldIncluded(Optional<Set<String>> includeNames, String name){
+		return includeNames.map(ns -> ns.contains(name)).orElse(true);
 	}
 	
 	private static <T extends IOInstance<T>> void generateSpecialToString(Class<T> interf, CodeStream writer, Specials specials) throws MalformedJorth{
@@ -613,25 +641,25 @@ public class DefInstanceCompiler{
 			interf.getName());
 	}
 	
-	private static <T extends IOInstance<T>> void generateFormatToString(Key<T> interf, List<FieldInfo> fieldInfo, Specials specials, CodeStream writer, IOInstance.Def.ToString.Format format, String humanName) throws MalformedJorth{
+	private static <T extends IOInstance<T>> void generateFormatToString(Optional<Set<String>> includeNames, List<FieldInfo> fieldInfo, Specials specials, CodeStream writer, IOInstance.Def.ToString.Format format, String humanName) throws MalformedJorth{
 		var fragment = ToStringFormat.parse(format.value(), fieldInfo.stream().map(FieldInfo::name).toList());
 		
 		if(specials.toStr.isEmpty()){
-			generateFormatToString(interf, fieldInfo, "toString", true, fragment, writer, humanName);
+			generateFormatToString(includeNames, fieldInfo, "toString", true, fragment, writer, humanName);
 		}
 		if(specials.toShortStr.isEmpty()){
-			generateFormatToString(interf, fieldInfo, "toShortString", false, fragment, writer, humanName);
+			generateFormatToString(includeNames, fieldInfo, "toShortString", false, fragment, writer, humanName);
 		}
 	}
 	
-	private static <T extends IOInstance<T>> void generateStandardToString(Key<T> key, List<FieldInfo> fieldInfo, Specials specials, CodeStream writer, IOInstance.Def.ToString toStrAnn) throws MalformedJorth{
+	private static <T extends IOInstance<T>> void generateStandardToString(CompletionInfo<?> completion, Optional<Set<String>> includeNames, List<FieldInfo> fieldInfo, Specials specials, CodeStream writer, IOInstance.Def.ToString toStrAnn) throws MalformedJorth{
 		
 		if(specials.toStr.isEmpty()){
-			generateStandardToString(key, toStrAnn, "toString", fieldInfo, writer);
+			generateStandardToString(completion, includeNames, toStrAnn, "toString", fieldInfo, writer);
 		}
 		if(specials.toShortStr.isEmpty()){
 			if(toStrAnn.name()){
-				generateStandardToString(key, IOFieldTools.makeAnnotation(IOInstance.Def.ToString.class, Map.of(
+				generateStandardToString(completion, includeNames, IOFieldTools.makeAnnotation(IOInstance.Def.ToString.class, Map.of(
 					"name", false,
 					"curly", toStrAnn.curly(),
 					"fNames", toStrAnn.fNames(),
@@ -651,7 +679,7 @@ public class DefInstanceCompiler{
 		}
 	}
 	
-	private static void generateFormatToString(Key<?> key, List<FieldInfo> fieldInfo, String name, boolean all, ToStringFragment fragment, CodeStream writer, String humanName) throws MalformedJorth{
+	private static void generateFormatToString(Optional<Set<String>> includeNames, List<FieldInfo> fieldInfo, String name, boolean all, ToStringFragment fragment, CodeStream writer, String humanName) throws MalformedJorth{
 		
 		writer.write(
 			"""
@@ -665,7 +693,7 @@ public class DefInstanceCompiler{
 		
 		List<ToStringFragment> compact = new ArrayList<>();
 		processFragments(fragment, all, frag -> {
-			if(frag instanceof FieldValue v && !isFieldIncluded(key, v.name())){
+			if(frag instanceof FieldValue v && !isFieldIncluded(includeNames, v.name())){
 				frag = new Literal("<no " + v.name() + ">");
 			}
 			if(compact.isEmpty()){
@@ -747,7 +775,7 @@ public class DefInstanceCompiler{
 		}
 	}
 	
-	private static void generateStandardToString(Key<?> key, IOInstance.Def.ToString toStrAnn, String name, List<FieldInfo> fieldInfo, CodeStream writer) throws MalformedJorth{
+	private static void generateStandardToString(CompletionInfo<?> completion, Optional<Set<String>> includeNames, IOInstance.Def.ToString toStrAnn, String name, List<FieldInfo> fieldInfo, CodeStream writer) throws MalformedJorth{
 		
 		writer.write(
 			"""
@@ -760,10 +788,8 @@ public class DefInstanceCompiler{
 		);
 		
 		if(toStrAnn.name()){
-			var nam = key.clazz.getSimpleName();
-			if(nam.endsWith(IMPL_COMPLETION_POSTFIX)) nam = nam.substring(0, nam.length() - IMPL_COMPLETION_POSTFIX.length());
-			var clean = nam;
-			append(writer, w -> w.write("'{}'", clean));
+			var nam = completion.base.getSimpleName();
+			append(writer, w -> w.write("'{}'", nam));
 		}
 		if(toStrAnn.curly()){
 			append(writer, w -> w.write("'{'"));
@@ -775,7 +801,7 @@ public class DefInstanceCompiler{
 			if(!filter.isEmpty() && !filter.contains(info.name)){
 				continue;
 			}
-			if(!isFieldIncluded(key, info.name)){
+			if(!isFieldIncluded(includeNames, info.name)){
 				continue;
 			}
 			
@@ -1059,7 +1085,7 @@ public class DefInstanceCompiler{
 		);
 	}
 	
-	private static <T extends IOInstance<T>> Specials collectMethods(Class<T> interf, List<FieldStub> getters, List<FieldStub> setters){
+	private static <T extends IOInstance<T>> Specials collectMethods(Class<T> interf, Collection<FieldStub> getters, Collection<FieldStub> setters){
 		var set        = Optional.<Method>empty();
 		var toStr      = Optional.<Method>empty();
 		var toShortStr = Optional.<Method>empty();
