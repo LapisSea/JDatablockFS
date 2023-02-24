@@ -28,6 +28,8 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.IntFunction;
+import java.util.function.LongFunction;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
@@ -77,6 +79,37 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		
 		static <T extends Def<T>> NewObj<T> constrRef(Class<T> type){
 			return Struct.of(type).emptyConstructor();
+		}
+		
+		static <T extends Def<T>> IntFunction<T> constrRefI(Class<T> type){
+			class Cache{
+				static final Map<Class<?>, IntFunction<?>> CH = new ConcurrentHashMap<>();
+			}
+			
+			//noinspection unchecked
+			return (IntFunction<T>)Cache.CH.computeIfAbsent(ensureConcrete(type), t -> {
+				try{
+					var ctor = t.getConstructor(int.class);
+					return Access.makeLambda(ctor, IntFunction.class);
+				}catch(ReflectiveOperationException e){
+					throw new RuntimeException(e);
+				}
+			});
+		}
+		static <T extends Def<T>> LongFunction<T> constrRefL(Class<T> type){
+			class Cache{
+				static final Map<Class<?>, LongFunction<?>> CH = new ConcurrentHashMap<>();
+			}
+			
+			//noinspection unchecked
+			return (LongFunction<T>)Cache.CH.computeIfAbsent(ensureConcrete(type), t -> {
+				try{
+					var ctor = t.getConstructor(long.class);
+					return Access.makeLambda(ctor, LongFunction.class);
+				}catch(ReflectiveOperationException e){
+					throw new RuntimeException(e);
+				}
+			});
 		}
 		
 		static <T extends Def<T>, A1> Function<A1, T> constrRef(Class<T> type, Class<A1> arg1Type){

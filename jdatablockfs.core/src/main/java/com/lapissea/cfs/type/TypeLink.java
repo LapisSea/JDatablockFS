@@ -69,6 +69,16 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 				
 				boolean check(Class<?> type);
 				String errMsg(Class<?> type);
+				
+				default ArgCheck arg(){
+					return (type, db) -> {
+						var resolved = type.getTypeClass(db);
+						if(check(resolved)){
+							return;
+						}
+						throw new IllegalStateException("Invalid arguments: " + errMsg(resolved));
+					};
+				}
 			}
 			
 			static ArgCheck rawAny(RawCheck... anyOf){

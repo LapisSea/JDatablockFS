@@ -580,9 +580,17 @@ public interface IOList<T> extends IterablePP<T>{
 	default Optional<T> popLast() throws IOException{
 		if(isEmpty()) return Optional.empty();
 		var index = size() - 1;
-		var first = get(index);
+		var val   = get(index);
 		remove(index);
-		return Optional.of(first);
+		return Optional.of(val);
+	}
+	default Optional<T> popLastIf(Predicate<T> check) throws IOException{
+		if(isEmpty()) return Optional.empty();
+		var index = size() - 1;
+		var val   = get(index);
+		if(!check.test(val)) return Optional.empty();
+		remove(index);
+		return Optional.of(val);
 	}
 	
 	default void pushLast(T newLast) throws IOException{

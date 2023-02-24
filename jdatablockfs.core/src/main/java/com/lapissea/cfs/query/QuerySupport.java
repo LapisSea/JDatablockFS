@@ -52,6 +52,12 @@ public enum QuerySupport{
 			return count;
 		}
 		@Override
+		public boolean anyMatch() throws IOException{
+			var c = data.count();
+			if(c.isPresent()) return c.getAsLong()>0;
+			return data.elements(Set.of()).next() != null;
+		}
+		@Override
 		public OptionalPP<T> any() throws IOException{
 			var es    = data.elements(Set.of());
 			var match = es.next();

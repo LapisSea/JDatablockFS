@@ -12,6 +12,8 @@ public interface Query<T>{
 	
 	long count() throws IOException;
 	
+	boolean anyMatch() throws IOException;
+	
 	default OptionalPP<T> first() throws IOException{
 		return any();//TODO: ordered execution
 	}

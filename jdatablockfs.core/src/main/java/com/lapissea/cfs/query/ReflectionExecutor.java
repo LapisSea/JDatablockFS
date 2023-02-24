@@ -142,7 +142,7 @@ public class ReflectionExecutor extends QueryExecutor{
 					yield valN.longValue() == argN.longValue();
 				}
 				
-				if(!UtilL.instanceOf(arg.getClass(), val.getClass())){
+				if(val != null && !UtilL.instanceOf(arg.getClass(), val.getClass())){
 					throw new ClassCastException(arg + " not compatible with " + equals.l());
 				}
 				yield arg.equals(val);
