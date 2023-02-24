@@ -20,6 +20,7 @@ import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.OptionalLong;
 import java.util.Set;
 
@@ -73,6 +74,13 @@ public sealed interface ValueStorage<T>{
 		@Override
 		public void write(RandomIO dest, T src) throws IOException{
 			pipe.write(provider, dest, src);
+		}
+		
+		@Override
+		public void notifyRemoval(ContentReader io){ }
+		@Override
+		public boolean needsRemoval(){
+			return false;
 		}
 		
 		@Override
@@ -143,6 +151,12 @@ public sealed interface ValueStorage<T>{
 		@Override
 		public void write(RandomIO dest, T src) throws IOException{
 			pipe.write(provider, dest, src);
+		}
+		@Override
+		public void notifyRemoval(ContentReader io){ }
+		@Override
+		public boolean needsRemoval(){
+			return false;
 		}
 		
 		@Override
@@ -238,6 +252,18 @@ public sealed interface ValueStorage<T>{
 			}else{
 				ref.write(provider, true, pipe, src);
 			}
+		}
+		@Override
+		public void notifyRemoval(ContentReader io) throws IOException{
+			var ref = refPipe.readNew(provider, io, null);
+			if(ref.isNull()){
+				return;
+			}
+			provider.getMemoryManager().freeChains(List.of(ref.getPtr()));
+		}
+		@Override
+		public boolean needsRemoval(){
+			return true;
 		}
 		
 		@Override
@@ -341,6 +367,12 @@ public sealed interface ValueStorage<T>{
 		public void write(RandomIO dest, T src) throws IOException{
 			refPipe.write(provider, dest, src == null? new Reference() : src.getReference());
 		}
+		@Override
+		public void notifyRemoval(ContentReader io){ }
+		@Override
+		public boolean needsRemoval(){
+			return false;
+		}
 		
 		@Override
 		public long inlineSize(){
@@ -394,6 +426,12 @@ public sealed interface ValueStorage<T>{
 				case BOOLEAN -> dest.writeBoolean((Boolean)src);
 			}
 		}
+		@Override
+		public void notifyRemoval(ContentReader io){ }
+		@Override
+		public boolean needsRemoval(){
+			return false;
+		}
 		
 		@Override
 		public long inlineSize(){
@@ -428,6 +466,12 @@ public sealed interface ValueStorage<T>{
 		@Override
 		public void write(RandomIO dest, String src) throws IOException{
 			AutoText.PIPE.write(provider, dest, new AutoText(src));
+		}
+		@Override
+		public void notifyRemoval(ContentReader io){ }
+		@Override
+		public boolean needsRemoval(){
+			return false;
 		}
 		
 		@Override
@@ -483,6 +527,18 @@ public sealed interface ValueStorage<T>{
 			}else{
 				ref.write(provider, true, AutoText.PIPE, new AutoText(src));
 			}
+		}
+		@Override
+		public void notifyRemoval(ContentReader io) throws IOException{
+			var ref = refPipe.readNew(provider, io, null);
+			if(ref.isNull()){
+				return;
+			}
+			provider.getMemoryManager().freeChains(List.of(ref.getPtr()));
+		}
+		@Override
+		public boolean needsRemoval(){
+			return true;
 		}
 		
 		@Override
@@ -654,6 +710,12 @@ public sealed interface ValueStorage<T>{
 			
 			throw new NotImplementedException("Unknown type: " + type);
 		}
+		@Override
+		public void notifyRemoval(ContentReader io){ }
+		@Override
+		public boolean needsRemoval(){
+			return false;
+		}
 		
 		@Override
 		public long inlineSize(){
@@ -749,6 +811,9 @@ public sealed interface ValueStorage<T>{
 	
 	T readNew(ContentReader src) throws IOException;
 	void write(RandomIO dest, T src) throws IOException;
+	
+	void notifyRemoval(ContentReader io) throws IOException;
+	boolean needsRemoval();
 	
 	long inlineSize();
 	

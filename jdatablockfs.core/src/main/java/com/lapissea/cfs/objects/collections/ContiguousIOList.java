@@ -589,8 +589,17 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	@Override
 	public void clear() throws IOException{
 		if(isEmpty()) return;
-		deltaSize(-size());
+		var s = size();
+		deltaSize(-s);
+		
 		try(var io = selfIO()){
+			if(storage.needsRemoval()){
+				for(long i = 0; i<s; i++){
+					io.setPos(calcElementOffset(i));
+					storage.notifyRemoval(io);
+				}
+			}
+			io.setPos(calcElementOffset(0));
 			io.setCapacity(calcElementOffset(0));
 		}
 	}
@@ -690,6 +699,11 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	
 	private void squash(long index, long size) throws IOException{
 		try(var io = selfIO()){
+			if(storage.needsRemoval()){
+				io.setPos(calcElementOffset(index));
+				storage.notifyRemoval(io);
+			}
+			
 			var    siz  = getElementSize();
 			byte[] buff = new byte[Math.toIntExact(siz)];
 			
