@@ -11,6 +11,7 @@ import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.collections.HashIOMap;
 import com.lapissea.cfs.objects.collections.IOHashSet;
 import com.lapissea.cfs.objects.collections.IOMap;
+import com.lapissea.cfs.objects.collections.IOTreeSet;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.cfs.type.TypeLink;
@@ -438,14 +439,83 @@ public class SlowTests{
 				
 				assertEquals(set.size(), checkSet.size());
 				
-				var tmp    = HashSet.newHashSet(checkSet.size());
-				int finalI = i;
-				set.iterator().forRemaining(e -> {
-					assertTrue(tmp.add(e), "duplicated " + e + " at " + finalI);
-				});
+				var tmp = HashSet.newHashSet(checkSet.size());
+				
+				var iter = set.iterator();
+				while(iter.hasNext()){
+					var e = iter.ioNext();
+					assertTrue(tmp.add(e), "duplicated " + e + " at " + i);
+				}
 				assertEquals(tmp, checkSet, i + "");
 				
 			}
+		});
+	}
+	
+	
+	@Test
+	void fuzzTreeSet() throws IOException{
+		TestUtils.testCluster(TestInfo.of(), provider -> {
+			var set      = provider.getRootProvider().<IOTreeSet<Integer>>request("hi", IOTreeSet.class, Integer.class);
+			var checkSet = new HashSet<Integer>();
+			
+			var r    = new Random(69);
+			var iter = 200000;
+			for(int i = 0; i<iter; i++){
+				try{
+					if(i%10000 == 0) LogUtil.println(i/((double)iter));
+					Integer num = r.nextInt(400);
+
+//					if(set.size()>100){
+//						set.clear();
+//						checkSet.clear();
+//					}
+					
+					switch(r.nextInt(3)){
+						case 0 -> {
+							var added1 = set.add(num);
+							var added2 = checkSet.add(num);
+							LogUtil.println(set);
+							if(added1 != added2){
+								throw new IllegalStateException(num + "");
+							}
+						}
+						case 1 -> {
+							var removed1 = set.remove(num);
+							var removed2 = checkSet.remove(num);
+							LogUtil.println(set);
+							if(removed1 != removed2){
+								throw new IllegalStateException(num + "");
+							}
+						}
+						case 2 -> {
+							var c1 = set.contains(num);
+							var c2 = checkSet.contains(num);
+							if(c1 != c2){
+								throw new IllegalStateException(num + "");
+							}
+						}
+					}
+					
+					if(set.size() != checkSet.size()) throw new IllegalStateException(set.size() + " != " + checkSet.size());
+					
+					
+					var copy = HashSet.newHashSet(checkSet.size());
+					var it   = set.iterator();
+					while(it.hasNext()){
+						var v = it.ioNext();
+						if(!copy.add(v)){
+							throw new IllegalStateException(v + " duplicate");
+						}
+					}
+					if(!checkSet.equals(copy)){
+						throw new IllegalStateException("\n" + copy + "\n" + checkSet);
+					}
+				}catch(Throwable e){
+					throw new RuntimeException(i + "", e);
+				}
+			}
+			
 		});
 	}
 	
