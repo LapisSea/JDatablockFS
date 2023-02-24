@@ -57,8 +57,9 @@ public class IOFieldNumber<T extends IOInstance<T>, E extends INumber> extends I
 	}
 	@Override
 	public IOField<T, E> maxAsFixedSize(VaryingSize.Provider varProvider){
-		var ptr = getType() == ChunkPointer.class;
-		return new IOFieldNumber<>(getAccessor(), varProvider.provide(LARGEST, ptr), constructor);
+		var    ptr = getType() == ChunkPointer.class;
+		String uid = sizeDescriptorSafe() instanceof SizeDescriptor.UnknownNum<T> num? num.getAccessor().getName() : null;
+		return new IOFieldNumber<>(getAccessor(), varProvider.provide(LARGEST, uid, ptr), constructor);
 	}
 	
 	private NumberSize getSize(VarPool<T> ioPool, T instance){

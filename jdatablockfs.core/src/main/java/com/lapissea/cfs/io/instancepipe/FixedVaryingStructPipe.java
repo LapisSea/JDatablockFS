@@ -10,14 +10,17 @@ import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.VarPool;
-import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.VaryingSize;
 import com.lapissea.cfs.utils.ReadWriteClosableLock;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseFixedStructPipe<T>{
 	
@@ -49,7 +52,7 @@ public class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseFixedSt
 			
 			List<NumberSize> buff = new ArrayList<>(steps.size());
 			for(Step step : steps){
-				buff.add(rule.provide(step.max, step.ptr).size);
+				buff.add(rule.provide(step.max, null, step.ptr).size);
 			}
 			
 			try(var ignored = cacheLock.read()){
@@ -107,7 +110,8 @@ public class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseFixedSt
 			if(rule == VaryingSize.Provider.ALL_MAX){
 				throw new UseFixed();
 			}
-			Set<IOField<T, ?>> sizeFields = sizeFieldStream(structFields).collect(Collectors.toSet());
+			//noinspection rawtypes,unchecked
+			FieldSet<T> sizeFields = FieldSet.of((Stream)sizeFieldStream(structFields));
 			
 			boolean[] effectivelyAllMax = {true};
 			var snitchRule = VaryingSize.Provider.intercept(rule, (max, ptr, actual) -> {

@@ -10,6 +10,13 @@ public final class VaryingSize implements Stringify{
 	
 	public static final VaryingSize MAX = new VaryingSize(NumberSize.LARGEST, -1);
 	
+	private record UIDInfo(VaryingSize val, NumberSize max, boolean ptr){
+		void validate(NumberSize max, boolean ptr){
+			if(this.max != max) throw new IllegalStateException("Differing shared max");
+			if(this.ptr != ptr) throw new IllegalStateException("Differing ptr");
+		}
+	}
+	
 	public interface Provider{
 		
 		final class Recorder implements Provider{
@@ -24,16 +31,27 @@ public final class VaryingSize implements Stringify{
 			private final Map<Integer, Integer> marks = new HashMap<>();
 			private       int                   markIdCount;
 			
+			private final Map<String, UIDInfo> uidMap = new HashMap<>();
+			
 			public Recorder(Mapper mapper){
 				this.mapper = mapper;
 			}
 			
 			@Override
-			public VaryingSize provide(NumberSize max, boolean ptr){
+			public VaryingSize provide(NumberSize max, String uid, boolean ptr){
+				var repeat = uidMap.get(uid);
+				if(repeat != null){
+					repeat.validate(max, ptr);
+					return repeat.val;
+				}
+				
 				var id     = data.size();
 				var actual = mapper.map(max, ptr, id);
 				data.add(actual);
-				return new VaryingSize(actual, id);
+				
+				var result = new VaryingSize(actual, id);
+				if(uid != null) uidMap.put(uid, new UIDInfo(result, max, ptr));
+				return result;
 			}
 			
 			@Override
@@ -63,17 +81,28 @@ public final class VaryingSize implements Stringify{
 			private final Map<Integer, Integer> marks = new HashMap<>();
 			private       int                   markIdCount;
 			
+			private final Map<String, UIDInfo> uidMap = new HashMap<>();
+			
 			public Repeater(List<NumberSize> data){
 				this.data = List.copyOf(data);
 			}
 			
 			@Override
-			public VaryingSize provide(NumberSize max, boolean ptr){
-				var id     = counter;
-				var actual = data.get(id);
+			public VaryingSize provide(NumberSize max, String uid, boolean ptr){
+				var repeat = uidMap.get(uid);
+				if(repeat != null){
+					repeat.validate(max, ptr);
+					return repeat.val;
+				}
+				
+				var result = new VaryingSize(data.get(counter), counter);
+				
+				if(uid != null) uidMap.put(uid, new UIDInfo(result, max, ptr));
 				counter++;
-				return new VaryingSize(actual, id);
+				
+				return result;
 			}
+			
 			@Override
 			public int mark(){
 				int id = markIdCount++;
@@ -89,7 +118,7 @@ public final class VaryingSize implements Stringify{
 		
 		Provider ALL_MAX = new NoMark(){
 			@Override
-			public VaryingSize provide(NumberSize max, boolean ptr){
+			public VaryingSize provide(NumberSize max, String uid, boolean ptr){
 				return new VaryingSize(max, -1);
 			}
 			@Override
@@ -109,7 +138,7 @@ public final class VaryingSize implements Stringify{
 			if(size == NumberSize.LARGEST) return ALL_MAX;
 			return new NoMark(){
 				@Override
-				public VaryingSize provide(NumberSize max, boolean ptr){
+				public VaryingSize provide(NumberSize max, String uid, boolean ptr){
 					return new VaryingSize(max.min(size), id);
 				}
 				@Override
@@ -125,10 +154,13 @@ public final class VaryingSize implements Stringify{
 		
 		static Provider intercept(Provider src, Intercept intercept){
 			return new Provider(){
+				private final Set<String> uids = new HashSet<>();
 				@Override
-				public VaryingSize provide(NumberSize max, boolean ptr){
-					var actual = src.provide(max, ptr);
-					intercept.intercept(max, ptr, actual);
+				public VaryingSize provide(NumberSize max, String uid, boolean ptr){
+					var actual = src.provide(max, uid, ptr);
+					if(uid == null || uids.add(uid)){
+						intercept.intercept(max, ptr, actual);
+					}
 					return actual;
 				}
 				@Override
@@ -141,7 +173,7 @@ public final class VaryingSize implements Stringify{
 				}
 			};
 		}
-		VaryingSize provide(NumberSize max, boolean ptr);
+		VaryingSize provide(NumberSize max, String uid, boolean ptr);
 		
 		interface NoMark extends Provider{
 			@Override

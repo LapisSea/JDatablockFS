@@ -636,7 +636,8 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	
 	@Override
 	public IOField<T, ValueType> maxAsFixedSize(VaryingSize.Provider varProvider){
-		var size = varProvider.provide(maxAllowed(), false);
+		String uid  = sizeDescriptorSafe() instanceof SizeDescriptor.UnknownNum<T> num? num.getAccessor().getName() : null;
+		var    size = varProvider.provide(maxAllowed(), uid, false);
 		if(forceFixed && maxSize == size) return this;
 		return withVaryingSize(size);
 	}
