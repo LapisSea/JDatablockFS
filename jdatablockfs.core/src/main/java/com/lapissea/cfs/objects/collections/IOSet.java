@@ -24,6 +24,8 @@ public interface IOSet<T>{
 	 */
 	boolean remove(T value) throws IOException;
 	
+	void clear() throws IOException;
+	
 	default boolean contains(T value) throws IOException{
 		if(isEmpty()) return false;
 		var iter = iterator();

@@ -9,7 +9,6 @@ import com.lapissea.cfs.internal.HashCommons;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.ValueStorage;
 import com.lapissea.cfs.objects.Reference;
-import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.LogUtil;
@@ -17,7 +16,7 @@ import com.lapissea.util.LogUtil;
 import java.io.IOException;
 import java.util.*;
 
-public final class IOHashSet<T> extends IOInstance.Unmanaged<IOHashSet<T>> implements IOSet<T>{
+public final class IOHashSet<T> extends AbstractUnmanagedIOSet<T>{
 	
 	private static int idx(Random r, List<Chunk> ch){
 		int index = r.nextInt(ch.size());
@@ -90,9 +89,6 @@ public final class IOHashSet<T> extends IOInstance.Unmanaged<IOHashSet<T>> imple
 	
 	@IOValue
 	private ContiguousIOList<IONode<T>> data;
-	
-	@IOValue
-	private long size;
 	
 	public IOHashSet(DataProvider provider, Reference reference, TypeLink typeDef) throws IOException{
 		super(provider, reference, typeDef.argCount() == 0? typeDef.withArgs(TypeLink.of(Object.class)) : typeDef);
@@ -167,7 +163,7 @@ public final class IOHashSet<T> extends IOInstance.Unmanaged<IOHashSet<T>> imple
 		var place = findAddPlace(data, value);
 		if(place == null) return false;
 		
-		if(size>=width){
+		if(size()>=width){
 			grow();
 			return add(value);
 		}
@@ -273,10 +269,20 @@ public final class IOHashSet<T> extends IOInstance.Unmanaged<IOHashSet<T>> imple
 		
 		return false;
 	}
-	private void deltaSize(int delta) throws IOException{
-		size += delta;
-		writeManagedFields();
+	
+	@Override
+	public void clear() throws IOException{
+		if(isEmpty()) return;
+		for(IONode<T> datum : data){
+			if(datum != null){
+				datum.setValue(null);
+				datum.free();
+			}
+		}
+		data.clear();
+		deltaSize(-size());
 	}
+	
 	@Override
 	public boolean contains(T value) throws IOException{
 		int hash  = HashCommons.toHash(value);
@@ -296,11 +302,6 @@ public final class IOHashSet<T> extends IOInstance.Unmanaged<IOHashSet<T>> imple
 		}
 		
 		return false;
-	}
-	
-	@Override
-	public long size(){
-		return size;
 	}
 	
 	@Override
