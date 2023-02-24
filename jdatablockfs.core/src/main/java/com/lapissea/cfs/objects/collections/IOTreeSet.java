@@ -11,19 +11,21 @@ import com.lapissea.cfs.type.TypeLink.Check.ArgCheck.RawCheck;
 import com.lapissea.cfs.type.field.annotations.IODependency.VirtualNumSize;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.util.Rand;
 
 import java.io.IOException;
 import java.util.*;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NULLABLE;
+import static java.util.function.Predicate.not;
 
 public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedIOSet<T>{
 	
-	private interface NodePtr extends IOInstance.Def<NodePtr>{
+	private interface Node extends IOInstance.Def<Node>{
 		
-		static String toShortString(NodePtr ptr){
-			if(ptr.valueIndex() == -1) return "/";
+		static String toShortString(Node ptr){
+			if(!ptr.hasValue()) return "/";
 			
 			StringJoiner sj = new StringJoiner(" ", "{", "}");
 			sj.add("val = " + ptr.valueIndex());
@@ -31,8 +33,8 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 			if(ptr.hasRight()) sj.add(ptr.right() + "R");
 			return sj.toString();
 		}
-		static String toString(NodePtr ptr){
-			if(ptr.valueIndex() == -1) return "<EMPTY>";
+		static String toString(Node ptr){
+			if(!ptr.hasValue()) return "<EMPTY>";
 			
 			StringJoiner sj = new StringJoiner(", ", "NodePtr{", "}");
 			sj.add("value = " + ptr.valueIndex());
@@ -45,13 +47,16 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 		long valueIndex();
 		void valueIndex(long valueIndex);
 		
-		@VirtualNumSize
+		@VirtualNumSize(name = "lrSize")
 		long left();
 		void left(long left);
 		
-		@VirtualNumSize
+		@VirtualNumSize(name = "lrSize")
 		long right();
 		void right(long right);
+		
+		boolean red();
+		void red(boolean red);
 		
 		default long getChild(boolean isRight){
 			return isRight? right() : left();
@@ -70,14 +75,19 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 			return getChild(isRight) != -1;
 		}
 		
-		static NodePtr of(long index){
+		default boolean hasValue(){
+			return valueIndex() != -1;
+		}
+		
+		static Node of(long index, boolean red){
 			class Constr{
-				private static final NewObj<NodePtr> VAL = Struct.of(NodePtr.class).emptyConstructor();
+				private static final NewObj<Node> VAL = Struct.of(Node.class).emptyConstructor();
 			}
 			var ptr = Constr.VAL.make();
 			ptr.valueIndex(index);
-			ptr.left(-1);
-			ptr.right(-1);
+			ptr.red(red);
+			ptr.yeetChild(true);
+			ptr.yeetChild(false);
 			return ptr;
 		}
 	}
@@ -100,9 +110,9 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 	}
 	
 	@IOValue
-	private IOList<Val<T>>  values;
+	private IOList<Val<T>> values;
 	@IOValue
-	private IOList<NodePtr> nodes;
+	private IOList<Node>   nodes;
 	
 	private static final TypeLink.Check TYPE_CHECK = new TypeLink.Check(
 		IOTreeSet.class,
@@ -127,11 +137,11 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 	private static final int POP       = 0b0110;
 	private static final int NOT_FOUND = 0b1001;
 	
-	private static final int ADD    = 0;
+	private static final int INSERT = 0;
 	private static final int REMOVE = 1;
 	private static final int FIND   = 2;
 	
-	private int nodeIterAction(long nodePos, NodePtr node, T obj, int action) throws IOException{
+	private int nodeIterAction(long nodePos, Node node, T obj, int action) throws IOException{
 		var val = getVal(node);
 		
 		boolean isRight;
@@ -140,7 +150,7 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 			if(Objects.equals(val, obj)){
 				if(action == REMOVE){
 					if(nodePos == 0){//root edge case
-						var n = NodePtr.of(0);
+						var n = Node.of(0, true);
 						n.right(0);
 						removeLR(-1, n, true);
 						return REMOVED;
@@ -154,7 +164,7 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 		
 		if(node.hasChild(isRight = comp<0)){
 			var idx = node.getChild(isRight);
-			var res = nodeIterAction(idx, nodes.get(idx), obj, action);
+			var res = nodeIterAction(idx, node(idx), obj, action);
 			if(res == POP){
 				try(var ignored = getDataProvider().getSource().openIOTransaction()){
 					removeLR(nodePos, node, isRight);
@@ -164,37 +174,68 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 			assert (res&RET_BIT) == 1;
 			return res;
 		}else{
-			if(action != ADD) return NOT_FOUND;
+			if(action != INSERT) return NOT_FOUND;
 			try(var ignored = getDataProvider().getSource().openIOTransaction()){
-				node.setChild(isRight, addNode(obj));
-				nodes.set(nodePos, node);
+				node.setChild(isRight, addNode(obj, !node.red()));
+				updateNode(nodePos, node);
 			}
 			return INSERTED;
 		}
 	}
-	private T getVal(NodePtr node) throws IOException{
+	
+	private T getVal(Node node) throws IOException{
 		return values.get(node.valueIndex()).val;
 	}
 	
+	private static final class NodeCache{
+		private final Node node;
+		private       byte age = 1;
+		private NodeCache(Node node){ this.node = node; }
+	}
+	
+	private final Map<Long, NodeCache> nodeCache = new HashMap<>();
+	private Node node(long nodeIdx) throws IOException{
+		var cached = nodeCache.get(nodeIdx);
+		if(cached != null){
+			if(cached.age<10) cached.age++;
+			return cached.node;
+		}
+		if(nodeCache.size()>1){
+			var id = nodeCache.keySet().stream().skip(Rand.i(nodeCache.size())).findAny().orElseThrow();
+			var c  = nodeCache.get(id);
+			c.age -= 2;
+			if(c.age<=0){
+				nodeCache.remove(id);
+			}
+		}
+		var val = nodes.get(nodeIdx);
+		nodeCache.put(nodeIdx, new NodeCache(val));
+		return val;
+	}
+	private void updateNode(long nodeIdx, Node node) throws IOException{
+		nodeCache.remove(nodeIdx);
+		nodes.set(nodeIdx, node);
+	}
+	
 	private void swapValues(long a, long b) throws IOException{
-		var nodeA = nodes.get(a);
-		var nodeB = nodes.get(b);
+		var nodeA = node(a);
+		var nodeB = node(b);
 		
-		var newA = NodePtr.of(nodeB.valueIndex());
+		var newA = Node.of(nodeB.valueIndex(), nodeB.red());
 		newA.left(nodeA.left());
 		newA.right(nodeA.right());
 		
-		var newB = NodePtr.of(nodeA.valueIndex());
+		var newB = Node.of(nodeA.valueIndex(), nodeA.red());
 		newB.left(nodeB.left());
 		newB.right(nodeB.right());
 		
-		nodes.set(a, newA);
-		nodes.set(b, newB);
+		updateNode(a, newA);
+		updateNode(b, newB);
 	}
 	
-	private void removeLR(long parentPos, NodePtr parent, boolean isRight) throws IOException{
+	private void removeLR(long parentPos, Node parent, boolean isRight) throws IOException{
 		var childIdx      = parent.getChild(isRight);
-		var toRemoveChild = nodes.get(childIdx);
+		var toRemoveChild = node(childIdx);
 		
 		var hasL = toRemoveChild.hasLeft();
 		var hasR = toRemoveChild.hasRight();
@@ -203,8 +244,8 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 			var childChildIdx = toRemoveChild.getChild(hasR);
 			if(parentPos == -1){
 				popValue(childIdx, toRemoveChild);
-				var cc = nodes.get(childChildIdx);
-				nodes.set(0, cc);
+				var cc = node(childChildIdx);
+				updateNode(0, cc);
 				popNode(childChildIdx, cc);
 			}else{
 				parent.setChild(isRight, childChildIdx);
@@ -214,6 +255,7 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 			if(!hasR){
 				if(parentPos == -1){
 					nodes.clear();
+					nodeCache.clear();
 					values.clear();
 					return;
 				}
@@ -223,29 +265,29 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 				var smallestBiggerParentIdx = childIdx;
 				
 				var smallestBiggerIdx = toRemoveChild.right();
-				var smallestBigger    = nodes.get(smallestBiggerIdx);
+				var smallestBigger    = node(smallestBiggerIdx);
 				var lr                = true;
 				
 				while(smallestBigger.hasLeft()){
 					smallestBiggerParentIdx = smallestBiggerIdx;
 					
 					smallestBiggerIdx = smallestBigger.left();
-					smallestBigger = nodes.get(smallestBiggerIdx);
+					smallestBigger = node(smallestBiggerIdx);
 					lr = false;
 				}
 				
 				swapValues(smallestBiggerIdx, childIdx);
-				removeLR(smallestBiggerParentIdx, nodes.get(smallestBiggerParentIdx), lr);
+				removeLR(smallestBiggerParentIdx, node(smallestBiggerParentIdx), lr);
 				return;
 			}
 		}
 		if(parentPos != -1){
-			nodes.set(parentPos, parent);
+			updateNode(parentPos, parent);
 		}
 	}
 	
 	private final TreeSet<Long> blankValueIds = new TreeSet<>();
-	private void popValue(long nodeIdx, NodePtr node) throws IOException{
+	private void popValue(long nodeIdx, Node node) throws IOException{
 		var idx = node.valueIndex();
 		
 		popNode(nodeIdx, node);
@@ -263,31 +305,36 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 	}
 	
 	private final TreeSet<Long> blankNodeIds = new TreeSet<>();
-	private void popNode(long nodeIdx, NodePtr node) throws IOException{
+	private void popNode(long nodeIdx, Node node) throws IOException{
 		if(nodeIdx + 1 == nodes.size()){
 			nodes.remove(nodeIdx);
+			nodeCache.remove(nodeIdx);
 			blankNodeIds.remove(nodeIdx);
-			while(nodes.popLastIf(v -> v.valueIndex() == -1).isPresent()){
+			
+			while(nodes.popLastIf(not(Node::hasValue)).isPresent()){
 				blankNodeIds.remove(nodes.size());
+				nodeCache.remove(nodes.size());
 			}
 		}else{
 			node.valueIndex(-1);
-			node.left(-1);
-			node.right(-1);
+			node.yeetChild(true);
+			node.yeetChild(false);
 			
-			nodes.set(nodeIdx, node);
+			updateNode(nodeIdx, node);
 			if(nodeIdx>0) blankNodeIds.add(nodeIdx);
 		}
 	}
 	
-	private long addNode(T value) throws IOException{
+	private long addNode(T value, boolean red) throws IOException{
 		long valIdx  = findValueIdx();
 		long nodeIdx = findNodeIdx();
 		
-		var node = NodePtr.of(valIdx);
+		var node = Node.of(valIdx, red);
 		try(var ignored = getDataProvider().getSource().openIOTransaction()){
-			if(nodeIdx == nodes.size()) nodes.add(node);
-			else nodes.set(nodeIdx, node);
+			if(nodeIdx == nodes.size()){
+				nodeCache.put(nodes.size(), new NodeCache(node));
+				nodes.add(node);
+			}else updateNode(nodeIdx, node);
 			
 			if(valIdx == values.size()) values.add(new Val<>(value));
 			else values.set(valIdx, new Val<>(value));
@@ -297,15 +344,14 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 	
 	private long findNodeIdx() throws IOException{
 		if(!blankNodeIds.isEmpty()){
-			var nodeIdx = blankNodeIds.ceiling(blankNodeIds.first());
-			blankNodeIds.remove(nodeIdx);
-			assert nodes.get(nodeIdx).valueIndex() == -1;
+			var nodeIdx = popMinIdx(blankNodeIds);
+			assert !nodes.get(nodeIdx).hasValue();
 			return nodeIdx;
 		}
 		
 		long nodesSiz = nodes.size();
 		for(int i = 0; i<nodesSiz; i++){
-			if(nodes.get(i).valueIndex() == -1){
+			if(!node(i).hasValue()){
 				return i;
 			}
 		}
@@ -314,10 +360,9 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 	
 	private long findValueIdx() throws IOException{
 		if(!blankValueIds.isEmpty()){
-			var valueIdx = blankValueIds.ceiling(blankValueIds.first());
-			blankValueIds.remove(valueIdx);
-			assert values.get(valueIdx).val == null;
-			return valueIdx;
+			var idx = popMinIdx(blankValueIds);
+			assert values.get(idx).val == null;
+			return idx;
 		}
 		
 		var valSiz = values.size();
@@ -329,16 +374,23 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 		return valSiz;
 	}
 	
+	private long popMinIdx(TreeSet<Long> set){
+		var idx = set.ceiling(set.first());
+		Objects.requireNonNull(idx);
+		set.remove(idx);
+		return idx;
+	}
+	
 	@Override
 	public boolean add(T value) throws IOException{
 		Objects.requireNonNull(value);
 		
 		if(values.isEmpty()){
-			addNode(value);
+			addNode(value, false);
 			deltaSize(1);
 			return true;
 		}
-		var v = nodeIterAction(0, nodes.get(0), value, ADD) == INSERTED;
+		var v = nodeIterAction(0, node(0), value, INSERT) == INSERTED;
 		if(v){
 			deltaSize(1);
 			if(DEBUG_VALIDATION) validate();
@@ -346,26 +398,20 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 		return v;
 	}
 	
-	private String pad(String s, int len){
-		if(s.length()>=len) return s;
-		var toAdd = len - s.length();
-		var d     = toAdd/2;
-		return " ".repeat(d) + s + " ".repeat(toAdd - d);
-	}
-	
 	private void validate() throws IOException{
 		if(isEmpty()) return;
 		var h = HashSet.<Long>newHashSet((int)nodes.size());
 		h.add(0L);
-		validate(nodes.get(0), h);
+		var depth = validate(0, node(0), h);
+//		LogUtil.println(depth, Math.log(size()));
 	}
-	private void validate(NodePtr nodePtr, Set<Long> ids) throws IOException{
-		var val = getVal(nodePtr);
+	private int validate(int depth, Node node, Set<Long> ids) throws IOException{
+		var val = getVal(node);
 		for(int i = 0; i<2; i++){
 			var lr = i == 0;
-			if(nodePtr.hasChild(lr)){
-				var idx   = nodePtr.getChild(lr);
-				var child = nodes.get(idx);
+			if(node.hasChild(lr)){
+				var idx   = node.getChild(lr);
+				var child = node(idx);
 				if(!ids.add(idx)){
 					throw new IllegalStateException("duplicate idx " + idx);
 				}
@@ -375,18 +421,18 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 				if(c != c2){
 					throw new IllegalStateException(val + (lr? " > " : " < ") + cVal);
 				}
-				validate(child, ids);
+				depth = Math.max(depth, validate(depth + 1, child, ids));
 			}
 		}
+		return depth;
 	}
 	
 	@Override
 	public boolean remove(T value) throws IOException{
 		if(nodes.isEmpty()) return false;
-		var v = nodeIterAction(0, nodes.get(0), value, REMOVE) == REMOVED;
+		var v = nodeIterAction(0, node(0), value, REMOVE) == REMOVED;
 		if(v){
 			deltaSize(-1);
-//			print();
 			if(DEBUG_VALIDATION) validate();
 		}
 		return v;
@@ -396,6 +442,7 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 	public void clear() throws IOException{
 		if(isEmpty()) return;
 		nodes.clear();
+		nodeCache.clear();
 		values.clear();
 		deltaSize(-size());
 	}
@@ -404,7 +451,7 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 	public boolean contains(T value) throws IOException{
 		if(nodes.isEmpty()) return false;
 		
-		var v = nodeIterAction(0, nodes.get(0), value, FIND) == CONTAINS;
+		var v = nodeIterAction(0, node(0), value, FIND) == CONTAINS;
 		return v;
 	}
 	
@@ -412,7 +459,7 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 	public IOIterator<T> iterator(){
 		return new IOIterator<>(){
 			private long count;
-			private List<NodePtr> stack;
+			private List<Node> stack;
 			private List<Boolean> doneRight;
 			
 			@Override
@@ -426,21 +473,21 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 				stack = new ArrayList<>(cap);
 				doneRight = new ArrayList<>(cap);
 				if(nodes.isEmpty()) return;
-				stack.add(nodes.get(0));
+				stack.add(node(0));
 				doneRight.add(false);
 				teleportLeft();
 			}
 			
 			private void teleportLeft() throws IOException{
-				NodePtr p;
+				Node p;
 				while((p = stack.get(stack.size() - 1)).hasLeft()){
-					p = nodes.get(p.left());
+					p = node(p.left());
 					stack.add(p);
 					doneRight.add(false);
 				}
 			}
 			
-			private NodePtr nextPtr() throws IOException{
+			private Node nextPtr() throws IOException{
 				if(stack == null) init();
 				if(stack.isEmpty()) throw new NoSuchElementException();
 				while(true){
@@ -449,7 +496,7 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 					
 					if(ptr.hasRight() && !doneRight.get(depth)){
 						doneRight.set(depth, true);
-						var right = nodes.get(ptr.right());
+						var right = node(ptr.right());
 						stack.add(right);
 						doneRight.add(false);
 						teleportLeft();
