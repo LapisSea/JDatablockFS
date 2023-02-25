@@ -465,6 +465,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	
 	private FieldSet<T> fields;
 	private FieldSet<T> instanceFields;
+	private FieldSet<T> cloneFields;
 	
 	short[] poolObjectsSize;
 	short[] poolPrimitivesSize;
@@ -660,6 +661,21 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	public FieldSet<T> getInstanceFields(){
 		if(instanceFields == null){
 			instanceFields = FieldSet.of(getFields().stream().filter(e -> !Utils.isVirtual(e, IO)));
+		}
+		return instanceFields;
+	}
+	
+	public FieldSet<T> getCloneFields(){
+		if(instanceFields == null){
+			instanceFields = FieldSet.of(getFields().stream().filter(f -> {
+				if(f.typeFlag(IOField.PRIMITIVE_OR_ENUM_FLAG) || Utils.isVirtual(f, IO)) return false;
+				var acc = f.getAccessor();
+				if(acc != null){
+					var typ = acc.getType();
+					return typ != String.class;
+				}
+				return true;
+			}));
 		}
 		return instanceFields;
 	}

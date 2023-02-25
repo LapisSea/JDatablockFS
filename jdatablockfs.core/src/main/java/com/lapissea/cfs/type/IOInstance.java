@@ -1,6 +1,5 @@
 package com.lapissea.cfs.type;
 
-import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.chunk.MemoryOperations;
@@ -34,7 +33,6 @@ import java.util.stream.Stream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.type.field.StoragePool.INSTANCE;
-import static com.lapissea.cfs.type.field.StoragePool.IO;
 
 @SuppressWarnings({"UnusedReturnValue", "unused"})
 public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Cloneable, Stringify{
@@ -335,23 +333,24 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		@SuppressWarnings("unchecked")
 		@Override
 		public SELF clone(){
-			SELF c;
+			SELF copy;
 			try{
-				c = (SELF)super.clone();
+				copy = (SELF)super.clone();
 			}catch(CloneNotSupportedException e){
 				throw new RuntimeException(e);
 			}
+			deepClone(copy);
+			return copy;
+		}
+		
+		@SuppressWarnings("unchecked")
+		private void deepClone(SELF copy){
+			var fields = getThisStruct().getCloneFields();
+			if(fields.isEmpty()) return;
 			
-			for(IOField<SELF, ?> field : getThisStruct().getFields()){
-				if(field.typeFlag(IOField.PRIMITIVE_OR_ENUM_FLAG)){
-					continue;
-				}
-				if(Utils.isVirtual(field, IO)){
-					continue;
-				}
+			for(IOField<SELF, ?> field : fields){
 				var acc = field.getAccessor();
 				var typ = acc.getType();
-				if(typ == String.class) continue;
 				if(typ.isArray()){
 					var arrField = (IOField<SELF, Object[]>)field;
 					
@@ -368,7 +367,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 						}
 					}
 					
-					arrField.set(null, c, arr);
+					arrField.set(null, copy, arr);
 					continue;
 				}
 				
@@ -381,10 +380,8 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 				
 				val = val.clone();
 				
-				instField.set(null, c, val);
+				instField.set(null, copy, val);
 			}
-			
-			return c;
 		}
 	}
 	
