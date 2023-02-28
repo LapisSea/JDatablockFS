@@ -3,6 +3,7 @@ package com.lapissea.cfs.run;
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.Cluster;
+import com.lapissea.cfs.chunk.DefragmentManager;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.impl.MemoryData;
@@ -458,11 +459,6 @@ public class SlowTests{
 		TestUtils.testCluster(TestInfo.of(), provider -> {
 			var set = provider.getRootProvider().<IOTreeSet<Integer>>request("hi", IOTreeSet.class, Integer.class);
 			
-			var rp = new Cluster(MemoryData.builder().withRaw(provider.getSource().readAll()).build()).getRootProvider();
-			
-			LogUtil.println(rp.request("hi", IOTreeSet.class, Integer.class).equals(set));
-			
-			
 			var checkSet = new HashSet<Integer>();
 			
 			var r    = new Random(69);
@@ -471,6 +467,8 @@ public class SlowTests{
 				try{
 					if(i%10000 == 0) LogUtil.println(i/((double)iter));
 					Integer num = r.nextInt(200);
+					
+					provider.scanGarbage(DefragmentManager.FreeFoundAction.ERROR);
 					
 					if(r.nextInt(1000) == 1){
 						set.clear();
@@ -495,7 +493,6 @@ public class SlowTests{
 							if(added1 != added2){
 								throw new IllegalStateException(num + "");
 							}
-							System.exit(0);
 						}
 						case 1 -> {
 //							var removed1 = set.remove(num);
