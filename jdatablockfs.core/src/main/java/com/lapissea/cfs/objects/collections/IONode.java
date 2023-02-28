@@ -236,11 +236,11 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 			case SizeDescriptor.Unknown unknown -> unknown.calcUnknown(((IOInstance<?>)value).getThisStruct().allocVirtualVarPool(IO), provider, value, WordSpace.BYTE);
 			case BasicSizeDescriptor<T, ?> basic -> basic.calcUnknown(null, provider, value, WordSpace.BYTE);
 		};
-		
-		try(var ignored = provider.getSource().openIOTransaction()){
-			Chunk chunk = allocateNodeChunk(provider, positionMagnet, nextSize, bytes);
-			return new IONode<>(provider, chunk.getPtr().makeReference(), nodeType, value, next);
-		}
+
+//		try(var ignored = provider.getSource().openIOTransaction()){
+		Chunk chunk = allocateNodeChunk(provider, positionMagnet, nextSize, bytes);
+		return new IONode<>(provider, chunk.getPtr().makeReference(), nodeType, value, next);
+//		}
 	}
 	
 	public static <T> IONode<T> allocValNode(RandomIO valueBytes, IONode<T> next, TypeLink nodeType, DataProvider provider, OptionalLong positionMagnet) throws IOException{

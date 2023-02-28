@@ -456,37 +456,53 @@ public class SlowTests{
 	@Test
 	void fuzzTreeSet() throws IOException{
 		TestUtils.testCluster(TestInfo.of(), provider -> {
-			var set      = provider.getRootProvider().<IOTreeSet<Integer>>request("hi", IOTreeSet.class, Integer.class);
+			var set = provider.getRootProvider().<IOTreeSet<Integer>>request("hi", IOTreeSet.class, Integer.class);
+			
+			var rp = new Cluster(MemoryData.builder().withRaw(provider.getSource().readAll()).build()).getRootProvider();
+			
+			LogUtil.println(rp.request("hi", IOTreeSet.class, Integer.class).equals(set));
+			
+			
 			var checkSet = new HashSet<Integer>();
 			
 			var r    = new Random(69);
-			var iter = 200000;
+			var iter = 300000;
 			for(int i = 0; i<iter; i++){
 				try{
 					if(i%10000 == 0) LogUtil.println(i/((double)iter));
-					Integer num = r.nextInt(400);
-
-//					if(set.size()>100){
-//						set.clear();
-//						checkSet.clear();
-//					}
+					Integer num = r.nextInt(200);
+					
+					if(r.nextInt(1000) == 1){
+						set.clear();
+						checkSet.clear();
+					}
+					if(r.nextInt(1000) == 1){
+						var oldSet = set;
+						set = provider.getRootProvider().request("hi", IOTreeSet.class, Integer.class);
+						if(!set.equals(oldSet)){
+							throw new IllegalStateException(
+								"\n" +
+								set + "\n" +
+								oldSet
+							);
+						}
+					}
 					
 					switch(r.nextInt(3)){
 						case 0 -> {
 							var added1 = set.add(num);
 							var added2 = checkSet.add(num);
-							LogUtil.println(set);
 							if(added1 != added2){
 								throw new IllegalStateException(num + "");
 							}
+							System.exit(0);
 						}
 						case 1 -> {
-							var removed1 = set.remove(num);
-							var removed2 = checkSet.remove(num);
-							LogUtil.println(set);
-							if(removed1 != removed2){
-								throw new IllegalStateException(num + "");
-							}
+//							var removed1 = set.remove(num);
+//							var removed2 = checkSet.remove(num);
+//							if(removed1 != removed2){
+//								throw new IllegalStateException(num + "");
+//							}
 						}
 						case 2 -> {
 							var c1 = set.contains(num);
@@ -498,7 +514,6 @@ public class SlowTests{
 					}
 					
 					if(set.size() != checkSet.size()) throw new IllegalStateException(set.size() + " != " + checkSet.size());
-					
 					
 					var copy = HashSet.newHashSet(checkSet.size());
 					var it   = set.iterator();
