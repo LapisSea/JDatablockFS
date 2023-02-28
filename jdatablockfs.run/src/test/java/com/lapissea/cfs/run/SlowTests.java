@@ -468,8 +468,6 @@ public class SlowTests{
 					if(i%10000 == 0) LogUtil.println(i/((double)iter));
 					Integer num = r.nextInt(200);
 					
-					provider.scanGarbage(DefragmentManager.FreeFoundAction.ERROR);
-					
 					if(r.nextInt(1000) == 1){
 						set.clear();
 						checkSet.clear();
@@ -509,6 +507,8 @@ public class SlowTests{
 							}
 						}
 					}
+					
+					provider.scanGarbage(DefragmentManager.FreeFoundAction.ERROR);
 					
 					if(set.size() != checkSet.size()) throw new IllegalStateException(set.size() + " != " + checkSet.size());
 					

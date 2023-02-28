@@ -6,6 +6,7 @@ import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 
 import java.io.IOException;
@@ -17,6 +18,7 @@ public abstract class AbstractUnmanagedIOSet<T> extends IOInstance.Unmanaged<Abs
 	private IOField<AbstractUnmanagedIOSet<T>, ?> sizeField;
 	
 	@IOValue
+	@IODependency.VirtualNumSize
 	private long size;
 	
 	protected AbstractUnmanagedIOSet(DataProvider provider, Reference reference, TypeLink typeDef, TypeLink.Check check){
