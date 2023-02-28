@@ -2,7 +2,7 @@ package com.lapissea.cfs.chunk;
 
 import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.MagicID;
-import com.lapissea.cfs.exceptions.MalformedPointerException;
+import com.lapissea.cfs.exceptions.MalformedPointer;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.io.instancepipe.FixedStructPipe;
@@ -167,7 +167,7 @@ public class Cluster implements DataProvider{
 	public Chunk getFirstChunk() throws IOException{
 		try{
 			return getChunk(FIRST_CHUNK_PTR);
-		}catch(MalformedPointerException e){
+		}catch(MalformedPointer e){
 			throw new IOException("First chunk does not exist", e);
 		}
 	}

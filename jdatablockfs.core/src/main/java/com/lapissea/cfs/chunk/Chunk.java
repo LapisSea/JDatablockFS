@@ -5,7 +5,7 @@ import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.BitDepthOutOfSpaceException;
 import com.lapissea.cfs.exceptions.DesyncedCacheException;
-import com.lapissea.cfs.exceptions.MalformedPointerException;
+import com.lapissea.cfs.exceptions.MalformedPointer;
 import com.lapissea.cfs.io.ChunkChainIO;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.RandomIO;
@@ -234,12 +234,12 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	 */
 	public static Chunk readChunk(@NotNull DataProvider provider, @NotNull ChunkPointer pointer) throws IOException{
 		if(!earlyCheckChunkAt(provider, pointer)) throw new IOException("Invalid chunk at " + pointer);
-		if(provider.getSource().getIOSize()<pointer.add(PIPE.getSizeDescriptor().getMin(WordSpace.BYTE))) throw new MalformedPointerException(pointer + " points outside of available data");
+		if(provider.getSource().getIOSize()<pointer.add(PIPE.getSizeDescriptor().getMin(WordSpace.BYTE))) throw new MalformedPointer(pointer + " points outside of available data");
 		Chunk chunk = new Chunk(provider, pointer);
 		try{
 			chunk.readHeader();
 		}catch(Exception e){
-			throw new MalformedPointerException("No valid chunk at " + pointer, e);
+			throw new MalformedPointer("No valid chunk at " + pointer, e);
 		}
 		return chunk;
 	}

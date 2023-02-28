@@ -3,10 +3,7 @@ package com.lapissea.cfs.io.instancepipe;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.DataProvider;
-import com.lapissea.cfs.exceptions.FieldIsNullException;
-import com.lapissea.cfs.exceptions.MalformedObjectException;
-import com.lapissea.cfs.exceptions.MalformedPipe;
-import com.lapissea.cfs.exceptions.RecursiveSelfCompilation;
+import com.lapissea.cfs.exceptions.*;
 import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.content.ContentOutputBuilder;
@@ -672,6 +669,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 						else if(num.greaterThan(size)) return;
 						tooSmallIdMap.put(varying, num);
 					});
+				}catch(PointerOutsideFile badPtr){
+					Log.trace("Suppressed due to fake data: {}", badPtr);
 				}
 			}
 		}catch(IOException e){
