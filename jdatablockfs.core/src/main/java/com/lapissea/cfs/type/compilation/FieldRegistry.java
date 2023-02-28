@@ -10,7 +10,6 @@ import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.reflection.*;
 import com.lapissea.util.LateInit;
-import com.lapissea.util.NotImplementedException;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -30,7 +29,7 @@ class FieldRegistry{
 				@Override
 				public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
 					if(field.hasAnnotation(IOValue.Reference.class)){
-						throw new NotImplementedException();
+						return new IOFieldDynamicReferenceObject<>(field);
 					}
 					return new IOFieldDynamicInlineObject<>(field);
 				}

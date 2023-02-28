@@ -100,6 +100,7 @@ public @interface IOValue{
 					return;
 				}
 				if(!IOInstance.isInstance(field.getType())){
+					if(field.hasAnnotation(Generic.class)) return;
 					throw new MalformedStruct("Reference annotation can be used only in IOInstance types or collections but " + field + " is not");
 				}
 				if(IOInstance.isUnmanaged(field.getType())){
