@@ -1405,6 +1405,16 @@ public class BinaryGridRenderer implements DataRenderer{
 								if(annotate) annotateByteField(ctx, ioPool, instance, field, col, reference, Range.fromSize(fieldOffset, size));
 								continue;
 							}
+							if(inst instanceof IOInstance.Unmanaged<?> unmanaged){
+								var        ref = unmanaged.getReference();
+								StructPipe pip = unmanaged.getPipe();
+								annotateStruct(ctx, (T)unmanaged, ref, pip, generics(instance, parentGenerics), annotate);
+								if(annotate){
+									var bSize = sizeDesc.mapSize(WordSpace.BYTE, size);
+									annotateByteField(ctx, ioPool, instance, field, col, reference, Range.fromSize(fieldOffset, bSize));
+								}
+								continue;
+							}
 							if(inst instanceof IOInstance<?> ioi){
 								StructPipe pip = getStructPipe(instance, pipe, unmanagedStage, field, ioi);
 								annotateStruct(ctx, (T)ioi, reference.addOffset(fieldOffset), pip, generics(instance, parentGenerics), annotate);

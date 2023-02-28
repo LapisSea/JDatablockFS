@@ -296,6 +296,29 @@ public class MemoryWalker{
 								if(inst == null) continue;
 								
 								if(inst instanceof IOInstance.Unmanaged valueInstance){
+									{
+										var ref = valueInstance.getReference();
+										if(timer != null) timer.ignoreStart();
+										var res = pointerRecord.log(reference, instance, null, ref);
+										if(timer != null) timer.ignoreEnd();
+										
+										checkResult(res);
+										if(shouldSave(res) && getFlow(res) == CONTINUE && inlinedParent && field.getSizeDescriptor().hasFixed()){
+											inlineDirtyButContinue = true;
+										}else{
+											if(shouldSave(res)){
+												if(inlinedParent) return SAVE|END;
+												
+												reference.write(provider, false, pipe, instance);
+											}
+											switch(getFlow(res)){
+												case CONTINUE -> { }
+												case END -> { return END; }
+												default -> throw new NotImplementedException(getFlow(res) + "");
+											}
+										}
+									}
+									
 									if(timer != null) timer.ignoreStart();
 									var res = walkStructFull(valueInstance, valueInstance.getReference(), valueInstance.getPipe(), false);
 									if(timer != null) timer.ignoreEnd();
