@@ -261,4 +261,8 @@ public class Cluster implements DataProvider{
 	public void defragment() throws IOException{
 		defragmentManager.defragment();
 	}
+	
+	public void scanGarbage(DefragmentManager.FreeFoundAction action) throws IOException{
+		defragmentManager.scanFreeChunks(action);
+	}
 }

@@ -1,6 +1,7 @@
 package com.lapissea.cfs.chunk;
 
 import com.lapissea.cfs.exceptions.BitDepthOutOfSpaceException;
+import com.lapissea.cfs.exceptions.MalformedFileException;
 import com.lapissea.cfs.io.instancepipe.ObjectPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
@@ -9,6 +10,7 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.MemoryWalker;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.fields.RefField;
+import com.lapissea.util.MathUtil;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.function.UnsafeConsumer;
@@ -37,7 +39,7 @@ public class DefragmentManager{
 	public void defragment() throws IOException{
 		debug("Defragmenting...");
 		
-		scanFreeChunks(parent);
+		scanFreeChunks(FreeFoundAction.WARN_AND_LIST);
 		
 		mergeChains(parent);
 		optimizeFreeChunks(parent);
@@ -345,7 +347,7 @@ public class DefragmentManager{
 		}
 	}
 	
-	private void scanFreeChunks(Cluster cluster) throws IOException{
+	private ChunkSet findFreeChunks(Cluster cluster) throws IOException{
 		traceCall();
 		
 		var activeChunks       = new ChunkSet();
@@ -404,15 +406,48 @@ public class DefragmentManager{
 			}
 		}), true).walk();
 		
-		if(!unreferencedChunks.isEmpty()){
-			List<Chunk> unreferenced = new ArrayList<>(Math.toIntExact(unreferencedChunks.trueSize()));
-			for(var ptr : unreferencedChunks){
-				unreferenced.add(ptr.dereference(cluster));
+		return unreferencedChunks;
+	}
+	
+	public enum FreeFoundAction{
+		NOTHING,
+		WARN_AND_LIST,
+		WARN,
+		ERROR
+	}
+	
+	public void scanFreeChunks(FreeFoundAction action) throws IOException{
+		var cluster = parent;
+		
+		var unreferencedChunks = findFreeChunks(cluster);
+		if(unreferencedChunks.isEmpty()) return;
+		
+		switch(action){
+			case null -> throw new IllegalArgumentException();
+			case NOTHING -> { }
+			case WARN_AND_LIST -> {
+				warn("found unknown free chunks: {}", unreferencedChunks);
+				
+				List<Chunk> unreferenced = new ArrayList<>(MathUtil.snap((int)unreferencedChunks.trueSize(), 1, 50));
+				var         iter         = unreferencedChunks.iterator();
+				while(iter.hasNext()){
+					unreferenced.add(iter.next().dereference(cluster));
+					
+					if(unreferenced.size()>=64){
+						cluster.getMemoryManager().free(unreferenced);
+						unreferenced.clear();
+					}
+				}
+				if(!unreferenced.isEmpty()){
+					cluster.getMemoryManager().free(unreferenced);
+				}
 			}
-			
-			warn("found unknown free chunks: {}", unreferenced);
-			
-			cluster.getMemoryManager().free(unreferenced);
+			case WARN -> {
+				warn("found unknown free chunks: {}", unreferencedChunks);
+			}
+			case ERROR -> {
+				throw new MalformedFileException("found unknown free chunks: " + unreferencedChunks);
+			}
 		}
 	}
 	
