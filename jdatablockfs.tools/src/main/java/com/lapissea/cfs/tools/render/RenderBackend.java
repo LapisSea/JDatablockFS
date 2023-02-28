@@ -87,16 +87,16 @@ public abstract class RenderBackend{
 				void add(double a, double b, double c, double d){
 					snap = null;
 					if(protecc){
-						cap = (int)(cap*3F/2);
+						cap *= 2;
 						data = Arrays.copyOf(data, cap*4);
 						protecc = false;
 					}
 					
 					if(cap == 0){
-						cap = 2;
-						data = new double[8];
+						cap = 16;
+						data = new double[16*4];
 					}else if(len == cap){
-						cap = (int)(cap*3F/2);
+						cap *= 2;
 						data = Arrays.copyOf(data, cap*4);
 					}
 					

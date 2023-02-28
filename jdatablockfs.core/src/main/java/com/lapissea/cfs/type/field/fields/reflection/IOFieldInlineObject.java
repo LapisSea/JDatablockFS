@@ -125,4 +125,8 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 		}
 		instancePipe.skip(provider, src, genericContext);
 	}
+	
+	public StructPipe<ValueType> getInstancePipe(){
+		return instancePipe;
+	}
 }

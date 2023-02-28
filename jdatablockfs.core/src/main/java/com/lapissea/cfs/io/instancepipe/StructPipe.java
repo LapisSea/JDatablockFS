@@ -470,7 +470,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	
 	@SuppressWarnings("unchecked")
 	protected SizeDescriptor<T> createSizeDescriptor(){
-		var report = createSizeReport(2);
+		var report = createSizeReport(1);
 		
 		if(!report.dynamic && report.max.orElse(-1) == report.min){
 			return SizeDescriptor.Fixed.of(report.wordSpace, report.min);
@@ -742,7 +742,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		try{
 			safeBuff.close();
 		}catch(Exception e){
-			throw new IOException(TextUtil.toString(field) + " (" + Utils.toShortString(field.get(ioPool, instance)) + ") did not write correctly", e);
+			throw new IOException(TextUtil.toString(field) + " - " + field.getClass().getSimpleName() + " (" + Utils.toShortString(field.get(ioPool, instance)) + ") did not write correctly", e);
 		}
 	}
 	

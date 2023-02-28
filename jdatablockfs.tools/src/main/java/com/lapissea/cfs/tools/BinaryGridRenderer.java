@@ -33,6 +33,7 @@ import com.lapissea.cfs.type.field.fields.BitField;
 import com.lapissea.cfs.type.field.fields.NoIOField;
 import com.lapissea.cfs.type.field.fields.RefField;
 import com.lapissea.cfs.type.field.fields.reflection.BitFieldMerger;
+import com.lapissea.cfs.type.field.fields.reflection.IOFieldInlineObject;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.util.*;
 import org.joml.SimplexNoise;
@@ -1320,8 +1321,11 @@ public class BinaryGridRenderer implements DataRenderer{
 	}
 	
 	@SuppressWarnings("unchecked")
-	private <T extends IOInstance<T>> void annotateStruct(AnnotateCtx ctx,
-	                                                      T instance, Reference instanceReference, StructPipe<T> pipe, GenericContext parentGenerics, boolean annotate) throws IOException{
+	private <T extends IOInstance<T>> void annotateStruct(
+		AnnotateCtx ctx,
+		T instance, Reference instanceReference, StructPipe<T> pipe,
+		GenericContext parentGenerics, boolean annotate
+	) throws IOException{
 		var reference = instanceReference;
 		if(instance instanceof Chunk c){
 			var off = ctx.provider.getFirstChunk().getPtr();
@@ -1393,7 +1397,7 @@ public class BinaryGridRenderer implements DataRenderer{
 					try{
 						var acc = field.getAccessor();
 						
-						if(acc != null && field.typeFlag(IOField.DYNAMIC_FLAG)){
+						if(acc != null && field.typeFlag(IOField.DYNAMIC_FLAG) && !(field instanceof RefField)){
 							
 							var inst = field.get(ioPool, instance);
 							if(inst == null) continue;
@@ -1788,10 +1792,16 @@ public class BinaryGridRenderer implements DataRenderer{
 			}
 		}
 	}
-	private static <T extends IOInstance<T>> StructPipe getStructPipe(IOInstance instance, StructPipe<T> pipe, boolean unmanagedStage, IOField<T, Object> field, IOInstance<? extends IOInstance<?>> inst){
+	private static <T extends IOInstance<T>> StructPipe getStructPipe(
+		IOInstance instance, StructPipe<T> pipe, boolean unmanagedStage,
+		IOField<T, Object> field, IOInstance<? extends IOInstance<?>> inst
+	){
 		if(unmanagedStage){
 			return ((IOInstance.Unmanaged)instance).getFieldPipe(field, inst);
 		}else{
+			if(field instanceof IOFieldInlineObject obj){
+				return obj.getInstancePipe();
+			}
 			return StructPipe.of(pipe.getClass(), inst.getThisStruct());
 		}
 	}
