@@ -3,7 +3,10 @@ package com.lapissea.cfs.io.instancepipe;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.DataProvider;
-import com.lapissea.cfs.exceptions.*;
+import com.lapissea.cfs.exceptions.FieldIsNullException;
+import com.lapissea.cfs.exceptions.MalformedObjectException;
+import com.lapissea.cfs.exceptions.MalformedPipe;
+import com.lapissea.cfs.exceptions.RecursiveSelfCompilation;
 import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.content.ContentOutputBuilder;
@@ -87,7 +90,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				var cached = get(struct);
 				if(cached != null) return cached;
 				
-				if(info.recursiveCompilingDepth>5){
+				if(info.recursiveCompilingDepth>50){
 					throw new RecursiveSelfCompilation();
 				}
 				info.recursiveCompilingDepth++;
@@ -629,7 +632,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				}
 			}
 		}catch(VaryingSize.TooSmall e){
-			throw makeInvalid(fields, ioPool, instance, e);
+			throw VaryingSize.makeInvalid(fields, ioPool, instance, e);
 		}
 		
 		if(destBuff != null){
@@ -638,45 +641,6 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		if(close){
 			dest.close();
 		}
-	}
-	
-	private VaryingSize.TooSmall makeInvalid(FieldSet<T> fields, VarPool<T> ioPool, T instance, VaryingSize.TooSmall e){
-		var all = scanInvalidSizes(fields, ioPool, instance);
-		if(e.tooSmallIdMap.equals(all.tooSmallIdMap)){
-			throw e;
-		}
-		all.addSuppressed(e);
-		return all;
-	}
-	
-	private VaryingSize.TooSmall scanInvalidSizes(FieldSet<T> fields, VarPool<T> ioPool, T instance){
-		Map<VaryingSize, NumberSize> tooSmallIdMap = new HashMap<>();
-		
-		var provider = DataProvider.newVerySimpleProvider();
-		try(var blackHole = new ContentWriter(){
-			@Override
-			public void write(int b){ }
-			@Override
-			public void write(byte[] b, int off, int len){ }
-		}){
-			for(IOField<T, ?> field : fields){
-				try{
-					field.writeReported(ioPool, provider, blackHole, instance);
-				}catch(VaryingSize.TooSmall e){
-					e.tooSmallIdMap.forEach((varying, size) -> {
-						var num = tooSmallIdMap.get(varying);
-						if(num == null) num = size;
-						else if(num.greaterThan(size)) return;
-						tooSmallIdMap.put(varying, num);
-					});
-				}catch(PointerOutsideFile badPtr){
-					Log.trace("Suppressed due to fake data: {}", badPtr);
-				}
-			}
-		}catch(IOException e){
-			throw new RuntimeException(e);
-		}
-		return new VaryingSize.TooSmall(tooSmallIdMap);
 	}
 	
 	private ContentWriter validateAndSafeDestination(FieldSet<T> fields, VarPool<T> ioPool, DataProvider provider, ContentWriter dest, T instance) throws IOException{
