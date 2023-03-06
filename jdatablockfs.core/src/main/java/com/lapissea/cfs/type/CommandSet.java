@@ -297,6 +297,27 @@ public final class CommandSet{
 		public boolean readBool(){
 			return code[pos++] == 1;
 		}
+		
+		@Override
+		public String toString(){
+			var res = new StringJoiner(", ", "CmdReader{", "}");
+			if(pos>=code.length) return res.add("END").toString();
+			var cmd = code[pos];
+			return res.add("Next: " + switch(cmd){
+				case ENDF -> "ENDF";
+				case UNMANAGED_REST -> "UNMANAGED_REST";
+				case SKIPB_B -> "SKIPB_B";
+				case SKIPB_I -> "SKIPB_I";
+				case SKIPB_L -> "SKIPB_L";
+				case SKIPB_UNKOWN -> "SKIPB_UNKOWN";
+				case SKIPF_IF_NULL -> "SKIPF_IF_NULL";
+				case POTENTIAL_REF -> "POTENTIAL_REF";
+				case DYNAMIC -> "DYNAMIC";
+				case CHPTR -> "CHPTR";
+				case REF_FIELD -> "REF_FIELD";
+				default -> "?? " + cmd;
+			}).toString();
+		}
 	}
 	
 	public static final byte ENDF           = 0;

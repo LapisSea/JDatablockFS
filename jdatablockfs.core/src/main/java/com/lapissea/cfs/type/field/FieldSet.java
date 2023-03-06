@@ -1,6 +1,7 @@
 package com.lapissea.cfs.type.field;
 
 import com.lapissea.cfs.IterablePP;
+import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.fields.RefField;
@@ -107,6 +108,23 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		public IOField<T, ?> next(){
 			return data[cursor++];
 		}
+		
+		@Override
+		public String toString(){
+			StringJoiner res = new StringJoiner(", ", "FieldSet.Iter{", "}");
+			if(data.length == 0){
+				res.add("EMPTY");
+				return res.toString();
+			}
+			if(hasNext()){
+				var remaining = data.length - cursor;
+				if(remaining>1) res.add("remaining: " + remaining);
+				res.add("next: " + Utils.toShortString(data[cursor]));
+			}else{
+				res.add("END");
+			}
+			return res.toString();
+		}
 	}
 	
 	private final class FieldSetListIterator implements ListIterator<IOField<T, ?>>{
@@ -156,6 +174,27 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		public void set(IOField<T, ?> e){ throw new UnsupportedOperationException(); }
 		@Override
 		public void add(IOField<T, ?> e){ throw new UnsupportedOperationException(); }
+		
+		@Override
+		public String toString(){
+			StringJoiner res = new StringJoiner(", ", "FieldSet.ListIter{", "}");
+			if(data.length == 0){
+				res.add("EMPTY");
+				return res.toString();
+			}
+			if(hasPrevious()){
+				var previous = data[cursor - 1];
+				res.add("previous: " + Utils.toShortString(previous));
+			}
+			if(hasNext()){
+				var remaining = data.length - cursor;
+				if(remaining>1) res.add("remaining: " + remaining);
+				res.add("next: " + Utils.toShortString(data[cursor]));
+			}else{
+				res.add("END");
+			}
+			return res.toString();
+		}
 	}
 	
 	private static final FieldSet<?> EMPTY = new FieldSet<>();
