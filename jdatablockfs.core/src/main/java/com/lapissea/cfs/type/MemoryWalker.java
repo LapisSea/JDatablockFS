@@ -8,6 +8,7 @@ import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.fields.RefField;
+import com.lapissea.cfs.type.field.fields.reflection.IOFieldInlineObject;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
@@ -339,9 +340,7 @@ public class MemoryWalker{
 								if(inst instanceof IOInstance fieldValueInstance){
 									if(!fieldValueInstance.getThisStruct().getCanHavePointers()) continue;
 									{
-										StructPipe instancePipe;
-										if(dynamicPhase) instancePipe = ((IOInstance.Unmanaged)instance).getFieldPipe(field, fieldValueInstance);
-										else instancePipe = StructPipe.of(pipe.getClass(), fieldValueInstance.getThisStruct());
+										StructPipe instancePipe = getPipe(dynamicPhase, instance, field, pipe, fieldValueInstance);
 										
 										if(timer != null) timer.ignoreStart();
 										var res = walkStructFull(fieldValueInstance, reference.addOffset(fieldOffset), instancePipe, true);
@@ -371,9 +370,7 @@ public class MemoryWalker{
 											}
 											var array = (IOInstance<?>[])field.get(ioPool, instance);
 											if(array == null || array.length == 0) continue;
-											StructPipe pip;
-											if(dynamicPhase) pip = ((IOInstance.Unmanaged)instance).getFieldPipe(field, array[0]);
-											else pip = StructPipe.of(pipe.getClass(), array[0].getThisStruct());
+											StructPipe pip = getPipe(dynamicPhase, instance, field, pipe, array[0]);
 											
 											for(IOInstance<?> inst : array){
 												{
@@ -404,9 +401,7 @@ public class MemoryWalker{
 										var fieldValue = (IOInstance<?>)field.get(ioPool, instance);
 										if(fieldValue != null){
 											{
-												StructPipe pip;
-												if(dynamicPhase) pip = ((IOInstance.Unmanaged)instance).getFieldPipe(field, fieldValue);
-												else pip = StructPipe.of(pipe.getClass(), fieldValue.getThisStruct());
+												StructPipe pip = getPipe(dynamicPhase, instance, field, pipe, fieldValue);
 												
 												if(timer != null) timer.ignoreStart();
 												var res = walkStructFull((T)fieldValue, reference.addOffset(fieldOffset), pip, true);
@@ -457,6 +452,17 @@ public class MemoryWalker{
 			return CONTINUE|SAVE;
 		}
 		return CONTINUE;
+	}
+	
+	@SuppressWarnings({"unchecked", "rawtypes"})
+	private static <T extends IOInstance<T>> StructPipe getPipe(
+		boolean dynamic, T instance, IOField<T, ?> field, StructPipe<T> parentPipe, IOInstance fieldValue
+	){
+		if(dynamic) return ((IOInstance.Unmanaged)instance).getFieldPipe(field, fieldValue);
+		if(field instanceof IOFieldInlineObject objField){
+			return objField.getInstancePipe();
+		}
+		return StructPipe.of(parentPipe.getClass(), fieldValue.getThisStruct());
 	}
 	
 	private <T extends IOInstance<T>> long unknownSizeSkip(Iterator<IOField<T, ?>> iterator, CmdReader cmds, T instance, VarPool<T> ioPool, IOField<T, ?> field){
