@@ -4,8 +4,17 @@ import com.lapissea.jorth.MalformedJorth;
 import com.lapissea.jorth.lang.ClassName;
 import com.lapissea.util.NotImplementedException;
 
-import java.lang.reflect.*;
-import java.util.*;
+import java.lang.reflect.GenericArrayType;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.lang.reflect.TypeVariable;
+import java.lang.reflect.WildcardType;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 
 import static java.util.stream.Collectors.joining;
 

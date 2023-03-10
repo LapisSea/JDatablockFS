@@ -14,7 +14,11 @@ import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.WordSpace;
-import com.lapissea.cfs.type.field.*;
+import com.lapissea.cfs.type.field.FieldSet;
+import com.lapissea.cfs.type.field.IOField;
+import com.lapissea.cfs.type.field.IOFieldTools;
+import com.lapissea.cfs.type.field.SizeDescriptor;
+import com.lapissea.cfs.type.field.VaryingSize;
 import com.lapissea.cfs.type.field.fields.BitField;
 import com.lapissea.util.TextUtil;
 

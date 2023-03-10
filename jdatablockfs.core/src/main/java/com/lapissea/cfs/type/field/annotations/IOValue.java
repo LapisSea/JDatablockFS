@@ -18,7 +18,11 @@ import java.lang.annotation.Target;
 import java.lang.reflect.Array;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static com.lapissea.cfs.type.field.StoragePool.INSTANCE;
 import static com.lapissea.cfs.type.field.StoragePool.IO;

@@ -10,7 +10,12 @@ import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
-import com.lapissea.cfs.type.*;
+import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.MemoryWalker;
+import com.lapissea.cfs.type.NewUnmanaged;
+import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.TypeLink;
+import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.function.UnsafeConsumer;
 

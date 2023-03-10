@@ -8,7 +8,13 @@ import com.lapissea.util.NotImplementedException;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 
-import java.util.*;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.EnumSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Set;
 
 import static org.objectweb.asm.Opcodes.*;
 

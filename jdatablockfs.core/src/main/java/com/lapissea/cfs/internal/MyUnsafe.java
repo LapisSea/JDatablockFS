@@ -31,8 +31,4 @@ public class MyUnsafe{
 		field.setAccessible(true);
 		return OptionalLong.of(UNSAFE.objectFieldOffset(field));
 	}
-	
-	public static int arrayStart(Class<?> type){
-		return UNSAFE.arrayBaseOffset(type);
-	}
 }

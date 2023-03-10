@@ -1,6 +1,7 @@
 package com.lapissea.cfs.type.field;
 
 import com.lapissea.cfs.IterablePP;
+import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.fields.RefField;
@@ -8,11 +9,22 @@ import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
 
-import java.util.*;
+import java.util.AbstractList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.ConcurrentModificationException;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.ListIterator;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Spliterator;
+import java.util.StringJoiner;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
-public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOField<T, ?>>{
+public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOField<T, ?>> implements IterablePP<IOField<T, ?>>{
 	
 	private static final class FieldSetSpliterator<E extends IOInstance<E>> implements Spliterator<IOField<E, ?>>{
 		
@@ -107,6 +119,23 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		public IOField<T, ?> next(){
 			return data[cursor++];
 		}
+		
+		@Override
+		public String toString(){
+			StringJoiner res = new StringJoiner(", ", "FieldSet.Iter{", "}");
+			if(data.length == 0){
+				res.add("EMPTY");
+				return res.toString();
+			}
+			if(hasNext()){
+				var remaining = data.length - cursor;
+				if(remaining>1) res.add("remaining: " + remaining);
+				res.add("next: " + Utils.toShortString(data[cursor]));
+			}else{
+				res.add("END");
+			}
+			return res.toString();
+		}
 	}
 	
 	private final class FieldSetListIterator implements ListIterator<IOField<T, ?>>{
@@ -156,6 +185,27 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		public void set(IOField<T, ?> e){ throw new UnsupportedOperationException(); }
 		@Override
 		public void add(IOField<T, ?> e){ throw new UnsupportedOperationException(); }
+		
+		@Override
+		public String toString(){
+			StringJoiner res = new StringJoiner(", ", "FieldSet.ListIter{", "}");
+			if(data.length == 0){
+				res.add("EMPTY");
+				return res.toString();
+			}
+			if(hasPrevious()){
+				var previous = data[cursor - 1];
+				res.add("previous: " + Utils.toShortString(previous));
+			}
+			if(hasNext()){
+				var remaining = data.length - cursor;
+				if(remaining>1) res.add("remaining: " + remaining);
+				res.add("next: " + Utils.toShortString(data[cursor]));
+			}else{
+				res.add("END");
+			}
+			return res.toString();
+		}
 	}
 	
 	private static final FieldSet<?> EMPTY = new FieldSet<>();
@@ -165,11 +215,40 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		return (FieldSet<T>)EMPTY;
 	}
 	
-	@SuppressWarnings("unchecked")
+	private static final class SetBuilder<T extends IOInstance<T>> implements Consumer<IOField<T, ?>>{
+		private IOField<T, ?>[] safeData;
+		private int             pos = 0;
+		
+		private SetBuilder(int size){
+			//noinspection unchecked
+			this.safeData = new IOField[size];
+		}
+		
+		@Override
+		public void accept(IOField<T, ?> e){
+			Objects.requireNonNull(e);
+			for(int i = 0; i<pos; i++){
+				if(safeData[i].getName().equals(e.getName())){
+					return;
+				}
+			}
+			if(pos == safeData.length){
+				safeData = Arrays.copyOf(safeData, Math.max(pos + 1, safeData.length*2));
+			}
+			safeData[pos++] = e;
+		}
+		
+		private FieldSet<T> make(){
+			if(pos == 0) return of();
+			return new FieldSet<>(safeData, pos);
+		}
+	}
+	
 	public static <T extends IOInstance<T>> FieldSet<T> of(Stream<IOField<T, ?>> stream){
-		var data = stream.map(Objects::requireNonNull).distinct().toArray(IOField[]::new);
-		if(data.length == 0) return of();
-		return new FieldSet<>((IOField<T, ?>[])data);
+		var s = stream.spliterator();
+		var b = new SetBuilder<T>((int)Math.max(0, s.getExactSizeIfKnown()));
+		s.forEachRemaining(b);
+		return b.make();
 	}
 	
 	@SafeVarargs
@@ -178,10 +257,13 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	}
 	public static <T extends IOInstance<T>> FieldSet<T> of(Collection<IOField<T, ?>> data){
 		if(data == null || data.isEmpty()) return of();
-		return switch(data){
-			case FieldSet<T> f -> f;
-			default -> of(data.stream());
-		};
+		if(data instanceof FieldSet<T> f) return f;
+		
+		var safeData = new SetBuilder<T>(data.size());
+		for(var e : data){
+			safeData.accept(e);
+		}
+		return safeData.make();
 	}
 	
 	
@@ -193,11 +275,11 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	
 	@SuppressWarnings("unchecked")
 	private FieldSet(){
-		this(new IOField[0]);
+		this(new IOField[0], 0);
 	}
 	
-	private FieldSet(IOField<T, ?>[] data){
-		this.data = data;
+	private FieldSet(IOField<T, ?>[] data, int size){
+		this.data = data.length != size? Arrays.copyOf(data, size) : data;
 	}
 	
 	@Override
@@ -392,17 +474,17 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	}
 	
 	@SuppressWarnings("unchecked")
-	public <E> Stream<IOField<T, E>> byType(Class<E> type){
-		return stream().filter(f -> UtilL.instanceOf(f.getType(), type)).map(f -> (IOField<T, E>)f);
+	public <E> IterablePP<IOField<T, E>> byType(Class<E> type){
+		return filtered(f -> UtilL.instanceOf(f.getType(), type)).map(f -> (IOField<T, E>)f);
 	}
 	
-	public <E extends IOField<T, ?>> Stream<? extends E> byFieldType(Class<E> type){
-		return stream().filter(type::isInstance).map(type::cast);
+	public <E extends IOField<T, ?>> IterablePP<? extends E> byFieldType(Class<E> type){
+		return filtered(type::isInstance).map(type::cast);
 	}
 	
 	@SuppressWarnings("unchecked")
 	public IterablePP<RefField<T, ?>> onlyRefs(){
-		return () -> stream().filter(e -> e instanceof RefField).<RefField<T, ?>>map(e -> (RefField<T, ?>)e).iterator();
+		return (IterablePP<RefField<T, ?>>)(Object)filtered(e -> e instanceof RefField);
 	}
 	
 	public <E> IOField<T, E> requireExact(Class<E> type, String name){
@@ -410,7 +492,7 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	}
 	
 	public <E> Optional<IOField<T, E>> exact(Class<E> type, String name){
-		return byType(type).filter(f -> f.getName().equals(name)).findAny();
+		return byType(type).filtered(f -> f.getName().equals(name)).first();
 	}
 	
 	public <E extends IOField<T, ?>> Optional<? extends E> exactFieldType(Class<E> type, String name){

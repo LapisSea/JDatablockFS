@@ -1,7 +1,12 @@
 package com.lapissea.cfs.tools.render;
 
 import com.lapissea.util.MathUtil;
-import imgui.*;
+import imgui.ImDrawData;
+import imgui.ImFontAtlas;
+import imgui.ImGui;
+import imgui.ImGuiIO;
+import imgui.ImVec2;
+import imgui.ImVec4;
 import imgui.flag.ImGuiBackendFlags;
 import imgui.type.ImInt;
 
@@ -175,6 +180,7 @@ public final class ImGuiImplG2D{
 								@Override
 								public void dispose(){ }
 								
+								@Override
 								public void compose(Raster src1, Raster src2, WritableRaster dst){
 									var rect = dst.getBounds();
 									

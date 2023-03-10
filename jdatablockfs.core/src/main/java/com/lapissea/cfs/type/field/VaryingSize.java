@@ -1,12 +1,64 @@
 package com.lapissea.cfs.type.field;
 
+import com.lapissea.cfs.chunk.DataProvider;
+import com.lapissea.cfs.exceptions.PointerOutsideFile;
+import com.lapissea.cfs.io.content.ContentWriter;
+import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Stringify;
+import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.VarPool;
 import com.lapissea.util.TextUtil;
 
-import java.util.*;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 
 public final class VaryingSize implements Stringify{
+	
+	public static <T extends IOInstance<T>> TooSmall makeInvalid(FieldSet<T> fields, VarPool<T> ioPool, T instance, TooSmall e){
+		var all = scanInvalidSizes(fields, ioPool, instance);
+		if(e.tooSmallIdMap.equals(all.tooSmallIdMap)){
+			throw e;
+		}
+		all.addSuppressed(e);
+		return all;
+	}
+	
+	private static <T extends IOInstance<T>> TooSmall scanInvalidSizes(FieldSet<T> fields, VarPool<T> ioPool, T instance){
+		Map<VaryingSize, NumberSize> tooSmallIdMap = new HashMap<>();
+		
+		var provider = DataProvider.newVerySimpleProvider();
+		try(var blackHole = new ContentWriter(){
+			@Override
+			public void write(int b){ }
+			@Override
+			public void write(byte[] b, int off, int len){ }
+		}){
+			for(IOField<T, ?> field : fields){
+				try{
+					field.writeReported(ioPool, provider, blackHole, instance);
+				}catch(TooSmall e){
+					e.tooSmallIdMap.forEach((varying, size) -> {
+						var num = tooSmallIdMap.get(varying);
+						if(num == null) num = size;
+						else if(num.greaterThan(size)) return;
+						tooSmallIdMap.put(varying, num);
+					});
+				}catch(PointerOutsideFile badPtr){
+					Log.trace("Suppressed due to fake data: {}", badPtr);
+				}
+			}
+		}catch(IOException e){
+			throw new RuntimeException(e);
+		}
+		return new TooSmall(tooSmallIdMap);
+	}
 	
 	public static final VaryingSize MAX = new VaryingSize(NumberSize.LARGEST, -1);
 	

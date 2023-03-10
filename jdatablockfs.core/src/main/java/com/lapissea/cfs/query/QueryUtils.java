@@ -2,7 +2,14 @@ package com.lapissea.cfs.query;
 
 import com.lapissea.cfs.type.SupportedPrimitive;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.EnumSet;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 
 public enum QueryUtils{
 	;

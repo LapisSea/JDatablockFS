@@ -1,13 +1,26 @@
 package com.lapissea.jorth.lang;
 
 import com.lapissea.jorth.Jorth;
-import com.lapissea.jorth.lang.type.*;
+import com.lapissea.jorth.lang.type.Access;
+import com.lapissea.jorth.lang.type.ClassGen;
+import com.lapissea.jorth.lang.type.ClassType;
+import com.lapissea.jorth.lang.type.FunctionGen;
+import com.lapissea.jorth.lang.type.GenericType;
+import com.lapissea.jorth.lang.type.TypeSource;
+import com.lapissea.jorth.lang.type.TypeStack;
+import com.lapissea.jorth.lang.type.Visibility;
 import com.lapissea.util.NanoTimer;
 import com.lapissea.util.UtilL;
 import org.objectweb.asm.ClassWriter;
 
 import java.lang.invoke.MethodHandles;
-import java.util.*;
+import java.util.Collections;
+import java.util.EnumSet;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 import static org.objectweb.asm.Opcodes.V19;
