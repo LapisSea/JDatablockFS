@@ -1,7 +1,7 @@
 package com.lapissea.cfs.objects;
 
 import com.lapissea.cfs.Utils;
-import com.lapissea.cfs.exceptions.BitDepthOutOfSpaceException;
+import com.lapissea.cfs.exceptions.OutOfBitDepth;
 import com.lapissea.cfs.io.bit.BitUtils;
 import com.lapissea.cfs.io.bit.EnumUniverse;
 import com.lapissea.cfs.io.content.ContentReader;
@@ -211,7 +211,7 @@ public enum NumberSize{
 	private void validateUnsigned(long value){
 		try{
 			ensureCanFit(value);
-		}catch(BitDepthOutOfSpaceException e){
+		}catch(OutOfBitDepth e){
 			throw new RuntimeException(e);
 		}
 		if(value<0 && this != LONG && this != VOID){
@@ -221,7 +221,7 @@ public enum NumberSize{
 	private void validateUnsigned(int value){
 		try{
 			ensureCanFit(value);
-		}catch(BitDepthOutOfSpaceException e){
+		}catch(OutOfBitDepth e){
 			throw new RuntimeException(e);
 		}
 		if(value<0 && this != LONG && this != VOID){
@@ -231,14 +231,14 @@ public enum NumberSize{
 	private void validateSigned(long value){
 		try{
 			ensureCanFitSigned(value);
-		}catch(BitDepthOutOfSpaceException e){
+		}catch(OutOfBitDepth e){
 			throw new RuntimeException(e);
 		}
 	}
 	private void validateSigned(int value){
 		try{
 			ensureCanFitSigned(value);
-		}catch(BitDepthOutOfSpaceException e){
+		}catch(OutOfBitDepth e){
 			throw new RuntimeException(e);
 		}
 	}
@@ -339,28 +339,28 @@ public enum NumberSize{
 		return maxSize - num;
 	}
 	
-	public void ensureCanFit(@Nullable ChunkPointer num) throws BitDepthOutOfSpaceException{
+	public void ensureCanFit(@Nullable ChunkPointer num) throws OutOfBitDepth{
 		ensureCanFit(ChunkPointer.getValueNullable(num));
 	}
 	
-	public void ensureCanFit(@NotNull INumber num) throws BitDepthOutOfSpaceException{
+	public void ensureCanFit(@NotNull INumber num) throws OutOfBitDepth{
 		ensureCanFit(num.getValue());
 	}
 	
-	public void ensureCanFit(long num) throws BitDepthOutOfSpaceException{
-		if(!canFit(num)) throw new BitDepthOutOfSpaceException(this, num);
+	public void ensureCanFit(long num) throws OutOfBitDepth{
+		if(!canFit(num)) throw new OutOfBitDepth(this, num, false);
 	}
 	
-	public void ensureCanFit(int num) throws BitDepthOutOfSpaceException{
-		if(!canFit(num)) throw new BitDepthOutOfSpaceException(this, num);
+	public void ensureCanFit(int num) throws OutOfBitDepth{
+		if(!canFit(num)) throw new OutOfBitDepth(this, num, false);
 	}
 	
-	public void ensureCanFitSigned(long num) throws BitDepthOutOfSpaceException{
-		if(!canFitSigned(num)) throw new BitDepthOutOfSpaceException(this, num);
+	public void ensureCanFitSigned(long num) throws OutOfBitDepth{
+		if(!canFitSigned(num)) throw new OutOfBitDepth(this, num, true);
 	}
 	
-	public void ensureCanFitSigned(int num) throws BitDepthOutOfSpaceException{
-		if(!canFitSigned(num)) throw new BitDepthOutOfSpaceException(this, num);
+	public void ensureCanFitSigned(int num) throws OutOfBitDepth{
+		if(!canFitSigned(num)) throw new OutOfBitDepth(this, num, true);
 	}
 	
 	public void write(ContentWriter stream, long[] data) throws IOException{

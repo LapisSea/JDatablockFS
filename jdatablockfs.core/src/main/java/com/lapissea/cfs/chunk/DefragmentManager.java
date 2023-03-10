@@ -1,7 +1,7 @@
 package com.lapissea.cfs.chunk;
 
-import com.lapissea.cfs.exceptions.BitDepthOutOfSpaceException;
 import com.lapissea.cfs.exceptions.MalformedFileException;
+import com.lapissea.cfs.exceptions.OutOfBitDepth;
 import com.lapissea.cfs.io.instancepipe.ObjectPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
@@ -334,7 +334,7 @@ public class DefragmentManager{
 				
 				try{
 					fragmentedChunk.setCapacity(requiredSize);
-				}catch(BitDepthOutOfSpaceException e){
+				}catch(OutOfBitDepth e){
 					throw new ShouldNeverHappenError("This should be guarded by the canFit check");
 				}
 				

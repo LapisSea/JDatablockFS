@@ -1,7 +1,7 @@
 package com.lapissea.cfs.chunk;
 
 import com.lapissea.cfs.GlobalConfig;
-import com.lapissea.cfs.exceptions.BitDepthOutOfSpaceException;
+import com.lapissea.cfs.exceptions.OutOfBitDepth;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.objects.ChunkPointer;
@@ -342,7 +342,7 @@ public class MemoryOperations{
 				target.modifyAndSave(ch -> {
 					try{
 						ch.setCapacity(ch.getCapacity() + toGrow);
-					}catch(BitDepthOutOfSpaceException e){
+					}catch(OutOfBitDepth e){
 						/*
 						 * toGrow is clamped to the remaining bitspace of body num size. If this happens
 						 * something has gone horribly wrong and life choices should be reconsidered
@@ -372,7 +372,7 @@ public class MemoryOperations{
 		target.modifyAndSave(c -> {
 			try{
 				c.setNextPtr(toPin.getPtr());
-			}catch(BitDepthOutOfSpaceException e){
+			}catch(OutOfBitDepth e){
 				throw new ShouldNeverHappenError(e);
 			}
 		});
@@ -430,7 +430,7 @@ public class MemoryOperations{
 			target.setNextPtr(toPin.getPtr());
 			target.setSize(shiftSize);
 			target.setCapacity(oldCapacity - growth);
-		}catch(BitDepthOutOfSpaceException e){
+		}catch(OutOfBitDepth e){
 			throw new ShouldNeverHappenError(e);
 		}
 		try(var ignored = source.openIOTransaction()){
@@ -515,7 +515,7 @@ public class MemoryOperations{
 						var newHSiz = c.getHeaderSize();
 						c.setCapacity(c.getCapacity() + oldHSiz - newHSiz);
 						c.syncStruct();
-					}catch(BitDepthOutOfSpaceException e){
+					}catch(OutOfBitDepth e){
 						throw new ShouldNeverHappenError(e);
 					}
 					return c;
@@ -619,7 +619,7 @@ public class MemoryOperations{
 				iter.ioRemove();
 				try{
 					target.setCapacity(newCapacity);
-				}catch(BitDepthOutOfSpaceException e){
+				}catch(OutOfBitDepth e){
 					throw new ShouldNeverHappenError(e);
 				}
 				target.syncStruct();
@@ -654,7 +654,7 @@ public class MemoryOperations{
 				
 				try{
 					target.setCapacity(newCapacity);
-				}catch(BitDepthOutOfSpaceException e){
+				}catch(OutOfBitDepth e){
 					throw new ShouldNeverHappenError(e);
 				}
 				target.syncStruct();
