@@ -7,18 +7,17 @@ import com.lapissea.cfs.io.bit.EnumUniverse;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.utils.IOUtils;
-import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
 
 import java.io.IOException;
 import java.math.BigInteger;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
 import java.util.stream.IntStream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static java.util.Comparator.comparingInt;
 
 @SuppressWarnings("unused")
 public enum NumberSize{
@@ -34,22 +33,22 @@ public enum NumberSize{
 	LONG      ('L', 8);
 	// @formatter:on
 	
-	private static final NumberSize[] BYTE_MAP;
-	
-	static{
-		var all = values();
-		BYTE_MAP = IntStream.range(0, Arrays.stream(all).mapToInt(NumberSize::bytes).max().orElseThrow() + 1)
-		                    .mapToObj(b -> Arrays.stream(all).filter(f -> f.bytes>=b).reduce(NumberSize::min).orElseThrow())
-		                    .toArray(NumberSize[]::new);
-	}
-	
-	private static final long[] MAX_SIZES = Arrays.stream(values()).mapToLong(NumberSize::maxSize).toArray();
-	private static final int[]  BYTES     = Arrays.stream(values()).mapToInt(NumberSize::bytes).toArray();
+	private static final NumberSize[] BYTE_MAP =
+		IntStream.range(0, Arrays.stream(values()).mapToInt(NumberSize::bytes).max().orElseThrow() + 1)
+		         .mapToObj(b -> Arrays.stream(values()).filter(f -> f.bytes>=b).reduce(NumberSize::min).orElseThrow())
+		         .toArray(NumberSize[]::new);
 	
 	public static final EnumUniverse<NumberSize> FLAG_INFO = EnumUniverse.of(NumberSize.class);
 	
 	public static final NumberSize SMALEST_REAL = BYTE;
 	public static final NumberSize LARGEST      = LONG;
+	
+	static{
+		for(NumberSize ns : values()){
+			ns.prev = FLAG_INFO.stream().filter(n -> n.lesserThan(ns)).max(comparingInt(NumberSize::bytes)).orElse(null);
+			ns.next = FLAG_INFO.stream().filter(n -> n.greaterThan(ns)).min(comparingInt(NumberSize::bytes)).orElse(null);
+		}
+	}
 	
 	public static NumberSize ordinal(int index){
 		return FLAG_INFO.get(index);
@@ -94,8 +93,8 @@ public enum NumberSize{
 		return BYTE_MAP[bytes];
 	}
 	
-	private int nextId = -2;
-	private int prevId = -2;
+	private NumberSize next;
+	private NumberSize prev;
 	
 	public final int  bytes;
 	public final long maxSize;
@@ -257,14 +256,13 @@ public enum NumberSize{
 		if(this == LONG) return value;
 		return value&this.maxSize;
 	}
+	private int toUnsigned(int value){
+		return value&(int)this.maxSize;
+	}
 	private long toSigned(long value){
 		if(this == LONG || this == VOID) return value;
 		if(value<=signedMaxValue) return value;
 		return value - maxSize - 1;
-	}
-	
-	private int toUnsigned(int value){
-		return value&(int)this.maxSize;
 	}
 	private int toSigned(int value){
 		if(this == VOID) return value;
@@ -272,115 +270,45 @@ public enum NumberSize{
 		return value - (int)maxSize - 1;
 	}
 	
-	public NumberSize prev(){
-		if(prevId == -2){
-			prevId = FLAG_INFO.stream().filter(n -> n.lesserThan(this)).max(Comparator.comparingInt(NumberSize::bytes)).map(Enum::ordinal).orElse(-1);
-		}
-		if(prevId == -1) return this;
-		return ordinal(prevId);
-	}
+	public NumberSize prev(){ return prev; }
+	public NumberSize next(){ return next; }
 	
-	public NumberSize next(){
-		if(nextId == -2){
-			nextId = FLAG_INFO.stream().filter(n -> n.greaterThan(this)).min(Comparator.comparingInt(NumberSize::bytes)).map(Enum::ordinal).orElse(-1);
-		}
-		if(nextId == -1) return this;
-		return ordinal(nextId);
-	}
+	///////////
 	
-	public boolean greaterThanOrEqual(NumberSize other){
-		if(other == this) return true;
-		return bytes>=other.bytes;
-	}
-	public boolean lesserThanOrEqual(NumberSize other){
-		if(other == this) return true;
-		return bytes<=other.bytes;
-	}
+	public boolean greaterThanOrEqual(NumberSize other){ return other == this || bytes>=other.bytes; }
+	public boolean lesserThanOrEqual(NumberSize other) { return other == this || bytes<=other.bytes; }
+	public boolean greaterThan(NumberSize other)       { return other != this && bytes>other.bytes; }
+	public boolean lesserThan(NumberSize other)        { return other != this && bytes<other.bytes; }
 	
-	public boolean greaterThan(NumberSize other){
-		if(other == this) return false;
-		return bytes>other.bytes;
-	}
+	///////////
 	
-	public boolean lesserThan(NumberSize other){
-		if(other == this) return false;
-		return bytes<other.bytes;
-	}
+	public NumberSize max(NumberSize other){ return greaterThan(other)? this : other; }
+	public NumberSize min(NumberSize other){ return lesserThan(other)? this : other; }
 	
-	public NumberSize max(NumberSize other){
-		return greaterThan(other)? this : other;
-	}
+	///////////
 	
-	public NumberSize min(NumberSize other){
-		return lesserThan(other)? this : other;
-	}
-	
-	public boolean canFit(INumber num){
-		return canFit(num.getValue());
-	}
-	
-	public boolean canFit(long num){
-		return num<=maxSize;
-	}
-	
-	public boolean canFit(int num){
-		return num<=maxSize;
-	}
-	
-	public boolean canFitSigned(long num){
-		return signedMinValue<=num && num<=signedMaxValue;
-	}
-	
-	public boolean canFitSigned(int num){
-		return signedMinValue<=num && num<=signedMaxValue;
-	}
+	public boolean canFit(INumber num)             { return canFit(num.getValue()); }
+	public boolean canFit(long num)                { return num<=maxSize; }
+	public boolean canFit(int num)                 { return num<=maxSize; }
+	public boolean canFitSigned(long num)          { return signedMinValue<=num && num<=signedMaxValue; }
+	public boolean canFitSigned(int num)           { return signedMinValue<=num && num<=signedMaxValue; }
+	public boolean canFit(long num, boolean signed){ return signed? canFitSigned(num) : canFit(num); }
+	public boolean canFit(int num, boolean signed) { return signed? canFitSigned(num) : canFit(num); }
 	
 	public long remaining(long num){
 		return maxSize - num;
 	}
 	
-	public void ensureCanFit(@Nullable ChunkPointer num) throws OutOfBitDepth{
-		ensureCanFit(ChunkPointer.getValueNullable(num));
+	private void depthFail(long num, boolean signed) throws OutOfBitDepth{
+		throw new OutOfBitDepth(this, num, signed);
 	}
 	
-	public void ensureCanFit(@NotNull INumber num) throws OutOfBitDepth{
-		ensureCanFit(num.getValue());
-	}
-	
-	public void ensureCanFit(long num) throws OutOfBitDepth{
-		if(!canFit(num)) throw new OutOfBitDepth(this, num, false);
-	}
-	
-	public void ensureCanFit(int num) throws OutOfBitDepth{
-		if(!canFit(num)) throw new OutOfBitDepth(this, num, false);
-	}
-	
-	public void ensureCanFitSigned(long num) throws OutOfBitDepth{
-		if(!canFitSigned(num)) throw new OutOfBitDepth(this, num, true);
-	}
-	
-	public void ensureCanFitSigned(int num) throws OutOfBitDepth{
-		if(!canFitSigned(num)) throw new OutOfBitDepth(this, num, true);
-	}
-	
-	public void write(ContentWriter stream, long[] data) throws IOException{
-		for(var l : data){
-			write(stream, l);
-		}
-	}
-	
-	public NumberSize requireNonVoid(){
-		if(this == VOID) throw new RuntimeException("Value must not be " + VOID);
-		return this;
-	}
-	
-	public int bytes(){
-		return bytes;
-	}
-	
-	public int bits(){
-		return bytes*Byte.SIZE;
-	}
+	public void ensureCanFit(ChunkPointer num) throws OutOfBitDepth{ ensureCanFit(num.getValue()); }
+	public void ensureCanFit(INumber num) throws OutOfBitDepth     { ensureCanFit(num.getValue()); }
+	public void ensureCanFit(long num) throws OutOfBitDepth        { if(!canFit(num)) depthFail(num, false); }
+	public void ensureCanFit(int num) throws OutOfBitDepth         { if(!canFit(num)) depthFail(num, false); }
+	public void ensureCanFitSigned(long num) throws OutOfBitDepth  { if(!canFitSigned(num)) depthFail(num, true); }
+	public void ensureCanFitSigned(int num) throws OutOfBitDepth   { if(!canFitSigned(num)) depthFail(num, true); }
 	
 	public String binaryString(long value){
 		var    bitCount = bits();
@@ -389,23 +317,12 @@ public enum NumberSize{
 		return "0".repeat(bitCount - bits.length()) + bits;
 	}
 	
-	public long maxSize(){
-		return maxSize;
-	}
-	public long signedMinValue(){
-		return signedMinValue;
-	}
-	public long signedMaxValue(){
-		return signedMaxValue;
-	}
-	
-	public char shortName(){
-		return shortName;
-	}
-	public OptionalInt optionalBytes(){
-		return optionalBytes;
-	}
-	public OptionalLong optionalBytesLong(){
-		return optionalBytesLong;
-	}
+	public int bytes()                     { return bytes; }
+	public int bits()                      { return bytes*Byte.SIZE; }
+	public long maxSize()                  { return maxSize; }
+	public long signedMinValue()           { return signedMinValue; }
+	public long signedMaxValue()           { return signedMaxValue; }
+	public char shortName()                { return shortName; }
+	public OptionalInt optionalBytes()     { return optionalBytes; }
+	public OptionalLong optionalBytesLong(){ return optionalBytesLong; }
 }
