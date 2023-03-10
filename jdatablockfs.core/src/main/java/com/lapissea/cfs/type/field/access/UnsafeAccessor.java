@@ -3,6 +3,7 @@ package com.lapissea.cfs.type.field.access;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.internal.Access;
+import com.lapissea.cfs.internal.MyUnsafe;
 import com.lapissea.cfs.objects.INumber;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
@@ -211,7 +212,7 @@ public sealed class UnsafeAccessor<CTyp extends IOInstance<CTyp>> extends Abstra
 	
 	public UnsafeAccessor(Struct<CTyp> struct, Field field, String name, Type genericType){
 		super(struct, name, genericType);
-		fieldOffset = UNSAFE.objectFieldOffset(field);
+		fieldOffset = MyUnsafe.objectFieldOffset(field);
 		annotations = Arrays.stream(field.getAnnotations()).collect(Collectors.toMap(Annotation::annotationType, a -> a));
 	}
 	

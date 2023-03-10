@@ -56,7 +56,7 @@ public class Access{
 		
 		long offset;
 		try{
-			offset = MyUnsafe.objectFieldOffset(Mirror.class.getDeclaredField("allowedModes")).orElseThrow();
+			offset = MyUnsafe.objectFieldOffset(Mirror.class.getDeclaredField("allowedModes"));
 		}catch(NoSuchFieldException e){
 			throw new RuntimeException(e);
 		}
