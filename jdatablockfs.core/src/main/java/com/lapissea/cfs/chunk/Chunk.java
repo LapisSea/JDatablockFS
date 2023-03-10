@@ -3,7 +3,7 @@ package com.lapissea.cfs.chunk;
 import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.Utils;
-import com.lapissea.cfs.exceptions.DesyncedCacheException;
+import com.lapissea.cfs.exceptions.CacheOutOfSync;
 import com.lapissea.cfs.exceptions.MalformedPointer;
 import com.lapissea.cfs.exceptions.OutOfBitDepth;
 import com.lapissea.cfs.io.ChunkChainIO;
@@ -616,7 +616,7 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		return Stream.generate(new ChainSupplier(this)).takeWhile(Objects::nonNull);
 	}
 	
-	public void requireReal() throws DesyncedCacheException{
+	public void requireReal() throws CacheOutOfSync{
 		provider.getChunkCache().requireReal(this);
 	}
 	

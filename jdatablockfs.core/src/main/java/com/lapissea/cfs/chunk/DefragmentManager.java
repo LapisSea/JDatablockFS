@@ -1,6 +1,6 @@
 package com.lapissea.cfs.chunk;
 
-import com.lapissea.cfs.exceptions.MalformedFileException;
+import com.lapissea.cfs.exceptions.MalformedFile;
 import com.lapissea.cfs.exceptions.OutOfBitDepth;
 import com.lapissea.cfs.io.instancepipe.ObjectPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
@@ -452,7 +452,7 @@ public class DefragmentManager{
 				warn("found unknown free chunks: {}", unreferencedChunks);
 			}
 			case ERROR -> {
-				throw new MalformedFileException("found unknown free chunks: " + unreferencedChunks);
+				throw new MalformedFile("found unknown free chunks: " + unreferencedChunks);
 			}
 		}
 	}

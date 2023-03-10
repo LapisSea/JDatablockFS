@@ -1,6 +1,6 @@
 package com.lapissea.cfs.chunk;
 
-import com.lapissea.cfs.exceptions.UnknownAllocationMethodException;
+import com.lapissea.cfs.exceptions.UnknownAllocationMethod;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.util.NotNull;
@@ -108,7 +108,7 @@ public interface MemoryManager extends DataProvider.Holder{
 					}
 				}
 				
-				throw new UnknownAllocationMethodException("Tried to allocate " + toAllocate + " bytes to " + last.getPtr() + " but there is no known way to do that");
+				throw new UnknownAllocationMethod("Tried to allocate " + toAllocate + " bytes to " + last.getPtr() + " but there is no known way to do that");
 			}
 			
 		}

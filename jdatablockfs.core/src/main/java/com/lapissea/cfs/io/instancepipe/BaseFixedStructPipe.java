@@ -1,6 +1,6 @@
 package com.lapissea.cfs.io.instancepipe;
 
-import com.lapissea.cfs.exceptions.FixedFormatNotSupportedException;
+import com.lapissea.cfs.exceptions.FixedFormatNotSupported;
 import com.lapissea.cfs.exceptions.IllegalField;
 import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.exceptions.UnsupportedStructLayout;
@@ -42,7 +42,7 @@ public abstract class BaseFixedStructPipe<T extends IOInstance<T>> extends Struc
 					IOFieldTools.streamStep(s -> s.filter(not(checkFixed))),
 					IOFieldTools::mergeBitSpace
 				));
-		}catch(FixedFormatNotSupportedException e){
+		}catch(FixedFormatNotSupported e){
 			throw new UnsupportedStructLayout(type.getFullName() + " does not support fixed size layout because of " + e.getField(), e);
 		}
 	}

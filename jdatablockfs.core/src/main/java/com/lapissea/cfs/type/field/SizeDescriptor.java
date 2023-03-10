@@ -1,7 +1,7 @@
 package com.lapissea.cfs.type.field;
 
 import com.lapissea.cfs.chunk.DataProvider;
-import com.lapissea.cfs.exceptions.FieldIsNullException;
+import com.lapissea.cfs.exceptions.FieldIsNull;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.VarPool;
@@ -206,7 +206,7 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>> extends Ba
 		public long calcUnknown(VarPool<Inst> ioPool, DataProvider provider, Inst instance, WordSpace wordSpace){
 			var num = (NumberSize)accessor.get(ioPool, instance);
 			if(num == null){
-				throw new FieldIsNullException(null, () -> accessor + " value is null");
+				throw new FieldIsNull(null, () -> accessor + " value is null");
 			}
 			return switch(wordSpace){
 				case BYTE -> num.bytes;

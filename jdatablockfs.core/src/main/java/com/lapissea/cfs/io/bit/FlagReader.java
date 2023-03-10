@@ -1,7 +1,7 @@
 package com.lapissea.cfs.io.bit;
 
 
-import com.lapissea.cfs.exceptions.IllegalBitValueException;
+import com.lapissea.cfs.exceptions.IllegalBitValue;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.util.NotNull;
@@ -23,7 +23,7 @@ public class FlagReader implements BitReader, AutoCloseable{
 			int integrityBits = ((1<<eSiz) - 1)<<eSiz;
 			
 			if((data&integrityBits) != integrityBits){
-				throw new IllegalBitValueException(BitUtils.binaryRangeFindZero(data, 8, 0));
+				throw new IllegalBitValue(BitUtils.binaryRangeFindZero(data, 8, 0));
 			}
 			
 			return enumInfo.get((int)(data&((1L<<eSiz) - 1L)));

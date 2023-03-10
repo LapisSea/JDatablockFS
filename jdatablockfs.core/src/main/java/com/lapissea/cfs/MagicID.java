@@ -1,6 +1,6 @@
 package com.lapissea.cfs;
 
-import com.lapissea.cfs.exceptions.InvalidMagicIDException;
+import com.lapissea.cfs.exceptions.InvalidMagicID;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 
@@ -20,15 +20,15 @@ public class MagicID{
 		return MAGIC_ID.asReadOnlyBuffer();
 	}
 	
-	public static void read(ContentReader src) throws InvalidMagicIDException{
+	public static void read(ContentReader src) throws InvalidMagicID{
 		ByteBuffer magicId;
 		try{
 			magicId = ByteBuffer.wrap(src.readInts1(MAGIC_ID.limit()));
 			if(!magicId.equals(MAGIC_ID)){
-				throw new InvalidMagicIDException("ID: " + UTF_8.decode(magicId));
+				throw new InvalidMagicID("ID: " + UTF_8.decode(magicId));
 			}
 		}catch(IOException e){
-			throw new InvalidMagicIDException("There is no valid magic id, was Cluster.init called?", e);
+			throw new InvalidMagicID("There is no valid magic id, was Cluster.init called?", e);
 		}
 	}
 	
