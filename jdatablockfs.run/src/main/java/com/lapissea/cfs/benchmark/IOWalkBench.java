@@ -11,7 +11,14 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.MemoryWalker;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.fields.RefField;
-import org.openjdk.jmh.annotations.*;
+import com.lapissea.util.LogUtil;
+import org.openjdk.jmh.annotations.Benchmark;
+import org.openjdk.jmh.annotations.Fork;
+import org.openjdk.jmh.annotations.Measurement;
+import org.openjdk.jmh.annotations.OutputTimeUnit;
+import org.openjdk.jmh.annotations.Scope;
+import org.openjdk.jmh.annotations.State;
+import org.openjdk.jmh.annotations.Warmup;
 
 import java.io.IOException;
 import java.util.HashMap;

@@ -8,7 +8,12 @@ import com.lapissea.util.WeakValueHashMap;
 import com.lapissea.util.function.UnsafeFunction;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.AbstractMap;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.function.Supplier;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;

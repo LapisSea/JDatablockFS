@@ -6,7 +6,11 @@ import com.lapissea.cfs.objects.collections.IOIterator;
 import com.lapissea.util.NotImplementedException;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.Arrays;
+import java.util.NoSuchElementException;
+import java.util.Objects;
+import java.util.OptionalLong;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 public enum QuerySupport{

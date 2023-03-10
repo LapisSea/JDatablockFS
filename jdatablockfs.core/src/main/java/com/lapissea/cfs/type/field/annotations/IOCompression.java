@@ -1,7 +1,11 @@
 package com.lapissea.cfs.type.field.annotations;
 
 import com.lapissea.cfs.exceptions.MalformedStruct;
-import com.lapissea.cfs.io.compress.*;
+import com.lapissea.cfs.io.compress.BruteBestPacker;
+import com.lapissea.cfs.io.compress.GzipPacker;
+import com.lapissea.cfs.io.compress.Lz4Packer;
+import com.lapissea.cfs.io.compress.Packer;
+import com.lapissea.cfs.io.compress.RlePacker;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.compilation.AnnotationLogic;
 import com.lapissea.cfs.type.field.IOFieldTools;

@@ -6,7 +6,11 @@ import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.objects.ObjectID;
 import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.objects.text.AutoText;
-import com.lapissea.cfs.type.*;
+import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.SupportedPrimitive;
+import com.lapissea.cfs.type.TypeLink;
+import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.function.UnsafeSupplier;
 

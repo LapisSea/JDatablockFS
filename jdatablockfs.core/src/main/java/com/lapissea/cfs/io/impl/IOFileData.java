@@ -9,7 +9,11 @@ import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.utils.IOUtils;
 import com.lapissea.util.NotNull;
 
-import java.io.*;
+import java.io.Closeable;
+import java.io.EOFException;
+import java.io.File;
+import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.util.Collection;
