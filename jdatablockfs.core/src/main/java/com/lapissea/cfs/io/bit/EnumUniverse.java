@@ -1,6 +1,5 @@
 package com.lapissea.cfs.io.bit;
 
-import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.internal.MyUnsafe;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.utils.ReadWriteClosableLock;
@@ -18,7 +17,6 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
 import java.util.Objects;
-import java.util.OptionalLong;
 import java.util.Spliterator;
 import java.util.function.IntFunction;
 
@@ -31,51 +29,40 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
 		<E extends Enum<E>> E[] get(Class<E> type);
 	}
 	
-	private static final UGet UNSAFE_GETTER;
+	private static final UGet UNIVERSE_GETTER;
 	
 	static{
-		var uOff = OptionalLong.empty();
+		UGet uget;
 		try{
-			uOff = MyUnsafe.objectFieldOffset(EnumSet.class.getDeclaredField("universe"));
-		}catch(Throwable ignored){ }
-		
-		if(uOff.isEmpty()) UNSAFE_GETTER = null;
-		else{
-			long universeOffset = uOff.getAsLong();
-			
-			UGet uget = new UGet(){
+			long universeOffset = MyUnsafe.objectFieldOffset(EnumSet.class.getDeclaredField("universe"));
+			uget = new UGet(){
+				@SuppressWarnings("unchecked")
 				@Override
 				public <E extends Enum<E>> E[] get(Class<E> type){
-					try{
-						@SuppressWarnings("unchecked")
-						E[] universe = (E[])MyUnsafe.UNSAFE.getObject(EnumSet.noneOf(type), universeOffset);
-						if(GlobalConfig.DEBUG_VALIDATION){
-							if(!Arrays.equals(universe, getUniverseSafe(type))){
-								return null;
-							}
-						}
-						return universe;
-					}catch(Throwable e){
-						return null;
-					}
+					return (E[])MyUnsafe.UNSAFE.getObject(EnumSet.noneOf(type), universeOffset);
 				}
 			};
 			
 			enum DryRun{FOO, BAR}
-			if(uget.get(DryRun.class) == null) uget = null;
-			
-			UNSAFE_GETTER = uget;
+			if(!Arrays.equals(DryRun.class.getEnumConstants(), uget.get(DryRun.class))){
+				uget = null;
+			}
+		}catch(Throwable e){
+			uget = null;
 		}
+		if(uget == null){
+			uget = new UGet(){
+				@Override
+				public <E extends Enum<E>> E[] get(Class<E> type){
+					return type.getEnumConstants();
+				}
+			};
+		}
+		UNIVERSE_GETTER = uget;
 	}
 	
-	private static <T extends Enum<T>> T[] getUniverseUnsafe(Class<T> type){ return UNSAFE_GETTER == null? null : UNSAFE_GETTER.get(type); }
-	
-	private static <T extends Enum<T>> T[] getUniverseSafe(Class<T> type)  { return type.getEnumConstants(); }
-	
 	private static <T extends Enum<T>> T[] getUniverse(Class<T> type){
-		T[] universe = getUniverseUnsafe(type);
-		if(universe == null) universe = getUniverseSafe(type);
-		return universe;
+		return UNIVERSE_GETTER.get(type);
 	}
 	
 	private static void ensureEnum(Class<?> type){

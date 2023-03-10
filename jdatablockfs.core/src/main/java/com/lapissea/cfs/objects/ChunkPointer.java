@@ -30,10 +30,6 @@ public final class ChunkPointer implements INumber, Comparable<ChunkPointer>{
 		return of(value.getValue());
 	}
 	
-	public static long getValueNullable(ChunkPointer ptr){
-		return ptr == null? 0 : ptr.getValue();
-	}
-	
 	private final long value;
 	
 	private ChunkPointer(long value){

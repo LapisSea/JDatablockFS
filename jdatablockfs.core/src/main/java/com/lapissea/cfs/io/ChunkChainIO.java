@@ -2,7 +2,7 @@ package com.lapissea.cfs.io;
 
 import com.lapissea.cfs.chunk.ChainWalker;
 import com.lapissea.cfs.chunk.Chunk;
-import com.lapissea.cfs.exceptions.MalformedClusterDataException;
+import com.lapissea.cfs.exceptions.MalformedClusterData;
 import com.lapissea.cfs.io.content.ContentOutputStream;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.UtilL;
@@ -61,7 +61,7 @@ public final class ChunkChainIO implements RandomIO{
 		for(Chunk chunk : new ChainWalker(head)){
 			if(chunk == cursor) return;
 		}
-		throw new MalformedClusterDataException(cursor + " not in " + head.collectNext());
+		throw new MalformedClusterData(cursor + " not in " + head.collectNext());
 	}
 	
 	private long calcCursorEnd(){

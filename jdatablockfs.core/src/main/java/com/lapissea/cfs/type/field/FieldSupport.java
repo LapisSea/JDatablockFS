@@ -1,7 +1,7 @@
 package com.lapissea.cfs.type.field;
 
 import com.lapissea.cfs.Utils;
-import com.lapissea.cfs.exceptions.FieldIsNullException;
+import com.lapissea.cfs.exceptions.FieldIsNull;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.SupportedPrimitive;
@@ -115,7 +115,7 @@ class FieldSupport{
 		var val = field.get(ioPool, instance);
 		if(val == null){
 			if(field.getNullability() == IONullability.Mode.NOT_NULL){
-				throw new FieldIsNullException(field);
+				throw new FieldIsNull(field);
 			}
 			return Optional.empty();
 		}

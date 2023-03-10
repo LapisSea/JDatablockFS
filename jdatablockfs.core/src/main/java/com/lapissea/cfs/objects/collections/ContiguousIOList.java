@@ -6,7 +6,7 @@ import com.lapissea.cfs.chunk.ChainWalker;
 import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.ChunkBuilder;
 import com.lapissea.cfs.chunk.DataProvider;
-import com.lapissea.cfs.exceptions.BitDepthOutOfSpaceException;
+import com.lapissea.cfs.exceptions.OutOfBitDepth;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.ValueStorage;
 import com.lapissea.cfs.io.ValueStorage.StorageRule;
@@ -706,7 +706,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		
 		try{
 			point.target.setNextPtr(newNext.getPtr());
-		}catch(BitDepthOutOfSpaceException e){
+		}catch(OutOfBitDepth e){
 			throw new RuntimeException(e);
 		}
 		point.target.syncStruct();
@@ -783,7 +783,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		try{
 			chRem.setCapacity(sizeRem);
 			ch.setCapacity(totalFree - headerSize);
-		}catch(BitDepthOutOfSpaceException e){
+		}catch(OutOfBitDepth e){
 			throw new ShouldNeverHappenError(e);
 		}
 		ch.writeHeader();

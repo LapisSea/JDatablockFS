@@ -1,6 +1,6 @@
 package com.lapissea.cfs.chunk;
 
-import com.lapissea.cfs.exceptions.DesyncedCacheException;
+import com.lapissea.cfs.exceptions.CacheOutOfSync;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
@@ -95,10 +95,10 @@ public final class ChunkCache{
 		return generated;
 	}
 	
-	public synchronized void requireReal(Chunk chunk) throws DesyncedCacheException{
+	public synchronized void requireReal(Chunk chunk) throws CacheOutOfSync{
 		var cached = data.get(chunk.getPtr());
 		if(chunk != cached){
-			throw new DesyncedCacheException(chunk, cached);
+			throw new CacheOutOfSync(chunk, cached);
 		}
 	}
 	
@@ -115,7 +115,7 @@ public final class ChunkCache{
 			try{
 				var read = Chunk.readChunk(provider, cached.getPtr());
 				if(!read.equals(cached)){
-					throw new DesyncedCacheException(read, cached);
+					throw new CacheOutOfSync(read, cached);
 				}
 			}catch(Throwable e){
 				throw new RuntimeException(cached + "", e);
@@ -131,7 +131,7 @@ public final class ChunkCache{
 					continue outer;
 				}
 			}
-			throw new DesyncedCacheException("Unreachable chunk: " + value);
+			throw new CacheOutOfSync("Unreachable chunk: " + value);
 		}
 	}
 }

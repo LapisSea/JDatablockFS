@@ -3,9 +3,9 @@ package com.lapissea.cfs.chunk;
 import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.Utils;
-import com.lapissea.cfs.exceptions.BitDepthOutOfSpaceException;
-import com.lapissea.cfs.exceptions.DesyncedCacheException;
+import com.lapissea.cfs.exceptions.CacheOutOfSync;
 import com.lapissea.cfs.exceptions.MalformedPointer;
+import com.lapissea.cfs.exceptions.OutOfBitDepth;
 import com.lapissea.cfs.io.ChunkChainIO;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.RandomIO;
@@ -179,7 +179,7 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 				instance.setCapacity(bns.read(src));
 				instance.setSize(bns.read(src));
 				instance.setNextPtr(ChunkPointer.read(nns, src));
-			}catch(BitDepthOutOfSpaceException e){
+			}catch(OutOfBitDepth e){
 				throw new IOException(e);
 			}
 			return instance;
@@ -308,7 +308,7 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		this.nextSize = Objects.requireNonNull(nextSize);
 		try{
 			setNextPtr(nextPtr);
-		}catch(BitDepthOutOfSpaceException e){
+		}catch(OutOfBitDepth e){
 			throw new RuntimeException(e);
 		}
 		
@@ -318,7 +318,7 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		
 		try{
 			bodyNumSize.ensureCanFit(capacity);
-		}catch(BitDepthOutOfSpaceException e){
+		}catch(OutOfBitDepth e){
 			throw new IllegalArgumentException("capacity(" + capacity + ") can not fit in to " + bodyNumSize, e);
 		}
 		
@@ -440,7 +440,7 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		return capacity;
 	}
 	@IOValue
-	public void setCapacity(long newCapacity) throws BitDepthOutOfSpaceException{
+	public void setCapacity(long newCapacity) throws OutOfBitDepth{
 		forbidReadOnly();
 		if(this.capacity == newCapacity) return;
 		getBodyNumSize().ensureCanFit(newCapacity);
@@ -501,7 +501,7 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	public NumberSize getBodyNumSize(){
 		return bodyNumSize;
 	}
-	public void setBodyNumSize(NumberSize bodyNumSize) throws BitDepthOutOfSpaceException{
+	public void setBodyNumSize(NumberSize bodyNumSize) throws OutOfBitDepth{
 		forbidReadOnly();
 		if(this.bodyNumSize == bodyNumSize) return;
 		bodyNumSize.ensureCanFit(getCapacity());
@@ -514,7 +514,7 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		return nextSize;
 	}
 	
-	public void setNextSize(NumberSize nextSize) throws BitDepthOutOfSpaceException{
+	public void setNextSize(NumberSize nextSize) throws OutOfBitDepth{
 		forbidReadOnly();
 		if(this.nextSize == nextSize) return;
 		nextSize.ensureCanFit(getNextPtr());
@@ -550,7 +550,7 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	}
 	
 	@IOValue
-	public void setNextPtr(ChunkPointer nextPtr) throws BitDepthOutOfSpaceException{
+	public void setNextPtr(ChunkPointer nextPtr) throws OutOfBitDepth{
 		forbidReadOnly();
 		Objects.requireNonNull(nextPtr);
 		if(this.nextPtr.equals(nextPtr)) return;
@@ -583,12 +583,12 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 			setSize(0);
 			try{
 				setCapacity(getCapacity() + oldSiz - newSiz);
-			}catch(BitDepthOutOfSpaceException e){
+			}catch(OutOfBitDepth e){
 				setBodyNumSize(NumberSize.bySize(getCapacity() + oldSiz - newSiz));
 				newSiz = getHeaderSize();
 				setCapacity(getCapacity() + oldSiz - newSiz);
 			}
-		}catch(BitDepthOutOfSpaceException e){
+		}catch(OutOfBitDepth e){
 			throw new ShouldNeverHappenError(e);
 		}
 	}
@@ -596,7 +596,7 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	public void clearNextPtr(){
 		try{
 			setNextPtr(ChunkPointer.NULL);
-		}catch(BitDepthOutOfSpaceException e){
+		}catch(OutOfBitDepth e){
 			throw new ShouldNeverHappenError(e);
 		}
 	}
@@ -616,7 +616,7 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		return Stream.generate(new ChainSupplier(this)).takeWhile(Objects::nonNull);
 	}
 	
-	public void requireReal() throws DesyncedCacheException{
+	public void requireReal() throws CacheOutOfSync{
 		provider.getChunkCache().requireReal(this);
 	}
 	

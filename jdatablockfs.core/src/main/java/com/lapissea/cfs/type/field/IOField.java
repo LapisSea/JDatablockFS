@@ -2,8 +2,8 @@ package com.lapissea.cfs.type.field;
 
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
-import com.lapissea.cfs.exceptions.FieldIsNullException;
-import com.lapissea.cfs.exceptions.FixedFormatNotSupportedException;
+import com.lapissea.cfs.exceptions.FieldIsNull;
+import com.lapissea.cfs.exceptions.FixedFormatNotSupported;
 import com.lapissea.cfs.io.IO;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
@@ -79,7 +79,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 		try{
 			var val = get(ioPool, instance);
 			return val == null;
-		}catch(FieldIsNullException npe){
+		}catch(FieldIsNull npe){
 			if(npe.field == this){
 				return true;
 			}else{
@@ -92,7 +92,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 		var value = rawGet(ioPool, instance);
 		if(value != null) return value;
 		return switch(getNullability()){
-			case NOT_NULL -> throw new FieldIsNullException(this);
+			case NOT_NULL -> throw new FieldIsNull(this);
 			case NULLABLE -> null;
 			case DEFAULT_IF_NULL -> {
 				var newVal = createDefaultIfNull.get();
@@ -106,7 +106,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 		var value = rawGet(ioPool, instance);
 		if(value != null) return value;
 		switch(getNullability()){
-			case NOT_NULL -> throw new FieldIsNullException(this);
+			case NOT_NULL -> throw new FieldIsNull(this);
 			case null, NULLABLE -> { }
 			case DEFAULT_IF_NULL -> throw new IllegalStateException(this + " does not support " + DEFAULT_IF_NULL);
 		}
@@ -290,13 +290,13 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 	}
 	
 	protected void throwInformativeFixedSizeError(){ }
-	private FixedFormatNotSupportedException unsupportedFixed(){
+	private FixedFormatNotSupported unsupportedFixed(){
 		try{
 			throwInformativeFixedSizeError();
 		}catch(Throwable e){
-			return new FixedFormatNotSupportedException(this, e);
+			return new FixedFormatNotSupported(this, e);
 		}
-		return new FixedFormatNotSupportedException(this);
+		return new FixedFormatNotSupported(this);
 	}
 	
 	public final IOField<T, ValueType> forceMaxAsFixedSize(){

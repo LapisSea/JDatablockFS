@@ -1,6 +1,6 @@
 package com.lapissea.cfs.io.bit;
 
-import com.lapissea.cfs.exceptions.IllegalBitValueException;
+import com.lapissea.cfs.exceptions.IllegalBitValue;
 
 import java.io.IOException;
 
@@ -33,7 +33,7 @@ public interface BitReader{
 	default void checkNOneAndThrow(int n) throws IOException{
 		int errorBit = checkNOne(n);
 		if(errorBit != -1){
-			throw new IllegalBitValueException(errorBit);
+			throw new IllegalBitValue(errorBit);
 		}
 	}
 	

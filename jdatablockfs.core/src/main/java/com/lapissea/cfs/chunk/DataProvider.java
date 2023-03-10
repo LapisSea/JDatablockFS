@@ -1,7 +1,7 @@
 package com.lapissea.cfs.chunk;
 
 import com.lapissea.cfs.MagicID;
-import com.lapissea.cfs.exceptions.DesyncedCacheException;
+import com.lapissea.cfs.exceptions.CacheOutOfSync;
 import com.lapissea.cfs.exceptions.PointerOutsideFile;
 import com.lapissea.cfs.io.IOHook;
 import com.lapissea.cfs.io.IOInterface;
@@ -105,7 +105,7 @@ public interface DataProvider{
 		if(cached == null) return;
 		var read = readChunk(ptr);
 		if(!read.equals(cached)){
-			throw new DesyncedCacheException(read, cached);
+			throw new CacheOutOfSync(read, cached);
 		}
 	}
 	

@@ -3,7 +3,7 @@ package com.lapissea.cfs.type.field.fields.reflection;
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.DataProvider;
-import com.lapissea.cfs.exceptions.FieldIsNullException;
+import com.lapissea.cfs.exceptions.FieldIsNull;
 import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
@@ -87,7 +87,7 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 		var val = rawGet(ioPool, instance);
 		if(val == null){
 			if(nullable()) return null;
-			throw new FieldIsNullException(this);
+			throw new FieldIsNull(this);
 		}
 		return val;
 	}

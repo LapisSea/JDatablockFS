@@ -2,7 +2,7 @@ package com.lapissea.cfs.type.field.fields.reflection;
 
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
-import com.lapissea.cfs.exceptions.FieldIsNullException;
+import com.lapissea.cfs.exceptions.FieldIsNull;
 import com.lapissea.cfs.io.bit.BitInputStream;
 import com.lapissea.cfs.io.bit.BitOutputStream;
 import com.lapissea.cfs.io.bit.FlagReader;
@@ -224,7 +224,7 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 			Optional<String> str;
 			try{
 				str = field.instanceToString(ioPool, instance, doShort || TextUtil.USE_SHORT_IN_COLLECTIONS);
-			}catch(FieldIsNullException e){
+			}catch(FieldIsNull e){
 				str = Optional.of("<UNINITIALIZED>");
 			}
 			return str.map(s -> field.getName() + "=" + s);

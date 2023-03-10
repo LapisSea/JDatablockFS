@@ -3,8 +3,8 @@ package com.lapissea.cfs.io.instancepipe;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.DataProvider;
-import com.lapissea.cfs.exceptions.FieldIsNullException;
-import com.lapissea.cfs.exceptions.MalformedObjectException;
+import com.lapissea.cfs.exceptions.FieldIsNull;
+import com.lapissea.cfs.exceptions.MalformedObject;
 import com.lapissea.cfs.exceptions.MalformedPipe;
 import com.lapissea.cfs.exceptions.RecursiveSelfCompilation;
 import com.lapissea.cfs.internal.Access;
@@ -258,7 +258,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			if(inst != null){
 				try{
 					checkTypeIntegrity(inst, true);
-				}catch(FieldIsNullException ignored){
+				}catch(FieldIsNull ignored){
 				}catch(IOException e){
 					e.printStackTrace();
 					throw new RuntimeException(e);
@@ -614,7 +614,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		if(earlyNullChecks == null) return;
 		for(var field : earlyNullChecks){
 			if(field.isNull(ioPool, instance)){
-				throw new FieldIsNullException(field);
+				throw new FieldIsNull(field);
 			}
 		}
 	}
@@ -706,7 +706,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				generator.generate(ioPool, provider, instance, allowExternalMod);
 			}catch(IOException e){
 				throw new IOException("Failed to generate fields. Problem on " + generator, e);
-			}catch(FieldIsNullException e){
+			}catch(FieldIsNull e){
 				e.addSuppressed(new RuntimeException("Failed to generate fields. Problem on " + generator));
 				throw e;
 			}catch(Throwable e){
@@ -872,11 +872,11 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			write(ch, inst);
 			instRead = readNew(ch, null);
 		}catch(IOException e){
-			throw new MalformedObjectException("Failed object IO " + getType(), e);
+			throw new MalformedObject("Failed object IO " + getType(), e);
 		}
 		
 		if(!instRead.equals(inst)){
-			throw new MalformedObjectException(getType() + " has failed integrity check. Source/read:\n" + inst + "\n" + instRead);
+			throw new MalformedObject(getType() + " has failed integrity check. Source/read:\n" + inst + "\n" + instRead);
 		}
 	}
 	
