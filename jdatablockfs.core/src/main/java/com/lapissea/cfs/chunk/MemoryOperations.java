@@ -4,6 +4,7 @@ import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.exceptions.OutOfBitDepth;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.RandomIO;
+import com.lapissea.cfs.io.content.ContentOutputStream;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Reference;
@@ -254,6 +255,8 @@ public class MemoryOperations{
 	
 	public static List<Chunk> mergeChunks(Collection<Chunk> data) throws IOException{
 		if(data.isEmpty()) return new ArrayList<>();
+		var provider = data.iterator().next().getDataProvider();
+		
 		List<Chunk> toDestroy = new ArrayList<>();
 		List<Chunk> oks       = new ArrayList<>();
 		
@@ -276,14 +279,26 @@ public class MemoryOperations{
 			oks.add(chunk);
 		}
 		
-		for(Chunk chunk : oks){
-			clearFree(chunk);
+		{
+			oks.sort(Comparator.naturalOrder());
+			List<RandomIO.WriteChunk> chunks = new ArrayList<>(oks.size());
+			for(Chunk chunk : oks){
+				chunk.setSize(0);
+				chunk.clearAndCompressHeader();
+				
+				var    size      = chunk.getHeaderSize();
+				byte[] headBytes = new byte[size];
+				chunk.writeHeader(new ContentOutputStream.BA(headBytes));
+				chunks.add(new RandomIO.WriteChunk(chunk.getPtr().getValue(), headBytes, size));
+			}
+			try(var io = provider.getSource().io()){
+				io.writeAtOffsets(chunks);
+			}
 		}
 		
 		if(!toDestroy.isEmpty()){
 			toDestroy.sort(Comparator.naturalOrder());
-			byte[] empty    = new byte[(int)Chunk.PIPE.getSizeDescriptor().requireMax(WordSpace.BYTE)];
-			var    provider = toDestroy.get(0).getDataProvider();
+			byte[] empty = new byte[(int)Chunk.PIPE.getSizeDescriptor().requireMax(WordSpace.BYTE)];
 			try(var io = provider.getSource().io()){
 				io.writeAtOffsets(toDestroy.stream().map(c -> new RandomIO.WriteChunk(c.getPtr().getValue(), empty, c.getHeaderSize())).toList());
 			}
