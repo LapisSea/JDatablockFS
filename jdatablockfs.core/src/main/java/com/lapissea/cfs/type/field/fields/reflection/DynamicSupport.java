@@ -37,9 +37,11 @@ import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
 
 public abstract class DynamicSupport{
 	
+	private static final StructPipe<Reference> REF_PIPE = Reference.standardPipe();
+	
 	
 	@SuppressWarnings({"unchecked"})
-	static long calcSize(StructPipe<Reference> REF_PIPE, DataProvider prov, Object val){
+	static long calcSize(DataProvider prov, Object val){
 		return switch(val){
 			case Boolean ignored -> 1;
 			case Float ignored -> 4;
@@ -97,7 +99,7 @@ public abstract class DynamicSupport{
 		};
 	}
 	@SuppressWarnings("unchecked")
-	static void writeValue(StructPipe<Reference> REF_PIPE, DataProvider provider, ContentWriter dest, Object val) throws IOException{
+	static void writeValue(DataProvider provider, ContentWriter dest, Object val) throws IOException{
 		switch(val){
 			case Boolean v -> dest.writeBoolean(v);
 			case Float v -> NumberSize.INT.writeFloating(dest, v);
@@ -257,7 +259,7 @@ public abstract class DynamicSupport{
 		if(!List.<Class<? extends Number>>of(Byte.class, Short.class, Integer.class, Long.class).contains(tyo)) throw new AssertionError(tyo + " is not an integer");
 	}
 	
-	static Object readTyp(StructPipe<Reference> REF_PIPE, TypeLink typDef, DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+	static Object readTyp(TypeLink typDef, DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
 		var typ = typDef.getTypeClass(provider.getTypeDb());
 		if(typ == Boolean.class) return src.readBoolean();
 		if(typ == Float.class) return (float)NumberSize.INT.readFloating(src);
@@ -324,7 +326,7 @@ public abstract class DynamicSupport{
 		
 		throw new NotImplementedException(typ + "");
 	}
-	static void skipTyp(StructPipe<Reference> REF_PIPE, TypeLink typDef, DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+	static void skipTyp(TypeLink typDef, DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
 		var        typ = typDef.getTypeClass(provider.getTypeDb());
 		NumberSize siz = null;
 		if(typ == Boolean.class) siz = NumberSize.BYTE;
