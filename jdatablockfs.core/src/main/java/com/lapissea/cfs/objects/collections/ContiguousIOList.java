@@ -611,10 +611,16 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		
 		try(var io = selfIO()){
 			if(storage.needsRemoval()){
+				List<ChunkPointer> toFree = new ArrayList<>();
 				for(long i = 0; i<s; i++){
 					io.setPos(calcElementOffset(i));
-					storage.notifyRemoval(io);
+					toFree.addAll(storage.notifyRemoval(io));
+					if(toFree.size()>=256){
+						getDataProvider().getMemoryManager().freeChains(toFree);
+						toFree.clear();
+					}
 				}
+				getDataProvider().getMemoryManager().freeChains(toFree);
 			}
 			io.setPos(calcElementOffset(0));
 			io.setCapacity(calcElementOffset(0));
@@ -718,7 +724,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		try(var io = selfIO()){
 			if(storage.needsRemoval()){
 				io.setPos(calcElementOffset(index));
-				storage.notifyRemoval(io);
+				getDataProvider().getMemoryManager().freeChains(storage.notifyRemoval(io));
 			}
 			
 			var    siz  = getElementSize();

@@ -13,11 +13,13 @@ import com.lapissea.cfs.io.instancepipe.FixedStructPipe;
 import com.lapissea.cfs.io.instancepipe.FixedVaryingStructPipe;
 import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
+import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.MemoryWalker;
 import com.lapissea.cfs.type.NewObj;
 import com.lapissea.cfs.type.RuntimeType;
 import com.lapissea.cfs.type.Struct;
@@ -33,9 +35,11 @@ import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.fields.NoIOField;
 import com.lapissea.cfs.type.field.fields.RefField;
 import com.lapissea.util.NotImplementedException;
+import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.OptionalLong;
 import java.util.Set;
@@ -93,7 +97,7 @@ public sealed interface ValueStorage<T>{
 		}
 		
 		@Override
-		public void notifyRemoval(ContentReader io){ }
+		public List<ChunkPointer> notifyRemoval(ContentReader io){ return List.of(); }
 		@Override
 		public boolean needsRemoval(){
 			return false;
@@ -169,10 +173,29 @@ public sealed interface ValueStorage<T>{
 			pipe.write(provider, dest, src);
 		}
 		@Override
-		public void notifyRemoval(ContentReader io){ }
+		public List<ChunkPointer> notifyRemoval(ContentReader io) throws IOException{
+			var ptrs  = new ArrayList<ChunkPointer>();
+			var root  = readNew(io);
+			var dummy = new Reference(ChunkPointer.of(69), 420);
+			new MemoryWalker(provider, root, dummy, pipe, false, new MemoryWalker.PointerRecord(){
+				@Override
+				public <IO extends IOInstance<IO>> int log(Reference instanceReference, IO instance, RefField<IO, ?> field, Reference valueReference) throws IOException{
+					if(dummy == valueReference) throw new ShouldNeverHappenError();
+					if(!valueReference.isNull()){
+						ptrs.add(valueReference.getPtr());
+					}
+					return MemoryWalker.CONTINUE;
+				}
+				@Override
+				public <IO extends IOInstance<IO>> int logChunkPointer(Reference instanceReference, IO instance, IOField<IO, ChunkPointer> field, ChunkPointer value) throws IOException{
+					return MemoryWalker.CONTINUE;
+				}
+			}).walk();
+			return ptrs;
+		}
 		@Override
 		public boolean needsRemoval(){
-			return false;
+			return pipe.getType().getCanHavePointers();
 		}
 		
 		@Override
@@ -270,12 +293,12 @@ public sealed interface ValueStorage<T>{
 			}
 		}
 		@Override
-		public void notifyRemoval(ContentReader io) throws IOException{
+		public List<ChunkPointer> notifyRemoval(ContentReader io) throws IOException{
 			var ref = refPipe.readNew(provider, io, null);
 			if(ref.isNull()){
-				return;
+				return List.of();
 			}
-			provider.getMemoryManager().freeChains(List.of(ref.getPtr()));
+			return List.of(ref.getPtr());
 		}
 		@Override
 		public boolean needsRemoval(){
@@ -384,7 +407,7 @@ public sealed interface ValueStorage<T>{
 			refPipe.write(provider, dest, src == null? new Reference() : src.getReference());
 		}
 		@Override
-		public void notifyRemoval(ContentReader io){ }
+		public List<ChunkPointer> notifyRemoval(ContentReader io){ return List.of(); }
 		@Override
 		public boolean needsRemoval(){
 			return false;
@@ -443,7 +466,7 @@ public sealed interface ValueStorage<T>{
 			}
 		}
 		@Override
-		public void notifyRemoval(ContentReader io){ }
+		public List<ChunkPointer> notifyRemoval(ContentReader io){ return List.of(); }
 		@Override
 		public boolean needsRemoval(){
 			return false;
@@ -484,7 +507,7 @@ public sealed interface ValueStorage<T>{
 			AutoText.PIPE.write(provider, dest, new AutoText(src));
 		}
 		@Override
-		public void notifyRemoval(ContentReader io){ }
+		public List<ChunkPointer> notifyRemoval(ContentReader io){ return List.of(); }
 		@Override
 		public boolean needsRemoval(){
 			return false;
@@ -545,12 +568,12 @@ public sealed interface ValueStorage<T>{
 			}
 		}
 		@Override
-		public void notifyRemoval(ContentReader io) throws IOException{
+		public List<ChunkPointer> notifyRemoval(ContentReader io) throws IOException{
 			var ref = refPipe.readNew(provider, io, null);
 			if(ref.isNull()){
-				return;
+				return List.of();
 			}
-			provider.getMemoryManager().freeChains(List.of(ref.getPtr()));
+			return List.of(ref.getPtr());
 		}
 		@Override
 		public boolean needsRemoval(){
@@ -575,7 +598,7 @@ public sealed interface ValueStorage<T>{
 	
 	final class UnknownIDObject implements ValueStorage<Object>{
 		
-		private static final StandardStructPipe<Reference> REF_PIPE = StandardStructPipe.of(Reference.class);
+		private static final StructPipe<Reference> REF_PIPE = Reference.standardPipe();
 		
 		private final DataProvider   provider;
 		private final GenericContext generics;
@@ -727,7 +750,7 @@ public sealed interface ValueStorage<T>{
 			throw new NotImplementedException("Unknown type: " + type);
 		}
 		@Override
-		public void notifyRemoval(ContentReader io){ }
+		public List<ChunkPointer> notifyRemoval(ContentReader io){ return List.of(); }
 		@Override
 		public boolean needsRemoval(){
 			return false;
@@ -828,7 +851,7 @@ public sealed interface ValueStorage<T>{
 	T readNew(ContentReader src) throws IOException;
 	void write(RandomIO dest, T src) throws IOException;
 	
-	void notifyRemoval(ContentReader io) throws IOException;
+	List<ChunkPointer> notifyRemoval(ContentReader io) throws IOException;
 	boolean needsRemoval();
 	
 	long inlineSize();
