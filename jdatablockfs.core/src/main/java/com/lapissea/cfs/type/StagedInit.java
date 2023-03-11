@@ -241,14 +241,17 @@ public abstract class StagedInit{
 	
 	
 	private void actuallyWaitForState(int state){
-		var thread = Thread.currentThread();
-		if(initThread == thread){
-			throw new RuntimeException("Self deadlock");
-		}
+		threadCheck();
 		
-		long start = System.nanoTime();
+		boolean threadCheck = false;
+		long    start       = System.nanoTime();
 		
 		while(true){
+			if(!threadCheck && this.state>=STATE_START){
+				threadCheck = true;
+				threadCheck();
+			}
+			
 			try(var ignored = rLock.open()){
 				checkErr();
 				if(this.state>=state) break;
@@ -265,6 +268,12 @@ public abstract class StagedInit{
 			if(delta>LONG_WAIT_THRESHOLD*1_000_000L){
 				Log.debug("Long wait on {}#yellow in {}#yellow for {#red{}ms#}", (Supplier<Object>)() -> stateToString(state), this, delta/1000_000);
 			}
+		}
+	}
+	
+	private void threadCheck(){
+		if(initThread == Thread.currentThread()){
+			throw new RuntimeException("Self deadlock");
 		}
 	}
 }
