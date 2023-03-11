@@ -22,6 +22,8 @@ import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.IOException;
+import java.lang.ref.WeakReference;
+import java.nio.ByteBuffer;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
@@ -39,28 +41,36 @@ public class Cluster implements DataProvider{
 		return Cluster.init(MemoryData.builder().withCapacity(MagicID.size()).build());
 	}
 	
-	public static Cluster init(IOInterface data) throws IOException{
-		data.openIOTransaction(() -> {
-			var provider = DataProvider.newVerySimpleProvider(data);
-			var db       = new IOTypeDB.PersistentDB();
-			
-			try(var io = data.write(true)){
-				MagicID.write(io);
-			}
-			
-			var firstChunk = AllocateTicket.withData(ROOT_PIPE, provider, new RootRef())
-			                               .withApproval(c -> c.getPtr().equals(FIRST_CHUNK_PTR))
-			                               .submit(provider);
-			
-			db.init(provider);
-			
-			ROOT_PIPE.modify(firstChunk, root -> {
-				Metadata metadata = root.metadata;
-				metadata.db = db;
-				metadata.allocateNulls(provider);
-			}, null);
-		});
+	public static void initEmptyClusterSnapshot(IOInterface data) throws IOException{
+		var provider = DataProvider.newVerySimpleProvider(data);
+		var db       = new IOTypeDB.PersistentDB();
 		
+		try(var io = data.write(true)){
+			MagicID.write(io);
+		}
+		
+		var firstChunk = AllocateTicket.withData(ROOT_PIPE, provider, new RootRef())
+		                               .withApproval(c -> c.getPtr().equals(FIRST_CHUNK_PTR))
+		                               .submit(provider);
+		
+		db.init(provider);
+		
+		ROOT_PIPE.modify(firstChunk, root -> {
+			Metadata metadata = root.metadata;
+			metadata.db = db;
+			metadata.allocateNulls(provider);
+		}, null);
+	}
+	
+	private static WeakReference<ByteBuffer> EMPTY_CLUSTER_SNAP = new WeakReference<>(null);
+	public static Cluster init(IOInterface data) throws IOException{
+		var emptyClusterSnap = EMPTY_CLUSTER_SNAP.get();
+		if(emptyClusterSnap == null){
+			var mem = MemoryData.builder().withCapacity(MagicID.size()).build();
+			initEmptyClusterSnapshot(mem);
+			EMPTY_CLUSTER_SNAP = new WeakReference<>(emptyClusterSnap = ByteBuffer.wrap(mem.readAll()).asReadOnlyBuffer());
+		}
+		data.write(true, emptyClusterSnap);
 		return new Cluster(data);
 	}
 	
