@@ -14,13 +14,10 @@ import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
 import java.util.StringJoiner;
@@ -426,20 +423,7 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 	}
 	
 	private IOTransaction transaction(){
-		return new IOTransaction(){
-			@Override
-			public int getChunkCount(){
-				return 0;
-			}
-			@Override
-			public long getTotalBytes(){
-				return 0;
-			}
-			@Override
-			public void close() throws IOException{
-			}
-		};
-//		return getDataProvider().getSource().openIOTransaction();
+		return getDataProvider().getSource().openIOTransaction();
 	}
 	
 	private void validate() throws IOException{
