@@ -229,6 +229,6 @@ public interface MemoryManager extends DataProvider.Holder{
 	Chunk alloc(AllocateTicket ticket) throws IOException;
 	
 	default long minAllocationCapacity(){
-		return 8;
+		return 1;
 	}
 }
