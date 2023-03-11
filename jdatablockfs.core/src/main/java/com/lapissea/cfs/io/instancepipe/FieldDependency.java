@@ -41,6 +41,7 @@ public class FieldDependency<T extends IOInstance<T>>{
 		return getDeps(FieldSet.of(names.stream().map(n -> allFields.byName(n).orElseThrow())));
 	}
 	public Ticket<T> getDeps(FieldSet<T> selectedFields){
+		if(selectedFields.isEmpty()) return emptyTicket();
 		if(selectedFields.size() == 1){
 			return getDeps(selectedFields.get(0));
 		}
@@ -57,6 +58,9 @@ public class FieldDependency<T extends IOInstance<T>>{
 			multiDependencyCache.put(selectedFields, field);
 			return field;
 		}
+	}
+	private Ticket<T> emptyTicket(){
+		return new Ticket<T>(false, false, FieldSet.of(), FieldSet.of(), List.of());
 	}
 	
 	public Ticket<T> getDeps(IOField<T, ?> selectedField){
@@ -77,7 +81,7 @@ public class FieldDependency<T extends IOInstance<T>>{
 	
 	private Ticket<T> generateFieldsDependency(FieldSet<T> selectedFields){
 		if(selectedFields.isEmpty()){
-			return new Ticket<T>(false, false, FieldSet.of(), FieldSet.of(), List.of());
+			return emptyTicket();
 		}
 		selectedFields.forEach(this::checkExistenceOfField);
 		if(selectedFields.size() == allFields.size()){

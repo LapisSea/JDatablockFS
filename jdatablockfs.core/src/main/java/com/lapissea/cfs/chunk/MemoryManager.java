@@ -180,6 +180,7 @@ public interface MemoryManager extends DataProvider.Holder{
 	 * Frees a set of chunks listed in the pointers parameter and all their next chunks
 	 */
 	default void freeChains(Collection<ChunkPointer> chainStarts) throws IOException{
+		if(chainStarts.isEmpty()) return;
 		List<Chunk> chunks = new ArrayList<>(chainStarts.size());
 		for(var ptr : chainStarts){
 			if(DEBUG_VALIDATION){

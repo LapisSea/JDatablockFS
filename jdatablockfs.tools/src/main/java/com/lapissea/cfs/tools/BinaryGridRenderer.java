@@ -361,6 +361,7 @@ public class BinaryGridRenderer implements DataRenderer{
 		VarPool<T> ioPool, T instance, IOField<T, ?> field,
 		Color col, Reference reference, Range fieldRange
 	){
+		if(fieldRange.size() == 0) return;
 		Range hover     = null;
 		Range bestRange = new Range(0, 0);
 		Range lastRange = null;

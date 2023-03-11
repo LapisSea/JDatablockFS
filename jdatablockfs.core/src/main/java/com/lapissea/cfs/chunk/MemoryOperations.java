@@ -28,7 +28,6 @@ import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.LongStream;
 
 import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
@@ -254,6 +253,7 @@ public class MemoryOperations{
 	private static final boolean PURGE_ACCIDENTAL = GlobalConfig.configFlag("purgeAccidentalChunkHeaders", GlobalConfig.DEBUG_VALIDATION);
 	
 	public static List<Chunk> mergeChunks(Collection<Chunk> data) throws IOException{
+		if(data.isEmpty()) return new ArrayList<>();
 		List<Chunk> toDestroy = new ArrayList<>();
 		List<Chunk> oks       = new ArrayList<>();
 		
@@ -312,12 +312,7 @@ public class MemoryOperations{
 			}
 		}
 		if(service != null){
-			service.shutdown();
-			try{
-				while(!service.awaitTermination(Long.MAX_VALUE, TimeUnit.MILLISECONDS)) ;
-			}catch(InterruptedException e){
-				throw new RuntimeException(e);
-			}
+			service.close();
 		}
 		
 		return oks;

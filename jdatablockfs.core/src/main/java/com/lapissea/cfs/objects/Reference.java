@@ -114,19 +114,30 @@ public final class Reference extends IOInstance.Managed<Reference>{
 	}
 	
 	private static FixedStructPipe<Reference> FIXED_PIPE;
+	private static StructPipe<Reference>      STANDARD_PIPE;
 	
 	static{
-		Thread.ofVirtual().start(Reference::ensurePipe);
+		Thread.ofVirtual().start(Reference::ensureFixed);
+		Thread.ofVirtual().start(Reference::ensureStandard);
 	}
 	
 	public static FixedStructPipe<Reference> fixedPipe(){
-		ensurePipe();
+		if(FIXED_PIPE == null) ensureFixed();
 		return FIXED_PIPE;
 	}
 	
-	private static void ensurePipe(){
+	public static StructPipe<Reference> standardPipe(){
+		if(STANDARD_PIPE == null) ensureStandard();
+		return STANDARD_PIPE;
+	}
+	
+	private static void ensureFixed(){
 		if(FIXED_PIPE != null) return;
 		FIXED_PIPE = FixedStructPipe.of(STRUCT);
+	}
+	private static void ensureStandard(){
+		if(STANDARD_PIPE != null) return;
+		STANDARD_PIPE = StandardStructPipe.of(STRUCT);
 	}
 	
 	private static final class IOContext implements RandomIO.Creator{
