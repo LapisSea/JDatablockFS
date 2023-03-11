@@ -28,6 +28,7 @@ import com.lapissea.util.ShouldNeverHappenError;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
+import java.util.OptionalLong;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NULLABLE;
@@ -56,7 +57,7 @@ public class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, ValueT
 		}
 		@Override
 		public BasicSizeDescriptor<ValueType, Object> getSizeDescriptor(){
-			return BasicSizeDescriptor.IFixed.Basic.of(0);
+			return BasicSizeDescriptor.Unknown.of(0, OptionalLong.empty(), (pool, prov, value) -> DynamicSupport.calcSize(prov, value));
 		}
 		@Override
 		public Object makeIOPool(){

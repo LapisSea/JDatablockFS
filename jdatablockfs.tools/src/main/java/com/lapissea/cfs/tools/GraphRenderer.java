@@ -803,6 +803,12 @@ public class GraphRenderer implements DataRenderer{
 					continue;
 				}
 				var val = field.get(pool, inst);
+				if(field.typeFlag(IOField.DYNAMIC_FLAG) && val instanceof IOInstance.Unmanaged unmanaged){
+					var    ref   = unmanaged.getReference().getPtr().getValue();
+					Bubble child = parent.child(undead, path + "." + field.getName());
+					scan(child, provider, ref, unmanaged);
+					continue;
+				}
 				if(val instanceof IOInstance i) scanInline(parent, provider, i, path + "." + field.getName());
 				continue;
 			}
@@ -846,6 +852,12 @@ public class GraphRenderer implements DataRenderer{
 					continue;
 				}
 				var val = field.get(pool, inst);
+				if(field.typeFlag(IOField.DYNAMIC_FLAG) && val instanceof IOInstance.Unmanaged unmanaged){
+					var    ref   = unmanaged.getReference().getPtr().getValue();
+					Bubble child = bubble.child(undead, field.getName());
+					scan(child, provider, ref, unmanaged);
+					continue;
+				}
 				if(val instanceof IOInstance i) scanInline(bubble, provider, i, field.getName());
 				continue;
 			}

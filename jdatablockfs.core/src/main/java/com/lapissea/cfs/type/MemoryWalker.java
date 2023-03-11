@@ -224,7 +224,7 @@ public class MemoryWalker{
 					}
 					
 					//legacy fallback
-					if(cmd == POTENTIAL_REF){
+					if(cmd == POTENTIAL_REF || cmd == DYNAMIC){
 						if(field instanceof RefField){
 							cmd = REF_FIELD;
 						}
