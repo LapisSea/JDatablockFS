@@ -49,6 +49,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.function.IntFunction;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
@@ -298,19 +299,18 @@ public class FieldCompiler{
 				
 				String fieldName = getFieldName(field);
 				
-				Function<String, Optional<Method>> getMethod = prefix -> {
-					for(Method m : ioMethods){
-						if(checkMethod(fieldName, prefix, m)) return Optional.of(m);
-					}
-					return Optional.empty();
-				};
-				
 				Optional<Method> getter;
 				Optional<Method> setter;
 				if(UtilL.instanceOf(cl, IOInstance.Def.class)){
-					getter = ioMethods.stream().filter(m -> m.getParameterCount() == 0).filter(m -> m.getAnnotation(IOValue.class).name().equals(fieldName)).findAny();
-					setter = ioMethods.stream().filter(m -> m.getParameterCount() == 1).filter(m -> m.getAnnotation(IOValue.class).name().equals(fieldName)).findAny();
+					IntFunction<Optional<Method>> getMethod = count -> ioMethods.stream().filter(
+						m -> m.getParameterCount() == count &&
+						     m.getAnnotation(IOValue.class).name().equals(fieldName)
+					).findAny();
+					getter = getMethod.apply(0);
+					setter = getMethod.apply(1);
 				}else{
+					Function<String, Optional<Method>> getMethod =
+						prefix -> ioMethods.stream().filter(m -> checkMethod(fieldName, prefix, m)).findFirst();
 					getter = calcGetPrefixes(field).map(getMethod).filter(Optional::isPresent).map(Optional::get).findAny();
 					setter = getMethod.apply("set");
 				}

@@ -134,6 +134,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			P created;
 			try{
 				var typ = struct.getType();
+				//Special types must be statically initialized as they may add new special implementations.
 				if(typ.isAnnotationPresent(Special.class)){
 					try{
 						Class.forName(typ.getName(), true, typ.getClassLoader());
@@ -745,9 +746,6 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		int checkIndex = 0;
 		try{
 			for(IOField<T, ?> field : getSpecificFields()){
-				var desc  = field.getSizeDescriptor();
-				var bytes = desc.calcUnknown(ioPool, provider, instance, WordSpace.BYTE);
-				
 				if(fields.get(checkIndex) == field){
 					checkIndex++;
 					if(DEBUG_VALIDATION){
@@ -763,7 +761,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 					continue;
 				}
 				
-				atomicIO.skipExact(bytes);
+				atomicIO.skipExact(field.getSizeDescriptor().calcUnknown(ioPool, provider, instance, WordSpace.BYTE));
 			}
 		}finally{
 			if(atomicIO != dest){
