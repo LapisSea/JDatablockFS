@@ -7,7 +7,6 @@ import com.lapissea.cfs.io.bit.EnumUniverse;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.utils.IOUtils;
-import com.lapissea.util.Nullable;
 
 import java.io.IOException;
 import java.math.BigInteger;
@@ -54,11 +53,7 @@ public enum NumberSize{
 		return FLAG_INFO.get(index);
 	}
 	
-	public static NumberSize bySizeVoidable(@Nullable INumber size){
-		return size == null? VOID : bySize(size);
-	}
-	
-	public static NumberSize bySize(INumber size){
+	public static NumberSize bySize(ChunkPointer size){
 		return bySize(size.getValue());
 	}
 	
@@ -175,7 +170,7 @@ public enum NumberSize{
 		return toSigned(readInt(in));
 	}
 	
-	public void write(ContentWriter out, INumber value) throws IOException{
+	public void write(ContentWriter out, ChunkPointer value) throws IOException{
 		write(out, value == null? 0 : value.getValue());
 	}
 	
@@ -289,7 +284,7 @@ public enum NumberSize{
 	
 	///////////
 	
-	public boolean canFit(INumber num)             { return canFit(num.getValue()); }
+	public boolean canFit(ChunkPointer num)        { return canFit(num.getValue()); }
 	public boolean canFit(long num)                { return num<=maxSize; }
 	public boolean canFit(int num)                 { return num<=maxSize; }
 	public boolean canFitSigned(long num)          { return signedMinValue<=num && num<=signedMaxValue; }
@@ -306,7 +301,6 @@ public enum NumberSize{
 	}
 	
 	public void ensureCanFit(ChunkPointer num) throws OutOfBitDepth{ ensureCanFit(num.getValue()); }
-	public void ensureCanFit(INumber num) throws OutOfBitDepth     { ensureCanFit(num.getValue()); }
 	public void ensureCanFit(long num) throws OutOfBitDepth        { if(!canFit(num)) depthFail(num, false); }
 	public void ensureCanFit(int num) throws OutOfBitDepth         { if(!canFit(num)) depthFail(num, false); }
 	public void ensureCanFitSigned(long num) throws OutOfBitDepth  { if(!canFitSigned(num)) depthFail(num, true); }

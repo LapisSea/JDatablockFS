@@ -3,7 +3,7 @@ package com.lapissea.cfs.type.field.access;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.internal.Access;
-import com.lapissea.cfs.objects.INumber;
+import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
@@ -18,35 +18,31 @@ import java.lang.invoke.MethodHandle;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.util.Optional;
-import java.util.function.LongFunction;
 
 public class FunctionalReflectionAccessor<CTyp extends IOInstance<CTyp>> extends AbstractFieldAccessor<CTyp>{
 	
-	public static class Num<CTyp extends IOInstance<CTyp>> extends FunctionalReflectionAccessor<CTyp>{
+	public static class Ptr<CTyp extends IOInstance<CTyp>> extends FunctionalReflectionAccessor<CTyp>{
 		
-		private final LongFunction<INumber> constructor;
-		
-		public Num(Struct<CTyp> struct, GetAnnotation annotations, Method getter, Method setter, String name, Type genericType){
-			super(struct, annotations, getter, setter, name, genericType);
-			constructor = Access.findConstructor(getType(), LongFunction.class);
+		public Ptr(Struct<CTyp> struct, GetAnnotation annotations, Method getter, Method setter, String name){
+			super(struct, annotations, getter, setter, name, ChunkPointer.class);
 		}
 		@Override
 		public long getLong(VarPool<CTyp> ioPool, CTyp instance){
-			var num = (INumber)get(ioPool, instance);
+			var num = (ChunkPointer)get(ioPool, instance);
 			if(num == null){
-				throw new NullPointerException("value in " + getType().getName() + "#" + getName() + " is null but INumber is a non nullable type");
+				throw new NullPointerException("value in " + getType().getName() + "#" + getName() + " is null but ChunkPointer is a non nullable type");
 			}
 			return num.getValue();
 		}
 		@Override
 		public void setLong(VarPool<CTyp> ioPool, CTyp instance, long value){
-			set(ioPool, instance, constructor.apply(value));
+			set(ioPool, instance, ChunkPointer.of(value));
 		}
 	}
 	
 	public static <T extends IOInstance<T>> FunctionalReflectionAccessor<T> make(Struct<T> struct, String name, Method getter, Method setter, GetAnnotation annotations, Type type){
-		if(UtilL.instanceOf(Utils.typeToRaw(type), INumber.class)){
-			return new FunctionalReflectionAccessor.Num<>(struct, annotations, getter, setter, name, type);
+		if(type == ChunkPointer.class){
+			return new Ptr<>(struct, annotations, getter, setter, name);
 		}else{
 			return new FunctionalReflectionAccessor<>(struct, annotations, getter, setter, name, type);
 		}

@@ -7,7 +7,7 @@ import com.lapissea.util.NotNull;
 
 import java.io.IOException;
 
-public final class ChunkPointer implements INumber, Comparable<ChunkPointer>{
+public final class ChunkPointer implements Comparable<ChunkPointer>{
 	
 	public static final ChunkPointer NULL = new ChunkPointer(0);
 	
@@ -21,25 +21,11 @@ public final class ChunkPointer implements INumber, Comparable<ChunkPointer>{
 		return value == 0? NULL : new ChunkPointer(value);
 	}
 	
-	@Deprecated
-	public static ChunkPointer of(ChunkPointer value){
-		return value;
-	}
-	
-	public static ChunkPointer of(INumber value){
-		return of(value.getValue());
-	}
-	
 	private final long value;
 	
 	private ChunkPointer(long value){
 		if(value<0) throw new IllegalArgumentException();
 		this.value = value;
-	}
-	
-	@Override
-	public long getValue(){
-		return value;
 	}
 	
 	public Chunk dereference(DataProvider provider) throws IOException{
@@ -58,7 +44,7 @@ public final class ChunkPointer implements INumber, Comparable<ChunkPointer>{
 		return "*" + getValue();
 	}
 	
-	public ChunkPointer addPtr(INumber value){
+	public ChunkPointer addPtr(ChunkPointer value){
 		requireNonNull();
 		return addPtr(value.getValue());
 	}
@@ -68,7 +54,7 @@ public final class ChunkPointer implements INumber, Comparable<ChunkPointer>{
 		return new ChunkPointer(getValue() + value);
 	}
 	
-	public long add(INumber value){
+	public long add(ChunkPointer value){
 		requireNonNull();
 		return add(value.getValue());
 	}
@@ -81,7 +67,7 @@ public final class ChunkPointer implements INumber, Comparable<ChunkPointer>{
 	@Override
 	public boolean equals(Object o){
 		return o == this ||
-		       o instanceof INumber num &&
+		       o instanceof ChunkPointer num &&
 		       equals(num.getValue());
 	}
 	
@@ -108,5 +94,21 @@ public final class ChunkPointer implements INumber, Comparable<ChunkPointer>{
 	@Override
 	public int compareTo(ChunkPointer o){
 		return compareTo(o.getValue());
+	}
+	
+	public long getValue(){
+		return value;
+	}
+	
+	public int getValueInt(){
+		return Math.toIntExact(getValue());
+	}
+	
+	public boolean equals(long value){
+		return getValue() == value;
+	}
+	
+	public int compareTo(long o){
+		return Long.compare(getValue(), o);
 	}
 }

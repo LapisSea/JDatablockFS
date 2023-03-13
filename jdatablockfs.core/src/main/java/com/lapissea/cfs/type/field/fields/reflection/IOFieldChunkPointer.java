@@ -1,11 +1,9 @@
 package com.lapissea.cfs.type.field.fields.reflection;
 
 import com.lapissea.cfs.chunk.DataProvider;
-import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.objects.ChunkPointer;
-import com.lapissea.cfs.objects.INumber;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
@@ -19,34 +17,28 @@ import com.lapissea.cfs.type.field.access.FieldAccessor;
 import java.io.IOException;
 import java.util.Optional;
 import java.util.function.BiFunction;
-import java.util.function.LongFunction;
 
 import static com.lapissea.cfs.objects.NumberSize.LARGEST;
 import static com.lapissea.cfs.objects.NumberSize.VOID;
 
-public class IOFieldNumber<T extends IOInstance<T>, E extends INumber> extends IOField<T, E>{
+public class IOFieldChunkPointer<T extends IOInstance<T>> extends IOField<T, ChunkPointer>{
 	
 	private final boolean                               forceFixed;
 	private final VaryingSize                           maxSize;
 	private       BiFunction<VarPool<T>, T, NumberSize> dynamicSize;
-	private       LongFunction<E>                       constructor;
 	
-	public IOFieldNumber(FieldAccessor<T> accessor){
-		this(accessor, null, null);
+	public IOFieldChunkPointer(FieldAccessor<T> accessor){
+		this(accessor, null);
 	}
-	private IOFieldNumber(FieldAccessor<T> accessor, VaryingSize maxSize, LongFunction<E> constructor){
+	private IOFieldChunkPointer(FieldAccessor<T> accessor, VaryingSize maxSize){
 		super(accessor);
 		this.forceFixed = maxSize != null;
 		this.maxSize = maxSize == null? VaryingSize.MAX : maxSize;
-		this.constructor = constructor;
 	}
 	
 	@Override
 	public void init(){
 		super.init();
-		if(constructor == null){
-			this.constructor = Access.findConstructor(getType(), LongFunction.class);
-		}
 		
 		Optional<IOField<T, NumberSize>> fieldOps = forceFixed? Optional.empty() : IOFieldTools.getDynamicSize(getAccessor());
 		
@@ -56,10 +48,10 @@ public class IOFieldNumber<T extends IOInstance<T>, E extends INumber> extends I
 		                           .orElse(SizeDescriptor.Fixed.of(maxSize.size.bytes)));
 	}
 	@Override
-	public IOField<T, E> maxAsFixedSize(VaryingSize.Provider varProvider){
+	public IOField<T, ChunkPointer> maxAsFixedSize(VaryingSize.Provider varProvider){
 		var    ptr = getType() == ChunkPointer.class;
 		String uid = sizeDescriptorSafe() instanceof SizeDescriptor.UnknownNum<T> num? num.getAccessor().getName() : null;
-		return new IOFieldNumber<>(getAccessor(), varProvider.provide(LARGEST, uid, ptr), constructor);
+		return new IOFieldChunkPointer<>(getAccessor(), varProvider.provide(LARGEST, uid, ptr));
 	}
 	
 	private NumberSize getSize(VarPool<T> ioPool, T instance){
@@ -83,7 +75,7 @@ public class IOFieldNumber<T extends IOInstance<T>, E extends INumber> extends I
 	@Override
 	public void read(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		var size = getSize(ioPool, instance);
-		set(ioPool, instance, constructor.apply(size.read(src)));
+		set(ioPool, instance, ChunkPointer.of(size.read(src)));
 	}
 	@Override
 	public void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{

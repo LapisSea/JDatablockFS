@@ -2,7 +2,7 @@ package com.lapissea.cfs.type.compilation;
 
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.internal.Runner;
-import com.lapissea.cfs.objects.INumber;
+import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
@@ -14,6 +14,7 @@ import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldBooleanArray;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldByteArray;
+import com.lapissea.cfs.type.field.fields.reflection.IOFieldChunkPointer;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldDynamicInlineObject;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldDynamicReferenceObject;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldEnum;
@@ -22,7 +23,6 @@ import com.lapissea.cfs.type.field.fields.reflection.IOFieldEnumList;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldFloatArray;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldInlineObject;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldInlineString;
-import com.lapissea.cfs.type.field.fields.reflection.IOFieldNumber;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldObjectReference;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldStringArray;
@@ -70,10 +70,10 @@ class FieldRegistry{
 					return new IOFieldEnum<>(field);
 				}
 			});
-			reg.register(new RegistryNode.InstanceOf<>(INumber.class){
+			reg.register(new RegistryNode.InstanceOf<>(ChunkPointer.class){
 				@Override
-				public <T extends IOInstance<T>> IOField<T, INumber> create(FieldAccessor<T> field, GenericContext genericContext){
-					return new IOFieldNumber<>(field);
+				public <T extends IOInstance<T>> IOField<T, ChunkPointer> create(FieldAccessor<T> field, GenericContext genericContext){
+					return new IOFieldChunkPointer<>(field);
 				}
 			});
 			reg.register(new RegistryNode.InstanceOf<>(byte[].class){
