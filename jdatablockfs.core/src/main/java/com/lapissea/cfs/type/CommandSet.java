@@ -217,12 +217,20 @@ public final class CommandSet{
 		
 		public CommandSet build(){
 			if(!done) throw new IllegalStateException("not done");
-			
+			return toSet();
+		}
+		
+		private CommandSet toSet(){
 			var buff = new ContentOutputBuilder();
 			for(Cmd command : commands){
 				command.push(buff);
 			}
 			return new CommandSet(buff.toByteArray());
+		}
+		
+		@Override
+		public String toString(){
+			return toSet().toString();
 		}
 	}
 	
@@ -345,29 +353,31 @@ public final class CommandSet{
 	
 	@Override
 	public String toString(){
-		StringJoiner str = new StringJoiner(", ", "[", "]");
+		var str = new StringJoiner(", ", "[", "]");
 		
 		var reader = reader();
 		
 		while(true){
-			var cmd = reader.cmd();
-			
-			str.add(switch(cmd){
-				case ENDF -> "ENDF";
-				case UNMANAGED_REST -> "UNMANAGED_REST";
-				case SKIPB_B -> props("SKIPB_B", reader.read8(), "jump", reader.read8(), "byte");
-				case SKIPB_I -> props("SKIPB_B", reader.read8(), "jump", reader.read32(), "byte");
-				case SKIPB_L -> props("SKIPB_B", reader.read8(), "jump", reader.read64(), "byte");
-				case SKIPB_UNKOWN -> props("SKIPB_UNKOWN", reader.read8(), "field");
-				case SKIPF_IF_NULL -> "SKIPF_IF_NULL(" + reader.read8() + " offset)";
-				case POTENTIAL_REF -> obj(reader, "POTENTIAL_REF");
-				case DYNAMIC -> obj(reader, "DYNAMIC");
-				case CHPTR -> obj(reader, "CHPTR");
-				case REF_FIELD -> obj(reader, "REF_FIELD");
-				default -> throw new IllegalStateException("Unexpected value: " + cmd);
-			});
-			
-			if(cmd == ENDF || cmd == UNMANAGED_REST) return str.toString();
+			try{
+				var cmd = reader.cmd();
+				str.add(switch(cmd){
+					case ENDF -> "ENDF";
+					case UNMANAGED_REST -> "UNMANAGED_REST";
+					case SKIPB_B -> props("SKIPB_B", reader.read8(), "jump", reader.read8(), "byte");
+					case SKIPB_I -> props("SKIPB_B", reader.read8(), "jump", reader.read32(), "byte");
+					case SKIPB_L -> props("SKIPB_B", reader.read8(), "jump", reader.read64(), "byte");
+					case SKIPB_UNKOWN -> props("SKIPB_UNKOWN", reader.read8(), "field");
+					case SKIPF_IF_NULL -> "SKIPF_IF_NULL(" + reader.read8() + " offset)";
+					case POTENTIAL_REF -> obj(reader, "POTENTIAL_REF");
+					case DYNAMIC -> obj(reader, "DYNAMIC");
+					case CHPTR -> obj(reader, "CHPTR");
+					case REF_FIELD -> obj(reader, "REF_FIELD");
+					default -> throw new IllegalStateException("Unexpected value: " + cmd);
+				});
+				if(cmd == ENDF || cmd == UNMANAGED_REST) return str.toString();
+			}catch(Throwable e){
+				return str.add("<Incomplete> ...").toString();
+			}
 		}
 	}
 	

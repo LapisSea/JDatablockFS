@@ -41,6 +41,7 @@ public class FieldDependency<T extends IOInstance<T>>{
 		return getDeps(FieldSet.of(names.stream().map(n -> allFields.byName(n).orElseThrow())));
 	}
 	public Ticket<T> getDeps(FieldSet<T> selectedFields){
+		if(selectedFields.isEmpty()) return emptyTicket();
 		if(selectedFields.size() == 1){
 			return getDeps(selectedFields.get(0));
 		}
@@ -57,6 +58,9 @@ public class FieldDependency<T extends IOInstance<T>>{
 			multiDependencyCache.put(selectedFields, field);
 			return field;
 		}
+	}
+	private Ticket<T> emptyTicket(){
+		return new Ticket<T>(false, false, FieldSet.of(), FieldSet.of(), List.of());
 	}
 	
 	public Ticket<T> getDeps(IOField<T, ?> selectedField){
@@ -77,7 +81,7 @@ public class FieldDependency<T extends IOInstance<T>>{
 	
 	private Ticket<T> generateFieldsDependency(FieldSet<T> selectedFields){
 		if(selectedFields.isEmpty()){
-			return new Ticket<T>(false, false, FieldSet.of(), FieldSet.of(), List.of());
+			return emptyTicket();
 		}
 		selectedFields.forEach(this::checkExistenceOfField);
 		if(selectedFields.size() == allFields.size()){
@@ -107,14 +111,14 @@ public class FieldDependency<T extends IOInstance<T>>{
 			
 			for(IOField<T, ?> field : List.copyOf(selectedWriteFieldsSet)){
 				if(field.hasDependencies()){
-					if(selectedWriteFieldsSet.addAll(field.getDependencies())){
+					if(selectedWriteFieldsSet.addAll(field.getDependencies().stream().filter(allFields::contains).toList())){
 						shouldRun = true;
 					}
 				}
 				var gens = field.getGenerators();
 				if(gens != null){
 					for(var gen : gens){
-						if(selectedWriteFieldsSet.add(gen.field())){
+						if(allFields.contains(gen.field()) && selectedWriteFieldsSet.add(gen.field())){
 							shouldRun = true;
 						}
 					}
@@ -122,7 +126,7 @@ public class FieldDependency<T extends IOInstance<T>>{
 			}
 			for(IOField<T, ?> field : List.copyOf(selectedReadFieldsSet)){
 				if(field.hasDependencies()){
-					if(selectedReadFieldsSet.addAll(field.getDependencies())){
+					if(selectedReadFieldsSet.addAll(field.getDependencies().stream().filter(allFields::contains).toList())){
 						shouldRun = true;
 					}
 				}

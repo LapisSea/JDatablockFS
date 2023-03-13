@@ -8,8 +8,6 @@ import com.lapissea.cfs.io.content.ContentOutputBuilder;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.instancepipe.ObjectPipe;
-import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
-import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
@@ -30,13 +28,12 @@ import com.lapissea.util.ShouldNeverHappenError;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
+import java.util.OptionalLong;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NULLABLE;
 
 public class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, ValueType> extends RefField.ReferenceCompanion<CTyp, ValueType>{
-	
-	private static final StructPipe<Reference> STANDARD_REF = StandardStructPipe.of(Reference.class);
 	
 	private IOFieldPrimitive.FInt<CTyp> typeID;
 	
@@ -60,7 +57,7 @@ public class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, ValueT
 		}
 		@Override
 		public BasicSizeDescriptor<ValueType, Object> getSizeDescriptor(){
-			return BasicSizeDescriptor.IFixed.Basic.of(0);
+			return BasicSizeDescriptor.Unknown.of(0, OptionalLong.empty(), (pool, prov, value) -> DynamicSupport.calcSize(prov, value));
 		}
 		@Override
 		public Object makeIOPool(){
@@ -124,7 +121,7 @@ public class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, ValueT
 	@Override
 	protected Reference allocNew(DataProvider provider, ValueType val) throws IOException{
 		var buf = new ContentOutputBuilder();
-		DynamicSupport.writeValue(STANDARD_REF, provider, buf, val);
+		DynamicSupport.writeValue(provider, buf, val);
 		Chunk chunk = AllocateTicket.bytes(buf.size()).withDataPopulated((p, io) -> buf.writeTo(io)).submit(provider);
 		return chunk.getPtr().makeReference();
 	}
@@ -161,7 +158,7 @@ public class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, ValueT
 		
 		if(val != null){
 			try(var io = ref.io(provider)){
-				DynamicSupport.writeValue(STANDARD_REF, provider, io, val);
+				DynamicSupport.writeValue(provider, io, val);
 				io.trim();
 			}
 		}
@@ -181,7 +178,7 @@ public class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, ValueT
 		}
 		try(var io = readNew.io(provider)){
 			//noinspection unchecked
-			return (ValueType)DynamicSupport.readTyp(STANDARD_REF, type, provider, io, genericContext);
+			return (ValueType)DynamicSupport.readTyp(type, provider, io, genericContext);
 		}
 	}
 	

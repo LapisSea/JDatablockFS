@@ -6,7 +6,6 @@ import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
-import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
@@ -32,8 +31,6 @@ import static com.lapissea.cfs.type.StagedInit.STATE_DONE;
 
 public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType> extends NullFlagCompanyField<CTyp, ValueType>{
 	
-	private static final StructPipe<Reference> REF_PIPE = StandardStructPipe.of(Reference.class);
-	
 	private IOFieldPrimitive.FInt<CTyp> typeID;
 	
 	public IOFieldDynamicInlineObject(FieldAccessor<CTyp> accessor){
@@ -45,7 +42,6 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		
 		Type type = accessor.getGenericType(null);
 		
-		
 		long minKnownTypeSize = Long.MAX_VALUE;
 		try{
 			Struct<?>         struct  = Struct.ofUnknown(Utils.typeToRaw(type));
@@ -53,14 +49,14 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 			minKnownTypeSize = typDesc.getMin(WordSpace.BYTE);
 		}catch(IllegalArgumentException ignored){ }
 		
-		var refDesc = REF_PIPE.getSizeDescriptor();
+		var refDesc = Reference.standardPipe().getSizeDescriptor();
 		
 		long minSize = Math.min(refDesc.getMin(WordSpace.BYTE), minKnownTypeSize);
 		
 		initSizeDescriptor(SizeDescriptor.Unknown.of(minSize, OptionalLong.empty(), (ioPool, prov, inst) -> {
 			var val = get(null, inst);
 			if(val == null) return 0;
-			return DynamicSupport.calcSize(REF_PIPE, prov, val);
+			return DynamicSupport.calcSize(prov, val);
 		}));
 	}
 	
@@ -109,7 +105,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 	public void write(VarPool<CTyp> ioPool, DataProvider provider, ContentWriter dest, CTyp instance) throws IOException{
 		if(nullable() && getIsNull(ioPool, instance)) return;
 		var val = get(ioPool, instance);
-		DynamicSupport.writeValue(REF_PIPE, provider, dest, val);
+		DynamicSupport.writeValue(provider, dest, val);
 	}
 	
 	private TypeLink getType(VarPool<CTyp> ioPool, DataProvider provider, CTyp instance) throws IOException{
@@ -130,7 +126,7 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 			}
 			
 			TypeLink typ = getType(ioPool, provider, instance);
-			val = DynamicSupport.readTyp(REF_PIPE, typ, provider, src, genericContext);
+			val = DynamicSupport.readTyp(typ, provider, src, genericContext);
 		}
 		//noinspection unchecked
 		set(ioPool, instance, (ValueType)val);
@@ -145,6 +141,6 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 		}
 		
 		TypeLink typ = getType(ioPool, provider, instance);
-		DynamicSupport.skipTyp(REF_PIPE, typ, provider, src, genericContext);
+		DynamicSupport.skipTyp(typ, provider, src, genericContext);
 	}
 }

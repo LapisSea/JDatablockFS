@@ -24,6 +24,7 @@ import java.util.StringJoiner;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
+@SuppressWarnings({"rawtypes", "unchecked"})
 public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOField<T, ?>> implements IterablePP<IOField<T, ?>>{
 	
 	private static final class FieldSetSpliterator<E extends IOInstance<E>> implements Spliterator<IOField<E, ?>>{
@@ -208,25 +209,31 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		}
 	}
 	
-	private static final FieldSet<?> EMPTY = new FieldSet<>();
+	private static final IOField[]   NO_FIELDS = new IOField[0];
+	private static final FieldSet<?> EMPTY     = new FieldSet<>(NO_FIELDS, 0);
 	
-	@SuppressWarnings("unchecked")
 	public static <T extends IOInstance<T>> FieldSet<T> of(){
 		return (FieldSet<T>)EMPTY;
 	}
 	
 	private static final class SetBuilder<T extends IOInstance<T>> implements Consumer<IOField<T, ?>>{
 		private IOField<T, ?>[] safeData;
-		private int             pos = 0;
+		private int             pos;
 		
 		private SetBuilder(int size){
-			//noinspection unchecked
-			this.safeData = new IOField[size];
+			safeData = switch(size){
+				case -1 -> null;
+				case 0 -> NO_FIELDS;
+				default -> new IOField[size];
+			};
 		}
 		
 		@Override
 		public void accept(IOField<T, ?> e){
 			Objects.requireNonNull(e);
+			if(safeData == null){
+				safeData = new IOField[2];
+			}
 			for(int i = 0; i<pos; i++){
 				if(safeData[i].getName().equals(e.getName())){
 					return;
@@ -246,7 +253,7 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	
 	public static <T extends IOInstance<T>> FieldSet<T> of(Stream<IOField<T, ?>> stream){
 		var s = stream.spliterator();
-		var b = new SetBuilder<T>((int)Math.max(0, s.getExactSizeIfKnown()));
+		var b = new SetBuilder<T>((int)s.getExactSizeIfKnown());
 		s.forEachRemaining(b);
 		return b.make();
 	}
@@ -272,11 +279,6 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	private byte            age  = Byte.MIN_VALUE;
 	
 	private Map<String, Integer> nameLookup;
-	
-	@SuppressWarnings("unchecked")
-	private FieldSet(){
-		this(new IOField[0], 0);
-	}
 	
 	private FieldSet(IOField<T, ?>[] data, int size){
 		this.data = data.length != size? Arrays.copyOf(data, size) : data;

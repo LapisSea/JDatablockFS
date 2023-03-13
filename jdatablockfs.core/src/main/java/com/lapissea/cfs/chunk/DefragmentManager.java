@@ -354,8 +354,6 @@ public class DefragmentManager{
 	}
 	
 	private ChunkSet findFreeChunks(Cluster cluster) throws IOException{
-		traceCall();
-		
 		var activeChunks       = new ChunkSet();
 		var unreferencedChunks = new ChunkSet();
 		var knownFree          = new ChunkSet(cluster.getMemoryManager().getFreeChunks());
