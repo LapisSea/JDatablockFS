@@ -1,6 +1,7 @@
 package com.lapissea.cfs.type.field.annotations;
 
 import com.lapissea.cfs.exceptions.MalformedStruct;
+import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.VarPool;
@@ -136,7 +137,7 @@ public @interface IODependency{
 			@NotNull
 			@Override
 			public <T extends IOInstance<T>> List<VirtualFieldDefinition<T, ?>> injectPerInstanceValue(FieldAccessor<T> field, VirtualNumSize ann){
-				var unsigned = field.hasAnnotation(IOValue.Unsigned.class);
+				var unsigned = field.hasAnnotation(IOValue.Unsigned.class) || field.getType() == ChunkPointer.class;
 				
 				var retention = ann.retention();
 				var min       = ann.min();
@@ -149,11 +150,7 @@ public @interface IODependency{
 					new VirtualFieldDefinition.GetterFilter<T, NumberSize>(){
 						private NumberSize calcMax(VarPool<T> ioPool, T inst, List<FieldAccessor<T>> deps){
 							var len = calcMaxVal(ioPool, inst, deps);
-							if(len<0){
-								if(unsigned) return NumberSize.VOID;
-								len *= -1;
-							}
-							return NumberSize.bySize(len);
+							return NumberSize.bySize(len, unsigned);
 						}
 						private long calcMaxVal(VarPool<T> ioPool, T inst, List<FieldAccessor<T>> deps){
 							return switch(deps.size()){

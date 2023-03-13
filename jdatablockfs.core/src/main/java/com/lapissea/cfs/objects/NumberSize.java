@@ -66,9 +66,11 @@ public enum NumberSize{
 		return unsigned? bySize(Math.max(0, size)) : bySizeSigned(size);
 	}
 	public static NumberSize bySizeSigned(long size){
+		if(size == 0) return VOID;
 		return byBytes(BitUtils.bitsToBytes((Long.SIZE - Long.numberOfLeadingZeros(Math.abs(size))) + 1));
 	}
 	public static NumberSize bySizeSigned(int size){
+		if(size == 0) return VOID;
 		return byBytes(BitUtils.bitsToBytes((Integer.SIZE - Integer.numberOfLeadingZeros(Math.abs(size))) + 1));
 	}
 	
