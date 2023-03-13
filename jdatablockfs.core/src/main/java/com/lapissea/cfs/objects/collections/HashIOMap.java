@@ -194,8 +194,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 				transferRewire(oldBuckets, buckets, bucketPO2);
 				writeManagedFields();
 			}
-			oldBuckets.clear();
-			((Unmanaged<?>)oldBuckets).free();
+			disownedFree(oldBuckets);
 		}else{
 			long pos = 0;
 			
@@ -225,8 +224,18 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 			}
 			
 			writeManagedFields();
-			((Unmanaged<?>)oldBuckets).free();
+			disownedFree(oldBuckets);
 		}
+	}
+	
+	private void disownedFree(IOList<Bucket<K, V>> oldBuckets) throws IOException{
+		//TODO: properly handle memory ownership
+		try(var ignored = getDataProvider().getSource().openIOTransaction()){
+			for(long i = 0; i<oldBuckets.size(); i++){
+				oldBuckets.set(i, new Bucket<>());
+			}
+		}
+		((Unmanaged<?>)oldBuckets).free();
 	}
 	
 	private void optimizedOrderTransfer(IOList<Bucket<K, V>> oldData, IOList<Bucket<K, V>> newBuckets, short newPO2) throws IOException{
