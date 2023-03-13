@@ -158,7 +158,7 @@ public class TestUtils{
 		complexObjectIntegrityTest(info, initial, constr, typeDef, map -> {
 			var splitter = Splitter.map(map, new ReferenceMemoryIOMap<>(), TestUtils::checkCompliance);
 			session.accept(splitter);
-		}, false);
+		}, true);
 	}
 	
 }
