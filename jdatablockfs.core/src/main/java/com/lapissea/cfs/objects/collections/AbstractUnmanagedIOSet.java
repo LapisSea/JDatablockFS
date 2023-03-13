@@ -5,17 +5,16 @@ import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.TypeLink;
-import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
 
 import java.io.IOException;
 import java.util.StringJoiner;
 
 public abstract class AbstractUnmanagedIOSet<T> extends IOInstance.Unmanaged<AbstractUnmanagedIOSet<T>> implements IOSet<T>{
 	
-	
-	private IOField<AbstractUnmanagedIOSet<T>, ?> sizeField;
+	private IOFieldPrimitive.FLong<AbstractUnmanagedIOSet<T>> sizeField;
 	
 	@IOValue
 	@IODependency.VirtualNumSize
