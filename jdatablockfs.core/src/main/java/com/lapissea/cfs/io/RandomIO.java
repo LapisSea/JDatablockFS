@@ -7,7 +7,6 @@ import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.streams.RandomInputStream;
 import com.lapissea.cfs.io.streams.RandomOutputStream;
 import com.lapissea.cfs.objects.ChunkPointer;
-import com.lapissea.cfs.objects.INumber;
 import com.lapissea.cfs.utils.IOUtils;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.TextUtil;
@@ -284,10 +283,6 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 	
 	long getPos() throws IOException;
 	RandomIO setPos(long pos) throws IOException;
-	
-	default RandomIO setPos(INumber pos) throws IOException{
-		return setPos(pos.getValue());
-	}
 	
 	long getCapacity() throws IOException;
 	RandomIO setCapacity(long newCapacity) throws IOException;

@@ -286,7 +286,7 @@ public interface BasicSizeDescriptor<T, PoolType>{
 			var max = getMax();
 			if(max.isPresent()){
 				var min = getMin();
-				val = OptionalLong.of((min + max.getAsLong())/2);
+				val = OptionalLong.of((min*2 + max.getAsLong())/3);
 			}
 		}
 		if(val.isEmpty()){

@@ -74,7 +74,7 @@ public final class CommandSet{
 		
 		private record SkipFlow(int fieldOffset) implements Cmd{
 			public SkipFlow{
-				checkRange(63, fieldOffset);
+				checkRange(31, fieldOffset);
 			}
 			@Override
 			public void push(ContentOutputBuilder dest){

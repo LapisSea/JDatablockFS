@@ -18,7 +18,6 @@ import com.lapissea.cfs.io.instancepipe.ObjectPipe;
 import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
-import com.lapissea.cfs.objects.INumber;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.objects.text.AutoText;
@@ -1583,7 +1582,7 @@ public class BinaryGridRenderer implements DataRenderer{
 								}
 								if(!noPtr) ctx.recordPointer(new Pointer(trueOffset, ch.getValue(), (int)size, col, msg, 0.8F));
 							}
-						}else if(SupportedPrimitive.isAny(acc.getType()) || Stream.of(INumber.class, Enum.class).anyMatch(c -> UtilL.instanceOf(acc.getType(), c))){
+						}else if(SupportedPrimitive.isAny(acc.getType()) || Stream.of(ChunkPointer.class, Enum.class).anyMatch(c -> UtilL.instanceOf(acc.getType(), c))){
 							if(annotate){
 								renderer.setColor(col);
 								if(sizeDesc.getWordSpace() == WordSpace.BIT){

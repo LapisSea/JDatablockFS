@@ -154,14 +154,14 @@ public class MemoryWalker{
 			CmdReader cmds   = pipe.getReferenceWalkCommands().reader();
 			var       ioPool = instanceStruct.allocVirtualVarPool(IO);
 			
-			long    skipBits     = 0;
-			boolean dynamicPhase = false;
+			int skipBits     = 0;
+			var dynamicPhase = false;
 			wh:
 			while(true){
-				IOField<T, ?> field;
+				IOField<T, ?> field = null;
 				{
 					int cmd;
-					
+					var nextField = true;
 					while(true){
 						cmd = cmds.cmd();
 						if(cmd == UNMANAGED_REST){
@@ -180,7 +180,10 @@ public class MemoryWalker{
 							}
 						}
 						
-						field = iterator.next();
+						if(nextField){
+							field = iterator.next();
+						}
+						nextField = true;
 						
 						if(skipBits>0) skipBits >>>= 1;
 						boolean skipBit = (skipBits&1) == 1;
@@ -191,11 +194,13 @@ public class MemoryWalker{
 							var offset = cmds.read8();
 							
 							var inst = field.get(ioPool, instance);
-							if(inst != null){
-								if(inst instanceof Reference ref && !ref.isNull()) continue;
-								if(inst instanceof ChunkPointer ptr && !ptr.isNull()) continue;
+							
+							if(inst == null ||
+							   inst instanceof Reference ref && ref.isNull() ||
+							   inst instanceof ChunkPointer ptr && ptr.isNull()){
+								skipBits |= 1L<<offset;
 							}
-							skipBits |= 1L<<offset;
+							nextField = false;
 							continue;
 						}
 						break;

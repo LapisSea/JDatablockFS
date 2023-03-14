@@ -4,7 +4,7 @@ import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.internal.MyUnsafe;
-import com.lapissea.cfs.objects.INumber;
+import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.VarPool;
@@ -20,7 +20,6 @@ import java.lang.reflect.Type;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.LongFunction;
 import java.util.stream.Collectors;
 
 import static com.lapissea.cfs.internal.MyUnsafe.UNSAFE;
@@ -173,31 +172,28 @@ public sealed class UnsafeAccessor<CTyp extends IOInstance<CTyp>> extends Abstra
 		}
 	}
 	
-	public static final class Num<CTyp extends IOInstance<CTyp>> extends UnsafeAccessor.Funct<CTyp>{
+	public static final class Ptr<CTyp extends IOInstance<CTyp>> extends UnsafeAccessor.Funct<CTyp>{
 		
-		private final LongFunction<INumber> constructor;
-		
-		public Num(Struct<CTyp> struct, Field field, Optional<Method> getter, Optional<Method> setter, String name, Type genericType){
-			super(struct, field, getter, setter, name, genericType);
-			constructor = Access.findConstructor(getType(), LongFunction.class);
+		public Ptr(Struct<CTyp> struct, Field field, Optional<Method> getter, Optional<Method> setter, String name){
+			super(struct, field, getter, setter, name, ChunkPointer.class);
 		}
 		@Override
 		public long getLong(VarPool<CTyp> ioPool, CTyp instance){
-			var num = (INumber)get(ioPool, instance);
+			var num = (ChunkPointer)get(ioPool, instance);
 			if(num == null){
-				throw new NullPointerException("value in " + getType().getName() + "#" + getName() + " is null but INumber is a non nullable type");
+				throw new NullPointerException("value in " + getType().getName() + "#" + getName() + " is null but ChunkPointer is a non nullable type");
 			}
 			return num.getValue();
 		}
 		@Override
 		public void setLong(VarPool<CTyp> ioPool, CTyp instance, long value){
-			set(ioPool, instance, constructor.apply(value));
+			set(ioPool, instance, ChunkPointer.of(value));
 		}
 	}
 	
 	public static <T extends IOInstance<T>> FieldAccessor<T> make(Struct<T> struct, Field field, Optional<Method> getter, Optional<Method> setter, String name, Type genericType){
-		if(genericType instanceof Class<?> c && UtilL.instanceOf(c, INumber.class)){
-			return new UnsafeAccessor.Num<>(struct, field, getter, setter, name, genericType);
+		if(genericType == ChunkPointer.class){
+			return new Ptr<>(struct, field, getter, setter, name);
 		}else{
 			if(getter.isEmpty() && setter.isEmpty()){
 				return new UnsafeAccessor<>(struct, field, name, genericType);
