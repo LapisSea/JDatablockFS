@@ -270,9 +270,9 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	
 	@SuppressWarnings("unchecked")
 	private CommandSet generateReferenceWalkCommands(){
-		var         builder   = CommandSet.builder();
-		var         hasDynmic = getType() instanceof Struct.Unmanaged<?> u && u.isOverridingDynamicUnmanaged();
+		var         builder = CommandSet.builder();
 		FieldSet<T> fields;
+		
 		getType().waitForStateDone();
 		if(getType() instanceof Struct.Unmanaged<?> unmanaged){
 			fields = FieldSet.of(Stream.concat(getSpecificFields().stream(), unmanaged.getUnmanagedStaticFields().stream().map(f -> (IOField<T, ?>)f)).toList());
@@ -360,7 +360,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			throw new NotImplementedException(field + " not handled");
 		}
 		
-		if(hasDynmic){
+		if(getType() instanceof Struct.Unmanaged<?> u && u.isOverridingDynamicUnmanaged()){
 			builder.unmanagedRest();
 		}else{
 			builder.endFlow();
