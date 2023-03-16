@@ -400,9 +400,22 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		
 		protected final boolean readOnly;
 		
+		protected Unmanaged(Struct<SELF> thisStruct, DataProvider provider, Reference reference, TypeLink typeDef, TypeLink.Check check){
+			this(thisStruct, provider, reference, typeDef);
+			check.ensureValid(typeDef, provider.getTypeDb());
+		}
+		
 		protected Unmanaged(DataProvider provider, Reference reference, TypeLink typeDef, TypeLink.Check check){
 			this(provider, reference, typeDef);
 			check.ensureValid(typeDef, provider.getTypeDb());
+		}
+		
+		public Unmanaged(Struct<SELF> thisStruct, DataProvider provider, Reference reference, TypeLink typeDef){
+			super(thisStruct);
+			this.provider = Objects.requireNonNull(provider);
+			setIdentity(reference);
+			this.typeDef = typeDef;
+			readOnly = getDataProvider().isReadOnly();
 		}
 		
 		public Unmanaged(DataProvider provider, Reference reference, TypeLink typeDef){

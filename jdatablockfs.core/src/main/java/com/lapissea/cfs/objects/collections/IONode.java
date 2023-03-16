@@ -210,6 +210,9 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		};
 	}
 	
+	@SuppressWarnings("unchecked")
+	private static final Struct<IONode<Object>> STRUCT = (Struct<IONode<Object>>)(Object)Struct.of(IONode.class);
+	
 	private static final TypeLink.Check NODE_TYPE_CHECK = new TypeLink.Check(
 		IONode.class,
 		(type, db) -> { }
@@ -288,8 +291,9 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		if(val != null) setValue(val);
 	}
 	
+	@SuppressWarnings("unchecked")
 	public IONode(DataProvider provider, Reference reference, TypeLink typeDef) throws IOException{
-		super(provider, reference, typeDef, NODE_TYPE_CHECK);
+		super((Struct<IONode<T>>)(Object)STRUCT, provider, reference, typeDef, NODE_TYPE_CHECK);
 		
 		var magnetProvider = provider.withRouter(t -> t.withPositionMagnet(t.positionMagnet().orElse(getReference().getPtr().getValue())));
 		
