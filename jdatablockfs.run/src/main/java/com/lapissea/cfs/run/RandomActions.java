@@ -7,11 +7,58 @@ import com.lapissea.cfs.objects.collections.IOHashSet;
 import com.lapissea.util.LogUtil;
 
 import java.io.IOException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
+import java.util.Scanner;
+import java.util.stream.Collectors;
 
 public class RandomActions{
+	
+	public static void main(String[] args) throws Throwable{
+		var mth = Arrays.stream(RandomActions.class.getDeclaredMethods())
+		                .filter(m -> Modifier.isStatic(m.getModifiers()) && !m.getName().contains("main"))
+		                .toList();
+		String nOrg;
+		if(args.length == 0){
+			LogUtil.println(mth.stream().map(Method::getName));
+			LogUtil.println("Choose method:");
+			nOrg = new Scanner(System.in).nextLine().trim();
+		}else nOrg = args[0];
+		
+		var n = nOrg.toLowerCase();
+		
+		var l = mth.stream().filter(m -> m.getName().toLowerCase().contains(n)).toList();
+		if(l.isEmpty()) throw new IllegalArgumentException("No method \"" + nOrg + "\" found");
+		if(l.size() != 1) throw new IllegalArgumentException(
+			"Ambitious choice \"" + nOrg + "\", possible matches: " +
+			l.stream().map(Method::getName).collect(Collectors.joining(", "))
+		);
+		l.get(0).invoke(null);
+	}
+	
+	
+	private static void treeSet() throws IOException{
+		var provider = Cluster.emptyMem();
+		var set      = provider.getRootProvider().<IOHashSet<Object>>request("hi", IOHashSet.class);
+		var r        = new Random(420);
+		
+		
+		var iter = 5000_0000;
+		for(int i = 0; i<iter; i++){
+			if(i%200000 == 0) LogUtil.println(i/(float)iter);
+			Integer num = r.nextInt(400);
+			
+			switch(r.nextInt(3)){
+				case 0 -> set.add(num);
+				case 1 -> set.remove(num);
+				case 2 -> set.contains(num);
+			}
+		}
+	}
 	
 	
 	private static int idx(Random r, List<Chunk> ch){
@@ -70,15 +117,9 @@ public class RandomActions{
 			Integer num = r.nextInt(400);
 			
 			switch(r.nextInt(3)){
-				case 0 -> {
-					var added1 = set.add(num);
-				}
-				case 1 -> {
-					var removed1 = set.remove(num);
-				}
-				case 2 -> {
-					var c1 = set.contains(num);
-				}
+				case 0 -> set.add(num);
+				case 1 -> set.remove(num);
+				case 2 -> set.contains(num);
 			}
 		}
 	}
