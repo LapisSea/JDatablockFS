@@ -531,4 +531,10 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 		
 		return new TreeIterator();
 	}
+	
+	@Override
+	public void requestCapacity(long capacity) throws IOException{
+		nodes.requestCapacity(capacity);
+		values.requestCapacity(capacity);
+	}
 }

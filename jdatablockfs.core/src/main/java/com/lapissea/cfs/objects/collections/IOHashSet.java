@@ -344,6 +344,11 @@ public final class IOHashSet<T> extends AbstractUnmanagedIOSet<T>{
 		};
 	}
 	
+	@Override
+	public void requestCapacity(long capacity) throws IOException{
+		data.requestCapacity(capacity);
+	}
+	
 	private static long smallHash(int hash, long size){
 		return Math.abs(hash)%size;
 	}
