@@ -276,4 +276,8 @@ public abstract class MappedIOList<From, To> implements IOList<To>{
 	public long indexOf(To value) throws IOException{
 		return data.indexOf(unmap(value));
 	}
+	@Override
+	public void free(long index) throws IOException{
+		data.free(index);
+	}
 }

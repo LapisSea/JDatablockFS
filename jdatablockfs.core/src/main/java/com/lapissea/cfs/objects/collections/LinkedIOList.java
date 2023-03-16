@@ -15,6 +15,7 @@ import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.function.UnsafeConsumer;
 
@@ -427,5 +428,9 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 				}
 			};
 		}));
+	}
+	@Override
+	public void free(long index) throws IOException{
+		throw NotImplementedException.infer();//TODO: implement LinkedIOList.free()
 	}
 }

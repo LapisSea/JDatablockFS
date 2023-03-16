@@ -105,6 +105,10 @@ public class MemoryWrappedIOList<T> implements IOList<T>{
 	public long getCapacity() throws IOException{
 		return Integer.MAX_VALUE;
 	}
+	@Override
+	public void free(long index) throws IOException{
+		throw new UnsupportedOperationException();
+	}
 	
 	@Override
 	public String toString(){

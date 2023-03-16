@@ -614,7 +614,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 				List<ChunkPointer> toFree = new ArrayList<>();
 				for(long i = 0; i<s; i++){
 					io.setPos(calcElementOffset(i));
-					toFree.addAll(storage.notifyRemoval(io));
+					toFree.addAll(storage.notifyRemoval(io, false));
 					if(toFree.size()>=256){
 						getDataProvider().getMemoryManager().freeChains(toFree);
 						toFree.clear();
@@ -724,7 +724,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		try(var io = selfIO()){
 			if(storage.needsRemoval()){
 				io.setPos(calcElementOffset(index));
-				getDataProvider().getMemoryManager().freeChains(storage.notifyRemoval(io));
+				notifySingleFree(io, false);
 			}
 			
 			var    siz  = getElementSize();
@@ -743,6 +743,9 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 			var lastOff = calcElementOffset(size - 1);
 			io.setCapacity(lastOff);
 		}
+	}
+	private void notifySingleFree(RandomIO io, boolean dereferenceWrite) throws IOException{
+		getDataProvider().getMemoryManager().freeChains(storage.notifyRemoval(io, dereferenceWrite));
 	}
 	
 	@Override
@@ -842,6 +845,17 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 				}
 			};
 		}));
+	}
+	
+	@Override
+	public void free(long index) throws IOException{
+		checkSize(index);
+		if(!storage.needsRemoval()) return;
+		
+		
+		try(var io = ioAtElement(index)){
+			notifySingleFree(io, true);
+		}
 	}
 	
 	@Override

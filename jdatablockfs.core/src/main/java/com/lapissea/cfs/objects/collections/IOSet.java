@@ -46,4 +46,6 @@ public interface IOSet<T>{
 	
 	IOIterator<T> iterator();
 	
+	void requestCapacity(long capacity) throws IOException;
+	
 }

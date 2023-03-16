@@ -668,4 +668,6 @@ public interface IOList<T> extends IterablePP<T>{
 			};
 		}));
 	}
+	
+	void free(long index) throws IOException;
 }

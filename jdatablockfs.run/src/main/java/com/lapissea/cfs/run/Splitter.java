@@ -150,6 +150,11 @@ public class Splitter{
 				return a.getCapacity();
 			}
 			@Override
+			public void free(long index) throws IOException{
+				a.free(index);
+				b.free(index);
+			}
+			@Override
 			public String toString(){
 				return a.toString();
 			}
