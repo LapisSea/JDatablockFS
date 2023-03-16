@@ -97,7 +97,19 @@ public sealed interface ValueStorage<T>{
 		}
 		
 		@Override
-		public List<ChunkPointer> notifyRemoval(ContentReader io){ return List.of(); }
+		public List<ChunkPointer> notifyRemoval(RandomIO io, boolean dereferenceWrite) throws IOException{
+			var ptrs = new ArrayList<ChunkPointer>();
+			
+			var startPos = io.getPos();
+			var root     = readNew(io);
+			
+			var rootRef = new Reference(ChunkPointer.of(69), 420);
+			var dirty   = FixedInstance.structWalk(provider, ptrs, dereferenceWrite, pipe, root, rootRef);
+			if(dirty){
+				write(io.setPos(startPos), root);
+			}
+			return ptrs;
+		}
 		@Override
 		public boolean needsRemoval(){
 			return false;
@@ -173,16 +185,37 @@ public sealed interface ValueStorage<T>{
 			pipe.write(provider, dest, src);
 		}
 		@Override
-		public List<ChunkPointer> notifyRemoval(ContentReader io) throws IOException{
-			var ptrs  = new ArrayList<ChunkPointer>();
-			var root  = readNew(io);
-			var dummy = new Reference(ChunkPointer.of(69), 420);
-			new MemoryWalker(provider, root, dummy, pipe, false, new MemoryWalker.PointerRecord(){
+		public List<ChunkPointer> notifyRemoval(RandomIO io, boolean dereferenceWrite) throws IOException{
+			var ptrs = new ArrayList<ChunkPointer>();
+			
+			var startPos = io.getPos();
+			var root     = readNew(io);
+			
+			var rootRef = new Reference(ChunkPointer.of(69), 420);
+			var dirty   = structWalk(provider, ptrs, dereferenceWrite, pipe, root, rootRef);
+			if(dirty){
+				write(io.setPos(startPos), root);
+			}
+			return ptrs;
+		}
+		
+		private static <T extends IOInstance<T>> boolean structWalk(
+			DataProvider provider, ArrayList<ChunkPointer> ptrs,
+			boolean dereferenceWrite, StructPipe<T> pipe, T root, Reference rootRef
+		) throws IOException{
+			var rec = new MemoryWalker.PointerRecord(){
+				boolean dirty;
 				@Override
 				public <IO extends IOInstance<IO>> int log(Reference instanceReference, IO instance, RefField<IO, ?> field, Reference valueReference) throws IOException{
-					if(dummy == valueReference) throw new ShouldNeverHappenError();
+					if(rootRef == valueReference) throw new ShouldNeverHappenError();
 					if(!valueReference.isNull()){
 						ptrs.add(valueReference.getPtr());
+						
+						if(dereferenceWrite && instance == root && field.nullable()){
+							field.set(null, instance, null);
+							field.setReference(instance, new Reference());
+							dirty = true;
+						}
 					}
 					return MemoryWalker.CONTINUE;
 				}
@@ -190,9 +223,11 @@ public sealed interface ValueStorage<T>{
 				public <IO extends IOInstance<IO>> int logChunkPointer(Reference instanceReference, IO instance, IOField<IO, ChunkPointer> field, ChunkPointer value) throws IOException{
 					return MemoryWalker.CONTINUE;
 				}
-			}).walk();
-			return ptrs;
+			};
+			new MemoryWalker(provider, root, rootRef, pipe, false, rec).walk();
+			return rec.dirty;
 		}
+		
 		@Override
 		public boolean needsRemoval(){
 			return pipe.getType().getCanHavePointers();
@@ -293,11 +328,24 @@ public sealed interface ValueStorage<T>{
 			}
 		}
 		@Override
-		public List<ChunkPointer> notifyRemoval(ContentReader io) throws IOException{
-			var ref = refPipe.readNew(provider, io, null);
+		public List<ChunkPointer> notifyRemoval(RandomIO io, boolean dereferenceWrite) throws IOException{
+			var startPos = io.getPos();
+			var ref      = refPipe.readNew(provider, io, null);
 			if(ref.isNull()){
 				return List.of();
 			}
+			
+			if(dereferenceWrite){
+				refPipe.write(provider, io.setPos(startPos), new Reference());
+			}
+			
+			if(pipe.getType().getCanHavePointers()){
+				var ptrs = new ArrayList<ChunkPointer>(4);
+				ptrs.add(ref.getPtr());
+				FixedInstance.structWalk(provider, ptrs, false, pipe, ref.readNew(provider, pipe, ctx), ref);
+				return ptrs;
+			}
+			
 			return List.of(ref.getPtr());
 		}
 		@Override
@@ -407,7 +455,7 @@ public sealed interface ValueStorage<T>{
 			refPipe.write(provider, dest, src == null? new Reference() : src.getReference());
 		}
 		@Override
-		public List<ChunkPointer> notifyRemoval(ContentReader io){ return List.of(); }
+		public List<ChunkPointer> notifyRemoval(RandomIO io, boolean dereferenceWrite){ return List.of(); }
 		@Override
 		public boolean needsRemoval(){
 			return false;
@@ -466,7 +514,7 @@ public sealed interface ValueStorage<T>{
 			}
 		}
 		@Override
-		public List<ChunkPointer> notifyRemoval(ContentReader io){ return List.of(); }
+		public List<ChunkPointer> notifyRemoval(RandomIO io, boolean dereferenceWrite){ return List.of(); }
 		@Override
 		public boolean needsRemoval(){
 			return false;
@@ -507,7 +555,7 @@ public sealed interface ValueStorage<T>{
 			AutoText.PIPE.write(provider, dest, new AutoText(src));
 		}
 		@Override
-		public List<ChunkPointer> notifyRemoval(ContentReader io){ return List.of(); }
+		public List<ChunkPointer> notifyRemoval(RandomIO io, boolean dereferenceWrite){ return List.of(); }
 		@Override
 		public boolean needsRemoval(){
 			return false;
@@ -568,10 +616,14 @@ public sealed interface ValueStorage<T>{
 			}
 		}
 		@Override
-		public List<ChunkPointer> notifyRemoval(ContentReader io) throws IOException{
-			var ref = refPipe.readNew(provider, io, null);
+		public List<ChunkPointer> notifyRemoval(RandomIO io, boolean dereferenceWrite) throws IOException{
+			var startPos = io.getPos();
+			var ref      = refPipe.readNew(provider, io, null);
 			if(ref.isNull()){
 				return List.of();
+			}
+			if(dereferenceWrite){
+				refPipe.write(provider, io.setPos(startPos), new Reference());
 			}
 			return List.of(ref.getPtr());
 		}
@@ -750,7 +802,7 @@ public sealed interface ValueStorage<T>{
 			throw new NotImplementedException("Unknown type: " + type);
 		}
 		@Override
-		public List<ChunkPointer> notifyRemoval(ContentReader io){ return List.of(); }
+		public List<ChunkPointer> notifyRemoval(RandomIO io, boolean dereferenceWrite){ return List.of(); }
 		@Override
 		public boolean needsRemoval(){
 			return false;
@@ -851,7 +903,7 @@ public sealed interface ValueStorage<T>{
 	T readNew(ContentReader src) throws IOException;
 	void write(RandomIO dest, T src) throws IOException;
 	
-	List<ChunkPointer> notifyRemoval(ContentReader io) throws IOException;
+	List<ChunkPointer> notifyRemoval(RandomIO io, boolean dereferenceWrite) throws IOException;
 	boolean needsRemoval();
 	
 	long inlineSize();
