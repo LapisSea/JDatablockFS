@@ -35,47 +35,58 @@ import static com.lapissea.cfs.GlobalConfig.TYPE_VALIDATION;
  * interacting with a value of unknown implicit type.
  */
 public sealed interface IOTypeDB{
-	final class MemoryOnlyDB implements IOTypeDB{
-		
-		private final ReadWriteClosableLock rwLock = ReadWriteClosableLock.reentrant();
-		
-		private final Map<String, TypeDef> defs = new HashMap<>();
-		
-		private final Map<Integer, TypeLink> idToTyp = new HashMap<>();
-		private final Map<TypeLink, Integer> typToID = new HashMap<>();
-		private       int                    maxID   = 0;
-		
-		private WeakReference<ClassLoader> templateLoader = new WeakReference<>(null);
+	sealed interface MemoryOnlyDB extends IOTypeDB{
+		@Override
+		TypeID toID(Class<?> type, boolean recordNew);
+		@Override
+		TypeID toID(TypeLink type, boolean recordNew);
+		@Override
+		int toID(Class<?> type);
+		@Override
+		int toID(TypeLink type);
 		
 		@Override
-		public TypeID toID(Class<?> type, boolean recordNew){
-			return toID(TypeLink.of(type), recordNew);
-		}
+		TypeLink fromID(int id);
+		boolean hasType(TypeLink type);
+		boolean hasID(int id);
 		
 		@Override
-		public TypeID toID(TypeLink type, boolean recordNew){
-			try(var ignored = rwLock.read()){
+		TypeDef getDefinitionFromClassName(String className);
+		
+		sealed class Basic implements MemoryOnlyDB{
+			
+			private final Map<String, TypeDef> defs = new HashMap<>();
+			
+			private final Map<Integer, TypeLink> idToTyp = new HashMap<>();
+			private final Map<TypeLink, Integer> typToID = new HashMap<>();
+			private       int                    maxID   = 0;
+			
+			private WeakReference<ClassLoader> templateLoader = new WeakReference<>(null);
+			
+			@Override
+			public TypeID toID(Class<?> type, boolean recordNew){
+				return toID(TypeLink.of(type), recordNew);
+			}
+			
+			@Override
+			public TypeID toID(TypeLink type, boolean recordNew){
 				var id = typToID.get(type);
 				if(id != null) return new TypeID(id, true);
+				return newID(type, recordNew);
 			}
-			return newID(type, recordNew);
-		}
-		
-		@Override
-		public int toID(Class<?> type){
-			return toID(TypeLink.of(type));
-		}
-		@Override
-		public int toID(TypeLink type){
-			try(var ignored = rwLock.read()){
+			
+			@Override
+			public int toID(Class<?> type){
+				return toID(TypeLink.of(type));
+			}
+			@Override
+			public int toID(TypeLink type){
 				var id = typToID.get(type);
 				if(id != null) return id;
+				return newID(type, true).requireStored();
 			}
-			return newID(type, true).requireStored();
-		}
-		
-		private TypeID newID(TypeLink type, boolean recordNew){
-			try(var ignored = rwLock.write()){
+			
+			protected TypeID newID(TypeLink type, boolean recordNew){
 				var newID = maxID() + 1;
 				if(!recordNew) return new TypeID(newID, false);
 				idToTyp.put(newID, type);
@@ -85,65 +96,182 @@ public sealed interface IOTypeDB{
 				recordType(type);
 				return new TypeID(newID, true);
 			}
-		}
-		
-		private void recordType(TypeLink type){
-			if(!defs.containsKey(type.getTypeName())){
-				var def = new TypeDef(type.getTypeClass(null));
-				if(!def.isUnmanaged()){
-					defs.computeIfAbsent(type.getTypeName(), n -> new TypeDef(type.getTypeClass(null)));
-				}else{
-					defs.put(type.getTypeName(), null);
+			
+			private void recordType(TypeLink type){
+				if(!defs.containsKey(type.getTypeName())){
+					var def = new TypeDef(type.getTypeClass(null));
+					if(!def.isUnmanaged()){
+						defs.computeIfAbsent(type.getTypeName(), n -> new TypeDef(type.getTypeClass(null)));
+					}else{
+						defs.put(type.getTypeName(), null);
+					}
+					
+					for(TypeDef.FieldDef field : def.getFields()){
+						recordType(field.getType());
+					}
 				}
-				
-				for(TypeDef.FieldDef field : def.getFields()){
-					recordType(field.getType());
+				for(int i = 0; i<type.argCount(); i++){
+					recordType(type.arg(i));
 				}
 			}
-			for(int i = 0; i<type.argCount(); i++){
-				recordType(type.arg(i));
-			}
-		}
-		
-		@Override
-		public TypeLink fromID(int id){
-			try(var ignored = rwLock.read()){
+			
+			@Override
+			public TypeLink fromID(int id){
 				var type = idToTyp.get(id);
 				if(type == null){
 					throw new RuntimeException("Unknown type from ID of " + id);
 				}
 				return type;
 			}
-		}
-		
-		public boolean hasType(TypeLink type){
-			try(var ignored = rwLock.read()){
+			
+			@Override
+			public boolean hasType(TypeLink type){
 				return typToID.containsKey(type);
 			}
-		}
-		public boolean hasID(int id){
-			try(var ignored = rwLock.read()){
+			@Override
+			public boolean hasID(int id){
 				return idToTyp.containsKey(id);
 			}
-		}
-		
-		private int maxID(){
-			return maxID;
-		}
-		
-		@Override
-		public ClassLoader getTemplateLoader(){
-			var l = templateLoader.get();
-			if(l == null){
-				templateLoader = new WeakReference<>(l = new TemplateClassLoader(this, getClass().getClassLoader()));
+			
+			private int maxID(){
+				return maxID;
 			}
-			return l;
+			
+			@Override
+			public ClassLoader getTemplateLoader(){
+				var l = templateLoader.get();
+				if(l == null){
+					templateLoader = new WeakReference<>(l = new TemplateClassLoader(this, getClass().getClassLoader()));
+				}
+				return l;
+			}
+			
+			@Override
+			public TypeDef getDefinitionFromClassName(String className){
+				if(className == null || className.isEmpty()) return null;
+				return defs.get(className);
+			}
+			
+			public Fixed bake(){
+				return new Fixed(defs, idToTyp);
+			}
 		}
 		
-		@Override
-		public TypeDef getDefinitionFromClassName(String className){
-			if(className == null || className.isEmpty()) return null;
-			return defs.get(className);
+		final class Synchronized extends Basic{
+			
+			private final ReadWriteClosableLock rwLock = ReadWriteClosableLock.reentrant();
+			
+			@Override
+			public int toID(TypeLink type){
+				try(var ignored = rwLock.read()){
+					return super.toID(type);
+				}
+			}
+			
+			@Override
+			protected TypeID newID(TypeLink type, boolean recordNew){
+				try(var ignored = rwLock.write()){
+					return super.newID(type, recordNew);
+				}
+			}
+			
+			@Override
+			public TypeLink fromID(int id){
+				try(var ignored = rwLock.read()){
+					return super.fromID(id);
+				}
+			}
+			
+			@Override
+			public boolean hasType(TypeLink type){
+				try(var ignored = rwLock.read()){
+					return super.hasType(type);
+				}
+			}
+			@Override
+			public boolean hasID(int id){
+				try(var ignored = rwLock.read()){
+					return super.hasID(id);
+				}
+			}
+		}
+		
+		final class Fixed implements MemoryOnlyDB{
+			
+			private final Map<String, TypeDef> defs;
+			
+			private final TypeLink[]             idToTyp;
+			private final Map<TypeLink, Integer> typToID;
+			
+			private Fixed(Map<String, TypeDef> defs, Map<Integer, TypeLink> idToTyp){
+				this.defs = new HashMap<>(defs);
+				var maxID = idToTyp.keySet().stream().mapToInt(i -> i).max().orElse(0);
+				this.idToTyp = new TypeLink[maxID + 1];
+				idToTyp.forEach((k, v) -> this.idToTyp[k] = v.clone());
+				typToID = idToTyp.entrySet().stream().collect(Collectors.toUnmodifiableMap(Map.Entry::getValue, Map.Entry::getKey));
+			}
+			
+			private WeakReference<ClassLoader> templateLoader = new WeakReference<>(null);
+			
+			@Override
+			public TypeID toID(Class<?> type, boolean recordNew){
+				return toID(TypeLink.of(type), recordNew);
+			}
+			
+			@Override
+			public TypeID toID(TypeLink type, boolean recordNew){
+				var id = typToID.get(type);
+				if(id != null) return new TypeID(id, true);
+				if(!recordNew) return new TypeID(idToTyp.length, false);
+				throw new UnsupportedOperationException();
+			}
+			
+			@Override
+			public int toID(Class<?> type){
+				return toID(TypeLink.of(type));
+			}
+			@Override
+			public int toID(TypeLink type){
+				var id = typToID.get(type);
+				if(id != null) return id;
+				throw new UnsupportedOperationException();
+			}
+			
+			@Override
+			public TypeLink fromID(int id){
+				var type = idToTyp(id);
+				if(type == null){
+					throw new RuntimeException("Unknown type from ID of " + id);
+				}
+				return type;
+			}
+			private TypeLink idToTyp(int id){
+				return id>=idToTyp.length || id<0? null : idToTyp[id];
+			}
+			
+			@Override
+			public boolean hasType(TypeLink type){
+				return typToID.containsKey(type);
+			}
+			@Override
+			public boolean hasID(int id){
+				return idToTyp(id) != null;
+			}
+			
+			@Override
+			public ClassLoader getTemplateLoader(){
+				var l = templateLoader.get();
+				if(l == null){
+					templateLoader = new WeakReference<>(l = new TemplateClassLoader(this, getClass().getClassLoader()));
+				}
+				return l;
+			}
+			
+			@Override
+			public TypeDef getDefinitionFromClassName(String className){
+				if(className == null || className.isEmpty()) return null;
+				return defs.get(className);
+			}
 		}
 	}
 	
@@ -173,9 +301,9 @@ public sealed interface IOTypeDB{
 		}
 		
 		//Init async, improves first run time, does not load a bunch of classes in static initializer
-		private static       int                         FIRST_ID = -1;
-		private static final LateInit.Safe<MemoryOnlyDB> BUILT_IN = Runner.async(() -> {
-			var db = new MemoryOnlyDB();
+		private static       int                               FIRST_ID = -1;
+		private static final LateInit.Safe<MemoryOnlyDB.Fixed> BUILT_IN = Runner.async(() -> {
+			var db = new MemoryOnlyDB.Basic();
 			try{
 				for(var c : new Class<?>[]{
 					byte.class,
@@ -210,7 +338,7 @@ public sealed interface IOTypeDB{
 				throw new RuntimeException(e);
 			}
 			FIRST_ID = db.maxID();
-			return db;
+			return db.bake();
 		});
 		
 		private static void registerBuiltIn(MemoryOnlyDB builtIn, Class<?> c){
@@ -344,7 +472,7 @@ public sealed interface IOTypeDB{
 			if(e != null) throw e;
 		}
 		
-		private void recordType(MemoryOnlyDB builtIn, TypeLink type, Map<TypeName, TypeDef> newDefs) throws IOException{
+		private void recordType(MemoryOnlyDB.Fixed builtIn, TypeLink type, Map<TypeName, TypeDef> newDefs) throws IOException{
 			var isBuiltIn = builtIn.getDefinitionFromClassName(type.getTypeName()) != null;
 			if(isBuiltIn){
 				for(int i = 0; i<type.argCount(); i++){
