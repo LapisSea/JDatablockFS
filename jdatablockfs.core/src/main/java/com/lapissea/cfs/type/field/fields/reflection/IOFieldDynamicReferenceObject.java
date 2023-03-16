@@ -31,8 +31,6 @@ import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.stream.Stream;
 
-import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NULLABLE;
-
 public class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, ValueType> extends RefField.ReferenceCompanion<CTyp, ValueType>{
 	
 	private IOFieldPrimitive.FInt<CTyp> typeID;
@@ -92,7 +90,6 @@ public class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, ValueT
 		var idGenerator = new ValueGeneratorInfo<>(typeID, new ValueGenerator<CTyp, Integer>(){
 			private IOTypeDB.TypeID getId(VarPool<CTyp> ioPool, DataProvider provider, CTyp instance, boolean record) throws IOException{
 				var val = get(ioPool, instance);
-				if(val == null) return new IOTypeDB.TypeID(-1, false);
 				return provider.getTypeDb().toID(val, record);
 			}
 			@Override
@@ -170,12 +167,6 @@ public class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, ValueT
 	}
 	
 	private ValueType readValue(DataProvider provider, TypeLink type, Reference readNew, GenericContext genericContext) throws IOException{
-		if(readNew.isNull()){
-			if(getNullability() != NULLABLE){
-				throw new NullPointerException();
-			}
-			return null;
-		}
 		try(var io = readNew.io(provider)){
 			//noinspection unchecked
 			return (ValueType)DynamicSupport.readTyp(type, provider, io, genericContext);
@@ -184,9 +175,18 @@ public class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, ValueT
 	
 	@Override
 	public void read(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
-		var type = getType(ioPool, provider, instance);
-		var ref  = Objects.requireNonNull(getRef(instance));
-		set(ioPool, instance, readValue(provider, type, ref, genericContext));
+		var       ref = Objects.requireNonNull(getRef(instance));
+		ValueType val;
+		if(ref.isNull()){
+			if(!nullable()){
+				throw new NullPointerException();
+			}
+			val = null;
+		}else{
+			var type = getType(ioPool, provider, instance);
+			val = readValue(provider, type, ref, genericContext);
+		}
+		set(ioPool, instance, val);
 	}
 	
 	@Override

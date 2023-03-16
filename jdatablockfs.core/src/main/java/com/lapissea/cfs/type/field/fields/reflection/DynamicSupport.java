@@ -43,6 +43,7 @@ public abstract class DynamicSupport{
 	@SuppressWarnings({"unchecked"})
 	static long calcSize(DataProvider prov, Object val){
 		return switch(val){
+			case null -> 0;
 			case Boolean ignored -> 1;
 			case Float ignored -> 4;
 			case Double ignored -> 8;
