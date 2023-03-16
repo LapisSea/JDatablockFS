@@ -503,11 +503,11 @@ public class SlowTests{
 							}
 						}
 						case 1 -> {
-//							var removed1 = set.remove(num);
-//							var removed2 = checkSet.remove(num);
-//							if(removed1 != removed2){
-//								throw new IllegalStateException(num + "");
-//							}
+							var removed1 = set.remove(num);
+							var removed2 = checkSet.remove(num);
+							if(removed1 != removed2){
+								throw new IllegalStateException(num + "");
+							}
 						}
 						case 2 -> {
 							var c1 = set.contains(num);
