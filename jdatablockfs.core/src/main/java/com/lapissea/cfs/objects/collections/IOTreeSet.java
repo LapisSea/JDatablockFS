@@ -85,6 +85,9 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 		default void yeetChild(boolean isRight){
 			setChild(isRight, -1);
 		}
+		default void yeetValue(){
+			valueIndex(-1);
+		}
 		
 		default boolean hasLeft() { return left() != -1; }
 		default boolean hasRight(){ return right() != -1; }
@@ -325,7 +328,7 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 				blankValueIds.remove(values.size());
 			}
 		}else{
-			values.set(idx, new Val<>());
+			values.free(idx);
 			if(idx>0) blankValueIds.add(idx);
 		}
 	}
@@ -343,7 +346,7 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 				nodeCache.remove(nodes.size());
 			}
 		}else{
-			node.node.valueIndex(-1);
+			node.node.yeetValue();
 			node.node.yeetChild(true);
 			node.node.yeetChild(false);
 			
