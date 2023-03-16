@@ -845,6 +845,10 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	}
 	
 	@Override
+	public void free(long index) throws IOException{
+	}
+	
+	@Override
 	public RuntimeType<T> getElementType(){
 		return storage.getType();
 	}

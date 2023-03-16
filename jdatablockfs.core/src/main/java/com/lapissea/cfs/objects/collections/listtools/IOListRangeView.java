@@ -230,6 +230,11 @@ public class IOListRangeView<T> implements IOList<T>{
 	public IOList<T> subListView(long from, long to){
 		return new IOListRangeView<>(data, this.from + from, this.from + to);
 	}
+	@Override
+	public void free(long index) throws IOException{
+		if(data.size()<=from) throw new IndexOutOfBoundsException();
+		data.free(toGlobalIndex(index));
+	}
 	
 	@Override
 	public String toString(){
