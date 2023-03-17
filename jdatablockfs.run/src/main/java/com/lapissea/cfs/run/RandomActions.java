@@ -34,7 +34,7 @@ public class RandomActions{
 		var l = mth.stream().filter(m -> m.getName().toLowerCase().contains(n)).toList();
 		if(l.isEmpty()) throw new IllegalArgumentException("No method \"" + nOrg + "\" found");
 		if(l.size() != 1) throw new IllegalArgumentException(
-			"Ambitious choice \"" + nOrg + "\", possible matches: " +
+			"Ambiguous choice \"" + nOrg + "\", possible matches: " +
 			l.stream().map(Method::getName).collect(Collectors.joining(", "))
 		);
 		l.get(0).invoke(null);
