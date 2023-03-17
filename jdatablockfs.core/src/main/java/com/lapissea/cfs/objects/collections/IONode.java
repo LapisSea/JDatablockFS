@@ -200,7 +200,7 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 					return instance.getPipe();
 				}
 			};
-			next.initLateData(FieldSet.of(List.of(getNextSizeField())));
+			next.initLateData(-1, FieldSet.of(List.of(getNextSizeField())));
 			
 			
 			return Stream.of(

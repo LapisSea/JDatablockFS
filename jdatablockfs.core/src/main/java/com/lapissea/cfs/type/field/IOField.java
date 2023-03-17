@@ -47,7 +47,8 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 	public static final int HAS_NO_POINTERS_FLAG   = 1<<3;
 	public static final int HAS_GENERATED_NAME     = 1<<4;
 	
-	private int typeFlags = -1;
+	private int typeFlags   = -1;
+	private int inStructUID = -1;
 	
 	protected IOField(FieldAccessor<T> accessor, SizeDescriptor<T> descriptor){
 		this.accessor = accessor;
@@ -57,11 +58,12 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 		this.accessor = accessor;
 	}
 	
-	public final void initLateData(FieldSet<T> dependencies){
+	public final void initLateData(int inStructUID, FieldSet<T> dependencies){
 		if(lateDataInitialized) throw new IllegalStateException("already initialized");
 		
 		this.dependencies = dependencies == null? null : Utils.nullIfEmpty(dependencies);
 		lateDataInitialized = true;
+		this.inStructUID = inStructUID;
 	}
 	
 	public final boolean typeFlag(int flag){
@@ -72,6 +74,10 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 		var f = typeFlags;
 		if(f == -1) f = typeFlags = FieldSupport.typeFlags(this);
 		return f;
+	}
+	
+	public int getInStructUID(){
+		return inStructUID;
 	}
 	
 	public final boolean isNull(VarPool<T> ioPool, T instance){
@@ -309,7 +315,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 		}
 		var f = maxAsFixedSize(provider == null? VaryingSize.Provider.ALL_MAX : provider);
 		if(f != this){
-			f.initLateData(getDependencies());
+			f.initLateData(getInStructUID(), getDependencies());
 			f.init();
 			Objects.requireNonNull(f.getSizeDescriptor(), "Descriptor was not inited");
 		}
