@@ -233,7 +233,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			}catch(Exception e){
 				throw UtilL.uncheckedThrow(e);
 			}
-			fieldDependency = new FieldDependency<>(ioFields);
+			fieldDependency = new FieldDependency<>(getType(), ioFields);
 			setInitState(STATE_IO_FIELD);
 			
 			sizeDescription = Objects.requireNonNull(createSizeDescriptor());
