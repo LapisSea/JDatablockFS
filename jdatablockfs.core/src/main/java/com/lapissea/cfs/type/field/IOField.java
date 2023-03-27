@@ -248,6 +248,9 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 		var acc = getAccessor();
 		return acc == null? null : acc.getDeclaringStruct();
 	}
+	public boolean isVirtual(){
+		return getAccessor() instanceof VirtualAccessor;
+	}
 	
 	private void requireLateData(){
 		if(!lateDataInitialized){

@@ -119,7 +119,10 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	}
 	
 	private DataProvider makeMagnetProvider(){
-		return getDataProvider().withRouter(t -> t.withPositionMagnet(t.positionMagnet().orElse(getReference().getPtr().getValue())));
+		return getDataProvider().withRouter(t -> {
+			if(t.positionMagnet().isPresent()) return t;
+			return t.withPositionMagnet(getReference().getPtr().getValue());
+		});
 	}
 	
 	@Override

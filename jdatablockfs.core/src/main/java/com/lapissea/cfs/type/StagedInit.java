@@ -54,8 +54,8 @@ public abstract class StagedInit{
 	protected void init(boolean runNow, Runnable init, Runnable postValidate){
 		if(runNow){
 			if(DEBUG_VALIDATION) validateStates();
-			initThread = Thread.currentThread();
 			try{
+				initThread = Thread.currentThread();
 				setInitState(STATE_START);
 				init.run();
 				setInitState(STATE_DONE);

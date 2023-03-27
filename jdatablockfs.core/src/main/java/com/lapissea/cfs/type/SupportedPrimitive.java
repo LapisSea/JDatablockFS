@@ -7,14 +7,16 @@ import java.lang.reflect.Array;
 import java.lang.reflect.Type;
 
 public enum SupportedPrimitive implements RuntimeType<Object>{
-	DOUBLE(double.class, Double.class, SizeDescriptor.Fixed.of(8)),
-	CHAR(char.class, Character.class, SizeDescriptor.Fixed.of(2)),
-	FLOAT(float.class, Float.class, SizeDescriptor.Fixed.of(4)),
-	LONG(long.class, Long.class, SizeDescriptor.Fixed.of(8)),
-	INT(int.class, Integer.class, SizeDescriptor.Fixed.of(4)),
-	SHORT(short.class, Short.class, SizeDescriptor.Fixed.of(2)),
-	BYTE(byte.class, Byte.class, SizeDescriptor.Fixed.of(1)),
-	BOOLEAN(boolean.class, Boolean.class, SizeDescriptor.Fixed.of(WordSpace.BIT, 1));
+	// @formatter:off
+	DOUBLE (double.class,  Double.class,    false, SizeDescriptor.Fixed.of(8)),
+	CHAR   (char.class,    Character.class, false, SizeDescriptor.Fixed.of(2)),
+	FLOAT  (float.class,   Float.class,     false, SizeDescriptor.Fixed.of(4)),
+	LONG   (long.class,    Long.class,      true,  SizeDescriptor.Fixed.of(8)),
+	INT    (int.class,     Integer.class,   true,  SizeDescriptor.Fixed.of(4)),
+	SHORT  (short.class,   Short.class,     true,  SizeDescriptor.Fixed.of(2)),
+	BYTE   (byte.class,    Byte.class,      true,  SizeDescriptor.Fixed.of(1)),
+	BOOLEAN(boolean.class, Boolean.class,   false, SizeDescriptor.Fixed.of(WordSpace.BIT, 1));
+	// @formatter:on
 	
 	private static final SupportedPrimitive[] UNIVERSE = values();
 	
@@ -56,15 +58,17 @@ public enum SupportedPrimitive implements RuntimeType<Object>{
 	
 	public final Class<?> primitive;
 	public final Class<?> wrapper;
+	public final boolean  isInteger;
 	
 	public final SizeDescriptor.Fixed<?> maxSize;
 	
 	private final Object defVal;
 	
-	SupportedPrimitive(Class<?> primitive, Class<?> wrapper, SizeDescriptor.Fixed<?> maxSize){
+	SupportedPrimitive(Class<?> primitive, Class<?> wrapper, boolean isInteger, SizeDescriptor.Fixed<?> maxSize){
 		this.primitive = primitive;
 		this.wrapper = wrapper;
 		this.maxSize = maxSize;
+		this.isInteger = isInteger;
 		this.defVal = Array.get(Array.newInstance(primitive, 1), 0);
 	}
 	
@@ -91,5 +95,9 @@ public enum SupportedPrimitive implements RuntimeType<Object>{
 	@Override
 	public Class<Object> getType(){
 		return (Class<Object>)primitive;
+	}
+	
+	public boolean isInteger(){
+		return isInteger;
 	}
 }
