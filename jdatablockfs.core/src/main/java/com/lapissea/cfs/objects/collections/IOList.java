@@ -17,7 +17,10 @@ import com.lapissea.util.function.UnsafeFunction;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.ConcurrentModificationException;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
@@ -27,12 +30,267 @@ import java.util.Spliterator;
 import java.util.StringJoiner;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.LongPredicate;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 @SuppressWarnings("unused")
 @IOValue.OverrideType.DefaultImpl(ContiguousIOList.class)
 public interface IOList<T> extends IterablePP<T>{
+	
+	class Cached<T> implements IOList<T>{
+		private static class Container<T>{
+			private T       obj;
+			private boolean hasObj;
+			public Container()     { }
+			public Container(T obj){ set(obj); }
+			private void set(T obj){
+				this.obj = obj;
+				hasObj = true;
+			}
+		}
+		
+		private final IOList<T>               data;
+		private final int                     maxCacheSize;
+		private final Map<Long, Container<T>> cache = new LinkedHashMap<>();
+		
+		public Cached(IOList<T> data, int maxCacheSize){
+			if(maxCacheSize<=0) throw new IllegalStateException("{maxCacheSize > 0} not satisfied");
+			this.data = Objects.requireNonNull(data);
+			this.maxCacheSize = maxCacheSize;
+		}
+		
+		private Container<T> getC(long index){
+			if(cache.size()>=maxCacheSize) yeet();
+			return cache.computeIfAbsent(index, i -> new Container<>());
+		}
+		
+		private void yeet(){
+			var iter = cache.entrySet().iterator();
+			iter.next();
+			iter.remove();
+		}
+		
+		@Override
+		public Class<T> elementType(){ return data.elementType(); }
+		@Override
+		public long size(){ return data.size(); }
+		
+		@Override
+		public T get(long index) throws IOException{
+			var cached = getC(index);
+			if(cached.hasObj) return cached.obj;
+			
+			var read = data.get(index);
+			cached.set(read);
+			return read;
+		}
+		
+		@Override
+		public void set(long index, T value) throws IOException{
+			data.set(index, value);
+			getC(index).set(value);
+		}
+		@Override
+		public void add(long index, T value) throws IOException{
+			data.add(index, value);
+			
+			var toReadd = pull(index, i -> i>=index);
+			toReadd.forEach((k, v) -> cache.put(k + 1, v));
+			cache.put(index, new Container<>(value));
+		}
+		
+		private Map<Long, Container<T>> pull(long index, LongPredicate check){
+			Map<Long, Container<T>> buff = new LinkedHashMap<>();
+			cache.entrySet().removeIf(e -> {
+				if(check.test(e.getKey())) return false;
+				buff.put(e.getKey(), e.getValue());
+				return true;
+			});
+			return buff;
+		}
+		
+		@Override
+		public void add(T value) throws IOException{
+			getC(data.size()).set(value);
+			data.add(value);
+		}
+		@Override
+		public void remove(long index) throws IOException{
+			data.remove(index);
+			cache.remove(index);
+			var toReadd = pull(index, i -> i>index);
+			toReadd.forEach((k, v) -> cache.put(k - 1, v));
+		}
+		
+		@Override
+		public T addNew(UnsafeConsumer<T, IOException> initializer) throws IOException{
+			var c   = getC(data.size());
+			var gnu = data.addNew(initializer);
+			c.set(gnu);
+			return gnu;
+		}
+		@Override
+		public void addMultipleNew(long count, UnsafeConsumer<T, IOException> initializer) throws IOException{
+			data.addMultipleNew(count, initializer);
+		}
+		@Override
+		public void clear() throws IOException{
+			cache.clear();
+			data.clear();
+		}
+		@Override
+		public void requestCapacity(long capacity) throws IOException{
+			data.requestCapacity(capacity);
+		}
+		@Override
+		public void trim() throws IOException{
+			data.trim();
+		}
+		@Override
+		public long getCapacity() throws IOException{
+			return data.getCapacity();
+		}
+		@Override
+		public void free(long index) throws IOException{
+			data.free(index);
+			cache.remove(index);
+		}
+		
+		@Override
+		public IOIterator.Iter<T> iterator(){
+			IOListIterator<T> iter = data.listIterator();
+			return new IOIterator.Iter<>(){
+				@Override
+				public boolean hasNext(){
+					return iter.hasNext();
+				}
+				@Override
+				public T ioNext() throws IOException{
+					var c = getC(iter.nextIndex());
+					if(c.hasObj){
+						iter.skipNext();
+						return c.obj;
+					}
+					var next = iter.ioNext();
+					c.set(next);
+					return next;
+				}
+				@Override
+				public void ioRemove() throws IOException{
+					cache.clear();
+					iter.ioRemove();
+				}
+			};
+		}
+		@Override
+		public IOListIterator<T> listIterator(long startIndex){
+			IOListIterator<T> iter = data.listIterator(startIndex);
+			return new IOListIterator<T>(){
+				@Override
+				public boolean hasNext(){
+					return iter.hasNext();
+				}
+				@Override
+				public T ioNext() throws IOException{
+					var c = getC(iter.nextIndex());
+					if(c.hasObj){
+						iter.skipNext();
+						return c.obj;
+					}
+					var next = iter.ioNext();
+					c.set(next);
+					return next;
+				}
+				@Override
+				public void skipNext(){
+					iter.skipNext();
+				}
+				@Override
+				public boolean hasPrevious(){
+					return iter.hasPrevious();
+				}
+				@Override
+				public T ioPrevious() throws IOException{
+					var c = getC(iter.previousIndex());
+					if(c.hasObj){
+						iter.skipPrevious();
+						return c.obj;
+					}
+					var next = iter.ioPrevious();
+					c.set(next);
+					return next;
+				}
+				@Override
+				public void skipPrevious(){
+					iter.skipPrevious();
+				}
+				@Override
+				public long nextIndex(){
+					return iter.nextIndex();
+				}
+				@Override
+				public long previousIndex(){
+					return iter.previousIndex();
+				}
+				@Override
+				public void ioRemove() throws IOException{
+					iter.ioRemove();
+					cache.clear();
+				}
+				@Override
+				public void ioSet(T t) throws IOException{
+					iter.ioSet(t);
+					cache.clear();
+				}
+				@Override
+				public void ioAdd(T t) throws IOException{
+					iter.ioRemove();
+					cache.clear();
+				}
+			};
+		}
+		
+		@Override
+		public void modify(long index, UnsafeFunction<T, T, IOException> modifier) throws IOException{
+			cache.remove(index);
+			data.modify(index, modifier);
+		}
+		
+		@Override
+		public boolean isEmpty(){
+			return data.isEmpty();
+		}
+		@Override
+		public T addNew() throws IOException{
+			return data.addNew();
+		}
+		@Override
+		public void addMultipleNew(long count) throws IOException{
+			data.addMultipleNew(count);
+		}
+		@Override
+		public void requestRelativeCapacity(long extra) throws IOException{
+			data.requestRelativeCapacity(extra);
+		}
+		@Override
+		public boolean contains(T value) throws IOException{
+			for(var c : cache.values()){
+				if(!c.hasObj) continue;
+				if(Objects.equals(c.obj, value)) return true;
+			}
+			return data.contains(value);
+		}
+		@Override
+		public long indexOf(T value) throws IOException{
+			for(var e : cache.entrySet()){
+				var c = e.getValue();
+				if(!c.hasObj) continue;
+				if(Objects.equals(c.obj, value)) return e.getKey();
+			}
+			return data.indexOf(value);
+		}
+	}
 	
 	static <T> void elementSummary(StringJoiner sb, IOList<T> data){
 		var iter = data.iterator();
@@ -239,6 +497,11 @@ public interface IOList<T> extends IterablePP<T>{
 				return next;
 			}
 			@Override
+			public void skipNext(){
+				if(!hasNext()) throw new NoSuchElementException();
+				cursor++;
+			}
+			@Override
 			public boolean hasPrevious(){
 				return cursor != 0;
 			}
@@ -249,6 +512,11 @@ public interface IOList<T> extends IterablePP<T>{
 				var previous = getElement(i);
 				lastRet = cursor = i;
 				return previous;
+			}
+			@Override
+			public void skipPrevious(){
+				if(!hasPrevious()) throw new NoSuchElementException();
+				cursor--;
 			}
 			
 			@Override
@@ -285,9 +553,11 @@ public interface IOList<T> extends IterablePP<T>{
 		boolean hasNext();
 		@Override
 		T ioNext() throws IOException;
+		void skipNext();
 		
 		boolean hasPrevious();
 		T ioPrevious() throws IOException;
+		void skipPrevious();
 		
 		long nextIndex();
 		long previousIndex();

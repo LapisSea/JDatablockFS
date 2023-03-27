@@ -30,7 +30,9 @@ import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.StoragePool;
 import com.lapissea.cfs.type.field.VaryingSize;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
+import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IONullability;
+import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.RefField;
 import com.lapissea.cfs.utils.ClosableLock;
 import com.lapissea.util.NotImplementedException;
@@ -44,6 +46,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.lang.reflect.ParameterizedType;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -63,6 +66,7 @@ import static com.lapissea.cfs.GlobalConfig.TYPE_VALIDATION;
 import static com.lapissea.util.ConsoleColors.BLUE_BRIGHT;
 import static com.lapissea.util.ConsoleColors.CYAN_BRIGHT;
 import static com.lapissea.util.ConsoleColors.RESET;
+import static java.util.function.Predicate.not;
 
 public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit implements ObjectPipe<T, VarPool<T>>{
 	
@@ -233,7 +237,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			}catch(Exception e){
 				throw UtilL.uncheckedThrow(e);
 			}
-			fieldDependency = new FieldDependency<>(ioFields);
+			fieldDependency = new FieldDependency<>(getType(), ioFields);
 			setInitState(STATE_IO_FIELD);
 			
 			sizeDescription = Objects.requireNonNull(createSizeDescriptor());
@@ -860,8 +864,32 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	public void checkTypeIntegrity(T inst, boolean init) throws IOException{
 		var man = DataProvider.newVerySimpleProvider();
 		
-		if(init && inst.getThisStruct().hasInvalidInitialNulls()){
-			inst.allocateNulls(man);
+		if(init){
+			var fields = getType().getFields();
+			for(IOField<T, ?> field : fields){
+				if(field.isVirtual()) continue;
+				if(SupportedPrimitive.get(field.getType()).filter(SupportedPrimitive::isInteger).isEmpty()) continue;
+				
+				field.getAccessor().getAnnotation(IODependency.class)
+				     .map(IODependency::value).stream().flatMap(Arrays::stream)
+				     .map(fields::byName).map(Optional::orElseThrow)
+				     .filter(n -> n.getType() == NumberSize.class)
+				     .findAny()//dependency that is a numsize
+				     .filter(not(IOField::isVirtual))
+				     .filter(f -> {
+					     if(f.nullable()) return false;
+					     return f.getAccessor().get(null, inst) == null;
+				     })
+				     .ifPresent(f -> {
+					     var val        = field.get(null, inst);
+					     var isUnsigned = field.getAccessor().hasAnnotation(IOValue.Unsigned.class);
+					     ((IOField<T, NumberSize>)f).set(null, inst, NumberSize.bySize(((Number)val).longValue(), isUnsigned));
+				     });
+			}
+			
+			if(inst.getThisStruct().hasInvalidInitialNulls()){
+				inst.allocateNulls(man);
+			}
 		}
 		
 		T instRead;

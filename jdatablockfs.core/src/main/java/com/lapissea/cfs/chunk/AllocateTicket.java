@@ -41,8 +41,15 @@ public record AllocateTicket(
 	}
 	
 	public static <IO, PoolType> AllocateTicket withData(ObjectPipe<IO, PoolType> pipe, DataProvider provider, IO data){
-		var desc  = pipe.getSizeDescriptor();
-		var bytes = desc.getFixed(WordSpace.BYTE).orElseGet(() -> Math.max(desc.calcAllocSize(WordSpace.BYTE), desc.calcUnknown(pipe.makeIOPool(), provider, data, WordSpace.BYTE)));
+		var  desc  = pipe.getSizeDescriptor();
+		long bytes;
+		var  fixed = desc.getFixed(WordSpace.BYTE);
+		if(fixed.isPresent()) bytes = fixed.getAsLong();
+		else{
+			var predicted = desc.calcAllocSize(WordSpace.BYTE);
+			var actual    = desc.calcUnknown(pipe.makeIOPool(), provider, data, WordSpace.BYTE);
+			bytes = Math.max(predicted, actual);
+		}
 		return bytes(bytes).withDataPopulated((prov, io) -> pipe.write(prov, io, data));
 	}
 	

@@ -198,8 +198,8 @@ public abstract class MappedIOList<From, To> implements IOList<To>{
 	
 	@Override
 	public IOListIterator<To> listIterator(long startIndex){
+		IOListIterator<From> src = data.listIterator(startIndex);
 		return new IOListIterator<>(){
-			private final IOListIterator<From> src = data.listIterator(startIndex);
 			@Override
 			public boolean hasNext(){
 				return src.hasNext();
@@ -209,12 +209,20 @@ public abstract class MappedIOList<From, To> implements IOList<To>{
 				return map(src.ioNext());
 			}
 			@Override
+			public void skipNext(){
+				src.skipNext();
+			}
+			@Override
 			public boolean hasPrevious(){
 				return src.hasPrevious();
 			}
 			@Override
 			public To ioPrevious() throws IOException{
 				return map(src.ioPrevious());
+			}
+			@Override
+			public void skipPrevious(){
+				src.skipPrevious();
 			}
 			@Override
 			public long nextIndex(){

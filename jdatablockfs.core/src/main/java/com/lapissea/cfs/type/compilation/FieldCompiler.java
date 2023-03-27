@@ -190,11 +190,12 @@ public class FieldCompiler{
 	}
 	
 	private static <T extends IOInstance<T>> void initLateData(List<AnnotatedField<T>> fields){
-		for(var pair : fields){
+		for(int i = 0; i<fields.size(); i++){
+			var pair  = fields.get(i);
 			var depAn = pair.annotations;
 			var field = pair.field;
 			
-			field.initLateData(FieldSet.of(generateDependencies(fields, depAn, field)));
+			field.initLateData(i, FieldSet.of(generateDependencies(fields, depAn, field)));
 		}
 	}
 	

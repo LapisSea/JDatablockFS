@@ -145,6 +145,10 @@ public class IOListRangeView<T> implements IOList<T>{
 				return iter.ioPrevious();
 			}
 			@Override
+			public void skipPrevious(){
+				iter.skipPrevious();
+			}
+			@Override
 			public long nextIndex(){
 				return toLocalIndex(iter.nextIndex());
 			}
@@ -163,6 +167,10 @@ public class IOListRangeView<T> implements IOList<T>{
 			@Override
 			public void ioAdd(T t) throws IOException{
 				iter.ioAdd(t);
+			}
+			@Override
+			public void skipNext(){
+				iter.skipNext();
 			}
 		};
 	}

@@ -214,7 +214,7 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 				(ioPool, prov, inst) -> Utils.bitToByte(IOFieldTools.sumVars(group, s -> s.calcUnknown(ioPool, prov, inst, WordSpace.BIT)))
 			));
 		}
-		initLateData(FieldSet.of(group.stream().flatMap(IOField::dependencyStream)));
+		initLateData(-1, FieldSet.of(group.stream().flatMap(IOField::dependencyStream)));
 		generators = Utils.nullIfEmpty(streamUnpackedFields().flatMap(IOField::generatorStream).toList());
 	}
 	

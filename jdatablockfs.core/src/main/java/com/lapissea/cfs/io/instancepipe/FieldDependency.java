@@ -2,6 +2,7 @@ package com.lapissea.cfs.io.instancepipe;
 
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.utils.ReadWriteClosableLock;
@@ -25,16 +26,17 @@ public class FieldDependency<T extends IOInstance<T>>{
 	){ }
 	
 	
-	private final Map<IOField<T, ?>, Ticket<T>> singleDependencyCache     = new HashMap<>();
-	private final ReadWriteClosableLock         singleDependencyCacheLock = ReadWriteClosableLock.reentrant();
+	private final Ticket<T>[] singleDependencyCache;
 	
 	private final Map<FieldSet<T>, Ticket<T>> multiDependencyCache     = new HashMap<>();
 	private final ReadWriteClosableLock       multiDependencyCacheLock = ReadWriteClosableLock.reentrant();
 	
 	private final FieldSet<T> allFields;
 	
-	public FieldDependency(FieldSet<T> allFields){
+	public FieldDependency(Struct<T> struct, FieldSet<T> allFields){
 		this.allFields = allFields;
+		//noinspection unchecked
+		singleDependencyCache = new Ticket[struct.getFields().size()];
 	}
 	
 	public Ticket<T> getDeps(Set<String> names){
@@ -64,19 +66,12 @@ public class FieldDependency<T extends IOInstance<T>>{
 	}
 	
 	public Ticket<T> getDeps(IOField<T, ?> selectedField){
-		try(var ignored = singleDependencyCacheLock.read()){
-			var cached = singleDependencyCache.get(selectedField);
-			if(cached != null) return cached;
-		}
+		var cached = singleDependencyCache[selectedField.getInStructUID()];
+		if(cached != null) return cached;
 		
-		try(var ignored = singleDependencyCacheLock.write()){
-			var cached = singleDependencyCache.get(selectedField);
-			if(cached != null) return cached;
-			
-			var field = generateFieldDependency(selectedField);
-			singleDependencyCache.put(selectedField, field);
-			return field;
-		}
+		var ticket = generateFieldDependency(selectedField);
+		singleDependencyCache[selectedField.getInStructUID()] = ticket;
+		return ticket;
 	}
 	
 	private Ticket<T> generateFieldsDependency(FieldSet<T> selectedFields){
@@ -204,11 +199,7 @@ public class FieldDependency<T extends IOInstance<T>>{
 	}
 	
 	private void checkExistenceOfField(IOField<T, ?> selectedField){
-		for(IOField<T, ?> field : allFields){
-			if(field == selectedField){
-				return;
-			}
-		}
+		if(allFields.contains(selectedField)) return;
 		throw new IllegalArgumentException(selectedField + " is not listed!");
 	}
 }
