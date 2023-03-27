@@ -239,6 +239,11 @@ public interface IOList<T> extends IterablePP<T>{
 				return next;
 			}
 			@Override
+			public void skipNext(){
+				if(!hasNext()) throw new NoSuchElementException();
+				cursor++;
+			}
+			@Override
 			public boolean hasPrevious(){
 				return cursor != 0;
 			}
@@ -249,6 +254,11 @@ public interface IOList<T> extends IterablePP<T>{
 				var previous = getElement(i);
 				lastRet = cursor = i;
 				return previous;
+			}
+			@Override
+			public void skipPrevious(){
+				if(!hasPrevious()) throw new NoSuchElementException();
+				cursor--;
 			}
 			
 			@Override
@@ -285,9 +295,11 @@ public interface IOList<T> extends IterablePP<T>{
 		boolean hasNext();
 		@Override
 		T ioNext() throws IOException;
+		void skipNext();
 		
 		boolean hasPrevious();
 		T ioPrevious() throws IOException;
+		void skipPrevious();
 		
 		long nextIndex();
 		long previousIndex();
