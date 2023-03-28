@@ -226,6 +226,13 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 			this.node = node;
 			this.age = age;
 		}
+		void makeOlder(){
+			if(age<10) age++;
+		}
+		@Override
+		public String toString(){
+			return age + " " + node;
+		}
 	}
 	
 	private final Map<Long, NodeCache> nodeCache = new HashMap<>();
@@ -233,7 +240,7 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 		var cached = nodeCache.get(nodeIdx);
 		if(cached != null){
 			assert nodes.get(nodeIdx).equals(cached.node);
-			if(cached.age<10) cached.age++;
+			cached.makeOlder();
 			return cached.node.clone();
 		}
 		nodeCache.entrySet().stream().skip((nodeIdx + nodeCache.size())%Math.max(1, nodeCache.size())).findAny()
@@ -248,7 +255,7 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 		updateNode(node.idx, node.node);
 	}
 	private void updateNode(long nodeIdx, Node node) throws IOException{
-		assert !DEBUG_VALIDATION || nodeIdx != 0 || !node.red() : "Root is red";
+		assert nodeIdx != 0 || !node.red() : "Root is red";
 		nodeCache.put(nodeIdx, new NodeCache(node, (byte)3));
 		nodes.set(nodeIdx, node);
 	}
@@ -431,16 +438,20 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 	
 	private void validate() throws IOException{
 		if(isEmpty()) return;
+		var nodes = this.nodes.stream().toList();
+		
 		for(var e : nodeCache.entrySet()){
 			var read = nodes.get(e.getKey());
 			if(e.getValue().node.equals(read)) continue;
 			throw new IllegalStateException("cache desync " + e);
 		}
 		
-		var nodes = this.nodes.stream().toList();
-		var root  = nodes.get(0);
+		var root = nodes.get(0);
 		if(root.red()){
 			throw new IllegalStateException("Root is not black!");
+		}
+		if(!root.hasValue()){
+			throw new IllegalStateException("Root has no value!");
 		}
 		
 		var h = HashSet.<Long>newHashSet(nodes.size());
