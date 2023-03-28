@@ -4,6 +4,8 @@ import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.objects.collections.IOHashSet;
+import com.lapissea.cfs.objects.collections.IOSet;
+import com.lapissea.cfs.objects.collections.IOTreeSet;
 import com.lapissea.util.LogUtil;
 
 import java.io.IOException;
@@ -43,13 +45,13 @@ public class RandomActions{
 	
 	private static void treeSet() throws IOException{
 		var provider = Cluster.emptyMem();
-		var set      = provider.getRootProvider().<IOHashSet<Object>>request("hi", IOHashSet.class);
+		var set      = provider.getRootProvider().<IOSet<Integer>>request("hi", IOTreeSet.class, Integer.class);
 		var r        = new Random(420);
 		
 		
-		var iter = 5000_0000;
+		var iter = 50_000_000;
 		for(int i = 0; i<iter; i++){
-			if(i%200000 == 0) LogUtil.println(i/(float)iter);
+			if(i%(iter/100) == 0) LogUtil.println("treeSet", i/(double)iter);
 			Integer num = r.nextInt(400);
 			
 			switch(r.nextInt(3)){
@@ -108,7 +110,7 @@ public class RandomActions{
 	private static void hashSet() throws IOException{
 		var provider = Cluster.emptyMem();
 		
-		var set = provider.getRootProvider().<IOHashSet<Object>>request("hi", IOHashSet.class);
+		var set = provider.getRootProvider().<IOSet<Object>>request("hi", IOHashSet.class);
 		
 		var r    = new Random(69);
 		var iter = 50000000;

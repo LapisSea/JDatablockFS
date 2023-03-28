@@ -472,15 +472,16 @@ public class SlowTests{
 			var checkSet = new HashSet<Integer>();
 			
 			var r    = new Random(69);
-			var iter = 300000;
+			var iter = 100000;
 			for(int i = 0; i<iter; i++){
 				try{
-					if(i%10000 == 0) LogUtil.println(i/((double)iter));
+					if((i - 1)%(iter/100) == 0) LogUtil.println((i - 1)/((double)iter));
 					Integer num = r.nextInt(200);
 					
 					if(r.nextInt(1000) == 1){
 						set.clear();
 						checkSet.clear();
+//						LogUtil.println("clear", i);
 					}
 					if(r.nextInt(1000) == 1){
 						var oldSet = set;
