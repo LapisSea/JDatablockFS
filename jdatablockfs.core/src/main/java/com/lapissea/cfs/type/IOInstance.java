@@ -309,7 +309,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 			var struct = getThisStruct();
 			if(that.getThisStruct() != struct) return false;
 			
-			for(var field : struct.getInstanceFields()){
+			for(var field : struct.getRealFields()){
 				if(!field.instancesEqual(null, self(), null, (SELF)that)) return false;
 			}
 			
@@ -319,7 +319,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		@Override
 		public int hashCode(){
 			int result = 1;
-			for(var field : getThisStruct().getInstanceFields()){
+			for(var field : getThisStruct().getRealFields()){
 				result = 31*result + field.instanceHashCode(null, self());
 			}
 			return result;
@@ -327,7 +327,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		
 		@Override
 		public void allocateNulls(DataProvider provider) throws IOException{
-			for(var ref : getThisStruct().getInstanceFields().onlyRefs()){
+			for(var ref : getThisStruct().getRealFields().onlyRefs()){
 				if(!ref.isNull(null, self()))
 					continue;
 				ref.allocate(self(), provider, null);
