@@ -1,7 +1,10 @@
 package com.lapissea.cfs.type.field;
 
 import com.lapissea.cfs.chunk.DataProvider;
-import com.lapissea.cfs.exceptions.PointerOutsideFile;
+import com.lapissea.cfs.exceptions.MalformedPointer;
+import com.lapissea.cfs.io.IOInterface;
+import com.lapissea.cfs.io.IOTransaction;
+import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.objects.NumberSize;
@@ -12,6 +15,7 @@ import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -33,7 +37,7 @@ public final class VaryingSize implements Stringify{
 	private static <T extends IOInstance<T>> TooSmall scanInvalidSizes(FieldSet<T> fields, VarPool<T> ioPool, T instance){
 		Map<VaryingSize, NumberSize> tooSmallIdMap = new HashMap<>();
 		
-		var provider = DataProvider.newVerySimpleProvider();
+		var provider = DataProvider.newVerySimpleProvider(makeFakeData());
 		try(var blackHole = new ContentWriter(){
 			@Override
 			public void write(int b){ }
@@ -50,7 +54,7 @@ public final class VaryingSize implements Stringify{
 						else if(num.greaterThan(size)) return;
 						tooSmallIdMap.put(varying, num);
 					});
-				}catch(PointerOutsideFile badPtr){
+				}catch(MalformedPointer badPtr){
 					Log.trace("Suppressed due to fake data: {}", badPtr);
 				}
 			}
@@ -58,6 +62,46 @@ public final class VaryingSize implements Stringify{
 			throw new RuntimeException(e);
 		}
 		return new TooSmall(tooSmallIdMap);
+	}
+	
+	private static IOInterface makeFakeData(){
+		return new IOInterface(){
+			@Override
+			public boolean isReadOnly(){ return false; }
+			@Override
+			public IOTransaction openIOTransaction(){ return IOTransaction.NOOP; }
+			@Override
+			public RandomIO io(){
+				return new RandomIO(){
+					@Override
+					public void setSize(long requestedSize){ }
+					@Override
+					public long getSize(){ return Long.MAX_VALUE; }
+					@Override
+					public long getPos(){ return 1; }
+					@Override
+					public RandomIO setPos(long pos){ return this; }
+					@Override
+					public long getCapacity(){ return Long.MAX_VALUE; }
+					@Override
+					public RandomIO setCapacity(long newCapacity){ return this; }
+					@Override
+					public void close(){ }
+					@Override
+					public void flush(){ }
+					@Override
+					public int read(){ return 0; }
+					@Override
+					public void write(int b){ }
+					@Override
+					public void writeAtOffsets(Collection<WriteChunk> data) throws IOException{ }
+					@Override
+					public void fillZero(long requestedMemory) throws IOException{ }
+					@Override
+					public boolean isReadOnly(){ return false; }
+				};
+			}
+		};
 	}
 	
 	public static final VaryingSize MAX = new VaryingSize(NumberSize.LARGEST, -1);

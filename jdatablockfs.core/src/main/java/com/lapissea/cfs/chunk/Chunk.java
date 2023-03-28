@@ -237,7 +237,7 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	 * referenced outside a controlled context, then it should be reported to the chunk cache as it is not a "real" chunk until that happens.
 	 */
 	public static Chunk readChunk(@NotNull DataProvider provider, @NotNull ChunkPointer pointer) throws IOException{
-		if(!earlyCheckChunkAt(provider, pointer)) throw new IOException("Invalid chunk at " + pointer);
+		if(!earlyCheckChunkAt(provider, pointer)) throw new MalformedPointer("Invalid chunk at " + pointer);
 		if(provider.getSource().getIOSize()<pointer.add(PIPE.getSizeDescriptor().getMin(WordSpace.BYTE))) throw new MalformedPointer(pointer + " points outside of available data");
 		Chunk chunk = new Chunk(provider, pointer);
 		try{
