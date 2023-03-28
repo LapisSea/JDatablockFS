@@ -95,7 +95,7 @@ import static org.lwjgl.glfw.GLFW.*;
 public class BinaryGridRenderer implements DataRenderer{
 	
 	static{
-		Thread.ofVirtual().start(() -> {
+		Thread.startVirtualThread(() -> {
 			try{
 				Cluster.emptyMem().rootWalker(MemoryWalker.PointerRecord.NOOP, false).walk();
 			}catch(IOException ignored){ }

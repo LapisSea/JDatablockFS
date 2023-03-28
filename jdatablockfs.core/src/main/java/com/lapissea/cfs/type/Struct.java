@@ -525,7 +525,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			if(emptyConstructor == null && !getType().isAnnotationPresent(NoDefaultConstructor.class)){
 				findEmptyConstructor();
 			}
-			Thread.ofVirtual().start(() -> {
+			Thread.startVirtualThread(() -> {
 				for(IOField<T, ?> field : fields){
 					field.typeFlags();
 				}

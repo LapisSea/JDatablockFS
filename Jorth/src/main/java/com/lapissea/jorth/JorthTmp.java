@@ -9,7 +9,7 @@ public class JorthTmp{
 	
 	public static void main(String[] args) throws Throwable{
 		LogUtil.println("Starting");
-		Thread.ofVirtual().start(() -> { });
+		Thread.startVirtualThread(() -> { });
 
 //		test1();
 		test2();

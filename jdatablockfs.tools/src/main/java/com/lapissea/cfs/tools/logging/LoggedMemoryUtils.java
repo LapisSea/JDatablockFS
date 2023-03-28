@@ -76,7 +76,7 @@ public class LoggedMemoryUtils{
 				case "server" -> new DisplayIpc(loggerConfig);
 				default -> throw new IllegalArgumentException("logger.type unknown value \"" + type + "\"");
 			};
-		}, Thread.ofVirtual()::start);
+		}, Thread::startVirtualThread);
 	}
 	
 	public static MemoryData<?> newLoggedMemory(String sessionName, LateInit<DataLogger, RuntimeException> logger) throws IOException{
@@ -108,7 +108,7 @@ public class LoggedMemoryUtils{
 		var preBuf = new LinkedList<MemFrame>();
 		var lock   = ClosableLock.reentrant();
 		
-		Thread.ofVirtual().start(() -> {
+		Thread.startVirtualThread(() -> {
 			logger.block();
 			try(var ignored = lock.open()){
 				var ses = logger.get().getSession(sessionName);
