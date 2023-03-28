@@ -381,12 +381,13 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 	}
 	
 	private long findNodeIdx() throws IOException{
-		if(!blankNodeIds.isEmpty()){
-			var nodeIdx = popMinIdx(blankNodeIds);
-//			assert !nodes.get(nodeIdx).hasValue();
-			return nodeIdx;
+		if(blankNodeIds.isEmpty()){
+			return scanNodeIds();
 		}
-		
+		return popMinIdx(blankNodeIds);
+	}
+	
+	private long scanNodeIds() throws IOException{
 		long nodesSiz = nodes.size();
 		long idx      = -1;
 		if(!blankNodeIdsScanned){
@@ -403,13 +404,13 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 	}
 	
 	private long findValueIdx() throws IOException{
-		if(!blankValueIds.isEmpty()){
-			var idx = popMinIdx(blankValueIds);
-//			assert values.get(idx).val == null;
-			return idx;
+		if(blankValueIds.isEmpty()){
+			return scanValueIds();
 		}
-		
-		
+		return popMinIdx(blankValueIds);
+	}
+	
+	private long scanValueIds() throws IOException{
 		long idx    = -1;
 		var  valSiz = values.size();
 		
