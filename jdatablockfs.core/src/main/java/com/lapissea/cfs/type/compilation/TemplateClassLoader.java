@@ -98,7 +98,11 @@ public final class TemplateClassLoader extends ClassLoader{
 			throw new RuntimeException("Failed to generate class " + classType.name, e);
 		}
 		if(log != null) Log.log(log.output());
-		return jorth.getClassFile(classType.name);
+		
+		var bytecode = jorth.getClassFile(classType.name);
+		ClassGenerationCommons.dumpClassName(classType.name, bytecode);
+		
+		return bytecode;
 	}
 	
 	private void generateEnum(TypeNamed classType, CodeStream writer) throws MalformedJorth{

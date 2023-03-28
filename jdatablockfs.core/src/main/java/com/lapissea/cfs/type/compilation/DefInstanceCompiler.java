@@ -620,6 +620,7 @@ public class DefInstanceCompiler{
 			}
 			
 			var file = jorth.getClassFile(implName);
+			ClassGenerationCommons.dumpClassName(implName, file);
 			if(log != null){
 				Log.log(log.output());
 				BytecodeUtils.printClass(file);
