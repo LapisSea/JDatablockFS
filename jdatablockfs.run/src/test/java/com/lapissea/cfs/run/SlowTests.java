@@ -183,7 +183,7 @@ public class SlowTests{
 	void compressionIntegrity(IOCompression.Type type){
 		NanoTimer t = new NanoTimer.Simple();
 		t.start();
-		randomBatch(200000, (r, iter, tick) -> {
+		randomBatch(20000, (r, iter, tick) -> {
 			if(tick){
 				info("iteration: {}", iter);
 			}

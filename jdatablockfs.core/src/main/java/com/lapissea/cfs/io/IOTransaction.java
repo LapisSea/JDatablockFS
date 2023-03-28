@@ -3,6 +3,21 @@ package com.lapissea.cfs.io;
 import java.io.Closeable;
 
 public interface IOTransaction extends Closeable{
+	
+	IOTransaction NOOP = new IOTransaction(){
+		@Override
+		public int getChunkCount(){
+			return 0;
+		}
+		@Override
+		public long getTotalBytes(){
+			return 0;
+		}
+		@Override
+		public void close(){
+		}
+	};
+	
 	/**
 	 * Optional information used for profiling or debugging.
 	 *

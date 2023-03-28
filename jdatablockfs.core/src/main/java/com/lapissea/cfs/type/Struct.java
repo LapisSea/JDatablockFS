@@ -476,7 +476,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	private       boolean  isDefinition;
 	
 	private FieldSet<T> fields;
-	private FieldSet<T> instanceFields;
+	private FieldSet<T> realFields;
 	private FieldSet<T> cloneFields;
 	
 	short[] poolObjectsSize;
@@ -670,16 +670,16 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 		return type.getName();
 	}
 	
-	public FieldSet<T> getInstanceFields(){
-		if(instanceFields == null){
-			instanceFields = FieldSet.of(getFields().stream().filter(e -> !Utils.isVirtual(e, IO)));
+	public FieldSet<T> getRealFields(){
+		if(realFields == null){
+			realFields = FieldSet.of(getFields().stream().filter(e -> !Utils.isVirtual(e, IO)));
 		}
-		return instanceFields;
+		return realFields;
 	}
 	
 	public FieldSet<T> getCloneFields(){
-		if(instanceFields == null){
-			instanceFields = FieldSet.of(getFields().stream().filter(f -> {
+		if(cloneFields == null){
+			cloneFields = FieldSet.of(getFields().stream().filter(f -> {
 				if(f.typeFlag(IOField.PRIMITIVE_OR_ENUM_FLAG) || Utils.isVirtual(f, IO)) return false;
 				var acc = f.getAccessor();
 				if(acc != null){
@@ -689,7 +689,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 				return true;
 			}));
 		}
-		return instanceFields;
+		return cloneFields;
 	}
 	
 	public FieldSet<T> getFields(){

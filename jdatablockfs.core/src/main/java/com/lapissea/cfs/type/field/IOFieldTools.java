@@ -26,6 +26,7 @@ import java.lang.reflect.Array;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -36,8 +37,13 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.Set;
+import java.util.function.BiConsumer;
+import java.util.function.BinaryOperator;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.function.ToLongFunction;
+import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -340,5 +346,101 @@ public class IOFieldTools{
 	}
 	public static boolean isGeneric(GetAnnotation type){
 		return type.isPresent(IOValue.Generic.class);
+	}
+	
+	
+	public static <T extends IOInstance<T>> void requireFieldsEquals(T a, T b){
+		requireFieldsEquals(a, b, "Instances required to be equal but");
+	}
+	
+	public static <T extends IOInstance<T>> void requireFieldsEquals(T a, T b, String startMessage){
+		requireFieldsEquals(a, b, new Collector<>(){
+			@Override
+			public Supplier<List<String[]>> supplier(){ return ArrayList::new; }
+			@Override
+			public BiConsumer<List<String[]>, String[]> accumulator(){ return List::add; }
+			
+			@Override
+			public BinaryOperator<List<String[]>> combiner(){
+				return (a, b) -> {
+					var arr = new ArrayList<String[]>(a.size() + b.size());
+					arr.addAll(a);
+					arr.addAll(b);
+					return arr;
+				};
+			}
+			
+			@Override
+			public Function<List<String[]>, String> finisher(){
+				return data -> {
+					if(data.isEmpty()){
+						data = new ArrayList<>();
+						data.add(new String[]{"No reason??"});
+					}
+					
+					int[] lengths = new int[data.stream().mapToInt(s -> s.length).max().orElse(0)];
+					for(var line : data){
+						for(int i = 0; i<line.length; i++){
+							lengths[i] = Math.max(lengths[i], line[i].length() + 1);
+						}
+					}
+					
+					StringBuilder sb = new StringBuilder();
+					sb.append('\n').append(startMessage).append(':');
+					for(var line : data){
+						sb.append("\n\t");
+						for(int i = 0; i<line.length; i++){
+							sb.append(line[i]).append(" ".repeat(lengths[i] - line[i].length()));
+							if(i == 0) sb.append("not equal because ");
+						}
+					}
+					return sb.toString();
+				};
+			}
+			
+			@Override
+			public Set<Characteristics> characteristics(){ return Set.of(); }
+		});
+	}
+	
+	/**
+	 * String[] format:<br>
+	 * {subject} not equal because {reason}[: optional context...]
+	 */
+	public static <T extends IOInstance<T>> void requireFieldsEquals(T a, T b, Collector<String[], List<String[]>, String> messageBuilder){
+		if(a == null || b == null){
+			if(a != b){
+				var acum = messageBuilder.supplier().get();
+				acum.add(new String[]{"Instances", "nullability is not matching"});
+				throw new IllegalStateException(messageBuilder.finisher().apply(acum));
+			}
+			return;
+		}
+		
+		var struct = a.getThisStruct();
+		{
+			var bs = b.getThisStruct();
+			if(!bs.equals(struct)){
+				var acum = messageBuilder.supplier().get();
+				acum.add(new String[]{"Instances", "structs are not of the same type"});
+				throw new IllegalStateException(messageBuilder.finisher().apply(acum));
+			}
+		}
+		
+		List<String[]> acum = null;
+		
+		for(IOField<T, ?> field : struct.getRealFields()){
+			if(field.instancesEqual(null, a, null, b)){
+				continue;
+			}
+			
+			if(acum == null) acum = messageBuilder.supplier().get();
+			var as = field.instanceToString(null, a, false).orElse("null");
+			var bs = field.instanceToString(null, b, false).orElse("null");
+			acum.add(new String[]{"Field " + field.getName(), "values are not equal:", as, bs});
+		}
+		
+		if(acum == null) return;
+		throw new IllegalStateException(messageBuilder.finisher().apply(acum));
 	}
 }
