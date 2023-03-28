@@ -9,6 +9,7 @@ import com.lapissea.cfs.type.NewObj;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.TypeLink.Check.ArgCheck.RawCheck;
+import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.annotations.IODependency.VirtualNumSize;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
@@ -239,7 +240,7 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 	private Node node(long nodeIdx) throws IOException{
 		var cached = nodeCache.get(nodeIdx);
 		if(cached != null){
-			assert nodes.get(nodeIdx).equals(cached.node);
+			if(DEBUG_VALIDATION) IOFieldTools.requireFieldsEquals(nodes.get(nodeIdx), cached.node);
 			cached.makeOlder();
 			return cached.node.clone();
 		}
@@ -441,9 +442,9 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 		var nodes = this.nodes.stream().toList();
 		
 		for(var e : nodeCache.entrySet()){
-			var read = nodes.get(e.getKey());
-			if(e.getValue().node.equals(read)) continue;
-			throw new IllegalStateException("cache desync " + e);
+			var cached = e.getValue().node;
+			var read   = nodes.get(Math.toIntExact(e.getKey()));
+			IOFieldTools.requireFieldsEquals(cached, read, "Cache desync");
 		}
 		
 		var root = nodes.get(0);
