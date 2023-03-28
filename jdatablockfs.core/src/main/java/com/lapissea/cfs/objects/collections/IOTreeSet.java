@@ -604,7 +604,23 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 		return findNodeParent(node.index());
 	}
 	private NodePointer findNodeParent(IndexedNode node) throws IOException{
-		if(node.idx == 0) return null;
+		var idx = node.idx;
+		if(idx == 0) return null;
+		
+		for(var e : nodeCache.entrySet()){
+			var cache = e.getValue();
+			var cNode = cache.node;
+			var isR   = cNode.right() == idx;
+			if(isR || cNode.left() == idx){
+				cache.makeOlder();
+				return new NodePointer(e.getKey(), cNode, isR);
+			}
+		}
+		
+		return findParentByValue(node);
+	}
+	
+	private NodePointer findParentByValue(IndexedNode node) throws IOException{
 		var val = getVal(node.node);
 		var res = findParent(val);
 		assert res.child() == node.idx;
