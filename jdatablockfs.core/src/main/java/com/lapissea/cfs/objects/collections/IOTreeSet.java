@@ -277,7 +277,7 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 				var childChild = toRemove.node.getChild(hasR, this);
 				childChild.node.red(false);
 				gcNodeValue(toRemove);
-				updateNode(0, childChild.node);
+				updateNode(0, childChild.node.clone());
 				gcNode(childChild);
 			}else{
 				ptr.setChild(toRemove.node.getChild(hasR));
