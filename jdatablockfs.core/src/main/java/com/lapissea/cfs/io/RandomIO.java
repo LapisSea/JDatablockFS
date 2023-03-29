@@ -466,7 +466,7 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 	 * @throws IOException source may throw io
 	 */
 	default RandomIO localTransactionBuffer() throws IOException{
-		if(inTransaction()) return this;
+		if(IOTransaction.DISABLE_TRANSACTIONS || inTransaction()) return this;
 		
 		if(isReadOnly()){
 			throw new IllegalStateException();

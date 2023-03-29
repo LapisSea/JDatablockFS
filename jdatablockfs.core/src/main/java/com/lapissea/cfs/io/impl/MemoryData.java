@@ -408,6 +408,7 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 	
 	@Override
 	public IOTransaction openIOTransaction(){
+		if(IOTransaction.DISABLE_TRANSACTIONS) return IOTransaction.NOOP;
 		return transactionBuff.open(this, TRANSACTION_OPEN);
 	}
 	

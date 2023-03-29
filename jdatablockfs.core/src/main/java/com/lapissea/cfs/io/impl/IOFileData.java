@@ -379,6 +379,7 @@ public final class IOFileData implements IOInterface, Closeable{
 	
 	@Override
 	public IOTransaction openIOTransaction(){
+		if(IOTransaction.DISABLE_TRANSACTIONS) return IOTransaction.NOOP;
 		return transactionBuff.open(this, TRANSACTION_OPEN);
 	}
 	

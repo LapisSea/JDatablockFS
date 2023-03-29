@@ -1,21 +1,22 @@
 package com.lapissea.cfs.io;
 
+import com.lapissea.cfs.GlobalConfig;
+
 import java.io.Closeable;
 
 public interface IOTransaction extends Closeable{
 	
+	boolean DISABLE_TRANSACTIONS = GlobalConfig.configFlag("disableTransactions", false);
+	
 	IOTransaction NOOP = new IOTransaction(){
 		@Override
-		public int getChunkCount(){
-			return 0;
-		}
+		public int getChunkCount(){ return 0; }
 		@Override
-		public long getTotalBytes(){
-			return 0;
-		}
+		public long getTotalBytes(){ return 0; }
 		@Override
-		public void close(){
-		}
+		public void close(){ }
+		@Override
+		public String toString(){ return "NOOP"; }
 	};
 	
 	/**
