@@ -390,8 +390,8 @@ public class IOFieldTools{
 					for(var line : data){
 						sb.append("\n\t");
 						for(int i = 0; i<line.length; i++){
+							if(i == 1) sb.append("not equal because ");
 							sb.append(line[i]).append(" ".repeat(lengths[i] - line[i].length()));
-							if(i == 0) sb.append("not equal because ");
 						}
 					}
 					return sb.toString();
