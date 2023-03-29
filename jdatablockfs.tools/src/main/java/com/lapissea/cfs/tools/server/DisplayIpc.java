@@ -441,7 +441,7 @@ public class DisplayIpc implements DataLogger{
 			sessionCreator = switch(type){
 				case "local" -> {
 					if(tryConnect) warn("{}, switching to local server session.", msg);
-					yield getLocalLoggerImpl()::getSession;
+					yield getLocalLoggerImpl(true)::getSession;
 				}
 				case "none" -> {
 					active = false;

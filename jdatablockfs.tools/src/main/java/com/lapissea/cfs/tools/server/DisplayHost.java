@@ -276,7 +276,7 @@ public class DisplayHost{
 		if(display == null){
 			synchronized(this){
 				if(display == null){
-					display = async(ServerCommons::getLocalLoggerImpl);
+					display = async(() -> ServerCommons.getLocalLoggerImpl(false));
 				}
 			}
 		}

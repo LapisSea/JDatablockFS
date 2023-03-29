@@ -236,7 +236,7 @@ public class BinaryGridRenderer implements DataRenderer{
 		return getDisplayedSession().map(ses -> {
 			if(ses.framePos.get() == -1){
 				synchronized(ses.frames){
-					ses.setFrame(ses.frames.size() - 1);
+					return ses.frames.size() - 1;
 				}
 			}
 			return ses.framePos.get();

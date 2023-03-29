@@ -25,17 +25,18 @@ public class LoggedMemoryUtils{
 	
 	private static WeakReference<Map<String, Object>> CONFIG = new WeakReference<>(null);
 	
-	public static Map<String, Object> readConfig(){
+	public static synchronized Map<String, Object> readConfig(){
 		Map<String, Object> config = CONFIG.get();
 		if(config != null) return config;
 		
 		Map<String, Object> newConf;
-		
-		try(var r = new FileReader(new File("config.json").getAbsoluteFile())){
+		var                 f = new File("config.json").getAbsoluteFile();
+		try(var r = new FileReader(f)){
 			newConf = new HashMap<>(new GsonBuilder().create().<Map<String, Object>>fromJson(r, HashMap.class));
+			Log.info("Loaded config from {}", f);
 		}catch(Exception e){
 			newConf = new HashMap<>();
-			Log.warn("Unable to load config: " + e);
+			Log.warn("Unable to load config: {}", e);
 		}
 		
 		CONFIG = new WeakReference<>(Collections.unmodifiableMap(newConf));
@@ -72,7 +73,7 @@ public class LoggedMemoryUtils{
 			var type = loggerConfig.getOrDefault("type", "none").toString();
 			return switch(type){
 				case "none" -> DataLogger.Blank.INSTANCE;
-				case "direct" -> new DisplayManager();
+				case "direct" -> new DisplayManager(true);
 				case "server" -> new DisplayIpc(loggerConfig);
 				default -> throw new IllegalArgumentException("logger.type unknown value \"" + type + "\"");
 			};
@@ -80,17 +81,15 @@ public class LoggedMemoryUtils{
 	}
 	
 	public static MemoryData<?> newLoggedMemory(String sessionName, LateInit<DataLogger, RuntimeException> logger) throws IOException{
+		var    hasLocal    = readConfig().getOrDefault("server-fallback", "local").toString().equals("local");
+		IOHook proxyLogger = adaptToHook(sessionName, hasLocal, logger);
 		
-		IOHook proxyLogger = adaptToHook(sessionName, logger);
-		
-		MemoryData<?> mem = MemoryData.builder().withCapacity(0).withOnWrite(proxyLogger).build();
-		
-		mem.getHook().writeEvent(mem, LongStream.of());
-		
-		return mem;
+		return MemoryData.builder().withCapacity(0).withOnWrite(proxyLogger).build();
 	}
 	
-	private static IOHook adaptToHook(String sessionName, LateInit<DataLogger, RuntimeException> logger){
+	private static IOHook adaptToHook(String sessionName, boolean asyncLoad, LateInit<DataLogger, RuntimeException> logger){
+//		if(!asyncLoad) logger.block();
+		
 		long[] frameId = {0};
 		
 		if(logger.isInitialized()){
@@ -128,7 +127,7 @@ public class LoggedMemoryUtils{
 			}
 			var memFrame = makeFrame(frameId, data, ids);
 			try(var ignored = lock.open()){
-				if(logger.isInitialized()){
+				if(asyncLoad || logger.isInitialized()){
 					var ses = logger.get().getSession(sessionName);
 					while(!preBuf.isEmpty()){
 						ses.log(preBuf.remove(0));
