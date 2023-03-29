@@ -6,6 +6,7 @@ import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.VarPool;
+import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
@@ -40,9 +41,8 @@ public class IOFieldByteArray<T extends IOInstance<T>> extends IOField<T, byte[]
 	}
 	
 	@Override
-	public void init(){
-		super.init();
-		var fields = declaringStruct().getFields();
+	public void init(FieldSet<T> fields){
+		super.init(fields);
 		arraySize = fields.requireExactInt(IOFieldTools.makeCollectionLenName(getAccessor()));
 		if(compression != null){
 			compressed = fields.requireExact(byte[].class, IOFieldTools.makePackName(getAccessor()));

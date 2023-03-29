@@ -73,7 +73,7 @@ public class DefInstanceCompiler{
 	
 	static{
 		if(!Boolean.getBoolean("jorth.noPreload")){
-			Thread.ofVirtual().start(() -> {
+			Thread.startVirtualThread(() -> {
 				var jorth = new Jorth(null, null);
 				try(var writer = jorth.writer()){
 					writer.codePart().close();
@@ -620,6 +620,7 @@ public class DefInstanceCompiler{
 			}
 			
 			var file = jorth.getClassFile(implName);
+			ClassGenerationCommons.dumpClassName(implName, file);
 			if(log != null){
 				Log.log(log.output());
 				BytecodeUtils.printClass(file);

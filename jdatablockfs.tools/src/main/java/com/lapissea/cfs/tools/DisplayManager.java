@@ -109,7 +109,7 @@ public class DisplayManager implements DataLogger{
 		
 		display.registerMouseScroll(delta -> {
 			
-			Thread.ofVirtual().start(() -> {
+			Thread.startVirtualThread(() -> {
 				int     steps  = 10;
 				float[] deltas = new float[steps];
 				for(int i = 0; i<deltas.length; i++){

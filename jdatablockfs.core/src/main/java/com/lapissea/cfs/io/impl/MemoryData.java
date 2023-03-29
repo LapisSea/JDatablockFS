@@ -451,6 +451,10 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 		return new Builder();
 	}
 	
+	public static MemoryData<?> viewOf(byte[] data){
+		return new MemoryData.Arr(data, new Builder().asReadOnly());
+	}
+	
 	public interface DataInitializer{
 		void init(ContentWriter dest) throws IOException;
 	}

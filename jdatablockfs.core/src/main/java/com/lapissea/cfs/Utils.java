@@ -1,5 +1,6 @@
 package com.lapissea.cfs;
 
+import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.objects.Stringify;
 import com.lapissea.cfs.objects.collections.IOIterator;
 import com.lapissea.cfs.type.IOInstance;
@@ -14,6 +15,8 @@ import com.lapissea.util.UtilL;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
@@ -307,6 +310,15 @@ public class Utils{
 		all.addAll(a);
 		all.addAll(b);
 		return Set.copyOf(all);
+	}
+	
+	public static Optional<Integer> findPathBlockSize(Path path){
+		try{
+			return Optional.of((int)Math.min(Files.getFileStore(path).getBlockSize(), 1024*1024*64));
+		}catch(Throwable e){
+			Log.warn("Failed to create fetch chunk size: {}", e);
+		}
+		return Optional.empty();
 	}
 	
 }

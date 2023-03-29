@@ -506,11 +506,11 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			
 			setInitState(STATE_CONCRETE_TYPE);
 			
-			this.fields = FieldCompiler.compile(this);
+			fields = FieldCompiler.compile(this);
 			setInitState(STATE_FIELD_MAKE);
-			for(IOField<T, ?> field : this.fields){
+			for(var field : fields){
 				try{
-					field.init();
+					field.init(fields);
 					Objects.requireNonNull(field.getSizeDescriptor(), "Descriptor was not inited");
 				}catch(Throwable e){
 					throw new RuntimeException("Failed to init " + field, e);
@@ -525,7 +525,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			if(emptyConstructor == null && !getType().isAnnotationPresent(NoDefaultConstructor.class)){
 				findEmptyConstructor();
 			}
-			Thread.ofVirtual().start(() -> {
+			Thread.startVirtualThread(() -> {
 				for(IOField<T, ?> field : fields){
 					field.typeFlags();
 				}

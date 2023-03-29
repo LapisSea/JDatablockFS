@@ -106,7 +106,7 @@ public class DisplayHost{
 				}catch(Throwable e){
 					e.printStackTrace();
 				}
-			}, e -> Thread.ofVirtual().start(e));
+			}, Thread::startVirtualThread);
 			
 			var workerPool = Executors.newFixedThreadPool(ForkJoinPool.getCommonPoolParallelism());
 			

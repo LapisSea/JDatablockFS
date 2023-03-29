@@ -10,6 +10,7 @@ import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.SupportedPrimitive;
 import com.lapissea.cfs.type.VarPool;
+import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
@@ -590,8 +591,8 @@ public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType
 	}
 	
 	@Override
-	public void init(){
-		super.init();
+	public void init(FieldSet<T> fields){
+		super.init(fields);
 		var fieldOpt = forceFixed? Optional.<IOField<T, NumberSize>>empty() : IOFieldTools.getDynamicSize(getAccessor());
 		if(fieldOpt.isPresent()){
 			var allowed = EnumSet.copyOf(allowedSizes().stream().filter(s -> s.lesserThanOrEqual(maxSize.size)).collect(Collectors.toSet()));

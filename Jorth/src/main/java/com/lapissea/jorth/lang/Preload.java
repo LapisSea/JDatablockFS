@@ -40,7 +40,7 @@ public class Preload{
 		}
 		if(!added.add(cls)) return;
 		
-		Thread.ofVirtual().start(() -> {
+		Thread.startVirtualThread(() -> {
 			
 			try{
 				l.ensureInitialized(cls);
@@ -61,7 +61,7 @@ public class Preload{
 	}
 	
 	private static void preload(){
-		Thread.ofVirtual().start(() -> {
+		Thread.startVirtualThread(() -> {
 			try{
 				ClassWriter w = new ClassWriter(ClassWriter.COMPUTE_MAXS|ClassWriter.COMPUTE_FRAMES);
 				w.visit(V19, 0, "", "", "", null);
@@ -75,7 +75,7 @@ public class Preload{
 				e.printStackTrace();
 			}
 		});
-		Thread.ofVirtual().start(() -> {
+		Thread.startVirtualThread(() -> {
 			try{
 				var cg = new ClassGen(TypeSource.of(Jorth.class.getClassLoader()), ClassName.of(Object.class), ClassType.CLASS, Visibility.PUBLIC, GenericType.OBJECT, List.of(), Set.of(), List.of());
 				cg.defineField(Visibility.PUBLIC, Set.of(), Set.of(), GenericType.OBJECT, "");
@@ -88,7 +88,7 @@ public class Preload{
 			}
 		});
 		
-		Thread.ofVirtual().start(() -> {
+		Thread.startVirtualThread(() -> {
 			var           l     = MethodHandles.lookup();
 			Set<Class<?>> added = Collections.synchronizedSet(new HashSet<>());
 			

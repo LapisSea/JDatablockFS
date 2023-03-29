@@ -8,6 +8,7 @@ import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.VarPool;
+import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
@@ -37,8 +38,8 @@ public class IOFieldChunkPointer<T extends IOInstance<T>> extends IOField<T, Chu
 	}
 	
 	@Override
-	public void init(){
-		super.init();
+	public void init(FieldSet<T> fields){
+		super.init(fields);
 		
 		Optional<IOField<T, NumberSize>> fieldOps = forceFixed? Optional.empty() : IOFieldTools.getDynamicSize(getAccessor());
 		

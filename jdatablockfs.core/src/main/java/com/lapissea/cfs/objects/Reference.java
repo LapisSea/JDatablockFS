@@ -117,8 +117,8 @@ public final class Reference extends IOInstance.Managed<Reference>{
 	private static StructPipe<Reference>      STANDARD_PIPE;
 	
 	static{
-		Thread.ofVirtual().start(Reference::ensureFixed);
-		Thread.ofVirtual().start(Reference::ensureStandard);
+		Thread.startVirtualThread(Reference::ensureFixed);
+		Thread.startVirtualThread(Reference::ensureStandard);
 	}
 	
 	public static FixedStructPipe<Reference> fixedPipe(){

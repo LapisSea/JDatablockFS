@@ -20,6 +20,7 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.BasicSizeDescriptor;
+import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
@@ -81,9 +82,9 @@ public class InstanceCollection{
 		}
 		
 		@Override
-		public void init(){
-			super.init();
-			collectionSize = declaringStruct().getFields().requireExact(int.class, IOFieldTools.makeCollectionLenName(getAccessor()));
+		public void init(FieldSet<T> fields){
+			super.init(fields);
+			collectionSize = fields.requireExact(int.class, IOFieldTools.makeCollectionLenName(getAccessor()));
 		}
 		
 		@Override
