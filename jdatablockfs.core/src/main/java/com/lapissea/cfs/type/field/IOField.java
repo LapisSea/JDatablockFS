@@ -236,7 +236,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 		return FieldSupport.hash(this, ioPool, instance);
 	}
 	
-	public void init(){
+	public void init(FieldSet<T> fields){
 		if(getAccessor() instanceof VirtualAccessor<T> vacc) vacc.init(this);
 	}
 	
@@ -319,7 +319,8 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 		var f = maxAsFixedSize(provider == null? VaryingSize.Provider.ALL_MAX : provider);
 		if(f != this){
 			f.initLateData(getInStructUID(), getDependencies());
-			f.init();
+			var struct = declaringStruct();
+			f.init(struct == null? null : struct.getFields());
 			Objects.requireNonNull(f.getSizeDescriptor(), "Descriptor was not inited");
 		}
 		if(!f.getSizeDescriptor().hasFixed()) throw new RuntimeException(this + " failed to make itself fixed");

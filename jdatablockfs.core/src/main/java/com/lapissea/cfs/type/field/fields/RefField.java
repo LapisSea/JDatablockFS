@@ -7,6 +7,7 @@ import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.VarPool;
+import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
@@ -57,8 +58,8 @@ public abstract class RefField<T extends IOInstance<T>, Type> extends IOField<T,
 		}
 		
 		@Override
-		public void init(){
-			super.init();
+		public void init(FieldSet<T> fields){
+			super.init(fields);
 			referenceField = getDependencies().requireExact(Reference.class, IOFieldTools.makeRefName(getAccessor()));
 		}
 		

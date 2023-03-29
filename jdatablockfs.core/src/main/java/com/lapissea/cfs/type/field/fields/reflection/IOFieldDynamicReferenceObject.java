@@ -15,6 +15,7 @@ import com.lapissea.cfs.type.IOTypeDB;
 import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.field.BasicSizeDescriptor;
+import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
@@ -72,9 +73,9 @@ public class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, ValueT
 	}
 	
 	@Override
-	public void init(){
-		super.init();
-		typeID = declaringStruct().getFields().requireExactInt(IOFieldTools.makeGenericIDFieldName(getAccessor()));
+	public void init(FieldSet<CTyp> fields){
+		super.init(fields);
+		typeID = fields.requireExactInt(IOFieldTools.makeGenericIDFieldName(getAccessor()));
 	}
 	
 	@Override

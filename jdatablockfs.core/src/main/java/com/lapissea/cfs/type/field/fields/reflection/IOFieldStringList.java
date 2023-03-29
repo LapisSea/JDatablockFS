@@ -8,6 +8,7 @@ import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.WordSpace;
+import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
@@ -31,9 +32,9 @@ public class IOFieldStringList<T extends IOInstance<T>> extends IOField<T, List<
 		}));
 	}
 	@Override
-	public void init(){
-		super.init();
-		arraySize = declaringStruct().getFields().requireExactInt(IOFieldTools.makeCollectionLenName(getAccessor()));
+	public void init(FieldSet<T> fields){
+		super.init(fields);
+		arraySize = fields.requireExactInt(IOFieldTools.makeCollectionLenName(getAccessor()));
 	}
 	
 	@Override

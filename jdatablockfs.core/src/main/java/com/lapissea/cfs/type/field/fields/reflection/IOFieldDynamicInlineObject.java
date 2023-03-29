@@ -14,6 +14,7 @@ import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.WordSpace;
+import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
@@ -61,9 +62,9 @@ public class IOFieldDynamicInlineObject<CTyp extends IOInstance<CTyp>, ValueType
 	}
 	
 	@Override
-	public void init(){
-		super.init();
-		typeID = declaringStruct().getFields().requireExactInt(IOFieldTools.makeGenericIDFieldName(getAccessor()));
+	public void init(FieldSet<CTyp> fields){
+		super.init(fields);
+		typeID = fields.requireExactInt(IOFieldTools.makeGenericIDFieldName(getAccessor()));
 	}
 	
 	@Override

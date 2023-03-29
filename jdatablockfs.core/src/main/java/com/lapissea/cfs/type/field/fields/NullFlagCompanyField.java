@@ -3,6 +3,7 @@ package com.lapissea.cfs.type.field.fields;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.VarPool;
+import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
@@ -21,10 +22,10 @@ public abstract class NullFlagCompanyField<T extends IOInstance<T>, Type> extend
 	}
 	
 	@Override
-	public void init(){
-		super.init();
+	public void init(FieldSet<T> fields){
+		super.init(fields);
 		if(nullable()){
-			isNull = declaringStruct().getFields().requireExactBoolean(IOFieldTools.makeNullFlagName(getAccessor()));
+			isNull = fields.requireExactBoolean(IOFieldTools.makeNullFlagName(getAccessor()));
 		}
 	}
 	
