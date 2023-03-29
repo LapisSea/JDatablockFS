@@ -81,4 +81,29 @@ public abstract class AbstractUnmanagedIOSet<T> extends IOInstance.Unmanaged<Abs
 			return "CORRUPTED_SET{" + (e.getMessage() == null? e.getClass().getSimpleName() : e.getMessage()) + "}";
 		}
 	}
+	
+	@Override
+	public boolean equals(Object o){
+		if(o == this) return true;
+		if(!(o instanceof IOSet<?> that)) return false;
+		
+		if(that.size() != this.size()){
+			return false;
+		}
+		
+		var thatIter = that.iterator();
+		try{
+			while(thatIter.hasNext()){
+				//noinspection unchecked
+				var e = (T)thatIter.ioNext();
+				if(!this.contains(e)){
+					return false;
+				}
+			}
+		}catch(IOException e){
+			throw new RuntimeException(e);
+		}
+		
+		return true;
+	}
 }
