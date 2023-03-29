@@ -12,6 +12,7 @@ import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.collections.HashIOMap;
 import com.lapissea.cfs.objects.collections.IOHashSet;
 import com.lapissea.cfs.objects.collections.IOMap;
+import com.lapissea.cfs.objects.collections.IOSet;
 import com.lapissea.cfs.objects.collections.IOTreeSet;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
@@ -20,6 +21,8 @@ import com.lapissea.cfs.type.field.annotations.IOCompression;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.NanoTimer;
+import com.lapissea.util.UtilL;
+import com.lapissea.util.function.UnsafeBiConsumer;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -33,17 +36,17 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntConsumer;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static com.lapissea.cfs.logging.Log.info;
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
@@ -417,128 +420,115 @@ public class SlowTests{
 		});
 	}
 	
+	void checkSet(@SuppressWarnings("rawtypes") Class<? extends IOSet> type, UnsafeBiConsumer<Cluster, IOSet<Integer>, IOException> session) throws IOException{
+		TestUtils.testCluster(TestInfo.of(), provider -> {
+			var set = provider.getRootProvider().<IOSet<Integer>>request("hi", type, Integer.class);
+			session.accept(provider, new CheckSet<>(set));
+			provider.scanGarbage(DefragmentManager.FreeFoundAction.ERROR);
+		});
+	}
+	interface SetIter<T>{
+		void accept(int iter, Random rand, IOSet<T> u) throws IOException;
+	}
+	void checkSetIter(int iterations, @SuppressWarnings("rawtypes") Class<? extends IOSet> type, SetIter<Integer> session) throws IOException{
+		checkSet(type, (provider, set) -> {
+			var                waitingTasks = new AtomicInteger();
+			RuntimeException[] err          = {null};
+			try(var exec = Executors.newWorkStealingPool()){
+				
+				var r = new Random(69);
+				for(int i = 0; i<iterations; i++){
+					if(err[0] != null) throw err[0];
+					try{
+						if((i - 1)%(iterations/100) == 0) LogUtil.println((i - 1)/((double)iterations));
+						
+						if(r.nextInt(1000) == 1){
+							var oldSet = set;
+							set = provider.getRootProvider().request("hi", type, Integer.class);
+							if(!set.equals(oldSet)){
+								throw new IllegalStateException(
+									"\n" +
+									set + "\n" +
+									oldSet
+								);
+							}
+							set = new CheckSet<>(set);
+						}
+						
+						session.accept(i, r, set);
+						
+						var bytes = provider.getSource().readAll();
+						var iter  = i;
+						
+						UtilL.sleepWhile(() -> waitingTasks.get()>1);
+						waitingTasks.incrementAndGet();
+						exec.execute(() -> {
+							waitingTasks.decrementAndGet();
+							try{
+								var c = new Cluster(MemoryData.viewOf(bytes));
+								c.scanGarbage(DefragmentManager.FreeFoundAction.ERROR);
+							}catch(Throwable e){
+								synchronized(err){
+									if(err[0] == null){
+										err[0] = new RuntimeException("There was garbage on iteration: " + iter, e);
+									}
+								}
+							}
+						});
+					}catch(Throwable e){
+						throw new RuntimeException(i + "", e);
+					}
+				}
+			}
+			if(err[0] != null) throw err[0];
+		});
+	}
+	
 	@Test
 	void fuzzIOSet() throws IOException{
-		TestUtils.testCluster(TestInfo.of(), provider -> {
-			var set      = provider.getRootProvider().<IOHashSet<Object>>request("hi", IOHashSet.class);
-			var checkSet = new HashSet<>();
+		checkSetIter(100000, IOHashSet.class, (i, r, set) -> {
+			if(r.nextInt(1000) == 1){
+				set.clear();
+			}
 			
-			var r = new Random(69);
-			
-			for(int i = 0; i<10000; i++){
-				Integer num = r.nextInt(400);
-				
-				switch(r.nextInt(3)){
-					case 0 -> {
-						var added1 = set.add(num);
-						var added2 = checkSet.add(num);
-//						LogUtil.println("ADD", num);
-						assertEquals(added1, added2);
-					}
-					case 1 -> {
-						var removed1 = set.remove(num);
-						var removed2 = checkSet.remove(num);
-//						LogUtil.println("REM", num);
-						assertEquals(removed1, removed2);
-					}
-					case 2 -> {
-						var c1 = set.contains(num);
-						var c2 = checkSet.contains(num);
-						assertEquals(c1, c2, "contains fail at " + i + " on " + num);
-					}
-				}
-				
-				assertEquals(set.size(), checkSet.size());
-				
-				var tmp = HashSet.newHashSet(checkSet.size());
-				
-				var iter = set.iterator();
-				while(iter.hasNext()){
-					var e = iter.ioNext();
-					assertTrue(tmp.add(e), "duplicated " + e + " at " + i);
-				}
-				assertEquals(tmp, checkSet, i + "");
-				
+			Integer num = r.nextInt(400);
+			switch(r.nextInt(3)){
+				case 0 -> set.add(num);
+				case 1 -> set.remove(num);
+				case 2 -> set.contains(num);
 			}
 		});
 	}
 	
-	
 	@Test
+	void simpleTreeSet() throws IOException{
+		checkSet(IOTreeSet.class, (d, set) -> {
+			set.add(2);
+			set.add(1);
+			set.add(3);
+			set.add(4);
+			set.remove(2);
+			set.contains(2);
+			set.contains(3);
+			set.add(5);
+			set.remove(5);
+		});
+	}
+	
+	@Test(dependsOnMethods = "simpleTreeSet")
 	void fuzzTreeSet() throws IOException{
-		TestUtils.testCluster(TestInfo.of(), provider -> {
-			var set = provider.getRootProvider().<IOTreeSet<Integer>>request("hi", IOTreeSet.class, Integer.class);
+		checkSetIter(200000, IOTreeSet.class, (i, r, set) -> {
+			Integer num = r.nextInt(200);
 			
-			var checkSet = new HashSet<Integer>();
-			
-			var r    = new Random(69);
-			var iter = 100000;
-			for(int i = 0; i<iter; i++){
-				try{
-					if((i - 1)%(iter/100) == 0) LogUtil.println((i - 1)/((double)iter));
-					Integer num = r.nextInt(200);
-					
-					if(r.nextInt(1000) == 1){
-						set.clear();
-						checkSet.clear();
-//						LogUtil.println("clear", i);
-					}
-					if(r.nextInt(1000) == 1){
-						var oldSet = set;
-						set = provider.getRootProvider().request("hi", IOTreeSet.class, Integer.class);
-						if(!set.equals(oldSet)){
-							throw new IllegalStateException(
-								"\n" +
-								set + "\n" +
-								oldSet
-							);
-						}
-					}
-					
-					switch(r.nextInt(3)){
-						case 0 -> {
-							var added1 = set.add(num);
-							var added2 = checkSet.add(num);
-							if(added1 != added2){
-								throw new IllegalStateException(num + "");
-							}
-						}
-						case 1 -> {
-							var removed1 = set.remove(num);
-							var removed2 = checkSet.remove(num);
-							if(removed1 != removed2){
-								throw new IllegalStateException(num + "");
-							}
-						}
-						case 2 -> {
-							var c1 = set.contains(num);
-							var c2 = checkSet.contains(num);
-							if(c1 != c2){
-								throw new IllegalStateException(num + "");
-							}
-						}
-					}
-					
-					provider.scanGarbage(DefragmentManager.FreeFoundAction.ERROR);
-					
-					if(set.size() != checkSet.size()) throw new IllegalStateException(set.size() + " != " + checkSet.size());
-					
-					var copy = HashSet.newHashSet(checkSet.size());
-					var it   = set.iterator();
-					while(it.hasNext()){
-						var v = it.ioNext();
-						if(!copy.add(v)){
-							throw new IllegalStateException(v + " duplicate");
-						}
-					}
-					if(!checkSet.equals(copy)){
-						throw new IllegalStateException("\n" + copy + "\n" + checkSet);
-					}
-				}catch(Throwable e){
-					throw new RuntimeException(i + "", e);
-				}
+			if(r.nextInt(1000) == 1){
+				set.clear();
 			}
 			
+			switch(r.nextInt(3)){
+				case 0 -> set.add(num);
+				case 1 -> set.remove(num);
+				case 2 -> set.contains(num);
+			}
 		});
 	}
 	
