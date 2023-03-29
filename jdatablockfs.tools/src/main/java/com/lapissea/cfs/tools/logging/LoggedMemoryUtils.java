@@ -15,7 +15,6 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
@@ -23,23 +22,24 @@ import java.util.stream.LongStream;
 
 public class LoggedMemoryUtils{
 	
-	private static WeakReference<Map<String, Object>> CONFIG = new WeakReference<>(null);
+	private static WeakReference<MemoryLogConfig> CONFIG = new WeakReference<>(null);
 	
-	public static synchronized Map<String, Object> readConfig(){
-		Map<String, Object> config = CONFIG.get();
+	public static synchronized MemoryLogConfig readConfig(){
+		MemoryLogConfig config = CONFIG.get();
 		if(config != null) return config;
 		
-		Map<String, Object> newConf;
+		Map<String, Object> data;
 		var                 f = new File("config.json").getAbsoluteFile();
 		try(var r = new FileReader(f)){
-			newConf = new HashMap<>(new GsonBuilder().create().<Map<String, Object>>fromJson(r, HashMap.class));
+			data = new GsonBuilder().create().<Map<String, Object>>fromJson(r, HashMap.class);
 			Log.info("Loaded config from {}", f);
 		}catch(Exception e){
-			newConf = new HashMap<>();
+			data = Map.of();
 			Log.warn("Unable to load config: {}", e);
 		}
 		
-		CONFIG = new WeakReference<>(Collections.unmodifiableMap(newConf));
+		var newConf = new MemoryLogConfig(data);
+		CONFIG = new WeakReference<>(newConf);
 		return newConf;
 	}
 	
@@ -67,29 +67,23 @@ public class LoggedMemoryUtils{
 	
 	public static LateInit.Safe<DataLogger> createLoggerFromConfig(){
 		return new LateInit.Safe<>(() -> {
-			var config       = readConfig();
-			var loggerConfig = (Map<String, Object>)config.getOrDefault("logger", Map.of());
-			
-			var type = loggerConfig.getOrDefault("type", "none").toString();
-			return switch(type){
-				case "none" -> DataLogger.Blank.INSTANCE;
-				case "direct" -> new DisplayManager(true);
-				case "server" -> new DisplayIpc(loggerConfig);
-				default -> throw new IllegalArgumentException("logger.type unknown value \"" + type + "\"");
+			var config = readConfig();
+			return switch(config.loggerType){
+				case NONE -> DataLogger.Blank.INSTANCE;
+				case LOCAL -> new DisplayManager(true);
+				case SERVER -> new DisplayIpc(config);
 			};
 		}, Thread::startVirtualThread);
 	}
 	
 	public static MemoryData<?> newLoggedMemory(String sessionName, LateInit<DataLogger, RuntimeException> logger) throws IOException{
-		var    hasLocal    = readConfig().getOrDefault("server-fallback", "local").toString().equals("local");
-		IOHook proxyLogger = adaptToHook(sessionName, hasLocal, logger);
+		var    hasFallback = readConfig().loggerFallbackType != MemoryLogConfig.LoggerType.NONE;
+		IOHook proxyLogger = adaptToHook(sessionName, hasFallback, logger);
 		
 		return MemoryData.builder().withCapacity(0).withOnWrite(proxyLogger).build();
 	}
 	
 	private static IOHook adaptToHook(String sessionName, boolean asyncLoad, LateInit<DataLogger, RuntimeException> logger){
-//		if(!asyncLoad) logger.block();
-		
 		long[] frameId = {0};
 		
 		if(logger.isInitialized()){

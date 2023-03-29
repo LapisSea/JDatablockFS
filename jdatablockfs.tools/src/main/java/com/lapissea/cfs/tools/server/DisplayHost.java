@@ -226,10 +226,9 @@ public class DisplayHost{
 		if(!lazyStart) getDisplay();
 		
 		var config = LoggedMemoryUtils.readConfig();
-		int port   = ((Number)config.getOrDefault("port", 6666)).intValue();
 		
-		ServerSocket server = new ServerSocket(port);
-		info("Started on port {}", port);
+		ServerSocket server = new ServerSocket(config.negotiationPort);
+		info("Started on port {}", config.negotiationPort);
 		
 		var initialData = System.getProperty("initialData");
 		if(initialData != null){

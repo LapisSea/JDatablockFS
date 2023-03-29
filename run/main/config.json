@@ -1,10 +1,6 @@
 {
 	"port": 1234,
-	"fancyPrint": false,
-	"logger": {
-		"port": 1234,
-		"type": "server",
-		"server-fallback": "none",
-		"threadedOutput": false
-	}
+	"loggerType": "server",
+	"loggerFallback": "none",
+	"threadedOutput": false
 }

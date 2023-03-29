@@ -3,7 +3,6 @@ package com.lapissea.cfs;
 import com.lapissea.util.LogUtil;
 
 import java.net.URL;
-import java.util.Arrays;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -33,16 +32,10 @@ public class GlobalConfig{
 		return configProp(name).map(Integer::valueOf).orElse(defaultValue);
 	}
 	
-	@SuppressWarnings("unchecked")
 	public static <T extends Enum<T>> T configEnum(String name, T defaultValue){
 		Objects.requireNonNull(defaultValue);
-		return configProp(name).map(s -> Arrays.stream(defaultValue.getClass().getEnumConstants())
-		                                       .map(e -> (T)e)
-		                                       .filter(e -> e.name().equalsIgnoreCase(s))
-		                                       .findAny())
-		                       .filter(Optional::isPresent)
-		                       .map(Optional::get)
-		                       .orElse(defaultValue);
+		return Utils.findFuzzyEnum(configProp(name), defaultValue)
+		            .warn("Property " + CONFIG_PROPERTY_PREFIX + name);
 	}
 	
 	private static boolean isInJar(){

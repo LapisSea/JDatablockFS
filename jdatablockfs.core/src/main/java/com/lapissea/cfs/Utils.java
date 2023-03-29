@@ -22,6 +22,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
@@ -321,4 +322,32 @@ public class Utils{
 		return Optional.empty();
 	}
 	
+	public record FuzzyResult<T extends Enum<T>>(T value, String incorrect){
+		public FuzzyResult(T value){
+			this(value, null);
+		}
+		
+		public T warn(String nameOfBadEnum){
+			if(incorrect != null){
+				Log.warn("{} can only be one of {} but is actually \"{}\". Defaulting to {}",
+				         nameOfBadEnum,
+				         value.getClass().getEnumConstants(),
+				         incorrect,
+				         value
+				);
+			}
+			return value;
+		}
+	}
+	
+	public static <T extends Enum<T>> FuzzyResult<T> findFuzzyEnum(Optional<String> enumName, T defaultValue){
+		Objects.requireNonNull(defaultValue);
+		return enumName.map(
+			s -> Arrays.stream(defaultValue.getClass().getEnumConstants())
+			           .filter(e -> e.name().equalsIgnoreCase(s))
+			           .findAny()
+			           .map(e -> new FuzzyResult<>((T)e))
+			           .orElse(new FuzzyResult<>(defaultValue, s))
+		).orElse(new FuzzyResult<>(defaultValue));
+	}
 }
