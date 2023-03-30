@@ -1,6 +1,6 @@
 package com.lapissea.cfs.objects.text;
 
-import com.lapissea.cfs.config.GlobalConfig;
+import com.lapissea.cfs.config.ConfigDefs;
 import com.lapissea.cfs.io.bit.BitInputStream;
 import com.lapissea.cfs.io.bit.BitOutputStream;
 import com.lapissea.cfs.io.bit.BitUtils;
@@ -69,7 +69,7 @@ class Encoding{
 			
 			
 			int optimizedBlockCount;
-			if(GlobalConfig.configFlag("abBenchmark.disableBlockCoding", false)){
+			if(ConfigDefs.TEXT_DISABLE_BLOCK_CODING.resolve()){
 				optimizedBlockCount = -1;
 			}else{
 				optimizedBlockCount = 1;

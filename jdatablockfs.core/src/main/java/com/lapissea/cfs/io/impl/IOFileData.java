@@ -1,6 +1,6 @@
 package com.lapissea.cfs.io.impl;
 
-import com.lapissea.cfs.config.GlobalConfig;
+import com.lapissea.cfs.config.ConfigDefs;
 import com.lapissea.cfs.internal.MemPrimitive;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.IOTransaction;
@@ -28,8 +28,6 @@ public final class IOFileData implements IOInterface, Closeable{
 		final String str;
 		Mode(String str){ this.str = str; }
 	}
-	
-	private static final boolean FORCE_SYNCHRONOUS = GlobalConfig.configFlag("io.synchronousFileIO", false);
 	
 	@SuppressWarnings("resource")
 	public class FileRandomIO implements RandomIO{
@@ -323,7 +321,7 @@ public final class IOFileData implements IOInterface, Closeable{
 		
 		Mode mode;
 		if(readOnly) mode = Mode.READ_ONLY;
-		else mode = FORCE_SYNCHRONOUS? Mode.READ_WRITE_SYNCHRONOUS : Mode.READ_WRITE;
+		else mode = ConfigDefs.SYNCHRONOUS_FILE_IO.resolve()? Mode.READ_WRITE_SYNCHRONOUS : Mode.READ_WRITE;
 		fileData = new RandomAccessFile(file, mode.str);
 		
 		this.used = getLength();

@@ -2,7 +2,7 @@ package com.lapissea.cfs.type.compilation;
 
 import com.lapissea.cfs.SyntheticParameterizedType;
 import com.lapissea.cfs.Utils;
-import com.lapissea.cfs.config.GlobalConfig;
+import com.lapissea.cfs.config.ConfigDefs;
 import com.lapissea.cfs.exceptions.IllegalField;
 import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.type.GetAnnotation;
@@ -60,16 +60,13 @@ import static java.util.stream.Collectors.joining;
 
 public class FieldCompiler{
 	
-	private enum AccessImplType{
+	public enum AccessImplType{
 		UNSAFE,
 		VAR_HANDLE,
 		REFLECTION
 	}
 	
-	private static final AccessImplType FIELD_ACCESS = GlobalConfig.configEnum(
-		"fieldAccess",
-		Runtime.version().feature()<=19? AccessImplType.UNSAFE : AccessImplType.VAR_HANDLE
-	);
+	private static final AccessImplType FIELD_ACCESS = ConfigDefs.FIELD_ACCESS_TYPE.resolve();
 	
 	protected record LogicalAnnotation<T extends Annotation>(T annotation, AnnotationLogic<T> logic){ }
 	

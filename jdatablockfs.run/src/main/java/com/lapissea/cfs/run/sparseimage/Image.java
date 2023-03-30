@@ -1,6 +1,6 @@
 package com.lapissea.cfs.run.sparseimage;
 
-import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.config.ConfigUtils;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.collections.LinkedIOList;
 import com.lapissea.cfs.type.IOInstance;
@@ -27,7 +27,7 @@ public class Image extends IOInstance.Managed<Image>{
 		}
 	}
 	
-	private static final int CHUNK_SIZE = Utils.optionalProperty("chunkSize").map(Integer::valueOf).orElse(4);
+	private static final int CHUNK_SIZE = ConfigUtils.optionalProperty("chunkSize").map(Integer::valueOf).orElse(4);
 	
 	@IOValue
 	@IOValue.OverrideType(LinkedIOList.class)

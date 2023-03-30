@@ -1,6 +1,6 @@
 package com.lapissea.cfs.type.compilation;
 
-import com.lapissea.cfs.config.GlobalConfig;
+import com.lapissea.cfs.config.ConfigDefs;
 
 import java.util.StringJoiner;
 
@@ -13,7 +13,7 @@ public interface JorthLogger{
 	}
 	
 	static JorthLogger make(){
-		return make(GlobalConfig.configEnum("classGen.printBytecode", CodeLog.FALSE));
+		return make(ConfigDefs.CLASSGEN_PRINT_BYTECODE.resolve());
 	}
 	
 	static JorthLogger make(CodeLog level){

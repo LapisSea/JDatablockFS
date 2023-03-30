@@ -1,6 +1,6 @@
 package com.lapissea.cfs.type;
 
-import com.lapissea.cfs.config.GlobalConfig;
+import com.lapissea.cfs.config.ConfigDefs;
 import com.lapissea.cfs.exceptions.RecursiveSelfCompilation;
 import com.lapissea.cfs.internal.Runner;
 import com.lapissea.cfs.logging.Log;
@@ -25,11 +25,8 @@ import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 
 public abstract class StagedInit{
 	
-	private static final boolean DO_ASYNC            = GlobalConfig.configFlag("loading.async", true);
-	private static final int     LONG_WAIT_THRESHOLD = GlobalConfig.configInt(
-		"loading.longWaitThreshold",
-		GlobalConfig.RELEASE_MODE? -1 : 4000/Math.min(10, Runtime.getRuntime().availableProcessors())
-	);
+	private static final boolean DO_ASYNC            = ConfigDefs.LOAD_TYPES_ASYNCHRONOUSLY.resolve();
+	private static final int     LONG_WAIT_THRESHOLD = ConfigDefs.LONG_WAIT_THRESHOLD.resolve();
 	
 	public static void runBaseStageTask(Runnable task){
 		if(DO_ASYNC){

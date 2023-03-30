@@ -1,7 +1,7 @@
 package com.lapissea.cfs.objects;
 
 import com.lapissea.cfs.chunk.DataProvider;
-import com.lapissea.cfs.config.GlobalConfig;
+import com.lapissea.cfs.config.ConfigDefs;
 import com.lapissea.cfs.io.ChunkChainIO;
 import com.lapissea.cfs.io.OffsetIO;
 import com.lapissea.cfs.io.RandomIO;
@@ -33,8 +33,7 @@ public final class Reference extends IOInstance.Managed<Reference>{
 	public static final Struct<Reference> STRUCT = Struct.of(Reference.class);
 	
 	static{
-		boolean useOptimized = GlobalConfig.configFlag("abBenchmark.referenceOptimizedPipe", true);
-		if(useOptimized){
+		if(ConfigDefs.OPTIMIZED_PIPE_USE_REFERENCE.resolve()){
 			StandardStructPipe.registerSpecialImpl(STRUCT, () -> new StandardStructPipe<>(STRUCT, (t, structFields) -> {
 				var f = StandardStructPipe.<Reference>compiler().compile(t, structFields);
 				if(

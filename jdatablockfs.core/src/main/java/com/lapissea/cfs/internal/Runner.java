@@ -1,5 +1,6 @@
 package com.lapissea.cfs.internal;
 
+import com.lapissea.cfs.config.ConfigDefs;
 import com.lapissea.cfs.config.GlobalConfig;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.util.LateInit;
@@ -46,11 +47,8 @@ public class Runner{
 	
 	private static final List<Task> TASKS = new ArrayList<>();
 	
-	private static final String  BASE_NAME             = "Task";
-	private static final String  MUTE_CHOKE_NAME       = "runner.muteWarning";
-	private static final String  THRESHOLD_NAME_MILIS  = "runner.chokeTime";
-	private static final String  WATCHER_TIMEOUT_MILIS = "runner.watcherTimeout";
-	private static final boolean ONLY_VIRTUAL          = GlobalConfig.configFlag("runner.onlyVirtual", false);
+	private static final String  BASE_NAME    = ConfigDefs.RUNNER_BASE_TASK_NAME.resolve();
+	private static final boolean ONLY_VIRTUAL = ConfigDefs.RUNNER_ONLY_VIRTUAL_WORKERS.resolve();
 	
 	private static int             virtualChoke = 0;
 	private static boolean         cherry       = true;
@@ -88,8 +86,8 @@ public class Runner{
 		return Thread.ofPlatform().name(BASE_NAME + "-watcher").daemon(true).start(() -> {
 			Log.trace("{#yellowStarting " + BASE_NAME + "-watcher#}");
 			
-			int timeThreshold  = GlobalConfig.configInt(THRESHOLD_NAME_MILIS, 2000/Runtime.getRuntime().availableProcessors());
-			int watcherTimeout = GlobalConfig.configInt(WATCHER_TIMEOUT_MILIS, 1000);
+			int timeThreshold  = ConfigDefs.RUNNER_TASK_CHOKE_TIME_MS.resolve();
+			int watcherTimeout = ConfigDefs.RUNNER_WATCHER_TIMEOUT_MS.resolve();
 			var toRestart      = new ArrayList<Task>();
 			
 			// debug wait prevents debugging sessions from often restarting the watcher by
@@ -172,10 +170,10 @@ public class Runner{
 	private static void pop(){
 		if(cherry){
 			cherry = false;
-			if(!GlobalConfig.configFlag(MUTE_CHOKE_NAME, false)){
+			if(!ConfigDefs.RUNNER_MUTE_CHOKE_WARNING.resolve()){
 				Log.warn("Virtual threads choking! Starting platform thread fallback to prevent possible deadlocks.\n" +
 				         "\"{}\" property may be used to configure choke time threshold. (Set \"{}\" to true to mute this)",
-				         GlobalConfig.propName(THRESHOLD_NAME_MILIS), GlobalConfig.propName(MUTE_CHOKE_NAME));
+				         ConfigDefs.RUNNER_TASK_CHOKE_TIME_MS.name(), ConfigDefs.RUNNER_MUTE_CHOKE_WARNING.name());
 			}
 		}
 	}
@@ -212,7 +210,7 @@ public class Runner{
 	 * worker pool.
 	 * </p>
 	 * <p>
-	 * If the thread has been waiting to start for more than {@link Runner#THRESHOLD_NAME_MILIS}, it may be executed on a
+	 * If the thread has been waiting to start for more than {@link ConfigDefs#RUNNER_TASK_CHOKE_TIME_MS}, it may be executed on a
 	 * platform thread. <br>
 	 * A task might be ran on a platform thread right away if a task start has timed out recently.
 	 * </p>

@@ -1,12 +1,12 @@
 package com.lapissea.cfs.io;
 
-import com.lapissea.cfs.config.GlobalConfig;
+import com.lapissea.cfs.config.ConfigDefs;
 
 import java.io.Closeable;
 
 public interface IOTransaction extends Closeable{
 	
-	boolean DISABLE_TRANSACTIONS = GlobalConfig.configFlag("disableTransactions", false);
+	boolean DISABLE_TRANSACTIONS = ConfigDefs.DISABLE_TRANSACTIONS.resolve();
 	
 	IOTransaction NOOP = new IOTransaction(){
 		@Override

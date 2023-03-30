@@ -1,13 +1,11 @@
 package com.lapissea.cfs.tools.logging;
 
-import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.config.ConfigUtils;
 import com.lapissea.cfs.logging.Log;
 
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
 
 public final class MemoryLogConfig{
 	
@@ -23,22 +21,10 @@ public final class MemoryLogConfig{
 	public final boolean    threadedOutput;
 	
 	public MemoryLogConfig(Map<String, Object> data){
-		
-		negotiationPort = ((Number)data.getOrDefault("port", 6666)).intValue();
-		loggerType = Utils.findFuzzyEnum(Optional.ofNullable(data.get("loggerType")).map(Object::toString), LoggerType.NONE)
-		                  .warn("Logger type");
-		loggerFallbackType = Utils.findFuzzyEnum(Optional.ofNullable(data.get("loggerFallback")).map(Object::toString), LoggerType.NONE)
-		                          .warn("Logger fallback type");
-		
-		var to = Objects.toString(data.getOrDefault("threadedOutput", "false"));
-		threadedOutput = switch(to.toLowerCase()){
-			case "true" -> true;
-			case "false" -> false;
-			default -> {
-				Log.warn("threadedOutput can only be true or false but is \"{}\"", to);
-				yield false;
-			}
-		};
+		negotiationPort = ConfigUtils.configInt("port", data, 6666);
+		loggerType = ConfigUtils.configEnum("loggerType", data, LoggerType.NONE);
+		loggerFallbackType = ConfigUtils.configEnum("loggerFallback", data, LoggerType.NONE);
+		threadedOutput = ConfigUtils.configBoolean("threadedOutput", data, false);
 		
 		var check = new HashSet<>(data.keySet());
 		List.of("port", "loggerType", "loggerFallback", "threadedOutput").forEach(check::remove);

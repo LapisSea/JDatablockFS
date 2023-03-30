@@ -1,6 +1,6 @@
 package com.lapissea.cfs.type.compilation;
 
-import com.lapissea.cfs.config.GlobalConfig;
+import com.lapissea.cfs.config.ConfigDefs;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.IOTypeDB;
@@ -36,8 +36,7 @@ public final class TemplateClassLoader extends ClassLoader{
 	
 	private static final Map<TypeNamed, byte[]> CLASS_DATA_CACHE = Collections.synchronizedMap(new WeakValueHashMap<>());
 	
-	private static final boolean PRINT_GENERATING_INFO = GlobalConfig.configFlag("classGen.printGeneratingInfo", false);
-	private static final boolean EXIT_ON_FAIL          = GlobalConfig.configFlag("classGen.exitOnFail", false);
+	private static final boolean PRINT_GENERATING_INFO = ConfigDefs.CLASSGEN_PRINT_GENERATING_INFO.resolve();
 	
 	private final IOTypeDB db;
 	
@@ -70,7 +69,7 @@ public final class TemplateClassLoader extends ClassLoader{
 			try{
 				classData = jorthGenerate(typ);
 			}catch(Throwable e){
-				if(EXIT_ON_FAIL){
+				if(ConfigDefs.CLASSGEN_EXIT_ON_FAIL.resolve()){
 					e.printStackTrace();
 					System.exit(-1);
 				}

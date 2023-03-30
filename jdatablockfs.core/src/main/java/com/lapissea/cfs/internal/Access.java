@@ -1,7 +1,7 @@
 package com.lapissea.cfs.internal;
 
 import com.lapissea.cfs.Utils;
-import com.lapissea.cfs.config.GlobalConfig;
+import com.lapissea.cfs.config.ConfigDefs;
 import com.lapissea.cfs.exceptions.MissingConstruct;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;
@@ -36,7 +36,7 @@ import static java.lang.invoke.MethodHandles.Lookup.*;
 @SuppressWarnings("unchecked")
 public class Access{
 	
-	private static final boolean USE_UNSAFE_LOOKUP = GlobalConfig.configFlag("corruptAccess", true);
+	private static final boolean USE_UNSAFE_LOOKUP = ConfigDefs.USE_UNSAFE_LOOKUP.resolve();
 	
 	private static long calcModesOffset(){
 		@SuppressWarnings("all")

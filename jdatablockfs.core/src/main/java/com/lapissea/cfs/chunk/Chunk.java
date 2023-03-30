@@ -1,7 +1,7 @@
 package com.lapissea.cfs.chunk;
 
 import com.lapissea.cfs.Utils;
-import com.lapissea.cfs.config.GlobalConfig;
+import com.lapissea.cfs.config.ConfigDefs;
 import com.lapissea.cfs.exceptions.CacheOutOfSync;
 import com.lapissea.cfs.exceptions.MalformedPointer;
 import com.lapissea.cfs.exceptions.OutOfBitDepth;
@@ -202,7 +202,7 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	
 	static{
 		STRUCT = Struct.of(Chunk.class);
-		if(GlobalConfig.configFlag("abBenchmark.chunkOptimizedPipe", true)){
+		if(ConfigDefs.OPTIMIZED_PIPE_USE_CHUNK.resolve()){
 			StandardStructPipe.registerSpecialImpl(STRUCT, OptimizedChunkPipe::new);
 		}
 		PIPE = StandardStructPipe.of(STRUCT);

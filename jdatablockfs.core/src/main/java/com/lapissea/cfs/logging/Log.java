@@ -1,6 +1,7 @@
 package com.lapissea.cfs.logging;
 
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.config.ConfigDefs;
 import com.lapissea.cfs.config.GlobalConfig;
 import com.lapissea.util.ConsoleColors;
 import com.lapissea.util.LogUtil;
@@ -17,6 +18,23 @@ import static com.lapissea.cfs.Utils.getFrame;
 public class Log{
 	static{
 		LogUtil.registerSkipClass(Log.class);
+	}
+	
+	public enum LogLevel{
+		NONE(Integer.MIN_VALUE),
+		MIN(0),
+		WARN(1),
+		INFO(2),
+		DEBUG(3),
+		TRACE(4),
+		SMALL_TRACE(5),
+		ALL(Integer.MAX_VALUE);
+		private final int val;
+		LogLevel(int val){ this.val = val; }
+		
+		private boolean isIn(LogLevel other){
+			return val>=other.val;
+		}
 	}
 	
 	private record Tag(String name, String cmd){ }
@@ -40,34 +58,17 @@ public class Log{
 		new Tag("WHITEBRIGHT", ConsoleColors.WHITE_BRIGHT)
 	);
 	
-	private static final int NONE_LEVEL        = Integer.MIN_VALUE;
-	private static final int MIN_LEVEL         = 0;
-	private static final int WARN_LEVEL        = 1;
-	private static final int INFO_LEVEL        = 2;
-	private static final int DEBUG_LEVEL       = 3;
-	private static final int TRACE_LEVEL       = 4;
-	private static final int SMALL_TRACE_LEVEL = 5;
-	private static final int ALL_LEVEL         = Integer.MAX_VALUE;
+	public static final boolean MIN, WARN, INFO, DEBUG, TRACE, SMALL_TRACE;
 	
-	private static final int LEVEL = GlobalConfig.configProp("log.level").map(String::toUpperCase).map(level -> switch(level){
-		case "NONE" -> NONE_LEVEL;
-		case "MIN" -> MIN_LEVEL;
-		case "WARN" -> WARN_LEVEL;
-		case "INFO" -> INFO_LEVEL;
-		case "DEBUG" -> DEBUG_LEVEL;
-		case "TRACE" -> TRACE_LEVEL;
-		case "SMALL_TRACE" -> SMALL_TRACE_LEVEL;
-		case "ALL" -> ALL_LEVEL;
-		default -> throw new IllegalStateException(level + " is not a recognised logging level");
-	}).orElse(GlobalConfig.RELEASE_MODE? WARN_LEVEL : INFO_LEVEL);
-	
-	public static final boolean MIN         = MIN_LEVEL<=LEVEL;
-	public static final boolean WARN        = WARN_LEVEL<=LEVEL;
-	public static final boolean INFO        = INFO_LEVEL<=LEVEL;
-	public static final boolean DEBUG       = DEBUG_LEVEL<=LEVEL;
-	public static final boolean TRACE       = TRACE_LEVEL<=LEVEL;
-	public static final boolean SMALL_TRACE = SMALL_TRACE_LEVEL<=LEVEL;
-	public static final boolean ALL         = true;
+	static{
+		var level = ConfigDefs.LOG_LEVEL.resolve();
+		MIN = level.isIn(LogLevel.MIN);
+		WARN = level.isIn(LogLevel.WARN);
+		INFO = level.isIn(LogLevel.INFO);
+		DEBUG = level.isIn(LogLevel.DEBUG);
+		TRACE = level.isIn(LogLevel.TRACE);
+		SMALL_TRACE = level.isIn(LogLevel.SMALL_TRACE);
+	}
 	
 	static{
 		if(GlobalConfig.DEBUG_VALIDATION){
@@ -84,7 +85,7 @@ public class Log{
 	}
 	
 	public static void log(String message){
-		if(LEVEL>=MIN_LEVEL) LogUtil.println(message);
+		if(MIN) LogUtil.println(message);
 	}
 	
 	public static void warn(String message)                                                    { if(WARN) warn0(resolveArgs(message)); }
