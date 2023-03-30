@@ -1,7 +1,7 @@
 package com.lapissea.cfs.logging;
 
-import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.config.GlobalConfig;
 import com.lapissea.util.ConsoleColors;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.TextUtil;

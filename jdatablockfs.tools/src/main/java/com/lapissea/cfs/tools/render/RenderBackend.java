@@ -1,6 +1,6 @@
 package com.lapissea.cfs.tools.render;
 
-import com.lapissea.cfs.GlobalConfig;
+import com.lapissea.cfs.config.GlobalConfig;
 import com.lapissea.cfs.tools.DrawFont;
 
 import java.awt.Color;

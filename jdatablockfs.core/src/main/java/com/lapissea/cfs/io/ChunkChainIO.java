@@ -17,7 +17,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
 
-import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 
 public final class ChunkChainIO implements RandomIO{
 	

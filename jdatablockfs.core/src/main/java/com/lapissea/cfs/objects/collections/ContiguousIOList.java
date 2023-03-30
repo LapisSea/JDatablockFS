@@ -57,7 +57,7 @@ import java.util.RandomAccess;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
-import static com.lapissea.cfs.GlobalConfig.BATCH_BYTES;
+import static com.lapissea.cfs.config.GlobalConfig.BATCH_BYTES;
 import static com.lapissea.cfs.type.TypeLink.Check.ArgCheck.RawCheck.INSTANCE;
 import static com.lapissea.cfs.type.TypeLink.Check.ArgCheck.RawCheck.PRIMITIVE;
 import static com.lapissea.util.UtilL.Assert;

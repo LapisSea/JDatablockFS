@@ -33,7 +33,7 @@ import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
-import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 
 public abstract class DynamicSupport{
 	

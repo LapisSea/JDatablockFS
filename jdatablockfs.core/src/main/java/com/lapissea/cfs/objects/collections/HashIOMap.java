@@ -1,6 +1,5 @@
 package com.lapissea.cfs.objects.collections;
 
-import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.internal.HashCommons;
 import com.lapissea.cfs.io.IOTransaction;
@@ -20,6 +19,7 @@ import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.RefField;
+import com.lapissea.cfs.utils.IterablePP;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.Rand;
 import com.lapissea.util.TextUtil;
@@ -38,7 +38,7 @@ import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NULLABLE;
 
 public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{

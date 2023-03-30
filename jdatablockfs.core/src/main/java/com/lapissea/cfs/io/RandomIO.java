@@ -20,7 +20,7 @@ import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.Objects;
 
-import static com.lapissea.cfs.GlobalConfig.BATCH_BYTES;
+import static com.lapissea.cfs.config.GlobalConfig.BATCH_BYTES;
 
 /**
  * This interface represents a session where data can be read and optionally modified. Once

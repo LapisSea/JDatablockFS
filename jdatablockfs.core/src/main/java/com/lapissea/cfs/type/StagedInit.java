@@ -1,6 +1,6 @@
 package com.lapissea.cfs.type;
 
-import com.lapissea.cfs.GlobalConfig;
+import com.lapissea.cfs.config.GlobalConfig;
 import com.lapissea.cfs.exceptions.RecursiveSelfCompilation;
 import com.lapissea.cfs.internal.Runner;
 import com.lapissea.cfs.logging.Log;
@@ -21,7 +21,7 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
-import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 
 public abstract class StagedInit{
 	

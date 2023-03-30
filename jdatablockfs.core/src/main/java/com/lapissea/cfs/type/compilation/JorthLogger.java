@@ -1,6 +1,6 @@
 package com.lapissea.cfs.type.compilation;
 
-import com.lapissea.cfs.GlobalConfig;
+import com.lapissea.cfs.config.GlobalConfig;
 
 import java.util.StringJoiner;
 

@@ -1,6 +1,6 @@
 package com.lapissea.cfs.io.compress;
 
-import com.lapissea.cfs.GlobalConfig;
+import com.lapissea.cfs.config.GlobalConfig;
 import net.jpountz.lz4.LZ4Compressor;
 import net.jpountz.lz4.LZ4Factory;
 import net.jpountz.lz4.LZ4FastDecompressor;

@@ -1,9 +1,8 @@
 package com.lapissea.cfs.type.compilation;
 
-import com.lapissea.cfs.GlobalConfig;
-import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.SyntheticParameterizedType;
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.config.GlobalConfig;
 import com.lapissea.cfs.exceptions.IllegalField;
 import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.type.GetAnnotation;
@@ -24,6 +23,7 @@ import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOUnmanagedValueInfo;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.cfs.utils.IterablePP;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.PairM;
 import com.lapissea.util.TextUtil;

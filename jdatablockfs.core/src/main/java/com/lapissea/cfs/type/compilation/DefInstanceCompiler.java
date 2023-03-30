@@ -1,7 +1,7 @@
 package com.lapissea.cfs.type.compilation;
 
-import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.config.GlobalConfig;
 import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.exceptions.MalformedTemplateStruct;
 import com.lapissea.cfs.internal.Access;

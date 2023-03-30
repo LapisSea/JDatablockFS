@@ -1,6 +1,6 @@
 package com.lapissea.cfs.tools.render;
 
-import com.lapissea.cfs.GlobalConfig;
+import com.lapissea.cfs.config.GlobalConfig;
 import com.lapissea.cfs.tools.AtlasFont;
 import com.lapissea.cfs.tools.DrawFont;
 import com.lapissea.cfs.tools.MSDFAtlas;

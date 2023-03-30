@@ -1,11 +1,11 @@
 package com.lapissea.cfs.type.field;
 
-import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.fields.RefField;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
+import com.lapissea.cfs.utils.IterablePP;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
 

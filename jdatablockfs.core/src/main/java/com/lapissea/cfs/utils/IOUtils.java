@@ -2,7 +2,7 @@ package com.lapissea.cfs.utils;
 
 import java.io.IOException;
 
-import static com.lapissea.cfs.GlobalConfig.BATCH_BYTES;
+import static com.lapissea.cfs.config.GlobalConfig.BATCH_BYTES;
 
 public class IOUtils{
 	

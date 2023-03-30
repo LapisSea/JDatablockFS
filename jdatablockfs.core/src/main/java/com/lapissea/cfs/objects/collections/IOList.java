@@ -1,6 +1,5 @@
 package com.lapissea.cfs.objects.collections;
 
-import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.objects.collections.listtools.IOListRangeView;
 import com.lapissea.cfs.objects.collections.listtools.MappedIOList;
@@ -9,6 +8,7 @@ import com.lapissea.cfs.query.Query;
 import com.lapissea.cfs.query.QueryCheck;
 import com.lapissea.cfs.query.QuerySupport;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.cfs.utils.IterablePP;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.function.FunctionOL;
 import com.lapissea.util.function.UnsafeConsumer;

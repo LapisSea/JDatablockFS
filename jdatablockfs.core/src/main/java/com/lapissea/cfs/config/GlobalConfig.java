@@ -1,5 +1,6 @@
-package com.lapissea.cfs;
+package com.lapissea.cfs.config;
 
+import com.lapissea.cfs.Utils;
 import com.lapissea.util.LogUtil;
 
 import java.net.URL;

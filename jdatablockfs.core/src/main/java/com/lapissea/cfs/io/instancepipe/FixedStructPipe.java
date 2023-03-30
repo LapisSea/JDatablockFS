@@ -17,7 +17,7 @@ import java.util.Set;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
-import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 
 public class FixedStructPipe<T extends IOInstance<T>> extends BaseFixedStructPipe<T>{
 	

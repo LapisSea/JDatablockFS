@@ -16,7 +16,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
 
-import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 
 public final class ChunkCache{
 	

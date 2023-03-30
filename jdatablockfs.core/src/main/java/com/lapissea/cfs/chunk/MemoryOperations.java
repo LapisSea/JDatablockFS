@@ -1,6 +1,6 @@
 package com.lapissea.cfs.chunk;
 
-import com.lapissea.cfs.GlobalConfig;
+import com.lapissea.cfs.config.GlobalConfig;
 import com.lapissea.cfs.exceptions.OutOfBitDepth;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.RandomIO;
@@ -31,7 +31,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.LongStream;
 
-import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.logging.Log.smallTrace;
 
 public class MemoryOperations{

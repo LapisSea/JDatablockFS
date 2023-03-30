@@ -1,7 +1,7 @@
 package com.lapissea.cfs.query;
 
-import com.lapissea.cfs.OptionalPP;
 import com.lapissea.cfs.objects.collections.IOIterator;
+import com.lapissea.cfs.utils.OptionalPP;
 import com.lapissea.util.ZeroArrays;
 
 import java.io.IOException;

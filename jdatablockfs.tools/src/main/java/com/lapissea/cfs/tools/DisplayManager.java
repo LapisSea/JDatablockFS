@@ -1,6 +1,6 @@
 package com.lapissea.cfs.tools;
 
-import com.lapissea.cfs.GlobalConfig;
+import com.lapissea.cfs.config.GlobalConfig;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.MemFrame;
 import com.lapissea.cfs.tools.render.G2DBackend;

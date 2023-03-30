@@ -14,7 +14,7 @@ import java.util.OptionalLong;
 import java.util.PrimitiveIterator;
 import java.util.Set;
 
-import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 
 /**
  * This class implements the logic necessary for {@link IOTransaction}. The changes are

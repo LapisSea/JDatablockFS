@@ -11,6 +11,7 @@ module JDatablockFS.core {
 	exports com.lapissea.cfs.objects;
 	
 	exports com.lapissea.cfs;
+	exports com.lapissea.cfs.config;
 	exports com.lapissea.cfs.chunk;
 	exports com.lapissea.cfs.io;
 	exports com.lapissea.cfs.io.content;

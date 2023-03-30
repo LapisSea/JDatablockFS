@@ -1,7 +1,7 @@
 package com.lapissea.cfs.internal;
 
-import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.config.GlobalConfig;
 import com.lapissea.cfs.exceptions.MissingConstruct;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
 import com.lapissea.cfs.objects.ChunkPointer;

@@ -1,7 +1,7 @@
 package com.lapissea.cfs.objects;
 
-import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.chunk.DataProvider;
+import com.lapissea.cfs.config.GlobalConfig;
 import com.lapissea.cfs.io.ChunkChainIO;
 import com.lapissea.cfs.io.OffsetIO;
 import com.lapissea.cfs.io.RandomIO;

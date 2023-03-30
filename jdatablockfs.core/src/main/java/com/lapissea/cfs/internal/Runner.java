@@ -1,6 +1,6 @@
 package com.lapissea.cfs.internal;
 
-import com.lapissea.cfs.GlobalConfig;
+import com.lapissea.cfs.config.GlobalConfig;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.TextUtil;

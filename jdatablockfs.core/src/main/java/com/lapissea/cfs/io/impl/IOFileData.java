@@ -1,6 +1,6 @@
 package com.lapissea.cfs.io.impl;
 
-import com.lapissea.cfs.GlobalConfig;
+import com.lapissea.cfs.config.GlobalConfig;
 import com.lapissea.cfs.internal.MemPrimitive;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.IOTransaction;

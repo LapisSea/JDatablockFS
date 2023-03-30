@@ -1,6 +1,5 @@
 package com.lapissea.cfs.chunk;
 
-import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.MagicID;
 import com.lapissea.cfs.exceptions.MalformedPointer;
 import com.lapissea.cfs.io.IOInterface;
@@ -19,6 +18,7 @@ import com.lapissea.cfs.type.MemoryWalker;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.cfs.utils.IterablePP;
 import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.IOException;

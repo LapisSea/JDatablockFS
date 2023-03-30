@@ -1,7 +1,6 @@
 package com.lapissea.cfs.tools;
 
 
-import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.MagicID;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.ChainWalker;
@@ -10,6 +9,7 @@ import com.lapissea.cfs.chunk.ChunkSet;
 import com.lapissea.cfs.chunk.Cluster;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.chunk.PhysicalChunkWalker;
+import com.lapissea.cfs.config.GlobalConfig;
 import com.lapissea.cfs.io.ChunkChainIO;
 import com.lapissea.cfs.io.bit.EnumUniverse;
 import com.lapissea.cfs.io.impl.MemoryData;

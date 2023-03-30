@@ -35,7 +35,7 @@ import java.util.function.IntFunction;
 import java.util.function.LongFunction;
 import java.util.stream.Stream;
 
-import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.type.field.StoragePool.INSTANCE;
 
 @SuppressWarnings({"UnusedReturnValue", "unused"})

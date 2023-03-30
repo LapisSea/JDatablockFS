@@ -26,7 +26,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import static com.lapissea.cfs.GlobalConfig.TYPE_VALIDATION;
+import static com.lapissea.cfs.config.GlobalConfig.TYPE_VALIDATION;
 
 
 /**

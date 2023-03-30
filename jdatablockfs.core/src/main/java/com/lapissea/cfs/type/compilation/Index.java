@@ -1,4 +1,4 @@
-package com.lapissea.cfs;
+package com.lapissea.cfs.type.compilation;
 
 import com.lapissea.util.TextUtil;
 

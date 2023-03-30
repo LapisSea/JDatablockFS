@@ -1,6 +1,6 @@
 package com.lapissea.cfs.type.compilation;
 
-import com.lapissea.cfs.GlobalConfig;
+import com.lapissea.cfs.config.GlobalConfig;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.IOTypeDB;

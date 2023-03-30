@@ -1,4 +1,4 @@
-package com.lapissea.cfs;
+package com.lapissea.cfs.utils;
 
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;

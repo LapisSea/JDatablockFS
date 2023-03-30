@@ -16,7 +16,7 @@ import com.lapissea.cfs.type.field.access.FieldAccessor;
 import java.io.IOException;
 import java.util.List;
 
-import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 
 public abstract class RefField<T extends IOInstance<T>, Type> extends IOField<T, Type>{

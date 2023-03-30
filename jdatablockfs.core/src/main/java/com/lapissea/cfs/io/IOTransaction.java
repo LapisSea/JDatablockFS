@@ -1,6 +1,6 @@
 package com.lapissea.cfs.io;
 
-import com.lapissea.cfs.GlobalConfig;
+import com.lapissea.cfs.config.GlobalConfig;
 
 import java.io.Closeable;
 
