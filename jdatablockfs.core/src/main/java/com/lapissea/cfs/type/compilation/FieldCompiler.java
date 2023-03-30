@@ -60,13 +60,13 @@ import static java.util.stream.Collectors.joining;
 
 public class FieldCompiler{
 	
-	public enum AccessImplType{
+	public enum AccessType{
 		UNSAFE,
 		VAR_HANDLE,
 		REFLECTION
 	}
 	
-	private static final AccessImplType FIELD_ACCESS = ConfigDefs.FIELD_ACCESS_TYPE.resolve();
+	private static final AccessType FIELD_ACCESS = ConfigDefs.FIELD_ACCESS_TYPE.resolve();
 	
 	protected record LogicalAnnotation<T extends Annotation>(T annotation, AnnotationLogic<T> logic){ }
 	

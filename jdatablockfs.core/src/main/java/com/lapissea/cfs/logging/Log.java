@@ -32,7 +32,7 @@ public class Log{
 		private final int val;
 		LogLevel(int val){ this.val = val; }
 		
-		private boolean isIn(LogLevel other){
+		public boolean isWithin(LogLevel other){
 			return val>=other.val;
 		}
 	}
@@ -62,12 +62,12 @@ public class Log{
 	
 	static{
 		var level = ConfigDefs.LOG_LEVEL.resolve();
-		MIN = level.isIn(LogLevel.MIN);
-		WARN = level.isIn(LogLevel.WARN);
-		INFO = level.isIn(LogLevel.INFO);
-		DEBUG = level.isIn(LogLevel.DEBUG);
-		TRACE = level.isIn(LogLevel.TRACE);
-		SMALL_TRACE = level.isIn(LogLevel.SMALL_TRACE);
+		MIN = level.isWithin(LogLevel.MIN);
+		WARN = level.isWithin(LogLevel.WARN);
+		INFO = level.isWithin(LogLevel.INFO);
+		DEBUG = level.isWithin(LogLevel.DEBUG);
+		TRACE = level.isWithin(LogLevel.TRACE);
+		SMALL_TRACE = level.isWithin(LogLevel.SMALL_TRACE);
 	}
 	
 	static{

@@ -4,7 +4,9 @@ import java.util.Objects;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-public class ConfigTools{
+public final class ConfigTools{
+	
+	static final class Dummy implements ConfigDefs{ }
 	
 	public sealed interface DefaultValue<T>{
 		record OtherFlagFallback<T>(Flag<T> flag) implements DefaultValue<T>{
@@ -41,6 +43,10 @@ public class ConfigTools{
 			public boolean resolveVal(){
 				return ConfigUtils.configBoolean(name, ConfigUtils.optionalProperty(name), defaultValue.value());
 			}
+			
+			public <U> Supplier<U> boolMap(U ifTrue, U ifFalse){
+				return () -> resolveVal()? ifTrue : ifFalse;
+			}
 		}
 		
 		record Int(String name, DefaultValue<Integer> defaultValue) implements Flag<Integer>{
@@ -68,8 +74,8 @@ public class ConfigTools{
 			}
 		}
 		
-		record EnumF<E extends Enum<E>>(String name, DefaultValue<E> defaultValue) implements Flag<E>{
-			public EnumF{
+		record Abc<E extends Enum<E>>(String name, DefaultValue<E> defaultValue) implements Flag<E>{
+			public Abc{
 				Objects.requireNonNull(name);
 				Objects.requireNonNull(defaultValue);
 			}
@@ -106,9 +112,10 @@ public class ConfigTools{
 	
 	///
 	
-	public static <T extends Enum<T>> Flag.EnumF<T> flagEnum(String name, DefaultValue<T> defaultVal){ return new Flag.EnumF<>(ConfigDefs.CONFIG_PROPERTY_PREFIX + Objects.requireNonNull(name), defaultVal); }
-	public static <T extends Enum<T>> Flag.EnumF<T> flagE(String name, Flag.EnumF<T> defaultVal)     { return flagEnum(name, new DefaultValue.OtherFlagFallback<>(defaultVal)); }
-	public static <T extends Enum<T>> Flag.EnumF<T> flagE(String name, T defaultVal)                 { return flagEnum(name, new DefaultValue.Literal<>(defaultVal)); }
-	public static <T extends Enum<T>> Flag.EnumF<T> flagE(String name, Supplier<T> valueMaker)       { return flagEnum(name, new DefaultValue.Lambda<>(valueMaker)); }
+	public static <T extends Enum<T>> Flag.Abc<T> flagEnum(String name, DefaultValue<T> defaultVal){ return new Flag.Abc<>(ConfigDefs.CONFIG_PROPERTY_PREFIX + Objects.requireNonNull(name), defaultVal); }
+	public static <T extends Enum<T>> Flag.Abc<T> flagE(String name, Flag.Abc<T> defaultVal)       { return flagEnum(name, new DefaultValue.OtherFlagFallback<>(defaultVal)); }
+	public static <T extends Enum<T>> Flag.Abc<T> flagE(String name, T defaultVal)                 { return flagEnum(name, new DefaultValue.Literal<>(defaultVal)); }
+	public static <T extends Enum<T>> Flag.Abc<T> flagE(String name, Supplier<T> valueMaker)       { return flagEnum(name, new DefaultValue.Lambda<>(valueMaker)); }
+	public static <T extends Enum<T>> Flag.Abc<T> flagEDyn(String name, Supplier<T> valueMaker)    { return flagE(name, valueMaker); }
 	
 }
