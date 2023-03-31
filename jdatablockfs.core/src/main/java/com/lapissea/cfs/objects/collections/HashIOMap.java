@@ -524,7 +524,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		if(!(value instanceof IOInstance.Unmanaged)){
 			try{
 				var d = MemoryData.builder().build();
-				var v = ValueStorage.makeStorage(DataProvider.newVerySimpleProvider(d), TypeLink.of(value.getClass()), getGenerics(), new ValueStorage.StorageRule.Default());
+				var v = ValueStorage.makeStorage(DataProvider.newVerySimpleProvider(d), TypeLink.of(value.getClass()), getGenerics().argAsContext("V"), new ValueStorage.StorageRule.Default());
 				//noinspection unchecked
 				((ValueStorage<V>)v).write(d.io(), value);
 			}catch(Throwable e){

@@ -103,7 +103,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 			return max.min(num);
 		});
 		
-		this.storage = (ValueStorage<T>)ValueStorage.makeStorage(makeMagnetProvider(), typeDef.arg(0), getGenerics(), new StorageRule.VariableFixed(rec));
+		this.storage = makeValueStorage(rec, typeDef.arg(0));
 		
 		Assert(this.storage.inlineSize() != -1);
 		
@@ -376,10 +376,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		var newVarying = List.copyOf(newBuffer);
 		
 		var oldStorage = storage;
-		var newStorage = (ValueStorage<T>)ValueStorage.makeStorage(
-			makeMagnetProvider(), getTypeDef().arg(0), getGenerics(),
-			new StorageRule.VariableFixed(VaryingSize.Provider.repeat(newVarying))
-		);
+		var newStorage = makeValueStorage(VaryingSize.Provider.repeat(newVarying), getTypeDef().arg(0));
 		
 		//fail on recurse
 		storage = null;
@@ -429,6 +426,12 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		}
 		storage = newStorage;
 		calcHead();
+	}
+	private ValueStorage<T> makeValueStorage(VaryingSize.Provider varying, TypeLink typeDef){
+		return (ValueStorage<T>)ValueStorage.makeStorage(
+			makeMagnetProvider(), typeDef, getGenerics().argAsContext("T"),
+			new StorageRule.VariableFixed(varying)
+		);
 	}
 	
 	private T readAt(long index) throws IOException{

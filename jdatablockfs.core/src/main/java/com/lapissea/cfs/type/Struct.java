@@ -819,15 +819,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	public GenericContext describeGenerics(TypeLink def){
-		return new GenericContext.Deferred(() -> {
-			var params = getType().getTypeParameters();
-			//noinspection unchecked
-			var types = (Map.Entry<String, Type>[])new Map.Entry<?, ?>[params.length];
-			for(int i = 0; i<params.length; i++){
-				types[i] = Map.entry(params[i].getName(), def.genericArg(i, null));
-			}
-			return new GenericContext.MapConstant(Map.ofEntries(types));
-		});
+		return new GenericContext.Deferred(() -> new GenericContext.TypeArgs(getType(), def.generic(null)));
 	}
 	
 	@Override
