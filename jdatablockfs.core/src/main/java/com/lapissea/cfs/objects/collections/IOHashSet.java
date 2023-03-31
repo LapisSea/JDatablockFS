@@ -210,6 +210,7 @@ public final class IOHashSet<T> extends AbstractUnmanagedIOSet<T>{
 			}
 		}
 		data.clear();
+		data.addMultipleNew(2);
 		deltaSize(-size());
 	}
 	
