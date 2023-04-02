@@ -13,8 +13,16 @@ import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.annotations.IODependency.VirtualNumSize;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.util.LogUtil;
+import com.lapissea.util.NotNull;
+import guru.nidi.graphviz.attribute.Color;
+import guru.nidi.graphviz.engine.Format;
+import guru.nidi.graphviz.engine.Graphviz;
+import guru.nidi.graphviz.model.Factory;
 
+import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -28,6 +36,16 @@ import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NULLABLE;
 import static java.util.function.Predicate.not;
 
+/**
+ * A red black binary tree implementation as an on disk data structure with a
+ * custom memory reference and allocation system to reference node relations.<br>
+ * Big thanks to <a href="https://www.happycoders.eu/algorithms/red-black-tree-java/">
+ * Red-Black Tree (Fully Explained, with Java Code) - happycoders.eu</a>
+ * for providing a detailed and friendly explanation on the data structure
+ * and the specifics of the balancing logic.
+ *
+ * @param <T>
+ */
 public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedIOSet<T>{
 	
 	private interface Node extends IOInstance.Def<Node>{
@@ -70,6 +88,9 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 		
 		boolean red();
 		void red(boolean red);
+		default boolean black(){
+			return !red();
+		}
 		
 		default long getChild(boolean isRight){
 			return isRight? right() : left();
@@ -155,11 +176,16 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 		readManagedFields();
 	}
 	
-	private record IndexedNode(long idx, Node node){
+	private record IndexedNode(long idx, @NotNull Node node){
+		private IndexedNode{
+			Objects.requireNonNull(node);
+		}
 		@Override
 		public String toString(){
 			return node + " @" + idx;
 		}
+		boolean red()  { return node.red(); }
+		boolean black(){ return node.black(); }
 	}
 	
 	private record NodePointer(long idx, Node node, boolean relation){
@@ -224,7 +250,7 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 		private       byte age = 1;
 		private NodeCache(Node node){ this.node = node.clone(); }
 		public NodeCache(Node node, byte age){
-			this.node = node;
+			this.node = node.clone();
 			this.age = age;
 		}
 		void makeOlder(){
@@ -256,9 +282,14 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 		updateNode(node.idx, node.node);
 	}
 	private void updateNode(long nodeIdx, Node node) throws IOException{
-		assert nodeIdx != 0 || !node.red() : "Root is red";
+		assert nodeIdx != 0 || node.black() : "Root is red";
 		nodeCache.put(nodeIdx, new NodeCache(node, (byte)3));
 		nodes.set(nodeIdx, node);
+		try{
+			renderGraph();
+		}catch(Throwable e){
+			LogUtil.println("fail graph");
+		}
 	}
 	
 	private void swapValues(IndexedNode a, IndexedNode b) throws IOException{
@@ -269,8 +300,9 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 		updateNode(b);
 	}
 	private void setAndUpdateColor(IndexedNode node, boolean red) throws IOException{
-		if(node.node.red() == red) return;
-		node.node.red(false);
+		var n = node.node;
+		if(n.red() == red) return;
+		n.red(red);
 		updateNode(node);
 	}
 	
@@ -280,41 +312,94 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 		var hasL = toRemove.node.hasLeft();
 		var hasR = toRemove.node.hasRight();
 		
+		if(!hasL && !hasR){
+			justRemove(ptr, toRemove);
+			return;
+		}
+		
 		if(hasL != hasR){
-			if(ptr.idx == -1){
-				var childChild = toRemove.node.getChild(hasR, this);
-				childChild.node.red(false);
-				gcNodeValue(toRemove);
-				updateNode(0, childChild.node.clone());
-				gcNode(childChild);
+			removeAndMoveDownTheChild(ptr, toRemove, hasR);
+			return;
+		}
+		
+		swapWithLeafAndPop(toRemove);
+	}
+	
+	private void swapWithLeafAndPop(IndexedNode toRemove) throws IOException{
+		var sParent  = toRemove;
+		var smallest = sParent.node.right(this);
+		var lr       = true;
+		
+		while(smallest.node.hasLeft()){
+			sParent = smallest;
+			smallest = smallest.node.left(this);
+			lr = false;
+		}
+		
+		swapValues(smallest, toRemove);
+		removeLR(new NodePointer(sParent.idx, sParent.node, lr));
+	}
+	
+	private void removeAndMoveDownTheChild(NodePointer ptr, IndexedNode toRemove, boolean hasR) throws IOException{
+		var childChild = toRemove.node.getChild(hasR, this);
+		if(ptr.idx == -1){
+			childChild.node.red(false);
+			gcNodeValue(toRemove);
+			updateNode(0, childChild.node.clone());
+			gcNode(childChild);
+			return;
+		}
+		
+		ptr.setChild(childChild);
+		gcNodeValue(toRemove);
+		updateNode(ptr.index());
+		
+		if(childChild.black()){
+			fixRedBlackPropertiesAfterDelete(childChild);
+		}
+	}
+	private void fixRedBlackPropertiesAfterDelete(IndexedNode movedDown) throws IOException{
+		var parent = findNodeParent(movedDown);
+		if(parent == null) return;
+		var sibling = parent.otherChild(this);
+		if(sibling == null) return;
+		
+		if(sibling.red()){
+			setAndUpdateColor(sibling, false);
+			setAndUpdateColor(parent.index(), true);
+			
+			rotate(parent.index(), parent.relation);
+			
+			parent = findNodeParent(movedDown);
+			Objects.requireNonNull(parent);
+			sibling = parent.otherChild(this);
+		}
+		
+		var l = sibling.node.left(this);
+		var r = sibling.node.right(this);
+		if(l != null && l.black() && r != null && r.black()){
+			setAndUpdateColor(sibling, true);
+			
+			var parentIdx = parent.index();
+			if(parentIdx.red()){
+				setAndUpdateColor(parentIdx, false);
 			}else{
-				ptr.setChild(toRemove.node.getChild(hasR));
-				gcNodeValue(toRemove);
-			}
-		}else{
-			if(!hasR){
-				if(ptr.idx == -1){
-					gcNodeValue(toRemove);
-					return;
-				}
-				ptr.node.yeetChild(ptr.relation);
-				gcNodeValue(toRemove);
-			}else{
-				var sParent  = toRemove;
-				var smallest = sParent.node.right(this);
-				var lr       = true;
-				
-				while(smallest.node.hasLeft()){
-					sParent = smallest;
-					smallest = smallest.node.left(this);
-					lr = false;
-				}
-				
-				swapValues(smallest, toRemove);
-				removeLR(new NodePointer(sParent.idx, sParent.node, lr));
-				return;
+				fixRedBlackPropertiesAfterDelete(parentIdx);
 			}
 		}
+	}
+	
+	private void justRemove(NodePointer ptr, IndexedNode toRemove) throws IOException{
+		
+		if(ptr.idx == -1){
+			gcNodeValue(toRemove);
+			return;
+		}
+		
+		ptr.node.yeetChild(ptr.relation);
+		gcNodeValue(toRemove);
+		
+		
 		if(ptr.idx != -1){
 			updateNode(ptr.index());
 		}
@@ -505,15 +590,15 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 		try(var ignored = transaction()){
 			parent.setChild(addNode(value, true));
 			updateNode(parent.index());
-			repairRedBlack(parent);
+			repairRedBlackInsert(parent);
 			deltaSize(1);
 		}
 		if(DEBUG_VALIDATION) validate();
 		return true;
 	}
 	
-	private void repairRedBlack(NodePointer parent) throws IOException{
-		if(!parent.node.red()) return;
+	private void repairRedBlackInsert(NodePointer parent) throws IOException{
+		if(parent.node.black()) return;
 		
 		NodePointer grandparent = findNodeParent(parent);
 		if(grandparent == null){
@@ -523,39 +608,113 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 		
 		var uncle = grandparent.otherChild(this);
 		
-		if(uncle != null && !uncle.node.red()){
+		if(uncle != null && uncle.node.black()){
 			setAndUpdateColor(parent.index(), false);
-			setAndUpdateColor(grandparent.index(), true);
+			if(grandparent.idx>0) setAndUpdateColor(grandparent.index(), true);
 			setAndUpdateColor(uncle, false);
-			repairRedBlack(grandparent);
+			repairRedBlackInsert(grandparent);
 			return;
 		}
 		
 		if(!grandparent.relation){
 			if(parent.relation){
 				setAndUpdateColor(parent.child(this), false);
-				setAndUpdateColor(grandparent.index(), true);
+				if(grandparent.idx>0) setAndUpdateColor(grandparent.index(), true);
 				var newP = rotateLeft(parent.index());
 				rotateRight(findNodeParent(newP).index());
 			}else{
 				setAndUpdateColor(parent.index(), false);
-				setAndUpdateColor(grandparent.index(), true);
+				if(grandparent.idx>0) setAndUpdateColor(grandparent.index(), true);
 				rotateRight(grandparent.index());
 			}
 		}else{
 			if(!parent.relation){
-				setAndUpdateColor(parent.child(this), false);
-				setAndUpdateColor(grandparent.index(), true);
-				var newP = rotateRight(parent.index());
-				rotateLeft(findNodeParent(newP).index());
-			}else{
-				setAndUpdateColor(parent.index(), false);
-				setAndUpdateColor(grandparent.index(), true);
+				var newParent = rotateRight(parent.index());
 				rotateLeft(grandparent.index());
+				setAndUpdateColor(newParent, false);
+				if(grandparent.idx>0) setAndUpdateColor(grandparent.index(), true);
+			}else{
+				LogUtil.println(parent.index());
+				var newGp = rotateLeft(grandparent.index());
+				var oldGP = newGp.node.getChild(false, this);
+				
+				LogUtil.println(newGp);
+				setAndUpdateColor(newGp, false);
+				setAndUpdateColor(oldGP, true);
 			}
+
+//			if(!parent.relation){
+//				renderGraph();
+//				setAndUpdateColor(parent.child(this), false);
+//				renderGraph();
+//				if(grandparent.idx>0) setAndUpdateColor(grandparent.index(), true);
+//				renderGraph();
+//				var newP = rotateRight(parent.index());
+//				renderGraph();
+//				LogUtil.println(getVal(newP.node));
+//				rotateLeft(findNodeParent(newP).index());
+//				renderGraph();
+//				int i = 0;
+//			}else{
+//				setAndUpdateColor(parent.index(), false);
+//				if(grandparent.idx>0) setAndUpdateColor(grandparent.index(), true);
+//				rotateLeft(grandparent.index());
+//			}
+//			if(!parent.relation){
+//				setAndUpdateColor(parent.child(this), false);
+//				if(grandparent.idx>0) setAndUpdateColor(grandparent.index(), true);
+//				var newP = rotateRight(parent.index());
+//				LogUtil.println(getVal(newP.node));
+//				rotateLeft(findNodeParent(newP).index());
+//			}else{
+//				setAndUpdateColor(parent.index(), false);
+//				if(grandparent.idx>0) setAndUpdateColor(grandparent.index(), true);
+//				rotateLeft(grandparent.index());
+//			}
 		}
 	}
 	
+	String nodeStr(Node node) throws IOException{
+		return getVal(node) + " @ " + node.valueIndex();
+	}
+	
+	void feedGraph(Node node, List<guru.nidi.graphviz.model.Node> graph) throws IOException{
+		
+		var n = Factory.node(nodeStr(node));
+		if(node.red()) n = n.with(Color.RED);
+		for(int i = 0; i<2; i++){
+			var b = i == 0;
+			if(!node.hasChild(b)) continue;
+			var ch = nodes.get(node.getChild(b));
+			n = n.link(Factory.node(nodeStr(ch)));
+			feedGraph(ch, graph);
+		}
+		graph.add(n);
+	}
+	
+	private void renderGraph(){
+		try{
+			List<guru.nidi.graphviz.model.Node> graph = new ArrayList<>();
+			if(size()>0){
+				feedGraph(node(0), graph);
+				graph.add(Factory.node("<ROOT>").link(nodeStr(node(0))));
+			}
+			var f  = new File("deb.png");
+			var f2 = new File("deb2.png");
+			Graphviz.fromGraph(Factory.graph("tree").with(graph)).width(300).render(Format.PNG).toFile(f2);
+			f.delete();
+			f2.renameTo(f);
+//			LogUtil.println(f.getAbsolutePath());
+		}catch(Throwable e){
+			throw new RuntimeException(e);
+		}
+	}
+	
+	
+	private IndexedNode rotate(IndexedNode iNode, boolean right) throws IOException{
+		if(right) return rotateRight(iNode);
+		else return rotateLeft(iNode);
+	}
 	private IndexedNode rotateLeft(IndexedNode iNode) throws IOException{
 		var node       = iNode.node;
 		var parent     = findNodeParent(iNode);
@@ -570,13 +729,33 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 			
 			parent.setChild(rightChild);
 			updateNode(parent.index());
+			return rightChild;
 		}else{
 			rightChild.node.left(rightChild.idx);
 			
-			updateNode(0, rightChild.node);
-			updateNode(rightChild.idx, node);
+			swapMemValues(node, rightChild.node);
+			node.red(false);
+			updateNode(rightChild);
+			updateNode(iNode);
+			return iNode;
 		}
-		return rightChild;
+	}
+	
+	private static void swapMemValues(Node node, Node nodeB){
+		var l   = node.left();
+		var r   = node.right();
+		var v   = node.valueIndex();
+		var red = node.red();
+		
+		node.left(nodeB.left());
+		node.right(nodeB.right());
+		node.valueIndex(nodeB.valueIndex());
+		node.red(nodeB.red());
+		
+		nodeB.left(l);
+		nodeB.right(r);
+		nodeB.valueIndex(v);
+		nodeB.red(red);
 	}
 	
 	private IndexedNode rotateRight(IndexedNode iNode) throws IOException{
@@ -593,13 +772,16 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 			
 			parent.setChild(leftChild);
 			updateNode(parent.index());
+			return leftChild;
 		}else{
 			leftChild.node.right(leftChild.idx);
 			
-			updateNode(0, leftChild.node);
-			updateNode(leftChild.idx, node);
+			swapMemValues(node, leftChild.node);
+			
+			updateNode(leftChild);
+			updateNode(iNode);
+			return iNode;
 		}
-		return leftChild;
 	}
 	
 	private NodePointer findNodeParent(NodePointer node) throws IOException{
@@ -635,6 +817,12 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 		
 		var res = findParent(value);
 		if(!res.node.hasChild(res.relation)) return false;
+		
+		var toRemove = res.child(this);
+		
+		if(!toRemove.node.hasLeft() && !toRemove.node.hasRight()){
+		
+		}
 		
 		try(var ignored = transaction()){
 			removeLR(res);

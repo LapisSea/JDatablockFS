@@ -6,6 +6,7 @@ module JDatablockFS.core {
 	requires Jorth;
 	requires generics.resolver;
 	requires org.lz4.java;
+	requires guru.nidi.graphviz;
 	
 	exports com.lapissea.cfs.type.field.annotations;
 	exports com.lapissea.cfs.objects;
