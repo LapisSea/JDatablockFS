@@ -1,6 +1,6 @@
 package com.lapissea.cfs.chunk;
 
-import com.lapissea.cfs.GlobalConfig;
+import com.lapissea.cfs.config.ConfigDefs;
 import com.lapissea.cfs.exceptions.OutOfBitDepth;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.RandomIO;
@@ -31,7 +31,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.LongStream;
 
-import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.logging.Log.smallTrace;
 
 public class MemoryOperations{
@@ -251,7 +251,7 @@ public class MemoryOperations{
 	}
 	
 	
-	private static final boolean PURGE_ACCIDENTAL = GlobalConfig.configFlag("purgeAccidentalChunkHeaders", GlobalConfig.DEBUG_VALIDATION);
+	private static final boolean PURGE_ACCIDENTAL = ConfigDefs.PURGE_ACCIDENTAL_CHUNK_HEADERS.resolve();
 	
 	public static List<Chunk> mergeChunks(Collection<Chunk> data) throws IOException{
 		if(data.isEmpty()) return new ArrayList<>();

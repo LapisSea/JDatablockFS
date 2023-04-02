@@ -15,7 +15,7 @@ import java.util.Collection;
 import java.util.Objects;
 import java.util.function.Function;
 
-import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 
 public interface DataProvider{
 	

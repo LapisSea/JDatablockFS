@@ -1,7 +1,7 @@
 package com.lapissea.cfs.type.compilation;
 
-import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.config.ConfigDefs;
 import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.exceptions.MalformedTemplateStruct;
 import com.lapissea.cfs.internal.Access;
@@ -305,8 +305,6 @@ public class DefInstanceCompiler{
 	}
 	
 	
-	private static final boolean EXIT_ON_FAIL = GlobalConfig.configFlag("classGen.exitOnFail", false);
-	
 	private static final List<Class<?>> IGNORE_TYPES =
 		Stream.concat(
 			Stream.<Class<?>>iterate(
@@ -451,7 +449,7 @@ public class DefInstanceCompiler{
 			var impl = generateImpl(completion, includeNames, specials, fieldInfo, orderedFields, humanName);
 			return new Result<>(impl, orderedFields);
 		}catch(Throwable e){
-			if(EXIT_ON_FAIL){
+			if(ConfigDefs.CLASSGEN_EXIT_ON_FAIL.resolve()){
 				new RuntimeException("failed to compile implementation for " + completeInter.getName(), e).printStackTrace();
 				System.exit(1);
 			}

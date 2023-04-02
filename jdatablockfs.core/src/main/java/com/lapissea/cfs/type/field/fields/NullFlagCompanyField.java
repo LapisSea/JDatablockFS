@@ -11,7 +11,7 @@ import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
 
 import java.util.List;
 
-import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 
 public abstract class NullFlagCompanyField<T extends IOInstance<T>, Type> extends IOField<T, Type>{
 	

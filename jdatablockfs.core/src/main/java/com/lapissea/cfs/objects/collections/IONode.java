@@ -1,6 +1,5 @@
 package com.lapissea.cfs.objects.collections;
 
-import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.Chunk;
@@ -33,6 +32,7 @@ import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.NoIOField;
 import com.lapissea.cfs.type.field.fields.RefField;
 import com.lapissea.cfs.utils.IOUtils;
+import com.lapissea.cfs.utils.IterablePP;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.ShouldNeverHappenError;
@@ -48,7 +48,7 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.stream.Stream;
 
-import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.type.field.StoragePool.IO;
 
 public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements IterablePP<IONode<T>>{

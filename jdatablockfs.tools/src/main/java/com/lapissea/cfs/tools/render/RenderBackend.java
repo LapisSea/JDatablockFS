@@ -1,6 +1,6 @@
 package com.lapissea.cfs.tools.render;
 
-import com.lapissea.cfs.GlobalConfig;
+import com.lapissea.cfs.config.GlobalConfig;
 import com.lapissea.cfs.tools.DrawFont;
 
 import java.awt.Color;
@@ -11,7 +11,22 @@ import java.util.function.Consumer;
 
 public abstract class RenderBackend{
 	
-	public static final boolean DRAW_DEBUG = GlobalConfig.configFlag("tools.drawDebug", false);
+	public static final boolean     DRAW_DEBUG = GlobalConfig.configFlag("tools.drawDebug", false);
+	public static final ThreadGroup UI_GROUP;
+	
+	static{
+		var group = Thread.currentThread().getThreadGroup();
+		while(true){
+			var parent = group.getParent();
+			if(parent == null) break;
+			group = parent;
+		}
+		UI_GROUP = new ThreadGroup(group, "UI Group");
+	}
+	
+	public static Thread makeDisplayThread(Runnable start){
+		return Thread.ofPlatform().name("display").group(UI_GROUP).daemon(false).start(start);
+	}
 	
 	public static class Buffered extends RenderBackend{
 		

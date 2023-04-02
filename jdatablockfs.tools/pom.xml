@@ -5,9 +5,9 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<properties>
-		<github.spair.version>1.86.4</github.spair.version>
-		<lwjgl.version>3.3.2-SNAPSHOT</lwjgl.version>
-		<joml.version>1.10.4</joml.version>
+		<github.spair.version>1.86.10</github.spair.version>
+		<lwjgl.version>3.3.2</lwjgl.version>
+		<joml.version>1.10.5</joml.version>
 		<lwjgl.natives>natives-windows</lwjgl.natives>
 	</properties>
 
@@ -68,12 +68,12 @@
 		<dependency>
 			<groupId>com.esotericsoftware</groupId>
 			<artifactId>kryo</artifactId>
-			<version>5.3.0</version>
+			<version>5.4.0</version>
 		</dependency>
 		<dependency>
 			<groupId>com.google.code.gson</groupId>
 			<artifactId>gson</artifactId>
-			<version>2.10</version>
+			<version>2.10.1</version>
 		</dependency>
 
 		<dependency>

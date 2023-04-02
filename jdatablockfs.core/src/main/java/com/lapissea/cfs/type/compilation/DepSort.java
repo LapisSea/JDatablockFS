@@ -1,6 +1,5 @@
 package com.lapissea.cfs.type.compilation;
 
-import com.lapissea.cfs.Index;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.ZeroArrays;
 

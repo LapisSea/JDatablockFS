@@ -1,8 +1,7 @@
 package com.lapissea.cfs.chunk;
 
-import com.lapissea.cfs.GlobalConfig;
-import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.config.ConfigDefs;
 import com.lapissea.cfs.exceptions.CacheOutOfSync;
 import com.lapissea.cfs.exceptions.MalformedPointer;
 import com.lapissea.cfs.exceptions.OutOfBitDepth;
@@ -30,6 +29,7 @@ import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.BitField;
 import com.lapissea.cfs.type.field.fields.reflection.BitFieldMerger;
+import com.lapissea.cfs.utils.IterablePP;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.ShouldNeverHappenError;
@@ -44,7 +44,7 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 
 
 /**
@@ -202,7 +202,7 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	
 	static{
 		STRUCT = Struct.of(Chunk.class);
-		if(GlobalConfig.configFlag("abBenchmark.chunkOptimizedPipe", true)){
+		if(ConfigDefs.OPTIMIZED_PIPE_USE_CHUNK.resolve()){
 			StandardStructPipe.registerSpecialImpl(STRUCT, OptimizedChunkPipe::new);
 		}
 		PIPE = StandardStructPipe.of(STRUCT);

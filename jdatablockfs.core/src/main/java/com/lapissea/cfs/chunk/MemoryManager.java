@@ -11,7 +11,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 
-import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 
 /**
  * This interface handles the management of memory (duh). This includes allocation of new independent {@link Chunk}s or

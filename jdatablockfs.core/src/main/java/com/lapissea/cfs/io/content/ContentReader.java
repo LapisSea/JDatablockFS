@@ -13,7 +13,7 @@ import java.util.Objects;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
 
-import static com.lapissea.cfs.GlobalConfig.BATCH_BYTES;
+import static com.lapissea.cfs.config.GlobalConfig.BATCH_BYTES;
 
 @SuppressWarnings({"PointlessArithmeticExpression", "PointlessBitwiseExpression", "unused", "UnusedReturnValue"})
 public interface ContentReader extends AutoCloseable{

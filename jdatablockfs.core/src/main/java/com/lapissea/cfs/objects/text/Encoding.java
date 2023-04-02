@@ -1,6 +1,6 @@
 package com.lapissea.cfs.objects.text;
 
-import com.lapissea.cfs.GlobalConfig;
+import com.lapissea.cfs.config.ConfigDefs;
 import com.lapissea.cfs.io.bit.BitInputStream;
 import com.lapissea.cfs.io.bit.BitOutputStream;
 import com.lapissea.cfs.io.bit.BitUtils;
@@ -28,7 +28,7 @@ import java.util.List;
 import java.util.function.Predicate;
 import java.util.stream.IntStream;
 
-import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static java.nio.charset.CodingErrorAction.REPORT;
 import static java.nio.charset.StandardCharsets.US_ASCII;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -69,7 +69,7 @@ class Encoding{
 			
 			
 			int optimizedBlockCount;
-			if(GlobalConfig.configFlag("abBenchmark.disableBlockCoding", false)){
+			if(ConfigDefs.TEXT_DISABLE_BLOCK_CODING.resolve()){
 				optimizedBlockCount = -1;
 			}else{
 				optimizedBlockCount = 1;

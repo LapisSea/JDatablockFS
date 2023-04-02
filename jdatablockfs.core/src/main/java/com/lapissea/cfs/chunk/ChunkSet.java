@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
-import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 
 @SuppressWarnings({"SimplifyStreamApiCallChains", "unused"})
 public final class ChunkSet implements Set<ChunkPointer>{

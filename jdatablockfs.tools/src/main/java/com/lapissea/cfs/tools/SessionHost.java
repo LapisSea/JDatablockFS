@@ -86,6 +86,10 @@ public class SessionHost implements DataLogger{
 			synchronized(framePos){
 				framePos.set(-1);
 			}
+			
+			if(blockLogTillDisplay){
+				UtilL.sleepWhile(() -> framePos.get() != frames.size() - 1);
+			}
 		}
 		
 		@Override
@@ -115,11 +119,14 @@ public class SessionHost implements DataLogger{
 	
 	private final Map<String, HostedSession> sessions = new LinkedHashMap<>();
 	
-	public final ChangeRegistry<Optional<HostedSession>> activeSession = new ChangeRegistry<>(Optional.empty());
-	public final ChangeRegistryInt                       activeFrame   = new ChangeRegistryInt(-1);
+	public final  ChangeRegistry<Optional<HostedSession>> activeSession = new ChangeRegistry<>(Optional.empty());
+	public final  ChangeRegistryInt                       activeFrame   = new ChangeRegistryInt(-1);
+	private final boolean                                 blockLogTillDisplay;
 	
 	
 	private long lastSessionSet;
+	
+	public SessionHost(boolean blockLogTillDisplay){ this.blockLogTillDisplay = blockLogTillDisplay; }
 	
 	@Override
 	public Session getSession(String name){

@@ -20,7 +20,7 @@ import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.Objects;
 
-import static com.lapissea.cfs.GlobalConfig.BATCH_BYTES;
+import static com.lapissea.cfs.config.GlobalConfig.BATCH_BYTES;
 
 /**
  * This interface represents a session where data can be read and optionally modified. Once
@@ -466,7 +466,7 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 	 * @throws IOException source may throw io
 	 */
 	default RandomIO localTransactionBuffer() throws IOException{
-		if(inTransaction()) return this;
+		if(IOTransaction.DISABLE_TRANSACTIONS || inTransaction()) return this;
 		
 		if(isReadOnly()){
 			throw new IllegalStateException();

@@ -1,6 +1,5 @@
 package com.lapissea.cfs.chunk;
 
-import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.io.bit.EnumUniverse;
 import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.objects.ObjectID;
@@ -12,6 +11,7 @@ import com.lapissea.cfs.type.SupportedPrimitive;
 import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.cfs.utils.IterablePP;
 import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.IOException;

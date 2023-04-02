@@ -152,7 +152,7 @@ public final class IOHashSet<T> extends AbstractUnmanagedIOSet<T>{
 			var type        = new TypeLink(IONode.class, genericType);
 			provider.getTypeDb().toID(type);
 			
-			var valueStorage = (ValueStorage<T>)ValueStorage.makeStorage(provider, genericType, getGenerics(), new ValueStorage.StorageRule.Default());
+			var valueStorage = (ValueStorage<T>)ValueStorage.makeStorage(provider, genericType, getGenerics().argAsContext("T"), new ValueStorage.StorageRule.Default());
 			var magnet       = OptionalLong.of(data.getReference().calcGlobalOffset(provider));
 			return IONode.allocValNode(value, null, valueStorage.getSizeDescriptor(), type, provider, magnet);
 		}
@@ -210,6 +210,7 @@ public final class IOHashSet<T> extends AbstractUnmanagedIOSet<T>{
 			}
 		}
 		data.clear();
+		data.addMultipleNew(2);
 		deltaSize(-size());
 	}
 	

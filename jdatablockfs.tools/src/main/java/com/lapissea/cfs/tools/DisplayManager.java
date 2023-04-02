@@ -1,6 +1,6 @@
 package com.lapissea.cfs.tools;
 
-import com.lapissea.cfs.GlobalConfig;
+import com.lapissea.cfs.config.GlobalConfig;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.MemFrame;
 import com.lapissea.cfs.tools.render.G2DBackend;
@@ -47,12 +47,13 @@ public class DisplayManager implements DataLogger{
 	private final RenderBackend          renderer;
 	private final RenderBackend.Buffered gridBuff;
 	
-	private final SessionHost        sessionHost = new SessionHost();
+	private final SessionHost        sessionHost;
 	private final DataRenderer.Split splitRenderer;
 	
 	private boolean titleDirty = true;
 	
-	public DisplayManager(){
+	public DisplayManager(boolean blockLogTillDisplay){
+		sessionHost = new SessionHost(blockLogTillDisplay);
 		
 		renderer = createBackend();
 		gridBuff = renderer.buffer();
@@ -299,6 +300,14 @@ public class DisplayManager implements DataLogger{
 		ImGui.render();
 		
 		renderer.postRender();
+		
+		splitRenderer.getDisplayedSession().ifPresent(ses -> {
+			if(ses.framePos.get() == -1){
+				synchronized(ses.frames){
+					ses.setFrame(ses.frames.size() - 1);
+				}
+			}
+		});
 		
 		if(!lastDownKeys.equals(downKeys)){
 			renderer.markFrameDirty();

@@ -25,7 +25,7 @@ import java.util.OptionalLong;
 import java.util.Set;
 import java.util.function.Predicate;
 
-import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.logging.Log.debug;
 import static com.lapissea.cfs.logging.Log.smallTrace;
 import static com.lapissea.cfs.logging.Log.traceCall;

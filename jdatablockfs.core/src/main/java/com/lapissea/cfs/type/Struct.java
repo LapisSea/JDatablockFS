@@ -1,8 +1,8 @@
 package com.lapissea.cfs.type;
 
-import com.lapissea.cfs.GlobalConfig;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
+import com.lapissea.cfs.config.GlobalConfig;
 import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.exceptions.RecursiveSelfCompilation;
 import com.lapissea.cfs.internal.Access;
@@ -48,8 +48,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static com.lapissea.cfs.GlobalConfig.PRINT_COMPILATION;
 import static com.lapissea.cfs.Utils.getCallee;
+import static com.lapissea.cfs.config.GlobalConfig.PRINT_COMPILATION;
 import static com.lapissea.cfs.type.field.StoragePool.IO;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NOT_NULL;
 import static com.lapissea.util.ConsoleColors.GREEN_BRIGHT;
@@ -819,15 +819,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	public GenericContext describeGenerics(TypeLink def){
-		return new GenericContext.Deferred(() -> {
-			var params = getType().getTypeParameters();
-			//noinspection unchecked
-			var types = (Map.Entry<String, Type>[])new Map.Entry<?, ?>[params.length];
-			for(int i = 0; i<params.length; i++){
-				types[i] = Map.entry(params[i].getName(), def.genericArg(i, null));
-			}
-			return new GenericContext.MapConstant(Map.ofEntries(types));
-		});
+		return new GenericContext.Deferred(() -> new GenericContext.TypeArgs(getType(), def.generic(null)));
 	}
 	
 	@Override

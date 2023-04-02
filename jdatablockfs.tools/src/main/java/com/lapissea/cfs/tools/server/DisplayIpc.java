@@ -2,6 +2,7 @@ package com.lapissea.cfs.tools.server;
 
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.MemFrame;
+import com.lapissea.cfs.tools.logging.MemoryLogConfig;
 import com.lapissea.cfs.utils.ClosableLock;
 import com.lapissea.cfs.utils.ReadWriteClosableLock;
 import com.lapissea.util.UtilL;
@@ -43,11 +44,9 @@ public class DisplayIpc implements DataLogger{
 		
 		private final Session proxy;
 		
-		public IpcSession(Info conn, String name, Map<String, Object> config) throws IOException{
+		public IpcSession(Info conn, String name, MemoryLogConfig config) throws IOException{
 			var socket = sessionConnection(conn, name, config);
 			info(YELLOW_BRIGHT + "Server session({}) established" + RESET, name);
-			
-			boolean threadedOutput = Boolean.parseBoolean(config.getOrDefault("threadedOutput", "false").toString());
 			
 			record Event(boolean compressed, byte[] b, int off, int len){ }
 			
@@ -60,7 +59,7 @@ public class DisplayIpc implements DataLogger{
 			
 			DataLogger.Session proxy;
 			
-			if(!threadedOutput){
+			if(!config.threadedOutput){
 				var sendActionLock = ClosableLock.reentrant();
 				UnsafeBiConsumer<Action, UnsafeConsumer<DataOutputStream, IOException>, IOException> sendAction = (a, data) -> {
 					try(var ignored = sendActionLock.open()){
@@ -346,11 +345,10 @@ public class DisplayIpc implements DataLogger{
 		
 		public record Info(InetAddress addr, int timeout){ }
 		
-		private static Socket sessionConnection(Info con, String sessionName, Map<String, Object> config) throws IOException{
-			int port = ((Number)config.getOrDefault("port", 6666)).intValue();
+		private static Socket sessionConnection(Info con, String sessionName, MemoryLogConfig config) throws IOException{
 			
 			var socketMake = new Socket();
-			socketMake.connect(new InetSocketAddress(con.addr, port), con.timeout);
+			socketMake.connect(new InetSocketAddress(con.addr, config.negotiationPort), con.timeout);
 			
 			int realPort;
 			try(var preSocket = socketMake){
@@ -390,13 +388,13 @@ public class DisplayIpc implements DataLogger{
 	private Function<String, Session> sessionCreator;
 	private boolean                   active = true;
 	
-	private final Map<String, Object>   config;
+	private final MemoryLogConfig       config;
 	private final Map<String, Session>  sessions     = new HashMap<>();
 	private final ReadWriteClosableLock sessionsLock = ReadWriteClosableLock.reentrant();
 	
 	private static final Map<InetAddress, Long> FAILS = new ConcurrentHashMap<>();
 	
-	public DisplayIpc(Map<String, Object> config){
+	public DisplayIpc(MemoryLogConfig config){
 		this.config = config;
 		
 		initSession();
@@ -436,24 +434,19 @@ public class DisplayIpc implements DataLogger{
 				return System.currentTimeMillis();
 			});
 			
-			var type = config.getOrDefault("server-fallback", "local").toString();
 			
-			sessionCreator = switch(type){
-				case "local" -> {
-					if(tryConnect) warn("{}, switching to local server session.", msg);
-					yield getLocalLoggerImpl()::getSession;
-				}
-				case "none" -> {
+			sessionCreator = switch(config.loggerFallbackType){
+				case LOCAL -> getLocalLoggerImpl(true)::getSession;
+				case NONE, SERVER -> {
 					active = false;
-					if(tryConnect) warn("{}, switching to no output.", msg);
-					yield s -> Session.Blank.INSTANCE;
-				}
-				default -> {
-					active = false;
-					if(tryConnect) warn("{}, unknown type \"{}\", defaulting to no output.", msg, type);
 					yield s -> Session.Blank.INSTANCE;
 				}
 			};
+			warn(switch(config.loggerFallbackType){
+				case SERVER -> "{}, Fallback is server. Already tried that...";
+				case LOCAL -> "{}, switching to local server session.";
+				case NONE -> "{}, switching to no output.";
+			}, msg);
 			
 			return sessionCreator.apply(name);
 		};

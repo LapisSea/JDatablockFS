@@ -1,6 +1,5 @@
 package com.lapissea.cfs.type.field;
 
-import com.lapissea.cfs.Index;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.objects.NumberSize;
@@ -9,6 +8,7 @@ import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.SupportedPrimitive;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.compilation.DepSort;
+import com.lapissea.cfs.type.compilation.Index;
 import com.lapissea.cfs.type.field.access.AnnotatedType;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IODependency;

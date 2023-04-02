@@ -15,7 +15,7 @@ import java.util.OptionalInt;
 import java.util.OptionalLong;
 import java.util.stream.IntStream;
 
-import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static java.util.Comparator.comparingInt;
 
 @SuppressWarnings("unused")

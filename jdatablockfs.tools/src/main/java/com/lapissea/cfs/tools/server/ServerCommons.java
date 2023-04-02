@@ -37,8 +37,8 @@ class ServerCommons{
 		PING
 	}
 	
-	static synchronized DataLogger getLocalLoggerImpl(){
-		return new DisplayManager();
+	static synchronized DataLogger getLocalLoggerImpl(boolean blockLogTillDisplay){
+		return new DisplayManager(blockLogTillDisplay);
 	}
 	
 	static byte[] readSafe(DataInputStream in) throws IOException{

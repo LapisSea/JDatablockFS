@@ -1,7 +1,7 @@
 package com.lapissea.cfs.type;
 
-import com.lapissea.cfs.OptionalPP;
 import com.lapissea.cfs.type.field.SizeDescriptor;
+import com.lapissea.cfs.utils.OptionalPP;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Type;

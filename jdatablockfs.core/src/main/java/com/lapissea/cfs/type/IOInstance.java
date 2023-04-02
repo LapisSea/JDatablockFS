@@ -35,7 +35,7 @@ import java.util.function.IntFunction;
 import java.util.function.LongFunction;
 import java.util.stream.Stream;
 
-import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.type.field.StoragePool.INSTANCE;
 
 @SuppressWarnings({"UnusedReturnValue", "unused"})
@@ -327,10 +327,11 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		
 		@Override
 		public void allocateNulls(DataProvider provider) throws IOException{
+			var ctx = this instanceof IOInstance.Unmanaged<?> u? u.getGenerics() : null;
 			for(var ref : getThisStruct().getRealFields().onlyRefs()){
 				if(!ref.isNull(null, self()))
 					continue;
-				ref.allocate(self(), provider, null);
+				ref.allocate(self(), provider, ctx);
 			}
 		}
 		
@@ -468,7 +469,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		public final GenericContext getGenerics(){
 			if(genericCtx == null){
 				genericCtx = getThisStruct().describeGenerics(typeDef);
-			}else if(genericCtx instanceof GenericContext.Deferred d && d.actualData() != null){
+			}else if(genericCtx instanceof GenericContext.Deferred d && d.dataBaked()){
 				genericCtx = d.actualData();
 			}
 			return genericCtx;

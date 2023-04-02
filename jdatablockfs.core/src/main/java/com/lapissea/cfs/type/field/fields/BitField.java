@@ -19,7 +19,7 @@ import com.lapissea.util.NotImplementedException;
 
 import java.io.IOException;
 
-import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 
 public abstract class BitField<T extends IOInstance<T>, Type> extends IOField<T, Type>{
 	

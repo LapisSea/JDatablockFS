@@ -43,8 +43,8 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.stream.Stream;
 
-import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
-import static com.lapissea.cfs.GlobalConfig.TYPE_VALIDATION;
+import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.config.GlobalConfig.TYPE_VALIDATION;
 import static com.lapissea.cfs.type.StagedInit.STATE_DONE;
 import static com.lapissea.cfs.type.StagedInit.runBaseStageTask;
 import static com.lapissea.cfs.type.field.StoragePool.IO;

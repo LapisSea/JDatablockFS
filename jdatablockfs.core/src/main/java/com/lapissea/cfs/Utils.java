@@ -193,10 +193,6 @@ public class Utils{
 		return TextUtil.toShortString(o);
 	}
 	
-	public static Optional<String> optionalProperty(String name){
-		return Optional.ofNullable(System.getProperty(name));
-	}
-	
 	public static void frameToStr(StringBuilder sb, StackWalker.StackFrame frame){
 		frameToStr(sb, frame, true);
 	}

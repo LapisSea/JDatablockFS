@@ -12,7 +12,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import static com.lapissea.cfs.GlobalConfig.BATCH_BYTES;
+import static com.lapissea.cfs.config.GlobalConfig.BATCH_BYTES;
 
 @SuppressWarnings({"PointlessBitwiseExpression", "PointlessArithmeticExpression", "unused"})
 public interface ContentWriter extends AutoCloseable{

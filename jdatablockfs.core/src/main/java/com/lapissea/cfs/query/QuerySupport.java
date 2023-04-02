@@ -1,8 +1,8 @@
 package com.lapissea.cfs.query;
 
-import com.lapissea.cfs.OptionalPP;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.objects.collections.IOIterator;
+import com.lapissea.cfs.utils.OptionalPP;
 import com.lapissea.util.NotImplementedException;
 
 import java.io.IOException;

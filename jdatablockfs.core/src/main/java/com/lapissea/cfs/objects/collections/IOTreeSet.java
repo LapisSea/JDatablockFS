@@ -24,7 +24,7 @@ import java.util.Set;
 import java.util.StringJoiner;
 import java.util.TreeSet;
 
-import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NULLABLE;
 import static java.util.function.Predicate.not;
 

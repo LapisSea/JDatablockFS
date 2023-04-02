@@ -1,9 +1,9 @@
 package com.lapissea.cfs.objects.collections;
 
-import com.lapissea.cfs.IterablePP;
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.objects.Stringify;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.cfs.utils.IterablePP;
 import com.lapissea.util.Nullable;
 
 import java.io.IOException;

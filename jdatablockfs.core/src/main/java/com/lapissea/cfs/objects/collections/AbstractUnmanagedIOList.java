@@ -13,7 +13,7 @@ import java.io.IOException;
 import java.util.Objects;
 import java.util.StringJoiner;
 
-import static com.lapissea.cfs.GlobalConfig.DEBUG_VALIDATION;
+import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 
 public abstract class AbstractUnmanagedIOList<T, SELF extends AbstractUnmanagedIOList<T, SELF>> extends IOInstance.Unmanaged<SELF> implements IOList<T>{
 	
