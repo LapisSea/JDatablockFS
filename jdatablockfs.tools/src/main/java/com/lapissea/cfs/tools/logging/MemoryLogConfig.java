@@ -21,7 +21,7 @@ public final class MemoryLogConfig{
 	public final boolean    threadedOutput;
 	
 	public MemoryLogConfig(Map<String, Object> data){
-		negotiationPort = ConfigUtils.configInt("port", data, 6666);
+		negotiationPort = ConfigUtils.configInt("port", data, 6969);
 		loggerType = ConfigUtils.configEnum("loggerType", data, LoggerType.NONE);
 		loggerFallbackType = ConfigUtils.configEnum("loggerFallback", data, LoggerType.NONE);
 		threadedOutput = ConfigUtils.configBoolean("threadedOutput", data, false);
