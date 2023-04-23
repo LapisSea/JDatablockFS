@@ -255,7 +255,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		var unmanaged    = storage instanceof ValueStorage.UnmanagedInstance<?> u? u : null;
 		
 		
-		//TODO: index hackery may cause problems?
+		//TODO: index and object reusing hackery may cause problems? Investigate when appropriate
 		//if(unmanaged != null){
 		//	return LongStream.range(0, size()).mapToObj(
 		//		index -> {
