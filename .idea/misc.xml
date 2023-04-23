@@ -27,6 +27,7 @@
       <writeAnnotation name="com.lapissea.cfs.type.field.annotations.IOValue" />
     </writeAnnotations>
   </component>
+  <component name="ExternalStorageConfigurationManager" enabled="true" />
   <component name="MavenProjectsManager">
     <option name="originalFiles">
       <list>
