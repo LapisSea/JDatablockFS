@@ -17,13 +17,10 @@ import com.lapissea.cfs.objects.collections.IOTreeSet;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.cfs.type.TypeLink;
-import com.lapissea.cfs.type.field.annotations.IOCompression;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.LogUtil;
-import com.lapissea.util.NanoTimer;
-import com.lapissea.util.UtilL;
+import com.lapissea.util.Rand;
 import com.lapissea.util.function.UnsafeBiConsumer;
-import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.io.DataInputStream;
@@ -41,46 +38,16 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.IntConsumer;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static com.lapissea.cfs.logging.Log.info;
+import static com.lapissea.cfs.run.TestUtils.randomBatch;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.fail;
 
 
 public class SlowTests{
-	
-	private interface Task{
-		void run(Random r, int iter, boolean tick);
-	}
-	
-	private void randomBatch(int totalTasks, Task task){
-		var cores = Runtime.getRuntime().availableProcessors();
-		IntStream.range(0, cores).parallel().map(i -> i*10000).forEach(new IntConsumer(){
-			int index;
-			long lastTime = 0;
-			@Override
-			public void accept(int seed){
-				Random r     = new Random(seed);
-				var    batch = totalTasks/cores;
-				for(int i = 0; i<batch; i++){
-					int     iter;
-					boolean tick = false;
-					synchronized(this){
-						iter = index;
-						index++;
-						if(System.currentTimeMillis() - lastTime>1000){
-							lastTime = System.currentTimeMillis();
-							tick = true;
-						}
-					}
-					task.run(r, iter, tick);
-				}
-			}
-		});
-	}
 	
 	@Test
 	void ioMultiWrite() throws IOException{
@@ -93,7 +60,6 @@ public class SlowTests{
 			Cluster.init(d);
 			baked = d.readAll();
 		}
-		
 		randomBatch(500000, (r, iter, tick) -> {
 			if(tick){
 				info("iteration: {}", iter);
@@ -174,56 +140,6 @@ public class SlowTests{
 			}
 		});
 		
-	}
-	
-	
-	@DataProvider(name = "comps", parallel = true)
-	Object[][] comps(){
-		return Arrays.stream(IOCompression.Type.values()).map(t -> new Object[]{t}).toArray(Object[][]::new);
-	}
-	
-	@Test(dataProvider = "comps")
-	void compressionIntegrity(IOCompression.Type type){
-		NanoTimer t = new NanoTimer.Simple();
-		t.start();
-		randomBatch(20000, (r, iter, tick) -> {
-			if(tick){
-				info("iteration: {}", iter);
-			}
-			
-			try{
-				byte[] raw;
-				if(iter == 0){
-					raw = new byte[10];
-					Arrays.fill(raw, (byte)(1));
-				}else{
-					raw = new byte[r.nextInt(1000)];
-					for(int i = 0; i<raw.length; ){
-						if(r.nextFloat()<0.2){
-							for(int to = Math.min(i + r.nextInt(300) + 1, raw.length); i<to; i++){
-								raw[i] = (byte)r.nextInt(256);
-							}
-						}else{
-							var b = (byte)r.nextInt(256);
-							for(int to = Math.min(i + r.nextInt(200) + 1, raw.length); i<to; i++){
-								raw[i] = b;
-							}
-						}
-					}
-				}
-				
-				byte[] compressed   = type.pack(raw);
-				byte[] uncompressed = type.unpack(compressed);
-				
-				assertEquals(uncompressed, raw, "Failed on " + iter);
-			}catch(AssertionError e){
-				throw e;
-			}catch(Throwable e){
-				throw new RuntimeException(iter + "", e);
-			}
-		});
-		t.end();
-		LogUtil.println("time: ", t.ms());
 	}
 	
 	@Test
@@ -460,7 +376,10 @@ public class SlowTests{
 						var bytes = provider.getSource().readAll();
 						var iter  = i;
 						
-						UtilL.sleepWhile(() -> waitingTasks.get()>1);
+						var t = waitingTasks.get();
+						if(t>4 && Rand.b(0.1F)) LogUtil.println(t);
+
+//						UtilL.sleepWhile(() -> waitingTasks.get()>2);
 						waitingTasks.incrementAndGet();
 						exec.execute(() -> {
 							waitingTasks.decrementAndGet();

@@ -21,6 +21,9 @@ import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Random;
+import java.util.function.IntConsumer;
+import java.util.stream.IntStream;
 
 import static com.lapissea.cfs.logging.Log.trace;
 import static com.lapissea.cfs.logging.Log.warn;
@@ -161,4 +164,34 @@ public class TestUtils{
 		}, true);
 	}
 	
+	
+	public interface Task{
+		void run(Random r, int iter, boolean tick);
+	}
+	
+	public static void randomBatch(int totalTasks, Task task){
+		var cores = Runtime.getRuntime().availableProcessors();
+		IntStream.range(0, cores).parallel().map(i -> i*10000).forEach(new IntConsumer(){
+			int index;
+			long lastTime = 0;
+			@Override
+			public void accept(int seed){
+				Random r     = new Random(seed);
+				var    batch = totalTasks/cores;
+				for(int i = 0; i<batch; i++){
+					int     iter;
+					boolean tick = false;
+					synchronized(this){
+						iter = index;
+						index++;
+						if(System.currentTimeMillis() - lastTime>1000){
+							lastTime = System.currentTimeMillis();
+							tick = true;
+						}
+					}
+					task.run(r, iter, tick);
+				}
+			}
+		});
+	}
 }
