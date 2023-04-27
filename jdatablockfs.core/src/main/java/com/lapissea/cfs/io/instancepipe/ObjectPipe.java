@@ -15,7 +15,6 @@ public interface ObjectPipe<T, PoolType>{
 	
 	void write(DataProvider provider, ContentWriter dest, T instance) throws IOException;
 	void skip(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException;
-	T read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException;
 	T readNew(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException;
 	BasicSizeDescriptor<T, PoolType> getSizeDescriptor();
 	PoolType makeIOPool();
@@ -43,18 +42,6 @@ public interface ObjectPipe<T, PoolType>{
 	default T readNew(DataProvider provider, RandomIO.Creator src, GenericContext genericContext) throws IOException{
 		try(var io = src.io()){
 			return readNew(provider, io, genericContext);
-		}
-	}
-	
-	
-	default <Prov extends DataProvider.Holder & RandomIO.Creator> T read(Prov src, T instance, GenericContext genericContext) throws IOException{
-		try(var io = src.io()){
-			return read(src.getDataProvider(), io, instance, genericContext);
-		}
-	}
-	default T read(DataProvider provider, RandomIO.Creator src, T instance, GenericContext genericContext) throws IOException{
-		try(var io = src.io()){
-			return read(provider, io, instance, genericContext);
 		}
 	}
 	

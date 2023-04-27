@@ -47,10 +47,6 @@ public class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, ValueT
 			throw NotImplementedException.infer();//TODO: implement .skip()
 		}
 		@Override
-		public ValueType read(DataProvider provider, ContentReader src, ValueType instance, GenericContext genericContext) throws IOException{
-			throw NotImplementedException.infer();//TODO: implement .read()
-		}
-		@Override
 		public ValueType readNew(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
 			throw NotImplementedException.infer();//TODO: implement .readNew()
 		}

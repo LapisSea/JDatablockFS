@@ -219,9 +219,9 @@ public final class Reference extends IOInstance.Managed<Reference>{
 			return pipe.readNew(provider, io, genericContext);
 		}
 	}
-	public <T> T read(DataProvider provider, ObjectPipe<T, ?> pipe, T instance, GenericContext genericContext) throws IOException{
+	public <T> T read(DataProvider provider, ObjectPipe<T, ?> pipe, GenericContext genericContext) throws IOException{
 		try(var io = io(provider)){
-			return pipe.read(provider, io, instance, genericContext);
+			return pipe.readNew(provider, io, genericContext);
 		}
 	}
 	

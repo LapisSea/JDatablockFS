@@ -164,11 +164,7 @@ public class InstanceCollection{
 					var size = readSiz(src);
 					dataAdapter.skipData(size, provider, src, genericContext);
 				}
-				@Override
-				public CollectionType read(DataProvider provider, ContentReader src, CollectionType instance, GenericContext genericContext) throws IOException{
-					int size = readSiz(src);
-					return dataAdapter.readData(size, provider, src, genericContext);
-				}
+				
 				private int readSiz(ContentReader src) throws IOException{
 					var sizSiz = FlagReader.readSingle(src, NumberSize.FLAG_INFO);
 					return (int)sizSiz.read(src);
@@ -263,7 +259,7 @@ public class InstanceCollection{
 				}
 			}
 			
-			set(ioPool, instance, ref.read(provider, refPipe, null, genericContext));
+			set(ioPool, instance, ref.read(provider, refPipe, genericContext));
 		}
 		
 		@Override

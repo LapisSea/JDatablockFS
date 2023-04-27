@@ -359,9 +359,7 @@ public abstract class DynamicSupport{
 	}
 	private static <T extends IOInstance<T>> T readStruct(DataProvider provider, ContentReader src, GenericContext genericContext, Struct<T> struct) throws IOException{
 		var pipe = StandardStructPipe.of(struct);
-		var inst = struct.make();
-		pipe.read(provider, src, inst, genericContext);
-		return inst;
+		return pipe.readNew(provider, src, genericContext);
 	}
 	private static void skipStruct(DataProvider provider, ContentReader src, GenericContext genericContext, Struct<?> struct) throws IOException{
 		var pipe = StandardStructPipe.of(struct);

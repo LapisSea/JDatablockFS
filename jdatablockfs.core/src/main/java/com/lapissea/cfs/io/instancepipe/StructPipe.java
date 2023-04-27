@@ -586,7 +586,6 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		return doRead(makeIOPool(), provider, src, instance, genericContext);
 	}
 	
-	@Override
 	public final T read(DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
 		return doRead(makeIOPool(), provider, src, instance, genericContext);
 	}

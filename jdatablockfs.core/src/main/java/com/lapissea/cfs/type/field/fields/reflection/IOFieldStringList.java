@@ -52,10 +52,8 @@ public class IOFieldStringList<T extends IOInstance<T>> extends IOField<T, List<
 		
 		var arr = new ArrayList<String>(size);
 		
-		var text = new AutoText();
 		for(int i = 0; i<size; i++){
-			AutoText.PIPE.read(provider, src, text, null);
-			arr.add(i, text.getData());
+			arr.add(i, AutoText.PIPE.readNew(provider, src, null).getData());
 		}
 		
 		set(ioPool, instance, arr);

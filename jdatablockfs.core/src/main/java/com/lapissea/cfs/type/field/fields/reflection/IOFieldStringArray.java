@@ -53,10 +53,8 @@ public class IOFieldStringArray<T extends IOInstance<T>> extends IOField<T, Stri
 		
 		var arr = new String[size];
 		
-		var text = new AutoText();
 		for(int i = 0; i<arr.length; i++){
-			AutoText.PIPE.read(provider, src, text, null);
-			arr[i] = text.getData();
+			arr[i] = AutoText.PIPE.readNew(provider, src, null).getData();
 		}
 		
 		set(ioPool, instance, arr);
