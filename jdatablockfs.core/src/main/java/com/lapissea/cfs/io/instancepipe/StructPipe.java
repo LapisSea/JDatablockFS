@@ -9,6 +9,7 @@ import com.lapissea.cfs.exceptions.MalformedPipe;
 import com.lapissea.cfs.exceptions.RecursiveSelfCompilation;
 import com.lapissea.cfs.internal.Access;
 import com.lapissea.cfs.io.RandomIO;
+import com.lapissea.cfs.io.bit.BitUtils;
 import com.lapissea.cfs.io.content.ContentOutputBuilder;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
@@ -463,7 +464,10 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			var fixed = d.getFixed(wordSpace);
 			if(fixed.isPresent()){
 				var siz = fixed.getAsLong();
-				return clampMinBit(wordSpace, siz);
+				return switch(wordSpace){
+					case BIT -> BitUtils.bitsToBytes(siz)*Byte.SIZE;
+					case BYTE -> siz;
+				};
 			}
 			return 0;
 		});
@@ -549,11 +553,6 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			
 			return knownFixed + unkownSum;
 		});
-	}
-	
-	private long clampMinBit(WordSpace wordSpace, long siz){
-		var bytes = WordSpace.mapSize(wordSpace, WordSpace.BYTE, siz);
-		return WordSpace.mapSize(WordSpace.BYTE, wordSpace, bytes);
 	}
 	
 	private void checkNull(T inst){

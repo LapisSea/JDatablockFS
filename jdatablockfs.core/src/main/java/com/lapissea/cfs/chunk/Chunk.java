@@ -1,6 +1,5 @@
 package com.lapissea.cfs.chunk;
 
-import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.config.ConfigDefs;
 import com.lapissea.cfs.exceptions.CacheOutOfSync;
 import com.lapissea.cfs.exceptions.MalformedPointer;
@@ -216,7 +215,7 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 		if(PIPE.getSpecificFields().get(0) instanceof BitFieldMerger<?> bf){
 			var layout = bf.getSafetyBits().orElseThrow();
 			
-			CHECK_BYTE_OFF = (int)(Utils.bitToByte(layout.usedBits()) - 1);
+			CHECK_BYTE_OFF = (int)(BitUtils.bitsToBytes(layout.usedBits()) - 1);
 			
 			int offset = (int)(layout.usedBits() - CHECK_BYTE_OFF*Byte.SIZE);
 			CHECK_BIT_MASK = (byte)(BitUtils.makeMask(layout.safetyBits())<<offset);

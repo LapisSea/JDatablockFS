@@ -1,6 +1,6 @@
 package com.lapissea.cfs.type;
 
-import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.io.bit.BitUtils;
 
 import java.util.Arrays;
 
@@ -12,7 +12,7 @@ public enum WordSpace{
 		return switch(sourceSpace){
 			case BIT -> switch(targetSpace){
 				case BIT -> val;
-				case BYTE -> Utils.bitToByte(val);
+				case BYTE -> BitUtils.bitsToBytes(val);
 			};
 			case BYTE -> switch(targetSpace){
 				case BIT -> val*Byte.SIZE;

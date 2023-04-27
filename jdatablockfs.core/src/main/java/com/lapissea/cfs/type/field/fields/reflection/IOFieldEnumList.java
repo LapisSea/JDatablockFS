@@ -1,9 +1,9 @@
 package com.lapissea.cfs.type.field.fields.reflection;
 
-import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.bit.BitInputStream;
 import com.lapissea.cfs.io.bit.BitOutputStream;
+import com.lapissea.cfs.io.bit.BitUtils;
 import com.lapissea.cfs.io.bit.EnumUniverse;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
@@ -69,6 +69,6 @@ public class IOFieldEnumList<T extends IOInstance<T>, E extends Enum<E>> extends
 	}
 	
 	private int byteCount(int len){
-		return Utils.bitToByte(universe.bitSize*len);
+		return BitUtils.bitsToBytes(universe.bitSize*len);
 	}
 }

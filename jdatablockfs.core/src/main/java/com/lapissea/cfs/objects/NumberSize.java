@@ -1,6 +1,5 @@
 package com.lapissea.cfs.objects;
 
-import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.OutOfBitDepth;
 import com.lapissea.cfs.io.bit.BitUtils;
 import com.lapissea.cfs.io.bit.EnumUniverse;
@@ -83,7 +82,7 @@ public enum NumberSize{
 	}
 	
 	public static NumberSize byBits(int bits){
-		return byBytes(Utils.bitToByte(bits));
+		return byBytes(BitUtils.bitsToBytes(bits));
 	}
 	
 	public static NumberSize byBytes(int bytes){

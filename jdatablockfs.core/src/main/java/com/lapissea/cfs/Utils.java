@@ -1,5 +1,6 @@
 package com.lapissea.cfs;
 
+import com.lapissea.cfs.io.bit.BitUtils;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.objects.Stringify;
 import com.lapissea.cfs.objects.collections.IOIterator;
@@ -57,14 +58,8 @@ public class Utils{
 		}
 	}
 	
-	public static int bitToByte(int bits){
-		return (int)Math.ceil(bits/(double)Byte.SIZE);
-	}
-	public static long bitToByte(long bits){
-		return (long)Math.ceil(bits/(double)Byte.SIZE);
-	}
 	public static OptionalLong bitToByte(OptionalLong bits){
-		return bits.isPresent()? OptionalLong.of(bitToByte(bits.getAsLong())) : bits;
+		return bits.isPresent()? OptionalLong.of(BitUtils.bitsToBytes(bits.getAsLong())) : bits;
 	}
 	
 	public static OptionalLong addIfBoth(OptionalLong a, OptionalLong b){

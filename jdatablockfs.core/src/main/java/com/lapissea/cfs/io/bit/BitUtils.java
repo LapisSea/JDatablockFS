@@ -33,16 +33,12 @@ public class BitUtils{
 		return (1L<<size) - 1L;
 	}
 	
-	public static int ceilDiv(int dividend, int divisor){
-		return (int)Math.ceil(dividend/(double)divisor);
-	}
-	
-	public static long ceilDiv(long dividend, long divisor){
-		return (long)Math.ceil(dividend/(double)divisor);
-	}
-	
 	public static int bitsToBytes(int bits){
-		return ceilDiv(bits, Byte.SIZE);
+		return Math.ceilDiv(bits, Byte.SIZE);
+	}
+	
+	public static long bitsToBytes(long bits){
+		return Math.ceilDiv(bits, Byte.SIZE);
 	}
 	
 	public static String toBinStr(byte[] bb){

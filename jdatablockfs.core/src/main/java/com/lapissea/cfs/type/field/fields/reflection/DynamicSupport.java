@@ -1,9 +1,9 @@
 package com.lapissea.cfs.type.field.fields.reflection;
 
-import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.bit.BitInputStream;
 import com.lapissea.cfs.io.bit.BitOutputStream;
+import com.lapissea.cfs.io.bit.BitUtils;
 import com.lapissea.cfs.io.bit.EnumUniverse;
 import com.lapissea.cfs.io.bit.FlagReader;
 import com.lapissea.cfs.io.bit.FlagWriter;
@@ -60,7 +60,7 @@ public abstract class DynamicSupport{
 					yield StandardStructPipe.sizeOfUnknown(prov, inst, WordSpace.BYTE);
 				}
 			}
-			case Enum<?> e -> Utils.bitToByte(EnumUniverse.of(e.getClass()).bitSize);
+			case Enum<?> e -> BitUtils.bitsToBytes(EnumUniverse.of(e.getClass()).bitSize);
 			default -> {
 				var type = val.getClass();
 				if(type.isArray()){
@@ -71,7 +71,7 @@ public abstract class DynamicSupport{
 					
 					var psiz = SupportedPrimitive.get(e).map(pTyp -> (switch(pTyp){
 						case DOUBLE, FLOAT -> pTyp.maxSize.get();
-						case BOOLEAN -> Utils.bitToByte(len);
+						case BOOLEAN -> BitUtils.bitsToBytes(len);
 						case LONG -> NumberSize.bySize(LongStream.of((long[])val).max().orElse(0)).bytes;
 						case INT -> NumberSize.bySize(IntStream.of((int[])val).max().orElse(0)).bytes;
 						case SHORT, CHAR -> 2;

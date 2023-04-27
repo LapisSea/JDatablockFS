@@ -5,6 +5,7 @@ import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.FieldIsNull;
 import com.lapissea.cfs.io.bit.BitInputStream;
 import com.lapissea.cfs.io.bit.BitOutputStream;
+import com.lapissea.cfs.io.bit.BitUtils;
 import com.lapissea.cfs.io.bit.FlagReader;
 import com.lapissea.cfs.io.bit.FlagWriter;
 import com.lapissea.cfs.io.content.ContentReader;
@@ -172,7 +173,7 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 		if(oBits.isPresent()){
 			var bits = oBits.getAsLong();
 			if(bits>=63) break simple;
-			var bytes   = Utils.bitToByte((int)bits);
+			var bytes   = BitUtils.bitsToBytes((int)bits);
 			var numSize = NumberSize.byBytes(bytes);
 			if(numSize.bytes != bytes) break simple;
 			
@@ -183,7 +184,7 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 	
 	public record BitLayout(long usedBits, int safetyBits){
 		BitLayout(long bits){
-			this(bits, (int)(Utils.bitToByte(bits)*8 - bits));
+			this(bits, (int)(BitUtils.bitsToBytes(bits)*8 - bits));
 		}
 		@Override
 		public String toString(){
@@ -211,7 +212,7 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 			initSizeDescriptor(SizeDescriptor.Unknown.of(
 				IOFieldTools.sumVars(group, SizeDescriptor::getMin),
 				IOFieldTools.sumVarsIfAll(group, SizeDescriptor::getMax),
-				(ioPool, prov, inst) -> Utils.bitToByte(IOFieldTools.sumVars(group, s -> s.calcUnknown(ioPool, prov, inst, WordSpace.BIT)))
+				(ioPool, prov, inst) -> BitUtils.bitsToBytes(IOFieldTools.sumVars(group, s -> s.calcUnknown(ioPool, prov, inst, WordSpace.BIT)))
 			));
 		}
 		initLateData(-1, FieldSet.of(group.stream().flatMap(IOField::dependencyStream)));

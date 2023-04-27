@@ -1,6 +1,5 @@
 package com.lapissea.cfs.io.bit;
 
-import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.IllegalBitValue;
 import com.lapissea.cfs.io.content.ContentReader;
 
@@ -35,7 +34,7 @@ public class BitInputStream implements BitReader, AutoCloseable{
 				if(remainingExpected>0){
 					var alreadyBuffered = bitsToBytes(bufferedBits);
 					var maxToRead       = 8 - alreadyBuffered;
-					var expectedBytes   = Utils.bitToByte(remainingExpected);
+					var expectedBytes   = bitsToBytes(remainingExpected);
 					bytesToRead = Math.min(Math.max(bytesToRead, expectedBytes), maxToRead);
 				}
 			}
