@@ -144,10 +144,4 @@ public class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseFixedSt
 		readIOFields(getSpecificFields(), ioPool, provider, src, instance, genericContext);
 		return instance;
 	}
-	
-	@Override
-	public void skip(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
-		T instance = getType().make();
-		read(provider, src, instance, genericContext);
-	}
 }

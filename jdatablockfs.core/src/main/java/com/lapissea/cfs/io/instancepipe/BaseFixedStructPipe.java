@@ -1,10 +1,13 @@
 package com.lapissea.cfs.io.instancepipe;
 
+import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.FixedFormatNotSupported;
 import com.lapissea.cfs.exceptions.IllegalField;
 import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.exceptions.UnsupportedStructLayout;
+import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.objects.NumberSize;
+import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.WordSpace;
@@ -13,6 +16,7 @@ import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 
+import java.io.IOException;
 import java.util.AbstractMap;
 import java.util.List;
 import java.util.Map;
@@ -79,5 +83,10 @@ public abstract class BaseFixedStructPipe<T extends IOInstance<T>> extends Struc
 	
 	public <E extends IOInstance<E>> SizeDescriptor.Fixed<E> getFixedDescriptor(){
 		return (SizeDescriptor.Fixed<E>)super.getSizeDescriptor();
+	}
+	
+	@Override
+	public void skip(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
+		src.skipExact(getFixedDescriptor().get());
 	}
 }

@@ -90,9 +90,4 @@ public class FixedStructPipe<T extends IOInstance<T>> extends BaseFixedStructPip
 		readIOFields(getSpecificFields(), ioPool, provider, src, instance, genericContext);
 		return instance;
 	}
-	
-	@Override
-	public void skip(DataProvider provider, ContentReader src, GenericContext genericContext) throws IOException{
-		src.skipExact(getFixedDescriptor().get());
-	}
 }
