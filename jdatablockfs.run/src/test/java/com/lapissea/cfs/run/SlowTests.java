@@ -18,9 +18,8 @@ import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.util.LateInit;
-import com.lapissea.util.LogUtil;
-import com.lapissea.util.Rand;
 import com.lapissea.util.function.UnsafeBiConsumer;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import java.io.DataInputStream;
@@ -36,8 +35,6 @@ import java.util.Arrays;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Random;
-import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -343,80 +340,61 @@ public class SlowTests{
 			provider.scanGarbage(DefragmentManager.FreeFoundAction.ERROR);
 		});
 	}
-	interface SetIter<T>{
-		void accept(int iter, Random rand, IOSet<T> u) throws IOException;
-	}
-	void checkSetIter(int iterations, @SuppressWarnings("rawtypes") Class<? extends IOSet> type, SetIter<Integer> session) throws IOException{
-		checkSet(type, (provider, set) -> {
-			var                waitingTasks = new AtomicInteger();
-			RuntimeException[] err          = {null};
-			try(var exec = Executors.newWorkStealingPool()){
-				
-				var r = new Random(69);
-				for(int i = 0; i<iterations; i++){
-					if(err[0] != null) throw err[0];
-					try{
-						if((i - 1)%(iterations/100) == 0) LogUtil.println((i - 1)/((double)iterations));
-						
-						if(r.nextInt(1000) == 1){
-							var oldSet = set;
-							set = provider.getRootProvider().request("hi", type, Integer.class);
-							if(!set.equals(oldSet)){
-								throw new IllegalStateException(
-									"\n" +
-									set + "\n" +
-									oldSet
-								);
-							}
-							set = new CheckSet<>(set);
-						}
-						
-						session.accept(i, r, set);
-						
-						var bytes = provider.getSource().readAll();
-						var iter  = i;
-						
-						var t = waitingTasks.get();
-						if(t>4 && Rand.b(0.1F)) LogUtil.println(t);
-
-//						UtilL.sleepWhile(() -> waitingTasks.get()>2);
-						waitingTasks.incrementAndGet();
-						exec.execute(() -> {
-							waitingTasks.decrementAndGet();
-							try{
-								var c = new Cluster(MemoryData.viewOf(bytes));
-								c.scanGarbage(DefragmentManager.FreeFoundAction.ERROR);
-							}catch(Throwable e){
-								synchronized(err){
-									if(err[0] == null){
-										err[0] = new RuntimeException("There was garbage on iteration: " + iter, e);
-									}
-								}
-							}
-						});
-					}catch(Throwable e){
-						throw new RuntimeException(i + "", e);
-					}
+	
+	void runSetFuzz(int iterations, @SuppressWarnings("rawtypes") Class<? extends IOSet> type){
+		
+		record State(Cluster cluster, IOSet<Integer> set){ }
+		enum Type{
+			ADD, REMOVE, CONTAINS, CLEAR
+		}
+		record Action(Type type, int num){
+			@Override
+			public String toString(){ return type == Type.CLEAR? type.toString() : type + "-" + num; }
+		}
+		var allTypes = Arrays.stream(Type.values()).filter(t -> t != Type.CLEAR).toArray(Type[]::new);
+		
+		var runner = new FuzzingRunner<State, Action, IOException>(new FuzzingRunner.StateEnv<>(){
+			@Override
+			public boolean shouldRun(FuzzingRunner.SequenceSrc sequence){
+				return true;
+			}
+			@Override
+			public State create(Random random) throws IOException{
+				var cluster = Cluster.emptyMem();
+				return new State(cluster, cluster.getRootProvider().request("hi", type, Integer.class));
+			}
+			@Override
+			public void applyAction(State state, long id, Action action) throws IOException{
+				switch(action.type){
+					case ADD -> state.set.add(action.num);
+					case REMOVE -> state.set.remove(action.num);
+					case CONTAINS -> state.set.contains(action.num);
+					case CLEAR -> state.set.clear();
+				}
+				if(List.of(Type.REMOVE, Type.CLEAR).contains(action.type)){
+					state.cluster.scanGarbage(DefragmentManager.FreeFoundAction.ERROR);
 				}
 			}
-			if(err[0] != null) throw err[0];
+		}, rand -> {
+			if(rand.nextInt(1000) == 1){
+				return new Action(Type.CLEAR, -1);
+			}
+			return new Action(
+				allTypes[rand.nextInt(allTypes.length)],
+				rand.nextInt(200)
+			);
 		});
+		
+		var fails = runner.run(69_420, iterations, 5000);
+		
+		if(!fails.isEmpty()){
+			Assert.fail(FuzzingRunner.Fail.report(fails));
+		}
 	}
 	
 	@Test
-	void fuzzIOSet() throws IOException{
-		checkSetIter(100000, IOHashSet.class, (i, r, set) -> {
-			if(r.nextInt(1000) == 1){
-				set.clear();
-			}
-			
-			Integer num = r.nextInt(400);
-			switch(r.nextInt(3)){
-				case 0 -> set.add(num);
-				case 1 -> set.remove(num);
-				case 2 -> set.contains(num);
-			}
-		});
+	void fuzzIOSet(){
+		runSetFuzz(100000, IOHashSet.class);
 	}
 	
 	@Test
@@ -435,20 +413,8 @@ public class SlowTests{
 	}
 	
 	@Test(dependsOnMethods = "simpleTreeSet")
-	void fuzzTreeSet() throws IOException{
-		checkSetIter(200000, IOTreeSet.class, (i, r, set) -> {
-			Integer num = r.nextInt(200);
-			
-			if(r.nextInt(1000) == 1){
-				set.clear();
-			}
-			
-			switch(r.nextInt(3)){
-				case 0 -> set.add(num);
-				case 1 -> set.remove(num);
-				case 2 -> set.contains(num);
-			}
-		});
+	void fuzzTreeSet(){
+		runSetFuzz(200000, IOTreeSet.class);
 	}
 	
 }
