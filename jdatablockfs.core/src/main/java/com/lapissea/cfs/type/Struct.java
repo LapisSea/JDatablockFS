@@ -206,7 +206,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	
 	private static final ReadWriteClosableLock STRUCT_CACHE_LOCK = ReadWriteClosableLock.reentrant();
 	
-	private static final Map<Class<?>, Struct<?>>  STRUCT_CACHE      = new WeakValueHashMap<>();
+	private static final Map<Class<?>, Struct<?>>  STRUCT_CACHE      = new WeakValueHashMap<Class<?>, Struct<?>>().defineStayAlivePolicy(Log.TRACE? 5 : 0);
 	private static final Map<Class<?>, WaitHolder> NON_CONCRETE_WAIT = new HashMap<>();
 	private static final Map<Class<?>, Thread>     STRUCT_THREAD_LOG = new HashMap<>();
 	

@@ -6,7 +6,6 @@ import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.IOTransaction;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.content.ContentWriter;
-import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Stringify;
 import com.lapissea.cfs.type.IOInstance;
@@ -55,7 +54,7 @@ public final class VaryingSize implements Stringify{
 						tooSmallIdMap.put(varying, num);
 					});
 				}catch(MalformedPointer badPtr){
-					Log.trace("Suppressed due to fake data: {}", badPtr);
+					//Log.trace("Suppressed due to fake data: {} {}", badPtr, tooSmallIdMap);
 				}
 			}
 		}catch(IOException e){
