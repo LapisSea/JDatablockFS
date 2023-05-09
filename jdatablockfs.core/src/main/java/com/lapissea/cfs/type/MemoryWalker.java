@@ -182,12 +182,11 @@ public class MemoryWalker{
 						
 						if(nextField){
 							field = iterator.next();
+							
+							if(skipBits>0) skipBits >>>= 1;
+							boolean skipBit = (skipBits&1) == 1;
+							if(skipBit) continue wh;
 						}
-						nextField = true;
-						
-						if(skipBits>0) skipBits >>>= 1;
-						boolean skipBit = (skipBits&1) == 1;
-						if(skipBit) continue wh;
 						
 						//repeat cmd cases
 						if(cmd == SKIPF_IF_NULL){
