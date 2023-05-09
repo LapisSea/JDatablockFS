@@ -16,20 +16,31 @@ public abstract class ContentOutputStream extends OutputStream implements Conten
 		public BA(byte[] ba){ this.ba = ba; }
 		
 		@Override
-		public void write(int b) throws IOException{
+		public void write(int b){
 			ba[pos] = (byte)b;
 			pos++;
 		}
 		
 		@Override
-		public void write(@NotNull byte[] b, int off, int len) throws IOException{
+		public void write(@NotNull byte[] b, int off, int len){
 			System.arraycopy(b, off, ba, pos, len);
 			pos += len;
 		}
+		
 		@Override
-		public void writeWord(long v, int len) throws IOException{
+		public void write(byte[] b){
+			write(b, 0, b.length);
+		}
+		
+		@Override
+		public void writeWord(long v, int len){
 			MemPrimitive.setWord(v, ba, pos, len);
 			pos += len;
+		}
+		
+		@Override
+		public void writeBoolean(boolean v){
+			write(v? 1 : 0);
 		}
 		
 		public void reset(){
@@ -39,6 +50,10 @@ public abstract class ContentOutputStream extends OutputStream implements Conten
 		@Override
 		public String toString(){
 			return this.getClass().getSimpleName() + "{" + pos + "/" + ba.length + "}";
+		}
+		
+		public int size(){
+			return pos;
 		}
 	}
 	
@@ -50,13 +65,17 @@ public abstract class ContentOutputStream extends OutputStream implements Conten
 		}
 		
 		@Override
-		public void write(int b) throws IOException{
+		public void write(int b){
 			bb.put((byte)b);
 		}
 		
 		@Override
-		public void write(@NotNull byte[] b, int off, int len) throws IOException{
+		public void write(@NotNull byte[] b, int off, int len){
 			bb.put(b, off, len);
+		}
+		@Override
+		public void write(byte[] b){
+			write(b, 0, b.length);
 		}
 		
 		@Override
