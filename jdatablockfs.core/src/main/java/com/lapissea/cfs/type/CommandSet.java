@@ -21,7 +21,7 @@ public final class CommandSet{
 		
 		private record Skip(byte cmd, long bytes, int fields) implements Cmd{
 			public Skip{
-				if(cmd != SKIPB_UNKOWN){
+				if(cmd != SKIPB_UNKNOWN){
 					var max = switch(cmd){
 						case SKIPB_B -> 255;
 						case SKIPB_I -> Integer.MAX_VALUE;
@@ -38,7 +38,7 @@ public final class CommandSet{
 				dest.write(cmd);
 				dest.write(fields - 1);
 				switch(cmd){
-					case SKIPB_UNKOWN -> { }
+					case SKIPB_UNKNOWN -> { }
 					case SKIPB_B -> dest.write((int)bytes);
 					case SKIPB_I -> {
 						byte[] bb = new byte[4];
@@ -129,7 +129,7 @@ public final class CommandSet{
 		}
 		
 		public void skipBytesUnknown(){
-			addOptional(new Skip(SKIPB_UNKOWN, -1, 1));
+			addOptional(new Skip(SKIPB_UNKNOWN, -1, 1));
 		}
 		
 		public void skipField(IOField<?, ?> field){
@@ -185,7 +185,7 @@ public final class CommandSet{
 			
 			if(lastIndex>=0 &&
 			   optionals.get(lastIndex) instanceof Skip s1 && cmd instanceof Skip s2 &&
-			   s1.cmd != SKIPB_UNKOWN && s2.cmd != SKIPB_UNKOWN &&
+			   s1.cmd != SKIPB_UNKNOWN && s2.cmd != SKIPB_UNKNOWN &&
 			   (fields = s1.fields + s2.fields)<=255 &&
 			   (bigSum = BigInteger.valueOf(s1.bytes).add(BigInteger.valueOf(s2.bytes))).compareTo(BigInteger.valueOf(Long.MAX_VALUE))<=0
 			){
@@ -334,7 +334,7 @@ public final class CommandSet{
 					case SKIPB_B -> props("SKIPB_B", read8(), "jump", read8(), "byte");
 					case SKIPB_I -> props("SKIPB_I", read8(), "jump", read32(), "byte");
 					case SKIPB_L -> props("SKIPB_L", read8(), "jump", read64(), "byte");
-					case SKIPB_UNKOWN -> props("SKIPB_UNKOWN", read8(), "field");
+					case SKIPB_UNKNOWN -> props("SKIPB_UNKNOWN", read8(), "field");
 					case SKIPF_IF_NULL -> "SKIPF_IF_NULL(" + read8() + " offset)";
 					case POTENTIAL_REF -> obj("POTENTIAL_REF");
 					case DYNAMIC -> obj("DYNAMIC");
@@ -379,7 +379,7 @@ public final class CommandSet{
 	public static final byte SKIPB_B        = 100 + 2;
 	public static final byte SKIPB_I        = 100 + 3;
 	public static final byte SKIPB_L        = 100 + 4;
-	public static final byte SKIPB_UNKOWN   = 100 + 5;
+	public static final byte SKIPB_UNKNOWN  = 100 + 5;
 	public static final byte SKIPF_IF_NULL  = 100 + 6;
 	public static final byte POTENTIAL_REF  = 100 + 7;
 	public static final byte DYNAMIC        = 100 + 8;

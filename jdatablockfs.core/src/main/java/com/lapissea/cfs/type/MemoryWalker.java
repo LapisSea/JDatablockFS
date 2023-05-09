@@ -211,7 +211,7 @@ public class MemoryWalker{
 							fieldOffset += knownSizeSkip(iterator, cmds, cmd);
 							continue;
 						}
-						case SKIPB_UNKOWN -> {
+						case SKIPB_UNKNOWN -> {
 							fieldOffset += unknownSizeSkip(iterator, cmds, instance, ioPool, field);
 							continue;
 						}
