@@ -52,7 +52,6 @@ public final class CommandSet{
 					}
 					default -> throw new IllegalStateException("Unexpected value: " + cmd);
 				}
-				
 			}
 		}
 		
@@ -63,7 +62,7 @@ public final class CommandSet{
 					DYNAMIC,
 					CHPTR,
 					REF_FIELD
-				).contains(cmd)) throw new IllegalArgumentException(cmd + "");
+				).contains(cmd)) throw new IllegalArgumentException(String.valueOf(cmd));
 			}
 			@Override
 			public void push(ContentOutputBuilder dest){
@@ -308,37 +307,84 @@ public final class CommandSet{
 		
 		@Override
 		public String toString(){
-			var res = new StringJoiner(", ", "CmdReader{", "}");
-			if(pos>=code.length) return res.add("END").toString();
-			var cmd = code[pos];
-			return res.add("Next: " + switch(cmd){
-				case ENDF -> "ENDF";
-				case UNMANAGED_REST -> "UNMANAGED_REST";
-				case SKIPB_B -> "SKIPB_B";
-				case SKIPB_I -> "SKIPB_I";
-				case SKIPB_L -> "SKIPB_L";
-				case SKIPB_UNKOWN -> "SKIPB_UNKOWN";
-				case SKIPF_IF_NULL -> "SKIPF_IF_NULL";
-				case POTENTIAL_REF -> "POTENTIAL_REF";
-				case DYNAMIC -> "DYNAMIC";
-				case CHPTR -> "CHPTR";
-				case REF_FIELD -> "REF_FIELD";
-				default -> "?? " + cmd;
-			}).toString();
+			if(pos>=code.length) return "CmdReader{}";
+			
+			var    reader = new BakedCmdReader(code);
+			String result;
+			int    rPos;
+			do{
+				rPos = reader.pos;
+				result = reader.readCmdStr();
+				if(result == null){
+					result = "<Error>";
+					break;
+				}
+			}while(reader.pos<=pos);
+			
+			return "CmdReader{" + (rPos == pos? "next" : "current") + ": " + result + "}";
 		}
+		
+		private String readCmdStr(){
+			var oldPos = pos;
+			try{
+				var cmd = cmd();
+				return switch(cmd){
+					case ENDF -> "ENDF";
+					case UNMANAGED_REST -> "UNMANAGED_REST";
+					case SKIPB_B -> props("SKIPB_B", read8(), "jump", read8(), "byte");
+					case SKIPB_I -> props("SKIPB_I", read8(), "jump", read32(), "byte");
+					case SKIPB_L -> props("SKIPB_L", read8(), "jump", read64(), "byte");
+					case SKIPB_UNKOWN -> props("SKIPB_UNKOWN", read8(), "field");
+					case SKIPF_IF_NULL -> "SKIPF_IF_NULL(" + read8() + " offset)";
+					case POTENTIAL_REF -> obj("POTENTIAL_REF");
+					case DYNAMIC -> obj("DYNAMIC");
+					case CHPTR -> obj("CHPTR");
+					case REF_FIELD -> obj("REF_FIELD");
+					default -> throw new IllegalStateException("Unexpected value: " + cmd);
+				};
+			}catch(Throwable e){
+				pos = oldPos;
+				return null;
+			}
+		}
+		
+		private static String props(String name, Object... props){
+			StringBuilder b = new StringBuilder();
+			b.append(name);
+			boolean any = false;
+			for(int i = 0; i<props.length; i += 2){
+				long val = ((Number)props[i]).longValue();
+				if(val == 0) continue;
+				if(!any){
+					any = true;
+					b.append('(');
+				}else b.append(", ");
+				b.append(val).append(' ').append(TextUtil.plural((String)props[i + 1], (int)Math.min(100, val)));
+			}
+			if(any) b.append(')');
+			return b.toString();
+		}
+		private static String iprop(long val, String name){
+			return val == 0? name : val + " " + name;
+		}
+		private String obj(String name){
+			if(readBool()) return name;
+			return name + "(No advance)";
+		}
+		
 	}
 	
-	public static final byte ENDF           = 0;
-	public static final byte UNMANAGED_REST = 1;
-	public static final byte SKIPB_B        = 2;
-	public static final byte SKIPB_I        = 3;
-	public static final byte SKIPB_L        = 4;
-	public static final byte SKIPB_UNKOWN   = 5;
-	public static final byte SKIPF_IF_NULL  = 6;
-	public static final byte POTENTIAL_REF  = 7;
-	public static final byte DYNAMIC        = 8;
-	public static final byte CHPTR          = 9;
-	public static final byte REF_FIELD      = 10;
+	public static final byte ENDF           = 100;
+	public static final byte UNMANAGED_REST = 100 + 1;
+	public static final byte SKIPB_B        = 100 + 2;
+	public static final byte SKIPB_I        = 100 + 3;
+	public static final byte SKIPB_L        = 100 + 4;
+	public static final byte SKIPB_UNKOWN   = 100 + 5;
+	public static final byte SKIPF_IF_NULL  = 100 + 6;
+	public static final byte POTENTIAL_REF  = 100 + 7;
+	public static final byte DYNAMIC        = 100 + 8;
+	public static final byte CHPTR          = 100 + 9;
+	public static final byte REF_FIELD      = 100 + 10;
 	
 	
 	private final byte[] code;
@@ -355,53 +401,18 @@ public final class CommandSet{
 	public String toString(){
 		var str = new StringJoiner(", ", "[", "]");
 		
-		var reader = reader();
+		var reader = new BakedCmdReader(code);
 		
-		while(true){
+		while(reader.pos<code.length){
 			try{
-				var cmd = reader.cmd();
-				str.add(switch(cmd){
-					case ENDF -> "ENDF";
-					case UNMANAGED_REST -> "UNMANAGED_REST";
-					case SKIPB_B -> props("SKIPB_B", reader.read8(), "jump", reader.read8(), "byte");
-					case SKIPB_I -> props("SKIPB_B", reader.read8(), "jump", reader.read32(), "byte");
-					case SKIPB_L -> props("SKIPB_B", reader.read8(), "jump", reader.read64(), "byte");
-					case SKIPB_UNKOWN -> props("SKIPB_UNKOWN", reader.read8(), "field");
-					case SKIPF_IF_NULL -> "SKIPF_IF_NULL(" + reader.read8() + " offset)";
-					case POTENTIAL_REF -> obj(reader, "POTENTIAL_REF");
-					case DYNAMIC -> obj(reader, "DYNAMIC");
-					case CHPTR -> obj(reader, "CHPTR");
-					case REF_FIELD -> obj(reader, "REF_FIELD");
-					default -> throw new IllegalStateException("Unexpected value: " + cmd);
-				});
-				if(cmd == ENDF || cmd == UNMANAGED_REST) return str.toString();
+				var cmd = reader.readCmdStr();
+				if(cmd == null) throw new Throwable();
+				str.add(cmd);
 			}catch(Throwable e){
 				return str.add("<Incomplete> ...").toString();
 			}
 		}
-	}
-	
-	private String props(String name, Object... props){
-		StringBuilder b = new StringBuilder();
-		b.append(name);
-		boolean any = false;
-		for(int i = 0; i<props.length; i += 2){
-			long val = ((Number)props[i]).longValue();
-			if(val == 0) continue;
-			if(!any){
-				any = true;
-				b.append('(');
-			}else b.append(", ");
-			b.append(val).append(' ').append(TextUtil.plural((String)props[i + 1], (int)Math.min(100, val)));
-		}
-		if(any) b.append(')');
-		return b.toString();
-	}
-	private String iprop(long val, String name){
-		return val == 0? name : val + " " + name;
-	}
-	private String obj(CmdReader reader, String name){
-		if(reader.readBool()) return name;
-		return name + "(No advance)";
+		
+		return str.toString();
 	}
 }
