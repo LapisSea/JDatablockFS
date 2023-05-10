@@ -172,7 +172,7 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 		}
 		
 		/**
-		 * Provides an {@link OutputStream} that can be used as a specialised write only version of {@link RandomIO}.
+		 * Provides an {@link OutputStream} that can be used as specialized write only version of {@link RandomIO}.
 		 *
 		 * @param trimOnClose signifies if data should be trunctuated / trimmed once writing is done.
 		 *                    Example:<br>
@@ -365,7 +365,7 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 	void writeAtOffsets(Collection<WriteChunk> data) throws IOException;
 	
 	/**
-	 * Simiar to the write methods except it writes some number of 0 bytes but does not modify things such as the size of the data. (useful for clearing garbage data after some data has ben shrunk)
+	 * Simiar to the write methods except it writes some number of 0 bytes but does not modify things such as the size of the data. (useful for clearing garbage data after some data has been shrunk)
 	 */
 	void fillZero(long requestedMemory) throws IOException;
 	
@@ -460,7 +460,7 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 	 * This serves as an atomic write statement. Data that is related and can not be written at once should use this.<br>
 	 * The function may refuse to create a local transaction buffer if it is already inside an active transaction (local or global).
 	 * If the transaction refuses, it returns the current instance.<br>
-	 * The returning io should only be closed if function did not refuse to make a buffer.
+	 * The returning io should only be closed if the function did not refuse to make a buffer.
 	 *
 	 * @return RandomIO instance that may be the calling instance or a new buffer
 	 * @throws IOException source may throw io

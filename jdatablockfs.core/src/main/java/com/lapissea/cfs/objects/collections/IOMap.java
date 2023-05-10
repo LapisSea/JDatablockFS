@@ -129,7 +129,8 @@ public interface IOMap<K, V> extends IterablePP<IOMap.IOEntry<K, V>>{
 	}
 	
 	/**
-	 * Provides an entry that provides the key and value in this map. The entry may be modifiable. If it is its modification will reflect in the contents of the map.
+	 * Provides an entry that provides the key and value in this map. The entry may be modifiable.
+	 * If it is, its modification will reflect in the contents of the map.
 	 *
 	 * @return null if the entry with specified key does not exist.
 	 */
@@ -138,7 +139,7 @@ public interface IOMap<K, V> extends IterablePP<IOMap.IOEntry<K, V>>{
 	
 	/**
 	 * @param key key whose existence should be checked
-	 * @return true if map contains the key
+	 * @return true if the key is present in the map
 	 */
 	default boolean containsKey(K key) throws IOException{
 		return getEntry(key) != null;
@@ -168,7 +169,8 @@ public interface IOMap<K, V> extends IterablePP<IOMap.IOEntry<K, V>>{
 	}
 	
 	/**
-	 * Adds a new entry to the map or overrides a value of an existing entry of the same key if it exists
+	 * Adds a new key-value pair to the map. If the key already exists in the map,
+	 * the function updates the value associated with that key to the new value provided.
 	 *
 	 * @param key   the key of the entry
 	 * @param value the value of the entry

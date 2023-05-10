@@ -137,16 +137,22 @@ public @interface IOValue{
 	}
 	
 	/**
-	 * This annotation serves as a hint for a field as to what type it should actually be. This is useful in
-	 * cases where for example, there is a field of an interface type. This type can not be instantiated.
-	 * Some actions such as automatically allocating values to fields that are null require an instantiable type.
-	 * In order to enable such actions this annotation is required. An IOList interface may have an OverrideType with
-	 * a value of SomeIOListImplementation and this class will be used to allocate an instance to the field.
+	 * This annotation provides a hint for a field about its intended type. It is particularly useful for
+	 * interface types that cannot be instantiated. In cases where values need to be allocated to null
+	 * fields automatically, an instantiable type is required. The annotation enables such actions by
+	 * specifying the intended type of the field. For example, a field with a fictional type of FancyList (interface)
+	 * may have an OverrideType annotation with a value of ActualFancyList. This tells the system to allocate an instance
+	 * of ActualFancyList to the field.<br>
+	 * Additionally, FancyList may be annotated with {@link DefaultImpl} to specify a default replacement type.
 	 */
 	@Retention(RetentionPolicy.RUNTIME)
 	@Target({ElementType.FIELD, ElementType.METHOD})
 	@interface OverrideType{
 		
+		/**
+		 * Provides a default implementation for an interface.<br>
+		 * This is a convenience feature that removes the requirement to always specify an {@link OverrideType} on a relevant field.
+		 */
 		@Retention(RetentionPolicy.RUNTIME)
 		@interface DefaultImpl{
 			@SuppressWarnings("rawtypes")
@@ -188,9 +194,9 @@ public @interface IOValue{
 	}
 	
 	/**
-	 * This annotation specifies that a number may not store negative values. This is useful for things such as sizes. Larger
-	 * values may take less space with this annotation. For example the maximum positive value of a signed 1 byte integer is 127
-	 * but an unsigned version may store up to 255.
+	 * This annotation specifies that a number may not store negative values. This is useful for things such as sizes/lengths.
+	 * Larger values may take less space with this annotation. For example, the maximum positive value of a signed 1-byte integer is 127,
+	 * but an unsigned version may store a value of up to 255.
 	 */
 	@Retention(RetentionPolicy.RUNTIME)
 	@Target({ElementType.FIELD, ElementType.METHOD})
@@ -218,7 +224,7 @@ public @interface IOValue{
 	 * <code>Square, Circle, ...</code> are valid.
 	 * </p>
 	 * <p>
-	 * This flexibility comes at the cost of needing to store an ID of the exact type.
+	 * This flexibility comes at the cost of needing to store an ID of the exact type and querying the type database.
 	 * On fixed layouts, this will take up 4 bytes per field. On dynamic, it may use from 0 to 4 bytes + 3 bits in the size flag.
 	 * </p>
 	 */

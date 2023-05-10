@@ -144,7 +144,7 @@ public class MemoryOperations{
 			else if(cmp>0) high = mid - 1;
 			else return mid; // key found
 		}
-		return -1;  // key not found.
+		return -1;  // key isn't found.
 	}
 	
 	public static void mergeFreeChunksSorted(DataProvider provider, IOList<ChunkPointer> data, List<Chunk> newData) throws IOException{
@@ -168,7 +168,7 @@ public class MemoryOperations{
 				if(next.isNextPhysical(existing)){
 					freeListReplace(data, 0, newCh);
 					mergeFreeChunks(next, existing);
-					//check if next element in free list is now next physical and merge+remove from list
+					//check if the next element in free list is now next physical and merge+remove from the list
 					if(data.size()>1){
 						var ptr = data.get(1);
 						if(existing.isNextPhysical(ptr)){
@@ -354,7 +354,7 @@ public class MemoryOperations{
 						ch.setCapacity(ch.getCapacity() + toGrow);
 					}catch(OutOfBitDepth e){
 						/*
-						 * toGrow is clamped to the remaining bitspace of body num size. If this happens
+						 * toGrow is clamped to the remaining bitspace of body num size. If this happens,
 						 * something has gone horribly wrong and life choices should be reconsidered
 						 * */
 						throw new ShouldNeverHappenError(e);

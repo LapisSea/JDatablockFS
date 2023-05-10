@@ -187,7 +187,7 @@ public record GenericType(ClassName raw, int dims, List<GenericType> args){
 		//if is primitive and equal, nothing else to check
 		if(thisInfo != null) return true;
 		
-		//Instance of object and not primitive, always true
+		//Instance of an object and not primitive, always true
 		if(right.equals(GenericType.OBJECT)) return true;
 		
 		if(dims != right.dims) return false;

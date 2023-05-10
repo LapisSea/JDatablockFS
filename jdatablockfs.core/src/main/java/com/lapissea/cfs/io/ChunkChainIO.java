@@ -88,7 +88,7 @@ public final class ChunkChainIO implements RandomIO{
 	}
 	
 	/**
-	 * @return flag if cursor has advanced
+	 * @return flag if the cursor has advanced
 	 */
 	private boolean tryAdvanceCursor() throws IOException{
 		var last = cursor;

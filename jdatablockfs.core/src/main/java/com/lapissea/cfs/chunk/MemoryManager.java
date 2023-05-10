@@ -45,8 +45,9 @@ public interface MemoryManager extends DataProvider.Holder{
 			/**
 			 * @param firstChunk is the chunk that is at the start of the chain.
 			 * @param target     is the last chunk in the chain. It is the chunk that will be modified to achieve extra capacity in the chain.
-			 * @param toAllocate is the number of bytes that would need to be allocated. This is only a suggestion but should be taken seriously.
-			 * @return amount of bytes that has been newly allocated to target. (directly or indirectly) Returning 0 indicates a failure
+			 * @param toAllocate is the number of bytes that would need to be allocated. (should be greater than 0)
+			 *                   This is only a suggestion but should be taken seriously.
+			 * @return the number of bytes that have been newly allocated to target (directly or indirectly). Returning 0 indicates a failure
 			 * of the strategy. Returning any other positive number signifies a success. The amount of bytes allocates should try to be as close
 			 * as possible to toAllocate. If it is less than, another pass of strategy executing will be done. If greater or equal, then the
 			 * allocation sequence will end.
@@ -177,7 +178,8 @@ public interface MemoryManager extends DataProvider.Holder{
 	IOList<ChunkPointer> getFreeChunks();
 	
 	/**
-	 * Frees a set of chunks listed in the pointers parameter and all their next chunks
+	 * Takes any number of {@link ChunkPointer}s as input and collects all the next chunks
+	 * for each pointer in the collection. It then frees all the collected chunks
 	 */
 	default void freeChains(Collection<ChunkPointer> chainStarts) throws IOException{
 		if(chainStarts.isEmpty()) return;
@@ -197,8 +199,8 @@ public interface MemoryManager extends DataProvider.Holder{
 	/**
 	 * Explicitly frees a chunk.<br>
 	 * <br>
-	 * This may alter the chunks contents, properties or completely destroy it. Do not use this chunk or any object that could
-	 * use it after its freed! Any data that was, is assumed to be gone permanently and will never be accessible trough normal means.
+	 * This may alter the chunk contents, properties or completely destroy it. Do not use this chunk or any object that could
+	 * use it after its freed! Any data that was, is assumed to be gone permanently and will never be accessible through normal means.
 	 * Usage of this chunk after it has been freed can cause crashes or serious data corruption.
 	 */
 	default void free(Chunk toFree) throws IOException{
@@ -208,8 +210,8 @@ public interface MemoryManager extends DataProvider.Holder{
 	 * Explicitly frees a collection of chunks.<br>
 	 * It is preferable (within reason) to free as many chunks at once. The manager can more efficiently handle them if they are presented at once.<br>
 	 * <br>
-	 * This may alter any/all of the chunks contents, properties or completely destroy them. Do not use this chunk or any object that could
-	 * use them after they are freed! Any data that was, is assumed to be gone permanently and will never be accessible trough normal means.
+	 * This may alter any/all the chunk contents, properties or completely destroy them. Do not use this chunk or any object that could
+	 * use them after they are freed! Any data that was, is assumed to be gone permanently and will never be accessible through normal means.
 	 * Usage of any chunks after they have been freed can cause crashes or serious data corruption.
 	 */
 	void free(Collection<Chunk> toFree) throws IOException;

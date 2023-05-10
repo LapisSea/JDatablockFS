@@ -232,7 +232,7 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	}
 	
 	/**
-	 * Created a new chunk at the specified pointer within the data of the provider. This chunk object is stray and if it will be
+	 * Reads a new chunk at the specified pointer within the data of the provider. This {@link Chunk} instance is stray, if it is
 	 * referenced outside a controlled context, then it should be reported to the chunk cache as it is not a "real" chunk until that happens.
 	 */
 	public static Chunk readChunk(@NotNull DataProvider provider, @NotNull ChunkPointer pointer) throws IOException{
@@ -248,7 +248,7 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	}
 	
 	/**
-	 * Quickly checks of a chunk start is possible at all at a certain pointer.
+	 * Quickly checks if a chunk start is possible at all at a certain pointer.
 	 */
 	public static boolean earlyCheckChunkAt(DataProvider provider, ChunkPointer pointer) throws IOException{
 		try(var io = provider.getSource().ioAt(pointer.add(CHECK_BYTE_OFF))){
@@ -478,8 +478,8 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	}
 	
 	/**
-	 * Should be put before any early termination. If any forbidden function in
-	 * correct state is called, it should fail 100% of the time no matter the input.
+	 * Should be put before any early termination. If any forbidden function incorrect
+	 * state is called, it should fail 100% of the time no matter the input.
 	 */
 	private void forbidReadOnly(){
 		if(reading) return;

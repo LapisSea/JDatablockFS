@@ -618,7 +618,7 @@ public class DisplayManager implements DataLogger{
 				var windowY = d.getPositionY();
 				io.setMousePos(d.getMouseX() + windowX, d.getMouseY() + windowY);
 			}else{
-				// Single viewport mode: mouse position in client window coordinates (io.MousePos is (0,0) when the mouse is on the upper-left corner of the app window)
+				// Single viewport mode: mouse position in client window coordinates (io.MousePos is (0,0) when the mouse is in the upper-left corner of the app window)
 				io.setMousePos(d.getMouseX(), d.getMouseY());
 			}
 		}

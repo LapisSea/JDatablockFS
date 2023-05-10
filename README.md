@@ -17,7 +17,7 @@ This library has at its core 2 tasks.
 
 ### Who is this for?
 
-If you need to store data but do not want to deal with complicated SQL servers or are annoyed with writing queries then this is a perfect alternative.
+If you need to store data but do not want to deal with complicated SQL servers or are annoyed with writing queries, then this is a perfect alternative.
 
 This library acts like a database, but it writes like regular objects/collections and there is no server at all. Everything can be simply stored in a single efficient self-contained file.
 
@@ -98,16 +98,16 @@ public interface IP extends IOInstance.Def<IP>{
 }
 ```
 
-This is just an interface. It infers the fields from the contents of the interface. Every non static/default/private function is considered a getter/setter. Getters and setters can have multiple formats. (eg: `double getLatitude()` or `void setV6(String v6)`) A getter or setter is required for a field but not both of them. 
+This is just an interface. It infers the fields from the contents of the interface. Every non static/default/private function is considered a getter/setter. Getters and setters can have multiple formats. (eg: `double getLatitude()` or `void setV6(String v6)`) A getter or setter is required for a field but not both of them.
 
-- `IOInstance.Def` is the base type of a template type (or definition type)
+- `IOInstance.Def` is the base type of template type (or definition type)
 - `IOInstance.Def.Order` is an annotation that is required if the type needs a `void setAll(<all fields>)` or needs to be constructed with data. (aka `IOInstance.Def.of(<type>, <all field values in order>`)
 - `IOInstance.Def.ToString.Format` or `IOInstance.Def.ToString` are optional and just give the ability to customize the field in a friendly way. Alternatively a `static String toString(<type> instance){...}` can be added to write a custom toString
 - `static IP of(...)` is just a convenience function that is completely optional. It just makes it more pleasing to manually make an instance. It is a replacement for `new IP(...)`
 
 Note that this creates implementation(s) as needed. This may provide a performance increase and clarity in a context where only partial access to data is needed. (such as finding an object by a spesific field) This is because manually creating a perfect instance is annoying and clumsy. Simply defining what fields you need offloads the annoying bolierplate work to the code generation mechanism inside the library.
 
-NOTE: You *can* create your own implementation of an interface like this but it is best for the internals of this library to do that for you. 
+NOTE: You *can* create your own implementation of an interface like this, but it is best for the internals of this library to do that for you.
 
 ---
 

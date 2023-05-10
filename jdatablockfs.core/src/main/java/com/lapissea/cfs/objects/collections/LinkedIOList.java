@@ -343,7 +343,7 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 			if(initializer != null){
 				initializer.accept(val);
 			}
-			//inverse order add, reduce chance for fragmentation by providing next node immediately
+			//inverse order add, reduce chance for fragmentation by providing the next node immediately
 			var nextNode = chainStart;
 			chainStart = allocNode(val, nextNode);
 		}

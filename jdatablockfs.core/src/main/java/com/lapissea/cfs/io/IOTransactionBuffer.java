@@ -17,10 +17,10 @@ import java.util.Set;
 import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 
 /**
- * This class implements the logic necessary for {@link IOTransaction}. The changes are
- * stored in memory as a sorted list of {@link WriteEvent}. If the transaction corsses a threshold
- * where it has too many events. It will attempt to merge them as to minimise overhead of writing new
- * changes but at the cost of total data that needs to be written once it has been exported on close.
+ * This class provides the logic for {@link IOTransaction} by buffering data changes in memory as a sorted
+ * list of {@link WriteEvent}. When the transaction accumulates a large number of events, it attempts to
+ * merge them to reduce the overhead of writing new changes, but at the expense of writing more data when
+ * it is exported upon closing.
  */
 public final class IOTransactionBuffer{
 	

@@ -138,7 +138,7 @@ public class FieldDependency<T extends IOInstance<T>>{
 				before.removeIf(selectedReadFieldsSet::contains);
 				
 				for(IOField<T, ?> skipped : before){
-					//is skipped field dependency of another skipped field whos size may depend on it.
+					//is skipped field dependency of another skipped field who's size may depend on it.
 					if(before.stream().filter(e -> !e.getSizeDescriptor().hasFixed())
 					         .flatMap(IOField::dependencyStream)
 					         .anyMatch(e -> skipped.streamUnpackedFields().anyMatch(s -> s == e))){

@@ -528,7 +528,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 				//noinspection unchecked
 				((ValueStorage<V>)v).write(d.io(), value);
 			}catch(Throwable e){
-				e = StagedInit.WaitException.unwait(e);
+				e = StagedInit.WaitException.unwait(e);//TODO: Handling wait exceptions is annoying and prone to be overlooked.
 				
 				String valStr;
 				try{

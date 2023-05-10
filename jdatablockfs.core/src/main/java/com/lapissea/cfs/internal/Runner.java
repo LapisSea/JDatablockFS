@@ -92,7 +92,7 @@ public class Runner{
 			
 			// debug wait prevents debugging sessions from often restarting the watcher by
 			// repeatedly sleeping for a short time and checking if it should still exit.
-			// When debugging the short sleeps will extend when ever the code is paused
+			// When debugging, the short sleeps will extend when ever the code is paused
 			var debugWait    = GlobalConfig.RELEASE_MODE? 0 : 200;
 			var debugCounter = 0;
 			

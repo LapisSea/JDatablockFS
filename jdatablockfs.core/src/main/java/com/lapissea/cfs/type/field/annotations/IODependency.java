@@ -25,7 +25,7 @@ import static com.lapissea.cfs.type.field.annotations.IODependency.VirtualNumSiz
 import static com.lapissea.cfs.type.field.annotations.IODependency.VirtualNumSize.RetentionPolicy.GROW_ONLY;
 
 /**
- * This annotation can specify that other field or fields are dependent on it. This is needed when
+ * This annotation can specify that another field or fields are dependent on it. This is needed when
  * a custom getter is used and is accessing another IO field.
  */
 @Retention(RetentionPolicy.RUNTIME)
@@ -106,9 +106,11 @@ public @interface IODependency{
 			 */
 			GHOST,
 			/**
-			 * This policy states that a field should only grow. If the value has been saved with a size that requires 8 bytes and
-			 * on the subsequent write it requires only 1, it will still be written as if it needs 8 bytes. This can increase the
-			 * predictability of where data is and may decrease fragmentation at the cost of space efficiency.
+			 * This policy states that the field should only grow.
+			 * If the value has been saved with a size that requires 8 bytes and on the
+			 * subsequent writing, it requires only 1, it will still be written as if it needs 8 bytes.
+			 * This can increase the predictability of where data is and may decrease fragmentation
+			 * at the cost of space efficiency.
 			 */
 			GROW_ONLY,
 			/**

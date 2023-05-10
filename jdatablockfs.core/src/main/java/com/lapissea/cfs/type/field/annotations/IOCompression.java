@@ -27,7 +27,7 @@ import java.util.function.Supplier;
 public @interface IOCompression{
 	enum Type{
 		/**
-		 * (modified) Run length encoding: Very simple and very fast. Works great for data with low noise/variation. (eg: 20 values in a row are the same)<br/>
+		 * (Modified) Run length encoding: Very simple and very fast. Works great for data with low noise/variation. (Eg: 20 values in a row are the same)<br/>
 		 * In addition, a raw block and a packed length block have been added to reduce fragility and increase compression ratio at a small sacrifice in speed.
 		 */
 		RLE(RlePacker::new),
@@ -36,8 +36,8 @@ public @interface IOCompression{
 		 */
 		LZ4_FAST(Lz4Packer.Fast::new),
 		/**
-		 * LZ4 compression is a balance between RLE and GZIP. It is significantly slower than RLE but is also produces higher compression
-		 * ratio. This is probably the right choice if type of data is unkown.
+		 * LZ4 compression is a balance between RLE and GZIP. It is significantly slower than RLE but is also produces a higher compression
+		 * ratio. This is probably the right choice if the type of data is unknown.
 		 */
 		LZ4(Lz4Packer.High::new),
 		/**
@@ -45,8 +45,8 @@ public @interface IOCompression{
 		 */
 		GZIP(GzipPacker::new),
 		/**
-		 * An experimental amalgamation of all previous types where all of them are ran and the smallest output is picked. This is horribly
-		 * inefficient and slow and should probably not be used.
+		 * An experimental amalgamation of all previous types where all of them are run and the smallest output is picked.
+		 * This is horribly inefficient and slow and should probably not be used.
 		 */
 		BRUTE_BEST(BruteBestPacker::new);
 		
