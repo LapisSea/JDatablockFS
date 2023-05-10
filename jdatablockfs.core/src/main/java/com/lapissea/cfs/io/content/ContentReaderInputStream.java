@@ -29,7 +29,7 @@ public class ContentReaderInputStream extends ContentInputStream{
 	}
 	
 	@Override
-	public long getOffset() throws IOException{
+	public long getOffset(){
 //		if(reader instanceof RandomIO r) return r.getPos();
 		return -1;
 	}

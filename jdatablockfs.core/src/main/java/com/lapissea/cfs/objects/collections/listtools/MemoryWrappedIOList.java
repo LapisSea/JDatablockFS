@@ -38,27 +38,27 @@ public class MemoryWrappedIOList<T> implements IOList<T>{
 		return data.size();
 	}
 	@Override
-	public T get(long index) throws IOException{
+	public T get(long index){
 		return data.get(Math.toIntExact(index));
 	}
 	
 	@Override
-	public void set(long index, T value) throws IOException{
+	public void set(long index, T value){
 		data.set(Math.toIntExact(index), value);
 	}
 	
 	@Override
-	public void add(long index, T value) throws IOException{
+	public void add(long index, T value){
 		data.add(Math.toIntExact(index), value);
 	}
 	
 	@Override
-	public void add(T value) throws IOException{
+	public void add(T value){
 		data.add(value);
 	}
 	
 	@Override
-	public void remove(long index) throws IOException{
+	public void remove(long index){
 		data.remove(Math.toIntExact(index));
 	}
 	
@@ -95,18 +95,18 @@ public class MemoryWrappedIOList<T> implements IOList<T>{
 	}
 	
 	@Override
-	public void trim() throws IOException{
+	public void trim(){
 		if(data instanceof ArrayList<T> al){
 			al.trimToSize();
 		}
 	}
 	
 	@Override
-	public long getCapacity() throws IOException{
+	public long getCapacity(){
 		return Integer.MAX_VALUE;
 	}
 	@Override
-	public void free(long index) throws IOException{
+	public void free(long index){
 		throw new UnsupportedOperationException();
 	}
 	

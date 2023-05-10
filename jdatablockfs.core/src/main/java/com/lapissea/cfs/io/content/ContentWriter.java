@@ -322,7 +322,7 @@ public interface ContentWriter extends AutoCloseable{
 				earlyCheck();
 			}
 			@Override
-			public void writeWord(long v, int len) throws IOException{
+			public void writeWord(long v, int len){
 				if(count + len<=buf.length){
 					MemPrimitive.setWord(v, buf, count, len);
 				}

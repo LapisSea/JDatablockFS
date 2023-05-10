@@ -227,7 +227,7 @@ public class GeneralTypeHandlingTests{
 	}
 	
 	@Test(dataProvider = "templateTypes")
-	<T extends IOInstance.Def<T>> void newTemplate(Class<T> type, Object[] args) throws IOException{
+	<T extends IOInstance.Def<T>> void newTemplate(Class<T> type, Object[] args){
 		if(args == null){
 			IOInstance.Def.of(type);
 		}else{

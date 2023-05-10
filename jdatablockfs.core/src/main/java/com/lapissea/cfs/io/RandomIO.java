@@ -484,28 +484,28 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 			}
 			
 			@Override
-			public void setSize(long requestedSize) throws IOException{
+			public void setSize(long requestedSize){
 				size = requestedSize;
 			}
 			@Override
-			public long getSize() throws IOException{
+			public long getSize(){
 				return size;
 			}
 			@Override
-			public long getPos() throws IOException{
+			public long getPos(){
 				return pos;
 			}
 			@Override
-			public RandomIO setPos(long pos) throws IOException{
+			public RandomIO setPos(long pos){
 				this.pos = pos;
 				return this;
 			}
 			@Override
-			public long getCapacity() throws IOException{
+			public long getCapacity(){
 				return transactionBuffer.getCapacity(capacity);
 			}
 			@Override
-			public RandomIO setCapacity(long newCapacity) throws IOException{
+			public RandomIO setCapacity(long newCapacity){
 				transactionBuffer.capacityChange(newCapacity);
 				return this;
 			}
@@ -517,7 +517,7 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 			}
 			
 			@Override
-			public void flush() throws IOException{ }
+			public void flush(){ }
 			
 			private int readAt(long offset, byte[] b, int off, int len) throws IOException{
 				that.setPos(offset);
@@ -533,14 +533,14 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 				return b;
 			}
 			@Override
-			public void write(int b) throws IOException{
+			public void write(int b){
 				transactionBuffer.writeByte(pos, b);
 				pos++;
 				if(size<=pos) size = pos + 1;
 			}
 			
 			@Override
-			public void writeAtOffsets(Collection<WriteChunk> data) throws IOException{
+			public void writeAtOffsets(Collection<WriteChunk> data){
 				for(var e : data){
 					transactionBuffer.write(e.ioOffset(), e.data(), e.dataOffset(), e.dataLength());
 				}

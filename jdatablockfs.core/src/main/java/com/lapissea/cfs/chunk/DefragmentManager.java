@@ -155,7 +155,7 @@ public class DefragmentManager{
 				return END|SAVE;
 			}
 			@Override
-			public <T extends IOInstance<T>> int logChunkPointer(Reference instanceReference, T instance, IOField<T, ChunkPointer> field, ChunkPointer value) throws IOException{
+			public <T extends IOInstance<T>> int logChunkPointer(Reference instanceReference, T instance, IOField<T, ChunkPointer> field, ChunkPointer value){
 				return CONTINUE;
 			}
 		};
@@ -216,7 +216,7 @@ public class DefragmentManager{
 					return CONTINUE;
 				}
 				@Override
-				public <T extends IOInstance<T>> int logChunkPointer(Reference instanceReference, T instance, IOField<T, ChunkPointer> field, ChunkPointer value) throws IOException{
+				public <T extends IOInstance<T>> int logChunkPointer(Reference instanceReference, T instance, IOField<T, ChunkPointer> field, ChunkPointer value){
 					return CONTINUE;
 				}
 			}, false).walk();
@@ -446,12 +446,8 @@ public class DefragmentManager{
 					cluster.getMemoryManager().free(unreferenced);
 				}
 			}
-			case WARN -> {
-				warn("found unknown free chunks: {}", unreferencedChunks);
-			}
-			case ERROR -> {
-				throw new MalformedFile("found unknown free chunks: " + unreferencedChunks);
-			}
+			case WARN -> warn("found unknown free chunks: {}", unreferencedChunks);
+			case ERROR -> throw new MalformedFile("found unknown free chunks: " + unreferencedChunks);
 		}
 	}
 	

@@ -263,8 +263,8 @@ public class InstanceCollection{
 		}
 		
 		@Override
-		public void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext) throws IOException{
-			//nothing to do. Reference field stores the actual pointer
+		public void skip(VarPool<T> ioPool, DataProvider provider, ContentReader src, T instance, GenericContext genericContext){
+			//Nothing to do. Reference field stores the actual pointer
 		}
 		
 		private void allocAndSet(T instance, DataProvider provider, CollectionType val) throws IOException{

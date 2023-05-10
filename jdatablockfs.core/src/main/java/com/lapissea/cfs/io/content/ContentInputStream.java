@@ -21,7 +21,7 @@ public abstract class ContentInputStream extends InputStream implements ContentR
 		}
 		
 		@Override
-		public long getOffset() throws IOException{
+		public long getOffset(){
 			return -1;
 		}
 		
@@ -72,14 +72,14 @@ public abstract class ContentInputStream extends InputStream implements ContentR
 		
 		
 		@Override
-		public int read() throws IOException{
+		public int read(){
 			int rem = available();
 			if(rem == 0) return -1;
 			return ba[pos++]&0xFF;
 		}
 		
 		@Override
-		public int read(@NotNull byte[] b, int off, int len) throws IOException{
+		public int read(@NotNull byte[] b, int off, int len){
 			int rem = available();
 			if(rem == 0) return -1;
 			int read = Math.min(len, rem);
@@ -125,14 +125,14 @@ public abstract class ContentInputStream extends InputStream implements ContentR
 		}
 		
 		@Override
-		public int read() throws IOException{
+		public int read(){
 			int rem = available();
 			if(rem == 0) return -1;
 			return bb.get();
 		}
 		
 		@Override
-		public int read(@NotNull byte[] b, int off, int len) throws IOException{
+		public int read(@NotNull byte[] b, int off, int len){
 			int rem = available();
 			if(rem == 0) return -1;
 			if(len<rem) len = rem;

@@ -120,7 +120,7 @@ public class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, ValueT
 		return chunk.getPtr().makeReference();
 	}
 	@Override
-	public void allocate(CTyp instance, DataProvider provider, GenericContext genericContext) throws IOException{
+	public void allocate(CTyp instance, DataProvider provider, GenericContext genericContext){
 	}
 	@Override
 	public void setReference(CTyp instance, Reference newRef){
@@ -187,7 +187,7 @@ public class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, ValueT
 	}
 	
 	@Override
-	public void skip(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
+	public void skip(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext){
 		//nothing to do. Reference field stores the actual pointer
 	}
 	
