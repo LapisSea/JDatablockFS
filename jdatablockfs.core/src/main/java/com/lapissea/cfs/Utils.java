@@ -117,8 +117,7 @@ public class Utils{
 	public static Type extractFromVarType(TypeVariable<?> c){
 		var bounds = c.getBounds();
 		if(bounds.length == 1){
-			var typ = bounds[0];
-			return typ;
+			return bounds[0];
 		}
 		throw new NotImplementedException(TextUtil.toString("wut? ", bounds));
 	}

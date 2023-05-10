@@ -123,8 +123,7 @@ public class ReflectionExecutor extends QueryExecutor{
 			case QueryCheck.Or or -> {
 				var l = executeCheck(ctx, or.l());
 				if(l) yield true;
-				var r = executeCheck(ctx, or.r());
-				yield r;
+				yield executeCheck(ctx, or.r());
 			}
 			case QueryCheck.Not not -> !executeCheck(ctx, not.check());
 			case QueryCheck.Equals equals -> {

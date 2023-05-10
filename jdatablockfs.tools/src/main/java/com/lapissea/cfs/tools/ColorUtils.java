@@ -77,7 +77,6 @@ public class ColorUtils{
 		if(rand.nextBoolean()) hueOffset *= -1;
 		hueOffset /= 600;
 //		LogUtil.printTable("col", hueStep, "off", hueOffset);
-		var hue = hueStep + hueOffset;
-		return hue;
+		return hueStep + hueOffset;
 	}
 }

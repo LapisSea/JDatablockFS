@@ -62,7 +62,7 @@ public class G2DBackend extends RenderBackend{
 	private       Thread          renderThread;
 	private final Deque<Runnable> tasks = new LinkedList<>();
 	
-	private ImGuiImplG2D imguiImpl;
+	private final ImGuiImplG2D imguiImpl;
 	
 	private final DrawFont font = new DrawFont(){
 		@Override
@@ -118,8 +118,7 @@ public class G2DBackend extends RenderBackend{
 		private Color alphaScale(Color color, float pixelHeight, boolean outline){
 			var   minSpace = outline? 20 : 5;
 			float alphaMul = clamp(0, 1, (pixelHeight - minSpace)/3);
-			var   newCol   = new Color(color.getRed(), color.getGreen(), color.getBlue(), (int)(color.getAlpha()*alphaMul));
-			return newCol;
+			return new Color(color.getRed(), color.getGreen(), color.getBlue(), (int)(color.getAlpha()*alphaMul));
 		}
 	};
 	
@@ -127,9 +126,7 @@ public class G2DBackend extends RenderBackend{
 		return switch(e.getButton()){
 			case BUTTON1 -> DisplayInterface.MouseKey.LEFT;
 			case BUTTON2 -> DisplayInterface.MouseKey.RIGHT;
-			default -> {
-				throw new RuntimeException("Unknown event" + e);
-			}
+			default -> throw new RuntimeException("Unknown event" + e);
 		};
 	}
 	

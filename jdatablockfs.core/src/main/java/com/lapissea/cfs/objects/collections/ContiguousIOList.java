@@ -149,11 +149,11 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		private final boolean  nullable;
 		private final int      typeID;
 		
-		protected IndexAccessor(Type elementType, long index, boolean nullable){
+		protected IndexAccessor(Type elementType, boolean nullable){
 			super(null, "");
 			this.elementType = elementType;
 			rawelementType = Utils.typeToRaw(elementType);
-			this.index = index;
+			this.index = -1;
 			this.nullable = nullable;
 			typeID = TypeFlag.getId(Utils.typeToRaw(elementType));
 		}
@@ -270,7 +270,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		
 		
 		if(unmanaged != null){
-			var indexAccessor = new IndexAccessor<>(genericType, -1, true);
+			var indexAccessor = new IndexAccessor<>(genericType, true);
 			//noinspection rawtypes
 			var f = new UnmanagedField(indexAccessor, -1, unmanaged);
 			return LongStream.range(0, size()).mapToObj(
@@ -293,7 +293,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 			}
 		};
 		
-		var indexAccessor = new IndexAccessor<T>(genericType, -1, false);
+		var indexAccessor = new IndexAccessor<T>(genericType, false);
 		var indexField    = storage.field(indexAccessor, ioAt);
 		
 		return LongStream.range(0, size()).mapToObj(index -> {

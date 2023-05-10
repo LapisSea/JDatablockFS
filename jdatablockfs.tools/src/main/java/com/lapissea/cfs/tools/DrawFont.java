@@ -5,9 +5,9 @@ import java.util.Arrays;
 import java.util.List;
 
 public abstract class DrawFont{
-	public static record Bounds(float width, float height){ }
+	public record Bounds(float width, float height){ }
 	
-	public static record StringDraw(float pixelHeight, float xScale, Color color, String string, float x, float y){
+	public record StringDraw(float pixelHeight, float xScale, Color color, String string, float x, float y){
 		public StringDraw(float pixelHeight, Color color, String string, float x, float y){
 			this(pixelHeight, 1, color, string, x, y);
 		}

@@ -29,7 +29,7 @@ public final class FunctionGen implements Endable, FunctionInfo{
 		
 		private boolean ended;
 		
-		private Label endLabel = new Label();
+		private final Label endLabel = new Label();
 		
 		public CodePath(MethodVisitor mv, TypeStack stack){
 			this.stack = stack;

@@ -555,7 +555,6 @@ public class JorthTests{
 				className);
 		});
 		cls.getEnumConstants();
-		LogUtil.println(cls.getEnumConstants());
 		
 		assertEquals(List.of("FOO", "BAR"), EnumSet.allOf((Class<T>)cls).stream().map(Enum::name).toList());
 	}

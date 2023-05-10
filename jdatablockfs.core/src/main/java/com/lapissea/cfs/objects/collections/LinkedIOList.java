@@ -414,11 +414,10 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 						}
 						
 						IONode<T> node;
-						while(true){
+						do{
 							node = iter.ioNext();
 							iterCursor++;
-							if(iterCursor == index + 1) break;
-						}
+						}while(iterCursor != index + 1);
 						
 						if(!full && depTicket != null && valueStorage instanceof ValueStorage.InstanceBased i){
 							return node.readValueSelective(depTicket, true);

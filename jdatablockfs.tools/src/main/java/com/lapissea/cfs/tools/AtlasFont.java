@@ -244,7 +244,7 @@ public class AtlasFont extends DrawFont{
 		glUseProgram(0);
 	}
 	
-	private static record BakedGlyph(
+	private record BakedGlyph(
 		boolean empty,
 		float advance,
 		float x0, float x1, float y0, float y1,

@@ -220,9 +220,7 @@ public abstract class DynamicSupport{
 			case FLOAT -> src.readFloats4(len);
 			case BOOLEAN -> {
 				try(var bitIn = new BitInputStream(src, len)){
-					var bools = new boolean[len];
-					bitIn.readBits(bools);
-					yield bools;
+					yield bitIn.readBits(new boolean[len]);
 				}
 			}
 			case LONG -> {
@@ -281,8 +279,7 @@ public abstract class DynamicSupport{
 		if(IOInstance.isUnmanaged(typ)){
 			var uStruct = Struct.Unmanaged.ofUnknown(typ);
 			var ref     = REF_PIPE.readNew(provider, src, genericContext);
-			var inst    = uStruct.make(provider, ref, typDef);
-			return inst;
+			return uStruct.make(provider, ref, typDef);
 		}
 		if(IOInstance.isInstance(typ)){
 			var struct = Struct.ofUnknown(typ);

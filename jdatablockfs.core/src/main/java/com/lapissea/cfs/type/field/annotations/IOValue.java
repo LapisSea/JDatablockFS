@@ -154,6 +154,7 @@ public @interface IOValue{
 		 * This is a convenience feature that removes the requirement to always specify an {@link OverrideType} on a relevant field.
 		 */
 		@Retention(RetentionPolicy.RUNTIME)
+		@Target({ElementType.TYPE})
 		@interface DefaultImpl{
 			@SuppressWarnings("rawtypes")
 			Class<? extends IOInstance> value();

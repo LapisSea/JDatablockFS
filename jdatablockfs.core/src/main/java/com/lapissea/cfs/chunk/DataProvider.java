@@ -167,7 +167,7 @@ public interface DataProvider{
 			}
 			@Override
 			public String toString(){
-				return super.toString();
+				return DataProvider.this.toString();
 			}
 		}
 		

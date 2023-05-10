@@ -10,7 +10,6 @@ import com.lapissea.util.LateInit;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.UtilL;
 
-import java.io.IOException;
 import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.IntStream;
@@ -27,21 +26,17 @@ public class RandomLists{
 	
 	public static void main(Configuration.View conf){
 		IntStream.range(conf.getInt("min", 1), conf.getInt("max", 20)).mapToObj(listCount -> {
-			try{
-				var logger = LoggedMemoryUtils.createLoggerFromConfig();
-				var mem    = LoggedMemoryUtils.newLoggedMemory("l" + listCount, logger);
-				logger.get().getSession("l" + listCount);
-				
-				var task = CompletableFuture.runAsync(() -> {
-					task(listCount, logger, mem);
-				});
-				if(conf.getBoolean("async", true)) UtilL.sleep(10);
-				else task.join();
-				return task;
-				
-			}catch(IOException e){
-				throw new RuntimeException(e);
-			}
+			var logger = LoggedMemoryUtils.createLoggerFromConfig();
+			var mem    = LoggedMemoryUtils.newLoggedMemory("l" + listCount, logger);
+			logger.get().getSession("l" + listCount);
+			
+			var task = CompletableFuture.runAsync(() -> {
+				task(listCount, logger, mem);
+			});
+			if(conf.getBoolean("async", true)) UtilL.sleep(10);
+			else task.join();
+			return task;
+			
 		}).toList().forEach(CompletableFuture::join);
 	}
 	

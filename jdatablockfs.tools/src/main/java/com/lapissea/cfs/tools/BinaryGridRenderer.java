@@ -444,12 +444,10 @@ public class BinaryGridRenderer implements DataRenderer{
 		DrawUtils.drawPixelLine(ctx, xPosFrom + 0.5, yPosFrom + 0.5, xPosTo + 0.5, yPosTo + 0.5);
 	}
 	
-	private Color chunkBaseColor(){
-		return Color.GRAY;
-	}
+	private static final Color CHUNK_BASE_COLOR = Color.GRAY;
 	
 	private void fillChunk(RenderContext ctx, Chunk chunk, boolean withChar, boolean force){
-		var chunkColor = chunkBaseColor();
+		var chunkColor = CHUNK_BASE_COLOR;
 		var dataColor  = alpha(ColorUtils.mul(chunkColor, 0.5F), 0.7F);
 		var freeColor  = alpha(chunkColor, 0.4F);
 		
@@ -1103,7 +1101,7 @@ public class BinaryGridRenderer implements DataRenderer{
 			
 			Color col;
 			if(parsed.lastHoverChunk != null && new ChainWalker(parsed.lastHoverChunk).stream().anyMatch(ch -> ch.rangeIntersects(ptr.from()))){
-				col = ColorUtils.mix(chunkBaseColor(), ptr.color(), 0.5F);
+				col = ColorUtils.mix(CHUNK_BASE_COLOR, ptr.color(), 0.5F);
 				drawMsg = true;
 				renderer.setLineWidth(sFul*ptr.widthFactor()*2);
 				
@@ -1264,7 +1262,7 @@ public class BinaryGridRenderer implements DataRenderer{
 			var chunk = parsed.lastHoverChunk;
 			ctx.renderer.setLineWidth(1);
 			try{
-				outlineChunk(ctx, chunk, ColorUtils.mix(chunkBaseColor(), Color.WHITE, 0.4F));
+				outlineChunk(ctx, chunk, ColorUtils.mix(CHUNK_BASE_COLOR, Color.WHITE, 0.4F));
 			}catch(IOException e){
 				handleError(e, parsed);
 			}

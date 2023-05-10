@@ -169,9 +169,7 @@ public class SessionHost implements DataLogger{
 	}
 	@Override
 	public boolean isActive(){
-		if(destroyed) return false;
-		
-		return true;
+		return !destroyed;
 	}
 	
 	public void prevSession(){

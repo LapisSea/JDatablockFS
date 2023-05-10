@@ -38,12 +38,8 @@ public class ToStringFormat{
 		
 		default Stream<ToStringFragment> deep(){
 			return switch(this){
-				case Concat c -> {
-					yield c.fragments.stream().flatMap(ToStringFragment::deep);
-				}
-				case OptionalBlock o -> {
-					yield o.content.deep();
-				}
+				case Concat c -> c.fragments.stream().flatMap(ToStringFragment::deep);
+				case OptionalBlock o -> o.content.deep();
 				default -> Stream.of(this);
 			};
 		}
@@ -161,7 +157,6 @@ public class ToStringFormat{
 			}
 			to = format.length();
 		}
-		var range = new Range(from, to);
-		return range;
+		return new Range(from, to);
 	}
 }

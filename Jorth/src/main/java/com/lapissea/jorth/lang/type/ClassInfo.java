@@ -23,13 +23,11 @@ public interface ClassInfo{
 	
 	class OfArray implements ClassInfo{
 		
-		private final TypeSource  source;
 		private final GenericType component;
 		
 		private final ClassInfo base;
 		
 		public OfArray(TypeSource source, GenericType component) throws MalformedJorth{
-			this.source = source;
 			this.component = component;
 			base = source.byType(GenericType.OBJECT);
 		}

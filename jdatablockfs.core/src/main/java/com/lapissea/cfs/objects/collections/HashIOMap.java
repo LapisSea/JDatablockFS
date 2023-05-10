@@ -562,8 +562,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		}
 		
 		getDataProvider().getSource().openIOTransaction(() -> {
-			boolean reflow    = false;
-			long    deltaSize = 0;
+			long deltaSize = 0;
 			for(var group : sorted.values()){
 				for(Map.Entry<K, V> e : group){
 					var key   = e.getKey();
@@ -575,7 +574,6 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 			}
 			
 			deltaSize(deltaSize);
-			return reflow;
 		});
 	}
 	

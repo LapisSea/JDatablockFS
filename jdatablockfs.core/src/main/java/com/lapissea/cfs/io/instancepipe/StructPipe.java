@@ -86,8 +86,8 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		private final Class<?>                    type;
 		
 		private static class CompileInfo{
-			private ClosableLock lock = ClosableLock.reentrant();
-			private int          recursiveCompilingDepth;
+			private final ClosableLock lock = ClosableLock.reentrant();
+			private       int          recursiveCompilingDepth;
 		}
 		
 		private final Map<Struct<T>, Throwable>   errors = new HashMap<>();

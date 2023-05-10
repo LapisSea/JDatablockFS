@@ -234,7 +234,7 @@ public final class ImGuiImplG2D{
 	/**
 	 * Method rebuilds the font atlas for Dear ImGui. Could be used to update application fonts in runtime.
 	 */
-	public void updateFontsTexture(){
+	public void updateFontTexture(){
 		
 		final ImFontAtlas fontAtlas = ImGui.getIO().getFonts();
 		final ImInt       width     = new ImInt();
@@ -263,7 +263,7 @@ public final class ImGuiImplG2D{
 	}
 	
 	private void createDeviceObjects(){
-		updateFontsTexture();
+		updateFontTexture();
 	}
 	
 	public void dispose(){

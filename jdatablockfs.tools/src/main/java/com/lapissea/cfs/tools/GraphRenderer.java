@@ -113,7 +113,6 @@ public class GraphRenderer implements DataRenderer{
 	private CompletableFuture<Void> e;
 	private SessionHost.CachedFrame waitingFrame;
 	private int                     jumpFrames;
-	private float                   sleepTime = 1;
 	
 	@Override
 	public List<HoverMessage> render(){
@@ -309,7 +308,6 @@ public class GraphRenderer implements DataRenderer{
 		
 		var min = 0.01;
 		if(maxDist<min*10 && undead.isEmpty()){
-			sleepTime = 0;
 			while(maxDist>min){
 				var t = System.nanoTime();
 				if(t - start>1000000*16*3) break;
