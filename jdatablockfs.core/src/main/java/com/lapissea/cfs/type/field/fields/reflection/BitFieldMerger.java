@@ -203,7 +203,7 @@ public abstract sealed class BitFieldMerger<T extends IOInstance<T>> extends IOF
 		this.group = group;
 		
 		var bits      = IOFieldTools.sumVarsIfAll(group, SizeDescriptor::getFixed);
-		var fixedSize = Utils.bitToByte(bits);
+		var fixedSize = BitUtils.bitsToBytes(bits);
 		if(fixedSize.isPresent()){
 			initSizeDescriptor(SizeDescriptor.Fixed.of(fixedSize.getAsLong()));
 			safetyBits = bits.stream().mapToObj(BitLayout::new).findAny();
