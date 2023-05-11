@@ -1,6 +1,5 @@
 package com.lapissea.cfs.query;
 
-import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.InvalidQueryString;
 import com.lapissea.cfs.io.bit.EnumUniverse;
 import com.lapissea.cfs.logging.Log;
@@ -444,7 +443,7 @@ public class QueryExpressionParser{
 			if(IOInstance.isInstance(type)){
 				IOField<?, ?> field = Struct.ofUnknown(type).getFields().byName(fieldName)
 				                            .orElseThrow(() -> noField(fieldName));
-				if(Utils.isVirtual(field, null)){
+				if(field.isVirtual()){
 					throw new NotImplementedException("Virtual field access not implemented");
 				}
 				return new QueryValueSource.Field.IO(field);

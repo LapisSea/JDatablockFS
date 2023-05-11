@@ -546,7 +546,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	private Stream<VirtualAccessor<T>> virtualAccessorStream(){
-		return getFields().stream().map(t -> Utils.getVirtual(t, null)).filter(Objects::nonNull);
+		return getFields().stream().map(t -> t.getVirtual(null)).filter(Objects::nonNull);
 	}
 	
 	private short[] calcPoolObjectsSize(){
@@ -672,7 +672,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	
 	public FieldSet<T> getRealFields(){
 		if(realFields == null){
-			realFields = FieldSet.of(getFields().stream().filter(e -> !Utils.isVirtual(e, IO)));
+			realFields = FieldSet.of(getFields().stream().filter(e -> !e.isVirtual(IO)));
 		}
 		return realFields;
 	}
@@ -680,7 +680,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	public FieldSet<T> getCloneFields(){
 		if(cloneFields == null){
 			cloneFields = FieldSet.of(getFields().stream().filter(f -> {
-				if(f.typeFlag(IOField.PRIMITIVE_OR_ENUM_FLAG) || Utils.isVirtual(f, IO)) return false;
+				if(f.typeFlag(IOField.PRIMITIVE_OR_ENUM_FLAG) || f.isVirtual(IO)) return false;
 				var acc = f.getAccessor();
 				if(acc != null){
 					var typ = acc.getType();

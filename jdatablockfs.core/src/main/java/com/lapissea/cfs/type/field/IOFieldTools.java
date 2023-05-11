@@ -1,6 +1,5 @@
 package com.lapissea.cfs.type.field;
 
-import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.GetAnnotation;
@@ -115,7 +114,7 @@ public class IOFieldTools{
 				                 return order;
 			                 })
 			                 //Pull any temporary fields back to reduce unessecary field skipping when re-reading them
-			                 .thenComparingInt(f -> Utils.isVirtual(f, StoragePool.IO)? 0 : 1)
+			                 .thenComparingInt(f -> f.isVirtual(StoragePool.IO)? 0 : 1)
 			                 //pull any cheap to read/write fields back
 			                 .thenComparingInt(f -> f.getType().isEnum() || SupportedPrimitive.isAny(f.getType())? 0 : 1)
 			                 //Encourage fields with similar dependencies to be next to each other
