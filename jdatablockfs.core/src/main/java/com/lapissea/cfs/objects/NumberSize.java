@@ -125,10 +125,11 @@ public enum NumberSize{
 	
 	public void writeFloating(ContentWriter out, double value) throws IOException{
 		switch(this){
+			case null -> { }
 			case INT -> out.writeInt4(Float.floatToIntBits((float)value));
 			case LONG -> out.writeInt8(Double.doubleToLongBits(value));
 			case SHORT -> out.writeInt2(IOUtils.floatToShortBits((float)value));
-			case VOID, null -> { }
+			case VOID -> { }
 			case BYTE, SMALL_INT, BIG_INT, SMALL_LONG -> throw new UnsupportedOperationException();
 		}
 	}
