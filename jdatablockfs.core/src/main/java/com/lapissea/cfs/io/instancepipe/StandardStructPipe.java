@@ -1,6 +1,5 @@
 package com.lapissea.cfs.io.instancepipe;
 
-import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.internal.MemPrimitive;
 import com.lapissea.cfs.io.content.ContentReader;
@@ -138,7 +137,7 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		List<CmdBuild> cmds   = new ArrayList<>(fields.size());
 		
 		for(IOField<T, ?> field : fields){
-			var needsInstance = !field.streamUnpackedFields().allMatch(f -> Utils.isVirtual(f, IO));
+			var needsInstance = !field.streamUnpackedFields().allMatch(f -> f.isVirtual(IO));
 			
 			if(field.streamUnpackedFields().flatMap(fields::streamDependentOn).findAny().isPresent()){
 				cmds.add(new CmdBuild.Read(needsInstance));

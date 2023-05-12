@@ -1,13 +1,7 @@
 package com.lapissea.cfs;
 
-import com.lapissea.cfs.io.bit.BitUtils;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.objects.Stringify;
-import com.lapissea.cfs.objects.collections.IOIterator;
-import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.field.IOField;
-import com.lapissea.cfs.type.field.StoragePool;
-import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
@@ -22,13 +16,10 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.Optional;
-import java.util.OptionalLong;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static com.lapissea.util.UtilL.Assert;
@@ -56,42 +47,6 @@ public class Utils{
 		}else{
 			Assert(free == 0);
 		}
-	}
-	
-	public static OptionalLong bitToByte(OptionalLong bits){
-		return bits.isPresent()? OptionalLong.of(BitUtils.bitsToBytes(bits.getAsLong())) : bits;
-	}
-	
-	public static OptionalLong addIfBoth(OptionalLong a, OptionalLong b){
-		if(a.isEmpty()) return a;
-		if(b.isEmpty()) return b;
-		return OptionalLong.of(a.getAsLong() + b.getAsLong());
-	}
-	
-	public static OptionalLong maxIfBoth(OptionalLong a, OptionalLong b){
-		if(a.isEmpty()) return a;
-		if(b.isEmpty()) return b;
-		return OptionalLong.of(Math.max(a.getAsLong(), b.getAsLong()));
-	}
-	
-	public static OptionalLong minIfBoth(OptionalLong a, OptionalLong b){
-		if(a.isEmpty()) return a;
-		if(b.isEmpty()) return b;
-		return OptionalLong.of(Math.min(a.getAsLong(), b.getAsLong()));
-	}
-	
-	public static String byteArrayToBitString(byte[] data){
-		return byteArrayToBitString(data, 0, data.length);
-	}
-	public static String byteArrayToBitString(byte[] data, int length){
-		return byteArrayToBitString(data, 0, length);
-	}
-	public static String byteArrayToBitString(byte[] data, int offset, int length){
-		return IntStream.range(offset, offset + length)
-		                .map(i -> data[i]&0xFF)
-		                .mapToObj(b -> String.format("%8s", Integer.toBinaryString(b)).replace(' ', '0'))
-		                .map(s -> new StringBuilder(s).reverse())
-		                .collect(Collectors.joining());
 	}
 	
 	@Deprecated
@@ -164,22 +119,6 @@ public class Utils{
 	public static <K, V, C extends Map<K, V>> C nullIfEmpty(C map){
 		if(map.isEmpty()) return null;
 		return map;
-	}
-	
-	
-	private static final IOIterator.Iter<?> EMPTY_ITER = new IOIterator.Iter<>(){
-		@Override
-		public boolean hasNext(){
-			return false;
-		}
-		@Override
-		public Object ioNext(){
-			throw new NoSuchElementException();
-		}
-	};
-	
-	public static <T> IOIterator.Iter<T> emptyIter(){
-		return (IOIterator.Iter<T>)EMPTY_ITER;
 	}
 	
 	public static String toShortString(Object o){
@@ -268,16 +207,6 @@ public class Utils{
 			e.printStackTrace();
 		}
 		throw UtilL.uncheckedThrow(e);
-	}
-	
-	public static boolean isVirtual(IOField<?, ?> field, StoragePool pool){
-		return field.getAccessor() instanceof VirtualAccessor<?> acc &&
-		       (pool == null || acc.getStoragePool() == pool);
-	}
-	public static <T extends IOInstance<T>> VirtualAccessor<T> getVirtual(IOField<T, ?> field, StoragePool pool){
-		return field.getAccessor() instanceof VirtualAccessor<T> acc &&
-		       (pool == null || acc.getStoragePool() == pool)
-		       ? acc : null;
 	}
 	
 	public static <T> Set<T> join(Set<T> a, Set<T> b){

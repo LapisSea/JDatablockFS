@@ -3,12 +3,31 @@ package com.lapissea.cfs.objects.collections;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.function.Consumer;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
 public interface IOIterator<T>{
 	interface Iter<T> extends IOIterator<T>, Iterator<T>{
+		
+		@SuppressWarnings("unchecked")
+		static <T> IOIterator.Iter<T> emptyIter(){
+			final class Holder{
+				private static final IOIterator.Iter<?> EMPTY_ITER = new IOIterator.Iter<>(){
+					@Override
+					public boolean hasNext(){
+						return false;
+					}
+					@Override
+					public Object ioNext(){
+						throw new NoSuchElementException();
+					}
+				};
+			}
+			return (IOIterator.Iter<T>)Holder.EMPTY_ITER;
+		}
+		
 		@Deprecated
 		@Override
 		default T next(){

@@ -253,6 +253,16 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 		return getAccessor() instanceof VirtualAccessor;
 	}
 	
+	public boolean isVirtual(StoragePool pool){
+		return getAccessor() instanceof VirtualAccessor<?> acc &&
+		       (pool == null || acc.getStoragePool() == pool);
+	}
+	public VirtualAccessor<T> getVirtual(StoragePool pool){
+		return getAccessor() instanceof VirtualAccessor<T> acc &&
+		       (pool == null || acc.getStoragePool() == pool)
+		       ? acc : null;
+	}
+	
 	private void requireLateData(){
 		if(!lateDataInitialized){
 			throw new IllegalStateException(this.getName() + " late data not initialized");
