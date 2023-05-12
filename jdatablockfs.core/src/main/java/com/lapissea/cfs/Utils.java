@@ -2,7 +2,6 @@ package com.lapissea.cfs;
 
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.objects.Stringify;
-import com.lapissea.cfs.objects.collections.IOIterator;
 import com.lapissea.util.LogUtil;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.TextUtil;
@@ -17,7 +16,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
@@ -121,22 +119,6 @@ public class Utils{
 	public static <K, V, C extends Map<K, V>> C nullIfEmpty(C map){
 		if(map.isEmpty()) return null;
 		return map;
-	}
-	
-	
-	private static final IOIterator.Iter<?> EMPTY_ITER = new IOIterator.Iter<>(){
-		@Override
-		public boolean hasNext(){
-			return false;
-		}
-		@Override
-		public Object ioNext(){
-			throw new NoSuchElementException();
-		}
-	};
-	
-	public static <T> IOIterator.Iter<T> emptyIter(){
-		return (IOIterator.Iter<T>)EMPTY_ITER;
 	}
 	
 	public static String toShortString(Object o){

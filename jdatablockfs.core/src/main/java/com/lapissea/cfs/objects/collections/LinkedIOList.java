@@ -1,6 +1,5 @@
 package com.lapissea.cfs.objects.collections;
 
-import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.ValueStorage;
 import com.lapissea.cfs.io.instancepipe.FieldDependency;
@@ -317,7 +316,7 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 		
 		try{
 			var head = getHead();
-			if(head == null) return Utils.emptyIter();
+			if(head == null) return IOIterator.Iter.emptyIter();
 			return head.valueIterator();
 		}catch(IOException e){
 			throw new RuntimeException(e);
@@ -408,7 +407,7 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 						
 						if(iter == null || iterCursor>=index + 1){
 							var head = getHead();
-							if(head == null) iter = Utils.emptyIter();
+							if(head == null) iter = IOIterator.Iter.emptyIter();
 							else iter = head.iterator();
 							iterCursor = 0;
 						}
