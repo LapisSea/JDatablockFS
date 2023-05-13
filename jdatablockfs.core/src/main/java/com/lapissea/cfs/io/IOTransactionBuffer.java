@@ -1,6 +1,7 @@
 package com.lapissea.cfs.io;
 
 import com.lapissea.cfs.internal.MemPrimitive;
+import com.lapissea.cfs.utils.IntHashSet;
 import com.lapissea.cfs.utils.ReadWriteClosableLock;
 import com.lapissea.util.UtilL;
 
@@ -8,11 +9,9 @@ import java.io.IOException;
 import java.lang.invoke.VarHandle;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
 import java.util.OptionalLong;
 import java.util.PrimitiveIterator;
-import java.util.Set;
 
 import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 
@@ -480,8 +479,8 @@ public final class IOTransactionBuffer{
 		}
 	}
 	
-	private       boolean      optimize;
-	private final Set<Integer> dirty = new HashSet<>();
+	private       boolean    optimize;
+	private final IntHashSet dirty = new IntHashSet();
 	
 	private void markIndexDirty(int i){
 		if(i>0) dirty.add(i - 1);
@@ -505,7 +504,9 @@ public final class IOTransactionBuffer{
 			}
 			
 			var jumpSize = writeEvents.size()/4;
-			for(int i : dirty){
+			for(var ic : dirty){
+				var i = ic.value;
+				
 				if(i + 1>=writeEvents.size()) continue;
 				var e1End   = writeEvents.get(i).end();
 				var e2Start = writeEvents.get(i + 1).start();
