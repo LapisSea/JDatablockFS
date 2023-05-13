@@ -250,7 +250,7 @@ public class DefragmentManager{
 	}
 	
 	private void reallocateAndMove(Cluster cluster, Chunk fragmentedChunk, long requiredSize) throws IOException{
-		var likelyChain = fragmentedChunk.streamNext().limit(3).count()>2;
+		var likelyChain = fragmentedChunk.chainLength(3)>2;
 		var newChunk = AllocateTicket
 			               .bytes(requiredSize)
 			               .withDataPopulated((p, io) -> {

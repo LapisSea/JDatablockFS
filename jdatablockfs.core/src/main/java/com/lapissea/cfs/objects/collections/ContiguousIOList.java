@@ -661,7 +661,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	}
 	private void defragData(Chunk ch, long extraSlots, long max) throws IOException{
 		if(max<=2) return;
-		var nextCount = ch.streamNext().limit(max + 1).count();
+		var nextCount = ch.chainLength(max + 1);
 		if(nextCount<max) return;
 		if(nextCount == max){
 			var cap = 0L;
@@ -682,7 +682,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 			Point optimal    = null;
 			Chunk mergePoint = ch.requireNext();
 			int   steps      = 0;
-			while(mergePoint.streamNext().limit(3).count() == 3){
+			while(mergePoint.chainLength(3) == 3){
 				if(steps>=max) break;
 				steps++;
 				var next = mergePoint.requireNext();

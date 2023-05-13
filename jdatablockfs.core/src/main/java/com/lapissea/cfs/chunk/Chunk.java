@@ -614,6 +614,19 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	public Stream<Chunk> streamNext(){
 		return Stream.generate(new ChainSupplier(this)).takeWhile(Objects::nonNull);
 	}
+	public long chainLength(long maxLen) throws IOException{
+		if(maxLen == 0) return 0;
+		if(maxLen<0) throw new IllegalArgumentException("maxLen must be positive");
+		
+		var  ch  = this;
+		long len = 0;
+		while(ch != null){
+			len++;
+			if(len>=maxLen) return len;
+			ch = ch.next();
+		}
+		return len;
+	}
 	
 	public void requireReal() throws CacheOutOfSync{
 		provider.getChunkCache().requireReal(this);
