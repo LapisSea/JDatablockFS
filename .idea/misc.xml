@@ -40,7 +40,7 @@
     <option name="myDefaultNotNull" value="com.lapissea.util.NotNull" />
     <option name="myNullables">
       <value>
-        <list size="15">
+        <list size="16">
           <item index="0" class="java.lang.String" itemvalue="org.checkerframework.checker.nullness.compatqual.NullableDecl" />
           <item index="1" class="java.lang.String" itemvalue="org.jetbrains.annotations.Nullable" />
           <item index="2" class="java.lang.String" itemvalue="androidx.annotation.Nullable" />
@@ -56,12 +56,13 @@
           <item index="12" class="java.lang.String" itemvalue="io.reactivex.rxjava3.annotations.Nullable" />
           <item index="13" class="java.lang.String" itemvalue="io.reactivex.annotations.Nullable" />
           <item index="14" class="java.lang.String" itemvalue="org.jspecify.nullness.Nullable" />
+          <item index="15" class="java.lang.String" itemvalue="jakarta.annotation.Nullable" />
         </list>
       </value>
     </option>
     <option name="myNotNulls">
       <value>
-        <list size="16">
+        <list size="17">
           <item index="0" class="java.lang.String" itemvalue="androidx.annotation.RecentlyNonNull" />
           <item index="1" class="java.lang.String" itemvalue="org.checkerframework.checker.nullness.qual.NonNull" />
           <item index="2" class="java.lang.String" itemvalue="com.android.annotations.NonNull" />
@@ -78,6 +79,7 @@
           <item index="13" class="java.lang.String" itemvalue="io.reactivex.annotations.NonNull" />
           <item index="14" class="java.lang.String" itemvalue="io.reactivex.rxjava3.annotations.NonNull" />
           <item index="15" class="java.lang.String" itemvalue="org.jspecify.nullness.NonNull" />
+          <item index="16" class="java.lang.String" itemvalue="jakarta.annotation.Nonnull" />
         </list>
       </value>
     </option>
@@ -86,7 +88,7 @@
       <option value="org.jetbrains.annotations.NotNull" />
     </instrumentedNotNulls>
   </component>
-  <component name="ProjectRootManager" version="2" languageLevel="JDK_19_PREVIEW" project-jdk-name="openjdk-19" project-jdk-type="JavaSDK">
+  <component name="ProjectRootManager" version="2" languageLevel="JDK_20_PREVIEW" project-jdk-name="openjdk-20" project-jdk-type="JavaSDK">
     <output url="file://$PROJECT_DIR$/target" />
   </component>
 </project>

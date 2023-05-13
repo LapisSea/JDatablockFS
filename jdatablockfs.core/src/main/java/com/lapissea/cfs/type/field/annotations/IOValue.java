@@ -209,8 +209,9 @@ public @interface IOValue{
 			@Override
 			public void validate(FieldAccessor<?> field, Unsigned typeOverride){
 				switch(SupportedPrimitive.get(field.getType()).orElse(null)){
-					case null, BOOLEAN, FLOAT, DOUBLE, CHAR -> throw new MalformedStruct(field + " can not be unsigned");
+					case BOOLEAN, FLOAT, DOUBLE, CHAR -> throw new MalformedStruct(field + " can not be unsigned");
 					case BYTE, SHORT, INT, LONG -> { }
+					case null -> { }
 				}
 			}
 		};

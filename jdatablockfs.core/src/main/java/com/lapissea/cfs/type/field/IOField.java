@@ -113,7 +113,8 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 		if(value != null) return value;
 		switch(getNullability()){
 			case NOT_NULL -> throw new FieldIsNull(this);
-			case null, NULLABLE -> { }
+			case NULLABLE -> { }
+			case null -> { }
 			case DEFAULT_IF_NULL -> throw new IllegalStateException(this + " does not support " + DEFAULT_IF_NULL);
 		}
 		return null;

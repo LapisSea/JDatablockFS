@@ -84,52 +84,40 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 		return s;
 	}
 	
-	private SkipData<T> calcSkip(){
-		interface CmdBuild{
-			boolean needsPool();
-			boolean needsInstance();
-			int siz();
-			void write(int off, byte[] dest);
-			
-			record Skip() implements CmdBuild{
-				@Override
-				public boolean needsPool(){ return true; }
-				@Override
-				public boolean needsInstance(){ return false; }
-				@Override
-				public int siz(){ return 1; }
-				@Override
-				public void write(int off, byte[] dest){
-					dest[off] = SKIP;
-				}
-			}
-			
-			record SkipFixed(long bytes) implements CmdBuild{
-				@Override
-				public boolean needsPool(){ return false; }
-				@Override
-				public boolean needsInstance(){ return false; }
-				@Override
-				public int siz(){ return 9; }
-				@Override
-				public void write(int off, byte[] dest){
-					dest[off] = SKIP_FIXED;
-					MemPrimitive.setLong(dest, off + 1, bytes);
-				}
-			}
-			
-			record Read(boolean needsInstance) implements CmdBuild{
-				@Override
-				public boolean needsPool(){ return true; }
-				@Override
-				public int siz(){ return 1; }
-				@Override
-				public void write(int off, byte[] dest){
-					dest[off] = READ;
-				}
+	private sealed interface CmdBuild{
+		int siz();
+		void write(int off, byte[] dest);
+		
+		record Skip() implements CmdBuild{
+			@Override
+			public int siz(){ return 1; }
+			@Override
+			public void write(int off, byte[] dest){
+				dest[off] = SKIP;
 			}
 		}
 		
+		record SkipFixed(long bytes) implements CmdBuild{
+			@Override
+			public int siz(){ return 9; }
+			@Override
+			public void write(int off, byte[] dest){
+				dest[off] = SKIP_FIXED;
+				MemPrimitive.setLong(dest, off + 1, bytes);
+			}
+		}
+		
+		record Read(boolean needsInstance) implements CmdBuild{
+			@Override
+			public int siz(){ return 1; }
+			@Override
+			public void write(int off, byte[] dest){
+				dest[off] = READ;
+			}
+		}
+	}
+	
+	private SkipData<T> calcSkip(){
 		var report = createSizeReport(0);
 		if(report.dynamic()) return null;
 		
@@ -165,8 +153,16 @@ public class StandardStructPipe<T extends IOInstance<T>> extends StructPipe<T>{
 			pos += c.siz();
 		}
 		
-		boolean needsInstance = cmds.stream().anyMatch(CmdBuild::needsInstance);
-		boolean needsPool     = cmds.stream().anyMatch(CmdBuild::needsPool) && makeIOPool() != null;
+		boolean needsInstance = cmds.stream().anyMatch(c -> switch(c){
+			case CmdBuild.Skip ignored -> false;
+			case CmdBuild.SkipFixed ignored -> false;
+			case CmdBuild.Read read -> read.needsInstance;
+		});
+		boolean needsPool = cmds.stream().anyMatch(c -> switch(c){
+			case CmdBuild.Read ignored -> true;
+			case CmdBuild.Skip ignored -> true;
+			case CmdBuild.SkipFixed ignored -> false;
+		}) && makeIOPool() != null;
 		
 		return new SkipData<>(fields, buff, needsInstance, needsPool);
 	}
