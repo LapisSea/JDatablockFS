@@ -313,7 +313,11 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 		return Arrays.stream(args).map(IOInstance::clone).toArray(TypeLink[]::new);
 	}
 	public Type[] genericArgsCopy(IOTypeDB db){
-		return Arrays.stream(args).map(arg -> arg.generic(db)).toArray(Type[]::new);
+		Type[] res = new Type[args.length];
+		for(int i = 0; i<args.length; i++){
+			res[i] = args[i].generic(db);
+		}
+		return res;
 	}
 	
 	@Override
@@ -334,7 +338,13 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 		return Utils.classNameToHuman(getTypeName(), true) + argStr;
 	}
 	public Type generic(IOTypeDB db){
-		if(generic == null) generic = SyntheticParameterizedType.of(getTypeClass(db), Arrays.stream(args).map(t -> t.getTypeClass(db)).toArray(Type[]::new));
+		if(generic == null){
+			Type[] tArgs = new Type[args.length];
+			for(int i = 0; i<args.length; i++){
+				tArgs[i] = args[i].getTypeClass(db);
+			}
+			generic = SyntheticParameterizedType.of(getTypeClass(db), tArgs);
+		}
 		return generic;
 	}
 	

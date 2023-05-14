@@ -77,7 +77,12 @@ public class InstanceCollection{
 				if(desc.hasFixed()){
 					return size*desc.requireFixed(WordSpace.BYTE);
 				}
-				return dataAdapter.getStream(arr).mapToLong(instance -> desc.calcUnknown(instance.getThisStruct().allocVirtualVarPool(IO), prov, instance, WordSpace.BYTE)).sum();
+				
+				long sum = 0;
+				for(var instance : dataAdapter.getAsIterable(arr)){
+					sum += desc.calcUnknown(instance.getThisStruct().allocVirtualVarPool(IO), prov, instance, WordSpace.BYTE);
+				}
+				return sum;
 			}));
 		}
 		

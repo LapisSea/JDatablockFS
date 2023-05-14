@@ -5,20 +5,49 @@ import com.lapissea.cfs.io.content.ContentOutputStream;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.io.instancepipe.StructPipe;
+import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.text.Encoding.CharEncoding;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
+import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.util.NotNull;
 
 import java.io.IOException;
 import java.util.Objects;
+import java.util.OptionalLong;
 
+@StructPipe.Special
 public final class AutoText extends IOInstance.Managed<AutoText> implements CharSequence{
 	
-	public static final Struct<AutoText>     STRUCT = Struct.of(AutoText.class);
-	public static final StructPipe<AutoText> PIPE   = StandardStructPipe.of(STRUCT);
+	public static final Struct<AutoText> STRUCT = Struct.of(AutoText.class);
+	
+	private static final class AutoTextPipe extends StandardStructPipe<AutoText>{
+		public AutoTextPipe(){
+			super(STRUCT, true);
+		}
+		@Override
+		protected SizeDescriptor<AutoText> createSizeDescriptor(){
+			return SizeDescriptor.UnknownLambda.of(1, OptionalLong.empty(), (ioPool, prov, value) -> {
+				var charCount = value.charCount;
+				int textBytesCount;
+				if(value.dataSrc != null) textBytesCount = value.dataSrc.length;
+				else textBytesCount = value.encoding.calcSize(value.data);
+				
+				var numSize      = NumberSize.bySize(charCount);
+				var textBytesLen = NumberSize.bySize(textBytesCount);
+				
+				return 1L + numSize.bytes + textBytesLen.bytes + textBytesCount;
+			});
+		}
+	}
+	
+	static{
+		StandardStructPipe.registerSpecialImpl(STRUCT, AutoTextPipe::new);
+	}
+	
+	public static final StructPipe<AutoText> PIPE = StandardStructPipe.of(STRUCT);
 	
 	private String       data;
 	private byte[]       dataSrc;

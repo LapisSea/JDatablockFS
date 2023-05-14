@@ -27,7 +27,7 @@ import java.util.stream.LongStream;
 public abstract sealed class MemoryData<DataType> implements IOInterface{
 	
 	@SuppressWarnings("resource")
-	public class MemRandomIO implements RandomIO{
+	public final class MemRandomIO implements RandomIO{
 		
 		private int pos;
 		
@@ -90,7 +90,7 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 		@Override
 		public int read() throws IOException{
 			if(transactionOpen){
-				int b = transactionBuff.readByte(this::readAt, pos);
+				int b = transactionBuff.readByte(readAt(), pos);
 				if(b>=0){
 					this.pos++;
 				}
@@ -105,7 +105,7 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 		@Override
 		public int read(byte[] b, int off, int len) throws IOException{
 			if(transactionOpen){
-				int read = transactionBuff.read(this::readAt, pos, b, off, len);
+				int read = transactionBuff.read(readAt(), pos, b, off, len);
 				pos += read;
 				return read;
 			}
@@ -118,7 +118,7 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 		@Override
 		public long readWord(int len) throws IOException{
 			if(transactionOpen){
-				var word = transactionBuff.readWord(this::readAt, pos, len);
+				var word = transactionBuff.readWord(readAt(), pos, len);
 				pos += len;
 				return word;
 			}
@@ -131,6 +131,12 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 			long val = MemoryData.this.readWord(fileData, pos, len);
 			pos += len;
 			return val;
+		}
+		
+		private IOTransactionBuffer.BaseAccess readAt;
+		private IOTransactionBuffer.BaseAccess readAt(){
+			if(readAt == null) readAt = this::readAt;
+			return readAt;
 		}
 		
 		private int readAt(long pos, byte[] b, int off, int len){

@@ -253,16 +253,20 @@ class Encoding{
 			}
 		}
 		private boolean isCompatible(String s){
-			return s.chars().allMatch(c -> {
+			outer:
+			for(int ci = 0, l = s.length(); ci<l; ci++){
+				var c = s.charAt(ci);
+				
 				for(int i = 0; i<ranges.length; i += 2){
 					int from = ranges[i];
 					int to   = ranges[i + 1];
 					if(from<=c && c<=to){
-						return true;
+						continue outer;
 					}
 				}
 				return false;
-			});
+			}
+			return true;
 		}
 		
 	}

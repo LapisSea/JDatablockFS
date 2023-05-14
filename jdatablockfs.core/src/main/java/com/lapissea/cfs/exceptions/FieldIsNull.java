@@ -27,7 +27,7 @@ public class FieldIsNull extends NullPointerException{
 	
 	public FieldIsNull(IOField<?, ?> field){
 		this.field = field;
-		msgMake = () -> this.field == null? "<unknown field>" : (Utils.typeToHuman(this.field.getClass(), false) + " - " + this.field) + " is null";
+		msgMake = null;
 	}
 	
 	public FieldIsNull(IOField<?, ?> field, Supplier<String> msgMake){
@@ -42,7 +42,13 @@ public class FieldIsNull extends NullPointerException{
 	
 	@Override
 	public String getMessage(){
-		if(msg == null) msg = msgMake.get();
+		if(msg == null){
+			if(msgMake == null){
+				msg = this.field == null?
+				      "<unknown field>" :
+				      (Utils.typeToHuman(this.field.getClass(), false) + " - " + this.field) + " is null";
+			}else msg = msgMake.get();
+		}
 		return msg;
 	}
 }

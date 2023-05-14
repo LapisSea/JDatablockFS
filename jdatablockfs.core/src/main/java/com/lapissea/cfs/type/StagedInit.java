@@ -5,6 +5,7 @@ import com.lapissea.cfs.exceptions.RecursiveSelfCompilation;
 import com.lapissea.cfs.internal.Runner;
 import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.utils.ClosableLock;
+import com.lapissea.cfs.utils.IntHashSet;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 
@@ -211,7 +212,7 @@ public abstract class StagedInit{
 	}
 	
 	protected final void validateStates(){
-		Set<Integer>   ids      = new HashSet<>();
+		IntHashSet     ids      = new IntHashSet();
 		Set<String>    names    = new HashSet<>();
 		List<String>   problems = new ArrayList<>();
 		Set<StateInfo> base     = new HashSet<>(StateInfo.BASE_STATES);

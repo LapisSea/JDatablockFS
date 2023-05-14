@@ -10,7 +10,6 @@ import com.lapissea.util.TextUtil;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -99,17 +98,19 @@ public interface GenericContext extends Stringify{
 		public GenericContext argAsContext(String argName){
 			var type = getType(argName);
 			
-			switch(type){
-				case ParameterizedType parm -> {
-					return new TypeArgs((Class<?>)parm.getRawType(), type);
-				}
+			return switch(type){
+				case ParameterizedType parm -> new TypeArgs((Class<?>)parm.getRawType(), type);
 				case Class<?> raw -> {
-					var parms   = raw.getTypeParameters();
-					var rawArgs = Arrays.stream(parms).map(p -> p.getBounds()[0]).toArray(Type[]::new);
-					return new TypeArgs(raw, SyntheticParameterizedType.of(raw, rawArgs));
+					var parms = raw.getTypeParameters();
+					
+					var rawArgs = new Type[parms.length];
+					for(int i = 0; i<parms.length; i++){
+						rawArgs[i] = parms[i].getBounds()[0];
+					}
+					yield new TypeArgs(raw, SyntheticParameterizedType.of(raw, rawArgs));
 				}
 				default -> throw new NotImplementedException(type.getClass().getName());
-			}
+			};
 		}
 	}
 	
