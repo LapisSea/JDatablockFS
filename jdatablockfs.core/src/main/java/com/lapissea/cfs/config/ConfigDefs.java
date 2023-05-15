@@ -61,6 +61,8 @@ public sealed interface ConfigDefs permits ConfigTools.Dummy{
 	
 	Flag.Abc<Lz4Packer.Provider> LZ4_COMPATIBILITY = flagE("lz4.compatibility", Lz4Packer.Provider.ANY);
 	
+	Flag.Int ROOT_PROVIDER_WARMUP_COUNT = flagI("rootProviderWarmupCount", 20).positive();
+	
 	private static int cores(){
 		return Math.min(10, Runtime.getRuntime().availableProcessors());
 	}

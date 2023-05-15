@@ -1,6 +1,7 @@
 package com.lapissea.cfs.chunk;
 
 import com.lapissea.cfs.MagicID;
+import com.lapissea.cfs.config.ConfigDefs;
 import com.lapissea.cfs.exceptions.MalformedPointer;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.impl.MemoryData;
@@ -24,7 +25,9 @@ import com.lapissea.util.function.UnsafeSupplier;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -113,23 +116,50 @@ public class Cluster implements DataProvider{
 	
 	
 	private final RootProvider rootProvider = new RootProvider(){
+		private static final int ROOT_PROVIDER_WARMUP_COUNT = ConfigDefs.ROOT_PROVIDER_WARMUP_COUNT.resolveVal();
+		
+		private static class Node{
+			WeakReference<Object> val;
+			int                   warmup;
+		}
+		
+		private final Map<ObjectID, Node> cache = ROOT_PROVIDER_WARMUP_COUNT>0? new HashMap<>() : null;
+		
+		@SuppressWarnings("unchecked")
+		private <T> T requestCached(ObjectID id, UnsafeSupplier<T, IOException> objectGenerator) throws IOException{
+			{
+				var cached = cache.get(id);
+				if(cached != null && cached.val != null){
+					Object val = cached.val.get();
+					if(val != null) return (T)val;
+					else cache.remove(id);
+				}
+			}
+			
+			var val = readOrMake(id, (UnsafeSupplier<Object, IOException>)objectGenerator);
+			
+			var cached = cache.computeIfAbsent(id.clone(), i -> new Node());
+			if(cached.warmup<ROOT_PROVIDER_WARMUP_COUNT) cached.warmup++;
+			else cached.val = new WeakReference<>(val);
+			return (T)val;
+		}
+		
+		private Object readOrMake(ObjectID id, UnsafeSupplier<Object, IOException> objectGenerator) throws IOException{
+			var meta = meta();
+			return meta.rootObjects.computeIfAbsent(id, objectGenerator);
+		}
+		
 		@SuppressWarnings("unchecked")
 		@Override
 		public <T> T request(ObjectID id, UnsafeSupplier<T, IOException> objectGenerator) throws IOException{
 			Objects.requireNonNull(id);
 			Objects.requireNonNull(objectGenerator);
 			
-			var meta = meta();
-			
-			var existing = meta.rootObjects.get(id);
-			if(existing != null){
-				return (T)existing;
+			if(ROOT_PROVIDER_WARMUP_COUNT>0){
+				return requestCached(id, objectGenerator);
 			}
 			
-			var inst = objectGenerator.get();
-			
-			meta.rootObjects.put(id, inst);
-			return inst;
+			return (T)readOrMake(id, (UnsafeSupplier<Object, IOException>)objectGenerator);
 		}
 		
 		@Override

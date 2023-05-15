@@ -5,6 +5,8 @@ import com.lapissea.cfs.objects.Stringify;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.utils.IterablePP;
 import com.lapissea.util.Nullable;
+import com.lapissea.util.function.UnsafeFunction;
+import com.lapissea.util.function.UnsafeSupplier;
 
 import java.io.IOException;
 import java.util.Iterator;
@@ -157,6 +159,25 @@ public interface IOMap<K, V> extends IterablePP<IOMap.IOEntry<K, V>>{
 	@Override
 	default Iterator<IOEntry<K, V>> iterator(){
 		return stream().iterator();
+	}
+	
+	default V computeIfAbsent(K key, UnsafeSupplier<V, IOException> compute) throws IOException{
+		var e = getEntry(key);
+		if(e == null){
+			var def = compute.get();
+			put(key, def);
+			return def;
+		}
+		return e.getValue();
+	}
+	default V computeIfAbsent(K key, UnsafeFunction<K, V, IOException> compute) throws IOException{
+		var e = getEntry(key);
+		if(e == null){
+			var def = compute.apply(key);
+			put(key, def);
+			return def;
+		}
+		return e.getValue();
 	}
 	
 	/**
