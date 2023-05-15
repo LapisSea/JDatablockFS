@@ -247,10 +247,37 @@ public final class ChunkSet implements Set<ChunkPointer>{
 		return true;
 	}
 	
+	private Index to64(Index index){
+		return switch(index){
+			case Index.Bitmap32 b32 -> {
+				var b64 = new Index.Bitmap64();
+				b32.data.forEach((IntConsumer)b64.data::addLong);
+				yield b64;
+			}
+			case Index.Bitmap64 b64 -> b64;
+		};
+	}
 	private Index ptrsToIndex(Stream<? extends ChunkPointer> c){
-		Index bitmap = new Index.Bitmap32();
-		c.mapToInt(ChunkPointer::getValueInt).forEach(bitmap::add);
-		return bitmap;
+		return switch(index){
+			case Index.Bitmap32 ignored -> {
+				Index bitmap = new Index.Bitmap32();
+				var   iter   = c.iterator();
+				while(iter.hasNext()){
+					var v = iter.next().getValue();
+					if(v>Integer.MAX_VALUE){
+						bitmap = to64(bitmap);
+						index = to64(index);
+					}
+					bitmap.add(v);
+				}
+				yield bitmap;
+			}
+			case Index.Bitmap64 ignored -> {
+				var bitmap = new Index.Bitmap64();
+				c.mapToLong(ChunkPointer::getValue).forEach(bitmap::add);
+				yield bitmap;
+			}
+		};
 	}
 	
 	private long calcEnd(Index toAdd){
@@ -324,9 +351,7 @@ public final class ChunkSet implements Set<ChunkPointer>{
 		}
 		size++;
 		if(ptr>Integer.MAX_VALUE && index instanceof Index.Bitmap32 b32){
-			var b64 = new Index.Bitmap64();
-			b32.data.forEach((IntConsumer)b64.data::addLong);
-			index = b64;
+			index = to64(index);
 		}
 		index.add(ptr);
 		
