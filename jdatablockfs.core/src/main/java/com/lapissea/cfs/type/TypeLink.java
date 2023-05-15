@@ -158,7 +158,7 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 		for(int i = 0; i<parms.length; i++){
 			args[i] = readType(iter);
 		}
-		return SyntheticParameterizedType.of(cls, args);
+		return SyntheticParameterizedType.of(cls, List.of(args));
 	}
 	
 	public static TypeLink ofFlat(Class<?>... args){
@@ -166,6 +166,9 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 	}
 	
 	public static TypeLink of(Class<?> raw, Type... args){
+		return of(raw, List.of(args));
+	}
+	public static TypeLink of(Class<?> raw, List<Type> args){
 		return of(SyntheticParameterizedType.of(raw, args));
 	}
 	
@@ -343,7 +346,7 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 			for(int i = 0; i<args.length; i++){
 				tArgs[i] = args[i].getTypeClass(db);
 			}
-			generic = SyntheticParameterizedType.of(getTypeClass(db), tArgs);
+			generic = SyntheticParameterizedType.of(getTypeClass(db), List.of(tArgs));
 		}
 		return generic;
 	}

@@ -65,7 +65,7 @@ public interface RootProvider extends DataProvider.Holder{
 				if(defTypAnn != null){
 					var defTyp = defTypAnn.value();
 					if(!IOInstance.isInstance(defTyp)) throw new IllegalStateException();
-					Type[] args = genericType.genericArgsCopy(provider.getTypeDb());
+					var args = genericType.genericArgsCopy(provider.getTypeDb());
 					
 					return withType(TypeLink.of(defTypAnn.value(), args));
 				}

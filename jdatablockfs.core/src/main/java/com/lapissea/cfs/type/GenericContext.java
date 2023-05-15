@@ -11,6 +11,7 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
@@ -83,7 +84,7 @@ public interface GenericContext extends Stringify{
 							}
 						}
 						if(dirty){
-							yield SyntheticParameterizedType.of(parmType.getOwnerType(), (Class<?>)parmType.getRawType(), args);
+							yield SyntheticParameterizedType.of(parmType.getOwnerType(), (Class<?>)parmType.getRawType(), List.of(args));
 						}
 						yield parmType;
 					}
@@ -107,7 +108,7 @@ public interface GenericContext extends Stringify{
 					for(int i = 0; i<parms.length; i++){
 						rawArgs[i] = parms[i].getBounds()[0];
 					}
-					yield new TypeArgs(raw, SyntheticParameterizedType.of(raw, rawArgs));
+					yield new TypeArgs(raw, SyntheticParameterizedType.of(raw, List.of(rawArgs)));
 				}
 				default -> throw new NotImplementedException(type.getClass().getName());
 			};

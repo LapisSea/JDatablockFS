@@ -447,10 +447,10 @@ public class FieldCompiler{
 		if(typeOverride != null){
 			var      rawType = SyntheticParameterizedType.generalize(type);
 			Class<?> raw     = rawType.getRawType();
-			Type[]   parms   = rawType.getActualTypeArguments();
+			var      parms   = rawType.getActualTypeArgumentsList();
 			
 			if(typeOverride.value() != Object.class) raw = typeOverride.value();
-			if(typeOverride.genericArgs().length != 0) parms = typeOverride.genericArgs();
+			if(typeOverride.genericArgs().length != 0) parms = List.of(typeOverride.genericArgs());
 			
 			type = SyntheticParameterizedType.of(raw, parms);
 		}
@@ -461,7 +461,7 @@ public class FieldCompiler{
 				var      rawType = SyntheticParameterizedType.generalize(type);
 				Class<?> raw     = impl.value();
 				if(!IOInstance.isInstance(raw)) throw new IllegalStateException();
-				Type[] parms = rawType.getActualTypeArguments();
+				var parms = rawType.getActualTypeArgumentsList();
 				type = SyntheticParameterizedType.of(raw, parms);
 			}
 		}
