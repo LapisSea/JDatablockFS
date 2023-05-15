@@ -5,7 +5,7 @@ public class IllegalBitValue extends RuntimeException{
 	public final long bit;
 	
 	public IllegalBitValue(long bit){
-		this.bit = bit;
+		this(bit, "Illegal bit found at " + bit);
 	}
 	public IllegalBitValue(long bit, String message){
 		super(message);

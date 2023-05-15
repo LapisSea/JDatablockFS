@@ -170,24 +170,18 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 		
 		@Override
 		public void write(byte[] b, int off, int len){
-			write(b, off, len, true);
-		}
-		
-		private void write(byte[] b, int off, int len, boolean pushPos){
 			if(readOnly) throw new UnsupportedOperationException();
 			if(transactionOpen){
 				transactionBuff.write(pos, b, off, len);
-				if(pushPos) pos += len;
+				pos += len;
 				return;
 			}
 			
 			var oldPos = pos;
 			write0(b, off, len);
 			
-			if(pushPos){
-				pos += len;
-				used = Math.max(used, pos);
-			}
+			pos += len;
+			used = Math.max(used, pos);
 			if(hook != null) logWriteEvent(oldPos, oldPos + len);
 		}
 		
@@ -196,19 +190,24 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 			if(readOnly) throw new UnsupportedOperationException();
 			if(writeData.isEmpty()) return;
 			if(transactionOpen){
-				for(var e : writeData){
-					transactionBuff.write(e.ioOffset(), e.data(), e.dataOffset(), e.dataLength());
+				for(WriteChunk(long ioOffset, int dataOffset, int dataLength, byte[] data) : writeData){
+					transactionBuff.write(ioOffset, data, dataOffset, dataLength);
 				}
 				return;
 			}
 			
-			var required = writeData.stream().mapToLong(WriteChunk::ioEnd).max().orElseThrow();
+			long required = Long.MIN_VALUE;
+			for(var writeDatum : writeData){
+				long ioEnd = writeDatum.ioEnd();
+				if(ioEnd>required) required = ioEnd;
+			}
+			
 			if(getCapacity()<required) setCapacity(Math.max(4, Math.max((int)(getCapacity()*4D/3), required)));
 			
 			used = Math.max(used, Math.toIntExact(required));
 			
-			for(var e : writeData){
-				writeN(e.data(), e.dataOffset(), fileData, Math.toIntExact(e.ioOffset()), e.dataLength());
+			for(WriteChunk(long ioOffset, int dataOffset, int dataLength, byte[] data) : writeData){
+				writeN(data, dataOffset, fileData, Math.toIntExact(ioOffset), dataLength);
 			}
 			
 			if(hook != null) logWriteEvent(writeData.stream().flatMapToLong(e -> LongStream.range(e.ioOffset(), e.ioEnd())));

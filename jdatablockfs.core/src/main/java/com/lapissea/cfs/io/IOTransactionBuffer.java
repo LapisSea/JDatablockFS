@@ -594,7 +594,11 @@ public final class IOTransactionBuffer{
 		}
 	}
 	private TransactionExport export0(){
-		var writes      = writeEvents.stream().map(e -> new RandomIO.WriteChunk(e.offset, e.data)).toList();
+		var writes = new ArrayList<RandomIO.WriteChunk>(writeEvents.size());
+		for(WriteEvent(long offset, byte[] data) : writeEvents){
+			writes.add(new RandomIO.WriteChunk(offset, data));
+		}
+		
 		var setCapacity = OptionalLong.empty();
 		if(modifiedCapacity != -1){
 			setCapacity = OptionalLong.of(modifiedCapacity);
