@@ -25,13 +25,13 @@ public sealed interface ConfigDefs permits ConfigTools.Dummy{
 	
 	Flag.Bool RELEASE_MODE    = flagB("releaseMode", () -> !deb() && isInJar());
 	Flag.Bool TYPE_VALIDATION = flagB("typeValidation", deb());
-	Flag.Int  BATCH_BYTES     = flagI("batchBytes", 1<<12);
+	Flag.Int  BATCH_BYTES     = flagI("batchBytes", 1<<12).natural();
 	
 	Flag.Abc<Log.LogLevel> LOG_LEVEL         = flagEDyn("log.level", RELEASE_MODE.boolMap(WARN, INFO));
 	Flag.Bool              PRINT_COMPILATION = flagB("printCompilation", LOG_LEVEL.map(l -> l.isWithin(SMALL_TRACE)));
 	
 	Flag.Bool            LOAD_TYPES_ASYNCHRONOUSLY = flagB("loading.async", true);
-	Flag.Int             LONG_WAIT_THRESHOLD       = flagI("loading.longWaitThreshold", RELEASE_MODE.boolMap(-1, 10000/cores()));
+	Flag.Int             LONG_WAIT_THRESHOLD       = flagI("loading.longWaitThreshold", RELEASE_MODE.boolMap(-1, 10000/cores())).positiveOptional();
 	Flag.Bool            TEXT_DISABLE_BLOCK_CODING = flagB("tweaks.disableTextBlockCoding", true);
 	Flag.Abc<AccessType> FIELD_ACCESS_TYPE         = flagEDyn("tweaks.fieldAccess", () -> jVersion()<=20? UNSAFE : VAR_HANDLE);
 	
@@ -49,8 +49,8 @@ public sealed interface ConfigDefs permits ConfigTools.Dummy{
 	Flag.Str  RUNNER_BASE_TASK_NAME       = flagS("runner.baseTaskName", "Task");
 	Flag.Bool RUNNER_ONLY_VIRTUAL_WORKERS = flagB("runner.onlyVirtual", false);
 	Flag.Bool RUNNER_MUTE_CHOKE_WARNING   = flagB("runner.muteWarning", false);
-	Flag.Int  RUNNER_TASK_CHOKE_TIME_MS   = flagI("runner.taskChokeTime", () -> 2000/cores());
-	Flag.Int  RUNNER_WATCHER_TIMEOUT_MS   = flagI("runner.watcherTimeout", 1000);
+	Flag.Int  RUNNER_TASK_CHOKE_TIME_MS   = flagI("runner.taskChokeTime", () -> 2000/cores()).natural();
+	Flag.Int  RUNNER_WATCHER_TIMEOUT_MS   = flagI("runner.watcherTimeout", 1000).natural();
 	
 	Flag.Bool         CLASSGEN_DEBUG                 = flagB("classGen.debug", false);
 	Flag.Bool         CLASSGEN_EXIT_ON_FAIL          = flagB("classGen.exitOnFail", false);

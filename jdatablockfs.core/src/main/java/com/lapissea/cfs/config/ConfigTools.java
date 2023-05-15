@@ -1,7 +1,10 @@
 package com.lapissea.cfs.config;
 
+import com.lapissea.cfs.logging.Log;
+
 import java.util.Objects;
 import java.util.function.Function;
+import java.util.function.IntFunction;
 import java.util.function.Supplier;
 
 public final class ConfigTools{
@@ -49,7 +52,7 @@ public final class ConfigTools{
 			}
 		}
 		
-		record Int(String name, DefaultValue<Integer> defaultValue) implements Flag<Integer>{
+		record Int(String name, DefaultValue<Integer> defaultValue, IntFunction<String> validate) implements Flag<Integer>{
 			public Int{
 				Objects.requireNonNull(name);
 				Objects.requireNonNull(defaultValue);
@@ -58,7 +61,46 @@ public final class ConfigTools{
 			@Override
 			public Integer resolve(){ return resolveVal(); }
 			public int resolveVal(){
-				return ConfigUtils.configInt(name, ConfigUtils.optionalProperty(name), defaultValue.value());
+				int def = defaultValue.value();
+				int val = ConfigUtils.configInt(name, ConfigUtils.optionalProperty(name), def);
+				if(validate != null){
+					var err = validate.apply(val);
+					if(err != null){
+						Log.warn("\"{}\" is not a valid value for {}. Reason: {}", val, name, err);
+						return def;
+					}
+				}
+				return val;
+			}
+			public Int natural(){
+				return withValidation(val -> {
+					if(val<=0) return "Value must be greater than 0!";
+					return null;
+				});
+			}
+			public Int positiveOptional(){
+				return withValidation(val -> {
+					if(val<0 && val != -1) return "Value must be positive or -1!";
+					return null;
+				});
+			}
+			public Int positive(){
+				return withValidation(val -> {
+					if(val<0) return "Value must be positive!";
+					return null;
+				});
+			}
+			public Int withValidation(IntFunction<String> validate){
+				if(this.validate != null){
+					var oldValidate = this.validate;
+					var newValidate = validate;
+					validate = val -> {
+						var err = oldValidate.apply(val);
+						if(err != null) return err;
+						return newValidate.apply(val);
+					};
+				}
+				return new Int(name, defaultValue, validate);
 			}
 		}
 		
@@ -95,7 +137,7 @@ public final class ConfigTools{
 		}
 	}
 	
-	public static Flag.Int flagInt(String name, DefaultValue<Integer> defaultVal)  { return new Flag.Int(ConfigDefs.CONFIG_PROPERTY_PREFIX + Objects.requireNonNull(name), defaultVal); }
+	public static Flag.Int flagInt(String name, DefaultValue<Integer> defaultVal)  { return new Flag.Int(ConfigDefs.CONFIG_PROPERTY_PREFIX + Objects.requireNonNull(name), defaultVal, null); }
 	public static Flag.Int flagI(String name, Flag.Int defaultVal)                 { return flagInt(name, new DefaultValue.OtherFlagFallback<>(defaultVal)); }
 	public static Flag.Int flagI(String name, int defaultVal)                      { return flagInt(name, new DefaultValue.Literal<>(defaultVal)); }
 	public static Flag.Int flagI(String name, Supplier<Integer> valueMaker)        { return flagInt(name, new DefaultValue.Lambda<>(valueMaker)); }
