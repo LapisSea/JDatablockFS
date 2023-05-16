@@ -245,7 +245,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			setInitState(STATE_SIZE_DESC);
 			generators = Utils.nullIfEmpty(ioFields.stream().flatMap(IOField::generatorStream).toList());
 			referenceWalkCommands = generateReferenceWalkCommands();
-			earlyNullChecks = Utils.nullIfEmpty(
+			earlyNullChecks = !DEBUG_VALIDATION? null : Utils.nullIfEmpty(
 				getNonNulls().filter(f -> generators == null || generators.stream().noneMatch(gen -> gen.field() == f))
 				             .toList()
 			);
@@ -562,7 +562,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 	@Override
 	public final void write(DataProvider provider, ContentWriter dest, T instance) throws IOException{
 		var ioPool = makeIOPool();
-		earlyCheckNulls(ioPool, instance);
+		if(DEBUG_VALIDATION) earlyCheckNulls(ioPool, instance);
 		doWrite(provider, dest, ioPool, instance);
 	}
 	
