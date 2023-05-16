@@ -25,7 +25,7 @@ public class FlagWriter implements BitWriter<FlagWriter>{
 		}
 	}
 	
-	public static void writeSingle(ContentWriter target, boolean value) throws IOException{
+	public static void writeSingleBool(ContentWriter target, boolean value) throws IOException{
 		target.writeInt1((value? 0b11111111 : 0b11111110));
 	}
 	
@@ -75,7 +75,9 @@ public class FlagWriter implements BitWriter<FlagWriter>{
 	public int remainingCount(){
 		return numberSize.bytes*Byte.SIZE - written;
 	}
-	
+	public int writtenBitCount(){
+		return written;
+	}
 	@Override
 	public FlagWriter fillNOne(int n){
 		checkBuffer(n);

@@ -48,12 +48,13 @@ public final class ChunkCache{
 	}
 	
 	public synchronized void add(Chunk chunk){
-		if(DEBUG_VALIDATION){
-			if(data.containsKey(chunk.getPtr())){
-				throw new IllegalStateException(chunk.getPtr() + " already exists");
-			}
-		}
+		if(DEBUG_VALIDATION) addCheck(chunk);
 		data.put(chunk.getPtr(), chunk);
+	}
+	private void addCheck(Chunk chunk){
+		if(data.containsKey(chunk.getPtr())){
+			throw new IllegalStateException(chunk.getPtr() + " already exists");
+		}
 	}
 	
 	@Nullable

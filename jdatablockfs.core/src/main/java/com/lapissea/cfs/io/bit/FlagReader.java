@@ -12,6 +12,18 @@ import static com.lapissea.cfs.io.bit.BitUtils.makeMask;
 
 public class FlagReader implements BitReader, AutoCloseable{
 	
+	public static boolean readSingleBool(ContentReader in) throws IOException{
+		var b = in.readUnsignedInt1();
+		if((b|1) != 255) failBool(b);
+		return (b&1) == 1;
+	}
+	private static void failBool(int b){
+		for(int i = 1; i<8; i++){
+			if(((b>>i)&1) == 0) throw new IllegalBitValue(i);
+		}
+		throw new IllegalBitValue(-1);
+	}
+	
 	@NotNull
 	public static <T extends Enum<T>> T readSingle(ContentReader in, EnumUniverse<T> enumInfo) throws IOException{
 		var size = enumInfo.numSize(false);
