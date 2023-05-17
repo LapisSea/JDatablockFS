@@ -11,6 +11,7 @@ import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.collections.HashIOMap;
 import com.lapissea.cfs.objects.collections.IOHashSet;
+import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.objects.collections.IOSet;
 import com.lapissea.cfs.objects.collections.IOTreeSet;
@@ -417,4 +418,185 @@ public class SlowTests{
 		runSetFuzz(200000, IOTreeSet.class);
 	}
 	
+	interface ListAction{
+		enum NumT{
+			ADD, REMOVE, CONTAINS
+		}
+		
+		enum Num2T{
+			ADD, REMOVE
+		}
+		
+		record Num(NumT type, int num) implements ListAction{
+			@Override
+			public String toString(){ return type + "(" + num + ")"; }
+		}
+		
+		record Clear() implements ListAction{
+			@Override
+			public String toString(){ return "CLEAR"; }
+		}
+		
+		record Num2(Num2T type, int index, int val) implements ListAction{
+			@Override
+			public String toString(){ return type + "(" + index + " -> " + val + ")"; }
+		}
+	}
+	
+	@Test
+	void fuzzIOListCache(){
+		var allTypes  = ListAction.NumT.values();
+		var all2Types = ListAction.Num2T.values();
+		
+		var runner = new FuzzingRunner<IOList<Integer>, ListAction, IOException>(new FuzzingRunner.StateEnv<>(){
+			@Override
+			public boolean shouldRun(FuzzingRunner.SequenceSrc sequence){
+//				return sequence.index() == 12;
+				return true;
+			}
+			@Override
+			public IOList<Integer> create(Random random){
+				var l1 = IOList.wrap(new ArrayList<Integer>());
+				var l2 = IOList.wrap(new ArrayList<Integer>()).cachedView(40);
+				return Splitter.list(l1, l2, TestUtils::checkCompliance);
+			}
+			@Override
+			public void applyAction(IOList<Integer> state, long actionIdx, ListAction action) throws IOException{
+				switch(action){
+					case ListAction.Num(ListAction.NumT type, int num) -> {
+						switch(type){
+							case ADD -> state.add(num);
+							case REMOVE -> {
+								var idx = state.indexOf(num);
+								if(idx != -1) state.remove(idx);
+							}
+							case CONTAINS -> state.contains(num);
+						}
+					}
+					case ListAction.Clear c -> state.clear();
+					case ListAction.Num2(ListAction.Num2T type, int idx, int num) -> {
+						if(!state.isEmpty()){
+							var i = idx%state.size();
+							switch(type){
+								case ADD -> state.add(i, num);
+								case REMOVE -> state.remove(i);
+							}
+						}
+					}
+					default -> throw new IllegalStateException("Unexpected value: " + action);
+				}
+			}
+		}, rand -> {
+			if(rand.nextInt(1000) == 1){
+				return new ListAction.Clear();
+			}
+			var idx = rand.nextInt(allTypes.length + all2Types.length);
+			int num = rand.nextInt(200);
+			if(idx>=allTypes.length) return new ListAction.Num2(all2Types[idx - allTypes.length], num, rand.nextInt(200));
+			return new ListAction.Num(
+				allTypes[idx],
+				num
+			);
+		});
+		
+		var fails = runner.run(69_420, 500_000, 5000);
+		
+		if(!fails.isEmpty()){
+			Assert.fail(FuzzingRunner.Fail.report(fails));
+		}
+	}
+	
+	@Test(dependsOnMethods = "fuzzIOListCache")
+	void fuzzIOListCacheIter(){
+		enum Type{
+			NEXT, PREV, SKIP, SKIP_PREV, REMOVE, ADD, SET
+		}
+		record Action(Type type, int num){
+			@Override
+			public String toString(){
+				return type + (type == Type.SET? "(" + num + ")" : "");
+			}
+		}
+		var allTypes = Type.values();
+		
+		class State{
+			IOList.IOListIterator<Integer> iter;
+			boolean                        has;
+			public State(IOList.IOListIterator<Integer> iter){
+				this.iter = iter;
+			}
+			
+		}
+		
+		var runner = new FuzzingRunner<State, Action, IOException>(new FuzzingRunner.StateEnv<>(){
+			@Override
+			public boolean shouldRun(FuzzingRunner.SequenceSrc sequence){
+//				return sequence.index() == 12;
+				return true;
+			}
+			@Override
+			public State create(Random random) throws IOException{
+				var l2 = IOList.wrap(new ArrayList<Integer>()).cachedView(40);
+				var s  = new CheckIOList<>(l2);
+				for(int i = 0, j = random.nextInt(10) + 1; i<j; i++){
+					s.add(random.nextInt(200));
+				}
+				return new State(s.listIterator());
+			}
+			@Override
+			public void applyAction(State state, long actionIdx, Action action) throws IOException{
+				switch(action.type){
+					case null -> { }
+					case NEXT -> {
+						if(state.iter.hasNext()){
+							state.iter.ioNext();
+							state.has = true;
+						}
+					}
+					case PREV -> {
+						if(state.iter.hasPrevious()){
+							state.iter.ioPrevious();
+							state.has = true;
+						}
+					}
+					case SKIP -> {
+						if(state.iter.hasNext()){
+							state.iter.skipNext();
+							state.has = true;
+						}
+					}
+					case SKIP_PREV -> {
+						if(state.iter.hasPrevious()){
+							state.iter.skipPrevious();
+							state.has = true;
+						}
+					}
+					case REMOVE -> {
+						if(state.has){
+							state.has = false;
+							state.iter.ioRemove();
+						}
+					}
+					case ADD -> {
+						state.has = false;
+						state.iter.ioAdd(action.num);
+					}
+					case SET -> {
+						if(state.has){
+							state.iter.ioSet(action.num);
+						}
+					}
+				}
+			}
+		}, rand -> new Action(
+			allTypes[rand.nextInt(allTypes.length)],
+			rand.nextInt(200)
+		));
+		
+		var fails = runner.run(69_420, 1000_000, 10000);
+		
+		if(!fails.isEmpty()){
+			Assert.fail(FuzzingRunner.Fail.report(fails));
+		}
+	}
 }

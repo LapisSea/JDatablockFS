@@ -16,6 +16,7 @@ import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.ConcurrentModificationException;
 import java.util.LinkedHashMap;
@@ -49,11 +50,15 @@ public interface IOList<T> extends IterablePP<T>{
 				this.obj = obj;
 				hasObj = true;
 			}
+			@Override
+			public String toString(){
+				return hasObj? Objects.toString(obj) : "<empty>";
+			}
 		}
 		
 		private final IOList<T>               data;
 		private final int                     maxCacheSize;
-		private final Map<Long, Container<T>> cache = new LinkedHashMap<>();
+		private       Map<Long, Container<T>> cache = new LinkedHashMap<>();
 		
 		public Cached(IOList<T> data, int maxCacheSize){
 			if(maxCacheSize<=0) throw new IllegalStateException("{maxCacheSize > 0} not satisfied");
@@ -97,16 +102,18 @@ public interface IOList<T> extends IterablePP<T>{
 			data.add(index, value);
 			
 			var toReadd = pull(index, i -> i>=index);
-			toReadd.forEach((k, v) -> cache.put(k + 1, v));
+			toReadd.forEach((e) -> cache.put(e.getKey() + 1, e.getValue()));
 			cache.put(index, new Container<>(value));
 		}
 		
-		private Map<Long, Container<T>> pull(long index, LongPredicate check){
-			Map<Long, Container<T>> buff = new LinkedHashMap<>();
+		private List<Map.Entry<Long, Container<T>>> pull(long index, LongPredicate check){
+			List<Map.Entry<Long, Container<T>>> buff = new ArrayList<>();
 			cache.entrySet().removeIf(e -> {
-				if(check.test(e.getKey())) return false;
-				buff.put(e.getKey(), e.getValue());
-				return true;
+				if(check.test(e.getKey())){
+					buff.add(e);
+					return true;
+				}
+				return false;
 			});
 			return buff;
 		}
@@ -121,7 +128,7 @@ public interface IOList<T> extends IterablePP<T>{
 			data.remove(index);
 			cache.remove(index);
 			var toReadd = pull(index, i -> i>index);
-			toReadd.forEach((k, v) -> cache.put(k - 1, v));
+			toReadd.forEach(e -> cache.put(e.getKey() - 1, e.getValue()));
 		}
 		
 		@Override
@@ -246,7 +253,7 @@ public interface IOList<T> extends IterablePP<T>{
 				}
 				@Override
 				public void ioAdd(T t) throws IOException{
-					iter.ioRemove();
+					iter.ioAdd(t);
 					cache.clear();
 				}
 			};
@@ -291,17 +298,20 @@ public interface IOList<T> extends IterablePP<T>{
 			}
 			return data.indexOf(value);
 		}
-		@Override
-		public int hashCode(){
-			return data.hashCode();
-		}
+		
 		@Override
 		public String toString(){
-			return data.toString();
+			var sj = new StringJoiner(", ", "CAC{size: " + size() + "}" + "[", "]");
+			var c  = cache;
+			cache = new LinkedHashMap<>(c);
+			IOList.elementSummary(sj, this);
+			cache = c;
+			return sj.toString();
 		}
+		
 		@Override
-		public String toShortString(){
-			return data instanceof Stringify s? s.toShortString() : data.toString();
+		public IOList<T> cachedView(int maxCacheSize){
+			return new Cached<>(data, maxCacheSize);
 		}
 	}
 	
@@ -540,7 +550,9 @@ public interface IOList<T> extends IterablePP<T>{
 			@Override
 			public void skipNext(){
 				if(!hasNext()) throw new NoSuchElementException();
-				cursor++;
+				var i = cursor;
+				lastRet = i;
+				cursor = i + 1;
 			}
 			@Override
 			public boolean hasPrevious(){
@@ -557,7 +569,7 @@ public interface IOList<T> extends IterablePP<T>{
 			@Override
 			public void skipPrevious(){
 				if(!hasPrevious()) throw new NoSuchElementException();
-				cursor--;
+				lastRet = cursor = cursor - 1;
 			}
 			
 			@Override
@@ -567,7 +579,7 @@ public interface IOList<T> extends IterablePP<T>{
 			
 			@Override
 			public void ioRemove() throws IOException{
-				if(lastRet<0) throw new IllegalStateException();
+				if(lastRet == -1) throw new IllegalStateException();
 				
 				removeElement(lastRet);
 				
@@ -981,4 +993,8 @@ public interface IOList<T> extends IterablePP<T>{
 	}
 	
 	void free(long index) throws IOException;
+	
+	default IOList<T> cachedView(int maxCacheSize){
+		return new Cached<>(this, maxCacheSize);
+	}
 }
