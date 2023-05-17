@@ -158,6 +158,13 @@ public class Splitter{
 			public String toString(){
 				return a.toString();
 			}
+			
+			@SuppressWarnings("unchecked")
+			@Override
+			public boolean equals(Object obj){
+				return obj == this ||
+				       obj instanceof IOList<?> l && IOList.elementsEqual(this, (IOList<E>)l);
+			}
 		};
 	}
 	

@@ -1,6 +1,7 @@
 package com.lapissea.cfs.objects.collections;
 
 import com.lapissea.cfs.Utils;
+import com.lapissea.cfs.objects.Stringify;
 import com.lapissea.cfs.objects.collections.listtools.IOListRangeView;
 import com.lapissea.cfs.objects.collections.listtools.MappedIOList;
 import com.lapissea.cfs.objects.collections.listtools.MemoryWrappedIOList;
@@ -38,7 +39,7 @@ import java.util.function.Supplier;
 @IOValue.OverrideType.DefaultImpl(ContiguousIOList.class)
 public interface IOList<T> extends IterablePP<T>{
 	
-	class Cached<T> implements IOList<T>{
+	class Cached<T> implements IOList<T>, Stringify{
 		private static class Container<T>{
 			private T       obj;
 			private boolean hasObj;
@@ -290,6 +291,18 @@ public interface IOList<T> extends IterablePP<T>{
 			}
 			return data.indexOf(value);
 		}
+		@Override
+		public int hashCode(){
+			return data.hashCode();
+		}
+		@Override
+		public String toString(){
+			return data.toString();
+		}
+		@Override
+		public String toShortString(){
+			return data instanceof Stringify s? s.toShortString() : data.toString();
+		}
 	}
 	
 	static <T> void elementSummary(StringJoiner sb, IOList<T> data){
@@ -465,6 +478,34 @@ public interface IOList<T> extends IterablePP<T>{
 				cycleStart--;
 			}
 		}
+	}
+	
+	static <T> boolean elementsEqual(IOList<T> thisL, IOList<T> thatL){
+		if(thisL == thatL){
+			return true;
+		}
+		var siz = thisL.size();
+		if(siz != thatL.size()){
+			return false;
+		}
+		
+		var iThis = thisL.iterator();
+		var iThat = thatL.iterator();
+		
+		for(long i = 0; i<siz; i++){
+			try{
+				var vThis = iThis.ioNext();
+				var vThat = iThat.ioNext();
+				
+				if(!Objects.equals(vThis, vThat)){
+					return false;
+				}
+			}catch(IOException e){
+				throw new RuntimeException(e);
+			}
+		}
+		
+		return true;
 	}
 	
 	interface IOListIterator<T> extends IOIterator<T>{
