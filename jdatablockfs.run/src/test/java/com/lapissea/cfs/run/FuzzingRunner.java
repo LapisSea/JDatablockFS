@@ -36,14 +36,19 @@ public class FuzzingRunner<State, Action, Err extends Throwable>{
 				sb.append('\t').append(fail.note()).append('\n');
 			}
 			sb.append("\nFirst fail:\n");
-			sb.append(fails.get(0).trace());
+			sb.append(fails.stream().reduce(fails.get(0), (a, b) -> {
+				if(a instanceof Action<?> ac && b instanceof Action<?> bc){
+					return ac.actionIndex - ac.sequence.startIndex<bc.actionIndex - bc.sequence.startIndex? ac : bc;
+				}
+				return a;
+			}).trace());
 			return sb.toString();
 		}
 		
 		record Create<Action>(Throwable e, SequenceSrc sequence) implements Fail{
 			@Override
 			public String note(){
-				return "Failed to create at: " + sequence + " - " + e;
+				return "Failed to create on sequence: " + sequence + "\t- " + e;
 			}
 			@Override
 			public String trace(){
@@ -55,30 +60,15 @@ public class FuzzingRunner<State, Action, Err extends Throwable>{
 			}
 		}
 		
-		record Action<Action>(Throwable e, SequenceSrc sequence, Action action, int actionIndex) implements Fail{
+		record Action<Action>(Throwable e, SequenceSrc sequence, Action action, long actionIndex) implements Fail{
 			@Override
 			public String note(){
-				return "Failed to apply action at: " + sequence + ", actionIndex: " + actionIndex + " Action: " + action + " - " + e;
+				return "Failed to apply action on sequence: " + sequence + ",\tactionIndex: " + actionIndex + "\tAction: " + action + "\t- " + e;
 			}
 			@Override
 			public String trace(){
 				StringWriter sw = new StringWriter();
-				sw.append("Failed to apply action at: ").append(String.valueOf(sequence)).append(", actionIndex: ").append(String.valueOf(actionIndex)).append(" Action: ").append(String.valueOf(action)).append("\n");
-				PrintWriter pw = new PrintWriter(sw);
-				e.printStackTrace(pw);
-				return sw.toString();
-			}
-		}
-		
-		record Validate<Action>(Throwable e, SequenceSrc sequence, Action action, int actionIndex) implements Fail{
-			@Override
-			public String note(){
-				return "Failed to validate action at: " + sequence + ", actionIndex: " + actionIndex + " Action: " + action + " - " + e;
-			}
-			@Override
-			public String trace(){
-				StringWriter sw = new StringWriter();
-				sw.append("Failed to validate action at: ").append(String.valueOf(sequence)).append(", actionIndex: ").append(String.valueOf(actionIndex)).append(" Action: ").append(String.valueOf(action)).append("\n");
+				sw.append("Failed to apply action on sequence: ").append(String.valueOf(sequence)).append(", actionIndex: ").append(String.valueOf(actionIndex)).append(" Action: ").append(String.valueOf(action)).append("\n");
 				PrintWriter pw = new PrintWriter(sw);
 				e.printStackTrace(pw);
 				return sw.toString();
@@ -121,7 +111,7 @@ public class FuzzingRunner<State, Action, Err extends Throwable>{
 	
 	public interface StateEnv<State, Action, Err extends Throwable>{
 		boolean shouldRun(SequenceSrc sequence);
-		void applyAction(State state, long id, Action action) throws Err;
+		void applyAction(State state, long actionIdx, Action action) throws Err;
 		State create(Random random) throws Err;
 	}
 	
@@ -148,10 +138,11 @@ public class FuzzingRunner<State, Action, Err extends Throwable>{
 			if(progress != null && progress.hasErr) return Optional.empty();
 			
 			var action = actionFactory.apply(rand);
+			var idx    = sequence.startIndex + actionIndex;
 			try{
-				stateEnv.applyAction(state, sequence.startIndex + actionIndex, action);
+				stateEnv.applyAction(state, idx, action);
 			}catch(Throwable e){
-				return Optional.of(new Fail.Action<>(e, sequence, action, actionIndex));
+				return Optional.of(new Fail.Action<>(e, sequence, action, idx));
 			}
 			
 			if(progress != null) progress.inc();
@@ -180,6 +171,7 @@ public class FuzzingRunner<State, Action, Err extends Throwable>{
 				
 				var seqSeed  = genesisRand.nextLong();
 				var sequence = new SequenceSrc(from, sequenceIndex, seqSeed, actionCount);
+				if(!stateEnv.shouldRun(sequence)) continue;
 				
 				worker.execute(() -> {
 					if(progress.hasErr) return;
