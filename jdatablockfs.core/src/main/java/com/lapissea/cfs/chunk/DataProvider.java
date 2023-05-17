@@ -92,7 +92,16 @@ public interface DataProvider{
 		if(DEBUG_VALIDATION){
 			ensureChunkValid(ptr);
 		}
-		return getChunkCache().getOr(ptr, this::readChunk);
+		var cc = getChunkCache();
+		synchronized(cc){
+			var ch = cc.get(ptr);
+			if(ch != null) return ch;
+			
+			var read = readChunk(ptr);
+			Objects.requireNonNull(read);
+			cc.add(read);
+			return read;
+		}
 	}
 	
 	private void ensureChunkValid(ChunkPointer ptr) throws IOException{

@@ -20,11 +20,13 @@ import com.lapissea.cfs.utils.IOUtils;
 
 import java.io.IOException;
 import java.util.Objects;
+import java.util.function.Supplier;
 
 public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extends IOInstance<ValueType>> extends NullFlagCompanyField<CTyp, ValueType>{
 	
 	private final StructPipe<ValueType> instancePipe;
 	private final boolean               fixed;
+	private final Supplier<ValueType>   createDefaultIfNull;
 	
 	public IOFieldInlineObject(FieldAccessor<CTyp> accessor){
 		this(accessor, null);
@@ -59,11 +61,12 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 				}
 			));
 		}
+		createDefaultIfNull = () -> instancePipe.getType().make();
 	}
 	
 	@Override
 	public ValueType get(VarPool<CTyp> ioPool, CTyp instance){
-		return getNullable(ioPool, instance, () -> instancePipe.getType().make());
+		return getNullable(ioPool, instance, createDefaultIfNull);
 	}
 	
 	@Override

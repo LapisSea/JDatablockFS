@@ -63,7 +63,10 @@ public record AllocateTicket(
 	
 	
 	public AllocateTicket withApproval(Predicate<Chunk> approve){
-		return new AllocateTicket(bytes, next, explicitNextSize, positionMagnet, Optional.of(this.approve.map(p -> p.and(approve)).orElse(approve)), dataPopulator);
+		if(this.approve.isPresent()){
+			approve = this.approve.get().and(approve);
+		}
+		return new AllocateTicket(bytes, next, explicitNextSize, positionMagnet, Optional.of(approve), dataPopulator);
 	}
 	
 	public <IO extends IOInstance<IO>> AllocateTicket withDataPopulated(Class<? extends StructPipe> pipeType, IO data){

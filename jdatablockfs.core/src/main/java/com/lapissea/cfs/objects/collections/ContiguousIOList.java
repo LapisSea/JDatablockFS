@@ -697,7 +697,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 			point = optimal;
 		}
 		
-		var forwardCap = point.realloc.streamNext().mapToLong(Chunk::getCapacity).sum();
+		var forwardCap = point.realloc.chainCapacity();
 		
 		var extra = extraSlots*getElementSize();
 		

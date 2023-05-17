@@ -614,6 +614,7 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	public Stream<Chunk> streamNext(){
 		return Stream.generate(new ChainSupplier(this)).takeWhile(Objects::nonNull);
 	}
+	
 	public long chainLength(long maxLen) throws IOException{
 		if(maxLen == 0) return 0;
 		if(maxLen<0) throw new IllegalArgumentException("maxLen must be positive");
@@ -626,6 +627,24 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 			ch = ch.next();
 		}
 		return len;
+	}
+	public long chainSize() throws IOException{
+		var  ch  = this;
+		long sum = 0;
+		while(ch != null){
+			sum += ch.getSize();
+			ch = ch.next();
+		}
+		return sum;
+	}
+	public long chainCapacity() throws IOException{
+		var  ch  = this;
+		long sum = 0;
+		while(ch != null){
+			sum += ch.getCapacity();
+			ch = ch.next();
+		}
+		return sum;
 	}
 	
 	public void requireReal() throws CacheOutOfSync{
@@ -769,16 +788,5 @@ public final class Chunk extends IOInstance.Managed<Chunk> implements RandomIO.C
 	@Override
 	public int compareTo(Chunk o){
 		return getPtr().compareTo(o.getPtr());
-	}
-	
-	public long chainSize() throws IOException{
-		try(var io = io()){
-			return io.getSize();
-		}
-	}
-	public long chainCapacity() throws IOException{
-		try(var io = io()){
-			return io.getCapacity();
-		}
 	}
 }

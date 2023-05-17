@@ -109,7 +109,7 @@ public final class AutoText extends IOInstance.Managed<AutoText> implements Char
 	@IOValue
 	private void setTextBytes(byte[] bytes) throws IOException{
 		dataSrc = bytes;
-		StringBuilder sb = new StringBuilder();
+		StringBuilder sb = new StringBuilder(charCount);
 		readTextBytes(new ContentInputStream.BA(bytes), sb);
 		data = sb.toString();
 	}

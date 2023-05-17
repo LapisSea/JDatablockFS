@@ -13,12 +13,14 @@ import com.lapissea.cfs.type.field.fields.BitField;
 
 import java.io.IOException;
 import java.util.Objects;
+import java.util.function.Supplier;
 
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 
 public class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> extends BitField<T, E>{
 	
 	private final EnumUniverse<E> enumUniverse;
+	private final Supplier<E>     createDefaultIfNull;
 	
 	public IOFieldEnum(FieldAccessor<T> field){
 		super(field);
@@ -29,11 +31,12 @@ public class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> extends Bit
 		if(getNullability() == DEFAULT_IF_NULL && enumUniverse.isEmpty()){
 			throw new MalformedStruct(DEFAULT_IF_NULL + " is not supported for empty enums");
 		}
+		createDefaultIfNull = () -> enumUniverse.get(0);
 	}
 	
 	@Override
 	public E get(VarPool<T> ioPool, T instance){
-		return getNullable(ioPool, instance, () -> enumUniverse.get(0));
+		return getNullable(ioPool, instance, createDefaultIfNull);
 	}
 	
 	@Override
