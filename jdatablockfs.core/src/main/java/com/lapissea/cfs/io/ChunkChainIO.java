@@ -203,14 +203,14 @@ public final class ChunkChainIO implements RandomIO{
 					chunk.zeroOutFromTo(chunkSpace, chunk.getSize());
 				}
 				
-				if(next != null){
-					next.freeChaining();
-					revalidate();
-				}
-				
 				var cap = getCapacity();
 				if(cap<newCapacity){
 					throw new IOException("Capacity not allocated for: " + head.collectNext() + " " + cap + " < " + newCapacity);
+				}
+				
+				if(next != null){
+					next.freeChaining();
+					revalidate();
 				}
 				
 				return this;
