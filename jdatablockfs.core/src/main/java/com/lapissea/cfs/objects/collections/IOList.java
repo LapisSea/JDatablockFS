@@ -1,7 +1,7 @@
 package com.lapissea.cfs.objects.collections;
 
 import com.lapissea.cfs.Utils;
-import com.lapissea.cfs.objects.Stringify;
+import com.lapissea.cfs.objects.collections.listtools.IOListCached;
 import com.lapissea.cfs.objects.collections.listtools.IOListRangeView;
 import com.lapissea.cfs.objects.collections.listtools.MappedIOList;
 import com.lapissea.cfs.objects.collections.listtools.MemoryWrappedIOList;
@@ -16,12 +16,9 @@ import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.ConcurrentModificationException;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
@@ -32,288 +29,12 @@ import java.util.Spliterator;
 import java.util.StringJoiner;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.LongPredicate;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 @SuppressWarnings("unused")
 @IOValue.OverrideType.DefaultImpl(ContiguousIOList.class)
 public interface IOList<T> extends IterablePP<T>{
-	
-	class Cached<T> implements IOList<T>, Stringify{
-		private static class Container<T>{
-			private T       obj;
-			private boolean hasObj;
-			public Container()     { }
-			public Container(T obj){ set(obj); }
-			private void set(T obj){
-				this.obj = obj;
-				hasObj = true;
-			}
-			@Override
-			public String toString(){
-				return hasObj? Objects.toString(obj) : "<empty>";
-			}
-		}
-		
-		private final IOList<T>               data;
-		private final int                     maxCacheSize;
-		private       Map<Long, Container<T>> cache = new LinkedHashMap<>();
-		
-		public Cached(IOList<T> data, int maxCacheSize){
-			if(maxCacheSize<=0) throw new IllegalStateException("{maxCacheSize > 0} not satisfied");
-			this.data = Objects.requireNonNull(data);
-			this.maxCacheSize = maxCacheSize;
-		}
-		
-		private Container<T> getC(long index){
-			if(cache.size()>=maxCacheSize) yeet();
-			return cache.computeIfAbsent(index, i -> new Container<>());
-		}
-		
-		private void yeet(){
-			var iter = cache.entrySet().iterator();
-			iter.next();
-			iter.remove();
-		}
-		
-		@Override
-		public Class<T> elementType(){ return data.elementType(); }
-		@Override
-		public long size(){ return data.size(); }
-		
-		@Override
-		public T get(long index) throws IOException{
-			var cached = getC(index);
-			if(cached.hasObj) return cached.obj;
-			
-			var read = data.get(index);
-			cached.set(read);
-			return read;
-		}
-		
-		@Override
-		public void set(long index, T value) throws IOException{
-			data.set(index, value);
-			getC(index).set(value);
-		}
-		@Override
-		public void add(long index, T value) throws IOException{
-			data.add(index, value);
-			
-			var toReadd = pull(index, i -> i>=index);
-			toReadd.forEach((e) -> cache.put(e.getKey() + 1, e.getValue()));
-			cache.put(index, new Container<>(value));
-		}
-		
-		private List<Map.Entry<Long, Container<T>>> pull(long index, LongPredicate check){
-			List<Map.Entry<Long, Container<T>>> buff = new ArrayList<>();
-			cache.entrySet().removeIf(e -> {
-				if(check.test(e.getKey())){
-					buff.add(e);
-					return true;
-				}
-				return false;
-			});
-			return buff;
-		}
-		
-		@Override
-		public void add(T value) throws IOException{
-			getC(data.size()).set(value);
-			data.add(value);
-		}
-		@Override
-		public void remove(long index) throws IOException{
-			data.remove(index);
-			cache.remove(index);
-			var toReadd = pull(index, i -> i>index);
-			toReadd.forEach(e -> cache.put(e.getKey() - 1, e.getValue()));
-		}
-		
-		@Override
-		public T addNew(UnsafeConsumer<T, IOException> initializer) throws IOException{
-			var c   = getC(data.size());
-			var gnu = data.addNew(initializer);
-			c.set(gnu);
-			return gnu;
-		}
-		@Override
-		public void addMultipleNew(long count, UnsafeConsumer<T, IOException> initializer) throws IOException{
-			data.addMultipleNew(count, initializer);
-		}
-		@Override
-		public void clear() throws IOException{
-			cache.clear();
-			data.clear();
-		}
-		@Override
-		public void requestCapacity(long capacity) throws IOException{
-			data.requestCapacity(capacity);
-		}
-		@Override
-		public void trim() throws IOException{
-			data.trim();
-		}
-		@Override
-		public long getCapacity() throws IOException{
-			return data.getCapacity();
-		}
-		@Override
-		public void free(long index) throws IOException{
-			data.free(index);
-			cache.remove(index);
-		}
-		
-		@Override
-		public IOIterator.Iter<T> iterator(){
-			IOListIterator<T> iter = data.listIterator();
-			return new IOIterator.Iter<>(){
-				@Override
-				public boolean hasNext(){
-					return iter.hasNext();
-				}
-				@Override
-				public T ioNext() throws IOException{
-					var c = getC(iter.nextIndex());
-					if(c.hasObj){
-						iter.skipNext();
-						return c.obj;
-					}
-					var next = iter.ioNext();
-					c.set(next);
-					return next;
-				}
-				@Override
-				public void ioRemove() throws IOException{
-					cache.clear();
-					iter.ioRemove();
-				}
-			};
-		}
-		@Override
-		public IOListIterator<T> listIterator(long startIndex){
-			IOListIterator<T> iter = data.listIterator(startIndex);
-			return new IOListIterator<T>(){
-				@Override
-				public boolean hasNext(){
-					return iter.hasNext();
-				}
-				@Override
-				public T ioNext() throws IOException{
-					var c = getC(iter.nextIndex());
-					if(c.hasObj){
-						iter.skipNext();
-						return c.obj;
-					}
-					var next = iter.ioNext();
-					c.set(next);
-					return next;
-				}
-				@Override
-				public void skipNext(){
-					iter.skipNext();
-				}
-				@Override
-				public boolean hasPrevious(){
-					return iter.hasPrevious();
-				}
-				@Override
-				public T ioPrevious() throws IOException{
-					var c = getC(iter.previousIndex());
-					if(c.hasObj){
-						iter.skipPrevious();
-						return c.obj;
-					}
-					var next = iter.ioPrevious();
-					c.set(next);
-					return next;
-				}
-				@Override
-				public void skipPrevious(){
-					iter.skipPrevious();
-				}
-				@Override
-				public long nextIndex(){
-					return iter.nextIndex();
-				}
-				@Override
-				public long previousIndex(){
-					return iter.previousIndex();
-				}
-				@Override
-				public void ioRemove() throws IOException{
-					iter.ioRemove();
-					cache.clear();
-				}
-				@Override
-				public void ioSet(T t) throws IOException{
-					iter.ioSet(t);
-					cache.clear();
-				}
-				@Override
-				public void ioAdd(T t) throws IOException{
-					iter.ioAdd(t);
-					cache.clear();
-				}
-			};
-		}
-		
-		@Override
-		public void modify(long index, UnsafeFunction<T, T, IOException> modifier) throws IOException{
-			cache.remove(index);
-			data.modify(index, modifier);
-		}
-		
-		@Override
-		public boolean isEmpty(){
-			return data.isEmpty();
-		}
-		@Override
-		public T addNew() throws IOException{
-			return data.addNew();
-		}
-		@Override
-		public void addMultipleNew(long count) throws IOException{
-			data.addMultipleNew(count);
-		}
-		@Override
-		public void requestRelativeCapacity(long extra) throws IOException{
-			data.requestRelativeCapacity(extra);
-		}
-		@Override
-		public boolean contains(T value) throws IOException{
-			for(var c : cache.values()){
-				if(!c.hasObj) continue;
-				if(Objects.equals(c.obj, value)) return true;
-			}
-			return data.contains(value);
-		}
-		@Override
-		public long indexOf(T value) throws IOException{
-			for(var e : cache.entrySet()){
-				var c = e.getValue();
-				if(!c.hasObj) continue;
-				if(Objects.equals(c.obj, value)) return e.getKey();
-			}
-			return data.indexOf(value);
-		}
-		
-		@Override
-		public String toString(){
-			var sj = new StringJoiner(", ", "CAC{size: " + size() + "}" + "[", "]");
-			var c  = cache;
-			cache = new LinkedHashMap<>(c);
-			IOList.elementSummary(sj, this);
-			cache = c;
-			return sj.toString();
-		}
-		
-		@Override
-		public IOList<T> cachedView(int maxCacheSize){
-			return new Cached<>(data, maxCacheSize);
-		}
-	}
 	
 	static <T> void elementSummary(StringJoiner sb, IOList<T> data){
 		var iter = data.iterator();
@@ -995,6 +716,6 @@ public interface IOList<T> extends IterablePP<T>{
 	void free(long index) throws IOException;
 	
 	default IOList<T> cachedView(int maxCacheSize){
-		return new Cached<>(this, maxCacheSize);
+		return new IOListCached<>(this, maxCacheSize);
 	}
 }
