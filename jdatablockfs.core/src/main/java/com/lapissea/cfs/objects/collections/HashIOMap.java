@@ -551,7 +551,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 			}
 		}
 		
-		if(size()>=(buckets.size() + values.size())){
+		while(size()>=(buckets.size() + values.size())){
 			reflow();
 		}
 		

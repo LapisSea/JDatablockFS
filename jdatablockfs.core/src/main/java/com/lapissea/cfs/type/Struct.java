@@ -812,10 +812,16 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	}
 	
 	@Nullable
-	public VarPool<T> allocVirtualVarPool(StoragePool pool){
+	public final VarPool<T> allocVirtualVarPool(StoragePool pool){
+		if(needsPool(pool)){
+			return new VarPool.GeneralVarArray<>(this, pool);
+		}
+		return null;
+	}
+	
+	public final boolean needsPool(StoragePool pool){
 		waitForStateDone();
-		if(hasPools == null || !hasPools[pool.ordinal()]) return null;
-		return new VarPool.GeneralVarArray<>(this, pool);
+		return hasPools != null && hasPools[pool.ordinal()];
 	}
 	
 	public GenericContext describeGenerics(TypeLink def){
