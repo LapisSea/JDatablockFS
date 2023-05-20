@@ -47,6 +47,10 @@ public class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends NullFlag
 	public String get(VarPool<CTyp> ioPool, CTyp instance){
 		return getNullable(ioPool, instance, () -> "");
 	}
+	@Override
+	public boolean isNull(VarPool<CTyp> ioPool, CTyp instance){
+		return isNullRawNullable(ioPool, instance);
+	}
 	
 	@Override
 	public void set(VarPool<CTyp> ioPool, CTyp instance, String value){

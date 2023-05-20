@@ -68,6 +68,10 @@ public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extend
 	public ValueType get(VarPool<CTyp> ioPool, CTyp instance){
 		return getNullable(ioPool, instance, createDefaultIfNull);
 	}
+	@Override
+	public boolean isNull(VarPool<CTyp> ioPool, CTyp instance){
+		return isNullRawNullable(ioPool, instance);
+	}
 	
 	@Override
 	public void set(VarPool<CTyp> ioPool, CTyp instance, ValueType value){

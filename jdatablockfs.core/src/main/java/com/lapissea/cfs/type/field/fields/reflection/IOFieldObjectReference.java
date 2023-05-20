@@ -81,6 +81,10 @@ public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends I
 	public ValueType get(VarPool<T> ioPool, T instance){
 		return getNullable(ioPool, instance, () -> null);
 	}
+	@Override
+	public boolean isNull(VarPool<T> ioPool, T instance){
+		return isNullRawNullable(ioPool, instance);
+	}
 	
 	@Override
 	public StructPipe<ValueType> getReferencedPipe(T instance){

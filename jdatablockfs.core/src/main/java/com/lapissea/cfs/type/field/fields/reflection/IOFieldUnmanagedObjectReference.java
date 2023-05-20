@@ -92,6 +92,11 @@ public class IOFieldUnmanagedObjectReference<T extends IOInstance<T>, ValueType 
 		return val;
 	}
 	@Override
+	public boolean isNull(VarPool<T> ioPool, T instance){
+		return rawGet(ioPool, instance) == null;
+	}
+	
+	@Override
 	public Reference getReference(T instance){
 		return getReference(get(null, instance));
 	}

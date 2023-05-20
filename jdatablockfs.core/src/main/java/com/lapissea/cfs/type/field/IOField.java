@@ -80,7 +80,7 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 		return inStructUID;
 	}
 	
-	public final boolean isNull(VarPool<T> ioPool, T instance){
+	public boolean isNull(VarPool<T> ioPool, T instance){
 		if(!getAccessor().canBeNull()) return false;
 		try{
 			var val = get(ioPool, instance);
@@ -92,6 +92,13 @@ public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<
 				throw npe;
 			}
 		}
+	}
+	
+	protected final boolean isNullRawNullable(VarPool<T> ioPool, T instance){
+		return switch(getNullability()){
+			case NOT_NULL, NULLABLE -> rawGet(ioPool, instance) == null;
+			case DEFAULT_IF_NULL -> false;
+		};
 	}
 	
 	protected final ValueType getNullable(VarPool<T> ioPool, T instance, Supplier<ValueType> createDefaultIfNull){
