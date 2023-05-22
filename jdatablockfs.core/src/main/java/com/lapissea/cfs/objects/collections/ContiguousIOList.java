@@ -587,10 +587,15 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 	public void remove(long index) throws IOException{
 		checkSize(index);
 		
+		var size = size();
 		try(var ignored = getDataProvider().getSource().openIOTransaction()){
-			var size = size();
 			deltaSize(-1);
 			squash(index, size);
+		}
+		
+		var lastOff = calcElementOffset(size - 1);
+		try(var io = selfIO()){
+			io.setCapacity(lastOff);
 		}
 	}
 	
@@ -637,21 +642,29 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		defragData(1);
 		
 		try(var io = selfIO()){
-			var    siz  = getElementSize();
-			byte[] buff = new byte[Math.toIntExact(siz)];
+			var  size              = size();
+			long remainingElements = size - index;
 			
-			var lastOff = calcElementOffset(size() + 1);
+			var elementSize = Math.toIntExact(getElementSize());
+			var maxChunk    = Math.max(1, (int)Math.min(remainingElements, BATCH_BYTES/elementSize));
+			
+			byte[] buff = new byte[elementSize*maxChunk];
+			
+			var lastOff = calcElementOffset(size + 1);
 			io.setCapacity(lastOff);
 			
-			for(long i = size() - 1; i>=index; i--){
+			for(long i = size; i>index; ){
+				var stepSize = Math.min(maxChunk, (int)Math.max(0, i - index));
+				i -= stepSize;
+				var buffSize = stepSize*elementSize;
 				
 				var pos = calcElementOffset(i);
 				io.setPos(pos);
-				io.readFully(buff);
+				io.readFully(buff, 0, buffSize);
 				
 				var nextPos = calcElementOffset(i + 1);
 				io.setPos(nextPos);
-				io.write(buff);
+				io.write(buff, 0, buffSize);
 			}
 		}
 	}
@@ -733,21 +746,25 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 				notifySingleFree(io, false);
 			}
 			
-			var    siz  = getElementSize();
-			byte[] buff = new byte[Math.toIntExact(siz)];
+			long sm1 = size - 1;
+			if(sm1 == index) return;
+			long remainingElements = sm1 - index;
 			
-			for(long i = index; i<size - 1; i++){
-				var nextPos = calcElementOffset(i + 1);
+			var siz      = Math.toIntExact(getElementSize());
+			var maxChunk = Math.max(1, (int)Math.min(remainingElements, BATCH_BYTES/siz));
+			
+			byte[] buff = new byte[siz*maxChunk];
+			
+			for(long i = index; i<sm1; i += maxChunk){
+				var buffSize = (int)Math.min(sm1 - i, maxChunk)*siz;
+				var nextPos  = calcElementOffset(i + 1);
 				io.setPos(nextPos);
-				io.readFully(buff);
+				io.readFully(buff, 0, buffSize);
 				
 				var pos = calcElementOffset(i);
 				io.setPos(pos);
-				io.write(buff);
+				io.write(buff, 0, buffSize);
 			}
-			
-			var lastOff = calcElementOffset(size - 1);
-			io.setCapacity(lastOff);
 		}
 	}
 	private void notifySingleFree(RandomIO io, boolean dereferenceWrite) throws IOException{
