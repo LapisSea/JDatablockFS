@@ -276,7 +276,11 @@ public class CheckIOList<T> implements IOList<T>{
 	public long indexOf(T value) throws IOException{
 		var a = data.indexOf(value);
 		var b = base.indexOf(value);
-		assertEquals(a, b);
+		if(a != b){
+			var aEl = data.get(a);
+			var bEl = base.get(b);
+			assertEquals(aEl, bEl, "indexOf returned different idx (" + a + ", " + b + ") and the values are not the same");
+		}
 		return a;
 	}
 	@Override

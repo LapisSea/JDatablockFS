@@ -9,18 +9,22 @@ import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.impl.MemoryData;
 import com.lapissea.cfs.objects.ChunkPointer;
 import com.lapissea.cfs.objects.NumberSize;
+import com.lapissea.cfs.objects.collections.ContiguousIOList;
 import com.lapissea.cfs.objects.collections.HashIOMap;
 import com.lapissea.cfs.objects.collections.IOHashSet;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.collections.IOMap;
 import com.lapissea.cfs.objects.collections.IOSet;
 import com.lapissea.cfs.objects.collections.IOTreeSet;
+import com.lapissea.cfs.objects.collections.LinkedIOList;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.function.UnsafeBiConsumer;
+import com.lapissea.util.function.UnsafeSupplier;
 import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.io.DataInputStream;
@@ -443,22 +447,50 @@ public class SlowTests{
 		}
 	}
 	
-	@Test
-	void fuzzIOListCache(){
+	static final class ListMaker{
+		
+		final String                                       name;
+		final double                                       weight;
+		final UnsafeSupplier<IOList<Integer>, IOException> make;
+		
+		ListMaker(String name, double weight, UnsafeSupplier<IOList<Integer>, IOException> make){
+			this.name = name;
+			this.weight = weight;
+			this.make = make;
+		}
+		IOList<Integer> make() throws IOException{
+			return make.get();
+		}
+		@Override
+		public String toString(){
+			return name;
+		}
+	}
+	
+	@DataProvider
+	Object[][] listMakers(){
+		return new Object[][]{
+			{new ListMaker("memory wrap", 1, () -> IOList.wrap(new ArrayList<>()))},
+			{new ListMaker("cached wrapper", 1, () -> IOList.wrap(new ArrayList<Integer>()).cachedView(40))},
+			{new ListMaker("contiguous list", 0.5, () -> Cluster.emptyMem().getRootProvider().request("list", ContiguousIOList.class, Integer.class))},
+			{new ListMaker("linked list", 0.2, () -> Cluster.emptyMem().getRootProvider().request("list", LinkedIOList.class, Integer.class))},
+			};
+	}
+	
+	@Test(dataProvider = "listMakers")
+	void fuzzIOList(ListMaker maker){
 		var allTypes  = ListAction.NumT.values();
 		var all2Types = ListAction.Num2T.values();
 		
 		var runner = new FuzzingRunner<IOList<Integer>, ListAction, IOException>(new FuzzingRunner.StateEnv<>(){
 			@Override
 			public boolean shouldRun(FuzzingRunner.SequenceSrc sequence){
-//				return sequence.index() == 12;
+//				return sequence.index() == 6;
 				return true;
 			}
 			@Override
-			public IOList<Integer> create(Random random){
-				var l1 = IOList.wrap(new ArrayList<Integer>());
-				var l2 = IOList.wrap(new ArrayList<Integer>()).cachedView(40);
-				return Splitter.list(l1, l2, TestUtils::checkCompliance);
+			public IOList<Integer> create(Random random) throws IOException{
+				return new CheckIOList<>(maker.make());
 			}
 			@Override
 			public void applyAction(IOList<Integer> state, long actionIdx, ListAction action) throws IOException{
@@ -499,15 +531,15 @@ public class SlowTests{
 			);
 		});
 		
-		var fails = runner.run(69_420, 500_000, 5000);
+		var fails = runner.run(69_420, (long)(500_000L*maker.weight), 5000);
 		
 		if(!fails.isEmpty()){
 			Assert.fail(FuzzingRunner.Fail.report(fails));
 		}
 	}
 	
-	@Test(dependsOnMethods = "fuzzIOListCache")
-	void fuzzIOListCacheIter(){
+	@Test(dependsOnMethods = "fuzzIOList", dataProvider = "listMakers")
+	void fuzzIOListIter(ListMaker maker){
 		enum Type{
 			NEXT, PREV, SKIP, SKIP_PREV, REMOVE, ADD, SET
 		}
@@ -520,8 +552,8 @@ public class SlowTests{
 		var allTypes = Type.values();
 		
 		class State{
-			IOList.IOListIterator<Integer> iter;
-			boolean                        has;
+			final IOList.IOListIterator<Integer> iter;
+			boolean has;
 			public State(IOList.IOListIterator<Integer> iter){
 				this.iter = iter;
 			}
@@ -536,9 +568,8 @@ public class SlowTests{
 			}
 			@Override
 			public State create(Random random) throws IOException{
-				var l2 = IOList.wrap(new ArrayList<Integer>()).cachedView(40);
-				var s  = new CheckIOList<>(l2);
-				for(int i = 0, j = random.nextInt(10) + 1; i<j; i++){
+				var s = new CheckIOList<>(maker.make());
+				for(int i = 0, j = random.nextInt(50); i<j; i++){
 					s.add(random.nextInt(200));
 				}
 				return new State(s.listIterator());
@@ -593,7 +624,7 @@ public class SlowTests{
 			rand.nextInt(200)
 		));
 		
-		var fails = runner.run(69_420, 1000_000, 10000);
+		var fails = runner.run(69_420, (long)(1000_000L*maker.weight), 1000);
 		
 		if(!fails.isEmpty()){
 			Assert.fail(FuzzingRunner.Fail.report(fails));
