@@ -298,7 +298,11 @@ public final class VaryingSize implements Stringify{
 		public TooSmall(VaryingSize size, NumberSize neededSize){
 			this(Map.of(size, neededSize));
 		}
-		
+		@Override
+		public Throwable fillInStackTrace(){
+//			return super.fillInStackTrace();
+			return this;
+		}
 		@Override
 		public String toString(){
 			return this.getClass().getSimpleName() + ": " + TextUtil.toString(tooSmallIdMap);

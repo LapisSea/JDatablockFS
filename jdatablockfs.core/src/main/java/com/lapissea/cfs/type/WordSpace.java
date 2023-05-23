@@ -2,28 +2,19 @@ package com.lapissea.cfs.type;
 
 import com.lapissea.cfs.io.bit.BitUtils;
 
-import java.util.Arrays;
-
 public enum WordSpace{
 	BIT(1, "bit"),
 	BYTE(2, "byte");
 	
 	public static long mapSize(WordSpace sourceSpace, WordSpace targetSpace, long val){
-		return switch(sourceSpace){
-			case BIT -> switch(targetSpace){
-				case BIT -> val;
-				case BYTE -> BitUtils.bitsToBytes(val);
-			};
-			case BYTE -> switch(targetSpace){
-				case BIT -> val*Byte.SIZE;
-				case BYTE -> val;
-			};
-		};
+		if(sourceSpace == WordSpace.BIT){
+			if(targetSpace == WordSpace.BIT) return val;
+			else return BitUtils.bitsToBytes(val);
+		}else{
+			if(targetSpace == WordSpace.BIT) return val*Byte.SIZE;
+			else return val;
+		}
 	}
-	
-	
-	public static final WordSpace MIN = Arrays.stream(WordSpace.values()).reduce(WordSpace::min).orElseThrow();
-	public static final WordSpace MAX = Arrays.stream(WordSpace.values()).reduce(WordSpace::max).orElseThrow();
 	
 	public final int    sortOrder;
 	public final String friendlyName;
