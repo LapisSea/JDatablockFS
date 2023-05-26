@@ -160,11 +160,8 @@ public class FieldCompiler{
 			if(!missingNames.isEmpty()) throw new IllegalField("Could not find dependencies " + missingNames + " on field " + field.getAccessor());
 			
 			for(String nam : depNames){
-				IOField<T, ?> e = fields.stream().filter(f -> f.field.getName().equals(nam)).findAny().orElseThrow().field;
-				if(!dependencies.add(e)){
-					//TODO: decide if duplicated dependencies should be tolerated
-//					throw new MalformedStructLayout("Duplicate dependency "+e.getAccessor());
-				}
+				AnnotatedField<T> e = fields.stream().filter(f -> f.field.getName().equals(nam)).findAny().orElseThrow();
+				dependencies.add(e.field);
 			}
 		}
 		return dependencies;
