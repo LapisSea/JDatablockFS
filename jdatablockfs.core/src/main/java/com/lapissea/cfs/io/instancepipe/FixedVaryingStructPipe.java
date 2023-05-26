@@ -94,12 +94,9 @@ public class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseFixedSt
 			}catch(UseFixed e){
 				return FixedStructPipe.of(type, STATE_IO_FIELD);
 			}
-		}catch(UnsupportedStructLayout|WaitException e){
-			if(WaitException.unwait(e) instanceof UnsupportedStructLayout us){
-				FAILS.put(type, us);
-				throw us;
-			}
-			throw e;
+		}catch(UnsupportedStructLayout us){
+			FAILS.put(type, us);
+			throw us;
 		}
 	}
 	

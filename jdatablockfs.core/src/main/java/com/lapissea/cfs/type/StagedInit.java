@@ -8,12 +8,17 @@ import com.lapissea.cfs.utils.ClosableLock;
 import com.lapissea.cfs.utils.IntHashSet;
 import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
+import com.lapissea.util.UtilL;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Objects;
 import java.util.Set;
 import java.util.StringJoiner;
 import java.util.concurrent.TimeUnit;
@@ -160,22 +165,9 @@ public abstract class StagedInit{
 		return state;
 	}
 	
-	public static class WaitException extends RuntimeException{
-		public static Throwable unwait(Throwable e){
-			if(e instanceof WaitException w){
-				return w.getWaitedCause();
-			}
-			return e;
-		}
-		public WaitException(String message, Throwable cause){
-			super(message, Objects.requireNonNull(cause));
-		}
-		public Throwable getWaitedCause(){
-			var c = getCause();
-			if(c instanceof WaitException w){
-				return w.getWaitedCause();
-			}
-			return c;
+	private static final class WaitException extends RuntimeException{
+		public WaitException(String message){
+			super(message);
 		}
 	}
 	
@@ -185,7 +177,21 @@ public abstract class StagedInit{
 	
 	private void checkErr(){
 		if(e == null) return;
-		throw new WaitException("Exception occurred while initializing: " + this, e);
+		var eCopy = cloneE(e);
+		eCopy.addSuppressed(new WaitException("Exception occurred while initializing: " + this));
+		throw UtilL.uncheckedThrow(eCopy);
+	}
+	
+	private static Throwable cloneE(Throwable e){
+		try{
+			var out = new ByteArrayOutputStream();
+			try(var ay = new ObjectOutputStream(out)){
+				ay.writeObject(e);
+			}
+			return (Throwable)new ObjectInputStream(new ByteArrayInputStream(out.toByteArray())).readObject();
+		}catch(IOException|ClassNotFoundException e1){
+			throw new RuntimeException("Failed to clone exception", e1);
+		}
 	}
 	
 	public record StateInfo(int id, String name){

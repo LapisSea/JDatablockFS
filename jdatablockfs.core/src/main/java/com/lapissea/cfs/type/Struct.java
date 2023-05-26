@@ -395,10 +395,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 			if(!PRINT_COMPILATION){
 				struct.runOnStateDone(
 					() -> Log.trace("Struct compiled: {}#cyan{}#cyanBright", struct.getFullName().substring(0, struct.getFullName().length() - struct.cleanName().length()), struct),
-					e -> {
-						var e1 = StagedInit.WaitException.unwait(e);
-						Log.warn("Failed to compile struct asynchronously: {}#red because - {}: {}", struct.cleanFullName(), e1.getClass().getSimpleName(), e1.getMessage());
-					}
+					e -> Log.warn("Failed to compile struct asynchronously: {}#red because - {}: {}", struct.cleanFullName(), e.getClass().getSimpleName(), e.getMessage())
 				);
 			}else{
 				struct.runOnStateDone(

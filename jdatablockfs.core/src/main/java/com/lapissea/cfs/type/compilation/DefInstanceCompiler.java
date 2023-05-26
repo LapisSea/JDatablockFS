@@ -380,8 +380,7 @@ public class DefInstanceCompiler{
 					//Eagerly load struct
 					Struct.of(node.impl).waitForStateDone();
 				}catch(Throwable e){
-					var e1 = StagedInit.WaitException.unwait(e);
-					Log.warn("Failed to preload {}. Cause: {}", node.impl.getName(), e1.getMessage());
+					Log.warn("Failed to preload {}. Cause: {}", node.impl.getName(), e.getMessage());
 				}
 			});
 			
@@ -1180,17 +1179,17 @@ public class DefInstanceCompiler{
 		             .map(name -> {
 			             var getter = getters.stream().filter(s -> s.varName().equals(name)).findAny();
 			             var setter = setters.stream().filter(s -> s.varName().equals(name)).findAny();
-			
+			             
 			             var gors = getter.or(() -> setter).orElseThrow();
-			
+			             
 			             var type = gors.type();
-			
+			             
 			             var anns = Stream.concat(getter.stream(), setter.stream())
 			                              .map(f -> f.method().getAnnotations())
 			                              .flatMap(Arrays::stream)
 			                              .filter(a -> FieldCompiler.ANNOTATION_TYPES.contains(a.annotationType()))
 			                              .collect(Collectors.toList());
-			
+			             
 			             IOValue valBack = null;
 			             var     iter    = anns.iterator();
 			             while(iter.hasNext()){
@@ -1206,7 +1205,7 @@ public class DefInstanceCompiler{
 			             }
 			             if(valBack == null) valBack = IOFieldTools.makeAnnotation(IOValue.class);
 			             anns.add(valBack);
-			
+			             
 			             return new FieldInfo(name, type, anns, getter, setter);
 		             })
 		             .toList();

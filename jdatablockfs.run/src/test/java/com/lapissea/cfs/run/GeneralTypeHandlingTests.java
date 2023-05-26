@@ -17,7 +17,6 @@ import com.lapissea.cfs.objects.collections.LinkedIOList;
 import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.cfs.tools.utils.ToolUtils;
 import com.lapissea.cfs.type.IOInstance;
-import com.lapissea.cfs.type.StagedInit;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.field.IOField;
@@ -126,7 +125,7 @@ public class GeneralTypeHandlingTests{
 		StructPipe<T> pipe;
 		try{
 			pipe = StandardStructPipe.of(struct, STATE_DONE);
-		}catch(MalformedStruct|StagedInit.WaitException ignored){
+		}catch(MalformedStruct ignored){
 			pipe = null;
 		}
 		if(pipe != null){
@@ -134,7 +133,7 @@ public class GeneralTypeHandlingTests{
 		}
 		try{
 			pipe = FixedStructPipe.of(struct, STATE_DONE);
-		}catch(MalformedStruct|StagedInit.WaitException ignored){
+		}catch(MalformedStruct ignored){
 			pipe = null;
 		}
 		if(pipe != null){
