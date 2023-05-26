@@ -284,7 +284,7 @@ public class IOListCached<T> implements IOList<T>, Stringify{
 	@Override
 	public boolean contains(T value) throws IOException{
 		for(var c : cache.values()){
-			if(c != null) continue;
+			if(c == null) continue;
 			if(Objects.equals(c, value)) return true;
 		}
 		return data.contains(value);

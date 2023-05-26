@@ -418,7 +418,7 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 							iterCursor++;
 						}while(iterCursor != index + 1);
 						
-						if(!full && depTicket != null && valueStorage instanceof ValueStorage.InstanceBased i){
+						if(!full && depTicket != null){
 							return node.readValueSelective(depTicket, true);
 						}
 						return node.getValue();

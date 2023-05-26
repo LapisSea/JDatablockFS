@@ -1283,14 +1283,14 @@ public class BinaryGridRenderer implements DataRenderer{
 			}
 		}
 		
-		var b    = bytes[byteIndex]&0xFF;
-		var bStr = b + "";
-		while(bStr.length()<3) bStr += " ";
-		bStr = bStr + (ctx.renderer.getFont().canFontDisplay(bytes[byteIndex])? " = " + (char)b : "");
+		var           b    = bytes[byteIndex]&0xFF;
+		StringBuilder bStr = new StringBuilder(String.valueOf(b));
+		while(bStr.length()<3) bStr.append(" ");
+		bStr.append(ctx.renderer.getFont().canFontDisplay(bytes[byteIndex])? " = " + (char)b : "");
 		ctx.hoverMessages().addAll(0, List.of(new HoverMessage(List.of(new Range(0, 0)), null, new Object[]{
 			parsed.lastHoverChunk != null && byteIndex>=parsed.lastHoverChunk.dataStart()? new Reference(parsed.lastHoverChunk.getPtr(), byteIndex - parsed.lastHoverChunk.dataStart()).toString() : "",
 			"@" + byteIndex
-		}), new HoverMessage(List.of(new Range(0, 0)), null, new Object[]{bStr})));
+		}), new HoverMessage(List.of(new Range(0, 0)), null, new Object[]{bStr.toString()})));
 		
 		ctx.renderer.setLineWidth(3);
 		outlineByteRange(Color.BLACK, ctx, Range.fromSize(byteIndex, 1));
