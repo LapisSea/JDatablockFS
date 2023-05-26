@@ -218,9 +218,9 @@ public final class ClassGen implements ClassInfo, Endable{
 	}
 	
 	public static void writeAnnotations(Collection<AnnGen> annotations, BiFunction<String, Boolean, AnnotationVisitor> visitor){
-		for(AnnGen annotation : annotations){
-			var annWriter = visitor.apply(new GenericType(annotation.type()).jvmDescriptor().toString(), true);
-			for(var e : annotation.args().entrySet()){
+		for(AnnGen(ClassName annType, Map<String, Object> args) : annotations){
+			var annWriter = visitor.apply(new GenericType(annType).jvmDescriptor().toString(), true);
+			for(var e : args.entrySet()){
 				var argName  = e.getKey();
 				var argValue = e.getValue();
 				if(argValue.getClass().isArray()){

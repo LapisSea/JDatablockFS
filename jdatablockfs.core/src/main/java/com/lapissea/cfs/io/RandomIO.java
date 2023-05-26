@@ -541,8 +541,8 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 			
 			@Override
 			public void writeAtOffsets(Collection<WriteChunk> data){
-				for(var e : data){
-					transactionBuffer.write(e.ioOffset(), e.data(), e.dataOffset(), e.dataLength());
+				for(WriteChunk(long ioOffset, int dataOffset, int dataLength, byte[] data1) : data){
+					transactionBuffer.write(ioOffset, data1, dataOffset, dataLength);
 				}
 			}
 			@Override

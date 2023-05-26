@@ -51,8 +51,8 @@ public class FixedVaryingStructPipe<T extends IOInstance<T>> extends BaseFixedSt
 			}
 			
 			List<NumberSize> buff = new ArrayList<>(steps.size());
-			for(Step step : steps){
-				buff.add(rule.provide(step.max, null, step.ptr).size);
+			for(Step(NumberSize max, boolean ptr) : steps){
+				buff.add(rule.provide(max, null, ptr).size);
 			}
 			
 			try(var ignored = cacheLock.read()){

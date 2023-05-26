@@ -518,9 +518,9 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 			unkownNumAcc = new FieldAccessor[report.sizeGroups.size()];
 			unkownNumAccMul = new int[report.sizeGroups.size()];
 			int i = 0;
-			for(var e : report.sizeGroups){
-				unkownNumAcc[i] = e.num.getAccessor();
-				unkownNumAccMul[i] = e.fields.size();
+			for(SizeGroup(var num, var fields) : report.sizeGroups){
+				unkownNumAcc[i] = num.getAccessor();
+				unkownNumAccMul[i] = fields.size();
 				i++;
 			}
 		}

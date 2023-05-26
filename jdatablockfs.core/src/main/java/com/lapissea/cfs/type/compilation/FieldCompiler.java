@@ -148,10 +148,10 @@ public class FieldCompiler{
 	private static <T extends IOInstance<T>> Collection<IOField<T, ?>> generateDependencies(List<AnnotatedField<T>> fields, List<LogicalAnnotation<Annotation>> depAn, IOField<T, ?> field){
 		Collection<IOField<T, ?>> dependencies = new HashSet<>();
 		
-		for(var ann : depAn){
-			ann.logic().validate(field.getAccessor(), ann.annotation());
+		for(LogicalAnnotation(Annotation annotation, AnnotationLogic<Annotation> logic) : depAn){
+			logic.validate(field.getAccessor(), annotation);
 			
-			var depNames = ann.logic().getDependencyValueNames(field.getAccessor(), ann.annotation());
+			var depNames = logic.getDependencyValueNames(field.getAccessor(), annotation);
 			if(depNames.size() == 0) continue;
 			
 			var missingNames = depNames.stream()
@@ -168,17 +168,17 @@ public class FieldCompiler{
 	}
 	
 	private static <T extends IOInstance<T>> void validate(List<AnnotatedField<T>> parsed){
-		for(var pair : parsed){
-			var nam = pair.field.getName();
+		for(AnnotatedField(IOField<T, ?> annField, List<LogicalAnnotation<Annotation>> annotations) : parsed){
+			var nam = annField.getName();
 			for(char c : new char[]{'.', '/', '\\', ' '}){
 				if(nam.indexOf(c) != -1){
 					throw new IllegalField("Character '" + c + "' is not allowed in field name \"" + nam + "\"! ");
 				}
 			}
 			
-			var field = pair.field.getAccessor();
-			for(var ann : pair.annotations){
-				ann.logic().validate(field, ann.annotation());
+			var field = annField.getAccessor();
+			for(LogicalAnnotation(Annotation annotation, AnnotationLogic<Annotation> logic) : annotations){
+				logic.validate(field, annotation);
 			}
 		}
 	}
@@ -203,9 +203,9 @@ public class FieldCompiler{
 		List<AnnotatedField<T>> toRun = new ArrayList<>(parsed);
 		
 		do{
-			for(var runAnn : toRun){
-				for(var logicalAnn : runAnn.annotations){
-					for(var s : logicalAnn.logic().injectPerInstanceValue(runAnn.field.getAccessor(), logicalAnn.annotation())){
+			for(AnnotatedField(IOField<T, ?> field, List<LogicalAnnotation<Annotation>> annotations) : toRun){
+				for(LogicalAnnotation(Annotation annotation, AnnotationLogic<Annotation> logic) : annotations){
+					for(var s : logic.injectPerInstanceValue(field.getAccessor(), annotation)){
 						var existing = virtualData.get(s.name);
 						if(existing != null){
 							var gTyp = existing.getGenericType(null);
