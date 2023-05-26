@@ -424,19 +424,19 @@ public sealed interface ValueStorage<T>{
 		private final DataProvider        provider;
 		private final Struct.Unmanaged<T> struct;
 		
-		private final BaseFixedStructPipe<Reference> refPipe;
-		private final long                           size;
+		private final StructPipe<Reference> refPipe;
+		private final long                  size;
 		
 		@SuppressWarnings("unchecked")
-		public UnmanagedInstance(TypeLink type, DataProvider provider, BaseFixedStructPipe<Reference> refPipe){
+		public UnmanagedInstance(TypeLink type, DataProvider provider, StructPipe<Reference> refPipe){
 			this.type = type;
 			this.provider = provider;
 			this.refPipe = refPipe;
-			size = refPipe.getFixedDescriptor().get(WordSpace.BYTE);
+			size = refPipe.getSizeDescriptor().getFixed(WordSpace.BYTE).orElse(-1);
 			struct = (Struct.Unmanaged<T>)Struct.Unmanaged.ofUnknown(type.getTypeClass(provider.getTypeDb()));
 		}
 		
-		public BaseFixedStructPipe<Reference> getRefPipe(){
+		public StructPipe<Reference> getRefPipe(){
 			return refPipe;
 		}
 		
@@ -872,7 +872,7 @@ public sealed interface ValueStorage<T>{
 		
 		if(!IOInstance.isManaged(clazz)){
 			return switch(rule){
-				case StorageRule.Default ignored -> new UnmanagedInstance<>(typeDef, provider, Reference.fixedPipe());//TODO: implement standard reference unmanaged
+				case StorageRule.Default ignored -> new UnmanagedInstance<>(typeDef, provider, Reference.standardPipe());
 				case StorageRule.FixedOnly ignored -> new UnmanagedInstance<>(typeDef, provider, Reference.fixedPipe());
 				case StorageRule.VariableFixed conf -> new UnmanagedInstance<>(typeDef, provider, FixedVaryingStructPipe.tryVarying(Reference.STRUCT, conf.provider));
 			};

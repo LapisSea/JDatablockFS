@@ -208,7 +208,7 @@ public final class ContiguousIOList<T> extends AbstractUnmanagedIOList<T, Contig
 		public UnmanagedField(FieldAccessor<ContiguousIOList<T>> accessor, long index, ValueStorage.UnmanagedInstance<T> storage){
 			super(accessor, SizeDescriptor.Fixed.of(storage.getSizeDescriptor()));
 			this.index = index;
-			refPipe = storage.getRefPipe();
+			refPipe = (BaseFixedStructPipe<Reference>)storage.getRefPipe();
 		}
 		
 		@Override
