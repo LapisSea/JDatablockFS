@@ -2,6 +2,7 @@ package com.lapissea.cfs.logging;
 
 import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.config.ConfigDefs;
+import com.lapissea.cfs.config.ConfigTools;
 import com.lapissea.cfs.config.GlobalConfig;
 import com.lapissea.util.ConsoleColors;
 import com.lapissea.util.LogUtil;
@@ -12,6 +13,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import static com.lapissea.cfs.Utils.getFrame;
 
@@ -68,18 +70,12 @@ public class Log{
 		DEBUG = level.isWithin(LogLevel.DEBUG);
 		TRACE = level.isWithin(LogLevel.TRACE);
 		SMALL_TRACE = level.isWithin(LogLevel.SMALL_TRACE);
-	}
-	
-	static{
-		if(GlobalConfig.DEBUG_VALIDATION){
+		
+		if(GlobalConfig.DEBUG_VALIDATION && INFO){
+			var values = ConfigTools.collectConfigFlags();
 			info(
-				"""
-					{#yellowBrightRunning with debugging:#}
-						RELEASE_MODE: {}
-						TYPE_VALIDATION: {}
-						PRINT_COMPILATION: {}
-					""",
-				GlobalConfig.RELEASE_MODE, GlobalConfig.TYPE_VALIDATION, GlobalConfig.PRINT_COMPILATION
+				"{#yellowBrightRunning with debugging:#}\n" +
+				ConfigTools.configFlagsToTable(values, 4)
 			);
 		}
 	}
@@ -234,7 +230,8 @@ public class Log{
 			if(i<message.length() - 1){
 				if(c == '{' && message.charAt(i + 1) == '#'){
 					var col = findColor(message, i + 2).orElseThrow(
-						() -> new IllegalArgumentException("Illegal log format, opened format block with {#... could not find a valid color"));
+						() -> new IllegalArgumentException("Illegal log format, opened format block with {#... could not find a valid color. Valid colors: " +
+						                                   COLORS.stream().map(Tag::name).collect(Collectors.joining(", ", "[", "]"))));
 					var cmd = col.cmd;
 					formatted.append(cmd);
 					colorStack.add(last);
@@ -242,7 +239,9 @@ public class Log{
 					i += 1 + col.name.length();
 					continue;
 				}else if(c == '#' && message.charAt(i + 1) == '}'){
-					formatted.append(colorStack.remove(colorStack.size() - 1));
+					var col = colorStack.remove(colorStack.size() - 1);
+					formatted.append(col);
+					last = col;
 					i++;
 					continue;
 				}

@@ -1,11 +1,22 @@
 package com.lapissea.cfs.config;
 
 import com.lapissea.cfs.logging.Log;
+import com.lapissea.util.TextUtil;
+import com.lapissea.util.UtilL;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.IntFunction;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
+
+import static com.lapissea.util.ConsoleColors.*;
 
 public final class ConfigTools{
 	
@@ -180,5 +191,96 @@ public final class ConfigTools{
 	public static <T extends Enum<T>> Flag.Abc<T> flagE(String name, T defaultVal)                 { return flagEnum(name, new DefaultValue.Literal<>(defaultVal)); }
 	public static <T extends Enum<T>> Flag.Abc<T> flagE(String name, Supplier<T> valueMaker)       { return flagEnum(name, new DefaultValue.Lambda<>(valueMaker)); }
 	public static <T extends Enum<T>> Flag.Abc<T> flagEDyn(String name, Supplier<T> valueMaker)    { return flagE(name, valueMaker); }
+	
+	
+	public record ConfEntry(String name, String val){
+		public ConfEntry{
+			if(!name.startsWith(ConfigDefs.CONFIG_PROPERTY_PREFIX)){
+				throw new IllegalArgumentException(name + " does not start with " + ConfigDefs.CONFIG_PROPERTY_PREFIX);
+			}
+		}
+	}
+	
+	public static String configFlagsToTable(List<ConfEntry> values, int padding){
+		var padStr = " ".repeat(padding);
+		
+		var nameLen = values.stream().map(ConfigTools.ConfEntry::name).mapToInt(String::length).max().orElse(0);
+		
+		var groups = values.stream().collect(Collectors.groupingBy(e -> e.name.split("\\.")[1]));
+		
+		var singles = new ArrayList<ConfEntry>();
+		var groupsE = new ArrayList<Map.Entry<String, List<ConfEntry>>>();
+		for(var e : groups.entrySet()){
+			if(e.getValue().size() == 1){
+				singles.add(e.getValue().get(0));
+			}else{
+				groupsE.add(e);
+			}
+		}
+		singles.sort(Comparator.comparing(e -> e.name));
+		groupsE.sort(Map.Entry.comparingByKey());
+		
+		
+		StringBuilder sb = new StringBuilder();
+		for(ConfEntry(String name, String val) : singles){
+			var segments = name.split("\\.");
+			var len      = segments[0].length() + 1;
+			sb.append(padStr);
+			sb.append(BLACK_BRIGHT).append(name, 0, len).append(RESET).append(name, len, name.length());
+			sb.append(" ".repeat(nameLen - name.length())).append(": ")
+			  .append(val).append('\n');
+		}
+		
+		for(var group : groupsE){
+			var gName    = group.getKey();
+			var elements = group.getValue();
+			int pad      = nameLen - gName.length() - 2, before = pad/2, after = pad - before;
+			sb.append(padStr).append("-".repeat(before)).append(' ')
+			  .append(gName.length()>2? TextUtil.firstToUpperCase(gName) : gName).append(' ')
+			  .append("-".repeat(after)).append('\n');
+			
+			var len = Arrays.stream(elements.get(0).name.split("\\.")).limit(2).mapToInt(s -> s.length() + 1).sum();
+			for(ConfEntry(String name, String val) : elements){
+				var segments = name.split("\\.");
+				sb.append(padStr);
+				if(segments.length == 2){
+					sb.append(name);
+				}else{
+					sb.append(BLACK_BRIGHT).append(name, 0, len).append(RESET).append(name, len, name.length());
+				}
+				sb.append(" ".repeat(nameLen - name.length())).append(": ")
+				  .append(val).append('\n');
+			}
+		}
+		
+		return sb.toString();
+	}
+	
+	public static List<ConfEntry> collectConfigFlags(){
+		List<ConfEntry> values = new ArrayList<>();
+		try{
+			for(var field : ConfigDefs.class.getDeclaredFields()){
+				if(UtilL.instanceOf(field.getType(), ConfigTools.Flag.class)){
+					var val  = (ConfigTools.Flag<?>)field.get(null);
+					var name = val.name();
+					values.add(new ConfEntry(name, switch(val){
+						case ConfigTools.Flag.Abc<?> enumFlag -> {
+							var enums   = enumFlag.defaultValue().value().getClass().getEnumConstants();
+							var enumStr = Arrays.stream(enums).map(Enum::toString).collect(Collectors.joining(", ", "[", "]"));
+							yield PURPLE_BRIGHT + val.resolve() + RESET + " - " + PURPLE + enumStr + RESET;
+						}
+						case ConfigTools.Flag.Bool bool -> BLUE + bool.resolve() + RESET;
+						case ConfigTools.Flag.Int anInt -> YELLOW_BRIGHT + anInt.resolve() + RESET;
+						case ConfigTools.Flag.Str str -> PURPLE_BRIGHT + str.resolve() + RESET;
+						case ConfigTools.Flag.StrOptional str -> str.resolve().map(v -> PURPLE + v + RESET).orElse("");
+					}));
+				}
+			}
+			return values;
+		}catch(IllegalAccessException e){
+			throw new RuntimeException(e);
+		}
+		
+	}
 	
 }
