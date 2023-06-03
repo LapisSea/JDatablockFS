@@ -8,7 +8,6 @@ import com.lapissea.util.LogUtil;
 
 import java.net.URL;
 import java.util.Objects;
-import java.util.Optional;
 
 import static com.lapissea.cfs.config.ConfigTools.*;
 import static com.lapissea.cfs.logging.Log.LogLevel.INFO;
@@ -56,7 +55,7 @@ public sealed interface ConfigDefs permits ConfigTools.Dummy{
 	Flag.Bool         CLASSGEN_EXIT_ON_FAIL          = flagB("classGen.exitOnFail", false);
 	Flag.Bool         CLASSGEN_PRINT_GENERATING_INFO = flagB("classGen.printGeneratingInfo", CLASSGEN_DEBUG);
 	Flag.Abc<CodeLog> CLASSGEN_PRINT_BYTECODE        = flagE("classGen.printBytecode", CLASSGEN_DEBUG.boolMap(TRUE, FALSE));
-	Optional<String>  CLASSGEN_DUMP_LOCATION         = ConfigUtils.optionalProperty("classGen.printBytecode");
+	Flag.StrOptional  CLASSGEN_DUMP_LOCATION         = flagS("classGen.dumpLocation");
 	
 	
 	Flag.Abc<Lz4Packer.Provider> LZ4_COMPATIBILITY = flagE("lz4.compatibility", Lz4Packer.Provider.ANY);

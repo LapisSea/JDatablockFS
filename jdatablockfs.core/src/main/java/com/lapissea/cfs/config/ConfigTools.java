@@ -116,6 +116,25 @@ public final class ConfigTools{
 			}
 		}
 		
+		record StrOptional(String name) implements Flag<Optional<String>>{
+			
+			private static final DefaultValue<Optional<String>> DEFAULT_VALUE = new DefaultValue.Literal<>(Optional.empty());
+			
+			public StrOptional{
+				Objects.requireNonNull(name);
+			}
+			
+			@Override
+			public DefaultValue<Optional<String>> defaultValue(){
+				return DEFAULT_VALUE;
+			}
+			
+			@Override
+			public Optional<String> resolve(){
+				return ConfigUtils.optionalProperty(name);
+			}
+		}
+		
 		record Abc<E extends Enum<E>>(String name, DefaultValue<E> defaultValue) implements Flag<E>{
 			public Abc{
 				Objects.requireNonNull(name);
@@ -151,6 +170,8 @@ public final class ConfigTools{
 	public static Flag.Str flagS(String name, Flag.Str defaultVal)                 { return flagStr(name, new DefaultValue.OtherFlagFallback<>(defaultVal)); }
 	public static Flag.Str flagS(String name, String defaultVal)                   { return flagStr(name, new DefaultValue.Literal<>(defaultVal)); }
 	public static Flag.Str flagS(String name, Supplier<String> valueMaker)         { return flagStr(name, new DefaultValue.Lambda<>(valueMaker)); }
+	
+	public static Flag.StrOptional flagS(String name)                              { return new Flag.StrOptional(ConfigDefs.CONFIG_PROPERTY_PREFIX + Objects.requireNonNull(name)); }
 	
 	///
 	

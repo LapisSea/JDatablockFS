@@ -13,7 +13,7 @@ import java.util.Optional;
 
 public class ClassGenerationCommons{
 	
-	private static final Optional<File> DUMP_LOCATION = ConfigDefs.CLASSGEN_DUMP_LOCATION.map(File::new);
+	private static final Optional<File> DUMP_LOCATION = ConfigDefs.CLASSGEN_DUMP_LOCATION.resolve().map(File::new);
 	private static final int            CHUNK_SIZE    = DUMP_LOCATION.map(File::toPath).flatMap(Utils::findPathBlockSize).orElse(1024);
 	
 	public static void dumpClassName(String className, byte[] data){
