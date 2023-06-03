@@ -442,7 +442,8 @@ public class DisplayIpc implements DataLogger{
 					yield s -> Session.Blank.INSTANCE;
 				}
 			};
-			warn(switch(config.loggerFallbackType){
+			
+			if(msg != null) warn(switch(config.loggerFallbackType){
 				case SERVER -> "{}, Fallback is server. Already tried that...";
 				case LOCAL -> "{}, switching to local server session.";
 				case NONE -> "{}, switching to no output.";

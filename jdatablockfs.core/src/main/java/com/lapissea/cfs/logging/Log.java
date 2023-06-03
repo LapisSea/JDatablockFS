@@ -18,9 +18,6 @@ import java.util.stream.Collectors;
 import static com.lapissea.cfs.Utils.getFrame;
 
 public class Log{
-	static{
-		LogUtil.registerSkipClass(Log.class);
-	}
 	
 	public enum LogLevel{
 		NONE(Integer.MIN_VALUE),
@@ -78,6 +75,8 @@ public class Log{
 				ConfigTools.configFlagsToTable(values, 4)
 			);
 		}
+		
+		LogUtil.registerSkipClass(Log.class);
 	}
 	
 	public static void log(String message){

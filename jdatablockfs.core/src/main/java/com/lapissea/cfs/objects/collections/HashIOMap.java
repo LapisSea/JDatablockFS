@@ -558,7 +558,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 			sorted.computeIfAbsent(hashToSmall(HashCommons.toHash(kvEntry.getKey()), bucketPO2), i -> new ArrayList<>()).add(kvEntry);
 		}
 		
-		getDataProvider().getSource().openIOTransaction(() -> {
+		try(var ignored = getDataProvider().getSource().openIOTransaction()){
 			long deltaSize = 0;
 			for(var group : sorted.values()){
 				for(Map.Entry<K, V> e : group){
@@ -571,7 +571,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 			}
 			
 			deltaSize(deltaSize);
-		});
+		}
 	}
 	
 	@Override
