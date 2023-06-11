@@ -182,6 +182,9 @@ public class DisplayHost{
 					if("Socket closed".equals(e.getMessage())){
 						break;
 					}
+					if(e.getMessage().contains("connection was aborted")){
+						break;
+					}
 					e.printStackTrace();
 					break;
 				}catch(Exception e){
