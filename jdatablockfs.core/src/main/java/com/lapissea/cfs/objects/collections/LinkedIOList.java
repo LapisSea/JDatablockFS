@@ -1,6 +1,7 @@
 package com.lapissea.cfs.objects.collections;
 
 import com.lapissea.cfs.chunk.DataProvider;
+import com.lapissea.cfs.internal.Runner;
 import com.lapissea.cfs.io.ValueStorage;
 import com.lapissea.cfs.io.instancepipe.FieldDependency;
 import com.lapissea.cfs.objects.Reference;
@@ -14,6 +15,7 @@ import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.util.LateInit;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.function.UnsafeConsumer;
@@ -99,7 +101,9 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 		ArgCheck.rawAny(PRIMITIVE, INSTANCE_MANAGED)
 	);
 	
-	private final IOField<LinkedIOList<T>, IONode<T>> headField = (IOField<LinkedIOList<T>, IONode<T>>)Struct.Unmanaged.thisClass().getFields().byName("head").orElseThrow();
+	private static final LateInit.Safe<IOField<?, ?>> HEAD_FIELD = Runner.async(
+		() -> Struct.Unmanaged.thisClass().getFields().byName("head").orElseThrow()
+	);
 	
 	@IOValue
 	@IONullability(IONullability.Mode.NULLABLE)
@@ -279,12 +283,16 @@ public class LinkedIOList<T> extends AbstractUnmanagedIOList<T, LinkedIOList<T>>
 	}
 	
 	private IONode<T> getHead() throws IOException{
-		if(!readOnly || head == null) readManagedField(headField);
+		if(!readOnly || head == null){
+			readManagedField((IOField<LinkedIOList<T>, IONode<T>>)HEAD_FIELD.get());
+		}
 		return head;
 	}
 	private void setHead(IONode<T> head) throws IOException{
 		this.head = head;
-		getDataProvider().getSource().openIOTransaction(() -> writeManagedField(headField));
+		getDataProvider().getSource().openIOTransaction(() -> {
+			writeManagedField((IOField<LinkedIOList<T>, IONode<T>>)HEAD_FIELD.get());
+		});
 	}
 	
 	@Override

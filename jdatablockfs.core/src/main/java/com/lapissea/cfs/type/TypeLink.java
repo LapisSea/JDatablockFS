@@ -117,7 +117,7 @@ public final class TypeLink extends IOInstance.Managed<TypeLink>{
 		
 		public void ensureValid(TypeLink type, IOTypeDB db){
 			try{
-				rawCheck.accept(type.getTypeClass(null));
+				rawCheck.accept(type.getTypeClass(db));
 				if(type.argCount() != argChecks.size()) throw new IllegalArgumentException("Argument count in " + type + " should be " + argChecks.size() + " but is " + type.argCount());
 				
 				var errs = new LinkedList<Throwable>();

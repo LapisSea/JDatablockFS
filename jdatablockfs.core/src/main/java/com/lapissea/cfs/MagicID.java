@@ -23,7 +23,7 @@ public class MagicID{
 	public static void read(ContentReader src) throws InvalidMagicID{
 		ByteBuffer magicId;
 		try{
-			magicId = ByteBuffer.wrap(src.readInts1(MAGIC_ID.limit()));
+			magicId = ByteBuffer.wrap(src.readInts1(size()));
 			if(!magicId.equals(MAGIC_ID)){
 				throw new InvalidMagicID("ID: " + UTF_8.decode(magicId));
 			}

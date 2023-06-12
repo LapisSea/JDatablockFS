@@ -427,7 +427,7 @@ public abstract sealed class MemoryData<DataType> implements IOInterface{
 	
 	@Override
 	public String toString(){
-		return MemoryData.class.getSimpleName() + "." + getClass().getSimpleName() + "#" + Integer.toHexString(hashCode());
+		return MemoryData.class.getSimpleName() + "#" + Integer.toHexString(hashCode()) + "{" + getIOSize() + " bytes}";
 	}
 	
 	@Override

@@ -392,7 +392,7 @@ public final class IOFileData implements IOInterface, Closeable{
 	
 	@Override
 	public String toString(){
-		return IOFileData.class.getSimpleName() + "." + getClass().getSimpleName() + "#" + Integer.toHexString(hashCode());
+		return IOFileData.class.getSimpleName() + "{" + file + "}";
 	}
 	
 	@Override
