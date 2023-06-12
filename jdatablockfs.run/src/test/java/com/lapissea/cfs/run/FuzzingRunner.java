@@ -1,6 +1,7 @@
 package com.lapissea.cfs.run;
 
 import com.lapissea.cfs.logging.Log;
+import org.testng.Assert;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -21,7 +22,6 @@ public class FuzzingRunner<State, Action, Err extends Throwable>{
 			return String.valueOf(index);
 		}
 	}
-	
 	
 	public sealed interface Fail{
 		
@@ -149,6 +149,13 @@ public class FuzzingRunner<State, Action, Err extends Throwable>{
 		}
 		
 		return Optional.empty();
+	}
+	
+	public void runAndAssert(long seed, long totalIterations, int sequenceLength){
+		var fails = run(seed, totalIterations, sequenceLength);
+		if(!fails.isEmpty()){
+			Assert.fail(FuzzingRunner.Fail.report(fails));
+		}
 	}
 	
 	public List<Fail> run(long seed, long totalIterations, int sequenceLength){

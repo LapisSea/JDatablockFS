@@ -23,7 +23,6 @@ import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.util.LateInit;
 import com.lapissea.util.function.UnsafeBiConsumer;
 import com.lapissea.util.function.UnsafeSupplier;
-import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -380,21 +379,12 @@ public class SlowTests{
 					state.cluster.scanGarbage(DefragmentManager.FreeFoundAction.ERROR);
 				}
 			}
-		}, rand -> {
-			if(rand.nextInt(1000) == 1){
-				return new Action(Type.CLEAR, -1);
-			}
-			return new Action(
-				allTypes[rand.nextInt(allTypes.length)],
-				rand.nextInt(200)
-			);
-		});
+		}, RNGEnum.of(Type.class)
+		          .chanceFor(Type.CLEAR, 1F/1000)
+		          .map((e, rand) -> new Action(e, rand.nextInt(200)))
+		);
 		
-		var fails = runner.run(69_420, iterations, 5000);
-		
-		if(!fails.isEmpty()){
-			Assert.fail(FuzzingRunner.Fail.report(fails));
-		}
+		runner.runAndAssert(69_420, iterations, 5000);
 	}
 	
 	@Test
@@ -479,9 +469,6 @@ public class SlowTests{
 	
 	@Test(dataProvider = "listMakers")
 	void fuzzIOList(ListMaker maker){
-		var allTypes  = ListAction.NumT.values();
-		var all2Types = ListAction.Num2T.values();
-		
 		var runner = new FuzzingRunner<IOList<Integer>, ListAction, IOException>(new FuzzingRunner.StateEnv<>(){
 			@Override
 			public boolean shouldRun(FuzzingRunner.SequenceSrc sequence){
@@ -518,24 +505,13 @@ public class SlowTests{
 					default -> throw new IllegalStateException("Unexpected value: " + action);
 				}
 			}
-		}, rand -> {
-			if(rand.nextInt(1000) == 1){
-				return new ListAction.Clear();
-			}
-			var idx = rand.nextInt(allTypes.length + all2Types.length);
-			int num = rand.nextInt(200);
-			if(idx>=allTypes.length) return new ListAction.Num2(all2Types[idx - allTypes.length], num, rand.nextInt(200));
-			return new ListAction.Num(
-				allTypes[idx],
-				num
-			);
-		});
+		}, RNGType.<ListAction>of(List.of(
+			r -> new ListAction.Clear(),
+			r -> new ListAction.Num(RNGEnum.anyOf(r, ListAction.NumT.class), r.nextInt(200)),
+			r -> new ListAction.Num2(RNGEnum.anyOf(r, ListAction.Num2T.class), r.nextInt(200), r.nextInt(200))
+		)).chanceFor(ListAction.Clear.class, 1F/1000));
 		
-		var fails = runner.run(69_420, (long)(500_000L*maker.weight), 5000);
-		
-		if(!fails.isEmpty()){
-			Assert.fail(FuzzingRunner.Fail.report(fails));
-		}
+		runner.runAndAssert(69_420, (long)(500_000L*maker.weight), 5000);
 	}
 	
 	@Test(dependsOnMethods = "fuzzIOList", dataProvider = "listMakers")
@@ -549,15 +525,12 @@ public class SlowTests{
 				return type + (type == Type.SET? "(" + num + ")" : "");
 			}
 		}
-		var allTypes = Type.values();
-		
 		class State{
 			final IOList.IOListIterator<Integer> iter;
 			boolean has;
 			public State(IOList.IOListIterator<Integer> iter){
 				this.iter = iter;
 			}
-			
 		}
 		
 		var runner = new FuzzingRunner<State, Action, IOException>(new FuzzingRunner.StateEnv<>(){
@@ -619,15 +592,8 @@ public class SlowTests{
 					}
 				}
 			}
-		}, rand -> new Action(
-			allTypes[rand.nextInt(allTypes.length)],
-			rand.nextInt(200)
-		));
+		}, RNGEnum.of(Type.class).map((t, rand) -> new Action(t, rand.nextInt(200))));
 		
-		var fails = runner.run(69_420, (long)(1000_000L*maker.weight), 1000);
-		
-		if(!fails.isEmpty()){
-			Assert.fail(FuzzingRunner.Fail.report(fails));
-		}
+		runner.runAndAssert(69_420, (long)(1000_000L*maker.weight), 1000);
 	}
 }
