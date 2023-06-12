@@ -69,6 +69,11 @@ public sealed interface IOTypeDB{
 			}
 			
 			@Override
+			public long typeLinkCount(){ return typToID.size(); }
+			@Override
+			public long definitionCount(){ return defs.size(); }
+			
+			@Override
 			public TypeID toID(TypeLink type, boolean recordNew){
 				var id = typToID.get(type);
 				if(id != null) return new TypeID(id, true);
@@ -217,6 +222,11 @@ public sealed interface IOTypeDB{
 			public TypeID toID(Class<?> type, boolean recordNew){
 				return toID(TypeLink.of(type), recordNew);
 			}
+			
+			@Override
+			public long typeLinkCount(){ return typToID.size(); }
+			@Override
+			public long definitionCount(){ return defs.size(); }
 			
 			@Override
 			public TypeID toID(TypeLink type, boolean recordNew){
@@ -372,6 +382,11 @@ public sealed interface IOTypeDB{
 		private       int                    max;
 		
 		private WeakReference<ClassLoader> templateLoader = new WeakReference<>(null);
+		
+		@Override
+		public long typeLinkCount(){ return data.size(); }
+		@Override
+		public long definitionCount(){ return defs.size(); }
 		
 		@Override
 		public TypeID toID(TypeLink type, boolean recordNew) throws IOException{
@@ -619,6 +634,9 @@ public sealed interface IOTypeDB{
 			return val;
 		}
 	}
+	
+	long typeLinkCount();
+	long definitionCount();
 	
 	TypeID toID(TypeLink type, boolean recordNew) throws IOException;
 	TypeLink fromID(int id) throws IOException;

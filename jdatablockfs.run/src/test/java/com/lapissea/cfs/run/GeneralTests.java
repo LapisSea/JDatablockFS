@@ -48,7 +48,7 @@ public class GeneralTests{
 		
 		try{
 			for(var typ : List.of(
-				Chunk.class, Reference.class, AutoText.class, Cluster.RootRef.class, ContiguousIOList.class,
+				Chunk.class, Reference.class, AutoText.class, ContiguousIOList.class,
 				LinkedIOList.class, HashIOMap.class, TypeDef.class, TypeLink.class, ObjectID.class
 			)){
 				tasks.add(Struct.ofUnknown(typ));

@@ -654,7 +654,7 @@ public interface IOList<T> extends IterablePP<T>{
 		return new IOListRangeView<>(this, from, to);
 	}
 	
-	default <To> IOList<To> map(Class<To> mappedType, Function<T, To> map, Function<To, T> unmap){
+	default <To> IOList<To> mappedView(Class<To> mappedType, Function<T, To> map, Function<To, T> unmap){
 		Objects.requireNonNull(map);
 		Objects.requireNonNull(unmap);
 		return new MappedIOList<>(this, mappedType){

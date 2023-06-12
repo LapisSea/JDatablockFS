@@ -1,6 +1,7 @@
 package com.lapissea.cfs.chunk;
 
 import com.lapissea.cfs.MagicID;
+import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.config.ConfigDefs;
 import com.lapissea.cfs.exceptions.MalformedPointer;
 import com.lapissea.cfs.io.IOInterface;
@@ -30,6 +31,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.StringJoiner;
 
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NULLABLE;
@@ -41,7 +43,7 @@ public class Cluster implements DataProvider{
 	private static final ChunkPointer             FIRST_CHUNK_PTR = ChunkPointer.of(MagicID.size());
 	
 	public static Cluster emptyMem() throws IOException{
-		return Cluster.init(MemoryData.builder().withCapacity(MagicID.size()).build());
+		return Cluster.init(MemoryData.builder().withCapacity(getEmptyClusterSnapshot().limit()).build());
 	}
 	
 	public static void initEmptyClusterSnapshot(IOInterface data) throws IOException{
@@ -59,26 +61,30 @@ public class Cluster implements DataProvider{
 		db.init(provider);
 		
 		ROOT_PIPE.modify(firstChunk, root -> {
-			Metadata metadata = root.metadata;
-			metadata.db = db;
-			metadata.allocateNulls(provider);
+			root.metadata.db = db;
+			root.metadata.allocateNulls(provider);
 		}, null);
 	}
 	
 	private static WeakReference<ByteBuffer> EMPTY_CLUSTER_SNAP = new WeakReference<>(null);
-	public static Cluster init(IOInterface data) throws IOException{
+	private static ByteBuffer getEmptyClusterSnapshot() throws IOException{
 		var emptyClusterSnap = EMPTY_CLUSTER_SNAP.get();
 		if(emptyClusterSnap == null){
 			var mem = MemoryData.builder().withCapacity(MagicID.size()).build();
 			initEmptyClusterSnapshot(mem);
-			EMPTY_CLUSTER_SNAP = new WeakReference<>(emptyClusterSnap = ByteBuffer.wrap(mem.readAll()).asReadOnlyBuffer());
+			emptyClusterSnap = ByteBuffer.wrap(mem.readAll()).asReadOnlyBuffer();
+			
+			EMPTY_CLUSTER_SNAP = new WeakReference<>(emptyClusterSnap);
 		}
-		data.write(true, emptyClusterSnap);
+		return emptyClusterSnap;
+	}
+	
+	public static Cluster init(IOInterface data) throws IOException{
+		data.write(true, getEmptyClusterSnapshot());
 		return new Cluster(data);
 	}
 	
-	
-	public static class RootRef extends IOInstance.Managed<RootRef>{
+	private static class RootRef extends IOInstance.Managed<RootRef>{
 		@IOValue
 		@IOValue.Reference(dataPipeType = FLEXIBLE)
 		@IONullability(DEFAULT_IF_NULL)
@@ -87,6 +93,7 @@ public class Cluster implements DataProvider{
 	
 	@IOInstance.Def.ToString(name = false, curly = false, fNames = false)
 	private interface IOChunkPointer extends IOInstance.Def<IOChunkPointer>{
+		
 		ChunkPointer getVal();
 	}
 	
@@ -112,7 +119,8 @@ public class Cluster implements DataProvider{
 	private final MemoryManager     memoryManager;
 	private final DefragmentManager defragmentManager = new DefragmentManager(this);
 	
-	private final RootRef root;
+	private final RootRef  root;
+	private final Metadata metadata;
 	
 	
 	private final RootProvider rootProvider = new RootProvider(){
@@ -145,8 +153,7 @@ public class Cluster implements DataProvider{
 		}
 		
 		private Object readOrMake(ObjectID id, UnsafeSupplier<Object, IOException> objectGenerator) throws IOException{
-			var meta = meta();
-			return meta.rootObjects.computeIfAbsent(id, objectGenerator);
+			return metadata.rootObjects.computeIfAbsent(id, objectGenerator);
 		}
 		
 		@SuppressWarnings("unchecked")
@@ -165,8 +172,7 @@ public class Cluster implements DataProvider{
 		@Override
 		public <T> void provide(ObjectID id, T obj) throws IOException{
 			Objects.requireNonNull(obj);
-			var meta = meta();
-			meta.rootObjects.put(id, obj);
+			metadata.rootObjects.put(id, obj);
 		}
 		
 		@Override
@@ -176,18 +182,17 @@ public class Cluster implements DataProvider{
 		
 		@Override
 		public IterablePP<IOMap.IOEntry<ObjectID, Object>> listAll(){
-			return () -> meta().rootObjects.iterator();
+			return () -> metadata.rootObjects.iterator();
 		}
 		
 		@Override
 		public void drop(ObjectID id) throws IOException{
-			meta().rootObjects.remove(id);
+			metadata.rootObjects.remove(id);
 		}
 	};
 	
 	public Cluster(IOInterface source) throws IOException{
 		this.source = source;
-		
 		source.read(MagicID::read);
 		
 		Chunk ch = getFirstChunk();
@@ -198,11 +203,14 @@ public class Cluster implements DataProvider{
 		}
 		
 		root = ROOT_PIPE.readNew(this, ch, null);
-		var frees  = meta().freeChunks;
-		var mapped = frees.map(ChunkPointer.class, IOChunkPointer::getVal, IOInstance.Def.constrRef(IOChunkPointer.class, ChunkPointer.class));
-		var cached = mapped.cachedView(128);
+		metadata = root.metadata;
 		
-		memoryManager = new PersistentMemoryManager(this, cached);
+		memoryManager = new PersistentMemoryManager(
+			this,
+			metadata.freeChunks
+				.mappedView(ChunkPointer.class, IOChunkPointer::getVal, IOInstance.Def.constrRef(IOChunkPointer.class, ChunkPointer.class))
+				.cachedView(128)
+		);
 	}
 	
 	@Override
@@ -214,38 +222,34 @@ public class Cluster implements DataProvider{
 		}
 	}
 	
-	private Metadata meta(){
-		return root.metadata;
-	}
+	@Override
+	public IOTypeDB getTypeDb(){ return metadata == null? null : metadata.db; }
+	@Override
+	public IOInterface getSource(){ return source; }
+	@Override
+	public MemoryManager getMemoryManager(){ return Objects.requireNonNull(memoryManager); }
+	@Override
+	public ChunkCache getChunkCache(){ return chunkCache; }
 	
-	@Override
-	public IOTypeDB getTypeDb(){
-		if(root == null) return null;
-		return meta().db;
-	}
-	
-	@Override
-	public IOInterface getSource(){
-		return source;
-	}
-	@Override
-	public MemoryManager getMemoryManager(){
-		return Objects.requireNonNull(memoryManager);
-	}
-	public RootProvider getRootProvider(){
-		return rootProvider;
-	}
-	
-	@Override
-	public ChunkCache getChunkCache(){
-		return chunkCache;
-	}
+	public RootProvider getRootProvider(){ return rootProvider; }
 	
 	@Override
 	public String toString(){
-		return "Cluster{" +
-		       "source=" + source +
-		       '}';
+		var res = new StringJoiner(", ", "Cluster{", "}");
+		res.add("source: " + Utils.toShortString(source));
+		
+		var db    = getTypeDb();
+		var defs  = db != null? db.definitionCount() : 0;
+		var types = db != null? db.typeLinkCount() : 0;
+		if(defs != 0 || types != 0) res.add("db: (" + defs + " defs, " + types + " types)");
+		
+		var freeChunks = memoryManager != null? memoryManager.getFreeChunks().size() : 0;
+		if(freeChunks != 0) res.add("freeChunks: " + freeChunks);
+		
+		var roots = metadata != null? metadata.rootObjects.size() : 0;
+		if(roots != 0) res.add("roots: " + roots);
+		
+		return res.toString();
 	}
 	
 	
