@@ -15,7 +15,7 @@ public abstract class AbstractUnmanagedIOMap<K, V> extends IOInstance.Unmanaged<
 	@IOValue
 	@IOValue.Unsigned
 	@IODependency.VirtualNumSize
-	private long size;
+	protected long size;
 	
 	private IOFieldPrimitive.FLong<AbstractUnmanagedIOMap<K, V>> sizeField;
 	

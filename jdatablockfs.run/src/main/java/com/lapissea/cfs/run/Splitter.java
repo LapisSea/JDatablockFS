@@ -51,6 +51,12 @@ public class Splitter{
 				return removed;
 			}
 			@Override
+			public void clear() throws IOException{
+				a.clear();
+				b.clear();
+				test();
+			}
+			@Override
 			public boolean containsKey(K key) throws IOException{
 				return a.containsKey(key);
 			}

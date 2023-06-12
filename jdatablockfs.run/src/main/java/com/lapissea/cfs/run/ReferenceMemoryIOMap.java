@@ -58,6 +58,11 @@ public class ReferenceMemoryIOMap<K, V> implements IOMap<K, V>{
 	}
 	
 	@Override
+	public void clear() throws IOException{
+		data.clear();
+	}
+	
+	@Override
 	public String toString(){
 		return IOMap.toString(this);
 	}

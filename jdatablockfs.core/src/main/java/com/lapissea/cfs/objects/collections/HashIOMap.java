@@ -607,6 +607,20 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		return false;
 	}
 	
+	@Override
+	public void clear() throws IOException{
+		datasetID++;
+		try(var ignored = getDataProvider().getSource().openIOTransaction()){
+			buckets.clear();
+			fillBuckets(buckets, bucketPO2);
+			
+			size = 0;
+			bucketPO2 = 1;
+			writeManagedFields();
+		}
+		
+	}
+	
 	private enum PutAction{
 		OVERWRITE(0),
 		OVERWRITE_EMPTY(1),

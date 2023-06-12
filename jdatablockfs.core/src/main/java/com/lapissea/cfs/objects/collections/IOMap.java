@@ -210,6 +210,8 @@ public interface IOMap<K, V> extends IterablePP<IOMap.IOEntry<K, V>>{
 	 */
 	boolean remove(K key) throws IOException;
 	
+	void clear() throws IOException;
+	
 	static <K, V> String toString(IOMap<K, V> map){
 		if(map.isEmpty()) return "{}";
 		var i = map.iterator();
