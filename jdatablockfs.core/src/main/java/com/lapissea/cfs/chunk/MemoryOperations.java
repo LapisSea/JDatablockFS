@@ -224,10 +224,14 @@ public class MemoryOperations{
 		ChunkPointer last = null;
 		for(ChunkPointer val : data){
 			if(last != null){
-				if(last.compareTo(val)>=0) throw new IllegalStateException(last + " >= " + val + " in " + data);
+				if(last.compareTo(val)>=0){
+					throw new IllegalStateException(last + " >= " + val + " in " + data);
+				}
 				var prev = last.dereference(provider);
 				var c    = val.dereference(provider);
-				if(prev.isNextPhysical(c)) throw new IllegalStateException(prev + " connected to " + c + " in " + data);
+				if(prev.isNextPhysical(c)){
+					throw new IllegalStateException(prev + " connected to " + c + " in " + data);
+				}
 			}
 			last = val;
 		}

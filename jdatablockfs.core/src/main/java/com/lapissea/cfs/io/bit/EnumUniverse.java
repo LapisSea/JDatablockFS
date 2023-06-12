@@ -2,7 +2,6 @@ package com.lapissea.cfs.io.bit;
 
 import com.lapissea.cfs.internal.MyUnsafe;
 import com.lapissea.cfs.objects.NumberSize;
-import com.lapissea.cfs.utils.ReadWriteClosableLock;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
 
@@ -11,19 +10,18 @@ import java.lang.reflect.Array;
 import java.util.AbstractList;
 import java.util.Arrays;
 import java.util.EnumSet;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Spliterator;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.IntFunction;
 
 public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
 	
-	private static final Map<Class<? extends Enum>, EnumUniverse<?>> CACHE      = new HashMap<>();
-	private static final ReadWriteClosableLock                       CACHE_LOCK = ReadWriteClosableLock.reentrant();
+	private static final Map<Class<? extends Enum>, EnumUniverse<?>> CACHE = new ConcurrentHashMap<>();
 	
 	private interface UGet{
 		<E extends Enum<E>> E[] get(Class<E> type);
@@ -77,24 +75,17 @@ public final class EnumUniverse<T extends Enum<T>> extends AbstractList<T>{
 	
 	@SuppressWarnings("unchecked")
 	public static <T extends Enum<T>> EnumUniverse<T> of(Class<T> type){
-		EnumUniverse<T> flags;
+		var flags = (EnumUniverse<T>)CACHE.get(type);
+		if(flags != null) return flags;
 		
-		try(var ignored = CACHE_LOCK.read()){
-			flags = (EnumUniverse<T>)CACHE.get(type);
-		}
-		
-		if(flags == null){
-			ensureEnum(type);
-			try(var ignored = CACHE_LOCK.write()){
-				flags = (EnumUniverse<T>)CACHE.get(type);
-				if(flags == null){
-					var newFlags = new EnumUniverse<>(type);
-					CACHE.put(type, newFlags);
-					return newFlags;
-				}
-			}
-		}
-		return flags;
+		return init(type);
+	}
+	
+	private static <T extends Enum<T>> EnumUniverse<T> init(Class<T> type){
+		ensureEnum(type);
+		var newFlags = new EnumUniverse<>(type);
+		CACHE.put(type, newFlags);
+		return newFlags;
 	}
 	
 	public final  Class<T> type;
