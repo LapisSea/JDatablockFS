@@ -9,6 +9,8 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -18,6 +20,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 public class FuzzingRunner<State, Action, Err extends Throwable>{
 	
@@ -34,10 +37,11 @@ public class FuzzingRunner<State, Action, Err extends Throwable>{
 			LEAST_ACTION,
 			ORIGINAL_ORDER,
 			FAIL_SPEED,
-			INDEX;
+			INDEX,
+			COMMON_STACK;
 			
 			private static FailOrder defaultOrder(){
-				return ConfigUtils.configEnum("test.fuzzing.reportFailOrder", FailOrder.LEAST_ACTION);
+				return ConfigUtils.configEnum("test.fuzzing.reportFailOrder", FailOrder.COMMON_STACK);
 			}
 		}
 		
@@ -47,7 +51,20 @@ public class FuzzingRunner<State, Action, Err extends Throwable>{
 				return fails.get(0).trace();
 			}
 			
-			var sorted = switch(order == null? FailOrder.defaultOrder() : order){
+			var sorted = sortFails(fails, order);
+			
+			var sb = new StringBuilder("Multiple fails:\n");
+			for(Fail fail : sorted){
+				sb.append('\t').append(fail.note()).append('\n');
+			}
+			sb.append("\nFirst fail:\n");
+			sb.append(sorted.get(0).trace());
+			return sb.toString();
+		}
+		
+		static List<Fail> sortFails(List<Fail> fails){ return sortFails(fails, null); }
+		static List<Fail> sortFails(List<Fail> fails, FailOrder order){
+			return switch(order == null? FailOrder.defaultOrder() : order){
 				case LEAST_ACTION -> fails.stream().sorted((a, b) -> {
 					if(a instanceof Create && b instanceof Create) return Long.compare(a.sequence().index, b.sequence().index);
 					if(a instanceof Create) return -1;
@@ -62,15 +79,14 @@ public class FuzzingRunner<State, Action, Err extends Throwable>{
 				case ORIGINAL_ORDER -> fails;
 				case FAIL_SPEED -> fails.stream().sorted(Comparator.comparing(Fail::timeToFail)).toList();
 				case INDEX -> fails.stream().sorted(Comparator.comparing(f -> f.sequence().index)).toList();
+				case COMMON_STACK -> fails.stream()
+				                          .collect(Collectors.groupingBy(f -> Arrays.asList(f.e().getStackTrace())))
+				                          .values().stream()
+				                          .map(l -> sortFails(l, FailOrder.LEAST_ACTION))
+				                          .sorted(Comparator.comparingInt(f -> -f.size()))
+				                          .flatMap(Collection::stream)
+				                          .toList();
 			};
-			
-			StringBuilder sb = new StringBuilder("Multiple fails:\n");
-			for(Fail fail : sorted){
-				sb.append('\t').append(fail.note()).append('\n');
-			}
-			sb.append("\nFirst fail:\n");
-			sb.append(sorted.get(0).trace());
-			return sb.toString();
 		}
 		
 		record Create(Throwable e, SequenceSrc sequence, Duration timeToFail) implements Fail{
@@ -91,17 +107,24 @@ public class FuzzingRunner<State, Action, Err extends Throwable>{
 		record Action<Action>(Throwable e, SequenceSrc sequence, Action action, long actionIndex, Duration timeToFail) implements Fail{
 			@Override
 			public String note(){
-				return "Failed action - sequence: " + sequence + ",\tactionIndex: " + actionIndex + "\tAction: " + action + "\t- " + e;
+				return "Failed action - sequence: " + sequence +
+				       ",\tactionIndex: (" + (actionIndex - sequence.startIndex) + ")\t" +
+				       actionIndex + "\tAction: " + action + "\t- " + e;
 			}
 			@Override
 			public String trace(){
 				StringWriter sw = new StringWriter();
-				sw.append("Failed to apply action on sequence: ").append(String.valueOf(sequence)).append(", actionIndex: ").append(String.valueOf(actionIndex)).append(" Action: ").append(String.valueOf(action)).append("\n");
+				sw.append("Failed to apply action on sequence: ")
+				  .append(String.valueOf(sequence)).append(", actionIndex: (")
+				  .append(String.valueOf(actionIndex - sequence.startIndex)).append(")\t").append(String.valueOf(actionIndex))
+				  .append(" Action: ").append(String.valueOf(action)).append("\n");
 				PrintWriter pw = new PrintWriter(sw);
 				e.printStackTrace(pw);
 				return sw.toString();
 			}
 		}
+		
+		Throwable e();
 		
 		Duration timeToFail();
 		String note();
@@ -196,6 +219,8 @@ public class FuzzingRunner<State, Action, Err extends Throwable>{
 	private static final ScheduledExecutorService DELAY = Executors.newScheduledThreadPool(1, r -> Thread.ofPlatform().name("Error delay thread").daemon().unstarted(r));
 	
 	public List<Fail> run(long seed, long totalIterations, int sequenceLength){
+		var name = StackWalker.getInstance().walk(s -> s.skip(1).findAny().orElseThrow()).getMethodName();
+		
 		var fails = new CopyOnWriteArrayList<Fail>();
 		
 		Random genesisRand = new Random(seed);
@@ -206,8 +231,9 @@ public class FuzzingRunner<State, Action, Err extends Throwable>{
 		
 		var milisDelay = ConfigTools.flagI("test.fuzzing.errorDelayMs", 2000).positive().resolveVal();
 		
-		var cores = Runtime.getRuntime().availableProcessors();
-		try(var worker = Executors.newFixedThreadPool((int)Math.min(cores, sequences))){
+		var cores   = Runtime.getRuntime().availableProcessors();
+		var builder = Thread.ofPlatform().name("fuzzWorker(" + name + ")-", 0);
+		try(var worker = Executors.newFixedThreadPool((int)Math.min(cores, sequences), builder::unstarted)){
 			for(long sequenceIndex = 0; sequenceIndex<sequences; sequenceIndex++){
 				if(!fails.isEmpty()) break;
 				
