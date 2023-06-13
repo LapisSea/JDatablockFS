@@ -10,7 +10,6 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class CheckMap<K, V> implements IOMap<K, V>{
@@ -27,9 +26,13 @@ public class CheckMap<K, V> implements IOMap<K, V>{
 	}
 	
 	private void checkData(){
-		Assert.assertEquals(data.size(), base.size(), "checkData.len");
+		var allData = new HashMap<K, V>();
+		for(IOEntry<K, V> e : data){
+			if(allData.put(e.getKey(), e.getValue()) != null){
+				Assert.fail("Duplicate key: " + e.getKey());
+			}
+		}
 		
-		var allData = data.stream().collect(Collectors.toMap(IOEntry::getKey, IOEntry::getValue));
 		Assert.assertEquals(allData, base);
 	}
 	
@@ -49,28 +52,31 @@ public class CheckMap<K, V> implements IOMap<K, V>{
 	}
 	@Override
 	public Iterator<IOEntry<K, V>> iterator(){
-		var ia = data.iterator();
-		var ib = base.entrySet().iterator();
+		var ia        = data.iterator();
+		var remaining = new HashMap<>(base);
 		
 		return new Iterator<>(){
+			K lastRet;
 			@Override
 			public boolean hasNext(){
 				var a = ia.hasNext();
-				var b = ib.hasNext();
+				var b = !remaining.isEmpty();
 				Assert.assertEquals(a, b, "iter.hasNext");
 				return a;
 			}
 			@Override
 			public IOEntry<K, V> next(){
-				var a = ia.next();
-				var b = IOEntry.viewOf(ib.next());
+				var a    = ia.next();
+				var bVal = remaining.remove(a.getKey());
+				var b    = IOEntry.of(a.getKey(), bVal);
 				Assert.assertEquals(a, b, "iter.next");
+				lastRet = a.getKey();
 				return a;
 			}
 			@Override
 			public void remove(){
 				ia.remove();
-				ib.remove();
+				base.remove(lastRet);
 				checkData();
 			}
 		};
@@ -149,5 +155,9 @@ public class CheckMap<K, V> implements IOMap<K, V>{
 		data.clear();
 		base.clear();
 		checkData();
+	}
+	@Override
+	public String toString(){
+		return data.toString();
 	}
 }

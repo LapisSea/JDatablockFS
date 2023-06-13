@@ -289,21 +289,21 @@ public class SlowTests{
 				info("Starting on step", map.size());
 			}
 			
-			IOMap<Object, Object> splitter;
+			IOMap<Object, Object> mapC;
 			if(compliantCheck){
 				var ref = new ReferenceMemoryIOMap<>();
 				for(var entry : map){
 					ref.put(entry.getKey(), entry.getValue());
 				}
-				splitter = Splitter.map(map, ref, TestUtils::checkCompliance);
+				mapC = new CheckMap<>(map);
 			}else{
-				splitter = map;
+				mapC = map;
 			}
 			
 			var size = (compliantCheck? NumberSize.SHORT.maxSize : NumberSize.SMALL_INT.maxSize/2);
 			
 			var  inst = Instant.now();
-			long i    = splitter.size();
+			long i    = mapC.size();
 			while(provider.getSource().getIOSize()<size){
 				IOException e1 = null;
 				
@@ -318,8 +318,8 @@ public class SlowTests{
 					}
 				}
 				try{
-					if(splitter.size()>=1023*2) return;
-					splitter.put(i, ("int(" + i + ")").repeat(new Random(provider.getSource().getIOSize() + i).nextInt(20)));
+					if(mapC.size()>=1023*2) return;
+					mapC.put(i, ("int(" + i + ")").repeat(new Random(provider.getSource().getIOSize() + i).nextInt(20)));
 					i++;
 				}catch(Throwable e){
 					e1 = new IOException("failed to put element: " + i, e);

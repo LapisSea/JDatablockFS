@@ -20,7 +20,6 @@ import com.lapissea.util.LateInit;
 import com.lapissea.util.function.UnsafeConsumer;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Random;
 import java.util.function.IntConsumer;
 import java.util.stream.IntStream;
@@ -130,14 +129,6 @@ public class TestUtils{
 		}
 	}
 	
-	public static <T> void checkCompliance(T test, T compliance){
-		if(!test.equals(compliance)){
-			throw new RuntimeException(test.getClass().getSimpleName() + " is not compliant!\n"
-			                           + test + " different to: \n"
-			                           + compliance);
-		}
-	}
-	
 	static <E, T extends IOInstance.Unmanaged<T> & IOList<E>> void ioListComplianceSequence(
 		TestInfo info, int initalCapacity,
 		NewUnmanaged<T> constr,
@@ -145,8 +136,8 @@ public class TestUtils{
 		UnsafeConsumer<IOList<E>, IOException> session, boolean useCluster
 	) throws IOException{
 		complexObjectIntegrityTest(info, initalCapacity, constr, typeDef, list -> {
-			var splitter = Splitter.list(list, IOList.wrap(new ArrayList<>()), TestUtils::checkCompliance);
-			session.accept(splitter);
+			var checked = new CheckIOList<>(list);
+			session.accept(checked);
 		}, useCluster);
 	}
 	
@@ -159,8 +150,8 @@ public class TestUtils{
 	) throws IOException{
 		int initial = (int)StandardStructPipe.of(Struct.ofUnknown(typeDef.getTypeClass(null)), STATE_DONE).getSizeDescriptor().getMax(WordSpace.BYTE).orElse(8);
 		complexObjectIntegrityTest(info, initial, constr, typeDef, map -> {
-			var splitter = Splitter.map(map, new ReferenceMemoryIOMap<>(), TestUtils::checkCompliance);
-			session.accept(splitter);
+			var checked = new CheckMap<>(map);
+			session.accept(checked);
 		}, true);
 	}
 	
