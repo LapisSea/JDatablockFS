@@ -596,4 +596,60 @@ public class SlowTests{
 		
 		runner.runAndAssert(69_420, (long)(1000_000L*maker.weight), 1000);
 	}
+	
+	sealed interface MapAction{
+		record Clear() implements MapAction{ }
+		
+		record Put(Object key, Object value) implements MapAction{ }
+		
+		record Remove(Object key) implements MapAction{ }
+		
+		record ContainsKey(Object key) implements MapAction{ }
+	}
+	
+	@Test
+	void fuzzHashMap(){
+		record MapState(Cluster provider, IOMap<Object, Object> map){ }
+		
+		var runner = new FuzzingRunner<MapState, MapAction, IOException>(new FuzzingRunner.StateEnv<>(){
+			@Override
+			public boolean shouldRun(FuzzingRunner.SequenceSrc sequence){
+				return true;
+//				return sequence.index() == 2;
+			}
+			
+			@Override
+			public void applyAction(MapState mapState, long actionIdx, MapAction action) throws IOException{
+				switch(action){
+					case MapAction.Put(var key, var value) -> mapState.map.put(key, value);
+					case MapAction.Remove(var key) -> mapState.map.remove(key);
+					case MapAction.ContainsKey(var key) -> mapState.map.containsKey(key);
+					case MapAction.Clear ignored -> mapState.map.clear();
+				}
+				
+				if(!(action instanceof MapAction.ContainsKey)){
+					mapState.provider.scanGarbage(ERROR);
+				}
+			}
+			
+			@Override
+			public MapState create(Random random) throws IOException{
+				var provider = Cluster.emptyMem();
+				var map = provider.getRootProvider().<IOMap<Object, Object>>builder()
+				                  .withType(TypeLink.of(HashIOMap.class, Object.class, Object.class))
+				                  .withId("map")
+				                  .request();
+				
+				return new MapState(provider, new CheckMap<>(map));
+			}
+		}, RNGType.<MapAction>of(List.of(
+			r -> new MapAction.Put(r.nextInt(200), r.nextInt(100)),
+			r -> new MapAction.Remove(r.nextInt(200)),
+			r -> new MapAction.ContainsKey(r.nextInt(200)),
+			r -> new MapAction.Clear()
+		)).chanceFor(MapAction.Clear.class, 1F/500*0));
+		
+		runner.runAndAssert(69, 50000, 2000);
+	}
+	
 }
