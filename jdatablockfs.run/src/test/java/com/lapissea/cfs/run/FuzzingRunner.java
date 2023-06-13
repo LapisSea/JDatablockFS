@@ -1,5 +1,7 @@
 package com.lapissea.cfs.run;
 
+import com.lapissea.cfs.config.ConfigTools;
+import com.lapissea.cfs.config.ConfigUtils;
 import com.lapissea.cfs.logging.Log;
 import org.testng.Assert;
 
@@ -7,11 +9,14 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
 public class FuzzingRunner<State, Action, Err extends Throwable>{
@@ -25,27 +30,50 @@ public class FuzzingRunner<State, Action, Err extends Throwable>{
 	
 	public sealed interface Fail{
 		
-		static String report(List<Fail> fails){
+		enum FailOrder{
+			LEAST_ACTION,
+			ORIGINAL_ORDER,
+			FAIL_SPEED,
+			INDEX;
+			
+			private static FailOrder defaultOrder(){
+				return ConfigUtils.configEnum("test.fuzzing.reportFailOrder", FailOrder.LEAST_ACTION);
+			}
+		}
+		
+		static String report(List<Fail> fails, FailOrder order){
 			if(fails.isEmpty()) return "";
 			if(fails.size() == 1){
 				return fails.get(0).trace();
 			}
 			
+			var sorted = switch(order == null? FailOrder.defaultOrder() : order){
+				case LEAST_ACTION -> fails.stream().sorted((a, b) -> {
+					if(a instanceof Create && b instanceof Create) return Long.compare(a.sequence().index, b.sequence().index);
+					if(a instanceof Create) return -1;
+					if(b instanceof Create) return 1;
+					
+					if(a instanceof Action<?> ac && b instanceof Action<?> bc){
+						var cmp = Long.compare(ac.actionIndex - ac.sequence.startIndex, bc.actionIndex - bc.sequence.startIndex);
+						if(cmp != 0) return cmp;
+					}
+					return Long.compare(a.sequence().index, b.sequence().index);
+				}).toList();
+				case ORIGINAL_ORDER -> fails;
+				case FAIL_SPEED -> fails.stream().sorted(Comparator.comparing(Fail::timeToFail)).toList();
+				case INDEX -> fails.stream().sorted(Comparator.comparing(f -> f.sequence().index)).toList();
+			};
+			
 			StringBuilder sb = new StringBuilder("Multiple fails:\n");
-			for(Fail fail : fails){
+			for(Fail fail : sorted){
 				sb.append('\t').append(fail.note()).append('\n');
 			}
 			sb.append("\nFirst fail:\n");
-			sb.append(fails.stream().reduce(fails.get(0), (a, b) -> {
-				if(a instanceof Action<?> ac && b instanceof Action<?> bc){
-					return ac.actionIndex - ac.sequence.startIndex<bc.actionIndex - bc.sequence.startIndex? ac : bc;
-				}
-				return a;
-			}).trace());
+			sb.append(sorted.get(0).trace());
 			return sb.toString();
 		}
 		
-		record Create(Throwable e, SequenceSrc sequence) implements Fail{
+		record Create(Throwable e, SequenceSrc sequence, Duration timeToFail) implements Fail{
 			@Override
 			public String note(){
 				return "Failed create - sequence: " + sequence + "\t- " + e;
@@ -60,7 +88,7 @@ public class FuzzingRunner<State, Action, Err extends Throwable>{
 			}
 		}
 		
-		record Action<Action>(Throwable e, SequenceSrc sequence, Action action, long actionIndex) implements Fail{
+		record Action<Action>(Throwable e, SequenceSrc sequence, Action action, long actionIndex, Duration timeToFail) implements Fail{
 			@Override
 			public String note(){
 				return "Failed action - sequence: " + sequence + ",\tactionIndex: " + actionIndex + "\tAction: " + action + "\t- " + e;
@@ -75,6 +103,7 @@ public class FuzzingRunner<State, Action, Err extends Throwable>{
 			}
 		}
 		
+		Duration timeToFail();
 		String note();
 		String trace();
 		
@@ -126,13 +155,15 @@ public class FuzzingRunner<State, Action, Err extends Throwable>{
 	
 	public Optional<Fail> run(SequenceSrc sequence, ProgressTracker progress){
 		
+		var start = Instant.now();
+		
 		var rand = new Random(sequence.seed);
 		
 		State state;
 		try{
 			state = stateEnv.create(rand);
 		}catch(Throwable e){
-			return Optional.of(new Fail.Create(e, sequence));
+			return Optional.of(new Fail.Create(e, sequence, Duration.between(start, Instant.now())));
 		}
 		
 		for(var actionIndex = 0; actionIndex<sequence.iterations; actionIndex++){
@@ -143,7 +174,7 @@ public class FuzzingRunner<State, Action, Err extends Throwable>{
 			try{
 				stateEnv.applyAction(state, idx, action);
 			}catch(Throwable e){
-				return Optional.of(new Fail.Action<>(e, sequence, action, idx));
+				return Optional.of(new Fail.Action<>(e, sequence, action, idx, Duration.between(start, Instant.now())));
 			}
 			
 			if(progress != null) progress.inc();
@@ -153,11 +184,16 @@ public class FuzzingRunner<State, Action, Err extends Throwable>{
 	}
 	
 	public void runAndAssert(long seed, long totalIterations, int sequenceLength){
+		runAndAssert(seed, totalIterations, sequenceLength, null);
+	}
+	public void runAndAssert(long seed, long totalIterations, int sequenceLength, Fail.FailOrder failOrder){
 		var fails = run(seed, totalIterations, sequenceLength);
 		if(!fails.isEmpty()){
-			Assert.fail(FuzzingRunner.Fail.report(fails));
+			Assert.fail(FuzzingRunner.Fail.report(fails, failOrder));
 		}
 	}
+	
+	private static final ScheduledExecutorService DELAY = Executors.newScheduledThreadPool(1, r -> Thread.ofPlatform().name("Error delay thread").daemon().unstarted(r));
 	
 	public List<Fail> run(long seed, long totalIterations, int sequenceLength){
 		var fails = new CopyOnWriteArrayList<Fail>();
@@ -167,6 +203,8 @@ public class FuzzingRunner<State, Action, Err extends Throwable>{
 		var sequences = Math.ceilDiv(totalIterations, sequenceLength);
 		
 		var progress = new ProgressTracker(totalIterations);
+		
+		var milisDelay = ConfigTools.flagI("test.fuzzing.errorDelayMs", 2000).positive().resolveVal();
 		
 		var cores = Runtime.getRuntime().availableProcessors();
 		try(var worker = Executors.newFixedThreadPool((int)Math.min(cores, sequences))){
@@ -184,7 +222,8 @@ public class FuzzingRunner<State, Action, Err extends Throwable>{
 				worker.execute(() -> {
 					if(progress.hasErr) return;
 					run(sequence, progress).ifPresent(e -> {
-						progress.err();
+						if(milisDelay == 0) progress.err();
+						else DELAY.schedule(progress::err, milisDelay, TimeUnit.MILLISECONDS);
 						fails.add(e);
 					});
 				});
