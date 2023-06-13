@@ -55,7 +55,7 @@ public final class ConfigTools{
 			@Override
 			public Boolean resolve(){ return resolveVal(); }
 			public boolean resolveVal(){
-				return ConfigUtils.configBoolean(name, ConfigUtils.optionalProperty(name), defaultValue.value());
+				return ConfigUtils.configBoolean(name, defaultValue.value());
 			}
 			
 			public <U> Supplier<U> boolMap(U ifTrue, U ifFalse){
@@ -73,7 +73,7 @@ public final class ConfigTools{
 			public Integer resolve(){ return resolveVal(); }
 			public int resolveVal(){
 				int def = defaultValue.value();
-				int val = ConfigUtils.configInt(name, ConfigUtils.optionalProperty(name), def);
+				int val = ConfigUtils.configInt(name, def);
 				if(validate != null){
 					var err = validate.apply(val);
 					if(err != null){
@@ -154,7 +154,7 @@ public final class ConfigTools{
 			
 			@Override
 			public E resolve(){
-				return ConfigUtils.configEnum(name, ConfigUtils.optionalProperty(name), defaultValue.value());
+				return ConfigUtils.configEnum(name, defaultValue.value());
 			}
 		}
 		

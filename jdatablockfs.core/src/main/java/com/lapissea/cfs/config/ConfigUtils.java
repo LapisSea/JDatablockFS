@@ -30,6 +30,9 @@ public class ConfigUtils{
 	public static int configInt(String name, Map<String, ?> map, int defaultValue){
 		return configInt(name, Optional.ofNullable(map.get(name)).map(Object::toString), defaultValue);
 	}
+	public static int configInt(String name, int defaultValue){
+		return configInt(name, optionalProperty(name), defaultValue);
+	}
 	public static int configInt(String name, Optional<String> value, int defaultValue){
 		return value.map(s -> {
 			if(s.endsWith(".0")) s = s.substring(0, s.length() - 2);
@@ -48,6 +51,9 @@ public class ConfigUtils{
 	public static <T extends Enum<T>> T configEnum(String name, Optional<String> value, T defaultValue){
 		return configEnum(value, defaultValue).warn(name);
 	}
+	public static <T extends Enum<T>> T configEnum(String name, T defaultValue){
+		return configEnum(name, optionalProperty(name), defaultValue);
+	}
 	
 	@SuppressWarnings("unchecked")
 	public static <T extends Enum<T>> FuzzyResult<T> configEnum(Optional<String> value, T defaultValue){
@@ -63,6 +69,9 @@ public class ConfigUtils{
 	
 	public static boolean configBoolean(String name, Map<String, ?> map, boolean defaultValue){
 		return configBoolean(name, Optional.ofNullable(map.get(name)).map(Object::toString), defaultValue);
+	}
+	public static boolean configBoolean(String name, boolean defaultValue){
+		return configBoolean(name, optionalProperty(name), defaultValue);
 	}
 	public static boolean configBoolean(String name, Optional<String> value, boolean defaultValue){
 		return value.map(val -> switch(val.toLowerCase()){
