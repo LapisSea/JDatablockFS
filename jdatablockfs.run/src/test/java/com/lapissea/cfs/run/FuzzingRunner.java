@@ -45,10 +45,10 @@ public class FuzzingRunner<State, Action, Err extends Throwable>{
 			return sb.toString();
 		}
 		
-		record Create<Action>(Throwable e, SequenceSrc sequence) implements Fail{
+		record Create(Throwable e, SequenceSrc sequence) implements Fail{
 			@Override
 			public String note(){
-				return "Failed to create on sequence: " + sequence + "\t- " + e;
+				return "Failed create - sequence: " + sequence + "\t- " + e;
 			}
 			@Override
 			public String trace(){
@@ -63,7 +63,7 @@ public class FuzzingRunner<State, Action, Err extends Throwable>{
 		record Action<Action>(Throwable e, SequenceSrc sequence, Action action, long actionIndex) implements Fail{
 			@Override
 			public String note(){
-				return "Failed to apply action on sequence: " + sequence + ",\tactionIndex: " + actionIndex + "\tAction: " + action + "\t- " + e;
+				return "Failed action - sequence: " + sequence + ",\tactionIndex: " + actionIndex + "\tAction: " + action + "\t- " + e;
 			}
 			@Override
 			public String trace(){
@@ -82,6 +82,7 @@ public class FuzzingRunner<State, Action, Err extends Throwable>{
 	}
 	
 	public static final class ProgressTracker{
+		
 		private long    executedCount;
 		private int     last    = -1;
 		private Instant lastLog = Instant.now();
@@ -131,7 +132,7 @@ public class FuzzingRunner<State, Action, Err extends Throwable>{
 		try{
 			state = stateEnv.create(rand);
 		}catch(Throwable e){
-			return Optional.of(new Fail.Create<>(e, sequence));
+			return Optional.of(new Fail.Create(e, sequence));
 		}
 		
 		for(var actionIndex = 0; actionIndex<sequence.iterations; actionIndex++){

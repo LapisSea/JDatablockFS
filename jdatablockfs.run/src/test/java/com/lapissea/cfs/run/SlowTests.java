@@ -3,7 +3,6 @@ package com.lapissea.cfs.run;
 import com.lapissea.cfs.chunk.AllocateTicket;
 import com.lapissea.cfs.chunk.Chunk;
 import com.lapissea.cfs.chunk.Cluster;
-import com.lapissea.cfs.chunk.DefragmentManager;
 import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.RandomIO;
 import com.lapissea.cfs.io.impl.MemoryData;
@@ -42,6 +41,7 @@ import java.util.Random;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import static com.lapissea.cfs.chunk.DefragmentManager.FreeFoundAction.ERROR;
 import static com.lapissea.cfs.logging.Log.info;
 import static com.lapissea.cfs.run.TestUtils.randomBatch;
 import static org.testng.Assert.assertEquals;
@@ -341,7 +341,7 @@ public class SlowTests{
 		TestUtils.testCluster(TestInfo.of(), provider -> {
 			var set = provider.getRootProvider().<IOSet<Integer>>request("hi", type, Integer.class);
 			session.accept(provider, new CheckSet<>(set));
-			provider.scanGarbage(DefragmentManager.FreeFoundAction.ERROR);
+			provider.scanGarbage(ERROR);
 		});
 	}
 	
@@ -376,7 +376,7 @@ public class SlowTests{
 					case CLEAR -> state.set.clear();
 				}
 				if(List.of(Type.REMOVE, Type.CLEAR).contains(action.type)){
-					state.cluster.scanGarbage(DefragmentManager.FreeFoundAction.ERROR);
+					state.cluster.scanGarbage(ERROR);
 				}
 			}
 		}, RNGEnum.of(Type.class)

@@ -7,6 +7,7 @@ import java.util.Objects;
 import java.util.Random;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static java.util.stream.Collectors.toUnmodifiableMap;
 
@@ -61,7 +62,9 @@ public final class RNGType<E> implements Function<Random, E>{
 	}
 	
 	public RNGType<E> chanceFor(Class<? extends E> val, float chance){
-		var fn = Objects.requireNonNull(universe.get(val), () -> "Invalid type: " + val + " available types: " + universe.keySet());
+		var fn = universe.get(Objects.requireNonNull(val));
+		if(fn == null) throw new IllegalArgumentException("Invalid type: " + val.getName() + " available types:\n" + universe.keySet().stream().map(Class::getName).collect(Collectors.joining("\n")));
+		
 		chances.add(new Chance<>(fn, chance));
 		randomPick.remove(fn);
 		

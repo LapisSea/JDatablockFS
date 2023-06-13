@@ -4,6 +4,7 @@ import com.lapissea.cfs.io.bit.EnumUniverse;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Random;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -56,6 +57,7 @@ public final class RNGEnum<E extends Enum<E>> implements Function<Random, E>{
 	}
 	
 	public RNGEnum<E> chanceFor(E val, float chance){
+		Objects.requireNonNull(val);
 		chances.add(new Chance<>(val, chance));
 		randomPick.remove(val);
 		
