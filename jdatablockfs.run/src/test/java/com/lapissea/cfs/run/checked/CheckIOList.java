@@ -1,4 +1,4 @@
-package com.lapissea.cfs.run;
+package com.lapissea.cfs.run.checked;
 
 import com.lapissea.cfs.objects.collections.IOIterator;
 import com.lapissea.cfs.objects.collections.IOList;

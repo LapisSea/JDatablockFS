@@ -1,4 +1,4 @@
-package com.lapissea.cfs.run;
+package com.lapissea.cfs.run.fuzzing;
 
 import com.lapissea.cfs.config.ConfigTools;
 import com.lapissea.cfs.config.ConfigUtils;

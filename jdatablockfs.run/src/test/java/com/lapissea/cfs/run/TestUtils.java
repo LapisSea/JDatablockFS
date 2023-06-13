@@ -8,6 +8,8 @@ import com.lapissea.cfs.io.IOInterface;
 import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.objects.collections.IOList;
 import com.lapissea.cfs.objects.collections.IOMap;
+import com.lapissea.cfs.run.checked.CheckIOList;
+import com.lapissea.cfs.run.checked.CheckMap;
 import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.cfs.type.IOInstance;
