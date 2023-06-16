@@ -19,6 +19,7 @@ import com.lapissea.cfs.objects.collections.LinkedIOList;
 import com.lapissea.cfs.run.checked.CheckIOList;
 import com.lapissea.cfs.run.checked.CheckMap;
 import com.lapissea.cfs.run.checked.CheckSet;
+import com.lapissea.cfs.run.fuzzing.FuzzFail;
 import com.lapissea.cfs.run.fuzzing.FuzzingRunner;
 import com.lapissea.cfs.run.fuzzing.RNGEnum;
 import com.lapissea.cfs.run.fuzzing.RNGType;
@@ -26,8 +27,10 @@ import com.lapissea.cfs.tools.logging.DataLogger;
 import com.lapissea.cfs.tools.logging.LoggedMemoryUtils;
 import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.util.LateInit;
+import com.lapissea.util.LogUtil;
 import com.lapissea.util.function.UnsafeBiConsumer;
 import com.lapissea.util.function.UnsafeSupplier;
+import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -43,6 +46,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Optional;
 import java.util.Random;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -369,7 +373,7 @@ public class SlowTests{
 				return true;
 			}
 			@Override
-			public State create(Random random) throws IOException{
+			public State create(Random random, long sequenceIndex) throws IOException{
 				var cluster = Cluster.emptyMem();
 				return new State(cluster, cluster.getRootProvider().request("hi", type, Integer.class));
 			}
@@ -482,7 +486,7 @@ public class SlowTests{
 				return true;
 			}
 			@Override
-			public IOList<Integer> create(Random random) throws IOException{
+			public IOList<Integer> create(Random random, long sequenceIndex) throws IOException{
 				return new CheckIOList<>(maker.make());
 			}
 			@Override
@@ -546,7 +550,7 @@ public class SlowTests{
 				return true;
 			}
 			@Override
-			public State create(Random random) throws IOException{
+			public State create(Random random, long sequenceIndex) throws IOException{
 				var s = new CheckIOList<>(maker.make());
 				for(int i = 0, j = random.nextInt(50); i<j; i++){
 					s.add(random.nextInt(200));
@@ -616,31 +620,46 @@ public class SlowTests{
 	@Test
 	void fuzzHashMap(){
 		record MapState(Cluster provider, IOMap<Object, Object> map){ }
-		
-		var runner = new FuzzingRunner<MapState, MapAction, IOException>(new FuzzingRunner.StateEnv<>(){
+		var rnr = new FuzzingRunner.StateEnv<MapState, MapAction, IOException>(){
+			long actionIndex = -1;
+			long sequenceIndex = -1;
+			
 			@Override
 			public boolean shouldRun(FuzzingRunner.SequenceSrc sequence){
-				return true;
-//				return sequence.index() == 2;
+//				return true;
+				return sequenceIndex == -1 || sequence.index() == sequenceIndex;
 			}
 			
 			@Override
-			public void applyAction(MapState mapState, long actionIdx, MapAction action) throws IOException{
+			public void applyAction(MapState state, long actionIdx, MapAction action) throws IOException{
+				if(actionIdx == actionIndex){
+					LogUtil.println(action);
+					LogUtil.println(state.map);
+					int a = 0;//for breakpoint
+				}
+				
 				switch(action){
-					case MapAction.Put(var key, var value) -> mapState.map.put(key, value);
-					case MapAction.Remove(var key) -> mapState.map.remove(key);
-					case MapAction.ContainsKey(var key) -> mapState.map.containsKey(key);
-					case MapAction.Clear ignored -> mapState.map.clear();
+					case MapAction.Put(var key, var value) -> state.map.put(key, value);
+					case MapAction.Remove(var key) -> state.map.remove(key);
+					case MapAction.ContainsKey(var key) -> state.map.containsKey(key);
+					case MapAction.Clear ignored -> state.map.clear();
 				}
 				
 				if(!(action instanceof MapAction.ContainsKey)){
-					mapState.provider.scanGarbage(ERROR);
+					state.provider.scanGarbage(ERROR);
 				}
 			}
 			
 			@Override
-			public MapState create(Random random) throws IOException{
-				var provider = Cluster.emptyMem();
+			public MapState create(Random random, long sequenceIndex) throws IOException{
+				Cluster provider;
+				if(sequenceIndex == this.sequenceIndex){
+					var logger = LoggedMemoryUtils.createLoggerFromConfig();
+					provider = Cluster.init(LoggedMemoryUtils.newLoggedMemory(sequenceIndex + "", logger));
+				}else{
+					provider = Cluster.emptyMem();
+				}
+				
 				var map = provider.getRootProvider().<IOMap<Object, Object>>builder()
 				                  .withType(TypeLink.of(HashIOMap.class, Object.class, Object.class))
 				                  .withId("map")
@@ -648,14 +667,25 @@ public class SlowTests{
 				
 				return new MapState(provider, new CheckMap<>(map));
 			}
-		}, RNGType.<MapAction>of(List.of(
-			r -> new MapAction.Put(r.nextInt(200), r.nextInt(100)),
-			r -> new MapAction.Remove(r.nextInt(200)),
-			r -> new MapAction.ContainsKey(r.nextInt(200)),
+		};
+		var runner = new FuzzingRunner<MapState, MapAction, IOException>(rnr, RNGType.<MapAction>of(List.of(
+			r -> new MapAction.Put(10 + r.nextInt(40), 10 + r.nextInt(90)),
+			r -> new MapAction.Remove(10 + r.nextInt(40)),
+			r -> new MapAction.ContainsKey(10 + r.nextInt(40)),
 			r -> new MapAction.Clear()
-		)).chanceFor(MapAction.Clear.class, 1F/500*0));
+		)).chanceFor(MapAction.Clear.class, 1F/500));
 		
-		runner.runAndAssert(69, 50000, 2000);
+		var fails = FuzzFail.sortFails(runner.run(69, 500000, 2000));
+		if(!fails.isEmpty()){
+			LogUtil.printlnEr(FuzzFail.report(fails));
+			//get first fail and rerun it with display server logging
+			var fail     = fails.get(0);
+			var sequence = fail.sequence();
+			rnr.sequenceIndex = sequence.index();
+			var reFail = runner.run(sequence);
+			assertEquals(reFail, Optional.of(fail), "Fail not stable" + reFail.map(f -> "\n" + f.trace()).orElse(""));
+			Assert.fail("There were fails!");
+		}
 	}
 	
 }
