@@ -127,20 +127,26 @@ public class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 	
 	private void tryPopFree() throws IOException{
 		if(adding) return;
-		while(true){
-			var last = freeChunks.peekLast();
-			if(last.isEmpty()) break;
-			var lastCh = last.orElseThrow().dereference(context);
-			if(lastCh.checkLastPhysical()){
+		boolean anyPopped;
+		do{
+			anyPopped = false;
+			var lastChO = freeChunks.peekLast().map(p -> p.dereference(context)).filter(Chunk::checkLastPhysical);
+			if(lastChO.isPresent()){
+				var lastCh = lastChO.get();
+				
 				freeChunks.popLast();
-				try(var io = context.getSource().io()){
-					io.setCapacity(lastCh.getPtr().getValue());
+				if(lastCh.checkLastPhysical()){
+					try(var io = context.getSource().io()){
+						io.setCapacity(lastCh.getPtr().getValue());
+					}
+					context.getChunkCache().notifyDestroyed(lastCh);
+					anyPopped = true;
+				}else{
+					free(lastCh);
+					break;
 				}
-				context.getChunkCache().notifyDestroyed(lastCh);
-			}else{
-				break;
 			}
-		}
+		}while(anyPopped);
 	}
 	
 	private Collection<Chunk> popFile(Collection<Chunk> toFree) throws IOException{
