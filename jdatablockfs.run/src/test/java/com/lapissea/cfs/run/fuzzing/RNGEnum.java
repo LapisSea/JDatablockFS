@@ -1,24 +1,35 @@
 package com.lapissea.cfs.run.fuzzing;
 
-import com.lapissea.cfs.io.bit.EnumUniverse;
-
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
 public final class RNGEnum<E extends Enum<E>> implements Function<Random, E>{
 	
-	private static <E extends Enum<E>> EnumUniverse<E> getUniverse(Class<E> type){
-		var uni = EnumUniverse.of(type);
+	@SuppressWarnings("rawtypes")
+	private static final Map<Class<? extends Enum>, List<?>> ENUM_CACHE = new ConcurrentHashMap<>();
+	
+	private static <E extends Enum<E>> List<E> getUniverse(Class<E> type){
+		@SuppressWarnings("unchecked")
+		var flags = (List<E>)ENUM_CACHE.get(type);
+		if(flags != null) return flags;
+		return makeUniverse(type);
+	}
+	private static <E extends Enum<E>> List<E> makeUniverse(Class<E> type){
+		if(!type.isEnum()) throw new IllegalArgumentException(type.getName() + " not an Enum");
+		var uni = List.of(type.getEnumConstants());
 		if(uni.isEmpty()) throw new IllegalArgumentException(type.getName() + " has no values");
+		ENUM_CACHE.put(type, uni);
 		return uni;
 	}
 	
 	public static <E extends Enum<E>> E anyOf(Random random, Class<E> type){
-		EnumUniverse<E> uni = getUniverse(type);
+		var uni = getUniverse(type);
 		return uni.get(random.nextInt(uni.size()));
 	}
 	

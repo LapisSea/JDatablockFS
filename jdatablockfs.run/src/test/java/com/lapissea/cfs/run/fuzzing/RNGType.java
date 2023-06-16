@@ -9,8 +9,6 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import static java.util.stream.Collectors.toUnmodifiableMap;
-
 public final class RNGType<E> implements Function<Random, E>{
 	
 	public static <E> RNGType<E> of(List<Function<Random, E>> definition){
@@ -29,8 +27,9 @@ public final class RNGType<E> implements Function<Random, E>{
 		if(definition.isEmpty()) throw new IllegalArgumentException("Definitions required");
 		
 		var rand = new Random(123);
+		//noinspection unchecked
 		universe = definition.stream()
-		                     .collect(toUnmodifiableMap(
+		                     .collect(Collectors.toUnmodifiableMap(
 			                     e -> (Class<? extends E>)e.apply(rand).getClass(),
 			                     Function.identity()
 		                     ));

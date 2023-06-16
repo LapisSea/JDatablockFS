@@ -369,7 +369,7 @@ public class SlowTests{
 		
 		var runner = new FuzzingRunner<State, Action, IOException>(new FuzzingRunner.StateEnv<>(){
 			@Override
-			public boolean shouldRun(FuzzingRunner.SequenceSrc sequence){
+			public boolean shouldRun(FuzzingRunner.Sequence sequence){
 				return true;
 			}
 			@Override
@@ -481,7 +481,7 @@ public class SlowTests{
 	void fuzzIOList(ListMaker maker){
 		var runner = new FuzzingRunner<IOList<Integer>, ListAction, IOException>(new FuzzingRunner.StateEnv<>(){
 			@Override
-			public boolean shouldRun(FuzzingRunner.SequenceSrc sequence){
+			public boolean shouldRun(FuzzingRunner.Sequence sequence){
 //				return sequence.index() == 6;
 				return true;
 			}
@@ -545,7 +545,7 @@ public class SlowTests{
 		
 		var runner = new FuzzingRunner<State, Action, IOException>(new FuzzingRunner.StateEnv<>(){
 			@Override
-			public boolean shouldRun(FuzzingRunner.SequenceSrc sequence){
+			public boolean shouldRun(FuzzingRunner.Sequence sequence){
 //				return sequence.index() == 12;
 				return true;
 			}
@@ -625,7 +625,7 @@ public class SlowTests{
 			long sequenceIndex = -1;
 			
 			@Override
-			public boolean shouldRun(FuzzingRunner.SequenceSrc sequence){
+			public boolean shouldRun(FuzzingRunner.Sequence sequence){
 //				return true;
 				return sequenceIndex == -1 || sequence.index() == sequenceIndex;
 			}

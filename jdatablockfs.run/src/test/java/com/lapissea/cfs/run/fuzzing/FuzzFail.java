@@ -1,7 +1,5 @@
 package com.lapissea.cfs.run.fuzzing;
 
-import com.lapissea.cfs.config.ConfigUtils;
-
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.time.Duration;
@@ -10,6 +8,7 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 public sealed interface FuzzFail<Act, State>{
@@ -21,8 +20,24 @@ public sealed interface FuzzFail<Act, State>{
 		INDEX,
 		COMMON_STACK;
 		
+		private static String lastFail;
+		
 		private static FailOrder defaultOrder(){
-			return ConfigUtils.configEnum("test.fuzzing.reportFailOrder", FailOrder.COMMON_STACK);
+			var defaultVal = FailOrder.COMMON_STACK;
+			var propName   = "test.fuzzing.reportFailOrder";
+			return Optional.ofNullable(System.getProperty(propName))
+			               .map(String::trim)
+			               .map(name -> {
+				               var vals = FailOrder.values();
+				               return Arrays.stream(vals).filter(e -> e.name().equalsIgnoreCase(name)).findAny().orElseGet(() -> {
+					               if(!Objects.equals(lastFail, name)){
+						               lastFail = name;
+						               System.err.println(propName + " can only be one of " + Arrays.toString(vals) +
+						                                  " but is actually \"" + name + "\". Defaulting to " + defaultVal);
+					               }
+					               return defaultVal;
+				               });
+			               }).orElse(defaultVal);
 		}
 	}
 	
@@ -71,7 +86,7 @@ public sealed interface FuzzFail<Act, State>{
 		};
 	}
 	
-	record Create<Action, State>(Throwable e, FuzzingRunner.SequenceSrc sequence, Duration timeToFail) implements FuzzFail<Action, State>{
+	record Create<Action, State>(Throwable e, FuzzingRunner.Sequence sequence, Duration timeToFail) implements FuzzFail<Action, State>{
 		@Override
 		public String note(){
 			return "Failed create - sequence: " + sequence + "\t- " + e;
@@ -86,7 +101,7 @@ public sealed interface FuzzFail<Act, State>{
 		}
 	}
 	
-	record Action<Action, State>(Throwable e, FuzzingRunner.SequenceSrc sequence, Action action, long actionIndex, Duration timeToFail, State badState) implements FuzzFail<Action, State>{
+	record Action<Action, State>(Throwable e, FuzzingRunner.Sequence sequence, Action action, long actionIndex, Duration timeToFail, State badState) implements FuzzFail<Action, State>{
 		public Action{
 			Objects.requireNonNull(e);
 			Objects.requireNonNull(sequence);
@@ -123,7 +138,7 @@ public sealed interface FuzzFail<Act, State>{
 		public boolean equals(Object o){
 			if(this == o) return true;
 			if(!(o instanceof FuzzFail.Action<?, ?>(
-				Throwable e2, FuzzingRunner.SequenceSrc sequence2, Object action2,
+				Throwable e2, FuzzingRunner.Sequence sequence2, Object action2,
 				long actionIndex2, Duration timeToFail2, Object badState2
 			))) return false;
 			if(!permissiveThrowableEquals(e, e2)) return false;
@@ -165,5 +180,5 @@ public sealed interface FuzzFail<Act, State>{
 	String note();
 	String trace();
 	
-	FuzzingRunner.SequenceSrc sequence();
+	FuzzingRunner.Sequence sequence();
 }
