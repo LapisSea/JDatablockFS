@@ -89,7 +89,7 @@ public class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 		
 		var popped = popFile(toFree);
 		if(popped.isEmpty()){
-			popLast();
+			tryPopFree();
 			return;
 		}
 		
@@ -122,10 +122,10 @@ public class PersistentMemoryManager extends MemoryManager.StrategyImpl{
 			adding = false;
 		}
 		
-		popLast();
+		tryPopFree();
 	}
 	
-	private void popLast() throws IOException{
+	private void tryPopFree() throws IOException{
 		if(adding) return;
 		while(true){
 			var last = freeChunks.peekLast();

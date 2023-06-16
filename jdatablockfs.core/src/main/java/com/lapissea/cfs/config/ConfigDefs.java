@@ -31,7 +31,7 @@ public sealed interface ConfigDefs permits ConfigTools.Dummy{
 	
 	Flag.Bool            LOAD_TYPES_ASYNCHRONOUSLY = flagB("loading.async", true);
 	Flag.Int             LONG_WAIT_THRESHOLD       = flagI("loading.longWaitThreshold", RELEASE_MODE.boolMap(-1, 10000/cores())).positiveOptional();
-	Flag.Bool            TEXT_DISABLE_BLOCK_CODING = flagB("tweaks.disableTextBlockCoding", true);
+	Flag.Bool            TEXT_DISABLE_BLOCK_CODING = flagB("tweaks.disableTextBlockCoding", false);
 	Flag.Abc<AccessType> FIELD_ACCESS_TYPE         = flagEDyn("tweaks.fieldAccess", () -> jVersion()<=20? UNSAFE : VAR_HANDLE);
 	
 	Flag.Bool OPTIMIZED_PIPE               = flagB("optimizedPipe", true);

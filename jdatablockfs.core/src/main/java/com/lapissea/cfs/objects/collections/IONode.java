@@ -557,6 +557,9 @@ public class IONode<T> extends IOInstance.Unmanaged<IONode<T>> implements Iterab
 		if(oldPtr.equals(ptr)){
 			return;
 		}
+		
+		assert !ptr.equals(getReference().getPtr()) : "Can not set next to self! " + getReference().getPtr() + " -> " + ptr;
+		
 		writeNextPtr(ptr);
 	}
 	
