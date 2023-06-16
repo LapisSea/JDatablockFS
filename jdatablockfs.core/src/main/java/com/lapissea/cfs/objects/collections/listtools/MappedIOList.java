@@ -2,6 +2,7 @@ package com.lapissea.cfs.objects.collections.listtools;
 
 import com.lapissea.cfs.objects.collections.IOIterator;
 import com.lapissea.cfs.objects.collections.IOList;
+import com.lapissea.cfs.utils.OptionalPP;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;
 
@@ -9,7 +10,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Optional;
 import java.util.StringJoiner;
 import java.util.stream.Stream;
 
@@ -84,27 +84,27 @@ public abstract class MappedIOList<From, To> implements IOList<To>{
 	}
 	
 	@Override
-	public Optional<To> first(){
+	public OptionalPP<To> first(){
 		return data.first().map(this::map);
 	}
 	
 	@Override
-	public Optional<To> peekFirst() throws IOException{
+	public OptionalPP<To> peekFirst() throws IOException{
 		return data.peekFirst().map(this::map);
 	}
 	
 	@Override
-	public Optional<To> popFirst() throws IOException{
+	public OptionalPP<To> popFirst() throws IOException{
 		return data.popFirst().map(this::map);
 	}
 	
 	@Override
-	public Optional<To> peekLast() throws IOException{
+	public OptionalPP<To> peekLast() throws IOException{
 		return data.peekLast().map(this::map);
 	}
 	
 	@Override
-	public Optional<To> popLast() throws IOException{
+	public OptionalPP<To> popLast() throws IOException{
 		return data.popLast().map(this::map);
 	}
 	

@@ -27,7 +27,6 @@ import java.util.TreeSet;
 
 import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.NULLABLE;
-import static java.util.function.Predicate.not;
 
 public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedIOSet<T>{
 	
@@ -360,7 +359,7 @@ public final class IOTreeSet<T extends Comparable<T>> extends AbstractUnmanagedI
 			nodeCache.remove(node.idx);
 			blankNodeIds.remove(node.idx);
 			
-			while(nodes.popLastIf(not(Node::hasValue)).isPresent()){
+			while(nodes.popLastIf(n -> !n.hasValue()).isPresent()){
 				blankNodeIds.remove(nodes.size());
 				nodeCache.remove(nodes.size());
 			}

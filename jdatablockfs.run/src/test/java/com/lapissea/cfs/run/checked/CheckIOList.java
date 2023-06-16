@@ -2,17 +2,17 @@ package com.lapissea.cfs.run.checked;
 
 import com.lapissea.cfs.objects.collections.IOIterator;
 import com.lapissea.cfs.objects.collections.IOList;
+import com.lapissea.cfs.utils.OptionalPP;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;
+import com.lapissea.util.function.UnsafePredicate;
 import org.testng.Assert;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Optional;
 import java.util.Spliterator;
-import java.util.function.Predicate;
 
 import static org.testng.Assert.assertEquals;
 
@@ -284,21 +284,21 @@ public class CheckIOList<T> implements IOList<T>{
 		return a;
 	}
 	@Override
-	public Optional<T> first(){
+	public OptionalPP<T> first(){
 		var a = data.first();
 		var b = base.first();
 		assertEquals(a, b);
 		return a;
 	}
 	@Override
-	public Optional<T> peekFirst() throws IOException{
+	public OptionalPP<T> peekFirst() throws IOException{
 		var a = data.peekFirst();
 		var b = base.peekFirst();
 		assertEquals(a, b);
 		return a;
 	}
 	@Override
-	public Optional<T> popFirst() throws IOException{
+	public OptionalPP<T> popFirst() throws IOException{
 		var a = data.popFirst();
 		var b = base.popFirst();
 		assertEquals(a, b);
@@ -312,14 +312,14 @@ public class CheckIOList<T> implements IOList<T>{
 		dataEquality();
 	}
 	@Override
-	public Optional<T> peekLast() throws IOException{
+	public OptionalPP<T> peekLast() throws IOException{
 		var a = data.peekLast();
 		var b = base.peekLast();
 		assertEquals(a, b);
 		return a;
 	}
 	@Override
-	public Optional<T> popLast() throws IOException{
+	public OptionalPP<T> popLast() throws IOException{
 		var a = data.popLast();
 		var b = base.popLast();
 		assertEquals(a, b);
@@ -327,7 +327,7 @@ public class CheckIOList<T> implements IOList<T>{
 		return a;
 	}
 	@Override
-	public Optional<T> popLastIf(Predicate<T> check) throws IOException{
+	public OptionalPP<T> popLastIf(UnsafePredicate<T, IOException> check) throws IOException{
 		var a = data.popLastIf(check);
 		var b = base.popLastIf(check);
 		assertEquals(a, b);

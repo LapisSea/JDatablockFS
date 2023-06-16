@@ -6,6 +6,7 @@ import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.field.fields.RefField;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.cfs.utils.IterablePP;
+import com.lapissea.cfs.utils.OptionalPP;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.UtilL;
 
@@ -496,7 +497,7 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 		return exact(type, name).orElseThrow();
 	}
 	
-	public <E> Optional<IOField<T, E>> exact(Class<E> type, String name){
+	public <E> OptionalPP<IOField<T, E>> exact(Class<E> type, String name){
 		return byType(type).filtered(f -> f.getName().equals(name)).first();
 	}
 	

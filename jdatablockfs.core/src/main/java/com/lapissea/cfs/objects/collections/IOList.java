@@ -10,10 +10,12 @@ import com.lapissea.cfs.query.QueryCheck;
 import com.lapissea.cfs.query.QuerySupport;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.utils.IterablePP;
+import com.lapissea.cfs.utils.OptionalPP;
 import com.lapissea.util.Nullable;
 import com.lapissea.util.function.FunctionOL;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;
+import com.lapissea.util.function.UnsafePredicate;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -21,7 +23,6 @@ import java.util.ConcurrentModificationException;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.RandomAccess;
 import java.util.Set;
@@ -602,20 +603,20 @@ public interface IOList<T> extends IterablePP<T>{
 	}
 	
 	@Override
-	default Optional<T> first(){
-		if(isEmpty()) return Optional.empty();
-		return Optional.of(getUnsafe(0));
+	default OptionalPP<T> first(){
+		if(isEmpty()) return OptionalPP.empty();
+		return OptionalPP.of(getUnsafe(0));
 	}
 	
-	default Optional<T> peekFirst() throws IOException{
-		if(isEmpty()) return Optional.empty();
-		return Optional.of(get(0));
+	default OptionalPP<T> peekFirst() throws IOException{
+		if(isEmpty()) return OptionalPP.empty();
+		return OptionalPP.of(get(0));
 	}
-	default Optional<T> popFirst() throws IOException{
-		if(isEmpty()) return Optional.empty();
+	default OptionalPP<T> popFirst() throws IOException{
+		if(isEmpty()) return OptionalPP.empty();
 		var first = get(0);
 		remove(0);
-		return Optional.of(first);
+		return OptionalPP.of(first);
 	}
 	
 	default void pushFirst(T newFirst) throws IOException{
@@ -626,24 +627,24 @@ public interface IOList<T> extends IterablePP<T>{
 		}
 	}
 	
-	default Optional<T> peekLast() throws IOException{
-		if(isEmpty()) return Optional.empty();
-		return Optional.of(get(size() - 1));
+	default OptionalPP<T> peekLast() throws IOException{
+		if(isEmpty()) return OptionalPP.empty();
+		return OptionalPP.of(get(size() - 1));
 	}
-	default Optional<T> popLast() throws IOException{
-		if(isEmpty()) return Optional.empty();
+	default OptionalPP<T> popLast() throws IOException{
+		if(isEmpty()) return OptionalPP.empty();
 		var index = size() - 1;
 		var val   = get(index);
 		remove(index);
-		return Optional.of(val);
+		return OptionalPP.of(val);
 	}
-	default Optional<T> popLastIf(Predicate<T> check) throws IOException{
-		if(isEmpty()) return Optional.empty();
+	default OptionalPP<T> popLastIf(UnsafePredicate<T, IOException> check) throws IOException{
+		if(isEmpty()) return OptionalPP.empty();
 		var index = size() - 1;
 		var val   = get(index);
-		if(!check.test(val)) return Optional.empty();
+		if(!check.test(val)) return OptionalPP.empty();
 		remove(index);
-		return Optional.of(val);
+		return OptionalPP.of(val);
 	}
 	
 	default void pushLast(T newLast) throws IOException{

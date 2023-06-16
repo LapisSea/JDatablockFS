@@ -2,6 +2,7 @@ package com.lapissea.cfs.objects.collections.listtools;
 
 import com.lapissea.cfs.objects.collections.IOIterator;
 import com.lapissea.cfs.objects.collections.IOList;
+import com.lapissea.cfs.utils.OptionalPP;
 import com.lapissea.util.function.UnsafeConsumer;
 import com.lapissea.util.function.UnsafeFunction;
 
@@ -9,7 +10,6 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.NoSuchElementException;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Spliterator;
 import java.util.StringJoiner;
 import java.util.stream.Stream;
@@ -226,10 +226,10 @@ public class IOListRangeView<T> implements IOList<T>{
 		return IOList.super.indexOf(value);
 	}
 	@Override
-	public Optional<T> first(){
-		if(isEmpty()) return Optional.empty();
+	public OptionalPP<T> first(){
+		if(isEmpty()) return OptionalPP.empty();
 		try{
-			return Optional.of(get(0));
+			return OptionalPP.of(get(0));
 		}catch(IOException e){
 			throw new RuntimeException(e);
 		}

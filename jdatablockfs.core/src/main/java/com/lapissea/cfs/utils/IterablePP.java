@@ -3,7 +3,6 @@ package com.lapissea.cfs.utils;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
-import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -16,10 +15,10 @@ public interface IterablePP<T> extends Iterable<T>{
 		return StreamSupport.stream(spliterator(), false);
 	}
 	
-	default Optional<T> first(){
+	default OptionalPP<T> first(){
 		var iter = iterator();
-		if(iter.hasNext()) return Optional.ofNullable(iter.next());
-		return Optional.empty();
+		if(iter.hasNext()) return OptionalPP.ofNullable(iter.next());
+		return OptionalPP.empty();
 	}
 	
 	default IterablePP<T> filtered(Predicate<T> filter){
