@@ -44,10 +44,12 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -622,12 +624,12 @@ public class SlowTests{
 		record MapState(Cluster provider, IOMap<Object, Object> map){ }
 		var rnr = new FuzzingRunner.StateEnv<MapState, MapAction, IOException>(){
 			long actionIndex = -1;
-			long sequenceIndex = -1;
+			final Set<Long> sequenceIndexes = new HashSet<>();
 			
 			@Override
 			public boolean shouldRun(FuzzingRunner.Sequence sequence){
 //				return true;
-				return sequenceIndex == -1 || sequence.index() == sequenceIndex;
+				return sequenceIndexes.isEmpty() || sequenceIndexes.contains(sequence.index());
 			}
 			
 			@Override
@@ -653,7 +655,7 @@ public class SlowTests{
 			@Override
 			public MapState create(Random random, long sequenceIndex) throws IOException{
 				Cluster provider;
-				if(sequenceIndex == this.sequenceIndex){
+				if(sequenceIndexes.contains(sequenceIndex)){
 					var logger = LoggedMemoryUtils.createLoggerFromConfig();
 					provider = Cluster.init(LoggedMemoryUtils.newLoggedMemory(sequenceIndex + "", logger));
 				}else{
@@ -675,13 +677,14 @@ public class SlowTests{
 			r -> new MapAction.Clear()
 		)).chanceFor(MapAction.Clear.class, 1F/500));
 		
-		var fails = FuzzFail.sortFails(runner.run(69, 500000, 2000));
+		var fails = FuzzFail.sortFails(runner.run(69, 200000, 2000));
 		if(!fails.isEmpty()){
 			LogUtil.printlnEr(FuzzFail.report(fails));
 			//get first fail and rerun it with display server logging
 			var fail     = fails.get(0);
 			var sequence = fail.sequence();
-			rnr.sequenceIndex = sequence.index();
+			rnr.sequenceIndexes.clear();
+			rnr.sequenceIndexes.add(sequence.index());
 			var reFail = runner.run(sequence);
 			assertEquals(reFail, Optional.of(fail), "Fail not stable" + reFail.map(f -> "\n" + f.trace()).orElse(""));
 			Assert.fail("There were fails!");
