@@ -47,7 +47,7 @@ public abstract class DynamicSupport{
 			case Boolean ignored -> 1;
 			case Float ignored -> 4;
 			case Double ignored -> 8;
-			case Number integer -> 1 + NumberSize.bySize(numToLong(integer)).bytes;
+			case Number integer -> 1 + NumberSize.bySizeSigned(numToLong(integer)).bytes;
 			case String str -> AutoText.PIPE.calcUnknownSize(prov, new AutoText(str), WordSpace.BYTE);
 			case byte[] array -> {
 				var num = NumberSize.bySize(array.length);
@@ -107,9 +107,9 @@ public abstract class DynamicSupport{
 			case Double v -> NumberSize.LONG.writeFloating(dest, v);
 			case Number integer -> {
 				long value = numToLong(integer);
-				var  num   = NumberSize.bySize(value);
+				var  num   = NumberSize.bySizeSigned(value);
 				FlagWriter.writeSingle(dest, NumberSize.FLAG_INFO, num);
-				num.write(dest, value);
+				num.writeSigned(dest, value);
 			}
 			case String str -> AutoText.PIPE.write(provider, dest, new AutoText(str));
 			case byte[] array -> {
@@ -266,7 +266,7 @@ public abstract class DynamicSupport{
 		if(UtilL.instanceOf(typ, Number.class)){
 			ensureInt(typ);
 			var num     = FlagReader.readSingle(src, NumberSize.FLAG_INFO);
-			var longNum = num.read(src);
+			var longNum = num.readSigned(src);
 			if(typ == Byte.class) return (byte)longNum;
 			if(typ == Short.class) return (short)longNum;
 			if(typ == Integer.class) return (int)longNum;
