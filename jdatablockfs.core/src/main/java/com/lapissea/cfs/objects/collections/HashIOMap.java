@@ -31,6 +31,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.OptionalLong;
+import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -194,8 +196,8 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	
 	private int datasetID;
 	
-	private final Map<K, IOEntry.Modifiable<K, V>> readOnlyCache;
-	private final Map<Integer, Bucket<K, V>>       hotBuckets = new HashMap<>();
+	private final Map<K, IOEntry.Modifiable<K, V>>    readOnlyCache;
+	private final Map<Integer, BucketContainer<K, V>> hotBuckets = new ConcurrentHashMap<>();
 	
 	public HashIOMap(DataProvider provider, Reference reference, TypeLink typeDef) throws IOException{
 		super(provider, reference, typeDef);
@@ -641,6 +643,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 	@Override
 	public void clear() throws IOException{
 		datasetID++;
+		hotBuckets.clear();
 		try(var ignored = getDataProvider().getSource().openIOTransaction()){
 			size = 0;
 			bucketPO2 = 1;
@@ -659,7 +662,7 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		PutAction(int inc){ this.inc = inc; }
 	}
 	
-	private PutAction putEntry(Map<Integer, Bucket<K, V>> hotBuckets, IOList<Bucket<K, V>> buckets, short bucketPO2, K key, V value) throws IOException{
+	private PutAction putEntry(Map<Integer, BucketContainer<K, V>> hotBuckets, IOList<Bucket<K, V>> buckets, short bucketPO2, K key, V value) throws IOException{
 		
 		Bucket<K, V> firstBucket = null;
 		
@@ -738,24 +741,39 @@ public class HashIOMap<K, V> extends AbstractUnmanagedIOMap<K, V>{
 		}
 	}
 	
-	private Bucket<K, V> getBucket(Map<Integer, Bucket<K, V>> hotBuckets, IOList<Bucket<K, V>> buckets, int smallHash) throws IOException{
-//		if(hotBuckets != null){
-//			var cached = hotBuckets.get(smallHash);
-//			if(cached != null){
-//				return cached;
-//			}
-//		}
-		
+	private static final class BucketContainer<K, V>{
+		private final Bucket<K, V> bucket;
+		private       byte         age = 1;
+		private BucketContainer(Bucket<K, V> bucket){
+			this.bucket = bucket;
+		}
+		private void makeOlder(){
+			if(age<10) age++;
+		}
+	}
+	
+	private Bucket<K, V> getBucket(Map<Integer, BucketContainer<K, V>> hotBuckets, IOList<Bucket<K, V>> buckets, int smallHash) throws IOException{
+		if(hotBuckets != null){
+			var container = hotBuckets.get(smallHash);
+			if(container != null){
+				container.makeOlder();
+				return container.bucket;
+			}
+		}
 		var bucket = buckets.get(smallHash);
-
-//		if(hotBuckets != null){
-//			if(hotBuckets.size()>=64){
-//				hotBuckets.keySet().stream().skip(Rand.i(hotBuckets.size() - 1)).limit(8).toList().forEach(hotBuckets::remove);
-//			}
-//			hotBuckets.put(smallHash, bucket);
-//		}
+		
+		if(hotBuckets != null){
+			if(hotBuckets.size()>16) yeet(hotBuckets);
+			hotBuckets.put(smallHash, new BucketContainer<>(bucket));
+		}
 		
 		return bucket;
+	}
+	
+	private static <K, V> void yeet(Map<Integer, BucketContainer<K, V>> hotBuckets){
+		var chance = 1F/256;
+		var random = new Random();
+		hotBuckets.entrySet().removeIf(e -> random.nextFloat()<=chance && (e.getValue().age--)<=0);
 	}
 	
 	private void setBucket(IOList<Bucket<K, V>> buckets, int smallHash, Bucket<K, V> bucket) throws IOException{
