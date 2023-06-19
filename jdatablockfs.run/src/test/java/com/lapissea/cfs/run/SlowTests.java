@@ -47,6 +47,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
@@ -614,6 +615,8 @@ public class SlowTests{
 		
 		record Put(Object key, Object value) implements MapAction{ }
 		
+		record PutAll(Map<Object, Object> data) implements MapAction{ }
+		
 		record Remove(Object key) implements MapAction{ }
 		
 		record ContainsKey(Object key) implements MapAction{ }
@@ -642,6 +645,7 @@ public class SlowTests{
 				
 				switch(action){
 					case MapAction.Put(var key, var value) -> state.map.put(key, value);
+					case MapAction.PutAll(var data) -> state.map.putAll(data);
 					case MapAction.Remove(var key) -> state.map.remove(key);
 					case MapAction.ContainsKey(var key) -> state.map.containsKey(key);
 					case MapAction.Clear ignored -> state.map.clear();
@@ -670,12 +674,18 @@ public class SlowTests{
 				return new MapState(provider, new CheckMap<>(map));
 			}
 		};
+		int range = 40;
+		
 		var runner = new FuzzingRunner<MapState, MapAction, IOException>(rnr, RNGType.<MapAction>of(List.of(
-			r -> new MapAction.Put(10 + r.nextInt(40), 10 + r.nextInt(90)),
-			r -> new MapAction.Remove(10 + r.nextInt(40)),
-			r -> new MapAction.ContainsKey(10 + r.nextInt(40)),
+			r -> new MapAction.Put(10 + r.nextInt(range), 10 + r.nextInt(90)),
+			r -> new MapAction.PutAll(
+				r.ints(10, 10 + range).distinct().limit(2 + r.nextInt(10)).boxed()
+				 .collect(Collectors.toMap(i -> i, i -> 10 + r.nextInt(90)))
+			),
+			r -> new MapAction.Remove(10 + r.nextInt(range)),
+			r -> new MapAction.ContainsKey(10 + r.nextInt(range)),
 			r -> new MapAction.Clear()
-		)).chanceFor(MapAction.Clear.class, 1F/500));
+		)).chanceFor(MapAction.Clear.class, 1F/500).chanceFor(MapAction.PutAll.class, 0.1F));
 		
 		var fails = FuzzFail.sortFails(runner.run(69, 200000, 2000));
 		if(!fails.isEmpty()){
