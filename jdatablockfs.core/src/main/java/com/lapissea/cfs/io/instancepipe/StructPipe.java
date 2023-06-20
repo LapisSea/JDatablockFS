@@ -743,7 +743,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 		var gen = deps.generators();
 		if(gen != null) generateAll(gen, ioPool, provider, instance, true);
 		
-		var atomicIO = fields.size()>1? dest.localTransactionBuffer() : dest;
+		var atomicIO = fields.size()>1? dest.localTransactionBuffer(false) : dest;
 		
 		int checkIndex = 0;
 		try{

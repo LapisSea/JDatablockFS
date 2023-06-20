@@ -512,7 +512,7 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		}
 		
 		@Override
-		public Struct.Unmanaged<SELF> getThisStruct(){
+		public final Struct.Unmanaged<SELF> getThisStruct(){
 			return (Struct.Unmanaged<SELF>)super.getThisStruct();
 		}
 		

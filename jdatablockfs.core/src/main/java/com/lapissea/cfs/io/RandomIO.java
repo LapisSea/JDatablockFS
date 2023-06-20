@@ -465,20 +465,19 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 	 * @return RandomIO instance that may be the calling instance or a new buffer
 	 * @throws IOException source may throw io
 	 */
-	default RandomIO localTransactionBuffer() throws IOException{
+	default RandomIO localTransactionBuffer(boolean closeSource) throws IOException{
 		if(IOTransaction.DISABLE_TRANSACTIONS || inTransaction()) return this;
 		
 		if(isReadOnly()){
 			throw new IllegalStateException();
 		}
 		
-		var that = this;
 		class LocalTransactionIO implements RandomIO{
 			private final IOTransactionBuffer transactionBuffer = new IOTransactionBuffer(false);
 			
-			private       long size     = that.getSize();
-			private final long capacity = that.getCapacity();
-			private       long pos      = that.getPos();
+			private       long size     = RandomIO.this.getSize();
+			private final long capacity = RandomIO.this.getCapacity();
+			private       long pos      = RandomIO.this.getPos();
 			
 			LocalTransactionIO() throws IOException{
 			}
@@ -512,16 +511,17 @@ public interface RandomIO extends Flushable, ContentWriter, ContentReader{
 			
 			@Override
 			public void close() throws IOException{
-				transactionBuffer.export().apply(that);
-				that.setPos(pos);
+				transactionBuffer.export().apply(RandomIO.this);
+				RandomIO.this.setPos(pos);
+				if(closeSource) RandomIO.this.close();
 			}
 			
 			@Override
 			public void flush(){ }
 			
 			private int readAt(long offset, byte[] b, int off, int len) throws IOException{
-				that.setPos(offset);
-				return that.read(b, off, len);
+				RandomIO.this.setPos(offset);
+				return RandomIO.this.read(b, off, len);
 			}
 			
 			@Override
