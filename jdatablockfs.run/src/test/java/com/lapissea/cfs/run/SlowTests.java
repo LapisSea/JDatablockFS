@@ -297,7 +297,7 @@ public class SlowTests{
 				provider = new Cluster(provider.getSource());
 			}
 			
-			var map = provider.getRootProvider().<IOMap<Object, Object>>builder().withType(TypeLink.of(HashIOMap.class, Object.class, Object.class)).withId("map").request();
+			var map = provider.getRootProvider().<IOMap<Object, Object>>builder("map").withType(TypeLink.of(HashIOMap.class, Object.class, Object.class)).request();
 			if(mode == Mode.CHECKPOINT){
 				info("Starting on step", map.size());
 			}
@@ -666,9 +666,8 @@ public class SlowTests{
 					provider = Cluster.emptyMem();
 				}
 				
-				var map = provider.getRootProvider().<IOMap<Object, Object>>builder()
+				var map = provider.getRootProvider().<IOMap<Object, Object>>builder("map")
 				                  .withType(TypeLink.of(HashIOMap.class, Object.class, Object.class))
-				                  .withId("map")
 				                  .request();
 				
 				return new MapState(provider, new CheckMap<>(map));

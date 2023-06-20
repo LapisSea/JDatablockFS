@@ -3,6 +3,8 @@ package com.lapissea.cfs.objects;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 
+import java.util.Objects;
+
 public class ObjectID extends IOInstance.Managed<ObjectID>{
 	
 	@IOValue
@@ -10,7 +12,7 @@ public class ObjectID extends IOInstance.Managed<ObjectID>{
 	
 	public ObjectID(){ }
 	public ObjectID(String id){
-		this.id = id;
+		this.id = Objects.requireNonNull(id);
 	}
 	
 	@Override

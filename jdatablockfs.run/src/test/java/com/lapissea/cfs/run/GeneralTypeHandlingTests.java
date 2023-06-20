@@ -77,10 +77,10 @@ public class GeneralTypeHandlingTests{
 	@Test(dataProvider = "genericObjects")
 	<T extends IOInstance<T>> void genericStorage(T obj) throws IOException{
 		TestUtils.testCluster(TestInfo.of(obj), ses -> {
-			var ls = ses.getRootProvider().<IOList<GenericContainer<?>>>builder().withType(TypeLink.ofFlat(
+			var ls = ses.getRootProvider().<IOList<GenericContainer<?>>>builder("list").withType(TypeLink.ofFlat(
 				LinkedIOList.class,
 				GenericContainer.class, Object.class
-			)).withId("list").request();
+			)).request();
 			
 			var c = new GenericContainer<>(obj);
 			ls.clear();
@@ -177,7 +177,7 @@ public class GeneralTypeHandlingTests{
 	public static void use(byte[] data) throws IOException{
 		var cluster = new Cluster(MemoryData.builder().withRaw(data).build());
 		
-		var r         = cluster.getRootProvider().builder().withId("hello!").withGenerator(() -> { throw new RuntimeException(); });
+		var r         = cluster.getRootProvider().builder("hello!").withGenerator(() -> { throw new RuntimeException(); });
 		var container = (IOInstance<?>)r.request();
 		
 		IOField f = container.getThisStruct().getFields().byName("r").orElseThrow();

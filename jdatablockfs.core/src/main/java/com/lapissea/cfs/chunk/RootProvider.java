@@ -125,10 +125,15 @@ public interface RootProvider extends DataProvider.Holder{
 	default <T> Builder<T> builder(){
 		return new Builder<>(this);
 	}
+	default <T> Builder<T> builder(String id){ return new Builder<T>(this).withId(id); }
 	
-	default <T> T request(String id, Class<?> raw, Class<?>... args) throws IOException      { return this.<T>builder().withId(id).withType(TypeLink.of(raw, args)).request(); }
-	default <T extends IOInstance<T>> T request(String id, Struct<T> type) throws IOException{ return this.builder().withId(id).withType(type.getType()).request(); }
-	default <T> T request(String id, Class<T> type) throws IOException                       { return this.builder().withId(id).withType(type).request(); }
+	default <T> T require(String id, Class<T> type) throws IOException{
+		return builder(id).<T>withGenerator(() -> { throw new IllegalStateException(id + " does not exist!"); }).request();
+	}
+	
+	default <T> T request(String id, Class<?> raw, Class<?>... args) throws IOException      { return this.<T>builder(id).withType(TypeLink.of(raw, args)).request(); }
+	default <T extends IOInstance<T>> T request(String id, Struct<T> type) throws IOException{ return this.builder(id).withType(type.getType()).request(); }
+	default <T> T request(String id, Class<T> type) throws IOException                       { return this.builder(id).withType(type).request(); }
 	
 	<T> T request(ObjectID id, UnsafeSupplier<T, IOException> objectGenerator) throws IOException;
 	default <T> void provide(String id, T obj) throws IOException{

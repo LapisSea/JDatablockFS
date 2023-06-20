@@ -331,9 +331,8 @@ public class GeneralTests{
 			
 			var prov = cluster.getRootProvider();
 			
-			var dummies = prov.builder()
+			var dummies = prov.builder("dummy_array")
 			                  .withGenerator(() -> new GenericContainer<>(IntStream.range(0, 3).mapToObj(Dummy::new).toArray(Dummy[]::new)))
-			                  .withId("dummy_array")
 			                  .request();
 			
 			
