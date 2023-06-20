@@ -1,5 +1,6 @@
 package com.lapissea.cfs.chunk;
 
+import com.lapissea.cfs.exceptions.MissingRoot;
 import com.lapissea.cfs.io.bit.EnumUniverse;
 import com.lapissea.cfs.io.instancepipe.StandardStructPipe;
 import com.lapissea.cfs.objects.ObjectID;
@@ -128,7 +129,10 @@ public interface RootProvider extends DataProvider.Holder{
 	default <T> Builder<T> builder(String id){ return new Builder<T>(this).withId(id); }
 	
 	default <T> T require(String id, Class<T> type) throws IOException{
-		return builder(id).<T>withGenerator(() -> { throw new IllegalStateException(id + " does not exist!"); }).request();
+		var val = builder(id).withGenerator(() -> {
+			throw new MissingRoot(id + " does not exist!");
+		}).request();
+		return type.cast(val);
 	}
 	
 	default <T> T request(String id, Class<?> raw, Class<?>... args) throws IOException      { return this.<T>builder(id).withType(TypeLink.of(raw, args)).request(); }
