@@ -23,10 +23,12 @@ import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.annotations.IOCompression;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.cfs.utils.IterablePP;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
@@ -329,4 +331,24 @@ public class GeneralTypeHandlingTests{
 		
 	}
 	
+	@Test
+	void testDuration() throws IOException{
+		TestUtils.testChunkProvider(TestInfo.of(), provider -> {
+			interface Hold extends IOInstance.Def<Hold>{
+				Duration val();
+			}
+			
+			var hold = StandardStructPipe.of(Hold.class);
+			var make = IOInstance.Def.<Hold, Duration>constrRef(Hold.class, Duration.class);
+			
+			var chunk = AllocateTicket.bytes(64).submit(provider);
+			
+			for(var val : (IterablePP<Hold>)() -> new Random(42069).longs(10000).mapToObj(Duration::ofMillis).map(make).iterator()){
+				hold.write(chunk, val);
+				var read = hold.readNew(chunk, null);
+				
+				assertEquals(read, val);
+			}
+		});
+	}
 }
