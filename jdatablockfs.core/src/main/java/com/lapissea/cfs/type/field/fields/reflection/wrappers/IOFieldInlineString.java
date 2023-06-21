@@ -32,7 +32,7 @@ public class IOFieldInlineString<CTyp extends IOInstance<CTyp>> extends NullFlag
 					if(nullable()) return 0;
 					throw new NullPointerException();
 				}
-				return desc.calcUnknown(AutoText.PIPE.makeIOPool(), prov, val, desc.getWordSpace());
+				return AutoText.PIPE.calcUnknownSize(prov, val, desc.getWordSpace());
 			}
 		));
 	}
