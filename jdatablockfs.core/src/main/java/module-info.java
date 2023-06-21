@@ -33,4 +33,5 @@ module JDatablockFS.core {
 	
 	exports com.lapissea.cfs.type.field.fields.reflection to JDatablockFS.tools, jlapisutil;
 	exports com.lapissea.cfs.logging to JDatablockFS.tools, JDatablockFS.run;
+	exports com.lapissea.cfs.type.field.fields.reflection.wrappers to JDatablockFS.tools, jlapisutil;
 }

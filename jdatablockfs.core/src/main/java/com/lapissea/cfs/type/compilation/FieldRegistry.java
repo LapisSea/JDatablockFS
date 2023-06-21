@@ -12,6 +12,7 @@ import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.cfs.type.field.fields.CollectionAddapter;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldBooleanArray;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldByteArray;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldChunkPointer;
@@ -22,13 +23,12 @@ import com.lapissea.cfs.type.field.fields.reflection.IOFieldEnumArray;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldEnumList;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldFloatArray;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldInlineObject;
-import com.lapissea.cfs.type.field.fields.reflection.IOFieldInlineString;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldObjectReference;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
-import com.lapissea.cfs.type.field.fields.reflection.IOFieldStringArray;
-import com.lapissea.cfs.type.field.fields.reflection.IOFieldStringList;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldUnmanagedObjectReference;
 import com.lapissea.cfs.type.field.fields.reflection.InstanceCollection;
+import com.lapissea.cfs.type.field.fields.reflection.wrappers.IOFieldInlineString;
+import com.lapissea.cfs.type.field.fields.reflection.wrappers.IOFieldStringCollection;
 import com.lapissea.util.LateInit;
 
 import java.lang.reflect.ParameterizedType;
@@ -104,9 +104,9 @@ class FieldRegistry{
 				@Override
 				public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
 					if(field.hasAnnotation(IOValue.Reference.class)){
-						return new InstanceCollection.ReferenceField<>(field, InstanceCollection.DataAdapter.ArrayAdapter.class);
+						return new InstanceCollection.ReferenceField<>(field, CollectionAddapter.OfArray.class);
 					}
-					return new InstanceCollection.InlineField<>(field, InstanceCollection.DataAdapter.ArrayAdapter.class);
+					return new InstanceCollection.InlineField<>(field, CollectionAddapter.OfArray.class);
 				}
 			});
 			reg.register(new RegistryNode(){
@@ -120,9 +120,9 @@ class FieldRegistry{
 				@Override
 				public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
 					if(field.hasAnnotation(IOValue.Reference.class)){
-						return new InstanceCollection.ReferenceField<>(field, InstanceCollection.DataAdapter.ListAdapter.class);
+						return new InstanceCollection.ReferenceField<>(field, CollectionAddapter.OfList.class);
 					}
-					return new InstanceCollection.InlineField<>(field, InstanceCollection.DataAdapter.ListAdapter.class);
+					return new InstanceCollection.InlineField<>(field, CollectionAddapter.OfList.class);
 				}
 			});
 			reg.register(new RegistryNode.InstanceOf<>(String.class){
@@ -134,7 +134,7 @@ class FieldRegistry{
 			reg.register(new RegistryNode.InstanceOf<>(String[].class){
 				@Override
 				public <T extends IOInstance<T>> IOField<T, String[]> create(FieldAccessor<T> field, GenericContext genericContext){
-					return new IOFieldStringArray<>(field);
+					return new IOFieldStringCollection<>(field, CollectionAddapter.OfArray.class);
 				}
 			});
 			reg.register(new RegistryNode(){
@@ -147,7 +147,7 @@ class FieldRegistry{
 				}
 				@Override
 				public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
-					return new IOFieldStringList<>(field);
+					return new IOFieldStringCollection<>(field, CollectionAddapter.OfList.class);
 				}
 			});
 			reg.register(new RegistryNode.InstanceOf<>(IOInstance.class){
