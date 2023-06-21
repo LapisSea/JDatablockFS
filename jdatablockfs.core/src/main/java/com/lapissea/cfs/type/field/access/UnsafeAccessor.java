@@ -19,6 +19,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -225,82 +226,82 @@ public sealed class UnsafeAccessor<CTyp extends IOInstance<CTyp>> extends Abstra
 	
 	@Override
 	protected void setExactShort(VarPool<CTyp> ioPool, CTyp instance, short value){
-		UNSAFE.putShort(instance, fieldOffset, value);
+		UNSAFE.putShort(Objects.requireNonNull(instance), fieldOffset, value);
 	}
 	@Override
 	protected short getExactShort(VarPool<CTyp> ioPool, CTyp instance){
-		return UNSAFE.getShort(instance, fieldOffset);
+		return UNSAFE.getShort(Objects.requireNonNull(instance), fieldOffset);
 	}
 	
 	@Override
 	protected void setExactChar(VarPool<CTyp> ioPool, CTyp instance, char value){
-		UNSAFE.putChar(instance, fieldOffset, value);
+		UNSAFE.putChar(Objects.requireNonNull(instance), fieldOffset, value);
 	}
 	@Override
 	protected char getExactChar(VarPool<CTyp> ioPool, CTyp instance){
-		return UNSAFE.getChar(instance, fieldOffset);
+		return UNSAFE.getChar(Objects.requireNonNull(instance), fieldOffset);
 	}
 	
 	@Override
 	protected long getExactLong(VarPool<CTyp> ioPool, CTyp instance){
-		return UNSAFE.getLong(instance, fieldOffset);
+		return UNSAFE.getLong(Objects.requireNonNull(instance), fieldOffset);
 	}
 	@Override
 	protected void setExactLong(VarPool<CTyp> ioPool, CTyp instance, long value){
-		UNSAFE.putLong(instance, fieldOffset, value);
+		UNSAFE.putLong(Objects.requireNonNull(instance), fieldOffset, value);
 	}
 	
 	@Override
 	protected byte getExactByte(VarPool<CTyp> ioPool, CTyp instance){
-		return UNSAFE.getByte(instance, fieldOffset);
+		return UNSAFE.getByte(Objects.requireNonNull(instance), fieldOffset);
 	}
 	@Override
 	protected void setExactByte(VarPool<CTyp> ioPool, CTyp instance, byte value){
-		UNSAFE.putByte(instance, fieldOffset, value);
+		UNSAFE.putByte(Objects.requireNonNull(instance), fieldOffset, value);
 	}
 	
 	@Override
 	protected int getExactInt(VarPool<CTyp> ioPool, CTyp instance){
-		return UNSAFE.getInt(instance, fieldOffset);
+		return UNSAFE.getInt(Objects.requireNonNull(instance), fieldOffset);
 	}
 	@Override
 	protected void setExactInt(VarPool<CTyp> ioPool, CTyp instance, int value){
-		UNSAFE.putInt(instance, fieldOffset, value);
+		UNSAFE.putInt(Objects.requireNonNull(instance), fieldOffset, value);
 	}
 	
 	@Override
 	protected double getExactDouble(VarPool<CTyp> ioPool, CTyp instance){
-		return UNSAFE.getDouble(instance, fieldOffset);
+		return UNSAFE.getDouble(Objects.requireNonNull(instance), fieldOffset);
 	}
 	@Override
 	protected void setExactDouble(VarPool<CTyp> ioPool, CTyp instance, double value){
-		UNSAFE.putDouble(instance, fieldOffset, value);
+		UNSAFE.putDouble(Objects.requireNonNull(instance), fieldOffset, value);
 	}
 	
 	@Override
 	protected void setExactFloat(VarPool<CTyp> ioPool, CTyp instance, float value){
-		UNSAFE.putFloat(instance, fieldOffset, value);
+		UNSAFE.putFloat(Objects.requireNonNull(instance), fieldOffset, value);
 	}
 	@Override
 	protected float getExactFloat(VarPool<CTyp> ioPool, CTyp instance){
-		return UNSAFE.getFloat(instance, fieldOffset);
+		return UNSAFE.getFloat(Objects.requireNonNull(instance), fieldOffset);
 	}
 	
 	@Override
 	protected void setExactBoolean(VarPool<CTyp> ioPool, CTyp instance, boolean value){
-		UNSAFE.putBoolean(instance, fieldOffset, value);
+		UNSAFE.putBoolean(Objects.requireNonNull(instance), fieldOffset, value);
 	}
 	@Override
 	protected boolean getExactBoolean(VarPool<CTyp> ioPool, CTyp instance){
-		return UNSAFE.getBoolean(instance, fieldOffset);
+		return UNSAFE.getBoolean(Objects.requireNonNull(instance), fieldOffset);
 	}
 	
 	@Override
 	protected Object getExactObject(VarPool<CTyp> ioPool, CTyp instance){
-		return UNSAFE.getObject(instance, fieldOffset);
+		return UNSAFE.getObject(Objects.requireNonNull(instance), fieldOffset);
 	}
 	@Override
 	protected void setExactObject(VarPool<CTyp> ioPool, CTyp instance, Object value){
-		UNSAFE.putObject(instance, fieldOffset, getType().cast(value));
+		UNSAFE.putObject(Objects.requireNonNull(instance), fieldOffset, getType().cast(value));
 	}
 }
