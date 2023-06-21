@@ -29,12 +29,14 @@ import com.lapissea.cfs.type.field.fields.reflection.IOFieldUnmanagedObjectRefer
 import com.lapissea.cfs.type.field.fields.reflection.InstanceCollection;
 import com.lapissea.cfs.type.field.fields.reflection.wrappers.IOFieldDuration;
 import com.lapissea.cfs.type.field.fields.reflection.wrappers.IOFieldInlineString;
+import com.lapissea.cfs.type.field.fields.reflection.wrappers.IOFieldInstant;
 import com.lapissea.cfs.type.field.fields.reflection.wrappers.IOFieldStringCollection;
 import com.lapissea.util.LateInit;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -137,6 +139,12 @@ class FieldRegistry{
 				@Override
 				public <T extends IOInstance<T>> IOField<T, Duration> create(FieldAccessor<T> field, GenericContext genericContext){
 					return new IOFieldDuration<>(field);
+				}
+			});
+			reg.register(new RegistryNode.InstanceOf<>(Instant.class){
+				@Override
+				public <T extends IOInstance<T>> IOField<T, Instant> create(FieldAccessor<T> field, GenericContext genericContext){
+					return new IOFieldInstant<>(field);
 				}
 			});
 			reg.register(new RegistryNode.InstanceOf<>(String[].class){

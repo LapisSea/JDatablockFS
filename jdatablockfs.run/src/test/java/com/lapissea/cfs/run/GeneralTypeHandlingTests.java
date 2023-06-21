@@ -29,6 +29,7 @@ import org.testng.annotations.Test;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
@@ -344,6 +345,27 @@ public class GeneralTypeHandlingTests{
 			var chunk = AllocateTicket.bytes(64).submit(provider);
 			
 			for(var val : (IterablePP<Hold>)() -> new Random(42069).longs(10000).mapToObj(Duration::ofMillis).map(make).iterator()){
+				hold.write(chunk, val);
+				var read = hold.readNew(chunk, null);
+				
+				assertEquals(read, val);
+			}
+		});
+	}
+	
+	@Test
+	void testInstant() throws IOException{
+		TestUtils.testChunkProvider(TestInfo.of(), provider -> {
+			interface Hold extends IOInstance.Def<Hold>{
+				Instant val();
+			}
+			
+			var hold = StandardStructPipe.of(Hold.class);
+			var make = IOInstance.Def.<Hold, Instant>constrRef(Hold.class, Instant.class);
+			
+			var chunk = AllocateTicket.bytes(64).submit(provider);
+			
+			for(var val : (IterablePP<Hold>)() -> new Random(42069).longs(10000).mapToObj(Instant::ofEpochMilli).map(make).iterator()){
 				hold.write(chunk, val);
 				var read = hold.readNew(chunk, null);
 				

@@ -48,6 +48,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.lang.reflect.ParameterizedType;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -339,7 +340,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				builder.chptr();
 				continue;
 			}
-			if(List.of(String.class, Duration.class).contains(type)){
+			if(List.of(String.class, Duration.class, Instant.class).contains(type)){
 				builder.skipField(field);
 				continue;
 			}
