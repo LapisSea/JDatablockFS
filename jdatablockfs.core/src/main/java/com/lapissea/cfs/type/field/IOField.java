@@ -4,7 +4,6 @@ import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.exceptions.FieldIsNull;
 import com.lapissea.cfs.exceptions.FixedFormatNotSupported;
-import com.lapissea.cfs.exceptions.IllegalField;
 import com.lapissea.cfs.io.IO;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
@@ -56,64 +55,6 @@ public abstract sealed class IOField<T extends IOInstance<T>, ValueType> impleme
 	        IOFieldFloatArray, IOFieldPrimitive, IOFieldStringCollection{
 	
 	public interface FieldUsage{
-		sealed class AnyOf implements FieldUsage{
-			private final List<FieldUsage> usages;
-			public AnyOf(List<FieldUsage> usages){
-				this.usages = usages;
-			}
-			
-			@Override
-			public boolean isCompatible(Type type, GetAnnotation annotations){
-				for(var usage : usages){
-					if(usage.isCompatible(type, annotations)){
-						return true;
-					}
-				}
-				return false;
-			}
-			
-			@Override
-			public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
-				var ann  = GetAnnotation.from(field);
-				var type = field.getGenericType(genericContext);
-				
-				FieldUsage compatible;
-				find:
-				{
-					for(var usage : usages){
-						if(usage.isCompatible(type, ann)){
-							compatible = usage;
-							break find;
-						}
-					}
-					throw fail(type.getTypeName());
-				}
-				
-				return compatible.create(field, genericContext);
-			}
-			
-			protected IllegalField fail(String typeName){
-				throw new IllegalField("Unable to create field from " + typeName);
-			}
-		}
-		
-		final class Registry extends AnyOf{
-			public Registry(List<FieldUsage> usages){
-				super(usages);
-			}
-			
-			public void requireCanCreate(Type type, GetAnnotation annotations){
-				if(!isCompatible(type, annotations)){
-					throw fail(type.getTypeName());
-				}
-			}
-			@Override
-			protected IllegalField fail(String typeName){
-				throw new IllegalField("Unable to find implementation of " + IOField.class.getSimpleName() + " from " + typeName);
-			}
-			
-		}
-		
 		abstract class InstanceOf<Typ> implements FieldUsage{
 			private final Class<Typ> typ;
 			public InstanceOf(Class<Typ> typ){

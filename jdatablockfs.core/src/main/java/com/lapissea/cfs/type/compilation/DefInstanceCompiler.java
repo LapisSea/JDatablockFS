@@ -1278,10 +1278,9 @@ public class DefInstanceCompiler{
 	}
 	
 	private static void checkModel(List<FieldInfo> fieldInfo){
-		var reg = FieldCompiler.registry();
 		for(var field : fieldInfo){
 			var ann = GetAnnotation.from(field.annotations);
-			reg.requireCanCreate(FieldCompiler.getType(field.type, ann), ann);
+			FieldRegistry.requireCanCreate(FieldCompiler.getType(field.type, ann), ann);
 		}
 	}
 }

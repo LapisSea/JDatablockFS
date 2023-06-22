@@ -6,7 +6,6 @@ import com.lapissea.cfs.config.ConfigDefs;
 import com.lapissea.cfs.exceptions.IllegalField;
 import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.internal.Runner;
-import com.lapissea.cfs.logging.Log;
 import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
@@ -26,16 +25,12 @@ import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOUnmanagedValueInfo;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.utils.IterablePP;
-import com.lapissea.util.LateInit;
-import com.lapissea.util.LogUtil;
-import com.lapissea.util.NanoTimer;
 import com.lapissea.util.PairM;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
 import ru.vyarus.java.generics.resolver.GenericsResolver;
 
 import java.lang.annotation.Annotation;
-import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -45,7 +40,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.Deque;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -54,7 +48,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.function.Function;
 import java.util.function.IntFunction;
 import java.util.function.Supplier;
@@ -139,7 +132,7 @@ public final class FieldCompiler{
 		
 		List<AnnotatedField<T>> fields = new ArrayList<>(Math.max(accessor.size()*2, accessor.size() + 5));//Give extra capacity for virtual fields
 		for(var a : accessor){
-			var f = registry().create(a, null);
+			var f = FieldRegistry.create(a, null);
 			fields.add(new AnnotatedField<>(f, scanAnnotations(f)));
 		}
 		
@@ -251,7 +244,7 @@ public final class FieldCompiler{
 			}
 			toRun.clear();
 			for(var virtual : newVirtualData.values()){
-				var field     = registry().create(virtual, null);
+				var field     = FieldRegistry.create(virtual, null);
 				var annotated = new AnnotatedField<>(field, scanAnnotations(field));
 				toRun.add(annotated);
 				UtilL.addRemainSorted(parsed, annotated);
@@ -261,7 +254,7 @@ public final class FieldCompiler{
 	}
 	
 	
-	protected static IterablePP<Class<?>> deepClasses(Class<?> clazz){
+	private static IterablePP<Class<?>> deepClasses(Class<?> clazz){
 		return IterablePP.nullTerminated(() -> new Supplier<>(){
 			Class<?> c = clazz;
 			@Override
@@ -278,13 +271,13 @@ public final class FieldCompiler{
 			}
 		});
 	}
-	protected static IterablePP<Field> deepIOValueFields(Class<?> clazz){
+	private static IterablePP<Field> deepIOValueFields(Class<?> clazz){
 		return deepClasses(clazz)
 			       .flatMap(c -> Arrays.asList(c.getDeclaredFields()).iterator())
 			       .filtered(f -> f.isAnnotationPresent(IOValue.class));
 	}
 	
-	protected static <T extends IOInstance<T>> List<FieldAccessor<T>> scanFields(Struct<T> struct){
+	private static <T extends IOInstance<T>> List<FieldAccessor<T>> scanFields(Struct<T> struct){
 		var cl = struct.getConcreteType();
 		
 		List<FieldAccessor<T>> fields     = new ArrayList<>();
@@ -296,7 +289,6 @@ public final class FieldCompiler{
 			try{
 				Type type = getType(field);
 				
-				registry().requireCanCreate(type, field::getAnnotation);
 				field.setAccessible(true);
 				
 				String fieldName = getFieldName(field);
@@ -320,6 +312,7 @@ public final class FieldCompiler{
 				getter.ifPresent(usedFields::add);
 				setter.ifPresent(usedFields::add);
 				
+				FieldRegistry.requireCanCreate(type, field::getAnnotation);
 				fields.add(switch(FIELD_ACCESS){
 					case UNSAFE -> UnsafeAccessor.make(struct, field, getter, setter, fieldName, type);
 					case VAR_HANDLE -> VarHandleAccessor.make(struct, field, getter, setter, fieldName, type);
@@ -528,7 +521,7 @@ public final class FieldCompiler{
 		                .map(LogicalAnnType::new)
 		                .toList();
 	
-	protected static <T extends IOInstance<T>> List<LogicalAnnotation<Annotation>> scanAnnotations(IOField<T, ?> field){
+	private static <T extends IOInstance<T>> List<LogicalAnnotation<Annotation>> scanAnnotations(IOField<T, ?> field){
 		return LOGICAL_ANN_TYPES.stream()
 		                        .map(logTyp -> field.getAccessor()
 		                                            .getAnnotation(logTyp.type)
@@ -536,118 +529,6 @@ public final class FieldCompiler{
 		                        .filter(Optional::isPresent)
 		                        .map(Optional::get)
 		                        .toList();
-	}
-	
-	
-	private static final LateInit.Safe<IOField.FieldUsage.Registry> REGISTRY = Runner.async(new Supplier<>(){
-		
-		@Override
-		public IOField.FieldUsage.Registry get(){
-			NanoTimer t = new NanoTimer.Simple();
-			t.start();
-			Log.trace("{#yellowBrightDiscovering IOFields#}");
-			var tasks2 = new ConcurrentLinkedDeque<LateInit.Safe<Optional<Map.Entry<Class<?>, IOField.FieldUsage>>>>();
-			scan(IOField.class, tasks2);
-			
-			var scanned = new HashMap<Class<?>, IOField.FieldUsage>();
-			while(!tasks2.isEmpty()){
-				var task = tasks2.pop();
-				var opt  = task.get();
-				if(opt.isEmpty()) continue;
-				var e = opt.get();
-				scanned.put(e.getKey(), e.getValue());
-			}
-			Log.trace("{#yellowBrightFound {} IOFields#}", scanned.size());
-			t.end();
-			LogUtil.println(t);
-			return new IOField.FieldUsage.Registry(List.copyOf(scanned.values()));
-		}
-		
-		private static void scan(Class<?> type, Deque<LateInit.Safe<Optional<Map.Entry<Class<?>, IOField.FieldUsage>>>> tasks){
-			if(type.getSimpleName().contains("NoIO")){
-				Log.trace("Ignoring \"NoIO\" {}#blackBright", type);
-				return;
-			}
-			if(type.isSealed()){
-				var usage = getFieldUsage(type);
-				if(usage.isPresent()){
-					Log.trace("Sealed {}#blackBright has usage, ignoring children", type);
-					tasks.add(new LateInit.Safe<>(() -> usage, Runnable::run));
-					return;
-				}
-				Log.trace("Scanning sealed {}#blackBright children", type);
-				for(var sub : type.getPermittedSubclasses()){
-					tasks.add(Runner.async(() -> {
-						scan(sub, tasks);
-						return Optional.empty();
-					}));
-				}
-				return;
-			}
-			if(Modifier.isAbstract(type.getModifiers())){
-				return;
-			}
-			tasks.add(Runner.async(() -> {
-				var typ0 = type;
-				while(true){
-					var typ = typ0;
-					var res = getFieldUsage(typ);
-					if(res.isPresent()){
-						Log.trace("{}#blackBright has usage", typ);
-						return res;
-					}
-					
-					var up = typ.getEnclosingClass();
-					if(up == null || up.isSealed()){
-						Log.trace("{}#blackBright does not have usage", typ);
-						return Optional.empty();
-					}
-					Log.trace("{}#blackBright does not have usage, scanning parent", typ);
-					typ0 = up;
-				}
-			}));
-		}
-		
-		private static Optional<Map.Entry<Class<?>, IOField.FieldUsage>> getFieldUsage(Class<?> type){
-			if(type == IOField.class) return Optional.empty();
-			var usageClasses =
-				Optional.ofNullable(type.getDeclaredAnnotation(IOField.FieldUsageRef.class))
-				        .map(IOField.FieldUsageRef::value).filter(a -> a.length>0).map(List::of)
-				        .orElseGet(() -> Arrays.stream(type.getDeclaredClasses())
-				                               .filter(c -> UtilL.instanceOf(c, IOField.FieldUsage.class))
-				                               .map(c -> {
-					                               //noinspection unchecked
-					                               return (Class<IOField.FieldUsage>)c;
-				                               })
-				                               .toList());
-			
-			if(usageClasses.isEmpty()){
-				return Optional.empty();
-			}
-			
-			var usages = usageClasses.stream().map(u -> make(u)).toList();
-			if(usages.size() == 1) return Optional.of(Map.entry(type, usages.get(0)));
-			return Optional.of(Map.entry(type, new IOField.FieldUsage.AnyOf(usages)));
-		}
-		
-		private static IOField.FieldUsage make(Class<IOField.FieldUsage> usageClass){
-			Constructor<IOField.FieldUsage> constr;
-			try{
-				constr = usageClass.getDeclaredConstructor();
-			}catch(NoSuchMethodException e){
-				throw UtilL.exitWithErrorMsg(usageClass.getName() + " does not have an empty constructor");
-			}
-			try{
-				constr.setAccessible(true);
-				return constr.newInstance();
-			}catch(ReflectiveOperationException e){
-				throw new RuntimeException("There was an issue instantiating " + usageClass.getName(), e);
-			}
-		}
-	});
-	
-	static IOField.FieldUsage.Registry registry(){
-		return REGISTRY.get();
 	}
 	
 	private static Set<Class<? extends Annotation>> activeAnnotations(){
@@ -659,4 +540,7 @@ public final class FieldCompiler{
 		);
 	}
 	
+	public static void init(){
+		Runner.run(FieldRegistry::init);
+	}
 }
