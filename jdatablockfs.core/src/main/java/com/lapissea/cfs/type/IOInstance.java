@@ -64,6 +64,14 @@ public sealed interface IOInstance<SELF extends IOInstance<SELF>> extends Clonea
 		@Target({ElementType.TYPE})
 		@interface ToString{
 			
+			/**
+			 * Syntax:<br/>
+			 * Special value: !!name - "name" can be any of [className]<br/>
+			 * Field reference: @name - "name" can be any defined field within the specified type.
+			 * E.g.: Example{int foo; int bar;} - valid names are "foo" and "bar"<br/>
+			 * Optional block: [...] - "[" and "]" are the start and end of the optional block.
+			 * An optional block will be excluded if the "short string" variant is being executed<br/>
+			 */
 			@Retention(RetentionPolicy.RUNTIME)
 			@Target({ElementType.TYPE})
 			@interface Format{

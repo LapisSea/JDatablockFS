@@ -21,4 +21,5 @@ module JDatablockFS.tools {
 	exports com.lapissea.cfs.tools.utils;
 	
 	opens com.lapissea.cfs.tools;
+	exports com.lapissea.cfs.tools.logging.session;
 }
