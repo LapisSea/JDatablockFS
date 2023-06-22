@@ -17,7 +17,16 @@ import java.io.IOException;
 import java.util.List;
 import java.util.OptionalLong;
 
-public class IOFieldByteArray<T extends IOInstance<T>> extends IOField<T, byte[]>{
+public final class IOFieldByteArray<T extends IOInstance<T>> extends IOField<T, byte[]>{
+	
+	@SuppressWarnings("unused")
+	private static final class Usage extends FieldUsage.InstanceOf<byte[]>{
+		public Usage(){ super(byte[].class); }
+		@Override
+		public <T extends IOInstance<T>> IOField<T, byte[]> create(FieldAccessor<T> field, GenericContext genericContext){
+			return new IOFieldByteArray<>(field);
+		}
+	}
 	
 	private final IOCompression.Type compression;
 	private       IOField<T, byte[]> compressed;

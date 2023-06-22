@@ -15,13 +15,16 @@ import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.VaryingSize;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
+import com.lapissea.cfs.type.field.fields.reflection.IOFieldEnum;
+import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
 import com.lapissea.util.NotImplementedException;
 
 import java.io.IOException;
 
 import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 
-public abstract class BitField<T extends IOInstance<T>, Type> extends IOField<T, Type>{
+public abstract sealed class BitField<T extends IOInstance<T>, Type> extends IOField<T, Type>
+	permits BitField.NoIO, IOFieldEnum, IOFieldPrimitive.FBoolean{
 	
 	public static final class NoIO<T extends IOInstance<T>, Type> extends BitField<T, Type>{
 		

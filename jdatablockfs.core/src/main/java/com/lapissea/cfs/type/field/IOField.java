@@ -9,6 +9,7 @@ import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.objects.Stringify;
 import com.lapissea.cfs.type.GenericContext;
+import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
 import com.lapissea.cfs.type.VarPool;
@@ -16,11 +17,29 @@ import com.lapissea.cfs.type.field.access.AnnotatedType;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.access.VirtualAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
+import com.lapissea.cfs.type.field.fields.BitField;
+import com.lapissea.cfs.type.field.fields.NoIOField;
+import com.lapissea.cfs.type.field.fields.NullFlagCompanyField;
+import com.lapissea.cfs.type.field.fields.RefField;
+import com.lapissea.cfs.type.field.fields.reflection.BitFieldMerger;
+import com.lapissea.cfs.type.field.fields.reflection.IOFieldBooleanArray;
+import com.lapissea.cfs.type.field.fields.reflection.IOFieldByteArray;
+import com.lapissea.cfs.type.field.fields.reflection.IOFieldChunkPointer;
+import com.lapissea.cfs.type.field.fields.reflection.IOFieldEnumArray;
+import com.lapissea.cfs.type.field.fields.reflection.IOFieldEnumList;
+import com.lapissea.cfs.type.field.fields.reflection.IOFieldFloatArray;
+import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
+import com.lapissea.cfs.type.field.fields.reflection.wrappers.IOFieldStringCollection;
 import com.lapissea.util.NotNull;
 import com.lapissea.util.Nullable;
+import com.lapissea.util.UtilL;
 
 import java.io.IOException;
 import java.lang.annotation.Annotation;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Objects;
@@ -30,7 +49,39 @@ import java.util.stream.Stream;
 
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 
-public abstract class IOField<T extends IOInstance<T>, ValueType> implements IO<T>, Stringify, AnnotatedType{
+public abstract sealed class IOField<T extends IOInstance<T>, ValueType> implements IO<T>, Stringify, AnnotatedType
+	permits BitField, NoIOField, NullFlagCompanyField, RefField, BitFieldMerger,
+	        IOFieldBooleanArray, IOFieldByteArray, IOFieldChunkPointer, IOFieldEnumArray, IOFieldEnumList,
+	        IOFieldFloatArray, IOFieldPrimitive, IOFieldStringCollection{
+	
+	public interface FieldUsage{
+		abstract class InstanceOf<Typ> implements FieldUsage{
+			private final Class<Typ> typ;
+			public InstanceOf(Class<Typ> typ){
+				this.typ = typ;
+			}
+			
+			public Class<Typ> getType(){
+				return typ;
+			}
+			
+			@Override
+			public final boolean isCompatible(Type type, GetAnnotation annotations){
+				return UtilL.instanceOf(Utils.typeToRaw(type), getType());
+			}
+			@Override
+			public abstract <T extends IOInstance<T>> IOField<T, Typ> create(FieldAccessor<T> field, GenericContext genericContext);
+		}
+		
+		boolean isCompatible(Type type, GetAnnotation annotations);
+		<T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext);
+	}
+	
+	@Retention(RetentionPolicy.RUNTIME)
+	@Target(ElementType.TYPE)
+	public @interface FieldUsageRef{
+		Class<FieldUsage>[] value();
+	}
 	
 	private final FieldAccessor<T> accessor;
 	

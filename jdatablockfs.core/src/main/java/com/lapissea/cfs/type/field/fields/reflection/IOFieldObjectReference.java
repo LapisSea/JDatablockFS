@@ -25,7 +25,7 @@ import java.util.Objects;
 
 import static com.lapissea.cfs.io.instancepipe.StructPipe.STATE_IO_FIELD;
 
-public class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends IOInstance<ValueType>> extends RefField.ReferenceCompanion<T, ValueType> implements RefField.Inst<T, ValueType>{
+public final class IOFieldObjectReference<T extends IOInstance<T>, ValueType extends IOInstance<ValueType>> extends RefField.ReferenceCompanion<T, ValueType> implements RefField.Inst<T, ValueType>{
 	
 	
 	private final Struct<ValueType>     struct;

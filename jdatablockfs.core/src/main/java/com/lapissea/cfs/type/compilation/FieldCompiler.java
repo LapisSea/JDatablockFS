@@ -5,6 +5,7 @@ import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.config.ConfigDefs;
 import com.lapissea.cfs.exceptions.IllegalField;
 import com.lapissea.cfs.exceptions.MalformedStruct;
+import com.lapissea.cfs.internal.Runner;
 import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.Struct;
@@ -24,7 +25,6 @@ import com.lapissea.cfs.type.field.annotations.IONullability;
 import com.lapissea.cfs.type.field.annotations.IOUnmanagedValueInfo;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.utils.IterablePP;
-import com.lapissea.util.LateInit;
 import com.lapissea.util.PairM;
 import com.lapissea.util.TextUtil;
 import com.lapissea.util.UtilL;
@@ -58,7 +58,7 @@ import java.util.stream.Stream;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.joining;
 
-public class FieldCompiler{
+public final class FieldCompiler{
 	
 	public enum AccessType{
 		UNSAFE,
@@ -132,7 +132,7 @@ public class FieldCompiler{
 		
 		List<AnnotatedField<T>> fields = new ArrayList<>(Math.max(accessor.size()*2, accessor.size() + 5));//Give extra capacity for virtual fields
 		for(var a : accessor){
-			var f = registry().create(a, null);
+			var f = FieldRegistry.create(a, null);
 			fields.add(new AnnotatedField<>(f, scanAnnotations(f)));
 		}
 		
@@ -244,7 +244,7 @@ public class FieldCompiler{
 			}
 			toRun.clear();
 			for(var virtual : newVirtualData.values()){
-				var field     = registry().create(virtual, null);
+				var field     = FieldRegistry.create(virtual, null);
 				var annotated = new AnnotatedField<>(field, scanAnnotations(field));
 				toRun.add(annotated);
 				UtilL.addRemainSorted(parsed, annotated);
@@ -254,7 +254,7 @@ public class FieldCompiler{
 	}
 	
 	
-	protected static IterablePP<Class<?>> deepClasses(Class<?> clazz){
+	private static IterablePP<Class<?>> deepClasses(Class<?> clazz){
 		return IterablePP.nullTerminated(() -> new Supplier<>(){
 			Class<?> c = clazz;
 			@Override
@@ -271,13 +271,13 @@ public class FieldCompiler{
 			}
 		});
 	}
-	protected static IterablePP<Field> deepIOValueFields(Class<?> clazz){
+	private static IterablePP<Field> deepIOValueFields(Class<?> clazz){
 		return deepClasses(clazz)
 			       .flatMap(c -> Arrays.asList(c.getDeclaredFields()).iterator())
 			       .filtered(f -> f.isAnnotationPresent(IOValue.class));
 	}
 	
-	protected static <T extends IOInstance<T>> List<FieldAccessor<T>> scanFields(Struct<T> struct){
+	private static <T extends IOInstance<T>> List<FieldAccessor<T>> scanFields(Struct<T> struct){
 		var cl = struct.getConcreteType();
 		
 		List<FieldAccessor<T>> fields     = new ArrayList<>();
@@ -289,7 +289,6 @@ public class FieldCompiler{
 			try{
 				Type type = getType(field);
 				
-				registry().requireCanCreate(type, field::getAnnotation);
 				field.setAccessible(true);
 				
 				String fieldName = getFieldName(field);
@@ -313,6 +312,7 @@ public class FieldCompiler{
 				getter.ifPresent(usedFields::add);
 				setter.ifPresent(usedFields::add);
 				
+				FieldRegistry.requireCanCreate(type, field::getAnnotation);
 				fields.add(switch(FIELD_ACCESS){
 					case UNSAFE -> UnsafeAccessor.make(struct, field, getter, setter, fieldName, type);
 					case VAR_HANDLE -> VarHandleAccessor.make(struct, field, getter, setter, fieldName, type);
@@ -521,7 +521,7 @@ public class FieldCompiler{
 		                .map(LogicalAnnType::new)
 		                .toList();
 	
-	protected static <T extends IOInstance<T>> List<LogicalAnnotation<Annotation>> scanAnnotations(IOField<T, ?> field){
+	private static <T extends IOInstance<T>> List<LogicalAnnotation<Annotation>> scanAnnotations(IOField<T, ?> field){
 		return LOGICAL_ANN_TYPES.stream()
 		                        .map(logTyp -> field.getAccessor()
 		                                            .getAnnotation(logTyp.type)
@@ -529,13 +529,6 @@ public class FieldCompiler{
 		                        .filter(Optional::isPresent)
 		                        .map(Optional::get)
 		                        .toList();
-	}
-	
-	
-	private static final LateInit.Safe<RegistryNode.FieldRegistry> REGISTRY = FieldRegistry.make();
-	
-	protected static RegistryNode.FieldRegistry registry(){
-		return REGISTRY.get();
 	}
 	
 	private static Set<Class<? extends Annotation>> activeAnnotations(){
@@ -547,4 +540,7 @@ public class FieldCompiler{
 		);
 	}
 	
+	public static void init(){
+		Runner.run(FieldRegistry::init);
+	}
 }

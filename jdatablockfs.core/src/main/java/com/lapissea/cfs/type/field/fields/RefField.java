@@ -12,6 +12,10 @@ import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
+import com.lapissea.cfs.type.field.fields.reflection.IOFieldDynamicReferenceObject;
+import com.lapissea.cfs.type.field.fields.reflection.IOFieldObjectReference;
+import com.lapissea.cfs.type.field.fields.reflection.IOFieldUnmanagedObjectReference;
+import com.lapissea.cfs.type.field.fields.reflection.InstanceCollection;
 
 import java.io.IOException;
 import java.util.List;
@@ -19,9 +23,10 @@ import java.util.List;
 import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 
-public abstract class RefField<T extends IOInstance<T>, Type> extends IOField<T, Type>{
+public abstract sealed class RefField<T extends IOInstance<T>, Type> extends IOField<T, Type>{
 	
-	public abstract static class InstRef<T extends IOInstance<T>, Type extends IOInstance<Type>> extends RefField<T, Type> implements Inst<T, Type>{
+	public abstract static sealed class InstRef<T extends IOInstance<T>, Type extends IOInstance<Type>> extends RefField<T, Type> implements Inst<T, Type>
+		permits NoIO, IOFieldUnmanagedObjectReference{
 		public InstRef(FieldAccessor<T> accessor){
 			super(accessor);
 		}
@@ -34,7 +39,8 @@ public abstract class RefField<T extends IOInstance<T>, Type> extends IOField<T,
 		StructPipe<Type> getReferencedPipe(T instance);
 	}
 	
-	public abstract static class NoIO<T extends IOInstance<T>, ValueType extends IOInstance<ValueType>> extends InstRef<T, ValueType> implements DisabledIO<T>{
+	public abstract static non-sealed class NoIO<T extends IOInstance<T>, ValueType extends IOInstance<ValueType>>
+		extends InstRef<T, ValueType> implements DisabledIO<T>{
 		
 		public NoIO(FieldAccessor<T> accessor, SizeDescriptor<T> sizeDescriptor){
 			super(accessor, sizeDescriptor);
@@ -46,7 +52,8 @@ public abstract class RefField<T extends IOInstance<T>, Type> extends IOField<T,
 		}
 	}
 	
-	public abstract static class ReferenceCompanion<T extends IOInstance<T>, ValueType> extends RefField<T, ValueType>{
+	public abstract static sealed class ReferenceCompanion<T extends IOInstance<T>, ValueType> extends RefField<T, ValueType>
+		permits IOFieldDynamicReferenceObject, IOFieldObjectReference, InstanceCollection.ReferenceField{
 		
 		private IOField<T, Reference> referenceField;
 		

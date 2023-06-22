@@ -15,6 +15,7 @@ import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.VaryingSize;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
+import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.NullFlagCompanyField;
 import com.lapissea.cfs.utils.IOUtils;
 
@@ -22,7 +23,26 @@ import java.io.IOException;
 import java.util.Objects;
 import java.util.function.Supplier;
 
-public class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extends IOInstance<ValueType>> extends NullFlagCompanyField<CTyp, ValueType>{
+public final class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extends IOInstance<ValueType>> extends NullFlagCompanyField<CTyp, ValueType>{
+	
+	@SuppressWarnings({"unused", "rawtypes", "unchecked"})
+	private static final class Usage extends FieldUsage.InstanceOf<IOInstance>{
+		public Usage(){ super(IOInstance.class); }
+		@Override
+		public <T extends IOInstance<T>> IOField<T, IOInstance> create(FieldAccessor<T> field, GenericContext genericContext){
+			Class<?> raw       = field.getType();
+			var      unmanaged = !IOInstance.isManaged(raw);
+			
+			if(unmanaged){
+				return new IOFieldUnmanagedObjectReference(field);
+			}
+			if(field.hasAnnotation(IOValue.Reference.class)){
+				return new IOFieldObjectReference<>(field);
+			}
+			return new IOFieldInlineObject<>(field);
+		}
+	}
+	
 	
 	private final StructPipe<ValueType> instancePipe;
 	private final boolean               fixed;

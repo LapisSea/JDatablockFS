@@ -25,7 +25,16 @@ import java.lang.invoke.MethodHandle;
 import java.time.Instant;
 import java.util.Objects;
 
-public class IOFieldInstant<CTyp extends IOInstance<CTyp>> extends NullFlagCompanyField<CTyp, Instant>{
+public final class IOFieldInstant<CTyp extends IOInstance<CTyp>> extends NullFlagCompanyField<CTyp, Instant>{
+	
+	@SuppressWarnings("unused")
+	private static final class Usage extends FieldUsage.InstanceOf<Instant>{
+		public Usage(){ super(Instant.class); }
+		@Override
+		public <T extends IOInstance<T>> IOField<T, Instant> create(FieldAccessor<T> field, GenericContext genericContext){
+			return new IOFieldInstant<>(field);
+		}
+	}
 	
 	@IOInstance.Def.Order({"seconds", "nanos"})
 	private interface IOInstant extends IOInstance.Def<IOInstant>{

@@ -4,9 +4,11 @@ import com.lapissea.cfs.exceptions.MalformedStruct;
 import com.lapissea.cfs.io.bit.BitReader;
 import com.lapissea.cfs.io.bit.BitWriter;
 import com.lapissea.cfs.io.bit.EnumUniverse;
+import com.lapissea.cfs.type.GenericContext;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.WordSpace;
+import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.fields.BitField;
@@ -17,7 +19,16 @@ import java.util.function.Supplier;
 
 import static com.lapissea.cfs.type.field.annotations.IONullability.Mode.DEFAULT_IF_NULL;
 
-public class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> extends BitField<T, E>{
+public final class IOFieldEnum<T extends IOInstance<T>, E extends Enum<E>> extends BitField<T, E>{
+	
+	@SuppressWarnings({"unused", "rawtypes"})
+	private static final class Usage extends FieldUsage.InstanceOf<Enum>{
+		public Usage(){ super(Enum.class); }
+		@Override
+		public <T extends IOInstance<T>> IOField<T, Enum> create(FieldAccessor<T> field, GenericContext genericContext){
+			return new IOFieldEnum<>(field);
+		}
+	}
 	
 	private final EnumUniverse<E> enumUniverse;
 	private final Supplier<E>     createDefaultIfNull;

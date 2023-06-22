@@ -1,10 +1,12 @@
 package com.lapissea.cfs.type.field.fields.reflection.wrappers;
 
+import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.objects.text.AutoText;
 import com.lapissea.cfs.type.GenericContext;
+import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.WordSpace;
@@ -17,9 +19,37 @@ import com.lapissea.cfs.type.field.fields.CollectionAddapter;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
 
 import java.io.IOException;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.OptionalLong;
 
-public class IOFieldStringCollection<T extends IOInstance<T>, CollectionType> extends IOField<T, CollectionType>{
+public final class IOFieldStringCollection<T extends IOInstance<T>, CollectionType> extends IOField<T, CollectionType>{
+	
+	@SuppressWarnings("unused")
+	private static final class UsageArr extends FieldUsage.InstanceOf<String[]>{
+		public UsageArr(){ super(String[].class); }
+		@Override
+		public <T extends IOInstance<T>> IOField<T, String[]> create(FieldAccessor<T> field, GenericContext genericContext){
+			return new IOFieldStringCollection<>(field, CollectionAddapter.OfArray.class);
+		}
+	}
+	
+	@SuppressWarnings("unused")
+	private static final class UsageList implements FieldUsage{
+		@Override
+		public boolean isCompatible(Type type, GetAnnotation annotations){
+			if(!(type instanceof ParameterizedType parmType)) return false;
+			if(parmType.getRawType() != List.class && parmType.getRawType() != ArrayList.class) return false;
+			var args = parmType.getActualTypeArguments();
+			return Utils.typeToRaw(args[0]) == String.class;
+		}
+		@Override
+		public <T extends IOInstance<T>> IOField<T, String[]> create(FieldAccessor<T> field, GenericContext genericContext){
+			return new IOFieldStringCollection<>(field, CollectionAddapter.OfList.class);
+		}
+	}
 	
 	
 	private static final class StringIO implements CollectionAddapter.ElementIOImpl<String>{

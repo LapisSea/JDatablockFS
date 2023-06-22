@@ -11,7 +11,9 @@ import com.lapissea.cfs.io.instancepipe.ObjectPipe;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.GenericContext;
+import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
+import com.lapissea.cfs.type.TypeLink;
 import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.WordSpace;
 import com.lapissea.cfs.type.field.BasicSizeDescriptor;
@@ -21,6 +23,7 @@ import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
+import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.CollectionAddapter;
 import com.lapissea.cfs.type.field.fields.NullFlagCompanyField;
 import com.lapissea.cfs.type.field.fields.RefField;
@@ -28,13 +31,52 @@ import com.lapissea.util.ShouldNeverHappenError;
 import com.lapissea.util.TextUtil;
 
 import java.io.IOException;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 
 public class InstanceCollection{
 	
-	public static class InlineField<T extends IOInstance<T>, ElementType extends IOInstance<ElementType>, CollectionType>
+	@SuppressWarnings("unused")
+	private static final class UsageArr implements IOField.FieldUsage{
+		@Override
+		public boolean isCompatible(Type type, GetAnnotation annotations){
+			var raw = Utils.typeToRaw(type);
+			if(!raw.isArray()) return false;
+			return IOInstance.isManaged(raw.componentType());
+		}
+		@Override
+		public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
+			if(field.hasAnnotation(IOValue.Reference.class)){
+				return new InstanceCollection.ReferenceField<>(field, CollectionAddapter.OfArray.class);
+			}
+			return new InstanceCollection.InlineField<>(field, CollectionAddapter.OfArray.class);
+		}
+	}
+	
+	@SuppressWarnings("unused")
+	private static final class UsageList implements IOField.FieldUsage{
+		@Override
+		public boolean isCompatible(Type type, GetAnnotation annotations){
+			if(!(type instanceof ParameterizedType parmType)) return false;
+			if(parmType.getRawType() != List.class && parmType.getRawType() != ArrayList.class) return false;
+			var args = parmType.getActualTypeArguments();
+			return IOInstance.isManaged(Objects.requireNonNull(TypeLink.of(args[0])).getTypeClass(null));
+		}
+		@Override
+		public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
+			if(field.hasAnnotation(IOValue.Reference.class)){
+				return new InstanceCollection.ReferenceField<>(field, CollectionAddapter.OfList.class);
+			}
+			return new InstanceCollection.InlineField<>(field, CollectionAddapter.OfList.class);
+		}
+	}
+	
+	public static final class InlineField<T extends IOInstance<T>, ElementType extends IOInstance<ElementType>, CollectionType>
 		extends NullFlagCompanyField<T, CollectionType>{
 		
 		private final CollectionAddapter<ElementType, CollectionType> dataAdapter;
@@ -122,7 +164,7 @@ public class InstanceCollection{
 		}
 	}
 	
-	public static class ReferenceField<T extends IOInstance<T>, ElementType extends IOInstance<ElementType>, CollectionType>
+	public static final class ReferenceField<T extends IOInstance<T>, ElementType extends IOInstance<ElementType>, CollectionType>
 		extends RefField.ReferenceCompanion<T, CollectionType>{
 		
 		private final CollectionAddapter<ElementType, CollectionType> dataAdapter;
