@@ -15,7 +15,6 @@ import com.lapissea.cfs.type.field.annotations.IOCompression;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.OptionalLong;
 
 public final class IOFieldByteArray<T extends IOInstance<T>> extends IOField<T, byte[]>{
 	
@@ -38,7 +37,7 @@ public final class IOFieldByteArray<T extends IOInstance<T>> extends IOField<T, 
 		
 		compression = accessor.getAnnotation(IOCompression.class).map(IOCompression::value).orElse(null);
 		
-		initSizeDescriptor(SizeDescriptor.Unknown.of(0, OptionalLong.empty(), (ioPool, prov, inst) -> {
+		initSizeDescriptor(SizeDescriptor.Unknown.of((ioPool, prov, inst) -> {
 			if(compression != null){
 				return 0;
 			}

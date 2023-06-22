@@ -24,7 +24,6 @@ import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.OptionalLong;
 
 public final class IOFieldEnumList<T extends IOInstance<T>, E extends Enum<E>> extends IOField<T, List<E>>{
 	
@@ -52,7 +51,7 @@ public final class IOFieldEnumList<T extends IOInstance<T>, E extends Enum<E>> e
 		var etyp = ((ParameterizedType)gt).getActualTypeArguments()[0];
 		universe = EnumUniverse.of((Class<E>)etyp);
 		
-		initSizeDescriptor(SizeDescriptor.Unknown.of(0, OptionalLong.empty(), (ioPool, prov, inst) -> {
+		initSizeDescriptor(SizeDescriptor.Unknown.of((ioPool, prov, inst) -> {
 			var siz = arraySize.getValue(ioPool, inst);
 			if(siz>0) return byteCount(siz);
 			var arr = get(ioPool, inst);

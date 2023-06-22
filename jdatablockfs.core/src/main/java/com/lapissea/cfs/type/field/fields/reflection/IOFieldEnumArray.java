@@ -21,7 +21,6 @@ import com.lapissea.cfs.type.field.access.FieldAccessor;
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.Arrays;
-import java.util.OptionalLong;
 
 public final class IOFieldEnumArray<T extends IOInstance<T>, E extends Enum<E>> extends IOField<T, E[]>{
 	
@@ -47,7 +46,7 @@ public final class IOFieldEnumArray<T extends IOInstance<T>, E extends Enum<E>> 
 		super(accessor);
 		universe = EnumUniverse.of((Class<E>)accessor.getType().componentType());
 		
-		initSizeDescriptor(SizeDescriptor.Unknown.of(0, OptionalLong.empty(), (ioPool, prov, inst) -> {
+		initSizeDescriptor(SizeDescriptor.Unknown.of((ioPool, prov, inst) -> {
 			var siz = arraySize.getValue(ioPool, inst);
 			if(siz>0) return byteCount(siz);
 			var arr = get(ioPool, inst);

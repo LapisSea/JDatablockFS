@@ -32,7 +32,6 @@ import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Objects;
-import java.util.OptionalLong;
 import java.util.stream.Stream;
 
 public final class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, ValueType> extends RefField.ReferenceCompanion<CTyp, ValueType>{
@@ -67,7 +66,7 @@ public final class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, 
 		}
 		@Override
 		public BasicSizeDescriptor<ValueType, Object> getSizeDescriptor(){
-			return BasicSizeDescriptor.Unknown.of(0, OptionalLong.empty(), (pool, prov, value) -> DynamicSupport.calcSize(prov, value));
+			return BasicSizeDescriptor.Unknown.of((pool, prov, value) -> DynamicSupport.calcSize(prov, value));
 		}
 		@Override
 		public Object makeIOPool(){

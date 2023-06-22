@@ -88,7 +88,7 @@ public final class IOFieldStringCollection<T extends IOInstance<T>, CollectionTy
 	public IOFieldStringCollection(FieldAccessor<T> accessor, Class<? extends CollectionAddapter> dataAdapterType){
 		super(accessor);
 		addapter = makeAddapter(accessor, dataAdapterType);
-		initSizeDescriptor(SizeDescriptor.Unknown.of(0, OptionalLong.empty(), (ioPool, prov, inst) -> {
+		initSizeDescriptor(SizeDescriptor.Unknown.of((ioPool, prov, inst) -> {
 			var col = get(ioPool, inst);
 			if(col == null) return 0;
 			long sum = 0;

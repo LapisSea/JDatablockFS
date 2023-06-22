@@ -185,6 +185,12 @@ public interface BasicSizeDescriptor<T, PoolType>{
 			}
 		}
 		
+		public static <Inst, PoolType> BasicSizeDescriptor<Inst, PoolType> of(Sizer<Inst, PoolType> unknownSize){
+			return of(BYTE, 0, OptionalLong.empty(), unknownSize);
+		}
+		public static <Inst, PoolType> BasicSizeDescriptor<Inst, PoolType> of(WordSpace wordSpace, Sizer<Inst, PoolType> unknownSize){
+			return of(wordSpace, 0, OptionalLong.empty(), unknownSize);
+		}
 		public static <Inst, PoolType> BasicSizeDescriptor<Inst, PoolType> of(long min, OptionalLong max, Sizer<Inst, PoolType> unknownSize){
 			return of(BYTE, min, max, unknownSize);
 		}

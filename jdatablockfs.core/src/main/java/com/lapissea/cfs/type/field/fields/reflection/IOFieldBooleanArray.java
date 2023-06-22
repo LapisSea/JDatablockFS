@@ -16,7 +16,6 @@ import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 
 import java.io.IOException;
-import java.util.OptionalLong;
 
 public final class IOFieldBooleanArray<T extends IOInstance<T>> extends IOField<T, boolean[]>{
 	
@@ -34,7 +33,7 @@ public final class IOFieldBooleanArray<T extends IOInstance<T>> extends IOField<
 	public IOFieldBooleanArray(FieldAccessor<T> accessor){
 		super(accessor);
 		
-		initSizeDescriptor(SizeDescriptor.Unknown.of(0, OptionalLong.empty(), (ioPool, prov, inst) -> {
+		initSizeDescriptor(SizeDescriptor.Unknown.of((ioPool, prov, inst) -> {
 			var siz = arraySize.getValue(ioPool, inst);
 			if(siz>0) return siz;
 			var arr = get(ioPool, inst);

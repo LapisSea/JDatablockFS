@@ -101,7 +101,15 @@ public sealed interface SizeDescriptor<Inst extends IOInstance<Inst>> extends Ba
 	
 	abstract sealed class Unknown<Inst extends IOInstance<Inst>> implements SizeDescriptor<Inst>{
 		
-		public static <Inst extends IOInstance<Inst>> SizeDescriptor<Inst> of(long min, OptionalLong max, SizeDescriptor.Sizer<Inst> unknownSize){ return of(BYTE, min, max, unknownSize); }
+		public static <Inst extends IOInstance<Inst>> SizeDescriptor<Inst> of(SizeDescriptor.Sizer<Inst> unknownSize){
+			return of(BYTE, 0, OptionalLong.empty(), unknownSize);
+		}
+		public static <Inst extends IOInstance<Inst>> SizeDescriptor<Inst> of(WordSpace wordSpace, SizeDescriptor.Sizer<Inst> unknownSize){
+			return of(wordSpace, 0, OptionalLong.empty(), unknownSize);
+		}
+		public static <Inst extends IOInstance<Inst>> SizeDescriptor<Inst> of(long min, OptionalLong max, SizeDescriptor.Sizer<Inst> unknownSize){
+			return of(BYTE, min, max, unknownSize);
+		}
 		public static <Inst extends IOInstance<Inst>> SizeDescriptor<Inst> of(WordSpace wordSpace, long min, OptionalLong max, SizeDescriptor.Sizer<Inst> unknownSize){
 			return new UnknownLambda<>(wordSpace, min, max, unknownSize);
 		}
