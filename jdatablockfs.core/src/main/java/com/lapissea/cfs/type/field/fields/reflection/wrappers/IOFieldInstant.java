@@ -1,4 +1,4 @@
-package com.lapissea.cfs.type.field.fields.reflection;
+package com.lapissea.cfs.type.field.fields.reflection.wrappers;
 
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.content.ContentReader;
@@ -15,51 +15,66 @@ import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.VaryingSize;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
+import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.NullFlagCompanyField;
 import com.lapissea.cfs.utils.IOUtils;
 
 import java.io.IOException;
+import java.lang.invoke.MethodHandle;
+import java.time.Instant;
 import java.util.Objects;
-import java.util.function.Supplier;
 
-public final class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType extends IOInstance<ValueType>> extends NullFlagCompanyField<CTyp, ValueType>{
+public final class IOFieldInstant<CTyp extends IOInstance<CTyp>> extends NullFlagCompanyField<CTyp, Instant>{
 	
-	@SuppressWarnings({"unused", "rawtypes", "unchecked"})
-	private static final class Usage extends FieldUsage.InstanceOf<IOInstance>{
-		public Usage(){ super(IOInstance.class); }
+	@SuppressWarnings("unused")
+	private static final class Usage extends FieldUsage.InstanceOf<Instant>{
+		public Usage(){ super(Instant.class); }
 		@Override
-		public <T extends IOInstance<T>> IOField<T, IOInstance> create(FieldAccessor<T> field, GenericContext genericContext){
-			Class<?> raw       = field.getType();
-			var      unmanaged = !IOInstance.isManaged(raw);
-			
-			if(unmanaged){
-				return new IOFieldUnmanagedObjectReference(field);
-			}
-			if(field.hasAnnotation(IOValue.Reference.class)){
-				return new IOFieldObjectReference<>(field);
-			}
-			return new IOFieldInlineObject<>(field);
+		public <T extends IOInstance<T>> IOField<T, Instant> create(FieldAccessor<T> field, GenericContext genericContext){
+			return new IOFieldInstant<>(field);
 		}
 	}
 	
-	
-	private final StructPipe<ValueType> instancePipe;
-	private final boolean               fixed;
-	private final Supplier<ValueType>   createDefaultIfNull;
-	
-	public IOFieldInlineObject(FieldAccessor<CTyp> accessor){
-		this(accessor, null);
+	@IOInstance.Def.Order({"seconds", "nanos"})
+	private interface IOInstant extends IOInstance.Def<IOInstant>{
+		
+		static String toString(IOInstant val){
+			return val.getData().toString();
+		}
+		
+		@IODependency.VirtualNumSize
+		long seconds();
+		@IODependency.VirtualNumSize
+		@IOValue.Unsigned
+		int nanos();
+		
+		Struct<IOInstant> STRUCT = Struct.of(IOInstant.class);
+		
+		MethodHandle CONSTR = Def.constrRef(IOInstant.class, long.class, int.class);
+		static IOInstant of(Instant val){
+			try{
+				return (IOInstant)CONSTR.invoke(val.getEpochSecond(), val.getNano());
+			}catch(Throwable e){
+				throw new RuntimeException(e);
+			}
+		}
+		default Instant getData(){
+			return Instant.ofEpochSecond(seconds(), nanos());
+		}
 	}
-	private IOFieldInlineObject(FieldAccessor<CTyp> accessor, VaryingSize.Provider varProvider){
+	
+	private final StructPipe<IOInstant> instancePipe;
+	private final boolean               fixed;
+	
+	public IOFieldInstant(FieldAccessor<CTyp> accessor){ this(accessor, null); }
+	public IOFieldInstant(FieldAccessor<CTyp> accessor, VaryingSize.Provider varProvider){
 		super(accessor);
 		this.fixed = varProvider != null;
 		
-		@SuppressWarnings("unchecked")
-		var struct = (Struct<ValueType>)Struct.ofUnknown(getType());
 		if(fixed){
-			instancePipe = FixedVaryingStructPipe.tryVarying(struct, varProvider);
-		}else instancePipe = StandardStructPipe.of(struct);
+			instancePipe = FixedVaryingStructPipe.tryVarying(IOInstant.STRUCT, varProvider);
+		}else instancePipe = StandardStructPipe.of(IOInstant.STRUCT);
 		
 		var desc = instancePipe.getSizeDescriptor();
 		
@@ -72,7 +87,7 @@ public final class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType 
 				nullable()? 0 : desc.getMin(),
 				desc.getMax(),
 				(ioPool, prov, inst) -> {
-					var val = get(null, inst);
+					var val = getWrapped(ioPool, inst);
 					if(val == null){
 						if(!nullable()) throw new NullPointerException();
 						return 0;
@@ -81,12 +96,17 @@ public final class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType 
 				}
 			));
 		}
-		createDefaultIfNull = () -> instancePipe.getType().make();
+	}
+	
+	private IOInstant getWrapped(VarPool<CTyp> ioPool, CTyp instance){
+		var raw = get(ioPool, instance);
+		if(raw == null) return null;
+		return IOInstant.of(raw);
 	}
 	
 	@Override
-	public ValueType get(VarPool<CTyp> ioPool, CTyp instance){
-		return getNullable(ioPool, instance, createDefaultIfNull);
+	public Instant get(VarPool<CTyp> ioPool, CTyp instance){
+		return getNullable(ioPool, instance, () -> Instant.EPOCH);
 	}
 	@Override
 	public boolean isNull(VarPool<CTyp> ioPool, CTyp instance){
@@ -94,21 +114,20 @@ public final class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType 
 	}
 	
 	@Override
-	public void set(VarPool<CTyp> ioPool, CTyp instance, ValueType value){
+	public void set(VarPool<CTyp> ioPool, CTyp instance, Instant value){
 		super.set(ioPool, instance, switch(getNullability()){
 			case DEFAULT_IF_NULL, NULLABLE -> value;
 			case NOT_NULL -> Objects.requireNonNull(value);
 		});
 	}
-	
 	@Override
-	public IOField<CTyp, ValueType> maxAsFixedSize(VaryingSize.Provider varProvider){
-		return new IOFieldInlineObject<>(getAccessor(), varProvider);
+	protected IOField<CTyp, Instant> maxAsFixedSize(VaryingSize.Provider varProvider){
+		return new IOFieldInstant<>(getAccessor(), varProvider);
 	}
 	
 	@Override
 	public void write(VarPool<CTyp> ioPool, DataProvider provider, ContentWriter dest, CTyp instance) throws IOException{
-		var val = get(ioPool, instance);
+		var val = getWrapped(ioPool, instance);
 		if(nullable()){
 			if(val == null){
 				if(fixed){
@@ -120,7 +139,7 @@ public final class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType 
 		instancePipe.write(provider, dest, val);
 	}
 	
-	private ValueType readNew(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
+	private Instant readNew(VarPool<CTyp> ioPool, DataProvider provider, ContentReader src, CTyp instance, GenericContext genericContext) throws IOException{
 		if(nullable()){
 			boolean isNull = getIsNull(ioPool, instance);
 			if(isNull){
@@ -131,7 +150,7 @@ public final class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType 
 			}
 		}
 		
-		return instancePipe.readNew(provider, src, genericContext);
+		return instancePipe.readNew(provider, src, genericContext).getData();
 	}
 	
 	@Override
@@ -155,9 +174,5 @@ public final class IOFieldInlineObject<CTyp extends IOInstance<CTyp>, ValueType 
 			}
 		}
 		instancePipe.skip(provider, src, genericContext);
-	}
-	
-	public StructPipe<ValueType> getInstancePipe(){
-		return instancePipe;
 	}
 }

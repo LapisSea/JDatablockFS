@@ -450,15 +450,16 @@ public final class FieldSet<T extends IOInstance<T>> extends AbstractList<IOFiel
 	}
 	
 	private Map<String, Integer> getNameLookup(){
-		if(nameLookup == null) buildNameLookup();
-		return nameLookup;
+		var nl = nameLookup;
+		if(nl == null) nameLookup = nl = buildNameLookup();
+		return nl;
 	}
-	private void buildNameLookup(){
+	private Map<String, Integer> buildNameLookup(){
 		var builder = HashMap.<String, Integer>newHashMap(size());
 		for(int i = 0; i<size(); i++){
 			builder.put(get(i).getName(), i);
 		}
-		nameLookup = Map.copyOf(builder);
+		return Map.copyOf(builder);
 	}
 	
 	@Override

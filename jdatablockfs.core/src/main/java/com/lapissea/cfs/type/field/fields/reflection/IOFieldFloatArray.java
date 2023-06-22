@@ -13,9 +13,17 @@ import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 
 import java.io.IOException;
-import java.util.OptionalLong;
 
-public class IOFieldFloatArray<T extends IOInstance<T>> extends IOField<T, float[]>{
+public final class IOFieldFloatArray<T extends IOInstance<T>> extends IOField<T, float[]>{
+	
+	@SuppressWarnings("unused")
+	private static final class Usage extends FieldUsage.InstanceOf<float[]>{
+		public Usage(){ super(float[].class); }
+		@Override
+		public <T extends IOInstance<T>> IOField<T, float[]> create(FieldAccessor<T> field, GenericContext genericContext){
+			return new IOFieldFloatArray<>(field);
+		}
+	}
 	
 	private IOFieldPrimitive.FInt<T> arraySize;
 	
@@ -23,7 +31,7 @@ public class IOFieldFloatArray<T extends IOInstance<T>> extends IOField<T, float
 	public IOFieldFloatArray(FieldAccessor<T> accessor){
 		super(accessor);
 		
-		initSizeDescriptor(SizeDescriptor.Unknown.of(0, OptionalLong.empty(), (ioPool, prov, inst) -> {
+		initSizeDescriptor(SizeDescriptor.Unknown.of((ioPool, prov, inst) -> {
 			var siz = arraySize.getValue(ioPool, inst);
 			if(siz>0) return siz*4L;
 			var arr = get(ioPool, inst);

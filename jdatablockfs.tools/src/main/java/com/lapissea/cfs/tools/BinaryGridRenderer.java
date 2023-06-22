@@ -74,7 +74,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.OptionalLong;
 import java.util.Random;
 import java.util.function.Consumer;
 import java.util.function.IntPredicate;
@@ -1733,7 +1732,7 @@ public class BinaryGridRenderer implements DataRenderer{
 										public void set(VarPool<T> ioPool, T instance, Object value){
 											throw new UnsupportedOperationException();
 										}
-									}, SizeDescriptor.Unknown.of(0, OptionalLong.empty(), (ioPool1, prov, value) -> {
+									}, SizeDescriptor.Unknown.of((ioPool1, prov, value) -> {
 										throw new ShouldNeverHappenError();
 									}));
 									for(int i = 0; i<arrSiz; i++){

@@ -70,6 +70,7 @@ public sealed class Struct<T extends IOInstance<T>> extends StagedInit implement
 	static{
 		//Preload for faster first start
 		Runner.run(DefInstanceCompiler::init);
+		Runner.run(FieldCompiler::init);
 	}
 	
 	

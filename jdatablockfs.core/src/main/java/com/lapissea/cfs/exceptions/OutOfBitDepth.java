@@ -24,6 +24,12 @@ public class OutOfBitDepth extends Exception{
 		this.numberSize = numberSize;
 		this.num = num;
 		
-		assert !numberSize.canFit(num) : num + " can fit in to " + numberSize;
+		assert !numberSize.canFit(num, signed) :
+			num + " can fit in to " + numberSize + ", " +
+			(signed? (
+				num<0?
+				"signedMinValue = " + numberSize.signedMinValue :
+				"signedMaxValue = " + numberSize.signedMaxValue
+			) : "maxSize = " + numberSize.maxSize);
 	}
 }

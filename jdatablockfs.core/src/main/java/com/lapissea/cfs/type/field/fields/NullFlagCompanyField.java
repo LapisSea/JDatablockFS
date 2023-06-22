@@ -7,13 +7,25 @@ import com.lapissea.cfs.type.field.FieldSet;
 import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.IOFieldTools;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
+import com.lapissea.cfs.type.field.fields.reflection.IOFieldDynamicInlineObject;
+import com.lapissea.cfs.type.field.fields.reflection.IOFieldInlineObject;
 import com.lapissea.cfs.type.field.fields.reflection.IOFieldPrimitive;
+import com.lapissea.cfs.type.field.fields.reflection.InstanceCollection;
+import com.lapissea.cfs.type.field.fields.reflection.wrappers.IOFieldDuration;
+import com.lapissea.cfs.type.field.fields.reflection.wrappers.IOFieldInlineString;
+import com.lapissea.cfs.type.field.fields.reflection.wrappers.IOFieldInstant;
+import com.lapissea.cfs.type.field.fields.reflection.wrappers.IOFieldLocalDate;
+import com.lapissea.cfs.type.field.fields.reflection.wrappers.IOFieldLocalDateTime;
+import com.lapissea.cfs.type.field.fields.reflection.wrappers.IOFieldLocalTime;
 
 import java.util.List;
 
 import static com.lapissea.cfs.config.GlobalConfig.DEBUG_VALIDATION;
 
-public abstract class NullFlagCompanyField<T extends IOInstance<T>, Type> extends IOField<T, Type>{
+public abstract sealed class NullFlagCompanyField<T extends IOInstance<T>, Type> extends IOField<T, Type>
+	permits IOFieldDynamicInlineObject, IOFieldInlineObject, InstanceCollection.InlineField,
+	        IOFieldInlineString,
+	        IOFieldDuration, IOFieldInstant, IOFieldLocalDate, IOFieldLocalDateTime, IOFieldLocalTime{
 	
 	private IOFieldPrimitive.FBoolean<T> isNull;
 	

@@ -10,6 +10,7 @@ import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.io.instancepipe.ObjectPipe;
 import com.lapissea.cfs.objects.Reference;
 import com.lapissea.cfs.type.GenericContext;
+import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.IOTypeDB;
 import com.lapissea.cfs.type.TypeLink;
@@ -22,17 +23,30 @@ import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.VaryingSize;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 import com.lapissea.cfs.type.field.annotations.IONullability;
+import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.RefField;
 import com.lapissea.util.NotImplementedException;
 import com.lapissea.util.ShouldNeverHappenError;
 
 import java.io.IOException;
+import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Objects;
-import java.util.OptionalLong;
 import java.util.stream.Stream;
 
-public class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, ValueType> extends RefField.ReferenceCompanion<CTyp, ValueType>{
+public final class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, ValueType> extends RefField.ReferenceCompanion<CTyp, ValueType>{
+	
+	@SuppressWarnings("unused")
+	private static final class Usage implements FieldUsage{
+		@Override
+		public boolean isCompatible(Type type, GetAnnotation annotations){
+			return IOFieldTools.isGeneric(annotations) && annotations.isPresent(IOValue.Reference.class);
+		}
+		@Override
+		public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
+			return new IOFieldDynamicReferenceObject<>(field);
+		}
+	}
 	
 	private IOFieldPrimitive.FInt<CTyp> typeID;
 	
@@ -52,7 +66,7 @@ public class IOFieldDynamicReferenceObject<CTyp extends IOInstance<CTyp>, ValueT
 		}
 		@Override
 		public BasicSizeDescriptor<ValueType, Object> getSizeDescriptor(){
-			return BasicSizeDescriptor.Unknown.of(0, OptionalLong.empty(), (pool, prov, value) -> DynamicSupport.calcSize(prov, value));
+			return BasicSizeDescriptor.Unknown.of((pool, prov, value) -> DynamicSupport.calcSize(prov, value));
 		}
 		@Override
 		public Object makeIOPool(){

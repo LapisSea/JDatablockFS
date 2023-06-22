@@ -7,6 +7,7 @@ import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.objects.NumberSize;
 import com.lapissea.cfs.type.GenericContext;
+import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.SupportedPrimitive;
 import com.lapissea.cfs.type.VarPool;
@@ -20,6 +21,7 @@ import com.lapissea.cfs.type.field.annotations.IOValue;
 import com.lapissea.cfs.type.field.fields.BitField;
 
 import java.io.IOException;
+import java.lang.reflect.Type;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.Optional;
@@ -30,6 +32,18 @@ import static com.lapissea.cfs.objects.NumberSize.*;
 import static com.lapissea.cfs.type.WordSpace.BIT;
 
 public abstract sealed class IOFieldPrimitive<T extends IOInstance<T>, ValueType> extends IOField<T, ValueType>{
+	
+	@SuppressWarnings("unused")
+	private static final class Usage implements FieldUsage{
+		@Override
+		public boolean isCompatible(Type type, GetAnnotation annotations){
+			return SupportedPrimitive.isAny(type);
+		}
+		@Override
+		public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
+			return IOFieldPrimitive.make(field);
+		}
+	}
 	
 	public static <T extends IOInstance<T>> IOField<T, ?> make(FieldAccessor<T> field){
 		return SupportedPrimitive.get(field.getType()).map(t -> switch(t){

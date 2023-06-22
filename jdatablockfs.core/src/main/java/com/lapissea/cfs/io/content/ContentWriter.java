@@ -198,7 +198,7 @@ public interface ContentWriter extends AutoCloseable{
 		siz.write(this, v);
 	}
 	default void writeInt8Dynamic(long v) throws IOException{
-		var siz = NumberSize.bySize(Math.abs(v));
+		var siz = NumberSize.bySizeSigned(Math.abs(v));
 		FlagWriter.writeSingle(this, NumberSize.FLAG_INFO, siz);
 		siz.writeSigned(this, v);
 	}

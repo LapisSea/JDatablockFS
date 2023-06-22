@@ -57,116 +57,139 @@ public sealed class VarHandleAccessor<CTyp extends IOInstance<CTyp>> extends Abs
 			this.setter = setter.map(AbstractPrimitiveAccessor::findParent).map(Access::makeMethodHandle).orElse(null);
 		}
 		
-		private Object getter(CTyp instance){
-			try{
-				return getter.invoke(instance);
-			}catch(Throwable e){
-				throw UtilL.uncheckedThrow(e);
-			}
-		}
-		private void setter(CTyp instance, Object value){
-			try{
+		@Override
+		protected void setExactShort(VarPool<CTyp> ioPool, CTyp instance, short value){
+			if(setter != null) try{
 				setter.invoke(instance, value);
-			}catch(Throwable e){
-				throw UtilL.uncheckedThrow(e);
-			}
+			}catch(Throwable e){ throw UtilL.uncheckedThrow(e); }
+			super.setExactShort(ioPool, instance, value);
+		}
+		@Override
+		protected short getExactShort(VarPool<CTyp> ioPool, CTyp instance){
+			if(getter != null) try{
+				return (short)getter.invoke(instance);
+			}catch(Throwable e){ throw UtilL.uncheckedThrow(e); }
+			return super.getExactShort(ioPool, instance);
 		}
 		
 		@Override
-		public Object get(VarPool<CTyp> ioPool, CTyp instance){
-			if(getter != null) return getter(instance);
-			else return super.get(ioPool, instance);
+		protected void setExactChar(VarPool<CTyp> ioPool, CTyp instance, char value){
+			if(setter != null) try{
+				setter.invoke(instance, value);
+			}catch(Throwable e){ throw UtilL.uncheckedThrow(e); }
+			super.setExactChar(ioPool, instance, value);
+		}
+		@Override
+		protected char getExactChar(VarPool<CTyp> ioPool, CTyp instance){
+			if(getter != null) try{
+				return (char)getter.invoke(instance);
+			}catch(Throwable e){ throw UtilL.uncheckedThrow(e); }
+			return super.getExactChar(ioPool, instance);
 		}
 		
 		@Override
-		public void set(VarPool<CTyp> ioPool, CTyp instance, Object value){
-			if(setter != null) setter(instance, value);
-			else super.set(ioPool, instance, value);
+		protected void setExactLong(VarPool<CTyp> ioPool, CTyp instance, long value){
+			if(setter != null) try{
+				setter.invoke(instance, value);
+			}catch(Throwable e){ throw UtilL.uncheckedThrow(e); }
+			super.setExactLong(ioPool, instance, value);
+		}
+		@Override
+		protected long getExactLong(VarPool<CTyp> ioPool, CTyp instance){
+			if(getter != null) try{
+				return (long)getter.invoke(instance);
+			}catch(Throwable e){ throw UtilL.uncheckedThrow(e); }
+			return super.getExactLong(ioPool, instance);
 		}
 		
 		@Override
-		public double getDouble(VarPool<CTyp> ioPool, CTyp instance){
-			if(getter != null) return (double)getter(instance);
-			else return super.getDouble(ioPool, instance);
+		protected void setExactByte(VarPool<CTyp> ioPool, CTyp instance, byte value){
+			if(setter != null) try{
+				setter.invoke(instance, value);
+			}catch(Throwable e){ throw UtilL.uncheckedThrow(e); }
+			super.setExactByte(ioPool, instance, value);
+		}
+		@Override
+		protected byte getExactByte(VarPool<CTyp> ioPool, CTyp instance){
+			if(getter != null) try{
+				return (byte)getter.invoke(instance);
+			}catch(Throwable e){ throw UtilL.uncheckedThrow(e); }
+			return super.getExactByte(ioPool, instance);
 		}
 		
 		@Override
-		public void setDouble(VarPool<CTyp> ioPool, CTyp instance, double value){
-			if(setter != null) setter(instance, value);
-			else super.setDouble(ioPool, instance, value);
+		protected void setExactInt(VarPool<CTyp> ioPool, CTyp instance, int value){
+			if(setter != null) try{
+				setter.invoke(instance, value);
+			}catch(Throwable e){ throw UtilL.uncheckedThrow(e); }
+			super.setExactInt(ioPool, instance, value);
+		}
+		@Override
+		protected int getExactInt(VarPool<CTyp> ioPool, CTyp instance){
+			if(getter != null) try{
+				return (int)getter.invoke(instance);
+			}catch(Throwable e){ throw UtilL.uncheckedThrow(e); }
+			return super.getExactInt(ioPool, instance);
 		}
 		
 		@Override
-		public float getFloat(VarPool<CTyp> ioPool, CTyp instance){
-			if(getter != null) return (float)getter(instance);
-			else return super.getFloat(ioPool, instance);
+		protected void setExactDouble(VarPool<CTyp> ioPool, CTyp instance, double value){
+			if(setter != null) try{
+				setter.invoke(instance, value);
+			}catch(Throwable e){ throw UtilL.uncheckedThrow(e); }
+			super.setExactDouble(ioPool, instance, value);
+		}
+		@Override
+		protected double getExactDouble(VarPool<CTyp> ioPool, CTyp instance){
+			if(getter != null) try{
+				return (double)getter.invoke(instance);
+			}catch(Throwable e){ throw UtilL.uncheckedThrow(e); }
+			return super.getExactDouble(ioPool, instance);
 		}
 		
 		@Override
-		public void setFloat(VarPool<CTyp> ioPool, CTyp instance, float value){
-			if(setter != null) setter(instance, value);
-			else super.setFloat(ioPool, instance, value);
+		protected void setExactFloat(VarPool<CTyp> ioPool, CTyp instance, float value){
+			if(setter != null) try{
+				setter.invoke(instance, value);
+			}catch(Throwable e){ throw UtilL.uncheckedThrow(e); }
+			super.setExactFloat(ioPool, instance, value);
+		}
+		@Override
+		protected float getExactFloat(VarPool<CTyp> ioPool, CTyp instance){
+			if(getter != null) try{
+				return (float)getter.invoke(instance);
+			}catch(Throwable e){ throw UtilL.uncheckedThrow(e); }
+			return super.getExactFloat(ioPool, instance);
 		}
 		
 		@Override
-		public byte getByte(VarPool<CTyp> ioPool, CTyp instance){
-			if(getter != null) return (byte)getter(instance);
-			else return super.getByte(ioPool, instance);
+		protected void setExactBoolean(VarPool<CTyp> ioPool, CTyp instance, boolean value){
+			if(setter != null) try{
+				setter.invoke(instance, value);
+			}catch(Throwable e){ throw UtilL.uncheckedThrow(e); }
+			super.setExactBoolean(ioPool, instance, value);
+		}
+		@Override
+		protected boolean getExactBoolean(VarPool<CTyp> ioPool, CTyp instance){
+			if(getter != null) try{
+				return (boolean)getter.invoke(instance);
+			}catch(Throwable e){ throw UtilL.uncheckedThrow(e); }
+			return super.getExactBoolean(ioPool, instance);
 		}
 		
 		@Override
-		public void setByte(VarPool<CTyp> ioPool, CTyp instance, byte value){
-			if(setter != null) setter(instance, value);
-			else super.setByte(ioPool, instance, value);
+		protected void setExactObject(VarPool<CTyp> ioPool, CTyp instance, Object value){
+			if(setter != null) try{
+				setter.invoke(instance, value);
+			}catch(Throwable e){ throw UtilL.uncheckedThrow(e); }
+			super.setExactObject(ioPool, instance, value);
 		}
-		
 		@Override
-		public boolean getBoolean(VarPool<CTyp> ioPool, CTyp instance){
-			if(getter != null) return (boolean)getter(instance);
-			else return super.getBoolean(ioPool, instance);
-		}
-		
-		@Override
-		public void setBoolean(VarPool<CTyp> ioPool, CTyp instance, boolean value){
-			if(setter != null) setter(instance, value);
-			else super.setBoolean(ioPool, instance, value);
-		}
-		
-		
-		@Override
-		public long getLong(VarPool<CTyp> ioPool, CTyp instance){
-			if(getter != null) return (long)getter(instance);
-			else return super.getLong(ioPool, instance);
-		}
-		
-		@Override
-		public void setLong(VarPool<CTyp> ioPool, CTyp instance, long value){
-			if(setter != null) setter(instance, value);
-			else super.setLong(ioPool, instance, value);
-		}
-		
-		@Override
-		public int getInt(VarPool<CTyp> ioPool, CTyp instance){
-			if(getter != null) return (int)getter(instance);
-			else return super.getInt(ioPool, instance);
-		}
-		
-		@Override
-		public void setInt(VarPool<CTyp> ioPool, CTyp instance, int value){
-			if(setter != null) setter(instance, value);
-			else super.setInt(ioPool, instance, value);
-		}
-		
-		@Override
-		public short getShort(VarPool<CTyp> ioPool, CTyp instance){
-			if(getter != null) return (Short)getter(instance);
-			else return super.getShort(ioPool, instance);
-		}
-		
-		@Override
-		public void setShort(VarPool<CTyp> ioPool, CTyp instance, short value){
-			if(setter != null) setter(instance, value);
-			else super.setShort(ioPool, instance, value);
+		protected Object getExactObject(VarPool<CTyp> ioPool, CTyp instance){
+			if(getter != null) try{
+				return getter.invoke(instance);
+			}catch(Throwable e){ throw UtilL.uncheckedThrow(e); }
+			return super.getExactObject(ioPool, instance);
 		}
 	}
 	

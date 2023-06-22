@@ -179,13 +179,13 @@ public class Runner{
 	}
 	
 	private static void virtualRun(Runnable task){
-		Thread.ofVirtual().name(BASE_NAME, Task.ID_COUNTER.incrementAndGet()).start(task);
+		Thread.ofVirtual().name(BASE_NAME + Task.ID_COUNTER.incrementAndGet()).start(task);
 	}
 	
 	private static void robustRun(Runnable task){
 		var t = new Task(task);
 		
-		Thread.ofVirtual().name(BASE_NAME, t.id).start(t);
+		Thread.ofVirtual().name(BASE_NAME + t.id).start(t);
 		
 		// If tasks were choking recently, it is beneficial to
 		// immediately attempt to work on a platform thread

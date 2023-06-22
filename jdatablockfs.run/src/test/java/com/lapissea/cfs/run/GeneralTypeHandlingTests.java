@@ -23,13 +23,20 @@ import com.lapissea.cfs.type.field.IOField;
 import com.lapissea.cfs.type.field.annotations.IOCompression;
 import com.lapissea.cfs.type.field.annotations.IODependency;
 import com.lapissea.cfs.type.field.annotations.IOValue;
+import com.lapissea.cfs.utils.IterablePP;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
+import java.util.function.LongFunction;
 import java.util.stream.Stream;
 
 import static com.lapissea.cfs.type.StagedInit.STATE_DONE;
@@ -329,4 +336,73 @@ public class GeneralTypeHandlingTests{
 		
 	}
 	
+	record LongTyp<T extends IOInstance.Def<T>>(Class<T> typ, LongFunction<T> func){
+		LongTyp{ StandardStructPipe.of(typ); }
+		@Override
+		public String toString(){
+			return typ.getSimpleName();
+		}
+	}
+	
+	@DataProvider
+	Object[][] longTypes(){
+		interface Dur extends IOInstance.Def<Dur>{
+			Duration val();
+		}
+		interface Inst extends IOInstance.Def<Inst>{
+			Instant val();
+		}
+		interface LocDate extends IOInstance.Def<LocDate>{
+			LocalDate val();
+		}
+		interface LocTime extends IOInstance.Def<LocTime>{
+			LocalTime val();
+		}
+		return new Object[][]{
+			{new LongTyp<>(Dur.class, l -> IOInstance.Def.of(Dur.class, Duration.ofMillis(l)))},
+			{new LongTyp<>(Inst.class, l -> IOInstance.Def.of(Inst.class, Instant.ofEpochMilli(l)))},
+			{new LongTyp<>(LocDate.class, l -> IOInstance.Def.of(LocDate.class, LocalDate.ofEpochDay(l%365243219162L)))},
+			{new LongTyp<>(LocTime.class, l -> IOInstance.Def.of(LocTime.class, LocalTime.ofNanoOfDay(Math.abs(l)%86399999999999L)))},
+			};
+	}
+	
+	@Test(dataProvider = "longTypes")
+	<T extends IOInstance.Def<T>> void testLongClass(LongTyp<T> typ) throws IOException{
+		TestUtils.testChunkProvider(TestInfo.of(), provider -> {
+			var hold  = StandardStructPipe.of(typ.typ);
+			var chunk = AllocateTicket.bytes(64).submit(provider);
+			
+			for(var val : (IterablePP<T>)() -> new Random(42069).longs(10000).mapToObj(typ.func).iterator()){
+				hold.write(chunk, val);
+				var read = hold.readNew(chunk, null);
+				
+				assertEquals(read, val);
+			}
+		});
+	}
+	
+	@Test
+	void testLocalDateTime() throws IOException{
+		interface LocDateTime extends IOInstance.Def<LocDateTime>{
+			LocalDateTime val();
+		}
+		TestUtils.testChunkProvider(TestInfo.of(), provider -> {
+			var hold  = StandardStructPipe.of(LocDateTime.class);
+			var chunk = AllocateTicket.bytes(64).submit(provider);
+			var rand  = new Random(42096);
+			
+			for(int i = 0; i<10000; i++){
+				var tim = LocalDateTime.of(
+					LocalDate.ofEpochDay(rand.nextLong()%365243219162L),
+					LocalTime.ofNanoOfDay(Math.abs(rand.nextLong())%86399999999999L)
+				);
+				var val = IOInstance.Def.of(LocDateTime.class, tim);
+				
+				hold.write(chunk, val);
+				var read = hold.readNew(chunk, null);
+				
+				assertEquals(read, val);
+			}
+		});
+	}
 }

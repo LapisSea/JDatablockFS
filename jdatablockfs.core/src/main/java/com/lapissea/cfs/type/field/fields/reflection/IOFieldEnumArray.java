@@ -1,5 +1,6 @@
 package com.lapissea.cfs.type.field.fields.reflection;
 
+import com.lapissea.cfs.Utils;
 import com.lapissea.cfs.chunk.DataProvider;
 import com.lapissea.cfs.io.bit.BitInputStream;
 import com.lapissea.cfs.io.bit.BitOutputStream;
@@ -8,6 +9,7 @@ import com.lapissea.cfs.io.bit.EnumUniverse;
 import com.lapissea.cfs.io.content.ContentReader;
 import com.lapissea.cfs.io.content.ContentWriter;
 import com.lapissea.cfs.type.GenericContext;
+import com.lapissea.cfs.type.GetAnnotation;
 import com.lapissea.cfs.type.IOInstance;
 import com.lapissea.cfs.type.VarPool;
 import com.lapissea.cfs.type.field.FieldSet;
@@ -17,10 +19,25 @@ import com.lapissea.cfs.type.field.SizeDescriptor;
 import com.lapissea.cfs.type.field.access.FieldAccessor;
 
 import java.io.IOException;
+import java.lang.reflect.Type;
 import java.util.Arrays;
-import java.util.OptionalLong;
 
-public class IOFieldEnumArray<T extends IOInstance<T>, E extends Enum<E>> extends IOField<T, E[]>{
+public final class IOFieldEnumArray<T extends IOInstance<T>, E extends Enum<E>> extends IOField<T, E[]>{
+	
+	@SuppressWarnings("unused")
+	private static final class Usage implements FieldUsage{
+		@Override
+		public boolean isCompatible(Type type, GetAnnotation annotations){
+			var raw = Utils.typeToRaw(type);
+			if(!raw.isArray()) return false;
+			return raw.componentType().isEnum();
+		}
+		@Override
+		public <T extends IOInstance<T>> IOField<T, ?> create(FieldAccessor<T> field, GenericContext genericContext){
+			return new IOFieldEnumArray<>(field);
+		}
+	}
+	
 	
 	private final EnumUniverse<E>          universe;
 	private       IOFieldPrimitive.FInt<T> arraySize;
@@ -29,7 +46,7 @@ public class IOFieldEnumArray<T extends IOInstance<T>, E extends Enum<E>> extend
 		super(accessor);
 		universe = EnumUniverse.of((Class<E>)accessor.getType().componentType());
 		
-		initSizeDescriptor(SizeDescriptor.Unknown.of(0, OptionalLong.empty(), (ioPool, prov, inst) -> {
+		initSizeDescriptor(SizeDescriptor.Unknown.of((ioPool, prov, inst) -> {
 			var siz = arraySize.getValue(ioPool, inst);
 			if(siz>0) return byteCount(siz);
 			var arr = get(ioPool, inst);

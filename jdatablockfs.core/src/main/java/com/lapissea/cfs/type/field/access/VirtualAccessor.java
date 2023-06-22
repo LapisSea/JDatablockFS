@@ -169,17 +169,18 @@ public final class VirtualAccessor<CTyp extends IOInstance<CTyp>> extends Abstra
 		return getTargetPool(ioPool, instance, false);
 	}
 	private VarPool<CTyp> getTargetPool(VarPool<CTyp> ioPool, CTyp instance, boolean retNull){
-		return switch(getStoragePool()){
-			case INSTANCE -> getVirtualPool(instance);
-			case IO -> {
-				if(ioPool != null){
-					yield ioPool;
-				}else{
-					if(retNull) yield null;
-					throw new IllegalStateException(this + " is an IO pool accessor. IO pool must be provided for access");
-				}
-			}
-		};
+		if(getStoragePool() == StoragePool.INSTANCE){
+			return getVirtualPool(instance);
+		}
+		if(ioPool != null){
+			return ioPool;
+		}else{
+			if(retNull) return null;
+			throw failIOPool();
+		}
+	}
+	private IllegalStateException failIOPool(){
+		return new IllegalStateException(this + " is an IO pool accessor. IO pool must be provided for access");
 	}
 	
 	@Override

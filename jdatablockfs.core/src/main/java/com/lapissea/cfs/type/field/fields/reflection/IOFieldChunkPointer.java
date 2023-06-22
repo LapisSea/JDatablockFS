@@ -22,7 +22,16 @@ import java.util.function.BiFunction;
 import static com.lapissea.cfs.objects.NumberSize.LARGEST;
 import static com.lapissea.cfs.objects.NumberSize.VOID;
 
-public class IOFieldChunkPointer<T extends IOInstance<T>> extends IOField<T, ChunkPointer>{
+public final class IOFieldChunkPointer<T extends IOInstance<T>> extends IOField<T, ChunkPointer>{
+	
+	@SuppressWarnings("unused")
+	private static final class Usage extends FieldUsage.InstanceOf<ChunkPointer>{
+		public Usage(){ super(ChunkPointer.class); }
+		@Override
+		public <T extends IOInstance<T>> IOField<T, ChunkPointer> create(FieldAccessor<T> field, GenericContext genericContext){
+			return new IOFieldChunkPointer<>(field);
+		}
+	}
 	
 	private final boolean                               forceFixed;
 	private final VaryingSize                           maxSize;

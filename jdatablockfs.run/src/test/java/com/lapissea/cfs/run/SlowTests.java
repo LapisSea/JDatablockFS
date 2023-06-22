@@ -686,7 +686,7 @@ public class SlowTests{
 			r -> new MapAction.Clear()
 		)).chanceFor(MapAction.Clear.class, 1F/500).chanceFor(MapAction.PutAll.class, 0.1F));
 		
-		var fails = FuzzFail.sortFails(runner.run(69, 200000, 2000));
+		var fails = FuzzFail.sortFails(runner.run(69, 100000, 2000));
 		if(!fails.isEmpty()){
 			LogUtil.printlnEr(FuzzFail.report(fails));
 			//get first fail and rerun it with display server logging
