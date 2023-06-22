@@ -30,6 +30,9 @@ import com.lapissea.cfs.type.field.fields.reflection.InstanceCollection;
 import com.lapissea.cfs.type.field.fields.reflection.wrappers.IOFieldDuration;
 import com.lapissea.cfs.type.field.fields.reflection.wrappers.IOFieldInlineString;
 import com.lapissea.cfs.type.field.fields.reflection.wrappers.IOFieldInstant;
+import com.lapissea.cfs.type.field.fields.reflection.wrappers.IOFieldLocalDate;
+import com.lapissea.cfs.type.field.fields.reflection.wrappers.IOFieldLocalDateTime;
+import com.lapissea.cfs.type.field.fields.reflection.wrappers.IOFieldLocalTime;
 import com.lapissea.cfs.type.field.fields.reflection.wrappers.IOFieldStringCollection;
 import com.lapissea.util.LateInit;
 
@@ -37,6 +40,9 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -145,6 +151,24 @@ class FieldRegistry{
 				@Override
 				public <T extends IOInstance<T>> IOField<T, Instant> create(FieldAccessor<T> field, GenericContext genericContext){
 					return new IOFieldInstant<>(field);
+				}
+			});
+			reg.register(new RegistryNode.InstanceOf<>(LocalDate.class){
+				@Override
+				public <T extends IOInstance<T>> IOField<T, LocalDate> create(FieldAccessor<T> field, GenericContext genericContext){
+					return new IOFieldLocalDate<>(field);
+				}
+			});
+			reg.register(new RegistryNode.InstanceOf<>(LocalTime.class){
+				@Override
+				public <T extends IOInstance<T>> IOField<T, LocalTime> create(FieldAccessor<T> field, GenericContext genericContext){
+					return new IOFieldLocalTime<>(field);
+				}
+			});
+			reg.register(new RegistryNode.InstanceOf<>(LocalDateTime.class){
+				@Override
+				public <T extends IOInstance<T>> IOField<T, LocalDateTime> create(FieldAccessor<T> field, GenericContext genericContext){
+					return new IOFieldLocalDateTime<>(field);
 				}
 			});
 			reg.register(new RegistryNode.InstanceOf<>(String[].class){

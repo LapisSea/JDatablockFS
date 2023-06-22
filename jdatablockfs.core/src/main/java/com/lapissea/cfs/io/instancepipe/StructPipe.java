@@ -49,6 +49,9 @@ import java.lang.annotation.Target;
 import java.lang.reflect.ParameterizedType;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -340,7 +343,10 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				builder.chptr();
 				continue;
 			}
-			if(List.of(String.class, Duration.class, Instant.class).contains(type)){
+			if(List.of(
+				String.class, Duration.class, Instant.class,
+				LocalDate.class, LocalTime.class, LocalDateTime.class
+			).contains(type)){
 				builder.skipField(field);
 				continue;
 			}
@@ -364,7 +370,7 @@ public abstract class StructPipe<T extends IOInstance<T>> extends StagedInit imp
 				}
 			}
 			
-			throw new NotImplementedException(field + " not handled");
+			throw new NotImplementedException(field + " (" + type.getName() + ") not handled");
 		}
 		
 		if(getType() instanceof Struct.Unmanaged<?> u && u.isOverridingDynamicUnmanaged()){
